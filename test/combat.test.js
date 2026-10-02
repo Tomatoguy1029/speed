@@ -69,7 +69,7 @@ test('a fast dash pierces a whole line of enemies without tunneling', () => {
     e.facing = Math.PI / 2;
     game.enemies.push(e);
   }
-  for (let i = 0; i < 25; i++) update(game, 0.02, idle);
+  for (let i = 0; i < 60; i++) update(game, 0.02, idle); // includes kill hitstops
   assert.equal(game.enemies.filter((e) => !e.dead).length, 0);
   assert.ok(game.kills >= 6);
   assert.ok(sh.vx > 1400, "kept most of the speed");

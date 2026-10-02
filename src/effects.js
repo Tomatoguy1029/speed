@@ -22,6 +22,7 @@ export function onLaunch(game) {
   game.dashActive = true;
   game.dashPeakAtk = 0;
   game.dashPierce = 0;
+  game.dashStop = 0;
 }
 
 function finishDash(game) {

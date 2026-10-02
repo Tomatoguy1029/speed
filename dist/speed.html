@@ -112,10 +112,12 @@ const CONFIG = {
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTime: 2.5, // real seconds to draw before the path commits itself
+  drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.06, // world speed while drawing
   drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
-  drawRunTime: 0.3, // real seconds to trace the whole path, however long it is
+  drawRunTime: 0.45, // real seconds to trace the whole path, however long it is (plus kill hitstops)
+  killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
+  killHitstopCap: 0.6, // max hitstop per dash
   drawStep: 8, // min world distance between path points
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
@@ -1077,17 +1079,27 @@ function rollModule(rng, ctx) {
 
 function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || dmg <= 0) return;
+  const fresh = e.hp >= e.maxHp - 1e-6;
   e.hp -= dmg;
   e.flash = 0.12;
   game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
   if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
   if (e.hp <= 0) {
+    if (fresh && opts.cause === 'ram') killStop(game, e, opts.crit);
     killEnemy(game, e, opts);
   } else if (opts.dirX !== undefined) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
   }
+}
+
+// One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
+function killStop(game, e, crit) {
+  if (game.dashStop >= CONFIG.killHitstopCap) return;
+  const t = CONFIG.killHitstop * (e.r > 25 ? 1.8 : 1) * (crit ? 1.3 : 1);
+  game.hitstop = Math.max(game.hitstop, t);
+  game.dashStop = (game.dashStop || 0) + t;
 }
 
 function killEnemy(game, e, opts = {}) {
@@ -1213,6 +1225,7 @@ function onLaunch(game) {
   game.dashActive = true;
   game.dashPeakAtk = 0;
   game.dashPierce = 0;
+  game.dashStop = 0;
 }
 
 function finishDash(game) {
@@ -1430,7 +1443,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはカーソルの方向へ進む。Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -1564,7 +1577,8 @@ const ZERO = { ax: 0, ay: 0 };
 function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse': {
+    case 'mouse':
+    case 'draw': { // draw mode also cruises toward the cursor between paths
       const a = cursorAngle(game, input.cursor);
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
@@ -1668,6 +1682,12 @@ function update(game, frameDt, input) {
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  if (game.draw && game.draw.phase === 'run') {
+    // trace every frame on real time (world steps are rare while it is nearly frozen)
+    runAlongPath(game, frameDt);
+    collideBodies(game);
+    recordTrail(game.ship, frameDt);
+  }
   let scale = 1;
   if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
@@ -1738,10 +1758,7 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  if (game.draw && game.draw.phase === 'run') {
-    runAlongPath(game, dt / game.timeScale); // the ship runs at real time through a slowed world
-    collideBodies(game);
-  } else if (!game.draw) {
+  if (!game.draw) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
     const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
     const x0 = sh.x, y0 = sh.y;
@@ -2421,6 +2438,11 @@ function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  if (game.draw && r.cam.ready) {
+    // hold the view still while a path is drawn and traced, so it is followed exactly where it was drawn
+    game.viewRadius = Math.hypot(r.W, r.H) / 2 / r.cam.zoom;
+    return;
+  }
   const zoomT = targetZoom(game, r.W, r.H);
   // look ahead along the velocity, but keep the ship well inside the screen at any speed
   let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
@@ -2445,6 +2467,7 @@ function handleEvents(r, game) {
     if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
     else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
+    else if (ev.type === 'kill' && ev.cause === 'ram') r.shake = Math.max(r.shake, 5);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
@@ -3914,6 +3937,8 @@ const TUNABLES = [
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTimeScale', label: '駆け抜け中の世界の速さ', min: 0, max: 1, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
+  { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
+  { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },

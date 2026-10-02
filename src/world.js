@@ -63,6 +63,12 @@ export function update(game, frameDt, input) {
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  if (game.draw && game.draw.phase === 'run') {
+    // trace every frame on real time (world steps are rare while it is nearly frozen)
+    runAlongPath(game, frameDt);
+    collideBodies(game);
+    recordTrail(game.ship, frameDt);
+  }
   let scale = 1;
   if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
@@ -133,10 +139,7 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  if (game.draw && game.draw.phase === 'run') {
-    runAlongPath(game, dt / game.timeScale); // the ship runs at real time through a slowed world
-    collideBodies(game);
-  } else if (!game.draw) {
+  if (!game.draw) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
     const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
     const x0 = sh.x, y0 = sh.y;

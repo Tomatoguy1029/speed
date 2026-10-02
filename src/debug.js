@@ -29,6 +29,8 @@ export const TUNABLES = [
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTimeScale', label: '駆け抜け中の世界の速さ', min: 0, max: 1, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
+  { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
+  { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },

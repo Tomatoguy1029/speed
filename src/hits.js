@@ -8,17 +8,27 @@ import { attackPower } from './combat.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || dmg <= 0) return;
+  const fresh = e.hp >= e.maxHp - 1e-6;
   e.hp -= dmg;
   e.flash = 0.12;
   game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
   if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
   if (e.hp <= 0) {
+    if (fresh && opts.cause === 'ram') killStop(game, e, opts.crit);
     killEnemy(game, e, opts);
   } else if (opts.dirX !== undefined) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
   }
+}
+
+// One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
+function killStop(game, e, crit) {
+  if (game.dashStop >= CONFIG.killHitstopCap) return;
+  const t = CONFIG.killHitstop * (e.r > 25 ? 1.8 : 1) * (crit ? 1.3 : 1);
+  game.hitstop = Math.max(game.hitstop, t);
+  game.dashStop = (game.dashStop || 0) + t;
 }
 
 export function killEnemy(game, e, opts = {}) {

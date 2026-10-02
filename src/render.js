@@ -45,6 +45,11 @@ export function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  if (game.draw && r.cam.ready) {
+    // hold the view still while a path is drawn and traced, so it is followed exactly where it was drawn
+    game.viewRadius = Math.hypot(r.W, r.H) / 2 / r.cam.zoom;
+    return;
+  }
   const zoomT = targetZoom(game, r.W, r.H);
   // look ahead along the velocity, but keep the ship well inside the screen at any speed
   let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
@@ -69,6 +74,7 @@ function handleEvents(r, game) {
     if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
     else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
+    else if (ev.type === 'kill' && ev.cause === 'ram') r.shake = Math.max(r.shake, 5);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
