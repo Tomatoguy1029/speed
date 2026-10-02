@@ -26,6 +26,13 @@ export const CONFIG = {
   // ship
   baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
   levelSpeedGrowth: 0.015, // +1.5% max speed per level
+  levelAtkGrowth: 0.02, // +2% attack per level
+  levelHpGrowth: 4, // +4 max HP per level
+  levelChargeGrowth: 0.01, // -1% charge time per level (down to 60%)
+  dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
+  dropPowerExp: 1,
+  dropMax: 0.5,
+  dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.4, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)

@@ -975,7 +975,7 @@ function drawLoadout(r, game) {
   SLOTS.forEach((s, i) => {
     const m = game.loadout[s.id];
     ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
-    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name : '—'}`, x, y0 + i * 17);
+    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name + (m.plus ? ` +${m.plus}` : '') : '—'}`, x, y0 + i * 17);
   });
 }
 

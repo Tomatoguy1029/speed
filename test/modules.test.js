@@ -64,21 +64,32 @@ test('power cores always give a speed-limit module for the booster', () => {
   }
 });
 
-test('leveling up pauses for an offer; equipping replaces the slot', () => {
+test('leveling up raises base stats and never pauses for a module', () => {
   const game = createGame({ seed: 1 });
   game.spawning = false;
+  const atk0 = game.stats.atkMult, hp0 = game.stats.maxHp;
   addXp(game, 1000);
   update(game, 0.02, idle);
-  assert.equal(game.state, 'offer');
-  const first = game.currentOffer;
-  assert.ok(first);
-  resolveOffer(game, true);
-  const pick = (m) => ({ id: m.id, slot: m.slot, r: m.r });
-  assert.deepEqual(game.loadout[first.slot], pick(first));
-  // drain remaining offers by discarding
-  while (game.state === 'offer') resolveOffer(game, false);
   assert.equal(game.state, 'play');
-  assert.deepEqual(game.loadout[first.slot], pick(first));
+  assert.ok(game.level > 3);
+  assert.ok(game.stats.atkMult > atk0 && game.stats.maxHp > hp0);
+});
+
+test('a picked-up module can be equipped; the same one again upgrades it without asking', () => {
+  const game = createGame({ seed: 1 });
+  game.spawning = false;
+  game.offerQueue.push({ id: 'ram', slot: 'bow', r: 1, source: 'drop' });
+  update(game, 0.02, idle);
+  assert.equal(game.state, 'offer');
+  resolveOffer(game, true);
+  assert.equal(game.state, 'play');
+  const atk1 = game.stats.atkMult;
+  game.offerQueue.push({ id: 'ram', slot: 'bow', r: 0, source: 'drop' });
+  update(game, 0.02, idle);
+  assert.equal(game.state, 'play', 'no prompt for a duplicate');
+  assert.equal(game.loadout.bow.plus, 1);
+  assert.equal(game.loadout.bow.r, 1, 'keeps the higher rarity');
+  assert.ok(game.stats.atkMult > atk1);
 });
 
 test('more max HP also raises current HP', () => {

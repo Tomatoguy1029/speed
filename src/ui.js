@@ -63,7 +63,7 @@ export function showResult(game, extra, onNext) {
   btn.focus();
 }
 
-const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
+const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', drop: '敵のドロップ', core: '出力コア' };
 
 function partCanvas(slot, color, size = 64) {
   const c = el('canvas', { class: 'part' });
@@ -105,7 +105,7 @@ function moduleCard(mod, tag, isNew) {
   const card = el('div', { class: `card${isNew ? ' new' : ''}` },
     partCanvas(mod.slot, rar.color),
     el('div', { class: 'tag' }, tag),
-    el('div', { class: 'name' }, def.name),
+    el('div', { class: 'name' }, `${def.name}${mod.plus ? ` +${mod.plus}` : ''}`),
     el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
     el('div', { class: 'desc' }, def.desc(mod.r)));
   if (isNew) card.style.borderColor = rar.color;
@@ -166,6 +166,7 @@ export function showStation(save, onBuy, onDepart) {
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
+      el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
       el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),

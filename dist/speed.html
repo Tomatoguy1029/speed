@@ -104,6 +104,13 @@ const CONFIG = {
   // ship
   baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
   levelSpeedGrowth: 0.015, // +1.5% max speed per level
+  levelAtkGrowth: 0.02, // +2% attack per level
+  levelHpGrowth: 4, // +4 max HP per level
+  levelChargeGrowth: 0.01, // -1% charge time per level (down to 60%)
+  dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
+  dropPowerExp: 1,
+  dropMax: 0.5,
+  dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.4, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
@@ -1013,6 +1020,9 @@ const MODULES = [
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
     desc: (r) => `描ける軌跡の長さ +${pct(0.25 * M(r))}`,
     apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r) => `描ける軌跡の長さ ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -1032,9 +1042,13 @@ function computeStats(meta, loadout, bonus = {}) {
   const s = baseStats(meta);
   for (const slot of SLOTS) {
     const mod = loadout[slot.id];
-    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
   }
-  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * (bonus.level || 0));
+  const lv = bonus.level || 0;
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
+  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
+  s.maxHp += CONFIG.levelHpGrowth * lv;
+  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
   return s;
 }
 
@@ -1042,6 +1056,11 @@ function rarityWeights(ctx) {
   if (ctx.source === 'core') return [0, 0, 1, 2];
   if (ctx.source === 'capsule') {
     const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  if (ctx.source === 'drop') {
+    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
+    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
     return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
   }
   const t = ctx.t;
@@ -1126,7 +1145,10 @@ function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  if (e.elite || e.type === 'battleship') dropCapsule(game, e.x, e.y, 'elite', Math.max(0.4, danger));
+  // modules come from enemies: stronger ones drop more often and rarer; elites and battleships always
+  const power = e.xp;
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
+  if (e.elite || e.type === 'battleship' || game.rng() < chance) dropModule(game, e.x, e.y, power, danger);
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
 
@@ -1164,6 +1186,11 @@ function dropGem(game, x, y, v) {
   }
   const a = game.rng() * Math.PI * 2;
   game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
+}
+
+function dropModule(game, x, y, power, danger) {
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
+  game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
 }
 
 function dropCapsule(game, x, y, src, danger) {
@@ -1411,8 +1438,13 @@ function updateCapsules(game, dt) {
     }
   }
   let taken = false;
+  const pull = game.stats.pickupRadius * 1.6;
   for (const c of game.capsules) {
     c.age += dt;
+    if (c.src === 'drop' || c.src === 'elite') {
+      const dx = sh.x - c.x, dy = sh.y - c.y, d = Math.hypot(dx, dy);
+      if (d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
+    }
     const reach = 22 + CONFIG.shipRadius + 14;
     if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
       c.taken = true; taken = true;
@@ -1421,12 +1453,12 @@ function updateCapsules(game, dt) {
         refreshStats(game);
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
       } else {
-        game.offerQueue.push({ ...c.mod, source: c.src === 'elite' ? 'elite' : 'capsule' });
+        game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
       addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
     }
-    if (c.src === 'elite' && c.age > 45) { c.taken = true; taken = true; }
+    if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
   }
   if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
 }
@@ -1714,8 +1746,10 @@ function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
-    queueOffers(game);
-    if (game.offerQueue.length) { openOffer(game); break; }
+    if (game.offerQueue.length) {
+      absorbDuplicates(game);
+      if (game.offerQueue.length) { openOffer(game); break; }
+    }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
@@ -1815,10 +1849,19 @@ function end(game, state, reason) {
 
 // ---- offers ----
 
-function queueOffers(game) {
-  while (game.pendingLevelups > 0) {
-    game.pendingLevelups--;
-    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot, scheme: game.scheme }), 'xp');
+// Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
+function absorbDuplicates(game) {
+  while (game.offerQueue.length) {
+    const o = game.offerQueue[0];
+    const cur = game.loadout[o.slot];
+    if (!cur || cur.id !== o.id) return;
+    game.offerQueue.shift();
+    cur.r = Math.max(cur.r, o.r);
+    cur.plus = (cur.plus || 0) + 1;
+    refreshStats(game);
+    const sh = game.ship;
+    addText(game, sh.x, sh.y - 46, `${moduleDef(cur.id).name} +${cur.plus}`, RARITIES[cur.r].color, 20);
+    game.events.push({ type: 'upgrade', mod: cur });
   }
 }
 
@@ -1847,10 +1890,11 @@ function resolveOffer(game, accept) {
   const mod = game.currentOffer;
   if (!mod) return;
   if (accept) {
-    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r };
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r, plus: 0 };
     refreshStats(game);
     game.events.push({ type: 'equip', mod });
   }
+  absorbDuplicates(game);
   if (game.offerQueue.length) {
     game.currentOffer = game.offerQueue.shift();
   } else {
@@ -2226,11 +2270,11 @@ function addXp(game, v) {
   while (game.xp >= need) {
     game.xp -= need;
     game.level++;
-    game.pendingLevelups++;
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
-    refreshStats(game);
+    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
+    addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
   }
 }
 
@@ -3421,7 +3465,7 @@ function drawLoadout(r, game) {
   SLOTS.forEach((s, i) => {
     const m = game.loadout[s.id];
     ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
-    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name : '—'}`, x, y0 + i * 17);
+    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name + (m.plus ? ` +${m.plus}` : '') : '—'}`, x, y0 + i * 17);
   });
 }
 
@@ -3680,7 +3724,7 @@ function showResult(game, extra, onNext) {
   btn.focus();
 }
 
-const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
+const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', drop: '敵のドロップ', core: '出力コア' };
 
 function partCanvas(slot, color, size = 64) {
   const c = el('canvas', { class: 'part' });
@@ -3722,7 +3766,7 @@ function moduleCard(mod, tag, isNew) {
   const card = el('div', { class: `card${isNew ? ' new' : ''}` },
     partCanvas(mod.slot, rar.color),
     el('div', { class: 'tag' }, tag),
-    el('div', { class: 'name' }, def.name),
+    el('div', { class: 'name' }, `${def.name}${mod.plus ? ` +${mod.plus}` : ''}`),
     el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
     el('div', { class: 'desc' }, def.desc(mod.r)));
   if (isNew) card.style.borderColor = rar.color;
@@ -3783,6 +3827,7 @@ function showStation(save, onBuy, onDepart) {
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
+      el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
       el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),

@@ -117,6 +117,9 @@ export const MODULES = [
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
     desc: (r) => `描ける軌跡の長さ +${pct(0.25 * M(r))}`,
     apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r) => `描ける軌跡の長さ ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -136,9 +139,13 @@ export function computeStats(meta, loadout, bonus = {}) {
   const s = baseStats(meta);
   for (const slot of SLOTS) {
     const mod = loadout[slot.id];
-    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
   }
-  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * (bonus.level || 0));
+  const lv = bonus.level || 0;
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
+  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
+  s.maxHp += CONFIG.levelHpGrowth * lv;
+  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
   return s;
 }
 
@@ -146,6 +153,11 @@ function rarityWeights(ctx) {
   if (ctx.source === 'core') return [0, 0, 1, 2];
   if (ctx.source === 'capsule') {
     const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  if (ctx.source === 'drop') {
+    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
+    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
     return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
   }
   const t = ctx.t;

@@ -9,7 +9,7 @@ import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
 import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
-import { SLOTS, computeStats, rollModule } from './modules.js';
+import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
@@ -83,8 +83,10 @@ export function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
-    queueOffers(game);
-    if (game.offerQueue.length) { openOffer(game); break; }
+    if (game.offerQueue.length) {
+      absorbDuplicates(game);
+      if (game.offerQueue.length) { openOffer(game); break; }
+    }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
@@ -184,10 +186,19 @@ function end(game, state, reason) {
 
 // ---- offers ----
 
-function queueOffers(game) {
-  while (game.pendingLevelups > 0) {
-    game.pendingLevelups--;
-    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot, scheme: game.scheme }), 'xp');
+// Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
+export function absorbDuplicates(game) {
+  while (game.offerQueue.length) {
+    const o = game.offerQueue[0];
+    const cur = game.loadout[o.slot];
+    if (!cur || cur.id !== o.id) return;
+    game.offerQueue.shift();
+    cur.r = Math.max(cur.r, o.r);
+    cur.plus = (cur.plus || 0) + 1;
+    refreshStats(game);
+    const sh = game.ship;
+    addText(game, sh.x, sh.y - 46, `${moduleDef(cur.id).name} +${cur.plus}`, RARITIES[cur.r].color, 20);
+    game.events.push({ type: 'upgrade', mod: cur });
   }
 }
 
@@ -216,10 +227,11 @@ export function resolveOffer(game, accept) {
   const mod = game.currentOffer;
   if (!mod) return;
   if (accept) {
-    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r };
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r, plus: 0 };
     refreshStats(game);
     game.events.push({ type: 'equip', mod });
   }
+  absorbDuplicates(game);
   if (game.offerQueue.length) {
     game.currentOffer = game.offerQueue.shift();
   } else {
@@ -595,11 +607,11 @@ export function addXp(game, v) {
   while (game.xp >= need) {
     game.xp -= need;
     game.level++;
-    game.pendingLevelups++;
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
-    refreshStats(game);
+    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
+    addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
   }
 }
 

@@ -43,7 +43,10 @@ export function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  if (e.elite || e.type === 'battleship') dropCapsule(game, e.x, e.y, 'elite', Math.max(0.4, danger));
+  // modules come from enemies: stronger ones drop more often and rarer; elites and battleships always
+  const power = e.xp;
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
+  if (e.elite || e.type === 'battleship' || game.rng() < chance) dropModule(game, e.x, e.y, power, danger);
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
 
@@ -81,6 +84,11 @@ export function dropGem(game, x, y, v) {
   }
   const a = game.rng() * Math.PI * 2;
   game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
+}
+
+function dropModule(game, x, y, power, danger) {
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
+  game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
 }
 
 export function dropCapsule(game, x, y, src, danger) {
