@@ -1,0 +1,10 @@
+{
+  "name": "speed",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "node build.js",
+    "balance": "node tools/balance.js"
+  }
+}
