@@ -71,6 +71,7 @@ export function render(r, game, dt, pointer) {
   drawSpecks(r);
   drawBodies(r, game);
   drawEnemies(r, game);
+  drawEnemyBullets(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
@@ -227,10 +228,28 @@ function drawEnemies(r, game) {
   const atk = attackPower(sp, game.stats);
   const arcMult = game.stats.weakArcMult;
   for (const e of game.enemies) {
-    if (!onScreen(r, e.x, e.y, e.r + 30)) continue;
+    if (!onScreen(r, e.x, e.y, e.r + 220)) continue;
     const R = e.r;
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.T.auraR) {
+      const g = ctx.createRadialGradient(0, 0, R, 0, 0, e.T.auraR);
+      g.addColorStop(0, 'rgba(199,125,255,0.22)');
+      g.addColorStop(1, 'rgba(199,125,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, e.T.auraR, 0, TAU); ctx.fill();
+    }
+    if (e.state === 'windup') {
+      ctx.strokeStyle = 'rgba(255,90,60,0.7)';
+      ctx.lineWidth = 3 / z;
+      ctx.setLineDash([12 / z, 8 / z]);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(e.facing) * 500, Math.sin(e.facing) * 500); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (e.charge > 0) {
+      ctx.fillStyle = `rgba(255,80,80,${0.25 + 0.5 * e.charge})`;
+      ctx.beginPath(); ctx.arc(Math.cos(e.facing) * R, Math.sin(e.facing) * R, (4 + 8 * e.charge) / Math.sqrt(z), 0, TAU); ctx.fill();
+    }
     const pierce = atk >= e.armor;
     const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
     // body
@@ -276,6 +295,29 @@ function drawEnemies(r, game) {
       ctx.fillRect(-w / 2, -R - 16 / z, w * Math.max(0, e.hp / e.maxHp), h);
     }
     ctx.restore();
+  }
+}
+
+function drawEnemyBullets(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const b of game.ebullets) {
+    if (!onScreen(r, b.x, b.y, 40)) continue;
+    const s = b.r / Math.sqrt(z);
+    if (b.kind === 'missile') {
+      const a = Math.atan2(b.vy, b.vx);
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
+      ctx.fillStyle = '#ffb36b';
+      ctx.beginPath(); ctx.moveTo(s * 1.6, 0); ctx.lineTo(-s, s * 0.7); ctx.lineTo(-s, -s * 0.7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,200,120,0.5)';
+      ctx.beginPath(); ctx.arc(-s * 1.6, 0, s * 0.6, 0, TAU); ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#ff5a6e';
+      ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd0d6';
+      ctx.beginPath(); ctx.arc(b.x, b.y, s * 0.45, 0, TAU); ctx.fill();
+    }
   }
 }
 

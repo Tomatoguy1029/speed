@@ -4,7 +4,8 @@ import { baseStats, createShip, computeGauge, launchVelocity, stepShip } from '.
 import { createField, updateMoons, dustDragAt } from './field.js';
 import { gravityAt } from './gravity.js';
 import { attackPower, isWeakHit, resolveRam, pierceKeep, canPierce } from './combat.js';
-import { updateEnemy, MAX_ENEMY_R } from './enemies.js';
+import { updateEnemy, onEnemyDeath, MAX_ENEMY_R } from './enemies.js';
+import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
 import { segCircleT } from './math.js';
 import { updateSpawner } from './spawner.js';
@@ -24,6 +25,9 @@ export function createGame(opts = {}) {
     field: createField(rng),
     debug: { invincible: false },
     enemies: [],
+    newEnemies: [],
+    ebullets: [],
+    leechDrag: 0,
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     kills: 0,
@@ -73,17 +77,21 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
+  game.leechDrag = 0;
   for (const e of game.enemies) updateEnemy(e, game, dt);
+  flushNewEnemies(game);
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const drag = dustDragAt(game.field, sh.x, sh.y);
+  const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
   stepShip(sh, stats, dt, g.ax, g.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
+  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow));
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
+  flushNewEnemies(game);
   updateSpawner(game, dt);
   if (sh.invulnT > 0) sh.invulnT -= dt;
 
@@ -110,6 +118,12 @@ function launch(game, ax, ay) {
   game.dashId++;
   game.dashPierce = 0;
   game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+function flushNewEnemies(game) {
+  if (!game.newEnemies.length) return;
+  for (const e of game.newEnemies) game.enemies.push(e);
+  game.newEnemies.length = 0;
 }
 
 function separateEnemies(game) {
@@ -156,6 +170,7 @@ function collideEnemies(game, x0, y0) {
       const keep = pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
+      if (e.T.steal) { const k = 1 - e.T.steal * game.stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
     }
@@ -199,6 +214,7 @@ export function killEnemy(game, e, opts = {}) {
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+  onEnemyDeath(e, game);
 }
 
 function burst(game, x, y, color, n, dx, dy, speed) {
