@@ -753,7 +753,7 @@ function drawTrail(r, game) {
 function drawShip(r, game) {
   const { ctx } = r;
   const sh = game.ship;
-  let ang = Math.atan2(sh.vy, sh.vx);
+  let ang = Math.atan2(sh.hy, sh.hx); // heading: travel direction, or where the ship was turned while still
   if (sh.charging && Math.hypot(sh.aimX, sh.aimY) >= CONFIG.minDrag) ang = Math.atan2(sh.aimY, sh.aimX);
   const R = CONFIG.shipRadius;
   const minPx = 9 / r.cam.zoom;

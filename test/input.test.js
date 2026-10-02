@@ -54,9 +54,10 @@ test('reset drops a held Space so no stray launch happens after a menu', () => {
   assert.equal(r.release, false);
 });
 
-// ---- nudging and launching in the world ----
+// ---- ship-relative WASD in the world ----
 
 const none = { x: 0, y: 0 };
+const W = { x: 0, y: -1 }, S = { x: 0, y: 1 }, A = { x: -1, y: 0 }, D = { x: 1, y: 0 };
 const idle = { charging: false, aimX: 0, aimY: 0, release: false, keyboard: false, move: none };
 
 function quiet() {
@@ -64,31 +65,53 @@ function quiet() {
   game.spawning = false;
   game.field.planet.gm = 0; game.field.moons.length = 0; game.field.dust.length = 0;
   game.ship.x = 0; game.ship.y = -3000; game.ship.vx = 0; game.ship.vy = 0;
+  game.ship.hx = 0; game.ship.hy = -1; // facing up the screen
   return game;
 }
 
-test('WASD nudges the ship a little from rest', () => {
+const run = (game, move, n = 10, dt = 0.1) => { for (let i = 0; i < n; i++) update(game, dt, { ...idle, move }); };
+const heading = (game) => Math.atan2(game.ship.hy, game.ship.hx);
+
+test('W pushes the ship forward a little from rest', () => {
   const game = quiet();
-  for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, move: { x: 1, y: 0 } });
-  const sp = Math.hypot(game.ship.vx, game.ship.vy);
-  assert.ok(game.ship.vx > 50, 'moved right');
-  assert.ok(sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed + 1, 'only slightly');
+  run(game, W, 5);
+  assert.ok(game.ship.vy < -50, 'moved forward (up)');
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed + 1, 'only slightly');
 });
 
-test('sideways nudges bend a fast trajectory without speeding it up', () => {
-  const game = quiet();
-  game.ship.vy = -1200; game.ship.boostT = 99;
-  for (let i = 0; i < 10; i++) update(game, 0.1, { ...idle, move: { x: 1, y: 0 } });
-  const ang = Math.atan2(game.ship.vx, -game.ship.vy); // 0 = straight up
-  assert.ok(ang > 0.3, `turned ${ang}`);
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 1250);
+test('D bends toward the ship\'s right, whichever way it is flying', () => {
+  const up = quiet();
+  up.ship.vy = -1200; up.ship.boostT = 99;
+  run(up, D);
+  assert.ok(up.ship.vx > 300, 'flying up, right is +x');
+  const down = quiet();
+  down.ship.vy = 1200; down.ship.hy = 1; down.ship.boostT = 99;
+  run(down, D);
+  assert.ok(down.ship.vx < -300, 'flying down, right is -x');
+  assert.ok(Math.hypot(down.ship.vx, down.ship.vy) < 1250, 'bending does not speed up');
 });
 
-test('pushing forward at speed gives no free acceleration', () => {
+test('W at speed gives no free acceleration', () => {
   const game = quiet();
   game.ship.vy = -900; game.ship.boostT = 99;
-  for (let i = 0; i < 10; i++) update(game, 0.1, { ...idle, move: { x: 0, y: -1 } });
+  run(game, W);
   assert.ok(Math.hypot(game.ship.vx, game.ship.vy) <= 901);
+});
+
+test('S brakes but never reverses', () => {
+  const game = quiet();
+  game.ship.vy = -600; game.ship.boostT = 99;
+  run(game, S, 30);
+  assert.ok(game.ship.vy <= 0.001, 'did not go backwards');
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 50, 'came to a stop');
+  assert.ok(Math.abs(heading(game) + Math.PI / 2) < 1e-6, 'still facing up');
+});
+
+test('when nearly still, A/D turn the ship in place', () => {
+  const game = quiet();
+  run(game, D, 3);
+  assert.ok(heading(game) > -Math.PI / 2 + 0.3, 'turned clockwise (right)');
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 5, 'stayed put');
 });
 
 test('a keyboard launch boosts along the current travel direction', () => {
@@ -102,11 +125,12 @@ test('a keyboard launch boosts along the current travel direction', () => {
   assert.ok(Math.abs(Math.atan2(game.ship.vy, game.ship.vx) - ang0) < 0.05);
 });
 
-test('from a standstill a keyboard launch uses the last nudge direction', () => {
+test('from a standstill a keyboard launch goes where the ship was turned', () => {
   const game = quiet();
-  update(game, 0.02, { ...idle, move: { x: -1, y: 0 } });
-  game.ship.vx = 0; game.ship.vy = 0;
+  run(game, D, 2, 0.1);
+  const h = heading(game);
   for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, charging: true, keyboard: true });
   update(game, 0.02, { ...idle, release: true, keyboard: true });
-  assert.ok(game.ship.vx < -300);
+  assert.ok(Math.abs(Math.atan2(game.ship.vy, game.ship.vx) - h) < 0.05);
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) > 300);
 });

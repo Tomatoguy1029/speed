@@ -70,25 +70,38 @@ export function update(game, frameDt, input) {
   }
 }
 
-// WASD thrust: nudges at rest, bends the trajectory at speed, never a free speed-up when fast.
-function nudge(game, move) {
-  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
+// Ship-relative WASD. W: forward thrust (only speeds up while slow). S: brake, never reverse.
+// A/D: bend the trajectory left/right when moving (stronger at speed), turn in place when nearly still.
+function nudge(game, move, dt) {
   const sh = game.ship;
+  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
+  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
   const sp = Math.hypot(sh.vx, sh.vy);
-  const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
-  let ax = move.x * acc, ay = move.y * acc;
-  if (sp > 1) {
-    const ux = sh.vx / sp, uy = sh.vy / sp;
-    const par = ax * ux + ay * uy;
-    if (par > 0 && sp >= game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax -= par * ux; ay -= par * uy; }
+  const rx = -sh.hy, ry = sh.hx; // ship's right
+  let ax = 0, ay = 0;
+  if (side) {
+    if (sp > CONFIG.pivotSpeed) {
+      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+      ax += rx * side * acc; ay += ry * side * acc;
+    } else {
+      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
+      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
+    }
+  }
+  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) {
+    ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel;
+  }
+  if (fwd < 0 && sp > 0) {
+    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
+    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
   }
   return { ax, ay };
 }
 
-function updateHeading(sh, move) {
+// Heading follows the travel direction; when nearly still it stays where A/D turned it.
+function updateHeading(sh) {
   const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
-  else if (move && (move.x || move.y)) { sh.hx = move.x; sh.hy = move.y; }
+  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
 }
 
 function step(game, dt, input) {
@@ -101,7 +114,7 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  updateHeading(sh, input.move);
+  updateHeading(sh);
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
@@ -127,7 +140,7 @@ function step(game, dt, input) {
   game.grid = buildGrid(game.enemies, 160);
 
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const n = nudge(game, input.move);
+  const n = nudge(game, input.move, dt);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
   stepShip(sh, stats, dt, g.ax + n.ax, g.ay + n.ay, drag);
