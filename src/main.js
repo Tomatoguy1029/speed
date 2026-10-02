@@ -3,12 +3,16 @@ import { createInput } from './input.js';
 import { createGame, update, resolveOffer } from './world.js';
 import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
 import { loadSave, writeSave, buyUpgrade, applyRunResult } from './progression.js';
+import { createAudio } from './audio.js';
 
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
 const input = createInput(canvas);
 const storage = (() => { try { return window.localStorage; } catch { return null; } })();
 const save = loadSave(storage);
+const audio = createAudio();
+window.addEventListener('pointerdown', () => audio.unlock(), true);
+window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
 let mode = 'station'; // station | run | result
@@ -71,6 +75,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape') togglePause();
+  if (e.key === 'm' || e.key === 'M') audio.toggleMute();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
     else if (mode === 'result') { e.preventDefault(); openStation(); }
@@ -88,6 +93,8 @@ function frame(now) {
   const wasPlaying = game.state === 'play';
   update(game, dt, input.read());
   render(renderer, game, dt, input.state);
+  audio.handle(game.events);
+  audio.update(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
     if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();

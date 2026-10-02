@@ -16,7 +16,7 @@ export function createRenderer(canvas) {
     p,
     stars: Array.from({ length: 110 - i * 25 }, () => ({ x: rng() * STAR_TILE, y: rng() * STAR_TILE, s: 0.6 + rng() * (0.6 + i * 0.6), a: 0.25 + rng() * 0.6 })),
   }));
-  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0 };
+  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, zoomPunch: 0, stageFlash: null, hurt: 0 };
 }
 
 export function resizeRenderer(r) {
@@ -50,6 +50,7 @@ function updateCamera(r, game, dt) {
   cam.x += (tx - cam.x) * kp;
   cam.y += (ty - cam.y) * kp;
   cam.zoom += (zoomT - cam.zoom) * kz;
+  if (r.zoomPunch > 0) { cam.zoom *= 1 + r.zoomPunch; r.zoomPunch = Math.max(0, r.zoomPunch - dt * 0.5); }
   game.viewRadius = Math.hypot(r.W, r.H) / 2 / cam.zoom;
 }
 
@@ -60,6 +61,10 @@ function handleEvents(r, game) {
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
+    else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
+    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
+    else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
 
@@ -93,9 +98,11 @@ export function render(r, game, dt, pointer) {
   drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
+  drawVapor(r, game, dt);
   drawShip(r, game);
   drawFx(r, game);
   ctx.restore();
+  drawSpeedLines(r, game);
 
   drawChargeUi(r, game, pointer);
   drawCapsuleArrows(r, game);
@@ -103,6 +110,90 @@ export function render(r, game, dt, pointer) {
   drawHud(r, game);
   drawMinimap(r, game);
   drawBanner(r, dt);
+  drawStageFlash(r, dt);
+  if (r.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, r.flash)})`;
+    ctx.fillRect(0, 0, r.W, r.H);
+    r.flash = Math.max(0, r.flash - dt * 2.2);
+  }
+}
+
+// Conical shock layers wrapped around the ship near max speed.
+function drawVapor(r, game, dt) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const ratio = sp / game.stats.maxSpeed;
+  if (r.vapor > 0) r.vapor -= dt;
+  const k = Math.max(r.vapor > 0 ? 1 : 0, (ratio - 0.88) / 0.12);
+  if (k <= 0 || sp < 1) return;
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const ux = sh.vx / sp, uy = sh.vy / sp;
+  const back = Math.atan2(-uy, -ux);
+  ctx.save();
+  ctx.translate(sh.x, sh.y);
+  ctx.lineCap = 'round';
+  const unit = Math.max(1, 0.6 / z);
+  for (let i = 0; i < 4; i++) {
+    const rad = (26 + i * 16) * unit;
+    const spread = 1.25 - i * 0.18;
+    ctx.globalAlpha = Math.min(1, k) * (0.5 - i * 0.1) * (0.75 + 0.25 * Math.random());
+    ctx.strokeStyle = '#eaf6ff';
+    ctx.lineWidth = (3 - i * 0.5) * unit;
+    ctx.beginPath();
+    ctx.arc(-ux * (i * 10 - 14) * unit, -uy * (i * 10 - 14) * unit, rad, back - spread, back + spread);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawSpeedLines(r, game) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const k = (sp / CONFIG.escapeSpeed - 0.42) / 0.5;
+  if (k <= 0) return;
+  const { ctx, W, H } = r;
+  const cx = W / 2, cy = H / 2;
+  const R0 = Math.hypot(W, H) / 2;
+  ctx.strokeStyle = '#dff3ff';
+  ctx.lineWidth = 1.5;
+  const n = Math.round(18 + 40 * Math.min(1, k));
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU;
+    const r1 = R0 * (0.62 + Math.random() * 0.2 * (1 - Math.min(1, k)));
+    ctx.globalAlpha = Math.min(0.5, 0.15 + 0.35 * k) * Math.random();
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawStageFlash(r, dt) {
+  const f = r.stageFlash;
+  if (!f) return;
+  f.life -= dt;
+  if (f.life <= 0) { r.stageFlash = null; return; }
+  const { ctx, W, H } = r;
+  const t = 1 - f.life / f.max;
+  ctx.globalAlpha = Math.min(1, f.life / 0.4);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#bff3ff';
+  ctx.font = `italic 800 ${Math.round(30 + 10 * (1 - t))}px ${MONO}`;
+  ctx.fillText(f.text, W / 2, H * 0.68);
+  ctx.font = `13px ${MONO}`;
+  ctx.fillStyle = '#8fd8ff';
+  ctx.fillText(`${f.kms} km/s`, W / 2, H * 0.68 + 20);
+  const sweep = W * (t * 1.4 - 0.2);
+  const g = ctx.createLinearGradient(sweep - 160, 0, sweep + 160, 0);
+  g.addColorStop(0, 'rgba(191,243,255,0)');
+  g.addColorStop(0.5, 'rgba(191,243,255,0.5)');
+  g.addColorStop(1, 'rgba(191,243,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, H * 0.68 - 36, W, 2);
+  ctx.globalAlpha = 1;
 }
 
 function drawGems(r, game) {

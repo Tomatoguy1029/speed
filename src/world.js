@@ -12,6 +12,7 @@ import { xpForLevel } from './progression.js';
 import { SLOTS, computeStats, rollModule } from './modules.js';
 import { damageEnemy, addText } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
+import { SPEED_STAGES, speedStage } from './stages.js';
 
 export const STEP = 1 / 120;
 
@@ -46,7 +47,7 @@ export function createGame(opts = {}) {
     state: 'play',
     timeScale: 1,
     releasePending: null,
-    peakSpeed: 0,
+    peakSpeed: 0, stage: 0,
     events: [],
     viewRadius: 1400,
   };
@@ -117,6 +118,13 @@ function step(game, dt, input) {
   const sp = Math.hypot(sh.vx, sh.vy);
   if (sp > game.peakSpeed) game.peakSpeed = sp;
   recordTrail(sh, dt);
+  const st = speedStage(sp);
+  if (st > game.stage) {
+    game.stage = st;
+    game.events.push({ type: 'stage', stage: st, name: SPEED_STAGES[st - 1].name, speed: sp });
+  } else if (game.stage > 0 && sp < SPEED_STAGES[game.stage - 1].v * 0.85) {
+    game.stage = st;
+  }
 
   if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
   else if (sh.hp <= 0) end(game, 'lost', 'hp');
