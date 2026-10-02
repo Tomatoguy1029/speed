@@ -941,14 +941,14 @@ function drawHud(r, game) {
 function drawLoadout(r, game) {
   const { ctx, H, W } = r;
   const unit = Math.min(15, H / 50);
-  const cx = 16 + unit * 1.8, cy = H - 18 - unit * 3.2;
+  const cx = 12 + unit * 3.4, cy = H - 14 - unit * 3.4;
   ctx.fillStyle = 'rgba(8,12,28,0.55)';
   ctx.beginPath(); ctx.arc(cx, cy - unit * 0.1, unit * 3.4, 0, TAU); ctx.fill();
   drawShipAssembly(ctx, cx, cy, unit, (slot) => {
     const m = game.loadout[slot];
     return m ? RARITIES[m.r].color : null;
   }, null, game.t);
-  if (W < 640) return;
+  if (W < 960) return; // names only where they clear the speed bar
   const x = cx + unit * 3.8, y0 = cy - unit * 3 + 4;
   ctx.textAlign = 'left';
   ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
