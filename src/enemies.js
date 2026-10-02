@@ -15,6 +15,7 @@ export const ENEMY_TYPES = {
   gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.8, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 7, slow: 0.12 },
   missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
   battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
+  titan: { name: 'タイタン', r: 75, hp: 160, armor: 6, speed: 38, accel: 0.8, contact: 18, xp: 25, color: '#ff8fd1', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.0, turn: 0.8, sizeVar: true },
   meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
 };
 
@@ -26,7 +27,7 @@ export function createEnemy(type, level, x, y, opts = {}) {
   const T = ENEMY_TYPES[type];
   const L = Math.max(1, level);
   const elite = !!opts.elite;
-  const size = type === 'meteor' ? (opts.size || T.r) : T.r;
+  const size = type === 'meteor' || T.sizeVar ? (opts.size || T.r) : T.r;
   const sz = size / T.r;
   const hp = T.hp * sz * sz * (1 + 0.6 * (L - 1)) * CONFIG.enemyHpMult * (elite ? 3 : 1);
   return {

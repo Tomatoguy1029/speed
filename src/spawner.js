@@ -1,16 +1,16 @@
-import { createEnemy } from './enemies.js';
+import { createEnemy, ENEMY_TYPES } from './enemies.js';
 import { lerp, pickWeighted, TAU, clamp } from './math.js';
 import { CONFIG } from './config.js';
 import { dangerAt } from './field.js';
 
 // The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
 export const PHASES = [
-  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1 } },
-  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5 } },
-  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2 } },
+  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1, titan: 0.05 } },
+  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5, titan: 0.3 } },
+  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2, titan: 0.4 } },
   { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
-  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, battleship: 0.12 } },
-  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, battleship: 0.25 } },
+  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, titan: 1.2, battleship: 0.3 } },
+  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, titan: 2, battleship: 0.6 } },
 ];
 
 export function getPhase(t) {
@@ -52,10 +52,13 @@ function spawnOne(game, target) {
   const danger = dangerAt(Math.hypot(pt.x, pt.y));
   const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
   if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
+  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return;
+  const T = ENEMY_TYPES[type];
   const late = target.phase.id === 'tension' || target.phase.id === 'escape';
   const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
   const level = target.level + danger * CONFIG.dangerLevel;
-  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, facing: pt.a + Math.PI }));
+  const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
+  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
 }
 
 function spawnWave(game, target) {
