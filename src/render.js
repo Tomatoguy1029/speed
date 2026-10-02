@@ -3,7 +3,6 @@ import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
-import { getPhase } from './spawner.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 
@@ -71,8 +70,7 @@ function updateCamera(r, game, dt) {
 
 function handleEvents(r, game) {
   for (const ev of game.events) {
-    if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
-    else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
     else if (ev.type === 'kill' && ev.cause === 'ram') r.shake = Math.max(r.shake, 5);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
@@ -988,9 +986,6 @@ function drawTimer(r, game) {
   ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
   ctx.font = `700 26px ${MONO}`;
   ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
-  ctx.font = '13px "Hiragino Sans", "Noto Sans JP", sans-serif';
-  ctx.fillStyle = '#8fa3c8';
-  ctx.fillText(getPhase(game.t).name, W / 2, 58);
   // xp bar
   const need = xpForLevel(game.level);
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
