@@ -55,14 +55,14 @@ test('critical hits get through armor that would otherwise stop the ship', () =>
 test('a fast dash pierces a whole line of enemies without tunneling', () => {
   const game = quietGame();
   const sh = game.ship;
-  sh.x = 0; sh.y = OY; sh.vx = 2300; sh.vy = 0; sh.boostT = 5;
-  game.stats.maxSpeed = 2300;
+  sh.x = 0; sh.y = OY; sh.vx = 2150; sh.vy = 0; sh.boostT = 5;
+  game.stats.maxSpeed = 2150;
   for (let i = 0; i < 6; i++) {
     const e = createEnemy('drifter', 1, 200 + i * 60, OY);
     e.facing = Math.PI / 2;
     game.enemies.push(e);
   }
-  for (let i = 0; i < 20; i++) update(game, 0.02, idle);
+  for (let i = 0; i < 25; i++) update(game, 0.02, idle);
   assert.equal(game.enemies.filter((e) => !e.dead).length, 0);
   assert.ok(game.kills >= 6);
   assert.ok(sh.vx > 1400, "kept most of the speed");

@@ -2,9 +2,9 @@
 export const CONFIG = {
   // run
   runTime: 600,
-  escapeSpeed: 2400, // px/s needed to clear
+  escapeSpeed: 2250, // px/s needed to clear
   escapeBonus: 30, // coins for escaping
-  speedToKms: 11.2 / 2400, // display factor: escape speed shows as 11.2 km/s
+  speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
   fieldRadius: 6000,
@@ -12,7 +12,7 @@ export const CONFIG = {
   zoneInner: 2200,
   zoneOuter: 4200,
   startRadius: 3200,
-  planetGM: 5.12e8, // ~50 px/s^2 at the start radius
+  planetGM: 3.0e8, // ~29 px/s^2 at the start radius
   moonCount: 6,
   moonGM: 1.2e7,
   moonOrbitSpeed: 0.02, // rad/s
