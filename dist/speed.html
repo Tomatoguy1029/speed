@@ -2796,7 +2796,7 @@ function createInput(el) {
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
-    el.setPointerCapture?.(e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
     if (!st.down || e.pointerId !== st.pointerId) return;
