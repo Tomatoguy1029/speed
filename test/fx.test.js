@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPEED_STAGES, speedStage } from '../src/stages.js';
-import { createAudio } from '../src/audio.js';
+import { createAudio, initialMuted } from '../src/audio.js';
 import { createGame, update, refreshStats } from '../src/world.js';
 import { CONFIG } from '../src/config.js';
 
@@ -51,4 +51,10 @@ test('audio is a safe no-op without Web Audio', () => {
     audio.handle([{ type: 'kill' }, { type: 'sonic' }], null);
     audio.update(null, 0.016);
   });
+});
+
+test('sound starts muted unless the player turned it on before', () => {
+  assert.equal(initialMuted(null), true);
+  assert.equal(initialMuted('1'), true);
+  assert.equal(initialMuted('0'), false);
 });

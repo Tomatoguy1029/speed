@@ -2,13 +2,18 @@
 
 function noop() {}
 
+// Muted by default; only a stored '0' (the player pressed M to turn sound on) starts unmuted.
+export function initialMuted(stored) {
+  return stored !== '0';
+}
+
 export function createAudio() {
   const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
   if (!AC) return { unlock: noop, handle: noop, update: noop, toggleMute: () => true, muted: true };
 
   let ctx = null, master, sfx, muffle, boomBus, engine, sub, engineGain, wind, windFilter, windGain, noiseBuf;
-  let muted = false;
-  try { muted = window.localStorage.getItem('speed-muted') === '1'; } catch { /* ignore */ }
+  let muted = true;
+  try { muted = initialMuted(window.localStorage.getItem('speed-muted')); } catch { /* ignore */ }
   const lastPlayed = {};
   let duckT = 0;
 
