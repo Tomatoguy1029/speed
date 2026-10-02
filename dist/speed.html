@@ -27,6 +27,20 @@
   button.primary:hover { background: #4a7dff; }
   button:disabled { opacity: 0.4; cursor: default; }
   .win { color: #ffd24a; } .lose { color: #ff6b5a; }
+  .cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
+  .card { border: 1px solid #2a3a6a; border-radius: 10px; padding: 12px 14px; background: rgba(255,255,255,0.03); min-height: 110px; }
+  .card .tag { font-size: 11px; color: #8fa3c8; margin-bottom: 6px; }
+  .card .name { font-size: 18px; font-weight: 700; }
+  .card .rar { font-size: 12px; margin: 2px 0 8px; font-weight: 700; }
+  .card .desc { font-size: 13px; color: #cdd6f0; line-height: 1.5; }
+  .card.empty { display: flex; align-items: center; justify-content: center; color: #5b6b94; }
+  .card.new { border-width: 2px; box-shadow: 0 0 24px rgba(120,160,255,0.15); }
+  .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
+  .loadout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 16px; font-size: 12px; }
+  .loadout div { border: 1px solid #1f2b52; border-radius: 6px; padding: 5px 8px; color: #8fa3c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .loadout div.hl { border-color: #5d8bff; color: #e6ecff; }
+  .src { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #1d2c5c; color: #b8c6ea; margin-bottom: 8px; }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
@@ -754,7 +768,183 @@ function xpForLevel(level) {
   return CONFIG.xpBase + CONFIG.xpGrowth * level;
 }
 
+// ---- modules.js ----
+
+
+
+const SLOTS = [
+  { id: 'bow', name: '船首', icon: '▲' },
+  { id: 'booster', name: 'ブースター', icon: '»' },
+  { id: 'gun', name: '銃', icon: '✶' },
+  { id: 'radar', name: 'レーダー', icon: '◎' },
+  { id: 'armor', name: '装甲', icon: '■' },
+  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
+];
+
+const RARITIES = [
+  { name: 'コモン', color: '#b8c4d6' },
+  { name: 'レア', color: '#4fa3ff' },
+  { name: 'エピック', color: '#c46bff' },
+  { name: 'レジェンド', color: '#ffb340' },
+];
+
+const RARITY_MULT = [1, 1.6, 2.4, 3.5];
+
+const ALL = [0, 1, 2, 3];
+const pct = (v) => `${Math.round(v * 100)}%`;
+const M = (r) => RARITY_MULT[r];
+
+const MODULES = [
+  // 船首: 貫通と衝突時の効果
+  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
+    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
+  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
+    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
+  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
+    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
+  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
+    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
+    apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
+    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
+    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
+
+  // ブースター: 最高速度と加速
+  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
+    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
+  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
+    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
+    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
+    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
+    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
+
+  // 銃: 突進以外の攻撃
+  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
+    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
+    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL,
+    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
+  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
+    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
+    apply: (s, m) => { s.turret = m; } },
+  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
+    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
+    apply: (s, m) => { s.mines = 0.6 * m; } },
+
+  // レーダー: 読みの補助
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
+    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
+    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL,
+    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
+    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
+  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
+    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
+    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
+  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
+    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
+
+  // 装甲: 耐久
+  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
+    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
+    apply: (s, m) => { s.maxHp += 30 * m; } },
+  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
+    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
+    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
+  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
+    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
+    apply: (s, m) => { s.regen += 0.8 * m; } },
+  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
+    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
+    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
+
+  // ジェネレーター: エネルギーとチャージ
+  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL,
+    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
+  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
+    desc: (r) => `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
+    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
+  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
+    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
+];
+
+const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+function moduleDef(id) {
+  return BY_ID[id];
+}
+
+function computeStats(meta, loadout) {
+  const s = baseStats(meta);
+  for (const slot of SLOTS) {
+    const mod = loadout[slot.id];
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
+  }
+  return s;
+}
+
+function rarityWeights(ctx) {
+  if (ctx.source === 'core') return [0, 0, 1, 2];
+  if (ctx.source === 'capsule') {
+    const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  const t = ctx.t;
+  if (t < 150) return [7, 2.5, 0.5, 0];
+  if (t < 300) return [5, 4, 1.2, 0.1];
+  if (t < 480) return [3, 4, 2.5, 0.4];
+  return [1.5, 3, 4, 1.2];
+}
+
+function rollModule(rng, ctx) {
+  const t = ctx.t || 0;
+  const loadout = ctx.loadout;
+  let slot;
+  let pool;
+  if (ctx.source === 'core') {
+    slot = 'booster';
+    pool = [BY_ID.limiter];
+  } else {
+    slot = pickWeighted(rng, SLOTS.map((s) => {
+      const cur = loadout[s.id];
+      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
+      if (s.id === ctx.lastSlot) w *= 0.35;
+      return [s.id, w];
+    }));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t);
+  }
+  const rw = rarityWeights(ctx);
+  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
+  const fits = pool.filter((m) => m.rarities.includes(r));
+  if (fits.length) {
+    const def = fits[Math.floor(rng() * fits.length)];
+    return { id: def.id, slot, r };
+  }
+  const def = pool[Math.floor(rng() * pool.length)];
+  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
+  return { id: def.id, slot, r: nearest };
+}
+
 // ---- world.js ----
+
 
 
 
@@ -774,13 +964,15 @@ const STEP = 1 / 120;
 function createGame(opts = {}) {
   const meta = opts.meta || {};
   const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
-  const stats = baseStats(meta);
+  const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
+  const stats = computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
     t: 0, acc: 0, seed, rng,
-    meta, stats, ship,
+    meta, stats, ship, loadout,
+    offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
     debug: { invincible: false },
     enemies: [],
@@ -819,7 +1011,67 @@ function update(game, frameDt, input) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (game.state !== 'play') break;
+    queueOffers(game);
+    if (game.offerQueue.length) { openOffer(game); break; }
   }
+}
+
+function queueOffers(game) {
+  while (game.pendingLevelups > 0) {
+    game.pendingLevelups--;
+    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot }), 'xp');
+  }
+}
+
+function pushOffer(game, mod, source) {
+  game.lastOfferSlot = mod.slot;
+  game.offerQueue.push({ ...mod, source });
+}
+
+function openOffer(game) {
+  const auto = game.debug.autoOffer;
+  game.state = 'offer';
+  game.currentOffer = stripSource(game.offerQueue.shift());
+  game.ship.charging = false;
+  game.releasePending = null;
+  game.events.push({ type: 'offer' });
+  if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
+}
+
+function stripSource(o) {
+  const { source, ...mod } = o;
+  mod.source = source;
+  return mod;
+}
+
+function isBetter(game, mod) {
+  const cur = game.loadout[mod.slot];
+  return !cur || mod.r >= cur.r;
+}
+
+// accept: equip (the old module in that slot is thrown away); otherwise discard the offer.
+function resolveOffer(game, accept) {
+  const mod = game.currentOffer;
+  if (!mod) return;
+  if (accept) {
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r };
+    refreshStats(game);
+    game.events.push({ type: 'equip', mod });
+  }
+  if (game.offerQueue.length) {
+    game.currentOffer = stripSource(game.offerQueue.shift());
+  } else {
+    game.currentOffer = null;
+    game.state = 'play';
+  }
+}
+
+function refreshStats(game) {
+  const oldMax = game.stats.maxHp;
+  game.stats = computeStats(game.meta, game.loadout);
+  const gain = game.stats.maxHp - oldMax;
+  if (gain > 0) game.ship.hp += gain;
+  game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
 }
 
 function step(game, dt, input) {
@@ -1176,6 +1428,7 @@ function shipSpeed(game) {
 }
 
 // ---- render.js ----
+
 
 
 
@@ -1797,6 +2050,20 @@ function drawHud(r, game) {
   drawSpeedPanel(r, game);
   drawStatus(r, game);
   drawTimer(r, game);
+  drawLoadout(r, game);
+}
+
+function drawLoadout(r, game) {
+  const { ctx, H, W } = r;
+  if (W < 520) return;
+  const x = 16, y0 = H - 16 - SLOTS.length * 18;
+  ctx.textAlign = 'left';
+  ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  SLOTS.forEach((s, i) => {
+    const m = game.loadout[s.id];
+    ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
+    ctx.fillText(`${s.icon} ${m ? moduleDef(m.id).name : s.name + ' —'}`, x, y0 + i * 18);
+  });
 }
 
 function drawTimer(r, game) {
@@ -1917,6 +2184,7 @@ function createInput(el) {
 // ---- ui.js ----
 
 
+
 const root = () => document.getElementById('ui');
 
 function el(tag, attrs = {}, ...kids) {
@@ -1976,6 +2244,43 @@ function showResult(game, extra, onNext) {
   btn.focus();
 }
 
+const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
+
+function moduleCard(mod, tag, isNew) {
+  if (!mod) return el('div', { class: 'card empty' }, '空きスロット');
+  const def = moduleDef(mod.id);
+  const rar = RARITIES[mod.r];
+  const card = el('div', { class: `card${isNew ? ' new' : ''}` },
+    el('div', { class: 'tag' }, tag),
+    el('div', { class: 'name' }, def.name),
+    el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
+    el('div', { class: 'desc' }, def.desc(mod.r)));
+  if (isNew) card.style.borderColor = rar.color;
+  return card;
+}
+
+function showOffer(game, onChoose) {
+  const mod = game.currentOffer;
+  const slot = SLOTS.find((s) => s.id === mod.slot);
+  const cur = game.loadout[mod.slot];
+  const loadout = el('div', { class: 'loadout' });
+  for (const s of SLOTS) {
+    const m = game.loadout[s.id];
+    const d = el('div', { class: s.id === mod.slot ? 'hl' : '' }, `${s.icon} ${s.name}: ${m ? moduleDef(m.id).name : '—'}`);
+    if (m) d.style.color = RARITIES[m.r].color;
+    loadout.append(d);
+  }
+  const equip = el('button', { class: 'primary', onclick: () => onChoose(true) }, '付け替える ', el('kbd', {}, '1'));
+  const skip = el('button', { onclick: () => onChoose(false) }, '捨てる ', el('kbd', {}, '2'));
+  showScreen(el('div', { class: 'panel' },
+    el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
+    el('h1', {}, `${slot.icon} ${slot.name}`),
+    el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'),
+    el('div', { class: 'cards' }, moduleCard(cur, '装備中', false), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true)),
+    el('div', { class: 'btns' }, equip, skip),
+    loadout), 'offer');
+}
+
 // ---- main.js ----
 
 
@@ -1997,6 +2302,22 @@ function startRun() {
   game = createGame({});
 }
 
+let offerShown = null;
+
+function chooseOffer(accept) {
+  if (game.state !== 'offer') return;
+  resolveOffer(game, accept);
+  offerShown = null;
+  if (game.state === 'play') { clearScreens(); input.reset(); }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (game.state === 'offer') {
+    if (e.key === '1') chooseOffer(true);
+    else if (e.key === '2') chooseOffer(false);
+  }
+});
+
 function onEnd() {
   input.reset();
   showResult(game, [], startRun);
@@ -2013,6 +2334,11 @@ function frame(now) {
   render(renderer, game, dt, input.state);
   game.events.length = 0;
   if (wasPlaying && (game.state === 'won' || game.state === 'lost')) onEnd();
+  if (game.state === 'offer' && offerShown !== game.currentOffer) {
+    offerShown = game.currentOffer;
+    input.reset();
+    showOffer(game, chooseOffer);
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

@@ -11,19 +11,22 @@ import { segCircleT } from './math.js';
 import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { dangerAt } from './field.js';
+import { SLOTS, computeStats, rollModule } from './modules.js';
 
 export const STEP = 1 / 120;
 
 export function createGame(opts = {}) {
   const meta = opts.meta || {};
   const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
-  const stats = baseStats(meta);
+  const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
+  const stats = computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
     t: 0, acc: 0, seed, rng,
-    meta, stats, ship,
+    meta, stats, ship, loadout,
+    offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
     debug: { invincible: false },
     enemies: [],
@@ -62,7 +65,67 @@ export function update(game, frameDt, input) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (game.state !== 'play') break;
+    queueOffers(game);
+    if (game.offerQueue.length) { openOffer(game); break; }
   }
+}
+
+function queueOffers(game) {
+  while (game.pendingLevelups > 0) {
+    game.pendingLevelups--;
+    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot }), 'xp');
+  }
+}
+
+export function pushOffer(game, mod, source) {
+  game.lastOfferSlot = mod.slot;
+  game.offerQueue.push({ ...mod, source });
+}
+
+function openOffer(game) {
+  const auto = game.debug.autoOffer;
+  game.state = 'offer';
+  game.currentOffer = stripSource(game.offerQueue.shift());
+  game.ship.charging = false;
+  game.releasePending = null;
+  game.events.push({ type: 'offer' });
+  if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
+}
+
+function stripSource(o) {
+  const { source, ...mod } = o;
+  mod.source = source;
+  return mod;
+}
+
+function isBetter(game, mod) {
+  const cur = game.loadout[mod.slot];
+  return !cur || mod.r >= cur.r;
+}
+
+// accept: equip (the old module in that slot is thrown away); otherwise discard the offer.
+export function resolveOffer(game, accept) {
+  const mod = game.currentOffer;
+  if (!mod) return;
+  if (accept) {
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r };
+    refreshStats(game);
+    game.events.push({ type: 'equip', mod });
+  }
+  if (game.offerQueue.length) {
+    game.currentOffer = stripSource(game.offerQueue.shift());
+  } else {
+    game.currentOffer = null;
+    game.state = 'play';
+  }
+}
+
+export function refreshStats(game) {
+  const oldMax = game.stats.maxHp;
+  game.stats = computeStats(game.meta, game.loadout);
+  const gain = game.stats.maxHp - oldMax;
+  if (gain > 0) game.ship.hp += gain;
+  game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
 }
 
 function step(game, dt, input) {

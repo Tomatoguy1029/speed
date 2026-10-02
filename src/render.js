@@ -4,6 +4,7 @@ import { predictPath, annotatePrediction } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { getPhase } from './spawner.js';
+import { SLOTS, RARITIES, moduleDef } from './modules.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -619,6 +620,20 @@ function drawHud(r, game) {
   drawSpeedPanel(r, game);
   drawStatus(r, game);
   drawTimer(r, game);
+  drawLoadout(r, game);
+}
+
+function drawLoadout(r, game) {
+  const { ctx, H, W } = r;
+  if (W < 520) return;
+  const x = 16, y0 = H - 16 - SLOTS.length * 18;
+  ctx.textAlign = 'left';
+  ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  SLOTS.forEach((s, i) => {
+    const m = game.loadout[s.id];
+    ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
+    ctx.fillText(`${s.icon} ${m ? moduleDef(m.id).name : s.name + ' —'}`, x, y0 + i * 18);
+  });
 }
 
 function drawTimer(r, game) {
