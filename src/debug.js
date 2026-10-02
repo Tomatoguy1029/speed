@@ -9,7 +9,8 @@ const DEFAULTS = { ...CONFIG };
 
 export const TUNABLES = [
   { key: 'escapeSpeed', label: '脱出速度', min: 1200, max: 4000, step: 50, fmt: (v) => `${(v * CONFIG.speedToKms).toFixed(1)} km/s` },
-  { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 500, max: 2500, step: 25 },
+  { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 300, max: 2500, step: 25 },
+  { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
@@ -31,7 +32,7 @@ export const TUNABLES = [
   { key: 'xpMult', label: '経験値 倍率', min: 0.2, max: 4, step: 0.05 },
 ];
 
-const STAT_KEYS = new Set(['baseMaxSpeed', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
+const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
 
 export function applyTunable(game, key, value) {
   CONFIG[key] = value;

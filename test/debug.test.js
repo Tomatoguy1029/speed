@@ -19,8 +19,8 @@ test('changing base max speed applies to the running game immediately', () => {
   applyTunable(game, 'planetGM', 1e8);
   assert.equal(game.field.planet.gm, 1e8);
   resetConfig(game);
-  assert.equal(CONFIG.baseMaxSpeed, 1000);
-  assert.equal(game.stats.maxSpeed, 1000);
+  assert.equal(CONFIG.baseMaxSpeed, 650);
+  assert.equal(game.stats.maxSpeed, 650);
 });
 
 test('time skip and phase jump move the run clock', () => {

@@ -208,7 +208,7 @@ export function resolveOffer(game, accept) {
 
 export function refreshStats(game) {
   const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores });
+  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
   const gain = game.stats.maxHp - oldMax;
   if (gain > 0) game.ship.hp += gain;
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
@@ -410,6 +410,7 @@ export function addXp(game, v) {
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
+    refreshStats(game);
   }
 }
 

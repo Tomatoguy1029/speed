@@ -4,6 +4,7 @@ import { MODULES, SLOTS, computeStats, rollModule, moduleDef } from '../src/modu
 import { baseStats } from '../src/ship.js';
 import { makeRng } from '../src/math.js';
 import { createGame, update, addXp, resolveOffer } from '../src/world.js';
+import { CONFIG } from '../src/config.js';
 
 const idle = { charging: false, aimX: 0, aimY: 0, release: false };
 const emptyLoadout = () => Object.fromEntries(SLOTS.map((s) => [s.id, null]));
@@ -89,4 +90,16 @@ test('more max HP also raises current HP', () => {
   resolveOffer(game, true);
   assert.ok(game.ship.hp > hp0);
   assert.ok(game.stats.maxHp > hp0);
+});
+
+test('max speed grows a little with every level', () => {
+  const game = createGame({ seed: 1 });
+  game.spawning = false;
+  const base = game.stats.maxSpeed;
+  game.debug.autoOffer = 'discard';
+  addXp(game, 1e4);
+  update(game, 0.02, idle);
+  assert.ok(game.level >= 5);
+  const expected = base * (1 + CONFIG.levelSpeedGrowth * game.level);
+  assert.ok(Math.abs(game.stats.maxSpeed - expected) < 1e-6, `${game.stats.maxSpeed} vs ${expected}`);
 });

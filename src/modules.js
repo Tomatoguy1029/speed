@@ -122,14 +122,14 @@ export function moduleDef(id) {
   return BY_ID[id];
 }
 
-// bonus.cores: power cores collected this run, each raising max speed.
+// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
 export function computeStats(meta, loadout, bonus = {}) {
   const s = baseStats(meta);
   for (const slot of SLOTS) {
     const mod = loadout[slot.id];
     if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
   }
-  s.maxSpeed *= 1 + CONFIG.coreBoost * (bonus.cores || 0);
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * (bonus.level || 0));
   return s;
 }
 

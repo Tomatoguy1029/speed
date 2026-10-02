@@ -98,7 +98,8 @@ const CONFIG = {
   crashDamage: 0.012, // hp per px/s of impact speed above 200
 
   // ship
-  baseMaxSpeed: 1000,
+  baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
+  levelSpeedGrowth: 0.02, // +2% max speed per level
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
   chargeTime: 0.7, // seconds to fill the gauge
@@ -1000,14 +1001,14 @@ function moduleDef(id) {
   return BY_ID[id];
 }
 
-// bonus.cores: power cores collected this run, each raising max speed.
+// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
 function computeStats(meta, loadout, bonus = {}) {
   const s = baseStats(meta);
   for (const slot of SLOTS) {
     const mod = loadout[slot.id];
     if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
   }
-  s.maxSpeed *= 1 + CONFIG.coreBoost * (bonus.cores || 0);
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * (bonus.level || 0));
   return s;
 }
 
@@ -1798,7 +1799,7 @@ function resolveOffer(game, accept) {
 
 function refreshStats(game) {
   const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores });
+  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
   const gain = game.stats.maxHp - oldMax;
   if (gain > 0) game.ship.hp += gain;
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
@@ -2000,6 +2001,7 @@ function addXp(game, v) {
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
+    refreshStats(game);
   }
 }
 
@@ -3467,7 +3469,8 @@ const DEFAULTS = { ...CONFIG };
 
 const TUNABLES = [
   { key: 'escapeSpeed', label: '脱出速度', min: 1200, max: 4000, step: 50, fmt: (v) => `${(v * CONFIG.speedToKms).toFixed(1)} km/s` },
-  { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 500, max: 2500, step: 25 },
+  { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 300, max: 2500, step: 25 },
+  { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
@@ -3489,7 +3492,7 @@ const TUNABLES = [
   { key: 'xpMult', label: '経験値 倍率', min: 0.2, max: 4, step: 0.05 },
 ];
 
-const STAT_KEYS = new Set(['baseMaxSpeed', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
+const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
 
 function applyTunable(game, key, value) {
   CONFIG[key] = value;

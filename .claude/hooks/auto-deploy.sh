@@ -6,9 +6,22 @@ cd "$(dirname "$0")/../.." || exit 0
 
 say() { node -e 'console.log(JSON.stringify({ systemMessage: process.argv[1] }))' "$1"; }
 
+hook_input=$(cat)
+# true when Claude is already continuing because a Stop hook blocked it once
+active=$(printf '%s' "$hook_input" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).stop_hook_active?"1":"")}catch{console.log("")}})')
+
 changes=$(git status --porcelain)
 ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
 [ -z "$changes" ] && [ "$ahead" = "0" ] && exit 0
+
+# Keep AGENTS.md (the hand-off doc) in step with the game: if game code changed but the doc
+# did not, stop once and ask Claude to update it. The second stop always goes through.
+touched=$( { git diff --name-only @{u}..HEAD 2>/dev/null; git status --porcelain | awk '{print $2}'; } | sort -u )
+if [ -z "$active" ] && echo "$touched" | grep -qE '^(src/|index\.html$|build\.js$|tools/)' && ! echo "$touched" | grep -qx 'AGENTS.md'; then
+  node -e 'console.log(JSON.stringify({ decision: "block", reason: process.argv[1] }))' \
+    "ゲームのコードが変わっていますが AGENTS.md が更新されていません。変更内容・理由・ユーザーの要望を AGENTS.md（現在の仕様／判断の履歴／未解決の課題）に反映してから終了してください。更新が不要なら理由を一言述べて終了して構いません。"
+  exit 0
+fi
 
 if [ -n "$changes" ]; then
   if ! out=$(node build.js 2>&1); then

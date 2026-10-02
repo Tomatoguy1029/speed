@@ -15,6 +15,7 @@ function quiet(scheme) {
   game.field.planet.gm = 0; game.field.moons.length = 0; game.field.dust.length = 0;
   game.ship.x = 0; game.ship.y = -3000; game.ship.vx = 0; game.ship.vy = 0;
   game.ship.hx = 0; game.ship.hy = -1;
+  game.stats.maxSpeed = 1000; // scheme behavior should not depend on speed tuning
   return game;
 }
 const run = (game, intent, seconds, dt = 0.05) => { for (let t = 0; t < seconds - 1e-9; t += dt) update(game, dt, { ...idle, ...intent }); };

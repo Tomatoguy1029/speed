@@ -23,7 +23,8 @@ export const CONFIG = {
   crashDamage: 0.012, // hp per px/s of impact speed above 200
 
   // ship
-  baseMaxSpeed: 1000,
+  baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
+  levelSpeedGrowth: 0.02, // +2% max speed per level
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
   chargeTime: 0.7, // seconds to fill the gauge
