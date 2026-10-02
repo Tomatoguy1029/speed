@@ -1,11 +1,12 @@
 // Module effects that change how the ship attacks, plus field capsules and power cores.
 import { CONFIG } from './config.js';
 import { attackPower } from './combat.js';
-import { explode, damageEnemy, addRing } from './hits.js';
+import { explode, damageEnemy, addRing, addText } from './hits.js';
 import { queryGrid } from './grid.js';
 import { rollModule } from './modules.js';
 import { dangerAt } from './field.js';
 import { getPhase } from './spawner.js';
+import { refreshStats } from './world.js';
 import { randRange, TAU } from './math.js';
 
 export function createEffectState() {
@@ -199,7 +200,13 @@ function updateCapsules(game, dt) {
     const reach = 22 + CONFIG.shipRadius + 14;
     if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
       c.taken = true; taken = true;
-      game.offerQueue.push({ ...c.mod, source: c.kind === 'core' ? 'core' : c.src === 'elite' ? 'elite' : 'capsule' });
+      if (c.kind === 'core') {
+        game.cores++;
+        refreshStats(game);
+        addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else {
+        game.offerQueue.push({ ...c.mod, source: c.src === 'elite' ? 'elite' : 'capsule' });
+      }
       addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
     }

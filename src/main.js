@@ -4,6 +4,7 @@ import { createGame, update, resolveOffer } from './world.js';
 import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
 import { loadSave, writeSave, buyUpgrade, applyRunResult } from './progression.js';
 import { createAudio } from './audio.js';
+import { createDebugPanel } from './debug.js';
 
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
@@ -15,6 +16,7 @@ window.addEventListener('pointerdown', () => audio.unlock(), true);
 window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
+const debug = createDebugPanel(() => game);
 let mode = 'station'; // station | run | result
 let offerShown = null;
 
@@ -76,6 +78,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
+  if (e.key === 'p' || e.key === 'P') debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
     else if (mode === 'result') { e.preventDefault(); openStation(); }
@@ -95,6 +98,7 @@ function frame(now) {
   render(renderer, game, dt, input.state);
   audio.handle(game.events);
   audio.update(game, dt);
+  debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
     if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();

@@ -40,7 +40,7 @@ export function createGame(opts = {}) {
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     ...createEffectState(),
-    kills: 0, coins: 0,
+    kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
     spawning: true,
     dashPierce: 0, dashId: 0,
@@ -107,7 +107,7 @@ function step(game, dt, input) {
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
-  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow));
+  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
   flushNewEnemies(game);
@@ -186,7 +186,7 @@ export function resolveOffer(game, accept) {
 
 export function refreshStats(game) {
   const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout);
+  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores });
   const gain = game.stats.maxHp - oldMax;
   if (gain > 0) game.ship.hp += gain;
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
@@ -216,14 +216,14 @@ function launch(game, ax, ay) {
 }
 
 // amount: hp lost, slow: share of speed lost (0..1)
-export function damageShip(game, amount, slow) {
+export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
   if (sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
-  game.events.push({ type: 'hurt', amount, x: sh.x, y: sh.y });
+  game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
   addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
   onShipHurt(game);
   return true;
@@ -273,7 +273,7 @@ function collideEnemies(game, x0, y0) {
     if (!stats.reflect) sh.boostT = 0;
     damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
     e.hitCD = 0.25;
-    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0);
+    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
     game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
     break;
   }
@@ -297,7 +297,7 @@ function collideBodies(game) {
       sh.vx -= (1 + restitution) * vn * nx;
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
-      if (dmg > 0) damageShip(game, dmg, 0);
+      if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
       game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
     }
   }
@@ -386,6 +386,7 @@ export function addXp(game, v) {
     game.xp -= need;
     game.level++;
     game.pendingLevelups++;
+    game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
   }
@@ -421,10 +422,19 @@ function simulateFrom(game, ghost, t0, seconds) {
     updateMoons(field, game.t + t);
     const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
     stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
-    pts.push({ x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy });
-    if (Math.hypot(ghost.x, ghost.y) < CONFIG.planetRadius + CONFIG.shipRadius) break;
+    const p = { x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy };
+    pts.push(p);
+    if (hitsBody(field, p.x, p.y)) { p.block = true; break; }
   }
   return pts;
+}
+
+function hitsBody(field, x, y) {
+  const R = CONFIG.shipRadius;
+  for (const b of [field.planet, ...field.moons]) {
+    if ((x - b.x) ** 2 + (y - b.y) ** 2 < (b.r + R) ** 2) return true;
+  }
+  return false;
 }
 
 // Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
@@ -444,6 +454,7 @@ export function annotatePrediction(game, pts, seconds) {
       if (!canPierce(attackPower(p.sp, game.stats), e, crit)) blocker = e;
     });
     out.push(p);
+    if (p.block) break;
     if (blocker) {
       p.block = true;
       if (game.stats.predictBounce && seconds) {

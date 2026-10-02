@@ -145,3 +145,24 @@ test('power cores appear near the planet in the escape phase', () => {
   assert.ok(cores.length >= 1);
   for (const c of cores) assert.ok(Math.hypot(c.x, c.y) < CONFIG.zoneInner);
 });
+
+test('a power core raises max speed on the spot without pausing', () => {
+  const game = setup({});
+  const before = game.stats.maxSpeed;
+  game.capsules.push({ kind: 'core', src: 'core', x: 40, y: OY, mod: { id: 'limiter', slot: 'booster', r: 3 }, age: 0 });
+  run(game, 0.2);
+  assert.equal(game.state, 'play');
+  assert.ok(game.stats.maxSpeed > before * 1.1);
+  assert.equal(game.cores, 1);
+});
+
+test('leveling up restores a little HP', () => {
+  const game = setup({});
+  game.ship.hp = 50;
+  game.debug.autoOffer = 'discard';
+  game.xp = 1e3;
+  run(game, 0.05);
+  game.gems.push({ x: game.ship.x, y: game.ship.y, v: 1, age: 0 });
+  run(game, 0.1);
+  assert.ok(game.ship.hp > 50);
+});

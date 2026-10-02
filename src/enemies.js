@@ -8,13 +8,13 @@ export const ENEMY_TYPES = {
   drifter: { name: 'ドリフター', r: 14, hp: 6, armor: 2, speed: 130, accel: 2.5, contact: 6, xp: 1, color: '#7fd1ff', shape: 'orb', behavior: 'chase', weakDir: BACK, weakArc: 1.0 },
   swarm: { name: 'スウォーム', r: 11, hp: 3, armor: 1.2, speed: 200, accel: 3, contact: 4, xp: 0.6, color: '#9df0ff', shape: 'dart', behavior: 'chase', weakDir: BACK, weakArc: 1.1 },
   darter: { name: 'ダーター', r: 16, hp: 9, armor: 3.5, speed: 110, accel: 2, contact: 10, xp: 2, color: '#ff9f6b', shape: 'dart', behavior: 'dash', weakDir: BACK, weakArc: 0.9, range: 520, windup: 0.7, dashSpeed: 760, dashTime: 0.55, recover: 0.9 },
-  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 16, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
+  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 11, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
   splitter: { name: '分裂型', r: 22, hp: 14, armor: 4, speed: 60, accel: 1.5, contact: 8, xp: 2, color: '#a8ff7a', shape: 'blob', behavior: 'split', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.55, budInterval: 5, maxBuds: 5, turn: 1.5 },
   splitling: { name: '分裂体', r: 10, hp: 3, armor: 1.5, speed: 150, accel: 2.5, contact: 4, xp: 0.4, color: '#cfff9a', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.2 },
   leech: { name: '減速型', r: 20, hp: 14, armor: 5, speed: 120, accel: 1.6, contact: 6, xp: 3, color: '#c77dff', shape: 'diamond', behavior: 'leech', weakDir: BACK, weakArc: 0.9, auraR: 210, drain: 0.9, steal: 0.2 },
-  gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.2, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 8, slow: 0.12 },
-  missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4, telegraph: 0.6, missileSpeed: 520, missileTurn: 2.4, bulletDmg: 12, slow: 0.2 },
-  battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 30, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
+  gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.8, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 7, slow: 0.12 },
+  missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
+  battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
   meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
 };
 
@@ -35,7 +35,7 @@ export function createEnemy(type, level, x, y, opts = {}) {
     r: size * (elite ? 1.25 : 1),
     hp, maxHp: hp,
     armor: T.armor * sz * (1 + 0.35 * (L - 1)) * CONFIG.enemyArmorMult * (elite ? 1.3 : 1),
-    contact: T.contact * (1 + 0.3 * (L - 1)),
+    contact: T.contact * (1 + 0.2 * (L - 1)),
     xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
     speed: T.speed * (1 + 0.04 * (L - 1)),
     facing: opts.facing ?? 0,
@@ -84,7 +84,7 @@ function fire(game, e, angle, speed, kind) {
   game.ebullets.push({
     kind, x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r,
     vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, speed,
-    r: kind === 'missile' ? 9 : 7, dmg: T.bulletDmg * lv, slow: T.slow, life: kind === 'missile' ? 6 : 4,
+    r: kind === 'missile' ? 9 : 7, dmg: T.bulletDmg * lv, slow: T.slow, life: kind === 'missile' ? 4.5 : 4,
     turn: T.missileTurn || 0,
   });
   game.events.push({ type: 'shoot', x: e.x, y: e.y, kind });

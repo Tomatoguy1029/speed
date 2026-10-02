@@ -14,13 +14,13 @@ export const CONFIG = {
   startRadius: 3200,
   planetGM: 5.12e8, // ~50 px/s^2 at the start radius
   moonCount: 6,
-  moonGM: 2.5e7,
+  moonGM: 1.2e7,
   moonOrbitSpeed: 0.02, // rad/s
   dustCount: 34,
   dustDrag: 0.55,
   boundaryPush: 600,
   crashRestitution: 0.45,
-  crashDamage: 0.03, // hp per px/s of impact speed above 200
+  crashDamage: 0.012, // hp per px/s of impact speed above 200
 
   // ship
   baseMaxSpeed: 1000,
@@ -35,7 +35,7 @@ export const CONFIG = {
   cruiseFloor: 0.35, // cruise drag never slows below this share of max speed
   overcapDecay: 0.3, // per second decay of speed above max speed
   shipRadius: 16,
-  baseHP: 100,
+  baseHP: 120,
   invulnTime: 0.6,
   pickupRadius: 140,
 
@@ -46,6 +46,8 @@ export const CONFIG = {
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
+  coreBoost: 0.18, // max speed gained per power core
+  levelHeal: 0.08, // share of max HP restored per level-up
   capsuleCount: 5, // field capsules kept on the map
   capsuleInterval: 16, // seconds between respawns
 
