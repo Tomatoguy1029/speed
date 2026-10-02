@@ -41,6 +41,14 @@ export const CONFIG = {
   // enemies
   enemyHpMult: 1,
   enemyArmorMult: 1,
+  densityMult: 1,
+  dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
+  meteorCount: 12,
+
+  // growth
+  xpBase: 10,
+  xpGrowth: 7,
+  xpMult: 1,
 
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest

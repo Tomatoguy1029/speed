@@ -8,10 +8,31 @@
   html, body { margin: 0; height: 100%; background: #04050b; overflow: hidden; color: #e6ecff;
     font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; user-select: none; }
   canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: crosshair; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(3,5,14,0.72); backdrop-filter: blur(3px); pointer-events: auto; }
+  .panel { background: linear-gradient(180deg, #121a33, #0b1022); border: 1px solid #2a3a6a; border-radius: 14px;
+    padding: 24px 28px; min-width: 320px; max-width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: 0.04em; }
+  .panel h2 { margin: 18px 0 8px; font-size: 15px; color: #8fa3c8; font-weight: 600; }
+  .sub { color: #8fa3c8; font-size: 13px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  .stats div:nth-child(odd) { color: #8fa3c8; }
+  .btns { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 9px; border: 1px solid #3b5bb5;
+    background: #1d2c5c; color: #e6ecff; cursor: pointer; }
+  button:hover { background: #2a3f80; }
+  button.primary { background: #2f6bff; border-color: #5d8bff; font-weight: 700; }
+  button.primary:hover { background: #4a7dff; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .win { color: #ffd24a; } .lose { color: #ff6b5a; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="ui"></div>
 <script>
 (() => {
 'use strict';
@@ -59,6 +80,14 @@ const CONFIG = {
   // enemies
   enemyHpMult: 1,
   enemyArmorMult: 1,
+  densityMult: 1,
+  dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
+  meteorCount: 12,
+
+  // growth
+  xpBase: 10,
+  xpGrowth: 7,
+  xpMult: 1,
 
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
@@ -599,21 +628,135 @@ function queryRadius(grid, x, y, r, cb) {
 
 
 
-// Temporary population keeper (replaced by the phase table in Task 6).
+
+// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
+const PHASES = [
+  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1 } },
+  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3, darter: 3, armored: 2.2, gunner: 2, leech: 1.5, splitter: 1.5 } },
+  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2 } },
+  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
+  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 3, missile: 2, leech: 2, splitter: 2, drifter: 2, battleship: 0.12 } },
+  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 3, missile: 2.5, leech: 2, splitter: 1.5, swarm: 3, battleship: 0.25 } },
+];
+
+function getPhase(t) {
+  for (const p of PHASES) if (t < p.end) return p;
+  return PHASES[PHASES.length - 1];
+}
+
+function phaseTarget(t) {
+  const p = getPhase(t);
+  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
+  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
+}
+
+function spawnPoint(game, extra = 0) {
+  const sh = game.ship;
+  for (let i = 0; i < 6; i++) {
+    const a = game.rng() * TAU;
+    const d = game.viewRadius + 100 + extra + game.rng() * 300;
+    const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
+    const r = Math.hypot(x, y);
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
+  }
+  return null;
+}
+
+function mixAt(phase, danger) {
+  const items = Object.entries(phase.mix);
+  if (danger > 0.25) {
+    items.push(['armored', 2 * danger], ['gunner', 1.5 * danger], ['missile', danger]);
+  }
+  return items;
+}
+
+function spawnOne(game, target) {
+  const pt = spawnPoint(game);
+  if (!pt) return;
+  const danger = dangerAt(Math.hypot(pt.x, pt.y));
+  const type = pickWeighted(game.rng, mixAt(target.phase, danger));
+  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
+  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
+  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
+  const level = target.level + danger * CONFIG.dangerLevel;
+  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, facing: pt.a + Math.PI }));
+}
+
+function spawnWave(game, target) {
+  const sh = game.ship;
+  const n = Math.round(30 * CONFIG.densityMult);
+  if (game.rng() < 0.5) {
+    // ring closing in
+    const d = game.viewRadius * 0.95;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, { facing: a + Math.PI }));
+    }
+  } else {
+    // a stream from one direction
+    const a = game.rng() * TAU;
+    for (let i = 0; i < n; i++) {
+      const d = game.viewRadius + 80 + i * 34;
+      const off = (game.rng() - 0.5) * 120;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
+    }
+  }
+  game.events.push({ type: 'wave' });
+}
+
+function keepMeteors(game) {
+  let near = 0;
+  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  if (near >= CONFIG.meteorCount) return;
+  const pt = spawnPoint(game, 200);
+  if (!pt) return;
+  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
+  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
+  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
+  game.enemies.push(m);
+}
+
+function despawnFar(game) {
+  const sh = game.ship;
+  const far = game.viewRadius * 2.6 + 800;
+  let removed = false;
+  for (const e of game.enemies) {
+    const lim = e.type === 'battleship' ? far * 1.6 : far;
+    if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
+  }
+  if (removed) game.enemies = game.enemies.filter((e) => !e.dead);
+}
+
 function updateSpawner(game, dt) {
   if (!game.spawning) return;
-  const want = 30;
-  if (game.enemies.length >= want) return;
-  const sh = game.ship;
-  const a = game.rng() * TAU;
-  const d = game.viewRadius + 150 + game.rng() * 300;
-  const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
-  if (Math.hypot(x, y) > CONFIG.fieldRadius || Math.hypot(x, y) < CONFIG.planetRadius + 100) return;
-  const type = game.rng() < 0.15 ? 'armored' : 'drifter';
-  game.enemies.push(createEnemy(type, 1, x, y, { facing: a + Math.PI }));
+  despawnFar(game);
+  keepMeteors(game);
+  const target = phaseTarget(game.t);
+  const P = target.phase;
+  let alive = 0;
+  for (const e of game.enemies) if (e.type !== 'meteor') alive++;
+  game.spawnAcc = Math.min(game.spawnAcc + P.rate * dt, 8);
+  while (game.spawnAcc >= 1 && alive < target.pop) {
+    game.spawnAcc -= 1;
+    spawnOne(game, target);
+    alive++;
+  }
+  if (P.waves) {
+    game.waveT = (game.waveT || 0) + dt;
+    if (game.waveT >= P.waves) { game.waveT = 0; spawnWave(game, target); }
+  }
+}
+
+// ---- progression.js ----
+
+
+function xpForLevel(level) {
+  return CONFIG.xpBase + CONFIG.xpGrowth * level;
 }
 
 // ---- world.js ----
+
+
 
 
 
@@ -644,6 +787,11 @@ function createGame(opts = {}) {
     newEnemies: [],
     ebullets: [],
     leechDrag: 0,
+    gems: [],
+    xp: 0, level: 0, pendingLevelups: 0,
+    spawnAcc: 0,
+    phaseId: null,
+    endReason: null,
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     kills: 0,
@@ -678,6 +826,11 @@ function step(game, dt, input) {
   const sh = game.ship;
   const stats = game.stats;
   game.t += dt;
+  const phase = getPhase(game.t);
+  if (phase.id !== game.phaseId) {
+    game.phaseId = phase.id;
+    game.events.push({ type: 'phase', phase });
+  }
 
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
@@ -711,9 +864,62 @@ function step(game, dt, input) {
   updateSpawner(game, dt);
   if (sh.invulnT > 0) sh.invulnT -= dt;
 
+  updateGems(game, dt);
+  if (stats.regen > 0) sh.hp = Math.min(stats.maxHp, sh.hp + stats.regen * dt);
+
   const sp = Math.hypot(sh.vx, sh.vy);
   if (sp > game.peakSpeed) game.peakSpeed = sp;
   recordTrail(sh, dt);
+
+  if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
+  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+}
+
+function end(game, state, reason) {
+  game.state = state;
+  game.endReason = reason;
+  game.events.push({ type: 'end', state, reason });
+}
+
+function updateGems(game, dt) {
+  const sh = game.ship;
+  const pr = game.stats.pickupRadius;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  for (const g of game.gems) {
+    g.age += dt;
+    const dx = sh.x - g.x, dy = sh.y - g.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr || g.pulled) {
+      g.pulled = true;
+      const pull = 700 + sp * 1.2;
+      g.x += (dx / (d || 1)) * pull * dt;
+      g.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
+  }
+  if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+}
+
+function addXp(game, v) {
+  game.xp += v;
+  let need = xpForLevel(game.level);
+  while (game.xp >= need) {
+    game.xp -= need;
+    game.level++;
+    game.pendingLevelups++;
+    game.events.push({ type: 'levelup', level: game.level });
+    need = xpForLevel(game.level);
+  }
+}
+
+function dropGem(game, x, y, v) {
+  if (game.gems.length > 600) {
+    const old = game.gems.shift();
+    v += old.v;
+  }
+  const a = game.rng() * Math.PI * 2;
+  game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
 }
 
 function launch(game, ax, ay) {
@@ -831,6 +1037,10 @@ function killEnemy(game, e, opts = {}) {
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
   onEnemyDeath(e, game);
+  const phase = getPhase(game.t);
+  const danger = dangerAt(Math.hypot(e.x, e.y));
+  const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
+  dropGem(game, e.x, e.y, xp);
 }
 
 function burst(game, x, y, color, n, dx, dy, speed) {
@@ -971,6 +1181,8 @@ function shipSpeed(game) {
 
 
 
+
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -1018,8 +1230,19 @@ function updateCamera(r, game, dt) {
   game.viewRadius = Math.hypot(r.W, r.H) / 2 / cam.zoom;
 }
 
+function handleEvents(r, game) {
+  for (const ev of game.events) {
+    if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
+    else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
+    else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
+    else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
+  }
+}
+
 function render(r, game, dt, pointer) {
   const { ctx } = r;
+  handleEvents(r, game);
   updateCamera(r, game, dt);
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   drawBackground(r, game);
@@ -1038,6 +1261,7 @@ function render(r, game, dt, pointer) {
   drawDust(r, game);
   drawSpecks(r);
   drawBodies(r, game);
+  drawGems(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
   drawPrediction(r, game);
@@ -1047,8 +1271,63 @@ function render(r, game, dt, pointer) {
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
+  drawOverlays(r, game, dt);
   drawHud(r, game);
   drawMinimap(r, game);
+  drawBanner(r, dt);
+}
+
+function drawGems(r, game) {
+  const { ctx } = r;
+  const s = Math.max(5, 3 / r.cam.zoom);
+  ctx.fillStyle = '#6dffb0';
+  for (const g of game.gems) {
+    if (!onScreen(r, g.x, g.y, 20)) continue;
+    const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
+    ctx.beginPath();
+    ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawOverlays(r, game, dt) {
+  const { ctx, W, H } = r;
+  if (r.hurt > 0) {
+    r.hurt -= dt;
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(255,40,40,0)');
+    g.addColorStop(1, `rgba(255,40,40,${0.5 * r.hurt / 0.35})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  const lowHp = game.ship.hp / game.stats.maxHp;
+  if (lowHp < 0.3 && game.state === 'play') {
+    const a = (0.3 - lowHp) * (0.6 + 0.4 * Math.sin(game.t * 8));
+    ctx.strokeStyle = `rgba(255,50,50,${a})`;
+    ctx.lineWidth = 16;
+    ctx.strokeRect(0, 0, W, H);
+  }
+}
+
+function drawBanner(r, dt) {
+  const b = r.banner;
+  if (!b) return;
+  b.life -= dt;
+  if (b.life <= 0) { r.banner = null; return; }
+  const { ctx, W, H } = r;
+  const t = b.max - b.life;
+  const a = Math.min(1, t / 0.25, b.life / 0.6);
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${Math.min(54, W / 10)}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  ctx.fillText(b.text, W / 2, H * 0.3);
+  if (b.sub) {
+    ctx.font = `16px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = '#b8c6ea';
+    ctx.fillText(b.sub, W / 2, H * 0.3 + 30);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawZones(r) {
@@ -1337,6 +1616,11 @@ function drawMinimap(r, game) {
   ctx.beginPath(); ctx.arc(0, 0, Math.max(3, CONFIG.planetRadius * k), 0, TAU); ctx.fill();
   ctx.fillStyle = '#a08a6c';
   for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
+  for (const e of game.enemies) {
+    if (e.type !== 'battleship' && !e.elite) continue;
+    ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
+    ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
+  }
   if (r.minimapExtra) r.minimapExtra(ctx, k, game);
   const sh = game.ship;
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -1512,6 +1796,26 @@ function drawChargeUi(r, game, pointer) {
 function drawHud(r, game) {
   drawSpeedPanel(r, game);
   drawStatus(r, game);
+  drawTimer(r, game);
+}
+
+function drawTimer(r, game) {
+  const { ctx, W } = r;
+  const left = Math.max(0, CONFIG.runTime - game.t);
+  const m = Math.floor(left / 60), sec = Math.floor(left % 60);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
+  ctx.font = `700 26px ${MONO}`;
+  ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
+  ctx.font = '13px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText(getPhase(game.t).name, W / 2, 58);
+  // xp bar
+  const need = xpForLevel(game.level);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(0, 0, W, 5);
+  ctx.fillStyle = '#6dffb0';
+  ctx.fillRect(0, 0, W * Math.min(1, game.xp / need), 5);
 }
 
 function drawStatus(r, game) {
@@ -1527,7 +1831,7 @@ function drawStatus(r, game) {
   ctx.textAlign = 'left';
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
-  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}`, x, y + 46);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
 }
 
 function drawSpeedPanel(r, game) {
@@ -1610,7 +1914,70 @@ function createInput(el) {
   };
 }
 
+// ---- ui.js ----
+
+
+const root = () => document.getElementById('ui');
+
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'html') n.innerHTML = v;
+    else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+}
+
+function clearScreens() {
+  for (const n of [...root().querySelectorAll('.screen')]) n.remove();
+}
+
+function showScreen(panel, id) {
+  clearScreens();
+  const s = el('div', { class: 'screen', id }, panel);
+  root().append(s);
+  return s;
+}
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+
+const END_TEXT = {
+  escape: ['重力圏 脱出', 'win', '脱出速度に到達した'],
+  hp: ['機体 大破', 'lose', 'HP が尽きた'],
+  time: ['時間切れ', 'lose', '10 分以内に脱出速度へ届かなかった'],
+};
+
+function showResult(game, extra, onNext) {
+  const [title, cls, sub] = END_TEXT[game.endReason] || END_TEXT.time;
+  const rows = [
+    ['経過時間', fmtTime(game.t)],
+    ['最高速度', `${kms(game.peakSpeed)} km/s`],
+    ['脱出速度', `${kms(CONFIG.escapeSpeed)} km/s`],
+    ['撃破数', String(game.kills)],
+    ['レベル', String(game.level)],
+    ...(extra || []),
+  ];
+  const stats = el('div', { class: 'stats' });
+  for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
+  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ');
+  showScreen(el('div', { class: 'panel' },
+    el('h1', { class: cls }, title),
+    el('div', { class: 'sub' }, sub),
+    stats,
+    el('div', { class: 'btns' }, btn)), 'result');
+  btn.focus();
+}
+
 // ---- main.js ----
+
 
 
 
@@ -1618,21 +1985,40 @@ function createInput(el) {
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
 const input = createInput(canvas);
-let game = createGame({});
+let game = null;
 
 window.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
+
+function startRun() {
+  clearScreens();
+  input.reset();
+  renderer.cam.ready = false;
+  game = createGame({});
+}
+
+function onEnd() {
+  input.reset();
+  showResult(game, [], startRun);
+}
+
+startRun();
 
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  const wasPlaying = game.state === 'play';
   update(game, dt, input.read());
   render(renderer, game, dt, input.state);
   game.events.length = 0;
+  if (wasPlaying && (game.state === 'won' || game.state === 'lost')) onEnd();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// console access for debugging
+window.__speed = { get game() { return game; } };
 
 })();
 </script>

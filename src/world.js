@@ -8,7 +8,9 @@ import { updateEnemy, onEnemyDeath, MAX_ENEMY_R } from './enemies.js';
 import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
 import { segCircleT } from './math.js';
-import { updateSpawner } from './spawner.js';
+import { updateSpawner, getPhase } from './spawner.js';
+import { xpForLevel } from './progression.js';
+import { dangerAt } from './field.js';
 
 export const STEP = 1 / 120;
 
@@ -28,6 +30,11 @@ export function createGame(opts = {}) {
     newEnemies: [],
     ebullets: [],
     leechDrag: 0,
+    gems: [],
+    xp: 0, level: 0, pendingLevelups: 0,
+    spawnAcc: 0,
+    phaseId: null,
+    endReason: null,
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     kills: 0,
@@ -62,6 +69,11 @@ function step(game, dt, input) {
   const sh = game.ship;
   const stats = game.stats;
   game.t += dt;
+  const phase = getPhase(game.t);
+  if (phase.id !== game.phaseId) {
+    game.phaseId = phase.id;
+    game.events.push({ type: 'phase', phase });
+  }
 
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
@@ -95,9 +107,62 @@ function step(game, dt, input) {
   updateSpawner(game, dt);
   if (sh.invulnT > 0) sh.invulnT -= dt;
 
+  updateGems(game, dt);
+  if (stats.regen > 0) sh.hp = Math.min(stats.maxHp, sh.hp + stats.regen * dt);
+
   const sp = Math.hypot(sh.vx, sh.vy);
   if (sp > game.peakSpeed) game.peakSpeed = sp;
   recordTrail(sh, dt);
+
+  if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
+  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+}
+
+function end(game, state, reason) {
+  game.state = state;
+  game.endReason = reason;
+  game.events.push({ type: 'end', state, reason });
+}
+
+function updateGems(game, dt) {
+  const sh = game.ship;
+  const pr = game.stats.pickupRadius;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  for (const g of game.gems) {
+    g.age += dt;
+    const dx = sh.x - g.x, dy = sh.y - g.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr || g.pulled) {
+      g.pulled = true;
+      const pull = 700 + sp * 1.2;
+      g.x += (dx / (d || 1)) * pull * dt;
+      g.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
+  }
+  if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+}
+
+export function addXp(game, v) {
+  game.xp += v;
+  let need = xpForLevel(game.level);
+  while (game.xp >= need) {
+    game.xp -= need;
+    game.level++;
+    game.pendingLevelups++;
+    game.events.push({ type: 'levelup', level: game.level });
+    need = xpForLevel(game.level);
+  }
+}
+
+function dropGem(game, x, y, v) {
+  if (game.gems.length > 600) {
+    const old = game.gems.shift();
+    v += old.v;
+  }
+  const a = game.rng() * Math.PI * 2;
+  game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
 }
 
 function launch(game, ax, ay) {
@@ -215,6 +280,10 @@ export function killEnemy(game, e, opts = {}) {
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
   onEnemyDeath(e, game);
+  const phase = getPhase(game.t);
+  const danger = dangerAt(Math.hypot(e.x, e.y));
+  const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
+  dropGem(game, e.x, e.y, xp);
 }
 
 function burst(game, x, y, color, n, dx, dy, speed) {

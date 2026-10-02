@@ -8,10 +8,31 @@
   html, body { margin: 0; height: 100%; background: #04050b; overflow: hidden; color: #e6ecff;
     font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; user-select: none; }
   canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: crosshair; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(3,5,14,0.72); backdrop-filter: blur(3px); pointer-events: auto; }
+  .panel { background: linear-gradient(180deg, #121a33, #0b1022); border: 1px solid #2a3a6a; border-radius: 14px;
+    padding: 24px 28px; min-width: 320px; max-width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: 0.04em; }
+  .panel h2 { margin: 18px 0 8px; font-size: 15px; color: #8fa3c8; font-weight: 600; }
+  .sub { color: #8fa3c8; font-size: 13px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  .stats div:nth-child(odd) { color: #8fa3c8; }
+  .btns { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 9px; border: 1px solid #3b5bb5;
+    background: #1d2c5c; color: #e6ecff; cursor: pointer; }
+  button:hover { background: #2a3f80; }
+  button.primary { background: #2f6bff; border-color: #5d8bff; font-weight: 700; }
+  button.primary:hover { background: #4a7dff; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .win { color: #ffd24a; } .lose { color: #ff6b5a; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="ui"></div>
 <!--BUNDLE-->
 </body>
 </html>

@@ -2,6 +2,8 @@ import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
+import { xpForLevel } from './progression.js';
+import { getPhase } from './spawner.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -50,8 +52,19 @@ function updateCamera(r, game, dt) {
   game.viewRadius = Math.hypot(r.W, r.H) / 2 / cam.zoom;
 }
 
+function handleEvents(r, game) {
+  for (const ev of game.events) {
+    if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
+    else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
+    else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
+    else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
+  }
+}
+
 export function render(r, game, dt, pointer) {
   const { ctx } = r;
+  handleEvents(r, game);
   updateCamera(r, game, dt);
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   drawBackground(r, game);
@@ -70,6 +83,7 @@ export function render(r, game, dt, pointer) {
   drawDust(r, game);
   drawSpecks(r);
   drawBodies(r, game);
+  drawGems(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
   drawPrediction(r, game);
@@ -79,8 +93,63 @@ export function render(r, game, dt, pointer) {
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
+  drawOverlays(r, game, dt);
   drawHud(r, game);
   drawMinimap(r, game);
+  drawBanner(r, dt);
+}
+
+function drawGems(r, game) {
+  const { ctx } = r;
+  const s = Math.max(5, 3 / r.cam.zoom);
+  ctx.fillStyle = '#6dffb0';
+  for (const g of game.gems) {
+    if (!onScreen(r, g.x, g.y, 20)) continue;
+    const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
+    ctx.beginPath();
+    ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawOverlays(r, game, dt) {
+  const { ctx, W, H } = r;
+  if (r.hurt > 0) {
+    r.hurt -= dt;
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(255,40,40,0)');
+    g.addColorStop(1, `rgba(255,40,40,${0.5 * r.hurt / 0.35})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  const lowHp = game.ship.hp / game.stats.maxHp;
+  if (lowHp < 0.3 && game.state === 'play') {
+    const a = (0.3 - lowHp) * (0.6 + 0.4 * Math.sin(game.t * 8));
+    ctx.strokeStyle = `rgba(255,50,50,${a})`;
+    ctx.lineWidth = 16;
+    ctx.strokeRect(0, 0, W, H);
+  }
+}
+
+function drawBanner(r, dt) {
+  const b = r.banner;
+  if (!b) return;
+  b.life -= dt;
+  if (b.life <= 0) { r.banner = null; return; }
+  const { ctx, W, H } = r;
+  const t = b.max - b.life;
+  const a = Math.min(1, t / 0.25, b.life / 0.6);
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${Math.min(54, W / 10)}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  ctx.fillText(b.text, W / 2, H * 0.3);
+  if (b.sub) {
+    ctx.font = `16px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = '#b8c6ea';
+    ctx.fillText(b.sub, W / 2, H * 0.3 + 30);
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawZones(r) {
@@ -369,6 +438,11 @@ function drawMinimap(r, game) {
   ctx.beginPath(); ctx.arc(0, 0, Math.max(3, CONFIG.planetRadius * k), 0, TAU); ctx.fill();
   ctx.fillStyle = '#a08a6c';
   for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
+  for (const e of game.enemies) {
+    if (e.type !== 'battleship' && !e.elite) continue;
+    ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
+    ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
+  }
   if (r.minimapExtra) r.minimapExtra(ctx, k, game);
   const sh = game.ship;
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -544,6 +618,26 @@ function drawChargeUi(r, game, pointer) {
 function drawHud(r, game) {
   drawSpeedPanel(r, game);
   drawStatus(r, game);
+  drawTimer(r, game);
+}
+
+function drawTimer(r, game) {
+  const { ctx, W } = r;
+  const left = Math.max(0, CONFIG.runTime - game.t);
+  const m = Math.floor(left / 60), sec = Math.floor(left % 60);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
+  ctx.font = `700 26px ${MONO}`;
+  ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
+  ctx.font = '13px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText(getPhase(game.t).name, W / 2, 58);
+  // xp bar
+  const need = xpForLevel(game.level);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(0, 0, W, 5);
+  ctx.fillStyle = '#6dffb0';
+  ctx.fillRect(0, 0, W * Math.min(1, game.xp / need), 5);
 }
 
 function drawStatus(r, game) {
@@ -559,7 +653,7 @@ function drawStatus(r, game) {
   ctx.textAlign = 'left';
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
-  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}`, x, y + 46);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
 }
 
 function drawSpeedPanel(r, game) {
