@@ -20,6 +20,7 @@ function quiet() {
 function charge(game, seconds, cursor) {
   for (let t = 0; t < seconds - 1e-9; t += 0.05) update(game, 0.05, { ...idle, charging: true, cursor });
   update(game, 0.02, { ...idle, release: true, cursor });
+  update(game, 0.02, { ...idle, press: true, cursor }); // click to start drawing
 }
 const at = (x, y) => ({ x, y: OY + y });
 const pathLength = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);

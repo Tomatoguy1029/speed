@@ -123,7 +123,8 @@ const CONFIG = {
   drawTimeScale: 0.01, // world speed while drawing
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this
-  drawHitRadius: 45, // ship hit radius while tracing a drawn path (drawn as the band's half-width)
+  waveRadius: 45, // reach of the wave a traced path gives off (the band's half-width); the ship body itself stays shipRadius
+  waveDamage: 0.5, // wave damage = attack x this (ignores armor; the body hit is separate)
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
@@ -271,7 +272,7 @@ function baseStats(meta = {}) {
     predictTime: 0.9,
     predictBounce: false,
     regen: 0,
-    drawLengthMult: 1, traceSpeedMult: 1, drawWidthMult: 1, // draw-mode modules
+    drawLengthMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // draw-mode modules
   };
 }
 
@@ -941,9 +942,6 @@ const MODULES = [
   { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
     desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
     apply: (s, m) => { s.fling = 0.5 * m; } },
-  { id: 'wideBlade', slot: 'bow', name: 'ワイドブレード', rarities: ALL, drawOnly: true,
-    desc: (r) => `軌跡をなぞるときの当たり幅 +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.drawWidthMult *= 1 + 0.25 * m; } },
   { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
     desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
     apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
@@ -975,6 +973,12 @@ const MODULES = [
   { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
     desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
     apply: (s, m) => { s.turret = m; } },
+  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
+  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
   { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
     desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
     apply: (s, m) => { s.mines = 0.6 * m; } },
@@ -1487,7 +1491,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはカーソルの方向へ進む。Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはカーソルの方向へ進む。Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。クリックで描き始め、カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -1921,8 +1925,33 @@ function drawBudget(game, gauge) {
   return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
 }
 
-function traceRadius(game) {
-  return CONFIG.drawHitRadius * game.stats.drawWidthMult;
+// How far the wave from a traced path reaches (the band drawn around the path).
+function waveRadius(game) {
+  return CONFIG.waveRadius * game.stats.waveRadiusMult;
+}
+
+// The traced path gives off a wave: enemies within reach take damage once per pass and are
+// pushed away from the path. Sampled finely so long, fast traces leave no gaps.
+function waveAlong(game, r, x0, y0, x1, y1) {
+  const W = waveRadius(game);
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
+  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  for (let k = 1; k <= n; k++) {
+    const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
+    for (const [id, e] of r.waveInside) {
+      if (e.dead || Math.hypot(px - e.x, py - e.y) > e.r + W + 2) r.waveInside.delete(id);
+    }
+    queryGrid(game.grid, px - W - MAX_ENEMY_R, py - W - MAX_ENEMY_R, px + W + MAX_ENEMY_R, py + W + MAX_ENEMY_R, (e) => {
+      if (r.waveInside.has(e.id)) return;
+      const d = Math.hypot(e.x - px, e.y - py);
+      if (d > e.r + W) return;
+      r.waveInside.set(e.id, e);
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+    });
+    r.waveAcc += len / n;
+    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
+  }
 }
 
 // World speed while tracing: the faster the dash, the slower everything else.
@@ -1937,7 +1966,7 @@ function drawWorldScale(game) {
 function startDrawing(game, input) {
   const sh = game.ship;
   const budget = drawBudget(game, sh.gauge);
-  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
+  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false, started: false };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -1947,7 +1976,14 @@ function startDrawing(game, input) {
 function updateDrawing(game, dt, input) {
   const d = game.draw;
   d.timeLeft -= dt;
-  if (input.cursor) { d.cursor = input.cursor; extendPath(game, d, input.cursor); }
+  if (input.cursor) d.cursor = input.cursor;
+  if (!d.started) {
+    // the line only starts on a click (or Space), so moving the mouse never draws by accident
+    if (input.press) { d.started = true; if (d.cursor) extendPath(game, d, d.cursor); }
+    else if (d.timeLeft <= 0) commitPath(game);
+    return;
+  }
+  if (input.cursor) extendPath(game, d, input.cursor);
   if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
 }
 
@@ -1998,7 +2034,7 @@ function commitPath(game) {
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
   const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map() };
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -2013,14 +2049,15 @@ function runAlongPath(game, realDt) {
     const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
     const move = Math.min(dist, segLen - r.segPos);
     const x0 = sh.x, y0 = sh.y;
-    // enemies the band has left can be hit again on the next pass
-    const R = traceRadius(game);
+    // enemies the ship body has left can be hit again on the next pass
+    const R = CONFIG.shipRadius;
     for (const [id, e] of r.inside) {
       if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
     }
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    waveAlong(game, r, x0, y0, sh.x, sh.y);
     if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
@@ -2036,7 +2073,7 @@ function runAlongPath(game, realDt) {
 function previewPath(game) {
   const d = game.draw;
   if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = traceRadius(game);
+  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
@@ -2051,16 +2088,18 @@ function previewPath(game) {
       const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
       let blocked = false;
       const cur = new Set();
-      queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
-        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > (e.r + R) ** 2) return;
+      queryGrid(game.grid, p.x - W - MAX_ENEMY_R, p.y - W - MAX_ENEMY_R, p.x + W + MAX_ENEMY_R, p.y + W + MAX_ENEMY_R, (e) => {
+        const d2 = (p.x - e.x) ** 2 + (p.y - e.y) ** 2;
+        if (d2 > (e.r + W) ** 2) return;
+        const t = targets.get(e) || { crit: false, body: false };
+        targets.set(e, t);
+        if (d2 > (e.r + R) ** 2) return; // wave only
         cur.add(e);
         if (prev.has(e)) return; // still inside from the previous sample: same pass
         const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
         if (crit) p.hot = true;
         if (!canPierce(atk, e, crit)) { blocked = true; return; }
-        const t = targets.get(e) || { crit: false, hits: 0 };
-        t.hits++; t.crit = t.crit || crit;
-        targets.set(e, t);
+        t.body = true; t.crit = t.crit || crit;
       });
       prev = cur;
       samples.push(p);
@@ -2965,7 +3004,7 @@ function drawPathUi(r, game) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
     ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = traceRadius(game) * 2;
+    ctx.lineWidth = waveRadius(game) * 2;
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -2982,7 +3021,7 @@ function drawPathUi(r, game) {
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
     // the band is the real hit width of the trace
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = traceRadius(game) * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = waveRadius(game) * 2; ctx.stroke();
     line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
@@ -2998,7 +3037,8 @@ function drawPathUi(r, game) {
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
   for (const [e, t] of pv.targets) {
-    ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+    // white/yellow: the ship body cuts it; cyan: only the wave reaches it
+    ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? 'rgba(255,255,255,0.9)' : 'rgba(120,225,255,0.85)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
   }
@@ -3034,7 +3074,7 @@ function drawDrawingHud(r, game) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#e8f6ff';
   ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
-  ctx.fillText('カーソルで軌跡を描く — Space／クリックで駆け抜ける', W / 2, y - 12);
+  ctx.fillText(d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : 'クリック（または Space）で描き始める', W / 2, y - 12);
 }
 
 function drawPrediction(r, game) {
@@ -4050,7 +4090,8 @@ const TUNABLES = [
   { key: 'drawRunSlowRef', label: 'なぞり中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
   { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
-  { key: 'drawHitRadius', label: '軌跡の当たり幅（半径）', min: 10, max: 150, step: 5 },
+  { key: 'waveRadius', label: '軌跡の波動が届く距離', min: 0, max: 300, step: 5 },
+  { key: 'waveDamage', label: '軌跡の波動の威力（攻撃力比）', min: 0, max: 3, step: 0.05 },
   { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },

@@ -10,7 +10,7 @@ import { buildGrid, queryGrid } from './grid.js';
 import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
-import { damageEnemy, addText } from './hits.js';
+import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim } from './controls.js';
@@ -258,8 +258,33 @@ export function drawBudget(game, gauge) {
   return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
 }
 
-export function traceRadius(game) {
-  return CONFIG.drawHitRadius * game.stats.drawWidthMult;
+// How far the wave from a traced path reaches (the band drawn around the path).
+export function waveRadius(game) {
+  return CONFIG.waveRadius * game.stats.waveRadiusMult;
+}
+
+// The traced path gives off a wave: enemies within reach take damage once per pass and are
+// pushed away from the path. Sampled finely so long, fast traces leave no gaps.
+function waveAlong(game, r, x0, y0, x1, y1) {
+  const W = waveRadius(game);
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
+  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  for (let k = 1; k <= n; k++) {
+    const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
+    for (const [id, e] of r.waveInside) {
+      if (e.dead || Math.hypot(px - e.x, py - e.y) > e.r + W + 2) r.waveInside.delete(id);
+    }
+    queryGrid(game.grid, px - W - MAX_ENEMY_R, py - W - MAX_ENEMY_R, px + W + MAX_ENEMY_R, py + W + MAX_ENEMY_R, (e) => {
+      if (r.waveInside.has(e.id)) return;
+      const d = Math.hypot(e.x - px, e.y - py);
+      if (d > e.r + W) return;
+      r.waveInside.set(e.id, e);
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+    });
+    r.waveAcc += len / n;
+    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
+  }
 }
 
 // World speed while tracing: the faster the dash, the slower everything else.
@@ -274,7 +299,7 @@ function drawWorldScale(game) {
 function startDrawing(game, input) {
   const sh = game.ship;
   const budget = drawBudget(game, sh.gauge);
-  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
+  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false, started: false };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -284,7 +309,14 @@ function startDrawing(game, input) {
 function updateDrawing(game, dt, input) {
   const d = game.draw;
   d.timeLeft -= dt;
-  if (input.cursor) { d.cursor = input.cursor; extendPath(game, d, input.cursor); }
+  if (input.cursor) d.cursor = input.cursor;
+  if (!d.started) {
+    // the line only starts on a click (or Space), so moving the mouse never draws by accident
+    if (input.press) { d.started = true; if (d.cursor) extendPath(game, d, d.cursor); }
+    else if (d.timeLeft <= 0) commitPath(game);
+    return;
+  }
+  if (input.cursor) extendPath(game, d, input.cursor);
   if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
 }
 
@@ -335,7 +367,7 @@ function commitPath(game) {
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
   const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map() };
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -350,14 +382,15 @@ function runAlongPath(game, realDt) {
     const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
     const move = Math.min(dist, segLen - r.segPos);
     const x0 = sh.x, y0 = sh.y;
-    // enemies the band has left can be hit again on the next pass
-    const R = traceRadius(game);
+    // enemies the ship body has left can be hit again on the next pass
+    const R = CONFIG.shipRadius;
     for (const [id, e] of r.inside) {
       if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
     }
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    waveAlong(game, r, x0, y0, sh.x, sh.y);
     if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
@@ -373,7 +406,7 @@ function runAlongPath(game, realDt) {
 export function previewPath(game) {
   const d = game.draw;
   if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = traceRadius(game);
+  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
@@ -388,16 +421,18 @@ export function previewPath(game) {
       const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
       let blocked = false;
       const cur = new Set();
-      queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
-        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > (e.r + R) ** 2) return;
+      queryGrid(game.grid, p.x - W - MAX_ENEMY_R, p.y - W - MAX_ENEMY_R, p.x + W + MAX_ENEMY_R, p.y + W + MAX_ENEMY_R, (e) => {
+        const d2 = (p.x - e.x) ** 2 + (p.y - e.y) ** 2;
+        if (d2 > (e.r + W) ** 2) return;
+        const t = targets.get(e) || { crit: false, body: false };
+        targets.set(e, t);
+        if (d2 > (e.r + R) ** 2) return; // wave only
         cur.add(e);
         if (prev.has(e)) return; // still inside from the previous sample: same pass
         const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
         if (crit) p.hot = true;
         if (!canPierce(atk, e, crit)) { blocked = true; return; }
-        const t = targets.get(e) || { crit: false, hits: 0 };
-        t.hits++; t.crit = t.crit || crit;
-        targets.set(e, t);
+        t.body = true; t.crit = t.crit || crit;
       });
       prev = cur;
       samples.push(p);

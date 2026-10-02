@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath, annotatePrediction, previewPath, drawBudget, traceRadius } from './world.js';
+import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { getPhase } from './spawner.js';
@@ -475,7 +475,7 @@ function drawPathUi(r, game) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
     ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = traceRadius(game) * 2;
+    ctx.lineWidth = waveRadius(game) * 2;
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -492,7 +492,7 @@ function drawPathUi(r, game) {
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
     // the band is the real hit width of the trace
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = traceRadius(game) * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = waveRadius(game) * 2; ctx.stroke();
     line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
@@ -508,7 +508,8 @@ function drawPathUi(r, game) {
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
   for (const [e, t] of pv.targets) {
-    ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+    // white/yellow: the ship body cuts it; cyan: only the wave reaches it
+    ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? 'rgba(255,255,255,0.9)' : 'rgba(120,225,255,0.85)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
   }
@@ -544,7 +545,7 @@ function drawDrawingHud(r, game) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#e8f6ff';
   ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
-  ctx.fillText('カーソルで軌跡を描く — Space／クリックで駆け抜ける', W / 2, y - 12);
+  ctx.fillText(d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : 'クリック（または Space）で描き始める', W / 2, y - 12);
 }
 
 function drawPrediction(r, game) {
