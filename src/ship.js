@@ -34,7 +34,7 @@ export function createShip(stats, x, y) {
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
     aimX: 0, aimY: 0,
-    boostT: 0, invulnT: 0,
+    boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
 }
@@ -63,7 +63,12 @@ export function stepShip(ship, stats, dt, ax, ay, extraDrag) {
     let target = sp;
     if (ship.boostT > 0) {
       ship.boostT -= dt;
+      if (ship.boostT <= 0) ship.fadeT = 0.3;
     } else {
+      if (ship.fadeT > 0) {
+        ship.fadeT -= dt;
+        if (target > stats.maxSpeed * stats.cruiseFloor) target *= Math.pow(CONFIG.energyCut, dt / 0.3);
+      }
       const floor = stats.maxSpeed * stats.cruiseFloor;
       if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
     }

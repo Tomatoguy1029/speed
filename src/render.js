@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
+import { predictPath } from './world.js';
 
 const STAR_TILE = 1600;
 
@@ -63,13 +64,157 @@ export function render(r, game, dt, pointer) {
   ctx.translate(r.W / 2 + sx, r.H / 2 + sy);
   ctx.scale(r.cam.zoom, r.cam.zoom);
   ctx.translate(-r.cam.x, -r.cam.y);
+  drawZones(r);
+  drawDust(r, game);
   drawSpecks(r);
+  drawBodies(r, game);
+  drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
   drawHud(r, game);
+  drawMinimap(r, game);
+}
+
+function drawZones(r) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const g = ctx.createRadialGradient(0, 0, CONFIG.planetRadius, 0, 0, CONFIG.zoneInner);
+  g.addColorStop(0, 'rgba(255,70,50,0.16)');
+  g.addColorStop(1, 'rgba(255,70,50,0.02)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.07)';
+  ctx.beginPath();
+  ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU);
+  ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU, true);
+  ctx.fill();
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([30 / z, 24 / z]);
+  ctx.strokeStyle = 'rgba(255,110,90,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = 'rgba(170,120,255,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 6 / z;
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU); ctx.stroke();
+}
+
+function drawDust(r, game) {
+  const { ctx } = r;
+  for (const d of game.field.dust) {
+    if (!onScreen(r, d.x, d.y, d.r)) continue;
+    const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+    g.addColorStop(0, 'rgba(170,130,210,0.20)');
+    g.addColorStop(0.7, 'rgba(140,100,190,0.10)');
+    g.addColorStop(1, 'rgba(140,100,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TAU); ctx.fill();
+  }
+}
+
+function onScreen(r, x, y, rad) {
+  const halfW = r.W / 2 / r.cam.zoom + rad, halfH = r.H / 2 / r.cam.zoom + rad;
+  return Math.abs(x - r.cam.x) < halfW && Math.abs(y - r.cam.y) < halfH;
+}
+
+function drawBodies(r, game) {
+  const { ctx } = r;
+  const p = game.field.planet;
+  if (onScreen(r, p.x, p.y, p.r * 1.6)) {
+    const halo = ctx.createRadialGradient(0, 0, p.r * 0.9, 0, 0, p.r * 1.6);
+    halo.addColorStop(0, 'rgba(90,160,255,0.45)');
+    halo.addColorStop(1, 'rgba(90,160,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(0, 0, p.r * 1.6, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(-p.r * 0.35, -p.r * 0.35, p.r * 0.1, 0, 0, p.r);
+    body.addColorStop(0, '#6a8cff');
+    body.addColorStop(0.6, '#2b3d8f');
+    body.addColorStop(1, '#0d1238');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.clip();
+    ctx.strokeStyle = 'rgba(160,190,255,0.12)';
+    ctx.lineWidth = p.r * 0.08;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath(); ctx.ellipse(0, i * p.r * 0.25, p.r * 1.1, p.r * 0.06, 0.15, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  for (const m of game.field.moons) {
+    if (!onScreen(r, m.x, m.y, m.r * 3)) continue;
+    const halo = ctx.createRadialGradient(m.x, m.y, m.r, m.x, m.y, m.r * 3);
+    halo.addColorStop(0, 'rgba(200,170,120,0.12)');
+    halo.addColorStop(1, 'rgba(200,170,120,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 3, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(m.x - m.r * 0.3, m.y - m.r * 0.3, m.r * 0.1, m.x, m.y, m.r);
+    body.addColorStop(0, '#b9a58a');
+    body.addColorStop(1, '#4a3d33');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.9 + m.orbit, d = m.r * (0.2 + 0.15 * k);
+      ctx.beginPath(); ctx.arc(m.x + Math.cos(a) * d, m.y + Math.sin(a) * d, m.r * 0.16, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawPrediction(r, game) {
+  const sh = game.ship;
+  if (!sh.charging) return;
+  let ax = sh.aimX, ay = sh.aimY;
+  if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
+  if (Math.hypot(ax, ay) < 1) return;
+  const pts = predictPath(game, ax, ay, sh.gauge, game.stats.predictTime);
+  r.lastPrediction = pts;
+  const { ctx } = r;
+  const dot = 3.2 / r.cam.zoom;
+  for (let i = 2; i < pts.length; i += 3) {
+    const p = pts[i];
+    ctx.globalAlpha = 0.85 * (1 - i / pts.length) + 0.1;
+    ctx.fillStyle = p.hot ? '#ffe46b' : '#9fe8ff';
+    const s = p.hot ? dot * 2 : dot;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMinimap(r, game) {
+  const { ctx, W, H } = r;
+  const R = Math.min(90, Math.min(W, H) * 0.12);
+  const cx = W - R - 16, cy = R + 16;
+  const k = R / (CONFIG.fieldRadius + 300);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = 'rgba(8,12,28,0.78)';
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.16)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.arc(0, 0, CONFIG.zoneOuter * k, 0, TAU, true); ctx.fill();
+  ctx.fillStyle = 'rgba(255,70,50,0.18)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner * k, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#4a68d8';
+  ctx.beginPath(); ctx.arc(0, 0, Math.max(3, CONFIG.planetRadius * k), 0, TAU); ctx.fill();
+  ctx.fillStyle = '#a08a6c';
+  for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
+  if (r.minimapExtra) r.minimapExtra(ctx, k, game);
+  const sh = game.ship;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, game.viewRadius * k, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#5fd8ff';
+  ctx.beginPath(); ctx.moveTo(sh.x * k, sh.y * k); ctx.lineTo((sh.x + sh.vx * 1.5) * k, (sh.y + sh.vy * 1.5) * k); ctx.stroke();
+  ctx.fillStyle = '#e8f6ff';
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, 3, 0, TAU); ctx.fill();
+  ctx.restore();
 }
 
 function drawBackground(r, game) {
@@ -231,14 +376,48 @@ function drawChargeUi(r, game, pointer) {
   }
 }
 
+const MONO = 'ui-monospace, Menlo, monospace';
+
 function drawHud(r, game) {
+  drawSpeedPanel(r, game);
+}
+
+function drawSpeedPanel(r, game) {
   const { ctx, W, H } = r;
   const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+  const bw = Math.min(420, W * 0.5), bh = 10;
+  const bx = W / 2 - bw / 2, by = H - 34;
+  const top = CONFIG.escapeSpeed * 1.08;
+  const X = (v) => bx + clamp(v / top, 0, 1) * bw;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(bx, by, bw, bh);
+  const hot = sp > game.stats.maxSpeed;
+  ctx.fillStyle = sp >= CONFIG.escapeSpeed ? '#ffd24a' : hot ? '#bff3ff' : '#5fd8ff';
+  ctx.fillRect(bx, by, X(sp) - bx, bh);
+  // max speed tick
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(X(game.stats.maxSpeed) - 1, by - 5, 2, bh + 10);
+  // peak marker
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(X(game.peakSpeed) - 1, by, 2, bh);
+  // escape line
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
+  ctx.font = `11px ${MONO}`;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#e8f0ff';
-  ctx.font = '700 34px ui-monospace, Menlo, monospace';
-  ctx.fillText(`${(sp * CONFIG.speedToKms).toFixed(2)}`, W / 2, H - 46);
-  ctx.font = '12px ui-monospace, Menlo, monospace';
+  ctx.fillText(`脱出 ${kms(CONFIG.escapeSpeed)}`, X(CONFIG.escapeSpeed), by - 11);
+  ctx.fillStyle = '#cfd8ee';
+  ctx.fillText(`上限 ${kms(game.stats.maxSpeed)}`, X(game.stats.maxSpeed), by + bh + 14);
+  ctx.textAlign = 'left';
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('km/s', W / 2, H - 28);
+  ctx.fillText(`最高 ${kms(game.peakSpeed)}`, bx, by - 8);
+  ctx.fillStyle = hot ? '#bff3ff' : '#e8f0ff';
+  ctx.font = `700 34px ${MONO}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(kms(sp), W / 2 + 40, by - 18);
+  ctx.textAlign = 'left';
+  ctx.font = `13px ${MONO}`;
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('km/s', W / 2 + 46, by - 19);
 }

@@ -20,8 +20,8 @@
 const CONFIG = {
   // run
   runTime: 600,
-  escapeSpeed: 2800, // px/s needed to clear
-  speedToKms: 0.004, // display factor: 2800 px/s => 11.2 km/s
+  escapeSpeed: 2400, // px/s needed to clear
+  speedToKms: 11.2 / 2400, // display factor: escape speed shows as 11.2 km/s
 
   // field
   fieldRadius: 6000,
@@ -29,6 +29,15 @@ const CONFIG = {
   zoneInner: 2200,
   zoneOuter: 4200,
   startRadius: 3200,
+  planetGM: 5.12e8, // ~50 px/s^2 at the start radius
+  moonCount: 6,
+  moonGM: 2.5e7,
+  moonOrbitSpeed: 0.02, // rad/s
+  dustCount: 34,
+  dustDrag: 0.55,
+  boundaryPush: 600,
+  crashRestitution: 0.45,
+  crashDamage: 0.03, // hp per px/s of impact speed above 200
 
   // ship
   baseMaxSpeed: 1000,
@@ -38,9 +47,10 @@ const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   boostDuration: 0.9, // seconds after launch with no cruise drag
-  cruiseDrag: 0.3, // per second, once boost energy runs out
+  energyCut: 0.85, // speed kept when the launch energy runs out (applied over ~0.3s)
+  cruiseDrag: 0.06, // weak per-second drag after the energy runs out
   cruiseFloor: 0.35, // cruise drag never slows below this share of max speed
-  overcapDecay: 0.45, // per second decay of speed above max speed
+  overcapDecay: 0.3, // per second decay of speed above max speed
   shipRadius: 16,
   baseHP: 100,
   invulnTime: 0.6,
@@ -122,7 +132,343 @@ function pickWeighted(rng, items) {
   return items[items.length - 1][0];
 }
 
+// ---- ship.js ----
+
+
+function baseStats(meta = {}) {
+  const lv = (k) => meta[k] || 0;
+  return {
+    maxSpeed: CONFIG.baseMaxSpeed * (1 + 0.05 * lv('speed')),
+    launchRatio: CONFIG.launchRatio,
+    carry: CONFIG.carry,
+    chargeTime: CONFIG.chargeTime * Math.pow(0.95, lv('charge')),
+    gaugeMax: 1,
+    boostDuration: CONFIG.boostDuration,
+    cruiseDrag: CONFIG.cruiseDrag,
+    cruiseFloor: CONFIG.cruiseFloor,
+    atkMult: 1 + 0.06 * lv('atk'),
+    maxHp: CONFIG.baseHP + 15 * lv('hp'),
+    pickupRadius: CONFIG.pickupRadius * (1 + 0.15 * lv('pickup')),
+    xpMult: 1 + 0.08 * lv('xp'),
+    damageTakenMult: 1,
+    hitSlowMult: 1,
+    critMult: 2.5,
+    weakArcMult: 1,
+    pierceLossMult: 1,
+    bounceKeep: 0.5,
+    bounceDamageMult: 1,
+    predictTime: 0.9,
+    predictBounce: false,
+    regen: 0,
+  };
+}
+
+function createShip(stats, x, y) {
+  return {
+    x, y, vx: 0, vy: 0,
+    hp: stats.maxHp,
+    charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
+    aimX: 0, aimY: 0,
+    boostT: 0, fadeT: 0, invulnT: 0,
+    trail: [], trailAcc: 0,
+  };
+}
+
+function computeGauge(chargeT, stats, bank = 0) {
+  return Math.min(stats.gaugeMax, Math.max(CONFIG.minGauge, bank + chargeT / stats.chargeTime));
+}
+
+// New velocity after launching along unit direction (dx, dy) with the given gauge.
+function launchVelocity(vx, vy, dx, dy, gauge, stats) {
+  const speed = Math.hypot(vx, vy);
+  const cos = speed > 0 ? Math.max(0, (vx * dx + vy * dy) / speed) : 0;
+  const carried = speed * stats.carry * cos;
+  const thrust = stats.maxSpeed * stats.launchRatio * gauge;
+  const limit = stats.maxSpeed * Math.max(1, gauge);
+  const newSpeed = Math.max(Math.min(carried + thrust, limit), speed * cos);
+  return { vx: dx * newSpeed, vy: dy * newSpeed };
+}
+
+// Integrate one step: acceleration (ax, ay), drag rules, then position.
+function stepShip(ship, stats, dt, ax, ay, extraDrag) {
+  ship.vx += ax * dt;
+  ship.vy += ay * dt;
+  let sp = Math.hypot(ship.vx, ship.vy);
+  if (sp > 0) {
+    let target = sp;
+    if (ship.boostT > 0) {
+      ship.boostT -= dt;
+      if (ship.boostT <= 0) ship.fadeT = 0.3;
+    } else {
+      if (ship.fadeT > 0) {
+        ship.fadeT -= dt;
+        if (target > stats.maxSpeed * stats.cruiseFloor) target *= Math.pow(CONFIG.energyCut, dt / 0.3);
+      }
+      const floor = stats.maxSpeed * stats.cruiseFloor;
+      if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
+    }
+    if (target > stats.maxSpeed) {
+      target = stats.maxSpeed + (target - stats.maxSpeed) * Math.exp(-CONFIG.overcapDecay * dt);
+    }
+    if (extraDrag > 0) target *= Math.exp(-extraDrag * dt);
+    const k = target / sp;
+    ship.vx *= k;
+    ship.vy *= k;
+  }
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+}
+
+// ---- field.js ----
+
+
+
+function createField(rng) {
+  const moons = [];
+  for (let i = 0; i < CONFIG.moonCount; i++) {
+    moons.push({
+      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
+      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
+      dir: rng() < 0.5 ? -1 : 1,
+      r: randRange(rng, 110, 180),
+      gm: CONFIG.moonGM,
+      x: 0, y: 0,
+    });
+  }
+  const dust = [];
+  for (let i = 0; i < CONFIG.dustCount; i++) {
+    const a = rng() * TAU;
+    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
+    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
+  }
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  updateMoons(field, 0);
+  return field;
+}
+
+function updateMoons(field, t) {
+  for (const m of field.moons) {
+    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
+    m.x = Math.cos(a) * m.orbit;
+    m.y = Math.sin(a) * m.orbit;
+  }
+}
+
+function zoneOf(r) {
+  if (r < CONFIG.zoneInner) return 'inner';
+  if (r > CONFIG.zoneOuter) return 'outer';
+  return 'mid';
+}
+
+// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
+function dangerAt(r) {
+  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
+  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
+  return 0;
+}
+
+function dustDragAt(field, x, y) {
+  for (const d of field.dust) {
+    const dx = x - d.x, dy = y - d.y;
+    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
+  }
+  return 0;
+}
+
+// ---- gravity.js ----
+
+
+function pull(out, x, y, b) {
+  const dx = b.x - x, dy = b.y - y;
+  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
+  const d = Math.sqrt(d2);
+  const a = b.gm / d2;
+  out.ax += (dx / d) * a;
+  out.ay += (dy / d) * a;
+}
+
+function gravityAt(field, t, x, y) {
+  const out = { ax: 0, ay: 0 };
+  pull(out, x, y, field.planet);
+  for (const m of field.moons) pull(out, x, y, m);
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius) {
+    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
+    out.ax -= (x / r) * push;
+    out.ay -= (y / r) * push;
+  }
+  return out;
+}
+
+// ---- world.js ----
+
+
+
+
+
+
+const STEP = 1 / 120;
+
+function createGame(opts = {}) {
+  const meta = opts.meta || {};
+  const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
+  const stats = baseStats(meta);
+  const rng = makeRng(seed);
+  const ship = createShip(stats, -CONFIG.startRadius, 0);
+  ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
+  return {
+    t: 0, acc: 0, seed, rng,
+    meta, stats, ship,
+    field: createField(rng),
+    debug: { invincible: false },
+    state: 'play',
+    timeScale: 1,
+    releasePending: null,
+    dashId: 0,
+    peakSpeed: 0,
+    events: [],
+    viewRadius: 1400,
+  };
+}
+
+function update(game, frameDt, input) {
+  if (game.state !== 'play') return;
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
+  game.acc += Math.min(frameDt, 0.1) * game.timeScale;
+  while (game.acc >= STEP) {
+    game.acc -= STEP;
+    step(game, STEP, input);
+    if (game.state !== 'play') break;
+  }
+}
+
+function step(game, dt, input) {
+  const sh = game.ship;
+  const stats = game.stats;
+  game.t += dt;
+
+  if (input.charging && !game.releasePending) {
+    if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
+    sh.chargeT += dt;
+    sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
+    sh.aimX = input.aimX; sh.aimY = input.aimY;
+  }
+  if (game.releasePending) {
+    const r = game.releasePending;
+    game.releasePending = null;
+    if (sh.charging) launch(game, r.x, r.y);
+    sh.charging = false;
+  }
+
+  updateMoons(game.field, game.t);
+  const g = gravityAt(game.field, game.t, sh.x, sh.y);
+  const drag = dustDragAt(game.field, sh.x, sh.y);
+  stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  collideBodies(game);
+  if (sh.invulnT > 0) sh.invulnT -= dt;
+
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > game.peakSpeed) game.peakSpeed = sp;
+  recordTrail(sh, dt);
+}
+
+function launch(game, ax, ay) {
+  const sh = game.ship;
+  const len = Math.hypot(ax, ay);
+  let dx, dy;
+  if (len < CONFIG.minDrag) {
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (sp < 1) return;
+    dx = sh.vx / sp; dy = sh.vy / sp;
+  } else {
+    dx = ax / len; dy = ay / len;
+  }
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
+  sh.vx = v.vx; sh.vy = v.vy;
+  sh.boostT = game.stats.boostDuration;
+  sh.gaugeBank = 0;
+  game.dashId++;
+  game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+function collideBodies(game) {
+  const sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const f = game.field;
+  for (const b of [f.planet, ...f.moons]) {
+    const dx = sh.x - b.x, dy = sh.y - b.y;
+    const d = Math.hypot(dx, dy);
+    const min = b.r + R;
+    if (d >= min || d === 0) continue;
+    const nx = dx / d, ny = dy / d;
+    sh.x = b.x + nx * min;
+    sh.y = b.y + ny * min;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) {
+      sh.vx -= (1 + CONFIG.crashRestitution) * vn * nx;
+      sh.vy -= (1 + CONFIG.crashRestitution) * vn * ny;
+      const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage;
+      if (dmg > 0) damageShip(game, dmg, 0);
+      game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
+    }
+  }
+  // hard wall well outside the soft boundary
+  const r = Math.hypot(sh.x, sh.y);
+  const wall = CONFIG.fieldRadius + 500;
+  if (r > wall) {
+    const nx = sh.x / r, ny = sh.y / r;
+    sh.x = nx * wall; sh.y = ny * wall;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn > 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+  }
+}
+
+// amount: hp lost, slow: share of speed lost (0..1)
+function damageShip(game, amount, slow) {
+  const sh = game.ship;
+  if (sh.invulnT > 0 || game.debug.invincible) return false;
+  sh.hp -= amount * game.stats.damageTakenMult;
+  const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
+  sh.vx *= k; sh.vy *= k;
+  sh.invulnT = CONFIG.invulnTime;
+  game.events.push({ type: 'hurt', amount, x: sh.x, y: sh.y });
+  return true;
+}
+
+// Ballistic preview of a launch along (dx, dy) with the given gauge, under gravity only.
+function predictPath(game, dx, dy, gauge, seconds) {
+  const sh = game.ship;
+  const len = Math.hypot(dx, dy) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, dx / len, dy / len, gauge, game.stats);
+  const ghost = { x: sh.x, y: sh.y, vx: v.vx, vy: v.vy, boostT: game.stats.boostDuration };
+  const pts = [];
+  const h = 1 / 60;
+  const moons = game.field.moons.map((m) => ({ ...m }));
+  const field = { ...game.field, moons };
+  for (let t = 0; t < seconds; t += h) {
+    updateMoons(field, game.t + t);
+    const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
+    stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
+    pts.push({ x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy) });
+    if (Math.hypot(ghost.x, ghost.y) < CONFIG.planetRadius + CONFIG.shipRadius) break;
+  }
+  return pts;
+}
+
+function recordTrail(sh, dt) {
+  sh.trailAcc += dt;
+  if (sh.trailAcc < 1 / 60) return;
+  sh.trailAcc = 0;
+  sh.trail.push({ x: sh.x, y: sh.y });
+  if (sh.trail.length > 150) sh.trail.shift();
+}
+
+function shipSpeed(game) {
+  return Math.hypot(game.ship.vx, game.ship.vy);
+}
+
 // ---- render.js ----
+
 
 
 
@@ -188,13 +534,157 @@ function render(r, game, dt, pointer) {
   ctx.translate(r.W / 2 + sx, r.H / 2 + sy);
   ctx.scale(r.cam.zoom, r.cam.zoom);
   ctx.translate(-r.cam.x, -r.cam.y);
+  drawZones(r);
+  drawDust(r, game);
   drawSpecks(r);
+  drawBodies(r, game);
+  drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
   drawHud(r, game);
+  drawMinimap(r, game);
+}
+
+function drawZones(r) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const g = ctx.createRadialGradient(0, 0, CONFIG.planetRadius, 0, 0, CONFIG.zoneInner);
+  g.addColorStop(0, 'rgba(255,70,50,0.16)');
+  g.addColorStop(1, 'rgba(255,70,50,0.02)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.07)';
+  ctx.beginPath();
+  ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU);
+  ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU, true);
+  ctx.fill();
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([30 / z, 24 / z]);
+  ctx.strokeStyle = 'rgba(255,110,90,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = 'rgba(170,120,255,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 6 / z;
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU); ctx.stroke();
+}
+
+function drawDust(r, game) {
+  const { ctx } = r;
+  for (const d of game.field.dust) {
+    if (!onScreen(r, d.x, d.y, d.r)) continue;
+    const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+    g.addColorStop(0, 'rgba(170,130,210,0.20)');
+    g.addColorStop(0.7, 'rgba(140,100,190,0.10)');
+    g.addColorStop(1, 'rgba(140,100,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TAU); ctx.fill();
+  }
+}
+
+function onScreen(r, x, y, rad) {
+  const halfW = r.W / 2 / r.cam.zoom + rad, halfH = r.H / 2 / r.cam.zoom + rad;
+  return Math.abs(x - r.cam.x) < halfW && Math.abs(y - r.cam.y) < halfH;
+}
+
+function drawBodies(r, game) {
+  const { ctx } = r;
+  const p = game.field.planet;
+  if (onScreen(r, p.x, p.y, p.r * 1.6)) {
+    const halo = ctx.createRadialGradient(0, 0, p.r * 0.9, 0, 0, p.r * 1.6);
+    halo.addColorStop(0, 'rgba(90,160,255,0.45)');
+    halo.addColorStop(1, 'rgba(90,160,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(0, 0, p.r * 1.6, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(-p.r * 0.35, -p.r * 0.35, p.r * 0.1, 0, 0, p.r);
+    body.addColorStop(0, '#6a8cff');
+    body.addColorStop(0.6, '#2b3d8f');
+    body.addColorStop(1, '#0d1238');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.clip();
+    ctx.strokeStyle = 'rgba(160,190,255,0.12)';
+    ctx.lineWidth = p.r * 0.08;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath(); ctx.ellipse(0, i * p.r * 0.25, p.r * 1.1, p.r * 0.06, 0.15, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  for (const m of game.field.moons) {
+    if (!onScreen(r, m.x, m.y, m.r * 3)) continue;
+    const halo = ctx.createRadialGradient(m.x, m.y, m.r, m.x, m.y, m.r * 3);
+    halo.addColorStop(0, 'rgba(200,170,120,0.12)');
+    halo.addColorStop(1, 'rgba(200,170,120,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 3, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(m.x - m.r * 0.3, m.y - m.r * 0.3, m.r * 0.1, m.x, m.y, m.r);
+    body.addColorStop(0, '#b9a58a');
+    body.addColorStop(1, '#4a3d33');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.9 + m.orbit, d = m.r * (0.2 + 0.15 * k);
+      ctx.beginPath(); ctx.arc(m.x + Math.cos(a) * d, m.y + Math.sin(a) * d, m.r * 0.16, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawPrediction(r, game) {
+  const sh = game.ship;
+  if (!sh.charging) return;
+  let ax = sh.aimX, ay = sh.aimY;
+  if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
+  if (Math.hypot(ax, ay) < 1) return;
+  const pts = predictPath(game, ax, ay, sh.gauge, game.stats.predictTime);
+  r.lastPrediction = pts;
+  const { ctx } = r;
+  const dot = 3.2 / r.cam.zoom;
+  for (let i = 2; i < pts.length; i += 3) {
+    const p = pts[i];
+    ctx.globalAlpha = 0.85 * (1 - i / pts.length) + 0.1;
+    ctx.fillStyle = p.hot ? '#ffe46b' : '#9fe8ff';
+    const s = p.hot ? dot * 2 : dot;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMinimap(r, game) {
+  const { ctx, W, H } = r;
+  const R = Math.min(90, Math.min(W, H) * 0.12);
+  const cx = W - R - 16, cy = R + 16;
+  const k = R / (CONFIG.fieldRadius + 300);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = 'rgba(8,12,28,0.78)';
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.16)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.arc(0, 0, CONFIG.zoneOuter * k, 0, TAU, true); ctx.fill();
+  ctx.fillStyle = 'rgba(255,70,50,0.18)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner * k, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#4a68d8';
+  ctx.beginPath(); ctx.arc(0, 0, Math.max(3, CONFIG.planetRadius * k), 0, TAU); ctx.fill();
+  ctx.fillStyle = '#a08a6c';
+  for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
+  if (r.minimapExtra) r.minimapExtra(ctx, k, game);
+  const sh = game.ship;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, game.viewRadius * k, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#5fd8ff';
+  ctx.beginPath(); ctx.moveTo(sh.x * k, sh.y * k); ctx.lineTo((sh.x + sh.vx * 1.5) * k, (sh.y + sh.vy * 1.5) * k); ctx.stroke();
+  ctx.fillStyle = '#e8f6ff';
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, 3, 0, TAU); ctx.fill();
+  ctx.restore();
 }
 
 function drawBackground(r, game) {
@@ -356,16 +846,50 @@ function drawChargeUi(r, game, pointer) {
   }
 }
 
+const MONO = 'ui-monospace, Menlo, monospace';
+
 function drawHud(r, game) {
+  drawSpeedPanel(r, game);
+}
+
+function drawSpeedPanel(r, game) {
   const { ctx, W, H } = r;
   const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+  const bw = Math.min(420, W * 0.5), bh = 10;
+  const bx = W / 2 - bw / 2, by = H - 34;
+  const top = CONFIG.escapeSpeed * 1.08;
+  const X = (v) => bx + clamp(v / top, 0, 1) * bw;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(bx, by, bw, bh);
+  const hot = sp > game.stats.maxSpeed;
+  ctx.fillStyle = sp >= CONFIG.escapeSpeed ? '#ffd24a' : hot ? '#bff3ff' : '#5fd8ff';
+  ctx.fillRect(bx, by, X(sp) - bx, bh);
+  // max speed tick
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(X(game.stats.maxSpeed) - 1, by - 5, 2, bh + 10);
+  // peak marker
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(X(game.peakSpeed) - 1, by, 2, bh);
+  // escape line
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
+  ctx.font = `11px ${MONO}`;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#e8f0ff';
-  ctx.font = '700 34px ui-monospace, Menlo, monospace';
-  ctx.fillText(`${(sp * CONFIG.speedToKms).toFixed(2)}`, W / 2, H - 46);
-  ctx.font = '12px ui-monospace, Menlo, monospace';
+  ctx.fillText(`脱出 ${kms(CONFIG.escapeSpeed)}`, X(CONFIG.escapeSpeed), by - 11);
+  ctx.fillStyle = '#cfd8ee';
+  ctx.fillText(`上限 ${kms(game.stats.maxSpeed)}`, X(game.stats.maxSpeed), by + bh + 14);
+  ctx.textAlign = 'left';
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('km/s', W / 2, H - 28);
+  ctx.fillText(`最高 ${kms(game.peakSpeed)}`, bx, by - 8);
+  ctx.fillStyle = hot ? '#bff3ff' : '#e8f0ff';
+  ctx.font = `700 34px ${MONO}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(kms(sp), W / 2 + 40, by - 18);
+  ctx.textAlign = 'left';
+  ctx.font = `13px ${MONO}`;
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('km/s', W / 2 + 46, by - 19);
 }
 
 // ---- input.js ----
@@ -406,180 +930,6 @@ function createInput(el) {
     },
     reset() { st.down = false; st.release = false; },
   };
-}
-
-// ---- ship.js ----
-
-
-function baseStats(meta = {}) {
-  const lv = (k) => meta[k] || 0;
-  return {
-    maxSpeed: CONFIG.baseMaxSpeed * (1 + 0.05 * lv('speed')),
-    launchRatio: CONFIG.launchRatio,
-    carry: CONFIG.carry,
-    chargeTime: CONFIG.chargeTime * Math.pow(0.95, lv('charge')),
-    gaugeMax: 1,
-    boostDuration: CONFIG.boostDuration,
-    cruiseDrag: CONFIG.cruiseDrag,
-    cruiseFloor: CONFIG.cruiseFloor,
-    atkMult: 1 + 0.06 * lv('atk'),
-    maxHp: CONFIG.baseHP + 15 * lv('hp'),
-    pickupRadius: CONFIG.pickupRadius * (1 + 0.15 * lv('pickup')),
-    xpMult: 1 + 0.08 * lv('xp'),
-    damageTakenMult: 1,
-    hitSlowMult: 1,
-    critMult: 2.5,
-    weakArcMult: 1,
-    pierceLossMult: 1,
-    bounceKeep: 0.5,
-    bounceDamageMult: 1,
-    predictTime: 0.9,
-    predictBounce: false,
-    regen: 0,
-  };
-}
-
-function createShip(stats, x, y) {
-  return {
-    x, y, vx: 0, vy: 0,
-    hp: stats.maxHp,
-    charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0,
-    boostT: 0, invulnT: 0,
-    trail: [], trailAcc: 0,
-  };
-}
-
-function computeGauge(chargeT, stats, bank = 0) {
-  return Math.min(stats.gaugeMax, Math.max(CONFIG.minGauge, bank + chargeT / stats.chargeTime));
-}
-
-// New velocity after launching along unit direction (dx, dy) with the given gauge.
-function launchVelocity(vx, vy, dx, dy, gauge, stats) {
-  const speed = Math.hypot(vx, vy);
-  const cos = speed > 0 ? Math.max(0, (vx * dx + vy * dy) / speed) : 0;
-  const carried = speed * stats.carry * cos;
-  const thrust = stats.maxSpeed * stats.launchRatio * gauge;
-  const limit = stats.maxSpeed * Math.max(1, gauge);
-  const newSpeed = Math.max(Math.min(carried + thrust, limit), speed * cos);
-  return { vx: dx * newSpeed, vy: dy * newSpeed };
-}
-
-// Integrate one step: acceleration (ax, ay), drag rules, then position.
-function stepShip(ship, stats, dt, ax, ay, extraDrag) {
-  ship.vx += ax * dt;
-  ship.vy += ay * dt;
-  let sp = Math.hypot(ship.vx, ship.vy);
-  if (sp > 0) {
-    let target = sp;
-    if (ship.boostT > 0) {
-      ship.boostT -= dt;
-    } else {
-      const floor = stats.maxSpeed * stats.cruiseFloor;
-      if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
-    }
-    if (target > stats.maxSpeed) {
-      target = stats.maxSpeed + (target - stats.maxSpeed) * Math.exp(-CONFIG.overcapDecay * dt);
-    }
-    if (extraDrag > 0) target *= Math.exp(-extraDrag * dt);
-    const k = target / sp;
-    ship.vx *= k;
-    ship.vy *= k;
-  }
-  ship.x += ship.vx * dt;
-  ship.y += ship.vy * dt;
-}
-
-// ---- world.js ----
-
-
-
-
-const STEP = 1 / 120;
-
-function createGame(opts = {}) {
-  const meta = opts.meta || {};
-  const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
-  const stats = baseStats(meta);
-  const ship = createShip(stats, -CONFIG.startRadius, 0);
-  return {
-    t: 0, acc: 0, seed, rng: makeRng(seed),
-    meta, stats, ship,
-    state: 'play',
-    timeScale: 1,
-    releasePending: null,
-    dashId: 0,
-    peakSpeed: 0,
-    events: [],
-    viewRadius: 1400,
-  };
-}
-
-function update(game, frameDt, input) {
-  if (game.state !== 'play') return;
-  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
-  game.acc += Math.min(frameDt, 0.1) * game.timeScale;
-  while (game.acc >= STEP) {
-    game.acc -= STEP;
-    step(game, STEP, input);
-    if (game.state !== 'play') break;
-  }
-}
-
-function step(game, dt, input) {
-  const sh = game.ship;
-  const stats = game.stats;
-  game.t += dt;
-
-  if (input.charging && !game.releasePending) {
-    if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
-    sh.chargeT += dt;
-    sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
-    sh.aimX = input.aimX; sh.aimY = input.aimY;
-  }
-  if (game.releasePending) {
-    const r = game.releasePending;
-    game.releasePending = null;
-    if (sh.charging) launch(game, r.x, r.y);
-    sh.charging = false;
-  }
-
-  stepShip(sh, stats, dt, 0, 0, 0);
-
-  const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > game.peakSpeed) game.peakSpeed = sp;
-  recordTrail(sh, dt);
-}
-
-function launch(game, ax, ay) {
-  const sh = game.ship;
-  const len = Math.hypot(ax, ay);
-  let dx, dy;
-  if (len < CONFIG.minDrag) {
-    const sp = Math.hypot(sh.vx, sh.vy);
-    if (sp < 1) return;
-    dx = sh.vx / sp; dy = sh.vy / sp;
-  } else {
-    dx = ax / len; dy = ay / len;
-  }
-  const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
-  sh.vx = v.vx; sh.vy = v.vy;
-  sh.boostT = game.stats.boostDuration;
-  sh.gaugeBank = 0;
-  game.dashId++;
-  game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
-}
-
-function recordTrail(sh, dt) {
-  sh.trailAcc += dt;
-  if (sh.trailAcc < 1 / 60) return;
-  sh.trailAcc = 0;
-  sh.trail.push({ x: sh.x, y: sh.y });
-  if (sh.trail.length > 150) sh.trail.shift();
-}
-
-function shipSpeed(game) {
-  return Math.hypot(game.ship.vx, game.ship.vy);
 }
 
 // ---- main.js ----
