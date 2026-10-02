@@ -1923,7 +1923,7 @@ function commitPath(game) {
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
   const rate = Math.max(speed, total / CONFIG.drawRunTime);
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget };
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map() };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -1938,10 +1938,14 @@ function runAlongPath(game, realDt) {
     const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
     const move = Math.min(dist, segLen - r.segPos);
     const x0 = sh.x, y0 = sh.y;
+    // enemies the band has left can be hit again on the next pass
+    for (const [id, e] of r.inside) {
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + CONFIG.drawHitRadius + 2) r.inside.delete(id);
+    }
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius, r)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -1961,7 +1965,8 @@ function previewPath(game) {
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
   const samples = [];
-  const targets = new Map(); // enemy -> crit?
+  const targets = new Map(); // enemy -> { crit, hits }
+  let prev = new Set();
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -1969,13 +1974,19 @@ function previewPath(game) {
     for (let k = 1; k <= n; k++) {
       const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
       let blocked = false;
+      const cur = new Set();
       queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
         if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > (e.r + R) ** 2) return;
+        cur.add(e);
+        if (prev.has(e)) return; // still inside from the previous sample: same pass
         const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
         if (crit) p.hot = true;
-        if (!canPierce(atk, e, crit)) blocked = true;
-        else if (!targets.has(e) || crit) targets.set(e, crit);
+        if (!canPierce(atk, e, crit)) { blocked = true; return; }
+        const t = targets.get(e) || { crit: false, hits: 0 };
+        t.hits++; t.crit = t.crit || crit;
+        targets.set(e, t);
       });
+      prev = cur;
       samples.push(p);
       if (blocked) return { samples, block: p, targets: [...targets] };
     }
@@ -2020,13 +2031,14 @@ function damageShip(game, amount, slow, cause = 'other') {
 }
 
 // R: hit radius of the ship (wider while tracing a drawn path).
-function collideEnemies(game, x0, y0, R = CONFIG.shipRadius) {
+// run: the trace state; while tracing, an enemy can be hit again each time the band re-enters it.
+function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
   const sh = game.ship, stats = game.stats;
   const x1 = sh.x, y1 = sh.y;
   const pad = R + MAX_ENEMY_R;
   const hits = [];
   queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
-    if (e.hitCD > 0) return;
+    if (run ? run.inside.has(e.id) : e.hitCD > 0) return;
     const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
     if (t >= 0) hits.push({ e, t });
   });
@@ -2042,6 +2054,7 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius) {
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
       e.hitCD = 0.3;
+      if (run) run.inside.set(e.id, e);
       const keep = pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
@@ -2903,10 +2916,16 @@ function drawPathUi(r, game) {
   }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
-  for (const [e, crit] of pv.targets) {
-    ctx.strokeStyle = crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+  ctx.textAlign = 'left';
+  ctx.font = `800 ${Math.round(15 / z)}px ${MONO}`;
+  for (const [e, t] of pv.targets) {
+    ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
+    if (t.hits > 1) {
+      ctx.fillStyle = t.crit ? '#ffe46b' : '#ffffff';
+      ctx.fillText(`×${t.hits}`, e.x + e.r + 10 / z, e.y - e.r);
+    }
   }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }

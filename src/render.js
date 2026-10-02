@@ -507,10 +507,16 @@ function drawPathUi(r, game) {
   }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
-  for (const [e, crit] of pv.targets) {
-    ctx.strokeStyle = crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+  ctx.textAlign = 'left';
+  ctx.font = `800 ${Math.round(15 / z)}px ${MONO}`;
+  for (const [e, t] of pv.targets) {
+    ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
+    if (t.hits > 1) {
+      ctx.fillStyle = t.crit ? '#ffe46b' : '#ffffff';
+      ctx.fillText(`×${t.hits}`, e.x + e.r + 10 / z, e.y - e.r);
+    }
   }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }

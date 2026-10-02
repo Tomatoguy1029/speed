@@ -120,3 +120,18 @@ test('committing without drawing dashes straight at the cursor', () => {
   for (let i = 0; i < 100 && game.draw; i++) update(game, 0.02, { ...idle, cursor: at(0, 500) });
   assert.ok(game.ship.y > OY + 300 && Math.abs(game.ship.x) < 5);
 });
+
+test('a path that crosses the same enemy twice hits it twice', () => {
+  const game = quiet();
+  const tank = createEnemy('armored', 1, 300, OY); tank.speed = 0; tank.facing = 0; // weak spot faces away (+x)
+  tank.hp = tank.maxHp = 1000; tank.armor = 1; // pierceable, survives both passes
+  game.enemies.push(tank);
+  charge(game, 0.8, at(0, 0));
+  // through it, out the far side, swing around, and back through
+  const route = [[150, 0], [300, 0], [450, 0], [450, 150], [300, 150], [300, 0], [300, -150]];
+  for (const [x, y] of route) update(game, 0.02, { ...idle, cursor: at(x, y) });
+  update(game, 0.02, { ...idle, press: true, cursor: at(300, -150) });
+  const hits = [];
+  for (let i = 0; i < 200 && game.draw; i++) { update(game, 0.02, { ...idle, cursor: at(300, -150) }); hits.push(...game.events.filter((e) => e.type === 'hit')); game.events.length = 0; }
+  assert.ok(hits.length >= 2, `hits ${hits.length}`);
+});
