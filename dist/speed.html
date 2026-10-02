@@ -101,11 +101,9 @@ const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
-  nudgeAccel: 450, // WASD thrust (px/s^2) at rest
-  nudgeSteer: 0.7, // extra WASD thrust per px/s of speed, so fast ships can still bend
-  nudgeMaxSpeed: 0.4, // W can only speed the ship up below this share of max speed
-  pivotSpeed: 60, // below this speed A/D turn the ship in place instead of bending the path
-  pivotRate: 3.2, // rad/s turning in place
+  steerRate: 4.5, // rad/s the travel direction swings toward the held WASD direction
+  steerAccel: 900, // px/s^2 WASD acceleration while below cruise speed
+  steerCruise: 0.4, // WASD alone gets the ship up to this share of max speed
   boostDuration: 0.9, // seconds after launch with no cruise drag
   energyCut: 0.85, // speed kept when the launch energy runs out (applied over ~0.3s)
   cruiseDrag: 0.06, // weak per-second drag after the energy runs out
@@ -245,7 +243,7 @@ function createShip(stats, x, y) {
     x, y, vx: 0, vy: 0,
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or last nudge when nearly still
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last WASD direction when nearly still
     boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
@@ -1471,38 +1469,35 @@ function update(game, frameDt, input) {
   }
 }
 
-// Ship-relative WASD. W: forward thrust (only speeds up while slow). S: brake, never reverse.
-// A/D: bend the trajectory left/right when moving (stronger at speed), turn in place when nearly still.
-function nudge(game, move, dt) {
+// Screen-absolute WASD: swing the travel direction toward the held direction at a fixed turn rate
+// (speed is kept), and below cruise speed also accelerate that way so the ship can always get going.
+function steer(game, move, dt) {
+  if (!move || (!move.x && !move.y)) return;
   const sh = game.ship;
-  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
-  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const rx = -sh.hy, ry = sh.hx; // ship's right
-  let ax = 0, ay = 0;
-  if (side) {
-    if (sp > CONFIG.pivotSpeed) {
-      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
-      ax += rx * side * acc; ay += ry * side * acc;
-    } else {
-      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
-      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
-    }
+  const want = Math.atan2(move.y, move.x);
+  let sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > 1) {
+    const cur = Math.atan2(sh.vy, sh.vx);
+    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const vx = sh.vx * c - sh.vy * s;
+    sh.vy = sh.vx * s + sh.vy * c;
+    sh.vx = vx;
   }
-  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) {
-    ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel;
+  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
+  if (sp < cruise) {
+    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
+    sh.vx += Math.cos(want) * add;
+    sh.vy += Math.sin(want) * add;
   }
-  if (fwd < 0 && sp > 0) {
-    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
-    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
-  }
-  return { ax, ay };
+  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
 }
 
-// Heading follows the travel direction; when nearly still it stays where A/D turned it.
+// Heading follows the travel direction; when nearly still it keeps the last key direction.
 function updateHeading(sh) {
   const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
 }
 
 function step(game, dt, input) {
@@ -1515,6 +1510,7 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
+  steer(game, input.move, dt);
   updateHeading(sh);
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
@@ -1541,10 +1537,9 @@ function step(game, dt, input) {
   game.grid = buildGrid(game.enemies, 160);
 
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const n = nudge(game, input.move, dt);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax + n.ax, g.ay + n.ay, drag);
+  stepShip(sh, stats, dt, g.ax, g.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
@@ -2666,28 +2661,25 @@ function drawTrail(r, game) {
   ctx.globalAlpha = 1;
 }
 
+// The ship never rotates: a round craft, so screen-absolute controls always read the same way.
+// Direction is shown by the trail and the heading marker instead.
 function drawShip(r, game) {
   const { ctx } = r;
   const sh = game.ship;
-  let ang = Math.atan2(sh.hy, sh.hx); // heading: travel direction, or where the ship was turned while still
-  if (sh.charging && Math.hypot(sh.aimX, sh.aimY) >= CONFIG.minDrag) ang = Math.atan2(sh.aimY, sh.aimX);
-  const R = CONFIG.shipRadius;
-  const minPx = 9 / r.cam.zoom;
-  const s = Math.max(R, minPx);
+  const s = Math.max(CONFIG.shipRadius, 9 / r.cam.zoom);
   ctx.save();
   ctx.translate(sh.x, sh.y);
-  ctx.rotate(ang);
   if (sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
   ctx.shadowColor = '#5fd8ff';
   ctx.shadowBlur = 18;
-  ctx.fillStyle = '#e8f6ff';
-  ctx.beginPath();
-  ctx.moveTo(s * 1.3, 0);
-  ctx.lineTo(-s * 0.9, s * 0.8);
-  ctx.lineTo(-s * 0.5, 0);
-  ctx.lineTo(-s * 0.9, -s * 0.8);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = '#1b3b5c';
+  ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
+  ctx.lineWidth = s * 0.28;
+  ctx.strokeStyle = '#bff3ff';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.82, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.38, 0, TAU); ctx.fill();
   ctx.restore();
 }
 
@@ -3082,7 +3074,7 @@ function showStation(save, onBuy, onDepart) {
     el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
-      el('li', {}, el('b', {}, 'キーボード'), '（機体基準）：', el('kbd', {}, 'W'), ' 前進　', el('kbd', {}, 'S'), ' ブレーキ　', el('kbd', {}, 'A'), el('kbd', {}, 'D'), ' 左右に曲がる（止まっているとその場で旋回）。', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離すと機体の向きへ加速'),
+      el('li', {}, el('b', {}, 'キーボード'), '：', el('kbd', {}, 'W'), el('kbd', {}, 'A'), el('kbd', {}, 'S'), el('kbd', {}, 'D'), '（矢印キー可）で行きたい方向へ向かう（画面基準）。', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離すと進んでいる方向へ加速'),
       el('li', {}, el('b', {}, 'マウス'), '：画面を押したままドラッグ → 離すと、ドラッグと逆方向へ突進。長く押すほど強い'),
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
@@ -3285,10 +3277,9 @@ const TUNABLES = [
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
-  { key: 'nudgeAccel', label: 'WASD 推力（静止時）', min: 0, max: 1500, step: 25 },
-  { key: 'nudgeSteer', label: 'A/D 曲がりやすさ（速度比）', min: 0, max: 3, step: 0.05 },
-  { key: 'nudgeMaxSpeed', label: 'W で加速できる上限（上限比）', min: 0, max: 1, step: 0.05 },
-  { key: 'pivotRate', label: '停止中の旋回 rad/s', min: 0.5, max: 8, step: 0.1 },
+  { key: 'steerRate', label: 'WASD 旋回の速さ rad/s', min: 0.5, max: 12, step: 0.1 },
+  { key: 'steerAccel', label: 'WASD 加速（低速時）', min: 0, max: 3000, step: 50 },
+  { key: 'steerCruise', label: 'WASD だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
   { key: 'boostDuration', label: '突進エネルギー（秒）', min: 0.1, max: 3, step: 0.05 },
   { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
   { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },

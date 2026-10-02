@@ -750,28 +750,25 @@ function drawTrail(r, game) {
   ctx.globalAlpha = 1;
 }
 
+// The ship never rotates: a round craft, so screen-absolute controls always read the same way.
+// Direction is shown by the trail and the heading marker instead.
 function drawShip(r, game) {
   const { ctx } = r;
   const sh = game.ship;
-  let ang = Math.atan2(sh.hy, sh.hx); // heading: travel direction, or where the ship was turned while still
-  if (sh.charging && Math.hypot(sh.aimX, sh.aimY) >= CONFIG.minDrag) ang = Math.atan2(sh.aimY, sh.aimX);
-  const R = CONFIG.shipRadius;
-  const minPx = 9 / r.cam.zoom;
-  const s = Math.max(R, minPx);
+  const s = Math.max(CONFIG.shipRadius, 9 / r.cam.zoom);
   ctx.save();
   ctx.translate(sh.x, sh.y);
-  ctx.rotate(ang);
   if (sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
   ctx.shadowColor = '#5fd8ff';
   ctx.shadowBlur = 18;
-  ctx.fillStyle = '#e8f6ff';
-  ctx.beginPath();
-  ctx.moveTo(s * 1.3, 0);
-  ctx.lineTo(-s * 0.9, s * 0.8);
-  ctx.lineTo(-s * 0.5, 0);
-  ctx.lineTo(-s * 0.9, -s * 0.8);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = '#1b3b5c';
+  ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
+  ctx.lineWidth = s * 0.28;
+  ctx.strokeStyle = '#bff3ff';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.82, 0, TAU); ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(0, 0, s * 0.38, 0, TAU); ctx.fill();
   ctx.restore();
 }
 

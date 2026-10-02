@@ -33,7 +33,7 @@ export function createShip(stats, x, y) {
     x, y, vx: 0, vy: 0,
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or last nudge when nearly still
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last WASD direction when nearly still
     boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };

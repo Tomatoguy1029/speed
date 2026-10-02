@@ -54,10 +54,10 @@ test('reset drops a held Space so no stray launch happens after a menu', () => {
   assert.equal(r.release, false);
 });
 
-// ---- ship-relative WASD in the world ----
+// ---- absolute WASD steering in the world ----
 
 const none = { x: 0, y: 0 };
-const W = { x: 0, y: -1 }, S = { x: 0, y: 1 }, A = { x: -1, y: 0 }, D = { x: 1, y: 0 };
+const UP = { x: 0, y: -1 }, DOWN = { x: 0, y: 1 }, RIGHT = { x: 1, y: 0 }, LEFT = { x: -1, y: 0 };
 const idle = { charging: false, aimX: 0, aimY: 0, release: false, keyboard: false, move: none };
 
 function quiet() {
@@ -65,53 +65,47 @@ function quiet() {
   game.spawning = false;
   game.field.planet.gm = 0; game.field.moons.length = 0; game.field.dust.length = 0;
   game.ship.x = 0; game.ship.y = -3000; game.ship.vx = 0; game.ship.vy = 0;
-  game.ship.hx = 0; game.ship.hy = -1; // facing up the screen
   return game;
 }
 
-const run = (game, move, n = 10, dt = 0.1) => { for (let i = 0; i < n; i++) update(game, dt, { ...idle, move }); };
-const heading = (game) => Math.atan2(game.ship.hy, game.ship.hx);
+const run = (game, move, seconds, dt = 0.05) => { for (let t = 0; t < seconds - 1e-9; t += dt) update(game, dt, { ...idle, move }); };
+const speed = (game) => Math.hypot(game.ship.vx, game.ship.vy);
 
-test('W pushes the ship forward a little from rest', () => {
+test('from rest, a direction key gets the ship moving that way (screen-absolute)', () => {
   const game = quiet();
-  run(game, W, 5);
-  assert.ok(game.ship.vy < -50, 'moved forward (up)');
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed + 1, 'only slightly');
+  run(game, RIGHT, 0.5);
+  assert.ok(game.ship.vx > 100 && Math.abs(game.ship.vy) < 1);
+  assert.ok(speed(game) <= game.stats.maxSpeed * CONFIG.steerCruise + 1, 'keys alone only reach cruise speed');
 });
 
-test('D bends toward the ship\'s right, whichever way it is flying', () => {
-  const up = quiet();
-  up.ship.vy = -1200; up.ship.boostT = 99;
-  run(up, D);
-  assert.ok(up.ship.vx > 300, 'flying up, right is +x');
-  const down = quiet();
-  down.ship.vy = 1200; down.ship.hy = 1; down.ship.boostT = 99;
-  run(down, D);
-  assert.ok(down.ship.vx < -300, 'flying down, right is -x');
-  assert.ok(Math.hypot(down.ship.vx, down.ship.vy) < 1250, 'bending does not speed up');
+test('holding a direction swings a fast ship toward it quickly, keeping its speed', () => {
+  const game = quiet();
+  game.ship.vy = -1200; game.ship.boostT = 99;
+  run(game, RIGHT, 0.4);
+  const ang = Math.atan2(game.ship.vx, -game.ship.vy); // 0 = up, PI/2 = right
+  assert.ok(ang > 1.4, `turned ${ang.toFixed(2)} rad`);
+  assert.ok(Math.abs(speed(game) - 1200) < 60, `speed ${speed(game)}`);
 });
 
-test('W at speed gives no free acceleration', () => {
+test('holding the opposite direction turns the ship around', () => {
   const game = quiet();
-  game.ship.vy = -900; game.ship.boostT = 99;
-  run(game, W);
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) <= 901);
+  game.ship.vy = -1000; game.ship.boostT = 99;
+  run(game, DOWN, 1);
+  assert.ok(game.ship.vy > 900, `vy ${game.ship.vy}`);
 });
 
-test('S brakes but never reverses', () => {
-  const game = quiet();
-  game.ship.vy = -600; game.ship.boostT = 99;
-  run(game, S, 30);
-  assert.ok(game.ship.vy <= 0.001, 'did not go backwards');
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 50, 'came to a stop');
-  assert.ok(Math.abs(heading(game) + Math.PI / 2) < 1e-6, 'still facing up');
+test('the same key means the same screen direction whichever way the ship flies', () => {
+  const a = quiet(); a.ship.vy = -800; a.ship.boostT = 99;
+  const b = quiet(); b.ship.vy = 800; b.ship.boostT = 99;
+  run(a, LEFT, 1); run(b, LEFT, 1);
+  assert.ok(a.ship.vx < -700 && b.ship.vx < -700);
 });
 
-test('when nearly still, A/D turn the ship in place', () => {
+test('no keys, no steering', () => {
   const game = quiet();
-  run(game, D, 3);
-  assert.ok(heading(game) > -Math.PI / 2 + 0.3, 'turned clockwise (right)');
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 5, 'stayed put');
+  game.ship.vx = 500; game.ship.boostT = 99;
+  run(game, none, 0.5);
+  assert.ok(Math.abs(game.ship.vy) < 1 && Math.abs(game.ship.vx - 500) < 1);
 });
 
 test('a keyboard launch boosts along the current travel direction', () => {
@@ -120,17 +114,15 @@ test('a keyboard launch boosts along the current travel direction', () => {
   for (let i = 0; i < 8; i++) update(game, 0.1, { ...idle, charging: true, keyboard: true });
   const ang0 = Math.atan2(game.ship.vy, game.ship.vx);
   update(game, 0.02, { ...idle, release: true, keyboard: true });
-  const sp = Math.hypot(game.ship.vx, game.ship.vy);
-  assert.ok(sp > 700);
+  assert.ok(speed(game) > 700);
   assert.ok(Math.abs(Math.atan2(game.ship.vy, game.ship.vx) - ang0) < 0.05);
 });
 
-test('from a standstill a keyboard launch goes where the ship was turned', () => {
+test('from a standstill a keyboard launch goes the way the keys last pointed', () => {
   const game = quiet();
-  run(game, D, 2, 0.1);
-  const h = heading(game);
+  update(game, 0.02, { ...idle, move: LEFT });
+  game.ship.vx = 0; game.ship.vy = 0;
   for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, charging: true, keyboard: true });
   update(game, 0.02, { ...idle, release: true, keyboard: true });
-  assert.ok(Math.abs(Math.atan2(game.ship.vy, game.ship.vx) - h) < 0.05);
-  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) > 300);
+  assert.ok(game.ship.vx < -300 && Math.abs(game.ship.vy) < 1);
 });

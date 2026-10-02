@@ -29,11 +29,9 @@ export const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
-  nudgeAccel: 450, // WASD thrust (px/s^2) at rest
-  nudgeSteer: 0.7, // extra WASD thrust per px/s of speed, so fast ships can still bend
-  nudgeMaxSpeed: 0.4, // W can only speed the ship up below this share of max speed
-  pivotSpeed: 60, // below this speed A/D turn the ship in place instead of bending the path
-  pivotRate: 3.2, // rad/s turning in place
+  steerRate: 4.5, // rad/s the travel direction swings toward the held WASD direction
+  steerAccel: 900, // px/s^2 WASD acceleration while below cruise speed
+  steerCruise: 0.4, // WASD alone gets the ship up to this share of max speed
   boostDuration: 0.9, // seconds after launch with no cruise drag
   energyCut: 0.85, // speed kept when the launch energy runs out (applied over ~0.3s)
   cruiseDrag: 0.06, // weak per-second drag after the energy runs out

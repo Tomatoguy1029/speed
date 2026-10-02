@@ -70,38 +70,35 @@ export function update(game, frameDt, input) {
   }
 }
 
-// Ship-relative WASD. W: forward thrust (only speeds up while slow). S: brake, never reverse.
-// A/D: bend the trajectory left/right when moving (stronger at speed), turn in place when nearly still.
-function nudge(game, move, dt) {
+// Screen-absolute WASD: swing the travel direction toward the held direction at a fixed turn rate
+// (speed is kept), and below cruise speed also accelerate that way so the ship can always get going.
+function steer(game, move, dt) {
+  if (!move || (!move.x && !move.y)) return;
   const sh = game.ship;
-  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
-  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const rx = -sh.hy, ry = sh.hx; // ship's right
-  let ax = 0, ay = 0;
-  if (side) {
-    if (sp > CONFIG.pivotSpeed) {
-      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
-      ax += rx * side * acc; ay += ry * side * acc;
-    } else {
-      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
-      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
-    }
+  const want = Math.atan2(move.y, move.x);
+  let sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > 1) {
+    const cur = Math.atan2(sh.vy, sh.vx);
+    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const vx = sh.vx * c - sh.vy * s;
+    sh.vy = sh.vx * s + sh.vy * c;
+    sh.vx = vx;
   }
-  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) {
-    ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel;
+  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
+  if (sp < cruise) {
+    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
+    sh.vx += Math.cos(want) * add;
+    sh.vy += Math.sin(want) * add;
   }
-  if (fwd < 0 && sp > 0) {
-    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
-    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
-  }
-  return { ax, ay };
+  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
 }
 
-// Heading follows the travel direction; when nearly still it stays where A/D turned it.
+// Heading follows the travel direction; when nearly still it keeps the last key direction.
 function updateHeading(sh) {
   const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
 }
 
 function step(game, dt, input) {
@@ -114,6 +111,7 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
+  steer(game, input.move, dt);
   updateHeading(sh);
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
@@ -140,10 +138,9 @@ function step(game, dt, input) {
   game.grid = buildGrid(game.enemies, 160);
 
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const n = nudge(game, input.move, dt);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax + n.ax, g.ay + n.ay, drag);
+  stepShip(sh, stats, dt, g.ax, g.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
