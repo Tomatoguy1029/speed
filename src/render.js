@@ -31,18 +31,23 @@ export function worldToScreen(r, x, y) {
   return { x: (x - r.cam.x) * r.cam.zoom + r.W / 2, y: (y - r.cam.y) * r.cam.zoom + r.H / 2 };
 }
 
-function speedZoom(sp) {
-  const f = Math.pow(CONFIG.zoomRefSpeed / Math.max(CONFIG.zoomRefSpeed, sp), CONFIG.zoomExp);
-  return clamp(f, CONFIG.zoomMin, 1);
+// Zoom is tied to the ship's max speed so the view only widens as the build gets faster,
+// instead of pumping in and out with every dash.
+export function targetZoom(game, W, H) {
+  const f = Math.pow(CONFIG.zoomRefSpeed / Math.max(CONFIG.zoomRefSpeed, game.stats.maxSpeed), CONFIG.zoomExp);
+  return (Math.min(W, H) / CONFIG.baseView) * clamp(f, CONFIG.zoomMin, 1);
 }
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const base = Math.min(r.W, r.H) / CONFIG.baseView;
-  const zoomT = base * speedZoom(sp);
-  const tx = sh.x + sh.vx * CONFIG.lookAhead;
-  const ty = sh.y + sh.vy * CONFIG.lookAhead;
+  const zoomT = targetZoom(game, r.W, r.H);
+  // look ahead along the velocity, but keep the ship well inside the screen at any speed
+  let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
+  const maxOff = (0.3 * Math.min(r.W, r.H)) / 2 / zoomT;
+  const off = Math.hypot(ox, oy);
+  if (off > maxOff) { ox *= maxOff / off; oy *= maxOff / off; }
+  const tx = sh.x + ox;
+  const ty = sh.y + oy;
   const cam = r.cam;
   if (!cam.ready) { cam.x = tx; cam.y = ty; cam.zoom = zoomT; cam.ready = true; }
   const kp = 1 - Math.exp(-7 * dt);
