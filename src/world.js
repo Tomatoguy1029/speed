@@ -31,7 +31,7 @@ export function createGame(opts = {}) {
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     leechDrag: 0,
-    gems: [],
+    gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
     spawnAcc: 0, waveT: 0,
     phaseId: null,
@@ -124,6 +124,7 @@ function step(game, dt, input) {
 }
 
 function end(game, state, reason) {
+  if (state === 'won') game.coins += CONFIG.escapeBonus;
   game.state = state;
   game.endReason = reason;
   game.events.push({ type: 'end', state, reason });
@@ -356,6 +357,18 @@ function updateGems(game, dt) {
     if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
   }
   if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+  for (const c of game.coinDrops) {
+    const dx = sh.x - c.x, dy = sh.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr * 1.3 || c.pulled) {
+      c.pulled = true;
+      const pull = 700 + sp * 1.2;
+      c.x += (dx / (d || 1)) * pull * dt;
+      c.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { c.taken = true; game.coins += c.v; game.events.push({ type: 'coin' }); }
+  }
+  if (game.coinDrops.some((c) => c.taken)) game.coinDrops = game.coinDrops.filter((c) => !c.taken);
 }
 
 export function addXp(game, v) {

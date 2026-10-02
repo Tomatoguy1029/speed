@@ -41,6 +41,14 @@
   .loadout div.hl { border-color: #5d8bff; color: #e6ecff; }
   .src { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #1d2c5c; color: #b8c6ea; margin-bottom: 8px; }
   @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
+  .ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .up { border: 1px solid #2a3a6a; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); }
+  .up .n { font-weight: 700; } .up .d { font-size: 12px; color: #b8c6ea; margin: 2px 0 6px; }
+  .pips { letter-spacing: 3px; color: #5d8bff; font-size: 12px; margin-bottom: 8px; }
+  .up button { width: 100%; padding: 7px 10px; font-size: 13px; }
+  .coins { color: #ffd24a; font-weight: 700; font-family: ui-monospace, Menlo, monospace; }
+  .how { font-size: 13px; color: #cdd6f0; line-height: 1.7; margin: 0; padding-left: 18px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>

@@ -33,6 +33,6 @@ export function createInput(el) {
       st.release = false;
       return out;
     },
-    reset() { st.down = false; st.release = false; },
+    reset() { st.down = false; st.release = false; st.pointerId = null; },
   };
 }

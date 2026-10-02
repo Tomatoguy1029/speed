@@ -3,6 +3,7 @@ export const CONFIG = {
   // run
   runTime: 600,
   escapeSpeed: 2400, // px/s needed to clear
+  escapeBonus: 30, // coins for escaping
   speedToKms: 11.2 / 2400, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -44,6 +45,7 @@ export const CONFIG = {
   densityMult: 1,
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
+  meteorCoinChance: 0.4,
   capsuleCount: 5, // field capsules kept on the map
   capsuleInterval: 16, // seconds between respawns
 

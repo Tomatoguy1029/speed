@@ -41,6 +41,14 @@
   .loadout div.hl { border-color: #5d8bff; color: #e6ecff; }
   .src { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #1d2c5c; color: #b8c6ea; margin-bottom: 8px; }
   @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
+  .ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .up { border: 1px solid #2a3a6a; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); }
+  .up .n { font-weight: 700; } .up .d { font-size: 12px; color: #b8c6ea; margin: 2px 0 6px; }
+  .pips { letter-spacing: 3px; color: #5d8bff; font-size: 12px; margin-bottom: 8px; }
+  .up button { width: 100%; padding: 7px 10px; font-size: 13px; }
+  .coins { color: #ffd24a; font-weight: 700; font-family: ui-monospace, Menlo, monospace; }
+  .how { font-size: 13px; color: #cdd6f0; line-height: 1.7; margin: 0; padding-left: 18px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
@@ -56,6 +64,7 @@ const CONFIG = {
   // run
   runTime: 600,
   escapeSpeed: 2400, // px/s needed to clear
+  escapeBonus: 30, // coins for escaping
   speedToKms: 11.2 / 2400, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -97,6 +106,7 @@ const CONFIG = {
   densityMult: 1,
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
+  meteorCoinChance: 0.4,
   capsuleCount: 5, // field capsules kept on the map
   capsuleInterval: 16, // seconds between respawns
 
@@ -770,6 +780,68 @@ function xpForLevel(level) {
   return CONFIG.xpBase + CONFIG.xpGrowth * level;
 }
 
+// Station upgrades bought with coins (parts). Effects are applied in baseStats().
+const META_UPGRADES = [
+  { id: 'speed', name: '主推進器', desc: '最高速度 +5%', max: 5, costs: [25, 50, 90, 140, 210] },
+  { id: 'hp', name: '機体フレーム', desc: '最大 HP +15', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'atk', name: '衝角素材', desc: '攻撃力 +6%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'charge', name: '充電効率', desc: 'チャージ時間 -5%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'pickup', name: '回収装置', desc: '回収範囲 +15%', max: 5, costs: [15, 30, 55, 85, 125] },
+  { id: 'xp', name: '学習回路', desc: '経験値 +8%', max: 5, costs: [25, 50, 90, 140, 210] },
+];
+
+const SAVE_KEY = 'speed-save-v1';
+
+function metaCost(id, level) {
+  const u = META_UPGRADES.find((x) => x.id === id);
+  if (!u || level >= u.max) return null;
+  return u.costs[level];
+}
+
+function buyUpgrade(save, id) {
+  const lv = save.meta[id] || 0;
+  const cost = metaCost(id, lv);
+  if (cost == null || save.coins < cost) return false;
+  save.coins -= cost;
+  save.meta[id] = lv + 1;
+  return true;
+}
+
+function defaultSave() {
+  return { coins: 0, meta: {}, best: { runs: 0, escapes: 0, escapeTime: null, topSpeed: 0 } };
+}
+
+function loadSave(storage) {
+  try {
+    const raw = storage && storage.getItem(SAVE_KEY);
+    if (!raw) return defaultSave();
+    const s = JSON.parse(raw);
+    const d = defaultSave();
+    if (typeof s !== 'object' || !s) return d;
+    return {
+      coins: Number.isFinite(s.coins) ? s.coins : 0,
+      meta: typeof s.meta === 'object' && s.meta ? s.meta : {},
+      best: { ...d.best, ...(s.best || {}) },
+    };
+  } catch {
+    return defaultSave();
+  }
+}
+
+function writeSave(storage, save) {
+  try { storage && storage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* storage unavailable */ }
+}
+
+function applyRunResult(save, game) {
+  save.coins += Math.round(game.coins);
+  save.best.runs++;
+  save.best.topSpeed = Math.max(save.best.topSpeed, game.peakSpeed);
+  if (game.state === 'won') {
+    save.best.escapes++;
+    save.best.escapeTime = save.best.escapeTime == null ? game.t : Math.min(save.best.escapeTime, game.t);
+  }
+}
+
 // ---- modules.js ----
 
 
@@ -980,6 +1052,7 @@ function killEnemy(game, e, opts = {}) {
   const danger = dangerAt(Math.hypot(e.x, e.y));
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
+  dropCoins(game, e, danger);
   if (e.elite || e.type === 'battleship') dropCapsule(game, e.x, e.y, 'elite', Math.max(0.4, danger));
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
@@ -996,6 +1069,18 @@ function flingCorpse(game, e) {
       kind: 'corpse', x: e.x, y: e.y, vx: Math.cos(a) * sp * 0.9, vy: Math.sin(a) * sp * 0.9,
       r: Math.max(10, e.r * 0.8), dmg, life: 0.7, pierce: true, hit: new Set(), color: e.T.color,
     });
+  }
+}
+
+function dropCoins(game, e, danger) {
+  let n = 0;
+  if (e.type === 'battleship') n = 12;
+  else if (e.elite) n = 3 + Math.floor(game.rng() * 4);
+  else if (e.type === 'meteor') n = game.rng() < CONFIG.meteorCoinChance ? 1 + Math.floor(game.rng() * 3) : 0;
+  else if (game.rng() < 0.03 * (1 + danger * 2)) n = 1;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2, d = game.rng() * e.r;
+    game.coinDrops.push({ x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, v: 1, pulled: false, taken: false });
   }
 }
 
@@ -1299,7 +1384,7 @@ function createGame(opts = {}) {
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     leechDrag: 0,
-    gems: [],
+    gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
     spawnAcc: 0, waveT: 0,
     phaseId: null,
@@ -1392,6 +1477,7 @@ function step(game, dt, input) {
 }
 
 function end(game, state, reason) {
+  if (state === 'won') game.coins += CONFIG.escapeBonus;
   game.state = state;
   game.endReason = reason;
   game.events.push({ type: 'end', state, reason });
@@ -1624,6 +1710,18 @@ function updateGems(game, dt) {
     if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
   }
   if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+  for (const c of game.coinDrops) {
+    const dx = sh.x - c.x, dy = sh.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr * 1.3 || c.pulled) {
+      c.pulled = true;
+      const pull = 700 + sp * 1.2;
+      c.x += (dx / (d || 1)) * pull * dt;
+      c.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { c.taken = true; game.coins += c.v; game.events.push({ type: 'coin' }); }
+  }
+  if (game.coinDrops.some((c) => c.taken)) game.coinDrops = game.coinDrops.filter((c) => !c.taken);
 }
 
 function addXp(game, v) {
@@ -1798,6 +1896,7 @@ function render(r, game, dt, pointer) {
   drawSpecks(r);
   drawBodies(r, game);
   drawGems(r, game);
+  drawCoins(r, game);
   drawCapsules(r, game);
   drawMines(r, game);
   drawEnemies(r, game);
@@ -1832,6 +1931,18 @@ function drawGems(r, game) {
 
 function capsuleColor(c) {
   return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+}
+
+function drawCoins(r, game) {
+  const { ctx } = r;
+  const s = Math.max(6, 3.5 / r.cam.zoom);
+  for (const c of game.coinDrops) {
+    if (!onScreen(r, c.x, c.y, 20)) continue;
+    ctx.fillStyle = '#ffd24a';
+    ctx.beginPath(); ctx.arc(c.x, c.y, s, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a07a10';
+    ctx.fillRect(c.x - s * 0.15, c.y - s * 0.55, s * 0.3, s * 1.1);
+  }
 }
 
 function drawCapsules(r, game) {
@@ -2476,6 +2587,8 @@ function drawStatus(r, game) {
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
   ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 64);
 }
 
 function drawSpeedPanel(r, game) {
@@ -2554,11 +2667,12 @@ function createInput(el) {
       st.release = false;
       return out;
     },
-    reset() { st.down = false; st.release = false; },
+    reset() { st.down = false; st.release = false; st.pointerId = null; },
   };
 }
 
 // ---- ui.js ----
+
 
 
 
@@ -2612,7 +2726,7 @@ function showResult(game, extra, onNext) {
   ];
   const stats = el('div', { class: 'stats' });
   for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
-  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ');
+  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ ', el('kbd', {}, 'Enter'));
   showScreen(el('div', { class: 'panel' },
     el('h1', { class: cls }, title),
     el('div', { class: 'sub' }, sub),
@@ -2658,7 +2772,54 @@ function showOffer(game, onChoose) {
     loadout), 'offer');
 }
 
+function showStation(save, onBuy, onDepart) {
+  const b = save.best;
+  const ups = el('div', { class: 'ups' });
+  for (const u of META_UPGRADES) {
+    const lv = save.meta[u.id] || 0;
+    const cost = metaCost(u.id, lv);
+    const btn = el('button', { onclick: () => onBuy(u.id) }, cost == null ? '最大' : `強化  ${cost} 部品`);
+    if (cost == null || save.coins < cost) btn.disabled = true;
+    ups.append(el('div', { class: 'up' },
+      el('div', { class: 'n' }, u.name),
+      el('div', { class: 'd' }, u.desc),
+      el('div', { class: 'pips' }, '●'.repeat(lv) + '○'.repeat(u.max - lv)),
+      btn));
+  }
+  const records = el('div', { class: 'stats' },
+    el('div', {}, '出撃'), el('div', {}, `${b.runs} 回`),
+    el('div', {}, '脱出'), el('div', {}, `${b.escapes} 回`),
+    el('div', {}, '最速脱出'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
+    el('div', {}, '最高速度'), el('div', {}, `${kms(b.topSpeed)} km/s`));
+  const go = el('button', { class: 'primary', onclick: onDepart }, '出発 ', el('kbd', {}, 'Enter'));
+  showScreen(el('div', { class: 'panel' },
+    el('div', { class: 'row' }, el('h1', {}, 'ステーション'), el('div', { class: 'coins' }, `部品 ${save.coins}`), go),
+    el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
+    el('h2', {}, '操作'),
+    el('ul', { class: 'how' },
+      el('li', {}, '画面を押したままドラッグ → 離すと、ドラッグと逆方向へ突進。長く押すほど強い'),
+      el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
+      el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
+      el('li', {}, '中心の惑星の重力をかすめると上限を超えて加速できる。中心ほど敵は強いがレアなカプセルがある'),
+      el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'P'), ' 調整パネル')),
+    el('h2', {}, '機体強化'),
+    ups,
+    el('h2', {}, '記録'),
+    records,
+    el('div', { class: 'btns' }, el('button', { class: 'primary', onclick: onDepart }, '出発'))), 'station');
+}
+
+function showPause(onResume, onAbandon) {
+  showScreen(el('div', { class: 'panel' },
+    el('h1', {}, 'ポーズ'),
+    el('div', { class: 'btns' },
+      el('button', { class: 'primary', onclick: onResume }, '再開 ', el('kbd', {}, 'Esc')),
+      el('button', { onclick: onAbandon }, 'ランを終了してステーションへ'))), 'pause');
+}
+
 // ---- main.js ----
+
 
 
 
@@ -2667,19 +2828,43 @@ function showOffer(game, onChoose) {
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
 const input = createInput(canvas);
+const storage = (() => { try { return window.localStorage; } catch { return null; } })();
+const save = loadSave(storage);
+
 let game = null;
+let mode = 'station'; // station | run | result
+let offerShown = null;
 
 window.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
 
+function openStation() {
+  mode = 'station';
+  input.state.enabled = false;
+  input.reset();
+  if (!game) { game = createGame({ meta: save.meta }); game.spawning = false; game.state = 'idle'; }
+  showStation(save, (id) => { if (buyUpgrade(save, id)) { writeSave(storage, save); openStation(); } }, startRun);
+}
+
 function startRun() {
   clearScreens();
   input.reset();
+  input.state.enabled = true;
   renderer.cam.ready = false;
-  game = createGame({});
+  offerShown = null;
+  game = createGame({ meta: save.meta });
+  mode = 'run';
 }
 
-let offerShown = null;
+function finishRun() {
+  mode = 'result';
+  input.state.enabled = false;
+  input.reset();
+  const before = save.coins;
+  applyRunResult(save, game);
+  writeSave(storage, save);
+  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation);
+}
 
 function chooseOffer(accept) {
   if (game.state !== 'offer') return;
@@ -2688,19 +2873,34 @@ function chooseOffer(accept) {
   if (game.state === 'play') { clearScreens(); input.reset(); }
 }
 
+function togglePause() {
+  if (mode !== 'run') return;
+  if (game.state === 'play') {
+    game.state = 'paused';
+    input.reset();
+    showPause(togglePause, () => { game.state = 'lost'; game.endReason = 'time'; clearScreens(); finishRun(); });
+  } else if (game.state === 'paused') {
+    game.state = 'play';
+    clearScreens();
+  }
+}
+
 window.addEventListener('keydown', (e) => {
-  if (game.state === 'offer') {
+  if (mode === 'run' && game.state === 'offer') {
     if (e.key === '1') chooseOffer(true);
     else if (e.key === '2') chooseOffer(false);
+    return;
+  }
+  if (e.key === 'Escape') togglePause();
+  if (e.key === 'Enter') {
+    if (mode === 'station') { e.preventDefault(); startRun(); }
+    else if (mode === 'result') { e.preventDefault(); openStation(); }
   }
 });
 
-function onEnd() {
-  input.reset();
-  showResult(game, [], startRun);
-}
+window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
 
-startRun();
+openStation();
 
 let last = performance.now();
 function frame(now) {
@@ -2710,18 +2910,20 @@ function frame(now) {
   update(game, dt, input.read());
   render(renderer, game, dt, input.state);
   game.events.length = 0;
-  if (wasPlaying && (game.state === 'won' || game.state === 'lost')) onEnd();
-  if (game.state === 'offer' && offerShown !== game.currentOffer) {
-    offerShown = game.currentOffer;
-    input.reset();
-    showOffer(game, chooseOffer);
+  if (mode === 'run') {
+    if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (game.state === 'offer' && offerShown !== game.currentOffer) {
+      offerShown = game.currentOffer;
+      input.reset();
+      showOffer(game, chooseOffer);
+    }
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 // console access for debugging
-window.__speed = { get game() { return game; } };
+window.__speed = { get game() { return game; }, save };
 
 })();
 </script>

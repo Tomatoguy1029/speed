@@ -32,6 +32,7 @@ export function killEnemy(game, e, opts = {}) {
   const danger = dangerAt(Math.hypot(e.x, e.y));
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
+  dropCoins(game, e, danger);
   if (e.elite || e.type === 'battleship') dropCapsule(game, e.x, e.y, 'elite', Math.max(0.4, danger));
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
@@ -48,6 +49,18 @@ function flingCorpse(game, e) {
       kind: 'corpse', x: e.x, y: e.y, vx: Math.cos(a) * sp * 0.9, vy: Math.sin(a) * sp * 0.9,
       r: Math.max(10, e.r * 0.8), dmg, life: 0.7, pierce: true, hit: new Set(), color: e.T.color,
     });
+  }
+}
+
+function dropCoins(game, e, danger) {
+  let n = 0;
+  if (e.type === 'battleship') n = 12;
+  else if (e.elite) n = 3 + Math.floor(game.rng() * 4);
+  else if (e.type === 'meteor') n = game.rng() < CONFIG.meteorCoinChance ? 1 + Math.floor(game.rng() * 3) : 0;
+  else if (game.rng() < 0.03 * (1 + danger * 2)) n = 1;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2, d = game.rng() * e.r;
+    game.coinDrops.push({ x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, v: 1, pulled: false, taken: false });
   }
 }
 

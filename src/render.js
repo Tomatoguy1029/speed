@@ -85,6 +85,7 @@ export function render(r, game, dt, pointer) {
   drawSpecks(r);
   drawBodies(r, game);
   drawGems(r, game);
+  drawCoins(r, game);
   drawCapsules(r, game);
   drawMines(r, game);
   drawEnemies(r, game);
@@ -119,6 +120,18 @@ function drawGems(r, game) {
 
 function capsuleColor(c) {
   return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+}
+
+function drawCoins(r, game) {
+  const { ctx } = r;
+  const s = Math.max(6, 3.5 / r.cam.zoom);
+  for (const c of game.coinDrops) {
+    if (!onScreen(r, c.x, c.y, 20)) continue;
+    ctx.fillStyle = '#ffd24a';
+    ctx.beginPath(); ctx.arc(c.x, c.y, s, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a07a10';
+    ctx.fillRect(c.x - s * 0.15, c.y - s * 0.55, s * 0.3, s * 1.1);
+  }
 }
 
 function drawCapsules(r, game) {
@@ -763,6 +776,8 @@ function drawStatus(r, game) {
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
   ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 64);
 }
 
 function drawSpeedPanel(r, game) {
