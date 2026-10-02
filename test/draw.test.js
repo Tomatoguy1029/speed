@@ -59,10 +59,11 @@ test('the path follows the cursor from the ship and is capped by the charge', ()
   charge(long, 0.8, at(50, 0));
   assert.ok(long.draw.budget > short.draw.budget * 2);
   for (const game of [short, long]) {
+    const budget = game.draw.budget;
     for (let i = 1; i <= 40; i++) update(game, 0.02, { ...idle, cursor: at(50 + i * 60, i * 10) });
     const pts = (game.draw && (game.draw.points || game.draw.path)) || game.lastPath;
     assert.deepEqual(pts[0], { x: 0, y: OY });
-    assert.ok(pathLength(pts) <= game.draw.budget + 1e-6);
+    assert.ok(pathLength(pts) <= budget + 1e-6);
   }
 });
 
