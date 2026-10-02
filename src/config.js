@@ -36,7 +36,8 @@ export const CONFIG = {
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 2.5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.06, // world speed while drawing
-  drawRunTimeScale: 0.3, // world speed while the ship runs the path (the ship itself runs at real time)
+  drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
+  drawRunTime: 0.3, // real seconds to trace the whole path, however long it is
   drawStep: 8, // min world distance between path points
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest

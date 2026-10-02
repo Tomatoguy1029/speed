@@ -296,14 +296,18 @@ function commitPath(game) {
   sh.aimAngle = Math.atan2(dy, dx);
   game.dashId++;
   game.lastPath = pts;
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, budget: d.budget };
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
+  const rate = Math.max(speed, total / CONFIG.drawRunTime);
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
-// Move along the polyline; piercing slows the run, a bounce ends it.
+// Trace the polyline quickly (the world is nearly frozen); piercing costs dash speed, a bounce ends it.
 function runAlongPath(game, realDt) {
   const r = game.draw, sh = game.ship;
-  let dist = r.speed * realDt;
+  let dist = r.rate * realDt;
   while (dist > 1e-9 && r.seg < r.path.length - 1) {
     const a = r.path[r.seg], b = r.path[r.seg + 1];
     const segLen = Math.hypot(b.x - a.x, b.y - a.y);
@@ -316,7 +320,7 @@ function runAlongPath(game, realDt) {
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
     if (collideEnemies(game, x0, y0)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
-    if (sp < r.speed) { dist *= sp / r.speed; r.speed = sp; }
+    if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
   }
   if (r.seg >= r.path.length - 1) {
