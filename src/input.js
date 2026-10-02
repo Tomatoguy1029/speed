@@ -3,29 +3,13 @@ export function aimFromDrag(sx, sy, cx, cy) {
   return { x: sx - cx, y: sy - cy };
 }
 
-const DIR_KEYS = {
-  w: [0, -1], arrowup: [0, -1],
-  s: [0, 1], arrowdown: [0, 1],
-  a: [-1, 0], arrowleft: [-1, 0],
-  d: [1, 0], arrowright: [1, 0],
-};
-const CODE_NAMES = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright' };
+const TURN_KEYS = { KeyA: -1, ArrowLeft: -1, KeyD: 1, ArrowRight: 1 };
+const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
+const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
-// Keyboard aim: held direction keys -> vector of length 100 (or zero when none / cancelled).
-export function keyAim(keys) {
-  let dx = 0, dy = 0;
-  for (const k of keys) {
-    const d = DIR_KEYS[k];
-    if (d) { dx += d[0]; dy += d[1]; }
-  }
-  dx = Math.sign(dx); dy = Math.sign(dy);
-  if (dx === 0 && dy === 0) return { x: 0, y: 0 };
-  const len = Math.hypot(dx, dy);
-  return { x: (dx / len) * 100 || 0, y: (dy / len) * 100 || 0 };
-}
-
-function keyName(e) {
-  return CODE_NAMES[e.code] || (e.key || '').toLowerCase();
+// Physical key position (works with IME on), falling back to the key name.
+function keyCode(e) {
+  return e.code || KEY_CODES[(e.key || '').toLowerCase()] || '';
 }
 
 const isSpace = (e) => e.code === 'Space' || e.key === ' ';
@@ -34,7 +18,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true,
     release: false, relX: 0, relY: 0,
-    keys: new Set(), space: false,
+    keys: new Set(), space: false, snap: null, relKeyboard: false,
   };
   el.addEventListener('pointerdown', (e) => {
     if (!st.enabled || e.button > 0) return;
@@ -50,7 +34,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y;
+    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y; st.relKeyboard = false;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
@@ -58,8 +42,9 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
 
   if (keyTarget) {
     keyTarget.addEventListener('keydown', (e) => {
-      const name = keyName(e);
-      if (DIR_KEYS[name]) { st.keys.add(name); if (st.enabled) e.preventDefault(); }
+      const code = keyCode(e);
+      if (TURN_KEYS[code]) { st.keys.add(code); if (st.enabled) e.preventDefault(); }
+      if (SNAP_KEYS[code]) { if (!e.repeat) st.snap = SNAP_KEYS[code]; if (st.enabled) e.preventDefault(); }
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space || st.down) return;
@@ -67,11 +52,9 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       }
     });
     keyTarget.addEventListener('keyup', (e) => {
-      const name = keyName(e);
-      if (DIR_KEYS[name]) st.keys.delete(name);
+      st.keys.delete(keyCode(e));
       if (isSpace(e) && st.space) {
-        const a = keyAim(st.keys);
-        st.space = false; st.release = true; st.relX = a.x; st.relY = a.y;
+        st.space = false; st.release = true; st.relX = 0; st.relY = 0; st.relKeyboard = true;
       }
     });
     keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
@@ -79,13 +62,23 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
 
   return {
     state: st,
+    // keyboard: the aim comes from the ship's aim angle (world applies turn/snap).
     read() {
-      let a;
+      let a = { x: 0, y: 0 };
       if (st.release) a = { x: st.relX, y: st.relY };
       else if (st.down) a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-      else a = keyAim(st.keys);
-      const out = { charging: st.down || st.space, aimX: a.x, aimY: a.y, release: st.release };
+      let turn = 0;
+      for (const k of st.keys) turn += TURN_KEYS[k] || 0;
+      const out = {
+        charging: st.down || st.space,
+        aimX: a.x, aimY: a.y,
+        release: st.release,
+        keyboard: st.release ? st.relKeyboard : st.space && !st.down,
+        turn: Math.sign(turn),
+        snap: st.snap,
+      };
       st.release = false;
+      st.snap = null;
       return out;
     },
     reset() { st.down = false; st.space = false; st.release = false; st.pointerId = null; },

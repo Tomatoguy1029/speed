@@ -24,6 +24,7 @@ export function createGame(opts = {}) {
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
+  ship.aimAngle = -Math.PI / 2;
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout,
@@ -55,8 +56,9 @@ export function createGame(opts = {}) {
 
 export function update(game, frameDt, input) {
   if (game.state !== 'play') return;
-  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
   frameDt = Math.min(frameDt, 0.1);
+  input = steerAim(game, frameDt, input);
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
@@ -68,6 +70,26 @@ export function update(game, frameDt, input) {
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
+}
+
+// Keyboard aim: A/D rotate (accelerating while held), W/S snap; runs on real time so slow-mo doesn't drag it.
+function steerAim(game, dt, input) {
+  const sh = game.ship;
+  if (input.turn) {
+    sh.turnHeld += dt;
+    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
+    sh.aimAngle += input.turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
+  } else {
+    sh.turnHeld = 0;
+  }
+  if (input.snap) {
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (input.snap === 'forward' && sp > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
+    else if (input.snap === 'back') sh.aimAngle += Math.PI;
+  }
+  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
+  if (!input.keyboard) return input;
+  return { ...input, aimX: Math.cos(sh.aimAngle) * 100, aimY: Math.sin(sh.aimAngle) * 100 };
 }
 
 function step(game, dt, input) {
@@ -206,6 +228,7 @@ function launch(game, ax, ay) {
     dx = ax / len; dy = ay / len;
   }
   onLaunch(game);
+  sh.aimAngle = Math.atan2(dy, dx);
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
   sh.vx = v.vx; sh.vy = v.vy;
   sh.boostT = game.stats.boostDuration;

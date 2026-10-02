@@ -770,7 +770,31 @@ function drawShip(r, game) {
   ctx.restore();
 }
 
+// Keyboard aim marker, always visible so the shot can be lined up before charging.
+function drawAimMarker(r, game) {
+  const sh = game.ship;
+  if (sh.charging || game.state !== 'play') return;
+  const { ctx } = r;
+  const p = worldToScreen(r, sh.x, sh.y);
+  const ux = Math.cos(sh.aimAngle), uy = Math.sin(sh.aimAngle);
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#9fe8ff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.moveTo(p.x + ux * 24, p.y + uy * 24); ctx.lineTo(p.x + ux * 46, p.y + uy * 46); ctx.stroke();
+  ctx.setLineDash([]);
+  const tx = p.x + ux * 56, ty = p.y + uy * 56;
+  ctx.fillStyle = '#9fe8ff';
+  ctx.beginPath();
+  ctx.moveTo(tx + ux * 9, ty + uy * 9);
+  ctx.lineTo(tx - ux * 3 - uy * 7, ty - uy * 3 + ux * 7);
+  ctx.lineTo(tx - ux * 3 + uy * 7, ty - uy * 3 - ux * 7);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
 function drawChargeUi(r, game, pointer) {
+  drawAimMarker(r, game);
   const sh = game.ship;
   if (!sh.charging) return;
   const { ctx } = r;

@@ -101,6 +101,9 @@ const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
+  turnRateMin: 1.6, // rad/s when tapping A/D
+  turnRateMax: 4.6, // rad/s after holding
+  turnAccelTime: 0.35, // seconds of holding to reach the max turn rate
   boostDuration: 0.9, // seconds after launch with no cruise drag
   energyCut: 0.85, // speed kept when the launch energy runs out (applied over ~0.3s)
   cruiseDrag: 0.06, // weak per-second drag after the energy runs out
@@ -240,7 +243,7 @@ function createShip(stats, x, y) {
     x, y, vx: 0, vy: 0,
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0,
+    aimX: 0, aimY: 0, aimAngle: 0, turnHeld: 0,
     boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
@@ -1420,6 +1423,7 @@ function createGame(opts = {}) {
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
+  ship.aimAngle = -Math.PI / 2;
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout,
@@ -1451,8 +1455,9 @@ function createGame(opts = {}) {
 
 function update(game, frameDt, input) {
   if (game.state !== 'play') return;
-  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
   frameDt = Math.min(frameDt, 0.1);
+  input = steerAim(game, frameDt, input);
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
@@ -1464,6 +1469,26 @@ function update(game, frameDt, input) {
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
+}
+
+// Keyboard aim: A/D rotate (accelerating while held), W/S snap; runs on real time so slow-mo doesn't drag it.
+function steerAim(game, dt, input) {
+  const sh = game.ship;
+  if (input.turn) {
+    sh.turnHeld += dt;
+    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
+    sh.aimAngle += input.turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
+  } else {
+    sh.turnHeld = 0;
+  }
+  if (input.snap) {
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (input.snap === 'forward' && sp > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
+    else if (input.snap === 'back') sh.aimAngle += Math.PI;
+  }
+  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
+  if (!input.keyboard) return input;
+  return { ...input, aimX: Math.cos(sh.aimAngle) * 100, aimY: Math.sin(sh.aimAngle) * 100 };
 }
 
 function step(game, dt, input) {
@@ -1602,6 +1627,7 @@ function launch(game, ax, ay) {
     dx = ax / len; dy = ay / len;
   }
   onLaunch(game);
+  sh.aimAngle = Math.atan2(dy, dx);
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
   sh.vx = v.vx; sh.vy = v.vy;
   sh.boostT = game.stats.boostDuration;
@@ -2643,7 +2669,31 @@ function drawShip(r, game) {
   ctx.restore();
 }
 
+// Keyboard aim marker, always visible so the shot can be lined up before charging.
+function drawAimMarker(r, game) {
+  const sh = game.ship;
+  if (sh.charging || game.state !== 'play') return;
+  const { ctx } = r;
+  const p = worldToScreen(r, sh.x, sh.y);
+  const ux = Math.cos(sh.aimAngle), uy = Math.sin(sh.aimAngle);
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#9fe8ff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.moveTo(p.x + ux * 24, p.y + uy * 24); ctx.lineTo(p.x + ux * 46, p.y + uy * 46); ctx.stroke();
+  ctx.setLineDash([]);
+  const tx = p.x + ux * 56, ty = p.y + uy * 56;
+  ctx.fillStyle = '#9fe8ff';
+  ctx.beginPath();
+  ctx.moveTo(tx + ux * 9, ty + uy * 9);
+  ctx.lineTo(tx - ux * 3 - uy * 7, ty - uy * 3 + ux * 7);
+  ctx.lineTo(tx - ux * 3 + uy * 7, ty - uy * 3 - ux * 7);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
 function drawChargeUi(r, game, pointer) {
+  drawAimMarker(r, game);
   const sh = game.ship;
   if (!sh.charging) return;
   const { ctx } = r;
@@ -2790,29 +2840,13 @@ function aimFromDrag(sx, sy, cx, cy) {
   return { x: sx - cx, y: sy - cy };
 }
 
-const DIR_KEYS = {
-  w: [0, -1], arrowup: [0, -1],
-  s: [0, 1], arrowdown: [0, 1],
-  a: [-1, 0], arrowleft: [-1, 0],
-  d: [1, 0], arrowright: [1, 0],
-};
-const CODE_NAMES = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'arrowup', ArrowDown: 'arrowdown', ArrowLeft: 'arrowleft', ArrowRight: 'arrowright' };
+const TURN_KEYS = { KeyA: -1, ArrowLeft: -1, KeyD: 1, ArrowRight: 1 };
+const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
+const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
-// Keyboard aim: held direction keys -> vector of length 100 (or zero when none / cancelled).
-function keyAim(keys) {
-  let dx = 0, dy = 0;
-  for (const k of keys) {
-    const d = DIR_KEYS[k];
-    if (d) { dx += d[0]; dy += d[1]; }
-  }
-  dx = Math.sign(dx); dy = Math.sign(dy);
-  if (dx === 0 && dy === 0) return { x: 0, y: 0 };
-  const len = Math.hypot(dx, dy);
-  return { x: (dx / len) * 100 || 0, y: (dy / len) * 100 || 0 };
-}
-
-function keyName(e) {
-  return CODE_NAMES[e.code] || (e.key || '').toLowerCase();
+// Physical key position (works with IME on), falling back to the key name.
+function keyCode(e) {
+  return e.code || KEY_CODES[(e.key || '').toLowerCase()] || '';
 }
 
 const isSpace = (e) => e.code === 'Space' || e.key === ' ';
@@ -2821,7 +2855,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true,
     release: false, relX: 0, relY: 0,
-    keys: new Set(), space: false,
+    keys: new Set(), space: false, snap: null, relKeyboard: false,
   };
   el.addEventListener('pointerdown', (e) => {
     if (!st.enabled || e.button > 0) return;
@@ -2837,7 +2871,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y;
+    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y; st.relKeyboard = false;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
@@ -2845,8 +2879,9 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 
   if (keyTarget) {
     keyTarget.addEventListener('keydown', (e) => {
-      const name = keyName(e);
-      if (DIR_KEYS[name]) { st.keys.add(name); if (st.enabled) e.preventDefault(); }
+      const code = keyCode(e);
+      if (TURN_KEYS[code]) { st.keys.add(code); if (st.enabled) e.preventDefault(); }
+      if (SNAP_KEYS[code]) { if (!e.repeat) st.snap = SNAP_KEYS[code]; if (st.enabled) e.preventDefault(); }
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space || st.down) return;
@@ -2854,11 +2889,9 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       }
     });
     keyTarget.addEventListener('keyup', (e) => {
-      const name = keyName(e);
-      if (DIR_KEYS[name]) st.keys.delete(name);
+      st.keys.delete(keyCode(e));
       if (isSpace(e) && st.space) {
-        const a = keyAim(st.keys);
-        st.space = false; st.release = true; st.relX = a.x; st.relY = a.y;
+        st.space = false; st.release = true; st.relX = 0; st.relY = 0; st.relKeyboard = true;
       }
     });
     keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
@@ -2866,13 +2899,23 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 
   return {
     state: st,
+    // keyboard: the aim comes from the ship's aim angle (world applies turn/snap).
     read() {
-      let a;
+      let a = { x: 0, y: 0 };
       if (st.release) a = { x: st.relX, y: st.relY };
       else if (st.down) a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-      else a = keyAim(st.keys);
-      const out = { charging: st.down || st.space, aimX: a.x, aimY: a.y, release: st.release };
+      let turn = 0;
+      for (const k of st.keys) turn += TURN_KEYS[k] || 0;
+      const out = {
+        charging: st.down || st.space,
+        aimX: a.x, aimY: a.y,
+        release: st.release,
+        keyboard: st.release ? st.relKeyboard : st.space && !st.down,
+        turn: Math.sign(turn),
+        snap: st.snap,
+      };
       st.release = false;
+      st.snap = null;
       return out;
     },
     reset() { st.down = false; st.space = false; st.release = false; st.pointerId = null; },
@@ -3005,7 +3048,7 @@ function showStation(save, onBuy, onDepart) {
     el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
-      el('li', {}, el('b', {}, 'キーボード'), '：', el('kbd', {}, 'W'), el('kbd', {}, 'A'), el('kbd', {}, 'S'), el('kbd', {}, 'D'), '（矢印キー可）で向きを決め、', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離して突進。向きなしで離すと進行方向へ加速'),
+      el('li', {}, el('b', {}, 'キーボード'), '：', el('kbd', {}, 'A'), el('kbd', {}, 'D'), '（←→）で照準を回す（押し続けると速く回る）、', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離して照準の向きへ突進。', el('kbd', {}, 'W'), ' 照準を進行方向へ、', el('kbd', {}, 'S'), ' 照準を反転'),
       el('li', {}, el('b', {}, 'マウス'), '：画面を押したままドラッグ → 離すと、ドラッグと逆方向へ突進。長く押すほど強い'),
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
@@ -3208,6 +3251,8 @@ const TUNABLES = [
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
+  { key: 'turnRateMin', label: '照準の回転（微調整）rad/s', min: 0.3, max: 5, step: 0.1 },
+  { key: 'turnRateMax', label: '照準の回転（長押し）rad/s', min: 1, max: 10, step: 0.1 },
   { key: 'boostDuration', label: '突進エネルギー（秒）', min: 0.1, max: 3, step: 0.05 },
   { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
   { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },
