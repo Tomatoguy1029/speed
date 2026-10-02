@@ -29,6 +29,9 @@
   .win { color: #ffd24a; } .lose { color: #ff6b5a; }
   .cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
   .card { border: 1px solid #2a3a6a; border-radius: 10px; padding: 12px 14px; background: rgba(255,255,255,0.03); min-height: 110px; }
+  .card canvas.part { float: right; margin: -4px -4px 4px 8px; }
+  .offerhead { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+  .offerhead canvas.assembly { flex: none; background: radial-gradient(circle, rgba(40,60,120,0.35), rgba(0,0,0,0) 70%); border-radius: 50%; }
   .card .tag { font-size: 11px; color: #8fa3c8; margin-bottom: 6px; }
   .card .name { font-size: 18px; font-weight: 700; }
   .card .rar { font-size: 12px; margin: 2px 0 8px; font-weight: 700; }
@@ -87,9 +90,10 @@ const CONFIG = {
   zoneInner: 2200,
   zoneOuter: 4200,
   startRadius: 3200,
-  planetGM: 3.0e8, // ~29 px/s^2 at the start radius
+  planetGM: 0, // gravity is off (the user found it annoying); 3.0e8 gives ~29 px/s^2 at the start radius
+  gravityTestGM: 3.0e8, // reference strength used by the gravity tests and the panel's slider range
   moonCount: 6,
-  moonGM: 1.2e7,
+  moonGM: 0, // was 1.2e7; moons are now plain obstacles
   moonOrbitSpeed: 0.02, // rad/s
   dustCount: 34,
   dustDrag: 0.55,
@@ -99,13 +103,19 @@ const CONFIG = {
 
   // ship
   baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
-  levelSpeedGrowth: 0.02, // +2% max speed per level
+  levelSpeedGrowth: 0.015, // +1.5% max speed per level
+  atkScale: 1.4, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
-  controlScheme: 'mouse', // see controls.js SCHEMES
+  controlScheme: 'draw', // see controls.js SCHEMES
+  drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
+  drawTime: 2.5, // real seconds to draw before the path commits itself
+  drawTimeScale: 0.06, // world speed while drawing
+  drawRunTimeScale: 0.3, // world speed while the ship runs the path (the ship itself runs at real time)
+  drawStep: 8, // min world distance between path points
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
   nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend
@@ -394,10 +404,11 @@ function gravityAt(field, t, x, y) {
 // ---- combat.js ----
 
 
+
 const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
 
 function attackPower(speed, stats) {
-  return (speed / 100) * stats.atkMult;
+  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
 }
 
 function isWeakHit(e, hx, hy, arcMult) {
@@ -1418,6 +1429,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると軌跡の上を駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -1434,12 +1446,12 @@ function schemeById(id) {
 // Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
 // keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
 function buildIntent(raw, scheme) {
-  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
+  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, press: !!raw.pressed, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
   if (scheme === 'drag') {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'mouse') {
+  } else if (scheme === 'mouse' || scheme === 'draw') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
     it.release = raw.release;
@@ -1575,7 +1587,8 @@ function controlStep(game, input, dt) {
 function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse': {
+    case 'mouse':
+    case 'draw': {
       const a = cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }
@@ -1630,6 +1643,7 @@ function createGame(opts = {}) {
     spawnAcc: 0, waveT: 0,
     phaseId: null,
     endReason: null,
+    draw: null, lastPath: null,
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     ...createEffectState(),
@@ -1652,16 +1666,23 @@ function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
-  if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
-  game.acc += frameDt * game.timeScale;
+  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  let scale = 1;
+  if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
+  game.timeScale = scale;
+  game.acc += frameDt * scale;
+  const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
+    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
+  if (game.draw && game.slowmo <= 0) game.timeScale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
 }
 
 // Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
@@ -1685,22 +1706,25 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  const ctl = controlStep(game, input, dt);
+  const ctl = game.draw ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
   updateHeading(sh);
   const aim = schemeAim(game, input);
   sh.markX = aim.x / 100; sh.markY = aim.y / 100;
-  if (input.charging && !game.releasePending) {
+  if (game.draw) {
+    game.releasePending = null; // presses while drawing/running only commit the path
+  } else if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
     sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
     sh.aimX = input.keyboard ? aim.x : input.aimX;
     sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
-  if (game.releasePending) {
+  if (game.releasePending && !game.draw) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard) launch(game, aim.x, aim.y);
+      if (r.keyboard && game.scheme === 'draw') startDrawing(game, input);
+      else if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
     sh.charging = false;
@@ -1713,12 +1737,17 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
-  const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
-  collideEnemies(game, x0, y0);
-  collideBodies(game);
+  if (game.draw && game.draw.phase === 'run') {
+    runAlongPath(game, dt / game.timeScale); // the ship runs at real time through a slowed world
+    collideBodies(game);
+  } else if (!game.draw) {
+    const g = gravityAt(game.field, game.t, sh.x, sh.y);
+    const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
+    const x0 = sh.x, y0 = sh.y;
+    stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
+    collideEnemies(game, x0, y0);
+    collideBodies(game);
+  }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
@@ -1805,6 +1834,130 @@ function refreshStats(game) {
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
 }
 
+// ---- draw a path, then run it (draw scheme) ----
+
+function drawPhase(game) {
+  return game.draw ? game.draw.phase : null;
+}
+
+function startDrawing(game, input) {
+  const sh = game.ship;
+  const budget = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
+  sh.charging = false;
+  game.events.push({ type: 'drawStart' });
+}
+
+// Real-time while the world crawls: the path follows the cursor until the length runs out,
+// time runs out, it reaches a planet, or the player presses again.
+function updateDrawing(game, dt, input) {
+  const d = game.draw;
+  d.timeLeft -= dt;
+  if (input.cursor) { d.cursor = input.cursor; extendPath(game, d, input.cursor); }
+  if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
+}
+
+function extendPath(game, d, c) {
+  const last = d.points[d.points.length - 1];
+  const dx = c.x - last.x, dy = c.y - last.y;
+  const len = Math.hypot(dx, dy);
+  if (len < CONFIG.drawStep) return;
+  const remain = d.budget - d.used;
+  if (remain <= 0.5) return;
+  let L = Math.min(len, remain);
+  const ux = dx / len, uy = dy / len;
+  const R = CONFIG.shipRadius;
+  for (const b of [game.field.planet, ...game.field.moons]) {
+    const t = segCircleT(last.x, last.y, last.x + ux * L, last.y + uy * L, b.x, b.y, b.r + R);
+    if (t >= 0) { L = Math.max(0, t * L - 2); d.blocked = true; }
+  }
+  if (L < 1) return;
+  d.points.push({ x: last.x + ux * L, y: last.y + uy * L });
+  d.used += L;
+}
+
+function commitPath(game) {
+  const d = game.draw, sh = game.ship;
+  if (d.points.length < 2) {
+    // nothing drawn: dash straight at the cursor (or along the heading) for the full length
+    let ux = sh.hx, uy = sh.hy;
+    if (d.cursor) {
+      const dx = d.cursor.x - sh.x, dy = d.cursor.y - sh.y, l = Math.hypot(dx, dy);
+      if (l > 1) { ux = dx / l; uy = dy / l; }
+    }
+    const o = d.points[0];
+    extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
+    if (d.points.length < 2) { game.draw = null; return; }
+  }
+  const pts = d.points;
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
+  onLaunch(game);
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, d.gauge, game.stats);
+  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  sh.vx = dx * speed; sh.vy = dy * speed;
+  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
+  sh.aimAngle = Math.atan2(dy, dx);
+  game.dashId++;
+  game.lastPath = pts;
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, budget: d.budget };
+  game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// Move along the polyline; piercing slows the run, a bounce ends it.
+function runAlongPath(game, realDt) {
+  const r = game.draw, sh = game.ship;
+  let dist = r.speed * realDt;
+  while (dist > 1e-9 && r.seg < r.path.length - 1) {
+    const a = r.path[r.seg], b = r.path[r.seg + 1];
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    if (segLen < 1e-6) { r.seg++; r.segPos = 0; continue; }
+    const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
+    const move = Math.min(dist, segLen - r.segPos);
+    const x0 = sh.x, y0 = sh.y;
+    r.segPos += move; dist -= move;
+    sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
+    sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    if (collideEnemies(game, x0, y0)) { game.draw = null; return; }
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (sp < r.speed) { dist *= sp / r.speed; r.speed = sp; }
+    if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
+  }
+  if (r.seg >= r.path.length - 1) {
+    game.draw = null;
+    sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
+  }
+}
+
+// Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
+function previewPath(game) {
+  const d = game.draw;
+  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null };
+  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius;
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
+  const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
+  const samples = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.ceil(len / 14));
+    for (let k = 1; k <= n; k++) {
+      const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
+      let blocked = false;
+      queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > (e.r + R) ** 2) return;
+        const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+        if (crit) p.hot = true;
+        if (!canPierce(atk, e, crit)) blocked = true;
+      });
+      samples.push(p);
+      if (blocked) return { samples, block: p };
+    }
+  }
+  return { samples, block: null };
+}
+
 // ---- ship ----
 
 function launch(game, ax, ay) {
@@ -1852,7 +2005,7 @@ function collideEnemies(game, x0, y0) {
     const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
     if (t >= 0) hits.push({ e, t });
   });
-  if (!hits.length) return;
+  if (!hits.length) return false;
   hits.sort((a, b) => a.t - b.t);
   for (const { e, t } of hits) {
     const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
@@ -1887,8 +2040,9 @@ function collideEnemies(game, x0, y0) {
     e.hitCD = 0.25;
     damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
     game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
-    break;
+    return true;
   }
+  return false;
 }
 
 function collideBodies(game) {
@@ -2087,7 +2241,135 @@ function annotatePrediction(game, pts, seconds) {
   return out;
 }
 
+// ---- parts.js ----
+// Module slots drawn as spaceship parts. Each part has its own silhouette, and the six of them
+// assemble into one ship (nose, radar, gun, reactor, wings, engine). Pure canvas drawing.
+
+const TAU_P = Math.PI * 2;
+
+// Where each part sits in the assembled ship, in units (ship points up, center = reactor).
+const PART_LAYOUT = {
+  armor: { x: 0, y: 0.35, s: 1 },
+  booster: { x: 0, y: 1.85, s: 1 },
+  gen: { x: 0, y: -0.05, s: 0.95 },
+  gun: { x: 1.15, y: -1.0, s: 0.8 },
+  radar: { x: -1.15, y: -1.0, s: 0.8 },
+  bow: { x: 0, y: -2.2, s: 1 },
+};
+const DRAW_ORDER = ['armor', 'booster', 'gen', 'gun', 'radar', 'bow'];
+
+function trace(ctx, slot, s) {
+  ctx.beginPath();
+  switch (slot) {
+    case 'bow': // nose cone
+      ctx.moveTo(0, -1.15 * s);
+      ctx.quadraticCurveTo(0.8 * s, -0.25 * s, 0.62 * s, 0.85 * s);
+      ctx.lineTo(-0.62 * s, 0.85 * s);
+      ctx.quadraticCurveTo(-0.8 * s, -0.25 * s, 0, -1.15 * s);
+      break;
+    case 'booster': // twin engine bells
+      for (const sx of [-1, 1]) {
+        const cx = sx * 0.42 * s;
+        ctx.moveTo(cx - 0.26 * s, -0.55 * s);
+        ctx.lineTo(cx + 0.26 * s, -0.55 * s);
+        ctx.lineTo(cx + 0.4 * s, 0.45 * s);
+        ctx.lineTo(cx - 0.4 * s, 0.45 * s);
+        ctx.closePath();
+      }
+      break;
+    case 'gun': // turret + barrel
+      ctx.rect(-0.16 * s, -1.15 * s, 0.32 * s, 1.15 * s);
+      ctx.moveTo(0.48 * s, 0.25 * s);
+      ctx.arc(0, 0.25 * s, 0.48 * s, 0, TAU_P);
+      break;
+    case 'radar': // dish on a mast
+      ctx.moveTo(-0.85 * s, -0.55 * s);
+      ctx.quadraticCurveTo(0, 0.55 * s, 0.85 * s, -0.55 * s);
+      ctx.quadraticCurveTo(0, -0.05 * s, -0.85 * s, -0.55 * s);
+      ctx.rect(-0.1 * s, 0, 0.2 * s, 0.75 * s);
+      break;
+    case 'armor': // a pair of swept wing plates
+      for (const sx of [-1, 1]) {
+        ctx.moveTo(sx * 0.45 * s, -0.55 * s);
+        ctx.lineTo(sx * 1.55 * s, 0.35 * s);
+        ctx.lineTo(sx * 1.55 * s, 0.95 * s);
+        ctx.lineTo(sx * 0.45 * s, 0.55 * s);
+        ctx.closePath();
+      }
+      break;
+    case 'gen': // hexagonal reactor
+    default:
+      for (let i = 0; i < 6; i++) {
+        const a = i * TAU_P / 6 - Math.PI / 2;
+        if (i === 0) ctx.moveTo(Math.cos(a) * 0.72 * s, Math.sin(a) * 0.72 * s);
+        else ctx.lineTo(Math.cos(a) * 0.72 * s, Math.sin(a) * 0.72 * s);
+      }
+      ctx.closePath();
+  }
+}
+
+// One part at the origin. color = rarity color (filled), or null for an empty outline.
+function drawPart(ctx, slot, s, color, opts = {}) {
+  ctx.save();
+  if (color) {
+    if (opts.glow) { ctx.shadowColor = color; ctx.shadowBlur = opts.glow; }
+    trace(ctx, slot, s);
+    ctx.fillStyle = color;
+    ctx.fill('nonzero');
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = Math.max(1, s * 0.09);
+    ctx.strokeStyle = 'rgba(10,14,30,0.75)';
+    ctx.stroke();
+    // small details so the parts read as machinery
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    if (slot === 'bow') { ctx.beginPath(); ctx.ellipse(0, -0.2 * s, 0.18 * s, 0.3 * s, 0, 0, TAU_P); ctx.fill(); }
+    if (slot === 'gen') { ctx.beginPath(); ctx.arc(0, 0, 0.3 * s, 0, TAU_P); ctx.fill(); }
+    if (slot === 'radar') { ctx.beginPath(); ctx.arc(0, -0.25 * s, 0.11 * s, 0, TAU_P); ctx.fill(); }
+    if (slot === 'gun') { ctx.fillRect(-0.16 * s, -1.15 * s, 0.32 * s, 0.16 * s); }
+    if (slot === 'booster' && opts.flame !== false) {
+      ctx.fillStyle = 'rgba(255,170,80,0.85)';
+      for (const sx of [-1, 1]) {
+        const cx = sx * 0.42 * s;
+        ctx.beginPath(); ctx.moveTo(cx - 0.26 * s, 0.5 * s); ctx.lineTo(cx + 0.26 * s, 0.5 * s); ctx.lineTo(cx, 1.1 * s); ctx.closePath(); ctx.fill();
+      }
+    }
+  } else {
+    trace(ctx, slot, s);
+    ctx.setLineDash([Math.max(2, s * 0.18), Math.max(2, s * 0.14)]);
+    ctx.lineWidth = Math.max(1, s * 0.07);
+    ctx.strokeStyle = opts.outline || 'rgba(190,205,240,0.35)';
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+// The whole ship. colorOf(slot) -> rarity color or null (empty). highlight: slot to pulse.
+function drawShipAssembly(ctx, cx, cy, unit, colorOf, highlight, t = 0) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  // chassis spine that holds the parts
+  ctx.strokeStyle = 'rgba(160,180,230,0.25)';
+  ctx.lineWidth = Math.max(1, unit * 0.12);
+  ctx.beginPath(); ctx.moveTo(0, -1.4 * unit); ctx.lineTo(0, 1.3 * unit); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-1.15 * unit, -0.75 * unit); ctx.lineTo(1.15 * unit, -0.75 * unit); ctx.stroke();
+  for (const slot of DRAW_ORDER) {
+    const L = PART_LAYOUT[slot];
+    ctx.save();
+    ctx.translate(L.x * unit, L.y * unit);
+    const color = colorOf(slot);
+    drawPart(ctx, slot, L.s * unit, color, { glow: color ? unit * 0.4 : 0 });
+    if (slot === highlight) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6);
+      drawPart(ctx, slot, L.s * unit * (1.12 + 0.06 * pulse), null, { outline: `rgba(255,255,255,${0.5 + 0.5 * pulse})` });
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 // ---- render.js ----
+
 
 
 
@@ -2194,6 +2476,7 @@ function render(r, game, dt, pointer) {
   drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
+  drawPathUi(r, game);
   drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
@@ -2205,6 +2488,7 @@ function render(r, game, dt, pointer) {
 
   drawChargeUi(r, game, pointer);
   drawCapsuleArrows(r, game);
+  drawDrawingHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
   drawMinimap(r, game);
@@ -2338,19 +2622,20 @@ function drawCapsules(r, game) {
     ctx.beginPath(); ctx.arc(c.x, c.y, S * (1.2 + pulse * 2.5), 0, TAU); ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(game.t * 1.2);
-    ctx.shadowColor = col; ctx.shadowBlur = 20;
-    ctx.fillStyle = col;
-    ctx.beginPath();
+    ctx.translate(c.x, c.y + Math.sin(game.t * 2 + c.x) * S * 0.12);
     if (c.kind === 'core') {
+      ctx.rotate(game.t * 1.2);
+      ctx.shadowColor = col; ctx.shadowBlur = 20;
+      ctx.fillStyle = col;
+      ctx.beginPath();
       for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.45 : 1; ctx.lineTo(Math.cos(a) * S * k, Math.sin(a) * S * k); }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     } else {
-      ctx.moveTo(0, -S); ctx.lineTo(S * 0.7, 0); ctx.lineTo(0, S); ctx.lineTo(-S * 0.7, 0);
+      // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
+      drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
     }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     ctx.restore();
   }
 }
@@ -2533,9 +2818,90 @@ function drawBodies(r, game) {
   }
 }
 
+// Draw scheme: while charging, show how far a path could reach.
+function drawReach(r, game) {
+  const sh = game.ship;
+  const reach = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.strokeStyle = sh.gauge >= 1 ? 'rgba(255,228,107,0.7)' : 'rgba(159,232,255,0.55)';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([14 / z, 10 / z]);
+  ctx.beginPath(); ctx.arc(sh.x, sh.y, reach, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawPathUi(r, game) {
+  const d = game.draw;
+  if (!d) return;
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const sh = game.ship;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (d.phase === 'run') {
+    ctx.strokeStyle = 'rgba(159,232,255,0.4)';
+    ctx.lineWidth = 4 / z;
+    ctx.setLineDash([10 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+  const pts = d.points;
+  const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
+  if (pts.length > 1) {
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.22)'; ctx.lineWidth = 18 / z; ctx.stroke();
+    line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
+  }
+  const last = pts[pts.length - 1];
+  if (d.cursor && d.used < d.budget - 0.5) {
+    ctx.strokeStyle = 'rgba(214,246,255,0.3)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([6 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  const pv = previewPath(game);
+  ctx.fillStyle = '#ffe46b';
+  for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
+  if (pv.block) {
+    const k = 12 / z, b = pv.block;
+    ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 4 / z;
+    ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k); ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
+}
+
+// Screen-space: slow-time vignette and the remaining length / time while drawing.
+function drawDrawingHud(r, game) {
+  const d = game.draw;
+  if (!d || d.phase !== 'draw') return;
+  const { ctx, W, H } = r;
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, 'rgba(40,80,200,0)');
+  g.addColorStop(1, 'rgba(40,80,200,0.35)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  const bw = Math.min(320, W * 0.5), x = W / 2 - bw / 2, y = H * 0.72;
+  const bar = (yy, frac, color, label) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, yy, bw, 6);
+    ctx.fillStyle = color; ctx.fillRect(x, yy, bw * Math.max(0, Math.min(1, frac)), 6);
+    ctx.fillStyle = '#b8c6ea'; ctx.font = `11px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(label, x - 8, yy + 6);
+  };
+  bar(y, 1 - d.used / d.budget, '#9fe8ff', '長さ');
+  bar(y + 14, d.timeLeft / CONFIG.drawTime, '#ffd24a', '時間');
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e8f6ff';
+  ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.fillText('カーソルで軌跡を描く — Space／クリックで駆け抜ける', W / 2, y - 12);
+}
+
 function drawPrediction(r, game) {
   const sh = game.ship;
   if (!sh.charging) return;
+  if (game.scheme === 'draw') { drawReach(r, game); return; }
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
@@ -2941,16 +3307,26 @@ function drawHud(r, game) {
   drawLoadout(r, game);
 }
 
+// Bottom-left: the ship assembled from the equipped parts (empty slots are dashed outlines),
+// with the module names beside it on wide screens.
 function drawLoadout(r, game) {
   const { ctx, H, W } = r;
-  if (W < 520) return;
-  const x = 16, y0 = H - 16 - SLOTS.length * 18;
+  const unit = Math.min(15, H / 50);
+  const cx = 16 + unit * 1.8, cy = H - 18 - unit * 3.2;
+  ctx.fillStyle = 'rgba(8,12,28,0.55)';
+  ctx.beginPath(); ctx.arc(cx, cy - unit * 0.1, unit * 3.4, 0, TAU); ctx.fill();
+  drawShipAssembly(ctx, cx, cy, unit, (slot) => {
+    const m = game.loadout[slot];
+    return m ? RARITIES[m.r].color : null;
+  }, null, game.t);
+  if (W < 640) return;
+  const x = cx + unit * 3.8, y0 = cy - unit * 3 + 4;
   ctx.textAlign = 'left';
   ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
   SLOTS.forEach((s, i) => {
     const m = game.loadout[s.id];
     ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
-    ctx.fillText(`${s.icon} ${m ? moduleDef(m.id).name : s.name + ' —'}`, x, y0 + i * 18);
+    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name : '—'}`, x, y0 + i * 17);
   });
 }
 
@@ -3072,10 +3448,11 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null,
+    keys: new Set(), space: false, snap: null, pressed: false,
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = { x: e.clientX, y: e.clientY };
+    if (st.enabled && e.button === 0) st.pressed = true;
     if (!st.enabled || e.button > 0 || st.space) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
@@ -3103,7 +3480,9 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
-        if (!st.enabled || e.repeat || st.space || st.down) return;
+        if (!st.enabled || e.repeat || st.space) return;
+        st.pressed = true;
+        if (st.down) return;
         st.space = true;
       }
     });
@@ -3123,6 +3502,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,
         space: st.space,
+        pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         pointerDown: st.down,
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
@@ -3132,13 +3512,15 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       };
       st.release = false;
       st.snap = null;
+      st.pressed = false;
       return out;
     },
-    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.pointerId = null; },
   };
 }
 
 // ---- ui.js ----
+
 
 
 
@@ -3205,11 +3587,45 @@ function showResult(game, extra, onNext) {
 
 const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
 
+function partCanvas(slot, color, size = 64) {
+  const c = el('canvas', { class: 'part' });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = size * dpr; c.height = size * dpr;
+  c.style.width = c.style.height = `${size}px`;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.translate(size / 2, size / 2);
+  drawPart(ctx, slot, size * (slot === 'armor' ? 0.26 : 0.36), color, { glow: color ? 10 : 0 });
+  return c;
+}
+
+// The assembled ship with `slot` pulsing; redraws itself while the offer is open.
+function assemblyCanvas(game, slot, size = 150) {
+  const c = el('canvas', { class: 'assembly' });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = size * dpr; c.height = size * dpr;
+  c.style.width = c.style.height = `${size}px`;
+  const ctx = c.getContext('2d');
+  const paint = (t) => {
+    if (!c.isConnected && t > 0) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    drawShipAssembly(ctx, size / 2, size / 2 + size * 0.03, size / 7.4, (s) => {
+      const m = game.loadout[s];
+      return m ? RARITIES[m.r].color : null;
+    }, slot, t / 1000);
+    requestAnimationFrame(paint);
+  };
+  paint(0);
+  return c;
+}
+
 function moduleCard(mod, tag, isNew) {
   if (!mod) return el('div', { class: 'card empty' }, '空きスロット');
   const def = moduleDef(mod.id);
   const rar = RARITIES[mod.r];
   const card = el('div', { class: `card${isNew ? ' new' : ''}` },
+    partCanvas(mod.slot, rar.color),
     el('div', { class: 'tag' }, tag),
     el('div', { class: 'name' }, def.name),
     el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
@@ -3232,9 +3648,12 @@ function showOffer(game, onChoose) {
   const equip = el('button', { class: 'primary', onclick: () => onChoose(true) }, '付け替える ', el('kbd', {}, '1'));
   const skip = el('button', { onclick: () => onChoose(false) }, '捨てる ', el('kbd', {}, '2'));
   showScreen(el('div', { class: 'panel' },
-    el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
-    el('h1', {}, `${slot.icon} ${slot.name}`),
-    el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'),
+    el('div', { class: 'offerhead' },
+      assemblyCanvas(game, mod.slot),
+      el('div', {},
+        el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
+        el('h1', {}, slot.name),
+        el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'))),
     el('div', { class: 'cards' }, moduleCard(cur, '装備中', false), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true)),
     el('div', { class: 'btns' }, equip, skip),
     loadout), 'offer');
@@ -3269,8 +3688,8 @@ function showStation(save, onBuy, onDepart) {
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
-      el('li', {}, '中心の惑星の重力をかすめると上限を超えて加速できる。中心ほど敵は強いがレアなカプセルがある'),
-      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて惑星をかすめ、脱出速度へ'),
+      el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
+      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
     ups,
@@ -3395,6 +3814,7 @@ function createAudio() {
     stage: () => { tone(392, 0.25, 'sawtooth', 0.1, 784); tone(587, 0.35, 'triangle', 0.12, 1175, sfx, 0.08); },
     phase: () => tone(110, 1.2, 'sawtooth', 0.12, 220),
     barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
+    drawStart: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
     sonic: () => {
       // a beat of silence, then everything comes back at once
       duckT = 0.22;
@@ -3481,8 +3901,13 @@ const TUNABLES = [
   { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
   { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },
   { key: 'overcapDecay', label: '上限超過の減衰', min: 0, max: 2, step: 0.05 },
-  { key: 'planetGM', label: '中心惑星の重力', min: 0, max: 1.5e9, step: 1e7, fmt: (v) => `${(v / 1e8).toFixed(1)}e8` },
+  { key: 'planetGM', label: '中心惑星の重力（既定 0）', min: 0, max: 1.5e9, step: 1e7, fmt: (v) => `${(v / 1e8).toFixed(1)}e8` },
   { key: 'moonGM', label: '小惑星の重力', min: 0, max: 1e8, step: 1e6, fmt: (v) => `${(v / 1e6).toFixed(0)}e6` },
+  { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
+  { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
+  { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
+  { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.01 },
+  { key: 'drawRunTimeScale', label: '駆け抜け中の世界の速さ', min: 0.05, max: 1, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },
@@ -3631,9 +4056,9 @@ window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
 // control scheme is a per-browser preference
-try { const c = window.localStorage.getItem('speed-controls'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
 const debug = createDebugPanel(() => game, (id) => {
-  try { window.localStorage.setItem('speed-controls', id); } catch { /* ignore */ }
+  try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
 });
 let mode = 'station'; // station | run | result

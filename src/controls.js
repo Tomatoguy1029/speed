@@ -3,6 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると軌跡の上を駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -19,12 +20,12 @@ export function schemeById(id) {
 // Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
 // keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
 export function buildIntent(raw, scheme) {
-  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
+  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, press: !!raw.pressed, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
   if (scheme === 'drag') {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'mouse') {
+  } else if (scheme === 'mouse' || scheme === 'draw') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
     it.release = raw.release;
@@ -160,7 +161,8 @@ export function controlStep(game, input, dt) {
 export function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse': {
+    case 'mouse':
+    case 'draw': {
       const a = cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }

@@ -1,10 +1,11 @@
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath, annotatePrediction } from './world.js';
+import { predictPath, annotatePrediction, previewPath } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { getPhase } from './spawner.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
+import { drawPart, drawShipAssembly } from './parts.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -104,6 +105,7 @@ export function render(r, game, dt, pointer) {
   drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
+  drawPathUi(r, game);
   drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
@@ -115,6 +117,7 @@ export function render(r, game, dt, pointer) {
 
   drawChargeUi(r, game, pointer);
   drawCapsuleArrows(r, game);
+  drawDrawingHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
   drawMinimap(r, game);
@@ -248,19 +251,20 @@ function drawCapsules(r, game) {
     ctx.beginPath(); ctx.arc(c.x, c.y, S * (1.2 + pulse * 2.5), 0, TAU); ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(game.t * 1.2);
-    ctx.shadowColor = col; ctx.shadowBlur = 20;
-    ctx.fillStyle = col;
-    ctx.beginPath();
+    ctx.translate(c.x, c.y + Math.sin(game.t * 2 + c.x) * S * 0.12);
     if (c.kind === 'core') {
+      ctx.rotate(game.t * 1.2);
+      ctx.shadowColor = col; ctx.shadowBlur = 20;
+      ctx.fillStyle = col;
+      ctx.beginPath();
       for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.45 : 1; ctx.lineTo(Math.cos(a) * S * k, Math.sin(a) * S * k); }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     } else {
-      ctx.moveTo(0, -S); ctx.lineTo(S * 0.7, 0); ctx.lineTo(0, S); ctx.lineTo(-S * 0.7, 0);
+      // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
+      drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
     }
-    ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     ctx.restore();
   }
 }
@@ -443,9 +447,90 @@ function drawBodies(r, game) {
   }
 }
 
+// Draw scheme: while charging, show how far a path could reach.
+function drawReach(r, game) {
+  const sh = game.ship;
+  const reach = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.strokeStyle = sh.gauge >= 1 ? 'rgba(255,228,107,0.7)' : 'rgba(159,232,255,0.55)';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([14 / z, 10 / z]);
+  ctx.beginPath(); ctx.arc(sh.x, sh.y, reach, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawPathUi(r, game) {
+  const d = game.draw;
+  if (!d) return;
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const sh = game.ship;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (d.phase === 'run') {
+    ctx.strokeStyle = 'rgba(159,232,255,0.4)';
+    ctx.lineWidth = 4 / z;
+    ctx.setLineDash([10 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+  const pts = d.points;
+  const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
+  if (pts.length > 1) {
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.22)'; ctx.lineWidth = 18 / z; ctx.stroke();
+    line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
+  }
+  const last = pts[pts.length - 1];
+  if (d.cursor && d.used < d.budget - 0.5) {
+    ctx.strokeStyle = 'rgba(214,246,255,0.3)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([6 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  const pv = previewPath(game);
+  ctx.fillStyle = '#ffe46b';
+  for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
+  if (pv.block) {
+    const k = 12 / z, b = pv.block;
+    ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 4 / z;
+    ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k); ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
+}
+
+// Screen-space: slow-time vignette and the remaining length / time while drawing.
+function drawDrawingHud(r, game) {
+  const d = game.draw;
+  if (!d || d.phase !== 'draw') return;
+  const { ctx, W, H } = r;
+  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+  g.addColorStop(0, 'rgba(40,80,200,0)');
+  g.addColorStop(1, 'rgba(40,80,200,0.35)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  const bw = Math.min(320, W * 0.5), x = W / 2 - bw / 2, y = H * 0.72;
+  const bar = (yy, frac, color, label) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, yy, bw, 6);
+    ctx.fillStyle = color; ctx.fillRect(x, yy, bw * Math.max(0, Math.min(1, frac)), 6);
+    ctx.fillStyle = '#b8c6ea'; ctx.font = `11px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(label, x - 8, yy + 6);
+  };
+  bar(y, 1 - d.used / d.budget, '#9fe8ff', '長さ');
+  bar(y + 14, d.timeLeft / CONFIG.drawTime, '#ffd24a', '時間');
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e8f6ff';
+  ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.fillText('カーソルで軌跡を描く — Space／クリックで駆け抜ける', W / 2, y - 12);
+}
+
 function drawPrediction(r, game) {
   const sh = game.ship;
   if (!sh.charging) return;
+  if (game.scheme === 'draw') { drawReach(r, game); return; }
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
@@ -851,16 +936,26 @@ function drawHud(r, game) {
   drawLoadout(r, game);
 }
 
+// Bottom-left: the ship assembled from the equipped parts (empty slots are dashed outlines),
+// with the module names beside it on wide screens.
 function drawLoadout(r, game) {
   const { ctx, H, W } = r;
-  if (W < 520) return;
-  const x = 16, y0 = H - 16 - SLOTS.length * 18;
+  const unit = Math.min(15, H / 50);
+  const cx = 16 + unit * 1.8, cy = H - 18 - unit * 3.2;
+  ctx.fillStyle = 'rgba(8,12,28,0.55)';
+  ctx.beginPath(); ctx.arc(cx, cy - unit * 0.1, unit * 3.4, 0, TAU); ctx.fill();
+  drawShipAssembly(ctx, cx, cy, unit, (slot) => {
+    const m = game.loadout[slot];
+    return m ? RARITIES[m.r].color : null;
+  }, null, game.t);
+  if (W < 640) return;
+  const x = cx + unit * 3.8, y0 = cy - unit * 3 + 4;
   ctx.textAlign = 'left';
   ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
   SLOTS.forEach((s, i) => {
     const m = game.loadout[s.id];
     ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
-    ctx.fillText(`${s.icon} ${m ? moduleDef(m.id).name : s.name + ' —'}`, x, y0 + i * 18);
+    ctx.fillText(`${s.name}: ${m ? moduleDef(m.id).name : '—'}`, x, y0 + i * 17);
   });
 }
 

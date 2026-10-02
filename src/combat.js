@@ -1,9 +1,10 @@
 import { angleDiff } from './math.js';
+import { CONFIG } from './config.js';
 
 export const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
 
 export function attackPower(speed, stats) {
-  return (speed / 100) * stats.atkMult;
+  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
 }
 
 export function isWeakHit(e, hx, hy, arcMult) {

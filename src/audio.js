@@ -105,6 +105,7 @@ export function createAudio() {
     stage: () => { tone(392, 0.25, 'sawtooth', 0.1, 784); tone(587, 0.35, 'triangle', 0.12, 1175, sfx, 0.08); },
     phase: () => tone(110, 1.2, 'sawtooth', 0.12, 220),
     barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
+    drawStart: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
     sonic: () => {
       // a beat of silence, then everything comes back at once
       duckT = 0.22;

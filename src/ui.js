@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { META_UPGRADES, metaCost } from './progression.js';
 import { schemeById } from './controls.js';
+import { drawPart, drawShipAssembly } from './parts.js';
 
 const root = () => document.getElementById('ui');
 
@@ -64,11 +65,45 @@ export function showResult(game, extra, onNext) {
 
 const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
 
+function partCanvas(slot, color, size = 64) {
+  const c = el('canvas', { class: 'part' });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = size * dpr; c.height = size * dpr;
+  c.style.width = c.style.height = `${size}px`;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.translate(size / 2, size / 2);
+  drawPart(ctx, slot, size * (slot === 'armor' ? 0.26 : 0.36), color, { glow: color ? 10 : 0 });
+  return c;
+}
+
+// The assembled ship with `slot` pulsing; redraws itself while the offer is open.
+function assemblyCanvas(game, slot, size = 150) {
+  const c = el('canvas', { class: 'assembly' });
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = size * dpr; c.height = size * dpr;
+  c.style.width = c.style.height = `${size}px`;
+  const ctx = c.getContext('2d');
+  const paint = (t) => {
+    if (!c.isConnected && t > 0) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size, size);
+    drawShipAssembly(ctx, size / 2, size / 2 + size * 0.03, size / 7.4, (s) => {
+      const m = game.loadout[s];
+      return m ? RARITIES[m.r].color : null;
+    }, slot, t / 1000);
+    requestAnimationFrame(paint);
+  };
+  paint(0);
+  return c;
+}
+
 function moduleCard(mod, tag, isNew) {
   if (!mod) return el('div', { class: 'card empty' }, '空きスロット');
   const def = moduleDef(mod.id);
   const rar = RARITIES[mod.r];
   const card = el('div', { class: `card${isNew ? ' new' : ''}` },
+    partCanvas(mod.slot, rar.color),
     el('div', { class: 'tag' }, tag),
     el('div', { class: 'name' }, def.name),
     el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
@@ -91,9 +126,12 @@ export function showOffer(game, onChoose) {
   const equip = el('button', { class: 'primary', onclick: () => onChoose(true) }, '付け替える ', el('kbd', {}, '1'));
   const skip = el('button', { onclick: () => onChoose(false) }, '捨てる ', el('kbd', {}, '2'));
   showScreen(el('div', { class: 'panel' },
-    el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
-    el('h1', {}, `${slot.icon} ${slot.name}`),
-    el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'),
+    el('div', { class: 'offerhead' },
+      assemblyCanvas(game, mod.slot),
+      el('div', {},
+        el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
+        el('h1', {}, slot.name),
+        el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'))),
     el('div', { class: 'cards' }, moduleCard(cur, '装備中', false), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true)),
     el('div', { class: 'btns' }, equip, skip),
     loadout), 'offer');
@@ -128,8 +166,8 @@ export function showStation(save, onBuy, onDepart) {
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
-      el('li', {}, '中心の惑星の重力をかすめると上限を超えて加速できる。中心ほど敵は強いがレアなカプセルがある'),
-      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて惑星をかすめ、脱出速度へ'),
+      el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
+      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
     ups,

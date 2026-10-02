@@ -10,6 +10,7 @@ const idle = { charging: false, aimX: 0, aimY: 0, release: false };
 test('planet gravity points to center and grows closer in', () => {
   const field = createField(() => 0.5);
   field.moons.length = 0;
+  field.planet.gm = CONFIG.gravityTestGM;
   const far = gravityAt(field, 0, 3000, 0);
   const near = gravityAt(field, 0, 1000, 0);
   assert.ok(far.ax < 0 && Math.abs(far.ay) < 1e-6);
@@ -20,6 +21,7 @@ test('a ship left alone falls toward the planet', () => {
   const game = createGame({ seed: 3 });
   game.spawning = false;
   game.field.moons.length = 0;
+  game.field.planet.gm = CONFIG.gravityTestGM;
   game.ship.vx = 0; game.ship.vy = 0; // left alone = not moving
   const r0 = Math.hypot(game.ship.x, game.ship.y);
   for (let i = 0; i < 30; i++) update(game, 0.1, idle);
@@ -30,6 +32,7 @@ test('skimming the planet pushes speed above the max speed', () => {
   const game = createGame({ seed: 3 });
   game.spawning = false;
   game.field.moons.length = 0;
+  game.field.planet.gm = CONFIG.gravityTestGM;
   game.field.dust.length = 0;
   game.ship.x = -3000; game.ship.y = 0;
   game.ship.vx = 800; game.ship.vy = 230; // dives in, swings past ~550 from the center
@@ -77,9 +80,19 @@ test('predictPath bends under gravity', () => {
   const game = createGame({ seed: 3 });
   game.spawning = false;
   game.field.moons.length = 0;
+  game.field.planet.gm = CONFIG.gravityTestGM;
   const pts = predictPath(game, 0, -1, 1, 1.0);
   assert.ok(pts.length > 10);
   const last = pts[pts.length - 1];
   assert.ok(last.y < game.ship.y - 200, 'moves along launch direction');
   assert.ok(last.x > game.ship.x + 5, 'bent toward the planet');
+});
+
+test('by default there is no gravity: a ship left alone stays put', () => {
+  const game = createGame({ seed: 3 });
+  game.spawning = false;
+  game.ship.vx = 0; game.ship.vy = 0;
+  const x0 = game.ship.x, y0 = game.ship.y;
+  for (let i = 0; i < 30; i++) update(game, 0.1, idle);
+  assert.ok(Math.hypot(game.ship.x - x0, game.ship.y - y0) < 1);
 });

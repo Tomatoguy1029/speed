@@ -26,11 +26,11 @@ function chargeAndRelease(game, intent = {}) {
   update(game, 0.02, { ...idle, ...intent, release: true, keyboard: true });
 }
 
-test('every scheme has a name and help text; mouse steering is the default', () => {
-  assert.ok(SCHEMES.length >= 7);
+test('every scheme has a name and help text; drawing a path is the default', () => {
+  assert.ok(SCHEMES.length >= 8);
   for (const s of SCHEMES) assert.ok(s.id && s.name && s.help, s.id);
-  assert.equal(CONFIG.controlScheme, 'mouse');
-  assert.equal(createGame({ seed: 1 }).scheme, 'mouse');
+  assert.equal(CONFIG.controlScheme, 'draw');
+  assert.equal(createGame({ seed: 1 }).scheme, 'draw');
 });
 
 // ---- intents per scheme ----

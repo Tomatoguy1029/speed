@@ -19,9 +19,9 @@ window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
 // control scheme is a per-browser preference
-try { const c = window.localStorage.getItem('speed-controls'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
 const debug = createDebugPanel(() => game, (id) => {
-  try { window.localStorage.setItem('speed-controls', id); } catch { /* ignore */ }
+  try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
 });
 let mode = 'station'; // station | run | result

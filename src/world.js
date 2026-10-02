@@ -39,6 +39,7 @@ export function createGame(opts = {}) {
     spawnAcc: 0, waveT: 0,
     phaseId: null,
     endReason: null,
+    draw: null, lastPath: null,
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [] },
     ...createEffectState(),
@@ -61,16 +62,23 @@ export function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
-  if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
-  game.acc += frameDt * game.timeScale;
+  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  let scale = 1;
+  if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
+  game.timeScale = scale;
+  game.acc += frameDt * scale;
+  const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
+    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
+  if (game.draw && game.slowmo <= 0) game.timeScale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
 }
 
 // Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
@@ -94,22 +102,25 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  const ctl = controlStep(game, input, dt);
+  const ctl = game.draw ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
   updateHeading(sh);
   const aim = schemeAim(game, input);
   sh.markX = aim.x / 100; sh.markY = aim.y / 100;
-  if (input.charging && !game.releasePending) {
+  if (game.draw) {
+    game.releasePending = null; // presses while drawing/running only commit the path
+  } else if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
     sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
     sh.aimX = input.keyboard ? aim.x : input.aimX;
     sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
-  if (game.releasePending) {
+  if (game.releasePending && !game.draw) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard) launch(game, aim.x, aim.y);
+      if (r.keyboard && game.scheme === 'draw') startDrawing(game, input);
+      else if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
     sh.charging = false;
@@ -122,12 +133,17 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  const g = gravityAt(game.field, game.t, sh.x, sh.y);
-  const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
-  const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
-  collideEnemies(game, x0, y0);
-  collideBodies(game);
+  if (game.draw && game.draw.phase === 'run') {
+    runAlongPath(game, dt / game.timeScale); // the ship runs at real time through a slowed world
+    collideBodies(game);
+  } else if (!game.draw) {
+    const g = gravityAt(game.field, game.t, sh.x, sh.y);
+    const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
+    const x0 = sh.x, y0 = sh.y;
+    stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
+    collideEnemies(game, x0, y0);
+    collideBodies(game);
+  }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
@@ -214,6 +230,130 @@ export function refreshStats(game) {
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
 }
 
+// ---- draw a path, then run it (draw scheme) ----
+
+function drawPhase(game) {
+  return game.draw ? game.draw.phase : null;
+}
+
+function startDrawing(game, input) {
+  const sh = game.ship;
+  const budget = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
+  sh.charging = false;
+  game.events.push({ type: 'drawStart' });
+}
+
+// Real-time while the world crawls: the path follows the cursor until the length runs out,
+// time runs out, it reaches a planet, or the player presses again.
+function updateDrawing(game, dt, input) {
+  const d = game.draw;
+  d.timeLeft -= dt;
+  if (input.cursor) { d.cursor = input.cursor; extendPath(game, d, input.cursor); }
+  if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
+}
+
+function extendPath(game, d, c) {
+  const last = d.points[d.points.length - 1];
+  const dx = c.x - last.x, dy = c.y - last.y;
+  const len = Math.hypot(dx, dy);
+  if (len < CONFIG.drawStep) return;
+  const remain = d.budget - d.used;
+  if (remain <= 0.5) return;
+  let L = Math.min(len, remain);
+  const ux = dx / len, uy = dy / len;
+  const R = CONFIG.shipRadius;
+  for (const b of [game.field.planet, ...game.field.moons]) {
+    const t = segCircleT(last.x, last.y, last.x + ux * L, last.y + uy * L, b.x, b.y, b.r + R);
+    if (t >= 0) { L = Math.max(0, t * L - 2); d.blocked = true; }
+  }
+  if (L < 1) return;
+  d.points.push({ x: last.x + ux * L, y: last.y + uy * L });
+  d.used += L;
+}
+
+function commitPath(game) {
+  const d = game.draw, sh = game.ship;
+  if (d.points.length < 2) {
+    // nothing drawn: dash straight at the cursor (or along the heading) for the full length
+    let ux = sh.hx, uy = sh.hy;
+    if (d.cursor) {
+      const dx = d.cursor.x - sh.x, dy = d.cursor.y - sh.y, l = Math.hypot(dx, dy);
+      if (l > 1) { ux = dx / l; uy = dy / l; }
+    }
+    const o = d.points[0];
+    extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
+    if (d.points.length < 2) { game.draw = null; return; }
+  }
+  const pts = d.points;
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
+  onLaunch(game);
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, d.gauge, game.stats);
+  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  sh.vx = dx * speed; sh.vy = dy * speed;
+  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
+  sh.aimAngle = Math.atan2(dy, dx);
+  game.dashId++;
+  game.lastPath = pts;
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, budget: d.budget };
+  game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// Move along the polyline; piercing slows the run, a bounce ends it.
+function runAlongPath(game, realDt) {
+  const r = game.draw, sh = game.ship;
+  let dist = r.speed * realDt;
+  while (dist > 1e-9 && r.seg < r.path.length - 1) {
+    const a = r.path[r.seg], b = r.path[r.seg + 1];
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    if (segLen < 1e-6) { r.seg++; r.segPos = 0; continue; }
+    const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
+    const move = Math.min(dist, segLen - r.segPos);
+    const x0 = sh.x, y0 = sh.y;
+    r.segPos += move; dist -= move;
+    sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
+    sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    if (collideEnemies(game, x0, y0)) { game.draw = null; return; }
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (sp < r.speed) { dist *= sp / r.speed; r.speed = sp; }
+    if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
+  }
+  if (r.seg >= r.path.length - 1) {
+    game.draw = null;
+    sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
+  }
+}
+
+// Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
+export function previewPath(game) {
+  const d = game.draw;
+  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null };
+  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius;
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
+  const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
+  const samples = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.ceil(len / 14));
+    for (let k = 1; k <= n; k++) {
+      const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
+      let blocked = false;
+      queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+        if ((p.x - e.x) ** 2 + (p.y - e.y) ** 2 > (e.r + R) ** 2) return;
+        const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+        if (crit) p.hot = true;
+        if (!canPierce(atk, e, crit)) blocked = true;
+      });
+      samples.push(p);
+      if (blocked) return { samples, block: p };
+    }
+  }
+  return { samples, block: null };
+}
+
 // ---- ship ----
 
 function launch(game, ax, ay) {
@@ -261,7 +401,7 @@ function collideEnemies(game, x0, y0) {
     const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
     if (t >= 0) hits.push({ e, t });
   });
-  if (!hits.length) return;
+  if (!hits.length) return false;
   hits.sort((a, b) => a.t - b.t);
   for (const { e, t } of hits) {
     const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
@@ -296,8 +436,9 @@ function collideEnemies(game, x0, y0) {
     e.hitCD = 0.25;
     damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
     game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
-    break;
+    return true;
   }
+  return false;
 }
 
 function collideBodies(game) {

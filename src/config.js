@@ -12,9 +12,10 @@ export const CONFIG = {
   zoneInner: 2200,
   zoneOuter: 4200,
   startRadius: 3200,
-  planetGM: 3.0e8, // ~29 px/s^2 at the start radius
+  planetGM: 0, // gravity is off (the user found it annoying); 3.0e8 gives ~29 px/s^2 at the start radius
+  gravityTestGM: 3.0e8, // reference strength used by the gravity tests and the panel's slider range
   moonCount: 6,
-  moonGM: 1.2e7,
+  moonGM: 0, // was 1.2e7; moons are now plain obstacles
   moonOrbitSpeed: 0.02, // rad/s
   dustCount: 34,
   dustDrag: 0.55,
@@ -24,13 +25,19 @@ export const CONFIG = {
 
   // ship
   baseMaxSpeed: 650, // start slow (3.2 km/s) so growth over the run is felt
-  levelSpeedGrowth: 0.02, // +2% max speed per level
+  levelSpeedGrowth: 0.015, // +1.5% max speed per level
+  atkScale: 1.4, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
-  controlScheme: 'mouse', // see controls.js SCHEMES
+  controlScheme: 'draw', // see controls.js SCHEMES
+  drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
+  drawTime: 2.5, // real seconds to draw before the path commits itself
+  drawTimeScale: 0.06, // world speed while drawing
+  drawRunTimeScale: 0.3, // world speed while the ship runs the path (the ship itself runs at real time)
+  drawStep: 8, // min world distance between path points
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
   nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend

@@ -4,6 +4,7 @@ import { attackPower, isWeakHit, resolveRam } from '../src/combat.js';
 import { baseStats } from '../src/ship.js';
 import { createEnemy } from '../src/enemies.js';
 import { createGame, update } from '../src/world.js';
+import { CONFIG } from '../src/config.js';
 
 const stats = baseStats();
 const idle = { charging: false, aimX: 0, aimY: 0, release: false };
@@ -20,8 +21,14 @@ function quietGame() {
 const OY = -3000; // keep scenes away from the planet at the origin
 
 test('attack power scales with speed and multiplier', () => {
-  assert.equal(attackPower(1000, stats), 10);
-  assert.equal(attackPower(1000, { ...stats, atkMult: 2 }), 20);
+  assert.ok(Math.abs(attackPower(1000, stats) - 10 * CONFIG.atkScale) < 1e-9);
+  assert.ok(Math.abs(attackPower(1000, { ...stats, atkMult: 2 }) - 20 * CONFIG.atkScale) < 1e-9);
+});
+
+test('a full-gauge dash from rest one-shots basic fodder', () => {
+  const sp = stats.maxSpeed * stats.launchRatio;
+  const e = createEnemy('drifter', 1, 0, 0);
+  assert.ok(attackPower(sp, stats) >= e.hp);
 });
 
 test('enough attack pierces, too little bounces and hurts the ship', () => {

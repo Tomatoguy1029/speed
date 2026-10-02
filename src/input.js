@@ -38,10 +38,11 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null,
+    keys: new Set(), space: false, snap: null, pressed: false,
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = { x: e.clientX, y: e.clientY };
+    if (st.enabled && e.button === 0) st.pressed = true;
     if (!st.enabled || e.button > 0 || st.space) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
@@ -69,7 +70,9 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
-        if (!st.enabled || e.repeat || st.space || st.down) return;
+        if (!st.enabled || e.repeat || st.space) return;
+        st.pressed = true;
+        if (st.down) return;
         st.space = true;
       }
     });
@@ -89,6 +92,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,
         space: st.space,
+        pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         pointerDown: st.down,
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
@@ -98,8 +102,9 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       };
       st.release = false;
       st.snap = null;
+      st.pressed = false;
       return out;
     },
-    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.pointerId = null; },
   };
 }
