@@ -1,17 +1,22 @@
+import { createRenderer, resizeRenderer, render } from './render.js';
+import { createInput } from './input.js';
+import { createGame, update } from './world.js';
+
 const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+const renderer = createRenderer(canvas);
+const input = createInput(canvas);
+let game = createGame({});
 
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.floor(window.innerWidth * dpr);
-  canvas.height = Math.floor(window.innerHeight * dpr);
-}
-window.addEventListener('resize', resize);
-resize();
+window.addEventListener('resize', () => resizeRenderer(renderer));
+resizeRenderer(renderer);
 
-function frame() {
-  ctx.fillStyle = '#04050b';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  update(game, dt, input.read());
+  render(renderer, game, dt, input.state);
+  game.events.length = 0;
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

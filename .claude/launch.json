@@ -4,8 +4,8 @@
     {
       "name": "speed",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "dist"],
-      "port": 8765
+      "runtimeArgs": ["-m", "http.server", "8931", "--directory", "dist"],
+      "port": 8931
     }
   ]
 }
