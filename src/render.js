@@ -770,13 +770,13 @@ function drawShip(r, game) {
   ctx.restore();
 }
 
-// Keyboard aim marker, always visible so the shot can be lined up before charging.
+// Heading marker: a Space launch boosts this way (the travel direction).
 function drawAimMarker(r, game) {
   const sh = game.ship;
   if (sh.charging || game.state !== 'play') return;
   const { ctx } = r;
   const p = worldToScreen(r, sh.x, sh.y);
-  const ux = Math.cos(sh.aimAngle), uy = Math.sin(sh.aimAngle);
+  const ux = sh.hx, uy = sh.hy;
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = '#9fe8ff';
   ctx.lineWidth = 2;

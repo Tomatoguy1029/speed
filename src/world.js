@@ -24,7 +24,6 @@ export function createGame(opts = {}) {
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
-  ship.aimAngle = -Math.PI / 2;
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout,
@@ -57,8 +56,7 @@ export function createGame(opts = {}) {
 export function update(game, frameDt, input) {
   if (game.state !== 'play') return;
   frameDt = Math.min(frameDt, 0.1);
-  input = steerAim(game, frameDt, input);
-  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
@@ -72,24 +70,25 @@ export function update(game, frameDt, input) {
   }
 }
 
-// Keyboard aim: A/D rotate (accelerating while held), W/S snap; runs on real time so slow-mo doesn't drag it.
-function steerAim(game, dt, input) {
+// WASD thrust: nudges at rest, bends the trajectory at speed, never a free speed-up when fast.
+function nudge(game, move) {
+  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
   const sh = game.ship;
-  if (input.turn) {
-    sh.turnHeld += dt;
-    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
-    sh.aimAngle += input.turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
-  } else {
-    sh.turnHeld = 0;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+  let ax = move.x * acc, ay = move.y * acc;
+  if (sp > 1) {
+    const ux = sh.vx / sp, uy = sh.vy / sp;
+    const par = ax * ux + ay * uy;
+    if (par > 0 && sp >= game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax -= par * ux; ay -= par * uy; }
   }
-  if (input.snap) {
-    const sp = Math.hypot(sh.vx, sh.vy);
-    if (input.snap === 'forward' && sp > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
-    else if (input.snap === 'back') sh.aimAngle += Math.PI;
-  }
-  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
-  if (!input.keyboard) return input;
-  return { ...input, aimX: Math.cos(sh.aimAngle) * 100, aimY: Math.sin(sh.aimAngle) * 100 };
+  return { ax, ay };
+}
+
+function updateHeading(sh, move) {
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+  else if (move && (move.x || move.y)) { sh.hx = move.x; sh.hy = move.y; }
 }
 
 function step(game, dt, input) {
@@ -102,16 +101,21 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
+  updateHeading(sh, input.move);
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
     sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
-    sh.aimX = input.aimX; sh.aimY = input.aimY;
+    sh.aimX = input.keyboard ? sh.hx * 100 : input.aimX;
+    sh.aimY = input.keyboard ? sh.hy * 100 : input.aimY;
   }
   if (game.releasePending) {
     const r = game.releasePending;
     game.releasePending = null;
-    if (sh.charging) launch(game, r.x, r.y);
+    if (sh.charging) {
+      if (r.keyboard) launch(game, sh.hx * 100, sh.hy * 100);
+      else launch(game, r.x, r.y);
+    }
     sh.charging = false;
   }
 
@@ -123,9 +127,10 @@ function step(game, dt, input) {
   game.grid = buildGrid(game.enemies, 160);
 
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
+  const n = nudge(game, input.move);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  stepShip(sh, stats, dt, g.ax + n.ax, g.ay + n.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
@@ -221,14 +226,11 @@ function launch(game, ax, ay) {
   const len = Math.hypot(ax, ay);
   let dx, dy;
   if (len < CONFIG.minDrag) {
-    const sp = Math.hypot(sh.vx, sh.vy);
-    if (sp < 1) return;
-    dx = sh.vx / sp; dy = sh.vy / sp;
+    dx = sh.hx; dy = sh.hy;
   } else {
     dx = ax / len; dy = ay / len;
   }
   onLaunch(game);
-  sh.aimAngle = Math.atan2(dy, dx);
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
   sh.vx = v.vx; sh.vy = v.vy;
   sh.boostT = game.stats.boostDuration;

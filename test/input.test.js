@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createInput } from '../src/input.js';
+import { createInput, moveVector } from '../src/input.js';
 import { createGame, update } from '../src/world.js';
 import { CONFIG } from '../src/config.js';
 
@@ -15,33 +15,19 @@ function fakeTarget() {
 const press = (win, code, key) => win.fire('keydown', { code, key });
 const lift = (win, code, key) => win.fire('keyup', { code, key });
 
-test('A/D and arrows report a turn direction; both cancel', () => {
+test('WASD and arrows make a unit move vector; opposite keys cancel', () => {
+  assert.deepEqual(moveVector(new Set(['KeyW'])), { x: 0, y: -1 });
+  assert.deepEqual(moveVector(new Set(['ArrowRight'])), { x: 1, y: 0 });
+  const d = moveVector(new Set(['KeyS', 'KeyA']));
+  assert.ok(d.x < 0 && d.y > 0 && Math.abs(Math.hypot(d.x, d.y) - 1) < 1e-9);
+  assert.deepEqual(moveVector(new Set(['KeyA', 'KeyD'])), { x: 0, y: 0 });
+});
+
+test('held keys show up in read(); Space charges and releases as a keyboard launch', () => {
   const win = fakeTarget();
   const input = createInput(fakeTarget(), win);
-  press(win, 'KeyA', 'a');
-  assert.equal(input.read().turn, -1);
   press(win, 'KeyD', 'd');
-  assert.equal(input.read().turn, 0);
-  lift(win, 'KeyA', 'a');
-  assert.equal(input.read().turn, 1);
-  lift(win, 'KeyD', 'd');
-  press(win, 'ArrowLeft', 'ArrowLeft');
-  assert.equal(input.read().turn, -1);
-});
-
-test('W and S request a snap once per press', () => {
-  const win = fakeTarget();
-  const input = createInput(fakeTarget(), win);
-  press(win, 'KeyW', 'w');
-  assert.equal(input.read().snap, 'forward');
-  assert.equal(input.read().snap, null);
-  press(win, 'KeyS', 's');
-  assert.equal(input.read().snap, 'back');
-});
-
-test('Space charges and releases as a keyboard launch', () => {
-  const win = fakeTarget();
-  const input = createInput(fakeTarget(), win);
+  assert.deepEqual(input.read().move, { x: 1, y: 0 });
   press(win, 'Space', ' ');
   let r = input.read();
   assert.equal(r.charging, true);
@@ -53,6 +39,8 @@ test('Space charges and releases as a keyboard launch', () => {
   assert.equal(r.release, true);
   assert.equal(r.keyboard, true);
   assert.equal(input.read().release, false, 'release is consumed once');
+  lift(win, 'KeyD', 'd');
+  assert.deepEqual(input.read().move, { x: 0, y: 0 });
 });
 
 test('reset drops a held Space so no stray launch happens after a menu', () => {
@@ -66,55 +54,59 @@ test('reset drops a held Space so no stray launch happens after a menu', () => {
   assert.equal(r.release, false);
 });
 
-// ---- aim rotation in the world ----
+// ---- nudging and launching in the world ----
 
-const idle = { charging: false, aimX: 0, aimY: 0, release: false, keyboard: false, turn: 0, snap: null };
+const none = { x: 0, y: 0 };
+const idle = { charging: false, aimX: 0, aimY: 0, release: false, keyboard: false, move: none };
 
 function quiet() {
   const game = createGame({ seed: 1 });
   game.spawning = false;
   game.field.planet.gm = 0; game.field.moons.length = 0; game.field.dust.length = 0;
   game.ship.x = 0; game.ship.y = -3000; game.ship.vx = 0; game.ship.vy = 0;
-  game.ship.aimAngle = 0;
   return game;
 }
 
-test('holding a turn key rotates the aim, faster the longer it is held', () => {
+test('WASD nudges the ship a little from rest', () => {
   const game = quiet();
-  update(game, 0.05, { ...idle, turn: 1 });
-  const first = game.ship.aimAngle;
-  assert.ok(first > 0);
-  for (let i = 0; i < 10; i++) update(game, 0.05, { ...idle, turn: 1 });
-  const a0 = game.ship.aimAngle;
-  update(game, 0.05, { ...idle, turn: 1 });
-  assert.ok(game.ship.aimAngle - a0 > first * 1.5, 'accelerated');
-  const b = game.ship.aimAngle;
-  update(game, 0.05, { ...idle, turn: -1 });
-  assert.ok(game.ship.aimAngle < b, 'turns back');
+  for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, move: { x: 1, y: 0 } });
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  assert.ok(game.ship.vx > 50, 'moved right');
+  assert.ok(sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed + 1, 'only slightly');
 });
 
-test('keyboard launch goes along the aim angle', () => {
+test('sideways nudges bend a fast trajectory without speeding it up', () => {
   const game = quiet();
-  game.ship.aimAngle = Math.PI / 2; // down the screen
+  game.ship.vy = -1200; game.ship.boostT = 99;
+  for (let i = 0; i < 10; i++) update(game, 0.1, { ...idle, move: { x: 1, y: 0 } });
+  const ang = Math.atan2(game.ship.vx, -game.ship.vy); // 0 = straight up
+  assert.ok(ang > 0.3, `turned ${ang}`);
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) < 1250);
+});
+
+test('pushing forward at speed gives no free acceleration', () => {
+  const game = quiet();
+  game.ship.vy = -900; game.ship.boostT = 99;
+  for (let i = 0; i < 10; i++) update(game, 0.1, { ...idle, move: { x: 0, y: -1 } });
+  assert.ok(Math.hypot(game.ship.vx, game.ship.vy) <= 901);
+});
+
+test('a keyboard launch boosts along the current travel direction', () => {
+  const game = quiet();
+  game.ship.vx = 300; game.ship.vy = 300;
   for (let i = 0; i < 8; i++) update(game, 0.1, { ...idle, charging: true, keyboard: true });
-  assert.ok(game.ship.charging);
+  const ang0 = Math.atan2(game.ship.vy, game.ship.vx);
   update(game, 0.02, { ...idle, release: true, keyboard: true });
-  assert.ok(game.ship.vy > CONFIG.baseMaxSpeed * 0.5);
-  assert.ok(Math.abs(game.ship.vx) < 1);
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  assert.ok(sp > 700);
+  assert.ok(Math.abs(Math.atan2(game.ship.vy, game.ship.vx) - ang0) < 0.05);
 });
 
-test('snap forward aligns the aim with the travel direction; back flips it', () => {
+test('from a standstill a keyboard launch uses the last nudge direction', () => {
   const game = quiet();
-  game.ship.vx = -300; game.ship.vy = 0;
-  update(game, 0.02, { ...idle, snap: 'forward' });
-  assert.ok(Math.abs(Math.cos(game.ship.aimAngle) + 1) < 1e-6);
-  update(game, 0.02, { ...idle, snap: 'back' });
-  assert.ok(Math.abs(Math.cos(game.ship.aimAngle) - 1) < 1e-6);
-});
-
-test('a mouse launch also points the keyboard aim that way', () => {
-  const game = quiet();
-  for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, charging: true, aimX: 0, aimY: -100 });
-  update(game, 0.02, { ...idle, release: true, aimX: 0, aimY: -100 });
-  assert.ok(Math.abs(Math.sin(game.ship.aimAngle) + 1) < 1e-6);
+  update(game, 0.02, { ...idle, move: { x: -1, y: 0 } });
+  game.ship.vx = 0; game.ship.vy = 0;
+  for (let i = 0; i < 5; i++) update(game, 0.1, { ...idle, charging: true, keyboard: true });
+  update(game, 0.02, { ...idle, release: true, keyboard: true });
+  assert.ok(game.ship.vx < -300);
 });
