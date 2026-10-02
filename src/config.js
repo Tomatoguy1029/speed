@@ -44,6 +44,8 @@ export const CONFIG = {
   densityMult: 1,
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
+  capsuleCount: 5, // field capsules kept on the map
+  capsuleInterval: 16, // seconds between respawns
 
   // growth
   xpBase: 10,

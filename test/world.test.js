@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
-import { createGame, update, killEnemy } from '../src/world.js';
+import { createGame, update } from '../src/world.js';
+import { killEnemy } from '../src/hits.js';
 import { createEnemy } from '../src/enemies.js';
 
 const idle = { charging: false, aimX: 0, aimY: 0, release: false };

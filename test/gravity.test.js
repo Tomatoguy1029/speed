@@ -18,6 +18,7 @@ test('planet gravity points to center and grows closer in', () => {
 
 test('a ship left alone falls toward the planet', () => {
   const game = createGame({ seed: 3 });
+  game.spawning = false;
   game.field.moons.length = 0;
   const r0 = Math.hypot(game.ship.x, game.ship.y);
   for (let i = 0; i < 30; i++) update(game, 0.1, idle);
@@ -26,6 +27,7 @@ test('a ship left alone falls toward the planet', () => {
 
 test('skimming the planet pushes speed above the max speed', () => {
   const game = createGame({ seed: 3 });
+  game.spawning = false;
   game.field.moons.length = 0;
   game.field.dust.length = 0;
   game.ship.x = -3000; game.ship.y = 0;
@@ -40,6 +42,7 @@ test('skimming the planet pushes speed above the max speed', () => {
 
 test('the field boundary pushes the ship back', () => {
   const game = createGame({ seed: 3 });
+  game.spawning = false;
   game.field.moons.length = 0;
   game.ship.x = CONFIG.fieldRadius + 200; game.ship.y = 0;
   game.ship.vx = 600; game.ship.vy = 0; game.ship.boostT = 5;
@@ -50,6 +53,7 @@ test('the field boundary pushes the ship back', () => {
 
 test('crashing into the planet bounces and hurts', () => {
   const game = createGame({ seed: 3 });
+  game.spawning = false;
   game.field.moons.length = 0;
   game.ship.x = -CONFIG.planetRadius - 60; game.ship.y = 0;
   game.ship.vx = 1200; game.ship.vy = 0;
@@ -70,6 +74,7 @@ test('danger is zero in the middle zone and rises toward center and edge', () =>
 
 test('predictPath bends under gravity', () => {
   const game = createGame({ seed: 3 });
+  game.spawning = false;
   game.field.moons.length = 0;
   const pts = predictPath(game, 0, -1, 1, 1.0);
   assert.ok(pts.length > 10);

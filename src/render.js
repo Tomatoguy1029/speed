@@ -85,8 +85,11 @@ export function render(r, game, dt, pointer) {
   drawSpecks(r);
   drawBodies(r, game);
   drawGems(r, game);
+  drawCapsules(r, game);
+  drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
+  drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
@@ -94,6 +97,7 @@ export function render(r, game, dt, pointer) {
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
+  drawCapsuleArrows(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
   drawMinimap(r, game);
@@ -111,6 +115,92 @@ function drawGems(r, game) {
     ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
     ctx.closePath(); ctx.fill();
   }
+}
+
+function capsuleColor(c) {
+  return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+}
+
+function drawCapsules(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const c of game.capsules) {
+    if (!onScreen(r, c.x, c.y, 200)) continue;
+    const col = capsuleColor(c);
+    const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
+    const pulse = (game.t * 1.5 + c.x * 0.001) % 1;
+    ctx.globalAlpha = 1 - pulse;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2 / z;
+    ctx.beginPath(); ctx.arc(c.x, c.y, S * (1.2 + pulse * 2.5), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(game.t * 1.2);
+    ctx.shadowColor = col; ctx.shadowBlur = 20;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    if (c.kind === 'core') {
+      for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.45 : 1; ctx.lineTo(Math.cos(a) * S * k, Math.sin(a) * S * k); }
+    } else {
+      ctx.moveTo(0, -S); ctx.lineTo(S * 0.7, 0); ctx.lineTo(0, S); ctx.lineTo(-S * 0.7, 0);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Edge-of-screen pointers to capsules that are off screen.
+function drawCapsuleArrows(r, game) {
+  const { ctx, W, H } = r;
+  const sh = game.ship;
+  const m = 34;
+  for (const c of game.capsules) {
+    const d = Math.hypot(c.x - sh.x, c.y - sh.y);
+    if (d > 5000 || onScreen(r, c.x, c.y, 0)) continue;
+    const p = worldToScreen(r, c.x, c.y);
+    const ang = Math.atan2(p.y - H / 2, p.x - W / 2);
+    const k = Math.min((W / 2 - m) / Math.abs(Math.cos(ang) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(ang) || 1e-6));
+    const x = W / 2 + Math.cos(ang) * k, y = H / 2 + Math.sin(ang) * k;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    ctx.globalAlpha = 0.55 + 0.45 * (1 - d / 5000);
+    ctx.fillStyle = capsuleColor(c);
+    const s = c.kind === 'core' ? 13 : 9;
+    ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, s * 0.7); ctx.lineTo(-s * 0.7, -s * 0.7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMines(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const m of game.mines) {
+    if (!onScreen(r, m.x, m.y, 30)) continue;
+    ctx.fillStyle = m.armed > 0 ? '#7a5040' : (Math.floor(game.t * 6) % 2 ? '#ff7b54' : '#ffb08a');
+    ctx.beginPath(); ctx.arc(m.x, m.y, 7 / Math.sqrt(z), 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,207,107,0.5)';
+  for (const m of game.marks) {
+    if (!onScreen(r, m.x, m.y, 30)) continue;
+    ctx.beginPath(); ctx.arc(m.x, m.y, (4 + 6 * (1 - m.t / 0.55)) / Math.sqrt(z), 0, TAU); ctx.fill();
+  }
+}
+
+function drawFriendly(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const b of game.fbullets) {
+    if (!onScreen(r, b.x, b.y, 40)) continue;
+    ctx.fillStyle = b.color;
+    ctx.globalAlpha = b.kind === 'corpse' ? 0.85 : 1;
+    const s = b.kind === 'corpse' ? b.r * 0.6 : b.r / Math.sqrt(z);
+    ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawOverlays(r, game, dt) {
@@ -246,13 +336,13 @@ function drawPrediction(r, game) {
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
-  const pts = annotatePrediction(game, predictPath(game, ax, ay, sh.gauge, game.stats.predictTime));
+  const pts = annotatePrediction(game, predictPath(game, ax, ay, sh.gauge, game.stats.predictTime), game.stats.predictTime);
   const { ctx } = r;
   const dot = 3.2 / r.cam.zoom;
   for (let i = 2; i < pts.length; i += 3) {
     const p = pts[i];
     ctx.globalAlpha = 0.85 * (1 - i / pts.length) + 0.1;
-    ctx.fillStyle = p.hot ? '#ffe46b' : '#9fe8ff';
+    ctx.fillStyle = p.hot ? '#ffe46b' : p.bounced ? '#c9a6ff' : '#9fe8ff';
     const s = p.hot ? dot * 2 : dot;
     ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
   }
@@ -444,7 +534,11 @@ function drawMinimap(r, game) {
     ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
     ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
   }
-  if (r.minimapExtra) r.minimapExtra(ctx, k, game);
+  for (const c of game.capsules) {
+    ctx.fillStyle = c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+    const s2 = c.kind === 'core' ? 3.5 : 2.5;
+    ctx.beginPath(); ctx.moveTo(c.x * k, c.y * k - s2); ctx.lineTo(c.x * k + s2, c.y * k); ctx.lineTo(c.x * k, c.y * k + s2); ctx.lineTo(c.x * k - s2, c.y * k); ctx.closePath(); ctx.fill();
+  }
   const sh = game.ship;
   ctx.strokeStyle = 'rgba(255,255,255,0.25)';
   ctx.lineWidth = 1;
