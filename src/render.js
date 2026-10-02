@@ -1,8 +1,10 @@
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath } from './world.js';
+import { predictPath, annotatePrediction } from './world.js';
+import { attackPower, CRIT_ARMOR } from './combat.js';
 
 const STAR_TILE = 1600;
+const MONO = 'ui-monospace, Menlo, monospace';
 
 export function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
@@ -68,9 +70,11 @@ export function render(r, game, dt, pointer) {
   drawDust(r, game);
   drawSpecks(r);
   drawBodies(r, game);
+  drawEnemies(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
+  drawFx(r, game);
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
@@ -171,8 +175,7 @@ function drawPrediction(r, game) {
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
-  const pts = predictPath(game, ax, ay, sh.gauge, game.stats.predictTime);
-  r.lastPrediction = pts;
+  const pts = annotatePrediction(game, predictPath(game, ax, ay, sh.gauge, game.stats.predictTime));
   const { ctx } = r;
   const dot = 3.2 / r.cam.zoom;
   for (let i = 2; i < pts.length; i += 3) {
@@ -181,6 +184,125 @@ function drawPrediction(r, game) {
     ctx.fillStyle = p.hot ? '#ffe46b' : '#9fe8ff';
     const s = p.hot ? dot * 2 : dot;
     ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const end = pts[pts.length - 1];
+  if (end && end.block) {
+    const k = 10 / r.cam.zoom;
+    ctx.strokeStyle = '#ff4d4d';
+    ctx.lineWidth = 3 / r.cam.zoom;
+    ctx.beginPath();
+    ctx.moveTo(end.x - k, end.y - k); ctx.lineTo(end.x + k, end.y + k);
+    ctx.moveTo(end.x + k, end.y - k); ctx.lineTo(end.x - k, end.y + k);
+    ctx.stroke();
+  }
+}
+
+function shapePath(ctx, shape, R) {
+  ctx.beginPath();
+  if (shape === 'hex') {
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); }
+    ctx.closePath();
+  } else if (shape === 'dart') {
+    ctx.moveTo(R * 1.2, 0); ctx.lineTo(-R * 0.8, R * 0.8); ctx.lineTo(-R * 0.4, 0); ctx.lineTo(-R * 0.8, -R * 0.8); ctx.closePath();
+  } else if (shape === 'diamond') {
+    ctx.moveTo(R, 0); ctx.lineTo(0, R * 0.8); ctx.lineTo(-R, 0); ctx.lineTo(0, -R * 0.8); ctx.closePath();
+  } else if (shape === 'blob') {
+    for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.82 : 1; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else if (shape === 'ship') {
+    ctx.moveTo(R * 1.3, 0); ctx.lineTo(R * 0.3, R * 0.55); ctx.lineTo(-R, R * 0.6); ctx.lineTo(-R * 0.8, 0); ctx.lineTo(-R, -R * 0.6); ctx.lineTo(R * 0.3, -R * 0.55); ctx.closePath();
+  } else if (shape === 'rock') {
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8, k = 0.8 + ((i * 37) % 5) * 0.06; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else {
+    ctx.arc(0, 0, R, 0, TAU);
+  }
+}
+
+function drawEnemies(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const atk = attackPower(sp, game.stats);
+  const arcMult = game.stats.weakArcMult;
+  for (const e of game.enemies) {
+    if (!onScreen(r, e.x, e.y, e.r + 30)) continue;
+    const R = e.r;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    const pierce = atk >= e.armor;
+    const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
+    // body
+    ctx.save();
+    ctx.rotate(e.facing);
+    shapePath(ctx, e.T.shape, R);
+    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.T.color;
+    ctx.globalAlpha = pierce ? 1 : 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = Math.max(1.5 / z, R * 0.08);
+    ctx.strokeStyle = e.elite ? '#ffcf4a' : pierce ? 'rgba(255,255,255,0.85)' : 'rgba(40,0,0,0.6)';
+    ctx.stroke();
+    // eye / nose shows facing
+    ctx.fillStyle = '#0b0f1e';
+    ctx.beginPath(); ctx.arc(R * 0.45, 0, R * 0.2, 0, TAU); ctx.fill();
+    ctx.restore();
+    // weak spot
+    if (e.weakArc) {
+      const wa = e.facing + e.weakDir, half = Math.min(Math.PI, e.weakArc * arcMult);
+      const lw = Math.max(4 / z, R * 0.32);
+      ctx.strokeStyle = '#ffe46b';
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wa - half, wa + half); ctx.stroke();
+      if (e.weakDir2 !== undefined) {
+        const wb = e.facing + e.weakDir2;
+        ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wb - half, wb + half); ctx.stroke();
+      }
+    }
+    // cannot pierce: red ring (orange dashed = only through the weak spot)
+    if (!pierce) {
+      ctx.lineWidth = 3 / z;
+      ctx.strokeStyle = critOnly ? '#ff9f40' : '#ff3b3b';
+      if (critOnly) ctx.setLineDash([8 / z, 6 / z]);
+      ctx.beginPath(); ctx.arc(0, 0, R + 9 / z + R * 0.2, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (e.hp < e.maxHp) {
+      const w = Math.max(R * 2, 30 / z), h = 4 / z;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(-w / 2, -R - 16 / z, w, h);
+      ctx.fillStyle = '#ff6b5a';
+      ctx.fillRect(-w / 2, -R - 16 / z, w * Math.max(0, e.hp / e.maxHp), h);
+    }
+    ctx.restore();
+  }
+}
+
+function drawFx(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const ps = 1 / Math.sqrt(z);
+  for (const p of game.fx.particles) {
+    ctx.globalAlpha = Math.min(1, p.life / 0.4);
+    ctx.fillStyle = p.color;
+    const s = p.size * ps;
+    ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+  }
+  for (const g of game.fx.rings) {
+    const k = 1 - g.life / g.max;
+    ctx.globalAlpha = Math.max(0, g.life / g.max);
+    ctx.strokeStyle = g.color;
+    ctx.lineWidth = (10 * (1 - k) + 2) / z;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.radius * (0.2 + 0.8 * Math.sqrt(k)), 0, TAU); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = `800 ${Math.round(16 / z)}px ${MONO}`;
+  for (const t of game.fx.texts) {
+    ctx.globalAlpha = Math.min(1, t.life / 0.3);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.x, t.y);
   }
   ctx.globalAlpha = 1;
 }
@@ -376,10 +498,26 @@ function drawChargeUi(r, game, pointer) {
   }
 }
 
-const MONO = 'ui-monospace, Menlo, monospace';
 
 function drawHud(r, game) {
   drawSpeedPanel(r, game);
+  drawStatus(r, game);
+}
+
+function drawStatus(r, game) {
+  const { ctx } = r;
+  const sh = game.ship;
+  const x = 16, y = 18, w = 220;
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(x, y, w, 12);
+  ctx.fillStyle = sh.hp / game.stats.maxHp < 0.3 ? '#ff5a4a' : '#5dffa0';
+  ctx.fillRect(x, y, w * Math.max(0, sh.hp / game.stats.maxHp), 12);
+  ctx.fillStyle = '#e8f0ff';
+  ctx.font = `12px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
+  const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}`, x, y + 46);
 }
 
 function drawSpeedPanel(r, game) {

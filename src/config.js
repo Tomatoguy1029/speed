@@ -38,6 +38,10 @@ export const CONFIG = {
   invulnTime: 0.6,
   pickupRadius: 140,
 
+  // enemies
+  enemyHpMult: 1,
+  enemyArmorMult: 1,
+
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
   zoomRefSpeed: 700,

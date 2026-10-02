@@ -56,6 +56,10 @@ const CONFIG = {
   invulnTime: 0.6,
   pickupRadius: 140,
 
+  // enemies
+  enemyHpMult: 1,
+  enemyArmorMult: 1,
+
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
   zoomRefSpeed: 700,
@@ -300,7 +304,177 @@ function gravityAt(field, t, x, y) {
   return out;
 }
 
+// ---- combat.js ----
+
+
+const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
+
+function attackPower(speed, stats) {
+  return (speed / 100) * stats.atkMult;
+}
+
+function isWeakHit(e, hx, hy, arcMult) {
+  if (!e.weakArc) return false;
+  const a = Math.atan2(hy - e.y, hx - e.x);
+  return Math.abs(angleDiff(a, e.facing + e.weakDir)) <= e.weakArc * arcMult;
+}
+
+function canPierce(atk, e, crit) {
+  return atk >= e.armor * (crit ? CRIT_ARMOR : 1);
+}
+
+function resolveRam(atk, e, crit, stats) {
+  if (canPierce(atk, e, crit)) {
+    const damage = atk * (crit ? stats.critMult : 1);
+    return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
+  }
+  return { pierce: false, damage: atk * 0.25, kill: false, shipDamage: e.contact };
+}
+
+// Share of speed kept after going through an enemy.
+function pierceKeep(e, killed, stats) {
+  const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
+  return 1 - Math.min(0.6, loss * stats.pierceLossMult);
+}
+
+// ---- enemies.js ----
+
+
+const BACK = Math.PI;
+
+// hp/armor/contact are level-1 values; armor is in attack units (speed/100 at x1 multiplier).
+const ENEMY_TYPES = {
+  drifter: { name: 'ドリフター', r: 14, hp: 6, armor: 2, speed: 130, accel: 2.5, contact: 6, xp: 1, color: '#7fd1ff', shape: 'orb', behavior: 'chase', weakDir: BACK, weakArc: 1.0 },
+  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 16, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
+};
+
+const MAX_ENEMY_R = 130;
+
+let nextId = 1;
+
+function createEnemy(type, level, x, y, opts = {}) {
+  const T = ENEMY_TYPES[type];
+  const L = Math.max(1, level);
+  const elite = !!opts.elite;
+  return {
+    id: nextId++, type, T, level: L, elite,
+    x, y, vx: 0, vy: 0,
+    r: T.r * (elite ? 1.25 : 1),
+    hp: 0, maxHp: 0,
+    armor: T.armor * (1 + 0.35 * (L - 1)) * CONFIG.enemyArmorMult * (elite ? 1.3 : 1),
+    contact: T.contact * (1 + 0.3 * (L - 1)),
+    xp: T.xp * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
+    speed: T.speed * (1 + 0.04 * (L - 1)),
+    facing: opts.facing ?? 0,
+    weakDir: T.weakDir, weakArc: T.weakArc || 0,
+    hitCD: 0, flash: 0, dead: false,
+    state: 'move', timer: 0, fireT: 0, budT: 0, age: 0,
+    ...(function hp() {
+      const v = T.hp * (1 + 0.6 * (L - 1)) * CONFIG.enemyHpMult * (elite ? 3 : 1);
+      return { hp: v, maxHp: v };
+    })(),
+  };
+}
+
+function steerTo(e, tx, ty, speed, accel, dt) {
+  const dx = tx - e.x, dy = ty - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const k = Math.min(1, accel * dt);
+  e.vx += ((dx / d) * speed - e.vx) * k;
+  e.vy += ((dy / d) * speed - e.vy) * k;
+}
+
+function turnToward(e, target, rate, dt) {
+  let d = target - e.facing;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const m = rate * dt;
+  e.facing += Math.max(-m, Math.min(m, d));
+}
+
+const BEHAVIORS = {
+  chase(e, game, dt) {
+    const sh = game.ship;
+    steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
+    turnToward(e, Math.atan2(sh.y - e.y, sh.x - e.x), e.T.turn || 4, dt);
+  },
+};
+
+function updateEnemy(e, game, dt) {
+  e.age += dt;
+  if (e.hitCD > 0) e.hitCD -= dt;
+  if (e.flash > 0) e.flash -= dt;
+  BEHAVIORS[e.T.behavior](e, game, dt);
+  e.x += e.vx * dt;
+  e.y += e.vy * dt;
+  // stay out of the planet
+  const p = game.field.planet;
+  const d = Math.hypot(e.x, e.y);
+  if (d < p.r + e.r && d > 0) {
+    e.x = (e.x / d) * (p.r + e.r);
+    e.y = (e.y / d) * (p.r + e.r);
+  }
+}
+
+// ---- grid.js ----
+const OFF = 4096;
+
+function buildGrid(list, cell) {
+  const map = new Map();
+  for (const it of list) {
+    if (it.dead) continue;
+    const key = (Math.floor(it.x / cell) + OFF) * 8192 + (Math.floor(it.y / cell) + OFF);
+    let arr = map.get(key);
+    if (!arr) { arr = []; map.set(key, arr); }
+    arr.push(it);
+  }
+  return { cell, map };
+}
+
+function queryGrid(grid, x0, y0, x1, y1, cb) {
+  const c = grid.cell;
+  const cx0 = Math.floor(x0 / c), cx1 = Math.floor(x1 / c);
+  const cy0 = Math.floor(y0 / c), cy1 = Math.floor(y1 / c);
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const arr = grid.map.get((cx + OFF) * 8192 + (cy + OFF));
+      if (!arr) continue;
+      for (const it of arr) if (!it.dead) cb(it);
+    }
+  }
+}
+
+function queryRadius(grid, x, y, r, cb) {
+  queryGrid(grid, x - r, y - r, x + r, y + r, (it) => {
+    const dx = it.x - x, dy = it.y - y, rr = r + (it.r || 0);
+    if (dx * dx + dy * dy <= rr * rr) cb(it);
+  });
+}
+
+// ---- spawner.js ----
+
+
+
+
+// Temporary population keeper (replaced by the phase table in Task 6).
+function updateSpawner(game, dt) {
+  if (!game.spawning) return;
+  const want = 30;
+  if (game.enemies.length >= want) return;
+  const sh = game.ship;
+  const a = game.rng() * TAU;
+  const d = game.viewRadius + 150 + game.rng() * 300;
+  const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
+  if (Math.hypot(x, y) > CONFIG.fieldRadius || Math.hypot(x, y) < CONFIG.planetRadius + 100) return;
+  const type = game.rng() < 0.15 ? 'armored' : 'drifter';
+  game.enemies.push(createEnemy(type, 1, x, y, { facing: a + Math.PI }));
+}
+
 // ---- world.js ----
+
+
+
+
+
 
 
 
@@ -321,6 +495,13 @@ function createGame(opts = {}) {
     meta, stats, ship,
     field: createField(rng),
     debug: { invincible: false },
+    enemies: [],
+    grid: buildGrid([], 160),
+    fx: { particles: [], rings: [], texts: [] },
+    kills: 0,
+    hitstop: 0,
+    spawning: true,
+    dashPierce: 0,
     state: 'play',
     timeScale: 1,
     releasePending: null,
@@ -334,7 +515,10 @@ function createGame(opts = {}) {
 function update(game, frameDt, input) {
   if (game.state !== 'play') return;
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
-  game.acc += Math.min(frameDt, 0.1) * game.timeScale;
+  frameDt = Math.min(frameDt, 0.1);
+  updateFx(game, frameDt);
+  if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
+  game.acc += frameDt * game.timeScale;
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
@@ -361,10 +545,18 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
+  for (const e of game.enemies) updateEnemy(e, game, dt);
+  separateEnemies(game);
+  game.grid = buildGrid(game.enemies, 160);
+
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
   const drag = dustDragAt(game.field, sh.x, sh.y);
+  const x0 = sh.x, y0 = sh.y;
   stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  collideEnemies(game, x0, y0);
   collideBodies(game);
+  if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
+  updateSpawner(game, dt);
   if (sh.invulnT > 0) sh.invulnT -= dt;
 
   const sp = Math.hypot(sh.vx, sh.vy);
@@ -388,7 +580,152 @@ function launch(game, ax, ay) {
   sh.boostT = game.stats.boostDuration;
   sh.gaugeBank = 0;
   game.dashId++;
+  game.dashPierce = 0;
   game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+function separateEnemies(game) {
+  const grid = buildGrid(game.enemies, 120);
+  for (const e of game.enemies) {
+    queryGrid(grid, e.x - e.r - 40, e.y - e.r - 40, e.x + e.r + 40, e.y + e.r + 40, (o) => {
+      if (o.id <= e.id) return;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      const min = (e.r + o.r) * 0.9;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= min * min || d2 === 0) return;
+      const d = Math.sqrt(d2);
+      const push = (min - d) * 0.5;
+      const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+      e.x -= (dx / d) * push * 2 * wE; e.y -= (dy / d) * push * 2 * wE;
+      o.x += (dx / d) * push * 2 * (1 - wE); o.y += (dy / d) * push * 2 * (1 - wE);
+    });
+  }
+}
+
+function collideEnemies(game, x0, y0) {
+  const sh = game.ship, stats = game.stats;
+  const x1 = sh.x, y1 = sh.y;
+  const R = CONFIG.shipRadius;
+  const pad = R + MAX_ENEMY_R;
+  const hits = [];
+  queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
+    if (e.hitCD > 0) return;
+    const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
+    if (t >= 0) hits.push({ e, t });
+  });
+  if (!hits.length) return;
+  hits.sort((a, b) => a.t - b.t);
+  for (const { e, t } of hits) {
+    const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
+    const sp = Math.hypot(sh.vx, sh.vy);
+    const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
+    const atk = attackPower(sp, stats);
+    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const res = resolveRam(atk, e, crit, stats);
+    if (res.pierce) {
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      e.hitCD = 0.3;
+      const keep = pierceKeep(e, e.dead, stats);
+      sh.vx *= keep; sh.vy *= keep;
+      game.dashPierce++;
+      if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
+      continue;
+    }
+    // bounce off
+    let nx = hx - e.x, ny = hy - e.y;
+    const nd = Math.hypot(nx, ny) || 1;
+    nx /= nd; ny /= nd;
+    sh.x = e.x + nx * (e.r + R + 1);
+    sh.y = e.y + ny * (e.r + R + 1);
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+    const keep = stats.bounceKeep;
+    sh.vx *= keep; sh.vy *= keep;
+    if (Math.hypot(sh.vx, sh.vy) < 220) { sh.vx = nx * 220; sh.vy = ny * 220; }
+    sh.boostT = 0;
+    damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
+    e.hitCD = 0.25;
+    e.vx -= nx * 120; e.vy -= ny * 120;
+    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0);
+    game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
+    break;
+  }
+}
+
+function damageEnemy(game, e, dmg, opts = {}) {
+  if (e.dead || dmg <= 0) return;
+  e.hp -= dmg;
+  e.flash = 0.12;
+  game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
+  if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
+  if (e.hp <= 0) {
+    killEnemy(game, e, opts);
+  } else if (opts.dirX !== undefined) {
+    e.vx += opts.dirX * 160; e.vy += opts.dirY * 160;
+  }
+}
+
+function killEnemy(game, e, opts = {}) {
+  if (e.dead) return;
+  e.dead = true;
+  game.kills++;
+  game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+}
+
+function burst(game, x, y, color, n, dx, dy, speed) {
+  const P = game.fx.particles;
+  if (P.length > 1600) return;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2;
+    const s = speed * (0.3 + game.rng());
+    P.push({
+      x, y,
+      vx: Math.cos(a) * s * 0.6 + dx * s * 0.8,
+      vy: Math.sin(a) * s * 0.6 + dy * s * 0.8,
+      life: 0.5 + game.rng() * 0.4, max: 0.9, color, size: 2 + game.rng() * 4,
+    });
+  }
+}
+
+function addText(game, x, y, text, color) {
+  if (game.fx.texts.length > 40) game.fx.texts.shift();
+  game.fx.texts.push({ x, y, text, color, life: 0.7 });
+}
+
+function addRing(game, x, y, radius, color, life = 0.45) {
+  game.fx.rings.push({ x, y, radius, color, life, max: life });
+}
+
+function updateFx(game, dt) {
+  const P = game.fx.particles;
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  game.fx.particles = P.filter((p) => p.life > 0);
+  for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
+  game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
+  for (const r of game.fx.rings) r.life -= dt;
+  game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
+}
+
+// Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
+function annotatePrediction(game, pts) {
+  const R = CONFIG.shipRadius;
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    let block = false;
+    queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+      const dx = p.x - e.x, dy = p.y - e.y;
+      const rr = e.r + R;
+      if (dx * dx + dy * dy > rr * rr) return;
+      const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+      if (crit) p.hot = true;
+      if (!canPierce(attackPower(p.sp, game.stats), e, crit)) block = true;
+    });
+    out.push(p);
+    if (block) { p.block = true; break; }
+  }
+  return out;
 }
 
 function collideBodies(game) {
@@ -432,6 +769,7 @@ function damageShip(game, amount, slow) {
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
   game.events.push({ type: 'hurt', amount, x: sh.x, y: sh.y });
+  addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
   return true;
 }
 
@@ -472,7 +810,9 @@ function shipSpeed(game) {
 
 
 
+
 const STAR_TILE = 1600;
+const MONO = 'ui-monospace, Menlo, monospace';
 
 function createRenderer(canvas) {
   const ctx = canvas.getContext('2d');
@@ -538,9 +878,11 @@ function render(r, game, dt, pointer) {
   drawDust(r, game);
   drawSpecks(r);
   drawBodies(r, game);
+  drawEnemies(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawShip(r, game);
+  drawFx(r, game);
   ctx.restore();
 
   drawChargeUi(r, game, pointer);
@@ -641,8 +983,7 @@ function drawPrediction(r, game) {
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
-  const pts = predictPath(game, ax, ay, sh.gauge, game.stats.predictTime);
-  r.lastPrediction = pts;
+  const pts = annotatePrediction(game, predictPath(game, ax, ay, sh.gauge, game.stats.predictTime));
   const { ctx } = r;
   const dot = 3.2 / r.cam.zoom;
   for (let i = 2; i < pts.length; i += 3) {
@@ -651,6 +992,125 @@ function drawPrediction(r, game) {
     ctx.fillStyle = p.hot ? '#ffe46b' : '#9fe8ff';
     const s = p.hot ? dot * 2 : dot;
     ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const end = pts[pts.length - 1];
+  if (end && end.block) {
+    const k = 10 / r.cam.zoom;
+    ctx.strokeStyle = '#ff4d4d';
+    ctx.lineWidth = 3 / r.cam.zoom;
+    ctx.beginPath();
+    ctx.moveTo(end.x - k, end.y - k); ctx.lineTo(end.x + k, end.y + k);
+    ctx.moveTo(end.x + k, end.y - k); ctx.lineTo(end.x - k, end.y + k);
+    ctx.stroke();
+  }
+}
+
+function shapePath(ctx, shape, R) {
+  ctx.beginPath();
+  if (shape === 'hex') {
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); }
+    ctx.closePath();
+  } else if (shape === 'dart') {
+    ctx.moveTo(R * 1.2, 0); ctx.lineTo(-R * 0.8, R * 0.8); ctx.lineTo(-R * 0.4, 0); ctx.lineTo(-R * 0.8, -R * 0.8); ctx.closePath();
+  } else if (shape === 'diamond') {
+    ctx.moveTo(R, 0); ctx.lineTo(0, R * 0.8); ctx.lineTo(-R, 0); ctx.lineTo(0, -R * 0.8); ctx.closePath();
+  } else if (shape === 'blob') {
+    for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.82 : 1; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else if (shape === 'ship') {
+    ctx.moveTo(R * 1.3, 0); ctx.lineTo(R * 0.3, R * 0.55); ctx.lineTo(-R, R * 0.6); ctx.lineTo(-R * 0.8, 0); ctx.lineTo(-R, -R * 0.6); ctx.lineTo(R * 0.3, -R * 0.55); ctx.closePath();
+  } else if (shape === 'rock') {
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8, k = 0.8 + ((i * 37) % 5) * 0.06; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else {
+    ctx.arc(0, 0, R, 0, TAU);
+  }
+}
+
+function drawEnemies(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const atk = attackPower(sp, game.stats);
+  const arcMult = game.stats.weakArcMult;
+  for (const e of game.enemies) {
+    if (!onScreen(r, e.x, e.y, e.r + 30)) continue;
+    const R = e.r;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    const pierce = atk >= e.armor;
+    const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
+    // body
+    ctx.save();
+    ctx.rotate(e.facing);
+    shapePath(ctx, e.T.shape, R);
+    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.T.color;
+    ctx.globalAlpha = pierce ? 1 : 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = Math.max(1.5 / z, R * 0.08);
+    ctx.strokeStyle = e.elite ? '#ffcf4a' : pierce ? 'rgba(255,255,255,0.85)' : 'rgba(40,0,0,0.6)';
+    ctx.stroke();
+    // eye / nose shows facing
+    ctx.fillStyle = '#0b0f1e';
+    ctx.beginPath(); ctx.arc(R * 0.45, 0, R * 0.2, 0, TAU); ctx.fill();
+    ctx.restore();
+    // weak spot
+    if (e.weakArc) {
+      const wa = e.facing + e.weakDir, half = Math.min(Math.PI, e.weakArc * arcMult);
+      const lw = Math.max(4 / z, R * 0.32);
+      ctx.strokeStyle = '#ffe46b';
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wa - half, wa + half); ctx.stroke();
+      if (e.weakDir2 !== undefined) {
+        const wb = e.facing + e.weakDir2;
+        ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wb - half, wb + half); ctx.stroke();
+      }
+    }
+    // cannot pierce: red ring (orange dashed = only through the weak spot)
+    if (!pierce) {
+      ctx.lineWidth = 3 / z;
+      ctx.strokeStyle = critOnly ? '#ff9f40' : '#ff3b3b';
+      if (critOnly) ctx.setLineDash([8 / z, 6 / z]);
+      ctx.beginPath(); ctx.arc(0, 0, R + 9 / z + R * 0.2, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (e.hp < e.maxHp) {
+      const w = Math.max(R * 2, 30 / z), h = 4 / z;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(-w / 2, -R - 16 / z, w, h);
+      ctx.fillStyle = '#ff6b5a';
+      ctx.fillRect(-w / 2, -R - 16 / z, w * Math.max(0, e.hp / e.maxHp), h);
+    }
+    ctx.restore();
+  }
+}
+
+function drawFx(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const ps = 1 / Math.sqrt(z);
+  for (const p of game.fx.particles) {
+    ctx.globalAlpha = Math.min(1, p.life / 0.4);
+    ctx.fillStyle = p.color;
+    const s = p.size * ps;
+    ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+  }
+  for (const g of game.fx.rings) {
+    const k = 1 - g.life / g.max;
+    ctx.globalAlpha = Math.max(0, g.life / g.max);
+    ctx.strokeStyle = g.color;
+    ctx.lineWidth = (10 * (1 - k) + 2) / z;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.radius * (0.2 + 0.8 * Math.sqrt(k)), 0, TAU); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = `800 ${Math.round(16 / z)}px ${MONO}`;
+  for (const t of game.fx.texts) {
+    ctx.globalAlpha = Math.min(1, t.life / 0.3);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.x, t.y);
   }
   ctx.globalAlpha = 1;
 }
@@ -846,10 +1306,26 @@ function drawChargeUi(r, game, pointer) {
   }
 }
 
-const MONO = 'ui-monospace, Menlo, monospace';
 
 function drawHud(r, game) {
   drawSpeedPanel(r, game);
+  drawStatus(r, game);
+}
+
+function drawStatus(r, game) {
+  const { ctx } = r;
+  const sh = game.ship;
+  const x = 16, y = 18, w = 220;
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(x, y, w, 12);
+  ctx.fillStyle = sh.hp / game.stats.maxHp < 0.3 ? '#ff5a4a' : '#5dffa0';
+  ctx.fillRect(x, y, w * Math.max(0, sh.hp / game.stats.maxHp), 12);
+  ctx.fillStyle = '#e8f0ff';
+  ctx.font = `12px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
+  const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}`, x, y + 46);
 }
 
 function drawSpeedPanel(r, game) {

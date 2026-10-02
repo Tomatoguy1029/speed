@@ -3,6 +3,11 @@ import { makeRng } from './math.js';
 import { baseStats, createShip, computeGauge, launchVelocity, stepShip } from './ship.js';
 import { createField, updateMoons, dustDragAt } from './field.js';
 import { gravityAt } from './gravity.js';
+import { attackPower, isWeakHit, resolveRam, pierceKeep, canPierce } from './combat.js';
+import { updateEnemy, MAX_ENEMY_R } from './enemies.js';
+import { buildGrid, queryGrid } from './grid.js';
+import { segCircleT } from './math.js';
+import { updateSpawner } from './spawner.js';
 
 export const STEP = 1 / 120;
 
@@ -18,6 +23,13 @@ export function createGame(opts = {}) {
     meta, stats, ship,
     field: createField(rng),
     debug: { invincible: false },
+    enemies: [],
+    grid: buildGrid([], 160),
+    fx: { particles: [], rings: [], texts: [] },
+    kills: 0,
+    hitstop: 0,
+    spawning: true,
+    dashPierce: 0,
     state: 'play',
     timeScale: 1,
     releasePending: null,
@@ -31,7 +43,10 @@ export function createGame(opts = {}) {
 export function update(game, frameDt, input) {
   if (game.state !== 'play') return;
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY };
-  game.acc += Math.min(frameDt, 0.1) * game.timeScale;
+  frameDt = Math.min(frameDt, 0.1);
+  updateFx(game, frameDt);
+  if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
+  game.acc += frameDt * game.timeScale;
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
@@ -58,10 +73,18 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
+  for (const e of game.enemies) updateEnemy(e, game, dt);
+  separateEnemies(game);
+  game.grid = buildGrid(game.enemies, 160);
+
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
   const drag = dustDragAt(game.field, sh.x, sh.y);
+  const x0 = sh.x, y0 = sh.y;
   stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  collideEnemies(game, x0, y0);
   collideBodies(game);
+  if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
+  updateSpawner(game, dt);
   if (sh.invulnT > 0) sh.invulnT -= dt;
 
   const sp = Math.hypot(sh.vx, sh.vy);
@@ -85,7 +108,152 @@ function launch(game, ax, ay) {
   sh.boostT = game.stats.boostDuration;
   sh.gaugeBank = 0;
   game.dashId++;
+  game.dashPierce = 0;
   game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+function separateEnemies(game) {
+  const grid = buildGrid(game.enemies, 120);
+  for (const e of game.enemies) {
+    queryGrid(grid, e.x - e.r - 40, e.y - e.r - 40, e.x + e.r + 40, e.y + e.r + 40, (o) => {
+      if (o.id <= e.id) return;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      const min = (e.r + o.r) * 0.9;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= min * min || d2 === 0) return;
+      const d = Math.sqrt(d2);
+      const push = (min - d) * 0.5;
+      const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+      e.x -= (dx / d) * push * 2 * wE; e.y -= (dy / d) * push * 2 * wE;
+      o.x += (dx / d) * push * 2 * (1 - wE); o.y += (dy / d) * push * 2 * (1 - wE);
+    });
+  }
+}
+
+function collideEnemies(game, x0, y0) {
+  const sh = game.ship, stats = game.stats;
+  const x1 = sh.x, y1 = sh.y;
+  const R = CONFIG.shipRadius;
+  const pad = R + MAX_ENEMY_R;
+  const hits = [];
+  queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
+    if (e.hitCD > 0) return;
+    const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
+    if (t >= 0) hits.push({ e, t });
+  });
+  if (!hits.length) return;
+  hits.sort((a, b) => a.t - b.t);
+  for (const { e, t } of hits) {
+    const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
+    const sp = Math.hypot(sh.vx, sh.vy);
+    const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
+    const atk = attackPower(sp, stats);
+    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const res = resolveRam(atk, e, crit, stats);
+    if (res.pierce) {
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      e.hitCD = 0.3;
+      const keep = pierceKeep(e, e.dead, stats);
+      sh.vx *= keep; sh.vy *= keep;
+      game.dashPierce++;
+      if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
+      continue;
+    }
+    // bounce off
+    let nx = hx - e.x, ny = hy - e.y;
+    const nd = Math.hypot(nx, ny) || 1;
+    nx /= nd; ny /= nd;
+    sh.x = e.x + nx * (e.r + R + 1);
+    sh.y = e.y + ny * (e.r + R + 1);
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+    const keep = stats.bounceKeep;
+    sh.vx *= keep; sh.vy *= keep;
+    if (Math.hypot(sh.vx, sh.vy) < 220) { sh.vx = nx * 220; sh.vy = ny * 220; }
+    sh.boostT = 0;
+    damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
+    e.hitCD = 0.25;
+    e.vx -= nx * 120; e.vy -= ny * 120;
+    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0);
+    game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
+    break;
+  }
+}
+
+export function damageEnemy(game, e, dmg, opts = {}) {
+  if (e.dead || dmg <= 0) return;
+  e.hp -= dmg;
+  e.flash = 0.12;
+  game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
+  if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
+  if (e.hp <= 0) {
+    killEnemy(game, e, opts);
+  } else if (opts.dirX !== undefined) {
+    e.vx += opts.dirX * 160; e.vy += opts.dirY * 160;
+  }
+}
+
+export function killEnemy(game, e, opts = {}) {
+  if (e.dead) return;
+  e.dead = true;
+  game.kills++;
+  game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+}
+
+function burst(game, x, y, color, n, dx, dy, speed) {
+  const P = game.fx.particles;
+  if (P.length > 1600) return;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2;
+    const s = speed * (0.3 + game.rng());
+    P.push({
+      x, y,
+      vx: Math.cos(a) * s * 0.6 + dx * s * 0.8,
+      vy: Math.sin(a) * s * 0.6 + dy * s * 0.8,
+      life: 0.5 + game.rng() * 0.4, max: 0.9, color, size: 2 + game.rng() * 4,
+    });
+  }
+}
+
+export function addText(game, x, y, text, color) {
+  if (game.fx.texts.length > 40) game.fx.texts.shift();
+  game.fx.texts.push({ x, y, text, color, life: 0.7 });
+}
+
+export function addRing(game, x, y, radius, color, life = 0.45) {
+  game.fx.rings.push({ x, y, radius, color, life, max: life });
+}
+
+function updateFx(game, dt) {
+  const P = game.fx.particles;
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  game.fx.particles = P.filter((p) => p.life > 0);
+  for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
+  game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
+  for (const r of game.fx.rings) r.life -= dt;
+  game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
+}
+
+// Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
+export function annotatePrediction(game, pts) {
+  const R = CONFIG.shipRadius;
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    let block = false;
+    queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+      const dx = p.x - e.x, dy = p.y - e.y;
+      const rr = e.r + R;
+      if (dx * dx + dy * dy > rr * rr) return;
+      const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+      if (crit) p.hot = true;
+      if (!canPierce(attackPower(p.sp, game.stats), e, crit)) block = true;
+    });
+    out.push(p);
+    if (block) { p.block = true; break; }
+  }
+  return out;
 }
 
 function collideBodies(game) {
@@ -129,6 +297,7 @@ export function damageShip(game, amount, slow) {
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
   game.events.push({ type: 'hurt', amount, x: sh.x, y: sh.y });
+  addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
   return true;
 }
 
