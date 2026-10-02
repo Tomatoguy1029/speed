@@ -29,6 +29,16 @@ export const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
+  controlScheme: 'mouse', // see controls.js SCHEMES
+  mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
+  nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
+  nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend
+  nudgeMaxSpeed: 0.4, // forward thrust only speeds the ship up below this share of max speed
+  pivotSpeed: 60, // below this speed the heading stays where the controls left it
+  pivotRate: 3.2, // relative scheme: rad/s turning in place
+  turnRateMin: 1.6, // rotate scheme: rad/s when tapping A/D
+  turnRateMax: 4.6, // rotate scheme: rad/s after holding
+  turnAccelTime: 0.35,
   steerRate: 4.5, // rad/s the travel direction swings toward the held WASD direction
   steerAccel: 900, // px/s^2 WASD acceleration while below cruise speed
   steerCruise: 0.4, // WASD alone gets the ship up to this share of max speed

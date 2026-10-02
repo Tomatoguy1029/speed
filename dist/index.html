@@ -54,6 +54,9 @@
   #debug.open { display: block; }
   #debug .dh { display: flex; justify-content: space-between; margin-bottom: 6px; }
   #debug .dclose { color: #8fa3c8; }
+  #debug .dctl { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin-bottom: 4px; font-weight: 700; }
+  #debug .dctl select { width: 100%; }
+  #debug .dhelp { color: #b8c6ea; line-height: 1.5; margin-bottom: 10px; }
   #debug .dinfo { font-family: ui-monospace, Menlo, monospace; color: #9fe8ff; margin-bottom: 8px; line-height: 1.5; }
   #debug .dbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   #debug button, #debug select { font-size: 12px; padding: 5px 8px; border-radius: 6px; background: #1d2c5c; color: #e6ecff; border: 1px solid #3b5bb5; }
@@ -101,6 +104,16 @@ const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
+  controlScheme: 'mouse', // see controls.js SCHEMES
+  mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
+  nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
+  nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend
+  nudgeMaxSpeed: 0.4, // forward thrust only speeds the ship up below this share of max speed
+  pivotSpeed: 60, // below this speed the heading stays where the controls left it
+  pivotRate: 3.2, // relative scheme: rad/s turning in place
+  turnRateMin: 1.6, // rotate scheme: rad/s when tapping A/D
+  turnRateMax: 4.6, // rotate scheme: rad/s after holding
+  turnAccelTime: 0.35,
   steerRate: 4.5, // rad/s the travel direction swings toward the held WASD direction
   steerAccel: 900, // px/s^2 WASD acceleration while below cruise speed
   steerCruise: 0.4, // WASD alone gets the ship up to this share of max speed
@@ -243,7 +256,9 @@ function createShip(stats, x, y) {
     x, y, vx: 0, vy: 0,
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last WASD direction when nearly still
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
+    markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
+    aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
     boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
@@ -1396,7 +1411,184 @@ function speedStage(sp) {
   return s;
 }
 
+// ---- controls.js ----
+// Control schemes. buildIntent turns raw input into what the world needs (charge / release / aim);
+// controlStep and controlAim run inside the world step for scheme-specific steering and aiming.
+
+
+const SCHEMES = [
+  { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
+  { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
+  { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
+  { id: 'nudge', name: 'WASD 微推力（画面基準）＋ Space', help: 'WASD で押した方向へ小さく推力。Space で進んでいる方向へ加速' },
+  { id: 'rotate', name: 'A/D 照準を回す ＋ Space', help: 'A/D で照準を回す（長押しで速く）、W で進行方向へ、S で反転。Space で照準の向きへ突進' },
+  { id: 'aim8', name: 'WASD 8 方向に狙う ＋ Space', help: 'WASD で狙う方向（8 方向）を決め、Space で突進。キーなしなら進行方向へ' },
+  { id: 'drag', name: 'マウスで引っ張って離す', help: '押したままドラッグ → 離すとドラッグと逆方向へ突進。長く押すほど強い' },
+];
+
+function schemeById(id) {
+  return SCHEMES.find((s) => s.id === id) || SCHEMES[0];
+}
+
+// Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
+// keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
+function buildIntent(raw, scheme) {
+  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
+  if (scheme === 'drag') {
+    it.charging = raw.pointerDown;
+    it.aimX = raw.drag.x; it.aimY = raw.drag.y;
+    if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
+  } else if (scheme === 'mouse') {
+    it.charging = raw.space || raw.pointerDown;
+    it.keyboard = true;
+    it.release = raw.release;
+  } else {
+    // keyboard schemes keep the slingshot drag as a fallback
+    if (raw.pointerDown) { it.charging = true; it.aimX = raw.drag.x; it.aimY = raw.drag.y; }
+    else { it.charging = raw.space; it.keyboard = true; }
+    if (raw.release) {
+      it.release = true;
+      if (raw.releaseSource === 'pointer') { it.keyboard = false; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
+      else it.keyboard = true;
+    }
+  }
+  return it;
+}
+
+const hasMove = (m) => m && (m.x || m.y);
+
+// Swing the travel direction toward `want` at a fixed turn rate (speed kept); below cruise speed
+// also accelerate that way so the ship can always get going.
+function steerToward(game, want, dt) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > 1) {
+    const cur = Math.atan2(sh.vy, sh.vx);
+    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const vx = sh.vx * c - sh.vy * s;
+    sh.vy = sh.vx * s + sh.vy * c;
+    sh.vx = vx;
+  }
+  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
+  if (sp < cruise) {
+    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
+    sh.vx += Math.cos(want) * add;
+    sh.vy += Math.sin(want) * add;
+  }
+  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
+}
+
+function cursorAngle(game, cursor) {
+  if (!cursor) return null;
+  const sh = game.ship;
+  const dx = cursor.x - sh.x, dy = cursor.y - sh.y;
+  if (dx * dx + dy * dy < CONFIG.mouseDeadZone * CONFIG.mouseDeadZone) return null;
+  return Math.atan2(dy, dx);
+}
+
+// Screen-absolute small thrust (forward thrust only helps while slow).
+function nudgeAbsolute(game, move) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+  let ax = move.x * acc, ay = move.y * acc;
+  if (sp > 1) {
+    const ux = sh.vx / sp, uy = sh.vy / sp;
+    const par = ax * ux + ay * uy;
+    if (par > 0 && sp >= game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax -= par * ux; ay -= par * uy; }
+  } else {
+    sh.hx = move.x; sh.hy = move.y;
+  }
+  return { ax, ay };
+}
+
+// Ship-relative: W forward, S brake (never reverse), A/D bend when moving or pivot when still.
+function nudgeRelative(game, move, dt) {
+  const sh = game.ship;
+  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const rx = -sh.hy, ry = sh.hx;
+  let ax = 0, ay = 0;
+  if (side) {
+    if (sp > CONFIG.pivotSpeed) {
+      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+      ax += rx * side * acc; ay += ry * side * acc;
+    } else {
+      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
+      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
+    }
+  }
+  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel; }
+  if (fwd < 0 && sp > 0) {
+    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
+    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
+  }
+  return { ax, ay };
+}
+
+// Rotating aim: A/D turn (accelerating while held), W/S snap to travel direction / flip.
+function rotateAim(game, input, dt) {
+  const sh = game.ship;
+  const turn = input.move ? Math.sign(input.move.x) : 0;
+  if (turn) {
+    sh.turnHeld += dt;
+    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
+    sh.aimAngle += turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
+  } else {
+    sh.turnHeld = 0;
+  }
+  if (input.snap === 'forward' && Math.hypot(sh.vx, sh.vy) > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
+  else if (input.snap === 'back') sh.aimAngle += Math.PI;
+  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
+}
+
+const ZERO = { ax: 0, ay: 0 };
+
+// Per-step steering. Returns extra acceleration for the physics step.
+function controlStep(game, input, dt) {
+  const sh = game.ship;
+  switch (game.scheme) {
+    case 'mouse': {
+      const a = cursorAngle(game, input.cursor);
+      if (a !== null) steerToward(game, a, dt);
+      return ZERO;
+    }
+    case 'steer':
+      if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
+      return ZERO;
+    case 'nudge':
+      return hasMove(input.move) ? nudgeAbsolute(game, input.move) : ZERO;
+    case 'relative':
+      return hasMove(input.move) ? nudgeRelative(game, input.move, dt) : ZERO;
+    case 'rotate':
+      rotateAim(game, input, dt);
+      return ZERO;
+    default:
+      return ZERO;
+  }
+}
+
+// Scheme aim for keyboard/hover launches: a vector, or null to boost along the heading.
+function controlAim(game, input) {
+  const sh = game.ship;
+  switch (game.scheme) {
+    case 'mouse': {
+      const a = cursorAngle(game, input.cursor);
+      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
+    }
+    case 'rotate':
+      return { x: Math.cos(sh.aimAngle) * 100, y: Math.sin(sh.aimAngle) * 100 };
+    case 'aim8':
+      return hasMove(input.move) ? { x: input.move.x * 100, y: input.move.y * 100 } : null;
+    default:
+      return null;
+  }
+}
+
 // ---- world.js ----
+
 
 
 
@@ -1426,6 +1618,7 @@ function createGame(opts = {}) {
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout,
+    scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
@@ -1463,41 +1656,22 @@ function update(game, frameDt, input) {
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
+    if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
 }
 
-// Screen-absolute WASD: swing the travel direction toward the held direction at a fixed turn rate
-// (speed is kept), and below cruise speed also accelerate that way so the ship can always get going.
-function steer(game, move, dt) {
-  if (!move || (!move.x && !move.y)) return;
-  const sh = game.ship;
-  const want = Math.atan2(move.y, move.x);
-  let sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 1) {
-    const cur = Math.atan2(sh.vy, sh.vx);
-    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
-    const c = Math.cos(turn), s = Math.sin(turn);
-    const vx = sh.vx * c - sh.vy * s;
-    sh.vy = sh.vx * s + sh.vy * c;
-    sh.vx = vx;
-  }
-  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
-  if (sp < cruise) {
-    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
-    sh.vx += Math.cos(want) * add;
-    sh.vy += Math.sin(want) * add;
-  }
-  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
-}
-
-// Heading follows the travel direction; when nearly still it keeps the last key direction.
+// Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
 function updateHeading(sh) {
   const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+}
+
+// Direction a keyboard/hover launch would take right now.
+function schemeAim(game, input) {
+  return controlAim(game, input) || { x: game.ship.hx * 100, y: game.ship.hy * 100 };
 }
 
 function step(game, dt, input) {
@@ -1510,20 +1684,22 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  steer(game, input.move, dt);
+  const ctl = controlStep(game, input, dt);
   updateHeading(sh);
+  const aim = schemeAim(game, input);
+  sh.markX = aim.x / 100; sh.markY = aim.y / 100;
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
     sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
-    sh.aimX = input.keyboard ? sh.hx * 100 : input.aimX;
-    sh.aimY = input.keyboard ? sh.hy * 100 : input.aimY;
+    sh.aimX = input.keyboard ? aim.x : input.aimX;
+    sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
   if (game.releasePending) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard) launch(game, sh.hx * 100, sh.hy * 100);
+      if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
     sh.charging = false;
@@ -1539,7 +1715,7 @@ function step(game, dt, input) {
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
@@ -1640,6 +1816,7 @@ function launch(game, ax, ay) {
     dx = ax / len; dy = ay / len;
   }
   onLaunch(game);
+  sh.aimAngle = Math.atan2(dy, dx);
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
   sh.vx = v.vx; sh.vy = v.vy;
   sh.boostT = game.stats.boostDuration;
@@ -1940,6 +2117,10 @@ function resizeRenderer(r) {
 
 function worldToScreen(r, x, y) {
   return { x: (x - r.cam.x) * r.cam.zoom + r.W / 2, y: (y - r.cam.y) * r.cam.zoom + r.H / 2 };
+}
+
+function screenToWorld(r, x, y) {
+  return { x: (x - r.W / 2) / r.cam.zoom + r.cam.x, y: (y - r.H / 2) / r.cam.zoom + r.cam.y };
 }
 
 // Zoom is tied to the ship's max speed so the view only widens as the build gets faster,
@@ -2683,13 +2864,13 @@ function drawShip(r, game) {
   ctx.restore();
 }
 
-// Heading marker: a Space launch boosts this way (the travel direction).
+// Aim marker: a Space launch goes this way (scheme dependent).
 function drawAimMarker(r, game) {
   const sh = game.ship;
   if (sh.charging || game.state !== 'play') return;
   const { ctx } = r;
   const p = worldToScreen(r, sh.x, sh.y);
-  const ux = sh.hx, uy = sh.hy;
+  const ux = sh.markX, uy = sh.markY; // where a Space launch would go under the current scheme
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = '#9fe8ff';
   ctx.lineWidth = 2;
@@ -2849,6 +3030,8 @@ function drawSpeedPanel(r, game) {
 }
 
 // ---- input.js ----
+// Raw input only: keys, Space, pointer drag and hover. Control schemes (controls.js) turn this into intent.
+
 // Launch direction is opposite to the drag: start - current.
 function aimFromDrag(sx, sy, cx, cy) {
   return { x: sx - cx, y: sy - cy };
@@ -2860,6 +3043,7 @@ const MOVE_KEYS = {
   KeyA: [-1, 0], ArrowLeft: [-1, 0],
   KeyD: [1, 0], ArrowRight: [1, 0],
 };
+const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
 const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
 // Held movement keys -> unit vector (zero when none or cancelled).
@@ -2884,17 +3068,19 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 
 function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
-    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true,
-    release: false, relX: 0, relY: 0,
-    keys: new Set(), space: false, relKeyboard: false,
+    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
+    release: false, relSource: null, relX: 0, relY: 0,
+    keys: new Set(), space: false, snap: null,
   };
   el.addEventListener('pointerdown', (e) => {
-    if (!st.enabled || e.button > 0) return;
+    st.hover = { x: e.clientX, y: e.clientY };
+    if (!st.enabled || e.button > 0 || st.space) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
+    st.hover = { x: e.clientX, y: e.clientY };
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
   });
@@ -2902,7 +3088,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y; st.relKeyboard = false;
+    st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
@@ -2912,6 +3098,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     keyTarget.addEventListener('keydown', (e) => {
       const code = keyCode(e);
       if (MOVE_KEYS[code]) { st.keys.add(code); if (st.enabled) e.preventDefault(); }
+      if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space || st.down) return;
@@ -2921,7 +3108,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     keyTarget.addEventListener('keyup', (e) => {
       st.keys.delete(keyCode(e));
       if (isSpace(e) && st.space) {
-        st.space = false; st.release = true; st.relX = 0; st.relY = 0; st.relKeyboard = true;
+        st.space = false; st.release = true; st.relSource = 'space'; st.relX = 0; st.relY = 0;
       }
     });
     keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
@@ -2929,26 +3116,28 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 
   return {
     state: st,
-    // keyboard launches carry no aim: the world boosts along the current travel direction.
     read() {
-      let a = { x: 0, y: 0 };
-      if (st.release) a = { x: st.relX, y: st.relY };
-      else if (st.down) a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
       const out = {
-        charging: st.down || st.space,
-        aimX: a.x, aimY: a.y,
-        release: st.release,
-        keyboard: st.release ? st.relKeyboard : st.space && !st.down,
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
+        snap: st.enabled ? st.snap : null,
+        space: st.space,
+        pointerDown: st.down,
+        drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
+        hover: st.hover,
+        release: st.release,
+        releaseSource: st.release ? st.relSource : null,
+        releaseDrag: { x: st.relX, y: st.relY },
       };
       st.release = false;
+      st.snap = null;
       return out;
     },
-    reset() { st.down = false; st.space = false; st.release = false; st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pointerId = null; },
   };
 }
 
 // ---- ui.js ----
+
 
 
 
@@ -3074,8 +3263,7 @@ function showStation(save, onBuy, onDepart) {
     el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
-      el('li', {}, el('b', {}, 'キーボード'), '：', el('kbd', {}, 'W'), el('kbd', {}, 'A'), el('kbd', {}, 'S'), el('kbd', {}, 'D'), '（矢印キー可）で行きたい方向へ向かう（画面基準）。', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離すと進んでいる方向へ加速'),
-      el('li', {}, el('b', {}, 'マウス'), '：画面を押したままドラッグ → 離すと、ドラッグと逆方向へ突進。長く押すほど強い'),
+      el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
@@ -3269,6 +3457,7 @@ function createAudio() {
 
 
 
+
 const DEFAULTS = { ...CONFIG };
 
 const TUNABLES = [
@@ -3277,9 +3466,9 @@ const TUNABLES = [
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
-  { key: 'steerRate', label: 'WASD 旋回の速さ rad/s', min: 0.5, max: 12, step: 0.1 },
-  { key: 'steerAccel', label: 'WASD 加速（低速時）', min: 0, max: 3000, step: 50 },
-  { key: 'steerCruise', label: 'WASD だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
+  { key: 'steerRate', label: '旋回の速さ（マウス / WASD 旋回）rad/s', min: 0.5, max: 12, step: 0.1 },
+  { key: 'steerAccel', label: '旋回操作の加速（低速時）', min: 0, max: 3000, step: 50 },
+  { key: 'steerCruise', label: '旋回操作だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
   { key: 'boostDuration', label: '突進エネルギー（秒）', min: 0.1, max: 3, step: 0.05 },
   { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
   { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },
@@ -3318,11 +3507,27 @@ function jumpToPhase(game, id) {
   if (p) game.t = p.start + 0.01;
 }
 
-function createDebugPanel(getGame) {
+function setScheme(game, id) {
+  CONFIG.controlScheme = schemeById(id).id;
+  if (game) game.scheme = CONFIG.controlScheme;
+}
+
+function createDebugPanel(getGame, onScheme) {
   const root = document.createElement('div');
   root.id = 'debug';
-  root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
+  root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
+  const schemeSel = root.querySelector('.dctl select');
+  const schemeHelp = root.querySelector('.dhelp');
+  schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = schemeById(CONFIG.controlScheme).help; };
+  schemeSel.addEventListener('change', () => {
+    setScheme(getGame(), schemeSel.value);
+    syncScheme();
+    schemeSel.blur(); // keep WASD/Space for the game, not the select
+    if (onScheme) onScheme(CONFIG.controlScheme);
+  });
+  syncScheme();
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
@@ -3385,7 +3590,7 @@ function createDebugPanel(getGame) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;
@@ -3405,6 +3610,8 @@ function createDebugPanel(getGame) {
 
 
 
+
+
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
 const input = createInput(canvas);
@@ -3415,7 +3622,12 @@ window.addEventListener('pointerdown', () => audio.unlock(), true);
 window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
-const debug = createDebugPanel(() => game);
+// control scheme is a per-browser preference
+try { const c = window.localStorage.getItem('speed-controls'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+const debug = createDebugPanel(() => game, (id) => {
+  try { window.localStorage.setItem('speed-controls', id); } catch { /* ignore */ }
+  if (mode === 'station') openStation();
+});
 let mode = 'station'; // station | run | result
 let offerShown = null;
 
@@ -3493,7 +3705,9 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const wasPlaying = game.state === 'play';
-  update(game, dt, input.read());
+  const raw = input.read();
+  raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
+  update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
   audio.handle(game.events);
   audio.update(game, dt);

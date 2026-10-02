@@ -13,6 +13,7 @@ import { SLOTS, computeStats, rollModule } from './modules.js';
 import { damageEnemy, addText } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
+import { controlStep, controlAim } from './controls.js';
 
 export const STEP = 1 / 120;
 
@@ -27,6 +28,7 @@ export function createGame(opts = {}) {
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout,
+    scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
@@ -64,41 +66,22 @@ export function update(game, frameDt, input) {
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
+    if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
 }
 
-// Screen-absolute WASD: swing the travel direction toward the held direction at a fixed turn rate
-// (speed is kept), and below cruise speed also accelerate that way so the ship can always get going.
-function steer(game, move, dt) {
-  if (!move || (!move.x && !move.y)) return;
-  const sh = game.ship;
-  const want = Math.atan2(move.y, move.x);
-  let sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 1) {
-    const cur = Math.atan2(sh.vy, sh.vx);
-    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
-    const c = Math.cos(turn), s = Math.sin(turn);
-    const vx = sh.vx * c - sh.vy * s;
-    sh.vy = sh.vx * s + sh.vy * c;
-    sh.vx = vx;
-  }
-  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
-  if (sp < cruise) {
-    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
-    sh.vx += Math.cos(want) * add;
-    sh.vy += Math.sin(want) * add;
-  }
-  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
-}
-
-// Heading follows the travel direction; when nearly still it keeps the last key direction.
+// Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
 function updateHeading(sh) {
   const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 30) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+}
+
+// Direction a keyboard/hover launch would take right now.
+function schemeAim(game, input) {
+  return controlAim(game, input) || { x: game.ship.hx * 100, y: game.ship.hy * 100 };
 }
 
 function step(game, dt, input) {
@@ -111,20 +94,22 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  steer(game, input.move, dt);
+  const ctl = controlStep(game, input, dt);
   updateHeading(sh);
+  const aim = schemeAim(game, input);
+  sh.markX = aim.x / 100; sh.markY = aim.y / 100;
   if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
     sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
-    sh.aimX = input.keyboard ? sh.hx * 100 : input.aimX;
-    sh.aimY = input.keyboard ? sh.hy * 100 : input.aimY;
+    sh.aimX = input.keyboard ? aim.x : input.aimX;
+    sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
   if (game.releasePending) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard) launch(game, sh.hx * 100, sh.hy * 100);
+      if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
     sh.charging = false;
@@ -140,7 +125,7 @@ function step(game, dt, input) {
   const g = gravityAt(game.field, game.t, sh.x, sh.y);
   const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
   const x0 = sh.x, y0 = sh.y;
-  stepShip(sh, stats, dt, g.ax, g.ay, drag);
+  stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
   collideEnemies(game, x0, y0);
   collideBodies(game);
   if (sh.invulnT > 0) sh.invulnT -= dt;
@@ -241,6 +226,7 @@ function launch(game, ax, ay) {
     dx = ax / len; dy = ay / len;
   }
   onLaunch(game);
+  sh.aimAngle = Math.atan2(dy, dx);
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
   sh.vx = v.vx; sh.vy = v.vy;
   sh.boostT = game.stats.boostDuration;

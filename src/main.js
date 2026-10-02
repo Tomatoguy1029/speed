@@ -1,10 +1,12 @@
-import { createRenderer, resizeRenderer, render } from './render.js';
+import { createRenderer, resizeRenderer, render, screenToWorld } from './render.js';
 import { createInput } from './input.js';
 import { createGame, update, resolveOffer } from './world.js';
 import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
 import { loadSave, writeSave, buyUpgrade, applyRunResult } from './progression.js';
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
+import { buildIntent } from './controls.js';
+import { CONFIG } from './config.js';
 
 const canvas = document.getElementById('game');
 const renderer = createRenderer(canvas);
@@ -16,7 +18,12 @@ window.addEventListener('pointerdown', () => audio.unlock(), true);
 window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
-const debug = createDebugPanel(() => game);
+// control scheme is a per-browser preference
+try { const c = window.localStorage.getItem('speed-controls'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+const debug = createDebugPanel(() => game, (id) => {
+  try { window.localStorage.setItem('speed-controls', id); } catch { /* ignore */ }
+  if (mode === 'station') openStation();
+});
 let mode = 'station'; // station | run | result
 let offerShown = null;
 
@@ -94,7 +101,9 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const wasPlaying = game.state === 'play';
-  update(game, dt, input.read());
+  const raw = input.read();
+  raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
+  update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
   audio.handle(game.events);
   audio.update(game, dt);

@@ -1,3 +1,5 @@
+// Raw input only: keys, Space, pointer drag and hover. Control schemes (controls.js) turn this into intent.
+
 // Launch direction is opposite to the drag: start - current.
 export function aimFromDrag(sx, sy, cx, cy) {
   return { x: sx - cx, y: sy - cy };
@@ -9,6 +11,7 @@ const MOVE_KEYS = {
   KeyA: [-1, 0], ArrowLeft: [-1, 0],
   KeyD: [1, 0], ArrowRight: [1, 0],
 };
+const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
 const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
 // Held movement keys -> unit vector (zero when none or cancelled).
@@ -33,17 +36,19 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 
 export function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
-    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true,
-    release: false, relX: 0, relY: 0,
-    keys: new Set(), space: false, relKeyboard: false,
+    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
+    release: false, relSource: null, relX: 0, relY: 0,
+    keys: new Set(), space: false, snap: null,
   };
   el.addEventListener('pointerdown', (e) => {
-    if (!st.enabled || e.button > 0) return;
+    st.hover = { x: e.clientX, y: e.clientY };
+    if (!st.enabled || e.button > 0 || st.space) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
+    st.hover = { x: e.clientX, y: e.clientY };
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
   });
@@ -51,7 +56,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     if (!st.down || e.pointerId !== st.pointerId) return;
     st.cx = e.clientX; st.cy = e.clientY;
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
-    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y; st.relKeyboard = false;
+    st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', up);
@@ -61,6 +66,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     keyTarget.addEventListener('keydown', (e) => {
       const code = keyCode(e);
       if (MOVE_KEYS[code]) { st.keys.add(code); if (st.enabled) e.preventDefault(); }
+      if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space || st.down) return;
@@ -70,7 +76,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     keyTarget.addEventListener('keyup', (e) => {
       st.keys.delete(keyCode(e));
       if (isSpace(e) && st.space) {
-        st.space = false; st.release = true; st.relX = 0; st.relY = 0; st.relKeyboard = true;
+        st.space = false; st.release = true; st.relSource = 'space'; st.relX = 0; st.relY = 0;
       }
     });
     keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
@@ -78,21 +84,22 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
 
   return {
     state: st,
-    // keyboard launches carry no aim: the world boosts along the current travel direction.
     read() {
-      let a = { x: 0, y: 0 };
-      if (st.release) a = { x: st.relX, y: st.relY };
-      else if (st.down) a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
       const out = {
-        charging: st.down || st.space,
-        aimX: a.x, aimY: a.y,
-        release: st.release,
-        keyboard: st.release ? st.relKeyboard : st.space && !st.down,
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
+        snap: st.enabled ? st.snap : null,
+        space: st.space,
+        pointerDown: st.down,
+        drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
+        hover: st.hover,
+        release: st.release,
+        releaseSource: st.release ? st.relSource : null,
+        releaseDrag: { x: st.relX, y: st.relY },
       };
       st.release = false;
+      st.snap = null;
       return out;
     },
-    reset() { st.down = false; st.space = false; st.release = false; st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pointerId = null; },
   };
 }

@@ -31,6 +31,10 @@ export function worldToScreen(r, x, y) {
   return { x: (x - r.cam.x) * r.cam.zoom + r.W / 2, y: (y - r.cam.y) * r.cam.zoom + r.H / 2 };
 }
 
+export function screenToWorld(r, x, y) {
+  return { x: (x - r.W / 2) / r.cam.zoom + r.cam.x, y: (y - r.H / 2) / r.cam.zoom + r.cam.y };
+}
+
 // Zoom is tied to the ship's max speed so the view only widens as the build gets faster,
 // instead of pumping in and out with every dash.
 export function targetZoom(game, W, H) {
@@ -772,13 +776,13 @@ function drawShip(r, game) {
   ctx.restore();
 }
 
-// Heading marker: a Space launch boosts this way (the travel direction).
+// Aim marker: a Space launch goes this way (scheme dependent).
 function drawAimMarker(r, game) {
   const sh = game.ship;
   if (sh.charging || game.state !== 'play') return;
   const { ctx } = r;
   const p = worldToScreen(r, sh.x, sh.y);
-  const ux = sh.hx, uy = sh.hy;
+  const ux = sh.markX, uy = sh.markY; // where a Space launch would go under the current scheme
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = '#9fe8ff';
   ctx.lineWidth = 2;

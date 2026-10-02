@@ -3,6 +3,7 @@ import { CONFIG } from './config.js';
 import { refreshStats, pushOffer } from './world.js';
 import { PHASES } from './spawner.js';
 import { MODULES, RARITIES } from './modules.js';
+import { SCHEMES, schemeById } from './controls.js';
 
 const DEFAULTS = { ...CONFIG };
 
@@ -12,9 +13,9 @@ export const TUNABLES = [
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
-  { key: 'steerRate', label: 'WASD 旋回の速さ rad/s', min: 0.5, max: 12, step: 0.1 },
-  { key: 'steerAccel', label: 'WASD 加速（低速時）', min: 0, max: 3000, step: 50 },
-  { key: 'steerCruise', label: 'WASD だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
+  { key: 'steerRate', label: '旋回の速さ（マウス / WASD 旋回）rad/s', min: 0.5, max: 12, step: 0.1 },
+  { key: 'steerAccel', label: '旋回操作の加速（低速時）', min: 0, max: 3000, step: 50 },
+  { key: 'steerCruise', label: '旋回操作だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
   { key: 'boostDuration', label: '突進エネルギー（秒）', min: 0.1, max: 3, step: 0.05 },
   { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
   { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },
@@ -53,11 +54,27 @@ export function jumpToPhase(game, id) {
   if (p) game.t = p.start + 0.01;
 }
 
-export function createDebugPanel(getGame) {
+export function setScheme(game, id) {
+  CONFIG.controlScheme = schemeById(id).id;
+  if (game) game.scheme = CONFIG.controlScheme;
+}
+
+export function createDebugPanel(getGame, onScheme) {
   const root = document.createElement('div');
   root.id = 'debug';
-  root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
+  root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
+  const schemeSel = root.querySelector('.dctl select');
+  const schemeHelp = root.querySelector('.dhelp');
+  schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = schemeById(CONFIG.controlScheme).help; };
+  schemeSel.addEventListener('change', () => {
+    setScheme(getGame(), schemeSel.value);
+    syncScheme();
+    schemeSel.blur(); // keep WASD/Space for the game, not the select
+    if (onScheme) onScheme(CONFIG.controlScheme);
+  });
+  syncScheme();
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
@@ -120,7 +137,7 @@ export function createDebugPanel(getGame) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;

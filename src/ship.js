@@ -33,7 +33,9 @@ export function createShip(stats, x, y) {
     x, y, vx: 0, vy: 0,
     hp: stats.maxHp,
     charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last WASD direction when nearly still
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
+    markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
+    aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
     boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
