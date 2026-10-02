@@ -321,7 +321,7 @@ function runAlongPath(game, realDt) {
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    if (collideEnemies(game, x0, y0)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -335,12 +335,13 @@ function runAlongPath(game, realDt) {
 // Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
 export function previewPath(game) {
   const d = game.draw;
-  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null };
-  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius;
+  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
+  const pts = d.points, sh = game.ship, R = CONFIG.drawHitRadius;
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
   const samples = [];
+  const targets = new Map(); // enemy -> crit?
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -353,12 +354,13 @@ export function previewPath(game) {
         const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
         if (crit) p.hot = true;
         if (!canPierce(atk, e, crit)) blocked = true;
+        else if (!targets.has(e) || crit) targets.set(e, crit);
       });
       samples.push(p);
-      if (blocked) return { samples, block: p };
+      if (blocked) return { samples, block: p, targets: [...targets] };
     }
   }
-  return { samples, block: null };
+  return { samples, block: null, targets: [...targets] };
 }
 
 // ---- ship ----
@@ -397,10 +399,10 @@ export function damageShip(game, amount, slow, cause = 'other') {
   return true;
 }
 
-function collideEnemies(game, x0, y0) {
+// R: hit radius of the ship (wider while tracing a drawn path).
+function collideEnemies(game, x0, y0, R = CONFIG.shipRadius) {
   const sh = game.ship, stats = game.stats;
   const x1 = sh.x, y1 = sh.y;
-  const R = CONFIG.shipRadius;
   const pad = R + MAX_ENEMY_R;
   const hits = [];
   queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {

@@ -35,8 +35,9 @@ export const CONFIG = {
   controlScheme: 'draw', // see controls.js SCHEMES
   drawLength: 2000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
-  drawTimeScale: 0.06, // world speed while drawing
+  drawTimeScale: 0.01, // world speed while drawing
   drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
+  drawHitRadius: 45, // ship hit radius while tracing a drawn path (drawn as the band's half-width)
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash

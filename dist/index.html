@@ -113,8 +113,9 @@ const CONFIG = {
   controlScheme: 'draw', // see controls.js SCHEMES
   drawLength: 2000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
-  drawTimeScale: 0.06, // world speed while drawing
+  drawTimeScale: 0.01, // world speed while drawing
   drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
+  drawHitRadius: 45, // ship hit radius while tracing a drawn path (drawn as the band's half-width)
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
@@ -1940,7 +1941,7 @@ function runAlongPath(game, realDt) {
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    if (collideEnemies(game, x0, y0)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -1954,12 +1955,13 @@ function runAlongPath(game, realDt) {
 // Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
 function previewPath(game) {
   const d = game.draw;
-  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null };
-  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius;
+  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
+  const pts = d.points, sh = game.ship, R = CONFIG.drawHitRadius;
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
   const samples = [];
+  const targets = new Map(); // enemy -> crit?
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i], b = pts[i + 1];
     const len = Math.hypot(b.x - a.x, b.y - a.y);
@@ -1972,12 +1974,13 @@ function previewPath(game) {
         const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
         if (crit) p.hot = true;
         if (!canPierce(atk, e, crit)) blocked = true;
+        else if (!targets.has(e) || crit) targets.set(e, crit);
       });
       samples.push(p);
-      if (blocked) return { samples, block: p };
+      if (blocked) return { samples, block: p, targets: [...targets] };
     }
   }
-  return { samples, block: null };
+  return { samples, block: null, targets: [...targets] };
 }
 
 // ---- ship ----
@@ -2016,10 +2019,10 @@ function damageShip(game, amount, slow, cause = 'other') {
   return true;
 }
 
-function collideEnemies(game, x0, y0) {
+// R: hit radius of the ship (wider while tracing a drawn path).
+function collideEnemies(game, x0, y0, R = CONFIG.shipRadius) {
   const sh = game.ship, stats = game.stats;
   const x1 = sh.x, y1 = sh.y;
-  const R = CONFIG.shipRadius;
   const pad = R + MAX_ENEMY_R;
   const hits = [];
   queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
@@ -2867,6 +2870,11 @@ function drawPathUi(r, game) {
   const sh = game.ship;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
+    ctx.strokeStyle = 'rgba(159,232,255,0.14)';
+    ctx.lineWidth = CONFIG.drawHitRadius * 2;
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
     ctx.strokeStyle = 'rgba(159,232,255,0.4)';
     ctx.lineWidth = 4 / z;
     ctx.setLineDash([10 / z, 8 / z]);
@@ -2879,7 +2887,10 @@ function drawPathUi(r, game) {
   const pts = d.points;
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.22)'; ctx.lineWidth = 18 / z; ctx.stroke();
+    // the band is the real hit width of the trace
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = CONFIG.drawHitRadius * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
+    ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
   }
   const last = pts[pts.length - 1];
@@ -2891,6 +2902,12 @@ function drawPathUi(r, game) {
     ctx.setLineDash([]);
   }
   const pv = previewPath(game);
+  // enemies the band will cut: white ring, yellow if through the weak spot
+  for (const [e, crit] of pv.targets) {
+    ctx.strokeStyle = crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
+  }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
   if (pv.block) {
@@ -3934,9 +3951,10 @@ const TUNABLES = [
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
-  { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.01 },
+  { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },
   { key: 'drawRunTimeScale', label: '駆け抜け中の世界の速さ', min: 0, max: 1, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
+  { key: 'drawHitRadius', label: '軌跡の当たり幅（半径）', min: 10, max: 150, step: 5 },
   { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },

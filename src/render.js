@@ -474,6 +474,11 @@ function drawPathUi(r, game) {
   const sh = game.ship;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
+    ctx.strokeStyle = 'rgba(159,232,255,0.14)';
+    ctx.lineWidth = CONFIG.drawHitRadius * 2;
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
     ctx.strokeStyle = 'rgba(159,232,255,0.4)';
     ctx.lineWidth = 4 / z;
     ctx.setLineDash([10 / z, 8 / z]);
@@ -486,7 +491,10 @@ function drawPathUi(r, game) {
   const pts = d.points;
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.22)'; ctx.lineWidth = 18 / z; ctx.stroke();
+    // the band is the real hit width of the trace
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = CONFIG.drawHitRadius * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
+    ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
   }
   const last = pts[pts.length - 1];
@@ -498,6 +506,12 @@ function drawPathUi(r, game) {
     ctx.setLineDash([]);
   }
   const pv = previewPath(game);
+  // enemies the band will cut: white ring, yellow if through the weak spot
+  for (const [e, crit] of pv.targets) {
+    ctx.strokeStyle = crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
+  }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
   if (pv.block) {
