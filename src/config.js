@@ -33,10 +33,11 @@ export const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
-  drawLength: 2000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
+  drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.01, // world speed while drawing
-  drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
+  drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
+  drawRunScaleMin: 0.03, // ...but never slower than this
   drawHitRadius: 45, // ship hit radius while tracing a drawn path (drawn as the band's half-width)
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)

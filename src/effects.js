@@ -179,7 +179,7 @@ function updateCapsules(game, dt) {
     if (field < CONFIG.capsuleCount && (game.t < 2 || F.capsuleT >= CONFIG.capsuleInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
-      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r) });
+      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
       game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
     }
     if (getPhase(game.t).cores) {

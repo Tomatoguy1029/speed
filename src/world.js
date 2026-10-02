@@ -70,10 +70,12 @@ export function update(game, frameDt, input) {
     recordTrail(game.ship, frameDt);
   }
   let scale = 1;
-  if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.draw) scale = drawWorldScale(game);
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
   game.timeScale = scale;
   game.acc += frameDt * scale;
+  // the run clock keeps real time while drawing/tracing even though the world crawls
+  if (game.draw) game.t += frameDt * (1 - scale);
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -84,7 +86,8 @@ export function update(game, frameDt, input) {
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
-  if (game.draw && game.slowmo <= 0) game.timeScale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
+  if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
 // Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
@@ -184,7 +187,7 @@ function end(game, state, reason) {
 function queueOffers(game) {
   while (game.pendingLevelups > 0) {
     game.pendingLevelups--;
-    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot }), 'xp');
+    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot, scheme: game.scheme }), 'xp');
   }
 }
 
@@ -239,9 +242,26 @@ function drawPhase(game) {
   return game.draw ? game.draw.phase : null;
 }
 
+export function drawBudget(game, gauge) {
+  return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
+}
+
+export function traceRadius(game) {
+  return CONFIG.drawHitRadius * game.stats.drawWidthMult;
+}
+
+// World speed while tracing: the faster the dash, the slower everything else.
+function traceWorldScale(game) {
+  return Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, game.draw.speed)));
+}
+
+function drawWorldScale(game) {
+  return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
+}
+
 function startDrawing(game, input) {
   const sh = game.ship;
-  const budget = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const budget = drawBudget(game, sh.gauge);
   game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
@@ -302,8 +322,8 @@ function commitPath(game) {
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / CONFIG.drawRunTime);
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map() };
+  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map() };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -319,13 +339,14 @@ function runAlongPath(game, realDt) {
     const move = Math.min(dist, segLen - r.segPos);
     const x0 = sh.x, y0 = sh.y;
     // enemies the band has left can be hit again on the next pass
+    const R = traceRadius(game);
     for (const [id, e] of r.inside) {
-      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + CONFIG.drawHitRadius + 2) r.inside.delete(id);
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
     }
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius, r)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -340,7 +361,7 @@ function runAlongPath(game, realDt) {
 export function previewPath(game) {
   const d = game.draw;
   if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = CONFIG.drawHitRadius;
+  const pts = d.points, sh = game.ship, R = traceRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
@@ -434,7 +455,12 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
       e.hitCD = 0.3;
-      if (run) run.inside.set(e.id, e);
+      if (run) {
+        run.inside.set(e.id, e);
+        const n = (run.passes.get(e.id) || 0) + 1;
+        run.passes.set(e.id, n);
+        if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
+      }
       const keep = pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;

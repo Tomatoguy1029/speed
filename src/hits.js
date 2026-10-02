@@ -84,7 +84,7 @@ export function dropGem(game, x, y, v) {
 }
 
 export function dropCapsule(game, x, y, src, danger) {
-  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger });
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
 }
 
@@ -119,9 +119,9 @@ export function burst(game, x, y, color, n, dx, dy, speed) {
   }
 }
 
-export function addText(game, x, y, text, color) {
+export function addText(game, x, y, text, color, size = 16) {
   if (game.fx.texts.length > 40) game.fx.texts.shift();
-  game.fx.texts.push({ x, y, text, color, life: 0.7 });
+  game.fx.texts.push({ x, y, text, color, life: size > 16 ? 0.9 : 0.7, size });
 }
 
 export function addRing(game, x, y, radius, color, life = 0.45) {

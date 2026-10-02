@@ -1,6 +1,6 @@
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath, annotatePrediction, previewPath } from './world.js';
+import { predictPath, annotatePrediction, previewPath, drawBudget, traceRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { getPhase } from './spawner.js';
@@ -456,7 +456,7 @@ function drawBodies(r, game) {
 // Draw scheme: while charging, show how far a path could reach.
 function drawReach(r, game) {
   const sh = game.ship;
-  const reach = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const reach = drawBudget(game, sh.gauge);
   const { ctx } = r;
   const z = r.cam.zoom;
   ctx.strokeStyle = sh.gauge >= 1 ? 'rgba(255,228,107,0.7)' : 'rgba(159,232,255,0.55)';
@@ -475,7 +475,7 @@ function drawPathUi(r, game) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
     ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = CONFIG.drawHitRadius * 2;
+    ctx.lineWidth = traceRadius(game) * 2;
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -492,7 +492,7 @@ function drawPathUi(r, game) {
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
     // the band is the real hit width of the trace
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = CONFIG.drawHitRadius * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = traceRadius(game) * 2; ctx.stroke();
     line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
@@ -507,16 +507,10 @@ function drawPathUi(r, game) {
   }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
-  ctx.textAlign = 'left';
-  ctx.font = `800 ${Math.round(15 / z)}px ${MONO}`;
   for (const [e, t] of pv.targets) {
     ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
-    if (t.hits > 1) {
-      ctx.fillStyle = t.crit ? '#ffe46b' : '#ffffff';
-      ctx.fillText(`×${t.hits}`, e.x + e.r + 10 / z, e.y - e.r);
-    }
   }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
@@ -724,10 +718,10 @@ function drawFx(r, game) {
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center';
-  ctx.font = `800 ${Math.round(16 / z)}px ${MONO}`;
   for (const t of game.fx.texts) {
     ctx.globalAlpha = Math.min(1, t.life / 0.3);
     ctx.fillStyle = t.color;
+    ctx.font = `800 ${Math.round((t.size || 16) / z)}px ${MONO}`;
     ctx.fillText(t.text, t.x, t.y);
   }
   ctx.globalAlpha = 1;

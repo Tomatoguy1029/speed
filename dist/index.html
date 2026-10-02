@@ -111,10 +111,11 @@ const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
-  drawLength: 2000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
+  drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.01, // world speed while drawing
-  drawRunTimeScale: 0.05, // world speed while the ship traces the path (stays nearly frozen so the plan holds)
+  drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
+  drawRunScaleMin: 0.03, // ...but never slower than this
   drawHitRadius: 45, // ship hit radius while tracing a drawn path (drawn as the band's half-width)
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
@@ -263,6 +264,7 @@ function baseStats(meta = {}) {
     predictTime: 0.9,
     predictBounce: false,
     regen: 0,
+    drawLengthMult: 1, traceSpeedMult: 1, drawWidthMult: 1, // draw-mode modules
   };
 }
 
@@ -932,6 +934,9 @@ const MODULES = [
   { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
     desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
     apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'wideBlade', slot: 'bow', name: 'ワイドブレード', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡をなぞるときの当たり幅 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawWidthMult *= 1 + 0.25 * m; } },
   { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
     desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
     apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
@@ -946,6 +951,9 @@ const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡をなぞる速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
   { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
     desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
     apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
@@ -1002,6 +1010,9 @@ const MODULES = [
   { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL,
     desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
+    desc: (r) => `描ける軌跡の長さ +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -1055,7 +1066,7 @@ function rollModule(rng, ctx) {
       if (s.id === ctx.lastSlot) w *= 0.35;
       return [s.id, w];
     }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t);
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw'));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
@@ -1156,7 +1167,7 @@ function dropGem(game, x, y, v) {
 }
 
 function dropCapsule(game, x, y, src, danger) {
-  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger });
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
 }
 
@@ -1191,9 +1202,9 @@ function burst(game, x, y, color, n, dx, dy, speed) {
   }
 }
 
-function addText(game, x, y, text, color) {
+function addText(game, x, y, text, color, size = 16) {
   if (game.fx.texts.length > 40) game.fx.texts.shift();
-  game.fx.texts.push({ x, y, text, color, life: 0.7 });
+  game.fx.texts.push({ x, y, text, color, life: size > 16 ? 0.9 : 0.7, size });
 }
 
 function addRing(game, x, y, radius, color, life = 0.45) {
@@ -1383,7 +1394,7 @@ function updateCapsules(game, dt) {
     if (field < CONFIG.capsuleCount && (game.t < 2 || F.capsuleT >= CONFIG.capsuleInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
-      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r) });
+      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
       game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
     }
     if (getPhase(game.t).cores) {
@@ -1690,10 +1701,12 @@ function update(game, frameDt, input) {
     recordTrail(game.ship, frameDt);
   }
   let scale = 1;
-  if (game.draw) scale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.draw) scale = drawWorldScale(game);
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
   game.timeScale = scale;
   game.acc += frameDt * scale;
+  // the run clock keeps real time while drawing/tracing even though the world crawls
+  if (game.draw) game.t += frameDt * (1 - scale);
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -1704,7 +1717,8 @@ function update(game, frameDt, input) {
     queueOffers(game);
     if (game.offerQueue.length) { openOffer(game); break; }
   }
-  if (game.draw && game.slowmo <= 0) game.timeScale = game.draw.phase === 'draw' ? CONFIG.drawTimeScale : CONFIG.drawRunTimeScale;
+  if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
+  if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
 // Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
@@ -1804,7 +1818,7 @@ function end(game, state, reason) {
 function queueOffers(game) {
   while (game.pendingLevelups > 0) {
     game.pendingLevelups--;
-    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot }), 'xp');
+    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot, scheme: game.scheme }), 'xp');
   }
 }
 
@@ -1859,9 +1873,26 @@ function drawPhase(game) {
   return game.draw ? game.draw.phase : null;
 }
 
+function drawBudget(game, gauge) {
+  return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
+}
+
+function traceRadius(game) {
+  return CONFIG.drawHitRadius * game.stats.drawWidthMult;
+}
+
+// World speed while tracing: the faster the dash, the slower everything else.
+function traceWorldScale(game) {
+  return Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, game.draw.speed)));
+}
+
+function drawWorldScale(game) {
+  return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
+}
+
 function startDrawing(game, input) {
   const sh = game.ship;
-  const budget = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const budget = drawBudget(game, sh.gauge);
   game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
@@ -1922,8 +1953,8 @@ function commitPath(game) {
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / CONFIG.drawRunTime);
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map() };
+  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map() };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -1939,13 +1970,14 @@ function runAlongPath(game, realDt) {
     const move = Math.min(dist, segLen - r.segPos);
     const x0 = sh.x, y0 = sh.y;
     // enemies the band has left can be hit again on the next pass
+    const R = traceRadius(game);
     for (const [id, e] of r.inside) {
-      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + CONFIG.drawHitRadius + 2) r.inside.delete(id);
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
     }
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    if (collideEnemies(game, x0, y0, CONFIG.drawHitRadius, r)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -1960,7 +1992,7 @@ function runAlongPath(game, realDt) {
 function previewPath(game) {
   const d = game.draw;
   if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = CONFIG.drawHitRadius;
+  const pts = d.points, sh = game.ship, R = traceRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
   const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
@@ -2054,7 +2086,12 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
       e.hitCD = 0.3;
-      if (run) run.inside.set(e.id, e);
+      if (run) {
+        run.inside.set(e.id, e);
+        const n = (run.passes.get(e.id) || 0) + 1;
+        run.passes.set(e.id, n);
+        if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
+      }
       const keep = pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
@@ -2865,7 +2902,7 @@ function drawBodies(r, game) {
 // Draw scheme: while charging, show how far a path could reach.
 function drawReach(r, game) {
   const sh = game.ship;
-  const reach = CONFIG.drawLength * sh.gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed);
+  const reach = drawBudget(game, sh.gauge);
   const { ctx } = r;
   const z = r.cam.zoom;
   ctx.strokeStyle = sh.gauge >= 1 ? 'rgba(255,228,107,0.7)' : 'rgba(159,232,255,0.55)';
@@ -2884,7 +2921,7 @@ function drawPathUi(r, game) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
     ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = CONFIG.drawHitRadius * 2;
+    ctx.lineWidth = traceRadius(game) * 2;
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -2901,7 +2938,7 @@ function drawPathUi(r, game) {
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
     // the band is the real hit width of the trace
-    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = CONFIG.drawHitRadius * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = traceRadius(game) * 2; ctx.stroke();
     line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
@@ -2916,16 +2953,10 @@ function drawPathUi(r, game) {
   }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
-  ctx.textAlign = 'left';
-  ctx.font = `800 ${Math.round(15 / z)}px ${MONO}`;
   for (const [e, t] of pv.targets) {
     ctx.strokeStyle = t.crit ? '#ffe46b' : 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3 / z;
     ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
-    if (t.hits > 1) {
-      ctx.fillStyle = t.crit ? '#ffe46b' : '#ffffff';
-      ctx.fillText(`×${t.hits}`, e.x + e.r + 10 / z, e.y - e.r);
-    }
   }
   ctx.fillStyle = '#ffe46b';
   for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
@@ -3133,10 +3164,10 @@ function drawFx(r, game) {
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center';
-  ctx.font = `800 ${Math.round(16 / z)}px ${MONO}`;
   for (const t of game.fx.texts) {
     ctx.globalAlpha = Math.min(1, t.life / 0.3);
     ctx.fillStyle = t.color;
+    ctx.font = `800 ${Math.round((t.size || 16) / z)}px ${MONO}`;
     ctx.fillText(t.text, t.x, t.y);
   }
   ctx.globalAlpha = 1;
@@ -3971,7 +4002,8 @@ const TUNABLES = [
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },
-  { key: 'drawRunTimeScale', label: '駆け抜け中の世界の速さ', min: 0, max: 1, step: 0.01 },
+  { key: 'drawRunSlowRef', label: 'なぞり中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
+  { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
   { key: 'drawHitRadius', label: '軌跡の当たり幅（半径）', min: 10, max: 150, step: 5 },
   { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },

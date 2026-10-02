@@ -38,6 +38,9 @@ export const MODULES = [
   { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
     desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
     apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'wideBlade', slot: 'bow', name: 'ワイドブレード', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡をなぞるときの当たり幅 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawWidthMult *= 1 + 0.25 * m; } },
   { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
     desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
     apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
@@ -52,6 +55,9 @@ export const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡をなぞる速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
   { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
     desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
     apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
@@ -108,6 +114,9 @@ export const MODULES = [
   { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL,
     desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
+    desc: (r) => `描ける軌跡の長さ +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -161,7 +170,7 @@ export function rollModule(rng, ctx) {
       if (s.id === ctx.lastSlot) w *= 0.35;
       return [s.id, w];
     }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t);
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw'));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
