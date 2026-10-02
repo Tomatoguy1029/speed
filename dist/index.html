@@ -3531,19 +3531,23 @@ function drawTimer(r, game) {
 function drawStatus(r, game) {
   const { ctx } = r;
   const sh = game.ship;
-  const x = 16, y = 18, w = 220;
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.fillRect(x, y, w, 12);
-  ctx.fillStyle = sh.hp / game.stats.maxHp < 0.3 ? '#ff5a4a' : '#5dffa0';
-  ctx.fillRect(x, y, w * Math.max(0, sh.hp / game.stats.maxHp), 12);
+  const frac = Math.max(0, sh.hp / game.stats.maxHp);
+  // HP bar right under the ship
+  const p = worldToScreen(r, sh.x, sh.y);
+  const bw = 44, bx = p.x - bw / 2, by = p.y + Math.max(CONFIG.shipRadius * r.cam.zoom, 9) + 10;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
+  ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
+  ctx.fillRect(bx, by, bw * frac, 5);
+  const x = 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `12px ${MONO}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
+  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
-  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 28);
   ctx.fillStyle = '#ffd24a';
-  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 64);
+  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 46);
 }
 
 function drawSpeedPanel(r, game) {
