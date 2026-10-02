@@ -1,0 +1,3529 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPEED — 重力圏脱出</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #04050b; overflow: hidden; color: #e6ecff;
+    font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; user-select: none; }
+  canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: crosshair; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(3,5,14,0.72); backdrop-filter: blur(3px); pointer-events: auto; }
+  .panel { background: linear-gradient(180deg, #121a33, #0b1022); border: 1px solid #2a3a6a; border-radius: 14px;
+    padding: 24px 28px; min-width: 320px; max-width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+    overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  .panel h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: 0.04em; }
+  .panel h2 { margin: 18px 0 8px; font-size: 15px; color: #8fa3c8; font-weight: 600; }
+  .sub { color: #8fa3c8; font-size: 13px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: auto auto; gap: 6px 18px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+  .stats div:nth-child(odd) { color: #8fa3c8; }
+  .btns { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 15px; padding: 10px 18px; border-radius: 9px; border: 1px solid #3b5bb5;
+    background: #1d2c5c; color: #e6ecff; cursor: pointer; }
+  button:hover { background: #2a3f80; }
+  button.primary { background: #2f6bff; border-color: #5d8bff; font-weight: 700; }
+  button.primary:hover { background: #4a7dff; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .win { color: #ffd24a; } .lose { color: #ff6b5a; }
+  .cards { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch; }
+  .card { border: 1px solid #2a3a6a; border-radius: 10px; padding: 12px 14px; background: rgba(255,255,255,0.03); min-height: 110px; }
+  .card .tag { font-size: 11px; color: #8fa3c8; margin-bottom: 6px; }
+  .card .name { font-size: 18px; font-weight: 700; }
+  .card .rar { font-size: 12px; margin: 2px 0 8px; font-weight: 700; }
+  .card .desc { font-size: 13px; color: #cdd6f0; line-height: 1.5; }
+  .card.empty { display: flex; align-items: center; justify-content: center; color: #5b6b94; }
+  .card.new { border-width: 2px; box-shadow: 0 0 24px rgba(120,160,255,0.15); }
+  .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
+  .loadout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 16px; font-size: 12px; }
+  .loadout div { border: 1px solid #1f2b52; border-radius: 6px; padding: 5px 8px; color: #8fa3c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .loadout div.hl { border-color: #5d8bff; color: #e6ecff; }
+  .src { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #1d2c5c; color: #b8c6ea; margin-bottom: 8px; }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
+  .ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .up { border: 1px solid #2a3a6a; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); }
+  .up .n { font-weight: 700; } .up .d { font-size: 12px; color: #b8c6ea; margin: 2px 0 6px; }
+  .pips { letter-spacing: 3px; color: #5d8bff; font-size: 12px; margin-bottom: 8px; }
+  .up button { width: 100%; padding: 7px 10px; font-size: 13px; }
+  .coins { color: #ffd24a; font-weight: 700; font-family: ui-monospace, Menlo, monospace; }
+  .how { font-size: 13px; color: #cdd6f0; line-height: 1.7; margin: 0; padding-left: 18px; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  #debug { position: fixed; top: 0; right: 0; width: min(360px, 100vw); max-height: 100vh; overflow: auto; display: none;
+    background: rgba(8,12,28,0.94); border-left: 1px solid #2a3a6a; padding: 12px 14px; font-size: 12px; z-index: 10; }
+  #debug.open { display: block; }
+  #debug .dh { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  #debug .dclose { color: #8fa3c8; }
+  #debug .dinfo { font-family: ui-monospace, Menlo, monospace; color: #9fe8ff; margin-bottom: 8px; line-height: 1.5; }
+  #debug .dbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  #debug button, #debug select { font-size: 12px; padding: 5px 8px; border-radius: 6px; background: #1d2c5c; color: #e6ecff; border: 1px solid #3b5bb5; }
+  #debug .drow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 6px; }
+  #debug .drow input { grid-column: 1 / 3; width: 100%; }
+  #debug .dval { font-family: ui-monospace, Menlo, monospace; color: #ffd24a; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="ui"></div>
+<script>
+(() => {
+'use strict';
+// ---- config.js ----
+// All tunable numbers live here. The debug panel edits this object directly.
+const CONFIG = {
+  // run
+  runTime: 600,
+  escapeSpeed: 2250, // px/s needed to clear
+  escapeBonus: 30, // coins for escaping
+  speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
+
+  // field
+  fieldRadius: 6000,
+  planetRadius: 420,
+  zoneInner: 2200,
+  zoneOuter: 4200,
+  startRadius: 3200,
+  planetGM: 3.0e8, // ~29 px/s^2 at the start radius
+  moonCount: 6,
+  moonGM: 1.2e7,
+  moonOrbitSpeed: 0.02, // rad/s
+  dustCount: 34,
+  dustDrag: 0.55,
+  boundaryPush: 600,
+  crashRestitution: 0.45,
+  crashDamage: 0.012, // hp per px/s of impact speed above 200
+
+  // ship
+  baseMaxSpeed: 1000,
+  launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
+  carry: 0.65, // share of current speed carried into the next launch (same direction)
+  chargeTime: 0.7, // seconds to fill the gauge
+  minGauge: 0.12,
+  minDrag: 14, // screen px; shorter drags boost forward along velocity
+  nudgeAccel: 450, // WASD thrust (px/s^2) at rest
+  nudgeSteer: 0.7, // extra WASD thrust per px/s of speed, so fast ships can still bend
+  nudgeMaxSpeed: 0.4, // W can only speed the ship up below this share of max speed
+  pivotSpeed: 60, // below this speed A/D turn the ship in place instead of bending the path
+  pivotRate: 3.2, // rad/s turning in place
+  boostDuration: 0.9, // seconds after launch with no cruise drag
+  energyCut: 0.85, // speed kept when the launch energy runs out (applied over ~0.3s)
+  cruiseDrag: 0.06, // weak per-second drag after the energy runs out
+  cruiseFloor: 0.35, // cruise drag never slows below this share of max speed
+  overcapDecay: 0.3, // per second decay of speed above max speed
+  shipRadius: 16,
+  baseHP: 120,
+  invulnTime: 0.6,
+  pickupRadius: 140,
+
+  // enemies
+  enemyHpMult: 1,
+  enemyArmorMult: 1,
+  densityMult: 1,
+  dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
+  meteorCount: 12,
+  meteorCoinChance: 0.4,
+  coreBoost: 0.18, // max speed gained per power core
+  levelHeal: 0.08, // share of max HP restored per level-up
+  capsuleCount: 5, // field capsules kept on the map
+  capsuleInterval: 16, // seconds between respawns
+
+  // growth
+  xpBase: 10,
+  xpGrowth: 7,
+  xpMult: 1,
+
+  // camera
+  baseView: 1100, // world units visible on the shorter screen side at rest
+  zoomRefSpeed: 700,
+  zoomExp: 0.7,
+  zoomMin: 0.28,
+  lookAhead: 0.32,
+};
+
+// ---- math.js ----
+const TAU = Math.PI * 2;
+
+function clamp(v, a, b) {
+  return v < a ? a : v > b ? b : v;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function smoothstep(a, b, v) {
+  const t = clamp((v - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function angleDiff(a, b) {
+  let d = (a - b) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return d;
+}
+
+// Segment p0->p1 vs circle (c, r): first t in [0,1] where the segment is inside the circle, -1 if never.
+function segCircleT(x0, y0, x1, y1, cx, cy, r) {
+  const fx = x0 - cx, fy = y0 - cy;
+  const c = fx * fx + fy * fy - r * r;
+  if (c <= 0) return 0;
+  const dx = x1 - x0, dy = y1 - y0;
+  const a = dx * dx + dy * dy;
+  if (a === 0) return -1;
+  const b = 2 * (fx * dx + fy * dy);
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return -1;
+  const t = (-b - Math.sqrt(disc)) / (2 * a);
+  return t >= 0 && t <= 1 ? t : -1;
+}
+
+// mulberry32
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return function rng() {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randRange(rng, a, b) {
+  return a + (b - a) * rng();
+}
+
+// items: [[value, weight], ...]
+function pickWeighted(rng, items) {
+  let total = 0;
+  for (const [, w] of items) total += Math.max(0, w);
+  if (total <= 0) return items[0][0];
+  let r = rng() * total;
+  for (const [v, w] of items) {
+    if (w <= 0) continue;
+    r -= w;
+    if (r < 0) return v;
+  }
+  return items[items.length - 1][0];
+}
+
+// ---- ship.js ----
+
+
+function baseStats(meta = {}) {
+  const lv = (k) => meta[k] || 0;
+  return {
+    maxSpeed: CONFIG.baseMaxSpeed * (1 + 0.05 * lv('speed')),
+    launchRatio: CONFIG.launchRatio,
+    carry: CONFIG.carry,
+    chargeTime: CONFIG.chargeTime * Math.pow(0.95, lv('charge')),
+    gaugeMax: 1,
+    boostDuration: CONFIG.boostDuration,
+    cruiseDrag: CONFIG.cruiseDrag,
+    cruiseFloor: CONFIG.cruiseFloor,
+    atkMult: 1 + 0.06 * lv('atk'),
+    maxHp: CONFIG.baseHP + 15 * lv('hp'),
+    pickupRadius: CONFIG.pickupRadius * (1 + 0.15 * lv('pickup')),
+    xpMult: 1 + 0.08 * lv('xp'),
+    damageTakenMult: 1,
+    hitSlowMult: 1,
+    critMult: 2.5,
+    weakArcMult: 1,
+    pierceLossMult: 1,
+    bounceKeep: 0.5,
+    bounceDamageMult: 1,
+    predictTime: 0.9,
+    predictBounce: false,
+    regen: 0,
+  };
+}
+
+function createShip(stats, x, y) {
+  return {
+    x, y, vx: 0, vy: 0,
+    hp: stats.maxHp,
+    charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or last nudge when nearly still
+    boostT: 0, fadeT: 0, invulnT: 0,
+    trail: [], trailAcc: 0,
+  };
+}
+
+function computeGauge(chargeT, stats, bank = 0) {
+  return Math.min(stats.gaugeMax, Math.max(CONFIG.minGauge, bank + chargeT / stats.chargeTime));
+}
+
+// New velocity after launching along unit direction (dx, dy) with the given gauge.
+function launchVelocity(vx, vy, dx, dy, gauge, stats) {
+  const speed = Math.hypot(vx, vy);
+  const cos = speed > 0 ? Math.max(0, (vx * dx + vy * dy) / speed) : 0;
+  const carried = speed * stats.carry * cos;
+  const thrust = stats.maxSpeed * stats.launchRatio * gauge;
+  const limit = stats.maxSpeed * Math.max(1, gauge);
+  const newSpeed = Math.max(Math.min(carried + thrust, limit), speed * cos);
+  return { vx: dx * newSpeed, vy: dy * newSpeed };
+}
+
+// Integrate one step: acceleration (ax, ay), drag rules, then position.
+function stepShip(ship, stats, dt, ax, ay, extraDrag) {
+  ship.vx += ax * dt;
+  ship.vy += ay * dt;
+  let sp = Math.hypot(ship.vx, ship.vy);
+  if (sp > 0) {
+    let target = sp;
+    if (ship.boostT > 0) {
+      ship.boostT -= dt;
+      if (ship.boostT <= 0) ship.fadeT = 0.3;
+    } else {
+      if (ship.fadeT > 0) {
+        ship.fadeT -= dt;
+        if (target > stats.maxSpeed * stats.cruiseFloor) target *= Math.pow(CONFIG.energyCut, dt / 0.3);
+      }
+      const floor = stats.maxSpeed * stats.cruiseFloor;
+      if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
+    }
+    if (target > stats.maxSpeed) {
+      target = stats.maxSpeed + (target - stats.maxSpeed) * Math.exp(-CONFIG.overcapDecay * dt);
+    }
+    if (extraDrag > 0) target *= Math.exp(-extraDrag * dt);
+    const k = target / sp;
+    ship.vx *= k;
+    ship.vy *= k;
+  }
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+}
+
+// ---- field.js ----
+
+
+
+function createField(rng) {
+  const moons = [];
+  for (let i = 0; i < CONFIG.moonCount; i++) {
+    moons.push({
+      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
+      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
+      dir: rng() < 0.5 ? -1 : 1,
+      r: randRange(rng, 110, 180),
+      gm: CONFIG.moonGM,
+      x: 0, y: 0,
+    });
+  }
+  const dust = [];
+  for (let i = 0; i < CONFIG.dustCount; i++) {
+    const a = rng() * TAU;
+    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
+    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
+  }
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  updateMoons(field, 0);
+  return field;
+}
+
+function updateMoons(field, t) {
+  for (const m of field.moons) {
+    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
+    m.x = Math.cos(a) * m.orbit;
+    m.y = Math.sin(a) * m.orbit;
+  }
+}
+
+function zoneOf(r) {
+  if (r < CONFIG.zoneInner) return 'inner';
+  if (r > CONFIG.zoneOuter) return 'outer';
+  return 'mid';
+}
+
+// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
+function dangerAt(r) {
+  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
+  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
+  return 0;
+}
+
+function dustDragAt(field, x, y) {
+  for (const d of field.dust) {
+    const dx = x - d.x, dy = y - d.y;
+    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
+  }
+  return 0;
+}
+
+// ---- gravity.js ----
+
+
+function pull(out, x, y, b) {
+  const dx = b.x - x, dy = b.y - y;
+  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
+  const d = Math.sqrt(d2);
+  const a = b.gm / d2;
+  out.ax += (dx / d) * a;
+  out.ay += (dy / d) * a;
+}
+
+function gravityAt(field, t, x, y) {
+  const out = { ax: 0, ay: 0 };
+  pull(out, x, y, field.planet);
+  for (const m of field.moons) pull(out, x, y, m);
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius) {
+    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
+    out.ax -= (x / r) * push;
+    out.ay -= (y / r) * push;
+  }
+  return out;
+}
+
+// ---- combat.js ----
+
+
+const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
+
+function attackPower(speed, stats) {
+  return (speed / 100) * stats.atkMult;
+}
+
+function isWeakHit(e, hx, hy, arcMult) {
+  if (!e.weakArc) return false;
+  const a = Math.atan2(hy - e.y, hx - e.x);
+  return Math.abs(angleDiff(a, e.facing + e.weakDir)) <= e.weakArc * arcMult;
+}
+
+function canPierce(atk, e, crit) {
+  return atk >= e.armor * (crit ? CRIT_ARMOR : 1);
+}
+
+function resolveRam(atk, e, crit, stats) {
+  if (canPierce(atk, e, crit)) {
+    const damage = atk * (crit ? stats.critMult : 1);
+    return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
+  }
+  return { pierce: false, damage: atk * 0.25, kill: false, shipDamage: e.contact };
+}
+
+// Share of speed kept after going through an enemy.
+function pierceKeep(e, killed, stats) {
+  const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
+  return 1 - Math.min(0.6, loss * stats.pierceLossMult);
+}
+
+// ---- enemies.js ----
+
+
+const BACK = Math.PI;
+const SIDE = Math.PI / 2;
+
+// hp/armor/contact are level-1 values; armor is in attack units (speed/100 at x1 multiplier).
+const ENEMY_TYPES = {
+  drifter: { name: 'ドリフター', r: 14, hp: 6, armor: 2, speed: 130, accel: 2.5, contact: 6, xp: 1, color: '#7fd1ff', shape: 'orb', behavior: 'chase', weakDir: BACK, weakArc: 1.0 },
+  swarm: { name: 'スウォーム', r: 11, hp: 3, armor: 1.2, speed: 200, accel: 3, contact: 4, xp: 0.6, color: '#9df0ff', shape: 'dart', behavior: 'chase', weakDir: BACK, weakArc: 1.1 },
+  darter: { name: 'ダーター', r: 16, hp: 9, armor: 3.5, speed: 110, accel: 2, contact: 10, xp: 2, color: '#ff9f6b', shape: 'dart', behavior: 'dash', weakDir: BACK, weakArc: 0.9, range: 520, windup: 0.7, dashSpeed: 760, dashTime: 0.55, recover: 0.9 },
+  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 11, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
+  splitter: { name: '分裂型', r: 22, hp: 14, armor: 4, speed: 60, accel: 1.5, contact: 8, xp: 2, color: '#a8ff7a', shape: 'blob', behavior: 'split', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.55, budInterval: 5, maxBuds: 5, turn: 1.5 },
+  splitling: { name: '分裂体', r: 10, hp: 3, armor: 1.5, speed: 150, accel: 2.5, contact: 4, xp: 0.4, color: '#cfff9a', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.2 },
+  leech: { name: '減速型', r: 20, hp: 14, armor: 5, speed: 120, accel: 1.6, contact: 6, xp: 3, color: '#c77dff', shape: 'diamond', behavior: 'leech', weakDir: BACK, weakArc: 0.9, auraR: 210, drain: 0.9, steal: 0.2 },
+  gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.8, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 7, slow: 0.12 },
+  missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
+  battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
+  meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
+};
+
+const MAX_ENEMY_R = 130;
+
+let nextId = 1;
+
+function createEnemy(type, level, x, y, opts = {}) {
+  const T = ENEMY_TYPES[type];
+  const L = Math.max(1, level);
+  const elite = !!opts.elite;
+  const size = type === 'meteor' ? (opts.size || T.r) : T.r;
+  const sz = size / T.r;
+  const hp = T.hp * sz * sz * (1 + 0.6 * (L - 1)) * CONFIG.enemyHpMult * (elite ? 3 : 1);
+  return {
+    id: nextId++, type, T, level: L, elite,
+    x, y, vx: 0, vy: 0,
+    r: size * (elite ? 1.25 : 1),
+    hp, maxHp: hp,
+    armor: T.armor * sz * (1 + 0.35 * (L - 1)) * CONFIG.enemyArmorMult * (elite ? 1.3 : 1),
+    contact: T.contact * (1 + 0.2 * (L - 1)),
+    xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
+    speed: T.speed * (1 + 0.04 * (L - 1)),
+    facing: opts.facing ?? 0,
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: T.weakArc || 0,
+    hitCD: 0, flash: 0, dead: false,
+    state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
+    parent: opts.parent || 0,
+    spin: opts.spin || 0,
+  };
+}
+
+function steerTo(e, tx, ty, speed, accel, dt) {
+  const dx = tx - e.x, dy = ty - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const k = Math.min(1, accel * dt);
+  e.vx += ((dx / d) * speed - e.vx) * k;
+  e.vy += ((dy / d) * speed - e.vy) * k;
+}
+
+function turnToward(e, target, rate, dt) {
+  let d = target - e.facing;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const m = rate * dt;
+  e.facing += Math.max(-m, Math.min(m, d));
+}
+
+function angleToShip(e, game) {
+  return Math.atan2(game.ship.y - e.y, game.ship.x - e.x);
+}
+
+// Hold a ring around the ship at `keep` distance while circling it.
+function keepDistance(e, game, dt) {
+  const sh = game.ship;
+  const dx = e.x - sh.x, dy = e.y - sh.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const side = e.id % 2 ? 1 : -1;
+  const tx = sh.x + (dx / d) * e.T.keep - (dy / d) * 200 * side;
+  const ty = sh.y + (dy / d) * e.T.keep + (dx / d) * 200 * side;
+  steerTo(e, tx, ty, e.speed, e.T.accel, dt);
+  turnToward(e, angleToShip(e, game), 3, dt);
+}
+
+function fire(game, e, angle, speed, kind) {
+  const T = e.T;
+  const lv = 1 + 0.25 * (e.level - 1);
+  game.ebullets.push({
+    kind, x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, speed,
+    r: kind === 'missile' ? 9 : 7, dmg: T.bulletDmg * lv, slow: T.slow, life: kind === 'missile' ? 4.5 : 4,
+    turn: T.missileTurn || 0,
+  });
+  game.events.push({ type: 'shoot', x: e.x, y: e.y, kind });
+}
+
+// Count down to a shot; `charge` > 0 while telegraphing.
+function gunTimer(e, dt) {
+  e.fireT -= dt;
+  e.charge = e.fireT < e.T.telegraph ? 1 - Math.max(0, e.fireT) / e.T.telegraph : 0;
+  if (e.fireT <= 0) { e.fireT = e.T.fireInterval; return true; }
+  return false;
+}
+
+const BEHAVIORS = {
+  chase(e, game, dt) {
+    const sh = game.ship;
+    steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
+    turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
+  },
+  dash(e, game, dt) {
+    const T = e.T;
+    const sh = game.ship;
+    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
+    e.timer -= dt;
+    if (e.state === 'move') {
+      BEHAVIORS.chase(e, game, dt);
+      if (d < T.range) { e.state = 'windup'; e.timer = T.windup; }
+    } else if (e.state === 'windup') {
+      e.vx *= 1 - 4 * dt; e.vy *= 1 - 4 * dt;
+      turnToward(e, angleToShip(e, game), 6, dt);
+      if (e.timer <= 0) {
+        e.state = 'dash'; e.timer = T.dashTime;
+        e.vx = Math.cos(e.facing) * T.dashSpeed; e.vy = Math.sin(e.facing) * T.dashSpeed;
+      }
+    } else if (e.state === 'dash') {
+      if (e.timer <= 0) { e.state = 'recover'; e.timer = T.recover; }
+    } else {
+      e.vx *= 1 - 2 * dt; e.vy *= 1 - 2 * dt;
+      if (e.timer <= 0) e.state = 'move';
+    }
+  },
+  split(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    e.budT += dt;
+    if (e.budT >= e.T.budInterval) {
+      e.budT = 0;
+      if (e.buds < e.T.maxBuds) {
+        e.buds++;
+        const a = game.rng() * Math.PI * 2;
+        game.newEnemies.push(createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r * 1.5, e.y + Math.sin(a) * e.r * 1.5, { parent: e.id, facing: a }));
+      }
+    }
+  },
+  leech(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    const sh = game.ship;
+    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
+    if (d < e.T.auraR) game.leechDrag += e.T.drain * (1 - d / e.T.auraR * 0.5);
+  },
+  gunner(e, game, dt) {
+    keepDistance(e, game, dt);
+    if (gunTimer(e, dt)) fire(game, e, angleToShip(e, game), e.T.bulletSpeed, 'bullet');
+  },
+  missile(e, game, dt) {
+    keepDistance(e, game, dt);
+    if (gunTimer(e, dt)) fire(game, e, e.facing, e.T.missileSpeed, 'missile');
+  },
+  battleship(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    if (gunTimer(e, dt)) {
+      const base = angleToShip(e, game);
+      const n = e.T.volley;
+      for (let i = 0; i < n; i++) fire(game, e, base + (i / (n - 1) - 0.5) * e.T.spread, e.T.bulletSpeed, 'bullet');
+    }
+  },
+  drift(e, game, dt) {
+    e.facing += e.spin * dt;
+  },
+};
+
+function onEnemyDeath(e, game) {
+  if (e.type === 'splitter') {
+    for (let i = 0; i < 2; i++) {
+      const a = e.facing + (i ? 1 : -1) * Math.PI / 2;
+      const c = createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r, e.y + Math.sin(a) * e.r, { facing: a });
+      c.vx = Math.cos(a) * 200; c.vy = Math.sin(a) * 200;
+      c.hitCD = 0.35;
+      game.newEnemies.push(c);
+    }
+  }
+}
+
+function updateEnemy(e, game, dt) {
+  e.age += dt;
+  if (e.hitCD > 0) e.hitCD -= dt;
+  if (e.flash > 0) e.flash -= dt;
+  BEHAVIORS[e.T.behavior](e, game, dt);
+  e.x += e.vx * dt;
+  e.y += e.vy * dt;
+  // stay out of the planet
+  const p = game.field.planet;
+  const d = Math.hypot(e.x - p.x, e.y - p.y);
+  if (d < p.r + e.r && d > 0) {
+    e.x = p.x + ((e.x - p.x) / d) * (p.r + e.r);
+    e.y = p.y + ((e.y - p.y) / d) * (p.r + e.r);
+  }
+}
+
+// ---- projectiles.js ----
+
+
+// Enemy bullets and missiles. Returns hits on the ship via the callback.
+function updateEnemyBullets(game, dt, onHit) {
+  const sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const p = game.field.planet;
+  for (const b of game.ebullets) {
+    if (b.kind === 'missile') {
+      const want = Math.atan2(sh.y - b.y, sh.x - b.x);
+      const cur = Math.atan2(b.vy, b.vx);
+      let d = want - cur;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      const a = cur + Math.max(-b.turn * dt, Math.min(b.turn * dt, d));
+      b.vx = Math.cos(a) * b.speed; b.vy = Math.sin(a) * b.speed;
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    const dx = b.x - sh.x, dy = b.y - sh.y;
+    if (dx * dx + dy * dy < (b.r + R) * (b.r + R)) { onHit(b); b.life = 0; }
+    if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) b.life = 0;
+  }
+  if (game.ebullets.some((b) => b.life <= 0)) game.ebullets = game.ebullets.filter((b) => b.life > 0);
+}
+
+// ---- grid.js ----
+const OFF = 4096;
+
+function buildGrid(list, cell) {
+  const map = new Map();
+  for (const it of list) {
+    if (it.dead) continue;
+    const key = (Math.floor(it.x / cell) + OFF) * 8192 + (Math.floor(it.y / cell) + OFF);
+    let arr = map.get(key);
+    if (!arr) { arr = []; map.set(key, arr); }
+    arr.push(it);
+  }
+  return { cell, map };
+}
+
+function queryGrid(grid, x0, y0, x1, y1, cb) {
+  const c = grid.cell;
+  const cx0 = Math.floor(x0 / c), cx1 = Math.floor(x1 / c);
+  const cy0 = Math.floor(y0 / c), cy1 = Math.floor(y1 / c);
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const arr = grid.map.get((cx + OFF) * 8192 + (cy + OFF));
+      if (!arr) continue;
+      for (const it of arr) if (!it.dead) cb(it);
+    }
+  }
+}
+
+function queryRadius(grid, x, y, r, cb) {
+  queryGrid(grid, x - r, y - r, x + r, y + r, (it) => {
+    const dx = it.x - x, dy = it.y - y, rr = r + (it.r || 0);
+    if (dx * dx + dy * dy <= rr * rr) cb(it);
+  });
+}
+
+// ---- spawner.js ----
+
+
+
+
+
+// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
+const PHASES = [
+  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1 } },
+  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5 } },
+  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2 } },
+  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
+  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, battleship: 0.12 } },
+  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, battleship: 0.25 } },
+];
+
+function getPhase(t) {
+  for (const p of PHASES) if (t < p.end) return p;
+  return PHASES[PHASES.length - 1];
+}
+
+function phaseTarget(t) {
+  const p = getPhase(t);
+  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
+  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
+}
+
+function spawnPoint(game, extra = 0) {
+  const sh = game.ship;
+  for (let i = 0; i < 6; i++) {
+    const a = game.rng() * TAU;
+    const d = game.viewRadius + 100 + extra + game.rng() * 300;
+    const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
+    const r = Math.hypot(x, y);
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
+  }
+  return null;
+}
+
+// Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
+function mixAt(phase, danger, t) {
+  const items = Object.entries(phase.mix);
+  if (danger > 0.25) {
+    const ramp = clamp(t / 150, 0.15, 1);
+    items.push(['armored', 2 * danger], ['gunner', danger * ramp], ['missile', 0.7 * danger * ramp]);
+  }
+  return items;
+}
+
+function spawnOne(game, target) {
+  const pt = spawnPoint(game);
+  if (!pt) return;
+  const danger = dangerAt(Math.hypot(pt.x, pt.y));
+  const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
+  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
+  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
+  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
+  const level = target.level + danger * CONFIG.dangerLevel;
+  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, facing: pt.a + Math.PI }));
+}
+
+function spawnWave(game, target) {
+  const sh = game.ship;
+  const n = Math.round(30 * CONFIG.densityMult);
+  if (game.rng() < 0.5) {
+    // ring closing in
+    const d = game.viewRadius * 0.95;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, { facing: a + Math.PI }));
+    }
+  } else {
+    // a stream from one direction
+    const a = game.rng() * TAU;
+    for (let i = 0; i < n; i++) {
+      const d = game.viewRadius + 80 + i * 34;
+      const off = (game.rng() - 0.5) * 120;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
+    }
+  }
+  game.events.push({ type: 'wave' });
+}
+
+function keepMeteors(game) {
+  let near = 0;
+  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  if (near >= CONFIG.meteorCount) return;
+  const pt = spawnPoint(game, 200);
+  if (!pt) return;
+  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
+  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
+  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
+  game.enemies.push(m);
+}
+
+function despawnFar(game) {
+  const sh = game.ship;
+  const far = game.viewRadius * 2.6 + 800;
+  let removed = false;
+  for (const e of game.enemies) {
+    const lim = e.type === 'battleship' ? far * 1.6 : far;
+    if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
+  }
+  if (removed) game.enemies = game.enemies.filter((e) => !e.dead);
+}
+
+function updateSpawner(game, dt) {
+  if (!game.spawning) return;
+  despawnFar(game);
+  keepMeteors(game);
+  const target = phaseTarget(game.t);
+  const P = target.phase;
+  let alive = 0;
+  for (const e of game.enemies) if (e.type !== 'meteor') alive++;
+  game.spawnAcc = Math.min(game.spawnAcc + P.rate * dt, 8);
+  while (game.spawnAcc >= 1 && alive < target.pop) {
+    game.spawnAcc -= 1;
+    spawnOne(game, target);
+    alive++;
+  }
+  if (P.waves) {
+    game.waveT = (game.waveT || 0) + dt;
+    if (game.waveT >= P.waves) { game.waveT = 0; spawnWave(game, target); }
+  }
+}
+
+// ---- progression.js ----
+
+
+function xpForLevel(level) {
+  return CONFIG.xpBase + CONFIG.xpGrowth * level;
+}
+
+// Station upgrades bought with coins (parts). Effects are applied in baseStats().
+const META_UPGRADES = [
+  { id: 'speed', name: '主推進器', desc: '最高速度 +5%', max: 5, costs: [25, 50, 90, 140, 210] },
+  { id: 'hp', name: '機体フレーム', desc: '最大 HP +15', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'atk', name: '衝角素材', desc: '攻撃力 +6%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'charge', name: '充電効率', desc: 'チャージ時間 -5%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'pickup', name: '回収装置', desc: '回収範囲 +15%', max: 5, costs: [15, 30, 55, 85, 125] },
+  { id: 'xp', name: '学習回路', desc: '経験値 +8%', max: 5, costs: [25, 50, 90, 140, 210] },
+];
+
+const SAVE_KEY = 'speed-save-v1';
+
+function metaCost(id, level) {
+  const u = META_UPGRADES.find((x) => x.id === id);
+  if (!u || level >= u.max) return null;
+  return u.costs[level];
+}
+
+function buyUpgrade(save, id) {
+  const lv = save.meta[id] || 0;
+  const cost = metaCost(id, lv);
+  if (cost == null || save.coins < cost) return false;
+  save.coins -= cost;
+  save.meta[id] = lv + 1;
+  return true;
+}
+
+function defaultSave() {
+  return { coins: 0, meta: {}, best: { runs: 0, escapes: 0, escapeTime: null, topSpeed: 0 } };
+}
+
+function loadSave(storage) {
+  try {
+    const raw = storage && storage.getItem(SAVE_KEY);
+    if (!raw) return defaultSave();
+    const s = JSON.parse(raw);
+    const d = defaultSave();
+    if (typeof s !== 'object' || !s) return d;
+    return {
+      coins: Number.isFinite(s.coins) ? s.coins : 0,
+      meta: typeof s.meta === 'object' && s.meta ? s.meta : {},
+      best: { ...d.best, ...(s.best || {}) },
+    };
+  } catch {
+    return defaultSave();
+  }
+}
+
+function writeSave(storage, save) {
+  try { storage && storage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* storage unavailable */ }
+}
+
+function applyRunResult(save, game) {
+  save.coins += Math.round(game.coins);
+  save.best.runs++;
+  save.best.topSpeed = Math.max(save.best.topSpeed, game.peakSpeed);
+  if (game.state === 'won') {
+    save.best.escapes++;
+    save.best.escapeTime = save.best.escapeTime == null ? game.t : Math.min(save.best.escapeTime, game.t);
+  }
+}
+
+// ---- modules.js ----
+
+
+
+
+const SLOTS = [
+  { id: 'bow', name: '船首', icon: '▲' },
+  { id: 'booster', name: 'ブースター', icon: '»' },
+  { id: 'gun', name: '銃', icon: '✶' },
+  { id: 'radar', name: 'レーダー', icon: '◎' },
+  { id: 'armor', name: '装甲', icon: '■' },
+  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
+];
+
+const RARITIES = [
+  { name: 'コモン', color: '#b8c4d6' },
+  { name: 'レア', color: '#4fa3ff' },
+  { name: 'エピック', color: '#c46bff' },
+  { name: 'レジェンド', color: '#ffb340' },
+];
+
+const RARITY_MULT = [1, 1.6, 2.4, 3.5];
+
+const ALL = [0, 1, 2, 3];
+const pct = (v) => `${Math.round(v * 100)}%`;
+const M = (r) => RARITY_MULT[r];
+
+const MODULES = [
+  // 船首: 貫通と衝突時の効果
+  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
+    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
+  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
+    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
+  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
+    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
+  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
+    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
+    apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
+    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
+    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
+
+  // ブースター: 最高速度と加速
+  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
+    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
+  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
+    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
+    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
+    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
+    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
+
+  // 銃: 突進以外の攻撃
+  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
+    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
+    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL,
+    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
+  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
+    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
+    apply: (s, m) => { s.turret = m; } },
+  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
+    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
+    apply: (s, m) => { s.mines = 0.6 * m; } },
+
+  // レーダー: 読みの補助
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
+    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
+    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL,
+    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
+    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
+  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
+    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
+    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
+  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
+    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
+
+  // 装甲: 耐久
+  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
+    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
+    apply: (s, m) => { s.maxHp += 30 * m; } },
+  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
+    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
+    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
+  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
+    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
+    apply: (s, m) => { s.regen += 0.8 * m; } },
+  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
+    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
+    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
+
+  // ジェネレーター: エネルギーとチャージ
+  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL,
+    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
+  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
+    desc: (r) => `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
+    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
+  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
+    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
+];
+
+const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+function moduleDef(id) {
+  return BY_ID[id];
+}
+
+// bonus.cores: power cores collected this run, each raising max speed.
+function computeStats(meta, loadout, bonus = {}) {
+  const s = baseStats(meta);
+  for (const slot of SLOTS) {
+    const mod = loadout[slot.id];
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r], mod.r);
+  }
+  s.maxSpeed *= 1 + CONFIG.coreBoost * (bonus.cores || 0);
+  return s;
+}
+
+function rarityWeights(ctx) {
+  if (ctx.source === 'core') return [0, 0, 1, 2];
+  if (ctx.source === 'capsule') {
+    const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  const t = ctx.t;
+  if (t < 150) return [7, 2.5, 0.5, 0];
+  if (t < 300) return [5, 4, 1.2, 0.1];
+  if (t < 480) return [3, 4, 2.5, 0.4];
+  return [1.5, 3, 4, 1.2];
+}
+
+function rollModule(rng, ctx) {
+  const t = ctx.t || 0;
+  const loadout = ctx.loadout;
+  let slot;
+  let pool;
+  if (ctx.source === 'core') {
+    slot = 'booster';
+    pool = [BY_ID.limiter];
+  } else {
+    slot = pickWeighted(rng, SLOTS.map((s) => {
+      const cur = loadout[s.id];
+      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
+      if (s.id === ctx.lastSlot) w *= 0.35;
+      return [s.id, w];
+    }));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t);
+  }
+  const rw = rarityWeights(ctx);
+  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
+  const fits = pool.filter((m) => m.rarities.includes(r));
+  if (fits.length) {
+    const def = fits[Math.floor(rng() * fits.length)];
+    return { id: def.id, slot, r };
+  }
+  const def = pool[Math.floor(rng() * pool.length)];
+  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
+  return { id: def.id, slot, r: nearest };
+}
+
+// ---- hits.js ----
+// Damage, kills, drops and area attacks applied to enemies.
+
+
+
+
+
+
+
+function damageEnemy(game, e, dmg, opts = {}) {
+  if (e.dead || dmg <= 0) return;
+  e.hp -= dmg;
+  e.flash = 0.12;
+  game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
+  if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
+  if (e.hp <= 0) {
+    killEnemy(game, e, opts);
+  } else if (opts.dirX !== undefined) {
+    const k = opts.knock ?? 160;
+    const mass = Math.max(1, e.r / 20);
+    e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
+  }
+}
+
+function killEnemy(game, e, opts = {}) {
+  if (e.dead) return;
+  e.dead = true;
+  game.kills++;
+  game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+  onEnemyDeath(e, game);
+  const phase = getPhase(game.t);
+  const danger = dangerAt(Math.hypot(e.x, e.y));
+  const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
+  dropGem(game, e.x, e.y, xp);
+  dropCoins(game, e, danger);
+  if (e.elite || e.type === 'battleship') dropCapsule(game, e.x, e.y, 'elite', Math.max(0.4, danger));
+  if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
+}
+
+function flingCorpse(game, e) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp < 1) return;
+  const base = Math.atan2(sh.vy, sh.vx);
+  const dmg = attackPower(sp, game.stats) * game.stats.fling;
+  for (const off of [-0.28, 0, 0.28]) {
+    const a = base + off;
+    game.fbullets.push({
+      kind: 'corpse', x: e.x, y: e.y, vx: Math.cos(a) * sp * 0.9, vy: Math.sin(a) * sp * 0.9,
+      r: Math.max(10, e.r * 0.8), dmg, life: 0.7, pierce: true, hit: new Set(), color: e.T.color,
+    });
+  }
+}
+
+function dropCoins(game, e, danger) {
+  let n = 0;
+  if (e.type === 'battleship') n = 12;
+  else if (e.elite) n = 3 + Math.floor(game.rng() * 4);
+  else if (e.type === 'meteor') n = game.rng() < CONFIG.meteorCoinChance ? 1 + Math.floor(game.rng() * 3) : 0;
+  else if (game.rng() < 0.03 * (1 + danger * 2)) n = 1;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2, d = game.rng() * e.r;
+    game.coinDrops.push({ x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, v: 1, pulled: false, taken: false });
+  }
+}
+
+function dropGem(game, x, y, v) {
+  if (game.gems.length > 600) {
+    const old = game.gems.shift();
+    v += old.v;
+  }
+  const a = game.rng() * Math.PI * 2;
+  game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
+}
+
+function dropCapsule(game, x, y, src, danger) {
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger });
+  game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
+}
+
+// Area damage that ignores armor (module effects, sonic booms).
+function explode(game, x, y, radius, dmg, opts = {}) {
+  const knock = opts.knock ?? 300;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = radius + e.r;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > rr * rr) continue;
+    const d = Math.sqrt(d2) || 1;
+    damageEnemy(game, e, dmg, { cause: opts.cause, dirX: dx / d, dirY: dy / d, knock });
+  }
+  addRing(game, x, y, radius, opts.color || '#ffb36b', opts.life || 0.4);
+  game.events.push({ type: 'explode', x, y, radius, cause: opts.cause });
+}
+
+function burst(game, x, y, color, n, dx, dy, speed) {
+  const P = game.fx.particles;
+  if (P.length > 1600) return;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2;
+    const s = speed * (0.3 + game.rng());
+    P.push({
+      x, y,
+      vx: Math.cos(a) * s * 0.6 + dx * s * 0.8,
+      vy: Math.sin(a) * s * 0.6 + dy * s * 0.8,
+      life: 0.5 + game.rng() * 0.4, max: 0.9, color, size: 2 + game.rng() * 4,
+    });
+  }
+}
+
+function addText(game, x, y, text, color) {
+  if (game.fx.texts.length > 40) game.fx.texts.shift();
+  game.fx.texts.push({ x, y, text, color, life: 0.7 });
+}
+
+function addRing(game, x, y, radius, color, life = 0.45) {
+  if (game.fx.rings.length > 80) game.fx.rings.shift();
+  game.fx.rings.push({ x, y, radius, color, life, max: life });
+}
+
+// ---- effects.js ----
+// Module effects that change how the ship attacks, plus field capsules and power cores.
+
+
+
+
+
+
+
+
+
+
+function createEffectState() {
+  return {
+    fbullets: [], marks: [], mines: [], capsules: [],
+    fx2: { waveT: 0, trailDist: 0, lastX: 0, lastY: 0, mineT: 0, turretT: 0, sonicCD: 0, prevSpeed: 0, capsuleT: 0, coreT: 0, coresStarted: false },
+    dashActive: false, dashPeakAtk: 0,
+  };
+}
+
+function onLaunch(game) {
+  if (game.dashActive) finishDash(game);
+  game.dashActive = true;
+  game.dashPeakAtk = 0;
+  game.dashPierce = 0;
+}
+
+function finishDash(game) {
+  game.dashActive = false;
+  const eb = game.stats.endBlast;
+  if (eb && game.dashPierce >= eb.min) {
+    const sh = game.ship;
+    explode(game, sh.x, sh.y, eb.radius, game.dashPeakAtk * eb.mult, { cause: 'endBlast', color: '#ff9f40', knock: 500, life: 0.5 });
+  }
+}
+
+function onPierce(game) {
+  const s = game.stats, sh = game.ship;
+  if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
+}
+
+function onShipHurt(game) {
+  const s = game.stats, sh = game.ship;
+  if (s.reactive) explode(game, sh.x, sh.y, 260, attackPower(s.maxSpeed, s) * s.reactive, { cause: 'reactive', color: '#ff6b5a', knock: 450 });
+}
+
+function updateEffects(game, dt) {
+  const sh = game.ship, s = game.stats, F = game.fx2;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const atkNow = attackPower(sp, s);
+  const atkMax = attackPower(s.maxSpeed, s);
+
+  // dash bookkeeping (end-of-dash blast)
+  if (sh.boostT > 0 && !game.dashActive) { game.dashActive = true; game.dashPeakAtk = 0; }
+  if (game.dashActive) {
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
+    if (sh.boostT <= 0) finishDash(game);
+  }
+
+  // charge shockwave
+  if (s.chargeWave && sh.charging) {
+    F.waveT += dt;
+    if (F.waveT >= 0.5) {
+      F.waveT = 0;
+      explode(game, sh.x, sh.y, s.chargeWave.radius, atkMax * s.chargeWave.mult, { cause: 'chargeWave', color: '#5fd8ff', knock: 350 });
+    }
+  } else {
+    F.waveT = 0.25;
+  }
+
+  // trail burst marks
+  if (s.trailBurst && sh.boostT > 0 && sp > 200) {
+    F.trailDist += sp * dt;
+    if (F.trailDist >= 45) {
+      F.trailDist = 0;
+      game.marks.push({ x: sh.x, y: sh.y, t: 0.55, dmg: atkNow * s.trailBurst });
+    }
+  }
+  for (const m of game.marks) {
+    m.t -= dt;
+    if (m.t <= 0) explode(game, m.x, m.y, 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
+  }
+  if (game.marks.length) game.marks = game.marks.filter((m) => m.t > 0);
+
+  // mines
+  if (s.mines && sp > 0.6 * s.maxSpeed) {
+    F.mineT += dt;
+    if (F.mineT >= 0.2) {
+      F.mineT = 0;
+      game.mines.push({ x: sh.x, y: sh.y, life: 5, armed: 0.3, dmg: atkMax * s.mines });
+    }
+  }
+  for (const m of game.mines) {
+    m.life -= dt; m.armed -= dt;
+    if (m.armed > 0) continue;
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const rr = 70 + e.r;
+      if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
+        explode(game, m.x, m.y, 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+        m.life = 0;
+        break;
+      }
+    }
+  }
+  if (game.mines.length) game.mines = game.mines.filter((m) => m.life > 0);
+
+  // auto turret
+  if (s.turret) {
+    F.turretT += dt;
+    if (F.turretT >= 1 / (1.6 * s.turret)) {
+      let best = null, bd = 650 * 650;
+      for (const e of game.enemies) {
+        if (e.dead) continue;
+        const d = (e.x - sh.x) ** 2 + (e.y - sh.y) ** 2;
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (best) {
+        F.turretT = 0;
+        const a = Math.atan2(best.y - sh.y, best.x - sh.x);
+        game.fbullets.push({ kind: 'shot', x: sh.x, y: sh.y, vx: Math.cos(a) * 1300 + sh.vx * 0.5, vy: Math.sin(a) * 1300 + sh.vy * 0.5, r: 6, dmg: atkMax * 0.22, life: 0.8, pierce: false, hit: new Set(), color: '#9fe8ff' });
+        game.events.push({ type: 'turret' });
+      }
+    }
+  }
+  updateFriendly(game, dt);
+
+  // sonic boom on crossing 92% of max speed
+  F.sonicCD -= dt;
+  const thr = 0.92 * s.maxSpeed;
+  if (s.sonic && F.sonicCD <= 0 && F.prevSpeed < thr && sp >= thr) {
+    F.sonicCD = 2.5;
+    explode(game, sh.x, sh.y, s.sonic.radius, atkMax * s.sonic.mult, { cause: 'sonic', color: '#ffffff', knock: 900, life: 0.7 });
+    game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius: s.sonic.radius });
+    game.slowmo = 0.45;
+  }
+  if (sp >= thr && F.prevSpeed < thr) game.events.push({ type: 'barrier', x: sh.x, y: sh.y });
+  F.prevSpeed = sp;
+
+  updateCapsules(game, dt);
+}
+
+function updateFriendly(game, dt) {
+  const B = game.fbullets;
+  if (!B.length) return;
+  for (const b of B) {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    const pad = b.r + 130;
+    queryGrid(game.grid, b.x - pad, b.y - pad, b.x + pad, b.y + pad, (e) => {
+      if (b.life <= 0 || b.hit.has(e.id)) return;
+      const rr = b.r + e.r;
+      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) return;
+      b.hit.add(e.id);
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+      damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
+      if (!b.pierce) b.life = 0;
+    });
+  }
+  game.fbullets = B.filter((b) => b.life > 0);
+}
+
+function fieldCapsulePoint(game) {
+  const rng = game.rng;
+  const roll = rng();
+  let r;
+  if (roll < 0.4) r = randRange(rng, CONFIG.planetRadius + 200, CONFIG.zoneInner);
+  else if (roll < 0.75) r = randRange(rng, CONFIG.zoneOuter, CONFIG.fieldRadius - 150);
+  else r = randRange(rng, CONFIG.zoneInner, CONFIG.zoneOuter);
+  const a = rng() * TAU;
+  return { x: Math.cos(a) * r, y: Math.sin(a) * r, r };
+}
+
+function updateCapsules(game, dt) {
+  const F = game.fx2, sh = game.ship;
+  if (game.spawning) {
+    F.capsuleT += dt;
+    const field = game.capsules.filter((c) => c.src === 'field').length;
+    if (field < CONFIG.capsuleCount && (game.t < 2 || F.capsuleT >= CONFIG.capsuleInterval)) {
+      F.capsuleT = 0;
+      const p = fieldCapsulePoint(game);
+      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r) });
+      game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+    }
+    if (getPhase(game.t).cores) {
+      F.coreT += dt;
+      const cores = game.capsules.filter((c) => c.kind === 'core').length;
+      if (cores < 3 && (!F.coresStarted || F.coreT >= 20)) {
+        F.coreT = 0;
+        const a = game.rng() * TAU;
+        const r = randRange(game.rng, CONFIG.planetRadius + 250, CONFIG.zoneInner - 300);
+        game.capsules.push({ kind: 'core', src: 'core', x: Math.cos(a) * r, y: Math.sin(a) * r, mod: rollModule(game.rng, { source: 'core', t: game.t, loadout: game.loadout }), age: 0 });
+        if (!F.coresStarted || cores >= 2) F.coresStarted = true;
+        game.events.push({ type: 'core' });
+      }
+    }
+  }
+  let taken = false;
+  for (const c of game.capsules) {
+    c.age += dt;
+    const reach = 22 + CONFIG.shipRadius + 14;
+    if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
+      c.taken = true; taken = true;
+      if (c.kind === 'core') {
+        game.cores++;
+        refreshStats(game);
+        addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else {
+        game.offerQueue.push({ ...c.mod, source: c.src === 'elite' ? 'elite' : 'capsule' });
+      }
+      addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
+      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
+    }
+    if (c.src === 'elite' && c.age > 45) { c.taken = true; taken = true; }
+  }
+  if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
+}
+
+// ---- stages.js ----
+
+
+// Speed tiers announced on screen as the ship breaks through them (values in px/s).
+const SPEED_STAGES = [
+  { v: CONFIG.escapeSpeed * 0.27, name: 'STAGE Ⅰ' },
+  { v: CONFIG.escapeSpeed * 0.45, name: 'STAGE Ⅱ' },
+  { v: CONFIG.escapeSpeed * 0.62, name: 'STAGE Ⅲ' },
+  { v: CONFIG.escapeSpeed * 0.8, name: 'STAGE Ⅳ' },
+  { v: CONFIG.escapeSpeed, name: 'ESCAPE' },
+];
+
+function speedStage(sp) {
+  let s = 0;
+  for (let i = 0; i < SPEED_STAGES.length; i++) if (sp >= SPEED_STAGES[i].v) s = i + 1;
+  return s;
+}
+
+// ---- world.js ----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const STEP = 1 / 120;
+
+function createGame(opts = {}) {
+  const meta = opts.meta || {};
+  const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
+  const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
+  const stats = computeStats(meta, loadout);
+  const rng = makeRng(seed);
+  const ship = createShip(stats, -CONFIG.startRadius, 0);
+  ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
+  return {
+    t: 0, acc: 0, seed, rng,
+    meta, stats, ship, loadout,
+    offerQueue: [], currentOffer: null, lastOfferSlot: null,
+    field: createField(rng),
+    debug: { invincible: false, autoOffer: null },
+    enemies: [], newEnemies: [], ebullets: [],
+    leechDrag: 0,
+    gems: [], coinDrops: [],
+    xp: 0, level: 0, pendingLevelups: 0,
+    spawnAcc: 0, waveT: 0,
+    phaseId: null,
+    endReason: null,
+    grid: buildGrid([], 160),
+    fx: { particles: [], rings: [], texts: [] },
+    ...createEffectState(),
+    kills: 0, coins: 0, cores: 0,
+    hitstop: 0, slowmo: 0,
+    spawning: true,
+    dashPierce: 0, dashId: 0,
+    state: 'play',
+    timeScale: 1,
+    releasePending: null,
+    peakSpeed: 0, stage: 0,
+    events: [],
+    viewRadius: 1400,
+  };
+}
+
+function update(game, frameDt, input) {
+  if (game.state !== 'play') return;
+  frameDt = Math.min(frameDt, 0.1);
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
+  updateFx(game, frameDt);
+  if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
+  if (game.slowmo > 0) { game.slowmo -= frameDt; game.timeScale = 0.18; } else game.timeScale = 1;
+  game.acc += frameDt * game.timeScale;
+  while (game.acc >= STEP) {
+    game.acc -= STEP;
+    step(game, STEP, input);
+    if (game.state !== 'play') break;
+    queueOffers(game);
+    if (game.offerQueue.length) { openOffer(game); break; }
+  }
+}
+
+// Ship-relative WASD. W: forward thrust (only speeds up while slow). S: brake, never reverse.
+// A/D: bend the trajectory left/right when moving (stronger at speed), turn in place when nearly still.
+function nudge(game, move, dt) {
+  const sh = game.ship;
+  if (!move || (!move.x && !move.y)) return { ax: 0, ay: 0 };
+  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const rx = -sh.hy, ry = sh.hx; // ship's right
+  let ax = 0, ay = 0;
+  if (side) {
+    if (sp > CONFIG.pivotSpeed) {
+      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+      ax += rx * side * acc; ay += ry * side * acc;
+    } else {
+      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
+      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
+    }
+  }
+  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) {
+    ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel;
+  }
+  if (fwd < 0 && sp > 0) {
+    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
+    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
+  }
+  return { ax, ay };
+}
+
+// Heading follows the travel direction; when nearly still it stays where A/D turned it.
+function updateHeading(sh) {
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+}
+
+function step(game, dt, input) {
+  const sh = game.ship;
+  const stats = game.stats;
+  game.t += dt;
+  const phase = getPhase(game.t);
+  if (phase.id !== game.phaseId) {
+    game.phaseId = phase.id;
+    game.events.push({ type: 'phase', phase });
+  }
+
+  updateHeading(sh);
+  if (input.charging && !game.releasePending) {
+    if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
+    sh.chargeT += dt;
+    sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
+    sh.aimX = input.keyboard ? sh.hx * 100 : input.aimX;
+    sh.aimY = input.keyboard ? sh.hy * 100 : input.aimY;
+  }
+  if (game.releasePending) {
+    const r = game.releasePending;
+    game.releasePending = null;
+    if (sh.charging) {
+      if (r.keyboard) launch(game, sh.hx * 100, sh.hy * 100);
+      else launch(game, r.x, r.y);
+    }
+    sh.charging = false;
+  }
+
+  updateMoons(game.field, game.t);
+  game.leechDrag = 0;
+  for (const e of game.enemies) updateEnemy(e, game, dt);
+  flushNewEnemies(game);
+  separateEnemies(game);
+  game.grid = buildGrid(game.enemies, 160);
+
+  const g = gravityAt(game.field, game.t, sh.x, sh.y);
+  const n = nudge(game, input.move, dt);
+  const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
+  const x0 = sh.x, y0 = sh.y;
+  stepShip(sh, stats, dt, g.ax + n.ax, g.ay + n.ay, drag);
+  collideEnemies(game, x0, y0);
+  collideBodies(game);
+  if (sh.invulnT > 0) sh.invulnT -= dt;
+  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
+  updateEffects(game, dt);
+  if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
+  flushNewEnemies(game);
+  updateSpawner(game, dt);
+  updateGems(game, dt);
+  if (stats.regen > 0) sh.hp = Math.min(stats.maxHp, sh.hp + stats.regen * dt);
+
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > game.peakSpeed) game.peakSpeed = sp;
+  recordTrail(sh, dt);
+  const st = speedStage(sp);
+  if (st > game.stage) {
+    game.stage = st;
+    game.events.push({ type: 'stage', stage: st, name: SPEED_STAGES[st - 1].name, speed: sp });
+  } else if (game.stage > 0 && sp < SPEED_STAGES[game.stage - 1].v * 0.85) {
+    game.stage = st;
+  }
+
+  if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
+  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+}
+
+function end(game, state, reason) {
+  if (state === 'won') game.coins += CONFIG.escapeBonus;
+  game.state = state;
+  game.endReason = reason;
+  game.events.push({ type: 'end', state, reason });
+}
+
+// ---- offers ----
+
+function queueOffers(game) {
+  while (game.pendingLevelups > 0) {
+    game.pendingLevelups--;
+    pushOffer(game, rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'xp', lastSlot: game.lastOfferSlot }), 'xp');
+  }
+}
+
+function pushOffer(game, mod, source) {
+  game.lastOfferSlot = mod.slot;
+  game.offerQueue.push({ ...mod, source });
+}
+
+function openOffer(game) {
+  const auto = game.debug.autoOffer;
+  game.state = 'offer';
+  game.currentOffer = game.offerQueue.shift();
+  game.ship.charging = false;
+  game.releasePending = null;
+  game.events.push({ type: 'offer' });
+  if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
+}
+
+function isBetter(game, mod) {
+  const cur = game.loadout[mod.slot];
+  return !cur || mod.r >= cur.r;
+}
+
+// accept: equip (the old module in that slot is thrown away); otherwise discard the offer.
+function resolveOffer(game, accept) {
+  const mod = game.currentOffer;
+  if (!mod) return;
+  if (accept) {
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r };
+    refreshStats(game);
+    game.events.push({ type: 'equip', mod });
+  }
+  if (game.offerQueue.length) {
+    game.currentOffer = game.offerQueue.shift();
+  } else {
+    game.currentOffer = null;
+    game.state = 'play';
+  }
+}
+
+function refreshStats(game) {
+  const oldMax = game.stats.maxHp;
+  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores });
+  const gain = game.stats.maxHp - oldMax;
+  if (gain > 0) game.ship.hp += gain;
+  game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
+}
+
+// ---- ship ----
+
+function launch(game, ax, ay) {
+  const sh = game.ship;
+  const len = Math.hypot(ax, ay);
+  let dx, dy;
+  if (len < CONFIG.minDrag) {
+    dx = sh.hx; dy = sh.hy;
+  } else {
+    dx = ax / len; dy = ay / len;
+  }
+  onLaunch(game);
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
+  sh.vx = v.vx; sh.vy = v.vy;
+  sh.boostT = game.stats.boostDuration;
+  sh.fadeT = 0;
+  sh.gaugeBank = 0;
+  game.dashId++;
+  game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// amount: hp lost, slow: share of speed lost (0..1)
+function damageShip(game, amount, slow, cause = 'other') {
+  const sh = game.ship;
+  if (sh.invulnT > 0 || game.debug.invincible) return false;
+  sh.hp -= amount * game.stats.damageTakenMult;
+  const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
+  sh.vx *= k; sh.vy *= k;
+  sh.invulnT = CONFIG.invulnTime;
+  game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
+  addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
+  onShipHurt(game);
+  return true;
+}
+
+function collideEnemies(game, x0, y0) {
+  const sh = game.ship, stats = game.stats;
+  const x1 = sh.x, y1 = sh.y;
+  const R = CONFIG.shipRadius;
+  const pad = R + MAX_ENEMY_R;
+  const hits = [];
+  queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
+    if (e.hitCD > 0) return;
+    const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
+    if (t >= 0) hits.push({ e, t });
+  });
+  if (!hits.length) return;
+  hits.sort((a, b) => a.t - b.t);
+  for (const { e, t } of hits) {
+    const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
+    const sp = Math.hypot(sh.vx, sh.vy);
+    const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
+    const atk = attackPower(sp, stats);
+    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const res = resolveRam(atk, e, crit, stats);
+    if (res.pierce) {
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      e.hitCD = 0.3;
+      const keep = pierceKeep(e, e.dead, stats);
+      sh.vx *= keep; sh.vy *= keep;
+      game.dashPierce++;
+      onPierce(game);
+      if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
+      if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
+      continue;
+    }
+    // bounce off
+    let nx = hx - e.x, ny = hy - e.y;
+    const nd = Math.hypot(nx, ny) || 1;
+    nx /= nd; ny /= nd;
+    sh.x = e.x + nx * (e.r + R + 1);
+    sh.y = e.y + ny * (e.r + R + 1);
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+    sh.vx *= stats.bounceKeep; sh.vy *= stats.bounceKeep;
+    if (Math.hypot(sh.vx, sh.vy) < 220) { sh.vx = nx * 220; sh.vy = ny * 220; }
+    if (!stats.reflect) sh.boostT = 0;
+    damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
+    e.hitCD = 0.25;
+    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
+    game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
+    break;
+  }
+}
+
+function collideBodies(game) {
+  const sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const f = game.field;
+  const restitution = game.stats.reflect ? 0.9 : CONFIG.crashRestitution;
+  for (const b of [f.planet, ...f.moons]) {
+    const dx = sh.x - b.x, dy = sh.y - b.y;
+    const d = Math.hypot(dx, dy);
+    const min = b.r + R;
+    if (d >= min || d === 0) continue;
+    const nx = dx / d, ny = dy / d;
+    sh.x = b.x + nx * min;
+    sh.y = b.y + ny * min;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) {
+      sh.vx -= (1 + restitution) * vn * nx;
+      sh.vy -= (1 + restitution) * vn * ny;
+      const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
+      if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
+      game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
+    }
+  }
+  // hard wall well outside the soft boundary
+  const r = Math.hypot(sh.x, sh.y);
+  const wall = CONFIG.fieldRadius + 500;
+  if (r > wall) {
+    const nx = sh.x / r, ny = sh.y / r;
+    sh.x = nx * wall; sh.y = ny * wall;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn > 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+  }
+}
+
+function recordTrail(sh, dt) {
+  sh.trailAcc += dt;
+  if (sh.trailAcc < 1 / 60) return;
+  sh.trailAcc = 0;
+  sh.trail.push({ x: sh.x, y: sh.y });
+  if (sh.trail.length > 150) sh.trail.shift();
+}
+
+// ---- enemies ----
+
+function flushNewEnemies(game) {
+  if (!game.newEnemies.length) return;
+  for (const e of game.newEnemies) game.enemies.push(e);
+  game.newEnemies.length = 0;
+}
+
+function separateEnemies(game) {
+  const grid = buildGrid(game.enemies, 120);
+  for (const e of game.enemies) {
+    queryGrid(grid, e.x - e.r - 40, e.y - e.r - 40, e.x + e.r + 40, e.y + e.r + 40, (o) => {
+      if (o.id <= e.id) return;
+      const dx = o.x - e.x, dy = o.y - e.y;
+      const min = (e.r + o.r) * 0.9;
+      const d2 = dx * dx + dy * dy;
+      if (d2 >= min * min || d2 === 0) return;
+      const d = Math.sqrt(d2);
+      const push = (min - d) * 0.5;
+      const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+      e.x -= (dx / d) * push * 2 * wE; e.y -= (dy / d) * push * 2 * wE;
+      o.x += (dx / d) * push * 2 * (1 - wE); o.y += (dy / d) * push * 2 * (1 - wE);
+    });
+  }
+}
+
+// ---- pickups ----
+
+function updateGems(game, dt) {
+  const sh = game.ship;
+  const pr = game.stats.pickupRadius;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  for (const g of game.gems) {
+    g.age += dt;
+    const dx = sh.x - g.x, dy = sh.y - g.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr || g.pulled) {
+      g.pulled = true;
+      const pull = 700 + sp * 1.2;
+      g.x += (dx / (d || 1)) * pull * dt;
+      g.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
+  }
+  if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+  for (const c of game.coinDrops) {
+    const dx = sh.x - c.x, dy = sh.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr * 1.3 || c.pulled) {
+      c.pulled = true;
+      const pull = 700 + sp * 1.2;
+      c.x += (dx / (d || 1)) * pull * dt;
+      c.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { c.taken = true; game.coins += c.v; game.events.push({ type: 'coin' }); }
+  }
+  if (game.coinDrops.some((c) => c.taken)) game.coinDrops = game.coinDrops.filter((c) => !c.taken);
+}
+
+function addXp(game, v) {
+  game.xp += v;
+  let need = xpForLevel(game.level);
+  while (game.xp >= need) {
+    game.xp -= need;
+    game.level++;
+    game.pendingLevelups++;
+    game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
+    game.events.push({ type: 'levelup', level: game.level });
+    need = xpForLevel(game.level);
+  }
+}
+
+// ---- fx ----
+
+function updateFx(game, dt) {
+  const P = game.fx.particles;
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  game.fx.particles = P.filter((p) => p.life > 0);
+  for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
+  game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
+  for (const r of game.fx.rings) r.life -= dt;
+  game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
+}
+
+// ---- prediction ----
+
+// Ballistic preview of a launch along (dx, dy) with the given gauge, under gravity only.
+function predictPath(game, dx, dy, gauge, seconds) {
+  const sh = game.ship;
+  const len = Math.hypot(dx, dy) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, dx / len, dy / len, gauge, game.stats);
+  return simulateFrom(game, { x: sh.x, y: sh.y, vx: v.vx, vy: v.vy, boostT: game.stats.boostDuration, fadeT: 0 }, 0, seconds);
+}
+
+function simulateFrom(game, ghost, t0, seconds) {
+  const pts = [];
+  const h = 1 / 60;
+  const field = { ...game.field, moons: game.field.moons.map((m) => ({ ...m })) };
+  for (let t = t0; t < seconds; t += h) {
+    updateMoons(field, game.t + t);
+    const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
+    stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
+    const p = { x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy };
+    pts.push(p);
+    if (hitsBody(field, p.x, p.y)) { p.block = true; break; }
+  }
+  return pts;
+}
+
+function hitsBody(field, x, y) {
+  const R = CONFIG.shipRadius;
+  for (const b of [field.planet, ...field.moons]) {
+    if ((x - b.x) ** 2 + (y - b.y) ** 2 < (b.r + R) ** 2) return true;
+  }
+  return false;
+}
+
+// Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
+// With the bounce-preview radar the path continues past the block.
+function annotatePrediction(game, pts, seconds) {
+  const R = CONFIG.shipRadius;
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    let blocker = null;
+    queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+      const dx = p.x - e.x, dy = p.y - e.y;
+      const rr = e.r + R;
+      if (dx * dx + dy * dy > rr * rr) return;
+      const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+      if (crit) p.hot = true;
+      if (!canPierce(attackPower(p.sp, game.stats), e, crit)) blocker = e;
+    });
+    out.push(p);
+    if (p.block) break;
+    if (blocker) {
+      p.block = true;
+      if (game.stats.predictBounce && seconds) {
+        let nx = p.x - blocker.x, ny = p.y - blocker.y;
+        const nd = Math.hypot(nx, ny) || 1;
+        nx /= nd; ny /= nd;
+        let vx = p.vx, vy = p.vy;
+        const vn = vx * nx + vy * ny;
+        if (vn < 0) { vx -= 2 * vn * nx; vy -= 2 * vn * ny; }
+        vx *= game.stats.bounceKeep; vy *= game.stats.bounceKeep;
+        const ghost = { x: blocker.x + nx * (blocker.r + R + 1), y: blocker.y + ny * (blocker.r + R + 1), vx, vy, boostT: 0, fadeT: 0 };
+        for (const q of simulateFrom(game, ghost, p.t, seconds)) { q.bounced = true; out.push(q); }
+      }
+      break;
+    }
+  }
+  return out;
+}
+
+// ---- render.js ----
+
+
+
+
+
+
+
+
+const STAR_TILE = 1600;
+const MONO = 'ui-monospace, Menlo, monospace';
+
+function createRenderer(canvas) {
+  const ctx = canvas.getContext('2d');
+  const rng = makeRng(7);
+  const layers = [0.06, 0.16, 0.35].map((p, i) => ({
+    p,
+    stars: Array.from({ length: 110 - i * 25 }, () => ({ x: rng() * STAR_TILE, y: rng() * STAR_TILE, s: 0.6 + rng() * (0.6 + i * 0.6), a: 0.25 + rng() * 0.6 })),
+  }));
+  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, zoomPunch: 0, stageFlash: null, hurt: 0 };
+}
+
+function resizeRenderer(r) {
+  r.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  r.W = window.innerWidth;
+  r.H = window.innerHeight;
+  r.canvas.width = Math.floor(r.W * r.dpr);
+  r.canvas.height = Math.floor(r.H * r.dpr);
+}
+
+function worldToScreen(r, x, y) {
+  return { x: (x - r.cam.x) * r.cam.zoom + r.W / 2, y: (y - r.cam.y) * r.cam.zoom + r.H / 2 };
+}
+
+// Zoom is tied to the ship's max speed so the view only widens as the build gets faster,
+// instead of pumping in and out with every dash.
+function targetZoom(game, W, H) {
+  const f = Math.pow(CONFIG.zoomRefSpeed / Math.max(CONFIG.zoomRefSpeed, game.stats.maxSpeed), CONFIG.zoomExp);
+  return (Math.min(W, H) / CONFIG.baseView) * clamp(f, CONFIG.zoomMin, 1);
+}
+
+function updateCamera(r, game, dt) {
+  const sh = game.ship;
+  const zoomT = targetZoom(game, r.W, r.H);
+  // look ahead along the velocity, but keep the ship well inside the screen at any speed
+  let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
+  const maxOff = (0.3 * Math.min(r.W, r.H)) / 2 / zoomT;
+  const off = Math.hypot(ox, oy);
+  if (off > maxOff) { ox *= maxOff / off; oy *= maxOff / off; }
+  const tx = sh.x + ox;
+  const ty = sh.y + oy;
+  const cam = r.cam;
+  if (!cam.ready) { cam.x = tx; cam.y = ty; cam.zoom = zoomT; cam.ready = true; }
+  const kp = 1 - Math.exp(-7 * dt);
+  const kz = 1 - Math.exp(-2.2 * dt);
+  cam.x += (tx - cam.x) * kp;
+  cam.y += (ty - cam.y) * kp;
+  cam.zoom += (zoomT - cam.zoom) * kz;
+  if (r.zoomPunch > 0) { cam.zoom *= 1 + r.zoomPunch; r.zoomPunch = Math.max(0, r.zoomPunch - dt * 0.5); }
+  game.viewRadius = Math.hypot(r.W, r.H) / 2 / cam.zoom;
+}
+
+function handleEvents(r, game) {
+  for (const ev of game.events) {
+    if (ev.type === 'phase') r.banner = { text: ev.phase.name, sub: ev.phase.sub, life: 3, max: 3 };
+    else if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
+    else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
+    else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
+    else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
+    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
+    else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
+  }
+}
+
+function render(r, game, dt, pointer) {
+  const { ctx } = r;
+  handleEvents(r, game);
+  updateCamera(r, game, dt);
+  ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
+  drawBackground(r, game);
+
+  ctx.save();
+  let sx = 0, sy = 0;
+  if (r.shake > 0) {
+    sx = (Math.random() - 0.5) * r.shake;
+    sy = (Math.random() - 0.5) * r.shake;
+    r.shake = Math.max(0, r.shake - dt * 60);
+  }
+  ctx.translate(r.W / 2 + sx, r.H / 2 + sy);
+  ctx.scale(r.cam.zoom, r.cam.zoom);
+  ctx.translate(-r.cam.x, -r.cam.y);
+  drawZones(r);
+  drawDust(r, game);
+  drawSpecks(r);
+  drawBodies(r, game);
+  drawGems(r, game);
+  drawCoins(r, game);
+  drawCapsules(r, game);
+  drawMines(r, game);
+  drawEnemies(r, game);
+  drawEnemyBullets(r, game);
+  drawFriendly(r, game);
+  drawPrediction(r, game);
+  drawTrail(r, game);
+  drawVapor(r, game, dt);
+  drawShip(r, game);
+  drawFx(r, game);
+  ctx.restore();
+  drawSpeedLines(r, game);
+
+  drawChargeUi(r, game, pointer);
+  drawCapsuleArrows(r, game);
+  drawOverlays(r, game, dt);
+  drawHud(r, game);
+  drawMinimap(r, game);
+  drawBanner(r, dt);
+  drawStageFlash(r, dt);
+  if (r.flash > 0) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, r.flash)})`;
+    ctx.fillRect(0, 0, r.W, r.H);
+    r.flash = Math.max(0, r.flash - dt * 2.2);
+  }
+}
+
+// Conical shock layers wrapped around the ship near max speed.
+function drawVapor(r, game, dt) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const ratio = sp / game.stats.maxSpeed;
+  if (r.vapor > 0) r.vapor -= dt;
+  const k = Math.max(r.vapor > 0 ? 1 : 0, (ratio - 0.88) / 0.12);
+  if (k <= 0 || sp < 1) return;
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const ux = sh.vx / sp, uy = sh.vy / sp;
+  const back = Math.atan2(-uy, -ux);
+  ctx.save();
+  ctx.translate(sh.x, sh.y);
+  ctx.lineCap = 'round';
+  const unit = Math.max(1, 0.6 / z);
+  for (let i = 0; i < 4; i++) {
+    const rad = (26 + i * 16) * unit;
+    const spread = 1.25 - i * 0.18;
+    ctx.globalAlpha = Math.min(1, k) * (0.5 - i * 0.1) * (0.75 + 0.25 * Math.random());
+    ctx.strokeStyle = '#eaf6ff';
+    ctx.lineWidth = (3 - i * 0.5) * unit;
+    ctx.beginPath();
+    ctx.arc(-ux * (i * 10 - 14) * unit, -uy * (i * 10 - 14) * unit, rad, back - spread, back + spread);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function drawSpeedLines(r, game) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const k = (sp / CONFIG.escapeSpeed - 0.42) / 0.5;
+  if (k <= 0) return;
+  const { ctx, W, H } = r;
+  const cx = W / 2, cy = H / 2;
+  const R0 = Math.hypot(W, H) / 2;
+  ctx.strokeStyle = '#dff3ff';
+  ctx.lineWidth = 1.5;
+  const n = Math.round(18 + 40 * Math.min(1, k));
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * TAU;
+    const r1 = R0 * (0.62 + Math.random() * 0.2 * (1 - Math.min(1, k)));
+    ctx.globalAlpha = Math.min(0.5, 0.15 + 0.35 * k) * Math.random();
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * R0, cy + Math.sin(a) * R0);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawStageFlash(r, dt) {
+  const f = r.stageFlash;
+  if (!f) return;
+  f.life -= dt;
+  if (f.life <= 0) { r.stageFlash = null; return; }
+  const { ctx, W, H } = r;
+  const t = 1 - f.life / f.max;
+  ctx.globalAlpha = Math.min(1, f.life / 0.4);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#bff3ff';
+  ctx.font = `italic 800 ${Math.round(30 + 10 * (1 - t))}px ${MONO}`;
+  ctx.fillText(f.text, W / 2, H * 0.68);
+  ctx.font = `13px ${MONO}`;
+  ctx.fillStyle = '#8fd8ff';
+  ctx.fillText(`${f.kms} km/s`, W / 2, H * 0.68 + 20);
+  const sweep = W * (t * 1.4 - 0.2);
+  const g = ctx.createLinearGradient(sweep - 160, 0, sweep + 160, 0);
+  g.addColorStop(0, 'rgba(191,243,255,0)');
+  g.addColorStop(0.5, 'rgba(191,243,255,0.5)');
+  g.addColorStop(1, 'rgba(191,243,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, H * 0.68 - 36, W, 2);
+  ctx.globalAlpha = 1;
+}
+
+function drawGems(r, game) {
+  const { ctx } = r;
+  const s = Math.max(5, 3 / r.cam.zoom);
+  ctx.fillStyle = '#6dffb0';
+  for (const g of game.gems) {
+    if (!onScreen(r, g.x, g.y, 20)) continue;
+    const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
+    ctx.beginPath();
+    ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function capsuleColor(c) {
+  return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+}
+
+function drawCoins(r, game) {
+  const { ctx } = r;
+  const s = Math.max(6, 3.5 / r.cam.zoom);
+  for (const c of game.coinDrops) {
+    if (!onScreen(r, c.x, c.y, 20)) continue;
+    ctx.fillStyle = '#ffd24a';
+    ctx.beginPath(); ctx.arc(c.x, c.y, s, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#a07a10';
+    ctx.fillRect(c.x - s * 0.15, c.y - s * 0.55, s * 0.3, s * 1.1);
+  }
+}
+
+function drawCapsules(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const c of game.capsules) {
+    if (!onScreen(r, c.x, c.y, 200)) continue;
+    const col = capsuleColor(c);
+    const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
+    const pulse = (game.t * 1.5 + c.x * 0.001) % 1;
+    ctx.globalAlpha = 1 - pulse;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2 / z;
+    ctx.beginPath(); ctx.arc(c.x, c.y, S * (1.2 + pulse * 2.5), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(game.t * 1.2);
+    ctx.shadowColor = col; ctx.shadowBlur = 20;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    if (c.kind === 'core') {
+      for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.45 : 1; ctx.lineTo(Math.cos(a) * S * k, Math.sin(a) * S * k); }
+    } else {
+      ctx.moveTo(0, -S); ctx.lineTo(S * 0.7, 0); ctx.lineTo(0, S); ctx.lineTo(-S * 0.7, 0);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Edge-of-screen pointers to capsules that are off screen.
+function drawCapsuleArrows(r, game) {
+  const { ctx, W, H } = r;
+  const sh = game.ship;
+  const m = 34;
+  for (const c of game.capsules) {
+    const d = Math.hypot(c.x - sh.x, c.y - sh.y);
+    if (d > 5000 || onScreen(r, c.x, c.y, 0)) continue;
+    const p = worldToScreen(r, c.x, c.y);
+    const ang = Math.atan2(p.y - H / 2, p.x - W / 2);
+    const k = Math.min((W / 2 - m) / Math.abs(Math.cos(ang) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(ang) || 1e-6));
+    const x = W / 2 + Math.cos(ang) * k, y = H / 2 + Math.sin(ang) * k;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    ctx.globalAlpha = 0.55 + 0.45 * (1 - d / 5000);
+    ctx.fillStyle = capsuleColor(c);
+    const s = c.kind === 'core' ? 13 : 9;
+    ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, s * 0.7); ctx.lineTo(-s * 0.7, -s * 0.7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMines(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const m of game.mines) {
+    if (!onScreen(r, m.x, m.y, 30)) continue;
+    ctx.fillStyle = m.armed > 0 ? '#7a5040' : (Math.floor(game.t * 6) % 2 ? '#ff7b54' : '#ffb08a');
+    ctx.beginPath(); ctx.arc(m.x, m.y, 7 / Math.sqrt(z), 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,207,107,0.5)';
+  for (const m of game.marks) {
+    if (!onScreen(r, m.x, m.y, 30)) continue;
+    ctx.beginPath(); ctx.arc(m.x, m.y, (4 + 6 * (1 - m.t / 0.55)) / Math.sqrt(z), 0, TAU); ctx.fill();
+  }
+}
+
+function drawFriendly(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const b of game.fbullets) {
+    if (!onScreen(r, b.x, b.y, 40)) continue;
+    ctx.fillStyle = b.color;
+    ctx.globalAlpha = b.kind === 'corpse' ? 0.85 : 1;
+    const s = b.kind === 'corpse' ? b.r * 0.6 : b.r / Math.sqrt(z);
+    ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawOverlays(r, game, dt) {
+  const { ctx, W, H } = r;
+  if (r.hurt > 0) {
+    r.hurt -= dt;
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.7);
+    g.addColorStop(0, 'rgba(255,40,40,0)');
+    g.addColorStop(1, `rgba(255,40,40,${0.5 * r.hurt / 0.35})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  const lowHp = game.ship.hp / game.stats.maxHp;
+  if (lowHp < 0.3 && game.state === 'play') {
+    const a = (0.3 - lowHp) * (0.6 + 0.4 * Math.sin(game.t * 8));
+    ctx.strokeStyle = `rgba(255,50,50,${a})`;
+    ctx.lineWidth = 16;
+    ctx.strokeRect(0, 0, W, H);
+  }
+}
+
+function drawBanner(r, dt) {
+  const b = r.banner;
+  if (!b) return;
+  b.life -= dt;
+  if (b.life <= 0) { r.banner = null; return; }
+  const { ctx, W, H } = r;
+  const t = b.max - b.life;
+  const a = Math.min(1, t / 0.25, b.life / 0.6);
+  ctx.globalAlpha = a;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${Math.min(54, W / 10)}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  ctx.fillText(b.text, W / 2, H * 0.3);
+  if (b.sub) {
+    ctx.font = `16px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    ctx.fillStyle = '#b8c6ea';
+    ctx.fillText(b.sub, W / 2, H * 0.3 + 30);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawZones(r) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const g = ctx.createRadialGradient(0, 0, CONFIG.planetRadius, 0, 0, CONFIG.zoneInner);
+  g.addColorStop(0, 'rgba(255,70,50,0.16)');
+  g.addColorStop(1, 'rgba(255,70,50,0.02)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.07)';
+  ctx.beginPath();
+  ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU);
+  ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU, true);
+  ctx.fill();
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([30 / z, 24 / z]);
+  ctx.strokeStyle = 'rgba(255,110,90,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = 'rgba(170,120,255,0.35)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneOuter, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 6 / z;
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius, 0, TAU); ctx.stroke();
+}
+
+function drawDust(r, game) {
+  const { ctx } = r;
+  for (const d of game.field.dust) {
+    if (!onScreen(r, d.x, d.y, d.r)) continue;
+    const g = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, d.r);
+    g.addColorStop(0, 'rgba(170,130,210,0.20)');
+    g.addColorStop(0.7, 'rgba(140,100,190,0.10)');
+    g.addColorStop(1, 'rgba(140,100,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TAU); ctx.fill();
+  }
+}
+
+function onScreen(r, x, y, rad) {
+  const halfW = r.W / 2 / r.cam.zoom + rad, halfH = r.H / 2 / r.cam.zoom + rad;
+  return Math.abs(x - r.cam.x) < halfW && Math.abs(y - r.cam.y) < halfH;
+}
+
+function drawBodies(r, game) {
+  const { ctx } = r;
+  const p = game.field.planet;
+  if (onScreen(r, p.x, p.y, p.r * 1.6)) {
+    const halo = ctx.createRadialGradient(0, 0, p.r * 0.9, 0, 0, p.r * 1.6);
+    halo.addColorStop(0, 'rgba(90,160,255,0.45)');
+    halo.addColorStop(1, 'rgba(90,160,255,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(0, 0, p.r * 1.6, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(-p.r * 0.35, -p.r * 0.35, p.r * 0.1, 0, 0, p.r);
+    body.addColorStop(0, '#6a8cff');
+    body.addColorStop(0.6, '#2b3d8f');
+    body.addColorStop(1, '#0d1238');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.fill();
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.clip();
+    ctx.strokeStyle = 'rgba(160,190,255,0.12)';
+    ctx.lineWidth = p.r * 0.08;
+    for (let i = -3; i <= 3; i++) {
+      ctx.beginPath(); ctx.ellipse(0, i * p.r * 0.25, p.r * 1.1, p.r * 0.06, 0.15, 0, TAU); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  for (const m of game.field.moons) {
+    if (!onScreen(r, m.x, m.y, m.r * 3)) continue;
+    const halo = ctx.createRadialGradient(m.x, m.y, m.r, m.x, m.y, m.r * 3);
+    halo.addColorStop(0, 'rgba(200,170,120,0.12)');
+    halo.addColorStop(1, 'rgba(200,170,120,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r * 3, 0, TAU); ctx.fill();
+    const body = ctx.createRadialGradient(m.x - m.r * 0.3, m.y - m.r * 0.3, m.r * 0.1, m.x, m.y, m.r);
+    body.addColorStop(0, '#b9a58a');
+    body.addColorStop(1, '#4a3d33');
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.9 + m.orbit, d = m.r * (0.2 + 0.15 * k);
+      ctx.beginPath(); ctx.arc(m.x + Math.cos(a) * d, m.y + Math.sin(a) * d, m.r * 0.16, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawPrediction(r, game) {
+  const sh = game.ship;
+  if (!sh.charging) return;
+  let ax = sh.aimX, ay = sh.aimY;
+  if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
+  if (Math.hypot(ax, ay) < 1) return;
+  const pts = annotatePrediction(game, predictPath(game, ax, ay, sh.gauge, game.stats.predictTime), game.stats.predictTime);
+  const { ctx } = r;
+  const dot = 3.2 / r.cam.zoom;
+  for (let i = 2; i < pts.length; i += 3) {
+    const p = pts[i];
+    ctx.globalAlpha = 0.85 * (1 - i / pts.length) + 0.1;
+    ctx.fillStyle = p.hot ? '#ffe46b' : p.bounced ? '#c9a6ff' : '#9fe8ff';
+    const s = p.hot ? dot * 2 : dot;
+    ctx.beginPath(); ctx.arc(p.x, p.y, s, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const end = pts[pts.length - 1];
+  if (end && end.block) {
+    const k = 10 / r.cam.zoom;
+    ctx.strokeStyle = '#ff4d4d';
+    ctx.lineWidth = 3 / r.cam.zoom;
+    ctx.beginPath();
+    ctx.moveTo(end.x - k, end.y - k); ctx.lineTo(end.x + k, end.y + k);
+    ctx.moveTo(end.x + k, end.y - k); ctx.lineTo(end.x - k, end.y + k);
+    ctx.stroke();
+  }
+}
+
+function shapePath(ctx, shape, R) {
+  ctx.beginPath();
+  if (shape === 'hex') {
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6; ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R); }
+    ctx.closePath();
+  } else if (shape === 'dart') {
+    ctx.moveTo(R * 1.2, 0); ctx.lineTo(-R * 0.8, R * 0.8); ctx.lineTo(-R * 0.4, 0); ctx.lineTo(-R * 0.8, -R * 0.8); ctx.closePath();
+  } else if (shape === 'diamond') {
+    ctx.moveTo(R, 0); ctx.lineTo(0, R * 0.8); ctx.lineTo(-R, 0); ctx.lineTo(0, -R * 0.8); ctx.closePath();
+  } else if (shape === 'blob') {
+    for (let i = 0; i < 10; i++) { const a = i * TAU / 10, k = i % 2 ? 0.82 : 1; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else if (shape === 'ship') {
+    ctx.moveTo(R * 1.3, 0); ctx.lineTo(R * 0.3, R * 0.55); ctx.lineTo(-R, R * 0.6); ctx.lineTo(-R * 0.8, 0); ctx.lineTo(-R, -R * 0.6); ctx.lineTo(R * 0.3, -R * 0.55); ctx.closePath();
+  } else if (shape === 'rock') {
+    for (let i = 0; i < 8; i++) { const a = i * TAU / 8, k = 0.8 + ((i * 37) % 5) * 0.06; ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k); }
+    ctx.closePath();
+  } else {
+    ctx.arc(0, 0, R, 0, TAU);
+  }
+}
+
+function drawEnemies(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const atk = attackPower(sp, game.stats);
+  const arcMult = game.stats.weakArcMult;
+  for (const e of game.enemies) {
+    if (!onScreen(r, e.x, e.y, e.r + 220)) continue;
+    const R = e.r;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (e.T.auraR) {
+      const g = ctx.createRadialGradient(0, 0, R, 0, 0, e.T.auraR);
+      g.addColorStop(0, 'rgba(199,125,255,0.22)');
+      g.addColorStop(1, 'rgba(199,125,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, e.T.auraR, 0, TAU); ctx.fill();
+    }
+    if (e.state === 'windup') {
+      ctx.strokeStyle = 'rgba(255,90,60,0.7)';
+      ctx.lineWidth = 3 / z;
+      ctx.setLineDash([12 / z, 8 / z]);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(e.facing) * 500, Math.sin(e.facing) * 500); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (e.charge > 0) {
+      ctx.fillStyle = `rgba(255,80,80,${0.25 + 0.5 * e.charge})`;
+      ctx.beginPath(); ctx.arc(Math.cos(e.facing) * R, Math.sin(e.facing) * R, (4 + 8 * e.charge) / Math.sqrt(z), 0, TAU); ctx.fill();
+    }
+    const pierce = atk >= e.armor;
+    const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
+    // body
+    ctx.save();
+    ctx.rotate(e.facing);
+    shapePath(ctx, e.T.shape, R);
+    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.T.color;
+    ctx.globalAlpha = pierce ? 1 : 0.8;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = Math.max(1.5 / z, R * 0.08);
+    ctx.strokeStyle = e.elite ? '#ffcf4a' : pierce ? 'rgba(255,255,255,0.85)' : 'rgba(40,0,0,0.6)';
+    ctx.stroke();
+    // eye / nose shows facing
+    ctx.fillStyle = '#0b0f1e';
+    ctx.beginPath(); ctx.arc(R * 0.45, 0, R * 0.2, 0, TAU); ctx.fill();
+    ctx.restore();
+    // weak spot
+    if (e.weakArc) {
+      const wa = e.facing + e.weakDir, half = Math.min(Math.PI, e.weakArc * arcMult);
+      const lw = Math.max(4 / z, R * 0.32);
+      ctx.strokeStyle = '#ffe46b';
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wa - half, wa + half); ctx.stroke();
+      if (e.weakDir2 !== undefined) {
+        const wb = e.facing + e.weakDir2;
+        ctx.beginPath(); ctx.arc(0, 0, R + lw * 0.3, wb - half, wb + half); ctx.stroke();
+      }
+    }
+    // cannot pierce: red ring (orange dashed = only through the weak spot)
+    if (!pierce) {
+      ctx.lineWidth = 3 / z;
+      ctx.strokeStyle = critOnly ? '#ff9f40' : '#ff3b3b';
+      if (critOnly) ctx.setLineDash([8 / z, 6 / z]);
+      ctx.beginPath(); ctx.arc(0, 0, R + 9 / z + R * 0.2, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (e.hp < e.maxHp) {
+      const w = Math.max(R * 2, 30 / z), h = 4 / z;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(-w / 2, -R - 16 / z, w, h);
+      ctx.fillStyle = '#ff6b5a';
+      ctx.fillRect(-w / 2, -R - 16 / z, w * Math.max(0, e.hp / e.maxHp), h);
+    }
+    ctx.restore();
+  }
+}
+
+function drawEnemyBullets(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  for (const b of game.ebullets) {
+    if (!onScreen(r, b.x, b.y, 40)) continue;
+    const s = b.r / Math.sqrt(z);
+    if (b.kind === 'missile') {
+      const a = Math.atan2(b.vy, b.vx);
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
+      ctx.fillStyle = '#ffb36b';
+      ctx.beginPath(); ctx.moveTo(s * 1.6, 0); ctx.lineTo(-s, s * 0.7); ctx.lineTo(-s, -s * 0.7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,200,120,0.5)';
+      ctx.beginPath(); ctx.arc(-s * 1.6, 0, s * 0.6, 0, TAU); ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#ff5a6e';
+      ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd0d6';
+      ctx.beginPath(); ctx.arc(b.x, b.y, s * 0.45, 0, TAU); ctx.fill();
+    }
+  }
+}
+
+function drawFx(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  const ps = 1 / Math.sqrt(z);
+  for (const p of game.fx.particles) {
+    ctx.globalAlpha = Math.min(1, p.life / 0.4);
+    ctx.fillStyle = p.color;
+    const s = p.size * ps;
+    ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+  }
+  for (const g of game.fx.rings) {
+    const k = 1 - g.life / g.max;
+    ctx.globalAlpha = Math.max(0, g.life / g.max);
+    ctx.strokeStyle = g.color;
+    ctx.lineWidth = (10 * (1 - k) + 2) / z;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.radius * (0.2 + 0.8 * Math.sqrt(k)), 0, TAU); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  ctx.font = `800 ${Math.round(16 / z)}px ${MONO}`;
+  for (const t of game.fx.texts) {
+    ctx.globalAlpha = Math.min(1, t.life / 0.3);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawMinimap(r, game) {
+  const { ctx, W, H } = r;
+  const R = Math.min(90, Math.min(W, H) * 0.12);
+  const cx = W - R - 16, cy = R + 16;
+  const k = R / (CONFIG.fieldRadius + 300);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = 'rgba(8,12,28,0.78)';
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(150,70,255,0.16)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.arc(0, 0, CONFIG.zoneOuter * k, 0, TAU, true); ctx.fill();
+  ctx.fillStyle = 'rgba(255,70,50,0.18)';
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.zoneInner * k, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(190,120,255,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, 0, CONFIG.fieldRadius * k, 0, TAU); ctx.stroke();
+  ctx.fillStyle = '#4a68d8';
+  ctx.beginPath(); ctx.arc(0, 0, Math.max(3, CONFIG.planetRadius * k), 0, TAU); ctx.fill();
+  ctx.fillStyle = '#a08a6c';
+  for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
+  for (const e of game.enemies) {
+    if (e.type !== 'battleship' && !e.elite) continue;
+    ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
+    ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
+  }
+  for (const c of game.capsules) {
+    ctx.fillStyle = c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+    const s2 = c.kind === 'core' ? 3.5 : 2.5;
+    ctx.beginPath(); ctx.moveTo(c.x * k, c.y * k - s2); ctx.lineTo(c.x * k + s2, c.y * k); ctx.lineTo(c.x * k, c.y * k + s2); ctx.lineTo(c.x * k - s2, c.y * k); ctx.closePath(); ctx.fill();
+  }
+  const sh = game.ship;
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, game.viewRadius * k, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = '#5fd8ff';
+  ctx.beginPath(); ctx.moveTo(sh.x * k, sh.y * k); ctx.lineTo((sh.x + sh.vx * 1.5) * k, (sh.y + sh.vy * 1.5) * k); ctx.stroke();
+  ctx.fillStyle = '#e8f6ff';
+  ctx.beginPath(); ctx.arc(sh.x * k, sh.y * k, 3, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+function drawBackground(r, game) {
+  const { ctx, W, H } = r;
+  ctx.fillStyle = '#04050b';
+  ctx.fillRect(0, 0, W, H);
+  const sh = game.ship;
+  const vx = sh.vx, vy = sh.vy;
+  for (const L of r.layers) {
+    const ox = ((-r.cam.x * L.p) % STAR_TILE + STAR_TILE) % STAR_TILE;
+    const oy = ((-r.cam.y * L.p) % STAR_TILE + STAR_TILE) % STAR_TILE;
+    const stretch = Math.min(260, Math.hypot(vx, vy) * L.p * 0.05);
+    const sp = Math.hypot(vx, vy) || 1;
+    const ux = -vx / sp, uy = -vy / sp;
+    ctx.strokeStyle = '#cfe0ff';
+    ctx.fillStyle = '#cfe0ff';
+    for (const s of L.stars) {
+      for (let tx = -STAR_TILE; tx < W + STAR_TILE; tx += STAR_TILE) {
+        const x = s.x + ox + tx - STAR_TILE;
+        if (x < -20 || x > W + 20) continue;
+        for (let ty = -STAR_TILE; ty < H + STAR_TILE; ty += STAR_TILE) {
+          const y = s.y + oy + ty - STAR_TILE;
+          if (y < -20 || y > H + 20) continue;
+          ctx.globalAlpha = s.a;
+          if (stretch > 2) {
+            ctx.lineWidth = s.s;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + ux * stretch, y + uy * stretch);
+            ctx.stroke();
+          } else {
+            ctx.fillRect(x, y, s.s, s.s);
+          }
+        }
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Procedural dust specks in world space: the main cue for how fast the world flows by.
+function drawSpecks(r) {
+  const { ctx, cam } = r;
+  const cell = 420;
+  const halfW = r.W / 2 / cam.zoom, halfH = r.H / 2 / cam.zoom;
+  const x0 = Math.floor((cam.x - halfW) / cell), x1 = Math.floor((cam.x + halfW) / cell);
+  const y0 = Math.floor((cam.y - halfH) / cell), y1 = Math.floor((cam.y + halfH) / cell);
+  ctx.fillStyle = '#7f8db8';
+  const size = 2.2 / cam.zoom;
+  for (let cx = x0; cx <= x1; cx++) {
+    for (let cy = y0; cy <= y1; cy++) {
+      let h = (cx * 73856093) ^ (cy * 19349663);
+      for (let k = 0; k < 3; k++) {
+        h = Math.imul(h ^ (h >>> 13), 0x5bd1e995) >>> 0;
+        const px = cx * cell + (h & 1023) / 1023 * cell;
+        h = Math.imul(h ^ (h >>> 15), 0x27d4eb2d) >>> 0;
+        const py = cy * cell + (h & 1023) / 1023 * cell;
+        ctx.globalAlpha = 0.35 + ((h >>> 12) & 7) / 14;
+        ctx.fillRect(px, py, size, size);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawTrail(r, game) {
+  const { ctx } = r;
+  const sh = game.ship;
+  const tr = sh.trail;
+  if (tr.length < 2) return;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const ratio = sp / game.stats.maxSpeed;
+  const n = Math.min(tr.length, Math.round(6 + clamp(ratio, 0, 2) * 55));
+  const start = tr.length - n;
+  const hot = clamp((ratio - 0.85) / 0.4, 0, 1);
+  ctx.lineCap = 'round';
+  for (let i = start + 1; i < tr.length; i++) {
+    const a = (i - start) / n;
+    ctx.globalAlpha = a * 0.85;
+    ctx.strokeStyle = hot > 0 ? `rgb(${120 + 135 * hot},${220 + 35 * hot},255)` : '#5fd8ff';
+    ctx.lineWidth = (CONFIG.shipRadius * 1.1) * a + 1 / r.cam.zoom;
+    ctx.beginPath();
+    ctx.moveTo(tr[i - 1].x, tr[i - 1].y);
+    ctx.lineTo(tr[i].x, tr[i].y);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(tr[tr.length - 1].x, tr[tr.length - 1].y);
+  ctx.lineTo(sh.x, sh.y);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawShip(r, game) {
+  const { ctx } = r;
+  const sh = game.ship;
+  let ang = Math.atan2(sh.hy, sh.hx); // heading: travel direction, or where the ship was turned while still
+  if (sh.charging && Math.hypot(sh.aimX, sh.aimY) >= CONFIG.minDrag) ang = Math.atan2(sh.aimY, sh.aimX);
+  const R = CONFIG.shipRadius;
+  const minPx = 9 / r.cam.zoom;
+  const s = Math.max(R, minPx);
+  ctx.save();
+  ctx.translate(sh.x, sh.y);
+  ctx.rotate(ang);
+  if (sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.shadowColor = '#5fd8ff';
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#e8f6ff';
+  ctx.beginPath();
+  ctx.moveTo(s * 1.3, 0);
+  ctx.lineTo(-s * 0.9, s * 0.8);
+  ctx.lineTo(-s * 0.5, 0);
+  ctx.lineTo(-s * 0.9, -s * 0.8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// Heading marker: a Space launch boosts this way (the travel direction).
+function drawAimMarker(r, game) {
+  const sh = game.ship;
+  if (sh.charging || game.state !== 'play') return;
+  const { ctx } = r;
+  const p = worldToScreen(r, sh.x, sh.y);
+  const ux = sh.hx, uy = sh.hy;
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#9fe8ff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath(); ctx.moveTo(p.x + ux * 24, p.y + uy * 24); ctx.lineTo(p.x + ux * 46, p.y + uy * 46); ctx.stroke();
+  ctx.setLineDash([]);
+  const tx = p.x + ux * 56, ty = p.y + uy * 56;
+  ctx.fillStyle = '#9fe8ff';
+  ctx.beginPath();
+  ctx.moveTo(tx + ux * 9, ty + uy * 9);
+  ctx.lineTo(tx - ux * 3 - uy * 7, ty - uy * 3 + ux * 7);
+  ctx.lineTo(tx - ux * 3 + uy * 7, ty - uy * 3 - ux * 7);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawChargeUi(r, game, pointer) {
+  drawAimMarker(r, game);
+  const sh = game.ship;
+  if (!sh.charging) return;
+  const { ctx } = r;
+  const p = worldToScreen(r, sh.x, sh.y);
+  const g = sh.gauge;
+  const full = g >= 1;
+  // gauge ring
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.arc(p.x, p.y, 34, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = g > 1 ? '#ff9f40' : full ? '#ffe46b' : '#5fd8ff';
+  ctx.beginPath(); ctx.arc(p.x, p.y, 34, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, g)); ctx.stroke();
+  if (g > 1) {
+    ctx.strokeStyle = '#ff5a3c';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 40, -Math.PI / 2, -Math.PI / 2 + TAU * (g - 1) / Math.max(0.01, game.stats.gaugeMax - 1)); ctx.stroke();
+  }
+  // aim arrow
+  const len = Math.hypot(sh.aimX, sh.aimY);
+  if (len >= CONFIG.minDrag) {
+    const ux = sh.aimX / len, uy = sh.aimY / len;
+    const L = 50 + 90 * Math.min(1.5, g);
+    ctx.strokeStyle = full ? '#ffe46b' : '#9fe8ff';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(p.x + ux * 40, p.y + uy * 40); ctx.lineTo(p.x + ux * L, p.y + uy * L); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(p.x + ux * (L + 12), p.y + uy * (L + 12));
+    ctx.lineTo(p.x + ux * L - uy * 8, p.y + uy * L + ux * 8);
+    ctx.lineTo(p.x + ux * L + uy * 8, p.y + uy * L - ux * 8);
+    ctx.closePath();
+    ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+  }
+  // drag rubber band (screen space)
+  if (pointer && pointer.down) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath(); ctx.moveTo(pointer.sx, pointer.sy); ctx.lineTo(pointer.cx, pointer.cy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(pointer.sx, pointer.sy, 6, 0, TAU); ctx.stroke();
+  }
+}
+
+
+function drawHud(r, game) {
+  drawSpeedPanel(r, game);
+  drawStatus(r, game);
+  drawTimer(r, game);
+  drawLoadout(r, game);
+}
+
+function drawLoadout(r, game) {
+  const { ctx, H, W } = r;
+  if (W < 520) return;
+  const x = 16, y0 = H - 16 - SLOTS.length * 18;
+  ctx.textAlign = 'left';
+  ctx.font = '12px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  SLOTS.forEach((s, i) => {
+    const m = game.loadout[s.id];
+    ctx.fillStyle = m ? RARITIES[m.r].color : '#4a5878';
+    ctx.fillText(`${s.icon} ${m ? moduleDef(m.id).name : s.name + ' —'}`, x, y0 + i * 18);
+  });
+}
+
+function drawTimer(r, game) {
+  const { ctx, W } = r;
+  const left = Math.max(0, CONFIG.runTime - game.t);
+  const m = Math.floor(left / 60), sec = Math.floor(left % 60);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
+  ctx.font = `700 26px ${MONO}`;
+  ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
+  ctx.font = '13px "Hiragino Sans", "Noto Sans JP", sans-serif';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText(getPhase(game.t).name, W / 2, 58);
+  // xp bar
+  const need = xpForLevel(game.level);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(0, 0, W, 5);
+  ctx.fillStyle = '#6dffb0';
+  ctx.fillRect(0, 0, W * Math.min(1, game.xp / need), 5);
+}
+
+function drawStatus(r, game) {
+  const { ctx } = r;
+  const sh = game.ship;
+  const x = 16, y = 18, w = 220;
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(x, y, w, 12);
+  ctx.fillStyle = sh.hp / game.stats.maxHp < 0.3 ? '#ff5a4a' : '#5dffa0';
+  ctx.fillRect(x, y, w * Math.max(0, sh.hp / game.stats.maxHp), 12);
+  ctx.fillStyle = '#e8f0ff';
+  ctx.font = `12px ${MONO}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 28);
+  const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
+  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 46);
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 64);
+}
+
+function drawSpeedPanel(r, game) {
+  const { ctx, W, H } = r;
+  const sp = Math.hypot(game.ship.vx, game.ship.vy);
+  const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+  const bw = Math.min(420, W * 0.5), bh = 10;
+  const bx = W / 2 - bw / 2, by = H - 34;
+  const top = CONFIG.escapeSpeed * 1.08;
+  const X = (v) => bx + clamp(v / top, 0, 1) * bw;
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(bx, by, bw, bh);
+  const hot = sp > game.stats.maxSpeed;
+  ctx.fillStyle = sp >= CONFIG.escapeSpeed ? '#ffd24a' : hot ? '#bff3ff' : '#5fd8ff';
+  ctx.fillRect(bx, by, X(sp) - bx, bh);
+  // max speed tick
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(X(game.stats.maxSpeed) - 1, by - 5, 2, bh + 10);
+  // peak marker
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(X(game.peakSpeed) - 1, by, 2, bh);
+  // escape line
+  ctx.fillStyle = '#ffd24a';
+  ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
+  ctx.font = `11px ${MONO}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(`脱出 ${kms(CONFIG.escapeSpeed)}`, X(CONFIG.escapeSpeed), by - 11);
+  ctx.fillStyle = '#cfd8ee';
+  ctx.fillText(`上限 ${kms(game.stats.maxSpeed)}`, X(game.stats.maxSpeed), by + bh + 14);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText(`最高 ${kms(game.peakSpeed)}`, bx, by - 8);
+  ctx.fillStyle = hot ? '#bff3ff' : '#e8f0ff';
+  ctx.font = `700 34px ${MONO}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(kms(sp), W / 2 + 40, by - 18);
+  ctx.textAlign = 'left';
+  ctx.font = `13px ${MONO}`;
+  ctx.fillStyle = '#8fa3c8';
+  ctx.fillText('km/s', W / 2 + 46, by - 19);
+}
+
+// ---- input.js ----
+// Launch direction is opposite to the drag: start - current.
+function aimFromDrag(sx, sy, cx, cy) {
+  return { x: sx - cx, y: sy - cy };
+}
+
+const MOVE_KEYS = {
+  KeyW: [0, -1], ArrowUp: [0, -1],
+  KeyS: [0, 1], ArrowDown: [0, 1],
+  KeyA: [-1, 0], ArrowLeft: [-1, 0],
+  KeyD: [1, 0], ArrowRight: [1, 0],
+};
+const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
+
+// Held movement keys -> unit vector (zero when none or cancelled).
+function moveVector(keys) {
+  let dx = 0, dy = 0;
+  for (const k of keys) {
+    const d = MOVE_KEYS[k];
+    if (d) { dx += d[0]; dy += d[1]; }
+  }
+  dx = Math.sign(dx); dy = Math.sign(dy);
+  if (dx === 0 && dy === 0) return { x: 0, y: 0 };
+  const len = Math.hypot(dx, dy);
+  return { x: dx / len || 0, y: dy / len || 0 };
+}
+
+// Physical key position (works with IME on), falling back to the key name.
+function keyCode(e) {
+  return e.code || KEY_CODES[(e.key || '').toLowerCase()] || '';
+}
+
+const isSpace = (e) => e.code === 'Space' || e.key === ' ';
+
+function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
+  const st = {
+    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true,
+    release: false, relX: 0, relY: 0,
+    keys: new Set(), space: false, relKeyboard: false,
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (!st.enabled || e.button > 0) return;
+    st.down = true; st.pointerId = e.pointerId;
+    st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
+    try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!st.down || e.pointerId !== st.pointerId) return;
+    st.cx = e.clientX; st.cy = e.clientY;
+  });
+  const up = (e) => {
+    if (!st.down || e.pointerId !== st.pointerId) return;
+    st.cx = e.clientX; st.cy = e.clientY;
+    const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
+    st.down = false; st.release = true; st.relX = a.x; st.relY = a.y; st.relKeyboard = false;
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  if (keyTarget) {
+    keyTarget.addEventListener('keydown', (e) => {
+      const code = keyCode(e);
+      if (MOVE_KEYS[code]) { st.keys.add(code); if (st.enabled) e.preventDefault(); }
+      if (isSpace(e)) {
+        if (st.enabled) e.preventDefault();
+        if (!st.enabled || e.repeat || st.space || st.down) return;
+        st.space = true;
+      }
+    });
+    keyTarget.addEventListener('keyup', (e) => {
+      st.keys.delete(keyCode(e));
+      if (isSpace(e) && st.space) {
+        st.space = false; st.release = true; st.relX = 0; st.relY = 0; st.relKeyboard = true;
+      }
+    });
+    keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
+  }
+
+  return {
+    state: st,
+    // keyboard launches carry no aim: the world boosts along the current travel direction.
+    read() {
+      let a = { x: 0, y: 0 };
+      if (st.release) a = { x: st.relX, y: st.relY };
+      else if (st.down) a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
+      const out = {
+        charging: st.down || st.space,
+        aimX: a.x, aimY: a.y,
+        release: st.release,
+        keyboard: st.release ? st.relKeyboard : st.space && !st.down,
+        move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
+      };
+      st.release = false;
+      return out;
+    },
+    reset() { st.down = false; st.space = false; st.release = false; st.pointerId = null; },
+  };
+}
+
+// ---- ui.js ----
+
+
+
+
+const root = () => document.getElementById('ui');
+
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') n.className = v;
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else if (k === 'html') n.innerHTML = v;
+    else n.setAttribute(k, v);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+}
+
+function clearScreens() {
+  for (const n of [...root().querySelectorAll('.screen')]) n.remove();
+}
+
+function showScreen(panel, id) {
+  clearScreens();
+  const s = el('div', { class: 'screen', id }, panel);
+  root().append(s);
+  return s;
+}
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60), s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+
+const END_TEXT = {
+  escape: ['重力圏 脱出', 'win', '脱出速度に到達した'],
+  hp: ['機体 大破', 'lose', 'HP が尽きた'],
+  time: ['時間切れ', 'lose', '10 分以内に脱出速度へ届かなかった'],
+};
+
+function showResult(game, extra, onNext) {
+  const [title, cls, sub] = END_TEXT[game.endReason] || END_TEXT.time;
+  const rows = [
+    ['経過時間', fmtTime(game.t)],
+    ['最高速度', `${kms(game.peakSpeed)} km/s`],
+    ['脱出速度', `${kms(CONFIG.escapeSpeed)} km/s`],
+    ['撃破数', String(game.kills)],
+    ['レベル', String(game.level)],
+    ...(extra || []),
+  ];
+  const stats = el('div', { class: 'stats' });
+  for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
+  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ ', el('kbd', {}, 'Enter'));
+  showScreen(el('div', { class: 'panel' },
+    el('h1', { class: cls }, title),
+    el('div', { class: 'sub' }, sub),
+    stats,
+    el('div', { class: 'btns' }, btn)), 'result');
+  btn.focus();
+}
+
+const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', core: '出力コア' };
+
+function moduleCard(mod, tag, isNew) {
+  if (!mod) return el('div', { class: 'card empty' }, '空きスロット');
+  const def = moduleDef(mod.id);
+  const rar = RARITIES[mod.r];
+  const card = el('div', { class: `card${isNew ? ' new' : ''}` },
+    el('div', { class: 'tag' }, tag),
+    el('div', { class: 'name' }, def.name),
+    el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
+    el('div', { class: 'desc' }, def.desc(mod.r)));
+  if (isNew) card.style.borderColor = rar.color;
+  return card;
+}
+
+function showOffer(game, onChoose) {
+  const mod = game.currentOffer;
+  const slot = SLOTS.find((s) => s.id === mod.slot);
+  const cur = game.loadout[mod.slot];
+  const loadout = el('div', { class: 'loadout' });
+  for (const s of SLOTS) {
+    const m = game.loadout[s.id];
+    const d = el('div', { class: s.id === mod.slot ? 'hl' : '' }, `${s.icon} ${s.name}: ${m ? moduleDef(m.id).name : '—'}`);
+    if (m) d.style.color = RARITIES[m.r].color;
+    loadout.append(d);
+  }
+  const equip = el('button', { class: 'primary', onclick: () => onChoose(true) }, '付け替える ', el('kbd', {}, '1'));
+  const skip = el('button', { onclick: () => onChoose(false) }, '捨てる ', el('kbd', {}, '2'));
+  showScreen(el('div', { class: 'panel' },
+    el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
+    el('h1', {}, `${slot.icon} ${slot.name}`),
+    el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'),
+    el('div', { class: 'cards' }, moduleCard(cur, '装備中', false), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true)),
+    el('div', { class: 'btns' }, equip, skip),
+    loadout), 'offer');
+}
+
+function showStation(save, onBuy, onDepart) {
+  const b = save.best;
+  const ups = el('div', { class: 'ups' });
+  for (const u of META_UPGRADES) {
+    const lv = save.meta[u.id] || 0;
+    const cost = metaCost(u.id, lv);
+    const btn = el('button', { onclick: () => onBuy(u.id) }, cost == null ? '最大' : `強化  ${cost} 部品`);
+    if (cost == null || save.coins < cost) btn.disabled = true;
+    ups.append(el('div', { class: 'up' },
+      el('div', { class: 'n' }, u.name),
+      el('div', { class: 'd' }, u.desc),
+      el('div', { class: 'pips' }, '●'.repeat(lv) + '○'.repeat(u.max - lv)),
+      btn));
+  }
+  const records = el('div', { class: 'stats' },
+    el('div', {}, '出撃'), el('div', {}, `${b.runs} 回`),
+    el('div', {}, '脱出'), el('div', {}, `${b.escapes} 回`),
+    el('div', {}, '最速脱出'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
+    el('div', {}, '最高速度'), el('div', {}, `${kms(b.topSpeed)} km/s`));
+  const go = el('button', { class: 'primary', onclick: onDepart }, '出発 ', el('kbd', {}, 'Enter'));
+  showScreen(el('div', { class: 'panel' },
+    el('div', { class: 'row' }, el('h1', {}, 'ステーション'), el('div', { class: 'coins' }, `部品 ${save.coins}`), go),
+    el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
+    el('h2', {}, '操作'),
+    el('ul', { class: 'how' },
+      el('li', {}, el('b', {}, 'キーボード'), '（機体基準）：', el('kbd', {}, 'W'), ' 前進　', el('kbd', {}, 'S'), ' ブレーキ　', el('kbd', {}, 'A'), el('kbd', {}, 'D'), ' 左右に曲がる（止まっているとその場で旋回）。', el('kbd', {}, 'Space'), ' 長押しでチャージ → 離すと機体の向きへ加速'),
+      el('li', {}, el('b', {}, 'マウス'), '：画面を押したままドラッグ → 離すと、ドラッグと逆方向へ突進。長く押すほど強い'),
+      el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
+      el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
+      el('li', {}, '中心の惑星の重力をかすめると上限を超えて加速できる。中心ほど敵は強いがレアなカプセルがある'),
+      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて惑星をかすめ、脱出速度へ'),
+      el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' ミュート　', el('kbd', {}, 'P'), ' 調整パネル')),
+    el('h2', {}, '機体強化'),
+    ups,
+    el('h2', {}, '記録'),
+    records,
+    el('div', { class: 'btns' }, el('button', { class: 'primary', onclick: onDepart }, '出発'))), 'station');
+}
+
+function showPause(onResume, onAbandon) {
+  showScreen(el('div', { class: 'panel' },
+    el('h1', {}, 'ポーズ'),
+    el('div', { class: 'btns' },
+      el('button', { class: 'primary', onclick: onResume }, '再開 ', el('kbd', {}, 'Esc')),
+      el('button', { onclick: onAbandon }, 'ランを終了してステーションへ'))), 'pause');
+}
+
+// ---- audio.js ----
+// Synthesized sound. Everything is optional: without Web Audio this is a silent stub.
+
+function noop() {}
+
+function createAudio() {
+  const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
+  if (!AC) return { unlock: noop, handle: noop, update: noop, toggleMute: () => true, muted: true };
+
+  let ctx = null, master, sfx, muffle, boomBus, engine, sub, engineGain, wind, windFilter, windGain, noiseBuf;
+  let muted = false;
+  try { muted = window.localStorage.getItem('speed-muted') === '1'; } catch { /* ignore */ }
+  const lastPlayed = {};
+  let duckT = 0;
+
+  function init() {
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 0.7;
+    const comp = ctx.createDynamicsCompressor();
+    master.connect(comp).connect(ctx.destination);
+    muffle = ctx.createBiquadFilter();
+    muffle.type = 'lowpass';
+    muffle.frequency.value = 16000;
+    sfx = ctx.createGain();
+    sfx.connect(muffle).connect(master);
+    boomBus = ctx.createGain();
+    boomBus.connect(master);
+
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    engineGain = ctx.createGain();
+    engineGain.gain.value = 0;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 700;
+    engine = ctx.createOscillator(); engine.type = 'sawtooth'; engine.frequency.value = 50;
+    sub = ctx.createOscillator(); sub.type = 'sine'; sub.frequency.value = 25;
+    engine.connect(lp); sub.connect(lp); lp.connect(engineGain).connect(sfx);
+    engine.start(); sub.start();
+
+    wind = ctx.createBufferSource(); wind.buffer = noiseBuf; wind.loop = true;
+    windFilter = ctx.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.Q.value = 0.8;
+    windGain = ctx.createGain(); windGain.gain.value = 0;
+    wind.connect(windFilter).connect(windGain).connect(sfx);
+    wind.start();
+  }
+
+  function env(g, t, a, peak, dur) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  }
+
+  function tone(freq, dur, type = 'sine', vol = 0.2, slideTo = null, bus = sfx, delay = 0) {
+    const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator(); o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    const g = ctx.createGain();
+    env(g, t, 0.005, vol, dur);
+    o.connect(g).connect(bus);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function noise(dur, freq, vol = 0.3, type = 'lowpass', sweepTo = null, bus = sfx, q = 1) {
+    const t = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    s.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(freq, t);
+    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+    const g = ctx.createGain();
+    env(g, t, 0.01, vol, dur);
+    s.connect(f).connect(g).connect(bus);
+    s.start(t, Math.random()); s.stop(t + dur + 0.05);
+  }
+
+  function throttle(key, gap) {
+    const now = ctx.currentTime;
+    if (lastPlayed[key] && now - lastPlayed[key] < gap) return false;
+    lastPlayed[key] = now;
+    return true;
+  }
+
+  const SOUNDS = {
+    launch: (e) => noise(0.35, 400 + 1200 * Math.min(1.5, e.gauge), 0.25 + 0.15 * Math.min(1, e.gauge), 'bandpass', 3000, sfx, 1.5),
+    kill: (e) => throttle('kill', 0.025) && tone(320 + Math.random() * 280 + (e.r > 25 ? -150 : 0), 0.12, 'square', e.r > 25 ? 0.12 : 0.06, 90),
+    hit: (e) => e.crit && throttle('crit', 0.05) && tone(1400, 0.18, 'triangle', 0.18, 2200),
+    hurt: () => { noise(0.3, 300, 0.5); tone(90, 0.3, 'sawtooth', 0.25, 40); },
+    bounce: () => throttle('bounce', 0.08) && tone(160, 0.15, 'square', 0.15, 80),
+    crash: () => noise(0.4, 250, 0.5),
+    levelup: () => [523, 659, 784].forEach((f, i) => tone(f, 0.14, 'triangle', 0.12, null, sfx, i * 0.06)),
+    pickup: (e) => tone(e.kind === 'core' ? 660 : 880, 0.3, 'sine', 0.2, e.kind === 'core' ? 1320 : 1760),
+    equip: () => tone(440, 0.15, 'triangle', 0.15, 880),
+    coin: () => throttle('coin', 0.04) && tone(1568, 0.08, 'square', 0.05),
+    explode: (e) => throttle('explode' + e.cause, 0.05) && noise(0.35, e.cause === 'trail' ? 900 : 500, e.cause === 'trail' ? 0.12 : 0.3),
+    shoot: () => throttle('shoot', 0.09) && tone(700, 0.05, 'square', 0.03, 400),
+    turret: () => throttle('turret', 0.06) && tone(1800, 0.04, 'square', 0.03, 1200),
+    stage: () => { tone(392, 0.25, 'sawtooth', 0.1, 784); tone(587, 0.35, 'triangle', 0.12, 1175, sfx, 0.08); },
+    phase: () => tone(110, 1.2, 'sawtooth', 0.12, 220),
+    barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
+    sonic: () => {
+      // a beat of silence, then everything comes back at once
+      duckT = 0.22;
+      const t = ctx.currentTime;
+      sfx.gain.cancelScheduledValues(t);
+      sfx.gain.setValueAtTime(0.0001, t);
+      sfx.gain.linearRampToValueAtTime(1, t + 0.9);
+      setTimeout(() => {
+        noise(1.6, 1800, 1.0, 'lowpass', 60, boomBus);
+        tone(95, 1.4, 'sine', 0.9, 28, boomBus);
+        tone(190, 0.5, 'sawtooth', 0.25, 40, boomBus);
+      }, 200);
+    },
+    end: (e) => {
+      if (e.state === 'won') [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.4, 'triangle', 0.18, null, boomBus, i * 0.12));
+      else tone(220, 1.2, 'sawtooth', 0.15, 55, boomBus);
+    },
+  };
+
+  return {
+    get muted() { return muted; },
+    unlock() {
+      try {
+        if (!ctx) init();
+        if (ctx.state === 'suspended') ctx.resume();
+      } catch { /* audio unavailable */ }
+    },
+    toggleMute() {
+      muted = !muted;
+      try { window.localStorage.setItem('speed-muted', muted ? '1' : '0'); } catch { /* ignore */ }
+      if (master) master.gain.value = muted ? 0 : 0.7;
+      return muted;
+    },
+    handle(events) {
+      if (!ctx || ctx.state !== 'running') return;
+      for (const e of events) {
+        const f = SOUNDS[e.type];
+        if (f) try { f(e); } catch { /* ignore */ }
+      }
+    },
+    // Continuous layers: engine pitch, wind, and the high-speed fade toward silence.
+    update(game, dt) {
+      if (!ctx || ctx.state !== 'running' || !game) return;
+      const t = ctx.currentTime;
+      const sh = game.ship;
+      const sp = Math.hypot(sh.vx, sh.vy);
+      const ratio = sp / game.stats.maxSpeed;
+      const live = game.state === 'play';
+      engine.frequency.setTargetAtTime(45 + sp * 0.05, t, 0.08);
+      sub.frequency.setTargetAtTime(22 + sp * 0.025, t, 0.08);
+      engineGain.gain.setTargetAtTime(live ? 0.05 + 0.08 * Math.min(1.2, ratio) : 0, t, 0.1);
+      windFilter.frequency.setTargetAtTime(250 + sp * 0.9, t, 0.1);
+      windGain.gain.setTargetAtTime(live ? Math.min(0.35, sp / 4000) : 0, t, 0.1);
+      // approaching max speed the world goes quiet
+      const k = Math.max(0, Math.min(1, (ratio - 0.6) / 0.38));
+      muffle.frequency.setTargetAtTime(16000 * Math.pow(0.02, k), t, 0.15);
+      if (duckT > 0) duckT -= dt;
+      else sfx.gain.setTargetAtTime(1 - 0.88 * k, t, 0.2);
+    },
+  };
+}
+
+// ---- debug.js ----
+// Tuning panel: edits CONFIG live and offers shortcuts (time skip, modules, invincibility).
+
+
+
+
+
+const DEFAULTS = { ...CONFIG };
+
+const TUNABLES = [
+  { key: 'escapeSpeed', label: '脱出速度', min: 1200, max: 4000, step: 50, fmt: (v) => `${(v * CONFIG.speedToKms).toFixed(1)} km/s` },
+  { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 500, max: 2500, step: 25 },
+  { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
+  { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
+  { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
+  { key: 'nudgeAccel', label: 'WASD 推力（静止時）', min: 0, max: 1500, step: 25 },
+  { key: 'nudgeSteer', label: 'A/D 曲がりやすさ（速度比）', min: 0, max: 3, step: 0.05 },
+  { key: 'nudgeMaxSpeed', label: 'W で加速できる上限（上限比）', min: 0, max: 1, step: 0.05 },
+  { key: 'pivotRate', label: '停止中の旋回 rad/s', min: 0.5, max: 8, step: 0.1 },
+  { key: 'boostDuration', label: '突進エネルギー（秒）', min: 0.1, max: 3, step: 0.05 },
+  { key: 'energyCut', label: 'エネルギー切れ後の速度', min: 0.5, max: 1, step: 0.01 },
+  { key: 'cruiseDrag', label: '巡航ドラッグ', min: 0, max: 1, step: 0.01 },
+  { key: 'overcapDecay', label: '上限超過の減衰', min: 0, max: 2, step: 0.05 },
+  { key: 'planetGM', label: '中心惑星の重力', min: 0, max: 1.5e9, step: 1e7, fmt: (v) => `${(v / 1e8).toFixed(1)}e8` },
+  { key: 'moonGM', label: '小惑星の重力', min: 0, max: 1e8, step: 1e6, fmt: (v) => `${(v / 1e6).toFixed(0)}e6` },
+  { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
+  { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
+  { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },
+  { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
+  { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
+  { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
+  { key: 'xpMult', label: '経験値 倍率', min: 0.2, max: 4, step: 0.05 },
+];
+
+const STAT_KEYS = new Set(['baseMaxSpeed', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
+
+function applyTunable(game, key, value) {
+  CONFIG[key] = value;
+  if (!game) return;
+  if (STAT_KEYS.has(key)) refreshStats(game);
+  if (key === 'planetGM') game.field.planet.gm = value;
+  if (key === 'moonGM') for (const m of game.field.moons) m.gm = value;
+}
+
+function resetConfig(game) {
+  for (const t of TUNABLES) applyTunable(game, t.key, DEFAULTS[t.key]);
+}
+
+function skipTime(game, sec) {
+  game.t = Math.min(CONFIG.runTime - 1, game.t + sec);
+}
+
+function jumpToPhase(game, id) {
+  const p = PHASES.find((x) => x.id === id);
+  if (p) game.t = p.start + 0.01;
+}
+
+function createDebugPanel(getGame) {
+  const root = document.createElement('div');
+  root.id = 'debug';
+  root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
+  document.body.append(root);
+  const info = root.querySelector('.dinfo');
+  const btns = root.querySelector('.dbtns');
+  const sliders = root.querySelector('.dsl');
+
+  const button = (label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', () => { const g = getGame(); if (g) fn(g); });
+    btns.append(b);
+    return b;
+  };
+  button('+30 秒', (g) => skipTime(g, 30));
+  button('+60 秒', (g) => skipTime(g, 60));
+  const sel = document.createElement('select');
+  sel.innerHTML = '<option value="">フェーズへ…</option>' + PHASES.map((p) => `<option value="${p.id}">${p.name}（${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}）</option>`).join('');
+  sel.addEventListener('change', () => { const g = getGame(); if (g && sel.value) jumpToPhase(g, sel.value); sel.value = ''; });
+  btns.append(sel);
+  const inv = button('無敵: OFF', (g) => { g.debug.invincible = !g.debug.invincible; inv.textContent = `無敵: ${g.debug.invincible ? 'ON' : 'OFF'}`; });
+  const rsel = document.createElement('select');
+  rsel.innerHTML = RARITIES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
+  rsel.value = '2';
+  btns.append(rsel);
+  button('モジュール入手', (g) => {
+    const r = Number(rsel.value);
+    const pool = MODULES.filter((m) => m.rarities.includes(r));
+    const def = pool[Math.floor(Math.random() * pool.length)];
+    if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
+  });
+  button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
+  button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
+  button('敵を消す', (g) => { g.enemies.length = 0; g.ebullets.length = 0; });
+  button('部品 +100', (g) => { g.coins += 100; });
+  button('既定値に戻す', (g) => { resetConfig(g); sync(); });
+
+  const inputs = [];
+  for (const t of TUNABLES) {
+    const row = document.createElement('label');
+    row.className = 'drow';
+    const name = document.createElement('span');
+    name.textContent = t.label;
+    const val = document.createElement('span');
+    val.className = 'dval';
+    const inp = document.createElement('input');
+    inp.type = 'range'; inp.min = t.min; inp.max = t.max; inp.step = t.step;
+    inp.addEventListener('input', () => {
+      applyTunable(getGame(), t.key, Number(inp.value));
+      val.textContent = t.fmt ? t.fmt(CONFIG[t.key]) : String(CONFIG[t.key]);
+    });
+    row.append(name, val, inp);
+    sliders.append(row);
+    inputs.push({ t, inp, val });
+  }
+  function sync() {
+    for (const { t, inp, val } of inputs) {
+      inp.value = CONFIG[t.key];
+      val.textContent = t.fmt ? t.fmt(CONFIG[t.key]) : String(CONFIG[t.key]);
+    }
+  }
+  sync();
+
+  let fps = 60;
+  return {
+    toggle() { root.classList.toggle('open'); sync(); },
+    get open() { return root.classList.contains('open'); },
+    tick(game, dt) {
+      if (!root.classList.contains('open') || !game) return;
+      fps = fps * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
+      const sp = Math.hypot(game.ship.vx, game.ship.vy);
+      info.textContent = `t ${game.t.toFixed(1)}s ・ 敵 ${game.enemies.length} ・ Lv ${game.level} ・ 上限 ${(game.stats.maxSpeed * CONFIG.speedToKms).toFixed(2)} ・ 現在 ${(sp * CONFIG.speedToKms).toFixed(2)} ・ 最高 ${(game.peakSpeed * CONFIG.speedToKms).toFixed(2)} km/s ・ ${fps.toFixed(0)} fps`;
+    },
+  };
+}
+
+// ---- main.js ----
+
+
+
+
+
+
+
+
+const canvas = document.getElementById('game');
+const renderer = createRenderer(canvas);
+const input = createInput(canvas);
+const storage = (() => { try { return window.localStorage; } catch { return null; } })();
+const save = loadSave(storage);
+const audio = createAudio();
+window.addEventListener('pointerdown', () => audio.unlock(), true);
+window.addEventListener('keydown', () => audio.unlock(), true);
+
+let game = null;
+const debug = createDebugPanel(() => game);
+let mode = 'station'; // station | run | result
+let offerShown = null;
+
+window.addEventListener('resize', () => resizeRenderer(renderer));
+resizeRenderer(renderer);
+
+function openStation() {
+  mode = 'station';
+  input.state.enabled = false;
+  input.reset();
+  if (!game) { game = createGame({ meta: save.meta }); game.spawning = false; game.state = 'idle'; }
+  showStation(save, (id) => { if (buyUpgrade(save, id)) { writeSave(storage, save); openStation(); } }, startRun);
+}
+
+function startRun() {
+  clearScreens();
+  input.reset();
+  input.state.enabled = true;
+  renderer.cam.ready = false;
+  offerShown = null;
+  game = createGame({ meta: save.meta });
+  mode = 'run';
+}
+
+function finishRun() {
+  mode = 'result';
+  input.state.enabled = false;
+  input.reset();
+  const before = save.coins;
+  applyRunResult(save, game);
+  writeSave(storage, save);
+  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation);
+}
+
+function chooseOffer(accept) {
+  if (game.state !== 'offer') return;
+  resolveOffer(game, accept);
+  offerShown = null;
+  if (game.state === 'play') { clearScreens(); input.reset(); }
+}
+
+function togglePause() {
+  if (mode !== 'run') return;
+  if (game.state === 'play') {
+    game.state = 'paused';
+    input.reset();
+    showPause(togglePause, () => { game.state = 'lost'; game.endReason = 'time'; clearScreens(); finishRun(); });
+  } else if (game.state === 'paused') {
+    game.state = 'play';
+    clearScreens();
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (mode === 'run' && game.state === 'offer') {
+    if (e.key === '1') chooseOffer(true);
+    else if (e.key === '2') chooseOffer(false);
+    return;
+  }
+  if (e.key === 'Escape') togglePause();
+  if (e.key === 'm' || e.key === 'M') audio.toggleMute();
+  if (e.key === 'p' || e.key === 'P') debug.toggle();
+  if (e.key === 'Enter') {
+    if (mode === 'station') { e.preventDefault(); startRun(); }
+    else if (mode === 'result') { e.preventDefault(); openStation(); }
+  }
+});
+
+window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
+
+openStation();
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const wasPlaying = game.state === 'play';
+  update(game, dt, input.read());
+  render(renderer, game, dt, input.state);
+  audio.handle(game.events);
+  audio.update(game, dt);
+  debug.tick(game, dt);
+  game.events.length = 0;
+  if (mode === 'run') {
+    if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (game.state === 'offer' && offerShown !== game.currentOffer) {
+      offerShown = game.currentOffer;
+      input.reset();
+      showOffer(game, chooseOffer);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// console access for debugging
+window.__speed = { get game() { return game; }, save };
+
+})();
+</script>
+</body>
+</html>

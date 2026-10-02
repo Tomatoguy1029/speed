@@ -52,9 +52,10 @@ export function buildHtml() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const out = path.join(ROOT, 'dist', 'speed.html');
-  fs.mkdirSync(path.dirname(out), { recursive: true });
+  const dist = path.join(ROOT, 'dist');
+  fs.mkdirSync(dist, { recursive: true });
   const html = buildHtml();
-  fs.writeFileSync(out, html);
-  console.log(`built ${path.relative(ROOT, out)} (${(html.length / 1024).toFixed(1)} KB)`);
+  // speed.html is the shareable single file; index.html is the same page for web hosting.
+  for (const name of ['speed.html', 'index.html']) fs.writeFileSync(path.join(dist, name), html);
+  console.log(`built dist/speed.html + dist/index.html (${(html.length / 1024).toFixed(1)} KB)`);
 }
