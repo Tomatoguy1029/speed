@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはカーソルの方向へ進む。Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。クリックで描き始め、カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはクリックしたままずらした方向へ進む（押した点からのずれで操作するスティック。離すとそのまま直進）。Space でチャージ → 離すと世界がほぼ止まる。クリックで描き始め、カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -25,7 +25,13 @@ export function buildIntent(raw, scheme) {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'mouse' || scheme === 'draw') {
+  } else if (scheme === 'draw') {
+    // the pointer is a virtual stick (offset from the press point); Space charges
+    it.charging = raw.space;
+    it.keyboard = true;
+    it.release = raw.release && raw.releaseSource === 'space';
+    if (raw.pointerDown) it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+  } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
     it.release = raw.release;
@@ -65,6 +71,11 @@ function steerToward(game, want, dt) {
     sh.vy += Math.sin(want) * add;
   }
   sh.hx = Math.cos(want); sh.hy = Math.sin(want);
+}
+
+function stickAngle(stick) {
+  if (!stick || Math.hypot(stick.x, stick.y) < CONFIG.stickDeadZone) return null;
+  return Math.atan2(stick.y, stick.x);
 }
 
 function cursorAngle(game, cursor) {
@@ -137,8 +148,12 @@ const ZERO = { ax: 0, ay: 0 };
 export function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse':
-    case 'draw': { // draw mode also cruises toward the cursor between paths
+    case 'draw': {
+      const a = stickAngle(input.stick);
+      if (a !== null) steerToward(game, a, dt);
+      return ZERO;
+    }
+    case 'mouse': {
       const a = cursorAngle(game, input.cursor);
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
@@ -162,8 +177,11 @@ export function controlStep(game, input, dt) {
 export function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse':
     case 'draw': {
+      const a = stickAngle(input.stick);
+      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
+    }
+    case 'mouse': {
       const a = cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }

@@ -101,7 +101,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const wasPlaying = game.state === 'play';
-  const raw = input.read();
+  const raw = input.read({ stickRadius: game.scheme === 'draw' ? CONFIG.stickRadius : 0 });
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);

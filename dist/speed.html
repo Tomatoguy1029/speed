@@ -129,6 +129,8 @@ const CONFIG = {
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
   drawStep: 8, // min world distance between path points
+  stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer
+  stickRadius: 70, // screen px: the stick's press point trails the pointer beyond this
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
   nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend
@@ -1495,7 +1497,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはカーソルの方向へ進む。Space（またはクリック長押し）でチャージ → 離すと世界がほぼ止まる。クリックで描き始め、カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'ふだんはクリックしたままずらした方向へ進む（押した点からのずれで操作するスティック。離すとそのまま直進）。Space でチャージ → 離すと世界がほぼ止まる。クリックで描き始め、カーソルを動かして軌跡を描き（長さはチャージ量で決まる）、もう一度 Space／クリックで確定すると、止まった世界の中で軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -1517,7 +1519,13 @@ function buildIntent(raw, scheme) {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'mouse' || scheme === 'draw') {
+  } else if (scheme === 'draw') {
+    // the pointer is a virtual stick (offset from the press point); Space charges
+    it.charging = raw.space;
+    it.keyboard = true;
+    it.release = raw.release && raw.releaseSource === 'space';
+    if (raw.pointerDown) it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+  } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
     it.release = raw.release;
@@ -1557,6 +1565,11 @@ function steerToward(game, want, dt) {
     sh.vy += Math.sin(want) * add;
   }
   sh.hx = Math.cos(want); sh.hy = Math.sin(want);
+}
+
+function stickAngle(stick) {
+  if (!stick || Math.hypot(stick.x, stick.y) < CONFIG.stickDeadZone) return null;
+  return Math.atan2(stick.y, stick.x);
 }
 
 function cursorAngle(game, cursor) {
@@ -1629,8 +1642,12 @@ const ZERO = { ax: 0, ay: 0 };
 function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse':
-    case 'draw': { // draw mode also cruises toward the cursor between paths
+    case 'draw': {
+      const a = stickAngle(input.stick);
+      if (a !== null) steerToward(game, a, dt);
+      return ZERO;
+    }
+    case 'mouse': {
       const a = cursorAngle(game, input.cursor);
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
@@ -1654,8 +1671,11 @@ function controlStep(game, input, dt) {
 function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'mouse':
     case 'draw': {
+      const a = stickAngle(input.stick);
+      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
+    }
+    case 'mouse': {
       const a = cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }
@@ -3436,7 +3456,23 @@ function drawAimMarker(r, game) {
   ctx.globalAlpha = 1;
 }
 
+// Draw scheme: the virtual stick (press point + knob) while the pointer is held.
+function drawStick(r, game, pointer) {
+  if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || game.state !== 'play') return;
+  const { ctx } = r;
+  const R = CONFIG.stickRadius;
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(190,215,255,0.35)';
+  ctx.fillStyle = 'rgba(190,215,255,0.06)';
+  ctx.beginPath(); ctx.arc(pointer.sx, pointer.sy, R, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(220,235,255,0.55)';
+  ctx.beginPath(); ctx.arc(pointer.cx, pointer.cy, 16, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
 function drawChargeUi(r, game, pointer) {
+  drawStick(r, game, pointer);
   drawAimMarker(r, game);
   const sh = game.ship;
   if (!sh.charging) return;
@@ -3635,7 +3671,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   el.addEventListener('pointerdown', (e) => {
     st.hover = { x: e.clientX, y: e.clientY };
     if (st.enabled && e.button === 0) st.pressed = true;
-    if (!st.enabled || e.button > 0 || st.space) return;
+    if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
@@ -3664,7 +3700,6 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space) return;
         st.pressed = true;
-        if (st.down) return;
         st.space = true;
       }
     });
@@ -3679,7 +3714,14 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 
   return {
     state: st,
-    read() {
+    // opts.stickRadius: the press point trails the pointer so it never sits farther than this
+    // (virtual stick: reversing direction only needs a short move).
+    read(opts = {}) {
+      const R = opts.stickRadius || 0;
+      if (R > 0 && st.down) {
+        const dx = st.cx - st.sx, dy = st.cy - st.sy, d = Math.hypot(dx, dy);
+        if (d > R) { st.sx = st.cx - dx / d * R; st.sy = st.cy - dy / d * R; }
+      }
       const out = {
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,
@@ -4089,6 +4131,8 @@ const TUNABLES = [
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
+  { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
+  { key: 'stickDeadZone', label: 'スティックの遊び(px)', min: 0, max: 40, step: 1 },
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },
   { key: 'drawRunSlowRef', label: 'なぞり中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
   { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
@@ -4327,7 +4371,7 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const wasPlaying = game.state === 'play';
-  const raw = input.read();
+  const raw = input.read({ stickRadius: game.scheme === 'draw' ? CONFIG.stickRadius : 0 });
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);

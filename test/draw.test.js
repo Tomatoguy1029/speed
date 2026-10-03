@@ -25,12 +25,15 @@ function charge(game, seconds, cursor) {
 const at = (x, y) => ({ x, y: OY + y });
 const pathLength = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
 
-test('draw intent: Space or a click charges; a fresh press is reported for committing', () => {
-  const raw = { move: none, snap: null, space: false, pointerDown: true, pressed: true, drag: none, hover: null, cursor: { x: 1, y: 2 }, release: false, releaseSource: null, releaseDrag: none };
-  const it = buildIntent(raw, 'draw');
+test('draw intent: Space charges, a held click is a stick (offset from the press point)', () => {
+  const raw = { move: none, snap: null, space: false, pointerDown: true, pressed: true, drag: { x: -30, y: 40 }, hover: null, cursor: { x: 1, y: 2 }, release: false, releaseSource: null, releaseDrag: none };
+  let it = buildIntent(raw, 'draw');
+  assert.equal(it.charging, false);
+  assert.deepEqual(it.stick, { x: 30, y: -40 });
+  assert.equal(it.press, true);
+  it = buildIntent({ ...raw, pointerDown: false, space: true }, 'draw');
   assert.equal(it.charging, true);
   assert.equal(it.keyboard, true);
-  assert.equal(it.press, true);
 });
 
 test('releasing a charge freezes the ship and slows the world instead of launching', () => {

@@ -43,7 +43,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   el.addEventListener('pointerdown', (e) => {
     st.hover = { x: e.clientX, y: e.clientY };
     if (st.enabled && e.button === 0) st.pressed = true;
-    if (!st.enabled || e.button > 0 || st.space) return;
+    if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId;
     st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
@@ -72,7 +72,6 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space) return;
         st.pressed = true;
-        if (st.down) return;
         st.space = true;
       }
     });
@@ -87,7 +86,14 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
 
   return {
     state: st,
-    read() {
+    // opts.stickRadius: the press point trails the pointer so it never sits farther than this
+    // (virtual stick: reversing direction only needs a short move).
+    read(opts = {}) {
+      const R = opts.stickRadius || 0;
+      if (R > 0 && st.down) {
+        const dx = st.cx - st.sx, dy = st.cy - st.sy, d = Math.hypot(dx, dy);
+        if (d > R) { st.sx = st.cx - dx / d * R; st.sy = st.cy - dy / d * R; }
+      }
       const out = {
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,

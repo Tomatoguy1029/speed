@@ -903,7 +903,23 @@ function drawAimMarker(r, game) {
   ctx.globalAlpha = 1;
 }
 
+// Draw scheme: the virtual stick (press point + knob) while the pointer is held.
+function drawStick(r, game, pointer) {
+  if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || game.state !== 'play') return;
+  const { ctx } = r;
+  const R = CONFIG.stickRadius;
+  ctx.save();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(190,215,255,0.35)';
+  ctx.fillStyle = 'rgba(190,215,255,0.06)';
+  ctx.beginPath(); ctx.arc(pointer.sx, pointer.sy, R, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(220,235,255,0.55)';
+  ctx.beginPath(); ctx.arc(pointer.cx, pointer.cy, 16, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
 function drawChargeUi(r, game, pointer) {
+  drawStick(r, game, pointer);
   drawAimMarker(r, game);
   const sh = game.ship;
   if (!sh.charging) return;
