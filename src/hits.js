@@ -8,13 +8,19 @@ import { attackPower } from './combat.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || dmg <= 0) return;
-  const fresh = e.hp >= e.maxHp - 1e-6;
+  let fresh = e.hp >= e.maxHp - 1e-6;
+  // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
+  // by its HP when this dash first touched it, so wave + body still count as one strike
+  if (game.draw && game.draw.phase === 'run') {
+    if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
+    fresh = e.dashFresh;
+  }
   e.hp -= dmg;
   e.flash = 0.12;
   game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
   if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
   if (e.hp <= 0) {
-    if (fresh && opts.cause === 'ram') killStop(game, e, opts.crit);
+    if (fresh && (opts.cause === 'ram' || opts.cause === 'wave')) killStop(game, e, opts.crit);
     killEnemy(game, e, opts);
   } else if (opts.dirX !== undefined) {
     const k = opts.knock ?? 160;

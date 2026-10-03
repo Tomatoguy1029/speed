@@ -67,6 +67,8 @@ export function update(game, frameDt, input) {
     input = { ...input, press: false }; // the same Space press must not also place the start
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
+  // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
+  if (!game.draw && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
   if (game.draw && game.draw.phase === 'run') {
     // trace every frame on real time (world steps are rare while it is nearly frozen)
