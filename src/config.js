@@ -53,6 +53,7 @@ export const CONFIG = {
   drawStep: 8, // min world distance between path points
   stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
   dashXpFrac: 0.35, // draw mode: XP to fill the dash gauge = this share of the current level's XP (scaled by charge-time stats)
+  cursorFullSpeed: 0.4, // draw mode with a mouse: cursor this far from the ship (share of the half-screen diagonal) = full cruise
   stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer
   stickRadius: 70, // screen px: stick offset for full speed (the press point stays fixed)
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer

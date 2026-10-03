@@ -49,7 +49,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     st.hover = local(e);
     if (st.enabled && e.button === 0) st.pressed = true;
     if (!st.enabled || e.button > 0) return;
-    st.down = true; st.pointerId = e.pointerId;
+    st.down = true; st.pointerId = e.pointerId; st.pointerType = e.pointerType || 'mouse';
     ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
@@ -100,6 +100,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
         pointerDown: st.down,
+        pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
         release: st.release,

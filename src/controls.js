@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'クリックしたままずらすと、押した点からのずれの方向へ進む（大きくずらすほど速い。速いほど体当たりが強い）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。カーソルが機体から遠いほど速く、速いほど体当たりが強い。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -26,11 +26,11 @@ export function buildIntent(raw, scheme) {
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
   } else if (scheme === 'draw') {
-    // the pointer is a virtual stick (offset from the press point); Space / the button fires the
-    // gauge-based dash (no charging in this scheme)
+    // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
+    // from the press point). Space / the button fires the gauge-based dash (no charging here).
     it.keyboard = true;
     it.dash = !!raw.dash;
-    if (raw.pointerDown) it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+    if (raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
@@ -149,12 +149,21 @@ export function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
     case 'draw': {
-      // push the stick further to go faster: ramming at speed is the normal attack
-      const a = stickAngle(input.stick);
+      // a stronger push goes faster (ramming at speed is the normal attack):
+      // touch = how far the stick is pushed, mouse = how far the cursor is from the ship
+      const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
+      if (input.stick) {
+        const a = stickAngle(input.stick);
+        if (a !== null) {
+          const len = Math.hypot(input.stick.x, input.stick.y);
+          steerToward(game, a, dt, throttle((len - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone)));
+        }
+        return ZERO;
+      }
+      const a = cursorAngle(game, input.cursor);
       if (a !== null) {
-        const len = Math.hypot(input.stick.x, input.stick.y);
-        const k = Math.min(1, (len - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone));
-        steerToward(game, a, dt, CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * k);
+        const d = Math.hypot(input.cursor.x - sh.x, input.cursor.y - sh.y);
+        steerToward(game, a, dt, throttle((d - CONFIG.mouseDeadZone) / Math.max(1, CONFIG.cursorFullSpeed * (game.viewRadius || 1400))));
       }
       return ZERO;
     }
@@ -183,7 +192,7 @@ export function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
     case 'draw': {
-      const a = stickAngle(input.stick);
+      const a = input.stick ? stickAngle(input.stick) : cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }
     case 'mouse': {

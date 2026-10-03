@@ -940,7 +940,7 @@ function drawAimMarker(r, game) {
 
 // Draw scheme: the virtual stick (press point + knob) while the pointer is held.
 function drawStick(r, game, pointer) {
-  if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || game.state !== 'play') return;
+  if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || pointer.pointerType !== 'touch' || game.state !== 'play') return;
   const { ctx } = r;
   const R = CONFIG.stickRadius;
   ctx.save();

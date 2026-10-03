@@ -28,9 +28,11 @@ function charge(game, _seconds, cursor) {
 const at = (x, y) => ({ x, y: OY + y });
 const pathLength = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
 
-test('draw intent: Space fires the dash, a held click is a stick (offset from the press point)', () => {
+test('draw intent: Space fires the dash; a held touch is a stick, the mouse cursor steers (offset from the press point)', () => {
   const raw = { move: none, snap: null, space: false, pointerDown: true, pressed: true, drag: { x: -30, y: 40 }, hover: null, cursor: { x: 1, y: 2 }, release: false, releaseSource: null, releaseDrag: none };
   let it = buildIntent(raw, 'draw');
+  assert.equal(it.stick, undefined, 'a mouse press does not steer (the cursor does)');
+  it = buildIntent({ ...raw, pointerType: 'touch' }, 'draw');
   assert.equal(it.charging, false);
   assert.deepEqual(it.stick, { x: 30, y: -40 });
   assert.equal(it.press, true);
