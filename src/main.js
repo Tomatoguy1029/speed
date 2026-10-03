@@ -92,6 +92,17 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// On-screen dash button (draw mode): fills with the dash gauge, fires like Space when full.
+const dashBtn = document.getElementById('dashBtn');
+dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
+function updateDashButton() {
+  const show = mode === 'run' && game.scheme === 'draw' && (game.state === 'play' || game.state === 'paused') && !game.draw;
+  dashBtn.classList.toggle('show', show);
+  if (!show) return;
+  dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));
+  dashBtn.classList.toggle('ready', game.dashMeter >= 1);
+}
+
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
 
 openStation();
@@ -101,10 +112,11 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   const wasPlaying = game.state === 'play';
-  const raw = input.read({ stickRadius: game.scheme === 'draw' ? CONFIG.stickRadius : 0 });
+  const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
+  updateDashButton();
   audio.handle(game.events);
   audio.update(game, dt);
   debug.tick(game, dt);

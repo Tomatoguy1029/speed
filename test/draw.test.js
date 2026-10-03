@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
 import { buildIntent } from '../src/controls.js';
-import { createGame, update } from '../src/world.js';
+import { createGame, update, addXp } from '../src/world.js';
 import { createEnemy } from '../src/enemies.js';
 
 const none = { x: 0, y: 0 };
@@ -17,23 +17,26 @@ function quiet() {
   return game;
 }
 
-function charge(game, seconds, cursor) {
-  for (let t = 0; t < seconds - 1e-9; t += 0.05) update(game, 0.05, { ...idle, charging: true, cursor });
-  update(game, 0.02, { ...idle, release: true, cursor });
-  update(game, 0.02, { ...idle, press: true, cursor }); // click to start drawing
+// Fire the (full) dash gauge, click at the ship to start the path there, then aim at `cursor`.
+function charge(game, _seconds, cursor) {
+  const here = { x: game.ship.x, y: game.ship.y };
+  game.dashMeter = 1;
+  update(game, 0.02, { ...idle, dash: true, cursor: here });
+  update(game, 0.02, { ...idle, press: true, cursor: here }); // click to start drawing
+  update(game, 0.02, { ...idle, cursor });
 }
 const at = (x, y) => ({ x, y: OY + y });
 const pathLength = (pts) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.x - pts[i].x, p.y - pts[i].y), 0);
 
-test('draw intent: Space charges, a held click is a stick (offset from the press point)', () => {
+test('draw intent: Space fires the dash, a held click is a stick (offset from the press point)', () => {
   const raw = { move: none, snap: null, space: false, pointerDown: true, pressed: true, drag: { x: -30, y: 40 }, hover: null, cursor: { x: 1, y: 2 }, release: false, releaseSource: null, releaseDrag: none };
   let it = buildIntent(raw, 'draw');
   assert.equal(it.charging, false);
   assert.deepEqual(it.stick, { x: 30, y: -40 });
   assert.equal(it.press, true);
-  it = buildIntent({ ...raw, pointerDown: false, space: true }, 'draw');
-  assert.equal(it.charging, true);
-  assert.equal(it.keyboard, true);
+  it = buildIntent({ ...raw, pointerDown: false, dash: true }, 'draw');
+  assert.equal(it.dash, true);
+  assert.equal(it.charging, false);
 });
 
 test('releasing a charge freezes the ship and slows the world instead of launching', () => {
@@ -56,21 +59,31 @@ test('enemies crawl while drawing', () => {
   assert.ok(Math.abs(e.x - ex) < 30, `moved ${Math.abs(e.x - ex)}`);
 });
 
-test('the path follows the cursor from the ship and is capped by the charge', () => {
-  const short = quiet();
-  charge(short, 0.2, at(50, 0));
-  const long = quiet();
-  charge(long, 0.8, at(50, 0));
-  assert.ok(long.draw.budget > short.draw.budget * 2);
-  for (const game of [short, long]) {
-    const budget = game.draw.budget;
-    const start = { ...game.draw.points[0] };
-    assert.ok(Math.hypot(start.x - game.ship.x, start.y - game.ship.y) < 1e-9, 'starts at the ship');
-    for (let i = 1; i <= 40; i++) update(game, 0.02, { ...idle, cursor: at(50 + i * 60, i * 10) });
-    const pts = (game.draw && (game.draw.points || game.draw.path)) || game.lastPath;
-    assert.deepEqual(pts[0], start);
-    assert.ok(pathLength(pts) <= budget + 1e-6);
-  }
+test('the dash needs a full gauge; the path starts where you click and the ship warps there', () => {
+  const game = quiet();
+  game.dashMeter = 0.5;
+  update(game, 0.02, { ...idle, dash: true });
+  assert.equal(game.draw, null, 'not ready');
+  game.dashMeter = 1;
+  update(game, 0.02, { ...idle, dash: true, cursor: at(0, 0) });
+  assert.equal(game.draw?.phase, 'draw');
+  assert.equal(game.dashMeter, 0);
+  const budget = game.draw.budget;
+  update(game, 0.02, { ...idle, press: true, cursor: at(600, 200) });
+  assert.deepEqual(game.draw.points[0], at(600, 200));
+  for (let i = 1; i <= 40; i++) update(game, 0.02, { ...idle, cursor: at(600 + i * 60, 200 + i * 10) });
+  const pts = (game.draw && (game.draw.points || game.draw.path)) || game.lastPath;
+  assert.ok(pathLength(pts) <= budget + 1e-6);
+  assert.ok(game.events.some((e) => e.type === 'warp'), 'warped to the start');
+});
+
+test('XP fills the dash gauge', () => {
+  const game = quiet();
+  game.dashMeter = 0;
+  addXp(game, 1);
+  assert.ok(game.dashMeter > 0 && game.dashMeter < 1);
+  addXp(game, 100);
+  assert.equal(game.dashMeter, 1);
 });
 
 test('committing runs the ship along the drawn path, then it keeps its momentum', () => {

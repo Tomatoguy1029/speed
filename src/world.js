@@ -40,8 +40,9 @@ export function createGame(opts = {}) {
     phaseId: null,
     endReason: null,
     draw: null, lastPath: null,
+    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -61,6 +62,10 @@ export function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
+  if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
+    startDrawing(game, input);
+    input = { ...input, press: false }; // the same Space press must not also place the start
+  }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
   if (game.draw && game.draw.phase === 'run') {
@@ -296,10 +301,19 @@ function drawWorldScale(game) {
   return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
 }
 
+// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
+// charge-time stats (modules, levels) make it fill faster.
+export function dashNeed(game) {
+  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
+}
+
 function startDrawing(game, input) {
   const sh = game.ship;
-  const budget = drawBudget(game, sh.gauge);
-  game.draw = { phase: 'draw', points: [{ x: sh.x, y: sh.y }], budget, used: 0, timeLeft: CONFIG.drawTime, gauge: sh.gauge, cursor: input.cursor || null, blocked: false, started: false };
+  const gauge = game.stats.gaugeMax; // always a full (over)charge
+  const budget = drawBudget(game, gauge);
+  game.dashMeter = 0;
+  // no points yet: the path starts wherever the player clicks (the ship warps there on commit)
+  game.draw = { phase: 'draw', points: [], budget, used: 0, timeLeft: CONFIG.drawTime, gauge, cursor: input.cursor || null, blocked: false, started: false };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -312,12 +326,23 @@ function updateDrawing(game, dt, input) {
   if (input.cursor) d.cursor = input.cursor;
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
-    if (input.press) { d.started = true; if (d.cursor) extendPath(game, d, d.cursor); }
+    if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
     else if (d.timeLeft <= 0) commitPath(game);
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
   if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
+}
+
+// Where a path may start: the clicked point, pushed out of planets and moons.
+function startPoint(game, c) {
+  const sh = game.ship;
+  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
+  for (const b of [game.field.planet, ...game.field.moons]) {
+    const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
+    if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
+  }
+  return p;
 }
 
 function extendPath(game, d, c) {
@@ -342,17 +367,21 @@ function extendPath(game, d, c) {
 function commitPath(game) {
   const d = game.draw, sh = game.ship;
   if (d.points.length < 2) {
-    // nothing drawn: dash straight at the cursor (or along the heading) for the full length
+    // nothing drawn: dash straight for the full length — from the ship toward the cursor, or from
+    // the clicked start onward in the direction ship -> start
     let ux = sh.hx, uy = sh.hy;
-    if (d.cursor) {
-      const dx = d.cursor.x - sh.x, dy = d.cursor.y - sh.y, l = Math.hypot(dx, dy);
+    if (!d.points.length) d.points.push({ x: sh.x, y: sh.y });
+    const o = d.points[0];
+    const tgt = Math.hypot(o.x - sh.x, o.y - sh.y) > 1 ? o : d.cursor;
+    if (tgt) {
+      const dx = tgt.x - sh.x, dy = tgt.y - sh.y, l = Math.hypot(dx, dy);
       if (l > 1) { ux = dx / l; uy = dy / l; }
     }
-    const o = d.points[0];
     extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
     if (d.points.length < 2) { game.draw = null; return; }
   }
   const pts = d.points;
+  warpTo(game, pts[0].x, pts[0].y);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
   const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
   onLaunch(game);
@@ -369,6 +398,22 @@ function commitPath(game) {
   const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
   game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// Blink to the start of the path, leaving a few fading afterimages behind.
+function warpTo(game, x, y) {
+  const sh = game.ship;
+  const dx = x - sh.x, dy = y - sh.y, dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+  const ux = dx / dist, uy = dy / dist, step = Math.min(26, dist / 5);
+  for (let i = 0; i < 4; i++) {
+    game.fx.ghosts.push({ x: sh.x + ux * step * i, y: sh.y + uy * step * i, life: 0.45 - i * 0.08, max: 0.45 });
+  }
+  game.fx.ghosts.push({ x0: sh.x, y0: sh.y, x1: x, y1: y, life: 0.18, max: 0.18, streak: true });
+  sh.x = x; sh.y = y;
+  sh.trail = [];
+  addRing(game, x, y, 46, 'rgba(190,240,255,0.9)', 0.3);
+  game.events.push({ type: 'warp', dist });
 }
 
 // Trace the polyline quickly (the world is nearly frozen); piercing costs dash speed, a bounce ends it.
@@ -638,6 +683,10 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
+  if (game.scheme === 'draw' && game.dashMeter < 1) {
+    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
+    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
+  }
   let need = xpForLevel(game.level);
   while (game.xp >= need) {
     game.xp -= need;
@@ -657,6 +706,8 @@ function updateFx(game, dt) {
   for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
   game.fx.particles = P.filter((p) => p.life > 0);
   for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
+  for (const g of game.fx.ghosts) g.life -= dt;
+  game.fx.ghosts = game.fx.ghosts.filter((g) => g.life > 0);
   game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
   for (const r of game.fx.rings) r.life -= dt;
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);

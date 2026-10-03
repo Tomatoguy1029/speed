@@ -51,8 +51,10 @@ export const CONFIG = {
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
   drawStep: 8, // min world distance between path points
+  stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
+  dashXpFrac: 0.35, // draw mode: XP to fill the dash gauge = this share of the current level's XP (scaled by charge-time stats)
   stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer
-  stickRadius: 70, // screen px: the stick's press point trails the pointer beyond this
+  stickRadius: 70, // screen px: stick offset for full speed (the press point stays fixed)
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest
   nudgeSteer: 0.7, // extra thrust per px/s of speed so fast ships can still bend

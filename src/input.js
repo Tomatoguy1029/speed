@@ -38,7 +38,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null, pressed: false,
+    keys: new Set(), space: false, snap: null, pressed: false, dash: false,
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = { x: e.clientX, y: e.clientY };
@@ -72,6 +72,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space) return;
         st.pressed = true;
+        st.dash = true;
         st.space = true;
       }
     });
@@ -86,19 +87,13 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
 
   return {
     state: st,
-    // opts.stickRadius: the press point trails the pointer so it never sits farther than this
-    // (virtual stick: reversing direction only needs a short move).
-    read(opts = {}) {
-      const R = opts.stickRadius || 0;
-      if (R > 0 && st.down) {
-        const dx = st.cx - st.sx, dy = st.cy - st.sy, d = Math.hypot(dx, dy);
-        if (d > R) { st.sx = st.cx - dx / d * R; st.sy = st.cy - dy / d * R; }
-      }
+    read() {
       const out = {
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,
         space: st.space,
         pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
+        dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
         pointerDown: st.down,
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
@@ -109,8 +104,10 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       st.release = false;
       st.snap = null;
       st.pressed = false;
+      st.dash = false;
       return out;
     },
+    triggerDash() { if (st.enabled) st.dash = true; },
     reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.pointerId = null; },
   };
 }

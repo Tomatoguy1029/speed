@@ -487,6 +487,19 @@ function drawPathUi(r, game) {
     return;
   }
   const pts = d.points;
+  if (!pts.length) {
+    // not started yet: the ship will blink to wherever the player clicks
+    if (!d.cursor) return;
+    ctx.strokeStyle = 'rgba(214,246,255,0.25)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([4 / z, 10 / z]);
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.setLineDash([8 / z, 6 / z]);
+    ctx.strokeStyle = 'rgba(214,246,255,0.8)';
+    ctx.beginPath(); ctx.arc(d.cursor.x, d.cursor.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
   const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
   if (pts.length > 1) {
     // the band is the real hit width of the trace
@@ -543,7 +556,7 @@ function drawDrawingHud(r, game) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#e8f6ff';
   ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
-  ctx.fillText(d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : 'クリック（または Space）で描き始める', W / 2, y - 12);
+  ctx.fillText(d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : '好きな場所をクリック（または Space）→ そこから描き始める', W / 2, y - 12);
 }
 
 function drawPrediction(r, game) {
@@ -701,6 +714,24 @@ function drawEnemyBullets(r, game) {
 function drawFx(r, game) {
   const { ctx } = r;
   const z = r.cam.zoom;
+  // warp afterimages
+  for (const g of game.fx.ghosts) {
+    const a = Math.max(0, g.life / g.max);
+    if (g.streak) {
+      ctx.strokeStyle = `rgba(190,240,255,${0.5 * a})`;
+      ctx.lineWidth = CONFIG.shipRadius * 1.2 * a;
+      ctx.beginPath(); ctx.moveTo(g.x0, g.y0); ctx.lineTo(g.x1, g.y1); ctx.stroke();
+      continue;
+    }
+    const s = Math.max(CONFIG.shipRadius, 9 / z);
+    ctx.globalAlpha = 0.55 * a;
+    ctx.fillStyle = '#5fd8ff';
+    ctx.beginPath(); ctx.arc(g.x, g.y, s * (1 + 0.3 * (1 - a)), 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.8 * a;
+    ctx.strokeStyle = '#bff3ff'; ctx.lineWidth = s * 0.2;
+    ctx.beginPath(); ctx.arc(g.x, g.y, s * 0.82, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
   const ps = 1 / Math.sqrt(z);
   for (const p of game.fx.particles) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
@@ -913,8 +944,10 @@ function drawStick(r, game, pointer) {
   ctx.strokeStyle = 'rgba(190,215,255,0.35)';
   ctx.fillStyle = 'rgba(190,215,255,0.06)';
   ctx.beginPath(); ctx.arc(pointer.sx, pointer.sy, R, 0, TAU); ctx.fill(); ctx.stroke();
+  // the knob stays on the ring when the finger goes further (the press point never moves)
+  const dx = pointer.cx - pointer.sx, dy = pointer.cy - pointer.sy, d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
   ctx.fillStyle = 'rgba(220,235,255,0.55)';
-  ctx.beginPath(); ctx.arc(pointer.cx, pointer.cy, 16, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(pointer.sx + dx * k, pointer.sy + dy * k, 16, 0, TAU); ctx.fill();
   ctx.restore();
 }
 
@@ -1021,6 +1054,14 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
+  if (game.scheme === 'draw') {
+    // dash gauge right below the HP bar
+    const m = game.dashMeter;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(bx - 1, by + 7, bw + 2, 5);
+    ctx.fillStyle = m >= 1 ? (Math.floor(game.t * 4) % 2 ? '#ffe46b' : '#fff6c8') : '#5fd8ff';
+    ctx.fillRect(bx, by + 8, bw * m, 3);
+  }
   const x = 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `12px ${MONO}`;
