@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>SPEED — 重力圏脱出</title>
 <style>
   html, body { margin: 0; height: 100%; background: #04050b; overflow: hidden; color: #e6ecff;
     font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; user-select: none; }
-  canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; cursor: crosshair; touch-action: none; }
+  canvas#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
   #ui { position: fixed; inset: 0; pointer-events: none; }
   .screen { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(3,5,14,0.72); backdrop-filter: blur(3px); pointer-events: auto; }
@@ -2642,8 +2642,11 @@ function createRenderer(canvas) {
 
 function resizeRenderer(r) {
   r.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  r.W = window.innerWidth;
-  r.H = window.innerHeight;
+  // size from the canvas as laid out, so drawing and pointer coordinates always share one space
+  // (window.innerHeight and 100vh disagree on mobile browsers with a collapsing toolbar)
+  const b = r.canvas.getBoundingClientRect();
+  r.W = b.width || window.innerWidth;
+  r.H = b.height || window.innerHeight;
   r.canvas.width = Math.floor(r.W * r.dpr);
   r.canvas.height = Math.floor(r.H * r.dpr);
 }
@@ -2712,6 +2715,7 @@ function render(r, game, dt, pointer) {
 
   ctx.save();
   let sx = 0, sy = 0;
+  if (game.draw && game.draw.phase === 'draw') r.shake = 0; // no jitter while placing a path
   if (r.shake > 0) {
     sx = (Math.random() - 0.5) * r.shake;
     sy = (Math.random() - 0.5) * r.shake;
@@ -3777,22 +3781,27 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, snap: null, pressed: false, dash: false,
   };
+  // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
+  const local = (e) => {
+    const b = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    return b ? { x: e.clientX - b.left, y: e.clientY - b.top } : { x: e.clientX, y: e.clientY };
+  };
   el.addEventListener('pointerdown', (e) => {
-    st.hover = { x: e.clientX, y: e.clientY };
+    st.hover = local(e);
     if (st.enabled && e.button === 0) st.pressed = true;
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId;
-    st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
+    ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
-    st.hover = { x: e.clientX, y: e.clientY };
+    st.hover = local(e);
     if (!st.down || e.pointerId !== st.pointerId) return;
-    st.cx = e.clientX; st.cy = e.clientY;
+    ({ x: st.cx, y: st.cy } = local(e));
   });
   const up = (e) => {
     if (!st.down || e.pointerId !== st.pointerId) return;
-    st.cx = e.clientX; st.cy = e.clientY;
+    ({ x: st.cx, y: st.cy } = local(e));
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
     st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
@@ -4406,6 +4415,8 @@ let mode = 'station'; // station | run | result
 let offerShown = null;
 
 window.addEventListener('resize', () => resizeRenderer(renderer));
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resizeRenderer(renderer)).observe(renderer.canvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
 
 function openStation() {

@@ -28,6 +28,8 @@ let mode = 'station'; // station | run | result
 let offerShown = null;
 
 window.addEventListener('resize', () => resizeRenderer(renderer));
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resizeRenderer(renderer)).observe(renderer.canvas);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
 
 function openStation() {

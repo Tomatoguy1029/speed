@@ -21,8 +21,11 @@ export function createRenderer(canvas) {
 
 export function resizeRenderer(r) {
   r.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  r.W = window.innerWidth;
-  r.H = window.innerHeight;
+  // size from the canvas as laid out, so drawing and pointer coordinates always share one space
+  // (window.innerHeight and 100vh disagree on mobile browsers with a collapsing toolbar)
+  const b = r.canvas.getBoundingClientRect();
+  r.W = b.width || window.innerWidth;
+  r.H = b.height || window.innerHeight;
   r.canvas.width = Math.floor(r.W * r.dpr);
   r.canvas.height = Math.floor(r.H * r.dpr);
 }
@@ -91,6 +94,7 @@ export function render(r, game, dt, pointer) {
 
   ctx.save();
   let sx = 0, sy = 0;
+  if (game.draw && game.draw.phase === 'draw') r.shake = 0; // no jitter while placing a path
   if (r.shake > 0) {
     sx = (Math.random() - 0.5) * r.shake;
     sy = (Math.random() - 0.5) * r.shake;

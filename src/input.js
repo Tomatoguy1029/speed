@@ -40,22 +40,27 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, snap: null, pressed: false, dash: false,
   };
+  // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
+  const local = (e) => {
+    const b = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    return b ? { x: e.clientX - b.left, y: e.clientY - b.top } : { x: e.clientX, y: e.clientY };
+  };
   el.addEventListener('pointerdown', (e) => {
-    st.hover = { x: e.clientX, y: e.clientY };
+    st.hover = local(e);
     if (st.enabled && e.button === 0) st.pressed = true;
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId;
-    st.sx = st.cx = e.clientX; st.sy = st.cy = e.clientY;
+    ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
-    st.hover = { x: e.clientX, y: e.clientY };
+    st.hover = local(e);
     if (!st.down || e.pointerId !== st.pointerId) return;
-    st.cx = e.clientX; st.cy = e.clientY;
+    ({ x: st.cx, y: st.cy } = local(e));
   });
   const up = (e) => {
     if (!st.down || e.pointerId !== st.pointerId) return;
-    st.cx = e.clientX; st.cy = e.clientY;
+    ({ x: st.cx, y: st.cy } = local(e));
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
     st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
