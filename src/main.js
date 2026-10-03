@@ -98,7 +98,7 @@ window.addEventListener('keydown', (e) => {
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && game.scheme === 'draw' && (game.state === 'play' || game.state === 'paused') && !game.draw;
+  const show = mode === 'run' && game.scheme === 'draw' && game.state === 'play' && !game.draw;
   dashBtn.classList.toggle('show', show);
   if (!show) return;
   dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));

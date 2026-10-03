@@ -255,7 +255,7 @@ function drawCapsules(r, game) {
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
-    const pulse = (game.t * 1.5 + c.x * 0.001) % 1;
+    const pulse = (((game.t * 1.5 + c.x * 0.001) % 1) + 1) % 1; // x can be negative
     ctx.globalAlpha = 1 - pulse;
     ctx.strokeStyle = col;
     ctx.lineWidth = 2 / z;
@@ -1124,19 +1124,24 @@ function drawSpeedPanel(r, game) {
   ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
   ctx.font = `11px ${MONO}`;
   ctx.textAlign = 'center';
-  ctx.fillText(`脱出 ${kms(CONFIG.escapeSpeed)}`, X(CONFIG.escapeSpeed), by - 11);
+  // labels stay on screen whatever the width
+  const fit = (text, x) => { const w = ctx.measureText(text).width / 2; return clamp(x, w + 4, W - w - 4); };
+  const escTxt = `脱出 ${kms(CONFIG.escapeSpeed)}`, capTxt = `上限 ${kms(game.stats.maxSpeed)}`;
+  ctx.fillText(escTxt, fit(escTxt, X(CONFIG.escapeSpeed)), by - 11);
   ctx.fillStyle = '#cfd8ee';
-  ctx.fillText(`上限 ${kms(game.stats.maxSpeed)}`, X(game.stats.maxSpeed), by + bh + 14);
+  ctx.fillText(capTxt, fit(capTxt, X(game.stats.maxSpeed)), by + bh + 14);
   ctx.textAlign = 'left';
   ctx.fillStyle = '#8fa3c8';
   ctx.fillText(`最高 ${kms(game.peakSpeed)}`, bx, by - 8);
   ctx.fillStyle = hot ? '#bff3ff' : '#e8f0ff';
   ctx.font = `700 34px ${MONO}`;
   ctx.textAlign = 'right';
-  ctx.font = `700 ${W < 600 ? 28 : 34}px ${MONO}`;
-  ctx.fillText(kms(sp), mid + 40, by - 18);
+  const narrow = W < 600;
+  const ny = narrow ? by - 28 : by - 18; // narrow: lift the number above the label row
+  ctx.font = `700 ${narrow ? 28 : 34}px ${MONO}`;
+  ctx.fillText(kms(sp), mid + 40, ny);
   ctx.textAlign = 'left';
   ctx.font = `13px ${MONO}`;
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('km/s', mid + 46, by - 19);
+  ctx.fillText('km/s', mid + 46, ny - 1);
 }
