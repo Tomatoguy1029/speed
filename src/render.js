@@ -87,6 +87,9 @@ function handleEvents(r, game) {
 
 export function render(r, game, dt, pointer) {
   const { ctx } = r;
+  // keep the backing store matched to the laid-out canvas (mobile toolbars and rotation can
+  // change it without a resize event; a mismatch stretches the picture)
+  if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
   handleEvents(r, game);
   updateCamera(r, game, dt);
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
@@ -559,8 +562,12 @@ function drawDrawingHud(r, game) {
   bar(y + 14, d.timeLeft / CONFIG.drawTime, '#ffd24a', '時間');
   ctx.textAlign = 'center';
   ctx.fillStyle = '#e8f6ff';
-  ctx.font = '14px "Hiragino Sans", "Noto Sans JP", sans-serif';
-  ctx.fillText(d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : '好きな場所をクリック（または Space）→ そこから描き始める', W / 2, y - 12);
+  const hint = d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : '好きな場所をクリック（または Space）→ そこから描き始める';
+  let fs = 14;
+  ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  const tw = ctx.measureText(hint).width;
+  if (tw > W - 24) { fs = Math.max(9, Math.floor(fs * (W - 24) / tw)); ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`; }
+  ctx.fillText(hint, W / 2, y - 12);
 }
 
 function drawPrediction(r, game) {
@@ -1010,9 +1017,15 @@ function drawHud(r, game) {
 
 // Bottom-left: the ship assembled from the equipped parts (empty slots are dashed outlines),
 // with the module names beside it on wide screens.
+// Size of the bottom-left ship diagram; shrinks on narrow (portrait phone) screens.
+// Matches the dash button's CSS offset (min(102px, 13.6vh, 17vw) = unit * 6.8).
+function loadoutUnit(r) {
+  return Math.min(15, r.H / 50, r.W / 40);
+}
+
 function drawLoadout(r, game) {
   const { ctx, H, W } = r;
-  const unit = Math.min(15, H / 50);
+  const unit = loadoutUnit(r);
   const cx = 12 + unit * 3.4, cy = H - 14 - unit * 3.4;
   ctx.fillStyle = 'rgba(8,12,28,0.55)';
   ctx.beginPath(); ctx.arc(cx, cy - unit * 0.1, unit * 3.4, 0, TAU); ctx.fill();
@@ -1072,17 +1085,27 @@ function drawStatus(r, game) {
   ctx.textAlign = 'left';
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
-  ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, y + 28);
+  let ly = y + 28;
+  if (r.W < 600) {
+    // narrow (portrait phone): shorter lines so they clear the timer in the middle
+    ctx.fillText(`ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
+    ctx.fillText(`撃破 ${game.kills}`, x, ly += 18);
+  } else {
+    ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, ly);
+  }
   ctx.fillStyle = '#ffd24a';
-  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, y + 46);
+  ctx.fillText(`部品 ${Math.round(game.coins)}`, x, ly + 18);
 }
 
 function drawSpeedPanel(r, game) {
   const { ctx, W, H } = r;
   const sp = Math.hypot(game.ship.vx, game.ship.vy);
   const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
-  const bw = Math.min(420, W * 0.5), bh = 10;
-  const bx = W / 2 - bw / 2, by = H - 34;
+  const bh = 10, by = H - 34;
+  let bw = Math.min(420, W * 0.5), bx = W / 2 - bw / 2;
+  const clear = 12 + loadoutUnit(r) * 6.8 + 14; // right edge of the ship diagram
+  if (bx < clear) { bx = clear; bw = Math.max(80, W - clear - 16); }
+  const mid = bx + bw / 2;
   const top = CONFIG.escapeSpeed * 1.08;
   const X = (v) => bx + clamp(v / top, 0, 1) * bw;
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -1110,9 +1133,10 @@ function drawSpeedPanel(r, game) {
   ctx.fillStyle = hot ? '#bff3ff' : '#e8f0ff';
   ctx.font = `700 34px ${MONO}`;
   ctx.textAlign = 'right';
-  ctx.fillText(kms(sp), W / 2 + 40, by - 18);
+  ctx.font = `700 ${W < 600 ? 28 : 34}px ${MONO}`;
+  ctx.fillText(kms(sp), mid + 40, by - 18);
   ctx.textAlign = 'left';
   ctx.font = `13px ${MONO}`;
   ctx.fillStyle = '#8fa3c8';
-  ctx.fillText('km/s', W / 2 + 46, by - 19);
+  ctx.fillText('km/s', mid + 46, by - 19);
 }
