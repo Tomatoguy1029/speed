@@ -14,12 +14,12 @@ changes=$(git status --porcelain)
 ahead=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
 [ -z "$changes" ] && [ "$ahead" = "0" ] && exit 0
 
-# Keep AGENTS.md (the hand-off doc) in step with the game: if game code changed but the doc
-# did not, stop once and ask Claude to update it. The second stop always goes through.
+# Keep docs/ (spec, decisions, backlog) in step with the game: if game code changed but no doc
+# did, stop once and ask Claude to update them. The second stop always goes through.
 touched=$( { git diff --name-only @{u}..HEAD 2>/dev/null; git status --porcelain | awk '{print $2}'; } | sort -u )
-if [ -z "$active" ] && echo "$touched" | grep -qE '^(src/|index\.html$|build\.js$|tools/)' && ! echo "$touched" | grep -qx 'AGENTS.md'; then
+if [ -z "$active" ] && echo "$touched" | grep -qE '^(src/|index\.html$|build\.js$|tools/)' && ! echo "$touched" | grep -q '^docs/'; then
   node -e 'console.log(JSON.stringify({ decision: "block", reason: process.argv[1] }))' \
-    "ゲームのコードが変わっていますが AGENTS.md が更新されていません。変更内容・理由・ユーザーの要望を AGENTS.md（現在の仕様／判断の履歴／未解決の課題）に反映してから終了してください。更新が不要なら理由を一言述べて終了して構いません。"
+    "ゲームのコードが変わっていますが docs/ が更新されていません。変更内容は docs/spec.md、ユーザーの要望と決めたことは docs/decisions.md の末尾、課題は docs/backlog.md に反映してから終了してください。更新が不要なら理由を一言述べて終了して構いません。"
   exit 0
 fi
 
