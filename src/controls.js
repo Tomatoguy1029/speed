@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。カーソルが機体から遠いほど速く、速いほど体当たりが強い。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -149,8 +149,8 @@ export function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
     case 'draw': {
-      // a stronger push goes faster (ramming at speed is the normal attack):
-      // touch = how far the stick is pushed, mouse = how far the cursor is from the ship
+      // mouse: head toward the cursor at the usual cruise speed (no click needed).
+      // touch: a virtual stick; pushing it further goes faster.
       const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
       if (input.stick) {
         const a = stickAngle(input.stick);
@@ -161,10 +161,7 @@ export function controlStep(game, input, dt) {
         return ZERO;
       }
       const a = cursorAngle(game, input.cursor);
-      if (a !== null) {
-        const d = Math.hypot(input.cursor.x - sh.x, input.cursor.y - sh.y);
-        steerToward(game, a, dt, throttle((d - CONFIG.mouseDeadZone) / Math.max(1, CONFIG.cursorFullSpeed * (game.viewRadius || 1400))));
-      }
+      if (a !== null) steerToward(game, a, dt);
       return ZERO;
     }
     case 'mouse': {
