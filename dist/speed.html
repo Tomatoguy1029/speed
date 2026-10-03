@@ -138,6 +138,8 @@ const CONFIG = {
   drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
+  enemyAimLag: 0.5, // seconds: enemies aim at a lagging copy of the ship's position
+  enemyAimSpeed: 450, // px/s: that copy never moves faster than this (dashes leave enemy aim behind)
   killHitstopRegen: 0.3, // outside dashes the hitstop budget refills this many seconds per second
   drawStep: 8, // min world distance between path points
   stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
@@ -530,13 +532,32 @@ function turnToward(e, target, rate, dt) {
   e.facing += Math.max(-m, Math.min(m, d));
 }
 
+// Where enemies think the ship is: a sluggish copy of its position (see updateEnemyAim), so a
+// fast dash leaves their aim behind instead of being tracked instantly.
+function enemyTarget(game) {
+  return game.enemyAim || game.ship;
+}
+
 function angleToShip(e, game) {
-  return Math.atan2(game.ship.y - e.y, game.ship.x - e.x);
+  const t = enemyTarget(game);
+  return Math.atan2(t.y - e.y, t.x - e.x);
+}
+
+// Ease the enemies' idea of the ship's position toward the real one: lagging by `enemyAimLag`
+// seconds and never faster than `enemyAimSpeed`.
+function updateEnemyAim(game, dt) {
+  const sh = game.ship;
+  if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
+  const a = game.enemyAim;
+  const dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  if (d < 1e-6) return;
+  const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
+  a.x += dx / d * step; a.y += dy / d * step;
 }
 
 // Hold a ring around the ship at `keep` distance while circling it.
 function keepDistance(e, game, dt) {
-  const sh = game.ship;
+  const sh = enemyTarget(game);
   const dx = e.x - sh.x, dy = e.y - sh.y;
   const d = Math.hypot(dx, dy) || 1;
   const side = e.id % 2 ? 1 : -1;
@@ -568,13 +589,13 @@ function gunTimer(e, dt) {
 
 const BEHAVIORS = {
   chase(e, game, dt) {
-    const sh = game.ship;
+    const sh = enemyTarget(game);
     steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {
     const T = e.T;
-    const sh = game.ship;
+    const sh = enemyTarget(game);
     const d = Math.hypot(sh.x - e.x, sh.y - e.y);
     e.timer -= dt;
     if (e.state === 'move') {
@@ -671,7 +692,8 @@ function updateEnemyBullets(game, dt, onHit) {
   const p = game.field.planet;
   for (const b of game.ebullets) {
     if (b.kind === 'missile') {
-      const want = Math.atan2(sh.y - b.y, sh.x - b.x);
+      const t = game.enemyAim || sh; // home on where enemies think the ship is
+      const want = Math.atan2(t.y - b.y, t.x - b.x);
       const cur = Math.atan2(b.vy, b.vx);
       let d = want - cur;
       d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -1868,6 +1890,7 @@ function step(game, dt, input) {
 
   updateMoons(game.field, game.t);
   game.leechDrag = 0;
+  updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
   separateEnemies(game);
@@ -4294,6 +4317,8 @@ const TUNABLES = [
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
+  { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
+  { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
   { key: 'stickDeadZone', label: 'スティックの遊び(px)', min: 0, max: 40, step: 1 },
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },

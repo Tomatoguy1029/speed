@@ -7,7 +7,8 @@ export function updateEnemyBullets(game, dt, onHit) {
   const p = game.field.planet;
   for (const b of game.ebullets) {
     if (b.kind === 'missile') {
-      const want = Math.atan2(sh.y - b.y, sh.x - b.x);
+      const t = game.enemyAim || sh; // home on where enemies think the ship is
+      const want = Math.atan2(t.y - b.y, t.x - b.x);
       const cur = Math.atan2(b.vy, b.vx);
       let d = want - cur;
       d = Math.atan2(Math.sin(d), Math.cos(d));

@@ -26,6 +26,8 @@ export const TUNABLES = [
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
+  { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
+  { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
   { key: 'stickDeadZone', label: 'スティックの遊び(px)', min: 0, max: 40, step: 1 },
   { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },

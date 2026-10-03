@@ -4,7 +4,7 @@ import { createShip, computeGauge, launchVelocity, stepShip } from './ship.js';
 import { createField, updateMoons, dustDragAt } from './field.js';
 import { gravityAt } from './gravity.js';
 import { attackPower, isWeakHit, resolveRam, pierceKeep, canPierce } from './combat.js';
-import { updateEnemy, MAX_ENEMY_R } from './enemies.js';
+import { updateEnemy, updateEnemyAim, MAX_ENEMY_R } from './enemies.js';
 import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
 import { updateSpawner, getPhase } from './spawner.js';
@@ -146,6 +146,7 @@ function step(game, dt, input) {
 
   updateMoons(game.field, game.t);
   game.leechDrag = 0;
+  updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
   separateEnemies(game);

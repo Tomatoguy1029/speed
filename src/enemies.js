@@ -63,13 +63,32 @@ function turnToward(e, target, rate, dt) {
   e.facing += Math.max(-m, Math.min(m, d));
 }
 
+// Where enemies think the ship is: a sluggish copy of its position (see updateEnemyAim), so a
+// fast dash leaves their aim behind instead of being tracked instantly.
+function enemyTarget(game) {
+  return game.enemyAim || game.ship;
+}
+
 function angleToShip(e, game) {
-  return Math.atan2(game.ship.y - e.y, game.ship.x - e.x);
+  const t = enemyTarget(game);
+  return Math.atan2(t.y - e.y, t.x - e.x);
+}
+
+// Ease the enemies' idea of the ship's position toward the real one: lagging by `enemyAimLag`
+// seconds and never faster than `enemyAimSpeed`.
+export function updateEnemyAim(game, dt) {
+  const sh = game.ship;
+  if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
+  const a = game.enemyAim;
+  const dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  if (d < 1e-6) return;
+  const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
+  a.x += dx / d * step; a.y += dy / d * step;
 }
 
 // Hold a ring around the ship at `keep` distance while circling it.
 function keepDistance(e, game, dt) {
-  const sh = game.ship;
+  const sh = enemyTarget(game);
   const dx = e.x - sh.x, dy = e.y - sh.y;
   const d = Math.hypot(dx, dy) || 1;
   const side = e.id % 2 ? 1 : -1;
@@ -101,13 +120,13 @@ function gunTimer(e, dt) {
 
 export const BEHAVIORS = {
   chase(e, game, dt) {
-    const sh = game.ship;
+    const sh = enemyTarget(game);
     steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {
     const T = e.T;
-    const sh = game.ship;
+    const sh = enemyTarget(game);
     const d = Math.hypot(sh.x - e.x, sh.y - e.y);
     e.timer -= dt;
     if (e.state === 'move') {
