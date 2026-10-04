@@ -2,7 +2,7 @@ import { createRenderer, resizeRenderer, render, screenToWorld } from './render.
 import { createInput } from './input.js';
 import { createGame, update, resolveOffer } from './world.js';
 import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
-import { loadSave, writeSave, buyUpgrade, applyRunResult } from './progression.js';
+import { loadSave, writeSave, buyUpgrade, applyRunResult, resetMeta } from './progression.js';
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
 import { buildIntent } from './controls.js';
@@ -23,6 +23,11 @@ try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.
 const debug = createDebugPanel(() => game, (id) => {
   try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
+}, () => {
+  const refund = resetMeta(save);
+  writeSave(storage, save);
+  if (mode === 'station') openStation(); // the station screen shows the new levels at once
+  return refund; // takes effect from the next run
 });
 let mode = 'station'; // station | run | result
 let offerShown = null;

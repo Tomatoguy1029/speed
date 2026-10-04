@@ -31,6 +31,18 @@ export function buyUpgrade(save, id) {
   return true;
 }
 
+// Debug: put every station upgrade back to 0 and refund the parts spent on them.
+export function resetMeta(save) {
+  let refund = 0;
+  for (const u of META_UPGRADES) {
+    const lv = save.meta[u.id] || 0;
+    for (let i = 0; i < lv; i++) refund += u.costs[i] || 0;
+  }
+  save.meta = {};
+  save.coins += refund;
+  return refund;
+}
+
 export function defaultSave() {
   return { coins: 0, meta: {}, best: { runs: 0, escapes: 0, escapeTime: null, topSpeed: 0 } };
 }

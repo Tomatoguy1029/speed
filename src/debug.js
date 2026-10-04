@@ -75,7 +75,7 @@ export function setScheme(game, id) {
   if (game) game.scheme = CONFIG.controlScheme;
 }
 
-export function createDebugPanel(getGame, onScheme) {
+export function createDebugPanel(getGame, onScheme, onResetMeta) {
   const root = document.createElement('div');
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
@@ -123,6 +123,13 @@ export function createDebugPanel(getGame, onScheme) {
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
   button('敵を消す', (g) => { g.enemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
+  if (onResetMeta) {
+    const b = document.createElement('button');
+    b.textContent = '機体強化をリセット';
+    b.title = 'ステーションの機体強化をすべて 0 に戻し、使った部品を返す';
+    b.addEventListener('click', () => { const n = onResetMeta(); b.textContent = `リセット済み（部品 +${n}）`; setTimeout(() => { b.textContent = '機体強化をリセット'; }, 1500); });
+    btns.append(b);
+  }
   button('既定値に戻す', (g) => { resetConfig(g); sync(); });
 
   const inputs = [];
