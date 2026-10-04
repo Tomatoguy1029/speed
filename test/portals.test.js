@@ -41,7 +41,7 @@ test('portal drops stay separated and nearby crowd kills replenish only once per
   assert.ok(Math.hypot(g.portals[0].x - g.portals[1].x, g.portals[0].y - g.portals[1].y) >= CONFIG.portalSpacing);
 });
 
-test('portal dash traverses and attacks the path, emits the equipped arrival wave, then waits in slow time', () => {
+test('portal dash attacks the path and arrival; waiting keeps enemies and bullets moving and can hurt the ship', () => {
   const g = portalQuiet(); portalAnchor(g, 0); portalAnchor(g, 600); g.ship.x = 0;
   const body = createEnemy('drifter', 1, 300, -3000);
   const nearby = createEnemy('swarm', 1, 620, -2900);
@@ -56,8 +56,19 @@ test('portal dash traverses and attacks the path, emits the equipped arrival wav
   assert.equal(g.portalDash?.phase, 'choose');
   assert.ok(Math.abs(g.ship.x - 600) < 1e-6);
   portalFrame(g);
-  assert.equal(g.timeScale, CONFIG.portalChooseScale);
+  assert.equal(g.timeScale, 1);
   assert.equal(g.portals.find((p) => p.manual && p.x === 600).uses, Infinity);
+  const chaser = createEnemy('swarm', 1, g.ship.x + 500, g.ship.y);
+  g.enemies.push(chaser);
+  const bullet = { kind: 'bullet', x: g.ship.x + 80, y: g.ship.y, vx: -100, vy: 0, r: 3, dmg: 7, slow: 0, life: 5 };
+  g.ebullets.push(bullet);
+  const hp = g.ship.hp, bx = bullet.x, ex = chaser.x;
+  portalFrame(g, {}, 0.1);
+  assert.ok(bx - bullet.x > 9, 'bullet advances at normal speed during the selection window');
+  assert.ok(chaser.x < ex, 'enemy keeps chasing');
+  for (let i = 0; i < 12; i++) portalFrame(g, {}, 0.05);
+  assert.equal(g.portalDash?.phase, 'choose');
+  assert.ok(g.ship.hp < hp, 'waiting at the portal gives no immunity to incoming fire');
 });
 
 test('a dropped destination loses one use per arrival and disappears after three; anchors remain', () => {
