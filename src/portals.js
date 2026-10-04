@@ -54,7 +54,7 @@ export function placePortal(game) {
 
 // Check spacing before rolling for a drop. A crowd can replenish one node, not create a pile.
 export function dropPortal(game, x, y) {
-  if (game.scheme !== 'portal') return;
+  if (game.scheme !== 'portal' || CONFIG.portalDropChance <= 0) return;
   const near = portalNearby(game, x, y);
   if (near) {
     if (!near.manual && near.uses < CONFIG.portalDropUses && game.t >= near.refillAt) {

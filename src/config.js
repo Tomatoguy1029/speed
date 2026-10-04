@@ -43,7 +43,7 @@ export const CONFIG = {
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,
   portalDropMax: 36,
-  portalDropChance: 0.18,
+  portalDropChance: 0, // temporarily disabled; portals are placed with B
   portalDropUses: 3,
   portalRefillInterval: 1.5, // nearby kills replenish at most once per this many world seconds
   portalMinHop: 100,

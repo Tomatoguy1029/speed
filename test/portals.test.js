@@ -37,13 +37,23 @@ function portalArrive(g, direction) {
   for (let i = 0; i < 300 && (g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g);
 }
 
-test('portal drops stay separated and nearby crowd kills replenish only once per interval', () => {
-  const g = portalQuiet(); g.rng = () => 0; dropPortal(g, 600, -3000);
-  const p = g.portals[0]; p.uses = 1; g.t = CONFIG.portalRefillInterval + 0.1;
-  for (let i = 0; i < 100; i++) dropPortal(g, 600 + i % 30, -3000);
-  assert.equal(g.portals.length, 1); assert.equal(p.uses, 2);
-  dropPortal(g, 600 + CONFIG.portalSpacing + 10, -3000);
-  assert.equal(g.portals.length, 2);
+test('portal drops are disabled by default; enabling them preserves spacing and refill limits', () => {
+  const g = portalQuiet(); g.rng = () => 0;
+  dropPortal(g, 600, -3000);
+  assert.equal(g.portals.length, 0);
+  const previousChance = CONFIG.portalDropChance;
+  try {
+    CONFIG.portalDropChance = 0.18;
+    dropPortal(g, 600, -3000);
+    const p = g.portals[0]; p.uses = 1; g.t = CONFIG.portalRefillInterval + 0.1;
+    for (let i = 0; i < 100; i++) dropPortal(g, 600 + i % 30, -3000);
+    assert.equal(g.portals.length, 1); assert.equal(p.uses, 2);
+    dropPortal(g, 600 + CONFIG.portalSpacing + 10, -3000);
+    assert.equal(g.portals.length, 2);
+    CONFIG.portalDropChance = 0; g.t += CONFIG.portalRefillInterval;
+    dropPortal(g, p.x, p.y);
+    assert.equal(p.uses, 2, 'disabled drops do not replenish existing portals');
+  } finally { CONFIG.portalDropChance = previousChance; }
 });
 
 test('portal traversal attacks the path and arrival; selection changes do not depart; waiting allows enemy fire', () => {
