@@ -53,7 +53,7 @@ export const MODULES = [
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
   { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
-    desc: (r) => `軌跡をなぞる速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    desc: (r) => `経路を駆け抜ける速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
     apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
   { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
     desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
@@ -80,6 +80,9 @@ export const MODULES = [
     apply: (s, m) => { s.mines = 0.6 * m; } },
 
   // レーダー: 読みの補助
+  { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
+    desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
+    apply: (s, m) => { s.portalWave = m; } },
   { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
     desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
     apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
@@ -118,10 +121,10 @@ export const MODULES = [
     desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
-    desc: (r) => `描ける軌跡の長さ +${pct(0.25 * M(r))}`,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} +${pct(0.25 * M(r))}`,
     apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
   { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
-    desc: (r) => `描ける軌跡の長さ ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
     apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
@@ -185,7 +188,9 @@ export function rollModule(rng, ctx) {
       if (s.id === ctx.lastSlot) w *= 0.35;
       return [s.id, w];
     }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw'));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
+      && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw' || ctx.scheme === 'portal')
+      && (!m.portalOnly || ctx.scheme === 'portal'));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));

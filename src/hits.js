@@ -5,13 +5,14 @@ import { getPhase } from './spawner.js';
 import { dangerAt } from './field.js';
 import { rollModule } from './modules.js';
 import { attackPower } from './combat.js';
+import { dropPortal } from './portals.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || dmg <= 0) return;
   let fresh = e.hp >= e.maxHp - 1e-6;
   // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
   // by its HP when this dash first touched it, so wave + body still count as one strike
-  if (game.draw && game.draw.phase === 'run') {
+  if ((game.draw && game.draw.phase === 'run') || game.portalDash) {
     if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
     fresh = e.dashFresh;
   }
@@ -44,6 +45,7 @@ export function killEnemy(game, e, opts = {}) {
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
   onEnemyDeath(e, game);
+  dropPortal(game, e.x, e.y);
   const phase = getPhase(game.t);
   const danger = dangerAt(Math.hypot(e.x, e.y));
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);

@@ -14,6 +14,7 @@ import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim } from './controls.js';
+import { handlePortalInput, updatePortals, portalWorldScale } from './portals.js';
 
 export const STEP = 1 / 120;
 
@@ -21,6 +22,8 @@ export function createGame(opts = {}) {
   const meta = opts.meta || {};
   const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
   const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
+  // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
+  if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
   const stats = computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
@@ -40,6 +43,7 @@ export function createGame(opts = {}) {
     phaseId: null,
     endReason: null,
     draw: null, lastPath: null,
+    portals: [], portalSerial: 0, portalDash: null, portalPreview: null,
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [] },
@@ -62,13 +66,15 @@ export function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
+  handlePortalInput(game, input);
   if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
     input = { ...input, press: false }; // the same Space press must not also place the start
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
-  if (!game.draw && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
+  if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
+  if (game.portalDash) updatePortals(game, frameDt);
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
   if (game.draw && game.draw.phase === 'run') {
     // trace every frame on real time (world steps are rare while it is nearly frozen)
@@ -78,11 +84,12 @@ export function update(game, frameDt, input) {
   }
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
+  if (game.portalDash) scale = portalWorldScale(game);
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
   game.timeScale = scale;
   game.acc += frameDt * scale;
   // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw) game.t += frameDt * (1 - scale);
+  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -120,11 +127,11 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  const ctl = game.draw ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
+  const ctl = game.draw || game.portalDash ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
   updateHeading(sh);
   const aim = schemeAim(game, input);
   sh.markX = aim.x / 100; sh.markY = aim.y / 100;
-  if (game.draw) {
+  if (game.draw || game.portalDash) {
     game.releasePending = null; // presses while drawing/running only commit the path
   } else if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
@@ -133,7 +140,7 @@ function step(game, dt, input) {
     sh.aimX = input.keyboard ? aim.x : input.aimX;
     sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
-  if (game.releasePending && !game.draw) {
+  if (game.releasePending && !game.draw && !game.portalDash) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
@@ -152,7 +159,7 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  if (!game.draw) {
+  if (!game.draw && !game.portalDash) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
     const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
     const x0 = sh.x, y0 = sh.y;
@@ -273,7 +280,7 @@ export function waveRadius(game) {
 
 // The traced path gives off a wave: enemies within reach take damage once per pass and are
 // pushed away from the path. Sampled finely so long, fast traces leave no gaps.
-function waveAlong(game, r, x0, y0, x1, y1) {
+export function waveAlong(game, r, x0, y0, x1, y1) {
   const W = waveRadius(game);
   const len = Math.hypot(x1 - x0, y1 - y0);
   const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
@@ -451,8 +458,8 @@ function runAlongPath(game, realDt) {
 }
 
 // Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
-export function previewPath(game) {
-  const d = game.draw;
+export function previewPath(game, points = null) {
+  const d = points ? { phase: 'draw', points, gauge: game.stats.gaugeMax } : game.draw;
   if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
   const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
@@ -528,7 +535,7 @@ export function damageShip(game, amount, slow, cause = 'other') {
 
 // R: hit radius of the ship (wider while tracing a drawn path).
 // run: the trace state; while tracing, an enemy can be hit again each time the band re-enters it.
-function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
+export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
   const sh = game.ship, stats = game.stats;
   const x1 = sh.x, y1 = sh.y;
   const pad = R + MAX_ENEMY_R;
@@ -686,7 +693,7 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
-  if (game.scheme === 'draw' && game.dashMeter < 1) {
+  if ((game.scheme === 'draw' || game.scheme === 'portal') && game.dashMeter < 1) {
     game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
     if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }

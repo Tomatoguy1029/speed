@@ -25,6 +25,15 @@ export const TUNABLES = [
   { key: 'moonGM', label: '小惑星の重力', min: 0, max: 1e8, step: 1e6, fmt: (v) => `${(v / 1e6).toFixed(0)}e6` },
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
+  { key: 'portalReach', label: 'ポータル：1回の到達距離（基礎）', min: 300, max: 2500, step: 50 },
+  { key: 'portalBudget', label: 'ポータル：連続突進の総距離（基礎）', min: 500, max: 6000, step: 100 },
+  { key: 'portalChooseTime', label: 'ポータル：次を選べる時間（秒）', min: 0.2, max: 3, step: 0.05 },
+  { key: 'portalChooseScale', label: 'ポータル：選択中の世界の速さ', min: 0.05, max: 1, step: 0.05 },
+  { key: 'portalHopTime', label: 'ポータル：1区間の移動時間（秒）', min: 0.05, max: 0.8, step: 0.01 },
+  { key: 'portalSpacing', label: 'ポータル：密集を防ぐ間隔', min: 100, max: 700, step: 20 },
+  { key: 'portalDropChance', label: 'ポータル：撃破での出現率', min: 0, max: 1, step: 0.02 },
+  { key: 'portalWaveRadius', label: 'ポータル：到着波動の半径', min: 0, max: 600, step: 10 },
+  { key: 'portalWaveDamage', label: 'ポータル：到着波動の威力（攻撃力比）', min: 0, max: 3, step: 0.1 },
   { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
   { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
   { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
@@ -72,7 +81,11 @@ export function jumpToPhase(game, id) {
 
 export function setScheme(game, id) {
   CONFIG.controlScheme = schemeById(id).id;
-  if (game) game.scheme = CONFIG.controlScheme;
+  if (game) {
+    game.scheme = CONFIG.controlScheme;
+    game.draw = null; game.portalDash = null; game.portalPreview = null;
+    game.ship.charging = false; game.releasePending = null;
+  }
 }
 
 export function createDebugPanel(getGame, onScheme, onResetMeta) {

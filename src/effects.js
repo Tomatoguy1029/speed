@@ -37,7 +37,7 @@ function finishDash(game) {
 export function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && game.scheme === 'draw') game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.regenGauge && (game.scheme === 'draw' || game.scheme === 'portal')) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
 }
 
 export function onShipHurt(game) {
@@ -55,7 +55,7 @@ export function updateEffects(game, dt) {
   if (sh.boostT > 0 && !game.dashActive) { game.dashActive = true; game.dashPeakAtk = 0; }
   if (game.dashActive) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
-    if (sh.boostT <= 0) finishDash(game);
+    if (sh.boostT <= 0 && !game.portalDash) finishDash(game);
   }
 
   // charge shockwave
@@ -70,7 +70,7 @@ export function updateEffects(game, dt) {
   }
 
   // trail burst marks
-  if (s.trailBurst && sh.boostT > 0 && sp > 200) {
+  if (s.trailBurst && sh.boostT > 0 && sp > 200 && !game.portalDash) {
     F.trailDist += sp * dt;
     if (F.trailDist >= 45) {
       F.trailDist = 0;

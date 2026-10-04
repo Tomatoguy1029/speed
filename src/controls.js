@@ -3,6 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
+  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動。E で現在地にポータルを置く（水色・残る）。敵から出るポータルは紫色・3回で消える。ゲージ満タンで Space → 方向キーを押してその方向のポータルへ突進。到着時は短いスロー。移動中に次の方向を押すと予約できる。同じ方向へ続けるときは押し直す。Space で終了。総移動距離が尽きるか、選ばずに待つと通常移動へ戻る' },
   { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
@@ -14,14 +15,19 @@ export const SCHEMES = [
 ];
 
 export function schemeById(id) {
-  return SCHEMES.find((s) => s.id === id) || SCHEMES[0];
+  return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'draw');
 }
 
 // Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
 // keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
 export function buildIntent(raw, scheme) {
   const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, press: !!raw.pressed, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
-  if (scheme === 'drag') {
+  if (scheme === 'portal') {
+    it.keyboard = true;
+    it.dash = !!raw.dash;
+    it.place = !!raw.place;
+    it.portalSelect = raw.portalSelect;
+  } else if (scheme === 'drag') {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
@@ -169,6 +175,7 @@ export function controlStep(game, input, dt) {
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
     }
+    case 'portal':
     case 'steer':
       if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
       return ZERO;

@@ -40,6 +40,20 @@ export const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
+  portalSpacing: 260, // minimum separation between portals (including manual ones)
+  portalManualMax: 12,
+  portalDropMax: 36,
+  portalDropChance: 0.18,
+  portalDropUses: 3,
+  portalRefillInterval: 1.5, // nearby kills replenish at most once per this many world seconds
+  portalMinHop: 100,
+  portalReach: 900, // scales with max speed and path-length modules
+  portalBudget: 2400, // total distance per activation; same growth as reach
+  portalChooseTime: 0.85, // real seconds to choose at each arrival
+  portalChooseScale: 0.15,
+  portalHopTime: 0.22, // maximum real seconds for each segment
+  portalWaveRadius: 160,
+  portalWaveDamage: 0.9,
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.05, // world speed while drawing

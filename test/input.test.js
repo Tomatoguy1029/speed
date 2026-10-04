@@ -13,6 +13,23 @@ function fakeTarget() {
 const press = (win, code, key) => win.fire('keydown', { code, key });
 const lift = (win, code, key) => win.fire('keyup', { code, key });
 
+test('portal direction and placement are fresh presses; held keys and reset do not leave queued choices', () => {
+  const win = fakeTarget(), input = createInput(fakeTarget(), win);
+  press(win, 'KeyD', 'd');
+  assert.deepEqual(input.read().portalSelect, { x: 1, y: 0 });
+  assert.equal(input.read().portalSelect, null);
+  win.fire('keydown', { code: 'KeyD', key: 'd', repeat: true });
+  assert.equal(input.read().portalSelect, null);
+  lift(win, 'KeyD', 'd'); press(win, 'KeyD', 'd'); lift(win, 'KeyD', 'd');
+  assert.deepEqual(input.read().portalSelect, { x: 1, y: 0 }, 'a tap released before the next frame still chooses');
+  press(win, 'KeyE', 'e');
+  assert.equal(input.read().place, true);
+  assert.equal(input.read().place, false);
+  press(win, 'KeyE', 'e'); input.triggerDash(); input.reset();
+  const r = input.read();
+  assert.equal(r.place, false); assert.equal(r.dash, false); assert.deepEqual(r.move, { x: 0, y: 0 });
+});
+
 test('WASD and arrows make a unit move vector; opposite keys cancel', () => {
   assert.deepEqual(moveVector(new Set(['KeyW'])), { x: 0, y: -1 });
   assert.deepEqual(moveVector(new Set(['ArrowRight'])), { x: 1, y: 0 });

@@ -98,7 +98,7 @@ function assemblyCanvas(game, slot, size = 150) {
   return c;
 }
 
-function moduleCard(mod, tag, isNew) {
+function moduleCard(mod, tag, isNew, scheme) {
   if (!mod) return el('div', { class: 'card empty' }, '空きスロット');
   const def = moduleDef(mod.id);
   const rar = RARITIES[mod.r];
@@ -107,7 +107,7 @@ function moduleCard(mod, tag, isNew) {
     el('div', { class: 'tag' }, tag),
     el('div', { class: 'name' }, `${def.name}${mod.plus ? ` +${mod.plus}` : ''}`),
     el('div', { class: 'rar', style: `color:${rar.color}` }, rar.name),
-    el('div', { class: 'desc' }, def.desc(mod.r)));
+    el('div', { class: 'desc' }, def.desc(mod.r, scheme)));
   if (isNew) card.style.borderColor = rar.color;
   return card;
 }
@@ -132,7 +132,7 @@ export function showOffer(game, onChoose) {
         el('div', { class: 'src' }, `${SOURCE_TEXT[mod.source] || '入手'}${game.offerQueue.length ? `　残り ${game.offerQueue.length}` : ''}`),
         el('h1', {}, slot.name),
         el('div', { class: 'sub' }, '付け替えると今のモジュールは捨てられる'))),
-    el('div', { class: 'cards' }, moduleCard(cur, '装備中', false), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true)),
+    el('div', { class: 'cards' }, moduleCard(cur, '装備中', false, game.scheme), el('div', { class: 'arrowcol' }, '→'), moduleCard(mod, '新規', true, game.scheme)),
     el('div', { class: 'btns' }, equip, skip),
     loadout), 'offer');
 }
@@ -163,7 +163,7 @@ export function showStation(save, onBuy, onDepart) {
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
       el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
