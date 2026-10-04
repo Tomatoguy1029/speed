@@ -159,6 +159,9 @@ export function showStation(save, onBuy, onDepart) {
   const go = el('button', { class: 'primary', onclick: onDepart }, '出発 ', el('kbd', {}, 'Enter'));
   showScreen(el('div', { class: 'panel' },
     el('div', { class: 'row' }, el('h1', {}, 'ステーション'), el('div', { class: 'coins' }, `部品 ${save.coins}`), go),
+    el('div', { class: 'version-links' },
+      el('a', { href: './draw-original.html', target: '_blank', rel: 'noopener' }, '元の版：線を描いて駆け抜ける'),
+      el('a', { href: './index.html?controls=portal', target: '_blank', rel: 'noopener' }, 'ポータル試作')),
     el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },

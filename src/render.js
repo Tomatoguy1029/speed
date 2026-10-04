@@ -491,10 +491,11 @@ function drawPortals(r, game) {
   for (const p of game.portals) {
     if (!onScreen(r, p.x, p.y, 80 / z)) continue;
     const selectable = labels.has(p.id), selected = p === target;
-    const color = p.manual ? '#5fd8ff' : '#c995ff';
+    const next = p === (d?.next || target);
+    const color = next ? '#ffe46b' : p.manual ? '#5fd8ff' : '#c995ff';
     ctx.save();
     ctx.globalAlpha = selectable || selected ? 1 : 0.4;
-    ctx.strokeStyle = color; ctx.lineWidth = (selected ? 3.5 : 2) / z;
+    ctx.strokeStyle = color; ctx.lineWidth = (next || selected ? 3.5 : 2) / z;
     ctx.fillStyle = p.manual ? 'rgba(50,150,210,0.18)' : 'rgba(150,80,220,0.2)';
     const R = 20 / z;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, TAU); ctx.fill(); ctx.stroke();
@@ -502,17 +503,32 @@ function drawPortals(r, game) {
     ctx.font = `bold ${12 / z}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillStyle = '#eef8ff';
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
     if (selectable && (d || game.dashMeter >= 1)) {
-      ctx.font = `bold ${15 / z}px ${MONO}`;
-      ctx.fillStyle = '#ffffff'; ctx.fillText(labels.get(p.id).join('/'), p.x, p.y - 29 / z);
+      ctx.font = `bold ${18 / z}px ${MONO}`;
+      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 17 / z, p.y - 47 / z, 34 / z, 25 / z);
+      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(labels.get(p.id).join('/'), p.x, p.y - 29 / z);
+      if (next) {
+        ctx.font = `bold ${15 / z}px "Hiragino Sans", sans-serif`;
+        ctx.fillText('次', p.x, p.y - 55 / z);
+      }
     }
     ctx.restore();
+  }
+  if (d?.phase === 'hop' && d.next) {
+    ctx.strokeStyle = '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([14 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(d.target.x, d.target.y); ctx.lineTo(d.next.x, d.next.y); ctx.stroke(); ctx.setLineDash([]);
   }
   if (!target) return;
   ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(95,216,255,0.14)'; ctx.lineWidth = waveRadius(game) * 2;
   ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke();
-  ctx.strokeStyle = '#d8f7ff'; ctx.lineWidth = 2.5 / z; ctx.setLineDash([10 / z, 7 / z]);
+  ctx.strokeStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([10 / z, 7 / z]);
   ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.setLineDash([]);
+  const angle = Math.atan2(target.y - sh.y, target.x - sh.x);
+  const tip = { x: target.x - Math.cos(angle) * 26 / z, y: target.y - Math.sin(angle) * 26 / z };
+  ctx.fillStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b';
+  ctx.beginPath(); ctx.moveTo(tip.x, tip.y);
+  ctx.lineTo(tip.x - Math.cos(angle - 0.5) * 16 / z, tip.y - Math.sin(angle - 0.5) * 16 / z);
+  ctx.lineTo(tip.x - Math.cos(angle + 0.5) * 16 / z, tip.y - Math.sin(angle + 0.5) * 16 / z); ctx.closePath(); ctx.fill();
   if (game.stats.portalWave) {
     ctx.strokeStyle = 'rgba(201,149,255,0.5)'; ctx.lineWidth = 1.5 / z;
     ctx.beginPath(); ctx.arc(target.x, target.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult, 0, TAU); ctx.stroke();
@@ -534,30 +550,32 @@ function drawPortals(r, game) {
 function drawPortalHud(r, game) {
   if (game.scheme !== 'portal' || game.state !== 'play') return;
   const { ctx, W, H } = r, d = game.portalDash;
-  const bw = Math.min(340, W - 32), x = (W - bw) / 2, y = H - 130;
-  ctx.fillStyle = 'rgba(8,12,28,0.8)'; ctx.fillRect(x - 8, y - 17, bw + 16, 74);
+  const bw = Math.min(360, W - 32), x = (W - bw) / 2, y = H - 145;
+  ctx.fillStyle = 'rgba(8,12,28,0.88)'; ctx.fillRect(x - 8, y - 17, bw + 16, 91);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e8f6ff';
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
-  ctx.fillText(d ? (d.phase === 'hop' ? '次の方向を押して予約・Space で終了' : '方向キーで次へ・Space で終了') : 'WASD 移動・E 設置・Space 高速攻撃', W / 2, y);
+  ctx.fillText(d ? '番号 1〜8 / WASD で「次」を変更' : 'ポータルに入ると自動で連続突進', W / 2, y);
+  ctx.fillStyle = '#b8c6ea';
+  ctx.fillText(d ? 'Space ですぐ出発・X で終了' : 'WASD 移動・E 設置・Space 手動開始', W / 2, y + 18);
   ctx.fillStyle = d ? '#9fe8ff' : game.dashMeter >= 1 ? '#ffe46b' : '#9fe8ff';
-  ctx.fillRect(x, y + 12, bw * (d ? d.remaining / d.budget : game.dashMeter), 5);
+  ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : game.dashMeter), 5);
   if (d?.phase === 'choose') {
-    ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 22, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
+    ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
   }
   ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? `残り ${Math.round(d.remaining)} / ${Math.round(d.budget)}・${d.hops} 区間`
-    : `${game.dashMeter >= 1 ? '高速攻撃 READY' : '経験値でゲージ回復'}・ポータル ${game.portals.length}`, W / 2, y + 43);
+  ctx.fillText(d ? (d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒` : '移動中・次の行き先も変更できる')
+    : `${game.dashMeter >= 1 ? '高速攻撃 READY' : '経験値でゲージ回復'}・ポータル ${game.portals.length}`, W / 2, y + 60);
   // Keep next directions readable even when a reachable portal sits outside the viewport.
   const marked = new Set();
   for (const c of portalChoices(game)) {
     if (marked.has(c.portal.id) || onScreen(r, c.portal.x, c.portal.y, 0)) continue;
     marked.add(c.portal.id);
     const p = worldToScreen(r, c.portal.x, c.portal.y);
-    const px = clamp(p.x, 30, W - 30), py = clamp(p.y, 88, H - 160);
+    const px = clamp(p.x, 30, W - 30), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
     const keys = portalChoices(game).filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
     ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 22, py - 15, 44, 30);
-    ctx.font = `bold 14px ${MONO}`; ctx.fillStyle = c.portal.manual ? '#5fd8ff' : '#c995ff';
-    ctx.fillText(keys, px, py + 5);
+    ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : c.portal.manual ? '#5fd8ff' : '#c995ff';
+    ctx.fillText(c.portal === d?.next ? `次 ${keys}` : keys, px, py + 5);
   }
 }
 

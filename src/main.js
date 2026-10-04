@@ -21,7 +21,8 @@ let game = null;
 // control scheme is a per-browser preference
 try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
-if (new URLSearchParams(window.location.search).get('controls') === 'portal') CONFIG.controlScheme = 'portal';
+const previewControls = new URLSearchParams(window.location.search).get('controls');
+if (previewControls === 'portal' || previewControls === 'draw') CONFIG.controlScheme = previewControls;
 const debug = createDebugPanel(() => game, (id) => {
   try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();

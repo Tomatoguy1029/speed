@@ -14,7 +14,7 @@ import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim } from './controls.js';
-import { handlePortalInput, updatePortals, portalWorldScale } from './portals.js';
+import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
 
 export const STEP = 1 / 120;
 
@@ -43,7 +43,7 @@ export function createGame(opts = {}) {
     phaseId: null,
     endReason: null,
     draw: null, lastPath: null,
-    portals: [], portalSerial: 0, portalDash: null, portalPreview: null,
+    portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [] },
@@ -166,6 +166,7 @@ function step(game, dt, input) {
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
     collideEnemies(game, x0, y0);
     collideBodies(game);
+    checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
@@ -266,7 +267,7 @@ export function refreshStats(game) {
 // ---- draw a path, then run it (draw scheme) ----
 
 function drawPhase(game) {
-  return game.draw ? game.draw.phase : null;
+  return game.draw ? game.draw.phase : game.portalDash ? `portal:${game.portalDash.phase}` : null;
 }
 
 export function drawBudget(game, gauge) {

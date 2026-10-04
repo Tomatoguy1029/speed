@@ -12,7 +12,7 @@ const MOVE_KEYS = {
   KeyD: [1, 0], ArrowRight: [1, 0],
 };
 const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
-const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', e: 'KeyE', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
+const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', e: 'KeyE', x: 'KeyX', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
 // Held movement keys -> unit vector (zero when none or cancelled).
 export function moveVector(keys) {
@@ -38,7 +38,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null, pressed: false, dash: false, place: false, select: null,
+    keys: new Set(), space: false, snap: null, pressed: false, dash: false, place: false, select: null, portalIndex: null, cancelDash: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
   const local = (e) => {
@@ -77,6 +77,9 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         if (fresh) st.select = moveVector(st.keys);
       }
       if (code === 'KeyE' && st.enabled) { e.preventDefault(); if (!e.repeat) st.place = true; }
+      const digit = /^[1-8]$/.test(e.key || '') ? Number(e.key) : /^Digit[1-8]$/.test(code) ? Number(code.slice(-1)) : null;
+      if (digit && st.enabled && !e.repeat) st.portalIndex = digit;
+      if (code === 'KeyX' && st.enabled && !e.repeat) st.cancelDash = true;
       if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
@@ -106,6 +109,8 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
         place: st.enabled && st.place,
         portalSelect: st.enabled ? st.select : null,
+        portalIndex: st.enabled ? st.portalIndex : null,
+        cancelDash: st.enabled && st.cancelDash,
         pointerDown: st.down,
         pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
@@ -120,9 +125,10 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       st.dash = false;
       st.place = false;
       st.select = null;
+      st.portalIndex = null; st.cancelDash = false;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.select = null; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.select = null; st.portalIndex = null; st.cancelDash = false; st.keys.clear(); st.pointerId = null; },
   };
 }

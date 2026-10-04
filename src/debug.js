@@ -27,7 +27,7 @@ export const TUNABLES = [
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'portalReach', label: 'ポータル：1回の到達距離（基礎）', min: 300, max: 2500, step: 50 },
   { key: 'portalBudget', label: 'ポータル：連続突進の総距離（基礎）', min: 500, max: 6000, step: 100 },
-  { key: 'portalChooseTime', label: 'ポータル：次を選べる時間（秒）', min: 0.2, max: 3, step: 0.05 },
+  { key: 'portalChooseTime', label: 'ポータル：自動出発までの猶予（秒）', min: 0.5, max: 8, step: 0.1 },
   { key: 'portalChooseScale', label: 'ポータル：選択中の世界の速さ', min: 0.05, max: 1, step: 0.05 },
   { key: 'portalHopTime', label: 'ポータル：1区間の移動時間（秒）', min: 0.05, max: 0.8, step: 0.01 },
   { key: 'portalSpacing', label: 'ポータル：密集を防ぐ間隔', min: 100, max: 700, step: 20 },

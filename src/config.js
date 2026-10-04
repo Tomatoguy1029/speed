@@ -49,8 +49,10 @@ export const CONFIG = {
   portalMinHop: 100,
   portalReach: 900, // scales with max speed and path-length modules
   portalBudget: 2400, // total distance per activation; same growth as reach
-  portalChooseTime: 0.85, // real seconds to choose at each arrival
-  portalChooseScale: 0.15,
+  portalChooseTime: 3, // real seconds to change the automatic next destination
+  portalChooseScale: 0.08,
+  portalEntryRadius: 28, // ship body + this radius triggers a portal on entry
+  portalEntryCooldown: 0.6, // world seconds after ending a chain
   portalHopTime: 0.22, // maximum real seconds for each segment
   portalWaveRadius: 160,
   portalWaveDamage: 0.9,
