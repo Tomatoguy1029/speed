@@ -139,6 +139,7 @@ const CONFIG = {
   portalReach: 900, // scales with max speed and path-length modules
   portalBudget: 2400, // total distance per activation; same growth as reach
   portalChooseTime: 3, // real seconds to change the automatic next destination
+  portalDirectionGrace: 0.06, // combine staggered WASD presses into a diagonal before acting
   portalChooseScale: 1, // enemies and bullets keep normal speed while choosing
   portalEntryRadius: 28, // ship body + this radius triggers a portal on entry
   portalEntryCooldown: 0.6, // world seconds after ending a chain
@@ -1564,30 +1565,34 @@ function dropPortal(game, x, y) {
   portalCreate(game, x, y, false);
 }
 
-function portalTarget(game, direction, origin = game.ship) {
-  if (!direction || !(direction.x || direction.y)) return null;
-  const len = Math.hypot(direction.x, direction.y);
-  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
-  let best = null, score = Infinity;
-  for (const { portal: p } of portalChoices(game)) {
-    const dx = p.x - origin.x, dy = p.y - origin.y, d = Math.hypot(dx, dy);
-    if (d < CONFIG.portalMinHop || d > reach || !portalClearLine(game, origin.x, origin.y, p.x, p.y)) continue;
-    const dot = (dx * direction.x + dy * direction.y) / (d * len);
-    if (dot < Math.SQRT1_2 - 1e-6) continue;
-    const s = d * (1 + 4 * (1 - dot));
-    if (s < score) { best = p; score = s; }
-  }
-  return best;
+function portalSectorIndex(x, y) {
+  return (Math.floor(Math.atan2(y, x) / (Math.PI / 4) + 0.5) + 8) % 8;
 }
 
-function portalChoices(game) {
-  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+function portalCandidates(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
   const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
   return game.portals.filter((p) => {
     const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
     return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y);
-  }).sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))
-    .slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
+  }).sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y));
+}
+
+function portalTarget(game, direction, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
+  if (!direction || !(direction.x || direction.y)) return null;
+  const sector = portalSectorIndex(direction.x, direction.y);
+  return portalCandidates(game, origin).find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === sector) ?? null;
+}
+
+function portalSectors(game) {
+  const keys = ['D', 'S+D', 'S', 'S+A', 'A', 'W+A', 'W', 'W+D'];
+  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+  const candidates = portalCandidates(game, origin);
+  return keys.map((key, i) => ({ key, angle: i * Math.PI / 4,
+    portal: candidates.find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === i) ?? null }));
+}
+
+function portalChoices(game) {
+  return portalCandidates(game).slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
 }
 
 function portalNearest(game) {
@@ -1655,6 +1660,31 @@ function stopPortalDash(game, message = '') {
   if (message) addText(game, game.ship.x, game.ship.y - 48, message, '#e8f6ff');
 }
 
+function portalLeave(game, direction) {
+  const sh = game.ship, len = Math.hypot(direction.x, direction.y);
+  stopPortalDash(game, 'ポータル離脱');
+  game.portalPreview = null;
+  sh.hx = direction.x / len; sh.hy = direction.y / len;
+  const speed = game.stats.maxSpeed * CONFIG.steerCruise;
+  sh.vx = sh.hx * speed; sh.vy = sh.hy * speed;
+  sh.boostT = 0; sh.fadeT = 0;
+}
+
+function portalSelectDirection(game, direction) {
+  const d = game.portalDash, selected = portalTarget(game, direction);
+  if (!selected) {
+    d.next = null; d.explicitNext = false; d.departOnArrival = false;
+    game.portalPreview = null;
+    if (d.phase === 'choose') portalLeave(game, direction);
+    else d.exitDirection = direction; // finish the current hop, then leave at its destination
+    return;
+  }
+  d.exitDirection = null;
+  d.next = selected; d.explicitNext = true; d.departOnArrival = d.phase === 'hop';
+  game.portalPreview = selected;
+  if (d.phase === 'choose') portalBeginHop(game, selected);
+}
+
 function handlePortalInput(game, input) {
   if (game.scheme !== 'portal') return;
   if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
@@ -1670,11 +1700,19 @@ function handlePortalInput(game, input) {
     return;
   }
   const d = game.portalDash;
-  const origin = d.phase === 'hop' ? d.target : game.ship;
+  if (input.portalSelect) {
+    const direction = input.portalSelect;
+    if (!(direction.x || direction.y)) d.directionInput = null;
+    else {
+      // A short chord window prevents W followed by D from departing upward before W+D exists.
+      d.directionInput = { direction, left: direction.x && direction.y ? 0 : d.directionInput?.left ?? CONFIG.portalDirectionGrace };
+      d.exitDirection = null; d.departOnArrival = false; d.explicitNext = false;
+    }
+  }
   const selected = input.nearestPortal ? portalNearest(game)
-    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal
-    : input.portalSelect ? portalTarget(game, input.portalSelect, origin) : null;
+    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal : null;
   if (selected) {
+    d.directionInput = null; d.exitDirection = null;
     d.next = selected; d.explicitNext = true;
     d.departOnArrival = d.phase === 'hop';
   }
@@ -1713,7 +1751,7 @@ function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
 function portalRefreshNext(game) {
   const d = game.portalDash;
   if (!d) return;
-  if (!d.explicitNext || !portalChoices(game).some((c) => c.portal === d.next)) {
+  if (!d.explicitNext || !portalCandidates(game).includes(d.next)) {
     d.next = portalDefaultNext(game);
     d.explicitNext = false;
   }
@@ -1730,9 +1768,19 @@ function portalWorldScale(game) {
 function updatePortals(game, realDt) {
   const d = game.portalDash;
   if (!d) return;
+  if (d.directionInput) {
+    d.directionInput.left -= realDt;
+    if (d.directionInput.left <= 1e-6) {
+      const direction = d.directionInput.direction;
+      d.directionInput = null;
+      portalSelectDirection(game, direction);
+      if (!game.portalDash) return;
+    }
+  }
   if (d.phase === 'choose') {
     portalRefreshNext(game);
     d.timeLeft -= realDt;
+    if (d.directionInput) return;
     if (!d.next) stopPortalDash(game, '通常移動へ');
     else if (d.timeLeft <= 0 && !portalBeginHop(game, d.next)) stopPortalDash(game, '通常移動へ');
     return;
@@ -1787,8 +1835,10 @@ function updatePortals(game, realDt) {
     attackPower(d.speed, game.stats) * CONFIG.portalWaveDamage * wave * game.stats.waveDmgMult,
     { cause: 'portalWave', color: '#c995ff', knock: 500, life: 0.45 });
   else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
+  if (d.exitDirection) { portalLeave(game, d.exitDirection); return; }
   // Include routes opened by kills while retaining an explicit choice made in flight.
   portalRefreshNext(game);
+  if (d.directionInput) return;
   if (!d.next) stopPortalDash(game, '通常移動へ');
   else if (d.departOnArrival) portalBeginHop(game, d.next);
 }
@@ -1965,7 +2015,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
-  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動、Bで設置（水色・残る）。Spaceで最寄りポータルへ突進（ゲージ不要）。敵ドロップは紫色・3回で消える。ポータルに入ると自動で連続突進。到着後はWASDでその方向のポータルへ即出発、番号1〜8でも直接移動できる。Spaceは最寄りの次候補へ即出発、Xで終了。突進中の方向・番号・Spaceは次の移動を予約し、到着後に即続行する。入力がなければ3秒後に黄色い「次」の行き先へ自動出発。待機中も敵と弾は通常速度で動く。通過した軌跡は連続突進が終わるまで残る' },
+  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動、Bで設置（水色・残る）。Spaceで最寄りポータルへ突進（ゲージ不要）。敵ドロップは紫色・3回で消える。ポータルに入ると自動で連続突進。到着後は周囲を8方向に分けてWASDで選択（斜めはW+Dなど同時押し）。その方向の最寄りへ出発し、到達できるポータルがない方向なら離脱して通常移動。番号1〜8でも直接移動できる。Spaceは最寄りの次候補へ出発、Xで終了。突進中の方向・番号・Spaceは到着後の移動を予約し、空の方向なら到着後に離脱。入力がなければ3秒後に黄色い「次」の行き先へ自動出発。待機中も敵と弾は通常速度で動く。通過した軌跡は連続突進が終わるまで残る' },
   { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
@@ -3579,6 +3629,27 @@ function drawReach(r, game) {
   ctx.setLineDash([]);
 }
 
+function drawPortalCompass(r, game, sectors) {
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  ctx.save();
+  ctx.textAlign = 'center';
+  for (const sector of sectors) {
+    const start = sector.angle - Math.PI / 8, end = sector.angle + Math.PI / 8;
+    const selected = sector.portal && sector.portal === game.portalDash.next;
+    const color = selected ? '#ffe46b' : sector.portal ? '#9fe8ff' : '#b8c4d6';
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 107 / z, start, end);
+    ctx.arc(sh.x, sh.y, 35 / z, end, start, true); ctx.closePath();
+    ctx.fillStyle = sector.portal ? 'rgba(15,65,90,0.5)' : 'rgba(8,12,28,0.65)'; ctx.fill();
+    ctx.strokeStyle = sector.portal ? 'rgba(159,232,255,0.45)' : 'rgba(184,196,214,0.25)';
+    ctx.lineWidth = 1 / z; ctx.stroke();
+    const x = sh.x + Math.cos(sector.angle) * 79 / z, y = sh.y + Math.sin(sector.angle) * 79 / z;
+    ctx.fillStyle = color; ctx.font = `bold ${13 / z}px ${MONO}`; ctx.fillText(sector.key, x, y - 2 / z);
+    ctx.font = `${10 / z}px "Hiragino Sans", sans-serif`;
+    ctx.fillText(sector.portal ? '移動' : '離脱', x, y + 12 / z);
+  }
+  ctx.restore();
+}
+
 function drawPortals(r, game) {
   if (game.scheme !== 'portal') return;
   const { ctx } = r, z = r.cam.zoom, sh = game.ship;
@@ -3595,14 +3666,17 @@ function drawPortals(r, game) {
     ctx.restore();
   }
   const choices = portalChoices(game);
+  const sectors = d ? portalSectors(game) : [];
   const labels = new Map();
   for (const c of choices) labels.set(c.portal.id, [...(labels.get(c.portal.id) || []), c.key]);
+  for (const s of sectors) if (s.portal) labels.set(s.portal.id, [...(labels.get(s.portal.id) || []), s.key]);
   const target = d?.phase === 'hop' ? d.target : game.portalPreview;
   if (d?.phase === 'choose') {
     ctx.strokeStyle = 'rgba(95,216,255,0.15)'; ctx.lineWidth = 1 / z;
     ctx.setLineDash([10 / z, 12 / z]);
     ctx.beginPath(); ctx.arc(sh.x, sh.y, Math.min(portalReach(game), d.remaining), 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
+    drawPortalCompass(r, game, sectors);
   }
   for (const p of game.portals) {
     if (!onScreen(r, p.x, p.y, 80 / z)) continue;
@@ -3620,8 +3694,9 @@ function drawPortals(r, game) {
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
     if (selectable) {
       ctx.font = `bold ${18 / z}px ${MONO}`;
-      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 17 / z, p.y - 47 / z, 34 / z, 25 / z);
-      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(labels.get(p.id).join('/'), p.x, p.y - 29 / z);
+      const label = labels.get(p.id).join('/'), width = ctx.measureText(label).width + 12 / z;
+      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - width / 2, p.y - 47 / z, width, 25 / z);
+      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(label, p.x, p.y - 29 / z);
       if (next) {
         ctx.font = `bold ${15 / z}px "Hiragino Sans", sans-serif`;
         ctx.fillText('次', p.x, p.y - 55 / z);
@@ -3672,24 +3747,25 @@ function drawPortalHud(r, game) {
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
   ctx.fillText(d ? 'WASD / 番号 1〜8 で即移動' : 'Space 最寄りポータルへ突進', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? 'Space 最寄りへ・X 終了' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
+  ctx.fillText(d ? '空の方向へWASDで離脱・Space 最寄りへ' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
   ctx.fillStyle = d ? '#9fe8ff' : '#ffe46b';
   ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
   if (d?.phase === 'choose') {
     ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
   }
   ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? (d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒` : '移動中・次の行き先も変更できる')
+  ctx.fillText(d ? (d.exitDirection ? '到着後に離脱' : d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒・斜めはW+D等` : '移動中・次の行き先も変更できる')
     : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
   // Keep next directions readable even when a reachable portal sits outside the viewport.
   const marked = new Set();
-  for (const c of portalChoices(game)) {
+  const choices = portalChoices(game), sectors = d ? portalSectors(game).filter((s) => s.portal) : [];
+  for (const c of [...choices, ...sectors]) {
     if (marked.has(c.portal.id) || onScreen(r, c.portal.x, c.portal.y, 0)) continue;
     marked.add(c.portal.id);
     const p = worldToScreen(r, c.portal.x, c.portal.y);
     const px = clamp(p.x, 30, W - 30), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
-    const keys = portalChoices(game).filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
-    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 22, py - 15, 44, 30);
+    const keys = [...choices, ...sectors].filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
+    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 40, py - 15, 80, 30);
     ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : c.portal.manual ? '#5fd8ff' : '#c995ff';
     ctx.fillText(c.portal === d?.next ? `次 ${keys}` : keys, px, py + 5);
   }

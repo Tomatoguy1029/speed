@@ -5,7 +5,7 @@ import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
-import { portalChoices, portalReach } from './portals.js';
+import { portalChoices, portalReach, portalSectors } from './portals.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -474,6 +474,27 @@ function drawReach(r, game) {
   ctx.setLineDash([]);
 }
 
+function drawPortalCompass(r, game, sectors) {
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  ctx.save();
+  ctx.textAlign = 'center';
+  for (const sector of sectors) {
+    const start = sector.angle - Math.PI / 8, end = sector.angle + Math.PI / 8;
+    const selected = sector.portal && sector.portal === game.portalDash.next;
+    const color = selected ? '#ffe46b' : sector.portal ? '#9fe8ff' : '#b8c4d6';
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 107 / z, start, end);
+    ctx.arc(sh.x, sh.y, 35 / z, end, start, true); ctx.closePath();
+    ctx.fillStyle = sector.portal ? 'rgba(15,65,90,0.5)' : 'rgba(8,12,28,0.65)'; ctx.fill();
+    ctx.strokeStyle = sector.portal ? 'rgba(159,232,255,0.45)' : 'rgba(184,196,214,0.25)';
+    ctx.lineWidth = 1 / z; ctx.stroke();
+    const x = sh.x + Math.cos(sector.angle) * 79 / z, y = sh.y + Math.sin(sector.angle) * 79 / z;
+    ctx.fillStyle = color; ctx.font = `bold ${13 / z}px ${MONO}`; ctx.fillText(sector.key, x, y - 2 / z);
+    ctx.font = `${10 / z}px "Hiragino Sans", sans-serif`;
+    ctx.fillText(sector.portal ? '移動' : '離脱', x, y + 12 / z);
+  }
+  ctx.restore();
+}
+
 function drawPortals(r, game) {
   if (game.scheme !== 'portal') return;
   const { ctx } = r, z = r.cam.zoom, sh = game.ship;
@@ -490,14 +511,17 @@ function drawPortals(r, game) {
     ctx.restore();
   }
   const choices = portalChoices(game);
+  const sectors = d ? portalSectors(game) : [];
   const labels = new Map();
   for (const c of choices) labels.set(c.portal.id, [...(labels.get(c.portal.id) || []), c.key]);
+  for (const s of sectors) if (s.portal) labels.set(s.portal.id, [...(labels.get(s.portal.id) || []), s.key]);
   const target = d?.phase === 'hop' ? d.target : game.portalPreview;
   if (d?.phase === 'choose') {
     ctx.strokeStyle = 'rgba(95,216,255,0.15)'; ctx.lineWidth = 1 / z;
     ctx.setLineDash([10 / z, 12 / z]);
     ctx.beginPath(); ctx.arc(sh.x, sh.y, Math.min(portalReach(game), d.remaining), 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
+    drawPortalCompass(r, game, sectors);
   }
   for (const p of game.portals) {
     if (!onScreen(r, p.x, p.y, 80 / z)) continue;
@@ -515,8 +539,9 @@ function drawPortals(r, game) {
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
     if (selectable) {
       ctx.font = `bold ${18 / z}px ${MONO}`;
-      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 17 / z, p.y - 47 / z, 34 / z, 25 / z);
-      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(labels.get(p.id).join('/'), p.x, p.y - 29 / z);
+      const label = labels.get(p.id).join('/'), width = ctx.measureText(label).width + 12 / z;
+      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - width / 2, p.y - 47 / z, width, 25 / z);
+      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(label, p.x, p.y - 29 / z);
       if (next) {
         ctx.font = `bold ${15 / z}px "Hiragino Sans", sans-serif`;
         ctx.fillText('次', p.x, p.y - 55 / z);
@@ -567,24 +592,25 @@ function drawPortalHud(r, game) {
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
   ctx.fillText(d ? 'WASD / 番号 1〜8 で即移動' : 'Space 最寄りポータルへ突進', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? 'Space 最寄りへ・X 終了' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
+  ctx.fillText(d ? '空の方向へWASDで離脱・Space 最寄りへ' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
   ctx.fillStyle = d ? '#9fe8ff' : '#ffe46b';
   ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
   if (d?.phase === 'choose') {
     ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
   }
   ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? (d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒` : '移動中・次の行き先も変更できる')
+  ctx.fillText(d ? (d.exitDirection ? '到着後に離脱' : d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒・斜めはW+D等` : '移動中・次の行き先も変更できる')
     : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
   // Keep next directions readable even when a reachable portal sits outside the viewport.
   const marked = new Set();
-  for (const c of portalChoices(game)) {
+  const choices = portalChoices(game), sectors = d ? portalSectors(game).filter((s) => s.portal) : [];
+  for (const c of [...choices, ...sectors]) {
     if (marked.has(c.portal.id) || onScreen(r, c.portal.x, c.portal.y, 0)) continue;
     marked.add(c.portal.id);
     const p = worldToScreen(r, c.portal.x, c.portal.y);
     const px = clamp(p.x, 30, W - 30), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
-    const keys = portalChoices(game).filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
-    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 22, py - 15, 44, 30);
+    const keys = [...choices, ...sectors].filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
+    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 40, py - 15, 80, 30);
     ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : c.portal.manual ? '#5fd8ff' : '#c995ff';
     ctx.fillText(c.portal === d?.next ? `次 ${keys}` : keys, px, py + 5);
   }

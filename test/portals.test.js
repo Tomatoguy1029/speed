@@ -5,7 +5,7 @@ import { createGame, update, addXp, refreshStats } from '../src/world.js';
 import { tracePortalLoop } from '../src/portal-loops.js';
 import { createEnemy } from '../src/enemies.js';
 import { buildIntent } from '../src/controls.js';
-import { placePortal, dropPortal, portalTarget, portalReach, portalChoices, checkPortalEntry } from '../src/portals.js';
+import { placePortal, dropPortal, portalTarget, portalReach, portalChoices, portalSectors, checkPortalEntry } from '../src/portals.js';
 
 const portalIdle = { move: { x: 0, y: 0 }, charging: false, release: false, snap: null };
 const portalRight = { x: 1, y: 0 }, portalLeft = { x: -1, y: 0 }, portalDown = { x: 0, y: 1 };
@@ -26,7 +26,7 @@ function portalArrive(g, direction) {
   if (g.portalDash?.phase === 'choose') {
     portalFrame(g, { portalSelect: direction });
   }
-  for (let i = 0; i < 300 && (g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g);
+  for (let i = 0; i < 300 && (g.portalDash?.directionInput || g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g);
 }
 
 test('portal drops stay separated and nearby crowd kills replenish only once per interval', () => {
@@ -71,7 +71,8 @@ test('portal dash attacks the path and arrival; waiting keeps enemies and bullet
   assert.equal(g.portalDash?.phase, 'choose');
   assert.ok(g.ship.hp < hp, 'waiting at the portal gives no immunity to incoming fire');
   portalFrame(g, buildIntent({ portalSelect: portalLeft, move: portalLeft }, 'portal'));
-  assert.equal(g.portalDash?.phase, 'hop', 'a direction press alone departs immediately');
+  for (let i = 0; i < 5 && g.portalDash?.directionInput; i++) portalFrame(g);
+  assert.equal(g.portalDash?.phase, 'hop', 'a direction press alone departs after the short chord window');
   assert.equal(g.portalDash.target.x, 0);
 });
 
@@ -260,4 +261,48 @@ test('crossing an old segment closes the actual polygon mid-hop; retracing and u
   const plain = portalQuiet();
   tracePortalLoop(plain, { speed: 1000, loopPath: [{ x: 0, y: -3000 }, { x: 600, y: -3000 }, { x: 600, y: -2400 }] }, 600, -2400, 0, -3000);
   assert.equal(plain.fx.loops.length, 0);
+});
+
+test('WASD targets eight exclusive sectors, selecting the nearest in each even outside numbered choices', () => {
+  const g = portalQuiet();
+  const directions = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  const anchors = directions.map(([x, y]) => portalAnchor(g, x * 600 / Math.hypot(x, y), y * 600 / Math.hypot(x, y)));
+  g.ship.x = 0; g.ship.y = -3000;
+  for (const [i, [x, y]] of directions.entries()) assert.equal(portalTarget(g, { x, y }), anchors[i]);
+  assert.deepEqual(portalSectors(g).map((s) => s.portal), anchors);
+  g.portals = [anchors[7]];
+  assert.equal(portalTarget(g, { x: 0, y: -1 }), null, 'upper-right is never borrowed by the upper sector');
+  g.portals = Array.from({ length: 9 }, (_, i) => ({ id: i + 1, manual: true, uses: Infinity,
+    x: i < 8 ? 110 + i * 50 : 0, y: i < 8 ? -3000 : -3800 }));
+  assert.equal(portalChoices(g).length, 8);
+  assert.equal(portalTarget(g, { x: 0, y: -1 }), g.portals[8], 'direction selection sees every reachable portal');
+  g.field.moons = [{ x: 0, y: -3400, r: 80, gm: 0 }];
+  assert.equal(portalTarget(g, { x: 0, y: -1 }), null, 'obstructed sectors count as exits');
+});
+
+test('an empty sector exits in that direction, keeps held movement, and cannot immediately re-enter', () => {
+  const g = portalQuiet(); portalAnchor(g, 0); portalAnchor(g, 600); g.ship.x = 0;
+  portalStart(g); portalArrive(g);
+  const y = g.ship.y, x = g.ship.x;
+  portalFrame(g, { portalSelect: { x: 0, y: -1 }, move: { x: 0, y: -1 } });
+  for (let i = 0; i < 12; i++) portalFrame(g, { move: { x: 0, y: -1 } });
+  assert.equal(g.portalDash, null);
+  assert.ok(g.ship.y < y - 20 && Math.abs(g.ship.x - x) < 1e-6);
+  assert.ok(g.ship.vy < 0 && Math.abs(g.ship.vx) < 1e-6);
+});
+
+test('staggered diagonal presses combine before choosing; an in-flight empty direction exits after arrival', () => {
+  const g = portalQuiet(); portalAnchor(g, -600); portalAnchor(g, 0); const diagonal = portalAnchor(g, 500, -500);
+  g.ship.x = -600; g.ship.y = -3000; portalStart(g); portalArrive(g);
+  portalFrame(g, { portalSelect: { x: 0, y: -1 } });
+  assert.equal(g.portalDash?.phase, 'choose', 'the first W press must not leave before D can form a diagonal');
+  portalFrame(g, { portalSelect: { x: 1, y: -1 } });
+  assert.equal(g.portalDash?.target, diagonal);
+  const flight = portalQuiet(); portalAnchor(flight, 0); portalAnchor(flight, 600); portalAnchor(flight, 600, 600);
+  flight.ship.x = 0; flight.ship.y = -3000; portalStart(flight);
+  portalFrame(flight, { portalSelect: { x: 0, y: -1 } });
+  assert.equal(flight.portalDash.phase, 'hop');
+  portalArrive(flight);
+  assert.equal(flight.portalDash, null);
+  assert.ok(Math.abs(flight.ship.x - 600) < 1e-6 && flight.ship.vy < 0, 'the hop completes before leaving upward');
 });

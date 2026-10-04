@@ -50,6 +50,7 @@ export const CONFIG = {
   portalReach: 900, // scales with max speed and path-length modules
   portalBudget: 2400, // total distance per activation; same growth as reach
   portalChooseTime: 3, // real seconds to change the automatic next destination
+  portalDirectionGrace: 0.06, // combine staggered WASD presses into a diagonal before acting
   portalChooseScale: 1, // enemies and bullets keep normal speed while choosing
   portalEntryRadius: 28, // ship body + this radius triggers a portal on entry
   portalEntryCooldown: 0.6, // world seconds after ending a chain

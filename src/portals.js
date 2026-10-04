@@ -69,30 +69,34 @@ export function dropPortal(game, x, y) {
   portalCreate(game, x, y, false);
 }
 
-export function portalTarget(game, direction, origin = game.ship) {
-  if (!direction || !(direction.x || direction.y)) return null;
-  const len = Math.hypot(direction.x, direction.y);
-  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
-  let best = null, score = Infinity;
-  for (const { portal: p } of portalChoices(game)) {
-    const dx = p.x - origin.x, dy = p.y - origin.y, d = Math.hypot(dx, dy);
-    if (d < CONFIG.portalMinHop || d > reach || !portalClearLine(game, origin.x, origin.y, p.x, p.y)) continue;
-    const dot = (dx * direction.x + dy * direction.y) / (d * len);
-    if (dot < Math.SQRT1_2 - 1e-6) continue;
-    const s = d * (1 + 4 * (1 - dot));
-    if (s < score) { best = p; score = s; }
-  }
-  return best;
+function portalSectorIndex(x, y) {
+  return (Math.floor(Math.atan2(y, x) / (Math.PI / 4) + 0.5) + 8) % 8;
 }
 
-export function portalChoices(game) {
-  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+function portalCandidates(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
   const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
   return game.portals.filter((p) => {
     const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
     return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y);
-  }).sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))
-    .slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
+  }).sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y));
+}
+
+export function portalTarget(game, direction, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
+  if (!direction || !(direction.x || direction.y)) return null;
+  const sector = portalSectorIndex(direction.x, direction.y);
+  return portalCandidates(game, origin).find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === sector) ?? null;
+}
+
+export function portalSectors(game) {
+  const keys = ['D', 'S+D', 'S', 'S+A', 'A', 'W+A', 'W', 'W+D'];
+  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+  const candidates = portalCandidates(game, origin);
+  return keys.map((key, i) => ({ key, angle: i * Math.PI / 4,
+    portal: candidates.find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === i) ?? null }));
+}
+
+export function portalChoices(game) {
+  return portalCandidates(game).slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
 }
 
 export function portalNearest(game) {
@@ -160,6 +164,31 @@ export function stopPortalDash(game, message = '') {
   if (message) addText(game, game.ship.x, game.ship.y - 48, message, '#e8f6ff');
 }
 
+function portalLeave(game, direction) {
+  const sh = game.ship, len = Math.hypot(direction.x, direction.y);
+  stopPortalDash(game, 'ポータル離脱');
+  game.portalPreview = null;
+  sh.hx = direction.x / len; sh.hy = direction.y / len;
+  const speed = game.stats.maxSpeed * CONFIG.steerCruise;
+  sh.vx = sh.hx * speed; sh.vy = sh.hy * speed;
+  sh.boostT = 0; sh.fadeT = 0;
+}
+
+function portalSelectDirection(game, direction) {
+  const d = game.portalDash, selected = portalTarget(game, direction);
+  if (!selected) {
+    d.next = null; d.explicitNext = false; d.departOnArrival = false;
+    game.portalPreview = null;
+    if (d.phase === 'choose') portalLeave(game, direction);
+    else d.exitDirection = direction; // finish the current hop, then leave at its destination
+    return;
+  }
+  d.exitDirection = null;
+  d.next = selected; d.explicitNext = true; d.departOnArrival = d.phase === 'hop';
+  game.portalPreview = selected;
+  if (d.phase === 'choose') portalBeginHop(game, selected);
+}
+
 export function handlePortalInput(game, input) {
   if (game.scheme !== 'portal') return;
   if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
@@ -175,11 +204,19 @@ export function handlePortalInput(game, input) {
     return;
   }
   const d = game.portalDash;
-  const origin = d.phase === 'hop' ? d.target : game.ship;
+  if (input.portalSelect) {
+    const direction = input.portalSelect;
+    if (!(direction.x || direction.y)) d.directionInput = null;
+    else {
+      // A short chord window prevents W followed by D from departing upward before W+D exists.
+      d.directionInput = { direction, left: direction.x && direction.y ? 0 : d.directionInput?.left ?? CONFIG.portalDirectionGrace };
+      d.exitDirection = null; d.departOnArrival = false; d.explicitNext = false;
+    }
+  }
   const selected = input.nearestPortal ? portalNearest(game)
-    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal
-    : input.portalSelect ? portalTarget(game, input.portalSelect, origin) : null;
+    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal : null;
   if (selected) {
+    d.directionInput = null; d.exitDirection = null;
     d.next = selected; d.explicitNext = true;
     d.departOnArrival = d.phase === 'hop';
   }
@@ -218,7 +255,7 @@ function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
 function portalRefreshNext(game) {
   const d = game.portalDash;
   if (!d) return;
-  if (!d.explicitNext || !portalChoices(game).some((c) => c.portal === d.next)) {
+  if (!d.explicitNext || !portalCandidates(game).includes(d.next)) {
     d.next = portalDefaultNext(game);
     d.explicitNext = false;
   }
@@ -235,9 +272,19 @@ export function portalWorldScale(game) {
 export function updatePortals(game, realDt) {
   const d = game.portalDash;
   if (!d) return;
+  if (d.directionInput) {
+    d.directionInput.left -= realDt;
+    if (d.directionInput.left <= 1e-6) {
+      const direction = d.directionInput.direction;
+      d.directionInput = null;
+      portalSelectDirection(game, direction);
+      if (!game.portalDash) return;
+    }
+  }
   if (d.phase === 'choose') {
     portalRefreshNext(game);
     d.timeLeft -= realDt;
+    if (d.directionInput) return;
     if (!d.next) stopPortalDash(game, '通常移動へ');
     else if (d.timeLeft <= 0 && !portalBeginHop(game, d.next)) stopPortalDash(game, '通常移動へ');
     return;
@@ -292,8 +339,10 @@ export function updatePortals(game, realDt) {
     attackPower(d.speed, game.stats) * CONFIG.portalWaveDamage * wave * game.stats.waveDmgMult,
     { cause: 'portalWave', color: '#c995ff', knock: 500, life: 0.45 });
   else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
+  if (d.exitDirection) { portalLeave(game, d.exitDirection); return; }
   // Include routes opened by kills while retaining an explicit choice made in flight.
   portalRefreshNext(game);
+  if (d.directionInput) return;
   if (!d.next) stopPortalDash(game, '通常移動へ');
   else if (d.departOnArrival) portalBeginHop(game, d.next);
 }
