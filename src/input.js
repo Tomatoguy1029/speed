@@ -38,7 +38,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null, pressed: false, dash: false, place: false, select: null, portalIndex: null, cancelDash: false,
+    keys: new Set(), space: false, snap: null, pressed: false, dash: false, nearestPortal: false, select: null, portalIndex: null, cancelDash: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
   const local = (e) => {
@@ -76,7 +76,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         st.keys.add(code); if (st.enabled) e.preventDefault();
         if (fresh) st.select = moveVector(st.keys);
       }
-      if (code === 'KeyE' && st.enabled) { e.preventDefault(); if (!e.repeat) st.place = true; }
+      if (code === 'KeyE' && st.enabled) { e.preventDefault(); if (!e.repeat) st.nearestPortal = true; }
       const digit = /^[1-8]$/.test(e.key || '') ? Number(e.key) : /^Digit[1-8]$/.test(code) ? Number(code.slice(-1)) : null;
       if (digit && st.enabled && !e.repeat) st.portalIndex = digit;
       if (code === 'KeyX' && st.enabled && !e.repeat) st.cancelDash = true;
@@ -107,7 +107,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         space: st.space,
         pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
-        place: st.enabled && st.place,
+        nearestPortal: st.enabled && st.nearestPortal,
         portalSelect: st.enabled ? st.select : null,
         portalIndex: st.enabled ? st.portalIndex : null,
         cancelDash: st.enabled && st.cancelDash,
@@ -123,12 +123,12 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       st.snap = null;
       st.pressed = false;
       st.dash = false;
-      st.place = false;
+      st.nearestPortal = false;
       st.select = null;
       st.portalIndex = null; st.cancelDash = false;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.select = null; st.portalIndex = null; st.cancelDash = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.nearestPortal = false; st.select = null; st.portalIndex = null; st.cancelDash = false; st.keys.clear(); st.pointerId = null; },
   };
 }

@@ -94,6 +94,19 @@ export function portalChoices(game) {
     .slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
 }
 
+export function portalNearest(game) {
+  if (game.portalDash) return portalChoices(game)[0]?.portal ?? null;
+  const sh = game.ship;
+  let nearest = null, best = Math.min(portalReach(game), CONFIG.portalBudget * portalGrowth(game));
+  for (const p of game.portals) {
+    const dist = Math.hypot(p.x - sh.x, p.y - sh.y);
+    if (dist < CONFIG.portalEntryRadius + CONFIG.shipRadius || dist > best
+      || !portalClearLine(game, sh.x, sh.y, p.x, p.y)) continue;
+    nearest = p; best = dist;
+  }
+  return nearest;
+}
+
 function portalDefaultNext(game) {
   const d = game.portalDash;
   const origin = d?.phase === 'hop' ? d.target : game.ship;
@@ -108,17 +121,17 @@ function portalDefaultNext(game) {
   return best;
 }
 
-function startPortalDash(game, entry = null) {
-  if (game.dashMeter < 1 || !portalChoices(game).length) return false;
+function startPortalDash(game, entry = null, initialTarget = null) {
+  if (game.dashMeter < 1 || (!initialTarget && !portalChoices(game).length)) return false;
   const budget = CONFIG.portalBudget * portalGrowth(game);
   game.dashMeter = 0;
   game.portalDash = { phase: 'choose', remaining: budget, budget, timeLeft: CONFIG.portalChooseTime,
     hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
-    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }] };
+    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
   game.ship.charging = false;
   onLaunch(game);
   game.ship.boostT = game.stats.boostDuration;
-  game.portalDash.next = portalDefaultNext(game);
+  game.portalDash.next = initialTarget || portalDefaultNext(game);
   game.portalPreview = game.portalDash.next;
   return true;
 }
@@ -150,30 +163,42 @@ export function handlePortalInput(game, input) {
   if (game.scheme !== 'portal') return;
   if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
   if (!game.portalDash) {
-    if (input.dash || input.place) placePortal(game);
-    game.portalPreview = portalTarget(game, input.move) || portalDefaultNext(game);
+    if (input.dash) placePortal(game);
+    const nearest = portalNearest(game);
+    game.portalPreview = nearest;
+    if (input.nearestPortal) {
+      if (nearest && startPortalDash(game, null, nearest)) {
+        portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
+      } else addText(game, game.ship.x, game.ship.y - 45,
+        game.dashMeter < 1 ? '高速攻撃ゲージが必要' : '到達できるポータルが必要', '#9fe8ff');
+    }
     return;
   }
   const d = game.portalDash;
   const origin = d.phase === 'hop' ? d.target : game.ship;
-  const selected = input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal
+  const selected = input.nearestPortal ? portalNearest(game)
+    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal
     : input.portalSelect ? portalTarget(game, input.portalSelect, origin) : null;
-  if (selected) { d.next = selected; d.explicitNext = true; }
+  if (selected) {
+    d.next = selected; d.explicitNext = true;
+    d.departOnArrival = !!input.nearestPortal && d.phase === 'hop';
+  }
   game.portalPreview = d.next;
   // Space confirms a selection while waiting; automatic departures need no button press.
-  if (input.dash && d.phase === 'choose' && d.next) portalBeginHop(game, d.next);
+  if ((input.dash || input.nearestPortal) && d.phase === 'choose' && d.next) portalBeginHop(game, d.next);
 }
 
-function portalBeginHop(game, target) {
+function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
   const d = game.portalDash, sh = game.ship;
   if (!target || !game.portals.includes(target)) return false;
   const len = Math.hypot(target.x - sh.x, target.y - sh.y);
-  if (len < CONFIG.portalMinHop || len > Math.min(portalReach(game), d.remaining)
+  if (len < minDistance || len > Math.min(portalReach(game), d.remaining)
     || !portalClearLine(game, sh.x, sh.y, target.x, target.y)) return false;
   d.previous = d.currentPortal;
   d.currentPortal = target.id;
   d.visited.add(target.id);
   d.explicitNext = false;
+  d.departOnArrival = false;
   const dx = (target.x - sh.x) / len, dy = (target.y - sh.y) / len;
   const v = launchVelocity(sh.vx, sh.vy, dx, dy, game.stats.gaugeMax, game.stats);
   const speed = Math.max(1, Math.hypot(v.vx, v.vy));
@@ -267,4 +292,5 @@ export function updatePortals(game, realDt) {
   // Include routes opened by kills while retaining an explicit choice made in flight.
   portalRefreshNext(game);
   if (!d.next) stopPortalDash(game, '通常移動へ');
+  else if (d.departOnArrival) portalBeginHop(game, d.next);
 }

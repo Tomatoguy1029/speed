@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
 import { createGame, update, addXp } from '../src/world.js';
 import { createEnemy } from '../src/enemies.js';
+import { buildIntent } from '../src/controls.js';
 import { placePortal, dropPortal, portalTarget, portalReach, portalChoices, checkPortalEntry } from '../src/portals.js';
 
 const portalIdle = { move: { x: 0, y: 0 }, charging: false, release: false, snap: null };
@@ -170,4 +171,38 @@ test('numbered choices distinguish portals in the same direction and selection n
   assert.ok(g.portalDash.timeLeft > 2.5);
   portalFrame(g, { dash: true });
   assert.equal(g.portalDash.target, choices[1].portal);
+});
+
+test('E launches toward the nearest portal without steering, confirms the nearest next hop, and can buffer it in flight', () => {
+  const g = portalQuiet();
+  const near = portalAnchor(g, -300), origin = portalAnchor(g, 0);
+  portalAnchor(g, 600); g.ship.x = 0; g.ship.hx = 1; g.ship.hy = 0;
+  portalFrame(g, buildIntent({ nearestPortal: true, move: portalIdle.move }, 'portal'));
+  assert.equal(g.portalDash.target, near, 'nearest wins even behind the heading');
+  assert.equal(g.dashMeter, 0); assert.equal(g.portals.length, 3, 'E creates no portal');
+  portalArrive(g);
+  portalFrame(g, { portalIndex: 2 });
+  portalFrame(g, { nearestPortal: true });
+  assert.equal(g.portalDash.phase, 'hop');
+  assert.equal(g.portalDash.target, origin);
+  portalFrame(g, { nearestPortal: true });
+  for (let i = 0; i < 100 && g.portalDash.hops < 2; i++) portalFrame(g);
+  assert.equal(g.portalDash.phase, 'hop', 'buffered E departs without the three-second wait');
+  assert.equal(g.portalDash.target, near);
+});
+
+test('nearest travel accepts a nearby small portal, excludes blocked routes, and never consumes an unavailable gauge', () => {
+  const close = portalQuiet(), small = portalAnchor(close, 80); close.ship.x = 0;
+  portalFrame(close, { nearestPortal: true });
+  assert.equal(close.portalDash.target, small, 'a portal closer than the ordinary minimum hop is reachable');
+  const g = portalQuiet();
+  portalAnchor(g, 300); const clear = portalAnchor(g, 0, 600); g.ship.y = -3000;
+  g.field.planet = { x: 150, y: -3000, r: 30, gm: 0 };
+  portalFrame(g, { nearestPortal: true });
+  assert.equal(g.portalDash.target, clear, 'nearest obstructed route is skipped');
+  g.portalDash = null; g.dashMeter = 0;
+  portalFrame(g, { nearestPortal: true });
+  assert.equal(g.portalDash, null); assert.equal(g.dashMeter, 0);
+  const empty = portalQuiet(); portalFrame(empty, { nearestPortal: true });
+  assert.equal(empty.portalDash, null); assert.equal(empty.dashMeter, 1);
 });

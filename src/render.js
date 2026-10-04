@@ -565,9 +565,9 @@ function drawPortalHud(r, game) {
   ctx.fillStyle = 'rgba(8,12,28,0.88)'; ctx.fillRect(x - 8, y - 17, bw + 16, 91);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e8f6ff';
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
-  ctx.fillText(d ? '番号 1〜8 / WASD で「次」を変更' : 'ポータルに入ると自動で連続突進', W / 2, y);
+  ctx.fillText(d ? '番号 1〜8 / WASD で「次」を変更' : 'E 最寄りへ突進（ゲージ満タン）', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? 'Space ですぐ出発・X で終了' : 'WASD 移動・Space ポータル設置', W / 2, y + 18);
+  ctx.fillText(d ? 'Space 出発・E 最寄りへ・X 終了' : 'WASD 移動・Space ポータル設置', W / 2, y + 18);
   ctx.fillStyle = d ? '#9fe8ff' : game.dashMeter >= 1 ? '#ffe46b' : '#9fe8ff';
   ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : game.dashMeter), 5);
   if (d?.phase === 'choose') {

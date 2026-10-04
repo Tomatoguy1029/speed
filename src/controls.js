@@ -3,7 +3,7 @@
 import { CONFIG } from './config.js';
 
 export const SCHEMES = [
-  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動、Spaceで設置（水色・残る）。敵ドロップは紫色・3回で消える。ゲージ満タンでポータルに入ると自動で連続突進。黄色い線と「次」が行き先。到着後は3秒以内に行き先を選ぶ。待機中も敵と弾は通常速度で動き、何もしなければ次へ進む。1〜8の番号キーかWASDで行き先を変更、Spaceですぐ出発、Xで終了。移動中にも次を予約できる。通過した軌跡は連続突進が終わるまで残る' },
+  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動、Spaceで設置（水色・残る）、Eで最寄りポータルへ突進（ゲージ満タンが必要）。敵ドロップは紫色・3回で消える。ゲージ満タンでポータルに入ると自動で連続突進。黄色い線と「次」が行き先。到着後は3秒以内に行き先を選ぶ。待機中も敵と弾は通常速度で動き、何もしなければ次へ進む。1〜8の番号キーかWASDで行き先を変更、Spaceですぐ出発、Eで最寄りの次候補へ即出発、Xで終了。移動中にも次を予約できる。通過した軌跡は連続突進が終わるまで残る' },
   { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
@@ -25,7 +25,7 @@ export function buildIntent(raw, scheme) {
   if (scheme === 'portal') {
     it.keyboard = true;
     it.dash = !!raw.dash;
-    it.place = !!raw.place;
+    it.nearestPortal = !!raw.nearestPortal;
     it.portalSelect = raw.portalSelect;
     it.portalIndex = raw.portalIndex;
     it.cancelDash = !!raw.cancelDash;
