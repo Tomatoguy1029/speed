@@ -13,15 +13,15 @@ function fakeTarget() {
 const press = (win, code, key) => win.fire('keydown', { code, key });
 const lift = (win, code, key) => win.fire('keyup', { code, key });
 
-test('portal direction and placement are fresh presses; held keys and reset do not leave queued choices', () => {
+test('A/D cycles follow key presses and repeats; reset clears queued choices and placement', () => {
   const win = fakeTarget(), input = createInput(fakeTarget(), win);
   press(win, 'KeyD', 'd');
-  assert.deepEqual(input.read().portalSelect, { x: 1, y: 0 });
-  assert.equal(input.read().portalSelect, null);
+  assert.equal(input.read().portalCycle, 1);
+  assert.equal(input.read().portalCycle, 0);
   win.fire('keydown', { code: 'KeyD', key: 'd', repeat: true });
-  assert.equal(input.read().portalSelect, null);
+  assert.equal(input.read().portalCycle, 1, 'holding D can scan through many candidate lines');
   lift(win, 'KeyD', 'd'); press(win, 'KeyD', 'd'); lift(win, 'KeyD', 'd');
-  assert.deepEqual(input.read().portalSelect, { x: 1, y: 0 }, 'a tap released before the next frame still chooses');
+  assert.equal(input.read().portalCycle, 1, 'a tap released before the next frame still chooses');
   press(win, 'KeyB', 'b');
   assert.equal(input.read().place, true);
   assert.equal(input.read().place, false);

@@ -44,6 +44,7 @@ export function createGame(opts = {}) {
     endReason: null,
     draw: null, lastPath: null,
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
+    portalSpace: { armed: false, seconds: 0, consumed: false },
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
@@ -66,7 +67,7 @@ export function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
-  handlePortalInput(game, input);
+  handlePortalInput(game, input, frameDt);
   if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
     input = { ...input, press: false }; // the same Space press must not also place the start

@@ -138,8 +138,7 @@ const CONFIG = {
   portalMinHop: 100,
   portalReach: 900, // scales with max speed and path-length modules
   portalBudget: 2400, // total distance per activation; same growth as reach
-  portalChooseTime: 3, // real seconds to change the automatic next destination
-  portalDirectionGrace: 0.06, // combine staggered WASD presses into a diagonal before acting
+  portalExitHold: 1.5, // real seconds holding Space to leave; a short release confirms a route
   portalChooseScale: 1, // enemies and bullets keep normal speed while choosing
   portalEntryRadius: 28, // ship body + this radius triggers a portal on entry
   portalEntryCooldown: 0.6, // world seconds after ending a chain
@@ -1565,38 +1564,30 @@ function dropPortal(game, x, y) {
   portalCreate(game, x, y, false);
 }
 
-function portalSectorIndex(x, y) {
-  return (Math.floor(Math.atan2(y, x) / (Math.PI / 4) + 0.5) + 8) % 8;
-}
-
-function portalCandidates(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
-  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
-  return game.portals.filter((p) => {
-    const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
-    return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y);
-  }).sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y));
-}
-
-function portalTarget(game, direction, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship) {
-  if (!direction || !(direction.x || direction.y)) return null;
-  const sector = portalSectorIndex(direction.x, direction.y);
-  return portalCandidates(game, origin).find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === sector) ?? null;
-}
-
-function portalSectors(game) {
-  const keys = ['D', 'S+D', 'S', 'S+A', 'A', 'W+A', 'W', 'W+D'];
-  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
-  const candidates = portalCandidates(game, origin);
-  return keys.map((key, i) => ({ key, angle: i * Math.PI / 4,
-    portal: candidates.find((p) => portalSectorIndex(p.x - origin.x, p.y - origin.y) === i) ?? null }));
+function portalEdgeKey(a, b) {
+  const pa = `${a.x},${a.y}`, pb = `${b.x},${b.y}`;
+  return pa < pb ? `${pa}|${pb}` : `${pb}|${pa}`;
 }
 
 function portalChoices(game) {
-  return portalCandidates(game).slice(0, 8).map((p, i) => ({ key: String(i + 1), portal: p }));
+  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
+  const angle = (p) => (Math.atan2(p.y - origin.y, p.x - origin.x) + Math.PI * 2.5) % (Math.PI * 2);
+  return game.portals.filter((p) => {
+    const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
+    return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y)
+      && !game.portalDash?.usedEdges.has(portalEdgeKey(origin, p));
+  }).sort((a, b) => angle(a) - angle(b)
+    || Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y)
+    || a.id - b.id).map((p, i) => ({ key: String(i + 1), portal: p }));
 }
 
 function portalNearest(game) {
-  if (game.portalDash) return portalChoices(game)[0]?.portal ?? null;
+  if (game.portalDash) {
+    const origin = game.portalDash.phase === 'hop' ? game.portalDash.target : game.ship;
+    return portalChoices(game).map((c) => c.portal).sort((a, b) =>
+      Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0] ?? null;
+  }
   const sh = game.ship;
   let nearest = null, best = Math.min(portalReach(game), CONFIG.portalBudget * portalGrowth(game));
   for (const p of game.portals) {
@@ -1625,7 +1616,8 @@ function portalDefaultNext(game) {
 function startPortalDash(game, entry = null, initialTarget = null) {
   if (!initialTarget && !portalChoices(game).length) return false;
   const budget = CONFIG.portalBudget * portalGrowth(game);
-  game.portalDash = { phase: 'choose', remaining: budget, budget, timeLeft: CONFIG.portalChooseTime,
+  if (entry) { game.ship.x = entry.x; game.ship.y = entry.y; }
+  game.portalDash = { phase: 'choose', remaining: budget, budget, usedEdges: new Set(),
     hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
     visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }],
     loopPath: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
@@ -1639,7 +1631,7 @@ function startPortalDash(game, entry = null, initialTarget = null) {
 
 // Sweep the movement segment so fast entries are detected even between physics ticks.
 function checkPortalEntry(game, x0, y0) {
-  if (game.scheme !== 'portal' || game.portalDash) return;
+  if (game.scheme !== 'portal' || game.portalDash || game.portalSpace.consumed) return;
   const sh = game.ship, R = CONFIG.portalEntryRadius + CONFIG.shipRadius;
   const previousTouch = game.portalTouch;
   game.portalTouch = game.portals.find((p) => Math.hypot(p.x - sh.x, p.y - sh.y) < R)?.id ?? null;
@@ -1650,11 +1642,12 @@ function checkPortalEntry(game, x0, y0) {
     const t = segCircleT(x0, y0, sh.x, sh.y, p.x, p.y, R);
     if (t >= 0 && t < first) { entry = p; first = t; }
   }
-  if (entry && startPortalDash(game, entry)) portalBeginHop(game, game.portalDash.next);
+  if (entry) startPortalDash(game, entry);
 }
 
 function stopPortalDash(game, message = '') {
   game.portalDash = null;
+  game.portalPreview = null;
   game.portalEntryT = game.t + CONFIG.portalEntryCooldown;
   game.ship.boostT = game.stats.boostDuration;
   if (message) addText(game, game.ship.x, game.ship.y - 48, message, '#e8f6ff');
@@ -1670,55 +1663,46 @@ function portalLeave(game, direction) {
   sh.boostT = 0; sh.fadeT = 0;
 }
 
-function portalSelectDirection(game, direction) {
-  const d = game.portalDash, selected = portalTarget(game, direction);
-  if (!selected) {
-    d.next = null; d.explicitNext = false; d.departOnArrival = false;
-    game.portalPreview = null;
-    if (d.phase === 'choose') portalLeave(game, direction);
-    else d.exitDirection = direction; // finish the current hop, then leave at its destination
-    return;
-  }
-  d.exitDirection = null;
-  d.next = selected; d.explicitNext = true; d.departOnArrival = d.phase === 'hop';
-  game.portalPreview = selected;
-  if (d.phase === 'choose') portalBeginHop(game, selected);
-}
-
-function handlePortalInput(game, input) {
+function handlePortalInput(game, input, realDt = 0) {
   if (game.scheme !== 'portal') return;
-  if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
+  const press = game.portalSpace;
+  if (input.portalPressed) { press.armed = true; press.seconds = 0; press.consumed = false; }
+  if (press.armed && input.portalHolding) press.seconds += realDt;
+  if (press.armed && input.portalHeldTime !== undefined) press.seconds = Math.max(press.seconds, input.portalHeldTime);
+  if (press.armed && !press.consumed && press.seconds >= CONFIG.portalExitHold) {
+    press.consumed = true;
+    if (game.portalDash) portalLeave(game, input.move?.x || input.move?.y ? input.move : { x: game.ship.hx, y: game.ship.hy });
+  }
+  const confirm = !!input.portalReleased && press.armed && !press.consumed;
+  if (input.portalReleased || (!input.portalHolding && !input.portalPressed)) {
+    press.armed = false; press.seconds = 0; press.consumed = false;
+  }
   if (!game.portalDash) {
     if (input.place) placePortal(game);
     const nearest = portalNearest(game);
     game.portalPreview = nearest;
-    if (input.nearestPortal) {
-      if (nearest && startPortalDash(game, null, nearest)) {
-        portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
-      } else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
+    if (confirm) {
+      const entry = game.portals.find((p) => Math.hypot(p.x - game.ship.x, p.y - game.ship.y) < CONFIG.portalEntryRadius + CONFIG.shipRadius);
+      if (nearest && startPortalDash(game, entry, nearest)) portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
+      else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
     }
     return;
   }
   const d = game.portalDash;
-  if (input.portalSelect) {
-    const direction = input.portalSelect;
-    if (!(direction.x || direction.y)) d.directionInput = null;
-    else {
-      // A short chord window prevents W followed by D from departing upward before W+D exists.
-      d.directionInput = { direction, left: direction.x && direction.y ? 0 : d.directionInput?.left ?? CONFIG.portalDirectionGrace };
-      d.exitDirection = null; d.departOnArrival = false; d.explicitNext = false;
+  portalRefreshNext(game);
+  if (input.portalCycle) {
+    const choices = portalChoices(game);
+    if (choices.length) {
+      const current = Math.max(0, choices.findIndex((c) => c.portal === d.next));
+      const index = ((current + input.portalCycle) % choices.length + choices.length) % choices.length;
+      d.next = choices[index].portal; d.explicitNext = true;
     }
   }
-  const selected = input.nearestPortal ? portalNearest(game)
-    : input.portalIndex ? portalChoices(game)[input.portalIndex - 1]?.portal : null;
-  if (selected) {
-    d.directionInput = null; d.exitDirection = null;
-    d.next = selected; d.explicitNext = true;
-    d.departOnArrival = d.phase === 'hop';
-  }
   game.portalPreview = d.next;
-  // A fresh direction, number, or nearest command selects and departs in one action.
-  if (selected && d.phase === 'choose') portalBeginHop(game, selected);
+  if (confirm && d.next) {
+    if (d.phase === 'choose') portalBeginHop(game, d.next);
+    else d.departOnArrival = true;
+  }
 }
 
 function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
@@ -1726,7 +1710,9 @@ function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
   if (!target || !game.portals.includes(target)) return false;
   const len = Math.hypot(target.x - sh.x, target.y - sh.y);
   if (len < minDistance || len > Math.min(portalReach(game), d.remaining)
-    || !portalClearLine(game, sh.x, sh.y, target.x, target.y)) return false;
+    || !portalClearLine(game, sh.x, sh.y, target.x, target.y)
+    || d.usedEdges.has(portalEdgeKey(sh, target))) return false;
+  d.usedEdges.add(portalEdgeKey(sh, target));
   d.previous = d.currentPortal;
   d.currentPortal = target.id;
   d.visited.add(target.id);
@@ -1751,7 +1737,7 @@ function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
 function portalRefreshNext(game) {
   const d = game.portalDash;
   if (!d) return;
-  if (!d.explicitNext || !portalCandidates(game).includes(d.next)) {
+  if (!portalChoices(game).some((c) => c.portal === d.next)) {
     d.next = portalDefaultNext(game);
     d.explicitNext = false;
   }
@@ -1768,23 +1754,7 @@ function portalWorldScale(game) {
 function updatePortals(game, realDt) {
   const d = game.portalDash;
   if (!d) return;
-  if (d.directionInput) {
-    d.directionInput.left -= realDt;
-    if (d.directionInput.left <= 1e-6) {
-      const direction = d.directionInput.direction;
-      d.directionInput = null;
-      portalSelectDirection(game, direction);
-      if (!game.portalDash) return;
-    }
-  }
-  if (d.phase === 'choose') {
-    portalRefreshNext(game);
-    d.timeLeft -= realDt;
-    if (d.directionInput) return;
-    if (!d.next) stopPortalDash(game, '通常移動へ');
-    else if (d.timeLeft <= 0 && !portalBeginHop(game, d.next)) stopPortalDash(game, '通常移動へ');
-    return;
-  }
+  if (d.phase === 'choose') { portalRefreshNext(game); return; }
   const sh = game.ship;
   let travel = Math.min(d.left, d.rate * realDt);
   // Small swept steps keep body hits, wave hits, obstacles and trail explosions in travel order.
@@ -1829,18 +1799,16 @@ function updatePortals(game, realDt) {
     if (d.target.uses <= 0) game.portals = game.portals.filter((p) => p !== d.target);
   }
   d.hops++;
-  d.phase = 'choose'; d.timeLeft = CONFIG.portalChooseTime;
+  d.phase = 'choose';
   const wave = game.stats.portalWave;
   if (wave) explode(game, sh.x, sh.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult,
     attackPower(d.speed, game.stats) * CONFIG.portalWaveDamage * wave * game.stats.waveDmgMult,
     { cause: 'portalWave', color: '#c995ff', knock: 500, life: 0.45 });
   else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
-  if (d.exitDirection) { portalLeave(game, d.exitDirection); return; }
   // Include routes opened by kills while retaining an explicit choice made in flight.
   portalRefreshNext(game);
-  if (d.directionInput) return;
-  if (!d.next) stopPortalDash(game, '通常移動へ');
-  else if (d.departOnArrival) portalBeginHop(game, d.next);
+  if (d.departOnArrival && d.next) portalBeginHop(game, d.next);
+  else d.departOnArrival = false;
 }
 
 // ---- hits.js ----
@@ -2015,7 +1983,7 @@ function speedStage(sp) {
 
 
 const SCHEMES = [
-  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で移動、Bで設置（水色・残る）。Spaceで最寄りポータルへ突進（ゲージ不要）。敵ドロップは紫色・3回で消える。ポータルに入ると自動で連続突進。到着後は周囲を8方向に分けてWASDで選択（斜めはW+Dなど同時押し）。その方向の最寄りへ出発し、到達できるポータルがない方向なら離脱して通常移動。番号1〜8でも直接移動できる。Spaceは最寄りの次候補へ出発、Xで終了。突進中の方向・番号・Spaceは到着後の移動を予約し、空の方向なら到着後に離脱。入力がなければ3秒後に黄色い「次」の行き先へ自動出発。待機中も敵と弾は通常速度で動く。通過した軌跡は連続突進が終わるまで残る' },
+  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、1.5秒長押しで離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。同じ辺は一回のアタック中に往復も含めて再利用できない。敵ドロップは紫色・3回で消える。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
   { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
@@ -2037,10 +2005,11 @@ function buildIntent(raw, scheme) {
   if (scheme === 'portal') {
     it.keyboard = true;
     it.place = !!raw.place;
-    it.nearestPortal = !!raw.dash;
-    it.portalSelect = raw.portalSelect;
-    it.portalIndex = raw.portalIndex;
-    it.cancelDash = !!raw.cancelDash;
+    it.portalPressed = !!raw.dash;
+    it.portalHolding = !!raw.space;
+    it.portalHeldTime = raw.spaceHeldTime;
+    it.portalReleased = !!raw.release && raw.releaseSource === 'space';
+    it.portalCycle = raw.portalCycle || 0;
   } else if (scheme === 'drag') {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
@@ -2273,6 +2242,7 @@ function createGame(opts = {}) {
     endReason: null,
     draw: null, lastPath: null,
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
+    portalSpace: { armed: false, seconds: 0, consumed: false },
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
@@ -2295,7 +2265,7 @@ function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
-  handlePortalInput(game, input);
+  handlePortalInput(game, input, frameDt);
   if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
     input = { ...input, press: false }; // the same Space press must not also place the start
@@ -3629,145 +3599,114 @@ function drawReach(r, game) {
   ctx.setLineDash([]);
 }
 
-function drawPortalCompass(r, game, sectors) {
-  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
-  ctx.save();
-  ctx.textAlign = 'center';
-  for (const sector of sectors) {
-    const start = sector.angle - Math.PI / 8, end = sector.angle + Math.PI / 8;
-    const selected = sector.portal && sector.portal === game.portalDash.next;
-    const color = selected ? '#ffe46b' : sector.portal ? '#9fe8ff' : '#b8c4d6';
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, 107 / z, start, end);
-    ctx.arc(sh.x, sh.y, 35 / z, end, start, true); ctx.closePath();
-    ctx.fillStyle = sector.portal ? 'rgba(15,65,90,0.5)' : 'rgba(8,12,28,0.65)'; ctx.fill();
-    ctx.strokeStyle = sector.portal ? 'rgba(159,232,255,0.45)' : 'rgba(184,196,214,0.25)';
-    ctx.lineWidth = 1 / z; ctx.stroke();
-    const x = sh.x + Math.cos(sector.angle) * 79 / z, y = sh.y + Math.sin(sector.angle) * 79 / z;
-    ctx.fillStyle = color; ctx.font = `bold ${13 / z}px ${MONO}`; ctx.fillText(sector.key, x, y - 2 / z);
-    ctx.font = `${10 / z}px "Hiragino Sans", sans-serif`;
-    ctx.fillText(sector.portal ? '移動' : '離脱', x, y + 12 / z);
-  }
-  ctx.restore();
+function drawPortalRoute(r, origin, target, color, width, arrow = false) {
+  const { ctx } = r, z = r.cam.zoom;
+  ctx.strokeStyle = color; ctx.lineWidth = width / z;
+  ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+  if (!arrow) return;
+  const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
+  const x = target.x - Math.cos(angle) * 26 / z, y = target.y - Math.sin(angle) * 26 / z;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.lineTo(x - Math.cos(angle - 0.5) * 18 / z, y - Math.sin(angle - 0.5) * 18 / z);
+  ctx.lineTo(x - Math.cos(angle + 0.5) * 18 / z, y - Math.sin(angle + 0.5) * 18 / z);
+  ctx.closePath(); ctx.fill();
 }
 
 function drawPortals(r, game) {
   if (game.scheme !== 'portal') return;
-  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
-  const d = game.portalDash;
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship, d = game.portalDash;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d?.path.length) {
-    // Keep every completed segment; the live endpoint follows the ship mid-hop.
-    ctx.save();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(d.path[0].x, d.path[0].y);
     for (let i = 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.lineTo(sh.x, sh.y);
     ctx.strokeStyle = 'rgba(95,216,255,0.18)'; ctx.lineWidth = 12 / z; ctx.stroke();
     ctx.strokeStyle = 'rgba(145,235,255,0.85)'; ctx.lineWidth = 3 / z; ctx.stroke();
-    ctx.restore();
   }
-  const choices = portalChoices(game);
-  const sectors = d ? portalSectors(game) : [];
-  const labels = new Map();
-  for (const c of choices) labels.set(c.portal.id, [...(labels.get(c.portal.id) || []), c.key]);
-  for (const s of sectors) if (s.portal) labels.set(s.portal.id, [...(labels.get(s.portal.id) || []), s.key]);
-  const target = d?.phase === 'hop' ? d.target : game.portalPreview;
-  if (d?.phase === 'choose') {
-    ctx.strokeStyle = 'rgba(95,216,255,0.15)'; ctx.lineWidth = 1 / z;
-    ctx.setLineDash([10 / z, 12 / z]);
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, Math.min(portalReach(game), d.remaining), 0, TAU); ctx.stroke();
-    ctx.setLineDash([]);
-    drawPortalCompass(r, game, sectors);
+  const choices = portalChoices(game), labels = new Map(choices.map((c) => [c.portal.id, c.key]));
+  const origin = d?.phase === 'hop' ? d.target : sh;
+  const next = d ? d.next : game.portalPreview;
+  // Every selectable edge is drawn, including those extending beyond the viewport.
+  if (d) for (const { portal } of choices) drawPortalRoute(r, origin, portal, 'rgba(160,210,235,0.3)', 1.2);
+  if (next) {
+    drawPortalRoute(r, origin, next, 'rgba(255,228,107,0.2)', 10);
+    drawPortalRoute(r, origin, next, '#ffe46b', 4, true);
+    ctx.strokeStyle = '#ffe46b'; ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(next.x, next.y, 28 / z, 0, TAU); ctx.stroke();
   }
+  const target = d?.phase === 'hop' ? d.target : next;
+  if (d?.phase === 'hop') drawPortalRoute(r, sh, d.target, '#d8f7ff', 3, true);
   for (const p of game.portals) {
     if (!onScreen(r, p.x, p.y, 80 / z)) continue;
-    const selectable = labels.has(p.id), selected = p === target;
-    const next = p === (d?.next || target);
-    const color = next ? '#ffe46b' : p.manual ? '#5fd8ff' : '#c995ff';
-    ctx.save();
-    ctx.globalAlpha = selectable || selected ? 1 : 0.4;
-    ctx.strokeStyle = color; ctx.lineWidth = (next || selected ? 3.5 : 2) / z;
+    const selected = p === next, selectable = labels.has(p.id);
+    const color = selected ? '#ffe46b' : p.manual ? '#5fd8ff' : '#c995ff';
+    ctx.save(); ctx.globalAlpha = selectable || p === target ? 1 : 0.4;
+    ctx.strokeStyle = color; ctx.lineWidth = (selected ? 3.5 : 2) / z;
     ctx.fillStyle = p.manual ? 'rgba(50,150,210,0.18)' : 'rgba(150,80,220,0.2)';
     const R = 20 / z;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.65, game.t * 2, game.t * 2 + Math.PI * 1.5); ctx.stroke();
     ctx.font = `bold ${12 / z}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillStyle = '#eef8ff';
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
-    if (selectable) {
-      ctx.font = `bold ${18 / z}px ${MONO}`;
-      const label = labels.get(p.id).join('/'), width = ctx.measureText(label).width + 12 / z;
-      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - width / 2, p.y - 47 / z, width, 25 / z);
-      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(label, p.x, p.y - 29 / z);
-      if (next) {
-        ctx.font = `bold ${15 / z}px "Hiragino Sans", sans-serif`;
-        ctx.fillText('次', p.x, p.y - 55 / z);
-      }
+    if (selected) {
+      ctx.font = `bold ${16 / z}px "Hiragino Sans", sans-serif`;
+      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 32 / z, p.y - 50 / z, 64 / z, 24 / z);
+      ctx.fillStyle = '#ffe46b'; ctx.fillText(`次 ${labels.get(p.id) || ''}`, p.x, p.y - 32 / z);
     }
     ctx.restore();
   }
-  if (d?.phase === 'hop' && d.next) {
-    ctx.strokeStyle = '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([14 / z, 8 / z]);
-    ctx.beginPath(); ctx.moveTo(d.target.x, d.target.y); ctx.lineTo(d.next.x, d.next.y); ctx.stroke(); ctx.setLineDash([]);
+  if (target) {
+    ctx.strokeStyle = 'rgba(95,216,255,0.14)'; ctx.lineWidth = waveRadius(game) * 2;
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+    if (game.stats.portalWave) {
+      ctx.strokeStyle = 'rgba(201,149,255,0.5)'; ctx.lineWidth = 1.5 / z;
+      ctx.beginPath(); ctx.arc(target.x, target.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult, 0, TAU); ctx.stroke();
+    }
+    if (d?.phase !== 'hop') {
+      const preview = previewPath(game, [{ x: sh.x, y: sh.y }, target]);
+      for (const [e, t] of preview.targets) {
+        ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? '#ffffff' : '#5fd8ff'; ctx.lineWidth = 2 / z;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 / z, 0, TAU); ctx.stroke();
+      }
+      if (preview.block) {
+        const q = preview.block, k = 10 / z;
+        ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 3 / z;
+        ctx.beginPath(); ctx.moveTo(q.x - k, q.y - k); ctx.lineTo(q.x + k, q.y + k);
+        ctx.moveTo(q.x + k, q.y - k); ctx.lineTo(q.x - k, q.y + k); ctx.stroke();
+      }
+    }
   }
-  if (!target) return;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(95,216,255,0.14)'; ctx.lineWidth = waveRadius(game) * 2;
-  ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke();
-  ctx.strokeStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([10 / z, 7 / z]);
-  ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.setLineDash([]);
-  const angle = Math.atan2(target.y - sh.y, target.x - sh.x);
-  const tip = { x: target.x - Math.cos(angle) * 26 / z, y: target.y - Math.sin(angle) * 26 / z };
-  ctx.fillStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b';
-  ctx.beginPath(); ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x - Math.cos(angle - 0.5) * 16 / z, tip.y - Math.sin(angle - 0.5) * 16 / z);
-  ctx.lineTo(tip.x - Math.cos(angle + 0.5) * 16 / z, tip.y - Math.sin(angle + 0.5) * 16 / z); ctx.closePath(); ctx.fill();
-  if (game.stats.portalWave) {
-    ctx.strokeStyle = 'rgba(201,149,255,0.5)'; ctx.lineWidth = 1.5 / z;
-    ctx.beginPath(); ctx.arc(target.x, target.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult, 0, TAU); ctx.stroke();
-  }
-  if (d?.phase === 'hop') return;
-  const preview = previewPath(game, [{ x: sh.x, y: sh.y }, target]);
-  for (const [e, t] of preview.targets) {
-    ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? '#ffffff' : '#5fd8ff'; ctx.lineWidth = 2 / z;
-    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 / z, 0, TAU); ctx.stroke();
-  }
-  if (preview.block) {
-    const b = preview.block, k = 10 / z;
-    ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 3 / z;
-    ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k);
-    ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
-  }
+  ctx.restore();
 }
 
 function drawPortalHud(r, game) {
   if (game.scheme !== 'portal' || game.state !== 'play') return;
-  const { ctx, W, H } = r, d = game.portalDash;
+  const { ctx, W, H } = r, d = game.portalDash, press = game.portalSpace;
+  const choices = portalChoices(game), index = choices.findIndex((c) => c.portal === d?.next);
   const bw = Math.min(360, W - 32), x = (W - bw) / 2, y = H - 145;
   ctx.fillStyle = 'rgba(8,12,28,0.88)'; ctx.fillRect(x - 8, y - 17, bw + 16, 91);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e8f6ff';
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
-  ctx.fillText(d ? 'WASD / 番号 1〜8 で即移動' : 'Space 最寄りポータルへ突進', W / 2, y);
+  ctx.fillText(d ? `A / D 選択 ${index + 1}/${choices.length}・Space 短押しで移動` : 'Space 短押しで最寄りポータルへ', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? '空の方向へWASDで離脱・Space 最寄りへ' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
-  ctx.fillStyle = d ? '#9fe8ff' : '#ffe46b';
-  ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
-  if (d?.phase === 'choose') {
-    ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
+  ctx.fillText(d ? `Space ${CONFIG.portalExitHold.toFixed(1)}秒長押しで離脱` : 'WASD 移動・B ポータル設置', W / 2, y + 18);
+  ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
+  const holding = press.armed && !press.consumed;
+  if (holding && d) {
+    ctx.fillStyle = '#ffb340'; ctx.fillRect(x, y + 40, bw * Math.min(1, press.seconds / CONFIG.portalExitHold), 4);
   }
-  ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? (d.exitDirection ? '到着後に離脱' : d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒・斜めはW+D等` : '移動中・次の行き先も変更できる')
+  ctx.font = `11px ${MONO}`; ctx.fillStyle = holding && d ? '#ffcf83' : '#b8c6ea';
+  ctx.fillText(d ? (holding ? `離脱まで ${(Math.max(0, CONFIG.portalExitHold - press.seconds)).toFixed(1)} 秒`
+    : !d.next ? '行き先なし・Space 長押しで離脱' : d.phase === 'hop' ? '移動中・A/Dで次を選択できる' : '黄色い太線が次の行き先')
     : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
-  // Keep next directions readable even when a reachable portal sits outside the viewport.
-  const marked = new Set();
-  const choices = portalChoices(game), sectors = d ? portalSectors(game).filter((s) => s.portal) : [];
-  for (const c of [...choices, ...sectors]) {
-    if (marked.has(c.portal.id) || onScreen(r, c.portal.x, c.portal.y, 0)) continue;
-    marked.add(c.portal.id);
+  for (const c of choices) {
+    if (onScreen(r, c.portal.x, c.portal.y, 0)) continue;
     const p = worldToScreen(r, c.portal.x, c.portal.y);
-    const px = clamp(p.x, 30, W - 30), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
-    const keys = [...choices, ...sectors].filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
-    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 40, py - 15, 80, 30);
-    ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : c.portal.manual ? '#5fd8ff' : '#c995ff';
-    ctx.fillText(c.portal === d?.next ? `次 ${keys}` : keys, px, py + 5);
+    const px = clamp(p.x, 36, W - 36), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
+    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 32, py - 15, 64, 30);
+    ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : '#8bb9ca';
+    ctx.fillText(c.portal === d?.next ? `次 ${c.key}` : c.key, px, py + 5);
   }
 }
 
@@ -4469,7 +4408,7 @@ const MOVE_KEYS = {
   KeyD: [1, 0], ArrowRight: [1, 0],
 };
 const SNAP_KEYS = { KeyW: 'forward', ArrowUp: 'forward', KeyS: 'back', ArrowDown: 'back' };
-const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', b: 'KeyB', x: 'KeyX', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
+const KEY_CODES = { a: 'KeyA', d: 'KeyD', w: 'KeyW', s: 'KeyS', b: 'KeyB', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', arrowup: 'ArrowUp', arrowdown: 'ArrowDown' };
 
 // Held movement keys -> unit vector (zero when none or cancelled).
 function moveVector(keys) {
@@ -4495,7 +4434,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, snap: null, pressed: false, dash: false, place: false, select: null, portalIndex: null, cancelDash: false,
+    keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
   const local = (e) => {
@@ -4531,28 +4470,29 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       if (MOVE_KEYS[code]) {
         const fresh = st.enabled && !e.repeat && !st.keys.has(code);
         st.keys.add(code); if (st.enabled) e.preventDefault();
-        if (fresh) st.select = moveVector(st.keys);
+        if (st.enabled && (fresh || e.repeat)) {
+          if (code === 'KeyA' || code === 'ArrowLeft') st.cycle--;
+          if (code === 'KeyD' || code === 'ArrowRight') st.cycle++;
+        }
       }
       if (code === 'KeyB' && st.enabled) { e.preventDefault(); if (!e.repeat) st.place = true; }
-      const digit = /^[1-8]$/.test(e.key || '') ? Number(e.key) : /^Digit[1-8]$/.test(code) ? Number(code.slice(-1)) : null;
-      if (digit && st.enabled && !e.repeat) st.portalIndex = digit;
-      if (code === 'KeyX' && st.enabled && !e.repeat) st.cancelDash = true;
       if (SNAP_KEYS[code] && !e.repeat) st.snap = SNAP_KEYS[code];
       if (isSpace(e)) {
         if (st.enabled) e.preventDefault();
         if (!st.enabled || e.repeat || st.space) return;
         st.pressed = true;
         st.dash = true;
-        st.space = true;
+        st.space = true; st.spaceStartedAt = performance.now(); st.spaceDuration = 0;
       }
     });
     keyTarget.addEventListener('keyup', (e) => {
       st.keys.delete(keyCode(e));
       if (isSpace(e) && st.space) {
+        st.spaceDuration = (performance.now() - st.spaceStartedAt) / 1000;
         st.space = false; st.release = true; st.relSource = 'space'; st.relX = 0; st.relY = 0;
       }
     });
-    keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; });
+    keyTarget.addEventListener('blur', () => { st.keys.clear(); st.space = false; st.release = false; st.spaceDuration = 0; st.cycle = 0; });
   }
 
   return {
@@ -4561,13 +4501,12 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       const out = {
         move: st.enabled ? moveVector(st.keys) : { x: 0, y: 0 },
         snap: st.enabled ? st.snap : null,
-        space: st.space,
+        space: st.enabled && st.space,
+        spaceHeldTime: st.enabled ? (st.space ? (performance.now() - st.spaceStartedAt) / 1000 : st.spaceDuration) : 0,
+        portalCycle: st.enabled ? st.cycle : 0,
         pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
         place: st.enabled && st.place,
-        portalSelect: st.enabled ? st.select : null,
-        portalIndex: st.enabled ? st.portalIndex : null,
-        cancelDash: st.enabled && st.cancelDash,
         pointerDown: st.down,
         pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
@@ -4581,12 +4520,11 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       st.pressed = false;
       st.dash = false;
       st.place = false;
-      st.select = null;
-      st.portalIndex = null; st.cancelDash = false;
+      st.cycle = 0; st.spaceDuration = 0;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.select = null; st.portalIndex = null; st.cancelDash = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
   };
 }
 
@@ -4984,7 +4922,7 @@ const TUNABLES = [
   { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
   { key: 'portalReach', label: 'ポータル：1回の到達距離（基礎）', min: 300, max: 2500, step: 50 },
   { key: 'portalBudget', label: 'ポータル：連続突進の総距離（基礎）', min: 500, max: 6000, step: 100 },
-  { key: 'portalChooseTime', label: 'ポータル：自動出発までの猶予（秒）', min: 0.5, max: 8, step: 0.1 },
+  { key: 'portalExitHold', label: 'ポータル：Space長押しで離脱（秒）', min: 0.5, max: 3, step: 0.1 },
   { key: 'portalChooseScale', label: 'ポータル：選択中の世界の速さ', min: 0.05, max: 1, step: 0.05 },
   { key: 'portalHopTime', label: 'ポータル：1区間の移動時間（秒）', min: 0.05, max: 0.8, step: 0.01 },
   { key: 'portalSpacing', label: 'ポータル：密集を防ぐ間隔', min: 100, max: 700, step: 20 },

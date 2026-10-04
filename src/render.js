@@ -5,7 +5,7 @@ import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
-import { portalChoices, portalReach, portalSectors } from './portals.js';
+import { portalChoices } from './portals.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -474,145 +474,114 @@ function drawReach(r, game) {
   ctx.setLineDash([]);
 }
 
-function drawPortalCompass(r, game, sectors) {
-  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
-  ctx.save();
-  ctx.textAlign = 'center';
-  for (const sector of sectors) {
-    const start = sector.angle - Math.PI / 8, end = sector.angle + Math.PI / 8;
-    const selected = sector.portal && sector.portal === game.portalDash.next;
-    const color = selected ? '#ffe46b' : sector.portal ? '#9fe8ff' : '#b8c4d6';
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, 107 / z, start, end);
-    ctx.arc(sh.x, sh.y, 35 / z, end, start, true); ctx.closePath();
-    ctx.fillStyle = sector.portal ? 'rgba(15,65,90,0.5)' : 'rgba(8,12,28,0.65)'; ctx.fill();
-    ctx.strokeStyle = sector.portal ? 'rgba(159,232,255,0.45)' : 'rgba(184,196,214,0.25)';
-    ctx.lineWidth = 1 / z; ctx.stroke();
-    const x = sh.x + Math.cos(sector.angle) * 79 / z, y = sh.y + Math.sin(sector.angle) * 79 / z;
-    ctx.fillStyle = color; ctx.font = `bold ${13 / z}px ${MONO}`; ctx.fillText(sector.key, x, y - 2 / z);
-    ctx.font = `${10 / z}px "Hiragino Sans", sans-serif`;
-    ctx.fillText(sector.portal ? '移動' : '離脱', x, y + 12 / z);
-  }
-  ctx.restore();
+function drawPortalRoute(r, origin, target, color, width, arrow = false) {
+  const { ctx } = r, z = r.cam.zoom;
+  ctx.strokeStyle = color; ctx.lineWidth = width / z;
+  ctx.beginPath(); ctx.moveTo(origin.x, origin.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+  if (!arrow) return;
+  const angle = Math.atan2(target.y - origin.y, target.x - origin.x);
+  const x = target.x - Math.cos(angle) * 26 / z, y = target.y - Math.sin(angle) * 26 / z;
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.moveTo(x, y);
+  ctx.lineTo(x - Math.cos(angle - 0.5) * 18 / z, y - Math.sin(angle - 0.5) * 18 / z);
+  ctx.lineTo(x - Math.cos(angle + 0.5) * 18 / z, y - Math.sin(angle + 0.5) * 18 / z);
+  ctx.closePath(); ctx.fill();
 }
 
 function drawPortals(r, game) {
   if (game.scheme !== 'portal') return;
-  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
-  const d = game.portalDash;
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship, d = game.portalDash;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d?.path.length) {
-    // Keep every completed segment; the live endpoint follows the ship mid-hop.
-    ctx.save();
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.beginPath(); ctx.moveTo(d.path[0].x, d.path[0].y);
     for (let i = 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.lineTo(sh.x, sh.y);
     ctx.strokeStyle = 'rgba(95,216,255,0.18)'; ctx.lineWidth = 12 / z; ctx.stroke();
     ctx.strokeStyle = 'rgba(145,235,255,0.85)'; ctx.lineWidth = 3 / z; ctx.stroke();
-    ctx.restore();
   }
-  const choices = portalChoices(game);
-  const sectors = d ? portalSectors(game) : [];
-  const labels = new Map();
-  for (const c of choices) labels.set(c.portal.id, [...(labels.get(c.portal.id) || []), c.key]);
-  for (const s of sectors) if (s.portal) labels.set(s.portal.id, [...(labels.get(s.portal.id) || []), s.key]);
-  const target = d?.phase === 'hop' ? d.target : game.portalPreview;
-  if (d?.phase === 'choose') {
-    ctx.strokeStyle = 'rgba(95,216,255,0.15)'; ctx.lineWidth = 1 / z;
-    ctx.setLineDash([10 / z, 12 / z]);
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, Math.min(portalReach(game), d.remaining), 0, TAU); ctx.stroke();
-    ctx.setLineDash([]);
-    drawPortalCompass(r, game, sectors);
+  const choices = portalChoices(game), labels = new Map(choices.map((c) => [c.portal.id, c.key]));
+  const origin = d?.phase === 'hop' ? d.target : sh;
+  const next = d ? d.next : game.portalPreview;
+  // Every selectable edge is drawn, including those extending beyond the viewport.
+  if (d) for (const { portal } of choices) drawPortalRoute(r, origin, portal, 'rgba(160,210,235,0.3)', 1.2);
+  if (next) {
+    drawPortalRoute(r, origin, next, 'rgba(255,228,107,0.2)', 10);
+    drawPortalRoute(r, origin, next, '#ffe46b', 4, true);
+    ctx.strokeStyle = '#ffe46b'; ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(next.x, next.y, 28 / z, 0, TAU); ctx.stroke();
   }
+  const target = d?.phase === 'hop' ? d.target : next;
+  if (d?.phase === 'hop') drawPortalRoute(r, sh, d.target, '#d8f7ff', 3, true);
   for (const p of game.portals) {
     if (!onScreen(r, p.x, p.y, 80 / z)) continue;
-    const selectable = labels.has(p.id), selected = p === target;
-    const next = p === (d?.next || target);
-    const color = next ? '#ffe46b' : p.manual ? '#5fd8ff' : '#c995ff';
-    ctx.save();
-    ctx.globalAlpha = selectable || selected ? 1 : 0.4;
-    ctx.strokeStyle = color; ctx.lineWidth = (next || selected ? 3.5 : 2) / z;
+    const selected = p === next, selectable = labels.has(p.id);
+    const color = selected ? '#ffe46b' : p.manual ? '#5fd8ff' : '#c995ff';
+    ctx.save(); ctx.globalAlpha = selectable || p === target ? 1 : 0.4;
+    ctx.strokeStyle = color; ctx.lineWidth = (selected ? 3.5 : 2) / z;
     ctx.fillStyle = p.manual ? 'rgba(50,150,210,0.18)' : 'rgba(150,80,220,0.2)';
     const R = 20 / z;
     ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, TAU); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.65, game.t * 2, game.t * 2 + Math.PI * 1.5); ctx.stroke();
     ctx.font = `bold ${12 / z}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillStyle = '#eef8ff';
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
-    if (selectable) {
-      ctx.font = `bold ${18 / z}px ${MONO}`;
-      const label = labels.get(p.id).join('/'), width = ctx.measureText(label).width + 12 / z;
-      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - width / 2, p.y - 47 / z, width, 25 / z);
-      ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(label, p.x, p.y - 29 / z);
-      if (next) {
-        ctx.font = `bold ${15 / z}px "Hiragino Sans", sans-serif`;
-        ctx.fillText('次', p.x, p.y - 55 / z);
-      }
+    if (selected) {
+      ctx.font = `bold ${16 / z}px "Hiragino Sans", sans-serif`;
+      ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 32 / z, p.y - 50 / z, 64 / z, 24 / z);
+      ctx.fillStyle = '#ffe46b'; ctx.fillText(`次 ${labels.get(p.id) || ''}`, p.x, p.y - 32 / z);
     }
     ctx.restore();
   }
-  if (d?.phase === 'hop' && d.next) {
-    ctx.strokeStyle = '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([14 / z, 8 / z]);
-    ctx.beginPath(); ctx.moveTo(d.target.x, d.target.y); ctx.lineTo(d.next.x, d.next.y); ctx.stroke(); ctx.setLineDash([]);
+  if (target) {
+    ctx.strokeStyle = 'rgba(95,216,255,0.14)'; ctx.lineWidth = waveRadius(game) * 2;
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke();
+    if (game.stats.portalWave) {
+      ctx.strokeStyle = 'rgba(201,149,255,0.5)'; ctx.lineWidth = 1.5 / z;
+      ctx.beginPath(); ctx.arc(target.x, target.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult, 0, TAU); ctx.stroke();
+    }
+    if (d?.phase !== 'hop') {
+      const preview = previewPath(game, [{ x: sh.x, y: sh.y }, target]);
+      for (const [e, t] of preview.targets) {
+        ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? '#ffffff' : '#5fd8ff'; ctx.lineWidth = 2 / z;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 / z, 0, TAU); ctx.stroke();
+      }
+      if (preview.block) {
+        const q = preview.block, k = 10 / z;
+        ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 3 / z;
+        ctx.beginPath(); ctx.moveTo(q.x - k, q.y - k); ctx.lineTo(q.x + k, q.y + k);
+        ctx.moveTo(q.x + k, q.y - k); ctx.lineTo(q.x - k, q.y + k); ctx.stroke();
+      }
+    }
   }
-  if (!target) return;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(95,216,255,0.14)'; ctx.lineWidth = waveRadius(game) * 2;
-  ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke();
-  ctx.strokeStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b'; ctx.lineWidth = 3 / z; ctx.setLineDash([10 / z, 7 / z]);
-  ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(target.x, target.y); ctx.stroke(); ctx.setLineDash([]);
-  const angle = Math.atan2(target.y - sh.y, target.x - sh.x);
-  const tip = { x: target.x - Math.cos(angle) * 26 / z, y: target.y - Math.sin(angle) * 26 / z };
-  ctx.fillStyle = d?.phase === 'hop' ? '#d8f7ff' : '#ffe46b';
-  ctx.beginPath(); ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x - Math.cos(angle - 0.5) * 16 / z, tip.y - Math.sin(angle - 0.5) * 16 / z);
-  ctx.lineTo(tip.x - Math.cos(angle + 0.5) * 16 / z, tip.y - Math.sin(angle + 0.5) * 16 / z); ctx.closePath(); ctx.fill();
-  if (game.stats.portalWave) {
-    ctx.strokeStyle = 'rgba(201,149,255,0.5)'; ctx.lineWidth = 1.5 / z;
-    ctx.beginPath(); ctx.arc(target.x, target.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult, 0, TAU); ctx.stroke();
-  }
-  if (d?.phase === 'hop') return;
-  const preview = previewPath(game, [{ x: sh.x, y: sh.y }, target]);
-  for (const [e, t] of preview.targets) {
-    ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? '#ffffff' : '#5fd8ff'; ctx.lineWidth = 2 / z;
-    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5 / z, 0, TAU); ctx.stroke();
-  }
-  if (preview.block) {
-    const b = preview.block, k = 10 / z;
-    ctx.strokeStyle = '#ff6b5a'; ctx.lineWidth = 3 / z;
-    ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k);
-    ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
-  }
+  ctx.restore();
 }
 
 function drawPortalHud(r, game) {
   if (game.scheme !== 'portal' || game.state !== 'play') return;
-  const { ctx, W, H } = r, d = game.portalDash;
+  const { ctx, W, H } = r, d = game.portalDash, press = game.portalSpace;
+  const choices = portalChoices(game), index = choices.findIndex((c) => c.portal === d?.next);
   const bw = Math.min(360, W - 32), x = (W - bw) / 2, y = H - 145;
   ctx.fillStyle = 'rgba(8,12,28,0.88)'; ctx.fillRect(x - 8, y - 17, bw + 16, 91);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e8f6ff';
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
-  ctx.fillText(d ? 'WASD / 番号 1〜8 で即移動' : 'Space 最寄りポータルへ突進', W / 2, y);
+  ctx.fillText(d ? `A / D 選択 ${index + 1}/${choices.length}・Space 短押しで移動` : 'Space 短押しで最寄りポータルへ', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? '空の方向へWASDで離脱・Space 最寄りへ' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
-  ctx.fillStyle = d ? '#9fe8ff' : '#ffe46b';
-  ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
-  if (d?.phase === 'choose') {
-    ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
+  ctx.fillText(d ? `Space ${CONFIG.portalExitHold.toFixed(1)}秒長押しで離脱` : 'WASD 移動・B ポータル設置', W / 2, y + 18);
+  ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
+  const holding = press.armed && !press.consumed;
+  if (holding && d) {
+    ctx.fillStyle = '#ffb340'; ctx.fillRect(x, y + 40, bw * Math.min(1, press.seconds / CONFIG.portalExitHold), 4);
   }
-  ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? (d.exitDirection ? '到着後に離脱' : d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒・斜めはW+D等` : '移動中・次の行き先も変更できる')
+  ctx.font = `11px ${MONO}`; ctx.fillStyle = holding && d ? '#ffcf83' : '#b8c6ea';
+  ctx.fillText(d ? (holding ? `離脱まで ${(Math.max(0, CONFIG.portalExitHold - press.seconds)).toFixed(1)} 秒`
+    : !d.next ? '行き先なし・Space 長押しで離脱' : d.phase === 'hop' ? '移動中・A/Dで次を選択できる' : '黄色い太線が次の行き先')
     : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
-  // Keep next directions readable even when a reachable portal sits outside the viewport.
-  const marked = new Set();
-  const choices = portalChoices(game), sectors = d ? portalSectors(game).filter((s) => s.portal) : [];
-  for (const c of [...choices, ...sectors]) {
-    if (marked.has(c.portal.id) || onScreen(r, c.portal.x, c.portal.y, 0)) continue;
-    marked.add(c.portal.id);
+  for (const c of choices) {
+    if (onScreen(r, c.portal.x, c.portal.y, 0)) continue;
     const p = worldToScreen(r, c.portal.x, c.portal.y);
-    const px = clamp(p.x, 30, W - 30), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
-    const keys = [...choices, ...sectors].filter((k) => k.portal === c.portal).map((k) => k.key).join('/');
-    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 40, py - 15, 80, 30);
-    ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : c.portal.manual ? '#5fd8ff' : '#c995ff';
-    ctx.fillText(c.portal === d?.next ? `次 ${keys}` : keys, px, py + 5);
+    const px = clamp(p.x, 36, W - 36), py = clamp(p.y, Math.min(88, H * 0.2), Math.max(H * 0.2, H - 175));
+    ctx.fillStyle = 'rgba(8,12,28,0.85)'; ctx.fillRect(px - 32, py - 15, 64, 30);
+    ctx.font = `bold 16px ${MONO}`; ctx.fillStyle = c.portal === d?.next ? '#ffe46b' : '#8bb9ca';
+    ctx.fillText(c.portal === d?.next ? `次 ${c.key}` : c.key, px, py + 5);
   }
 }
 
