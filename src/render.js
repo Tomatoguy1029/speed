@@ -478,6 +478,17 @@ function drawPortals(r, game) {
   if (game.scheme !== 'portal') return;
   const { ctx } = r, z = r.cam.zoom, sh = game.ship;
   const d = game.portalDash;
+  if (d?.path.length) {
+    // Keep every completed segment; the live endpoint follows the ship mid-hop.
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(d.path[0].x, d.path[0].y);
+    for (let i = 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.lineTo(sh.x, sh.y);
+    ctx.strokeStyle = 'rgba(95,216,255,0.18)'; ctx.lineWidth = 12 / z; ctx.stroke();
+    ctx.strokeStyle = 'rgba(145,235,255,0.85)'; ctx.lineWidth = 3 / z; ctx.stroke();
+    ctx.restore();
+  }
   const choices = portalChoices(game);
   const labels = new Map();
   for (const c of choices) labels.set(c.portal.id, [...(labels.get(c.portal.id) || []), c.key]);
@@ -556,7 +567,7 @@ function drawPortalHud(r, game) {
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
   ctx.fillText(d ? '番号 1〜8 / WASD で「次」を変更' : 'ポータルに入ると自動で連続突進', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? 'Space ですぐ出発・X で終了' : 'WASD 移動・E 設置・Space 手動開始', W / 2, y + 18);
+  ctx.fillText(d ? 'Space ですぐ出発・X で終了' : 'WASD 移動・Space ポータル設置', W / 2, y + 18);
   ctx.fillStyle = d ? '#9fe8ff' : game.dashMeter >= 1 ? '#ffe46b' : '#9fe8ff';
   ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : game.dashMeter), 5);
   if (d?.phase === 'choose') {

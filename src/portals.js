@@ -114,7 +114,7 @@ function startPortalDash(game, entry = null) {
   game.dashMeter = 0;
   game.portalDash = { phase: 'choose', remaining: budget, budget, timeLeft: CONFIG.portalChooseTime,
     hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
-    visited: new Set(entry ? [entry.id] : []) };
+    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }] };
   game.ship.charging = false;
   onLaunch(game);
   game.ship.boostT = game.stats.boostDuration;
@@ -149,15 +149,10 @@ export function stopPortalDash(game, message = '') {
 export function handlePortalInput(game, input) {
   if (game.scheme !== 'portal') return;
   if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
-  if (input.place) placePortal(game);
-  const wasActive = !!game.portalDash;
   if (!game.portalDash) {
+    if (input.dash || input.place) placePortal(game);
     game.portalPreview = portalTarget(game, input.move) || portalDefaultNext(game);
-    if (!input.dash) return;
-    if (!startPortalDash(game)) {
-      if (game.dashMeter >= 1) addText(game, game.ship.x, game.ship.y - 45, '移動先のポータルが必要', '#9fe8ff');
-      return;
-    }
+    return;
   }
   const d = game.portalDash;
   const origin = d.phase === 'hop' ? d.target : game.ship;
@@ -166,7 +161,7 @@ export function handlePortalInput(game, input) {
   if (selected) { d.next = selected; d.explicitNext = true; }
   game.portalPreview = d.next;
   // Space confirms a selection while waiting; automatic departures need no button press.
-  if (wasActive && input.dash && d.phase === 'choose' && d.next) portalBeginHop(game, d.next);
+  if (input.dash && d.phase === 'choose' && d.next) portalBeginHop(game, d.next);
 }
 
 function portalBeginHop(game, target) {
@@ -255,6 +250,7 @@ export function updatePortals(game, realDt) {
   }
   if (d.left > 1e-6) return;
   sh.x = d.target.x; sh.y = d.target.y;
+  d.path.push({ x: sh.x, y: sh.y });
   game.portalTouch = d.target.id;
   if (!d.target.manual) {
     d.target.uses--;
