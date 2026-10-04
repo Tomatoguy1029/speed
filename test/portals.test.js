@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CONFIG } from '../src/config.js';
-import { createGame, update, addXp } from '../src/world.js';
+import { createGame, update, addXp, refreshStats } from '../src/world.js';
+import { tracePortalLoop } from '../src/portal-loops.js';
 import { createEnemy } from '../src/enemies.js';
 import { buildIntent } from '../src/controls.js';
 import { placePortal, dropPortal, portalTarget, portalReach, portalChoices, checkPortalEntry } from '../src/portals.js';
@@ -24,7 +25,6 @@ function portalStart(g) {
 function portalArrive(g, direction) {
   if (g.portalDash?.phase === 'choose') {
     portalFrame(g, { portalSelect: direction });
-    portalFrame(g, { dash: true });
   }
   for (let i = 0; i < 300 && (g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g);
 }
@@ -48,7 +48,7 @@ test('portal dash attacks the path and arrival; waiting keeps enemies and bullet
   const nearby = createEnemy('swarm', 1, 620, -2900);
   g.enemies.push(body, nearby);
   portalStart(g);
-  assert.equal(g.dashMeter, 0);
+  assert.equal(g.dashMeter, 1, 'portal travel does not consume the gauge');
   portalFrame(g);
   assert.ok(g.ship.x > 0 && g.ship.x < 600, 'moves through space, not a teleport');
   for (let i = 0; i < 300 && (g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g);
@@ -70,6 +70,9 @@ test('portal dash attacks the path and arrival; waiting keeps enemies and bullet
   for (let i = 0; i < 12; i++) portalFrame(g, {}, 0.05);
   assert.equal(g.portalDash?.phase, 'choose');
   assert.ok(g.ship.hp < hp, 'waiting at the portal gives no immunity to incoming fire');
+  portalFrame(g, buildIntent({ portalSelect: portalLeft, move: portalLeft }, 'portal'));
+  assert.equal(g.portalDash?.phase, 'hop', 'a direction press alone departs immediately');
+  assert.equal(g.portalDash.target.x, 0);
 });
 
 test('a dropped destination loses one use per arrival and disappears after three; anchors remain', () => {
@@ -106,8 +109,8 @@ test('buffered direction is resolved from the arrival point and the distance bud
   assert.equal(g.portalDash, null, 'permanent nodes do not permit infinite attacks');
 });
 
-test('no route leaves the gauge intact; waiting automatically departs; XP refills; growth extends reach', () => {
-  const g = portalQuiet(); portalFrame(g, { dash: true });
+test('no route leaves the gauge intact; waiting automatically departs; growth extends reach', () => {
+  const g = portalQuiet(); portalFrame(g, { nearestPortal: true });
   assert.equal(g.dashMeter, 1); assert.equal(g.portalDash, null);
   portalAnchor(g, 0); portalAnchor(g, 600); g.ship.x = 0;
   portalStart(g); portalArrive(g, portalRight);
@@ -115,7 +118,7 @@ test('no route leaves the gauge intact; waiting automatically departs; XP refill
   assert.equal(g.portalDash?.phase, 'hop');
   portalFrame(g, { cancelDash: true });
   assert.equal(g.portalDash, null);
-  addXp(g, 2); assert.ok(g.dashMeter > 0);
+  g.dashMeter = 0; addXp(g, 2); assert.equal(g.dashMeter, 0, 'portal XP does not refill an unused gauge');
   const initial = portalReach(g); g.stats.maxSpeed *= 2;
   assert.equal(portalReach(g), initial * 2);
 });
@@ -138,7 +141,7 @@ test('obstacles exclude a route and armored enemies interrupt it with immediate 
 test('entering a portal automatically launches; placement and staying inside do not retrigger', () => {
   const g = portalQuiet();
   portalAnchor(g, 0); portalAnchor(g, 600);
-  g.ship.x = -90; g.ship.vx = 200; g.portalTouch = null;
+  g.ship.x = -90; g.ship.vx = 200; g.portalTouch = null; g.dashMeter = 0;
   for (let i = 0; i < 20 && !g.portalDash; i++) portalFrame(g);
   assert.equal(g.portalDash?.phase, 'hop');
   assert.equal(g.portalDash.target.x, 600);
@@ -151,13 +154,13 @@ test('entering a portal automatically launches; placement and staying inside do 
   assert.equal(g.portalDash, null, 'remaining inside the arrival portal cannot restart');
   const placed = portalQuiet();
   portalAnchor(placed, 600); placed.ship.x = 0;
-  portalFrame(placed, { dash: true });
-  assert.equal(placed.portals.length, 2, 'Space places a portal even with a charged gauge and reachable target');
+  portalFrame(placed, buildIntent({ place: true, move: portalIdle.move }, 'portal'));
+  assert.equal(placed.portals.length, 2, 'B places a portal even with a charged gauge and reachable target');
   assert.equal(placed.dashMeter, 1);
   assert.equal(placed.portalDash, null, 'placing under yourself does not activate it');
 });
 
-test('numbered choices distinguish portals in the same direction and selection never launches before confirmation', () => {
+test('numbered choices distinguish portals in the same direction and immediately depart', () => {
   const g = portalQuiet();
   portalAnchor(g, -600); portalAnchor(g, 0); portalAnchor(g, 300); portalAnchor(g, 650); g.ship.x = -600;
   portalStart(g); portalArrive(g, portalRight);
@@ -165,33 +168,28 @@ test('numbered choices distinguish portals in the same direction and selection n
   const choices = portalChoices(g);
   assert.equal(choices.length, 2);
   portalFrame(g, { portalIndex: 2 });
-  assert.equal(g.portalDash.phase, 'choose');
-  assert.equal(g.portalDash.next, choices[1].portal);
-  assert.equal(g.portalPreview, choices[1].portal);
-  assert.ok(g.portalDash.timeLeft > 2.5);
-  portalFrame(g, { dash: true });
+  assert.equal(g.portalDash.phase, 'hop');
   assert.equal(g.portalDash.target, choices[1].portal);
 });
 
-test('E launches toward the nearest portal without steering, confirms the nearest next hop, and can buffer it in flight', () => {
+test('Space launches toward the nearest portal without steering and can buffer the next nearest hop', () => {
   const g = portalQuiet();
   const near = portalAnchor(g, -300), origin = portalAnchor(g, 0);
-  portalAnchor(g, 600); g.ship.x = 0; g.ship.hx = 1; g.ship.hy = 0;
-  portalFrame(g, buildIntent({ nearestPortal: true, move: portalIdle.move }, 'portal'));
+  portalAnchor(g, 600); g.ship.x = 0; g.ship.hx = 1; g.ship.hy = 0; g.dashMeter = 0.35;
+  portalFrame(g, buildIntent({ dash: true, move: portalIdle.move }, 'portal'));
   assert.equal(g.portalDash.target, near, 'nearest wins even behind the heading');
-  assert.equal(g.dashMeter, 0); assert.equal(g.portals.length, 3, 'E creates no portal');
+  assert.equal(g.dashMeter, 0.35, 'partly charged gauge is neither required nor consumed'); assert.equal(g.portals.length, 3, 'Space creates no portal');
   portalArrive(g);
-  portalFrame(g, { portalIndex: 2 });
   portalFrame(g, { nearestPortal: true });
   assert.equal(g.portalDash.phase, 'hop');
   assert.equal(g.portalDash.target, origin);
   portalFrame(g, { nearestPortal: true });
   for (let i = 0; i < 100 && g.portalDash.hops < 2; i++) portalFrame(g);
-  assert.equal(g.portalDash.phase, 'hop', 'buffered E departs without the three-second wait');
+  assert.equal(g.portalDash.phase, 'hop', 'buffered Space departs without the three-second wait');
   assert.equal(g.portalDash.target, near);
 });
 
-test('nearest travel accepts a nearby small portal, excludes blocked routes, and never consumes an unavailable gauge', () => {
+test('nearest travel accepts a nearby small portal, excludes blocked routes, and works with an empty gauge', () => {
   const close = portalQuiet(), small = portalAnchor(close, 80); close.ship.x = 0;
   portalFrame(close, { nearestPortal: true });
   assert.equal(close.portalDash.target, small, 'a portal closer than the ordinary minimum hop is reachable');
@@ -202,7 +200,64 @@ test('nearest travel accepts a nearby small portal, excludes blocked routes, and
   assert.equal(g.portalDash.target, clear, 'nearest obstructed route is skipped');
   g.portalDash = null; g.dashMeter = 0;
   portalFrame(g, { nearestPortal: true });
-  assert.equal(g.portalDash, null); assert.equal(g.dashMeter, 0);
+  assert.equal(g.portalDash.target, clear); assert.equal(g.dashMeter, 0);
   const empty = portalQuiet(); portalFrame(empty, { nearestPortal: true });
   assert.equal(empty.portalDash, null); assert.equal(empty.dashMeter, 1);
+});
+
+function portalLoopEnemy(g, x, y) {
+  const e = createEnemy('swarm', 1, x, y);
+  e.speed = 0; e.vx = 0; e.vy = 0;
+  g.enemies.push(e);
+  return e;
+}
+
+function portalLoopEquip(g, rarity) {
+  g.loadout.gun = { id: 'loopBurst', r: rarity };
+  refreshStats(g);
+}
+
+test('an equipped enclosure module explodes only after the actual four-hop path closes', () => {
+  const g = portalQuiet(); portalLoopEquip(g, 2);
+  portalAnchor(g, 0); portalAnchor(g, 600); portalAnchor(g, 600, 600); portalAnchor(g, 0, 600);
+  g.ship.x = 0; g.ship.y = -3000;
+  const inside = portalLoopEnemy(g, 300, -2700), outside = portalLoopEnemy(g, 900, -2700);
+  portalStart(g); portalArrive(g);
+  portalArrive(g, portalDown); portalArrive(g, portalLeft);
+  assert.ok(!inside.dead, 'a planned or open route does not explode');
+  portalArrive(g, { x: 0, y: -1 });
+  assert.ok(inside.dead); assert.ok(!outside.dead);
+  assert.ok(g.events.some((ev) => ev.type === 'kill' && ev.cause === 'portalLoop'));
+  assert.equal(g.events.filter((ev) => ev.cause === 'portalLoop' && ev.type === 'explode').length, 1);
+  assert.ok(g.fx.loops.length > 0, 'closed-area feedback survives the end of the chain');
+});
+
+test('legendary enclosure splashes outside; epic does not; a consumed loop cannot repeat its blast', () => {
+  for (const rarity of [2, 3]) {
+    const g = portalQuiet(); portalLoopEquip(g, rarity);
+    const d = { speed: 1000, loopPath: [
+      { x: 0, y: -3000 }, { x: 600, y: -3000 }, { x: 600, y: -2400 }, { x: 0, y: -2400 },
+    ] };
+    const inside = portalLoopEnemy(g, 50, -2700), nearby = portalLoopEnemy(g, -20, -2700);
+    const far = portalLoopEnemy(g, -200, -2700);
+    tracePortalLoop(g, d, 0, -2400, 0, -3000);
+    assert.ok(inside.dead); assert.equal(nearby.dead, rarity === 3); assert.ok(!far.dead);
+    tracePortalLoop(g, d, 0, -2400, 0, -3000);
+    assert.equal(g.events.filter((ev) => ev.cause === 'portalLoop' && ev.type === 'explode').length, 1);
+  }
+});
+
+test('crossing an old segment closes the actual polygon mid-hop; retracing and unequipped routes do nothing', () => {
+  const g = portalQuiet(); portalLoopEquip(g, 2);
+  const d = { speed: 1000, loopPath: [{ x: 0, y: -3000 }, { x: 600, y: -3000 }, { x: 600, y: -2400 }] };
+  const inside = portalLoopEnemy(g, 550, -2850), outside = portalLoopEnemy(g, 300, -2850);
+  tracePortalLoop(g, d, 600, -2400, 300, -3300);
+  assert.ok(inside.dead); assert.ok(!outside.dead);
+  assert.deepEqual(d.loopPath, [{ x: 0, y: -3000 }, { x: 400, y: -3000 }]);
+  const count = g.fx.loops.length;
+  tracePortalLoop(g, d, 400, -3000, 0, -3000);
+  assert.equal(g.fx.loops.length, count);
+  const plain = portalQuiet();
+  tracePortalLoop(plain, { speed: 1000, loopPath: [{ x: 0, y: -3000 }, { x: 600, y: -3000 }, { x: 600, y: -2400 }] }, 600, -2400, 0, -3000);
+  assert.equal(plain.fx.loops.length, 0);
 });

@@ -114,3 +114,19 @@ test('max speed grows a little with every level', () => {
   const expected = base * (1 + CONFIG.levelSpeedGrowth * game.level);
   assert.ok(Math.abs(game.stats.maxSpeed - expected) < 1e-6, `${game.stats.maxSpeed} vs ${expected}`);
 });
+
+test('enclosure blasts are epic/legendary portal drops; obsolete charge modules stay out of portal rolls', () => {
+  assert.deepEqual(moduleDef('loopBurst').rarities, [2, 3]);
+  const epic = computeStats({}, { ...emptyLoadout(), gun: { id: 'loopBurst', r: 2 } }).loopBurst;
+  const legend = computeStats({}, { ...emptyLoadout(), gun: { id: 'loopBurst', r: 3 } }).loopBurst;
+  assert.ok(legend.mult > epic.mult); assert.equal(epic.splash, false); assert.equal(legend.splash, true);
+  const rng = makeRng(24), seen = new Set();
+  for (const scheme of ['portal', 'draw']) for (let i = 0; i < 1000; i++) {
+    const m = rollModule(rng, { t: 500, loadout: emptyLoadout(), source: 'capsule', danger: 1, scheme });
+    if (scheme === 'portal') {
+      seen.add(m.id);
+      assert.ok(!['chargeWave', 'quickCharge', 'regenGen'].includes(m.id));
+    } else assert.notEqual(m.id, 'loopBurst');
+  }
+  assert.ok(seen.has('loopBurst'), 'the new module is obtainable through normal loot');
+});

@@ -63,7 +63,10 @@ export const MODULES = [
   { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
     desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
     apply: (s, m) => { s.trailBurst = 0.35 * m; } },
-  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL,
+  { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
+    desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
+    apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true,
     desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
     apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
   { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
@@ -111,13 +114,13 @@ export const MODULES = [
     apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
 
   // ジェネレーター: エネルギーとチャージ
-  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL,
+  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
     desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
     apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
   { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
-    desc: (r) => `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
     apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL,
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
     desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
@@ -190,7 +193,8 @@ export function rollModule(rng, ctx) {
     }));
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
       && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw' || ctx.scheme === 'portal')
-      && (!m.portalOnly || ctx.scheme === 'portal'));
+      && (!m.portalOnly || ctx.scheme === 'portal')
+      && (!m.portalExcluded || ctx.scheme !== 'portal'));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));

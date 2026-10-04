@@ -37,7 +37,7 @@ function finishDash(game) {
 export function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && (game.scheme === 'draw' || game.scheme === 'portal')) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.regenGauge && game.scheme === 'draw') game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
 }
 
 export function onShipHurt(game) {

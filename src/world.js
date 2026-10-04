@@ -46,7 +46,7 @@ export function createGame(opts = {}) {
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -694,7 +694,7 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
-  if ((game.scheme === 'draw' || game.scheme === 'portal') && game.dashMeter < 1) {
+  if (game.scheme === 'draw' && game.dashMeter < 1) {
     game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
     if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }
@@ -722,6 +722,8 @@ function updateFx(game, dt) {
   game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
   for (const r of game.fx.rings) r.life -= dt;
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
+  for (const loop of game.fx.loops) loop.life -= dt;
+  game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
 }
 
 // ---- prediction ----

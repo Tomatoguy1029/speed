@@ -513,7 +513,7 @@ function drawPortals(r, game) {
     ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.65, game.t * 2, game.t * 2 + Math.PI * 1.5); ctx.stroke();
     ctx.font = `bold ${12 / z}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillStyle = '#eef8ff';
     ctx.fillText(p.manual ? '∞' : String(p.uses), p.x, p.y + 4 / z);
-    if (selectable && (d || game.dashMeter >= 1)) {
+    if (selectable) {
       ctx.font = `bold ${18 / z}px ${MONO}`;
       ctx.fillStyle = '#08101c'; ctx.fillRect(p.x - 17 / z, p.y - 47 / z, 34 / z, 25 / z);
       ctx.fillStyle = next ? '#ffe46b' : '#ffffff'; ctx.fillText(labels.get(p.id).join('/'), p.x, p.y - 29 / z);
@@ -565,17 +565,17 @@ function drawPortalHud(r, game) {
   ctx.fillStyle = 'rgba(8,12,28,0.88)'; ctx.fillRect(x - 8, y - 17, bw + 16, 91);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e8f6ff';
   ctx.font = `${Math.min(13, Math.max(9, (W - 32) / 34))}px "Hiragino Sans", sans-serif`;
-  ctx.fillText(d ? '番号 1〜8 / WASD で「次」を変更' : 'E 最寄りへ突進（ゲージ満タン）', W / 2, y);
+  ctx.fillText(d ? 'WASD / 番号 1〜8 で即移動' : 'Space 最寄りポータルへ突進', W / 2, y);
   ctx.fillStyle = '#b8c6ea';
-  ctx.fillText(d ? 'Space 出発・E 最寄りへ・X 終了' : 'WASD 移動・Space ポータル設置', W / 2, y + 18);
-  ctx.fillStyle = d ? '#9fe8ff' : game.dashMeter >= 1 ? '#ffe46b' : '#9fe8ff';
-  ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : game.dashMeter), 5);
+  ctx.fillText(d ? 'Space 最寄りへ・X 終了' : 'WASD 移動・B ポータル設置', W / 2, y + 18);
+  ctx.fillStyle = d ? '#9fe8ff' : '#ffe46b';
+  ctx.fillRect(x, y + 30, bw * (d ? d.remaining / d.budget : 1), 5);
   if (d?.phase === 'choose') {
     ctx.fillStyle = '#ffd24a'; ctx.fillRect(x, y + 40, bw * Math.max(0, d.timeLeft / CONFIG.portalChooseTime), 3);
   }
   ctx.font = `11px ${MONO}`; ctx.fillStyle = '#b8c6ea';
   ctx.fillText(d ? (d.phase === 'choose' ? `自動出発まで ${Math.max(0, d.timeLeft).toFixed(1)} 秒` : '移動中・次の行き先も変更できる')
-    : `${game.dashMeter >= 1 ? '高速攻撃 READY' : '経験値でゲージ回復'}・ポータル ${game.portals.length}`, W / 2, y + 60);
+    : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
   // Keep next directions readable even when a reachable portal sits outside the viewport.
   const marked = new Set();
   for (const c of portalChoices(game)) {
@@ -844,6 +844,14 @@ function drawEnemyBullets(r, game) {
 function drawFx(r, game) {
   const { ctx } = r;
   const z = r.cam.zoom;
+  for (const loop of game.fx.loops) {
+    const a = Math.max(0, loop.life / loop.max);
+    ctx.beginPath(); ctx.moveTo(loop.points[0].x, loop.points[0].y);
+    for (let i = 1; i < loop.points.length; i++) ctx.lineTo(loop.points[i].x, loop.points[i].y);
+    ctx.closePath(); ctx.fillStyle = loop.color; ctx.globalAlpha = 0.3 * a; ctx.fill();
+    ctx.globalAlpha = a; ctx.strokeStyle = loop.color; ctx.lineWidth = (3 + 5 * a) / z; ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   // warp afterimages
   for (const g of game.fx.ghosts) {
     const a = Math.max(0, g.life / g.max);
@@ -1190,7 +1198,7 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  if (game.scheme === 'draw' || game.scheme === 'portal') {
+  if (game.scheme === 'draw') {
     // dash gauge right below the HP bar
     const m = game.dashMeter;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';

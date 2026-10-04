@@ -56,6 +56,10 @@ export const CONFIG = {
   portalHopTime: 0.22, // maximum real seconds for each segment
   portalWaveRadius: 160,
   portalWaveDamage: 0.9,
+  portalLoopDamage: 1.2, // attack power x rarity multiplier inside a closed path
+  portalLoopSplashRadius: 90, // legendary: each enclosed enemy also explodes outward
+  portalLoopSplashDamage: 0.5,
+  portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 0.05, // world speed while drawing

@@ -133,6 +133,10 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
     if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
   button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
+  button('包囲炸裂を入手', (g) => {
+    if (g.state === 'play' && g.scheme === 'portal') pushOffer(g,
+      { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
+  });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
   button('敵を消す', (g) => { g.enemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });

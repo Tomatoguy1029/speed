@@ -5,6 +5,7 @@ import { attackPower } from './combat.js';
 import { addText, addRing, explode } from './hits.js';
 import { onLaunch } from './effects.js';
 import { waveAlong, collideEnemies, damageShip } from './world.js';
+import { tracePortalLoop } from './portal-loops.js';
 
 export function portalGrowth(game) {
   return game.stats.maxSpeed / CONFIG.baseMaxSpeed * game.stats.drawLengthMult * game.stats.gaugeMax;
@@ -122,12 +123,12 @@ function portalDefaultNext(game) {
 }
 
 function startPortalDash(game, entry = null, initialTarget = null) {
-  if (game.dashMeter < 1 || (!initialTarget && !portalChoices(game).length)) return false;
+  if (!initialTarget && !portalChoices(game).length) return false;
   const budget = CONFIG.portalBudget * portalGrowth(game);
-  game.dashMeter = 0;
   game.portalDash = { phase: 'choose', remaining: budget, budget, timeLeft: CONFIG.portalChooseTime,
     hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
-    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
+    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }],
+    loopPath: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
   game.ship.charging = false;
   onLaunch(game);
   game.ship.boostT = game.stats.boostDuration;
@@ -142,7 +143,7 @@ export function checkPortalEntry(game, x0, y0) {
   const sh = game.ship, R = CONFIG.portalEntryRadius + CONFIG.shipRadius;
   const previousTouch = game.portalTouch;
   game.portalTouch = game.portals.find((p) => Math.hypot(p.x - sh.x, p.y - sh.y) < R)?.id ?? null;
-  if (game.t < game.portalEntryT || game.dashMeter < 1) return;
+  if (game.t < game.portalEntryT) return;
   let entry = null, first = Infinity;
   for (const p of game.portals) {
     if (p.id === previousTouch) continue;
@@ -163,14 +164,13 @@ export function handlePortalInput(game, input) {
   if (game.scheme !== 'portal') return;
   if (input.cancelDash && game.portalDash) { stopPortalDash(game); return; }
   if (!game.portalDash) {
-    if (input.dash) placePortal(game);
+    if (input.place) placePortal(game);
     const nearest = portalNearest(game);
     game.portalPreview = nearest;
     if (input.nearestPortal) {
       if (nearest && startPortalDash(game, null, nearest)) {
         portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
-      } else addText(game, game.ship.x, game.ship.y - 45,
-        game.dashMeter < 1 ? '高速攻撃ゲージが必要' : '到達できるポータルが必要', '#9fe8ff');
+      } else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
     }
     return;
   }
@@ -181,11 +181,11 @@ export function handlePortalInput(game, input) {
     : input.portalSelect ? portalTarget(game, input.portalSelect, origin) : null;
   if (selected) {
     d.next = selected; d.explicitNext = true;
-    d.departOnArrival = !!input.nearestPortal && d.phase === 'hop';
+    d.departOnArrival = d.phase === 'hop';
   }
   game.portalPreview = d.next;
-  // Space confirms a selection while waiting; automatic departures need no button press.
-  if ((input.dash || input.nearestPortal) && d.phase === 'choose' && d.next) portalBeginHop(game, d.next);
+  // A fresh direction, number, or nearest command selects and departs in one action.
+  if (selected && d.phase === 'choose') portalBeginHop(game, selected);
 }
 
 function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
@@ -262,6 +262,7 @@ export function updatePortals(game, realDt) {
     waveAlong(game, d, x0, y0, x1, y1);
     if (collideEnemies(game, x0, y0, CONFIG.shipRadius, d)) { stopPortalDash(game, '弾かれた'); return; }
     d.speed = Math.hypot(sh.vx, sh.vy);
+    tracePortalLoop(game, d, x0, y0, sh.x, sh.y);
     d.trailAcc += stepDist;
     if (game.stats.trailBurst && d.trailAcc >= 45) {
       d.trailAcc = 0;
@@ -276,6 +277,8 @@ export function updatePortals(game, realDt) {
   if (d.left > 1e-6) return;
   sh.x = d.target.x; sh.y = d.target.y;
   d.path.push({ x: sh.x, y: sh.y });
+  const loopEnd = d.loopPath[d.loopPath.length - 1];
+  if (Math.hypot(loopEnd.x - sh.x, loopEnd.y - sh.y) > 1e-6) d.loopPath.push({ x: sh.x, y: sh.y });
   game.portalTouch = d.target.id;
   if (!d.target.manual) {
     d.target.uses--;
