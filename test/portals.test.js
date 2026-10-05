@@ -105,24 +105,24 @@ test('undirected edges cannot repeat in one attack; a triangle can close and a n
   portalPick(g, c); portalTap(g); portalArrive(g);
   portalPick(g, a); portalTap(g); portalArrive(g);
   assert.equal(g.portalDash.usedEdges.size, 3); assert.equal(portalChoices(g).length, 0);
-  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 1.5 });
+  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 0.5 });
   portalFrame(g, { portalReleased: true });
   assert.equal(g.portalDash, null);
   g.ship.x = a.x; g.ship.y = a.y; portalTap(g); assert.equal(g.portalDash.target, c);
 });
 
-test('Space distinguishes tap from 1.5-second hold and release after leaving cannot launch again', () => {
+test('Space distinguishes tap from 0.5-second hold and release after leaving cannot launch again', () => {
   const g = portalQuiet(); portalAnchor(g, 0); portalAnchor(g, 600); g.ship.x = 0; portalMount(g);
   portalFrame(g, { portalPressed: true, portalHolding: true }, 0.01);
-  portalFrame(g, { portalHolding: true, portalHeldTime: 1.49 }, 0.01);
+  portalFrame(g, { portalHolding: true, portalHeldTime: 0.49 }, 0.01);
   assert.equal(g.portalDash.phase, 'choose', 'a held Space does not prematurely hop');
-  portalFrame(g, { portalHolding: true, portalHeldTime: 1.5 }, 0.01);
+  portalFrame(g, { portalHolding: true, portalHeldTime: 0.5 }, 0.01);
   assert.equal(g.portalDash, null);
-  portalFrame(g, { portalReleased: true, portalHeldTime: 1.51 }); assert.equal(g.portalDash, null);
+  portalFrame(g, { portalReleased: true, portalHeldTime: 0.51 }); assert.equal(g.portalDash, null);
   // A complete long press between physics frames must also be recognized on release.
   const released = portalQuiet(); portalAnchor(released, 0); portalAnchor(released, 600); released.ship.x = 0; portalMount(released);
   released.hitstop = 2;
-  portalFrame(released, { portalPressed: true, portalReleased: true, portalHeldTime: 1.6 });
+  portalFrame(released, { portalPressed: true, portalReleased: true, portalHeldTime: 0.6 });
   assert.equal(released.portalDash, null);
 });
 
@@ -135,7 +135,7 @@ test('selection and a Space tap during flight buffer the chosen next edge; holdi
   for (let i = 0; i < 100 && g.portalDash.hops < 1; i++) portalFrame(g);
   assert.equal(g.portalDash.phase, 'hop'); assert.equal(g.portalDash.target, c);
   const pos = g.ship.y;
-  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 1.5 }, 0.001);
+  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 0.5 }, 0.001);
   assert.equal(g.portalDash, null); assert.ok(g.ship.y < -2400 && g.ship.y >= pos);
 });
 

@@ -49,7 +49,7 @@ export const CONFIG = {
   portalMinHop: 100,
   portalReach: 900, // scales with max speed and path-length modules
   portalBudget: 2400, // total distance per activation; same growth as reach
-  portalExitHold: 1.5, // real seconds holding Space to leave; a short release confirms a route
+  portalExitHold: 0.5, // real seconds holding Space to leave; a short release confirms a route
   portalChooseScale: 1, // enemies and bullets keep normal speed while choosing
   portalEntryRadius: 28, // ship body + this radius triggers a portal on entry
   portalEntryCooldown: 0.6, // world seconds after ending a chain
