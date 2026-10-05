@@ -45,6 +45,7 @@ export function createGame(opts = {}) {
     draw: null, lastPath: null,
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     portalSpace: { armed: false, seconds: 0, consumed: false },
+    portalClock: 0, portalCooldowns: new Map(),
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
@@ -65,6 +66,8 @@ export function createGame(opts = {}) {
 export function update(game, frameDt, input) {
   if (game.state !== 'play') return;
   frameDt = Math.min(frameDt, 0.1);
+  game.portalClock += frameDt;
+  for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);

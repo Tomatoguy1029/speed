@@ -98,7 +98,7 @@ test('A/D cycles all reachable portals clockwise and back, including collinear a
   assert.ok(!portalChoices(g).some((c) => c.portal.y < -3000 && c.portal.x === 0), 'blocked edges are not selectable');
 });
 
-test('undirected edges cannot repeat in one attack; a triangle can close and a new attack resets the restriction', () => {
+test('undirected edges close a triangle, survive auto-exit, and unlock only after ten real play seconds', () => {
   const g = portalQuiet(), a = portalAnchor(g, 0), b = portalAnchor(g, 600), c = portalAnchor(g, 300, 500);
   g.ship.x = 0; g.ship.y = -3000; portalMount(g); portalPick(g, b); portalTap(g); portalArrive(g);
   assert.ok(!portalChoices(g).some((choice) => choice.portal === a));
@@ -107,7 +107,39 @@ test('undirected edges cannot repeat in one attack; a triangle can close and a n
   portalPick(g, a); portalTap(g); portalArrive(g);
   assert.equal(attack.usedEdges.size, 3); assert.equal(attack.hops, 3);
   assert.equal(g.portalDash, null, 'the closed triangle exhausts every edge and leaves automatically');
+  g.ship.x = a.x; g.ship.y = a.y; portalTap(g);
+  assert.equal(g.portalDash, null, 'leaving does not reset cooled-down edges');
+  const expiry = Math.max(...g.portalCooldowns.values()), clock = g.portalClock;
+  g.state = 'paused'; portalFrame(g, {}, 0.1);
+  assert.equal(g.portalClock, clock, 'pause does not advance cooldowns');
+  g.state = 'play'; g.hitstop = 20;
+  while (g.portalClock < expiry - 0.001) portalFrame(g, {}, Math.min(0.1, expiry - 0.001 - g.portalClock));
+  assert.ok(!portalChoices(g).some((choice) => choice.portal === c), 'the last edge stays blocked until ten seconds after arrival');
+  portalFrame(g, {}, 0.002); assert.equal(g.portalCooldowns.size, 0);
   g.ship.x = a.x; g.ship.y = a.y; portalTap(g); assert.equal(g.portalDash.target, c);
+});
+
+test('manual exit and re-entry near a portal cannot bypass an edge cooldown; a different edge remains usable', () => {
+  const g = portalQuiet(), a = portalAnchor(g, 0), b = portalAnchor(g, 600), c = portalAnchor(g, 600, 600);
+  g.ship.x = a.x; g.ship.y = a.y; portalStart(g); portalArrive(g);
+  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 0.5 });
+  assert.equal(g.portalDash, null);
+  g.ship.x = b.x + 12; g.ship.y = b.y;
+  // Even a recreated portal at the same coordinates shares the original cooldown.
+  g.portals = g.portals.filter((p) => p !== a);
+  const replacement = portalAnchor(g, a.x);
+  g.ship.x = b.x + 12; g.ship.y = b.y; portalTap(g);
+  assert.equal(g.portalDash.target, c);
+  assert.ok(!portalChoices(g, b).some((choice) => choice.portal === replacement));
+  const waiting = portalQuiet(), origin = portalAnchor(waiting, 0), target = portalAnchor(waiting, 600);
+  const next = portalAnchor(waiting, 600, 600);
+  waiting.ship.x = origin.x; waiting.ship.y = origin.y; portalStart(waiting); portalArrive(waiting);
+  waiting.hitstop = 20;
+  for (let i = 0; i < 101; i++) portalFrame(waiting, {}, 0.1);
+  assert.equal(waiting.portalCooldowns.size, 0, 'hitstop and world slowdown do not stretch the real-time cooldown');
+  assert.equal(waiting.portalDash.currentPortal, target.id);
+  assert.ok(!portalChoices(waiting).some((choice) => choice.portal === origin), 'expiry still cannot reuse an edge in the same attack');
+  assert.ok(portalChoices(waiting).some((choice) => choice.portal === next));
 });
 
 test('an exhausted connection finishes its hop and arrival wave before auto-exit; held Space cannot re-enter', () => {

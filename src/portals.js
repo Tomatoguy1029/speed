@@ -74,14 +74,22 @@ function portalEdgeKey(a, b) {
   return pa < pb ? `${pa}|${pb}` : `${pb}|${pa}`;
 }
 
-export function portalChoices(game) {
-  const origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : game.ship;
+function portalEdgeUnavailable(game, a, b) {
+  const key = portalEdgeKey(a, b);
+  return game.portalDash?.usedEdges.has(key) || (game.portalCooldowns.get(key) ?? 0) > game.portalClock;
+}
+
+function portalAtShip(game) {
+  return game.portals.find((p) => Math.hypot(p.x - game.ship.x, p.y - game.ship.y) < CONFIG.portalEntryRadius + CONFIG.shipRadius) ?? null;
+}
+
+export function portalChoices(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : portalAtShip(game) || game.ship) {
   const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
   const angle = (p) => (Math.atan2(p.y - origin.y, p.x - origin.x) + Math.PI * 2.5) % (Math.PI * 2);
   return game.portals.filter((p) => {
     const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
     return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y)
-      && !game.portalDash?.usedEdges.has(portalEdgeKey(origin, p));
+      && !portalEdgeUnavailable(game, origin, p);
   }).sort((a, b) => angle(a) - angle(b)
     || Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y)
     || a.id - b.id).map((p, i) => ({ key: String(i + 1), portal: p }));
@@ -93,12 +101,12 @@ export function portalNearest(game) {
     return portalChoices(game).map((c) => c.portal).sort((a, b) =>
       Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0] ?? null;
   }
-  const sh = game.ship;
+  const sh = portalAtShip(game) || game.ship;
   let nearest = null, best = Math.min(portalReach(game), CONFIG.portalBudget * portalGrowth(game));
   for (const p of game.portals) {
     const dist = Math.hypot(p.x - sh.x, p.y - sh.y);
     if (dist < CONFIG.portalEntryRadius + CONFIG.shipRadius || dist > best
-      || !portalClearLine(game, sh.x, sh.y, p.x, p.y)) continue;
+      || !portalClearLine(game, sh.x, sh.y, p.x, p.y) || portalEdgeUnavailable(game, sh, p)) continue;
     nearest = p; best = dist;
   }
   return nearest;
@@ -119,7 +127,7 @@ function portalDefaultNext(game) {
 }
 
 function startPortalDash(game, entry = null, initialTarget = null) {
-  if (!initialTarget && !portalChoices(game).length) return false;
+  if (!initialTarget && !portalChoices(game, entry || game.ship).length) return false;
   const budget = CONFIG.portalBudget * portalGrowth(game);
   if (entry) { game.ship.x = entry.x; game.ship.y = entry.y; }
   game.portalDash = { phase: 'choose', remaining: budget, budget, usedEdges: new Set(),
@@ -187,7 +195,7 @@ export function handlePortalInput(game, input, realDt = 0) {
     const nearest = portalNearest(game);
     game.portalPreview = nearest;
     if (confirm) {
-      const entry = game.portals.find((p) => Math.hypot(p.x - game.ship.x, p.y - game.ship.y) < CONFIG.portalEntryRadius + CONFIG.shipRadius);
+      const entry = portalAtShip(game);
       if (nearest && startPortalDash(game, entry, nearest)) portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
       else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
     }
@@ -217,8 +225,10 @@ function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
   const len = Math.hypot(target.x - sh.x, target.y - sh.y);
   if (len < minDistance || len > Math.min(portalReach(game), d.remaining)
     || !portalClearLine(game, sh.x, sh.y, target.x, target.y)
-    || d.usedEdges.has(portalEdgeKey(sh, target))) return false;
-  d.usedEdges.add(portalEdgeKey(sh, target));
+    || portalEdgeUnavailable(game, sh, target)) return false;
+  d.edgeKey = portalEdgeKey(sh, target);
+  d.usedEdges.add(d.edgeKey);
+  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
   d.previous = d.currentPortal;
   d.currentPortal = target.id;
   d.visited.add(target.id);
@@ -299,6 +309,7 @@ export function updatePortals(game, realDt) {
   }
   if (d.left > 1e-6) return;
   sh.x = d.target.x; sh.y = d.target.y;
+  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
   d.path.push({ x: sh.x, y: sh.y });
   const loopEnd = d.loopPath[d.loopPath.length - 1];
   if (Math.hypot(loopEnd.x - sh.x, loopEnd.y - sh.y) > 1e-6) d.loopPath.push({ x: sh.x, y: sh.y });
