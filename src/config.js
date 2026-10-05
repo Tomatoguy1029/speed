@@ -32,6 +32,11 @@ export const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
+  drawDropScale: 0.1, // fewer module drops even with five times as many enemies
+  drawDropInterval: 35, // minimum seconds between enemy module drops in draw mode
+  drawOfferInterval: 30, // minimum play seconds between selection screens
+  drawCapsuleCount: 2,
+  drawCapsuleInterval: 40,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio

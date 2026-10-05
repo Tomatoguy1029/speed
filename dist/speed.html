@@ -121,6 +121,11 @@ const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
+  drawDropScale: 0.1, // fewer module drops even with five times as many enemies
+  drawDropInterval: 35, // minimum seconds between enemy module drops in draw mode
+  drawOfferInterval: 30, // minimum play seconds between selection screens
+  drawCapsuleCount: 2,
+  drawCapsuleInterval: 40,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -323,7 +328,7 @@ function createShip(stats, x, y) {
     aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
     markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
     aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
-    boostT: 0, fadeT: 0, invulnT: 0,
+    boostT: 0, fadeT: 0, invulnT: 0, glide: false,
     trail: [], trailAcc: 0,
   };
 }
@@ -345,6 +350,13 @@ function launchVelocity(vx, vy, dx, dy, gauge, stats) {
 
 // Integrate one step: acceleration (ax, ay), drag rules, then position.
 function stepShip(ship, stats, dt, ax, ay, extraDrag) {
+  if (ship.glide) {
+    ship.boostT = Math.max(0, ship.boostT - dt);
+    ship.fadeT = 0;
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    return;
+  }
   ship.vx += ax * dt;
   ship.vy += ay * dt;
   let sp = Math.hypot(ship.vx, ship.vy);
@@ -1367,7 +1379,9 @@ function updateCapsules(game, dt) {
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    if (field < CONFIG.capsuleCount && (game.t < 2 || F.capsuleT >= CONFIG.capsuleInterval)) {
+    const fieldCount = game.scheme === 'draw' ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = game.scheme === 'draw' ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
+    if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
       const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
@@ -1883,10 +1897,15 @@ function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  // modules come from enemies: stronger ones drop more often and rarer; elites and battleships always
+  // Draw mode spaces drops in time so a larger crowd cannot flood the player with modules.
   const power = e.xp;
-  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
-  if (e.elite || e.type === 'battleship' || game.rng() < chance) dropModule(game, e.x, e.y, power, danger);
+  const drawMode = game.scheme === 'draw';
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
+  if ((!drawMode || game.t >= game.nextModuleDropAt) &&
+      (e.elite || e.type === 'battleship' || game.rng() < chance)) {
+    dropModule(game, e.x, e.y, power, danger);
+    if (drawMode) game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * 15;
+  }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
 
@@ -2157,6 +2176,7 @@ function controlStep(game, input, dt) {
   switch (game.scheme) {
     case 'draw': {
       // mouse: head toward the cursor at the usual cruise speed (no click needed).
+      if (sh.glide) return ZERO; // drawing again or being hit returns to ordinary steering
       // touch: a virtual stick; pushing it further goes faster.
       const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
       if (input.stick) {
@@ -2249,6 +2269,7 @@ function createGame(opts = {}) {
     meta, stats, ship, loadout,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
+    nextOfferAt: 0, nextModuleDropAt: 0,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
@@ -2319,7 +2340,8 @@ function update(game, frameDt, input) {
     if (game.state !== 'play') break;
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.draw &&
+          (game.scheme !== 'draw' || game.t >= game.nextOfferAt)) { openOffer(game); break; }
     }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
@@ -2445,6 +2467,7 @@ function pushOffer(game, mod, source) {
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
+  if (game.scheme === 'draw') game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -2468,7 +2491,7 @@ function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length) {
+  if (game.offerQueue.length && game.scheme !== 'draw') {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -2540,6 +2563,7 @@ function dashNeed(game) {
 
 function startDrawing(game, input) {
   const sh = game.ship;
+  sh.glide = false;
   const gauge = game.stats.gaugeMax; // always a full (over)charge
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
@@ -2674,6 +2698,7 @@ function runAlongPath(game, realDt) {
   }
   if (r.seg >= r.path.length - 1) {
     game.draw = null;
+    sh.glide = true; // leave the line along its last segment until a collision interrupts it
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
   }
 }
@@ -2745,6 +2770,7 @@ function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
   if (sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
+  if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
@@ -2784,15 +2810,16 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
         run.passes.set(e.id, n);
         if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
       }
-      const keep = pierceKeep(e, e.dead, stats);
+      const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
       onPierce(game);
-      if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
+      if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
     }
     // bounce off
+    sh.glide = false;
     let nx = hx - e.x, ny = hy - e.y;
     const nd = Math.hypot(nx, ny) || 1;
     nx /= nd; ny /= nd;
@@ -2827,6 +2854,7 @@ function collideBodies(game) {
     sh.y = b.y + ny * min;
     const vn = sh.vx * nx + sh.vy * ny;
     if (vn < 0) {
+      sh.glide = false;
       sh.vx -= (1 + restitution) * vn * nx;
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
@@ -2838,6 +2866,7 @@ function collideBodies(game) {
   const r = Math.hypot(sh.x, sh.y);
   const wall = CONFIG.fieldRadius + 500;
   if (r > wall) {
+    sh.glide = false;
     const nx = sh.x / r, ny = sh.y / r;
     sh.x = nx * wall; sh.y = ny * wall;
     const vn = sh.vx * nx + sh.vy * ny;

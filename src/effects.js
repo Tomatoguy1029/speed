@@ -177,7 +177,9 @@ function updateCapsules(game, dt) {
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    if (field < CONFIG.capsuleCount && (game.t < 2 || F.capsuleT >= CONFIG.capsuleInterval)) {
+    const fieldCount = game.scheme === 'draw' ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = game.scheme === 'draw' ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
+    if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
       const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });

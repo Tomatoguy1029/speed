@@ -51,10 +51,15 @@ export function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  // modules come from enemies: stronger ones drop more often and rarer; elites and battleships always
+  // Draw mode spaces drops in time so a larger crowd cannot flood the player with modules.
   const power = e.xp;
-  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
-  if (e.elite || e.type === 'battleship' || game.rng() < chance) dropModule(game, e.x, e.y, power, danger);
+  const drawMode = game.scheme === 'draw';
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
+  if ((!drawMode || game.t >= game.nextModuleDropAt) &&
+      (e.elite || e.type === 'battleship' || game.rng() < chance)) {
+    dropModule(game, e.x, e.y, power, danger);
+    if (drawMode) game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * 15;
+  }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
 

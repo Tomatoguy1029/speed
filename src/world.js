@@ -33,6 +33,7 @@ export function createGame(opts = {}) {
     meta, stats, ship, loadout,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
+    nextOfferAt: 0, nextModuleDropAt: 0,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
@@ -103,7 +104,8 @@ export function update(game, frameDt, input) {
     if (game.state !== 'play') break;
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.draw &&
+          (game.scheme !== 'draw' || game.t >= game.nextOfferAt)) { openOffer(game); break; }
     }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
@@ -229,6 +231,7 @@ export function pushOffer(game, mod, source) {
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
+  if (game.scheme === 'draw') game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -252,7 +255,7 @@ export function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length) {
+  if (game.offerQueue.length && game.scheme !== 'draw') {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -324,6 +327,7 @@ export function dashNeed(game) {
 
 function startDrawing(game, input) {
   const sh = game.ship;
+  sh.glide = false;
   const gauge = game.stats.gaugeMax; // always a full (over)charge
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
@@ -458,6 +462,7 @@ function runAlongPath(game, realDt) {
   }
   if (r.seg >= r.path.length - 1) {
     game.draw = null;
+    sh.glide = true; // leave the line along its last segment until a collision interrupts it
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
   }
 }
@@ -529,6 +534,7 @@ export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
   if (sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
+  if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
@@ -568,15 +574,16 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
         run.passes.set(e.id, n);
         if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
       }
-      const keep = pierceKeep(e, e.dead, stats);
+      const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
       onPierce(game);
-      if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
+      if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
     }
     // bounce off
+    sh.glide = false;
     let nx = hx - e.x, ny = hy - e.y;
     const nd = Math.hypot(nx, ny) || 1;
     nx /= nd; ny /= nd;
@@ -611,6 +618,7 @@ function collideBodies(game) {
     sh.y = b.y + ny * min;
     const vn = sh.vx * nx + sh.vy * ny;
     if (vn < 0) {
+      sh.glide = false;
       sh.vx -= (1 + restitution) * vn * nx;
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
@@ -622,6 +630,7 @@ function collideBodies(game) {
   const r = Math.hypot(sh.x, sh.y);
   const wall = CONFIG.fieldRadius + 500;
   if (r > wall) {
+    sh.glide = false;
     const nx = sh.x / r, ny = sh.y / r;
     sh.x = nx * wall; sh.y = ny * wall;
     const vn = sh.vx * nx + sh.vy * ny;

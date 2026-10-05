@@ -159,6 +159,7 @@ export function controlStep(game, input, dt) {
   switch (game.scheme) {
     case 'draw': {
       // mouse: head toward the cursor at the usual cruise speed (no click needed).
+      if (sh.glide) return ZERO; // drawing again or being hit returns to ordinary steering
       // touch: a virtual stick; pushing it further goes faster.
       const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
       if (input.stick) {
