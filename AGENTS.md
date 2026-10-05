@@ -36,6 +36,7 @@ node tools/balance.js 3 1 god   # 自動プレイで各フェーズの数値を�
 - **テストは最小限**（ユーザー指示: デモなので毎回テストを書いたり回したりしない）。作業のまとまりの最後に 1 回 `node --test`。自動デプロイのフックもデプロイ前に走らせる
 - **dist/ はコミットする**（`speed.html` は単体で配布できる 1 ファイル。`index.html` は Vercel 用で中身は同じ）
 - **自動デプロイ**: Claude Code の Stop フック（`.claude/settings.local.json` → [.claude/hooks/auto-deploy.sh](.claude/hooks/auto-deploy.sh)）が、ターン終了時に変更があればビルド＋テストを通したうえで自動コミット＆ push する。テストが落ちたらコミットしない。ゲームのコードが変わっているのに `docs/` が未更新なら、一度だけ更新を促して止める
+- **Codexでの公開更新**: 上記のClaude Code用StopフックはCodexでは実行されない。公開版を更新する変更はビルド・テスト・コミット後、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` を行う（force pushしない）。Vercelの公開HTMLが検証済みの `dist/index.html` と一致するまで確認し、ローカルコミットだけで公開反映済みと報告しない。ユーザーがローカル限定・公開保留を指定した場合はそれを優先する。
 - 区切りのいい変更は自分で中身の分かるメッセージでコミットする（末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`）
 - ユーザーのブラウザ（アプリ内プレビュー）のタブを勝手に置き換えない。確認は本番 URL を別タブで開くか、自動テストで行う
 
