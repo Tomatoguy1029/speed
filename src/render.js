@@ -573,7 +573,7 @@ function drawPortalHud(r, game) {
   }
   ctx.font = `11px ${MONO}`; ctx.fillStyle = holding && d ? '#ffcf83' : '#b8c6ea';
   ctx.fillText(d ? (holding ? `離脱まで ${(Math.max(0, CONFIG.portalExitHold - press.seconds)).toFixed(1)} 秒`
-    : !d.next ? '行き先なし・Space 長押しで離脱' : d.phase === 'hop' ? '移動中・A/Dで次を選択できる' : '黄色い太線が次の行き先')
+    : !d.next ? '行き先なし・到着後に自動離脱' : d.phase === 'hop' ? '移動中・A/Dで次を選択できる' : '黄色い太線が次の行き先')
     : `ゲージ不要・ポータル ${game.portals.length}`, W / 2, y + 60);
   for (const c of choices) {
     if (onScreen(r, c.portal.x, c.portal.y, 0)) continue;

@@ -195,6 +195,7 @@ export function handlePortalInput(game, input, realDt = 0) {
   }
   const d = game.portalDash;
   portalRefreshNext(game);
+  if (!game.portalDash) return;
   if (input.portalCycle) {
     const choices = portalChoices(game);
     if (choices.length) {
@@ -247,6 +248,10 @@ function portalRefreshNext(game) {
     d.explicitNext = false;
   }
   game.portalPreview = d.next;
+  if (d.phase === 'choose' && !d.next) {
+    if (game.portalSpace.armed) game.portalSpace.consumed = true;
+    portalLeave(game, { x: game.ship.hx, y: game.ship.hy });
+  }
 }
 
 export function portalWorldScale(game) {
@@ -312,6 +317,7 @@ export function updatePortals(game, realDt) {
   else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
   // Include routes opened by kills while retaining an explicit choice made in flight.
   portalRefreshNext(game);
+  if (!game.portalDash) return;
   if (d.departOnArrival && d.next) portalBeginHop(game, d.next);
   else d.departOnArrival = false;
 }

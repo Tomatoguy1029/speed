@@ -103,12 +103,38 @@ test('undirected edges cannot repeat in one attack; a triangle can close and a n
   g.ship.x = 0; g.ship.y = -3000; portalMount(g); portalPick(g, b); portalTap(g); portalArrive(g);
   assert.ok(!portalChoices(g).some((choice) => choice.portal === a));
   portalPick(g, c); portalTap(g); portalArrive(g);
+  const attack = g.portalDash;
   portalPick(g, a); portalTap(g); portalArrive(g);
-  assert.equal(g.portalDash.usedEdges.size, 3); assert.equal(portalChoices(g).length, 0);
-  portalFrame(g, { portalPressed: true, portalHolding: true, portalHeldTime: 0.5 });
-  portalFrame(g, { portalReleased: true });
-  assert.equal(g.portalDash, null);
+  assert.equal(attack.usedEdges.size, 3); assert.equal(attack.hops, 3);
+  assert.equal(g.portalDash, null, 'the closed triangle exhausts every edge and leaves automatically');
   g.ship.x = a.x; g.ship.y = a.y; portalTap(g); assert.equal(g.portalDash.target, c);
+});
+
+test('an exhausted connection finishes its hop and arrival wave before auto-exit; held Space cannot re-enter', () => {
+  const g = portalQuiet(); portalAnchor(g, 0); const b = portalAnchor(g, 600);
+  g.ship.x = 0; portalStart(g);
+  assert.equal(g.portalDash.phase, 'hop', 'an empty next-route list does not interrupt the current hop');
+  assert.equal(g.portalDash.next, null);
+  const nearby = createEnemy('swarm', 1, 620, -2900); g.enemies.push(nearby);
+  const attack = g.portalDash;
+  portalFrame(g, { portalPressed: true, portalHolding: true }, 0.01);
+  for (let i = 0; i < 300 && (g.portalDash?.phase === 'hop' || g.hitstop > 0); i++) portalFrame(g, { portalHolding: true });
+  assert.equal(attack.hops, 1); assert.ok(nearby.dead, 'the final arrival still attacks');
+  assert.equal(g.portalDash, null); assert.ok(g.ship.x >= b.x);
+  assert.ok(g.ship.vx > 0); assert.equal(g.portalPreview, null);
+  assert.ok(g.portalEntryT > g.t);
+  assert.equal(g.portalSpace.consumed, true);
+  portalFrame(g, { portalReleased: true, portalHeldTime: 0.35 });
+  assert.equal(g.portalDash, null);
+  // A route becoming unavailable during selection also leaves without waiting for a hop.
+  const waiting = portalQuiet(); portalAnchor(waiting, 0); const next = portalAnchor(waiting, 600);
+  waiting.ship.x = 0; portalMount(waiting);
+  portalFrame(waiting, { portalPressed: true, portalHolding: true }, 0.01);
+  waiting.portals = waiting.portals.filter((p) => p !== next);
+  portalFrame(waiting, { portalHolding: true }, 0.01);
+  assert.equal(waiting.portalDash, null); assert.equal(waiting.portalSpace.consumed, true);
+  portalFrame(waiting, { portalReleased: true, portalHeldTime: 0.03 });
+  assert.equal(waiting.portalDash, null);
 });
 
 test('Space distinguishes tap from 0.5-second hold and release after leaving cannot launch again', () => {
