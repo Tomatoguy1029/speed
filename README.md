@@ -110,7 +110,9 @@ node tools/balance.js 3 1 god   # 自動プレイ計測（3回、シード1、�
 ## 設計・作業の記録
 
 - [現在の仕様](docs/spec.md)：実装済みの操作・数値・画面
-- [判断の履歴](docs/decisions.md)：変更の理由と決定事項
+- [wakida の履歴](docs/wakida.md)：脇田知樹の作業内容・変更の理由・決定事項（既存の履歴を継承）
+- [ShueMaker70969 の履歴](docs/shumak.md)：ShueMaker70969 の作業内容・変更の理由・決定事項
+- [keporusu の履歴](docs/keporusu.md)：keporusu の作業内容・変更の理由・決定事項
 - [未解決の課題](docs/backlog.md)：検証したいこと・保留中の案
 - [初期設計](SPEC.md)：試作開始時の仕様
 - [作業方針](AGENTS.md)：リポジトリの構成・開発ルール

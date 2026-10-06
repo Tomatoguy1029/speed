@@ -12,9 +12,18 @@
 | ファイル | 中身 | いつ更新するか |
 |---|---|---|
 | [docs/spec.md](docs/spec.md) | 現在の仕様（操作・数値・画面・計測値） | 挙動や数値を変えたとき |
-| [docs/decisions.md](docs/decisions.md) | 判断の履歴（ユーザーの要望 → 決めたこと、番号付き） | 要望を受けて何かを決めたとき（末尾に追記） |
+| [docs/wakida.md](docs/wakida.md) | 脇田知樹（wakida）の作業・判断の履歴（旧 decisions.md） | wakida の作業時に末尾へ追記 |
+| [docs/shumak.md](docs/shumak.md) | [ShueMaker70969](https://github.com/ShueMaker70969) の作業・判断の履歴 | ShueMaker70969 の作業時に末尾へ追記 |
+| [docs/keporusu.md](docs/keporusu.md) | [keporusu](https://github.com/keporusu) の作業・判断の履歴 | keporusu の作業時に末尾へ追記 |
 | [docs/backlog.md](docs/backlog.md) | 未解決の課題・次の候補・保留中の議論 | 課題が見つかった／片付いたとき |
 | `tasks/plan.md`, `tasks/todo.md` | 最初の実装計画（完了済み、記録として残す） | 更新しない |
+
+### ユーザーごとの記録更新
+
+- **Claude Code・Codex などのエージェントは、ユーザーが作業するたびに、同じ作業の中で対応する履歴ファイルを自動で更新する**。更新の依頼を毎回待たず、日付・要望・作業内容・決めたことと理由を末尾に番号付きで追記する。記録がまだないファイルでは「まだ作業記録はない。」を最初の記録に置き換える。
+- 更新先は **脇田知樹（wakida）→ `docs/wakida.md`、GitHub `ShueMaker70969` → `docs/shumak.md`、GitHub `keporusu` → `docs/keporusu.md`**。会話で明示された作業ユーザーを優先し、明示がなければ認証済みの GitHub アカウントなど確認できる情報で判断する。特定できない場合は本人に確認し、別ユーザーの履歴へ推測で書かない。
+- 作業前に関連するユーザーの履歴も確認する。他のユーザーの作業記録は書き換えず、番号はファイルごとに続ける。
+- 現在の仕様と未解決の課題は共通で管理する。挙動・数値を変えたら `docs/spec.md`、課題が見つかった／片付いたら `docs/backlog.md` も同じ作業の中で更新する。
 
 ## ユーザーとのやりとりのルール
 
