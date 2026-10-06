@@ -5,6 +5,7 @@ import { CONFIG } from './config.js';
 export const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
   { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 描画開始（世界の速さはPで0〜1に調整可能）→ 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
+  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンでSpaceか左下のボタン → 好きな場所をクリックしてマウスで軌跡を描く → Space／クリックで確定して高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -16,6 +17,10 @@ export const SCHEMES = [
 
 export function schemeById(id) {
   return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'draw');
+}
+
+export function isDrawScheme(id) {
+  return id === 'draw' || id === 'draw-wasd';
 }
 
 // Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
@@ -34,12 +39,12 @@ export function buildIntent(raw, scheme) {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'draw') {
+  } else if (isDrawScheme(scheme)) {
     // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
     // from the press point). Space / the button fires the gauge-based dash (no charging here).
     it.keyboard = true;
     it.dash = !!raw.dash;
-    if (raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+    if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
@@ -178,6 +183,7 @@ export function controlStep(game, input, dt) {
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
     }
+    case 'draw-wasd':
     case 'portal':
     case 'steer':
       if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
@@ -208,6 +214,7 @@ export function controlAim(game, input) {
     }
     case 'rotate':
       return { x: Math.cos(sh.aimAngle) * 100, y: Math.sin(sh.aimAngle) * 100 };
+    case 'draw-wasd':
     case 'aim8':
       return hasMove(input.move) ? { x: input.move.x * 100, y: input.move.y * 100 } : null;
     default:

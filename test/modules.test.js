@@ -121,7 +121,7 @@ test('enclosure blasts are epic/legendary portal drops; obsolete charge modules 
   const legend = computeStats({}, { ...emptyLoadout(), gun: { id: 'loopBurst', r: 3 } }).loopBurst;
   assert.ok(legend.mult > epic.mult); assert.equal(epic.splash, false); assert.equal(legend.splash, true);
   const rng = makeRng(24), seen = new Set();
-  for (const scheme of ['portal', 'draw']) for (let i = 0; i < 1000; i++) {
+  for (const scheme of ['portal', 'draw', 'draw-wasd']) for (let i = 0; i < 1000; i++) {
     const m = rollModule(rng, { t: 500, loadout: emptyLoadout(), source: 'capsule', danger: 1, scheme });
     if (scheme === 'portal') {
       seen.add(m.id);

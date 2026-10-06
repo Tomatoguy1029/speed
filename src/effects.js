@@ -1,3 +1,4 @@
+import { isDrawScheme } from './controls.js';
 // Module effects that change how the ship attacks, plus field capsules and power cores.
 import { CONFIG } from './config.js';
 import { attackPower } from './combat.js';
@@ -37,7 +38,7 @@ function finishDash(game) {
 export function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && game.scheme === 'draw') game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
 }
 
 export function onShipHurt(game) {
@@ -177,8 +178,8 @@ function updateCapsules(game, dt) {
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    const fieldCount = game.scheme === 'draw' ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
-    const fieldInterval = game.scheme === 'draw' ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
+    const fieldCount = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);

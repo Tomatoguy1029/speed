@@ -1,3 +1,4 @@
+import { isDrawScheme } from './controls.js';
 import { baseStats } from './ship.js';
 import { pickWeighted } from './math.js';
 import { CONFIG } from './config.js';
@@ -192,7 +193,7 @@ export function rollModule(rng, ctx) {
       return [s.id, w];
     }));
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw' || ctx.scheme === 'portal')
+      && (!m.drawOnly || !ctx.scheme || isDrawScheme(ctx.scheme) || ctx.scheme === 'portal')
       && (!m.portalOnly || ctx.scheme === 'portal')
       && (!m.portalExcluded || ctx.scheme !== 'portal'));
   }

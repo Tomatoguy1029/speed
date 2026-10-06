@@ -6,8 +6,8 @@ import { killEnemy } from '../src/hits.js';
 import { CONFIG } from '../src/config.js';
 
 const flowIdle = { charging: false, release: false, cursor: null };
-function flowGame() {
-  const game = createGame({ seed: 5, scheme: 'draw' });
+function flowGame(scheme = 'draw') {
+  const game = createGame({ seed: 5, scheme });
   game.spawning = false;
   game.field.moons.length = 0;
   game.field.dust.length = 0;
@@ -55,6 +55,28 @@ test('post-trace mouse and touch steering change direction without losing launch
     assert.ok(Math.abs(Math.hypot(game.ship.vx, game.ship.vy) - speed) < 1e-6);
     assert.ok(game.ship.glide);
   }
+});
+
+test('WASD drawing traces the mouse path, defers pickups and lets keys steer the retained speed', () => {
+  const game = flowGame('draw-wasd');
+  flowTrace(game);
+  assert.equal(game.draw?.phase, 'run');
+  assert.deepEqual(game.draw.path, [{ x: 0, y: -3000 }, { x: 800, y: -3000 }]);
+  game.capsules.push({ kind: 'capsule', src: 'drop', x: game.ship.x, y: game.ship.y,
+    mod: { id: 'ram', slot: 'bow', r: 0 }, age: 0 });
+  for (let i = 0; i < 60 && game.draw; i++) {
+    update(game, 0.01, { ...flowIdle, move: { x: 0, y: 1 } });
+    if (game.draw) assert.equal(game.state, 'play');
+  }
+  assert.equal(game.state, 'offer');
+  assert.ok(game.ship.x >= 800);
+  resolveOffer(game, true);
+  const speed = Math.hypot(game.ship.vx, game.ship.vy);
+  for (let i = 0; i < 25; i++) update(game, 0.02,
+    { ...flowIdle, move: { x: 0, y: 1 }, cursor: { x: -1000, y: -3000 } });
+  assert.ok(game.ship.vy > speed * 0.99);
+  assert.ok(Math.abs(Math.hypot(game.ship.vx, game.ship.vy) - speed) < 1e-6);
+  assert.ok(game.ship.glide);
 });
 
 test('post-trace flight pierces fodder without slowing, but an armored bounce restores ordinary movement', () => {

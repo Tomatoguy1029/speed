@@ -225,6 +225,231 @@ const CONFIG = {
   lookAhead: 0.32,
 };
 
+// ---- controls.js ----
+// Control schemes. buildIntent turns raw input into what the world needs (charge / release / aim);
+// controlStep and controlAim run inside the world step for scheme-specific steering and aiming.
+
+
+const SCHEMES = [
+  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 描画開始（世界の速さはPで0〜1に調整可能）→ 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
+  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンでSpaceか左下のボタン → 好きな場所をクリックしてマウスで軌跡を描く → Space／クリックで確定して高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
+  { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
+  { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
+  { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
+  { id: 'nudge', name: 'WASD 微推力（画面基準）＋ Space', help: 'WASD で押した方向へ小さく推力。Space で進んでいる方向へ加速' },
+  { id: 'rotate', name: 'A/D 照準を回す ＋ Space', help: 'A/D で照準を回す（長押しで速く）、W で進行方向へ、S で反転。Space で照準の向きへ突進' },
+  { id: 'aim8', name: 'WASD 8 方向に狙う ＋ Space', help: 'WASD で狙う方向（8 方向）を決め、Space で突進。キーなしなら進行方向へ' },
+  { id: 'drag', name: 'マウスで引っ張って離す', help: '押したままドラッグ → 離すとドラッグと逆方向へ突進。長く押すほど強い' },
+];
+
+function schemeById(id) {
+  return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'draw');
+}
+
+function isDrawScheme(id) {
+  return id === 'draw' || id === 'draw-wasd';
+}
+
+// Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
+// keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
+function buildIntent(raw, scheme) {
+  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, press: !!raw.pressed, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
+  if (scheme === 'portal') {
+    it.keyboard = true;
+    it.place = !!raw.place;
+    it.portalPressed = !!raw.dash;
+    it.portalHolding = !!raw.space;
+    it.portalHeldTime = raw.spaceHeldTime;
+    it.portalReleased = !!raw.release && raw.releaseSource === 'space';
+    it.portalCycle = raw.portalCycle || 0;
+  } else if (scheme === 'drag') {
+    it.charging = raw.pointerDown;
+    it.aimX = raw.drag.x; it.aimY = raw.drag.y;
+    if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
+  } else if (isDrawScheme(scheme)) {
+    // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
+    // from the press point). Space / the button fires the gauge-based dash (no charging here).
+    it.keyboard = true;
+    it.dash = !!raw.dash;
+    if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+  } else if (scheme === 'mouse') {
+    it.charging = raw.space || raw.pointerDown;
+    it.keyboard = true;
+    it.release = raw.release;
+  } else {
+    // keyboard schemes keep the slingshot drag as a fallback
+    if (raw.pointerDown) { it.charging = true; it.aimX = raw.drag.x; it.aimY = raw.drag.y; }
+    else { it.charging = raw.space; it.keyboard = true; }
+    if (raw.release) {
+      it.release = true;
+      if (raw.releaseSource === 'pointer') { it.keyboard = false; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
+      else it.keyboard = true;
+    }
+  }
+  return it;
+}
+
+const hasMove = (m) => m && (m.x || m.y);
+
+// Swing the travel direction toward `want` at a fixed turn rate (speed kept); below cruise speed
+// also accelerate that way so the ship can always get going.
+function steerToward(game, want, dt, cruiseShare = CONFIG.steerCruise) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > 1) {
+    const cur = Math.atan2(sh.vy, sh.vx);
+    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const vx = sh.vx * c - sh.vy * s;
+    sh.vy = sh.vx * s + sh.vy * c;
+    sh.vx = vx;
+  }
+  const cruise = game.stats.maxSpeed * cruiseShare;
+  if (sp < cruise) {
+    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
+    sh.vx += Math.cos(want) * add;
+    sh.vy += Math.sin(want) * add;
+  }
+  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
+}
+
+function stickAngle(stick) {
+  if (!stick || Math.hypot(stick.x, stick.y) < CONFIG.stickDeadZone) return null;
+  return Math.atan2(stick.y, stick.x);
+}
+
+function cursorAngle(game, cursor) {
+  if (!cursor) return null;
+  const sh = game.ship;
+  const dx = cursor.x - sh.x, dy = cursor.y - sh.y;
+  if (dx * dx + dy * dy < CONFIG.mouseDeadZone * CONFIG.mouseDeadZone) return null;
+  return Math.atan2(dy, dx);
+}
+
+// Screen-absolute small thrust (forward thrust only helps while slow).
+function nudgeAbsolute(game, move) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+  let ax = move.x * acc, ay = move.y * acc;
+  if (sp > 1) {
+    const ux = sh.vx / sp, uy = sh.vy / sp;
+    const par = ax * ux + ay * uy;
+    if (par > 0 && sp >= game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax -= par * ux; ay -= par * uy; }
+  } else {
+    sh.hx = move.x; sh.hy = move.y;
+  }
+  return { ax, ay };
+}
+
+// Ship-relative: W forward, S brake (never reverse), A/D bend when moving or pivot when still.
+function nudgeRelative(game, move, dt) {
+  const sh = game.ship;
+  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const rx = -sh.hy, ry = sh.hx;
+  let ax = 0, ay = 0;
+  if (side) {
+    if (sp > CONFIG.pivotSpeed) {
+      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
+      ax += rx * side * acc; ay += ry * side * acc;
+    } else {
+      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
+      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
+    }
+  }
+  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel; }
+  if (fwd < 0 && sp > 0) {
+    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
+    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
+  }
+  return { ax, ay };
+}
+
+// Rotating aim: A/D turn (accelerating while held), W/S snap to travel direction / flip.
+function rotateAim(game, input, dt) {
+  const sh = game.ship;
+  const turn = input.move ? Math.sign(input.move.x) : 0;
+  if (turn) {
+    sh.turnHeld += dt;
+    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
+    sh.aimAngle += turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
+  } else {
+    sh.turnHeld = 0;
+  }
+  if (input.snap === 'forward' && Math.hypot(sh.vx, sh.vy) > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
+  else if (input.snap === 'back') sh.aimAngle += Math.PI;
+  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
+}
+
+const ZERO = { ax: 0, ay: 0 };
+
+// Per-step steering. Returns extra acceleration for the physics step.
+function controlStep(game, input, dt) {
+  const sh = game.ship;
+  switch (game.scheme) {
+    case 'draw': {
+      // mouse: head toward the cursor at the usual cruise speed (no click needed).
+      // touch: a virtual stick; pushing it further goes faster.
+      const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
+      if (input.stick) {
+        const a = stickAngle(input.stick);
+        if (a !== null) {
+          const len = Math.hypot(input.stick.x, input.stick.y);
+          steerToward(game, a, dt, throttle((len - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone)));
+        }
+        return ZERO;
+      }
+      const a = cursorAngle(game, input.cursor);
+      if (a !== null) steerToward(game, a, dt);
+      return ZERO;
+    }
+    case 'mouse': {
+      const a = cursorAngle(game, input.cursor);
+      if (a !== null) steerToward(game, a, dt);
+      return ZERO;
+    }
+    case 'draw-wasd':
+    case 'portal':
+    case 'steer':
+      if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
+      return ZERO;
+    case 'nudge':
+      return hasMove(input.move) ? nudgeAbsolute(game, input.move) : ZERO;
+    case 'relative':
+      return hasMove(input.move) ? nudgeRelative(game, input.move, dt) : ZERO;
+    case 'rotate':
+      rotateAim(game, input, dt);
+      return ZERO;
+    default:
+      return ZERO;
+  }
+}
+
+// Scheme aim for keyboard/hover launches: a vector, or null to boost along the heading.
+function controlAim(game, input) {
+  const sh = game.ship;
+  switch (game.scheme) {
+    case 'draw': {
+      const a = input.stick ? stickAngle(input.stick) : cursorAngle(game, input.cursor);
+      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
+    }
+    case 'mouse': {
+      const a = cursorAngle(game, input.cursor);
+      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
+    }
+    case 'rotate':
+      return { x: Math.cos(sh.aimAngle) * 100, y: Math.sin(sh.aimAngle) * 100 };
+    case 'draw-wasd':
+    case 'aim8':
+      return hasMove(input.move) ? { x: input.move.x * 100, y: input.move.y * 100 } : null;
+    default:
+      return null;
+  }
+}
+
 // ---- math.js ----
 const TAU = Math.PI * 2;
 
@@ -1028,6 +1253,7 @@ function applyRunResult(save, game) {
 
 
 
+
 const SLOTS = [
   { id: 'bow', name: '船首', icon: '▲' },
   { id: 'booster', name: 'ブースター', icon: '»' },
@@ -1218,7 +1444,7 @@ function rollModule(rng, ctx) {
       return [s.id, w];
     }));
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.drawOnly || !ctx.scheme || ctx.scheme === 'draw' || ctx.scheme === 'portal')
+      && (!m.drawOnly || !ctx.scheme || isDrawScheme(ctx.scheme) || ctx.scheme === 'portal')
       && (!m.portalOnly || ctx.scheme === 'portal')
       && (!m.portalExcluded || ctx.scheme !== 'portal'));
   }
@@ -1235,6 +1461,7 @@ function rollModule(rng, ctx) {
 }
 
 // ---- effects.js ----
+
 // Module effects that change how the ship attacks, plus field capsules and power cores.
 
 
@@ -1274,7 +1501,7 @@ function finishDash(game) {
 function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && game.scheme === 'draw') game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
 }
 
 function onShipHurt(game) {
@@ -1414,8 +1641,8 @@ function updateCapsules(game, dt) {
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    const fieldCount = game.scheme === 'draw' ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
-    const fieldInterval = game.scheme === 'draw' ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
+    const fieldCount = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
@@ -1879,6 +2106,7 @@ function updatePortals(game, realDt) {
 }
 
 // ---- hits.js ----
+
 // Damage, kills, drops and area attacks applied to enemies.
 
 
@@ -1934,7 +2162,7 @@ function killEnemy(game, e, opts = {}) {
   dropCoins(game, e, danger);
   // Draw mode spaces drops in time so a larger crowd cannot flood the player with modules.
   const power = e.xp;
-  const drawMode = game.scheme === 'draw';
+  const drawMode = isDrawScheme(game.scheme);
   const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
   if ((!drawMode || game.t >= game.nextModuleDropAt) &&
       (e.elite || e.type === 'battleship' || game.rng() < chance)) {
@@ -2049,224 +2277,6 @@ function speedStage(sp) {
   return s;
 }
 
-// ---- controls.js ----
-// Control schemes. buildIntent turns raw input into what the world needs (charge / release / aim);
-// controlStep and controlAim run inside the world step for scheme-specific steering and aiming.
-
-
-const SCHEMES = [
-  { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 描画開始（世界の速さはPで0〜1に調整可能）→ 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
-  { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
-  { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
-  { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
-  { id: 'nudge', name: 'WASD 微推力（画面基準）＋ Space', help: 'WASD で押した方向へ小さく推力。Space で進んでいる方向へ加速' },
-  { id: 'rotate', name: 'A/D 照準を回す ＋ Space', help: 'A/D で照準を回す（長押しで速く）、W で進行方向へ、S で反転。Space で照準の向きへ突進' },
-  { id: 'aim8', name: 'WASD 8 方向に狙う ＋ Space', help: 'WASD で狙う方向（8 方向）を決め、Space で突進。キーなしなら進行方向へ' },
-  { id: 'drag', name: 'マウスで引っ張って離す', help: '押したままドラッグ → 離すとドラッグと逆方向へ突進。長く押すほど強い' },
-];
-
-function schemeById(id) {
-  return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'draw');
-}
-
-// Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
-// keyboard: the launch direction comes from the scheme (controlAim) instead of a drag.
-function buildIntent(raw, scheme) {
-  const it = { move: raw.move, snap: raw.snap, cursor: raw.cursor, press: !!raw.pressed, charging: false, release: false, aimX: 0, aimY: 0, keyboard: false };
-  if (scheme === 'portal') {
-    it.keyboard = true;
-    it.place = !!raw.place;
-    it.portalPressed = !!raw.dash;
-    it.portalHolding = !!raw.space;
-    it.portalHeldTime = raw.spaceHeldTime;
-    it.portalReleased = !!raw.release && raw.releaseSource === 'space';
-    it.portalCycle = raw.portalCycle || 0;
-  } else if (scheme === 'drag') {
-    it.charging = raw.pointerDown;
-    it.aimX = raw.drag.x; it.aimY = raw.drag.y;
-    if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (scheme === 'draw') {
-    // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
-    // from the press point). Space / the button fires the gauge-based dash (no charging here).
-    it.keyboard = true;
-    it.dash = !!raw.dash;
-    if (raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
-  } else if (scheme === 'mouse') {
-    it.charging = raw.space || raw.pointerDown;
-    it.keyboard = true;
-    it.release = raw.release;
-  } else {
-    // keyboard schemes keep the slingshot drag as a fallback
-    if (raw.pointerDown) { it.charging = true; it.aimX = raw.drag.x; it.aimY = raw.drag.y; }
-    else { it.charging = raw.space; it.keyboard = true; }
-    if (raw.release) {
-      it.release = true;
-      if (raw.releaseSource === 'pointer') { it.keyboard = false; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-      else it.keyboard = true;
-    }
-  }
-  return it;
-}
-
-const hasMove = (m) => m && (m.x || m.y);
-
-// Swing the travel direction toward `want` at a fixed turn rate (speed kept); below cruise speed
-// also accelerate that way so the ship can always get going.
-function steerToward(game, want, dt, cruiseShare = CONFIG.steerCruise) {
-  const sh = game.ship;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > 1) {
-    const cur = Math.atan2(sh.vy, sh.vx);
-    const d = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
-    const turn = Math.max(-CONFIG.steerRate * dt, Math.min(CONFIG.steerRate * dt, d));
-    const c = Math.cos(turn), s = Math.sin(turn);
-    const vx = sh.vx * c - sh.vy * s;
-    sh.vy = sh.vx * s + sh.vy * c;
-    sh.vx = vx;
-  }
-  const cruise = game.stats.maxSpeed * cruiseShare;
-  if (sp < cruise) {
-    const add = Math.min(CONFIG.steerAccel * dt, cruise - sp);
-    sh.vx += Math.cos(want) * add;
-    sh.vy += Math.sin(want) * add;
-  }
-  sh.hx = Math.cos(want); sh.hy = Math.sin(want);
-}
-
-function stickAngle(stick) {
-  if (!stick || Math.hypot(stick.x, stick.y) < CONFIG.stickDeadZone) return null;
-  return Math.atan2(stick.y, stick.x);
-}
-
-function cursorAngle(game, cursor) {
-  if (!cursor) return null;
-  const sh = game.ship;
-  const dx = cursor.x - sh.x, dy = cursor.y - sh.y;
-  if (dx * dx + dy * dy < CONFIG.mouseDeadZone * CONFIG.mouseDeadZone) return null;
-  return Math.atan2(dy, dx);
-}
-
-// Screen-absolute small thrust (forward thrust only helps while slow).
-function nudgeAbsolute(game, move) {
-  const sh = game.ship;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
-  let ax = move.x * acc, ay = move.y * acc;
-  if (sp > 1) {
-    const ux = sh.vx / sp, uy = sh.vy / sp;
-    const par = ax * ux + ay * uy;
-    if (par > 0 && sp >= game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax -= par * ux; ay -= par * uy; }
-  } else {
-    sh.hx = move.x; sh.hy = move.y;
-  }
-  return { ax, ay };
-}
-
-// Ship-relative: W forward, S brake (never reverse), A/D bend when moving or pivot when still.
-function nudgeRelative(game, move, dt) {
-  const sh = game.ship;
-  const fwd = -Math.sign(move.y), side = Math.sign(move.x);
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const rx = -sh.hy, ry = sh.hx;
-  let ax = 0, ay = 0;
-  if (side) {
-    if (sp > CONFIG.pivotSpeed) {
-      const acc = CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp;
-      ax += rx * side * acc; ay += ry * side * acc;
-    } else {
-      const a = Math.atan2(sh.hy, sh.hx) + side * CONFIG.pivotRate * dt;
-      sh.hx = Math.cos(a); sh.hy = Math.sin(a);
-    }
-  }
-  if (fwd > 0 && sp < game.stats.maxSpeed * CONFIG.nudgeMaxSpeed) { ax += sh.hx * CONFIG.nudgeAccel; ay += sh.hy * CONFIG.nudgeAccel; }
-  if (fwd < 0 && sp > 0) {
-    const brake = Math.min(CONFIG.nudgeAccel + CONFIG.nudgeSteer * sp, sp / dt);
-    ax -= (sh.vx / sp) * brake; ay -= (sh.vy / sp) * brake;
-  }
-  return { ax, ay };
-}
-
-// Rotating aim: A/D turn (accelerating while held), W/S snap to travel direction / flip.
-function rotateAim(game, input, dt) {
-  const sh = game.ship;
-  const turn = input.move ? Math.sign(input.move.x) : 0;
-  if (turn) {
-    sh.turnHeld += dt;
-    const k = Math.min(1, sh.turnHeld / CONFIG.turnAccelTime);
-    sh.aimAngle += turn * (CONFIG.turnRateMin + (CONFIG.turnRateMax - CONFIG.turnRateMin) * k) * dt;
-  } else {
-    sh.turnHeld = 0;
-  }
-  if (input.snap === 'forward' && Math.hypot(sh.vx, sh.vy) > 1) sh.aimAngle = Math.atan2(sh.vy, sh.vx);
-  else if (input.snap === 'back') sh.aimAngle += Math.PI;
-  sh.aimAngle = Math.atan2(Math.sin(sh.aimAngle), Math.cos(sh.aimAngle));
-}
-
-const ZERO = { ax: 0, ay: 0 };
-
-// Per-step steering. Returns extra acceleration for the physics step.
-function controlStep(game, input, dt) {
-  const sh = game.ship;
-  switch (game.scheme) {
-    case 'draw': {
-      // mouse: head toward the cursor at the usual cruise speed (no click needed).
-      // touch: a virtual stick; pushing it further goes faster.
-      const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
-      if (input.stick) {
-        const a = stickAngle(input.stick);
-        if (a !== null) {
-          const len = Math.hypot(input.stick.x, input.stick.y);
-          steerToward(game, a, dt, throttle((len - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone)));
-        }
-        return ZERO;
-      }
-      const a = cursorAngle(game, input.cursor);
-      if (a !== null) steerToward(game, a, dt);
-      return ZERO;
-    }
-    case 'mouse': {
-      const a = cursorAngle(game, input.cursor);
-      if (a !== null) steerToward(game, a, dt);
-      return ZERO;
-    }
-    case 'portal':
-    case 'steer':
-      if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
-      return ZERO;
-    case 'nudge':
-      return hasMove(input.move) ? nudgeAbsolute(game, input.move) : ZERO;
-    case 'relative':
-      return hasMove(input.move) ? nudgeRelative(game, input.move, dt) : ZERO;
-    case 'rotate':
-      rotateAim(game, input, dt);
-      return ZERO;
-    default:
-      return ZERO;
-  }
-}
-
-// Scheme aim for keyboard/hover launches: a vector, or null to boost along the heading.
-function controlAim(game, input) {
-  const sh = game.ship;
-  switch (game.scheme) {
-    case 'draw': {
-      const a = input.stick ? stickAngle(input.stick) : cursorAngle(game, input.cursor);
-      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
-    }
-    case 'mouse': {
-      const a = cursorAngle(game, input.cursor);
-      return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
-    }
-    case 'rotate':
-      return { x: Math.cos(sh.aimAngle) * 100, y: Math.sin(sh.aimAngle) * 100 };
-    case 'aim8':
-      return hasMove(input.move) ? { x: input.move.x * 100, y: input.move.y * 100 } : null;
-    default:
-      return null;
-  }
-}
-
 // ---- world.js ----
 
 
@@ -2344,7 +2354,7 @@ function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
+  if (input.dash && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
     input = { ...input, press: false }; // the same Space press must not also place the start
   }
@@ -2377,7 +2387,7 @@ function update(game, frameDt, input) {
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw &&
-          (game.scheme !== 'draw' || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
     }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
@@ -2422,7 +2432,7 @@ function step(game, dt, input) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard && game.scheme === 'draw') startDrawing(game, input);
+      if (r.keyboard && isDrawScheme(game.scheme)) startDrawing(game, input);
       else if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
@@ -2503,7 +2513,7 @@ function pushOffer(game, mod, source) {
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (game.scheme === 'draw') game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
+  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -2527,7 +2537,7 @@ function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && game.scheme !== 'draw') {
+  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -2987,7 +2997,7 @@ function updateGems(game, dt) {
 
 function addXp(game, v) {
   game.xp += v;
-  if (game.scheme === 'draw' && game.dashMeter < 1) {
+  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
     game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
     if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }
@@ -3217,6 +3227,7 @@ function drawShipAssembly(ctx, cx, cy, unit, colorOf, highlight, t = 0) {
 }
 
 // ---- render.js ----
+
 
 
 
@@ -3908,7 +3919,7 @@ function drawDrawingHud(r, game) {
 function drawPrediction(r, game) {
   const sh = game.ship;
   if (!sh.charging) return;
-  if (game.scheme === 'draw') { drawReach(r, game); return; }
+  if (isDrawScheme(game.scheme)) { drawReach(r, game); return; }
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
@@ -4414,7 +4425,7 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  if (game.scheme === 'draw') {
+  if (isDrawScheme(game.scheme)) {
     // dash gauge right below the HP bar
     const m = game.dashMeter;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -4815,7 +4826,7 @@ function showStation(save, onBuy, onDepart) {
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : CONFIG.controlScheme === 'draw' ? '線を走り切った後も高速を維持し、カーソル／スティックで方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
       el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
@@ -5234,7 +5245,7 @@ let game = null;
 try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
-if (previewControls === 'portal' || previewControls === 'draw') CONFIG.controlScheme = previewControls;
+if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
 const debug = createDebugPanel(() => game, (id) => {
   try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
@@ -5318,7 +5329,7 @@ window.addEventListener('keydown', (e) => {
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && game.scheme === 'draw' && game.state === 'play' && !game.draw;
+  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw;
   dashBtn.classList.toggle('show', show);
   if (!show) return;
   dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));

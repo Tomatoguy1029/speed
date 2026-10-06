@@ -13,7 +13,7 @@ import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
-import { controlStep, controlAim } from './controls.js';
+import { controlStep, controlAim, isDrawScheme } from './controls.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
 
 export const STEP = 1 / 120;
@@ -74,7 +74,7 @@ export function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if (input.dash && game.scheme === 'draw' && !game.draw && game.dashMeter >= 1) {
+  if (input.dash && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
     input = { ...input, press: false }; // the same Space press must not also place the start
   }
@@ -107,7 +107,7 @@ export function update(game, frameDt, input) {
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw &&
-          (game.scheme !== 'draw' || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
     }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
@@ -152,7 +152,7 @@ function step(game, dt, input) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard && game.scheme === 'draw') startDrawing(game, input);
+      if (r.keyboard && isDrawScheme(game.scheme)) startDrawing(game, input);
       else if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
@@ -233,7 +233,7 @@ export function pushOffer(game, mod, source) {
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (game.scheme === 'draw') game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
+  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -257,7 +257,7 @@ export function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && game.scheme !== 'draw') {
+  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -717,7 +717,7 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
-  if (game.scheme === 'draw' && game.dashMeter < 1) {
+  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
     game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
     if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }

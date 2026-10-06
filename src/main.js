@@ -5,7 +5,7 @@ import { showResult, clearScreens, showOffer, showStation, showPause } from './u
 import { loadSave, writeSave, buyUpgrade, applyRunResult, resetMeta } from './progression.js';
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
-import { buildIntent } from './controls.js';
+import { buildIntent, isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -22,7 +22,7 @@ let game = null;
 try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
-if (previewControls === 'portal' || previewControls === 'draw') CONFIG.controlScheme = previewControls;
+if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
 const debug = createDebugPanel(() => game, (id) => {
   try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
@@ -106,7 +106,7 @@ window.addEventListener('keydown', (e) => {
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && game.scheme === 'draw' && game.state === 'play' && !game.draw;
+  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw;
   dashBtn.classList.toggle('show', show);
   if (!show) return;
   dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));

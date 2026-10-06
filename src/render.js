@@ -1,3 +1,4 @@
+import { isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
@@ -689,7 +690,7 @@ function drawDrawingHud(r, game) {
 function drawPrediction(r, game) {
   const sh = game.ship;
   if (!sh.charging) return;
-  if (game.scheme === 'draw') { drawReach(r, game); return; }
+  if (isDrawScheme(game.scheme)) { drawReach(r, game); return; }
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
@@ -1195,7 +1196,7 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  if (game.scheme === 'draw') {
+  if (isDrawScheme(game.scheme)) {
     // dash gauge right below the HP bar
     const m = game.dashMeter;
     ctx.fillStyle = 'rgba(0,0,0,0.55)';

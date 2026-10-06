@@ -60,6 +60,20 @@ test('keyboard schemes: Space charges with the scheme aim, a mouse drag still wo
   }
 });
 
+test('WASD drawing controls ignore the cursor for movement and use Space for a gauge dash', () => {
+  const game = quiet('draw-wasd');
+  const cursor = { x: 0, y: -1000 };
+  const intent = buildIntent(raw({ pointerDown: true, cursor }), 'draw-wasd');
+  assert.equal(intent.charging, false, 'mouse presses must not start a charge');
+  run(game, intent, 0.2);
+  assert.equal(speed(game), 0, 'moving the mouse alone does not move the ship');
+  run(game, buildIntent(raw({ move: RIGHT, cursor }), 'draw-wasd'), 0.5);
+  assert.ok(game.ship.vx > 100 && Math.abs(game.ship.vy) < 1);
+  update(game, 0.02, buildIntent(raw({ dash: true, space: true, cursor }), 'draw-wasd'));
+  assert.equal(game.draw?.phase, 'draw');
+  assert.equal(game.dashMeter, 0);
+});
+
 // ---- mouse: go where the cursor is ----
 
 test('mouse scheme steers toward the cursor and dashes at it', () => {
