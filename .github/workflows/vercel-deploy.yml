@@ -3,7 +3,7 @@
 # teams cannot add members), so collaborators' commits would be blocked there. It is turned
 # off in vercel.json (git.deploymentEnabled: false).
 # Needs repository secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
-name: Vercel Deployment
+name: Demo Vercel Deployment
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -11,6 +11,10 @@ env:
 
 on:
   push:
+    paths:
+      - 'demo/**'
+      - 'vercel.json'
+      - '.github/workflows/vercel-deploy.yml'
   workflow_dispatch:
 
 concurrency:
