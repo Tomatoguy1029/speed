@@ -51,7 +51,7 @@ export const CONFIG = {
   carry: 0.65, // share of current speed carried into the next launch (same direction)
   baseAttack: 10, // damage is independent of travel speed
   dashChargeTime: 6, // real play seconds for one unit of draw charge
-  drawMinCharge: 0.5, // partial launch distinguishes full-charge traits
+  drawMinCharge: 0.25, // partial launch distinguishes full-charge traits
   baseCritChance: 0.05,
   weaponSlots: 4,
   traitSlots: 6, // prototype value; adjustable in P

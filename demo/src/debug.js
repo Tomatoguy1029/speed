@@ -18,7 +18,7 @@ export const TUNABLES = [
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
   { key: 'dashChargeTime', label: '描画版：1単位の充填時間（実秒）', min: 1, max: 20, step: 0.5 },
-  { key: 'drawMinCharge', label: '描画版：発動できる最低充填率', min: 0.1, max: 1, step: 0.1 },
+  { key: 'drawMinCharge', label: '描画版：発動できる最低充填率', min: 0.1, max: 1, step: 0.05 },
   { key: 'weaponSlots', label: '描画版：武器枠', min: 1, max: 8, step: 1 },
   { key: 'traitSlots', label: '描画版：特性枠', min: 1, max: 12, step: 1 },
   { key: 'chargeTime', label: '旧方式：押下チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },

@@ -402,10 +402,11 @@ function startDrawing(game, input) {
   const fullCharge = game.dashMeter >= 1 - 1e-6;
   const gauge = game.stats.gaugeMax * (game.newBuild ? game.dashMeter : 1);
   const budget = drawBudget(game, gauge);
-  game.dashMeter = 0;
+  // Keep the draw prototype's charge until commit; only the drawn length is spent.
+  if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -476,6 +477,7 @@ function commitPath(game) {
     extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
     if (d.points.length < 2) { game.draw = null; return; }
   }
+  if (game.newBuild) game.dashMeter = Math.max(0, game.dashMeter - d.charge * Math.min(1, d.used / d.budget));
   const pts = d.points;
   warpTo(game, pts[0].x, pts[0].y);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
