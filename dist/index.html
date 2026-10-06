@@ -168,6 +168,25 @@ const CONFIG = {
   enemyAimSpeed: 450, // px/s: that copy never moves faster than this (dashes leave enemy aim behind)
   killHitstopRegen: 0.3, // outside dashes the hitstop budget refills this many seconds per second
   drawStep: 8, // min world distance between path points
+  drawStartRange: 260, // a path can only start this close to the ship (clicks farther out start on the edge)
+  // path-shape skills (skills.js)
+  skillMinLength: 120, // shorter paths never trigger a skill
+  skillStraightness: 0.95, // straight = start-to-end distance / path length at least this
+  skillZigzagSwing: 30, // world units a zigzag must swing across its axis to count as a turn
+  skillZigzagFlips: 3, // turns needed for a zigzag
+  skillSpiralTurns: 0.75, // total turning (in turns) for a spiral
+  skillSpiralShrink: 1.3, // spiral: first third this many times farther from the centre than the last third
+  blinkWidth: 70, // Blink: half-width of the cut along the line
+  blinkDamage: 3, // Blink: attack x this, ignores armor
+  lightningRate: 2.5, // Lightning: traces this many times faster
+  lightningWidth: 2, // Lightning: wave reach x this
+  lightningDamage: 1.5, // Lightning: wave damage x this
+  lightningStun: 0.8, // Lightning: world seconds of stun
+  blastRadius: 360, // Blast: explosion radius at the end of the path
+  blastDamage: 1, // Blast: attack x this, ignores armor
+  blastKnock: 1500, // Blast: outward speed given to every enemy caught (ignores mass)
+  blastStun: 0.6, // Blast: enemies fly helplessly for this long
+  stunDrag: 2, // per-second velocity damping while stunned
   stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
   dashXpFrac: 0.35, // draw mode: XP to fill the dash gauge = this share of the current level's XP (scaled by charge-time stats)
   stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer
@@ -228,8 +247,8 @@ const CONFIG = {
 
 const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
-  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。描き始めは機体の周りの点線の円の中だけ（外をクリックすると円の縁から）。線の形で技が出る: 直線＝Blink（終点へ一瞬で移動し、線上を防御無視の大ダメージ）、ジグザグ＝Lightning（速くなぞり、太い帯で範囲攻撃＋スタン）、外から内への渦巻き＝Blast（なぞり終わりに大爆発、周りの敵を必ず大きく吹き飛ばす）。それ以外は通常のなぞり。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描き始めは機体の周りの点線の円の中だけ（外をクリックすると円の縁から）。線の形で技が出る: 直線＝Blink（終点へ一瞬で移動し、線上を防御無視の大ダメージ）、ジグザグ＝Lightning（速くなぞり、太い帯で範囲攻撃＋スタン）、外から内への渦巻き＝Blast（なぞり終わりに大爆発、周りの敵を必ず大きく吹き飛ばす）。それ以外は通常のなぞり。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -938,7 +957,14 @@ function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
-  BEHAVIORS[e.T.behavior](e, game, dt);
+  if (e.stunT > 0) {
+    // stunned (Lightning / Blast): no steering or attacks, just drift with the knockback
+    e.stunT -= dt;
+    const k = Math.max(0, 1 - CONFIG.stunDrag * dt);
+    e.vx *= k; e.vy *= k;
+  } else {
+    BEHAVIORS[e.T.behavior](e, game, dt);
+  }
   e.x += e.vx * dt;
   e.y += e.vy * dt;
   // stay out of the planet
@@ -2257,6 +2283,99 @@ function addRing(game, x, y, radius, color, life = 0.45) {
   game.fx.rings.push({ x, y, radius, color, life, max: life });
 }
 
+// ---- skills.js ----
+// Draw-mode skills: the shape of the drawn path picks a skill (straight -> Blink, zigzag -> Lightning,
+// inward spiral -> Blast, anything else -> a plain trace). Only the shape test lives here; the
+// effects run in world.js where the trace state is.
+
+
+const SKILL_INFO = {
+  blink: { name: 'BLINK', sub: '一閃', color: '#bff3ff' },
+  lightning: { name: 'LIGHTNING', sub: '迅雷', color: '#ffe46b' },
+  blast: { name: 'BLAST', sub: '爆縮', color: '#ff9f40' },
+};
+
+// Evenly spaced copy of a polyline, so the shape tests do not depend on how fast the mouse moved.
+function resamplePath(points, step) {
+  const out = [{ x: points[0].x, y: points[0].y }];
+  let carry = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1], b = points[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    let t = step - carry;
+    while (t <= len) {
+      out.push({ x: a.x + (b.x - a.x) * t / len, y: a.y + (b.y - a.y) * t / len });
+      t += step;
+    }
+    carry = len - (t - step);
+  }
+  const last = points[points.length - 1], tail = out[out.length - 1];
+  if (Math.hypot(last.x - tail.x, last.y - tail.y) > step * 0.3) out.push({ x: last.x, y: last.y });
+  return out;
+}
+
+// Net angle the path sweeps around its centroid (radians); one loop around it is about ±2π.
+// Swept angle (not heading turns) so sharp zigzag corners cannot add up to fake loops.
+function windingOf(pts) {
+  let cx = 0, cy = 0;
+  for (const p of pts) { cx += p.x; cy += p.y; }
+  cx /= pts.length; cy /= pts.length;
+  let total = 0, prev = Math.atan2(pts[0].y - cy, pts[0].x - cx);
+  for (let i = 1; i < pts.length; i++) {
+    const a = Math.atan2(pts[i].y - cy, pts[i].x - cx);
+    total += Math.atan2(Math.sin(a - prev), Math.cos(a - prev));
+    prev = a;
+  }
+  return total;
+}
+
+// How many times the path swings back across its main axis (with a minimum swing size).
+function zigzagFlips(pts) {
+  let mx = 0, my = 0;
+  for (const p of pts) { mx += p.x; my += p.y; }
+  mx /= pts.length; my /= pts.length;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const p of pts) { const dx = p.x - mx, dy = p.y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  const axis = 0.5 * Math.atan2(2 * sxy, sxx - syy); // principal direction
+  const nx = -Math.sin(axis), ny = Math.cos(axis);
+  const H = CONFIG.skillZigzagSwing;
+  let dir = 0, ext = (pts[0].x - mx) * nx + (pts[0].y - my) * ny, flips = 0;
+  for (const p of pts) {
+    const v = (p.x - mx) * nx + (p.y - my) * ny;
+    if (dir === 0) { if (Math.abs(v - ext) > H) { dir = Math.sign(v - ext); ext = v; } }
+    else if (dir > 0) { if (v > ext) ext = v; else if (ext - v > H) { flips++; dir = -1; ext = v; } }
+    else if (v < ext) ext = v;
+    else if (v - ext > H) { flips++; dir = 1; ext = v; }
+  }
+  return flips;
+}
+
+// Outside -> inside: early points sit much farther from the centroid than late ones.
+function spiralsInward(pts) {
+  const n = pts.length;
+  let cx = 0, cy = 0;
+  for (const p of pts) { cx += p.x; cy += p.y; }
+  cx /= n; cy /= n;
+  const avg = (arr) => arr.reduce((s, p) => s + Math.hypot(p.x - cx, p.y - cy), 0) / arr.length;
+  const third = Math.max(1, Math.floor(n / 3));
+  return avg(pts.slice(0, third)) > CONFIG.skillSpiralShrink * avg(pts.slice(n - third));
+}
+
+// 'blink' | 'lightning' | 'blast' | null
+function classifyPath(points) {
+  if (!points || points.length < 2) return null;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  if (total < CONFIG.skillMinLength) return null;
+  const pts = resamplePath(points, Math.max(6, total / 160));
+  const winding = Math.abs(windingOf(pts));
+  if (winding >= CONFIG.skillSpiralTurns * 2 * Math.PI && spiralsInward(pts)) return 'blast';
+  const first = points[0], last = points[points.length - 1];
+  if (Math.hypot(last.x - first.x, last.y - first.y) >= total * CONFIG.skillStraightness) return 'blink';
+  if (winding < 1.2 * Math.PI && zigzagFlips(pts) >= CONFIG.skillZigzagFlips) return 'lightning';
+  return null;
+}
+
 // ---- stages.js ----
 
 
@@ -2276,6 +2395,7 @@ function speedStage(sp) {
 }
 
 // ---- world.js ----
+
 
 
 
@@ -2328,7 +2448,7 @@ function createGame(opts = {}) {
     portalClock: 0, portalCooldowns: new Map(),
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], bolts: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -2569,10 +2689,11 @@ function waveRadius(game) {
 // The traced path gives off a wave: enemies within reach take damage once per pass and are
 // pushed away from the path. Sampled finely so long, fast traces leave no gaps.
 function waveAlong(game, r, x0, y0, x1, y1) {
-  const W = waveRadius(game);
+  const bolt = r.skill === 'lightning';
+  const W = waveRadius(game) * (bolt ? CONFIG.lightningWidth : 1);
   const len = Math.hypot(x1 - x0, y1 - y0);
   const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
-  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult * (bolt ? CONFIG.lightningDamage : 1);
   for (let k = 1; k <= n; k++) {
     const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
     for (const [id, e] of r.waveInside) {
@@ -2584,9 +2705,10 @@ function waveAlong(game, r, x0, y0, x1, y1) {
       if (d > e.r + W) return;
       r.waveInside.set(e.id, e);
       damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+      if (bolt && !e.dead) e.stunT = Math.max(e.stunT || 0, CONFIG.lightningStun);
     });
     r.waveAcc += len / n;
-    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
+    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, bolt ? 'rgba(255,228,107,0.9)' : 'rgba(130,225,255,0.9)', 0.35); }
   }
 }
 
@@ -2631,10 +2753,17 @@ function updateDrawing(game, input) {
   if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
-// Where a path may start: the clicked point, pushed out of planets and moons.
-function startPoint(game, c) {
+// A path may only start within drawStartRange of the ship; farther clicks land on the edge.
+function clampDrawStart(game, c) {
   const sh = game.ship;
-  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
+  if (!c) return { x: sh.x, y: sh.y };
+  const dx = c.x - sh.x, dy = c.y - sh.y, d = Math.hypot(dx, dy), R = CONFIG.drawStartRange;
+  return d <= R ? { x: c.x, y: c.y } : { x: sh.x + dx / d * R, y: sh.y + dy / d * R };
+}
+
+// Where a path may start: the clicked point (within range of the ship), pushed out of planets and moons.
+function startPoint(game, c) {
+  const p = clampDrawStart(game, c);
   for (const b of [game.field.planet, ...game.field.moons]) {
     const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
     if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
@@ -2678,6 +2807,7 @@ function commitPath(game) {
     if (d.points.length < 2) { game.draw = null; return; }
   }
   const pts = d.points;
+  const skill = classifyPath(pts);
   warpTo(game, pts[0].x, pts[0].y);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
   const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
@@ -2692,9 +2822,84 @@ function commitPath(game) {
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  let rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
+  if (skill === 'lightning') rate *= CONFIG.lightningRate;
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+  if (skill) announceSkill(game, skill);
+  if (skill === 'blink') { game.draw = null; blinkAlong(game, pts, speed); return; }
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, skill, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  if (skill === 'lightning') game.fx.bolts.push({ path: pts, life: 0.5, max: 0.5, seed: game.rng() * 1000 });
+}
+
+function announceSkill(game, skill) {
+  const info = SKILL_INFO[skill];
+  game.events.push({ type: 'skill', skill, name: info.name, sub: info.sub, color: info.color });
+  addText(game, game.ship.x, game.ship.y - 40, info.name, info.color, 30);
+}
+
+// End of a traced dash: keep the speed and steer freely; a spiral ends in a Blast wherever it stopped.
+function endTrace(game, r) {
+  const sh = game.ship;
+  game.draw = null;
+  if (r.skill === 'blast') blastAt(game, sh.x, sh.y, r.speed);
+}
+
+// Blink: be at the end of the straight line at once, cutting everything along it (armor ignored).
+function blinkAlong(game, pts, speed) {
+  const sh = game.ship, W = CONFIG.blinkWidth;
+  const dmg = attackPower(speed, game.stats) * CONFIG.blinkDamage;
+  const a = pts[0], b = pts[pts.length - 1];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+  const hit = [];
+  queryGrid(game.grid, Math.min(a.x, b.x) - W - MAX_ENEMY_R, Math.min(a.y, b.y) - W - MAX_ENEMY_R,
+    Math.max(a.x, b.x) + W + MAX_ENEMY_R, Math.max(a.y, b.y) + W + MAX_ENEMY_R, (e) => {
+      if (e.dead) return;
+      const t = Math.max(0, Math.min(len, (e.x - a.x) * ux + (e.y - a.y) * uy));
+      const px = a.x + ux * t, py = a.y + uy * t;
+      if (Math.hypot(e.x - px, e.y - py) <= e.r + W) hit.push({ e, t, px, py });
+    });
+  hit.sort((p, q) => p.t - q.t);
+  for (const { e, px, py } of hit) {
+    const d = Math.hypot(e.x - px, e.y - py) || 1;
+    damageEnemy(game, e, dmg, { cause: 'blink', dirX: (e.x - px) / d, dirY: (e.y - py) / d, knock: 200 });
+    addRing(game, e.x, e.y, e.r + 16, 'rgba(191,243,255,0.9)', 0.3);
+  }
+  for (let i = 1; i <= 5; i++) {
+    const t = len * i / 6;
+    game.fx.ghosts.push({ x: a.x + ux * t, y: a.y + uy * t, life: 0.2 + 0.05 * i, max: 0.45 });
+  }
+  game.fx.ghosts.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, life: 0.4, max: 0.4, streak: true });
+  sh.x = b.x; sh.y = b.y; sh.trail = [];
+  sh.vx = ux * speed; sh.vy = uy * speed;
+  collideBodies(game);
+  sh.glide = true;
+  sh.boostT = game.stats.boostDuration;
+  game.lastPath = pts;
+  if (hit.length) game.hitstop = Math.max(game.hitstop, 0.08);
+  addRing(game, b.x, b.y, 60, 'rgba(191,243,255,0.95)', 0.35);
+}
+
+// Blast: an armor-ignoring explosion that always throws every enemy caught far outward.
+function blastAt(game, x, y, speed) {
+  const R = CONFIG.blastRadius * game.stats.waveRadiusMult;
+  const dmg = attackPower(speed, game.stats) * CONFIG.blastDamage;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy);
+    if (d > R + e.r) continue;
+    const ux = d > 1 ? dx / d : Math.cos(e.id || 0), uy = d > 1 ? dy / d : Math.sin(e.id || 0);
+    damageEnemy(game, e, dmg, { cause: 'blast' });
+    if (e.dead) continue;
+    const k = CONFIG.blastKnock * (1 - 0.4 * Math.min(1, d / R));
+    e.vx = ux * k; e.vy = uy * k;
+    e.stunT = Math.max(e.stunT || 0, CONFIG.blastStun);
+  }
+  addRing(game, x, y, R, '#ff9f40', 0.6);
+  addRing(game, x, y, R * 0.6, '#ffe46b', 0.45);
+  burst(game, x, y, '#ffb36b', 40, 0, 0, 700);
+  game.hitstop = Math.max(game.hitstop, 0.06);
+  game.events.push({ type: 'explode', x, y, radius: R, cause: 'blast' });
+  game.events.push({ type: 'blast', x, y });
 }
 
 // Blink to the start of the path, leaving a few fading afterimages behind.
@@ -2733,13 +2938,13 @@ function runAlongPath(game, realDt) {
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
     waveAlong(game, r, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, R, r)) { endTrace(game, r); return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
   }
   if (r.seg >= r.path.length - 1) {
-    game.draw = null;
+    endTrace(game, r);
     sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
   }
@@ -3023,6 +3228,8 @@ function updateFx(game, dt) {
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
   for (const loop of game.fx.loops) loop.life -= dt;
   game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
+  for (const b of game.fx.bolts) b.life -= dt;
+  game.fx.bolts = game.fx.bolts.filter((b) => b.life > 0);
 }
 
 // ---- prediction ----
@@ -3233,6 +3440,7 @@ function drawShipAssembly(ctx, cx, cy, unit, colorOf, highlight, t = 0) {
 
 
 
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -3308,6 +3516,8 @@ function handleEvents(r, game) {
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'skill') { r.banner = { text: ev.name, sub: ev.sub, color: ev.color, life: 1.1, max: 1.1 }; r.flash = Math.max(r.flash, 0.12); r.shake = Math.max(r.shake, 6); }
+    else if (ev.type === 'blast') { r.shake = Math.max(r.shake, 26); r.flash = Math.max(r.flash, 0.35); r.zoomPunch = 0.08; }
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
@@ -3346,6 +3556,7 @@ function render(r, game, dt, pointer) {
   drawEnemyBullets(r, game);
   drawPortals(r, game);
   drawPathUi(r, game);
+  drawStartRange(r, game);
   drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
@@ -3591,8 +3802,10 @@ function drawBanner(r, dt) {
   const a = Math.min(1, t / 0.25, b.life / 0.6);
   ctx.globalAlpha = a;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `800 ${Math.min(54, W / 10)}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  const size = Math.min(54, W / 10) * (1 + 0.25 * Math.max(0, 1 - t / 0.15));
+  ctx.font = `italic 900 ${size}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  if (b.color) { ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(3,8,20,0.85)'; ctx.strokeText(b.text, W / 2, H * 0.3); }
+  ctx.fillStyle = b.color || '#ffffff';
   ctx.fillText(b.text, W / 2, H * 0.3);
   if (b.sub) {
     ctx.font = `16px "Hiragino Sans", "Noto Sans JP", sans-serif`;
@@ -3821,8 +4034,9 @@ function drawPathUi(r, game) {
   const sh = game.ship;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
-    ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = waveRadius(game) * 2;
+    const bolt = d.skill === 'lightning';
+    ctx.strokeStyle = bolt ? 'rgba(255,228,107,0.16)' : 'rgba(159,232,255,0.14)';
+    ctx.lineWidth = waveRadius(game) * 2 * (bolt ? CONFIG.lightningWidth : 1);
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -3839,13 +4053,14 @@ function drawPathUi(r, game) {
   if (!pts.length) {
     // not started yet: the ship will blink to wherever the player clicks
     if (!d.cursor) return;
+    const c = clampDrawStart(game, d.cursor);
     ctx.strokeStyle = 'rgba(214,246,255,0.25)';
     ctx.lineWidth = 2 / z;
     ctx.setLineDash([4 / z, 10 / z]);
-    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(c.x, c.y); ctx.stroke();
     ctx.setLineDash([8 / z, 6 / z]);
     ctx.strokeStyle = 'rgba(214,246,255,0.8)';
-    ctx.beginPath(); ctx.arc(d.cursor.x, d.cursor.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(c.x, c.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
     return;
   }
@@ -3884,6 +4099,24 @@ function drawPathUi(r, game) {
   ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
 }
 
+// Where a path may start: a dashed circle around the ship while a new path can be begun.
+function drawStartRange(r, game) {
+  if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
+  const d = game.draw;
+  if (d ? d.phase !== 'draw' || d.started : game.dashMeter < 1) return;
+  const { ctx } = r;
+  const z = r.cam.zoom, sh = game.ship;
+  ctx.save();
+  ctx.fillStyle = 'rgba(159,232,255,0.05)';
+  ctx.beginPath(); ctx.arc(sh.x, sh.y, CONFIG.drawStartRange, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(159,232,255,0.45)';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([10 / z, 8 / z]);
+  ctx.lineDashOffset = -game.t * 30 / z;
+  ctx.stroke();
+  ctx.restore();
+}
+
 // One cursor ring shows charge before drawing and remaining path length while drawing.
 function drawDrawingHud(r, game, pointer) {
   if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
@@ -3918,6 +4151,16 @@ function drawDrawingHud(r, game, pointer) {
   ctx.strokeText(label, lx, y + radius + 17);
   ctx.fillStyle = color;
   ctx.fillText(label, lx, y + radius + 17);
+  const skill = drawing ? classifyPath(d.points) : null;
+  if (skill) {
+    // the skill the current shape would trigger
+    const info = SKILL_INFO[skill];
+    ctx.font = `italic 900 15px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    const sy = y - radius - 10;
+    ctx.strokeText(info.name, lx, sy);
+    ctx.fillStyle = info.color;
+    ctx.fillText(info.name, lx, sy);
+  }
   ctx.restore();
 }
 
@@ -4084,6 +4327,33 @@ function drawFx(r, game) {
     ctx.globalAlpha = a; ctx.strokeStyle = loop.color; ctx.lineWidth = (3 + 5 * a) / z; ctx.stroke();
   }
   ctx.globalAlpha = 1;
+  // Lightning: jagged bolts flicker along the traced path
+  for (const b of game.fx.bolts) {
+    const a = Math.max(0, b.life / b.max);
+    const jag = 22 / Math.sqrt(z);
+    const flick = Math.floor((b.max - b.life) * 30);
+    for (let k = 0; k < 2; k++) {
+      ctx.strokeStyle = k ? `rgba(255,255,255,${0.9 * a})` : `rgba(255,228,107,${0.8 * a})`;
+      ctx.lineWidth = (k ? 2 : 5) / z;
+      ctx.beginPath();
+      let i = 0;
+      for (const p of b.path) {
+        const n = Math.sin((i++ + flick) * 12.9898 + b.seed) * 43758.5453;
+        const o = (n - Math.floor(n) - 0.5) * jag * (k ? 0.6 : 1);
+        if (i === 1) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x + o, p.y - o);
+      }
+      ctx.stroke();
+    }
+  }
+  // stunned enemies spin a little yellow ring
+  ctx.lineWidth = 2.5 / z;
+  ctx.strokeStyle = 'rgba(255,228,107,0.85)';
+  for (const e of game.enemies) {
+    if (!(e.stunT > 0) || e.dead || !onScreen(r, e.x, e.y, e.r + 40)) continue;
+    const a0 = game.t * 9;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 8 / z, a0, a0 + Math.PI * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 8 / z, a0 + Math.PI, a0 + Math.PI * 1.7); ctx.stroke();
+  }
   // warp afterimages
   for (const g of game.fx.ghosts) {
     const a = Math.max(0, g.life / g.max);
@@ -4956,6 +5226,10 @@ function createAudio() {
     phase: () => tone(110, 1.2, 'sawtooth', 0.12, 220),
     barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
     warp: () => { tone(1400, 0.12, 'sine', 0.12, 300); noise(0.12, 3000, 0.1, 'highpass'); },
+    skill: (e) => e.skill === 'blink' ? (tone(2200, 0.18, 'sine', 0.16, 600), noise(0.2, 4000, 0.15, 'highpass'))
+      : e.skill === 'lightning' ? (noise(0.35, 3000, 0.25, 'bandpass', 800), tone(1200, 0.2, 'square', 0.06, 300))
+      : tone(220, 0.3, 'sawtooth', 0.1, 440),
+    blast: () => { noise(0.9, 700, 0.6, 'lowpass', 60, boomBus); tone(70, 0.8, 'sine', 0.6, 30, boomBus); },
     dashReady: () => tone(988, 0.18, 'triangle', 0.1, 1480),
     drawStart: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
     sonic: () => {
@@ -5069,6 +5343,15 @@ const TUNABLES = [
   { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
   { key: 'waveRadius', label: '軌跡の波動が届く距離', min: 0, max: 300, step: 5 },
+  { key: 'drawStartRange', label: '描き始められる範囲（機体からの距離）', min: 50, max: 1500, step: 10 },
+  { key: 'blinkDamage', label: 'Blink（直線）の威力（攻撃力比・防御無視）', min: 0, max: 10, step: 0.1 },
+  { key: 'blinkWidth', label: 'Blink の切る幅', min: 10, max: 300, step: 5 },
+  { key: 'lightningRate', label: 'Lightning（ジグザグ）のなぞる速さ倍率', min: 1, max: 6, step: 0.1 },
+  { key: 'lightningWidth', label: 'Lightning の範囲倍率（波動比）', min: 1, max: 5, step: 0.1 },
+  { key: 'lightningStun', label: 'Lightning のスタン（秒）', min: 0, max: 3, step: 0.05 },
+  { key: 'blastRadius', label: 'Blast（渦巻き）の爆発半径', min: 50, max: 1000, step: 10 },
+  { key: 'blastKnock', label: 'Blast のノックバック速度', min: 0, max: 4000, step: 50 },
+  { key: 'blastDamage', label: 'Blast の威力（攻撃力比・防御無視）', min: 0, max: 5, step: 0.1 },
   { key: 'waveDamage', label: '軌跡の波動の威力（攻撃力比）', min: 0, max: 3, step: 0.05 },
   { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },

@@ -207,7 +207,14 @@ export function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
-  BEHAVIORS[e.T.behavior](e, game, dt);
+  if (e.stunT > 0) {
+    // stunned (Lightning / Blast): no steering or attacks, just drift with the knockback
+    e.stunT -= dt;
+    const k = Math.max(0, 1 - CONFIG.stunDrag * dt);
+    e.vx *= k; e.vy *= k;
+  } else {
+    BEHAVIORS[e.T.behavior](e, game, dt);
+  }
   e.x += e.vx * dt;
   e.y += e.vy * dt;
   // stay out of the planet

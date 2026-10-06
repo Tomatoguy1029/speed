@@ -82,6 +82,25 @@ export const CONFIG = {
   enemyAimSpeed: 450, // px/s: that copy never moves faster than this (dashes leave enemy aim behind)
   killHitstopRegen: 0.3, // outside dashes the hitstop budget refills this many seconds per second
   drawStep: 8, // min world distance between path points
+  drawStartRange: 260, // a path can only start this close to the ship (clicks farther out start on the edge)
+  // path-shape skills (skills.js)
+  skillMinLength: 120, // shorter paths never trigger a skill
+  skillStraightness: 0.95, // straight = start-to-end distance / path length at least this
+  skillZigzagSwing: 30, // world units a zigzag must swing across its axis to count as a turn
+  skillZigzagFlips: 3, // turns needed for a zigzag
+  skillSpiralTurns: 0.75, // total turning (in turns) for a spiral
+  skillSpiralShrink: 1.3, // spiral: first third this many times farther from the centre than the last third
+  blinkWidth: 70, // Blink: half-width of the cut along the line
+  blinkDamage: 3, // Blink: attack x this, ignores armor
+  lightningRate: 2.5, // Lightning: traces this many times faster
+  lightningWidth: 2, // Lightning: wave reach x this
+  lightningDamage: 1.5, // Lightning: wave damage x this
+  lightningStun: 0.8, // Lightning: world seconds of stun
+  blastRadius: 360, // Blast: explosion radius at the end of the path
+  blastDamage: 1, // Blast: attack x this, ignores armor
+  blastKnock: 1500, // Blast: outward speed given to every enemy caught (ignores mass)
+  blastStun: 0.6, // Blast: enemies fly helplessly for this long
+  stunDrag: 2, // per-second velocity damping while stunned
   stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
   dashXpFrac: 0.35, // draw mode: XP to fill the dash gauge = this share of the current level's XP (scaled by charge-time stats)
   stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer

@@ -10,7 +10,8 @@ import { buildGrid, queryGrid } from './grid.js';
 import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
-import { damageEnemy, addText, addRing } from './hits.js';
+import { damageEnemy, addText, addRing, burst } from './hits.js';
+import { classifyPath, SKILL_INFO } from './skills.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
@@ -50,7 +51,7 @@ export function createGame(opts = {}) {
     portalClock: 0, portalCooldowns: new Map(),
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], bolts: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -291,10 +292,11 @@ export function waveRadius(game) {
 // The traced path gives off a wave: enemies within reach take damage once per pass and are
 // pushed away from the path. Sampled finely so long, fast traces leave no gaps.
 export function waveAlong(game, r, x0, y0, x1, y1) {
-  const W = waveRadius(game);
+  const bolt = r.skill === 'lightning';
+  const W = waveRadius(game) * (bolt ? CONFIG.lightningWidth : 1);
   const len = Math.hypot(x1 - x0, y1 - y0);
   const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
-  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult * (bolt ? CONFIG.lightningDamage : 1);
   for (let k = 1; k <= n; k++) {
     const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
     for (const [id, e] of r.waveInside) {
@@ -306,9 +308,10 @@ export function waveAlong(game, r, x0, y0, x1, y1) {
       if (d > e.r + W) return;
       r.waveInside.set(e.id, e);
       damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+      if (bolt && !e.dead) e.stunT = Math.max(e.stunT || 0, CONFIG.lightningStun);
     });
     r.waveAcc += len / n;
-    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
+    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, bolt ? 'rgba(255,228,107,0.9)' : 'rgba(130,225,255,0.9)', 0.35); }
   }
 }
 
@@ -353,10 +356,17 @@ function updateDrawing(game, input) {
   if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
-// Where a path may start: the clicked point, pushed out of planets and moons.
-function startPoint(game, c) {
+// A path may only start within drawStartRange of the ship; farther clicks land on the edge.
+export function clampDrawStart(game, c) {
   const sh = game.ship;
-  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
+  if (!c) return { x: sh.x, y: sh.y };
+  const dx = c.x - sh.x, dy = c.y - sh.y, d = Math.hypot(dx, dy), R = CONFIG.drawStartRange;
+  return d <= R ? { x: c.x, y: c.y } : { x: sh.x + dx / d * R, y: sh.y + dy / d * R };
+}
+
+// Where a path may start: the clicked point (within range of the ship), pushed out of planets and moons.
+function startPoint(game, c) {
+  const p = clampDrawStart(game, c);
   for (const b of [game.field.planet, ...game.field.moons]) {
     const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
     if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
@@ -400,6 +410,7 @@ function commitPath(game) {
     if (d.points.length < 2) { game.draw = null; return; }
   }
   const pts = d.points;
+  const skill = classifyPath(pts);
   warpTo(game, pts[0].x, pts[0].y);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
   const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
@@ -414,9 +425,84 @@ function commitPath(game) {
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  let rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
+  if (skill === 'lightning') rate *= CONFIG.lightningRate;
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+  if (skill) announceSkill(game, skill);
+  if (skill === 'blink') { game.draw = null; blinkAlong(game, pts, speed); return; }
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, skill, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  if (skill === 'lightning') game.fx.bolts.push({ path: pts, life: 0.5, max: 0.5, seed: game.rng() * 1000 });
+}
+
+function announceSkill(game, skill) {
+  const info = SKILL_INFO[skill];
+  game.events.push({ type: 'skill', skill, name: info.name, sub: info.sub, color: info.color });
+  addText(game, game.ship.x, game.ship.y - 40, info.name, info.color, 30);
+}
+
+// End of a traced dash: keep the speed and steer freely; a spiral ends in a Blast wherever it stopped.
+function endTrace(game, r) {
+  const sh = game.ship;
+  game.draw = null;
+  if (r.skill === 'blast') blastAt(game, sh.x, sh.y, r.speed);
+}
+
+// Blink: be at the end of the straight line at once, cutting everything along it (armor ignored).
+function blinkAlong(game, pts, speed) {
+  const sh = game.ship, W = CONFIG.blinkWidth;
+  const dmg = attackPower(speed, game.stats) * CONFIG.blinkDamage;
+  const a = pts[0], b = pts[pts.length - 1];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+  const hit = [];
+  queryGrid(game.grid, Math.min(a.x, b.x) - W - MAX_ENEMY_R, Math.min(a.y, b.y) - W - MAX_ENEMY_R,
+    Math.max(a.x, b.x) + W + MAX_ENEMY_R, Math.max(a.y, b.y) + W + MAX_ENEMY_R, (e) => {
+      if (e.dead) return;
+      const t = Math.max(0, Math.min(len, (e.x - a.x) * ux + (e.y - a.y) * uy));
+      const px = a.x + ux * t, py = a.y + uy * t;
+      if (Math.hypot(e.x - px, e.y - py) <= e.r + W) hit.push({ e, t, px, py });
+    });
+  hit.sort((p, q) => p.t - q.t);
+  for (const { e, px, py } of hit) {
+    const d = Math.hypot(e.x - px, e.y - py) || 1;
+    damageEnemy(game, e, dmg, { cause: 'blink', dirX: (e.x - px) / d, dirY: (e.y - py) / d, knock: 200 });
+    addRing(game, e.x, e.y, e.r + 16, 'rgba(191,243,255,0.9)', 0.3);
+  }
+  for (let i = 1; i <= 5; i++) {
+    const t = len * i / 6;
+    game.fx.ghosts.push({ x: a.x + ux * t, y: a.y + uy * t, life: 0.2 + 0.05 * i, max: 0.45 });
+  }
+  game.fx.ghosts.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, life: 0.4, max: 0.4, streak: true });
+  sh.x = b.x; sh.y = b.y; sh.trail = [];
+  sh.vx = ux * speed; sh.vy = uy * speed;
+  collideBodies(game);
+  sh.glide = true;
+  sh.boostT = game.stats.boostDuration;
+  game.lastPath = pts;
+  if (hit.length) game.hitstop = Math.max(game.hitstop, 0.08);
+  addRing(game, b.x, b.y, 60, 'rgba(191,243,255,0.95)', 0.35);
+}
+
+// Blast: an armor-ignoring explosion that always throws every enemy caught far outward.
+function blastAt(game, x, y, speed) {
+  const R = CONFIG.blastRadius * game.stats.waveRadiusMult;
+  const dmg = attackPower(speed, game.stats) * CONFIG.blastDamage;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const dx = e.x - x, dy = e.y - y, d = Math.hypot(dx, dy);
+    if (d > R + e.r) continue;
+    const ux = d > 1 ? dx / d : Math.cos(e.id || 0), uy = d > 1 ? dy / d : Math.sin(e.id || 0);
+    damageEnemy(game, e, dmg, { cause: 'blast' });
+    if (e.dead) continue;
+    const k = CONFIG.blastKnock * (1 - 0.4 * Math.min(1, d / R));
+    e.vx = ux * k; e.vy = uy * k;
+    e.stunT = Math.max(e.stunT || 0, CONFIG.blastStun);
+  }
+  addRing(game, x, y, R, '#ff9f40', 0.6);
+  addRing(game, x, y, R * 0.6, '#ffe46b', 0.45);
+  burst(game, x, y, '#ffb36b', 40, 0, 0, 700);
+  game.hitstop = Math.max(game.hitstop, 0.06);
+  game.events.push({ type: 'explode', x, y, radius: R, cause: 'blast' });
+  game.events.push({ type: 'blast', x, y });
 }
 
 // Blink to the start of the path, leaving a few fading afterimages behind.
@@ -455,13 +541,13 @@ function runAlongPath(game, realDt) {
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
     waveAlong(game, r, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
+    if (collideEnemies(game, x0, y0, R, r)) { endTrace(game, r); return; }
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
   }
   if (r.seg >= r.path.length - 1) {
-    game.draw = null;
+    endTrace(game, r);
     sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
   }
@@ -745,6 +831,8 @@ function updateFx(game, dt) {
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
   for (const loop of game.fx.loops) loop.life -= dt;
   game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
+  for (const b of game.fx.bolts) b.life -= dt;
+  game.fx.bolts = game.fx.bolts.filter((b) => b.life > 0);
 }
 
 // ---- prediction ----

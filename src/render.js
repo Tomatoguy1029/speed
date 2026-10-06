@@ -1,7 +1,8 @@
 import { isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
+import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius, clampDrawStart } from './world.js';
+import { classifyPath, SKILL_INFO } from './skills.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
@@ -83,6 +84,8 @@ function handleEvents(r, game) {
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'skill') { r.banner = { text: ev.name, sub: ev.sub, color: ev.color, life: 1.1, max: 1.1 }; r.flash = Math.max(r.flash, 0.12); r.shake = Math.max(r.shake, 6); }
+    else if (ev.type === 'blast') { r.shake = Math.max(r.shake, 26); r.flash = Math.max(r.flash, 0.35); r.zoomPunch = 0.08; }
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
@@ -121,6 +124,7 @@ export function render(r, game, dt, pointer) {
   drawEnemyBullets(r, game);
   drawPortals(r, game);
   drawPathUi(r, game);
+  drawStartRange(r, game);
   drawFriendly(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
@@ -366,8 +370,10 @@ function drawBanner(r, dt) {
   const a = Math.min(1, t / 0.25, b.life / 0.6);
   ctx.globalAlpha = a;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `800 ${Math.min(54, W / 10)}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  const size = Math.min(54, W / 10) * (1 + 0.25 * Math.max(0, 1 - t / 0.15));
+  ctx.font = `italic 900 ${size}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  if (b.color) { ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(3,8,20,0.85)'; ctx.strokeText(b.text, W / 2, H * 0.3); }
+  ctx.fillStyle = b.color || '#ffffff';
   ctx.fillText(b.text, W / 2, H * 0.3);
   if (b.sub) {
     ctx.font = `16px "Hiragino Sans", "Noto Sans JP", sans-serif`;
@@ -596,8 +602,9 @@ function drawPathUi(r, game) {
   const sh = game.ship;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (d.phase === 'run') {
-    ctx.strokeStyle = 'rgba(159,232,255,0.14)';
-    ctx.lineWidth = waveRadius(game) * 2;
+    const bolt = d.skill === 'lightning';
+    ctx.strokeStyle = bolt ? 'rgba(255,228,107,0.16)' : 'rgba(159,232,255,0.14)';
+    ctx.lineWidth = waveRadius(game) * 2 * (bolt ? CONFIG.lightningWidth : 1);
     ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
     for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
     ctx.stroke();
@@ -614,13 +621,14 @@ function drawPathUi(r, game) {
   if (!pts.length) {
     // not started yet: the ship will blink to wherever the player clicks
     if (!d.cursor) return;
+    const c = clampDrawStart(game, d.cursor);
     ctx.strokeStyle = 'rgba(214,246,255,0.25)';
     ctx.lineWidth = 2 / z;
     ctx.setLineDash([4 / z, 10 / z]);
-    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(c.x, c.y); ctx.stroke();
     ctx.setLineDash([8 / z, 6 / z]);
     ctx.strokeStyle = 'rgba(214,246,255,0.8)';
-    ctx.beginPath(); ctx.arc(d.cursor.x, d.cursor.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(c.x, c.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
     return;
   }
@@ -659,6 +667,24 @@ function drawPathUi(r, game) {
   ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
 }
 
+// Where a path may start: a dashed circle around the ship while a new path can be begun.
+function drawStartRange(r, game) {
+  if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
+  const d = game.draw;
+  if (d ? d.phase !== 'draw' || d.started : game.dashMeter < 1) return;
+  const { ctx } = r;
+  const z = r.cam.zoom, sh = game.ship;
+  ctx.save();
+  ctx.fillStyle = 'rgba(159,232,255,0.05)';
+  ctx.beginPath(); ctx.arc(sh.x, sh.y, CONFIG.drawStartRange, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(159,232,255,0.45)';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([10 / z, 8 / z]);
+  ctx.lineDashOffset = -game.t * 30 / z;
+  ctx.stroke();
+  ctx.restore();
+}
+
 // One cursor ring shows charge before drawing and remaining path length while drawing.
 function drawDrawingHud(r, game, pointer) {
   if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
@@ -693,6 +719,16 @@ function drawDrawingHud(r, game, pointer) {
   ctx.strokeText(label, lx, y + radius + 17);
   ctx.fillStyle = color;
   ctx.fillText(label, lx, y + radius + 17);
+  const skill = drawing ? classifyPath(d.points) : null;
+  if (skill) {
+    // the skill the current shape would trigger
+    const info = SKILL_INFO[skill];
+    ctx.font = `italic 900 15px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+    const sy = y - radius - 10;
+    ctx.strokeText(info.name, lx, sy);
+    ctx.fillStyle = info.color;
+    ctx.fillText(info.name, lx, sy);
+  }
   ctx.restore();
 }
 
@@ -859,6 +895,33 @@ function drawFx(r, game) {
     ctx.globalAlpha = a; ctx.strokeStyle = loop.color; ctx.lineWidth = (3 + 5 * a) / z; ctx.stroke();
   }
   ctx.globalAlpha = 1;
+  // Lightning: jagged bolts flicker along the traced path
+  for (const b of game.fx.bolts) {
+    const a = Math.max(0, b.life / b.max);
+    const jag = 22 / Math.sqrt(z);
+    const flick = Math.floor((b.max - b.life) * 30);
+    for (let k = 0; k < 2; k++) {
+      ctx.strokeStyle = k ? `rgba(255,255,255,${0.9 * a})` : `rgba(255,228,107,${0.8 * a})`;
+      ctx.lineWidth = (k ? 2 : 5) / z;
+      ctx.beginPath();
+      let i = 0;
+      for (const p of b.path) {
+        const n = Math.sin((i++ + flick) * 12.9898 + b.seed) * 43758.5453;
+        const o = (n - Math.floor(n) - 0.5) * jag * (k ? 0.6 : 1);
+        if (i === 1) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x + o, p.y - o);
+      }
+      ctx.stroke();
+    }
+  }
+  // stunned enemies spin a little yellow ring
+  ctx.lineWidth = 2.5 / z;
+  ctx.strokeStyle = 'rgba(255,228,107,0.85)';
+  for (const e of game.enemies) {
+    if (!(e.stunT > 0) || e.dead || !onScreen(r, e.x, e.y, e.r + 40)) continue;
+    const a0 = game.t * 9;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 8 / z, a0, a0 + Math.PI * 0.7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 8 / z, a0 + Math.PI, a0 + Math.PI * 1.7); ctx.stroke();
+  }
   // warp afterimages
   for (const g of game.fx.ghosts) {
     const a = Math.max(0, g.life / g.max);

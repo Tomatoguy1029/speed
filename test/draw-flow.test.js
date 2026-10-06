@@ -5,6 +5,10 @@ import { createEnemy } from '../src/enemies.js';
 import { killEnemy } from '../src/hits.js';
 import { CONFIG } from '../src/config.js';
 
+// plain tracing only: path-shape skills and the start range are covered in skills.test.js
+CONFIG.skillMinLength = Infinity;
+CONFIG.drawStartRange = Infinity;
+
 const flowIdle = { charging: false, release: false, cursor: null };
 function flowGame(scheme = 'draw') {
   const game = createGame({ seed: 5, scheme });

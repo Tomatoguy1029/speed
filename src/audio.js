@@ -106,6 +106,10 @@ export function createAudio() {
     phase: () => tone(110, 1.2, 'sawtooth', 0.12, 220),
     barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
     warp: () => { tone(1400, 0.12, 'sine', 0.12, 300); noise(0.12, 3000, 0.1, 'highpass'); },
+    skill: (e) => e.skill === 'blink' ? (tone(2200, 0.18, 'sine', 0.16, 600), noise(0.2, 4000, 0.15, 'highpass'))
+      : e.skill === 'lightning' ? (noise(0.35, 3000, 0.25, 'bandpass', 800), tone(1200, 0.2, 'square', 0.06, 300))
+      : tone(220, 0.3, 'sawtooth', 0.1, 440),
+    blast: () => { noise(0.9, 700, 0.6, 'lowpass', 60, boomBus); tone(70, 0.8, 'sine', 0.6, 30, boomBus); },
     dashReady: () => tone(988, 0.18, 'triangle', 0.1, 1480),
     drawStart: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
     sonic: () => {

@@ -5,6 +5,10 @@ import { buildIntent } from '../src/controls.js';
 import { createGame, update, addXp } from '../src/world.js';
 import { createEnemy } from '../src/enemies.js';
 
+// plain tracing only: path-shape skills and the start range are covered in skills.test.js
+CONFIG.skillMinLength = Infinity;
+CONFIG.drawStartRange = Infinity;
+
 const none = { x: 0, y: 0 };
 const OY = -3000;
 const idle = { charging: false, aimX: 0, aimY: 0, release: false, keyboard: true, press: false, move: none, snap: null, cursor: null };
