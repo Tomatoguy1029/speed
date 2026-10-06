@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { refreshStats, pushOffer, addXp } from './world.js';
 import { xpForLevel } from './progression.js';
 import { PHASES } from './spawner.js';
-import { MODULES, RARITIES } from './modules.js';
+import { MODULES, RARITIES, SLOTS, moduleFitsScheme } from './modules.js';
 import { SCHEMES, schemeById } from './controls.js';
 
 const DEFAULTS = { ...CONFIG };
@@ -62,10 +62,10 @@ export const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
-  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
-  { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
-  { key: 'hyperOfferInterval', label: 'ハイパー版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
-  { key: 'hyperDropInterval', label: 'ハイパー版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
+  { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
+  { key: 'dropBase', label: 'モジュール基本ドロップ率（敵の強さで増加）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
+  { key: 'dropMax', label: 'モジュールドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
@@ -116,6 +116,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();
+    syncModulePicker();
     schemeSel.blur(); // keep WASD/Space for the game, not the select
     if (onScheme) onScheme(CONFIG.controlScheme);
   });
@@ -123,6 +124,13 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
+  const moduleRow = document.createElement('label');
+  moduleRow.className = 'dctl';
+  moduleRow.innerHTML = '<span>入手するモジュール</span><select aria-label="入手するモジュール"></select>';
+  const moduleSel = moduleRow.querySelector('select');
+  const moduleHelp = document.createElement('div');
+  moduleHelp.className = 'dhelp';
+  btns.before(moduleRow, moduleHelp);
 
   const button = (label, fn) => {
     const b = document.createElement('button');
@@ -140,14 +148,44 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
   btns.append(sel);
   const inv = button('無敵: OFF', (g) => { g.debug.invincible = !g.debug.invincible; inv.textContent = `無敵: ${g.debug.invincible ? 'ON' : 'OFF'}`; });
   const rsel = document.createElement('select');
+  rsel.setAttribute('aria-label', '入手するモジュールのレア度');
   rsel.innerHTML = RARITIES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
   rsel.value = '2';
   btns.append(rsel);
+  function syncModuleRarity() {
+    const def = MODULES.find(m => m.id === moduleSel.value);
+    if (def && !def.rarities.includes(Number(rsel.value))) {
+      const current = Number(rsel.value);
+      rsel.value = String(def.rarities.reduce((a, b) => Math.abs(b - current) < Math.abs(a - current) ? b : a));
+    }
+    for (const option of rsel.options) option.disabled = !!def && !def.rarities.includes(Number(option.value));
+    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : 'モジュールとレア度を選び、「モジュール入手」でその場で試せます。';
+  }
+  function syncModulePicker() {
+    const selected = moduleSel.value;
+    const scheme = getGame()?.scheme || CONFIG.controlScheme;
+    moduleSel.innerHTML = '<option value="">ランダム（従来）</option>';
+    for (const slot of SLOTS) {
+      const group = document.createElement('optgroup');
+      group.label = slot.name;
+      for (const mod of MODULES.filter(m => m.slot === slot.id && moduleFitsScheme(m, scheme))) {
+        const option = document.createElement('option');
+        option.value = mod.id; option.textContent = mod.name;
+        group.append(option);
+      }
+      if (group.children.length) moduleSel.append(group);
+    }
+    if ([...moduleSel.options].some(option => option.value === selected)) moduleSel.value = selected;
+    syncModuleRarity();
+  }
+  moduleSel.addEventListener('change', () => { syncModuleRarity(); moduleSel.blur(); });
+  rsel.addEventListener('change', () => { syncModuleRarity(); rsel.blur(); });
+  syncModulePicker();
   button('モジュール入手', (g) => {
     const r = Number(rsel.value);
-    const pool = MODULES.filter((m) => m.rarities.includes(r));
-    const def = pool[Math.floor(Math.random() * pool.length)];
-    if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
+    const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
+    const def = pool.find(m => m.id === moduleSel.value) || pool[Math.floor(Math.random() * pool.length)];
+    if (g.state === 'play' || g.state === 'offer') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
   button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
   button('包囲炸裂を入手', (g) => {
@@ -195,7 +233,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); syncModulePicker(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;

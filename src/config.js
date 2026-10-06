@@ -7,6 +7,11 @@ export const CONFIG = {
   bossTime: 420, // one provisional boss appears after seven minutes
   bossHp: 2200,
   bossArmor: 14,
+  bossFinishReplayWindow: 0.18, // actual approach recorded before the final blow
+  bossFinishSlowTime: 1.2,
+  bossFinishZoom: 3.2,
+  bossFinishBlastTime: 2,
+  bossFinishClearTime: 1.4,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -41,11 +46,11 @@ export const CONFIG = {
   gunSpeed: 1100, // px/s on top of the ship's own velocity
   gunLife: 0.7, // seconds
   gunSpread: 0.16, // radians between shots when it fires several
-  hyperDropScale: 0.1, // fewer module drops even with five times as many enemies
-  hyperDropInterval: 35, // minimum seconds between enemy module drops in hyperdrive mode
-  hyperOfferInterval: 30, // minimum play seconds between selection screens
-  hyperCapsuleCount: 2,
-  hyperCapsuleInterval: 40,
+  hyperCapsuleCount: 4,
+  hyperCapsuleInterval: 16,
+  spawnMargin: 70, // spawn/recycle just beyond the actual screen edges
+  spawnRefillTime: 1, // replenish local population deficits in about one world second
+  spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -125,8 +130,13 @@ export const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
-  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
+  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
+  enemyPursuitSpread: 480, // width reference for roaming routes across the current view
+  enemyApproachCycle: 18,
+  enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
+  enemyApproachBlend: 2,
+  enemyRoamTurn: 0.12,
+  enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,

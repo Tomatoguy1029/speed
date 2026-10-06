@@ -1,5 +1,6 @@
 import { isHyperScheme } from './controls.js';
 import { CONFIG } from './config.js';
+import { finishCameraTarget, drawBossFinish } from './finale.js';
 import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, waveRadius, hyperReach, jumpTarget, hyperMaxCharges } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
@@ -51,6 +52,14 @@ export function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  const finishTarget = finishCameraTarget(game, r.W, r.H, targetZoom(game, r.W, r.H));
+  if (finishTarget) {
+    const k = 1 - Math.exp(-10 * dt);
+    r.cam.x += (finishTarget.x - r.cam.x) * k;
+    r.cam.y += (finishTarget.y - r.cam.y) * k;
+    r.cam.zoom += (finishTarget.zoom - r.cam.zoom) * k;
+    return;
+  }
   const zoomT = targetZoom(game, r.W, r.H);
   // look ahead along the velocity, but keep the ship well inside the screen at any speed
   let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
@@ -81,6 +90,8 @@ function handleEvents(r, game) {
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
+    else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
+    else if (ev.type === 'bossExplosion') { r.flash = 1; r.shake = 30; }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
@@ -92,6 +103,7 @@ export function render(r, game, dt, pointer) {
   if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
   handleEvents(r, game);
   updateCamera(r, game, dt);
+  game.spawnView = { x: r.cam.x, y: r.cam.y, halfW: r.W / 2 / r.cam.zoom, halfH: r.H / 2 / r.cam.zoom };
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   drawBackground(r, game);
 
@@ -128,21 +140,24 @@ export function render(r, game, dt, pointer) {
   ctx.restore();
   drawSpeedLines(r, game);
 
-  drawChargeUi(r, game, pointer);
-  drawCapsuleArrows(r, game);
-  drawHyperHud(r, game);
-  drawPortalHud(r, game);
-  drawOverlays(r, game, dt);
-  drawHud(r, game);
-  drawBossHud(r, game, dt);
-  drawMinimap(r, game);
-  drawBanner(r, dt);
-  drawStageFlash(r, dt);
+  if (game.state !== 'finishing') {
+    drawChargeUi(r, game, pointer);
+    drawCapsuleArrows(r, game);
+    drawHyperHud(r, game);
+    drawPortalHud(r, game);
+    drawOverlays(r, game, dt);
+    drawHud(r, game);
+    drawBossHud(r, game, dt);
+    drawMinimap(r, game);
+    drawBanner(r, dt);
+    drawStageFlash(r, dt);
+  }
   if (r.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, r.flash)})`;
     ctx.fillRect(0, 0, r.W, r.H);
     r.flash = Math.max(0, r.flash - dt * 2.2);
   }
+  drawBossFinish(r, game);
 }
 
 // Conical shock layers wrapped around the ship near max speed.
@@ -931,6 +946,15 @@ function drawFx(r, game) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;
+    if (p.kind === 'finishDebris') {
+      ctx.save(); ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+      ctx.strokeStyle = p.color; ctx.lineWidth = 1.5 / z;
+      ctx.fillStyle = '#dfe9f0';
+      ctx.beginPath(); ctx.moveTo(-s, -s * 0.6); ctx.lineTo(s * 0.8, -s * 0.35);
+      ctx.lineTo(s * 0.5, s * 0.7); ctx.lineTo(-s * 0.6, s * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+      continue;
+    }
     if (p.kind === 'spark') {
       const speed = Math.hypot(p.vx, p.vy) || 1;
       const length = s * 4;

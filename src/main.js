@@ -68,7 +68,7 @@ function finishRun() {
   const before = save.coins;
   applyRunResult(save, game);
   writeSave(storage, save);
-  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation);
+  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation, startRun);
 }
 
 function chooseOffer(accept) {
@@ -109,10 +109,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
-  if (e.key === 'p' || e.key === 'P') debug.toggle();
+  if ((e.key === 'p' || e.key === 'P') && game.state !== 'finishing') debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
-    else if (mode === 'result') { e.preventDefault(); openStation(); }
   }
 });
 
@@ -136,12 +135,13 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const wasPlaying = game.state === 'play';
+  const wasRunning = game.state === 'play' || game.state === 'finishing';
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   raw.clickCursors = raw.clicks.map((c) => screenToWorld(renderer, c.x, c.y));
   update(game, dt, buildIntent(raw, game.scheme));
+  if (game.state === 'finishing') input.state.enabled = false;
   render(renderer, game, dt, input.state);
   updateDashButton();
   audio.handle(game.events);
@@ -149,7 +149,7 @@ function frame(now) {
   debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
-    if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
     if (game.state === 'levelup' && levelShown !== game.levelChoices) {
       levelShown = game.levelChoices;
       input.reset();

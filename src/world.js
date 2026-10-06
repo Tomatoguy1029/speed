@@ -8,16 +8,17 @@ import { addCombatImpact } from './impact-fx.js';
 import { updateEnemy, updateEnemyAim, MAX_ENEMY_R } from './enemies.js';
 import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
-import { updateSpawner, getPhase } from './spawner.js';
+import { updateSpawner, getPhase, phaseTarget } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing, explode } from './hits.js';
-import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
+import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isHyperScheme } from './controls.js';
 import { updateWeapons } from './weapons.js';
 import { rollLevelChoices, applyLevelChoice, perkLevel, perkBlastRadius, perkBlastMult, fullChargePower, vortexRadius, vortexLife } from './upgrades.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
+import { recordBossApproach, advanceBossFinish } from './finale.js';
 
 export const STEP = 1 / 120;
 
@@ -36,11 +37,11 @@ export function createGame(opts = {}) {
     meta, stats, ship, loadout,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
-    nextOfferAt: 0, nextModuleDropAt: 0,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     boss: null, bossSpawned: false,
+    finale: null, finishFrames: [], finishClock: 0,
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0, levelChoices: null,
@@ -69,9 +70,15 @@ export function createGame(opts = {}) {
 }
 
 export function update(game, frameDt, input) {
-  if (game.state !== 'play') return;
-  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
   frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'finishing') {
+    updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
+    const finished = advanceBossFinish(game, frameDt);
+    if (finished) end(game, 'won', 'boss');
+    return;
+  }
+  if (game.state !== 'play') return;
+  recordBossApproach(game, frameDt);
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
@@ -82,9 +89,11 @@ export function update(game, frameDt, input) {
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
   if (!game.jump && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
+  if (game.state !== 'play') return;
   if (game.jump) {
     // jump every frame on real time (world steps are rare while it is nearly frozen)
     runJump(game, frameDt);
+    if (game.state !== 'play') return;
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
@@ -101,14 +110,13 @@ export function update(game, frameDt, input) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
-    if (jumpPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
+    if (jumpPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     // level-ups wait until hyperdrive and jumps are over, like module offers
     if (game.pendingLevelups > 0 && !game.jump && !game.hyper.focus && !game.portalDash) { openLevelup(game); break; }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length && !game.jump && !game.hyper.focus &&
-          (!isHyperScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.jump && !game.hyper.focus) { openOffer(game); break; }
     }
   }
   if (isHyperScheme(game.scheme) && !game.portalDash && game.slowmo <= 0) game.timeScale = hyperWorldScale(game);
@@ -174,6 +182,7 @@ function step(game, dt, input) {
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
     if (isHyperScheme(game.scheme)) hyperSlowdown(game, dt);
     collideEnemies(game, x0, y0);
+    if (game.state !== 'play') return;
     collideBodies(game);
     checkPortalEntry(game, x0, y0);
   }
@@ -182,6 +191,7 @@ function step(game, dt, input) {
   updateVortices(game, dt);
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
+  if (game.state !== 'play') return;
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
   flushNewEnemies(game);
   updateSpawner(game, dt);
@@ -199,8 +209,7 @@ function step(game, dt, input) {
     game.stage = st;
   }
 
-  if (game.boss?.dead) end(game, 'won', 'boss');
-  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  if (sh.hp <= 0) end(game, 'lost', 'hp');
   else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
@@ -232,11 +241,14 @@ export function absorbDuplicates(game) {
 export function pushOffer(game, mod, source) {
   game.lastOfferSlot = mod.slot;
   game.offerQueue.push({ ...mod, source });
+  if (game.state === 'play' && !game.jump && !game.hyper.focus) {
+    absorbDuplicates(game);
+    if (game.offerQueue.length) openOffer(game);
+  }
 }
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (isHyperScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.hyperOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -282,7 +294,7 @@ export function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && !isHyperScheme(game.scheme)) {
+  if (game.offerQueue.length) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -360,8 +372,9 @@ export function waveAlong(game, r, x0, y0, x1, y1) {
       const d = Math.hypot(e.x - px, e.y - py);
       if (d > e.r + W) return;
       r.waveInside.set(e.id, e);
-      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260, impactX: px, impactY: py });
     });
+    if (game.state === 'finishing') return;
     r.waveAcc += len / n;
     if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
   }
@@ -480,8 +493,11 @@ function runJump(game, realDt) {
     j.pos += move;
     sh.x = j.from.x + j.ux * j.pos; sh.y = j.from.y + j.uy * j.pos;
     sh.vx = j.ux * j.speed; sh.vy = j.uy * j.speed;
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(j.speed, game.stats));
     waveAlong(game, j, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); return; }
+    if (game.state !== 'play') return;
+    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); endTraceAttack(game); return; }
+    if (game.state !== 'play') return;
   }
   if (j.pos >= j.len - 1e-9) {
     game.jump = null;
@@ -489,6 +505,7 @@ function runJump(game, realDt) {
     // keep part of the jump speed, then the normal slowdown takes over
     sh.vx = j.ux * j.speed * CONFIG.hyperKeep; sh.vy = j.uy * j.speed * CONFIG.hyperKeep;
     sh.boostT = CONFIG.hyperCoast; sh.fadeT = 0;
+    endTraceAttack(game); // route-end modules (end blast, finish pulse) go off where the jump lands
   }
 }
 
@@ -615,7 +632,7 @@ function launch(game, ax, ay) {
 // amount: hp lost, slow: share of speed lost (0..1)
 export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
-  if (sh.invulnT > 0 || game.debug.invincible) return false;
+  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
@@ -649,7 +666,8 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     let res = resolveRam(atk, e, crit, stats);
     if (run?.overdrive && !res.pierce) res = { pierce: true, damage: atk * (crit ? stats.critMult : 1), shipDamage: 0 };
     if (res.pierce) {
-      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
+      if (game.state === 'finishing') return false;
       if (crit) {
         const len = Math.hypot(hx - e.x, hy - e.y) || 1;
         addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
@@ -664,7 +682,8 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
       const keep = game.jump ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
-      onPierce(game);
+      onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
       if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
@@ -735,7 +754,14 @@ function recordTrail(sh, dt) {
 
 function flushNewEnemies(game) {
   if (!game.newEnemies.length) return;
-  for (const e of game.newEnemies) game.enemies.push(e);
+  const limit = Math.ceil(phaseTarget(game.t).pop * (1 + CONFIG.enemySplitOverflow));
+  let population = 0;
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss') population++;
+  for (const e of game.newEnemies) {
+    if (population >= limit) break;
+    game.enemies.push(e);
+    population++;
+  }
   game.newEnemies.length = 0;
 }
 
@@ -760,6 +786,13 @@ export function separateEnemies(game) {
         const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
         e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
         o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+        // Position correction alone lets the rear ranks drive back into the same packed mass.
+        // Cancel only their closing velocity; sideways and separating movement stay available.
+        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
+        if (closing < 0) {
+          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
+          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
+        }
       });
     }
   }
@@ -817,7 +850,7 @@ export function addXp(game, v) {
 
 function updateFx(game, dt) {
   const P = game.fx.particles;
-  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; if (p.spin) p.angle += p.spin * dt; }
   game.fx.particles = P.filter((p) => p.life > 0);
   for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
   for (const g of game.fx.ghosts) g.life -= dt;

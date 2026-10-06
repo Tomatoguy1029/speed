@@ -24,6 +24,8 @@ test('one boss appears on time, stays when left off screen, and its defeat clear
   damageEnemy(game, boss, boss.hp, { cause: 'wave' });
   game.spawning = false;
   update(game, 0.02, { charging: false });
+  assert.equal(game.state, 'finishing');
+  for (let i = 0; i < 100 && game.state === 'finishing'; i++) update(game, 0.05, {});
   assert.equal(game.state, 'won');
   assert.equal(game.endReason, 'boss');
 });
@@ -58,4 +60,33 @@ test('coincident enemies and large neighboring bodies separate instead of remain
   game.enemies = [small, large];
   separateEnemies(game);
   assert.ok(Math.hypot(small.x - large.x, small.y - large.y) >= small.r + large.r + CONFIG.enemySpacing - 0.01);
+});
+
+test('rear ranks cannot keep driving into enemies after their bodies are separated', () => {
+  const game = createGame({ seed: 12 });
+  const a = createEnemy('armored', 1, 0, -3000);
+  const b = createEnemy('armored', 1, 45, -3000);
+  a.vx = 70; b.vx = -70;
+  a.vy = b.vy = 25;
+  game.enemies = [a, b];
+  separateEnemies(game);
+  assert.ok(b.vx - a.vx >= -1e-6, 'closing velocity is removed rather than restored next step');
+  assert.equal(a.vy, 25, 'sideways movement remains available');
+  assert.equal(b.vy, 25);
+});
+
+test('splitter offspring cannot flood the field beyond the population allowance', () => {
+  const game = createGame({ seed: 12 });
+  game.spawning = false;
+  game.debug.invincible = true;
+  game.ship.vx = game.ship.vy = 0;
+  const count = Math.floor(phaseTarget(0).pop);
+  for (let i = 0; i < count; i++) {
+    const e = createEnemy('splitter', 1, -3000 + (i % 10) * 100, 500 + Math.floor(i / 10) * 100);
+    e.budT = e.T.budInterval;
+    game.enemies.push(e);
+  }
+  update(game, 0.02, {});
+  assert.equal(game.enemies.length, Math.ceil(phaseTarget(game.t).pop * (1 + CONFIG.enemySplitOverflow)));
+  assert.ok(game.enemies.some(e => e.type === 'splitling'), 'ordinary splitting still produces offspring');
 });

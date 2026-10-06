@@ -100,6 +100,11 @@ const CONFIG = {
   bossTime: 420, // one provisional boss appears after seven minutes
   bossHp: 2200,
   bossArmor: 14,
+  bossFinishReplayWindow: 0.18, // actual approach recorded before the final blow
+  bossFinishSlowTime: 1.2,
+  bossFinishZoom: 3.2,
+  bossFinishBlastTime: 2,
+  bossFinishClearTime: 1.4,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -134,11 +139,11 @@ const CONFIG = {
   gunSpeed: 1100, // px/s on top of the ship's own velocity
   gunLife: 0.7, // seconds
   gunSpread: 0.16, // radians between shots when it fires several
-  hyperDropScale: 0.1, // fewer module drops even with five times as many enemies
-  hyperDropInterval: 35, // minimum seconds between enemy module drops in hyperdrive mode
-  hyperOfferInterval: 30, // minimum play seconds between selection screens
-  hyperCapsuleCount: 2,
-  hyperCapsuleInterval: 40,
+  hyperCapsuleCount: 4,
+  hyperCapsuleInterval: 16,
+  spawnMargin: 70, // spawn/recycle just beyond the actual screen edges
+  spawnRefillTime: 1, // replenish local population deficits in about one world second
+  spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -218,8 +223,13 @@ const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
-  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
+  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
+  enemyPursuitSpread: 480, // width reference for roaming routes across the current view
+  enemyApproachCycle: 18,
+  enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
+  enemyApproachBlend: 2,
+  enemyRoamTurn: 0.12,
+  enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
@@ -474,6 +484,242 @@ function controlAim(game, input) {
   }
 }
 
+// ---- enemies.js ----
+
+
+const BACK = Math.PI;
+const SIDE = Math.PI / 2;
+
+// hp/armor/contact are level-1 values; armor is in attack units (speed/100 at x1 multiplier).
+const ENEMY_TYPES = {
+  drifter: { name: 'ドリフター', r: 14, hp: 6, armor: 2, speed: 130, accel: 2.5, contact: 6, xp: 1, color: '#7fd1ff', shape: 'orb', behavior: 'chase', weakDir: BACK, weakArc: 1.0 },
+  swarm: { name: 'スウォーム', r: 11, hp: 3, armor: 1.2, speed: 200, accel: 3, contact: 4, xp: 0.6, color: '#9df0ff', shape: 'dart', behavior: 'chase', weakDir: BACK, weakArc: 1.1 },
+  darter: { name: 'ダーター', r: 16, hp: 9, armor: 3.5, speed: 110, accel: 2, contact: 10, xp: 2, color: '#ff9f6b', shape: 'dart', behavior: 'dash', weakDir: BACK, weakArc: 0.9, range: 520, windup: 0.7, dashSpeed: 760, dashTime: 0.55, recover: 0.9 },
+  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 11, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
+  splitter: { name: '分裂型', r: 22, hp: 14, armor: 4, speed: 60, accel: 1.5, contact: 8, xp: 2, color: '#a8ff7a', shape: 'blob', behavior: 'split', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.55, budInterval: 5, maxBuds: 5, turn: 1.5 },
+  splitling: { name: '分裂体', r: 10, hp: 3, armor: 1.5, speed: 150, accel: 2.5, contact: 4, xp: 0.4, color: '#cfff9a', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.2 },
+  leech: { name: '減速型', r: 20, hp: 14, armor: 5, speed: 120, accel: 1.6, contact: 6, xp: 3, color: '#c77dff', shape: 'diamond', behavior: 'leech', weakDir: BACK, weakArc: 0.9, auraR: 210, drain: 0.9, steal: 0.2 },
+  gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.8, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 7, slow: 0.12 },
+  missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
+  battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
+  titan: { name: 'タイタン', r: 75, hp: 160, armor: 6, speed: 38, accel: 0.8, contact: 18, xp: 25, color: '#ff8fd1', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.0, turn: 0.8, sizeVar: true },
+  boss: { name: 'ボス戦艦（暫定）', r: 120, hp: 2200, armor: 14, speed: 100, accel: 0.8, contact: 28, xp: 100, color: '#ff526e', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.7, turn: 0.7, fireInterval: 2.6, telegraph: 0.8, volley: 9, spread: 1.3, bulletSpeed: 420, bulletDmg: 15, slow: 0.15 },
+  meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
+};
+
+const MAX_ENEMY_R = 130;
+
+let nextId = 1;
+
+function createEnemy(type, level, x, y, opts = {}) {
+  const T = ENEMY_TYPES[type];
+  const L = Math.max(1, level);
+  const elite = !!opts.elite;
+  const size = type === 'meteor' || T.sizeVar ? (opts.size || T.r) : T.r;
+  const sz = size / T.r;
+  const hp = T.hp * sz * sz * (1 + 0.6 * (L - 1)) * CONFIG.enemyHpMult * (elite ? 3 : 1);
+  return {
+    id: nextId++, type, T, level: L, elite,
+    x, y, vx: 0, vy: 0,
+    r: size * (elite ? 1.25 : 1),
+    hp, maxHp: hp,
+    armor: T.armor * sz * (1 + 0.35 * (L - 1)) * CONFIG.enemyArmorMult * (elite ? 1.3 : 1),
+    contact: T.contact * (1 + 0.2 * (L - 1)),
+    xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
+    speed: T.speed * (1 + 0.04 * (L - 1)),
+    facing: opts.facing ?? 0,
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: T.weakArc || 0,
+    hitCD: 0, flash: 0, dead: false,
+    state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
+    parent: opts.parent || 0,
+    spin: opts.spin || 0,
+  };
+}
+
+function steerTo(e, tx, ty, speed, accel, dt) {
+  const dx = tx - e.x, dy = ty - e.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const k = Math.min(1, accel * dt);
+  e.vx += ((dx / d) * speed - e.vx) * k;
+  e.vy += ((dy / d) * speed - e.vy) * k;
+}
+
+function turnToward(e, target, rate, dt) {
+  let d = target - e.facing;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const m = rate * dt;
+  e.facing += Math.max(-m, Math.min(m, d));
+}
+
+// Where enemies think the ship is: a sluggish copy of its position (see updateEnemyAim), so a
+// fast dash leaves their aim behind instead of being tracked instantly.
+function enemyTarget(game) {
+  return game.enemyAim || game.ship;
+}
+
+function angleToShip(e, game) {
+  const t = enemyTarget(game);
+  return Math.atan2(t.y - e.y, t.x - e.x);
+}
+
+// Ease the enemies' idea of the ship's position toward the real one: lagging by `enemyAimLag`
+// seconds and never faster than `enemyAimSpeed`.
+function updateEnemyAim(game, dt) {
+  const sh = game.ship;
+  if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
+  const a = game.enemyAim;
+  let dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  // Keep the reaction lag, but never let its target remain several screens behind forever.
+  const maxLag = Math.max(300, game.viewRadius * 0.55);
+  if (d > maxLag) {
+    a.x = sh.x - dx / d * maxLag; a.y = sh.y - dy / d * maxLag;
+    dx = sh.x - a.x; dy = sh.y - a.y; d = maxLag;
+  }
+  if (d < 1e-6) return;
+  const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
+  a.x += dx / d * step; a.y += dy / d * step;
+}
+
+// Hold a ring around the ship at `keep` distance while circling it.
+function keepDistance(e, game, dt) {
+  const sh = enemyTarget(game);
+  const dx = e.x - sh.x, dy = e.y - sh.y;
+  const d = Math.hypot(dx, dy) || 1;
+  const side = e.id % 2 ? 1 : -1;
+  const tx = sh.x + (dx / d) * e.T.keep - (dy / d) * 200 * side;
+  const ty = sh.y + (dy / d) * e.T.keep + (dx / d) * 200 * side;
+  steerTo(e, tx, ty, e.speed, e.T.accel, dt);
+  turnToward(e, angleToShip(e, game), 3, dt);
+}
+
+function fire(game, e, angle, speed, kind) {
+  const T = e.T;
+  const lv = 1 + 0.25 * (e.level - 1);
+  game.ebullets.push({
+    kind, x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, speed,
+    r: kind === 'missile' ? 9 : 7, dmg: T.bulletDmg * lv, slow: T.slow, life: kind === 'missile' ? 4.5 : 4,
+    turn: T.missileTurn || 0,
+  });
+  game.events.push({ type: 'shoot', x: e.x, y: e.y, kind });
+}
+
+// Count down to a shot; `charge` > 0 while telegraphing.
+function gunTimer(e, dt) {
+  e.fireT -= dt;
+  e.charge = e.fireT < e.T.telegraph ? 1 - Math.max(0, e.fireT) / e.T.telegraph : 0;
+  if (e.fireT <= 0) { e.fireT = e.T.fireInterval; return true; }
+  return false;
+}
+
+const BEHAVIORS = {
+  chase(e, game, dt) {
+    const sh = enemyTarget(game);
+    // Stagger pursuit so the whole population cannot settle around one central coordinate.
+    // Bosses keep pursuing directly; ordinary enemies alternate rushes and broad moving routes.
+    const cycle = (e.age + e.id * 1.61803398875) % CONFIG.enemyApproachCycle;
+    const roam = e.type === 'boss' ? 0 : Math.max(0, Math.min(1,
+      (cycle - CONFIG.enemyApproachTime) / CONFIG.enemyApproachBlend,
+      (CONFIG.enemyApproachCycle - cycle) / CONFIG.enemyApproachBlend));
+    const view = game.spawnView || { x: sh.x, y: sh.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+    const angle = e.id * 2.39996322973 + e.age * CONFIG.enemyRoamTurn;
+    const ux = Math.cos(angle), uy = Math.sin(angle);
+    const radius = (0.45 + 0.5 * Math.sqrt((e.id * 0.61803398875) % 1)) * Math.min(1, CONFIG.enemyPursuitSpread / 480);
+    const edge = radius / Math.max(Math.abs(ux), Math.abs(uy));
+    const tx = sh.x + (view.x + ux * edge * view.halfW - sh.x) * roam;
+    const ty = sh.y + (view.y + uy * edge * view.halfH - sh.y) * roam;
+    steerTo(e, tx, ty, e.speed, e.T.accel || 2, dt);
+    turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
+  },
+  dash(e, game, dt) {
+    const T = e.T;
+    const sh = enemyTarget(game);
+    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
+    e.timer -= dt;
+    if (e.state === 'move') {
+      BEHAVIORS.chase(e, game, dt);
+      if (d < T.range) { e.state = 'windup'; e.timer = T.windup; }
+    } else if (e.state === 'windup') {
+      e.vx *= 1 - 4 * dt; e.vy *= 1 - 4 * dt;
+      turnToward(e, angleToShip(e, game), 6, dt);
+      if (e.timer <= 0) {
+        e.state = 'dash'; e.timer = T.dashTime;
+        e.vx = Math.cos(e.facing) * T.dashSpeed; e.vy = Math.sin(e.facing) * T.dashSpeed;
+      }
+    } else if (e.state === 'dash') {
+      if (e.timer <= 0) { e.state = 'recover'; e.timer = T.recover; }
+    } else {
+      e.vx *= 1 - 2 * dt; e.vy *= 1 - 2 * dt;
+      if (e.timer <= 0) e.state = 'move';
+    }
+  },
+  split(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    e.budT += dt;
+    if (e.budT >= e.T.budInterval) {
+      e.budT = 0;
+      if (e.buds < e.T.maxBuds) {
+        e.buds++;
+        const a = game.rng() * Math.PI * 2;
+        game.newEnemies.push(createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r * 1.5, e.y + Math.sin(a) * e.r * 1.5, { parent: e.id, facing: a }));
+      }
+    }
+  },
+  leech(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    const sh = game.ship;
+    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
+    if (d < e.T.auraR) game.leechDrag += e.T.drain * (1 - d / e.T.auraR * 0.5);
+  },
+  gunner(e, game, dt) {
+    keepDistance(e, game, dt);
+    if (gunTimer(e, dt)) fire(game, e, angleToShip(e, game), e.T.bulletSpeed, 'bullet');
+  },
+  missile(e, game, dt) {
+    keepDistance(e, game, dt);
+    if (gunTimer(e, dt)) fire(game, e, e.facing, e.T.missileSpeed, 'missile');
+  },
+  battleship(e, game, dt) {
+    BEHAVIORS.chase(e, game, dt);
+    if (gunTimer(e, dt)) {
+      const base = angleToShip(e, game);
+      const n = e.T.volley;
+      for (let i = 0; i < n; i++) fire(game, e, base + (i / (n - 1) - 0.5) * e.T.spread, e.T.bulletSpeed, 'bullet');
+    }
+  },
+  drift(e, game, dt) {
+    e.facing += e.spin * dt;
+  },
+};
+
+function onEnemyDeath(e, game) {
+  if (e.type === 'splitter') {
+    for (let i = 0; i < 2; i++) {
+      const a = e.facing + (i ? 1 : -1) * Math.PI / 2;
+      const c = createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r, e.y + Math.sin(a) * e.r, { facing: a });
+      c.vx = Math.cos(a) * 200; c.vy = Math.sin(a) * 200;
+      c.hitCD = 0.35;
+      game.newEnemies.push(c);
+    }
+  }
+}
+
+function updateEnemy(e, game, dt) {
+  e.age += dt;
+  if (e.hitCD > 0) e.hitCD -= dt;
+  if (e.flash > 0) e.flash -= dt;
+  BEHAVIORS[e.T.behavior](e, game, dt);
+  e.x += e.vx * dt;
+  e.y += e.vy * dt;
+  // stay out of the planet
+  const p = game.field.planet;
+  const d = Math.hypot(e.x - p.x, e.y - p.y);
+  if (d < p.r + e.r && d > 0) {
+    e.x = p.x + ((e.x - p.x) / d) * (p.r + e.r);
+    e.y = p.y + ((e.y - p.y) / d) * (p.r + e.r);
+  }
+}
+
 // ---- math.js ----
 const TAU = Math.PI * 2;
 
@@ -540,6 +786,247 @@ function pickWeighted(rng, items) {
     if (r < 0) return v;
   }
   return items[items.length - 1][0];
+}
+
+// ---- field.js ----
+
+
+
+function createField(rng) {
+  const moons = [];
+  for (let i = 0; i < CONFIG.moonCount; i++) {
+    moons.push({
+      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
+      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
+      dir: rng() < 0.5 ? -1 : 1,
+      r: randRange(rng, 110, 180),
+      gm: CONFIG.moonGM,
+      x: 0, y: 0,
+    });
+  }
+  const dust = [];
+  for (let i = 0; i < CONFIG.dustCount; i++) {
+    const a = rng() * TAU;
+    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
+    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
+  }
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  updateMoons(field, 0);
+  return field;
+}
+
+function updateMoons(field, t) {
+  for (const m of field.moons) {
+    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
+    m.x = Math.cos(a) * m.orbit;
+    m.y = Math.sin(a) * m.orbit;
+  }
+}
+
+function zoneOf(r) {
+  if (r < CONFIG.zoneInner) return 'inner';
+  if (r > CONFIG.zoneOuter) return 'outer';
+  return 'mid';
+}
+
+// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
+function dangerAt(r) {
+  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
+  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
+  return 0;
+}
+
+function dustDragAt(field, x, y) {
+  for (const d of field.dust) {
+    const dx = x - d.x, dy = y - d.y;
+    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
+  }
+  return 0;
+}
+
+// ---- spawner.js ----
+
+
+// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
+const PHASES = [
+  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1, titan: 0.05 } },
+  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5, titan: 0.3 } },
+  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2, titan: 0.4 } },
+  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
+  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, titan: 1.2, battleship: 0.3 } },
+  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, titan: 2, battleship: 0.6 } },
+];
+
+function getPhase(t) {
+  for (const p of PHASES) if (t < p.end) return p;
+  return PHASES[PHASES.length - 1];
+}
+
+function phaseTarget(t) {
+  const p = getPhase(t);
+  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
+  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
+}
+
+function spawnPoint(game, extra = 0) {
+  const sh = game.ship;
+  const view = spawnBounds(game);
+  for (let i = 0; i < 24; i++) {
+    // Replenish the sparse sides rather than feeding an already packed approach direction.
+    const counts = game.spawnEdgeCounts || [0, 0, 0, 0];
+    const side = pickWeighted(game.rng, counts.map((count, edge) => [edge,
+      (edge < 2 ? view.halfH : view.halfW) / (count + 8)]));
+    const margin = CONFIG.spawnMargin + extra + game.rng() * 80;
+    const along = game.rng() * 2 - 1;
+    const x = view.x + (side < 2 ? (side === 0 ? -1 : 1) * (view.halfW + margin) : along * view.halfW);
+    const y = view.y + (side >= 2 ? (side === 2 ? -1 : 1) * (view.halfH + margin) : along * view.halfH);
+    const r = Math.hypot(x, y);
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) {
+      counts[side]++;
+      return { x, y, a: Math.atan2(y - sh.y, x - sh.x) };
+    }
+  }
+  return null;
+}
+
+function spawnBounds(game) {
+  return game.spawnView || { x: game.ship.x, y: game.ship.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+}
+
+// Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
+function mixAt(phase, danger, t) {
+  const items = Object.entries(phase.mix);
+  if (danger > 0.25) {
+    const ramp = clamp(t / 150, 0.15, 1);
+    items.push(['armored', 2 * danger], ['gunner', danger * ramp], ['missile', 0.7 * danger * ramp]);
+  }
+  return items;
+}
+
+function spawnOne(game, target) {
+  const pt = spawnPoint(game);
+  if (!pt) return false;
+  const danger = dangerAt(Math.hypot(pt.x, pt.y));
+  const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
+  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return false;
+  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return false;
+  const T = ENEMY_TYPES[type];
+  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
+  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
+  const level = target.level + danger * CONFIG.dangerLevel;
+  const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
+  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
+  return true;
+}
+
+function spawnWave(game, target, remaining) {
+  const sh = game.ship;
+  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
+  if (game.rng() < 0.5) {
+    // ring closing in
+    const view = spawnBounds(game);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      const ux = Math.cos(a), uy = Math.sin(a);
+      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy)));
+      game.enemies.push(createEnemy('swarm', target.level, view.x + ux * d, view.y + uy * d, { facing: a + Math.PI }));
+    }
+  } else {
+    // a stream from one direction
+    const a = game.rng() * TAU;
+    for (let i = 0; i < n; i++) {
+      const view = spawnBounds(game);
+      const d = Math.min(view.halfW / Math.max(0.0001, Math.abs(Math.cos(a))), view.halfH / Math.max(0.0001, Math.abs(Math.sin(a)))) + CONFIG.spawnMargin + i * 12;
+      const off = (game.rng() - 0.5) * 120;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
+    }
+  }
+  game.events.push({ type: 'wave' });
+}
+
+function keepMeteors(game) {
+  let near = 0;
+  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  if (near >= CONFIG.meteorCount) return;
+  const pt = spawnPoint(game, 200);
+  if (!pt) return;
+  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
+  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
+  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
+  game.enemies.push(m);
+}
+
+function despawnFar(game) {
+  const sh = game.ship;
+  const view = spawnBounds(game);
+  for (const e of game.enemies) {
+    if (e.type === 'boss') continue;
+    if (e.dead || (Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200)) continue;
+    const pt = spawnPoint(game);
+    if (!pt) continue;
+    // Recycling retains HP/strength and creates no kills, XP, modules or cooldown exploits.
+    e.x = pt.x; e.y = pt.y;
+    const dx = sh.x - e.x, dy = sh.y - e.y, d = Math.hypot(dx, dy) || 1;
+    e.vx = dx / d * e.speed; e.vy = dy / d * e.speed;
+    e.facing = Math.atan2(dy, dx); e.state = 'move'; e.timer = e.charge = 0;
+    e.fireT = e.T.fireInterval || 0;
+  }
+}
+
+function updateSpawner(game, dt) {
+  if (!game.spawning) return;
+  const bounds = spawnBounds(game);
+  game.spawnEdgeCounts = [0, 0, 0, 0];
+  for (const e of game.enemies) {
+    if (e.dead || e.type === 'boss' || e.type === 'meteor') continue;
+    const dx = (e.x - bounds.x) / bounds.halfW, dy = (e.y - bounds.y) / bounds.halfH;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.45) continue;
+    const side = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 0 : 1) : (dy < 0 ? 2 : 3);
+    game.spawnEdgeCounts[side]++;
+  }
+  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
+  despawnFar(game);
+  keepMeteors(game);
+  const target = phaseTarget(game.t);
+  const P = target.phase;
+  let alive = 0;
+  const view = spawnBounds(game);
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss' &&
+    Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200) alive++;
+  const deficit = Math.max(0, target.pop - alive);
+  const rate = Math.max(P.rate * CONFIG.densityMult, deficit / CONFIG.spawnRefillTime);
+  game.spawnAcc = Math.min(game.spawnAcc + rate * dt, Math.max(8, 8 * CONFIG.densityMult));
+  let attempts = 0;
+  while (game.spawnAcc >= 1 && alive < target.pop && attempts++ < Math.max(8, 8 * CONFIG.densityMult)) {
+    game.spawnAcc -= 1;
+    if (spawnOne(game, target)) alive++;
+  }
+  if (P.waves) {
+    game.waveT = (game.waveT || 0) + dt;
+    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
+  }
+}
+
+function spawnBoss(game) {
+  const sh = game.ship;
+  const distance = Math.min(1000, game.viewRadius * 0.65);
+  const angle = game.rng() * TAU;
+  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
+  const planet = game.field.planet;
+  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
+    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
+    x = planet.x + Math.cos(a) * (planet.r + 220);
+    y = planet.y + Math.sin(a) * (planet.r + 220);
+  }
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
+  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
+  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
+  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
+  game.boss = boss;
+  game.bossSpawned = true;
+  game.enemies.push(boss);
+  game.events.push({ type: 'bossSpawn', x, y });
 }
 
 // ---- ship.js ----
@@ -633,85 +1120,231 @@ function stepShip(ship, stats, dt, ax, ay, extraDrag) {
   ship.y += ship.vy * dt;
 }
 
-// ---- field.js ----
+// ---- modules.js ----
 
 
 
-function createField(rng) {
-  const moons = [];
-  for (let i = 0; i < CONFIG.moonCount; i++) {
-    moons.push({
-      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
-      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
-      dir: rng() < 0.5 ? -1 : 1,
-      r: randRange(rng, 110, 180),
-      gm: CONFIG.moonGM,
-      x: 0, y: 0,
-    });
+
+
+const SLOTS = [
+  { id: 'bow', name: '船首', icon: '▲' },
+  { id: 'booster', name: 'ブースター', icon: '»' },
+  { id: 'gun', name: '銃', icon: '✶' },
+  { id: 'radar', name: 'レーダー', icon: '◎' },
+  { id: 'armor', name: '装甲', icon: '■' },
+  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
+];
+
+const RARITIES = [
+  { name: 'コモン', color: '#b8c4d6' },
+  { name: 'レア', color: '#4fa3ff' },
+  { name: 'エピック', color: '#c46bff' },
+  { name: 'レジェンド', color: '#ffb340' },
+];
+
+const RARITY_MULT = [1, 1.6, 2.4, 3.5];
+
+const ALL = [0, 1, 2, 3];
+const pct = (v) => `${Math.round(v * 100)}%`;
+const M = (r) => RARITY_MULT[r];
+
+const MODULES = [
+  // 船首: 貫通と衝突時の効果
+  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
+    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
+  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
+    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
+  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
+    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
+  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
+    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
+    apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
+    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
+    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
+
+  // ブースター: 最高速度と加速
+  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
+    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
+  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
+    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
+    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
+    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'slipstream', slot: 'booster', name: 'スリップストリーム', rarities: ALL, schemeOnly: 'hyper',
+    desc: (r) => `同じ方向（±${CONFIG.streakAngle}°）へ続けてジャンプするたびに速度 +${pct(0.15 * M(r))}（最大 ${CONFIG.streakMax} 段。速度＝攻撃力）。${CONFIG.streakWindow} 秒途切れるか向きを変えるとリセット`,
+    apply: (s, m) => { s.streakBoost = 0.15 * m; } },
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
+    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
+
+  // 銃: 突進以外の攻撃
+  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
+    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
+    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
+  { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
+    desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
+    apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
+  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
+    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
+    apply: (s, m) => { s.turret = m; } },
+  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, hyperOnly: true,
+    desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
+  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, hyperOnly: true,
+    desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
+  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
+    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
+    apply: (s, m) => { s.mines = 0.6 * m; } },
+
+  // レーダー: 読みの補助
+  { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
+    desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
+    apply: (s, m) => { s.portalWave = m; } },
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL, hyperExcluded: true,
+    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
+    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL, hyperExcluded: true,
+    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
+    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
+  { id: 'finishPulse', slot: 'radar', name: '終端爆縮器', rarities: ALL, hyperOnly: true, portalExcluded: true,
+    desc: (r) => `描いた経路の移動終了時に爆発（半径 ${Math.round(180 * (1 + 0.2 * r))}、威力 ${pct(0.7 * M(r))}）。弾かれた地点でも発動`,
+    apply: (s, m, r) => { s.traceEndBlast = { radius: 180 * (1 + 0.2 * r), mult: 0.7 * m }; } },
+  { id: 'impactPulse', slot: 'radar', name: '連鎖パルス', rarities: [2, 3], hyperOnly: true, portalExcluded: true,
+    desc: (r) => `敵を貫くたびに波動で周囲へ攻撃（半径 ${Math.round(95 * (1 + 0.2 * r))}、威力 ${pct(0.25 * M(r))}）`,
+    apply: (s, m, r) => { s.pierceWave = { radius: 95 * (1 + 0.2 * r), mult: 0.25 * m }; } },
+  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
+    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
+    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
+  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
+    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
+
+  // 装甲: 耐久
+  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
+    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
+    apply: (s, m) => { s.maxHp += 30 * m; } },
+  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
+    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
+    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
+  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
+    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
+    apply: (s, m) => { s.regen += 0.8 * m; } },
+  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
+    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
+    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
+
+  // ジェネレーター: エネルギーとチャージ
+  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
+    desc: (r, scheme) => `${scheme === 'hyper' ? 'ジャンプの充填時間' : 'チャージ時間'} -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
+  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
+    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
+  // not in hyperdrive: refilling jumps on hits allowed endless dashing
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.rangeMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.rangeMult *= 1 + 0.8 * m; } },
+  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
+    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
+  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
+    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
+];
+
+const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+function moduleDef(id) {
+  return BY_ID[id];
+}
+
+function moduleFitsScheme(m, scheme) {
+  return (!m.hyperOnly || !scheme || isHyperScheme(scheme) || scheme === 'portal')
+    && (!m.portalOnly || scheme === 'portal')
+    && (!m.hyperExcluded || !isHyperScheme(scheme))
+    && (!m.portalExcluded || scheme !== 'portal')
+    && (!m.schemeOnly || scheme === m.schemeOnly);
+}
+
+// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
+function computeStats(meta, loadout, bonus = {}) {
+  const s = baseStats(meta);
+  for (const slot of SLOTS) {
+    const mod = loadout[slot.id];
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
   }
-  const dust = [];
-  for (let i = 0; i < CONFIG.dustCount; i++) {
-    const a = rng() * TAU;
-    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
-    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
+  const lv = bonus.level || 0;
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
+  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
+  s.maxHp += CONFIG.levelHpGrowth * lv;
+  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
+  return s;
+}
+
+function rarityWeights(ctx) {
+  if (ctx.source === 'core') return [0, 0, 1, 2];
+  if (ctx.source === 'capsule') {
+    const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
   }
-  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
-  updateMoons(field, 0);
-  return field;
-}
-
-function updateMoons(field, t) {
-  for (const m of field.moons) {
-    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
-    m.x = Math.cos(a) * m.orbit;
-    m.y = Math.sin(a) * m.orbit;
+  if (ctx.source === 'drop') {
+    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
+    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
   }
+  const t = ctx.t;
+  if (t < 150) return [7, 2.5, 0.5, 0];
+  if (t < 300) return [5, 4, 1.2, 0.1];
+  if (t < 480) return [3, 4, 2.5, 0.4];
+  return [1.5, 3, 4, 1.2];
 }
 
-function zoneOf(r) {
-  if (r < CONFIG.zoneInner) return 'inner';
-  if (r > CONFIG.zoneOuter) return 'outer';
-  return 'mid';
-}
-
-// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
-function dangerAt(r) {
-  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
-  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
-  return 0;
-}
-
-function dustDragAt(field, x, y) {
-  for (const d of field.dust) {
-    const dx = x - d.x, dy = y - d.y;
-    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
+function rollModule(rng, ctx) {
+  const t = ctx.t || 0;
+  const loadout = ctx.loadout;
+  let slot;
+  let pool;
+  if (ctx.source === 'core') {
+    slot = 'booster';
+    pool = [BY_ID.limiter];
+  } else {
+    slot = pickWeighted(rng, SLOTS.map((s) => {
+      const cur = loadout[s.id];
+      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
+      if (s.id === ctx.lastSlot) w *= 0.35;
+      return [s.id, w];
+    }));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && moduleFitsScheme(m, ctx.scheme));
   }
-  return 0;
-}
-
-// ---- gravity.js ----
-
-
-function pull(out, x, y, b) {
-  const dx = b.x - x, dy = b.y - y;
-  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
-  const d = Math.sqrt(d2);
-  const a = b.gm / d2;
-  out.ax += (dx / d) * a;
-  out.ay += (dy / d) * a;
-}
-
-function gravityAt(field, t, x, y) {
-  const out = { ax: 0, ay: 0 };
-  pull(out, x, y, field.planet);
-  for (const m of field.moons) pull(out, x, y, m);
-  const r = Math.hypot(x, y);
-  if (r > CONFIG.fieldRadius) {
-    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
-    out.ax -= (x / r) * push;
-    out.ay -= (y / r) * push;
+  const rw = rarityWeights(ctx);
+  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
+  const fits = pool.filter((m) => m.rarities.includes(r));
+  if (fits.length) {
+    const def = fits[Math.floor(rng() * fits.length)];
+    return { id: def.id, slot, r };
   }
-  return out;
+  const def = pool[Math.floor(rng() * pool.length)];
+  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
+  return { id: def.id, slot, r: nearest };
 }
 
 // ---- combat.js ----
@@ -746,6 +1379,66 @@ function resolveRam(atk, e, crit, stats) {
 function pierceKeep(e, killed, stats) {
   const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
   return 1 - Math.min(0.6, loss * stats.pierceLossMult);
+}
+
+// ---- grid.js ----
+const OFF = 4096;
+
+function buildGrid(list, cell) {
+  const map = new Map();
+  for (const it of list) {
+    if (it.dead) continue;
+    const key = (Math.floor(it.x / cell) + OFF) * 8192 + (Math.floor(it.y / cell) + OFF);
+    let arr = map.get(key);
+    if (!arr) { arr = []; map.set(key, arr); }
+    arr.push(it);
+  }
+  return { cell, map };
+}
+
+function queryGrid(grid, x0, y0, x1, y1, cb) {
+  const c = grid.cell;
+  const cx0 = Math.floor(x0 / c), cx1 = Math.floor(x1 / c);
+  const cy0 = Math.floor(y0 / c), cy1 = Math.floor(y1 / c);
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const arr = grid.map.get((cx + OFF) * 8192 + (cy + OFF));
+      if (!arr) continue;
+      for (const it of arr) if (!it.dead) cb(it);
+    }
+  }
+}
+
+function queryRadius(grid, x, y, r, cb) {
+  queryGrid(grid, x - r, y - r, x + r, y + r, (it) => {
+    const dx = it.x - x, dy = it.y - y, rr = r + (it.r || 0);
+    if (dx * dx + dy * dy <= rr * rr) cb(it);
+  });
+}
+
+// ---- gravity.js ----
+
+
+function pull(out, x, y, b) {
+  const dx = b.x - x, dy = b.y - y;
+  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
+  const d = Math.sqrt(d2);
+  const a = b.gm / d2;
+  out.ax += (dx / d) * a;
+  out.ay += (dy / d) * a;
+}
+
+function gravityAt(field, t, x, y) {
+  const out = { ax: 0, ay: 0 };
+  pull(out, x, y, field.planet);
+  for (const m of field.moons) pull(out, x, y, m);
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius) {
+    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
+    out.ax -= (x / r) * push;
+    out.ay -= (y / r) * push;
+  }
+  return out;
 }
 
 // ---- impact-fx.js ----
@@ -806,228 +1499,6 @@ function drawCombatImpacts(r, game) {
   ctx.restore();
 }
 
-// ---- enemies.js ----
-
-
-const BACK = Math.PI;
-const SIDE = Math.PI / 2;
-
-// hp/armor/contact are level-1 values; armor is in attack units (speed/100 at x1 multiplier).
-const ENEMY_TYPES = {
-  drifter: { name: 'ドリフター', r: 14, hp: 6, armor: 2, speed: 130, accel: 2.5, contact: 6, xp: 1, color: '#7fd1ff', shape: 'orb', behavior: 'chase', weakDir: BACK, weakArc: 1.0 },
-  swarm: { name: 'スウォーム', r: 11, hp: 3, armor: 1.2, speed: 200, accel: 3, contact: 4, xp: 0.6, color: '#9df0ff', shape: 'dart', behavior: 'chase', weakDir: BACK, weakArc: 1.1 },
-  darter: { name: 'ダーター', r: 16, hp: 9, armor: 3.5, speed: 110, accel: 2, contact: 10, xp: 2, color: '#ff9f6b', shape: 'dart', behavior: 'dash', weakDir: BACK, weakArc: 0.9, range: 520, windup: 0.7, dashSpeed: 760, dashTime: 0.55, recover: 0.9 },
-  armored: { name: '装甲型', r: 30, hp: 40, armor: 12, speed: 70, accel: 1.2, contact: 11, xp: 6, color: '#9aa7b8', shape: 'hex', behavior: 'chase', weakDir: BACK, weakArc: 0.8, turn: 1.2 },
-  splitter: { name: '分裂型', r: 22, hp: 14, armor: 4, speed: 60, accel: 1.5, contact: 8, xp: 2, color: '#a8ff7a', shape: 'blob', behavior: 'split', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.55, budInterval: 5, maxBuds: 5, turn: 1.5 },
-  splitling: { name: '分裂体', r: 10, hp: 3, armor: 1.5, speed: 150, accel: 2.5, contact: 4, xp: 0.4, color: '#cfff9a', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.2 },
-  leech: { name: '減速型', r: 20, hp: 14, armor: 5, speed: 120, accel: 1.6, contact: 6, xp: 3, color: '#c77dff', shape: 'diamond', behavior: 'leech', weakDir: BACK, weakArc: 0.9, auraR: 210, drain: 0.9, steal: 0.2 },
-  gunner: { name: '射撃型', r: 18, hp: 12, armor: 4, speed: 110, accel: 2, contact: 8, xp: 3, color: '#ff6b9a', shape: 'ship', behavior: 'gunner', weakDir: BACK, weakArc: 0.9, keep: 560, fireInterval: 2.8, telegraph: 0.5, bulletSpeed: 430, bulletDmg: 7, slow: 0.12 },
-  missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
-  battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
-  titan: { name: 'タイタン', r: 75, hp: 160, armor: 6, speed: 38, accel: 0.8, contact: 18, xp: 25, color: '#ff8fd1', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.0, turn: 0.8, sizeVar: true },
-  boss: { name: 'ボス戦艦（暫定）', r: 120, hp: 2200, armor: 14, speed: 100, accel: 0.8, contact: 28, xp: 100, color: '#ff526e', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.7, turn: 0.7, fireInterval: 2.6, telegraph: 0.8, volley: 9, spread: 1.3, bulletSpeed: 420, bulletDmg: 15, slow: 0.15 },
-  meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
-};
-
-const MAX_ENEMY_R = 130;
-
-let nextId = 1;
-
-function createEnemy(type, level, x, y, opts = {}) {
-  const T = ENEMY_TYPES[type];
-  const L = Math.max(1, level);
-  const elite = !!opts.elite;
-  const size = type === 'meteor' || T.sizeVar ? (opts.size || T.r) : T.r;
-  const sz = size / T.r;
-  const hp = T.hp * sz * sz * (1 + 0.6 * (L - 1)) * CONFIG.enemyHpMult * (elite ? 3 : 1);
-  return {
-    id: nextId++, type, T, level: L, elite,
-    x, y, vx: 0, vy: 0,
-    r: size * (elite ? 1.25 : 1),
-    hp, maxHp: hp,
-    armor: T.armor * sz * (1 + 0.35 * (L - 1)) * CONFIG.enemyArmorMult * (elite ? 1.3 : 1),
-    contact: T.contact * (1 + 0.2 * (L - 1)),
-    xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
-    speed: T.speed * (1 + 0.04 * (L - 1)),
-    facing: opts.facing ?? 0,
-    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: T.weakArc || 0,
-    hitCD: 0, flash: 0, dead: false,
-    state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
-    parent: opts.parent || 0,
-    spin: opts.spin || 0,
-  };
-}
-
-function steerTo(e, tx, ty, speed, accel, dt) {
-  const dx = tx - e.x, dy = ty - e.y;
-  const d = Math.hypot(dx, dy) || 1;
-  const k = Math.min(1, accel * dt);
-  e.vx += ((dx / d) * speed - e.vx) * k;
-  e.vy += ((dy / d) * speed - e.vy) * k;
-}
-
-function turnToward(e, target, rate, dt) {
-  let d = target - e.facing;
-  d = Math.atan2(Math.sin(d), Math.cos(d));
-  const m = rate * dt;
-  e.facing += Math.max(-m, Math.min(m, d));
-}
-
-// Where enemies think the ship is: a sluggish copy of its position (see updateEnemyAim), so a
-// fast dash leaves their aim behind instead of being tracked instantly.
-function enemyTarget(game) {
-  return game.enemyAim || game.ship;
-}
-
-function angleToShip(e, game) {
-  const t = enemyTarget(game);
-  return Math.atan2(t.y - e.y, t.x - e.x);
-}
-
-// Ease the enemies' idea of the ship's position toward the real one: lagging by `enemyAimLag`
-// seconds and never faster than `enemyAimSpeed`.
-function updateEnemyAim(game, dt) {
-  const sh = game.ship;
-  if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
-  const a = game.enemyAim;
-  const dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
-  if (d < 1e-6) return;
-  const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
-  a.x += dx / d * step; a.y += dy / d * step;
-}
-
-// Hold a ring around the ship at `keep` distance while circling it.
-function keepDistance(e, game, dt) {
-  const sh = enemyTarget(game);
-  const dx = e.x - sh.x, dy = e.y - sh.y;
-  const d = Math.hypot(dx, dy) || 1;
-  const side = e.id % 2 ? 1 : -1;
-  const tx = sh.x + (dx / d) * e.T.keep - (dy / d) * 200 * side;
-  const ty = sh.y + (dy / d) * e.T.keep + (dx / d) * 200 * side;
-  steerTo(e, tx, ty, e.speed, e.T.accel, dt);
-  turnToward(e, angleToShip(e, game), 3, dt);
-}
-
-function fire(game, e, angle, speed, kind) {
-  const T = e.T;
-  const lv = 1 + 0.25 * (e.level - 1);
-  game.ebullets.push({
-    kind, x: e.x + Math.cos(angle) * e.r, y: e.y + Math.sin(angle) * e.r,
-    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, speed,
-    r: kind === 'missile' ? 9 : 7, dmg: T.bulletDmg * lv, slow: T.slow, life: kind === 'missile' ? 4.5 : 4,
-    turn: T.missileTurn || 0,
-  });
-  game.events.push({ type: 'shoot', x: e.x, y: e.y, kind });
-}
-
-// Count down to a shot; `charge` > 0 while telegraphing.
-function gunTimer(e, dt) {
-  e.fireT -= dt;
-  e.charge = e.fireT < e.T.telegraph ? 1 - Math.max(0, e.fireT) / e.T.telegraph : 0;
-  if (e.fireT <= 0) { e.fireT = e.T.fireInterval; return true; }
-  return false;
-}
-
-const BEHAVIORS = {
-  chase(e, game, dt) {
-    const sh = enemyTarget(game);
-    // Approach different points rather than converging on exactly the same lagging coordinate.
-    // Close enemies still target the ship directly, so spreading the crowd does not remove contact threats.
-    const near = Math.min(1, Math.max(0, (Math.hypot(game.ship.x - e.x, game.ship.y - e.y) - 100) / 600));
-    const radius = CONFIG.enemyPursuitSpread * near * ((e.id * 0.61803398875) % 1);
-    const angle = e.id * 2.39996322973;
-    steerTo(e, sh.x + Math.cos(angle) * radius, sh.y + Math.sin(angle) * radius, e.speed, e.T.accel || 2, dt);
-    turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
-  },
-  dash(e, game, dt) {
-    const T = e.T;
-    const sh = enemyTarget(game);
-    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
-    e.timer -= dt;
-    if (e.state === 'move') {
-      BEHAVIORS.chase(e, game, dt);
-      if (d < T.range) { e.state = 'windup'; e.timer = T.windup; }
-    } else if (e.state === 'windup') {
-      e.vx *= 1 - 4 * dt; e.vy *= 1 - 4 * dt;
-      turnToward(e, angleToShip(e, game), 6, dt);
-      if (e.timer <= 0) {
-        e.state = 'dash'; e.timer = T.dashTime;
-        e.vx = Math.cos(e.facing) * T.dashSpeed; e.vy = Math.sin(e.facing) * T.dashSpeed;
-      }
-    } else if (e.state === 'dash') {
-      if (e.timer <= 0) { e.state = 'recover'; e.timer = T.recover; }
-    } else {
-      e.vx *= 1 - 2 * dt; e.vy *= 1 - 2 * dt;
-      if (e.timer <= 0) e.state = 'move';
-    }
-  },
-  split(e, game, dt) {
-    BEHAVIORS.chase(e, game, dt);
-    e.budT += dt;
-    if (e.budT >= e.T.budInterval) {
-      e.budT = 0;
-      if (e.buds < e.T.maxBuds) {
-        e.buds++;
-        const a = game.rng() * Math.PI * 2;
-        game.newEnemies.push(createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r * 1.5, e.y + Math.sin(a) * e.r * 1.5, { parent: e.id, facing: a }));
-      }
-    }
-  },
-  leech(e, game, dt) {
-    BEHAVIORS.chase(e, game, dt);
-    const sh = game.ship;
-    const d = Math.hypot(sh.x - e.x, sh.y - e.y);
-    if (d < e.T.auraR) game.leechDrag += e.T.drain * (1 - d / e.T.auraR * 0.5);
-  },
-  gunner(e, game, dt) {
-    keepDistance(e, game, dt);
-    if (gunTimer(e, dt)) fire(game, e, angleToShip(e, game), e.T.bulletSpeed, 'bullet');
-  },
-  missile(e, game, dt) {
-    keepDistance(e, game, dt);
-    if (gunTimer(e, dt)) fire(game, e, e.facing, e.T.missileSpeed, 'missile');
-  },
-  battleship(e, game, dt) {
-    BEHAVIORS.chase(e, game, dt);
-    if (gunTimer(e, dt)) {
-      const base = angleToShip(e, game);
-      const n = e.T.volley;
-      for (let i = 0; i < n; i++) fire(game, e, base + (i / (n - 1) - 0.5) * e.T.spread, e.T.bulletSpeed, 'bullet');
-    }
-  },
-  drift(e, game, dt) {
-    e.facing += e.spin * dt;
-  },
-};
-
-function onEnemyDeath(e, game) {
-  if (e.type === 'splitter') {
-    for (let i = 0; i < 2; i++) {
-      const a = e.facing + (i ? 1 : -1) * Math.PI / 2;
-      const c = createEnemy('splitling', e.level, e.x + Math.cos(a) * e.r, e.y + Math.sin(a) * e.r, { facing: a });
-      c.vx = Math.cos(a) * 200; c.vy = Math.sin(a) * 200;
-      c.hitCD = 0.35;
-      game.newEnemies.push(c);
-    }
-  }
-}
-
-function updateEnemy(e, game, dt) {
-  e.age += dt;
-  if (e.hitCD > 0) e.hitCD -= dt;
-  if (e.flash > 0) e.flash -= dt;
-  BEHAVIORS[e.T.behavior](e, game, dt);
-  e.x += e.vx * dt;
-  e.y += e.vy * dt;
-  // stay out of the planet
-  const p = game.field.planet;
-  const d = Math.hypot(e.x - p.x, e.y - p.y);
-  if (d < p.r + e.r && d > 0) {
-    e.x = p.x + ((e.x - p.x) / d) * (p.r + e.r);
-    e.y = p.y + ((e.y - p.y) / d) * (p.r + e.r);
-  }
-}
-
 // ---- projectiles.js ----
 
 
@@ -1053,194 +1524,6 @@ function updateEnemyBullets(game, dt, onHit) {
     if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) b.life = 0;
   }
   if (game.ebullets.some((b) => b.life <= 0)) game.ebullets = game.ebullets.filter((b) => b.life > 0);
-}
-
-// ---- grid.js ----
-const OFF = 4096;
-
-function buildGrid(list, cell) {
-  const map = new Map();
-  for (const it of list) {
-    if (it.dead) continue;
-    const key = (Math.floor(it.x / cell) + OFF) * 8192 + (Math.floor(it.y / cell) + OFF);
-    let arr = map.get(key);
-    if (!arr) { arr = []; map.set(key, arr); }
-    arr.push(it);
-  }
-  return { cell, map };
-}
-
-function queryGrid(grid, x0, y0, x1, y1, cb) {
-  const c = grid.cell;
-  const cx0 = Math.floor(x0 / c), cx1 = Math.floor(x1 / c);
-  const cy0 = Math.floor(y0 / c), cy1 = Math.floor(y1 / c);
-  for (let cx = cx0; cx <= cx1; cx++) {
-    for (let cy = cy0; cy <= cy1; cy++) {
-      const arr = grid.map.get((cx + OFF) * 8192 + (cy + OFF));
-      if (!arr) continue;
-      for (const it of arr) if (!it.dead) cb(it);
-    }
-  }
-}
-
-function queryRadius(grid, x, y, r, cb) {
-  queryGrid(grid, x - r, y - r, x + r, y + r, (it) => {
-    const dx = it.x - x, dy = it.y - y, rr = r + (it.r || 0);
-    if (dx * dx + dy * dy <= rr * rr) cb(it);
-  });
-}
-
-// ---- spawner.js ----
-
-
-
-
-
-// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
-const PHASES = [
-  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1, titan: 0.05 } },
-  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5, titan: 0.3 } },
-  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2, titan: 0.4 } },
-  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
-  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, titan: 1.2, battleship: 0.3 } },
-  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, titan: 2, battleship: 0.6 } },
-];
-
-function getPhase(t) {
-  for (const p of PHASES) if (t < p.end) return p;
-  return PHASES[PHASES.length - 1];
-}
-
-function phaseTarget(t) {
-  const p = getPhase(t);
-  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
-  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
-}
-
-function spawnPoint(game, extra = 0) {
-  const sh = game.ship;
-  for (let i = 0; i < 6; i++) {
-    const a = game.rng() * TAU;
-    const d = game.viewRadius + 100 + extra + game.rng() * 300;
-    const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
-    const r = Math.hypot(x, y);
-    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
-  }
-  return null;
-}
-
-// Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
-function mixAt(phase, danger, t) {
-  const items = Object.entries(phase.mix);
-  if (danger > 0.25) {
-    const ramp = clamp(t / 150, 0.15, 1);
-    items.push(['armored', 2 * danger], ['gunner', danger * ramp], ['missile', 0.7 * danger * ramp]);
-  }
-  return items;
-}
-
-function spawnOne(game, target) {
-  const pt = spawnPoint(game);
-  if (!pt) return;
-  const danger = dangerAt(Math.hypot(pt.x, pt.y));
-  const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
-  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
-  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return;
-  const T = ENEMY_TYPES[type];
-  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
-  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
-  const level = target.level + danger * CONFIG.dangerLevel;
-  const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
-  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
-}
-
-function spawnWave(game, target, remaining) {
-  const sh = game.ship;
-  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
-  if (game.rng() < 0.5) {
-    // ring closing in
-    const d = game.viewRadius * 0.95;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU;
-      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, { facing: a + Math.PI }));
-    }
-  } else {
-    // a stream from one direction
-    const a = game.rng() * TAU;
-    for (let i = 0; i < n; i++) {
-      const d = game.viewRadius + 80 + i * 34;
-      const off = (game.rng() - 0.5) * 120;
-      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
-    }
-  }
-  game.events.push({ type: 'wave' });
-}
-
-function keepMeteors(game) {
-  let near = 0;
-  for (const e of game.enemies) if (e.type === 'meteor') near++;
-  if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game, 200);
-  if (!pt) return;
-  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
-  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
-  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
-  game.enemies.push(m);
-}
-
-function despawnFar(game) {
-  const sh = game.ship;
-  const far = game.viewRadius * 2.6 + 800;
-  let removed = false;
-  for (const e of game.enemies) {
-    if (e.type === 'boss') continue;
-    const lim = e.type === 'battleship' ? far * 1.6 : far;
-    if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
-  }
-  if (removed) game.enemies = game.enemies.filter((e) => !e.dead);
-}
-
-function updateSpawner(game, dt) {
-  if (!game.spawning) return;
-  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
-  despawnFar(game);
-  keepMeteors(game);
-  const target = phaseTarget(game.t);
-  const P = target.phase;
-  let alive = 0;
-  for (const e of game.enemies) if (e.type !== 'meteor' && e.type !== 'boss') alive++;
-  game.spawnAcc = Math.min(game.spawnAcc + P.rate * CONFIG.densityMult * dt, Math.max(8, 8 * CONFIG.densityMult));
-  while (game.spawnAcc >= 1 && alive < target.pop) {
-    game.spawnAcc -= 1;
-    spawnOne(game, target);
-    alive++;
-  }
-  if (P.waves) {
-    game.waveT = (game.waveT || 0) + dt;
-    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
-  }
-}
-
-function spawnBoss(game) {
-  const sh = game.ship;
-  const distance = Math.min(1000, game.viewRadius * 0.65);
-  const angle = game.rng() * TAU;
-  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
-  const planet = game.field.planet;
-  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
-    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
-    x = planet.x + Math.cos(a) * (planet.r + 220);
-    y = planet.y + Math.sin(a) * (planet.r + 220);
-  }
-  const r = Math.hypot(x, y);
-  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
-  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
-  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
-  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
-  game.boss = boss;
-  game.bossSpawned = true;
-  game.enemies.push(boss);
-  game.events.push({ type: 'bossSpawn', x, y });
 }
 
 // ---- progression.js ----
@@ -1322,1023 +1605,6 @@ function applyRunResult(save, game) {
     save.best.escapes++;
     save.best.escapeTime = save.best.escapeTime == null ? game.t : Math.min(save.best.escapeTime, game.t);
   }
-}
-
-// ---- modules.js ----
-
-
-
-
-
-const SLOTS = [
-  { id: 'bow', name: '船首', icon: '▲' },
-  { id: 'booster', name: 'ブースター', icon: '»' },
-  { id: 'gun', name: '銃', icon: '✶' },
-  { id: 'radar', name: 'レーダー', icon: '◎' },
-  { id: 'armor', name: '装甲', icon: '■' },
-  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
-];
-
-const RARITIES = [
-  { name: 'コモン', color: '#b8c4d6' },
-  { name: 'レア', color: '#4fa3ff' },
-  { name: 'エピック', color: '#c46bff' },
-  { name: 'レジェンド', color: '#ffb340' },
-];
-
-const RARITY_MULT = [1, 1.6, 2.4, 3.5];
-
-const ALL = [0, 1, 2, 3];
-const pct = (v) => `${Math.round(v * 100)}%`;
-const M = (r) => RARITY_MULT[r];
-
-const MODULES = [
-  // 船首: 貫通と衝突時の効果
-  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
-    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
-  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
-    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
-    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
-  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
-    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
-    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
-  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
-    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
-    apply: (s, m) => { s.fling = 0.5 * m; } },
-  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
-    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
-    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
-
-  // ブースター: 最高速度と加速
-  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
-    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
-    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
-  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
-    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
-    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
-  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
-    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
-    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
-  { id: 'slipstream', slot: 'booster', name: 'スリップストリーム', rarities: ALL, schemeOnly: 'hyper',
-    desc: (r) => `同じ方向（±${CONFIG.streakAngle}°）へ続けてジャンプするたびに速度 +${pct(0.15 * M(r))}（最大 ${CONFIG.streakMax} 段。速度＝攻撃力）。${CONFIG.streakWindow} 秒途切れるか向きを変えるとリセット`,
-    apply: (s, m) => { s.streakBoost = 0.15 * m; } },
-  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
-    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
-  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
-    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
-    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
-
-  // 銃: 突進以外の攻撃
-  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
-    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
-    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
-  { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
-    desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
-    apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
-  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true,
-    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
-    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
-  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
-    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
-    apply: (s, m) => { s.turret = m; } },
-  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, hyperOnly: true,
-    desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
-    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
-  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, hyperOnly: true,
-    desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
-    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
-  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
-    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
-    apply: (s, m) => { s.mines = 0.6 * m; } },
-
-  // レーダー: 読みの補助
-  { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
-    desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
-    apply: (s, m) => { s.portalWave = m; } },
-  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
-    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
-    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
-  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL,
-    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
-    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
-  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
-    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
-    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
-  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
-    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
-    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
-
-  // 装甲: 耐久
-  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
-    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
-    apply: (s, m) => { s.maxHp += 30 * m; } },
-  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
-    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
-    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
-  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
-    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
-    apply: (s, m) => { s.regen += 0.8 * m; } },
-  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
-    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
-    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
-
-  // ジェネレーター: エネルギーとチャージ
-  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
-    desc: (r, scheme) => `${scheme === 'hyper' ? 'ジャンプの充填時間' : 'チャージ時間'} -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
-    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
-  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
-    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
-    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  // not in hyperdrive: refilling jumps on hits allowed endless dashing
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true, hyperExcluded: true,
-    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
-    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
-  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.rangeMult *= 1 + 0.25 * m; } },
-  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
-    apply: (s, m) => { s.rangeMult *= 1 + 0.8 * m; } },
-  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
-    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
-    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
-  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
-    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
-    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
-];
-
-const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
-
-function moduleDef(id) {
-  return BY_ID[id];
-}
-
-// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
-function computeStats(meta, loadout, bonus = {}) {
-  const s = baseStats(meta);
-  for (const slot of SLOTS) {
-    const mod = loadout[slot.id];
-    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
-  }
-  const lv = bonus.level || 0;
-  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
-  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
-  s.maxHp += CONFIG.levelHpGrowth * lv;
-  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
-  return s;
-}
-
-function rarityWeights(ctx) {
-  if (ctx.source === 'core') return [0, 0, 1, 2];
-  if (ctx.source === 'capsule') {
-    const d = ctx.danger || 0;
-    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
-  }
-  if (ctx.source === 'drop') {
-    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
-    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
-    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
-  }
-  const t = ctx.t;
-  if (t < 150) return [7, 2.5, 0.5, 0];
-  if (t < 300) return [5, 4, 1.2, 0.1];
-  if (t < 480) return [3, 4, 2.5, 0.4];
-  return [1.5, 3, 4, 1.2];
-}
-
-function rollModule(rng, ctx) {
-  const t = ctx.t || 0;
-  const loadout = ctx.loadout;
-  let slot;
-  let pool;
-  if (ctx.source === 'core') {
-    slot = 'booster';
-    pool = [BY_ID.limiter];
-  } else {
-    slot = pickWeighted(rng, SLOTS.map((s) => {
-      const cur = loadout[s.id];
-      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
-      if (s.id === ctx.lastSlot) w *= 0.35;
-      return [s.id, w];
-    }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.hyperOnly || !ctx.scheme || isHyperScheme(ctx.scheme) || ctx.scheme === 'portal')
-      && (!m.portalOnly || ctx.scheme === 'portal')
-      && (!m.portalExcluded || ctx.scheme !== 'portal')
-      && (!m.hyperExcluded || !isHyperScheme(ctx.scheme))
-      && (!m.schemeOnly || ctx.scheme === m.schemeOnly));
-  }
-  const rw = rarityWeights(ctx);
-  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
-  const fits = pool.filter((m) => m.rarities.includes(r));
-  if (fits.length) {
-    const def = fits[Math.floor(rng() * fits.length)];
-    return { id: def.id, slot, r };
-  }
-  const def = pool[Math.floor(rng() * pool.length)];
-  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
-  return { id: def.id, slot, r: nearest };
-}
-
-// ---- effects.js ----
-
-// Module effects that change how the ship attacks, plus field capsules and power cores.
-
-
-
-
-
-
-
-
-
-
-function createEffectState() {
-  return {
-    fbullets: [], marks: [], mines: [], capsules: [],
-    fx2: { waveT: 0, trailDist: 0, lastX: 0, lastY: 0, mineT: 0, turretT: 0, sonicCD: 0, prevSpeed: 0, capsuleT: 0, coreT: 0, coresStarted: false },
-    dashActive: false, dashPeakAtk: 0,
-  };
-}
-
-function onLaunch(game) {
-  if (game.dashActive) finishDash(game);
-  game.dashActive = true;
-  game.dashPeakAtk = 0;
-  game.dashPierce = 0;
-  game.dashStop = 0;
-}
-
-function finishDash(game) {
-  game.dashActive = false;
-  const eb = game.stats.endBlast;
-  if (eb && game.dashPierce >= eb.min) {
-    const sh = game.ship;
-    explode(game, sh.x, sh.y, eb.radius, game.dashPeakAtk * eb.mult, { cause: 'endBlast', color: '#ff9f40', knock: 500, life: 0.5 });
-  }
-}
-
-function onPierce(game) {
-  const s = game.stats, sh = game.ship;
-  if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-}
-
-function onShipHurt(game) {
-  const s = game.stats, sh = game.ship;
-  if (s.reactive) explode(game, sh.x, sh.y, 260, attackPower(s.maxSpeed, s) * s.reactive, { cause: 'reactive', color: '#ff6b5a', knock: 450 });
-}
-
-function updateEffects(game, dt) {
-  const sh = game.ship, s = game.stats, F = game.fx2;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  const atkNow = attackPower(sp, s);
-  const atkMax = attackPower(s.maxSpeed, s);
-
-  // dash bookkeeping (end-of-dash blast)
-  if (sh.boostT > 0 && !game.dashActive) { game.dashActive = true; game.dashPeakAtk = 0; }
-  if (game.dashActive) {
-    game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
-    if (sh.boostT <= 0 && !game.portalDash) finishDash(game);
-  }
-
-  // charge shockwave
-  if (s.chargeWave && sh.charging) {
-    F.waveT += dt;
-    if (F.waveT >= 0.5) {
-      F.waveT = 0;
-      explode(game, sh.x, sh.y, s.chargeWave.radius, atkMax * s.chargeWave.mult, { cause: 'chargeWave', color: '#5fd8ff', knock: 350 });
-    }
-  } else {
-    F.waveT = 0.25;
-  }
-
-  // trail burst marks
-  if (s.trailBurst && sh.boostT > 0 && sp > 200 && !game.portalDash) {
-    F.trailDist += sp * dt;
-    if (F.trailDist >= 45) {
-      F.trailDist = 0;
-      game.marks.push({ x: sh.x, y: sh.y, t: 0.55, dmg: atkNow * s.trailBurst });
-    }
-  }
-  for (const m of game.marks) {
-    m.t -= dt;
-    if (m.t <= 0) explode(game, m.x, m.y, 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
-  }
-  if (game.marks.length) game.marks = game.marks.filter((m) => m.t > 0);
-
-  // mines
-  if (s.mines && sp > 0.6 * s.maxSpeed) {
-    F.mineT += dt;
-    if (F.mineT >= 0.2) {
-      F.mineT = 0;
-      game.mines.push({ x: sh.x, y: sh.y, life: 5, armed: 0.3, dmg: atkMax * s.mines });
-    }
-  }
-  for (const m of game.mines) {
-    m.life -= dt; m.armed -= dt;
-    if (m.armed > 0) continue;
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const rr = 70 + e.r;
-      if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
-        explode(game, m.x, m.y, 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
-        m.life = 0;
-        break;
-      }
-    }
-  }
-  if (game.mines.length) game.mines = game.mines.filter((m) => m.life > 0);
-
-  // auto turret
-  if (s.turret) {
-    F.turretT += dt;
-    if (F.turretT >= 1 / (1.6 * s.turret)) {
-      let best = null, bd = 650 * 650;
-      for (const e of game.enemies) {
-        if (e.dead) continue;
-        const d = (e.x - sh.x) ** 2 + (e.y - sh.y) ** 2;
-        if (d < bd) { bd = d; best = e; }
-      }
-      if (best) {
-        F.turretT = 0;
-        const a = Math.atan2(best.y - sh.y, best.x - sh.x);
-        game.fbullets.push({ kind: 'shot', x: sh.x, y: sh.y, vx: Math.cos(a) * 1300 + sh.vx * 0.5, vy: Math.sin(a) * 1300 + sh.vy * 0.5, r: 6, dmg: atkMax * 0.22, life: 0.8, pierce: false, hit: new Set(), color: '#9fe8ff' });
-        game.events.push({ type: 'turret' });
-      }
-    }
-  }
-  updateFriendly(game, dt);
-
-  // sonic boom on crossing 92% of max speed
-  F.sonicCD -= dt;
-  const thr = 0.92 * s.maxSpeed;
-  if (s.sonic && F.sonicCD <= 0 && F.prevSpeed < thr && sp >= thr) {
-    F.sonicCD = 2.5;
-    explode(game, sh.x, sh.y, s.sonic.radius, atkMax * s.sonic.mult, { cause: 'sonic', color: '#ffffff', knock: 900, life: 0.7 });
-    game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius: s.sonic.radius });
-    game.slowmo = 0.45;
-  }
-  if (sp >= thr && F.prevSpeed < thr) game.events.push({ type: 'barrier', x: sh.x, y: sh.y });
-  F.prevSpeed = sp;
-
-  updateCapsules(game, dt);
-}
-
-function updateFriendly(game, dt) {
-  const B = game.fbullets;
-  if (!B.length) return;
-  for (const b of B) {
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    b.life -= dt;
-    const pad = b.r + 130;
-    queryGrid(game.grid, b.x - pad, b.y - pad, b.x + pad, b.y + pad, (e) => {
-      if (b.life <= 0 || b.hit.has(e.id)) return;
-      const rr = b.r + e.r;
-      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) return;
-      b.hit.add(e.id);
-      const sp = Math.hypot(b.vx, b.vy) || 1;
-      damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
-      if (b.pierceLeft > 0) b.pierceLeft--;
-      else if (!b.pierce) b.life = 0;
-    });
-  }
-  game.fbullets = B.filter((b) => b.life > 0);
-}
-
-function fieldCapsulePoint(game) {
-  const rng = game.rng;
-  const roll = rng();
-  let r;
-  if (roll < 0.4) r = randRange(rng, CONFIG.planetRadius + 200, CONFIG.zoneInner);
-  else if (roll < 0.75) r = randRange(rng, CONFIG.zoneOuter, CONFIG.fieldRadius - 150);
-  else r = randRange(rng, CONFIG.zoneInner, CONFIG.zoneOuter);
-  const a = rng() * TAU;
-  return { x: Math.cos(a) * r, y: Math.sin(a) * r, r };
-}
-
-function updateCapsules(game, dt) {
-  const F = game.fx2, sh = game.ship;
-  if (game.spawning) {
-    F.capsuleT += dt;
-    const field = game.capsules.filter((c) => c.src === 'field').length;
-    const fieldCount = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleCount : CONFIG.capsuleCount;
-    const fieldInterval = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleInterval : CONFIG.capsuleInterval;
-    if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
-      F.capsuleT = 0;
-      const p = fieldCapsulePoint(game);
-      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
-      game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
-    }
-    if (getPhase(game.t).cores) {
-      F.coreT += dt;
-      const cores = game.capsules.filter((c) => c.kind === 'core').length;
-      if (cores < 3 && (!F.coresStarted || F.coreT >= 20)) {
-        F.coreT = 0;
-        const a = game.rng() * TAU;
-        const r = randRange(game.rng, CONFIG.planetRadius + 250, CONFIG.zoneInner - 300);
-        game.capsules.push({ kind: 'core', src: 'core', x: Math.cos(a) * r, y: Math.sin(a) * r, mod: rollModule(game.rng, { source: 'core', t: game.t, loadout: game.loadout }), age: 0 });
-        if (!F.coresStarted || cores >= 2) F.coresStarted = true;
-        game.events.push({ type: 'core' });
-      }
-    }
-  }
-  let taken = false;
-  const pull = game.stats.pickupRadius * 1.6;
-  for (const c of game.capsules) {
-    c.age += dt;
-    if (c.src === 'drop' || c.src === 'elite') {
-      const dx = sh.x - c.x, dy = sh.y - c.y, d = Math.hypot(dx, dy);
-      if (d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
-    }
-    const reach = 22 + CONFIG.shipRadius + 14;
-    if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
-      c.taken = true; taken = true;
-      if (c.kind === 'core') {
-        game.cores++;
-        refreshStats(game);
-        addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
-      } else {
-        game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
-      }
-      addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
-      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
-    }
-    if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
-  }
-  if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
-}
-
-// ---- portal-loops.js ----
-
-
-
-
-function portalLoopCross(a, b, c, d) {
-  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
-  const cross = rx * sy - ry * sx;
-  if (Math.abs(cross) < 1e-9) return null; // retracing a line encloses no area
-  const dx = c.x - a.x, dy = c.y - a.y;
-  const t = (dx * sy - dy * sx) / cross, u = (dx * ry - dy * rx) / cross;
-  if (t <= 1e-6 || t > 1 + 1e-6 || u < -1e-6 || u > 1 + 1e-6) return null;
-  return { x: a.x + rx * t, y: a.y + ry * t, t };
-}
-
-function portalLoopArea(points) {
-  let twice = 0;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    twice += points[j].x * points[i].y - points[i].x * points[j].y;
-  }
-  return Math.abs(twice) / 2;
-}
-
-function portalLoopContains(points, x, y) {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const a = points[j], b = points[i];
-    const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-    if (Math.abs(cross) < 1e-6 && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x)
-      && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) return true;
-    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
-
-function portalLoopExplode(game, dash, points, area) {
-  const effect = game.stats.loopBurst;
-  const dmg = attackPower(dash.speed, game.stats) * effect.mult;
-  const color = effect.splash ? '#ffb340' : '#c46bff';
-  const center = points.reduce((c, p) => ({ x: c.x + p.x / points.length, y: c.y + p.y / points.length }), { x: 0, y: 0 });
-  // Snapshot the enclosed targets: secondary blasts cannot recursively create more blasts.
-  const targets = game.enemies.filter((e) => !e.dead && portalLoopContains(points, e.x, e.y));
-  for (const e of targets) {
-    const dx = e.x - center.x, dy = e.y - center.y, dist = Math.hypot(dx, dy) || 1;
-    damageEnemy(game, e, dmg, { cause: 'portalLoop', dirX: dx / dist, dirY: dy / dist, knock: 500 });
-    addRing(game, e.x, e.y, e.r + 28, color, 0.4);
-    burst(game, e.x, e.y, color, 12, 0, 0, 360);
-  }
-  if (effect.splash) for (const e of targets) explode(game, e.x, e.y, CONFIG.portalLoopSplashRadius,
-    dmg * CONFIG.portalLoopSplashDamage, { cause: 'portalLoopSplash', color, knock: 350, life: 0.4 });
-  game.fx.loops.push({ points, color, life: 0.6, max: 0.6 });
-  addText(game, center.x, center.y, `包囲炸裂 ${targets.length}`, color, 24);
-  game.events.push({ type: 'explode', x: center.x, y: center.y, radius: Math.sqrt(area / Math.PI), cause: 'portalLoop', enclosed: targets.length });
-}
-
-// Test only traveled movement. Closing across an old segment works before reaching a portal.
-function tracePortalLoop(game, dash, x0, y0, x1, y1) {
-  if (!game.stats.loopBurst || dash.loopPath.length < 3) return;
-  let start = { x: x0, y: y0 }, end = { x: x1, y: y1 };
-  let attempts = dash.loopPath.length;
-  while (attempts-- > 0) {
-    const path = dash.loopPath;
-    let first = null;
-    for (let i = 0; i < path.length - 1; i++) {
-      const hit = portalLoopCross(start, end, path[i], path[i + 1]);
-      if (!hit || (first && hit.t >= first.hit.t)) continue;
-      const points = [{ x: hit.x, y: hit.y }, ...path.slice(i + 1)];
-      const area = portalLoopArea(points);
-      if (area >= CONFIG.portalLoopMinArea) first = { hit, points, area, i };
-    }
-    if (!first) return;
-    portalLoopExplode(game, dash, first.points, first.area);
-    const hit = { x: first.hit.x, y: first.hit.y };
-    // Consume the closed portion while retaining the earlier open prefix and the live tail.
-    dash.loopPath = path.slice(0, first.i + 1);
-    const last = dash.loopPath[dash.loopPath.length - 1];
-    if (Math.hypot(last.x - hit.x, last.y - hit.y) > 1e-6) dash.loopPath.push(hit);
-    start = hit;
-  }
-}
-
-// ---- portals.js ----
-
-
-
-
-
-
-
-
-
-function portalGrowth(game) {
-  return game.stats.maxSpeed / CONFIG.baseMaxSpeed * game.stats.rangeMult * game.stats.gaugeMax;
-}
-
-function portalReach(game) {
-  return CONFIG.portalReach * portalGrowth(game);
-}
-
-function portalClearLine(game, x, y, tx, ty) {
-  return ![game.field.planet, ...game.field.moons].some((b) =>
-    segCircleT(x, y, tx, ty, b.x, b.y, b.r + CONFIG.shipRadius) >= 0);
-}
-
-function portalNearby(game, x, y) {
-  let best = null, dist = CONFIG.portalSpacing;
-  for (const p of game.portals) {
-    const d = Math.hypot(p.x - x, p.y - y);
-    if (d < dist) { best = p; dist = d; }
-  }
-  return best;
-}
-
-function portalCreate(game, x, y, manual) {
-  const p = { id: ++game.portalSerial, x, y, manual, uses: manual ? Infinity : CONFIG.portalDropUses, refillAt: game.t + CONFIG.portalRefillInterval };
-  game.portals.push(p);
-  addRing(game, x, y, 45, manual ? '#5fd8ff' : '#c995ff', 0.35);
-  return p;
-}
-
-function placePortal(game) {
-  if (game.scheme !== 'portal' || game.portalDash) return null;
-  const sh = game.ship;
-  if ([game.field.planet, ...game.field.moons].some((b) => Math.hypot(sh.x - b.x, sh.y - b.y) <= b.r + CONFIG.shipRadius + 4)) return null;
-  const near = portalNearby(game, sh.x, sh.y);
-  if (near?.manual) { addText(game, sh.x, sh.y - 45, '近くに設置済み', '#9fe8ff'); return null; }
-  if (game.portals.filter((p) => p.manual).length >= CONFIG.portalManualMax) {
-    addText(game, sh.x, sh.y - 45, '設置上限', '#9fe8ff'); return null;
-  }
-  // A dropped portal can become a permanent anchor without creating an overlapping node.
-  if (near) { near.manual = true; near.uses = Infinity; addRing(game, near.x, near.y, 45, '#5fd8ff'); return near; }
-  const created = portalCreate(game, sh.x, sh.y, true);
-  game.portalTouch = created.id;
-  return created;
-}
-
-// Check spacing before rolling for a drop. A crowd can replenish one node, not create a pile.
-function dropPortal(game, x, y) {
-  if (game.scheme !== 'portal' || CONFIG.portalDropChance <= 0) return;
-  const near = portalNearby(game, x, y);
-  if (near) {
-    if (!near.manual && near.uses < CONFIG.portalDropUses && game.t >= near.refillAt) {
-      near.uses++;
-      near.refillAt = game.t + CONFIG.portalRefillInterval;
-      addRing(game, near.x, near.y, 35, '#c995ff', 0.25);
-    }
-    return;
-  }
-  if (game.portals.filter((p) => !p.manual).length >= CONFIG.portalDropMax || game.rng() >= CONFIG.portalDropChance) return;
-  if ([game.field.planet, ...game.field.moons].some((b) => Math.hypot(x - b.x, y - b.y) <= b.r + CONFIG.shipRadius + 4)) return;
-  portalCreate(game, x, y, false);
-}
-
-function portalEdgeKey(a, b) {
-  const pa = `${a.x},${a.y}`, pb = `${b.x},${b.y}`;
-  return pa < pb ? `${pa}|${pb}` : `${pb}|${pa}`;
-}
-
-function portalEdgeUnavailable(game, a, b) {
-  const key = portalEdgeKey(a, b);
-  return game.portalDash?.usedEdges.has(key) || (game.portalCooldowns.get(key) ?? 0) > game.portalClock;
-}
-
-function portalAtShip(game) {
-  return game.portals.find((p) => Math.hypot(p.x - game.ship.x, p.y - game.ship.y) < CONFIG.portalEntryRadius + CONFIG.shipRadius) ?? null;
-}
-
-function portalChoices(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : portalAtShip(game) || game.ship) {
-  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
-  const angle = (p) => (Math.atan2(p.y - origin.y, p.x - origin.x) + Math.PI * 2.5) % (Math.PI * 2);
-  return game.portals.filter((p) => {
-    const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
-    return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y)
-      && !portalEdgeUnavailable(game, origin, p);
-  }).sort((a, b) => angle(a) - angle(b)
-    || Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y)
-    || a.id - b.id).map((p, i) => ({ key: String(i + 1), portal: p }));
-}
-
-function portalNearest(game) {
-  if (game.portalDash) {
-    const origin = game.portalDash.phase === 'hop' ? game.portalDash.target : game.ship;
-    return portalChoices(game).map((c) => c.portal).sort((a, b) =>
-      Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0] ?? null;
-  }
-  const sh = portalAtShip(game) || game.ship;
-  let nearest = null, best = Math.min(portalReach(game), CONFIG.portalBudget * portalGrowth(game));
-  for (const p of game.portals) {
-    const dist = Math.hypot(p.x - sh.x, p.y - sh.y);
-    if (dist < CONFIG.portalEntryRadius + CONFIG.shipRadius || dist > best
-      || !portalClearLine(game, sh.x, sh.y, p.x, p.y) || portalEdgeUnavailable(game, sh, p)) continue;
-    nearest = p; best = dist;
-  }
-  return nearest;
-}
-
-function portalDefaultNext(game) {
-  const d = game.portalDash;
-  const origin = d?.phase === 'hop' ? d.target : game.ship;
-  let best = null, score = Infinity;
-  for (const { portal: p } of portalChoices(game)) {
-    const dx = p.x - origin.x, dy = p.y - origin.y, dist = Math.hypot(dx, dy);
-    const alignment = (dx * game.ship.hx + dy * game.ship.hy) / dist;
-    const penalty = (p.id === d?.previous ? 4 : 0) + (d?.visited.has(p.id) ? 2 : 0);
-    const s = (penalty + 1 - alignment) * portalReach(game) + dist * 0.25;
-    if (s < score) { best = p; score = s; }
-  }
-  return best;
-}
-
-function startPortalDash(game, entry = null, initialTarget = null) {
-  if (!initialTarget && !portalChoices(game, entry || game.ship).length) return false;
-  const budget = CONFIG.portalBudget * portalGrowth(game);
-  if (entry) { game.ship.x = entry.x; game.ship.y = entry.y; }
-  game.portalDash = { phase: 'choose', remaining: budget, budget, usedEdges: new Set(),
-    hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
-    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }],
-    loopPath: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
-  game.ship.charging = false;
-  onLaunch(game);
-  game.ship.boostT = game.stats.boostDuration;
-  game.portalDash.next = initialTarget || portalDefaultNext(game);
-  game.portalPreview = game.portalDash.next;
-  return true;
-}
-
-// Sweep the movement segment so fast entries are detected even between physics ticks.
-function checkPortalEntry(game, x0, y0) {
-  if (game.scheme !== 'portal' || game.portalDash || game.portalSpace.consumed) return;
-  const sh = game.ship, R = CONFIG.portalEntryRadius + CONFIG.shipRadius;
-  const previousTouch = game.portalTouch;
-  game.portalTouch = game.portals.find((p) => Math.hypot(p.x - sh.x, p.y - sh.y) < R)?.id ?? null;
-  if (game.t < game.portalEntryT) return;
-  let entry = null, first = Infinity;
-  for (const p of game.portals) {
-    if (p.id === previousTouch) continue;
-    const t = segCircleT(x0, y0, sh.x, sh.y, p.x, p.y, R);
-    if (t >= 0 && t < first) { entry = p; first = t; }
-  }
-  if (entry) startPortalDash(game, entry);
-}
-
-function stopPortalDash(game, message = '') {
-  game.portalDash = null;
-  game.portalPreview = null;
-  game.portalEntryT = game.t + CONFIG.portalEntryCooldown;
-  game.ship.boostT = game.stats.boostDuration;
-  if (message) addText(game, game.ship.x, game.ship.y - 48, message, '#e8f6ff');
-}
-
-function portalLeave(game, direction) {
-  const sh = game.ship, len = Math.hypot(direction.x, direction.y);
-  stopPortalDash(game, 'ポータル離脱');
-  game.portalPreview = null;
-  sh.hx = direction.x / len; sh.hy = direction.y / len;
-  const speed = game.stats.maxSpeed * CONFIG.steerCruise;
-  sh.vx = sh.hx * speed; sh.vy = sh.hy * speed;
-  sh.boostT = 0; sh.fadeT = 0;
-}
-
-function handlePortalInput(game, input, realDt = 0) {
-  if (game.scheme !== 'portal') return;
-  const press = game.portalSpace;
-  if (input.portalPressed) { press.armed = true; press.seconds = 0; press.consumed = false; }
-  if (press.armed && input.portalHolding) press.seconds += realDt;
-  if (press.armed && input.portalHeldTime !== undefined) press.seconds = Math.max(press.seconds, input.portalHeldTime);
-  if (press.armed && !press.consumed && press.seconds >= CONFIG.portalExitHold) {
-    press.consumed = true;
-    if (game.portalDash) portalLeave(game, input.move?.x || input.move?.y ? input.move : { x: game.ship.hx, y: game.ship.hy });
-  }
-  const confirm = !!input.portalReleased && press.armed && !press.consumed;
-  if (input.portalReleased || (!input.portalHolding && !input.portalPressed)) {
-    press.armed = false; press.seconds = 0; press.consumed = false;
-  }
-  if (!game.portalDash) {
-    if (input.place) placePortal(game);
-    const nearest = portalNearest(game);
-    game.portalPreview = nearest;
-    if (confirm) {
-      const entry = portalAtShip(game);
-      if (nearest && startPortalDash(game, entry, nearest)) portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
-      else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
-    }
-    return;
-  }
-  const d = game.portalDash;
-  portalRefreshNext(game);
-  if (!game.portalDash) return;
-  if (input.portalCycle) {
-    const choices = portalChoices(game);
-    if (choices.length) {
-      const current = Math.max(0, choices.findIndex((c) => c.portal === d.next));
-      const index = ((current + input.portalCycle) % choices.length + choices.length) % choices.length;
-      d.next = choices[index].portal; d.explicitNext = true;
-    }
-  }
-  game.portalPreview = d.next;
-  if (confirm && d.next) {
-    if (d.phase === 'choose') portalBeginHop(game, d.next);
-    else d.departOnArrival = true;
-  }
-}
-
-function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
-  const d = game.portalDash, sh = game.ship;
-  if (!target || !game.portals.includes(target)) return false;
-  const len = Math.hypot(target.x - sh.x, target.y - sh.y);
-  if (len < minDistance || len > Math.min(portalReach(game), d.remaining)
-    || !portalClearLine(game, sh.x, sh.y, target.x, target.y)
-    || portalEdgeUnavailable(game, sh, target)) return false;
-  d.edgeKey = portalEdgeKey(sh, target);
-  d.usedEdges.add(d.edgeKey);
-  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
-  d.previous = d.currentPortal;
-  d.currentPortal = target.id;
-  d.visited.add(target.id);
-  d.explicitNext = false;
-  d.departOnArrival = false;
-  const dx = (target.x - sh.x) / len, dy = (target.y - sh.y) / len;
-  const v = launchVelocity(sh.vx, sh.vy, dx, dy, game.stats.gaugeMax, game.stats);
-  const speed = Math.max(1, Math.hypot(v.vx, v.vy));
-  d.remaining = Math.max(0, d.remaining - len);
-  d.phase = 'hop'; d.target = target; d.left = len; d.dx = dx; d.dy = dy;
-  d.speed = speed; d.rate = Math.max(speed, len * game.stats.traceSpeedMult / CONFIG.portalHopTime);
-  d.inside = new Map(); d.passes = new Map(); d.waveInside = new Map(); d.waveAcc = 0; d.trailAcc = 0;
-  sh.vx = dx * speed; sh.vy = dy * speed; sh.hx = dx; sh.hy = dy;
-  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
-  d.next = portalDefaultNext(game);
-  game.portalPreview = d.next;
-  game.dashId++;
-  game.events.push({ type: 'launch', gauge: game.stats.gaugeMax, x: sh.x, y: sh.y, dx, dy });
-  return true;
-}
-
-function portalRefreshNext(game) {
-  const d = game.portalDash;
-  if (!d) return;
-  if (!portalChoices(game).some((c) => c.portal === d.next)) {
-    d.next = portalDefaultNext(game);
-    d.explicitNext = false;
-  }
-  game.portalPreview = d.next;
-  if (d.phase === 'choose' && !d.next) {
-    if (game.portalSpace.armed) game.portalSpace.consumed = true;
-    portalLeave(game, { x: game.ship.hx, y: game.ship.hy });
-  }
-}
-
-function portalWorldScale(game) {
-  const d = game.portalDash;
-  if (!d) return 1;
-  return d.phase === 'choose' ? CONFIG.portalChooseScale
-    : Math.max(CONFIG.dashScaleMin, Math.min(1, CONFIG.dashSlowRef / Math.max(1, d.speed)));
-}
-
-function updatePortals(game, realDt) {
-  const d = game.portalDash;
-  if (!d) return;
-  if (d.phase === 'choose') { portalRefreshNext(game); return; }
-  const sh = game.ship;
-  let travel = Math.min(d.left, d.rate * realDt);
-  // Small swept steps keep body hits, wave hits, obstacles and trail explosions in travel order.
-  while (travel > 1e-6) {
-    const stepDist = Math.min(20, travel), x0 = sh.x, y0 = sh.y;
-    const x1 = x0 + d.dx * stepDist, y1 = y0 + d.dy * stepDist;
-    if (!portalClearLine(game, x0, y0, x1, y1)) {
-      damageShip(game, Math.max(0, d.speed - 200) * CONFIG.crashDamage, 0, 'portalCrash');
-      sh.vx *= -0.4; sh.vy *= -0.4;
-      game.events.push({ type: 'bounce', x: x0, y: y0 });
-      stopPortalDash(game, '障害物に衝突'); return;
-    }
-    for (const [id, e] of d.inside) {
-      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + CONFIG.shipRadius + 2) d.inside.delete(id);
-    }
-    sh.x = x1; sh.y = y1;
-    sh.vx = d.dx * d.speed; sh.vy = d.dy * d.speed;
-    waveAlong(game, d, x0, y0, x1, y1);
-    if (collideEnemies(game, x0, y0, CONFIG.shipRadius, d)) { stopPortalDash(game, '弾かれた'); return; }
-    d.speed = Math.hypot(sh.vx, sh.vy);
-    tracePortalLoop(game, d, x0, y0, sh.x, sh.y);
-    d.trailAcc += stepDist;
-    if (game.stats.trailBurst && d.trailAcc >= 45) {
-      d.trailAcc = 0;
-      game.marks.push({ x: x1, y: y1, t: 0.55, dmg: attackPower(d.speed, game.stats) * game.stats.trailBurst });
-    }
-    sh.trail.push({ x: sh.x, y: sh.y });
-    if (sh.trail.length > 150) sh.trail.shift();
-    travel -= stepDist; d.left -= stepDist;
-    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(d.speed, game.stats));
-    if (sh.hp <= 0) { stopPortalDash(game); return; }
-  }
-  if (d.left > 1e-6) return;
-  sh.x = d.target.x; sh.y = d.target.y;
-  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
-  d.path.push({ x: sh.x, y: sh.y });
-  const loopEnd = d.loopPath[d.loopPath.length - 1];
-  if (Math.hypot(loopEnd.x - sh.x, loopEnd.y - sh.y) > 1e-6) d.loopPath.push({ x: sh.x, y: sh.y });
-  game.portalTouch = d.target.id;
-  if (!d.target.manual) {
-    d.target.uses--;
-    d.target.refillAt = game.t + CONFIG.portalRefillInterval;
-    if (d.target.uses <= 0) game.portals = game.portals.filter((p) => p !== d.target);
-  }
-  d.hops++;
-  d.phase = 'choose';
-  const wave = game.stats.portalWave;
-  if (wave) explode(game, sh.x, sh.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult,
-    attackPower(d.speed, game.stats) * CONFIG.portalWaveDamage * wave * game.stats.waveDmgMult,
-    { cause: 'portalWave', color: '#c995ff', knock: 500, life: 0.45 });
-  else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
-  // Include routes opened by kills while retaining an explicit choice made in flight.
-  portalRefreshNext(game);
-  if (!game.portalDash) return;
-  if (d.departOnArrival && d.next) portalBeginHop(game, d.next);
-  else d.departOnArrival = false;
-}
-
-// ---- hits.js ----
-
-// Damage, kills, drops and area attacks applied to enemies.
-
-
-
-
-
-
-
-
-function damageEnemy(game, e, dmg, opts = {}) {
-  if (e.dead || dmg <= 0) return;
-  let fresh = e.hp >= e.maxHp - 1e-6;
-  // during a jump, the wave reaches an enemy just before the body does: judge "one-shot"
-  // by its HP when this jump first touched it, so wave + body still count as one strike
-  if (game.jump || game.portalDash) {
-    if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
-    fresh = e.dashFresh;
-  }
-  e.hp -= dmg;
-  e.flash = 0.12;
-  game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
-  if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
-  if (e.hp <= 0) {
-    if (fresh && (opts.cause === 'ram' || opts.cause === 'wave')) killStop(game, e, opts.crit);
-    killEnemy(game, e, opts);
-  } else if (opts.dirX !== undefined) {
-    const k = opts.knock ?? 160;
-    const mass = Math.max(1, e.r / 20);
-    e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
-  }
-}
-
-// One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
-function killStop(game, e, crit) {
-  if (game.dashStop >= CONFIG.killHitstopCap) return;
-  const t = CONFIG.killHitstop * (e.r > 25 ? 1.8 : 1) * (crit ? 1.3 : 1);
-  game.hitstop = Math.max(game.hitstop, t);
-  game.dashStop = (game.dashStop || 0) + t;
-}
-
-function killEnemy(game, e, opts = {}) {
-  if (e.dead) return;
-  e.dead = true;
-  game.kills++;
-  game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
-  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
-  onEnemyDeath(e, game);
-  dropPortal(game, e.x, e.y);
-  const phase = getPhase(game.t);
-  const danger = dangerAt(Math.hypot(e.x, e.y));
-  const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
-  dropGem(game, e.x, e.y, xp);
-  dropCoins(game, e, danger);
-  // Hyperdrive mode spaces drops in time so a larger crowd cannot flood the player with modules.
-  const power = e.xp;
-  const hyperMode = isHyperScheme(game.scheme);
-  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (hyperMode ? CONFIG.hyperDropScale : 1);
-  if ((!hyperMode || game.t >= game.nextModuleDropAt) &&
-      (e.elite || e.type === 'battleship' || game.rng() < chance)) {
-    dropModule(game, e.x, e.y, power, danger);
-    if (hyperMode) game.nextModuleDropAt = game.t + CONFIG.hyperDropInterval + game.rng() * 15;
-  }
-  if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
-}
-
-function flingCorpse(game, e) {
-  const sh = game.ship;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp < 1) return;
-  const base = Math.atan2(sh.vy, sh.vx);
-  const dmg = attackPower(sp, game.stats) * game.stats.fling;
-  for (const off of [-0.28, 0, 0.28]) {
-    const a = base + off;
-    game.fbullets.push({
-      kind: 'corpse', x: e.x, y: e.y, vx: Math.cos(a) * sp * 0.9, vy: Math.sin(a) * sp * 0.9,
-      r: Math.max(10, e.r * 0.8), dmg, life: 0.7, pierce: true, hit: new Set(), color: e.T.color,
-    });
-  }
-}
-
-function dropCoins(game, e, danger) {
-  let n = 0;
-  if (e.type === 'battleship') n = 12;
-  else if (e.elite) n = 3 + Math.floor(game.rng() * 4);
-  else if (e.type === 'meteor') n = game.rng() < CONFIG.meteorCoinChance ? 1 + Math.floor(game.rng() * 3) : 0;
-  else if (game.rng() < 0.03 * (1 + danger * 2)) n = 1;
-  for (let i = 0; i < n; i++) {
-    const a = game.rng() * Math.PI * 2, d = game.rng() * e.r;
-    game.coinDrops.push({ x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, v: 1, pulled: false, taken: false });
-  }
-}
-
-function dropGem(game, x, y, v) {
-  if (game.gems.length > 600) {
-    const old = game.gems.shift();
-    v += old.v;
-  }
-  const a = game.rng() * Math.PI * 2;
-  game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
-}
-
-function dropModule(game, x, y, power, danger) {
-  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
-  game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
-}
-
-function dropCapsule(game, x, y, src, danger) {
-  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
-  game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
-}
-
-// Area damage that ignores armor (module effects, sonic booms).
-function explode(game, x, y, radius, dmg, opts = {}) {
-  const knock = opts.knock ?? 300;
-  for (const e of game.enemies) {
-    if (e.dead) continue;
-    const dx = e.x - x, dy = e.y - y;
-    const rr = radius + e.r;
-    const d2 = dx * dx + dy * dy;
-    if (d2 > rr * rr) continue;
-    const d = Math.sqrt(d2) || 1;
-    damageEnemy(game, e, dmg, { cause: opts.cause, dirX: dx / d, dirY: dy / d, knock });
-  }
-  addRing(game, x, y, radius, opts.color || '#ffb36b', opts.life || 0.4);
-  game.events.push({ type: 'explode', x, y, radius, cause: opts.cause });
-}
-
-function burst(game, x, y, color, n, dx, dy, speed) {
-  const P = game.fx.particles;
-  if (P.length > 1600) return;
-  for (let i = 0; i < n; i++) {
-    const a = game.rng() * Math.PI * 2;
-    const s = speed * (0.3 + game.rng());
-    P.push({
-      x, y,
-      vx: Math.cos(a) * s * 0.6 + dx * s * 0.8,
-      vy: Math.sin(a) * s * 0.6 + dy * s * 0.8,
-      life: 0.5 + game.rng() * 0.4, max: 0.9, color, size: 2 + game.rng() * 4,
-    });
-  }
-}
-
-function addText(game, x, y, text, color, size = 16) {
-  if (game.fx.texts.length > 40) game.fx.texts.shift();
-  game.fx.texts.push({ x, y, text, color, life: size > 16 ? 0.9 : 0.7, size });
-}
-
-function addRing(game, x, y, radius, color, life = 0.45) {
-  if (game.fx.rings.length > 80) game.fx.rings.shift();
-  game.fx.rings.push({ x, y, radius, color, life, max: life });
 }
 
 // ---- stages.js ----
@@ -2772,6 +2038,7 @@ function buildSummary(game) {
 
 
 
+
 const STEP = 1 / 120;
 
 function createGame(opts = {}) {
@@ -2789,11 +2056,11 @@ function createGame(opts = {}) {
     meta, stats, ship, loadout,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
-    nextOfferAt: 0, nextModuleDropAt: 0,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     boss: null, bossSpawned: false,
+    finale: null, finishFrames: [], finishClock: 0,
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0, levelChoices: null,
@@ -2822,9 +2089,15 @@ function createGame(opts = {}) {
 }
 
 function update(game, frameDt, input) {
-  if (game.state !== 'play') return;
-  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
   frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'finishing') {
+    updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
+    const finished = advanceBossFinish(game, frameDt);
+    if (finished) end(game, 'won', 'boss');
+    return;
+  }
+  if (game.state !== 'play') return;
+  recordBossApproach(game, frameDt);
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
@@ -2835,9 +2108,11 @@ function update(game, frameDt, input) {
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
   if (!game.jump && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
+  if (game.state !== 'play') return;
   if (game.jump) {
     // jump every frame on real time (world steps are rare while it is nearly frozen)
     runJump(game, frameDt);
+    if (game.state !== 'play') return;
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
@@ -2854,14 +2129,13 @@ function update(game, frameDt, input) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
-    if (jumpPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
+    if (jumpPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     // level-ups wait until hyperdrive and jumps are over, like module offers
     if (game.pendingLevelups > 0 && !game.jump && !game.hyper.focus && !game.portalDash) { openLevelup(game); break; }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length && !game.jump && !game.hyper.focus &&
-          (!isHyperScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.jump && !game.hyper.focus) { openOffer(game); break; }
     }
   }
   if (isHyperScheme(game.scheme) && !game.portalDash && game.slowmo <= 0) game.timeScale = hyperWorldScale(game);
@@ -2927,6 +2201,7 @@ function step(game, dt, input) {
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
     if (isHyperScheme(game.scheme)) hyperSlowdown(game, dt);
     collideEnemies(game, x0, y0);
+    if (game.state !== 'play') return;
     collideBodies(game);
     checkPortalEntry(game, x0, y0);
   }
@@ -2935,6 +2210,7 @@ function step(game, dt, input) {
   updateVortices(game, dt);
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
+  if (game.state !== 'play') return;
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
   flushNewEnemies(game);
   updateSpawner(game, dt);
@@ -2952,8 +2228,7 @@ function step(game, dt, input) {
     game.stage = st;
   }
 
-  if (game.boss?.dead) end(game, 'won', 'boss');
-  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  if (sh.hp <= 0) end(game, 'lost', 'hp');
   else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
@@ -2985,11 +2260,14 @@ function absorbDuplicates(game) {
 function pushOffer(game, mod, source) {
   game.lastOfferSlot = mod.slot;
   game.offerQueue.push({ ...mod, source });
+  if (game.state === 'play' && !game.jump && !game.hyper.focus) {
+    absorbDuplicates(game);
+    if (game.offerQueue.length) openOffer(game);
+  }
 }
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (isHyperScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.hyperOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -3035,7 +2313,7 @@ function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && !isHyperScheme(game.scheme)) {
+  if (game.offerQueue.length) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -3113,8 +2391,9 @@ function waveAlong(game, r, x0, y0, x1, y1) {
       const d = Math.hypot(e.x - px, e.y - py);
       if (d > e.r + W) return;
       r.waveInside.set(e.id, e);
-      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260, impactX: px, impactY: py });
     });
+    if (game.state === 'finishing') return;
     r.waveAcc += len / n;
     if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
   }
@@ -3233,8 +2512,11 @@ function runJump(game, realDt) {
     j.pos += move;
     sh.x = j.from.x + j.ux * j.pos; sh.y = j.from.y + j.uy * j.pos;
     sh.vx = j.ux * j.speed; sh.vy = j.uy * j.speed;
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(j.speed, game.stats));
     waveAlong(game, j, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); return; }
+    if (game.state !== 'play') return;
+    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); endTraceAttack(game); return; }
+    if (game.state !== 'play') return;
   }
   if (j.pos >= j.len - 1e-9) {
     game.jump = null;
@@ -3242,6 +2524,7 @@ function runJump(game, realDt) {
     // keep part of the jump speed, then the normal slowdown takes over
     sh.vx = j.ux * j.speed * CONFIG.hyperKeep; sh.vy = j.uy * j.speed * CONFIG.hyperKeep;
     sh.boostT = CONFIG.hyperCoast; sh.fadeT = 0;
+    endTraceAttack(game); // route-end modules (end blast, finish pulse) go off where the jump lands
   }
 }
 
@@ -3368,7 +2651,7 @@ function launch(game, ax, ay) {
 // amount: hp lost, slow: share of speed lost (0..1)
 function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
-  if (sh.invulnT > 0 || game.debug.invincible) return false;
+  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
@@ -3402,7 +2685,8 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     let res = resolveRam(atk, e, crit, stats);
     if (run?.overdrive && !res.pierce) res = { pierce: true, damage: atk * (crit ? stats.critMult : 1), shipDamage: 0 };
     if (res.pierce) {
-      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
+      if (game.state === 'finishing') return false;
       if (crit) {
         const len = Math.hypot(hx - e.x, hy - e.y) || 1;
         addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
@@ -3417,7 +2701,8 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
       const keep = game.jump ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
-      onPierce(game);
+      onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
       if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
@@ -3488,7 +2773,14 @@ function recordTrail(sh, dt) {
 
 function flushNewEnemies(game) {
   if (!game.newEnemies.length) return;
-  for (const e of game.newEnemies) game.enemies.push(e);
+  const limit = Math.ceil(phaseTarget(game.t).pop * (1 + CONFIG.enemySplitOverflow));
+  let population = 0;
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss') population++;
+  for (const e of game.newEnemies) {
+    if (population >= limit) break;
+    game.enemies.push(e);
+    population++;
+  }
   game.newEnemies.length = 0;
 }
 
@@ -3513,6 +2805,13 @@ function separateEnemies(game) {
         const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
         e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
         o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+        // Position correction alone lets the rear ranks drive back into the same packed mass.
+        // Cancel only their closing velocity; sideways and separating movement stay available.
+        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
+        if (closing < 0) {
+          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
+          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
+        }
       });
     }
   }
@@ -3570,7 +2869,7 @@ function addXp(game, v) {
 
 function updateFx(game, dt) {
   const P = game.fx.particles;
-  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; if (p.spin) p.angle += p.spin * dt; }
   game.fx.particles = P.filter((p) => p.life > 0);
   for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
   for (const g of game.fx.ghosts) g.life -= dt;
@@ -3652,6 +2951,965 @@ function annotatePrediction(game, pts, seconds) {
     }
   }
   return out;
+}
+
+// ---- effects.js ----
+
+// Module effects that change how the ship attacks, plus field capsules and power cores.
+
+
+
+
+
+
+
+
+
+
+function createEffectState() {
+  return {
+    fbullets: [], marks: [], mines: [], capsules: [],
+    fx2: { waveT: 0, trailDist: 0, lastX: 0, lastY: 0, mineT: 0, turretT: 0, sonicCD: 0, prevSpeed: 0, capsuleT: 0, coreT: 0, coresStarted: false },
+    dashActive: false, dashPeakAtk: 0, traceEndHandled: false,
+  };
+}
+
+function onLaunch(game) {
+  if (game.dashActive) finishDash(game);
+  game.traceEndHandled = false;
+  game.dashActive = true;
+  game.dashPeakAtk = 0;
+  game.dashPierce = 0;
+  game.dashStop = 0;
+}
+
+function finishDash(game) {
+  game.dashActive = false;
+  const eb = game.stats.endBlast;
+  if (eb && game.dashPierce >= eb.min) {
+    const sh = game.ship;
+    explode(game, sh.x, sh.y, eb.radius, game.dashPeakAtk * eb.mult, { cause: 'endBlast', color: '#ff9f40', knock: 500, life: 0.5 });
+  }
+}
+
+function endTraceAttack(game) {
+  game.traceEndHandled = true;
+  finishDash(game);
+  const pulse = game.stats.traceEndBlast, sh = game.ship;
+  if (pulse && game.state === 'play') explode(game, sh.x, sh.y, pulse.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), game.stats) * pulse.mult,
+    { cause: 'traceEnd', color: '#c46bff', knock: 500, life: 0.5 });
+}
+
+function onPierce(game, x = game.ship.x, y = game.ship.y) {
+  const s = game.stats, sh = game.ship;
+  if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
+  if (s.pierceWave) explode(game, x, y, s.pierceWave.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), s) * s.pierceWave.mult,
+    { cause: 'pierceWave', color: '#9fe8ff', knock: 350, life: 0.3 });
+}
+
+function onShipHurt(game) {
+  const s = game.stats, sh = game.ship;
+  if (s.reactive) explode(game, sh.x, sh.y, 260, attackPower(s.maxSpeed, s) * s.reactive, { cause: 'reactive', color: '#ff6b5a', knock: 450 });
+}
+
+function updateEffects(game, dt) {
+  const sh = game.ship, s = game.stats, F = game.fx2;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const atkNow = attackPower(sp, s);
+  const atkMax = attackPower(s.maxSpeed, s);
+
+  // dash bookkeeping (end-of-dash blast)
+  if (sh.boostT > 0 && !game.dashActive && !game.traceEndHandled) { game.dashActive = true; game.dashPeakAtk = 0; }
+  if (game.dashActive) {
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
+    if (sh.boostT <= 0 && !game.portalDash && !game.jump) finishDash(game);
+  }
+
+  // charge shockwave
+  if (s.chargeWave && sh.charging) {
+    F.waveT += dt;
+    if (F.waveT >= 0.5) {
+      F.waveT = 0;
+      explode(game, sh.x, sh.y, s.chargeWave.radius, atkMax * s.chargeWave.mult, { cause: 'chargeWave', color: '#5fd8ff', knock: 350 });
+    }
+  } else {
+    F.waveT = 0.25;
+  }
+
+  // trail burst marks
+  if (s.trailBurst && sh.boostT > 0 && sp > 200 && !game.portalDash) {
+    F.trailDist += sp * dt;
+    if (F.trailDist >= 45) {
+      F.trailDist = 0;
+      game.marks.push({ x: sh.x, y: sh.y, t: 0.55, dmg: atkNow * s.trailBurst });
+    }
+  }
+  for (const m of game.marks) {
+    m.t -= dt;
+    if (m.t <= 0) explode(game, m.x, m.y, 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
+  }
+  if (game.marks.length) game.marks = game.marks.filter((m) => m.t > 0);
+
+  // mines
+  if (s.mines && sp > 0.6 * s.maxSpeed) {
+    F.mineT += dt;
+    if (F.mineT >= 0.2) {
+      F.mineT = 0;
+      game.mines.push({ x: sh.x, y: sh.y, life: 5, armed: 0.3, dmg: atkMax * s.mines });
+    }
+  }
+  for (const m of game.mines) {
+    m.life -= dt; m.armed -= dt;
+    if (m.armed > 0) continue;
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const rr = 70 + e.r;
+      if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
+        explode(game, m.x, m.y, 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+        m.life = 0;
+        break;
+      }
+    }
+  }
+  if (game.mines.length) game.mines = game.mines.filter((m) => m.life > 0);
+
+  // auto turret
+  if (s.turret) {
+    F.turretT += dt;
+    if (F.turretT >= 1 / (1.6 * s.turret)) {
+      let best = null, bd = 650 * 650;
+      for (const e of game.enemies) {
+        if (e.dead) continue;
+        const d = (e.x - sh.x) ** 2 + (e.y - sh.y) ** 2;
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (best) {
+        F.turretT = 0;
+        const a = Math.atan2(best.y - sh.y, best.x - sh.x);
+        game.fbullets.push({ kind: 'shot', x: sh.x, y: sh.y, vx: Math.cos(a) * 1300 + sh.vx * 0.5, vy: Math.sin(a) * 1300 + sh.vy * 0.5, r: 6, dmg: atkMax * 0.22, life: 0.8, pierce: false, hit: new Set(), color: '#9fe8ff' });
+        game.events.push({ type: 'turret' });
+      }
+    }
+  }
+  updateFriendly(game, dt);
+
+  // sonic boom on crossing 92% of max speed
+  F.sonicCD -= dt;
+  const thr = 0.92 * s.maxSpeed;
+  if (s.sonic && F.sonicCD <= 0 && F.prevSpeed < thr && sp >= thr) {
+    F.sonicCD = 2.5;
+    explode(game, sh.x, sh.y, s.sonic.radius, atkMax * s.sonic.mult, { cause: 'sonic', color: '#ffffff', knock: 900, life: 0.7 });
+    game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius: s.sonic.radius });
+    game.slowmo = 0.45;
+  }
+  if (sp >= thr && F.prevSpeed < thr) game.events.push({ type: 'barrier', x: sh.x, y: sh.y });
+  F.prevSpeed = sp;
+
+  updateCapsules(game, dt);
+}
+
+function updateFriendly(game, dt) {
+  const B = game.fbullets;
+  if (!B.length) return;
+  for (const b of B) {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    const pad = b.r + 130;
+    queryGrid(game.grid, b.x - pad, b.y - pad, b.x + pad, b.y + pad, (e) => {
+      if (b.life <= 0 || b.hit.has(e.id)) return;
+      const rr = b.r + e.r;
+      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) return;
+      b.hit.add(e.id);
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+      damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
+      if (b.pierceLeft > 0) b.pierceLeft--;
+      else if (!b.pierce) b.life = 0;
+    });
+  }
+  game.fbullets = B.filter((b) => b.life > 0);
+}
+
+function fieldCapsulePoint(game) {
+  const rng = game.rng;
+  if (isHyperScheme(game.scheme)) {
+    // Put build opportunities within reach of the current fight, rather than across the whole map.
+    const distance = Math.max(200, game.viewRadius * (0.25 + rng() * 0.3));
+    for (let i = 0; i < 16; i++) {
+      const a = rng() * TAU;
+      const x = game.ship.x + Math.cos(a) * distance, y = game.ship.y + Math.sin(a) * distance;
+      const r = Math.hypot(x, y);
+      if (r > CONFIG.planetRadius + 100 && r < CONFIG.fieldRadius - 100) return { x, y, r };
+    }
+  }
+  const roll = rng();
+  let r;
+  if (roll < 0.4) r = randRange(rng, CONFIG.planetRadius + 200, CONFIG.zoneInner);
+  else if (roll < 0.75) r = randRange(rng, CONFIG.zoneOuter, CONFIG.fieldRadius - 150);
+  else r = randRange(rng, CONFIG.zoneInner, CONFIG.zoneOuter);
+  const a = rng() * TAU;
+  return { x: Math.cos(a) * r, y: Math.sin(a) * r, r };
+}
+
+function updateCapsules(game, dt) {
+  const F = game.fx2, sh = game.ship;
+  if (isHyperScheme(game.scheme)) game.capsules = game.capsules.filter(c => c.src !== 'field' || Math.hypot(c.x - sh.x, c.y - sh.y) < game.viewRadius * 2);
+  if (game.spawning) {
+    F.capsuleT += dt;
+    const field = game.capsules.filter((c) => c.src === 'field').length;
+    const fieldCount = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleInterval : CONFIG.capsuleInterval;
+    if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
+      F.capsuleT = 0;
+      const p = fieldCapsulePoint(game);
+      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
+      game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+    }
+    if (getPhase(game.t).cores) {
+      F.coreT += dt;
+      const cores = game.capsules.filter((c) => c.kind === 'core').length;
+      if (cores < 3 && (!F.coresStarted || F.coreT >= 20)) {
+        F.coreT = 0;
+        const a = game.rng() * TAU;
+        const r = randRange(game.rng, CONFIG.planetRadius + 250, CONFIG.zoneInner - 300);
+        game.capsules.push({ kind: 'core', src: 'core', x: Math.cos(a) * r, y: Math.sin(a) * r, mod: rollModule(game.rng, { source: 'core', t: game.t, loadout: game.loadout }), age: 0 });
+        if (!F.coresStarted || cores >= 2) F.coresStarted = true;
+        game.events.push({ type: 'core' });
+      }
+    }
+  }
+  let taken = false;
+  const pull = game.stats.pickupRadius * 1.6;
+  for (const c of game.capsules) {
+    c.age += dt;
+    if (c.src === 'drop' || c.src === 'elite') {
+      const dx = sh.x - c.x, dy = sh.y - c.y, d = Math.hypot(dx, dy);
+      if (d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
+    }
+    const reach = 22 + CONFIG.shipRadius + 14;
+    if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
+      c.taken = true; taken = true;
+      if (c.kind === 'core') {
+        game.cores++;
+        refreshStats(game);
+        addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else {
+        game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
+      }
+      addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
+      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
+    }
+    if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
+  }
+  if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
+}
+
+// ---- portal-loops.js ----
+
+
+
+
+function portalLoopCross(a, b, c, d) {
+  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+  const cross = rx * sy - ry * sx;
+  if (Math.abs(cross) < 1e-9) return null; // retracing a line encloses no area
+  const dx = c.x - a.x, dy = c.y - a.y;
+  const t = (dx * sy - dy * sx) / cross, u = (dx * ry - dy * rx) / cross;
+  if (t <= 1e-6 || t > 1 + 1e-6 || u < -1e-6 || u > 1 + 1e-6) return null;
+  return { x: a.x + rx * t, y: a.y + ry * t, t };
+}
+
+function portalLoopArea(points) {
+  let twice = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    twice += points[j].x * points[i].y - points[i].x * points[j].y;
+  }
+  return Math.abs(twice) / 2;
+}
+
+function portalLoopContains(points, x, y) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[j], b = points[i];
+    const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+    if (Math.abs(cross) < 1e-6 && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x)
+      && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) return true;
+    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+function portalLoopExplode(game, dash, points, area) {
+  const effect = game.stats.loopBurst;
+  const dmg = attackPower(dash.speed, game.stats) * effect.mult;
+  const color = effect.splash ? '#ffb340' : '#c46bff';
+  const center = points.reduce((c, p) => ({ x: c.x + p.x / points.length, y: c.y + p.y / points.length }), { x: 0, y: 0 });
+  // Snapshot the enclosed targets: secondary blasts cannot recursively create more blasts.
+  const targets = game.enemies.filter((e) => !e.dead && portalLoopContains(points, e.x, e.y));
+  for (const e of targets) {
+    const dx = e.x - center.x, dy = e.y - center.y, dist = Math.hypot(dx, dy) || 1;
+    damageEnemy(game, e, dmg, { cause: 'portalLoop', dirX: dx / dist, dirY: dy / dist, knock: 500 });
+    addRing(game, e.x, e.y, e.r + 28, color, 0.4);
+    burst(game, e.x, e.y, color, 12, 0, 0, 360);
+  }
+  if (effect.splash) for (const e of targets) explode(game, e.x, e.y, CONFIG.portalLoopSplashRadius,
+    dmg * CONFIG.portalLoopSplashDamage, { cause: 'portalLoopSplash', color, knock: 350, life: 0.4 });
+  game.fx.loops.push({ points, color, life: 0.6, max: 0.6 });
+  addText(game, center.x, center.y, `包囲炸裂 ${targets.length}`, color, 24);
+  game.events.push({ type: 'explode', x: center.x, y: center.y, radius: Math.sqrt(area / Math.PI), cause: 'portalLoop', enclosed: targets.length });
+}
+
+// Test only traveled movement. Closing across an old segment works before reaching a portal.
+function tracePortalLoop(game, dash, x0, y0, x1, y1) {
+  if (!game.stats.loopBurst || dash.loopPath.length < 3) return;
+  let start = { x: x0, y: y0 }, end = { x: x1, y: y1 };
+  let attempts = dash.loopPath.length;
+  while (attempts-- > 0) {
+    const path = dash.loopPath;
+    let first = null;
+    for (let i = 0; i < path.length - 1; i++) {
+      const hit = portalLoopCross(start, end, path[i], path[i + 1]);
+      if (!hit || (first && hit.t >= first.hit.t)) continue;
+      const points = [{ x: hit.x, y: hit.y }, ...path.slice(i + 1)];
+      const area = portalLoopArea(points);
+      if (area >= CONFIG.portalLoopMinArea) first = { hit, points, area, i };
+    }
+    if (!first) return;
+    portalLoopExplode(game, dash, first.points, first.area);
+    const hit = { x: first.hit.x, y: first.hit.y };
+    // Consume the closed portion while retaining the earlier open prefix and the live tail.
+    dash.loopPath = path.slice(0, first.i + 1);
+    const last = dash.loopPath[dash.loopPath.length - 1];
+    if (Math.hypot(last.x - hit.x, last.y - hit.y) > 1e-6) dash.loopPath.push(hit);
+    start = hit;
+  }
+}
+
+// ---- portals.js ----
+
+
+function portalGrowth(game) {
+  return game.stats.maxSpeed / CONFIG.baseMaxSpeed * game.stats.rangeMult * game.stats.gaugeMax;
+}
+
+function portalReach(game) {
+  return CONFIG.portalReach * portalGrowth(game);
+}
+
+function portalClearLine(game, x, y, tx, ty) {
+  return ![game.field.planet, ...game.field.moons].some((b) =>
+    segCircleT(x, y, tx, ty, b.x, b.y, b.r + CONFIG.shipRadius) >= 0);
+}
+
+function portalNearby(game, x, y) {
+  let best = null, dist = CONFIG.portalSpacing;
+  for (const p of game.portals) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d < dist) { best = p; dist = d; }
+  }
+  return best;
+}
+
+function portalCreate(game, x, y, manual) {
+  const p = { id: ++game.portalSerial, x, y, manual, uses: manual ? Infinity : CONFIG.portalDropUses, refillAt: game.t + CONFIG.portalRefillInterval };
+  game.portals.push(p);
+  addRing(game, x, y, 45, manual ? '#5fd8ff' : '#c995ff', 0.35);
+  return p;
+}
+
+function placePortal(game) {
+  if (game.scheme !== 'portal' || game.portalDash) return null;
+  const sh = game.ship;
+  if ([game.field.planet, ...game.field.moons].some((b) => Math.hypot(sh.x - b.x, sh.y - b.y) <= b.r + CONFIG.shipRadius + 4)) return null;
+  const near = portalNearby(game, sh.x, sh.y);
+  if (near?.manual) { addText(game, sh.x, sh.y - 45, '近くに設置済み', '#9fe8ff'); return null; }
+  if (game.portals.filter((p) => p.manual).length >= CONFIG.portalManualMax) {
+    addText(game, sh.x, sh.y - 45, '設置上限', '#9fe8ff'); return null;
+  }
+  // A dropped portal can become a permanent anchor without creating an overlapping node.
+  if (near) { near.manual = true; near.uses = Infinity; addRing(game, near.x, near.y, 45, '#5fd8ff'); return near; }
+  const created = portalCreate(game, sh.x, sh.y, true);
+  game.portalTouch = created.id;
+  return created;
+}
+
+// Check spacing before rolling for a drop. A crowd can replenish one node, not create a pile.
+function dropPortal(game, x, y) {
+  if (game.scheme !== 'portal' || CONFIG.portalDropChance <= 0) return;
+  const near = portalNearby(game, x, y);
+  if (near) {
+    if (!near.manual && near.uses < CONFIG.portalDropUses && game.t >= near.refillAt) {
+      near.uses++;
+      near.refillAt = game.t + CONFIG.portalRefillInterval;
+      addRing(game, near.x, near.y, 35, '#c995ff', 0.25);
+    }
+    return;
+  }
+  if (game.portals.filter((p) => !p.manual).length >= CONFIG.portalDropMax || game.rng() >= CONFIG.portalDropChance) return;
+  if ([game.field.planet, ...game.field.moons].some((b) => Math.hypot(x - b.x, y - b.y) <= b.r + CONFIG.shipRadius + 4)) return;
+  portalCreate(game, x, y, false);
+}
+
+function portalEdgeKey(a, b) {
+  const pa = `${a.x},${a.y}`, pb = `${b.x},${b.y}`;
+  return pa < pb ? `${pa}|${pb}` : `${pb}|${pa}`;
+}
+
+function portalEdgeUnavailable(game, a, b) {
+  const key = portalEdgeKey(a, b);
+  return game.portalDash?.usedEdges.has(key) || (game.portalCooldowns.get(key) ?? 0) > game.portalClock;
+}
+
+function portalAtShip(game) {
+  return game.portals.find((p) => Math.hypot(p.x - game.ship.x, p.y - game.ship.y) < CONFIG.portalEntryRadius + CONFIG.shipRadius) ?? null;
+}
+
+function portalChoices(game, origin = game.portalDash?.phase === 'hop' ? game.portalDash.target : portalAtShip(game) || game.ship) {
+  const reach = Math.min(portalReach(game), game.portalDash?.remaining ?? Infinity);
+  const angle = (p) => (Math.atan2(p.y - origin.y, p.x - origin.x) + Math.PI * 2.5) % (Math.PI * 2);
+  return game.portals.filter((p) => {
+    const dist = Math.hypot(p.x - origin.x, p.y - origin.y);
+    return dist >= CONFIG.portalMinHop && dist <= reach && portalClearLine(game, origin.x, origin.y, p.x, p.y)
+      && !portalEdgeUnavailable(game, origin, p);
+  }).sort((a, b) => angle(a) - angle(b)
+    || Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y)
+    || a.id - b.id).map((p, i) => ({ key: String(i + 1), portal: p }));
+}
+
+function portalNearest(game) {
+  if (game.portalDash) {
+    const origin = game.portalDash.phase === 'hop' ? game.portalDash.target : game.ship;
+    return portalChoices(game).map((c) => c.portal).sort((a, b) =>
+      Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0] ?? null;
+  }
+  const sh = portalAtShip(game) || game.ship;
+  let nearest = null, best = Math.min(portalReach(game), CONFIG.portalBudget * portalGrowth(game));
+  for (const p of game.portals) {
+    const dist = Math.hypot(p.x - sh.x, p.y - sh.y);
+    if (dist < CONFIG.portalEntryRadius + CONFIG.shipRadius || dist > best
+      || !portalClearLine(game, sh.x, sh.y, p.x, p.y) || portalEdgeUnavailable(game, sh, p)) continue;
+    nearest = p; best = dist;
+  }
+  return nearest;
+}
+
+function portalDefaultNext(game) {
+  const d = game.portalDash;
+  const origin = d?.phase === 'hop' ? d.target : game.ship;
+  let best = null, score = Infinity;
+  for (const { portal: p } of portalChoices(game)) {
+    const dx = p.x - origin.x, dy = p.y - origin.y, dist = Math.hypot(dx, dy);
+    const alignment = (dx * game.ship.hx + dy * game.ship.hy) / dist;
+    const penalty = (p.id === d?.previous ? 4 : 0) + (d?.visited.has(p.id) ? 2 : 0);
+    const s = (penalty + 1 - alignment) * portalReach(game) + dist * 0.25;
+    if (s < score) { best = p; score = s; }
+  }
+  return best;
+}
+
+function startPortalDash(game, entry = null, initialTarget = null) {
+  if (!initialTarget && !portalChoices(game, entry || game.ship).length) return false;
+  const budget = CONFIG.portalBudget * portalGrowth(game);
+  if (entry) { game.ship.x = entry.x; game.ship.y = entry.y; }
+  game.portalDash = { phase: 'choose', remaining: budget, budget, usedEdges: new Set(),
+    hops: 0, next: null, explicitNext: false, currentPortal: entry?.id ?? null, previous: null,
+    visited: new Set(entry ? [entry.id] : []), path: [{ x: game.ship.x, y: game.ship.y }],
+    loopPath: [{ x: game.ship.x, y: game.ship.y }], departOnArrival: false };
+  game.ship.charging = false;
+  onLaunch(game);
+  game.ship.boostT = game.stats.boostDuration;
+  game.portalDash.next = initialTarget || portalDefaultNext(game);
+  game.portalPreview = game.portalDash.next;
+  return true;
+}
+
+// Sweep the movement segment so fast entries are detected even between physics ticks.
+function checkPortalEntry(game, x0, y0) {
+  if (game.scheme !== 'portal' || game.portalDash || game.portalSpace.consumed) return;
+  const sh = game.ship, R = CONFIG.portalEntryRadius + CONFIG.shipRadius;
+  const previousTouch = game.portalTouch;
+  game.portalTouch = game.portals.find((p) => Math.hypot(p.x - sh.x, p.y - sh.y) < R)?.id ?? null;
+  if (game.t < game.portalEntryT) return;
+  let entry = null, first = Infinity;
+  for (const p of game.portals) {
+    if (p.id === previousTouch) continue;
+    const t = segCircleT(x0, y0, sh.x, sh.y, p.x, p.y, R);
+    if (t >= 0 && t < first) { entry = p; first = t; }
+  }
+  if (entry) startPortalDash(game, entry);
+}
+
+function stopPortalDash(game, message = '') {
+  game.portalDash = null;
+  game.portalPreview = null;
+  game.portalEntryT = game.t + CONFIG.portalEntryCooldown;
+  game.ship.boostT = game.stats.boostDuration;
+  if (message) addText(game, game.ship.x, game.ship.y - 48, message, '#e8f6ff');
+}
+
+function portalLeave(game, direction) {
+  const sh = game.ship, len = Math.hypot(direction.x, direction.y);
+  stopPortalDash(game, 'ポータル離脱');
+  game.portalPreview = null;
+  sh.hx = direction.x / len; sh.hy = direction.y / len;
+  const speed = game.stats.maxSpeed * CONFIG.steerCruise;
+  sh.vx = sh.hx * speed; sh.vy = sh.hy * speed;
+  sh.boostT = 0; sh.fadeT = 0;
+}
+
+function handlePortalInput(game, input, realDt = 0) {
+  if (game.scheme !== 'portal') return;
+  const press = game.portalSpace;
+  if (input.portalPressed) { press.armed = true; press.seconds = 0; press.consumed = false; }
+  if (press.armed && input.portalHolding) press.seconds += realDt;
+  if (press.armed && input.portalHeldTime !== undefined) press.seconds = Math.max(press.seconds, input.portalHeldTime);
+  if (press.armed && !press.consumed && press.seconds >= CONFIG.portalExitHold) {
+    press.consumed = true;
+    if (game.portalDash) portalLeave(game, input.move?.x || input.move?.y ? input.move : { x: game.ship.hx, y: game.ship.hy });
+  }
+  const confirm = !!input.portalReleased && press.armed && !press.consumed;
+  if (input.portalReleased || (!input.portalHolding && !input.portalPressed)) {
+    press.armed = false; press.seconds = 0; press.consumed = false;
+  }
+  if (!game.portalDash) {
+    if (input.place) placePortal(game);
+    const nearest = portalNearest(game);
+    game.portalPreview = nearest;
+    if (confirm) {
+      const entry = portalAtShip(game);
+      if (nearest && startPortalDash(game, entry, nearest)) portalBeginHop(game, nearest, CONFIG.portalEntryRadius + CONFIG.shipRadius);
+      else addText(game, game.ship.x, game.ship.y - 45, '到達できるポータルが必要', '#9fe8ff');
+    }
+    return;
+  }
+  const d = game.portalDash;
+  portalRefreshNext(game);
+  if (!game.portalDash) return;
+  if (input.portalCycle) {
+    const choices = portalChoices(game);
+    if (choices.length) {
+      const current = Math.max(0, choices.findIndex((c) => c.portal === d.next));
+      const index = ((current + input.portalCycle) % choices.length + choices.length) % choices.length;
+      d.next = choices[index].portal; d.explicitNext = true;
+    }
+  }
+  game.portalPreview = d.next;
+  if (confirm && d.next) {
+    if (d.phase === 'choose') portalBeginHop(game, d.next);
+    else d.departOnArrival = true;
+  }
+}
+
+function portalBeginHop(game, target, minDistance = CONFIG.portalMinHop) {
+  const d = game.portalDash, sh = game.ship;
+  if (!target || !game.portals.includes(target)) return false;
+  const len = Math.hypot(target.x - sh.x, target.y - sh.y);
+  if (len < minDistance || len > Math.min(portalReach(game), d.remaining)
+    || !portalClearLine(game, sh.x, sh.y, target.x, target.y)
+    || portalEdgeUnavailable(game, sh, target)) return false;
+  d.edgeKey = portalEdgeKey(sh, target);
+  d.usedEdges.add(d.edgeKey);
+  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
+  d.previous = d.currentPortal;
+  d.currentPortal = target.id;
+  d.visited.add(target.id);
+  d.explicitNext = false;
+  d.departOnArrival = false;
+  const dx = (target.x - sh.x) / len, dy = (target.y - sh.y) / len;
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, game.stats.gaugeMax, game.stats);
+  const speed = Math.max(1, Math.hypot(v.vx, v.vy));
+  d.remaining = Math.max(0, d.remaining - len);
+  d.phase = 'hop'; d.target = target; d.left = len; d.dx = dx; d.dy = dy;
+  d.speed = speed; d.rate = Math.max(speed, len * game.stats.traceSpeedMult / CONFIG.portalHopTime);
+  d.inside = new Map(); d.passes = new Map(); d.waveInside = new Map(); d.waveAcc = 0; d.trailAcc = 0;
+  sh.vx = dx * speed; sh.vy = dy * speed; sh.hx = dx; sh.hy = dy;
+  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
+  d.next = portalDefaultNext(game);
+  game.portalPreview = d.next;
+  game.dashId++;
+  game.events.push({ type: 'launch', gauge: game.stats.gaugeMax, x: sh.x, y: sh.y, dx, dy });
+  return true;
+}
+
+function portalRefreshNext(game) {
+  const d = game.portalDash;
+  if (!d) return;
+  if (!portalChoices(game).some((c) => c.portal === d.next)) {
+    d.next = portalDefaultNext(game);
+    d.explicitNext = false;
+  }
+  game.portalPreview = d.next;
+  if (d.phase === 'choose' && !d.next) {
+    if (game.portalSpace.armed) game.portalSpace.consumed = true;
+    portalLeave(game, { x: game.ship.hx, y: game.ship.hy });
+  }
+}
+
+function portalWorldScale(game) {
+  const d = game.portalDash;
+  if (!d) return 1;
+  return d.phase === 'choose' ? CONFIG.portalChooseScale
+    : Math.max(CONFIG.dashScaleMin, Math.min(1, CONFIG.dashSlowRef / Math.max(1, d.speed)));
+}
+
+function updatePortals(game, realDt) {
+  const d = game.portalDash;
+  if (!d) return;
+  if (d.phase === 'choose') { portalRefreshNext(game); return; }
+  const sh = game.ship;
+  let travel = Math.min(d.left, d.rate * realDt);
+  // Small swept steps keep body hits, wave hits, obstacles and trail explosions in travel order.
+  while (travel > 1e-6) {
+    const stepDist = Math.min(20, travel), x0 = sh.x, y0 = sh.y;
+    const x1 = x0 + d.dx * stepDist, y1 = y0 + d.dy * stepDist;
+    if (!portalClearLine(game, x0, y0, x1, y1)) {
+      damageShip(game, Math.max(0, d.speed - 200) * CONFIG.crashDamage, 0, 'portalCrash');
+      sh.vx *= -0.4; sh.vy *= -0.4;
+      game.events.push({ type: 'bounce', x: x0, y: y0 });
+      stopPortalDash(game, '障害物に衝突'); return;
+    }
+    for (const [id, e] of d.inside) {
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + CONFIG.shipRadius + 2) d.inside.delete(id);
+    }
+    sh.x = x1; sh.y = y1;
+    sh.vx = d.dx * d.speed; sh.vy = d.dy * d.speed;
+    waveAlong(game, d, x0, y0, x1, y1);
+    if (game.state === 'finishing') return;
+    if (collideEnemies(game, x0, y0, CONFIG.shipRadius, d)) { stopPortalDash(game, '弾かれた'); return; }
+    if (game.state === 'finishing') return;
+    d.speed = Math.hypot(sh.vx, sh.vy);
+    tracePortalLoop(game, d, x0, y0, sh.x, sh.y);
+    d.trailAcc += stepDist;
+    if (game.stats.trailBurst && d.trailAcc >= 45) {
+      d.trailAcc = 0;
+      game.marks.push({ x: x1, y: y1, t: 0.55, dmg: attackPower(d.speed, game.stats) * game.stats.trailBurst });
+    }
+    sh.trail.push({ x: sh.x, y: sh.y });
+    if (sh.trail.length > 150) sh.trail.shift();
+    travel -= stepDist; d.left -= stepDist;
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(d.speed, game.stats));
+    if (sh.hp <= 0) { stopPortalDash(game); return; }
+  }
+  if (d.left > 1e-6) return;
+  sh.x = d.target.x; sh.y = d.target.y;
+  game.portalCooldowns.set(d.edgeKey, game.portalClock + CONFIG.portalEdgeCooldown);
+  d.path.push({ x: sh.x, y: sh.y });
+  const loopEnd = d.loopPath[d.loopPath.length - 1];
+  if (Math.hypot(loopEnd.x - sh.x, loopEnd.y - sh.y) > 1e-6) d.loopPath.push({ x: sh.x, y: sh.y });
+  game.portalTouch = d.target.id;
+  if (!d.target.manual) {
+    d.target.uses--;
+    d.target.refillAt = game.t + CONFIG.portalRefillInterval;
+    if (d.target.uses <= 0) game.portals = game.portals.filter((p) => p !== d.target);
+  }
+  d.hops++;
+  d.phase = 'choose';
+  const wave = game.stats.portalWave;
+  if (wave) explode(game, sh.x, sh.y, CONFIG.portalWaveRadius * game.stats.waveRadiusMult,
+    attackPower(d.speed, game.stats) * CONFIG.portalWaveDamage * wave * game.stats.waveDmgMult,
+    { cause: 'portalWave', color: '#c995ff', knock: 500, life: 0.45 });
+  else addRing(game, sh.x, sh.y, 48, '#9fe8ff', 0.25);
+  // Include routes opened by kills while retaining an explicit choice made in flight.
+  portalRefreshNext(game);
+  if (!game.portalDash) return;
+  if (d.departOnArrival && d.next) portalBeginHop(game, d.next);
+  else d.departOnArrival = false;
+}
+
+// ---- hits.js ----
+// Damage, kills, drops and area attacks applied to enemies.
+
+
+
+
+
+
+
+
+
+function damageEnemy(game, e, dmg, opts = {}) {
+  if (e.dead || game.state === 'finishing' || dmg <= 0) return;
+  let fresh = e.hp >= e.maxHp - 1e-6;
+  // during a jump, the wave reaches an enemy just before the body does: judge "one-shot"
+  // by its HP when this jump first touched it, so wave + body still count as one strike
+  if (game.jump || game.portalDash) {
+    if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
+    fresh = e.dashFresh;
+  }
+  e.hp -= dmg;
+  e.flash = 0.12;
+  game.events.push({ type: 'hit', x: e.x, y: e.y, crit: !!opts.crit, dmg, cause: opts.cause });
+  if (opts.crit) addText(game, e.x, e.y - e.r - 10, 'CRIT', '#ffe46b');
+  if (e.hp <= 0) {
+    if (fresh && (opts.cause === 'ram' || opts.cause === 'wave')) killStop(game, e, opts.crit);
+    killEnemy(game, e, opts);
+  } else if (opts.dirX !== undefined) {
+    const k = opts.knock ?? 160;
+    const mass = Math.max(1, e.r / 20);
+    e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
+  }
+}
+
+// One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
+function killStop(game, e, crit) {
+  if (game.dashStop >= CONFIG.killHitstopCap) return;
+  const t = CONFIG.killHitstop * (e.r > 25 ? 1.8 : 1) * (crit ? 1.3 : 1);
+  game.hitstop = Math.max(game.hitstop, t);
+  game.dashStop = (game.dashStop || 0) + t;
+}
+
+function killEnemy(game, e, opts = {}) {
+  if (e.dead || game.state === 'finishing') return;
+  if (e === game.boss) { beginBossFinish(game, e, opts); return; }
+  e.dead = true;
+  game.kills++;
+  game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+  onEnemyDeath(e, game);
+  dropPortal(game, e.x, e.y);
+  const phase = getPhase(game.t);
+  const danger = dangerAt(Math.hypot(e.x, e.y));
+  const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
+  dropGem(game, e.x, e.y, xp);
+  dropCoins(game, e, danger);
+  // Roll independently for each kill; drop frequency is controlled by probability, not a timer.
+  const power = e.xp;
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
+  if (game.rng() < chance) {
+    dropModule(game, e.x, e.y, power, danger);
+  }
+  if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
+}
+
+function flingCorpse(game, e) {
+  const sh = game.ship;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp < 1) return;
+  const base = Math.atan2(sh.vy, sh.vx);
+  const dmg = attackPower(sp, game.stats) * game.stats.fling;
+  for (const off of [-0.28, 0, 0.28]) {
+    const a = base + off;
+    game.fbullets.push({
+      kind: 'corpse', x: e.x, y: e.y, vx: Math.cos(a) * sp * 0.9, vy: Math.sin(a) * sp * 0.9,
+      r: Math.max(10, e.r * 0.8), dmg, life: 0.7, pierce: true, hit: new Set(), color: e.T.color,
+    });
+  }
+}
+
+function dropCoins(game, e, danger) {
+  let n = 0;
+  if (e.type === 'battleship') n = 12;
+  else if (e.elite) n = 3 + Math.floor(game.rng() * 4);
+  else if (e.type === 'meteor') n = game.rng() < CONFIG.meteorCoinChance ? 1 + Math.floor(game.rng() * 3) : 0;
+  else if (game.rng() < 0.03 * (1 + danger * 2)) n = 1;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2, d = game.rng() * e.r;
+    game.coinDrops.push({ x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, v: 1, pulled: false, taken: false });
+  }
+}
+
+function dropGem(game, x, y, v) {
+  if (game.gems.length > 600) {
+    const old = game.gems.shift();
+    v += old.v;
+  }
+  const a = game.rng() * Math.PI * 2;
+  game.gems.push({ x: x + Math.cos(a) * 8, y: y + Math.sin(a) * 8, v, age: 0, pulled: false, taken: false });
+}
+
+function dropModule(game, x, y, power, danger) {
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
+  game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
+}
+
+function dropCapsule(game, x, y, src, danger) {
+  const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
+  game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
+}
+
+// Area damage that ignores armor (module effects, sonic booms).
+function explode(game, x, y, radius, dmg, opts = {}) {
+  const knock = opts.knock ?? 300;
+  for (const e of game.enemies) {
+    if (e.dead) continue;
+    const dx = e.x - x, dy = e.y - y;
+    const rr = radius + e.r;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > rr * rr) continue;
+    const d = Math.sqrt(d2) || 1;
+    damageEnemy(game, e, dmg, { cause: opts.cause, dirX: dx / d, dirY: dy / d, knock });
+  }
+  addRing(game, x, y, radius, opts.color || '#ffb36b', opts.life || 0.4);
+  game.events.push({ type: 'explode', x, y, radius, cause: opts.cause });
+}
+
+function burst(game, x, y, color, n, dx, dy, speed) {
+  const P = game.fx.particles;
+  if (P.length > 1600) return;
+  for (let i = 0; i < n; i++) {
+    const a = game.rng() * Math.PI * 2;
+    const s = speed * (0.3 + game.rng());
+    P.push({
+      x, y,
+      vx: Math.cos(a) * s * 0.6 + dx * s * 0.8,
+      vy: Math.sin(a) * s * 0.6 + dy * s * 0.8,
+      life: 0.5 + game.rng() * 0.4, max: 0.9, color, size: 2 + game.rng() * 4,
+    });
+  }
+}
+
+function addText(game, x, y, text, color, size = 16) {
+  if (game.fx.texts.length > 40) game.fx.texts.shift();
+  game.fx.texts.push({ x, y, text, color, life: size > 16 ? 0.9 : 0.7, size });
+}
+
+function addRing(game, x, y, radius, color, life = 0.45) {
+  if (game.fx.rings.length > 80) game.fx.rings.shift();
+  game.fx.rings.push({ x, y, radius, color, life, max: life });
+}
+
+// ---- finale.js ----
+
+
+// Only keep the recent approach while the boss is alive; no world snapshots or replayed damage.
+function recordBossApproach(game, dt) {
+  if (!game.boss || game.boss.dead) return;
+  game.finishClock += dt;
+  const sh = game.ship, frames = game.finishFrames;
+  frames.push({ t: game.finishClock - dt, x: sh.x, y: sh.y, vx: sh.vx, vy: sh.vy });
+  const cutoff = game.finishClock - CONFIG.bossFinishReplayWindow;
+  while (frames.length > 2 && frames[1].t < cutoff) frames.shift();
+  if (frames.length > 64) frames.shift();
+}
+
+function beginBossFinish(game, boss, hit = {}) {
+  if (game.finale) return;
+  const sh = game.ship;
+  const impact = { t: game.finishClock, x: hit.impactX ?? sh.x, y: hit.impactY ?? sh.y, vx: sh.vx, vy: sh.vy };
+  const frames = [...game.finishFrames, impact];
+  game.finale = { phase: 'slow', elapsed: 0, boss, frames, impact };
+  game.state = 'finishing';
+  game.endReason = 'boss';
+  game.spawning = false;
+  game.hitstop = game.slowmo = game.acc = 0;
+  game.jump = game.portalDash = game.releasePending = null;
+  if (game.hyper) { game.hyper.focus = false; game.hyper.queue = []; }
+  game.offerQueue.length = 0;
+  game.currentOffer = null;
+  sh.charging = false; sh.invulnT = 0;
+  game.events.push({ type: 'bossFinish' });
+}
+
+// Timings are in real seconds. The slow segment replays positions, never combat or pickups.
+function advanceBossFinish(game, dt) {
+  const f = game.finale, sh = game.ship;
+  f.elapsed += dt;
+  if (f.phase === 'slow') {
+    const k = Math.min(1, f.elapsed / CONFIG.bossFinishSlowTime);
+    const frames = f.frames;
+    const start = Math.max(frames[0].t, f.impact.t - CONFIG.bossFinishReplayWindow);
+    const time = start + (f.impact.t - start) * k;
+    let i = 0;
+    while (i < frames.length - 2 && frames[i + 1].t < time) i++;
+    const a = frames[i], b = frames[i + 1] || a;
+    const mix = Math.max(0, Math.min(1, (time - a.t) / (b.t - a.t || 1)));
+    for (const key of ['x', 'y', 'vx', 'vy']) sh[key] = a[key] + (b[key] - a[key]) * mix;
+    sh.trail = frames.slice(0, i + 1).map(p => ({ x: p.x, y: p.y }));
+    game.timeScale = CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime;
+    f.boss.flash = 0.12;
+    if (k < 1) return false;
+    sh.trail = [];
+    sh.invulnT = 0;
+    f.phase = 'blast'; f.elapsed = 0;
+    bossClearBlast(game);
+  } else {
+    game.timeScale = 1;
+    // Release the shot at normal speed, then let it settle as the camera opens back out.
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt;
+    const drag = Math.exp(-3 * dt);
+    sh.vx *= drag; sh.vy *= drag;
+    sh.trail.push({ x: sh.x, y: sh.y });
+    if (sh.trail.length > 64) sh.trail.shift();
+    if (f.phase === 'blast' && f.elapsed >= CONFIG.bossFinishBlastTime) {
+      f.phase = 'clear'; f.elapsed = 0;
+    }
+  }
+  return f.phase === 'clear' && f.elapsed >= CONFIG.bossFinishClearTime;
+}
+
+function bossClearBlast(game) {
+  const f = game.finale, boss = f.boss;
+  game.timeScale = 1;
+  game.fx.particles = [];
+  // This is the victory sweep, not a chain of gameplay kills: no drops, splits or extra offers.
+  burst(game, boss.x, boss.y, '#ffe3a3', 90, 0, 0, 900);
+  for (const e of new Set([boss, ...game.enemies, ...game.newEnemies])) {
+    if (e.dead) continue;
+    e.dead = true;
+    game.kills++;
+    const dx = e.x - boss.x, dy = e.y - boss.y, d = Math.hypot(dx, dy) || 1;
+    if (e !== boss) burst(game, e.x, e.y, e.T.color, 4, dx / d, dy / d, 500);
+    if (game.fx.particles.length < 1400) for (let i = 0; i < (e === boss ? 24 : 3); i++) {
+      const a = Math.random() * Math.PI * 2, speed = 150 + Math.random() * 550;
+      game.fx.particles.push({ kind: 'finishDebris', x: e.x, y: e.y,
+        vx: Math.cos(a) * speed + dx / d * 300, vy: Math.sin(a) * speed + dy / d * 300,
+        life: CONFIG.bossFinishBlastTime, max: CONFIG.bossFinishBlastTime,
+        color: e.T.color, size: e === boss ? 10 + Math.random() * 16 : 3 + Math.random() * 5,
+        angle: a, spin: (Math.random() - 0.5) * 8 });
+    }
+  }
+  boss.dead = true;
+  game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
+  game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
+  game.fx.texts = [];
+  const radius = Math.max(900, game.viewRadius * 1.4);
+  addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);
+  addRing(game, boss.x, boss.y, radius * 0.8, '#ff526e', 0.7);
+  game.events.push({ type: 'bossExplosion', x: boss.x, y: boss.y });
+}
+
+function finishCameraTarget(game, W, H, baseZoom) {
+  const f = game.finale;
+  if (!f || game.state !== 'finishing') return null;
+  const sh = game.ship, boss = f.boss;
+  const zoom = baseZoom * CONFIG.bossFinishZoom;
+  const dx = boss.x - sh.x, dy = boss.y - sh.y, dist = Math.hypot(dx, dy) || 1;
+  const offset = Math.min(dist * 0.25, Math.min(W, H) * 0.2 / zoom);
+  if (f.phase === 'slow') return { x: sh.x + dx / dist * offset, y: sh.y + dy / dist * offset, zoom };
+  if (f.phase === 'blast') return { x: boss.x, y: boss.y, zoom: baseZoom };
+  return { x: sh.x, y: sh.y, zoom: baseZoom };
+}
+
+function drawBossFinish(r, game) {
+  const f = game.finale;
+  if (!f || game.state !== 'finishing') return;
+  const { ctx, W, H } = r;
+  ctx.save();
+  if (f.phase === 'slow') {
+    // A vignette draws attention to the actual final approach without explanatory HUD.
+    const vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.18, W / 2, H / 2, Math.max(W, H) * 0.65);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
+  } else {
+    const blastAge = f.phase === 'blast' ? f.elapsed : CONFIG.bossFinishBlastTime + f.elapsed;
+    const p = { x: (f.boss.x - r.cam.x) * r.cam.zoom + W / 2, y: (f.boss.y - r.cam.y) * r.cam.zoom + H / 2 };
+    const radius = Math.max(1, (70 + blastAge * 1400) * r.cam.zoom);
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+    const alpha = Math.max(0, 0.8 * (1 - blastAge / 1.1));
+    glow.addColorStop(0, `rgba(255,248,215,${alpha})`);
+    glow.addColorStop(0.25, `rgba(255,150,60,${alpha * 0.7})`);
+    glow.addColorStop(1, 'rgba(255,70,70,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+  }
+  if (f.phase === 'clear') {
+    ctx.globalAlpha = Math.min(1, f.elapsed / 0.2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.min(104, W * 0.17, H * 0.2)}px system-ui, sans-serif`;
+    ctx.shadowColor = '#ffac32'; ctx.shadowBlur = 28;
+    ctx.fillStyle = '#fff2bf'; ctx.fillText('CLEAR!', W / 2, H / 2);
+  }
+  ctx.restore();
 }
 
 // ---- parts.js ----
@@ -3877,6 +4135,7 @@ function drawCorpseDebris(r, game, dt) {
 
 
 
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -3918,6 +4177,14 @@ function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  const finishTarget = finishCameraTarget(game, r.W, r.H, targetZoom(game, r.W, r.H));
+  if (finishTarget) {
+    const k = 1 - Math.exp(-10 * dt);
+    r.cam.x += (finishTarget.x - r.cam.x) * k;
+    r.cam.y += (finishTarget.y - r.cam.y) * k;
+    r.cam.zoom += (finishTarget.zoom - r.cam.zoom) * k;
+    return;
+  }
   const zoomT = targetZoom(game, r.W, r.H);
   // look ahead along the velocity, but keep the ship well inside the screen at any speed
   let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
@@ -3948,6 +4215,8 @@ function handleEvents(r, game) {
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
+    else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
+    else if (ev.type === 'bossExplosion') { r.flash = 1; r.shake = 30; }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
@@ -3959,6 +4228,7 @@ function render(r, game, dt, pointer) {
   if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
   handleEvents(r, game);
   updateCamera(r, game, dt);
+  game.spawnView = { x: r.cam.x, y: r.cam.y, halfW: r.W / 2 / r.cam.zoom, halfH: r.H / 2 / r.cam.zoom };
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   drawBackground(r, game);
 
@@ -3995,21 +4265,24 @@ function render(r, game, dt, pointer) {
   ctx.restore();
   drawSpeedLines(r, game);
 
-  drawChargeUi(r, game, pointer);
-  drawCapsuleArrows(r, game);
-  drawHyperHud(r, game);
-  drawPortalHud(r, game);
-  drawOverlays(r, game, dt);
-  drawHud(r, game);
-  drawBossHud(r, game, dt);
-  drawMinimap(r, game);
-  drawBanner(r, dt);
-  drawStageFlash(r, dt);
+  if (game.state !== 'finishing') {
+    drawChargeUi(r, game, pointer);
+    drawCapsuleArrows(r, game);
+    drawHyperHud(r, game);
+    drawPortalHud(r, game);
+    drawOverlays(r, game, dt);
+    drawHud(r, game);
+    drawBossHud(r, game, dt);
+    drawMinimap(r, game);
+    drawBanner(r, dt);
+    drawStageFlash(r, dt);
+  }
   if (r.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, r.flash)})`;
     ctx.fillRect(0, 0, r.W, r.H);
     r.flash = Math.max(0, r.flash - dt * 2.2);
   }
+  drawBossFinish(r, game);
 }
 
 // Conical shock layers wrapped around the ship near max speed.
@@ -4798,6 +5071,15 @@ function drawFx(r, game) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;
+    if (p.kind === 'finishDebris') {
+      ctx.save(); ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+      ctx.strokeStyle = p.color; ctx.lineWidth = 1.5 / z;
+      ctx.fillStyle = '#dfe9f0';
+      ctx.beginPath(); ctx.moveTo(-s, -s * 0.6); ctx.lineTo(s * 0.8, -s * 0.35);
+      ctx.lineTo(s * 0.5, s * 0.7); ctx.lineTo(-s * 0.6, s * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+      continue;
+    }
     if (p.kind === 'spark') {
       const speed = Math.hypot(p.vx, p.vy) || 1;
       const length = s * 4;
@@ -5366,12 +5648,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 }
 
 // ---- ui.js ----
-
-
-
-
-
-
+
 
 const root = () => document.getElementById('ui');
 
@@ -5406,12 +5683,12 @@ function fmtTime(t) {
 const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
-  boss: ['ボス 撃破', 'win', '敵の大群を突破し、ボスを撃破した'],
+  boss: ['CLEAR!', 'win', '敵の大群を突破し、ボスを撃破した'],
   hp: ['機体 大破', 'lose', 'HP が尽きた'],
   time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
-function showResult(game, extra, onNext) {
+function showResult(game, extra, onNext, onRetry) {
   const [title, cls, sub] = END_TEXT[game.endReason] || END_TEXT.time;
   const rows = [
     ['経過時間', fmtTime(game.t)],
@@ -5422,13 +5699,15 @@ function showResult(game, extra, onNext) {
   ];
   const stats = el('div', { class: 'stats' });
   for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
-  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ ', el('kbd', {}, 'Enter'));
+  const won = game.state === 'won';
+  const btn = el('button', { class: won ? '' : 'primary', onclick: onNext }, won ? 'メニューに戻る' : 'ステーションへ');
+  const retry = won && onRetry ? el('button', { class: 'primary', onclick: onRetry }, 'もう一回やる') : null;
   showScreen(el('div', { class: 'panel' },
     el('h1', { class: cls }, title),
     el('div', { class: 'sub' }, sub),
     stats,
-    el('div', { class: 'btns' }, btn)), 'result');
-  btn.focus();
+    el('div', { class: 'btns' }, retry, btn)), 'result');
+  (retry || btn).focus();
 }
 
 const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', drop: '敵のドロップ', core: '出力コア' };
@@ -5815,10 +6094,10 @@ const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
-  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
-  { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
-  { key: 'hyperOfferInterval', label: 'ハイパー版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
-  { key: 'hyperDropInterval', label: 'ハイパー版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
+  { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
+  { key: 'dropBase', label: 'モジュール基本ドロップ率（敵の強さで増加）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
+  { key: 'dropMax', label: 'モジュールドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
@@ -5869,6 +6148,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();
+    syncModulePicker();
     schemeSel.blur(); // keep WASD/Space for the game, not the select
     if (onScheme) onScheme(CONFIG.controlScheme);
   });
@@ -5876,6 +6156,13 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
+  const moduleRow = document.createElement('label');
+  moduleRow.className = 'dctl';
+  moduleRow.innerHTML = '<span>入手するモジュール</span><select aria-label="入手するモジュール"></select>';
+  const moduleSel = moduleRow.querySelector('select');
+  const moduleHelp = document.createElement('div');
+  moduleHelp.className = 'dhelp';
+  btns.before(moduleRow, moduleHelp);
 
   const button = (label, fn) => {
     const b = document.createElement('button');
@@ -5893,14 +6180,44 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
   btns.append(sel);
   const inv = button('無敵: OFF', (g) => { g.debug.invincible = !g.debug.invincible; inv.textContent = `無敵: ${g.debug.invincible ? 'ON' : 'OFF'}`; });
   const rsel = document.createElement('select');
+  rsel.setAttribute('aria-label', '入手するモジュールのレア度');
   rsel.innerHTML = RARITIES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
   rsel.value = '2';
   btns.append(rsel);
+  function syncModuleRarity() {
+    const def = MODULES.find(m => m.id === moduleSel.value);
+    if (def && !def.rarities.includes(Number(rsel.value))) {
+      const current = Number(rsel.value);
+      rsel.value = String(def.rarities.reduce((a, b) => Math.abs(b - current) < Math.abs(a - current) ? b : a));
+    }
+    for (const option of rsel.options) option.disabled = !!def && !def.rarities.includes(Number(option.value));
+    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : 'モジュールとレア度を選び、「モジュール入手」でその場で試せます。';
+  }
+  function syncModulePicker() {
+    const selected = moduleSel.value;
+    const scheme = getGame()?.scheme || CONFIG.controlScheme;
+    moduleSel.innerHTML = '<option value="">ランダム（従来）</option>';
+    for (const slot of SLOTS) {
+      const group = document.createElement('optgroup');
+      group.label = slot.name;
+      for (const mod of MODULES.filter(m => m.slot === slot.id && moduleFitsScheme(m, scheme))) {
+        const option = document.createElement('option');
+        option.value = mod.id; option.textContent = mod.name;
+        group.append(option);
+      }
+      if (group.children.length) moduleSel.append(group);
+    }
+    if ([...moduleSel.options].some(option => option.value === selected)) moduleSel.value = selected;
+    syncModuleRarity();
+  }
+  moduleSel.addEventListener('change', () => { syncModuleRarity(); moduleSel.blur(); });
+  rsel.addEventListener('change', () => { syncModuleRarity(); rsel.blur(); });
+  syncModulePicker();
   button('モジュール入手', (g) => {
     const r = Number(rsel.value);
-    const pool = MODULES.filter((m) => m.rarities.includes(r));
-    const def = pool[Math.floor(Math.random() * pool.length)];
-    if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
+    const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
+    const def = pool.find(m => m.id === moduleSel.value) || pool[Math.floor(Math.random() * pool.length)];
+    if (g.state === 'play' || g.state === 'offer') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
   button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
   button('包囲炸裂を入手', (g) => {
@@ -5948,7 +6265,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); syncModulePicker(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;
@@ -6030,7 +6347,7 @@ function finishRun() {
   const before = save.coins;
   applyRunResult(save, game);
   writeSave(storage, save);
-  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation);
+  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation, startRun);
 }
 
 function chooseOffer(accept) {
@@ -6071,10 +6388,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
-  if (e.key === 'p' || e.key === 'P') debug.toggle();
+  if ((e.key === 'p' || e.key === 'P') && game.state !== 'finishing') debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
-    else if (mode === 'result') { e.preventDefault(); openStation(); }
   }
 });
 
@@ -6098,12 +6414,13 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const wasPlaying = game.state === 'play';
+  const wasRunning = game.state === 'play' || game.state === 'finishing';
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   raw.clickCursors = raw.clicks.map((c) => screenToWorld(renderer, c.x, c.y));
   update(game, dt, buildIntent(raw, game.scheme));
+  if (game.state === 'finishing') input.state.enabled = false;
   render(renderer, game, dt, input.state);
   updateDashButton();
   audio.handle(game.events);
@@ -6111,7 +6428,7 @@ function frame(now) {
   debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
-    if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
     if (game.state === 'levelup' && levelShown !== game.levelChoices) {
       levelShown = game.levelChoices;
       input.reset();
