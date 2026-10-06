@@ -5,14 +5,14 @@
 
 - 2D 見下ろしのサバイバー系の **試作**。目的は作者が通しで遊んで「面白くなりそうか」を判断すること（作り込みより全要素を一通り体験できることを優先）
 - 公開 URL: https://speed-nine-kappa.vercel.app ／ GitHub: https://github.com/Tomatoguy1029/speed （`main` への push で Vercel が本番デプロイ）
-- 元の設計書: ユーザー（@脇田知樹）の「ゲーム設計書.md」。要点は [SPEC.md](SPEC.md) に転記済み（初期のもの。現在の仕様は `docs/spec.md`）
+- 元の設計書: ユーザー（[Tomatoguy1029](https://github.com/Tomatoguy1029)）の「ゲーム設計書.md」。要点は [SPEC.md](SPEC.md) に転記済み（初期のもの。現在の仕様は `docs/spec.md`）
 
 ## ドキュメント
 
 | ファイル | 中身 | いつ更新するか |
 |---|---|---|
 | [docs/spec.md](docs/spec.md) | 現在の仕様（操作・数値・画面・計測値） | 挙動や数値を変えたとき |
-| [docs/wakida.md](docs/wakida.md) | 脇田知樹（[Tomatoguy1029](https://github.com/Tomatoguy1029)、wakida）の作業・判断の履歴（旧 decisions.md） | Tomatoguy1029 の作業時に末尾へ追記 |
+| [docs/wakida.md](docs/wakida.md) | [Tomatoguy1029](https://github.com/Tomatoguy1029)の作業・判断の履歴（旧 decisions.md） | Tomatoguy1029 の作業時に末尾へ追記 |
 | [docs/shumak.md](docs/shumak.md) | [ShueMaker70969](https://github.com/ShueMaker70969) の作業・判断の履歴 | ShueMaker70969 の作業時に末尾へ追記 |
 | [docs/keporusu.md](docs/keporusu.md) | [keporusu](https://github.com/keporusu) の作業・判断の履歴 | keporusu の作業時に末尾へ追記 |
 | [docs/backlog.md](docs/backlog.md) | 未解決の課題・次の候補・保留中の議論 | 課題が見つかった／片付いたとき |
@@ -21,13 +21,14 @@
 ### ユーザーごとの記録更新
 
 - **Claude Code・Codex などのエージェントは、ユーザーが作業するたびに、同じ作業の中で対応する履歴ファイルを自動で更新する**。更新の依頼を毎回待たず、日付・要望・作業内容・決めたことと理由を末尾に番号付きで追記する。記録がまだないファイルでは「まだ作業記録はない。」を最初の記録に置き換える。
-- 更新先は **GitHub `Tomatoguy1029`（脇田知樹・wakida）→ `docs/wakida.md`、GitHub `ShueMaker70969` → `docs/shumak.md`、GitHub `keporusu` → `docs/keporusu.md`**。会話で明示された作業ユーザーを優先し、明示がなければ認証済みの GitHub アカウントなど確認できる情報で判断する。特定できない場合は本人に確認し、別ユーザーの履歴へ推測で書かない。
+- 更新先は **GitHub `Tomatoguy1029`→ `docs/wakida.md`、GitHub `ShueMaker70969` → `docs/shumak.md`、GitHub `keporusu` → `docs/keporusu.md`**。会話で明示された作業ユーザーを優先し、明示がなければ認証済みの GitHub アカウントなど確認できる情報で判断する。特定できない場合は本人に確認し、別ユーザーの履歴へ推測で書かない。
 - 作業前に関連するユーザーの履歴も確認する。他のユーザーの作業記録は書き換えず、番号はファイルごとに続ける。
 - 現在の仕様と未解決の課題は共通で管理する。挙動・数値を変えたら `docs/spec.md`、課題が見つかった／片付いたら `docs/backlog.md` も同じ作業の中で更新する。
 
 ## ユーザーとのやりとりのルール
 
 - 会話は日本語
+- ユーザーの表記は GitHub ユーザー名を使う。本人の明示的な許可なく本名・フルネームを会話やドキュメントに記載しない。
 - **設計の相談（操作・面白さ・スリルなど）にはすぐ実装案や「実装しますか？」で返さない**。問題を一緒に掘り下げ、意見と質問を返す。実装はユーザーが決めてから
 - 操作の方向性はユーザーと議論中（[docs/backlog.md](docs/backlog.md)）。ユーザーの指摘: ヒット作はシステムが独自でも操作は定番のものがほとんど
 - フェーズ（強化期・圧力期など）は裏のレベルデザイン用。**ゲーム画面にも説明にも名前を出さない**（説明は「〜分ごろ」）
