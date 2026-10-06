@@ -40,11 +40,6 @@ export const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
-  drawDropScale: 1,
-  drawDropInterval: 10,
-  drawDropJitter: 4,
-  drawDropPity: 14, // next kill guarantees a drop after this many run seconds
-  drawOfferInterval: 8, // pickup choices still wait until the drawn attack ends
   drawCapsuleCount: 4,
   drawCapsuleInterval: 16,
   spawnMargin: 70, // spawn/recycle just beyond the actual screen edges

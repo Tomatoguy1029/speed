@@ -96,22 +96,16 @@ test('post-trace flight pierces fodder without slowing, but an armored bounce re
   assert.ok(game.ship.hp < game.stats.maxHp);
 });
 
-test('large elite sweeps cannot flood draw mode with module drops or consecutive selection screens', () => {
+test('successful drops and queued offers do not require waiting between acquisitions', () => {
   const game = flowGame();
-  for (let i = 0; i < 100; i++) killEnemy(game, createEnemy('drifter', 1, 200, -3000, { elite: true }));
-  assert.equal(game.capsules.length, 1);
-  game.t = game.nextModuleDropAt;
+  game.rng = () => 0;
+  killEnemy(game, createEnemy('drifter', 1, 200, -3000, { elite: true }));
   killEnemy(game, createEnemy('drifter', 1, 200, -3000, { elite: true }));
   assert.equal(game.capsules.length, 2);
   game.offerQueue.push({ id: 'ram', slot: 'bow', r: 0 }, { id: 'thruster', slot: 'booster', r: 0 });
   update(game, 0.02, flowIdle);
   assert.equal(game.state, 'offer');
   resolveOffer(game, false);
-  update(game, 0.02, flowIdle);
-  assert.equal(game.state, 'play');
-  game.t = game.nextOfferAt;
-  update(game, 0.02, flowIdle);
   assert.equal(game.state, 'offer');
   assert.equal(game.currentOffer.id, 'thruster');
-  assert.equal(game.nextOfferAt - game.t, CONFIG.drawOfferInterval);
 });

@@ -8,18 +8,16 @@ import { makeRng } from '../src/math.js';
 import { updateSpawner } from '../src/spawner.js';
 import { CONFIG } from '../src/config.js';
 
-test('draw drops have a short spacing and guarantee a module after a dry spell', () => {
+test('draw drops use independent probability rolls without a time gate or pity timer', () => {
   const g = createGame({ scheme: 'draw', seed: 5 });
   g.rng = () => 0.99;
-  g.t = CONFIG.drawDropPity;
+  g.t = 300;
   killEnemy(g, createEnemy('drifter', 1, 0, -3000));
-  assert.equal(g.capsules.length, 1);
-  assert.ok(g.nextModuleDropAt <= g.t + 14);
-  for (let i = 0; i < 30; i++) killEnemy(g, createEnemy('drifter', 1, 0, -3000));
-  assert.equal(g.capsules.length, 1, 'a single sweep still cannot flood the player with drops');
-  g.t += CONFIG.drawDropPity;
+  assert.equal(g.capsules.length, 0, 'elapsed time does not guarantee a drop');
+  g.rng = () => 0;
   killEnemy(g, createEnemy('drifter', 1, 0, -3000));
-  assert.equal(g.capsules.length, 2);
+  killEnemy(g, createEnemy('drifter', 1, 0, -3000));
+  assert.equal(g.capsules.length, 2, 'two kills at the same time can both drop modules');
 });
 
 test('draw module rolls replace obsolete prediction and charge effects with route attacks', () => {

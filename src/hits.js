@@ -1,4 +1,3 @@
-import { isDrawScheme } from './controls.js';
 // Damage, kills, drops and area attacks applied to enemies.
 import { CONFIG } from './config.js';
 import { onEnemyDeath } from './enemies.js';
@@ -54,18 +53,11 @@ export function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  // Draw mode spaces drops in time so a larger crowd cannot flood the player with modules.
+  // Roll independently for each kill; drop frequency is controlled by probability, not a timer.
   const power = e.xp;
-  const drawMode = isDrawScheme(game.scheme);
-  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
-  const pity = drawMode && game.t - (game.lastModuleDropAt || 0) >= CONFIG.drawDropPity;
-  if ((!drawMode || game.t >= game.nextModuleDropAt) &&
-      (pity || e.elite || e.type === 'battleship' || game.rng() < chance)) {
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
+  if (game.rng() < chance) {
     dropModule(game, e.x, e.y, power, danger);
-    if (drawMode) {
-      game.lastModuleDropAt = game.t;
-      game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * CONFIG.drawDropJitter;
-    }
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }

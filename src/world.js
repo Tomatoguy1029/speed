@@ -35,7 +35,6 @@ export function createGame(opts = {}) {
     meta, stats, ship, loadout,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
-    nextOfferAt: 0, nextModuleDropAt: 0,
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
@@ -117,8 +116,7 @@ export function update(game, frameDt, input) {
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length && !game.draw &&
-          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
     }
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
@@ -241,11 +239,14 @@ export function absorbDuplicates(game) {
 export function pushOffer(game, mod, source) {
   game.lastOfferSlot = mod.slot;
   game.offerQueue.push({ ...mod, source });
+  if (game.state === 'play' && !game.draw) {
+    absorbDuplicates(game);
+    if (game.offerQueue.length) openOffer(game);
+  }
 }
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
@@ -269,7 +270,7 @@ export function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
+  if (game.offerQueue.length) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
