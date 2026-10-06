@@ -8,7 +8,7 @@ import { addCombatImpact } from './impact-fx.js';
 import { updateEnemy, updateEnemyAim, MAX_ENEMY_R } from './enemies.js';
 import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
-import { updateSpawner, getPhase } from './spawner.js';
+import { updateSpawner, getPhase, phaseTarget } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
@@ -681,7 +681,14 @@ function recordTrail(sh, dt) {
 
 function flushNewEnemies(game) {
   if (!game.newEnemies.length) return;
-  for (const e of game.newEnemies) game.enemies.push(e);
+  const limit = Math.ceil(phaseTarget(game.t).pop * (1 + CONFIG.enemySplitOverflow));
+  let population = 0;
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss') population++;
+  for (const e of game.newEnemies) {
+    if (population >= limit) break;
+    game.enemies.push(e);
+    population++;
+  }
   game.newEnemies.length = 0;
 }
 
@@ -706,6 +713,13 @@ export function separateEnemies(game) {
         const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
         e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
         o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+        // Position correction alone lets the rear ranks drive back into the same packed mass.
+        // Cancel only their closing velocity; sideways and separating movement stay available.
+        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
+        if (closing < 0) {
+          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
+          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
+        }
       });
     }
   }

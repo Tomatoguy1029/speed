@@ -209,8 +209,9 @@ const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
-  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
+  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
+  enemyPursuitSpread: 480, // distributed approach targets, fading out near the actual ship
+  enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
@@ -2276,7 +2277,14 @@ function recordTrail(sh, dt) {
 
 function flushNewEnemies(game) {
   if (!game.newEnemies.length) return;
-  for (const e of game.newEnemies) game.enemies.push(e);
+  const limit = Math.ceil(phaseTarget(game.t).pop * (1 + CONFIG.enemySplitOverflow));
+  let population = 0;
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss') population++;
+  for (const e of game.newEnemies) {
+    if (population >= limit) break;
+    game.enemies.push(e);
+    population++;
+  }
   game.newEnemies.length = 0;
 }
 
@@ -2301,6 +2309,13 @@ function separateEnemies(game) {
         const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
         e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
         o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+        // Position correction alone lets the rear ranks drive back into the same packed mass.
+        // Cancel only their closing velocity; sideways and separating movement stay available.
+        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
+        if (closing < 0) {
+          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
+          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
+        }
       });
     }
   }
@@ -5533,7 +5548,7 @@ const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
-  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
+  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
   { key: 'drawOfferInterval', label: '描画版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'drawDropInterval', label: '描画版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },

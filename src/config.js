@@ -123,8 +123,9 @@ export const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
-  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
+  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
+  enemyPursuitSpread: 480, // distributed approach targets, fading out near the actual ship
+  enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
