@@ -41,24 +41,35 @@ test('draw intent: Space fires the dash; a held touch is a stick, the mouse curs
   assert.equal(it.charging, false);
 });
 
-test('releasing a charge freezes the ship and slows the world instead of launching', () => {
+test('starting a draw holds the ship and applies the configured world speed instead of launching', () => {
   const game = quiet();
   charge(game, 0.8, at(300, 0));
   assert.equal(game.draw?.phase, 'draw');
-  assert.ok(game.timeScale < 0.15);
+  assert.equal(game.timeScale, CONFIG.drawTimeScale);
   const x0 = game.ship.x;
   update(game, 0.1, { ...idle, cursor: at(300, 0) });
   assert.ok(Math.abs(game.ship.x - x0) < 1, 'ship waits while the path is drawn');
 });
 
-test('enemies crawl while drawing', () => {
-  const game = quiet();
-  const e = createEnemy('drifter', 1, 600, OY); e.vx = -200;
-  game.enemies.push(e);
-  charge(game, 0.8, at(100, 0));
-  const ex = e.x;
-  for (let i = 0; i < 10; i++) update(game, 0.05, { ...idle, cursor: at(100, 0) });
-  assert.ok(Math.abs(e.x - ex) < 30, `moved ${Math.abs(e.x - ex)}`);
+test('drawing world speed can stop, slow or run enemies normally', () => {
+  const saved = CONFIG.drawTimeScale;
+  const distances = [];
+  try {
+    for (const scale of [0, 0.5, 1]) {
+      CONFIG.drawTimeScale = scale;
+      const game = quiet();
+      const e = createEnemy('drifter', 1, 600, OY); e.vx = -200;
+      game.enemies.push(e);
+      charge(game, 0.8, at(100, 0));
+      const ex = e.x;
+      for (let i = 0; i < 10; i++) update(game, 0.05, { ...idle, cursor: at(100, 0) });
+      assert.equal(game.timeScale, scale);
+      distances.push(Math.abs(e.x - ex));
+    }
+  } finally { CONFIG.drawTimeScale = saved; }
+  assert.equal(distances[0], 0);
+  assert.ok(distances[1] > 0 && distances[1] < distances[2]);
+  assert.ok(distances[2] > 30);
 });
 
 test('the dash needs a full gauge; the path starts where you click and the ship warps there', () => {

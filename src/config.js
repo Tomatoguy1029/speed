@@ -71,7 +71,7 @@ export const CONFIG = {
   portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
   drawTime: 5, // real seconds to draw before the path commits itself
-  drawTimeScale: 0.05, // world speed while drawing
+  drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this
   waveRadius: 45, // reach of the wave a traced path gives off (the band's half-width); the ship body itself stays shipRadius

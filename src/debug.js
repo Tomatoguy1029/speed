@@ -42,7 +42,7 @@ export const TUNABLES = [
   { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
   { key: 'stickDeadZone', label: 'スティックの遊び(px)', min: 0, max: 40, step: 1 },
-  { key: 'drawTimeScale', label: '描画中の世界の速さ', min: 0, max: 0.5, step: 0.005 },
+  { key: 'drawTimeScale', label: '描画中の世界の速さ（0＝停止、1＝通常）', min: 0, max: 1, step: 0.01 },
   { key: 'drawRunSlowRef', label: 'なぞり中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
   { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
   { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
