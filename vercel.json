@@ -3,5 +3,11 @@
   "framework": null,
   "installCommand": "",
   "buildCommand": "node build.js",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true
+    }
+  }
 }
