@@ -4521,7 +4521,7 @@ function createRenderer(canvas) {
     p,
     stars: Array.from({ length: 110 - i * 25 }, () => ({ x: rng() * STAR_TILE, y: rng() * STAR_TILE, s: 0.6 + rng() * (0.6 + i * 0.6), a: 0.25 + rng() * 0.6 })),
   }));
-  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, zoomPunch: 0, stageFlash: null, hurt: 0 };
+  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, stageFlash: null, hurt: 0 };
 }
 
 function resizeRenderer(r) {
@@ -4580,7 +4580,6 @@ function updateCamera(r, game, dt) {
   cam.x += (tx - cam.x) * kp;
   cam.y += (ty - cam.y) * kp;
   cam.zoom += (zoomT - cam.zoom) * kz;
-  if (r.zoomPunch > 0) { cam.zoom *= 1 + r.zoomPunch; r.zoomPunch = Math.max(0, r.zoomPunch - dt * 0.5); }
   game.viewRadius = Math.hypot(r.W, r.H) / 2 / cam.zoom;
 }
 
@@ -4592,7 +4591,7 @@ function handleEvents(r, game) {
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
-    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
+    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
