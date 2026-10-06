@@ -32,4 +32,5 @@ jobs:
         id: deploy
         run: echo "url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
       - name: Show preview URL
-        run: echo "Preview: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Preview: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
