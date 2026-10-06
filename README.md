@@ -30,6 +30,16 @@ godot --editor --path speed
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
 | `.github/workflows/vercel-deploy.yml`, `vercel.json` | demo のビルドと Vercel 公開設定 |
 
+## 武器・特性・敵の管理
+
+本番とdemoで同じ [一覧の運用ルール](docs/catalog.md) を使い、追加・変更・採否判断・実装の同じ作業で対象側の一覧を更新します。
+
+| 一覧 | 本番 | demo |
+|---|---|---|
+| 武器 | [武器一覧](docs/weapons.md) | [demoの武器一覧](demo/docs/weapons.md) |
+| 特性 | [特性一覧](docs/traits.md) | [demoの特性一覧](demo/docs/traits.md) |
+| 敵 | [敵一覧](docs/enemies.md) | [demoの敵一覧](demo/docs/enemies.md) |
+
 ## demo を使う
 
 [公開 demo](https://speed-nine-kappa.vercel.app/) は引き続きブラウザで遊べます。操作・調整方法・実験の進め方は [demo/README.md](demo/README.md) を参照してください。
