@@ -1,4 +1,4 @@
-import { isDrawScheme } from './controls.js';
+import { isHyperScheme } from './controls.js';
 import { baseStats } from './ship.js';
 import { pickWeighted } from './math.js';
 import { CONFIG } from './config.js';
@@ -53,8 +53,8 @@ export const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
-  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
-    desc: (r) => `経路を駆け抜ける速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
     apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
   { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
     desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
@@ -73,10 +73,10 @@ export const MODULES = [
   { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
     desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
     apply: (s, m) => { s.turret = m; } },
-  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, drawOnly: true,
+  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, hyperOnly: true,
     desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
     apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
-  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, drawOnly: true,
+  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, hyperOnly: true,
     desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
     apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
   { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
@@ -116,20 +116,20 @@ export const MODULES = [
 
   // ジェネレーター: エネルギーとチャージ
   { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
-    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    desc: (r, scheme) => `${scheme === 'hyper' ? 'ジャンプの充填時間' : 'チャージ時間'} -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
     apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
   { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
-    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
     apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
   { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
-    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+    desc: (r, scheme) => scheme === 'hyper' ? `敵を貫くたびに次のジャンプが ${pct(0.05 * M(r))} 溜まる、充填時間 -8%` : `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
-  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
-  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
-    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.rangeMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, hyperOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.rangeMult *= 1 + 0.8 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -193,7 +193,7 @@ export function rollModule(rng, ctx) {
       return [s.id, w];
     }));
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.drawOnly || !ctx.scheme || isDrawScheme(ctx.scheme) || ctx.scheme === 'portal')
+      && (!m.hyperOnly || !ctx.scheme || isHyperScheme(ctx.scheme) || ctx.scheme === 'portal')
       && (!m.portalOnly || ctx.scheme === 'portal')
       && (!m.portalExcluded || ctx.scheme !== 'portal'));
   }

@@ -107,7 +107,7 @@ export function createAudio() {
     barrier: () => noise(0.25, 2000, 0.15, 'highpass'),
     warp: () => { tone(1400, 0.12, 'sine', 0.12, 300); noise(0.12, 3000, 0.1, 'highpass'); },
     dashReady: () => tone(988, 0.18, 'triangle', 0.1, 1480),
-    drawStart: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
+    hyperOpen: () => { tone(330, 0.6, 'sine', 0.12, 110); noise(0.5, 600, 0.12, 'lowpass', 150); },
     sonic: () => {
       // a beat of silence, then everything comes back at once
       duckT = 0.22;

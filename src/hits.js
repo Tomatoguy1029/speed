@@ -1,4 +1,4 @@
-import { isDrawScheme } from './controls.js';
+import { isHyperScheme } from './controls.js';
 // Damage, kills, drops and area attacks applied to enemies.
 import { CONFIG } from './config.js';
 import { onEnemyDeath } from './enemies.js';
@@ -11,9 +11,9 @@ import { dropPortal } from './portals.js';
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || dmg <= 0) return;
   let fresh = e.hp >= e.maxHp - 1e-6;
-  // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
-  // by its HP when this dash first touched it, so wave + body still count as one strike
-  if ((game.draw && game.draw.phase === 'run') || game.portalDash) {
+  // during a jump, the wave reaches an enemy just before the body does: judge "one-shot"
+  // by its HP when this jump first touched it, so wave + body still count as one strike
+  if (game.jump || game.portalDash) {
     if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
     fresh = e.dashFresh;
   }
@@ -52,14 +52,14 @@ export function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
-  // Draw mode spaces drops in time so a larger crowd cannot flood the player with modules.
+  // Hyperdrive mode spaces drops in time so a larger crowd cannot flood the player with modules.
   const power = e.xp;
-  const drawMode = isDrawScheme(game.scheme);
-  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
-  if ((!drawMode || game.t >= game.nextModuleDropAt) &&
+  const hyperMode = isHyperScheme(game.scheme);
+  const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (hyperMode ? CONFIG.hyperDropScale : 1);
+  if ((!hyperMode || game.t >= game.nextModuleDropAt) &&
       (e.elite || e.type === 'battleship' || game.rng() < chance)) {
     dropModule(game, e.x, e.y, power, danger);
-    if (drawMode) game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * 15;
+    if (hyperMode) game.nextModuleDropAt = game.t + CONFIG.hyperDropInterval + game.rng() * 15;
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }

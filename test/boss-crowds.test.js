@@ -7,7 +7,7 @@ import { damageEnemy } from '../src/hits.js';
 import { CONFIG } from '../src/config.js';
 
 test('one boss appears on time, stays when left off screen, and its defeat clears the run', () => {
-  const game = createGame({ seed: 18, scheme: 'draw' });
+  const game = createGame({ seed: 18, scheme: 'hyper' });
   game.t = CONFIG.bossTime - 1;
   updateSpawner(game, 0.02);
   assert.equal(game.boss, null);

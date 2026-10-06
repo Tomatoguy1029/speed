@@ -25,7 +25,7 @@ export function baseStats(meta = {}) {
     predictTime: 0.9,
     predictBounce: false,
     regen: 0,
-    drawLengthMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // draw-mode modules
+    rangeMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // hyperdrive / portal modules
   };
 }
 
@@ -37,7 +37,7 @@ export function createShip(stats, x, y) {
     aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
     markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
     aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
-    boostT: 0, fadeT: 0, invulnT: 0, glide: false,
+    boostT: 0, fadeT: 0, invulnT: 0,
     trail: [], trailAcc: 0,
   };
 }
@@ -59,13 +59,6 @@ export function launchVelocity(vx, vy, dx, dy, gauge, stats) {
 
 // Integrate one step: acceleration (ax, ay), drag rules, then position.
 export function stepShip(ship, stats, dt, ax, ay, extraDrag) {
-  if (ship.glide) {
-    ship.boostT = Math.max(0, ship.boostT - dt);
-    ship.fadeT = 0;
-    ship.x += ship.vx * dt;
-    ship.y += ship.vy * dt;
-    return;
-  }
   ship.vx += ax * dt;
   ship.vy += ay * dt;
   let sp = Math.hypot(ship.vx, ship.vy);

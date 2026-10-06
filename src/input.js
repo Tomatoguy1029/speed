@@ -38,7 +38,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false, confirm: false,
+    keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false, confirm: false, clicks: [],
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
   const local = (e) => {
@@ -48,7 +48,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   el.addEventListener('pointerdown', (e) => {
     st.hover = local(e);
     if (st.enabled && e.button === 2) { st.confirm = true; e.preventDefault(); }
-    if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
+    if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; st.clicks.push(st.hover); }
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId; st.pointerType = e.pointerType || 'mouse';
     ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
@@ -118,6 +118,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
         click: st.click, // preserve the press position even if the mouse moves before the next frame
+        clicks: st.clicks, // every press this frame, in order (fast clicks between frames are not lost)
         release: st.release,
         releaseSource: st.release ? st.relSource : null,
         releaseDrag: { x: st.relX, y: st.relY },
@@ -126,6 +127,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       st.snap = null;
       st.pressed = false;
       st.click = null;
+      st.clicks = [];
       st.dash = false;
       st.place = false;
       st.confirm = false;
@@ -133,6 +135,6 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.clicks = []; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
   };
 }

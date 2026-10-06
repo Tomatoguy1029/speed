@@ -1,6 +1,7 @@
 // Tuning panel: edits CONFIG live and offers shortcuts (time skip, modules, invincibility).
 import { CONFIG } from './config.js';
-import { refreshStats, pushOffer } from './world.js';
+import { refreshStats, pushOffer, addXp } from './world.js';
+import { xpForLevel } from './progression.js';
 import { PHASES } from './spawner.js';
 import { MODULES, RARITIES } from './modules.js';
 import { SCHEMES, schemeById } from './controls.js';
@@ -26,7 +27,14 @@ export const TUNABLES = [
   { key: 'planetGM', label: '中心惑星の重力（既定 0）', min: 0, max: 1.5e9, step: 1e7, fmt: (v) => `${(v / 1e8).toFixed(1)}e8` },
   { key: 'moonGM', label: '小惑星の重力', min: 0, max: 1e8, step: 1e6, fmt: (v) => `${(v / 1e6).toFixed(0)}e6` },
   { key: 'atkScale', label: '攻撃力の係数', min: 0.5, max: 3, step: 0.05 },
-  { key: 'drawLength', label: '軌跡の長さ（満タン時）', min: 200, max: 3000, step: 50 },
+  { key: 'hyperRadius', label: 'ハイパー：ジャンプの届く距離（基礎）', min: 100, max: 2000, step: 20 },
+  { key: 'hyperChargeTime', label: 'ハイパー：1チャージの充填時間（秒）', min: 0.2, max: 15, step: 0.1 },
+  { key: 'hyperMaxCharges', label: 'ハイパー：チャージの最大数', min: 1, max: 10, step: 1 },
+  { key: 'hyperFocusScale', label: 'ハイパー：照準中の世界の速さ（0＝停止）', min: 0, max: 1, step: 0.01 },
+  { key: 'hyperFocusMax', label: 'ハイパー：照準できる時間（実時間・秒、0＝無制限）', min: 0, max: 10, step: 0.5 },
+  { key: 'hyperJumpTime', label: 'ハイパー：1ジャンプの移動時間（秒）', min: 0.02, max: 0.5, step: 0.01 },
+  { key: 'hyperKeep', label: 'ハイパー：ジャンプ後に残る勢い（比）', min: 0, max: 1.5, step: 0.05 },
+  { key: 'hyperCoast', label: 'ハイパー：減速が始まるまで（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'portalReach', label: 'ポータル：1回の到達距離（基礎）', min: 300, max: 2500, step: 50 },
   { key: 'portalBudget', label: 'ポータル：連続突進の総距離（基礎）', min: 500, max: 6000, step: 100 },
   { key: 'portalExitHold', label: 'ポータル：Space長押しで離脱（秒）', min: 0.5, max: 3, step: 0.1 },
@@ -37,16 +45,15 @@ export const TUNABLES = [
   { key: 'portalDropChance', label: 'ポータル：撃破での出現率', min: 0, max: 1, step: 0.02 },
   { key: 'portalWaveRadius', label: 'ポータル：到着波動の半径', min: 0, max: 600, step: 10 },
   { key: 'portalWaveDamage', label: 'ポータル：到着波動の威力（攻撃力比）', min: 0, max: 3, step: 0.1 },
+  { key: 'hyperDecay', label: 'ハイパー：ジャンプ後の減速の強さ（毎秒）', min: 0, max: 6, step: 0.1 },
   { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
   { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
   { key: 'stickDeadZone', label: 'スティックの遊び(px)', min: 0, max: 40, step: 1 },
-  { key: 'drawTimeScale', label: '描画中の世界の速さ（0＝停止、1＝通常）', min: 0, max: 1, step: 0.01 },
-  { key: 'drawRunSlowRef', label: 'なぞり中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
-  { key: 'drawRunScaleMin', label: 'なぞり中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
-  { key: 'drawRunTime', label: '軌跡をなぞる時間（秒）', min: 0.05, max: 2, step: 0.05 },
-  { key: 'waveRadius', label: '軌跡の波動が届く距離', min: 0, max: 300, step: 5 },
-  { key: 'waveDamage', label: '軌跡の波動の威力（攻撃力比）', min: 0, max: 3, step: 0.05 },
+  { key: 'dashSlowRef', label: 'ジャンプ中の世界の遅さ（大きいほど速い。世界の速さ = この値 / 突進速度）', min: 20, max: 2000, step: 10 },
+  { key: 'dashScaleMin', label: 'ジャンプ中の世界の速さ 下限', min: 0, max: 0.5, step: 0.01 },
+  { key: 'waveRadius', label: 'ジャンプの波動が届く距離', min: 0, max: 300, step: 5 },
+  { key: 'waveDamage', label: 'ジャンプの波動の威力（攻撃力比）', min: 0, max: 3, step: 0.05 },
   { key: 'killHitstop', label: '一撃撃破のヒットストップ（秒）', min: 0, max: 0.2, step: 0.005 },
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
@@ -54,8 +61,8 @@ export const TUNABLES = [
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
-  { key: 'drawOfferInterval', label: '描画版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
-  { key: 'drawDropInterval', label: '描画版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'hyperOfferInterval', label: 'ハイパー版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'hyperDropInterval', label: 'ハイパー版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
@@ -89,12 +96,12 @@ export function setScheme(game, id) {
   CONFIG.controlScheme = schemeById(id).id;
   if (game) {
     game.scheme = CONFIG.controlScheme;
-    game.draw = null; game.portalDash = null; game.portalPreview = null;
+    game.jump = null; game.hyper.focus = false; game.portalDash = null; game.portalPreview = null;
     game.ship.charging = false; game.releasePending = null;
   }
 }
 
-export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
+export function createDebugPanel(getGame, onScheme, onResetMeta) {
   const root = document.createElement('div');
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
@@ -110,27 +117,6 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     if (onScheme) onScheme(CONFIG.controlScheme);
   });
   syncScheme();
-  const pathRow = document.createElement('label');
-  pathRow.className = 'dctl';
-  pathRow.innerHTML = '<span>軌跡の入力</span><select aria-label="軌跡の入力"><option value="freehand">マウスで描く（従来）</option><option value="points">クリックで通過点を置く</option></select>';
-  const pathSel = pathRow.querySelector('select');
-  const pathHelp = document.createElement('div');
-  pathHelp.className = 'dhelp';
-  schemeHelp.after(pathRow, pathHelp);
-  const syncPathInput = () => {
-    pathSel.value = CONFIG.drawInput;
-    pathHelp.textContent = CONFIG.drawInput === 'points'
-      ? '描画方式で使用。左クリックで開始点・通過点を置く。点の間は直線で結ぶ。右クリック／Spaceで発動、長さを使い切っても自動発動。通常移動は操作方法の設定どおり。'
-      : '描画方式で使用。クリックで開始し、マウス移動で線を描く。再クリックか長さを使い切ると発動。';
-  };
-  pathSel.addEventListener('change', () => {
-    CONFIG.drawInput = pathSel.value;
-    const g = getGame();
-    if (g?.draw?.phase === 'draw') { g.draw = null; g.dashMeter = 1; }
-    syncPathInput(); pathSel.blur();
-    if (onDrawInput) onDrawInput(CONFIG.drawInput);
-  });
-  syncPathInput();
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
@@ -165,6 +151,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     if (g.state === 'play' && g.scheme === 'portal') pushOffer(g,
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
+  button('レベル +1', (g) => { if (g.state === 'play') addXp(g, xpForLevel(g.level) - g.xp); });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
   button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });

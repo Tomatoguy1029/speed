@@ -36,6 +36,12 @@
   .card .name { font-size: 18px; font-weight: 700; }
   .card .rar { font-size: 12px; margin: 2px 0 8px; font-weight: 700; }
   .card .desc { font-size: 13px; color: #cdd6f0; line-height: 1.5; }
+  .lvcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0; }
+  .lvcard { text-align: left; font: inherit; color: inherit; cursor: pointer; position: relative; }
+  .lvcard:hover, .lvcard:focus-visible { border-color: #ffe46b; background: rgba(255,228,107,0.07); }
+  .lvcard.weapon .tag { color: #ffe46b; }
+  .lvcard.perk .tag { color: #9fe8ff; }
+  .lvcard kbd { position: absolute; right: 10px; top: 10px; }
   .card.empty { display: flex; align-items: center; justify-content: center; color: #5b6b94; }
   .card.new { border-width: 2px; box-shadow: 0 0 24px rgba(120,160,255,0.15); }
   .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
@@ -44,7 +50,7 @@
   .loadout div.hl { border-color: #5d8bff; color: #e6ecff; }
   .src { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #1d2c5c; color: #b8c6ea; margin-bottom: 8px; }
   @media (max-width: 420px) { .panel { padding: 18px 16px; } .panel h1 { font-size: 24px; } }
-  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .lvcards { grid-template-columns: 1fr; } .cards { grid-template-columns: 1fr; } .arrowcol { justify-content: center; transform: rotate(90deg); } .loadout { grid-template-columns: repeat(2, 1fr); } }
   .ups { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
   .up { border: 1px solid #2a3a6a; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,0.03); }
   .up .n { font-weight: 700; } .up .d { font-size: 12px; color: #b8c6ea; margin: 2px 0 6px; }
@@ -72,13 +78,14 @@
     border-radius: 8px; background: #0d1530; color: #cfe0ff; font-weight: 700; font-size: 13px; }
   #dashBtn.show { display: block; }
   #dashBtn:disabled { opacity: 0.4; }
+  #dashBtn.active { background: rgba(255,228,107,0.35); }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
-<button id="dashBtn" type="button">描く</button>
+<button id="dashBtn" type="button">ハイパー</button>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <!--BUNDLE-->
 </body>

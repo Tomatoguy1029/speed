@@ -11,10 +11,11 @@ import { buildGrid, queryGrid } from './grid.js';
 import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
-import { damageEnemy, addText, addRing } from './hits.js';
+import { damageEnemy, addText, addRing, explode } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
-import { controlStep, controlAim, isDrawScheme } from './controls.js';
+import { controlStep, controlAim, isHyperScheme } from './controls.js';
+import { rollLevelChoices, applyLevelChoice, updateGun, perkLevel, perkBlastRadius, perkBlastMult, fullChargePower, vortexRadius, vortexLife } from './upgrades.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
 
 export const STEP = 1 / 120;
@@ -41,15 +42,15 @@ export function createGame(opts = {}) {
     boss: null, bossSpawned: false,
     leechDrag: 0,
     gems: [], coinDrops: [],
-    xp: 0, level: 0, pendingLevelups: 0,
+    xp: 0, level: 0, pendingLevelups: 0, levelChoices: null,
+    weapons: { gun: 1 }, perks: {}, gunT: 0, vortices: [],
     spawnAcc: 0, waveT: 0,
     phaseId: null,
     endReason: null,
-    draw: null, lastPath: null,
+    jump: null, hyper: createHyperState(),
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     portalSpace: { armed: false, seconds: 0, consumed: false },
     portalClock: 0, portalCooldowns: new Map(),
-    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
     ...createEffectState(),
@@ -75,43 +76,44 @@ export function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
-    startDrawing(game, input);
-    input = { ...input, press: false }; // consume the start click so it cannot also commit
-  }
+  updateHyper(game, input, frameDt);
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
-  if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
+  if (!game.jump && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
-  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
-  if (game.draw && game.draw.phase === 'run') {
-    // trace every frame on real time (world steps are rare while it is nearly frozen)
-    runAlongPath(game, frameDt);
+  if (game.jump) {
+    // jump every frame on real time (world steps are rare while it is nearly frozen)
+    const kills = game.kills;
+    runJump(game, frameDt);
+    const refill = perkLevel(game, 'killRecharge');
+    if (refill && game.kills > kills) addHyperCharge(game, (game.kills - kills) * 0.08 * refill);
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
   let scale = 1;
-  if (game.draw) scale = drawWorldScale(game);
+  if (isHyperScheme(game.scheme)) scale = hyperWorldScale(game);
   if (game.portalDash) scale = portalWorldScale(game);
   if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
   game.timeScale = scale;
   game.acc += frameDt * scale;
-  // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
-  const phaseBefore = drawPhase(game);
+  // the run clock keeps real time in hyperdrive and during jumps even though the world crawls
+  if (game.jump || game.hyper.focus || game.portalDash) game.t += frameDt * (1 - scale);
+  const phaseBefore = jumpPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
-    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
+    if (jumpPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
+    // level-ups wait until hyperdrive and jumps are over, like module offers
+    if (game.pendingLevelups > 0 && !game.jump && !game.hyper.focus && !game.portalDash) { openLevelup(game); break; }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
-      if (game.offerQueue.length && !game.draw &&
-          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+      if (game.offerQueue.length && !game.jump && !game.hyper.focus &&
+          (!isHyperScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
     }
   }
-  if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
+  if (isHyperScheme(game.scheme) && !game.portalDash && game.slowmo <= 0) game.timeScale = hyperWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
@@ -136,12 +138,12 @@ function step(game, dt, input) {
     game.events.push({ type: 'phase', phase });
   }
 
-  const ctl = game.draw || game.portalDash ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
+  const ctl = game.jump || game.portalDash ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
   updateHeading(sh);
   const aim = schemeAim(game, input);
   sh.markX = aim.x / 100; sh.markY = aim.y / 100;
-  if (game.draw || game.portalDash) {
-    game.releasePending = null; // presses while drawing/running only commit the path
+  if (game.jump || game.portalDash) {
+    game.releasePending = null; // presses during a jump do not launch
   } else if (input.charging && !game.releasePending) {
     if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
     sh.chargeT += dt;
@@ -149,12 +151,11 @@ function step(game, dt, input) {
     sh.aimX = input.keyboard ? aim.x : input.aimX;
     sh.aimY = input.keyboard ? aim.y : input.aimY;
   }
-  if (game.releasePending && !game.draw && !game.portalDash) {
+  if (game.releasePending && !game.jump && !game.portalDash) {
     const r = game.releasePending;
     game.releasePending = null;
     if (sh.charging) {
-      if (r.keyboard && isDrawScheme(game.scheme)) startDrawing(game, input);
-      else if (r.keyboard) launch(game, aim.x, aim.y);
+      if (r.keyboard) launch(game, aim.x, aim.y);
       else launch(game, r.x, r.y);
     }
     sh.charging = false;
@@ -168,16 +169,19 @@ function step(game, dt, input) {
   separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160);
 
-  if (!game.draw && !game.portalDash) {
+  if (!game.jump && !game.portalDash) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
     const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
     const x0 = sh.x, y0 = sh.y;
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
+    if (isHyperScheme(game.scheme)) hyperSlowdown(game, dt);
     collideEnemies(game, x0, y0);
     collideBodies(game);
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
+  updateGun(game, dt);
+  updateVortices(game, dt);
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
@@ -234,13 +238,35 @@ export function pushOffer(game, mod, source) {
 
 function openOffer(game) {
   const auto = game.debug.autoOffer;
-  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
+  if (isHyperScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.hyperOfferInterval;
   game.state = 'offer';
   game.currentOffer = game.offerQueue.shift();
   game.ship.charging = false;
   game.releasePending = null;
   game.events.push({ type: 'offer' });
   if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
+}
+
+// ---- level-ups ----
+
+function openLevelup(game) {
+  game.state = 'levelup';
+  game.levelChoices = rollLevelChoices(game);
+  game.ship.charging = false;
+  game.releasePending = null;
+  game.events.push({ type: 'levelupOpen' });
+  if (game.debug.autoOffer || game.debug.autoLevel) while (game.state === 'levelup') resolveLevelup(game, 0);
+}
+
+// Take choice i; further pending level-ups roll new choices right away.
+export function resolveLevelup(game, i) {
+  const c = game.levelChoices?.[i];
+  if (!c) return;
+  applyLevelChoice(game, c);
+  game.events.push({ type: 'levelupPick', choice: c });
+  game.pendingLevelups = Math.max(0, game.pendingLevelups - 1);
+  if (game.pendingLevelups > 0) game.levelChoices = rollLevelChoices(game);
+  else { game.levelChoices = null; game.state = 'play'; }
 }
 
 function isBetter(game, mod) {
@@ -258,7 +284,7 @@ export function resolveOffer(game, accept) {
     game.events.push({ type: 'equip', mod });
   }
   absorbDuplicates(game);
-  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
+  if (game.offerQueue.length && !isHyperScheme(game.scheme)) {
     game.currentOffer = game.offerQueue.shift();
   } else {
     game.currentOffer = null;
@@ -274,28 +300,58 @@ export function refreshStats(game) {
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
 }
 
-// ---- draw a path, then run it (draw scheme) ----
+// ---- hyperdrive (hyper scheme) ----
+// Charges refill over time (up to hyperMaxCharges). Space opens hyperdrive: the world slows and each
+// click jumps straight toward the clicked point, clamped to the reach circle. Jumps chain while charges last.
 
-function drawPhase(game) {
-  return game.draw ? game.draw.phase : game.portalDash ? `portal:${game.portalDash.phase}` : null;
+export function createHyperState() {
+  return { charges: CONFIG.hyperMaxCharges, progress: 0, focus: false, focusT: 0, queue: [], chain: 0, lines: [] };
 }
 
-export function drawBudget(game, gauge) {
-  return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
+// Charge cap: the base plus the spare-cell perk.
+export function hyperMaxCharges(game) {
+  return CONFIG.hyperMaxCharges + perkLevel(game, 'extraCell');
 }
 
-// How far the wave from a traced path reaches (the band drawn around the path).
+function jumpPhase(game) {
+  return game.jump ? 'jump' : game.portalDash ? `portal:${game.portalDash.phase}` : game.hyper.focus ? 'focus' : null;
+}
+
+// Jump reach: grows with max speed and range modules.
+export function hyperReach(game) {
+  return CONFIG.hyperRadius * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.rangeMult;
+}
+
+// Seconds per charge; charge-time stats (modules, levels) shorten it.
+export function hyperChargeTime(game) {
+  return CONFIG.hyperChargeTime * (game.stats.chargeTime / CONFIG.chargeTime) * Math.pow(0.85, perkLevel(game, 'quickCell'));
+}
+
+export function addHyperCharge(game, share) {
+  const h = game.hyper;
+  const max = hyperMaxCharges(game);
+  if (h.charges >= max) { h.progress = 0; return; }
+  h.progress += share;
+  while (h.progress >= 1 && h.charges < max) {
+    h.progress -= 1;
+    h.charges++;
+    game.events.push({ type: 'dashReady', charges: h.charges });
+  }
+  if (h.charges >= max) h.progress = 0;
+}
+
+// How far the wave from a jump reaches (the band drawn around it).
 export function waveRadius(game) {
   return CONFIG.waveRadius * game.stats.waveRadiusMult;
 }
 
-// The traced path gives off a wave: enemies within reach take damage once per pass and are
-// pushed away from the path. Sampled finely so long, fast traces leave no gaps.
+// A jump gives off a wave: enemies within reach take damage once per pass and are pushed away
+// from the line. Sampled finely so long, fast jumps leave no gaps.
 export function waveAlong(game, r, x0, y0, x1, y1) {
   const W = waveRadius(game);
   const len = Math.hypot(x1 - x0, y1 - y0);
   const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
-  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  const dmg = attackPower(r.speed, game.stats) * (r.power || 1) * CONFIG.waveDamage * game.stats.waveDmgMult;
   for (let k = 1; k <= n; k++) {
     const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
     for (const [id, e] of r.waveInside) {
@@ -313,175 +369,184 @@ export function waveAlong(game, r, x0, y0, x1, y1) {
   }
 }
 
-// World speed while tracing: the faster the dash, the slower everything else.
-function traceWorldScale(game) {
-  return Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, game.draw.speed)));
+// World speed during a jump: the faster the jump, the slower everything else.
+function jumpWorldScale(game) {
+  return Math.max(CONFIG.dashScaleMin, Math.min(1, CONFIG.dashSlowRef / Math.max(1, game.jump.speed)));
 }
 
-function drawWorldScale(game) {
-  return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
+function hyperWorldScale(game) {
+  let s = 1;
+  if (game.hyper.focus) s = CONFIG.hyperFocusScale;
+  if (game.jump) s = Math.min(s, jumpWorldScale(game));
+  return s;
 }
 
-// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
-// charge-time stats (modules, levels) make it fill faster.
-export function dashNeed(game) {
-  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
+// Charges, the mode toggle and clicks; runs every frame on real time.
+function updateHyper(game, input, frameDt) {
+  if (!isHyperScheme(game.scheme)) return;
+  const h = game.hyper;
+  // charges refill on play time (they crawl with the world while it is slowed)
+  addHyperCharge(game, frameDt * game.timeScale / hyperChargeTime(game));
+  if (input.hyperToggle) {
+    if (h.focus) closeHyper(game);
+    else if (h.charges >= 1 || game.jump) openHyper(game);
+  } else if (input.hyperExit && h.focus) closeHyper(game);
+  if (!h.focus) return;
+  if (!game.jump) h.focusT += frameDt;
+  // clicks made during a jump (or several in one frame) wait their turn, as many as there are charges
+  for (const c of input.jumpClicks || []) if (h.queue.length < h.charges) h.queue.push({ x: c.x, y: c.y });
+  while (!game.jump && h.queue.length) startJump(game, h.queue.shift());
+  if (!game.jump && (h.charges < 1 || (CONFIG.hyperFocusMax > 0 && h.focusT >= CONFIG.hyperFocusMax))) closeHyper(game);
 }
 
-function startDrawing(game, input) {
+function openHyper(game) {
+  const h = game.hyper;
+  h.focus = true; h.focusT = 0; h.queue = []; h.chain = 0; h.lines = [];
+  game.ship.charging = false;
+  game.events.push({ type: 'hyperOpen' });
+}
+
+function closeHyper(game) {
+  const h = game.hyper;
+  if (!h.focus) return;
+  h.focus = false; h.queue = [];
+  game.events.push({ type: 'hyperClose' });
+}
+
+// Where a jump from the ship toward c ends: clamped to the reach circle, stopped short of planets.
+export function jumpTarget(game, c) {
   const sh = game.ship;
-  sh.glide = false;
-  const gauge = game.stats.gaugeMax; // always a full (over)charge
-  const budget = drawBudget(game, gauge);
-  game.dashMeter = 0;
-  // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
-  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
-  sh.charging = false;
-  game.events.push({ type: 'drawStart' });
-}
-
-// The path follows the cursor until its length runs out, it reaches a planet, or another click.
-function updateDrawing(game, input) {
-  const d = game.draw;
-  if (input.cursor) d.cursor = input.cursor;
-  if (!d.started) {
-    // the line only starts on a click (or Space), so moving the mouse never draws by accident
-    if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
-    return;
-  }
-  if (d.inputMethod === 'points') {
-    if (input.drawClick && (input.clickCursor || d.cursor)) extendPath(game, d, input.clickCursor || d.cursor);
-    if (input.confirm || input.dash || d.used >= d.budget - 0.5 || d.blocked) {
-      if (d.points.length >= 2) commitPath(game);
-    }
-    return;
-  }
-  if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
-}
-
-// Where a path may start: the clicked point, pushed out of planets and moons.
-function startPoint(game, c) {
-  const sh = game.ship;
-  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
-  for (const b of [game.field.planet, ...game.field.moons]) {
-    const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
-    if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
-  }
-  return p;
-}
-
-function extendPath(game, d, c) {
-  const last = d.points[d.points.length - 1];
-  const dx = c.x - last.x, dy = c.y - last.y;
-  const len = Math.hypot(dx, dy);
-  if (len < CONFIG.drawStep) return;
-  const remain = d.budget - d.used;
-  if (remain <= 0.5) return;
-  let L = Math.min(len, remain);
+  let dx = c.x - sh.x, dy = c.y - sh.y;
+  let len = Math.hypot(dx, dy);
+  if (len < 1) { dx = sh.hx; dy = sh.hy; len = 1; }
   const ux = dx / len, uy = dy / len;
+  let L = Math.min(len, hyperReach(game));
   const R = CONFIG.shipRadius;
+  let blocked = false;
   for (const b of [game.field.planet, ...game.field.moons]) {
-    const t = segCircleT(last.x, last.y, last.x + ux * L, last.y + uy * L, b.x, b.y, b.r + R);
-    if (t >= 0) { L = Math.max(0, t * L - 2); d.blocked = true; }
+    const t = segCircleT(sh.x, sh.y, sh.x + ux * L, sh.y + uy * L, b.x, b.y, b.r + R);
+    if (t >= 0) { L = Math.max(0, t * L - 2); blocked = true; }
   }
-  if (L < 1) return;
-  d.points.push({ x: last.x + ux * L, y: last.y + uy * L });
-  d.used += L;
+  return { x: sh.x + ux * L, y: sh.y + uy * L, ux, uy, len: L, blocked };
 }
 
-function commitPath(game) {
-  const d = game.draw, sh = game.ship;
-  if (d.points.length < 2) {
-    // nothing drawn: dash straight for the full length — from the ship toward the cursor, or from
-    // the clicked start onward in the direction ship -> start
-    let ux = sh.hx, uy = sh.hy;
-    if (!d.points.length) d.points.push({ x: sh.x, y: sh.y });
-    const o = d.points[0];
-    const tgt = Math.hypot(o.x - sh.x, o.y - sh.y) > 1 ? o : d.cursor;
-    if (tgt) {
-      const dx = tgt.x - sh.x, dy = tgt.y - sh.y, l = Math.hypot(dx, dy);
-      if (l > 1) { ux = dx / l; uy = dy / l; }
-    }
-    extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
-    if (d.points.length < 2) { game.draw = null; return; }
-  }
-  const pts = d.points;
-  warpTo(game, pts[0].x, pts[0].y);
-  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-  const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
+function startJump(game, c) {
+  const h = game.hyper, sh = game.ship;
+  if (h.charges < 1) return false;
+  const tgt = jumpTarget(game, c);
+  if (tgt.len < 4) return false;
+  // full-charge perk: a jump from a full stock never bounces and hits harder
+  const full = perkLevel(game, 'fullCharge') && h.charges >= hyperMaxCharges(game);
+  h.charges--;
+  h.chain++;
   onLaunch(game);
-  const v = launchVelocity(sh.vx, sh.vy, dx, dy, d.gauge, game.stats);
+  const v = launchVelocity(sh.vx, sh.vy, tgt.ux, tgt.uy, game.stats.gaugeMax, game.stats);
   const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
-  sh.vx = dx * speed; sh.vy = dy * speed;
+  sh.vx = tgt.ux * speed; sh.vy = tgt.uy * speed;
   sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
-  sh.aimAngle = Math.atan2(dy, dx);
+  sh.aimAngle = Math.atan2(tgt.uy, tgt.ux);
   game.dashId++;
-  game.lastPath = pts;
-  let total = 0;
-  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-  // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
-  game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+  // speed = the jump speed (attack, momentum afterwards); rate = how fast it crosses on screen
+  const rate = Math.max(speed, tgt.len * game.stats.traceSpeedMult / CONFIG.hyperJumpTime);
+  const from = { x: sh.x, y: sh.y }, to = { x: tgt.x, y: tgt.y };
+  game.jump = { from, to, ux: tgt.ux, uy: tgt.uy, len: tgt.len, pos: 0,
+    speed, rate, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0,
+    chain: h.chain, overdrive: !!full, power: full ? fullChargePower(perkLevel(game, 'fullCharge')) : 1,
+    crossings: perkLevel(game, 'crossBlast') ? lineCrossings(h.lines, from, to) : [] };
+  if (h.focus) h.lines.push({ a: from, b: to });
+  game.events.push({ type: 'launch', gauge: game.stats.gaugeMax, x: sh.x, y: sh.y, dx: tgt.ux, dy: tgt.uy });
+  return true;
 }
 
-// Blink to the start of the path, leaving a few fading afterimages behind.
-function warpTo(game, x, y) {
-  const sh = game.ship;
-  const dx = x - sh.x, dy = y - sh.y, dist = Math.hypot(dx, dy);
-  if (dist < 1) return;
-  const ux = dx / dist, uy = dy / dist, step = Math.min(26, dist / 5);
-  for (let i = 0; i < 4; i++) {
-    game.fx.ghosts.push({ x: sh.x + ux * step * i, y: sh.y + uy * step * i, life: 0.45 - i * 0.08, max: 0.45 });
-  }
-  game.fx.ghosts.push({ x0: sh.x, y0: sh.y, x1: x, y1: y, life: 0.18, max: 0.18, streak: true });
-  sh.x = x; sh.y = y;
-  sh.trail = [];
-  addRing(game, x, y, 46, 'rgba(190,240,255,0.9)', 0.3);
-  game.events.push({ type: 'warp', dist });
-}
-
-// Trace the polyline quickly (the world is nearly frozen); piercing costs dash speed, a bounce ends it.
-function runAlongPath(game, realDt) {
-  const r = game.draw, sh = game.ship;
-  let dist = r.rate * realDt;
-  while (dist > 1e-9 && r.seg < r.path.length - 1) {
-    const a = r.path[r.seg], b = r.path[r.seg + 1];
-    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segLen < 1e-6) { r.seg++; r.segPos = 0; continue; }
-    const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
-    const move = Math.min(dist, segLen - r.segPos);
+// Cross the jump quickly on real time; piercing costs no speed, a bounce ends it.
+function runJump(game, realDt) {
+  const j = game.jump, sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const move = Math.min(j.rate * realDt, j.len - j.pos);
+  if (move > 1e-9) {
     const x0 = sh.x, y0 = sh.y;
-    // enemies the ship body has left can be hit again on the next pass
-    const R = CONFIG.shipRadius;
-    for (const [id, e] of r.inside) {
-      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
+    for (const [id, e] of j.inside) {
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) j.inside.delete(id);
     }
-    r.segPos += move; dist -= move;
-    sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
-    sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    waveAlong(game, r, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
-    const sp = Math.hypot(sh.vx, sh.vy);
-    if (sp < r.speed) r.speed = sp;
-    if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
+    j.pos += move;
+    sh.x = j.from.x + j.ux * j.pos; sh.y = j.from.y + j.uy * j.pos;
+    sh.vx = j.ux * j.speed; sh.vy = j.uy * j.speed;
+    waveAlong(game, j, x0, y0, sh.x, sh.y);
+    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; endJump(game, j); return; }
   }
-  if (r.seg >= r.path.length - 1) {
-    game.draw = null;
-    sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
-    sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
+  if (j.pos >= j.len - 1e-9) {
+    game.jump = null;
+    endJump(game, j);
+    // keep part of the jump speed, then the normal slowdown takes over
+    sh.vx = j.ux * j.speed * CONFIG.hyperKeep; sh.vy = j.uy * j.speed * CONFIG.hyperKeep;
+    sh.boostT = CONFIG.hyperCoast; sh.fadeT = 0;
   }
 }
 
-// Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
-export function previewPath(game, points = null) {
-  const d = points ? { phase: 'draw', points, gauge: game.stats.gaugeMax } : game.draw;
-  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
+// Where a new jump line crosses earlier ones from this hyperdrive (not at the shared endpoints).
+function lineCrossings(lines, p, q) {
+  const out = [];
+  for (const { a, b } of lines) {
+    const rx = q.x - p.x, ry = q.y - p.y, sx = b.x - a.x, sy = b.y - a.y;
+    const den = rx * sy - ry * sx;
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((a.x - p.x) * sy - (a.y - p.y) * sx) / den;
+    const u = ((a.x - p.x) * ry - (a.y - p.y) * rx) / den;
+    if (t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98) out.push({ x: p.x + rx * t, y: p.y + ry * t });
+  }
+  return out;
+}
+
+// Perks that go off when a jump ends (landing or bouncing).
+function endJump(game, j) {
+  const sh = game.ship;
+  const atk = attackPower(j.speed, game.stats) * j.power;
+  const chainN = perkLevel(game, 'chainBlast');
+  if (chainN && j.chain % 3 === 0) {
+    explode(game, sh.x, sh.y, perkBlastRadius(chainN), atk * perkBlastMult(chainN), { cause: 'chainBlast', color: '#ff9f40', knock: 520, life: 0.5 });
+    addText(game, sh.x, sh.y - 40, '連鎖爆発', '#ffb340', 20);
+  }
+  const crossN = perkLevel(game, 'crossBlast');
+  for (const c of j.crossings) {
+    explode(game, c.x, c.y, 120 + 25 * crossN, atk * (0.8 + 0.4 * crossN), { cause: 'crossBlast', color: '#c995ff', knock: 420, life: 0.45 });
+  }
+  const vortexN = perkLevel(game, 'vortex');
+  if (vortexN) game.vortices.push({ x: sh.x, y: sh.y, r: vortexRadius(vortexN), life: vortexLife(vortexN), max: vortexLife(vortexN) });
+}
+
+// Vortices left by jumps pull nearby enemies (not the boss) toward their centre.
+function updateVortices(game, dt) {
+  if (!game.vortices.length) return;
+  for (const v of game.vortices) {
+    v.life -= dt;
+    queryGrid(game.grid, v.x - v.r - MAX_ENEMY_R, v.y - v.r - MAX_ENEMY_R, v.x + v.r + MAX_ENEMY_R, v.y + v.r + MAX_ENEMY_R, (e) => {
+      if (e.dead || e.type === 'boss') return;
+      const dx = v.x - e.x, dy = v.y - e.y, d = Math.hypot(dx, dy);
+      if (d > v.r || d < 8) return;
+      const pull = Math.min(d, 420 * dt / Math.max(1, e.r / 20));
+      e.x += dx / d * pull; e.y += dy / d * pull;
+    });
+  }
+  game.vortices = game.vortices.filter((v) => v.life > 0);
+}
+
+// After a jump the kept speed fades back toward cruise speed, so the ship slows down over time.
+function hyperSlowdown(game, dt) {
+  const sh = game.ship;
+  if (sh.boostT > 0) return;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  const cruise = game.stats.maxSpeed * CONFIG.steerCruise;
+  if (sp <= cruise) return;
+  const k = (cruise + (sp - cruise) * Math.exp(-CONFIG.hyperDecay * dt)) / sp;
+  sh.vx *= k; sh.vy *= k;
+}
+
+// Preview of a straight jump: enemies it would cut (body or wave) and the first one that would stop it.
+export function previewPath(game, points) {
+  if (!points || points.length < 2) return { samples: [], block: null, targets: [] };
+  const pts = points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
   const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
-  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
+  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, game.stats.gaugeMax, game.stats);
   const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
   const samples = [];
   const targets = new Map(); // enemy -> { crit, hits }
@@ -542,7 +607,6 @@ export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
   if (sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
-  if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
@@ -552,8 +616,8 @@ export function damageShip(game, amount, slow, cause = 'other') {
   return true;
 }
 
-// R: hit radius of the ship (wider while tracing a drawn path).
-// run: the trace state; while tracing, an enemy can be hit again each time the band re-enters it.
+// R: hit radius of the ship.
+// run: the jump state; during a jump an enemy can be hit again each time the ship re-enters it.
 export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
   const sh = game.ship, stats = game.stats;
   const x1 = sh.x, y1 = sh.y;
@@ -570,9 +634,10 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
     const sp = Math.hypot(sh.vx, sh.vy);
     const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
-    const atk = attackPower(sp, stats);
+    const atk = attackPower(sp, stats) * (run?.power || 1);
     const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
-    const res = resolveRam(atk, e, crit, stats);
+    let res = resolveRam(atk, e, crit, stats);
+    if (run?.overdrive && !res.pierce) res = { pierce: true, damage: atk * (crit ? stats.critMult : 1), shipDamage: 0 };
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
       if (crit) {
@@ -586,16 +651,15 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
         run.passes.set(e.id, n);
         if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
       }
-      const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
+      const keep = game.jump ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
       onPierce(game);
-      if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
+      if (e.T.steal) { const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
     }
     // bounce off
-    sh.glide = false;
     let nx = hx - e.x, ny = hy - e.y;
     const nd = Math.hypot(nx, ny) || 1;
     nx /= nd; ny /= nd;
@@ -631,7 +695,6 @@ function collideBodies(game) {
     sh.y = b.y + ny * min;
     const vn = sh.vx * nx + sh.vy * ny;
     if (vn < 0) {
-      sh.glide = false;
       sh.vx -= (1 + restitution) * vn * nx;
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
@@ -643,7 +706,6 @@ function collideBodies(game) {
   const r = Math.hypot(sh.x, sh.y);
   const wall = CONFIG.fieldRadius + 500;
   if (r > wall) {
-    sh.glide = false;
     const nx = sh.x / r, ny = sh.y / r;
     sh.x = nx * wall; sh.y = ny * wall;
     const vn = sh.vx * nx + sh.vy * ny;
@@ -728,14 +790,11 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
-  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
-    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
-    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
-  }
   let need = xpForLevel(game.level);
   while (game.xp >= need) {
     game.xp -= need;
     game.level++;
+    game.pendingLevelups++;
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);

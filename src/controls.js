@@ -4,8 +4,7 @@ import { CONFIG } from './config.js';
 
 export const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
-  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'hyper', name: 'ハイパードライブ', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。ジャンプは時間で1つずつ溜まり、最大5つまで貯められる。Spaceでハイパードライブに入ると世界がスローになり、届く範囲の円が出る。クリックした地点へまっすぐジャンプ（円の外なら円の端まで）。チャージが残っている間はクリックを続けて連続ジャンプできる。Space／右クリックで解除、チャージ切れか一定時間で自動解除。通り道の敵は貫通し、周りに波動。ジャンプ後は勢いが少し残り、徐々に減速する。硬い敵には弾かれる。モジュール選択はハイパードライブ解除後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -16,11 +15,11 @@ export const SCHEMES = [
 ];
 
 export function schemeById(id) {
-  return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'draw');
+  return SCHEMES.find((s) => s.id === id) || SCHEMES.find((s) => s.id === 'hyper');
 }
 
-export function isDrawScheme(id) {
-  return id === 'draw' || id === 'draw-wasd';
+export function isHyperScheme(id) {
+  return id === 'hyper';
 }
 
 // Raw input -> intent { charging, release, aimX, aimY, keyboard, move, snap, cursor }.
@@ -39,15 +38,15 @@ export function buildIntent(raw, scheme) {
     it.charging = raw.pointerDown;
     it.aimX = raw.drag.x; it.aimY = raw.drag.y;
     if (raw.release && raw.releaseSource === 'pointer') { it.release = true; it.aimX = raw.releaseDrag.x; it.aimY = raw.releaseDrag.y; }
-  } else if (isDrawScheme(scheme)) {
+  } else if (isHyperScheme(scheme)) {
     // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
-    // from the press point). Space / the button fires the gauge-based dash (no charging here).
+    // from the press point) outside hyperdrive. Space / the button toggles hyperdrive; inside it,
+    // a click or tap is a jump target and a right click leaves.
     it.keyboard = true;
-    it.dash = !!raw.dash;
-    it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
-    it.clickCursor = raw.clickCursor || null;
-    it.confirm = !!raw.confirm;
-    if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+    it.hyperToggle = !!raw.dash;
+    it.jumpClicks = raw.clickCursors?.length ? raw.clickCursors : raw.clickCursor ? [raw.clickCursor] : [];
+    it.hyperExit = !!raw.confirm;
+    if (raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
@@ -165,11 +164,11 @@ const ZERO = { ax: 0, ay: 0 };
 export function controlStep(game, input, dt) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'draw': {
+    case 'hyper': {
       // mouse: head toward the cursor at the usual cruise speed (no click needed).
       // touch: a virtual stick; pushing it further goes faster.
       const throttle = (k) => CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * Math.max(0, Math.min(1, k));
-      if (input.stick) {
+      if (input.stick && !game.hyper.focus) {
         const a = stickAngle(input.stick);
         if (a !== null) {
           const len = Math.hypot(input.stick.x, input.stick.y);
@@ -186,7 +185,6 @@ export function controlStep(game, input, dt) {
       if (a !== null) steerToward(game, a, dt);
       return ZERO;
     }
-    case 'draw-wasd':
     case 'portal':
     case 'steer':
       if (hasMove(input.move)) steerToward(game, Math.atan2(input.move.y, input.move.x), dt);
@@ -207,8 +205,8 @@ export function controlStep(game, input, dt) {
 export function controlAim(game, input) {
   const sh = game.ship;
   switch (game.scheme) {
-    case 'draw': {
-      const a = input.stick ? stickAngle(input.stick) : cursorAngle(game, input.cursor);
+    case 'hyper': {
+      const a = input.stick && !game.hyper.focus ? stickAngle(input.stick) : cursorAngle(game, input.cursor);
       return a === null ? null : { x: Math.cos(a) * 100, y: Math.sin(a) * 100 };
     }
     case 'mouse': {
@@ -217,7 +215,6 @@ export function controlAim(game, input) {
     }
     case 'rotate':
       return { x: Math.cos(sh.aimAngle) * 100, y: Math.sin(sh.aimAngle) * 100 };
-    case 'draw-wasd':
     case 'aim8':
       return hasMove(input.move) ? { x: input.move.x * 100, y: input.move.y * 100 } : null;
     default:

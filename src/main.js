@@ -1,11 +1,11 @@
 import { createRenderer, resizeRenderer, render, screenToWorld } from './render.js';
 import { createInput } from './input.js';
-import { createGame, update, resolveOffer } from './world.js';
-import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
+import { createGame, update, resolveOffer, resolveLevelup } from './world.js';
+import { showResult, clearScreens, showOffer, showStation, showPause, showLevelup } from './ui.js';
 import { loadSave, writeSave, buyUpgrade, applyRunResult, resetMeta } from './progression.js';
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
-import { buildIntent, isDrawScheme } from './controls.js';
+import { buildIntent, isHyperScheme, schemeById } from './controls.js';
 import { CONFIG } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -19,14 +19,11 @@ window.addEventListener('keydown', () => audio.unlock(), true);
 
 let game = null;
 // control scheme is a per-browser preference
-try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
-try {
-  const method = window.localStorage.getItem('speed-draw-input-v1');
-  if (method === 'points' || method === 'freehand') CONFIG.drawInput = method;
-} catch { /* ignore */ }
+// a saved scheme that no longer exists (the old drawing modes) falls back to the default
+try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = schemeById(c).id; } catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
-if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
+if (previewControls === 'portal' || isHyperScheme(previewControls)) CONFIG.controlScheme = previewControls;
 const debug = createDebugPanel(() => game, (id) => {
   try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
@@ -35,11 +32,10 @@ const debug = createDebugPanel(() => game, (id) => {
   writeSave(storage, save);
   if (mode === 'station') openStation(); // the station screen shows the new levels at once
   return refund; // takes effect from the next run
-}, (method) => {
-  try { window.localStorage.setItem('speed-draw-input-v1', method); } catch { /* ignore */ }
 });
 let mode = 'station'; // station | run | result
 let offerShown = null;
+let levelShown = null;
 
 window.addEventListener('resize', () => resizeRenderer(renderer));
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resizeRenderer(renderer)).observe(renderer.canvas);
@@ -60,6 +56,7 @@ function startRun() {
   input.state.enabled = true;
   renderer.cam.ready = false;
   offerShown = null;
+  levelShown = null;
   game = createGame({ meta: save.meta });
   mode = 'run';
 }
@@ -81,6 +78,13 @@ function chooseOffer(accept) {
   if (game.state === 'play') { clearScreens(); input.reset(); }
 }
 
+function chooseLevel(i) {
+  if (game.state !== 'levelup') return;
+  resolveLevelup(game, i);
+  levelShown = null;
+  if (game.state === 'play') { clearScreens(); input.reset(); }
+}
+
 function togglePause() {
   if (mode !== 'run') return;
   if (game.state === 'play') {
@@ -99,6 +103,10 @@ window.addEventListener('keydown', (e) => {
     else if (e.key === '2') chooseOffer(false);
     return;
   }
+  if (mode === 'run' && game.state === 'levelup') {
+    if (e.key === '1' || e.key === '2' || e.key === '3') chooseLevel(Number(e.key) - 1);
+    return;
+  }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
   if (e.key === 'p' || e.key === 'P') debug.toggle();
@@ -108,15 +116,16 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Touch-only shortcut: leave the virtual stick and pick a drawing start. Charge lives in the cursor ring.
+// Touch-only shortcut: toggles hyperdrive (Space on a keyboard).
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw &&
+  const show = mode === 'run' && isHyperScheme(game.scheme) && game.state === 'play' &&
     (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
   if (!show) return;
-  dashBtn.disabled = game.dashMeter < 1;
+  dashBtn.disabled = !game.hyper.focus && game.hyper.charges < 1;
+  dashBtn.classList.toggle('active', game.hyper.focus);
 }
 
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
@@ -131,6 +140,7 @@ function frame(now) {
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
+  raw.clickCursors = raw.clicks.map((c) => screenToWorld(renderer, c.x, c.y));
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
   updateDashButton();
@@ -140,6 +150,11 @@ function frame(now) {
   game.events.length = 0;
   if (mode === 'run') {
     if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (game.state === 'levelup' && levelShown !== game.levelChoices) {
+      levelShown = game.levelChoices;
+      input.reset();
+      showLevelup(game, chooseLevel);
+    }
     if (game.state === 'offer' && offerShown !== game.currentOffer) {
       offerShown = game.currentOffer;
       input.reset();

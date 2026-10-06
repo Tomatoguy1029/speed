@@ -64,13 +64,14 @@ test('power cores always give a speed-limit module for the booster', () => {
   }
 });
 
-test('leveling up raises base stats and never pauses for a module', () => {
+test('leveling up raises base stats and asks for a level-up pick (not a module)', () => {
   const game = createGame({ seed: 1 });
   game.spawning = false;
   const atk0 = game.stats.atkMult, hp0 = game.stats.maxHp;
   addXp(game, 1000);
   update(game, 0.02, idle);
-  assert.equal(game.state, 'play');
+  assert.equal(game.state, 'levelup');
+  assert.equal(game.currentOffer, null);
   assert.ok(game.level > 3);
   assert.ok(game.stats.atkMult > atk0 && game.stats.maxHp > hp0);
 });
@@ -121,7 +122,7 @@ test('enclosure blasts are epic/legendary portal drops; obsolete charge modules 
   const legend = computeStats({}, { ...emptyLoadout(), gun: { id: 'loopBurst', r: 3 } }).loopBurst;
   assert.ok(legend.mult > epic.mult); assert.equal(epic.splash, false); assert.equal(legend.splash, true);
   const rng = makeRng(24), seen = new Set();
-  for (const scheme of ['portal', 'draw', 'draw-wasd']) for (let i = 0; i < 1000; i++) {
+  for (const scheme of ['portal', 'hyper']) for (let i = 0; i < 1000; i++) {
     const m = rollModule(rng, { t: 500, loadout: emptyLoadout(), source: 'capsule', danger: 1, scheme });
     if (scheme === 'portal') {
       seen.add(m.id);

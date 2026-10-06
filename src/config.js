@@ -35,11 +35,16 @@ export const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
-  drawDropScale: 0.1, // fewer module drops even with five times as many enemies
-  drawDropInterval: 35, // minimum seconds between enemy module drops in draw mode
-  drawOfferInterval: 30, // minimum play seconds between selection screens
-  drawCapsuleCount: 2,
-  drawCapsuleInterval: 40,
+  gunRate: 2.5, // blaster shots per second at weapon level 1
+  gunDamage: 5, // blaster damage x attack multiplier (level, modules, station); not speed
+  gunSpeed: 1100, // px/s on top of the ship's own velocity
+  gunLife: 0.7, // seconds
+  gunSpread: 0.16, // radians between shots when it fires several
+  hyperDropScale: 0.1, // fewer module drops even with five times as many enemies
+  hyperDropInterval: 35, // minimum seconds between enemy module drops in hyperdrive mode
+  hyperOfferInterval: 30, // minimum play seconds between selection screens
+  hyperCapsuleCount: 2,
+  hyperCapsuleInterval: 40,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -47,8 +52,16 @@ export const CONFIG = {
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
-  controlScheme: 'draw', // see controls.js SCHEMES
-  drawInput: 'freehand', // freehand or clicked points; independent of ordinary steering
+  controlScheme: 'hyper', // see controls.js SCHEMES
+  hyperMaxCharges: 5, // hyperdrive: jump charges stack up to this many
+  hyperChargeTime: 3, // seconds per charge (scaled by charge-time stats)
+  hyperRadius: 420, // jump reach (scales with max speed / base max speed and range modules)
+  hyperFocusScale: 0.12, // world speed while aiming in hyperdrive mode
+  hyperFocusMax: 3, // real seconds of aiming before the mode closes by itself (0 = unlimited)
+  hyperJumpTime: 0.09, // real seconds to cross one jump, however long
+  hyperKeep: 0.95, // share of the jump speed kept afterwards
+  hyperCoast: 0.6, // seconds of that speed before it starts to slow down
+  hyperDecay: 0.6, // per second: after a jump, speed above cruise speed (steerCruise) fades at this rate
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,
   portalDropMax: 36,
@@ -70,22 +83,17 @@ export const CONFIG = {
   portalLoopSplashRadius: 90, // legendary: each enclosed enemy also explodes outward
   portalLoopSplashDamage: 0.5,
   portalLoopMinArea: 64, // reject degenerate backtracking loops
-  drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
-  drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
-  drawRunScaleMin: 0.03, // ...but never slower than this
-  waveRadius: 45, // reach of the wave a traced path gives off (the band's half-width); the ship body itself stays shipRadius
+  dashSlowRef: 260, // world speed during a jump = dashSlowRef / dash speed (faster ship -> slower world)
+  dashScaleMin: 0.03, // ...but never slower than this
+  waveRadius: 45, // reach of the wave a jump gives off (the band's half-width); the ship body itself stays shipRadius
   waveDamage: 0.5, // wave damage = attack x this (ignores armor; the body hit is separate)
-  drawRunTime: 0.5, // real seconds to trace the whole path, however long it is (plus kill hitstops)
   killHitstop: 0.045, // seconds of hitstop per one-shot ram kill (x1.8 big, x1.3 crit)
   killHitstopCap: 0.6, // max hitstop per dash
   enemyAimLag: 0.5, // seconds: enemies aim at a lagging copy of the ship's position
   enemyAimSpeed: 450, // px/s: that copy never moves faster than this (dashes leave enemy aim behind)
   killHitstopRegen: 0.3, // outside dashes the hitstop budget refills this many seconds per second
-  drawStep: 8, // min world distance between path points
-  stickCruiseMax: 0.75, // draw-mode stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
-  dashXpFrac: 0.35, // draw mode: XP to fill the dash gauge = this share of the current level's XP (scaled by charge-time stats)
-  stickDeadZone: 8, // screen px: draw-mode stick offset below this does not steer
+  stickCruiseMax: 0.75, // hyperdrive-mode touch stick pushed to its edge cruises up to this share of max speed (ramming = the normal attack)
+  stickDeadZone: 8, // screen px: touch stick offset below this does not steer
   stickRadius: 70, // screen px: stick offset for full speed (the press point stays fixed)
   mouseDeadZone: 40, // world units: a cursor this close to the ship does not steer
   nudgeAccel: 450, // nudge/relative schemes: WASD thrust at rest

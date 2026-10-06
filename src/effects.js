@@ -1,4 +1,4 @@
-import { isDrawScheme } from './controls.js';
+import { isHyperScheme } from './controls.js';
 // Module effects that change how the ship attacks, plus field capsules and power cores.
 import { CONFIG } from './config.js';
 import { attackPower } from './combat.js';
@@ -7,7 +7,7 @@ import { queryGrid } from './grid.js';
 import { rollModule } from './modules.js';
 import { dangerAt } from './field.js';
 import { getPhase } from './spawner.js';
-import { refreshStats } from './world.js';
+import { refreshStats, addHyperCharge } from './world.js';
 import { randRange, TAU } from './math.js';
 
 export function createEffectState() {
@@ -38,7 +38,7 @@ function finishDash(game) {
 export function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.regenGauge && isHyperScheme(game.scheme)) addHyperCharge(game, s.regenGauge * 0.5);
 }
 
 export function onShipHurt(game) {
@@ -156,7 +156,8 @@ function updateFriendly(game, dt) {
       b.hit.add(e.id);
       const sp = Math.hypot(b.vx, b.vy) || 1;
       damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
-      if (!b.pierce) b.life = 0;
+      if (b.pierceLeft > 0) b.pierceLeft--;
+      else if (!b.pierce) b.life = 0;
     });
   }
   game.fbullets = B.filter((b) => b.life > 0);
@@ -178,8 +179,8 @@ function updateCapsules(game, dt) {
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    const fieldCount = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
-    const fieldInterval = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
+    const fieldCount = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleInterval : CONFIG.capsuleInterval;
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
