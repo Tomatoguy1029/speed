@@ -134,6 +134,7 @@ const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
+  drawInput: 'freehand', // freehand or clicked points; independent of ordinary steering
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,
   portalDropMax: 36,
@@ -214,6 +215,10 @@ const CONFIG = {
   xpMult: 1,
 
   // flung wreckage visuals
+  blockImpactLife: 0.65,
+  weakImpactLife: 0.38,
+  blockSparkCount: 28,
+  weakFlameCount: 16,
   corpseTrailLife: 0.26, // real seconds; a flung fragment's actual path fades after it disappears
   corpseTrailPoints: 18, // bound each fragment's visual history
   corpseSpinRate: 10, // rad/s for rotating wreckage
@@ -274,6 +279,7 @@ function buildIntent(raw, scheme) {
     it.dash = !!raw.dash;
     it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
     it.clickCursor = raw.clickCursor || null;
+    it.confirm = !!raw.confirm;
     if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
@@ -730,6 +736,64 @@ function resolveRam(atk, e, crit, stats) {
 function pierceKeep(e, killed, stats) {
   const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
   return 1 - Math.min(0.6, loss * stats.pierceLossMult);
+}
+
+// ---- impact-fx.js ----
+
+
+// Effects remain at the actual contact; the illuminated hull follows a surviving blocker.
+function addCombatImpact(game, enemy, kind, nx, ny) {
+  const impacts = game.fx.impacts;
+  if (impacts.length >= 48) {
+    if (kind !== 'block') return;
+    const old = impacts.findIndex(i => i.kind !== 'block');
+    impacts.splice(Math.max(0, old), 1);
+  }
+  const life = kind === 'block' ? CONFIG.blockImpactLife : CONFIG.weakImpactLife;
+  const x = enemy.x + nx * enemy.r, y = enemy.y + ny * enemy.r;
+  impacts.push({ kind, enemy, x, y, nx, ny, life, max: life });
+  const count = kind === 'block' ? CONFIG.blockSparkCount : CONFIG.weakFlameCount;
+  const normal = Math.atan2(ny, nx);
+  for (let i = 0; i < count && game.fx.particles.length < 1800; i++) {
+    const side = i % 2 ? 1 : -1;
+    const angle = kind === 'block' ? normal + side * (0.8 + Math.random() * 0.75)
+      : normal + (Math.random() - 0.5) * 1.25;
+    const speed = kind === 'block' ? 180 + Math.random() * 460 : 100 + Math.random() * 260;
+    const duration = life * (0.6 + Math.random() * 0.4);
+    game.fx.particles.push({ kind: kind === 'block' ? 'spark' : 'flame', x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: duration, max: duration, color: i % 3 ? '#ffae40' : '#fff6c7', size: 2 + Math.random() * 3 });
+  }
+}
+
+function drawCombatImpacts(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (const impact of game.fx.impacts) {
+    const a = impact.life / impact.max;
+    const { enemy, nx, ny } = impact;
+    const x = impact.kind === 'block' && !enemy.dead ? enemy.x + nx * enemy.r : impact.x;
+    const y = impact.kind === 'block' && !enemy.dead ? enemy.y + ny * enemy.r : impact.y;
+    const reach = (impact.kind === 'block' ? 60 : 38) / Math.sqrt(z);
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, reach);
+    glow.addColorStop(0, `rgba(255,245,190,${a * 0.85})`);
+    glow.addColorStop(0.2, `rgba(255,157,38,${a * 0.6})`);
+    glow.addColorStop(1, 'rgba(255,80,12,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - reach, y - reach, reach * 2, reach * 2);
+    if (impact.kind === 'block') {
+      // A brief reflection across this hull identifies the enemy that stopped the dash.
+      const angle = Math.atan2(ny, nx);
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = '#ffcf69'; ctx.lineWidth = 5 / z;
+      ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.r + 2 / z, angle - 1.15, angle + 1.15); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
 }
 
 // ---- enemies.js ----
@@ -2298,6 +2362,7 @@ function speedStage(sp) {
 
 
 
+
 const STEP = 1 / 120;
 
 function createGame(opts = {}) {
@@ -2332,7 +2397,7 @@ function createGame(opts = {}) {
     portalClock: 0, portalCooldowns: new Map(),
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -2617,7 +2682,7 @@ function startDrawing(game, input) {
   game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick };
+    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -2629,6 +2694,13 @@ function updateDrawing(game, input) {
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
+    return;
+  }
+  if (d.inputMethod === 'points') {
+    if (input.drawClick && (input.clickCursor || d.cursor)) extendPath(game, d, input.clickCursor || d.cursor);
+    if (input.confirm || input.dash || d.used >= d.budget - 0.5 || d.blocked) {
+      if (d.points.length >= 2) commitPath(game);
+    }
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
@@ -2849,6 +2921,10 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     const res = resolveRam(atk, e, crit, stats);
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      if (crit) {
+        const len = Math.hypot(hx - e.x, hy - e.y) || 1;
+        addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
+      }
       e.hitCD = 0.3;
       if (run) {
         run.inside.set(e.id, e);
@@ -2869,6 +2945,7 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     let nx = hx - e.x, ny = hy - e.y;
     const nd = Math.hypot(nx, ny) || 1;
     nx /= nd; ny /= nd;
+    addCombatImpact(game, e, 'block', nx, ny);
     sh.x = e.x + nx * (e.r + R + 1);
     sh.y = e.y + ny * (e.r + R + 1);
     const vn = sh.vx * nx + sh.vy * ny;
@@ -3027,6 +3104,8 @@ function updateFx(game, dt) {
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
   for (const loop of game.fx.loops) loop.life -= dt;
   game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
+  for (const impact of game.fx.impacts) impact.life -= dt;
+  game.fx.impacts = game.fx.impacts.filter((impact) => impact.life > 0);
 }
 
 // ---- prediction ----
@@ -3321,6 +3400,7 @@ function drawCorpseDebris(r, game, dt) {
 
 
 
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -3440,6 +3520,7 @@ function render(r, game, dt, pointer) {
   drawVapor(r, game, dt);
   drawShip(r, game);
   drawFx(r, game);
+  drawCombatImpacts(r, game);
   ctx.restore();
   drawSpeedLines(r, game);
 
@@ -3946,6 +4027,10 @@ function drawPathUi(r, game) {
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
   }
+  if (d.inputMethod === 'points') {
+    ctx.fillStyle = '#d6f6ff';
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / z, 0, TAU); ctx.fill(); }
+  }
   const last = pts[pts.length - 1];
   if (d.cursor && d.used < d.budget - 0.5) {
     ctx.strokeStyle = 'rgba(214,246,255,0.3)';
@@ -3998,7 +4083,9 @@ function drawDrawingHud(r, game, pointer) {
   ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
   ctx.strokeStyle = color;
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
-  const label = drawing ? `残り ${Math.ceil(frac * 100)}%` : ready || d ? (pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+  const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
+  const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
+    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
@@ -4196,6 +4283,18 @@ function drawFx(r, game) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;
+    if (p.kind === 'spark') {
+      const speed = Math.hypot(p.vx, p.vy) || 1;
+      const length = s * 4;
+      ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(1 / z, s * 0.55);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx / speed * length, p.y - p.vy / speed * length); ctx.stroke();
+      continue;
+    }
+    if (p.kind === 'flame') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 2.4, s * 0.8, 0, 0, TAU); ctx.fill(); ctx.restore();
+      continue;
+    }
     ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
   }
   for (const g of game.fx.rings) {
@@ -4650,7 +4749,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
     release: false, relSource: null, relX: 0, relY: 0,
-    keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false,
+    keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false, confirm: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
   const local = (e) => {
@@ -4659,6 +4758,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = local(e);
+    if (st.enabled && e.button === 2) { st.confirm = true; e.preventDefault(); }
     if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId; st.pointerType = e.pointerType || 'mouse';
@@ -4723,6 +4823,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
         pressed: st.pressed, // a fresh Space press or click this frame (commits a drawn path)
         dash: st.dash, // a fresh Space press or the on-screen dash button (draw mode)
         place: st.enabled && st.place,
+        confirm: st.enabled && st.confirm,
         pointerDown: st.down,
         pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
@@ -4738,11 +4839,12 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       st.click = null;
       st.dash = false;
       st.place = false;
+      st.confirm = false;
       st.cycle = 0; st.spaceDuration = 0;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
   };
 }
 
@@ -5206,7 +5308,7 @@ function setScheme(game, id) {
   }
 }
 
-function createDebugPanel(getGame, onScheme, onResetMeta) {
+function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   const root = document.createElement('div');
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
@@ -5222,6 +5324,27 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
     if (onScheme) onScheme(CONFIG.controlScheme);
   });
   syncScheme();
+  const pathRow = document.createElement('label');
+  pathRow.className = 'dctl';
+  pathRow.innerHTML = '<span>軌跡の入力</span><select aria-label="軌跡の入力"><option value="freehand">マウスで描く（従来）</option><option value="points">クリックで通過点を置く</option></select>';
+  const pathSel = pathRow.querySelector('select');
+  const pathHelp = document.createElement('div');
+  pathHelp.className = 'dhelp';
+  schemeHelp.after(pathRow, pathHelp);
+  const syncPathInput = () => {
+    pathSel.value = CONFIG.drawInput;
+    pathHelp.textContent = CONFIG.drawInput === 'points'
+      ? '描画方式で使用。左クリックで開始点・通過点を置く。点の間は直線で結ぶ。右クリック／Spaceで発動、長さを使い切っても自動発動。通常移動は操作方法の設定どおり。'
+      : '描画方式で使用。クリックで開始し、マウス移動で線を描く。再クリックか長さを使い切ると発動。';
+  };
+  pathSel.addEventListener('change', () => {
+    CONFIG.drawInput = pathSel.value;
+    const g = getGame();
+    if (g?.draw?.phase === 'draw') { g.draw = null; g.dashMeter = 1; }
+    syncPathInput(); pathSel.blur();
+    if (onDrawInput) onDrawInput(CONFIG.drawInput);
+  });
+  syncPathInput();
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
@@ -5296,7 +5419,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); syncScheme(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;
@@ -5330,6 +5453,10 @@ window.addEventListener('keydown', () => audio.unlock(), true);
 let game = null;
 // control scheme is a per-browser preference
 try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+try {
+  const method = window.localStorage.getItem('speed-draw-input-v1');
+  if (method === 'points' || method === 'freehand') CONFIG.drawInput = method;
+} catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
 if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
@@ -5341,6 +5468,8 @@ const debug = createDebugPanel(() => game, (id) => {
   writeSave(storage, save);
   if (mode === 'station') openStation(); // the station screen shows the new levels at once
   return refund; // takes effect from the next run
+}, (method) => {
+  try { window.localStorage.setItem('speed-draw-input-v1', method); } catch { /* ignore */ }
 });
 let mode = 'station'; // station | run | result
 let offerShown = null;

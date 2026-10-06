@@ -94,7 +94,7 @@ export function setScheme(game, id) {
   }
 }
 
-export function createDebugPanel(getGame, onScheme, onResetMeta) {
+export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   const root = document.createElement('div');
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
@@ -110,6 +110,27 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
     if (onScheme) onScheme(CONFIG.controlScheme);
   });
   syncScheme();
+  const pathRow = document.createElement('label');
+  pathRow.className = 'dctl';
+  pathRow.innerHTML = '<span>軌跡の入力</span><select aria-label="軌跡の入力"><option value="freehand">マウスで描く（従来）</option><option value="points">クリックで通過点を置く</option></select>';
+  const pathSel = pathRow.querySelector('select');
+  const pathHelp = document.createElement('div');
+  pathHelp.className = 'dhelp';
+  schemeHelp.after(pathRow, pathHelp);
+  const syncPathInput = () => {
+    pathSel.value = CONFIG.drawInput;
+    pathHelp.textContent = CONFIG.drawInput === 'points'
+      ? '描画方式で使用。左クリックで開始点・通過点を置く。点の間は直線で結ぶ。右クリック／Spaceで発動、長さを使い切っても自動発動。通常移動は操作方法の設定どおり。'
+      : '描画方式で使用。クリックで開始し、マウス移動で線を描く。再クリックか長さを使い切ると発動。';
+  };
+  pathSel.addEventListener('change', () => {
+    CONFIG.drawInput = pathSel.value;
+    const g = getGame();
+    if (g?.draw?.phase === 'draw') { g.draw = null; g.dashMeter = 1; }
+    syncPathInput(); pathSel.blur();
+    if (onDrawInput) onDrawInput(CONFIG.drawInput);
+  });
+  syncPathInput();
   const info = root.querySelector('.dinfo');
   const btns = root.querySelector('.dbtns');
   const sliders = root.querySelector('.dsl');
@@ -184,7 +205,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
 
   let fps = 60;
   return {
-    toggle() { root.classList.toggle('open'); sync(); syncScheme(); },
+    toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;

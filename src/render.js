@@ -8,6 +8,7 @@ import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 import { portalChoices } from './portals.js';
 import { drawCorpseDebris } from './debris.js';
+import { drawCombatImpacts } from './impact-fx.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -128,6 +129,7 @@ export function render(r, game, dt, pointer) {
   drawVapor(r, game, dt);
   drawShip(r, game);
   drawFx(r, game);
+  drawCombatImpacts(r, game);
   ctx.restore();
   drawSpeedLines(r, game);
 
@@ -634,6 +636,10 @@ function drawPathUi(r, game) {
     ctx.stroke();
     line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
   }
+  if (d.inputMethod === 'points') {
+    ctx.fillStyle = '#d6f6ff';
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / z, 0, TAU); ctx.fill(); }
+  }
   const last = pts[pts.length - 1];
   if (d.cursor && d.used < d.budget - 0.5) {
     ctx.strokeStyle = 'rgba(214,246,255,0.3)';
@@ -686,7 +692,9 @@ function drawDrawingHud(r, game, pointer) {
   ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
   ctx.strokeStyle = color;
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
-  const label = drawing ? `残り ${Math.ceil(frac * 100)}%` : ready || d ? (pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+  const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
+  const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
+    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
@@ -884,6 +892,18 @@ function drawFx(r, game) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;
+    if (p.kind === 'spark') {
+      const speed = Math.hypot(p.vx, p.vy) || 1;
+      const length = s * 4;
+      ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(1 / z, s * 0.55);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx / speed * length, p.y - p.vy / speed * length); ctx.stroke();
+      continue;
+    }
+    if (p.kind === 'flame') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.atan2(p.vy, p.vx));
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 2.4, s * 0.8, 0, 0, TAU); ctx.fill(); ctx.restore();
+      continue;
+    }
     ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
   }
   for (const g of game.fx.rings) {

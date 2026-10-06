@@ -4,6 +4,7 @@ import { createShip, computeGauge, launchVelocity, stepShip } from './ship.js';
 import { createField, updateMoons, dustDragAt } from './field.js';
 import { gravityAt } from './gravity.js';
 import { attackPower, isWeakHit, resolveRam, pierceKeep, canPierce } from './combat.js';
+import { addCombatImpact } from './impact-fx.js';
 import { updateEnemy, updateEnemyAim, MAX_ENEMY_R } from './enemies.js';
 import { updateEnemyBullets } from './projectiles.js';
 import { buildGrid, queryGrid } from './grid.js';
@@ -50,7 +51,7 @@ export function createGame(opts = {}) {
     portalClock: 0, portalCooldowns: new Map(),
     dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
     grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [] },
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
     ...createEffectState(),
     kills: 0, coins: 0, cores: 0,
     hitstop: 0, slowmo: 0,
@@ -335,7 +336,7 @@ function startDrawing(game, input) {
   game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick };
+    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -347,6 +348,13 @@ function updateDrawing(game, input) {
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
+    return;
+  }
+  if (d.inputMethod === 'points') {
+    if (input.drawClick && (input.clickCursor || d.cursor)) extendPath(game, d, input.clickCursor || d.cursor);
+    if (input.confirm || input.dash || d.used >= d.budget - 0.5 || d.blocked) {
+      if (d.points.length >= 2) commitPath(game);
+    }
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
@@ -567,6 +575,10 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     const res = resolveRam(atk, e, crit, stats);
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      if (crit) {
+        const len = Math.hypot(hx - e.x, hy - e.y) || 1;
+        addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
+      }
       e.hitCD = 0.3;
       if (run) {
         run.inside.set(e.id, e);
@@ -587,6 +599,7 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     let nx = hx - e.x, ny = hy - e.y;
     const nd = Math.hypot(nx, ny) || 1;
     nx /= nd; ny /= nd;
+    addCombatImpact(game, e, 'block', nx, ny);
     sh.x = e.x + nx * (e.r + R + 1);
     sh.y = e.y + ny * (e.r + R + 1);
     const vn = sh.vx * nx + sh.vy * ny;
@@ -745,6 +758,8 @@ function updateFx(game, dt) {
   game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
   for (const loop of game.fx.loops) loop.life -= dt;
   game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
+  for (const impact of game.fx.impacts) impact.life -= dt;
+  game.fx.impacts = game.fx.impacts.filter((impact) => impact.life > 0);
 }
 
 // ---- prediction ----

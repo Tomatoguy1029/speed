@@ -48,6 +48,7 @@ export const CONFIG = {
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
   controlScheme: 'draw', // see controls.js SCHEMES
+  drawInput: 'freehand', // freehand or clicked points; independent of ordinary steering
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,
   portalDropMax: 36,
@@ -128,6 +129,10 @@ export const CONFIG = {
   xpMult: 1,
 
   // flung wreckage visuals
+  blockImpactLife: 0.65,
+  weakImpactLife: 0.38,
+  blockSparkCount: 28,
+  weakFlameCount: 16,
   corpseTrailLife: 0.26, // real seconds; a flung fragment's actual path fades after it disappears
   corpseTrailPoints: 18, // bound each fragment's visual history
   corpseSpinRate: 10, // rad/s for rotating wreckage

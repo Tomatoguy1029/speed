@@ -20,6 +20,10 @@ window.addEventListener('keydown', () => audio.unlock(), true);
 let game = null;
 // control scheme is a per-browser preference
 try { const c = window.localStorage.getItem('speed-controls-v2'); if (c) CONFIG.controlScheme = c; } catch { /* ignore */ }
+try {
+  const method = window.localStorage.getItem('speed-draw-input-v1');
+  if (method === 'points' || method === 'freehand') CONFIG.drawInput = method;
+} catch { /* ignore */ }
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
 if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
@@ -31,6 +35,8 @@ const debug = createDebugPanel(() => game, (id) => {
   writeSave(storage, save);
   if (mode === 'station') openStation(); // the station screen shows the new levels at once
   return refund; // takes effect from the next run
+}, (method) => {
+  try { window.localStorage.setItem('speed-draw-input-v1', method); } catch { /* ignore */ }
 });
 let mode = 'station'; // station | run | result
 let offerShown = null;

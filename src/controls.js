@@ -46,6 +46,7 @@ export function buildIntent(raw, scheme) {
     it.dash = !!raw.dash;
     it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
     it.clickCursor = raw.clickCursor || null;
+    it.confirm = !!raw.confirm;
     if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
