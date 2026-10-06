@@ -16,6 +16,7 @@ export const ENEMY_TYPES = {
   missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
   battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
   titan: { name: 'タイタン', r: 75, hp: 160, armor: 6, speed: 38, accel: 0.8, contact: 18, xp: 25, color: '#ff8fd1', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.0, turn: 0.8, sizeVar: true },
+  boss: { name: 'ボス戦艦（暫定）', r: 120, hp: 2200, armor: 14, speed: 100, accel: 0.8, contact: 28, xp: 100, color: '#ff526e', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.7, turn: 0.7, fireInterval: 2.6, telegraph: 0.8, volley: 9, spread: 1.3, bulletSpeed: 420, bulletDmg: 15, slow: 0.15 },
   meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
 };
 
@@ -121,7 +122,12 @@ function gunTimer(e, dt) {
 export const BEHAVIORS = {
   chase(e, game, dt) {
     const sh = enemyTarget(game);
-    steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
+    // Approach different points rather than converging on exactly the same lagging coordinate.
+    // Close enemies still target the ship directly, so spreading the crowd does not remove contact threats.
+    const near = Math.min(1, Math.max(0, (Math.hypot(game.ship.x - e.x, game.ship.y - e.y) - 100) / 600));
+    const radius = CONFIG.enemyPursuitSpread * near * ((e.id * 0.61803398875) % 1);
+    const angle = e.id * 2.39996322973;
+    steerTo(e, sh.x + Math.cos(angle) * radius, sh.y + Math.sin(angle) * radius, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {

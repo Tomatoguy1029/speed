@@ -61,9 +61,9 @@ function spawnOne(game, target) {
   game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
 }
 
-function spawnWave(game, target) {
+function spawnWave(game, target, remaining) {
   const sh = game.ship;
-  const n = Math.round(30 * CONFIG.densityMult);
+  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
   if (game.rng() < 0.5) {
     // ring closing in
     const d = game.viewRadius * 0.95;
@@ -100,6 +100,7 @@ function despawnFar(game) {
   const far = game.viewRadius * 2.6 + 800;
   let removed = false;
   for (const e of game.enemies) {
+    if (e.type === 'boss') continue;
     const lim = e.type === 'battleship' ? far * 1.6 : far;
     if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
   }
@@ -108,13 +109,14 @@ function despawnFar(game) {
 
 export function updateSpawner(game, dt) {
   if (!game.spawning) return;
+  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
   keepMeteors(game);
   const target = phaseTarget(game.t);
   const P = target.phase;
   let alive = 0;
-  for (const e of game.enemies) if (e.type !== 'meteor') alive++;
-  game.spawnAcc = Math.min(game.spawnAcc + P.rate * dt, 8);
+  for (const e of game.enemies) if (e.type !== 'meteor' && e.type !== 'boss') alive++;
+  game.spawnAcc = Math.min(game.spawnAcc + P.rate * CONFIG.densityMult * dt, Math.max(8, 8 * CONFIG.densityMult));
   while (game.spawnAcc >= 1 && alive < target.pop) {
     game.spawnAcc -= 1;
     spawnOne(game, target);
@@ -122,6 +124,28 @@ export function updateSpawner(game, dt) {
   }
   if (P.waves) {
     game.waveT = (game.waveT || 0) + dt;
-    if (game.waveT >= P.waves) { game.waveT = 0; spawnWave(game, target); }
+    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
   }
+}
+
+function spawnBoss(game) {
+  const sh = game.ship;
+  const distance = Math.min(1000, game.viewRadius * 0.65);
+  const angle = game.rng() * TAU;
+  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
+  const planet = game.field.planet;
+  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
+    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
+    x = planet.x + Math.cos(a) * (planet.r + 220);
+    y = planet.y + Math.sin(a) * (planet.r + 220);
+  }
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
+  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
+  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
+  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
+  game.boss = boss;
+  game.bossSpawned = true;
+  game.enemies.push(boss);
+  game.events.push({ type: 'bossSpawn', x, y });
 }

@@ -91,8 +91,11 @@
 const CONFIG = {
   // run
   runTime: 600,
-  escapeSpeed: 2250, // px/s needed to clear
-  escapeBonus: 30, // coins for escaping
+  escapeSpeed: 2250, // legacy speed reference for visual effects, no longer a clear condition
+  escapeBonus: 30, // clear bonus (legacy key retained)
+  bossTime: 420, // one provisional boss appears after seven minutes
+  bossHp: 2200,
+  bossArmor: 14,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -198,7 +201,9 @@ const CONFIG = {
   // enemies
   enemyHpMult: 1,
   enemyArmorMult: 1,
-  densityMult: 1,
+  densityMult: 5,
+  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
+  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
@@ -519,6 +524,7 @@ const ENEMY_TYPES = {
   missile: { name: 'ミサイル艇', r: 22, hp: 20, armor: 6, speed: 85, accel: 1.5, contact: 10, xp: 5, color: '#ffb36b', shape: 'ship', behavior: 'missile', weakDir: SIDE, weakDir2: -SIDE, weakArc: 0.6, keep: 720, fireInterval: 4.5, telegraph: 0.6, missileSpeed: 500, missileTurn: 1.7, bulletDmg: 11, slow: 0.2 },
   battleship: { name: '戦艦', r: 95, hp: 420, armor: 20, speed: 45, accel: 0.6, contact: 22, xp: 45, color: '#d0d6e8', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.55, turn: 0.5, fireInterval: 1.8, telegraph: 0.5, volley: 7, spread: 0.9, bulletSpeed: 380, bulletDmg: 12, slow: 0.15 },
   titan: { name: 'タイタン', r: 75, hp: 160, armor: 6, speed: 38, accel: 0.8, contact: 18, xp: 25, color: '#ff8fd1', shape: 'blob', behavior: 'chase', weakDir: BACK, weakArc: 1.0, turn: 0.8, sizeVar: true },
+  boss: { name: 'ボス戦艦（暫定）', r: 120, hp: 2200, armor: 14, speed: 100, accel: 0.8, contact: 28, xp: 100, color: '#ff526e', shape: 'ship', behavior: 'battleship', weakDir: BACK, weakArc: 0.7, turn: 0.7, fireInterval: 2.6, telegraph: 0.8, volley: 9, spread: 1.3, bulletSpeed: 420, bulletDmg: 15, slow: 0.15 },
   meteor: { name: '隕石', r: 40, hp: 20, armor: 5, speed: 40, accel: 0, contact: 10, xp: 1, color: '#8b7a6a', shape: 'rock', behavior: 'drift', weakDir: 0, weakArc: 0 },
 };
 
@@ -624,7 +630,12 @@ function gunTimer(e, dt) {
 const BEHAVIORS = {
   chase(e, game, dt) {
     const sh = enemyTarget(game);
-    steerTo(e, sh.x, sh.y, e.speed, e.T.accel || 2, dt);
+    // Approach different points rather than converging on exactly the same lagging coordinate.
+    // Close enemies still target the ship directly, so spreading the crowd does not remove contact threats.
+    const near = Math.min(1, Math.max(0, (Math.hypot(game.ship.x - e.x, game.ship.y - e.y) - 100) / 600));
+    const radius = CONFIG.enemyPursuitSpread * near * ((e.id * 0.61803398875) % 1);
+    const angle = e.id * 2.39996322973;
+    steerTo(e, sh.x + Math.cos(angle) * radius, sh.y + Math.sin(angle) * radius, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {
@@ -842,9 +853,9 @@ function spawnOne(game, target) {
   game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
 }
 
-function spawnWave(game, target) {
+function spawnWave(game, target, remaining) {
   const sh = game.ship;
-  const n = Math.round(30 * CONFIG.densityMult);
+  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
   if (game.rng() < 0.5) {
     // ring closing in
     const d = game.viewRadius * 0.95;
@@ -881,6 +892,7 @@ function despawnFar(game) {
   const far = game.viewRadius * 2.6 + 800;
   let removed = false;
   for (const e of game.enemies) {
+    if (e.type === 'boss') continue;
     const lim = e.type === 'battleship' ? far * 1.6 : far;
     if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
   }
@@ -889,13 +901,14 @@ function despawnFar(game) {
 
 function updateSpawner(game, dt) {
   if (!game.spawning) return;
+  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
   keepMeteors(game);
   const target = phaseTarget(game.t);
   const P = target.phase;
   let alive = 0;
-  for (const e of game.enemies) if (e.type !== 'meteor') alive++;
-  game.spawnAcc = Math.min(game.spawnAcc + P.rate * dt, 8);
+  for (const e of game.enemies) if (e.type !== 'meteor' && e.type !== 'boss') alive++;
+  game.spawnAcc = Math.min(game.spawnAcc + P.rate * CONFIG.densityMult * dt, Math.max(8, 8 * CONFIG.densityMult));
   while (game.spawnAcc >= 1 && alive < target.pop) {
     game.spawnAcc -= 1;
     spawnOne(game, target);
@@ -903,8 +916,30 @@ function updateSpawner(game, dt) {
   }
   if (P.waves) {
     game.waveT = (game.waveT || 0) + dt;
-    if (game.waveT >= P.waves) { game.waveT = 0; spawnWave(game, target); }
+    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
   }
+}
+
+function spawnBoss(game) {
+  const sh = game.ship;
+  const distance = Math.min(1000, game.viewRadius * 0.65);
+  const angle = game.rng() * TAU;
+  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
+  const planet = game.field.planet;
+  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
+    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
+    x = planet.x + Math.cos(a) * (planet.r + 220);
+    y = planet.y + Math.sin(a) * (planet.r + 220);
+  }
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
+  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
+  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
+  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
+  game.boss = boss;
+  game.bossSpawned = true;
+  game.enemies.push(boss);
+  game.events.push({ type: 'bossSpawn', x, y });
 }
 
 // ---- progression.js ----
@@ -2021,7 +2056,7 @@ function speedStage(sp) {
 
 const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 世界がほぼ止まる → 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も最後の向き・速度で直進し、ザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -2273,6 +2308,7 @@ function createGame(opts = {}) {
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
+    boss: null, bossSpawned: false,
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
@@ -2302,6 +2338,7 @@ function createGame(opts = {}) {
 
 function update(game, frameDt, input) {
   if (game.state !== 'play') return;
+  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
   frameDt = Math.min(frameDt, 0.1);
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
@@ -2430,7 +2467,7 @@ function step(game, dt, input) {
     game.stage = st;
   }
 
-  if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
+  if (game.boss?.dead) end(game, 'won', 'boss');
   else if (sh.hp <= 0) end(game, 'lost', 'hp');
   else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
@@ -2891,20 +2928,28 @@ function flushNewEnemies(game) {
 }
 
 function separateEnemies(game) {
-  const grid = buildGrid(game.enemies, 120);
-  for (const e of game.enemies) {
-    queryGrid(grid, e.x - e.r - 40, e.y - e.r - 40, e.x + e.r + 40, e.y + e.r + 40, (o) => {
-      if (o.id <= e.id) return;
-      const dx = o.x - e.x, dy = o.y - e.y;
-      const min = (e.r + o.r) * 0.9;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= min * min || d2 === 0) return;
-      const d = Math.sqrt(d2);
-      const push = (min - d) * 0.5;
-      const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
-      e.x -= (dx / d) * push * 2 * wE; e.y -= (dy / d) * push * 2 * wE;
-      o.x += (dx / d) * push * 2 * (1 - wE); o.y += (dy / d) * push * 2 * (1 - wE);
-    });
+  for (let pass = 0; pass < 2; pass++) {
+    const grid = buildGrid(game.enemies, 120);
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
+      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
+        if (o.id <= e.id) return;
+        let dx = o.x - e.x, dy = o.y - e.y;
+        const min = e.r + o.r + CONFIG.enemySpacing;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= min * min) return;
+        const d = Math.sqrt(d2);
+        if (d < 1e-6) {
+          const a = (e.id + o.id) * 2.39996322973;
+          dx = Math.cos(a); dy = Math.sin(a);
+        } else { dx /= d; dy /= d; }
+        const push = (min - d) * 0.5;
+        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
+        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+      });
+    }
   }
 }
 
@@ -3257,6 +3302,7 @@ function handleEvents(r, game) {
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
@@ -3309,6 +3355,7 @@ function render(r, game, dt, pointer) {
   drawPortalHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
+  drawBossHud(r, game, dt);
   drawMinimap(r, game);
   drawBanner(r, dt);
   drawStageFlash(r, dt);
@@ -4403,12 +4450,12 @@ function drawSpeedPanel(r, game) {
   const clear = 12 + loadoutUnit(r) * 6.8 + 14; // right edge of the ship diagram
   if (bx < clear) { bx = clear; bw = Math.max(80, W - clear - 16); }
   const mid = bx + bw / 2;
-  const top = CONFIG.escapeSpeed * 1.08;
+  const top = Math.max(CONFIG.baseMaxSpeed, game.stats.maxSpeed, sp, game.peakSpeed) * 1.15;
   const X = (v) => bx + clamp(v / top, 0, 1) * bw;
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(bx, by, bw, bh);
   const hot = sp > game.stats.maxSpeed;
-  ctx.fillStyle = sp >= CONFIG.escapeSpeed ? '#ffd24a' : hot ? '#bff3ff' : '#5fd8ff';
+  ctx.fillStyle = hot ? '#bff3ff' : '#5fd8ff';
   ctx.fillRect(bx, by, X(sp) - bx, bh);
   // max speed tick
   ctx.fillStyle = '#ffffff';
@@ -4416,15 +4463,11 @@ function drawSpeedPanel(r, game) {
   // peak marker
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillRect(X(game.peakSpeed) - 1, by, 2, bh);
-  // escape line
-  ctx.fillStyle = '#ffd24a';
-  ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
   ctx.font = `11px ${MONO}`;
   ctx.textAlign = 'center';
   // labels stay on screen whatever the width
   const fit = (text, x) => { const w = ctx.measureText(text).width / 2; return clamp(x, w + 4, W - w - 4); };
-  const escTxt = `脱出 ${kms(CONFIG.escapeSpeed)}`, capTxt = `上限 ${kms(game.stats.maxSpeed)}`;
-  ctx.fillText(escTxt, fit(escTxt, X(CONFIG.escapeSpeed)), by - 11);
+  const capTxt = `上限 ${kms(game.stats.maxSpeed)}`;
   ctx.fillStyle = '#cfd8ee';
   ctx.fillText(capTxt, fit(capTxt, X(game.stats.maxSpeed)), by + bh + 14);
   ctx.textAlign = 'left';
@@ -4441,6 +4484,33 @@ function drawSpeedPanel(r, game) {
   ctx.font = `13px ${MONO}`;
   ctx.fillStyle = '#8fa3c8';
   ctx.fillText('km/s', mid + 46, ny - 1);
+}
+
+function drawBossHud(r, game, dt) {
+  const boss = game.boss;
+  if (!boss || boss.dead) return;
+  const { ctx, W, H } = r;
+  const width = Math.min(360, W - 32, W * 0.46), x = (W - width) / 2, y = W < 600 ? 104 : 82;
+  r.bossWarning = Math.max(0, (r.bossWarning || 0) - dt);
+  ctx.textAlign = 'center';
+  ctx.font = `700 14px ${MONO}`;
+  ctx.fillStyle = '#ff647b';
+  ctx.fillText(r.bossWarning > 0 ? 'WARNING!!  ボス出現' : 'BOSS', W / 2, y - 8);
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+  ctx.fillRect(x - 2, y - 2, width + 4, 12);
+  ctx.fillStyle = '#ff526e';
+  ctx.fillRect(x, y, width * Math.max(0, boss.hp / boss.maxHp), 8);
+  const p = worldToScreen(r, boss.x, boss.y);
+  if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
+    const dx = p.x - W / 2, dy = p.y - H / 2;
+    const k = Math.min((W / 2 - 40) / Math.max(1, Math.abs(dx)), (H / 2 - 60) / Math.max(1, Math.abs(dy)));
+    const bx = W / 2 + dx * k, by = H / 2 + dy * k;
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.atan2(dy, dx));
+    ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.font = `12px ${MONO}`;
+    ctx.fillText('BOSS', bx, by + 21);
+  }
+  ctx.textAlign = 'left';
 }
 
 // ---- input.js ----
@@ -4618,9 +4688,9 @@ function fmtTime(t) {
 const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
-  escape: ['重力圏 脱出', 'win', '脱出速度に到達した'],
+  boss: ['ボス 撃破', 'win', '敵の大群を突破し、ボスを撃破した'],
   hp: ['機体 大破', 'lose', 'HP が尽きた'],
-  time: ['時間切れ', 'lose', '10 分以内に脱出速度へ届かなかった'],
+  time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
 function showResult(game, extra, onNext) {
@@ -4628,7 +4698,6 @@ function showResult(game, extra, onNext) {
   const rows = [
     ['経過時間', fmtTime(game.t)],
     ['最高速度', `${kms(game.peakSpeed)} km/s`],
-    ['脱出速度', `${kms(CONFIG.escapeSpeed)} km/s`],
     ['撃破数', String(game.kills)],
     ['レベル', String(game.level)],
     ...(extra || []),
@@ -4734,8 +4803,8 @@ function showStation(save, onBuy, onDepart) {
   }
   const records = el('div', { class: 'stats' },
     el('div', {}, '出撃'), el('div', {}, `${b.runs} 回`),
-    el('div', {}, '脱出'), el('div', {}, `${b.escapes} 回`),
-    el('div', {}, '最速脱出'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
+    el('div', {}, 'クリア'), el('div', {}, `${b.escapes} 回`),
+    el('div', {}, '最速クリア'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
     el('div', {}, '最高速度'), el('div', {}, `${kms(b.topSpeed)} km/s`));
   const go = el('button', { class: 'primary', onclick: onDepart }, '出発 ', el('kbd', {}, 'Enter'));
   showScreen(el('div', { class: 'panel' },
@@ -4743,16 +4812,16 @@ function showStation(save, onBuy, onDepart) {
     el('div', { class: 'version-links' },
       el('a', { href: './draw-original.html', target: '_blank', rel: 'noopener' }, '元の版：線を描いて駆け抜ける'),
       el('a', { href: './index.html?controls=portal', target: '_blank', rel: 'noopener' }, 'ポータル試作')),
-    el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
+    el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : CONFIG.controlScheme === 'draw' ? '線を走り切った後も、その向きと速度で直進する。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
       el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
       el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
-      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
+      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。ボスとの戦いに向けて機体を強化する'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
     ups,
@@ -4953,7 +5022,9 @@ function createAudio() {
 const DEFAULTS = { ...CONFIG };
 
 const TUNABLES = [
-  { key: 'escapeSpeed', label: '脱出速度', min: 1200, max: 4000, step: 50, fmt: (v) => `${(v * CONFIG.speedToKms).toFixed(1)} km/s` },
+  { key: 'bossTime', label: 'ボス出現時間（秒）', min: 30, max: 570, step: 30 },
+  { key: 'bossHp', label: 'ボス HP', min: 100, max: 10000, step: 100 },
+  { key: 'bossArmor', label: 'ボス装甲', min: 0, max: 100, step: 1 },
   { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 300, max: 2500, step: 25 },
   { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
@@ -4995,7 +5066,11 @@ const TUNABLES = [
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
-  { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },
+  { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
+  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
+  { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
+  { key: 'drawOfferInterval', label: '描画版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'drawDropInterval', label: '描画版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
@@ -5063,8 +5138,9 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
   };
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
+  button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
   const sel = document.createElement('select');
-  sel.innerHTML = '<option value="">フェーズへ…</option>' + PHASES.map((p) => `<option value="${p.id}">${p.name}（${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}）</option>`).join('');
+  sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
   sel.addEventListener('change', () => { const g = getGame(); if (g && sel.value) jumpToPhase(g, sel.value); sel.value = ''; });
   btns.append(sel);
   const inv = button('無敵: OFF', (g) => { g.debug.invincible = !g.debug.invincible; inv.textContent = `無敵: ${g.debug.invincible ? 'ON' : 'OFF'}`; });
@@ -5084,7 +5160,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
-  button('敵を消す', (g) => { g.enemies.length = 0; g.ebullets.length = 0; });
+  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
   if (onResetMeta) {
     const b = document.createElement('button');

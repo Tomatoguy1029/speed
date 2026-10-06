@@ -8,7 +8,9 @@ import { SCHEMES, schemeById } from './controls.js';
 const DEFAULTS = { ...CONFIG };
 
 export const TUNABLES = [
-  { key: 'escapeSpeed', label: '脱出速度', min: 1200, max: 4000, step: 50, fmt: (v) => `${(v * CONFIG.speedToKms).toFixed(1)} km/s` },
+  { key: 'bossTime', label: 'ボス出現時間（秒）', min: 30, max: 570, step: 30 },
+  { key: 'bossHp', label: 'ボス HP', min: 100, max: 10000, step: 100 },
+  { key: 'bossArmor', label: 'ボス装甲', min: 0, max: 100, step: 1 },
   { key: 'baseMaxSpeed', label: '基礎 最高速度', min: 300, max: 2500, step: 25 },
   { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
@@ -50,7 +52,11 @@ export const TUNABLES = [
   { key: 'killHitstopCap', label: 'ヒットストップ上限／突進（秒）', min: 0, max: 2, step: 0.05 },
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
-  { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 3, step: 0.05 },
+  { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
+  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 40, step: 1 },
+  { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
+  { key: 'drawOfferInterval', label: '描画版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
+  { key: 'drawDropInterval', label: '描画版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
@@ -118,8 +124,9 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
   };
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
+  button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
   const sel = document.createElement('select');
-  sel.innerHTML = '<option value="">フェーズへ…</option>' + PHASES.map((p) => `<option value="${p.id}">${p.name}（${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}）</option>`).join('');
+  sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
   sel.addEventListener('change', () => { const g = getGame(); if (g && sel.value) jumpToPhase(g, sel.value); sel.value = ''; });
   btns.append(sel);
   const inv = button('無敵: OFF', (g) => { g.debug.invincible = !g.debug.invincible; inv.textContent = `無敵: ${g.debug.invincible ? 'ON' : 'OFF'}`; });
@@ -139,7 +146,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
-  button('敵を消す', (g) => { g.enemies.length = 0; g.ebullets.length = 0; });
+  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
   if (onResetMeta) {
     const b = document.createElement('button');

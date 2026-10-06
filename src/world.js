@@ -37,6 +37,7 @@ export function createGame(opts = {}) {
     field: createField(rng),
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
+    boss: null, bossSpawned: false,
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
@@ -66,6 +67,7 @@ export function createGame(opts = {}) {
 
 export function update(game, frameDt, input) {
   if (game.state !== 'play') return;
+  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
   frameDt = Math.min(frameDt, 0.1);
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
@@ -194,7 +196,7 @@ function step(game, dt, input) {
     game.stage = st;
   }
 
-  if (sp >= CONFIG.escapeSpeed) end(game, 'won', 'escape');
+  if (game.boss?.dead) end(game, 'won', 'boss');
   else if (sh.hp <= 0) end(game, 'lost', 'hp');
   else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
@@ -654,21 +656,29 @@ function flushNewEnemies(game) {
   game.newEnemies.length = 0;
 }
 
-function separateEnemies(game) {
-  const grid = buildGrid(game.enemies, 120);
-  for (const e of game.enemies) {
-    queryGrid(grid, e.x - e.r - 40, e.y - e.r - 40, e.x + e.r + 40, e.y + e.r + 40, (o) => {
-      if (o.id <= e.id) return;
-      const dx = o.x - e.x, dy = o.y - e.y;
-      const min = (e.r + o.r) * 0.9;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= min * min || d2 === 0) return;
-      const d = Math.sqrt(d2);
-      const push = (min - d) * 0.5;
-      const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
-      e.x -= (dx / d) * push * 2 * wE; e.y -= (dy / d) * push * 2 * wE;
-      o.x += (dx / d) * push * 2 * (1 - wE); o.y += (dy / d) * push * 2 * (1 - wE);
-    });
+export function separateEnemies(game) {
+  for (let pass = 0; pass < 2; pass++) {
+    const grid = buildGrid(game.enemies, 120);
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
+      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
+        if (o.id <= e.id) return;
+        let dx = o.x - e.x, dy = o.y - e.y;
+        const min = e.r + o.r + CONFIG.enemySpacing;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= min * min) return;
+        const d = Math.sqrt(d2);
+        if (d < 1e-6) {
+          const a = (e.id + o.id) * 2.39996322973;
+          dx = Math.cos(a); dy = Math.sin(a);
+        } else { dx /= d; dy /= d; }
+        const push = (min - d) * 0.5;
+        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
+        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+      });
+    }
   }
 }
 

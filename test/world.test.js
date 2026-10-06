@@ -28,12 +28,12 @@ test('losing all HP loses the run', () => {
   assert.equal(game.endReason, 'hp');
 });
 
-test('reaching the escape speed wins', () => {
+test('reaching the old escape speed no longer clears the game', () => {
   const game = createGame({ seed: 2 });
   game.spawning = false;
   game.ship.vx = CONFIG.escapeSpeed + 10;
   update(game, 0.02, idle);
-  assert.equal(game.state, 'won');
+  assert.equal(game.state, 'play');
 });
 
 test('kills drop xp that is collected and levels up', () => {
@@ -65,6 +65,6 @@ test('a full 10 minute run simulates without errors or NaN', () => {
     t += 0.1;
   }
   assert.ok(Number.isFinite(game.ship.x) && Number.isFinite(game.ship.y));
-  assert.ok(maxEnemies < 450, `max enemies ${maxEnemies}`);
+  assert.ok(maxEnemies < 450 * CONFIG.densityMult, `max enemies ${maxEnemies}`);
   assert.ok(game.kills > 50, `kills ${game.kills}`);
 });

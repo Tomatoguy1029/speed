@@ -82,6 +82,7 @@ function handleEvents(r, game) {
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
+    else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
@@ -134,6 +135,7 @@ export function render(r, game, dt, pointer) {
   drawPortalHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
+  drawBossHud(r, game, dt);
   drawMinimap(r, game);
   drawBanner(r, dt);
   drawStageFlash(r, dt);
@@ -1228,12 +1230,12 @@ function drawSpeedPanel(r, game) {
   const clear = 12 + loadoutUnit(r) * 6.8 + 14; // right edge of the ship diagram
   if (bx < clear) { bx = clear; bw = Math.max(80, W - clear - 16); }
   const mid = bx + bw / 2;
-  const top = CONFIG.escapeSpeed * 1.08;
+  const top = Math.max(CONFIG.baseMaxSpeed, game.stats.maxSpeed, sp, game.peakSpeed) * 1.15;
   const X = (v) => bx + clamp(v / top, 0, 1) * bw;
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(bx, by, bw, bh);
   const hot = sp > game.stats.maxSpeed;
-  ctx.fillStyle = sp >= CONFIG.escapeSpeed ? '#ffd24a' : hot ? '#bff3ff' : '#5fd8ff';
+  ctx.fillStyle = hot ? '#bff3ff' : '#5fd8ff';
   ctx.fillRect(bx, by, X(sp) - bx, bh);
   // max speed tick
   ctx.fillStyle = '#ffffff';
@@ -1241,15 +1243,11 @@ function drawSpeedPanel(r, game) {
   // peak marker
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillRect(X(game.peakSpeed) - 1, by, 2, bh);
-  // escape line
-  ctx.fillStyle = '#ffd24a';
-  ctx.fillRect(X(CONFIG.escapeSpeed) - 1.5, by - 8, 3, bh + 16);
   ctx.font = `11px ${MONO}`;
   ctx.textAlign = 'center';
   // labels stay on screen whatever the width
   const fit = (text, x) => { const w = ctx.measureText(text).width / 2; return clamp(x, w + 4, W - w - 4); };
-  const escTxt = `脱出 ${kms(CONFIG.escapeSpeed)}`, capTxt = `上限 ${kms(game.stats.maxSpeed)}`;
-  ctx.fillText(escTxt, fit(escTxt, X(CONFIG.escapeSpeed)), by - 11);
+  const capTxt = `上限 ${kms(game.stats.maxSpeed)}`;
   ctx.fillStyle = '#cfd8ee';
   ctx.fillText(capTxt, fit(capTxt, X(game.stats.maxSpeed)), by + bh + 14);
   ctx.textAlign = 'left';
@@ -1266,4 +1264,31 @@ function drawSpeedPanel(r, game) {
   ctx.font = `13px ${MONO}`;
   ctx.fillStyle = '#8fa3c8';
   ctx.fillText('km/s', mid + 46, ny - 1);
+}
+
+function drawBossHud(r, game, dt) {
+  const boss = game.boss;
+  if (!boss || boss.dead) return;
+  const { ctx, W, H } = r;
+  const width = Math.min(360, W - 32, W * 0.46), x = (W - width) / 2, y = W < 600 ? 104 : 82;
+  r.bossWarning = Math.max(0, (r.bossWarning || 0) - dt);
+  ctx.textAlign = 'center';
+  ctx.font = `700 14px ${MONO}`;
+  ctx.fillStyle = '#ff647b';
+  ctx.fillText(r.bossWarning > 0 ? 'WARNING!!  ボス出現' : 'BOSS', W / 2, y - 8);
+  ctx.fillStyle = 'rgba(0,0,0,0.8)';
+  ctx.fillRect(x - 2, y - 2, width + 4, 12);
+  ctx.fillStyle = '#ff526e';
+  ctx.fillRect(x, y, width * Math.max(0, boss.hp / boss.maxHp), 8);
+  const p = worldToScreen(r, boss.x, boss.y);
+  if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
+    const dx = p.x - W / 2, dy = p.y - H / 2;
+    const k = Math.min((W / 2 - 40) / Math.max(1, Math.abs(dx)), (H / 2 - 60) / Math.max(1, Math.abs(dy)));
+    const bx = W / 2 + dx * k, by = H / 2 + dy * k;
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(Math.atan2(dy, dx));
+    ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.font = `12px ${MONO}`;
+    ctx.fillText('BOSS', bx, by + 21);
+  }
+  ctx.textAlign = 'left';
 }

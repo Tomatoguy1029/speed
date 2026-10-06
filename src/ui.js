@@ -37,9 +37,9 @@ export function fmtTime(t) {
 export const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
-  escape: ['重力圏 脱出', 'win', '脱出速度に到達した'],
+  boss: ['ボス 撃破', 'win', '敵の大群を突破し、ボスを撃破した'],
   hp: ['機体 大破', 'lose', 'HP が尽きた'],
-  time: ['時間切れ', 'lose', '10 分以内に脱出速度へ届かなかった'],
+  time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
 export function showResult(game, extra, onNext) {
@@ -47,7 +47,6 @@ export function showResult(game, extra, onNext) {
   const rows = [
     ['経過時間', fmtTime(game.t)],
     ['最高速度', `${kms(game.peakSpeed)} km/s`],
-    ['脱出速度', `${kms(CONFIG.escapeSpeed)} km/s`],
     ['撃破数', String(game.kills)],
     ['レベル', String(game.level)],
     ...(extra || []),
@@ -153,8 +152,8 @@ export function showStation(save, onBuy, onDepart) {
   }
   const records = el('div', { class: 'stats' },
     el('div', {}, '出撃'), el('div', {}, `${b.runs} 回`),
-    el('div', {}, '脱出'), el('div', {}, `${b.escapes} 回`),
-    el('div', {}, '最速脱出'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
+    el('div', {}, 'クリア'), el('div', {}, `${b.escapes} 回`),
+    el('div', {}, '最速クリア'), el('div', {}, b.escapeTime == null ? '—' : fmtTime(b.escapeTime)),
     el('div', {}, '最高速度'), el('div', {}, `${kms(b.topSpeed)} km/s`));
   const go = el('button', { class: 'primary', onclick: onDepart }, '出発 ', el('kbd', {}, 'Enter'));
   showScreen(el('div', { class: 'panel' },
@@ -162,16 +161,16 @@ export function showStation(save, onBuy, onDepart) {
     el('div', { class: 'version-links' },
       el('a', { href: './draw-original.html', target: '_blank', rel: 'noopener' }, '元の版：線を描いて駆け抜ける'),
       el('a', { href: './index.html?controls=portal', target: '_blank', rel: 'noopener' }, 'ポータル試作')),
-    el('div', { class: 'sub' }, `10 分以内に、実際の速度で脱出速度 ${kms(CONFIG.escapeSpeed)} km/s に到達すれば重力圏脱出`),
+    el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : CONFIG.controlScheme === 'draw' ? '線を走り切った後も、その向きと速度で直進する。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る' : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
       el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
       el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
       el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
-      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。集めて脱出速度へ'),
+      el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。ボスとの戦いに向けて機体を強化する'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
     ups,

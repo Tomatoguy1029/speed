@@ -2,8 +2,11 @@
 export const CONFIG = {
   // run
   runTime: 600,
-  escapeSpeed: 2250, // px/s needed to clear
-  escapeBonus: 30, // coins for escaping
+  escapeSpeed: 2250, // legacy speed reference for visual effects, no longer a clear condition
+  escapeBonus: 30, // clear bonus (legacy key retained)
+  bossTime: 420, // one provisional boss appears after seven minutes
+  bossHp: 2200,
+  bossArmor: 14,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -109,7 +112,9 @@ export const CONFIG = {
   // enemies
   enemyHpMult: 1,
   enemyArmorMult: 1,
-  densityMult: 1,
+  densityMult: 5,
+  enemySpacing: 12, // gap between bodies; crowds stay legible instead of overlapping
+  enemyPursuitSpread: 280, // distributed approach targets, fading out near the actual ship
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
   meteorCoinChance: 0.4,
