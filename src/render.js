@@ -118,6 +118,7 @@ export function render(r, game, dt, pointer) {
   drawPortals(r, game);
   drawHyperUi(r, game, pointer);
   drawFriendly(r, game, dt);
+  drawWeapons(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
@@ -333,6 +334,67 @@ function drawFriendly(r, game, dt) {
     ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
+
+// Level-up weapons: orbit blades, missiles, discs, lightning and beams.
+function drawWeapons(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.save();
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const f of game.wfx) {
+    const a = f.life / f.max;
+    if (f.kind === 'beam') {
+      ctx.strokeStyle = `rgba(255,107,213,${0.35 * a})`; ctx.lineWidth = f.width * 1.8;
+      ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,230,250,${a})`; ctx.lineWidth = f.width * 0.45;
+      ctx.stroke();
+    } else if (f.kind === 'bolt') {
+      ctx.strokeStyle = `rgba(168,240,255,${a})`; ctx.lineWidth = 3 / z;
+      ctx.beginPath(); ctx.moveTo(f.pts[0].x, f.pts[0].y);
+      for (let i = 1; i < f.pts.length; i++) {
+        const p = f.pts[i - 1], q = f.pts[i];
+        const nx = -(q.y - p.y) * 0.18, ny = (q.x - p.x) * 0.18, k = (i % 2 ? 1 : -1) * (0.5 + 0.5 * Math.sin(game.t * 60 + i));
+        ctx.lineTo((p.x + q.x) / 2 + nx * k, (p.y + q.y) / 2 + ny * k);
+        ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+    }
+  }
+  for (const p of game.wproj) {
+    if (!onScreen(r, p.x, p.y, 60)) continue;
+    if (p.kind === 'missile') {
+      const a = Math.atan2(p.vy, p.vx), s = 9;
+      ctx.fillStyle = '#ff9f40';
+      ctx.beginPath();
+      ctx.moveTo(p.x + Math.cos(a) * s, p.y + Math.sin(a) * s);
+      ctx.lineTo(p.x + Math.cos(a + 2.5) * s * 0.7, p.y + Math.sin(a + 2.5) * s * 0.7);
+      ctx.lineTo(p.x + Math.cos(a - 2.5) * s * 0.7, p.y + Math.sin(a - 2.5) * s * 0.7);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,200,120,0.5)';
+      ctx.beginPath(); ctx.arc(p.x - Math.cos(a) * s, p.y - Math.sin(a) * s, 4, 0, TAU); ctx.fill();
+    } else if (p.kind === 'disc') {
+      ctx.strokeStyle = '#6dffb0'; ctx.lineWidth = 3 / z;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke();
+      ctx.beginPath();
+      for (let k = 0; k < 3; k++) { const a = p.spin + k * TAU / 3; ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a) * p.r, p.y + Math.sin(a) * p.r); }
+      ctx.stroke();
+    }
+  }
+  const orbit = game.wstate.orbit;
+  if (orbit?.blades && game.weapons.orbit) {
+    ctx.fillStyle = '#9fe8ff';
+    for (const b of orbit.blades) {
+      const s = 14, a = b.a + Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(b.x + Math.cos(a) * s, b.y + Math.sin(a) * s);
+      ctx.lineTo(b.x + Math.cos(a + 1.9) * s * 0.4, b.y + Math.sin(a + 1.9) * s * 0.4);
+      ctx.lineTo(b.x - Math.cos(a) * s, b.y - Math.sin(a) * s);
+      ctx.lineTo(b.x + Math.cos(a - 1.9) * s * 0.4, b.y + Math.sin(a - 1.9) * s * 0.4);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function drawOverlays(r, game, dt) {

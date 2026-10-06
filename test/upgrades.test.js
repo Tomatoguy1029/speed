@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, update, addXp, resolveLevelup, hyperMaxCharges } from '../src/world.js';
-import { rollLevelChoices, GUN_LEVELS, PERK_MAX } from '../src/upgrades.js';
+import { rollLevelChoices, PERK_MAX } from '../src/upgrades.js';
+import { GUN_LEVELS, WEAPONS } from '../src/weapons.js';
 import { createEnemy } from '../src/enemies.js';
 import { CONFIG } from '../src/config.js';
 
@@ -50,7 +51,7 @@ test('the blaster fires along the heading, keeps the last direction when stopped
   game.fbullets.length = 0;
   update(game, 0.01, { ...idle, hyperToggle: true });
   update(game, 0.01, { ...idle, jumpClicks: [{ x: 400, y: -3000 }] });
-  game.gunT = 99;
+  game.wstate.gun = { t: 99 };
   update(game, 0.01, idle);
   assert.ok(game.jump);
   assert.equal(game.fbullets.filter((b) => b.kind === 'gun').length, 0);
@@ -59,14 +60,38 @@ test('the blaster fires along the heading, keeps the last direction when stopped
 test('weapon levels add shots; perks stack up to the cap and leave the pool when maxed', () => {
   const game = quietGame();
   game.weapons.gun = 3;
-  game.gunT = 99;
+  game.wstate.gun = { t: 99 };
   update(game, 0.02, idle);
   assert.equal(game.fbullets.filter((b) => b.kind === 'gun').length, GUN_LEVELS[2].shots);
   game.weapons.gun = GUN_LEVELS.length;
   game.perks.extraCell = PERK_MAX;
   assert.equal(hyperMaxCharges(game), CONFIG.hyperMaxCharges + PERK_MAX);
   for (let i = 0; i < 50; i++) for (const c of rollLevelChoices(game)) {
-    assert.notEqual(c.kind, 'weapon'); assert.notEqual(c.id, 'extraCell');
+    assert.notEqual(c.id, 'gun'); assert.notEqual(c.id, 'extraCell');
+  }
+});
+
+test('new weapons are offered only while a weapon slot is free', () => {
+  const game = quietGame();
+  const seen = new Set();
+  for (let i = 0; i < 200; i++) for (const c of rollLevelChoices(game)) if (c.kind === 'weapon' && c.level === 1) seen.add(c.id);
+  assert.equal(seen.size, WEAPONS.length - 1, 'every other weapon can show up');
+  for (const w of WEAPONS.slice(0, CONFIG.weaponSlots)) game.weapons[w.id] = 1;
+  for (let i = 0; i < 100; i++) for (const c of rollLevelChoices(game)) assert.ok(c.kind !== 'weapon' || c.level > 1);
+});
+
+test('every weapon damages enemies near the ship on its own', () => {
+  for (const w of WEAPONS) {
+    const game = quietGame();
+    game.weapons = { [w.id]: 1 };
+    const foes = [];
+    for (const [x, y] of [[60, 0], [0, 90], [-90, 0], [0, -90], [140, 60]]) {
+      const e = createEnemy('armored', 1, x, -3000 + y);
+      e.speed = 0;
+      foes.push(e); game.enemies.push(e);
+    }
+    for (let i = 0; i < 300; i++) update(game, 0.02, idle);
+    assert.ok(foes.some((e) => e.hp < e.maxHp || e.dead), w.id);
   }
 });
 

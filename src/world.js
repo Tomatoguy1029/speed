@@ -15,7 +15,8 @@ import { damageEnemy, addText, addRing, explode } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isHyperScheme } from './controls.js';
-import { rollLevelChoices, applyLevelChoice, updateGun, perkLevel, perkBlastRadius, perkBlastMult, fullChargePower, vortexRadius, vortexLife } from './upgrades.js';
+import { updateWeapons } from './weapons.js';
+import { rollLevelChoices, applyLevelChoice, perkLevel, perkBlastRadius, perkBlastMult, fullChargePower, vortexRadius, vortexLife } from './upgrades.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
 
 export const STEP = 1 / 120;
@@ -43,7 +44,7 @@ export function createGame(opts = {}) {
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0, levelChoices: null,
-    weapons: { gun: 1 }, perks: {}, gunT: 0, vortices: [],
+    weapons: { gun: 1 }, perks: {}, wstate: {}, wproj: [], wfx: [], vortices: [],
     spawnAcc: 0, waveT: 0,
     phaseId: null,
     endReason: null,
@@ -180,7 +181,7 @@ function step(game, dt, input) {
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
-  updateGun(game, dt);
+  updateWeapons(game, dt);
   updateVortices(game, dt);
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);

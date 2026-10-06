@@ -2,24 +2,9 @@
 // that change how hyperdrive plays. Every level-up offers three of them.
 import { CONFIG } from './config.js';
 import { isHyperScheme } from './controls.js';
+import { WEAPONS, weaponDef, weaponCount } from './weapons.js';
 
 export const PERK_MAX = 5; // each perk can be taken up to this many times
-
-// Blaster: cumulative stats per weapon level (index = level - 1).
-export const GUN_LEVELS = [
-  { dmg: 1, rate: 1, shots: 1, pierce: 0, text: '進行方向へ弾を撃つ' },
-  { dmg: 1.3, rate: 1, shots: 1, pierce: 0, text: '威力 +30%' },
-  { dmg: 1.3, rate: 1, shots: 2, pierce: 0, text: '弾 +1' },
-  { dmg: 1.3, rate: 1.3, shots: 2, pierce: 0, text: '連射 +30%' },
-  { dmg: 1.3, rate: 1.3, shots: 2, pierce: 1, text: '貫通 +1' },
-  { dmg: 1.3, rate: 1.3, shots: 3, pierce: 1, text: '弾 +1' },
-  { dmg: 1.8, rate: 1.3, shots: 3, pierce: 1, text: '威力 +40%' },
-  { dmg: 1.8, rate: 1.6, shots: 3, pierce: 3, text: '貫通 +2、連射 +25%' },
-];
-
-export const WEAPONS = [
-  { id: 'gun', name: 'ブラスター', levels: GUN_LEVELS },
-];
 
 // desc(n): what the perk does with n stacks.
 export const PERKS = [
@@ -40,7 +25,6 @@ export const PERKS = [
 ];
 
 const PERK_BY_ID = Object.fromEntries(PERKS.map((p) => [p.id, p]));
-const WEAPON_BY_ID = Object.fromEntries(WEAPONS.map((w) => [w.id, w]));
 
 export function perkLevel(game, id) {
   return game.perks[id] || 0;
@@ -52,12 +36,15 @@ export function fullChargePower(n) { return 1.5 + 0.5 * (n - 1); }
 export function vortexRadius(n) { return 220 + 30 * (n - 1); }
 export function vortexLife(n) { return 1.5 + 0.3 * (n - 1); }
 
-// Three different choices: weapon upgrades are a little more likely than any single perk.
+// Three different choices: upgrades of owned weapons are a little more likely than anything else;
+// new weapons only while a weapon slot is free (CONFIG.weaponSlots, like Vampire Survivors).
 export function rollLevelChoices(game) {
   const pool = [];
+  const slotFree = weaponCount(game) < CONFIG.weaponSlots;
   for (const w of WEAPONS) {
     const lv = game.weapons[w.id] || 0;
-    if (lv < w.levels.length) pool.push({ kind: 'weapon', id: w.id, level: lv + 1, weight: 1.6 });
+    if (lv >= w.levels.length || (!lv && !slotFree)) continue;
+    pool.push({ kind: 'weapon', id: w.id, level: lv + 1, weight: lv ? 1.6 : 1 });
   }
   for (const p of PERKS) {
     if (p.hyperOnly && !isHyperScheme(game.scheme)) continue;
@@ -78,8 +65,8 @@ export function rollLevelChoices(game) {
 // Card text for a choice.
 export function choiceInfo(c) {
   if (c.kind === 'weapon') {
-    const w = WEAPON_BY_ID[c.id];
-    return { tag: c.level === 1 ? '新しい武器' : '武器強化', name: `${w.name} Lv${c.level}`, desc: w.levels[c.level - 1].text };
+    const w = weaponDef(c.id);
+    return { tag: c.level === 1 ? '新しい武器' : '武器強化', name: `${w.name} Lv${c.level}`, desc: c.level === 1 ? w.desc : w.levels[c.level - 1].text };
   }
   if (c.kind === 'perk') {
     const p = PERK_BY_ID[c.id];
@@ -100,26 +87,4 @@ export function buildSummary(game) {
   for (const w of WEAPONS) if (game.weapons[w.id]) out.push(`${w.name} Lv${game.weapons[w.id]}`);
   for (const p of PERKS) if (game.perks[p.id]) out.push(`${p.name}${game.perks[p.id] > 1 ? ` ×${game.perks[p.id]}` : ''}`);
   return out;
-}
-
-// Blaster: fires along the ship's heading (the last travel direction when stopped). Runs on world time,
-// so it keeps firing (slowly) in hyperdrive's slow motion, but not during a jump itself.
-// Damage comes from stats (attack multiplier: level, modules, station), not from speed.
-export function updateGun(game, dt) {
-  const lv = game.weapons.gun || 0;
-  if (!lv || game.jump || game.portalDash) return;
-  const L = GUN_LEVELS[lv - 1];
-  game.gunT += dt;
-  const interval = 1 / (CONFIG.gunRate * L.rate);
-  if (game.gunT < interval) return;
-  game.gunT = 0;
-  const sh = game.ship;
-  const base = Math.atan2(sh.hy, sh.hx);
-  const dmg = CONFIG.gunDamage * L.dmg * game.stats.atkMult;
-  for (let i = 0; i < L.shots; i++) {
-    const a = base + (i - (L.shots - 1) / 2) * CONFIG.gunSpread;
-    game.fbullets.push({ kind: 'gun', x: sh.x, y: sh.y, vx: Math.cos(a) * CONFIG.gunSpeed + sh.vx, vy: Math.sin(a) * CONFIG.gunSpeed + sh.vy,
-      r: 5, dmg, life: CONFIG.gunLife, pierce: false, pierceLeft: L.pierce, hit: new Set(), color: '#ffe46b' });
-  }
-  game.events.push({ type: 'turret' });
 }

@@ -35,6 +35,7 @@ export const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
+  weaponSlots: 6, // weapons held at once (level-ups stop offering new ones when full)
   gunRate: 2.5, // blaster shots per second at weapon level 1
   gunDamage: 5, // blaster damage x attack multiplier (level, modules, station); not speed
   gunSpeed: 1100, // px/s on top of the ship's own velocity
