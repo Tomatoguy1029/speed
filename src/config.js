@@ -127,6 +127,10 @@ export const CONFIG = {
   xpGrowth: 7,
   xpMult: 1,
 
+  // flung wreckage visuals
+  corpseTrailLife: 0.26, // real seconds; a flung fragment's actual path fades after it disappears
+  corpseTrailPoints: 18, // bound each fragment's visual history
+  corpseSpinRate: 10, // rad/s for rotating wreckage
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
   zoomRefSpeed: 700,

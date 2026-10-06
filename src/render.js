@@ -7,6 +7,7 @@ import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 import { portalChoices } from './portals.js';
+import { drawCorpseDebris } from './debris.js';
 
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
@@ -121,7 +122,7 @@ export function render(r, game, dt, pointer) {
   drawEnemyBullets(r, game);
   drawPortals(r, game);
   drawPathUi(r, game);
-  drawFriendly(r, game);
+  drawFriendly(r, game, dt);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
@@ -324,14 +325,15 @@ function drawMines(r, game) {
   }
 }
 
-function drawFriendly(r, game) {
+function drawFriendly(r, game, dt) {
+  drawCorpseDebris(r, game, dt);
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const b of game.fbullets) {
+    if (b.kind === 'corpse') continue;
     if (!onScreen(r, b.x, b.y, 40)) continue;
     ctx.fillStyle = b.color;
-    ctx.globalAlpha = b.kind === 'corpse' ? 0.85 : 1;
-    const s = b.kind === 'corpse' ? b.r * 0.6 : b.r / Math.sqrt(z);
+    const s = b.r / Math.sqrt(z);
     ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
   }
   ctx.globalAlpha = 1;
