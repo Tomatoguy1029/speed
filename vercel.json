@@ -5,9 +5,6 @@
   "buildCommand": "node build.js",
   "outputDirectory": "dist",
   "git": {
-    "deploymentEnabled": {
-      "**": false,
-      "main": true
-    }
+    "deploymentEnabled": false
   }
 }
