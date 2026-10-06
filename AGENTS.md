@@ -33,9 +33,9 @@ node build.js        # src/*.js を結合して dist/speed.html と dist/index.h
 node tools/balance.js 3 1 god   # 自動プレイで各フェーズの数値を計測（god=無敵）。引数: 回数 シード [god]
 ```
 
-- **テストは最小限**（ユーザー指示: デモなので毎回テストを書いたり回したりしない）。作業のまとまりの最後に 1 回 `node --test`
+- **自動テストはユーザーが依頼したときだけ**（2026-10-06の指示: イテレーションが遅くなるため、毎回のテスト実行は不要）。通常はビルドと変更箇所の画面確認で進める。長時間の自動プレイも実行しない
 - **dist/ はコミットする**（`speed.html` は単体で配布できる 1 ファイル。`index.html` は Vercel 用で中身は同じ）
-- **公開のしかた（Claude Code・Codex 共通）**: `main` に push すると Vercel の GitHub 連携が本番をデプロイする（Vercel 側でも `node build.js` を実行する）。自動でコミット・push する仕組みはない（以前の Claude Code の Stop フックは、別のエージェントの作業途中の変更までまとめてコミットしたため廃止）。変更したらビルド・テストのあと **自分が変えたファイルだけ** を `git add` してコミットし、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main`（force push しない）
+- **公開のしかた（Claude Code・Codex 共通）**: `main` に push すると Vercel の GitHub 連携が本番をデプロイする（Vercel 側でも `node build.js` を実行する）。自動でコミット・push する仕組みはない（以前の Claude Code の Stop フックは、別のエージェントの作業途中の変更までまとめてコミットしたため廃止）。変更したらビルド・変更箇所の画面確認のあと **自分が変えたファイルだけ** を `git add` してコミットし、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main`（force push しない）
 - **同じフォルダで複数のエージェント（Claude Code と Codex など）が作業することがある**。`git add -A` や `git commit -a` は使わない。他の人の未コミットの変更には触れない
 - **プレビューデプロイ**: main 以外のブランチは GitHub Actions（[.github/workflows/vercel-preview.yml](.github/workflows/vercel-preview.yml)）が Vercel CLI でプレビューをデプロイする（共同作業者のコミットも通る）。Vercel の GitHub 連携は main の本番だけ（`vercel.json` の `git.deploymentEnabled`）。プレビュー URL は Actions の実行結果（Summary）に出る
 - **公開の確認**: Vercel の公開 HTML が検証済みの `dist/index.html` と一致するまで確認し、ローカルコミットだけで公開反映済みと報告しない。ユーザーがローカル限定・公開保留を指定した場合はそれを優先する

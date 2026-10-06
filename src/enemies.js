@@ -128,12 +128,20 @@ function gunTimer(e, dt) {
 export const BEHAVIORS = {
   chase(e, game, dt) {
     const sh = enemyTarget(game);
-    // Approach different points rather than converging on exactly the same lagging coordinate.
-    // Close enemies still target the ship directly, so spreading the crowd does not remove contact threats.
-    const near = Math.min(1, Math.max(0, (Math.hypot(game.ship.x - e.x, game.ship.y - e.y) - 100) / 600));
-    const radius = CONFIG.enemyPursuitSpread * near * ((e.id * 0.61803398875) % 1);
-    const angle = e.id * 2.39996322973;
-    steerTo(e, sh.x + Math.cos(angle) * radius, sh.y + Math.sin(angle) * radius, e.speed, e.T.accel || 2, dt);
+    // Stagger pursuit so the whole population cannot settle around one central coordinate.
+    // Bosses keep pursuing directly; ordinary enemies alternate rushes and broad moving routes.
+    const cycle = (e.age + e.id * 1.61803398875) % CONFIG.enemyApproachCycle;
+    const roam = e.type === 'boss' ? 0 : Math.max(0, Math.min(1,
+      (cycle - CONFIG.enemyApproachTime) / CONFIG.enemyApproachBlend,
+      (CONFIG.enemyApproachCycle - cycle) / CONFIG.enemyApproachBlend));
+    const view = game.spawnView || { x: sh.x, y: sh.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+    const angle = e.id * 2.39996322973 + e.age * CONFIG.enemyRoamTurn;
+    const ux = Math.cos(angle), uy = Math.sin(angle);
+    const radius = (0.45 + 0.5 * Math.sqrt((e.id * 0.61803398875) % 1)) * Math.min(1, CONFIG.enemyPursuitSpread / 480);
+    const edge = radius / Math.max(Math.abs(ux), Math.abs(uy));
+    const tx = sh.x + (view.x + ux * edge * view.halfW - sh.x) * roam;
+    const ty = sh.y + (view.y + uy * edge * view.halfH - sh.y) * roam;
+    steerTo(e, tx, ty, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {

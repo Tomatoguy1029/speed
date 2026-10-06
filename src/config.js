@@ -124,7 +124,11 @@ export const CONFIG = {
   enemyArmorMult: 1,
   densityMult: 5,
   enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
-  enemyPursuitSpread: 480, // distributed approach targets, fading out near the actual ship
+  enemyPursuitSpread: 480, // width reference for roaming routes across the current view
+  enemyApproachCycle: 18,
+  enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
+  enemyApproachBlend: 2,
+  enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,

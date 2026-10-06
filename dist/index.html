@@ -210,7 +210,11 @@ const CONFIG = {
   enemyArmorMult: 1,
   densityMult: 5,
   enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
-  enemyPursuitSpread: 480, // distributed approach targets, fading out near the actual ship
+  enemyPursuitSpread: 480, // width reference for roaming routes across the current view
+  enemyApproachCycle: 18,
+  enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
+  enemyApproachBlend: 2,
+  enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 12,
@@ -600,12 +604,20 @@ function gunTimer(e, dt) {
 const BEHAVIORS = {
   chase(e, game, dt) {
     const sh = enemyTarget(game);
-    // Approach different points rather than converging on exactly the same lagging coordinate.
-    // Close enemies still target the ship directly, so spreading the crowd does not remove contact threats.
-    const near = Math.min(1, Math.max(0, (Math.hypot(game.ship.x - e.x, game.ship.y - e.y) - 100) / 600));
-    const radius = CONFIG.enemyPursuitSpread * near * ((e.id * 0.61803398875) % 1);
-    const angle = e.id * 2.39996322973;
-    steerTo(e, sh.x + Math.cos(angle) * radius, sh.y + Math.sin(angle) * radius, e.speed, e.T.accel || 2, dt);
+    // Stagger pursuit so the whole population cannot settle around one central coordinate.
+    // Bosses keep pursuing directly; ordinary enemies alternate rushes and broad moving routes.
+    const cycle = (e.age + e.id * 1.61803398875) % CONFIG.enemyApproachCycle;
+    const roam = e.type === 'boss' ? 0 : Math.max(0, Math.min(1,
+      (cycle - CONFIG.enemyApproachTime) / CONFIG.enemyApproachBlend,
+      (CONFIG.enemyApproachCycle - cycle) / CONFIG.enemyApproachBlend));
+    const view = game.spawnView || { x: sh.x, y: sh.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+    const angle = e.id * 2.39996322973 + e.age * CONFIG.enemyRoamTurn;
+    const ux = Math.cos(angle), uy = Math.sin(angle);
+    const radius = (0.45 + 0.5 * Math.sqrt((e.id * 0.61803398875) % 1)) * Math.min(1, CONFIG.enemyPursuitSpread / 480);
+    const edge = radius / Math.max(Math.abs(ux), Math.abs(uy));
+    const tx = sh.x + (view.x + ux * edge * view.halfW - sh.x) * roam;
+    const ty = sh.y + (view.y + uy * edge * view.halfH - sh.y) * roam;
+    steerTo(e, tx, ty, e.speed, e.T.accel || 2, dt);
     turnToward(e, angleToShip(e, game), e.T.turn || 4, dt);
   },
   dash(e, game, dt) {
@@ -852,15 +864,19 @@ function spawnPoint(game, extra = 0) {
   const sh = game.ship;
   const view = spawnBounds(game);
   for (let i = 0; i < 24; i++) {
-    // The short screen edge matters too: a circumscribed circle leaves wide empty strips.
-    let a = game.rng() * TAU;
-    if (Math.hypot(sh.vx, sh.vy) > 100 && game.rng() < 0.6) a = Math.atan2(sh.vy, sh.vx) + (game.rng() - 0.5) * Math.PI;
-    const ux = Math.cos(a), uy = Math.sin(a);
+    // Replenish the sparse sides rather than feeding an already packed approach direction.
+    const counts = game.spawnEdgeCounts || [0, 0, 0, 0];
+    const side = pickWeighted(game.rng, counts.map((count, edge) => [edge,
+      (edge < 2 ? view.halfH : view.halfW) / (count + 8)]));
     const margin = CONFIG.spawnMargin + extra + game.rng() * 80;
-    const d = Math.min((view.halfW + margin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + margin) / Math.max(0.0001, Math.abs(uy)));
-    const x = view.x + ux * d, y = view.y + uy * d;
+    const along = game.rng() * 2 - 1;
+    const x = view.x + (side < 2 ? (side === 0 ? -1 : 1) * (view.halfW + margin) : along * view.halfW);
+    const y = view.y + (side >= 2 ? (side === 2 ? -1 : 1) * (view.halfH + margin) : along * view.halfH);
     const r = Math.hypot(x, y);
-    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) {
+      counts[side]++;
+      return { x, y, a: Math.atan2(y - sh.y, x - sh.x) };
+    }
   }
   return null;
 }
@@ -951,6 +967,15 @@ function despawnFar(game) {
 
 function updateSpawner(game, dt) {
   if (!game.spawning) return;
+  const bounds = spawnBounds(game);
+  game.spawnEdgeCounts = [0, 0, 0, 0];
+  for (const e of game.enemies) {
+    if (e.dead || e.type === 'boss' || e.type === 'meteor') continue;
+    const dx = (e.x - bounds.x) / bounds.halfW, dy = (e.y - bounds.y) / bounds.halfH;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.45) continue;
+    const side = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 0 : 1) : (dy < 0 ? 2 : 3);
+    game.spawnEdgeCounts[side]++;
+  }
   if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
   keepMeteors(game);
@@ -5549,7 +5574,7 @@ const TUNABLES = [
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
-  { key: 'enemyPursuitSpread', label: '敵の接近経路の広がり', min: 0, max: 600, step: 20 },
+  { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
   { key: 'drawOfferInterval', label: '描画版の獲得画面 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'drawDropInterval', label: '描画版のドロップ 最低間隔（秒）', min: 0, max: 90, step: 5 },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },

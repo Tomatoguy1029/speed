@@ -28,15 +28,19 @@ function spawnPoint(game, extra = 0) {
   const sh = game.ship;
   const view = spawnBounds(game);
   for (let i = 0; i < 24; i++) {
-    // The short screen edge matters too: a circumscribed circle leaves wide empty strips.
-    let a = game.rng() * TAU;
-    if (Math.hypot(sh.vx, sh.vy) > 100 && game.rng() < 0.6) a = Math.atan2(sh.vy, sh.vx) + (game.rng() - 0.5) * Math.PI;
-    const ux = Math.cos(a), uy = Math.sin(a);
+    // Replenish the sparse sides rather than feeding an already packed approach direction.
+    const counts = game.spawnEdgeCounts || [0, 0, 0, 0];
+    const side = pickWeighted(game.rng, counts.map((count, edge) => [edge,
+      (edge < 2 ? view.halfH : view.halfW) / (count + 8)]));
     const margin = CONFIG.spawnMargin + extra + game.rng() * 80;
-    const d = Math.min((view.halfW + margin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + margin) / Math.max(0.0001, Math.abs(uy)));
-    const x = view.x + ux * d, y = view.y + uy * d;
+    const along = game.rng() * 2 - 1;
+    const x = view.x + (side < 2 ? (side === 0 ? -1 : 1) * (view.halfW + margin) : along * view.halfW);
+    const y = view.y + (side >= 2 ? (side === 2 ? -1 : 1) * (view.halfH + margin) : along * view.halfH);
     const r = Math.hypot(x, y);
-    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) {
+      counts[side]++;
+      return { x, y, a: Math.atan2(y - sh.y, x - sh.x) };
+    }
   }
   return null;
 }
@@ -127,6 +131,15 @@ function despawnFar(game) {
 
 export function updateSpawner(game, dt) {
   if (!game.spawning) return;
+  const bounds = spawnBounds(game);
+  game.spawnEdgeCounts = [0, 0, 0, 0];
+  for (const e of game.enemies) {
+    if (e.dead || e.type === 'boss' || e.type === 'meteor') continue;
+    const dx = (e.x - bounds.x) / bounds.halfW, dy = (e.y - bounds.y) / bounds.halfH;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.45) continue;
+    const side = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 0 : 1) : (dy < 0 ? 2 : 3);
+    game.spawnEdgeCounts[side]++;
+  }
   if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
   keepMeteors(game);
