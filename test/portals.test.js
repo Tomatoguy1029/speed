@@ -61,7 +61,7 @@ test('portal traversal attacks the path and arrival; selection changes do not de
   g.ship.x = 0; g.ship.y = -3000;
   const body = createEnemy('drifter', 1, 300, -3000), nearby = createEnemy('swarm', 1, 620, -2900);
   g.enemies.push(body, nearby); portalStart(g);
-  assert.ok(g.ship.x > 0 && g.ship.x < 600);
+  assert.equal(g.dashMeter, 1); assert.ok(g.ship.x > 0 && g.ship.x < 600);
   portalArrive(g); assert.ok(body.dead); assert.ok(nearby.dead);
   assert.equal(g.portalDash.phase, 'choose'); assert.equal(g.portalDash.next, next);
   const chaser = createEnemy('swarm', 1, 1100, -3000); g.enemies.push(chaser);
@@ -75,9 +75,9 @@ test('portal traversal attacks the path and arrival; selection changes do not de
 
 test('entry mounts without a gauge or automatic departure; placement under the ship does not activate', () => {
   const g = portalQuiet(); portalAnchor(g, 0); portalAnchor(g, 600);
-  g.ship.x = -90; g.ship.vx = 200; g.portalTouch = null;
+  g.ship.x = -90; g.ship.vx = 200; g.portalTouch = null; g.dashMeter = 0;
   for (let i = 0; i < 30 && !g.portalDash; i++) portalFrame(g);
-  assert.equal(g.portalDash.phase, 'choose'); assert.equal(g.ship.x, 0);
+  assert.equal(g.portalDash.phase, 'choose'); assert.equal(g.ship.x, 0); assert.equal(g.dashMeter, 0);
   const placed = portalQuiet(); portalAnchor(placed, 600); placed.ship.x = 0;
   portalFrame(placed, buildIntent({ place: true, move: portalIdle.move }, 'portal'));
   assert.equal(placed.portals.length, 2); assert.equal(placed.portalDash, null);
@@ -198,12 +198,13 @@ test('selection and a Space tap during flight buffer the chosen next edge; holdi
 });
 
 test('Space taps reach the nearest small portal with an empty gauge; blocked routes and growth remain respected', () => {
-  const g = portalQuiet(), small = portalAnchor(g, 80); g.ship.x = 0;
-  portalTap(g); assert.equal(g.portalDash.target, small);
+  const g = portalQuiet(), small = portalAnchor(g, 80); g.ship.x = 0; g.dashMeter = 0;
+  portalTap(g); assert.equal(g.portalDash.target, small); assert.equal(g.dashMeter, 0);
   const blocked = portalQuiet(); portalAnchor(blocked, 300); const clear = portalAnchor(blocked, 0, 600); blocked.ship.y = -3000;
   blocked.field.planet = { x: 150, y: -3000, r: 30, gm: 0 };
   portalTap(blocked); assert.equal(blocked.portalDash.target, clear);
   const initial = portalReach(blocked); blocked.stats.maxSpeed *= 2; assert.equal(portalReach(blocked), initial * 2);
+  addXp(g, 2); assert.equal(g.dashMeter, 0);
 });
 
 test('armored enemies still interrupt portal travel with immediate damage', () => {

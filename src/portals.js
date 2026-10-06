@@ -8,7 +8,7 @@ import { waveAlong, collideEnemies, damageShip } from './world.js';
 import { tracePortalLoop } from './portal-loops.js';
 
 export function portalGrowth(game) {
-  return game.stats.maxSpeed / CONFIG.baseMaxSpeed * game.stats.rangeMult * game.stats.gaugeMax;
+  return game.stats.maxSpeed / CONFIG.baseMaxSpeed * game.stats.drawLengthMult * game.stats.gaugeMax;
 }
 
 export function portalReach(game) {
@@ -268,7 +268,7 @@ export function portalWorldScale(game) {
   const d = game.portalDash;
   if (!d) return 1;
   return d.phase === 'choose' ? CONFIG.portalChooseScale
-    : Math.max(CONFIG.dashScaleMin, Math.min(1, CONFIG.dashSlowRef / Math.max(1, d.speed)));
+    : Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, d.speed)));
 }
 
 export function updatePortals(game, realDt) {

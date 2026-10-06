@@ -6,7 +6,7 @@ import { damageEnemy } from '../src/hits.js';
 import { CONFIG } from '../src/config.js';
 
 test('the lethal boss hit replays the approach, sweeps the field, shows clear, and awards once', () => {
-  const g = createGame({ scheme: 'hyper', seed: 4 });
+  const g = createGame({ scheme: 'draw-wasd', seed: 4 });
   g.spawning = false; g.field.moons = []; g.field.dust = [];
   Object.assign(g.ship, { x: 0, y: -3000, vx: 600, vy: 0, glide: true });
   const boss = createEnemy('boss', 1, 220, -3000);

@@ -11,9 +11,9 @@ import { beginBossFinish } from './finale.js';
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || game.state === 'finishing' || dmg <= 0) return;
   let fresh = e.hp >= e.maxHp - 1e-6;
-  // during a jump, the wave reaches an enemy just before the body does: judge "one-shot"
-  // by its HP when this jump first touched it, so wave + body still count as one strike
-  if (game.jump || game.portalDash) {
+  // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
+  // by its HP when this dash first touched it, so wave + body still count as one strike
+  if ((game.draw && game.draw.phase === 'run') || game.portalDash) {
     if (e.dashSeen !== game.dashId) { e.dashSeen = game.dashId; e.dashFresh = fresh; }
     fresh = e.dashFresh;
   }

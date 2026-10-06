@@ -1,8 +1,8 @@
-import { isHyperScheme } from './controls.js';
+import { isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
 import { finishCameraTarget, drawBossFinish } from './finale.js';
 import { clamp, makeRng, TAU } from './math.js';
-import { predictPath, annotatePrediction, previewPath, waveRadius, hyperReach, jumpTarget, hyperMaxCharges } from './world.js';
+import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
@@ -60,6 +60,11 @@ function updateCamera(r, game, dt) {
     r.cam.zoom += (finishTarget.zoom - r.cam.zoom) * k;
     return;
   }
+  if (game.draw && r.cam.ready) {
+    // hold the view still while a path is drawn and traced, so it is followed exactly where it was drawn
+    game.viewRadius = Math.hypot(r.W, r.H) / 2 / r.cam.zoom;
+    return;
+  }
   const zoomT = targetZoom(game, r.W, r.H);
   // look ahead along the velocity, but keep the ship well inside the screen at any speed
   let ox = sh.vx * CONFIG.lookAhead, oy = sh.vy * CONFIG.lookAhead;
@@ -109,6 +114,7 @@ export function render(r, game, dt, pointer) {
 
   ctx.save();
   let sx = 0, sy = 0;
+  if (game.draw && game.draw.phase === 'draw') r.shake = 0; // no jitter while placing a path
   if (r.shake > 0) {
     sx = (Math.random() - 0.5) * r.shake;
     sy = (Math.random() - 0.5) * r.shake;
@@ -128,9 +134,8 @@ export function render(r, game, dt, pointer) {
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
   drawPortals(r, game);
-  drawHyperUi(r, game, pointer);
+  drawPathUi(r, game);
   drawFriendly(r, game, dt);
-  drawWeapons(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
@@ -143,7 +148,7 @@ export function render(r, game, dt, pointer) {
   if (game.state !== 'finishing') {
     drawChargeUi(r, game, pointer);
     drawCapsuleArrows(r, game);
-    drawHyperHud(r, game);
+    drawDrawingHud(r, game, pointer);
     drawPortalHud(r, game);
     drawOverlays(r, game, dt);
     drawHud(r, game);
@@ -351,67 +356,6 @@ function drawFriendly(r, game, dt) {
   ctx.globalAlpha = 1;
 }
 
-// Level-up weapons: orbit blades, missiles, discs, lightning and beams.
-function drawWeapons(r, game) {
-  const { ctx } = r;
-  const z = r.cam.zoom;
-  ctx.save();
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const f of game.wfx) {
-    const a = f.life / f.max;
-    if (f.kind === 'beam') {
-      ctx.strokeStyle = `rgba(255,107,213,${0.35 * a})`; ctx.lineWidth = f.width * 1.8;
-      ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,230,250,${a})`; ctx.lineWidth = f.width * 0.45;
-      ctx.stroke();
-    } else if (f.kind === 'bolt') {
-      ctx.strokeStyle = `rgba(168,240,255,${a})`; ctx.lineWidth = 3 / z;
-      ctx.beginPath(); ctx.moveTo(f.pts[0].x, f.pts[0].y);
-      for (let i = 1; i < f.pts.length; i++) {
-        const p = f.pts[i - 1], q = f.pts[i];
-        const nx = -(q.y - p.y) * 0.18, ny = (q.x - p.x) * 0.18, k = (i % 2 ? 1 : -1) * (0.5 + 0.5 * Math.sin(game.t * 60 + i));
-        ctx.lineTo((p.x + q.x) / 2 + nx * k, (p.y + q.y) / 2 + ny * k);
-        ctx.lineTo(q.x, q.y);
-      }
-      ctx.stroke();
-    }
-  }
-  for (const p of game.wproj) {
-    if (!onScreen(r, p.x, p.y, 60)) continue;
-    if (p.kind === 'missile') {
-      const a = Math.atan2(p.vy, p.vx), s = 9;
-      ctx.fillStyle = '#ff9f40';
-      ctx.beginPath();
-      ctx.moveTo(p.x + Math.cos(a) * s, p.y + Math.sin(a) * s);
-      ctx.lineTo(p.x + Math.cos(a + 2.5) * s * 0.7, p.y + Math.sin(a + 2.5) * s * 0.7);
-      ctx.lineTo(p.x + Math.cos(a - 2.5) * s * 0.7, p.y + Math.sin(a - 2.5) * s * 0.7);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(255,200,120,0.5)';
-      ctx.beginPath(); ctx.arc(p.x - Math.cos(a) * s, p.y - Math.sin(a) * s, 4, 0, TAU); ctx.fill();
-    } else if (p.kind === 'disc') {
-      ctx.strokeStyle = '#6dffb0'; ctx.lineWidth = 3 / z;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke();
-      ctx.beginPath();
-      for (let k = 0; k < 3; k++) { const a = p.spin + k * TAU / 3; ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(a) * p.r, p.y + Math.sin(a) * p.r); }
-      ctx.stroke();
-    }
-  }
-  const orbit = game.wstate.orbit;
-  if (orbit?.blades && game.weapons.orbit) {
-    ctx.fillStyle = '#9fe8ff';
-    for (const b of orbit.blades) {
-      const s = 14, a = b.a + Math.PI / 2;
-      ctx.beginPath();
-      ctx.moveTo(b.x + Math.cos(a) * s, b.y + Math.sin(a) * s);
-      ctx.lineTo(b.x + Math.cos(a + 1.9) * s * 0.4, b.y + Math.sin(a + 1.9) * s * 0.4);
-      ctx.lineTo(b.x - Math.cos(a) * s, b.y - Math.sin(a) * s);
-      ctx.lineTo(b.x + Math.cos(a - 1.9) * s * 0.4, b.y + Math.sin(a - 1.9) * s * 0.4);
-      ctx.closePath(); ctx.fill();
-    }
-  }
-  ctx.restore();
-}
-
 function drawOverlays(r, game, dt) {
   const { ctx, W, H } = r;
   if (r.hurt > 0) {
@@ -539,6 +483,19 @@ function drawBodies(r, game) {
   }
 }
 
+// Draw scheme: while charging, show how far a path could reach.
+function drawReach(r, game) {
+  const sh = game.ship;
+  const reach = drawBudget(game, sh.gauge);
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.strokeStyle = sh.gauge >= 1 ? 'rgba(255,228,107,0.7)' : 'rgba(159,232,255,0.55)';
+  ctx.lineWidth = 2 / z;
+  ctx.setLineDash([14 / z, 10 / z]);
+  ctx.beginPath(); ctx.arc(sh.x, sh.y, reach, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function drawPortalRoute(r, origin, target, color, width, arrow = false) {
   const { ctx } = r, z = r.cam.zoom;
   ctx.strokeStyle = color; ctx.lineWidth = width / z;
@@ -650,120 +607,124 @@ function drawPortalHud(r, game) {
   }
 }
 
-// Hyperdrive, in the world: the reach circle, the aimed jump with what it would cut, and the jump in flight.
-function drawHyperUi(r, game, pointer) {
-  if (!isHyperScheme(game.scheme) || game.state !== 'play') return;
+function drawPathUi(r, game) {
+  const d = game.draw;
+  if (!d) return;
   const { ctx } = r;
   const z = r.cam.zoom;
-  const sh = game.ship, h = game.hyper, j = game.jump;
-  ctx.save();
+  const sh = game.ship;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  // vortices left by jumps (perk): a fading disc and three turning arcs
-  for (const v of game.vortices) {
-    const a = v.life / v.max;
-    ctx.fillStyle = `rgba(150,110,255,${0.1 * a})`;
-    ctx.beginPath(); ctx.arc(v.x, v.y, v.r, 0, TAU); ctx.fill();
-    ctx.strokeStyle = `rgba(190,160,255,${0.7 * a})`; ctx.lineWidth = 3 / z;
-    for (let k = 0; k < 3; k++) {
-      const s = -game.t * 5 + k * TAU / 3, rr = v.r * (0.35 + 0.25 * k);
-      ctx.beginPath(); ctx.arc(v.x, v.y, rr, s, s + 1.6); ctx.stroke();
-    }
-  }
-  if (j) {
-    ctx.strokeStyle = 'rgba(159,232,255,0.16)';
+  if (d.phase === 'run') {
+    ctx.strokeStyle = 'rgba(159,232,255,0.14)';
     ctx.lineWidth = waveRadius(game) * 2;
-    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(j.to.x, j.to.y); ctx.stroke();
-    ctx.strokeStyle = 'rgba(214,246,255,0.75)';
-    ctx.lineWidth = 3 / z;
-    ctx.beginPath(); ctx.moveTo(j.from.x, j.from.y); ctx.lineTo(j.to.x, j.to.y); ctx.stroke();
-  }
-  if (h.focus) {
-    const ready = h.charges >= 1;
-    const reach = hyperReach(game);
-    ctx.strokeStyle = ready ? 'rgba(255,228,107,0.75)' : 'rgba(159,232,255,0.4)';
-    ctx.lineWidth = 2 / z;
-    ctx.setLineDash([14 / z, 10 / z]);
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, reach, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(159,232,255,0.4)';
+    ctx.lineWidth = 4 / z;
+    ctx.setLineDash([10 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y);
+    for (let i = d.seg + 1; i < d.path.length; i++) ctx.lineTo(d.path[i].x, d.path[i].y);
+    ctx.stroke();
     ctx.setLineDash([]);
-    const hover = pointer?.hover;
-    if (!j && ready && hover) {
-      const c = screenToWorld(r, hover.x, hover.y);
-      const t = jumpTarget(game, c);
-      const pv = previewPath(game, [{ x: sh.x, y: sh.y }, t]);
-      ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = waveRadius(game) * 2;
-      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(t.x, t.y); ctx.stroke();
-      ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3 / z;
-      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(t.x, t.y); ctx.stroke();
-      // white/yellow: the ship body cuts it; cyan: only the wave reaches it
-      for (const [e, tg] of pv.targets) {
-        ctx.strokeStyle = tg.crit ? '#ffe46b' : tg.body ? 'rgba(255,255,255,0.9)' : 'rgba(120,225,255,0.85)';
-        ctx.lineWidth = 3 / z;
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
-      }
-      if (pv.block) {
-        const k = 12 / z, b = pv.block;
-        ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 4 / z;
-        ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k); ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
-      }
-      ctx.strokeStyle = t.blocked ? '#ffb340' : '#ffe46b';
-      ctx.lineWidth = 3 / z;
-      ctx.beginPath(); ctx.arc(t.x, t.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(255,228,107,0.6)'; ctx.lineWidth = 2 / z;
-    for (const q of h.queue) { ctx.beginPath(); ctx.arc(q.x, q.y, 10 / z, 0, TAU); ctx.stroke(); }
+    return;
   }
-  ctx.restore();
+  const pts = d.points;
+  if (!pts.length) {
+    // not started yet: the ship will blink to wherever the player clicks
+    if (!d.cursor) return;
+    ctx.strokeStyle = 'rgba(214,246,255,0.25)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([4 / z, 10 / z]);
+    ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.setLineDash([8 / z, 6 / z]);
+    ctx.strokeStyle = 'rgba(214,246,255,0.8)';
+    ctx.beginPath(); ctx.arc(d.cursor.x, d.cursor.y, CONFIG.shipRadius + 6 / z, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    return;
+  }
+  const line = () => { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const p of pts) ctx.lineTo(p.x, p.y); };
+  if (pts.length > 1) {
+    // the band is the real hit width of the trace
+    line(); ctx.strokeStyle = 'rgba(95,216,255,0.16)'; ctx.lineWidth = waveRadius(game) * 2; ctx.stroke();
+    line(); ctx.strokeStyle = 'rgba(159,232,255,0.35)'; ctx.lineWidth = 2 / z; ctx.setLineDash([]);
+    ctx.stroke();
+    line(); ctx.strokeStyle = '#d6f6ff'; ctx.lineWidth = 3.5 / z; ctx.stroke();
+  }
+  if (d.inputMethod === 'points') {
+    ctx.fillStyle = '#d6f6ff';
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 5 / z, 0, TAU); ctx.fill(); }
+  }
+  const last = pts[pts.length - 1];
+  if (d.cursor && d.used < d.budget - 0.5) {
+    ctx.strokeStyle = 'rgba(214,246,255,0.3)';
+    ctx.lineWidth = 2 / z;
+    ctx.setLineDash([6 / z, 8 / z]);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  const pv = previewPath(game);
+  // enemies the band will cut: white ring, yellow if through the weak spot
+  for (const [e, t] of pv.targets) {
+    // white/yellow: the ship body cuts it; cyan: only the wave reaches it
+    ctx.strokeStyle = t.crit ? '#ffe46b' : t.body ? 'rgba(255,255,255,0.9)' : 'rgba(120,225,255,0.85)';
+    ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 7 / z, 0, TAU); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffe46b';
+  for (const p of pv.samples) if (p.hot) { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / z, 0, TAU); ctx.fill(); }
+  if (pv.block) {
+    const k = 12 / z, b = pv.block;
+    ctx.strokeStyle = '#ff4d4d'; ctx.lineWidth = 4 / z;
+    ctx.beginPath(); ctx.moveTo(b.x - k, b.y - k); ctx.lineTo(b.x + k, b.y + k); ctx.moveTo(b.x + k, b.y - k); ctx.lineTo(b.x - k, b.y + k); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
 }
 
-// Hyperdrive, on screen: charge pips under the ship, plus the slow-motion tint and hints in the mode.
-function drawHyperHud(r, game) {
-  if (!isHyperScheme(game.scheme) || game.state !== 'play') return;
+// One cursor ring shows charge before drawing and remaining path length while drawing.
+function drawDrawingHud(r, game, pointer) {
+  if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
+  const d = game.draw;
+  if (d && d.phase !== 'draw') return;
   const { ctx, W, H } = r;
-  const h = game.hyper;
+  const tip = d?.points[d.points.length - 1] || d?.cursor;
+  const p = tip ? worldToScreen(r, tip.x, tip.y)
+    : pointer?.hover && pointer.pointerType !== 'touch' ? pointer.hover
+    : worldToScreen(r, game.ship.x, game.ship.y);
+  const frac = clamp(d ? 1 - d.used / d.budget : game.dashMeter, 0, 1);
+  const drawing = d?.started;
+  const ready = !d && frac >= 1;
+  const color = ready ? '#ffe46b' : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
+  const radius = 24, x = clamp(p.x, radius + 4, W - radius - 4), y = clamp(p.y, radius + 4, H - radius - 24);
   ctx.save();
-  if (h.focus) {
-    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.hypot(W, H) / 2);
-    g.addColorStop(0, 'rgba(40,70,140,0)');
-    g.addColorStop(1, 'rgba(40,70,140,0.35)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  }
-  const p = worldToScreen(r, game.ship.x, game.ship.y);
-  const n = hyperMaxCharges(game), gap = 14, w = 10;
-  const x0 = clamp(p.x - ((n - 1) * gap) / 2, 8, W - (n - 1) * gap - 8), y = clamp(p.y + 34, 8, H - 30);
-  for (let i = 0; i < n; i++) {
-    const x = x0 + i * gap;
-    const fill = i < h.charges ? 1 : i === h.charges ? h.progress : 0;
-    ctx.fillStyle = 'rgba(3,8,20,0.85)';
-    ctx.fillRect(x - w / 2 - 1, y - 4, w + 2, 8);
-    ctx.fillStyle = 'rgba(190,215,255,0.2)';
-    ctx.fillRect(x - w / 2, y - 3, w, 6);
-    if (fill > 0) {
-      ctx.fillStyle = fill >= 1 ? (h.focus ? '#ffe46b' : '#9fe8ff') : 'rgba(159,232,255,0.55)';
-      ctx.fillRect(x - w / 2, y - 3, w * fill, 6);
-    }
-  }
-  if (h.focus) {
-    const label = h.charges >= 1 ? `クリックでジャンプ（残り ${h.charges}）・Space／右クリックで解除` : 'ジャンプ中…';
-    ctx.font = `13px "Hiragino Sans", "Noto Sans JP", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(3,8,20,0.95)';
-    const ty = Math.max(70, H * 0.16);
-    ctx.strokeText(label, W / 2, ty);
-    ctx.fillStyle = '#ffe46b';
-    ctx.fillText(label, W / 2, ty);
-    if (CONFIG.hyperFocusMax > 0) {
-      const bw = Math.min(240, W - 32), frac = clamp(1 - h.focusT / CONFIG.hyperFocusMax, 0, 1);
-      ctx.fillStyle = 'rgba(3,8,20,0.85)'; ctx.fillRect((W - bw) / 2 - 1, ty + 9, bw + 2, 6);
-      ctx.fillStyle = frac < 0.3 ? '#ffb340' : '#9fe8ff'; ctx.fillRect((W - bw) / 2, ty + 10, bw * frac, 4);
-    }
-  }
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(3,8,20,0.9)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(190,215,255,0.22)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = color;
+  if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
+  const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
+  const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
+    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+  ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(3,8,20,0.95)';
+  const lx = clamp(x, ctx.measureText(label).width / 2 + 4, W - ctx.measureText(label).width / 2 - 4);
+  ctx.strokeText(label, lx, y + radius + 17);
+  ctx.fillStyle = color;
+  ctx.fillText(label, lx, y + radius + 17);
   ctx.restore();
 }
 
 function drawPrediction(r, game) {
   const sh = game.ship;
   if (!sh.charging) return;
+  if (isDrawScheme(game.scheme)) { drawReach(r, game); return; }
   let ax = sh.aimX, ay = sh.aimY;
   if (Math.hypot(ax, ay) < CONFIG.minDrag) { ax = sh.vx; ay = sh.vy; }
   if (Math.hypot(ax, ay) < 1) return;
@@ -1144,7 +1105,7 @@ function drawShip(r, game) {
 // Aim marker: a Space launch goes this way (scheme dependent).
 function drawAimMarker(r, game) {
   const sh = game.ship;
-  if (sh.charging || game.state !== 'play' || isHyperScheme(game.scheme)) return;
+  if (sh.charging || game.state !== 'play') return;
   const { ctx } = r;
   const p = worldToScreen(r, sh.x, sh.y);
   const ux = sh.markX, uy = sh.markY; // where a Space launch would go under the current scheme
@@ -1164,9 +1125,9 @@ function drawAimMarker(r, game) {
   ctx.globalAlpha = 1;
 }
 
-// Hyperdrive scheme: the virtual stick (press point + knob) while the pointer is held outside the mode.
+// Draw scheme: the virtual stick (press point + knob) while the pointer is held.
 function drawStick(r, game, pointer) {
-  if (game.scheme !== 'hyper' || game.hyper.focus || !pointer || !pointer.down || pointer.pointerType !== 'touch' || game.state !== 'play') return;
+  if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || pointer.pointerType !== 'touch' || game.state !== 'play') return;
   const { ctx } = r;
   const R = CONFIG.stickRadius;
   ctx.save();

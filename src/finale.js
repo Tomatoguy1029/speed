@@ -22,8 +22,7 @@ export function beginBossFinish(game, boss, hit = {}) {
   game.endReason = 'boss';
   game.spawning = false;
   game.hitstop = game.slowmo = game.acc = 0;
-  game.jump = game.portalDash = game.releasePending = null;
-  if (game.hyper) { game.hyper.focus = false; game.hyper.queue = []; }
+  game.draw = game.portalDash = game.releasePending = null;
   game.offerQueue.length = 0;
   game.currentOffer = null;
   sh.charging = false; sh.invulnT = 0;

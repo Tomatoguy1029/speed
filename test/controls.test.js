@@ -26,11 +26,11 @@ function chargeAndRelease(game, intent = {}) {
   update(game, 0.02, { ...idle, ...intent, release: true, keyboard: true });
 }
 
-test('every scheme has a name and help text; hyperdrive is the default', () => {
+test('every scheme has a name and help text; drawing a path is the default', () => {
   assert.ok(SCHEMES.length >= 8);
   for (const s of SCHEMES) assert.ok(s.id && s.name && s.help, s.id);
-  assert.equal(CONFIG.controlScheme, 'hyper');
-  assert.equal(createGame({ seed: 1 }).scheme, 'hyper');
+  assert.equal(CONFIG.controlScheme, 'draw');
+  assert.equal(createGame({ seed: 1 }).scheme, 'draw');
 });
 
 // ---- intents per scheme ----
@@ -58,6 +58,20 @@ test('keyboard schemes: Space charges with the scheme aim, a mouse drag still wo
     i = buildIntent(raw({ pointerDown: true, drag: { x: 0, y: -80 } }), id);
     assert.equal(i.keyboard, false, id); assert.equal(i.aimY, -80, id);
   }
+});
+
+test('WASD drawing controls ignore the cursor for movement and use Space for a gauge dash', () => {
+  const game = quiet('draw-wasd');
+  const cursor = { x: 0, y: -1000 };
+  const intent = buildIntent(raw({ pointerDown: true, cursor }), 'draw-wasd');
+  assert.equal(intent.charging, false, 'mouse presses must not start a charge');
+  run(game, intent, 0.2);
+  assert.equal(speed(game), 0, 'moving the mouse alone does not move the ship');
+  run(game, buildIntent(raw({ move: RIGHT, cursor }), 'draw-wasd'), 0.5);
+  assert.ok(game.ship.vx > 100 && Math.abs(game.ship.vy) < 1);
+  update(game, 0.02, buildIntent(raw({ dash: true, space: true, cursor }), 'draw-wasd'));
+  assert.equal(game.draw?.phase, 'draw');
+  assert.equal(game.dashMeter, 0);
 });
 
 // ---- mouse: go where the cursor is ----

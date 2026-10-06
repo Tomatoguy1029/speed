@@ -134,7 +134,7 @@ test('capsules appear on the field over time', () => {
   game.debug.invincible = true;
   game.debug.autoOffer = 'discard';
   run(game, 3);
-  assert.ok(game.capsules.length >= CONFIG.hyperCapsuleCount);
+  assert.ok(game.capsules.length >= CONFIG.drawCapsuleCount);
 });
 
 test('power cores appear near the planet in the escape phase', () => {

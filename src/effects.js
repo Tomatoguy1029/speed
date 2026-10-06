@@ -1,4 +1,4 @@
-import { isHyperScheme } from './controls.js';
+import { isDrawScheme } from './controls.js';
 // Module effects that change how the ship attacks, plus field capsules and power cores.
 import { CONFIG } from './config.js';
 import { attackPower } from './combat.js';
@@ -48,6 +48,7 @@ export function endTraceAttack(game) {
 export function onPierce(game, x = game.ship.x, y = game.ship.y) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
+  if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
   if (s.pierceWave) explode(game, x, y, s.pierceWave.radius,
     attackPower(Math.hypot(sh.vx, sh.vy), s) * s.pierceWave.mult,
     { cause: 'pierceWave', color: '#9fe8ff', knock: 350, life: 0.3 });
@@ -68,7 +69,7 @@ export function updateEffects(game, dt) {
   if (sh.boostT > 0 && !game.dashActive && !game.traceEndHandled) { game.dashActive = true; game.dashPeakAtk = 0; }
   if (game.dashActive) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
-    if (sh.boostT <= 0 && !game.portalDash && !game.jump) finishDash(game);
+    if (sh.boostT <= 0 && !game.portalDash && !game.draw) finishDash(game);
   }
 
   // charge shockwave
@@ -168,8 +169,7 @@ function updateFriendly(game, dt) {
       b.hit.add(e.id);
       const sp = Math.hypot(b.vx, b.vy) || 1;
       damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
-      if (b.pierceLeft > 0) b.pierceLeft--;
-      else if (!b.pierce) b.life = 0;
+      if (!b.pierce) b.life = 0;
     });
   }
   game.fbullets = B.filter((b) => b.life > 0);
@@ -177,7 +177,7 @@ function updateFriendly(game, dt) {
 
 function fieldCapsulePoint(game) {
   const rng = game.rng;
-  if (isHyperScheme(game.scheme)) {
+  if (isDrawScheme(game.scheme)) {
     // Put build opportunities within reach of the current fight, rather than across the whole map.
     const distance = Math.max(200, game.viewRadius * (0.25 + rng() * 0.3));
     for (let i = 0; i < 16; i++) {
@@ -198,12 +198,12 @@ function fieldCapsulePoint(game) {
 
 function updateCapsules(game, dt) {
   const F = game.fx2, sh = game.ship;
-  if (isHyperScheme(game.scheme)) game.capsules = game.capsules.filter(c => c.src !== 'field' || Math.hypot(c.x - sh.x, c.y - sh.y) < game.viewRadius * 2);
+  if (isDrawScheme(game.scheme)) game.capsules = game.capsules.filter(c => c.src !== 'field' || Math.hypot(c.x - sh.x, c.y - sh.y) < game.viewRadius * 2);
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
-    const fieldCount = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleCount : CONFIG.capsuleCount;
-    const fieldInterval = isHyperScheme(game.scheme) ? CONFIG.hyperCapsuleInterval : CONFIG.capsuleInterval;
+    const fieldCount = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleCount : CONFIG.capsuleCount;
+    const fieldInterval = isDrawScheme(game.scheme) ? CONFIG.drawCapsuleInterval : CONFIG.capsuleInterval;
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);

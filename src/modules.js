@@ -1,4 +1,4 @@
-import { isHyperScheme } from './controls.js';
+import { isDrawScheme } from './controls.js';
 import { baseStats } from './ship.js';
 import { pickWeighted } from './math.js';
 import { CONFIG } from './config.js';
@@ -53,11 +53,8 @@ export const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
-  { id: 'slipstream', slot: 'booster', name: 'スリップストリーム', rarities: ALL, schemeOnly: 'hyper',
-    desc: (r) => `同じ方向（±${CONFIG.streakAngle}°）へ続けてジャンプするたびに速度 +${pct(0.15 * M(r))}（最大 ${CONFIG.streakMax} 段。速度＝攻撃力）。${CONFIG.streakWindow} 秒途切れるか向きを変えるとリセット`,
-    apply: (s, m) => { s.streakBoost = 0.15 * m; } },
-  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
+    desc: (r) => `経路を駆け抜ける速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
     apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
   { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
     desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
@@ -70,16 +67,16 @@ export const MODULES = [
   { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
     desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
     apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
-  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true, drawExcluded: true,
     desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
     apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
   { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
     desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
     apply: (s, m) => { s.turret = m; } },
-  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, hyperOnly: true,
+  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, drawOnly: true,
     desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
     apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
-  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, hyperOnly: true,
+  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, drawOnly: true,
     desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
     apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
   { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
@@ -90,16 +87,16 @@ export const MODULES = [
   { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
     desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
     apply: (s, m) => { s.portalWave = m; } },
-  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL, hyperExcluded: true,
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL, drawExcluded: true,
     desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
     apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
-  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL, hyperExcluded: true,
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL, drawExcluded: true,
     desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
     apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
-  { id: 'finishPulse', slot: 'radar', name: '終端爆縮器', rarities: ALL, hyperOnly: true, portalExcluded: true,
+  { id: 'finishPulse', slot: 'radar', name: '終端爆縮器', rarities: ALL, drawOnly: true, portalExcluded: true,
     desc: (r) => `描いた経路の移動終了時に爆発（半径 ${Math.round(180 * (1 + 0.2 * r))}、威力 ${pct(0.7 * M(r))}）。弾かれた地点でも発動`,
     apply: (s, m, r) => { s.traceEndBlast = { radius: 180 * (1 + 0.2 * r), mult: 0.7 * m }; } },
-  { id: 'impactPulse', slot: 'radar', name: '連鎖パルス', rarities: [2, 3], hyperOnly: true, portalExcluded: true,
+  { id: 'impactPulse', slot: 'radar', name: '連鎖パルス', rarities: [2, 3], drawOnly: true, portalExcluded: true,
     desc: (r) => `敵を貫くたびに波動で周囲へ攻撃（半径 ${Math.round(95 * (1 + 0.2 * r))}、威力 ${pct(0.25 * M(r))}）`,
     apply: (s, m, r) => { s.pierceWave = { radius: 95 * (1 + 0.2 * r), mult: 0.25 * m }; } },
   { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
@@ -125,21 +122,20 @@ export const MODULES = [
 
   // ジェネレーター: エネルギーとチャージ
   { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
-    desc: (r, scheme) => `${scheme === 'hyper' ? 'ジャンプの充填時間' : 'チャージ時間'} -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
     apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
   { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
-    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
     apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  // not in hyperdrive: refilling jumps on hits allowed endless dashing
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
     desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
-  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.rangeMult *= 1 + 0.25 * m; } },
-  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, hyperOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
-    apply: (s, m) => { s.rangeMult *= 1 + 0.8 * m; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
   { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
     desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
     apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
@@ -155,11 +151,10 @@ export function moduleDef(id) {
 }
 
 export function moduleFitsScheme(m, scheme) {
-  return (!m.hyperOnly || !scheme || isHyperScheme(scheme) || scheme === 'portal')
+  return (!m.drawOnly || !scheme || isDrawScheme(scheme) || scheme === 'portal')
     && (!m.portalOnly || scheme === 'portal')
-    && (!m.hyperExcluded || !isHyperScheme(scheme))
-    && (!m.portalExcluded || scheme !== 'portal')
-    && (!m.schemeOnly || scheme === m.schemeOnly);
+    && (!m.drawExcluded || !isDrawScheme(scheme))
+    && (!m.portalExcluded || scheme !== 'portal');
 }
 
 // bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
