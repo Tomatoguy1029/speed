@@ -12,11 +12,22 @@
 | ファイル | 中身 | いつ更新するか |
 |---|---|---|
 | [docs/spec.md](docs/spec.md) | 現在の仕様（操作・数値・画面・計測値） | 挙動や数値を変えたとき |
+| [docs/weapons.md](docs/weapons.md) | 武器の候補・効果・採否・既存処理・保留枠 | 武器の追加・仕様変更・採否判断・実装時 |
+| [docs/traits.md](docs/traits.md) | 特性の候補・発動条件・重ね掛け・採否・既存処理 | 特性の追加・仕様変更・採否判断・実装時 |
+| [docs/enemies.md](docs/enemies.md) | 敵の種類・基礎数値・行動・出現・実装状態 | 敵の追加・数値・行動・出現条件の変更時 |
+| [docs/module-plan.md](docs/module-plan.md) | 武器・特性の共通設計（装備枠・成長・入手方法） | 共通方針を変えたとき |
+| [docs/catalog.md](docs/catalog.md) | 一覧の運用ルール | 管理方針を変えたとき |
 | [docs/wakida.md](docs/wakida.md) | [Tomatoguy1029](https://github.com/Tomatoguy1029)の作業・判断の履歴（旧 decisions.md） | Tomatoguy1029 の作業時に末尾へ追記 |
 | [docs/shumak.md](docs/shumak.md) | [ShueMaker70969](https://github.com/ShueMaker70969) の作業・判断の履歴 | ShueMaker70969 の作業時に末尾へ追記 |
 | [docs/keporusu.md](docs/keporusu.md) | [keporusu](https://github.com/keporusu) の作業・判断の履歴 | keporusu の作業時に末尾へ追記 |
 | [docs/backlog.md](docs/backlog.md) | 未解決の課題・次の候補・保留中の議論 | 課題が見つかった／片付いたとき |
 | `tasks/plan.md`, `tasks/todo.md` | 最初の実装計画（完了済み、記録として残す） | 更新しない |
+
+### コンテンツ一覧の更新
+
+- 武器・特性・敵に関する作業前に [docs/catalog.md](docs/catalog.md) と該当一覧を読む。追加・変更・採否判断・実装の同じ作業で一覧も更新する。
+- 個別の一覧を正本とし、候補・採用・保留・不採用と実装状況を区別する。提案を採用済みにせず、現行の類似処理と新仕様の違いを明記する。
+- 武器の保留枠は通常候補と分離したまま保持する。廃止・保留した項目は理由と参照先を残す。詳細な運用は `docs/catalog.md` に従う。
 
 ### ユーザーごとの記録更新
 

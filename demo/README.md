@@ -114,6 +114,11 @@ demo または公開設定を変更してpushすると、ルートのGitHub Acti
 ## 設計・作業の記録
 
 - [現在の仕様](docs/spec.md)：実装済みの操作・数値・画面
+- [武器一覧](docs/weapons.md)：候補・効果・ルートへの影響・保留枠
+- [特性一覧](docs/traits.md)：候補・発動条件・重ね掛け・既存効果
+- [敵一覧](docs/enemies.md)：種類・基礎数値・行動・出現
+- [一覧の運用ルール](docs/catalog.md)：追加・変更・採否・実装状況の更新方法
+- [武器・特性の共通設計](docs/module-plan.md)：装備枠・成長・入手方法
 - [wakida の履歴](docs/wakida.md)：Tomatoguy1029の作業内容・変更の理由・決定事項（既存の履歴を継承）
 - [ShueMaker70969 の履歴](docs/shumak.md)：ShueMaker70969 の作業内容・変更の理由・決定事項
 - [keporusu の履歴](docs/keporusu.md)：keporusu の作業内容・変更の理由・決定事項
