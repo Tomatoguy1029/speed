@@ -464,7 +464,7 @@ function runAlongPath(game, realDt) {
   }
   if (r.seg >= r.path.length - 1) {
     game.draw = null;
-    sh.glide = true; // leave the line along its last segment until a collision interrupts it
+    sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
   }
 }

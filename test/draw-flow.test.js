@@ -36,9 +36,25 @@ test('a pickup during tracing waits until the line ends, then resumes with the s
   assert.ok(game.ship.x >= 800);
   assert.ok(game.ship.glide);
   resolveOffer(game, true);
-  for (let i = 0; i < 150; i++) update(game, 0.02, { ...flowIdle, cursor: { x: -1000, y: -3000 } });
-  assert.equal(game.ship.vx, vx, 'cursor, boost expiry and cruise drag must not end the straight flight');
+  for (let i = 0; i < 150; i++) update(game, 0.02, flowIdle);
+  assert.equal(game.ship.vx, vx, 'boost expiry and cruise drag must not reduce post-trace speed');
   assert.equal(game.ship.vy, 0);
+});
+
+test('post-trace mouse and touch steering change direction without losing launch speed', () => {
+  for (const touch of [false, true]) {
+    const game = flowGame();
+    const speed = game.stats.maxSpeed * 2;
+    Object.assign(game.ship, { vx: speed, glide: true });
+    for (let i = 0; i < 25; i++) {
+      const steer = touch ? { stick: { x: 0, y: CONFIG.stickDeadZone + 1 } }
+        : { cursor: { x: game.ship.x, y: game.ship.y + 1000 } };
+      update(game, 0.02, { ...flowIdle, ...steer });
+    }
+    assert.ok(game.ship.vy > speed * 0.99, 'input must turn the flight toward the chosen direction');
+    assert.ok(Math.abs(Math.hypot(game.ship.vx, game.ship.vy) - speed) < 1e-6);
+    assert.ok(game.ship.glide);
+  }
 });
 
 test('post-trace flight pierces fodder without slowing, but an armored bounce restores ordinary movement', () => {
