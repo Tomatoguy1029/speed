@@ -67,21 +67,18 @@
   #debug .drow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 6px; }
   #debug .drow input { grid-column: 1 / 3; width: 100%; }
   #debug .dval { font-family: ui-monospace, Menlo, monospace; color: #ffd24a; }
-  #dashBtn { position: fixed; left: 14px; bottom: calc(30px + min(102px, 13.6vh, 17vw)); width: min(86px, 22vw, 22vh); height: min(86px, 22vw, 22vh); border-radius: 50%;
-    padding: 0; display: none; pointer-events: auto; z-index: 2; border: 2px solid #3b5bb5; color: #cfe0ff; font-weight: 700; font-size: 13px; line-height: 1.25;
-    background: radial-gradient(circle, #0d1530 58%, transparent 59%), conic-gradient(#5fd8ff calc(var(--p, 0) * 1turn), rgba(255,255,255,0.08) 0); }
-  #dashBtn small { display: block; font-size: 10px; font-weight: 400; color: #8fa3c8; }
+  #dashBtn { position: fixed; left: 14px; bottom: calc(30px + min(102px, 13.6vh, 17vw));
+    padding: 12px 18px; display: none; pointer-events: auto; z-index: 2; border: 1px solid #5fd8ff;
+    border-radius: 8px; background: #0d1530; color: #cfe0ff; font-weight: 700; font-size: 13px; }
   #dashBtn.show { display: block; }
-  #dashBtn.ready { border-color: #ffe46b; color: #fff6c8; animation: dashPulse 0.9s ease-in-out infinite;
-    background: radial-gradient(circle, #2a2a10 58%, transparent 59%), conic-gradient(#ffe46b 1turn, #ffe46b 0); }
-  @keyframes dashPulse { 50% { box-shadow: 0 0 26px rgba(255,228,107,0.7); } }
+  #dashBtn:disabled { opacity: 0.4; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
-<button id="dashBtn" type="button">高速攻撃<small>Space</small></button>
+<button id="dashBtn" type="button">描く</button>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <script>
 (() => {
@@ -159,7 +156,6 @@ const CONFIG = {
   portalLoopSplashDamage: 0.5,
   portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this
@@ -232,8 +228,8 @@ const CONFIG = {
 
 const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで Space か左下のボタン → 描画開始（世界の速さはPで0〜1に調整可能）→ 好きな場所をクリックしてそこから軌跡を描き、もう一度 Space／クリックで確定すると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
-  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンでSpaceか左下のボタン → 好きな場所をクリックしてマウスで軌跡を描く → Space／クリックで確定して高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。モジュール選択は線の終了後' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -272,6 +268,8 @@ function buildIntent(raw, scheme) {
     // from the press point). Space / the button fires the gauge-based dash (no charging here).
     it.keyboard = true;
     it.dash = !!raw.dash;
+    it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
+    it.clickCursor = raw.clickCursor || null;
     if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
@@ -2354,15 +2352,15 @@ function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if (input.dash && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
+  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
-    input = { ...input, press: false }; // the same Space press must not also place the start
+    input = { ...input, press: false }; // consume the start click so it cannot also commit
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
   if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
-  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
   if (game.draw && game.draw.phase === 'run') {
     // trace every frame on real time (world steps are rare while it is nearly frozen)
     runAlongPath(game, frameDt);
@@ -2613,26 +2611,24 @@ function startDrawing(game, input) {
   const gauge = game.stats.gaugeMax; // always a full (over)charge
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
-  // no points yet: the path starts wherever the player clicks (the ship warps there on commit)
-  game.draw = { phase: 'draw', points: [], budget, used: 0, timeLeft: CONFIG.drawTime, gauge, cursor: input.cursor || null, blocked: false, started: false };
+  // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
+  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
 
-// Real-time while the world crawls: the path follows the cursor until the length runs out,
-// time runs out, it reaches a planet, or the player presses again.
-function updateDrawing(game, dt, input) {
+// The path follows the cursor until its length runs out, it reaches a planet, or another click.
+function updateDrawing(game, input) {
   const d = game.draw;
-  d.timeLeft -= dt;
   if (input.cursor) d.cursor = input.cursor;
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
-    else if (d.timeLeft <= 0) commitPath(game);
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
+  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
 // Where a path may start: the clicked point, pushed out of planets and moons.
@@ -3361,7 +3357,7 @@ function render(r, game, dt, pointer) {
 
   drawChargeUi(r, game, pointer);
   drawCapsuleArrows(r, game);
-  drawDrawingHud(r, game);
+  drawDrawingHud(r, game, pointer);
   drawPortalHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
@@ -3888,32 +3884,41 @@ function drawPathUi(r, game) {
   ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
 }
 
-// Screen-space: slow-time vignette and the remaining length / time while drawing.
-function drawDrawingHud(r, game) {
+// One cursor ring shows charge before drawing and remaining path length while drawing.
+function drawDrawingHud(r, game, pointer) {
+  if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
   const d = game.draw;
-  if (!d || d.phase !== 'draw') return;
+  if (d && d.phase !== 'draw') return;
   const { ctx, W, H } = r;
-  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-  g.addColorStop(0, 'rgba(40,80,200,0)');
-  g.addColorStop(1, 'rgba(40,80,200,0.35)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  const bw = Math.min(320, W * 0.5), x = W / 2 - bw / 2, y = H * 0.72;
-  const bar = (yy, frac, color, label) => {
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, yy, bw, 6);
-    ctx.fillStyle = color; ctx.fillRect(x, yy, bw * Math.max(0, Math.min(1, frac)), 6);
-    ctx.fillStyle = '#b8c6ea'; ctx.font = `11px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(label, x - 8, yy + 6);
-  };
-  bar(y, 1 - d.used / d.budget, '#9fe8ff', '長さ');
-  bar(y + 14, d.timeLeft / CONFIG.drawTime, '#ffd24a', '時間');
+  const tip = d?.points[d.points.length - 1] || d?.cursor;
+  const p = tip ? worldToScreen(r, tip.x, tip.y)
+    : pointer?.hover && pointer.pointerType !== 'touch' ? pointer.hover
+    : worldToScreen(r, game.ship.x, game.ship.y);
+  const frac = clamp(d ? 1 - d.used / d.budget : game.dashMeter, 0, 1);
+  const drawing = d?.started;
+  const ready = !d && frac >= 1;
+  const color = ready ? '#ffe46b' : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
+  const radius = 24, x = clamp(p.x, radius + 4, W - radius - 4), y = clamp(p.y, radius + 4, H - radius - 24);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(3,8,20,0.9)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(190,215,255,0.22)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = color;
+  if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
+  const label = drawing ? `残り ${Math.ceil(frac * 100)}%` : ready || d ? (pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+  ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#e8f6ff';
-  const hint = d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : '好きな場所をクリック（または Space）→ そこから描き始める';
-  let fs = 14;
-  ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
-  const tw = ctx.measureText(hint).width;
-  if (tw > W - 24) { fs = Math.max(9, Math.floor(fs * (W - 24) / tw)); ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`; }
-  ctx.fillText(hint, W / 2, y - 12);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(3,8,20,0.95)';
+  const lx = clamp(x, ctx.measureText(label).width / 2 + 4, W - ctx.measureText(label).width / 2 - 4);
+  ctx.strokeText(label, lx, y + radius + 17);
+  ctx.fillStyle = color;
+  ctx.fillText(label, lx, y + radius + 17);
+  ctx.restore();
 }
 
 function drawPrediction(r, game) {
@@ -4425,14 +4430,6 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  if (isDrawScheme(game.scheme)) {
-    // dash gauge right below the HP bar
-    const m = game.dashMeter;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(bx - 1, by + 7, bw + 2, 5);
-    ctx.fillStyle = m >= 1 ? (Math.floor(game.t * 4) % 2 ? '#ffe46b' : '#fff6c8') : '#5fd8ff';
-    ctx.fillRect(bx, by + 8, bw * m, 3);
-  }
   const x = 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `12px ${MONO}`;
@@ -4562,7 +4559,7 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 
 function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
-    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
+    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
     release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false,
   };
@@ -4573,7 +4570,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = local(e);
-    if (st.enabled && e.button === 0) st.pressed = true;
+    if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId; st.pointerType = e.pointerType || 'mouse';
     ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
@@ -4641,6 +4638,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
         pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
+        click: st.click, // preserve the press position even if the mouse moves before the next frame
         release: st.release,
         releaseSource: st.release ? st.relSource : null,
         releaseDrag: { x: st.relX, y: st.relY },
@@ -4648,13 +4646,14 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       st.release = false;
       st.snap = null;
       st.pressed = false;
+      st.click = null;
       st.dash = false;
       st.place = false;
       st.cycle = 0; st.spaceDuration = 0;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
   };
 }
 
@@ -5061,7 +5060,6 @@ const TUNABLES = [
   { key: 'portalDropChance', label: 'ポータル：撃破での出現率', min: 0, max: 1, step: 0.02 },
   { key: 'portalWaveRadius', label: 'ポータル：到着波動の半径', min: 0, max: 600, step: 10 },
   { key: 'portalWaveDamage', label: 'ポータル：到着波動の威力（攻撃力比）', min: 0, max: 3, step: 0.1 },
-  { key: 'drawTime', label: '軌跡を描ける時間（秒）', min: 0.5, max: 6, step: 0.1 },
   { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
   { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },
@@ -5325,15 +5323,15 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// On-screen dash button (draw mode): fills with the dash gauge, fires like Space when full.
+// Touch-only shortcut: leave the virtual stick and pick a drawing start. Charge lives in the cursor ring.
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw;
+  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw &&
+    (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
   if (!show) return;
-  dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));
-  dashBtn.classList.toggle('ready', game.dashMeter >= 1);
+  dashBtn.disabled = game.dashMeter < 1;
 }
 
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
@@ -5347,6 +5345,7 @@ function frame(now) {
   const wasPlaying = game.state === 'play';
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
+  raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
   updateDashButton();

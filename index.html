@@ -67,21 +67,18 @@
   #debug .drow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 6px; }
   #debug .drow input { grid-column: 1 / 3; width: 100%; }
   #debug .dval { font-family: ui-monospace, Menlo, monospace; color: #ffd24a; }
-  #dashBtn { position: fixed; left: 14px; bottom: calc(30px + min(102px, 13.6vh, 17vw)); width: min(86px, 22vw, 22vh); height: min(86px, 22vw, 22vh); border-radius: 50%;
-    padding: 0; display: none; pointer-events: auto; z-index: 2; border: 2px solid #3b5bb5; color: #cfe0ff; font-weight: 700; font-size: 13px; line-height: 1.25;
-    background: radial-gradient(circle, #0d1530 58%, transparent 59%), conic-gradient(#5fd8ff calc(var(--p, 0) * 1turn), rgba(255,255,255,0.08) 0); }
-  #dashBtn small { display: block; font-size: 10px; font-weight: 400; color: #8fa3c8; }
+  #dashBtn { position: fixed; left: 14px; bottom: calc(30px + min(102px, 13.6vh, 17vw));
+    padding: 12px 18px; display: none; pointer-events: auto; z-index: 2; border: 1px solid #5fd8ff;
+    border-radius: 8px; background: #0d1530; color: #cfe0ff; font-weight: 700; font-size: 13px; }
   #dashBtn.show { display: block; }
-  #dashBtn.ready { border-color: #ffe46b; color: #fff6c8; animation: dashPulse 0.9s ease-in-out infinite;
-    background: radial-gradient(circle, #2a2a10 58%, transparent 59%), conic-gradient(#ffe46b 1turn, #ffe46b 0); }
-  @keyframes dashPulse { 50% { box-shadow: 0 0 26px rgba(255,228,107,0.7); } }
+  #dashBtn:disabled { opacity: 0.4; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
-<button id="dashBtn" type="button">高速攻撃<small>Space</small></button>
+<button id="dashBtn" type="button">描く</button>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <!--BUNDLE-->
 </body>

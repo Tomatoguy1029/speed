@@ -36,6 +36,7 @@ test('draw intent: Space fires the dash; a held touch is a stick, the mouse curs
   assert.equal(it.charging, false);
   assert.deepEqual(it.stick, { x: 30, y: -40 });
   assert.equal(it.press, true);
+  assert.equal(it.drawClick, false, 'a touch-stick press must not fire a ready attack');
   it = buildIntent({ ...raw, pointerDown: false, dash: true }, 'draw');
   assert.equal(it.dash, true);
   assert.equal(it.charging, false);
@@ -135,11 +136,36 @@ test('the run pierces enemies on the path; armor it cannot pierce stops it with 
   assert.ok(game.ship.x < 450, 'stopped at the wall');
 });
 
-test('drawing ends by itself when time runs out', () => {
+test('drawing waits for a click or exhausted length instead of a time limit', () => {
   const game = quiet();
   charge(game, 0.8, at(100, 0));
-  for (let t = 0; t < CONFIG.drawTime + 0.3; t += 0.05) update(game, 0.05, { ...idle, cursor: at(100, 0) });
-  assert.notEqual(game.draw?.phase, 'draw');
+  for (let t = 0; t < 6; t += 0.05) update(game, 0.05, { ...idle, cursor: at(100, 0) });
+  assert.equal(game.draw?.phase, 'draw');
+  const budget = game.draw.budget;
+  update(game, 0.02, { ...idle, cursor: at(budget + 100, 0) });
+  assert.equal(game.draw?.phase, 'run');
+  assert.equal(pathLength(game.lastPath), budget);
+});
+
+test('a ready mouse click starts drawing directly, mouse release keeps drawing, and the next click launches', () => {
+  for (const scheme of ['draw', 'draw-wasd']) {
+    const game = quiet(); game.scheme = scheme;
+    const mouse = (cursor, pressed = false, clickCursor = null) => buildIntent({ move: none, cursor, pressed, clickCursor,
+      pointerType: 'mouse', pointerDown: false, dash: false }, scheme);
+    game.dashMeter = 0.5;
+    update(game, 0.02, mouse(at(0, 0), true));
+    assert.equal(game.draw, null);
+    game.dashMeter = 1;
+    update(game, 0.02, mouse(at(100, 0), true, at(50, 0)));
+    assert.equal(game.draw?.phase, 'draw');
+    assert.ok(game.draw.started);
+    assert.deepEqual(game.draw.points, [at(50, 0), at(100, 0)], 'drawing starts at the press even if the cursor already moved');
+    assert.equal(game.dashMeter, 0);
+    update(game, 0.02, mouse(at(250, 0)));
+    assert.equal(game.draw.used, 200, 'mouse movement draws without holding a button');
+    update(game, 0.02, mouse(at(250, 0), true));
+    assert.equal(game.draw?.phase, 'run');
+  }
 });
 
 test('committing without drawing dashes straight at the cursor', () => {

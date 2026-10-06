@@ -70,7 +70,6 @@ export const CONFIG = {
   portalLoopSplashDamage: 0.5,
   portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTime: 5, // real seconds to draw before the path commits itself
   drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this

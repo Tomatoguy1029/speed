@@ -132,7 +132,7 @@ export function render(r, game, dt, pointer) {
 
   drawChargeUi(r, game, pointer);
   drawCapsuleArrows(r, game);
-  drawDrawingHud(r, game);
+  drawDrawingHud(r, game, pointer);
   drawPortalHud(r, game);
   drawOverlays(r, game, dt);
   drawHud(r, game);
@@ -659,32 +659,41 @@ function drawPathUi(r, game) {
   ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill();
 }
 
-// Screen-space: slow-time vignette and the remaining length / time while drawing.
-function drawDrawingHud(r, game) {
+// One cursor ring shows charge before drawing and remaining path length while drawing.
+function drawDrawingHud(r, game, pointer) {
+  if (!isDrawScheme(game.scheme) || game.state !== 'play') return;
   const d = game.draw;
-  if (!d || d.phase !== 'draw') return;
+  if (d && d.phase !== 'draw') return;
   const { ctx, W, H } = r;
-  const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
-  g.addColorStop(0, 'rgba(40,80,200,0)');
-  g.addColorStop(1, 'rgba(40,80,200,0.35)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  const bw = Math.min(320, W * 0.5), x = W / 2 - bw / 2, y = H * 0.72;
-  const bar = (yy, frac, color, label) => {
-    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, yy, bw, 6);
-    ctx.fillStyle = color; ctx.fillRect(x, yy, bw * Math.max(0, Math.min(1, frac)), 6);
-    ctx.fillStyle = '#b8c6ea'; ctx.font = `11px ${MONO}`; ctx.textAlign = 'right'; ctx.fillText(label, x - 8, yy + 6);
-  };
-  bar(y, 1 - d.used / d.budget, '#9fe8ff', '長さ');
-  bar(y + 14, d.timeLeft / CONFIG.drawTime, '#ffd24a', '時間');
+  const tip = d?.points[d.points.length - 1] || d?.cursor;
+  const p = tip ? worldToScreen(r, tip.x, tip.y)
+    : pointer?.hover && pointer.pointerType !== 'touch' ? pointer.hover
+    : worldToScreen(r, game.ship.x, game.ship.y);
+  const frac = clamp(d ? 1 - d.used / d.budget : game.dashMeter, 0, 1);
+  const drawing = d?.started;
+  const ready = !d && frac >= 1;
+  const color = ready ? '#ffe46b' : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
+  const radius = 24, x = clamp(p.x, radius + 4, W - radius - 4), y = clamp(p.y, radius + 4, H - radius - 24);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(3,8,20,0.9)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(190,215,255,0.22)';
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+  ctx.strokeStyle = color;
+  if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
+  const label = drawing ? `残り ${Math.ceil(frac * 100)}%` : ready || d ? (pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+  ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#e8f6ff';
-  const hint = d.started ? 'カーソルで軌跡を描く — Space／クリックで駆け抜ける' : '好きな場所をクリック（または Space）→ そこから描き始める';
-  let fs = 14;
-  ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`;
-  const tw = ctx.measureText(hint).width;
-  if (tw > W - 24) { fs = Math.max(9, Math.floor(fs * (W - 24) / tw)); ctx.font = `${fs}px "Hiragino Sans", "Noto Sans JP", sans-serif`; }
-  ctx.fillText(hint, W / 2, y - 12);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(3,8,20,0.95)';
+  const lx = clamp(x, ctx.measureText(label).width / 2 + 4, W - ctx.measureText(label).width / 2 - 4);
+  ctx.strokeText(label, lx, y + radius + 17);
+  ctx.fillStyle = color;
+  ctx.fillText(label, lx, y + radius + 17);
+  ctx.restore();
 }
 
 function drawPrediction(r, game) {
@@ -1196,14 +1205,6 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  if (isDrawScheme(game.scheme)) {
-    // dash gauge right below the HP bar
-    const m = game.dashMeter;
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(bx - 1, by + 7, bw + 2, 5);
-    ctx.fillStyle = m >= 1 ? (Math.floor(game.t * 4) % 2 ? '#ffe46b' : '#fff6c8') : '#5fd8ff';
-    ctx.fillRect(bx, by + 8, bw * m, 3);
-  }
   const x = 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `12px ${MONO}`;

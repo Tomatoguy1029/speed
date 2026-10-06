@@ -75,9 +75,11 @@ test('the pointer is tracked without clicking, and a drag reports its pull', () 
   let r = input.read();
   assert.equal(r.pointerDown, true);
   assert.deepEqual(r.drag, { x: 40, y: -30 });
+  assert.deepEqual(r.click, { x: 300, y: 200 }, 'the click keeps its origin after mouse movement');
   canvas.fire('pointerup', { clientX: 260, clientY: 230, pointerId: 1 });
   r = input.read();
   assert.equal(r.release, true);
+  assert.equal(r.click, null, 'the click position is consumed once');
   assert.equal(r.releaseSource, 'pointer');
   assert.deepEqual(r.releaseDrag, { x: 40, y: -30 });
 });

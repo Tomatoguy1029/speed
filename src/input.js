@@ -36,7 +36,7 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 
 export function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
-    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null,
+    down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
     release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false,
   };
@@ -47,7 +47,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   };
   el.addEventListener('pointerdown', (e) => {
     st.hover = local(e);
-    if (st.enabled && e.button === 0) st.pressed = true;
+    if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
     if (!st.enabled || e.button > 0) return;
     st.down = true; st.pointerId = e.pointerId; st.pointerType = e.pointerType || 'mouse';
     ({ x: st.sx, y: st.sy } = local(e)); st.cx = st.sx; st.cy = st.sy;
@@ -115,6 +115,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         pointerType: st.pointerType || 'mouse', // 'touch' turns the press into a virtual stick (draw mode)
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
+        click: st.click, // preserve the press position even if the mouse moves before the next frame
         release: st.release,
         releaseSource: st.release ? st.relSource : null,
         releaseDrag: { x: st.relX, y: st.relY },
@@ -122,12 +123,13 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       st.release = false;
       st.snap = null;
       st.pressed = false;
+      st.click = null;
       st.dash = false;
       st.place = false;
       st.cycle = 0; st.spaceDuration = 0;
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.keys.clear(); st.pointerId = null; },
   };
 }

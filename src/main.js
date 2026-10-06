@@ -102,15 +102,15 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// On-screen dash button (draw mode): fills with the dash gauge, fires like Space when full.
+// Touch-only shortcut: leave the virtual stick and pick a drawing start. Charge lives in the cursor ring.
 const dashBtn = document.getElementById('dashBtn');
 dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
-  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw;
+  const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw &&
+    (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
   if (!show) return;
-  dashBtn.style.setProperty('--p', game.dashMeter.toFixed(3));
-  dashBtn.classList.toggle('ready', game.dashMeter >= 1);
+  dashBtn.disabled = game.dashMeter < 1;
 }
 
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
@@ -124,6 +124,7 @@ function frame(now) {
   const wasPlaying = game.state === 'play';
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
+  raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
   render(renderer, game, dt, input.state);
   updateDashButton();

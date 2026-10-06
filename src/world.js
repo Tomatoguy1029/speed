@@ -74,15 +74,15 @@ export function update(game, frameDt, input) {
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if (input.dash && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
+  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
     startDrawing(game, input);
-    input = { ...input, press: false }; // the same Space press must not also place the start
+    input = { ...input, press: false }; // consume the start click so it cannot also commit
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
   if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
-  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, frameDt, input);
+  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
   if (game.draw && game.draw.phase === 'run') {
     // trace every frame on real time (world steps are rare while it is nearly frozen)
     runAlongPath(game, frameDt);
@@ -333,26 +333,24 @@ function startDrawing(game, input) {
   const gauge = game.stats.gaugeMax; // always a full (over)charge
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
-  // no points yet: the path starts wherever the player clicks (the ship warps there on commit)
-  game.draw = { phase: 'draw', points: [], budget, used: 0, timeLeft: CONFIG.drawTime, gauge, cursor: input.cursor || null, blocked: false, started: false };
+  // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
+  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
 
-// Real-time while the world crawls: the path follows the cursor until the length runs out,
-// time runs out, it reaches a planet, or the player presses again.
-function updateDrawing(game, dt, input) {
+// The path follows the cursor until its length runs out, it reaches a planet, or another click.
+function updateDrawing(game, input) {
   const d = game.draw;
-  d.timeLeft -= dt;
   if (input.cursor) d.cursor = input.cursor;
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
-    else if (d.timeLeft <= 0) commitPath(game);
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.timeLeft <= 0 || d.blocked) commitPath(game);
+  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
 // Where a path may start: the clicked point, pushed out of planets and moons.
