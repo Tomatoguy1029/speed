@@ -33,11 +33,12 @@ node build.js        # src/*.js を結合して dist/speed.html と dist/index.h
 node tools/balance.js 3 1 god   # 自動プレイで各フェーズの数値を計測（god=無敵）。引数: 回数 シード [god]
 ```
 
-- **テストは最小限**（ユーザー指示: デモなので毎回テストを書いたり回したりしない）。作業のまとまりの最後に 1 回 `node --test`。自動デプロイのフックもデプロイ前に走らせる
+- **テストは最小限**（ユーザー指示: デモなので毎回テストを書いたり回したりしない）。作業のまとまりの最後に 1 回 `node --test`
 - **dist/ はコミットする**（`speed.html` は単体で配布できる 1 ファイル。`index.html` は Vercel 用で中身は同じ）
-- **自動デプロイ**: Claude Code の Stop フック（`.claude/settings.local.json` → [.claude/hooks/auto-deploy.sh](.claude/hooks/auto-deploy.sh)）が、ターン終了時に変更があればビルド＋テストを通したうえで自動コミット＆ push する。テストが落ちたらコミットしない。ゲームのコードが変わっているのに `docs/` が未更新なら、一度だけ更新を促して止める
+- **公開のしかた（Claude Code・Codex 共通）**: `main` に push すると Vercel の GitHub 連携が本番をデプロイする（Vercel 側でも `node build.js` を実行する）。自動でコミット・push する仕組みはない（以前の Claude Code の Stop フックは、別のエージェントの作業途中の変更までまとめてコミットしたため廃止）。変更したらビルド・テストのあと **自分が変えたファイルだけ** を `git add` してコミットし、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main`（force push しない）
+- **同じフォルダで複数のエージェント（Claude Code と Codex など）が作業することがある**。`git add -A` や `git commit -a` は使わない。他の人の未コミットの変更には触れない
 - **プレビューデプロイ**: main 以外のブランチは GitHub Actions（[.github/workflows/vercel-preview.yml](.github/workflows/vercel-preview.yml)）が Vercel CLI でプレビューをデプロイする（共同作業者のコミットも通る）。Vercel の GitHub 連携は main の本番だけ（`vercel.json` の `git.deploymentEnabled`）。プレビュー URL は Actions の実行結果（Summary）に出る
-- **Codexでの公開更新**: 上記のClaude Code用StopフックはCodexでは実行されない。公開版を更新する変更はビルド・テスト・コミット後、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` を行う（force pushしない）。Vercelの公開HTMLが検証済みの `dist/index.html` と一致するまで確認し、ローカルコミットだけで公開反映済みと報告しない。ユーザーがローカル限定・公開保留を指定した場合はそれを優先する。
+- **公開の確認**: Vercel の公開 HTML が検証済みの `dist/index.html` と一致するまで確認し、ローカルコミットだけで公開反映済みと報告しない。ユーザーがローカル限定・公開保留を指定した場合はそれを優先する
 - 区切りのいい変更は自分で中身の分かるメッセージでコミットする（末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`）
 - ユーザーのブラウザ（アプリ内プレビュー）のタブを勝手に置き換えない。確認は本番 URL を別タブで開くか、自動テストで行う
 
