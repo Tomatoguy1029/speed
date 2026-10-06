@@ -7,9 +7,10 @@ import { dangerAt } from './field.js';
 import { rollModule } from './modules.js';
 import { attackPower } from './combat.js';
 import { dropPortal } from './portals.js';
+import { beginBossFinish } from './finale.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
-  if (e.dead || dmg <= 0) return;
+  if (e.dead || game.state === 'finishing' || dmg <= 0) return;
   let fresh = e.hp >= e.maxHp - 1e-6;
   // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
   // by its HP when this dash first touched it, so wave + body still count as one strike
@@ -40,7 +41,8 @@ function killStop(game, e, crit) {
 }
 
 export function killEnemy(game, e, opts = {}) {
-  if (e.dead) return;
+  if (e.dead || game.state === 'finishing') return;
+  if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
@@ -56,10 +58,14 @@ export function killEnemy(game, e, opts = {}) {
   const power = e.xp;
   const drawMode = isDrawScheme(game.scheme);
   const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
+  const pity = drawMode && game.t - (game.lastModuleDropAt || 0) >= CONFIG.drawDropPity;
   if ((!drawMode || game.t >= game.nextModuleDropAt) &&
-      (e.elite || e.type === 'battleship' || game.rng() < chance)) {
+      (pity || e.elite || e.type === 'battleship' || game.rng() < chance)) {
     dropModule(game, e.x, e.y, power, danger);
-    if (drawMode) game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * 15;
+    if (drawMode) {
+      game.lastModuleDropAt = game.t;
+      game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * CONFIG.drawDropJitter;
+    }
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }

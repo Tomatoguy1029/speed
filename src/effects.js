@@ -14,12 +14,13 @@ export function createEffectState() {
   return {
     fbullets: [], marks: [], mines: [], capsules: [],
     fx2: { waveT: 0, trailDist: 0, lastX: 0, lastY: 0, mineT: 0, turretT: 0, sonicCD: 0, prevSpeed: 0, capsuleT: 0, coreT: 0, coresStarted: false },
-    dashActive: false, dashPeakAtk: 0,
+    dashActive: false, dashPeakAtk: 0, traceEndHandled: false,
   };
 }
 
 export function onLaunch(game) {
   if (game.dashActive) finishDash(game);
+  game.traceEndHandled = false;
   game.dashActive = true;
   game.dashPeakAtk = 0;
   game.dashPierce = 0;
@@ -35,10 +36,22 @@ function finishDash(game) {
   }
 }
 
-export function onPierce(game) {
+export function endTraceAttack(game) {
+  game.traceEndHandled = true;
+  finishDash(game);
+  const pulse = game.stats.traceEndBlast, sh = game.ship;
+  if (pulse && game.state === 'play') explode(game, sh.x, sh.y, pulse.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), game.stats) * pulse.mult,
+    { cause: 'traceEnd', color: '#c46bff', knock: 500, life: 0.5 });
+}
+
+export function onPierce(game, x = game.ship.x, y = game.ship.y) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
   if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.pierceWave) explode(game, x, y, s.pierceWave.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), s) * s.pierceWave.mult,
+    { cause: 'pierceWave', color: '#9fe8ff', knock: 350, life: 0.3 });
 }
 
 export function onShipHurt(game) {
@@ -53,10 +66,10 @@ export function updateEffects(game, dt) {
   const atkMax = attackPower(s.maxSpeed, s);
 
   // dash bookkeeping (end-of-dash blast)
-  if (sh.boostT > 0 && !game.dashActive) { game.dashActive = true; game.dashPeakAtk = 0; }
+  if (sh.boostT > 0 && !game.dashActive && !game.traceEndHandled) { game.dashActive = true; game.dashPeakAtk = 0; }
   if (game.dashActive) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
-    if (sh.boostT <= 0 && !game.portalDash) finishDash(game);
+    if (sh.boostT <= 0 && !game.portalDash && !game.draw) finishDash(game);
   }
 
   // charge shockwave
@@ -164,6 +177,16 @@ function updateFriendly(game, dt) {
 
 function fieldCapsulePoint(game) {
   const rng = game.rng;
+  if (isDrawScheme(game.scheme)) {
+    // Put build opportunities within reach of the current fight, rather than across the whole map.
+    const distance = Math.max(200, game.viewRadius * (0.25 + rng() * 0.3));
+    for (let i = 0; i < 16; i++) {
+      const a = rng() * TAU;
+      const x = game.ship.x + Math.cos(a) * distance, y = game.ship.y + Math.sin(a) * distance;
+      const r = Math.hypot(x, y);
+      if (r > CONFIG.planetRadius + 100 && r < CONFIG.fieldRadius - 100) return { x, y, r };
+    }
+  }
   const roll = rng();
   let r;
   if (roll < 0.4) r = randRange(rng, CONFIG.planetRadius + 200, CONFIG.zoneInner);
@@ -175,6 +198,7 @@ function fieldCapsulePoint(game) {
 
 function updateCapsules(game, dt) {
   const F = game.fx2, sh = game.ship;
+  if (isDrawScheme(game.scheme)) game.capsules = game.capsules.filter(c => c.src !== 'field' || Math.hypot(c.x - sh.x, c.y - sh.y) < game.viewRadius * 2);
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;

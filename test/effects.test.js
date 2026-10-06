@@ -129,6 +129,8 @@ test('picking up a capsule offers its module', () => {
 
 test('capsules appear on the field over time', () => {
   const game = createGame({ seed: 4 });
+  game.ship.vx = game.ship.vy = 0;
+  game.field.moons = []; game.field.dust = [];
   game.debug.invincible = true;
   game.debug.autoOffer = 'discard';
   run(game, 3);

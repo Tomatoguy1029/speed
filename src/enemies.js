@@ -81,7 +81,13 @@ export function updateEnemyAim(game, dt) {
   const sh = game.ship;
   if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
   const a = game.enemyAim;
-  const dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  let dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  // Keep the reaction lag, but never let its target remain several screens behind forever.
+  const maxLag = Math.max(300, game.viewRadius * 0.55);
+  if (d > maxLag) {
+    a.x = sh.x - dx / d * maxLag; a.y = sh.y - dy / d * maxLag;
+    dx = sh.x - a.x; dy = sh.y - a.y; d = maxLag;
+  }
   if (d < 1e-6) return;
   const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
   a.x += dx / d * step; a.y += dy / d * step;

@@ -93,6 +93,11 @@ const CONFIG = {
   bossTime: 420, // one provisional boss appears after seven minutes
   bossHp: 2200,
   bossArmor: 14,
+  bossFinishReplayWindow: 0.18, // actual approach recorded before the final blow
+  bossFinishSlowTime: 1.2,
+  bossFinishZoom: 3.2,
+  bossFinishBlastTime: 2,
+  bossFinishClearTime: 1.4,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -121,11 +126,16 @@ const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
-  drawDropScale: 0.1, // fewer module drops even with five times as many enemies
-  drawDropInterval: 35, // minimum seconds between enemy module drops in draw mode
-  drawOfferInterval: 30, // minimum play seconds between selection screens
-  drawCapsuleCount: 2,
-  drawCapsuleInterval: 40,
+  drawDropScale: 1,
+  drawDropInterval: 10,
+  drawDropJitter: 4,
+  drawDropPity: 14, // next kill guarantees a drop after this many run seconds
+  drawOfferInterval: 8, // pickup choices still wait until the drawn attack ends
+  drawCapsuleCount: 4,
+  drawCapsuleInterval: 16,
+  spawnMargin: 70, // spawn/recycle just beyond the actual screen edges
+  spawnRefillTime: 1, // replenish local population deficits in about one world second
+  spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -157,7 +167,7 @@ const CONFIG = {
   portalLoopSplashDamage: 0.5,
   portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
+  drawTimeScale: 0.1, // world speed while drawing: 0 = stopped, 1 = normal
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this
   waveRadius: 45, // reach of the wave a traced path gives off (the band's half-width); the ship body itself stays shipRadius
@@ -458,344 +468,6 @@ function controlAim(game, input) {
   }
 }
 
-// ---- math.js ----
-const TAU = Math.PI * 2;
-
-function clamp(v, a, b) {
-  return v < a ? a : v > b ? b : v;
-}
-
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-function smoothstep(a, b, v) {
-  const t = clamp((v - a) / (b - a), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
-function angleDiff(a, b) {
-  let d = (a - b) % TAU;
-  if (d > Math.PI) d -= TAU;
-  if (d < -Math.PI) d += TAU;
-  return d;
-}
-
-// Segment p0->p1 vs circle (c, r): first t in [0,1] where the segment is inside the circle, -1 if never.
-function segCircleT(x0, y0, x1, y1, cx, cy, r) {
-  const fx = x0 - cx, fy = y0 - cy;
-  const c = fx * fx + fy * fy - r * r;
-  if (c <= 0) return 0;
-  const dx = x1 - x0, dy = y1 - y0;
-  const a = dx * dx + dy * dy;
-  if (a === 0) return -1;
-  const b = 2 * (fx * dx + fy * dy);
-  const disc = b * b - 4 * a * c;
-  if (disc < 0) return -1;
-  const t = (-b - Math.sqrt(disc)) / (2 * a);
-  return t >= 0 && t <= 1 ? t : -1;
-}
-
-// mulberry32
-function makeRng(seed) {
-  let s = seed >>> 0;
-  return function rng() {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function randRange(rng, a, b) {
-  return a + (b - a) * rng();
-}
-
-// items: [[value, weight], ...]
-function pickWeighted(rng, items) {
-  let total = 0;
-  for (const [, w] of items) total += Math.max(0, w);
-  if (total <= 0) return items[0][0];
-  let r = rng() * total;
-  for (const [v, w] of items) {
-    if (w <= 0) continue;
-    r -= w;
-    if (r < 0) return v;
-  }
-  return items[items.length - 1][0];
-}
-
-// ---- ship.js ----
-
-
-function baseStats(meta = {}) {
-  const lv = (k) => meta[k] || 0;
-  return {
-    maxSpeed: CONFIG.baseMaxSpeed * (1 + 0.05 * lv('speed')),
-    launchRatio: CONFIG.launchRatio,
-    carry: CONFIG.carry,
-    chargeTime: CONFIG.chargeTime * Math.pow(0.95, lv('charge')),
-    gaugeMax: 1,
-    boostDuration: CONFIG.boostDuration,
-    cruiseDrag: CONFIG.cruiseDrag,
-    cruiseFloor: CONFIG.cruiseFloor,
-    atkMult: 1 + 0.06 * lv('atk'),
-    maxHp: CONFIG.baseHP + 15 * lv('hp'),
-    pickupRadius: CONFIG.pickupRadius * (1 + 0.15 * lv('pickup')),
-    xpMult: 1 + 0.08 * lv('xp'),
-    damageTakenMult: 1,
-    hitSlowMult: 1,
-    critMult: 2.5,
-    weakArcMult: 1,
-    pierceLossMult: 1,
-    bounceKeep: 0.5,
-    bounceDamageMult: 1,
-    predictTime: 0.9,
-    predictBounce: false,
-    regen: 0,
-    drawLengthMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // draw-mode modules
-  };
-}
-
-function createShip(stats, x, y) {
-  return {
-    x, y, vx: 0, vy: 0,
-    hp: stats.maxHp,
-    charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
-    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
-    markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
-    aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
-    boostT: 0, fadeT: 0, invulnT: 0, glide: false,
-    trail: [], trailAcc: 0,
-  };
-}
-
-function computeGauge(chargeT, stats, bank = 0) {
-  return Math.min(stats.gaugeMax, Math.max(CONFIG.minGauge, bank + chargeT / stats.chargeTime));
-}
-
-// New velocity after launching along unit direction (dx, dy) with the given gauge.
-function launchVelocity(vx, vy, dx, dy, gauge, stats) {
-  const speed = Math.hypot(vx, vy);
-  const cos = speed > 0 ? Math.max(0, (vx * dx + vy * dy) / speed) : 0;
-  const carried = speed * stats.carry * cos;
-  const thrust = stats.maxSpeed * stats.launchRatio * gauge;
-  const limit = stats.maxSpeed * Math.max(1, gauge);
-  const newSpeed = Math.max(Math.min(carried + thrust, limit), speed * cos);
-  return { vx: dx * newSpeed, vy: dy * newSpeed };
-}
-
-// Integrate one step: acceleration (ax, ay), drag rules, then position.
-function stepShip(ship, stats, dt, ax, ay, extraDrag) {
-  if (ship.glide) {
-    ship.boostT = Math.max(0, ship.boostT - dt);
-    ship.fadeT = 0;
-    ship.x += ship.vx * dt;
-    ship.y += ship.vy * dt;
-    return;
-  }
-  ship.vx += ax * dt;
-  ship.vy += ay * dt;
-  let sp = Math.hypot(ship.vx, ship.vy);
-  if (sp > 0) {
-    let target = sp;
-    if (ship.boostT > 0) {
-      ship.boostT -= dt;
-      if (ship.boostT <= 0) ship.fadeT = 0.3;
-    } else {
-      if (ship.fadeT > 0) {
-        ship.fadeT -= dt;
-        if (target > stats.maxSpeed * stats.cruiseFloor) target *= Math.pow(CONFIG.energyCut, dt / 0.3);
-      }
-      const floor = stats.maxSpeed * stats.cruiseFloor;
-      if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
-    }
-    if (target > stats.maxSpeed) {
-      target = stats.maxSpeed + (target - stats.maxSpeed) * Math.exp(-CONFIG.overcapDecay * dt);
-    }
-    if (extraDrag > 0) target *= Math.exp(-extraDrag * dt);
-    const k = target / sp;
-    ship.vx *= k;
-    ship.vy *= k;
-  }
-  ship.x += ship.vx * dt;
-  ship.y += ship.vy * dt;
-}
-
-// ---- field.js ----
-
-
-
-function createField(rng) {
-  const moons = [];
-  for (let i = 0; i < CONFIG.moonCount; i++) {
-    moons.push({
-      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
-      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
-      dir: rng() < 0.5 ? -1 : 1,
-      r: randRange(rng, 110, 180),
-      gm: CONFIG.moonGM,
-      x: 0, y: 0,
-    });
-  }
-  const dust = [];
-  for (let i = 0; i < CONFIG.dustCount; i++) {
-    const a = rng() * TAU;
-    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
-    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
-  }
-  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
-  updateMoons(field, 0);
-  return field;
-}
-
-function updateMoons(field, t) {
-  for (const m of field.moons) {
-    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
-    m.x = Math.cos(a) * m.orbit;
-    m.y = Math.sin(a) * m.orbit;
-  }
-}
-
-function zoneOf(r) {
-  if (r < CONFIG.zoneInner) return 'inner';
-  if (r > CONFIG.zoneOuter) return 'outer';
-  return 'mid';
-}
-
-// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
-function dangerAt(r) {
-  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
-  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
-  return 0;
-}
-
-function dustDragAt(field, x, y) {
-  for (const d of field.dust) {
-    const dx = x - d.x, dy = y - d.y;
-    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
-  }
-  return 0;
-}
-
-// ---- gravity.js ----
-
-
-function pull(out, x, y, b) {
-  const dx = b.x - x, dy = b.y - y;
-  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
-  const d = Math.sqrt(d2);
-  const a = b.gm / d2;
-  out.ax += (dx / d) * a;
-  out.ay += (dy / d) * a;
-}
-
-function gravityAt(field, t, x, y) {
-  const out = { ax: 0, ay: 0 };
-  pull(out, x, y, field.planet);
-  for (const m of field.moons) pull(out, x, y, m);
-  const r = Math.hypot(x, y);
-  if (r > CONFIG.fieldRadius) {
-    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
-    out.ax -= (x / r) * push;
-    out.ay -= (y / r) * push;
-  }
-  return out;
-}
-
-// ---- combat.js ----
-
-
-
-const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
-
-function attackPower(speed, stats) {
-  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
-}
-
-function isWeakHit(e, hx, hy, arcMult) {
-  if (!e.weakArc) return false;
-  const a = Math.atan2(hy - e.y, hx - e.x);
-  return Math.abs(angleDiff(a, e.facing + e.weakDir)) <= e.weakArc * arcMult;
-}
-
-function canPierce(atk, e, crit) {
-  return atk >= e.armor * (crit ? CRIT_ARMOR : 1);
-}
-
-function resolveRam(atk, e, crit, stats) {
-  if (canPierce(atk, e, crit)) {
-    const damage = atk * (crit ? stats.critMult : 1);
-    return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
-  }
-  return { pierce: false, damage: atk * 0.25, kill: false, shipDamage: e.contact };
-}
-
-// Share of speed kept after going through an enemy.
-function pierceKeep(e, killed, stats) {
-  const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
-  return 1 - Math.min(0.6, loss * stats.pierceLossMult);
-}
-
-// ---- impact-fx.js ----
-
-
-// Effects remain at the actual contact; the illuminated hull follows a surviving blocker.
-function addCombatImpact(game, enemy, kind, nx, ny) {
-  const impacts = game.fx.impacts;
-  if (impacts.length >= 48) {
-    if (kind !== 'block') return;
-    const old = impacts.findIndex(i => i.kind !== 'block');
-    impacts.splice(Math.max(0, old), 1);
-  }
-  const life = kind === 'block' ? CONFIG.blockImpactLife : CONFIG.weakImpactLife;
-  const x = enemy.x + nx * enemy.r, y = enemy.y + ny * enemy.r;
-  impacts.push({ kind, enemy, x, y, nx, ny, life, max: life });
-  const count = kind === 'block' ? CONFIG.blockSparkCount : CONFIG.weakFlameCount;
-  const normal = Math.atan2(ny, nx);
-  for (let i = 0; i < count && game.fx.particles.length < 1800; i++) {
-    const side = i % 2 ? 1 : -1;
-    const angle = kind === 'block' ? normal + side * (0.8 + Math.random() * 0.75)
-      : normal + (Math.random() - 0.5) * 1.25;
-    const speed = kind === 'block' ? 180 + Math.random() * 460 : 100 + Math.random() * 260;
-    const duration = life * (0.6 + Math.random() * 0.4);
-    game.fx.particles.push({ kind: kind === 'block' ? 'spark' : 'flame', x, y,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: duration, max: duration, color: i % 3 ? '#ffae40' : '#fff6c7', size: 2 + Math.random() * 3 });
-  }
-}
-
-function drawCombatImpacts(r, game) {
-  const { ctx } = r;
-  const z = r.cam.zoom;
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.lineCap = 'round';
-  for (const impact of game.fx.impacts) {
-    const a = impact.life / impact.max;
-    const { enemy, nx, ny } = impact;
-    const x = impact.kind === 'block' && !enemy.dead ? enemy.x + nx * enemy.r : impact.x;
-    const y = impact.kind === 'block' && !enemy.dead ? enemy.y + ny * enemy.r : impact.y;
-    const reach = (impact.kind === 'block' ? 60 : 38) / Math.sqrt(z);
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, reach);
-    glow.addColorStop(0, `rgba(255,245,190,${a * 0.85})`);
-    glow.addColorStop(0.2, `rgba(255,157,38,${a * 0.6})`);
-    glow.addColorStop(1, 'rgba(255,80,12,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(x - reach, y - reach, reach * 2, reach * 2);
-    if (impact.kind === 'block') {
-      // A brief reflection across this hull identifies the enemy that stopped the dash.
-      const angle = Math.atan2(ny, nx);
-      ctx.globalAlpha = a;
-      ctx.strokeStyle = '#ffcf69'; ctx.lineWidth = 5 / z;
-      ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.r + 2 / z, angle - 1.15, angle + 1.15); ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-  }
-  ctx.restore();
-}
-
 // ---- enemies.js ----
 
 
@@ -880,7 +552,13 @@ function updateEnemyAim(game, dt) {
   const sh = game.ship;
   if (!game.enemyAim) { game.enemyAim = { x: sh.x, y: sh.y }; return; }
   const a = game.enemyAim;
-  const dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  let dx = sh.x - a.x, dy = sh.y - a.y, d = Math.hypot(dx, dy);
+  // Keep the reaction lag, but never let its target remain several screens behind forever.
+  const maxLag = Math.max(300, game.viewRadius * 0.55);
+  if (d > maxLag) {
+    a.x = sh.x - dx / d * maxLag; a.y = sh.y - dy / d * maxLag;
+    dx = sh.x - a.x; dy = sh.y - a.y; d = maxLag;
+  }
   if (d < 1e-6) return;
   const step = Math.min(d * (1 - Math.exp(-dt / CONFIG.enemyAimLag)), CONFIG.enemyAimSpeed * dt);
   a.x += dx / d * step; a.y += dy / d * step;
@@ -1018,31 +696,656 @@ function updateEnemy(e, game, dt) {
   }
 }
 
-// ---- projectiles.js ----
+// ---- math.js ----
+const TAU = Math.PI * 2;
 
+function clamp(v, a, b) {
+  return v < a ? a : v > b ? b : v;
+}
 
-// Enemy bullets and missiles. Returns hits on the ship via the callback.
-function updateEnemyBullets(game, dt, onHit) {
-  const sh = game.ship;
-  const R = CONFIG.shipRadius;
-  const p = game.field.planet;
-  for (const b of game.ebullets) {
-    if (b.kind === 'missile') {
-      const t = game.enemyAim || sh; // home on where enemies think the ship is
-      const want = Math.atan2(t.y - b.y, t.x - b.x);
-      const cur = Math.atan2(b.vy, b.vx);
-      let d = want - cur;
-      d = Math.atan2(Math.sin(d), Math.cos(d));
-      const a = cur + Math.max(-b.turn * dt, Math.min(b.turn * dt, d));
-      b.vx = Math.cos(a) * b.speed; b.vy = Math.sin(a) * b.speed;
-    }
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    b.life -= dt;
-    const dx = b.x - sh.x, dy = b.y - sh.y;
-    if (dx * dx + dy * dy < (b.r + R) * (b.r + R)) { onHit(b); b.life = 0; }
-    if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) b.life = 0;
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function smoothstep(a, b, v) {
+  const t = clamp((v - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function angleDiff(a, b) {
+  let d = (a - b) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return d;
+}
+
+// Segment p0->p1 vs circle (c, r): first t in [0,1] where the segment is inside the circle, -1 if never.
+function segCircleT(x0, y0, x1, y1, cx, cy, r) {
+  const fx = x0 - cx, fy = y0 - cy;
+  const c = fx * fx + fy * fy - r * r;
+  if (c <= 0) return 0;
+  const dx = x1 - x0, dy = y1 - y0;
+  const a = dx * dx + dy * dy;
+  if (a === 0) return -1;
+  const b = 2 * (fx * dx + fy * dy);
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return -1;
+  const t = (-b - Math.sqrt(disc)) / (2 * a);
+  return t >= 0 && t <= 1 ? t : -1;
+}
+
+// mulberry32
+function makeRng(seed) {
+  let s = seed >>> 0;
+  return function rng() {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randRange(rng, a, b) {
+  return a + (b - a) * rng();
+}
+
+// items: [[value, weight], ...]
+function pickWeighted(rng, items) {
+  let total = 0;
+  for (const [, w] of items) total += Math.max(0, w);
+  if (total <= 0) return items[0][0];
+  let r = rng() * total;
+  for (const [v, w] of items) {
+    if (w <= 0) continue;
+    r -= w;
+    if (r < 0) return v;
   }
-  if (game.ebullets.some((b) => b.life <= 0)) game.ebullets = game.ebullets.filter((b) => b.life > 0);
+  return items[items.length - 1][0];
+}
+
+// ---- field.js ----
+
+
+
+function createField(rng) {
+  const moons = [];
+  for (let i = 0; i < CONFIG.moonCount; i++) {
+    moons.push({
+      orbit: randRange(rng, 1500, CONFIG.fieldRadius - 600),
+      a0: (i / CONFIG.moonCount) * TAU + randRange(rng, -0.3, 0.3),
+      dir: rng() < 0.5 ? -1 : 1,
+      r: randRange(rng, 110, 180),
+      gm: CONFIG.moonGM,
+      x: 0, y: 0,
+    });
+  }
+  const dust = [];
+  for (let i = 0; i < CONFIG.dustCount; i++) {
+    const a = rng() * TAU;
+    const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
+    dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
+  }
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  updateMoons(field, 0);
+  return field;
+}
+
+function updateMoons(field, t) {
+  for (const m of field.moons) {
+    const a = m.a0 + m.dir * CONFIG.moonOrbitSpeed * t;
+    m.x = Math.cos(a) * m.orbit;
+    m.y = Math.sin(a) * m.orbit;
+  }
+}
+
+function zoneOf(r) {
+  if (r < CONFIG.zoneInner) return 'inner';
+  if (r > CONFIG.zoneOuter) return 'outer';
+  return 'mid';
+}
+
+// 0 in the middle ring, rising to 1 at the planet surface and at the field edge.
+function dangerAt(r) {
+  if (r < CONFIG.zoneInner) return clamp((CONFIG.zoneInner - r) / (CONFIG.zoneInner - CONFIG.planetRadius), 0, 1);
+  if (r > CONFIG.zoneOuter) return clamp((r - CONFIG.zoneOuter) / (CONFIG.fieldRadius - CONFIG.zoneOuter), 0, 1);
+  return 0;
+}
+
+function dustDragAt(field, x, y) {
+  for (const d of field.dust) {
+    const dx = x - d.x, dy = y - d.y;
+    if (dx * dx + dy * dy < d.r * d.r) return CONFIG.dustDrag;
+  }
+  return 0;
+}
+
+// ---- spawner.js ----
+
+
+
+
+
+// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
+const PHASES = [
+  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1, titan: 0.05 } },
+  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5, titan: 0.3 } },
+  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2, titan: 0.4 } },
+  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
+  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, titan: 1.2, battleship: 0.3 } },
+  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, titan: 2, battleship: 0.6 } },
+];
+
+function getPhase(t) {
+  for (const p of PHASES) if (t < p.end) return p;
+  return PHASES[PHASES.length - 1];
+}
+
+function phaseTarget(t) {
+  const p = getPhase(t);
+  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
+  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
+}
+
+function spawnPoint(game, extra = 0) {
+  const sh = game.ship;
+  const view = spawnBounds(game);
+  for (let i = 0; i < 24; i++) {
+    // The short screen edge matters too: a circumscribed circle leaves wide empty strips.
+    let a = game.rng() * TAU;
+    if (Math.hypot(sh.vx, sh.vy) > 100 && game.rng() < 0.6) a = Math.atan2(sh.vy, sh.vx) + (game.rng() - 0.5) * Math.PI;
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const margin = CONFIG.spawnMargin + extra + game.rng() * 80;
+    const d = Math.min((view.halfW + margin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + margin) / Math.max(0.0001, Math.abs(uy)));
+    const x = view.x + ux * d, y = view.y + uy * d;
+    const r = Math.hypot(x, y);
+    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
+  }
+  return null;
+}
+
+function spawnBounds(game) {
+  return game.spawnView || { x: game.ship.x, y: game.ship.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+}
+
+// Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
+function mixAt(phase, danger, t) {
+  const items = Object.entries(phase.mix);
+  if (danger > 0.25) {
+    const ramp = clamp(t / 150, 0.15, 1);
+    items.push(['armored', 2 * danger], ['gunner', danger * ramp], ['missile', 0.7 * danger * ramp]);
+  }
+  return items;
+}
+
+function spawnOne(game, target) {
+  const pt = spawnPoint(game);
+  if (!pt) return false;
+  const danger = dangerAt(Math.hypot(pt.x, pt.y));
+  const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
+  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return false;
+  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return false;
+  const T = ENEMY_TYPES[type];
+  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
+  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
+  const level = target.level + danger * CONFIG.dangerLevel;
+  const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
+  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
+  return true;
+}
+
+function spawnWave(game, target, remaining) {
+  const sh = game.ship;
+  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
+  if (game.rng() < 0.5) {
+    // ring closing in
+    const view = spawnBounds(game);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      const ux = Math.cos(a), uy = Math.sin(a);
+      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy)));
+      game.enemies.push(createEnemy('swarm', target.level, view.x + ux * d, view.y + uy * d, { facing: a + Math.PI }));
+    }
+  } else {
+    // a stream from one direction
+    const a = game.rng() * TAU;
+    for (let i = 0; i < n; i++) {
+      const view = spawnBounds(game);
+      const d = Math.min(view.halfW / Math.max(0.0001, Math.abs(Math.cos(a))), view.halfH / Math.max(0.0001, Math.abs(Math.sin(a)))) + CONFIG.spawnMargin + i * 12;
+      const off = (game.rng() - 0.5) * 120;
+      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
+    }
+  }
+  game.events.push({ type: 'wave' });
+}
+
+function keepMeteors(game) {
+  let near = 0;
+  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  if (near >= CONFIG.meteorCount) return;
+  const pt = spawnPoint(game, 200);
+  if (!pt) return;
+  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
+  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
+  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
+  game.enemies.push(m);
+}
+
+function despawnFar(game) {
+  const sh = game.ship;
+  const view = spawnBounds(game);
+  for (const e of game.enemies) {
+    if (e.type === 'boss') continue;
+    if (e.dead || (Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200)) continue;
+    const pt = spawnPoint(game);
+    if (!pt) continue;
+    // Recycling retains HP/strength and creates no kills, XP, modules or cooldown exploits.
+    e.x = pt.x; e.y = pt.y;
+    const dx = sh.x - e.x, dy = sh.y - e.y, d = Math.hypot(dx, dy) || 1;
+    e.vx = dx / d * e.speed; e.vy = dy / d * e.speed;
+    e.facing = Math.atan2(dy, dx); e.state = 'move'; e.timer = e.charge = 0;
+    e.fireT = e.T.fireInterval || 0;
+  }
+}
+
+function updateSpawner(game, dt) {
+  if (!game.spawning) return;
+  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
+  despawnFar(game);
+  keepMeteors(game);
+  const target = phaseTarget(game.t);
+  const P = target.phase;
+  let alive = 0;
+  const view = spawnBounds(game);
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss' &&
+    Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200) alive++;
+  const deficit = Math.max(0, target.pop - alive);
+  const rate = Math.max(P.rate * CONFIG.densityMult, deficit / CONFIG.spawnRefillTime);
+  game.spawnAcc = Math.min(game.spawnAcc + rate * dt, Math.max(8, 8 * CONFIG.densityMult));
+  let attempts = 0;
+  while (game.spawnAcc >= 1 && alive < target.pop && attempts++ < Math.max(8, 8 * CONFIG.densityMult)) {
+    game.spawnAcc -= 1;
+    if (spawnOne(game, target)) alive++;
+  }
+  if (P.waves) {
+    game.waveT = (game.waveT || 0) + dt;
+    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
+  }
+}
+
+function spawnBoss(game) {
+  const sh = game.ship;
+  const distance = Math.min(1000, game.viewRadius * 0.65);
+  const angle = game.rng() * TAU;
+  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
+  const planet = game.field.planet;
+  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
+    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
+    x = planet.x + Math.cos(a) * (planet.r + 220);
+    y = planet.y + Math.sin(a) * (planet.r + 220);
+  }
+  const r = Math.hypot(x, y);
+  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
+  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
+  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
+  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
+  game.boss = boss;
+  game.bossSpawned = true;
+  game.enemies.push(boss);
+  game.events.push({ type: 'bossSpawn', x, y });
+}
+
+// ---- ship.js ----
+
+
+function baseStats(meta = {}) {
+  const lv = (k) => meta[k] || 0;
+  return {
+    maxSpeed: CONFIG.baseMaxSpeed * (1 + 0.05 * lv('speed')),
+    launchRatio: CONFIG.launchRatio,
+    carry: CONFIG.carry,
+    chargeTime: CONFIG.chargeTime * Math.pow(0.95, lv('charge')),
+    gaugeMax: 1,
+    boostDuration: CONFIG.boostDuration,
+    cruiseDrag: CONFIG.cruiseDrag,
+    cruiseFloor: CONFIG.cruiseFloor,
+    atkMult: 1 + 0.06 * lv('atk'),
+    maxHp: CONFIG.baseHP + 15 * lv('hp'),
+    pickupRadius: CONFIG.pickupRadius * (1 + 0.15 * lv('pickup')),
+    xpMult: 1 + 0.08 * lv('xp'),
+    damageTakenMult: 1,
+    hitSlowMult: 1,
+    critMult: 2.5,
+    weakArcMult: 1,
+    pierceLossMult: 1,
+    bounceKeep: 0.5,
+    bounceDamageMult: 1,
+    predictTime: 0.9,
+    predictBounce: false,
+    regen: 0,
+    drawLengthMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // draw-mode modules
+  };
+}
+
+function createShip(stats, x, y) {
+  return {
+    x, y, vx: 0, vy: 0,
+    hp: stats.maxHp,
+    charging: false, chargeT: 0, gauge: 0, gaugeBank: 0,
+    aimX: 0, aimY: 0, hx: 0, hy: -1, // heading: travel direction, or the last control direction when nearly still
+    markX: 0, markY: -1, // where a Space launch would go right now (drawn as the aim marker)
+    aimAngle: -Math.PI / 2, turnHeld: 0, // rotating-aim scheme
+    boostT: 0, fadeT: 0, invulnT: 0, glide: false,
+    trail: [], trailAcc: 0,
+  };
+}
+
+function computeGauge(chargeT, stats, bank = 0) {
+  return Math.min(stats.gaugeMax, Math.max(CONFIG.minGauge, bank + chargeT / stats.chargeTime));
+}
+
+// New velocity after launching along unit direction (dx, dy) with the given gauge.
+function launchVelocity(vx, vy, dx, dy, gauge, stats) {
+  const speed = Math.hypot(vx, vy);
+  const cos = speed > 0 ? Math.max(0, (vx * dx + vy * dy) / speed) : 0;
+  const carried = speed * stats.carry * cos;
+  const thrust = stats.maxSpeed * stats.launchRatio * gauge;
+  const limit = stats.maxSpeed * Math.max(1, gauge);
+  const newSpeed = Math.max(Math.min(carried + thrust, limit), speed * cos);
+  return { vx: dx * newSpeed, vy: dy * newSpeed };
+}
+
+// Integrate one step: acceleration (ax, ay), drag rules, then position.
+function stepShip(ship, stats, dt, ax, ay, extraDrag) {
+  if (ship.glide) {
+    ship.boostT = Math.max(0, ship.boostT - dt);
+    ship.fadeT = 0;
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    return;
+  }
+  ship.vx += ax * dt;
+  ship.vy += ay * dt;
+  let sp = Math.hypot(ship.vx, ship.vy);
+  if (sp > 0) {
+    let target = sp;
+    if (ship.boostT > 0) {
+      ship.boostT -= dt;
+      if (ship.boostT <= 0) ship.fadeT = 0.3;
+    } else {
+      if (ship.fadeT > 0) {
+        ship.fadeT -= dt;
+        if (target > stats.maxSpeed * stats.cruiseFloor) target *= Math.pow(CONFIG.energyCut, dt / 0.3);
+      }
+      const floor = stats.maxSpeed * stats.cruiseFloor;
+      if (target > floor) target = floor + (target - floor) * Math.exp(-stats.cruiseDrag * dt);
+    }
+    if (target > stats.maxSpeed) {
+      target = stats.maxSpeed + (target - stats.maxSpeed) * Math.exp(-CONFIG.overcapDecay * dt);
+    }
+    if (extraDrag > 0) target *= Math.exp(-extraDrag * dt);
+    const k = target / sp;
+    ship.vx *= k;
+    ship.vy *= k;
+  }
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+}
+
+// ---- modules.js ----
+
+
+
+
+
+const SLOTS = [
+  { id: 'bow', name: '船首', icon: '▲' },
+  { id: 'booster', name: 'ブースター', icon: '»' },
+  { id: 'gun', name: '銃', icon: '✶' },
+  { id: 'radar', name: 'レーダー', icon: '◎' },
+  { id: 'armor', name: '装甲', icon: '■' },
+  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
+];
+
+const RARITIES = [
+  { name: 'コモン', color: '#b8c4d6' },
+  { name: 'レア', color: '#4fa3ff' },
+  { name: 'エピック', color: '#c46bff' },
+  { name: 'レジェンド', color: '#ffb340' },
+];
+
+const RARITY_MULT = [1, 1.6, 2.4, 3.5];
+
+const ALL = [0, 1, 2, 3];
+const pct = (v) => `${Math.round(v * 100)}%`;
+const M = (r) => RARITY_MULT[r];
+
+const MODULES = [
+  // 船首: 貫通と衝突時の効果
+  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
+    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
+  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
+    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
+  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
+    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
+  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
+    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
+    apply: (s, m) => { s.fling = 0.5 * m; } },
+  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
+    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
+    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
+
+  // ブースター: 最高速度と加速
+  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
+    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
+  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
+    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
+    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
+    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
+    desc: (r) => `経路を駆け抜ける速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
+    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
+  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
+    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
+    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
+
+  // 銃: 突進以外の攻撃
+  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
+    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
+    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
+  { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
+    desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
+    apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true, drawExcluded: true,
+    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
+    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
+  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
+    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
+    apply: (s, m) => { s.turret = m; } },
+  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, drawOnly: true,
+    desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
+  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
+    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
+  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
+    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
+    apply: (s, m) => { s.mines = 0.6 * m; } },
+
+  // レーダー: 読みの補助
+  { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
+    desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
+    apply: (s, m) => { s.portalWave = m; } },
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL, drawExcluded: true,
+    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
+    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL, drawExcluded: true,
+    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
+    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
+  { id: 'finishPulse', slot: 'radar', name: '終端爆縮器', rarities: ALL, drawOnly: true, portalExcluded: true,
+    desc: (r) => `描いた経路の移動終了時に爆発（半径 ${Math.round(180 * (1 + 0.2 * r))}、威力 ${pct(0.7 * M(r))}）。弾かれた地点でも発動`,
+    apply: (s, m, r) => { s.traceEndBlast = { radius: 180 * (1 + 0.2 * r), mult: 0.7 * m }; } },
+  { id: 'impactPulse', slot: 'radar', name: '連鎖パルス', rarities: [2, 3], drawOnly: true, portalExcluded: true,
+    desc: (r) => `敵を貫くたびに波動で周囲へ攻撃（半径 ${Math.round(95 * (1 + 0.2 * r))}、威力 ${pct(0.25 * M(r))}）`,
+    apply: (s, m, r) => { s.pierceWave = { radius: 95 * (1 + 0.2 * r), mult: 0.25 * m }; } },
+  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
+    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
+    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
+  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
+    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
+    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
+
+  // 装甲: 耐久
+  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
+    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
+    apply: (s, m) => { s.maxHp += 30 * m; } },
+  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
+    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
+    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
+  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
+    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
+    apply: (s, m) => { s.regen += 0.8 * m; } },
+  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
+    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
+    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
+
+  // ジェネレーター: エネルギーとチャージ
+  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
+    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
+    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
+  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
+    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
+    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
+  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} +${pct(0.25 * M(r))}`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
+  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
+    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
+    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
+  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
+    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
+  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
+    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
+    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
+];
+
+const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+function moduleDef(id) {
+  return BY_ID[id];
+}
+
+function moduleFitsScheme(m, scheme) {
+  return (!m.drawOnly || !scheme || isDrawScheme(scheme) || scheme === 'portal')
+    && (!m.portalOnly || scheme === 'portal')
+    && (!m.drawExcluded || !isDrawScheme(scheme))
+    && (!m.portalExcluded || scheme !== 'portal');
+}
+
+// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
+function computeStats(meta, loadout, bonus = {}) {
+  const s = baseStats(meta);
+  for (const slot of SLOTS) {
+    const mod = loadout[slot.id];
+    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
+  }
+  const lv = bonus.level || 0;
+  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
+  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
+  s.maxHp += CONFIG.levelHpGrowth * lv;
+  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
+  return s;
+}
+
+function rarityWeights(ctx) {
+  if (ctx.source === 'core') return [0, 0, 1, 2];
+  if (ctx.source === 'capsule') {
+    const d = ctx.danger || 0;
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  if (ctx.source === 'drop') {
+    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
+    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
+    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
+  }
+  const t = ctx.t;
+  if (t < 150) return [7, 2.5, 0.5, 0];
+  if (t < 300) return [5, 4, 1.2, 0.1];
+  if (t < 480) return [3, 4, 2.5, 0.4];
+  return [1.5, 3, 4, 1.2];
+}
+
+function rollModule(rng, ctx) {
+  const t = ctx.t || 0;
+  const loadout = ctx.loadout;
+  let slot;
+  let pool;
+  if (ctx.source === 'core') {
+    slot = 'booster';
+    pool = [BY_ID.limiter];
+  } else {
+    slot = pickWeighted(rng, SLOTS.map((s) => {
+      const cur = loadout[s.id];
+      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
+      if (s.id === ctx.lastSlot) w *= 0.35;
+      return [s.id, w];
+    }));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && moduleFitsScheme(m, ctx.scheme));
+  }
+  const rw = rarityWeights(ctx);
+  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
+  const fits = pool.filter((m) => m.rarities.includes(r));
+  if (fits.length) {
+    const def = fits[Math.floor(rng() * fits.length)];
+    return { id: def.id, slot, r };
+  }
+  const def = pool[Math.floor(rng() * pool.length)];
+  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
+  return { id: def.id, slot, r: nearest };
+}
+
+// ---- combat.js ----
+
+
+
+const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
+
+function attackPower(speed, stats) {
+  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
+}
+
+function isWeakHit(e, hx, hy, arcMult) {
+  if (!e.weakArc) return false;
+  const a = Math.atan2(hy - e.y, hx - e.x);
+  return Math.abs(angleDiff(a, e.facing + e.weakDir)) <= e.weakArc * arcMult;
+}
+
+function canPierce(atk, e, crit) {
+  return atk >= e.armor * (crit ? CRIT_ARMOR : 1);
+}
+
+function resolveRam(atk, e, crit, stats) {
+  if (canPierce(atk, e, crit)) {
+    const damage = atk * (crit ? stats.critMult : 1);
+    return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
+  }
+  return { pierce: false, damage: atk * 0.25, kill: false, shipDamage: e.contact };
+}
+
+// Share of speed kept after going through an enemy.
+function pierceKeep(e, killed, stats) {
+  const loss = killed ? 0.004 + e.r * 0.0006 : 0.1 + e.r * 0.002;
+  return 1 - Math.min(0.6, loss * stats.pierceLossMult);
 }
 
 // ---- grid.js ----
@@ -1080,157 +1383,114 @@ function queryRadius(grid, x, y, r, cb) {
   });
 }
 
-// ---- spawner.js ----
+// ---- gravity.js ----
 
 
-
-
-
-// The run's experience curve. pop = enemies kept around the ship, level = enemy strength.
-const PHASES = [
-  { id: 'build1', name: '強化期', sub: '弱い敵を吹っ飛ばして機体を育てろ', start: 0, end: 150, pop: [14, 45], level: [1.0, 1.35], rate: 6, mix: { drifter: 6, darter: 1.5, splitter: 0.8, swarm: 1, titan: 0.05 } },
-  { id: 'pressure', name: '圧力期', sub: '敵が硬くなってきた', start: 150, end: 240, pop: [45, 70], level: [1.7, 2.3], rate: 8, mix: { drifter: 3.5, darter: 3, armored: 2.2, gunner: 1.1, leech: 1.5, splitter: 1.5, titan: 0.3 } },
-  { id: 'build2', name: '強化期 II', sub: '今のうちに組み上げろ', start: 240, end: 300, pop: [38, 45], level: [2.0, 2.2], rate: 6, xpBonus: 1.4, mix: { drifter: 4, darter: 2, splitter: 2, gunner: 1, swarm: 2, titan: 0.4 } },
-  { id: 'rampage', name: '無双期', sub: '群れが来る — まとめて貫け', start: 300, end: 360, pop: [140, 260], level: [1.3, 1.6], rate: 60, waves: 3.5, mix: { swarm: 10, drifter: 3, splitling: 2 } },
-  { id: 'tension', name: '緊張期', sub: '互角の相手。弱点を突け', start: 360, end: 510, pop: [70, 110], level: [3.0, 4.4], rate: 10, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.3, leech: 2, splitter: 2, drifter: 2.5, titan: 1.2, battleship: 0.3 } },
-  { id: 'escape', name: '脱出期', sub: '出力コアで上限を解放し、脱出速度へ', start: 510, end: 600, pop: [90, 120], level: [4.2, 5.0], rate: 12, cores: true, mix: { darter: 3, armored: 3, gunner: 2, missile: 1.6, leech: 2, splitter: 1.5, swarm: 3, titan: 2, battleship: 0.6 } },
-];
-
-function getPhase(t) {
-  for (const p of PHASES) if (t < p.end) return p;
-  return PHASES[PHASES.length - 1];
+function pull(out, x, y, b) {
+  const dx = b.x - x, dy = b.y - y;
+  const d2 = Math.max(dx * dx + dy * dy, b.r * b.r);
+  const d = Math.sqrt(d2);
+  const a = b.gm / d2;
+  out.ax += (dx / d) * a;
+  out.ay += (dy / d) * a;
 }
 
-function phaseTarget(t) {
-  const p = getPhase(t);
-  const k = clamp((t - p.start) / (p.end - p.start), 0, 1);
-  return { phase: p, pop: lerp(p.pop[0], p.pop[1], k) * CONFIG.densityMult, level: lerp(p.level[0], p.level[1], k) };
-}
-
-function spawnPoint(game, extra = 0) {
-  const sh = game.ship;
-  for (let i = 0; i < 6; i++) {
-    const a = game.rng() * TAU;
-    const d = game.viewRadius + 100 + extra + game.rng() * 300;
-    const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
-    const r = Math.hypot(x, y);
-    if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
-  }
-  return null;
-}
-
-// Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
-function mixAt(phase, danger, t) {
-  const items = Object.entries(phase.mix);
-  if (danger > 0.25) {
-    const ramp = clamp(t / 150, 0.15, 1);
-    items.push(['armored', 2 * danger], ['gunner', danger * ramp], ['missile', 0.7 * danger * ramp]);
-  }
-  return items;
-}
-
-function spawnOne(game, target) {
-  const pt = spawnPoint(game);
-  if (!pt) return;
-  const danger = dangerAt(Math.hypot(pt.x, pt.y));
-  const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
-  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
-  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return;
-  const T = ENEMY_TYPES[type];
-  const late = target.phase.id === 'tension' || target.phase.id === 'escape';
-  const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
-  const level = target.level + danger * CONFIG.dangerLevel;
-  const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
-  game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
-}
-
-function spawnWave(game, target, remaining) {
-  const sh = game.ship;
-  const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
-  if (game.rng() < 0.5) {
-    // ring closing in
-    const d = game.viewRadius * 0.95;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU;
-      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, { facing: a + Math.PI }));
-    }
-  } else {
-    // a stream from one direction
-    const a = game.rng() * TAU;
-    for (let i = 0; i < n; i++) {
-      const d = game.viewRadius + 80 + i * 34;
-      const off = (game.rng() - 0.5) * 120;
-      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
-    }
-  }
-  game.events.push({ type: 'wave' });
-}
-
-function keepMeteors(game) {
-  let near = 0;
-  for (const e of game.enemies) if (e.type === 'meteor') near++;
-  if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game, 200);
-  if (!pt) return;
-  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
-  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
-  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
-  game.enemies.push(m);
-}
-
-function despawnFar(game) {
-  const sh = game.ship;
-  const far = game.viewRadius * 2.6 + 800;
-  let removed = false;
-  for (const e of game.enemies) {
-    if (e.type === 'boss') continue;
-    const lim = e.type === 'battleship' ? far * 1.6 : far;
-    if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
-  }
-  if (removed) game.enemies = game.enemies.filter((e) => !e.dead);
-}
-
-function updateSpawner(game, dt) {
-  if (!game.spawning) return;
-  if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
-  despawnFar(game);
-  keepMeteors(game);
-  const target = phaseTarget(game.t);
-  const P = target.phase;
-  let alive = 0;
-  for (const e of game.enemies) if (e.type !== 'meteor' && e.type !== 'boss') alive++;
-  game.spawnAcc = Math.min(game.spawnAcc + P.rate * CONFIG.densityMult * dt, Math.max(8, 8 * CONFIG.densityMult));
-  while (game.spawnAcc >= 1 && alive < target.pop) {
-    game.spawnAcc -= 1;
-    spawnOne(game, target);
-    alive++;
-  }
-  if (P.waves) {
-    game.waveT = (game.waveT || 0) + dt;
-    if (game.waveT >= P.waves) { game.waveT = 0; if (alive < target.pop) spawnWave(game, target, target.pop - alive); }
-  }
-}
-
-function spawnBoss(game) {
-  const sh = game.ship;
-  const distance = Math.min(1000, game.viewRadius * 0.65);
-  const angle = game.rng() * TAU;
-  let x = sh.x + Math.cos(angle) * distance, y = sh.y + Math.sin(angle) * distance;
-  const planet = game.field.planet;
-  if (Math.hypot(x - planet.x, y - planet.y) < planet.r + 180) {
-    const a = Math.atan2(sh.y - planet.y, sh.x - planet.x);
-    x = planet.x + Math.cos(a) * (planet.r + 220);
-    y = planet.y + Math.sin(a) * (planet.r + 220);
-  }
+function gravityAt(field, t, x, y) {
+  const out = { ax: 0, ay: 0 };
+  pull(out, x, y, field.planet);
+  for (const m of field.moons) pull(out, x, y, m);
   const r = Math.hypot(x, y);
-  if (r > CONFIG.fieldRadius - 160) { x *= (CONFIG.fieldRadius - 160) / r; y *= (CONFIG.fieldRadius - 160) / r; }
-  const boss = createEnemy('boss', 1, x, y, { facing: Math.atan2(sh.y - y, sh.x - x) });
-  boss.hp = boss.maxHp = CONFIG.bossHp * CONFIG.enemyHpMult;
-  boss.armor = CONFIG.bossArmor * CONFIG.enemyArmorMult;
-  game.boss = boss;
-  game.bossSpawned = true;
-  game.enemies.push(boss);
-  game.events.push({ type: 'bossSpawn', x, y });
+  if (r > CONFIG.fieldRadius) {
+    const push = CONFIG.boundaryPush + (r - CONFIG.fieldRadius) * 4;
+    out.ax -= (x / r) * push;
+    out.ay -= (y / r) * push;
+  }
+  return out;
+}
+
+// ---- impact-fx.js ----
+
+
+// Effects remain at the actual contact; the illuminated hull follows a surviving blocker.
+function addCombatImpact(game, enemy, kind, nx, ny) {
+  const impacts = game.fx.impacts;
+  if (impacts.length >= 48) {
+    if (kind !== 'block') return;
+    const old = impacts.findIndex(i => i.kind !== 'block');
+    impacts.splice(Math.max(0, old), 1);
+  }
+  const life = kind === 'block' ? CONFIG.blockImpactLife : CONFIG.weakImpactLife;
+  const x = enemy.x + nx * enemy.r, y = enemy.y + ny * enemy.r;
+  impacts.push({ kind, enemy, x, y, nx, ny, life, max: life });
+  const count = kind === 'block' ? CONFIG.blockSparkCount : CONFIG.weakFlameCount;
+  const normal = Math.atan2(ny, nx);
+  for (let i = 0; i < count && game.fx.particles.length < 1800; i++) {
+    const side = i % 2 ? 1 : -1;
+    const angle = kind === 'block' ? normal + side * (0.8 + Math.random() * 0.75)
+      : normal + (Math.random() - 0.5) * 1.25;
+    const speed = kind === 'block' ? 180 + Math.random() * 460 : 100 + Math.random() * 260;
+    const duration = life * (0.6 + Math.random() * 0.4);
+    game.fx.particles.push({ kind: kind === 'block' ? 'spark' : 'flame', x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: duration, max: duration, color: i % 3 ? '#ffae40' : '#fff6c7', size: 2 + Math.random() * 3 });
+  }
+}
+
+function drawCombatImpacts(r, game) {
+  const { ctx } = r;
+  const z = r.cam.zoom;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (const impact of game.fx.impacts) {
+    const a = impact.life / impact.max;
+    const { enemy, nx, ny } = impact;
+    const x = impact.kind === 'block' && !enemy.dead ? enemy.x + nx * enemy.r : impact.x;
+    const y = impact.kind === 'block' && !enemy.dead ? enemy.y + ny * enemy.r : impact.y;
+    const reach = (impact.kind === 'block' ? 60 : 38) / Math.sqrt(z);
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, reach);
+    glow.addColorStop(0, `rgba(255,245,190,${a * 0.85})`);
+    glow.addColorStop(0.2, `rgba(255,157,38,${a * 0.6})`);
+    glow.addColorStop(1, 'rgba(255,80,12,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - reach, y - reach, reach * 2, reach * 2);
+    if (impact.kind === 'block') {
+      // A brief reflection across this hull identifies the enemy that stopped the dash.
+      const angle = Math.atan2(ny, nx);
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = '#ffcf69'; ctx.lineWidth = 5 / z;
+      ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.r + 2 / z, angle - 1.15, angle + 1.15); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+
+// ---- projectiles.js ----
+
+
+// Enemy bullets and missiles. Returns hits on the ship via the callback.
+function updateEnemyBullets(game, dt, onHit) {
+  const sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const p = game.field.planet;
+  for (const b of game.ebullets) {
+    if (b.kind === 'missile') {
+      const t = game.enemyAim || sh; // home on where enemies think the ship is
+      const want = Math.atan2(t.y - b.y, t.x - b.x);
+      const cur = Math.atan2(b.vy, b.vx);
+      let d = want - cur;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      const a = cur + Math.max(-b.turn * dt, Math.min(b.turn * dt, d));
+      b.vx = Math.cos(a) * b.speed; b.vy = Math.sin(a) * b.speed;
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt;
+    const dx = b.x - sh.x, dy = b.y - sh.y;
+    if (dx * dx + dy * dy < (b.r + R) * (b.r + R)) { onHit(b); b.life = 0; }
+    if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) b.life = 0;
+  }
+  if (game.ebullets.some((b) => b.life <= 0)) game.ebullets = game.ebullets.filter((b) => b.life > 0);
 }
 
 // ---- progression.js ----
@@ -1314,216 +1574,875 @@ function applyRunResult(save, game) {
   }
 }
 
-// ---- modules.js ----
+// ---- stages.js ----
 
 
-
-
-
-const SLOTS = [
-  { id: 'bow', name: '船首', icon: '▲' },
-  { id: 'booster', name: 'ブースター', icon: '»' },
-  { id: 'gun', name: '銃', icon: '✶' },
-  { id: 'radar', name: 'レーダー', icon: '◎' },
-  { id: 'armor', name: '装甲', icon: '■' },
-  { id: 'gen', name: 'ジェネレーター', icon: 'ϟ' },
+// Speed tiers announced on screen as the ship breaks through them (values in px/s).
+const SPEED_STAGES = [
+  { v: CONFIG.escapeSpeed * 0.27, name: 'STAGE Ⅰ' },
+  { v: CONFIG.escapeSpeed * 0.45, name: 'STAGE Ⅱ' },
+  { v: CONFIG.escapeSpeed * 0.62, name: 'STAGE Ⅲ' },
+  { v: CONFIG.escapeSpeed * 0.8, name: 'STAGE Ⅳ' },
+  { v: CONFIG.escapeSpeed, name: 'ESCAPE' },
 ];
 
-const RARITIES = [
-  { name: 'コモン', color: '#b8c4d6' },
-  { name: 'レア', color: '#4fa3ff' },
-  { name: 'エピック', color: '#c46bff' },
-  { name: 'レジェンド', color: '#ffb340' },
-];
-
-const RARITY_MULT = [1, 1.6, 2.4, 3.5];
-
-const ALL = [0, 1, 2, 3];
-const pct = (v) => `${Math.round(v * 100)}%`;
-const M = (r) => RARITY_MULT[r];
-
-const MODULES = [
-  // 船首: 貫通と衝突時の効果
-  { id: 'ram', slot: 'bow', name: '衝角強化', rarities: ALL,
-    desc: (r) => `攻撃力 +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.atkMult *= 1 + 0.25 * m; } },
-  { id: 'piercer', slot: 'bow', name: '貫通弾頭', rarities: ALL,
-    desc: (r) => `貫通時の減速 -${pct(1 - 1 / (1 + M(r)))}、攻撃力 +${pct(0.08 * M(r))}`,
-    apply: (s, m) => { s.pierceLossMult /= 1 + m; s.atkMult *= 1 + 0.08 * m; } },
-  { id: 'burstHead', slot: 'bow', name: '炸裂弾頭', rarities: ALL,
-    desc: (r) => `1回の突進で ${Math.max(2, 6 - r)} 体以上貫くと、突進の終点で大爆発（半径 ${Math.round(220 * (1 + 0.25 * r))}）`,
-    apply: (s, m, r) => { s.endBlast = { min: Math.max(2, 6 - r), radius: 220 * (1 + 0.25 * r), mult: 0.9 * m }; } },
-  { id: 'flinger', slot: 'bow', name: '吹き飛ばし衝角', rarities: ALL,
-    desc: (r) => `倒した敵が弾丸となって吹き飛び、周りの敵を巻き込む（威力 ${pct(0.5 * M(r))}）`,
-    apply: (s, m) => { s.fling = 0.5 * m; } },
-  { id: 'weakHunter', slot: 'bow', name: '弱点特攻', rarities: ALL,
-    desc: (r) => `クリティカル倍率 +${M(r).toFixed(1)}、弱点の範囲 +${pct(0.15 * M(r))}`,
-    apply: (s, m) => { s.critMult += m; s.weakArcMult *= 1 + 0.15 * m; } },
-
-  // ブースター: 最高速度と加速
-  { id: 'thruster', slot: 'booster', name: '高出力スラスター', rarities: ALL,
-    desc: (r) => `最高速度 +${pct(0.12 * M(r))}`,
-    apply: (s, m) => { s.maxSpeed *= 1 + 0.12 * m; } },
-  { id: 'inertia', slot: 'booster', name: '慣性保持ノズル', rarities: ALL,
-    desc: (r) => `突進後の減速が遅く、勢いの持ち越し +${pct(0.06 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
-    apply: (s, m) => { s.boostDuration *= 1 + 0.5 * m; s.carry = Math.min(0.95, s.carry + 0.06 * m); s.maxSpeed *= 1 + 0.04 * m; } },
-  { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
-    desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
-    apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
-  { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, drawOnly: true,
-    desc: (r) => `経路を駆け抜ける速さ +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
-    apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
-  { id: 'limiter', slot: 'booster', name: 'リミッター解除', rarities: [2, 3], minTime: 480,
-    desc: (r) => `最高速度 +${pct(0.18 * M(r))}。脱出のための出力`,
-    apply: (s, m) => { s.maxSpeed *= 1 + 0.18 * m; } },
-
-  // 銃: 突進以外の攻撃
-  { id: 'trailBurst', slot: 'gun', name: '軌跡炸裂', rarities: ALL,
-    desc: (r) => `突進で通った軌跡が遅れて爆ぜる（威力 ${pct(0.35 * M(r))}）`,
-    apply: (s, m) => { s.trailBurst = 0.35 * m; } },
-  { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
-    desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
-    apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
-  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true,
-    desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
-    apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
-  { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
-    desc: (r) => `近くの敵を自動で撃つ（${(1.6 * M(r)).toFixed(1)} 発/秒）`,
-    apply: (s, m) => { s.turret = m; } },
-  { id: 'waveAmp', slot: 'gun', name: '波動増幅器', rarities: ALL, drawOnly: true,
-    desc: (r) => `軌跡から出る波動の届く距離 +${pct(0.25 * M(r))}、威力 +${pct(0.3 * M(r))}`,
-    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.25 * m; s.waveDmgMult *= 1 + 0.3 * m; } },
-  { id: 'tsunami', slot: 'gun', name: '大波動', rarities: [2, 3], minTime: 420, drawOnly: true,
-    desc: (r) => `軌跡の波動が届く距離 ×${(1 + 0.9 * M(r)).toFixed(1)}、威力 ×${(1 + 0.8 * M(r)).toFixed(1)}。群れをまとめて消し飛ばす`,
-    apply: (s, m) => { s.waveRadiusMult *= 1 + 0.9 * m; s.waveDmgMult *= 1 + 0.8 * m; } },
-  { id: 'mines', slot: 'gun', name: '機雷投下', rarities: ALL,
-    desc: (r) => `最高速度の 60% 以上で機雷をばらまく（威力 ${pct(0.6 * M(r))}）`,
-    apply: (s, m) => { s.mines = 0.6 * m; } },
-
-  // レーダー: 読みの補助
-  { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
-    desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
-    apply: (s, m) => { s.portalWave = m; } },
-  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
-    desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
-    apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
-  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL,
-    desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
-    apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
-  { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
-    desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
-    apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
-  { id: 'magnet', slot: 'radar', name: '回収ビーコン', rarities: ALL,
-    desc: (r) => `回収範囲 +${pct(0.5 * M(r))}、経験値 +${pct(0.08 * M(r))}`,
-    apply: (s, m) => { s.pickupRadius *= 1 + 0.5 * m; s.xpMult *= 1 + 0.08 * m; } },
-
-  // 装甲: 耐久
-  { id: 'plating', slot: 'armor', name: '複合装甲', rarities: ALL,
-    desc: (r) => `最大 HP +${Math.round(30 * M(r))}`,
-    apply: (s, m) => { s.maxHp += 30 * m; } },
-  { id: 'absorber', slot: 'armor', name: '衝撃吸収材', rarities: ALL,
-    desc: (r) => `被ダメージ -${pct(1 - 1 / (1 + 0.3 * M(r)))}、被弾時の減速 -${pct(1 - 1 / (1 + 0.6 * M(r)))}`,
-    apply: (s, m) => { s.damageTakenMult /= 1 + 0.3 * m; s.hitSlowMult /= 1 + 0.6 * m; } },
-  { id: 'repair', slot: 'armor', name: '自己修復', rarities: ALL,
-    desc: (r) => `HP を毎秒 ${(0.8 * M(r)).toFixed(1)} 回復`,
-    apply: (s, m) => { s.regen += 0.8 * m; } },
-  { id: 'reactive', slot: 'armor', name: '反応装甲', rarities: ALL,
-    desc: (r) => `被弾すると周囲に衝撃波（威力 ${pct(1.2 * M(r))}）、最大 HP +${Math.round(10 * M(r))}`,
-    apply: (s, m) => { s.reactive = 1.2 * m; s.maxHp += 10 * m; } },
-
-  // ジェネレーター: エネルギーとチャージ
-  { id: 'quickCharge', slot: 'gen', name: '高速チャージャ', rarities: ALL, portalExcluded: true,
-    desc: (r) => `チャージ時間 -${pct(1 - 1 / (1 + 0.35 * M(r)))}`,
-    apply: (s, m) => { s.chargeTime /= 1 + 0.35 * m; } },
-  { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
-    desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
-    apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
-    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
-    apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
-  { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, drawOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} +${pct(0.25 * M(r))}`,
-    apply: (s, m) => { s.drawLengthMult *= 1 + 0.25 * m; } },
-  { id: 'trailOverdrive', slot: 'gen', name: '軌跡オーバードライブ', rarities: [2, 3], minTime: 420, drawOnly: true,
-    desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : '描ける軌跡の長さ'} ×${(1 + 0.8 * M(r)).toFixed(1)}。画面中を駆けめぐれる`,
-    apply: (s, m) => { s.drawLengthMult *= 1 + 0.8 * m; } },
-  { id: 'sonicS', slot: 'gen', name: 'ソニックブーム（小）', rarities: [1, 2], minTime: 240,
-    desc: (r) => `最高速度の 92% を超えた瞬間、衝撃波で周囲を吹き飛ばす（半径 ${Math.round(420 * (1 + 0.15 * r))}）`,
-    apply: (s, m, r) => { s.sonic = { radius: 420 * (1 + 0.15 * r), mult: 2 * m }; } },
-  { id: 'sonicL', slot: 'gen', name: 'ソニックブーム（大）', rarities: [2, 3], minTime: 360,
-    desc: (r) => `最高速度の 92% を超えた瞬間、巨大な衝撃波で一掃する（半径 ${Math.round(950 * (1 + 0.15 * (r - 2)))}）`,
-    apply: (s, m, r) => { s.sonic = { radius: 950 * (1 + 0.15 * (r - 2)), mult: 3.5 * m }; } },
-];
-
-const BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
-
-function moduleDef(id) {
-  return BY_ID[id];
-}
-
-// bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
-function computeStats(meta, loadout, bonus = {}) {
-  const s = baseStats(meta);
-  for (const slot of SLOTS) {
-    const mod = loadout[slot.id];
-    if (mod) BY_ID[mod.id].apply(s, RARITY_MULT[mod.r] * (1 + CONFIG.dupBonus * (mod.plus || 0)), mod.r);
-  }
-  const lv = bonus.level || 0;
-  s.maxSpeed *= (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + CONFIG.levelSpeedGrowth * lv);
-  s.atkMult *= 1 + CONFIG.levelAtkGrowth * lv;
-  s.maxHp += CONFIG.levelHpGrowth * lv;
-  s.chargeTime *= Math.max(0.6, 1 - CONFIG.levelChargeGrowth * lv);
+function speedStage(sp) {
+  let s = 0;
+  for (let i = 0; i < SPEED_STAGES.length; i++) if (sp >= SPEED_STAGES[i].v) s = i + 1;
   return s;
 }
 
-function rarityWeights(ctx) {
-  if (ctx.source === 'core') return [0, 0, 1, 2];
-  if (ctx.source === 'capsule') {
-    const d = ctx.danger || 0;
-    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
-  }
-  if (ctx.source === 'drop') {
-    // stronger enemies (power = their xp: type x level x elite) drop rarer modules
-    const d = Math.max(Math.min(1, ((ctx.power || 1) - 1) / 20), (ctx.danger || 0) * 0.6);
-    return [6 * (1 - d), 3 + d, 0.6 + 4 * d, 2.4 * d * d];
-  }
-  const t = ctx.t;
-  if (t < 150) return [7, 2.5, 0.5, 0];
-  if (t < 300) return [5, 4, 1.2, 0.1];
-  if (t < 480) return [3, 4, 2.5, 0.4];
-  return [1.5, 3, 4, 1.2];
+// ---- world.js ----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const STEP = 1 / 120;
+
+function createGame(opts = {}) {
+  const meta = opts.meta || {};
+  const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
+  const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
+  // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
+  if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
+  const stats = computeStats(meta, loadout);
+  const rng = makeRng(seed);
+  const ship = createShip(stats, -CONFIG.startRadius, 0);
+  ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
+  return {
+    t: 0, acc: 0, seed, rng,
+    meta, stats, ship, loadout,
+    scheme: opts.scheme || CONFIG.controlScheme,
+    offerQueue: [], currentOffer: null, lastOfferSlot: null,
+    nextOfferAt: 0, nextModuleDropAt: 0,
+    field: createField(rng),
+    debug: { invincible: false, autoOffer: null },
+    enemies: [], newEnemies: [], ebullets: [],
+    boss: null, bossSpawned: false,
+    finale: null, finishFrames: [], finishClock: 0,
+    leechDrag: 0,
+    gems: [], coinDrops: [],
+    xp: 0, level: 0, pendingLevelups: 0,
+    spawnAcc: 0, waveT: 0,
+    phaseId: null,
+    endReason: null,
+    draw: null, lastPath: null,
+    portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
+    portalSpace: { armed: false, seconds: 0, consumed: false },
+    portalClock: 0, portalCooldowns: new Map(),
+    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
+    grid: buildGrid([], 160),
+    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
+    ...createEffectState(),
+    kills: 0, coins: 0, cores: 0,
+    hitstop: 0, slowmo: 0,
+    spawning: true,
+    dashPierce: 0, dashId: 0,
+    state: 'play',
+    timeScale: 1,
+    releasePending: null,
+    peakSpeed: 0, stage: 0,
+    events: [],
+    viewRadius: 1400,
+  };
 }
 
-function rollModule(rng, ctx) {
-  const t = ctx.t || 0;
-  const loadout = ctx.loadout;
-  let slot;
-  let pool;
-  if (ctx.source === 'core') {
-    slot = 'booster';
-    pool = [BY_ID.limiter];
+function update(game, frameDt, input) {
+  frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'finishing') {
+    updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
+    const finished = advanceBossFinish(game, frameDt);
+    if (finished) end(game, 'won', 'boss');
+    return;
+  }
+  if (game.state !== 'play') return;
+  recordBossApproach(game, frameDt);
+  game.portalClock += frameDt;
+  for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
+  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
+  updateFx(game, frameDt);
+  handlePortalInput(game, input, frameDt);
+  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
+    startDrawing(game, input);
+    input = { ...input, press: false }; // consume the start click so it cannot also commit
+  }
+  if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
+  // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
+  if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
+  if (game.portalDash) updatePortals(game, frameDt);
+  if (game.state !== 'play') return;
+  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
+  if (game.draw && game.draw.phase === 'run') {
+    // trace every frame on real time (world steps are rare while it is nearly frozen)
+    runAlongPath(game, frameDt);
+    if (game.state !== 'play') return;
+    collideBodies(game);
+    recordTrail(game.ship, frameDt);
+  }
+  let scale = 1;
+  if (game.draw) scale = drawWorldScale(game);
+  if (game.portalDash) scale = portalWorldScale(game);
+  if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
+  game.timeScale = scale;
+  game.acc += frameDt * scale;
+  // the run clock keeps real time while drawing/tracing even though the world crawls
+  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
+  const phaseBefore = drawPhase(game);
+  while (game.acc >= STEP) {
+    game.acc -= STEP;
+    step(game, STEP, input);
+    if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
+    if (game.state !== 'play') break;
+    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
+    if (game.offerQueue.length) {
+      absorbDuplicates(game);
+      if (game.offerQueue.length && !game.draw &&
+          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
+    }
+  }
+  if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
+  if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+}
+
+// Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
+function updateHeading(sh) {
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
+}
+
+// Direction a keyboard/hover launch would take right now.
+function schemeAim(game, input) {
+  return controlAim(game, input) || { x: game.ship.hx * 100, y: game.ship.hy * 100 };
+}
+
+function step(game, dt, input) {
+  const sh = game.ship;
+  const stats = game.stats;
+  game.t += dt;
+  const phase = getPhase(game.t);
+  if (phase.id !== game.phaseId) {
+    game.phaseId = phase.id;
+    game.events.push({ type: 'phase', phase });
+  }
+
+  const ctl = game.draw || game.portalDash ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
+  updateHeading(sh);
+  const aim = schemeAim(game, input);
+  sh.markX = aim.x / 100; sh.markY = aim.y / 100;
+  if (game.draw || game.portalDash) {
+    game.releasePending = null; // presses while drawing/running only commit the path
+  } else if (input.charging && !game.releasePending) {
+    if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
+    sh.chargeT += dt;
+    sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
+    sh.aimX = input.keyboard ? aim.x : input.aimX;
+    sh.aimY = input.keyboard ? aim.y : input.aimY;
+  }
+  if (game.releasePending && !game.draw && !game.portalDash) {
+    const r = game.releasePending;
+    game.releasePending = null;
+    if (sh.charging) {
+      if (r.keyboard && isDrawScheme(game.scheme)) startDrawing(game, input);
+      else if (r.keyboard) launch(game, aim.x, aim.y);
+      else launch(game, r.x, r.y);
+    }
+    sh.charging = false;
+  }
+
+  updateMoons(game.field, game.t);
+  game.leechDrag = 0;
+  updateEnemyAim(game, dt);
+  for (const e of game.enemies) updateEnemy(e, game, dt);
+  flushNewEnemies(game);
+  separateEnemies(game);
+  game.grid = buildGrid(game.enemies, 160);
+
+  if (!game.draw && !game.portalDash) {
+    const g = gravityAt(game.field, game.t, sh.x, sh.y);
+    const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
+    const x0 = sh.x, y0 = sh.y;
+    stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
+    collideEnemies(game, x0, y0);
+    if (game.state !== 'play') return;
+    collideBodies(game);
+    checkPortalEntry(game, x0, y0);
+  }
+  if (sh.invulnT > 0) sh.invulnT -= dt;
+  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
+  updateEffects(game, dt);
+  if (game.state !== 'play') return;
+  if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
+  flushNewEnemies(game);
+  updateSpawner(game, dt);
+  updateGems(game, dt);
+  if (stats.regen > 0) sh.hp = Math.min(stats.maxHp, sh.hp + stats.regen * dt);
+
+  const sp = Math.hypot(sh.vx, sh.vy);
+  if (sp > game.peakSpeed) game.peakSpeed = sp;
+  recordTrail(sh, dt);
+  const st = speedStage(sp);
+  if (st > game.stage) {
+    game.stage = st;
+    game.events.push({ type: 'stage', stage: st, name: SPEED_STAGES[st - 1].name, speed: sp });
+  } else if (game.stage > 0 && sp < SPEED_STAGES[game.stage - 1].v * 0.85) {
+    game.stage = st;
+  }
+
+  if (sh.hp <= 0) end(game, 'lost', 'hp');
+  else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+}
+
+function end(game, state, reason) {
+  if (state === 'won') game.coins += CONFIG.escapeBonus;
+  game.state = state;
+  game.endReason = reason;
+  game.events.push({ type: 'end', state, reason });
+}
+
+// ---- offers ----
+
+// Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
+function absorbDuplicates(game) {
+  while (game.offerQueue.length) {
+    const o = game.offerQueue[0];
+    const cur = game.loadout[o.slot];
+    if (!cur || cur.id !== o.id) return;
+    game.offerQueue.shift();
+    cur.r = Math.max(cur.r, o.r);
+    cur.plus = (cur.plus || 0) + 1;
+    refreshStats(game);
+    const sh = game.ship;
+    addText(game, sh.x, sh.y - 46, `${moduleDef(cur.id).name} +${cur.plus}`, RARITIES[cur.r].color, 20);
+    game.events.push({ type: 'upgrade', mod: cur });
+  }
+}
+
+function pushOffer(game, mod, source) {
+  game.lastOfferSlot = mod.slot;
+  game.offerQueue.push({ ...mod, source });
+}
+
+function openOffer(game) {
+  const auto = game.debug.autoOffer;
+  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
+  game.state = 'offer';
+  game.currentOffer = game.offerQueue.shift();
+  game.ship.charging = false;
+  game.releasePending = null;
+  game.events.push({ type: 'offer' });
+  if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
+}
+
+function isBetter(game, mod) {
+  const cur = game.loadout[mod.slot];
+  return !cur || mod.r >= cur.r;
+}
+
+// accept: equip (the old module in that slot is thrown away); otherwise discard the offer.
+function resolveOffer(game, accept) {
+  const mod = game.currentOffer;
+  if (!mod) return;
+  if (accept) {
+    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r, plus: 0 };
+    refreshStats(game);
+    game.events.push({ type: 'equip', mod });
+  }
+  absorbDuplicates(game);
+  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
+    game.currentOffer = game.offerQueue.shift();
   } else {
-    slot = pickWeighted(rng, SLOTS.map((s) => {
-      const cur = loadout[s.id];
-      let w = 1 + (cur ? (3 - cur.r) * 0.25 : 1.2);
-      if (s.id === ctx.lastSlot) w *= 0.35;
-      return [s.id, w];
-    }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.drawOnly || !ctx.scheme || isDrawScheme(ctx.scheme) || ctx.scheme === 'portal')
-      && (!m.portalOnly || ctx.scheme === 'portal')
-      && (!m.portalExcluded || ctx.scheme !== 'portal'));
+    game.currentOffer = null;
+    game.state = 'play';
   }
-  const rw = rarityWeights(ctx);
-  const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
-  const fits = pool.filter((m) => m.rarities.includes(r));
-  if (fits.length) {
-    const def = fits[Math.floor(rng() * fits.length)];
-    return { id: def.id, slot, r };
+}
+
+function refreshStats(game) {
+  const oldMax = game.stats.maxHp;
+  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
+  const gain = game.stats.maxHp - oldMax;
+  if (gain > 0) game.ship.hp += gain;
+  game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
+}
+
+// ---- draw a path, then run it (draw scheme) ----
+
+function drawPhase(game) {
+  return game.draw ? game.draw.phase : game.portalDash ? `portal:${game.portalDash.phase}` : null;
+}
+
+function drawBudget(game, gauge) {
+  return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
+}
+
+// How far the wave from a traced path reaches (the band drawn around the path).
+function waveRadius(game) {
+  return CONFIG.waveRadius * game.stats.waveRadiusMult;
+}
+
+// The traced path gives off a wave: enemies within reach take damage once per pass and are
+// pushed away from the path. Sampled finely so long, fast traces leave no gaps.
+function waveAlong(game, r, x0, y0, x1, y1) {
+  const W = waveRadius(game);
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
+  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
+  for (let k = 1; k <= n; k++) {
+    const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
+    for (const [id, e] of r.waveInside) {
+      if (e.dead || Math.hypot(px - e.x, py - e.y) > e.r + W + 2) r.waveInside.delete(id);
+    }
+    queryGrid(game.grid, px - W - MAX_ENEMY_R, py - W - MAX_ENEMY_R, px + W + MAX_ENEMY_R, py + W + MAX_ENEMY_R, (e) => {
+      if (r.waveInside.has(e.id)) return;
+      const d = Math.hypot(e.x - px, e.y - py);
+      if (d > e.r + W) return;
+      r.waveInside.set(e.id, e);
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260, impactX: px, impactY: py });
+    });
+    if (game.state === 'finishing') return;
+    r.waveAcc += len / n;
+    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
   }
-  const def = pool[Math.floor(rng() * pool.length)];
-  const nearest = def.rarities.reduce((a, b) => (Math.abs(b - r) < Math.abs(a - r) ? b : a));
-  return { id: def.id, slot, r: nearest };
+}
+
+// World speed while tracing: the faster the dash, the slower everything else.
+function traceWorldScale(game) {
+  return Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, game.draw.speed)));
+}
+
+function drawWorldScale(game) {
+  return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
+}
+
+// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
+// charge-time stats (modules, levels) make it fill faster.
+function dashNeed(game) {
+  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
+}
+
+function startDrawing(game, input) {
+  const sh = game.ship;
+  sh.glide = false;
+  const gauge = game.stats.gaugeMax; // always a full (over)charge
+  const budget = drawBudget(game, gauge);
+  game.dashMeter = 0;
+  // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
+  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+  sh.charging = false;
+  game.events.push({ type: 'drawStart' });
+}
+
+// The path follows the cursor until its length runs out, it reaches a planet, or another click.
+function updateDrawing(game, input) {
+  const d = game.draw;
+  if (input.cursor) d.cursor = input.cursor;
+  if (!d.started) {
+    // the line only starts on a click (or Space), so moving the mouse never draws by accident
+    if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
+    return;
+  }
+  if (d.inputMethod === 'points') {
+    if (input.drawClick && (input.clickCursor || d.cursor)) extendPath(game, d, input.clickCursor || d.cursor);
+    if (input.confirm || input.dash || d.used >= d.budget - 0.5 || d.blocked) {
+      if (d.points.length >= 2) commitPath(game);
+    }
+    return;
+  }
+  if (input.cursor) extendPath(game, d, input.cursor);
+  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
+}
+
+// Where a path may start: the clicked point, pushed out of planets and moons.
+function startPoint(game, c) {
+  const sh = game.ship;
+  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
+  for (const b of [game.field.planet, ...game.field.moons]) {
+    const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
+    if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
+  }
+  return p;
+}
+
+function extendPath(game, d, c) {
+  const last = d.points[d.points.length - 1];
+  const dx = c.x - last.x, dy = c.y - last.y;
+  const len = Math.hypot(dx, dy);
+  if (len < CONFIG.drawStep) return;
+  const remain = d.budget - d.used;
+  if (remain <= 0.5) return;
+  let L = Math.min(len, remain);
+  const ux = dx / len, uy = dy / len;
+  const R = CONFIG.shipRadius;
+  for (const b of [game.field.planet, ...game.field.moons]) {
+    const t = segCircleT(last.x, last.y, last.x + ux * L, last.y + uy * L, b.x, b.y, b.r + R);
+    if (t >= 0) { L = Math.max(0, t * L - 2); d.blocked = true; }
+  }
+  if (L < 1) return;
+  d.points.push({ x: last.x + ux * L, y: last.y + uy * L });
+  d.used += L;
+}
+
+function commitPath(game) {
+  const d = game.draw, sh = game.ship;
+  if (d.points.length < 2) {
+    // nothing drawn: dash straight for the full length — from the ship toward the cursor, or from
+    // the clicked start onward in the direction ship -> start
+    let ux = sh.hx, uy = sh.hy;
+    if (!d.points.length) d.points.push({ x: sh.x, y: sh.y });
+    const o = d.points[0];
+    const tgt = Math.hypot(o.x - sh.x, o.y - sh.y) > 1 ? o : d.cursor;
+    if (tgt) {
+      const dx = tgt.x - sh.x, dy = tgt.y - sh.y, l = Math.hypot(dx, dy);
+      if (l > 1) { ux = dx / l; uy = dy / l; }
+    }
+    extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
+    if (d.points.length < 2) { game.draw = null; return; }
+  }
+  const pts = d.points;
+  warpTo(game, pts[0].x, pts[0].y);
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+  const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
+  onLaunch(game);
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, d.gauge, game.stats);
+  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  sh.vx = dx * speed; sh.vy = dy * speed;
+  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
+  sh.aimAngle = Math.atan2(dy, dx);
+  game.dashId++;
+  game.lastPath = pts;
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
+  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
+  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// Blink to the start of the path, leaving a few fading afterimages behind.
+function warpTo(game, x, y) {
+  const sh = game.ship;
+  const dx = x - sh.x, dy = y - sh.y, dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+  const ux = dx / dist, uy = dy / dist, step = Math.min(26, dist / 5);
+  for (let i = 0; i < 4; i++) {
+    game.fx.ghosts.push({ x: sh.x + ux * step * i, y: sh.y + uy * step * i, life: 0.45 - i * 0.08, max: 0.45 });
+  }
+  game.fx.ghosts.push({ x0: sh.x, y0: sh.y, x1: x, y1: y, life: 0.18, max: 0.18, streak: true });
+  sh.x = x; sh.y = y;
+  sh.trail = [];
+  addRing(game, x, y, 46, 'rgba(190,240,255,0.9)', 0.3);
+  game.events.push({ type: 'warp', dist });
+}
+
+// Trace the polyline quickly (the world is nearly frozen); piercing costs dash speed, a bounce ends it.
+function runAlongPath(game, realDt) {
+  const r = game.draw, sh = game.ship;
+  let dist = r.rate * realDt;
+  while (dist > 1e-9 && r.seg < r.path.length - 1) {
+    const a = r.path[r.seg], b = r.path[r.seg + 1];
+    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
+    if (segLen < 1e-6) { r.seg++; r.segPos = 0; continue; }
+    const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
+    const move = Math.min(dist, segLen - r.segPos);
+    const x0 = sh.x, y0 = sh.y;
+    // enemies the ship body has left can be hit again on the next pass
+    const R = CONFIG.shipRadius;
+    for (const [id, e] of r.inside) {
+      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
+    }
+    r.segPos += move; dist -= move;
+    sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
+    sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(r.speed, game.stats));
+    waveAlong(game, r, x0, y0, sh.x, sh.y);
+    if (game.state !== 'play') return;
+    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; endTraceAttack(game); return; }
+    if (game.state !== 'play') return;
+    const sp = Math.hypot(sh.vx, sh.vy);
+    if (sp < r.speed) r.speed = sp;
+    if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
+  }
+  if (r.seg >= r.path.length - 1) {
+    game.draw = null;
+    sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
+    sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
+    endTraceAttack(game);
+  }
+}
+
+// Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
+function previewPath(game, points = null) {
+  const d = points ? { phase: 'draw', points, gauge: game.stats.gaugeMax } : game.draw;
+  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
+  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
+  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
+  const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
+  const samples = [];
+  const targets = new Map(); // enemy -> { crit, hits }
+  let prev = new Set();
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = Math.max(1, Math.ceil(len / 14));
+    for (let k = 1; k <= n; k++) {
+      const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
+      let blocked = false;
+      const cur = new Set();
+      queryGrid(game.grid, p.x - W - MAX_ENEMY_R, p.y - W - MAX_ENEMY_R, p.x + W + MAX_ENEMY_R, p.y + W + MAX_ENEMY_R, (e) => {
+        const d2 = (p.x - e.x) ** 2 + (p.y - e.y) ** 2;
+        if (d2 > (e.r + W) ** 2) return;
+        const t = targets.get(e) || { crit: false, body: false };
+        targets.set(e, t);
+        if (d2 > (e.r + R) ** 2) return; // wave only
+        cur.add(e);
+        if (prev.has(e)) return; // still inside from the previous sample: same pass
+        const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+        if (crit) p.hot = true;
+        if (!canPierce(atk, e, crit)) { blocked = true; return; }
+        t.body = true; t.crit = t.crit || crit;
+      });
+      prev = cur;
+      samples.push(p);
+      if (blocked) return { samples, block: p, targets: [...targets] };
+    }
+  }
+  return { samples, block: null, targets: [...targets] };
+}
+
+// ---- ship ----
+
+function launch(game, ax, ay) {
+  const sh = game.ship;
+  const len = Math.hypot(ax, ay);
+  let dx, dy;
+  if (len < CONFIG.minDrag) {
+    dx = sh.hx; dy = sh.hy;
+  } else {
+    dx = ax / len; dy = ay / len;
+  }
+  onLaunch(game);
+  sh.aimAngle = Math.atan2(dy, dx);
+  const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
+  sh.vx = v.vx; sh.vy = v.vy;
+  sh.boostT = game.stats.boostDuration;
+  sh.fadeT = 0;
+  sh.gaugeBank = 0;
+  game.dashId++;
+  game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
+}
+
+// amount: hp lost, slow: share of speed lost (0..1)
+function damageShip(game, amount, slow, cause = 'other') {
+  const sh = game.ship;
+  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
+  sh.hp -= amount * game.stats.damageTakenMult;
+  if (slow > 0) sh.glide = false;
+  const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
+  sh.vx *= k; sh.vy *= k;
+  sh.invulnT = CONFIG.invulnTime;
+  game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
+  addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
+  onShipHurt(game);
+  return true;
+}
+
+// R: hit radius of the ship (wider while tracing a drawn path).
+// run: the trace state; while tracing, an enemy can be hit again each time the band re-enters it.
+function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
+  const sh = game.ship, stats = game.stats;
+  const x1 = sh.x, y1 = sh.y;
+  const pad = R + MAX_ENEMY_R;
+  const hits = [];
+  queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
+    if (run ? run.inside.has(e.id) : e.hitCD > 0) return;
+    const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
+    if (t >= 0) hits.push({ e, t });
+  });
+  if (!hits.length) return false;
+  hits.sort((a, b) => a.t - b.t);
+  for (const { e, t } of hits) {
+    const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
+    const sp = Math.hypot(sh.vx, sh.vy);
+    const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
+    const atk = attackPower(sp, stats);
+    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const res = resolveRam(atk, e, crit, stats);
+    if (res.pierce) {
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
+      if (game.state === 'finishing') return false;
+      if (crit) {
+        const len = Math.hypot(hx - e.x, hy - e.y) || 1;
+        addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
+      }
+      e.hitCD = 0.3;
+      if (run) {
+        run.inside.set(e.id, e);
+        const n = (run.passes.get(e.id) || 0) + 1;
+        run.passes.set(e.id, n);
+        if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
+      }
+      const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
+      sh.vx *= keep; sh.vy *= keep;
+      game.dashPierce++;
+      onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
+      if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
+      if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
+      continue;
+    }
+    // bounce off
+    sh.glide = false;
+    let nx = hx - e.x, ny = hy - e.y;
+    const nd = Math.hypot(nx, ny) || 1;
+    nx /= nd; ny /= nd;
+    addCombatImpact(game, e, 'block', nx, ny);
+    sh.x = e.x + nx * (e.r + R + 1);
+    sh.y = e.y + ny * (e.r + R + 1);
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+    sh.vx *= stats.bounceKeep; sh.vy *= stats.bounceKeep;
+    if (Math.hypot(sh.vx, sh.vy) < 220) { sh.vx = nx * 220; sh.vy = ny * 220; }
+    if (!stats.reflect) sh.boostT = 0;
+    damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
+    e.hitCD = 0.25;
+    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
+    game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
+    return true;
+  }
+  return false;
+}
+
+function collideBodies(game) {
+  const sh = game.ship;
+  const R = CONFIG.shipRadius;
+  const f = game.field;
+  const restitution = game.stats.reflect ? 0.9 : CONFIG.crashRestitution;
+  for (const b of [f.planet, ...f.moons]) {
+    const dx = sh.x - b.x, dy = sh.y - b.y;
+    const d = Math.hypot(dx, dy);
+    const min = b.r + R;
+    if (d >= min || d === 0) continue;
+    const nx = dx / d, ny = dy / d;
+    sh.x = b.x + nx * min;
+    sh.y = b.y + ny * min;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn < 0) {
+      sh.glide = false;
+      sh.vx -= (1 + restitution) * vn * nx;
+      sh.vy -= (1 + restitution) * vn * ny;
+      const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
+      if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
+      game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
+    }
+  }
+  // hard wall well outside the soft boundary
+  const r = Math.hypot(sh.x, sh.y);
+  const wall = CONFIG.fieldRadius + 500;
+  if (r > wall) {
+    sh.glide = false;
+    const nx = sh.x / r, ny = sh.y / r;
+    sh.x = nx * wall; sh.y = ny * wall;
+    const vn = sh.vx * nx + sh.vy * ny;
+    if (vn > 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
+  }
+}
+
+function recordTrail(sh, dt) {
+  sh.trailAcc += dt;
+  if (sh.trailAcc < 1 / 60) return;
+  sh.trailAcc = 0;
+  sh.trail.push({ x: sh.x, y: sh.y });
+  if (sh.trail.length > 150) sh.trail.shift();
+}
+
+// ---- enemies ----
+
+function flushNewEnemies(game) {
+  if (!game.newEnemies.length) return;
+  for (const e of game.newEnemies) game.enemies.push(e);
+  game.newEnemies.length = 0;
+}
+
+function separateEnemies(game) {
+  for (let pass = 0; pass < 2; pass++) {
+    const grid = buildGrid(game.enemies, 120);
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
+      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
+        if (o.id <= e.id) return;
+        let dx = o.x - e.x, dy = o.y - e.y;
+        const min = e.r + o.r + CONFIG.enemySpacing;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= min * min) return;
+        const d = Math.sqrt(d2);
+        if (d < 1e-6) {
+          const a = (e.id + o.id) * 2.39996322973;
+          dx = Math.cos(a); dy = Math.sin(a);
+        } else { dx /= d; dy /= d; }
+        const push = (min - d) * 0.5;
+        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
+        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
+        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
+      });
+    }
+  }
+}
+
+// ---- pickups ----
+
+function updateGems(game, dt) {
+  const sh = game.ship;
+  const pr = game.stats.pickupRadius;
+  const sp = Math.hypot(sh.vx, sh.vy);
+  for (const g of game.gems) {
+    g.age += dt;
+    const dx = sh.x - g.x, dy = sh.y - g.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr || g.pulled) {
+      g.pulled = true;
+      const pull = 700 + sp * 1.2;
+      g.x += (dx / (d || 1)) * pull * dt;
+      g.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
+  }
+  if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
+  for (const c of game.coinDrops) {
+    const dx = sh.x - c.x, dy = sh.y - c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < pr * 1.3 || c.pulled) {
+      c.pulled = true;
+      const pull = 700 + sp * 1.2;
+      c.x += (dx / (d || 1)) * pull * dt;
+      c.y += (dy / (d || 1)) * pull * dt;
+    }
+    if (d < CONFIG.shipRadius + 14) { c.taken = true; game.coins += c.v; game.events.push({ type: 'coin' }); }
+  }
+  if (game.coinDrops.some((c) => c.taken)) game.coinDrops = game.coinDrops.filter((c) => !c.taken);
+}
+
+function addXp(game, v) {
+  game.xp += v;
+  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
+    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
+    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
+  }
+  let need = xpForLevel(game.level);
+  while (game.xp >= need) {
+    game.xp -= need;
+    game.level++;
+    game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
+    game.events.push({ type: 'levelup', level: game.level });
+    need = xpForLevel(game.level);
+    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
+    addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
+  }
+}
+
+// ---- fx ----
+
+function updateFx(game, dt) {
+  const P = game.fx.particles;
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; if (p.spin) p.angle += p.spin * dt; }
+  game.fx.particles = P.filter((p) => p.life > 0);
+  for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
+  for (const g of game.fx.ghosts) g.life -= dt;
+  game.fx.ghosts = game.fx.ghosts.filter((g) => g.life > 0);
+  game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
+  for (const r of game.fx.rings) r.life -= dt;
+  game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
+  for (const loop of game.fx.loops) loop.life -= dt;
+  game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
+  for (const impact of game.fx.impacts) impact.life -= dt;
+  game.fx.impacts = game.fx.impacts.filter((impact) => impact.life > 0);
+}
+
+// ---- prediction ----
+
+// Ballistic preview of a launch along (dx, dy) with the given gauge, under gravity only.
+function predictPath(game, dx, dy, gauge, seconds) {
+  const sh = game.ship;
+  const len = Math.hypot(dx, dy) || 1;
+  const v = launchVelocity(sh.vx, sh.vy, dx / len, dy / len, gauge, game.stats);
+  return simulateFrom(game, { x: sh.x, y: sh.y, vx: v.vx, vy: v.vy, boostT: game.stats.boostDuration, fadeT: 0 }, 0, seconds);
+}
+
+function simulateFrom(game, ghost, t0, seconds) {
+  const pts = [];
+  const h = 1 / 60;
+  const field = { ...game.field, moons: game.field.moons.map((m) => ({ ...m })) };
+  for (let t = t0; t < seconds; t += h) {
+    updateMoons(field, game.t + t);
+    const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
+    stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
+    const p = { x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy };
+    pts.push(p);
+    if (hitsBody(field, p.x, p.y)) { p.block = true; break; }
+  }
+  return pts;
+}
+
+function hitsBody(field, x, y) {
+  const R = CONFIG.shipRadius;
+  for (const b of [field.planet, ...field.moons]) {
+    if ((x - b.x) ** 2 + (y - b.y) ** 2 < (b.r + R) ** 2) return true;
+  }
+  return false;
+}
+
+// Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
+// With the bounce-preview radar the path continues past the block.
+function annotatePrediction(game, pts, seconds) {
+  const R = CONFIG.shipRadius;
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    let blocker = null;
+    queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
+      const dx = p.x - e.x, dy = p.y - e.y;
+      const rr = e.r + R;
+      if (dx * dx + dy * dy > rr * rr) return;
+      const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
+      if (crit) p.hot = true;
+      if (!canPierce(attackPower(p.sp, game.stats), e, crit)) blocker = e;
+    });
+    out.push(p);
+    if (p.block) break;
+    if (blocker) {
+      p.block = true;
+      if (game.stats.predictBounce && seconds) {
+        let nx = p.x - blocker.x, ny = p.y - blocker.y;
+        const nd = Math.hypot(nx, ny) || 1;
+        nx /= nd; ny /= nd;
+        let vx = p.vx, vy = p.vy;
+        const vn = vx * nx + vy * ny;
+        if (vn < 0) { vx -= 2 * vn * nx; vy -= 2 * vn * ny; }
+        vx *= game.stats.bounceKeep; vy *= game.stats.bounceKeep;
+        const ghost = { x: blocker.x + nx * (blocker.r + R + 1), y: blocker.y + ny * (blocker.r + R + 1), vx, vy, boostT: 0, fadeT: 0 };
+        for (const q of simulateFrom(game, ghost, p.t, seconds)) { q.bounced = true; out.push(q); }
+      }
+      break;
+    }
+  }
+  return out;
 }
 
 // ---- effects.js ----
@@ -1543,12 +2462,13 @@ function createEffectState() {
   return {
     fbullets: [], marks: [], mines: [], capsules: [],
     fx2: { waveT: 0, trailDist: 0, lastX: 0, lastY: 0, mineT: 0, turretT: 0, sonicCD: 0, prevSpeed: 0, capsuleT: 0, coreT: 0, coresStarted: false },
-    dashActive: false, dashPeakAtk: 0,
+    dashActive: false, dashPeakAtk: 0, traceEndHandled: false,
   };
 }
 
 function onLaunch(game) {
   if (game.dashActive) finishDash(game);
+  game.traceEndHandled = false;
   game.dashActive = true;
   game.dashPeakAtk = 0;
   game.dashPierce = 0;
@@ -1564,10 +2484,22 @@ function finishDash(game) {
   }
 }
 
-function onPierce(game) {
+function endTraceAttack(game) {
+  game.traceEndHandled = true;
+  finishDash(game);
+  const pulse = game.stats.traceEndBlast, sh = game.ship;
+  if (pulse && game.state === 'play') explode(game, sh.x, sh.y, pulse.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), game.stats) * pulse.mult,
+    { cause: 'traceEnd', color: '#c46bff', knock: 500, life: 0.5 });
+}
+
+function onPierce(game, x = game.ship.x, y = game.ship.y) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
   if (s.regenGauge && isDrawScheme(game.scheme)) game.dashMeter = Math.min(1, game.dashMeter + s.regenGauge * 0.15);
+  if (s.pierceWave) explode(game, x, y, s.pierceWave.radius,
+    attackPower(Math.hypot(sh.vx, sh.vy), s) * s.pierceWave.mult,
+    { cause: 'pierceWave', color: '#9fe8ff', knock: 350, life: 0.3 });
 }
 
 function onShipHurt(game) {
@@ -1582,10 +2514,10 @@ function updateEffects(game, dt) {
   const atkMax = attackPower(s.maxSpeed, s);
 
   // dash bookkeeping (end-of-dash blast)
-  if (sh.boostT > 0 && !game.dashActive) { game.dashActive = true; game.dashPeakAtk = 0; }
+  if (sh.boostT > 0 && !game.dashActive && !game.traceEndHandled) { game.dashActive = true; game.dashPeakAtk = 0; }
   if (game.dashActive) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, atkNow);
-    if (sh.boostT <= 0 && !game.portalDash) finishDash(game);
+    if (sh.boostT <= 0 && !game.portalDash && !game.draw) finishDash(game);
   }
 
   // charge shockwave
@@ -1693,6 +2625,16 @@ function updateFriendly(game, dt) {
 
 function fieldCapsulePoint(game) {
   const rng = game.rng;
+  if (isDrawScheme(game.scheme)) {
+    // Put build opportunities within reach of the current fight, rather than across the whole map.
+    const distance = Math.max(200, game.viewRadius * (0.25 + rng() * 0.3));
+    for (let i = 0; i < 16; i++) {
+      const a = rng() * TAU;
+      const x = game.ship.x + Math.cos(a) * distance, y = game.ship.y + Math.sin(a) * distance;
+      const r = Math.hypot(x, y);
+      if (r > CONFIG.planetRadius + 100 && r < CONFIG.fieldRadius - 100) return { x, y, r };
+    }
+  }
   const roll = rng();
   let r;
   if (roll < 0.4) r = randRange(rng, CONFIG.planetRadius + 200, CONFIG.zoneInner);
@@ -1704,6 +2646,7 @@ function fieldCapsulePoint(game) {
 
 function updateCapsules(game, dt) {
   const F = game.fx2, sh = game.ship;
+  if (isDrawScheme(game.scheme)) game.capsules = game.capsules.filter(c => c.src !== 'field' || Math.hypot(c.x - sh.x, c.y - sh.y) < game.viewRadius * 2);
   if (game.spawning) {
     F.capsuleT += dt;
     const field = game.capsules.filter((c) => c.src === 'field').length;
@@ -2131,7 +3074,9 @@ function updatePortals(game, realDt) {
     sh.x = x1; sh.y = y1;
     sh.vx = d.dx * d.speed; sh.vy = d.dy * d.speed;
     waveAlong(game, d, x0, y0, x1, y1);
+    if (game.state === 'finishing') return;
     if (collideEnemies(game, x0, y0, CONFIG.shipRadius, d)) { stopPortalDash(game, '弾かれた'); return; }
+    if (game.state === 'finishing') return;
     d.speed = Math.hypot(sh.vx, sh.vy);
     tracePortalLoop(game, d, x0, y0, sh.x, sh.y);
     d.trailAcc += stepDist;
@@ -2182,8 +3127,9 @@ function updatePortals(game, realDt) {
 
 
 
+
 function damageEnemy(game, e, dmg, opts = {}) {
-  if (e.dead || dmg <= 0) return;
+  if (e.dead || game.state === 'finishing' || dmg <= 0) return;
   let fresh = e.hp >= e.maxHp - 1e-6;
   // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
   // by its HP when this dash first touched it, so wave + body still count as one strike
@@ -2214,7 +3160,8 @@ function killStop(game, e, crit) {
 }
 
 function killEnemy(game, e, opts = {}) {
-  if (e.dead) return;
+  if (e.dead || game.state === 'finishing') return;
+  if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
@@ -2230,10 +3177,14 @@ function killEnemy(game, e, opts = {}) {
   const power = e.xp;
   const drawMode = isDrawScheme(game.scheme);
   const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp)) * (drawMode ? CONFIG.drawDropScale : 1);
+  const pity = drawMode && game.t - (game.lastModuleDropAt || 0) >= CONFIG.drawDropPity;
   if ((!drawMode || game.t >= game.nextModuleDropAt) &&
-      (e.elite || e.type === 'battleship' || game.rng() < chance)) {
+      (pity || e.elite || e.type === 'battleship' || game.rng() < chance)) {
     dropModule(game, e.x, e.y, power, danger);
-    if (drawMode) game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * 15;
+    if (drawMode) {
+      game.lastModuleDropAt = game.t;
+      game.nextModuleDropAt = game.t + CONFIG.drawDropInterval + game.rng() * CONFIG.drawDropJitter;
+    }
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
 }
@@ -2325,857 +3276,147 @@ function addRing(game, x, y, radius, color, life = 0.45) {
   game.fx.rings.push({ x, y, radius, color, life, max: life });
 }
 
-// ---- stages.js ----
+// ---- finale.js ----
 
 
-// Speed tiers announced on screen as the ship breaks through them (values in px/s).
-const SPEED_STAGES = [
-  { v: CONFIG.escapeSpeed * 0.27, name: 'STAGE Ⅰ' },
-  { v: CONFIG.escapeSpeed * 0.45, name: 'STAGE Ⅱ' },
-  { v: CONFIG.escapeSpeed * 0.62, name: 'STAGE Ⅲ' },
-  { v: CONFIG.escapeSpeed * 0.8, name: 'STAGE Ⅳ' },
-  { v: CONFIG.escapeSpeed, name: 'ESCAPE' },
-];
 
-function speedStage(sp) {
-  let s = 0;
-  for (let i = 0; i < SPEED_STAGES.length; i++) if (sp >= SPEED_STAGES[i].v) s = i + 1;
-  return s;
+// Only keep the recent approach while the boss is alive; no world snapshots or replayed damage.
+function recordBossApproach(game, dt) {
+  if (!game.boss || game.boss.dead) return;
+  game.finishClock += dt;
+  const sh = game.ship, frames = game.finishFrames;
+  frames.push({ t: game.finishClock - dt, x: sh.x, y: sh.y, vx: sh.vx, vy: sh.vy });
+  const cutoff = game.finishClock - CONFIG.bossFinishReplayWindow;
+  while (frames.length > 2 && frames[1].t < cutoff) frames.shift();
+  if (frames.length > 64) frames.shift();
 }
 
-// ---- world.js ----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const STEP = 1 / 120;
-
-function createGame(opts = {}) {
-  const meta = opts.meta || {};
-  const seed = opts.seed ?? (Math.random() * 4294967296) >>> 0;
-  const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
-  // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
-  if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
-  const stats = computeStats(meta, loadout);
-  const rng = makeRng(seed);
-  const ship = createShip(stats, -CONFIG.startRadius, 0);
-  ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
-  return {
-    t: 0, acc: 0, seed, rng,
-    meta, stats, ship, loadout,
-    scheme: opts.scheme || CONFIG.controlScheme,
-    offerQueue: [], currentOffer: null, lastOfferSlot: null,
-    nextOfferAt: 0, nextModuleDropAt: 0,
-    field: createField(rng),
-    debug: { invincible: false, autoOffer: null },
-    enemies: [], newEnemies: [], ebullets: [],
-    boss: null, bossSpawned: false,
-    leechDrag: 0,
-    gems: [], coinDrops: [],
-    xp: 0, level: 0, pendingLevelups: 0,
-    spawnAcc: 0, waveT: 0,
-    phaseId: null,
-    endReason: null,
-    draw: null, lastPath: null,
-    portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
-    portalSpace: { armed: false, seconds: 0, consumed: false },
-    portalClock: 0, portalCooldowns: new Map(),
-    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
-    grid: buildGrid([], 160),
-    fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
-    ...createEffectState(),
-    kills: 0, coins: 0, cores: 0,
-    hitstop: 0, slowmo: 0,
-    spawning: true,
-    dashPierce: 0, dashId: 0,
-    state: 'play',
-    timeScale: 1,
-    releasePending: null,
-    peakSpeed: 0, stage: 0,
-    events: [],
-    viewRadius: 1400,
-  };
-}
-
-function update(game, frameDt, input) {
-  if (game.state !== 'play') return;
-  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
-  frameDt = Math.min(frameDt, 0.1);
-  game.portalClock += frameDt;
-  for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
-  if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
-  updateFx(game, frameDt);
-  handlePortalInput(game, input, frameDt);
-  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
-    startDrawing(game, input);
-    input = { ...input, press: false }; // consume the start click so it cannot also commit
-  }
-  if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
-  // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
-  if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
-  if (game.portalDash) updatePortals(game, frameDt);
-  if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
-  if (game.draw && game.draw.phase === 'run') {
-    // trace every frame on real time (world steps are rare while it is nearly frozen)
-    runAlongPath(game, frameDt);
-    collideBodies(game);
-    recordTrail(game.ship, frameDt);
-  }
-  let scale = 1;
-  if (game.draw) scale = drawWorldScale(game);
-  if (game.portalDash) scale = portalWorldScale(game);
-  if (game.slowmo > 0) { game.slowmo -= frameDt; scale = Math.min(scale, 0.18); }
-  game.timeScale = scale;
-  game.acc += frameDt * scale;
-  // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
-  const phaseBefore = drawPhase(game);
-  while (game.acc >= STEP) {
-    game.acc -= STEP;
-    step(game, STEP, input);
-    if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
-    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
-    if (game.state !== 'play') break;
-    if (game.offerQueue.length) {
-      absorbDuplicates(game);
-      if (game.offerQueue.length && !game.draw &&
-          (!isDrawScheme(game.scheme) || game.t >= game.nextOfferAt)) { openOffer(game); break; }
-    }
-  }
-  if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
-  if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
-}
-
-// Heading follows the travel direction; when nearly still it keeps whatever the controls last set.
-function updateHeading(sh) {
-  const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > CONFIG.pivotSpeed) { sh.hx = sh.vx / sp; sh.hy = sh.vy / sp; }
-}
-
-// Direction a keyboard/hover launch would take right now.
-function schemeAim(game, input) {
-  return controlAim(game, input) || { x: game.ship.hx * 100, y: game.ship.hy * 100 };
-}
-
-function step(game, dt, input) {
+function beginBossFinish(game, boss, hit = {}) {
+  if (game.finale) return;
   const sh = game.ship;
-  const stats = game.stats;
-  game.t += dt;
-  const phase = getPhase(game.t);
-  if (phase.id !== game.phaseId) {
-    game.phaseId = phase.id;
-    game.events.push({ type: 'phase', phase });
-  }
-
-  const ctl = game.draw || game.portalDash ? { ax: 0, ay: 0 } : controlStep(game, input, dt);
-  updateHeading(sh);
-  const aim = schemeAim(game, input);
-  sh.markX = aim.x / 100; sh.markY = aim.y / 100;
-  if (game.draw || game.portalDash) {
-    game.releasePending = null; // presses while drawing/running only commit the path
-  } else if (input.charging && !game.releasePending) {
-    if (!sh.charging) { sh.charging = true; sh.chargeT = 0; }
-    sh.chargeT += dt;
-    sh.gauge = computeGauge(sh.chargeT, stats, sh.gaugeBank);
-    sh.aimX = input.keyboard ? aim.x : input.aimX;
-    sh.aimY = input.keyboard ? aim.y : input.aimY;
-  }
-  if (game.releasePending && !game.draw && !game.portalDash) {
-    const r = game.releasePending;
-    game.releasePending = null;
-    if (sh.charging) {
-      if (r.keyboard && isDrawScheme(game.scheme)) startDrawing(game, input);
-      else if (r.keyboard) launch(game, aim.x, aim.y);
-      else launch(game, r.x, r.y);
-    }
-    sh.charging = false;
-  }
-
-  updateMoons(game.field, game.t);
-  game.leechDrag = 0;
-  updateEnemyAim(game, dt);
-  for (const e of game.enemies) updateEnemy(e, game, dt);
-  flushNewEnemies(game);
-  separateEnemies(game);
-  game.grid = buildGrid(game.enemies, 160);
-
-  if (!game.draw && !game.portalDash) {
-    const g = gravityAt(game.field, game.t, sh.x, sh.y);
-    const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
-    const x0 = sh.x, y0 = sh.y;
-    stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
-    collideEnemies(game, x0, y0);
-    collideBodies(game);
-    checkPortalEntry(game, x0, y0);
-  }
-  if (sh.invulnT > 0) sh.invulnT -= dt;
-  updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
-  updateEffects(game, dt);
-  if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
-  flushNewEnemies(game);
-  updateSpawner(game, dt);
-  updateGems(game, dt);
-  if (stats.regen > 0) sh.hp = Math.min(stats.maxHp, sh.hp + stats.regen * dt);
-
-  const sp = Math.hypot(sh.vx, sh.vy);
-  if (sp > game.peakSpeed) game.peakSpeed = sp;
-  recordTrail(sh, dt);
-  const st = speedStage(sp);
-  if (st > game.stage) {
-    game.stage = st;
-    game.events.push({ type: 'stage', stage: st, name: SPEED_STAGES[st - 1].name, speed: sp });
-  } else if (game.stage > 0 && sp < SPEED_STAGES[game.stage - 1].v * 0.85) {
-    game.stage = st;
-  }
-
-  if (game.boss?.dead) end(game, 'won', 'boss');
-  else if (sh.hp <= 0) end(game, 'lost', 'hp');
-  else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
+  const impact = { t: game.finishClock, x: hit.impactX ?? sh.x, y: hit.impactY ?? sh.y, vx: sh.vx, vy: sh.vy };
+  const frames = [...game.finishFrames, impact];
+  game.finale = { phase: 'slow', elapsed: 0, boss, frames, impact };
+  game.state = 'finishing';
+  game.endReason = 'boss';
+  game.spawning = false;
+  game.hitstop = game.slowmo = game.acc = 0;
+  game.draw = game.portalDash = game.releasePending = null;
+  game.offerQueue.length = 0;
+  game.currentOffer = null;
+  sh.charging = false; sh.invulnT = 0;
+  game.events.push({ type: 'bossFinish' });
 }
 
-function end(game, state, reason) {
-  if (state === 'won') game.coins += CONFIG.escapeBonus;
-  game.state = state;
-  game.endReason = reason;
-  game.events.push({ type: 'end', state, reason });
-}
-
-// ---- offers ----
-
-// Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
-function absorbDuplicates(game) {
-  while (game.offerQueue.length) {
-    const o = game.offerQueue[0];
-    const cur = game.loadout[o.slot];
-    if (!cur || cur.id !== o.id) return;
-    game.offerQueue.shift();
-    cur.r = Math.max(cur.r, o.r);
-    cur.plus = (cur.plus || 0) + 1;
-    refreshStats(game);
-    const sh = game.ship;
-    addText(game, sh.x, sh.y - 46, `${moduleDef(cur.id).name} +${cur.plus}`, RARITIES[cur.r].color, 20);
-    game.events.push({ type: 'upgrade', mod: cur });
-  }
-}
-
-function pushOffer(game, mod, source) {
-  game.lastOfferSlot = mod.slot;
-  game.offerQueue.push({ ...mod, source });
-}
-
-function openOffer(game) {
-  const auto = game.debug.autoOffer;
-  if (isDrawScheme(game.scheme)) game.nextOfferAt = game.t + CONFIG.drawOfferInterval;
-  game.state = 'offer';
-  game.currentOffer = game.offerQueue.shift();
-  game.ship.charging = false;
-  game.releasePending = null;
-  game.events.push({ type: 'offer' });
-  if (auto) while (game.state === 'offer') resolveOffer(game, auto === 'equip' || (auto === 'better' && isBetter(game, game.currentOffer)));
-}
-
-function isBetter(game, mod) {
-  const cur = game.loadout[mod.slot];
-  return !cur || mod.r >= cur.r;
-}
-
-// accept: equip (the old module in that slot is thrown away); otherwise discard the offer.
-function resolveOffer(game, accept) {
-  const mod = game.currentOffer;
-  if (!mod) return;
-  if (accept) {
-    game.loadout[mod.slot] = { id: mod.id, slot: mod.slot, r: mod.r, plus: 0 };
-    refreshStats(game);
-    game.events.push({ type: 'equip', mod });
-  }
-  absorbDuplicates(game);
-  if (game.offerQueue.length && !isDrawScheme(game.scheme)) {
-    game.currentOffer = game.offerQueue.shift();
+// Timings are in real seconds. The slow segment replays positions, never combat or pickups.
+function advanceBossFinish(game, dt) {
+  const f = game.finale, sh = game.ship;
+  f.elapsed += dt;
+  if (f.phase === 'slow') {
+    const k = Math.min(1, f.elapsed / CONFIG.bossFinishSlowTime);
+    const frames = f.frames;
+    const start = Math.max(frames[0].t, f.impact.t - CONFIG.bossFinishReplayWindow);
+    const time = start + (f.impact.t - start) * k;
+    let i = 0;
+    while (i < frames.length - 2 && frames[i + 1].t < time) i++;
+    const a = frames[i], b = frames[i + 1] || a;
+    const mix = Math.max(0, Math.min(1, (time - a.t) / (b.t - a.t || 1)));
+    for (const key of ['x', 'y', 'vx', 'vy']) sh[key] = a[key] + (b[key] - a[key]) * mix;
+    sh.trail = frames.slice(0, i + 1).map(p => ({ x: p.x, y: p.y }));
+    game.timeScale = CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime;
+    f.boss.flash = 0.12;
+    if (k < 1) return false;
+    sh.trail = [];
+    sh.invulnT = 0;
+    f.phase = 'blast'; f.elapsed = 0;
+    bossClearBlast(game);
   } else {
-    game.currentOffer = null;
-    game.state = 'play';
-  }
-}
-
-function refreshStats(game) {
-  const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
-  const gain = game.stats.maxHp - oldMax;
-  if (gain > 0) game.ship.hp += gain;
-  game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
-}
-
-// ---- draw a path, then run it (draw scheme) ----
-
-function drawPhase(game) {
-  return game.draw ? game.draw.phase : game.portalDash ? `portal:${game.portalDash.phase}` : null;
-}
-
-function drawBudget(game, gauge) {
-  return CONFIG.drawLength * gauge * (game.stats.maxSpeed / CONFIG.baseMaxSpeed) * game.stats.drawLengthMult;
-}
-
-// How far the wave from a traced path reaches (the band drawn around the path).
-function waveRadius(game) {
-  return CONFIG.waveRadius * game.stats.waveRadiusMult;
-}
-
-// The traced path gives off a wave: enemies within reach take damage once per pass and are
-// pushed away from the path. Sampled finely so long, fast traces leave no gaps.
-function waveAlong(game, r, x0, y0, x1, y1) {
-  const W = waveRadius(game);
-  const len = Math.hypot(x1 - x0, y1 - y0);
-  const n = Math.max(1, Math.ceil(len / Math.min(W, 40)));
-  const dmg = attackPower(r.speed, game.stats) * CONFIG.waveDamage * game.stats.waveDmgMult;
-  for (let k = 1; k <= n; k++) {
-    const px = x0 + (x1 - x0) * k / n, py = y0 + (y1 - y0) * k / n;
-    for (const [id, e] of r.waveInside) {
-      if (e.dead || Math.hypot(px - e.x, py - e.y) > e.r + W + 2) r.waveInside.delete(id);
-    }
-    queryGrid(game.grid, px - W - MAX_ENEMY_R, py - W - MAX_ENEMY_R, px + W + MAX_ENEMY_R, py + W + MAX_ENEMY_R, (e) => {
-      if (r.waveInside.has(e.id)) return;
-      const d = Math.hypot(e.x - px, e.y - py);
-      if (d > e.r + W) return;
-      r.waveInside.set(e.id, e);
-      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
-    });
-    r.waveAcc += len / n;
-    if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
-  }
-}
-
-// World speed while tracing: the faster the dash, the slower everything else.
-function traceWorldScale(game) {
-  return Math.max(CONFIG.drawRunScaleMin, Math.min(1, CONFIG.drawRunSlowRef / Math.max(1, game.draw.speed)));
-}
-
-function drawWorldScale(game) {
-  return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
-}
-
-// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
-// charge-time stats (modules, levels) make it fill faster.
-function dashNeed(game) {
-  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
-}
-
-function startDrawing(game, input) {
-  const sh = game.ship;
-  sh.glide = false;
-  const gauge = game.stats.gaugeMax; // always a full (over)charge
-  const budget = drawBudget(game, gauge);
-  game.dashMeter = 0;
-  // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
-  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
-  sh.charging = false;
-  game.events.push({ type: 'drawStart' });
-}
-
-// The path follows the cursor until its length runs out, it reaches a planet, or another click.
-function updateDrawing(game, input) {
-  const d = game.draw;
-  if (input.cursor) d.cursor = input.cursor;
-  if (!d.started) {
-    // the line only starts on a click (or Space), so moving the mouse never draws by accident
-    if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
-    return;
-  }
-  if (d.inputMethod === 'points') {
-    if (input.drawClick && (input.clickCursor || d.cursor)) extendPath(game, d, input.clickCursor || d.cursor);
-    if (input.confirm || input.dash || d.used >= d.budget - 0.5 || d.blocked) {
-      if (d.points.length >= 2) commitPath(game);
-    }
-    return;
-  }
-  if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
-}
-
-// Where a path may start: the clicked point, pushed out of planets and moons.
-function startPoint(game, c) {
-  const sh = game.ship;
-  const p = c ? { x: c.x, y: c.y } : { x: sh.x, y: sh.y };
-  for (const b of [game.field.planet, ...game.field.moons]) {
-    const dx = p.x - b.x, dy = p.y - b.y, dist = Math.hypot(dx, dy), min = b.r + CONFIG.shipRadius + 4;
-    if (dist < min) { const k = min / (dist || 1); p.x = b.x + (dx || 1) * k; p.y = b.y + dy * k; }
-  }
-  return p;
-}
-
-function extendPath(game, d, c) {
-  const last = d.points[d.points.length - 1];
-  const dx = c.x - last.x, dy = c.y - last.y;
-  const len = Math.hypot(dx, dy);
-  if (len < CONFIG.drawStep) return;
-  const remain = d.budget - d.used;
-  if (remain <= 0.5) return;
-  let L = Math.min(len, remain);
-  const ux = dx / len, uy = dy / len;
-  const R = CONFIG.shipRadius;
-  for (const b of [game.field.planet, ...game.field.moons]) {
-    const t = segCircleT(last.x, last.y, last.x + ux * L, last.y + uy * L, b.x, b.y, b.r + R);
-    if (t >= 0) { L = Math.max(0, t * L - 2); d.blocked = true; }
-  }
-  if (L < 1) return;
-  d.points.push({ x: last.x + ux * L, y: last.y + uy * L });
-  d.used += L;
-}
-
-function commitPath(game) {
-  const d = game.draw, sh = game.ship;
-  if (d.points.length < 2) {
-    // nothing drawn: dash straight for the full length — from the ship toward the cursor, or from
-    // the clicked start onward in the direction ship -> start
-    let ux = sh.hx, uy = sh.hy;
-    if (!d.points.length) d.points.push({ x: sh.x, y: sh.y });
-    const o = d.points[0];
-    const tgt = Math.hypot(o.x - sh.x, o.y - sh.y) > 1 ? o : d.cursor;
-    if (tgt) {
-      const dx = tgt.x - sh.x, dy = tgt.y - sh.y, l = Math.hypot(dx, dy);
-      if (l > 1) { ux = dx / l; uy = dy / l; }
-    }
-    extendPath(game, d, { x: o.x + ux * d.budget, y: o.y + uy * d.budget });
-    if (d.points.length < 2) { game.draw = null; return; }
-  }
-  const pts = d.points;
-  warpTo(game, pts[0].x, pts[0].y);
-  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
-  const dx = (pts[1].x - pts[0].x) / l, dy = (pts[1].y - pts[0].y) / l;
-  onLaunch(game);
-  const v = launchVelocity(sh.vx, sh.vy, dx, dy, d.gauge, game.stats);
-  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
-  sh.vx = dx * speed; sh.vy = dy * speed;
-  sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
-  sh.aimAngle = Math.atan2(dy, dx);
-  game.dashId++;
-  game.lastPath = pts;
-  let total = 0;
-  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-  // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
-  const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
-  game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
-  game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
-}
-
-// Blink to the start of the path, leaving a few fading afterimages behind.
-function warpTo(game, x, y) {
-  const sh = game.ship;
-  const dx = x - sh.x, dy = y - sh.y, dist = Math.hypot(dx, dy);
-  if (dist < 1) return;
-  const ux = dx / dist, uy = dy / dist, step = Math.min(26, dist / 5);
-  for (let i = 0; i < 4; i++) {
-    game.fx.ghosts.push({ x: sh.x + ux * step * i, y: sh.y + uy * step * i, life: 0.45 - i * 0.08, max: 0.45 });
-  }
-  game.fx.ghosts.push({ x0: sh.x, y0: sh.y, x1: x, y1: y, life: 0.18, max: 0.18, streak: true });
-  sh.x = x; sh.y = y;
-  sh.trail = [];
-  addRing(game, x, y, 46, 'rgba(190,240,255,0.9)', 0.3);
-  game.events.push({ type: 'warp', dist });
-}
-
-// Trace the polyline quickly (the world is nearly frozen); piercing costs dash speed, a bounce ends it.
-function runAlongPath(game, realDt) {
-  const r = game.draw, sh = game.ship;
-  let dist = r.rate * realDt;
-  while (dist > 1e-9 && r.seg < r.path.length - 1) {
-    const a = r.path[r.seg], b = r.path[r.seg + 1];
-    const segLen = Math.hypot(b.x - a.x, b.y - a.y);
-    if (segLen < 1e-6) { r.seg++; r.segPos = 0; continue; }
-    const ux = (b.x - a.x) / segLen, uy = (b.y - a.y) / segLen;
-    const move = Math.min(dist, segLen - r.segPos);
-    const x0 = sh.x, y0 = sh.y;
-    // enemies the ship body has left can be hit again on the next pass
-    const R = CONFIG.shipRadius;
-    for (const [id, e] of r.inside) {
-      if (e.dead || Math.hypot(x0 - e.x, y0 - e.y) > e.r + R + 2) r.inside.delete(id);
-    }
-    r.segPos += move; dist -= move;
-    sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
-    sh.vx = ux * r.speed; sh.vy = uy * r.speed;
-    waveAlong(game, r, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
-    const sp = Math.hypot(sh.vx, sh.vy);
-    if (sp < r.speed) r.speed = sp;
-    if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
-  }
-  if (r.seg >= r.path.length - 1) {
-    game.draw = null;
-    sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
-    sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
-  }
-}
-
-// Preview for the drawing UI: where the run would crit (hot) and the first thing that would stop it.
-function previewPath(game, points = null) {
-  const d = points ? { phase: 'draw', points, gauge: game.stats.gaugeMax } : game.draw;
-  if (!d || d.phase !== 'draw' || d.points.length < 2) return { samples: [], block: null, targets: [] };
-  const pts = d.points, sh = game.ship, R = CONFIG.shipRadius, W = waveRadius(game);
-  const l = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) || 1;
-  const v = launchVelocity(sh.vx, sh.vy, (pts[1].x - pts[0].x) / l, (pts[1].y - pts[0].y) / l, d.gauge, game.stats);
-  const atk = attackPower(Math.hypot(v.vx, v.vy), game.stats);
-  const samples = [];
-  const targets = new Map(); // enemy -> { crit, hits }
-  let prev = new Set();
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i], b = pts[i + 1];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    const n = Math.max(1, Math.ceil(len / 14));
-    for (let k = 1; k <= n; k++) {
-      const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n, hot: false };
-      let blocked = false;
-      const cur = new Set();
-      queryGrid(game.grid, p.x - W - MAX_ENEMY_R, p.y - W - MAX_ENEMY_R, p.x + W + MAX_ENEMY_R, p.y + W + MAX_ENEMY_R, (e) => {
-        const d2 = (p.x - e.x) ** 2 + (p.y - e.y) ** 2;
-        if (d2 > (e.r + W) ** 2) return;
-        const t = targets.get(e) || { crit: false, body: false };
-        targets.set(e, t);
-        if (d2 > (e.r + R) ** 2) return; // wave only
-        cur.add(e);
-        if (prev.has(e)) return; // still inside from the previous sample: same pass
-        const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
-        if (crit) p.hot = true;
-        if (!canPierce(atk, e, crit)) { blocked = true; return; }
-        t.body = true; t.crit = t.crit || crit;
-      });
-      prev = cur;
-      samples.push(p);
-      if (blocked) return { samples, block: p, targets: [...targets] };
+    game.timeScale = 1;
+    // Release the shot at normal speed, then let it settle as the camera opens back out.
+    sh.x += sh.vx * dt; sh.y += sh.vy * dt;
+    const drag = Math.exp(-3 * dt);
+    sh.vx *= drag; sh.vy *= drag;
+    sh.trail.push({ x: sh.x, y: sh.y });
+    if (sh.trail.length > 64) sh.trail.shift();
+    if (f.phase === 'blast' && f.elapsed >= CONFIG.bossFinishBlastTime) {
+      f.phase = 'clear'; f.elapsed = 0;
     }
   }
-  return { samples, block: null, targets: [...targets] };
+  return f.phase === 'clear' && f.elapsed >= CONFIG.bossFinishClearTime;
 }
 
-// ---- ship ----
+function bossClearBlast(game) {
+  const f = game.finale, boss = f.boss;
+  game.timeScale = 1;
+  game.fx.particles = [];
+  // This is the victory sweep, not a chain of gameplay kills: no drops, splits or extra offers.
+  burst(game, boss.x, boss.y, '#ffe3a3', 90, 0, 0, 900);
+  for (const e of new Set([boss, ...game.enemies, ...game.newEnemies])) {
+    if (e.dead) continue;
+    e.dead = true;
+    game.kills++;
+    const dx = e.x - boss.x, dy = e.y - boss.y, d = Math.hypot(dx, dy) || 1;
+    if (e !== boss) burst(game, e.x, e.y, e.T.color, 4, dx / d, dy / d, 500);
+    if (game.fx.particles.length < 1400) for (let i = 0; i < (e === boss ? 24 : 3); i++) {
+      const a = Math.random() * Math.PI * 2, speed = 150 + Math.random() * 550;
+      game.fx.particles.push({ kind: 'finishDebris', x: e.x, y: e.y,
+        vx: Math.cos(a) * speed + dx / d * 300, vy: Math.sin(a) * speed + dy / d * 300,
+        life: CONFIG.bossFinishBlastTime, max: CONFIG.bossFinishBlastTime,
+        color: e.T.color, size: e === boss ? 10 + Math.random() * 16 : 3 + Math.random() * 5,
+        angle: a, spin: (Math.random() - 0.5) * 8 });
+    }
+  }
+  boss.dead = true;
+  game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
+  game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
+  game.fx.texts = [];
+  const radius = Math.max(900, game.viewRadius * 1.4);
+  addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);
+  addRing(game, boss.x, boss.y, radius * 0.8, '#ff526e', 0.7);
+  game.events.push({ type: 'bossExplosion', x: boss.x, y: boss.y });
+}
 
-function launch(game, ax, ay) {
-  const sh = game.ship;
-  const len = Math.hypot(ax, ay);
-  let dx, dy;
-  if (len < CONFIG.minDrag) {
-    dx = sh.hx; dy = sh.hy;
+function finishCameraTarget(game, W, H, baseZoom) {
+  const f = game.finale;
+  if (!f || game.state !== 'finishing') return null;
+  const sh = game.ship, boss = f.boss;
+  const zoom = baseZoom * CONFIG.bossFinishZoom;
+  const dx = boss.x - sh.x, dy = boss.y - sh.y, dist = Math.hypot(dx, dy) || 1;
+  const offset = Math.min(dist * 0.25, Math.min(W, H) * 0.2 / zoom);
+  if (f.phase === 'slow') return { x: sh.x + dx / dist * offset, y: sh.y + dy / dist * offset, zoom };
+  if (f.phase === 'blast') return { x: boss.x, y: boss.y, zoom: baseZoom };
+  return { x: sh.x, y: sh.y, zoom: baseZoom };
+}
+
+function drawBossFinish(r, game) {
+  const f = game.finale;
+  if (!f || game.state !== 'finishing') return;
+  const { ctx, W, H } = r;
+  ctx.save();
+  if (f.phase === 'slow') {
+    // A vignette draws attention to the actual final approach without explanatory HUD.
+    const vignette = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.18, W / 2, H / 2, Math.max(W, H) * 0.65);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
   } else {
-    dx = ax / len; dy = ay / len;
+    const blastAge = f.phase === 'blast' ? f.elapsed : CONFIG.bossFinishBlastTime + f.elapsed;
+    const p = { x: (f.boss.x - r.cam.x) * r.cam.zoom + W / 2, y: (f.boss.y - r.cam.y) * r.cam.zoom + H / 2 };
+    const radius = Math.max(1, (70 + blastAge * 1400) * r.cam.zoom);
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+    const alpha = Math.max(0, 0.8 * (1 - blastAge / 1.1));
+    glow.addColorStop(0, `rgba(255,248,215,${alpha})`);
+    glow.addColorStop(0.25, `rgba(255,150,60,${alpha * 0.7})`);
+    glow.addColorStop(1, 'rgba(255,70,70,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
   }
-  onLaunch(game);
-  sh.aimAngle = Math.atan2(dy, dx);
-  const v = launchVelocity(sh.vx, sh.vy, dx, dy, sh.gauge, game.stats);
-  sh.vx = v.vx; sh.vy = v.vy;
-  sh.boostT = game.stats.boostDuration;
-  sh.fadeT = 0;
-  sh.gaugeBank = 0;
-  game.dashId++;
-  game.events.push({ type: 'launch', gauge: sh.gauge, x: sh.x, y: sh.y, dx, dy });
-}
-
-// amount: hp lost, slow: share of speed lost (0..1)
-function damageShip(game, amount, slow, cause = 'other') {
-  const sh = game.ship;
-  if (sh.invulnT > 0 || game.debug.invincible) return false;
-  sh.hp -= amount * game.stats.damageTakenMult;
-  if (slow > 0) sh.glide = false;
-  const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
-  sh.vx *= k; sh.vy *= k;
-  sh.invulnT = CONFIG.invulnTime;
-  game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
-  addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
-  onShipHurt(game);
-  return true;
-}
-
-// R: hit radius of the ship (wider while tracing a drawn path).
-// run: the trace state; while tracing, an enemy can be hit again each time the band re-enters it.
-function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
-  const sh = game.ship, stats = game.stats;
-  const x1 = sh.x, y1 = sh.y;
-  const pad = R + MAX_ENEMY_R;
-  const hits = [];
-  queryGrid(game.grid, Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.max(x0, x1) + pad, Math.max(y0, y1) + pad, (e) => {
-    if (run ? run.inside.has(e.id) : e.hitCD > 0) return;
-    const t = segCircleT(x0, y0, x1, y1, e.x, e.y, e.r + R);
-    if (t >= 0) hits.push({ e, t });
-  });
-  if (!hits.length) return false;
-  hits.sort((a, b) => a.t - b.t);
-  for (const { e, t } of hits) {
-    const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
-    const sp = Math.hypot(sh.vx, sh.vy);
-    const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
-    const atk = attackPower(sp, stats);
-    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
-    const res = resolveRam(atk, e, crit, stats);
-    if (res.pierce) {
-      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
-      if (crit) {
-        const len = Math.hypot(hx - e.x, hy - e.y) || 1;
-        addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
-      }
-      e.hitCD = 0.3;
-      if (run) {
-        run.inside.set(e.id, e);
-        const n = (run.passes.get(e.id) || 0) + 1;
-        run.passes.set(e.id, n);
-        if (n > 1) addText(game, e.x + e.r, e.y - e.r - 16, `×${n}`, crit ? '#ffe46b' : '#ffffff', 22 + 4 * Math.min(n, 5));
-      }
-      const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
-      sh.vx *= keep; sh.vy *= keep;
-      game.dashPierce++;
-      onPierce(game);
-      if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
-      if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
-      continue;
-    }
-    // bounce off
-    sh.glide = false;
-    let nx = hx - e.x, ny = hy - e.y;
-    const nd = Math.hypot(nx, ny) || 1;
-    nx /= nd; ny /= nd;
-    addCombatImpact(game, e, 'block', nx, ny);
-    sh.x = e.x + nx * (e.r + R + 1);
-    sh.y = e.y + ny * (e.r + R + 1);
-    const vn = sh.vx * nx + sh.vy * ny;
-    if (vn < 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
-    sh.vx *= stats.bounceKeep; sh.vy *= stats.bounceKeep;
-    if (Math.hypot(sh.vx, sh.vy) < 220) { sh.vx = nx * 220; sh.vy = ny * 220; }
-    if (!stats.reflect) sh.boostT = 0;
-    damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
-    e.hitCD = 0.25;
-    damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
-    game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
-    return true;
+  if (f.phase === 'clear') {
+    ctx.globalAlpha = Math.min(1, f.elapsed / 0.2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.min(104, W * 0.17, H * 0.2)}px system-ui, sans-serif`;
+    ctx.shadowColor = '#ffac32'; ctx.shadowBlur = 28;
+    ctx.fillStyle = '#fff2bf'; ctx.fillText('CLEAR!', W / 2, H / 2);
   }
-  return false;
-}
-
-function collideBodies(game) {
-  const sh = game.ship;
-  const R = CONFIG.shipRadius;
-  const f = game.field;
-  const restitution = game.stats.reflect ? 0.9 : CONFIG.crashRestitution;
-  for (const b of [f.planet, ...f.moons]) {
-    const dx = sh.x - b.x, dy = sh.y - b.y;
-    const d = Math.hypot(dx, dy);
-    const min = b.r + R;
-    if (d >= min || d === 0) continue;
-    const nx = dx / d, ny = dy / d;
-    sh.x = b.x + nx * min;
-    sh.y = b.y + ny * min;
-    const vn = sh.vx * nx + sh.vy * ny;
-    if (vn < 0) {
-      sh.glide = false;
-      sh.vx -= (1 + restitution) * vn * nx;
-      sh.vy -= (1 + restitution) * vn * ny;
-      const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
-      if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
-      game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
-    }
-  }
-  // hard wall well outside the soft boundary
-  const r = Math.hypot(sh.x, sh.y);
-  const wall = CONFIG.fieldRadius + 500;
-  if (r > wall) {
-    sh.glide = false;
-    const nx = sh.x / r, ny = sh.y / r;
-    sh.x = nx * wall; sh.y = ny * wall;
-    const vn = sh.vx * nx + sh.vy * ny;
-    if (vn > 0) { sh.vx -= 2 * vn * nx; sh.vy -= 2 * vn * ny; }
-  }
-}
-
-function recordTrail(sh, dt) {
-  sh.trailAcc += dt;
-  if (sh.trailAcc < 1 / 60) return;
-  sh.trailAcc = 0;
-  sh.trail.push({ x: sh.x, y: sh.y });
-  if (sh.trail.length > 150) sh.trail.shift();
-}
-
-// ---- enemies ----
-
-function flushNewEnemies(game) {
-  if (!game.newEnemies.length) return;
-  for (const e of game.newEnemies) game.enemies.push(e);
-  game.newEnemies.length = 0;
-}
-
-function separateEnemies(game) {
-  for (let pass = 0; pass < 2; pass++) {
-    const grid = buildGrid(game.enemies, 120);
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
-      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
-        if (o.id <= e.id) return;
-        let dx = o.x - e.x, dy = o.y - e.y;
-        const min = e.r + o.r + CONFIG.enemySpacing;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= min * min) return;
-        const d = Math.sqrt(d2);
-        if (d < 1e-6) {
-          const a = (e.id + o.id) * 2.39996322973;
-          dx = Math.cos(a); dy = Math.sin(a);
-        } else { dx /= d; dy /= d; }
-        const push = (min - d) * 0.5;
-        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
-        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
-        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
-      });
-    }
-  }
-}
-
-// ---- pickups ----
-
-function updateGems(game, dt) {
-  const sh = game.ship;
-  const pr = game.stats.pickupRadius;
-  const sp = Math.hypot(sh.vx, sh.vy);
-  for (const g of game.gems) {
-    g.age += dt;
-    const dx = sh.x - g.x, dy = sh.y - g.y;
-    const d = Math.hypot(dx, dy);
-    if (d < pr || g.pulled) {
-      g.pulled = true;
-      const pull = 700 + sp * 1.2;
-      g.x += (dx / (d || 1)) * pull * dt;
-      g.y += (dy / (d || 1)) * pull * dt;
-    }
-    if (d < CONFIG.shipRadius + 14) { g.taken = true; addXp(game, g.v); }
-  }
-  if (game.gems.some((g) => g.taken)) game.gems = game.gems.filter((g) => !g.taken);
-  for (const c of game.coinDrops) {
-    const dx = sh.x - c.x, dy = sh.y - c.y;
-    const d = Math.hypot(dx, dy);
-    if (d < pr * 1.3 || c.pulled) {
-      c.pulled = true;
-      const pull = 700 + sp * 1.2;
-      c.x += (dx / (d || 1)) * pull * dt;
-      c.y += (dy / (d || 1)) * pull * dt;
-    }
-    if (d < CONFIG.shipRadius + 14) { c.taken = true; game.coins += c.v; game.events.push({ type: 'coin' }); }
-  }
-  if (game.coinDrops.some((c) => c.taken)) game.coinDrops = game.coinDrops.filter((c) => !c.taken);
-}
-
-function addXp(game, v) {
-  game.xp += v;
-  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
-    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
-    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
-  }
-  let need = xpForLevel(game.level);
-  while (game.xp >= need) {
-    game.xp -= need;
-    game.level++;
-    game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
-    game.events.push({ type: 'levelup', level: game.level });
-    need = xpForLevel(game.level);
-    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
-    addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
-  }
-}
-
-// ---- fx ----
-
-function updateFx(game, dt) {
-  const P = game.fx.particles;
-  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
-  game.fx.particles = P.filter((p) => p.life > 0);
-  for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
-  for (const g of game.fx.ghosts) g.life -= dt;
-  game.fx.ghosts = game.fx.ghosts.filter((g) => g.life > 0);
-  game.fx.texts = game.fx.texts.filter((t) => t.life > 0);
-  for (const r of game.fx.rings) r.life -= dt;
-  game.fx.rings = game.fx.rings.filter((r) => r.life > 0);
-  for (const loop of game.fx.loops) loop.life -= dt;
-  game.fx.loops = game.fx.loops.filter((loop) => loop.life > 0);
-  for (const impact of game.fx.impacts) impact.life -= dt;
-  game.fx.impacts = game.fx.impacts.filter((impact) => impact.life > 0);
-}
-
-// ---- prediction ----
-
-// Ballistic preview of a launch along (dx, dy) with the given gauge, under gravity only.
-function predictPath(game, dx, dy, gauge, seconds) {
-  const sh = game.ship;
-  const len = Math.hypot(dx, dy) || 1;
-  const v = launchVelocity(sh.vx, sh.vy, dx / len, dy / len, gauge, game.stats);
-  return simulateFrom(game, { x: sh.x, y: sh.y, vx: v.vx, vy: v.vy, boostT: game.stats.boostDuration, fadeT: 0 }, 0, seconds);
-}
-
-function simulateFrom(game, ghost, t0, seconds) {
-  const pts = [];
-  const h = 1 / 60;
-  const field = { ...game.field, moons: game.field.moons.map((m) => ({ ...m })) };
-  for (let t = t0; t < seconds; t += h) {
-    updateMoons(field, game.t + t);
-    const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
-    stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
-    const p = { x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy };
-    pts.push(p);
-    if (hitsBody(field, p.x, p.y)) { p.block = true; break; }
-  }
-  return pts;
-}
-
-function hitsBody(field, x, y) {
-  const R = CONFIG.shipRadius;
-  for (const b of [field.planet, ...field.moons]) {
-    if ((x - b.x) ** 2 + (y - b.y) ** 2 < (b.r + R) ** 2) return true;
-  }
-  return false;
-}
-
-// Marks predicted points that cross a weak spot (hot) and stops at the first enemy that would block.
-// With the bounce-preview radar the path continues past the block.
-function annotatePrediction(game, pts, seconds) {
-  const R = CONFIG.shipRadius;
-  const out = [];
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    let blocker = null;
-    queryGrid(game.grid, p.x - R - MAX_ENEMY_R, p.y - R - MAX_ENEMY_R, p.x + R + MAX_ENEMY_R, p.y + R + MAX_ENEMY_R, (e) => {
-      const dx = p.x - e.x, dy = p.y - e.y;
-      const rr = e.r + R;
-      if (dx * dx + dy * dy > rr * rr) return;
-      const crit = isWeakHit(e, p.x, p.y, game.stats.weakArcMult);
-      if (crit) p.hot = true;
-      if (!canPierce(attackPower(p.sp, game.stats), e, crit)) blocker = e;
-    });
-    out.push(p);
-    if (p.block) break;
-    if (blocker) {
-      p.block = true;
-      if (game.stats.predictBounce && seconds) {
-        let nx = p.x - blocker.x, ny = p.y - blocker.y;
-        const nd = Math.hypot(nx, ny) || 1;
-        nx /= nd; ny /= nd;
-        let vx = p.vx, vy = p.vy;
-        const vn = vx * nx + vy * ny;
-        if (vn < 0) { vx -= 2 * vn * nx; vy -= 2 * vn * ny; }
-        vx *= game.stats.bounceKeep; vy *= game.stats.bounceKeep;
-        const ghost = { x: blocker.x + nx * (blocker.r + R + 1), y: blocker.y + ny * (blocker.r + R + 1), vx, vy, boostT: 0, fadeT: 0 };
-        for (const q of simulateFrom(game, ghost, p.t, seconds)) { q.bounced = true; out.push(q); }
-      }
-      break;
-    }
-  }
-  return out;
+  ctx.restore();
 }
 
 // ---- parts.js ----
@@ -3401,6 +3642,7 @@ function drawCorpseDebris(r, game, dt) {
 
 
 
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -3442,6 +3684,14 @@ function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  const finishTarget = finishCameraTarget(game, r.W, r.H, targetZoom(game, r.W, r.H));
+  if (finishTarget) {
+    const k = 1 - Math.exp(-10 * dt);
+    r.cam.x += (finishTarget.x - r.cam.x) * k;
+    r.cam.y += (finishTarget.y - r.cam.y) * k;
+    r.cam.zoom += (finishTarget.zoom - r.cam.zoom) * k;
+    return;
+  }
   if (game.draw && r.cam.ready) {
     // hold the view still while a path is drawn and traced, so it is followed exactly where it was drawn
     game.viewRadius = Math.hypot(r.W, r.H) / 2 / r.cam.zoom;
@@ -3477,6 +3727,8 @@ function handleEvents(r, game) {
     else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); r.zoomPunch = 0.14; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
+    else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
+    else if (ev.type === 'bossExplosion') { r.flash = 1; r.shake = 30; }
     else if (ev.type === 'end' && ev.state === 'won') r.flash = 1;
   }
 }
@@ -3488,6 +3740,7 @@ function render(r, game, dt, pointer) {
   if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
   handleEvents(r, game);
   updateCamera(r, game, dt);
+  game.spawnView = { x: r.cam.x, y: r.cam.y, halfW: r.W / 2 / r.cam.zoom, halfH: r.H / 2 / r.cam.zoom };
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   drawBackground(r, game);
 
@@ -3524,21 +3777,24 @@ function render(r, game, dt, pointer) {
   ctx.restore();
   drawSpeedLines(r, game);
 
-  drawChargeUi(r, game, pointer);
-  drawCapsuleArrows(r, game);
-  drawDrawingHud(r, game, pointer);
-  drawPortalHud(r, game);
-  drawOverlays(r, game, dt);
-  drawHud(r, game);
-  drawBossHud(r, game, dt);
-  drawMinimap(r, game);
-  drawBanner(r, dt);
-  drawStageFlash(r, dt);
+  if (game.state !== 'finishing') {
+    drawChargeUi(r, game, pointer);
+    drawCapsuleArrows(r, game);
+    drawDrawingHud(r, game, pointer);
+    drawPortalHud(r, game);
+    drawOverlays(r, game, dt);
+    drawHud(r, game);
+    drawBossHud(r, game, dt);
+    drawMinimap(r, game);
+    drawBanner(r, dt);
+    drawStageFlash(r, dt);
+  }
   if (r.flash > 0) {
     ctx.fillStyle = `rgba(255,255,255,${Math.min(0.85, r.flash)})`;
     ctx.fillRect(0, 0, r.W, r.H);
     r.flash = Math.max(0, r.flash - dt * 2.2);
   }
+  drawBossFinish(r, game);
 }
 
 // Conical shock layers wrapped around the ship near max speed.
@@ -4283,6 +4539,15 @@ function drawFx(r, game) {
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;
+    if (p.kind === 'finishDebris') {
+      ctx.save(); ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+      ctx.strokeStyle = p.color; ctx.lineWidth = 1.5 / z;
+      ctx.fillStyle = '#dfe9f0';
+      ctx.beginPath(); ctx.moveTo(-s, -s * 0.6); ctx.lineTo(s * 0.8, -s * 0.35);
+      ctx.lineTo(s * 0.5, s * 0.7); ctx.lineTo(-s * 0.6, s * 0.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+      continue;
+    }
     if (p.kind === 'spark') {
       const speed = Math.hypot(p.vx, p.vy) || 1;
       const length = s * 4;
@@ -4888,12 +5153,12 @@ function fmtTime(t) {
 const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
-  boss: ['ボス 撃破', 'win', '敵の大群を突破し、ボスを撃破した'],
+  boss: ['CLEAR!', 'win', '敵の大群を突破し、ボスを撃破した'],
   hp: ['機体 大破', 'lose', 'HP が尽きた'],
   time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
-function showResult(game, extra, onNext) {
+function showResult(game, extra, onNext, onRetry) {
   const [title, cls, sub] = END_TEXT[game.endReason] || END_TEXT.time;
   const rows = [
     ['経過時間', fmtTime(game.t)],
@@ -4904,13 +5169,15 @@ function showResult(game, extra, onNext) {
   ];
   const stats = el('div', { class: 'stats' });
   for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
-  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ ', el('kbd', {}, 'Enter'));
+  const won = game.state === 'won';
+  const btn = el('button', { class: won ? '' : 'primary', onclick: onNext }, won ? 'メニューに戻る' : 'ステーションへ');
+  const retry = won && onRetry ? el('button', { class: 'primary', onclick: onRetry }, 'もう一回やる') : null;
   showScreen(el('div', { class: 'panel' },
     el('h1', { class: cls }, title),
     el('div', { class: 'sub' }, sub),
     stats,
-    el('div', { class: 'btns' }, btn)), 'result');
-  btn.focus();
+    el('div', { class: 'btns' }, retry, btn)), 'result');
+  (retry || btn).focus();
 }
 
 const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', drop: '敵のドロップ', core: '出力コア' };
@@ -5370,7 +5637,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   btns.append(rsel);
   button('モジュール入手', (g) => {
     const r = Number(rsel.value);
-    const pool = MODULES.filter((m) => m.rarities.includes(r));
+    const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
     const def = pool[Math.floor(Math.random() * pool.length)];
     if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
@@ -5504,7 +5771,7 @@ function finishRun() {
   const before = save.coins;
   applyRunResult(save, game);
   writeSave(storage, save);
-  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation);
+  showResult(game, [['獲得部品', `+${save.coins - before}`]], openStation, startRun);
 }
 
 function chooseOffer(accept) {
@@ -5534,10 +5801,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
-  if (e.key === 'p' || e.key === 'P') debug.toggle();
+  if ((e.key === 'p' || e.key === 'P') && game.state !== 'finishing') debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
-    else if (mode === 'result') { e.preventDefault(); openStation(); }
   }
 });
 
@@ -5560,11 +5826,12 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const wasPlaying = game.state === 'play';
+  const wasRunning = game.state === 'play' || game.state === 'finishing';
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
+  if (game.state === 'finishing') input.state.enabled = false;
   render(renderer, game, dt, input.state);
   updateDashButton();
   audio.handle(game.events);
@@ -5572,7 +5839,7 @@ function frame(now) {
   debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
-    if (wasPlaying && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
     if (game.state === 'offer' && offerShown !== game.currentOffer) {
       offerShown = game.currentOffer;
       input.reset();

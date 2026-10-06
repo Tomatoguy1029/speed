@@ -37,12 +37,12 @@ export function fmtTime(t) {
 export const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
-  boss: ['ボス 撃破', 'win', '敵の大群を突破し、ボスを撃破した'],
+  boss: ['CLEAR!', 'win', '敵の大群を突破し、ボスを撃破した'],
   hp: ['機体 大破', 'lose', 'HP が尽きた'],
   time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
-export function showResult(game, extra, onNext) {
+export function showResult(game, extra, onNext, onRetry) {
   const [title, cls, sub] = END_TEXT[game.endReason] || END_TEXT.time;
   const rows = [
     ['経過時間', fmtTime(game.t)],
@@ -53,13 +53,15 @@ export function showResult(game, extra, onNext) {
   ];
   const stats = el('div', { class: 'stats' });
   for (const [k, v] of rows) stats.append(el('div', {}, k), el('div', {}, v));
-  const btn = el('button', { class: 'primary', onclick: onNext }, 'ステーションへ ', el('kbd', {}, 'Enter'));
+  const won = game.state === 'won';
+  const btn = el('button', { class: won ? '' : 'primary', onclick: onNext }, won ? 'メニューに戻る' : 'ステーションへ');
+  const retry = won && onRetry ? el('button', { class: 'primary', onclick: onRetry }, 'もう一回やる') : null;
   showScreen(el('div', { class: 'panel' },
     el('h1', { class: cls }, title),
     el('div', { class: 'sub' }, sub),
     stats,
-    el('div', { class: 'btns' }, btn)), 'result');
-  btn.focus();
+    el('div', { class: 'btns' }, retry, btn)), 'result');
+  (retry || btn).focus();
 }
 
 const SOURCE_TEXT = { xp: '経験値', capsule: '漂流カプセル', elite: '強敵のドロップ', drop: '敵のドロップ', core: '出力コア' };

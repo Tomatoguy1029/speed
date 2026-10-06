@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { refreshStats, pushOffer } from './world.js';
 import { PHASES } from './spawner.js';
-import { MODULES, RARITIES } from './modules.js';
+import { MODULES, RARITIES, moduleFitsScheme } from './modules.js';
 import { SCHEMES, schemeById } from './controls.js';
 
 const DEFAULTS = { ...CONFIG };
@@ -156,7 +156,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   btns.append(rsel);
   button('モジュール入手', (g) => {
     const r = Number(rsel.value);
-    const pool = MODULES.filter((m) => m.rarities.includes(r));
+    const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
     const def = pool[Math.floor(Math.random() * pool.length)];
     if (g.state === 'play') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });

@@ -24,6 +24,8 @@ test('one boss appears on time, stays when left off screen, and its defeat clear
   damageEnemy(game, boss, boss.hp, { cause: 'wave' });
   game.spawning = false;
   update(game, 0.02, { charging: false });
+  assert.equal(game.state, 'finishing');
+  for (let i = 0; i < 100 && game.state === 'finishing'; i++) update(game, 0.05, {});
   assert.equal(game.state, 'won');
   assert.equal(game.endReason, 'boss');
 });

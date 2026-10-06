@@ -26,14 +26,23 @@ export function phaseTarget(t) {
 
 function spawnPoint(game, extra = 0) {
   const sh = game.ship;
-  for (let i = 0; i < 6; i++) {
-    const a = game.rng() * TAU;
-    const d = game.viewRadius + 100 + extra + game.rng() * 300;
-    const x = sh.x + Math.cos(a) * d, y = sh.y + Math.sin(a) * d;
+  const view = spawnBounds(game);
+  for (let i = 0; i < 24; i++) {
+    // The short screen edge matters too: a circumscribed circle leaves wide empty strips.
+    let a = game.rng() * TAU;
+    if (Math.hypot(sh.vx, sh.vy) > 100 && game.rng() < 0.6) a = Math.atan2(sh.vy, sh.vx) + (game.rng() - 0.5) * Math.PI;
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const margin = CONFIG.spawnMargin + extra + game.rng() * 80;
+    const d = Math.min((view.halfW + margin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + margin) / Math.max(0.0001, Math.abs(uy)));
+    const x = view.x + ux * d, y = view.y + uy * d;
     const r = Math.hypot(x, y);
     if (r < CONFIG.fieldRadius + 200 && r > CONFIG.planetRadius + 150) return { x, y, a };
   }
   return null;
+}
+
+function spawnBounds(game) {
+  return game.spawnView || { x: game.ship.x, y: game.ship.y, halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
 }
 
 // Dangerous zones add tougher enemies; early in the run that bias is mostly armor, not guns.
@@ -48,17 +57,18 @@ function mixAt(phase, danger, t) {
 
 function spawnOne(game, target) {
   const pt = spawnPoint(game);
-  if (!pt) return;
+  if (!pt) return false;
   const danger = dangerAt(Math.hypot(pt.x, pt.y));
   const type = pickWeighted(game.rng, mixAt(target.phase, danger, game.t));
-  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return;
-  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return;
+  if (type === 'battleship' && game.enemies.some((e) => e.type === 'battleship')) return false;
+  if (type === 'titan' && game.enemies.filter((e) => e.type === 'titan').length >= 6) return false;
   const T = ENEMY_TYPES[type];
   const late = target.phase.id === 'tension' || target.phase.id === 'escape';
   const elite = type !== 'battleship' && game.rng() < 0.01 + 0.06 * danger + (late ? 0.02 : 0);
   const level = target.level + danger * CONFIG.dangerLevel;
   const size = T.sizeVar ? T.r * (0.85 + game.rng() * 0.45) : undefined;
   game.enemies.push(createEnemy(type, level, pt.x, pt.y, { elite, size, facing: pt.a + Math.PI }));
+  return true;
 }
 
 function spawnWave(game, target, remaining) {
@@ -66,16 +76,19 @@ function spawnWave(game, target, remaining) {
   const n = Math.min(Math.round(30 * CONFIG.densityMult), Math.ceil(remaining));
   if (game.rng() < 0.5) {
     // ring closing in
-    const d = game.viewRadius * 0.95;
+    const view = spawnBounds(game);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU;
-      game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d, sh.y + Math.sin(a) * d, { facing: a + Math.PI }));
+      const ux = Math.cos(a), uy = Math.sin(a);
+      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy)));
+      game.enemies.push(createEnemy('swarm', target.level, view.x + ux * d, view.y + uy * d, { facing: a + Math.PI }));
     }
   } else {
     // a stream from one direction
     const a = game.rng() * TAU;
     for (let i = 0; i < n; i++) {
-      const d = game.viewRadius + 80 + i * 34;
+      const view = spawnBounds(game);
+      const d = Math.min(view.halfW / Math.max(0.0001, Math.abs(Math.cos(a))), view.halfH / Math.max(0.0001, Math.abs(Math.sin(a)))) + CONFIG.spawnMargin + i * 12;
       const off = (game.rng() - 0.5) * 120;
       game.enemies.push(createEnemy('swarm', target.level, sh.x + Math.cos(a) * d - Math.sin(a) * off, sh.y + Math.sin(a) * d + Math.cos(a) * off, { facing: a + Math.PI }));
     }
@@ -97,14 +110,19 @@ function keepMeteors(game) {
 
 function despawnFar(game) {
   const sh = game.ship;
-  const far = game.viewRadius * 2.6 + 800;
-  let removed = false;
+  const view = spawnBounds(game);
   for (const e of game.enemies) {
     if (e.type === 'boss') continue;
-    const lim = e.type === 'battleship' ? far * 1.6 : far;
-    if (Math.abs(e.x - sh.x) > lim || Math.abs(e.y - sh.y) > lim) { e.dead = true; removed = true; }
+    if (e.dead || (Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200)) continue;
+    const pt = spawnPoint(game);
+    if (!pt) continue;
+    // Recycling retains HP/strength and creates no kills, XP, modules or cooldown exploits.
+    e.x = pt.x; e.y = pt.y;
+    const dx = sh.x - e.x, dy = sh.y - e.y, d = Math.hypot(dx, dy) || 1;
+    e.vx = dx / d * e.speed; e.vy = dy / d * e.speed;
+    e.facing = Math.atan2(dy, dx); e.state = 'move'; e.timer = e.charge = 0;
+    e.fireT = e.T.fireInterval || 0;
   }
-  if (removed) game.enemies = game.enemies.filter((e) => !e.dead);
 }
 
 export function updateSpawner(game, dt) {
@@ -115,12 +133,16 @@ export function updateSpawner(game, dt) {
   const target = phaseTarget(game.t);
   const P = target.phase;
   let alive = 0;
-  for (const e of game.enemies) if (e.type !== 'meteor' && e.type !== 'boss') alive++;
-  game.spawnAcc = Math.min(game.spawnAcc + P.rate * CONFIG.densityMult * dt, Math.max(8, 8 * CONFIG.densityMult));
-  while (game.spawnAcc >= 1 && alive < target.pop) {
+  const view = spawnBounds(game);
+  for (const e of game.enemies) if (!e.dead && e.type !== 'meteor' && e.type !== 'boss' &&
+    Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200) alive++;
+  const deficit = Math.max(0, target.pop - alive);
+  const rate = Math.max(P.rate * CONFIG.densityMult, deficit / CONFIG.spawnRefillTime);
+  game.spawnAcc = Math.min(game.spawnAcc + rate * dt, Math.max(8, 8 * CONFIG.densityMult));
+  let attempts = 0;
+  while (game.spawnAcc >= 1 && alive < target.pop && attempts++ < Math.max(8, 8 * CONFIG.densityMult)) {
     game.spawnAcc -= 1;
-    spawnOne(game, target);
-    alive++;
+    if (spawnOne(game, target)) alive++;
   }
   if (P.waves) {
     game.waveT = (game.waveT || 0) + dt;

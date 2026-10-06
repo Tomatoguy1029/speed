@@ -67,7 +67,7 @@ export const MODULES = [
   { id: 'loopBurst', slot: 'gun', name: '包囲炸裂', rarities: [2, 3], portalOnly: true,
     desc: (r) => `通過軌跡が閉じると、内側の敵が一斉に爆発（装甲無視・威力 ${pct(CONFIG.portalLoopDamage * M(r))}）${r === 3 ? `。敵の爆発が半径${CONFIG.portalLoopSplashRadius}の周囲にも波及` : ''}`,
     apply: (s, m, r) => { s.loopBurst = { mult: CONFIG.portalLoopDamage * m, splash: r === 3 }; } },
-  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true,
+  { id: 'chargeWave', slot: 'gun', name: 'チャージ衝撃波', rarities: ALL, portalExcluded: true, drawExcluded: true,
     desc: (r) => `チャージ中、0.5 秒ごとに周囲へ衝撃波（半径 ${Math.round(170 * (1 + 0.25 * r))}）`,
     apply: (s, m, r) => { s.chargeWave = { mult: 0.5 * m, radius: 170 * (1 + 0.25 * r) }; } },
   { id: 'turret', slot: 'gun', name: '自動砲台', rarities: ALL,
@@ -87,12 +87,18 @@ export const MODULES = [
   { id: 'portalPulse', slot: 'radar', name: '共振ビーコン', rarities: ALL, portalOnly: true,
     desc: (r) => `ポータル到着時に波動で周囲を吹き飛ばす（半径 ${CONFIG.portalWaveRadius}、威力 ${pct(CONFIG.portalWaveDamage * M(r))}）`,
     apply: (s, m) => { s.portalWave = m; } },
-  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL,
+  { id: 'scope', slot: 'radar', name: '長距離予測', rarities: ALL, drawExcluded: true,
     desc: (r) => `予測線 +${(0.6 * M(r)).toFixed(1)} 秒、回収範囲 +10%`,
     apply: (s, m) => { s.predictTime += 0.6 * m; s.pickupRadius *= 1.1; } },
-  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL,
+  { id: 'bounceScope', slot: 'radar', name: '反射予測', rarities: ALL, drawExcluded: true,
     desc: (r) => `予測線が反射先まで見える、予測線 +${(0.3 * M(r)).toFixed(1)} 秒`,
     apply: (s, m) => { s.predictBounce = true; s.predictTime += 0.3 * m; s.weakArcMult *= 1 + 0.05 * m; } },
+  { id: 'finishPulse', slot: 'radar', name: '終端爆縮器', rarities: ALL, drawOnly: true, portalExcluded: true,
+    desc: (r) => `描いた経路の移動終了時に爆発（半径 ${Math.round(180 * (1 + 0.2 * r))}、威力 ${pct(0.7 * M(r))}）。弾かれた地点でも発動`,
+    apply: (s, m, r) => { s.traceEndBlast = { radius: 180 * (1 + 0.2 * r), mult: 0.7 * m }; } },
+  { id: 'impactPulse', slot: 'radar', name: '連鎖パルス', rarities: [2, 3], drawOnly: true, portalExcluded: true,
+    desc: (r) => `敵を貫くたびに波動で周囲へ攻撃（半径 ${Math.round(95 * (1 + 0.2 * r))}、威力 ${pct(0.25 * M(r))}）`,
+    apply: (s, m, r) => { s.pierceWave = { radius: 95 * (1 + 0.2 * r), mult: 0.25 * m }; } },
   { id: 'weakScan', slot: 'radar', name: '弱点スキャナ', rarities: ALL,
     desc: (r) => `弱点の範囲 +${pct(0.25 * M(r))}、クリティカル倍率 +${(0.3 * M(r)).toFixed(1)}`,
     apply: (s, m) => { s.weakArcMult *= 1 + 0.25 * m; s.critMult += 0.3 * m; } },
@@ -144,6 +150,13 @@ export function moduleDef(id) {
   return BY_ID[id];
 }
 
+export function moduleFitsScheme(m, scheme) {
+  return (!m.drawOnly || !scheme || isDrawScheme(scheme) || scheme === 'portal')
+    && (!m.portalOnly || scheme === 'portal')
+    && (!m.drawExcluded || !isDrawScheme(scheme))
+    && (!m.portalExcluded || scheme !== 'portal');
+}
+
 // bonus.cores: power cores collected this run; bonus.level: current level. Both raise max speed.
 export function computeStats(meta, loadout, bonus = {}) {
   const s = baseStats(meta);
@@ -192,10 +205,7 @@ export function rollModule(rng, ctx) {
       if (s.id === ctx.lastSlot) w *= 0.35;
       return [s.id, w];
     }));
-    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
-      && (!m.drawOnly || !ctx.scheme || isDrawScheme(ctx.scheme) || ctx.scheme === 'portal')
-      && (!m.portalOnly || ctx.scheme === 'portal')
-      && (!m.portalExcluded || ctx.scheme !== 'portal'));
+    pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t && moduleFitsScheme(m, ctx.scheme));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));

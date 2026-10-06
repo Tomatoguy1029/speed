@@ -293,7 +293,9 @@ export function updatePortals(game, realDt) {
     sh.x = x1; sh.y = y1;
     sh.vx = d.dx * d.speed; sh.vy = d.dy * d.speed;
     waveAlong(game, d, x0, y0, x1, y1);
+    if (game.state === 'finishing') return;
     if (collideEnemies(game, x0, y0, CONFIG.shipRadius, d)) { stopPortalDash(game, '弾かれた'); return; }
+    if (game.state === 'finishing') return;
     d.speed = Math.hypot(sh.vx, sh.vy);
     tracePortalLoop(game, d, x0, y0, sh.x, sh.y);
     d.trailAcc += stepDist;

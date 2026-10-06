@@ -12,10 +12,11 @@ import { updateSpawner, getPhase } from './spawner.js';
 import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
-import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt } from './effects.js';
+import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
+import { recordBossApproach, advanceBossFinish } from './finale.js';
 
 export const STEP = 1 / 120;
 
@@ -39,6 +40,7 @@ export function createGame(opts = {}) {
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     boss: null, bossSpawned: false,
+    finale: null, finishFrames: [], finishClock: 0,
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
@@ -67,9 +69,15 @@ export function createGame(opts = {}) {
 }
 
 export function update(game, frameDt, input) {
-  if (game.state !== 'play') return;
-  if (game.boss?.dead) { end(game, 'won', 'boss'); return; }
   frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'finishing') {
+    updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
+    const finished = advanceBossFinish(game, frameDt);
+    if (finished) end(game, 'won', 'boss');
+    return;
+  }
+  if (game.state !== 'play') return;
+  recordBossApproach(game, frameDt);
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
@@ -83,10 +91,12 @@ export function update(game, frameDt, input) {
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
   if (!game.draw && !game.portalDash && game.dashStop > 0) game.dashStop = Math.max(0, game.dashStop - frameDt * CONFIG.killHitstopRegen);
   if (game.portalDash) updatePortals(game, frameDt);
+  if (game.state !== 'play') return;
   if (game.draw && game.draw.phase === 'draw') updateDrawing(game, input);
   if (game.draw && game.draw.phase === 'run') {
     // trace every frame on real time (world steps are rare while it is nearly frozen)
     runAlongPath(game, frameDt);
+    if (game.state !== 'play') return;
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
@@ -103,8 +113,8 @@ export function update(game, frameDt, input) {
     game.acc -= STEP;
     step(game, STEP, input);
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
-    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.state !== 'play') break;
+    if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw &&
@@ -174,12 +184,14 @@ function step(game, dt, input) {
     const x0 = sh.x, y0 = sh.y;
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
     collideEnemies(game, x0, y0);
+    if (game.state !== 'play') return;
     collideBodies(game);
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
+  if (game.state !== 'play') return;
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
   flushNewEnemies(game);
   updateSpawner(game, dt);
@@ -197,8 +209,7 @@ function step(game, dt, input) {
     game.stage = st;
   }
 
-  if (game.boss?.dead) end(game, 'won', 'boss');
-  else if (sh.hp <= 0) end(game, 'lost', 'hp');
+  if (sh.hp <= 0) end(game, 'lost', 'hp');
   else if (game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
 
@@ -306,8 +317,9 @@ export function waveAlong(game, r, x0, y0, x1, y1) {
       const d = Math.hypot(e.x - px, e.y - py);
       if (d > e.r + W) return;
       r.waveInside.set(e.id, e);
-      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260 });
+      damageEnemy(game, e, dmg, { cause: 'wave', dirX: (e.x - px) / (d || 1), dirY: (e.y - py) / (d || 1), knock: 260, impactX: px, impactY: py });
     });
+    if (game.state === 'finishing') return;
     r.waveAcc += len / n;
     if (r.waveAcc >= 45) { r.waveAcc = 0; addRing(game, px, py, W, 'rgba(130,225,255,0.9)', 0.35); }
   }
@@ -462,8 +474,11 @@ function runAlongPath(game, realDt) {
     r.segPos += move; dist -= move;
     sh.x = a.x + ux * r.segPos; sh.y = a.y + uy * r.segPos;
     sh.vx = ux * r.speed; sh.vy = uy * r.speed;
+    game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(r.speed, game.stats));
     waveAlong(game, r, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; return; }
+    if (game.state !== 'play') return;
+    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; endTraceAttack(game); return; }
+    if (game.state !== 'play') return;
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
     if (r.segPos >= segLen - 1e-9) { r.seg++; r.segPos = 0; }
@@ -472,6 +487,7 @@ function runAlongPath(game, realDt) {
     game.draw = null;
     sh.glide = true; // retain launch speed while allowing ordinary cursor/stick steering
     sh.boostT = game.stats.boostDuration; // keep cruising along the last segment
+    endTraceAttack(game);
   }
 }
 
@@ -540,7 +556,7 @@ function launch(game, ax, ay) {
 // amount: hp lost, slow: share of speed lost (0..1)
 export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
-  if (sh.invulnT > 0 || game.debug.invincible) return false;
+  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
@@ -574,7 +590,8 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
     const res = resolveRam(atk, e, crit, stats);
     if (res.pierce) {
-      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy });
+      damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
+      if (game.state === 'finishing') return false;
       if (crit) {
         const len = Math.hypot(hx - e.x, hy - e.y) || 1;
         addCombatImpact(game, e, 'weak', (hx - e.x) / len, (hy - e.y) / len);
@@ -589,7 +606,8 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
       const keep = sh.glide || game.draw?.phase === 'run' ? 1 : pierceKeep(e, e.dead, stats);
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
-      onPierce(game);
+      onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
       if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
       continue;
@@ -748,7 +766,7 @@ export function addXp(game, v) {
 
 function updateFx(game, dt) {
   const P = game.fx.particles;
-  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; }
+  for (const p of P) { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 1 - 2.5 * dt; p.vy *= 1 - 2.5 * dt; p.life -= dt; if (p.spin) p.angle += p.spin * dt; }
   game.fx.particles = P.filter((p) => p.life > 0);
   for (const t of game.fx.texts) { t.y -= 40 * dt; t.life -= dt; }
   for (const g of game.fx.ghosts) g.life -= dt;

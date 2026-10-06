@@ -7,6 +7,11 @@ export const CONFIG = {
   bossTime: 420, // one provisional boss appears after seven minutes
   bossHp: 2200,
   bossArmor: 14,
+  bossFinishReplayWindow: 0.18, // actual approach recorded before the final blow
+  bossFinishSlowTime: 1.2,
+  bossFinishZoom: 3.2,
+  bossFinishBlastTime: 2,
+  bossFinishClearTime: 1.4,
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -35,11 +40,16 @@ export const CONFIG = {
   dropBase: 0.005, // module drop chance = dropBase * power^dropPowerExp (power = enemy xp)
   dropPowerExp: 1,
   dropMax: 0.5,
-  drawDropScale: 0.1, // fewer module drops even with five times as many enemies
-  drawDropInterval: 35, // minimum seconds between enemy module drops in draw mode
-  drawOfferInterval: 30, // minimum play seconds between selection screens
-  drawCapsuleCount: 2,
-  drawCapsuleInterval: 40,
+  drawDropScale: 1,
+  drawDropInterval: 10,
+  drawDropJitter: 4,
+  drawDropPity: 14, // next kill guarantees a drop after this many run seconds
+  drawOfferInterval: 8, // pickup choices still wait until the drawn attack ends
+  drawCapsuleCount: 4,
+  drawCapsuleInterval: 16,
+  spawnMargin: 70, // spawn/recycle just beyond the actual screen edges
+  spawnRefillTime: 1, // replenish local population deficits in about one world second
+  spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
   atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
@@ -71,7 +81,7 @@ export const CONFIG = {
   portalLoopSplashDamage: 0.5,
   portalLoopMinArea: 64, // reject degenerate backtracking loops
   drawLength: 1000, // draw scheme: path length at full gauge (scales with max speed / base max speed)
-  drawTimeScale: 1, // world speed while drawing: 0 = stopped, 1 = normal
+  drawTimeScale: 0.1, // world speed while drawing: 0 = stopped, 1 = normal
   drawRunSlowRef: 260, // world speed while tracing = drawRunSlowRef / dash speed (faster ship -> slower world)
   drawRunScaleMin: 0.03, // ...but never slower than this
   waveRadius: 45, // reach of the wave a traced path gives off (the band's half-width); the ship body itself stays shipRadius
