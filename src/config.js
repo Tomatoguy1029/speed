@@ -62,6 +62,9 @@ export const CONFIG = {
   hyperJumpTime: 0.09, // real seconds to cross one jump, however long
   hyperKeep: 0.95, // share of the jump speed kept afterwards
   hyperCoast: 0.6, // seconds of that speed before it starts to slow down
+  streakAngle: 25, // slipstream: degrees a jump may differ from the last and still count as the same direction
+  streakWindow: 1.5, // slipstream: real seconds after landing for the next jump to continue the streak
+  streakMax: 4, // slipstream: steps of extra speed
   hyperDecay: 0.6, // per second: after a jump, speed above cruise speed (steerCruise) fades at this rate
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,

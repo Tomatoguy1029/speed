@@ -53,6 +53,9 @@ export const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'slipstream', slot: 'booster', name: 'スリップストリーム', rarities: ALL, schemeOnly: 'hyper',
+    desc: (r) => `同じ方向（±${CONFIG.streakAngle}°）へ続けてジャンプするたびに速度 +${pct(0.15 * M(r))}（最大 ${CONFIG.streakMax} 段。速度＝攻撃力）。${CONFIG.streakWindow} 秒途切れるか向きを変えるとリセット`,
+    apply: (s, m) => { s.streakBoost = 0.15 * m; } },
   { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
     desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
     apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
@@ -121,8 +124,9 @@ export const MODULES = [
   { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
     desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
     apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
-    desc: (r, scheme) => scheme === 'hyper' ? `敵を貫くたびに次のジャンプが ${pct(0.05 * M(r))} 溜まる、充填時間 -8%` : `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+  // not in hyperdrive: refilling jumps on hits allowed endless dashing
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
     desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
@@ -195,7 +199,9 @@ export function rollModule(rng, ctx) {
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
       && (!m.hyperOnly || !ctx.scheme || isHyperScheme(ctx.scheme) || ctx.scheme === 'portal')
       && (!m.portalOnly || ctx.scheme === 'portal')
-      && (!m.portalExcluded || ctx.scheme !== 'portal'));
+      && (!m.portalExcluded || ctx.scheme !== 'portal')
+      && (!m.hyperExcluded || !isHyperScheme(ctx.scheme))
+      && (!m.schemeOnly || ctx.scheme === m.schemeOnly));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));

@@ -155,6 +155,9 @@ const CONFIG = {
   hyperJumpTime: 0.09, // real seconds to cross one jump, however long
   hyperKeep: 0.95, // share of the jump speed kept afterwards
   hyperCoast: 0.6, // seconds of that speed before it starts to slow down
+  streakAngle: 25, // slipstream: degrees a jump may differ from the last and still count as the same direction
+  streakWindow: 1.5, // slipstream: real seconds after landing for the next jump to continue the streak
+  streakMax: 4, // slipstream: steps of extra speed
   hyperDecay: 0.6, // per second: after a jump, speed above cruise speed (steerCruise) fades at this rate
   portalSpacing: 260, // minimum separation between portals (including manual ones)
   portalManualMax: 12,
@@ -567,6 +570,7 @@ function baseStats(meta = {}) {
     predictTime: 0.9,
     predictBounce: false,
     regen: 0,
+    streakBoost: 0, // slipstream module: extra jump speed per same-direction step
     rangeMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // hyperdrive / portal modules
   };
 }
@@ -1376,6 +1380,9 @@ const MODULES = [
   { id: 'reflector', slot: 'booster', name: '反射スラスター', rarities: ALL,
     desc: (r) => `弾かれても勢いを ${pct(Math.min(1, 0.8 + 0.06 * r))} 保つ、弾かれ時の被ダメ -${pct(1 - 0.7 / Math.sqrt(M(r)))}、最高速度 +${pct(0.05 * M(r))}`,
     apply: (s, m, r) => { s.bounceKeep = Math.min(1, 0.8 + 0.06 * r); s.bounceDamageMult *= 0.7 / Math.sqrt(m); s.maxSpeed *= 1 + 0.05 * m; s.reflect = true; } },
+  { id: 'slipstream', slot: 'booster', name: 'スリップストリーム', rarities: ALL, schemeOnly: 'hyper',
+    desc: (r) => `同じ方向（±${CONFIG.streakAngle}°）へ続けてジャンプするたびに速度 +${pct(0.15 * M(r))}（最大 ${CONFIG.streakMax} 段。速度＝攻撃力）。${CONFIG.streakWindow} 秒途切れるか向きを変えるとリセット`,
+    apply: (s, m) => { s.streakBoost = 0.15 * m; } },
   { id: 'quickTrace', slot: 'booster', name: '高速トレーサー', rarities: ALL, hyperOnly: true,
     desc: (r, scheme) => `${scheme === 'portal' ? '経路を駆け抜ける速さ' : 'ジャンプの速さ'} +${pct(0.3 * M(r))}、最高速度 +${pct(0.04 * M(r))}`,
     apply: (s, m) => { s.traceSpeedMult *= 1 + 0.3 * m; s.maxSpeed *= 1 + 0.04 * m; } },
@@ -1444,8 +1451,9 @@ const MODULES = [
   { id: 'overcharge', slot: 'gen', name: '過充填コンデンサ', rarities: ALL,
     desc: (r, scheme) => scheme === 'portal' ? `突進出力・到達距離・総移動距離 +${pct(0.15 * M(r))}` : scheme === 'hyper' ? `ジャンプの出力 ${pct(1 + 0.15 * M(r))}。最高速度を超えて突っ込む` : `ゲージ上限 ${pct(1 + 0.15 * M(r))}。溜めきると最高速度を超えて突進`,
     apply: (s, m) => { s.gaugeMax = 1 + 0.15 * m; } },
-  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true,
-    desc: (r, scheme) => scheme === 'hyper' ? `敵を貫くたびに次のジャンプが ${pct(0.05 * M(r))} 溜まる、充填時間 -8%` : `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
+  // not in hyperdrive: refilling jumps on hits allowed endless dashing
+  { id: 'regenGen', slot: 'gen', name: '回生ジェネレーター', rarities: ALL, portalExcluded: true, hyperExcluded: true,
+    desc: (r) => `敵を貫くたびに次のゲージが ${pct(0.1 * M(r))} 溜まる、チャージ時間 -8%`,
     apply: (s, m) => { s.regenGauge = 0.1 * m; s.chargeTime *= 0.92; } },
   { id: 'longTrail', slot: 'gen', name: '軌跡延長コイル', rarities: ALL, hyperOnly: true,
     desc: (r, scheme) => `${scheme === 'portal' ? 'ポータルの到達距離・総移動距離' : 'ジャンプの届く距離'} +${pct(0.25 * M(r))}`,
@@ -1518,7 +1526,9 @@ function rollModule(rng, ctx) {
     pool = MODULES.filter((m) => m.slot === slot && (m.minTime || 0) <= t
       && (!m.hyperOnly || !ctx.scheme || isHyperScheme(ctx.scheme) || ctx.scheme === 'portal')
       && (!m.portalOnly || ctx.scheme === 'portal')
-      && (!m.portalExcluded || ctx.scheme !== 'portal'));
+      && (!m.portalExcluded || ctx.scheme !== 'portal')
+      && (!m.hyperExcluded || !isHyperScheme(ctx.scheme))
+      && (!m.schemeOnly || ctx.scheme === m.schemeOnly));
   }
   const rw = rarityWeights(ctx);
   const r = pickWeighted(rng, rw.map((w, i) => [i, w]));
@@ -1573,7 +1583,6 @@ function finishDash(game) {
 function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && isHyperScheme(game.scheme)) addHyperCharge(game, s.regenGauge * 0.5);
 }
 
 function onShipHurt(game) {
@@ -2664,8 +2673,6 @@ const PERK_MAX = 5; // each perk can be taken up to this many times
 const PERKS = [
   { id: 'chainBlast', name: '連鎖爆発', hyperOnly: true,
     desc: (n) => `ハイパードライブ中の3回目ごとのジャンプが着地点で爆発（半径 ${perkBlastRadius(n)}、威力 ジャンプ攻撃力×${perkBlastMult(n).toFixed(1)}）` },
-  { id: 'killRecharge', name: '撃破充填', hyperOnly: true,
-    desc: (n) => `ジャンプ中に倒した敵1体ごとにチャージが ${Math.round(8 * n)}% 溜まる。群れを抜けるほど連鎖が続く` },
   { id: 'fullCharge', name: '満タン突撃', hyperOnly: true,
     desc: (n) => `チャージ満タンから跳んだジャンプは硬い敵にも弾かれず、攻撃力 ×${fullChargePower(n).toFixed(1)}。貯めて待つほど強い一撃` },
   { id: 'crossBlast', name: '交差爆破', hyperOnly: true,
@@ -2830,10 +2837,7 @@ function update(game, frameDt, input) {
   if (game.portalDash) updatePortals(game, frameDt);
   if (game.jump) {
     // jump every frame on real time (world steps are rare while it is nearly frozen)
-    const kills = game.kills;
     runJump(game, frameDt);
-    const refill = perkLevel(game, 'killRecharge');
-    if (refill && game.kills > kills) addHyperCharge(game, (game.kills - kills) * 0.08 * refill);
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
@@ -3188,7 +3192,18 @@ function startJump(game, c) {
   h.chain++;
   onLaunch(game);
   const v = launchVelocity(sh.vx, sh.vy, tgt.ux, tgt.uy, game.stats.gaugeMax, game.stats);
-  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  let speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  // slipstream module: consecutive jumps in about the same direction (soon after the last one ends)
+  // ramp the speed up step by step; the floor is max speed x (1 + boost x steps), so it never compounds
+  const st = h.streak;
+  const same = st && game.portalClock - st.at <= CONFIG.streakWindow &&
+    st.ux * tgt.ux + st.uy * tgt.uy >= Math.cos(CONFIG.streakAngle * Math.PI / 180);
+  h.streak = { n: same ? Math.min(CONFIG.streakMax, st.n + 1) : 0, ux: tgt.ux, uy: tgt.uy, at: game.portalClock };
+  if (game.stats.streakBoost && h.streak.n) {
+    const mult = 1 + game.stats.streakBoost * h.streak.n;
+    speed = Math.max(speed, game.stats.maxSpeed * Math.max(1, game.stats.gaugeMax) * mult);
+    addText(game, sh.x, sh.y - 36, `加速 ×${mult.toFixed(2)}`, '#9fe8ff', 16 + 2 * h.streak.n);
+  }
   sh.vx = tgt.ux * speed; sh.vy = tgt.uy * speed;
   sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
   sh.aimAngle = Math.atan2(tgt.uy, tgt.ux);
@@ -3219,7 +3234,7 @@ function runJump(game, realDt) {
     sh.x = j.from.x + j.ux * j.pos; sh.y = j.from.y + j.uy * j.pos;
     sh.vx = j.ux * j.speed; sh.vy = j.uy * j.speed;
     waveAlong(game, j, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; endJump(game, j); return; }
+    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); return; }
   }
   if (j.pos >= j.len - 1e-9) {
     game.jump = null;
@@ -3247,6 +3262,7 @@ function lineCrossings(lines, p, q) {
 // Perks that go off when a jump ends (landing or bouncing).
 function endJump(game, j) {
   const sh = game.ship;
+  if (game.hyper.streak) game.hyper.streak.at = game.portalClock; // the streak window counts from the landing
   const atk = attackPower(j.speed, game.stats) * j.power;
   const chainN = perkLevel(game, 'chainBlast');
   if (chainN && j.chain % 3 === 0) {
@@ -5783,6 +5799,9 @@ const TUNABLES = [
   { key: 'portalWaveRadius', label: 'ポータル：到着波動の半径', min: 0, max: 600, step: 10 },
   { key: 'portalWaveDamage', label: 'ポータル：到着波動の威力（攻撃力比）', min: 0, max: 3, step: 0.1 },
   { key: 'hyperDecay', label: 'ハイパー：ジャンプ後の減速の強さ（毎秒）', min: 0, max: 6, step: 0.1 },
+  { key: 'streakAngle', label: 'スリップストリーム：同じ方向とみなす角度（°）', min: 5, max: 90, step: 5 },
+  { key: 'streakWindow', label: 'スリップストリーム：途切れるまでの時間（秒）', min: 0.2, max: 5, step: 0.1 },
+  { key: 'streakMax', label: 'スリップストリーム：最大段数', min: 1, max: 10, step: 1 },
   { key: 'enemyAimLag', label: '敵の照準の遅れ(秒)', min: 0, max: 2, step: 0.05 },
   { key: 'enemyAimSpeed', label: '敵の照準が追える速さ', min: 100, max: 3000, step: 50 },
   { key: 'stickRadius', label: 'スティックの半径(px)', min: 30, max: 200, step: 5 },

@@ -25,6 +25,7 @@ export function baseStats(meta = {}) {
     predictTime: 0.9,
     predictBounce: false,
     regen: 0,
+    streakBoost: 0, // slipstream module: extra jump speed per same-direction step
     rangeMult: 1, traceSpeedMult: 1, waveRadiusMult: 1, waveDmgMult: 1, // hyperdrive / portal modules
   };
 }

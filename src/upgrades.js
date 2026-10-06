@@ -10,8 +10,6 @@ export const PERK_MAX = 5; // each perk can be taken up to this many times
 export const PERKS = [
   { id: 'chainBlast', name: '連鎖爆発', hyperOnly: true,
     desc: (n) => `ハイパードライブ中の3回目ごとのジャンプが着地点で爆発（半径 ${perkBlastRadius(n)}、威力 ジャンプ攻撃力×${perkBlastMult(n).toFixed(1)}）` },
-  { id: 'killRecharge', name: '撃破充填', hyperOnly: true,
-    desc: (n) => `ジャンプ中に倒した敵1体ごとにチャージが ${Math.round(8 * n)}% 溜まる。群れを抜けるほど連鎖が続く` },
   { id: 'fullCharge', name: '満タン突撃', hyperOnly: true,
     desc: (n) => `チャージ満タンから跳んだジャンプは硬い敵にも弾かれず、攻撃力 ×${fullChargePower(n).toFixed(1)}。貯めて待つほど強い一撃` },
   { id: 'crossBlast', name: '交差爆破', hyperOnly: true,

@@ -7,7 +7,7 @@ import { queryGrid } from './grid.js';
 import { rollModule } from './modules.js';
 import { dangerAt } from './field.js';
 import { getPhase } from './spawner.js';
-import { refreshStats, addHyperCharge } from './world.js';
+import { refreshStats } from './world.js';
 import { randRange, TAU } from './math.js';
 
 export function createEffectState() {
@@ -38,7 +38,6 @@ function finishDash(game) {
 export function onPierce(game) {
   const s = game.stats, sh = game.ship;
   if (s.regenGauge) sh.gaugeBank = Math.min(s.gaugeMax, sh.gaugeBank + s.regenGauge);
-  if (s.regenGauge && isHyperScheme(game.scheme)) addHyperCharge(game, s.regenGauge * 0.5);
 }
 
 export function onShipHurt(game) {

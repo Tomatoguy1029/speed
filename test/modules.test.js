@@ -126,8 +126,12 @@ test('enclosure blasts are epic/legendary portal drops; obsolete charge modules 
     const m = rollModule(rng, { t: 500, loadout: emptyLoadout(), source: 'capsule', danger: 1, scheme });
     if (scheme === 'portal') {
       seen.add(m.id);
-      assert.ok(!['chargeWave', 'quickCharge', 'regenGen'].includes(m.id));
-    } else assert.notEqual(m.id, 'loopBurst');
+      assert.ok(!['chargeWave', 'quickCharge', 'regenGen', 'slipstream'].includes(m.id));
+    } else {
+      assert.ok(!['loopBurst', 'regenGen'].includes(m.id), 'no hit-recharge in hyperdrive');
+      seen.add(m.id);
+    }
   }
   assert.ok(seen.has('loopBurst'), 'the new module is obtainable through normal loot');
+  assert.ok(seen.has('slipstream'), 'slipstream drops in hyperdrive');
 });

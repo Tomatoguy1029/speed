@@ -84,10 +84,7 @@ export function update(game, frameDt, input) {
   if (game.portalDash) updatePortals(game, frameDt);
   if (game.jump) {
     // jump every frame on real time (world steps are rare while it is nearly frozen)
-    const kills = game.kills;
     runJump(game, frameDt);
-    const refill = perkLevel(game, 'killRecharge');
-    if (refill && game.kills > kills) addHyperCharge(game, (game.kills - kills) * 0.08 * refill);
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
@@ -442,7 +439,18 @@ function startJump(game, c) {
   h.chain++;
   onLaunch(game);
   const v = launchVelocity(sh.vx, sh.vy, tgt.ux, tgt.uy, game.stats.gaugeMax, game.stats);
-  const speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  let speed = Math.max(Math.hypot(v.vx, v.vy), 1);
+  // slipstream module: consecutive jumps in about the same direction (soon after the last one ends)
+  // ramp the speed up step by step; the floor is max speed x (1 + boost x steps), so it never compounds
+  const st = h.streak;
+  const same = st && game.portalClock - st.at <= CONFIG.streakWindow &&
+    st.ux * tgt.ux + st.uy * tgt.uy >= Math.cos(CONFIG.streakAngle * Math.PI / 180);
+  h.streak = { n: same ? Math.min(CONFIG.streakMax, st.n + 1) : 0, ux: tgt.ux, uy: tgt.uy, at: game.portalClock };
+  if (game.stats.streakBoost && h.streak.n) {
+    const mult = 1 + game.stats.streakBoost * h.streak.n;
+    speed = Math.max(speed, game.stats.maxSpeed * Math.max(1, game.stats.gaugeMax) * mult);
+    addText(game, sh.x, sh.y - 36, `加速 ×${mult.toFixed(2)}`, '#9fe8ff', 16 + 2 * h.streak.n);
+  }
   sh.vx = tgt.ux * speed; sh.vy = tgt.uy * speed;
   sh.boostT = game.stats.boostDuration; sh.fadeT = 0; sh.gaugeBank = 0;
   sh.aimAngle = Math.atan2(tgt.uy, tgt.ux);
@@ -473,7 +481,7 @@ function runJump(game, realDt) {
     sh.x = j.from.x + j.ux * j.pos; sh.y = j.from.y + j.uy * j.pos;
     sh.vx = j.ux * j.speed; sh.vy = j.uy * j.speed;
     waveAlong(game, j, x0, y0, sh.x, sh.y);
-    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; endJump(game, j); return; }
+    if (collideEnemies(game, x0, y0, R, j)) { game.jump = null; game.hyper.streak = null; endJump(game, j); return; }
   }
   if (j.pos >= j.len - 1e-9) {
     game.jump = null;
@@ -501,6 +509,7 @@ function lineCrossings(lines, p, q) {
 // Perks that go off when a jump ends (landing or bouncing).
 function endJump(game, j) {
   const sh = game.ship;
+  if (game.hyper.streak) game.hyper.streak.at = game.portalClock; // the streak window counts from the landing
   const atk = attackPower(j.speed, game.stats) * j.power;
   const chainN = perkLevel(game, 'chainBlast');
   if (chainN && j.chain % 3 === 0) {
