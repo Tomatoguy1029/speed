@@ -6,6 +6,7 @@ export function updateEnemyBullets(game, dt, onHit) {
   const R = CONFIG.shipRadius;
   const p = game.field.planet;
   for (const b of game.ebullets) {
+    if (b.life <= 0) continue;
     if (b.kind === 'missile') {
       const t = game.enemyAim || sh; // home on where enemies think the ship is
       const want = Math.atan2(t.y - b.y, t.x - b.x);

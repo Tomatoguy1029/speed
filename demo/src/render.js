@@ -5,6 +5,7 @@ import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
+import { RUN_WEAPONS, RUN_TRAITS, runWeaponStats } from './run-build.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 import { portalChoices } from './portals.js';
@@ -136,6 +137,7 @@ export function render(r, game, dt, pointer) {
   drawPortals(r, game);
   drawPathUi(r, game);
   drawFriendly(r, game, dt);
+  drawRunWeapons(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
@@ -257,7 +259,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
-  return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? '#6dffb0' : RARITIES[c.mod.r].color;
 }
 
 function drawCoins(r, game) {
@@ -296,6 +298,10 @@ function drawCapsules(r, game) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'cache') {
+      ctx.fillStyle = col; ctx.strokeStyle = '#e2fff0'; ctx.lineWidth = 2 / z;
+      ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
+      ctx.fillStyle = '#132f24'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
     } else {
       // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
       drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
@@ -354,6 +360,84 @@ function drawFriendly(r, game, dt) {
     ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
+
+function drawRunWeapons(r, game) {
+  if (!game.newBuild) return;
+  if (game.finale && game.finale.phase !== 'slow') return;
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  // The old lines persist as world effects only when a route-crossing trait uses them.
+  if (game.traits.crossBlast) {
+    ctx.strokeStyle = 'rgba(220,100,220,0.32)'; ctx.lineWidth = 2 / z;
+    for (const p of game.runPaths) {
+      if (p.until <= game.buildClock) continue;
+      ctx.beginPath(); ctx.moveTo(p.a.x, p.a.y); ctx.lineTo(p.b.x, p.b.y); ctx.stroke();
+    }
+  }
+  for (const v of game.vortexes) {
+    if (!onScreen(r, v.x, v.y, v.radius)) continue;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(game.t * 3);
+    ctx.strokeStyle = '#b79aff'; ctx.lineWidth = 3 / z; ctx.globalAlpha = Math.min(0.6, v.life / v.max);
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, 0, v.radius * (0.35 + i * 0.25), i * 2, i * 2 + 2.7); ctx.stroke(); }
+    ctx.restore();
+  }
+  if (game.weapons.barrier) {
+    const L = runWeaponStats('barrier', game.weapons.barrier), st = game.weaponState.barrier;
+    ctx.strokeStyle = st?.blockT > 0 ? 'rgba(118,170,255,0.2)' : 'rgba(118,170,255,0.65)'; ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 70 * L.radius, 0, TAU); ctx.stroke();
+  }
+  for (const d of game.drones) {
+    ctx.strokeStyle = 'rgba(168,255,219,0.55)'; ctx.lineWidth = 3 / z;
+    if (d.trail.length) { ctx.beginPath(); ctx.moveTo(d.trail[0].x, d.trail[0].y); for (const p of d.trail) ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(game.buildClock * 2);
+    ctx.fillStyle = '#a8ffdb'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1 / z;
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(0, 9); ctx.lineTo(-12, 0); ctx.lineTo(0, -9); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  for (const p of game.wproj) {
+    if (!onScreen(r, p.x, p.y, 40)) continue;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.kind === 'disc' ? p.spin : Math.atan2(p.vy, p.vx));
+    ctx.fillStyle = p.kind === 'disc' ? '#6dffb0' : '#ff9f40';
+    if (p.kind === 'disc') { ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.strokeStyle = '#6dffb0'; ctx.lineWidth = 3 / z; ctx.stroke(); ctx.fillRect(-p.r, -2 / z, p.r * 2, 4 / z); }
+    else { ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, 6); ctx.lineTo(-8, -6); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+  for (const b of game.wstate.orbit?.blades || []) {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(-18, -4, 36, 8); ctx.restore();
+  }
+  for (const f of game.wfx) {
+    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
+    if (f.kind === 'beam') {
+      ctx.lineWidth = f.width; ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
+      ctx.lineWidth = Math.max(2 / z, f.width * 0.2); ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    } else if (f.pts) {
+      ctx.strokeStyle = '#a8f0ff'; ctx.lineWidth = 3 / z; ctx.beginPath(); ctx.moveTo(f.pts[0].x, f.pts[0].y); for (const p of f.pts) ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const e of game.enemies) {
+    if (!e.shove || e.shove.time <= 0) continue;
+    ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
+    const sp = Math.hypot(e.vx, e.vy) || 1;
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
+  }
+}
+
+function drawRunLoadout(r, game) {
+  const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
+  ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
+  ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
+  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
+  let row = 0;
+  for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
+    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = d.color;
+    ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
+  }
+  const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
+  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
+  row = 0;
+  for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
+    ctx.fillStyle = '#cfb1f7'; ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
+  }
 }
 
 function drawOverlays(r, game, dt) {
@@ -663,6 +747,9 @@ function drawPathUi(r, game) {
     ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
     ctx.setLineDash([]);
   }
+  if (game.newBuild) {
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill(); return;
+  }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
   for (const [e, t] of pv.targets) {
@@ -694,8 +781,8 @@ function drawDrawingHud(r, game, pointer) {
     : worldToScreen(r, game.ship.x, game.ship.y);
   const frac = clamp(d ? 1 - d.used / d.budget : game.dashMeter, 0, 1);
   const drawing = d?.started;
-  const ready = !d && frac >= 1;
-  const color = ready ? '#ffe46b' : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
+  const ready = !d && frac >= (game.newBuild ? CONFIG.drawMinCharge : 1);
+  const color = ready ? (frac >= 1 ? '#ffe46b' : '#6dffb0') : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
   const radius = 24, x = clamp(p.x, radius + 4, W - radius - 4), y = clamp(p.y, radius + 4, H - radius - 24);
   ctx.save();
   ctx.lineCap = 'round';
@@ -709,7 +796,7 @@ function drawDrawingHud(r, game, pointer) {
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
   const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
   const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
-    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : `クリックで描く ${Math.floor(frac * 100)}%`) : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
@@ -803,7 +890,7 @@ function drawEnemies(r, game) {
       ctx.beginPath(); ctx.arc(Math.cos(e.facing) * R, Math.sin(e.facing) * R, (4 + 8 * e.charge) / Math.sqrt(z), 0, TAU); ctx.fill();
     }
     const pierce = atk >= e.armor;
-    const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
+    const critOnly = !!e.weakArc && !pierce && atk >= e.armor * CRIT_ARMOR;
     // body
     ctx.save();
     ctx.rotate(e.facing);
@@ -974,7 +1061,7 @@ function drawMinimap(r, game) {
     ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
   }
   for (const c of game.capsules) {
-    ctx.fillStyle = c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+    ctx.fillStyle = capsuleColor(c);
     const s2 = c.kind === 'core' ? 3.5 : 2.5;
     ctx.beginPath(); ctx.moveTo(c.x * k, c.y * k - s2); ctx.lineTo(c.x * k + s2, c.y * k); ctx.lineTo(c.x * k, c.y * k + s2); ctx.lineTo(c.x * k - s2, c.y * k); ctx.closePath(); ctx.fill();
   }
@@ -1204,6 +1291,7 @@ function loadoutUnit(r) {
 }
 
 function drawLoadout(r, game) {
+  if (game.newBuild) { drawRunLoadout(r, game); return; }
   const { ctx, H, W } = r;
   const unit = loadoutUnit(r);
   const cx = 12 + unit * 3.4, cy = H - 14 - unit * 3.4;

@@ -38,6 +38,11 @@
   .card .desc { font-size: 13px; color: #cdd6f0; line-height: 1.5; }
   .card.empty { display: flex; align-items: center; justify-content: center; color: #5b6b94; }
   .card.new { border-width: 2px; box-shadow: 0 0 24px rgba(120,160,255,0.15); }
+  .level-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .level-card { text-align: left; white-space: normal; min-height: 210px; cursor: pointer; }
+  .level-card .name { margin-bottom: 12px; }
+  .build-summary { margin-top: 18px; font-size: 12px; line-height: 1.8; color: #b8c6ea; }
+  @media (max-width: 600px) { .level-cards { grid-template-columns: 1fr; gap: 8px; } .level-card { min-height: 0; padding: 12px; } }
   .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
   .loadout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 16px; font-size: 12px; }
   .loadout div { border: 1px solid #1f2b52; border-radius: 6px; padding: 5px 8px; color: #8fa3c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -132,9 +137,18 @@ const CONFIG = {
   spawnRefillTime: 1, // replenish local population deficits in about one world second
   spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
-  atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
+  atkScale: 1, // multiplier of baseAttack; independent of speed
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
+  baseAttack: 10, // damage is independent of travel speed
+  dashChargeTime: 6, // real play seconds for one unit of draw charge
+  drawMinCharge: 0.5, // partial launch distinguishes full-charge traits
+  baseCritChance: 0.05,
+  weaponSlots: 4,
+  traitSlots: 6, // prototype value; adjustable in P
+  pathMemoryTime: 12,
+  pathMemoryMax: 160,
+  droneDelay: 0.12,
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
@@ -220,8 +234,9 @@ const CONFIG = {
   capsuleInterval: 16, // seconds between respawns
 
   // growth
-  xpBase: 10,
-  xpGrowth: 7,
+  xpBase: 60,
+  xpGrowth: 28,
+  xpCurve: 4,
   xpMult: 1,
 
   // flung wreckage visuals
@@ -247,8 +262,8 @@ const CONFIG = {
 
 const SCHEMES = [
   { id: 'portal', name: 'ポータル連続突進（試作）', help: 'WASD／矢印で通常移動、Bで設置（水色・残る）。Space短押しで最寄りポータルへ突進（ゲージ不要）。入場するとポータルに乗る。乗っている間は移動可能な全ポータルへ薄い線が出る。Aで反時計回り、Dで時計回りに行き先を選び、黄色い太線が次の経路。Spaceを短く押して離すと選んだポータルへ移動、0.5秒長押しで離脱。移動可能な接続先がなくなると自動離脱。移動中も次の行き先を選んで出発を予約できる。自動出発はしない。通った辺は往復とも10秒クールダウンし、離脱しても残る。同じ辺は一回のアタック中に再利用できない。ポータルの敵ドロップは停止中。待機中も敵と弾は通常速度で動く。通過軌跡は離脱まで残る' },
-  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
-  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。経験値で高速攻撃ゲージが溜まり、満タンで好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'draw', name: '軌跡を描いて駆け抜ける', help: 'カーソルの方向へ進む（クリック不要。タッチ操作では押した点からずらす仮想スティック）。時間経過で高速攻撃ゲージが溜まり、半分以上で好きな場所をクリックすると、その場所から描画開始。ボタンは離してよく、マウスを動かすだけで軌跡を描ける。再クリックか描ける長さを使い切ると、描き始めの点へワープして軌跡を一瞬でなぞって駆け抜ける。線の終端後も高速を維持し、カーソル／スティックで方向を変えながらザコを貫通し続ける。硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
+  { id: 'draw-wasd', name: 'WASD移動＋マウスで軌跡描画', help: 'WASD／矢印で移動。マウスを動かしても通常移動の方向は変わらない。時間経過で高速攻撃ゲージが溜まり、半分以上で好きな場所をクリックして描画開始。クリックは離してよく、マウスを動かすだけで描ける。再クリックか描ける長さを使い切ると高速で駆け抜ける。描画中の世界の速さはPで0〜1に調整可能。線の終端後も高速を維持し、WASDで方向を変えられる。ザコ貫通では減速せず、硬い敵や障害物への衝突などで通常移動に戻る。残量はカーソル付近の円形ゲージで表示。モジュール選択は線の終了後' },
   { id: 'mouse', name: 'マウスの方向へ進む ＋ Space', help: 'カーソルを置いた方向へ機体が向かう（クリック不要）。Space（またはクリック長押し）でチャージ → 離すとカーソルの方向へ突進' },
   { id: 'steer', name: 'WASD 旋回（画面基準）＋ Space', help: 'WASD で押した方向へ進行方向が素早く回る。Space 長押しでチャージ → 離すと進んでいる方向へ加速' },
   { id: 'relative', name: 'WASD 機体基準 ＋ Space', help: 'W 前進・S ブレーキ・A/D 左右に曲がる（止まっているとその場で旋回）。Space で機体の向きへ加速' },
@@ -512,7 +527,7 @@ function createEnemy(type, level, x, y, opts = {}) {
     xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
     speed: T.speed * (1 + 0.04 * (L - 1)),
     facing: opts.facing ?? 0,
-    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: T.weakArc || 0,
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: 0, // directional weak spots are not part of the current prototype
     hitCD: 0, flash: 0, dead: false,
     state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
     parent: opts.parent || 0,
@@ -692,7 +707,12 @@ function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
-  BEHAVIORS[e.T.behavior](e, game, dt);
+  if (e.shove && e.shove.time > 0) {
+    e.shoveFrom = { x: e.x, y: e.y };
+    e.shove.time -= dt;
+    e.vx = e.shove.vx; e.vy = e.shove.vy;
+    e.shove.vx *= Math.exp(-dt * 0.8); e.shove.vy *= Math.exp(-dt * 0.8);
+  } else BEHAVIORS[e.T.behavior](e, game, dt);
   e.x += e.vx * dt;
   e.y += e.vy * dt;
   // stay out of the planet
@@ -1339,10 +1359,10 @@ function rollModule(rng, ctx) {
 
 
 
-const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
+const CRIT_ARMOR = 0.5; // critical contact needs half the armor; no directional weak spot
 
 function attackPower(speed, stats) {
-  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
+  return CONFIG.baseAttack * stats.atkMult * CONFIG.atkScale * (stats.burstPower || 1);
 }
 
 function isWeakHit(e, hx, hy, arcMult) {
@@ -1356,7 +1376,7 @@ function canPierce(atk, e, crit) {
 }
 
 function resolveRam(atk, e, crit, stats) {
-  if (canPierce(atk, e, crit)) {
+  if (stats.ignoreArmor || canPierce(atk * (stats.armorPierceMult || 1), e, crit)) {
     const damage = atk * (crit ? stats.critMult : 1);
     return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
   }
@@ -1402,6 +1422,885 @@ function queryRadius(grid, x, y, r, cb) {
     const dx = it.x - x, dy = it.y - y, rr = r + (it.r || 0);
     if (dx * dx + dy * dy <= rr * rr) cb(it);
   });
+}
+
+// ---- run-build.js ----
+// The draw prototype's run build. Experimental items remain outside the regular level-up pool.
+
+
+
+const RUN_WEAPONS = [
+  { id: 'forward', catalog: 'W01', name: 'ブラスター', color: '#ffe46b', normal: true, desc: '進行方向へ自動射撃。Lvで威力・連射・弾数・貫通が伸びる' },
+  { id: 'scatter', catalog: 'W02', name: '散弾砲', color: '#ffb36b', normal: true, desc: '進行方向へ扇状の散弾。群れに向けて進むとまとめて当たる' },
+  { id: 'knockback', catalog: 'W03', name: '吹き飛ばし衝角', color: '#ff986b', normal: true, desc: '高速接触で敵の船体を進行方向へ吹き飛ばす。他の敵にぶつかると連鎖ダメージ' },
+  { id: 'contactWave', catalog: 'W04', name: '接触波動', color: '#9fe8ff', normal: true, desc: '高速で敵に接触するたび波動。弾かれた接触でも発動' },
+  { id: 'barrier', catalog: 'W05', name: 'バリアシステム', color: '#76aaff', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
+  { id: 'drone', catalog: 'W06', name: '追走ドローン', color: '#a8ffdb', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
+  { id: 'mines', catalog: 'W07', name: '軌跡機雷', color: '#ff7b54', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
+  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', color: '#ffffff', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。通常移動でも周期発動' },
+  { id: 'orbit', catalog: 'W09', name: 'オービットブレード', color: '#9fe8ff', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
+  { id: 'disc', catalog: 'W10', name: 'リターンディスク', color: '#6dffb0', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
+  { id: 'missile', catalog: 'W11', name: '追尾ミサイル', color: '#ff9f40', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
+  { id: 'arc', catalog: 'W12', name: 'アークコイル', color: '#a8f0ff', group: '保留', desc: '近くの敵から敵へ稲妻が連鎖。通常抽選には出ない' },
+  { id: 'turret', catalog: 'W13', name: '自動砲台', color: '#9fe8ff', group: '既存候補', desc: '最寄りの敵へ自動射撃' },
+  { id: 'nova', catalog: 'W14', name: 'パルスノヴァ', color: '#c995ff', group: '既存候補', desc: '自機中心に周期衝撃波' },
+  { id: 'laser', catalog: 'W15', name: 'レーザーランス', color: '#ff6bd5', group: '既存候補', desc: '最寄りの敵へ貫通ビーム' },
+  { id: 'trailBurst', catalog: 'W16', name: '軌跡炸裂', color: '#ffcf6b', group: '既存候補', desc: '高速で通った位置が遅れて爆発' },
+];
+
+const RUN_TRAITS = [
+  { id: 'endBlast', catalog: 'T01', name: '終端爆縮', normal: true, desc: n => `高速移動の終点で爆発。半径${180 + n * 30}、威力×${(1 + n * 0.5).toFixed(1)}` },
+  { id: 'crossBlast', catalog: 'T02', name: '交差爆破', normal: true, desc: n => `過去${CONFIG.pathMemoryTime}秒の高速軌跡を横切ると交点で爆発。半径${100 + n * 25}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
+  { id: 'vortex', catalog: 'T03', name: '余韻の渦', normal: true, desc: n => `終点に${(1.5 + n * 0.4).toFixed(1)}秒の渦。半径${180 + n * 35}の敵を引き寄せる` },
+  { id: 'fullCharge', catalog: 'T04', name: '満タン突撃', normal: true, desc: n => `満タン発動の経路移動中は装甲を無視し、攻撃力×${(1.25 + n * 0.25).toFixed(2)}。半分の充填から通常発動も可能` },
+  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${230 + n * 40}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
+  { id: 'critBeam', catalog: 'T06', name: 'クリティカルランス', normal: true, desc: n => `クリティカル時に突進方向へ貫通ビーム。射程${480 + n * 100}、威力×${(0.8 + n * 0.4).toFixed(1)}。ビームからは再発動しない` },
+  { id: 'quickCharge', catalog: 'T07', name: '急速充填', normal: true, desc: n => `時間チャージの充填速度 +${n * 25}%` },
+  { id: 'capacity', catalog: 'T08', name: '大容量チャージ', normal: true, desc: n => `チャージ容量 +${n * 20}%。満タンまでの時間と描ける長さが伸びる（回数ストックではない）` },
+  { id: 'critRate', catalog: 'T09', name: 'クリティカル率', normal: true, desc: n => `クリティカル率 +${n * 8}%（基礎${Math.round(CONFIG.baseCritChance * 100)}%）。弱点方向を狙う必要はない` },
+  { id: 'speed', catalog: 'T10', name: '最高速度', normal: true, desc: n => `最高速度 +${n * 12}%。攻撃力とは独立` },
+  { id: 'attack', catalog: 'T11', name: '攻撃力', normal: true, desc: n => `全攻撃の攻撃力倍率 +${n * 20}%` },
+  { id: 'pickup', catalog: 'T12', name: '広域回収', normal: true, desc: n => `回収範囲 +${n * 30}%` },
+  { id: 'reactive', catalog: 'T13', name: '反応波動', normal: true, desc: n => `被弾時に半径${170 + n * 30}へ衝撃波。威力×${(0.8 + n * 0.4).toFixed(1)}` },
+  { id: 'length', catalog: 'T14', name: '軌跡延長', normal: true, desc: n => `描ける軌跡の長さ +${n * 25}%` },
+  { id: 'wave', catalog: 'T15', name: '波動増幅', group: '既存候補', desc: n => `軌跡の波動範囲 +${n * 25}%、威力 +${n * 30}%` },
+  { id: 'loop', catalog: 'T16', name: '包囲炸裂', group: '既存候補', desc: n => `高速軌跡で囲んだ敵へ威力×${(1 + n * 0.6).toFixed(1)}の爆発。3重ね以上では周囲へも波及` },
+  { id: 'traceSpeed', catalog: 'T17', name: '高速トレーサー', group: '既存候補', desc: n => `経路の実行速度 +${n * 25}%` },
+  { id: 'hp', catalog: 'T18', name: '複合装甲', group: '既存候補', desc: n => `最大HP +${n * 25}` },
+  { id: 'guard', catalog: 'T19', name: '衝撃吸収', group: '既存候補', desc: n => `被ダメージ・被弾時の減速を${Math.round((1 - 1 / (1 + n * 0.2)) * 100)}%軽減` },
+  { id: 'regen', catalog: 'T20', name: '自己修復', group: '既存候補', desc: n => `毎秒HPを${(n * 0.8).toFixed(1)}回復` },
+  { id: 'reflect', catalog: 'T21', name: '反射スラスター', group: '既存候補', desc: n => `弾かれた際の速度を${Math.min(95, 65 + n * 6)}%保持し、衝突ダメージ軽減` },
+  { id: 'pierce', catalog: 'T22', name: '貫通弾頭', group: '既存候補', desc: n => `高速接触の装甲判定を${Math.round((1 - 1 / (1 + n * 0.2)) * 100)}%緩和（軌跡移動の減速軽減は不要）` },
+  { id: 'inertia', catalog: 'T23', name: '慣性保持', group: '既存候補', desc: n => `衝突後の加速持続 +${n * 30}%、突進への速度持ち越し +${n * 5}%` },
+  { id: 'recovery', catalog: 'T24', name: '回生充填', group: '既存候補', desc: n => `高速貫通のたびチャージ容量の${n * 2}%回復` },
+];
+
+function runModuleDef(kind, id) {
+  return (kind === 'weapon' ? RUN_WEAPONS : RUN_TRAITS).find(d => d.id === id);
+}
+
+function runItemCount(items) { return Object.values(items).filter(n => n > 0).length; }
+function runTrait(game, id) { return game.traits?.[id] || 0; }
+
+function runWeaponStats(id, level) {
+  const n = Math.max(0, Math.min(8, level) - 1);
+  return { damage: 1 + n * 0.3, rate: 1 + n * 0.12, radius: 1 + n * 0.1,
+    shots: id === 'scatter' ? 5 + Math.floor(n / 2) : 1 + Math.floor(n / 3),
+    pierce: Math.floor(n / 3), drones: 1 + Math.floor(n / 2) };
+}
+
+function computeRunStats(meta, weapons, traits, bonus = {}) {
+  const s = baseStats(meta), n = id => traits[id] || 0;
+  s.runBuild = true;
+  s.atkMult *= (1 + CONFIG.levelAtkGrowth * (bonus.level || 0)) * (1 + n('attack') * 0.2);
+  s.maxSpeed *= (1 + CONFIG.levelSpeedGrowth * (bonus.level || 0)) * (1 + CONFIG.coreBoost * (bonus.cores || 0)) * (1 + n('speed') * 0.12);
+  s.maxHp += CONFIG.levelHpGrowth * (bonus.level || 0) + n('hp') * 25;
+  s.gaugeMax = 1 + n('capacity') * 0.2;
+  s.chargeTime = CONFIG.dashChargeTime * Math.pow(0.95, meta.charge || 0) / (1 + n('quickCharge') * 0.25);
+  s.critChance = Math.min(0.9, CONFIG.baseCritChance + n('critRate') * 0.08);
+  s.pickupRadius *= 1 + n('pickup') * 0.3;
+  s.drawLengthMult *= 1 + n('length') * 0.25;
+  s.traceSpeedMult *= 1 + n('traceSpeed') * 0.25;
+  s.waveRadiusMult *= 1 + n('wave') * 0.25;
+  s.waveDmgMult *= 1 + n('wave') * 0.3;
+  s.damageTakenMult /= 1 + n('guard') * 0.2;
+  s.hitSlowMult /= 1 + n('guard') * 0.2;
+  s.regen += n('regen') * 0.8;
+  s.armorPierceMult = 1 + n('pierce') * 0.2;
+  if (n('reflect')) { s.reflect = true; s.bounceKeep = Math.min(0.95, 0.65 + n('reflect') * 0.06); s.bounceDamageMult = 1 / (1 + n('reflect') * 0.2); }
+  s.boostDuration *= 1 + n('inertia') * 0.3;
+  s.carry = Math.min(0.95, s.carry + n('inertia') * 0.05);
+  if (n('loop')) s.loopBurst = { mult: 1 + n('loop') * 0.6, splash: n('loop') >= 3 };
+  return s;
+}
+
+function rollRunChoices(game) {
+  const pool = [];
+  for (const [kind, defs, owned, slots, max] of [
+    ['weapon', RUN_WEAPONS, game.weapons, CONFIG.weaponSlots, 8],
+    ['trait', RUN_TRAITS, game.traits, CONFIG.traitSlots, 5],
+  ]) {
+    const free = runItemCount(owned) < slots;
+    for (const d of defs) {
+      const lv = owned[d.id] || 0;
+      if ((!d.normal && !lv) || lv >= max || (!lv && !free)) continue;
+      pool.push({ kind, id: d.id, level: lv + 1, weight: lv ? 1.6 : 1 });
+    }
+  }
+  const out = [];
+  while (out.length < 3 && pool.length) {
+    let roll = game.rng() * pool.reduce((sum, c) => sum + c.weight, 0), i = 0;
+    while (i < pool.length - 1 && roll >= pool[i].weight) { roll -= pool[i].weight; i++; }
+    out.push(pool.splice(i, 1)[0]);
+  }
+  // All remaining eligible items are still shown; healing fills only otherwise empty slots.
+  while (out.length < 3) out.push({ kind: 'heal', id: `heal${out.length}`, level: 1 });
+  return out;
+}
+
+function runChoiceInfo(c) {
+  if (c.kind === 'heal') return { tag: '回復', name: '緊急修理', color: '#6dffb0', desc: 'HPを30%回復（取得・強化できる装備が残り少ない場合）' };
+  const d = runModuleDef(c.kind, c.id);
+  const suffix = c.kind === 'weapon' ? `Lv${c.level}` : `${c.level}/5`;
+  const tag = c.level === 1 ? (c.kind === 'weapon' ? '新しい武器' : '新しい特性') : (c.kind === 'weapon' ? '武器強化' : '特性強化');
+  let desc = c.kind === 'weapon' ? d.desc : d.desc(c.level);
+  if (c.kind === 'weapon' && c.level > 1 && (d.normal || ['turret', 'trailBurst'].includes(c.id))) {
+    const before = runWeaponStats(c.id, c.level - 1), after = runWeaponStats(c.id, c.level);
+    desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
+    if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
+    else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
+    else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * (c.level - 1)}→${800 + 90 * c.level}`;
+    else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
+  }
+  return { tag, name: `${d.name} ${suffix}`, desc, color: d.color || '#c995ff' };
+}
+
+function grantRunItem(game, kind, id, levels = 1) {
+  const def = runModuleDef(kind, id);
+  if (!def) return false;
+  const owned = kind === 'weapon' ? game.weapons : game.traits;
+  const max = kind === 'weapon' ? 8 : 5, slots = kind === 'weapon' ? CONFIG.weaponSlots : CONFIG.traitSlots;
+  if (!owned[id] && runItemCount(owned) >= slots) return false;
+  if ((owned[id] || 0) >= max) return false;
+  owned[id] = Math.min(max, (owned[id] || 0) + levels);
+  return true;
+}
+
+// ---- experimental-weapons.js ----
+// Weapons gained and upgraded through level-ups (Vampire Survivors style). Each weapon has 8 levels;
+// damage scales with the attack multiplier (level, modules, station), never with speed. No weapon
+// starts an attack during a jump; projectiles already flying keep going on world time.
+
+
+
+
+
+// Builds cumulative per-level stats: level 1 = base, each step edits a copy of the previous level.
+function ladder(base, steps) {
+  const out = [{ ...base, text: null }];
+  for (const [text, edit] of steps) {
+    const s = { ...out[out.length - 1], text };
+    edit(s);
+    out.push(s);
+  }
+  return out;
+}
+
+const GUN_LEVELS = ladder({ dmg: 1, rate: 1, shots: 1, pierce: 0 }, [
+  ['威力 +30%', (s) => { s.dmg = 1.3; }],
+  ['弾 +1', (s) => { s.shots = 2; }],
+  ['連射 +30%', (s) => { s.rate = 1.3; }],
+  ['貫通 +1', (s) => { s.pierce = 1; }],
+  ['弾 +1', (s) => { s.shots = 3; }],
+  ['威力 +40%', (s) => { s.dmg = 1.8; }],
+  ['貫通 +2、連射 +25%', (s) => { s.pierce = 3; s.rate = 1.6; }],
+]);
+
+const MISSILE_LEVELS = ladder({ count: 1, dmg: 1, radius: 70, rate: 1 }, [
+  ['ミサイル +1', (s) => { s.count++; }],
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['爆発範囲 +25%', (s) => { s.radius *= 1.25; }],
+  ['ミサイル +1', (s) => { s.count++; }],
+  ['発射間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['ミサイル +1', (s) => { s.count++; }],
+  ['威力 +40%、爆発範囲 +20%', (s) => { s.dmg *= 1.4; s.radius *= 1.2; }],
+]);
+
+const ORBIT_LEVELS = ladder({ blades: 2, dmg: 1, dist: 90, spin: 3.2 }, [
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['刃 +1', (s) => { s.blades++; }],
+  ['回転半径 +25%、回転 +20%', (s) => { s.dist *= 1.25; s.spin *= 1.2; }],
+  ['刃 +1', (s) => { s.blades++; }],
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['刃 +1', (s) => { s.blades++; }],
+  ['回転半径 +25%、威力 +30%', (s) => { s.dist *= 1.25; s.dmg *= 1.3; }],
+]);
+
+const NOVA_LEVELS = ladder({ radius: 180, dmg: 1, rate: 1 }, [
+  ['範囲 +20%', (s) => { s.radius *= 1.2; }],
+  ['威力 +40%', (s) => { s.dmg *= 1.4; }],
+  ['間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['範囲 +20%', (s) => { s.radius *= 1.2; }],
+  ['威力 +40%', (s) => { s.dmg *= 1.4; }],
+  ['間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['範囲 +25%、威力 +40%', (s) => { s.radius *= 1.25; s.dmg *= 1.4; }],
+]);
+
+const ARC_LEVELS = ladder({ chains: 3, dmg: 1, rate: 1, reach: 220, bolts: 1 }, [
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['連鎖 +2', (s) => { s.chains += 2; }],
+  ['発射間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['連鎖 +2、飛び移る距離 +20%', (s) => { s.chains += 2; s.reach *= 1.2; }],
+  ['稲妻 +1', (s) => { s.bolts++; }],
+  ['威力 +40%、連鎖 +3', (s) => { s.dmg *= 1.4; s.chains += 3; }],
+]);
+
+const LASER_LEVELS = ladder({ beams: 1, dmg: 1, width: 14, length: 700, rate: 1 }, [
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['太さ +50%', (s) => { s.width *= 1.5; }],
+  ['発射間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['長さ +30%', (s) => { s.length *= 1.3; }],
+  ['ビーム +1', (s) => { s.beams++; }],
+  ['威力 +40%', (s) => { s.dmg *= 1.4; }],
+  ['ビーム +1、太さ +30%', (s) => { s.beams++; s.width *= 1.3; }],
+]);
+
+const DISC_LEVELS = ladder({ discs: 1, dmg: 1, size: 16, rate: 1 }, [
+  ['威力 +30%', (s) => { s.dmg *= 1.3; }],
+  ['ディスク +1', (s) => { s.discs++; }],
+  ['大きさ +40%', (s) => { s.size *= 1.4; }],
+  ['発射間隔 -20%', (s) => { s.rate *= 1.25; }],
+  ['ディスク +1', (s) => { s.discs++; }],
+  ['威力 +40%', (s) => { s.dmg *= 1.4; }],
+  ['ディスク +1、大きさ +30%', (s) => { s.discs++; s.size *= 1.3; }],
+]);
+
+// fire(game, L, st): one attack. interval: seconds between attacks at rate 1 (omit for always-on weapons).
+const WEAPONS = [
+  { id: 'gun', name: 'ブラスター', color: '#ffe46b', levels: GUN_LEVELS, // interval from CONFIG.gunRate (tunable)
+    desc: '進行方向へ弾を撃つ（止まっていても最後に進んだ方向へ）', fire: fireGun },
+  { id: 'missile', name: '追尾ミサイル', color: '#ff9f40', levels: MISSILE_LEVELS, interval: 1.6,
+    desc: '近くの敵を追いかけて小さく爆発するミサイル', fire: fireMissiles },
+  { id: 'orbit', name: 'オービットブレード', color: '#9fe8ff', levels: ORBIT_LEVELS,
+    desc: '機体の周りを回り続ける刃。触れた敵を切り続ける', fire: null },
+  { id: 'nova', name: 'パルスノヴァ', color: '#c995ff', levels: NOVA_LEVELS, interval: 2.5,
+    desc: '一定間隔で機体から衝撃波を放ち、周りの敵を押し返す', fire: fireNova },
+  { id: 'arc', name: 'アークコイル', color: '#a8f0ff', levels: ARC_LEVELS, interval: 1.2,
+    desc: '近くの敵に稲妻を落とし、次々と飛び移る', fire: fireArc },
+  { id: 'laser', name: 'レーザーランス', color: '#ff6bd5', levels: LASER_LEVELS, interval: 2.2,
+    desc: '最も近い敵の方向へ、すべてを貫く長いビームを撃つ', fire: fireLaser },
+  { id: 'disc', name: 'リターンディスク', color: '#6dffb0', levels: DISC_LEVELS, interval: 1.8,
+    desc: '敵の方へ投げると戻ってくる刃。行きも帰りも貫く', fire: fireDiscs },
+];
+
+const WEAPON_DEFS = Object.fromEntries(WEAPONS.map((w) => [w.id, w]));
+
+function weaponDef(id) {
+  return WEAPON_DEFS[id];
+}
+
+function weaponCount(game) {
+  return Object.values(game.weapons).filter((lv) => lv > 0).length;
+}
+
+const wdmg = (game, base) => base * game.stats.atkMult * CONFIG.atkScale * (game.stats.burstPower || 1);
+
+// Nearest live enemies to (x, y) within range, closest first.
+function nearestEnemies(game, x, y, range, n, skip) {
+  const found = [];
+  queryGrid(game.grid, x - range - MAX_ENEMY_R, y - range - MAX_ENEMY_R, x + range + MAX_ENEMY_R, y + range + MAX_ENEMY_R, (e) => {
+    if (e.dead || (skip && skip.has(e.id))) return;
+    const d = Math.hypot(e.x - x, e.y - y) - e.r;
+    if (d <= range) found.push({ e, d });
+  });
+  found.sort((a, b) => a.d - b.d);
+  return found.slice(0, n).map((f) => f.e);
+}
+
+function aimAt(game, target) {
+  const sh = game.ship;
+  if (target) return Math.atan2(target.y - sh.y, target.x - sh.x);
+  return Math.atan2(sh.hy, sh.hx);
+}
+
+function updateWeapons(game, dt) {
+  const busy = game.draw || game.portalDash;
+  for (const w of WEAPONS) {
+    const lv = game.weapons[w.id] || 0;
+    if (!lv || w.id === 'gun') continue;
+    const L = w.levels[lv - 1];
+    const st = game.wstate[w.id] || (game.wstate[w.id] = { t: 0 });
+    if (w.id === 'orbit') { updateOrbit(game, L, st, dt); continue; }
+    if (busy) continue;
+    st.t += dt;
+    if (st.t < (w.interval ?? 1 / CONFIG.gunRate) / (L.rate || 1)) continue;
+    if (w.fire(game, L, st) !== false) st.t = 0;
+  }
+  updateWeaponProjectiles(game, dt);
+  for (const f of game.wfx) f.life -= dt;
+  if (game.wfx.length) game.wfx = game.wfx.filter((f) => f.life > 0);
+}
+
+function fireGun(game, L) {
+  const sh = game.ship;
+  const base = Math.atan2(sh.hy, sh.hx);
+  const dmg = wdmg(game, CONFIG.gunDamage * L.dmg);
+  for (let i = 0; i < L.shots; i++) {
+    const a = base + (i - (L.shots - 1) / 2) * CONFIG.gunSpread;
+    game.fbullets.push({ kind: 'gun', x: sh.x, y: sh.y, vx: Math.cos(a) * CONFIG.gunSpeed + sh.vx, vy: Math.sin(a) * CONFIG.gunSpeed + sh.vy,
+      r: 5, dmg, life: CONFIG.gunLife, pierce: false, pierceLeft: L.pierce, hit: new Set(), color: '#ffe46b' });
+  }
+  game.events.push({ type: 'turret' });
+}
+
+function fireMissiles(game, L) {
+  const sh = game.ship;
+  const targets = nearestEnemies(game, sh.x, sh.y, 750, L.count);
+  if (!targets.length) return false;
+  for (let i = 0; i < L.count; i++) {
+    const t = targets[i % targets.length];
+    const a = aimAt(game, t) + (i - (L.count - 1) / 2) * 0.5;
+    game.wproj.push({ kind: 'missile', x: sh.x, y: sh.y, vx: Math.cos(a) * 420, vy: Math.sin(a) * 420, target: t, life: 2.5,
+      dmg: wdmg(game, 8 * L.dmg), radius: L.radius });
+  }
+  game.events.push({ type: 'shoot' });
+}
+
+function fireNova(game, L) {
+  const sh = game.ship;
+  explode(game, sh.x, sh.y, L.radius, wdmg(game, 6 * L.dmg), { cause: 'nova', color: '#c995ff', knock: 380, life: 0.5 });
+}
+
+function fireArc(game, L) {
+  const sh = game.ship;
+  const hit = new Set();
+  let any = false;
+  for (let b = 0; b < L.bolts; b++) {
+    let from = { x: sh.x, y: sh.y };
+    const pts = [from];
+    let next = nearestEnemies(game, sh.x, sh.y, 450, 1, hit)[0];
+    for (let k = 0; k < L.chains && next; k++) {
+      hit.add(next.id);
+      pts.push({ x: next.x, y: next.y });
+      damageEnemy(game, next, wdmg(game, 7 * L.dmg), { cause: 'arc', dirX: (next.x - from.x) / (Math.hypot(next.x - from.x, next.y - from.y) || 1), dirY: (next.y - from.y) / (Math.hypot(next.x - from.x, next.y - from.y) || 1), knock: 120 });
+      from = next;
+      next = nearestEnemies(game, from.x, from.y, L.reach, 1, hit)[0];
+    }
+    if (pts.length > 1) { any = true; game.wfx.push({ kind: 'bolt', pts, life: 0.18, max: 0.18 }); }
+  }
+  if (!any) return false;
+  game.events.push({ type: 'shoot' });
+}
+
+function fireLaser(game, L) {
+  const sh = game.ship;
+  const targets = nearestEnemies(game, sh.x, sh.y, L.length, L.beams);
+  if (!targets.length) return false;
+  const dmg = wdmg(game, 10 * L.dmg);
+  for (let i = 0; i < L.beams; i++) {
+    const a = aimAt(game, targets[i % targets.length]) + (i >= targets.length ? 0.4 * i : 0);
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const x1 = sh.x + ux * L.length, y1 = sh.y + uy * L.length, half = L.width / 2;
+    queryGrid(game.grid, Math.min(sh.x, x1) - half - MAX_ENEMY_R, Math.min(sh.y, y1) - half - MAX_ENEMY_R,
+      Math.max(sh.x, x1) + half + MAX_ENEMY_R, Math.max(sh.y, y1) + half + MAX_ENEMY_R, (e) => {
+        if (e.dead) return;
+        const t = Math.max(0, Math.min(L.length, (e.x - sh.x) * ux + (e.y - sh.y) * uy));
+        if (Math.hypot(sh.x + ux * t - e.x, sh.y + uy * t - e.y) > e.r + half) return;
+        damageEnemy(game, e, dmg, { cause: 'laser', dirX: ux, dirY: uy, knock: 140 });
+      });
+    game.wfx.push({ kind: 'beam', x0: sh.x, y0: sh.y, x1, y1, width: L.width, life: 0.22, max: 0.22 });
+  }
+  game.events.push({ type: 'shoot' });
+}
+
+function fireDiscs(game, L) {
+  const sh = game.ship;
+  const t = nearestEnemies(game, sh.x, sh.y, 600, 1)[0];
+  const base = aimAt(game, t);
+  for (let i = 0; i < L.discs; i++) {
+    const a = base + (i - (L.discs - 1) / 2) * 0.45;
+    game.wproj.push({ kind: 'disc', x: sh.x, y: sh.y, vx: Math.cos(a) * 950 + sh.vx * 0.5, vy: Math.sin(a) * 950 + sh.vy * 0.5,
+      ax: -Math.cos(a) * 1300, ay: -Math.sin(a) * 1300, life: 1.6, r: L.size, dmg: wdmg(game, 6 * L.dmg), hits: new Map(), spin: 0 });
+  }
+}
+
+// Orbit blades are always out (even during jumps); each enemy can be cut again every 0.4 s.
+function updateOrbit(game, L, st, dt) {
+  const sh = game.ship;
+  st.angle = (st.angle || 0) + L.spin * dt;
+  st.hits = st.hits || new Map();
+  const dmg = wdmg(game, 4 * L.dmg), R = 14;
+  st.blades = [];
+  for (let i = 0; i < L.blades; i++) {
+    const a = st.angle + i * Math.PI * 2 / L.blades;
+    const bx = sh.x + Math.cos(a) * L.dist, by = sh.y + Math.sin(a) * L.dist;
+    st.blades.push({ x: bx, y: by, a });
+    queryGrid(game.grid, bx - R - MAX_ENEMY_R, by - R - MAX_ENEMY_R, bx + R + MAX_ENEMY_R, by + R + MAX_ENEMY_R, (e) => {
+      if (e.dead || (st.hits.get(e.id) || 0) > game.t) return;
+      const d = Math.hypot(e.x - bx, e.y - by);
+      if (d > e.r + R) return;
+      st.hits.set(e.id, game.t + 0.4);
+      damageEnemy(game, e, dmg, { cause: 'orbit', dirX: (e.x - sh.x) / (Math.hypot(e.x - sh.x, e.y - sh.y) || 1), dirY: (e.y - sh.y) / (Math.hypot(e.x - sh.x, e.y - sh.y) || 1), knock: 200 });
+    });
+  }
+  if (st.hits.size > 400) for (const [id, until] of st.hits) if (until <= game.t) st.hits.delete(id);
+}
+
+function updateWeaponProjectiles(game, dt) {
+  const P = game.wproj;
+  if (!P.length) return;
+  for (const p of P) {
+    p.life -= dt;
+    if (p.kind === 'missile') {
+      if (!p.target || p.target.dead) p.target = nearestEnemies(game, p.x, p.y, 600, 1)[0] || null;
+      const sp = Math.hypot(p.vx, p.vy) || 1;
+      let a = Math.atan2(p.vy, p.vx);
+      if (p.target) {
+        const want = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+        const d = Math.atan2(Math.sin(want - a), Math.cos(want - a));
+        a += Math.max(-6 * dt, Math.min(6 * dt, d));
+      }
+      const v = Math.min(900, sp + 900 * dt);
+      p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      let boom = p.life <= 0;
+      if (!boom) {
+        queryGrid(game.grid, p.x - 10 - MAX_ENEMY_R, p.y - 10 - MAX_ENEMY_R, p.x + 10 + MAX_ENEMY_R, p.y + 10 + MAX_ENEMY_R, (e) => {
+          if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 10) boom = true;
+        });
+      }
+      if (boom) { explode(game, p.x, p.y, p.radius, p.dmg, { cause: 'missile', color: '#ff9f40', knock: 260, life: 0.3 }); p.life = 0; }
+    } else if (p.kind === 'disc') {
+      p.vx += p.ax * dt; p.vy += p.ay * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.spin += dt * 14;
+      queryGrid(game.grid, p.x - p.r - MAX_ENEMY_R, p.y - p.r - MAX_ENEMY_R, p.x + p.r + MAX_ENEMY_R, p.y + p.r + MAX_ENEMY_R, (e) => {
+        if (e.dead || (p.hits.get(e.id) || 0) > game.t) return;
+        if (Math.hypot(e.x - p.x, e.y - p.y) > e.r + p.r) return;
+        p.hits.set(e.id, game.t + 0.35);
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        damageEnemy(game, e, p.dmg, { cause: 'disc', dirX: p.vx / sp, dirY: p.vy / sp, knock: 180 });
+      });
+    }
+  }
+  game.wproj = P.filter((p) => p.life > 0);
+}
+
+// ---- portal-loops.js ----
+
+
+
+
+function portalLoopCross(a, b, c, d) {
+  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+  const cross = rx * sy - ry * sx;
+  if (Math.abs(cross) < 1e-9) return null; // retracing a line encloses no area
+  const dx = c.x - a.x, dy = c.y - a.y;
+  const t = (dx * sy - dy * sx) / cross, u = (dx * ry - dy * rx) / cross;
+  if (t <= 1e-6 || t > 1 + 1e-6 || u < -1e-6 || u > 1 + 1e-6) return null;
+  return { x: a.x + rx * t, y: a.y + ry * t, t };
+}
+
+function portalLoopArea(points) {
+  let twice = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    twice += points[j].x * points[i].y - points[i].x * points[j].y;
+  }
+  return Math.abs(twice) / 2;
+}
+
+function portalLoopContains(points, x, y) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[j], b = points[i];
+    const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+    if (Math.abs(cross) < 1e-6 && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x)
+      && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) return true;
+    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+function portalLoopExplode(game, dash, points, area) {
+  const effect = game.stats.loopBurst;
+  const dmg = attackPower(dash.speed, game.stats) * effect.mult;
+  const color = effect.splash ? '#ffb340' : '#c46bff';
+  const center = points.reduce((c, p) => ({ x: c.x + p.x / points.length, y: c.y + p.y / points.length }), { x: 0, y: 0 });
+  // Snapshot the enclosed targets: secondary blasts cannot recursively create more blasts.
+  const targets = game.enemies.filter((e) => !e.dead && portalLoopContains(points, e.x, e.y));
+  for (const e of targets) {
+    const dx = e.x - center.x, dy = e.y - center.y, dist = Math.hypot(dx, dy) || 1;
+    damageEnemy(game, e, dmg, { cause: 'portalLoop', dirX: dx / dist, dirY: dy / dist, knock: 500 });
+    addRing(game, e.x, e.y, e.r + 28, color, 0.4);
+    burst(game, e.x, e.y, color, 12, 0, 0, 360);
+  }
+  if (effect.splash) for (const e of targets) explode(game, e.x, e.y, CONFIG.portalLoopSplashRadius,
+    dmg * CONFIG.portalLoopSplashDamage, { cause: 'portalLoopSplash', color, knock: 350, life: 0.4 });
+  game.fx.loops.push({ points, color, life: 0.6, max: 0.6 });
+  addText(game, center.x, center.y, `包囲炸裂 ${targets.length}`, color, 24);
+  game.events.push({ type: 'explode', x: center.x, y: center.y, radius: Math.sqrt(area / Math.PI), cause: 'portalLoop', enclosed: targets.length });
+}
+
+// Test only traveled movement. Closing across an old segment works before reaching a portal.
+function tracePortalLoop(game, dash, x0, y0, x1, y1) {
+  if (!game.stats.loopBurst || dash.loopPath.length < 3) return;
+  let start = { x: x0, y: y0 }, end = { x: x1, y: y1 };
+  let attempts = dash.loopPath.length;
+  while (attempts-- > 0) {
+    const path = dash.loopPath;
+    let first = null;
+    for (let i = 0; i < path.length - 1; i++) {
+      const hit = portalLoopCross(start, end, path[i], path[i + 1]);
+      if (!hit || (first && hit.t >= first.hit.t)) continue;
+      const points = [{ x: hit.x, y: hit.y }, ...path.slice(i + 1)];
+      const area = portalLoopArea(points);
+      if (area >= CONFIG.portalLoopMinArea) first = { hit, points, area, i };
+    }
+    if (!first) return;
+    portalLoopExplode(game, dash, first.points, first.area);
+    const hit = { x: first.hit.x, y: first.hit.y };
+    // Consume the closed portion while retaining the earlier open prefix and the live tail.
+    dash.loopPath = path.slice(0, first.i + 1);
+    const last = dash.loopPath[dash.loopPath.length - 1];
+    if (Math.hypot(last.x - hit.x, last.y - hit.y) > 1e-6) dash.loopPath.push(hit);
+    start = hit;
+  }
+}
+
+// ---- run-weapons.js ----
+// Weapon actions and route traits for the draw prototype. All damage uses attack stats.
+
+
+
+
+
+
+
+
+
+
+function runNearest(game, x, y, range) {
+  let found = null, best = range * range;
+  queryGrid(game.grid, x - range - MAX_ENEMY_R, y - range - MAX_ENEMY_R, x + range + MAX_ENEMY_R, y + range + MAX_ENEMY_R, e => {
+    if (e.dead) return;
+    const d = (e.x - x) ** 2 + (e.y - y) ** 2;
+    if (d < best) { best = d; found = e; }
+  });
+  return found;
+}
+
+function runShot(game, x, y, angle, damage, options = {}) {
+  const speed = options.speed || 1300;
+  game.fbullets.push({ kind: 'runShot', x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+    r: options.r || 5, dmg: damage, life: options.life || 0.9, pierce: false,
+    pierceLeft: options.pierce || 0, hit: new Set(), color: options.color || '#ffe46b' });
+}
+
+function runBeam(game, x, y, ux, uy, length, width, dmg, cause = 'critBeam') {
+  const x1 = x + ux * length, y1 = y + uy * length, pad = width / 2 + MAX_ENEMY_R;
+  queryGrid(game.grid, Math.min(x, x1) - pad, Math.min(y, y1) - pad, Math.max(x, x1) + pad, Math.max(y, y1) + pad, e => {
+    if (e.dead || segCircleT(x, y, x1, y1, e.x, e.y, e.r + width / 2) < 0) return;
+    damageEnemy(game, e, dmg, { cause, noCrit: cause === 'critBeam', dirX: ux, dirY: uy, knock: 180 });
+  });
+  game.wfx.push({ kind: 'beam', x0: x, y0: y, x1, y1, width, life: 0.22, max: 0.22 });
+}
+
+function onRunCritical(game, x, y) {
+  const n = runTrait(game, 'critBeam');
+  if (!n || game.buildClock < game.criticalBeamAt || game.state !== 'play') return;
+  game.criticalBeamAt = game.buildClock + 0.15;
+  const sh = game.ship, sp = Math.hypot(sh.vx, sh.vy);
+  const ux = sp > 1 ? sh.vx / sp : sh.hx, uy = sp > 1 ? sh.vy / sp : sh.hy;
+  runBeam(game, x, y, ux, uy, 480 + n * 100, 14 + n * 4, attackPower(0, game.stats) * (0.8 + n * 0.4));
+}
+
+function onRunLaunch(game, full) {
+  game.dashKills = 0;
+  game.nextKillBoom = Math.max(3, 9 - runTrait(game, 'killSonic'));
+  game.runPendingPath = [];
+  game.crossUsed = new Set();
+  game.runLegSerial = game.runLegSerial || 0;
+  const n = runTrait(game, 'fullCharge');
+  game.stats.ignoreArmor = !!(full && n);
+  game.stats.burstPower = full && n ? 1.25 + n * 0.25 : 1;
+  if (game.weapons.sonic) runSonic(game, 'sonic');
+}
+
+function onRunKill(game, cause) {
+  if (!game.newBuild || !game.dashActive) return;
+  game.dashKills++;
+  const n = runTrait(game, 'killSonic');
+  if (!n || cause === 'killSonic' || game.dashKills < game.nextKillBoom || game.state !== 'play') return;
+  // Advance before dealing damage so kills from this blast cannot recursively retrigger it.
+  game.nextKillBoom = game.dashKills + Math.max(3, 9 - n);
+  runSonic(game, 'killSonic');
+}
+
+function runSonic(game, cause) {
+  const sh = game.ship, n = runTrait(game, 'killSonic');
+  const L = runWeaponStats('sonic', game.weapons.sonic || 1);
+  const radius = cause === 'killSonic' ? 230 + n * 40 : 260 * L.radius;
+  const mult = cause === 'killSonic' ? 0.8 + n * 0.4 : 1.2 * L.damage;
+  explode(game, sh.x, sh.y, radius, attackPower(0, game.stats) * mult,
+    { cause, color: '#c8f7ff', knock: 750, life: 0.5 });
+  game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius });
+}
+
+function onRunContact(game, e, x, y, ux, uy) {
+  if (!game.newBuild) return;
+  const atk = attackPower(0, game.stats);
+  if (game.weapons.knockback) {
+    const L = runWeaponStats('knockback', game.weapons.knockback);
+    const velocity = 800 + 90 * game.weapons.knockback;
+    if (e.dead) {
+      game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
+        r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });
+    } else {
+      e.shove = { time: 1.2, vx: ux * velocity, vy: uy * velocity, dmg: atk * 0.7 * L.damage, hits: new Set([e.id]) };
+      e.vx = ux * velocity; e.vy = uy * velocity;
+    }
+  }
+  if (game.weapons.contactWave && game.state === 'play') {
+    const L = runWeaponStats('contactWave', game.weapons.contactWave);
+    explode(game, x, y, 90 * L.radius, atk * 0.45 * L.damage, { cause: 'contactWave', color: '#9fe8ff', knock: 280, life: 0.3 });
+  }
+  const recovery = runTrait(game, 'recovery');
+  if (recovery) game.dashMeter = Math.min(1, game.dashMeter + recovery * 0.02);
+}
+
+function runSegmentCross(a, b, c, d) {
+  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
+  const den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-7) return null;
+  const dx = c.x - a.x, dy = c.y - a.y;
+  const t = (dx * sy - dy * sx) / den, u = (dx * ry - dy * rx) / den;
+  if (t <= 1e-6 || t > 1 || u < 0 || u > 1) return null;
+  return { x: a.x + t * rx, y: a.y + t * ry };
+}
+
+function onRunTrail(game, run, x0, y0, x1, y1) {
+  if (!game.newBuild || game.state !== 'play') return;
+  const a = { x: x0, y: y0 }, b = { x: x1, y: y1 };
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  if (len < 1e-6) return;
+  const n = runTrait(game, 'crossBlast');
+  if (n) for (const old of game.runPaths) {
+    if (old.until <= game.buildClock) continue;
+    const p = runSegmentCross(a, b, old.a, old.b);
+    if (!p) continue;
+    const key = `${Math.round(p.x / 20)},${Math.round(p.y / 20)}`;
+    if (game.crossUsed.has(key)) continue;
+    game.crossUsed.add(key);
+    explode(game, p.x, p.y, 100 + n * 25, attackPower(0, game.stats) * (0.8 + n * 0.4), { cause: 'crossBlast', color: '#ff6bd5', knock: 400 });
+  }
+  game.runPendingPath.push({ a, b, until: game.buildClock + CONFIG.pathMemoryTime });
+  game.runTravel.push({ a, b, serial: ++game.runLegSerial, time: game.buildClock });
+  if (game.runTravel.length > 600) game.runTravel.splice(0, game.runTravel.length - 600);
+  if (game.stats.loopBurst) {
+    run.loopPath = run.loopPath || [a];
+    tracePortalLoop(game, run, x0, y0, x1, y1);
+    run.loopPath.push(b);
+  }
+  // Distance-based placement follows every traveled segment, including corners within one frame.
+  for (const [id, spacing] of [['mines', 75], ['trailBurst', 45]]) {
+    const lv = game.weapons[id];
+    if (!lv) continue;
+    const st = game.weaponState[id] || (game.weaponState[id] = { distance: 0 });
+    const L = runWeaponStats(id, lv), step = spacing / L.rate;
+    for (let d = step - st.distance; d <= len; d += step) {
+      const x = x0 + (x1 - x0) * d / len, y = y0 + (y1 - y0) * d / len;
+      const dmg = attackPower(0, game.stats) * L.damage;
+      if (id === 'mines') {
+        if (game.mines.length < 250) game.mines.push({ x, y, life: 6, armed: 0.25, dmg, radius: 110 * L.radius });
+      } else if (game.marks.length < 250) game.marks.push({ x, y, t: 0.55, dmg: dmg * 0.5, radius: 85 * L.radius });
+    }
+    st.distance = (st.distance + len) % step;
+  }
+}
+
+function onRunEnd(game) {
+  if (!game.newBuild || game.state !== 'play') return;
+  game.runPaths = [...game.runPaths.filter(p => p.until > game.buildClock), ...(game.runPendingPath || [])].slice(-CONFIG.pathMemoryMax);
+  game.runPendingPath = [];
+  const sh = game.ship, n = runTrait(game, 'endBlast');
+  if (n) explode(game, sh.x, sh.y, 180 + n * 30, attackPower(0, game.stats) * (1 + n * 0.5), { cause: 'endBlast', color: '#c46bff', knock: 500 });
+  const v = runTrait(game, 'vortex');
+  if (v && game.state === 'play') {
+    const life = 1.5 + v * 0.4;
+    game.vortexes.push({ x: sh.x, y: sh.y, radius: 180 + v * 35, life, max: life, power: 200 + v * 70 });
+    if (game.vortexes.length > 12) game.vortexes.shift();
+  }
+  game.stats.burstPower = 1;
+  game.stats.ignoreArmor = false;
+}
+
+function onRunHurt(game) {
+  const n = runTrait(game, 'reactive');
+  if (n) explode(game, game.ship.x, game.ship.y, 170 + n * 30, attackPower(0, game.stats) * (0.8 + n * 0.4), { cause: 'reactive', color: '#ff6b5a', knock: 450 });
+}
+
+function updateRunFollowers(game) {
+  if (!game.newBuild) return;
+  game.runPaths = game.runPaths.filter(p => p.until > game.buildClock);
+  const lv = game.weapons.drone || 0;
+  if (!lv) { game.drones = []; return; }
+  const L = runWeaponStats('drone', lv), sh = game.ship;
+  while (game.drones.length < L.drones) game.drones.push({ x: sh.x, y: sh.y, serial: game.runLegSerial || 0, hits: new Map(), trail: [] });
+  for (let i = 0; i < game.drones.length; i++) {
+    const d = game.drones[i], delay = CONFIG.droneDelay * (i + 1);
+    for (const leg of game.runTravel) {
+      if (leg.serial <= d.serial || leg.time + delay > game.buildClock) continue;
+      d.serial = leg.serial; d.x = leg.b.x; d.y = leg.b.y; d.followUntil = leg.time + delay + 0.25;
+      const pad = 14 + MAX_ENEMY_R;
+      queryGrid(game.grid, Math.min(leg.a.x, leg.b.x) - pad, Math.min(leg.a.y, leg.b.y) - pad, Math.max(leg.a.x, leg.b.x) + pad, Math.max(leg.a.y, leg.b.y) + pad, e => {
+        if (e.dead || (d.hits.get(e.id) || 0) > game.buildClock || segCircleT(leg.a.x, leg.a.y, leg.b.x, leg.b.y, e.x, e.y, e.r + 14) < 0) return;
+        d.hits.set(e.id, game.buildClock + 0.3);
+        damageEnemy(game, e, attackPower(0, game.stats) * L.damage * 0.5, { cause: 'drone' });
+      });
+      d.trail.push({ x: d.x, y: d.y, time: game.buildClock });
+    }
+    if (!d.followUntil || d.followUntil < game.buildClock) {
+      const a = game.buildClock * 1.5 + i * Math.PI * 2 / L.drones;
+      const x = sh.x + Math.cos(a) * 90, y = sh.y + Math.sin(a) * 90;
+      d.x += (x - d.x) * 0.25; d.y += (y - d.y) * 0.25;
+    }
+    d.trail = d.trail.filter(p => p.time > game.buildClock - 0.35).slice(-18);
+    if (d.hits.size > 400) for (const [id, until] of d.hits) if (until < game.buildClock) d.hits.delete(id);
+  }
+}
+
+function updateRunWeapons(game, dt) {
+  if (!game.newBuild) return;
+  const sh = game.ship, atk = attackPower(0, game.stats);
+  const busy = !!game.draw;
+  for (const [id, interval] of [['forward', 0.45], ['scatter', 1.05], ['turret', 0.5], ['barrier', 0.7], ['sonic', 5]]) {
+    const lv = game.weapons[id];
+    if (!lv || busy) continue;
+    const L = runWeaponStats(id, lv), st = game.weaponState[id] || (game.weaponState[id] = { t: 0 });
+    st.t += dt;
+    if (st.t < interval / L.rate) continue;
+    st.t = 0;
+    if (id === 'sonic') { runSonic(game, 'sonic'); continue; }
+    if (id === 'barrier') {
+      explode(game, sh.x, sh.y, 70 * L.radius, atk * 0.4 * L.damage, { cause: 'barrier', color: '#76aaff', knock: 180, life: 0.2 });
+      continue;
+    }
+    const target = id === 'turret' ? runNearest(game, sh.x, sh.y, 700) : null;
+    const a = target ? Math.atan2(target.y - sh.y, target.x - sh.x) : Math.atan2(sh.hy, sh.hx);
+    for (let i = 0; i < L.shots; i++) runShot(game, sh.x, sh.y, a + (i - (L.shots - 1) / 2) * (id === 'scatter' ? 0.16 : 0.08),
+      atk * L.damage * (id === 'scatter' ? 0.55 : 0.8), { pierce: L.pierce, life: id === 'scatter' ? 0.45 : 0.9, color: id === 'scatter' ? '#ffb36b' : '#ffe46b' });
+    game.events.push({ type: 'turret' });
+  }
+  if (game.weapons.barrier) {
+    const L = runWeaponStats('barrier', game.weapons.barrier), st = game.weaponState.barrier || (game.weaponState.barrier = { t: 0 });
+    st.blockT = Math.max(0, (st.blockT || 0) - dt);
+    if (!st.blockT) for (const b of game.ebullets) {
+      if (b.life <= 0 || Math.hypot(b.x - sh.x, b.y - sh.y) > 70 * L.radius + b.r) continue;
+      b.life = 0; st.blockT = 0.8 / L.rate;
+      addRing(game, b.x, b.y, 32, '#76aaff', 0.25); break;
+    }
+  }
+  if (game.weapons.drone && !busy) {
+    const L = runWeaponStats('drone', game.weapons.drone), st = game.weaponState.drone || (game.weaponState.drone = { t: 0 });
+    st.t += dt;
+    if (st.t >= 0.65 / L.rate) {
+      st.t = 0;
+      for (const d of game.drones) {
+        const e = runNearest(game, d.x, d.y, 550);
+        if (e) runShot(game, d.x, d.y, Math.atan2(e.y - d.y, e.x - d.x), atk * 0.45 * L.damage, { color: '#a8ffdb', r: 4 });
+      }
+    }
+  }
+  for (const v of game.vortexes) {
+    v.life -= dt;
+    queryGrid(game.grid, v.x - v.radius - MAX_ENEMY_R, v.y - v.radius - MAX_ENEMY_R, v.x + v.radius + MAX_ENEMY_R, v.y + v.radius + MAX_ENEMY_R, e => {
+      if (e.dead || e.type === 'boss') return;
+      const dx = v.x - e.x, dy = v.y - e.y, d = Math.hypot(dx, dy);
+      if (d > v.radius || d < 10) return;
+      const move = Math.min(d - 10, v.power * dt / Math.max(1, e.r / 30));
+      e.x += dx / d * move; e.y += dy / d * move;
+    });
+  }
+  game.vortexes = game.vortexes.filter(v => v.life > 0);
+  updateShovedEnemies(game);
+  updateWeapons(game, dt); // Experimental weapons never enter the normal offer pool.
+}
+
+function updateShovedEnemies(game) {
+  for (const e of game.enemies) {
+    if (e.dead || !e.shove || e.shove.time <= 0 || !e.shoveFrom) continue;
+    const p = e.shoveFrom, shove = e.shove, pad = e.r + MAX_ENEMY_R;
+    queryGrid(game.grid, Math.min(p.x, e.x) - pad, Math.min(p.y, e.y) - pad, Math.max(p.x, e.x) + pad, Math.max(p.y, e.y) + pad, other => {
+      if (other.dead || shove.hits.has(other.id) || segCircleT(p.x, p.y, e.x, e.y, other.x, other.y, other.r + e.r) < 0) return;
+      shove.hits.add(other.id);
+      const sp = Math.hypot(shove.vx, shove.vy) || 1;
+      damageEnemy(game, other, shove.dmg, { cause: 'knockbackChain', dirX: shove.vx / sp, dirY: shove.vy / sp, knock: 400 });
+      addRing(game, other.x, other.y, other.r + 30, '#ff986b', 0.25);
+    });
+    e.shoveFrom = null;
+  }
+}
+
+// ---- progression.js ----
+
+
+function xpForLevel(level) {
+  return CONFIG.xpBase + CONFIG.xpGrowth * level + CONFIG.xpCurve * level * level;
+}
+
+// Station upgrades bought with coins (parts). Effects are applied in baseStats().
+const META_UPGRADES = [
+  { id: 'speed', name: '主推進器', desc: '最高速度 +5%', max: 5, costs: [25, 50, 90, 140, 210] },
+  { id: 'hp', name: '機体フレーム', desc: '最大 HP +15', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'atk', name: '衝角素材', desc: '攻撃力 +6%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'charge', name: '充電効率', desc: 'チャージ時間 -5%', max: 5, costs: [20, 40, 70, 110, 160] },
+  { id: 'pickup', name: '回収装置', desc: '回収範囲 +15%', max: 5, costs: [15, 30, 55, 85, 125] },
+  { id: 'xp', name: '学習回路', desc: '経験値 +8%', max: 5, costs: [25, 50, 90, 140, 210] },
+];
+
+const SAVE_KEY = 'speed-save-v1';
+
+function metaCost(id, level) {
+  const u = META_UPGRADES.find((x) => x.id === id);
+  if (!u || level >= u.max) return null;
+  return u.costs[level];
+}
+
+function buyUpgrade(save, id) {
+  const lv = save.meta[id] || 0;
+  const cost = metaCost(id, lv);
+  if (cost == null || save.coins < cost) return false;
+  save.coins -= cost;
+  save.meta[id] = lv + 1;
+  return true;
+}
+
+// Debug: put every station upgrade back to 0 and refund the parts spent on them.
+function resetMeta(save) {
+  let refund = 0;
+  for (const u of META_UPGRADES) {
+    const lv = save.meta[u.id] || 0;
+    for (let i = 0; i < lv; i++) refund += u.costs[i] || 0;
+  }
+  save.meta = {};
+  save.coins += refund;
+  return refund;
+}
+
+function defaultSave() {
+  return { coins: 0, meta: {}, best: { runs: 0, escapes: 0, escapeTime: null, topSpeed: 0 } };
+}
+
+function loadSave(storage) {
+  try {
+    const raw = storage && storage.getItem(SAVE_KEY);
+    if (!raw) return defaultSave();
+    const s = JSON.parse(raw);
+    const d = defaultSave();
+    if (typeof s !== 'object' || !s) return d;
+    return {
+      coins: Number.isFinite(s.coins) ? s.coins : 0,
+      meta: typeof s.meta === 'object' && s.meta ? s.meta : {},
+      best: { ...d.best, ...(s.best || {}) },
+    };
+  } catch {
+    return defaultSave();
+  }
+}
+
+function writeSave(storage, save) {
+  try { storage && storage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* storage unavailable */ }
+}
+
+function applyRunResult(save, game) {
+  save.coins += Math.round(game.coins);
+  save.best.runs++;
+  save.best.topSpeed = Math.max(save.best.topSpeed, game.peakSpeed);
+  if (game.state === 'won') {
+    save.best.escapes++;
+    save.best.escapeTime = save.best.escapeTime == null ? game.t : Math.min(save.best.escapeTime, game.t);
+  }
 }
 
 // ---- gravity.js ----
@@ -1496,6 +2395,7 @@ function updateEnemyBullets(game, dt, onHit) {
   const R = CONFIG.shipRadius;
   const p = game.field.planet;
   for (const b of game.ebullets) {
+    if (b.life <= 0) continue;
     if (b.kind === 'missile') {
       const t = game.enemyAim || sh; // home on where enemies think the ship is
       const want = Math.atan2(t.y - b.y, t.x - b.x);
@@ -1512,87 +2412,6 @@ function updateEnemyBullets(game, dt, onHit) {
     if (Math.hypot(b.x - p.x, b.y - p.y) < p.r) b.life = 0;
   }
   if (game.ebullets.some((b) => b.life <= 0)) game.ebullets = game.ebullets.filter((b) => b.life > 0);
-}
-
-// ---- progression.js ----
-
-
-function xpForLevel(level) {
-  return CONFIG.xpBase + CONFIG.xpGrowth * level;
-}
-
-// Station upgrades bought with coins (parts). Effects are applied in baseStats().
-const META_UPGRADES = [
-  { id: 'speed', name: '主推進器', desc: '最高速度 +5%', max: 5, costs: [25, 50, 90, 140, 210] },
-  { id: 'hp', name: '機体フレーム', desc: '最大 HP +15', max: 5, costs: [20, 40, 70, 110, 160] },
-  { id: 'atk', name: '衝角素材', desc: '攻撃力 +6%', max: 5, costs: [20, 40, 70, 110, 160] },
-  { id: 'charge', name: '充電効率', desc: 'チャージ時間 -5%', max: 5, costs: [20, 40, 70, 110, 160] },
-  { id: 'pickup', name: '回収装置', desc: '回収範囲 +15%', max: 5, costs: [15, 30, 55, 85, 125] },
-  { id: 'xp', name: '学習回路', desc: '経験値 +8%', max: 5, costs: [25, 50, 90, 140, 210] },
-];
-
-const SAVE_KEY = 'speed-save-v1';
-
-function metaCost(id, level) {
-  const u = META_UPGRADES.find((x) => x.id === id);
-  if (!u || level >= u.max) return null;
-  return u.costs[level];
-}
-
-function buyUpgrade(save, id) {
-  const lv = save.meta[id] || 0;
-  const cost = metaCost(id, lv);
-  if (cost == null || save.coins < cost) return false;
-  save.coins -= cost;
-  save.meta[id] = lv + 1;
-  return true;
-}
-
-// Debug: put every station upgrade back to 0 and refund the parts spent on them.
-function resetMeta(save) {
-  let refund = 0;
-  for (const u of META_UPGRADES) {
-    const lv = save.meta[u.id] || 0;
-    for (let i = 0; i < lv; i++) refund += u.costs[i] || 0;
-  }
-  save.meta = {};
-  save.coins += refund;
-  return refund;
-}
-
-function defaultSave() {
-  return { coins: 0, meta: {}, best: { runs: 0, escapes: 0, escapeTime: null, topSpeed: 0 } };
-}
-
-function loadSave(storage) {
-  try {
-    const raw = storage && storage.getItem(SAVE_KEY);
-    if (!raw) return defaultSave();
-    const s = JSON.parse(raw);
-    const d = defaultSave();
-    if (typeof s !== 'object' || !s) return d;
-    return {
-      coins: Number.isFinite(s.coins) ? s.coins : 0,
-      meta: typeof s.meta === 'object' && s.meta ? s.meta : {},
-      best: { ...d.best, ...(s.best || {}) },
-    };
-  } catch {
-    return defaultSave();
-  }
-}
-
-function writeSave(storage, save) {
-  try { storage && storage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* storage unavailable */ }
-}
-
-function applyRunResult(save, game) {
-  save.coins += Math.round(game.coins);
-  save.best.runs++;
-  save.best.topSpeed = Math.max(save.best.topSpeed, game.peakSpeed);
-  if (game.state === 'won') {
-    save.best.escapes++;
-    save.best.escapeTime = save.best.escapeTime == null ? game.t : Math.min(save.best.escapeTime, game.t);
-  }
 }
 
 // ---- stages.js ----
@@ -1634,6 +2453,8 @@ function speedStage(sp) {
 
 
 
+
+
 const STEP = 1 / 120;
 
 function createGame(opts = {}) {
@@ -1642,13 +2463,17 @@ function createGame(opts = {}) {
   const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
   // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
   if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
-  const stats = computeStats(meta, loadout);
+  const newBuild = isDrawScheme(opts.scheme || CONFIG.controlScheme);
+  const weapons = { forward: 1 }, traits = {};
+  const stats = newBuild ? computeRunStats(meta, weapons, traits) : computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
     t: 0, acc: 0, seed, rng,
-    meta, stats, ship, loadout,
+    meta, stats, ship, loadout, newBuild, weapons, traits,
+    levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
+    runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
@@ -1666,7 +2491,7 @@ function createGame(opts = {}) {
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     portalSpace: { armed: false, seconds: 0, consumed: false },
     portalClock: 0, portalCooldowns: new Map(),
-    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
+    dashMeter: 1, // normalized charge capacity; time-filled in the draw prototype
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
     ...createEffectState(),
@@ -1693,12 +2518,19 @@ function update(game, frameDt, input) {
   }
   if (game.state !== 'play') return;
   recordBossApproach(game, frameDt);
+  game.buildClock += frameDt;
+  if (game.newBuild && !game.draw) {
+    const old = game.dashMeter;
+    game.dashMeter = Math.min(1, old + frameDt / (game.stats.chargeTime * game.stats.gaugeMax));
+    if (old < 1 && game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
+  }
+  if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); return; }
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
+  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= (game.newBuild ? CONFIG.drawMinCharge : 1)) {
     startDrawing(game, input);
     input = { ...input, press: false }; // consume the start click so it cannot also commit
   }
@@ -1715,6 +2547,8 @@ function update(game, frameDt, input) {
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
+  if (game.newBuild) updateRunFollowers(game);
+  if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
   if (game.portalDash) scale = portalWorldScale(game);
@@ -1730,6 +2564,7 @@ function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
+    if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); break; }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
@@ -1803,6 +2638,8 @@ function step(game, dt, input) {
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
+  if (game.newBuild) updateRunWeapons(game, dt);
+  if (game.state !== 'play') return;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
   if (game.state !== 'play') return;
@@ -1834,7 +2671,43 @@ function end(game, state, reason) {
   game.events.push({ type: 'end', state, reason });
 }
 
-// ---- offers ----
+// ---- draw-build level-ups ----
+
+function openRunLevel(game) {
+  game.state = 'levelup';
+  game.levelChoices = rollRunChoices(game);
+  game.ship.charging = false;
+  game.releasePending = null;
+}
+
+function resolveRunLevel(game, index) {
+  if (game.state !== 'levelup') return false;
+  const c = game.levelChoices?.[index];
+  if (!c) return false;
+  if (c.kind === 'heal') game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * 0.3);
+  else if (!grantRunItem(game, c.kind, c.id)) return false;
+  refreshStats(game);
+  game.events.push({ type: 'upgrade', mod: c });
+  game.pendingLevelups = Math.max(0, game.pendingLevelups - 1);
+  game.levelChoices = null;
+  if (game.pendingLevelups) openRunLevel(game);
+  else game.state = 'play';
+  return true;
+}
+
+function debugRunItem(game, kind, id, levels = 1) {
+  if (!game.newBuild || !['play', 'levelup'].includes(game.state)) return false;
+  const ok = grantRunItem(game, kind, id, levels);
+  const name = runModuleDef(kind, id)?.name || id;
+  addText(game, game.ship.x, game.ship.y - 46, ok ? name : '装備枠が満員／強化済み', ok ? '#9fe8ff' : '#ff9f40', 18);
+  if (ok) {
+    refreshStats(game);
+    if (game.state === 'levelup') game.levelChoices = rollRunChoices(game);
+  }
+  return ok;
+}
+
+// ---- legacy offers ----
 
 // Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
 function absorbDuplicates(game) {
@@ -1896,7 +2769,11 @@ function resolveOffer(game, accept) {
 
 function refreshStats(game) {
   const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
+  const burstPower = game.stats.burstPower, ignoreArmor = game.stats.ignoreArmor;
+  game.stats = game.newBuild
+    ? computeRunStats(game.meta, game.weapons, game.traits, { cores: game.cores, level: game.level })
+    : computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
+  if (game.newBuild && game.draw?.phase === 'run') { game.stats.burstPower = burstPower; game.stats.ignoreArmor = ignoreArmor; }
   const gain = game.stats.maxHp - oldMax;
   if (gain > 0) game.ship.hp += gain;
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
@@ -1951,21 +2828,19 @@ function drawWorldScale(game) {
   return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
 }
 
-// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
-// charge-time stats (modules, levels) make it fill faster.
-function dashNeed(game) {
-  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
-}
+// Real play seconds needed to fill the draw gauge from empty.
+function dashNeed(game) { return game.stats.chargeTime * game.stats.gaugeMax; }
 
 function startDrawing(game, input) {
   const sh = game.ship;
   sh.glide = false;
-  const gauge = game.stats.gaugeMax; // always a full (over)charge
+  const fullCharge = game.dashMeter >= 1 - 1e-6;
+  const gauge = game.stats.gaugeMax * (game.newBuild ? game.dashMeter : 1);
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+    budget, used: 0, gauge, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -2053,6 +2928,7 @@ function commitPath(game) {
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
   const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
   game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  if (game.newBuild) onRunLaunch(game, d.fullCharge);
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -2094,7 +2970,11 @@ function runAlongPath(game, realDt) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(r.speed, game.stats));
     waveAlong(game, r, x0, y0, sh.x, sh.y);
     if (game.state !== 'play') return;
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; endTraceAttack(game); return; }
+    if (collideEnemies(game, x0, y0, R, r)) {
+      onRunTrail(game, r, x0, y0, sh.x, sh.y);
+      game.draw = null; endTraceAttack(game); return;
+    }
+    onRunTrail(game, r, x0, y0, sh.x, sh.y);
     if (game.state !== 'play') return;
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
@@ -2200,11 +3080,18 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
   if (!hits.length) return false;
   hits.sort((a, b) => a.t - b.t);
   for (const { e, t } of hits) {
+    if (e.dead) continue; // A preceding contact wave may already have removed this target.
     const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
     const sp = Math.hypot(sh.vx, sh.vy);
     const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
     const atk = attackPower(sp, stats);
-    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const crit = game.newBuild ? game.rng() < stats.critChance : false;
+    const fast = !!run || sh.glide || sp >= stats.maxSpeed * 0.65;
+    if (game.newBuild && !fast) {
+      e.hitCD = 0.3;
+      damageShip(game, e.contact, 0.1, `contact:${e.type}`);
+      continue;
+    }
     const res = resolveRam(atk, e, crit, stats);
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
@@ -2224,6 +3111,8 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
       onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
+      onRunContact(game, e, hx, hy, ux, uy);
       if (game.state === 'finishing') return false;
       if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
@@ -2245,6 +3134,7 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
     e.hitCD = 0.25;
     damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
+    onRunContact(game, e, hx, hy, ux, uy);
     game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
     return true;
   }
@@ -2377,18 +3267,15 @@ function updateGems(game, dt) {
 
 function addXp(game, v) {
   game.xp += v;
-  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
-    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
-    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
-  }
-  let need = xpForLevel(game.level);
+    let need = xpForLevel(game.level);
   while (game.xp >= need) {
     game.xp -= need;
     game.level++;
+    if (game.newBuild) game.pendingLevelups++;
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
-    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
+    refreshStats(game); // deferred level choices never interrupt the traced movement
     addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
   }
 }
@@ -2494,6 +3381,8 @@ function annotatePrediction(game, pts, seconds) {
 
 
 
+
+
 function createEffectState() {
   return {
     fbullets: [], marks: [], mines: [], capsules: [],
@@ -2523,6 +3412,7 @@ function finishDash(game) {
 function endTraceAttack(game) {
   game.traceEndHandled = true;
   finishDash(game);
+  if (game.newBuild) { onRunEnd(game); return; }
   const pulse = game.stats.traceEndBlast, sh = game.ship;
   if (pulse && game.state === 'play') explode(game, sh.x, sh.y, pulse.radius,
     attackPower(Math.hypot(sh.vx, sh.vy), game.stats) * pulse.mult,
@@ -2539,6 +3429,7 @@ function onPierce(game, x = game.ship.x, y = game.ship.y) {
 }
 
 function onShipHurt(game) {
+  if (game.newBuild) { onRunHurt(game); return; }
   const s = game.stats, sh = game.ship;
   if (s.reactive) explode(game, sh.x, sh.y, 260, attackPower(s.maxSpeed, s) * s.reactive, { cause: 'reactive', color: '#ff6b5a', knock: 450 });
 }
@@ -2577,7 +3468,7 @@ function updateEffects(game, dt) {
   }
   for (const m of game.marks) {
     m.t -= dt;
-    if (m.t <= 0) explode(game, m.x, m.y, 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
+    if (m.t <= 0) explode(game, m.x, m.y, m.radius || 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
   }
   if (game.marks.length) game.marks = game.marks.filter((m) => m.t > 0);
 
@@ -2596,7 +3487,7 @@ function updateEffects(game, dt) {
       if (e.dead) continue;
       const rr = 70 + e.r;
       if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
-        explode(game, m.x, m.y, 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+        explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
         m.life = 0;
         break;
       }
@@ -2641,22 +3532,25 @@ function updateEffects(game, dt) {
 
 function updateFriendly(game, dt) {
   const B = game.fbullets;
-  if (!B.length) return;
   for (const b of B) {
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    b.life -= dt;
-    const pad = b.r + 130;
-    queryGrid(game.grid, b.x - pad, b.y - pad, b.x + pad, b.y + pad, (e) => {
-      if (b.life <= 0 || b.hit.has(e.id)) return;
-      const rr = b.r + e.r;
-      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) return;
+    const x0 = b.x, y0 = b.y;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    const pad = b.r + 130, hits = [];
+    queryGrid(game.grid, Math.min(x0, b.x) - pad, Math.min(y0, b.y) - pad, Math.max(x0, b.x) + pad, Math.max(y0, b.y) + pad, e => {
+      if (e.dead || b.hit.has(e.id)) return;
+      const t = segCircleT(x0, y0, b.x, b.y, e.x, e.y, b.r + e.r);
+      if (t >= 0) hits.push({ e, t });
+    });
+    hits.sort((a, b) => a.t - b.t);
+    for (const { e } of hits) {
+      if (b.life <= 0 || e.dead) continue;
       b.hit.add(e.id);
       const sp = Math.hypot(b.vx, b.vy) || 1;
       damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
-      if (!b.pierce) b.life = 0;
-    });
+      if (!b.pierce) { if ((b.pierceLeft || 0) > 0) b.pierceLeft--; else b.life = 0; }
+    }
   }
-  game.fbullets = B.filter((b) => b.life > 0);
+  game.fbullets = B.filter(b => b.life > 0);
 }
 
 function fieldCapsulePoint(game) {
@@ -2691,8 +3585,11 @@ function updateCapsules(game, dt) {
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
-      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
-      game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+      if (game.newBuild) game.capsules.push({ kind: 'cache', src: 'field', x: p.x, y: p.y, xp: xpForLevel(game.level) * 0.2, age: 0 });
+      else {
+        const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
+        game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+      }
     }
     if (getPhase(game.t).cores) {
       F.coreT += dt;
@@ -2722,96 +3619,18 @@ function updateCapsules(game, dt) {
         game.cores++;
         refreshStats(game);
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else if (c.kind === 'cache') {
+        addXp(game, c.xp);
+        addText(game, c.x, c.y, 'XP', '#6dffb0');
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
       addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
-      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
+      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
     if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
   }
   if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
-}
-
-// ---- portal-loops.js ----
-
-
-
-
-function portalLoopCross(a, b, c, d) {
-  const rx = b.x - a.x, ry = b.y - a.y, sx = d.x - c.x, sy = d.y - c.y;
-  const cross = rx * sy - ry * sx;
-  if (Math.abs(cross) < 1e-9) return null; // retracing a line encloses no area
-  const dx = c.x - a.x, dy = c.y - a.y;
-  const t = (dx * sy - dy * sx) / cross, u = (dx * ry - dy * rx) / cross;
-  if (t <= 1e-6 || t > 1 + 1e-6 || u < -1e-6 || u > 1 + 1e-6) return null;
-  return { x: a.x + rx * t, y: a.y + ry * t, t };
-}
-
-function portalLoopArea(points) {
-  let twice = 0;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    twice += points[j].x * points[i].y - points[i].x * points[j].y;
-  }
-  return Math.abs(twice) / 2;
-}
-
-function portalLoopContains(points, x, y) {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const a = points[j], b = points[i];
-    const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-    if (Math.abs(cross) < 1e-6 && x >= Math.min(a.x, b.x) && x <= Math.max(a.x, b.x)
-      && y >= Math.min(a.y, b.y) && y <= Math.max(a.y, b.y)) return true;
-    if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
-
-function portalLoopExplode(game, dash, points, area) {
-  const effect = game.stats.loopBurst;
-  const dmg = attackPower(dash.speed, game.stats) * effect.mult;
-  const color = effect.splash ? '#ffb340' : '#c46bff';
-  const center = points.reduce((c, p) => ({ x: c.x + p.x / points.length, y: c.y + p.y / points.length }), { x: 0, y: 0 });
-  // Snapshot the enclosed targets: secondary blasts cannot recursively create more blasts.
-  const targets = game.enemies.filter((e) => !e.dead && portalLoopContains(points, e.x, e.y));
-  for (const e of targets) {
-    const dx = e.x - center.x, dy = e.y - center.y, dist = Math.hypot(dx, dy) || 1;
-    damageEnemy(game, e, dmg, { cause: 'portalLoop', dirX: dx / dist, dirY: dy / dist, knock: 500 });
-    addRing(game, e.x, e.y, e.r + 28, color, 0.4);
-    burst(game, e.x, e.y, color, 12, 0, 0, 360);
-  }
-  if (effect.splash) for (const e of targets) explode(game, e.x, e.y, CONFIG.portalLoopSplashRadius,
-    dmg * CONFIG.portalLoopSplashDamage, { cause: 'portalLoopSplash', color, knock: 350, life: 0.4 });
-  game.fx.loops.push({ points, color, life: 0.6, max: 0.6 });
-  addText(game, center.x, center.y, `包囲炸裂 ${targets.length}`, color, 24);
-  game.events.push({ type: 'explode', x: center.x, y: center.y, radius: Math.sqrt(area / Math.PI), cause: 'portalLoop', enclosed: targets.length });
-}
-
-// Test only traveled movement. Closing across an old segment works before reaching a portal.
-function tracePortalLoop(game, dash, x0, y0, x1, y1) {
-  if (!game.stats.loopBurst || dash.loopPath.length < 3) return;
-  let start = { x: x0, y: y0 }, end = { x: x1, y: y1 };
-  let attempts = dash.loopPath.length;
-  while (attempts-- > 0) {
-    const path = dash.loopPath;
-    let first = null;
-    for (let i = 0; i < path.length - 1; i++) {
-      const hit = portalLoopCross(start, end, path[i], path[i + 1]);
-      if (!hit || (first && hit.t >= first.hit.t)) continue;
-      const points = [{ x: hit.x, y: hit.y }, ...path.slice(i + 1)];
-      const area = portalLoopArea(points);
-      if (area >= CONFIG.portalLoopMinArea) first = { hit, points, area, i };
-    }
-    if (!first) return;
-    portalLoopExplode(game, dash, first.points, first.area);
-    const hit = { x: first.hit.x, y: first.hit.y };
-    // Consume the closed portion while retaining the earlier open prefix and the live tail.
-    dash.loopPath = path.slice(0, first.i + 1);
-    const last = dash.loopPath[dash.loopPath.length - 1];
-    if (Math.hypot(last.x - hit.x, last.y - hit.y) > 1e-6) dash.loopPath.push(hit);
-    start = hit;
-  }
 }
 
 // ---- portals.js ----
@@ -3163,8 +3982,16 @@ function updatePortals(game, realDt) {
 
 
 
+
+
 function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || game.state === 'finishing' || dmg <= 0) return;
+  let critical = !!opts.crit;
+  if (game.newBuild && opts.crit === undefined && !opts.noCrit) {
+    critical = game.rng() < game.stats.critChance;
+    if (critical) dmg *= game.stats.critMult;
+  }
+  opts = { ...opts, crit: critical };
   let fresh = e.hp >= e.maxHp - 1e-6;
   // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
   // by its HP when this dash first touched it, so wave + body still count as one strike
@@ -3184,6 +4011,7 @@ function damageEnemy(game, e, dmg, opts = {}) {
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
   }
+  if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
 
 // One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
@@ -3215,6 +4043,7 @@ function killEnemy(game, e, opts = {}) {
     dropModule(game, e.x, e.y, power, danger);
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
+  onRunKill(game, opts.cause);
 }
 
 function flingCorpse(game, e) {
@@ -3254,11 +4083,19 @@ function dropGem(game, x, y, v) {
 }
 
 function dropModule(game, x, y, power, danger) {
+  if (game.newBuild) {
+    game.capsules.push({ kind: 'cache', src: 'drop', x, y, xp: xpForLevel(game.level) * 0.15, age: 0 });
+    return;
+  }
   const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
 }
 
 function dropCapsule(game, x, y, src, danger) {
+  if (game.newBuild) {
+    game.capsules.push({ kind: 'cache', src, x, y, xp: xpForLevel(game.level) * 0.2, age: 0 });
+    return;
+  }
   const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
 }
@@ -3397,6 +4234,8 @@ function bossClearBlast(game) {
   boss.dead = true;
   game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
   game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
+  game.marks = []; game.wproj = []; game.wfx = []; game.wstate = {};
+  game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
   game.fx.texts = [];
   const radius = Math.max(900, game.viewRadius * 1.4);
   addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);
@@ -3671,6 +4510,7 @@ function drawCorpseDebris(r, game, dt) {
 
 
 
+
 const STAR_TILE = 1600;
 const MONO = 'ui-monospace, Menlo, monospace';
 
@@ -3796,6 +4636,7 @@ function render(r, game, dt, pointer) {
   drawPortals(r, game);
   drawPathUi(r, game);
   drawFriendly(r, game, dt);
+  drawRunWeapons(r, game);
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
@@ -3917,7 +4758,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
-  return c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? '#6dffb0' : RARITIES[c.mod.r].color;
 }
 
 function drawCoins(r, game) {
@@ -3956,6 +4797,10 @@ function drawCapsules(r, game) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'cache') {
+      ctx.fillStyle = col; ctx.strokeStyle = '#e2fff0'; ctx.lineWidth = 2 / z;
+      ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
+      ctx.fillStyle = '#132f24'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
     } else {
       // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
       drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
@@ -4014,6 +4859,84 @@ function drawFriendly(r, game, dt) {
     ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
+
+function drawRunWeapons(r, game) {
+  if (!game.newBuild) return;
+  if (game.finale && game.finale.phase !== 'slow') return;
+  const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  // The old lines persist as world effects only when a route-crossing trait uses them.
+  if (game.traits.crossBlast) {
+    ctx.strokeStyle = 'rgba(220,100,220,0.32)'; ctx.lineWidth = 2 / z;
+    for (const p of game.runPaths) {
+      if (p.until <= game.buildClock) continue;
+      ctx.beginPath(); ctx.moveTo(p.a.x, p.a.y); ctx.lineTo(p.b.x, p.b.y); ctx.stroke();
+    }
+  }
+  for (const v of game.vortexes) {
+    if (!onScreen(r, v.x, v.y, v.radius)) continue;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(game.t * 3);
+    ctx.strokeStyle = '#b79aff'; ctx.lineWidth = 3 / z; ctx.globalAlpha = Math.min(0.6, v.life / v.max);
+    for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(0, 0, v.radius * (0.35 + i * 0.25), i * 2, i * 2 + 2.7); ctx.stroke(); }
+    ctx.restore();
+  }
+  if (game.weapons.barrier) {
+    const L = runWeaponStats('barrier', game.weapons.barrier), st = game.weaponState.barrier;
+    ctx.strokeStyle = st?.blockT > 0 ? 'rgba(118,170,255,0.2)' : 'rgba(118,170,255,0.65)'; ctx.lineWidth = 3 / z;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 70 * L.radius, 0, TAU); ctx.stroke();
+  }
+  for (const d of game.drones) {
+    ctx.strokeStyle = 'rgba(168,255,219,0.55)'; ctx.lineWidth = 3 / z;
+    if (d.trail.length) { ctx.beginPath(); ctx.moveTo(d.trail[0].x, d.trail[0].y); for (const p of d.trail) ctx.lineTo(p.x, p.y); ctx.stroke(); }
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(game.buildClock * 2);
+    ctx.fillStyle = '#a8ffdb'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1 / z;
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(0, 9); ctx.lineTo(-12, 0); ctx.lineTo(0, -9); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  for (const p of game.wproj) {
+    if (!onScreen(r, p.x, p.y, 40)) continue;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.kind === 'disc' ? p.spin : Math.atan2(p.vy, p.vx));
+    ctx.fillStyle = p.kind === 'disc' ? '#6dffb0' : '#ff9f40';
+    if (p.kind === 'disc') { ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.strokeStyle = '#6dffb0'; ctx.lineWidth = 3 / z; ctx.stroke(); ctx.fillRect(-p.r, -2 / z, p.r * 2, 4 / z); }
+    else { ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, 6); ctx.lineTo(-8, -6); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+  for (const b of game.wstate.orbit?.blades || []) {
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(-18, -4, 36, 8); ctx.restore();
+  }
+  for (const f of game.wfx) {
+    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
+    if (f.kind === 'beam') {
+      ctx.lineWidth = f.width; ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
+      ctx.lineWidth = Math.max(2 / z, f.width * 0.2); ctx.strokeStyle = '#ffffff'; ctx.stroke();
+    } else if (f.pts) {
+      ctx.strokeStyle = '#a8f0ff'; ctx.lineWidth = 3 / z; ctx.beginPath(); ctx.moveTo(f.pts[0].x, f.pts[0].y); for (const p of f.pts) ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const e of game.enemies) {
+    if (!e.shove || e.shove.time <= 0) continue;
+    ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
+    const sp = Math.hypot(e.vx, e.vy) || 1;
+    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
+  }
+}
+
+function drawRunLoadout(r, game) {
+  const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
+  ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
+  ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
+  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
+  let row = 0;
+  for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
+    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = d.color;
+    ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
+  }
+  const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
+  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
+  row = 0;
+  for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
+    ctx.fillStyle = '#cfb1f7'; ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
+  }
 }
 
 function drawOverlays(r, game, dt) {
@@ -4323,6 +5246,9 @@ function drawPathUi(r, game) {
     ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(d.cursor.x, d.cursor.y); ctx.stroke();
     ctx.setLineDash([]);
   }
+  if (game.newBuild) {
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(last.x, last.y, 5 / z, 0, TAU); ctx.fill(); return;
+  }
   const pv = previewPath(game);
   // enemies the band will cut: white ring, yellow if through the weak spot
   for (const [e, t] of pv.targets) {
@@ -4354,8 +5280,8 @@ function drawDrawingHud(r, game, pointer) {
     : worldToScreen(r, game.ship.x, game.ship.y);
   const frac = clamp(d ? 1 - d.used / d.budget : game.dashMeter, 0, 1);
   const drawing = d?.started;
-  const ready = !d && frac >= 1;
-  const color = ready ? '#ffe46b' : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
+  const ready = !d && frac >= (game.newBuild ? CONFIG.drawMinCharge : 1);
+  const color = ready ? (frac >= 1 ? '#ffe46b' : '#6dffb0') : drawing && frac < 0.2 ? '#ffd24a' : '#9fe8ff';
   const radius = 24, x = clamp(p.x, radius + 4, W - radius - 4), y = clamp(p.y, radius + 4, H - radius - 24);
   ctx.save();
   ctx.lineCap = 'round';
@@ -4369,7 +5295,7 @@ function drawDrawingHud(r, game, pointer) {
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
   const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
   const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
-    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : 'クリックで描く') : `充填 ${Math.floor(frac * 100)}%`;
+    : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : `クリックで描く ${Math.floor(frac * 100)}%`) : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
@@ -4463,7 +5389,7 @@ function drawEnemies(r, game) {
       ctx.beginPath(); ctx.arc(Math.cos(e.facing) * R, Math.sin(e.facing) * R, (4 + 8 * e.charge) / Math.sqrt(z), 0, TAU); ctx.fill();
     }
     const pierce = atk >= e.armor;
-    const critOnly = !pierce && atk >= e.armor * CRIT_ARMOR;
+    const critOnly = !!e.weakArc && !pierce && atk >= e.armor * CRIT_ARMOR;
     // body
     ctx.save();
     ctx.rotate(e.facing);
@@ -4634,7 +5560,7 @@ function drawMinimap(r, game) {
     ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
   }
   for (const c of game.capsules) {
-    ctx.fillStyle = c.kind === 'core' ? '#ffd24a' : RARITIES[c.mod.r].color;
+    ctx.fillStyle = capsuleColor(c);
     const s2 = c.kind === 'core' ? 3.5 : 2.5;
     ctx.beginPath(); ctx.moveTo(c.x * k, c.y * k - s2); ctx.lineTo(c.x * k + s2, c.y * k); ctx.lineTo(c.x * k, c.y * k + s2); ctx.lineTo(c.x * k - s2, c.y * k); ctx.closePath(); ctx.fill();
   }
@@ -4864,6 +5790,7 @@ function loadoutUnit(r) {
 }
 
 function drawLoadout(r, game) {
+  if (game.newBuild) { drawRunLoadout(r, game); return; }
   const { ctx, H, W } = r;
   const unit = loadoutUnit(r);
   const cx = 12 + unit * 3.4, cy = H - 14 - unit * 3.4;
@@ -5148,6 +6075,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
 
 
 
+
 const root = () => document.getElementById('ui');
 
 function el(tag, attrs = {}, ...kids) {
@@ -5282,6 +6210,27 @@ function showOffer(game, onChoose) {
     loadout), 'offer');
 }
 
+function showRunLevel(game, onChoose) {
+  const cards = el('div', { class: 'level-cards' });
+  game.levelChoices.forEach((c, i) => {
+    const info = runChoiceInfo(c);
+    const card = el('button', { class: 'card level-card', onclick: () => onChoose(i), style: `border-color:${info.color}` },
+      el('div', { class: 'tag' }, info.tag, ' ', el('kbd', {}, String(i + 1))),
+      el('div', { class: 'name' }, info.name),
+      el('div', { class: 'desc' }, info.desc));
+    cards.append(card);
+  });
+  const build = el('div', { class: 'build-summary' });
+  for (const [title, defs, owned, max] of [['武器', RUN_WEAPONS, game.weapons, CONFIG.weaponSlots], ['特性', RUN_TRAITS, game.traits, CONFIG.traitSlots]]) {
+    const items = defs.filter(d => owned[d.id]).map(d => `${d.name} ${title === '武器' ? 'Lv' : '×'}${owned[d.id]}`);
+    build.append(el('div', {}, el('b', {}, `${title} ${items.length}/${max}　`), items.join(' ／ ') || 'なし'));
+  }
+  showScreen(el('div', { class: 'panel level-panel' },
+    el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
+    el('h1', {}, '強化を選ぶ'),
+    el('div', { class: 'sub' }, 'カードをクリック、または数字キー1〜3'), cards, build), 'levelup');
+}
+
 function showStation(save, onBuy, onDepart) {
   const b = save.best;
   const ups = el('div', { class: 'ups' });
@@ -5311,11 +6260,11 @@ function showStation(save, onBuy, onDepart) {
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
-      el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
-      el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
-      el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
-      el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
+      el('li', {}, '雑魚の弱点方向を狙う必要はない。クリティカルは確率で発生する'),
+      el('li', {}, isDrawScheme(CONFIG.controlScheme) ? `通常攻撃は自動。レベルアップで3枚から1つ選び、武器${CONFIG.weaponSlots}枠・各Lv8まで、特性${CONFIG.traitSlots}枠・各5重ねまで育てる。線の移動中は選択画面を保留する` : 'この操作の試作は従来の6部位モジュールを使用する'),
+      el('li', {}, isDrawScheme(CONFIG.controlScheme) ? '敵を倒して経験値を回収する。漂流カプセルも経験値になり、装備はレベルアップで選ぶ' : '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。ボスとの戦いに向けて機体を強化する'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
@@ -5514,6 +6463,8 @@ function createAudio() {
 
 
 
+
+
 const DEFAULTS = { ...CONFIG };
 
 const TUNABLES = [
@@ -5524,7 +6475,11 @@ const TUNABLES = [
   { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
-  { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
+  { key: 'dashChargeTime', label: '描画版：1単位の充填時間（実秒）', min: 1, max: 20, step: 0.5 },
+  { key: 'drawMinCharge', label: '描画版：発動できる最低充填率', min: 0.1, max: 1, step: 0.1 },
+  { key: 'weaponSlots', label: '描画版：武器枠', min: 1, max: 8, step: 1 },
+  { key: 'traitSlots', label: '描画版：特性枠', min: 1, max: 12, step: 1 },
+  { key: 'chargeTime', label: '旧方式：押下チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
   { key: 'steerRate', label: '旋回の速さ（マウス / WASD 旋回）rad/s', min: 0.5, max: 12, step: 0.1 },
   { key: 'steerAccel', label: '旋回操作の加速（低速時）', min: 0, max: 3000, step: 50 },
   { key: 'steerCruise', label: '旋回操作だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
@@ -5563,15 +6518,18 @@ const TUNABLES = [
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
-  { key: 'dropBase', label: 'モジュール基本ドロップ率（敵の強さで増加）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
-  { key: 'dropMax', label: 'モジュールドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'dropBase', label: 'カプセル基本ドロップ率（描画版はXP）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
+  { key: 'dropMax', label: 'カプセルドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
+  { key: 'xpBase', label: 'レベル経験値：基礎', min: 20, max: 200, step: 10 },
+  { key: 'xpGrowth', label: 'レベル経験値：一次増加', min: 0, max: 100, step: 2 },
+  { key: 'xpCurve', label: 'レベル経験値：二次増加', min: 0, max: 20, step: 1 },
   { key: 'xpMult', label: '経験値 倍率', min: 0.2, max: 4, step: 0.05 },
 ];
 
-const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
+const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'dashChargeTime', 'boostDuration', 'cruiseFloor']);
 
 function applyTunable(game, key, value) {
   CONFIG[key] = value;
@@ -5597,8 +6555,20 @@ function jumpToPhase(game, id) {
 function setScheme(game, id) {
   CONFIG.controlScheme = schemeById(id).id;
   if (game) {
+    const wasBuild = game.newBuild;
     game.scheme = CONFIG.controlScheme;
+    game.newBuild = isDrawScheme(game.scheme);
+    if (game.newBuild !== wasBuild) {
+      game.levelChoices = null; game.pendingLevelups = 0;
+      game.currentOffer = null; game.offerQueue = [];
+      if (game.state === 'levelup' || game.state === 'offer') game.state = 'play';
+      if (game.newBuild) for (const c of game.capsules) {
+        if (c.kind !== 'capsule') continue;
+        c.kind = 'cache'; c.xp = xpForLevel(game.level) * 0.2; delete c.mod;
+      }
+    }
     game.draw = null; game.portalDash = null; game.portalPreview = null;
+    refreshStats(game); // Temporary full-charge effects must end with the interrupted route.
     game.ship.charging = false; game.releasePending = null;
   }
 }
@@ -5661,6 +6631,14 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   };
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
+  button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
+  button('ゲージ満タン', g => { g.dashMeter = 1; });
+  button('装備をリセット', g => {
+    if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
+    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = [];
+    g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
+    if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
+  });
   button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
   const sel = document.createElement('select');
   sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
@@ -5673,42 +6651,65 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   rsel.value = '2';
   btns.append(rsel);
   function syncModuleRarity() {
-    const def = MODULES.find(m => m.id === moduleSel.value);
-    if (def && !def.rarities.includes(Number(rsel.value))) {
-      const current = Number(rsel.value);
-      rsel.value = String(def.rarities.reduce((a, b) => Math.abs(b - current) < Math.abs(a - current) ? b : a));
+    const modern = isDrawScheme(getGame()?.scheme || CONFIG.controlScheme);
+    if (modern) {
+      rsel.setAttribute('aria-label', '入手するモジュールの強化回数');
+      const [kind, id] = moduleSel.value.split(':');
+      const def = runModuleDef(kind, id), max = kind === 'trait' ? 5 : 8;
+      const selected = Number(rsel.value) || 1;
+      rsel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">+${i + 1} 段階</option>`).join('');
+      rsel.value = String(Math.min(max, Math.max(1, selected)));
+      moduleHelp.textContent = def ? `${def.group || '通常候補'}：${kind === 'trait' ? def.desc(1) : def.desc}。空き枠があれば直接入手、同じ装備なら強化。` : '武器／特性と強化回数を指定して直接入手。待機・選択画面なし。満員なら装備リセットで試せます。';
+      return;
     }
+    rsel.setAttribute('aria-label', '入手するモジュールのレア度');
+    if (rsel.options.length !== RARITIES.length || rsel.options[0].textContent !== RARITIES[0].name) rsel.innerHTML = RARITIES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
+    const def = MODULES.find(m => m.id === moduleSel.value);
+    if (def && !def.rarities.includes(Number(rsel.value))) rsel.value = String(def.rarities[0]);
     for (const option of rsel.options) option.disabled = !!def && !def.rarities.includes(Number(option.value));
-    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : 'モジュールとレア度を選び、「モジュール入手」でその場で試せます。';
+    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : '従来の6部位モジュールを指定して入手。';
   }
   function syncModulePicker() {
-    const selected = moduleSel.value;
-    const scheme = getGame()?.scheme || CONFIG.controlScheme;
-    moduleSel.innerHTML = '<option value="">ランダム（従来）</option>';
-    for (const slot of SLOTS) {
-      const group = document.createElement('optgroup');
-      group.label = slot.name;
+    const selected = moduleSel.value, scheme = getGame()?.scheme || CONFIG.controlScheme;
+    moduleSel.innerHTML = '<option value="">ランダム</option>';
+    if (isDrawScheme(scheme)) {
+      for (const [kind, defs] of [['weapon', RUN_WEAPONS], ['trait', RUN_TRAITS]]) {
+        for (const groupName of [undefined, '保留', '既存候補']) {
+          const group = document.createElement('optgroup');
+          group.label = `${kind === 'weapon' ? '武器' : '特性'}：${groupName || '通常候補'}`;
+          for (const def of defs.filter(d => d.group === groupName)) {
+            const option = document.createElement('option'); option.value = `${kind}:${def.id}`; option.textContent = def.name; group.append(option);
+          }
+          if (group.children.length) moduleSel.append(group);
+        }
+      }
+    } else for (const slot of SLOTS) {
+      const group = document.createElement('optgroup'); group.label = slot.name;
       for (const mod of MODULES.filter(m => m.slot === slot.id && moduleFitsScheme(m, scheme))) {
-        const option = document.createElement('option');
-        option.value = mod.id; option.textContent = mod.name;
-        group.append(option);
+        const option = document.createElement('option'); option.value = mod.id; option.textContent = mod.name; group.append(option);
       }
       if (group.children.length) moduleSel.append(group);
     }
-    if ([...moduleSel.options].some(option => option.value === selected)) moduleSel.value = selected;
+    if ([...moduleSel.options].some(o => o.value === selected)) moduleSel.value = selected;
     syncModuleRarity();
   }
   moduleSel.addEventListener('change', () => { syncModuleRarity(); moduleSel.blur(); });
   rsel.addEventListener('change', () => { syncModuleRarity(); rsel.blur(); });
   syncModulePicker();
   button('モジュール入手', (g) => {
+    if (g.newBuild) {
+      let [kind, id] = moduleSel.value.split(':');
+      if (!id) { const choices = [...RUN_WEAPONS.filter(d => d.normal).map(d => ['weapon', d.id]), ...RUN_TRAITS.filter(d => d.normal).map(d => ['trait', d.id])]; [kind, id] = choices[Math.floor(g.rng() * choices.length)]; }
+      debugRunItem(g, kind, id, Number(rsel.value)); return;
+    }
     const r = Number(rsel.value);
     const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
     const def = pool.find(m => m.id === moduleSel.value) || pool[Math.floor(Math.random() * pool.length)];
     if (g.state === 'play' || g.state === 'offer') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
-  button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
+  button('出力コア', g => { if (g.state === 'play') { g.cores++; refreshStats(g); } });
   button('包囲炸裂を入手', (g) => {
+    if (g.newBuild) { debugRunItem(g, 'trait', 'loop', Number(rsel.value)); return; }
     if (g.state === 'play' && g.scheme === 'portal') pushOffer(g,
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
@@ -5847,6 +6848,13 @@ function chooseOffer(accept) {
   if (game.state === 'play') { clearScreens(); input.reset(); }
 }
 
+function chooseRunCard(index) {
+  if (game.state !== 'levelup') return;
+  if (!resolveRunLevel(game, index)) return;
+  offerShown = null;
+  if (game.state === 'play') { clearScreens(); input.reset(); input.state.enabled = true; }
+}
+
 function togglePause() {
   if (mode !== 'run') return;
   if (game.state === 'play') {
@@ -5860,6 +6868,11 @@ function togglePause() {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (mode === 'run' && game.state === 'levelup') {
+    if (['1', '2', '3'].includes(e.key) && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
+    if (e.key === 'p' || e.key === 'P') debug.toggle();
+    return;
+  }
   if (mode === 'run' && game.state === 'offer') {
     if (e.key === '1') chooseOffer(true);
     else if (e.key === '2') chooseOffer(false);
@@ -5881,7 +6894,7 @@ function updateDashButton() {
     (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
   if (!show) return;
-  dashBtn.disabled = game.dashMeter < 1;
+  dashBtn.disabled = game.dashMeter < (game.newBuild ? CONFIG.drawMinCharge : 1);
 }
 
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
@@ -5905,7 +6918,14 @@ function frame(now) {
   debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
+    if (game.state === 'play' && offerShown) {
+      offerShown = null; clearScreens(); input.reset(); input.state.enabled = true;
+    }
     if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (game.state === 'levelup' && offerShown !== game.levelChoices) {
+      offerShown = game.levelChoices; input.reset(); input.state.enabled = false;
+      showRunLevel(game, chooseRunCard);
+    }
     if (game.state === 'offer' && offerShown !== game.currentOffer) {
       offerShown = game.currentOffer;
       input.reset();

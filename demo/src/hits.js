@@ -6,10 +6,18 @@ import { dangerAt } from './field.js';
 import { rollModule } from './modules.js';
 import { attackPower } from './combat.js';
 import { dropPortal } from './portals.js';
+import { onRunCritical, onRunKill } from './run-weapons.js';
+import { xpForLevel } from './progression.js';
 import { beginBossFinish } from './finale.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || game.state === 'finishing' || dmg <= 0) return;
+  let critical = !!opts.crit;
+  if (game.newBuild && opts.crit === undefined && !opts.noCrit) {
+    critical = game.rng() < game.stats.critChance;
+    if (critical) dmg *= game.stats.critMult;
+  }
+  opts = { ...opts, crit: critical };
   let fresh = e.hp >= e.maxHp - 1e-6;
   // during a traced dash, the wave reaches an enemy just before the body does: judge "one-shot"
   // by its HP when this dash first touched it, so wave + body still count as one strike
@@ -29,6 +37,7 @@ export function damageEnemy(game, e, dmg, opts = {}) {
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
   }
+  if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
 
 // One-shot ram kills freeze the action for a beat, so each kill in a sweep lands on its own.
@@ -60,6 +69,7 @@ export function killEnemy(game, e, opts = {}) {
     dropModule(game, e.x, e.y, power, danger);
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
+  onRunKill(game, opts.cause);
 }
 
 function flingCorpse(game, e) {
@@ -99,11 +109,19 @@ export function dropGem(game, x, y, v) {
 }
 
 function dropModule(game, x, y, power, danger) {
+  if (game.newBuild) {
+    game.capsules.push({ kind: 'cache', src: 'drop', x, y, xp: xpForLevel(game.level) * 0.15, age: 0 });
+    return;
+  }
   const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'drop', power, danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src: 'drop', x, y, mod, age: 0 });
 }
 
 export function dropCapsule(game, x, y, src, danger) {
+  if (game.newBuild) {
+    game.capsules.push({ kind: 'cache', src, x, y, xp: xpForLevel(game.level) * 0.2, age: 0 });
+    return;
+  }
   const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger, scheme: game.scheme });
   game.capsules.push({ kind: 'capsule', src, x, y, mod, age: 0 });
 }

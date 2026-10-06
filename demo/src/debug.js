@@ -1,9 +1,11 @@
 // Tuning panel: edits CONFIG live and offers shortcuts (time skip, modules, invincibility).
 import { CONFIG } from './config.js';
-import { refreshStats, pushOffer } from './world.js';
+import { refreshStats, pushOffer, addXp, debugRunItem } from './world.js';
 import { PHASES } from './spawner.js';
 import { MODULES, RARITIES, SLOTS, moduleFitsScheme } from './modules.js';
-import { SCHEMES, schemeById } from './controls.js';
+import { RUN_WEAPONS, RUN_TRAITS, runModuleDef, runChoiceInfo } from './run-build.js';
+import { xpForLevel } from './progression.js';
+import { SCHEMES, schemeById, isDrawScheme } from './controls.js';
 
 const DEFAULTS = { ...CONFIG };
 
@@ -15,7 +17,11 @@ export const TUNABLES = [
   { key: 'levelSpeedGrowth', label: 'レベルごとの最高速度 +', min: 0, max: 0.1, step: 0.005 },
   { key: 'launchRatio', label: '突進の強さ（上限比）', min: 0.3, max: 1.2, step: 0.02 },
   { key: 'carry', label: '勢いの持ち越し', min: 0, max: 1, step: 0.02 },
-  { key: 'chargeTime', label: 'チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
+  { key: 'dashChargeTime', label: '描画版：1単位の充填時間（実秒）', min: 1, max: 20, step: 0.5 },
+  { key: 'drawMinCharge', label: '描画版：発動できる最低充填率', min: 0.1, max: 1, step: 0.1 },
+  { key: 'weaponSlots', label: '描画版：武器枠', min: 1, max: 8, step: 1 },
+  { key: 'traitSlots', label: '描画版：特性枠', min: 1, max: 12, step: 1 },
+  { key: 'chargeTime', label: '旧方式：押下チャージ時間（秒）', min: 0.15, max: 2, step: 0.05 },
   { key: 'steerRate', label: '旋回の速さ（マウス / WASD 旋回）rad/s', min: 0.5, max: 12, step: 0.1 },
   { key: 'steerAccel', label: '旋回操作の加速（低速時）', min: 0, max: 3000, step: 50 },
   { key: 'steerCruise', label: '旋回操作だけで出せる速度（上限比）', min: 0, max: 1, step: 0.05 },
@@ -54,15 +60,18 @@ export const TUNABLES = [
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
-  { key: 'dropBase', label: 'モジュール基本ドロップ率（敵の強さで増加）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
-  { key: 'dropMax', label: 'モジュールドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'dropBase', label: 'カプセル基本ドロップ率（描画版はXP）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
+  { key: 'dropMax', label: 'カプセルドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemyHpMult', label: '敵 HP 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'enemyArmorMult', label: '敵 装甲 倍率', min: 0.2, max: 3, step: 0.05 },
   { key: 'dangerLevel', label: '危険ゾーンの強化', min: 0, max: 5, step: 0.1 },
+  { key: 'xpBase', label: 'レベル経験値：基礎', min: 20, max: 200, step: 10 },
+  { key: 'xpGrowth', label: 'レベル経験値：一次増加', min: 0, max: 100, step: 2 },
+  { key: 'xpCurve', label: 'レベル経験値：二次増加', min: 0, max: 20, step: 1 },
   { key: 'xpMult', label: '経験値 倍率', min: 0.2, max: 4, step: 0.05 },
 ];
 
-const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'boostDuration', 'cruiseFloor']);
+const STAT_KEYS = new Set(['baseMaxSpeed', 'levelSpeedGrowth', 'launchRatio', 'carry', 'chargeTime', 'dashChargeTime', 'boostDuration', 'cruiseFloor']);
 
 export function applyTunable(game, key, value) {
   CONFIG[key] = value;
@@ -88,8 +97,20 @@ export function jumpToPhase(game, id) {
 export function setScheme(game, id) {
   CONFIG.controlScheme = schemeById(id).id;
   if (game) {
+    const wasBuild = game.newBuild;
     game.scheme = CONFIG.controlScheme;
+    game.newBuild = isDrawScheme(game.scheme);
+    if (game.newBuild !== wasBuild) {
+      game.levelChoices = null; game.pendingLevelups = 0;
+      game.currentOffer = null; game.offerQueue = [];
+      if (game.state === 'levelup' || game.state === 'offer') game.state = 'play';
+      if (game.newBuild) for (const c of game.capsules) {
+        if (c.kind !== 'capsule') continue;
+        c.kind = 'cache'; c.xp = xpForLevel(game.level) * 0.2; delete c.mod;
+      }
+    }
     game.draw = null; game.portalDash = null; game.portalPreview = null;
+    refreshStats(game); // Temporary full-charge effects must end with the interrupted route.
     game.ship.charging = false; game.releasePending = null;
   }
 }
@@ -152,6 +173,14 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   };
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
+  button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
+  button('ゲージ満タン', g => { g.dashMeter = 1; });
+  button('装備をリセット', g => {
+    if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
+    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = [];
+    g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
+    if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
+  });
   button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
   const sel = document.createElement('select');
   sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
@@ -164,42 +193,65 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   rsel.value = '2';
   btns.append(rsel);
   function syncModuleRarity() {
-    const def = MODULES.find(m => m.id === moduleSel.value);
-    if (def && !def.rarities.includes(Number(rsel.value))) {
-      const current = Number(rsel.value);
-      rsel.value = String(def.rarities.reduce((a, b) => Math.abs(b - current) < Math.abs(a - current) ? b : a));
+    const modern = isDrawScheme(getGame()?.scheme || CONFIG.controlScheme);
+    if (modern) {
+      rsel.setAttribute('aria-label', '入手するモジュールの強化回数');
+      const [kind, id] = moduleSel.value.split(':');
+      const def = runModuleDef(kind, id), max = kind === 'trait' ? 5 : 8;
+      const selected = Number(rsel.value) || 1;
+      rsel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">+${i + 1} 段階</option>`).join('');
+      rsel.value = String(Math.min(max, Math.max(1, selected)));
+      moduleHelp.textContent = def ? `${def.group || '通常候補'}：${kind === 'trait' ? def.desc(1) : def.desc}。空き枠があれば直接入手、同じ装備なら強化。` : '武器／特性と強化回数を指定して直接入手。待機・選択画面なし。満員なら装備リセットで試せます。';
+      return;
     }
+    rsel.setAttribute('aria-label', '入手するモジュールのレア度');
+    if (rsel.options.length !== RARITIES.length || rsel.options[0].textContent !== RARITIES[0].name) rsel.innerHTML = RARITIES.map((r, i) => `<option value="${i}">${r.name}</option>`).join('');
+    const def = MODULES.find(m => m.id === moduleSel.value);
+    if (def && !def.rarities.includes(Number(rsel.value))) rsel.value = String(def.rarities[0]);
     for (const option of rsel.options) option.disabled = !!def && !def.rarities.includes(Number(option.value));
-    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : 'モジュールとレア度を選び、「モジュール入手」でその場で試せます。';
+    moduleHelp.textContent = def ? def.desc(Number(rsel.value)) : '従来の6部位モジュールを指定して入手。';
   }
   function syncModulePicker() {
-    const selected = moduleSel.value;
-    const scheme = getGame()?.scheme || CONFIG.controlScheme;
-    moduleSel.innerHTML = '<option value="">ランダム（従来）</option>';
-    for (const slot of SLOTS) {
-      const group = document.createElement('optgroup');
-      group.label = slot.name;
+    const selected = moduleSel.value, scheme = getGame()?.scheme || CONFIG.controlScheme;
+    moduleSel.innerHTML = '<option value="">ランダム</option>';
+    if (isDrawScheme(scheme)) {
+      for (const [kind, defs] of [['weapon', RUN_WEAPONS], ['trait', RUN_TRAITS]]) {
+        for (const groupName of [undefined, '保留', '既存候補']) {
+          const group = document.createElement('optgroup');
+          group.label = `${kind === 'weapon' ? '武器' : '特性'}：${groupName || '通常候補'}`;
+          for (const def of defs.filter(d => d.group === groupName)) {
+            const option = document.createElement('option'); option.value = `${kind}:${def.id}`; option.textContent = def.name; group.append(option);
+          }
+          if (group.children.length) moduleSel.append(group);
+        }
+      }
+    } else for (const slot of SLOTS) {
+      const group = document.createElement('optgroup'); group.label = slot.name;
       for (const mod of MODULES.filter(m => m.slot === slot.id && moduleFitsScheme(m, scheme))) {
-        const option = document.createElement('option');
-        option.value = mod.id; option.textContent = mod.name;
-        group.append(option);
+        const option = document.createElement('option'); option.value = mod.id; option.textContent = mod.name; group.append(option);
       }
       if (group.children.length) moduleSel.append(group);
     }
-    if ([...moduleSel.options].some(option => option.value === selected)) moduleSel.value = selected;
+    if ([...moduleSel.options].some(o => o.value === selected)) moduleSel.value = selected;
     syncModuleRarity();
   }
   moduleSel.addEventListener('change', () => { syncModuleRarity(); moduleSel.blur(); });
   rsel.addEventListener('change', () => { syncModuleRarity(); rsel.blur(); });
   syncModulePicker();
   button('モジュール入手', (g) => {
+    if (g.newBuild) {
+      let [kind, id] = moduleSel.value.split(':');
+      if (!id) { const choices = [...RUN_WEAPONS.filter(d => d.normal).map(d => ['weapon', d.id]), ...RUN_TRAITS.filter(d => d.normal).map(d => ['trait', d.id])]; [kind, id] = choices[Math.floor(g.rng() * choices.length)]; }
+      debugRunItem(g, kind, id, Number(rsel.value)); return;
+    }
     const r = Number(rsel.value);
     const pool = MODULES.filter((m) => m.rarities.includes(r) && moduleFitsScheme(m, g.scheme));
     const def = pool.find(m => m.id === moduleSel.value) || pool[Math.floor(Math.random() * pool.length)];
     if (g.state === 'play' || g.state === 'offer') pushOffer(g, { id: def.id, slot: def.slot, r }, 'capsule');
   });
-  button('出力コア', (g) => { if (g.state === 'play') pushOffer(g, { id: 'limiter', slot: 'booster', r: 3 }, 'core'); });
+  button('出力コア', g => { if (g.state === 'play') { g.cores++; refreshStats(g); } });
   button('包囲炸裂を入手', (g) => {
+    if (g.newBuild) { debugRunItem(g, 'trait', 'loop', Number(rsel.value)); return; }
     if (g.state === 'play' && g.scheme === 'portal') pushOffer(g,
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });

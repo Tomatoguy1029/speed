@@ -46,9 +46,18 @@ export const CONFIG = {
   spawnRefillTime: 1, // replenish local population deficits in about one world second
   spawnRecycleScale: 1.6,
   dupBonus: 0.15, // each duplicate pickup adds +15% to that module's effect
-  atkScale: 1.8, // attack = speed / 100 * atkMult * atkScale (keeps early fodder one-shot at the slower start)
+  atkScale: 1, // multiplier of baseAttack; independent of speed
   launchRatio: 0.8, // full gauge launch = maxSpeed * launchRatio
   carry: 0.65, // share of current speed carried into the next launch (same direction)
+  baseAttack: 10, // damage is independent of travel speed
+  dashChargeTime: 6, // real play seconds for one unit of draw charge
+  drawMinCharge: 0.5, // partial launch distinguishes full-charge traits
+  baseCritChance: 0.05,
+  weaponSlots: 4,
+  traitSlots: 6, // prototype value; adjustable in P
+  pathMemoryTime: 12,
+  pathMemoryMax: 160,
+  droneDelay: 0.12,
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
@@ -134,8 +143,9 @@ export const CONFIG = {
   capsuleInterval: 16, // seconds between respawns
 
   // growth
-  xpBase: 10,
-  xpGrowth: 7,
+  xpBase: 60,
+  xpGrowth: 28,
+  xpCurve: 4,
   xpMult: 1,
 
   // flung wreckage visuals

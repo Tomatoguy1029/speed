@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { META_UPGRADES, metaCost } from './progression.js';
 import { schemeById, isDrawScheme } from './controls.js';
+import { RUN_WEAPONS, RUN_TRAITS, runChoiceInfo, runItemCount } from './run-build.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 
 const root = () => document.getElementById('ui');
@@ -138,6 +139,27 @@ export function showOffer(game, onChoose) {
     loadout), 'offer');
 }
 
+export function showRunLevel(game, onChoose) {
+  const cards = el('div', { class: 'level-cards' });
+  game.levelChoices.forEach((c, i) => {
+    const info = runChoiceInfo(c);
+    const card = el('button', { class: 'card level-card', onclick: () => onChoose(i), style: `border-color:${info.color}` },
+      el('div', { class: 'tag' }, info.tag, ' ', el('kbd', {}, String(i + 1))),
+      el('div', { class: 'name' }, info.name),
+      el('div', { class: 'desc' }, info.desc));
+    cards.append(card);
+  });
+  const build = el('div', { class: 'build-summary' });
+  for (const [title, defs, owned, max] of [['武器', RUN_WEAPONS, game.weapons, CONFIG.weaponSlots], ['特性', RUN_TRAITS, game.traits, CONFIG.traitSlots]]) {
+    const items = defs.filter(d => owned[d.id]).map(d => `${d.name} ${title === '武器' ? 'Lv' : '×'}${owned[d.id]}`);
+    build.append(el('div', {}, el('b', {}, `${title} ${items.length}/${max}　`), items.join(' ／ ') || 'なし'));
+  }
+  showScreen(el('div', { class: 'panel level-panel' },
+    el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
+    el('h1', {}, '強化を選ぶ'),
+    el('div', { class: 'sub' }, 'カードをクリック、または数字キー1〜3'), cards, build), 'levelup');
+}
+
 export function showStation(save, onBuy, onDepart) {
   const b = save.best;
   const ups = el('div', { class: 'ups' });
@@ -167,11 +189,11 @@ export function showStation(save, onBuy, onDepart) {
     el('h2', {}, '操作'),
     el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
-      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中に拾ったモジュールの選択画面は線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
-      el('li', {}, '攻撃力 = 速度。赤い輪の敵は今の速度では貫けない（橙の点線は弱点からなら貫ける）'),
-      el('li', {}, '黄色い弧が弱点。そこに当たると必ずクリティカル。予測線が黄色く光る位置を狙う'),
-      el('li', {}, 'モジュールは敵が落とす（強い敵ほどよく落とし、レア度も高い）。同じモジュールを拾うと自動で強化（+1）。レベルアップでは基礎性能が上がる'),
-      el('li', {}, '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
+      el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
+      el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
+      el('li', {}, '雑魚の弱点方向を狙う必要はない。クリティカルは確率で発生する'),
+      el('li', {}, isDrawScheme(CONFIG.controlScheme) ? `通常攻撃は自動。レベルアップで3枚から1つ選び、武器${CONFIG.weaponSlots}枠・各Lv8まで、特性${CONFIG.traitSlots}枠・各5重ねまで育てる。線の移動中は選択画面を保留する` : 'この操作の試作は従来の6部位モジュールを使用する'),
+      el('li', {}, isDrawScheme(CONFIG.controlScheme) ? '敵を倒して経験値を回収する。漂流カプセルも経験値になり、装備はレベルアップで選ぶ' : '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。ボスとの戦いに向けて機体を強化する'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),

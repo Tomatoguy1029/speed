@@ -90,6 +90,8 @@ function bossClearBlast(game) {
   boss.dead = true;
   game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
   game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
+  game.marks = []; game.wproj = []; game.wfx = []; game.wstate = {};
+  game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
   game.fx.texts = [];
   const radius = Math.max(900, game.viewRadius * 1.4);
   addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);

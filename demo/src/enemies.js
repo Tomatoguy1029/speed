@@ -41,7 +41,7 @@ export function createEnemy(type, level, x, y, opts = {}) {
     xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
     speed: T.speed * (1 + 0.04 * (L - 1)),
     facing: opts.facing ?? 0,
-    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: T.weakArc || 0,
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: 0, // directional weak spots are not part of the current prototype
     hitCD: 0, flash: 0, dead: false,
     state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
     parent: opts.parent || 0,
@@ -221,7 +221,12 @@ export function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
-  BEHAVIORS[e.T.behavior](e, game, dt);
+  if (e.shove && e.shove.time > 0) {
+    e.shoveFrom = { x: e.x, y: e.y };
+    e.shove.time -= dt;
+    e.vx = e.shove.vx; e.vy = e.shove.vy;
+    e.shove.vx *= Math.exp(-dt * 0.8); e.shove.vy *= Math.exp(-dt * 0.8);
+  } else BEHAVIORS[e.T.behavior](e, game, dt);
   e.x += e.vx * dt;
   e.y += e.vy * dt;
   // stay out of the planet

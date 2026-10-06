@@ -13,6 +13,8 @@ import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
+import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers } from './run-weapons.js';
+import { computeRunStats, rollRunChoices, grantRunItem, runModuleDef } from './run-build.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
@@ -26,13 +28,17 @@ export function createGame(opts = {}) {
   const loadout = Object.fromEntries(SLOTS.map((s) => [s.id, null]));
   // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
   if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
-  const stats = computeStats(meta, loadout);
+  const newBuild = isDrawScheme(opts.scheme || CONFIG.controlScheme);
+  const weapons = { forward: 1 }, traits = {};
+  const stats = newBuild ? computeRunStats(meta, weapons, traits) : computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
     t: 0, acc: 0, seed, rng,
-    meta, stats, ship, loadout,
+    meta, stats, ship, loadout, newBuild, weapons, traits,
+    levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
+    runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
     field: createField(rng),
@@ -50,7 +56,7 @@ export function createGame(opts = {}) {
     portals: [], portalSerial: 0, portalDash: null, portalPreview: null, portalTouch: null, portalEntryT: 0,
     portalSpace: { armed: false, seconds: 0, consumed: false },
     portalClock: 0, portalCooldowns: new Map(),
-    dashMeter: 1, // draw mode: the dash gauge (fills from XP; full = ready)
+    dashMeter: 1, // normalized charge capacity; time-filled in the draw prototype
     grid: buildGrid([], 160),
     fx: { particles: [], rings: [], texts: [], ghosts: [], loops: [], impacts: [] },
     ...createEffectState(),
@@ -77,12 +83,19 @@ export function update(game, frameDt, input) {
   }
   if (game.state !== 'play') return;
   recordBossApproach(game, frameDt);
+  game.buildClock += frameDt;
+  if (game.newBuild && !game.draw) {
+    const old = game.dashMeter;
+    game.dashMeter = Math.min(1, old + frameDt / (game.stats.chargeTime * game.stats.gaugeMax));
+    if (old < 1 && game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
+  }
+  if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); return; }
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
   updateFx(game, frameDt);
   handlePortalInput(game, input, frameDt);
-  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= 1) {
+  if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= (game.newBuild ? CONFIG.drawMinCharge : 1)) {
     startDrawing(game, input);
     input = { ...input, press: false }; // consume the start click so it cannot also commit
   }
@@ -99,6 +112,8 @@ export function update(game, frameDt, input) {
     collideBodies(game);
     recordTrail(game.ship, frameDt);
   }
+  if (game.newBuild) updateRunFollowers(game);
+  if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
   if (game.portalDash) scale = portalWorldScale(game);
@@ -114,6 +129,7 @@ export function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
+    if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); break; }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
@@ -187,6 +203,8 @@ function step(game, dt, input) {
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
+  if (game.newBuild) updateRunWeapons(game, dt);
+  if (game.state !== 'play') return;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
   updateEffects(game, dt);
   if (game.state !== 'play') return;
@@ -218,7 +236,43 @@ function end(game, state, reason) {
   game.events.push({ type: 'end', state, reason });
 }
 
-// ---- offers ----
+// ---- draw-build level-ups ----
+
+function openRunLevel(game) {
+  game.state = 'levelup';
+  game.levelChoices = rollRunChoices(game);
+  game.ship.charging = false;
+  game.releasePending = null;
+}
+
+export function resolveRunLevel(game, index) {
+  if (game.state !== 'levelup') return false;
+  const c = game.levelChoices?.[index];
+  if (!c) return false;
+  if (c.kind === 'heal') game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * 0.3);
+  else if (!grantRunItem(game, c.kind, c.id)) return false;
+  refreshStats(game);
+  game.events.push({ type: 'upgrade', mod: c });
+  game.pendingLevelups = Math.max(0, game.pendingLevelups - 1);
+  game.levelChoices = null;
+  if (game.pendingLevelups) openRunLevel(game);
+  else game.state = 'play';
+  return true;
+}
+
+export function debugRunItem(game, kind, id, levels = 1) {
+  if (!game.newBuild || !['play', 'levelup'].includes(game.state)) return false;
+  const ok = grantRunItem(game, kind, id, levels);
+  const name = runModuleDef(kind, id)?.name || id;
+  addText(game, game.ship.x, game.ship.y - 46, ok ? name : '装備枠が満員／強化済み', ok ? '#9fe8ff' : '#ff9f40', 18);
+  if (ok) {
+    refreshStats(game);
+    if (game.state === 'levelup') game.levelChoices = rollRunChoices(game);
+  }
+  return ok;
+}
+
+// ---- legacy offers ----
 
 // Picking up a module you already have upgrades it (+1, +15% effect each) instead of asking.
 export function absorbDuplicates(game) {
@@ -280,7 +334,11 @@ export function resolveOffer(game, accept) {
 
 export function refreshStats(game) {
   const oldMax = game.stats.maxHp;
-  game.stats = computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
+  const burstPower = game.stats.burstPower, ignoreArmor = game.stats.ignoreArmor;
+  game.stats = game.newBuild
+    ? computeRunStats(game.meta, game.weapons, game.traits, { cores: game.cores, level: game.level })
+    : computeStats(game.meta, game.loadout, { cores: game.cores, level: game.level });
+  if (game.newBuild && game.draw?.phase === 'run') { game.stats.burstPower = burstPower; game.stats.ignoreArmor = ignoreArmor; }
   const gain = game.stats.maxHp - oldMax;
   if (gain > 0) game.ship.hp += gain;
   game.ship.hp = Math.min(game.ship.hp, game.stats.maxHp);
@@ -335,21 +393,19 @@ function drawWorldScale(game) {
   return game.draw.phase === 'draw' ? CONFIG.drawTimeScale : traceWorldScale(game);
 }
 
-// XP needed to refill the dash gauge: a share of the current level's XP (easier than levelling);
-// charge-time stats (modules, levels) make it fill faster.
-export function dashNeed(game) {
-  return CONFIG.dashXpFrac * xpForLevel(game.level) * (game.stats.chargeTime / CONFIG.chargeTime);
-}
+// Real play seconds needed to fill the draw gauge from empty.
+export function dashNeed(game) { return game.stats.chargeTime * game.stats.gaugeMax; }
 
 function startDrawing(game, input) {
   const sh = game.ship;
   sh.glide = false;
-  const gauge = game.stats.gaugeMax; // always a full (over)charge
+  const fullCharge = game.dashMeter >= 1 - 1e-6;
+  const gauge = game.stats.gaugeMax * (game.newBuild ? game.dashMeter : 1);
   const budget = drawBudget(game, gauge);
   game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+    budget, used: 0, gauge, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -437,6 +493,7 @@ function commitPath(game) {
   // speed = the dash speed (attack, escape, momentum afterwards); rate = how fast the path is traced on screen
   const rate = Math.max(speed, total / (CONFIG.drawRunTime / game.stats.traceSpeedMult));
   game.draw = { phase: 'run', path: pts, seg: 0, segPos: 0, speed, rate, budget: d.budget, inside: new Map(), passes: new Map(), waveInside: new Map(), waveAcc: 0 };
+  if (game.newBuild) onRunLaunch(game, d.fullCharge);
   game.events.push({ type: 'launch', gauge: d.gauge, x: sh.x, y: sh.y, dx, dy });
 }
 
@@ -478,7 +535,11 @@ function runAlongPath(game, realDt) {
     game.dashPeakAtk = Math.max(game.dashPeakAtk, attackPower(r.speed, game.stats));
     waveAlong(game, r, x0, y0, sh.x, sh.y);
     if (game.state !== 'play') return;
-    if (collideEnemies(game, x0, y0, R, r)) { game.draw = null; endTraceAttack(game); return; }
+    if (collideEnemies(game, x0, y0, R, r)) {
+      onRunTrail(game, r, x0, y0, sh.x, sh.y);
+      game.draw = null; endTraceAttack(game); return;
+    }
+    onRunTrail(game, r, x0, y0, sh.x, sh.y);
     if (game.state !== 'play') return;
     const sp = Math.hypot(sh.vx, sh.vy);
     if (sp < r.speed) r.speed = sp;
@@ -584,11 +645,18 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
   if (!hits.length) return false;
   hits.sort((a, b) => a.t - b.t);
   for (const { e, t } of hits) {
+    if (e.dead) continue; // A preceding contact wave may already have removed this target.
     const hx = x0 + (x1 - x0) * t, hy = y0 + (y1 - y0) * t;
     const sp = Math.hypot(sh.vx, sh.vy);
     const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
     const atk = attackPower(sp, stats);
-    const crit = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const crit = game.newBuild ? game.rng() < stats.critChance : false;
+    const fast = !!run || sh.glide || sp >= stats.maxSpeed * 0.65;
+    if (game.newBuild && !fast) {
+      e.hitCD = 0.3;
+      damageShip(game, e.contact, 0.1, `contact:${e.type}`);
+      continue;
+    }
     const res = resolveRam(atk, e, crit, stats);
     if (res.pierce) {
       damageEnemy(game, e, res.damage, { crit, cause: 'ram', dirX: ux, dirY: uy, impactX: hx, impactY: hy });
@@ -608,6 +676,8 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
       sh.vx *= keep; sh.vy *= keep;
       game.dashPierce++;
       onPierce(game, hx, hy);
+      if (game.state === 'finishing') return false;
+      onRunContact(game, e, hx, hy, ux, uy);
       if (game.state === 'finishing') return false;
       if (e.T.steal) { sh.glide = false; const k = 1 - e.T.steal * stats.hitSlowMult; sh.vx *= k; sh.vy *= k; game.events.push({ type: 'drain', x: e.x, y: e.y }); }
       if (crit) game.hitstop = Math.max(game.hitstop, e.dead ? 0.05 : 0.035);
@@ -629,6 +699,7 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     damageEnemy(game, e, res.damage, { crit, cause: 'bump', dirX: -nx, dirY: -ny });
     e.hitCD = 0.25;
     damageShip(game, res.shipDamage * stats.bounceDamageMult, 0, `bump:${e.type}`);
+    onRunContact(game, e, hx, hy, ux, uy);
     game.events.push({ type: 'bounce', x: sh.x, y: sh.y });
     return true;
   }
@@ -761,18 +832,15 @@ function updateGems(game, dt) {
 
 export function addXp(game, v) {
   game.xp += v;
-  if (isDrawScheme(game.scheme) && game.dashMeter < 1) {
-    game.dashMeter = Math.min(1, game.dashMeter + v / dashNeed(game));
-    if (game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
-  }
-  let need = xpForLevel(game.level);
+    let need = xpForLevel(game.level);
   while (game.xp >= need) {
     game.xp -= need;
     game.level++;
+    if (game.newBuild) game.pendingLevelups++;
     game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * CONFIG.levelHeal);
     game.events.push({ type: 'levelup', level: game.level });
     need = xpForLevel(game.level);
-    refreshStats(game); // level-ups raise base stats; modules come from enemy drops
+    refreshStats(game); // deferred level choices never interrupt the traced movement
     addText(game, game.ship.x, game.ship.y - 34, `Lv ${game.level}`, '#6dffb0', 18);
   }
 }

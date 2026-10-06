@@ -1,7 +1,7 @@
 import { createRenderer, resizeRenderer, render, screenToWorld } from './render.js';
 import { createInput } from './input.js';
-import { createGame, update, resolveOffer } from './world.js';
-import { showResult, clearScreens, showOffer, showStation, showPause } from './ui.js';
+import { createGame, update, resolveOffer, resolveRunLevel } from './world.js';
+import { showResult, clearScreens, showOffer, showStation, showPause, showRunLevel } from './ui.js';
 import { loadSave, writeSave, buyUpgrade, applyRunResult, resetMeta } from './progression.js';
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
@@ -81,6 +81,13 @@ function chooseOffer(accept) {
   if (game.state === 'play') { clearScreens(); input.reset(); }
 }
 
+function chooseRunCard(index) {
+  if (game.state !== 'levelup') return;
+  if (!resolveRunLevel(game, index)) return;
+  offerShown = null;
+  if (game.state === 'play') { clearScreens(); input.reset(); input.state.enabled = true; }
+}
+
 function togglePause() {
   if (mode !== 'run') return;
   if (game.state === 'play') {
@@ -94,6 +101,11 @@ function togglePause() {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (mode === 'run' && game.state === 'levelup') {
+    if (['1', '2', '3'].includes(e.key) && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
+    if (e.key === 'p' || e.key === 'P') debug.toggle();
+    return;
+  }
   if (mode === 'run' && game.state === 'offer') {
     if (e.key === '1') chooseOffer(true);
     else if (e.key === '2') chooseOffer(false);
@@ -115,7 +127,7 @@ function updateDashButton() {
     (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
   if (!show) return;
-  dashBtn.disabled = game.dashMeter < 1;
+  dashBtn.disabled = game.dashMeter < (game.newBuild ? CONFIG.drawMinCharge : 1);
 }
 
 window.addEventListener('blur', () => { if (mode === 'run' && game.state === 'play') togglePause(); });
@@ -139,7 +151,14 @@ function frame(now) {
   debug.tick(game, dt);
   game.events.length = 0;
   if (mode === 'run') {
+    if (game.state === 'play' && offerShown) {
+      offerShown = null; clearScreens(); input.reset(); input.state.enabled = true;
+    }
     if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
+    if (game.state === 'levelup' && offerShown !== game.levelChoices) {
+      offerShown = game.levelChoices; input.reset(); input.state.enabled = false;
+      showRunLevel(game, chooseRunCard);
+    }
     if (game.state === 'offer' && offerShown !== game.currentOffer) {
       offerShown = game.currentOffer;
       input.reset();

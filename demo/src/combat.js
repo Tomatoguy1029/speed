@@ -1,10 +1,10 @@
 import { angleDiff } from './math.js';
 import { CONFIG } from './config.js';
 
-export const CRIT_ARMOR = 0.5; // weak-spot hits only need half the armor
+export const CRIT_ARMOR = 0.5; // critical contact needs half the armor; no directional weak spot
 
 export function attackPower(speed, stats) {
-  return (speed / 100) * stats.atkMult * CONFIG.atkScale;
+  return CONFIG.baseAttack * stats.atkMult * CONFIG.atkScale * (stats.burstPower || 1);
 }
 
 export function isWeakHit(e, hx, hy, arcMult) {
@@ -18,7 +18,7 @@ export function canPierce(atk, e, crit) {
 }
 
 export function resolveRam(atk, e, crit, stats) {
-  if (canPierce(atk, e, crit)) {
+  if (stats.ignoreArmor || canPierce(atk * (stats.armorPierceMult || 1), e, crit)) {
     const damage = atk * (crit ? stats.critMult : 1);
     return { pierce: true, damage, kill: damage >= e.hp, shipDamage: 0 };
   }

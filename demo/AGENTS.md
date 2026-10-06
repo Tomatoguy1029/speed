@@ -77,34 +77,15 @@ node tools/balance.js 3 1 god   # 自動プレイで各フェーズの数値を�
 | `src/input.js` | 生入力（キー・Space・ドラッグ・カーソル位置）だけを集める |
 | `src/ship.js` | 機体の基礎ステータス、ゲージ、発射速度、移動と減速 |
 | `src/gravity.js` / `src/field.js` | 中心惑星・小惑星の重力、ゾーン、危険度、宇宙塵 |
-| `src/combat.js` | 攻撃力（= 速度/100 × 倍率）、貫通／弾かれ、弱点クリティカル |
-| `src/enemies.js` / `src/projectiles.js` | 敵 10 種の定義と行動、敵弾 |
+| `src/combat.js` | 速度と独立した攻撃力、貫通／弾かれ、クリティカル |
+| `src/enemies.js` / `src/projectiles.js` | 敵13定義（通常11・ボス・隕石）と行動、敵弾 |
 | `src/spawner.js` | フェーズ表（時間ごとの数・強さ・構成）と出現処理 |
 | `src/hits.js` | 敵へのダメージ、撃破、ドロップ、範囲攻撃 |
 | `src/effects.js` | 性質を変えるモジュール効果、カプセル、出力コア |
-| `src/modules.js` | 6 部位・26 種のモジュール、レア度、ステータス合成、抽選 |
-| `src/progression.js` | 経験値、メタ強化（ステーション）、セーブ |
-| `src/stages.js` | 速度段階（演出用） |
-| `src/parts.js` | モジュール 6 部位を宇宙船のパーツとして描く（船首・エンジン・砲・レーダー・翼の装甲・リアクター）。組み上がった機体図も |
-| `src/render.js` / `src/audio.js` / `src/ui.js` / `src/debug.js` | 描画・合成音・DOM 画面・調整パネル |
-| `src/main.js` | 画面遷移（ステーション→ラン→リザルト）とメインループ |
-
-## ファイル構成
-
-| ファイル | 役割 |
-|---|---|
-| `src/config.js` | 調整用の数値をすべて集約（`CONFIG`）。調整パネルはこれを直接書き換える |
-| `src/world.js` | ゲーム状態と 1/120 秒固定ステップの更新、衝突、オファー、予測線 |
-| `src/controls.js` | **操作方式**（7 種）。生入力→意図への変換と、方式ごとの操舵・照準 |
-| `src/input.js` | 生入力（キー・Space・ドラッグ・カーソル位置）だけを集める |
-| `src/ship.js` | 機体の基礎ステータス、ゲージ、発射速度、移動と減速 |
-| `src/gravity.js` / `src/field.js` | 中心惑星・小惑星の重力、ゾーン、危険度、宇宙塵 |
-| `src/combat.js` | 攻撃力（= 速度/100 × 倍率）、貫通／弾かれ、弱点クリティカル |
-| `src/enemies.js` / `src/projectiles.js` | 敵 10 種の定義と行動、敵弾 |
-| `src/spawner.js` | フェーズ表（時間ごとの数・強さ・構成）と出現処理 |
-| `src/hits.js` | 敵へのダメージ、撃破、ドロップ、範囲攻撃 |
-| `src/effects.js` | 性質を変えるモジュール効果、カプセル、出力コア |
-| `src/modules.js` | 6 部位・26 種のモジュール、レア度、ステータス合成、抽選 |
+| `src/modules.js` | 描画版以外で使う旧6部位モジュール、レア度、ステータス合成、抽選 |
+| `src/run-build.js` | 描画版の武器・特性定義、Lv／重ね数、装備枠、合成と3択抽選 |
+| `src/run-weapons.js` | 描画版の自動攻撃と実際の経路／接触／終点に連動する効果 |
+| `src/experimental-weapons.js` | 採用保留の武器を通常抽選外で保持する実装 |
 | `src/progression.js` | 経験値、メタ強化（ステーション）、セーブ |
 | `src/stages.js` | 速度段階（演出用） |
 | `src/parts.js` | モジュール 6 部位を宇宙船のパーツとして描く（船首・エンジン・砲・レーダー・翼の装甲・リアクター）。組み上がった機体図も |

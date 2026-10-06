@@ -7,8 +7,10 @@ import { queryGrid } from './grid.js';
 import { rollModule } from './modules.js';
 import { dangerAt } from './field.js';
 import { getPhase } from './spawner.js';
-import { refreshStats } from './world.js';
-import { randRange, TAU } from './math.js';
+import { onRunEnd, onRunHurt } from './run-weapons.js';
+import { xpForLevel } from './progression.js';
+import { refreshStats, addXp } from './world.js';
+import { randRange, TAU, segCircleT } from './math.js';
 
 export function createEffectState() {
   return {
@@ -39,6 +41,7 @@ function finishDash(game) {
 export function endTraceAttack(game) {
   game.traceEndHandled = true;
   finishDash(game);
+  if (game.newBuild) { onRunEnd(game); return; }
   const pulse = game.stats.traceEndBlast, sh = game.ship;
   if (pulse && game.state === 'play') explode(game, sh.x, sh.y, pulse.radius,
     attackPower(Math.hypot(sh.vx, sh.vy), game.stats) * pulse.mult,
@@ -55,6 +58,7 @@ export function onPierce(game, x = game.ship.x, y = game.ship.y) {
 }
 
 export function onShipHurt(game) {
+  if (game.newBuild) { onRunHurt(game); return; }
   const s = game.stats, sh = game.ship;
   if (s.reactive) explode(game, sh.x, sh.y, 260, attackPower(s.maxSpeed, s) * s.reactive, { cause: 'reactive', color: '#ff6b5a', knock: 450 });
 }
@@ -93,7 +97,7 @@ export function updateEffects(game, dt) {
   }
   for (const m of game.marks) {
     m.t -= dt;
-    if (m.t <= 0) explode(game, m.x, m.y, 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
+    if (m.t <= 0) explode(game, m.x, m.y, m.radius || 85, m.dmg, { cause: 'trail', color: '#ffcf6b', knock: 120, life: 0.25 });
   }
   if (game.marks.length) game.marks = game.marks.filter((m) => m.t > 0);
 
@@ -112,7 +116,7 @@ export function updateEffects(game, dt) {
       if (e.dead) continue;
       const rr = 70 + e.r;
       if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
-        explode(game, m.x, m.y, 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+        explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
         m.life = 0;
         break;
       }
@@ -157,22 +161,25 @@ export function updateEffects(game, dt) {
 
 function updateFriendly(game, dt) {
   const B = game.fbullets;
-  if (!B.length) return;
   for (const b of B) {
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    b.life -= dt;
-    const pad = b.r + 130;
-    queryGrid(game.grid, b.x - pad, b.y - pad, b.x + pad, b.y + pad, (e) => {
-      if (b.life <= 0 || b.hit.has(e.id)) return;
-      const rr = b.r + e.r;
-      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) return;
+    const x0 = b.x, y0 = b.y;
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    const pad = b.r + 130, hits = [];
+    queryGrid(game.grid, Math.min(x0, b.x) - pad, Math.min(y0, b.y) - pad, Math.max(x0, b.x) + pad, Math.max(y0, b.y) + pad, e => {
+      if (e.dead || b.hit.has(e.id)) return;
+      const t = segCircleT(x0, y0, b.x, b.y, e.x, e.y, b.r + e.r);
+      if (t >= 0) hits.push({ e, t });
+    });
+    hits.sort((a, b) => a.t - b.t);
+    for (const { e } of hits) {
+      if (b.life <= 0 || e.dead) continue;
       b.hit.add(e.id);
       const sp = Math.hypot(b.vx, b.vy) || 1;
       damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
-      if (!b.pierce) b.life = 0;
-    });
+      if (!b.pierce) { if ((b.pierceLeft || 0) > 0) b.pierceLeft--; else b.life = 0; }
+    }
   }
-  game.fbullets = B.filter((b) => b.life > 0);
+  game.fbullets = B.filter(b => b.life > 0);
 }
 
 function fieldCapsulePoint(game) {
@@ -207,8 +214,11 @@ function updateCapsules(game, dt) {
     if (field < fieldCount && (game.t < 2 || F.capsuleT >= fieldInterval)) {
       F.capsuleT = 0;
       const p = fieldCapsulePoint(game);
-      const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
-      game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+      if (game.newBuild) game.capsules.push({ kind: 'cache', src: 'field', x: p.x, y: p.y, xp: xpForLevel(game.level) * 0.2, age: 0 });
+      else {
+        const mod = rollModule(game.rng, { t: game.t, loadout: game.loadout, source: 'capsule', danger: dangerAt(p.r), scheme: game.scheme });
+        game.capsules.push({ kind: 'capsule', src: 'field', x: p.x, y: p.y, mod, age: 0 });
+      }
     }
     if (getPhase(game.t).cores) {
       F.coreT += dt;
@@ -238,11 +248,14 @@ function updateCapsules(game, dt) {
         game.cores++;
         refreshStats(game);
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else if (c.kind === 'cache') {
+        addXp(game, c.xp);
+        addText(game, c.x, c.y, 'XP', '#6dffb0');
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
       addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
-      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod.r });
+      game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
     if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
   }

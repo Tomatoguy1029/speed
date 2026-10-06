@@ -38,6 +38,11 @@
   .card .desc { font-size: 13px; color: #cdd6f0; line-height: 1.5; }
   .card.empty { display: flex; align-items: center; justify-content: center; color: #5b6b94; }
   .card.new { border-width: 2px; box-shadow: 0 0 24px rgba(120,160,255,0.15); }
+  .level-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .level-card { text-align: left; white-space: normal; min-height: 210px; cursor: pointer; }
+  .level-card .name { margin-bottom: 12px; }
+  .build-summary { margin-top: 18px; font-size: 12px; line-height: 1.8; color: #b8c6ea; }
+  @media (max-width: 600px) { .level-cards { grid-template-columns: 1fr; gap: 8px; } .level-card { min-height: 0; padding: 12px; } }
   .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
   .loadout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 16px; font-size: 12px; }
   .loadout div { border: 1px solid #1f2b52; border-radius: 6px; padding: 5px 8px; color: #8fa3c8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
