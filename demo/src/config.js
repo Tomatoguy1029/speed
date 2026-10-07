@@ -13,7 +13,7 @@ export const CONFIG = {
   bossFinishBlastTime: 2,
   bossFinishClearTime: 1.4,
   deathFreezeTime: 1,
-  deathFreezeDim: 0.22,
+  deathWorldDim: 0.75,
   deathExplosionTime: 0.8,
   deathGameOverTime: 1,
   shipHurtTime: 0.16,

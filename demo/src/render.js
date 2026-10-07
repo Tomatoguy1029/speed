@@ -147,16 +147,19 @@ export function render(r, game, dt, pointer) {
   drawTrail(r, game);
   drawVapor(r, game, dt);
   if (!game.death) drawShip(r, game);
-  drawFx(r, game);
-  drawCombatImpacts(r, game);
-  // Dim every world layer, including the background, before drawing the intact ship.
-  if (game.death?.phase === 'freeze') {
+  if (!game.death || game.death.phase === 'freeze') {
+    drawFx(r, game);
+    drawCombatImpacts(r, game);
+  }
+  // Keep the world subdued throughout death; the ship and its breakup stay bright.
+  if (game.death) {
     ctx.save();
     ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
-    ctx.fillStyle = `rgba(0,0,0,${CONFIG.deathFreezeDim})`;
+    ctx.fillStyle = `rgba(0,0,0,${CONFIG.deathWorldDim})`;
     ctx.fillRect(0, 0, r.W, r.H);
     ctx.restore();
-    drawShip(r, game);
+    if (game.death.phase === 'freeze') drawShip(r, game);
+    else drawFx(r, game); // advanceShipDeath clears the old FX before creating ship debris
   }
   ctx.restore();
   if (!game.death) drawSpeedLines(r, game);
