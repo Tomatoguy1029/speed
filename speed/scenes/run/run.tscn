@@ -1,7 +1,18 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/run_manager.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/ui/run_debug_hud.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/managers/field_manager.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/managers/ship_manager.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/managers/draw_manager.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/managers/combat_manager.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/managers/enemy_manager.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/managers/boss_manager.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/managers/projectile_manager.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/managers/build_manager.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/managers/pickup_manager.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/managers/render_manager.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/input/input_router.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="13"]
 
 [node name="Run" type="Node"]
 
@@ -9,29 +20,57 @@
 
 [node name="RunManager" type="Node" parent="Managers"]
 script = ExtResource("1")
+world_path = NodePath("../../World")
+input_path = NodePath("../../World/InputRouter")
+
+[node name="FieldManager" type="Node" parent="Managers"]
+script = ExtResource("2")
+
+[node name="ShipManager" type="Node" parent="Managers"]
+script = ExtResource("3")
+
+[node name="DrawManager" type="Node" parent="Managers"]
+script = ExtResource("4")
+
+[node name="CombatManager" type="Node" parent="Managers"]
+script = ExtResource("5")
+
+[node name="EnemyManager" type="Node" parent="Managers"]
+script = ExtResource("6")
+
+[node name="BossManager" type="Node" parent="Managers"]
+script = ExtResource("7")
+
+[node name="ProjectileManager" type="Node" parent="Managers"]
+script = ExtResource("8")
+
+[node name="BuildManager" type="Node" parent="Managers"]
+script = ExtResource("9")
+
+[node name="PickupManager" type="Node" parent="Managers"]
+script = ExtResource("10")
+
+[node name="RenderManager" type="Node" parent="Managers"]
+script = ExtResource("11")
+world_path = NodePath("../../World")
+camera_path = NodePath("../../World/Camera2D")
 
 [node name="World" type="Node2D" parent="."]
 
+[node name="InputRouter" type="Node2D" parent="World"]
+script = ExtResource("12")
+
+[node name="Camera2D" type="Camera2D" parent="World"]
+
 [node name="Hud" type="CanvasLayer" parent="."]
 
-[node name="DebugHud" type="VBoxContainer" parent="Hud"]
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 316.0
-offset_bottom = 160.0
-script = ExtResource("2")
+[node name="HudRoot" type="Control" parent="Hud"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("13")
 run_path = NodePath("../../Managers/RunManager")
-
-[node name="Info" type="Label" parent="Hud/DebugHud"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ClearButton" type="Button" parent="Hud/DebugHud"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "クリア扱い"
-
-[node name="FailButton" type="Button" parent="Hud/DebugHud"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "失敗扱い"
