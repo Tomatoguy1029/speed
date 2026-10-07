@@ -1,0 +1,25 @@
+## T06 クリティカルランス：クリティカルのたびに、進む向きへ貫くビーム。ビームからは再び発動しない（一覧 docs/traits.md）。
+extends TraitBehavior
+
+var _next_time := 0.0
+var _buf: Array = []
+
+func on_critical(from: Vector2) -> void:
+	if state.time < _next_time or state.phase != RunState.Phase.PLAY:
+		return
+	_next_time = state.time + float(def.params.cooldown)
+	var v := state.ship_vel
+	var u := v.normalized() if v.length() > 1.0 else state.ship_heading
+	var length := val("length")
+	var width := val("width")
+	var to := from + u * length
+	var pad := Vector2(width / 2.0, width / 2.0)
+	build.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
+	var dmg := atk() * val("damage")
+	for e: Enemy in _buf:
+		if e.dead or Geom.seg_circle_t(from, to, e.pos, e.r + width / 2.0) < 0.0:
+			continue
+		build.combat.damage_enemy(e, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
+		if state.phase != RunState.Phase.PLAY:
+			return
+	state.emit(&"beam", {"from": from, "to": to, "width": width})
