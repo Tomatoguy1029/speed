@@ -1048,6 +1048,8 @@ function drawFx(r, game) {
   }
   const ps = 1 / Math.sqrt(z);
   for (const p of game.fx.particles) {
+    // Include the longest spark and camera shake in the bound; simulation is unchanged.
+    if (!onScreen(r, p.x, p.y, p.size * ps * 5 + 40 / z)) continue;
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;

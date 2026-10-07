@@ -112,7 +112,7 @@ export function rollRunChoices(game) {
 }
 
 export function runRankColor(level) {
-  return ['#d5dbea', '#8ed7a3', '#83b8ed', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
+  return ['#d5dbea', '#8ed7a3', '#3989ff', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
 }
 
 export function runChoiceInfo(c) {

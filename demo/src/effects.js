@@ -3,7 +3,7 @@ import { isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
 import { attackPower } from './combat.js';
 import { explode, damageEnemy, addRing, addText } from './hits.js';
-import { queryGrid } from './grid.js';
+import { buildGrid, queryGrid, gridHasContact } from './grid.js';
 import { rollModule } from './modules.js';
 import { dangerAt } from './field.js';
 import { getPhase } from './spawner.js';
@@ -109,17 +109,20 @@ export function updateEffects(game, dt) {
       game.mines.push({ x: sh.x, y: sh.y, life: 5, armed: 0.3, dmg: atkMax * s.mines });
     }
   }
+  // Vortexes may have moved enemies since the combat grid was built: index their current
+  // positions once for all armed mines. Explosions change HP/velocity, not those positions.
+  let mineGrid = null;
+  let mineMaxRadius = 0;
   for (const m of game.mines) {
     m.life -= dt; m.armed -= dt;
     if (m.armed > 0) continue;
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const rr = 70 + e.r;
-      if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
-        explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
-        m.life = 0;
-        break;
-      }
+    if (!mineGrid) {
+      mineGrid = game.mineGrid = buildGrid(game.enemies, 160, game.mineGrid);
+      for (const e of game.enemies) if (!e.dead && e.r > mineMaxRadius) mineMaxRadius = e.r;
+    }
+    if (gridHasContact(mineGrid, m.x, m.y, 70, mineMaxRadius)) {
+      explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+      m.life = 0;
     }
   }
   if (game.mines.length) game.mines = game.mines.filter((m) => m.life > 0);
@@ -171,11 +174,12 @@ function updateFriendly(game, dt) {
       if (t >= 0) hits.push({ e, t });
     });
     hits.sort((a, b) => a.t - b.t);
+    const sp = Math.hypot(b.vx, b.vy) || 1;
     for (const { e } of hits) {
       if (b.life <= 0 || e.dead) continue;
       b.hit.add(e.id);
-      const sp = Math.hypot(b.vx, b.vy) || 1;
-      damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
+      damageEnemy(game, e, b.dmg, { cause: b.cause || b.kind, noCrit: b.noCrit,
+        dirX: b.vx / sp, dirY: b.vy / sp, knock: b.knock ?? 250 });
       if (!b.pierce) { if ((b.pierceLeft || 0) > 0) b.pierceLeft--; else b.life = 0; }
     }
   }

@@ -35,11 +35,17 @@ export function drawCorpseDebris(r, game, dt) {
   ctx.save();
   ctx.lineCap = 'butt';
   ctx.globalCompositeOperation = 'lighter';
+  const halfW = (r.W / 2 + 40) / r.cam.zoom, halfH = (r.H / 2 + 40) / r.cam.zoom;
   for (const [b, track] of tracks) {
     const points = track.points;
     const width = Math.max(1.5 / r.cam.zoom, b.r * 0.3);
     for (let i = 1; i < points.length; i++) {
       const from = points[i - 1], to = points[i];
+      // Keep offscreen history for camera movement, but skip invisible canvas strokes.
+      if (Math.max(from.x, to.x) + width < r.cam.x - halfW ||
+          Math.min(from.x, to.x) - width > r.cam.x + halfW ||
+          Math.max(from.y, to.y) + width < r.cam.y - halfH ||
+          Math.min(from.y, to.y) - width > r.cam.y + halfH) continue;
       const fade = Math.max(0, 1 - (now - from.t) / CONFIG.corpseTrailLife);
       if (!fade) continue;
       ctx.globalAlpha = fade * fade * 0.55;

@@ -56,6 +56,14 @@ export function killEnemy(game, e, opts = {}) {
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
+  if (game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
+      !(opts.cause === 'ram' && game.weapons.knockback)) {
+    const shove = e.shove;
+    const speed = shove ? Math.hypot(shove.vx, shove.vy) : forceful ? CONFIG.hullDebrisForceSpeed : CONFIG.hullDebrisSpeed;
+    scatterHull(game, e, shove ? shove.vx / (speed || 1) : opts.dirX || 0,
+      shove ? shove.vy / (speed || 1) : opts.dirY || 0, speed,
+      attackPower(0, game.stats) * CONFIG.hullDebrisDamage);
+  }
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
@@ -75,6 +83,26 @@ export function killEnemy(game, e, opts = {}) {
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
   onRunKill(game, opts.cause);
+}
+
+// Evenly spaced fragments expose the direction of a successful hit without consuming drop RNG.
+// Fragment kills never create more fragments, keeping large chain attacks finite.
+export function scatterHull(game, e, ux, uy, speed, dmg) {
+  if (e.r < CONFIG.hullDebrisMinRadius || e.type === 'meteor' || e.type === 'boss' || e.hullScattered) return false;
+  e.hullScattered = true;
+  const count = Math.min(CONFIG.hullDebrisMaxPieces, Math.max(6, Math.ceil(e.r / 12)));
+  const directed = Math.hypot(ux, uy) > 0.01;
+  const base = directed ? Math.atan2(uy, ux) : e.facing || 0;
+  const spread = directed ? Math.PI * 0.85 : Math.PI * 2;
+  for (let i = 0; i < count; i++) {
+    const a = base + (directed ? i / (count - 1) - 0.5 : i / count) * spread;
+    const dx = Math.cos(a), dy = Math.sin(a), v = speed * (0.85 + (i % 3) * 0.12);
+    game.fbullets.push({ kind: 'corpse', cause: 'hullDebris', noCrit: true,
+      x: e.x + dx * e.r * 0.3, y: e.y + dy * e.r * 0.3,
+      vx: dx * v, vy: dy * v, r: Math.min(20, Math.max(10, e.r * 0.17)), dmg,
+      life: CONFIG.hullDebrisLife, pierce: true, hit: new Set([e.id]), color: e.T.color, knock: 500 });
+  }
+  return true;
 }
 
 function flingCorpse(game, e) {

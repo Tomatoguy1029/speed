@@ -197,7 +197,7 @@ function step(game, dt, input) {
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
   separateEnemies(game);
-  game.grid = buildGrid(game.enemies, 160);
+  game.grid = buildGrid(game.enemies, 160, game.grid);
 
   if (!game.draw && !game.portalDash) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
@@ -779,12 +779,11 @@ function flushNewEnemies(game) {
 
 export function separateEnemies(game) {
   for (let pass = 0; pass < 2; pass++) {
-    const grid = buildGrid(game.enemies, 120);
+    const grid = game.spacingGrid = buildGrid(game.enemies, 120, game.spacingGrid);
     for (const e of game.enemies) {
       if (e.dead) continue;
       const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
       queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
-        if (o.id <= e.id) return;
         let dx = o.x - e.x, dy = o.y - e.y;
         const min = e.r + o.r + CONFIG.enemySpacing;
         const d2 = dx * dx + dy * dy;
@@ -805,7 +804,7 @@ export function separateEnemies(game) {
           e.vx += dx * closing * wE; e.vy += dy * closing * wE;
           o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
         }
-      });
+      }, e.id);
     }
   }
 }

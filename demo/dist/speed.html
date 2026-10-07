@@ -271,6 +271,12 @@ const CONFIG = {
   corpseTrailLife: 0.26, // real seconds; a flung fragment's actual path fades after it disappears
   corpseTrailPoints: 18, // bound each fragment's visual history
   corpseSpinRate: 10, // rad/s for rotating wreckage
+  hullDebrisMinRadius: 50,
+  hullDebrisMaxPieces: 12,
+  hullDebrisLife: 0.9,
+  hullDebrisDamage: 1.2, // attack multiplier; large enemies reward kills with secondary hits
+  hullDebrisSpeed: 850,
+  hullDebrisForceSpeed: 1100,
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
   zoomRefSpeed: 700,
@@ -1420,29 +1426,64 @@ function pierceKeep(e, killed, stats) {
 // ---- grid.js ----
 const OFF = 4096;
 
-function buildGrid(list, cell) {
-  const map = new Map();
+function buildGrid(list, cell, reuse) {
+  const grid = reuse || { cell, map: new Map(), buckets: [] };
+  const { map, buckets } = grid;
+  map.clear();
+  grid.cell = cell;
+  let used = 0;
   for (const it of list) {
     if (it.dead) continue;
     const key = (Math.floor(it.x / cell) + OFF) * 8192 + (Math.floor(it.y / cell) + OFF);
     let arr = map.get(key);
-    if (!arr) { arr = []; map.set(key, arr); }
+    if (!arr) {
+      arr = buckets[used] || (buckets[used] = []);
+      used++;
+      arr.length = 0; arr.maxId = -Infinity;
+      map.set(key, arr);
+    }
+    if (it.id > arr.maxId) arr.maxId = it.id;
     arr.push(it);
   }
-  return { cell, map };
+  // Release enemies retained in buckets no longer used after a dense fight.
+  for (let i = used; i < buckets.length; i++) buckets[i].length = 0;
+  return grid;
 }
 
-function queryGrid(grid, x0, y0, x1, y1, cb) {
+function queryGrid(grid, x0, y0, x1, y1, cb, afterId) {
   const c = grid.cell;
   const cx0 = Math.floor(x0 / c), cx1 = Math.floor(x1 / c);
   const cy0 = Math.floor(y0 / c), cy1 = Math.floor(y1 / c);
   for (let cx = cx0; cx <= cx1; cx++) {
     for (let cy = cy0; cy <= cy1; cy++) {
       const arr = grid.map.get((cx + OFF) * 8192 + (cy + OFF));
-      if (!arr) continue;
-      for (const it of arr) if (!it.dead) cb(it);
+      if (!arr || (afterId !== undefined && arr.maxId <= afterId)) continue;
+      if (afterId === undefined) {
+        for (const it of arr) if (!it.dead) cb(it);
+      } else {
+        for (const it of arr) if (!it.dead && it.id > afterId) cb(it);
+      }
     }
   }
+}
+
+// A boolean overlap query can stop at the first contact; its order has no gameplay effect.
+function gridHasContact(grid, x, y, radius, maxRadius) {
+  const reach = radius + maxRadius, c = grid.cell;
+  const cx0 = Math.floor((x - reach) / c), cx1 = Math.floor((x + reach) / c);
+  const cy0 = Math.floor((y - reach) / c), cy1 = Math.floor((y + reach) / c);
+  for (let cx = cx0; cx <= cx1; cx++) {
+    for (let cy = cy0; cy <= cy1; cy++) {
+      const arr = grid.map.get((cx + OFF) * 8192 + cy + OFF);
+      if (!arr) continue;
+      for (const e of arr) {
+        if (e.dead) continue;
+        const rr = radius + e.r, dx = e.x - x, dy = e.y - y;
+        if (dx * dx + dy * dy < rr * rr) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function queryRadius(grid, x, y, r, cb) {
@@ -1567,7 +1608,7 @@ function rollRunChoices(game) {
 }
 
 function runRankColor(level) {
-  return ['#d5dbea', '#8ed7a3', '#83b8ed', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
+  return ['#d5dbea', '#8ed7a3', '#3989ff', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
 }
 
 function runChoiceInfo(c) {
@@ -2097,10 +2138,10 @@ function onRunContact(game, e, x, y, ux, uy) {
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
     const velocity = 800 + 90 * game.weapons.knockback;
-    if (e.dead) {
+    if (e.dead && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
       game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
         r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });
-    } else {
+    } else if (!e.dead) {
       e.shove = { time: 1.2, vx: ux * velocity, vy: uy * velocity, dmg: atk * 0.7 * L.damage, hits: new Set([e.id]) };
       e.vx = ux * velocity; e.vy = uy * velocity;
     }
@@ -2698,7 +2739,7 @@ function step(game, dt, input) {
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
   separateEnemies(game);
-  game.grid = buildGrid(game.enemies, 160);
+  game.grid = buildGrid(game.enemies, 160, game.grid);
 
   if (!game.draw && !game.portalDash) {
     const g = gravityAt(game.field, game.t, sh.x, sh.y);
@@ -3280,12 +3321,11 @@ function flushNewEnemies(game) {
 
 function separateEnemies(game) {
   for (let pass = 0; pass < 2; pass++) {
-    const grid = buildGrid(game.enemies, 120);
+    const grid = game.spacingGrid = buildGrid(game.enemies, 120, game.spacingGrid);
     for (const e of game.enemies) {
       if (e.dead) continue;
       const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
       queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
-        if (o.id <= e.id) return;
         let dx = o.x - e.x, dy = o.y - e.y;
         const min = e.r + o.r + CONFIG.enemySpacing;
         const d2 = dx * dx + dy * dy;
@@ -3306,7 +3346,7 @@ function separateEnemies(game) {
           e.vx += dx * closing * wE; e.vy += dy * closing * wE;
           o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
         }
-      });
+      }, e.id);
     }
   }
 }
@@ -3559,17 +3599,20 @@ function updateEffects(game, dt) {
       game.mines.push({ x: sh.x, y: sh.y, life: 5, armed: 0.3, dmg: atkMax * s.mines });
     }
   }
+  // Vortexes may have moved enemies since the combat grid was built: index their current
+  // positions once for all armed mines. Explosions change HP/velocity, not those positions.
+  let mineGrid = null;
+  let mineMaxRadius = 0;
   for (const m of game.mines) {
     m.life -= dt; m.armed -= dt;
     if (m.armed > 0) continue;
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const rr = 70 + e.r;
-      if ((e.x - m.x) ** 2 + (e.y - m.y) ** 2 < rr * rr) {
-        explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
-        m.life = 0;
-        break;
-      }
+    if (!mineGrid) {
+      mineGrid = game.mineGrid = buildGrid(game.enemies, 160, game.mineGrid);
+      for (const e of game.enemies) if (!e.dead && e.r > mineMaxRadius) mineMaxRadius = e.r;
+    }
+    if (gridHasContact(mineGrid, m.x, m.y, 70, mineMaxRadius)) {
+      explode(game, m.x, m.y, m.radius || 120, m.dmg, { cause: 'mine', color: '#ff7b54', knock: 300, life: 0.3 });
+      m.life = 0;
     }
   }
   if (game.mines.length) game.mines = game.mines.filter((m) => m.life > 0);
@@ -3621,11 +3664,12 @@ function updateFriendly(game, dt) {
       if (t >= 0) hits.push({ e, t });
     });
     hits.sort((a, b) => a.t - b.t);
+    const sp = Math.hypot(b.vx, b.vy) || 1;
     for (const { e } of hits) {
       if (b.life <= 0 || e.dead) continue;
       b.hit.add(e.id);
-      const sp = Math.hypot(b.vx, b.vy) || 1;
-      damageEnemy(game, e, b.dmg, { cause: b.kind, dirX: b.vx / sp, dirY: b.vy / sp, knock: 250 });
+      damageEnemy(game, e, b.dmg, { cause: b.cause || b.kind, noCrit: b.noCrit,
+        dirX: b.vx / sp, dirY: b.vy / sp, knock: b.knock ?? 250 });
       if (!b.pierce) { if ((b.pierceLeft || 0) > 0) b.pierceLeft--; else b.life = 0; }
     }
   }
@@ -4114,6 +4158,14 @@ function killEnemy(game, e, opts = {}) {
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
+  if (game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
+      !(opts.cause === 'ram' && game.weapons.knockback)) {
+    const shove = e.shove;
+    const speed = shove ? Math.hypot(shove.vx, shove.vy) : forceful ? CONFIG.hullDebrisForceSpeed : CONFIG.hullDebrisSpeed;
+    scatterHull(game, e, shove ? shove.vx / (speed || 1) : opts.dirX || 0,
+      shove ? shove.vy / (speed || 1) : opts.dirY || 0, speed,
+      attackPower(0, game.stats) * CONFIG.hullDebrisDamage);
+  }
   burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
@@ -4133,6 +4185,26 @@ function killEnemy(game, e, opts = {}) {
   }
   if (opts.cause === 'ram' && game.stats.fling) flingCorpse(game, e);
   onRunKill(game, opts.cause);
+}
+
+// Evenly spaced fragments expose the direction of a successful hit without consuming drop RNG.
+// Fragment kills never create more fragments, keeping large chain attacks finite.
+function scatterHull(game, e, ux, uy, speed, dmg) {
+  if (e.r < CONFIG.hullDebrisMinRadius || e.type === 'meteor' || e.type === 'boss' || e.hullScattered) return false;
+  e.hullScattered = true;
+  const count = Math.min(CONFIG.hullDebrisMaxPieces, Math.max(6, Math.ceil(e.r / 12)));
+  const directed = Math.hypot(ux, uy) > 0.01;
+  const base = directed ? Math.atan2(uy, ux) : e.facing || 0;
+  const spread = directed ? Math.PI * 0.85 : Math.PI * 2;
+  for (let i = 0; i < count; i++) {
+    const a = base + (directed ? i / (count - 1) - 0.5 : i / count) * spread;
+    const dx = Math.cos(a), dy = Math.sin(a), v = speed * (0.85 + (i % 3) * 0.12);
+    game.fbullets.push({ kind: 'corpse', cause: 'hullDebris', noCrit: true,
+      x: e.x + dx * e.r * 0.3, y: e.y + dy * e.r * 0.3,
+      vx: dx * v, vy: dy * v, r: Math.min(20, Math.max(10, e.r * 0.17)), dmg,
+      life: CONFIG.hullDebrisLife, pierce: true, hit: new Set([e.id]), color: e.T.color, knock: 500 });
+  }
+  return true;
 }
 
 function flingCorpse(game, e) {
@@ -4586,11 +4658,17 @@ function drawCorpseDebris(r, game, dt) {
   ctx.save();
   ctx.lineCap = 'butt';
   ctx.globalCompositeOperation = 'lighter';
+  const halfW = (r.W / 2 + 40) / r.cam.zoom, halfH = (r.H / 2 + 40) / r.cam.zoom;
   for (const [b, track] of tracks) {
     const points = track.points;
     const width = Math.max(1.5 / r.cam.zoom, b.r * 0.3);
     for (let i = 1; i < points.length; i++) {
       const from = points[i - 1], to = points[i];
+      // Keep offscreen history for camera movement, but skip invisible canvas strokes.
+      if (Math.max(from.x, to.x) + width < r.cam.x - halfW ||
+          Math.min(from.x, to.x) - width > r.cam.x + halfW ||
+          Math.max(from.y, to.y) + width < r.cam.y - halfH ||
+          Math.min(from.y, to.y) - width > r.cam.y + halfH) continue;
       const fade = Math.max(0, 1 - (now - from.t) / CONFIG.corpseTrailLife);
       if (!fade) continue;
       ctx.globalAlpha = fade * fade * 0.55;
@@ -5682,6 +5760,8 @@ function drawFx(r, game) {
   }
   const ps = 1 / Math.sqrt(z);
   for (const p of game.fx.particles) {
+    // Include the longest spark and camera shake in the bound; simulation is unchanged.
+    if (!onScreen(r, p.x, p.y, p.size * ps * 5 + 40 / z)) continue;
     ctx.globalAlpha = Math.min(1, p.life / 0.4);
     ctx.fillStyle = p.color;
     const s = p.size * ps;

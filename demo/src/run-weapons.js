@@ -4,7 +4,7 @@ import { attackPower } from './combat.js';
 import { segCircleT } from './math.js';
 import { queryGrid } from './grid.js';
 import { MAX_ENEMY_R } from './enemies.js';
-import { damageEnemy, explode, addRing, addText } from './hits.js';
+import { damageEnemy, explode, addRing, addText, scatterHull } from './hits.js';
 import { runWeaponStats, runTrait } from './run-build.js';
 import { updateWeapons } from './experimental-weapons.js';
 import { tracePortalLoop } from './portal-loops.js';
@@ -114,10 +114,10 @@ export function onRunContact(game, e, x, y, ux, uy) {
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
     const velocity = 800 + 90 * game.weapons.knockback;
-    if (e.dead) {
+    if (e.dead && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
       game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
         r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });
-    } else {
+    } else if (!e.dead) {
       e.shove = { time: 1.2, vx: ux * velocity, vy: uy * velocity, dmg: atk * 0.7 * L.damage, hits: new Set([e.id]) };
       e.vx = ux * velocity; e.vy = uy * velocity;
     }

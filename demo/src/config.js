@@ -180,6 +180,12 @@ export const CONFIG = {
   corpseTrailLife: 0.26, // real seconds; a flung fragment's actual path fades after it disappears
   corpseTrailPoints: 18, // bound each fragment's visual history
   corpseSpinRate: 10, // rad/s for rotating wreckage
+  hullDebrisMinRadius: 50,
+  hullDebrisMaxPieces: 12,
+  hullDebrisLife: 0.9,
+  hullDebrisDamage: 1.2, // attack multiplier; large enemies reward kills with secondary hits
+  hullDebrisSpeed: 850,
+  hullDebrisForceSpeed: 1100,
   // camera
   baseView: 1100, // world units visible on the shorter screen side at rest
   zoomRefSpeed: 700,
