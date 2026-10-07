@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T13"
+code_id = &"reactive"
+display_name = "反応波動"
+description = "ダメージを受けたとき、周りを押し返す"
+params = {
+"radius_base": 170.0,
+"radius_per": 30.0,
+"damage_base": 0.8,
+"damage_per": 0.4,
+"knock": 450.0
+}

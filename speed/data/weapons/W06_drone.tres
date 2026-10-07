@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"W06"
+code_id = &"drone"
+display_name = "追走ドローン"
+description = "周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する"
+level_steps = PackedInt32Array(1, 3, 5, 6, 8)
+params = {
+"interval": 0.65,
+"damage": 0.45,
+"range": 550.0,
+"orbit": 90.0,
+"delay": 0.12,
+"contact_damage": 0.5,
+"contact_cd": 0.3
+}

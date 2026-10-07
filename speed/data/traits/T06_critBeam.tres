@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T06"
+code_id = &"critBeam"
+display_name = "クリティカルランス"
+description = "クリティカルのたびに前方へ貫くビーム"
+params = {
+"length_base": 720.0,
+"length_per": 120.0,
+"width_base": 32.0,
+"width_per": 8.0,
+"damage_base": 1.6,
+"damage_per": 0.8,
+"knock": 900.0,
+"cooldown": 0.15
+}

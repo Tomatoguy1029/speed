@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"W05"
+code_id = &"barrier"
+display_name = "バリアシステム"
+description = "周りに定期的な波動を出し、敵の弾を防ぐ"
+level_steps = PackedInt32Array(1, 3, 5, 6, 8)
+params = {
+"interval": 0.7,
+"radius": 70.0,
+"damage": 0.4,
+"block_interval": 0.8,
+"knock": 180.0
+}

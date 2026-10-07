@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T04"
+code_id = &"fullCharge"
+display_name = "満タン突撃"
+description = "満タンから使うと、装甲を無視して威力も上がる"
+params = {
+"mult_base": 1.25,
+"mult_per": 0.25
+}

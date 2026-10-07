@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T03"
+code_id = &"vortex"
+display_name = "余韻の渦"
+description = "線の終点に、敵を吸い寄せる渦"
+params = {
+"life_base": 1.5,
+"life_per": 0.4,
+"radius_base": 180.0,
+"radius_per": 35.0,
+"power_base": 200.0,
+"power_per": 70.0
+}

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T02"
+code_id = &"crossBlast"
+display_name = "交差爆破"
+description = "過去12秒の線を横切ると、交わった点で爆発"
+params = {
+"radius_base": 100.0,
+"radius_per": 25.0,
+"damage_base": 0.8,
+"damage_per": 0.4,
+"memory": 12.0,
+"max_segments": 160,
+"knock": 400.0
+}

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T01"
+code_id = &"endBlast"
+display_name = "終端爆縮"
+description = "線の終点で爆発"
+params = {
+"radius_base": 180.0,
+"radius_per": 30.0,
+"damage_base": 1.0,
+"damage_per": 0.5,
+"knock": 500.0
+}

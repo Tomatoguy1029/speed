@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T10"
+code_id = &"speed"
+display_name = "最高速度"
+description = "速くなり、描ける長さも伸びる（+12% ずつ）"
+params = {
+
+}

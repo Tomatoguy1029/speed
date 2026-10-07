@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T08"
+code_id = &"capacity"
+display_name = "大容量チャージ"
+description = "1回で描ける長さが伸びる（容量 +20% ずつ）"
+params = {
+
+}

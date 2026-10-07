@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T05"
+code_id = &"killSonic"
+display_name = "連鎖ソニック"
+description = "1回で何体も倒すと衝撃波"
+params = {
+"radius_base": 275.0,
+"radius_per": 45.0,
+"damage_base": 1.2,
+"damage_per": 0.6,
+"kills_base": 9.0,
+"kills_per": -1.0,
+"knock": 1000.0,
+"travel": 0.5
+}

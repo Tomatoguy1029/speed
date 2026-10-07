@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"W17"
+code_id = &"contactArc"
+display_name = "接触電撃"
+description = "敵に触れると、近くの敵へ電撃がつながる。Lv ごとにつながる数が増える"
+level_steps = PackedInt32Array(1, 3, 5, 6, 8)
+params = {
+"damage": 0.65,
+"chains_per_level": 2,
+"range": 240.0
+}

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"T07"
+code_id = &"quickCharge"
+display_name = "急速充填"
+description = "ゲージが早く溜まる（充填速度 +25% ずつ）"
+params = {
+
+}

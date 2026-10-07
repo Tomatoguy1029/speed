@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"W07"
+code_id = &"mines"
+display_name = "軌跡機雷"
+description = "高速で実際に通った線に機雷を残す。遅れて入った敵を爆破"
+level_steps = PackedInt32Array(1, 3, 5, 6, 8)
+params = {
+"spacing": 75.0,
+"armed": 0.25,
+"life": 6.0,
+"radius": 110.0,
+"damage": 1.0,
+"max": 250,
+"trigger": 70.0
+}

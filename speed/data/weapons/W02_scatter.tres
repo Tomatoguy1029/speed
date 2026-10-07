@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"W02"
+code_id = &"scatter"
+display_name = "散弾砲"
+description = "進む向きへ扇状に撃つ。群れに向けて進むとまとめて当たる"
+level_steps = PackedInt32Array(1, 3, 5, 6, 8)
+params = {
+"interval": 1.05,
+"damage": 0.55,
+"spread_step": 0.16,
+"life": 0.45,
+"color": "#ffb36b"
+}
