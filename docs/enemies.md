@@ -1,35 +1,35 @@
 # 本番の敵一覧
 
-最終更新：2026-10-07。対象はGodot本番。[共通の運用ルール](catalog.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
+最終更新：2026-10-08。対象はGodot本番。[共通の運用ルール](catalog.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
 
-2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。type IDと基礎値はdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](spec.md) の9〜11章。本番はゲームの実装がないため、すべて未実装。
+2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](spec.md) の9〜11章。
 
-数値はLv1・非エリート・標準サイズの基礎値。速度は単位/世界秒、半径は単位。
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ」画面で見て調整する。
 
 ## 通常敵
 
-| type ID | 名称 | 採用状態 | 本番の実装状況 | 基礎数値（半径／HP／装甲／速度／接触／XP） | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
-|---|---|---|---|---|---|---|---|
-| `drifter` | ドリフター | 採用 | 未実装 | 14／6／2／130／6／1 | 追跡と広域移動 | 全時間帯 | [demo](../demo/docs/enemies.md) |
-| `swarm` | スウォーム | 採用 | 未実装 | 11／3／1.2／200／4／0.6 | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | demo |
-| `darter` | ダーター | 採用 | 未実装 | 16／9／3.5／110／10／2 | 距離520以内で0.7秒予告→速度760で0.55秒突進→0.9秒回復 | 無双期以外 | demo |
-| `armored` | 装甲型 | 採用 | 未実装 | 30／40／12／70／11／6 | 装甲の硬い追跡敵。背面±0.8radは確定クリティカル | 圧力期・緊張期・脱出期、危険地帯 | demo |
-| `splitter` | 分裂型 | 採用 | 未実装 | 22／14／4／60／8／2 | 追跡し、5秒ごとに分裂体を生成（最大5回）。撃破時にも2体生成 | 無双期以外 | demo |
-| `splitling` | 分裂体 | 採用 | 未実装 | 10／3／1.5／150／4／0.4 | 小型の追跡敵 | 分裂型から生成、無双期の通常出現 | demo |
-| `leech` | 減速型 | 採用 | 未実装 | 20／14／5／120／6／3 | 半径210のオーラ内で減速。貫通接触時にも速度を20%吸収 | 圧力期・緊張期・脱出期 | demo |
-| `gunner` | 射撃型 | 採用 | 未実装 | 18／12／4／110／8／3 | 距離560付近を保ち、2.8秒間隔で射撃。予告0.5秒、弾速430・ダメージ7 | 圧力期以降（無双期を除く）、危険地帯 | demo |
-| `missile` | ミサイル艇 | 採用 | 未実装 | 22／20／6／85／10／5 | 距離720付近を保ち、4.5秒間隔で誘導弾。予告0.6秒、弾速500・ダメージ11 | 緊張期・脱出期、危険地帯 | demo |
-| `battleship` | 戦艦 | 採用 | 未実装 | 95／420／20／45／22／45 | 1.8秒間隔で7発の扇状射撃。予告0.5秒、弾速380・ダメージ12。背面±0.55radは確定クリティカル | 緊張期・脱出期。同時1体まで | demo。エリートにならない |
-| `titan` | タイタン | 採用 | 未実装 | 75／160／6／38／18／25 | 大型の追跡敵。標準の0.85〜1.30倍のサイズで生成 | 無双期以外。同時6体まで | demo |
+| type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
+|---|---|---|---|---|---|---|
+| `drifter` | ドリフター | 採用 | 実装済み | 追跡と広域移動 | 全時間帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../demo/docs/enemies.md) |
+| `swarm` | スウォーム | 採用 | 実装済み | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../demo/docs/enemies.md) |
+| `darter` | ダーター | 採用 | 実装済み | 近づくと予告してから突進し、しばらく止まる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../demo/docs/enemies.md) |
+| `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../demo/docs/enemies.md) |
+| `splitter` | 分裂型 | 採用 | 実装済み | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも2体に分かれる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../demo/docs/enemies.md) |
+| `splitling` | 分裂体 | 採用 | 実装済み | 小型の追跡敵 | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../demo/docs/enemies.md) |
+| `leech` | 減速型 | 採用 | 実装済み | 周りのオーラの中で機体を減速させる。貫くと勢いを吸う | 圧力期・緊張期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/leech.tres`。[demo](../demo/docs/enemies.md) |
+| `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../demo/docs/enemies.md) |
+| `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../demo/docs/enemies.md) |
+| `battleship` | 戦艦 | 採用 | 実装済み | 予告のあと扇状に弾をばらまく。背面に当てると必ずクリティカル。エリートにならない | 緊張期・脱出期。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/battleship.tres`。[demo](../demo/docs/enemies.md) |
+| `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../demo/docs/enemies.md) |
 
 ## ボス
 
-| type ID | 名称 | 採用状態 | 本番の実装状況 | 基礎数値 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
-|---|---|---|---|---|---|---|---|
-| `boss` | ボス戦艦 | 採用（暫定） | 未実装 | 半径120、HP2200、装甲14、速度100、接触28、XP100 | 直接追跡。2.6秒間隔で9発の扇状射撃、予告0.8秒、弾速420・基礎ダメージ15 | 7:00に1体。撃破でクリア | demo。ギミック・弱点は未検討 |
+| type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
+|---|---|---|---|---|---|---|
+| `provisional` | ボス戦艦（仮） | 採用（暫定） | 実装済み | 機体を直接追う。予告のあと扇状に弾を撃つ。形態＝LimboHSM、判断＝Behavior Tree、攻撃＝タイムライン | 決まった時刻に1体。撃破でクリア | `scenes/bosses/provisional_boss.tscn`、`scripts/bosses/`、`data/bosses/provisional.tres`。demo の `boss`。ギミック・弱点は未検討 |
 
 ## 障害物
 
-| type ID | 名称 | 採用状態 | 本番の実装状況 | 基礎数値 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
-|---|---|---|---|---|---|---|---|
-| `meteor` | 隕石 | 採用 | 未実装 | 標準半径40（24〜65）、HP20、装甲5、接触10、XP1 | 追跡しない。地帯の岩は固定、漂流は毎秒15〜35、彗星は毎秒950 | ラン開始時に世界の決まった位置へ配置（仕様書11章） | demo。撃破で修理キット8%・回収ビーコン4%・部品40%。光る特別な隕石（`meteor_special`）は本番に登録していない |
+| type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
+|---|---|---|---|---|---|---|
+| `meteor` | 隕石 | 採用 | 実装済み | 追跡しない。地帯の岩は固定、漂流と彗星は決まった軌道で動く | ラン開始時に世界の決まった位置へ配置し、画面の近くだけ有効（仕様書11章） | `scripts/managers/field_manager.gd`、`data/enemies/meteor.tres`。撃破で修理キット・回収ビーコン・部品を落とす。光る特別な隕石（`meteor_special`）は本番に登録していない |

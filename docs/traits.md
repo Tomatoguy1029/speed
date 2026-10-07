@@ -1,27 +1,29 @@
 # 本番の特性一覧
 
-最終更新：2026-10-07。対象はGodot本番。[共通の運用ルール](catalog.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
+最終更新：2026-10-08。対象はGodot本番。[共通の運用ルール](catalog.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
 
-2026-10-07、demo描画版の通常候補14種を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。管理IDと数値はdemoから引き継ぐ。共通のルール（6枠・5重ね・段階の色）は [仕様書](spec.md) の6章。本番はゲームの実装がないため、すべて未実装。demoの候補・保留・不採用（T15〜T30）は本番に登録していない。nは重ね数（1〜5）、Aは攻撃力。
+2026-10-07、demo描画版の通常候補14種を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。管理IDはdemoから引き継ぐ。共通のルール（枠・重ね数・段階の色）は [仕様書](spec.md) の6章。demoの候補・保留・不採用（T15〜T30）は本番に登録していない。
+
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。発動する特性の数値は `speed/data/traits/<ID>_<内部ID>.tres` が正。能力値を変える特性（T07〜T12、T14）の重ね数ごとの効果は `speed/scripts/managers/build_manager.gd` の能力値の計算にある。
 
 ## 採用
 
-| ID | 名称 | 採用状態 | 発動・効果 | ルートへの影響 | 本番の実装状況・コード参照 | demo参照・重ね掛け・未決事項 |
+| ID | 名称 | 採用状態 | 発動・効果 | ルート・成長への影響 | 本番の実装状況・コード参照 | demo参照・重ね掛け・未決事項 |
 |---|---|---|---|---|---|---|
-| T01 | 終端爆縮 | 採用 | 終点で半径180+30n、威力A(1+0.5n)の爆発。硬い敵に弾かれた地点でも発動 | 終点を密集地点にする | 未実装 | [demo T01](../demo/docs/traits.md) `endBlast` |
-| T02 | 交差爆破 | 採用 | 過去12実秒の高速軌跡を横切ると交点で半径100+25n、威力A(0.8+0.4n)の爆発。同じ交点は1攻撃1回 | 前の高速攻撃の軌跡を横切る | 未実装 | demo T02 `crossBlast`。実際の移動のみ記録、最大160区間 |
-| T03 | 余韻の渦 | 採用 | 終点に1.5+0.4n秒、半径180+35nの渦。吸引速度200+70n、敵サイズで軽減。ボスは引き寄せない | 次の群れ形成にも終点を使う | 未実装 | demo T03 `vortex`。寿命・吸引は世界時間 |
-| T04 | 満タン突撃 | 採用 | 満タンからの経路実行中は装甲無視、攻撃力×(1.25+0.25n)。経路が終わると解除。障害物は貫通しない | 25%以上で早く撃つか、満タンで硬い敵を抜くか | 未実装 | demo T04 `fullCharge` |
-| T05 | 連鎖ソニック | 採用 | 1回の高速攻撃で9−n体倒すたび波動。半径275+45n、威力A(1.2+0.6n)。0.5実秒、機体とともに経路を掃く。吹き飛ばし1000 | 多くの敵を倒せる経路を選ぶ | 未実装 | demo T05 `killSonic`。発動自身の撃破からは再帰発動しない。W08とは別 |
-| T06 | クリティカルランス | 採用 | クリティカル時に進行方向へ射程720+120n、幅32+8n、威力A(1.6+0.8n)、吹き飛ばし900の貫通ビーム。最短発動間隔0.15実秒 | 命中先に別の敵が並ぶ経路 | 未実装 | demo T06 `critBeam`。ビームからは再発動しない。残光0.4世界秒 |
-| T07 | 急速充填 | 採用 | 充填速度+25n%。1単位の充填時間6/(1+0.25n)秒（ステーション強化前） | 次の高速攻撃が早く使える | 未実装 | demo T07 `quickCharge` |
-| T08 | 大容量チャージ | 採用 | 容量+20n%。満タンまでの時間と描ける長さ・射出の勢いが伸びる。回数ストックではない | 1回で長い経路を通る | 未実装 | demo T08 `capacity` |
-| T09 | クリティカル率 | 採用 | 基礎5%+8n%、上限90%。クリティカル倍率2.5 | T06の発動頻度が上がる | 未実装 | demo T09 `critRate`。接触クリティカルは装甲判定も半分 |
-| T10 | 最高速度 | 採用 | 最高速度+12n%。威力は上がらない | 移動と描ける距離が伸びる | 未実装 | demo T10 `speed` |
-| T11 | 攻撃力 | 採用 | 全攻撃の攻撃力倍率+20n% | 倒せる／装甲を突破できる敵が変わる | 未実装 | demo T11 `attack` |
-| T12 | 広域回収 | 採用 | 回収範囲+30n% | アイテムに近づく必要が減る | 未実装 | demo T12 `pickup` |
-| T13 | 反応波動 | 採用 | 被弾時に半径170+30n、威力A(0.8+0.4n)の波動。実際にダメージを受けた時のみ | 被弾後の周囲を押し返す | 未実装 | demo T13 `reactive`。被弾無敵時間で連続発動を防ぐ |
-| T14 | 軌跡延長 | 採用 | 描ける経路+25n% | 複数の群れを1回で通る | 未実装 | demo T14 `length`。容量・最高速度とは別の倍率 |
+| T01 | 終端爆縮 | 採用 | 線の終点（弾かれた地点を含む）で爆発 | 終点を密集地点にする | 実装済み。`scripts/traits/endBlast.gd`、`data/traits/T01_endBlast.tres` | [demo T01](../demo/docs/traits.md) `endBlast`。最大5重ね |
+| T02 | 交差爆破 | 採用 | 過去の一定時間の線を横切ると、交わった点で爆発。同じ交点は1回の突進で1回だけ | 前の線を横切る | 実装済み。`scripts/traits/crossBlast.gd`、`data/traits/T02_crossBlast.tres` | [demo T02](../demo/docs/traits.md) `crossBlast`。最大5重ね |
+| T03 | 余韻の渦 | 採用 | 線の終点に、敵を吸い寄せる渦を残す。ボスは引き寄せない | 次の群れ作りにも終点を使う | 実装済み。`scripts/traits/vortex.gd`、`data/traits/T03_vortex.tres` | [demo T03](../demo/docs/traits.md) `vortex`。最大5重ね |
+| T04 | 満タン突撃 | 採用 | 満タンから始めた線をなぞっている間は、装甲を無視して攻撃力が上がる。線が終わると戻る | 早く撃つか、満タンで硬い敵を抜くか | 実装済み。`scripts/traits/fullCharge.gd`、`data/traits/T04_fullCharge.tres` | [demo T04](../demo/docs/traits.md) `fullCharge`。最大5重ね |
+| T05 | 連鎖ソニック | 採用 | 1回の突進で一定数を倒すたびに衝撃波。衝撃波の撃破からは次を起こさない。W08 とは別 | 多く倒せる線を選ぶ | 実装済み。`scripts/traits/killSonic.gd`、`data/traits/T05_killSonic.tres` | [demo T05](../demo/docs/traits.md) `killSonic`。最大5重ね |
+| T06 | クリティカルランス | 採用 | クリティカルのたびに進む向きへ貫くビーム。ビームからは再び発動しない | 命中した先に別の敵が並ぶ線 | 実装済み。`scripts/traits/critBeam.gd`、`data/traits/T06_critBeam.tres` | [demo T06](../demo/docs/traits.md) `critBeam`。最大5重ね |
+| T07 | 急速充填 | 採用 | ゲージの充填が速くなる | 次の高速攻撃が早く使える | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T07_quickCharge.tres` | [demo T07](../demo/docs/traits.md) `quickCharge`。最大5重ね |
+| T08 | 大容量チャージ | 採用 | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。回数のストックではない | 1回で長い線を通る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T08_capacity.tres` | [demo T08](../demo/docs/traits.md) `capacity`。最大5重ね |
+| T09 | クリティカル率 | 採用 | クリティカルが出やすくなる（上限あり） | T06 の発動が増える | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T09_critRate.tres` | [demo T09](../demo/docs/traits.md) `critRate`。最大5重ね |
+| T10 | 最高速度 | 採用 | 最高速度が上がる。威力は上がらない | 移動と描ける長さが伸びる | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T10_speed.tres` | [demo T10](../demo/docs/traits.md) `speed`。最大5重ね |
+| T11 | 攻撃力 | 採用 | すべての攻撃の攻撃力の倍率が上がる | 倒せる・装甲を抜ける敵が変わる | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T11_attack.tres` | [demo T11](../demo/docs/traits.md) `attack`。最大5重ね |
+| T12 | 広域回収 | 採用 | 回収範囲が広がる | アイテムに近づく必要が減る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T12_pickup.tres` | [demo T12](../demo/docs/traits.md) `pickup`。最大5重ね |
+| T13 | 反応波動 | 採用 | 実際にダメージを受けたとき、周りを押し返す波動 | 被弾のあとの周りを押し返す | 実装済み。`scripts/traits/reactive.gd`、`data/traits/T13_reactive.tres` | [demo T13](../demo/docs/traits.md) `reactive`。最大5重ね |
+| T14 | 軌跡延長 | 採用 | 描ける長さが伸びる。容量・最高速度とは別の倍率 | 複数の群れを1回で通る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T14_length.tres` | [demo T14](../demo/docs/traits.md) `length`。最大5重ね |
 
 ## 保留・不採用
 
