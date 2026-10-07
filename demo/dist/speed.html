@@ -246,8 +246,10 @@ const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
-  meteorCount: 12,
+  meteorCount: 36,
   meteorCoinChance: 0.4,
+  meteorHealChance: 0.25,
+  meteorHealFrac: 0.2,
   coreBoost: 0.18, // max speed gained per power core
   levelHeal: 0.08, // share of max HP restored per level-up
   capsuleCount: 5, // field capsules kept on the map
@@ -979,9 +981,9 @@ function spawnWave(game, target, remaining) {
 
 function keepMeteors(game) {
   let near = 0;
-  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  for (const e of game.enemies) if (!e.dead && e.type === 'meteor') near++;
   if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game, 200);
+  const pt = spawnPoint(game);
   if (!pt) return;
   const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
   const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
@@ -3685,24 +3687,29 @@ function updateCapsules(game, dt) {
   const pull = game.stats.pickupRadius * 1.6;
   for (const c of game.capsules) {
     c.age += dt;
+    const canCollect = c.kind !== 'heal' || sh.hp < game.stats.maxHp;
     if (c.src === 'drop' || c.src === 'elite') {
       const dx = sh.x - c.x, dy = sh.y - c.y, d = Math.hypot(dx, dy);
-      if (d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
+      if (canCollect && d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
     }
     const reach = 22 + CONFIG.shipRadius + 14;
-    if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
+    if (canCollect && (c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
       c.taken = true; taken = true;
       if (c.kind === 'core') {
         game.cores++;
         refreshStats(game);
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else if (c.kind === 'heal') {
+        const before = sh.hp;
+        sh.hp = Math.min(game.stats.maxHp, sh.hp + game.stats.maxHp * CONFIG.meteorHealFrac);
+        addText(game, sh.x, sh.y - 40, `HP +${Math.round(sh.hp - before)}`, '#67e8b1', 18);
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
         addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
-      addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
+      addRing(game, c.x, c.y, c.kind === 'heal' ? 70 : 120, c.kind === 'core' ? '#ffd24a' : c.kind === 'heal' ? '#67e8b1' : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
     if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
@@ -4115,6 +4122,9 @@ function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
+  if (e.type === 'meteor' && game.rng() < CONFIG.meteorHealChance) {
+    game.capsules.push({ kind: 'heal', src: 'drop', x: e.x, y: e.y, age: 0 });
+  }
   // Roll independently for each kill; drop frequency is controlled by probability, not a timer.
   const power = e.xp;
   const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));
@@ -4762,6 +4772,7 @@ function render(r, game, dt, pointer) {
   drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
+  drawCapsules(r, game, true); // repair kits remain visible above the crowd
   drawPortals(r, game);
   drawPathUi(r, game);
   drawFriendly(r, game, dt);
@@ -4891,6 +4902,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
+  if (c.kind === 'heal') return '#67e8b1';
   return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
 
@@ -4906,10 +4918,11 @@ function drawCoins(r, game) {
   }
 }
 
-function drawCapsules(r, game) {
+function drawCapsules(r, game, healingOnly = false) {
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const c of game.capsules) {
+    if ((c.kind === 'heal') !== healingOnly) continue;
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
@@ -4930,6 +4943,13 @@ function drawCapsules(r, game) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'heal') {
+      ctx.fillStyle = '#e1f4ec'; ctx.strokeStyle = '#365c50'; ctx.lineWidth = 2 / z;
+      ctx.fillRect(-S * 0.65, -S * 0.5, S * 1.3, S); ctx.strokeRect(-S * 0.65, -S * 0.5, S * 1.3, S);
+      ctx.strokeRect(-S * 0.22, -S * 0.75, S * 0.44, S * 0.25);
+      ctx.fillStyle = '#148563';
+      ctx.fillRect(-S * 0.12, -S * 0.33, S * 0.24, S * 0.66);
+      ctx.fillRect(-S * 0.33, -S * 0.12, S * 0.66, S * 0.24);
     } else if (c.kind === 'cache') {
       ctx.fillStyle = col; ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
@@ -5502,6 +5522,34 @@ function shapePath(ctx, shape, R) {
   }
 }
 
+function drawMeteor(r, e) {
+  const { ctx } = r, R = e.r;
+  ctx.rotate(e.facing);
+  ctx.beginPath();
+  for (let i = 0; i < 11; i++) {
+    const a = i * TAU / 11, k = 0.72 + ((e.id * 17 + i * 37) % 29) / 100;
+    ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k);
+  }
+  ctx.closePath(); ctx.fillStyle = e.flash > 0 ? '#e6e4df' : '#706a63'; ctx.fill();
+  ctx.strokeStyle = '#aaa49a'; ctx.lineWidth = Math.max(1 / r.cam.zoom, R * 0.035); ctx.stroke();
+  // Uneven facets and recessed craters, without the ship's eye or armor ring.
+  ctx.fillStyle = 'rgba(30,25,21,0.3)';
+  ctx.beginPath(); ctx.moveTo(-R * 0.65, -R * 0.25); ctx.lineTo(-R * 0.1, R * 0.15);
+  ctx.lineTo(R * 0.7, R * 0.1); ctx.lineTo(R * 0.3, R * 0.75); ctx.lineTo(-R * 0.5, R * 0.55); ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 3; i++) {
+    const a = (e.id * 0.7 + i * 2.2), d = R * (i === 0 ? 0.2 : 0.48), size = R * (0.12 + i * 0.03);
+    const x = Math.cos(a) * d, y = Math.sin(a) * d;
+    ctx.fillStyle = '#514d47'; ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.75, a, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#91897d'; ctx.lineWidth = R * 0.025;
+    ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.75, a, 0.15, Math.PI); ctx.stroke();
+  }
+  if (e.hp < e.maxHp) {
+    ctx.strokeStyle = '#302c28'; ctx.lineWidth = Math.max(1 / r.cam.zoom, R * 0.05);
+    ctx.beginPath(); ctx.moveTo(-R * 0.7, -R * 0.5); ctx.lineTo(-R * 0.1, -R * 0.1);
+    ctx.lineTo(R * 0.1, R * 0.25); ctx.lineTo(R * 0.65, R * 0.55); ctx.stroke();
+  }
+}
+
 function drawEnemies(r, game) {
   const { ctx } = r;
   const z = r.cam.zoom;
@@ -5513,6 +5561,7 @@ function drawEnemies(r, game) {
     const R = e.r;
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.type === 'meteor') { drawMeteor(r, e); ctx.restore(); continue; }
     if (e.T.auraR) {
       const g = ctx.createRadialGradient(0, 0, R, 0, 0, e.T.auraR);
       g.addColorStop(0, 'rgba(199,125,255,0.22)');
@@ -6410,6 +6459,7 @@ function showStation(save, onBuy, onDepart) {
       el('li', {}, '雑魚の弱点方向を狙う必要はない。クリティカルは確率で発生する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? `通常攻撃は自動。レベルアップで3枚から1つ選び、武器${CONFIG.weaponSlots}枠・各Lv8まで、特性${CONFIG.traitSlots}枠・各5重ねまで育てる。線の移動中は選択画面を保留する` : 'この操作の試作は従来の6部位モジュールを使用する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? '敵を倒して経験値を回収する。漂流カプセルも経験値になり、装備はレベルアップで選ぶ' : '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
+      el('li', {}, 'クレーターのある岩は隕石。壊すと確率で十字付きの修理キットが落ち、拾うとHPが回復する。HP満タン時は残せる'),
       el('li', {}, '8:30 以降、中心付近に出力コア（金の星）が出現。拾うたびに最高速度 +18%。ボスとの戦いに向けて機体を強化する'),
       el('li', {}, el('kbd', {}, 'Esc'), ' ポーズ　', el('kbd', {}, 'M'), ' 音のオン／オフ（最初はミュート）　', el('kbd', {}, 'P'), ' 調整パネル')),
     el('h2', {}, '機体強化'),
@@ -6661,6 +6711,9 @@ const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
+  { key: 'meteorCount', label: '隕石の数', min: 0, max: 100, step: 1 },
+  { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
   { key: 'dropBase', label: 'カプセル基本ドロップ率（描画版はXP）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },

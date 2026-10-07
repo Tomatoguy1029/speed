@@ -155,8 +155,10 @@ export const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
-  meteorCount: 12,
+  meteorCount: 36,
   meteorCoinChance: 0.4,
+  meteorHealChance: 0.25,
+  meteorHealFrac: 0.2,
   coreBoost: 0.18, // max speed gained per power core
   levelHeal: 0.08, // share of max HP restored per level-up
   capsuleCount: 5, // field capsules kept on the map

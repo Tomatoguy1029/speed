@@ -102,9 +102,9 @@ function spawnWave(game, target, remaining) {
 
 function keepMeteors(game) {
   let near = 0;
-  for (const e of game.enemies) if (e.type === 'meteor') near++;
+  for (const e of game.enemies) if (!e.dead && e.type === 'meteor') near++;
   if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game, 200);
+  const pt = spawnPoint(game);
   if (!pt) return;
   const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
   const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;

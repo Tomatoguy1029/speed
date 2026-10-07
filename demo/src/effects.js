@@ -237,24 +237,29 @@ function updateCapsules(game, dt) {
   const pull = game.stats.pickupRadius * 1.6;
   for (const c of game.capsules) {
     c.age += dt;
+    const canCollect = c.kind !== 'heal' || sh.hp < game.stats.maxHp;
     if (c.src === 'drop' || c.src === 'elite') {
       const dx = sh.x - c.x, dy = sh.y - c.y, d = Math.hypot(dx, dy);
-      if (d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
+      if (canCollect && d < pull && d > 1) { const v = (600 + Math.hypot(sh.vx, sh.vy)) * dt; c.x += (dx / d) * Math.min(v, d); c.y += (dy / d) * Math.min(v, d); }
     }
     const reach = 22 + CONFIG.shipRadius + 14;
-    if ((c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
+    if (canCollect && (c.x - sh.x) ** 2 + (c.y - sh.y) ** 2 < reach * reach) {
       c.taken = true; taken = true;
       if (c.kind === 'core') {
         game.cores++;
         refreshStats(game);
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
+      } else if (c.kind === 'heal') {
+        const before = sh.hp;
+        sh.hp = Math.min(game.stats.maxHp, sh.hp + game.stats.maxHp * CONFIG.meteorHealFrac);
+        addText(game, sh.x, sh.y - 40, `HP +${Math.round(sh.hp - before)}`, '#67e8b1', 18);
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
         addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
-      addRing(game, c.x, c.y, 120, c.kind === 'core' ? '#ffd24a' : '#9fe8ff', 0.5);
+      addRing(game, c.x, c.y, c.kind === 'heal' ? 70 : 120, c.kind === 'core' ? '#ffd24a' : c.kind === 'heal' ? '#67e8b1' : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
     if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }

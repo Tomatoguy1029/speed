@@ -138,6 +138,7 @@ export function render(r, game, dt, pointer) {
   drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
+  drawCapsules(r, game, true); // repair kits remain visible above the crowd
   drawPortals(r, game);
   drawPathUi(r, game);
   drawFriendly(r, game, dt);
@@ -267,6 +268,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
+  if (c.kind === 'heal') return '#67e8b1';
   return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
 
@@ -282,10 +284,11 @@ function drawCoins(r, game) {
   }
 }
 
-function drawCapsules(r, game) {
+function drawCapsules(r, game, healingOnly = false) {
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const c of game.capsules) {
+    if ((c.kind === 'heal') !== healingOnly) continue;
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
@@ -306,6 +309,13 @@ function drawCapsules(r, game) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'heal') {
+      ctx.fillStyle = '#e1f4ec'; ctx.strokeStyle = '#365c50'; ctx.lineWidth = 2 / z;
+      ctx.fillRect(-S * 0.65, -S * 0.5, S * 1.3, S); ctx.strokeRect(-S * 0.65, -S * 0.5, S * 1.3, S);
+      ctx.strokeRect(-S * 0.22, -S * 0.75, S * 0.44, S * 0.25);
+      ctx.fillStyle = '#148563';
+      ctx.fillRect(-S * 0.12, -S * 0.33, S * 0.24, S * 0.66);
+      ctx.fillRect(-S * 0.33, -S * 0.12, S * 0.66, S * 0.24);
     } else if (c.kind === 'cache') {
       ctx.fillStyle = col; ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
@@ -878,6 +888,34 @@ function shapePath(ctx, shape, R) {
   }
 }
 
+function drawMeteor(r, e) {
+  const { ctx } = r, R = e.r;
+  ctx.rotate(e.facing);
+  ctx.beginPath();
+  for (let i = 0; i < 11; i++) {
+    const a = i * TAU / 11, k = 0.72 + ((e.id * 17 + i * 37) % 29) / 100;
+    ctx.lineTo(Math.cos(a) * R * k, Math.sin(a) * R * k);
+  }
+  ctx.closePath(); ctx.fillStyle = e.flash > 0 ? '#e6e4df' : '#706a63'; ctx.fill();
+  ctx.strokeStyle = '#aaa49a'; ctx.lineWidth = Math.max(1 / r.cam.zoom, R * 0.035); ctx.stroke();
+  // Uneven facets and recessed craters, without the ship's eye or armor ring.
+  ctx.fillStyle = 'rgba(30,25,21,0.3)';
+  ctx.beginPath(); ctx.moveTo(-R * 0.65, -R * 0.25); ctx.lineTo(-R * 0.1, R * 0.15);
+  ctx.lineTo(R * 0.7, R * 0.1); ctx.lineTo(R * 0.3, R * 0.75); ctx.lineTo(-R * 0.5, R * 0.55); ctx.closePath(); ctx.fill();
+  for (let i = 0; i < 3; i++) {
+    const a = (e.id * 0.7 + i * 2.2), d = R * (i === 0 ? 0.2 : 0.48), size = R * (0.12 + i * 0.03);
+    const x = Math.cos(a) * d, y = Math.sin(a) * d;
+    ctx.fillStyle = '#514d47'; ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.75, a, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#91897d'; ctx.lineWidth = R * 0.025;
+    ctx.beginPath(); ctx.ellipse(x, y, size, size * 0.75, a, 0.15, Math.PI); ctx.stroke();
+  }
+  if (e.hp < e.maxHp) {
+    ctx.strokeStyle = '#302c28'; ctx.lineWidth = Math.max(1 / r.cam.zoom, R * 0.05);
+    ctx.beginPath(); ctx.moveTo(-R * 0.7, -R * 0.5); ctx.lineTo(-R * 0.1, -R * 0.1);
+    ctx.lineTo(R * 0.1, R * 0.25); ctx.lineTo(R * 0.65, R * 0.55); ctx.stroke();
+  }
+}
+
 function drawEnemies(r, game) {
   const { ctx } = r;
   const z = r.cam.zoom;
@@ -889,6 +927,7 @@ function drawEnemies(r, game) {
     const R = e.r;
     ctx.save();
     ctx.translate(e.x, e.y);
+    if (e.type === 'meteor') { drawMeteor(r, e); ctx.restore(); continue; }
     if (e.T.auraR) {
       const g = ctx.createRadialGradient(0, 0, R, 0, 0, e.T.auraR);
       g.addColorStop(0, 'rgba(199,125,255,0.22)');
