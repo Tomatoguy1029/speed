@@ -31,7 +31,7 @@ window/stretch/aspect="expand"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/stage_launcher/plugin.cfg")
+enabled=PackedStringArray("res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg")
 
 [gui]
 
@@ -50,3 +50,7 @@ rendering_device/driver.windows="d3d12"
 [stage_launcher]
 
 stage_dir="res://scenes/stages/"
+
+[speed_data_editor]
+
+data_dir="res://data"
