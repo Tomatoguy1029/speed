@@ -8,6 +8,7 @@ var max_hp := 0.0
 ## 攻撃力の倍率（基礎攻撃力にかける）
 var attack_mult := 1.0
 var crit_chance := 0.0
+var crit_mult := 2.5
 var pickup_radius := 0.0
 ## 1単位の充填にかかる実秒
 var charge_time := 0.0

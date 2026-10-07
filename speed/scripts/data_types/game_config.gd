@@ -67,6 +67,14 @@ extends Resource
 @export var cruise_drag: float
 @export var cruise_floor: float
 @export var overcap_decay: float
+## なぞりの開始時の速さ：最高速度 × launch_ratio × 充填率 ＋ 同じ向きの今の速さ × carry
+@export var launch_ratio: float
+@export var carry: float
+## 発射後に減速しない時間（秒）と、その後に残す速さの割合
+@export var boost_duration: float
+@export var energy_cut: float
+## これより遅いときは向きを変えない（速さ）
+@export var pivot_speed: float
 
 @export_group("ゲージと描画（仕様書 4）")
 @export var dash_charge_time: float
@@ -86,6 +94,13 @@ extends Resource
 @export var base_crit_chance: float
 @export var crit_mult: float
 @export var ram_speed_ratio: float
+## クリティカルの体当たりで装甲の判定に使う割合
+@export var crit_armor: float
+## 弾かれたときに残す速さの割合と、最低の速さ
+@export var bounce_keep: float
+@export var bounce_min_speed: float
+## 同じ敵に続けて当たらない時間（世界秒）
+@export var contact_cooldown: float
 @export var kill_hitstop: float
 @export var kill_hitstop_cap: float
 @export var kill_hitstop_regen: float
@@ -109,6 +124,9 @@ extends Resource
 @export var spawn_refill_time: float
 @export var spawn_recycle_scale: float
 @export var titan_max: int
+## 当たり判定の格子の大きさと、敵の半径の最大値（格子の検索の余白）
+@export var grid_cell: float
+@export var max_enemy_radius: float
 @export var battleship_max: int
 
 @export_group("大型の敵の破片（仕様書 9.5）")

@@ -27,6 +27,11 @@ var hitstop_budget := 0.0
 # ── 機体（仕様書 3） ───────────────────────────────────────────────
 var ship_pos := Vector2.ZERO
 var ship_vel := Vector2.ZERO
+## 機体の向き（進む向き。ほぼ止まっているときは最後に操作した向き）
+var ship_heading := Vector2.UP
+## 発射後に減速しない残り時間と、その後の減速の残り時間（世界秒）
+var ship_boost_t := 0.0
+var ship_fade_t := 0.0
 var ship_hp := 0.0
 var ship_invuln := 0.0
 ## 被弾の赤い表示の残り（実秒）
@@ -42,6 +47,12 @@ var stats := ShipStats.new()
 ## 充填率（0〜1）
 var gauge := 1.0
 var drawing := false
+## 描き始めたか（Space で始めたときは、クリックするまで線を引かない）
+var draw_started := false
+## 線が惑星・月に届いたか
+var draw_blocked := false
+## 描画で使う充填の量（容量 × 充填率）
+var draw_gauge := 0.0
 var draw_points := PackedVector2Array()
 var draw_limit := 0.0
 var draw_length := 0.0
