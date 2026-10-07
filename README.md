@@ -24,7 +24,7 @@ godot --editor --path speed
 |---|---|
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
-| `docs/` | 本番の現在の仕様・課題・ユーザーごとの作業記録 |
+| `docs/` | 本番の [企画書](docs/concept.md)・[仕様書](docs/spec.md)・[設計書](docs/design.md)、課題、ユーザーごとの作業記録 |
 | `demo/docs/` | demo の仕様・課題・これまでの作業記録 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
