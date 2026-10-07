@@ -113,7 +113,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
-  if ((e.key === 'p' || e.key === 'P') && game.state !== 'finishing') debug.toggle();
+  if ((e.key === 'p' || e.key === 'P') && !['finishing', 'dying'].includes(game.state)) debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
   }
@@ -138,12 +138,16 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const wasRunning = game.state === 'play' || game.state === 'finishing';
+  const beforeState = game.state;
+  const wasRunning = ['play', 'finishing', 'dying'].includes(beforeState);
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
-  if (game.state === 'finishing') input.state.enabled = false;
+  if (game.state === 'finishing' || game.state === 'dying') input.state.enabled = false;
+  if (game.state === 'dying' && (beforeState !== 'dying' || debug.open || offerShown)) {
+    input.reset(); clearScreens(); offerShown = null; debug.hide();
+  }
   render(renderer, game, dt, input.state);
   updateDashButton();
   audio.handle(game.events);

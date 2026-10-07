@@ -30,9 +30,9 @@ export function runBeam(game, x, y, ux, uy, length, width, dmg, cause = 'critBea
   const x1 = x + ux * length, y1 = y + uy * length, pad = width / 2 + MAX_ENEMY_R;
   queryGrid(game.grid, Math.min(x, x1) - pad, Math.min(y, y1) - pad, Math.max(x, x1) + pad, Math.max(y, y1) + pad, e => {
     if (e.dead || segCircleT(x, y, x1, y1, e.x, e.y, e.r + width / 2) < 0) return;
-    damageEnemy(game, e, dmg, { cause, noCrit: cause === 'critBeam', dirX: ux, dirY: uy, knock: 180 });
+    damageEnemy(game, e, dmg, { cause, noCrit: cause === 'critBeam', dirX: ux, dirY: uy, knock: CONFIG.lanceKnock });
   });
-  game.wfx.push({ kind: 'beam', x0: x, y0: y, x1, y1, width, life: 0.22, max: 0.22 });
+  game.wfx.push({ kind: 'beam', x0: x, y0: y, x1, y1, width, life: 0.4, max: 0.4 });
 }
 
 export function onRunCritical(game, x, y) {
@@ -41,7 +41,8 @@ export function onRunCritical(game, x, y) {
   game.criticalBeamAt = game.buildClock + 0.15;
   const sh = game.ship, sp = Math.hypot(sh.vx, sh.vy);
   const ux = sp > 1 ? sh.vx / sp : sh.hx, uy = sp > 1 ? sh.vy / sp : sh.hy;
-  runBeam(game, x, y, ux, uy, 480 + n * 100, 14 + n * 4, attackPower(0, game.stats) * (0.8 + n * 0.4));
+  runBeam(game, x, y, ux, uy, CONFIG.lanceLength + n * CONFIG.lanceLengthPerStack,
+    CONFIG.lanceWidth + n * CONFIG.lanceWidthPerStack, attackPower(0, game.stats) * (CONFIG.lanceDamage + n * CONFIG.lanceDamagePerStack));
 }
 
 export function onRunLaunch(game, full) {
@@ -69,11 +70,42 @@ export function onRunKill(game, cause) {
 function runSonic(game, cause) {
   const sh = game.ship, n = runTrait(game, 'killSonic');
   const L = runWeaponStats('sonic', game.weapons.sonic || 1);
-  const radius = cause === 'killSonic' ? 230 + n * 40 : 260 * L.radius;
-  const mult = cause === 'killSonic' ? 0.8 + n * 0.4 : 1.2 * L.damage;
-  explode(game, sh.x, sh.y, radius, attackPower(0, game.stats) * mult,
-    { cause, color: '#c8f7ff', knock: 750, life: 0.5 });
+  const radius = cause === 'killSonic' ? 320 + n * 50 : CONFIG.sonicRadius * L.radius;
+  const mult = cause === 'killSonic' ? 1.6 + n * 0.8 : CONFIG.sonicDamage * L.damage;
+  const wave = { x: sh.x, y: sh.y, radius, dmg: attackPower(0, game.stats) * mult, cause,
+    life: CONFIG.sonicTravelTime, max: CONFIG.sonicTravelTime, hits: new Set() };
+  game.sonicWaves.push(wave);
+  if (game.sonicWaves.length > 4) game.sonicWaves.shift();
+  sweepRunSonic(game, wave, sh.x, sh.y, sh.x, sh.y);
+  addRing(game, sh.x, sh.y, radius, '#c8f7ff', 0.5);
   game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius });
+}
+
+// The same damaging wave accompanies the ship; each enemy is struck once per wave.
+function sweepRunSonic(game, wave, x0, y0, x1, y1) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (wave.radius * 0.3)));
+  for (let i = 1; i <= steps && game.state === 'play'; i++) {
+    const x = x0 + (x1 - x0) * i / steps, y = y0 + (y1 - y0) * i / steps, pad = wave.radius + MAX_ENEMY_R;
+    queryGrid(game.grid, x - pad, y - pad, x + pad, y + pad, e => {
+      if (e.dead || wave.hits.has(e.id) || game.state !== 'play') return;
+      const dx = e.x - x, dy = e.y - y, dist = Math.hypot(dx, dy);
+      if (dist > wave.radius + e.r) return;
+      wave.hits.add(e.id);
+      damageEnemy(game, e, wave.dmg, { cause: wave.cause, dirX: dx / (dist || 1), dirY: dy / (dist || 1), knock: CONFIG.sonicKnock });
+    });
+  }
+  wave.x = x1; wave.y = y1;
+}
+
+export function updateRunSonic(game, dt) {
+  const sh = game.ship;
+  for (const wave of [...game.sonicWaves]) {
+    if (game.state !== 'play') break;
+    // Traced movement sweeps every actual segment in onRunTrail, including corners.
+    sweepRunSonic(game, wave, wave.x, wave.y, sh.x, sh.y);
+    wave.life -= dt;
+  }
+  game.sonicWaves = game.sonicWaves.filter(w => w.life > 0);
 }
 
 export function onRunContact(game, e, x, y, ux, uy) {
@@ -110,6 +142,8 @@ function runSegmentCross(a, b, c, d) {
 
 export function onRunTrail(game, run, x0, y0, x1, y1) {
   if (!game.newBuild || game.state !== 'play') return;
+  for (const wave of [...game.sonicWaves]) sweepRunSonic(game, wave, x0, y0, x1, y1);
+  if (game.state !== 'play') return;
   const a = { x: x0, y: y0 }, b = { x: x1, y: y1 };
   const len = Math.hypot(x1 - x0, y1 - y0);
   if (len < 1e-6) return;

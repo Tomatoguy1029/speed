@@ -1,6 +1,6 @@
 // Tuning panel: edits CONFIG live and offers shortcuts (time skip, modules, invincibility).
 import { CONFIG } from './config.js';
-import { refreshStats, pushOffer, addXp, debugRunItem } from './world.js';
+import { refreshStats, pushOffer, addXp, debugRunItem, damageShip } from './world.js';
 import { PHASES } from './spawner.js';
 import { MODULES, RARITIES, SLOTS, moduleFitsScheme } from './modules.js';
 import { RUN_WEAPONS, RUN_TRAITS, runModuleDef, runChoiceInfo } from './run-build.js';
@@ -175,9 +175,15 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   button('+60 秒', (g) => skipTime(g, 60));
   button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
   button('ゲージ満タン', g => { g.dashMeter = 1; });
+  for (const fatal of [false, true]) button(fatal ? '致命傷を確認' : '被弾を確認', g => {
+    if (g.state !== 'play') return;
+    const invincible = g.debug.invincible; g.debug.invincible = false; g.ship.invulnT = 0;
+    damageShip(g, fatal ? g.ship.hp + 1 : Math.min(12, g.ship.hp / 2), 0, 'debug');
+    g.debug.invincible = invincible;
+  });
   button('装備をリセット', g => {
     if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
-    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = [];
+    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = []; g.sonicWaves = [];
     g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
@@ -296,6 +302,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   let fps = 60;
   return {
     toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); syncModulePicker(); },
+    hide() { root.classList.remove('open'); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;

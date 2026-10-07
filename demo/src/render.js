@@ -1,6 +1,6 @@
 import { isDrawScheme } from './controls.js';
 import { CONFIG } from './config.js';
-import { finishCameraTarget, drawBossFinish } from './finale.js';
+import { finishCameraTarget, drawBossFinish, drawShipDeath } from './finale.js';
 import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
@@ -22,7 +22,7 @@ export function createRenderer(canvas) {
     p,
     stars: Array.from({ length: 110 - i * 25 }, () => ({ x: rng() * STAR_TILE, y: rng() * STAR_TILE, s: 0.6 + rng() * (0.6 + i * 0.6), a: 0.25 + rng() * 0.6 })),
   }));
-  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, stageFlash: null, hurt: 0 };
+  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, stageFlash: null, hurt: 0, shipHurt: 0 };
 }
 
 export function resizeRenderer(r) {
@@ -53,6 +53,7 @@ export function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  if (game.death) return; // preserve the camera at the fatal hit through the result
   const finishTarget = finishCameraTarget(game, r.W, r.H, targetZoom(game, r.W, r.H));
   if (finishTarget) {
     const k = 1 - Math.exp(-10 * dt);
@@ -86,13 +87,14 @@ function updateCamera(r, game, dt) {
 
 function handleEvents(r, game) {
   for (const ev of game.events) {
-    if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    if (ev.type === 'hurt') { r.hurt = 0.35; r.shipHurt = CONFIG.shipHurtTime; }
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
     else if (ev.type === 'kill' && ev.cause === 'ram') r.shake = Math.max(r.shake, 5);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
-    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); }
+    else if (ev.type === 'sonic') { r.flash = 0.25; r.shake = Math.max(r.shake, 10); }
+    else if (ev.type === 'shipDeath') { r.shake = r.flash = r.hurt = r.shipHurt = 0; r.stageFlash = null; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
@@ -106,7 +108,10 @@ export function render(r, game, dt, pointer) {
   // keep the backing store matched to the laid-out canvas (mobile toolbars and rotation can
   // change it without a resize event; a mismatch stretches the picture)
   if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
+  if (game.state === 'dying' && game.death.phase === 'freeze') dt = 0;
   handleEvents(r, game);
+  if (game.death) r.shake = r.flash = 0;
+  r.shipHurt = Math.max(0, r.shipHurt - dt);
   updateCamera(r, game, dt);
   game.spawnView = { x: r.cam.x, y: r.cam.y, halfW: r.W / 2 / r.cam.zoom, halfH: r.H / 2 / r.cam.zoom };
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
@@ -140,13 +145,15 @@ export function render(r, game, dt, pointer) {
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
-  drawShip(r, game);
+  if (!game.death) drawShip(r, game);
   drawFx(r, game);
   drawCombatImpacts(r, game);
+  // Fatal freeze: the intact ship is the last world layer, above enemies and effects.
+  if (game.death?.phase === 'freeze') drawShip(r, game);
   ctx.restore();
-  drawSpeedLines(r, game);
+  if (!game.death) drawSpeedLines(r, game);
 
-  if (game.state !== 'finishing') {
+  if (game.state !== 'finishing' && !game.death) {
     drawChargeUi(r, game, pointer);
     drawCapsuleArrows(r, game);
     drawDrawingHud(r, game, pointer);
@@ -164,6 +171,7 @@ export function render(r, game, dt, pointer) {
     r.flash = Math.max(0, r.flash - dt * 2.2);
   }
   drawBossFinish(r, game);
+  drawShipDeath(r, game);
 }
 
 // Conical shock layers wrapped around the ship near max speed.
@@ -403,6 +411,16 @@ function drawRunWeapons(r, game) {
   for (const b of game.wstate.orbit?.blades || []) {
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(-18, -4, 36, 8); ctx.restore();
   }
+  for (const wave of game.sonicWaves) {
+    const sh = game.ship, angle = Math.atan2(sh.vy, sh.vx), alpha = Math.min(1, wave.life / wave.max * 2);
+    ctx.save(); ctx.translate(wave.x, wave.y); ctx.rotate(angle);
+    ctx.globalAlpha = alpha * 0.8; ctx.strokeStyle = '#c8f7ff'; ctx.shadowColor = '#68dbff'; ctx.shadowBlur = 12;
+    for (const fraction of [0.5, 0.75, 1]) {
+      ctx.lineWidth = (fraction === 1 ? 4 : 2) / z;
+      ctx.beginPath(); ctx.arc(0, 0, wave.radius * fraction, -Math.PI * 0.42, Math.PI * 0.42); ctx.stroke();
+    }
+    ctx.restore();
+  }
   for (const f of game.wfx) {
     ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
     if (f.kind === 'beam') {
@@ -414,7 +432,7 @@ function drawRunWeapons(r, game) {
   }
   ctx.globalAlpha = 1;
   for (const e of game.enemies) {
-    if (!e.shove || e.shove.time <= 0) continue;
+    if (!(e.shove?.time > 0 || e.knockT > 0)) continue;
     ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
     const sp = Math.hypot(e.vx, e.vy) || 1;
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
@@ -1173,11 +1191,13 @@ function drawShip(r, game) {
   const sh = game.ship;
   const s = Math.max(CONFIG.shipRadius, 9 / r.cam.zoom);
   ctx.save();
-  ctx.translate(sh.x, sh.y);
-  if (sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
-  ctx.shadowColor = '#5fd8ff';
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = '#1b3b5c';
+  const hurting = r.shipHurt > 0, fatal = game.death?.phase === 'freeze';
+  const offset = hurting && !fatal ? Math.sin(r.shipHurt * 100) * CONFIG.shipHurtShake * r.shipHurt / CONFIG.shipHurtTime / r.cam.zoom : 0;
+  ctx.translate(sh.x + offset, sh.y);
+  if (!hurting && !fatal && sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.shadowColor = hurting || fatal ? '#ff665a' : '#5fd8ff';
+  ctx.shadowBlur = fatal ? 26 : 18;
+  ctx.fillStyle = hurting || fatal ? '#ff6354' : '#1b3b5c';
   ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
   ctx.lineWidth = s * 0.28;
   ctx.strokeStyle = '#bff3ff';

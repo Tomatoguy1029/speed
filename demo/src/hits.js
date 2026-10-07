@@ -11,7 +11,7 @@ import { xpForLevel } from './progression.js';
 import { beginBossFinish } from './finale.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
-  if (e.dead || game.state === 'finishing' || dmg <= 0) return;
+  if (e.dead || game.state === 'finishing' || game.state === 'dying' || dmg <= 0) return;
   let critical = !!opts.crit;
   if (game.newBuild && opts.crit === undefined && !opts.noCrit) {
     critical = game.rng() < game.stats.critChance;
@@ -36,6 +36,7 @@ export function damageEnemy(game, e, dmg, opts = {}) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
+    if (['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
   }
   if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
@@ -54,7 +55,8 @@ export function killEnemy(game, e, opts = {}) {
   e.dead = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
-  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
   const phase = getPhase(game.t);

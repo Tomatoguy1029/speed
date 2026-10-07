@@ -226,6 +226,10 @@ export function updateEnemy(e, game, dt) {
     e.shove.time -= dt;
     e.vx = e.shove.vx; e.vy = e.shove.vy;
     e.shove.vx *= Math.exp(-dt * 0.8); e.shove.vy *= Math.exp(-dt * 0.8);
+  } else if (e.knockT > 0) {
+    e.knockT -= dt;
+    const drag = Math.exp(-dt * 2);
+    e.vx *= drag; e.vy *= drag;
   } else BEHAVIORS[e.T.behavior](e, game, dt);
   e.x += e.vx * dt;
   e.y += e.vy * dt;

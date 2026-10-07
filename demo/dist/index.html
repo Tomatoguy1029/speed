@@ -103,6 +103,11 @@ const CONFIG = {
   bossFinishZoom: 3.2,
   bossFinishBlastTime: 2,
   bossFinishClearTime: 1.4,
+  deathFreezeTime: 1,
+  deathExplosionTime: 0.8,
+  deathGameOverTime: 1,
+  shipHurtTime: 0.16,
+  shipHurtShake: 3, // screen pixels; only the ship moves
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -149,6 +154,17 @@ const CONFIG = {
   pathMemoryTime: 12,
   pathMemoryMax: 160,
   droneDelay: 0.12,
+  sonicRadius: 360,
+  sonicDamage: 2.4,
+  sonicKnock: 1250,
+  sonicTravelTime: 0.5, // real seconds accompanying the actual traveled route
+  lanceLength: 720,
+  lanceLengthPerStack: 120,
+  lanceWidth: 32,
+  lanceWidthPerStack: 8,
+  lanceDamage: 1.6,
+  lanceDamagePerStack: 0.8,
+  lanceKnock: 900,
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity
@@ -712,6 +728,10 @@ function updateEnemy(e, game, dt) {
     e.shove.time -= dt;
     e.vx = e.shove.vx; e.vy = e.shove.vy;
     e.shove.vx *= Math.exp(-dt * 0.8); e.shove.vy *= Math.exp(-dt * 0.8);
+  } else if (e.knockT > 0) {
+    e.knockT -= dt;
+    const drag = Math.exp(-dt * 2);
+    e.vx *= drag; e.vy *= drag;
   } else BEHAVIORS[e.T.behavior](e, game, dt);
   e.x += e.vx * dt;
   e.y += e.vy * dt;
@@ -1437,7 +1457,7 @@ const RUN_WEAPONS = [
   { id: 'barrier', catalog: 'W05', name: 'バリアシステム', color: '#76aaff', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
   { id: 'drone', catalog: 'W06', name: '追走ドローン', color: '#a8ffdb', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
   { id: 'mines', catalog: 'W07', name: '軌跡機雷', color: '#ff7b54', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
-  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', color: '#ffffff', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。通常移動でも周期発動' },
+  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', color: '#ffffff', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
   { id: 'orbit', catalog: 'W09', name: 'オービットブレード', color: '#9fe8ff', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
   { id: 'disc', catalog: 'W10', name: 'リターンディスク', color: '#6dffb0', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
   { id: 'missile', catalog: 'W11', name: '追尾ミサイル', color: '#ff9f40', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
@@ -1453,8 +1473,8 @@ const RUN_TRAITS = [
   { id: 'crossBlast', catalog: 'T02', name: '交差爆破', normal: true, desc: n => `過去${CONFIG.pathMemoryTime}秒の高速軌跡を横切ると交点で爆発。半径${100 + n * 25}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
   { id: 'vortex', catalog: 'T03', name: '余韻の渦', normal: true, desc: n => `終点に${(1.5 + n * 0.4).toFixed(1)}秒の渦。半径${180 + n * 35}の敵を引き寄せる` },
   { id: 'fullCharge', catalog: 'T04', name: '満タン突撃', normal: true, desc: n => `満タン発動の経路移動中は装甲を無視し、攻撃力×${(1.25 + n * 0.25).toFixed(2)}。部分充填での通常発動には適用しない` },
-  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${230 + n * 40}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
-  { id: 'critBeam', catalog: 'T06', name: 'クリティカルランス', normal: true, desc: n => `クリティカル時に突進方向へ貫通ビーム。射程${480 + n * 100}、威力×${(0.8 + n * 0.4).toFixed(1)}。ビームからは再発動しない` },
+  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${320 + n * 50}、威力×${(1.6 + n * 0.8).toFixed(1)}` },
+  { id: 'critBeam', catalog: 'T06', name: 'クリティカルランス', normal: true, desc: n => `クリティカル時に突進方向へ貫通ビーム。射程${CONFIG.lanceLength + n * CONFIG.lanceLengthPerStack}、威力×${(CONFIG.lanceDamage + n * CONFIG.lanceDamagePerStack).toFixed(1)}。ビームからは再発動しない` },
   { id: 'quickCharge', catalog: 'T07', name: '急速充填', normal: true, desc: n => `時間チャージの充填速度 +${n * 25}%` },
   { id: 'capacity', catalog: 'T08', name: '大容量チャージ', normal: true, desc: n => `チャージ容量 +${n * 20}%。満タンまでの時間と描ける長さが伸びる（回数ストックではない）` },
   { id: 'critRate', catalog: 'T09', name: 'クリティカル率', normal: true, desc: n => `クリティカル率 +${n * 8}%（基礎${Math.round(CONFIG.baseCritChance * 100)}%）。弱点方向を狙う必要はない` },
@@ -1981,9 +2001,9 @@ function runBeam(game, x, y, ux, uy, length, width, dmg, cause = 'critBeam') {
   const x1 = x + ux * length, y1 = y + uy * length, pad = width / 2 + MAX_ENEMY_R;
   queryGrid(game.grid, Math.min(x, x1) - pad, Math.min(y, y1) - pad, Math.max(x, x1) + pad, Math.max(y, y1) + pad, e => {
     if (e.dead || segCircleT(x, y, x1, y1, e.x, e.y, e.r + width / 2) < 0) return;
-    damageEnemy(game, e, dmg, { cause, noCrit: cause === 'critBeam', dirX: ux, dirY: uy, knock: 180 });
+    damageEnemy(game, e, dmg, { cause, noCrit: cause === 'critBeam', dirX: ux, dirY: uy, knock: CONFIG.lanceKnock });
   });
-  game.wfx.push({ kind: 'beam', x0: x, y0: y, x1, y1, width, life: 0.22, max: 0.22 });
+  game.wfx.push({ kind: 'beam', x0: x, y0: y, x1, y1, width, life: 0.4, max: 0.4 });
 }
 
 function onRunCritical(game, x, y) {
@@ -1992,7 +2012,8 @@ function onRunCritical(game, x, y) {
   game.criticalBeamAt = game.buildClock + 0.15;
   const sh = game.ship, sp = Math.hypot(sh.vx, sh.vy);
   const ux = sp > 1 ? sh.vx / sp : sh.hx, uy = sp > 1 ? sh.vy / sp : sh.hy;
-  runBeam(game, x, y, ux, uy, 480 + n * 100, 14 + n * 4, attackPower(0, game.stats) * (0.8 + n * 0.4));
+  runBeam(game, x, y, ux, uy, CONFIG.lanceLength + n * CONFIG.lanceLengthPerStack,
+    CONFIG.lanceWidth + n * CONFIG.lanceWidthPerStack, attackPower(0, game.stats) * (CONFIG.lanceDamage + n * CONFIG.lanceDamagePerStack));
 }
 
 function onRunLaunch(game, full) {
@@ -2020,11 +2041,42 @@ function onRunKill(game, cause) {
 function runSonic(game, cause) {
   const sh = game.ship, n = runTrait(game, 'killSonic');
   const L = runWeaponStats('sonic', game.weapons.sonic || 1);
-  const radius = cause === 'killSonic' ? 230 + n * 40 : 260 * L.radius;
-  const mult = cause === 'killSonic' ? 0.8 + n * 0.4 : 1.2 * L.damage;
-  explode(game, sh.x, sh.y, radius, attackPower(0, game.stats) * mult,
-    { cause, color: '#c8f7ff', knock: 750, life: 0.5 });
+  const radius = cause === 'killSonic' ? 320 + n * 50 : CONFIG.sonicRadius * L.radius;
+  const mult = cause === 'killSonic' ? 1.6 + n * 0.8 : CONFIG.sonicDamage * L.damage;
+  const wave = { x: sh.x, y: sh.y, radius, dmg: attackPower(0, game.stats) * mult, cause,
+    life: CONFIG.sonicTravelTime, max: CONFIG.sonicTravelTime, hits: new Set() };
+  game.sonicWaves.push(wave);
+  if (game.sonicWaves.length > 4) game.sonicWaves.shift();
+  sweepRunSonic(game, wave, sh.x, sh.y, sh.x, sh.y);
+  addRing(game, sh.x, sh.y, radius, '#c8f7ff', 0.5);
   game.events.push({ type: 'sonic', x: sh.x, y: sh.y, radius });
+}
+
+// The same damaging wave accompanies the ship; each enemy is struck once per wave.
+function sweepRunSonic(game, wave, x0, y0, x1, y1) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (wave.radius * 0.3)));
+  for (let i = 1; i <= steps && game.state === 'play'; i++) {
+    const x = x0 + (x1 - x0) * i / steps, y = y0 + (y1 - y0) * i / steps, pad = wave.radius + MAX_ENEMY_R;
+    queryGrid(game.grid, x - pad, y - pad, x + pad, y + pad, e => {
+      if (e.dead || wave.hits.has(e.id) || game.state !== 'play') return;
+      const dx = e.x - x, dy = e.y - y, dist = Math.hypot(dx, dy);
+      if (dist > wave.radius + e.r) return;
+      wave.hits.add(e.id);
+      damageEnemy(game, e, wave.dmg, { cause: wave.cause, dirX: dx / (dist || 1), dirY: dy / (dist || 1), knock: CONFIG.sonicKnock });
+    });
+  }
+  wave.x = x1; wave.y = y1;
+}
+
+function updateRunSonic(game, dt) {
+  const sh = game.ship;
+  for (const wave of [...game.sonicWaves]) {
+    if (game.state !== 'play') break;
+    // Traced movement sweeps every actual segment in onRunTrail, including corners.
+    sweepRunSonic(game, wave, wave.x, wave.y, sh.x, sh.y);
+    wave.life -= dt;
+  }
+  game.sonicWaves = game.sonicWaves.filter(w => w.life > 0);
 }
 
 function onRunContact(game, e, x, y, ux, uy) {
@@ -2061,6 +2113,8 @@ function runSegmentCross(a, b, c, d) {
 
 function onRunTrail(game, run, x0, y0, x1, y1) {
   if (!game.newBuild || game.state !== 'play') return;
+  for (const wave of [...game.sonicWaves]) sweepRunSonic(game, wave, x0, y0, x1, y1);
+  if (game.state !== 'play') return;
   const a = { x: x0, y: y0 }, b = { x: x1, y: y1 };
   const len = Math.hypot(x1 - x0, y1 - y0);
   if (len < 1e-6) return;
@@ -2480,7 +2534,7 @@ function createGame(opts = {}) {
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     boss: null, bossSpawned: false,
-    finale: null, finishFrames: [], finishClock: 0,
+    finale: null, death: null, finishFrames: [], finishClock: 0, sonicWaves: [],
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
@@ -2510,6 +2564,11 @@ function createGame(opts = {}) {
 
 function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'dying') {
+    if (game.death.phase !== 'freeze') updateFx(game, frameDt);
+    if (advanceShipDeath(game, frameDt)) end(game, 'lost', 'hp');
+    return;
+  }
   if (game.state === 'finishing') {
     updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
     const finished = advanceBossFinish(game, frameDt);
@@ -2545,9 +2604,11 @@ function update(game, frameDt, input) {
     runAlongPath(game, frameDt);
     if (game.state !== 'play') return;
     collideBodies(game);
+    if (game.state !== 'play') return;
     recordTrail(game.ship, frameDt);
   }
   if (game.newBuild) updateRunFollowers(game);
+  if (game.newBuild) updateRunSonic(game, frameDt);
   if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
@@ -2635,12 +2696,14 @@ function step(game, dt, input) {
     collideEnemies(game, x0, y0);
     if (game.state !== 'play') return;
     collideBodies(game);
+    if (game.state !== 'play') return;
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   if (game.newBuild) updateRunWeapons(game, dt);
   if (game.state !== 'play') return;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
+  if (game.state !== 'play') return;
   updateEffects(game, dt);
   if (game.state !== 'play') return;
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
@@ -3055,13 +3118,14 @@ function launch(game, ax, ay) {
 // amount: hp lost, slow: share of speed lost (0..1)
 function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
-  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
+  if (game.state !== 'play' || sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
   game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
+  if (sh.hp <= 0) { beginShipDeath(game); return true; }
   addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
   onShipHurt(game);
   return true;
@@ -3163,6 +3227,7 @@ function collideBodies(game) {
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
       if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
+      if (game.state !== 'play') return;
       game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
     }
   }
@@ -3987,7 +4052,7 @@ function updatePortals(game, realDt) {
 
 
 function damageEnemy(game, e, dmg, opts = {}) {
-  if (e.dead || game.state === 'finishing' || dmg <= 0) return;
+  if (e.dead || game.state === 'finishing' || game.state === 'dying' || dmg <= 0) return;
   let critical = !!opts.crit;
   if (game.newBuild && opts.crit === undefined && !opts.noCrit) {
     critical = game.rng() < game.stats.critChance;
@@ -4012,6 +4077,7 @@ function damageEnemy(game, e, dmg, opts = {}) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
+    if (['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
   }
   if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
@@ -4030,7 +4096,8 @@ function killEnemy(game, e, opts = {}) {
   e.dead = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
-  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, 260 + e.r * 4);
+  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
+  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
   const phase = getPhase(game.t);
@@ -4237,7 +4304,7 @@ function bossClearBlast(game) {
   game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
   game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
   game.marks = []; game.wproj = []; game.wfx = []; game.wstate = {};
-  game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
+  game.sonicWaves = []; game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
   game.fx.texts = [];
   const radius = Math.max(900, game.viewRadius * 1.4);
   addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);
@@ -4285,6 +4352,52 @@ function drawBossFinish(r, game) {
     ctx.shadowColor = '#ffac32'; ctx.shadowBlur = 28;
     ctx.fillStyle = '#fff2bf'; ctx.fillText('CLEAR!', W / 2, H / 2);
   }
+  ctx.restore();
+}
+
+function beginShipDeath(game) {
+  if (game.state !== 'play' || game.death) return;
+  game.death = { phase: 'freeze', elapsed: 0 };
+  game.state = 'dying'; game.endReason = 'hp'; game.spawning = false;
+  game.hitstop = game.slowmo = game.acc = 0;
+  game.draw = game.portalDash = game.releasePending = null;
+  game.offerQueue.length = 0; game.pendingLevelups = 0; game.currentOffer = null;
+  game.ship.charging = false; game.ship.invulnT = 0;
+  game.events.push({ type: 'shipDeath' });
+}
+
+function advanceShipDeath(game, dt) {
+  const f = game.death;
+  f.elapsed += dt;
+  if (f.phase === 'freeze' && f.elapsed >= CONFIG.deathFreezeTime) {
+    f.phase = 'blast'; f.elapsed = 0;
+    const sh = game.ship;
+    for (const key of Object.keys(game.fx)) game.fx[key] = [];
+    game.sonicWaves = []; game.wfx = []; game.drones = [];
+    burst(game, sh.x, sh.y, '#a8eeff', 65, 0, 0, 650);
+    burst(game, sh.x, sh.y, '#ffb65b', 35, 0, 0, 450);
+    addRing(game, sh.x, sh.y, 160, '#ffd5a0', 0.6);
+    for (let i = 0; i < 12; i++) {
+      const a = game.rng() * Math.PI * 2, speed = 100 + game.rng() * 320;
+      game.fx.particles.push({ kind: 'finishDebris', x: sh.x, y: sh.y,
+        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+        life: 1.4, max: 1.4, color: i % 2 ? '#bff3ff' : '#1b3b5c',
+        size: 4 + game.rng() * 8, angle: a, spin: (game.rng() - 0.5) * 10 });
+    }
+  } else if (f.phase === 'blast' && f.elapsed >= CONFIG.deathExplosionTime) {
+    f.phase = 'over'; f.elapsed = 0;
+  }
+  return f.phase === 'over' && f.elapsed >= CONFIG.deathGameOverTime;
+}
+
+function drawShipDeath(r, game) {
+  if (!game.death || game.state !== 'dying' || game.death.phase !== 'over') return;
+  const { ctx, W, H } = r;
+  ctx.save(); ctx.globalAlpha = Math.min(1, game.death.elapsed / 0.2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.min(90, W * 0.13, H * 0.18)}px system-ui, sans-serif`;
+  ctx.shadowColor = '#ff526e'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#ffe0e5'; ctx.fillText('GAME OVER', W / 2, H / 2);
   ctx.restore();
 }
 
@@ -4523,7 +4636,7 @@ function createRenderer(canvas) {
     p,
     stars: Array.from({ length: 110 - i * 25 }, () => ({ x: rng() * STAR_TILE, y: rng() * STAR_TILE, s: 0.6 + rng() * (0.6 + i * 0.6), a: 0.25 + rng() * 0.6 })),
   }));
-  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, stageFlash: null, hurt: 0 };
+  return { canvas, ctx, layers, cam: { x: 0, y: 0, zoom: 1, ready: false }, W: 0, H: 0, dpr: 1, shake: 0, flash: 0, vapor: 0, stageFlash: null, hurt: 0, shipHurt: 0 };
 }
 
 function resizeRenderer(r) {
@@ -4554,6 +4667,7 @@ function targetZoom(game, W, H) {
 
 function updateCamera(r, game, dt) {
   const sh = game.ship;
+  if (game.death) return; // preserve the camera at the fatal hit through the result
   const finishTarget = finishCameraTarget(game, r.W, r.H, targetZoom(game, r.W, r.H));
   if (finishTarget) {
     const k = 1 - Math.exp(-10 * dt);
@@ -4587,13 +4701,14 @@ function updateCamera(r, game, dt) {
 
 function handleEvents(r, game) {
   for (const ev of game.events) {
-    if (ev.type === 'hurt') { r.shake = Math.max(r.shake, 14); r.hurt = 0.35; }
+    if (ev.type === 'hurt') { r.hurt = 0.35; r.shipHurt = CONFIG.shipHurtTime; }
     else if (ev.type === 'kill' && ev.r > 25) r.shake = Math.max(r.shake, 8);
     else if (ev.type === 'kill' && ev.cause === 'ram') r.shake = Math.max(r.shake, 5);
     else if (ev.type === 'bounce') r.shake = Math.max(r.shake, 10);
     else if (ev.type === 'crash') r.shake = Math.max(r.shake, 16);
     else if (ev.type === 'stage') { r.stageFlash = { text: ev.name, kms: (ev.speed * CONFIG.speedToKms).toFixed(1), life: 1.4, max: 1.4 }; r.flash = Math.max(r.flash, 0.18); }
-    else if (ev.type === 'sonic') { r.flash = 0.8; r.shake = Math.max(r.shake, 34); }
+    else if (ev.type === 'sonic') { r.flash = 0.25; r.shake = Math.max(r.shake, 10); }
+    else if (ev.type === 'shipDeath') { r.shake = r.flash = r.hurt = r.shipHurt = 0; r.stageFlash = null; }
     else if (ev.type === 'barrier') r.vapor = 0.6;
     else if (ev.type === 'bossSpawn') { r.bossWarning = 3; r.shake = Math.max(r.shake, 8); }
     else if (ev.type === 'bossFinish') { r.shake = 0; r.stageFlash = null; r.flash = 0; }
@@ -4607,7 +4722,10 @@ function render(r, game, dt, pointer) {
   // keep the backing store matched to the laid-out canvas (mobile toolbars and rotation can
   // change it without a resize event; a mismatch stretches the picture)
   if (r.canvas.clientWidth && (Math.abs(r.canvas.clientWidth - r.W) > 0.5 || Math.abs(r.canvas.clientHeight - r.H) > 0.5)) resizeRenderer(r);
+  if (game.state === 'dying' && game.death.phase === 'freeze') dt = 0;
   handleEvents(r, game);
+  if (game.death) r.shake = r.flash = 0;
+  r.shipHurt = Math.max(0, r.shipHurt - dt);
   updateCamera(r, game, dt);
   game.spawnView = { x: r.cam.x, y: r.cam.y, halfW: r.W / 2 / r.cam.zoom, halfH: r.H / 2 / r.cam.zoom };
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
@@ -4641,13 +4759,15 @@ function render(r, game, dt, pointer) {
   drawPrediction(r, game);
   drawTrail(r, game);
   drawVapor(r, game, dt);
-  drawShip(r, game);
+  if (!game.death) drawShip(r, game);
   drawFx(r, game);
   drawCombatImpacts(r, game);
+  // Fatal freeze: the intact ship is the last world layer, above enemies and effects.
+  if (game.death?.phase === 'freeze') drawShip(r, game);
   ctx.restore();
-  drawSpeedLines(r, game);
+  if (!game.death) drawSpeedLines(r, game);
 
-  if (game.state !== 'finishing') {
+  if (game.state !== 'finishing' && !game.death) {
     drawChargeUi(r, game, pointer);
     drawCapsuleArrows(r, game);
     drawDrawingHud(r, game, pointer);
@@ -4665,6 +4785,7 @@ function render(r, game, dt, pointer) {
     r.flash = Math.max(0, r.flash - dt * 2.2);
   }
   drawBossFinish(r, game);
+  drawShipDeath(r, game);
 }
 
 // Conical shock layers wrapped around the ship near max speed.
@@ -4904,6 +5025,16 @@ function drawRunWeapons(r, game) {
   for (const b of game.wstate.orbit?.blades || []) {
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(-18, -4, 36, 8); ctx.restore();
   }
+  for (const wave of game.sonicWaves) {
+    const sh = game.ship, angle = Math.atan2(sh.vy, sh.vx), alpha = Math.min(1, wave.life / wave.max * 2);
+    ctx.save(); ctx.translate(wave.x, wave.y); ctx.rotate(angle);
+    ctx.globalAlpha = alpha * 0.8; ctx.strokeStyle = '#c8f7ff'; ctx.shadowColor = '#68dbff'; ctx.shadowBlur = 12;
+    for (const fraction of [0.5, 0.75, 1]) {
+      ctx.lineWidth = (fraction === 1 ? 4 : 2) / z;
+      ctx.beginPath(); ctx.arc(0, 0, wave.radius * fraction, -Math.PI * 0.42, Math.PI * 0.42); ctx.stroke();
+    }
+    ctx.restore();
+  }
   for (const f of game.wfx) {
     ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
     if (f.kind === 'beam') {
@@ -4915,7 +5046,7 @@ function drawRunWeapons(r, game) {
   }
   ctx.globalAlpha = 1;
   for (const e of game.enemies) {
-    if (!e.shove || e.shove.time <= 0) continue;
+    if (!(e.shove?.time > 0 || e.knockT > 0)) continue;
     ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
     const sp = Math.hypot(e.vx, e.vy) || 1;
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
@@ -5674,11 +5805,13 @@ function drawShip(r, game) {
   const sh = game.ship;
   const s = Math.max(CONFIG.shipRadius, 9 / r.cam.zoom);
   ctx.save();
-  ctx.translate(sh.x, sh.y);
-  if (sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
-  ctx.shadowColor = '#5fd8ff';
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = '#1b3b5c';
+  const hurting = r.shipHurt > 0, fatal = game.death?.phase === 'freeze';
+  const offset = hurting && !fatal ? Math.sin(r.shipHurt * 100) * CONFIG.shipHurtShake * r.shipHurt / CONFIG.shipHurtTime / r.cam.zoom : 0;
+  ctx.translate(sh.x + offset, sh.y);
+  if (!hurting && !fatal && sh.invulnT > 0 && Math.floor(game.t * 20) % 2 === 0) ctx.globalAlpha = 0.4;
+  ctx.shadowColor = hurting || fatal ? '#ff665a' : '#5fd8ff';
+  ctx.shadowBlur = fatal ? 26 : 18;
+  ctx.fillStyle = hurting || fatal ? '#ff6354' : '#1b3b5c';
   ctx.beginPath(); ctx.arc(0, 0, s, 0, TAU); ctx.fill();
   ctx.lineWidth = s * 0.28;
   ctx.strokeStyle = '#bff3ff';
@@ -6111,7 +6244,7 @@ const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
   boss: ['CLEAR!', 'win', '敵の大群を突破し、ボスを撃破した'],
-  hp: ['機体 大破', 'lose', 'HP が尽きた'],
+  hp: ['GAME OVER', 'lose', 'HP が尽きた'],
   time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
@@ -6634,9 +6767,15 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   button('+60 秒', (g) => skipTime(g, 60));
   button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
   button('ゲージ満タン', g => { g.dashMeter = 1; });
+  for (const fatal of [false, true]) button(fatal ? '致命傷を確認' : '被弾を確認', g => {
+    if (g.state !== 'play') return;
+    const invincible = g.debug.invincible; g.debug.invincible = false; g.ship.invulnT = 0;
+    damageShip(g, fatal ? g.ship.hp + 1 : Math.min(12, g.ship.hp / 2), 0, 'debug');
+    g.debug.invincible = invincible;
+  });
   button('装備をリセット', g => {
     if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
-    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = [];
+    g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = []; g.sonicWaves = [];
     g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
@@ -6755,6 +6894,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   let fps = 60;
   return {
     toggle() { root.classList.toggle('open'); sync(); syncScheme(); syncPathInput(); syncModulePicker(); },
+    hide() { root.classList.remove('open'); },
     get open() { return root.classList.contains('open'); },
     tick(game, dt) {
       if (!root.classList.contains('open') || !game) return;
@@ -6881,7 +7021,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') togglePause();
   if (e.key === 'm' || e.key === 'M') audio.toggleMute();
-  if ((e.key === 'p' || e.key === 'P') && game.state !== 'finishing') debug.toggle();
+  if ((e.key === 'p' || e.key === 'P') && !['finishing', 'dying'].includes(game.state)) debug.toggle();
   if (e.key === 'Enter') {
     if (mode === 'station') { e.preventDefault(); startRun(); }
   }
@@ -6906,12 +7046,16 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
-  const wasRunning = game.state === 'play' || game.state === 'finishing';
+  const beforeState = game.state;
+  const wasRunning = ['play', 'finishing', 'dying'].includes(beforeState);
   const raw = input.read();
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
-  if (game.state === 'finishing') input.state.enabled = false;
+  if (game.state === 'finishing' || game.state === 'dying') input.state.enabled = false;
+  if (game.state === 'dying' && (beforeState !== 'dying' || debug.open || offerShown)) {
+    input.reset(); clearScreens(); offerShown = null; debug.hide();
+  }
   render(renderer, game, dt, input.state);
   updateDashButton();
   audio.handle(game.events);

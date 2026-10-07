@@ -12,6 +12,11 @@ export const CONFIG = {
   bossFinishZoom: 3.2,
   bossFinishBlastTime: 2,
   bossFinishClearTime: 1.4,
+  deathFreezeTime: 1,
+  deathExplosionTime: 0.8,
+  deathGameOverTime: 1,
+  shipHurtTime: 0.16,
+  shipHurtShake: 3, // screen pixels; only the ship moves
   speedToKms: 11.2 / 2250, // display factor: escape speed shows as 11.2 km/s
 
   // field
@@ -58,6 +63,17 @@ export const CONFIG = {
   pathMemoryTime: 12,
   pathMemoryMax: 160,
   droneDelay: 0.12,
+  sonicRadius: 360,
+  sonicDamage: 2.4,
+  sonicKnock: 1250,
+  sonicTravelTime: 0.5, // real seconds accompanying the actual traveled route
+  lanceLength: 720,
+  lanceLengthPerStack: 120,
+  lanceWidth: 32,
+  lanceWidthPerStack: 8,
+  lanceDamage: 1.6,
+  lanceDamagePerStack: 0.8,
+  lanceKnock: 900,
   chargeTime: 0.7, // seconds to fill the gauge
   minGauge: 0.12,
   minDrag: 14, // screen px; shorter drags boost forward along velocity

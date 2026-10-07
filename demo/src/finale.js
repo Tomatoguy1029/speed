@@ -91,7 +91,7 @@ function bossClearBlast(game) {
   game.enemies = []; game.newEnemies = []; game.ebullets = []; game.fbullets = [];
   game.mines = []; game.capsules = []; game.gems = []; game.coinDrops = [];
   game.marks = []; game.wproj = []; game.wfx = []; game.wstate = {};
-  game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
+  game.sonicWaves = []; game.drones = []; game.vortexes = []; game.runPaths = []; game.runPendingPath = [];
   game.fx.texts = [];
   const radius = Math.max(900, game.viewRadius * 1.4);
   addRing(game, boss.x, boss.y, radius, '#ffe7aa', 0.85);
@@ -139,5 +139,51 @@ export function drawBossFinish(r, game) {
     ctx.shadowColor = '#ffac32'; ctx.shadowBlur = 28;
     ctx.fillStyle = '#fff2bf'; ctx.fillText('CLEAR!', W / 2, H / 2);
   }
+  ctx.restore();
+}
+
+export function beginShipDeath(game) {
+  if (game.state !== 'play' || game.death) return;
+  game.death = { phase: 'freeze', elapsed: 0 };
+  game.state = 'dying'; game.endReason = 'hp'; game.spawning = false;
+  game.hitstop = game.slowmo = game.acc = 0;
+  game.draw = game.portalDash = game.releasePending = null;
+  game.offerQueue.length = 0; game.pendingLevelups = 0; game.currentOffer = null;
+  game.ship.charging = false; game.ship.invulnT = 0;
+  game.events.push({ type: 'shipDeath' });
+}
+
+export function advanceShipDeath(game, dt) {
+  const f = game.death;
+  f.elapsed += dt;
+  if (f.phase === 'freeze' && f.elapsed >= CONFIG.deathFreezeTime) {
+    f.phase = 'blast'; f.elapsed = 0;
+    const sh = game.ship;
+    for (const key of Object.keys(game.fx)) game.fx[key] = [];
+    game.sonicWaves = []; game.wfx = []; game.drones = [];
+    burst(game, sh.x, sh.y, '#a8eeff', 65, 0, 0, 650);
+    burst(game, sh.x, sh.y, '#ffb65b', 35, 0, 0, 450);
+    addRing(game, sh.x, sh.y, 160, '#ffd5a0', 0.6);
+    for (let i = 0; i < 12; i++) {
+      const a = game.rng() * Math.PI * 2, speed = 100 + game.rng() * 320;
+      game.fx.particles.push({ kind: 'finishDebris', x: sh.x, y: sh.y,
+        vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+        life: 1.4, max: 1.4, color: i % 2 ? '#bff3ff' : '#1b3b5c',
+        size: 4 + game.rng() * 8, angle: a, spin: (game.rng() - 0.5) * 10 });
+    }
+  } else if (f.phase === 'blast' && f.elapsed >= CONFIG.deathExplosionTime) {
+    f.phase = 'over'; f.elapsed = 0;
+  }
+  return f.phase === 'over' && f.elapsed >= CONFIG.deathGameOverTime;
+}
+
+export function drawShipDeath(r, game) {
+  if (!game.death || game.state !== 'dying' || game.death.phase !== 'over') return;
+  const { ctx, W, H } = r;
+  ctx.save(); ctx.globalAlpha = Math.min(1, game.death.elapsed / 0.2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.min(90, W * 0.13, H * 0.18)}px system-ui, sans-serif`;
+  ctx.shadowColor = '#ff526e'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#ffe0e5'; ctx.fillText('GAME OVER', W / 2, H / 2);
   ctx.restore();
 }

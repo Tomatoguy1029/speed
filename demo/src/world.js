@@ -13,12 +13,12 @@ import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
-import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers } from './run-weapons.js';
+import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers, updateRunSonic } from './run-weapons.js';
 import { computeRunStats, rollRunChoices, grantRunItem, runModuleDef } from './run-build.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
-import { recordBossApproach, advanceBossFinish } from './finale.js';
+import { recordBossApproach, advanceBossFinish, beginShipDeath, advanceShipDeath } from './finale.js';
 
 export const STEP = 1 / 120;
 
@@ -45,7 +45,7 @@ export function createGame(opts = {}) {
     debug: { invincible: false, autoOffer: null },
     enemies: [], newEnemies: [], ebullets: [],
     boss: null, bossSpawned: false,
-    finale: null, finishFrames: [], finishClock: 0,
+    finale: null, death: null, finishFrames: [], finishClock: 0, sonicWaves: [],
     leechDrag: 0,
     gems: [], coinDrops: [],
     xp: 0, level: 0, pendingLevelups: 0,
@@ -75,6 +75,11 @@ export function createGame(opts = {}) {
 
 export function update(game, frameDt, input) {
   frameDt = Math.min(frameDt, 0.1);
+  if (game.state === 'dying') {
+    if (game.death.phase !== 'freeze') updateFx(game, frameDt);
+    if (advanceShipDeath(game, frameDt)) end(game, 'lost', 'hp');
+    return;
+  }
   if (game.state === 'finishing') {
     updateFx(game, frameDt * (game.finale.phase === 'slow' ? CONFIG.bossFinishReplayWindow / CONFIG.bossFinishSlowTime : 1));
     const finished = advanceBossFinish(game, frameDt);
@@ -110,9 +115,11 @@ export function update(game, frameDt, input) {
     runAlongPath(game, frameDt);
     if (game.state !== 'play') return;
     collideBodies(game);
+    if (game.state !== 'play') return;
     recordTrail(game.ship, frameDt);
   }
   if (game.newBuild) updateRunFollowers(game);
+  if (game.newBuild) updateRunSonic(game, frameDt);
   if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
@@ -200,12 +207,14 @@ function step(game, dt, input) {
     collideEnemies(game, x0, y0);
     if (game.state !== 'play') return;
     collideBodies(game);
+    if (game.state !== 'play') return;
     checkPortalEntry(game, x0, y0);
   }
   if (sh.invulnT > 0) sh.invulnT -= dt;
   if (game.newBuild) updateRunWeapons(game, dt);
   if (game.state !== 'play') return;
   updateEnemyBullets(game, dt, (b) => damageShip(game, b.dmg, b.slow, b.kind));
+  if (game.state !== 'play') return;
   updateEffects(game, dt);
   if (game.state !== 'play') return;
   if (game.enemies.some((e) => e.dead)) game.enemies = game.enemies.filter((e) => !e.dead);
@@ -620,13 +629,14 @@ function launch(game, ax, ay) {
 // amount: hp lost, slow: share of speed lost (0..1)
 export function damageShip(game, amount, slow, cause = 'other') {
   const sh = game.ship;
-  if (game.state === 'finishing' || sh.invulnT > 0 || game.debug.invincible) return false;
+  if (game.state !== 'play' || sh.invulnT > 0 || game.debug.invincible) return false;
   sh.hp -= amount * game.stats.damageTakenMult;
   if (slow > 0) sh.glide = false;
   const k = 1 - Math.min(0.9, slow * game.stats.hitSlowMult);
   sh.vx *= k; sh.vy *= k;
   sh.invulnT = CONFIG.invulnTime;
   game.events.push({ type: 'hurt', amount: amount * game.stats.damageTakenMult, x: sh.x, y: sh.y, cause });
+  if (sh.hp <= 0) { beginShipDeath(game); return true; }
   addText(game, sh.x, sh.y - 30, `-${Math.round(amount * game.stats.damageTakenMult)}`, '#ff6b5a');
   onShipHurt(game);
   return true;
@@ -728,6 +738,7 @@ function collideBodies(game) {
       sh.vy -= (1 + restitution) * vn * ny;
       const dmg = Math.max(0, -vn - 200) * CONFIG.crashDamage * game.stats.bounceDamageMult;
       if (dmg > 0) damageShip(game, dmg, 0, b === f.planet ? 'planet' : 'moon');
+      if (game.state !== 'play') return;
       game.events.push({ type: 'crash', x: sh.x, y: sh.y, power: -vn });
     }
   }

@@ -39,7 +39,7 @@ export const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
 
 const END_TEXT = {
   boss: ['CLEAR!', 'win', '敵の大群を突破し、ボスを撃破した'],
-  hp: ['機体 大破', 'lose', 'HP が尽きた'],
+  hp: ['GAME OVER', 'lose', 'HP が尽きた'],
   time: ['時間切れ', 'lose', '時間内にボスを撃破できなかった'],
 };
 
