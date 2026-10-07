@@ -6,6 +6,7 @@ import { loadSave, writeSave, buyUpgrade, applyRunResult, resetMeta } from './pr
 import { createAudio } from './audio.js';
 import { createDebugPanel } from './debug.js';
 import { buildIntent, isDrawScheme } from './controls.js';
+import { createMobileControls } from './mobile-controls.js';
 import { CONFIG } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -27,8 +28,12 @@ try {
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
 if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
+const mobile = createMobileControls({ onDraw: () => input.triggerDash(), onPause: () => togglePause(), onDebug: () => debug.toggle() });
+// Touch uses drawing plus an independent stick, without overwriting PC preferences.
+if (mobile.active) CONFIG.controlScheme = 'draw';
+renderer.mobile = mobile.active;
 const debug = createDebugPanel(() => game, (id) => {
-  try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
+  try { if (!mobile.active) window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
 }, () => {
   const refund = resetMeta(save);
@@ -41,7 +46,17 @@ const debug = createDebugPanel(() => game, (id) => {
 let mode = 'station'; // station | run | result
 let offerShown = null;
 
-window.addEventListener('resize', () => resizeRenderer(renderer));
+let portraitViewport = window.innerHeight >= window.innerWidth;
+window.addEventListener('resize', () => {
+  const portrait = window.innerHeight >= window.innerWidth;
+  if (mobile.active && portrait !== portraitViewport) {
+    mobile.reset(); input.reset();
+    if (game?.draw?.phase === 'draw') game.draw = null;
+    renderer.cam.ready = false;
+  }
+  portraitViewport = portrait;
+  resizeRenderer(renderer);
+});
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resizeRenderer(renderer)).observe(renderer.canvas);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
@@ -121,8 +136,8 @@ window.addEventListener('keydown', (e) => {
 
 // Touch-only shortcut: leave the virtual stick and pick a drawing start. Charge lives in the cursor ring.
 const dashBtn = document.getElementById('dashBtn');
-dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
+  if (mobile.active) { mobile.sync(game, mode === 'run', debug.open); return; }
   const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw &&
     (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
@@ -141,6 +156,9 @@ function frame(now) {
   const beforeState = game.state;
   const wasRunning = ['play', 'finishing', 'dying'].includes(beforeState);
   const raw = input.read();
+  raw.mobile = mobile.active;
+  raw.mobileStick = mobile.read();
+  if (debug.open && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));

@@ -499,6 +499,15 @@ function drawRunWeapons(r, game) {
 }
 
 function drawRunLoadout(r, game) {
+  if (r.mobile) {
+    const { ctx, W, H } = r;
+    ctx.fillStyle = 'rgba(4,8,20,.78)'; ctx.fillRect(0, H - 48, W, 48);
+    ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
+    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 32);
+    const equipped = RUN_WEAPONS.filter(d => game.weapons[d.id]);
+    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + i * (W - 20) / 4, H - 14, (W - 24) / 4); });
+    return;
+  }
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
   ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
   ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
@@ -851,6 +860,7 @@ function drawDrawingHud(r, game, pointer) {
   const d = game.draw;
   if (d && d.phase !== 'draw') return;
   const { ctx, W, H } = r;
+  if (r.mobile && !d) return;
   const tip = d?.points[d.points.length - 1] || d?.cursor;
   const p = tip ? worldToScreen(r, tip.x, tip.y)
     : pointer?.hover && pointer.pointerType !== 'touch' ? pointer.hover
@@ -871,16 +881,17 @@ function drawDrawingHud(r, game, pointer) {
   ctx.strokeStyle = color;
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
   const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
-  const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
+  const label = r.mobile ? (drawing ? `残り ${Math.ceil(frac * 100)}% · 離すと発動` : '指で軌跡を描く') : drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
     : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : `クリックで描く ${Math.floor(frac * 100)}%`) : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
   ctx.strokeStyle = 'rgba(3,8,20,0.95)';
   const lx = clamp(x, ctx.measureText(label).width / 2 + 4, W - ctx.measureText(label).width / 2 - 4);
-  ctx.strokeText(label, lx, y + radius + 17);
+  const labelY = r.mobile ? Math.max(15, y - radius - 12) : y + radius + 17;
+  ctx.strokeText(label, lx, labelY);
   ctx.fillStyle = color;
-  ctx.fillText(label, lx, y + radius + 17);
+  ctx.fillText(label, lx, labelY);
   ctx.restore();
 }
 
@@ -1163,7 +1174,7 @@ function drawFx(r, game) {
 
 function drawMinimap(r, game) {
   const { ctx, W, H } = r;
-  const R = Math.min(90, Math.min(W, H) * 0.12);
+  const R = Math.min(r.mobile ? 36 : 90, Math.min(W, H) * 0.12);
   const cx = W - R - 16, cy = R + 16;
   const k = R / (CONFIG.fieldRadius + 300);
   ctx.save();
@@ -1342,6 +1353,7 @@ function drawAimMarker(r, game) {
 
 // Draw scheme: the virtual stick (press point + knob) while the pointer is held.
 function drawStick(r, game, pointer) {
+  if (r.mobile) return;
   if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || pointer.pointerType !== 'touch' || game.state !== 'play') return;
   const { ctx } = r;
   const R = CONFIG.stickRadius;
@@ -1446,7 +1458,7 @@ function drawTimer(r, game) {
   const m = Math.floor(left / 60), sec = Math.floor(left % 60);
   ctx.textAlign = 'center';
   ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
-  ctx.font = `700 26px ${MONO}`;
+  ctx.font = `700 ${r.mobile ? 20 : 26}px ${MONO}`;
   ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
   // xp bar
   const need = xpForLevel(game.level);
@@ -1467,9 +1479,9 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  const x = 16, y = 18;
+  const x = r.mobile ? 10 : 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
-  ctx.font = `12px ${MONO}`;
+  ctx.font = `${r.mobile ? 10 : 12}px ${MONO}`;
   ctx.textAlign = 'left';
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
@@ -1489,6 +1501,10 @@ function drawSpeedPanel(r, game) {
   const { ctx, W, H } = r;
   const sp = Math.hypot(game.ship.vx, game.ship.vy);
   const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+  if (r.mobile) {
+    ctx.textAlign = 'center'; ctx.font = `12px ${MONO}`; ctx.fillStyle = '#9fe8ff';
+    ctx.fillText(`${kms(sp)} km/s`, W / 2, 59); return;
+  }
   const bh = 10, by = H - 34;
   let bw = Math.min(420, W * 0.5), bx = W / 2 - bw / 2;
   const clear = 12 + loadoutUnit(r) * 6.8 + 14; // right edge of the ship diagram

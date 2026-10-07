@@ -43,11 +43,15 @@ export function buildIntent(raw, scheme) {
     // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
     // from the press point). Space / the button fires the gauge-based dash (no charging here).
     it.keyboard = true;
+    it.mobile = !!raw.mobile;
+    it.drawRelease = !!raw.mobile && raw.release && raw.releaseSource === 'pointer';
+    it.drawCancel = !!raw.mobile && raw.cancelled;
     it.dash = !!raw.dash;
-    it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
+    it.drawClick = !!raw.pressed && !raw.dash && !raw.mobile && raw.pointerType !== 'touch';
     it.clickCursor = raw.clickCursor || null;
     it.confirm = !!raw.confirm;
-    if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+    if (raw.mobileStick) it.stick = raw.mobileStick;
+    else if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
@@ -164,6 +168,14 @@ const ZERO = { ax: 0, ay: 0 };
 // Per-step steering. Returns extra acceleration for the physics step.
 export function controlStep(game, input, dt) {
   const sh = game.ship;
+  if (input.mobile && input.stick && isDrawScheme(game.scheme)) {
+    const angle = stickAngle(input.stick);
+    if (angle !== null) {
+      const share = Math.min(1, Math.max(0, (Math.hypot(input.stick.x, input.stick.y) - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone)));
+      steerToward(game, angle, dt, CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * share);
+    }
+    return ZERO;
+  }
   switch (game.scheme) {
     case 'draw': {
       // mouse: head toward the cursor at the usual cruise speed (no click needed).

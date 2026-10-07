@@ -107,7 +107,7 @@ export function update(game, frameDt, input) {
   handlePortalInput(game, input, frameDt);
   if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= (game.newBuild ? CONFIG.drawMinCharge : 1)) {
     startDrawing(game, input);
-    input = { ...input, press: false }; // consume the start click so it cannot also commit
+    input = { ...input, press: false, dash: false, drawRelease: false }; // consume the start click so it cannot also commit
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
@@ -450,7 +450,7 @@ function startDrawing(game, input) {
   if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -458,10 +458,12 @@ function startDrawing(game, input) {
 // The path follows the cursor until its length runs out, it reaches a planet, or another click.
 function updateDrawing(game, input) {
   const d = game.draw;
+  if (input.drawCancel || (input.mobile && input.dash && !d.started)) { game.draw = null; return; }
   if (input.cursor) d.cursor = input.cursor;
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
+    if (input.drawRelease) game.draw = null;
     return;
   }
   if (d.inputMethod === 'points') {
@@ -472,7 +474,9 @@ function updateDrawing(game, input) {
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
+  if (input.mobile && (input.drawRelease || input.dash)) {
+    if (d.points.length >= 2) commitPath(game); else game.draw = null;
+  } else if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
 // Where a path may start: the clicked point, pushed out of planets and moons.

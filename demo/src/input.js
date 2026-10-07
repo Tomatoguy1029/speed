@@ -37,7 +37,7 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 export function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
-    release: false, relSource: null, relX: 0, relY: 0,
+    cancelled: false, release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false, confirm: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
@@ -46,6 +46,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     return b ? { x: e.clientX - b.left, y: e.clientY - b.top } : { x: e.clientX, y: e.clientY };
   };
   el.addEventListener('pointerdown', (e) => {
+    if (st.down && e.pointerId !== st.pointerId) return;
     st.hover = local(e);
     if (st.enabled && e.button === 2) { st.confirm = true; e.preventDefault(); }
     if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
@@ -55,6 +56,7 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
+    if (st.down && e.pointerId !== st.pointerId) return;
     st.hover = local(e);
     if (!st.down || e.pointerId !== st.pointerId) return;
     ({ x: st.cx, y: st.cy } = local(e));
@@ -62,11 +64,15 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
   const up = (e) => {
     if (!st.down || e.pointerId !== st.pointerId) return;
     ({ x: st.cx, y: st.cy } = local(e));
+    st.hover = local(e);
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
     st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
   el.addEventListener('pointerup', up);
-  el.addEventListener('pointercancel', up);
+  el.addEventListener('pointercancel', (e) => {
+    if (e.pointerId !== st.pointerId) return;
+    st.down = false; st.release = false; st.cancelled = true; st.pointerId = null;
+  });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
 
   if (keyTarget) {
@@ -118,10 +124,12 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
         click: st.click, // preserve the press position even if the mouse moves before the next frame
+        cancelled: st.cancelled,
         release: st.release,
         releaseSource: st.release ? st.relSource : null,
         releaseDrag: { x: st.relX, y: st.relY },
       };
+      st.cancelled = false;
       st.release = false;
       st.snap = null;
       st.pressed = false;
@@ -133,6 +141,6 @@ export function createInput(el, keyTarget = typeof window !== 'undefined' ? wind
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.cancelled = false; st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
   };
 }

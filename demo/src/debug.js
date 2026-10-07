@@ -125,10 +125,13 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
+  const mobilePanel = document.body.classList.contains('mobile');
+  if (mobilePanel) root.querySelector('.dclose').textContent = '右下の調整で閉じる';
   const schemeSel = root.querySelector('.dctl select');
+  schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
   schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = schemeById(CONFIG.controlScheme).help; };
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：左下のジョイスティックで移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();
@@ -141,11 +144,14 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   pathRow.className = 'dctl';
   pathRow.innerHTML = '<span>軌跡の入力</span><select aria-label="軌跡の入力"><option value="freehand">マウスで描く（従来）</option><option value="points">クリックで通過点を置く</option></select>';
   const pathSel = pathRow.querySelector('select');
+  pathSel.disabled = mobilePanel;
+  if (mobilePanel) pathSel.options[0].textContent = '指で描く';
   const pathHelp = document.createElement('div');
   pathHelp.className = 'dhelp';
   schemeHelp.after(pathRow, pathHelp);
   const syncPathInput = () => {
-    pathSel.value = CONFIG.drawInput;
+    pathSel.value = mobilePanel ? 'freehand' : CONFIG.drawInput;
+    if (mobilePanel) { pathHelp.textContent = 'タッチでは指で描いて離す方式。PC用の保存設定は維持します。'; return; }
     pathHelp.textContent = CONFIG.drawInput === 'points'
       ? '描画方式で使用。左クリックで開始点・通過点を置く。点の間は直線で結ぶ。右クリック／Spaceで発動、長さを使い切っても自動発動。通常移動は操作方法の設定どおり。'
       : '描画方式で使用。クリックで開始し、マウス移動で線を描く。再クリックか長さを使い切ると発動。';

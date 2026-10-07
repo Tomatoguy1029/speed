@@ -159,7 +159,7 @@ export function showRunLevel(game, onChoose) {
   showScreen(el('div', { class: 'panel level-panel' },
     el('div', { class: 'src' }, game.rareOffer ? '光る隕石からの報酬' : `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
     el('h1', {}, game.rareOffer ? '限定武器を選ぶ' : '強化を選ぶ'),
-    el('div', { class: 'sub' }, game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'sub' }, document.body.classList.contains('mobile') ? (game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。カードをタップして選択` : '■ 武器 ／ ● 特性　　カードをタップして選択') : game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 export function showStation(save, onBuy, onDepart) {
@@ -189,7 +189,12 @@ export function showStation(save, onBuy, onDepart) {
       el('a', { href: './index.html?controls=portal', target: '_blank', rel: 'noopener' }, 'ポータル試作')),
     el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
-    el('ul', { class: 'how' },
+    document.body.classList.contains('mobile') ? el('ul', { class: 'how' },
+      el('li', {}, '左下のジョイスティックで移動。通常攻撃は自動。'),
+      el('li', {}, '25%以上溜まったら「描く」をタップし、フィールドに指で軌跡を描く。指を離すか長さを使い切ると高速攻撃。'),
+      el('li', {}, '線の終了後もジョイスティックで操舵。強化カードはタップで選択。'),
+      el('li', {}, '紫の結晶は経験値、赤い輪は敵弾。隕石を壊すと回復などを入手。'),
+      el('li', {}, '一時停止・調整は右下のボタンから。縦持ち・横持ちのどちらでも遊べます。')) : el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),

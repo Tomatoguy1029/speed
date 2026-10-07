@@ -84,12 +84,36 @@
   #dashBtn.show { display: block; }
   #dashBtn:disabled { opacity: 0.4; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
+  #mobileControls { display: none; }
+  body.mobile { height: 100dvh; --pad-height: 116px; }
+  body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(var(--pad-height) + env(safe-area-inset-bottom)) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - var(--pad-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body.mobile #mobileControls:not([hidden]) { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--pad-height); padding: 0 max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); align-items: center; justify-content: space-between; background: #080d1b; border-top: 1px solid #293b57; touch-action: none; }
+  #mobileStick { width: 96px; height: 96px; flex: none; border: 2px solid #526987; border-radius: 50%; position: relative; background: radial-gradient(circle, #213550, #101b2d); touch-action: none; }
+  #mobileStick.inactive { opacity: .35; }
+  .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; background: #c3e2f2; box-shadow: 0 0 0 5px #7296b533; pointer-events: none; }
+  .mobile-actions { display: flex; align-items: center; gap: 10px; }
+  .mobile-menu { display: grid; gap: 6px; }
+  body.mobile #dashBtn { position: static; width: 110px; min-height: 64px; padding: 8px; font-size: 15px; }
+  body.mobile button { min-height: 44px; touch-action: manipulation; }
+  body.mobile .mobile-menu button { padding: 6px 10px; font-size: 12px; }
+  body.mobile .screen { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+  body.mobile .panel { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+  body.mobile-running #ui { bottom: calc(var(--pad-height) + env(safe-area-inset-bottom)); }
+  body.mobile-running .panel { max-height: calc(100dvh - var(--pad-height) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  @media (max-width: 360px) { body.mobile #mobileControls:not([hidden]) { padding-left: 10px; padding-right: 10px; } body.mobile #mobileStick { width: 80px; height: 80px; } body.mobile .mobile-actions { gap: 6px; } body.mobile #dashBtn { width: 100px; } }
+  body.mobile kbd { display: none; }
+  body.mobile #debug { box-sizing: border-box; max-height: calc(100dvh - var(--pad-height) - env(safe-area-inset-bottom)); padding-top: max(12px, env(safe-area-inset-top)); }
+  body.mobile #debug button, body.mobile #debug select { min-height: 36px; }
+  @media (max-height: 500px) { body.mobile { --pad-height: 96px; } body.mobile #mobileStick { width: 78px; height: 78px; } body.mobile .panel { padding: 12px 16px; } body.mobile .level-card { min-height: 0; padding: 10px; } body.mobile .level-card .tag { margin-bottom: 6px; } body.mobile .level-card .name { margin-bottom: 6px; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
-<button id="dashBtn" type="button">描く</button>
+<div id="mobileControls" hidden>
+  <div id="mobileStick" role="group" aria-label="移動ジョイスティック"><span class="stick-knob"></span></div>
+  <div class="mobile-actions"><div class="mobile-menu"><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div><button id="dashBtn" type="button">描く</button></div>
+</div>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <script>
 (() => {
@@ -343,11 +367,15 @@ function buildIntent(raw, scheme) {
     // mouse: head toward the cursor (no click needed). touch: the press is a virtual stick (offset
     // from the press point). Space / the button fires the gauge-based dash (no charging here).
     it.keyboard = true;
+    it.mobile = !!raw.mobile;
+    it.drawRelease = !!raw.mobile && raw.release && raw.releaseSource === 'pointer';
+    it.drawCancel = !!raw.mobile && raw.cancelled;
     it.dash = !!raw.dash;
-    it.drawClick = !!raw.pressed && !raw.dash && raw.pointerType !== 'touch';
+    it.drawClick = !!raw.pressed && !raw.dash && !raw.mobile && raw.pointerType !== 'touch';
     it.clickCursor = raw.clickCursor || null;
     it.confirm = !!raw.confirm;
-    if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
+    if (raw.mobileStick) it.stick = raw.mobileStick;
+    else if (scheme === 'draw' && raw.pointerDown && raw.pointerType === 'touch') it.stick = { x: -raw.drag.x, y: -raw.drag.y };
   } else if (scheme === 'mouse') {
     it.charging = raw.space || raw.pointerDown;
     it.keyboard = true;
@@ -464,6 +492,14 @@ const ZERO = { ax: 0, ay: 0 };
 // Per-step steering. Returns extra acceleration for the physics step.
 function controlStep(game, input, dt) {
   const sh = game.ship;
+  if (input.mobile && input.stick && isDrawScheme(game.scheme)) {
+    const angle = stickAngle(input.stick);
+    if (angle !== null) {
+      const share = Math.min(1, Math.max(0, (Math.hypot(input.stick.x, input.stick.y) - CONFIG.stickDeadZone) / Math.max(1, CONFIG.stickRadius - CONFIG.stickDeadZone)));
+      steerToward(game, angle, dt, CONFIG.steerCruise + (CONFIG.stickCruiseMax - CONFIG.steerCruise) * share);
+    }
+    return ZERO;
+  }
   switch (game.scheme) {
     case 'draw': {
       // mouse: head toward the cursor at the usual cruise speed (no click needed).
@@ -2951,7 +2987,7 @@ function update(game, frameDt, input) {
   handlePortalInput(game, input, frameDt);
   if ((input.dash || input.drawClick) && isDrawScheme(game.scheme) && !game.draw && game.dashMeter >= (game.newBuild ? CONFIG.drawMinCharge : 1)) {
     startDrawing(game, input);
-    input = { ...input, press: false }; // consume the start click so it cannot also commit
+    input = { ...input, press: false, dash: false, drawRelease: false }; // consume the start click so it cannot also commit
   }
   if (game.hitstop > 0) { game.hitstop -= frameDt; return; }
   // outside a dash the hitstop budget refills slowly, so plain ramming kills keep their beat
@@ -3294,7 +3330,7 @@ function startDrawing(game, input) {
   if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
   game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: CONFIG.drawInput };
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -3302,10 +3338,12 @@ function startDrawing(game, input) {
 // The path follows the cursor until its length runs out, it reaches a planet, or another click.
 function updateDrawing(game, input) {
   const d = game.draw;
+  if (input.drawCancel || (input.mobile && input.dash && !d.started)) { game.draw = null; return; }
   if (input.cursor) d.cursor = input.cursor;
   if (!d.started) {
     // the line only starts on a click (or Space), so moving the mouse never draws by accident
     if (input.press) { d.started = true; d.points.push(startPoint(game, d.cursor)); }
+    if (input.drawRelease) game.draw = null;
     return;
   }
   if (d.inputMethod === 'points') {
@@ -3316,7 +3354,9 @@ function updateDrawing(game, input) {
     return;
   }
   if (input.cursor) extendPath(game, d, input.cursor);
-  if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
+  if (input.mobile && (input.drawRelease || input.dash)) {
+    if (d.points.length >= 2) commitPath(game); else game.draw = null;
+  } else if (input.press || d.used >= d.budget - 0.5 || d.blocked) commitPath(game);
 }
 
 // Where a path may start: the clicked point, pushed out of planets and moons.
@@ -5550,6 +5590,15 @@ function drawRunWeapons(r, game) {
 }
 
 function drawRunLoadout(r, game) {
+  if (r.mobile) {
+    const { ctx, W, H } = r;
+    ctx.fillStyle = 'rgba(4,8,20,.78)'; ctx.fillRect(0, H - 48, W, 48);
+    ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
+    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 32);
+    const equipped = RUN_WEAPONS.filter(d => game.weapons[d.id]);
+    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + i * (W - 20) / 4, H - 14, (W - 24) / 4); });
+    return;
+  }
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
   ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
   ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
@@ -5902,6 +5951,7 @@ function drawDrawingHud(r, game, pointer) {
   const d = game.draw;
   if (d && d.phase !== 'draw') return;
   const { ctx, W, H } = r;
+  if (r.mobile && !d) return;
   const tip = d?.points[d.points.length - 1] || d?.cursor;
   const p = tip ? worldToScreen(r, tip.x, tip.y)
     : pointer?.hover && pointer.pointerType !== 'touch' ? pointer.hover
@@ -5922,16 +5972,17 @@ function drawDrawingHud(r, game, pointer) {
   ctx.strokeStyle = color;
   if (frac > 0) { ctx.beginPath(); ctx.arc(x, y, radius, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke(); }
   const pointInput = (d?.inputMethod || CONFIG.drawInput) === 'points';
-  const label = drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
+  const label = r.mobile ? (drawing ? `残り ${Math.ceil(frac * 100)}% · 離すと発動` : '指で軌跡を描く') : drawing ? `残り ${Math.ceil(frac * 100)}%${pointInput ? '　右クリック／Spaceで発動' : ''}`
     : ready || d ? (pointInput ? 'クリックで開始点' : pointer?.pointerType === 'touch' ? 'タップで描く' : `クリックで描く ${Math.floor(frac * 100)}%`) : `充填 ${Math.floor(frac * 100)}%`;
   ctx.font = `12px "Hiragino Sans", "Noto Sans JP", sans-serif`;
   ctx.textAlign = 'center';
   ctx.lineWidth = 4;
   ctx.strokeStyle = 'rgba(3,8,20,0.95)';
   const lx = clamp(x, ctx.measureText(label).width / 2 + 4, W - ctx.measureText(label).width / 2 - 4);
-  ctx.strokeText(label, lx, y + radius + 17);
+  const labelY = r.mobile ? Math.max(15, y - radius - 12) : y + radius + 17;
+  ctx.strokeText(label, lx, labelY);
   ctx.fillStyle = color;
-  ctx.fillText(label, lx, y + radius + 17);
+  ctx.fillText(label, lx, labelY);
   ctx.restore();
 }
 
@@ -6214,7 +6265,7 @@ function drawFx(r, game) {
 
 function drawMinimap(r, game) {
   const { ctx, W, H } = r;
-  const R = Math.min(90, Math.min(W, H) * 0.12);
+  const R = Math.min(r.mobile ? 36 : 90, Math.min(W, H) * 0.12);
   const cx = W - R - 16, cy = R + 16;
   const k = R / (CONFIG.fieldRadius + 300);
   ctx.save();
@@ -6393,6 +6444,7 @@ function drawAimMarker(r, game) {
 
 // Draw scheme: the virtual stick (press point + knob) while the pointer is held.
 function drawStick(r, game, pointer) {
+  if (r.mobile) return;
   if (game.scheme !== 'draw' || game.draw || !pointer || !pointer.down || pointer.pointerType !== 'touch' || game.state !== 'play') return;
   const { ctx } = r;
   const R = CONFIG.stickRadius;
@@ -6497,7 +6549,7 @@ function drawTimer(r, game) {
   const m = Math.floor(left / 60), sec = Math.floor(left % 60);
   ctx.textAlign = 'center';
   ctx.fillStyle = left < 60 ? '#ff8a6b' : '#e8f0ff';
-  ctx.font = `700 26px ${MONO}`;
+  ctx.font = `700 ${r.mobile ? 20 : 26}px ${MONO}`;
   ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, W / 2, 40);
   // xp bar
   const need = xpForLevel(game.level);
@@ -6518,9 +6570,9 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  const x = 16, y = 18;
+  const x = r.mobile ? 10 : 16, y = 18;
   ctx.fillStyle = '#e8f0ff';
-  ctx.font = `12px ${MONO}`;
+  ctx.font = `${r.mobile ? 10 : 12}px ${MONO}`;
   ctx.textAlign = 'left';
   ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
@@ -6540,6 +6592,10 @@ function drawSpeedPanel(r, game) {
   const { ctx, W, H } = r;
   const sp = Math.hypot(game.ship.vx, game.ship.vy);
   const kms = (v) => (v * CONFIG.speedToKms).toFixed(2);
+  if (r.mobile) {
+    ctx.textAlign = 'center'; ctx.font = `12px ${MONO}`; ctx.fillStyle = '#9fe8ff';
+    ctx.fillText(`${kms(sp)} km/s`, W / 2, 59); return;
+  }
   const bh = 10, by = H - 34;
   let bw = Math.min(420, W * 0.5), bx = W / 2 - bw / 2;
   const clear = 12 + loadoutUnit(r) * 6.8 + 14; // right edge of the ship diagram
@@ -6648,7 +6704,7 @@ const isSpace = (e) => e.code === 'Space' || e.key === ' ';
 function createInput(el, keyTarget = typeof window !== 'undefined' ? window : null) {
   const st = {
     down: false, sx: 0, sy: 0, cx: 0, cy: 0, pointerId: null, enabled: true, hover: null, click: null,
-    release: false, relSource: null, relX: 0, relY: 0,
+    cancelled: false, release: false, relSource: null, relX: 0, relY: 0,
     keys: new Set(), space: false, spaceStartedAt: 0, spaceDuration: 0, cycle: 0, snap: null, pressed: false, dash: false, place: false, confirm: false,
   };
   // pointer position in the element's own CSS pixels (the same space the canvas is drawn in)
@@ -6657,6 +6713,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     return b ? { x: e.clientX - b.left, y: e.clientY - b.top } : { x: e.clientX, y: e.clientY };
   };
   el.addEventListener('pointerdown', (e) => {
+    if (st.down && e.pointerId !== st.pointerId) return;
     st.hover = local(e);
     if (st.enabled && e.button === 2) { st.confirm = true; e.preventDefault(); }
     if (st.enabled && e.button === 0) { st.pressed = true; st.click = st.hover; }
@@ -6666,6 +6723,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic or lost pointer */ }
   });
   el.addEventListener('pointermove', (e) => {
+    if (st.down && e.pointerId !== st.pointerId) return;
     st.hover = local(e);
     if (!st.down || e.pointerId !== st.pointerId) return;
     ({ x: st.cx, y: st.cy } = local(e));
@@ -6673,11 +6731,15 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
   const up = (e) => {
     if (!st.down || e.pointerId !== st.pointerId) return;
     ({ x: st.cx, y: st.cy } = local(e));
+    st.hover = local(e);
     const a = aimFromDrag(st.sx, st.sy, st.cx, st.cy);
     st.down = false; st.release = true; st.relSource = 'pointer'; st.relX = a.x; st.relY = a.y;
   };
   el.addEventListener('pointerup', up);
-  el.addEventListener('pointercancel', up);
+  el.addEventListener('pointercancel', (e) => {
+    if (e.pointerId !== st.pointerId) return;
+    st.down = false; st.release = false; st.cancelled = true; st.pointerId = null;
+  });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
 
   if (keyTarget) {
@@ -6729,10 +6791,12 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
         drag: st.down ? aimFromDrag(st.sx, st.sy, st.cx, st.cy) : { x: 0, y: 0 },
         hover: st.hover,
         click: st.click, // preserve the press position even if the mouse moves before the next frame
+        cancelled: st.cancelled,
         release: st.release,
         releaseSource: st.release ? st.relSource : null,
         releaseDrag: { x: st.relX, y: st.relY },
       };
+      st.cancelled = false;
       st.release = false;
       st.snap = null;
       st.pressed = false;
@@ -6744,7 +6808,7 @@ function createInput(el, keyTarget = typeof window !== 'undefined' ? window : nu
       return out;
     },
     triggerDash() { if (st.enabled) st.dash = true; },
-    reset() { st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
+    reset() { st.cancelled = false; st.down = false; st.space = false; st.spaceDuration = 0; st.cycle = 0; st.release = false; st.snap = null; st.pressed = false; st.click = null; st.dash = false; st.place = false; st.confirm = false; st.keys.clear(); st.pointerId = null; },
   };
 }
 
@@ -6910,7 +6974,7 @@ function showRunLevel(game, onChoose) {
   showScreen(el('div', { class: 'panel level-panel' },
     el('div', { class: 'src' }, game.rareOffer ? '光る隕石からの報酬' : `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
     el('h1', {}, game.rareOffer ? '限定武器を選ぶ' : '強化を選ぶ'),
-    el('div', { class: 'sub' }, game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'sub' }, document.body.classList.contains('mobile') ? (game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。カードをタップして選択` : '■ 武器 ／ ● 特性　　カードをタップして選択') : game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 function showStation(save, onBuy, onDepart) {
@@ -6940,7 +7004,12 @@ function showStation(save, onBuy, onDepart) {
       el('a', { href: './index.html?controls=portal', target: '_blank', rel: 'noopener' }, 'ポータル試作')),
     el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
-    el('ul', { class: 'how' },
+    document.body.classList.contains('mobile') ? el('ul', { class: 'how' },
+      el('li', {}, '左下のジョイスティックで移動。通常攻撃は自動。'),
+      el('li', {}, '25%以上溜まったら「描く」をタップし、フィールドに指で軌跡を描く。指を離すか長さを使い切ると高速攻撃。'),
+      el('li', {}, '線の終了後もジョイスティックで操舵。強化カードはタップで選択。'),
+      el('li', {}, '紫の結晶は経験値、赤い輪は敵弾。隕石を壊すと回復などを入手。'),
+      el('li', {}, '一時停止・調整は右下のボタンから。縦持ち・横持ちのどちらでも遊べます。')) : el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
@@ -7267,10 +7336,13 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   root.id = 'debug';
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
+  const mobilePanel = document.body.classList.contains('mobile');
+  if (mobilePanel) root.querySelector('.dclose').textContent = '右下の調整で閉じる';
   const schemeSel = root.querySelector('.dctl select');
+  schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
   schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = schemeById(CONFIG.controlScheme).help; };
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：左下のジョイスティックで移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();
@@ -7283,11 +7355,14 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   pathRow.className = 'dctl';
   pathRow.innerHTML = '<span>軌跡の入力</span><select aria-label="軌跡の入力"><option value="freehand">マウスで描く（従来）</option><option value="points">クリックで通過点を置く</option></select>';
   const pathSel = pathRow.querySelector('select');
+  pathSel.disabled = mobilePanel;
+  if (mobilePanel) pathSel.options[0].textContent = '指で描く';
   const pathHelp = document.createElement('div');
   pathHelp.className = 'dhelp';
   schemeHelp.after(pathRow, pathHelp);
   const syncPathInput = () => {
-    pathSel.value = CONFIG.drawInput;
+    pathSel.value = mobilePanel ? 'freehand' : CONFIG.drawInput;
+    if (mobilePanel) { pathHelp.textContent = 'タッチでは指で描いて離す方式。PC用の保存設定は維持します。'; return; }
     pathHelp.textContent = CONFIG.drawInput === 'points'
       ? '描画方式で使用。左クリックで開始点・通過点を置く。点の間は直線で結ぶ。右クリック／Spaceで発動、長さを使い切っても自動発動。通常移動は操作方法の設定どおり。'
       : '描画方式で使用。クリックで開始し、マウス移動で線を描く。再クリックか長さを使い切ると発動。';
@@ -7481,7 +7556,71 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   };
 }
 
+// ---- mobile-controls.js ----
+
+
+// Independent touch surfaces keep the steering thumb out of the path input.
+function createMobileControls({ onDraw, onPause, onDebug }) {
+  const active = window.matchMedia('(pointer: coarse)').matches || new URLSearchParams(window.location.search).get('mobile') === '1';
+  document.body.classList.toggle('mobile', active);
+  const root = document.getElementById('mobileControls');
+  const stick = document.getElementById('mobileStick');
+  const knob = stick.querySelector('.stick-knob');
+  const draw = document.getElementById('dashBtn');
+  if (!active) document.body.append(draw); // preserve the previous touch shortcut on hybrid PCs
+  let pointerId = null, enabled = false;
+  const vector = { x: 0, y: 0 };
+  function reset() {
+    pointerId = null; vector.x = vector.y = 0;
+    knob.style.transform = 'translate(0px, 0px)';
+  }
+  function move(e) {
+    const rect = stick.getBoundingClientRect();
+    const radius = rect.width * 0.35;
+    let x = e.clientX - rect.left - rect.width / 2;
+    let y = e.clientY - rect.top - rect.height / 2;
+    const scale = Math.min(1, radius / Math.max(1, Math.hypot(x, y)));
+    x *= scale; y *= scale;
+    // The world uses the existing stick's pixel scale and dead zone.
+    vector.x = x / radius * CONFIG.stickRadius; vector.y = y / radius * CONFIG.stickRadius;
+    knob.style.transform = `translate(${x}px, ${y}px)`;
+  }
+  stick.addEventListener('pointerdown', e => {
+    if (!enabled || pointerId !== null) return;
+    e.preventDefault(); pointerId = e.pointerId;
+    stick.setPointerCapture(pointerId); move(e);
+  });
+  stick.addEventListener('pointermove', e => { if (e.pointerId === pointerId) { e.preventDefault(); move(e); } });
+  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    stick.addEventListener(event, e => { if (e.pointerId === pointerId) reset(); });
+  }
+  draw.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if ((!active || enabled) && !draw.disabled) onDraw(); });
+  document.getElementById('mobilePause').addEventListener('click', onPause);
+  document.getElementById('mobileDebug').addEventListener('click', onDebug);
+  window.addEventListener('blur', reset);
+  return {
+    active, reset,
+    read: () => active ? { ...vector } : null,
+    sync(game, running, debugOpen) {
+      if (!active) return;
+      const playable = running && game.state === 'play' && !debugOpen;
+      if (!playable && enabled) reset();
+      enabled = playable;
+      document.body.classList.toggle('mobile-running', running && !['finishing', 'dying', 'won', 'lost'].includes(game.state));
+      root.hidden = !running || ['finishing', 'dying', 'won', 'lost'].includes(game.state);
+      stick.classList.toggle('inactive', !enabled);
+      const drawing = game.draw?.phase === 'draw';
+      draw.classList.toggle('show', playable && (!game.draw || drawing));
+      draw.disabled = !drawing && game.dashMeter < CONFIG.drawMinCharge;
+      draw.textContent = drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く ${Math.floor(game.dashMeter * 100)}%`;
+      document.getElementById('mobilePause').textContent = game.state === 'paused' ? '再開' : '一時停止';
+      document.getElementById('mobileDebug').textContent = debugOpen ? '調整を閉じる' : '調整';
+    },
+  };
+}
+
 // ---- main.js ----
+
 
 
 
@@ -7511,8 +7650,12 @@ try {
 // A shareable local preview can opt into the prototype without replacing saved controls.
 const previewControls = new URLSearchParams(window.location.search).get('controls');
 if (previewControls === 'portal' || isDrawScheme(previewControls)) CONFIG.controlScheme = previewControls;
+const mobile = createMobileControls({ onDraw: () => input.triggerDash(), onPause: () => togglePause(), onDebug: () => debug.toggle() });
+// Touch uses drawing plus an independent stick, without overwriting PC preferences.
+if (mobile.active) CONFIG.controlScheme = 'draw';
+renderer.mobile = mobile.active;
 const debug = createDebugPanel(() => game, (id) => {
-  try { window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
+  try { if (!mobile.active) window.localStorage.setItem('speed-controls-v2', id); } catch { /* ignore */ }
   if (mode === 'station') openStation();
 }, () => {
   const refund = resetMeta(save);
@@ -7525,7 +7668,17 @@ const debug = createDebugPanel(() => game, (id) => {
 let mode = 'station'; // station | run | result
 let offerShown = null;
 
-window.addEventListener('resize', () => resizeRenderer(renderer));
+let portraitViewport = window.innerHeight >= window.innerWidth;
+window.addEventListener('resize', () => {
+  const portrait = window.innerHeight >= window.innerWidth;
+  if (mobile.active && portrait !== portraitViewport) {
+    mobile.reset(); input.reset();
+    if (game?.draw?.phase === 'draw') game.draw = null;
+    renderer.cam.ready = false;
+  }
+  portraitViewport = portrait;
+  resizeRenderer(renderer);
+});
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => resizeRenderer(renderer)).observe(renderer.canvas);
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => resizeRenderer(renderer));
 resizeRenderer(renderer);
@@ -7605,8 +7758,8 @@ window.addEventListener('keydown', (e) => {
 
 // Touch-only shortcut: leave the virtual stick and pick a drawing start. Charge lives in the cursor ring.
 const dashBtn = document.getElementById('dashBtn');
-dashBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); input.triggerDash(); });
 function updateDashButton() {
+  if (mobile.active) { mobile.sync(game, mode === 'run', debug.open); return; }
   const show = mode === 'run' && isDrawScheme(game.scheme) && game.state === 'play' && !game.draw &&
     (input.state.pointerType === 'touch' || window.matchMedia('(pointer: coarse)').matches);
   dashBtn.classList.toggle('show', show);
@@ -7625,6 +7778,9 @@ function frame(now) {
   const beforeState = game.state;
   const wasRunning = ['play', 'finishing', 'dying'].includes(beforeState);
   const raw = input.read();
+  raw.mobile = mobile.active;
+  raw.mobileStick = mobile.read();
+  if (debug.open && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));
