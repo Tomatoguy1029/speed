@@ -1,0 +1,17 @@
+[gd_resource type="BehaviorTree" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/tasks/attack_ready.gd" id="1_sjrot"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/play_attack.gd" id="2_ian1e"]
+
+[sub_resource type="BTCondition" id="BTCondition_ab6u4"]
+script = ExtResource("1_sjrot")
+
+[sub_resource type="BTAction" id="BTAction_ux1om"]
+script = ExtResource("2_ian1e")
+
+[sub_resource type="BTSequence" id="BTSequence_t30xa"]
+children = [SubResource("BTCondition_ab6u4"), SubResource("BTAction_ux1om")]
+
+[resource]
+description = "仮のボス：攻撃を出せるなら volley を再生する"
+root_task = SubResource("BTSequence_t30xa")

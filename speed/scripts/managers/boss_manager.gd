@@ -69,6 +69,7 @@ func on_boss_defeated(e: Enemy, opts: Dictionary) -> void:
 func remove_boss() -> void:
 	if boss != null:
 		boss.dead = true
+		enemies.dirty = true
 	if actor != null:
 		actor.queue_free()
 		actor = null

@@ -1,6 +1,21 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/provisional_boss.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/provisional_boss.gd" id="1_ibtvp"]
+[ext_resource type="BehaviorTree" path="res://scenes/bosses/provisional_boss_bt.tres" id="2_7bg66"]
+[ext_resource type="AnimationLibrary" path="res://scenes/bosses/provisional_boss_timeline.tres" id="3_0ymck"]
 
-[node name="ProvisionalBoss" type="Node2D"]
-script = ExtResource("1")
+[sub_resource type="BlackboardPlan" id="BlackboardPlan_limbd"]
+
+[node name="ProvisionalBoss" type="Node2D" unique_id=1516291051]
+script = ExtResource("1_ibtvp")
+
+[node name="LimboHSM" type="LimboHSM" parent="." unique_id=881880626]
+update_mode = 2
+
+[node name="Form1" type="BTState" parent="LimboHSM" unique_id=623724998]
+behavior_tree = ExtResource("2_7bg66")
+blackboard_plan = SubResource("BlackboardPlan_limbd")
+
+[node name="Timeline" type="AnimationPlayer" parent="." unique_id=1917822830]
+callback_mode_process = 2
+libraries/ = ExtResource("3_0ymck")
