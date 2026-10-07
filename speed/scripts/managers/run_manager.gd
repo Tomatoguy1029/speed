@@ -32,6 +32,9 @@ var sequence_t := 0.0
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
 var _cam_ready := false
+## 開発版の計測：Manager ごとの処理時間の合計（マイクロ秒）と回数
+var profile: Dictionary = {}
+var profiling := false
 
 func _ready() -> void:
 	cfg = ConfigManager.cfg
@@ -50,6 +53,7 @@ func _ready() -> void:
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
+	field.enemies = enemies
 	ship.field = field
 	ship.combat = combat
 	ship.build = build
@@ -115,23 +119,35 @@ func _play_tick(real_dt: float) -> void:
 	var world_dt := real_dt * state.world_scale
 	state.time += real_dt
 	state.world_time += world_dt
-	field.tick(real_dt, world_dt)
-	enemies.tick(real_dt, world_dt)
-	bosses.tick(real_dt, world_dt)
-	combat.rebuild_grid()
-	ship.tick(real_dt, world_dt)
+	_run(&"field", func(): field.tick(real_dt, world_dt))
+	_run(&"enemies", func(): enemies.tick(real_dt, world_dt))
+	_run(&"bosses", func(): bosses.tick(real_dt, world_dt))
+	_run(&"grid", func(): combat.rebuild_grid())
+	_run(&"ship", func(): ship.tick(real_dt, world_dt))
 	if state.phase == RunState.Phase.PLAY:
-		build.tick(real_dt, world_dt)
+		_run(&"build", func(): build.tick(real_dt, world_dt))
 	if state.phase == RunState.Phase.PLAY:
-		projectiles.tick(real_dt, world_dt)
-	enemies.cleanup()
-	enemies.spawner_tick(real_dt, world_dt)
-	pickups.tick(real_dt, world_dt)
+		_run(&"projectiles", func(): projectiles.tick(real_dt, world_dt))
+	_run(&"cleanup", func(): enemies.cleanup())
+	_run(&"spawner", func(): enemies.spawner_tick(real_dt, world_dt))
+	_run(&"pickups", func(): pickups.tick(real_dt, world_dt))
 	_record_approach()
 	_update_camera(real_dt)
 	_check_end()
 	if state.phase == RunState.Phase.PLAY:
 		build.try_open_cards()
+
+## 処理を呼ぶ。計測中なら時間を測る。
+func _run(key: StringName, f: Callable) -> void:
+	if not profiling:
+		f.call()
+		return
+	var t0 := Time.get_ticks_usec()
+	f.call()
+	var rec: Array = profile.get(key, [0, 0])
+	rec[0] += Time.get_ticks_usec() - t0
+	rec[1] += 1
+	profile[key] = rec
 
 func _process(_delta: float) -> void:
 	if state.events.is_empty():
@@ -238,6 +254,7 @@ func _finishing_tick(real_dt: float) -> void:
 		for e: Enemy in enemies.list:
 			if not e.dead and not e.is_boss:
 				e.dead = true
+				enemies.dirty = true
 				state.emit(&"kill", {"pos": e.pos, "r": e.r, "type": e.type, "cause": &"finale", "dir": (e.pos - center).normalized(), "color": e.color, "silent": true})
 		projectiles.clear_hostile()
 		bosses.remove_boss()
@@ -283,6 +300,40 @@ func command(name: StringName, args := {}) -> void:
 			GameManager.abort_run()
 		&"draw_button":
 			input.press_draw_button()
+		&"debug_time":
+			state.time += float(args.get("seconds", 30.0))
+		&"debug_boss_time":
+			state.time = maxf(state.time, cfg.boss_time - 1.0)
+		&"debug_kill_boss":
+			if bosses.boss != null and not bosses.boss.dead:
+				combat.damage_enemy(bosses.boss, bosses.boss.hp + 1.0, {"crit": false, "cause": &"debug"})
+		&"debug_grant":
+			build.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
+		&"debug_reset_loadout":
+			build.reset_loadout()
+		&"debug_level_up":
+			build.add_xp(build.xp_needed() - state.xp + 0.01)
+		&"debug_gauge_full":
+			state.gauge = 1.0
+		&"debug_heal":
+			ship.heal(state.stats.max_hp)
+		&"debug_invincible":
+			ship.invincible = not ship.invincible
+		&"debug_clear_enemies":
+			for e: Enemy in enemies.list:
+				if not e.is_boss:
+					e.dead = true
+			enemies.dirty = true
+		&"debug_hurt":
+			var keep := ship.invincible
+			ship.invincible = false
+			state.ship_invuln = 0.0
+			ship.damage(1.0, 0.0, &"debug")
+			ship.invincible = keep
+		&"debug_die":
+			ship.invincible = false
+			state.ship_invuln = 0.0
+			ship.damage(state.ship_hp + 1.0, 0.0, &"debug")
 		&"debug_clear":
 			finish(true)
 		&"debug_fail":

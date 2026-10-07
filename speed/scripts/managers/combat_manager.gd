@@ -221,6 +221,7 @@ func kill_enemy(e: Enemy, opts := {}) -> void:
 		bosses.on_boss_defeated(e, opts)
 		return
 	e.dead = true
+	enemies.dirty = true
 	state.kills += 1
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)

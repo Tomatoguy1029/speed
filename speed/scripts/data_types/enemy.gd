@@ -3,9 +3,18 @@ class_name Enemy
 extends RefCounted
 
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
+## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの。更新の高速化のため）
+enum Beh { CHASE, DASH, SPLIT, LEECH, GUNNER, MISSILE, BATTLESHIP, DRIFT }
 
 var id := 0
 var def: EnemyDef
+var beh: Beh = Beh.CHASE
+## 追跡の広域移動の、敵ごとに決まった値（周期のずれ・移動先の向きと広がり）
+var roam_phase := 0.0
+var roam_angle := 0.0
+var roam_radius := 0.0
+var accel := 2.0
+var turn := 4.0
 var type: StringName
 var level := 1.0
 var elite := false

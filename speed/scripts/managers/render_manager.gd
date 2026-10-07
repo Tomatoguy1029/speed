@@ -16,6 +16,8 @@ var state: RunState
 var cfg: GameConfig
 
 var _layers: Dictionary = {}
+## 形ごとのまとめた描画（敵・経験値の結晶）
+var _batches: Dictionary = {}
 var _camera: Camera2D
 var _font: Font
 
@@ -26,6 +28,8 @@ var texts: Array = []
 var ghosts: Array = []
 var impacts: Array = []
 var trails: Array = []
+var beams: Array = []
+var bolts: Array = []
 var shake := 0.0
 var flash := 0.0
 var _stars: PackedVector3Array
@@ -43,11 +47,37 @@ func _ready() -> void:
 		layer.draw_fn = Callable(self, "_draw_" + name)
 		world.add_child(layer)
 		_layers[name] = layer
+	_build_batches()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
 		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	run.frame_events.connect(_on_events)
+
+## 敵の形ごと・目・経験値の結晶の MultiMesh を作り、それぞれの層の子に置く。
+func _build_batches() -> void:
+	var shapes := {
+		&"orb": InstanceBatch.circle_points(16),
+		&"blob": InstanceBatch.circle_points(14),
+		&"dart": PackedVector2Array([Vector2(1.2, 0), Vector2(-0.8, 0.9), Vector2(-0.4, 0), Vector2(-0.8, -0.9)]),
+		&"ship": PackedVector2Array([Vector2(1.4, 0), Vector2(-0.8, 0.9), Vector2(-0.4, 0), Vector2(-0.8, -0.9)]),
+		&"hex": InstanceBatch.circle_points(6),
+		&"diamond": PackedVector2Array([Vector2(1, 0), Vector2(0, 0.7), Vector2(-1, 0), Vector2(0, -0.7)]),
+		&"rock": PackedVector2Array([Vector2(1, 0), Vector2(0.62, 0.7), Vector2(0.05, 0.92), Vector2(-0.6, 0.72), Vector2(-0.95, 0.15), Vector2(-0.8, -0.5), Vector2(-0.2, -0.93), Vector2(0.5, -0.82)]),
+	}
+	for key in shapes:
+		var b := InstanceBatch.new()
+		b.setup_polygon(shapes[key])
+		_layers.enemies.add_child(b)
+		_batches[key] = b
+	var eye := InstanceBatch.new()
+	eye.setup_polygon(InstanceBatch.circle_points(8))
+	_layers.enemies.add_child(eye)
+	_batches[&"eye"] = eye
+	var gem := InstanceBatch.new()
+	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
+	_layers.pickups.add_child(gem)
+	_batches[&"gem"] = gem
 
 func _process(delta: float) -> void:
 	var phase := state.phase
@@ -94,6 +124,12 @@ func _on_events(events: Array[Dictionary]) -> void:
 				shake = maxf(shake, 16.0)
 			&"warp":
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
+			&"beam":
+				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": 0.4, "max": 0.4})
+			&"bolt":
+				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22})
+				if bolts.size() > 80:
+					bolts.pop_front()
 			&"debris_trail":
 				trails.append({"points": ev.points, "color": ev.color, "life": cfg.corpse_trail_life, "max": cfg.corpse_trail_life})
 			&"sonic":
@@ -142,7 +178,7 @@ func _update_fx(dt: float) -> void:
 		p.vel *= 1.0 - 2.5 * dt
 		p.life -= dt
 	particles = particles.filter(func(p): return p.life > 0.0)
-	for list in [rings, texts, ghosts, impacts, trails]:
+	for list in [rings, texts, ghosts, impacts, trails, beams, bolts]:
 		for f in list:
 			f.life -= dt
 	for t in texts:
@@ -152,6 +188,8 @@ func _update_fx(dt: float) -> void:
 	ghosts = ghosts.filter(func(f): return f.life > 0.0)
 	impacts = impacts.filter(func(f): return f.life > 0.0)
 	trails = trails.filter(func(f): return f.life > 0.0)
+	beams = beams.filter(func(f): return f.life > 0.0)
+	bolts = bolts.filter(func(f): return f.life > 0.0)
 
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
@@ -185,14 +223,14 @@ func _draw_field(c: CanvasItem) -> void:
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
 	var view := state.view_rect().grow(60.0)
+	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 15）
 	var gs := maxf(5.0, _px(4.0))
+	var gems: InstanceBatch = _batches[&"gem"]
+	gems.begin()
 	for g: Pickup in p.gems:
-		if not view.has_point(g.pos):
-			continue
-		var pts := PackedVector2Array([g.pos + Vector2(0, -gs * 1.4), g.pos + Vector2(gs, 0), g.pos + Vector2(0, gs * 1.4), g.pos + Vector2(-gs, 0)])
-		c.draw_colored_polygon(pts, XP_COLOR)
-		pts.append(pts[0])
-		c.draw_polyline(pts, XP_OUTLINE, _px(1.2))
+		if view.has_point(g.pos):
+			gems.add(g.pos, 0.0, gs, XP_COLOR)
+	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	for co: Pickup in p.coins:
 		if view.has_point(co.pos):
@@ -216,43 +254,36 @@ func _draw_pickups(c: CanvasItem) -> void:
 
 func _draw_enemies(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(cfg.max_enemy_radius)
+	for b in _batches.values():
+		b.begin()
+	var eye: InstanceBatch = _batches[&"eye"]
+	var dark := Color(0.05, 0.05, 0.1)
 	for e: Enemy in run.enemies.list:
 		if e.dead or not view.has_point(e.pos):
 			continue
-		_draw_enemy(c, e)
+		var col := e.color
+		if e.flash > 0.0:
+			col = col.lerp(Color.WHITE, 0.7)
+		if e.type == &"meteor":
+			_batches[&"rock"].add(e.pos, e.facing, e.r, Color("#b8a898") if e.flash > 0.0 else Color("#7a6a5c"))
+			continue
+		var shape: StringName = e.def.shape if e.def != null else &"ship"
+		var batch: InstanceBatch = _batches.get(shape, _batches[&"orb"])
+		batch.add(e.pos, e.facing, e.r, col)
+		eye.add(e.pos + Vector2.from_angle(e.facing) * e.r * 0.55, 0.0, maxf(2.0, e.r * 0.18), dark)
+		_draw_enemy_marks(c, e)
+	for key in _batches:
+		if key != &"gem":
+			_batches[key].end()
 
-func _draw_enemy(c: CanvasItem, e: Enemy) -> void:
-	var col := e.color
-	if e.flash > 0.0:
-		col = col.lerp(Color.WHITE, 0.7)
-	var shape: StringName = e.def.shape if e.def != null else &"ship"
-	if e.type == &"meteor":
-		_draw_rock(c, e)
-		return
-	var fwd := Vector2.from_angle(e.facing)
-	var side := Vector2(-fwd.y, fwd.x)
-	match shape:
-		&"dart", &"ship":
-			var len := 1.4 if shape == &"ship" else 1.2
-			var pts := PackedVector2Array([e.pos + fwd * e.r * len, e.pos - fwd * e.r * 0.8 + side * e.r * 0.9, e.pos - fwd * e.r * 0.4, e.pos - fwd * e.r * 0.8 - side * e.r * 0.9])
-			c.draw_colored_polygon(pts, col)
-		&"hex":
-			var pts := PackedVector2Array()
-			for i in 6:
-				pts.append(e.pos + Vector2.from_angle(e.facing + i * TAU / 6.0) * e.r)
-			c.draw_colored_polygon(pts, col)
-		&"diamond":
-			c.draw_colored_polygon(PackedVector2Array([e.pos + fwd * e.r, e.pos + side * e.r * 0.7, e.pos - fwd * e.r, e.pos - side * e.r * 0.7]), col)
-		_:
-			c.draw_circle(e.pos, e.r, col)
-	# 向き（目・船首）
-	c.draw_circle(e.pos + fwd * e.r * 0.55, maxf(2.0, e.r * 0.18), Color(0.05, 0.05, 0.1))
+## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。
+func _draw_enemy_marks(c: CanvasItem, e: Enemy) -> void:
 	if e.elite:
 		c.draw_arc(e.pos, e.r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	if e.weak_arc > 0.0:
-		c.draw_arc(e.pos, e.r + _px(2.0), e.facing + PI - e.weak_arc, e.facing + PI + e.weak_arc, 16, Color("#ffe46b"), _px(3.0))
+		c.draw_arc(e.pos, e.r + _px(2.0), e.facing + PI - e.weak_arc, e.facing + PI + e.weak_arc, 12, Color("#ffe46b"), _px(3.0))
 	if e.charge > 0.0:
-		c.draw_arc(e.pos, e.r + _px(6.0), 0, TAU * e.charge, 32, Color(1, 0.3, 0.3, 0.8), _px(2.5))
+		c.draw_arc(e.pos, e.r + _px(6.0), 0, TAU * e.charge, 24, Color(1, 0.3, 0.3, 0.8), _px(2.5))
 	if (e.r >= 25.0 or e.is_boss) and e.hp < e.max_hp:
 		var w := e.r * 1.6
 		var top := e.pos + Vector2(-w / 2.0, -e.r - _px(10.0))
@@ -314,7 +345,38 @@ func _draw_path(c: CanvasItem) -> void:
 		var a: float = g.life / g.max
 		c.draw_line(g.from, g.to, Color(0.75, 0.95, 1.0, 0.6 * a), _px(4.0))
 
+## 武器・特性が残すもの（機雷・ドローン・渦）。
+func _draw_build_objects(c: CanvasItem) -> void:
+	var b := run.build
+	var mines = b.weapon_behaviors.get(&"W07")
+	if mines != null:
+		for m in mines.mines:
+			var col := Color("#ff7b54") if m.armed <= 0.0 else Color(1, 0.5, 0.3, 0.4)
+			c.draw_circle(m.pos, 7.0, col)
+			c.draw_arc(m.pos, 11.0, 0, TAU, 12, Color(1, 0.6, 0.4, 0.5), _px(1.5))
+	var drones = b.weapon_behaviors.get(&"W06")
+	if drones != null:
+		for d in drones.drones:
+			c.draw_circle(d.pos, 9.0, Color("#a8ffdb"))
+	var vortex = b.trait_behaviors.get(&"T03")
+	if vortex != null:
+		for v in vortex.vortexes:
+			var k: float = v.life / v.max
+			for i in 3:
+				var a: float = state.time * 4.0 + i * TAU / 3.0
+				c.draw_arc(v.pos, v.radius * (0.3 + 0.2 * i), a, a + 2.0, 16, Color(0.75, 0.45, 1.0, 0.6 * k), _px(3.0))
+
 func _draw_fx(c: CanvasItem) -> void:
+	_draw_build_objects(c)
+	for bm in beams:
+		var k: float = bm.life / bm.max
+		c.draw_line(bm.from, bm.to, Color(1.0, 0.95, 0.6, 0.7 * k), bm.width)
+		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+	for bo in bolts:
+		var k: float = bo.life / bo.max
+		var pts := PackedVector2Array(bo.points)
+		if pts.size() > 1:
+			c.draw_polyline(pts, Color(0.7, 0.85, 1.0, k), _px(3.0))
 	for r in rings:
 		var k: float = r.life / r.max
 		var col: Color = r.color

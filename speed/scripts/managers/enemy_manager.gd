@@ -9,8 +9,14 @@ var field: FieldManager
 var projectiles: ProjectileManager
 var bosses: BossManager
 
+const BEH := {&"chase": Enemy.Beh.CHASE, &"dash": Enemy.Beh.DASH, &"split": Enemy.Beh.SPLIT,
+	&"leech": Enemy.Beh.LEECH, &"gunner": Enemy.Beh.GUNNER, &"missile": Enemy.Beh.MISSILE,
+	&"battleship": Enemy.Beh.BATTLESHIP, &"drift": Enemy.Beh.DRIFT}
+
 var list: Array = []
 var _new: Array = []
+## 死んだ敵がいて、配列から外す必要があるか
+var dirty := false
 var _next_id := 1
 var _spawn_acc := 0.0
 var _wave_t := 0.0
@@ -49,6 +55,12 @@ func create(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> Enemy:
 	e.color = def.color
 	var fire_interval: float = def.params.get("fire_interval", 0.0)
 	e.fire_t = fire_interval * (0.5 + state.rng.randf() * 0.5)
+	e.beh = BEH.get(def.behavior, Enemy.Beh.CHASE)
+	e.roam_phase = e.id * 1.61803398875
+	e.roam_angle = e.id * 2.39996322973
+	e.roam_radius = (0.45 + 0.5 * sqrt(fmod(e.id * 0.61803398875, 1.0))) * minf(1.0, cfg.enemy_pursuit_spread / 480.0)
+	e.accel = def.accel if def.accel > 0.0 else 2.0
+	e.turn = def.turn if def.turn > 0.0 else 4.0
 	return e
 
 func add(e: Enemy) -> void:
@@ -68,10 +80,48 @@ func tick(_real_dt: float, world_dt: float) -> void:
 		return
 	state.leech_drag = 0.0
 	_update_aim(world_dt)
+	var dt := world_dt
+	var aim := state.enemy_aim
+	var vc := state.view_center
+	var vh := state.view_half
+	var cycle_len := cfg.enemy_approach_cycle
+	var appr := cfg.enemy_approach_time
+	var blend := cfg.enemy_approach_blend
+	var roam_turn := cfg.enemy_roam_turn
 	for e: Enemy in list:
 		if e.dead or e.is_boss or e.meteor_index >= 0:
 			continue
-		_update(e, world_dt)
+		e.age += dt
+		if e.hit_cd > 0.0:
+			e.hit_cd -= dt
+		if e.flash > 0.0:
+			e.flash -= dt
+		var from := e.pos
+		if e.shove_time > 0.0 or e.knock_t > 0.0 or e.beh != Enemy.Beh.CHASE:
+			_update(e, dt)
+		else:
+			# 追跡（いちばん多い雑魚）は関数を呼ばずにここで計算する（仕様書 9.4）
+			var cycle := fmod(e.age + e.roam_phase, cycle_len)
+			var roam := clampf(minf((cycle - appr) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
+			var target := aim
+			if roam > 0.0:
+				var ang := e.roam_angle + e.age * roam_turn
+				var ux := cos(ang)
+				var uy := sin(ang)
+				var edge := e.roam_radius / maxf(absf(ux), absf(uy))
+				target = aim + (Vector2(vc.x + ux * edge * vh.x, vc.y + uy * edge * vh.y) - aim) * roam
+			var d := target - e.pos
+			var dist := d.length()
+			if dist < 0.001:
+				dist = 1.0
+			var k := minf(1.0, e.accel * dt)
+			e.vel += (d * (e.speed / dist) - e.vel) * k
+			var to_aim := (aim - e.pos).angle()
+			var turn_max := e.turn * dt
+			e.facing += clampf(wrapf(to_aim - e.facing, -PI, PI), -turn_max, turn_max)
+			e.pos += e.vel * dt
+		if field.near_body(e.pos, e.r + e.vel.length() * dt):
+			field.collide_enemy(e, from)
 	_flush_new()
 
 ## 敵の狙い：機体の遅れた位置（仕様書 5.5）。
@@ -89,12 +139,6 @@ func _update_aim(dt: float) -> void:
 	state.enemy_aim += d / dist * step
 
 func _update(e: Enemy, dt: float) -> void:
-	e.age += dt
-	if e.hit_cd > 0.0:
-		e.hit_cd -= dt
-	if e.flash > 0.0:
-		e.flash -= dt
-	var from := e.pos
 	if e.shove_time > 0.0:
 		e.shove_from = e.pos
 		e.shoved = true
@@ -105,36 +149,35 @@ func _update(e: Enemy, dt: float) -> void:
 		e.knock_t -= dt
 		e.vel *= exp(-dt * 2.0)
 	else:
-		match e.def.behavior:
-			&"dash":
+		match e.beh:
+			Enemy.Beh.DASH:
 				_dash(e, dt)
-			&"split":
+			Enemy.Beh.SPLIT:
 				_chase(e, dt)
 				_split(e, dt)
-			&"leech":
+			Enemy.Beh.LEECH:
 				_chase(e, dt)
 				var d := state.ship_pos.distance_to(e.pos)
 				var aura: float = e.def.params.aura_r
 				if d < aura:
 					state.leech_drag += float(e.def.params.drain) * (1.0 - d / aura * 0.5)
-			&"gunner":
+			Enemy.Beh.GUNNER:
 				_keep_distance(e, dt)
 				if _gun_timer(e, dt):
 					projectiles.fire_enemy(e, (state.enemy_aim - e.pos).angle(), e.def.params.bullet_speed, &"bullet")
-			&"missile":
+			Enemy.Beh.MISSILE:
 				_keep_distance(e, dt)
 				if _gun_timer(e, dt):
 					projectiles.fire_enemy(e, e.facing, e.def.params.missile_speed, &"missile")
-			&"battleship":
+			Enemy.Beh.BATTLESHIP:
 				_chase(e, dt)
 				if _gun_timer(e, dt):
 					fire_volley(e)
-			&"drift":
+			Enemy.Beh.DRIFT:
 				e.facing += e.spin * dt
 			_:
 				_chase(e, dt)
 	e.pos += e.vel * dt
-	field.collide_enemy(e, from)
 
 ## 扇状に弾をばらまく（戦艦）。
 func fire_volley(e: Enemy) -> void:
@@ -158,17 +201,16 @@ func _turn_toward(e: Enemy, target: float, rate: float, dt: float) -> void:
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 9.4）。
 func _chase(e: Enemy, dt: float) -> void:
 	var aim := state.enemy_aim
-	var cycle := fmod(e.age + e.id * 1.61803398875, cfg.enemy_approach_cycle)
+	var cycle := fmod(e.age + e.roam_phase, cfg.enemy_approach_cycle)
 	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / cfg.enemy_approach_blend,
 		(cfg.enemy_approach_cycle - cycle) / cfg.enemy_approach_blend), 0.0, 1.0)
-	var ang := e.id * 2.39996322973 + e.age * cfg.enemy_roam_turn
+	var ang := e.roam_angle + e.age * cfg.enemy_roam_turn
 	var u := Vector2(cos(ang), sin(ang))
-	var radius := (0.45 + 0.5 * sqrt(fmod(e.id * 0.61803398875, 1.0))) * minf(1.0, cfg.enemy_pursuit_spread / 480.0)
-	var edge := radius / maxf(absf(u.x), absf(u.y))
+	var edge := e.roam_radius / maxf(absf(u.x), absf(u.y))
 	var roam_target := state.view_center + Vector2(u.x * edge * state.view_half.x, u.y * edge * state.view_half.y)
 	var target := aim + (roam_target - aim) * roam
-	_steer_to(e, target, e.speed, e.def.accel if e.def.accel > 0.0 else 2.0, dt)
-	_turn_toward(e, (aim - e.pos).angle(), e.def.turn if e.def.turn > 0.0 else 4.0, dt)
+	_steer_to(e, target, e.speed, e.accel, dt)
+	_turn_toward(e, (aim - e.pos).angle(), e.turn, dt)
 
 func _dash(e: Enemy, dt: float) -> void:
 	var p := e.def.params
@@ -259,6 +301,9 @@ func _flush_new() -> void:
 
 ## 死んだ敵を配列から外す。
 func cleanup() -> void:
+	if not dirty:
+		return
+	dirty = false
 	var alive: Array = []
 	for e: Enemy in list:
 		if not e.dead:
@@ -302,9 +347,7 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	if phase.id != _phase_id:
 		_phase_id = phase.id
 		state.emit(&"phase", {"id": phase.id})
-	_count_edges()
-	_recycle_far()
-	var alive := _count_population(true)
+	var alive := _survey()
 	var deficit := maxf(0.0, t.pop - alive)
 	var rate := maxf(phase.rate * cfg.density_mult, deficit / cfg.spawn_refill_time)
 	var cap := maxf(8.0, 8.0 * cfg.density_mult)
@@ -322,16 +365,37 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 			if alive < t.pop:
 				_spawn_wave(t, t.pop - alive)
 
-func _count_edges() -> void:
+var _type_counts: Dictionary = {}
+
+## 1回の走査で、外周の辺ごとの数・種類ごとの数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
+## 戻り値は再配置の範囲の中の通常の敵の数。
+func _survey() -> int:
 	_edge_counts = [0, 0, 0, 0]
+	_type_counts = {}
+	var vc := state.view_center
+	var vh := state.view_half
+	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
+	var alive := 0
+	var far: Array = []
 	for e: Enemy in list:
 		if e.dead or e.is_boss or e.meteor_index >= 0:
 			continue
-		var d := (e.pos - state.view_center) / state.view_half
-		if maxf(absf(d.x), absf(d.y)) < 0.45:
+		_type_counts[e.type] = _type_counts.get(e.type, 0) + 1
+		var rel := e.pos - vc
+		if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
+			far.append(e)
 			continue
-		var side := (0 if d.x < 0.0 else 1) if absf(d.x) > absf(d.y) else (2 if d.y < 0.0 else 3)
+		alive += 1
+		var dx := rel.x / vh.x
+		var dy := rel.y / vh.y
+		if maxf(absf(dx), absf(dy)) < 0.45:
+			continue
+		var side := (0 if dx < 0.0 else 1) if absf(dx) > absf(dy) else (2 if dy < 0.0 else 3)
 		_edge_counts[side] += 1
+	for e: Enemy in far:
+		if _recycle(e):
+			alive += 1
+	return alive
 
 ## 画面の四辺の外の出現位置。外周の敵が少ない辺を優先する。
 func spawn_point(extra := 0.0) -> Variant:
@@ -369,9 +433,9 @@ func _spawn_one(t: Dictionary) -> bool:
 	var phase: PhaseDef = t.phase
 	var danger := field.danger_at(p.length())
 	var type := _pick_type(phase, danger)
-	if type == &"battleship" and _count_type(&"battleship") >= cfg.battleship_max:
+	if type == &"battleship" and _type_counts.get(type, 0) >= cfg.battleship_max:
 		return false
-	if type == &"titan" and _count_type(&"titan") >= cfg.titan_max:
+	if type == &"titan" and _type_counts.get(type, 0) >= cfg.titan_max:
 		return false
 	var def := def_of(type)
 	if def == null:
@@ -383,6 +447,7 @@ func _spawn_one(t: Dictionary) -> bool:
 	if def.size_var:
 		opts.size = def.radius * (0.85 + state.rng.randf() * 0.45)
 	add(create(def, level, p, opts))
+	_type_counts[type] = _type_counts.get(type, 0) + 1
 	return true
 
 func _pick_type(phase: PhaseDef, danger: float) -> StringName:
@@ -403,13 +468,6 @@ func _pick_type(phase: PhaseDef, danger: float) -> StringName:
 			return it[0]
 		roll -= it[1]
 	return items[items.size() - 1][0]
-
-func _count_type(type: StringName) -> int:
-	var n := 0
-	for e: Enemy in list:
-		if not e.dead and e.type == type:
-			n += 1
-	return n
 
 ## 無双期の群れ：環状に囲むか、一方向から流れ込む。
 func _spawn_wave(t: Dictionary, remaining: float) -> void:
@@ -432,22 +490,16 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 	state.emit(&"wave")
 
 ## 遠くへ離れた敵を、画面外の出現位置へ移す。HP などは保ち、撃破・経験値・ドロップは発生しない。
-func _recycle_far() -> void:
-	var lim := state.view_half * cfg.spawn_recycle_scale + Vector2(200, 200)
-	for e: Enemy in list:
-		if e.dead or e.is_boss or e.meteor_index >= 0:
-			continue
-		var d := (e.pos - state.view_center).abs()
-		if d.x <= lim.x and d.y <= lim.y:
-			continue
-		var p = spawn_point()
-		if p == null:
-			continue
-		e.pos = p
-		var to_ship: Vector2 = (state.ship_pos - e.pos).normalized()
-		e.vel = to_ship * e.speed
-		e.facing = to_ship.angle()
-		e.mode = Enemy.Mode.MOVE
-		e.timer = 0.0
-		e.charge = 0.0
-		e.fire_t = e.def.params.get("fire_interval", 0.0)
+func _recycle(e: Enemy) -> bool:
+	var p = spawn_point()
+	if p == null:
+		return false
+	e.pos = p
+	var to_ship: Vector2 = (state.ship_pos - e.pos).normalized()
+	e.vel = to_ship * e.speed
+	e.facing = to_ship.angle()
+	e.mode = Enemy.Mode.MOVE
+	e.timer = 0.0
+	e.charge = 0.0
+	e.fire_t = e.def.params.get("fire_interval", 0.0)
+	return true

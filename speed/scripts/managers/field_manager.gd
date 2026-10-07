@@ -5,6 +5,21 @@
 class_name FieldManager
 extends RunSystem
 
+## 隕石1つの配置（仕様書 11）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）
+class Rock:
+	var kind: StringName
+	var pos := Vector2.ZERO
+	var vel := Vector2.ZERO
+	var size := 40.0
+	var facing := 0.0
+	var spin := 0.0
+	var angle := 0.0
+	var offset := 0.0
+	var period := 0.0
+	var phase := 0.0
+	var destroyed := false
+	var entity: Enemy = null
+
 ## 障害物1つ（惑星か月）
 class Body:
 	var pos := Vector2.ZERO
@@ -14,11 +29,15 @@ class Body:
 	var a0 := 0.0
 	var dir := 1.0
 
+var enemies: EnemyManager
+
 var planet: Body
 var moons: Array[Body] = []
 var bodies: Array[Body] = []
 ## 宇宙塵の雲（中心と半径）
 var dust: Array[Vector3] = []
+var rocks: Array[Rock] = []
+var _stream_t := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -39,10 +58,107 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 		var a := rng.randf() * TAU
 		var d := rng.randf_range(cfg.planet_radius + 600.0, cfg.field_radius - 200.0)
 		dust.append(Vector3(cos(a) * d, sin(a) * d, rng.randf_range(250.0, 620.0)))
+	_place_rocks(rng)
 	_update_moons()
 
-func tick(_real_dt: float, _world_dt: float) -> void:
+func tick(_real_dt: float, world_dt: float) -> void:
 	_update_moons()
+	if world_dt > 0.0:
+		_stream_rocks(world_dt)
+
+# ── 隕石（仕様書 11） ─────────────────────────────────────────────
+
+## ラン開始時に、世界の決まった位置へ隕石を置く：地帯・漂流・彗星。
+func _place_rocks(rng: RandomNumberGenerator) -> void:
+	var n := cfg.meteor_count
+	for i in roundi(n * 0.45):
+		var center := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1100.0, cfg.field_radius - 650.0)
+		for j in 8:
+			_add_rock(rng, center + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * 380.0, &"belt", Vector2.ZERO)
+	for i in roundi(n * 2.5):
+		var d := sqrt(rng.randf_range(800.0 * 800.0, pow(cfg.field_radius - 300.0, 2.0)))
+		var heading := rng.randf() * TAU
+		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"drift", Vector2.from_angle(heading) * rng.randf_range(15.0, 35.0))
+	if n > 0:
+		for i in 3:
+			var r := Rock.new()
+			r.kind = &"comet"
+			r.angle = rng.randf() * TAU
+			r.offset = rng.randf_range(1200.0, 4500.0) * (-1.0 if rng.randf() < 0.5 else 1.0)
+			r.period = rng.randf_range(42.0, 65.0)
+			r.phase = rng.randf() * 40.0
+			r.size = rng.randf_range(35.0, 55.0)
+			r.facing = r.angle
+			r.spin = 0.4
+			rocks.append(r)
+
+func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Vector2) -> void:
+	var r := p.length()
+	if r < cfg.planet_radius + 200.0 or r > cfg.field_radius - 100.0:
+		return
+	var rock := Rock.new()
+	rock.kind = kind
+	rock.pos = p
+	rock.vel = vel
+	rock.size = rng.randf_range(24.0, 65.0)
+	rock.facing = rng.randf() * TAU
+	rock.spin = rng.randf_range(-0.5, 0.5)
+	rocks.append(rock)
+
+## 時刻 t の隕石の位置と速度。
+func _rock_at(rock: Rock, t: float) -> Array:
+	if rock.kind == &"comet":
+		var along := fmod(t + rock.phase, rock.period) * 950.0 - cfg.field_radius - 500.0
+		var u := Vector2.from_angle(rock.angle)
+		return [u * along + Vector2(-u.y, u.x) * rock.offset, u * 950.0]
+	var diameter := cfg.field_radius * 2.0
+	var p := rock.pos + rock.vel * t
+	p = Vector2(fposmod(p.x + cfg.field_radius, diameter) - cfg.field_radius, fposmod(p.y + cfg.field_radius, diameter) - cfg.field_radius)
+	return [p, rock.vel]
+
+func _near(p: Vector2, extra: float) -> bool:
+	var d := (p - state.view_center).abs()
+	var r := p.length()
+	return d.x < state.view_half.x + extra and d.y < state.view_half.y + extra \
+		and r > cfg.planet_radius + 100.0 and r < cfg.field_radius + 100.0
+
+## 画面の近くの隕石だけを敵の配列に入れる。壊した隕石はそのランの間は戻らない。
+func _stream_rocks(dt: float) -> void:
+	var t := state.time
+	for rock in rocks:
+		var e := rock.entity
+		if e == null:
+			continue
+		if e.dead:
+			if not e.hull_scattered:
+				rock.destroyed = true
+			rock.entity = null
+			continue
+		var pv := _rock_at(rock, t)
+		e.pos = pv[0]
+		e.vel = pv[1]
+		e.facing = rock.facing + rock.spin * t
+		if not _near(e.pos, 650.0):
+			e.dead = true
+			enemies.dirty = true
+			rock.entity = null
+	_stream_t -= dt
+	if _stream_t > 0.0:
+		return
+	_stream_t = 0.2
+	var def: EnemyDef = ConfigManager.enemies.get(&"meteor")
+	for i in rocks.size():
+		var rock := rocks[i]
+		if rock.destroyed or rock.entity != null:
+			continue
+		var pv := _rock_at(rock, t)
+		if not _near(pv[0], 300.0):
+			continue
+		var e := enemies.create(def, 1.0, pv[0], {"size": rock.size, "facing": rock.facing, "spin": rock.spin})
+		e.meteor_index = i
+		e.vel = pv[1]
+		rock.entity = e
+		enemies.add(e)
 
 func _update_moons() -> void:
 	for m in moons:
@@ -96,6 +212,16 @@ func push_out(p: Vector2, margin: float) -> Vector2:
 		if dist < min_d:
 			q = b.pos + (d / dist if dist > 0.001 else Vector2.RIGHT) * min_d
 	return q
+
+## 点 p（余白 margin）の近くに障害物があるか。敵の当たり判定を省くための速い判定。
+func near_body(p: Vector2, margin: float) -> bool:
+	var r := p.length()
+	if r < planet.r + margin + 4.0:
+		return true
+	for m in moons:
+		if absf(r - m.orbit) < m.r + margin + 4.0 and p.distance_squared_to(m.pos) < pow(m.r + margin + 4.0, 2.0):
+			return true
+	return false
 
 ## 敵が障害物をすり抜けないよう、表面で止めて横方向の速度だけ残す。
 func collide_enemy(e: Enemy, from: Vector2) -> void:
