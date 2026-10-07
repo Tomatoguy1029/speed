@@ -41,7 +41,7 @@ export function createEnemy(type, level, x, y, opts = {}) {
     xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
     speed: T.speed * (1 + 0.04 * (L - 1)),
     facing: opts.facing ?? 0,
-    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: 0, // directional weak spots are not part of the current prototype
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: ['armored', 'battleship'].includes(type) ? T.weakArc : 0, // readable rear weak spots only on armored ships
     hitCD: 0, flash: 0, dead: false,
     state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
     parent: opts.parent || 0,
@@ -221,6 +221,7 @@ export function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
+  if (e.worldMeteor) return; // streamed world trajectories are evaluated by the meteor field
   if (e.shove && e.shove.time > 0) {
     e.shoveFrom = { x: e.x, y: e.y };
     e.shove.time -= dt;

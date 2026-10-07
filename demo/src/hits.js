@@ -53,6 +53,7 @@ export function killEnemy(game, e, opts = {}) {
   if (e.dead || game.state === 'finishing') return;
   if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
+  if (e.worldMeteor) e.worldMeteor.destroyed = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);

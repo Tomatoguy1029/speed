@@ -58,11 +58,10 @@ export const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
-  { key: 'meteorCount', label: '隕石の数', min: 0, max: 100, step: 1 },
+  { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorMagnetChance', label: '隕石：経験値回収アイテムのドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
   { key: 'dropBase', label: 'カプセル基本ドロップ率（描画版はXP）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
   { key: 'dropMax', label: 'カプセルドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
@@ -266,10 +265,18 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
+  button('隕石地帯へ', (g) => {
+    const m = g.field.meteors.find(m => m.kind === 'belt' && !m.destroyed);
+    if (!m || g.state !== 'play') return;
+    g.ship.x = m.x; g.ship.y = m.y + 180;
+    g.ship.vx = g.ship.vy = 0;
+    g.enemyAim = { x: g.ship.x, y: g.ship.y };
+    g.meteorStreamT = 0;
+  });
   button('経験値回収アイテム', (g) => {
     if (g.state === 'play') g.capsules.push({ kind: 'magnet', src: 'drop', x: g.ship.x, y: g.ship.y, age: 0 });
   });
-  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
+  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => (e.type === 'boss' || e.type === 'meteor') && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
   if (onResetMeta) {
     const b = document.createElement('button');

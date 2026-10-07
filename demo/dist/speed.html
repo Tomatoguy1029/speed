@@ -41,6 +41,12 @@
   .level-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .level-card { text-align: left; white-space: normal; min-height: 210px; cursor: pointer; }
   .level-card .name { margin-bottom: 12px; }
+  .level-weapon { border-radius: 4px; }
+  .level-trait { border-radius: 36px; }
+  .level-card .tag { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .module-badge { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 42px; height: 42px; border: 2px solid var(--rank-color); color: var(--rank-color); font-weight: 700; }
+  .badge-weapon { border-radius: 3px; }
+  .badge-trait, .badge-heal { border-radius: 50%; }
   .build-summary { margin-top: 18px; font-size: 12px; line-height: 1.8; color: #b8c6ea; }
   @media (max-width: 600px) { .level-cards { grid-template-columns: 1fr; gap: 8px; } .level-card { min-height: 0; padding: 12px; } }
   .arrowcol { display: flex; align-items: center; color: #8fa3c8; font-size: 22px; }
@@ -239,7 +245,6 @@ const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
   enemyPursuitSpread: 480, // width reference for roaming routes across the current view
   enemyApproachCycle: 18,
   enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
@@ -247,7 +252,7 @@ const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
-  meteorCount: 18,
+  meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
   meteorHealChance: 0.08,
   meteorHealFrac: 0.1,
@@ -559,7 +564,7 @@ function createEnemy(type, level, x, y, opts = {}) {
     xp: T.xp * sz * (1 + 0.5 * (L - 1)) * (elite ? 4 : 1),
     speed: T.speed * (1 + 0.04 * (L - 1)),
     facing: opts.facing ?? 0,
-    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: 0, // directional weak spots are not part of the current prototype
+    weakDir: T.weakDir, weakDir2: T.weakDir2, weakArc: ['armored', 'battleship'].includes(type) ? T.weakArc : 0, // readable rear weak spots only on armored ships
     hitCD: 0, flash: 0, dead: false,
     state: 'move', timer: 0, fireT: (T.fireInterval || 0) * (0.5 + Math.random() * 0.5), charge: 0, budT: 0, buds: 0, age: 0,
     parent: opts.parent || 0,
@@ -739,6 +744,7 @@ function updateEnemy(e, game, dt) {
   e.age += dt;
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
+  if (e.worldMeteor) return; // streamed world trajectories are evaluated by the meteor field
   if (e.shove && e.shove.time > 0) {
     e.shoveFrom = { x: e.x, y: e.y };
     e.shove.time -= dt;
@@ -828,7 +834,86 @@ function pickWeighted(rng, items) {
   return items[items.length - 1][0];
 }
 
+// ---- meteor-field.js ----
+
+
+
+
+// World positions and trajectories are fixed for the run, independent of the ship.
+function createMeteorField(rng) {
+  const rocks = [];
+  function rock(x, y, kind, vx = 0, vy = 0) {
+    if (Math.hypot(x, y) < CONFIG.planetRadius + 200 || Math.hypot(x, y) > CONFIG.fieldRadius - 100) return;
+    rocks.push({ x, y, kind, vx, vy, size: randRange(rng, 24, 65),
+      facing: rng() * TAU, spin: randRange(rng, -0.5, 0.5), destroyed: false, entity: null });
+  }
+  for (let i = 0; i < Math.round(CONFIG.meteorCount * 0.45); i++) {
+    const a = rng() * TAU, d = randRange(rng, 1100, CONFIG.fieldRadius - 650);
+    const cx = Math.cos(a) * d, cy = Math.sin(a) * d;
+    for (let j = 0; j < 8; j++) {
+      const angle = rng() * TAU, radius = Math.sqrt(rng()) * 380;
+      rock(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius, 'belt');
+    }
+  }
+  for (let i = 0; i < Math.round(CONFIG.meteorCount * 2.5); i++) {
+    const a = rng() * TAU, d = Math.sqrt(randRange(rng, 800 ** 2, (CONFIG.fieldRadius - 300) ** 2));
+    const heading = rng() * TAU, speed = randRange(rng, 15, 35);
+    rock(Math.cos(a) * d, Math.sin(a) * d, 'drift', Math.cos(heading) * speed, Math.sin(heading) * speed);
+  }
+  if (CONFIG.meteorCount > 0) for (let i = 0; i < 3; i++) {
+    const angle = rng() * TAU;
+    rocks.push({ kind: 'comet', angle, offset: randRange(rng, 1200, 4500) * (rng() < 0.5 ? -1 : 1),
+      period: randRange(rng, 42, 65), phase: rng() * 40, size: randRange(rng, 35, 55),
+      facing: angle, spin: 0.4, destroyed: false, entity: null });
+  }
+  return rocks;
+}
+
+function meteorWorldPosition(m, t) {
+  if (m.kind === 'comet') {
+    const along = ((t + m.phase) % m.period) * 950 - CONFIG.fieldRadius - 500;
+    const ux = Math.cos(m.angle), uy = Math.sin(m.angle);
+    return { x: ux * along - uy * m.offset, y: uy * along + ux * m.offset, vx: ux * 950, vy: uy * 950 };
+  }
+  const diameter = CONFIG.fieldRadius * 2;
+  const wrap = v => ((v + CONFIG.fieldRadius) % diameter + diameter) % diameter - CONFIG.fieldRadius;
+  return { x: wrap(m.x + m.vx * t), y: wrap(m.y + m.vy * t), vx: m.vx, vy: m.vy };
+}
+
+function updateMeteorField(game, dt) {
+  const view = game.spawnView || { x: game.ship.x, y: game.ship.y,
+    halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
+  const near = (p, extra) => Math.abs(p.x - view.x) < view.halfW + extra &&
+    Math.abs(p.y - view.y) < view.halfH + extra &&
+    Math.hypot(p.x, p.y) > CONFIG.planetRadius + 100 && Math.hypot(p.x, p.y) < CONFIG.fieldRadius + 100;
+  let unload = false;
+  for (const e of game.enemies) {
+    const m = e.worldMeteor;
+    if (!m || e.dead) continue;
+    const p = meteorWorldPosition(m, game.t);
+    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy;
+    e.facing = m.facing + m.spin * game.t;
+    if (!near(p, 650)) { m.active = false; unload = true; }
+  }
+  if (unload) game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
+  if (!game.spawning) return;
+  game.meteorStreamT = (game.meteorStreamT || 0) - dt;
+  if (game.meteorStreamT > 0) return;
+  game.meteorStreamT = 0.2;
+  for (const m of game.field.meteors) {
+    if (m.destroyed || m.active) continue;
+    const p = meteorWorldPosition(m, game.t);
+    if (!near(p, 300)) continue;
+    const e = m.entity || (m.entity = createEnemy('meteor', 1, p.x, p.y,
+      { size: m.size, facing: m.facing, spin: m.spin }));
+    e.worldMeteor = m; m.active = true;
+    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * game.t;
+    game.enemies.push(e);
+  }
+}
+
 // ---- field.js ----
+
 
 
 
@@ -850,7 +935,7 @@ function createField(rng) {
     const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
     dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
   }
-  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust, meteors: createMeteorField(rng) };
   updateMoons(field, 0);
   return field;
 }
@@ -969,9 +1054,9 @@ function spawnWave(game, target, remaining) {
     // ring closing in
     const view = spawnBounds(game);
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU;
+      const a = ((i + game.rng()) / n) * TAU;
       const ux = Math.cos(a), uy = Math.sin(a);
-      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy)));
+      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy))) + game.rng() * 90;
       game.enemies.push(createEnemy('swarm', target.level, view.x + ux * d, view.y + uy * d, { facing: a + Math.PI }));
     }
   } else {
@@ -987,23 +1072,11 @@ function spawnWave(game, target, remaining) {
   game.events.push({ type: 'wave' });
 }
 
-function keepMeteors(game) {
-  let near = 0;
-  for (const e of game.enemies) if (!e.dead && e.type === 'meteor') near++;
-  if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game);
-  if (!pt) return;
-  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
-  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
-  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
-  game.enemies.push(m);
-}
-
 function despawnFar(game) {
   const sh = game.ship;
   const view = spawnBounds(game);
   for (const e of game.enemies) {
-    if (e.type === 'boss') continue;
+    if (e.type === 'boss' || e.type === 'meteor') continue;
     if (e.dead || (Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200)) continue;
     const pt = spawnPoint(game);
     if (!pt) continue;
@@ -1029,7 +1102,6 @@ function updateSpawner(game, dt) {
   }
   if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
-  keepMeteors(game);
   const target = phaseTarget(game.t);
   const P = target.phase;
   let alive = 0;
@@ -1509,6 +1581,7 @@ const RUN_WEAPONS = [
   { id: 'drone', catalog: 'W06', name: '追走ドローン', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
   { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
   { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
+  { id: 'contactArc', catalog: 'W17', name: '接触電撃', normal: true, desc: '敵に触れると電撃が近くの敵へ伝播。通常接触でも高速接触でも発動。Lvごとに連鎖数が増える' },
   { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
   { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
   { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
@@ -1625,12 +1698,14 @@ function runChoiceInfo(c) {
   const suffix = c.kind === 'weapon' ? `Lv${c.level}` : `${c.level}/5`;
   const tag = c.level === 1 ? (c.kind === 'weapon' ? '新しい武器' : '新しい特性') : (c.kind === 'weapon' ? '武器強化' : '特性強化');
   let desc = c.kind === 'weapon' ? d.desc : d.desc(c.level);
+  if (c.kind === 'weapon' && c.id === 'contactArc') desc += `。近隣${c.level * 2}体へ伝播、1回の伝播距離240`;
   if (c.kind === 'weapon' && c.level > 1 && (d.normal || ['turret', 'trailBurst'].includes(c.id))) {
     const before = runWeaponStats(c.id, c.level - 1), after = runWeaponStats(c.id, c.level);
     desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
     if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
     else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * before.tier}→${800 + 90 * after.tier}`;
+    else if (c.id === 'contactArc') desc += `、伝播${2 * (c.level - 1)}→${2 * c.level}体`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
   return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
@@ -2143,6 +2218,8 @@ function updateRunSonic(game, dt) {
 
 function onRunContact(game, e, x, y, ux, uy) {
   if (!game.newBuild) return;
+  onRunElectricContact(game, e);
+  if (game.state !== 'play') return;
   const atk = attackPower(0, game.stats);
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
@@ -2161,6 +2238,42 @@ function onRunContact(game, e, x, y, ux, uy) {
   }
   const recovery = runTrait(game, 'recovery');
   if (recovery) game.dashMeter = Math.min(1, game.dashMeter + recovery * 0.02);
+}
+
+function onRunElectricContact(game, target) {
+  const lv = game.weapons.contactArc;
+  if (!game.newBuild || !lv || game.state !== 'play' || target.type === 'meteor') return;
+  const L = runWeaponStats('contactArc', lv), damage = attackPower(0, game.stats) * 0.65 * L.damage;
+  const used = new Set([target.id]), pts = [{ x: game.ship.x, y: game.ship.y }, { x: target.x, y: target.y }];
+  let from = { x: target.x, y: target.y };
+  if (!target.dead) damageEnemy(game, target, damage, { cause: 'contactArc' });
+  for (let i = 0; i < lv * 2 && game.state === 'play'; i++) {
+    let next = null, nearest = 240 ** 2;
+    queryGrid(game.grid, from.x - 240, from.y - 240, from.x + 240, from.y + 240, e => {
+      if (e.dead || e.type === 'meteor' || used.has(e.id)) return;
+      const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (d < nearest) { nearest = d; next = e; }
+    });
+    if (!next) break;
+    used.add(next.id);
+    const point = { x: next.x, y: next.y };
+    pts.push(point);
+    const d = Math.hypot(point.x - from.x, point.y - from.y) || 1;
+    damageEnemy(game, next, damage, { cause: 'contactArc', dirX: (point.x - from.x) / d, dirY: (point.y - from.y) / d });
+    from = point;
+  }
+  // The visible zigzag is stable for its lifetime and never consumes drop RNG.
+  const zigzag = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+    for (let j = 1; j < 4; j++) {
+      const bend = (j % 2 ? 1 : -1) * Math.min(12, d * 0.12);
+      zigzag.push({ x: a.x + dx * j / 4 - dy / d * bend, y: a.y + dy * j / 4 + dx / d * bend });
+    }
+    zigzag.push(b);
+  }
+  game.wfx.push({ kind: 'bolt', pts: zigzag, life: 0.22, max: 0.22 });
+  if (game.wfx.length > 80) game.wfx.shift();
 }
 
 function runSegmentCross(a, b, c, d) {
@@ -2571,6 +2684,7 @@ function speedStage(sp) {
 
 
 
+
 const STEP = 1 / 120;
 
 function createGame(opts = {}) {
@@ -2743,11 +2857,11 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
+  updateMeteorField(game, dt);
   game.leechDrag = 0;
   updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
-  separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160, game.grid);
 
   if (!game.draw && !game.portalDash) {
@@ -3213,11 +3327,13 @@ function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) {
     const sp = Math.hypot(sh.vx, sh.vy);
     const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
     const atk = attackPower(sp, stats);
-    const crit = game.newBuild ? game.rng() < stats.critChance : false;
+    const weak = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const crit = weak || (game.newBuild && game.rng() < stats.critChance);
     const fast = !!run || sh.glide || sp >= stats.maxSpeed * 0.65;
     if (game.newBuild && !fast) {
       e.hitCD = 0.3;
       damageShip(game, e.contact, 0.1, `contact:${e.type}`);
+      if (game.state === 'play') onRunElectricContact(game, e);
       continue;
     }
     const res = resolveRam(atk, e, crit, stats);
@@ -3326,38 +3442,6 @@ function flushNewEnemies(game) {
     population++;
   }
   game.newEnemies.length = 0;
-}
-
-function separateEnemies(game) {
-  for (let pass = 0; pass < 2; pass++) {
-    const grid = game.spacingGrid = buildGrid(game.enemies, 120, game.spacingGrid);
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
-      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
-        let dx = o.x - e.x, dy = o.y - e.y;
-        const min = e.r + o.r + CONFIG.enemySpacing;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= min * min) return;
-        const d = Math.sqrt(d2);
-        if (d < 1e-6) {
-          const a = (e.id + o.id) * 2.39996322973;
-          dx = Math.cos(a); dy = Math.sin(a);
-        } else { dx /= d; dy /= d; }
-        const push = (min - d) * 0.5;
-        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
-        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
-        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
-        // Position correction alone lets the rear ranks drive back into the same packed mass.
-        // Cancel only their closing velocity; sideways and separating movement stay available.
-        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
-        if (closing < 0) {
-          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
-          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
-        }
-      }, e.id);
-    }
-  }
 }
 
 // ---- pickups ----
@@ -4177,6 +4261,7 @@ function killEnemy(game, e, opts = {}) {
   if (e.dead || game.state === 'finishing') return;
   if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
+  if (e.worldMeteor) e.worldMeteor.destroyed = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
   const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
@@ -5206,14 +5291,14 @@ function drawRunLoadout(r, game) {
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
   ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
   ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
-  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
+  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`■ 武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
   let row = 0;
   for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
     const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = runRankColor(game.weapons[d.id]);
     ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
   }
   const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
-  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
+  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`● 特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
   row = 0;
   for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
     ctx.fillStyle = runRankColor(game.traits[d.id]); ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
@@ -5642,6 +5727,13 @@ function shapePath(ctx, shape, R) {
 
 function drawMeteor(r, e) {
   const { ctx } = r, R = e.r;
+  if (e.worldMeteor?.kind === 'comet') {
+    const speed = Math.hypot(e.vx, e.vy) || 1;
+    ctx.strokeStyle = 'rgba(221,192,154,0.3)'; ctx.lineWidth = R * 0.9;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-e.vx / speed * 330, -e.vy / speed * 330); ctx.stroke();
+    ctx.strokeStyle = '#eee1cf'; ctx.lineWidth = R * 0.18;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-e.vx / speed * 180, -e.vy / speed * 180); ctx.stroke();
+  }
   ctx.rotate(e.facing);
   ctx.beginPath();
   for (let i = 0; i < 11; i++) {
@@ -6529,8 +6621,10 @@ function showRunLevel(game, onChoose) {
   const cards = el('div', { class: 'level-cards' });
   game.levelChoices.forEach((c, i) => {
     const info = runChoiceInfo(c);
-    const card = el('button', { class: 'card level-card', onclick: () => onChoose(i), style: `border-color:${info.color}` },
-      el('div', { class: 'tag' }, info.tag, ' ', el('kbd', {}, String(i + 1))),
+    const card = el('button', { class: `card level-card level-${c.kind}`, onclick: () => onChoose(i), style: `border-color:${info.color};--rank-color:${info.color}` },
+      el('div', { class: 'tag' },
+        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : '回復'),
+        el('span', {}, info.tag), el('kbd', {}, String(i + 1))),
       el('div', { class: 'name' }, info.name),
       el('div', { class: 'desc' }, info.desc));
     cards.append(card);
@@ -6543,7 +6637,7 @@ function showRunLevel(game, onChoose) {
   showScreen(el('div', { class: 'panel level-panel' },
     el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
     el('h1', {}, '強化を選ぶ'),
-    el('div', { class: 'sub' }, 'カードをクリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'sub' }, '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 function showStation(save, onBuy, onDepart) {
@@ -6577,7 +6671,7 @@ function showStation(save, onBuy, onDepart) {
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
-      el('li', {}, '雑魚の弱点方向を狙う必要はない。クリティカルは確率で発生する'),
+      el('li', {}, '小型敵の弱点狙いは不要。装甲型と大型戦艦は黄色い背面から攻撃すると装甲を突破しやすい。確率クリティカルも発生する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? `通常攻撃は自動。レベルアップで3枚から1つ選び、武器${CONFIG.weaponSlots}枠・各Lv${CONFIG.weaponMaxLevel}まで、特性${CONFIG.traitSlots}枠・各5重ねまで育てる。線の移動中は選択画面を保留する` : 'この操作の試作は従来の6部位モジュールを使用する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? '敵を倒して経験値を回収する。漂流カプセルも経験値になり、装備はレベルアップで選ぶ' : '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, 'クレーターのある岩は隕石。壊すと確率で十字付きの修理キットが落ち、拾うとHPが回復する。HP満タン時は残せる'),
@@ -6833,11 +6927,10 @@ const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
-  { key: 'meteorCount', label: '隕石の数', min: 0, max: 100, step: 1 },
+  { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorMagnetChance', label: '隕石：経験値回収アイテムのドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
-  { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
   { key: 'dropBase', label: 'カプセル基本ドロップ率（描画版はXP）', min: 0, max: 0.05, step: 0.0005, fmt: v => `${(v * 100).toFixed(2)}%` },
   { key: 'dropMax', label: 'カプセルドロップ率 上限', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
@@ -7041,10 +7134,18 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
+  button('隕石地帯へ', (g) => {
+    const m = g.field.meteors.find(m => m.kind === 'belt' && !m.destroyed);
+    if (!m || g.state !== 'play') return;
+    g.ship.x = m.x; g.ship.y = m.y + 180;
+    g.ship.vx = g.ship.vy = 0;
+    g.enemyAim = { x: g.ship.x, y: g.ship.y };
+    g.meteorStreamT = 0;
+  });
   button('経験値回収アイテム', (g) => {
     if (g.state === 'play') g.capsules.push({ kind: 'magnet', src: 'drop', x: g.ship.x, y: g.ship.y, age: 0 });
   });
-  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
+  button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => (e.type === 'boss' || e.type === 'meteor') && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
   if (onResetMeta) {
     const b = document.createElement('button');

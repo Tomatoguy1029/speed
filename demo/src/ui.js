@@ -143,8 +143,10 @@ export function showRunLevel(game, onChoose) {
   const cards = el('div', { class: 'level-cards' });
   game.levelChoices.forEach((c, i) => {
     const info = runChoiceInfo(c);
-    const card = el('button', { class: 'card level-card', onclick: () => onChoose(i), style: `border-color:${info.color}` },
-      el('div', { class: 'tag' }, info.tag, ' ', el('kbd', {}, String(i + 1))),
+    const card = el('button', { class: `card level-card level-${c.kind}`, onclick: () => onChoose(i), style: `border-color:${info.color};--rank-color:${info.color}` },
+      el('div', { class: 'tag' },
+        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : '回復'),
+        el('span', {}, info.tag), el('kbd', {}, String(i + 1))),
       el('div', { class: 'name' }, info.name),
       el('div', { class: 'desc' }, info.desc));
     cards.append(card);
@@ -157,7 +159,7 @@ export function showRunLevel(game, onChoose) {
   showScreen(el('div', { class: 'panel level-panel' },
     el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
     el('h1', {}, '強化を選ぶ'),
-    el('div', { class: 'sub' }, 'カードをクリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'sub' }, '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 export function showStation(save, onBuy, onDepart) {
@@ -191,7 +193,7 @@ export function showStation(save, onBuy, onDepart) {
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
-      el('li', {}, '雑魚の弱点方向を狙う必要はない。クリティカルは確率で発生する'),
+      el('li', {}, '小型敵の弱点狙いは不要。装甲型と大型戦艦は黄色い背面から攻撃すると装甲を突破しやすい。確率クリティカルも発生する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? `通常攻撃は自動。レベルアップで3枚から1つ選び、武器${CONFIG.weaponSlots}枠・各Lv${CONFIG.weaponMaxLevel}まで、特性${CONFIG.traitSlots}枠・各5重ねまで育てる。線の移動中は選択画面を保留する` : 'この操作の試作は従来の6部位モジュールを使用する'),
       el('li', {}, isDrawScheme(CONFIG.controlScheme) ? '敵を倒して経験値を回収する。漂流カプセルも経験値になり、装備はレベルアップで選ぶ' : '中心の惑星に近いほど敵は強いが、レアなカプセルが落ちている'),
       el('li', {}, 'クレーターのある岩は隕石。壊すと確率で十字付きの修理キットが落ち、拾うとHPが回復する。HP満タン時は残せる'),

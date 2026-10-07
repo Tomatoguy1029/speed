@@ -82,9 +82,9 @@ function spawnWave(game, target, remaining) {
     // ring closing in
     const view = spawnBounds(game);
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * TAU;
+      const a = ((i + game.rng()) / n) * TAU;
       const ux = Math.cos(a), uy = Math.sin(a);
-      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy)));
+      const d = Math.min((view.halfW + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(ux)), (view.halfH + CONFIG.spawnMargin) / Math.max(0.0001, Math.abs(uy))) + game.rng() * 90;
       game.enemies.push(createEnemy('swarm', target.level, view.x + ux * d, view.y + uy * d, { facing: a + Math.PI }));
     }
   } else {
@@ -100,23 +100,11 @@ function spawnWave(game, target, remaining) {
   game.events.push({ type: 'wave' });
 }
 
-function keepMeteors(game) {
-  let near = 0;
-  for (const e of game.enemies) if (!e.dead && e.type === 'meteor') near++;
-  if (near >= CONFIG.meteorCount) return;
-  const pt = spawnPoint(game);
-  if (!pt) return;
-  const m = createEnemy('meteor', 1, pt.x, pt.y, { size: 24 + game.rng() * 46, spin: (game.rng() - 0.5) * 1.2, facing: game.rng() * TAU });
-  const a = pt.a + Math.PI + (game.rng() - 0.5) * 1.6;
-  m.vx = Math.cos(a) * m.speed; m.vy = Math.sin(a) * m.speed;
-  game.enemies.push(m);
-}
-
 function despawnFar(game) {
   const sh = game.ship;
   const view = spawnBounds(game);
   for (const e of game.enemies) {
-    if (e.type === 'boss') continue;
+    if (e.type === 'boss' || e.type === 'meteor') continue;
     if (e.dead || (Math.abs(e.x - view.x) <= view.halfW * CONFIG.spawnRecycleScale + 200 && Math.abs(e.y - view.y) <= view.halfH * CONFIG.spawnRecycleScale + 200)) continue;
     const pt = spawnPoint(game);
     if (!pt) continue;
@@ -142,7 +130,6 @@ export function updateSpawner(game, dt) {
   }
   if (!game.bossSpawned && game.t >= CONFIG.bossTime) spawnBoss(game);
   despawnFar(game);
-  keepMeteors(game);
   const target = phaseTarget(game.t);
   const P = target.phase;
   let alive = 0;

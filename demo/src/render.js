@@ -469,14 +469,14 @@ function drawRunLoadout(r, game) {
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
   ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(x - 4, y - 12, width, 136);
   ctx.textAlign = 'left'; ctx.font = '11px "Hiragino Sans", sans-serif';
-  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
+  ctx.fillStyle = '#a8c4ff'; ctx.fillText(`■ 武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
   let row = 0;
   for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
     const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = runRankColor(game.weapons[d.id]);
     ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
   }
   const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
-  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
+  ctx.fillStyle = '#cfb1f7'; ctx.fillText(`● 特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
   row = 0;
   for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
     ctx.fillStyle = runRankColor(game.traits[d.id]); ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
@@ -905,6 +905,13 @@ function shapePath(ctx, shape, R) {
 
 function drawMeteor(r, e) {
   const { ctx } = r, R = e.r;
+  if (e.worldMeteor?.kind === 'comet') {
+    const speed = Math.hypot(e.vx, e.vy) || 1;
+    ctx.strokeStyle = 'rgba(221,192,154,0.3)'; ctx.lineWidth = R * 0.9;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-e.vx / speed * 330, -e.vy / speed * 330); ctx.stroke();
+    ctx.strokeStyle = '#eee1cf'; ctx.lineWidth = R * 0.18;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-e.vx / speed * 180, -e.vy / speed * 180); ctx.stroke();
+  }
   ctx.rotate(e.facing);
   ctx.beginPath();
   for (let i = 0; i < 11; i++) {

@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { makeRng, segCircleT } from './math.js';
 import { createShip, computeGauge, launchVelocity, stepShip } from './ship.js';
 import { createField, updateMoons, dustDragAt } from './field.js';
+import { updateMeteorField } from './meteor-field.js';
 import { gravityAt } from './gravity.js';
 import { attackPower, isWeakHit, resolveRam, pierceKeep, canPierce } from './combat.js';
 import { addCombatImpact } from './impact-fx.js';
@@ -13,7 +14,7 @@ import { xpForLevel } from './progression.js';
 import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
-import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers, updateRunSonic } from './run-weapons.js';
+import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers, updateRunSonic, onRunElectricContact } from './run-weapons.js';
 import { computeRunStats, rollRunChoices, grantRunItem, runModuleDef } from './run-build.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
@@ -192,11 +193,11 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
+  updateMeteorField(game, dt);
   game.leechDrag = 0;
   updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
   flushNewEnemies(game);
-  separateEnemies(game);
   game.grid = buildGrid(game.enemies, 160, game.grid);
 
   if (!game.draw && !game.portalDash) {
@@ -662,11 +663,13 @@ export function collideEnemies(game, x0, y0, R = CONFIG.shipRadius, run = null) 
     const sp = Math.hypot(sh.vx, sh.vy);
     const ux = sp > 0 ? sh.vx / sp : 0, uy = sp > 0 ? sh.vy / sp : 0;
     const atk = attackPower(sp, stats);
-    const crit = game.newBuild ? game.rng() < stats.critChance : false;
+    const weak = isWeakHit(e, hx, hy, stats.weakArcMult);
+    const crit = weak || (game.newBuild && game.rng() < stats.critChance);
     const fast = !!run || sh.glide || sp >= stats.maxSpeed * 0.65;
     if (game.newBuild && !fast) {
       e.hitCD = 0.3;
       damageShip(game, e.contact, 0.1, `contact:${e.type}`);
+      if (game.state === 'play') onRunElectricContact(game, e);
       continue;
     }
     const res = resolveRam(atk, e, crit, stats);
@@ -775,38 +778,6 @@ function flushNewEnemies(game) {
     population++;
   }
   game.newEnemies.length = 0;
-}
-
-export function separateEnemies(game) {
-  for (let pass = 0; pass < 2; pass++) {
-    const grid = game.spacingGrid = buildGrid(game.enemies, 120, game.spacingGrid);
-    for (const e of game.enemies) {
-      if (e.dead) continue;
-      const reach = e.r + MAX_ENEMY_R + CONFIG.enemySpacing;
-      queryGrid(grid, e.x - reach, e.y - reach, e.x + reach, e.y + reach, (o) => {
-        let dx = o.x - e.x, dy = o.y - e.y;
-        const min = e.r + o.r + CONFIG.enemySpacing;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= min * min) return;
-        const d = Math.sqrt(d2);
-        if (d < 1e-6) {
-          const a = (e.id + o.id) * 2.39996322973;
-          dx = Math.cos(a); dy = Math.sin(a);
-        } else { dx /= d; dy /= d; }
-        const push = (min - d) * 0.5;
-        const wE = o.r * o.r / (e.r * e.r + o.r * o.r);
-        e.x -= dx * push * 2 * wE; e.y -= dy * push * 2 * wE;
-        o.x += dx * push * 2 * (1 - wE); o.y += dy * push * 2 * (1 - wE);
-        // Position correction alone lets the rear ranks drive back into the same packed mass.
-        // Cancel only their closing velocity; sideways and separating movement stay available.
-        const closing = (o.vx - e.vx) * dx + (o.vy - e.vy) * dy;
-        if (closing < 0) {
-          e.vx += dx * closing * wE; e.vy += dy * closing * wE;
-          o.vx -= dx * closing * (1 - wE); o.vy -= dy * closing * (1 - wE);
-        }
-      }, e.id);
-    }
-  }
 }
 
 // ---- pickups ----

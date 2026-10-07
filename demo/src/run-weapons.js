@@ -110,6 +110,8 @@ export function updateRunSonic(game, dt) {
 
 export function onRunContact(game, e, x, y, ux, uy) {
   if (!game.newBuild) return;
+  onRunElectricContact(game, e);
+  if (game.state !== 'play') return;
   const atk = attackPower(0, game.stats);
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
@@ -128,6 +130,42 @@ export function onRunContact(game, e, x, y, ux, uy) {
   }
   const recovery = runTrait(game, 'recovery');
   if (recovery) game.dashMeter = Math.min(1, game.dashMeter + recovery * 0.02);
+}
+
+export function onRunElectricContact(game, target) {
+  const lv = game.weapons.contactArc;
+  if (!game.newBuild || !lv || game.state !== 'play' || target.type === 'meteor') return;
+  const L = runWeaponStats('contactArc', lv), damage = attackPower(0, game.stats) * 0.65 * L.damage;
+  const used = new Set([target.id]), pts = [{ x: game.ship.x, y: game.ship.y }, { x: target.x, y: target.y }];
+  let from = { x: target.x, y: target.y };
+  if (!target.dead) damageEnemy(game, target, damage, { cause: 'contactArc' });
+  for (let i = 0; i < lv * 2 && game.state === 'play'; i++) {
+    let next = null, nearest = 240 ** 2;
+    queryGrid(game.grid, from.x - 240, from.y - 240, from.x + 240, from.y + 240, e => {
+      if (e.dead || e.type === 'meteor' || used.has(e.id)) return;
+      const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (d < nearest) { nearest = d; next = e; }
+    });
+    if (!next) break;
+    used.add(next.id);
+    const point = { x: next.x, y: next.y };
+    pts.push(point);
+    const d = Math.hypot(point.x - from.x, point.y - from.y) || 1;
+    damageEnemy(game, next, damage, { cause: 'contactArc', dirX: (point.x - from.x) / d, dirY: (point.y - from.y) / d });
+    from = point;
+  }
+  // The visible zigzag is stable for its lifetime and never consumes drop RNG.
+  const zigzag = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 1;
+    for (let j = 1; j < 4; j++) {
+      const bend = (j % 2 ? 1 : -1) * Math.min(12, d * 0.12);
+      zigzag.push({ x: a.x + dx * j / 4 - dy / d * bend, y: a.y + dy * j / 4 + dx / d * bend });
+    }
+    zigzag.push(b);
+  }
+  game.wfx.push({ kind: 'bolt', pts: zigzag, life: 0.22, max: 0.22 });
+  if (game.wfx.length > 80) game.wfx.shift();
 }
 
 function runSegmentCross(a, b, c, d) {

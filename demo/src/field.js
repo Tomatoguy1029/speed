@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { clamp, randRange, TAU } from './math.js';
+import { createMeteorField } from './meteor-field.js';
 
 export function createField(rng) {
   const moons = [];
@@ -19,7 +20,7 @@ export function createField(rng) {
     const d = randRange(rng, CONFIG.planetRadius + 600, CONFIG.fieldRadius - 200);
     dust.push({ x: Math.cos(a) * d, y: Math.sin(a) * d, r: randRange(rng, 250, 620) });
   }
-  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust };
+  const field = { planet: { x: 0, y: 0, r: CONFIG.planetRadius, gm: CONFIG.planetGM }, moons, dust, meteors: createMeteorField(rng) };
   updateMoons(field, 0);
   return field;
 }

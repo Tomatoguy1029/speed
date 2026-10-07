@@ -148,7 +148,6 @@ export const CONFIG = {
   enemyHpMult: 1,
   enemyArmorMult: 1,
   densityMult: 5,
-  enemySpacing: 44, // leave room for armor/weak-point outlines as well as the bodies
   enemyPursuitSpread: 480, // width reference for roaming routes across the current view
   enemyApproachCycle: 18,
   enemyApproachTime: 4.5, // staggered rushes; other enemies keep crossing the outer parts of the view
@@ -156,7 +155,7 @@ export const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
-  meteorCount: 18,
+  meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
   meteorHealChance: 0.08,
   meteorHealFrac: 0.1,

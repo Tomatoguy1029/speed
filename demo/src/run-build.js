@@ -11,6 +11,7 @@ export const RUN_WEAPONS = [
   { id: 'drone', catalog: 'W06', name: '追走ドローン', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
   { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
   { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
+  { id: 'contactArc', catalog: 'W17', name: '接触電撃', normal: true, desc: '敵に触れると電撃が近くの敵へ伝播。通常接触でも高速接触でも発動。Lvごとに連鎖数が増える' },
   { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
   { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
   { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
@@ -127,12 +128,14 @@ export function runChoiceInfo(c) {
   const suffix = c.kind === 'weapon' ? `Lv${c.level}` : `${c.level}/5`;
   const tag = c.level === 1 ? (c.kind === 'weapon' ? '新しい武器' : '新しい特性') : (c.kind === 'weapon' ? '武器強化' : '特性強化');
   let desc = c.kind === 'weapon' ? d.desc : d.desc(c.level);
+  if (c.kind === 'weapon' && c.id === 'contactArc') desc += `。近隣${c.level * 2}体へ伝播、1回の伝播距離240`;
   if (c.kind === 'weapon' && c.level > 1 && (d.normal || ['turret', 'trailBurst'].includes(c.id))) {
     const before = runWeaponStats(c.id, c.level - 1), after = runWeaponStats(c.id, c.level);
     desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
     if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
     else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * before.tier}→${800 + 90 * after.tier}`;
+    else if (c.id === 'contactArc') desc += `、伝播${2 * (c.level - 1)}→${2 * c.level}体`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
   return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
