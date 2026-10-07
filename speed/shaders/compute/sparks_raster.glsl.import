@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dgoei1crr5uek"
+path="res://.godot/imported/sparks_raster.glsl-95ac44daade255baad303d885577dd3c.res"
+
+[deps]
+
+source_file="res://shaders/compute/sparks_raster.glsl"
+dest_files=["res://.godot/imported/sparks_raster.glsl-95ac44daade255baad303d885577dd3c.res"]
+
+[params]
+

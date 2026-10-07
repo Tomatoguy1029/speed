@@ -26,6 +26,9 @@ func setup_polygon(points: PackedVector2Array) -> void:
 	mm.transform_format = MultiMesh.TRANSFORM_2D
 	mm.use_colors = true
 	mm.mesh = mesh
+	# buffer へ直接書くと、Compatibility では描画の範囲（カリングの枠）が更新されず、原点から離れた物が
+	# 描かれない。フィールド全体を覆う枠を指定しておく
+	mm.custom_aabb = AABB(Vector3(-20000, -20000, -1), Vector3(40000, 40000, 2))
 	multimesh = mm
 
 static func circle_points(segments: int) -> PackedVector2Array:

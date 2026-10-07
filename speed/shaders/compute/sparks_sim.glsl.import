@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://2vqbrtsts0ed"
+path="res://.godot/imported/sparks_sim.glsl-29c624cd6dec94289bbc0b1a4d44be3a.res"
+
+[deps]
+
+source_file="res://shaders/compute/sparks_sim.glsl"
+dest_files=["res://.godot/imported/sparks_sim.glsl-29c624cd6dec94289bbc0b1a4d44be3a.res"]
+
+[params]
+

@@ -64,6 +64,7 @@ script = ExtResource("12")
 [node name="Camera2D" type="Camera2D" parent="World"]
 
 [node name="Hud" type="CanvasLayer" parent="."]
+layer = 10
 
 [node name="HudRoot" type="Control" parent="Hud"]
 layout_mode = 3

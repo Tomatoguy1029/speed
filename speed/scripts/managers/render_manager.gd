@@ -16,6 +16,7 @@ var state: RunState
 var cfg: GameConfig
 
 var _layers: Dictionary = {}
+var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
 var _camera: Camera2D
@@ -48,6 +49,9 @@ func _ready() -> void:
 		world.add_child(layer)
 		_layers[name] = layer
 	_build_batches()
+	pipeline = RenderPipeline.new()
+	add_child(pipeline)
+	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.ship])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -65,9 +69,12 @@ func _build_batches() -> void:
 		&"diamond": PackedVector2Array([Vector2(1, 0), Vector2(0, 0.7), Vector2(-1, 0), Vector2(0, -0.7)]),
 		&"rock": PackedVector2Array([Vector2(1, 0), Vector2(0.62, 0.7), Vector2(0.05, 0.92), Vector2(-0.6, 0.72), Vector2(-0.95, 0.15), Vector2(-0.8, -0.5), Vector2(-0.2, -0.93), Vector2(0.5, -0.82)]),
 	}
+	var enemy_mat := ShaderMaterial.new()
+	enemy_mat.shader = load("res://shaders/enemy.gdshader")
 	for key in shapes:
 		var b := InstanceBatch.new()
 		b.setup_polygon(shapes[key])
+		b.material = enemy_mat
 		_layers.enemies.add_child(b)
 		_batches[key] = b
 	var eye := InstanceBatch.new()
@@ -76,6 +83,9 @@ func _build_batches() -> void:
 	_batches[&"eye"] = eye
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
+	var gem_mat := ShaderMaterial.new()
+	gem_mat.shader = load("res://shaders/xp_crystal.gdshader")
+	gem.material = gem_mat
 	_layers.pickups.add_child(gem)
 	_batches[&"gem"] = gem
 
@@ -90,6 +100,7 @@ func _process(delta: float) -> void:
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake / maxf(state.camera_zoom, 0.01)
 	_camera.position = state.view_center + offset
 	_camera.zoom = Vector2(state.camera_zoom, state.camera_zoom)
+	pipeline.step(dt, _camera.position, state.camera_zoom)
 	for layer in _layers.values():
 		layer.queue_redraw()
 
@@ -102,6 +113,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 			&"explode":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
+				if ev.radius >= 150.0:
+					pipeline.add_wave(ev.pos, ev.radius, 0.4)
 			&"text":
 				_text(ev.pos, ev.text, ev.color, ev.get("size", 16))
 			&"kill":
@@ -135,12 +148,14 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"sonic":
 				flash = maxf(flash, 0.25)
 				shake = maxf(shake, 10.0)
+				pipeline.add_wave(ev.pos, ev.radius, 0.5)
 			&"boss_spawn":
 				shake = maxf(shake, 8.0)
 			&"boss_explode":
 				flash = 1.0
 				shake = 30.0
 				_burst(ev.pos, Color("#ff526e"), 120, Vector2.ZERO, 900.0)
+				pipeline.add_wave(ev.pos, 1600.0, 1.2)
 			&"ship_explode":
 				_burst(ev.pos, Color("#9fe8ff"), 60, Vector2.ZERO, 500.0)
 
@@ -155,8 +170,13 @@ func _text(p: Vector2, s: String, color: Color, size: int) -> void:
 	texts.append({"pos": p, "text": s, "color": color, "size": size, "life": 0.9 if size > 16 else 0.7})
 
 func _burst(p: Vector2, color: Color, n: int, dir: Vector2, speed: float) -> void:
-	if particles.size() > 1600:
+	if pipeline.sparks.available():
+		pipeline.sparks.burst(p, color, n * 2, dir, speed, 0.7, 5.0)
 		return
+	# 簡易版（CPU の粒）は数を抑える
+	if particles.size() > 500:
+		return
+	n = mini(n, 8)
 	for i in n:
 		var a := randf() * TAU
 		var s := speed * (0.3 + randf())
@@ -164,7 +184,11 @@ func _burst(p: Vector2, color: Color, n: int, dir: Vector2, speed: float) -> voi
 			"life": 0.5 + randf() * 0.4, "max": 0.9, "color": color, "size": 2.0 + randf() * 4.0})
 
 func _sparks(p: Vector2, normal: Vector2, n: int, color: Color) -> void:
+	if pipeline.sparks.available():
+		pipeline.sparks.burst(p, color, n, normal, 520.0, 0.4, 3.0)
+		return
 	var side := Vector2(-normal.y, normal.x)
+	n = mini(n, 10)
 	for i in n:
 		var s := 250.0 + randf() * 450.0
 		var dir := (side * (1.0 if i % 2 == 0 else -1.0) * randf_range(0.4, 1.0) + normal * randf_range(0.0, 0.8)).normalized()
