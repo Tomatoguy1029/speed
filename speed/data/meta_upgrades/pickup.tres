@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MetaUpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"pickup"
+display_name = "回収装置"
+description = "回収範囲 +15%"
+stat = &"pickup"
+per_level = 0.15
+costs = PackedInt32Array(15, 30, 55, 85, 125)
+order = 5

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"drifter"
+display_name = "ドリフター"
+radius = 14.0
+hp = 6.0
+armor = 2.0
+speed = 130.0
+accel = 2.5
+turn = 4.0
+contact = 6.0
+xp = 1.0
+color = Color(0.498, 0.8196, 1.0, 1)
+shape = &"orb"
+behavior = &"chase"
+size_var = false
+weak_arc = 0.0
+params = {
+
+}

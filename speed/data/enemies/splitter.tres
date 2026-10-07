@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"splitter"
+display_name = "分裂型"
+radius = 22.0
+hp = 14.0
+armor = 4.0
+speed = 60.0
+accel = 1.5
+turn = 1.5
+contact = 8.0
+xp = 2.0
+color = Color(0.6588, 1.0, 0.4784, 1)
+shape = &"blob"
+behavior = &"split"
+size_var = false
+weak_arc = 0.0
+params = {
+"bud_interval": 5.0,
+"max_buds": 5,
+"death_split": 2,
+"split_speed": 200.0
+}

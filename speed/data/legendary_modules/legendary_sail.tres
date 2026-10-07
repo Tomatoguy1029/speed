@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="LegendaryModuleDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/legendary_module_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"legendary_sail"
+display_name = "帆のモジュール"
+description = "ほ座を解放したときに残された、錆びついたモジュール。"
+boss_id = &"centaurus"
+order = 4

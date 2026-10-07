@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"escape"
+display_name = "脱出期"
+start = 510.0
+end = 600.0
+pop_from = 90.0
+pop_to = 120.0
+level_from = 4.2
+level_to = 5.0
+rate = 12.0
+xp_bonus = 0.0
+wave_interval = 0.0
+cores = true
+mix = {
+"darter": 3.0,
+"armored": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"leech": 2.0,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0,
+"battleship": 0.6
+}

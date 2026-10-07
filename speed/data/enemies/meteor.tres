@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"meteor"
+display_name = "隕石"
+radius = 40.0
+hp = 20.0
+armor = 5.0
+speed = 40.0
+accel = 0.0
+turn = 0.0
+contact = 10.0
+xp = 1.0
+color = Color(0.5451, 0.4784, 0.4157, 1)
+shape = &"rock"
+behavior = &"drift"
+size_var = false
+weak_arc = 0.0
+params = {
+
+}

@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"build2"
+display_name = "強化期 II"
+start = 240.0
+end = 300.0
+pop_from = 38.0
+pop_to = 45.0
+level_from = 2.0
+level_to = 2.2
+rate = 6.0
+xp_bonus = 1.4
+wave_interval = 0.0
+cores = false
+mix = {
+"drifter": 4.0,
+"darter": 2.0,
+"splitter": 2.0,
+"gunner": 1.0,
+"swarm": 2.0,
+"titan": 0.4
+}

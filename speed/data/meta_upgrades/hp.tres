@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MetaUpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hp"
+display_name = "機体フレーム"
+description = "最大 HP +15"
+stat = &"max_hp"
+per_level = 15.0
+costs = PackedInt32Array(20, 40, 70, 110, 160)
+order = 2

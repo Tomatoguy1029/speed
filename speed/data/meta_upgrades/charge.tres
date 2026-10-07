@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MetaUpgradeDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"charge"
+display_name = "充電効率"
+description = "ゲージの充填時間 -5%"
+stat = &"charge_time"
+per_level = 0.05
+costs = PackedInt32Array(20, 40, 70, 110, 160)
+order = 4
