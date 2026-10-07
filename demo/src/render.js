@@ -138,7 +138,7 @@ export function render(r, game, dt, pointer) {
   drawMines(r, game);
   drawEnemies(r, game);
   drawEnemyBullets(r, game);
-  drawCapsules(r, game, true); // repair kits remain visible above the crowd
+  drawCapsules(r, game, true); // repair kits and collectors remain visible above the crowd
   drawPortals(r, game);
   drawPathUi(r, game);
   drawFriendly(r, game, dt);
@@ -255,21 +255,25 @@ function drawStageFlash(r, dt) {
 
 function drawGems(r, game) {
   const { ctx } = r;
-  const s = Math.max(5, 3 / r.cam.zoom);
+  const s = Math.max(5, 4 / r.cam.zoom);
   ctx.fillStyle = CONFIG.xpColor;
-  ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 0.8 / r.cam.zoom;
+  ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 1.2 / r.cam.zoom;
   for (const g of game.gems) {
     if (!onScreen(r, g.x, g.y, 20)) continue;
     const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
     ctx.beginPath();
     ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
     ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#e5d9ff';
+    ctx.beginPath(); ctx.moveTo(g.x, g.y - s * k * 0.65); ctx.lineTo(g.x + s * k * 0.27, g.y);
+    ctx.lineTo(g.x, g.y + s * k * 0.35); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = CONFIG.xpColor;
   }
 }
 
 function capsuleColor(c) {
   if (c.kind === 'heal') return '#67e8b1';
-  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? CONFIG.xpColor : RARITIES[c.mod.r].color;
+  return c.kind === 'core' ? '#ffd24a' : ['cache', 'magnet'].includes(c.kind) ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
 
 function drawCoins(r, game) {
@@ -288,7 +292,7 @@ function drawCapsules(r, game, healingOnly = false) {
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const c of game.capsules) {
-    if ((c.kind === 'heal') !== healingOnly) continue;
+    if ((c.kind === 'heal' || c.kind === 'magnet') !== healingOnly) continue;
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
@@ -316,6 +320,14 @@ function drawCapsules(r, game, healingOnly = false) {
       ctx.fillStyle = '#148563';
       ctx.fillRect(-S * 0.12, -S * 0.33, S * 0.24, S * 0.66);
       ctx.fillRect(-S * 0.33, -S * 0.12, S * 0.66, S * 0.24);
+    } else if (c.kind === 'magnet') {
+      ctx.strokeStyle = '#39265e'; ctx.lineWidth = S * 0.55; ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(-S * 0.43, -S * 0.5); ctx.lineTo(-S * 0.43, S * 0.05);
+      ctx.arc(0, S * 0.05, S * 0.43, Math.PI, 0, true); ctx.lineTo(S * 0.43, -S * 0.5); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = S * 0.36; ctx.stroke();
+      ctx.fillStyle = '#eee4ff';
+      ctx.fillRect(-S * 0.61, -S * 0.65, S * 0.36, S * 0.27);
+      ctx.fillRect(S * 0.25, -S * 0.65, S * 0.36, S * 0.27);
     } else if (c.kind === 'cache') {
       ctx.fillStyle = col; ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
@@ -373,9 +385,12 @@ function drawFriendly(r, game, dt) {
   for (const b of game.fbullets) {
     if (b.kind === 'corpse') continue;
     if (!onScreen(r, b.x, b.y, 40)) continue;
-    ctx.fillStyle = b.color;
     const s = b.r / Math.sqrt(z);
-    ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
+    const speed = Math.hypot(b.vx, b.vy) || 1, ux = b.vx / speed, uy = b.vy / speed;
+    ctx.strokeStyle = '#53dfff'; ctx.lineWidth = Math.max(2 / z, s);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(b.x - ux * s * 2, b.y - uy * s * 2); ctx.lineTo(b.x + ux * s, b.y + uy * s); ctx.stroke();
+    ctx.lineCap = 'butt';
   }
   ctx.globalAlpha = 1;
 }
@@ -1009,10 +1024,11 @@ function drawEnemyBullets(r, game) {
       ctx.beginPath(); ctx.arc(-s * 1.6, 0, s * 0.6, 0, TAU); ctx.fill();
       ctx.restore();
     } else {
-      ctx.fillStyle = '#ff5a6e';
+      ctx.fillStyle = '#ff4055';
       ctx.beginPath(); ctx.arc(b.x, b.y, s, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#ffd0d6';
-      ctx.beginPath(); ctx.arc(b.x, b.y, s * 0.45, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#3a0716'; ctx.lineWidth = 1.4 / z; ctx.stroke();
+      ctx.fillStyle = '#250b16';
+      ctx.beginPath(); ctx.arc(b.x, b.y, s * 0.48, 0, TAU); ctx.fill();
     }
   }
 }

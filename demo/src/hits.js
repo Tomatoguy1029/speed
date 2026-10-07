@@ -75,6 +75,9 @@ export function killEnemy(game, e, opts = {}) {
   if (e.type === 'meteor' && game.rng() < CONFIG.meteorHealChance) {
     game.capsules.push({ kind: 'heal', src: 'drop', x: e.x, y: e.y, age: 0 });
   }
+  if (e.type === 'meteor' && game.rng() < CONFIG.meteorMagnetChance) {
+    game.capsules.push({ kind: 'magnet', src: 'drop', x: e.x, y: e.y, age: 0 });
+  }
   // Roll independently for each kill; drop frequency is controlled by probability, not a timer.
   const power = e.xp;
   const chance = Math.min(CONFIG.dropMax, CONFIG.dropBase * Math.pow(power, CONFIG.dropPowerExp));

@@ -49,11 +49,11 @@ export function drawCorpseDebris(r, game, dt) {
       const fade = Math.max(0, 1 - (now - from.t) / CONFIG.corpseTrailLife);
       if (!fade) continue;
       ctx.globalAlpha = fade * fade * 0.55;
-      ctx.strokeStyle = b.color;
+      ctx.strokeStyle = '#ffad56';
       ctx.lineWidth = width;
       ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
       ctx.globalAlpha *= 0.65;
-      ctx.strokeStyle = '#fff3d5';
+      ctx.strokeStyle = '#ffe2b0';
       ctx.lineWidth = width * 0.3;
       ctx.stroke();
     }
@@ -70,8 +70,8 @@ export function drawCorpseDebris(r, game, dt) {
     ctx.translate(b.x, b.y);
     ctx.rotate(Math.atan2(b.vy, b.vx) + now * CONFIG.corpseSpinRate);
     ctx.globalAlpha = 0.95;
-    ctx.fillStyle = '#26323d';
-    ctx.strokeStyle = b.color;
+    ctx.fillStyle = '#727b87';
+    ctx.strokeStyle = '#ffad56';
     ctx.lineWidth = Math.max(1 / r.cam.zoom, size * 0.16);
     ctx.beginPath();
     ctx.moveTo(size, -size * 0.25);
@@ -79,7 +79,7 @@ export function drawCorpseDebris(r, game, dt) {
     ctx.lineTo(-size * 0.85, size * 0.35);
     ctx.lineTo(size * 0.25, size * 0.6);
     ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = '#fff3d5';
+    ctx.strokeStyle = '#ffe2b0';
     ctx.beginPath(); ctx.moveTo(-size * 0.15, -size * 0.7); ctx.lineTo(size, -size * 0.25); ctx.stroke();
     ctx.restore();
   }

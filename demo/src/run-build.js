@@ -55,9 +55,15 @@ export function runModuleDef(kind, id) {
 export function runItemCount(items) { return Object.values(items).filter(n => n > 0).length; }
 export function runTrait(game, id) { return game.traits?.[id] || 0; }
 
+// Compress the original eight performance tiers into five picks, preserving the final build.
+export function runWeaponTier(level) {
+  return 1 + Math.round((Math.max(1, Math.min(CONFIG.weaponMaxLevel, level)) - 1) * 7 / (CONFIG.weaponMaxLevel - 1));
+}
+
 export function runWeaponStats(id, level) {
-  const n = Math.max(0, Math.min(8, level) - 1);
+  const n = runWeaponTier(level) - 1;
   return { damage: 1 + n * 0.3, rate: 1 + n * 0.12, radius: 1 + n * 0.1,
+    tier: n + 1,
     shots: id === 'scatter' ? 5 + Math.floor(n / 2) : 1 + Math.floor(n / 3),
     pierce: Math.floor(n / 3), drones: 1 + Math.floor(n / 2) };
 }
@@ -90,7 +96,7 @@ export function computeRunStats(meta, weapons, traits, bonus = {}) {
 export function rollRunChoices(game) {
   const pool = [];
   for (const [kind, defs, owned, slots, max] of [
-    ['weapon', RUN_WEAPONS, game.weapons, CONFIG.weaponSlots, 8],
+    ['weapon', RUN_WEAPONS, game.weapons, CONFIG.weaponSlots, CONFIG.weaponMaxLevel],
     ['trait', RUN_TRAITS, game.traits, CONFIG.traitSlots, 5],
   ]) {
     const free = runItemCount(owned) < slots;
@@ -126,7 +132,7 @@ export function runChoiceInfo(c) {
     desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
     if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
     else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
-    else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * (c.level - 1)}→${800 + 90 * c.level}`;
+    else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * before.tier}→${800 + 90 * after.tier}`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
   return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
@@ -136,7 +142,7 @@ export function grantRunItem(game, kind, id, levels = 1) {
   const def = runModuleDef(kind, id);
   if (!def) return false;
   const owned = kind === 'weapon' ? game.weapons : game.traits;
-  const max = kind === 'weapon' ? 8 : 5, slots = kind === 'weapon' ? CONFIG.weaponSlots : CONFIG.traitSlots;
+  const max = kind === 'weapon' ? CONFIG.weaponMaxLevel : 5, slots = kind === 'weapon' ? CONFIG.weaponSlots : CONFIG.traitSlots;
   if (!owned[id] && runItemCount(owned) >= slots) return false;
   if ((owned[id] || 0) >= max) return false;
   owned[id] = Math.min(max, (owned[id] || 0) + levels);

@@ -59,7 +59,8 @@ export const TUNABLES = [
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'meteorCount', label: '隕石の数', min: 0, max: 100, step: 1 },
-  { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
+  { key: 'meteorMagnetChance', label: '隕石：経験値回収アイテムのドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'enemySpacing', label: '敵同士の間隔', min: 0, max: 100, step: 1 },
   { key: 'enemyPursuitSpread', label: '敵の広域移動の強さ', min: 0, max: 480, step: 20 },
@@ -206,7 +207,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     if (modern) {
       rsel.setAttribute('aria-label', '入手するモジュールの強化回数');
       const [kind, id] = moduleSel.value.split(':');
-      const def = runModuleDef(kind, id), max = kind === 'trait' ? 5 : 8;
+      const def = runModuleDef(kind, id), max = kind === 'trait' ? 5 : CONFIG.weaponMaxLevel;
       const selected = Number(rsel.value) || 1;
       rsel.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}">+${i + 1} 段階</option>`).join('');
       rsel.value = String(Math.min(max, Math.max(1, selected)));
@@ -265,6 +266,9 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
+  button('経験値回収アイテム', (g) => {
+    if (g.state === 'play') g.capsules.push({ kind: 'magnet', src: 'drop', x: g.ship.x, y: g.ship.y, age: 0 });
+  });
   button('敵を消す（ボス以外）', (g) => { g.enemies = g.enemies.filter((e) => e.type === 'boss' && !e.dead); g.newEnemies.length = 0; g.ebullets.length = 0; });
   button('部品 +100', (g) => { g.coins += 100; });
   if (onResetMeta) {

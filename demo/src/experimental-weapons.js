@@ -1,10 +1,11 @@
-// Weapons gained and upgraded through level-ups (Vampire Survivors style). Each weapon has 8 levels;
+// Legacy weapon ladders retain 8 performance tiers, mapped to 5 visible upgrade levels.
 // damage scales with the attack multiplier (level, modules, station), never with speed. No weapon
 // starts an attack during a jump; projectiles already flying keep going on world time.
 import { CONFIG } from './config.js';
 import { queryGrid } from './grid.js';
 import { MAX_ENEMY_R } from './enemies.js';
 import { damageEnemy, explode } from './hits.js';
+import { runWeaponTier } from './run-build.js';
 
 // Builds cumulative per-level stats: level 1 = base, each step edits a copy of the previous level.
 function ladder(base, steps) {
@@ -140,7 +141,7 @@ export function updateWeapons(game, dt) {
   for (const w of WEAPONS) {
     const lv = game.weapons[w.id] || 0;
     if (!lv || w.id === 'gun') continue;
-    const L = w.levels[lv - 1];
+    const L = w.levels[runWeaponTier(lv) - 1];
     const st = game.wstate[w.id] || (game.wstate[w.id] = { t: 0 });
     if (w.id === 'orbit') { updateOrbit(game, L, st, dt); continue; }
     if (busy) continue;

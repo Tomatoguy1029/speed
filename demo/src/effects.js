@@ -240,6 +240,7 @@ function updateCapsules(game, dt) {
   let taken = false;
   const pull = game.stats.pickupRadius * 1.6;
   for (const c of game.capsules) {
+    if (c.taken) continue; // A magnet may have collected this cache earlier in the loop.
     c.age += dt;
     const canCollect = c.kind !== 'heal' || sh.hp < game.stats.maxHp;
     if (c.src === 'drop' || c.src === 'elite') {
@@ -257,13 +258,25 @@ function updateCapsules(game, dt) {
         const before = sh.hp;
         sh.hp = Math.min(game.stats.maxHp, sh.hp + game.stats.maxHp * CONFIG.meteorHealFrac);
         addText(game, sh.x, sh.y - 40, `HP +${Math.round(sh.hp - before)}`, '#67e8b1', 18);
+      } else if (c.kind === 'magnet') {
+        let xp = 0;
+        for (const g of game.gems) if (!g.taken) xp += g.v;
+        game.gems.length = 0;
+        for (const other of game.capsules) {
+          if (other.kind !== 'cache' || other.taken) continue;
+          xp += other.xp; other.taken = true;
+        }
+        addXp(game, xp);
+        addText(game, sh.x, sh.y - 45, `XP +${Math.round(xp)}`, CONFIG.xpColor, 22);
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
         addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
-      addRing(game, c.x, c.y, c.kind === 'heal' ? 70 : 120, c.kind === 'core' ? '#ffd24a' : c.kind === 'heal' ? '#67e8b1' : '#9fe8ff', 0.5);
+      addRing(game, c.x, c.y, c.kind === 'heal' ? 70 : 120,
+        c.kind === 'core' ? '#ffd24a' : c.kind === 'heal' ? '#67e8b1' :
+          c.kind === 'cache' || c.kind === 'magnet' ? CONFIG.xpColor : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
     if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }

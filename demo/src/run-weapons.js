@@ -113,7 +113,7 @@ export function onRunContact(game, e, x, y, ux, uy) {
   const atk = attackPower(0, game.stats);
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
-    const velocity = 800 + 90 * game.weapons.knockback;
+    const velocity = 800 + 90 * L.tier;
     if (e.dead && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
       game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
         r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });

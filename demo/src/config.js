@@ -59,6 +59,7 @@ export const CONFIG = {
   drawMinCharge: 0.25, // partial launch distinguishes full-charge traits
   baseCritChance: 0.05,
   weaponSlots: 4,
+  weaponMaxLevel: 5,
   traitSlots: 6, // prototype value; adjustable in P
   pathMemoryTime: 12,
   pathMemoryMax: 160,
@@ -157,20 +158,21 @@ export const CONFIG = {
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 18,
   meteorCoinChance: 0.4,
-  meteorHealChance: 0.25,
-  meteorHealFrac: 0.2,
+  meteorHealChance: 0.08,
+  meteorHealFrac: 0.1,
+  meteorMagnetChance: 0.04,
   coreBoost: 0.18, // max speed gained per power core
   levelHeal: 0.08, // share of max HP restored per level-up
   capsuleCount: 5, // field capsules kept on the map
   capsuleInterval: 16, // seconds between respawns
 
   // growth
-  xpBase: 60,
-  xpGrowth: 28,
-  xpCurve: 4,
+  xpBase: 90,
+  xpGrowth: 42,
+  xpCurve: 6,
   xpMult: 1,
-  xpColor: '#d7e7f8', // bright blue-white, distinct from saturated enemies and dark space
-  xpOutline: '#486782',
+  xpColor: '#b8a0ff', // violet crystals; bullets and damaging debris use other colors/shapes
+  xpOutline: '#39265e',
 
   // flung wreckage visuals
   blockImpactLife: 0.65,
