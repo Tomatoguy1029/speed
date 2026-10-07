@@ -36,6 +36,8 @@ func _ready() -> void:
 			await _weapons_steps()
 		"death":
 			await _death_steps()
+		"panel":
+			await _panel_steps()
 		_:
 			await _flow_steps()
 	_restore()
@@ -171,6 +173,38 @@ func _death_steps() -> void:
 	await _shot("death_02_explode", 0.9)
 	await _shot("death_03_gameover", 0.7)
 	await _shot("death_04_result", 1.6)
+
+## 調整パネルとポーズ、ランの後の図鑑。
+func _panel_steps() -> void:
+	GameManager.start_run(1)
+	await _wait(1.0)
+	_action(&"debug_panel")
+	await _shot("panel_00_debug", 0.3)
+	_action(&"debug_panel")
+	_action(&"pause")
+	await _shot("panel_01_pause", 0.3)
+	_action(&"pause")
+	var run := _run_manager()
+	run.command(&"debug_grant", {"kind": &"weapon", "id": &"W08", "levels": 3})
+	run.command(&"debug_grant", {"kind": &"trait", "id": &"T04", "levels": 2})
+	run.command(&"debug_level_up")
+	await _shot("panel_02_cards", 0.5)
+	run.command(&"choose_card", {"index": 0})
+	run.command(&"debug_clear")
+	await _wait(0.5)
+	GameManager.reset_to_main_menu()
+	GameManager.goto(GameManager.Screen.ENCYCLOPEDIA)
+	await _shot("panel_03_encyclopedia", 0.4)
+
+func _action(name: StringName) -> void:
+	var ev := InputEventAction.new()
+	ev.action = name
+	ev.pressed = true
+	Input.parse_input_event(ev)
+	var up := InputEventAction.new()
+	up.action = name
+	up.pressed = false
+	Input.parse_input_event(up)
 
 func _mouse_move(p: Vector2) -> void:
 	var ev := InputEventMouseMotion.new()

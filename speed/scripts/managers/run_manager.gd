@@ -174,10 +174,14 @@ func set_phase(phase: RunState.Phase) -> void:
 
 # ── カメラ（仕様書 13） ──────────────────────────────────────────
 
-func _update_camera(real_dt: float) -> void:
+func _base_zoom() -> float:
 	var size := get_viewport().get_visible_rect().size
 	var f := pow(cfg.zoom_ref_speed / maxf(cfg.zoom_ref_speed, state.stats.max_speed), cfg.zoom_exp)
-	var zoom_t := minf(size.x, size.y) / cfg.base_view * clampf(f, cfg.zoom_min, 1.0)
+	return minf(size.x, size.y) / cfg.base_view * clampf(f, cfg.zoom_min, 1.0)
+
+func _update_camera(real_dt: float) -> void:
+	var size := get_viewport().get_visible_rect().size
+	var zoom_t := _base_zoom()
 	if not _cam_ready:
 		state.view_center = state.ship_pos
 		state.camera_zoom = zoom_t
@@ -248,6 +252,12 @@ func _finishing_tick(real_dt: float) -> void:
 		var i0 := int(idx)
 		var i1 := mini(i0 + 1, finish_replay.size() - 1)
 		state.ship_pos = finish_replay[i0].lerp(finish_replay[i1], idx - i0)
+	# トドメの間は機体に寄る（3.2倍）。爆発からは元のズームへ戻す
+	var follow := 1.0 - exp(-10.0 * real_dt)
+	var zoom_to := _base_zoom() * (cfg.boss_finish_zoom if sequence_t < t1 else 1.0)
+	state.view_center += (state.ship_pos - state.view_center) * follow
+	state.camera_zoom += (zoom_to - state.camera_zoom) * follow
+	state.view_half = get_viewport().get_visible_rect().size / 2.0 / state.camera_zoom
 	if sequence_t >= t1 and sequence_t - real_dt < t1:
 		var center := bosses.boss.pos if bosses.boss != null else state.ship_pos
 		state.emit(&"boss_explode", {"pos": center})
@@ -334,6 +344,8 @@ func command(name: StringName, args := {}) -> void:
 			ship.invincible = false
 			state.ship_invuln = 0.0
 			ship.damage(state.ship_hp + 1.0, 0.0, &"debug")
+		&"debug_coins":
+			state.coins += int(args.get("amount", 100))
 		&"debug_clear":
 			finish(true)
 		&"debug_fail":
