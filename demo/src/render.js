@@ -149,8 +149,15 @@ export function render(r, game, dt, pointer) {
   if (!game.death) drawShip(r, game);
   drawFx(r, game);
   drawCombatImpacts(r, game);
-  // Fatal freeze: the intact ship is the last world layer, above enemies and effects.
-  if (game.death?.phase === 'freeze') drawShip(r, game);
+  // Dim every world layer, including the background, before drawing the intact ship.
+  if (game.death?.phase === 'freeze') {
+    ctx.save();
+    ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
+    ctx.fillStyle = `rgba(0,0,0,${CONFIG.deathFreezeDim})`;
+    ctx.fillRect(0, 0, r.W, r.H);
+    ctx.restore();
+    drawShip(r, game);
+  }
   ctx.restore();
   if (!game.death) drawSpeedLines(r, game);
 
