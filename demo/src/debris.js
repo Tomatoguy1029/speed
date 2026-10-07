@@ -1,3 +1,4 @@
+import { drawTowHull } from './rare-weapons.js';
 import { CONFIG } from './config.js';
 
 // Renderer-owned history follows the actual projectiles, including during world slowdown.
@@ -65,6 +66,10 @@ export function drawCorpseDebris(r, game, dt) {
     const sy = (b.y - r.cam.y) * r.cam.zoom + r.H / 2;
     const pad = b.r * r.cam.zoom;
     if (sx < -pad || sx > r.W + pad || sy < -pad || sy > r.H + pad) continue;
+    if (b.hull) {
+      ctx.globalAlpha = 1; drawTowHull(ctx, b.hull, b.x, b.y, Math.atan2(b.vy, b.vx), r.cam.zoom, b.r);
+      continue;
+    }
     const size = b.r * 0.65;
     ctx.save();
     ctx.translate(b.x, b.y);

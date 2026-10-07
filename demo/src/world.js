@@ -16,6 +16,7 @@ import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
 import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers, updateRunSonic, onRunElectricContact } from './run-weapons.js';
 import { computeRunStats, rollRunChoices, grantRunItem, runModuleDef } from './run-build.js';
+import { updateRareWeapons } from './rare-weapons.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
 import { handlePortalInput, updatePortals, portalWorldScale, checkPortalEntry } from './portals.js';
@@ -38,7 +39,7 @@ export function createGame(opts = {}) {
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout, newBuild, weapons, traits,
-    levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
+    rareQueue: [], rareOffer: null, levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
     runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
@@ -95,7 +96,10 @@ export function update(game, frameDt, input) {
     game.dashMeter = Math.min(1, old + frameDt / (game.stats.chargeTime * game.stats.gaugeMax));
     if (old < 1 && game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }
-  if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); return; }
+  if (game.newBuild && !game.draw && !game.portalDash) {
+    if (game.rareQueue.length) { openRareWeapon(game); return; }
+    if (game.pendingLevelups) { openRunLevel(game); return; }
+  }
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
@@ -121,6 +125,7 @@ export function update(game, frameDt, input) {
   }
   if (game.newBuild) updateRunFollowers(game);
   if (game.newBuild) updateRunSonic(game, frameDt);
+  if (game.newBuild) updateRareWeapons(game, frameDt);
   if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
@@ -137,7 +142,10 @@ export function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
-    if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); break; }
+    if (game.newBuild && !game.draw && !game.portalDash) {
+      if (game.rareQueue.length) { openRareWeapon(game); break; }
+      if (game.pendingLevelups) { openRunLevel(game); break; }
+    }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
@@ -248,6 +256,18 @@ function end(game, state, reason) {
 
 // ---- draw-build level-ups ----
 
+function openRareWeapon(game) {
+  game.rareOffer = game.rareOffer || game.rareQueue.shift();
+  const id = game.rareOffer, owned = game.weapons[id] || 0;
+  const pick = { kind: 'weapon', id, level: owned + 1, rare: true };
+  const slots = Object.keys(game.weapons).filter(k => game.weapons[k] > 0);
+  game.levelChoices = owned >= CONFIG.weaponMaxLevel ? [] : owned || slots.length < CONFIG.weaponSlots ? [pick] :
+    slots.map(replace => ({ ...pick, replace, replaceLevel: game.weapons[replace] }));
+  game.levelChoices.push({ kind: 'rareSkip', id });
+  game.state = 'levelup';
+  game.ship.charging = false; game.releasePending = null;
+}
+
 function openRunLevel(game) {
   game.state = 'levelup';
   game.levelChoices = rollRunChoices(game);
@@ -259,6 +279,20 @@ export function resolveRunLevel(game, index) {
   if (game.state !== 'levelup') return false;
   const c = game.levelChoices?.[index];
   if (!c) return false;
+  if (game.rareOffer) {
+    if (c.kind !== 'rareSkip') {
+      if (!runModuleDef('weapon', c.id) || (game.weapons[c.id] || 0) >= CONFIG.weaponMaxLevel) return false;
+      const count = Object.values(game.weapons).filter(n => n > 0).length;
+      if (!game.weapons[c.id] && count + 1 - (c.replace && game.weapons[c.replace] ? 1 : 0) > CONFIG.weaponSlots) return false;
+      if (c.replace) { delete game.weapons[c.replace]; delete game.weaponState[c.replace]; delete game.wstate[c.replace]; }
+      if (!grantRunItem(game, 'weapon', c.id)) return false;
+      refreshStats(game); game.events.push({ type: 'upgrade', mod: c });
+    }
+    game.rareOffer = null; game.levelChoices = null; game.state = 'play';
+    if (game.rareQueue.length) openRareWeapon(game);
+    else if (game.pendingLevelups) openRunLevel(game);
+    return true;
+  }
   if (c.kind === 'heal') game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * 0.3);
   else if (!grantRunItem(game, c.kind, c.id)) return false;
   refreshStats(game);
@@ -277,7 +311,7 @@ export function debugRunItem(game, kind, id, levels = 1) {
   addText(game, game.ship.x, game.ship.y - 46, ok ? name : '装備枠が満員／強化済み', ok ? '#9fe8ff' : '#ff9f40', 18);
   if (ok) {
     refreshStats(game);
-    if (game.state === 'levelup') game.levelChoices = rollRunChoices(game);
+    if (game.state === 'levelup') { if (game.rareOffer) openRareWeapon(game); else game.levelChoices = rollRunChoices(game); }
   }
   return ok;
 }

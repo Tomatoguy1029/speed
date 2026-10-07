@@ -10,6 +10,7 @@ import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 import { portalChoices } from './portals.js';
 import { drawCorpseDebris } from './debris.js';
+import { drawTowHull } from './rare-weapons.js';
 import { drawCombatImpacts } from './impact-fx.js';
 
 const STAR_TILE = 1600;
@@ -282,6 +283,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
+  if (c.kind === 'rareWeapon') return '#efcb70';
   if (c.kind === 'heal') return '#67e8b1';
   return c.kind === 'core' ? '#ffd24a' : ['cache', 'magnet'].includes(c.kind) ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
@@ -302,7 +304,7 @@ function drawCapsules(r, game, healingOnly = false) {
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const c of game.capsules) {
-    if ((c.kind === 'heal' || c.kind === 'magnet') !== healingOnly) continue;
+    if ((['heal', 'magnet', 'rareWeapon'].includes(c.kind)) !== healingOnly) continue;
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
@@ -323,6 +325,11 @@ function drawCapsules(r, game, healingOnly = false) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'rareWeapon') {
+      ctx.fillStyle = '#292335'; ctx.strokeStyle = col; ctx.lineWidth = 3 / z;
+      ctx.beginPath(); for (let i = 0; i < 6; i++) ctx.lineTo(Math.cos(i * TAU / 6) * S, Math.sin(i * TAU / 6) * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff1bf'; ctx.font = `bold ${S * 0.8}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(c.id === 'bipolar' ? 'Ⅱ' : '⚓', 0, S * 0.3);
     } else if (c.kind === 'heal') {
       ctx.fillStyle = '#e1f4ec'; ctx.strokeStyle = '#365c50'; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.65, -S * 0.5, S * 1.3, S); ctx.strokeRect(-S * 0.65, -S * 0.5, S * 1.3, S);
@@ -409,6 +416,22 @@ function drawRunWeapons(r, game) {
   if (!game.newBuild) return;
   if (game.finale && game.finale.phase !== 'slow') return;
   const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  const origin = game.weaponState.bipolar?.origin;
+  if (origin && onScreen(r, origin.x, origin.y, 55)) {
+    ctx.save(); ctx.translate(origin.x, origin.y); ctx.rotate(game.buildClock * 2);
+    ctx.strokeStyle = '#69fff0'; ctx.lineWidth = 3 / z;
+    ctx.strokeRect(-22, -22, 44, 44); ctx.fillStyle = '#e1fff6'; ctx.fillRect(-5, -5, 10, 10); ctx.restore();
+  }
+  const tow = game.weaponState.massTow;
+  if (tow && game.weapons.massTow) {
+    for (let j = 0; j < Math.min(CONFIG.massTowVisible, tow.cargo.length - tow.head); j++) {
+      const h = tow.cargo[tow.head + j];
+      if (!onScreen(r, h.x, h.y, h.r)) continue;
+      ctx.strokeStyle = 'rgba(255,190,101,0.55)'; ctx.lineWidth = 2 / z;
+      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(h.x, h.y); ctx.stroke();
+      drawTowHull(ctx, h, h.x, h.y, h.angle, z);
+    }
+  }
   // The old lines persist as world effects only when a route-crossing trait uses them.
   if (game.traits.crossBlast) {
     ctx.strokeStyle = 'rgba(220,100,220,0.32)'; ctx.lineWidth = 2 / z;
@@ -458,7 +481,7 @@ function drawRunWeapons(r, game) {
     ctx.restore();
   }
   for (const f of game.wfx) {
-    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
+    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = f.color || '#ff9ce5';
     if (f.kind === 'beam') {
       ctx.lineWidth = f.width; ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
       ctx.lineWidth = Math.max(2 / z, f.width * 0.2); ctx.strokeStyle = '#ffffff'; ctx.stroke();
@@ -915,6 +938,17 @@ function shapePath(ctx, shape, R) {
 
 function drawMeteor(r, e) {
   const { ctx } = r, R = e.r;
+  if (e.worldMeteor?.rareWeapon) {
+    const halo = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2);
+    halo.addColorStop(0, 'rgba(255,230,150,0.55)'); halo.addColorStop(1, 'rgba(255,200,80,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, 0, R * 2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffe4a5'; ctx.lineWidth = 2 / r.cam.zoom;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.3, e.facing, e.facing + Math.PI * 1.6); ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const a = e.facing * 2 + i * TAU / 5, x = Math.cos(a) * R * 1.6, y = Math.sin(a) * R * 1.6;
+      ctx.fillStyle = '#fff4d2'; ctx.fillRect(x - 2 / r.cam.zoom, y - 2 / r.cam.zoom, 4 / r.cam.zoom, 4 / r.cam.zoom);
+    }
+  }
   if (e.worldMeteor?.kind === 'comet') {
     const speed = Math.hypot(e.vx, e.vy) || 1;
     ctx.strokeStyle = 'rgba(221,192,154,0.3)'; ctx.lineWidth = R * 0.9;

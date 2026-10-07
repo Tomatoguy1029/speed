@@ -8,6 +8,7 @@ import { MAX_ENEMY_R } from './enemies.js';
 import { damageEnemy, explode, addRing, addText, scatterHull } from './hits.js';
 import { runWeaponStats, runTrait } from './run-build.js';
 import { updateWeapons } from './experimental-weapons.js';
+import { beginRareRoute, endRareRoute } from './rare-weapons.js';
 import { tracePortalLoop } from './portal-loops.js';
 
 function runNearest(game, x, y, range) {
@@ -55,6 +56,7 @@ export function onRunLaunch(game, full) {
   const n = runTrait(game, 'fullCharge');
   game.stats.ignoreArmor = !!(full && n);
   game.stats.burstPower = full && n ? 1.25 + n * 0.25 : 1;
+  beginRareRoute(game);
   if (game.weapons.sonic) runSonic(game, 'sonic');
 }
 
@@ -117,7 +119,7 @@ export function onRunContact(game, e, x, y, ux, uy) {
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
     const velocity = 800 + 90 * L.tier;
-    if (e.dead && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
+    if (e.dead && !e.towed && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
       game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
         r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });
     } else if (!e.dead) {
@@ -225,6 +227,8 @@ export function onRunEnd(game) {
   if (!game.newBuild || game.state !== 'play') return;
   game.runPaths = [...game.runPaths.filter(p => p.until > game.buildClock), ...(game.runPendingPath || [])].slice(-CONFIG.pathMemoryMax);
   game.runPendingPath = [];
+  endRareRoute(game);
+  if (game.state !== 'play') return;
   const sh = game.ship, n = runTrait(game, 'endBlast');
   if (n) explode(game, sh.x, sh.y, 180 + n * 30, attackPower(0, game.stats) * (1 + n * 0.5), { cause: 'endBlast', color: '#c46bff', knock: 500 });
   const v = runTrait(game, 'vortex');

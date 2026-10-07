@@ -255,6 +255,10 @@ const CONFIG = {
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
+  rareMeteorChance: 0.01, // assigned once per world rock; guaranteed weapon on destruction
+  bipolarWidth: 85, bipolarDamage: 3.5, bipolarLife: 0.55,
+  massTowInterval: 0.06, massTowSpeed: 2400, massTowDamage: 2.2, massTowLife: 1.2,
+  massTowVisible: 32, massTowFollow: 18,
   meteorHealChance: 0.08,
   meteorHealFrac: 0.1,
   meteorMagnetChance: 0.04,
@@ -906,6 +910,7 @@ function createMeteorField(rng) {
       period: randRange(rng, 42, 65), phase: rng() * 40, size: randRange(rng, 35, 55),
       facing: angle, spin: 0.4, destroyed: false, entity: null });
   }
+  for (const m of rocks) if (rng() < CONFIG.rareMeteorChance) m.rareWeapon = rng() < 0.5 ? 'massTow' : 'bipolar';
   return rocks;
 }
 
@@ -1622,6 +1627,8 @@ const RUN_WEAPONS = [
   { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
   { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
   { id: 'contactArc', catalog: 'W17', name: '接触電撃', normal: true, desc: '敵に触れると電撃が近くの敵へ伝播。通常接触でも高速接触でも発動。Lvごとに連鎖数が増える' },
+  { id: 'massTow', catalog: 'W21', name: '質量牽引砲', group: '隕石限定', exclusive: true, desc: '高速攻撃で倒した船体を大型敵ごと牽引。経路終了後、進行方向へ順番に高速発射し、弾が尽きるまで撃ち続ける' },
+  { id: 'bipolar', catalog: 'W22', name: '双極ビーム', group: '隕石限定', exclusive: true, desc: '高速攻撃の開始点に発射器を残し、経路終了時に自機との間を太いビームで貫く。迂回した群れも直線で一掃' },
   { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
   { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
   { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
@@ -1733,22 +1740,25 @@ function runRankColor(level) {
 }
 
 function runChoiceInfo(c) {
+  if (c.kind === 'rareSkip') return { tag: '見送る', name: '今の装備を維持', color: '#9ba7bd', desc: '今回の限定武器は装備せず、現在のビルドで続ける' };
   if (c.kind === 'heal') return { tag: '回復', name: '緊急修理', color: '#6dffb0', desc: 'HPを30%回復（取得・強化できる装備が残り少ない場合）' };
   const d = runModuleDef(c.kind, c.id);
   const suffix = c.kind === 'weapon' ? `Lv${c.level}` : `${c.level}/5`;
   const tag = c.level === 1 ? (c.kind === 'weapon' ? '新しい武器' : '新しい特性') : (c.kind === 'weapon' ? '武器強化' : '特性強化');
   let desc = c.kind === 'weapon' ? d.desc : d.desc(c.level);
   if (c.kind === 'weapon' && c.id === 'contactArc') desc += `。近隣${c.level * 2}体へ伝播、1回の伝播距離240`;
-  if (c.kind === 'weapon' && c.level > 1 && (d.normal || ['turret', 'trailBurst'].includes(c.id))) {
+  if (c.kind === 'weapon' && c.level > 1 && (d.normal || d.exclusive || ['turret', 'trailBurst'].includes(c.id))) {
     const before = runWeaponStats(c.id, c.level - 1), after = runWeaponStats(c.id, c.level);
     desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
     if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
     else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
+    else if (c.id === 'massTow') desc += `、発射間隔${(CONFIG.massTowInterval / before.rate).toFixed(3)}→${(CONFIG.massTowInterval / after.rate).toFixed(3)}秒`;
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * before.tier}→${800 + 90 * after.tier}`;
     else if (c.id === 'contactArc') desc += `、伝播${2 * (c.level - 1)}→${2 * c.level}体`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
-  return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
+  if (c.replace) desc += `。${runModuleDef('weapon', c.replace).name} Lv${c.replaceLevel}と交換`;
+  return { tag: c.rare ? (c.replace ? `${runModuleDef('weapon', c.replace).name} Lv${c.replaceLevel}と交換` : '隕石限定武器') : tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
 }
 
 function grantRunItem(game, kind, id, levels = 1) {
@@ -2068,6 +2078,122 @@ function updateWeaponProjectiles(game, dt) {
   game.wproj = P.filter((p) => p.life > 0);
 }
 
+// ---- rare-weapons.js ----
+
+
+
+
+
+
+
+
+function beginRareRoute(game) {
+  if (game.weapons.bipolar) {
+    game.weaponState.bipolar = { origin: { x: game.ship.x, y: game.ship.y } };
+  }
+}
+
+// Store the whole defeated hull, including large ships; projectile kills cannot reload it.
+function captureTowHull(game, e, cause) {
+  if (!game.newBuild || !game.weapons.massTow || game.draw?.phase !== 'run' ||
+      e.type === 'meteor' || e.type === 'boss' || e.towed ||
+      !['ram', 'wave', 'bump', 'sonic', 'killSonic', 'contactWave', 'contactArc', 'critBeam', 'crossBlast'].includes(cause)) return false;
+  const st = game.weaponState.massTow || (game.weaponState.massTow = { cargo: [], head: 0, fireT: 0 });
+  e.towed = true;
+  st.cargo.push({ x: e.x, y: e.y, r: e.r, color: e.T.color, shape: e.T.shape,
+    angle: e.facing, sourceId: e.id, ready: false });
+  return true;
+}
+
+function endRareRoute(game) {
+  const origin = game.weaponState.bipolar?.origin, sh = game.ship;
+  if (origin && game.weapons.bipolar) {
+    game.weaponState.bipolar.origin = null;
+    const dx = sh.x - origin.x, dy = sh.y - origin.y, length = Math.hypot(dx, dy);
+    if (length > 20) {
+      const L = runWeaponStats('bipolar', game.weapons.bipolar);
+      const width = CONFIG.bipolarWidth * L.radius, pad = width / 2 + MAX_ENEMY_R;
+      const x1 = sh.x, y1 = sh.y, ux = dx / length, uy = dy / length;
+      const damage = attackPower(0, game.stats) * CONFIG.bipolarDamage * L.damage;
+      queryGrid(game.grid, Math.min(origin.x, x1) - pad, Math.min(origin.y, y1) - pad,
+        Math.max(origin.x, x1) + pad, Math.max(origin.y, y1) + pad, e => {
+          if (e.dead || game.state !== 'play' || segCircleT(origin.x, origin.y, x1, y1, e.x, e.y, e.r + width / 2) < 0) return;
+          damageEnemy(game, e, damage, { cause: 'bipolar', dirX: ux, dirY: uy, knock: 1100 });
+        });
+      game.wfx.push({ kind: 'beam', color: '#69fff0', x0: origin.x, y0: origin.y, x1, y1,
+        width, life: CONFIG.bipolarLife, max: CONFIG.bipolarLife });
+      addRing(game, origin.x, origin.y, 65, '#69fff0', CONFIG.bipolarLife);
+      addRing(game, x1, y1, 65, '#69fff0', CONFIG.bipolarLife);
+    }
+  }
+  const st = game.weaponState.massTow;
+  if (st && game.state === 'play') {
+    for (let i = st.head; i < st.cargo.length; i++) st.cargo[i].ready = true;
+    st.fireT = 0;
+  }
+}
+
+function updateRareWeapons(game, dt) {
+  if (!game.newBuild || game.state !== 'play') return;
+  const st = game.weaponState.massTow;
+  if (!st || !game.weapons.massTow) return;
+  const sh = game.ship, sp = Math.hypot(sh.vx, sh.vy);
+  const ux = sp > 1 ? sh.vx / sp : sh.hx, uy = sp > 1 ? sh.vy / sp : sh.hy;
+  const follow = 1 - Math.exp(-CONFIG.massTowFollow * dt);
+  // Keep all ammunition. Only the visible front of a large train needs animation.
+  for (let j = 0; j < Math.min(CONFIG.massTowVisible, st.cargo.length - st.head); j++) {
+    const h = st.cargo[st.head + j], back = 85 + Math.floor(j / 4) * 85 + h.r;
+    const side = (j % 4 - 1.5) * 65;
+    const tx = sh.x - ux * back - uy * side, ty = sh.y - uy * back + ux * side;
+    h.x += (tx - h.x) * follow; h.y += (ty - h.y) * follow;
+    h.angle = Math.atan2(uy, ux) + Math.PI;
+  }
+  st.fireT -= dt;
+  const L = runWeaponStats('massTow', game.weapons.massTow), interval = CONFIG.massTowInterval / L.rate;
+  while (st.fireT <= 0 && st.cargo[st.head]?.ready) {
+    const hull = st.cargo[st.head++], r = hull.r;
+    game.fbullets.push({ kind: 'corpse', cause: 'towShot', hull, x: hull.x, y: hull.y,
+      vx: ux * (CONFIG.massTowSpeed + sp), vy: uy * (CONFIG.massTowSpeed + sp), r,
+      dmg: attackPower(0, game.stats) * CONFIG.massTowDamage * L.damage * Math.max(1, hull.r / 25),
+      life: CONFIG.massTowLife, pierce: true, hit: new Set([hull.sourceId]), noCrit: true, knock: 1200, color: hull.color });
+    addRing(game, hull.x, hull.y, Math.max(34, r), '#ffbe65', 0.15);
+    st.fireT += interval;
+  }
+  if (!st.cargo[st.head]?.ready) st.fireT = 0;
+  if (st.head > 64 || st.head === st.cargo.length) { st.cargo.splice(0, st.head); st.head = 0; }
+}
+
+function drawTowHull(ctx, hull, x, y, angle, z, radius = hull.r) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  ctx.fillStyle = hull.color; ctx.strokeStyle = '#ffc778'; ctx.lineWidth = 2 / z;
+  ctx.beginPath();
+  if (hull.shape === 'orb') ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  else if (hull.shape === 'ship') {
+    ctx.moveTo(radius, 0); ctx.lineTo(radius * 0.3, -radius * 0.6); ctx.lineTo(-radius * 0.8, -radius * 0.5);
+    ctx.lineTo(-radius, radius * 0.35); ctx.lineTo(radius * 0.2, radius * 0.65);
+  } else {
+    const n = hull.shape === 'dart' ? 3 : hull.shape === 'diamond' ? 4 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = i * Math.PI * 2 / n;
+      ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius * 0.8);
+    }
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = '#3a2d38'; ctx.lineWidth = Math.max(2 / z, radius * 0.06);
+  ctx.beginPath(); ctx.moveTo(-radius * 0.6, -radius * 0.4); ctx.lineTo(radius * 0.1, 0);
+  ctx.lineTo(-radius * 0.3, radius * 0.5); ctx.stroke();
+  ctx.fillStyle = '#ffe1ab'; ctx.fillRect(-4 / z, -4 / z, 8 / z, 8 / z);
+  ctx.restore();
+}
+
+function debugRareMeteor(game, weapon) {
+  if (!game.newBuild || game.state !== 'play') return;
+  const sh = game.ship;
+  game.field.meteors.push({ kind: 'belt', x: sh.x + sh.hx * 200, y: sh.y + sh.hy * 200,
+    vx: 0, vy: 0, size: 55, facing: 0, spin: 0.2, destroyed: false, entity: null, rareWeapon: weapon });
+  game.meteorStreamT = 0;
+}
+
 // ---- portal-loops.js ----
 
 
@@ -2162,6 +2288,7 @@ function tracePortalLoop(game, dash, x0, y0, x1, y1) {
 
 
 
+
 function runNearest(game, x, y, range) {
   let found = null, best = range * range;
   queryGrid(game.grid, x - range - MAX_ENEMY_R, y - range - MAX_ENEMY_R, x + range + MAX_ENEMY_R, y + range + MAX_ENEMY_R, e => {
@@ -2207,6 +2334,7 @@ function onRunLaunch(game, full) {
   const n = runTrait(game, 'fullCharge');
   game.stats.ignoreArmor = !!(full && n);
   game.stats.burstPower = full && n ? 1.25 + n * 0.25 : 1;
+  beginRareRoute(game);
   if (game.weapons.sonic) runSonic(game, 'sonic');
 }
 
@@ -2269,7 +2397,7 @@ function onRunContact(game, e, x, y, ux, uy) {
   if (game.weapons.knockback) {
     const L = runWeaponStats('knockback', game.weapons.knockback);
     const velocity = 800 + 90 * L.tier;
-    if (e.dead && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
+    if (e.dead && !e.towed && !e.hullScattered && !scatterHull(game, e, ux, uy, velocity, atk * 0.7 * L.damage)) {
       game.fbullets.push({ kind: 'corpse', x: e.x, y: e.y, vx: ux * velocity, vy: uy * velocity,
         r: Math.max(10, e.r * 0.6), dmg: atk * 0.7 * L.damage, life: 0.9, pierce: true, hit: new Set([e.id]), color: e.T.color });
     } else if (!e.dead) {
@@ -2377,6 +2505,8 @@ function onRunEnd(game) {
   if (!game.newBuild || game.state !== 'play') return;
   game.runPaths = [...game.runPaths.filter(p => p.until > game.buildClock), ...(game.runPendingPath || [])].slice(-CONFIG.pathMemoryMax);
   game.runPendingPath = [];
+  endRareRoute(game);
+  if (game.state !== 'play') return;
   const sh = game.ship, n = runTrait(game, 'endBlast');
   if (n) explode(game, sh.x, sh.y, 180 + n * 30, attackPower(0, game.stats) * (1 + n * 0.5), { cause: 'endBlast', color: '#c46bff', knock: 500 });
   const v = runTrait(game, 'vortex');
@@ -2735,6 +2865,7 @@ function speedStage(sp) {
 
 
 
+
 const STEP = 1 / 120;
 
 function createGame(opts = {}) {
@@ -2752,7 +2883,7 @@ function createGame(opts = {}) {
   return {
     t: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout, newBuild, weapons, traits,
-    levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
+    rareQueue: [], rareOffer: null, levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
     runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
     scheme: opts.scheme || CONFIG.controlScheme,
     offerQueue: [], currentOffer: null, lastOfferSlot: null,
@@ -2809,7 +2940,10 @@ function update(game, frameDt, input) {
     game.dashMeter = Math.min(1, old + frameDt / (game.stats.chargeTime * game.stats.gaugeMax));
     if (old < 1 && game.dashMeter >= 1) game.events.push({ type: 'dashReady' });
   }
-  if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); return; }
+  if (game.newBuild && !game.draw && !game.portalDash) {
+    if (game.rareQueue.length) { openRareWeapon(game); return; }
+    if (game.pendingLevelups) { openRunLevel(game); return; }
+  }
   game.portalClock += frameDt;
   for (const [edge, until] of game.portalCooldowns) if (until <= game.portalClock) game.portalCooldowns.delete(edge);
   if (input.release) game.releasePending = { x: input.aimX, y: input.aimY, keyboard: !!input.keyboard };
@@ -2835,6 +2969,7 @@ function update(game, frameDt, input) {
   }
   if (game.newBuild) updateRunFollowers(game);
   if (game.newBuild) updateRunSonic(game, frameDt);
+  if (game.newBuild) updateRareWeapons(game, frameDt);
   if (game.state !== 'play') return;
   let scale = 1;
   if (game.draw) scale = drawWorldScale(game);
@@ -2851,7 +2986,10 @@ function update(game, frameDt, input) {
     if (input.snap) input = { ...input, snap: null }; // one-shot per frame, not per substep
     if (game.state !== 'play') break;
     if (drawPhase(game) !== phaseBefore) { game.acc = 0; break; } // time scale changes next frame
-    if (game.newBuild && game.pendingLevelups && !game.draw && !game.portalDash) { openRunLevel(game); break; }
+    if (game.newBuild && !game.draw && !game.portalDash) {
+      if (game.rareQueue.length) { openRareWeapon(game); break; }
+      if (game.pendingLevelups) { openRunLevel(game); break; }
+    }
     if (game.offerQueue.length) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
@@ -2962,6 +3100,18 @@ function end(game, state, reason) {
 
 // ---- draw-build level-ups ----
 
+function openRareWeapon(game) {
+  game.rareOffer = game.rareOffer || game.rareQueue.shift();
+  const id = game.rareOffer, owned = game.weapons[id] || 0;
+  const pick = { kind: 'weapon', id, level: owned + 1, rare: true };
+  const slots = Object.keys(game.weapons).filter(k => game.weapons[k] > 0);
+  game.levelChoices = owned >= CONFIG.weaponMaxLevel ? [] : owned || slots.length < CONFIG.weaponSlots ? [pick] :
+    slots.map(replace => ({ ...pick, replace, replaceLevel: game.weapons[replace] }));
+  game.levelChoices.push({ kind: 'rareSkip', id });
+  game.state = 'levelup';
+  game.ship.charging = false; game.releasePending = null;
+}
+
 function openRunLevel(game) {
   game.state = 'levelup';
   game.levelChoices = rollRunChoices(game);
@@ -2973,6 +3123,20 @@ function resolveRunLevel(game, index) {
   if (game.state !== 'levelup') return false;
   const c = game.levelChoices?.[index];
   if (!c) return false;
+  if (game.rareOffer) {
+    if (c.kind !== 'rareSkip') {
+      if (!runModuleDef('weapon', c.id) || (game.weapons[c.id] || 0) >= CONFIG.weaponMaxLevel) return false;
+      const count = Object.values(game.weapons).filter(n => n > 0).length;
+      if (!game.weapons[c.id] && count + 1 - (c.replace && game.weapons[c.replace] ? 1 : 0) > CONFIG.weaponSlots) return false;
+      if (c.replace) { delete game.weapons[c.replace]; delete game.weaponState[c.replace]; delete game.wstate[c.replace]; }
+      if (!grantRunItem(game, 'weapon', c.id)) return false;
+      refreshStats(game); game.events.push({ type: 'upgrade', mod: c });
+    }
+    game.rareOffer = null; game.levelChoices = null; game.state = 'play';
+    if (game.rareQueue.length) openRareWeapon(game);
+    else if (game.pendingLevelups) openRunLevel(game);
+    return true;
+  }
   if (c.kind === 'heal') game.ship.hp = Math.min(game.stats.maxHp, game.ship.hp + game.stats.maxHp * 0.3);
   else if (!grantRunItem(game, c.kind, c.id)) return false;
   refreshStats(game);
@@ -2991,7 +3155,7 @@ function debugRunItem(game, kind, id, levels = 1) {
   addText(game, game.ship.x, game.ship.y - 46, ok ? name : '装備枠が満員／強化済み', ok ? '#9fe8ff' : '#ff9f40', 18);
   if (ok) {
     refreshStats(game);
-    if (game.state === 'levelup') game.levelChoices = rollRunChoices(game);
+    if (game.state === 'levelup') { if (game.rareOffer) openRareWeapon(game); else game.levelChoices = rollRunChoices(game); }
   }
   return ok;
 }
@@ -3904,6 +4068,8 @@ function updateCapsules(game, dt) {
         }
         addXp(game, xp);
         addText(game, sh.x, sh.y - 45, `XP +${Math.round(xp)}`, CONFIG.xpColor, 22);
+      } else if (c.kind === 'rareWeapon') {
+        if (game.newBuild) game.rareQueue.push(c.id);
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
         addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
@@ -3915,7 +4081,7 @@ function updateCapsules(game, dt) {
           c.kind === 'cache' || c.kind === 'magnet' ? CONFIG.xpColor : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
-    if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
+    if (c.kind !== 'rareWeapon' && (c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
   }
   if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
 }
@@ -4271,6 +4437,7 @@ function updatePortals(game, realDt) {
 
 
 
+
 function damageEnemy(game, e, dmg, opts = {}) {
   if (e.dead || game.state === 'finishing' || game.state === 'dying' || dmg <= 0) return;
   let critical = !!opts.crit;
@@ -4297,7 +4464,7 @@ function damageEnemy(game, e, dmg, opts = {}) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
-    if (['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
+    if (['sonic', 'killSonic', 'critBeam', 'laser', 'bipolar', 'towShot'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
   }
   if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
@@ -4314,11 +4481,12 @@ function killEnemy(game, e, opts = {}) {
   if (e.dead || game.state === 'finishing') return;
   if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
+  const towed = captureTowHull(game, e, opts.cause);
   if (e.worldMeteor) e.worldMeteor.destroyed = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
-  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
-  if (game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
+  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser', 'bipolar', 'towShot'].includes(opts.cause);
+  if (!towed && opts.cause !== 'towShot' && game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
       !(opts.cause === 'ram' && game.weapons.knockback)) {
     const shove = e.shove;
     const speed = shove ? Math.hypot(shove.vx, shove.vy) : forceful ? CONFIG.hullDebrisForceSpeed : CONFIG.hullDebrisSpeed;
@@ -4326,7 +4494,7 @@ function killEnemy(game, e, opts = {}) {
       shove ? shove.vy / (speed || 1) : opts.dirY || 0, speed,
       attackPower(0, game.stats) * CONFIG.hullDebrisDamage);
   }
-  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
+  burst(game, e.x, e.y, e.T.color, towed ? 4 : 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
   const phase = getPhase(game.t);
@@ -4334,6 +4502,9 @@ function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
+  if (game.newBuild && e.worldMeteor?.rareWeapon) {
+    game.capsules.push({ kind: 'rareWeapon', id: e.worldMeteor.rareWeapon, src: 'drop', x: e.x, y: e.y, age: 0 });
+  }
   if (e.type === 'meteor' && game.rng() < CONFIG.meteorHealChance) {
     game.capsules.push({ kind: 'heal', src: 'drop', x: e.x, y: e.y, age: 0 });
   }
@@ -4786,6 +4957,7 @@ function drawShipAssembly(ctx, cx, cy, unit, colorOf, highlight, t = 0) {
 // ---- debris.js ----
 
 
+
 // Renderer-owned history follows the actual projectiles, including during world slowdown.
 function drawCorpseDebris(r, game, dt) {
   if (r.debrisGame !== game) {
@@ -4851,6 +5023,10 @@ function drawCorpseDebris(r, game, dt) {
     const sy = (b.y - r.cam.y) * r.cam.zoom + r.H / 2;
     const pad = b.r * r.cam.zoom;
     if (sx < -pad || sx > r.W + pad || sy < -pad || sy > r.H + pad) continue;
+    if (b.hull) {
+      ctx.globalAlpha = 1; drawTowHull(ctx, b.hull, b.x, b.y, Math.atan2(b.vy, b.vx), r.cam.zoom, b.r);
+      continue;
+    }
     const size = b.r * 0.65;
     ctx.save();
     ctx.translate(b.x, b.y);
@@ -4873,6 +5049,7 @@ function drawCorpseDebris(r, game, dt) {
 }
 
 // ---- render.js ----
+
 
 
 
@@ -5157,6 +5334,7 @@ function drawGems(r, game) {
 }
 
 function capsuleColor(c) {
+  if (c.kind === 'rareWeapon') return '#efcb70';
   if (c.kind === 'heal') return '#67e8b1';
   return c.kind === 'core' ? '#ffd24a' : ['cache', 'magnet'].includes(c.kind) ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
@@ -5177,7 +5355,7 @@ function drawCapsules(r, game, healingOnly = false) {
   const { ctx } = r;
   const z = r.cam.zoom;
   for (const c of game.capsules) {
-    if ((c.kind === 'heal' || c.kind === 'magnet') !== healingOnly) continue;
+    if ((['heal', 'magnet', 'rareWeapon'].includes(c.kind)) !== healingOnly) continue;
     if (!onScreen(r, c.x, c.y, 200)) continue;
     const col = capsuleColor(c);
     const S = (c.kind === 'core' ? 30 : 20) * Math.max(1, 0.7 / z);
@@ -5198,6 +5376,11 @@ function drawCapsules(r, game, healingOnly = false) {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
+    } else if (c.kind === 'rareWeapon') {
+      ctx.fillStyle = '#292335'; ctx.strokeStyle = col; ctx.lineWidth = 3 / z;
+      ctx.beginPath(); for (let i = 0; i < 6; i++) ctx.lineTo(Math.cos(i * TAU / 6) * S, Math.sin(i * TAU / 6) * S);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff1bf'; ctx.font = `bold ${S * 0.8}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText(c.id === 'bipolar' ? 'Ⅱ' : '⚓', 0, S * 0.3);
     } else if (c.kind === 'heal') {
       ctx.fillStyle = '#e1f4ec'; ctx.strokeStyle = '#365c50'; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.65, -S * 0.5, S * 1.3, S); ctx.strokeRect(-S * 0.65, -S * 0.5, S * 1.3, S);
@@ -5284,6 +5467,22 @@ function drawRunWeapons(r, game) {
   if (!game.newBuild) return;
   if (game.finale && game.finale.phase !== 'slow') return;
   const { ctx } = r, z = r.cam.zoom, sh = game.ship;
+  const origin = game.weaponState.bipolar?.origin;
+  if (origin && onScreen(r, origin.x, origin.y, 55)) {
+    ctx.save(); ctx.translate(origin.x, origin.y); ctx.rotate(game.buildClock * 2);
+    ctx.strokeStyle = '#69fff0'; ctx.lineWidth = 3 / z;
+    ctx.strokeRect(-22, -22, 44, 44); ctx.fillStyle = '#e1fff6'; ctx.fillRect(-5, -5, 10, 10); ctx.restore();
+  }
+  const tow = game.weaponState.massTow;
+  if (tow && game.weapons.massTow) {
+    for (let j = 0; j < Math.min(CONFIG.massTowVisible, tow.cargo.length - tow.head); j++) {
+      const h = tow.cargo[tow.head + j];
+      if (!onScreen(r, h.x, h.y, h.r)) continue;
+      ctx.strokeStyle = 'rgba(255,190,101,0.55)'; ctx.lineWidth = 2 / z;
+      ctx.beginPath(); ctx.moveTo(sh.x, sh.y); ctx.lineTo(h.x, h.y); ctx.stroke();
+      drawTowHull(ctx, h, h.x, h.y, h.angle, z);
+    }
+  }
   // The old lines persist as world effects only when a route-crossing trait uses them.
   if (game.traits.crossBlast) {
     ctx.strokeStyle = 'rgba(220,100,220,0.32)'; ctx.lineWidth = 2 / z;
@@ -5333,7 +5532,7 @@ function drawRunWeapons(r, game) {
     ctx.restore();
   }
   for (const f of game.wfx) {
-    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = '#ff9ce5';
+    ctx.globalAlpha = Math.max(0, f.life / f.max); ctx.strokeStyle = f.color || '#ff9ce5';
     if (f.kind === 'beam') {
       ctx.lineWidth = f.width; ctx.beginPath(); ctx.moveTo(f.x0, f.y0); ctx.lineTo(f.x1, f.y1); ctx.stroke();
       ctx.lineWidth = Math.max(2 / z, f.width * 0.2); ctx.strokeStyle = '#ffffff'; ctx.stroke();
@@ -5790,6 +5989,17 @@ function shapePath(ctx, shape, R) {
 
 function drawMeteor(r, e) {
   const { ctx } = r, R = e.r;
+  if (e.worldMeteor?.rareWeapon) {
+    const halo = ctx.createRadialGradient(0, 0, R * 0.6, 0, 0, R * 2);
+    halo.addColorStop(0, 'rgba(255,230,150,0.55)'); halo.addColorStop(1, 'rgba(255,200,80,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(0, 0, R * 2, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffe4a5'; ctx.lineWidth = 2 / r.cam.zoom;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.3, e.facing, e.facing + Math.PI * 1.6); ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const a = e.facing * 2 + i * TAU / 5, x = Math.cos(a) * R * 1.6, y = Math.sin(a) * R * 1.6;
+      ctx.fillStyle = '#fff4d2'; ctx.fillRect(x - 2 / r.cam.zoom, y - 2 / r.cam.zoom, 4 / r.cam.zoom, 4 / r.cam.zoom);
+    }
+  }
   if (e.worldMeteor?.kind === 'comet') {
     const speed = Math.hypot(e.vx, e.vy) || 1;
     ctx.strokeStyle = 'rgba(221,192,154,0.3)'; ctx.lineWidth = R * 0.9;
@@ -6686,7 +6896,7 @@ function showRunLevel(game, onChoose) {
     const info = runChoiceInfo(c);
     const card = el('button', { class: `card level-card level-${c.kind}`, onclick: () => onChoose(i), style: `border-color:${info.color};--rank-color:${info.color}` },
       el('div', { class: 'tag' },
-        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : '回復'),
+        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : c.kind === 'rareSkip' ? '維持' : '回復'),
         el('span', {}, info.tag), el('kbd', {}, String(i + 1))),
       el('div', { class: 'name' }, info.name),
       el('div', { class: 'desc' }, info.desc));
@@ -6698,9 +6908,9 @@ function showRunLevel(game, onChoose) {
     build.append(el('div', {}, el('b', {}, `${title} ${items.length}/${max}　`), items.join(' ／ ') || 'なし'));
   }
   showScreen(el('div', { class: 'panel level-panel' },
-    el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
-    el('h1', {}, '強化を選ぶ'),
-    el('div', { class: 'sub' }, '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'src' }, game.rareOffer ? '光る隕石からの報酬' : `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
+    el('h1', {}, game.rareOffer ? '限定武器を選ぶ' : '強化を選ぶ'),
+    el('div', { class: 'sub' }, game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 function showStation(save, onBuy, onDepart) {
@@ -6939,6 +7149,7 @@ function createAudio() {
 
 
 
+
 const DEFAULTS = { ...CONFIG };
 
 const TUNABLES = [
@@ -6991,6 +7202,7 @@ const TUNABLES = [
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
+  { key: 'rareMeteorChance', label: '光る隕石の割合（次のラン）', min: 0, max: 0.1, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%` },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorMagnetChance', label: '隕石：経験値回収アイテムのドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
@@ -7036,7 +7248,7 @@ function setScheme(game, id) {
     game.scheme = CONFIG.controlScheme;
     game.newBuild = isDrawScheme(game.scheme);
     if (game.newBuild !== wasBuild) {
-      game.levelChoices = null; game.pendingLevelups = 0;
+      game.levelChoices = null; game.pendingLevelups = 0; game.rareOffer = null; game.rareQueue = [];
       game.currentOffer = null; game.offerQueue = [];
       if (game.state === 'levelup' || game.state === 'offer') game.state = 'play';
       if (game.newBuild) for (const c of game.capsules) {
@@ -7109,6 +7321,8 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
   button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
+  button('双極ビームの隕石', g => debugRareMeteor(g, 'bipolar'));
+  button('質量牽引砲の隕石', g => debugRareMeteor(g, 'massTow'));
   button('ゲージ満タン', g => { g.dashMeter = 1; });
   for (const fatal of [false, true]) button(fatal ? '致命傷を確認' : '被弾を確認', g => {
     if (g.state !== 'play') return;
@@ -7120,6 +7334,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
     g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = []; g.sonicWaves = [];
     g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
+    g.rareOffer = null; g.rareQueue = [];
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
   button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
@@ -7157,7 +7372,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     moduleSel.innerHTML = '<option value="">ランダム</option>';
     if (isDrawScheme(scheme)) {
       for (const [kind, defs] of [['weapon', RUN_WEAPONS], ['trait', RUN_TRAITS]]) {
-        for (const groupName of [undefined, '保留', '既存候補']) {
+        for (const groupName of [undefined, '隕石限定', '保留', '既存候補']) {
           const group = document.createElement('optgroup');
           group.label = `${kind === 'weapon' ? '武器' : '特性'}：${groupName || '通常候補'}`;
           for (const def of defs.filter(d => d.group === groupName)) {
@@ -7371,7 +7586,7 @@ function togglePause() {
 
 window.addEventListener('keydown', (e) => {
   if (mode === 'run' && game.state === 'levelup') {
-    if (['1', '2', '3'].includes(e.key) && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
+    if (/^[1-9]$/.test(e.key) && Number(e.key) <= game.levelChoices.length && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
     if (e.key === 'p' || e.key === 'P') debug.toggle();
     return;
   }

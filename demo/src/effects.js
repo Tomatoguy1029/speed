@@ -271,6 +271,8 @@ function updateCapsules(game, dt) {
         }
         addXp(game, xp);
         addText(game, sh.x, sh.y - 45, `XP +${Math.round(xp)}`, CONFIG.xpColor, 22);
+      } else if (c.kind === 'rareWeapon') {
+        if (game.newBuild) game.rareQueue.push(c.id);
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
         addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
@@ -282,7 +284,7 @@ function updateCapsules(game, dt) {
           c.kind === 'cache' || c.kind === 'magnet' ? CONFIG.xpColor : '#9fe8ff', 0.5);
       game.events.push({ type: 'pickup', kind: c.kind, r: c.mod?.r || 0 });
     }
-    if ((c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
+    if (c.kind !== 'rareWeapon' && (c.src === 'elite' || c.src === 'drop') && c.age > 45) { c.taken = true; taken = true; }
   }
   if (taken) game.capsules = game.capsules.filter((c) => !c.taken);
 }

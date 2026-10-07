@@ -29,6 +29,7 @@ export function createMeteorField(rng) {
       period: randRange(rng, 42, 65), phase: rng() * 40, size: randRange(rng, 35, 55),
       facing: angle, spin: 0.4, destroyed: false, entity: null });
   }
+  for (const m of rocks) if (rng() < CONFIG.rareMeteorChance) m.rareWeapon = rng() < 0.5 ? 'massTow' : 'bipolar';
   return rocks;
 }
 

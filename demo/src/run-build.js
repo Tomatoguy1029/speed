@@ -12,6 +12,8 @@ export const RUN_WEAPONS = [
   { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
   { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
   { id: 'contactArc', catalog: 'W17', name: '接触電撃', normal: true, desc: '敵に触れると電撃が近くの敵へ伝播。通常接触でも高速接触でも発動。Lvごとに連鎖数が増える' },
+  { id: 'massTow', catalog: 'W21', name: '質量牽引砲', group: '隕石限定', exclusive: true, desc: '高速攻撃で倒した船体を大型敵ごと牽引。経路終了後、進行方向へ順番に高速発射し、弾が尽きるまで撃ち続ける' },
+  { id: 'bipolar', catalog: 'W22', name: '双極ビーム', group: '隕石限定', exclusive: true, desc: '高速攻撃の開始点に発射器を残し、経路終了時に自機との間を太いビームで貫く。迂回した群れも直線で一掃' },
   { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
   { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
   { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
@@ -123,22 +125,25 @@ export function runRankColor(level) {
 }
 
 export function runChoiceInfo(c) {
+  if (c.kind === 'rareSkip') return { tag: '見送る', name: '今の装備を維持', color: '#9ba7bd', desc: '今回の限定武器は装備せず、現在のビルドで続ける' };
   if (c.kind === 'heal') return { tag: '回復', name: '緊急修理', color: '#6dffb0', desc: 'HPを30%回復（取得・強化できる装備が残り少ない場合）' };
   const d = runModuleDef(c.kind, c.id);
   const suffix = c.kind === 'weapon' ? `Lv${c.level}` : `${c.level}/5`;
   const tag = c.level === 1 ? (c.kind === 'weapon' ? '新しい武器' : '新しい特性') : (c.kind === 'weapon' ? '武器強化' : '特性強化');
   let desc = c.kind === 'weapon' ? d.desc : d.desc(c.level);
   if (c.kind === 'weapon' && c.id === 'contactArc') desc += `。近隣${c.level * 2}体へ伝播、1回の伝播距離240`;
-  if (c.kind === 'weapon' && c.level > 1 && (d.normal || ['turret', 'trailBurst'].includes(c.id))) {
+  if (c.kind === 'weapon' && c.level > 1 && (d.normal || d.exclusive || ['turret', 'trailBurst'].includes(c.id))) {
     const before = runWeaponStats(c.id, c.level - 1), after = runWeaponStats(c.id, c.level);
     desc += `。威力 ×${before.damage.toFixed(1)} → ×${after.damage.toFixed(1)}`;
     if (['forward', 'scatter', 'turret'].includes(c.id)) desc += `、弾数${before.shots}→${after.shots}`;
     else if (c.id === 'drone') desc += `、機数${before.drones}→${after.drones}`;
+    else if (c.id === 'massTow') desc += `、発射間隔${(CONFIG.massTowInterval / before.rate).toFixed(3)}→${(CONFIG.massTowInterval / after.rate).toFixed(3)}秒`;
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * before.tier}→${800 + 90 * after.tier}`;
     else if (c.id === 'contactArc') desc += `、伝播${2 * (c.level - 1)}→${2 * c.level}体`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
-  return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
+  if (c.replace) desc += `。${runModuleDef('weapon', c.replace).name} Lv${c.replaceLevel}と交換`;
+  return { tag: c.rare ? (c.replace ? `${runModuleDef('weapon', c.replace).name} Lv${c.replaceLevel}と交換` : '隕石限定武器') : tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
 }
 
 export function grantRunItem(game, kind, id, levels = 1) {

@@ -8,6 +8,7 @@ import { attackPower } from './combat.js';
 import { dropPortal } from './portals.js';
 import { onRunCritical, onRunKill } from './run-weapons.js';
 import { xpForLevel } from './progression.js';
+import { captureTowHull } from './rare-weapons.js';
 import { beginBossFinish } from './finale.js';
 
 export function damageEnemy(game, e, dmg, opts = {}) {
@@ -36,7 +37,7 @@ export function damageEnemy(game, e, dmg, opts = {}) {
     const k = opts.knock ?? 160;
     const mass = Math.max(1, e.r / 20);
     e.vx += (opts.dirX * k) / mass; e.vy += (opts.dirY * k) / mass;
-    if (['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
+    if (['sonic', 'killSonic', 'critBeam', 'laser', 'bipolar', 'towShot'].includes(opts.cause) && e.type !== 'boss') e.knockT = 0.3;
   }
   if (game.newBuild && critical && !opts.noCrit) onRunCritical(game, opts.impactX ?? e.x, opts.impactY ?? e.y);
 }
@@ -53,11 +54,12 @@ export function killEnemy(game, e, opts = {}) {
   if (e.dead || game.state === 'finishing') return;
   if (e === game.boss) { beginBossFinish(game, e, opts); return; }
   e.dead = true;
+  const towed = captureTowHull(game, e, opts.cause);
   if (e.worldMeteor) e.worldMeteor.destroyed = true;
   game.kills++;
   game.events.push({ type: 'kill', x: e.x, y: e.y, r: e.r, crit: !!opts.crit, enemyType: e.type, elite: e.elite, cause: opts.cause });
-  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser'].includes(opts.cause);
-  if (game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
+  const forceful = ['sonic', 'killSonic', 'critBeam', 'laser', 'bipolar', 'towShot'].includes(opts.cause);
+  if (!towed && opts.cause !== 'towShot' && game.newBuild && e.r >= CONFIG.hullDebrisMinRadius && e.type !== 'meteor' && opts.cause !== 'hullDebris' &&
       !(opts.cause === 'ram' && game.weapons.knockback)) {
     const shove = e.shove;
     const speed = shove ? Math.hypot(shove.vx, shove.vy) : forceful ? CONFIG.hullDebrisForceSpeed : CONFIG.hullDebrisSpeed;
@@ -65,7 +67,7 @@ export function killEnemy(game, e, opts = {}) {
       shove ? shove.vy / (speed || 1) : opts.dirY || 0, speed,
       attackPower(0, game.stats) * CONFIG.hullDebrisDamage);
   }
-  burst(game, e.x, e.y, e.T.color, 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
+  burst(game, e.x, e.y, e.T.color, towed ? 4 : 6 + Math.round(e.r / 3), opts.dirX || 0, opts.dirY || 0, (260 + e.r * 4) * (forceful ? 1.8 : 1));
   onEnemyDeath(e, game);
   dropPortal(game, e.x, e.y);
   const phase = getPhase(game.t);
@@ -73,6 +75,9 @@ export function killEnemy(game, e, opts = {}) {
   const xp = e.xp * game.stats.xpMult * CONFIG.xpMult * (phase.xpBonus || 1) * (1 + danger);
   dropGem(game, e.x, e.y, xp);
   dropCoins(game, e, danger);
+  if (game.newBuild && e.worldMeteor?.rareWeapon) {
+    game.capsules.push({ kind: 'rareWeapon', id: e.worldMeteor.rareWeapon, src: 'drop', x: e.x, y: e.y, age: 0 });
+  }
   if (e.type === 'meteor' && game.rng() < CONFIG.meteorHealChance) {
     game.capsules.push({ kind: 'heal', src: 'drop', x: e.x, y: e.y, age: 0 });
   }

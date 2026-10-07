@@ -145,7 +145,7 @@ export function showRunLevel(game, onChoose) {
     const info = runChoiceInfo(c);
     const card = el('button', { class: `card level-card level-${c.kind}`, onclick: () => onChoose(i), style: `border-color:${info.color};--rank-color:${info.color}` },
       el('div', { class: 'tag' },
-        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : '回復'),
+        el('span', { class: `module-badge badge-${c.kind}`, 'aria-hidden': 'true' }, c.kind === 'weapon' ? '武器' : c.kind === 'trait' ? '特性' : c.kind === 'rareSkip' ? '維持' : '回復'),
         el('span', {}, info.tag), el('kbd', {}, String(i + 1))),
       el('div', { class: 'name' }, info.name),
       el('div', { class: 'desc' }, info.desc));
@@ -157,9 +157,9 @@ export function showRunLevel(game, onChoose) {
     build.append(el('div', {}, el('b', {}, `${title} ${items.length}/${max}　`), items.join(' ／ ') || 'なし'));
   }
   showScreen(el('div', { class: 'panel level-panel' },
-    el('div', { class: 'src' }, `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
-    el('h1', {}, '強化を選ぶ'),
-    el('div', { class: 'sub' }, '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
+    el('div', { class: 'src' }, game.rareOffer ? '光る隕石からの報酬' : `Lv ${game.level}${game.pendingLevelups > 1 ? `　残り${game.pendingLevelups}回` : ''}`),
+    el('h1', {}, game.rareOffer ? '限定武器を選ぶ' : '強化を選ぶ'),
+    el('div', { class: 'sub' }, game.rareOffer ? `武器は${CONFIG.weaponSlots}枠のまま。クリック、または数字キー1〜${game.levelChoices.length}` : '■ 武器 ／ ● 特性　　クリック、または数字キー1〜3'), cards, build), 'levelup');
 }
 
 export function showStation(save, onBuy, onDepart) {

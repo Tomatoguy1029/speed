@@ -1,4 +1,5 @@
 // Tuning panel: edits CONFIG live and offers shortcuts (time skip, modules, invincibility).
+import { debugRareMeteor } from './rare-weapons.js';
 import { CONFIG } from './config.js';
 import { refreshStats, pushOffer, addXp, debugRunItem, damageShip } from './world.js';
 import { PHASES } from './spawner.js';
@@ -59,6 +60,7 @@ export const TUNABLES = [
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
   { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
+  { key: 'rareMeteorChance', label: '光る隕石の割合（次のラン）', min: 0, max: 0.1, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%` },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorMagnetChance', label: '隕石：経験値回収アイテムのドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'meteorHealFrac', label: '修理キット：最大HPに対する回復量', min: 0.05, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
@@ -104,7 +106,7 @@ export function setScheme(game, id) {
     game.scheme = CONFIG.controlScheme;
     game.newBuild = isDrawScheme(game.scheme);
     if (game.newBuild !== wasBuild) {
-      game.levelChoices = null; game.pendingLevelups = 0;
+      game.levelChoices = null; game.pendingLevelups = 0; game.rareOffer = null; game.rareQueue = [];
       game.currentOffer = null; game.offerQueue = [];
       if (game.state === 'levelup' || game.state === 'offer') game.state = 'play';
       if (game.newBuild) for (const c of game.capsules) {
@@ -177,6 +179,8 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   button('+30 秒', (g) => skipTime(g, 30));
   button('+60 秒', (g) => skipTime(g, 60));
   button('レベルアップ', g => { if (g.newBuild && ['play', 'levelup'].includes(g.state)) addXp(g, Math.max(0, xpForLevel(g.level) - g.xp)); });
+  button('双極ビームの隕石', g => debugRareMeteor(g, 'bipolar'));
+  button('質量牽引砲の隕石', g => debugRareMeteor(g, 'massTow'));
   button('ゲージ満タン', g => { g.dashMeter = 1; });
   for (const fatal of [false, true]) button(fatal ? '致命傷を確認' : '被弾を確認', g => {
     if (g.state !== 'play') return;
@@ -188,6 +192,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     if (!g.newBuild || !['play', 'levelup'].includes(g.state)) return;
     g.weapons = { forward: 1 }; g.traits = {}; g.weaponState = {}; g.wstate = {}; g.drones = []; g.wproj = []; g.sonicWaves = [];
     g.mines = []; g.marks = []; g.vortexes = []; g.stats.burstPower = 1; g.stats.ignoreArmor = false; refreshStats(g);
+    g.rareOffer = null; g.rareQueue = [];
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
   button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
@@ -225,7 +230,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     moduleSel.innerHTML = '<option value="">ランダム</option>';
     if (isDrawScheme(scheme)) {
       for (const [kind, defs] of [['weapon', RUN_WEAPONS], ['trait', RUN_TRAITS]]) {
-        for (const groupName of [undefined, '保留', '既存候補']) {
+        for (const groupName of [undefined, '隕石限定', '保留', '既存候補']) {
           const group = document.createElement('optgroup');
           group.label = `${kind === 'weapon' ? '武器' : '特性'}：${groupName || '通常候補'}`;
           for (const def of defs.filter(d => d.group === groupName)) {

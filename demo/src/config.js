@@ -158,6 +158,10 @@ export const CONFIG = {
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
   meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
+  rareMeteorChance: 0.01, // assigned once per world rock; guaranteed weapon on destruction
+  bipolarWidth: 85, bipolarDamage: 3.5, bipolarLife: 0.55,
+  massTowInterval: 0.06, massTowSpeed: 2400, massTowDamage: 2.2, massTowLife: 1.2,
+  massTowVisible: 32, massTowFollow: 18,
   meteorHealChance: 0.08,
   meteorHealFrac: 0.1,
   meteorMagnetChance: 0.04,

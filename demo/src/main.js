@@ -102,7 +102,7 @@ function togglePause() {
 
 window.addEventListener('keydown', (e) => {
   if (mode === 'run' && game.state === 'levelup') {
-    if (['1', '2', '3'].includes(e.key) && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
+    if (/^[1-9]$/.test(e.key) && Number(e.key) <= game.levelChoices.length && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
     if (e.key === 'p' || e.key === 'P') debug.toggle();
     return;
   }
