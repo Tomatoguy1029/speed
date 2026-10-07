@@ -58,28 +58,28 @@
 
 ## 段階2 ランの芯
 
-- [ ] **2-1 フィールドとカメラ**
+- [x] **2-1 フィールドとカメラ**
   - 内容：FieldManager（惑星、周回する月、宇宙塵、外縁の押し戻し）、StageDef とステージ1のシーン、最高速度に応じたカメラのズーム（仕様書11・13章）。
   - ファイル：`scripts/managers/field_manager.gd`、`scripts/data_types/stage_def.gd`、`data/stages/stage_1.tres`、`scenes/stages/stage_1.tscn`、カメラ
-- [ ] **2-2 機体の移動**
+- [x] **2-2 機体の移動**
   - 内容：ShipManager、マウス（カーソル方向・巡航40%・毎秒4.5ラジアン）とタッチ（仮想スティック）の入力のまとめ、機体の見た目（仕様書3章）。
   - ファイル：`scripts/managers/ship_manager.gd`、`scripts/input/` の2つ、`scenes/ship/ship.tscn`
-- [ ] **2-3 ゲージと描画**
+- [x] **2-3 ゲージと描画**
   - 内容：DrawManager の充填・描き始め・点の記録・確定の条件・消費、描画中の世界0.1倍、カーソル付近のリング（仕様書4.1〜4.4）。
   - ファイル：`scripts/managers/draw_manager.gd`、線とリングの見た目
-- [ ] **2-4 なぞりと勢い**
+- [x] **2-4 なぞりと勢い**
   - 内容：0.5実秒のなぞり、なぞり中の世界の速さ、勢いの維持と戻る条件（仕様書4.5〜4.6）。
   - ファイル：`draw_manager.gd`、`ship_manager.gd`
-- [ ] **2-5 敵の土台**
+- [x] **2-5 敵の土台**
   - 内容：EnemyManager の配列とまとめた描画、時間帯の表（PhaseDef）による出現・補充・再配置、追跡の周期、狙いの遅れ。まずドリフターだけ（仕様書9章）。
   - ファイル：`scripts/managers/enemy_manager.gd`、`scripts/data_types/enemy_def.gd`、`phase_def.gd`、`data/enemies/drifter.tres`、`data/phases/`
-- [ ] **2-6 戦闘**
+- [x] **2-6 戦闘**
   - 内容：CombatManager の格子、高速と普段の接触、装甲の貫通と弾かれ、なぞりの掃引と波動の帯、クリティカル、ヒットストップ、被弾と無敵、HP が0で結果へ（仕様書5章）。
   - ファイル：`scripts/managers/combat_manager.gd`、`ship_manager.gd`、`run_manager.gd`
-- [ ] **2-7 経験値と3択とブラスター**
+- [x] **2-7 経験値と3択とブラスター**
   - 内容：PickupManager（経験値の結晶と回収範囲）、BuildManager（必要経験値の式、レベルの成長、3択と保留）、ProjectileManager、W01 ブラスター（仕様書6〜8章）。
   - ファイル：`pickup_manager.gd`、`build_manager.gd`、`projectile_manager.gd`、`scripts/weapons/w01_blaster.gd`、3択の UI
-- [ ] **チェックポイント2**：実際に遊んで demo と手触りを比べてもらい、push する。
+- [x] **チェックポイント2**：実際に遊んで demo と手触りを比べてもらい、push する。
 
 ## 段階3 中身をそろえる
 
