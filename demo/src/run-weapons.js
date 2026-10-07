@@ -1,5 +1,6 @@
 // Weapon actions and route traits for the draw prototype. All damage uses attack stats.
 import { CONFIG } from './config.js';
+import { collideEnemyBodies } from './body-collision.js';
 import { attackPower } from './combat.js';
 import { segCircleT } from './math.js';
 import { queryGrid } from './grid.js';
@@ -320,7 +321,9 @@ export function updateRunWeapons(game, dt) {
       const dx = v.x - e.x, dy = v.y - e.y, d = Math.hypot(dx, dy);
       if (d > v.radius || d < 10) return;
       const move = Math.min(d - 10, v.power * dt / Math.max(1, e.r / 30));
+      const x0 = e.x, y0 = e.y;
       e.x += dx / d * move; e.y += dy / d * move;
+      collideEnemyBodies(e, game.field, x0, y0);
     });
   }
   game.vortexes = game.vortexes.filter(v => v.life > 0);

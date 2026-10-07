@@ -1,4 +1,5 @@
 import { CONFIG } from './config.js';
+import { collideEnemyBodies } from './body-collision.js';
 
 const BACK = Math.PI;
 const SIDE = Math.PI / 2;
@@ -222,6 +223,7 @@ export function updateEnemy(e, game, dt) {
   if (e.hitCD > 0) e.hitCD -= dt;
   if (e.flash > 0) e.flash -= dt;
   if (e.worldMeteor) return; // streamed world trajectories are evaluated by the meteor field
+  const x0 = e.x, y0 = e.y;
   if (e.shove && e.shove.time > 0) {
     e.shoveFrom = { x: e.x, y: e.y };
     e.shove.time -= dt;
@@ -234,11 +236,5 @@ export function updateEnemy(e, game, dt) {
   } else BEHAVIORS[e.T.behavior](e, game, dt);
   e.x += e.vx * dt;
   e.y += e.vy * dt;
-  // stay out of the planet
-  const p = game.field.planet;
-  const d = Math.hypot(e.x - p.x, e.y - p.y);
-  if (d < p.r + e.r && d > 0) {
-    e.x = p.x + ((e.x - p.x) / d) * (p.r + e.r);
-    e.y = p.y + ((e.y - p.y) / d) * (p.r + e.r);
-  }
+  collideEnemyBodies(e, game.field, x0, y0);
 }

@@ -11,6 +11,7 @@ import { onRunEnd, onRunHurt } from './run-weapons.js';
 import { xpForLevel } from './progression.js';
 import { refreshStats, addXp } from './world.js';
 import { randRange, TAU, segCircleT } from './math.js';
+import { clipProjectileToBody } from './body-collision.js';
 
 export function createEffectState() {
   return {
@@ -167,11 +168,12 @@ function updateFriendly(game, dt) {
   for (const b of B) {
     const x0 = b.x, y0 = b.y;
     b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    const bodyHit = clipProjectileToBody(game, b, x0, y0);
     const pad = b.r + 130, hits = [];
     queryGrid(game.grid, Math.min(x0, b.x) - pad, Math.min(y0, b.y) - pad, Math.max(x0, b.x) + pad, Math.max(y0, b.y) + pad, e => {
       if (e.dead || b.hit.has(e.id)) return;
       const t = segCircleT(x0, y0, b.x, b.y, e.x, e.y, b.r + e.r);
-      if (t >= 0) hits.push({ e, t });
+      if (t >= 0 && (!bodyHit || t < 1)) hits.push({ e, t });
     });
     hits.sort((a, b) => a.t - b.t);
     const sp = Math.hypot(b.vx, b.vy) || 1;
@@ -182,6 +184,7 @@ function updateFriendly(game, dt) {
         dirX: b.vx / sp, dirY: b.vy / sp, knock: b.knock ?? 250 });
       if (!b.pierce) { if ((b.pierceLeft || 0) > 0) b.pierceLeft--; else b.life = 0; }
     }
+    if (bodyHit) b.life = 0;
   }
   game.fbullets = B.filter(b => b.life > 0);
 }

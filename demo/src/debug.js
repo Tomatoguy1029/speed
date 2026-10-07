@@ -265,6 +265,13 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
       { id: 'loopBurst', slot: 'gun', r: Math.max(2, Number(rsel.value)) }, 'capsule');
   });
   button('HP 全快', (g) => { g.ship.hp = g.stats.maxHp; });
+  button('月の近くへ', (g) => {
+    const m = g.field.moons[0];
+    if (!m || g.state !== 'play') return;
+    g.ship.x = m.x; g.ship.y = m.y + m.r + 200;
+    g.ship.vx = g.ship.vy = 0; g.ship.hx = 0; g.ship.hy = -1;
+    g.enemyAim = { x: g.ship.x, y: g.ship.y };
+  });
   button('隕石地帯へ', (g) => {
     const m = g.field.meteors.find(m => m.kind === 'belt' && !m.destroyed);
     if (!m || g.state !== 'play') return;

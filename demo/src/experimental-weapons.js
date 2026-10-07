@@ -6,6 +6,7 @@ import { queryGrid } from './grid.js';
 import { MAX_ENEMY_R } from './enemies.js';
 import { damageEnemy, explode } from './hits.js';
 import { runWeaponTier } from './run-build.js';
+import { clipProjectileToBody } from './body-collision.js';
 
 // Builds cumulative per-level stats: level 1 = base, each step edits a copy of the previous level.
 function ladder(base, steps) {
@@ -263,6 +264,7 @@ function updateWeaponProjectiles(game, dt) {
   const P = game.wproj;
   if (!P.length) return;
   for (const p of P) {
+    const x0 = p.x, y0 = p.y;
     p.life -= dt;
     if (p.kind === 'missile') {
       if (!p.target || p.target.dead) p.target = nearestEnemies(game, p.x, p.y, 600, 1)[0] || null;
@@ -276,7 +278,8 @@ function updateWeaponProjectiles(game, dt) {
       const v = Math.min(900, sp + 900 * dt);
       p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
       p.x += p.vx * dt; p.y += p.vy * dt;
-      let boom = p.life <= 0;
+      const bodyHit = clipProjectileToBody(game, p, x0, y0);
+      let boom = p.life <= 0 || !!bodyHit;
       if (!boom) {
         queryGrid(game.grid, p.x - 10 - MAX_ENEMY_R, p.y - 10 - MAX_ENEMY_R, p.x + 10 + MAX_ENEMY_R, p.y + 10 + MAX_ENEMY_R, (e) => {
           if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 10) boom = true;
@@ -287,6 +290,7 @@ function updateWeaponProjectiles(game, dt) {
       p.vx += p.ax * dt; p.vy += p.ay * dt;
       p.x += p.vx * dt; p.y += p.vy * dt;
       p.spin += dt * 14;
+      if (clipProjectileToBody(game, p, x0, y0)) { p.life = 0; continue; }
       queryGrid(game.grid, p.x - p.r - MAX_ENEMY_R, p.y - p.r - MAX_ENEMY_R, p.x + p.r + MAX_ENEMY_R, p.y + p.r + MAX_ENEMY_R, (e) => {
         if (e.dead || (p.hits.get(e.id) || 0) > game.t) return;
         if (Math.hypot(e.x - p.x, e.y - p.y) > e.r + p.r) return;
