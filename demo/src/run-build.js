@@ -3,22 +3,22 @@ import { CONFIG } from './config.js';
 import { baseStats } from './ship.js';
 
 export const RUN_WEAPONS = [
-  { id: 'forward', catalog: 'W01', name: 'ブラスター', color: '#ffe46b', normal: true, desc: '進行方向へ自動射撃。Lvで威力・連射・弾数・貫通が伸びる' },
-  { id: 'scatter', catalog: 'W02', name: '散弾砲', color: '#ffb36b', normal: true, desc: '進行方向へ扇状の散弾。群れに向けて進むとまとめて当たる' },
-  { id: 'knockback', catalog: 'W03', name: '吹き飛ばし衝角', color: '#ff986b', normal: true, desc: '高速接触で敵の船体を進行方向へ吹き飛ばす。他の敵にぶつかると連鎖ダメージ' },
-  { id: 'contactWave', catalog: 'W04', name: '接触波動', color: '#9fe8ff', normal: true, desc: '高速で敵に接触するたび波動。弾かれた接触でも発動' },
-  { id: 'barrier', catalog: 'W05', name: 'バリアシステム', color: '#76aaff', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
-  { id: 'drone', catalog: 'W06', name: '追走ドローン', color: '#a8ffdb', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
-  { id: 'mines', catalog: 'W07', name: '軌跡機雷', color: '#ff7b54', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
-  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', color: '#ffffff', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
-  { id: 'orbit', catalog: 'W09', name: 'オービットブレード', color: '#9fe8ff', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
-  { id: 'disc', catalog: 'W10', name: 'リターンディスク', color: '#6dffb0', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
-  { id: 'missile', catalog: 'W11', name: '追尾ミサイル', color: '#ff9f40', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
-  { id: 'arc', catalog: 'W12', name: 'アークコイル', color: '#a8f0ff', group: '保留', desc: '近くの敵から敵へ稲妻が連鎖。通常抽選には出ない' },
-  { id: 'turret', catalog: 'W13', name: '自動砲台', color: '#9fe8ff', group: '既存候補', desc: '最寄りの敵へ自動射撃' },
-  { id: 'nova', catalog: 'W14', name: 'パルスノヴァ', color: '#c995ff', group: '既存候補', desc: '自機中心に周期衝撃波' },
-  { id: 'laser', catalog: 'W15', name: 'レーザーランス', color: '#ff6bd5', group: '既存候補', desc: '最寄りの敵へ貫通ビーム' },
-  { id: 'trailBurst', catalog: 'W16', name: '軌跡炸裂', color: '#ffcf6b', group: '既存候補', desc: '高速で通った位置が遅れて爆発' },
+  { id: 'forward', catalog: 'W01', name: 'ブラスター', normal: true, desc: '進行方向へ自動射撃。Lvで威力・連射・弾数・貫通が伸びる' },
+  { id: 'scatter', catalog: 'W02', name: '散弾砲', normal: true, desc: '進行方向へ扇状の散弾。群れに向けて進むとまとめて当たる' },
+  { id: 'knockback', catalog: 'W03', name: '吹き飛ばし衝角', normal: true, desc: '高速接触で敵の船体を進行方向へ吹き飛ばす。他の敵にぶつかると連鎖ダメージ' },
+  { id: 'contactWave', catalog: 'W04', name: '接触波動', normal: true, desc: '高速で敵に接触するたび波動。弾かれた接触でも発動' },
+  { id: 'barrier', catalog: 'W05', name: 'バリアシステム', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
+  { id: 'drone', catalog: 'W06', name: '追走ドローン', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
+  { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
+  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
+  { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
+  { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
+  { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
+  { id: 'arc', catalog: 'W12', name: 'アークコイル', group: '保留', desc: '近くの敵から敵へ稲妻が連鎖。通常抽選には出ない' },
+  { id: 'turret', catalog: 'W13', name: '自動砲台', group: '既存候補', desc: '最寄りの敵へ自動射撃' },
+  { id: 'nova', catalog: 'W14', name: 'パルスノヴァ', group: '既存候補', desc: '自機中心に周期衝撃波' },
+  { id: 'laser', catalog: 'W15', name: 'レーザーランス', group: '既存候補', desc: '最寄りの敵へ貫通ビーム' },
+  { id: 'trailBurst', catalog: 'W16', name: '軌跡炸裂', group: '既存候補', desc: '高速で通った位置が遅れて爆発' },
 ];
 
 export const RUN_TRAITS = [
@@ -26,7 +26,7 @@ export const RUN_TRAITS = [
   { id: 'crossBlast', catalog: 'T02', name: '交差爆破', normal: true, desc: n => `過去${CONFIG.pathMemoryTime}秒の高速軌跡を横切ると交点で爆発。半径${100 + n * 25}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
   { id: 'vortex', catalog: 'T03', name: '余韻の渦', normal: true, desc: n => `終点に${(1.5 + n * 0.4).toFixed(1)}秒の渦。半径${180 + n * 35}の敵を引き寄せる` },
   { id: 'fullCharge', catalog: 'T04', name: '満タン突撃', normal: true, desc: n => `満タン発動の経路移動中は装甲を無視し、攻撃力×${(1.25 + n * 0.25).toFixed(2)}。部分充填での通常発動には適用しない` },
-  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${320 + n * 50}、威力×${(1.6 + n * 0.8).toFixed(1)}` },
+  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${CONFIG.killSonicRadius + n * CONFIG.killSonicRadiusPerStack}、威力×${(CONFIG.killSonicDamage + n * CONFIG.killSonicDamagePerStack).toFixed(1)}` },
   { id: 'critBeam', catalog: 'T06', name: 'クリティカルランス', normal: true, desc: n => `クリティカル時に突進方向へ貫通ビーム。射程${CONFIG.lanceLength + n * CONFIG.lanceLengthPerStack}、威力×${(CONFIG.lanceDamage + n * CONFIG.lanceDamagePerStack).toFixed(1)}。ビームからは再発動しない` },
   { id: 'quickCharge', catalog: 'T07', name: '急速充填', normal: true, desc: n => `時間チャージの充填速度 +${n * 25}%` },
   { id: 'capacity', catalog: 'T08', name: '大容量チャージ', normal: true, desc: n => `チャージ容量 +${n * 20}%。満タンまでの時間と描ける長さが伸びる（回数ストックではない）` },
@@ -111,6 +111,10 @@ export function rollRunChoices(game) {
   return out;
 }
 
+export function runRankColor(level) {
+  return ['#d5dbea', '#8ed7a3', '#83b8ed', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
+}
+
 export function runChoiceInfo(c) {
   if (c.kind === 'heal') return { tag: '回復', name: '緊急修理', color: '#6dffb0', desc: 'HPを30%回復（取得・強化できる装備が残り少ない場合）' };
   const d = runModuleDef(c.kind, c.id);
@@ -125,7 +129,7 @@ export function runChoiceInfo(c) {
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * (c.level - 1)}→${800 + 90 * c.level}`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
-  return { tag, name: `${d.name} ${suffix}`, desc, color: d.color || '#c995ff' };
+  return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
 }
 
 export function grantRunItem(game, kind, id, levels = 1) {

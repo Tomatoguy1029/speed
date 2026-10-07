@@ -250,7 +250,7 @@ function updateCapsules(game, dt) {
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
-        addText(game, c.x, c.y, 'XP', '#6dffb0');
+        addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }

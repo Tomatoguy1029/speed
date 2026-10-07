@@ -5,7 +5,7 @@ import { clamp, makeRng, TAU } from './math.js';
 import { predictPath, annotatePrediction, previewPath, drawBudget, waveRadius } from './world.js';
 import { attackPower, CRIT_ARMOR } from './combat.js';
 import { xpForLevel } from './progression.js';
-import { RUN_WEAPONS, RUN_TRAITS, runWeaponStats } from './run-build.js';
+import { RUN_WEAPONS, RUN_TRAITS, runWeaponStats, runRankColor } from './run-build.js';
 import { SLOTS, RARITIES, moduleDef } from './modules.js';
 import { drawPart, drawShipAssembly } from './parts.js';
 import { portalChoices } from './portals.js';
@@ -255,18 +255,19 @@ function drawStageFlash(r, dt) {
 function drawGems(r, game) {
   const { ctx } = r;
   const s = Math.max(5, 3 / r.cam.zoom);
-  ctx.fillStyle = '#6dffb0';
+  ctx.fillStyle = CONFIG.xpColor;
+  ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 0.8 / r.cam.zoom;
   for (const g of game.gems) {
     if (!onScreen(r, g.x, g.y, 20)) continue;
     const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
     ctx.beginPath();
     ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
-    ctx.closePath(); ctx.fill();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 }
 
 function capsuleColor(c) {
-  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? '#6dffb0' : RARITIES[c.mod.r].color;
+  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
 
 function drawCoins(r, game) {
@@ -306,9 +307,9 @@ function drawCapsules(r, game) {
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     } else if (c.kind === 'cache') {
-      ctx.fillStyle = col; ctx.strokeStyle = '#e2fff0'; ctx.lineWidth = 2 / z;
+      ctx.fillStyle = col; ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
-      ctx.fillStyle = '#132f24'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
+      ctx.fillStyle = '#1d293a'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
     } else {
       // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
       drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
@@ -446,14 +447,14 @@ function drawRunLoadout(r, game) {
   ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
   let row = 0;
   for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
-    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = d.color;
+    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = runRankColor(game.weapons[d.id]);
     ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
   }
   const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
   ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
   row = 0;
   for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
-    ctx.fillStyle = '#cfb1f7'; ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
+    ctx.fillStyle = runRankColor(game.traits[d.id]); ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
   }
 }
 
@@ -1343,7 +1344,7 @@ function drawTimer(r, game) {
   const need = xpForLevel(game.level);
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(0, 0, W, 5);
-  ctx.fillStyle = '#6dffb0';
+  ctx.fillStyle = CONFIG.xpColor;
   ctx.fillRect(0, 0, W * Math.min(1, game.xp / need), 5);
 }
 

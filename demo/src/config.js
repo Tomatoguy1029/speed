@@ -63,10 +63,14 @@ export const CONFIG = {
   pathMemoryTime: 12,
   pathMemoryMax: 160,
   droneDelay: 0.12,
-  sonicRadius: 360,
-  sonicDamage: 2.4,
-  sonicKnock: 1250,
+  sonicRadius: 310,
+  sonicDamage: 1.8,
+  sonicKnock: 1000,
   sonicTravelTime: 0.5, // real seconds accompanying the actual traveled route
+  killSonicRadius: 275,
+  killSonicRadiusPerStack: 45,
+  killSonicDamage: 1.2,
+  killSonicDamagePerStack: 0.6,
   lanceLength: 720,
   lanceLengthPerStack: 120,
   lanceWidth: 32,
@@ -163,6 +167,8 @@ export const CONFIG = {
   xpGrowth: 28,
   xpCurve: 4,
   xpMult: 1,
+  xpColor: '#d7e7f8', // bright blue-white, distinct from saturated enemies and dark space
+  xpOutline: '#486782',
 
   // flung wreckage visuals
   blockImpactLife: 0.65,

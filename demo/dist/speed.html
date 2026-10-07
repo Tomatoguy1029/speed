@@ -154,10 +154,14 @@ const CONFIG = {
   pathMemoryTime: 12,
   pathMemoryMax: 160,
   droneDelay: 0.12,
-  sonicRadius: 360,
-  sonicDamage: 2.4,
-  sonicKnock: 1250,
+  sonicRadius: 310,
+  sonicDamage: 1.8,
+  sonicKnock: 1000,
   sonicTravelTime: 0.5, // real seconds accompanying the actual traveled route
+  killSonicRadius: 275,
+  killSonicRadiusPerStack: 45,
+  killSonicDamage: 1.2,
+  killSonicDamagePerStack: 0.6,
   lanceLength: 720,
   lanceLengthPerStack: 120,
   lanceWidth: 32,
@@ -254,6 +258,8 @@ const CONFIG = {
   xpGrowth: 28,
   xpCurve: 4,
   xpMult: 1,
+  xpColor: '#d7e7f8', // bright blue-white, distinct from saturated enemies and dark space
+  xpOutline: '#486782',
 
   // flung wreckage visuals
   blockImpactLife: 0.65,
@@ -1450,22 +1456,22 @@ function queryRadius(grid, x, y, r, cb) {
 
 
 const RUN_WEAPONS = [
-  { id: 'forward', catalog: 'W01', name: 'ブラスター', color: '#ffe46b', normal: true, desc: '進行方向へ自動射撃。Lvで威力・連射・弾数・貫通が伸びる' },
-  { id: 'scatter', catalog: 'W02', name: '散弾砲', color: '#ffb36b', normal: true, desc: '進行方向へ扇状の散弾。群れに向けて進むとまとめて当たる' },
-  { id: 'knockback', catalog: 'W03', name: '吹き飛ばし衝角', color: '#ff986b', normal: true, desc: '高速接触で敵の船体を進行方向へ吹き飛ばす。他の敵にぶつかると連鎖ダメージ' },
-  { id: 'contactWave', catalog: 'W04', name: '接触波動', color: '#9fe8ff', normal: true, desc: '高速で敵に接触するたび波動。弾かれた接触でも発動' },
-  { id: 'barrier', catalog: 'W05', name: 'バリアシステム', color: '#76aaff', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
-  { id: 'drone', catalog: 'W06', name: '追走ドローン', color: '#a8ffdb', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
-  { id: 'mines', catalog: 'W07', name: '軌跡機雷', color: '#ff7b54', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
-  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', color: '#ffffff', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
-  { id: 'orbit', catalog: 'W09', name: 'オービットブレード', color: '#9fe8ff', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
-  { id: 'disc', catalog: 'W10', name: 'リターンディスク', color: '#6dffb0', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
-  { id: 'missile', catalog: 'W11', name: '追尾ミサイル', color: '#ff9f40', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
-  { id: 'arc', catalog: 'W12', name: 'アークコイル', color: '#a8f0ff', group: '保留', desc: '近くの敵から敵へ稲妻が連鎖。通常抽選には出ない' },
-  { id: 'turret', catalog: 'W13', name: '自動砲台', color: '#9fe8ff', group: '既存候補', desc: '最寄りの敵へ自動射撃' },
-  { id: 'nova', catalog: 'W14', name: 'パルスノヴァ', color: '#c995ff', group: '既存候補', desc: '自機中心に周期衝撃波' },
-  { id: 'laser', catalog: 'W15', name: 'レーザーランス', color: '#ff6bd5', group: '既存候補', desc: '最寄りの敵へ貫通ビーム' },
-  { id: 'trailBurst', catalog: 'W16', name: '軌跡炸裂', color: '#ffcf6b', group: '既存候補', desc: '高速で通った位置が遅れて爆発' },
+  { id: 'forward', catalog: 'W01', name: 'ブラスター', normal: true, desc: '進行方向へ自動射撃。Lvで威力・連射・弾数・貫通が伸びる' },
+  { id: 'scatter', catalog: 'W02', name: '散弾砲', normal: true, desc: '進行方向へ扇状の散弾。群れに向けて進むとまとめて当たる' },
+  { id: 'knockback', catalog: 'W03', name: '吹き飛ばし衝角', normal: true, desc: '高速接触で敵の船体を進行方向へ吹き飛ばす。他の敵にぶつかると連鎖ダメージ' },
+  { id: 'contactWave', catalog: 'W04', name: '接触波動', normal: true, desc: '高速で敵に接触するたび波動。弾かれた接触でも発動' },
+  { id: 'barrier', catalog: 'W05', name: 'バリアシステム', normal: true, desc: '周囲の敵へ周期ダメージ、敵弾を遮断。Lvで範囲・威力・遮断頻度が伸びる' },
+  { id: 'drone', catalog: 'W06', name: '追走ドローン', normal: true, desc: '周囲を飛ぶドローンが敵へ自動射撃。高速移動では遅れて同じ経路を追い、触れた敵も攻撃' },
+  { id: 'mines', catalog: 'W07', name: '軌跡機雷', normal: true, desc: '高速で実際に通った経路に機雷を残す。遅れて入る敵を爆破' },
+  { id: 'sonic', catalog: 'W08', name: 'ソニックブーム', normal: true, desc: '高速攻撃の開始時に広範囲の衝撃波。0.5秒間、機体とともに進路を掃く。通常移動でも周期発動' },
+  { id: 'orbit', catalog: 'W09', name: 'オービットブレード', group: '保留', desc: '自機を回る刃で接触攻撃。通常抽選には出ない' },
+  { id: 'disc', catalog: 'W10', name: 'リターンディスク', group: '保留', desc: '敵に向けて投げ、戻る貫通刃。通常抽選には出ない' },
+  { id: 'missile', catalog: 'W11', name: '追尾ミサイル', group: '保留', desc: '敵を追尾し、着弾時に爆発。通常抽選には出ない' },
+  { id: 'arc', catalog: 'W12', name: 'アークコイル', group: '保留', desc: '近くの敵から敵へ稲妻が連鎖。通常抽選には出ない' },
+  { id: 'turret', catalog: 'W13', name: '自動砲台', group: '既存候補', desc: '最寄りの敵へ自動射撃' },
+  { id: 'nova', catalog: 'W14', name: 'パルスノヴァ', group: '既存候補', desc: '自機中心に周期衝撃波' },
+  { id: 'laser', catalog: 'W15', name: 'レーザーランス', group: '既存候補', desc: '最寄りの敵へ貫通ビーム' },
+  { id: 'trailBurst', catalog: 'W16', name: '軌跡炸裂', group: '既存候補', desc: '高速で通った位置が遅れて爆発' },
 ];
 
 const RUN_TRAITS = [
@@ -1473,7 +1479,7 @@ const RUN_TRAITS = [
   { id: 'crossBlast', catalog: 'T02', name: '交差爆破', normal: true, desc: n => `過去${CONFIG.pathMemoryTime}秒の高速軌跡を横切ると交点で爆発。半径${100 + n * 25}、威力×${(0.8 + n * 0.4).toFixed(1)}` },
   { id: 'vortex', catalog: 'T03', name: '余韻の渦', normal: true, desc: n => `終点に${(1.5 + n * 0.4).toFixed(1)}秒の渦。半径${180 + n * 35}の敵を引き寄せる` },
   { id: 'fullCharge', catalog: 'T04', name: '満タン突撃', normal: true, desc: n => `満タン発動の経路移動中は装甲を無視し、攻撃力×${(1.25 + n * 0.25).toFixed(2)}。部分充填での通常発動には適用しない` },
-  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${320 + n * 50}、威力×${(1.6 + n * 0.8).toFixed(1)}` },
+  { id: 'killSonic', catalog: 'T05', name: '連鎖ソニック', normal: true, desc: n => `1回の高速攻撃中に${Math.max(3, 9 - n)}体倒すたびソニックブーム。半径${CONFIG.killSonicRadius + n * CONFIG.killSonicRadiusPerStack}、威力×${(CONFIG.killSonicDamage + n * CONFIG.killSonicDamagePerStack).toFixed(1)}` },
   { id: 'critBeam', catalog: 'T06', name: 'クリティカルランス', normal: true, desc: n => `クリティカル時に突進方向へ貫通ビーム。射程${CONFIG.lanceLength + n * CONFIG.lanceLengthPerStack}、威力×${(CONFIG.lanceDamage + n * CONFIG.lanceDamagePerStack).toFixed(1)}。ビームからは再発動しない` },
   { id: 'quickCharge', catalog: 'T07', name: '急速充填', normal: true, desc: n => `時間チャージの充填速度 +${n * 25}%` },
   { id: 'capacity', catalog: 'T08', name: '大容量チャージ', normal: true, desc: n => `チャージ容量 +${n * 20}%。満タンまでの時間と描ける長さが伸びる（回数ストックではない）` },
@@ -1558,6 +1564,10 @@ function rollRunChoices(game) {
   return out;
 }
 
+function runRankColor(level) {
+  return ['#d5dbea', '#8ed7a3', '#83b8ed', '#bf91ef', '#efcb70'][Math.max(0, Math.min(4, level - 1))];
+}
+
 function runChoiceInfo(c) {
   if (c.kind === 'heal') return { tag: '回復', name: '緊急修理', color: '#6dffb0', desc: 'HPを30%回復（取得・強化できる装備が残り少ない場合）' };
   const d = runModuleDef(c.kind, c.id);
@@ -1572,7 +1582,7 @@ function runChoiceInfo(c) {
     else if (c.id === 'knockback') desc += `、吹き飛ばす速さ${800 + 90 * (c.level - 1)}→${800 + 90 * c.level}`;
     else desc += `、範囲 ×${before.radius.toFixed(1)} → ×${after.radius.toFixed(1)}`;
   }
-  return { tag, name: `${d.name} ${suffix}`, desc, color: d.color || '#c995ff' };
+  return { tag, name: `${d.name} ${suffix}`, desc, color: runRankColor(c.level) };
 }
 
 function grantRunItem(game, kind, id, levels = 1) {
@@ -2041,8 +2051,8 @@ function onRunKill(game, cause) {
 function runSonic(game, cause) {
   const sh = game.ship, n = runTrait(game, 'killSonic');
   const L = runWeaponStats('sonic', game.weapons.sonic || 1);
-  const radius = cause === 'killSonic' ? 320 + n * 50 : CONFIG.sonicRadius * L.radius;
-  const mult = cause === 'killSonic' ? 1.6 + n * 0.8 : CONFIG.sonicDamage * L.damage;
+  const radius = cause === 'killSonic' ? CONFIG.killSonicRadius + n * CONFIG.killSonicRadiusPerStack : CONFIG.sonicRadius * L.radius;
+  const mult = cause === 'killSonic' ? CONFIG.killSonicDamage + n * CONFIG.killSonicDamagePerStack : CONFIG.sonicDamage * L.damage;
   const wave = { x: sh.x, y: sh.y, radius, dmg: attackPower(0, game.stats) * mult, cause,
     life: CONFIG.sonicTravelTime, max: CONFIG.sonicTravelTime, hits: new Set() };
   game.sonicWaves.push(wave);
@@ -3688,7 +3698,7 @@ function updateCapsules(game, dt) {
         addText(game, sh.x, sh.y - 50, `出力 +${Math.round(CONFIG.coreBoost * 100)}%`, '#ffd24a');
       } else if (c.kind === 'cache') {
         addXp(game, c.xp);
-        addText(game, c.x, c.y, 'XP', '#6dffb0');
+        addText(game, c.x, c.y, 'XP', CONFIG.xpColor);
       } else {
         game.offerQueue.push({ ...c.mod, source: c.src && c.src !== 'field' ? c.src : 'capsule' });
       }
@@ -4869,18 +4879,19 @@ function drawStageFlash(r, dt) {
 function drawGems(r, game) {
   const { ctx } = r;
   const s = Math.max(5, 3 / r.cam.zoom);
-  ctx.fillStyle = '#6dffb0';
+  ctx.fillStyle = CONFIG.xpColor;
+  ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 0.8 / r.cam.zoom;
   for (const g of game.gems) {
     if (!onScreen(r, g.x, g.y, 20)) continue;
     const k = g.v > 8 ? 1.6 : g.v > 3 ? 1.25 : 1;
     ctx.beginPath();
     ctx.moveTo(g.x, g.y - s * k); ctx.lineTo(g.x + s * 0.7 * k, g.y); ctx.lineTo(g.x, g.y + s * k); ctx.lineTo(g.x - s * 0.7 * k, g.y);
-    ctx.closePath(); ctx.fill();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 }
 
 function capsuleColor(c) {
-  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? '#6dffb0' : RARITIES[c.mod.r].color;
+  return c.kind === 'core' ? '#ffd24a' : c.kind === 'cache' ? CONFIG.xpColor : RARITIES[c.mod.r].color;
 }
 
 function drawCoins(r, game) {
@@ -4920,9 +4931,9 @@ function drawCapsules(r, game) {
       ctx.fillStyle = '#ffffff';
       ctx.beginPath(); ctx.arc(0, 0, S * 0.22, 0, TAU); ctx.fill();
     } else if (c.kind === 'cache') {
-      ctx.fillStyle = col; ctx.strokeStyle = '#e2fff0'; ctx.lineWidth = 2 / z;
+      ctx.fillStyle = col; ctx.strokeStyle = CONFIG.xpOutline; ctx.lineWidth = 2 / z;
       ctx.fillRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1); ctx.strokeRect(-S * 0.55, -S * 0.55, S * 1.1, S * 1.1);
-      ctx.fillStyle = '#132f24'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
+      ctx.fillStyle = '#1d293a'; ctx.font = `bold ${S * 0.65}px ${MONO}`; ctx.textAlign = 'center'; ctx.fillText('XP', 0, S * 0.22);
     } else {
       // the module shows up as the ship part it is (nose, engine, gun, radar, wings, reactor)
       drawPart(ctx, c.mod.slot, S * 0.95, col, { glow: 22 });
@@ -5060,14 +5071,14 @@ function drawRunLoadout(r, game) {
   ctx.fillStyle = '#a8c4ff'; ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}`, x, y);
   let row = 0;
   for (const d of RUN_WEAPONS.filter(d => game.weapons[d.id])) {
-    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = d.color;
+    const col = row % 2, line = Math.floor(row / 2); ctx.fillStyle = runRankColor(game.weapons[d.id]);
     ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} Lv${game.weapons[d.id]}`, x + col * width / 2, y + 16 + line * 15); row++;
   }
   const ty = y + 20 + Math.max(2, Math.ceil(row / 2)) * 15;
   ctx.fillStyle = '#cfb1f7'; ctx.fillText(`特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, x, ty);
   row = 0;
   for (const d of RUN_TRAITS.filter(d => game.traits[d.id])) {
-    ctx.fillStyle = '#cfb1f7'; ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
+    ctx.fillStyle = runRankColor(game.traits[d.id]); ctx.fillText(`${d.name.slice(0, W < 600 ? 4 : 7)} ×${game.traits[d.id]}`, x + (row % 2) * width / 2, ty + 16 + Math.floor(row / 2) * 15); row++;
   }
 }
 
@@ -5957,7 +5968,7 @@ function drawTimer(r, game) {
   const need = xpForLevel(game.level);
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   ctx.fillRect(0, 0, W, 5);
-  ctx.fillStyle = '#6dffb0';
+  ctx.fillStyle = CONFIG.xpColor;
   ctx.fillRect(0, 0, W * Math.min(1, game.xp / need), 5);
 }
 

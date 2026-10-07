@@ -70,8 +70,8 @@ export function onRunKill(game, cause) {
 function runSonic(game, cause) {
   const sh = game.ship, n = runTrait(game, 'killSonic');
   const L = runWeaponStats('sonic', game.weapons.sonic || 1);
-  const radius = cause === 'killSonic' ? 320 + n * 50 : CONFIG.sonicRadius * L.radius;
-  const mult = cause === 'killSonic' ? 1.6 + n * 0.8 : CONFIG.sonicDamage * L.damage;
+  const radius = cause === 'killSonic' ? CONFIG.killSonicRadius + n * CONFIG.killSonicRadiusPerStack : CONFIG.sonicRadius * L.radius;
+  const mult = cause === 'killSonic' ? CONFIG.killSonicDamage + n * CONFIG.killSonicDamagePerStack : CONFIG.sonicDamage * L.damage;
   const wave = { x: sh.x, y: sh.y, radius, dmg: attackPower(0, game.stats) * mult, cause,
     life: CONFIG.sonicTravelTime, max: CONFIG.sonicTravelTime, hits: new Set() };
   game.sonicWaves.push(wave);
