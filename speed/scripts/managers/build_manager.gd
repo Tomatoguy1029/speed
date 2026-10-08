@@ -1,4 +1,4 @@
-## 成長と装備。経験値・レベル・3択・能力値・武器と特性の発動（仕様書 6・7）。
+## 成長と装備。経験値・レベル・3択・能力値・武器と特性の発動（仕様書 8・9）。
 ##
 ## 武器・特性の発動は、持っているものの WeaponBehavior / TraitBehavior の入口を呼んで行う。
 class_name BuildManager
@@ -27,6 +27,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	state.weapons = {}
 	state.traits = {}
 	refresh_stats()
+	state.rerolls_left = cfg.reroll_count + roundi(_meta_add(&"reroll"))
 	grant(&"weapon", &"W01")
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
@@ -62,7 +63,7 @@ func _trait_param(id: StringName, key: String, default := 0.0) -> float:
 func _per(id: StringName) -> float:
 	return _trait_param(id, "per_stack")
 
-## 強化画面での強化（仕様書 12）。
+## 強化画面での強化（仕様書 14）。
 func _meta_level(stat: StringName) -> Array:
 	var out := []
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
@@ -92,7 +93,7 @@ func add_core() -> void:
 	cores += 1
 	refresh_stats()
 
-# ── 経験値とレベル（仕様書 7.1） ──────────────────────────────────
+# ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
 func xp_needed() -> float:
 	var L := float(state.level)
@@ -111,7 +112,7 @@ func add_xp(v: float) -> void:
 		need = xp_needed()
 		refresh_stats()
 
-# ── 3択（仕様書 7.2・7.3） ─────────────────────────────────────────
+# ── 3択（仕様書 9.2・9.4） ─────────────────────────────────────────
 
 func tick(real_dt: float, world_dt: float) -> void:
 	var busy := state.drawing or state.tracing
@@ -163,6 +164,16 @@ func roll_cards() -> Array[Dictionary]:
 		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
+## 3択のカードを引き直す（仕様書 9.2）。回数が残っていなければ false。
+func reroll_cards() -> bool:
+	if state.cards.is_empty() or state.rerolls_left <= 0:
+		return false
+	state.rerolls_left -= 1
+	state.cards = roll_cards()
+	state.emit(&"reroll", {})
+	cards_opened.emit(state.cards)
+	return true
+
 ## 3択のカードを選ぶ。次の3択があれば作り直し、なければ false を返す。
 func choose_card(index: int) -> bool:
 	if index < 0 or index >= state.cards.size():
@@ -181,7 +192,7 @@ func choose_card(index: int) -> bool:
 	state.cards = []
 	return false
 
-# ── 装備（仕様書 6） ─────────────────────────────────────────────
+# ── 装備（仕様書 8） ─────────────────────────────────────────────
 
 ## 武器・特性を levels 段階手に入れる。枠が満員か上限なら false。
 func grant(kind: StringName, id: StringName, levels := 1) -> bool:

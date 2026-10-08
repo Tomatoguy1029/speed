@@ -18,11 +18,11 @@ func setup(b: BuildManager, d: WeaponDef) -> void:
 	build = b
 	def = d
 
-## 表示 Lv に対応する性能段階（仕様書 6）。
+## 表示 Lv に対応する性能段階（仕様書 8）。
 func tier() -> int:
 	return def.level_steps[clampi(level, 1, def.level_steps.size()) - 1]
 
-## 威力・頻度・範囲の係数（仕様書 6）。
+## 威力・頻度・範囲の係数（仕様書 8）。
 func dmg_k() -> float:
 	return 1.0 + 0.3 * (tier() - 1)
 

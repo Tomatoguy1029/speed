@@ -1,8 +1,8 @@
-## 戦闘の計算。当たり判定の格子・攻撃力・接触・クリティカル・ダメージ・撃破・範囲攻撃・ヒットストップ（仕様書 5）。
+## 戦闘の計算。当たり判定の格子・攻撃力・接触・クリティカル・ダメージ・撃破・範囲攻撃・ヒットストップ（仕様書 7）。
 class_name CombatManager
 extends RunSystem
 
-## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 9.4）
+## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
 const FORCEFUL := [&"sonic", &"killSonic", &"critBeam"]
 
 var enemies: EnemyManager
@@ -24,7 +24,7 @@ var _buf: Array = []
 var _hits: Array = []
 
 func tick(real_dt: float, _world_dt: float) -> void:
-	# 突進していない間、ヒットストップの上限が戻る（仕様書 5.4）
+	# 突進していない間、ヒットストップの上限が戻る（仕様書 7.4）
 	if not state.tracing and dash_stop > 0.0:
 		dash_stop = maxf(0.0, dash_stop - real_dt * cfg.kill_hitstop_regen)
 
@@ -40,7 +40,7 @@ func in_rect(lo: Vector2, hi: Vector2, out: Array) -> void:
 	var pad := Vector2(cfg.max_enemy_radius, cfg.max_enemy_radius)
 	grid.query(lo - pad, hi + pad, out)
 
-# ── 攻撃力と装甲（仕様書 5.1・5.2・5.3） ──────────────────────────
+# ── 攻撃力と装甲（仕様書 7.1・7.2・7.3） ──────────────────────────
 
 func attack_power() -> float:
 	return cfg.base_attack * state.stats.attack_mult * cfg.atk_scale * burst_power
@@ -55,7 +55,7 @@ func is_weak_hit(e: Enemy, hit: Vector2) -> bool:
 	var a := (hit - e.pos).angle()
 	return absf(Geom.angle_diff(a, e.facing + PI)) <= e.weak_arc
 
-# ── 機体と敵の接触（仕様書 5.2） ──────────────────────────────────
+# ── 機体と敵の接触（仕様書 7.2） ──────────────────────────────────
 
 ## 機体が from から今の位置まで動いたときの、敵との接触。run はなぞり中の記録（なぞり中でなければ null）。
 ## 弾かれたら true を返す。
@@ -107,7 +107,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 				if n > 1:
 					state.emit(&"text", {"pos": e.pos + Vector2(e.r, -e.r - 16.0), "text": "×%d" % n,
 						"color": Color("#ffe46b") if crit else Color.WHITE, "size": 22 + 4 * mini(n, 5)})
-			# なぞり中と勢いの間は、雑魚を貫いても減速しない（仕様書 4.6）
+			# なぞり中と勢いの間は、雑魚を貫いても減速しない（仕様書 6.6）
 			if not (state.glide or state.tracing):
 				state.ship_vel *= _pierce_keep(e)
 			build.on_contact(e, hit_pos, dir)
@@ -118,7 +118,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			if crit:
 				state.hitstop = maxf(state.hitstop, 0.05 if e.dead else 0.035)
 			continue
-		# 弾かれた（仕様書 4.5・5.2）
+		# 弾かれた（仕様書 6.5・7.2）
 		state.glide = false
 		var n := hit_pos - e.pos
 		n = n.normalized() if n.length_squared() > 0.0 else -dir
@@ -143,7 +143,7 @@ func _pierce_keep(e: Enemy) -> float:
 	var loss := (0.004 + e.r * 0.0006) if e.dead else (0.1 + e.r * 0.002)
 	return 1.0 - minf(0.6, loss)
 
-## なぞりの線から出る波動（仕様書 4.5）。帯から一度外れた敵には、もう一度当たる。
+## なぞりの線から出る波動（仕様書 6.5）。帯から一度外れた敵には、もう一度当たる。
 func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 	var W := cfg.wave_radius
 	var length := p0.distance_to(p1)
@@ -206,7 +206,7 @@ func damage_enemy(e: Enemy, dmg: float, opts := {}) -> void:
 	if crit and not opts.get("no_crit", false):
 		build.on_critical(opts.get("impact", e.pos))
 
-## 一撃で倒したときのヒットストップ（仕様書 5.4）。
+## 一撃で倒したときのヒットストップ（仕様書 7.4）。
 func _kill_stop(e: Enemy, crit: bool) -> void:
 	if dash_stop >= cfg.kill_hitstop_cap:
 		return
@@ -227,7 +227,7 @@ func kill_enemy(e: Enemy, opts := {}) -> void:
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
 	state.emit(&"kill", {"pos": e.pos, "r": e.r, "crit": opts.get("crit", false), "type": e.type,
 		"elite": e.elite, "cause": cause, "dir": dir, "color": e.color})
-	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 9.5）
+	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	if cause != &"hullDebris" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
 		projectiles.scatter_hull(e, dir, speed, attack_power() * cfg.hull_debris_damage)

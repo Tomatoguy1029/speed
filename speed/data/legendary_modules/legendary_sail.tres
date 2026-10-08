@@ -8,4 +8,4 @@ id = &"legendary_sail"
 display_name = "帆のモジュール"
 description = "ほ座を解放したときに残された、錆びついたモジュール。"
 boss_id = &"centaurus"
-order = 4
+order = 2

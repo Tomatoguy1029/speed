@@ -1,11 +1,11 @@
-## フィールド。惑星・周回する月・宇宙塵・外縁・危険度（仕様書 11）。
+## フィールド。惑星・周回する月・宇宙塵・外縁・危険度（仕様書 13.1）。
 ##
 ## 惑星と月は障害物で、機体・敵・弾・線を止める。ここでは位置と当たり判定だけを持ち、
 ## 当たったときの扱い（跳ね返りやダメージ）は、それぞれの Manager が決める。
 class_name FieldManager
 extends RunSystem
 
-## 隕石1つの配置（仕様書 11）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）
+## 隕石1つの配置（仕様書 13.1）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）
 class Rock:
 	var kind: StringName
 	var pos := Vector2.ZERO
@@ -66,7 +66,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt > 0.0:
 		_stream_rocks(world_dt)
 
-# ── 隕石（仕様書 11） ─────────────────────────────────────────────
+# ── 隕石（仕様書 13.1） ─────────────────────────────────────────────
 
 ## ラン開始時に、世界の決まった位置へ隕石を置く：地帯・漂流・彗星。
 func _place_rocks(rng: RandomNumberGenerator) -> void:

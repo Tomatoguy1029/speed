@@ -58,7 +58,7 @@ var shove_hits: Dictionary = {}
 var shove_from := Vector2.ZERO
 var shoved := false
 
-## 1回の突進で最初に触れたときに満タンだったか（ヒットストップの一撃の判定、仕様書 5.4）
+## 1回の突進で最初に触れたときに満タンだったか（ヒットストップの一撃の判定、仕様書 7.4）
 var dash_seen := -1
 var dash_fresh := false
 var hull_scattered := false

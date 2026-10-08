@@ -1,4 +1,4 @@
-## ボス（仕様書 10・21・23、設計書 6.1）。出現・役者の登録・撃破。
+## ボス（仕様書 12.2・12.3・12.4、設計書 6.1）。出現・役者の登録・撃破。
 ##
 ## ボスは役者（BossActor のシーン）としてノードで作り、当たり判定の円を Enemy として配列に登録する。
 ## ボスの行動（形態・判断・攻撃）は役者のシーンの側で持ち、この Manager は特定のボスを知らない。
@@ -22,7 +22,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 	if actor != null and boss != null and not boss.dead:
 		actor.sim_tick(real_dt, world_dt)
 
-## ボスを出す（仕様書 10）。機体から少し離れた位置に出し、惑星の中と外縁の外は避ける。
+## ボスを出す（仕様書 12.2）。機体から少し離れた位置に出し、惑星の中と外縁の外は避ける。
 func spawn() -> void:
 	var def: BossDef = ConfigManager.bosses.get(state.stage.boss_id)
 	if def == null:

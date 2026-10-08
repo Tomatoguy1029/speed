@@ -9,12 +9,12 @@ extends Resource
 const EDITOR_ORDER := 7
 
 ## 伸ばす能力
-## max_speed（最高速度）、max_hp（最大 HP）、attack（攻撃力）、charge_time（ゲージの充填時間）、pickup（回収範囲）、xp（経験値）。
+## max_speed（最高速度）、max_hp（最大 HP）、attack（攻撃力）、charge_time（ゲージの充填時間）、pickup（回収範囲）、xp（経験値）、reroll（3択のリロールの回数）。
 ## 単位：文字
 @export var stat: StringName
 ## 1段階ごとの効果
-## 1段階ごとに伸ばす量。最大 HP は足す量、ほかは割合（0.05 なら 5%）。充填時間は短くする割合。
-## 単位：割合または HP
+## 1段階ごとに伸ばす量。最大 HP とリロールの回数は足す量、ほかは割合（0.05 なら 5%）。充填時間は短くする割合。
+## 単位：割合、HP、回
 @export var per_level: float
 ## 段階ごとの費用
 ## 1段階目から順に、上げるのに必要な部品の数。数の個数が最大の段階になる。

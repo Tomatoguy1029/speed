@@ -1,4 +1,4 @@
-## 雑魚の配列・行動・出現・補充・再配置（仕様書 9、設計書 6・6.1）。
+## 雑魚の配列・行動・出現・補充・再配置（仕様書 11、設計書 6・6.1）。
 ##
 ## 敵はノードではなく Enemy のデータとして配列で持つ。雑魚の行動は種類ごとの単純なステートマシン
 ## （例：ダーターの予告 → 突進 → 回復）。隕石とボスもこの配列に入るが、数え方と行動は別に扱う。
@@ -29,7 +29,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 
 # ── 生成 ──────────────────────────────────────────────────────────
 
-## 敵を作る（まだ配列には入れない）。opts：elite、size、facing、spin。仕様書 9.1 の補正をかける。
+## 敵を作る（まだ配列には入れない）。opts：elite、size、facing、spin。仕様書 11.2 の補正をかける。
 func create(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> Enemy:
 	var e := Enemy.new()
 	e.id = _next_id
@@ -66,7 +66,7 @@ func create(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> Enemy:
 func add(e: Enemy) -> void:
 	list.append(e)
 
-## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で加える（仕様書 9.2）。
+## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で加える（仕様書 11.3）。
 func add_later(e: Enemy) -> void:
 	_new.append(e)
 
@@ -100,7 +100,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 		if e.shove_time > 0.0 or e.knock_t > 0.0 or e.beh != Enemy.Beh.CHASE:
 			_update(e, dt)
 		else:
-			# 追跡（いちばん多い雑魚）は関数を呼ばずにここで計算する（仕様書 9.4）
+			# 追跡（いちばん多い雑魚）は関数を呼ばずにここで計算する（仕様書 11.5）
 			var cycle := fmod(e.age + e.roam_phase, cycle_len)
 			var roam := clampf(minf((cycle - appr) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
 			var target := aim
@@ -124,7 +124,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			field.collide_enemy(e, from)
 	_flush_new()
 
-## 敵の狙い：機体の遅れた位置（仕様書 5.5）。
+## 敵の狙い：機体の遅れた位置（仕様書 7.5）。
 func _update_aim(dt: float) -> void:
 	var d := state.ship_pos - state.enemy_aim
 	var dist := d.length()
@@ -198,7 +198,7 @@ func _steer_to(e: Enemy, target: Vector2, speed: float, accel: float, dt: float)
 func _turn_toward(e: Enemy, target: float, rate: float, dt: float) -> void:
 	e.facing += clampf(Geom.angle_diff(target, e.facing), -rate * dt, rate * dt)
 
-## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 9.4）。
+## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
 func _chase(e: Enemy, dt: float) -> void:
 	var aim := state.enemy_aim
 	var cycle := fmod(e.age + e.roam_phase, cfg.enemy_approach_cycle)
@@ -287,7 +287,7 @@ func on_enemy_death(e: Enemy) -> void:
 		c.hit_cd = 0.35
 		add_later(c)
 
-## 分裂などで増えた敵を、個体数の上限の範囲で加える（仕様書 9.2）。
+## 分裂などで増えた敵を、個体数の上限の範囲で加える（仕様書 11.3）。
 func _flush_new() -> void:
 	if _new.is_empty():
 		return
@@ -311,7 +311,7 @@ func cleanup() -> void:
 			alive.append(e)
 	list = alive
 
-# ── 出現と補充（仕様書 2.3・9.2・9.3） ─────────────────────────────
+# ── 出現と補充（仕様書 4.2・11.3・11.4） ─────────────────────────────
 
 func current_phase() -> PhaseDef:
 	var phases: Array = state.stage.phases

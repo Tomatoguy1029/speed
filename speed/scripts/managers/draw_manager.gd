@@ -1,4 +1,4 @@
-## ゲージと描画・なぞり・勢い（仕様書 4）。
+## ゲージと描画・なぞり・勢い（仕様書 6）。
 ##
 ## 描画となぞりは実秒で進む。世界の速さ（描画中 0.1 倍、なぞり中は突進の速さに反比例）は
 ## world_scale() で RunManager に伝える。
@@ -18,7 +18,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
 	state.gauge = 1.0
 
-## 今の世界の速さ（仕様書 4.2・4.5）。
+## 今の世界の速さ（仕様書 6.2・6.5）。
 func world_scale() -> float:
 	if state.drawing:
 		return cfg.draw_time_scale
@@ -42,7 +42,7 @@ func tick(real_dt: float, _world_dt: float) -> void:
 	elif not state.drawing:
 		_charge(real_dt)
 
-# ── 充填（仕様書 4.1） ───────────────────────────────────────────
+# ── 充填（仕様書 6.1） ───────────────────────────────────────────
 
 func _charge(real_dt: float) -> void:
 	var before := state.gauge
@@ -50,7 +50,7 @@ func _charge(real_dt: float) -> void:
 	if before < 1.0 and state.gauge >= 1.0:
 		state.emit(&"gauge_full")
 
-# ── 描画（仕様書 4.2・4.3） ──────────────────────────────────────
+# ── 描画（仕様書 6.2・6.3） ──────────────────────────────────────
 
 ## 描ける長さの上限。
 func budget(gauge_amount: float) -> float:
@@ -113,7 +113,7 @@ func _extend(to: Vector2) -> void:
 	state.draw_points.append(last + u * L)
 	state.draw_length += L
 
-## 線を確定して、なぞりを始める（仕様書 4.3〜4.5）。
+## 線を確定して、なぞりを始める（仕様書 6.3〜4.5）。
 func _commit(it: Intent) -> void:
 	if state.draw_points.size() < 2:
 		# 何も描かなかった：描き始めの点（なければ機体の位置）から、まっすぐ上限の長さだけ進む
@@ -175,7 +175,7 @@ func _warp(to: Vector2) -> void:
 	state.emit(&"warp", {"from": from, "to": to})
 	state.ship_pos = to
 
-# ── なぞり（仕様書 4.5・4.6） ────────────────────────────────────
+# ── なぞり（仕様書 6.5・6.6） ────────────────────────────────────
 
 func _trace(real_dt: float) -> void:
 	var pts := state.trace_path

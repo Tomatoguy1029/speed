@@ -1,4 +1,4 @@
-## 画面・モード・ステージ進行の状態機械。Autoload（設計書 4.3、仕様書 2.1）。
+## 画面・モード・ステージ進行の状態機械。Autoload（設計書 4.3、仕様書 3）。
 ##
 ## 画面の切り替えはこの Manager の関数を通してだけ行う。Main（scenes/app/main.tscn）は
 ## screen_changed を受けて、対応する画面のシーンに差し替える。
@@ -41,13 +41,13 @@ func start_run(stage: int, endless := false) -> void:
 	goto(Screen.RUN, false)
 	run_requested.emit(stage, endless)
 
-## ランを最後まで終えた。結果を保存して結果画面へ（仕様書 2.1）。
+## ランを最後まで終えた。結果を保存して結果画面へ（仕様書 3）。
 func finish_run(result: Dictionary) -> void:
 	last_result = result
 	SaveManager.record_run(result)
 	goto(Screen.RESULT, false)
 
-## ランを途中でやめてメインメニューへ戻る。そのランの部品と記録は残さない（仕様書 2.1）。
+## ランを途中でやめてメインメニューへ戻る。そのランの部品と記録は残さない（仕様書 3）。
 func abort_run() -> void:
 	last_result = {}
 	reset_to_main_menu()

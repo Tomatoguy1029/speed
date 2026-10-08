@@ -1,7 +1,7 @@
 ## 描画の流れ（設計書 10）。ゲームの状態とイベントを読むだけで、状態は書き換えない。
 ##
 ## World の下に層（DrawLayer）を作り、層ごとに描く。カメラは RunManager が求めた位置とズームに合わせる。
-## 敵と天体は透過ピクセルスプライト。見分けのルール（仕様書 15）を保つ。
+## 敵と天体は透過ピクセルスプライト。見分けのルール（仕様書 17）を保つ。
 class_name RenderManager
 extends Node
 
@@ -243,7 +243,7 @@ func _draw_field(c: CanvasItem) -> void:
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
 	var view := state.view_rect().grow(60.0)
-	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 15）
+	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 17）
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
 	gems.begin()
@@ -404,7 +404,7 @@ func _draw_fx(c: CanvasItem) -> void:
 		var size := int(t.size / maxf(state.camera_zoom, 0.25))
 		c.draw_string(_font, t.pos - Vector2(size * 0.8, 0), t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
 
-## 敗北の暗転（機体以外を暗くする。仕様書 14）。
+## 敗北の暗転（機体以外を暗くする。仕様書 16）。
 func _draw_dim(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING:
 		c.draw_rect(state.view_rect().grow(400.0), Color(0, 0, 0, cfg.death_world_dim))
@@ -426,7 +426,7 @@ func _draw_ship(c: CanvasItem) -> void:
 	c.draw_set_transform(p, dir.angle() - PI / 2.0)
 	c.draw_texture_rect(AIRSHIP, Rect2(-size / 2.0, size), false, col)
 	c.draw_set_transform(Vector2.ZERO)
-	# HP バー（機体の真下、仕様書 15）
+	# HP バー（機体の真下、仕様書 17）
 	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)
 	var w := _px(44.0)
 	var top := p + Vector2(-w / 2.0, R + _px(10.0))

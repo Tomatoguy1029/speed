@@ -1,4 +1,4 @@
-## 機体の移動・速さの減り方・地形との衝突・被弾（仕様書 3・5.2）。
+## 機体の移動・速さの減り方・地形との衝突・被弾（仕様書 5・7.2）。
 ##
 ## なぞり中（state.tracing）は DrawManager が機体を動かすので、ここでは動かさない。
 class_name ShipManager
@@ -39,7 +39,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 	_collide_bodies()
 	state.peak_speed = maxf(state.peak_speed, state.ship_vel.length())
 
-# ── 操舵（仕様書 3.1） ────────────────────────────────────────────
+# ── 操舵（仕様書 5.1） ────────────────────────────────────────────
 
 func _steer(dt: float) -> void:
 	if intent.touch:
@@ -67,7 +67,7 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 		state.ship_vel += Vector2.from_angle(want) * minf(cfg.steer_accel * dt, cruise - sp)
 	state.ship_heading = Vector2.from_angle(want)
 
-# ── 速さの減り方（仕様書 3.2・4.6） ───────────────────────────────
+# ── 速さの減り方（仕様書 5.2・6.6） ───────────────────────────────
 
 func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 	if state.glide:
@@ -101,7 +101,7 @@ func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 	if sp > cfg.pivot_speed:
 		state.ship_heading = state.ship_vel / sp
 
-# ── 地形との衝突（仕様書 5.2） ────────────────────────────────────
+# ── 地形との衝突（仕様書 7.2） ────────────────────────────────────
 
 func _collide_bodies() -> void:
 	var R := cfg.ship_radius
@@ -133,7 +133,7 @@ func _collide_bodies() -> void:
 		if vn > 0.0:
 			state.ship_vel -= n * 2.0 * vn
 
-# ── 被弾（仕様書 3・5.2） ─────────────────────────────────────────
+# ── 被弾（仕様書 5・7.2） ─────────────────────────────────────────
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 func damage(amount: float, slow: float, cause: StringName) -> bool:
