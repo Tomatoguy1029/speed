@@ -1,12 +1,17 @@
 ## 描画の流れ（設計書 10）。ゲームの状態とイベントを読むだけで、状態は書き換えない。
 ##
 ## World の下に層（DrawLayer）を作り、層ごとに描く。カメラは RunManager が求めた位置とズームに合わせる。
-## 見た目は仮の図形（企画書 16）。見分けのルール（仕様書 15）だけは守る。
+## 敵と天体は透過ピクセルスプライト。見分けのルール（仕様書 15）を保つ。
 class_name RenderManager
 extends Node
 
 const XP_COLOR := Color("#b8a0ff")
 const XP_OUTLINE := Color("#39265e")
+const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
+	"leech", "gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
+const MOON := preload("res://assets/pixel/moon.png")
+const PLANET := preload("res://assets/pixel/planet.png")
+const AIRSHIP := preload("res://assets/pixel/airship.png")
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -45,42 +50,33 @@ func _ready() -> void:
 	for name in ["background", "field", "pickups", "enemies", "projectiles", "path", "fx", "dim", "ship", "top"]:
 		var layer := DrawLayer.new()
 		layer.name = name.capitalize().replace(" ", "")
+		layer.z_index = _layers.size() * 2
 		layer.draw_fn = Callable(self, "_draw_" + name)
+		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		world.add_child(layer)
 		_layers[name] = layer
 	_build_batches()
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
-	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.ship])
+	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path])
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
 		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	run.frame_events.connect(_on_events)
 
-## 敵の形ごと・目・経験値の結晶の MultiMesh を作り、それぞれの層の子に置く。
+## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
 func _build_batches() -> void:
-	var shapes := {
-		&"orb": InstanceBatch.circle_points(16),
-		&"blob": InstanceBatch.circle_points(14),
-		&"dart": PackedVector2Array([Vector2(1.2, 0), Vector2(-0.8, 0.9), Vector2(-0.4, 0), Vector2(-0.8, -0.9)]),
-		&"ship": PackedVector2Array([Vector2(1.4, 0), Vector2(-0.8, 0.9), Vector2(-0.4, 0), Vector2(-0.8, -0.9)]),
-		&"hex": InstanceBatch.circle_points(6),
-		&"diamond": PackedVector2Array([Vector2(1, 0), Vector2(0, 0.7), Vector2(-1, 0), Vector2(0, -0.7)]),
-		&"rock": PackedVector2Array([Vector2(1, 0), Vector2(0.62, 0.7), Vector2(0.05, 0.92), Vector2(-0.6, 0.72), Vector2(-0.95, 0.15), Vector2(-0.8, -0.5), Vector2(-0.2, -0.93), Vector2(0.5, -0.82)]),
-	}
 	var enemy_mat := ShaderMaterial.new()
-	enemy_mat.shader = load("res://shaders/enemy.gdshader")
-	for key in shapes:
+	enemy_mat.shader = load("res://shaders/pixel_sprite.gdshader")
+	for id in SPRITE_IDS:
 		var b := InstanceBatch.new()
-		b.setup_polygon(shapes[key])
+		b.setup_texture(load("res://assets/pixel/" + id + ".png") as Texture2D)
 		b.material = enemy_mat
+		# 弱点・予告・HPをスプライトの上に描く。
+		b.z_index = -1
 		_layers.enemies.add_child(b)
-		_batches[key] = b
-	var eye := InstanceBatch.new()
-	eye.setup_polygon(InstanceBatch.circle_points(8))
-	_layers.enemies.add_child(eye)
-	_batches[&"eye"] = eye
+		_batches[StringName(id)] = b
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -240,9 +236,9 @@ func _draw_field(c: CanvasItem) -> void:
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
 	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	for b in f.bodies:
-		var col := Color("#3b4d8a") if b.is_planet else Color("#55607a")
-		c.draw_circle(b.pos, b.r, col)
-		c.draw_arc(b.pos, b.r, 0, TAU, 96, col.lightened(0.35), _px(2.0))
+		if view.grow(b.r).has_point(b.pos):
+			c.draw_texture_rect(PLANET if b.is_planet else MOON,
+				Rect2(b.pos - Vector2.ONE * b.r, Vector2.ONE * b.r * 2.0), false)
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
@@ -278,23 +274,24 @@ func _draw_pickups(c: CanvasItem) -> void:
 
 func _draw_enemies(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(cfg.max_enemy_radius)
-	for b in _batches.values():
-		b.begin()
-	var eye: InstanceBatch = _batches[&"eye"]
-	var dark := Color(0.05, 0.05, 0.1)
+	for key in _batches:
+		if key != &"gem":
+			_batches[key].begin()
 	for e: Enemy in run.enemies.list:
 		if e.dead or not view.has_point(e.pos):
 			continue
-		var col := e.color
-		if e.flash > 0.0:
-			col = col.lerp(Color.WHITE, 0.7)
+		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
+		var col := Color(1.0 if e.flash > 0.0 else 0.0, 0.0, 0.0, 1.0)
 		if e.type == &"meteor":
-			_batches[&"rock"].add(e.pos, e.facing, e.r, Color("#b8a898") if e.flash > 0.0 else Color("#7a6a5c"))
+			# ストリームで再生成されても同じ岩の模様を使う。
+			var rock_key := &"meteor_0" if e.meteor_index % 2 == 0 else &"meteor_1"
+			_batches[rock_key].add(e.pos, e.facing, e.r, col)
+			if e.hp < e.max_hp:
+				c.draw_line(e.pos - Vector2(e.r * 0.4, 0).rotated(e.facing),
+					e.pos + Vector2(e.r * 0.3, e.r * 0.3).rotated(e.facing), Color("#2e2620"), _px(2.0))
 			continue
-		var shape: StringName = e.def.shape if e.def != null else &"ship"
-		var batch: InstanceBatch = _batches.get(shape, _batches[&"orb"])
-		batch.add(e.pos, e.facing, e.r, col)
-		eye.add(e.pos + Vector2.from_angle(e.facing) * e.r * 0.55, 0.0, maxf(2.0, e.r * 0.18), dark)
+		var batch: InstanceBatch = _batches.get(e.type, _batches[&"battleship"])
+		batch.add(e.pos, e.facing - PI / 2.0, e.r, col)
 		_draw_enemy_marks(c, e)
 	for key in _batches:
 		if key != &"gem":
@@ -313,21 +310,6 @@ func _draw_enemy_marks(c: CanvasItem, e: Enemy) -> void:
 		var top := e.pos + Vector2(-w / 2.0, -e.r - _px(10.0))
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, e.hp / e.max_hp), _px(4.0))), Color("#ff6b5a"))
-
-## 隕石：灰茶の不規則な岩とクレーター。敵の目・装甲の輪・HP バーは描かない（仕様書 15）。
-func _draw_rock(c: CanvasItem, e: Enemy) -> void:
-	var pts := PackedVector2Array()
-	var seed := e.id * 0.37
-	for i in 9:
-		var a := e.facing + i * TAU / 9.0
-		var k := 0.78 + 0.22 * sin(seed + i * 2.3)
-		pts.append(e.pos + Vector2.from_angle(a) * e.r * k)
-	c.draw_colored_polygon(pts, Color("#7a6a5c") if e.flash <= 0.0 else Color("#b8a898"))
-	for i in 3:
-		var off := Vector2.from_angle(seed * 3.0 + i * 2.1) * e.r * 0.45
-		c.draw_circle(e.pos + off, e.r * 0.16, Color("#5e5146"))
-	if e.hp < e.max_hp:
-		c.draw_line(e.pos - Vector2(e.r * 0.4, 0), e.pos + Vector2(e.r * 0.3, e.r * 0.3), Color("#2e2620"), _px(2.0))
 
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(40.0)
@@ -432,19 +414,18 @@ func _draw_ship(c: CanvasItem) -> void:
 		return
 	var p := state.ship_pos
 	var R := cfg.ship_radius
-	var col := Color("#e8f6ff")
+	var col := Color.WHITE
 	var hurt := state.ship_hurt > 0.0
 	if hurt:
 		col = Color("#ff6b5a")
 		p.x += randf_range(-1.0, 1.0) * _px(cfg.ship_hurt_shake)
 	if state.ship_invuln > 0.0 and fmod(state.time * 20.0, 2.0) < 1.0:
 		col.a = 0.5
-	c.draw_circle(p, R, col)
-	c.draw_arc(p, R + _px(2.0), 0, TAU, 32, Color("#5fd8ff"), _px(2.0))
 	var dir := state.ship_heading
-	var tip := p + dir * (R + _px(14.0))
-	var side := Vector2(-dir.y, dir.x) * _px(6.0)
-	c.draw_colored_polygon(PackedVector2Array([tip, p + dir * (R + _px(4.0)) + side, p + dir * (R + _px(4.0)) - side]), Color("#5fd8ff"))
+	var size := AIRSHIP.get_size() * (R * 2.0 / AIRSHIP.get_height())
+	c.draw_set_transform(p, dir.angle() - PI / 2.0)
+	c.draw_texture_rect(AIRSHIP, Rect2(-size / 2.0, size), false, col)
+	c.draw_set_transform(Vector2.ZERO)
 	# HP バー（機体の真下、仕様書 15）
 	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)
 	var w := _px(44.0)

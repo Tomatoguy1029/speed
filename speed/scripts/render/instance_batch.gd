@@ -22,6 +22,26 @@ func setup_polygon(points: PackedVector2Array) -> void:
 	arrays[Mesh.ARRAY_VERTEX] = verts
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_setup_mesh(mesh)
+
+## スプライトは下向きで作成。縦横比を保ち、長辺を直径2にそろえる。
+func setup_texture(sprite: Texture2D) -> void:
+	var size := sprite.get_size()
+	var half := size / maxf(size.x, size.y)
+	# QuadMeshの3D向けUVでは上下が反転するため、2Dの上端をUV.y=0にする。
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([
+		Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)])
+	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	texture = sprite
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_setup_mesh(mesh)
+
+func _setup_mesh(mesh: Mesh) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_2D
 	mm.use_colors = true

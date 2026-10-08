@@ -33,6 +33,10 @@ func _ready() -> void:
 	var mat := CanvasItemMaterial.new()
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	material = mat
+	# Godot 4.6 / D3D12では現在のrgba16f読み書きパイプラインを作れない。
+	# このバックエンドは既存のCPU火花を使う。VulkanのGPU経路は保つ。
+	if RenderingServer.get_current_rendering_driver_name() == "d3d12":
+		return
 	rd = RenderingServer.get_rendering_device()
 	if rd == null:
 		return
