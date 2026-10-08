@@ -4,7 +4,7 @@
 
 2026-10-07、demo描画版の通常候補14種を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。管理IDはdemoから引き継ぐ。共通のルール（枠・重ね数・段階の色）は [仕様書](spec.md) の6章。demoの候補・保留・不採用（T15〜T30）は本番に登録していない。
 
-**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。発動する特性の数値は `speed/data/traits/<ID>_<内部ID>.tres` が正。能力値を変える特性（T07〜T12、T14）の重ね数ごとの効果は `speed/scripts/managers/build_manager.gd` の能力値の計算にある。
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。各特性の数値は `speed/data/traits/<ID>_<内部ID>.tres` が正で、Godot エディタの「データ」画面で見て調整する。能力値を変える特性（T07〜T12、T14）は、重ねるごとの効果を `per_stack`（T09 は上限 `max` も）に持つ。
 
 ## 採用
 

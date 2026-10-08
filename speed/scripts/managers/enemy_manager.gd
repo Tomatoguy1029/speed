@@ -279,8 +279,9 @@ func _gun_timer(e: Enemy, dt: float) -> bool:
 func on_enemy_death(e: Enemy) -> void:
 	if e.type != &"splitter":
 		return
-	for i in 2:
-		var a := e.facing + (1.0 if i == 1 else -1.0) * PI / 2.0
+	var n := maxi(1, int(e.def.params.get("death_split", 2)))
+	for i in n:
+		var a := e.facing + PI / 2.0 + TAU * float(i) / float(n) if n > 2 else e.facing + (1.0 if i == 1 else -1.0) * PI / 2.0
 		var c := create(def_of(&"splitling"), e.level, e.pos + Vector2.from_angle(a) * e.r, {"facing": a})
 		c.vel = Vector2.from_angle(a) * float(e.def.params.get("split_speed", 200.0))
 		c.hit_cd = 0.35

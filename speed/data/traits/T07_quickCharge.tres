@@ -9,5 +9,5 @@ code_id = &"quickCharge"
 display_name = "急速充填"
 description = "ゲージが早く溜まる（充填速度 +25% ずつ）"
 params = {
-
+"per_stack": 0.25
 }

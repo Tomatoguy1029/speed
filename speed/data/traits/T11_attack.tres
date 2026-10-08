@@ -9,5 +9,5 @@ code_id = &"attack"
 display_name = "攻撃力"
 description = "すべての攻撃が強くなる（+20% ずつ）"
 params = {
-
+"per_stack": 0.2
 }

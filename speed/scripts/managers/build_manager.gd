@@ -37,15 +37,15 @@ func refresh_stats() -> void:
 	var old_max := s.max_hp
 	var lv := float(state.level)
 	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + cfg.level_speed_growth * lv) \
-		* (1.0 + cfg.core_boost * cores) * (1.0 + 0.12 * _n(&"T10"))
-	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + 0.2 * _n(&"T11"))
+		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
+	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + _per(&"T11") * _n(&"T11"))
 	s.max_hp = cfg.base_hp + _meta_add(&"max_hp") + cfg.level_hp_growth * lv
-	s.capacity = 1.0 + 0.2 * _n(&"T08")
-	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + 0.25 * _n(&"T07"))
-	s.crit_chance = minf(0.9, cfg.base_crit_chance + 0.08 * _n(&"T09"))
+	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
+	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + _per(&"T07") * _n(&"T07"))
+	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
 	s.crit_mult = cfg.crit_mult
-	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + 0.3 * _n(&"T12"))
-	s.length_mult = 1.0 + 0.25 * _n(&"T14")
+	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
+	s.length_mult = 1.0 + _per(&"T14") * _n(&"T14")
 	s.xp_mult = _meta_mult(&"xp")
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max
@@ -53,6 +53,14 @@ func refresh_stats() -> void:
 
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
+
+## 能力値を変える特性の値（.tres の params）。
+func _trait_param(id: StringName, key: String, default := 0.0) -> float:
+	var def: TraitDef = ConfigManager.traits.get(id)
+	return float(def.params.get(key, default)) if def != null else default
+
+func _per(id: StringName) -> float:
+	return _trait_param(id, "per_stack")
 
 ## 強化画面での強化（仕様書 12）。
 func _meta_level(stat: StringName) -> Array:

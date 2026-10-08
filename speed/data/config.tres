@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="GameConfig" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="GameConfig" format=3]
 
 [ext_resource type="Script" path="res://scripts/data_types/game_config.gd" id="1"]
 
@@ -9,7 +9,7 @@ boss_time = 420.0
 boss_hp = 2200.0
 boss_armor = 14.0
 clear_bonus = 30
-speed_to_kms = 0.004977777777777777
+speed_to_kms = 0.00497777777777777
 boss_finish_replay_window = 0.18
 boss_finish_slow_time = 1.2
 boss_finish_zoom = 3.2
@@ -103,9 +103,9 @@ spawn_margin = 70.0
 spawn_refill_time = 1.0
 spawn_recycle_scale = 1.6
 titan_max = 6
-battleship_max = 1
 grid_cell = 160.0
 max_enemy_radius = 130.0
+battleship_max = 1
 hull_debris_min_radius = 50.0
 hull_debris_max_pieces = 12
 hull_debris_life = 0.9
@@ -127,7 +127,6 @@ meteor_heal_chance = 0.08
 meteor_heal_frac = 0.1
 meteor_magnet_chance = 0.04
 core_boost = 0.18
-core_start_time = 510.0
 pickup_life = 45.0
 gem_max = 600
 xp_base = 90.0

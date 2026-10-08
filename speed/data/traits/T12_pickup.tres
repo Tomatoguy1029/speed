@@ -9,5 +9,5 @@ code_id = &"pickup"
 display_name = "広域回収"
 description = "遠くのアイテムも拾える（回収範囲 +30% ずつ）"
 params = {
-
+"per_stack": 0.3
 }

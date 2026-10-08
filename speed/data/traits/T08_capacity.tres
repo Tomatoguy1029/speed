@@ -9,5 +9,5 @@ code_id = &"capacity"
 display_name = "大容量チャージ"
 description = "1回で描ける長さが伸びる（容量 +20% ずつ）"
 params = {
-
+"per_stack": 0.2
 }
