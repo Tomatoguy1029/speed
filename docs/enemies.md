@@ -4,7 +4,7 @@
 
 2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](spec.md) の9〜11章。
 
-**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ」画面で見て調整する。
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 通常敵
 

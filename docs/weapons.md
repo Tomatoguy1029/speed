@@ -4,7 +4,7 @@
 
 2026-10-07、demo描画版の通常候補9種を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。管理IDはdemoから引き継ぐ。共通のルール（枠・Lv・係数・段階の色）は [仕様書](spec.md) の6章。demoの保留・候補（W09〜W16、W18）は本番に登録していない。
 
-**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。各武器の数値は `speed/data/weapons/<ID>_<内部ID>.tres` が正で、Godot エディタの「データ」画面で見て調整する。
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。各武器の数値は `speed/data/weapons/<ID>_<内部ID>.tres` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 採用
 
