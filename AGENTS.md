@@ -19,6 +19,6 @@ SPEED の本番ゲームは Godot で開発する。Godot プロジェクトは 
 
 作業ユーザーは会話で明示された情報を優先する。特定できなければ確認し、別ユーザーの履歴へ推測で書かない。他のユーザーの記録は書き換えず、番号はファイルごとに続ける。
 
-自分の変更だけを `git add` してコミットする。`git add -A`・`git commit -a`・force push は使わない。他の人の未コミット変更には触れない。最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` する。
+自分の変更だけを `git add` してコミットする。`git add -A`・`git commit -a`・force push は使わない。他の人の未コミット変更には触れない。pushする前に必ずユーザーへ確認し、承認を得る。承認後、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` する。
 
 Vercel で公開するのは demo。GitHub Actions とルートの `vercel.json` で `demo/dist/` を配信する。Godot 本番の配布方法は未設定。demo の公開を変更したときは、公開 HTML とビルド済み `demo/dist/index.html` の一致まで確認する。
