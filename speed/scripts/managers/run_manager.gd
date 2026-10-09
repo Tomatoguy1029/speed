@@ -34,6 +34,10 @@ var sequence_t := 0.0
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
 var _cam_ready := false
+## 次の世界側の更新までにたまった時間と回数（config.world_tick_div）
+var _world_real_dt := 0.0
+var _world_dt := 0.0
+var _world_steps := 0
 ## 開発版の計測：処理時間の合計（マイクロ秒）・回数・最大時間。
 ## play_total は全体の包含時間なので、個別の項目と合算しない。
 var profile: Dictionary = {}
@@ -133,18 +137,30 @@ func _play_tick(real_dt: float) -> void:
 	var world_dt := real_dt * state.world_scale
 	state.time += real_dt
 	state.world_time += world_dt
-	_run(&"field", func(): field.tick(real_dt, world_dt))
-	_run(&"enemies", func(): enemies.tick(real_dt, world_dt))
-	_run(&"bosses", func(): bosses.tick(real_dt, world_dt))
-	_run(&"grid", func(): combat.rebuild_grid())
+	# 世界側は config.world_tick_div 回に1回、たまった時間でまとめて進める
+	_world_real_dt += real_dt
+	_world_dt += world_dt
+	_world_steps += 1
+	var world_step := _world_steps >= maxi(1, cfg.world_tick_div)
+	var wr := _world_real_dt
+	var wd := _world_dt
+	if world_step:
+		_world_real_dt = 0.0
+		_world_dt = 0.0
+		_world_steps = 0
+		_run(&"field", func(): field.tick(wr, wd))
+		_run(&"enemies", func(): enemies.tick(wr, wd))
+		_run(&"bosses", func(): bosses.tick(wr, wd))
+		_run(&"grid", func(): combat.rebuild_grid())
 	_run(&"ship", func(): ship.tick(real_dt, world_dt))
 	if state.phase == RunState.Phase.PLAY:
 		_run(&"build", func(): build.tick(real_dt, world_dt))
-	if state.phase == RunState.Phase.PLAY:
-		_run(&"projectiles", func(): projectiles.tick(real_dt, world_dt))
+	if world_step and state.phase == RunState.Phase.PLAY:
+		_run(&"projectiles", func(): projectiles.tick(wr, wd))
 	_run(&"cleanup", func(): enemies.cleanup())
-	_run(&"spawner", func(): enemies.spawner_tick(real_dt, world_dt))
-	_run(&"pickups", func(): pickups.tick(real_dt, world_dt))
+	if world_step:
+		_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
+		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()
 	_update_camera(real_dt)
 	_check_end()

@@ -11,6 +11,7 @@ var build: BuildManager
 
 var friendly: Array = []
 var hostile: Array = []
+var _hostile_spare: Array = []
 var _buf: Array = []
 
 func tick(_real_dt: float, world_dt: float) -> void:
@@ -158,8 +159,11 @@ func fire_enemy(e: Enemy, angle: float, speed: float, kind: StringName, params :
 	state.emit(&"shoot", {"pos": e.pos, "kind": kind})
 
 func _update_hostile(dt: float) -> void:
-	var keep: Array = []
+	# 前回の配列を使い回し、毎回の配列の生成を避ける
+	var keep := _hostile_spare
+	keep.clear()
 	var R := cfg.ship_radius
+	var body_move := field.body_speed_max * dt
 	for s: Shot in hostile:
 		if s.life <= 0.0:
 			continue
@@ -171,7 +175,15 @@ func _update_hostile(dt: float) -> void:
 		var from := s.pos
 		s.pos += s.vel * dt
 		s.life -= dt
-		var body_hit = field.first_body_hit(from, s.pos, s.r)
+		# 敵の弾は等速。天体の表面までの余裕が、この更新の弾と天体の移動量より大きい間は判定を省く。
+		var step := s.speed * dt
+		s.body_gap -= body_move
+		var body_hit = null
+		if s.body_gap <= step:
+			s.body_gap = field.body_gap(from, s.r)
+			if s.body_gap <= step:
+				body_hit = field.first_body_hit(from, s.pos, s.r)
+		s.body_gap -= step
 		# 遠くの弾は安い線分の矩形判定で除外。高速な弾も線分全体を確認する。
 		var rr := s.r + R
 		var ship_pos := state.ship_pos
@@ -186,6 +198,7 @@ func _update_hostile(dt: float) -> void:
 			s.life = 0.0
 		if s.life > 0.0:
 			keep.append(s)
+	_hostile_spare = hostile
 	hostile = keep
 
 ## 機体の周り radius に入った敵の弾を1つ消す（バリアシステム）。消したら true。

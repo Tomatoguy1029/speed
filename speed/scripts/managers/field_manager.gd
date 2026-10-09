@@ -42,6 +42,8 @@ var _body_cells: Array[Array] = []
 var _body_used: Array[int] = []
 var _body_origin := Vector2.ZERO
 var _body_width := 0
+## 天体が動く速さの上限（月の公転）。弾の天体判定を省ける時間の見積もりに使う
+var body_speed_max := 0.0
 ## 宇宙塵の雲（中心と半径）
 var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
@@ -67,6 +69,9 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 		var d := rng.randf_range(cfg.planet_radius + 600.0, cfg.field_radius - 200.0)
 		dust.append(Vector3(cos(a) * d, sin(a) * d, rng.randf_range(250.0, 620.0)))
 	_build_moon_bands()
+	body_speed_max = 0.0
+	for m in moons:
+		body_speed_max = maxf(body_speed_max, absf(cfg.moon_orbit_speed) * m.orbit)
 	_body_origin = Vector2.ONE * (-cfg.field_radius - BODY_CELL_SIZE)
 	_body_width = ceili((cfg.field_radius * 2.0 + BODY_CELL_SIZE * 2.0) / BODY_CELL_SIZE)
 	_body_cells.clear()
@@ -240,6 +245,13 @@ func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
 						earliest = t
 						found = b
 	return null if found == null else {"body": found, "t": earliest, "point": p0.lerp(p1, earliest)}
+
+## 半径 radius の円が、いちばん近い障害物の表面に触れるまでの距離（重なっていれば 0 以下）。
+func body_gap(p: Vector2, radius: float) -> float:
+	var gap := INF
+	for b in bodies:
+		gap = minf(gap, p.distance_to(b.pos) - b.r - radius)
+	return gap
 
 ## 点 p を障害物の外へ押し出した位置（線の描き始めなどに使う）。
 func push_out(p: Vector2, margin: float) -> Vector2:

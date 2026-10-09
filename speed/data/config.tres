@@ -105,6 +105,7 @@ spawn_refill_time = 1.0
 spawn_recycle_scale = 1.6
 titan_max = 6
 grid_cell = 160.0
+world_tick_div = 2
 max_enemy_radius = 169.0
 battleship_max = 1
 hull_debris_min_radius = 50.0
