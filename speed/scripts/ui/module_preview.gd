@@ -81,7 +81,7 @@ func _draw_effect(code: String) -> void:
 		ship.x = 92
 	var end := Vector2(65, 12)
 	var route := PackedVector2Array([Vector2(-145, 65), Vector2(-75, -45), end])
-	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "crossBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length"]
+	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length"]
 	if route_effect:
 		draw_polyline(route, _ink(Color(0.8, 0.97, 1.0, 0.45)), 3.0, true)
 		ship = end
@@ -126,9 +126,6 @@ func _draw_effect(code: String) -> void:
 				_sprite(ENEMY, pos, 30.0)
 		"endBlast":
 			_burst(end, 42 + pulse * 12)
-		"crossBlast":
-			_line(Vector2(-40, 60), Vector2(20, -70), Color(0.8, 0.97, 1, 0.45))
-			_burst(Vector2(-5, -9), 28 + pulse * 8)
 		"vortex":
 			for i in 3:
 				var angle := _clock + i * TAU / 3
