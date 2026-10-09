@@ -32,6 +32,9 @@ var friend_spin := PackedFloat32Array()
 var friend_trail: Array[PackedVector2Array] = []
 var _buf: Array = []
 var _hits: Array = []
+## 列の長さの確認に使う列の名前（デバッグ版だけで確認する）
+var _friend_cols: Array[StringName] = []
+var _hostile_cols: Array[StringName] = []
 
 ## 敵の弾。弾1発ごとの箱を作らず、項目ごとの列で持つ。i 番目の弾は各列の i 番目（設計書 6）。
 enum HostileKind { BULLET, MISSILE }
@@ -50,6 +53,11 @@ var hostile_kind := PackedByteArray()
 var hostile_gap := PackedFloat32Array()
 var _hostile_updating := false
 var _hostile_clear_pending := false
+
+func setup(run_state: RunState, config: GameConfig) -> void:
+	super(run_state, config)
+	_friend_cols = Columns.names(self, "friend_")
+	_hostile_cols = Columns.names(self, "hostile_")
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
@@ -113,6 +121,7 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	friend_angle.append(angle)
 	friend_spin.append(spin)
 	friend_trail.append(PackedVector2Array())
+	assert(Columns.aligned(self, _friend_cols))
 
 func friend_count() -> int:
 	return friend_pos.size()
@@ -228,6 +237,7 @@ func _friend_resize(n: int) -> void:
 	friend_angle.resize(n)
 	friend_spin.resize(n)
 	friend_trail.resize(n)
+	assert(Columns.aligned(self, _friend_cols))
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
@@ -246,6 +256,7 @@ func fire_enemy(e: Enemy, angle: float, speed: float, kind: StringName, params :
 	hostile_turn.append(p.get("missile_turn", 0.0))
 	hostile_kind.append(HostileKind.MISSILE if missile else HostileKind.BULLET)
 	hostile_gap.append(0.0)
+	assert(Columns.aligned(self, _hostile_cols))
 	state.emit(&"shoot", {"pos": e.pos, "kind": kind})
 
 func hostile_count() -> int:
@@ -338,6 +349,7 @@ func _hostile_resize(n: int) -> void:
 	hostile_turn.resize(n)
 	hostile_kind.resize(n)
 	hostile_gap.resize(n)
+	assert(Columns.aligned(self, _hostile_cols))
 
 ## 機体の周り radius に入った敵の弾を1つ消す（バリアシステム）。消したら true。
 func block_one(center: Vector2, radius: float) -> bool:

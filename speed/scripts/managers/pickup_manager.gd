@@ -15,9 +15,17 @@ var gem_pulled := PackedByteArray()
 var coin_pos := PackedVector2Array()
 var coin_pulled := PackedByteArray()
 var capsules: Array = []
+## 列の長さの確認に使う列の名前（デバッグ版だけで確認する）
+var _gem_cols: Array[StringName] = []
+var _coin_cols: Array[StringName] = []
 var _capsule_t := 0.0
 var _core_t := 0.0
 var _cores_started := false
+
+func setup(run_state: RunState, config: GameConfig) -> void:
+	super(run_state, config)
+	_gem_cols = Columns.names(self, "gem_")
+	_coin_cols = Columns.names(self, "coin_")
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
@@ -56,6 +64,7 @@ func drop_gem(p: Vector2, v: float) -> void:
 	gem_pos.append(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0)
 	gem_value.append(v)
 	gem_pulled.append(0)
+	assert(Columns.aligned(self, _gem_cols))
 
 func _drop_coins(e: Enemy, danger: float) -> void:
 	var n := 0
@@ -70,6 +79,7 @@ func _drop_coins(e: Enemy, danger: float) -> void:
 	for i in n:
 		coin_pos.append(e.pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * e.r)
 		coin_pulled.append(0)
+	assert(Columns.aligned(self, _coin_cols))
 
 func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> void:
 	var c := Pickup.new()
@@ -160,6 +170,7 @@ func _collect_gems(dt: float) -> void:
 	gem_pos.resize(w)
 	gem_value.resize(w)
 	gem_pulled.resize(w)
+	assert(Columns.aligned(self, _gem_cols))
 
 func _collect_coins(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0
@@ -192,6 +203,7 @@ func _collect_coins(dt: float) -> void:
 		w += 1
 	coin_pos.resize(w)
 	coin_pulled.resize(w)
+	assert(Columns.aligned(self, _coin_cols))
 
 func _collect_capsules(dt: float) -> void:
 	var reach := 22.0 + cfg.ship_radius + 14.0
@@ -233,6 +245,7 @@ func _apply(c: Pickup) -> void:
 			gem_pos.clear()
 			gem_value.clear()
 			gem_pulled.clear()
+			assert(Columns.aligned(self, _gem_cols))
 			for other: Pickup in capsules:
 				if other.kind == Pickup.Kind.CACHE and not other.taken:
 					xp += other.value
