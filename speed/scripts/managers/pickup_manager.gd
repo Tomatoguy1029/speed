@@ -10,6 +10,8 @@ var enemies: EnemyManager
 var gems: Array = []
 var coins: Array = []
 var capsules: Array = []
+var _gems_spare: Array = []
+var _coins_spare: Array = []
 var _capsule_t := 0.0
 var _core_t := 0.0
 var _cores_started := false
@@ -120,36 +122,56 @@ func _spawn_cores(dt: float) -> void:
 
 # ── 拾う ──────────────────────────────────────────────────────────
 
-func _pull(p: Pickup, dt: float, radius: float, base_speed: float) -> float:
+## 吸い寄せる。step は今回の更新で寄せる最大の距離。戻り値は寄せる前の機体までの距離。
+func _pull(p: Pickup, radius: float, step: float) -> float:
 	var d := state.ship_pos - p.pos
 	var dist := d.length()
 	if dist < radius or p.pulled:
 		p.pulled = true
-		var pull := base_speed + state.ship_vel.length() * 1.2
-		p.pos += d / maxf(dist, 1.0) * minf(pull * dt, dist)
+		p.pos += d / maxf(dist, 1.0) * minf(step, dist)
 	return dist
 
 func _collect_gems(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0
-	var kept: Array = []
+	var radius := state.stats.pickup_radius
+	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
+	# 吸い寄せも回収もされない遠くの結晶は、平方根を使わない距離比較だけで残す
+	var far := maxf(radius, reach)
+	var far_sq := far * far
+	var ship_pos := state.ship_pos
+	# 前回の配列を使い回し、毎回の配列の生成を避ける
+	var kept := _gems_spare
+	kept.clear()
 	for g: Pickup in gems:
 		g.age += dt
-		if _pull(g, dt, state.stats.pickup_radius, 700.0) < reach:
+		if not g.pulled and ship_pos.distance_squared_to(g.pos) >= far_sq:
+			kept.append(g)
+		elif _pull(g, radius, step) < reach:
 			build.add_xp(g.value)
 			state.emit(&"pickup", {"kind": &"gem"})
 		else:
 			kept.append(g)
+	_gems_spare = gems
 	gems = kept
 
 func _collect_coins(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0
-	var kept: Array = []
+	var radius := state.stats.pickup_radius * 1.3
+	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
+	var far := maxf(radius, reach)
+	var far_sq := far * far
+	var ship_pos := state.ship_pos
+	var kept := _coins_spare
+	kept.clear()
 	for c: Pickup in coins:
-		if _pull(c, dt, state.stats.pickup_radius * 1.3, 700.0) < reach:
+		if not c.pulled and ship_pos.distance_squared_to(c.pos) >= far_sq:
+			kept.append(c)
+		elif _pull(c, radius, step) < reach:
 			state.coins += int(c.value)
 			state.emit(&"pickup", {"kind": &"coin"})
 		else:
 			kept.append(c)
+	_coins_spare = coins
 	coins = kept
 
 func _collect_capsules(dt: float) -> void:

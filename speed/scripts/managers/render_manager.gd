@@ -6,6 +6,7 @@ class_name RenderManager
 extends Node
 
 const XP_COLOR := Color("#b8a0ff")
+const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
 	"gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
@@ -58,6 +59,7 @@ var _stars: PackedVector3Array
 var _star_batch: InstanceBatch
 var _star_material: ShaderMaterial
 var _hostile_batch: InstanceBatch
+var _coin_batch: InstanceBatch
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
 
@@ -125,6 +127,11 @@ func _build_batches() -> void:
 	gem.material = gem_mat
 	_layers.pickups.add_child(gem)
 	_batches[&"gem"] = gem
+	# 部品は数が増え続けるので、円を1つずつ描かずにまとめて描く。カプセルより下に置く。
+	_coin_batch = InstanceBatch.new()
+	_coin_batch.setup_polygon(InstanceBatch.circle_points(24))
+	_coin_batch.show_behind_parent = true
+	_layers.pickups.add_child(_coin_batch)
 	# 弾の二重の円は全弾で共通。頂点を毎フレーム生成せず使い回す。
 	_hostile_batch = InstanceBatch.new()
 	var vertices := PackedVector2Array()
@@ -355,9 +362,11 @@ func _draw_pickups(c: CanvasItem) -> void:
 			gems.add(g.pos, 0.0, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
+	_coin_batch.begin()
 	for co: Pickup in p.coins:
 		if view.has_point(co.pos):
-			c.draw_circle(co.pos, cs, Color("#ffd24a"))
+			_coin_batch.add(co.pos, 0.0, cs, COIN_COLOR)
+	_coin_batch.end()
 	for cap: Pickup in p.capsules:
 		match cap.kind:
 			Pickup.Kind.HEAL:
