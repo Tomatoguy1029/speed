@@ -1,7 +1,7 @@
 ## 一様な格子での近傍探索（設計書 7）。毎回の更新で、敵の配列から作り直す。
 ##
 ## セルごとの先頭と、要素ごとの次の要素を PackedInt32Array で持ち、作り直しで新しい配列を作らない。
-## 範囲は毎回、要素の位置の最小・最大から決める。
+## 範囲は保持し、外へ出た要素がある時だけ拡張。前回使ったセルだけ空に戻す。
 class_name SpatialGrid
 extends RefCounted
 
@@ -12,42 +12,64 @@ var rows := 0
 var head := PackedInt32Array()
 var next := PackedInt32Array()
 var items: Array = []
+var _used_cells := PackedInt32Array()
 
 ## items の各要素は pos（Vector2）と dead（bool）を持つ。
 func build(list: Array, cell_size: float) -> void:
-	cell = cell_size
 	items = list
 	var n := list.size()
 	if next.size() < n:
 		next.resize(n)
-	var lo := Vector2(INF, INF)
-	var hi := Vector2(-INF, -INF)
-	for it in list:
-		if it.dead:
-			continue
-		lo = lo.min(it.pos)
-		hi = hi.max(it.pos)
-	if lo.x == INF:
-		cols = 0
-		rows = 0
+	if cols == 0 or cell != cell_size:
+		cell = cell_size
+		_reset_bounds(list)
+	if cols == 0:
 		return
-	origin = lo - Vector2(cell, cell)
-	cols = int((hi.x - origin.x) / cell) + 2
-	rows = int((hi.y - origin.y) / cell) + 2
-	var cells := cols * rows
-	if head.size() < cells:
-		head.resize(cells)
-	head.fill(-1)
+	for c in _used_cells:
+		head[c] = -1
+	_used_cells.clear()
 	for i in n:
 		var it = list[i]
 		if it.dead:
 			next[i] = -1
 			continue
-		var cx := int((it.pos.x - origin.x) / cell)
-		var cy := int((it.pos.y - origin.y) / cell)
+		var pos: Vector2 = it.pos
+		var cx := floori((pos.x - origin.x) / cell)
+		var cy := floori((pos.y - origin.y) / cell)
+		if cx < 0 or cy < 0 or cx >= cols or cy >= rows:
+			# 一部を書き込んだ後でも、全体を空にして新しい範囲で作り直す。
+			_reset_bounds(list)
+			build(list, cell_size)
+			return
 		var c := cy * cols + cx
+		if head[c] == -1:
+			_used_cells.append(c)
 		next[i] = head[c]
 		head[c] = i
+
+## 初回・範囲外へ移動した時だけ全件から範囲を求める。
+func _reset_bounds(list: Array) -> void:
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for it in list:
+		if it.dead:
+			continue
+		var pos: Vector2 = it.pos
+		lo = lo.min(pos)
+		hi = hi.max(pos)
+	_used_cells.clear()
+	if lo.x == INF:
+		cols = 0
+		rows = 0
+		return
+	# 移動で毎回境界を越えないよう、4セル分の余白を確保する。
+	origin = lo - Vector2(cell * 4.0, cell * 4.0)
+	cols = int((hi.x - origin.x) / cell) + 5
+	rows = int((hi.y - origin.y) / cell) + 5
+	var cells := cols * rows
+	if head.size() < cells:
+		head.resize(cells)
+	head.fill(-1)
 
 ## 長方形 lo〜hi に入るセルの要素を out に足す（死んだものは除く）。
 func query(lo: Vector2, hi: Vector2, out: Array) -> void:
