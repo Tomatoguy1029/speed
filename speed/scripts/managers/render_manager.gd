@@ -14,6 +14,8 @@ const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
 const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
 const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
+const AIRSHIP_TURRET_BASE := preload("res://assets/pixel/airship_turret_base.png")
+const AIRSHIP_TURRET := preload("res://assets/pixel/airship_turret.png")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
@@ -547,7 +549,19 @@ func _draw_ship(c: CanvasItem) -> void:
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	c.draw_texture_rect(AIRSHIP, Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size), false, col)
+	var rear = run.build.weapon_behaviors.get(&"W23")
+	if rear != null:
+		c.draw_texture_rect(AIRSHIP_TURRET_BASE,
+			Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size), false, col)
 	c.draw_set_transform(Vector2.ZERO)
+	if rear != null:
+		# 元絵の砲身は下向き。キャンバスの中心ではなく取り付け軸で回す。
+		var mount: Vector2 = rear.mount_position() + (p - state.ship_pos)
+		var aim: Vector2 = rear.aim_direction()
+		c.draw_set_transform(mount, aim.angle() - PI / 2.0)
+		c.draw_texture_rect(AIRSHIP_TURRET,
+			Rect2(-rear.MOUNT_PIXEL * cfg.character_scale, size), false, col)
+		c.draw_set_transform(Vector2.ZERO)
 	# HP バー（機体の真下、仕様書 17）
 	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)
 	var w := _px(44.0)

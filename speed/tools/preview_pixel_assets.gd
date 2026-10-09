@@ -114,6 +114,7 @@ func _preview() -> void:
 		state.ship_heading = Vector2.RIGHT
 		var weapon = load("res://scripts/weapons/rear.gd").new()
 		weapon.setup(run.build, ConfigManager.weapons[&"W23"])
+		run.build.weapon_behaviors[&"W23"] = weapon
 		for lv in range(1, 6):
 			weapon.level = lv
 			state.ship_pos = Vector2(0, -120 + (lv - 1) * 60)
