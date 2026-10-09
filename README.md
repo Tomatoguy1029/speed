@@ -26,7 +26,10 @@ godot --editor --path speed
 |---|---|
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
-| `docs/` | 本番の [企画書](docs/concept.md)・[仕様書](docs/spec.md)・[設計書](docs/design.md)、課題、ユーザーごとの作業記録 |
+| `docs/game/` | 本番の資料：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
+| `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
+| `docs/logs/` | 本番の作業ログ：ユーザーごとの履歴、報告書 |
+| `docs/art/` | 本番の画像の資料 |
 | `demo/docs/` | demo の仕様・課題・これまでの作業記録 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
@@ -34,13 +37,13 @@ godot --editor --path speed
 
 ## 武器・特性・敵の管理
 
-本番とdemoで同じ [一覧の運用ルール](docs/catalog.md) を使い、追加・変更・採否判断・実装の同じ作業で対象側の一覧を更新します。
+本番とdemoで同じ [一覧の運用ルール](docs/game/catalog/rules.md) を使い、追加・変更・採否判断・実装の同じ作業で対象側の一覧を更新します。
 
 | 一覧 | 本番 | demo |
 |---|---|---|
-| 武器 | [武器一覧](docs/weapons.md) | [demoの武器一覧](demo/docs/weapons.md) |
-| 特性 | [特性一覧](docs/traits.md) | [demoの特性一覧](demo/docs/traits.md) |
-| 敵 | [敵一覧](docs/enemies.md) | [demoの敵一覧](demo/docs/enemies.md) |
+| 武器 | [武器一覧](docs/game/catalog/weapons.md) | [demoの武器一覧](demo/docs/weapons.md) |
+| 特性 | [特性一覧](docs/game/catalog/traits.md) | [demoの特性一覧](demo/docs/traits.md) |
+| 敵 | [敵一覧](docs/game/catalog/enemies.md) | [demoの敵一覧](demo/docs/enemies.md) |
 
 ## demo を使う
 
@@ -57,4 +60,4 @@ python3 -m http.server 8766 --bind 127.0.0.1 --directory demo/dist
 
 GitHub Actions は demo または公開設定の変更時に Vercel へデプロイします。`main` は公開版、それ以外のブランチはプレビューです。この公開 URL はブラウザ demo 用です。
 
-本番の作業記録は [Tomatoguy1029](docs/wakida.md)・[ShueMaker70969](docs/shumak.md)・[keporusu](docs/keporusu.md) ごとに追記します。過去の試作記録は `demo/docs/` に保存しています。
+本番の作業記録は [Tomatoguy1029](docs/logs/wakida.md)・[ShueMaker70969](docs/logs/shumak.md)・[keporusu](docs/logs/keporusu.md) ごとに追記します。過去の試作記録は `demo/docs/` に保存しています。

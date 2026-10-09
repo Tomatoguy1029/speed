@@ -2,7 +2,7 @@
 ## 雑魚の種類ごとの強さと動き。ここの値はレベル1・標準の大きさのときの値で、時間帯のレベル・エリート・大きさで強くなる。
 ## HP・装甲には、調整値の「敵の HP 倍率」「敵の装甲倍率」も掛かる。
 ## ---
-## 値の正は res://data/enemies/*.tres（一覧 docs/enemies.md）。既定値は 0（GameConfig と同じ理由）。
+## 値の正は res://data/enemies/*.tres（一覧 docs/game/catalog/enemies.md）。既定値は 0（GameConfig と同じ理由）。
 class_name EnemyDef
 extends Resource
 

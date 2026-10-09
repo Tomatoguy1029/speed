@@ -136,6 +136,7 @@ weapon_slots = 4
 weapon_max_level = 5
 trait_slots = 6
 trait_max_stacks = 5
+start_weapon_choices = 3
 reroll_count = 3
 owned_card_bias = 1.6
 fallback_heal = 0.3

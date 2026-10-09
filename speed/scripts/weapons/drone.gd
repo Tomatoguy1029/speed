@@ -1,5 +1,5 @@
 ## W06 追走ドローン：周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する
-## （一覧 docs/weapons.md）。
+## （一覧 docs/game/catalog/weapons.md）。
 extends WeaponBehavior
 
 ## ドローン：pos、follow_until、serial（追い終えた区間）、hits（敵 → 次に当てられる時刻）

@@ -76,6 +76,8 @@ var traits: Dictionary = {}
 ## 保留中のレベルアップの数と、表示中の3択
 var pending_levels := 0
 var cards: Array[Dictionary] = []
+## ラン開始時の、最初の武器を選んでいる間か
+var start_pick := false
 ## このランで残っている、3択を引き直せる回数
 var rerolls_left := 0
 

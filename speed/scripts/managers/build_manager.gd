@@ -28,7 +28,6 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	state.traits = {}
 	refresh_stats()
 	state.rerolls_left = cfg.reroll_count + roundi(_meta_add(&"reroll"))
-	grant(&"weapon", &"W01")
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
@@ -135,6 +134,24 @@ func try_open_cards() -> bool:
 	cards_opened.emit(state.cards)
 	return true
 
+## ラン開始時に、最初の武器の候補を出す（仕様書 9.2）。
+func open_start_cards() -> void:
+	var out := roll_start_cards()
+	if out.is_empty():
+		return
+	state.start_pick = true
+	state.cards = out
+	cards_opened.emit(state.cards)
+
+## 最初の武器の候補：全武器からランダムに選ぶ。
+func roll_start_cards() -> Array[Dictionary]:
+	var ids: Array = ConfigManager.weapons.keys()
+	var out: Array[Dictionary] = []
+	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
+		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
+		out.append({"kind": &"weapon", "id": id, "level": 1, "start": true})
+	return out
+
 func roll_cards() -> Array[Dictionary]:
 	var pool: Array = []
 	for kind in [&"weapon", &"trait"]:
@@ -164,12 +181,12 @@ func roll_cards() -> Array[Dictionary]:
 		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
-## 3択のカードを引き直す（仕様書 9.2）。回数が残っていなければ false。
+## 表示中のカードを引き直す（仕様書 9.3）。最初の武器の選択でも使える。回数が残っていなければ false。
 func reroll_cards() -> bool:
 	if state.cards.is_empty() or state.rerolls_left <= 0:
 		return false
 	state.rerolls_left -= 1
-	state.cards = roll_cards()
+	state.cards = roll_start_cards() if state.start_pick else roll_cards()
 	state.emit(&"reroll", {})
 	cards_opened.emit(state.cards)
 	return true
@@ -179,6 +196,11 @@ func choose_card(index: int) -> bool:
 	if index < 0 or index >= state.cards.size():
 		return state.pending_levels > 0
 	var c: Dictionary = state.cards[index]
+	if state.start_pick:
+		state.start_pick = false
+		grant(c.kind, c.id)
+		state.cards = []
+		return false
 	if c.kind == &"heal":
 		ship.heal(state.stats.max_hp * cfg.fallback_heal)
 	else:

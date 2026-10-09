@@ -1,4 +1,4 @@
-## W08 ソニックブーム：駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波（一覧 docs/weapons.md）。
+## W08 ソニックブーム：駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波（一覧 docs/game/catalog/weapons.md）。
 extends WeaponBehavior
 
 var _t := 0.0

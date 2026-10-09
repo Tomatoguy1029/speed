@@ -491,7 +491,7 @@ function drawRunWeapons(r, game) {
   }
   ctx.globalAlpha = 1;
   for (const e of game.enemies) {
-    if (!(e.shove?.time > 0 || e.knockT > 0)) continue;
+    if (e.dead || !(e.shove?.time > 0 || e.knockT > 0)) continue;
     ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
     const sp = Math.hypot(e.vx, e.vy) || 1;
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
@@ -501,11 +501,12 @@ function drawRunWeapons(r, game) {
 function drawRunLoadout(r, game) {
   if (r.mobile) {
     const { ctx, W, H } = r;
-    ctx.fillStyle = 'rgba(4,8,20,.78)'; ctx.fillRect(0, H - 48, W, 48);
+    const width = Math.min(240, W - 144);
+    ctx.fillStyle = 'rgba(4,8,20,.65)'; ctx.fillRect(4, H - 54, width, 50);
     ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
-    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 32);
+    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 40);
     const equipped = RUN_WEAPONS.filter(d => game.weapons[d.id]);
-    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + i * (W - 20) / 4, H - 14, (W - 24) / 4); });
+    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + (i % 2) * width / 2, H - 25 + Math.floor(i / 2) * 14, width / 2 - 8); });
     return;
   }
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
@@ -1000,7 +1001,7 @@ function drawEnemies(r, game) {
   const atk = attackPower(sp, game.stats);
   const arcMult = game.stats.weakArcMult;
   for (const e of game.enemies) {
-    if (!onScreen(r, e.x, e.y, e.r + 220)) continue;
+    if (e.dead || !onScreen(r, e.x, e.y, e.r + 220)) continue;
     const R = e.r;
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -1193,7 +1194,7 @@ function drawMinimap(r, game) {
   ctx.fillStyle = '#a08a6c';
   for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
   for (const e of game.enemies) {
-    if (e.type !== 'battleship' && !e.elite) continue;
+    if (e.dead || (e.type !== 'battleship' && !e.elite)) continue;
     ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
     ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
   }
@@ -1479,16 +1480,17 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  const x = r.mobile ? 10 : 16, y = 18;
+  const x = r.mobile ? 10 : 16, y = r.mobile ? r.H - 124 : 18;
+  if (r.mobile) { ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(4, y - 4, 126, 80); }
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `${r.mobile ? 10 : 12}px ${MONO}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
+  ctx.fillText(r.mobile ? `HP${Math.ceil(Math.max(0, sh.hp))}/${Math.round(game.stats.maxHp)}` : `HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
   let ly = y + 28;
-  if (r.W < 600) {
+  if (r.mobile || r.W < 600) {
     // narrow (portrait phone): shorter lines so they clear the timer in the middle
-    ctx.fillText(`ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
+    ctx.fillText(r.mobile ? `ATK${atk.toFixed(1)} Lv${game.level}` : `ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
     ctx.fillText(`撃破 ${game.kills}`, x, ly += 18);
   } else {
     ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, ly);

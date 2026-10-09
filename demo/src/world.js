@@ -15,7 +15,7 @@ import { SLOTS, RARITIES, computeStats, moduleDef } from './modules.js';
 import { damageEnemy, addText, addRing } from './hits.js';
 import { createEffectState, updateEffects, onLaunch, onPierce, onShipHurt, endTraceAttack } from './effects.js';
 import { onRunLaunch, onRunTrail, onRunContact, updateRunWeapons, updateRunFollowers, updateRunSonic, onRunElectricContact } from './run-weapons.js';
-import { computeRunStats, rollRunChoices, grantRunItem, runModuleDef } from './run-build.js';
+import { computeRunStats, rollRunChoices, rollStarterWeapons, grantRunItem, runModuleDef } from './run-build.js';
 import { updateRareWeapons } from './rare-weapons.js';
 import { SPEED_STAGES, speedStage } from './stages.js';
 import { controlStep, controlAim, isDrawScheme } from './controls.js';
@@ -31,13 +31,13 @@ export function createGame(opts = {}) {
   // The portal prototype starts with its arrival wave so the core interaction is immediately testable.
   if ((opts.scheme || CONFIG.controlScheme) === 'portal') loadout.radar = { id: 'portalPulse', slot: 'radar', r: 0, plus: 0 };
   const newBuild = isDrawScheme(opts.scheme || CONFIG.controlScheme);
-  const weapons = { forward: 1 }, traits = {};
+  const weapons = newBuild && opts.chooseStarter ? {} : { forward: 1 }, traits = {};
   const stats = newBuild ? computeRunStats(meta, weapons, traits) : computeStats(meta, loadout);
   const rng = makeRng(seed);
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
-  return {
-    t: 0, acc: 0, seed, rng,
+  const game = {
+    t: 0, worldTime: 0, meteorClock: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout, newBuild, weapons, traits,
     rareQueue: [], rareOffer: null, levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
     runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
@@ -73,6 +73,11 @@ export function createGame(opts = {}) {
     events: [],
     viewRadius: 1400,
   };
+  if (newBuild && opts.chooseStarter) {
+    game.state = 'weaponSelect';
+    game.levelChoices = rollStarterWeapons(game);
+  }
+  return game;
 }
 
 export function update(game, frameDt, input) {
@@ -89,6 +94,7 @@ export function update(game, frameDt, input) {
     return;
   }
   if (game.state !== 'play') return;
+  const meteorClockBefore = game.meteorClock;
   recordBossApproach(game, frameDt);
   game.buildClock += frameDt;
   if (game.newBuild && !game.draw) {
@@ -134,7 +140,11 @@ export function update(game, frameDt, input) {
   game.timeScale = scale;
   game.acc += frameDt * scale;
   // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
+  if (game.draw || game.portalDash) {
+    const carry = frameDt * (1 - scale);
+    game.t += carry;
+    game.meteorClock += carry * (input.mobile ? (scale > 0 ? CONFIG.meteorSlowCarry : 0) : 1);
+  }
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -150,6 +160,11 @@ export function update(game, frameDt, input) {
       absorbDuplicates(game);
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
     }
+  }
+  // Meteors retain near-real-time motion during slow world steps. Update their
+  // positions on frames without a step too, then refresh the collision index.
+  if (game.state === 'play' && updateMeteorField(game, Math.max(0, game.meteorClock - meteorClockBefore))) {
+    game.grid = buildGrid(game.enemies, 160, game.grid);
   }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
@@ -170,6 +185,8 @@ function step(game, dt, input) {
   const sh = game.ship;
   const stats = game.stats;
   game.t += dt;
+  game.worldTime += dt;
+  game.meteorClock += dt;
   const phase = getPhase(game.t);
   if (phase.id !== game.phaseId) {
     game.phaseId = phase.id;
@@ -200,8 +217,8 @@ function step(game, dt, input) {
     sh.charging = false;
   }
 
-  updateMoons(game.field, game.t);
-  updateMeteorField(game, dt);
+  updateMoons(game.field, game.worldTime);
+  updateMeteorField(game, 0);
   game.leechDrag = 0;
   updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
@@ -209,7 +226,7 @@ function step(game, dt, input) {
   game.grid = buildGrid(game.enemies, 160, game.grid);
 
   if (!game.draw && !game.portalDash) {
-    const g = gravityAt(game.field, game.t, sh.x, sh.y);
+    const g = gravityAt(game.field, game.worldTime, sh.x, sh.y);
     const drag = dustDragAt(game.field, sh.x, sh.y) + game.leechDrag;
     const x0 = sh.x, y0 = sh.y;
     stepShip(sh, stats, dt, g.ax + ctl.ax, g.ay + ctl.ay, drag);
@@ -276,9 +293,17 @@ function openRunLevel(game) {
 }
 
 export function resolveRunLevel(game, index) {
-  if (game.state !== 'levelup') return false;
+  if (!['weaponSelect', 'levelup'].includes(game.state)) return false;
   const c = game.levelChoices?.[index];
   if (!c) return false;
+  if (game.state === 'weaponSelect') {
+    if (c.kind !== 'weapon' || c.level !== 1 || !runModuleDef('weapon', c.id)?.normal) return false;
+    if (!grantRunItem(game, 'weapon', c.id)) return false;
+    refreshStats(game);
+    game.levelChoices = null; game.state = 'play';
+    game.events.push({ type: 'upgrade', mod: c });
+    return true;
+  }
   if (game.rareOffer) {
     if (c.kind !== 'rareSkip') {
       if (!runModuleDef('weapon', c.id) || (game.weapons[c.id] || 0) >= CONFIG.weaponMaxLevel) return false;
@@ -449,8 +474,9 @@ function startDrawing(game, input) {
   // Keep the draw prototype's charge until commit; only the drawn length is spent.
   if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
-  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
+  const started = !!input.drawClick || (input.mobile && input.press);
+  game.draw = { phase: 'draw', points: started ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -899,8 +925,8 @@ function simulateFrom(game, ghost, t0, seconds) {
   const h = 1 / 60;
   const field = { ...game.field, moons: game.field.moons.map((m) => ({ ...m })) };
   for (let t = t0; t < seconds; t += h) {
-    updateMoons(field, game.t + t);
-    const g = gravityAt(field, game.t + t, ghost.x, ghost.y);
+    updateMoons(field, game.worldTime + t);
+    const g = gravityAt(field, game.worldTime + t, ghost.x, ghost.y);
     stepShip(ghost, game.stats, h, g.ax, g.ay, 0);
     const p = { x: ghost.x, y: ghost.y, sp: Math.hypot(ghost.vx, ghost.vy), t, vx: ghost.vx, vy: ghost.vy };
     pts.push(p);

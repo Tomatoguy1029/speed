@@ -156,6 +156,7 @@ export const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
+  meteorSlowCarry: 0.75, // mobile only: retain this share of the real-time carry during drawing/tracing
   meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
   rareMeteorChance: 0.01, // assigned once per world rock; guaranteed weapon on destruction

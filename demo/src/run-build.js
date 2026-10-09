@@ -96,6 +96,17 @@ export function computeRunStats(meta, weapons, traits, bonus = {}) {
   return s;
 }
 
+// Opening picks contain only adopted, ordinary weapons, all at Lv1.
+export function rollStarterWeapons(game) {
+  const pool = RUN_WEAPONS.filter(d => d.normal);
+  const choices = [];
+  while (choices.length < 3 && pool.length) {
+    const d = pool.splice(Math.floor(game.rng() * pool.length), 1)[0];
+    choices.push({ kind: 'weapon', id: d.id, level: 1 });
+  }
+  return choices;
+}
+
 export function rollRunChoices(game) {
   const pool = [];
   for (const [kind, defs, owned, slots, max] of [

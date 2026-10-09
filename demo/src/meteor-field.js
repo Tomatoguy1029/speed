@@ -45,33 +45,39 @@ function meteorWorldPosition(m, t) {
 }
 
 export function updateMeteorField(game, dt) {
+  const time = game.meteorClock ?? game.t;
   const view = game.spawnView || { x: game.ship.x, y: game.ship.y,
     halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
   const near = (p, extra) => Math.abs(p.x - view.x) < view.halfW + extra &&
     Math.abs(p.y - view.y) < view.halfH + extra &&
     Math.hypot(p.x, p.y) > CONFIG.planetRadius + 100 && Math.hypot(p.x, p.y) < CONFIG.fieldRadius + 100;
-  let unload = false;
+  let unload = false, changed = false;
   for (const e of game.enemies) {
     const m = e.worldMeteor;
     if (!m || e.dead) continue;
-    const p = meteorWorldPosition(m, game.t);
+    const p = meteorWorldPosition(m, time);
+    if (e.x !== p.x || e.y !== p.y) changed = true;
     e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy;
-    e.facing = m.facing + m.spin * game.t;
+    e.facing = m.facing + m.spin * time;
     if (!near(p, 650)) { m.active = false; unload = true; }
   }
-  if (unload) game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
-  if (!game.spawning) return;
+  if (unload) {
+    game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
+    changed = true;
+  }
+  if (!game.spawning) return changed;
   game.meteorStreamT = (game.meteorStreamT || 0) - dt;
-  if (game.meteorStreamT > 0) return;
+  if (game.meteorStreamT > 0) return changed;
   game.meteorStreamT = 0.2;
   for (const m of game.field.meteors) {
     if (m.destroyed || m.active) continue;
-    const p = meteorWorldPosition(m, game.t);
+    const p = meteorWorldPosition(m, time);
     if (!near(p, 300)) continue;
     const e = m.entity || (m.entity = createEnemy('meteor', 1, p.x, p.y,
       { size: m.size, facing: m.facing, spin: m.spin }));
     e.worldMeteor = m; m.active = true;
-    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * game.t;
-    game.enemies.push(e);
+    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * time;
+    game.enemies.push(e); changed = true;
   }
+  return changed;
 }

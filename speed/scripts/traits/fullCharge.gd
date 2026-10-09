@@ -1,4 +1,4 @@
-## T04 満タン突撃：満タンから始めた線をなぞっている間は、装甲を無視して攻撃力が上がる（一覧 docs/traits.md）。
+## T04 満タン突撃：満タンから始めた線をなぞっている間は、装甲を無視して攻撃力が上がる（一覧 docs/game/catalog/traits.md）。
 ## 線が終わると BuildManager.on_end() で元に戻る。
 extends TraitBehavior
 

@@ -1,4 +1,4 @@
-## W05 バリアシステム：周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ（一覧 docs/weapons.md）。
+## W05 バリアシステム：周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ（一覧 docs/game/catalog/weapons.md）。
 extends WeaponBehavior
 
 var _t := 0.0

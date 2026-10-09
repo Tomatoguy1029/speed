@@ -54,6 +54,8 @@ func _ready() -> void:
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
 	_update_camera(1.0)
+	# 最初の武器を選ぶ。HUD がつながってから開く
+	build.open_start_cards.call_deferred()
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:

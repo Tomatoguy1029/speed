@@ -1,10 +1,10 @@
 # 本番の敵一覧
 
-最終更新：2026-10-08。対象はGodot本番。[共通の運用ルール](catalog.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
+最終更新：2026-10-08。対象はGodot本番。[共通の運用ルール](rules.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
 
-2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](spec.md) の9〜11章。
+2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](../../logs/wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](../spec.md) の9〜11章。
 
-**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
+**数値はドキュメントで管理しない**（[catalog.md](rules.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 通常敵
 
@@ -30,19 +30,19 @@ ShueMaker70969 の手描き `drifter`・`swarm`・`darter` を画風の基準に
 
 ShueMaker70969 の組み込み依頼により、簡略化した生物アートを参照した通常敵11種の透過ピクセルスプライトを**試遊用に採用・実装済み**とした。以下の旧案の「未採用・未実装」は各相談時点の記録。最終アートの確定とは区別する。
 
-対象は `drifter`・`swarm`・`darter`・`armored`・`splitter`・`splitling`・`leech`・`gunner`・`missile`・`battleship`・`titan`。各画像は `speed/assets/pixel/<type ID>.png`、素材一覧と生成元は [素材README](../speed/assets/pixel/README.md)。描画は `RenderManager` と `InstanceBatch` の種類別MultiMesh、Nearestフィルタ。縦横比と実際の半径に合わせ、向き・エリートのサイズ補正・背面弱点・予告・HP・被弾フラッシュを保持する。ステータスと当たり判定は変更しない。
+対象は `drifter`・`swarm`・`darter`・`armored`・`splitter`・`splitling`・`leech`・`gunner`・`missile`・`battleship`・`titan`。各画像は `speed/assets/pixel/<type ID>.png`、素材一覧と生成元は [素材README](../../../speed/assets/pixel/README.md)。描画は `RenderManager` と `InstanceBatch` の種類別MultiMesh、Nearestフィルタ。縦横比と実際の半径に合わせ、向き・エリートのサイズ補正・背面弱点・予告・HP・被弾フラッシュを保持する。ステータスと当たり判定は変更しない。
 
 隕石 `meteor` は `meteor_0.png`／`meteor_1.png` を安定した配置IDで選ぶ。漂流・固定・彗星の既存挙動と損傷の亀裂は保持し、目やHPバーは加えない。月と惑星は `moon.png`／`planet.png` に置換し、障害物の半径に合わせる。暫定ボスは `battleship.png` を暫定共用する（星座ボスは未実装のまま）。
 
-Godot 4.6の通常ラン読み込みと、[全素材の実描画](art/pixel-implementation-preview.png) で透過・方向・弱点・HP・被弾フラッシュを確認した。素材は静止スプライトで、個別の歩行等のアニメーションは未実装。
+Godot 4.6の通常ラン読み込みと、[全素材の実描画](../../art/pixel-implementation-preview.png) で透過・方向・弱点・HP・被弾フラッシュを確認した。素材は静止スプライトで、個別の歩行等のアニメーションは未実装。
 
 ### 旧生物案を使用した全ピクセル画面の比較（2026-10-08）
 
-ユーザーが簡略化した11種の生物アートを再提示し、その場合の画面比較を依頼したため、[飛行船とピクセルHUDの画面モック](art/gameplay-airship-pixel-ui-v1.png) を制作した。敵は `mobs-v3-simple-lineup.png` の外観を参照し、小型・中型・タイタン・戦艦を配置した比較画像。図形案を取り消したり、この生物案を採用したりする判断ではない。サイズ比・弾数・配置は生成によるイメージで、実ゲームの再現・検証ではない。外観は未採用・未実装。
+ユーザーが簡略化した11種の生物アートを再提示し、その場合の画面比較を依頼したため、[飛行船とピクセルHUDの画面モック](../../art/gameplay-airship-pixel-ui-v1.png) を制作した。敵は `mobs-v3-simple-lineup.png` の外観を参照し、小型・中型・タイタン・戦艦を配置した比較画像。図形案を取り消したり、この生物案を採用したりする判断ではない。サイズ比・弾数・配置は生成によるイメージで、実ゲームの再現・検証ではない。外観は未採用・未実装。
 
 ### 図形と状態変化を軸にする案（2026-10-08）
 
-ShueMaker70969 が、情報量を増やすより元の図形を保つ方がよいと述べ、元の形をほぼ維持するか分かりやすい形へ置き換え、ゲームで生きるデザインを依頼した。[画面と状態変化の一枚絵](art/gameplay-geometric-states-v2.png) を制作した。元の丸・三角・多角形の識別を軸に、模様より向き・予告・残光・弱点・分裂で種類を示す方向。外観・演出は未採用・未実装。
+ShueMaker70969 が、情報量を増やすより元の図形を保つ方がよいと述べ、元の形をほぼ維持するか分かりやすい形へ置き換え、ゲームで生きるデザインを依頼した。[画面と状態変化の一枚絵](../../art/gameplay-geometric-states-v2.png) を制作した。元の丸・三角・多角形の識別を軸に、模様より向き・予告・残光・弱点・分裂で種類を示す方向。外観・演出は未採用・未実装。
 
 - `darter`：三角と先端の明るさ、前方の予告線、突進中の短い残光。
 - `gunner`：矢形と短いチャージ表示、簡潔な弾。
@@ -55,25 +55,25 @@ ShueMaker70969 が、情報量を増やすより元の図形を保つ方がよ�
 
 ### 現在の輪郭を保つ検討（2026-10-08）
 
-その後、ユーザーの依頼で [画面全体の一枚絵](art/gameplay-geometric-enemies-v1.png) を制作した。添付のゲーム画面を画像編集の対象として、丸・三角・五角形の外形を大きく変えず、内側の陰影・目・面の分割で個性を加えた候補。画面内の位置・大きさ・輪郭は生成による概略再現で、実ゲームの厳密な検証ではない。本番の採用・実装は未決。添付画面の五角形を本番の `blob` 形状へ転記していない。
+その後、ユーザーの依頼で [画面全体の一枚絵](../../art/gameplay-geometric-enemies-v1.png) を制作した。添付のゲーム画面を画像編集の対象として、丸・三角・五角形の外形を大きく変えず、内側の陰影・目・面の分割で個性を加えた候補。画面内の位置・大きさ・輪郭は生成による概略再現で、実ゲームの厳密な検証ではない。本番の採用・実装は未決。添付画面の五角形を本番の `blob` 形状へ転記していない。
 
 ShueMaker70969 から、現在の形状を維持し、その内側へ個性を加えるデザインが可能か相談があった。現ゲームの幾何形状を指すと仮定し、外形・サイズ・向きは保ち、目・裂け目・大きな陰影・装甲の切り替え・発射口などを内側へ少数だけ加える方法を提案した。個別の意匠と対象画像は未確定、未採用・未実装。新しい画像生成やゲーム実装はまだ行っていない。
 
 ### 独立したモチーフと共通の画風（2026-10-08）
 
-ShueMaker70969 が、雑魚敵にボスの要素を流用する必要はなく、同じ画面にいるときの画風の整合だけが必要と訂正した。[新しい11種の外観候補](art/mobs-v6-independent-motifs.png) では、ボス画像はピクセルの粗さ・輪郭・少色の陰影・色の強さのみの参考とした。全外観は未採用・未実装。ボス由来の装甲や角を雑魚敵に必須とする方針は採らない。
+ShueMaker70969 が、雑魚敵にボスの要素を流用する必要はなく、同じ画面にいるときの画風の整合だけが必要と訂正した。[新しい11種の外観候補](../../art/mobs-v6-independent-motifs.png) では、ボス画像はピクセルの粗さ・輪郭・少色の陰影・色の強さのみの参考とした。全外観は未採用・未実装。ボス由来の装甲や角を雑魚敵に必須とする方針は採らない。
 
 画像の上段は `splitling`（小さな雫）・`swarm`（小型の翼生物）・`drifter`（丸い小怪物）・`darter`（尖ったくちばしの流線形生物）・`gunner`（一つの開口部を持つ種莢風の生物）・`leech`（四つの短い突起を持つ円盤）。中段は `splitter`（二つの雫がつながる体）・`missile`（二つの発射器官を持つ体）・`armored`（厚い盾状の外殻と露出した背面）・`titan`（大型の岩肌の獣）・`battleship`（前面に三つの発射口を持つ幅広い生物）。行動・数値の変更はない。下段は大小関係のイメージで、縮尺は厳密ではない。
 
 ### 中ボスの参考デザインを基準とする方向（2026-10-08）
 
-ShueMaker70969 が方向を修正し、星が変化した存在という設定は維持する一方、雑魚敵に生物・星の要素を残すことは必須としないと指定した。中ボスの参考画像を先に [ピクセルアート化](art/bosses-v3-reference-pixel.png) し、その色・金色の装甲・角・尾の造形に合わせた [雑魚敵11種の新候補](art/mobs-v5-boss-matched.png) を制作した。現在の比較案はこちら。過去の星の核・外殻案は比較履歴として保持し、採用済み扱いにはしない。
+ShueMaker70969 が方向を修正し、星が変化した存在という設定は維持する一方、雑魚敵に生物・星の要素を残すことは必須としないと指定した。中ボスの参考画像を先に [ピクセルアート化](../../art/bosses-v3-reference-pixel.png) し、その色・金色の装甲・角・尾の造形に合わせた [雑魚敵11種の新候補](../../art/mobs-v5-boss-matched.png) を制作した。現在の比較案はこちら。過去の星の核・外殻案は比較履歴として保持し、採用済み扱いにはしない。
 
 新候補の上段は `splitling`（緑の小仮面）・`swarm`（青の小翼獣）・`drifter`（黒い小犬）・`darter`（白紫の角獣）・`gunner`（青の弓使い）・`leech`（紫の巻き蛇）、中段は `splitter`（つながる二仮面）・`missile`（双角の浮遊像）・`armored`（大きな正面装甲の獣）・`titan`（緑の大型竜獣）・`battleship`（大型の青い弩の獣）。外観のみの候補で全項目未採用・未実装。弓・弩・像などの外観は、既存の弾・誘導弾・扇状射撃の挙動を変更する決定ではない。群れの縮尺はイメージで厳密ではなく、装飾の削減と特性の視認性は今後検討する。
 
 ### 星が変質した怪物の外観候補（2026-10-08）
 
-ShueMaker70969 の指定では、雑魚敵は星座ではなく普通の星が変化した敵。虫・甲殻類を主題にするのではなく、星の核・外殻・尾・噴出口を体の器官にする案を [画像化](art/mobs-v4-transformed-stars.png) した。全11種の外観候補、未採用・未実装。上段は `splitling`・`swarm`・`drifter`・`darter`・`gunner`・`leech`、中段は `splitter`・`missile`・`armored`・`titan`・`battleship`、下段は群れのイメージ。既存の行動・数値は変更しない。
+ShueMaker70969 の指定では、雑魚敵は星座ではなく普通の星が変化した敵。虫・甲殻類を主題にするのではなく、星の核・外殻・尾・噴出口を体の器官にする案を [画像化](../../art/mobs-v4-transformed-stars.png) した。全11種の外観候補、未採用・未実装。上段は `splitling`・`swarm`・`drifter`・`darter`・`gunner`・`leech`、中段は `splitter`・`missile`・`armored`・`titan`・`battleship`、下段は群れのイメージ。既存の行動・数値は変更しない。
 
 - 分裂体は小さな核の破片、スウォームは短い尾を持つ星片、ドリフターは核の見える裂け目を持つ球体、ダーターは尖った核と尾を持つ流れ星の怪物。
 - 射撃型は一つの噴出口、減速型は暗い中心を持つ吸い込み円盤、分裂型は割れた二つの核、ミサイル艇は二つの発射用の核、装甲型は厚い正面の殻と露出した背面の核。
@@ -82,33 +82,33 @@ ShueMaker70969 の指定では、雑魚敵は星座ではなく普通の星が�
 
 ### 外観の簡略化方針（2026-10-08）
 
-ShueMaker70969 が、輪郭で種類を区別する／特性を示す主要な特徴を一つに絞る／小型ほど細部を減らす／世界観の装飾は控えめにする、という制作ルールを承認した。個別の外観は未採用・未実装。[11種の簡略化案](art/mobs-v3-simple-lineup.png) は、上段が大小関係のイメージ、下段が小型〜中型9種の拡大像。生成画像のサイズ比は厳密ではなく、当たり判定や実ゲームの表示サイズを決める資料には使わない。
+ShueMaker70969 が、輪郭で種類を区別する／特性を示す主要な特徴を一つに絞る／小型ほど細部を減らす／世界観の装飾は控えめにする、という制作ルールを承認した。個別の外観は未採用・未実装。[11種の簡略化案](../../art/mobs-v3-simple-lineup.png) は、上段が大小関係のイメージ、下段が小型〜中型9種の拡大像。生成画像のサイズ比は厳密ではなく、当たり判定や実ゲームの表示サイズを決める資料には使わない。
 
 上段の左から、`splitling`・`swarm`・`drifter`・`darter`・`gunner`・`leech`・`splitter`・`missile`・`armored`・`titan`・`battleship`。親子の共通形状、突進の尖った頭、射撃の砲口、ミサイル型の二つの発射器官、装甲型と戦艦の露出した背面、大型敵の大きな体構造を外観候補とする。背面弱点・攻撃予告・減速範囲が実際のプレイで読めるかは未検証。色や装飾、個別の形は引き続き検討対象。
 
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
 |---|---|---|---|---|---|---|
-| `drifter` | ドリフター | 採用 | 実装済み | 追跡と広域移動 | 全時間帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../demo/docs/enemies.md) |
-| `swarm` | スウォーム | 採用 | 実装済み | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../demo/docs/enemies.md) |
-| `darter` | ダーター | 採用 | 実装済み | 近づくと予告してから突進し、しばらく止まる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../demo/docs/enemies.md) |
-| `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../demo/docs/enemies.md) |
-| `splitter` | 分裂型 | 採用 | 実装済み | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも2体に分かれる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../demo/docs/enemies.md) |
-| `splitling` | 分裂体 | 採用 | 実装済み | 小型の追跡敵 | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../demo/docs/enemies.md) |
-| `leech` | 減速型 | 採用 | 実装済み | 周りのオーラの中で機体を減速させる。貫くと勢いを吸う | 圧力期・緊張期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/leech.tres`。[demo](../demo/docs/enemies.md) |
-| `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../demo/docs/enemies.md) |
-| `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../demo/docs/enemies.md) |
-| `battleship` | 戦艦 | 採用 | 実装済み | 予告のあと扇状に弾をばらまく。背面に当てると必ずクリティカル。エリートにならない | 緊張期・脱出期。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/battleship.tres`。[demo](../demo/docs/enemies.md) |
-| `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../demo/docs/enemies.md) |
+| `drifter` | ドリフター | 採用 | 実装済み | 追跡と広域移動 | 全時間帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../../../demo/docs/enemies.md) |
+| `swarm` | スウォーム | 採用 | 実装済み | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../../../demo/docs/enemies.md) |
+| `darter` | ダーター | 採用 | 実装済み | 近づくと予告してから突進し、しばらく止まる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../../../demo/docs/enemies.md) |
+| `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../../../demo/docs/enemies.md) |
+| `splitter` | 分裂型 | 採用 | 実装済み | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも2体に分かれる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md) |
+| `splitling` | 分裂体 | 採用 | 実装済み | 小型の追跡敵 | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../../../demo/docs/enemies.md) |
+| `leech` | 減速型 | 採用 | 実装済み | 周りのオーラの中で機体を減速させる。貫くと勢いを吸う | 圧力期・緊張期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/leech.tres`。[demo](../../../demo/docs/enemies.md) |
+| `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md) |
+| `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md) |
+| `battleship` | 戦艦 | 採用 | 実装済み | 予告のあと扇状に弾をばらまく。背面に当てると必ずクリティカル。エリートにならない | 緊張期・脱出期。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/battleship.tres`。[demo](../../../demo/docs/enemies.md) |
+| `titan` | タイタン | 採用 | 実装済み | 大型の追跡敵。生成時に大きさが変わる | 無双期以外。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../../../demo/docs/enemies.md) |
 
 ## ボス
 
 ### 外観の検討（2026-10-08）
 
-ShueMaker70969 の相談で、実体のあるピクセルの通常敵と星座モチーフの中ボスを [コンセプト画像](art/enemy-concepts-v1.png) にした。外観候補であり、既存の行動・採用状態・実装は変更しない。画像の装飾・配色・首の数は未確定。
+ShueMaker70969 の相談で、実体のあるピクセルの通常敵と星座モチーフの中ボスを [コンセプト画像](../../art/enemy-concepts-v1.png) にした。外観候補であり、既存の行動・採用状態・実装は変更しない。画像の装飾・配色・首の数は未確定。
 
-同日、ユーザーの参考画像に合わせて視点を真上からの見下ろしに訂正し、[トップダウン版の外観候補](art/enemy-concepts-v2-topdown.png) を制作した。現在の相談用画像はこちら。下表の生物モチーフは維持し、配色・装飾・視点の描き方は新画像を参照する。ゲームへの採用・実装は未確定。
+同日、ユーザーの参考画像に合わせて視点を真上からの見下ろしに訂正し、[トップダウン版の外観候補](../../art/enemy-concepts-v2-topdown.png) を制作した。現在の相談用画像はこちら。下表の生物モチーフは維持し、配色・装飾・視点の描き方は新画像を参照する。ゲームへの採用・実装は未確定。
 
-さらに通常敵6種（`drifter`・`darter`・`armored`・`splitter`・`leech`・`gunner`）の外観を比較するため、[A：丸い宇宙生物](art/mobs-style-a-rounded.png)、[B：鋭い異形の獣](art/mobs-style-b-predators.png)、[C：航海道具と融合した生物](art/mobs-style-c-nautical.png) を制作した。各案は同じ役割の形を異なる画風で表した候補で、新しい敵種の追加ではない。Aは大きな色面と丸い体、Bは骨や甲殻の鋭い形、Cは風化した真鍮・船体・巻貝などの装飾を使う。いずれも真上視点・実体のある体を前提とし、採用は未決、未実装。縮小表示と群れの配置は生成画像内のイメージであり、実ゲームでの視認性を検証済みではない。
+さらに通常敵6種（`drifter`・`darter`・`armored`・`splitter`・`leech`・`gunner`）の外観を比較するため、[A：丸い宇宙生物](../../art/mobs-style-a-rounded.png)、[B：鋭い異形の獣](../../art/mobs-style-b-predators.png)、[C：航海道具と融合した生物](../../art/mobs-style-c-nautical.png) を制作した。各案は同じ役割の形を異なる画風で表した候補で、新しい敵種の追加ではない。Aは大きな色面と丸い体、Bは骨や甲殻の鋭い形、Cは風化した真鍮・船体・巻貝などの装飾を使う。いずれも真上視点・実体のある体を前提とし、採用は未決、未実装。縮小表示と群れの配置は生成画像内のイメージであり、実ゲームでの視認性を検証済みではない。
 
 | 対象 | 外観候補 | 状態 |
 |---|---|---|
@@ -123,7 +123,7 @@ ShueMaker70969 の相談で、実体のあるピクセルの通常敵と星座�
 | 仮ID `concept_canis` | 船の竜骨風の装甲を持つ大型犬 | ボス候補・未実装 |
 | 仮ID `concept_centaurus` | 帆の装飾を持つケンタウロスの弓使い | ボス候補・未実装 |
 
-これらの仮IDは外観相談の参照用で、ゲームのtype IDには登録していない。世界観の参考はユーザー提供の外部 `design.md`。詳細は [作業履歴3](shumak.md#3-2026-10-08--実体のある雑魚敵と中ボスの外観案)。
+これらの仮IDは外観相談の参照用で、ゲームのtype IDには登録していない。世界観の参考はユーザー提供の外部 `design.md`。詳細は [作業履歴3](../../logs/shumak.md#3-2026-10-08--実体のある雑魚敵と中ボスの外観案)。
 
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
 |---|---|---|---|---|---|---|

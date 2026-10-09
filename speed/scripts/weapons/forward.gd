@@ -1,4 +1,4 @@
-## W01 ブラスター：進む向きへ自動で撃つ（一覧 docs/weapons.md）。描画中・なぞり中は休む。
+## W01 ブラスター：進む向きへ自動で撃つ（一覧 docs/game/catalog/weapons.md）。描画中・なぞり中は休む。
 extends WeaponBehavior
 
 var _t := 0.0

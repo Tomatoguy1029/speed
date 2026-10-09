@@ -1,4 +1,4 @@
-## T01 終端爆縮：線の終点（弾かれた地点を含む）で爆発（一覧 docs/traits.md）。
+## T01 終端爆縮：線の終点（弾かれた地点を含む）で爆発（一覧 docs/game/catalog/traits.md）。
 extends TraitBehavior
 
 func on_end() -> void:
