@@ -10,9 +10,25 @@ var ship: ShipManager
 var build: BuildManager
 
 var friendly: Array = []
-var hostile: Array = []
-var _hostile_spare: Array = []
 var _buf: Array = []
+
+## 敵の弾。弾1発ごとの箱を作らず、項目ごとの列で持つ。i 番目の弾は各列の i 番目（設計書 6）。
+enum HostileKind { BULLET, MISSILE }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile"]
+var hostile_pos := PackedVector2Array()
+var hostile_vel := PackedVector2Array()
+var hostile_speed := PackedFloat32Array()
+var hostile_r := PackedFloat32Array()
+var hostile_life := PackedFloat32Array()
+var hostile_dmg := PackedFloat32Array()
+var hostile_slow := PackedFloat32Array()
+## 誘導の曲がる速さ（ミサイル）
+var hostile_turn := PackedFloat32Array()
+var hostile_kind := PackedByteArray()
+## 天体の表面までの余裕の下限。これが移動量より大きい間は天体の判定を省く
+var hostile_gap := PackedFloat32Array()
+var _hostile_updating := false
+var _hostile_clear_pending := false
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
@@ -141,76 +157,126 @@ func _update_friendly(dt: float) -> void:
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
-## 敵の弾を撃つ（射撃型・ミサイル艇・戦艦・ボス）。
+## 敵の弾を撃つ（射撃型・ミサイル艇・戦艦・ボス）。kind は &"bullet" か &"missile"。
 func fire_enemy(e: Enemy, angle: float, speed: float, kind: StringName, params := {}) -> void:
 	var p: Dictionary = params if not params.is_empty() else e.def.params
-	var s := Shot.new()
-	s.kind = kind
-	s.pos = e.pos + Vector2.from_angle(angle) * e.r
-	s.vel = Vector2.from_angle(angle) * speed
-	s.speed = speed
-	s.r = 9.0 if kind == &"missile" else 7.0
-	s.dmg = float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (e.level - 1.0))
-	s.slow = p.get("slow", 0.0)
-	s.life = 4.5 if kind == &"missile" else 4.0
-	s.max_life = s.life
-	s.turn = p.get("missile_turn", 0.0)
-	hostile.append(s)
+	var missile := kind == &"missile"
+	var u := Vector2.from_angle(angle)
+	hostile_pos.append(e.pos + u * e.r)
+	hostile_vel.append(u * speed)
+	hostile_speed.append(speed)
+	hostile_r.append(9.0 if missile else 7.0)
+	hostile_life.append(4.5 if missile else 4.0)
+	hostile_dmg.append(float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (e.level - 1.0)))
+	hostile_slow.append(p.get("slow", 0.0))
+	hostile_turn.append(p.get("missile_turn", 0.0))
+	hostile_kind.append(HostileKind.MISSILE if missile else HostileKind.BULLET)
+	hostile_gap.append(0.0)
 	state.emit(&"shoot", {"pos": e.pos, "kind": kind})
 
+func hostile_count() -> int:
+	return hostile_pos.size()
+
 func _update_hostile(dt: float) -> void:
-	# 前回の配列を使い回し、毎回の配列の生成を避ける
-	var keep := _hostile_spare
-	keep.clear()
+	var n := hostile_pos.size()
 	var R := cfg.ship_radius
 	var body_move := field.body_speed_max * dt
-	for s: Shot in hostile:
-		if s.life <= 0.0:
+	var ship_pos := state.ship_pos
+	var aim := state.enemy_aim
+	var w := 0
+	_hostile_updating = true
+	for i in n:
+		var life := hostile_life[i]
+		if life <= 0.0:
 			continue
-		if s.kind == &"missile":
-			var want := (state.enemy_aim - s.pos).angle()
-			var cur := s.vel.angle()
-			var a := cur + clampf(Geom.angle_diff(want, cur), -s.turn * dt, s.turn * dt)
-			s.vel = Vector2.from_angle(a) * s.speed
-		var from := s.pos
-		s.pos += s.vel * dt
-		s.life -= dt
+		var from := hostile_pos[i]
+		var vel := hostile_vel[i]
+		var speed := hostile_speed[i]
+		var kind := hostile_kind[i]
+		if kind == HostileKind.MISSILE:
+			var turn := hostile_turn[i] * dt
+			var want := (aim - from).angle()
+			var cur := vel.angle()
+			vel = Vector2.from_angle(cur + clampf(Geom.angle_diff(want, cur), -turn, turn)) * speed
+		var to := from + vel * dt
+		life -= dt
+		var r := hostile_r[i]
 		# 敵の弾は等速。天体の表面までの余裕が、この更新の弾と天体の移動量より大きい間は判定を省く。
-		var step := s.speed * dt
-		s.body_gap -= body_move
+		var step := speed * dt
+		var gap := hostile_gap[i] - body_move
 		var body_hit = null
-		if s.body_gap <= step:
-			s.body_gap = field.body_gap(from, s.r)
-			if s.body_gap <= step:
-				body_hit = field.first_body_hit(from, s.pos, s.r)
-		s.body_gap -= step
+		if gap <= step:
+			gap = field.body_gap(from, r)
+			if gap <= step:
+				body_hit = field.first_body_hit(from, to, r)
+		gap -= step
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
-		var rr := s.r + R
+		var rr := r + R
 		var reach := rr + step
-		var ship_pos := state.ship_pos
-		var t := -1.0
-		if ship_pos.distance_squared_to(s.pos) <= reach * reach:
-			t = Geom.seg_circle_t(from, s.pos, ship_pos, rr)
-		if t >= 0.0 and (body_hit == null or t < body_hit.t):
-			ship.damage(s.dmg, s.slow, s.kind)
-			s.life = 0.0
-		if body_hit != null:
-			s.life = 0.0
-		if s.life > 0.0:
-			keep.append(s)
-	_hostile_spare = hostile
-	hostile = keep
+		if ship_pos.distance_squared_to(to) <= reach * reach:
+			var t := Geom.seg_circle_t(from, to, ship_pos, rr)
+			if t >= 0.0 and (body_hit == null or t < body_hit.t):
+				ship.damage(hostile_dmg[i], hostile_slow[i], HOSTILE_CAUSE[kind])
+				life = 0.0
+		if body_hit != null or life <= 0.0:
+			continue
+		# 残る弾を前へ詰める
+		hostile_pos[w] = to
+		hostile_vel[w] = vel
+		hostile_speed[w] = speed
+		hostile_r[w] = r
+		hostile_life[w] = life
+		hostile_dmg[w] = hostile_dmg[i]
+		hostile_slow[w] = hostile_slow[i]
+		hostile_turn[w] = hostile_turn[i]
+		hostile_kind[w] = kind
+		hostile_gap[w] = gap
+		w += 1
+	_hostile_updating = false
+	# 更新中に撃たれた弾も残す
+	for j in range(n, hostile_pos.size()):
+		_hostile_move(j, w)
+		w += 1
+	_hostile_resize(0 if _hostile_clear_pending else w)
+	_hostile_clear_pending = false
+
+func _hostile_move(from: int, to: int) -> void:
+	hostile_pos[to] = hostile_pos[from]
+	hostile_vel[to] = hostile_vel[from]
+	hostile_speed[to] = hostile_speed[from]
+	hostile_r[to] = hostile_r[from]
+	hostile_life[to] = hostile_life[from]
+	hostile_dmg[to] = hostile_dmg[from]
+	hostile_slow[to] = hostile_slow[from]
+	hostile_turn[to] = hostile_turn[from]
+	hostile_kind[to] = hostile_kind[from]
+	hostile_gap[to] = hostile_gap[from]
+
+func _hostile_resize(n: int) -> void:
+	hostile_pos.resize(n)
+	hostile_vel.resize(n)
+	hostile_speed.resize(n)
+	hostile_r.resize(n)
+	hostile_life.resize(n)
+	hostile_dmg.resize(n)
+	hostile_slow.resize(n)
+	hostile_turn.resize(n)
+	hostile_kind.resize(n)
+	hostile_gap.resize(n)
 
 ## 機体の周り radius に入った敵の弾を1つ消す（バリアシステム）。消したら true。
 func block_one(center: Vector2, radius: float) -> bool:
-	for s: Shot in hostile:
-		if s.life > 0.0 and s.pos.distance_to(center) <= radius + s.r:
-			s.life = 0.0
-			state.emit(&"ring", {"pos": s.pos, "radius": 32.0, "color": Color("#76aaff"), "life": 0.25})
+	for i in hostile_pos.size():
+		if hostile_life[i] > 0.0 and hostile_pos[i].distance_to(center) <= radius + hostile_r[i]:
+			hostile_life[i] = 0.0
+			state.emit(&"ring", {"pos": hostile_pos[i], "radius": 32.0, "color": Color("#76aaff"), "life": 0.25})
 			return true
 	return false
 
 ## ボスの撃破などで、敵の弾をすべて消す。
 func clear_hostile() -> void:
-	hostile.clear()
+	if _hostile_updating:
+		_hostile_clear_pending = true
+		return
+	_hostile_resize(0)

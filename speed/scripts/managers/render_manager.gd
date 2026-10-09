@@ -448,10 +448,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			var dir := s.vel.normalized()
 			c.draw_line(s.pos - dir * s.r * 2.2, s.pos + dir * s.r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), s.r * 0.9))
 	_hostile_batch.begin()
-	for s: Shot in run.projectiles.hostile:
-		if not view.has_point(s.pos):
-			continue
-		_hostile_batch.add(s.pos, 0.0, s.r, Color.WHITE)
+	var hostile_pos := run.projectiles.hostile_pos
+	var hostile_r := run.projectiles.hostile_r
+	for i in hostile_pos.size():
+		var pos := hostile_pos[i]
+		if view.has_point(pos):
+			_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
 	_hostile_batch.end()
 
 func _draw_path_band(c: CanvasItem) -> void:

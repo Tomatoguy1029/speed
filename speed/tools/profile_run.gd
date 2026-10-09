@@ -153,7 +153,7 @@ func _process(_delta: float) -> void:
 	render_times.append(RenderingServer.viewport_get_measured_render_time_cpu(viewport))
 	draws.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	counts.enemies += run.enemies.list.size()
-	counts.hostile += run.projectiles.hostile.size()
+	counts.hostile += run.projectiles.hostile_count()
 	counts.friendly += run.projectiles.friendly.size()
 	counts.gems += run.pickups.gems.size()
 	if now - start_us >= int(float(options.get("seconds", "6")) * 1000000.0):
@@ -215,18 +215,21 @@ func _benchmark_bodies() -> Dictionary:
 	for sample in 20:
 		for mode in 2:
 			var start := Time.get_ticks_usec()
-			for s: Shot in run.projectiles.hostile:
-				var from := s.pos - s.vel / 120.0
+			var hostile_pos := run.projectiles.hostile_pos
+			var hostile_vel := run.projectiles.hostile_vel
+			var hostile_r := run.projectiles.hostile_r
+			for i in hostile_pos.size():
+				var from := hostile_pos[i] - hostile_vel[i] / 120.0
 				if (sample + mode) % 2 == 0:
-					_old_body_hit(from, s.pos, s.r)
+					_old_body_hit(from, hostile_pos[i], hostile_r[i])
 				else:
-					run.field.first_body_hit(from, s.pos, s.r)
+					run.field.first_body_hit(from, hostile_pos[i], hostile_r[i])
 			var elapsed := (Time.get_ticks_usec() - start) / 1000.0
 			if (sample + mode) % 2 == 0:
 				old_ms.append(elapsed)
 			else:
 				grid_ms.append(elapsed)
-	return {"bullets": run.projectiles.hostile.size(), "old_ms": _stats(old_ms), "grid_ms": _stats(grid_ms)}
+	return {"bullets": run.projectiles.hostile_count(), "old_ms": _stats(old_ms), "grid_ms": _stats(grid_ms)}
 
 func _old_body_hit(p0: Vector2, p1: Vector2, radius: float) -> Variant:
 	var found = null
