@@ -30,6 +30,8 @@ var pipeline: RenderPipeline
 var _batches: Dictionary = {}
 var _camera: Camera2D
 var _font: Font
+var _path_band_group: CanvasGroup
+var _path_band: DrawLayer
 
 # 演出（実秒で進む。ポーズ中・3択の間は止まる）
 var rings: Array = []
@@ -60,6 +62,13 @@ func _ready() -> void:
 		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		world.add_child(layer)
 		_layers[name] = layer
+	# 不透明な帯を合成してから一度だけ透過し、交差部分も同じ濃さにする。
+	_path_band_group = CanvasGroup.new()
+	_path_band_group.z_index = -1
+	_layers.path.add_child(_path_band_group)
+	_path_band = DrawLayer.new()
+	_path_band.draw_fn = Callable(self, "_draw_path_band")
+	_path_band_group.add_child(_path_band)
 	_build_batches()
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
@@ -115,6 +124,9 @@ func _process(delta: float) -> void:
 	pipeline.step(dt, _camera.position, state.camera_zoom)
 	for layer in _layers.values():
 		layer.queue_redraw()
+	_path_band_group.visible = state.drawing or state.tracing
+	_path_band_group.self_modulate = Color(1, 1, 1, 0.25 if state.drawing else 0.18)
+	_path_band.queue_redraw()
 
 # ── イベント → 演出 ───────────────────────────────────────────────
 
@@ -377,15 +389,23 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		c.draw_circle(s.pos, s.r, Color("#ff3b3b"))
 		c.draw_circle(s.pos, s.r * 0.5, Color("#3a0a0a"))
 
+func _draw_path_band(c: CanvasItem) -> void:
+	var pts := state.draw_points if state.drawing else state.trace_path
+	if pts.size() < 2:
+		return
+	var color := Color(0.55, 0.9, 1.0)
+	for i in pts.size() - 1:
+		c.draw_line(pts[i], pts[i + 1], color, cfg.wave_radius * 2.0)
+	for point in pts:
+		c.draw_circle(point, cfg.wave_radius, color)
+
 func _draw_path(c: CanvasItem) -> void:
 	if state.drawing and state.draw_points.size() > 0:
 		var pts := state.draw_points
 		if pts.size() > 1:
-			c.draw_polyline(pts, Color(0.55, 0.9, 1.0, 0.25), cfg.wave_radius * 2.0)
 			c.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.95), _px(3.0))
 		c.draw_circle(pts[0], _px(6.0), Color("#c8f7ff"))
 	if state.tracing and state.trace_path.size() > 1:
-		c.draw_polyline(state.trace_path, Color(0.55, 0.9, 1.0, 0.18), cfg.wave_radius * 2.0)
 		c.draw_polyline(state.trace_path, Color(0.8, 0.97, 1.0, 0.6), _px(2.0))
 	for g in ghosts:
 		var a: float = g.life / g.max

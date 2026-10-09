@@ -73,6 +73,15 @@ func _preview() -> void:
 		drone.setup(run.build, ConfigManager.weapons[&"W06"])
 		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
 		run.build.weapon_behaviors[&"W06"] = drone
+	if "--path-preview" in OS.get_cmdline_user_args() or "--trace-preview" in OS.get_cmdline_user_args():
+		run.enemies.list.clear()
+		state.phase = RunState.Phase.PLAY
+		var points := PackedVector2Array([Vector2(-420, -160), Vector2(300, 160),
+			Vector2(-300, 160), Vector2(300, -160), Vector2(-300, -160), Vector2(420, 160)])
+		state.drawing = "--path-preview" in OS.get_cmdline_user_args()
+		state.tracing = not state.drawing
+		state.draw_points = points
+		state.trace_path = points
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:
