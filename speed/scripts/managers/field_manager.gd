@@ -105,7 +105,7 @@ func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Ve
 	rock.spin = rng.randf_range(-0.5, 0.5)
 	rocks.append(rock)
 
-## 時刻 t の隕石の位置と速度。
+## 世界時刻 t の隕石の位置と速度。
 func _rock_at(rock: Rock, t: float) -> Array:
 	if rock.kind == &"comet":
 		var along := fmod(t + rock.phase, rock.period) * 950.0 - cfg.field_radius - 500.0
@@ -124,7 +124,7 @@ func _near(p: Vector2, extra: float) -> bool:
 
 ## 画面の近くの隕石だけを敵の配列に入れる。壊した隕石はそのランの間は戻らない。
 func _stream_rocks(dt: float) -> void:
-	var t := state.time
+	var t := state.world_time
 	for rock in rocks:
 		var e := rock.entity
 		if e == null:
