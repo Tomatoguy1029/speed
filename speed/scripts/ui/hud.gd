@@ -12,6 +12,7 @@ var run: RunManager
 var _font: Font
 var _cards_box: VBoxContainer
 var _reroll_button: Button
+var _cards_title: Label
 var _cards_row: HBoxContainer
 var _pause_box: VBoxContainer
 var _draw_button: Button
@@ -100,6 +101,7 @@ func _build_cards() -> void:
 	_cards_box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_cards_box.visible = false
 	var title := Label.new()
+	_cards_title = title
 	title.text = "レベルアップ　1枚選ぶ（クリック／1〜3）"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_cards_box.add_child(title)
@@ -137,6 +139,9 @@ func _show_cards() -> void:
 		b.add_theme_stylebox_override("focus", hover)
 		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
+	var start: bool = run.state.start_pick
+	_cards_title.text = "最初の武器を1つ選ぶ（クリック／1〜3）" if start else "レベルアップ　1枚選ぶ（クリック／1〜3）"
+	_reroll_button.visible = not start
 	var left := run.state.rerolls_left
 	_reroll_button.text = "リロール（残り %d 回）　%s" % [left, OS.get_keycode_string(InputActions.key_of(&"reroll"))]
 	_reroll_button.disabled = left <= 0
@@ -153,6 +158,8 @@ static func card_info(c: Dictionary) -> Dictionary:
 	var def = (ConfigManager.weapons if weapon else ConfigManager.traits).get(c.id)
 	var lv: int = c.level
 	var tag := ("新しい武器" if weapon else "新しい特性") if lv == 1 else ("武器強化" if weapon else "特性強化")
+	if c.get("start", false):
+		tag = "最初の武器"
 	var suffix := "Lv%d" % lv if weapon else "%d/5" % lv
 	return {"tag": tag, "name": "%s %s" % [def.display_name, suffix], "desc": def.description,
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}

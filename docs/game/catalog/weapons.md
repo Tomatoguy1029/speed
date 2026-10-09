@@ -10,7 +10,7 @@
 
 | ID | 名称 | 採用状態 | 発動・効果 | ルートへの影響 | 本番の実装状況・コード参照 | demo参照・未決事項 |
 |---|---|---|---|---|---|---|
-| W01 | ブラスター | 採用（初期装備） | 進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる。描画中・なぞり中は休む | 通常の移動の向きが撃つ向きになる | 実装済み。`scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres` | [demo W01](../../../demo/docs/weapons.md) `forward` |
+| W01 | ブラスター | 採用 | 進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる。描画中・なぞり中は休む | 通常の移動の向きが撃つ向きになる | 実装済み。`scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres` | [demo W01](../../../demo/docs/weapons.md) `forward` |
 | W02 | 散弾砲 | 採用 | 進む向きへ扇状に撃つ | 群れに向けて進み、近い距離で広がりを当てる | 実装済み。`scripts/weapons/scatter.gd`、`data/weapons/W02_scatter.tres` | [demo W02](../../../demo/docs/weapons.md) `scatter` |
 | W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
 | W04 | 接触波動 | 採用 | 高速で触れるたびに、触れた位置から周りへ波動。弾かれた接触でも出る。波動の撃破からは連鎖しない | 密集した群れを通る | 実装済み。`scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | [demo W04](../../../demo/docs/weapons.md) `contactWave` |

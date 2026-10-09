@@ -40,6 +40,8 @@ func _ready() -> void:
 			await _panel_steps()
 		"reroll":
 			await _reroll_steps()
+		"start":
+			await _start_steps()
 		_:
 			await _flow_steps()
 	_restore()
@@ -54,7 +56,7 @@ func _flow_steps() -> void:
 	await _shot("03_main_menu")
 	GameManager.goto(GameManager.Screen.STAGE_SELECT)
 	await _shot("04_stage_select")
-	GameManager.start_run(1)
+	await _start_run()
 	await _shot("05_run")
 	_run_manager().command(&"debug_clear")
 	await _shot("06_result")
@@ -70,13 +72,13 @@ func _flow_steps() -> void:
 
 ## ランの中の確認（段階2以降で使う）。
 func _run_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	for i in 6:
 		await _shot("run_%02d" % i, 1.0)
 
 ## 線を描いて駆け抜ける確認：クリックで描き始め、マウスを動かして線を引き、もう一度クリックで確定する。
 func _dash_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(2.5)
 	var c := get_viewport().get_visible_rect().size / 2.0
 	_mouse_move(c + Vector2(80, 0))
@@ -95,7 +97,7 @@ func _dash_steps() -> void:
 
 ## ボスの出現から撃破の演出、結果画面までの確認。
 func _boss_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(1.0)
 	_run_manager().command(&"debug_boss_time")
 	await _shot("boss_00_spawn", 1.5)
@@ -108,7 +110,7 @@ func _boss_steps() -> void:
 
 ## 敵が最も多い時間帯（無双期）での処理時間の確認。
 func _perf_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(0.5)
 	var run := _run_manager()
 	run.ship.invincible = true
@@ -138,7 +140,7 @@ func _perf_steps() -> void:
 
 ## すべての武器と発動する特性を持たせ、敵が多い時間帯で線を描いて駆け抜ける。
 func _weapons_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(0.5)
 	var run := _run_manager()
 	run.ship.invincible = true
@@ -164,7 +166,7 @@ func _weapons_steps() -> void:
 
 ## 被弾と致命傷の演出。
 func _death_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(1.0)
 	var run := _run_manager()
 	run.command(&"debug_hurt")
@@ -178,7 +180,7 @@ func _death_steps() -> void:
 
 ## 調整パネルとポーズ、ランの後の図鑑。
 func _panel_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(1.0)
 	_action(&"debug_panel")
 	await _shot("panel_00_debug", 0.3)
@@ -198,9 +200,18 @@ func _panel_steps() -> void:
 	GameManager.goto(GameManager.Screen.ENCYCLOPEDIA)
 	await _shot("panel_03_encyclopedia", 0.4)
 
+## 開始時に最初の武器を選ぶ画面。
+func _start_steps() -> void:
+	GameManager.start_run(1)
+	await _shot("start_00_pick", 0.5)
+	_action(&"reroll")
+	await _shot("start_01_reroll_ignored", 0.3)
+	_run_manager().command(&"choose_card", {"index": 1})
+	await _shot("start_02_run", 1.0)
+
 ## 3択の引き直しと、続けて上がったレベルの3択、強化画面。
 func _reroll_steps() -> void:
-	GameManager.start_run(1)
+	await _start_run()
 	await _wait(1.0)
 	var run := _run_manager()
 	run.command(&"debug_level_up")
@@ -241,6 +252,13 @@ func _click(p: Vector2) -> void:
 		ev.position = p
 		ev.global_position = p
 		Input.parse_input_event(ev)
+
+## ランを始め、最初の武器の候補から1つ目を選ぶ。
+func _start_run() -> void:
+	GameManager.start_run(1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_run_manager().command(&"choose_card", {"index": 0})
 
 func _run_manager() -> RunManager:
 	return get_tree().root.find_child("RunManager", true, false) as RunManager
