@@ -39,18 +39,17 @@ theme/custom="res://assets/ui/theme.tres"
 
 [physics]
 
-3d/physics_engine="Jolt Physics"
 common/physics_ticks_per_second=120
-common/max_physics_steps_per_frame=8
+3d/physics_engine="Jolt Physics"
 
 [rendering]
 
 rendering_device/driver.windows="d3d12"
 
-[stage_launcher]
-
-stage_dir="res://scenes/stages/"
-
 [speed_data_editor]
 
 data_dir="res://data"
+
+[stage_launcher]
+
+stage_dir="res://scenes/stages/"
