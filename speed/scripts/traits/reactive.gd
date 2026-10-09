@@ -1,4 +1,4 @@
-## T13 反応波動：ダメージを受けたとき、周りを押し返す波動（一覧 docs/game/traits.md）。
+## T13 反応波動：ダメージを受けたとき、周りを押し返す波動（一覧 docs/game/catalog/traits.md）。
 extends TraitBehavior
 
 func on_hurt() -> void:

@@ -4,17 +4,17 @@
 
 | 管理対象 | 本番（Godot） | demo（ブラウザ） |
 |---|---|---|
-| 武器 | [weapons.md](weapons.md) | [demoの武器](../../demo/docs/weapons.md) |
-| 特性 | [traits.md](traits.md) | [demoの特性](../../demo/docs/traits.md) |
-| 敵 | [enemies.md](enemies.md) | [demoの敵](../../demo/docs/enemies.md) |
-| 共通仕様・設計 | [トリートメント](treatment.md)・[世界観とストーリー](world.md)・[デザインとアートスタイル](art-style.md)・[仕様書](spec.md)・[設計書](architecture.md) | [仕様](../../demo/docs/spec.md)・[共通設計](../../demo/docs/module-plan.md) |
-| 未解決課題 | [backlog.md](backlog.md) | [demoの課題](../../demo/docs/backlog.md) |
+| 武器 | [weapons.md](weapons.md) | [demoの武器](../../../demo/docs/weapons.md) |
+| 特性 | [traits.md](traits.md) | [demoの特性](../../../demo/docs/traits.md) |
+| 敵 | [enemies.md](enemies.md) | [demoの敵](../../../demo/docs/enemies.md) |
+| 共通仕様・設計 | [トリートメント](../treatment.md)・[世界観とストーリー](../world.md)・[デザインとアートスタイル](../art-style.md)・[仕様書](../spec.md)・[設計書](../architecture.md) | [仕様](../../../demo/docs/spec.md)・[共通設計](../../../demo/docs/module-plan.md) |
+| 未解決課題 | [backlog.md](../backlog.md) | [demoの課題](../../../demo/docs/backlog.md) |
 
 本番へ取り入れると決めた項目は本番の一覧に登録し、demoの元項目へリンクする。同じ項目は管理IDを引き継ぐ。demoにあるだけの案・実装・数値を、本番の採用済み・実装済みとして転記しない。片方だけの仕様変更はもう片方へ自動適用せず、必要な差分を明記する。
 
 ## 本番の数値パラメータ
 
-本番では、数値のパラメータの正は Godot の `.tres`（[設計書](architecture.md) 8章）とし、ドキュメントでは管理しない。本番の一覧には、ID・名称・採用状態・効果の内容・ルートへの影響・実装状況と `.tres` の参照先を書き、数値は書かない。下の更新ルールのうち数値に関する部分は、本番では `.tres` に対して行う。
+本番では、数値のパラメータの正は Godot の `.tres`（[設計書](../architecture.md) 8章）とし、ドキュメントでは管理しない。本番の一覧には、ID・名称・採用状態・効果の内容・ルートへの影響・実装状況と `.tres` の参照先を書き、数値は書かない。下の更新ルールのうち数値に関する部分は、本番では `.tres` に対して行う。
 
 demo から引き継いだ初期値は `speed/data/` の `.tres` へ移し、本番の一覧と仕様書から外した（2026-10-08）。仕様書は数値の代わりに `config.xxx`（`speed/data/config.tres` の項目）やデータのファイルを示す。demo の一覧は今のまま数値を記録する。
 

@@ -1,4 +1,4 @@
-## W03 吹き飛ばし衝角：高速で触れた敵を進む向きへ吹き飛ばし、ほかの敵にぶつける（一覧 docs/game/weapons.md）。
+## W03 吹き飛ばし衝角：高速で触れた敵を進む向きへ吹き飛ばし、ほかの敵にぶつける（一覧 docs/game/catalog/weapons.md）。
 ## 倒した大型の敵は破片を扇状に飛ばし、小型の敵は1つの死体として飛ばす。
 extends WeaponBehavior
 

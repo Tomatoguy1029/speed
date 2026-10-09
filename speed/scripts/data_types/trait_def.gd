@@ -2,7 +2,7 @@
 ## レベルアップの3択で手に入る特性。同じ特性を重ねるほど効果が強くなる。持てる種類と重ねられる数は調整値の「成長」で決まる。
 ## 「（基本）」と「（重ねるごと）」の組の値は、効果 ＝ 基本 ＋ 重ねるごと × 重ね数 で決まる。
 ## ---
-## 値の正は res://data/traits/*.tres（一覧 docs/game/traits.md）。発動する特性の処理は res://scripts/traits/<内部 ID>.gd、
+## 値の正は res://data/traits/*.tres（一覧 docs/game/catalog/traits.md）。発動する特性の処理は res://scripts/traits/<内部 ID>.gd、
 ## 能力値を変える特性は BuildManager.refresh_stats() が per_stack と max を読む。
 class_name TraitDef
 extends Resource

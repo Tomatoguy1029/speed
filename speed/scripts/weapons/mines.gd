@@ -1,5 +1,5 @@
 ## W07 軌跡機雷：高速で実際に通った線に、一定の間隔で機雷を残す。少し遅れて有効になり、
-## 敵が近づくと爆発する（一覧 docs/game/weapons.md）。
+## 敵が近づくと爆発する（一覧 docs/game/catalog/weapons.md）。
 extends WeaponBehavior
 
 ## 機雷：pos、life、armed、dmg、radius

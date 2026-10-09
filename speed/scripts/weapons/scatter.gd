@@ -1,4 +1,4 @@
-## W02 散弾砲：進む向きへ扇状に撃つ（一覧 docs/game/weapons.md）。描画中・なぞり中は休む。
+## W02 散弾砲：進む向きへ扇状に撃つ（一覧 docs/game/catalog/weapons.md）。描画中・なぞり中は休む。
 extends WeaponBehavior
 
 var _t := 0.0

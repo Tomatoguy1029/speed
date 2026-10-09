@@ -26,7 +26,8 @@ godot --editor --path speed
 |---|---|
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
-| `docs/game/` | 本番の資料：[トリートメント](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・一覧・課題 |
+| `docs/game/` | 本番の資料：[トリートメント](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
+| `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/logs/` | 本番の作業ログ：ユーザーごとの履歴、報告書 |
 | `docs/art/` | 本番の画像の資料 |
 | `demo/docs/` | demo の仕様・課題・これまでの作業記録 |
@@ -36,13 +37,13 @@ godot --editor --path speed
 
 ## 武器・特性・敵の管理
 
-本番とdemoで同じ [一覧の運用ルール](docs/game/catalog.md) を使い、追加・変更・採否判断・実装の同じ作業で対象側の一覧を更新します。
+本番とdemoで同じ [一覧の運用ルール](docs/game/catalog/rules.md) を使い、追加・変更・採否判断・実装の同じ作業で対象側の一覧を更新します。
 
 | 一覧 | 本番 | demo |
 |---|---|---|
-| 武器 | [武器一覧](docs/game/weapons.md) | [demoの武器一覧](demo/docs/weapons.md) |
-| 特性 | [特性一覧](docs/game/traits.md) | [demoの特性一覧](demo/docs/traits.md) |
-| 敵 | [敵一覧](docs/game/enemies.md) | [demoの敵一覧](demo/docs/enemies.md) |
+| 武器 | [武器一覧](docs/game/catalog/weapons.md) | [demoの武器一覧](demo/docs/weapons.md) |
+| 特性 | [特性一覧](docs/game/catalog/traits.md) | [demoの特性一覧](demo/docs/traits.md) |
+| 敵 | [敵一覧](docs/game/catalog/enemies.md) | [demoの敵一覧](demo/docs/enemies.md) |
 
 ## demo を使う
 
