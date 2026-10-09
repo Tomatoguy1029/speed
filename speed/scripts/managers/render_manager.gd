@@ -12,6 +12,8 @@ const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "split
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
+const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
+const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
@@ -46,6 +48,8 @@ var bolts: Array = []
 var shake := 0.0
 var flash := 0.0
 var _stars: PackedVector3Array
+var _jet_time := 0.0
+var _exhaust: Array[Dictionary] = []
 
 func _ready() -> void:
 	run = get_node("../RunManager") as RunManager
@@ -54,7 +58,7 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	_camera = get_node(camera_path) as Camera2D
 	var world := get_node(world_path)
-	for name in ["background", "field", "pickups", "enemies", "projectiles", "path", "fx", "dim", "ship", "top"]:
+	for name in ["background", "field", "exhaust", "pickups", "enemies", "projectiles", "path", "fx", "dim", "ship", "top"]:
 		var layer := DrawLayer.new()
 		layer.name = name.capitalize().replace(" ", "")
 		layer.z_index = _layers.size() * 2
@@ -72,7 +76,8 @@ func _ready() -> void:
 	_build_batches()
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
-	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path])
+	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust])
+	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -116,6 +121,7 @@ func _process(delta: float) -> void:
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
 	var dt := 0.0 if frozen else delta
 	_update_fx(dt)
+	_update_exhaust(dt)
 	var offset := Vector2.ZERO
 	if shake > 0.0 and phase != RunState.Phase.DYING:
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake / maxf(state.camera_zoom, 0.01)
@@ -162,6 +168,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"crash":
 				shake = maxf(shake, 16.0)
 			&"warp":
+				_exhaust.clear()
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
 			&"beam":
 				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": 0.4, "max": 0.4})
@@ -476,6 +483,45 @@ func _draw_dim(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING:
 		c.draw_rect(state.view_rect().grow(400.0), Color(0, 0, 0, cfg.death_world_dim))
 
+func _update_exhaust(dt: float) -> void:
+	if dt <= 0.0:
+		return
+	_jet_time += dt
+	for sample in _exhaust:
+		sample.life -= dt
+	_exhaust = _exhaust.filter(func(sample): return sample.life > 0.0)
+	if state.phase != RunState.Phase.PLAY and state.phase != RunState.Phase.FINISHING:
+		return
+	if state.ship_vel.length() < 5.0:
+		return
+	var tail := state.ship_pos - state.ship_heading * 22.0 * cfg.character_scale
+	if not _exhaust.is_empty():
+		var distance: float = tail.distance_to(_exhaust.back().pos)
+		if distance > maxf(120.0, state.ship_vel.length() * dt * 3.0):
+			_exhaust.clear()
+		elif distance < 2.0 * cfg.character_scale:
+			return
+	_exhaust.append({"pos": tail, "life": 0.24})
+	if _exhaust.size() > 48:
+		_exhaust.pop_front()
+
+func _draw_exhaust(c: CanvasItem) -> void:
+	for i in range(1, _exhaust.size()):
+		var fade: float = _exhaust[i - 1].life / 0.24
+		c.draw_line(_exhaust[i - 1].pos, _exhaust[i].pos,
+			Color(1.0, 0.57, 0.3, fade * 0.18), 3.0 * cfg.character_scale)
+	if state.phase == RunState.Phase.DYING or state.phase == RunState.Phase.ENDED:
+		return
+	var size := AIRSHIP.get_size() * cfg.character_scale
+	# 下側20pxは炎用の余白。機体本体の中心を判定の中心へ合わせる。
+	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size)
+	var frame := int(_jet_time * 12.0) % 3
+	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
+	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
+	c.draw_texture_rect_region(AIRSHIP_FLAME, rect, region)
+	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
+	c.draw_set_transform(Vector2.ZERO)
+
 func _draw_ship(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING and run.sequence_t >= cfg.death_freeze_time:
 		return
@@ -491,7 +537,7 @@ func _draw_ship(c: CanvasItem) -> void:
 	var dir := state.ship_heading
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
-	c.draw_texture_rect(AIRSHIP, Rect2(-size / 2.0, size), false, col)
+	c.draw_texture_rect(AIRSHIP, Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size), false, col)
 	c.draw_set_transform(Vector2.ZERO)
 	# HP バー（機体の真下、仕様書 17）
 	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)

@@ -101,6 +101,14 @@ func _preview() -> void:
 		original.draw_fn = func(c): c.draw_polyline(raw, Color("#c8f7ff"), 3.0)
 		original.position.y = -160.0
 		game.get_node("World").add_child(original)
+	if "--exhaust-preview" in OS.get_cmdline_user_args():
+		state.phase = RunState.Phase.PLAY
+		var renderer := game.get_node("Managers/RenderManager") as RenderManager
+		for i in 25:
+			state.ship_pos = Vector2(-180 + i * 7, sin(i * 0.07) * 35)
+			state.ship_heading = Vector2(7, cos(i * 0.07) * 2.45).normalized()
+			state.ship_vel = state.ship_heading * 700.0
+			renderer._update_exhaust(0.01)
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:
