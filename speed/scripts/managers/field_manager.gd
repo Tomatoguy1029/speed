@@ -34,6 +34,9 @@ var enemies: EnemyManager
 var planet: Body
 var moons: Array[Body] = []
 var bodies: Array[Body] = []
+## 月の軌道半径・大きさはラン中固定。半径帯ごとに確認候補を保持する。
+const MOON_BAND_SIZE := 256.0
+var _moon_bands: Array[Array] = []
 ## 宇宙塵の雲（中心と半径）
 var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
@@ -58,6 +61,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 		var a := rng.randf() * TAU
 		var d := rng.randf_range(cfg.planet_radius + 600.0, cfg.field_radius - 200.0)
 		dust.append(Vector3(cos(a) * d, sin(a) * d, rng.randf_range(250.0, 620.0)))
+	_build_moon_bands()
 	_place_rocks(rng)
 	_update_moons()
 
@@ -214,14 +218,33 @@ func push_out(p: Vector2, margin: float) -> Vector2:
 			q = b.pos + (d / dist if dist > 0.001 else Vector2.RIGHT) * min_d
 	return q
 
-## 点 p（余白 margin）の近くに障害物があるか。敵の当たり判定を省くための速い判定。
+## 軌道の半径帯に月を登録。月が周回しても所属帯は変わらない。
+func _build_moon_bands() -> void:
+	_moon_bands.clear()
+	var outer := 0.0
+	for moon in moons:
+		outer = maxf(outer, moon.orbit + moon.r + 4.0)
+	_moon_bands.resize(int(outer / MOON_BAND_SIZE) + 1)
+	for i in _moon_bands.size():
+		_moon_bands[i] = []
+	for moon in moons:
+		var first := maxi(0, int((moon.orbit - moon.r - 4.0) / MOON_BAND_SIZE))
+		var last := int((moon.orbit + moon.r + 4.0) / MOON_BAND_SIZE)
+		for i in range(first, last + 1):
+			_moon_bands[i].append(moon)
+
+## 元の近傍条件を維持し、該当する半径帯の月だけを確認する。
 func near_body(p: Vector2, margin: float) -> bool:
 	var r := p.length()
 	if r < planet.r + margin + 4.0:
 		return true
-	for m in moons:
-		if absf(r - m.orbit) < m.r + margin + 4.0 and p.distance_squared_to(m.pos) < pow(m.r + margin + 4.0, 2.0):
-			return true
+	var first := maxi(0, int((r - margin) / MOON_BAND_SIZE))
+	var last := mini(_moon_bands.size() - 1, int((r + margin) / MOON_BAND_SIZE))
+	for i in range(first, last + 1):
+		for moon: Body in _moon_bands[i]:
+			var limit := moon.r + margin + 4.0
+			if absf(r - moon.orbit) < limit and p.distance_squared_to(moon.pos) < limit * limit:
+				return true
 	return false
 
 ## 敵が障害物をすり抜けないよう、表面で止めて横方向の速度だけ残す。
