@@ -525,10 +525,13 @@ func _update_exhaust(dt: float) -> void:
 		_exhaust.pop_front()
 
 func _draw_exhaust(c: CanvasItem) -> void:
+	var sonic := run.build.weapon_behaviors.has(&"W08")
+	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
 	for i in range(1, _exhaust.size()):
 		var fade: float = _exhaust[i - 1].life / 0.24
+		trail_color.a = fade * 0.18
 		c.draw_line(_exhaust[i - 1].pos, _exhaust[i].pos,
-			Color(1.0, 0.57, 0.3, fade * 0.18), 3.0 * cfg.character_scale)
+			trail_color, 3.0 * cfg.character_scale)
 	if state.phase == RunState.Phase.DYING or state.phase == RunState.Phase.ENDED:
 		return
 	var size := AIRSHIP.get_size() * cfg.character_scale
@@ -537,7 +540,7 @@ func _draw_exhaust(c: CanvasItem) -> void:
 	var frame := int(_jet_time * 12.0) % 3
 	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
 	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	var flame := AIRSHIP_BLUE_FLAME if run.build.weapon_behaviors.has(&"W08") else AIRSHIP_FLAME
+	var flame := AIRSHIP_BLUE_FLAME if sonic else AIRSHIP_FLAME
 	c.draw_texture_rect_region(flame, rect, region)
 	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
 	c.draw_set_transform(Vector2.ZERO)
