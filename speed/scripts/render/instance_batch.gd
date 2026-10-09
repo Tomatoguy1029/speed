@@ -25,15 +25,20 @@ func setup_polygon(points: PackedVector2Array) -> void:
 	_setup_mesh(mesh)
 
 ## スプライトは下向きで作成。縦横比を保ち、長辺を直径2にそろえる。
-func setup_texture(sprite: Texture2D) -> void:
+func setup_texture(sprite: Texture2D, region := Rect2()) -> void:
 	var size := sprite.get_size()
+	if region.size == Vector2.ZERO:
+		region = Rect2(Vector2.ZERO, size)
+	var uv_start := region.position / size
+	var uv_end := region.end / size
+	size = region.size
 	var half := size / maxf(size.x, size.y)
 	# QuadMeshの3D向けUVでは上下が反転するため、2Dの上端をUV.y=0にする。
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([
 		Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)])
-	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
+	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([uv_start, Vector2(uv_end.x, uv_start.y), uv_end, Vector2(uv_start.x, uv_end.y)])
 	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)

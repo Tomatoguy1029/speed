@@ -226,6 +226,7 @@ func kill_enemy(e: Enemy, opts := {}) -> void:
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
 	state.emit(&"kill", {"pos": e.pos, "r": e.r, "crit": opts.get("crit", false), "type": e.type,
+		"enemy_type": e.type, "meteor_index": e.meteor_index, "facing": e.facing,
 		"elite": e.elite, "cause": cause, "dir": dir, "color": e.color})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	if cause != &"hullDebris" and not (cause == &"ram" and state.weapons.has(&"W03")):

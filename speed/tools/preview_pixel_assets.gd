@@ -52,6 +52,27 @@ func _preview() -> void:
 	var flashed := run.enemies.create(run.enemies.def_of(&"drifter"), 1.0, Vector2(120, 0))
 	flashed.flash = 1.0
 	run.enemies.add(flashed)
+	if "--damage-preview" in OS.get_cmdline_user_args():
+		run.enemies.list.clear()
+		state.phase = RunState.Phase.PLAY
+		var renderer := game.get_node("Managers/RenderManager") as RenderManager
+		for variant in 2:
+			for stage in 4:
+				var rock := run.enemies.create(run.enemies.def_of(&"meteor"), 1.0,
+					Vector2(-460 + stage * 300, -150 + variant * 300), {"size": 60.0 if variant == 0 else 40.0})
+				rock.meteor_index = variant
+				rock.hp *= [1.0, 0.5, 0.2, 0.0][stage]
+				run.enemies.add(rock)
+				if stage == 3:
+					run.combat.kill_enemy(rock)
+		renderer._on_events(state.events)
+		state.events.clear()
+		# 破片が分離した瞬間を静止確認する。
+		renderer._update_fx(0.2)
+		var drone = load("res://scripts/weapons/drone.gd").new()
+		drone.setup(run.build, ConfigManager.weapons[&"W06"])
+		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
+		run.build.weapon_behaviors[&"W06"] = drone
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:

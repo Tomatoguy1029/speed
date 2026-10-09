@@ -2,6 +2,10 @@
 
 ## 手描き素材への差し替え（2026-10-09）
 
+`drone.png` は15×15の原寸で追走ドローンを描画する。隕石の現行素材は `meteor_spritesheet.png`（360×120、1コマ120×120）と `meteor2_spritesheet.png`（240×80、1コマ80×80）。横3コマを残りHPの3分割に対応させ、左から無傷・中損傷・大損傷として表示する。HPがなくなると右端を4片へ分けて飛散・回転させ、0.65秒で消す。画像のリサイズは行わない。旧 `meteor_0.png`／`meteor_1.png` は旧素材として残す。
+
+全損傷段階と破砕・ドローンの静止確認はプレビューコマンドへ `-- --capture --damage-preview` を付ける。通常の全素材プレビューも引き続き使用可能。
+
 追加指定の `splitter.png`（45×45）も同名素材へ差し替え、原寸表示・当たり判定・準備ツールの上書き除外に対応。Armoredの背面弱点の黄色い弧は非表示とし、弱点判定は維持する。
 
 提供PNGを加工せず採用した。`main_character.png` は `airship.png`、`meteor.png` は `meteor_0.png`、`meteor_2.png` は `meteor_1.png`、敵5種は同名へ配置。自機39×40、drifter 23×23、swarm 32×32、darter 32×36、armored 64×64、splitling 13×26、隕石120×120／80×80。

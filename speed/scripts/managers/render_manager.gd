@@ -12,6 +12,9 @@ const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "split
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
+const DRONE := preload("res://assets/pixel/drone.png")
+const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
+	preload("res://assets/pixel/meteor2_spritesheet.png")]
 const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
 
 @export var world_path: NodePath
@@ -31,6 +34,7 @@ var _font: Font
 # 演出（実秒で進む。ポーズ中・3択の間は止まる）
 var rings: Array = []
 var particles: Array = []
+var meteor_shards: Array = []
 var texts: Array = []
 var ghosts: Array = []
 var impacts: Array = []
@@ -71,6 +75,17 @@ func _build_batches() -> void:
 	var enemy_mat := ShaderMaterial.new()
 	enemy_mat.shader = load("res://shaders/pixel_sprite.gdshader")
 	for id in SPRITE_IDS:
+		if id.begins_with("meteor_"):
+			var sheet: Texture2D = METEOR_SHEETS[0 if id == "meteor_0" else 1]
+			var frame_size := float(sheet.get_height())
+			for stage in 3:
+				var rock_batch := InstanceBatch.new()
+				rock_batch.setup_texture(sheet, Rect2(stage * frame_size, 0, frame_size, frame_size))
+				rock_batch.material = enemy_mat
+				rock_batch.z_index = -1
+				_layers.enemies.add_child(rock_batch)
+				_batches[StringName(id + "_damage_" + str(stage))] = rock_batch
+			continue
 		var b := InstanceBatch.new()
 		b.setup_texture(load("res://assets/pixel/" + id + ".png") as Texture2D)
 		b.material = enemy_mat
@@ -115,6 +130,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"text":
 				_text(ev.pos, ev.text, ev.color, ev.get("size", 16))
 			&"kill":
+				if ev.get("enemy_type", &"") == &"meteor":
+					_shatter_meteor(ev)
 				var n := 6 + roundi(ev.r / 3.0)
 				_burst(ev.pos, ev.color, n, ev.get("dir", Vector2.ZERO), 260.0 + ev.r * 4.0)
 				if ev.r > 25.0:
@@ -191,7 +208,24 @@ func _sparks(p: Vector2, normal: Vector2, n: int, color: Color) -> void:
 		var dir := (side * (1.0 if i % 2 == 0 else -1.0) * randf_range(0.4, 1.0) + normal * randf_range(0.0, 0.8)).normalized()
 		particles.append({"pos": p, "vel": dir * s, "life": 0.25 + randf() * 0.2, "max": 0.45, "color": color, "size": 2.0 + randf() * 2.0})
 
+func _shatter_meteor(ev: Dictionary) -> void:
+	var sheet: Texture2D = METEOR_SHEETS[posmod(int(ev.meteor_index), 2)]
+	var size := float(sheet.get_height())
+	var half := size / 2.0
+	for y in 2:
+		for x in 2:
+			var offset := Vector2((x - 0.5) * half, (y - 0.5) * half).rotated(ev.facing)
+			meteor_shards.append({"texture": sheet,
+				"region": Rect2(size * 2.0 + x * half, y * half, half, half),
+				"pos": ev.pos + offset, "vel": offset.normalized() * 100.0 + ev.dir * 60.0,
+				"angle": ev.facing, "spin": -1.5 if x == y else 1.5, "life": 0.65})
+
 func _update_fx(dt: float) -> void:
+	for shard in meteor_shards:
+		shard.pos += shard.vel * dt
+		shard.angle += shard.spin * dt
+		shard.life -= dt
+	meteor_shards = meteor_shards.filter(func(s): return s.life > 0.0)
 	shake = maxf(0.0, shake - dt * 40.0)
 	flash = maxf(0.0, flash - dt * 2.0)
 	for p in particles:
@@ -285,13 +319,11 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var col := Color(1.0 if e.flash > 0.0 else 0.0, 0.0, 0.0, 1.0)
 		if e.type == &"meteor":
 			# ストリームで再生成されても同じ岩の模様を使う。
-			var rock_key := &"meteor_0" if e.meteor_index % 2 == 0 else &"meteor_1"
+			var variant := posmod(e.meteor_index, 2)
+			var stage := clampi(int((1.0 - e.hp / e.max_hp) * 3.0), 0, 2)
+			var rock_key := StringName("meteor_" + str(variant) + "_damage_" + str(stage))
 			var rock_batch: InstanceBatch = _batches[rock_key]
-			var rock_size := rock_batch.texture.get_size()
-			rock_batch.add(e.pos, e.facing, maxf(rock_size.x, rock_size.y) / 2.0, col)
-			if e.hp < e.max_hp:
-				c.draw_line(e.pos - Vector2(e.r * 0.4, 0).rotated(e.facing),
-					e.pos + Vector2(e.r * 0.3, e.r * 0.3).rotated(e.facing), Color("#2e2620"), _px(2.0))
+			rock_batch.add(e.pos, e.facing, METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
 		var batch: InstanceBatch = _batches.get(e.type, _batches[&"battleship"])
 		if e.type in NATIVE_SPRITES:
@@ -303,6 +335,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
+	_draw_meteor_shards(c)
 
 ## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。
 func _draw_enemy_marks(c: CanvasItem, e: Enemy) -> void:
@@ -370,7 +403,7 @@ func _draw_build_objects(c: CanvasItem) -> void:
 	var drones = b.weapon_behaviors.get(&"W06")
 	if drones != null:
 		for d in drones.drones:
-			c.draw_circle(d.pos, 9.0, Color("#a8ffdb"))
+			c.draw_texture(DRONE, d.pos - DRONE.get_size() / 2.0)
 	var vortex = b.trait_behaviors.get(&"T03")
 	if vortex != null:
 		for v in vortex.vortexes:
@@ -378,6 +411,13 @@ func _draw_build_objects(c: CanvasItem) -> void:
 			for i in 3:
 				var a: float = state.time * 4.0 + i * TAU / 3.0
 				c.draw_arc(v.pos, v.radius * (0.3 + 0.2 * i), a, a + 2.0, 16, Color(0.75, 0.45, 1.0, 0.6 * k), _px(3.0))
+
+func _draw_meteor_shards(c: CanvasItem) -> void:
+	for shard in meteor_shards:
+		c.draw_set_transform(shard.pos, shard.angle)
+		c.draw_texture_rect_region(shard.texture, Rect2(-shard.region.size / 2.0, shard.region.size),
+			shard.region, Color(1, 1, 1, shard.life / 0.65))
+	c.draw_set_transform(Vector2.ZERO)
 
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)

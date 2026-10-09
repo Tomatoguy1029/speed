@@ -1,12 +1,16 @@
 # 本番の敵一覧
 
-最終更新：2026-10-08。対象はGodot本番。[共通の運用ルール](rules.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
+最終更新：2026-10-09。対象はGodot本番。[共通の運用ルール](rules.md) に従い、追加・変更・採否判断・実装の同じ作業で更新する。
 
 2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](../../logs/wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](../spec.md) の9〜11章。
 
 **数値はドキュメントで管理しない**（[catalog.md](rules.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 通常敵
+
+### 隕石の損傷スプライト（2026-10-09）
+
+ShueMaker70969 提供の `meteor_spritesheet.png`・`meteor2_spritesheet.png` を採用・実装済み。横3コマを残りHPに応じて左から右へ切り替え、原寸表示する。破壊時は右端のコマを破片として飛散・回転・フェードさせる。旧描画の線によるひびを置き換え、隕石の判定サイズ・HP・ドロップ・攻撃する破片の既存処理は維持した。実装は `RenderManager`・`InstanceBatch`、撃破イベント情報は `CombatManager`。素材対応と確認方法は [素材README](../../../speed/assets/pixel/README.md) を参照。
 
 ### Splitter差し替えとArmoredの弱点表示（2026-10-09）
 
