@@ -62,6 +62,7 @@ func _preview() -> void:
 					Vector2(-460 + stage * 300, -150 + variant * 300), {"size": 60.0 if variant == 0 else 40.0})
 				rock.meteor_index = variant
 				rock.hp *= [1.0, 0.5, 0.2, 0.0][stage]
+				rock.flash = 0.12 if stage > 0 else 0.0
 				run.enemies.add(rock)
 				if stage == 3:
 					run.combat.kill_enemy(rock)

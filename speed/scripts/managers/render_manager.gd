@@ -328,7 +328,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if e.dead or not view.has_point(e.pos):
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
-		var col := Color(1.0 if e.flash > 0.0 else 0.0, 0.0, 0.0, 1.0)
+		var col := Color(1.0 if e.flash > 0.0 and e.type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
 		if e.type == &"meteor":
 			# ストリームで再生成されても同じ岩の模様を使う。
 			var variant := posmod(e.meteor_index, 2)
