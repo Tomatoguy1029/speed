@@ -37,6 +37,8 @@ func tick(real_dt: float, world_dt: float) -> void:
 	if state.phase != RunState.Phase.PLAY:
 		return
 	_collide_bodies()
+	if not state.ship_vel.is_zero_approx():
+		state.ship_heading = state.ship_vel.normalized()
 	state.peak_speed = maxf(state.peak_speed, state.ship_vel.length())
 
 # ── 操舵（仕様書 5.1） ────────────────────────────────────────────
@@ -65,7 +67,8 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 	var cruise := state.stats.max_speed * cruise_share
 	if sp < cruise:
 		state.ship_vel += Vector2.from_angle(want) * minf(cfg.steer_accel * dt, cruise - sp)
-	state.ship_heading = Vector2.from_angle(want)
+	if state.ship_vel.is_zero_approx():
+		state.ship_heading = Vector2.from_angle(want)
 
 # ── 速さの減り方（仕様書 5.2・6.6） ───────────────────────────────
 
@@ -98,8 +101,8 @@ func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 			target *= exp(-extra_drag * dt)
 		state.ship_vel *= target / sp
 	state.ship_pos += state.ship_vel * dt
-	if sp > cfg.pivot_speed:
-		state.ship_heading = state.ship_vel / sp
+	if not state.ship_vel.is_zero_approx():
+		state.ship_heading = state.ship_vel.normalized()
 
 # ── 地形との衝突（仕様書 7.2） ────────────────────────────────────
 

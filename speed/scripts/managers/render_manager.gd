@@ -486,12 +486,17 @@ func _draw_dim(c: CanvasItem) -> void:
 func _update_exhaust(dt: float) -> void:
 	if dt <= 0.0:
 		return
-	_jet_time += dt
 	for sample in _exhaust:
 		sample.life -= dt
 	_exhaust = _exhaust.filter(func(sample): return sample.life > 0.0)
 	if state.phase != RunState.Phase.PLAY and state.phase != RunState.Phase.FINISHING:
 		return
+	if state.drawing or state.hitstop > 0.0:
+		return
+	var animation_speed := state.ship_vel.length()
+	if state.tracing and run.draw.run != null:
+		animation_speed = run.draw.run.rate
+	_jet_time += dt * clampf(animation_speed / cfg.base_max_speed, 0.0, 3.0)
 	if state.ship_vel.length() < 5.0:
 		return
 	var tail := state.ship_pos - state.ship_heading * 22.0 * cfg.character_scale

@@ -13,6 +13,7 @@ var ship: ShipManager
 var intent: Intent = Intent.new()
 var run: TraceRun = null
 var _ready_emitted := true
+var _pre_dash_speed := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -57,6 +58,7 @@ func budget(gauge_amount: float) -> float:
 	return cfg.draw_length * gauge_amount * (state.stats.max_speed / cfg.base_max_speed) * state.stats.length_mult
 
 func _start(it: Intent) -> void:
+	_pre_dash_speed = state.ship_vel.length()
 	state.glide = false
 	state.drawing = true
 	state.draw_started = it.press
@@ -226,6 +228,7 @@ func _trace(real_dt: float) -> void:
 		dist -= move
 		state.ship_pos = a + u * run.seg_pos
 		state.ship_vel = u * run.speed
+		state.ship_heading = u
 		combat.wave_along(run, from, state.ship_pos)
 		if state.phase != RunState.Phase.PLAY:
 			return
@@ -249,6 +252,10 @@ func _trace(real_dt: float) -> void:
 ## なぞりの終わり。最後まで走り切ったら勢いを残す（glide）。
 func _end_trace(completed: bool) -> void:
 	state.tracing = false
+	var speed := maxf(state.ship_vel.length(), _pre_dash_speed)
+	var direction := state.ship_vel.normalized() if not state.ship_vel.is_zero_approx() else state.ship_heading
+	state.ship_vel = direction * speed
+	state.ship_heading = direction
 	if completed:
 		state.glide = true
 		state.ship_boost_t = cfg.boost_duration
