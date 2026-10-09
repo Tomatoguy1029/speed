@@ -562,13 +562,13 @@ func _draw_ship(c: CanvasItem) -> void:
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
-	c.draw_texture_rect(AIRSHIP, rect, false, col)
 	var weapons := run.build.weapon_behaviors
+	if weapons.has(&"W01") or weapons.has(&"W02"):
+		c.draw_texture_rect(AIRSHIP_CANON, rect, false, col)
+	c.draw_texture_rect(AIRSHIP, rect, false, col)
 	var attachments: Array[Texture2D] = []
 	if weapons.has(&"W03") or weapons.has(&"W05"):
 		attachments.append(AIRSHIP_ARMOR)
-	if weapons.has(&"W01") or weapons.has(&"W02"):
-		attachments.append(AIRSHIP_CANON)
 	if weapons.has(&"W17"):
 		attachments.append(AIRSHIP_PROBE)
 	if weapons.has(&"W07"):
