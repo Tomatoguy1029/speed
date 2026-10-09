@@ -28,6 +28,7 @@ const SLIDERS := [
 var run: RunManager
 var _module: OptionButton
 var _levels: SpinBox
+var _enemy_count: SpinBox
 var _sliders: Dictionary = {}
 var _status: Label
 
@@ -61,6 +62,23 @@ func _ready() -> void:
 		btn.add_theme_font_size_override("font_size", 15)
 		btn.pressed.connect(run.command.bind(b[1], b[2]))
 		grid.add_child(btn)
+	box.add_child(_heading("負荷計測用の敵生成（種類ランダム）"))
+	var spawn_row := HBoxContainer.new()
+	var count_label := Label.new()
+	count_label.text = "追加数"
+	spawn_row.add_child(count_label)
+	_enemy_count = SpinBox.new()
+	_enemy_count.min_value = 1
+	_enemy_count.max_value = 10000
+	_enemy_count.step = 1
+	_enemy_count.value = 100
+	spawn_row.add_child(_enemy_count)
+	var spawn_button := Button.new()
+	spawn_button.text = "敵を生成"
+	spawn_button.tooltip_text = "画面内にランダムな通常敵を追加。通常の出現上限を超えて生成できます。"
+	spawn_button.pressed.connect(_spawn_enemies)
+	spawn_row.add_child(spawn_button)
+	box.add_child(spawn_row)
 	box.add_child(_heading("入手するモジュール"))
 	var row := HBoxContainer.new()
 	_module = OptionButton.new()
@@ -131,6 +149,10 @@ func _grant() -> void:
 	var id: StringName = _module.get_item_metadata(_module.selected)
 	var kind := &"weapon" if String(id).begins_with("W") else &"trait"
 	run.command(&"debug_grant", {"kind": kind, "id": id, "levels": int(_levels.value)})
+
+func _spawn_enemies() -> void:
+	_enemy_count.apply()
+	run.command(&"debug_spawn_enemies", {"count": int(_enemy_count.value)})
 
 func _on_slider(value: float, key: String) -> void:
 	var cfg := ConfigManager.cfg

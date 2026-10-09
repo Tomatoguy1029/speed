@@ -82,6 +82,31 @@ func add_later(e: Enemy) -> void:
 func def_of(type: StringName) -> EnemyDef:
 	return ConfigManager.enemies.get(type) as EnemyDef
 
+## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
+func debug_spawn_random(count: int) -> void:
+	if not OS.is_debug_build():
+		return
+	var choices: Array[EnemyDef] = []
+	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
+		if def.id != &"meteor":
+			choices.append(def)
+	if choices.is_empty():
+		return
+	var view := state.view_rect()
+	var level: float = _target().level
+	for i in clampi(count, 1, 10000):
+		var def := choices[state.rng.randi_range(0, choices.size() - 1)]
+		var pos := Vector2(state.rng.randf_range(view.position.x, view.end.x),
+			state.rng.randf_range(view.position.y, view.end.y))
+		var opts := {"facing": (state.ship_pos - pos).angle()}
+		if def.size_var:
+			opts.size = def.radius * state.rng.randf_range(0.85, 1.45)
+		var e := create(def, level + field.danger_at(pos.length()) * cfg.danger_level, pos, opts)
+		e.pos = field.push_out(pos, e.r + 4.0)
+		if e.pos.length() > cfg.field_radius - e.r:
+			e.pos = e.pos.normalized() * (cfg.field_radius - e.r)
+		add(e)
+
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func tick(_real_dt: float, world_dt: float) -> void:

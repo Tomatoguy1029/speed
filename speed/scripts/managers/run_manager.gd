@@ -353,6 +353,10 @@ func command(name: StringName, args := {}) -> void:
 				if not e.is_boss:
 					e.dead = true
 			enemies.dirty = true
+		&"debug_spawn_enemies":
+			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
+				enemies.debug_spawn_random(int(args.get("count", 100)))
+				combat.rebuild_grid()
 		&"debug_hurt":
 			var keep := ship.invincible
 			ship.invincible = false
