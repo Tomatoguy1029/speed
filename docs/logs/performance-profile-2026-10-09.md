@@ -102,3 +102,21 @@ godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350
 比較用の引数は `--background=off`、`--size=1280x720`、`--sparks=off`、`--glow=off`、`--hz=60`、`--attack=on`。これらは計測プロセス内だけに適用する。`--seconds=6`で採取時間を変えられる。`PROFILE_BEGIN`が環境、`PROFILE_RESULT`が測定結果。`play_total`は包含時間で、個別Managerと重複する。
 
 数値の記録は [計測データ](performance-profile-2026-10-09.json)。計測用シーンは [profile_run.tscn](../../speed/tools/profile_run.tscn)。
+
+## 追加：エディタでのスパイクの読み方（2026-10-10）
+
+ユーザー提供のプロファイラー画像では `RunManager._physics_process`39.23ms／8回、`_play_tick`39.21ms／8回、`_run`38.87ms／80回。親・共通ラッパー・lambdaの時間は呼び出し先を含む表示で、これらを足さない。RunManagerの39msは、ゲーム更新8回分の合計（平均約4.9ms／回）である。
+
+| 内包される処理 | 画像の時間（8回合計） | 子の例（親に含まれる） |
+|---|---:|---|
+| EnemyManager.tick | 23.77ms | `_update`9.09ms、天体の近傍判定など |
+| EnemyManager.spawner_tick | 4.72ms | `_survey`4.62ms |
+| ProjectileManager.tick | 4.38ms | `_update_hostile`4.33ms |
+
+`RenderManager._draw_background`6.03ms／1回は、上のRunManagerからの更新呼び出しとは別の再描画処理。天体近傍判定 `FieldManager.near_body` は5.40ms／3,721回で、主に敵の更新から呼ばれるためEnemyManagerの時間へ追加して二重計上しない。
+
+このプロジェクトの更新は120Hz（間隔8.33ms）。表示が遅れると、Godotは遅れた更新を次の表示までに複数回実行する。エンジンの既定上限は8回なので、画像はその上限まで実行している状態と読める。60 FPS時の通常2回に対して8回になり、ほぼ同じ1更新の処理が約4倍積み上がる。最初の遅延の原因はこの画像だけでは確定できない。
+
+2枚目の `Physics Time`5.40msは8回の合計ではない。[Godot 4.6の実装](https://github.com/godotengine/godot/blob/4.6/main/main.cpp#L4587) は各物理更新の時間の最大値をデバッガへ送る。`Physics Frame Time`8.33msは120Hzの更新間隔。これらとScript Functionsの合計時間は集計の単位が異なる。
+
+関数自体の負荷を見たいときは、プロファイラーのScopeを `Inclusive`から `Self`へ切り替える。呼び出し先込み／関数自身のみの区別は [Godotのプロファイラー資料](https://docs.godotengine.org/en/4.6/tutorials/scripting/debug/the_profiler.html#scope-of-measurement-and-measurement-windows)、物理更新の上限は [Engineの資料](https://docs.godotengine.org/en/4.6/classes/class_engine.html#class-engine-property-max-physics-steps-per-frame) を参照。
