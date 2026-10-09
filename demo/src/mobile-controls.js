@@ -5,6 +5,19 @@ export function createMobileControls({ onDraw, onPause, onDebug }) {
   const active = window.matchMedia('(pointer: coarse)').matches || new URLSearchParams(window.location.search).get('mobile') === '1';
   document.body.classList.toggle('mobile', active);
   const root = document.getElementById('mobileControls');
+  const menu = document.getElementById('mobileMenu');
+  const menuToggle = document.getElementById('mobileMenuToggle');
+  const menuPanel = document.getElementById('mobileMenuPanel');
+  let menuOpen = false;
+  function closeMenu() { menuOpen = false; menuPanel.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); }
+  menuToggle.addEventListener('click', () => {
+    reset(); menuOpen = !menuOpen; menuPanel.hidden = !menuOpen;
+    menuToggle.setAttribute('aria-expanded', String(menuOpen));
+  });
+  window.addEventListener('pointerdown', e => {
+    if (!menuOpen || menu.contains(e.target)) return;
+    closeMenu(); e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
   const stick = document.getElementById('mobileStick');
   const knob = stick.querySelector('.stick-knob');
   const draw = document.getElementById('dashBtn');
@@ -33,10 +46,11 @@ export function createMobileControls({ onDraw, onPause, onDebug }) {
   }
   // Capture steering before the canvas's drawing input. The drawing finger stays
   // independent while the movement finger keeps capture on its original surface.
-  if (active) for (const area of [canvas, root]) {
+  if (active) {
+    const area = canvas;
     area.addEventListener('pointerdown', e => {
       if (!enabled || e.button !== 0 || e.target.closest('button')) return;
-      if (drawing && area === canvas) return;
+      if (drawing) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (pointerId !== null) return;
       pointerId = e.pointerId; surface = area;
@@ -60,23 +74,27 @@ export function createMobileControls({ onDraw, onPause, onDebug }) {
     e.preventDefault(); e.stopPropagation();
     if ((!active || enabled) && !draw.disabled) { drawing = true; onDraw(); }
   });
-  document.getElementById('mobilePause').addEventListener('click', onPause);
-  document.getElementById('mobileDebug').addEventListener('click', onDebug);
-  window.addEventListener('blur', reset);
+  document.getElementById('mobilePause').addEventListener('click', () => { closeMenu(); onPause(); });
+  document.getElementById('mobileDebug').addEventListener('click', () => { closeMenu(); onDebug(); });
+  window.addEventListener('blur', () => { reset(); closeMenu(); });
   return {
     active, reset,
+    get menuOpen() { return menuOpen; },
     read: () => active ? { ...vector } : null,
     sync(game, running, debugOpen) {
       if (!active) return;
-      const playable = running && game.state === 'play' && !debugOpen;
+      const playable = running && game.state === 'play' && !debugOpen && !menuOpen;
       if (!playable && enabled) reset();
       enabled = playable;
-      document.body.classList.toggle('mobile-running', running && !['finishing', 'dying', 'won', 'lost'].includes(game.state));
       root.hidden = !running || ['finishing', 'dying', 'won', 'lost'].includes(game.state);
+      menu.hidden = root.hidden;
+      if (menu.hidden) closeMenu();
       drawing = game.draw?.phase === 'draw';
       draw.classList.toggle('show', playable && (!game.draw || drawing));
       draw.disabled = !drawing && game.dashMeter < CONFIG.drawMinCharge;
-      draw.textContent = drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く ${Math.floor(game.dashMeter * 100)}%`;
+      draw.textContent = drawing ? (game.draw.started ? '発動' : '取消') : '描く';
+      draw.style.setProperty('--charge', `${Math.max(0, Math.min(1, game.dashMeter)) * 360}deg`);
+      draw.setAttribute('aria-label', drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く：充填${Math.floor(game.dashMeter * 100)}%`);
       document.getElementById('mobilePause').textContent = game.state === 'paused' ? '再開' : '一時停止';
       document.getElementById('mobileDebug').textContent = debugOpen ? '調整を閉じる' : '調整';
     },

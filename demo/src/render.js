@@ -501,11 +501,12 @@ function drawRunWeapons(r, game) {
 function drawRunLoadout(r, game) {
   if (r.mobile) {
     const { ctx, W, H } = r;
-    ctx.fillStyle = 'rgba(4,8,20,.78)'; ctx.fillRect(0, H - 48, W, 48);
+    const width = Math.min(240, W - 88);
+    ctx.fillStyle = 'rgba(4,8,20,.65)'; ctx.fillRect(4, H - 54, width, 50);
     ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
-    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 32);
+    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 40);
     const equipped = RUN_WEAPONS.filter(d => game.weapons[d.id]);
-    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + i * (W - 20) / 4, H - 14, (W - 24) / 4); });
+    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + (i % 2) * width / 2, H - 25 + Math.floor(i / 2) * 14, width / 2 - 8); });
     return;
   }
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
@@ -1479,16 +1480,17 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  const x = r.mobile ? 10 : 16, y = 18;
+  const x = r.mobile ? 10 : 16, y = r.mobile ? r.H - 124 : 18;
+  if (r.mobile) { ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(4, y - 4, 126, 80); }
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `${r.mobile ? 10 : 12}px ${MONO}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
+  ctx.fillText(r.mobile ? `HP${Math.ceil(Math.max(0, sh.hp))}/${Math.round(game.stats.maxHp)}` : `HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
   let ly = y + 28;
-  if (r.W < 600) {
+  if (r.mobile || r.W < 600) {
     // narrow (portrait phone): shorter lines so they clear the timer in the middle
-    ctx.fillText(`ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
+    ctx.fillText(r.mobile ? `ATK${atk.toFixed(1)} Lv${game.level}` : `ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
     ctx.fillText(`撃破 ${game.kills}`, x, ly += 18);
   } else {
     ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, ly);

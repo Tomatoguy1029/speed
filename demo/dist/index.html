@@ -85,34 +85,39 @@
   #dashBtn:disabled { opacity: 0.4; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
   #mobileControls { display: none; }
-  body.mobile { height: 100dvh; --pad-height: 116px; }
-  body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(var(--pad-height) + env(safe-area-inset-bottom)) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - var(--pad-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-  body.mobile #mobileControls:not([hidden]) { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--pad-height); padding: 0 max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); align-items: center; justify-content: flex-end; background: #080d1b; border-top: 1px solid #293b57; touch-action: none; }
-  #mobileStick { width: 96px; height: 96px; border: 2px solid #526987; border-radius: 50%; position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: radial-gradient(circle, #213550, #101b2d); touch-action: none; }
+  body.mobile { height: 100dvh; }
+  body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body.mobile #mobileControls:not([hidden]) { display: block; position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); right: calc(16px + env(safe-area-inset-right)); z-index: 4; pointer-events: none; }
+  #mobileStick { width: 96px; height: 96px; border: 2px solid #52698799; border-radius: 50%; position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: none; touch-action: none; }
   #mobileStick[hidden] { display: none; }
-  .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; background: #c3e2f2; box-shadow: 0 0 0 5px #7296b533; pointer-events: none; }
-  .mobile-actions { display: flex; align-items: center; gap: 10px; }
-  .mobile-menu { display: grid; gap: 6px; }
-  body.mobile #dashBtn { position: static; width: 110px; min-height: 64px; padding: 8px; font-size: 15px; }
+  .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; box-sizing: border-box; border: 2px solid #c3e2f2aa; background: none; pointer-events: none; }
+  #mobileMenu { display: none; }
+  body.mobile #mobileMenu:not([hidden]) { display: block; position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); z-index: 12; }
+  #mobileMenuToggle { width: 44px; height: 44px; padding: 10px; background: #101b2deb; border-color: #526987; }
+  #mobileMenuToggle svg { display: block; width: 22px; height: 22px; pointer-events: none; }
+  #mobileMenuPanel:not([hidden]) { display: grid; gap: 6px; margin-top: 6px; padding: 8px; width: 160px; border: 1px solid #526987; border-radius: 9px; background: #080d1bf5; box-shadow: 0 8px 24px #0008; }
+  #mobileMenuPanel button { text-align: left; }
+  body.mobile #dashBtn { position: static; width: 56px; height: 56px; min-height: 56px; padding: 4px; font-size: 12px; border-radius: 50%; border: 3px solid transparent; background: linear-gradient(#101b2de0, #101b2de0) padding-box, conic-gradient(#5fd8ff var(--charge, 0deg), #52698766 0) border-box; }
   body.mobile button { min-height: 44px; touch-action: manipulation; }
-  body.mobile .mobile-menu button { padding: 6px 10px; font-size: 12px; }
   body.mobile .screen { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   body.mobile .panel { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
-  body.mobile-running #ui { bottom: calc(var(--pad-height) + env(safe-area-inset-bottom)); }
-  body.mobile-running .panel { max-height: calc(100dvh - var(--pad-height) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-  @media (max-width: 360px) { body.mobile #mobileControls:not([hidden]) { padding-left: 10px; padding-right: 10px; } body.mobile #mobileStick { width: 80px; height: 80px; } body.mobile .mobile-actions { gap: 6px; } body.mobile #dashBtn { width: 100px; } }
+  @media (max-width: 360px) { body.mobile #mobileStick { width: 80px; height: 80px; } }
   body.mobile kbd { display: none; }
-  body.mobile #debug { box-sizing: border-box; max-height: calc(100dvh - var(--pad-height) - env(safe-area-inset-bottom)); padding-top: max(12px, env(safe-area-inset-top)); }
+  body.mobile #debug { box-sizing: border-box; max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding-top: max(12px, env(safe-area-inset-top)); }
   body.mobile #debug button, body.mobile #debug select { min-height: 36px; }
-  @media (max-height: 500px) { body.mobile { --pad-height: 96px; } body.mobile #mobileStick { width: 78px; height: 78px; } body.mobile .panel { padding: 12px 16px; } body.mobile .level-card { min-height: 0; padding: 10px; } body.mobile .level-card .tag { margin-bottom: 6px; } body.mobile .level-card .name { margin-bottom: 6px; } }
+  @media (max-height: 500px) { body.mobile #mobileStick { width: 78px; height: 78px; } body.mobile .panel { padding: 12px 16px; } body.mobile .level-card { min-height: 0; padding: 10px; } body.mobile .level-card .tag { margin-bottom: 6px; } body.mobile .level-card .name { margin-bottom: 6px; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
 <div id="mobileStick" role="group" aria-label="移動ジョイスティック" hidden><span class="stick-knob"></span></div>
+<div id="mobileMenu" hidden>
+  <button id="mobileMenuToggle" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="mobileMenuPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  <div id="mobileMenuPanel" hidden><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div>
+</div>
 <div id="mobileControls" hidden>
-  <div class="mobile-actions"><div class="mobile-menu"><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div><button id="dashBtn" type="button">描く</button></div>
+  <button id="dashBtn" type="button">描く</button>
 </div>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <script>
@@ -277,6 +282,7 @@ const CONFIG = {
   enemyRoamTurn: 0.12,
   enemySplitOverflow: 0.1, // offspring may exceed the normal population target by at most 10%
   dangerLevel: 2.2, // extra enemy level at full danger (planet surface / field edge)
+  meteorSlowCarry: 0.75, // mobile only: retain this share of the real-time carry during drawing/tracing
   meteorCount: 18, // world-layout density; applied at the start of a run
   meteorCoinChance: 0.4,
   rareMeteorChance: 0.01, // assigned once per world rock; guaranteed weapon on destruction
@@ -962,6 +968,7 @@ function meteorWorldPosition(m, t) {
 }
 
 function updateMeteorField(game, dt) {
+  const time = game.meteorClock ?? game.t;
   const view = game.spawnView || { x: game.ship.x, y: game.ship.y,
     halfW: game.viewRadius * 0.707, halfH: game.viewRadius * 0.707 };
   const near = (p, extra) => Math.abs(p.x - view.x) < view.halfW + extra &&
@@ -971,9 +978,9 @@ function updateMeteorField(game, dt) {
   for (const e of game.enemies) {
     const m = e.worldMeteor;
     if (!m || e.dead) continue;
-    const p = meteorWorldPosition(m, game.t);
+    const p = meteorWorldPosition(m, time);
     e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy;
-    e.facing = m.facing + m.spin * game.t;
+    e.facing = m.facing + m.spin * time;
     if (!near(p, 650)) { m.active = false; unload = true; }
   }
   if (unload) game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
@@ -983,12 +990,12 @@ function updateMeteorField(game, dt) {
   game.meteorStreamT = 0.2;
   for (const m of game.field.meteors) {
     if (m.destroyed || m.active) continue;
-    const p = meteorWorldPosition(m, game.t);
+    const p = meteorWorldPosition(m, time);
     if (!near(p, 300)) continue;
     const e = m.entity || (m.entity = createEnemy('meteor', 1, p.x, p.y,
       { size: m.size, facing: m.facing, spin: m.spin }));
     e.worldMeteor = m; m.active = true;
-    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * game.t;
+    e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * time;
     game.enemies.push(e);
   }
 }
@@ -2917,7 +2924,7 @@ function createGame(opts = {}) {
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
-    t: 0, acc: 0, seed, rng,
+    t: 0, meteorClock: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout, newBuild, weapons, traits,
     rareQueue: [], rareOffer: null, levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
     runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
@@ -3014,7 +3021,11 @@ function update(game, frameDt, input) {
   game.timeScale = scale;
   game.acc += frameDt * scale;
   // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
+  if (game.draw || game.portalDash) {
+    const carry = frameDt * (1 - scale);
+    game.t += carry;
+    game.meteorClock += carry * (input.mobile ? (scale > 0 ? CONFIG.meteorSlowCarry : 0) : 1);
+  }
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -3050,6 +3061,7 @@ function step(game, dt, input) {
   const sh = game.ship;
   const stats = game.stats;
   game.t += dt;
+  game.meteorClock += dt;
   const phase = getPhase(game.t);
   if (phase.id !== game.phaseId) {
     game.phaseId = phase.id;
@@ -5593,11 +5605,12 @@ function drawRunWeapons(r, game) {
 function drawRunLoadout(r, game) {
   if (r.mobile) {
     const { ctx, W, H } = r;
-    ctx.fillStyle = 'rgba(4,8,20,.78)'; ctx.fillRect(0, H - 48, W, 48);
+    const width = Math.min(240, W - 88);
+    ctx.fillStyle = 'rgba(4,8,20,.65)'; ctx.fillRect(4, H - 54, width, 50);
     ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
-    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 32);
+    ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 40);
     const equipped = RUN_WEAPONS.filter(d => game.weapons[d.id]);
-    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + i * (W - 20) / 4, H - 14, (W - 24) / 4); });
+    equipped.forEach((d, i) => { ctx.fillStyle = runRankColor(game.weapons[d.id]); ctx.fillText(`${d.name.slice(0, 4)} ${game.weapons[d.id]}`, 10 + (i % 2) * width / 2, H - 25 + Math.floor(i / 2) * 14, width / 2 - 8); });
     return;
   }
   const { ctx, H, W } = r, width = Math.min(270, W * 0.42), x = 12, y = H - 130;
@@ -6571,16 +6584,17 @@ function drawStatus(r, game) {
   ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
   ctx.fillStyle = frac < 0.3 ? '#ff5a4a' : '#5dffa0';
   ctx.fillRect(bx, by, bw * frac, 5);
-  const x = r.mobile ? 10 : 16, y = 18;
+  const x = r.mobile ? 10 : 16, y = r.mobile ? r.H - 124 : 18;
+  if (r.mobile) { ctx.fillStyle = 'rgba(4,8,20,0.78)'; ctx.fillRect(4, y - 4, 126, 80); }
   ctx.fillStyle = '#e8f0ff';
   ctx.font = `${r.mobile ? 10 : 12}px ${MONO}`;
   ctx.textAlign = 'left';
-  ctx.fillText(`HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
+  ctx.fillText(r.mobile ? `HP${Math.ceil(Math.max(0, sh.hp))}/${Math.round(game.stats.maxHp)}` : `HP ${Math.ceil(Math.max(0, sh.hp))} / ${Math.round(game.stats.maxHp)}`, x, y + 10);
   const atk = attackPower(Math.hypot(sh.vx, sh.vy), game.stats);
   let ly = y + 28;
-  if (r.W < 600) {
+  if (r.mobile || r.W < 600) {
     // narrow (portrait phone): shorter lines so they clear the timer in the middle
-    ctx.fillText(`ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
+    ctx.fillText(r.mobile ? `ATK${atk.toFixed(1)} Lv${game.level}` : `ATK ${atk.toFixed(1)}  Lv ${game.level}`, x, ly);
     ctx.fillText(`撃破 ${game.kills}`, x, ly += 18);
   } else {
     ctx.fillText(`ATK ${atk.toFixed(1)}   撃破 ${game.kills}   Lv ${game.level}`, x, ly);
@@ -7010,7 +7024,7 @@ function showStation(save, onBuy, onDepart) {
       el('li', {}, '25%以上溜まったら「描く」をタップし、フィールドに指で軌跡を描く。指を離すか長さを使い切ると高速攻撃。'),
       el('li', {}, '線の終了後もジョイスティックで操舵。強化カードはタップで選択。'),
       el('li', {}, '紫の結晶は経験値、赤い輪は敵弾。隕石を壊すと回復などを入手。'),
-      el('li', {}, '一時停止・調整は右下のボタンから。縦持ち・横持ちのどちらでも遊べます。')) : el('ul', { class: 'how' },
+      el('li', {}, '一時停止・調整は左上のメニューから。縦持ち・横持ちのどちらでも遊べます。')) : el('ul', { class: 'how' },
       el('li', {}, el('b', {}, `${schemeById(CONFIG.controlScheme).name}`), '：', schemeById(CONFIG.controlScheme).help, '（', el('kbd', {}, 'P'), ' の調整パネルで操作方法を切り替えられます）'),
       el('li', {}, CONFIG.controlScheme === 'portal' ? '共振ビーコンを装備して出発。ポータル到着時に周囲へ波動が出る。次の行き先の線に赤い×が出ると、その敵には弾かれる' : isDrawScheme(CONFIG.controlScheme) ? `線を走り切った後も高速を維持し、${CONFIG.controlScheme === 'draw-wasd' ? 'WASD' : 'カーソル／スティック'}で方向を変えられる。貫通できる敵では減速せず、硬い敵に弾かれると通常移動へ戻る。移動中にレベルアップしても、強化カードは線の終了後に出る` : 'チャージ中も機体は流れ続ける。同じ向きへ続けて突進すると勢いが乗る'),
       el('li', {}, '威力は攻撃力倍率で決まる。速度を上げても威力は変わらない。硬い装甲に弾かれると火花が出る'),
@@ -7271,6 +7285,7 @@ const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
+  { key: 'meteorSlowCarry', label: 'スマホの描画・高速移動：隕石の速度保持率', min: 0, max: 1, step: 0.05 },
   { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
   { key: 'rareMeteorChance', label: '光る隕石の割合（次のラン）', min: 0, max: 0.1, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%` },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
@@ -7303,12 +7318,14 @@ function resetConfig(game) {
 }
 
 function skipTime(game, sec) {
-  game.t = Math.min(CONFIG.runTime - 1, game.t + sec);
+  const next = Math.min(CONFIG.runTime - 1, game.t + sec);
+  game.meteorClock = (game.meteorClock ?? game.t) + next - game.t;
+  game.t = next;
 }
 
 function jumpToPhase(game, id) {
   const p = PHASES.find((x) => x.id === id);
-  if (p) game.t = p.start + 0.01;
+  if (p) skipTime(game, p.start + 0.01 - game.t);
 }
 
 function setScheme(game, id) {
@@ -7338,7 +7355,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
   const mobilePanel = document.body.classList.contains('mobile');
-  if (mobilePanel) root.querySelector('.dclose').textContent = '右下の調整で閉じる';
+  if (mobilePanel) root.querySelector('.dclose').textContent = '左上メニューの調整で閉じる';
   const schemeSel = root.querySelector('.dctl select');
   schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
@@ -7413,7 +7430,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     g.rareOffer = null; g.rareQueue = [];
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
-  button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
+  button('ボス出現へ', (g) => skipTime(g, Math.max(0, CONFIG.bossTime - g.t)));
   const sel = document.createElement('select');
   sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
   sel.addEventListener('change', () => { const g = getGame(); if (g && sel.value) jumpToPhase(g, sel.value); sel.value = ''; });
@@ -7565,6 +7582,19 @@ function createMobileControls({ onDraw, onPause, onDebug }) {
   const active = window.matchMedia('(pointer: coarse)').matches || new URLSearchParams(window.location.search).get('mobile') === '1';
   document.body.classList.toggle('mobile', active);
   const root = document.getElementById('mobileControls');
+  const menu = document.getElementById('mobileMenu');
+  const menuToggle = document.getElementById('mobileMenuToggle');
+  const menuPanel = document.getElementById('mobileMenuPanel');
+  let menuOpen = false;
+  function closeMenu() { menuOpen = false; menuPanel.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); }
+  menuToggle.addEventListener('click', () => {
+    reset(); menuOpen = !menuOpen; menuPanel.hidden = !menuOpen;
+    menuToggle.setAttribute('aria-expanded', String(menuOpen));
+  });
+  window.addEventListener('pointerdown', e => {
+    if (!menuOpen || menu.contains(e.target)) return;
+    closeMenu(); e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
   const stick = document.getElementById('mobileStick');
   const knob = stick.querySelector('.stick-knob');
   const draw = document.getElementById('dashBtn');
@@ -7593,10 +7623,11 @@ function createMobileControls({ onDraw, onPause, onDebug }) {
   }
   // Capture steering before the canvas's drawing input. The drawing finger stays
   // independent while the movement finger keeps capture on its original surface.
-  if (active) for (const area of [canvas, root]) {
+  if (active) {
+    const area = canvas;
     area.addEventListener('pointerdown', e => {
       if (!enabled || e.button !== 0 || e.target.closest('button')) return;
-      if (drawing && area === canvas) return;
+      if (drawing) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (pointerId !== null) return;
       pointerId = e.pointerId; surface = area;
@@ -7620,23 +7651,27 @@ function createMobileControls({ onDraw, onPause, onDebug }) {
     e.preventDefault(); e.stopPropagation();
     if ((!active || enabled) && !draw.disabled) { drawing = true; onDraw(); }
   });
-  document.getElementById('mobilePause').addEventListener('click', onPause);
-  document.getElementById('mobileDebug').addEventListener('click', onDebug);
-  window.addEventListener('blur', reset);
+  document.getElementById('mobilePause').addEventListener('click', () => { closeMenu(); onPause(); });
+  document.getElementById('mobileDebug').addEventListener('click', () => { closeMenu(); onDebug(); });
+  window.addEventListener('blur', () => { reset(); closeMenu(); });
   return {
     active, reset,
+    get menuOpen() { return menuOpen; },
     read: () => active ? { ...vector } : null,
     sync(game, running, debugOpen) {
       if (!active) return;
-      const playable = running && game.state === 'play' && !debugOpen;
+      const playable = running && game.state === 'play' && !debugOpen && !menuOpen;
       if (!playable && enabled) reset();
       enabled = playable;
-      document.body.classList.toggle('mobile-running', running && !['finishing', 'dying', 'won', 'lost'].includes(game.state));
       root.hidden = !running || ['finishing', 'dying', 'won', 'lost'].includes(game.state);
+      menu.hidden = root.hidden;
+      if (menu.hidden) closeMenu();
       drawing = game.draw?.phase === 'draw';
       draw.classList.toggle('show', playable && (!game.draw || drawing));
       draw.disabled = !drawing && game.dashMeter < CONFIG.drawMinCharge;
-      draw.textContent = drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く ${Math.floor(game.dashMeter * 100)}%`;
+      draw.textContent = drawing ? (game.draw.started ? '発動' : '取消') : '描く';
+      draw.style.setProperty('--charge', `${Math.max(0, Math.min(1, game.dashMeter)) * 360}deg`);
+      draw.setAttribute('aria-label', drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く：充填${Math.floor(game.dashMeter * 100)}%`);
       document.getElementById('mobilePause').textContent = game.state === 'paused' ? '再開' : '一時停止';
       document.getElementById('mobileDebug').textContent = debugOpen ? '調整を閉じる' : '調整';
     },
@@ -7804,7 +7839,7 @@ function frame(now) {
   const raw = input.read();
   raw.mobile = mobile.active;
   raw.mobileStick = mobile.read();
-  if (debug.open && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
+  if ((debug.open || mobile.menuOpen) && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));

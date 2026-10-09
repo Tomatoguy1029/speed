@@ -158,7 +158,7 @@ function frame(now) {
   const raw = input.read();
   raw.mobile = mobile.active;
   raw.mobileStick = mobile.read();
-  if (debug.open && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
+  if ((debug.open || mobile.menuOpen) && mobile.active) { raw.mobileStick = { x: 0, y: 0 }; raw.dash = raw.pressed = false; }
   raw.cursor = raw.hover ? screenToWorld(renderer, raw.hover.x, raw.hover.y) : null;
   raw.clickCursor = raw.click ? screenToWorld(renderer, raw.click.x, raw.click.y) : null;
   update(game, dt, buildIntent(raw, game.scheme));

@@ -85,34 +85,39 @@
   #dashBtn:disabled { opacity: 0.4; }
   kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid #3b4a7a; border-radius: 4px; padding: 1px 5px; color: #b8c6ea; }
   #mobileControls { display: none; }
-  body.mobile { height: 100dvh; --pad-height: 116px; }
-  body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(var(--pad-height) + env(safe-area-inset-bottom)) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - var(--pad-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-  body.mobile #mobileControls:not([hidden]) { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--pad-height); padding: 0 max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); align-items: center; justify-content: flex-end; background: #080d1b; border-top: 1px solid #293b57; touch-action: none; }
-  #mobileStick { width: 96px; height: 96px; border: 2px solid #526987; border-radius: 50%; position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: radial-gradient(circle, #213550, #101b2d); touch-action: none; }
+  body.mobile { height: 100dvh; }
+  body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body.mobile #mobileControls:not([hidden]) { display: block; position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); right: calc(16px + env(safe-area-inset-right)); z-index: 4; pointer-events: none; }
+  #mobileStick { width: 96px; height: 96px; border: 2px solid #52698799; border-radius: 50%; position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: none; touch-action: none; }
   #mobileStick[hidden] { display: none; }
-  .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; background: #c3e2f2; box-shadow: 0 0 0 5px #7296b533; pointer-events: none; }
-  .mobile-actions { display: flex; align-items: center; gap: 10px; }
-  .mobile-menu { display: grid; gap: 6px; }
-  body.mobile #dashBtn { position: static; width: 110px; min-height: 64px; padding: 8px; font-size: 15px; }
+  .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; box-sizing: border-box; border: 2px solid #c3e2f2aa; background: none; pointer-events: none; }
+  #mobileMenu { display: none; }
+  body.mobile #mobileMenu:not([hidden]) { display: block; position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); z-index: 12; }
+  #mobileMenuToggle { width: 44px; height: 44px; padding: 10px; background: #101b2deb; border-color: #526987; }
+  #mobileMenuToggle svg { display: block; width: 22px; height: 22px; pointer-events: none; }
+  #mobileMenuPanel:not([hidden]) { display: grid; gap: 6px; margin-top: 6px; padding: 8px; width: 160px; border: 1px solid #526987; border-radius: 9px; background: #080d1bf5; box-shadow: 0 8px 24px #0008; }
+  #mobileMenuPanel button { text-align: left; }
+  body.mobile #dashBtn { position: static; width: 56px; height: 56px; min-height: 56px; padding: 4px; font-size: 12px; border-radius: 50%; border: 3px solid transparent; background: linear-gradient(#101b2de0, #101b2de0) padding-box, conic-gradient(#5fd8ff var(--charge, 0deg), #52698766 0) border-box; }
   body.mobile button { min-height: 44px; touch-action: manipulation; }
-  body.mobile .mobile-menu button { padding: 6px 10px; font-size: 12px; }
   body.mobile .screen { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   body.mobile .panel { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
-  body.mobile-running #ui { bottom: calc(var(--pad-height) + env(safe-area-inset-bottom)); }
-  body.mobile-running .panel { max-height: calc(100dvh - var(--pad-height) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-  @media (max-width: 360px) { body.mobile #mobileControls:not([hidden]) { padding-left: 10px; padding-right: 10px; } body.mobile #mobileStick { width: 80px; height: 80px; } body.mobile .mobile-actions { gap: 6px; } body.mobile #dashBtn { width: 100px; } }
+  @media (max-width: 360px) { body.mobile #mobileStick { width: 80px; height: 80px; } }
   body.mobile kbd { display: none; }
-  body.mobile #debug { box-sizing: border-box; max-height: calc(100dvh - var(--pad-height) - env(safe-area-inset-bottom)); padding-top: max(12px, env(safe-area-inset-top)); }
+  body.mobile #debug { box-sizing: border-box; max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding-top: max(12px, env(safe-area-inset-top)); }
   body.mobile #debug button, body.mobile #debug select { min-height: 36px; }
-  @media (max-height: 500px) { body.mobile { --pad-height: 96px; } body.mobile #mobileStick { width: 78px; height: 78px; } body.mobile .panel { padding: 12px 16px; } body.mobile .level-card { min-height: 0; padding: 10px; } body.mobile .level-card .tag { margin-bottom: 6px; } body.mobile .level-card .name { margin-bottom: 6px; } }
+  @media (max-height: 500px) { body.mobile #mobileStick { width: 78px; height: 78px; } body.mobile .panel { padding: 12px 16px; } body.mobile .level-card { min-height: 0; padding: 10px; } body.mobile .level-card .tag { margin-bottom: 6px; } body.mobile .level-card .name { margin-bottom: 6px; } }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
 <div id="mobileStick" role="group" aria-label="移動ジョイスティック" hidden><span class="stick-knob"></span></div>
+<div id="mobileMenu" hidden>
+  <button id="mobileMenuToggle" type="button" aria-label="メニュー" aria-expanded="false" aria-controls="mobileMenuPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+  <div id="mobileMenuPanel" hidden><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div>
+</div>
 <div id="mobileControls" hidden>
-  <div class="mobile-actions"><div class="mobile-menu"><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div><button id="dashBtn" type="button">描く</button></div>
+  <button id="dashBtn" type="button">描く</button>
 </div>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
 <!--BUNDLE-->

@@ -37,7 +37,7 @@ export function createGame(opts = {}) {
   const ship = createShip(stats, -CONFIG.startRadius, 0);
   ship.vy = -CONFIG.baseMaxSpeed * 0.3; // start drifting along the orbit
   return {
-    t: 0, acc: 0, seed, rng,
+    t: 0, meteorClock: 0, acc: 0, seed, rng,
     meta, stats, ship, loadout, newBuild, weapons, traits,
     rareQueue: [], rareOffer: null, levelChoices: null, buildClock: 0, weaponState: {}, drones: [], wstate: {}, wproj: [], wfx: [],
     runPaths: [], runTravel: [], vortexes: [], dashKills: 0, nextKillBoom: 0, criticalBeamAt: 0,
@@ -134,7 +134,11 @@ export function update(game, frameDt, input) {
   game.timeScale = scale;
   game.acc += frameDt * scale;
   // the run clock keeps real time while drawing/tracing even though the world crawls
-  if (game.draw || game.portalDash) game.t += frameDt * (1 - scale);
+  if (game.draw || game.portalDash) {
+    const carry = frameDt * (1 - scale);
+    game.t += carry;
+    game.meteorClock += carry * (input.mobile ? (scale > 0 ? CONFIG.meteorSlowCarry : 0) : 1);
+  }
   const phaseBefore = drawPhase(game);
   while (game.acc >= STEP) {
     game.acc -= STEP;
@@ -170,6 +174,7 @@ function step(game, dt, input) {
   const sh = game.ship;
   const stats = game.stats;
   game.t += dt;
+  game.meteorClock += dt;
   const phase = getPhase(game.t);
   if (phase.id !== game.phaseId) {
     game.phaseId = phase.id;

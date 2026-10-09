@@ -59,6 +59,7 @@ export const TUNABLES = [
   { key: 'zoomExp', label: 'ズームアウト強さ', min: 0, max: 1.2, step: 0.05 },
   { key: 'zoomMin', label: '最小ズーム', min: 0.1, max: 1, step: 0.02 },
   { key: 'densityMult', label: '敵の数 倍率', min: 0.2, max: 8, step: 0.05 },
+  { key: 'meteorSlowCarry', label: 'スマホの描画・高速移動：隕石の速度保持率', min: 0, max: 1, step: 0.05 },
   { key: 'meteorCount', label: '隕石の配置密度（次のラン）', min: 0, max: 100, step: 1 },
   { key: 'rareMeteorChance', label: '光る隕石の割合（次のラン）', min: 0, max: 0.1, step: 0.001, fmt: v => `${(v * 100).toFixed(1)}%` },
   { key: 'meteorHealChance', label: '隕石：回復ドロップ率', min: 0, max: 1, step: 0.01, fmt: v => `${Math.round(v * 100)}%` },
@@ -91,12 +92,14 @@ export function resetConfig(game) {
 }
 
 export function skipTime(game, sec) {
-  game.t = Math.min(CONFIG.runTime - 1, game.t + sec);
+  const next = Math.min(CONFIG.runTime - 1, game.t + sec);
+  game.meteorClock = (game.meteorClock ?? game.t) + next - game.t;
+  game.t = next;
 }
 
 export function jumpToPhase(game, id) {
   const p = PHASES.find((x) => x.id === id);
-  if (p) game.t = p.start + 0.01;
+  if (p) skipTime(game, p.start + 0.01 - game.t);
 }
 
 export function setScheme(game, id) {
@@ -126,7 +129,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   root.innerHTML = `<div class="dh"><b>調整パネル</b><span class="dclose">P で閉じる</span></div><label class="dctl"><span>操作方法</span><select></select></label><div class="dhelp"></div><div class="dinfo"></div><div class="dbtns"></div><div class="dsl"></div>`;
   document.body.append(root);
   const mobilePanel = document.body.classList.contains('mobile');
-  if (mobilePanel) root.querySelector('.dclose').textContent = '右下の調整で閉じる';
+  if (mobilePanel) root.querySelector('.dclose').textContent = '左上メニューの調整で閉じる';
   const schemeSel = root.querySelector('.dctl select');
   schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
@@ -201,7 +204,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
     g.rareOffer = null; g.rareQueue = [];
     if (g.state === 'levelup') g.levelChoices = null, g.pendingLevelups = 0, g.state = 'play';
   });
-  button('ボス出現へ', (g) => { g.t = Math.max(g.t, CONFIG.bossTime); });
+  button('ボス出現へ', (g) => skipTime(g, Math.max(0, CONFIG.bossTime - g.t)));
   const sel = document.createElement('select');
   sel.innerHTML = '<option value="">時刻へ…</option>' + PHASES.map((p) => `<option value="${p.id}">${Math.floor(p.start / 60)}:${String(p.start % 60).padStart(2, '0')}ごろ</option>`).join('');
   sel.addEventListener('change', () => { const g = getGame(); if (g && sel.value) jumpToPhase(g, sel.value); sel.value = ''; });
