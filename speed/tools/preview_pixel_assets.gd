@@ -119,8 +119,9 @@ func _preview() -> void:
 			weapon.level = lv
 			state.ship_pos = Vector2(0, -120 + (lv - 1) * 60)
 			weapon.tick(float(weapon.p("interval_by_level")[lv - 1]), false)
-		for shot in run.projectiles.friendly:
-			shot.pos += shot.vel * 0.08
+		var pr := run.projectiles
+		for i in pr.friend_count():
+			pr.friend_pos[i] += pr.friend_vel[i] * 0.08
 		state.ship_pos = Vector2.ZERO
 		var drone = load("res://scripts/weapons/drone.gd").new()
 		drone.setup(run.build, ConfigManager.weapons[&"W06"])

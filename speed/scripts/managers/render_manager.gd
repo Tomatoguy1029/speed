@@ -438,19 +438,24 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		var pts: PackedVector2Array = t.points
 		if pts.size() > 1:
 			c.draw_polyline(pts, Color(1.0, 0.6, 0.25, 0.6 * a), _px(3.0))
-	for s: Shot in run.projectiles.friendly:
-		if not view.has_point(s.pos):
+	var pr := run.projectiles
+	var friend_pos := pr.friend_pos
+	for i in friend_pos.size():
+		var pos := friend_pos[i]
+		if not view.has_point(pos):
 			continue
-		if s.kind == &"debris":
-			if s.trail.size() > 1:
-				c.draw_polyline(s.trail, Color(1.0, 0.6, 0.25, 0.7), _px(3.0))
-			var u := Vector2.from_angle(s.angle) * s.r
+		var r := pr.friend_r[i]
+		if pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
+			var trail := pr.friend_trail[i]
+			if trail.size() > 1:
+				c.draw_polyline(trail, Color(1.0, 0.6, 0.25, 0.7), _px(3.0))
+			var u := Vector2.from_angle(pr.friend_angle[i]) * r
 			var v := Vector2(-u.y, u.x) * 0.6
-			c.draw_colored_polygon(PackedVector2Array([s.pos + u, s.pos + v, s.pos - u * 0.7, s.pos - v]), Color("#aeb6c4"))
-			c.draw_polyline(PackedVector2Array([s.pos + u, s.pos + v, s.pos - u * 0.7, s.pos - v, s.pos + u]), Color("#ff9a3c"), _px(1.5))
+			c.draw_colored_polygon(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v]), Color("#aeb6c4"))
+			c.draw_polyline(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v, pos + u]), Color("#ff9a3c"), _px(1.5))
 		else:
-			var dir := s.vel.normalized()
-			c.draw_line(s.pos - dir * s.r * 2.2, s.pos + dir * s.r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), s.r * 0.9))
+			var dir := pr.friend_vel[i].normalized()
+			c.draw_line(pos - dir * r * 2.2, pos + dir * r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), r * 0.9))
 	_hostile_batch.begin()
 	var hostile_pos := run.projectiles.hostile_pos
 	var hostile_r := run.projectiles.hostile_r

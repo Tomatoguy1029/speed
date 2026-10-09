@@ -42,6 +42,12 @@ func _ready() -> void:
 		for id in [&"W03", &"W04", &"W08", &"W17"]:
 			run.build.grant(&"weapon", id, 5)
 		run.build.grant(&"trait", &"T04", 5)
+	if options.has("weapons"):
+		# --weapons=W01:5,W02:3 で装備を置き換える
+		run.build.reset_loadout()
+		for item in String(options.weapons).split(",", false):
+			var parts := item.split(":")
+			run.build.grant(&"weapon", StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
 	run.state.rng.seed = 1029
 	# RunManager の初期化は乱数配置なので、天体も同じシードで作り直す。
 	# 天体との接触量の違いを、描画の比較条件へ混ぜない。
@@ -154,7 +160,7 @@ func _process(_delta: float) -> void:
 	draws.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	counts.enemies += run.enemies.list.size()
 	counts.hostile += run.projectiles.hostile_count()
-	counts.friendly += run.projectiles.friendly.size()
+	counts.friendly += run.projectiles.friend_count()
 	counts.gems += run.pickups.gem_pos.size()
 	if now - start_us >= int(float(options.get("seconds", "6")) * 1000000.0):
 		measuring = false
