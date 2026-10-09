@@ -122,10 +122,13 @@ func _process(delta: float) -> void:
 	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
 	var dt := 0.0 if frozen else delta
+	# 停止中は減衰も止まるため、残った画面揺れを持ち越さない。
+	if phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
+		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
 	var offset := Vector2.ZERO
-	if shake > 0.0 and phase != RunState.Phase.DYING:
+	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING:
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake / maxf(state.camera_zoom, 0.01)
 	_camera.position = state.view_center + offset
 	_camera.zoom = Vector2(state.camera_zoom, state.camera_zoom)
@@ -542,7 +545,8 @@ func _draw_ship(c: CanvasItem) -> void:
 	var hurt := state.ship_hurt > 0.0
 	if hurt:
 		col = Color("#ff6b5a")
-		p.x += randf_range(-1.0, 1.0) * _px(cfg.ship_hurt_shake)
+		if state.phase != RunState.Phase.PAUSED and state.phase != RunState.Phase.LEVELUP:
+			p.x += randf_range(-1.0, 1.0) * _px(cfg.ship_hurt_shake)
 	if state.ship_invuln > 0.0 and fmod(state.time * 20.0, 2.0) < 1.0:
 		col.a = 0.5
 	var dir := state.ship_heading
