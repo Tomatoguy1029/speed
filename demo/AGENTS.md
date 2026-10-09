@@ -17,9 +17,6 @@
 | [docs/enemies.md](docs/enemies.md) | 敵の種類・基礎数値・行動・出現・実装状態 | 敵の追加・数値・行動・出現条件の変更時 |
 | [docs/module-plan.md](docs/module-plan.md) | 武器・特性の共通設計（装備枠・成長・入手方法） | 共通方針を変えたとき |
 | [docs/catalog.md](docs/catalog.md) | 一覧の運用ルール | 管理方針を変えたとき |
-| [docs/wakida.md](docs/wakida.md) | [Tomatoguy1029](https://github.com/Tomatoguy1029)の作業・判断の履歴（旧 decisions.md） | Tomatoguy1029 の作業時に末尾へ追記 |
-| [docs/shumak.md](docs/shumak.md) | [ShueMaker70969](https://github.com/ShueMaker70969) の作業・判断の履歴 | ShueMaker70969 の作業時に末尾へ追記 |
-| [docs/keporusu.md](docs/keporusu.md) | [keporusu](https://github.com/keporusu) の作業・判断の履歴 | keporusu の作業時に末尾へ追記 |
 | [docs/backlog.md](docs/backlog.md) | 未解決の課題・次の候補・保留中の議論 | 課題が見つかった／片付いたとき |
 | `tasks/plan.md`, `tasks/todo.md` | 最初の実装計画（完了済み、記録として残す） | 更新しない |
 
@@ -31,9 +28,7 @@
 
 ### ユーザーごとの記録更新
 
-- **Claude Code・Codex などのエージェントは、ユーザーが作業するたびに、同じ作業の中で対応する履歴ファイルを自動で更新する**。更新の依頼を毎回待たず、日付・要望・作業内容・決めたことと理由を末尾に番号付きで追記する。記録がまだないファイルでは「まだ作業記録はない。」を最初の記録に置き換える。
-- 更新先は **GitHub `Tomatoguy1029`→ `docs/wakida.md`、GitHub `ShueMaker70969` → `docs/shumak.md`、GitHub `keporusu` → `docs/keporusu.md`**。会話で明示された作業ユーザーを優先し、明示がなければ認証済みの GitHub アカウントなど確認できる情報で判断する。特定できない場合は本人に確認し、別ユーザーの履歴へ推測で書かない。
-- 作業前に関連するユーザーの履歴も確認する。他のユーザーの作業記録は書き換えず、番号はファイルごとに続ける。
+- 個人の作業ログ（作業・判断の履歴）は作らない。経緯は git のコミットに残す。
 - 現在の仕様と未解決の課題は共通で管理する。挙動・数値を変えたら `docs/spec.md`、課題が見つかった／片付いたら `docs/backlog.md` も同じ作業の中で更新する。
 
 ## ユーザーとのやりとりのルール

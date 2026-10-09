@@ -135,9 +135,6 @@ demo または公開設定を変更してpushすると、ルートのGitHub Acti
 - [敵一覧](docs/enemies.md)：種類・基礎数値・行動・出現
 - [一覧の運用ルール](docs/catalog.md)：追加・変更・採否・実装状況の更新方法
 - [武器・特性の共通設計](docs/module-plan.md)：装備枠・成長・入手方法
-- [wakida の履歴](docs/wakida.md)：Tomatoguy1029の作業内容・変更の理由・決定事項（既存の履歴を継承）
-- [ShueMaker70969 の履歴](docs/shumak.md)：ShueMaker70969 の作業内容・変更の理由・決定事項
-- [keporusu の履歴](docs/keporusu.md)：keporusu の作業内容・変更の理由・決定事項
 - [未解決の課題](docs/backlog.md)：検証したいこと・保留中の案
 - [初期設計](SPEC.md)：試作開始時の仕様
 - [作業方針](AGENTS.md)：リポジトリの構成・開発ルール
