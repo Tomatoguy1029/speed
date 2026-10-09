@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="MetaUpgradeDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"reroll"
+display_name = "演算予備"
+description = "3択のリロール +1回"
+stat = &"reroll"
+per_level = 1.0
+costs = PackedInt32Array(60, 140, 260)
+order = 7

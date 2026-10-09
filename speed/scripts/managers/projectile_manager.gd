@@ -1,4 +1,4 @@
-## 弾と破片（設計書 4.3）。味方の弾・敵の弾・大型の敵の破片（仕様書 6・9.5）。
+## 弾と破片（設計書 4.3）。味方の弾・敵の弾・大型の敵の破片（仕様書 8・11.6）。
 ##
 ## 物理的な弾と破片は、惑星と月で止まる。波動・範囲攻撃・ビームはここでは扱わない。
 class_name ProjectileManager
@@ -39,7 +39,7 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	s.color = opts.get("color", Color("#ffe46b"))
 	friendly.append(s)
 
-## 撃破された大型の敵から、攻撃する破片を飛ばす（仕様書 9.5）。
+## 撃破された大型の敵から、攻撃する破片を飛ばす（仕様書 11.6）。
 func scatter_hull(e: Enemy, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
 	if e.r < cfg.hull_debris_min_radius or e.meteor_index >= 0 or e.is_boss or e.hull_scattered:
 		return false

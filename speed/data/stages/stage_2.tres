@@ -11,8 +11,8 @@
 [resource]
 script = ExtResource("1")
 index = 2
-display_name = "いっかくじゅう座の星系"
+display_name = "ケンタウルス座の星系"
 scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
 boss_id = &"provisional"
-legendary_module_id = &"legendary_stern"
+legendary_module_id = &"legendary_sail"

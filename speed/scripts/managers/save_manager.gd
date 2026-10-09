@@ -14,6 +14,8 @@ const SAVE_VERSION := 1
 
 var data: Dictionary = {}
 var settings: Dictionary = {}
+## 起動してからウィンドウの大きさを画面に合わせたか
+var _window_sized := false
 
 func _ready() -> void:
 	InputActions.register_defaults()
@@ -102,7 +104,7 @@ func unlock_module(id: StringName) -> void:
 func is_module_known(id: StringName) -> bool:
 	return data.encyclopedia.has(String(id))
 
-## ランの結果を記録する。途中でやめたランは呼ばない（仕様書 2.1）。
+## ランの結果を記録する。途中でやめたランは呼ばない（仕様書 3）。
 func record_run(result: Dictionary) -> void:
 	var best: Dictionary = data.best
 	best.runs = int(best.runs) + 1
@@ -183,8 +185,27 @@ func _apply_window_mode() -> void:
 			mode = DisplayServer.WINDOW_MODE_FULLSCREEN
 		"exclusive":
 			mode = DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
-	if DisplayServer.window_get_mode() != mode:
+	var was := DisplayServer.window_get_mode()
+	if was != mode:
 		DisplayServer.window_set_mode(mode)
+	if mode == DisplayServer.WINDOW_MODE_WINDOWED and (not _window_sized or was != mode):
+		_fit_window_to_screen()
+
+## ウィンドウを、いま映っている画面の大きさに合わせる（仕様書 17）。
+## 使える領域の 85% に収まる、いちばん大きい 16:9 にして中央に置く。
+## エディタの中に埋め込んで動かしているときは、大きさはエディタが決めるので触らない。
+func _fit_window_to_screen() -> void:
+	_window_sized = true
+	var args := OS.get_cmdline_args()
+	if args.has("--embedded") or args.has("--wid"):
+		return
+	var screen := DisplayServer.window_get_current_screen()
+	var area := DisplayServer.screen_get_usable_rect(screen)
+	var size := Vector2(area.size) * 0.85
+	size = Vector2(minf(size.x, size.y * 16.0 / 9.0), minf(size.y, size.x * 9.0 / 16.0))
+	var win := Vector2i(size)
+	DisplayServer.window_set_size(win)
+	DisplayServer.window_set_position(area.position + (area.size - win) / 2)
 
 func _load_settings() -> Dictionary:
 	var s := default_settings()

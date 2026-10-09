@@ -1,4 +1,4 @@
-## ランの進行。時計、各 Manager の更新の順番、カメラ、3択、勝敗（設計書 4.3、仕様書 2・13・14）。
+## ランの進行。時計、各 Manager の更新の順番、カメラ、3択、勝敗（設計書 4.3、仕様書 4・15・16）。
 ##
 ## ランのシーン（scenes/run/run.tscn）の Managers ノードの子。ステージが終わるとシーンごと消える。
 ## UI と入力からの働きかけは command() で受け取る。
@@ -6,6 +6,8 @@ class_name RunManager
 extends Node
 
 signal phase_changed(phase: RunState.Phase)
+## 3択のカードが新しくなった（開いた・次の3択・引き直し）
+signal cards_changed
 ## 1フレームぶんの出来事。表示・音・UI が受け取る
 signal frame_events(events: Array[Dictionary])
 
@@ -28,7 +30,7 @@ var cfg: GameConfig
 
 ## 敗北・クリアの演出の経過時間（実秒）
 var sequence_t := 0.0
-## ボスへのトドメの直前の機体の位置の記録（スローの再生に使う。仕様書 14）
+## ボスへのトドメの直前の機体の位置の記録（スローの再生に使う。仕様書 16）
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
 var _cam_ready := false
@@ -48,7 +50,9 @@ func _ready() -> void:
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups]:
 		m.setup(state, cfg)
-	build.cards_opened.connect(func(_c): set_phase(RunState.Phase.LEVELUP))
+	build.cards_opened.connect(func(_c):
+		set_phase(RunState.Phase.LEVELUP)
+		cards_changed.emit())
 	_update_camera(1.0)
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
@@ -172,7 +176,7 @@ func set_phase(phase: RunState.Phase) -> void:
 	state.phase = phase
 	phase_changed.emit(phase)
 
-# ── カメラ（仕様書 13） ──────────────────────────────────────────
+# ── カメラ（仕様書 15） ──────────────────────────────────────────
 
 func _base_zoom() -> float:
 	var size := get_viewport().get_visible_rect().size
@@ -197,7 +201,7 @@ func _update_camera(real_dt: float) -> void:
 		state.camera_zoom += (zoom_t - state.camera_zoom) * (1.0 - exp(-2.2 * real_dt))
 	state.view_half = size / 2.0 / state.camera_zoom
 
-# ── 3択（仕様書 7.2） ─────────────────────────────────────────────
+# ── 3択（仕様書 9.2） ─────────────────────────────────────────────
 
 func choose_card(index: int) -> void:
 	if state.phase != RunState.Phase.LEVELUP:
@@ -205,7 +209,7 @@ func choose_card(index: int) -> void:
 	if not build.choose_card(index):
 		set_phase(RunState.Phase.PLAY)
 
-# ── 敗北（仕様書 14） ─────────────────────────────────────────────
+# ── 敗北（仕様書 16） ─────────────────────────────────────────────
 
 func _begin_death() -> void:
 	sequence_t = 0.0
@@ -224,7 +228,7 @@ func _dying_tick(real_dt: float) -> void:
 	if sequence_t >= t3:
 		finish(false)
 
-# ── クリア（仕様書 14） ───────────────────────────────────────────
+# ── クリア（仕様書 16） ───────────────────────────────────────────
 
 func _record_approach() -> void:
 	if not state.boss_spawned:
@@ -299,6 +303,9 @@ func command(name: StringName, args := {}) -> void:
 	match name:
 		&"choose_card":
 			choose_card(args.get("index", 0))
+		&"reroll":
+			if state.phase == RunState.Phase.LEVELUP:
+				build.reroll_cards()
 		&"pause":
 			if state.phase == RunState.Phase.PLAY:
 				set_phase(RunState.Phase.PAUSED)

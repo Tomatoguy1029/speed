@@ -8,4 +8,4 @@ id = &"legendary_compass"
 display_name = "羅針盤のモジュール"
 description = "らしんばん座を解放したときに残された、錆びついたモジュール。"
 boss_id = &"hydra"
-order = 1
+order = 4

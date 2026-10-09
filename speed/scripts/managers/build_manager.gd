@@ -1,4 +1,4 @@
-## 成長と装備。経験値・レベル・3択・能力値・武器と特性の発動（仕様書 6・7）。
+## 成長と装備。経験値・レベル・3択・能力値・武器と特性の発動（仕様書 8・9）。
 ##
 ## 武器・特性の発動は、持っているものの WeaponBehavior / TraitBehavior の入口を呼んで行う。
 class_name BuildManager
@@ -27,6 +27,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	state.weapons = {}
 	state.traits = {}
 	refresh_stats()
+	state.rerolls_left = cfg.reroll_count + roundi(_meta_add(&"reroll"))
 	grant(&"weapon", &"W01")
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
@@ -37,15 +38,15 @@ func refresh_stats() -> void:
 	var old_max := s.max_hp
 	var lv := float(state.level)
 	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + cfg.level_speed_growth * lv) \
-		* (1.0 + cfg.core_boost * cores) * (1.0 + 0.12 * _n(&"T10"))
-	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + 0.2 * _n(&"T11"))
+		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
+	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + _per(&"T11") * _n(&"T11"))
 	s.max_hp = cfg.base_hp + _meta_add(&"max_hp") + cfg.level_hp_growth * lv
-	s.capacity = 1.0 + 0.2 * _n(&"T08")
-	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + 0.25 * _n(&"T07"))
-	s.crit_chance = minf(0.9, cfg.base_crit_chance + 0.08 * _n(&"T09"))
+	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
+	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + _per(&"T07") * _n(&"T07"))
+	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
 	s.crit_mult = cfg.crit_mult
-	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + 0.3 * _n(&"T12"))
-	s.length_mult = 1.0 + 0.25 * _n(&"T14")
+	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
+	s.length_mult = 1.0 + _per(&"T14") * _n(&"T14")
 	s.xp_mult = _meta_mult(&"xp")
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max
@@ -54,7 +55,15 @@ func refresh_stats() -> void:
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
 
-## 強化画面での強化（仕様書 12）。
+## 能力値を変える特性の値（.tres の params）。
+func _trait_param(id: StringName, key: String, default := 0.0) -> float:
+	var def: TraitDef = ConfigManager.traits.get(id)
+	return float(def.params.get(key, default)) if def != null else default
+
+func _per(id: StringName) -> float:
+	return _trait_param(id, "per_stack")
+
+## 強化画面での強化（仕様書 14）。
 func _meta_level(stat: StringName) -> Array:
 	var out := []
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
@@ -84,7 +93,7 @@ func add_core() -> void:
 	cores += 1
 	refresh_stats()
 
-# ── 経験値とレベル（仕様書 7.1） ──────────────────────────────────
+# ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
 func xp_needed() -> float:
 	var L := float(state.level)
@@ -103,7 +112,7 @@ func add_xp(v: float) -> void:
 		need = xp_needed()
 		refresh_stats()
 
-# ── 3択（仕様書 7.2・7.3） ─────────────────────────────────────────
+# ── 3択（仕様書 9.2・9.4） ─────────────────────────────────────────
 
 func tick(real_dt: float, world_dt: float) -> void:
 	var busy := state.drawing or state.tracing
@@ -155,6 +164,16 @@ func roll_cards() -> Array[Dictionary]:
 		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
+## 3択のカードを引き直す（仕様書 9.2）。回数が残っていなければ false。
+func reroll_cards() -> bool:
+	if state.cards.is_empty() or state.rerolls_left <= 0:
+		return false
+	state.rerolls_left -= 1
+	state.cards = roll_cards()
+	state.emit(&"reroll", {})
+	cards_opened.emit(state.cards)
+	return true
+
 ## 3択のカードを選ぶ。次の3択があれば作り直し、なければ false を返す。
 func choose_card(index: int) -> bool:
 	if index < 0 or index >= state.cards.size():
@@ -173,7 +192,7 @@ func choose_card(index: int) -> bool:
 	state.cards = []
 	return false
 
-# ── 装備（仕様書 6） ─────────────────────────────────────────────
+# ── 装備（仕様書 8） ─────────────────────────────────────────────
 
 ## 武器・特性を levels 段階手に入れる。枠が満員か上限なら false。
 func grant(kind: StringName, id: StringName, levels := 1) -> bool:

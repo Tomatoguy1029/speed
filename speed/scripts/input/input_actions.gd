@@ -1,4 +1,4 @@
-## 入力のアクションの一覧と既定のキー（仕様書 17、設計書 9）。
+## 入力のアクションの一覧と既定のキー（仕様書 19、設計書 9）。
 ##
 ## アクションは起動時にここから InputMap に登録する。キー設定で変えた割り当ては
 ## SaveManager の設定ファイルに保存し、apply_bindings() で上書きする。
@@ -13,6 +13,7 @@ const REBINDABLE := {
 	&"card_1": "3択の1枚目",
 	&"card_2": "3択の2枚目",
 	&"card_3": "3択の3枚目",
+	&"reroll": "3択の引き直し",
 	&"debug_panel": "調整パネル（開発版）",
 }
 
@@ -24,6 +25,7 @@ const DEFAULT_KEYS := {
 	&"card_1": KEY_1,
 	&"card_2": KEY_2,
 	&"card_3": KEY_3,
+	&"reroll": KEY_R,
 	&"debug_panel": KEY_P,
 }
 

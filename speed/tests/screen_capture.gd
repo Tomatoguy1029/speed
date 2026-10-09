@@ -38,6 +38,8 @@ func _ready() -> void:
 			await _death_steps()
 		"panel":
 			await _panel_steps()
+		"reroll":
+			await _reroll_steps()
 		_:
 			await _flow_steps()
 	_restore()
@@ -195,6 +197,25 @@ func _panel_steps() -> void:
 	GameManager.reset_to_main_menu()
 	GameManager.goto(GameManager.Screen.ENCYCLOPEDIA)
 	await _shot("panel_03_encyclopedia", 0.4)
+
+## 3択の引き直しと、続けて上がったレベルの3択、強化画面。
+func _reroll_steps() -> void:
+	GameManager.start_run(1)
+	await _wait(1.0)
+	var run := _run_manager()
+	run.command(&"debug_level_up")
+	run.command(&"debug_level_up")
+	await _shot("reroll_00_cards", 0.4)
+	for i in 3:
+		_action(&"reroll")
+	await _shot("reroll_01_after_three", 0.4)
+	run.command(&"choose_card", {"index": 0})
+	await _shot("reroll_02_next_level", 0.4)
+	run.command(&"choose_card", {"index": 0})
+	run.command(&"abort")
+	await _wait(0.5)
+	GameManager.goto(GameManager.Screen.UPGRADE)
+	await _shot("reroll_03_upgrade", 0.4)
 
 func _action(name: StringName) -> void:
 	var ev := InputEventAction.new()

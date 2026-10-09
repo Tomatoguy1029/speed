@@ -1,4 +1,4 @@
-## ドロップと回収（仕様書 8）。経験値の結晶・部品・経験値カプセル・漂流カプセル・修理キット・回収ビーコン・出力コア。
+## ドロップと回収（仕様書 10）。経験値の結晶・部品・経験値カプセル・漂流カプセル・修理キット・回収ビーコン・出力コア。
 class_name PickupManager
 extends RunSystem
 
@@ -76,7 +76,7 @@ func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> 
 	c.value = xp
 	capsules.append(c)
 
-## 漂流カプセル：フィールドに最大 n 個。16秒ごとに補充（仕様書 8）。
+## 漂流カプセル：フィールドに最大 n 個。16秒ごとに補充（仕様書 10）。
 func _spawn_field_capsules(dt: float) -> void:
 	var view_r := state.view_half.length()
 	var kept: Array = []
@@ -100,7 +100,7 @@ func _spawn_field_capsules(dt: float) -> void:
 			_add_capsule(Pickup.Kind.CACHE, &"field", p, build.xp_needed() * cfg.drift_capsule_xp_frac)
 			return
 
-## 出力コア：脱出期に、中心付近へ最大3個（仕様書 8）。
+## 出力コア：脱出期に、中心付近へ最大3個（仕様書 10）。
 func _spawn_cores(dt: float) -> void:
 	if not enemies.current_phase().cores:
 		return

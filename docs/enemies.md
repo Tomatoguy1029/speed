@@ -4,7 +4,7 @@
 
 2026-10-07、demo描画版の敵（通常敵11種・暫定ボス・隕石）を本番の仕様として引き継ぐと決めた（[wakida.md](wakida.md) の100）。type IDはdemoから引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](spec.md) の9〜11章。
 
-**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ」画面で見て調整する。
+**数値はドキュメントで管理しない**（[catalog.md](catalog.md)）。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 通常敵
 
@@ -130,4 +130,4 @@ ShueMaker70969 の相談で、実体のあるピクセルの通常敵と星座�
 
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | コード・demo参照／未決事項 |
 |---|---|---|---|---|---|---|
-| `meteor` | 隕石 | 採用 | 実装済み | 追跡しない。地帯の岩は固定、漂流と彗星は決まった軌道で動く | ラン開始時に世界の決まった位置へ配置し、画面の近くだけ有効（仕様書11章） | `scripts/managers/field_manager.gd`、`data/enemies/meteor.tres`。撃破で修理キット・回収ビーコン・部品を落とす。光る特別な隕石（`meteor_special`）は本番に登録していない |
+| `meteor` | 隕石 | 採用 | 実装済み | 追跡しない。地帯の岩は固定、漂流と彗星は決まった軌道で動く | ラン開始時に世界の決まった位置へ配置し、画面の近くだけ有効（仕様書13.1章） | `scripts/managers/field_manager.gd`、`data/enemies/meteor.tres`。撃破で修理キット・回収ビーコン・部品を落とす。光る特別な隕石（`meteor_special`）は本番に登録していない |

@@ -9,5 +9,6 @@ code_id = &"critRate"
 display_name = "クリティカル率"
 description = "クリティカルが出やすくなる（+8% ずつ）"
 params = {
-
+"per_stack": 0.08,
+"max": 0.9
 }

@@ -1,4 +1,4 @@
-## ラン中の HUD（仕様書 15）。状態を読んで表示するだけで、選んだ結果は RunManager に命令として渡す。
+## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunManager に命令として渡す。
 ##
 ## 時間・経験値バー・状態の文字・速度メーター・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
@@ -11,6 +11,7 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 var run: RunManager
 var _font: Font
 var _cards_box: VBoxContainer
+var _reroll_button: Button
 var _cards_row: HBoxContainer
 var _pause_box: VBoxContainer
 var _draw_button: Button
@@ -34,13 +35,12 @@ func _ready() -> void:
 	_draw_button.pressed.connect(func(): run.command(&"draw_button"))
 	add_child(_draw_button)
 	run.phase_changed.connect(_on_phase)
+	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
 
 func _on_phase(phase: RunState.Phase) -> void:
 	_cards_box.visible = phase == RunState.Phase.LEVELUP
 	_pause_box.visible = phase == RunState.Phase.PAUSED
-	if phase == RunState.Phase.LEVELUP:
-		_show_cards()
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
 
@@ -79,6 +79,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.is_action_pressed(StringName("card_%d" % (i + 1))):
 				get_viewport().set_input_as_handled()
 				run.command(&"choose_card", {"index": i})
+		if event.is_action_pressed(&"reroll"):
+			get_viewport().set_input_as_handled()
+			run.command(&"reroll")
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null:
@@ -103,10 +106,17 @@ func _build_cards() -> void:
 	_cards_row = HBoxContainer.new()
 	_cards_row.add_theme_constant_override("separation", 16)
 	_cards_box.add_child(_cards_row)
+	_reroll_button = Button.new()
+	_reroll_button.custom_minimum_size = Vector2(320, 52)
+	_reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_reroll_button.pressed.connect(func(): run.command(&"reroll"))
+	_cards_box.add_child(_reroll_button)
 	add_child(_cards_box)
 
 func _show_cards() -> void:
+	# 古いカードはすぐ外す（消える前の札が並びの幅に残らないように）
 	for c in _cards_row.get_children():
+		_cards_row.remove_child(c)
 		c.queue_free()
 	var cards := run.state.cards
 	for i in cards.size():
@@ -127,12 +137,15 @@ func _show_cards() -> void:
 		b.add_theme_stylebox_override("focus", hover)
 		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
+	var left := run.state.rerolls_left
+	_reroll_button.text = "リロール（残り %d 回）　%s" % [left, OS.get_keycode_string(InputActions.key_of(&"reroll"))]
+	_reroll_button.disabled = left <= 0
 	_cards_box.reset_size()
 	_cards_box.position = (size - _cards_box.size) / 2.0
 	if _cards_row.get_child_count() > 0:
 		_cards_row.get_child(0).grab_focus.call_deferred()
 
-## カードの表示内容（仕様書 7.2）。色は取得後の段階（仕様書 6）。
+## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"heal":
 		return {"tag": "回復", "name": "緊急修理", "desc": "HP を 30% 回復", "color": Color("#6dffb0")}
@@ -220,7 +233,7 @@ func _draw_speed(W: float, H: float) -> void:
 	draw_line(Vector2(mx, by - 4), Vector2(mx, by + 14), Color("#ffd24a"), 2.0)
 	draw_string(_font, Vector2(bx, by - 8), "%.2f km/s　上限 %.2f　最高 %.2f" % [sp * k, s.stats.max_speed * k, s.peak_speed * k], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#e8f0ff"))
 
-## 装備一覧（左下）。文字の色は強化の段階（仕様書 6）。
+## 装備一覧（左下）。文字の色は強化の段階（仕様書 8）。
 func _draw_loadout(H: float) -> void:
 	var s := run.state
 	var lines: Array = []
@@ -254,7 +267,7 @@ func _draw_boss(W: float) -> void:
 		var side := Vector2(-dir.y, dir.x) * 12.0
 		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), Color("#ff526e"))
 
-## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 4.2）。
+## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 6.2）。
 func _draw_gauge_ring() -> void:
 	var s := run.state
 	var p := get_viewport().get_mouse_position()
