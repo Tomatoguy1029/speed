@@ -1,0 +1,26 @@
+Redesign the referenced Japanese SPEED ship upgrade UI as AUTHENTIC LOW RESOLUTION PIXEL ART. Reference is layout guidance only, not style. Absolutely remove fine high-resolution line art and filled spaceship panels. Target native canvas EXACTLY 320 by 180 pixels, 16:9, all content designed on this coarse grid. If output system enlarges it, show a perfect integer nearest-neighbor enlargement of that 320x180 design. Every visible dot corresponds to a consistent logical pixel. No antialiasing, no blur, no smooth gradients, no thin vector lines, no subpixel text, no high-resolution details. A complete single screen, not a collage or desktop photograph.
+
+Use dark navy background with sparse low contrast grid pixels. Palette 8-12 flat colors. Ivory small bitmap Japanese text, cyan selected highlights, muted blue inactive lines. Thin borders exactly 1 logical pixel, tiny square step corners, simple 3x3 attachment squares. Very sparse decoration.
+
+Logical 320x180 layout:
+header at x8 y6 "機体強化"; top right short currency "部品 120".
+diagram area x4..218 y25..155; fixed detail panel x224..315 y25..170.
+Top-down spacecraft wireframe at center x114 y83, about 52 logical pixels wide and 90 tall. Narrow long pointed nose, swept wings, rear engines. PURE HOLLOW PIXEL WIREFRAME, only 1 logical pixel stair-step contour and a handful of internal structural lines. Interior remains background navy. NO white filled triangles, NO shaded hull, NO detailed cockpit rendering, NO dense microscopic lines. Sharp deliberate stair-step diagonals and pixel-geometry wireframe ribs. Rear engine outline selected cyan, other ribs muted blue.
+Seven small labels around craft, connected with 1 pixel orthogonal or 45 degree leaders without crossing. Simple readable coarse bitmap Japanese lettering roughly 7-8 logical pixels high:
+upper-left "衝角素材"; middle-left "フレーム"; lower-left "回収装置";
+upper-right of diagram "学習回路"; middle-right "充電効率"; lower-right "演算予備";
+bottom-center "主推進器" selected in cyan border and tiny 5 empty squares below.
+Inactive labels unboxed or tiny simple dark rectangles to save room. Include actual usable space between them. Selected leader from rear engine to 主推進器 cyan, with tiny pixel mouse cursor by selected label.
+
+Right detail panel remains a genuinely low-resolution practical menu:
+"主推進器" title
+"Lv0 > Lv1"
+short divider
+"最高速度"
+"+5%" large clear bitmap digits
+"必要部品"
+"25" beside tiny flat pixel part icon
+bottom button "強化する".
+Do NOT put longer text paragraphs or purchase balance on small panel, simplify for 320x180 legibility.
+Bottom-left simple "戻る" button. No other text, no English captions, no watermark, no resolution label.
+Focus on coherent hand-placed pixel grid aesthetics like a beautifully clean retro game menu screenshot, every component including the wireframe AND surrounding UI must be the same pixel density. The earlier reference's ultra-detailed technical rendering must be replaced with a simple 52x90 pixel hollow spacecraft wireframe. Preserve its general menu arrangement and hovered-engine concept only.
