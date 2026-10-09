@@ -127,6 +127,9 @@ func _preview() -> void:
 		drone.drones = [{"pos": Vector2(-70, 0)}, {"pos": Vector2(70, 0)},
 			{"pos": Vector2(0, -70)}, {"pos": Vector2(0, 70)}]
 		run.build.weapon_behaviors[&"W06"] = drone
+	if "--attachments-preview" in OS.get_cmdline_user_args():
+		for id in [&"W01", &"W02", &"W03", &"W05", &"W07", &"W08", &"W17", &"W23"]:
+			run.build._sync_behavior(true, id, ConfigManager.weapons[id], 1)
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:

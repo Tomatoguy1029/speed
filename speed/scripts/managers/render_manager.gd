@@ -16,6 +16,11 @@ const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
 const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
 const AIRSHIP_TURRET_BASE := preload("res://assets/pixel/airship_turret_base.png")
 const AIRSHIP_TURRET := preload("res://assets/pixel/airship_turret.png")
+const AIRSHIP_ARMOR := preload("res://assets/pixel/airship_armor.png")
+const AIRSHIP_CANON := preload("res://assets/pixel/airship_canon.png")
+const AIRSHIP_PROBE := preload("res://assets/pixel/airship_electronic_probe.png")
+const AIRSHIP_MINE := preload("res://assets/pixel/airship_mine.png")
+const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
@@ -527,12 +532,13 @@ func _draw_exhaust(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING or state.phase == RunState.Phase.ENDED:
 		return
 	var size := AIRSHIP.get_size() * cfg.character_scale
-	# 下側20pxは炎用の余白。機体本体の中心を判定の中心へ合わせる。
-	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size)
+	# 上側10px・下側20pxの余白を除いた機体本体の中心へ合わせる。
+	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
 	var frame := int(_jet_time * 12.0) % 3
 	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
 	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	c.draw_texture_rect_region(AIRSHIP_FLAME, rect, region)
+	var flame := AIRSHIP_BLUE_FLAME if run.build.weapon_behaviors.has(&"W08") else AIRSHIP_FLAME
+	c.draw_texture_rect_region(flame, rect, region)
 	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
 	c.draw_set_transform(Vector2.ZERO)
 
@@ -552,11 +558,25 @@ func _draw_ship(c: CanvasItem) -> void:
 	var dir := state.ship_heading
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
-	c.draw_texture_rect(AIRSHIP, Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size), false, col)
+	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
+	c.draw_texture_rect(AIRSHIP, rect, false, col)
+	var weapons := run.build.weapon_behaviors
+	var attachments: Array[Texture2D] = []
+	if weapons.has(&"W03") or weapons.has(&"W05"):
+		attachments.append(AIRSHIP_ARMOR)
+	if weapons.has(&"W01") or weapons.has(&"W02"):
+		attachments.append(AIRSHIP_CANON)
+	if weapons.has(&"W17"):
+		attachments.append(AIRSHIP_PROBE)
+	if weapons.has(&"W07"):
+		attachments.append(AIRSHIP_MINE)
+	for attachment in attachments:
+		c.draw_texture_rect(attachment, rect, false, col)
 	var rear = run.build.weapon_behaviors.get(&"W23")
 	if rear != null:
 		c.draw_texture_rect(AIRSHIP_TURRET_BASE,
-			Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -20.0) * cfg.character_scale, size), false, col)
+			Rect2(Vector2(-AIRSHIP_TURRET_BASE.get_width() / 2.0, -20.0) * cfg.character_scale,
+				AIRSHIP_TURRET_BASE.get_size() * cfg.character_scale), false, col)
 	c.draw_set_transform(Vector2.ZERO)
 	if rear != null:
 		# 元絵の砲身は下向き。キャンバスの中心ではなく取り付け軸で回す。

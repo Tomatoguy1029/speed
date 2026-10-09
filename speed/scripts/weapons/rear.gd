@@ -1,14 +1,14 @@
 ## W23 後方ブラスター：逃げながら進行方向の反対へ撃つ。
 extends WeaponBehavior
 
-const MOUNT_PIXEL := Vector2(15.5, 29.5)
+const MOUNT_PIXEL := Vector2(15.5, 39.5)
 var _t := 0.0
 
 func aim_direction() -> Vector2:
 	return -state.ship_heading
 
 func mount_position() -> Vector2:
-	var offset := (MOUNT_PIXEL - Vector2(15.5, 20.0)) * cfg.character_scale
+	var offset := (MOUNT_PIXEL - Vector2(15.5, 30.0)) * cfg.character_scale
 	return state.ship_pos + offset.rotated(state.ship_heading.angle() + PI / 2.0)
 
 func tick(dt: float, busy: bool) -> void:
