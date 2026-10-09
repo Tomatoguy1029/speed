@@ -14,6 +14,9 @@ func _initialize() -> void:
 	assert(source != null and not source.is_empty(), "素材アトラスを読めません")
 	print("Atlas: ", source.get_size(), " alpha=", source.detect_alpha())
 	for i in NAMES.size():
+		# 手描きの原寸素材をアトラスの旧画像で上書きしない。
+		if NAMES[i] in ["drifter", "swarm", "darter", "armored", "splitling", "meteor_0", "meteor_1", "airship"]:
+			continue
 		var x := i % 4
 		var y := i / 4
 		var start := Vector2i(x * source.get_width() / 4, ROWS[y])

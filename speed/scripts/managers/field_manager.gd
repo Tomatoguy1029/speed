@@ -154,7 +154,8 @@ func _stream_rocks(dt: float) -> void:
 		var pv := _rock_at(rock, t)
 		if not _near(pv[0], 300.0):
 			continue
-		var e := enemies.create(def, 1.0, pv[0], {"size": rock.size, "facing": rock.facing, "spin": rock.spin})
+		var sprite_radius := 60.0 if i % 2 == 0 else 40.0
+		var e := enemies.create(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin})
 		e.meteor_index = i
 		e.vel = pv[1]
 		rock.entity = e

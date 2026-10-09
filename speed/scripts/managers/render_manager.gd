@@ -12,6 +12,7 @@ const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "split
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
+const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitling"]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -285,13 +286,19 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if e.type == &"meteor":
 			# ストリームで再生成されても同じ岩の模様を使う。
 			var rock_key := &"meteor_0" if e.meteor_index % 2 == 0 else &"meteor_1"
-			_batches[rock_key].add(e.pos, e.facing, e.r, col)
+			var rock_batch: InstanceBatch = _batches[rock_key]
+			var rock_size := rock_batch.texture.get_size()
+			rock_batch.add(e.pos, e.facing, maxf(rock_size.x, rock_size.y) / 2.0, col)
 			if e.hp < e.max_hp:
 				c.draw_line(e.pos - Vector2(e.r * 0.4, 0).rotated(e.facing),
 					e.pos + Vector2(e.r * 0.3, e.r * 0.3).rotated(e.facing), Color("#2e2620"), _px(2.0))
 			continue
 		var batch: InstanceBatch = _batches.get(e.type, _batches[&"battleship"])
-		batch.add(e.pos, e.facing - PI / 2.0, e.r, col)
+		if e.type in NATIVE_SPRITES:
+			var sprite_size := batch.texture.get_size()
+			batch.add(e.pos, e.facing + PI / 2.0, maxf(sprite_size.x, sprite_size.y) / 2.0, col)
+		else:
+			batch.add(e.pos, e.facing - PI / 2.0, e.r, col)
 		_draw_enemy_marks(c, e)
 	for key in _batches:
 		if key != &"gem":
@@ -422,8 +429,8 @@ func _draw_ship(c: CanvasItem) -> void:
 	if state.ship_invuln > 0.0 and fmod(state.time * 20.0, 2.0) < 1.0:
 		col.a = 0.5
 	var dir := state.ship_heading
-	var size := AIRSHIP.get_size() * (R * 2.0 / AIRSHIP.get_height())
-	c.draw_set_transform(p, dir.angle() - PI / 2.0)
+	var size := AIRSHIP.get_size()
+	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	c.draw_texture_rect(AIRSHIP, Rect2(-size / 2.0, size), false, col)
 	c.draw_set_transform(Vector2.ZERO)
 	# HP バー（機体の真下、仕様書 17）

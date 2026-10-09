@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = &"darter"
 display_name = "ダーター"
-radius = 16.0
+radius = 18.0
 hp = 9.0
 armor = 3.5
 speed = 110.0

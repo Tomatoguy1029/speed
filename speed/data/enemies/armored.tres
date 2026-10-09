@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = &"armored"
 display_name = "装甲型"
-radius = 30.0
+radius = 32.0
 hp = 40.0
 armor = 12.0
 speed = 70.0

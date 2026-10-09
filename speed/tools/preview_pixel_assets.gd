@@ -14,6 +14,7 @@ func _preview() -> void:
 	var run := game.get_node("Managers/RunManager") as RunManager
 	run.set_physics_process(false)
 	var state := run.state
+	game.get_node("Hud").hide()
 	state.ship_pos = Vector2.ZERO
 	state.ship_heading = Vector2.RIGHT
 	state.view_center = Vector2.ZERO
