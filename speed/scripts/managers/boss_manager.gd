@@ -39,7 +39,7 @@ func spawn() -> void:
 	boss.is_boss = true
 	boss.type = def.id
 	boss.pos = p
-	boss.r = def.radius
+	boss.r = def.radius * cfg.character_scale
 	boss.max_hp = cfg.boss_hp * cfg.enemy_hp_mult
 	boss.hp = boss.max_hp
 	boss.armor = cfg.boss_armor * cfg.enemy_armor_mult

@@ -42,9 +42,11 @@ func create(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> Enemy:
 	var size: float = opts.get("size", def.radius)
 	var z := size / def.radius
 	e.r = size * (1.25 if e.elite else 1.0)
-	# 手描き素材はエリートも原寸で運用する。
+	# 手描き素材はエリートも同じ基準サイズで運用する。
 	if def.id in RenderManager.NATIVE_SPRITES:
 		e.r = def.radius
+	if def.id != &"meteor":
+		e.r *= cfg.character_scale
 	e.max_hp = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if e.elite else 1.0)
 	e.hp = e.max_hp
 	e.armor = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if e.elite else 1.0)

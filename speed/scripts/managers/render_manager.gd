@@ -339,8 +339,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		var batch: InstanceBatch = _batches.get(e.type, _batches[&"battleship"])
 		if e.type in NATIVE_SPRITES:
-			var sprite_size := batch.texture.get_size()
-			batch.add(e.pos, e.facing + PI / 2.0, maxf(sprite_size.x, sprite_size.y) / 2.0, col)
+			batch.add(e.pos, e.facing + PI / 2.0, e.r, col)
 		else:
 			batch.add(e.pos, e.facing - PI / 2.0, e.r, col)
 		_draw_enemy_marks(c, e)
@@ -423,7 +422,8 @@ func _draw_build_objects(c: CanvasItem) -> void:
 	var drones = b.weapon_behaviors.get(&"W06")
 	if drones != null:
 		for d in drones.drones:
-			c.draw_texture(DRONE, d.pos - DRONE.get_size() / 2.0)
+			var size := DRONE.get_size() * cfg.character_scale
+			c.draw_texture_rect(DRONE, Rect2(d.pos - size / 2.0, size), false)
 	var vortex = b.trait_behaviors.get(&"T03")
 	if vortex != null:
 		for v in vortex.vortexes:
@@ -489,7 +489,7 @@ func _draw_ship(c: CanvasItem) -> void:
 	if state.ship_invuln > 0.0 and fmod(state.time * 20.0, 2.0) < 1.0:
 		col.a = 0.5
 	var dir := state.ship_heading
-	var size := AIRSHIP.get_size()
+	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	c.draw_texture_rect(AIRSHIP, Rect2(-size / 2.0, size), false, col)
 	c.draw_set_transform(Vector2.ZERO)

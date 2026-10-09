@@ -54,12 +54,13 @@ func tick(dt: float, busy: bool) -> void:
 				{"color": Color("#a8ffdb"), "r": 4.0})
 
 func _hit_along(d: Dictionary, a: Vector2, b: Vector2, now: float) -> void:
-	var pad := Vector2(14, 14)
+	var radius := 14.0 * cfg.character_scale
+	var pad := Vector2.ONE * radius
 	build.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _buf)
 	for e: Enemy in _buf:
 		if e.dead or float(d.hits.get(e.id, -1.0)) > now:
 			continue
-		if Geom.seg_circle_t(a, b, e.pos, e.r + 14.0) < 0.0:
+		if Geom.seg_circle_t(a, b, e.pos, e.r + radius) < 0.0:
 			continue
 		d.hits[e.id] = now + float(p("contact_cd"))
 		build.combat.damage_enemy(e, atk() * dmg_k() * float(p("contact_damage")), {"cause": &"drone"})
