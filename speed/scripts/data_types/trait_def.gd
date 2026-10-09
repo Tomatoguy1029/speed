@@ -60,3 +60,7 @@ const PARAMS_DOCS := {
 ## 3択のカード・図鑑に出る説明。
 ## 単位：文字
 @export_multiline var description: String
+
+## 図鑑の専用画像。未設定なら効果イメージ／仮の部品図を表示する。
+@export_group("図鑑")
+@export var preview_texture: Texture2D

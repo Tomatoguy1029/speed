@@ -28,3 +28,7 @@ const EDITOR_ORDER := 8
 ## 図鑑で並べる順番（小さいほど先）。
 ## 単位：番号
 @export var order: int
+
+## 図鑑の専用画像。未設定なら効果イメージ／仮の部品図を表示する。
+@export_group("図鑑")
+@export var preview_texture: Texture2D

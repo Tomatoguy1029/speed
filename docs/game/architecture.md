@@ -260,14 +260,14 @@ Main (Node)
 
 | クラス | 中身 | 対応する一覧 |
 |---|---|---|
-| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値 | [weapons.md](catalog/weapons.md) |
-| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値 | [traits.md](catalog/traits.md) |
+| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](catalog/weapons.md) |
+| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](catalog/traits.md) |
 | `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、接触ダメージ、経験値、行動の種類と値 | [enemies.md](catalog/enemies.md) |
 | `PhaseDef` | 開始と終了、敵の数、敵レベル、補充の速さ、出現の重み、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
 | `StageDef` | 星系、フィールドの配置、仕掛けの領域、時間帯の表、中ボス、伝説のモジュール | 仕様書 2〜22 |
 | `BossDef` | ボスの名前、部位、HP・装甲、行動 | 仕様書 12.2・12.3・12.4 |
-| `LegendaryModuleDef` | 伝説のモジュールの名前と対応する中ボス。能力値は持たない | 仕様書 2.3 |
+| `LegendaryModuleDef` | 伝説のモジュールの名前と対応する中ボス、図鑑用の任意画像 `preview_texture`。能力値は持たない | 仕様書 2.3 |
 
 - 管理 ID は一覧と同じものを使う。一覧からデータへ、データから一覧へ、ID で行き来できるようにする。
 - 武器・特性の効果の処理は、発動のきっかけ（一定間隔、高速の接触、なぞった跡、線の終点、撃破、被弾など）ごとに、決まった入口を持つスクリプトにする。

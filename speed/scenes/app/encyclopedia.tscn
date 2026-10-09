@@ -42,7 +42,7 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 40
 text = "図鑑"
 
-[node name="Content" type="HBoxContainer" parent="Margin/Layout"]
+[node name="Content" type="BoxContainer" parent="Margin/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
