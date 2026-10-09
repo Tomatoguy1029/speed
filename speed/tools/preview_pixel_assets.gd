@@ -109,6 +109,23 @@ func _preview() -> void:
 			state.ship_heading = Vector2(7, cos(i * 0.07) * 2.45).normalized()
 			state.ship_vel = state.ship_heading * 700.0
 			renderer._update_exhaust(0.01)
+	if "--rear-preview" in OS.get_cmdline_user_args():
+		state.phase = RunState.Phase.LEVELUP
+		state.ship_heading = Vector2.RIGHT
+		var weapon = load("res://scripts/weapons/rear.gd").new()
+		weapon.setup(run.build, ConfigManager.weapons[&"W23"])
+		for lv in range(1, 6):
+			weapon.level = lv
+			state.ship_pos = Vector2(0, -120 + (lv - 1) * 60)
+			weapon.tick(float(weapon.p("interval_by_level")[lv - 1]), false)
+		for shot in run.projectiles.friendly:
+			shot.pos += shot.vel * 0.08
+		state.ship_pos = Vector2.ZERO
+		var drone = load("res://scripts/weapons/drone.gd").new()
+		drone.setup(run.build, ConfigManager.weapons[&"W06"])
+		drone.drones = [{"pos": Vector2(-70, 0)}, {"pos": Vector2(70, 0)},
+			{"pos": Vector2(0, -70)}, {"pos": Vector2(0, 70)}]
+		run.build.weapon_behaviors[&"W06"] = drone
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:

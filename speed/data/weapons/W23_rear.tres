@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_steps = PackedInt32Array(1, 2, 3, 4, 5)
+params = {
+"color": "#ffb36b",
+"damage_by_level": [0.8, 0.8, 0.8, 1.2, 1.2],
+"interval_by_level": [0.45, 0.45, 0.3, 0.3, 0.3],
+"shots_by_level": [1, 2, 2, 2, 3],
+"life": 0.9,
+"spread_step": 0.12
+}
+id = &"W23"
+code_id = &"rear"
+display_name = "後方ブラスター"
+description = "機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇"

@@ -430,7 +430,11 @@ func _draw_build_objects(c: CanvasItem) -> void:
 	if drones != null:
 		for d in drones.drones:
 			var size := DRONE.get_size() * cfg.character_scale
-			c.draw_texture_rect(DRONE, Rect2(d.pos - size / 2.0, size), false)
+			var outward: Vector2 = d.pos - state.ship_pos
+			var angle := outward.angle() + PI / 2.0 if not outward.is_zero_approx() else state.ship_heading.angle() + PI / 2.0
+			c.draw_set_transform(d.pos, angle)
+			c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false)
+			c.draw_set_transform(Vector2.ZERO)
 	var vortex = b.trait_behaviors.get(&"T03")
 	if vortex != null:
 		for v in vortex.vortexes:
