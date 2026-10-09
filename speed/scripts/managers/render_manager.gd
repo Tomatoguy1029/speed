@@ -357,15 +357,19 @@ func _draw_pickups(c: CanvasItem) -> void:
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
 	gems.begin()
-	for g: Pickup in p.gems:
-		if view.has_point(g.pos):
-			gems.add(g.pos, 0.0, gs, XP_COLOR)
+	var gem_pos := p.gem_pos
+	for i in gem_pos.size():
+		var pos := gem_pos[i]
+		if view.has_point(pos):
+			gems.add(pos, 0.0, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
-	for co: Pickup in p.coins:
-		if view.has_point(co.pos):
-			_coin_batch.add(co.pos, 0.0, cs, COIN_COLOR)
+	var coin_pos := p.coin_pos
+	for i in coin_pos.size():
+		var pos := coin_pos[i]
+		if view.has_point(pos):
+			_coin_batch.add(pos, 0.0, cs, COIN_COLOR)
 	_coin_batch.end()
 	for cap: Pickup in p.capsules:
 		match cap.kind:

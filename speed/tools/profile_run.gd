@@ -155,7 +155,7 @@ func _process(_delta: float) -> void:
 	counts.enemies += run.enemies.list.size()
 	counts.hostile += run.projectiles.hostile_count()
 	counts.friendly += run.projectiles.friendly.size()
-	counts.gems += run.pickups.gems.size()
+	counts.gems += run.pickups.gem_pos.size()
 	if now - start_us >= int(float(options.get("seconds", "6")) * 1000000.0):
 		measuring = false
 		_finish((now - start_us) / 1000000.0)

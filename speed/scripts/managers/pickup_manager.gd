@@ -7,11 +7,14 @@ var ship: ShipManager
 var build: BuildManager
 var enemies: EnemyManager
 
-var gems: Array = []
-var coins: Array = []
+## 経験値の結晶と部品は、1つごとの箱を作らず項目ごとの列で持つ。i 番目は各列の i 番目（設計書 6）。
+var gem_pos := PackedVector2Array()
+var gem_value := PackedFloat64Array()
+## 吸い寄せが始まったか（1 なら始まった）
+var gem_pulled := PackedByteArray()
+var coin_pos := PackedVector2Array()
+var coin_pulled := PackedByteArray()
 var capsules: Array = []
-var _gems_spare: Array = []
-var _coins_spare: Array = []
 var _capsule_t := 0.0
 var _core_t := 0.0
 var _cores_started := false
@@ -44,14 +47,15 @@ func on_enemy_killed(e: Enemy) -> void:
 		_add_capsule(Pickup.Kind.CACHE, &"drop", e.pos, build.xp_needed() * cfg.capsule_xp_frac)
 
 func drop_gem(p: Vector2, v: float) -> void:
-	if gems.size() > cfg.gem_max:
-		var old: Pickup = gems.pop_front()
-		v += old.value
-	var g := Pickup.new()
-	g.kind = Pickup.Kind.GEM
-	g.pos = p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0
-	g.value = v
-	gems.append(g)
+	if gem_pos.size() > cfg.gem_max:
+		# いちばん古い結晶を、新しい結晶にまとめる
+		v += gem_value[0]
+		gem_pos.remove_at(0)
+		gem_value.remove_at(0)
+		gem_pulled.remove_at(0)
+	gem_pos.append(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0)
+	gem_value.append(v)
+	gem_pulled.append(0)
 
 func _drop_coins(e: Enemy, danger: float) -> void:
 	var n := 0
@@ -64,11 +68,8 @@ func _drop_coins(e: Enemy, danger: float) -> void:
 	elif state.rng.randf() < 0.03 * (1.0 + danger * 2.0):
 		n = 1
 	for i in n:
-		var c := Pickup.new()
-		c.kind = Pickup.Kind.COIN
-		c.pos = e.pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * e.r
-		c.value = 1
-		coins.append(c)
+		coin_pos.append(e.pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * e.r)
+		coin_pulled.append(0)
 
 func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> void:
 	var c := Pickup.new()
@@ -122,15 +123,6 @@ func _spawn_cores(dt: float) -> void:
 
 # ── 拾う ──────────────────────────────────────────────────────────
 
-## 吸い寄せる。step は今回の更新で寄せる最大の距離。戻り値は寄せる前の機体までの距離。
-func _pull(p: Pickup, radius: float, step: float) -> float:
-	var d := state.ship_pos - p.pos
-	var dist := d.length()
-	if dist < radius or p.pulled:
-		p.pulled = true
-		p.pos += d / maxf(dist, 1.0) * minf(step, dist)
-	return dist
-
 func _collect_gems(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0
 	var radius := state.stats.pickup_radius
@@ -139,20 +131,35 @@ func _collect_gems(dt: float) -> void:
 	var far := maxf(radius, reach)
 	var far_sq := far * far
 	var ship_pos := state.ship_pos
-	# 前回の配列を使い回し、毎回の配列の生成を避ける
-	var kept := _gems_spare
-	kept.clear()
-	for g: Pickup in gems:
-		g.age += dt
-		if not g.pulled and ship_pos.distance_squared_to(g.pos) >= far_sq:
-			kept.append(g)
-		elif _pull(g, radius, step) < reach:
-			build.add_xp(g.value)
-			state.emit(&"pickup", {"kind": &"gem"})
-		else:
-			kept.append(g)
-	_gems_spare = gems
-	gems = kept
+	var n := gem_pos.size()
+	var w := 0
+	for i in n:
+		var p := gem_pos[i]
+		var pulled := gem_pulled[i]
+		if pulled != 0 or ship_pos.distance_squared_to(p) < far_sq:
+			var d := ship_pos - p
+			var dist := d.length()
+			if dist < radius or pulled != 0:
+				pulled = 1
+				p += d / maxf(dist, 1.0) * minf(step, dist)
+			if dist < reach:
+				build.add_xp(gem_value[i])
+				state.emit(&"pickup", {"kind": &"gem"})
+				continue
+		# 残る結晶を前へ詰める
+		gem_pos[w] = p
+		gem_value[w] = gem_value[i]
+		gem_pulled[w] = pulled
+		w += 1
+	# 回収の処理中に落ちた結晶も残す
+	for j in range(n, gem_pos.size()):
+		gem_pos[w] = gem_pos[j]
+		gem_value[w] = gem_value[j]
+		gem_pulled[w] = gem_pulled[j]
+		w += 1
+	gem_pos.resize(w)
+	gem_value.resize(w)
+	gem_pulled.resize(w)
 
 func _collect_coins(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0
@@ -161,18 +168,30 @@ func _collect_coins(dt: float) -> void:
 	var far := maxf(radius, reach)
 	var far_sq := far * far
 	var ship_pos := state.ship_pos
-	var kept := _coins_spare
-	kept.clear()
-	for c: Pickup in coins:
-		if not c.pulled and ship_pos.distance_squared_to(c.pos) >= far_sq:
-			kept.append(c)
-		elif _pull(c, radius, step) < reach:
-			state.coins += int(c.value)
-			state.emit(&"pickup", {"kind": &"coin"})
-		else:
-			kept.append(c)
-	_coins_spare = coins
-	coins = kept
+	var n := coin_pos.size()
+	var w := 0
+	for i in n:
+		var p := coin_pos[i]
+		var pulled := coin_pulled[i]
+		if pulled != 0 or ship_pos.distance_squared_to(p) < far_sq:
+			var d := ship_pos - p
+			var dist := d.length()
+			if dist < radius or pulled != 0:
+				pulled = 1
+				p += d / maxf(dist, 1.0) * minf(step, dist)
+			if dist < reach:
+				state.coins += 1
+				state.emit(&"pickup", {"kind": &"coin"})
+				continue
+		coin_pos[w] = p
+		coin_pulled[w] = pulled
+		w += 1
+	for j in range(n, coin_pos.size()):
+		coin_pos[w] = coin_pos[j]
+		coin_pulled[w] = coin_pulled[j]
+		w += 1
+	coin_pos.resize(w)
+	coin_pulled.resize(w)
 
 func _collect_capsules(dt: float) -> void:
 	var reach := 22.0 + cfg.ship_radius + 14.0
@@ -209,9 +228,11 @@ func _apply(c: Pickup) -> void:
 			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -40), "text": "HP +%d" % roundi(state.ship_hp - before), "color": Color("#67e8b1"), "size": 18})
 		Pickup.Kind.MAGNET:
 			var xp := 0.0
-			for g: Pickup in gems:
-				xp += g.value
-			gems.clear()
+			for v in gem_value:
+				xp += v
+			gem_pos.clear()
+			gem_value.clear()
+			gem_pulled.clear()
 			for other: Pickup in capsules:
 				if other.kind == Pickup.Kind.CACHE and not other.taken:
 					xp += other.value
