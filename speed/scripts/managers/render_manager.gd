@@ -12,7 +12,7 @@ const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "split
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
-const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitling"]
+const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -308,7 +308,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 func _draw_enemy_marks(c: CanvasItem, e: Enemy) -> void:
 	if e.elite:
 		c.draw_arc(e.pos, e.r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
-	if e.weak_arc > 0.0:
+	if e.weak_arc > 0.0 and e.type != &"armored":
 		c.draw_arc(e.pos, e.r + _px(2.0), e.facing + PI - e.weak_arc, e.facing + PI + e.weak_arc, 12, Color("#ffe46b"), _px(3.0))
 	if e.charge > 0.0:
 		c.draw_arc(e.pos, e.r + _px(6.0), 0, TAU * e.charge, 24, Color(1, 0.3, 0.3, 0.8), _px(2.5))

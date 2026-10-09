@@ -6,7 +6,7 @@
 script = ExtResource("1")
 id = &"splitter"
 display_name = "分裂型"
-radius = 22.0
+radius = 22.5
 hp = 14.0
 armor = 4.0
 speed = 60.0

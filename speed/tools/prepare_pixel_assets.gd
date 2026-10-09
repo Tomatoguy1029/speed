@@ -15,7 +15,7 @@ func _initialize() -> void:
 	print("Atlas: ", source.get_size(), " alpha=", source.detect_alpha())
 	for i in NAMES.size():
 		# 手描きの原寸素材をアトラスの旧画像で上書きしない。
-		if NAMES[i] in ["drifter", "swarm", "darter", "armored", "splitling", "meteor_0", "meteor_1", "airship"]:
+		if NAMES[i] in ["drifter", "swarm", "darter", "armored", "splitter", "splitling", "meteor_0", "meteor_1", "airship"]:
 			continue
 		var x := i % 4
 		var y := i / 4
