@@ -449,8 +449,9 @@ function startDrawing(game, input) {
   // Keep the draw prototype's charge until commit; only the drawn length is spent.
   if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
-  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
+  const started = !!input.drawClick || (input.mobile && input.press);
+  game.draw = { phase: 'draw', points: started ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }

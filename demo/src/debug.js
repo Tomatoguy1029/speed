@@ -131,7 +131,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
   schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：左下のジョイスティックで移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：触れた位置にジョイスティックが出て移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();

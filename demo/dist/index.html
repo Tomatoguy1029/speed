@@ -87,9 +87,9 @@
   #mobileControls { display: none; }
   body.mobile { height: 100dvh; --pad-height: 116px; }
   body.mobile canvas#game { inset: env(safe-area-inset-top) env(safe-area-inset-right) calc(var(--pad-height) + env(safe-area-inset-bottom)) env(safe-area-inset-left); width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)); height: calc(100dvh - var(--pad-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-  body.mobile #mobileControls:not([hidden]) { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--pad-height); padding: 0 max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); align-items: center; justify-content: space-between; background: #080d1b; border-top: 1px solid #293b57; touch-action: none; }
-  #mobileStick { width: 96px; height: 96px; flex: none; border: 2px solid #526987; border-radius: 50%; position: relative; background: radial-gradient(circle, #213550, #101b2d); touch-action: none; }
-  #mobileStick.inactive { opacity: .35; }
+  body.mobile #mobileControls:not([hidden]) { display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: var(--pad-height); padding: 0 max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left)); align-items: center; justify-content: flex-end; background: #080d1b; border-top: 1px solid #293b57; touch-action: none; }
+  #mobileStick { width: 96px; height: 96px; border: 2px solid #526987; border-radius: 50%; position: fixed; transform: translate(-50%, -50%); z-index: 4; pointer-events: none; background: radial-gradient(circle, #213550, #101b2d); touch-action: none; }
+  #mobileStick[hidden] { display: none; }
   .stick-knob { position: absolute; width: 38px; height: 38px; left: calc(50% - 19px); top: calc(50% - 19px); border-radius: 50%; background: #c3e2f2; box-shadow: 0 0 0 5px #7296b533; pointer-events: none; }
   .mobile-actions { display: flex; align-items: center; gap: 10px; }
   .mobile-menu { display: grid; gap: 6px; }
@@ -110,8 +110,8 @@
 <body>
 <canvas id="game"></canvas>
 <div id="ui"></div>
+<div id="mobileStick" role="group" aria-label="移動ジョイスティック" hidden><span class="stick-knob"></span></div>
 <div id="mobileControls" hidden>
-  <div id="mobileStick" role="group" aria-label="移動ジョイスティック"><span class="stick-knob"></span></div>
   <div class="mobile-actions"><div class="mobile-menu"><button id="mobilePause" type="button">一時停止</button><button id="mobileDebug" type="button">調整</button></div><button id="dashBtn" type="button">描く</button></div>
 </div>
 <style>.version-links{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.version-links a{color:#bfeaff;border:1px solid #466183;border-radius:6px;padding:8px 12px;text-decoration:none;font-size:13px}.version-links a:hover{background:#172c43}</style>
@@ -3329,8 +3329,9 @@ function startDrawing(game, input) {
   // Keep the draw prototype's charge until commit; only the drawn length is spent.
   if (!game.newBuild) game.dashMeter = 0;
   // A mouse click starts the line immediately. Keyboard/touch shortcuts can still pick a start.
-  game.draw = { phase: 'draw', points: input.drawClick ? [startPoint(game, input.clickCursor || input.cursor)] : [],
-    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started: !!input.drawClick, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
+  const started = !!input.drawClick || (input.mobile && input.press);
+  game.draw = { phase: 'draw', points: started ? [startPoint(game, input.clickCursor || input.cursor)] : [],
+    budget, used: 0, gauge, charge: game.dashMeter, fullCharge, cursor: input.cursor || null, blocked: false, started, inputMethod: input.mobile ? 'freehand' : CONFIG.drawInput };
   sh.charging = false;
   game.events.push({ type: 'drawStart' });
 }
@@ -7005,7 +7006,7 @@ function showStation(save, onBuy, onDepart) {
     el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
     document.body.classList.contains('mobile') ? el('ul', { class: 'how' },
-      el('li', {}, '左下のジョイスティックで移動。通常攻撃は自動。'),
+      el('li', {}, '触れた位置に出るジョイスティックで移動。指を離すと消える。通常攻撃は自動。'),
       el('li', {}, '25%以上溜まったら「描く」をタップし、フィールドに指で軌跡を描く。指を離すか長さを使い切ると高速攻撃。'),
       el('li', {}, '線の終了後もジョイスティックで操舵。強化カードはタップで選択。'),
       el('li', {}, '紫の結晶は経験値、赤い輪は敵弾。隕石を壊すと回復などを入手。'),
@@ -7342,7 +7343,7 @@ function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
   schemeSel.disabled = mobilePanel;
   const schemeHelp = root.querySelector('.dhelp');
   schemeSel.innerHTML = SCHEMES.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
-  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：左下のジョイスティックで移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
+  const syncScheme = () => { schemeSel.value = CONFIG.controlScheme; schemeHelp.textContent = mobilePanel ? 'スマホ：触れた位置にジョイスティックが出て移動、右下の「描く」から指で軌跡を描く。指を離すと発動。' : schemeById(CONFIG.controlScheme).help; };
   schemeSel.addEventListener('change', () => {
     setScheme(getGame(), schemeSel.value);
     syncScheme();
@@ -7568,33 +7569,57 @@ function createMobileControls({ onDraw, onPause, onDebug }) {
   const knob = stick.querySelector('.stick-knob');
   const draw = document.getElementById('dashBtn');
   if (!active) document.body.append(draw); // preserve the previous touch shortcut on hybrid PCs
-  let pointerId = null, enabled = false;
+  const canvas = document.getElementById('game');
+  let pointerId = null, enabled = false, drawing = false, surface = null;
+  let originX = 0, originY = 0;
+  stick.hidden = true;
   const vector = { x: 0, y: 0 };
   function reset() {
-    pointerId = null; vector.x = vector.y = 0;
+    const captured = surface, id = pointerId;
+    pointerId = null; surface = null; vector.x = vector.y = 0;
+    stick.hidden = true;
     knob.style.transform = 'translate(0px, 0px)';
+    if (captured && id !== null && captured.hasPointerCapture(id)) captured.releasePointerCapture(id);
   }
   function move(e) {
-    const rect = stick.getBoundingClientRect();
-    const radius = rect.width * 0.35;
-    let x = e.clientX - rect.left - rect.width / 2;
-    let y = e.clientY - rect.top - rect.height / 2;
+    const radius = stick.getBoundingClientRect().width * 0.35;
+    let x = e.clientX - originX;
+    let y = e.clientY - originY;
     const scale = Math.min(1, radius / Math.max(1, Math.hypot(x, y)));
     x *= scale; y *= scale;
     // The world uses the existing stick's pixel scale and dead zone.
     vector.x = x / radius * CONFIG.stickRadius; vector.y = y / radius * CONFIG.stickRadius;
     knob.style.transform = `translate(${x}px, ${y}px)`;
   }
-  stick.addEventListener('pointerdown', e => {
-    if (!enabled || pointerId !== null) return;
-    e.preventDefault(); pointerId = e.pointerId;
-    stick.setPointerCapture(pointerId); move(e);
-  });
-  stick.addEventListener('pointermove', e => { if (e.pointerId === pointerId) { e.preventDefault(); move(e); } });
-  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    stick.addEventListener(event, e => { if (e.pointerId === pointerId) reset(); });
+  // Capture steering before the canvas's drawing input. The drawing finger stays
+  // independent while the movement finger keeps capture on its original surface.
+  if (active) for (const area of [canvas, root]) {
+    area.addEventListener('pointerdown', e => {
+      if (!enabled || e.button !== 0 || e.target.closest('button')) return;
+      if (drawing && area === canvas) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (pointerId !== null) return;
+      pointerId = e.pointerId; surface = area;
+      originX = e.clientX; originY = e.clientY;
+      stick.style.left = `${originX}px`; stick.style.top = `${originY}px`;
+      stick.hidden = false;
+      area.setPointerCapture(pointerId); move(e);
+    }, true);
+    area.addEventListener('pointermove', e => {
+      if (e.pointerId !== pointerId) return;
+      e.preventDefault(); e.stopImmediatePropagation(); move(e);
+    }, true);
+    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      area.addEventListener(event, e => {
+        if (e.pointerId !== pointerId) return;
+        e.stopImmediatePropagation(); reset();
+      }, true);
+    }
   }
-  draw.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if ((!active || enabled) && !draw.disabled) onDraw(); });
+  draw.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    if ((!active || enabled) && !draw.disabled) { drawing = true; onDraw(); }
+  });
   document.getElementById('mobilePause').addEventListener('click', onPause);
   document.getElementById('mobileDebug').addEventListener('click', onDebug);
   window.addEventListener('blur', reset);
@@ -7608,8 +7633,7 @@ function createMobileControls({ onDraw, onPause, onDebug }) {
       enabled = playable;
       document.body.classList.toggle('mobile-running', running && !['finishing', 'dying', 'won', 'lost'].includes(game.state));
       root.hidden = !running || ['finishing', 'dying', 'won', 'lost'].includes(game.state);
-      stick.classList.toggle('inactive', !enabled);
-      const drawing = game.draw?.phase === 'draw';
+      drawing = game.draw?.phase === 'draw';
       draw.classList.toggle('show', playable && (!game.draw || drawing));
       draw.disabled = !drawing && game.dashMeter < CONFIG.drawMinCharge;
       draw.textContent = drawing ? (game.draw.started ? '発動' : 'キャンセル') : `描く ${Math.floor(game.dashMeter * 100)}%`;

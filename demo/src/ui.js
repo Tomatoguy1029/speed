@@ -190,7 +190,7 @@ export function showStation(save, onBuy, onDepart) {
     el('div', { class: 'sub' }, `${fmtTime(CONFIG.bossTime)}ごろにボス出現。敵の大群を吹き飛ばし、${fmtTime(CONFIG.runTime)}以内にボスを撃破すればクリア`),
     el('h2', {}, '操作'),
     document.body.classList.contains('mobile') ? el('ul', { class: 'how' },
-      el('li', {}, '左下のジョイスティックで移動。通常攻撃は自動。'),
+      el('li', {}, '触れた位置に出るジョイスティックで移動。指を離すと消える。通常攻撃は自動。'),
       el('li', {}, '25%以上溜まったら「描く」をタップし、フィールドに指で軌跡を描く。指を離すか長さを使い切ると高速攻撃。'),
       el('li', {}, '線の終了後もジョイスティックで操舵。強化カードはタップで選択。'),
       el('li', {}, '紫の結晶は経験値、赤い輪は敵弾。隕石を壊すと回復などを入手。'),
