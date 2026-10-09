@@ -1,0 +1,3 @@
+#!/bin/sh
+# 文書の運用規定（docs/README.md）を守っていないコミットを止める。
+exec python3 "$(git rev-parse --show-toplevel)/tools/check_docs.py"

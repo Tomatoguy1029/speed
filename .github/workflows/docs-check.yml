@@ -1,0 +1,14 @@
+# 文書の運用規定（docs/README.md）のチェック。違反があると失敗する。
+name: Docs Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs
+        run: python3 tools/check_docs.py

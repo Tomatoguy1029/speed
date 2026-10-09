@@ -28,11 +28,13 @@ godot --editor --path speed
 |---|---|
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
+| `docs/README.md` | [文書の運用規定](docs/README.md)。文書を触る前に必ず読む |
 | `docs/game/` | 本番の資料：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
 | `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
-| `docs/logs/` | 本番の作業ログ：ユーザーごとの履歴、報告書 |
+| `docs/logs/` | 本番の計測・実装の報告 |
+| `docs/proposals/` | まだ採用していない案 |
 | `docs/art/` | 本番の画像の資料 |
-| `demo/docs/` | demo の仕様・課題・これまでの作業記録 |
+| `demo/docs/` | demo の仕様・課題 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
 | `.github/workflows/vercel-deploy.yml`, `vercel.json` | demo のビルドと Vercel 公開設定 |
@@ -62,4 +64,4 @@ python3 -m http.server 8766 --bind 127.0.0.1 --directory demo/dist
 
 GitHub Actions は demo または公開設定の変更時に Vercel へデプロイします。`main` は公開版、それ以外のブランチはプレビューです。この公開 URL はブラウザ demo 用です。
 
-本番の作業記録は [Tomatoguy1029](docs/logs/wakida.md)・[ShueMaker70969](docs/logs/shumak.md)・[keporusu](docs/logs/keporusu.md) ごとに追記します。過去の試作記録は `demo/docs/` に保存しています。
+個人の作業ログは作りません。経緯は git のコミットに残します。過去の試作記録は `demo/docs/` に保存しています。

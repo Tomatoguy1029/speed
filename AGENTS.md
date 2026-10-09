@@ -9,15 +9,14 @@ SPEED の本番ゲームは Godot で開発する。Godot プロジェクトは 
 - 自動テスト・長時間の自動プレイは依頼がある場合だけ実行する。変更に応じたビルド・読み込み・画面確認で検証する。
 - **武器・特性・敵の一覧管理は本番・demo共通**。[共通の運用ルール](docs/game/catalog/rules.md) に従い、関連する案・採否・実装・数値を変えた同じ作業で対象側の一覧を更新する。
 - 本番の一覧は [武器](docs/game/catalog/weapons.md)・[特性](docs/game/catalog/traits.md)・[敵](docs/game/catalog/enemies.md)、demoの一覧は [demo/docs/catalog.md](demo/docs/catalog.md) から参照する。採用状態と実装状況を区別し、demoの仕様を本番の確定仕様として転記しない。同じ項目を本番に取り入れるときは管理IDと参照先を引き継ぐ。
-- 本番の文書は `docs/` に置く。基盤の資料（企画書・世界観とストーリー・デザインとアートスタイル・仕様書・設計書・課題）は `docs/game/`、武器・特性・敵など量産する項目の一覧と運用ルールは `docs/game/catalog/`、作業ログ（ユーザーごとの履歴・報告書）は `docs/logs/`、画像の資料は `docs/art/`。demo の仕様と課題は `demo/docs/` に残す。作業・判断の履歴は、同じ作業の中でユーザーに対応するファイルへ自動で追記する。
 
-| ユーザー | 本番の履歴 | demo の履歴 |
-|---|---|---|
-| Tomatoguy1029 | [docs/logs/wakida.md](docs/logs/wakida.md) | [demo/docs/wakida.md](demo/docs/wakida.md) |
-| ShueMaker70969 | [docs/logs/shumak.md](docs/logs/shumak.md) | [demo/docs/shumak.md](demo/docs/shumak.md) |
-| keporusu | [docs/logs/keporusu.md](docs/logs/keporusu.md) | [demo/docs/keporusu.md](demo/docs/keporusu.md) |
+## 文書の決まり
 
-作業ユーザーは会話で明示された情報を優先する。特定できなければ確認し、別ユーザーの履歴へ推測で書かない。他のユーザーの記録は書き換えず、番号はファイルごとに続ける。
+- 文書を作る・直す前に、必ず [文書の運用規定](docs/README.md) を読んで従う。置き場、書き方（日付・経緯・作業者の名前・文書自身についての説明を書かない、同じ内容は1か所だけ）、案の扱いはそこにある。
+- 個人の作業ログ（作業・判断の履歴）は作らない。経緯は git のコミットに残す。
+- コミットの前に `python3 tools/check_docs.py` が通ることを確かめる。クローンごとに1回 `git config core.hooksPath .githooks` を実行すると、コミット前に自動で走る。GitHub Actions でも同じチェックが走る。
+
+## コミットと公開
 
 自分の変更だけを `git add` してコミットする。`git add -A`・`git commit -a`・force push は使わない。他の人の未コミット変更には触れない。pushする前に必ずユーザーへ確認し、承認を得る。承認後、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` する。
 
