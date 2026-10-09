@@ -184,12 +184,13 @@ func _update_hostile(dt: float) -> void:
 			if s.body_gap <= step:
 				body_hit = field.first_body_hit(from, s.pos, s.r)
 		s.body_gap -= step
-		# 遠くの弾は安い線分の矩形判定で除外。高速な弾も線分全体を確認する。
+		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
+		# 高速な弾も線分全体を確認する。
 		var rr := s.r + R
+		var reach := rr + step
 		var ship_pos := state.ship_pos
 		var t := -1.0
-		if ship_pos.x >= minf(from.x, s.pos.x) - rr and ship_pos.x <= maxf(from.x, s.pos.x) + rr \
-				and ship_pos.y >= minf(from.y, s.pos.y) - rr and ship_pos.y <= maxf(from.y, s.pos.y) + rr:
+		if ship_pos.distance_squared_to(s.pos) <= reach * reach:
 			t = Geom.seg_circle_t(from, s.pos, ship_pos, rr)
 		if t >= 0.0 and (body_hit == null or t < body_hit.t):
 			ship.damage(s.dmg, s.slow, s.kind)
