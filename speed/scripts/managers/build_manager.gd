@@ -136,16 +136,21 @@ func try_open_cards() -> bool:
 
 ## ラン開始時に、最初の武器の候補を出す（仕様書 9.2）。
 func open_start_cards() -> void:
-	var ids: Array = ConfigManager.weapons.keys()
-	var out: Array[Dictionary] = []
-	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
-		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
-		out.append({"kind": &"weapon", "id": id, "level": 1, "start": true})
+	var out := roll_start_cards()
 	if out.is_empty():
 		return
 	state.start_pick = true
 	state.cards = out
 	cards_opened.emit(state.cards)
+
+## 最初の武器の候補：全武器からランダムに選ぶ。
+func roll_start_cards() -> Array[Dictionary]:
+	var ids: Array = ConfigManager.weapons.keys()
+	var out: Array[Dictionary] = []
+	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
+		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
+		out.append({"kind": &"weapon", "id": id, "level": 1, "start": true})
+	return out
 
 func roll_cards() -> Array[Dictionary]:
 	var pool: Array = []
@@ -176,12 +181,12 @@ func roll_cards() -> Array[Dictionary]:
 		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
-## 3択のカードを引き直す（仕様書 9.2）。回数が残っていなければ false。
+## 表示中のカードを引き直す（仕様書 9.3）。最初の武器の選択でも使える。回数が残っていなければ false。
 func reroll_cards() -> bool:
-	if state.cards.is_empty() or state.rerolls_left <= 0 or state.start_pick:
+	if state.cards.is_empty() or state.rerolls_left <= 0:
 		return false
 	state.rerolls_left -= 1
-	state.cards = roll_cards()
+	state.cards = roll_start_cards() if state.start_pick else roll_cards()
 	state.emit(&"reroll", {})
 	cards_opened.emit(state.cards)
 	return true

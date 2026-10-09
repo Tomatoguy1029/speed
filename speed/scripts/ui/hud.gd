@@ -141,7 +141,6 @@ func _show_cards() -> void:
 		_cards_row.add_child(b)
 	var start: bool = run.state.start_pick
 	_cards_title.text = "最初の武器を1つ選ぶ（クリック／1〜3）" if start else "レベルアップ　1枚選ぶ（クリック／1〜3）"
-	_reroll_button.visible = not start
 	var left := run.state.rerolls_left
 	_reroll_button.text = "リロール（残り %d 回）　%s" % [left, OS.get_keycode_string(InputActions.key_of(&"reroll"))]
 	_reroll_button.disabled = left <= 0

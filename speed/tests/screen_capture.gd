@@ -205,7 +205,7 @@ func _start_steps() -> void:
 	GameManager.start_run(1)
 	await _shot("start_00_pick", 0.5)
 	_action(&"reroll")
-	await _shot("start_01_reroll_ignored", 0.3)
+	await _shot("start_01_reroll", 0.3)
 	_run_manager().command(&"choose_card", {"index": 1})
 	await _shot("start_02_run", 1.0)
 
