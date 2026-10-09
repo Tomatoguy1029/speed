@@ -97,7 +97,7 @@
   #mobileMenuToggle svg { display: block; width: 22px; height: 22px; pointer-events: none; }
   #mobileMenuPanel:not([hidden]) { display: grid; gap: 6px; margin-top: 6px; padding: 8px; width: 160px; border: 1px solid #526987; border-radius: 9px; background: #080d1bf5; box-shadow: 0 8px 24px #0008; }
   #mobileMenuPanel button { text-align: left; }
-  body.mobile #dashBtn { position: static; width: 56px; height: 56px; min-height: 56px; padding: 4px; font-size: 12px; border-radius: 50%; border: 3px solid transparent; background: linear-gradient(#101b2de0, #101b2de0) padding-box, conic-gradient(#5fd8ff var(--charge, 0deg), #52698766 0) border-box; }
+  body.mobile #dashBtn { position: static; width: 112px; height: 112px; min-height: 112px; padding: 8px; font-size: 16px; border-radius: 50%; border: 3px solid transparent; background: linear-gradient(#101b2de0, #101b2de0) padding-box, conic-gradient(#5fd8ff var(--charge, 0deg), #52698766 0) border-box; }
   body.mobile button { min-height: 44px; touch-action: manipulation; }
   body.mobile .screen { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   body.mobile .panel { max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
@@ -974,19 +974,23 @@ function updateMeteorField(game, dt) {
   const near = (p, extra) => Math.abs(p.x - view.x) < view.halfW + extra &&
     Math.abs(p.y - view.y) < view.halfH + extra &&
     Math.hypot(p.x, p.y) > CONFIG.planetRadius + 100 && Math.hypot(p.x, p.y) < CONFIG.fieldRadius + 100;
-  let unload = false;
+  let unload = false, changed = false;
   for (const e of game.enemies) {
     const m = e.worldMeteor;
     if (!m || e.dead) continue;
     const p = meteorWorldPosition(m, time);
+    if (e.x !== p.x || e.y !== p.y) changed = true;
     e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy;
     e.facing = m.facing + m.spin * time;
     if (!near(p, 650)) { m.active = false; unload = true; }
   }
-  if (unload) game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
-  if (!game.spawning) return;
+  if (unload) {
+    game.enemies = game.enemies.filter(e => !e.worldMeteor || e.worldMeteor.active || e.dead);
+    changed = true;
+  }
+  if (!game.spawning) return changed;
   game.meteorStreamT = (game.meteorStreamT || 0) - dt;
-  if (game.meteorStreamT > 0) return;
+  if (game.meteorStreamT > 0) return changed;
   game.meteorStreamT = 0.2;
   for (const m of game.field.meteors) {
     if (m.destroyed || m.active) continue;
@@ -996,8 +1000,9 @@ function updateMeteorField(game, dt) {
       { size: m.size, facing: m.facing, spin: m.spin }));
     e.worldMeteor = m; m.active = true;
     e.x = p.x; e.y = p.y; e.vx = p.vx; e.vy = p.vy; e.facing = m.facing + m.spin * time;
-    game.enemies.push(e);
+    game.enemies.push(e); changed = true;
   }
+  return changed;
 }
 
 // ---- field.js ----
@@ -2976,6 +2981,7 @@ function update(game, frameDt, input) {
     return;
   }
   if (game.state !== 'play') return;
+  const meteorClockBefore = game.meteorClock;
   recordBossApproach(game, frameDt);
   game.buildClock += frameDt;
   if (game.newBuild && !game.draw) {
@@ -3042,6 +3048,11 @@ function update(game, frameDt, input) {
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
     }
   }
+  // Meteors retain near-real-time motion during slow world steps. Update their
+  // positions on frames without a step too, then refresh the collision index.
+  if (game.state === 'play' && updateMeteorField(game, Math.max(0, game.meteorClock - meteorClockBefore))) {
+    game.grid = buildGrid(game.enemies, 160, game.grid);
+  }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
@@ -3093,7 +3104,7 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
-  updateMeteorField(game, dt);
+  updateMeteorField(game, 0);
   game.leechDrag = 0;
   updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);
@@ -5605,7 +5616,7 @@ function drawRunWeapons(r, game) {
 function drawRunLoadout(r, game) {
   if (r.mobile) {
     const { ctx, W, H } = r;
-    const width = Math.min(240, W - 88);
+    const width = Math.min(240, W - 144);
     ctx.fillStyle = 'rgba(4,8,20,.65)'; ctx.fillRect(4, H - 54, width, 50);
     ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
     ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 40);

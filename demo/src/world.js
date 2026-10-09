@@ -89,6 +89,7 @@ export function update(game, frameDt, input) {
     return;
   }
   if (game.state !== 'play') return;
+  const meteorClockBefore = game.meteorClock;
   recordBossApproach(game, frameDt);
   game.buildClock += frameDt;
   if (game.newBuild && !game.draw) {
@@ -155,6 +156,11 @@ export function update(game, frameDt, input) {
       if (game.offerQueue.length && !game.draw) { openOffer(game); break; }
     }
   }
+  // Meteors retain near-real-time motion during slow world steps. Update their
+  // positions on frames without a step too, then refresh the collision index.
+  if (game.state === 'play' && updateMeteorField(game, Math.max(0, game.meteorClock - meteorClockBefore))) {
+    game.grid = buildGrid(game.enemies, 160, game.grid);
+  }
   if (game.draw && game.slowmo <= 0) game.timeScale = drawWorldScale(game);
   if (game.state === 'play' && game.t >= CONFIG.runTime) end(game, 'lost', 'time');
 }
@@ -206,7 +212,7 @@ function step(game, dt, input) {
   }
 
   updateMoons(game.field, game.t);
-  updateMeteorField(game, dt);
+  updateMeteorField(game, 0);
   game.leechDrag = 0;
   updateEnemyAim(game, dt);
   for (const e of game.enemies) updateEnemy(e, game, dt);

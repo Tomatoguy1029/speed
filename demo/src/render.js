@@ -501,7 +501,7 @@ function drawRunWeapons(r, game) {
 function drawRunLoadout(r, game) {
   if (r.mobile) {
     const { ctx, W, H } = r;
-    const width = Math.min(240, W - 88);
+    const width = Math.min(240, W - 144);
     ctx.fillStyle = 'rgba(4,8,20,.65)'; ctx.fillRect(4, H - 54, width, 50);
     ctx.textAlign = 'left'; ctx.font = '10px sans-serif'; ctx.fillStyle = '#b9c8e6';
     ctx.fillText(`武器 ${Object.keys(game.weapons).length}/${CONFIG.weaponSlots}　特性 ${Object.keys(game.traits).length}/${CONFIG.traitSlots}`, 10, H - 40);
