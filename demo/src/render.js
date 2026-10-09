@@ -491,7 +491,7 @@ function drawRunWeapons(r, game) {
   }
   ctx.globalAlpha = 1;
   for (const e of game.enemies) {
-    if (!(e.shove?.time > 0 || e.knockT > 0)) continue;
+    if (e.dead || !(e.shove?.time > 0 || e.knockT > 0)) continue;
     ctx.strokeStyle = 'rgba(255,152,107,0.8)'; ctx.lineWidth = 3 / z;
     const sp = Math.hypot(e.vx, e.vy) || 1;
     ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x - e.vx / sp * Math.min(130, sp * 0.12), e.y - e.vy / sp * Math.min(130, sp * 0.12)); ctx.stroke();
@@ -1001,7 +1001,7 @@ function drawEnemies(r, game) {
   const atk = attackPower(sp, game.stats);
   const arcMult = game.stats.weakArcMult;
   for (const e of game.enemies) {
-    if (!onScreen(r, e.x, e.y, e.r + 220)) continue;
+    if (e.dead || !onScreen(r, e.x, e.y, e.r + 220)) continue;
     const R = e.r;
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -1194,7 +1194,7 @@ function drawMinimap(r, game) {
   ctx.fillStyle = '#a08a6c';
   for (const m of game.field.moons) { ctx.beginPath(); ctx.arc(m.x * k, m.y * k, 2.2, 0, TAU); ctx.fill(); }
   for (const e of game.enemies) {
-    if (e.type !== 'battleship' && !e.elite) continue;
+    if (e.dead || (e.type !== 'battleship' && !e.elite)) continue;
     ctx.fillStyle = e.type === 'battleship' ? '#ff5a5a' : '#ffcf4a';
     ctx.fillRect(e.x * k - 2, e.y * k - 2, 4, 4);
   }
