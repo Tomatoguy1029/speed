@@ -34,7 +34,8 @@ var sequence_t := 0.0
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
 var _cam_ready := false
-## 開発版の計測：Manager ごとの処理時間の合計（マイクロ秒）と回数
+## 開発版の計測：処理時間の合計（マイクロ秒）・回数・最大時間。
+## play_total は全体の包含時間なので、個別の項目と合算しない。
 var profile: Dictionary = {}
 var profiling := false
 
@@ -101,7 +102,10 @@ func _wire() -> void:
 func _physics_process(delta: float) -> void:
 	match state.phase:
 		RunState.Phase.PLAY:
-			_play_tick(delta)
+			if profiling:
+				_run(&"play_total", func(): _play_tick(delta))
+			else:
+				_play_tick(delta)
 		RunState.Phase.DYING:
 			_dying_tick(delta)
 		RunState.Phase.FINISHING:
@@ -117,8 +121,12 @@ func _play_tick(real_dt: float) -> void:
 	if state.hitstop > 0.0:
 		state.hitstop -= real_dt
 		return
-	combat.tick(real_dt, 0.0)
-	draw.tick(real_dt, 0.0)
+	if profiling:
+		_run(&"combat", func(): combat.tick(real_dt, 0.0))
+		_run(&"draw", func(): draw.tick(real_dt, 0.0))
+	else:
+		combat.tick(real_dt, 0.0)
+		draw.tick(real_dt, 0.0)
 	if state.phase != RunState.Phase.PLAY:
 		return
 	state.world_scale = draw.world_scale()
@@ -150,9 +158,11 @@ func _run(key: StringName, f: Callable) -> void:
 		return
 	var t0 := Time.get_ticks_usec()
 	f.call()
-	var rec: Array = profile.get(key, [0, 0])
-	rec[0] += Time.get_ticks_usec() - t0
+	var elapsed := Time.get_ticks_usec() - t0
+	var rec: Array = profile.get(key, [0, 0, 0])
+	rec[0] += elapsed
 	rec[1] += 1
+	rec[2] = maxi(rec[2], elapsed)
 	profile[key] = rec
 
 func _process(_delta: float) -> void:

@@ -20,6 +20,8 @@ godot --editor --path speed
 
 `.godot/` は生成キャッシュとして Git 管理から除外します。Godot 本番のビルド・配布方法は、今後の開発で決めます。
 
+短時間の性能計測は `godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350`。セーブへ書き込まず、ゲームの進行を指定秒へ進めて6秒準備・6秒計測します。[性能調査と比較用引数](docs/logs/performance-profile-2026-10-09.md) を参照してください。
+
 ## 構成
 
 | パス | 用途 |
