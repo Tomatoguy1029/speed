@@ -55,6 +55,8 @@ var bolts: Array = []
 var shake := 0.0
 var flash := 0.0
 var _stars: PackedVector3Array
+var _star_batch: InstanceBatch
+var _star_material: ShaderMaterial
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
 
@@ -89,6 +91,7 @@ func _ready() -> void:
 	rng.seed = 7
 	for i in 400:
 		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
+	_build_star_batch()
 	run.frame_events.connect(_on_events)
 
 ## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
@@ -280,16 +283,29 @@ func _update_fx(dt: float) -> void:
 func _px(px: float) -> float:
 	return px / maxf(state.camera_zoom, 0.01)
 
+## 星の円メッシュと乱数データは開始時に作り、GPUで位置・視差だけ更新する。
+func _build_star_batch() -> void:
+	_star_batch = InstanceBatch.new()
+	_star_batch.setup_polygon(InstanceBatch.circle_points(16))
+	var mm := _star_batch.multimesh
+	mm.use_custom_data = true
+	mm.instance_count = _stars.size()
+	for i in _stars.size():
+		var star := _stars[i]
+		mm.set_instance_transform_2d(i, Transform2D.IDENTITY)
+		mm.set_instance_custom_data(i, Color(star.x, star.y, star.z, 0.0))
+		mm.set_instance_color(i, Color(0.7, 0.8, 1.0, 0.25 + 0.5 * star.z))
+	_star_material = ShaderMaterial.new()
+	_star_material.shader = preload("res://shaders/background_stars.gdshader")
+	_star_batch.material = _star_material
+	_layers.background.add_child(_star_batch)
+
 func _draw_background(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(200.0)
 	c.draw_rect(view, Color(0.02, 0.03, 0.07))
-	var half := state.view_half
-	for s in _stars:
-		var par := s.z * 0.3
-		var p := state.view_center * (1.0 - par)
-		var w := half * 2.4
-		var sp := Vector2(fposmod(s.x * 5000.0 - p.x, w.x * 2.0) - w.x, fposmod(s.y * 5000.0 - p.y, w.y * 2.0) - w.y)
-		c.draw_circle(state.view_center + sp * 0.5, _px(1.2 * s.z), Color(0.7, 0.8, 1.0, 0.25 + 0.5 * s.z))
+	_star_material.set_shader_parameter("view_center", state.view_center)
+	_star_material.set_shader_parameter("view_half", state.view_half)
+	_star_material.set_shader_parameter("camera_zoom", state.camera_zoom)
 
 func _draw_field(c: CanvasItem) -> void:
 	var f := run.field
