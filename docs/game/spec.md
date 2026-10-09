@@ -108,7 +108,6 @@
 - **マウス**：機体はカーソルの方向へ進む。カーソルが機体から `config.mouse_dead_zone` 以内なら向きを変えない。向きは毎秒 `config.steer_rate` ラジアンで回る。最高速度 × `config.steer_cruise` に達するまで、毎秒 `config.steer_accel` ずつ加速する。
 - **タッチ**：押した点を中心とする仮想スティック。`config.stick_dead_zone`（px）未満のずれは無視し、`config.stick_radius`（px）で最大。倒し具合に応じて巡航速度が最高速度 × `config.steer_cruise` から × `config.stick_cruise_max` まで変わる。
 - 速さが `config.pivot_speed` より遅いときは、機体の向きを最後に操作した向きのままにする。
-- 機体は回転しない円で描く。
 
 ### 5.2 速さの減り方
 
