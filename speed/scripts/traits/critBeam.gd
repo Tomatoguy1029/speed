@@ -1,4 +1,4 @@
-## T06 クリティカルランス：クリティカルのたびに、進む向きへ貫くビーム。ビームからは再び発動しない（一覧 docs/traits.md）。
+## T06 クリティカルランス：クリティカルのたびに、進む向きへ貫くビーム。ビームからは再び発動しない（一覧 docs/game/traits.md）。
 extends TraitBehavior
 
 var _next_time := 0.0

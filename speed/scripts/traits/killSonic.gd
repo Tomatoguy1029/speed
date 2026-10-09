@@ -1,4 +1,4 @@
-## T05 連鎖ソニック：1回の突進で一定数を倒すたびに衝撃波（一覧 docs/traits.md）。
+## T05 連鎖ソニック：1回の突進で一定数を倒すたびに衝撃波（一覧 docs/game/traits.md）。
 ## 衝撃波で倒した敵では、次の衝撃波を起こさない。
 extends TraitBehavior
 

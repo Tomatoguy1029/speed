@@ -1,4 +1,4 @@
-## T03 余韻の渦：線の終点に、敵を吸い寄せる渦を残す。ボスは引き寄せない（一覧 docs/traits.md）。
+## T03 余韻の渦：線の終点に、敵を吸い寄せる渦を残す。ボスは引き寄せない（一覧 docs/game/traits.md）。
 extends TraitBehavior
 
 ## 渦：pos、radius、life、max、power

@@ -2,7 +2,7 @@
 ## レベルアップの3択で手に入る武器。持てる数と最大レベルは調整値の「成長」で決まる。
 ## 武器の Lv が上がると性能段階が上がり、段階が1上がるごとに威力 +30%・発動の頻度 +12%・範囲 +10% になる。
 ## ---
-## 値の正は res://data/weapons/*.tres（一覧 docs/weapons.md）。発動の処理は res://scripts/weapons/<内部 ID>.gd。
+## 値の正は res://data/weapons/*.tres（一覧 docs/game/weapons.md）。発動の処理は res://scripts/weapons/<内部 ID>.gd。
 class_name WeaponDef
 extends Resource
 

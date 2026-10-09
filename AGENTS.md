@@ -7,15 +7,15 @@ SPEED の本番ゲームは Godot で開発する。Godot プロジェクトは 
 - 会話は日本語。ユーザーの表記には GitHub ユーザー名を使い、本人の明示的な許可なく本名・フルネームを記載しない。
 - 設計相談は先に議論し、ユーザーが決めてから実装する。画面は特定の解像度に固定せず、ユーザーのブラウザタブを勝手に置き換えない。
 - 自動テスト・長時間の自動プレイは依頼がある場合だけ実行する。変更に応じたビルド・読み込み・画面確認で検証する。
-- **武器・特性・敵の一覧管理は本番・demo共通**。[共通の運用ルール](docs/catalog.md) に従い、関連する案・採否・実装・数値を変えた同じ作業で対象側の一覧を更新する。
-- 本番の一覧は [武器](docs/weapons.md)・[特性](docs/traits.md)・[敵](docs/enemies.md)、demoの一覧は [demo/docs/catalog.md](demo/docs/catalog.md) から参照する。採用状態と実装状況を区別し、demoの仕様を本番の確定仕様として転記しない。同じ項目を本番に取り入れるときは管理IDと参照先を引き継ぐ。
-- 本番の仕様と課題は `docs/`、demo の仕様と課題は `demo/docs/` に残す。作業・判断の履歴は、同じ作業の中でユーザーに対応するファイルへ自動で追記する。
+- **武器・特性・敵の一覧管理は本番・demo共通**。[共通の運用ルール](docs/game/catalog.md) に従い、関連する案・採否・実装・数値を変えた同じ作業で対象側の一覧を更新する。
+- 本番の一覧は [武器](docs/game/weapons.md)・[特性](docs/game/traits.md)・[敵](docs/game/enemies.md)、demoの一覧は [demo/docs/catalog.md](demo/docs/catalog.md) から参照する。採用状態と実装状況を区別し、demoの仕様を本番の確定仕様として転記しない。同じ項目を本番に取り入れるときは管理IDと参照先を引き継ぐ。
+- 本番の文書は `docs/` に置く。資料（企画書・世界観とストーリー・デザインとアートスタイル・仕様書・設計書・一覧・課題）は `docs/game/`、作業ログ（ユーザーごとの履歴・報告書）は `docs/logs/`、画像の資料は `docs/art/`。demo の仕様と課題は `demo/docs/` に残す。作業・判断の履歴は、同じ作業の中でユーザーに対応するファイルへ自動で追記する。
 
 | ユーザー | 本番の履歴 | demo の履歴 |
 |---|---|---|
-| Tomatoguy1029 | [docs/wakida.md](docs/wakida.md) | [demo/docs/wakida.md](demo/docs/wakida.md) |
-| ShueMaker70969 | [docs/shumak.md](docs/shumak.md) | [demo/docs/shumak.md](demo/docs/shumak.md) |
-| keporusu | [docs/keporusu.md](docs/keporusu.md) | [demo/docs/keporusu.md](demo/docs/keporusu.md) |
+| Tomatoguy1029 | [docs/logs/wakida.md](docs/logs/wakida.md) | [demo/docs/wakida.md](demo/docs/wakida.md) |
+| ShueMaker70969 | [docs/logs/shumak.md](docs/logs/shumak.md) | [demo/docs/shumak.md](demo/docs/shumak.md) |
+| keporusu | [docs/logs/keporusu.md](docs/logs/keporusu.md) | [demo/docs/keporusu.md](demo/docs/keporusu.md) |
 
 作業ユーザーは会話で明示された情報を優先する。特定できなければ確認し、別ユーザーの履歴へ推測で書かない。他のユーザーの記録は書き換えず、番号はファイルごとに続ける。
 
