@@ -1,0 +1,32 @@
+Use-case ui-mockup. Generate ONE complete polished provisional Japanese game UI screen for SPEED, a 2D pixel space game with nautical celestial chart / drafting design language. Screen is a SHIP UPGRADE interface. Wide landscape 16:9. No device frame or comparison board. Dark nearly black navy background, subtle drafting grid and incomplete circular calibration arcs, very restrained cyan and ivory fine linework, crisp pixel-compatible typography. No glow haze, no noisy data panels, no filled photoreal spaceship. Precise, readable, calm technical drawing.
+
+User's essential structure: a large TOP-DOWN WHITE/CYAN WIREFRAME drawing of the player's ship in the CENTER-LEFT main diagram area, labeled part buttons around it, with thin non-crossing angular leader lines from exact ship components to these buttons. RIGHTMOST 28 percent is a stable upgrade details panel. The reference image is ONLY silhouette guidance: narrow white dart spacecraft with long pointed nose, swept wings, compact center, and rear thrusters. Make a coherent technical wireframe of this silhouette with visible hull outline and selective internal structural ribs, not random dense triangles, not a 3D perspective model. Preserve large negative space around component callouts.
+
+Top-left header exact "機体強化". Top-right currency exact "所持部品 120" (sample UI value). Small understated bottom-left back button exact "戻る".
+
+Diagram centered around x=43 percent of screen, y=51 percent, ship pointing UP. Ship occupies roughly 38 percent screen height. Seven component label BUTTONS, sufficiently spaced on left and right of ship within the left 70 percent region, simple thin outlined rectangles with title and small level pips. Exact labels:
+"衝角素材" connected to nose tip;
+"機体フレーム" connected to mid hull outer frame;
+"回収装置" connected to left wing tip;
+"主推進器" connected to rear engine;
+"充電効率" connected to central power unit;
+"学習回路" connected to upper central cockpit;
+"演算予備" connected to right inner wing.
+Do not cross leaders over other labels or over the detail panel. A few small junction circles at attachment points, no gratuitous icons.
+
+Shown interaction state is HOVER over "主推進器". Put a small understated mouse pointer adjacent to this button. Highlight ONLY this part button, its leader line, and rear engine geometry in clear pale cyan; all other leaders and ship lines muted blue-gray/ivory. Small level pips under each label, selected main thruster 0 of 5 filled (five muted empty squares). Hover reveals right details; no purchase on hover.
+
+Right fixed details window, elegant thin ivory outline with small corner ticks, dark solid translucent-looking fill but fully readable. Exact hierarchy and text:
+large title "主推進器"
+small subtitle "Lv.0 → Lv.1"
+horizontal divider
+section "強化効果"
+prominent text "最高速度 +5%"
+section "必要部品"
+prominent cost "25"
+a simple component token icon beside 25, visually related to mechanical parts not gold money
+near bottom a wide cyan outlined action button "強化する"
+small muted line "購入後の残り部品 95".
+Use actual simple Japanese glyphs, correct spelling. No giant paragraphs, no additional stats or invented values. The numeric sample is NOT actual save data. Keep all text comfortably legible at screenshot scale, consistent stroke widths, adequate margins.
+
+This is a menu concept emphasizing a central ship wiring diagram and precise part callout selection. References to star charts should stay subtle, do not draw zodiac animals. Practical game UI, deliberate restrained pixel aesthetic. No watermark, no version numbers, no arbitrary English captions.
