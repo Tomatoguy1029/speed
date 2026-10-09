@@ -9,6 +9,10 @@ var field: FieldManager
 var projectiles: ProjectileManager
 var bosses: BossManager
 
+## 開発用計測の差し込み口。通常プレイでは未設定。
+var profile_tick_hook: Callable
+var profile_survey_hook: Callable
+
 const BEH := {&"chase": Enemy.Beh.CHASE, &"dash": Enemy.Beh.DASH, &"split": Enemy.Beh.SPLIT,
 	&"gunner": Enemy.Beh.GUNNER, &"missile": Enemy.Beh.MISSILE,
 	&"battleship": Enemy.Beh.BATTLESHIP, &"drift": Enemy.Beh.DRIFT}
@@ -81,6 +85,9 @@ func def_of(type: StringName) -> EnemyDef:
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func tick(_real_dt: float, world_dt: float) -> void:
+	if profile_tick_hook.is_valid():
+		profile_tick_hook.call(_real_dt, world_dt)
+		return
 	if world_dt <= 0.0:
 		return
 	_update_aim(world_dt)
@@ -365,33 +372,48 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 				_spawn_wave(t, t.pop - alive)
 
 var _type_counts: Dictionary = {}
+var _far_enemies: Array[Enemy] = []
 
 ## 1回の走査で、外周の辺ごとの数・種類ごとの数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
 ## 戻り値は再配置の範囲の中の通常の敵の数。
 func _survey() -> int:
-	_edge_counts = [0, 0, 0, 0]
-	_type_counts = {}
+	if profile_survey_hook.is_valid():
+		return profile_survey_hook.call()
+	_edge_counts.fill(0)
+	_type_counts.clear()
+	var battleships := 0
+	var titans := 0
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
 	var alive := 0
-	var far: Array = []
+	var center_x := vh.x * 0.45
+	var center_y := vh.y * 0.45
+	_far_enemies.clear()
 	for e: Enemy in list:
 		if e.dead or e.is_boss or e.meteor_index >= 0:
 			continue
-		_type_counts[e.type] = _type_counts.get(e.type, 0) + 1
+		# 種類別上限を使う2種類だけ集計。全種類の辞書更新は不要。
+		var type := e.type
+		if type == &"battleship":
+			battleships += 1
+		elif type == &"titan":
+			titans += 1
 		var rel := e.pos - vc
 		if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
-			far.append(e)
+			_far_enemies.append(e)
 			continue
 		alive += 1
-		var dx := rel.x / vh.x
-		var dy := rel.y / vh.y
-		if maxf(absf(dx), absf(dy)) < 0.45:
+		var ax := absf(rel.x)
+		var ay := absf(rel.y)
+		if ax < center_x and ay < center_y:
 			continue
-		var side := (0 if dx < 0.0 else 1) if absf(dx) > absf(dy) else (2 if dy < 0.0 else 3)
+		# 正規化した距離の比較を交差乗算にし、個体ごとの除算を省く。
+		var side := (0 if rel.x < 0.0 else 1) if ax * vh.y > ay * vh.x else (2 if rel.y < 0.0 else 3)
 		_edge_counts[side] += 1
-	for e: Enemy in far:
+	_type_counts[&"battleship"] = battleships
+	_type_counts[&"titan"] = titans
+	for e: Enemy in _far_enemies:
 		if _recycle(e):
 			alive += 1
 	return alive

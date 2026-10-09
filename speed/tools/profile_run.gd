@@ -16,6 +16,9 @@ var counts := {"enemies": 0.0, "hostile": 0.0, "friendly": 0.0, "gems": 0.0}
 var options: Dictionary = {}
 var saved_rd: RenderingDevice
 var attacked := false
+var detail: RefCounted
+var timeline: Array = []
+var last_totals: Dictionary = {}
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -68,6 +71,8 @@ func _ready() -> void:
 				child.environment.glow_enabled = false
 	if options.get("background", "on") == "off":
 		render._layers.background.draw_fn = func(_c): pass
+		if render.get("_star_batch") != null:
+			render._star_batch.hide()
 	if options.has("hz"):
 		Engine.physics_ticks_per_second = int(options.hz)
 	for key in render._layers:
@@ -78,6 +83,11 @@ func _ready() -> void:
 	run.profile.clear()
 	drawing_times.clear()
 	run.profiling = true
+	if options.get("detail", "off") == "on":
+		detail = preload("res://tools/profile_enemy_detail.gd").new()
+		detail.m = run.enemies
+		run.enemies.profile_tick_hook = detail.tick
+		run.enemies.profile_survey_hook = detail.survey
 	previous_us = Time.get_ticks_usec()
 	start_us = previous_us
 	measuring = true
@@ -112,6 +122,19 @@ func _process(_delta: float) -> void:
 	var now := Time.get_ticks_usec()
 	frames.append((now - previous_us) / 1000.0)
 	previous_us = now
+	var row := {"elapsed_ms": (now - start_us) / 1000.0, "frame_ms": frames[-1], "managers": {}, "drawing": {}}
+	for key in run.profile:
+		var rec: Array = run.profile[key]
+		var prev: Array = last_totals.get(key, [0, 0])
+		row.managers[key] = {"ms": (rec[0] - prev[0]) / 1000.0, "calls": rec[1] - prev[1]}
+		last_totals[key] = [rec[0], rec[1]]
+	for key in drawing_times:
+		var rec: Array = drawing_times[key]
+		var label: String = "draw:" + key
+		var prev: Array = last_totals.get(label, [0, 0])
+		row.drawing[key] = {"ms": (rec[0] - prev[0]) / 1000.0, "calls": rec[1] - prev[1]}
+		last_totals[label] = [rec[0], rec[1]]
+	timeline.append(row)
 	if options.get("attack", "off") == "on" and not attacked and now - start_us > 1500000:
 		attacked = true
 		var p := run.state.ship_pos
@@ -158,14 +181,22 @@ func _finish(seconds: float) -> void:
 		"frame_ms": _stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
 		"draw_calls": _stats(draws), "counts": counts, "managers": manager_ms, "drawing_ms_frame": draw_ms,
 		"phase": run.state.phase, "time": run.state.time, "world_time": run.state.world_time, "weapons": run.state.weapons}
+	result.timeline = timeline
+	if detail != null:
+		result.enemy_detail = detail.summary()
 	result.kills = run.state.kills
 	if gpu_times[-1] <= 0.0:
 		result.gpu_viewport_ms = {"available": false}
 	print("PROFILE_RESULT ", JSON.stringify(result))
+	if options.has("capture"):
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(options.capture)
 	if saved_rd != null:
 		render.pipeline.sparks.rd = saved_rd
 	set_process(false)
 	run.profiling = false
+	run.enemies.profile_tick_hook = Callable()
+	run.enemies.profile_survey_hook = Callable()
 	# ランと描画リソースの後始末を、通常のノード削除で済ませてから閉じる。
 	run.get_parent().get_parent().queue_free()
 	await get_tree().process_frame
