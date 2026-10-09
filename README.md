@@ -26,7 +26,7 @@ godot --editor --path speed
 |---|---|
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
-| `docs/game/` | 本番の資料：[トリートメント](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
+| `docs/game/` | 本番の資料：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
 | `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/logs/` | 本番の作業ログ：ユーザーごとの履歴、報告書 |
 | `docs/art/` | 本番の画像の資料 |

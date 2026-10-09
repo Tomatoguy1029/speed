@@ -7,7 +7,7 @@
 | 武器 | [weapons.md](weapons.md) | [demoの武器](../../../demo/docs/weapons.md) |
 | 特性 | [traits.md](traits.md) | [demoの特性](../../../demo/docs/traits.md) |
 | 敵 | [enemies.md](enemies.md) | [demoの敵](../../../demo/docs/enemies.md) |
-| 共通仕様・設計 | [トリートメント](../treatment.md)・[世界観とストーリー](../world.md)・[デザインとアートスタイル](../art-style.md)・[仕様書](../spec.md)・[設計書](../architecture.md) | [仕様](../../../demo/docs/spec.md)・[共通設計](../../../demo/docs/module-plan.md) |
+| 共通仕様・設計 | [企画書](../treatment.md)・[世界観とストーリー](../world.md)・[デザインとアートスタイル](../art-style.md)・[仕様書](../spec.md)・[設計書](../architecture.md) | [仕様](../../../demo/docs/spec.md)・[共通設計](../../../demo/docs/module-plan.md) |
 | 未解決課題 | [backlog.md](../backlog.md) | [demoの課題](../../../demo/docs/backlog.md) |
 
 本番へ取り入れると決めた項目は本番の一覧に登録し、demoの元項目へリンクする。同じ項目は管理IDを引き継ぐ。demoにあるだけの案・実装・数値を、本番の採用済み・実装済みとして転記しない。片方だけの仕様変更はもう片方へ自動適用せず、必要な差分を明記する。

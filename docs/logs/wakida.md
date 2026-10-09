@@ -160,3 +160,5 @@ Godot 本番の要望・作業内容・決定事項を日付と番号付きで�
 153. 「design という名前で設計の話、visual-direction でアートスタイルというのも直感的でなくて変」→ 設計書を docs/game/architecture.md、デザインとアートスタイルを docs/game/art-style.md に名前を変え、リポジトリ内のリンクとパスを直した（2026-10-09）。
 
 154. 「スキルや武器など量産系は、基盤的なドキュメントとは階層を分けて」→ 武器・特性・敵の一覧と一覧の運用ルールを docs/game/catalog/ に移した（catalog.md は catalog/rules.md）。基盤の文書（トリートメント・世界観とストーリー・デザインとアートスタイル・仕様書・設計書・課題）は docs/game/ に残す。リンクとパス（コードのコメント、AGENTS.md、README、demo/docs/catalog.md を含む）を直し、AGENTS.md と README のフォルダの説明を更新（2026-10-09）。
+
+155. 「見出しはトリートメントではなく企画書」→ docs/game/treatment.md の見出しと、AGENTS.md・README・設計書・一覧の運用ルールでの呼び名を「企画書」に戻した。ファイル名は treatment.md のまま（2026-10-09）。
