@@ -8,7 +8,7 @@ extends Node
 const XP_COLOR := Color("#b8a0ff")
 const XP_OUTLINE := Color("#39265e")
 const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
-	"leech", "gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
+	"gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")

@@ -21,7 +21,6 @@ mix = {
 "darter": 3.0,
 "armored": 2.2,
 "gunner": 1.1,
-"leech": 1.5,
 "splitter": 1.5,
 "titan": 0.3
 }

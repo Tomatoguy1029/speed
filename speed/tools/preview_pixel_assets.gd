@@ -28,7 +28,7 @@ func _preview() -> void:
 		run.field.moons[i].pos = Vector2(530 + 220 * i, 300)
 		run.field.moons[i].r = 85.0
 	run.enemies.list.clear()
-	var ids := ["splitling", "swarm", "drifter", "darter", "gunner", "leech",
+	var ids := ["splitling", "swarm", "drifter", "darter", "gunner",
 		"splitter", "missile", "armored", "titan", "battleship"]
 	for i in ids.size():
 		var definition := run.enemies.def_of(StringName(ids[i]))

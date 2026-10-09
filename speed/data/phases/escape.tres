@@ -21,7 +21,6 @@ mix = {
 "armored": 3.0,
 "gunner": 2.0,
 "missile": 1.6,
-"leech": 2.0,
 "splitter": 1.5,
 "swarm": 3.0,
 "titan": 2.0,

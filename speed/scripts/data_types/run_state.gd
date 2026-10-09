@@ -38,8 +38,6 @@ var ship_invuln := 0.0
 var ship_hurt := 0.0
 ## なぞり終えたあとの勢いがあるか（仕様書 6.6）
 var glide := false
-## 減速型のオーラによる抵抗（毎更新で集計し直す）
-var leech_drag := 0.0
 ## 能力値（基礎値・レベル・特性・強化から計算する。BuildManager が更新する）
 var stats := ShipStats.new()
 

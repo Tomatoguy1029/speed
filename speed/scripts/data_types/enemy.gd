@@ -4,7 +4,7 @@ extends RefCounted
 
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの。更新の高速化のため）
-enum Beh { CHASE, DASH, SPLIT, LEECH, GUNNER, MISSILE, BATTLESHIP, DRIFT }
+enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT }
 
 var id := 0
 var def: EnemyDef

@@ -8,6 +8,18 @@
 
 ## 通常敵
 
+### 減速型Leechの廃止（2026-10-09）
+
+ShueMaker70969 が、近くを通るだけで減速する仕組みは速度を軸にしたゲームでストレスになるとして削除を指定した。Leechを全出現フェーズと敵定義から除外し、減速オーラ・接触時の速度吸収の実装も削除。以下の採用・実装の説明は作業当時の履歴であり、現在の採用状態は廃止区分を参照。demoは今回の対象外。
+
+## 廃止
+
+| type ID | 名称 | 採用状態 | 実装状況 | 理由・参照 |
+|---|---|---|---|---|
+| `leech` | 減速型／リーチ | 不採用（廃止） | 本番の定義・出現・減速処理を削除済み | 近接するだけで減速するストレスを避けるため。旧実装はコミット `7281ad9` の `speed/data/enemies/leech.tres`・`enemy_manager.gd`・`combat_manager.gd`。IDは再利用しない。[demoの旧仕様](../../../demo/docs/enemies.md)は変更していない |
+
+## 通常敵の変更履歴
+
 ### キャラクター全体の拡大（2026-10-09）
 
 ShueMaker70969 の指定で通常敵全種とボスの表示・当たり判定へ共通倍率を適用した。倍率は `speed/data/config.tres` の `character_scale`。各敵・ボス `.tres` の基礎半径とHP・装甲・速度・攻撃力は維持する。手描き素材の敵はエリートも同じ基準サイズのまま共通倍率を適用。検索用半径も同configの `max_enemy_radius` へ反映した。隕石はこの倍率の対象外。自機・ドローンの拡大と合わせた変更で、以前の原寸表示は旧実装時点の記録。
@@ -114,7 +126,6 @@ ShueMaker70969 が、輪郭で種類を区別する／特性を示す主要な�
 | `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../../../demo/docs/enemies.md) |
 | `splitter` | 分裂型 | 採用 | 実装済み | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも2体に分かれる | 無双期以外 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md) |
 | `splitling` | 分裂体 | 採用 | 実装済み | 小型の追跡敵 | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../../../demo/docs/enemies.md) |
-| `leech` | 減速型 | 採用 | 実装済み | 周りのオーラの中で機体を減速させる。貫くと勢いを吸う | 圧力期・緊張期・脱出期 | `scripts/managers/enemy_manager.gd`、`data/enemies/leech.tres`。[demo](../../../demo/docs/enemies.md) |
 | `gunner` | 射撃型 | 採用 | 実装済み | 距離を保って回り込み、予告のあと弾を撃つ | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md) |
 | `missile` | ミサイル艇 | 採用 | 実装済み | さらに遠い距離を保ち、予告のあと誘導弾を撃つ | 緊張期・脱出期、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md) |
 | `battleship` | 戦艦 | 採用 | 実装済み | 予告のあと扇状に弾をばらまく。背面に当てると必ずクリティカル。エリートにならない | 緊張期・脱出期。同時に出る数に上限 | `scripts/managers/enemy_manager.gd`、`data/enemies/battleship.tres`。[demo](../../../demo/docs/enemies.md) |

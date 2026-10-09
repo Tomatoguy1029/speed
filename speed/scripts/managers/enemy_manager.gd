@@ -10,7 +10,7 @@ var projectiles: ProjectileManager
 var bosses: BossManager
 
 const BEH := {&"chase": Enemy.Beh.CHASE, &"dash": Enemy.Beh.DASH, &"split": Enemy.Beh.SPLIT,
-	&"leech": Enemy.Beh.LEECH, &"gunner": Enemy.Beh.GUNNER, &"missile": Enemy.Beh.MISSILE,
+	&"gunner": Enemy.Beh.GUNNER, &"missile": Enemy.Beh.MISSILE,
 	&"battleship": Enemy.Beh.BATTLESHIP, &"drift": Enemy.Beh.DRIFT}
 
 var list: Array = []
@@ -83,7 +83,6 @@ func def_of(type: StringName) -> EnemyDef:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
-	state.leech_drag = 0.0
 	_update_aim(world_dt)
 	var dt := world_dt
 	var aim := state.enemy_aim
@@ -160,12 +159,6 @@ func _update(e: Enemy, dt: float) -> void:
 			Enemy.Beh.SPLIT:
 				_chase(e, dt)
 				_split(e, dt)
-			Enemy.Beh.LEECH:
-				_chase(e, dt)
-				var d := state.ship_pos.distance_to(e.pos)
-				var aura: float = e.def.params.aura_r
-				if d < aura:
-					state.leech_drag += float(e.def.params.drain) * (1.0 - d / aura * 0.5)
 			Enemy.Beh.GUNNER:
 				_keep_distance(e, dt)
 				if _gun_timer(e, dt):

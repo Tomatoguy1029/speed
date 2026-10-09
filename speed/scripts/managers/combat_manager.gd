@@ -111,10 +111,6 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			if not (state.glide or state.tracing):
 				state.ship_vel *= _pierce_keep(e)
 			build.on_contact(e, hit_pos, dir)
-			if e.def != null and e.def.params.has("steal"):
-				state.glide = false
-				state.ship_vel *= 1.0 - float(e.def.params.steal)
-				state.emit(&"drain", {"pos": e.pos})
 			if crit:
 				state.hitstop = maxf(state.hitstop, 0.05 if e.dead else 0.035)
 			continue

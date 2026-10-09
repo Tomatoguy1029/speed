@@ -31,7 +31,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 		return
 	_steer(world_dt)
 	var from := state.ship_pos
-	var drag := field.dust_drag_at(from) + state.leech_drag
+	var drag := field.dust_drag_at(from)
 	_step(world_dt, field.boundary_accel(from), drag)
 	combat.collide_ship(from, cfg.ship_radius, null)
 	if state.phase != RunState.Phase.PLAY:
