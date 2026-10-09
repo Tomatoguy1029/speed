@@ -83,6 +83,24 @@ func _preview() -> void:
 		state.tracing = not state.drawing
 		state.draw_points = points
 		state.trace_path = points
+	if "--smoothing-preview" in OS.get_cmdline_user_args():
+		run.enemies.list.clear()
+		state.phase = RunState.Phase.PLAY
+		state.drawing = true
+		state.tracing = false
+		state.draw_limit = 10000.0
+		state.draw_length = 0.0
+		var raw := PackedVector2Array()
+		for i in 101:
+			raw.append(Vector2(-400 + i * 8, sin(i * 0.07) * 45 + sin(i * 1.7) * 2))
+		state.draw_points = PackedVector2Array([raw[0]])
+		for i in range(1, raw.size()):
+			run.draw._extend(raw[i])
+		var original := DrawLayer.new()
+		original.z_index = 12
+		original.draw_fn = func(c): c.draw_polyline(raw, Color("#c8f7ff"), 3.0)
+		original.position.y = -160.0
+		game.get_node("World").add_child(original)
 	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:

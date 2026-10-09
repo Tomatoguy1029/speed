@@ -112,6 +112,31 @@ func _extend(to: Vector2) -> void:
 		return
 	state.draw_points.append(last + u * L)
 	state.draw_length += L
+	_smooth_last_corner()
+
+## 試用中：端点と鋭い折り返しを保ち、細かな揺れだけ最大2.5画面px抑える。
+func _smooth_last_corner() -> void:
+	var pts := state.draw_points
+	if pts.size() < 3:
+		return
+	var i := pts.size() - 2
+	var a := pts[i - 1]
+	var b := pts[i]
+	var c := pts[i + 1]
+	if (b - a).normalized().dot((c - b).normalized()) < 0.5:
+		return
+	var offset := ((a + c) * 0.5 - b) * 0.5
+	offset = offset.limit_length(2.5 / maxf(state.camera_zoom, 0.01))
+	var corrected := b + offset
+	# 補正で障害物へ入り込む形には変えない。
+	if field.first_body_hit(a, corrected, cfg.ship_radius) != null \
+		or field.first_body_hit(corrected, c, cfg.ship_radius) != null:
+		return
+	var old_length := a.distance_to(b) + b.distance_to(c)
+	var new_length := a.distance_to(corrected) + corrected.distance_to(c)
+	pts[i] = corrected
+	state.draw_points = pts
+	state.draw_length += new_length - old_length
 
 ## 線を確定して、なぞりを始める（仕様書 6.3〜4.5）。
 func _commit(it: Intent) -> void:
