@@ -58,6 +58,9 @@ func _ready() -> void:
 	run.input.set_process_input(false)
 	run.input.set_process_unhandled_input(false)
 	run.state.time = float(options.get("time", "10"))
+	if options.has("enemies"):
+		run.enemies.debug_spawn_random(int(options.enemies))
+		run.combat.rebuild_grid()
 	if options.has("size") and DisplayServer.get_name() != "headless":
 		var size := String(options.size).split("x")
 		DisplayServer.window_set_size(Vector2i(int(size[0]), int(size[1])))
@@ -185,6 +188,8 @@ func _finish(seconds: float) -> void:
 	if detail != null:
 		result.enemy_detail = detail.summary()
 	result.kills = run.state.kills
+	if options.get("body_benchmark", "off") == "on":
+		result.body_benchmark = _benchmark_bodies()
 	if gpu_times[-1] <= 0.0:
 		result.gpu_viewport_ms = {"available": false}
 	print("PROFILE_RESULT ", JSON.stringify(result))
@@ -202,3 +207,37 @@ func _finish(seconds: float) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	get_tree().quit()
+
+## 同じ弾の位置で旧方式と格子方式を交互に測る。ランの状態は変更しない。
+func _benchmark_bodies() -> Dictionary:
+	var old_ms: Array[float] = []
+	var grid_ms: Array[float] = []
+	for sample in 20:
+		for mode in 2:
+			var start := Time.get_ticks_usec()
+			for s: Shot in run.projectiles.hostile:
+				var from := s.pos - s.vel / 120.0
+				if (sample + mode) % 2 == 0:
+					_old_body_hit(from, s.pos, s.r)
+				else:
+					run.field.first_body_hit(from, s.pos, s.r)
+			var elapsed := (Time.get_ticks_usec() - start) / 1000.0
+			if (sample + mode) % 2 == 0:
+				old_ms.append(elapsed)
+			else:
+				grid_ms.append(elapsed)
+	return {"bullets": run.projectiles.hostile.size(), "old_ms": _stats(old_ms), "grid_ms": _stats(grid_ms)}
+
+func _old_body_hit(p0: Vector2, p1: Vector2, radius: float) -> Variant:
+	var found = null
+	var earliest := INF
+	for b: FieldManager.Body in run.field.bodies:
+		var rr := b.r + radius
+		if maxf(p0.x, p1.x) < b.pos.x - rr or minf(p0.x, p1.x) > b.pos.x + rr \
+				or maxf(p0.y, p1.y) < b.pos.y - rr or minf(p0.y, p1.y) > b.pos.y + rr:
+			continue
+		var t := Geom.seg_circle_t(p0, p1, b.pos, rr)
+		if t >= 0.0 and t < earliest:
+			earliest = t
+			found = {"body": b, "t": t, "point": p0.lerp(p1, t)}
+	return found

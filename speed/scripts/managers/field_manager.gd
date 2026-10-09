@@ -37,6 +37,11 @@ var bodies: Array[Body] = []
 ## 月の軌道半径・大きさはラン中固定。半径帯ごとに確認候補を保持する。
 const MOON_BAND_SIZE := 256.0
 var _moon_bands: Array[Array] = []
+const BODY_CELL_SIZE := 512.0
+var _body_cells: Array[Array] = []
+var _body_used: Array[int] = []
+var _body_origin := Vector2.ZERO
+var _body_width := 0
 ## 宇宙塵の雲（中心と半径）
 var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
@@ -62,6 +67,13 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 		var d := rng.randf_range(cfg.planet_radius + 600.0, cfg.field_radius - 200.0)
 		dust.append(Vector3(cos(a) * d, sin(a) * d, rng.randf_range(250.0, 620.0)))
 	_build_moon_bands()
+	_body_origin = Vector2.ONE * (-cfg.field_radius - BODY_CELL_SIZE)
+	_body_width = ceili((cfg.field_radius * 2.0 + BODY_CELL_SIZE * 2.0) / BODY_CELL_SIZE)
+	_body_cells.clear()
+	_body_cells.resize(_body_width * _body_width)
+	for i in _body_cells.size():
+		_body_cells[i] = []
+	_body_used.clear()
 	_place_rocks(rng)
 	_update_moons()
 
@@ -169,6 +181,19 @@ func _update_moons() -> void:
 	for m in moons:
 		var a := m.a0 + m.dir * cfg.moon_orbit_speed * state.world_time
 		m.pos = Vector2(cos(a), sin(a)) * m.orbit
+	# 少数の天体を格子へ登録し、各弾が全天体を調べることを避ける。
+	for cell in _body_used:
+		_body_cells[cell].clear()
+	_body_used.clear()
+	for b in bodies:
+		var lo := Vector2i(((b.pos - Vector2.ONE * b.r - _body_origin) / BODY_CELL_SIZE).floor())
+		var hi := Vector2i(((b.pos + Vector2.ONE * b.r - _body_origin) / BODY_CELL_SIZE).floor())
+		for y in range(maxi(0, lo.y), mini(_body_width - 1, hi.y) + 1):
+			for x in range(maxi(0, lo.x), mini(_body_width - 1, hi.x) + 1):
+				var cell := y * _body_width + x
+				if _body_cells[cell].is_empty():
+					_body_used.append(cell)
+				_body_cells[cell].append(b)
 
 ## 中心からの距離 r の危険度（0〜1）。中間の環で 0、惑星の表面と外縁に向かって 1。
 func danger_at(r: float) -> float:
@@ -194,18 +219,27 @@ func boundary_accel(p: Vector2) -> Vector2:
 ## 線分 p0→p1（太さ radius）が最初に当たる障害物。当たらなければ null。
 ## 戻り値は { body, t, point }。
 func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
-	var found = null
+	var found: Body = null
 	var earliest := INF
-	for b in bodies:
-		var rr := b.r + radius
-		if maxf(p0.x, p1.x) < b.pos.x - rr or minf(p0.x, p1.x) > b.pos.x + rr \
-				or maxf(p0.y, p1.y) < b.pos.y - rr or minf(p0.y, p1.y) > b.pos.y + rr:
-			continue
-		var t := Geom.seg_circle_t(p0, p1, b.pos, rr)
-		if t >= 0.0 and t < earliest:
-			earliest = t
-			found = {"body": b, "t": t, "point": p0.lerp(p1, t)}
-	return found
+	var lo := Vector2i(((p0.min(p1) - Vector2.ONE * radius - _body_origin) / BODY_CELL_SIZE).floor())
+	var hi := Vector2i(((p0.max(p1) + Vector2.ONE * radius - _body_origin) / BODY_CELL_SIZE).floor())
+	# 長い描画経路は全7天体の走査の方が安い。弾の短い線分は格子で候補を絞る。
+	if lo.x < 0 or lo.y < 0 or hi.x >= _body_width or hi.y >= _body_width \
+			or (hi.x - lo.x + 1) * (hi.y - lo.y + 1) > 4:
+		for b in bodies:
+			var t := Geom.seg_circle_t(p0, p1, b.pos, b.r + radius)
+			if t >= 0.0 and t < earliest:
+				earliest = t
+				found = b
+	else:
+		for y in range(lo.y, hi.y + 1):
+			for x in range(lo.x, hi.x + 1):
+				for b: Body in _body_cells[y * _body_width + x]:
+					var t := Geom.seg_circle_t(p0, p1, b.pos, b.r + radius)
+					if t >= 0.0 and t < earliest:
+						earliest = t
+						found = b
+	return null if found == null else {"body": found, "t": earliest, "point": p0.lerp(p1, earliest)}
 
 ## 点 p を障害物の外へ押し出した位置（線の描き始めなどに使う）。
 func push_out(p: Vector2, margin: float) -> Vector2:

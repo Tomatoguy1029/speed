@@ -234,11 +234,13 @@ func _chase(e: Enemy, dt: float) -> void:
 	var cycle := fmod(e.age + e.roam_phase, cfg.enemy_approach_cycle)
 	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / cfg.enemy_approach_blend,
 		(cfg.enemy_approach_cycle - cycle) / cfg.enemy_approach_blend), 0.0, 1.0)
-	var ang := e.roam_angle + e.age * cfg.enemy_roam_turn
-	var u := Vector2(cos(ang), sin(ang))
-	var edge := e.roam_radius / maxf(absf(u.x), absf(u.y))
-	var roam_target := state.view_center + Vector2(u.x * edge * state.view_half.x, u.y * edge * state.view_half.y)
-	var target := aim + (roam_target - aim) * roam
+	var target := aim
+	if roam > 0.0:
+		var ang := e.roam_angle + e.age * cfg.enemy_roam_turn
+		var u := Vector2(cos(ang), sin(ang))
+		var edge := e.roam_radius / maxf(absf(u.x), absf(u.y))
+		var roam_target := state.view_center + Vector2(u.x * edge * state.view_half.x, u.y * edge * state.view_half.y)
+		target = aim + (roam_target - aim) * roam
 	_steer_to(e, target, e.speed, e.accel, dt)
 	_turn_toward(e, (aim - e.pos).angle(), e.turn, dt)
 

@@ -172,7 +172,13 @@ func _update_hostile(dt: float) -> void:
 		s.pos += s.vel * dt
 		s.life -= dt
 		var body_hit = field.first_body_hit(from, s.pos, s.r)
-		var t := Geom.seg_circle_t(from, s.pos, state.ship_pos, s.r + R)
+		# 遠くの弾は安い線分の矩形判定で除外。高速な弾も線分全体を確認する。
+		var rr := s.r + R
+		var ship_pos := state.ship_pos
+		var t := -1.0
+		if ship_pos.x >= minf(from.x, s.pos.x) - rr and ship_pos.x <= maxf(from.x, s.pos.x) + rr \
+				and ship_pos.y >= minf(from.y, s.pos.y) - rr and ship_pos.y <= maxf(from.y, s.pos.y) + rr:
+			t = Geom.seg_circle_t(from, s.pos, ship_pos, rr)
 		if t >= 0.0 and (body_hit == null or t < body_hit.t):
 			ship.damage(s.dmg, s.slow, s.kind)
 			s.life = 0.0

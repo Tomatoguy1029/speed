@@ -1,0 +1,857 @@
+{
+  "before": {
+    "counts": {
+      "enemies": 603.48275862069,
+      "friendly": 0.103448275862069,
+      "gems": 0.0689655172413793,
+      "hostile": 975.344827586207
+    },
+    "draw_calls": {
+      "max": 1635.0,
+      "mean": 1542.65517241379,
+      "p95": 1631.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.013448275862069,
+      "dim": 0.00227586206896552,
+      "enemies": 2.55455172413793,
+      "exhaust": 0.0236206896551724,
+      "field": 0.388586206896552,
+      "fx": 0.141689655172414,
+      "path": 0.00744827586206897,
+      "pickups": 0.341827586206897,
+      "projectiles": 31.8547586206897,
+      "ship": 0.0311724137931035,
+      "top": 0.00186206896551724
+    },
+    "fps": 7.15777917313335,
+    "frame_ms": {
+      "max": 185.972,
+      "mean": 139.708137931035,
+      "p95": 157.943
+    },
+    "frames": 29,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 3,
+    "managers": {
+      "bosses": {
+        "calls": 232,
+        "max_tick_ms": 0.045,
+        "ms_frame": 0.0617241379310345,
+        "ms_tick": 0.00771551724137931
+      },
+      "build": {
+        "calls": 232,
+        "max_tick_ms": 0.15,
+        "ms_frame": 0.194758620689655,
+        "ms_tick": 0.0243448275862069
+      },
+      "cleanup": {
+        "calls": 232,
+        "max_tick_ms": 0.297,
+        "ms_frame": 0.0572068965517241,
+        "ms_tick": 0.00715086206896552
+      },
+      "combat": {
+        "calls": 232,
+        "max_tick_ms": 0.007,
+        "ms_frame": 0.0235862068965517,
+        "ms_tick": 0.00294827586206897
+      },
+      "draw": {
+        "calls": 232,
+        "max_tick_ms": 0.068,
+        "ms_frame": 0.0391379310344828,
+        "ms_tick": 0.00489224137931034
+      },
+      "enemies": {
+        "calls": 232,
+        "max_tick_ms": 8.54,
+        "ms_frame": 33.2154482758621,
+        "ms_tick": 4.15193103448276
+      },
+      "field": {
+        "calls": 232,
+        "max_tick_ms": 1.474,
+        "ms_frame": 0.811,
+        "ms_tick": 0.101375
+      },
+      "grid": {
+        "calls": 232,
+        "max_tick_ms": 1.525,
+        "ms_frame": 4.48144827586207,
+        "ms_tick": 0.560181034482759
+      },
+      "pickups": {
+        "calls": 232,
+        "max_tick_ms": 0.426,
+        "ms_frame": 0.269344827586207,
+        "ms_tick": 0.0336681034482759
+      },
+      "play_total": {
+        "calls": 232,
+        "max_tick_ms": 26.401,
+        "ms_frame": 88.9655517241379,
+        "ms_tick": 11.1206939655172
+      },
+      "projectiles": {
+        "calls": 232,
+        "max_tick_ms": 18.359,
+        "ms_frame": 40.6308275862069,
+        "ms_tick": 5.07885344827586
+      },
+      "ship": {
+        "calls": 232,
+        "max_tick_ms": 0.608,
+        "ms_frame": 0.947275862068966,
+        "ms_tick": 0.118409482758621
+      },
+      "spawner": {
+        "calls": 232,
+        "max_tick_ms": 2.719,
+        "ms_frame": 7.26027586206897,
+        "ms_tick": 0.907534482758621
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 3.49200010299683,
+      "mean": 1.31413793563843,
+      "p95": 1.6690000295639
+    },
+    "seconds": 4.051536,
+    "time": 17.8666666666662,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 7.86666666666685
+  },
+  "batch": {
+    "counts": {
+      "enemies": 604.255319148936,
+      "friendly": 0.0,
+      "gems": 0.0,
+      "hostile": 1002.68085106383
+    },
+    "draw_calls": {
+      "max": 123.0,
+      "mean": 105.553191489362,
+      "p95": 119.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.0127446808510638,
+      "dim": 0.00334042553191489,
+      "enemies": 2.25159574468085,
+      "exhaust": 0.0222765957446808,
+      "field": 0.227276595744681,
+      "fx": 0.00919148936170213,
+      "path": 0.00423404255319149,
+      "pickups": 0.172489361702128,
+      "projectiles": 1.11287234042553,
+      "ship": 0.0212127659574468,
+      "top": 0.00119148936170213
+    },
+    "fps": 11.6072052591012,
+    "frame_ms": {
+      "max": 117.567,
+      "mean": 86.1533829787234,
+      "p95": 106.934
+    },
+    "frames": 47,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 1,
+    "managers": {
+      "bosses": {
+        "calls": 376,
+        "max_tick_ms": 0.742,
+        "ms_frame": 0.062936170212766,
+        "ms_tick": 0.00786702127659574
+      },
+      "build": {
+        "calls": 376,
+        "max_tick_ms": 0.338,
+        "ms_frame": 0.180191489361702,
+        "ms_tick": 0.0225239361702128
+      },
+      "cleanup": {
+        "calls": 376,
+        "max_tick_ms": 0.467,
+        "ms_frame": 0.058531914893617,
+        "ms_tick": 0.00731648936170213
+      },
+      "combat": {
+        "calls": 376,
+        "max_tick_ms": 0.02,
+        "ms_frame": 0.0224468085106383,
+        "ms_tick": 0.00280585106382979
+      },
+      "draw": {
+        "calls": 376,
+        "max_tick_ms": 0.039,
+        "ms_frame": 0.0404042553191489,
+        "ms_tick": 0.00505053191489362
+      },
+      "enemies": {
+        "calls": 376,
+        "max_tick_ms": 8.331,
+        "ms_frame": 30.0045957446808,
+        "ms_tick": 3.75057446808511
+      },
+      "field": {
+        "calls": 376,
+        "max_tick_ms": 0.391,
+        "ms_frame": 0.674957446808511,
+        "ms_tick": 0.0843696808510638
+      },
+      "grid": {
+        "calls": 376,
+        "max_tick_ms": 1.395,
+        "ms_frame": 3.94985106382979,
+        "ms_tick": 0.493731382978723
+      },
+      "pickups": {
+        "calls": 376,
+        "max_tick_ms": 0.126,
+        "ms_frame": 0.222340425531915,
+        "ms_tick": 0.0277925531914894
+      },
+      "play_total": {
+        "calls": 376,
+        "max_tick_ms": 17.594,
+        "ms_frame": 80.1734680851064,
+        "ms_tick": 10.0216835106383
+      },
+      "projectiles": {
+        "calls": 376,
+        "max_tick_ms": 11.986,
+        "ms_frame": 36.8580425531915,
+        "ms_tick": 4.60725531914894
+      },
+      "ship": {
+        "calls": 376,
+        "max_tick_ms": 0.793,
+        "ms_frame": 0.862510638297872,
+        "ms_tick": 0.107813829787234
+      },
+      "spawner": {
+        "calls": 376,
+        "max_tick_ms": 2.654,
+        "ms_frame": 6.45846808510638,
+        "ms_tick": 0.807308510638298
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 1.26300001144409,
+      "mean": 0.278191490376249,
+      "p95": 0.351000010967255
+    },
+    "seconds": 4.049209,
+    "time": 19.0583333333328,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 9.05833333333346
+  },
+  "grid": {
+    "counts": {
+      "enemies": 604.720588235294,
+      "friendly": 0.0,
+      "gems": 0.0,
+      "hostile": 955.75
+    },
+    "draw_calls": {
+      "max": 118.0,
+      "mean": 103.455882352941,
+      "p95": 114.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.0117794117647059,
+      "dim": 0.00182352941176471,
+      "enemies": 2.04447058823529,
+      "exhaust": 0.0204852941176471,
+      "field": 0.212573529411765,
+      "fx": 0.00760294117647059,
+      "path": 0.00335294117647059,
+      "pickups": 0.124544117647059,
+      "projectiles": 1.00072058823529,
+      "ship": 0.0175441176470588,
+      "top": 0.00126470588235294
+    },
+    "fps": 16.8627707714618,
+    "frame_ms": {
+      "max": 94.006,
+      "mean": 59.3022352941176,
+      "p95": 77.456
+    },
+    "frames": 68,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 0,
+    "managers": {
+      "bosses": {
+        "calls": 468,
+        "max_tick_ms": 0.014,
+        "ms_frame": 0.0344411764705882,
+        "ms_tick": 0.0050042735042735
+      },
+      "build": {
+        "calls": 468,
+        "max_tick_ms": 0.093,
+        "ms_frame": 0.127632352941176,
+        "ms_tick": 0.0185448717948718
+      },
+      "cleanup": {
+        "calls": 468,
+        "max_tick_ms": 0.381,
+        "ms_frame": 0.0310882352941176,
+        "ms_tick": 0.00451709401709402
+      },
+      "combat": {
+        "calls": 468,
+        "max_tick_ms": 0.009,
+        "ms_frame": 0.0165588235294118,
+        "ms_tick": 0.00240598290598291
+      },
+      "draw": {
+        "calls": 468,
+        "max_tick_ms": 0.018,
+        "ms_frame": 0.0331470588235294,
+        "ms_tick": 0.00481623931623932
+      },
+      "enemies": {
+        "calls": 468,
+        "max_tick_ms": 9.543,
+        "ms_frame": 23.8111911764706,
+        "ms_tick": 3.45974572649573
+      },
+      "field": {
+        "calls": 468,
+        "max_tick_ms": 0.959,
+        "ms_frame": 0.698735294117647,
+        "ms_tick": 0.101525641025641
+      },
+      "grid": {
+        "calls": 468,
+        "max_tick_ms": 1.006,
+        "ms_frame": 3.07464705882353,
+        "ms_tick": 0.44674358974359
+      },
+      "pickups": {
+        "calls": 468,
+        "max_tick_ms": 0.151,
+        "ms_frame": 0.160117647058824,
+        "ms_tick": 0.0232649572649573
+      },
+      "play_total": {
+        "calls": 468,
+        "max_tick_ms": 20.465,
+        "ms_frame": 54.0998235294118,
+        "ms_tick": 7.86065811965812
+      },
+      "projectiles": {
+        "calls": 468,
+        "max_tick_ms": 4.238,
+        "ms_frame": 19.8777058823529,
+        "ms_tick": 2.88821367521368
+      },
+      "ship": {
+        "calls": 468,
+        "max_tick_ms": 0.258,
+        "ms_frame": 0.671823529411765,
+        "ms_tick": 0.0976153846153846
+      },
+      "spawner": {
+        "calls": 468,
+        "max_tick_ms": 4.261,
+        "ms_frame": 5.04204411764706,
+        "ms_tick": 0.732604700854701
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 0.367000013589859,
+      "mean": 0.230852941160693,
+      "p95": 0.291000008583069
+    },
+    "seconds": 4.032552,
+    "time": 19.8249999999994,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 9.82500000000008
+  },
+  "final": {
+    "counts": {
+      "enemies": 605.870967741935,
+      "friendly": 0.0,
+      "gems": 0.0,
+      "hostile": 999.41935483871
+    },
+    "draw_calls": {
+      "max": 111.0,
+      "mean": 99.741935483871,
+      "p95": 106.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.0177096774193548,
+      "dim": 0.0027741935483871,
+      "enemies": 4.20445161290323,
+      "exhaust": 0.0304193548387097,
+      "field": 0.377645161290323,
+      "fx": 0.0176129032258065,
+      "path": 0.0087741935483871,
+      "pickups": 0.281806451612903,
+      "projectiles": 1.82077419354839,
+      "ship": 0.0516774193548387,
+      "top": 0.00196774193548387
+    },
+    "enemy_detail": {
+      "body_collision": {
+        "max_sample_ms": 0.0,
+        "ms_sample": 0.0,
+        "operations": 0,
+        "samples": 15
+      },
+      "chase_target": {
+        "max_sample_ms": 0.986,
+        "ms_sample": 0.502533333333333,
+        "operations": 4380,
+        "samples": 15
+      },
+      "flush_new": {
+        "max_sample_ms": 0.003,
+        "ms_sample": 0.00186666666666667,
+        "operations": 15,
+        "samples": 15
+      },
+      "near_body": {
+        "max_sample_ms": 5.161,
+        "ms_sample": 1.85973333333333,
+        "operations": 9000,
+        "samples": 15
+      },
+      "normal_tick": {
+        "max_sample_ms": 30.521,
+        "ms_sample": 7.01514163090129,
+        "operations": 233,
+        "samples": 233
+      },
+      "position": {
+        "max_sample_ms": 0.29,
+        "ms_sample": 0.1418,
+        "operations": 4380,
+        "samples": 15
+      },
+      "sampled_tick": {
+        "max_sample_ms": 12.329,
+        "ms_sample": 8.01733333333333,
+        "operations": 15,
+        "samples": 15
+      },
+      "special_behavior": {
+        "max_sample_ms": 6.3,
+        "ms_sample": 3.4028,
+        "operations": 4620,
+        "samples": 15
+      },
+      "survey_recycle": {
+        "max_sample_ms": 0.049,
+        "ms_sample": 0.0198,
+        "operations": 11,
+        "samples": 15
+      },
+      "survey_scan": {
+        "max_sample_ms": 1.987,
+        "ms_sample": 1.3172,
+        "operations": 9088,
+        "samples": 15
+      },
+      "velocity_heading": {
+        "max_sample_ms": 0.514,
+        "ms_sample": 0.4206,
+        "operations": 4380,
+        "samples": 15
+      }
+    },
+    "fps": 7.59128706354079,
+    "frame_ms": {
+      "max": 187.932,
+      "mean": 131.729967741935,
+      "p95": 166.453
+    },
+    "frames": 31,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 0,
+    "managers": {
+      "bosses": {
+        "calls": 248,
+        "max_tick_ms": 0.065,
+        "ms_frame": 0.0665806451612903,
+        "ms_tick": 0.00832258064516129
+      },
+      "build": {
+        "calls": 248,
+        "max_tick_ms": 0.499,
+        "ms_frame": 0.299064516129032,
+        "ms_tick": 0.037383064516129
+      },
+      "cleanup": {
+        "calls": 248,
+        "max_tick_ms": 0.327,
+        "ms_frame": 0.0599677419354839,
+        "ms_tick": 0.00749596774193548
+      },
+      "combat": {
+        "calls": 248,
+        "max_tick_ms": 0.03,
+        "ms_frame": 0.0312903225806452,
+        "ms_tick": 0.00391129032258064
+      },
+      "draw": {
+        "calls": 248,
+        "max_tick_ms": 0.053,
+        "ms_frame": 0.0569032258064516,
+        "ms_tick": 0.00711290322580645
+      },
+      "enemies": {
+        "calls": 248,
+        "max_tick_ms": 30.548,
+        "ms_frame": 56.7927096774194,
+        "ms_tick": 7.09908870967742
+      },
+      "field": {
+        "calls": 248,
+        "max_tick_ms": 0.87,
+        "ms_frame": 1.327,
+        "ms_tick": 0.165875
+      },
+      "grid": {
+        "calls": 248,
+        "max_tick_ms": 4.849,
+        "ms_frame": 7.29651612903226,
+        "ms_tick": 0.912064516129032
+      },
+      "pickups": {
+        "calls": 248,
+        "max_tick_ms": 0.63,
+        "ms_frame": 0.371709677419355,
+        "ms_tick": 0.0464637096774194
+      },
+      "play_total": {
+        "calls": 248,
+        "max_tick_ms": 38.279,
+        "ms_frame": 121.402193548387,
+        "ms_tick": 15.1752741935484
+      },
+      "projectiles": {
+        "calls": 248,
+        "max_tick_ms": 14.055,
+        "ms_frame": 40.7669032258064,
+        "ms_tick": 5.09586290322581
+      },
+      "ship": {
+        "calls": 248,
+        "max_tick_ms": 2.384,
+        "ms_frame": 1.77116129032258,
+        "ms_tick": 0.221395161290323
+      },
+      "spawner": {
+        "calls": 248,
+        "max_tick_ms": 3.815,
+        "ms_frame": 11.1948064516129,
+        "ms_tick": 1.39935080645161
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 0.853999972343445,
+      "mean": 0.469999998807907,
+      "p95": 0.777999997138977
+    },
+    "seconds": 4.083629,
+    "time": 17.9583333333329,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 7.95833333333352
+  },
+  "final-normal": {
+    "counts": {
+      "enemies": 603.69387755102,
+      "friendly": 0.489795918367347,
+      "gems": 0.122448979591837,
+      "hostile": 992.857142857143
+    },
+    "draw_calls": {
+      "max": 126.0,
+      "mean": 105.30612244898,
+      "p95": 123.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.0119591836734694,
+      "dim": 0.00212244897959184,
+      "enemies": 2.54312244897959,
+      "exhaust": 0.0218979591836735,
+      "field": 0.247612244897959,
+      "fx": 0.00757142857142857,
+      "path": 0.00342857142857143,
+      "pickups": 0.200102040816327,
+      "projectiles": 1.29857142857143,
+      "ship": 0.0196530612244898,
+      "top": 0.00142857142857143
+    },
+    "fps": 12.0471945157237,
+    "frame_ms": {
+      "max": 104.872,
+      "mean": 83.0068775510204,
+      "p95": 96.559
+    },
+    "frames": 49,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 2,
+    "managers": {
+      "bosses": {
+        "calls": 392,
+        "max_tick_ms": 0.012,
+        "ms_frame": 0.0380612244897959,
+        "ms_tick": 0.00475765306122449
+      },
+      "build": {
+        "calls": 392,
+        "max_tick_ms": 0.083,
+        "ms_frame": 0.152877551020408,
+        "ms_tick": 0.019109693877551
+      },
+      "cleanup": {
+        "calls": 392,
+        "max_tick_ms": 0.327,
+        "ms_frame": 0.0482040816326531,
+        "ms_tick": 0.00602551020408163
+      },
+      "combat": {
+        "calls": 392,
+        "max_tick_ms": 0.006,
+        "ms_frame": 0.0192244897959184,
+        "ms_tick": 0.0024030612244898
+      },
+      "draw": {
+        "calls": 392,
+        "max_tick_ms": 0.018,
+        "ms_frame": 0.0355102040816327,
+        "ms_tick": 0.00443877551020408
+      },
+      "enemies": {
+        "calls": 392,
+        "max_tick_ms": 5.517,
+        "ms_frame": 34.5638571428571,
+        "ms_tick": 4.32048214285714
+      },
+      "field": {
+        "calls": 392,
+        "max_tick_ms": 0.477,
+        "ms_frame": 0.902204081632653,
+        "ms_tick": 0.112775510204082
+      },
+      "grid": {
+        "calls": 392,
+        "max_tick_ms": 0.907,
+        "ms_frame": 4.29163265306122,
+        "ms_tick": 0.536454081632653
+      },
+      "pickups": {
+        "calls": 392,
+        "max_tick_ms": 0.059,
+        "ms_frame": 0.227571428571429,
+        "ms_tick": 0.0284464285714286
+      },
+      "play_total": {
+        "calls": 392,
+        "max_tick_ms": 12.154,
+        "ms_frame": 75.5991428571429,
+        "ms_tick": 9.44989285714286
+      },
+      "projectiles": {
+        "calls": 392,
+        "max_tick_ms": 4.592,
+        "ms_frame": 26.9104693877551,
+        "ms_tick": 3.36380867346939
+      },
+      "ship": {
+        "calls": 392,
+        "max_tick_ms": 0.205,
+        "ms_frame": 0.855857142857143,
+        "ms_tick": 0.106982142857143
+      },
+      "spawner": {
+        "calls": 392,
+        "max_tick_ms": 1.337,
+        "ms_frame": 6.93175510204082,
+        "ms_tick": 0.866469387755102
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 1.4650000333786,
+      "mean": 0.298285715738121,
+      "p95": 0.351000010967255
+    },
+    "seconds": 4.067337,
+    "time": 19.2249999999995,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 9.22500000000012
+  },
+  "paired": {
+    "body_benchmark": {
+      "bullets": 1031,
+      "grid_ms": {
+        "max": 4.269,
+        "mean": 3.58835,
+        "p95": 4.167
+      },
+      "old_ms": {
+        "max": 8.043,
+        "mean": 6.4836,
+        "p95": 7.081
+      }
+    },
+    "counts": {
+      "enemies": 605.567567567568,
+      "friendly": 0.378378378378378,
+      "gems": 0.0,
+      "hostile": 973.648648648649
+    },
+    "draw_calls": {
+      "max": 118.0,
+      "mean": 107.081081081081,
+      "p95": 117.0
+    },
+    "drawing_ms_frame": {
+      "background": 0.0154864864864865,
+      "dim": 0.00224324324324324,
+      "enemies": 3.43021621621622,
+      "exhaust": 0.0291891891891892,
+      "field": 0.317810810810811,
+      "fx": 0.0207837837837838,
+      "path": 0.0052972972972973,
+      "pickups": 0.253675675675676,
+      "projectiles": 1.67078378378378,
+      "ship": 0.0304864864864865,
+      "top": 0.00213513513513514
+    },
+    "fps": 9.14881637806272,
+    "frame_ms": {
+      "max": 139.424,
+      "mean": 109.303756756757,
+      "p95": 132.278
+    },
+    "frames": 37,
+    "gpu_viewport_ms": {
+      "available": false
+    },
+    "kills": 1,
+    "managers": {
+      "bosses": {
+        "calls": 296,
+        "max_tick_ms": 0.035,
+        "ms_frame": 0.0625945945945946,
+        "ms_tick": 0.00782432432432432
+      },
+      "build": {
+        "calls": 296,
+        "max_tick_ms": 0.114,
+        "ms_frame": 0.214432432432432,
+        "ms_tick": 0.0268040540540541
+      },
+      "cleanup": {
+        "calls": 296,
+        "max_tick_ms": 0.471,
+        "ms_frame": 0.0565405405405405,
+        "ms_tick": 0.00706756756756757
+      },
+      "combat": {
+        "calls": 296,
+        "max_tick_ms": 0.029,
+        "ms_frame": 0.0279459459459459,
+        "ms_tick": 0.00349324324324324
+      },
+      "draw": {
+        "calls": 296,
+        "max_tick_ms": 0.015,
+        "ms_frame": 0.0494864864864865,
+        "ms_tick": 0.00618581081081081
+      },
+      "enemies": {
+        "calls": 296,
+        "max_tick_ms": 8.606,
+        "ms_frame": 46.264972972973,
+        "ms_tick": 5.78312162162162
+      },
+      "field": {
+        "calls": 296,
+        "max_tick_ms": 0.561,
+        "ms_frame": 1.20862162162162,
+        "ms_tick": 0.151077702702703
+      },
+      "grid": {
+        "calls": 296,
+        "max_tick_ms": 1.418,
+        "ms_frame": 5.98440540540541,
+        "ms_tick": 0.748050675675676
+      },
+      "pickups": {
+        "calls": 296,
+        "max_tick_ms": 0.31,
+        "ms_frame": 0.320621621621622,
+        "ms_tick": 0.0400777027027027
+      },
+      "play_total": {
+        "calls": 296,
+        "max_tick_ms": 18.296,
+        "ms_frame": 100.663162162162,
+        "ms_tick": 12.5828952702703
+      },
+      "projectiles": {
+        "calls": 296,
+        "max_tick_ms": 6.848,
+        "ms_frame": 35.0854864864865,
+        "ms_tick": 4.38568581081081
+      },
+      "ship": {
+        "calls": 296,
+        "max_tick_ms": 0.356,
+        "ms_frame": 1.17881081081081,
+        "ms_tick": 0.147351351351351
+      },
+      "spawner": {
+        "calls": 296,
+        "max_tick_ms": 1.844,
+        "ms_frame": 9.21624324324324,
+        "ms_tick": 1.15203040540541
+      }
+    },
+    "phase": 0,
+    "render_cpu_ms": {
+      "max": 0.53600001335144,
+      "mean": 0.373486488252073,
+      "p95": 0.486999988555908
+    },
+    "seconds": 4.044239,
+    "time": 18.3416666666662,
+    "weapons": {
+      "W01": 1
+    },
+    "world_time": 8.34166666666683
+  }
+}

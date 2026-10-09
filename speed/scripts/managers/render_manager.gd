@@ -57,6 +57,7 @@ var flash := 0.0
 var _stars: PackedVector3Array
 var _star_batch: InstanceBatch
 var _star_material: ShaderMaterial
+var _hostile_batch: InstanceBatch
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
 
@@ -124,6 +125,28 @@ func _build_batches() -> void:
 	gem.material = gem_mat
 	_layers.pickups.add_child(gem)
 	_batches[&"gem"] = gem
+	# 弾の二重の円は全弾で共通。頂点を毎フレーム生成せず使い回す。
+	_hostile_batch = InstanceBatch.new()
+	var vertices := PackedVector2Array()
+	var colors := PackedColorArray()
+	var circle := InstanceBatch.circle_points(32)
+	for disc in 2:
+		var radius := 1.0 if disc == 0 else 0.5
+		var color := Color("#ff3b3b") if disc == 0 else Color("#3a0a0a")
+		for i in circle.size():
+			vertices.append(Vector2.ZERO)
+			vertices.append(circle[i] * radius)
+			vertices.append(circle[(i + 1) % circle.size()] * radius)
+			for j in 3:
+				colors.append(color)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_hostile_batch._setup_mesh(mesh)
+	_layers.projectiles.add_child(_hostile_batch)
 
 func _process(delta: float) -> void:
 	var phase := state.phase
@@ -415,11 +438,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		else:
 			var dir := s.vel.normalized()
 			c.draw_line(s.pos - dir * s.r * 2.2, s.pos + dir * s.r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), s.r * 0.9))
+	_hostile_batch.begin()
 	for s: Shot in run.projectiles.hostile:
 		if not view.has_point(s.pos):
 			continue
-		c.draw_circle(s.pos, s.r, Color("#ff3b3b"))
-		c.draw_circle(s.pos, s.r * 0.5, Color("#3a0a0a"))
+		_hostile_batch.add(s.pos, 0.0, s.r, Color.WHITE)
+	_hostile_batch.end()
 
 func _draw_path_band(c: CanvasItem) -> void:
 	var pts := state.draw_points if state.drawing else state.trace_path
