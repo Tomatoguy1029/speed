@@ -93,6 +93,7 @@ export function resetConfig(game) {
 
 export function skipTime(game, sec) {
   const next = Math.min(CONFIG.runTime - 1, game.t + sec);
+  game.worldTime = (game.worldTime ?? game.t) + next - game.t;
   game.meteorClock = (game.meteorClock ?? game.t) + next - game.t;
   game.t = next;
 }
@@ -111,7 +112,7 @@ export function setScheme(game, id) {
     if (game.newBuild !== wasBuild) {
       game.levelChoices = null; game.pendingLevelups = 0; game.rareOffer = null; game.rareQueue = [];
       game.currentOffer = null; game.offerQueue = [];
-      if (game.state === 'levelup' || game.state === 'offer') game.state = 'play';
+      if (['weaponSelect', 'levelup', 'offer'].includes(game.state)) game.state = 'play';
       if (game.newBuild) for (const c of game.capsules) {
         if (c.kind !== 'capsule') continue;
         c.kind = 'cache'; c.xp = xpForLevel(game.level) * 0.2; delete c.mod;
@@ -343,7 +344,7 @@ export function createDebugPanel(getGame, onScheme, onResetMeta, onDrawInput) {
       if (!root.classList.contains('open') || !game) return;
       fps = fps * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
       const sp = Math.hypot(game.ship.vx, game.ship.vy);
-      info.textContent = `t ${game.t.toFixed(1)}s ・ 敵 ${game.enemies.length} ・ Lv ${game.level} ・ 上限 ${(game.stats.maxSpeed * CONFIG.speedToKms).toFixed(2)} ・ 現在 ${(sp * CONFIG.speedToKms).toFixed(2)} ・ 最高 ${(game.peakSpeed * CONFIG.speedToKms).toFixed(2)} km/s ・ ${fps.toFixed(0)} fps`;
+      info.textContent = `t ${game.t.toFixed(1)}s ・ 世界 ${game.worldTime.toFixed(1)}s ・ 敵 ${game.enemies.length} ・ Lv ${game.level} ・ 上限 ${(game.stats.maxSpeed * CONFIG.speedToKms).toFixed(2)} ・ 現在 ${(sp * CONFIG.speedToKms).toFixed(2)} ・ 最高 ${(game.peakSpeed * CONFIG.speedToKms).toFixed(2)} km/s ・ ${fps.toFixed(0)} fps`;
     },
   };
 }

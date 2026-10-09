@@ -70,12 +70,14 @@ function openStation() {
 }
 
 function startRun() {
+  debug.hide();
   clearScreens();
   input.reset();
   input.state.enabled = true;
   renderer.cam.ready = false;
   offerShown = null;
-  game = createGame({ meta: save.meta });
+  game = createGame({ meta: save.meta, chooseStarter: true });
+  input.state.enabled = game.state === 'play';
   mode = 'run';
 }
 
@@ -97,7 +99,7 @@ function chooseOffer(accept) {
 }
 
 function chooseRunCard(index) {
-  if (game.state !== 'levelup') return;
+  if (!['weaponSelect', 'levelup'].includes(game.state)) return;
   if (!resolveRunLevel(game, index)) return;
   offerShown = null;
   if (game.state === 'play') { clearScreens(); input.reset(); input.state.enabled = true; }
@@ -116,7 +118,7 @@ function togglePause() {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (mode === 'run' && game.state === 'levelup') {
+  if (mode === 'run' && ['weaponSelect', 'levelup'].includes(game.state)) {
     if (/^[1-9]$/.test(e.key) && Number(e.key) <= game.levelChoices.length && !e.repeat && !['SELECT', 'INPUT'].includes(e.target.tagName)) { e.preventDefault(); chooseRunCard(Number(e.key) - 1); }
     if (e.key === 'p' || e.key === 'P') debug.toggle();
     return;
@@ -177,7 +179,7 @@ function frame(now) {
       offerShown = null; clearScreens(); input.reset(); input.state.enabled = true;
     }
     if (wasRunning && (game.state === 'won' || game.state === 'lost')) finishRun();
-    if (game.state === 'levelup' && offerShown !== game.levelChoices) {
+    if (['weaponSelect', 'levelup'].includes(game.state) && offerShown !== game.levelChoices) {
       offerShown = game.levelChoices; input.reset(); input.state.enabled = false;
       showRunLevel(game, chooseRunCard);
     }
