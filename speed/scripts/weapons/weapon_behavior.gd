@@ -48,11 +48,11 @@ func on_launch(_full: bool) -> void:
 ## なぞり・勢いで実際に動いた区間
 func on_trail(_run: TraceRun, _p0: Vector2, _p1: Vector2) -> void:
 	pass
-## 高速の接触（貫通・弾かれのどちらでも）
-func on_contact(_e: Enemy, _hit: Vector2, _dir: Vector2) -> void:
+## 高速の接触（貫通・弾かれのどちらでも）。_i は触れた敵の行番号
+func on_contact(_i: int, _hit: Vector2, _dir: Vector2) -> void:
 	pass
-## 普段・高速を問わない接触
-func on_any_contact(_e: Enemy) -> void:
+## 普段・高速を問わない接触。_i は触れた敵の行番号
+func on_any_contact(_i: int) -> void:
 	pass
 func on_kill(_cause: StringName) -> void:
 	pass

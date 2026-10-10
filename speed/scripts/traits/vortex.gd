@@ -3,7 +3,7 @@ extends TraitBehavior
 
 ## 渦：pos、radius、life、max、power
 var vortexes: Array = []
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
 func on_end() -> void:
 	var life := val("life")
@@ -15,15 +15,16 @@ func tick(dt: float, _busy: bool) -> void:
 	for v in vortexes:
 		v.life -= dt
 		build.combat.nearby(v.pos, v.radius, _buf)
-		for e: Enemy in _buf:
-			if e.is_boss:
+		var t := build.enemies.table
+		for i in _buf:
+			if t.is_boss[i] != 0:
 				continue
-			var d: Vector2 = v.pos - e.pos
+			var from := t.pos[i]
+			var d: Vector2 = v.pos - from
 			var dist := d.length()
 			if dist > v.radius or dist < 10.0:
 				continue
-			var move := minf(dist - 10.0, v.power * dt / maxf(1.0, e.r / 30.0))
-			var from := e.pos
-			e.pos += d / dist * move
-			build.field.collide_enemy(e, from)
+			var move := minf(dist - 10.0, v.power * dt / maxf(1.0, t.r[i] / 30.0))
+			t.pos[i] = from + d / dist * move
+			build.field.collide_enemy(i, from)
 	vortexes = vortexes.filter(func(v): return v.life > 0.0)

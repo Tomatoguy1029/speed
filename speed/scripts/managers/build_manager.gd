@@ -19,7 +19,7 @@ var trait_behaviors: Dictionary = {}
 var cores := 0
 ## 機体と一緒に進路を進む衝撃波（ソニックブームと連鎖ソニックで共通。一覧 W08・T05）
 var sonic_waves: Array = []
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -277,18 +277,19 @@ func run_sonic(cause: StringName, radius: float, dmg: float, knock: float, trave
 
 func _sweep_sonic(wave: Dictionary, p0: Vector2, p1: Vector2) -> void:
 	var steps := maxi(1, ceili(p0.distance_to(p1) / (wave.radius * 0.3)))
-	for i in range(1, steps + 1):
+	for k in range(1, steps + 1):
 		if state.phase != RunState.Phase.PLAY:
 			return
-		var p := p0.lerp(p1, float(i) / steps)
+		var p := p0.lerp(p1, float(k) / steps)
 		combat.nearby(p, wave.radius, _buf)
-		for e: Enemy in _buf:
-			if e.dead or wave.hits.has(e.id):
+		var t := enemies.table
+		for i in _buf:
+			if t.dead[i] != 0 or wave.hits.has(t.id[i]):
 				continue
-			wave.hits[e.id] = true
-			var d := e.pos - p
+			wave.hits[t.id[i]] = true
+			var d := t.pos[i] - p
 			var dist := d.length()
-			combat.damage_enemy(e, wave.dmg, {"cause": wave.cause, "dir": d / dist if dist > 0.0 else Vector2.ZERO, "knock": wave.knock})
+			combat.damage_enemy(i, wave.dmg, {"cause": wave.cause, "dir": d / dist if dist > 0.0 else Vector2.ZERO, "knock": wave.knock})
 			if state.phase != RunState.Phase.PLAY:
 				return
 	wave.pos = p1
@@ -325,19 +326,20 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 		if state.phase != RunState.Phase.PLAY:
 			return
 
-func on_contact(e: Enemy, hit: Vector2, dir: Vector2) -> void:
-	on_electric_contact(e)
+## 高速で敵（行 i）に触れた。
+func on_contact(i: int, hit: Vector2, dir: Vector2) -> void:
+	on_electric_contact(i)
 	for b in weapon_behaviors.values():
 		if state.phase != RunState.Phase.PLAY:
 			return
-		b.on_contact(e, hit, dir)
+		b.on_contact(i, hit, dir)
 
 ## 普段の接触でも発動するもの（接触電撃）。
-func on_electric_contact(e: Enemy) -> void:
+func on_electric_contact(i: int) -> void:
 	for b in weapon_behaviors.values():
 		if state.phase != RunState.Phase.PLAY:
 			return
-		b.on_any_contact(e)
+		b.on_any_contact(i)
 
 func on_kill(cause: StringName) -> void:
 	for b in trait_behaviors.values():

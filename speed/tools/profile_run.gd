@@ -16,7 +16,6 @@ var counts := {"enemies": 0.0, "hostile": 0.0, "friendly": 0.0, "gems": 0.0}
 var options: Dictionary = {}
 var saved_rd: RenderingDevice
 var attacked := false
-var detail: RefCounted
 var timeline: Array = []
 var last_totals: Dictionary = {}
 var phase_trace: Array = []
@@ -49,11 +48,12 @@ func _ready() -> void:
 			run.build.grant(&"weapon", id, 5)
 		run.build.grant(&"trait", &"T04", 5)
 	if options.has("weapons"):
-		# --weapons=W01:5,W02:3 で装備を置き換える
+		# --weapons=W01:5,W02:3,T03:2 で装備を置き換える（T で始まるものは特性）
 		run.build.reset_loadout()
 		for item in String(options.weapons).split(",", false):
 			var parts := item.split(":")
-			run.build.grant(&"weapon", StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
+			var kind := &"trait" if parts[0].begins_with("T") else &"weapon"
+			run.build.grant(kind, StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
 	run.state.rng.seed = 1029
 	# RunManager の初期化は乱数配置なので、天体も同じシードで作り直す。
 	# 天体との接触量の違いを、描画の比較条件へ混ぜない。
@@ -61,7 +61,7 @@ func _ready() -> void:
 	run.field.moons.clear()
 	run.field.dust.clear()
 	run.field.rocks.clear()
-	run.enemies.list = []
+	run.enemies.clear_all()
 	run.field.setup(run.state, run.cfg)
 	run.ship.setup(run.state, run.cfg)
 	run.state.world_time = 0.0
@@ -109,11 +109,6 @@ func _ready() -> void:
 	run.profile.clear()
 	drawing_times.clear()
 	run.profiling = true
-	if options.get("detail", "off") == "on":
-		detail = preload("res://tools/profile_enemy_detail.gd").new()
-		detail.m = run.enemies
-		run.enemies.profile_tick_hook = detail.tick
-		run.enemies.profile_survey_hook = detail.survey
 	previous_us = Time.get_ticks_usec()
 	start_us = previous_us
 	measuring = true
@@ -124,7 +119,7 @@ func _ready() -> void:
 		"renderer": RenderingServer.get_current_rendering_method(), "physics_hz": Engine.physics_ticks_per_second,
 		"world_tick_div": run.cfg.world_tick_div, "max_fps": Engine.max_fps,
 		"vsync_mode": DisplayServer.window_get_vsync_mode(),
-		"machine": OS.get_processor_name(), "initial_enemies": run.enemies.list.size(), "adapter": RenderingServer.get_video_adapter_name()}))
+		"machine": OS.get_processor_name(), "initial_enemies": run.enemies.count(), "adapter": RenderingServer.get_video_adapter_name()}))
 
 func _timed_draw(c: CanvasItem, key: String, original: Callable) -> void:
 	if not measuring:
@@ -164,7 +159,7 @@ func _process(_delta: float) -> void:
 		"canvas_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
 		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
 		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
-		"enemies": run.enemies.list.size(), "hostile": run.projectiles.hostile_count()}
+		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count()}
 	for key in run.profile:
 		var rec: Array = run.profile[key]
 		var prev: Array = last_totals.get(key, [0, 0])
@@ -191,7 +186,7 @@ func _process(_delta: float) -> void:
 	gpu_times.append(RenderingServer.viewport_get_measured_render_time_gpu(viewport))
 	render_times.append(RenderingServer.viewport_get_measured_render_time_cpu(viewport))
 	draws.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
-	counts.enemies += run.enemies.list.size()
+	counts.enemies += run.enemies.count()
 	counts.hostile += run.projectiles.hostile_count()
 	counts.friendly += run.projectiles.friend_count()
 	counts.gems += run.pickups.gem_slots.live
@@ -225,8 +220,6 @@ func _finish(seconds: float) -> void:
 		"phase": run.state.phase, "time": run.state.time, "world_time": run.state.world_time, "weapons": run.state.weapons}
 	result.timeline = timeline
 	result.phase_trace = phase_trace
-	if detail != null:
-		result.enemy_detail = detail.summary()
 	result.kills = run.state.kills
 	if options.get("body_benchmark", "off") == "on":
 		result.body_benchmark = _benchmark_bodies()
@@ -240,8 +233,6 @@ func _finish(seconds: float) -> void:
 		render.pipeline.sparks.rd = saved_rd
 	set_process(false)
 	run.profiling = false
-	run.enemies.profile_tick_hook = Callable()
-	run.enemies.profile_survey_hook = Callable()
 	# ランと描画リソースの後始末を、通常のノード削除で済ませてから閉じる。
 	run.get_parent().get_parent().queue_free()
 	await get_tree().process_frame

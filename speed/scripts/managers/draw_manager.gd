@@ -220,9 +220,10 @@ func _trace(real_dt: float) -> void:
 		var move := minf(dist, seg_len - run.seg_pos)
 		var from := state.ship_pos
 		# 本体から離れた敵には、もう一度当てられる
+		var et := combat.enemies.table
 		for id in run.inside.keys():
-			var e: Enemy = run.inside[id]
-			if e.dead or from.distance_to(e.pos) > e.r + R + 2.0:
+			var i: int = run.inside[id]
+			if not combat.enemies.is_same(i, id) or et.dead[i] != 0 or from.distance_to(et.pos[i]) > et.r[i] + R + 2.0:
 				run.inside.erase(id)
 		run.seg_pos += move
 		dist -= move

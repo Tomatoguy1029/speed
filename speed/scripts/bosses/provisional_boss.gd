@@ -23,23 +23,25 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	hsm.update(dt)
 	if timeline.is_playing():
 		timeline.advance(dt)
-		body.charge = timeline.current_animation_position / maxf(timeline.current_animation_length, 0.001)
+		table.charge[body] = timeline.current_animation_position / maxf(timeline.current_animation_length, 0.001)
 	else:
-		body.charge = 0.0
+		table.charge[body] = 0.0
 
 func _move(dt: float) -> void:
+	var t := table
+	var i := body
 	var aim := run_state.enemy_aim
-	var d := aim - body.pos
+	var from := t.pos[i]
+	var d := aim - from
 	var dist := maxf(d.length(), 1.0)
-	body.vel += (d / dist * body.speed - body.vel) * minf(1.0, def.accel * dt)
-	body.facing += clampf(Geom.angle_diff(d.angle(), body.facing), -def.turn * dt, def.turn * dt)
-	var from := body.pos
-	body.pos += body.vel * dt
-	manager.field.collide_enemy(body, from)
-	if body.hit_cd > 0.0:
-		body.hit_cd -= dt
-	if body.flash > 0.0:
-		body.flash -= dt
+	t.vel[i] += (d / dist * t.speed[i] - t.vel[i]) * minf(1.0, def.accel * dt)
+	t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
+	t.pos[i] += t.vel[i] * dt
+	manager.field.collide_enemy(i, from)
+	if t.hit_cd[i] > 0.0:
+		t.hit_cd[i] -= dt
+	if t.flash[i] > 0.0:
+		t.flash[i] -= dt
 
 # ── 判断の層から呼ばれる ──────────────────────────────────────────
 
@@ -60,6 +62,6 @@ func fire_volley() -> void:
 	_cooldown = def.params.fire_interval
 	var n: int = def.params.volley
 	var spread: float = def.params.spread
-	var base := (run_state.enemy_aim - body.pos).angle()
+	var base := (run_state.enemy_aim - table.pos[body]).angle()
 	for i in n:
 		manager.fire(base + (float(i) / (n - 1) - 0.5) * spread, def.params.bullet_speed, def.params)

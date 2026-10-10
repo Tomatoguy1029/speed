@@ -53,21 +53,23 @@ func tick(_real_dt: float, world_dt: float) -> void:
 
 # ── 落とす ────────────────────────────────────────────────────────
 
-## 敵を倒したときのドロップ。
-func on_enemy_killed(e: Enemy) -> void:
-	var danger := field.danger_at(e.pos.length())
+## 敵（行 i）を倒したときのドロップ。
+func on_enemy_killed(i: int) -> void:
+	var t := enemies.table
+	var pos := t.pos[i]
+	var danger := field.danger_at(pos.length())
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
-	drop_gem(e.pos, e.xp * state.stats.xp_mult * bonus * (1.0 + danger))
-	_drop_coins(e, danger)
-	if e.type == &"meteor":
+	drop_gem(pos, t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger))
+	_drop_coins(i, danger)
+	if t.type[i] == &"meteor":
 		if state.rng.randf() < cfg.meteor_heal_chance:
-			_add_capsule(Pickup.Kind.HEAL, &"drop", e.pos, 0.0)
+			_add_capsule(Pickup.Kind.HEAL, &"drop", pos, 0.0)
 		if state.rng.randf() < cfg.meteor_magnet_chance:
-			_add_capsule(Pickup.Kind.MAGNET, &"drop", e.pos, 0.0)
-	var chance := minf(cfg.drop_max, cfg.drop_base * pow(e.xp, cfg.drop_power_exp))
+			_add_capsule(Pickup.Kind.MAGNET, &"drop", pos, 0.0)
+	var chance := minf(cfg.drop_max, cfg.drop_base * pow(t.xp[i], cfg.drop_power_exp))
 	if state.rng.randf() < chance:
-		_add_capsule(Pickup.Kind.CACHE, &"drop", e.pos, build.xp_needed() * cfg.capsule_xp_frac)
+		_add_capsule(Pickup.Kind.CACHE, &"drop", pos, build.xp_needed() * cfg.capsule_xp_frac)
 
 func drop_gem(p: Vector2, v: float) -> void:
 	if gem_slots.live > cfg.gem_max:
@@ -123,18 +125,21 @@ func _add_coin(p: Vector2) -> int:
 	coin_pulled[i] = 0
 	return i
 
-func _drop_coins(e: Enemy, danger: float) -> void:
+func _drop_coins(i: int, danger: float) -> void:
+	var t := enemies.table
 	var n := 0
-	if e.type == &"battleship":
+	if t.type[i] == &"battleship":
 		n = 12
-	elif e.elite:
+	elif t.elite[i] != 0:
 		n = 3 + state.rng.randi_range(0, 3)
-	elif e.type == &"meteor":
+	elif t.type[i] == &"meteor":
 		n = (1 + state.rng.randi_range(0, 2)) if state.rng.randf() < cfg.meteor_coin_chance else 0
 	elif state.rng.randf() < 0.03 * (1.0 + danger * 2.0):
 		n = 1
-	for i in n:
-		_add_coin(e.pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * e.r)
+	var pos := t.pos[i]
+	var r := t.r[i]
+	for k in n:
+		_add_coin(pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * r)
 
 func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> void:
 	var c := Pickup.new()

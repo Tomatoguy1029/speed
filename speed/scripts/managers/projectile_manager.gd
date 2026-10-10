@@ -33,7 +33,7 @@ var friend_angle := PackedFloat32Array()
 var friend_spin := PackedFloat32Array()
 var friend_trail: Array[PackedVector2Array] = []
 var friend_slots: RowSlots
-var _buf: Array = []
+var _buf := PackedInt32Array()
 var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
@@ -89,30 +89,34 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 		opts.get("r", 5.0), dmg, opts.get("life", 0.9), false, opts.get("pierce_left", 0),
 		opts.get("color", Color("#ffe46b")), false, 250.0, 0.0, 0.0, -1)
 
-## 撃破された大型の敵から、攻撃する破片を飛ばす（仕様書 11.6）。
-func scatter_hull(e: Enemy, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
-	if e.r < cfg.hull_debris_min_radius or e.meteor_index >= 0 or e.is_boss or e.hull_scattered:
+## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
+func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
+	var t := combat.enemies.table
+	var r := t.r[i]
+	if r < cfg.hull_debris_min_radius or t.meteor_index[i] >= 0 or t.is_boss[i] != 0 or t.hull_scattered[i] != 0:
 		return false
-	e.hull_scattered = true
-	var count := mini(cfg.hull_debris_max_pieces, maxi(6, ceili(e.r / 12.0)))
+	t.hull_scattered[i] = 1
+	var pos := t.pos[i]
+	var count := mini(cfg.hull_debris_max_pieces, maxi(6, ceili(r / 12.0)))
 	var directed := dir.length() > 0.01
-	var base := dir.angle() if directed else e.facing
+	var base := dir.angle() if directed else t.facing[i]
 	var spread := deg_to_rad(cfg.hull_debris_spread) if directed else TAU
-	for i in count:
-		var a := base + ((float(i) / (count - 1) - 0.5) if directed else float(i) / count) * spread
+	for k in count:
+		var a := base + ((float(k) / (count - 1) - 0.5) if directed else float(k) / count) * spread
 		var u := Vector2.from_angle(a)
-		var v := speed * (0.85 + (i % 3) * 0.12)
-		_add_friend(FriendKind.DEBRIS, &"hullDebris", e.pos + u * e.r * 0.3, u * v,
-			clampf(e.r * 0.17, 10.0, 20.0), dmg, cfg.hull_debris_life, true, 0, e.color, true,
+		var v := speed * (0.85 + (k % 3) * 0.12)
+		_add_friend(FriendKind.DEBRIS, &"hullDebris", pos + u * r * 0.3, u * v,
+			clampf(r * 0.17, 10.0, 20.0), dmg, cfg.hull_debris_life, true, 0, t.color[i], true,
 			cfg.hull_debris_knock if knock < 0.0 else knock, state.rng.randf() * TAU,
-			10.0 * (1.0 if i % 2 == 0 else -1.0), e.id)
-	state.emit(&"hull_scatter", {"pos": e.pos, "count": count})
+			10.0 * (1.0 if k % 2 == 0 else -1.0), t.id[i])
+	state.emit(&"hull_scatter", {"pos": pos, "count": count})
 	return true
 
-## 敵の死体を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
-func fling_corpse(e: Enemy, vel: Vector2, dmg: float) -> void:
-	_add_friend(FriendKind.DEBRIS, &"corpse", e.pos, vel, maxf(10.0, e.r * 0.6), dmg, 0.9, true, 0,
-		e.color, false, 250.0, state.rng.randf() * TAU, 10.0, e.id)
+## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
+func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
+	var t := combat.enemies.table
+	_add_friend(FriendKind.DEBRIS, &"corpse", t.pos[i], vel, maxf(10.0, t.r[i] * 0.6), dmg, 0.9, true, 0,
+		t.color[i], false, 250.0, state.rng.randf() * TAU, 10.0, t.id[i])
 
 ## 味方の弾・破片を1行加え、その行番号を返す。hit_id は最初から当てたことにする敵（-1 なら無し）。
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
@@ -144,6 +148,7 @@ func friend_count() -> int:
 
 func _update_friendly(dt: float) -> void:
 	var trail_points := cfg.corpse_trail_points
+	var et := combat.enemies.table
 	var i := 0
 	# 命中で増えた破片が後ろの行に入った場合は、この更新で一緒に進める
 	while i < friend_alive.size():
@@ -169,22 +174,22 @@ func _update_friendly(dt: float) -> void:
 		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
-		for e: Enemy in _buf:
-			if hit.has(e.id):
+		for row in _buf:
+			if hit.has(et.id[row]):
 				continue
-			var t := Geom.seg_circle_t(from, to, e.pos, r + e.r)
+			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
 			if t >= 0.0:
-				_hits.append([t, e])
+				_hits.append([t, row])
 		if _hits.size() > 1:
 			_hits.sort_custom(func(a, b): return a[0] < b[0])
 		var sp := vel.length()
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
-			var e: Enemy = h[1]
-			if life <= 0.0 or e.dead:
+			var row: int = h[1]
+			if life <= 0.0 or et.dead[row] != 0:
 				continue
-			hit[e.id] = true
-			combat.damage_enemy(e, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
+			hit[et.id[row]] = true
+			combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
 				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i]})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
@@ -210,15 +215,17 @@ func _update_friendly(dt: float) -> void:
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
-## 敵の弾を撃つ（射撃型・ミサイル艇・戦艦・ボス）。kind は &"bullet" か &"missile"。
-func fire_enemy(e: Enemy, angle: float, speed: float, kind: StringName, params := {}) -> void:
-	var p: Dictionary = params if not params.is_empty() else e.def.params
+## 敵（行 i）が弾を撃つ（射撃型・ミサイル艇・戦艦・ボス）。kind は &"bullet" か &"missile"。
+func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := {}) -> void:
+	var t := combat.enemies.table
+	var p: Dictionary = params if not params.is_empty() else t.def[i].params
 	var missile := kind == &"missile"
 	var u := Vector2.from_angle(angle)
-	_add_hostile(e.pos + u * e.r, u * speed, speed, 9.0 if missile else 7.0, 4.5 if missile else 4.0,
-		float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (e.level - 1.0)), p.get("slow", 0.0),
+	var pos := t.pos[i]
+	_add_hostile(pos + u * t.r[i], u * speed, speed, 9.0 if missile else 7.0, 4.5 if missile else 4.0,
+		float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (t.level[i] - 1.0)), p.get("slow", 0.0),
 		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
-	state.emit(&"shoot", {"pos": e.pos, "kind": kind})
+	state.emit(&"shoot", {"pos": pos, "kind": kind})
 
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,

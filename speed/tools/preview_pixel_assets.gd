@@ -27,43 +27,39 @@ func _preview() -> void:
 	for i in run.field.moons.size():
 		run.field.moons[i].pos = Vector2(530 + 220 * i, 300)
 		run.field.moons[i].r = 85.0
-	run.enemies.list = []
+	run.enemies.clear_all()
+	var t := run.enemies.table
 	var ids := ["splitling", "swarm", "drifter", "darter", "gunner",
 		"splitter", "missile", "armored", "titan", "battleship"]
 	for i in ids.size():
 		var definition := run.enemies.def_of(StringName(ids[i]))
 		assert(definition != null, "敵定義がありません: " + ids[i])
 		var position := Vector2(-550 + (i % 6) * 210, -220 if i < 6 else 130)
-		var enemy := run.enemies.create(definition, 1.0, position, {"facing": PI / 2.0})
+		var enemy := run.enemies.spawn(definition, 1.0, position, {"facing": PI / 2.0})
 		if ids[i] == "gunner":
-			enemy.charge = 0.8
+			t.charge[enemy] = 0.8
 		if ids[i] == "armored":
-			enemy.elite = true
-			enemy.hp *= 0.6
-		run.enemies.add(enemy)
+			t.elite[enemy] = 1
+			t.hp[enemy] *= 0.6
 	for i in 2:
-		var rock := run.enemies.create(run.enemies.def_of(&"meteor"), 1.0,
-			Vector2(-180 + 140 * i, 340), {"size": 50.0})
-		rock.meteor_index = i
+		var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"), 1.0,
+			Vector2(-180 + 140 * i, 340), {"size": 50.0, "meteor_index": i})
 		if i == 1:
-			rock.hp *= 0.5
-		run.enemies.add(rock)
+			t.hp[rock] *= 0.5
 	# 実ゲーム内の同じフラッシュ処理も並べて確認する。
-	var flashed := run.enemies.create(run.enemies.def_of(&"drifter"), 1.0, Vector2(120, 0))
-	flashed.flash = 1.0
-	run.enemies.add(flashed)
+	var flashed := run.enemies.spawn(run.enemies.def_of(&"drifter"), 1.0, Vector2(120, 0))
+	t.flash[flashed] = 1.0
 	if "--damage-preview" in OS.get_cmdline_user_args():
-		run.enemies.list = []
+		run.enemies.clear_all()
 		state.phase = RunState.Phase.PLAY
 		var renderer := game.get_node("Managers/RenderManager") as RenderManager
 		for variant in 2:
 			for stage in 4:
-				var rock := run.enemies.create(run.enemies.def_of(&"meteor"), 1.0,
-					Vector2(-460 + stage * 300, -150 + variant * 300), {"size": 60.0 if variant == 0 else 40.0})
-				rock.meteor_index = variant
-				rock.hp *= [1.0, 0.5, 0.2, 0.0][stage]
-				rock.flash = 0.12 if stage > 0 else 0.0
-				run.enemies.add(rock)
+				var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"), 1.0,
+					Vector2(-460 + stage * 300, -150 + variant * 300),
+					{"size": 60.0 if variant == 0 else 40.0, "meteor_index": variant})
+				t.hp[rock] *= [1.0, 0.5, 0.2, 0.0][stage]
+				t.flash[rock] = 0.12 if stage > 0 else 0.0
 				if stage == 3:
 					run.combat.kill_enemy(rock)
 		renderer._on_events(state.events)
@@ -75,7 +71,7 @@ func _preview() -> void:
 		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
 		run.build.weapon_behaviors[&"W06"] = drone
 	if "--path-preview" in OS.get_cmdline_user_args() or "--trace-preview" in OS.get_cmdline_user_args():
-		run.enemies.list = []
+		run.enemies.clear_all()
 		state.phase = RunState.Phase.PLAY
 		var points := PackedVector2Array([Vector2(-420, -160), Vector2(300, 160),
 			Vector2(-300, 160), Vector2(300, -160), Vector2(-300, -160), Vector2(420, 160)])
@@ -84,7 +80,7 @@ func _preview() -> void:
 		state.draw_points = points
 		state.trace_path = points
 	if "--smoothing-preview" in OS.get_cmdline_user_args():
-		run.enemies.list = []
+		run.enemies.clear_all()
 		state.phase = RunState.Phase.PLAY
 		state.drawing = true
 		state.tracing = false
@@ -132,7 +128,7 @@ func _preview() -> void:
 	if "--attachments-preview" in OS.get_cmdline_user_args():
 		for id in [&"W01", &"W02", &"W03", &"W05", &"W07", &"W08", &"W17", &"W23"]:
 			run.build._sync_behavior(true, id, ConfigManager.weapons[id], 1)
-	print("PIXEL_PREVIEW_READY: ", run.enemies.list.size(), " enemies/rocks")
+	print("PIXEL_PREVIEW_READY: ", run.enemies.count(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:
 			await get_tree().process_frame

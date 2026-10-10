@@ -269,7 +269,7 @@ func _record_approach() -> void:
 func _begin_finish() -> void:
 	sequence_t = 0.0
 	finish_replay = approach.duplicate()
-	state.emit(&"boss_finish", {"pos": bosses.boss.pos if bosses.boss != null else state.ship_pos})
+	state.emit(&"boss_finish", {"pos": bosses.boss_pos(state.ship_pos)})
 	set_phase(RunState.Phase.FINISHING)
 
 ## スロー再生 → 爆発で一掃 → 破片が消える → CLEAR! → 結果画面。
@@ -291,13 +291,13 @@ func _finishing_tick(real_dt: float) -> void:
 	state.camera_zoom += (zoom_to - state.camera_zoom) * follow
 	state.view_half = get_viewport().get_visible_rect().size / 2.0 / state.camera_zoom
 	if sequence_t >= t1 and sequence_t - real_dt < t1:
-		var center := bosses.boss.pos if bosses.boss != null else state.ship_pos
+		var center := bosses.boss_pos(state.ship_pos)
 		state.emit(&"boss_explode", {"pos": center})
-		for e: Enemy in enemies.list:
-			if not e.dead and not e.is_boss:
-				e.dead = true
-				enemies.dirty = true
-				state.emit(&"kill", {"pos": e.pos, "r": e.r, "type": e.type, "cause": &"finale", "dir": (e.pos - center).normalized(), "color": e.color, "silent": true})
+		var t := enemies.table
+		for i in t.alive.size():
+			if t.alive[i] != 0 and t.dead[i] == 0 and t.is_boss[i] == 0:
+				enemies.mark_dead(i)
+				state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "cause": &"finale", "dir": (t.pos[i] - center).normalized(), "color": t.color[i], "silent": true})
 		projectiles.clear_hostile()
 		bosses.remove_boss()
 		enemies.cleanup()
@@ -350,8 +350,8 @@ func command(name: StringName, args := {}) -> void:
 		&"debug_boss_time":
 			state.time = maxf(state.time, cfg.boss_time - 1.0)
 		&"debug_kill_boss":
-			if bosses.boss != null and not bosses.boss.dead:
-				combat.damage_enemy(bosses.boss, bosses.boss.hp + 1.0, {"crit": false, "cause": &"debug"})
+			if bosses.boss_alive():
+				combat.damage_enemy(bosses.boss_row, enemies.table.hp[bosses.boss_row] + 1.0, {"crit": false, "cause": &"debug"})
 		&"debug_grant":
 			build.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
 		&"debug_reset_loadout":
@@ -365,10 +365,10 @@ func command(name: StringName, args := {}) -> void:
 		&"debug_invincible":
 			ship.invincible = not ship.invincible
 		&"debug_clear_enemies":
-			for e: Enemy in enemies.list:
-				if not e.is_boss:
-					e.dead = true
-			enemies.dirty = true
+			var t := enemies.table
+			for i in t.alive.size():
+				if t.alive[i] != 0 and t.is_boss[i] == 0:
+					enemies.mark_dead(i)
 		&"debug_spawn_enemies":
 			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
 				enemies.debug_spawn_random(int(args.get("count", 100)))

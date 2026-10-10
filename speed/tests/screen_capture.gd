@@ -129,8 +129,9 @@ func _perf_steps() -> void:
 		n += 1
 	frames = n
 	var alive := 0
-	for e in run.enemies.list:
-		if not e.dead:
+	var t := run.enemies.table
+	for i in t.alive.size():
+		if t.alive[i] != 0 and t.dead[i] == 0:
 			alive += 1
 	print("[perf] enemies=%d fps=%.1f physics_ms=%.2f process_ms=%.2f" % [alive, frames / 5.0, phys / n, proc / n])
 	for k in run.profile:

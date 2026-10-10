@@ -2,36 +2,38 @@
 ## つながる数は Lv × 2。同じ敵には1回の連鎖で1度だけ。隕石には流れない。
 extends WeaponBehavior
 
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
-func on_any_contact(target: Enemy) -> void:
-	if target.type == &"meteor":
+func on_any_contact(target: int) -> void:
+	var t := build.enemies.table
+	if t.type[target] == &"meteor":
 		return
 	var dmg := atk() * float(p("damage")) * dmg_k()
-	var used := {target.id: true}
-	var pts := [state.ship_pos, target.pos]
-	var from := target.pos
-	if not target.dead:
+	var used := {t.id[target]: true}
+	var pts := [state.ship_pos, t.pos[target]]
+	var from := t.pos[target]
+	if t.dead[target] == 0:
 		build.combat.damage_enemy(target, dmg, {"cause": &"contactArc"})
 	var reach: float = p("range")
-	for i in level * int(p("chains_per_level")):
+	for k in level * int(p("chains_per_level")):
 		if state.phase != RunState.Phase.PLAY:
 			break
 		build.combat.nearby(from, reach, _buf)
-		var next: Enemy = null
+		var next := -1
 		var best := reach * reach
-		for e: Enemy in _buf:
-			if e.type == &"meteor" or used.has(e.id):
+		for i in _buf:
+			if t.type[i] == &"meteor" or used.has(t.id[i]):
 				continue
-			var d := e.pos.distance_squared_to(from)
+			var d := t.pos[i].distance_squared_to(from)
 			if d < best:
 				best = d
-				next = e
-		if next == null:
+				next = i
+		if next < 0:
 			break
-		used[next.id] = true
-		pts.append(next.pos)
-		var dir := (next.pos - from).normalized()
+		used[t.id[next]] = true
+		var next_pos := t.pos[next]
+		pts.append(next_pos)
+		var dir := (next_pos - from).normalized()
 		build.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": dir})
-		from = next.pos
+		from = next_pos
 	state.emit(&"bolt", {"points": pts})

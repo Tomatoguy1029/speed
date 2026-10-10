@@ -143,7 +143,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(_delta: float) -> void:
 	if visible and run.state != null:
-		_status.text = "無敵 %s　敵 %d 体　経過 %.0f 秒" % ["ON" if run.ship.invincible else "OFF", run.enemies.list.size(), run.state.time]
+		_status.text = "無敵 %s　敵 %d 体　経過 %.0f 秒" % ["ON" if run.ship.invincible else "OFF", run.enemies.count(), run.state.time]
 
 func _grant() -> void:
 	var id: StringName = _module.get_item_metadata(_module.selected)

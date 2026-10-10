@@ -253,18 +253,20 @@ func _draw_loadout(H: float) -> void:
 		y += 18.0
 
 func _draw_boss(W: float) -> void:
-	var b := run.bosses.boss
+	var bosses := run.bosses
 	if _warning_t > 0.0 and fmod(_warning_t, 0.5) < 0.3:
 		draw_string(_font, Vector2(W / 2.0 - 160, 120), "WARNING!!", HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
-	if b == null or b.dead:
+	if not bosses.boss_alive():
 		return
+	var t := run.enemies.table
+	var b := bosses.boss_row
 	var bw := minf(520.0, W * 0.6)
 	var bx := W / 2.0 - bw / 2.0
 	draw_rect(Rect2(bx, 60, bw, 10), Color(0, 0, 0, 0.6))
-	draw_rect(Rect2(bx, 60, bw * clampf(b.hp / b.max_hp, 0.0, 1.0), 10), Color("#ff526e"))
+	draw_rect(Rect2(bx, 60, bw * clampf(t.hp[b] / t.max_hp[b], 0.0, 1.0), 10), Color("#ff526e"))
 	# 画面外にいるときの方向の矢印
 	var s := run.state
-	var rel := b.pos - s.view_center
+	var rel := t.pos[b] - s.view_center
 	if absf(rel.x) > s.view_half.x or absf(rel.y) > s.view_half.y:
 		var center := size / 2.0
 		var dir := rel.normalized()

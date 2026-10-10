@@ -395,43 +395,58 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].begin()
-	for e: Enemy in run.enemies.list:
-		if e.dead or not view.has_point(e.pos):
+	var t := run.enemies.table
+	var alive := t.alive
+	var dead := t.dead
+	var pos := t.pos
+	for i in alive.size():
+		if alive[i] == 0 or dead[i] != 0:
 			continue
+		var p := pos[i]
+		if not view.has_point(p):
+			continue
+		var type := t.type[i]
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
-		var col := Color(1.0 if e.flash > 0.0 and e.type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
-		if e.type == &"meteor":
+		var col := Color(1.0 if t.flash[i] > 0.0 and type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
+		if type == &"meteor":
 			# ストリームで再生成されても同じ岩の模様を使う。
-			var variant := posmod(e.meteor_index, 2)
-			var stage := clampi(int((1.0 - e.hp / e.max_hp) * 3.0), 0, 2)
+			var variant := posmod(t.meteor_index[i], 2)
+			var stage := clampi(int((1.0 - t.hp[i] / t.max_hp[i]) * 3.0), 0, 2)
 			var rock_key := StringName("meteor_" + str(variant) + "_damage_" + str(stage))
 			var rock_batch: InstanceBatch = _batches[rock_key]
-			rock_batch.add(e.pos, e.facing, METEOR_SHEETS[variant].get_height() / 2.0, col)
+			rock_batch.add(p, t.facing[i], METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
-		var batch: InstanceBatch = _batches.get(e.type, _batches[&"battleship"])
-		if e.type in NATIVE_SPRITES:
-			batch.add(e.pos, e.facing + PI / 2.0, e.r, col)
+		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
+		if type in NATIVE_SPRITES:
+			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
-			batch.add(e.pos, e.facing - PI / 2.0, e.r, col)
-		_draw_enemy_marks(c, e)
+			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
+		_draw_enemy_marks(c, t, i)
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
 	_draw_meteor_shards(c)
 
 ## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。
-func _draw_enemy_marks(c: CanvasItem, e: Enemy) -> void:
-	if e.elite:
-		c.draw_arc(e.pos, e.r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
-	if e.weak_arc > 0.0 and e.type != &"armored":
-		c.draw_arc(e.pos, e.r + _px(2.0), e.facing + PI - e.weak_arc, e.facing + PI + e.weak_arc, 12, Color("#ffe46b"), _px(3.0))
-	if e.charge > 0.0:
-		c.draw_arc(e.pos, e.r + _px(6.0), 0, TAU * e.charge, 24, Color(1, 0.3, 0.3, 0.8), _px(2.5))
-	if (e.r >= 25.0 or e.is_boss) and e.hp < e.max_hp:
-		var w := e.r * 1.6
-		var top := e.pos + Vector2(-w / 2.0, -e.r - _px(10.0))
+func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	if t.elite[i] != 0:
+		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
+	var weak := t.weak_arc[i]
+	if weak > 0.0 and t.type[i] != &"armored":
+		var f := t.facing[i]
+		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
+	var charge := t.charge[i]
+	if charge > 0.0:
+		c.draw_arc(p, r + _px(6.0), 0, TAU * charge, 24, Color(1, 0.3, 0.3, 0.8), _px(2.5))
+	var hp := t.hp[i]
+	var max_hp := t.max_hp[i]
+	if (r >= 25.0 or t.is_boss[i] != 0) and hp < max_hp:
+		var w := r * 1.6
+		var top := p + Vector2(-w / 2.0, -r - _px(10.0))
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
-		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, e.hp / e.max_hp), _px(4.0))), Color("#ff6b5a"))
+		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
 
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(40.0)

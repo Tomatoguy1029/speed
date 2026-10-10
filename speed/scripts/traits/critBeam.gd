@@ -2,7 +2,7 @@
 extends TraitBehavior
 
 var _next_time := 0.0
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
 func on_critical(from: Vector2) -> void:
 	if state.time < _next_time or state.phase != RunState.Phase.PLAY:
@@ -16,10 +16,11 @@ func on_critical(from: Vector2) -> void:
 	var pad := Vector2(width / 2.0, width / 2.0)
 	build.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
 	var dmg := atk() * val("damage")
-	for e: Enemy in _buf:
-		if e.dead or Geom.seg_circle_t(from, to, e.pos, e.r + width / 2.0) < 0.0:
+	var t := build.enemies.table
+	for i in _buf:
+		if t.dead[i] != 0 or Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + width / 2.0) < 0.0:
 			continue
-		build.combat.damage_enemy(e, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
+		build.combat.damage_enemy(i, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
 		if state.phase != RunState.Phase.PLAY:
 			return
 	state.emit(&"beam", {"from": from, "to": to, "width": width})

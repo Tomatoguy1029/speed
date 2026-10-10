@@ -18,7 +18,9 @@ class Rock:
 	var period := 0.0
 	var phase := 0.0
 	var destroyed := false
-	var entity: Enemy = null
+	## 敵の表で使っている行と、その敵の id（画面の近くにいない間は -1）
+	var row := -1
+	var row_id := 0
 
 ## 障害物1つ（惑星か月）
 class Body:
@@ -143,44 +145,44 @@ func _near(p: Vector2, extra: float) -> bool:
 	return d.x < state.view_half.x + extra and d.y < state.view_half.y + extra \
 		and r > cfg.planet_radius + 100.0 and r < cfg.field_radius + 100.0
 
-## 画面の近くの隕石だけを敵の配列に入れる。壊した隕石はそのランの間は戻らない。
+## 画面の近くの隕石だけを敵の表に入れる。壊した隕石はそのランの間は戻らない。
 func _stream_rocks(dt: float) -> void:
 	var t := state.world_time
+	var table := enemies.table
 	for rock in rocks:
-		var e := rock.entity
-		if e == null:
+		var i := rock.row
+		if i < 0:
 			continue
-		if e.dead:
-			if not e.hull_scattered:
+		# 撃破されて空きに戻った行は、別の敵に使い回されていることがある
+		if not enemies.is_same(i, rock.row_id) or table.dead[i] != 0:
+			if not enemies.is_same(i, rock.row_id) or table.hull_scattered[i] == 0:
 				rock.destroyed = true
-			rock.entity = null
+			rock.row = -1
 			continue
 		var pv := _rock_at(rock, t)
-		e.pos = pv[0]
-		e.vel = pv[1]
-		e.facing = rock.facing + rock.spin * t
-		if not _near(e.pos, 650.0):
-			e.dead = true
-			enemies.dirty = true
-			rock.entity = null
+		table.pos[i] = pv[0]
+		table.vel[i] = pv[1]
+		table.facing[i] = rock.facing + rock.spin * t
+		if not _near(pv[0], 650.0):
+			enemies.mark_dead(i)
+			rock.row = -1
 	_stream_t -= dt
 	if _stream_t > 0.0:
 		return
 	_stream_t = 0.2
 	var def: EnemyDef = ConfigManager.enemies.get(&"meteor")
-	for i in rocks.size():
-		var rock := rocks[i]
-		if rock.destroyed or rock.entity != null:
+	for k in rocks.size():
+		var rock := rocks[k]
+		if rock.destroyed or rock.row >= 0:
 			continue
 		var pv := _rock_at(rock, t)
 		if not _near(pv[0], 300.0):
 			continue
-		var sprite_radius := 60.0 if i % 2 == 0 else 40.0
-		var e := enemies.create(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin})
-		e.meteor_index = i
-		e.vel = pv[1]
-		rock.entity = e
-		enemies.add(e)
+		var sprite_radius := 60.0 if k % 2 == 0 else 40.0
+		var i := enemies.spawn(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
+			"meteor_index": k, "vel": pv[1]})
+		rock.row = i
+		rock.row_id = table.id[i]
 
 func _update_moons() -> void:
 	for m in moons:
@@ -293,9 +295,11 @@ func near_body(p: Vector2, margin: float) -> bool:
 				return true
 	return false
 
-## 敵が障害物をすり抜けないよう、表面で止めて横方向の速度だけ残す。
-func collide_enemy(e: Enemy, from: Vector2) -> void:
-	var hit = first_body_hit(from, e.pos, e.r)
+## 敵（行 i）が障害物をすり抜けないよう、表面で止めて横方向の速度だけ残す。
+func collide_enemy(i: int, from: Vector2) -> void:
+	var table := enemies.table
+	var r := table.r[i]
+	var hit = first_body_hit(from, table.pos[i], r)
 	if hit == null:
 		return
 	var b: Body = hit.body
@@ -303,9 +307,11 @@ func collide_enemy(e: Enemy, from: Vector2) -> void:
 	if n.length_squared() < 1e-6:
 		n = from - b.pos
 	n = n.normalized() if n.length_squared() > 0.0 else Vector2.RIGHT
-	e.pos = b.pos + n * (b.r + e.r + 0.01)
-	var vn := e.vel.dot(n)
+	table.pos[i] = b.pos + n * (b.r + r + 0.01)
+	var v := table.vel[i]
+	var vn := v.dot(n)
 	if vn < 0.0:
-		e.vel -= n * vn
-	if e.shove_time > 0.0:
-		e.shove_vel = e.vel
+		v -= n * vn
+		table.vel[i] = v
+	if table.shove_time[i] > 0.0:
+		table.shove_vel[i] = v

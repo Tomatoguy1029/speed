@@ -8,7 +8,7 @@ var drones: Array = []
 var legs: Array = []
 var _serial := 0
 var _t := 0.0
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
 func count() -> int:
 	return 1 + (tier() - 1) / 2
@@ -49,29 +49,32 @@ func tick(dt: float, busy: bool) -> void:
 	_t = 0.0
 	for d in drones:
 		var target := _nearest(d.pos, float(p("range")))
-		if target != null:
-			build.projectiles.fire_shot(d.pos, (target.pos - d.pos).angle(), atk() * float(p("damage")) * dmg_k(),
+		if target >= 0:
+			build.projectiles.fire_shot(d.pos, (build.enemies.table.pos[target] - d.pos).angle(), atk() * float(p("damage")) * dmg_k(),
 				{"color": Color("#a8ffdb"), "r": 4.0})
 
 func _hit_along(d: Dictionary, a: Vector2, b: Vector2, now: float) -> void:
 	var radius := 14.0 * cfg.character_scale
 	var pad := Vector2.ONE * radius
 	build.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _buf)
-	for e: Enemy in _buf:
-		if e.dead or float(d.hits.get(e.id, -1.0)) > now:
+	var t := build.enemies.table
+	for i in _buf:
+		if t.dead[i] != 0 or float(d.hits.get(t.id[i], -1.0)) > now:
 			continue
-		if Geom.seg_circle_t(a, b, e.pos, e.r + radius) < 0.0:
+		if Geom.seg_circle_t(a, b, t.pos[i], t.r[i] + radius) < 0.0:
 			continue
-		d.hits[e.id] = now + float(p("contact_cd"))
-		build.combat.damage_enemy(e, atk() * dmg_k() * float(p("contact_damage")), {"cause": &"drone"})
+		d.hits[t.id[i]] = now + float(p("contact_cd"))
+		build.combat.damage_enemy(i, atk() * dmg_k() * float(p("contact_damage")), {"cause": &"drone"})
 
-func _nearest(from: Vector2, range_r: float) -> Enemy:
+## 近くの敵の行番号（いなければ -1）。隕石は狙わない。
+func _nearest(from: Vector2, range_r: float) -> int:
 	build.combat.nearby(from, range_r, _buf)
-	var best: Enemy = null
+	var t := build.enemies.table
+	var best := -1
 	var bd := range_r * range_r
-	for e: Enemy in _buf:
-		var d := e.pos.distance_squared_to(from)
-		if d < bd and e.meteor_index < 0:
+	for i in _buf:
+		var d := t.pos[i].distance_squared_to(from)
+		if d < bd and t.meteor_index[i] < 0:
 			bd = d
-			best = e
+			best = i
 	return best
