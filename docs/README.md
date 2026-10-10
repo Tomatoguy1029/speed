@@ -54,6 +54,7 @@ python3 tools/check_docs.py
 - `docs/game/` の決められた文書以外のファイル
 - 個人の作業ログのファイル
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
+- [設計書](game/architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
 
 コミット前のフックを使うには、クローンごとに1回だけ次を実行する。
 

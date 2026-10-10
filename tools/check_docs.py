@@ -22,6 +22,10 @@ DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
 SELF_REF = re.compile(r"この(文書|資料|ドキュメント|一覧|章|節)|本文書")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+# 列で持つデータのコードと、その列の一覧を載せた設計書の節（表の1列目に列名をコードの書き方で書く）
+COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/game/architecture.md", "### 6.2 敵の表の列")]
+VAR = re.compile(r"^var (\w+)")
+TABLE_ROW = re.compile(r"^\|\s*`(\w+)`\s*\|")
 CODE_SPAN = re.compile(r"`[^`]*`")
 
 
@@ -40,6 +44,33 @@ def md_files(rel_dir):
 def prose(line):
     """リンク先とコードを除いた、読まれる文だけを返す。"""
     return CODE_SPAN.sub("", LINK.sub("]()", line))
+
+
+def column_table_errors():
+    """コードで宣言した列と、設計書の列の一覧の食い違い。"""
+    errors = []
+    for code, doc, heading in COLUMN_TABLES:
+        with open(os.path.join(ROOT, code), encoding="utf-8") as f:
+            cols = {m.group(1) for line in f if (m := VAR.match(line))}
+        listed = set()
+        found = False
+        with open(os.path.join(ROOT, doc), encoding="utf-8") as f:
+            for line in f:
+                if line.startswith(heading):
+                    found = True
+                    continue
+                if found and line.startswith("#"):
+                    break
+                if found and (m := TABLE_ROW.match(line)):
+                    listed.add(m.group(1))
+        if not found:
+            errors.append(f"{doc}: 列の一覧の節（{heading}）が無い")
+            continue
+        for name in sorted(cols - listed):
+            errors.append(f"{doc}: {heading} に {code} の列 `{name}` が無い")
+        for name in sorted(listed - cols):
+            errors.append(f"{doc}: {heading} の `{name}` が {code} に無い")
+    return errors
 
 
 def main():
@@ -77,6 +108,8 @@ def main():
                         dest = os.path.normpath(os.path.join(os.path.dirname(os.path.join(ROOT, path)), link))
                         if not os.path.exists(dest):
                             errors.append(f"{path}:{n}: リンク切れ（{m.group(1)}）")
+
+    errors += column_table_errors()
 
     if errors:
         print("文書の運用規定（docs/README.md）の違反：")

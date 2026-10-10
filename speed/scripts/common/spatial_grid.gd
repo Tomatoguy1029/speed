@@ -91,11 +91,13 @@ func query(lo: Vector2, hi: Vector2, out: PackedInt32Array) -> void:
 		return
 	var alive := table.alive
 	var dead := table.dead
+	# 表が空にされた後（計測用ツールなど）でも、表の長さを超えた行は読まない
+	var n := alive.size()
 	for cy in range(y0, y1 + 1):
 		for cx in range(x0, x1 + 1):
 			var i := head[cy * cols + cx]
 			while i != -1:
-				if alive[i] != 0 and dead[i] == 0:
+				if i < n and alive[i] != 0 and dead[i] == 0:
 					out.append(i)
 				i = next[i]
 
