@@ -1,0 +1,17 @@
+macOS sample: own Godot profiling process, 12 seconds, 1ms interval.
+Aggregate call stack; not timestamp-correlated with individual spike frames.
+    + ! : |   + !     : | + ! :   | 2049 Main::iteration()  (in Godot) + 1308  [0x105061b6c]
+    + ! : |   + !     : | + ! :   | + 1283 RenderingServerDefault::_draw(bool, double)  (in Godot) + 428  [0x10889cb78]
+    + ! : |   + !     : | + ! :   | + ! 1090 RendererViewport::draw_viewports(bool)  (in Godot) + 3804  [0x108701d70]
+    + ! : |   + !     : | + ! :   | + ! : 1084 RendererCompositorRD::blit_render_targets_to_screen(int, BlitToScreen const*, int)  (in Godot) + 84  [0x10897ce2c]
+    + ! : |   + !     : | + ! :   | + ! : | 1052 RenderingDevice::screen_prepare_for_drawing(int)  (in Godot) + 740  [0x108726abc]
+    + ! : |   + !     : | + ! :   | + ! : | + 1051 ???  (in Godot)  load address 0x1047d8000 + 0x1bcde10  [0x1063a5e10]
+    + ! : |   + !     : | + ! :   | + ! : | + ! 1043 -[CAMetalLayer nextDrawable]  (in QuartzCore) + 124  [0x18f30c57c]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : 1032 CAMetalLayerPrivateNextDrawableLocked(CAMetalLayer*, CAMetalDrawable**, unsigned long*)  (in QuartzCore) + 1192  [0x18f56b824]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : | 1032 _dispatch_semaphore_wait_slow  (in libdispatch.dylib) + 76  [0x185062ae8]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : |   1032 _dispatch_sema4_timedwait  (in libdispatch.dylib) + 64  [0x185095db8]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : |     1028 semaphore_timedwait_trap  (in libsystem_kernel.dylib) + 8  [0x1851d7bc8]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : |     4 semaphore_timedwait  (in libsystem_kernel.dylib) + 0  [0x1851dca54]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : 6 CAMetalLayerPrivateNextDrawableLocked(CAMetalLayer*, CAMetalDrawable**, unsigned long*)  (in QuartzCore) + 2068  [0x18f56bb90]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : | 5 -[CAMetalDrawable initWithDrawablePrivate:layer:waitStart:]  (in QuartzCore) + 360  [0x18f56c4bc]
+    + ! : |   + !     : | + ! :   | + ! : | + ! : | + 5 +[FPCAMetalLayerState drawableLifetimeStart:drawableID:surfaceID:acquisitionWaitStart:acquiredTime:]  (in FramePacing) + 144  [0x246b9215c]

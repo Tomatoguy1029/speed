@@ -70,3 +70,13 @@ Godot読み込みと画面を確認し、新しいスクリプトエラーは確
 計測データ：[performance-projectiles-2026-10-10.json](performance-projectiles-2026-10-10.json)。再計測用に `profile_run.gd` へ `--enemies=600` と `--body_benchmark=on` を追加した。
 
 参考：[GodotのMultiMesh最適化](https://docs.godotengine.org/en/4.6/tutorials/performance/using_multimesh.html)、[GDExtension](https://docs.godotengine.org/en/4.6/tutorials/scripting/gdextension/what_is_gdextension.html)。
+
+## 追記：ゲームプロセスがない状態での再計測
+
+ユーザーの指摘を受け、実行中プロセスを再確認したところGodotエディタのみで、ゲームプロセスは存在しなかった。前の確認時に存在したエディタ起動の `main.tscn` を「別のゲーム」と表現し、その状態を現在にも当てはめた説明は不正確だった。
+
+現在のHEAD `95b4338` で再計測：平均603.2体・敵弾971.1発、平均5.60ms / フレーム（178.6FPS）、p95 12.80ms、最大50.64ms。弾描画は0.419ms / フレーム。単発スパイクは残る。
+
+前回以降に世界側の更新60Hz化と弾などのPacked列化が入っている。プレイヤー側は120Hz。この再計測は前回と同じ実装の対照実験ではなく、差をプロセス競合や前回の変更だけに帰属させてはいけない。
+
+データ：[performance-projectiles-isolated-2026-10-10.json](performance-projectiles-isolated-2026-10-10.json)。

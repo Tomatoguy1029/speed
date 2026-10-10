@@ -19,6 +19,12 @@ var attacked := false
 var detail: RefCounted
 var timeline: Array = []
 var last_totals: Dictionary = {}
+var phase_trace: Array = []
+
+class FrameEnd extends Node:
+	var recorder: Node
+	func _process(_dt: float) -> void:
+		recorder._mark(&"process_end")
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
@@ -84,10 +90,21 @@ func _ready() -> void:
 			render._star_batch.hide()
 	if options.has("hz"):
 		Engine.physics_ticks_per_second = int(options.hz)
+	if options.has("fps"):
+		Engine.max_fps = int(options.fps)
 	for key in render._layers:
 		var layer: DrawLayer = render._layers[key]
 		layer.draw_fn = _timed_draw.bind(key, layer.draw_fn)
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+	if options.get("trace", "off") == "on":
+		get_tree().physics_frame.connect(_mark.bind(&"physics_begin"))
+		get_tree().process_frame.connect(_mark.bind(&"process_begin"))
+		RenderingServer.frame_pre_draw.connect(_mark.bind(&"draw_begin"))
+		RenderingServer.frame_post_draw.connect(_mark.bind(&"draw_end"))
+		var end := FrameEnd.new()
+		end.recorder = self
+		end.process_priority = 10000
+		add_child(end)
 	await get_tree().create_timer(6.0).timeout
 	run.profile.clear()
 	drawing_times.clear()
@@ -105,6 +122,8 @@ func _ready() -> void:
 		"field_seed": 1029,
 		"sparks_size": str(render.pipeline.sparks._image_size), "gpu_sparks": render.pipeline.sparks.available(),
 		"renderer": RenderingServer.get_current_rendering_method(), "physics_hz": Engine.physics_ticks_per_second,
+		"world_tick_div": run.cfg.world_tick_div, "max_fps": Engine.max_fps,
+		"vsync_mode": DisplayServer.window_get_vsync_mode(),
 		"machine": OS.get_processor_name(), "initial_enemies": run.enemies.list.size(), "adapter": RenderingServer.get_video_adapter_name()}))
 
 func _timed_draw(c: CanvasItem, key: String, original: Callable) -> void:
@@ -117,6 +136,13 @@ func _timed_draw(c: CanvasItem, key: String, original: Callable) -> void:
 	rec[0] += Time.get_ticks_usec() - before
 	rec[1] += 1
 	drawing_times[key] = rec
+	if options.get("trace", "off") == "on":
+		phase_trace.append({"name": "layer:" + key, "start_us": before - start_us,
+			"end_us": Time.get_ticks_usec() - start_us, "frame": Engine.get_process_frames()})
+
+func _mark(label: StringName) -> void:
+	if measuring:
+		phase_trace.append({"name": label, "us": Time.get_ticks_usec() - start_us, "frame": Engine.get_process_frames()})
 
 func _process(_delta: float) -> void:
 	if run == null:
@@ -131,7 +157,14 @@ func _process(_delta: float) -> void:
 	var now := Time.get_ticks_usec()
 	frames.append((now - previous_us) / 1000.0)
 	previous_us = now
-	var row := {"elapsed_ms": (now - start_us) / 1000.0, "frame_ms": frames[-1], "managers": {}, "drawing": {}}
+	var row := {"elapsed_ms": (now - start_us) / 1000.0, "frame_ms": frames[-1],
+		"engine_frame": Engine.get_process_frames(), "managers": {}, "drawing": {},
+		"frame_setup_cpu_ms": RenderingServer.get_frame_setup_time_cpu(),
+		"viewport_cpu_ms": RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid()),
+		"canvas_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
+		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
+		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
+		"enemies": run.enemies.list.size(), "hostile": run.projectiles.hostile_count()}
 	for key in run.profile:
 		var rec: Array = run.profile[key]
 		var prev: Array = last_totals.get(key, [0, 0])
@@ -191,6 +224,7 @@ func _finish(seconds: float) -> void:
 		"draw_calls": _stats(draws), "counts": counts, "managers": manager_ms, "drawing_ms_frame": draw_ms,
 		"phase": run.state.phase, "time": run.state.time, "world_time": run.state.world_time, "weapons": run.state.weapons}
 	result.timeline = timeline
+	result.phase_trace = phase_trace
 	if detail != null:
 		result.enemy_detail = detail.summary()
 	result.kills = run.state.kills
