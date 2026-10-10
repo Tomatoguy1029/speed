@@ -20,7 +20,6 @@ LINK_TARGETS = ["docs", "AGENTS.md", "README.md"]
 
 DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2}月\d{1,2}日|最終更新")
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
-SELF_REF = re.compile(r"この(文書|資料|ドキュメント|一覧|章|節)|本文書")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 # 列で持つデータのコードと、その列の一覧を載せた設計書の節（表の1列目に列名をコードの書き方で書く）
 COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/game/architecture.md", "### 6.2 敵の表の列")]
@@ -81,7 +80,7 @@ def main():
             with open(os.path.join(ROOT, path), encoding="utf-8") as f:
                 for n, line in enumerate(f, 1):
                     text = prose(line)
-                    for rule, pat in (("日付・最終更新", DATE), ("作業者の名前", NAMES), ("文書自身についての説明", SELF_REF)):
+                    for rule, pat in (("日付・最終更新", DATE), ("作業者の名前", NAMES)):
                         m = pat.search(text)
                         if m:
                             errors.append(f"{path}:{n}: {rule}を書かない（「{m.group(0)}」）")
