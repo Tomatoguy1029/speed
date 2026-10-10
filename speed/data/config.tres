@@ -98,6 +98,7 @@ enemy_approach_cycle = 18.0
 enemy_approach_time = 4.5
 enemy_approach_blend = 2.0
 enemy_roam_turn = 0.12
+enemy_face_move = 0.7
 enemy_split_overflow = 0.1
 danger_level = 2.2
 spawn_margin = 70.0

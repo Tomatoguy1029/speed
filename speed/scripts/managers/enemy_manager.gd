@@ -260,6 +260,7 @@ func _tick_chase(dt: float) -> void:
 	var appr := cfg.enemy_approach_time
 	var blend := cfg.enemy_approach_blend
 	var roam_turn := cfg.enemy_roam_turn
+	var face_move := cfg.enemy_face_move
 	var pos := t.pos
 	var vel := t.vel
 	var facing := t.facing
@@ -308,9 +309,13 @@ func _tick_chase(dt: float) -> void:
 			var v := vel[i]
 			v += (d * (speed[i] / dist) - v) * k
 			vel[i] = v
-			var f := facing[i]
-			var turn_max := turn[i] * dt
-			facing[i] = f + clampf(wrapf((aim - from).angle() - f, -PI, PI), -turn_max, turn_max)
+			# 向き：進む向きと機体への向きを混ぜ、毎秒 turn までしか回さない
+			var w := face_move * minf(1.0, v.length() / maxf(speed[i], 1.0))
+			var face := v.normalized() * w + (aim - from).normalized() * (1.0 - w)
+			if face.length_squared() > 0.0025:
+				var f := facing[i]
+				var turn_max := turn[i] * dt
+				facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
@@ -429,6 +434,16 @@ func _steer_to(i: int, target: Vector2, speed: float, accel: float, dt: float) -
 func _turn_toward(i: int, target: float, rate: float, dt: float) -> void:
 	table.facing[i] += clampf(Geom.angle_diff(target, table.facing[i]), -rate * dt, rate * dt)
 
+## 移動中の向き：進む向きと機体への向きを config.enemy_face_move の割合で混ぜた向きへ回す。
+func _turn_moving(i: int, rate: float, dt: float) -> void:
+	var t := table
+	var v := t.vel[i]
+	var spd := maxf(t.speed[i], 1.0)
+	var w := cfg.enemy_face_move * minf(1.0, v.length() / spd)
+	var face := v.normalized() * w + (state.enemy_aim - t.pos[i]).normalized() * (1.0 - w)
+	if face.length_squared() > 0.0025:
+		_turn_toward(i, face.angle(), rate, dt)
+
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
 func _chase(i: int, dt: float) -> void:
 	var t := table
@@ -444,7 +459,7 @@ func _chase(i: int, dt: float) -> void:
 		var roam_target := state.view_center + Vector2(u.x * edge * state.view_half.x, u.y * edge * state.view_half.y)
 		target = aim + (roam_target - aim) * roam
 	_steer_to(i, target, t.speed[i], t.accel[i], dt)
-	_turn_toward(i, (aim - t.pos[i]).angle(), t.turn[i], dt)
+	_turn_moving(i, t.turn[i], dt)
 
 func _dash(i: int, dt: float) -> void:
 	var t := table
@@ -499,7 +514,11 @@ func _keep_distance(i: int, dt: float) -> void:
 	var keep: float = t.def[i].params.keep
 	var target := aim + u * keep + Vector2(-u.y, u.x) * 200.0 * side
 	_steer_to(i, target, t.speed[i], t.def[i].accel, dt)
-	_turn_toward(i, (aim - t.pos[i]).angle(), 3.0, dt)
+	# 撃つ前の予告の間は機体の方を向く
+	if t.charge[i] > 0.0:
+		_turn_toward(i, (aim - t.pos[i]).angle(), 3.0, dt)
+	else:
+		_turn_moving(i, 3.0, dt)
 
 ## 発射までの時間を進める。予告の間は charge が 0〜1 で増える。撃つときに true。
 func _gun_timer(i: int, dt: float) -> bool:

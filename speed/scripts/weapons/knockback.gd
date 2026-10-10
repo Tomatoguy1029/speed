@@ -47,7 +47,7 @@ func tick(_dt: float, _busy: bool) -> void:
 			hits[t.id[other]] = true
 			var sv := t.shove_vel[i]
 			var sp := sv.length()
-			build.combat.damage_enemy(other, t.shove_dmg[i], {"cause": &"knockbackChain", "dir": sv / sp if sp > 0.0 else Vector2.ZERO, "knock": p("chain_knock")})
+			build.combat.damage_enemy(other, t.shove_dmg[i], {"cause": &"knockbackChain", "no_crit": true, "dir": sv / sp if sp > 0.0 else Vector2.ZERO, "knock": p("chain_knock")})
 			state.emit(&"ring", {"pos": t.pos[other], "radius": t.r[other] + 30.0, "color": Color("#ff986b"), "life": 0.25})
 			if state.phase != RunState.Phase.PLAY:
 				return

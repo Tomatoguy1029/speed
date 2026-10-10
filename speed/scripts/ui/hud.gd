@@ -4,6 +4,9 @@
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
+## 描けるようになったときに広がる輪の時間（実秒）
+const RING_PULSE_TIME := 0.35
+const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
@@ -20,6 +23,10 @@ var _banner := ""
 var _banner_color := Color.WHITE
 var _banner_t := 0.0
 var _warning_t := 0.0
+var _ring_usable := true
+## ポーズ中に開いている設定（なければ null）
+var _settings: UiScreen
+var _ring_pulse_t := 0.0
 
 func _ready() -> void:
 	run = get_node(run_path) as RunManager
@@ -29,7 +36,7 @@ func _ready() -> void:
 	_build_cards()
 	_build_pause()
 	_draw_button = Button.new()
-	_draw_button.text = tr("hud.draw")
+	_draw_button.text = "hud.draw"
 	_draw_button.custom_minimum_size = Vector2(120, 120)
 	_draw_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_draw_button.position = Vector2(-150, -170)
@@ -74,6 +81,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"boom")
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _settings != null:
+		return
 	var s := run.state
 	if event.is_action_pressed(&"pause"):
 		get_viewport().set_input_as_handled()
@@ -93,6 +102,7 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	_warning_t = maxf(0.0, _warning_t - delta)
+	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	queue_redraw()
 
 # ── 3択 ──────────────────────────────────────────────────────────
@@ -177,21 +187,38 @@ func _build_pause() -> void:
 	_pause_box.add_theme_constant_override("separation", 14)
 	_pause_box.visible = false
 	var title := Label.new()
-	title.text = tr("hud.pause")
+	title.text = "hud.pause"
 	title.add_theme_font_size_override("font_size", 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pause_box.add_child(title)
 	var resume := Button.new()
-	resume.text = tr("hud.resume")
+	resume.text = "hud.resume"
 	resume.custom_minimum_size = Vector2(320, 52)
 	resume.pressed.connect(func(): run.command(&"resume"))
 	_pause_box.add_child(resume)
+	var settings := Button.new()
+	settings.text = "menu.settings"
+	settings.custom_minimum_size = Vector2(320, 52)
+	settings.pressed.connect(_open_settings.bind(settings))
+	_pause_box.add_child(settings)
 	var quit := Button.new()
-	quit.text = tr("hud.quit_run")
+	quit.text = "hud.quit_run"
 	quit.custom_minimum_size = Vector2(320, 52)
 	quit.pressed.connect(func(): run.command(&"abort"))
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+
+## ポーズ中に設定を重ねて開く。戻ると閉じてポーズに戻る。
+func _open_settings(from: Button) -> void:
+	AudioManager.play(&"ui")
+	_settings = SETTINGS_SCENE.instantiate() as UiScreen
+	_settings.close_fn = func():
+		_settings.queue_free()
+		_settings = null
+		_pause_box.visible = true
+		from.grab_focus()
+	_pause_box.visible = false
+	add_child(_settings)
 
 # ── 描画（HUD） ─────────────────────────────────────────────────
 
@@ -280,17 +307,30 @@ func _draw_boss(W: float) -> void:
 		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), Color("#ff526e"))
 
 ## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 6.2）。
+## 描けるまでは同じ色を暗くして溜まり具合を見せ、描ける割合に目盛りを置く。描けるようになった瞬間に広がる輪を出す。
 func _draw_gauge_ring() -> void:
 	var s := run.state
-	var p := get_viewport().get_mouse_position()
+	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
+	var min_charge := run.cfg.draw_min_charge
+	var usable := s.gauge >= min_charge
+	if usable and not _ring_usable and not s.drawing and not s.tracing:
+		_ring_pulse_t = RING_PULSE_TIME
+	_ring_usable = usable
 	var frac := s.gauge
+	var col := Color("#ffd24a") if s.gauge >= 1.0 - 1e-6 else Color("#5dffa0")
+	if not usable:
+		col.a = 0.4
 	if s.drawing:
 		frac = 1.0 - s.draw_length / maxf(1.0, s.draw_limit)
-	var col := Color("#ffd24a") if s.gauge >= 1.0 - 1e-6 else (Color("#5dffa0") if s.gauge >= run.cfg.draw_min_charge else Color("#6b7690"))
-	if s.drawing:
 		col = Color("#c8f7ff")
-	draw_arc(p + Vector2(26, 26), 14.0, 0, TAU, 32, Color(1, 1, 1, 0.15), 4.0)
-	draw_arc(p + Vector2(26, 26), 14.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(frac, 0.0, 1.0), 32, col, 4.0)
+	draw_arc(c, 14.0, 0, TAU, 32, Color(1, 1, 1, 0.15), 4.0)
+	draw_arc(c, 14.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(frac, 0.0, 1.0), 32, col, 4.0)
+	if not s.drawing:
+		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
+		draw_line(c + tick * 10.0, c + tick * 19.0, Color(1, 1, 1, 0.9 if usable else 0.5), 2.0)
+	if _ring_pulse_t > 0.0:
+		var k := 1.0 - _ring_pulse_t / RING_PULSE_TIME
+		draw_arc(c, 14.0 + 12.0 * k, 0, TAU, 32, Color(0.36, 1.0, 0.63, 1.0 - k), 3.0)
 
 func _draw_banner() -> void:
 	if _banner == "":

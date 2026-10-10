@@ -115,7 +115,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 				state.ship_vel *= _pierce_keep(i)
 			build.on_contact(i, hit_pos, dir)
 			if crit:
-				state.hitstop = maxf(state.hitstop, 0.05 if t.dead[i] != 0 else 0.035)
+				_stop(0.05 if t.dead[i] != 0 else 0.035)
 			continue
 		# 弾かれた（仕様書 6.5・7.2）
 		state.glide = false
@@ -216,8 +216,13 @@ func _kill_stop(i: int, crit: bool) -> void:
 		return
 	var big := enemies.table.r[i] > 25.0
 	var stop := cfg.kill_hitstop * (cfg.hitstop_big_mult if big else 1.0) * (cfg.hitstop_crit_mult if crit else 1.0)
-	state.hitstop = maxf(state.hitstop, stop)
+	_stop(stop)
 	dash_stop += stop
+
+## ヒットストップを seconds 実秒以上にする。設定で切っていれば止めない。
+func _stop(seconds: float) -> void:
+	if state.hitstop_enabled:
+		state.hitstop = maxf(state.hitstop, seconds)
 
 func kill_enemy(i: int, opts := {}) -> void:
 	var t := enemies.table

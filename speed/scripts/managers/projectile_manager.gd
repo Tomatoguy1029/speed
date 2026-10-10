@@ -116,7 +116,7 @@ func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0)
 func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
 	var t := combat.enemies.table
 	_add_friend(FriendKind.DEBRIS, &"corpse", t.pos[i], vel, maxf(10.0, t.r[i] * 0.6), dmg, 0.9, true, 0,
-		t.color[i], false, 250.0, state.rng.randf() * TAU, 10.0, t.id[i])
+		t.color[i], true, 250.0, state.rng.randf() * TAU, 10.0, t.id[i])
 
 ## 味方の弾・破片を1行加え、その行番号を返す。hit_id は最初から当てたことにする敵（-1 なら無し）。
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。

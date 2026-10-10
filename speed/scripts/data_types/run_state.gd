@@ -23,6 +23,8 @@ var world_scale := 1.0
 ## ヒットストップの残り（実秒）と、突進ごとの上限の残り
 var hitstop := 0.0
 var hitstop_budget := 0.0
+## 設定でヒットストップを使うか
+var hitstop_enabled := true
 
 # ── 機体（仕様書 5） ───────────────────────────────────────────────
 var ship_pos := Vector2.ZERO

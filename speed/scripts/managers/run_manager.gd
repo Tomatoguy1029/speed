@@ -51,6 +51,8 @@ func _ready() -> void:
 	state.stage = ConfigManager.stage(state.stage_index)
 	state.rng.randomize()
 	state.hitstop_budget = cfg.kill_hitstop_cap
+	_read_settings()
+	SaveManager.settings_changed.connect(_read_settings)
 	_wire()
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups]:
@@ -114,6 +116,10 @@ func _physics_process(delta: float) -> void:
 			_dying_tick(delta)
 		RunState.Phase.FINISHING:
 			_finishing_tick(delta)
+
+## 設定のうちランに効くもの（ポーズ中に変えるとすぐ反映）。
+func _read_settings() -> void:
+	state.hitstop_enabled = bool(SaveManager.settings.hitstop)
 
 ## 更新の順番（設計書 4.3）。
 func _play_tick(real_dt: float) -> void:

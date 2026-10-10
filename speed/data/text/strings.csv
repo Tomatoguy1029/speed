@@ -21,6 +21,9 @@ settings.master_volume,全体の音量,Master
 settings.sfx_volume,効果音,Sound Effects
 settings.engine_volume,エンジン音,Engine
 settings.mute,消音（M キーでも切り替え）,Mute (also toggled with M)
+settings.effects,演出,Effects
+settings.screen_shake,画面の揺れ,Screen Shake
+settings.hitstop,ヒットストップ（敵を倒したときなどに一瞬止まる）,Hit Stop (brief freeze on kills and critical hits)
 settings.window_mode,画面モード,Display Mode
 settings.windowed,ウィンドウ,Windowed
 settings.fullscreen,フルスクリーン,Fullscreen

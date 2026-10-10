@@ -2,7 +2,7 @@
 ##
 ## セーブ（user://save.json）には、部品・強化の段階・ステージの解放・伝説のモジュール・
 ## 図鑑・記録・エンドレスのハイスコアを持つ。版番号を持たせ、版が変わったら変換する。
-## 設定（user://settings.cfg）には、音量・画面モード・言語・キー設定を持つ。
+## 設定（user://settings.cfg）には、音量・画面の揺れ・ヒットストップ・画面モード・言語・キー設定を持つ。
 extends Node
 
 signal save_changed
@@ -159,6 +159,8 @@ func default_settings() -> Dictionary:
 		"engine_volume": 0.6,
 		"muted": true,
 		"window_mode": "windowed",
+		"screen_shake": 1.0,
+		"hitstop": true,
 		"language": "ja" if OS.get_locale_language() == "ja" else "en",
 		"bindings": {},
 	}

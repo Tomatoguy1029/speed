@@ -1,4 +1,4 @@
-## 設定（仕様書 3）。音量・画面モード・言語・キー設定。変えるとすぐ反映し、設定のファイルに保存する。
+## 設定（仕様書 3）。音量・演出・画面モード・言語・キー設定。変えるとすぐ反映し、設定のファイルに保存する。
 extends UiScreen
 
 const VOLUMES := ["master_volume", "sfx_volume", "engine_volume"]
@@ -26,6 +26,13 @@ func _build() -> void:
 	mute.button_pressed = bool(SaveManager.settings.muted)
 	mute.toggled.connect(func(on): SaveManager.set_setting("muted", on))
 	%Content.add_child(mute)
+	_section(tr("settings.effects"))
+	_slider_row("screen_shake", tr("settings.screen_shake"))
+	var hitstop := CheckBox.new()
+	hitstop.text = tr("settings.hitstop")
+	hitstop.button_pressed = bool(SaveManager.settings.hitstop)
+	hitstop.toggled.connect(func(on): SaveManager.set_setting("hitstop", on))
+	%Content.add_child(hitstop)
 	_section(tr("settings.window_mode"))
 	var mode := _options(WINDOW_MODES, SaveManager.settings.window_mode)
 	mode.item_selected.connect(func(i): SaveManager.set_setting("window_mode", WINDOW_MODES[i]))

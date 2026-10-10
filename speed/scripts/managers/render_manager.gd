@@ -54,6 +54,8 @@ var trails: Array = []
 var beams: Array = []
 var bolts: Array = []
 var shake := 0.0
+## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
+var _shake_scale := 1.0
 var flash := 0.0
 var _stars: PackedVector3Array
 var _star_batch: InstanceBatch
@@ -68,6 +70,8 @@ func _ready() -> void:
 	state = run.state
 	cfg = run.cfg
 	_font = ThemeDB.fallback_font
+	_read_settings()
+	SaveManager.settings_changed.connect(_read_settings)
 	_camera = get_node(camera_path) as Camera2D
 	var world := get_node(world_path)
 	for name in ["background", "field", "exhaust", "pickups", "enemies", "projectiles", "path", "fx", "dim", "ship", "top"]:
@@ -155,6 +159,9 @@ func _build_batches() -> void:
 	_hostile_batch._setup_mesh(mesh)
 	_layers.projectiles.add_child(_hostile_batch)
 
+func _read_settings() -> void:
+	_shake_scale = float(SaveManager.settings.screen_shake)
+
 func _process(delta: float) -> void:
 	var phase := state.phase
 	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
@@ -167,7 +174,7 @@ func _process(delta: float) -> void:
 	_update_exhaust(dt)
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING:
-		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake / maxf(state.camera_zoom, 0.01)
+		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(state.camera_zoom, 0.01)
 	_camera.position = state.view_center + offset
 	_camera.zoom = Vector2(state.camera_zoom, state.camera_zoom)
 	pipeline.step(dt, _camera.position, state.camera_zoom)

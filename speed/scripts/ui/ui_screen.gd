@@ -4,6 +4,8 @@ extends Control
 
 ## false の画面（タイトル）では戻る操作を受け付けない
 @export var can_go_back := true
+## ほかの画面の上に重ねて開いたとき（ポーズ中の設定）に、戻る操作で呼ぶ処理。空なら前の画面へ戻る
+var close_fn: Callable
 
 func _ready() -> void:
 	var back := get_node_or_null("%BackButton") as Button
@@ -18,7 +20,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_back() -> void:
 	AudioManager.play(&"ui")
-	GameManager.back()
+	if close_fn.is_valid():
+		close_fn.call()
+	else:
+		GameManager.back()
 
 ## キーボードでも操作できるよう、最初のボタンにフォーカスを置く。
 func _focus_first() -> void:
