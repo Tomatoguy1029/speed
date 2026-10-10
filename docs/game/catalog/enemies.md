@@ -2,7 +2,7 @@
 
 [一覧の運用ルール](rules.md) に従う。type ID は demo から引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](../spec.md) の4.2・11章。
 
-数値は文書で管理しない。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
+数値の正は `.tres`。基礎値（半径・HP・装甲・速度・接触ダメージ・経験値・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
 ## 通常敵
 
