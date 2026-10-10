@@ -53,6 +53,10 @@ var hull_scattered := PackedByteArray()
 var speed := PackedFloat64Array()
 var accel := PackedFloat64Array()
 var turn := PackedFloat64Array()
+## 天体の近傍確認の省略：前回確かめたときの、天体の表面までの距離（負なら次の更新で確かめる）・位置・世界時刻
+var body_gap := PackedFloat64Array()
+var body_gap_pos := PackedVector2Array()
+var body_gap_time := PackedFloat64Array()
 
 # ── 追跡の広域移動：追跡する雑魚（仕様書 11.5）─────────────────────
 

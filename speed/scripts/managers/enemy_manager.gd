@@ -143,6 +143,9 @@ func _reset_row(i: int) -> void:
 	t.speed[i] = 0.0
 	t.accel[i] = 2.0
 	t.turn[i] = 4.0
+	t.body_gap[i] = -1.0
+	t.body_gap_pos[i] = Vector2.ZERO
+	t.body_gap_time[i] = 0.0
 	t.roam_phase[i] = 0.0
 	t.roam_angle[i] = 0.0
 	t.roam_radius[i] = 0.0
@@ -273,6 +276,8 @@ func _tick_chase(dt: float) -> void:
 	var accel := t.accel
 	var turn := t.turn
 	var r := t.r
+	var now := state.world_time
+	var body_move := field.body_speed_max
 	for i in beh_rows[EnemyTable.Beh.CHASE]:
 		if dead[i] != 0:
 			continue
@@ -307,22 +312,33 @@ func _tick_chase(dt: float) -> void:
 			var turn_max := turn[i] * dt
 			facing[i] = f + clampf(wrapf((aim - from).angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
-		if field.near_body(pos[i], r[i] + vel[i].length() * dt):
+		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
 
 ## 追跡以外の行動の種類 b の雑魚を進める。
 func _tick_behavior(b: int, dt: float) -> void:
 	var t := table
+	var now := state.world_time
+	var body_move := field.body_speed_max
+	var pos := t.pos
+	var vel := t.vel
+	var age := t.age
+	var hit_cd := t.hit_cd
+	var flash := t.flash
+	var dead := t.dead
+	var shove_time := t.shove_time
+	var knock_t := t.knock_t
+	var r := t.r
 	for i in beh_rows[b]:
-		if t.dead[i] != 0:
+		if dead[i] != 0:
 			continue
-		t.age[i] += dt
-		if t.hit_cd[i] > 0.0:
-			t.hit_cd[i] -= dt
-		if t.flash[i] > 0.0:
-			t.flash[i] -= dt
-		var from := t.pos[i]
-		if t.shove_time[i] > 0.0 or t.knock_t[i] > 0.0:
+		age[i] += dt
+		if hit_cd[i] > 0.0:
+			hit_cd[i] -= dt
+		if flash[i] > 0.0:
+			flash[i] -= dt
+		var from := pos[i]
+		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
 			match b:
@@ -334,7 +350,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.GUNNER:
 					_keep_distance(i, dt)
 					if _gun_timer(i, dt):
-						projectiles.fire_enemy(i, (state.enemy_aim - t.pos[i]).angle(), t.def[i].params.bullet_speed, &"bullet")
+						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), t.def[i].params.bullet_speed, &"bullet")
 				EnemyTable.Beh.MISSILE:
 					_keep_distance(i, dt)
 					if _gun_timer(i, dt):
@@ -345,9 +361,25 @@ func _tick_behavior(b: int, dt: float) -> void:
 						fire_volley(i)
 				EnemyTable.Beh.DRIFT:
 					t.facing[i] += t.spin[i] * dt
-			t.pos[i] += t.vel[i] * dt
-		if field.near_body(t.pos[i], t.r[i] + t.vel[i].length() * dt):
+			pos[i] += vel[i] * dt
+		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
+
+## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldManager.near_body と同じ条件）。
+## 前回確かめたときの天体の表面までの距離から、その後に動いた距離と月が動けた距離を引き、
+## まだ margin より遠ければ確かめずに false を返す。瞬間移動も、前回の位置からの距離に入る。
+func _near_body(i: int, p: Vector2, margin: float, now: float, body_speed: float) -> bool:
+	var t := table
+	var gap := t.body_gap[i]
+	if gap >= 0.0:
+		var travelled := p.distance_to(t.body_gap_pos[i]) + (now - t.body_gap_time[i]) * body_speed
+		if gap - travelled > margin:
+			return false
+	gap = field.body_gap(p, 4.0)
+	t.body_gap[i] = maxf(gap, 0.0)
+	t.body_gap_pos[i] = p
+	t.body_gap_time[i] = now
+	return gap < margin
 
 ## 押し出されている・吹き飛ばされている間の動き（行動の種類によらない）。
 func _update_pushed(i: int, dt: float) -> void:
