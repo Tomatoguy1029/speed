@@ -61,7 +61,7 @@ func _ready() -> void:
 	run.field.moons.clear()
 	run.field.dust.clear()
 	run.field.rocks.clear()
-	run.enemies.list.clear()
+	run.enemies.list = []
 	run.field.setup(run.state, run.cfg)
 	run.ship.setup(run.state, run.cfg)
 	run.state.world_time = 0.0
@@ -194,7 +194,7 @@ func _process(_delta: float) -> void:
 	counts.enemies += run.enemies.list.size()
 	counts.hostile += run.projectiles.hostile_count()
 	counts.friendly += run.projectiles.friend_count()
-	counts.gems += run.pickups.gem_pos.size()
+	counts.gems += run.pickups.gem_slots.live
 	if now - start_us >= int(float(options.get("seconds", "6")) * 1000000.0):
 		measuring = false
 		_finish((now - start_us) / 1000000.0)
@@ -255,10 +255,13 @@ func _benchmark_bodies() -> Dictionary:
 	for sample in 20:
 		for mode in 2:
 			var start := Time.get_ticks_usec()
+			var hostile_alive := run.projectiles.hostile_alive
 			var hostile_pos := run.projectiles.hostile_pos
 			var hostile_vel := run.projectiles.hostile_vel
 			var hostile_r := run.projectiles.hostile_r
-			for i in hostile_pos.size():
+			for i in hostile_alive.size():
+				if hostile_alive[i] == 0:
+					continue
 				var from := hostile_pos[i] - hostile_vel[i] / 120.0
 				if (sample + mode) % 2 == 0:
 					_old_body_hit(from, hostile_pos[i], hostile_r[i])

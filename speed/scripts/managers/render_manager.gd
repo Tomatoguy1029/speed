@@ -357,18 +357,20 @@ func _draw_pickups(c: CanvasItem) -> void:
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
 	gems.begin()
+	var gem_alive := p.gem_alive
 	var gem_pos := p.gem_pos
-	for i in gem_pos.size():
+	for i in gem_alive.size():
 		var pos := gem_pos[i]
-		if view.has_point(pos):
+		if gem_alive[i] != 0 and view.has_point(pos):
 			gems.add(pos, 0.0, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
+	var coin_alive := p.coin_alive
 	var coin_pos := p.coin_pos
-	for i in coin_pos.size():
+	for i in coin_alive.size():
 		var pos := coin_pos[i]
-		if view.has_point(pos):
+		if coin_alive[i] != 0 and view.has_point(pos):
 			_coin_batch.add(pos, 0.0, cs, COIN_COLOR)
 	_coin_batch.end()
 	for cap: Pickup in p.capsules:
@@ -439,10 +441,11 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		if pts.size() > 1:
 			c.draw_polyline(pts, Color(1.0, 0.6, 0.25, 0.6 * a), _px(3.0))
 	var pr := run.projectiles
+	var friend_alive := pr.friend_alive
 	var friend_pos := pr.friend_pos
-	for i in friend_pos.size():
+	for i in friend_alive.size():
 		var pos := friend_pos[i]
-		if not view.has_point(pos):
+		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		var r := pr.friend_r[i]
 		if pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
@@ -457,11 +460,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			var dir := pr.friend_vel[i].normalized()
 			c.draw_line(pos - dir * r * 2.2, pos + dir * r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), r * 0.9))
 	_hostile_batch.begin()
+	var hostile_alive := run.projectiles.hostile_alive
 	var hostile_pos := run.projectiles.hostile_pos
 	var hostile_r := run.projectiles.hostile_r
-	for i in hostile_pos.size():
+	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
-		if view.has_point(pos):
+		if hostile_alive[i] != 0 and view.has_point(pos):
 			_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
 	_hostile_batch.end()
 

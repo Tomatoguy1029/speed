@@ -27,7 +27,7 @@ func _preview() -> void:
 	for i in run.field.moons.size():
 		run.field.moons[i].pos = Vector2(530 + 220 * i, 300)
 		run.field.moons[i].r = 85.0
-	run.enemies.list.clear()
+	run.enemies.list = []
 	var ids := ["splitling", "swarm", "drifter", "darter", "gunner",
 		"splitter", "missile", "armored", "titan", "battleship"]
 	for i in ids.size():
@@ -53,7 +53,7 @@ func _preview() -> void:
 	flashed.flash = 1.0
 	run.enemies.add(flashed)
 	if "--damage-preview" in OS.get_cmdline_user_args():
-		run.enemies.list.clear()
+		run.enemies.list = []
 		state.phase = RunState.Phase.PLAY
 		var renderer := game.get_node("Managers/RenderManager") as RenderManager
 		for variant in 2:
@@ -75,7 +75,7 @@ func _preview() -> void:
 		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
 		run.build.weapon_behaviors[&"W06"] = drone
 	if "--path-preview" in OS.get_cmdline_user_args() or "--trace-preview" in OS.get_cmdline_user_args():
-		run.enemies.list.clear()
+		run.enemies.list = []
 		state.phase = RunState.Phase.PLAY
 		var points := PackedVector2Array([Vector2(-420, -160), Vector2(300, 160),
 			Vector2(-300, 160), Vector2(300, -160), Vector2(-300, -160), Vector2(420, 160)])
@@ -84,7 +84,7 @@ func _preview() -> void:
 		state.draw_points = points
 		state.trace_path = points
 	if "--smoothing-preview" in OS.get_cmdline_user_args():
-		run.enemies.list.clear()
+		run.enemies.list = []
 		state.phase = RunState.Phase.PLAY
 		state.drawing = true
 		state.tracing = false
@@ -120,8 +120,9 @@ func _preview() -> void:
 			state.ship_pos = Vector2(0, -120 + (lv - 1) * 60)
 			weapon.tick(float(weapon.p("interval_by_level")[lv - 1]), false)
 		var pr := run.projectiles
-		for i in pr.friend_count():
-			pr.friend_pos[i] += pr.friend_vel[i] * 0.08
+		for i in pr.friend_alive.size():
+			if pr.friend_alive[i] != 0:
+				pr.friend_pos[i] += pr.friend_vel[i] * 0.08
 		state.ship_pos = Vector2.ZERO
 		var drone = load("res://scripts/weapons/drone.gd").new()
 		drone.setup(run.build, ConfigManager.weapons[&"W06"])
