@@ -9,7 +9,6 @@
 | `docs/game/` | 基盤の資料。決まった今の状態だけを書く |
 | `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](game/catalog/rules.md) |
 | `docs/proposals/` | まだ採用していない案（画面案・外観案など） |
-| `docs/art/` | 画像の資料 |
 | `docs/logs/` | 計測・実装などの報告 |
 
 `docs/game/` に置ける文書は次のものだけ。増やすときは、この表と `tools/check_docs.py` を同じ作業で直す。

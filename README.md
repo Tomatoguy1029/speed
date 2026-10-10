@@ -33,7 +33,6 @@ godot --editor --path speed
 | `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/logs/` | 本番の計測・実装の報告 |
 | `docs/proposals/` | まだ採用していない案 |
-| `docs/art/` | 本番の画像の資料 |
 | `demo/docs/` | demo の仕様・課題 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
