@@ -15,6 +15,7 @@ const REBINDABLE := {
 	&"card_3": "3択の3枚目",
 	&"reroll": "3択の引き直し",
 	&"debug_panel": "調整パネル（開発版）",
+	&"debug_perf": "性能の表示（開発版）",
 }
 
 ## アクション → 既定のキー（物理キー）。
@@ -27,6 +28,7 @@ const DEFAULT_KEYS := {
 	&"card_3": KEY_3,
 	&"reroll": KEY_R,
 	&"debug_panel": KEY_P,
+	&"debug_perf": KEY_F3,
 }
 
 ## 既定の割り当てを InputMap に登録する。何度呼んでもよい。

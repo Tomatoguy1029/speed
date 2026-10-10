@@ -33,6 +33,9 @@ func _ready() -> void:
 	SaveManager.data = SaveManager.default_data()
 	GameManager.run_stage = 1
 	GameManager.run_endless = false
+	if options.has("overlay"):
+		# --overlay=compact|detail で性能の表示を出した状態で始める
+		PerfOverlay.saved_mode = PerfOverlay.Mode.DETAIL if options.overlay == "detail" else PerfOverlay.Mode.COMPACT
 	var scene := preload("res://scenes/run/run.tscn").instantiate()
 	add_child(scene)
 	run = scene.get_node("Managers/RunManager")
