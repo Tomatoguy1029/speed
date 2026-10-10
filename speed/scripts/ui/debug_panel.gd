@@ -85,7 +85,7 @@ func _ready() -> void:
 	_module.add_theme_font_size_override("font_size", 15)
 	for table in [ConfigManager.weapons, ConfigManager.traits]:
 		for def in ConfigManager.sorted(table):
-			_module.add_item("%s %s" % [def.id, def.display_name])
+			_module.add_item("%s %s" % [def.id, def.get_display_name()])
 			_module.set_item_metadata(_module.item_count - 1, def.id)
 	row.add_child(_module)
 	_levels = SpinBox.new()

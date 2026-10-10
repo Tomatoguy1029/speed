@@ -40,7 +40,7 @@ theme_override_constants/separation = 20
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
-text = "メインメニュー"
+text = "menu.main_menu"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -58,24 +58,23 @@ theme_override_constants/separation = 12
 unique_name_in_owner = true
 custom_minimum_size = Vector2(320, 52)
 layout_mode = 2
-text = "ステージ選択"
+text = "menu.stage_select"
 
 [node name="UpgradeButton" type="Button" parent="Margin/Layout/Scroll/Content"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(320, 52)
 layout_mode = 2
-text = "機体の強化"
+text = "menu.upgrade"
 
 [node name="EncyclopediaButton" type="Button" parent="Margin/Layout/Scroll/Content"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(320, 52)
 layout_mode = 2
-text = "図鑑"
+text = "menu.encyclopedia"
 
 [node name="Coins" type="Label" parent="Margin/Layout/Scroll/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "部品 0"
 
 [node name="Footer" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -85,4 +84,4 @@ theme_override_constants/separation = 16
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 52)
 layout_mode = 2
-text = "戻る"
+text = "common.back"

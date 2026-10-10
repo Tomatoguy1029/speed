@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T05"
 code_id = &"killSonic"
-display_name = "連鎖ソニック"
-description = "1回で何体も倒すと衝撃波"
 params = {
 "radius_base": 275.0,
 "radius_per": 45.0,

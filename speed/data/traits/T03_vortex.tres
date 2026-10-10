@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T03"
 code_id = &"vortex"
-display_name = "余韻の渦"
-description = "線の終点に、敵を吸い寄せる渦"
 params = {
 "life_base": 1.5,
 "life_per": 0.4,

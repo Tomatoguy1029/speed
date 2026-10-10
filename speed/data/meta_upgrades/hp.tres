@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"hp"
-display_name = "機体フレーム"
-description = "最大 HP +15"
 stat = &"max_hp"
 per_level = 15.0
 costs = PackedInt32Array(20, 40, 70, 110, 160)

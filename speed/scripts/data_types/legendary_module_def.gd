@@ -12,14 +12,6 @@ const EDITOR_ORDER := 8
 ## モジュールを見分ける名前。ステージのデータとセーブがこの名前で指す。
 ## 単位：文字
 @export var id: StringName
-## 名前
-## 図鑑に出る名前。
-## 単位：文字
-@export var display_name: String
-## 説明
-## 図鑑に出る説明。
-## 単位：文字
-@export_multiline var description: String
 ## 落とすボス
 ## このモジュールを落とすボスの ID。
 ## 単位：文字
@@ -32,3 +24,10 @@ const EDITOR_ORDER := 8
 ## 図鑑の専用画像。未設定なら効果イメージ／仮の部品図を表示する。
 @export_group("図鑑")
 @export var preview_texture: Texture2D
+
+## 画面に出る名前と説明。文章の正は res://data/text/strings.csv の legendary.<ID>.name／.desc。
+func get_display_name() -> String:
+	return tr("legendary.%s.name" % id)
+
+func get_description() -> String:
+	return tr("legendary.%s.desc" % id)

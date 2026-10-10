@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"xp"
-display_name = "学習回路"
-description = "経験値 +8%"
 stat = &"xp"
 per_level = 0.08
 costs = PackedInt32Array(25, 50, 90, 140, 210)

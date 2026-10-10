@@ -42,8 +42,8 @@ const PARAMS_DOCS := {
 ## 単位：—
 @export var params: Dictionary
 
-## 見分けるための ID と、画面に出る名前・説明
-@export_group("名前と ID")
+## 見分けるための ID
+@export_group("ID")
 ## 管理 ID
 ## 特性を見分ける番号（T01 など）。文書の一覧と同じ番号。
 ## 単位：文字
@@ -52,15 +52,14 @@ const PARAMS_DOCS := {
 ## 発動の処理のファイル名と対応する名前。変えると動かなくなる。
 ## 単位：文字
 @export var code_id: StringName
-## 名前
-## 3択のカード・図鑑に出る名前。
-## 単位：文字
-@export var display_name: String
-## 説明
-## 3択のカード・図鑑に出る説明。
-## 単位：文字
-@export_multiline var description: String
 
 ## 図鑑の専用画像。未設定なら効果イメージ／仮の部品図を表示する。
 @export_group("図鑑")
 @export var preview_texture: Texture2D
+
+## 画面に出る名前と説明。文章の正は res://data/text/strings.csv の trait.<ID>.name／.desc。
+func get_display_name() -> String:
+	return tr("trait.%s.name" % id)
+
+func get_description() -> String:
+	return tr("trait.%s.desc" % id)

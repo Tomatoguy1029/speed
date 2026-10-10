@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"atk"
-display_name = "衝角素材"
-description = "攻撃力 +6%"
 stat = &"attack"
 per_level = 0.06
 costs = PackedInt32Array(20, 40, 70, 110, 160)

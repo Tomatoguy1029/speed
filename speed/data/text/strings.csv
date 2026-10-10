@@ -1,0 +1,175 @@
+keys,ja,en
+,ゲーム中に表示する文章のマスタ。1行が1つの文章で、ja 列が日本語、en 列が英語。設定の「言語」で切り替える。,
+,キーは「場所.項目」の形で、コードと画面がこのキーで文章を読む。武器・特性・伝説のモジュール・機体の強化は <種類>.<ID>.name と .desc（ID は .tres の id）、ステージは stage.<番号>.name。,
+,{n} などの波かっこは、ゲームが数値や名前に置き換える場所。両方の言語で同じ名前を使う。,
+,キーが空の行はこの説明と見出しで、ゲームは読まない。,
+,■ 共通,
+common.back,戻る,Back
+common.to_main_menu,メインメニューに戻る,Back to Main Menu
+common.parts,部品 {n},Parts {n}
+,■ タイトル・メインメニュー,
+menu.start,ゲームスタート,Start Game
+menu.settings,設定,Settings
+menu.quit,終了,Quit
+menu.main_menu,メインメニュー,Main Menu
+menu.stage_select,ステージ選択,Stage Select
+menu.upgrade,機体の強化,Ship Upgrades
+menu.encyclopedia,図鑑,Codex
+,■ 設定,
+settings.volume,音量,Volume
+settings.master_volume,全体の音量,Master
+settings.sfx_volume,効果音,Sound Effects
+settings.engine_volume,エンジン音,Engine
+settings.mute,消音（M キーでも切り替え）,Mute (also toggled with M)
+settings.window_mode,画面モード,Display Mode
+settings.windowed,ウィンドウ,Windowed
+settings.fullscreen,フルスクリーン,Fullscreen
+settings.exclusive,排他フルスクリーン,Exclusive Fullscreen
+settings.language,言語,Language
+settings.language_ja,日本語,日本語
+settings.language_en,English,English
+settings.key_bindings,キー設定（ボタンを押してから、割り当てるキーを押す）,"Key Bindings (click a button, then press the key to assign)"
+settings.reset_bindings,キー設定を初期値に戻す,Reset Key Bindings
+settings.no_key,（なし）,(None)
+settings.press_key,キーを押す…,Press a key…
+,■ キー設定のアクション（action.<アクション名>）,
+action.draw_alt,描画の補助,Draw (Assist)
+action.pause,ポーズ,Pause
+action.mute,消音の切り替え,Toggle Mute
+action.card_1,3択の1枚目,Card 1
+action.card_2,3択の2枚目,Card 2
+action.card_3,3択の3枚目,Card 3
+action.reroll,3択の引き直し,Reroll Cards
+action.debug_panel,調整パネル（開発版）,Tuning Panel (Dev Build)
+action.debug_perf,性能の表示（開発版）,Performance Overlay (Dev Build)
+,■ ステージ選択,
+stage_select.stage,ステージ {n}　{name},Stage {n}  {name}
+stage_select.locked,ステージ {n}　（前のステージをクリアすると選べる）,Stage {n}  (Clear the previous stage to unlock)
+stage_select.endless,エンドレス（準備中）,Endless (Coming Soon)
+,■ ラン中（HUD・3択・ポーズ）,
+hud.draw,描く,Draw
+hud.kills,撃破 {n},Kills {n}
+hud.speed,{speed} km/s　上限 {max}　最高 {peak},{speed} km/s  Max {max}  Peak {peak}
+hud.warning,WARNING!!,WARNING!!
+hud.clear,CLEAR!,CLEAR!
+hud.game_over,GAME OVER,GAME OVER
+hud.levelup_title,レベルアップ　1枚選ぶ（クリック／1〜3）,Level Up: Pick One (Click / 1–3)
+hud.start_title,最初の武器を1つ選ぶ（クリック／1〜3）,Choose Your First Weapon (Click / 1–3)
+hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
+hud.pause,ポーズ,Paused
+hud.resume,続ける,Resume
+hud.quit_run,メインメニューに戻る（このランは残らない）,Back to Main Menu (This Run Is Lost)
+card.new_weapon,新しい武器,New Weapon
+card.new_trait,新しい特性,New Trait
+card.weapon_up,武器強化,Weapon Upgrade
+card.trait_up,特性強化,Trait Upgrade
+card.first_weapon,最初の武器,First Weapon
+card.heal_tag,回復,Repair
+card.heal_name,緊急修理,Emergency Repair
+card.heal_desc,HP を 30% 回復,Restores 30% HP
+,■ 結果,
+result.title,結果,Results
+result.cleared,クリア,Cleared
+result.failed,失敗,Failed
+result.retry,もう一回やる,Play Again
+result.stage,ステージ {n},Stage {n}
+result.time,時間　{time},Time  {time}
+result.kills,撃破　{n},Kills  {n}
+result.level,レベル　{n},Level  {n}
+result.peak_speed,最高速度　{speed} km/s,Top Speed  {speed} km/s
+result.parts,獲得した部品　{n},Parts Earned  {n}
+result.legendary,手に入れた伝説のモジュール　{name},Legendary Module Found  {name}
+result.fastest,最速クリア　{time},Fastest Clear  {time}
+,■ 機体の強化,
+upgrade.row,{name}　{desc}　（{lv} / {max}）,{name}  {desc}  ({lv} / {max})
+upgrade.buy,強化（部品 {n}）,Upgrade ({n} Parts)
+upgrade.max,最大,Maxed
+,■ 図鑑,
+codex.title,図鑑　（{known} / {total}）,Codex  ({known} / {total})
+codex.weapons,武器,Weapons
+codex.traits,特性,Traits
+codex.legendary,伝説のモジュール,Legendary Modules
+codex.unknown,未入手,Undiscovered
+codex.unknown_name,？？？,???
+codex.unknown_detail,まだ手に入れていない,Not obtained yet.
+codex.art_custom,専用ビジュアル,Artwork
+codex.art_placeholder,仮ビジュアル（専用素材未設定）,Placeholder (No Artwork Yet)
+codex.art_effect,効果イメージ,Effect Preview
+,■ 武器（weapon.<ID>）,
+weapon.W01.name,ブラスター,Blaster
+weapon.W01.desc,進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる,"Fires automatically in your heading. Levels raise damage, fire rate, shot count and piercing."
+weapon.W02.name,散弾砲,Scattergun
+weapon.W02.desc,進む向きへ扇状に撃つ。群れに向けて進むとまとめて当たる,Fires a spread in your heading. Fly at a swarm to hit many at once.
+weapon.W03.name,吹き飛ばし衝角,Knockback Ram
+weapon.W03.desc,高速で触れた敵を進む向きへ吹き飛ばし、ほかの敵にぶつける,Enemies you touch at high speed are knocked forward into other enemies.
+weapon.W04.name,接触波動,Contact Wave
+weapon.W04.desc,高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る,Every high-speed contact sends out a wave. Works even when you bounce off.
+weapon.W05.name,バリアシステム,Barrier System
+weapon.W05.desc,周りに定期的な波動を出し、敵の弾を防ぐ,Emits waves around you at intervals and blocks enemy shots.
+weapon.W06.name,追走ドローン,Chaser Drones
+weapon.W06.desc,周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する,"Orbit and shoot, then trail your dash line and strike enemies they touch."
+weapon.W07.name,軌跡機雷,Trail Mines
+weapon.W07.desc,高速で実際に通った線に機雷を残す。遅れて入った敵を爆破,Leaves mines along the line you flew at high speed. Blasts enemies that wander in.
+weapon.W08.name,ソニックブーム,Sonic Boom
+weapon.W08.desc,駆け抜け始めと一定間隔で、進路ごと大きな衝撃波,A huge shockwave along your path when a dash starts and at regular intervals.
+weapon.W17.name,接触電撃,Contact Arc
+weapon.W17.desc,敵に触れると、近くの敵へ電撃がつながる。Lv ごとにつながる数が増える,Touching an enemy arcs lightning to nearby enemies. Each level chains to more.
+weapon.W23.name,後方ブラスター,Rear Blaster
+weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
+,■ 特性（trait.<ID>）,
+trait.T01.name,終端爆縮,End Implosion
+trait.T01.desc,線の終点で爆発,Explodes at the end of your line.
+trait.T03.name,余韻の渦,Lingering Vortex
+trait.T03.desc,線の終点に、敵を吸い寄せる渦,Leaves a vortex at the end of your line that pulls enemies in.
+trait.T04.name,満タン突撃,Full-Charge Assault
+trait.T04.desc,満タンから使うと、装甲を無視して威力も上がる,Starting from a full gauge ignores armor and boosts damage.
+trait.T05.name,連鎖ソニック,Chain Sonic
+trait.T05.desc,1回で何体も倒すと衝撃波,Defeating many enemies in one line releases a shockwave.
+trait.T06.name,クリティカルランス,Critical Lance
+trait.T06.desc,クリティカルのたびに前方へ貫くビーム,Every critical hit fires a piercing beam forward.
+trait.T07.name,急速充填,Quick Charge
+trait.T07.desc,ゲージが早く溜まる（充填速度 +25% ずつ）,The gauge fills faster (+25% charge speed each).
+trait.T08.name,大容量チャージ,High-Capacity Charge
+trait.T08.desc,1回で描ける長さが伸びる（容量 +20% ずつ）,Draw longer lines in one go (+20% capacity each).
+trait.T09.name,クリティカル率,Critical Rate
+trait.T09.desc,クリティカルが出やすくなる（+8% ずつ）,Critical hits happen more often (+8% each).
+trait.T10.name,最高速度,Top Speed
+trait.T10.desc,速くなり、描ける長さも伸びる（+12% ずつ）,Fly faster and draw longer lines (+12% each).
+trait.T11.name,攻撃力,Attack Power
+trait.T11.desc,すべての攻撃が強くなる（+20% ずつ）,All attacks get stronger (+20% each).
+trait.T12.name,広域回収,Wide Pickup
+trait.T12.desc,遠くのアイテムも拾える（回収範囲 +30% ずつ）,Collect items from farther away (+30% pickup range each).
+trait.T13.name,反応波動,Reactive Wave
+trait.T13.desc,ダメージを受けたとき、周りを押し返す,Pushes nearby enemies away when you take damage.
+trait.T14.name,軌跡延長,Trail Extension
+trait.T14.desc,描ける長さが伸びる（+25% ずつ）,Draw longer lines (+25% each).
+,■ 伝説のモジュール（legendary.<ID>）,
+legendary.legendary_compass.name,羅針盤のモジュール,Compass Module
+legendary.legendary_compass.desc,らしんばん座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Pyxis was freed.
+legendary.legendary_keel.name,竜骨のモジュール,Keel Module
+legendary.legendary_keel.desc,りゅうこつ座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Carina was freed.
+legendary.legendary_sail.name,帆のモジュール,Sail Module
+legendary.legendary_sail.desc,ほ座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Vela was freed.
+legendary.legendary_stern.name,船尾のモジュール,Stern Module
+legendary.legendary_stern.desc,とも座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Puppis was freed.
+,■ 機体の強化（meta.<ID>）,
+meta.atk.name,衝角素材,Ram Plating
+meta.atk.desc,攻撃力 +6%,Attack +6%
+meta.charge.name,充電効率,Charge Efficiency
+meta.charge.desc,ゲージの充填時間 -5%,Gauge charge time -5%
+meta.hp.name,機体フレーム,Hull Frame
+meta.hp.desc,最大 HP +15,Max HP +15
+meta.pickup.name,回収装置,Collector
+meta.pickup.desc,回収範囲 +15%,Pickup range +15%
+meta.reroll.name,演算予備,Spare Processor
+meta.reroll.desc,3択のリロール +1回,Card rerolls +1
+meta.speed.name,主推進器,Main Thruster
+meta.speed.desc,最高速度 +5%,Top speed +5%
+meta.xp.name,学習回路,Learning Circuit
+meta.xp.desc,経験値 +8%,XP +8%
+,■ ステージ（stage.<番号>）,
+stage.1.name,いっかくじゅう座の星系,Monoceros System
+stage.2.name,ケンタウルス座の星系,Centaurus System
+stage.3.name,おおいぬ座の星系,Canis Major System
+stage.4.name,うみへび座の星系,Hydra System
+stage.5.name,元凶の待つ星系,Where the Source Awaits

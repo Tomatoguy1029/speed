@@ -15,5 +15,3 @@ params = {
 }
 id = &"W23"
 code_id = &"rear"
-display_name = "後方ブラスター"
-description = "機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇"

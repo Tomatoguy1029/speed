@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"W02"
 code_id = &"scatter"
-display_name = "散弾砲"
-description = "進む向きへ扇状に撃つ。群れに向けて進むとまとめて当たる"
 level_steps = PackedInt32Array(1, 3, 5, 6, 8)
 params = {
 "interval": 1.05,

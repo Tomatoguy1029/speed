@@ -9,14 +9,14 @@ func _ready() -> void:
 		b.custom_minimum_size = Vector2(420, 56)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		var unlocked := SaveManager.is_stage_unlocked(i)
-		b.text = ("ステージ %d　%s" % [i, def.display_name]) if unlocked else ("ステージ %d　（前のステージをクリアすると選べる）" % i)
+		b.text = tr("stage_select.stage").format({n = i, name = def.get_display_name()}) if unlocked else tr("stage_select.locked").format({n = i})
 		b.disabled = not unlocked
 		b.pressed.connect(_start.bind(i))
 		%Content.add_child(b)
 	var endless := Button.new()
 	endless.custom_minimum_size = Vector2(420, 56)
 	endless.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	endless.text = "エンドレス（準備中）"
+	endless.text = tr("stage_select.endless")
 	endless.disabled = true
 	%Content.add_child(endless)
 	super()

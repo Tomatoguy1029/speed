@@ -17,6 +17,7 @@ var _cards_row: HBoxContainer
 var _pause_box: VBoxContainer
 var _draw_button: Button
 var _banner := ""
+var _banner_color := Color.WHITE
 var _banner_t := 0.0
 var _warning_t := 0.0
 
@@ -28,7 +29,7 @@ func _ready() -> void:
 	_build_cards()
 	_build_pause()
 	_draw_button = Button.new()
-	_draw_button.text = "描く"
+	_draw_button.text = tr("hud.draw")
 	_draw_button.custom_minimum_size = Vector2(120, 120)
 	_draw_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_draw_button.position = Vector2(-150, -170)
@@ -51,10 +52,12 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"boss_spawn":
 				_warning_t = 3.0
 			&"clear_banner":
-				_banner = "CLEAR!"
+				_banner = tr("hud.clear")
+				_banner_color = Color("#ffe46b")
 				_banner_t = 99.0
 			&"game_over":
-				_banner = "GAME OVER"
+				_banner = tr("hud.game_over")
+				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
 			&"levelup":
 				AudioManager.play(&"levelup", -6.0)
@@ -102,7 +105,7 @@ func _build_cards() -> void:
 	_cards_box.visible = false
 	var title := Label.new()
 	_cards_title = title
-	title.text = "レベルアップ　1枚選ぶ（クリック／1〜3）"
+	title.text = tr("hud.levelup_title")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_cards_box.add_child(title)
 	_cards_row = HBoxContainer.new()
@@ -140,9 +143,9 @@ func _show_cards() -> void:
 		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
 	var start: bool = run.state.start_pick
-	_cards_title.text = "最初の武器を1つ選ぶ（クリック／1〜3）" if start else "レベルアップ　1枚選ぶ（クリック／1〜3）"
+	_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
 	var left := run.state.rerolls_left
-	_reroll_button.text = "リロール（残り %d 回）　%s" % [left, OS.get_keycode_string(InputActions.key_of(&"reroll"))]
+	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
 	_cards_box.reset_size()
 	_cards_box.position = (size - _cards_box.size) / 2.0
@@ -152,15 +155,16 @@ func _show_cards() -> void:
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"heal":
-		return {"tag": "回復", "name": "緊急修理", "desc": "HP を 30% 回復", "color": Color("#6dffb0")}
+		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
+			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
 	var weapon: bool = c.kind == &"weapon"
 	var def = (ConfigManager.weapons if weapon else ConfigManager.traits).get(c.id)
 	var lv: int = c.level
-	var tag := ("新しい武器" if weapon else "新しい特性") if lv == 1 else ("武器強化" if weapon else "特性強化")
+	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
-		tag = "最初の武器"
+		tag = "card.first_weapon"
 	var suffix := "Lv%d" % lv if weapon else "%d/5" % lv
-	return {"tag": tag, "name": "%s %s" % [def.display_name, suffix], "desc": def.description,
+	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 
 # ── ポーズ ───────────────────────────────────────────────────────
@@ -173,17 +177,17 @@ func _build_pause() -> void:
 	_pause_box.add_theme_constant_override("separation", 14)
 	_pause_box.visible = false
 	var title := Label.new()
-	title.text = "ポーズ"
+	title.text = tr("hud.pause")
 	title.add_theme_font_size_override("font_size", 40)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_pause_box.add_child(title)
 	var resume := Button.new()
-	resume.text = "続ける"
+	resume.text = tr("hud.resume")
 	resume.custom_minimum_size = Vector2(320, 52)
 	resume.pressed.connect(func(): run.command(&"resume"))
 	_pause_box.add_child(resume)
 	var quit := Button.new()
-	quit.text = "メインメニューに戻る（このランは残らない）"
+	quit.text = tr("hud.quit_run")
 	quit.custom_minimum_size = Vector2(320, 52)
 	quit.pressed.connect(func(): run.command(&"abort"))
 	_pause_box.add_child(quit)
@@ -215,11 +219,11 @@ func _draw() -> void:
 	draw_string(_font, Vector2(x, 32), "HP %d / %d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
 	if W < 600.0:
 		draw_string(_font, Vector2(x, 52), "ATK %.1f  Lv %d" % [atk, s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 72), "撃破 %d" % s.kills, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 92), "部品 %d" % s.coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
+		draw_string(_font, Vector2(x, 72), tr("hud.kills").format({n = s.kills}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
+		draw_string(_font, Vector2(x, 92), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
 	else:
-		draw_string(_font, Vector2(x, 52), "ATK %.1f   撃破 %d   Lv %d" % [atk, s.kills, s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 72), "部品 %d" % s.coins, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
+		draw_string(_font, Vector2(x, 52), "ATK %.1f   %s   Lv %d" % [atk, tr("hud.kills").format({n = s.kills}), s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
+		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
 	_draw_speed(W, H)
 	_draw_loadout(H)
 	_draw_boss(W)
@@ -237,16 +241,16 @@ func _draw_speed(W: float, H: float) -> void:
 	draw_rect(Rect2(bx, by, bw * clampf(sp / cap, 0.0, 1.0), 10), Color("#5fd8ff"))
 	var mx := bx + bw * clampf(s.stats.max_speed / cap, 0.0, 1.0)
 	draw_line(Vector2(mx, by - 4), Vector2(mx, by + 14), Color("#ffd24a"), 2.0)
-	draw_string(_font, Vector2(bx, by - 8), "%.2f km/s　上限 %.2f　最高 %.2f" % [sp * k, s.stats.max_speed * k, s.peak_speed * k], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#e8f0ff"))
+	draw_string(_font, Vector2(bx, by - 8), tr("hud.speed").format({speed = "%.2f" % (sp * k), max = "%.2f" % (s.stats.max_speed * k), peak = "%.2f" % (s.peak_speed * k)}), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#e8f0ff"))
 
 ## 装備一覧（左下）。文字の色は強化の段階（仕様書 8）。
 func _draw_loadout(H: float) -> void:
 	var s := run.state
 	var lines: Array = []
 	for id in s.weapons:
-		lines.append([ConfigManager.weapons[id].display_name + " Lv%d" % s.weapons[id], s.weapons[id]])
+		lines.append([ConfigManager.weapons[id].get_display_name() + " Lv%d" % s.weapons[id], s.weapons[id]])
 	for id in s.traits:
-		lines.append([ConfigManager.traits[id].display_name + " %d/5" % s.traits[id], s.traits[id]])
+		lines.append([ConfigManager.traits[id].get_display_name() + " %d/5" % s.traits[id], s.traits[id]])
 	var y := H - 60.0 - lines.size() * 18.0
 	for l in lines:
 		draw_string(_font, Vector2(16, y), l[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, RANK_COLORS[clampi(l[1] - 1, 0, 4)])
@@ -255,7 +259,7 @@ func _draw_loadout(H: float) -> void:
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses
 	if _warning_t > 0.0 and fmod(_warning_t, 0.5) < 0.3:
-		draw_string(_font, Vector2(W / 2.0 - 160, 120), "WARNING!!", HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
+		draw_string(_font, Vector2(W / 2.0 - 160, 120), tr("hud.warning"), HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
 	if not bosses.boss_alive():
 		return
 	var t := run.enemies.table
@@ -291,5 +295,4 @@ func _draw_gauge_ring() -> void:
 func _draw_banner() -> void:
 	if _banner == "":
 		return
-	var col := Color("#ffe46b") if _banner == "CLEAR!" else Color("#ff6b5a")
-	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, col)
+	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)

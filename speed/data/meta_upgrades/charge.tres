@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"charge"
-display_name = "充電効率"
-description = "ゲージの充填時間 -5%"
 stat = &"charge_time"
 per_level = 0.05
 costs = PackedInt32Array(20, 40, 70, 110, 160)

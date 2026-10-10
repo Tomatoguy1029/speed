@@ -1,7 +1,7 @@
 ## 図鑑（仕様書 14.3）。未入手の名前・詳細は伏せ、見た目はシルエットにする。
 extends UiScreen
 
-const SECTIONS := [["武器", "weapons"], ["特性", "traits"], ["伝説のモジュール", "legendary_modules"]]
+const SECTIONS := [["codex.weapons", "weapons"], ["codex.traits", "traits"], ["codex.legendary", "legendary_modules"]]
 
 var _detail: Label
 var _caption: Label
@@ -29,7 +29,7 @@ func _ready() -> void:
 	var total := 0
 	for section in SECTIONS:
 		var heading := Label.new()
-		heading.text = section[0]
+		heading.text = tr(section[0])
 		heading.add_theme_font_size_override("font_size", 28)
 		list.add_child(heading)
 		var grid := GridContainer.new()
@@ -49,7 +49,7 @@ func _ready() -> void:
 				first = b
 			if has and first_known == null:
 				first_known = b
-	%Heading.text = "図鑑　（%d / %d）" % [known, total]
+	%Heading.text = tr("codex.title").format({known = known, total = total})
 	resized.connect(_layout)
 	_list_scroll.resized.connect(_layout_grid)
 	_layout()
@@ -87,9 +87,9 @@ func _entry(def: Resource, has: bool) -> Button:
 	button.clip_text = true
 	button.toggle_mode = true
 	button.button_group = _selected_group
-	button.tooltip_text = def.display_name if has else "未入手"
+	button.tooltip_text = def.get_display_name() if has else tr("codex.unknown")
 	# 子のビジュアルを使い、名前はキーボード／アクセシビリティ用にも保持する。
-	button.text = def.display_name if has else "？？？"
+	button.text = def.get_display_name() if has else tr("codex.unknown_name")
 	button.add_theme_color_override("font_color", Color.TRANSPARENT)
 	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
 	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
@@ -132,10 +132,8 @@ func _show(def: Resource, has: bool) -> void:
 	_preview.setup(def, has, true)
 	_detail_scroll.scroll_vertical = 0
 	if not has:
-		_caption.text = "未入手"
-		_detail.text = "？？？\n\nまだ手に入れていない"
+		_caption.text = tr("codex.unknown")
+		_detail.text = tr("codex.unknown_name") + "\n\n" + tr("codex.unknown_detail")
 		return
-	_caption.text = "専用ビジュアル" if def.preview_texture != null else "仮ビジュアル（専用素材未設定）" if def is LegendaryModuleDef else "効果イメージ"
-	_detail.text = def.display_name + "\n" + String(def.id)
-	if def.description != "":
-		_detail.text += "\n\n" + def.description
+	_caption.text = tr("codex.art_custom") if def.preview_texture != null else tr("codex.art_placeholder") if def is LegendaryModuleDef else tr("codex.art_effect")
+	_detail.text = def.get_display_name() + "\n" + String(def.id) + "\n\n" + def.get_description()

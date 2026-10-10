@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"reroll"
-display_name = "演算予備"
-description = "3択のリロール +1回"
 stat = &"reroll"
 per_level = 1.0
 costs = PackedInt32Array(60, 140, 260)

@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"W06"
 code_id = &"drone"
-display_name = "追走ドローン"
-description = "周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する"
 level_steps = PackedInt32Array(1, 3, 5, 6, 8)
 params = {
 "interval": 0.65,

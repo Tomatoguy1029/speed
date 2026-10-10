@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T14"
 code_id = &"length"
-display_name = "軌跡延長"
-description = "描ける長さが伸びる（+25% ずつ）"
 params = {
 "per_stack": 0.25
 }

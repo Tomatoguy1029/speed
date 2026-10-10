@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T13"
 code_id = &"reactive"
-display_name = "反応波動"
-description = "ダメージを受けたとき、周りを押し返す"
 params = {
 "radius_base": 170.0,
 "radius_per": 30.0,

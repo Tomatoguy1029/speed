@@ -5,7 +5,7 @@ func _ready() -> void:
 	%StageSelectButton.pressed.connect(func(): _go(GameManager.Screen.STAGE_SELECT))
 	%UpgradeButton.pressed.connect(func(): _go(GameManager.Screen.UPGRADE))
 	%EncyclopediaButton.pressed.connect(func(): _go(GameManager.Screen.ENCYCLOPEDIA))
-	%Coins.text = "部品 %d" % SaveManager.coins()
+	%Coins.text = tr("common.parts").format({n = SaveManager.coins()})
 	super()
 
 func _go(screen: GameManager.Screen) -> void:

@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T01"
 code_id = &"endBlast"
-display_name = "終端爆縮"
-description = "線の終点で爆発"
 params = {
 "radius_base": 180.0,
 "radius_per": 30.0,

@@ -14,5 +14,3 @@ params = {
 }
 id = &"W01"
 code_id = &"forward"
-display_name = "ブラスター"
-description = "進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる"

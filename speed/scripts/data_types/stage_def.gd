@@ -12,10 +12,6 @@ const EDITOR_ORDER := 5
 ## ステージの番号。前の番号のステージをクリアすると選べるようになる。
 ## 単位：番号
 @export var index: int
-## 名前
-## ステージ選択に出る名前。
-## 単位：文字
-@export var display_name: String
 ## 配置のシーン
 ## ステージの配置を置いたシーンのファイル。
 ## 単位：ファイル
@@ -32,3 +28,7 @@ const EDITOR_ORDER := 5
 ## ボスを倒すと手に入る伝説のモジュールの ID。空ならなし。
 ## 単位：文字
 @export var legendary_module_id: StringName
+
+## ステージ選択に出る名前。文章の正は res://data/text/strings.csv の stage.<番号>.name。
+func get_display_name() -> String:
+	return tr("stage.%d.name" % index)

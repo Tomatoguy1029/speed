@@ -6,8 +6,6 @@
 script = ExtResource("1")
 id = &"T06"
 code_id = &"critBeam"
-display_name = "クリティカルランス"
-description = "クリティカルのたびに前方へ貫くビーム"
 params = {
 "length_base": 720.0,
 "length_per": 120.0,

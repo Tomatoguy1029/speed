@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1")
 id = &"speed"
-display_name = "主推進器"
-description = "最高速度 +5%"
 stat = &"max_speed"
 per_level = 0.05
 costs = PackedInt32Array(25, 50, 90, 140, 210)

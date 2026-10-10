@@ -21,21 +21,20 @@ const EDITOR_ORDER := 7
 ## 単位：個（カンマ区切り）
 @export var costs: PackedInt32Array
 
-## 見分けるための ID と、画面に出る名前・説明
-@export_group("名前と ID")
+## 見分けるための ID
+@export_group("ID")
 ## ID
 ## 強化を見分ける名前。セーブにこの名前で段階を保存する。変えると保存した段階が消える。
 ## 単位：文字
 @export var id: StringName
-## 名前
-## 強化画面に出る名前。
-## 単位：文字
-@export var display_name: String
-## 説明
-## 強化画面に出る説明。
-## 単位：文字
-@export var description: String
 ## 並び順
 ## 強化画面で並べる順番（小さいほど上）。
 ## 単位：番号
 @export var order: int
+
+## 画面に出る名前と説明。文章の正は res://data/text/strings.csv の meta.<ID>.name／.desc。
+func get_display_name() -> String:
+	return tr("meta.%s.name" % id)
+
+func get_description() -> String:
+	return tr("meta.%s.desc" % id)

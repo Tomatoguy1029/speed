@@ -40,7 +40,7 @@ theme_override_constants/separation = 20
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
-text = "設定"
+text = "menu.settings"
 
 [node name="Scroll" type="ScrollContainer" parent="Margin/Layout"]
 layout_mode = 2
@@ -63,4 +63,4 @@ theme_override_constants/separation = 16
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 52)
 layout_mode = 2
-text = "戻る"
+text = "common.back"

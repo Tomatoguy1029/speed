@@ -5,18 +5,10 @@
 class_name InputActions
 extends RefCounted
 
-## キー設定の画面で変えられるアクション（表示順）と表示名。
-const REBINDABLE := {
-	&"draw_alt": "描画の補助",
-	&"pause": "ポーズ",
-	&"mute": "消音の切り替え",
-	&"card_1": "3択の1枚目",
-	&"card_2": "3択の2枚目",
-	&"card_3": "3択の3枚目",
-	&"reroll": "3択の引き直し",
-	&"debug_panel": "調整パネル（開発版）",
-	&"debug_perf": "性能の表示（開発版）",
-}
+## キー設定の画面で変えられるアクション（表示順）。表示名は文章のマスタの action.<アクション名>。
+const REBINDABLE: Array[StringName] = [
+	&"draw_alt", &"pause", &"mute", &"card_1", &"card_2", &"card_3", &"reroll", &"debug_panel", &"debug_perf",
+]
 
 ## アクション → 既定のキー（物理キー）。
 const DEFAULT_KEYS := {

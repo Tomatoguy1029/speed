@@ -11,7 +11,6 @@
 [resource]
 script = ExtResource("1")
 index = 5
-display_name = "元凶の待つ星系"
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
 boss_id = &"provisional"

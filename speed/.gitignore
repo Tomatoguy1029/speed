@@ -1,3 +1,5 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+# 文章のマスタ（data/text/strings.csv）から Godot が作る翻訳データ
+*.translation

@@ -1,41 +1,62 @@
-## 設定（仕様書 3）。音量・画面モード・キー設定。変えるとすぐ反映し、設定のファイルに保存する。
+## 設定（仕様書 3）。音量・画面モード・言語・キー設定。変えるとすぐ反映し、設定のファイルに保存する。
 extends UiScreen
 
-const VOLUMES := [["master_volume", "全体の音量"], ["sfx_volume", "効果音"], ["engine_volume", "エンジン音"]]
-const WINDOW_MODES := [["windowed", "ウィンドウ"], ["fullscreen", "フルスクリーン"], ["exclusive", "排他フルスクリーン"]]
+const VOLUMES := ["master_volume", "sfx_volume", "engine_volume"]
+const WINDOW_MODES := ["windowed", "fullscreen", "exclusive"]
 
 ## キーの割り当てを待っているアクション（なければ空）
 var _waiting: StringName = &""
 var _bind_buttons: Dictionary = {}
 
 func _ready() -> void:
-	_section("音量")
-	for v in VOLUMES:
-		_slider_row(v[0], v[1])
+	_build()
+	super()
+
+## 言語を変えたら、文章を読み直すために作り直す。
+func _build() -> void:
+	for c in %Content.get_children():
+		%Content.remove_child(c)
+		c.queue_free()
+	_bind_buttons.clear()
+	_section(tr("settings.volume"))
+	for key in VOLUMES:
+		_slider_row(key, tr("settings." + key))
 	var mute := CheckBox.new()
-	mute.text = "消音（M キーでも切り替え）"
+	mute.text = tr("settings.mute")
 	mute.button_pressed = bool(SaveManager.settings.muted)
 	mute.toggled.connect(func(on): SaveManager.set_setting("muted", on))
 	%Content.add_child(mute)
-	_section("画面モード")
-	var mode := OptionButton.new()
-	mode.custom_minimum_size = Vector2(320, 44)
-	mode.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	for i in WINDOW_MODES.size():
-		mode.add_item(WINDOW_MODES[i][1], i)
-		if WINDOW_MODES[i][0] == SaveManager.settings.window_mode:
-			mode.select(i)
-	mode.item_selected.connect(func(i): SaveManager.set_setting("window_mode", WINDOW_MODES[i][0]))
-	%Content.add_child(mode)
-	_section("キー設定（ボタンを押してから、割り当てるキーを押す）")
+	_section(tr("settings.window_mode"))
+	var mode := _options(WINDOW_MODES, SaveManager.settings.window_mode)
+	mode.item_selected.connect(func(i): SaveManager.set_setting("window_mode", WINDOW_MODES[i]))
+	_section(tr("settings.language"))
+	var language := _options(SaveManager.LANGUAGES, SaveManager.settings.language, "language_")
+	language.item_selected.connect(_set_language)
+	_section(tr("settings.key_bindings"))
 	for action in InputActions.REBINDABLE:
-		_binding_row(action, InputActions.REBINDABLE[action])
+		_binding_row(action, tr("action." + action))
 	var reset := Button.new()
-	reset.text = "キー設定を初期値に戻す"
+	reset.text = tr("settings.reset_bindings")
 	reset.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	reset.pressed.connect(_reset_bindings)
 	%Content.add_child(reset)
-	super()
+
+## 選択肢の文章は settings.<接頭辞><値>。
+func _options(values: Array, current: String, prefix := "") -> OptionButton:
+	var b := OptionButton.new()
+	b.custom_minimum_size = Vector2(320, 44)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	for i in values.size():
+		b.add_item(tr("settings." + prefix + values[i]), i)
+		if values[i] == current:
+			b.select(i)
+	%Content.add_child(b)
+	return b
+
+func _set_language(i: int) -> void:
+	SaveManager.set_setting("language", SaveManager.LANGUAGES[i])
+	_build()
+	_focus_first()
 
 func _section(text: String) -> void:
 	var l := Label.new()
@@ -75,11 +96,11 @@ func _binding_row(action: StringName, label_text: String) -> void:
 
 func _refresh_binding(action: StringName) -> void:
 	var code := InputActions.key_of(action)
-	_bind_buttons[action].text = OS.get_keycode_string(code) if code != 0 else "（なし）"
+	_bind_buttons[action].text = OS.get_keycode_string(code) if code != 0 else tr("settings.no_key")
 
 func _wait_for_key(action: StringName) -> void:
 	_waiting = action
-	_bind_buttons[action].text = "キーを押す…"
+	_bind_buttons[action].text = tr("settings.press_key")
 
 func _input(event: InputEvent) -> void:
 	if _waiting == &"" or not (event is InputEventKey) or not event.pressed:
