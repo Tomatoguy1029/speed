@@ -395,7 +395,7 @@
 
 - `config.comet_interval_min`〜`config.comet_interval_max` 世界秒ごとに1つ現れ、画面の端の近くを `config.comet_speed` でまっすぐ横切る。惑星を通らない向きを選ぶ。画面を抜けたら消える。
 - 隕石と同じく壊せる（基礎値は隕石と同じで、大きさに応じて HP が増える）。見た目は [デザインとアートスタイル](art-style.md) の3.6。
-- 確率 `config.rare_comet_chance` でレアな彗星になる。レアな彗星は、彗星限定の武器（8章）のどれか1つを持ち、壊すとそのカプセルを必ず落とす。
+- ランの時計が `config.rare_comet_after` 実秒を過ぎたあと、確率 `config.rare_comet_chance` でレアな彗星になる。レアな彗星は、彗星限定の武器（8章）のどれか1つを持ち、壊すとそのカプセルを必ず落とす。
 - 隕石の基礎値は `speed/data/enemies/meteor.tres`。
 - 画面の近くに入ったら有効にし、離れたら無効にする。
 - 壊した隕石はそのランの間は戻らない。追跡・再配置・補充はしない。

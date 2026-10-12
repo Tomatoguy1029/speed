@@ -188,7 +188,7 @@ func _tick_comets(dt: float) -> void:
 	if _comet_t > 0.0:
 		return
 	_comet_t = state.rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
-	spawn_comet(state.rng.randf() < cfg.rare_comet_chance)
+	spawn_comet(state.time >= cfg.rare_comet_after and state.rng.randf() < cfg.rare_comet_chance)
 
 ## 画面の端の近くを横切る彗星を1つ出す。惑星を通らない向きを選ぶ。
 func spawn_comet(rare: bool) -> void:
