@@ -67,6 +67,11 @@ func on_enemy_killed(i: int) -> void:
 			_add_capsule(Pickup.Kind.HEAL, &"drop", pos, 0.0)
 		if state.rng.randf() < cfg.meteor_magnet_chance:
 			_add_capsule(Pickup.Kind.MAGNET, &"drop", pos, 0.0)
+		# レアな彗星は、決まった彗星限定の武器のカプセルを必ず落とす
+		var weapon := field.comet_weapon(t.meteor_index[i])
+		if weapon != &"":
+			_add_capsule(Pickup.Kind.COMET_WEAPON, &"comet", pos, 0.0)
+			capsules[capsules.size() - 1].weapon_id = weapon
 	var chance := minf(cfg.drop_max, cfg.drop_base * pow(t.xp[i], cfg.drop_power_exp))
 	if state.rng.randf() < chance:
 		_add_capsule(Pickup.Kind.CACHE, &"drop", pos, build.xp_needed() * cfg.capsule_xp_frac)
@@ -250,7 +255,7 @@ func _collect_capsules(dt: float) -> void:
 			continue
 		c.age += dt
 		var can := c.kind != Pickup.Kind.HEAL or state.ship_hp < state.stats.max_hp
-		if c.src == &"drop" and can:
+		if (c.src == &"drop" or c.src == &"comet") and can:
 			var d := state.ship_pos - c.pos
 			var dist := d.length()
 			if dist < pull_r and dist > 1.0:
@@ -270,7 +275,9 @@ func _apply(c: Pickup) -> void:
 	match c.kind:
 		Pickup.Kind.CORE:
 			build.add_core()
-			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -50), "text": "出力 +%d%%" % roundi(cfg.core_boost * 100.0), "color": Color("#ffd24a"), "size": 18})
+			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -50), "text": TranslationServer.translate("pickup.core").format({n = roundi(cfg.core_boost * 100.0)}), "color": Color("#ffd24a"), "size": 18})
+		Pickup.Kind.COMET_WEAPON:
+			state.pending_comet_weapons.append(c.weapon_id)
 		Pickup.Kind.HEAL:
 			var before := state.ship_hp
 			ship.heal(state.stats.max_hp * cfg.meteor_heal_frac)
@@ -295,7 +302,7 @@ func _apply(c: Pickup) -> void:
 
 func _ring_color(kind: Pickup.Kind) -> Color:
 	match kind:
-		Pickup.Kind.CORE:
+		Pickup.Kind.CORE, Pickup.Kind.COMET_WEAPON:
 			return Color("#ffd24a")
 		Pickup.Kind.HEAL:
 			return Color("#67e8b1")

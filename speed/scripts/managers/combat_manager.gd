@@ -3,7 +3,7 @@ class_name CombatManager
 extends RunSystem
 
 ## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
-const FORCEFUL := [&"sonic", &"killSonic", &"critBeam"]
+const FORCEFUL := [&"sonic", &"killSonic", &"critBeam", &"bipolar", &"towShot"]
 
 var enemies: EnemyManager
 var ship: ShipManager
@@ -239,7 +239,10 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
-	if cause != &"hullDebris" and not (cause == &"ram" and state.weapons.has(&"W03")):
+	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
+	if build.capture_hull(i, cause):
+		t.hull_scattered[i] = 1
+	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
 		projectiles.scatter_hull(i, dir, speed, attack_power() * cfg.hull_debris_damage)
 	enemies.on_enemy_death(i)

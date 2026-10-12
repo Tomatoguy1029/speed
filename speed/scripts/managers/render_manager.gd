@@ -52,6 +52,7 @@ var ghosts: Array = []
 var impacts: Array = []
 var trails: Array = []
 var beams: Array = []
+var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
@@ -221,7 +222,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_exhaust.clear()
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
 			&"beam":
-				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": 0.4, "max": 0.4})
+				var life: float = ev.get("life", 0.4)
+				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": life, "max": life,
+					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
 			&"bolt":
 				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22})
 				if bolts.size() > 80:
@@ -389,6 +392,12 @@ func _draw_pickups(c: CanvasItem) -> void:
 			Pickup.Kind.CORE:
 				c.draw_circle(cap.pos, 18.0, Color("#ffd24a"))
 				c.draw_arc(cap.pos, 26.0, 0, TAU, 32, Color("#fff2b0"), _px(2.0))
+			Pickup.Kind.COMET_WEAPON:
+				var pulse := 0.5 + 0.5 * sin(state.time * 5.0)
+				c.draw_circle(cap.pos, 30.0 + pulse * 6.0, Color(1.0, 0.75, 0.25, 0.25))
+				c.draw_colored_polygon(PackedVector2Array([cap.pos + Vector2(0, -22), cap.pos + Vector2(18, 0),
+					cap.pos + Vector2(0, 22), cap.pos + Vector2(-18, 0)]), Color("#efcb70"))
+				c.draw_circle(cap.pos, 7.0, Color("#fff1bf"))
 			Pickup.Kind.MAGNET:
 				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, XP_COLOR, 6.0)
 				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
@@ -416,6 +425,10 @@ func _draw_enemies(c: CanvasItem) -> void:
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 and type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
 		if type == &"meteor":
+			var comet := run.field.comet_at(t.meteor_index[i])
+			if comet != null:
+				_draw_comet(c, p, t.r[i], t.vel[i], comet.rare_weapon != &"")
+				continue
 			# ストリームで再生成されても同じ岩の模様を使う。
 			var variant := posmod(t.meteor_index[i], 2)
 			var stage := clampi(int((1.0 - t.hp[i] / t.max_hp[i]) * 3.0), 0, 2)
@@ -433,6 +446,45 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if key != &"gem":
 			_batches[key].end()
 	_draw_meteor_shards(c)
+
+## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
+## 専用の絵ができるまでの仮の描き方。
+func _draw_comet(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool) -> void:
+	var u := vel.normalized() if vel.length_squared() > 1.0 else Vector2.RIGHT
+	var n := Vector2(-u.y, u.x)
+	var core := Color("#ffe9a0") if rare else Color("#dff6ff")
+	var glow := Color("#ffb52e") if rare else Color("#7fd3ff")
+	var tail_len := r * 9.0
+	c.draw_polygon(PackedVector2Array([p + n * r * 0.9, p - u * tail_len, p - n * r * 0.9]),
+		PackedColorArray([Color(glow, 0.55), Color(glow, 0.0), Color(glow, 0.55)]))
+	c.draw_polygon(PackedVector2Array([p + n * r * 0.45, p - u * tail_len * 0.6, p - n * r * 0.45]),
+		PackedColorArray([Color(core, 0.8), Color(core, 0.0), Color(core, 0.8)]))
+	c.draw_circle(p, r * 1.35, Color(glow, 0.25))
+	c.draw_circle(p, r, Color(glow, 0.55))
+	c.draw_circle(p, r * 0.65, core)
+	if rare:
+		for k in 4:
+			var a := state.time * 3.0 + k * TAU / 4.0
+			c.draw_circle(p + Vector2.from_angle(a) * r * 1.7, maxf(3.0, r * 0.12), Color("#fff3c4"))
+
+## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
+func _enemy_texture(type: StringName) -> Texture2D:
+	if not _enemy_textures.has(type):
+		var path := "res://assets/pixel/%s.png" % type
+		_enemy_textures[type] = load(path) if String(type) in SPRITE_IDS and ResourceLoader.exists(path) else null
+	return _enemy_textures[type]
+
+## 敵の船体を絵で描く（牽引中・撃ち出した船体）。outline は縁の色。
+func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, outline: Color) -> void:
+	var tex := _enemy_texture(type)
+	c.draw_circle(p, r * 1.1, Color(outline, 0.25))
+	if tex == null:
+		c.draw_circle(p, r, Color("#aeb6c4"))
+		return
+	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
+	c.draw_set_transform(p, angle + (PI / 2.0 if type in NATIVE_SPRITES else -PI / 2.0))
+	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
+	c.draw_set_transform(Vector2.ZERO)
 
 ## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
@@ -470,7 +522,9 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		var r := pr.friend_r[i]
-		if pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
+		if pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
+			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
+		elif pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
 			var trail := pr.friend_trail[i]
 			if trail.size() > 1:
 				c.draw_polyline(trail, Color(1.0, 0.6, 0.25, 0.7), _px(3.0))
@@ -531,6 +585,18 @@ func _draw_build_objects(c: CanvasItem) -> void:
 			c.draw_set_transform(d.pos, angle)
 			c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false)
 			c.draw_set_transform(Vector2.ZERO)
+	var tow = b.weapon_behaviors.get(&"W21")
+	if tow != null:
+		for j in mini(int(tow.p("visible")), tow.cargo.size()):
+			var h: Dictionary = tow.cargo[j]
+			_draw_hull(c, h.type, h.pos, h.angle, h.r, Color("#ffc778"))
+	var bipolar = b.weapon_behaviors.get(&"W22")
+	if bipolar != null and bipolar.origin != null:
+		var o: Vector2 = bipolar.origin
+		var col := Color(bipolar.p("color", "#69fff0"))
+		c.draw_arc(o, 26.0, 0, TAU, 24, col, _px(3.0))
+		c.draw_circle(o, 9.0, col)
+		c.draw_line(o, state.ship_pos, Color(col, 0.25), _px(2.0))
 	var vortex = b.trait_behaviors.get(&"T03")
 	if vortex != null:
 		for v in vortex.vortexes:
@@ -550,7 +616,8 @@ func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
-		c.draw_line(bm.from, bm.to, Color(1.0, 0.95, 0.6, 0.7 * k), bm.width)
+		var bc: Color = bm.color
+		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
 		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
 	for bo in bolts:
 		var k: float = bo.life / bo.max

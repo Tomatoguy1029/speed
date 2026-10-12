@@ -10,7 +10,8 @@ var ship: ShipManager
 var build: BuildManager
 
 ## 味方の弾と破片。項目ごとの列で持つ。1行が1つで、行は前へ詰めない（設計書 6）。
-enum FriendKind { SHOT, DEBRIS }
+## HULL は質量牽引砲（W21）が撃ち出す船体
+enum FriendKind { SHOT, DEBRIS, HULL }
 ## 1 なら使用中の行
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
@@ -32,6 +33,8 @@ var friend_knock := PackedFloat32Array()
 var friend_angle := PackedFloat32Array()
 var friend_spin := PackedFloat32Array()
 var friend_trail: Array[PackedVector2Array] = []
+## 撃ち出した船体の元の敵の種類（見た目に使う。船体以外は空）
+var friend_type: Array[StringName] = []
 var friend_slots: RowSlots
 var _buf := PackedInt32Array()
 var _hits: Array = []
@@ -112,6 +115,12 @@ func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0)
 	state.emit(&"hull_scatter", {"pos": pos, "count": count})
 	return true
 
+## 牽引した船体を撃ち出す（質量牽引砲 W21）。敵を貫き、クリティカルにならない。source_id の敵には当たらない。
+func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, knock: float, type: StringName,
+		angle: float, source_id: int) -> void:
+	_add_friend(FriendKind.HULL, &"towShot", pos, vel, r, dmg, life, true, 0, Color("#ffbe65"), true, knock,
+		angle, 0.0, source_id, type)
+
 ## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
 func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
 	var t := combat.enemies.table
@@ -122,7 +131,7 @@ func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
 func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2, r: float, dmg: float,
 		life: float, pierce: bool, pierce_left: int, color: Color, no_crit: bool, knock: float,
-		angle: float, spin: float, hit_id: int) -> int:
+		angle: float, spin: float, hit_id: int, type := &"") -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
 	friend_cause[i] = cause
@@ -140,6 +149,7 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 	friend_angle[i] = angle
 	friend_spin[i] = spin
 	friend_trail[i] = PackedVector2Array()
+	friend_type[i] = type
 	return i
 
 ## 使用中の味方の弾・破片の数。

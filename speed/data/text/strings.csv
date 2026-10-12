@@ -62,6 +62,7 @@ hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
 hud.resume,続ける,Resume
 hud.quit_run,メインメニューに戻る（このランは残らない）,Back to Main Menu (This Run Is Lost)
+hud.swap_title,{name}を手に入れた　入れ替える武器を選ぶ,Got {name}: Choose a Weapon to Replace
 card.new_weapon,新しい武器,New Weapon
 card.new_trait,新しい特性,New Trait
 card.weapon_up,武器強化,Weapon Upgrade
@@ -70,6 +71,12 @@ card.first_weapon,最初の武器,First Weapon
 card.heal_tag,回復,Repair
 card.heal_name,緊急修理,Emergency Repair
 card.heal_desc,HP を 30% 回復,Restores 30% HP
+card.swap_tag,入れ替える,Replace
+card.swap_desc,この武器を外して、{name}を付ける,Remove this weapon and equip {name}
+card.keep_tag,見送る,Skip
+card.keep_name,今の装備を残す,Keep Current Loadout
+card.keep_desc,{name}は受け取らない,Leave {name} behind
+pickup.core,出力 +{n}%,Power +{n}%
 ,■ 結果,
 result.title,結果,Results
 result.cleared,クリア,Cleared
@@ -117,6 +124,10 @@ weapon.W08.name,ソニックブーム,Sonic Boom
 weapon.W08.desc,駆け抜け始めと一定間隔で、進路ごと大きな衝撃波,A huge shockwave along your path when a dash starts and at regular intervals.
 weapon.W17.name,接触電撃,Contact Arc
 weapon.W17.desc,敵に触れると、近くの敵へ電撃がつながる。Lv ごとにつながる数が増える,Touching an enemy arcs lightning to nearby enemies. Each level chains to more.
+weapon.W21.name,質量牽引砲,Mass Tow Cannon
+weapon.W21.desc,なぞり中に倒した敵の船体を牽引し、なぞり終えると進む向きへ次々と撃ち出す,"Tows the hulls of enemies you defeat mid-dash, then fires them ahead one by one when the dash ends."
+weapon.W22.name,双極ビーム,Bipolar Beam
+weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
 ,■ 特性（trait.<ID>）,

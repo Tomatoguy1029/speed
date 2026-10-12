@@ -140,7 +140,7 @@ func _show_cards() -> void:
 	for i in cards.size():
 		var info := card_info(cards[i])
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(280, 220)
+		b.custom_minimum_size = Vector2(280 if cards.size() <= 3 else 210, 220)
 		b.text = "%d. %s\n%s\n\n%s" % [i + 1, info.tag, info.name, info.desc]
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var style := StyleBoxFlat.new()
@@ -156,10 +156,16 @@ func _show_cards() -> void:
 		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
 	var start: bool = run.state.start_pick
-	_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
+	var swap: StringName = run.state.swap_pick
+	if swap != &"":
+		var got: WeaponDef = ConfigManager.weapons[swap]
+		_cards_title.text = tr("hud.swap_title").format({name = got.get_display_name()}) + "\n" + got.get_description()
+	else:
+		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
+	_reroll_button.visible = swap == &""
 	_cards_box.reset_size()
 	_cards_box.position = (size - _cards_box.size) / 2.0
 	if _cards_row.get_child_count() > 0:
@@ -167,6 +173,15 @@ func _show_cards() -> void:
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
+	if c.kind == &"swap" or c.kind == &"keep":
+		var new_def: WeaponDef = ConfigManager.weapons[c.new]
+		if c.kind == &"keep":
+			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
+				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
+		var old_def: WeaponDef = ConfigManager.weapons[c.id]
+		return {"tag": TranslationServer.translate("card.swap_tag"), "name": "%s Lv%d" % [old_def.get_display_name(), c.level],
+			"desc": TranslationServer.translate("card.swap_desc").format({name = new_def.get_display_name()}),
+			"color": Color("#efcb70")}
 	if c.kind == &"heal":
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}

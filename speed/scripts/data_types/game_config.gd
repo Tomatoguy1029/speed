@@ -518,9 +518,25 @@ extends Resource
 ## 単位：世界秒
 @export var drift_capsule_interval: float
 ## 隕石の密度
-## 隕石の配置の基準の数。隕石地帯・漂う岩・彗星の数がこれに合わせて決まる。
+## 隕石の配置の基準の数。隕石地帯・漂う岩の数がこれに合わせて決まる。
 ## 単位：個
 @export var meteor_count: int
+## 彗星の間隔（最短）
+## 彗星が画面の端の近くを横切る間隔の最短。間隔は最短と最長の間でランダム。
+## 単位：世界秒
+@export var comet_interval_min: float
+## 彗星の間隔（最長）
+## 彗星が画面の端の近くを横切る間隔の最長。
+## 単位：世界秒
+@export var comet_interval_max: float
+## 彗星の速さ
+## 彗星がまっすぐ進む速さ。
+## 単位：単位/秒
+@export var comet_speed: float
+## レアな彗星の確率
+## 彗星がレアな彗星になる確率。レアな彗星を壊すと、彗星限定の武器のカプセルを必ず落とす。
+## 単位：割合（0〜1）
+@export var rare_comet_chance: float
 ## 隕石の部品のドロップ率
 ## 隕石を壊したとき、部品（1〜3個）を落とす確率。
 ## 単位：割合（0〜1）

@@ -127,8 +127,15 @@ func tick(real_dt: float, world_dt: float) -> void:
 			b.tick(world_dt, busy)
 
 ## 保留中のレベルアップがあり、描画中・なぞり中でなければ3択を開く。開いたら true。
+## 拾った彗星限定の武器があれば、先に受け取る（枠が満員なら入れ替えを選ぶ）。
 func try_open_cards() -> bool:
-	if state.pending_levels <= 0 or state.drawing or state.tracing:
+	if state.drawing or state.tracing:
+		return false
+	while not state.pending_comet_weapons.is_empty():
+		var id: StringName = state.pending_comet_weapons.pop_front()
+		if _receive_comet_weapon(id):
+			return true
+	if state.pending_levels <= 0:
 		return false
 	state.cards = roll_cards()
 	cards_opened.emit(state.cards)
@@ -145,7 +152,7 @@ func open_start_cards() -> void:
 
 ## 最初の武器の候補：全武器からランダムに選ぶ。
 func roll_start_cards() -> Array[Dictionary]:
-	var ids: Array = ConfigManager.weapons.keys()
+	var ids: Array = ConfigManager.weapons.keys().filter(func(id): return not ConfigManager.weapons[id].comet_only)
 	var out: Array[Dictionary] = []
 	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
 		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
@@ -163,6 +170,9 @@ func roll_cards() -> Array[Dictionary]:
 		for id in defs:
 			var lv: int = owned.get(id, 0)
 			if lv >= max_lv or (lv == 0 and not free):
+				continue
+			# 彗星限定の武器は、持っているときの強化だけ3択に出す
+			if lv == 0 and kind == &"weapon" and defs[id].comet_only:
 				continue
 			pool.append({"kind": kind, "id": id, "level": lv + 1, "weight": cfg.owned_card_bias if lv > 0 else 1.0})
 	var out: Array[Dictionary] = []
@@ -183,7 +193,7 @@ func roll_cards() -> Array[Dictionary]:
 
 ## 表示中のカードを引き直す（仕様書 9.3）。最初の武器の選択でも使える。回数が残っていなければ false。
 func reroll_cards() -> bool:
-	if state.cards.is_empty() or state.rerolls_left <= 0:
+	if state.cards.is_empty() or state.rerolls_left <= 0 or state.swap_pick != &"":
 		return false
 	state.rerolls_left -= 1
 	state.cards = roll_start_cards() if state.start_pick else roll_cards()
@@ -196,6 +206,14 @@ func choose_card(index: int) -> bool:
 	if index < 0 or index >= state.cards.size():
 		return state.pending_levels > 0
 	var c: Dictionary = state.cards[index]
+	if state.swap_pick != &"":
+		if c.kind == &"swap":
+			remove_weapon(c.id)
+			grant(&"weapon", state.swap_pick)
+			state.emit(&"upgrade", {"card": c})
+		state.swap_pick = &""
+		state.cards = []
+		return try_open_cards()
 	if state.start_pick:
 		state.start_pick = false
 		grant(c.kind, c.id)
@@ -253,6 +271,37 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 		table[id].level = lv
 	else:
 		table[id].n = lv
+
+## 武器を外す（彗星限定の武器と入れ替えるとき）。
+func remove_weapon(id: StringName) -> void:
+	state.weapons.erase(id)
+	weapon_behaviors.erase(id)
+	refresh_stats()
+
+## 彗星限定の武器を受け取る（仕様書 13.1）。空き枠があれば装備し、持っていれば1段階上げる。
+## 枠が満員なら、入れ替える武器を選ぶカードを開いて true を返す。
+func _receive_comet_weapon(id: StringName) -> bool:
+	var lv: int = state.weapons.get(id, 0)
+	if lv >= cfg.weapon_max_level:
+		return false
+	if lv > 0 or state.weapons.size() < cfg.weapon_slots:
+		grant(&"weapon", id)
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ConfigManager.weapons[id].get_display_name(),
+			"color": Color("#efcb70"), "size": 24})
+		return false
+	state.swap_pick = id
+	var out: Array[Dictionary] = []
+	for owned in state.weapons:
+		out.append({"kind": &"swap", "id": owned, "level": state.weapons[owned], "new": id})
+	out.append({"kind": &"keep", "id": &"keep", "level": 1, "new": id})
+	state.cards = out
+	cards_opened.emit(state.cards)
+	return true
+
+## 質量牽引砲（W21）が、行 i の敵の船体を牽引するか。牽引したら true。
+func capture_hull(i: int, cause: StringName) -> bool:
+	var tow = weapon_behaviors.get(&"W21")
+	return tow != null and tow.capture(i, cause)
 
 ## 装備をすべて外す（調整パネル用）。
 func reset_loadout() -> void:

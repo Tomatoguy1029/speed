@@ -375,6 +375,9 @@ func command(name: StringName, args := {}) -> void:
 			for i in t.alive.size():
 				if t.alive[i] != 0 and t.is_boss[i] == 0:
 					enemies.mark_dead(i)
+		&"debug_comet":
+			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
+				field.spawn_comet(bool(args.get("rare", false)))
 		&"debug_spawn_enemies":
 			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
 				enemies.debug_spawn_random(int(args.get("count", 100)))

@@ -78,6 +78,10 @@ var pending_levels := 0
 var cards: Array[Dictionary] = []
 ## ラン開始時の、最初の武器を選んでいる間か
 var start_pick := false
+## 拾ったのに、まだ受け取っていない彗星限定の武器（管理 ID の並び）
+var pending_comet_weapons: Array[StringName] = []
+## 武器の枠が満員で、入れ替える武器を選んでいる彗星限定の武器（選んでいなければ空）
+var swap_pick: StringName = &""
 ## このランで残っている、3択を引き直せる回数
 var rerolls_left := 0
 

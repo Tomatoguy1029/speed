@@ -81,7 +81,7 @@ func _draw_effect(code: String) -> void:
 		ship.x = 92
 	var end := Vector2(65, 12)
 	var route := PackedVector2Array([Vector2(-145, 65), Vector2(-75, -45), end])
-	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length"]
+	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length", "bipolar"]
 	if route_effect:
 		draw_polyline(route, _ink(Color(0.8, 0.97, 1.0, 0.45)), 3.0, true)
 		ship = end
@@ -149,6 +149,18 @@ func _draw_effect(code: String) -> void:
 				_line(ship + Vector2(-65, -15 + i * 15), ship + Vector2(-27, -15 + i * 15), CYAN, 2.0)
 			if code == "length":
 				_line(end, Vector2(155, -55), CYAN)
+		"massTow":
+			for i in 3:
+				_sprite(ENEMY, ship + Vector2(-48 - i * 34, (i % 2) * 22 - 11), 30.0)
+			var flight := fmod(_clock * 140.0, 150.0)
+			_sprite(ENEMY, ship + Vector2(40 + flight, 0), 34.0)
+			_line(ship + Vector2(28, 0), ship + Vector2(36 + flight, 0), Color("#ffbe65"), 2.0)
+		"bipolar":
+			var beam_color := Color("#69fff0")
+			_ring(route[0], 16, beam_color)
+			_line(route[0], end, Color(0.41, 1.0, 0.94, 0.45 + pulse * 0.4), 14.0)
+			_line(route[0], end, Color.WHITE, 3.0)
+			_sprite(ENEMY, route[0].lerp(end, 0.5), 32.0)
 		"attack", "critRate":
 			_sprite(ENEMY, Vector2(48, 12), 48.0)
 			_line(ship + Vector2(24, 0), Vector2(30, 12), CYAN, 5.0)

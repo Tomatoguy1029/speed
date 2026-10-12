@@ -8,15 +8,17 @@ extends RunSystem
 ## 隕石1つの配置（仕様書 13.1）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）
 class Rock:
 	var kind: StringName
+	## 漂流は世界時刻0の位置、彗星は現れた時刻の位置
 	var pos := Vector2.ZERO
 	var vel := Vector2.ZERO
 	var size := 40.0
 	var facing := 0.0
 	var spin := 0.0
-	var angle := 0.0
-	var offset := 0.0
-	var period := 0.0
-	var phase := 0.0
+	## 彗星：現れた世界時刻と、消える世界時刻
+	var born := 0.0
+	var gone := 0.0
+	## レアな彗星が落とす、彗星限定の武器の管理 ID（レアでなければ空）
+	var rare_weapon: StringName = &""
 	var destroyed := false
 	## 敵の表で使っている行と、その敵の id（画面の近くにいない間は -1）
 	var row := -1
@@ -50,6 +52,8 @@ var body_speed_max := 0.0
 var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
 var _stream_t := 0.0
+## 次の彗星までの世界秒
+var _comet_t := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -87,11 +91,12 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	_update_moons()
 	if world_dt > 0.0:
+		_tick_comets(world_dt)
 		_stream_rocks(world_dt)
 
 # ── 隕石（仕様書 13.1） ─────────────────────────────────────────────
 
-## ラン開始時に、世界の決まった位置へ隕石を置く：地帯・漂流・彗星。
+## ラン開始時に、世界の決まった位置へ隕石を置く：地帯・漂流。彗星はラン中に現れる（_tick_comets）。
 func _place_rocks(rng: RandomNumberGenerator) -> void:
 	var n := cfg.meteor_count
 	for i in roundi(n * 0.45):
@@ -102,18 +107,7 @@ func _place_rocks(rng: RandomNumberGenerator) -> void:
 		var d := sqrt(rng.randf_range(800.0 * 800.0, pow(cfg.field_radius - 300.0, 2.0)))
 		var heading := rng.randf() * TAU
 		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"drift", Vector2.from_angle(heading) * rng.randf_range(15.0, 35.0))
-	if n > 0:
-		for i in 3:
-			var r := Rock.new()
-			r.kind = &"comet"
-			r.angle = rng.randf() * TAU
-			r.offset = rng.randf_range(1200.0, 4500.0) * (-1.0 if rng.randf() < 0.5 else 1.0)
-			r.period = rng.randf_range(42.0, 65.0)
-			r.phase = rng.randf() * 40.0
-			r.size = rng.randf_range(35.0, 55.0)
-			r.facing = r.angle
-			r.spin = 0.4
-			rocks.append(r)
+	_comet_t = rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
 
 func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Vector2) -> void:
 	var r := p.length()
@@ -131,9 +125,7 @@ func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Ve
 ## 世界時刻 t の隕石の位置と速度。
 func _rock_at(rock: Rock, t: float) -> Array:
 	if rock.kind == &"comet":
-		var along := fmod(t + rock.phase, rock.period) * 950.0 - cfg.field_radius - 500.0
-		var u := Vector2.from_angle(rock.angle)
-		return [u * along + Vector2(-u.y, u.x) * rock.offset, u * 950.0]
+		return [rock.pos + rock.vel * (t - rock.born), rock.vel]
 	var diameter := cfg.field_radius * 2.0
 	var p := rock.pos + rock.vel * t
 	p = Vector2(fposmod(p.x + cfg.field_radius, diameter) - cfg.field_radius, fposmod(p.y + cfg.field_radius, diameter) - cfg.field_radius)
@@ -163,7 +155,9 @@ func _stream_rocks(dt: float) -> void:
 		table.pos[i] = pv[0]
 		table.vel[i] = pv[1]
 		table.facing[i] = rock.facing + rock.spin * t
-		if not _near(pv[0], 650.0):
+		if rock.kind == &"comet" and t >= rock.gone:
+			rock.destroyed = true
+		if rock.destroyed or not _near(pv[0], 650.0):
 			enemies.mark_dead(i)
 			rock.row = -1
 	_stream_t -= dt
@@ -175,14 +169,67 @@ func _stream_rocks(dt: float) -> void:
 		var rock := rocks[k]
 		if rock.destroyed or rock.row >= 0:
 			continue
+		if rock.kind == &"comet" and t >= rock.gone:
+			rock.destroyed = true
+			continue
 		var pv := _rock_at(rock, t)
 		if not _near(pv[0], 300.0):
 			continue
-		var sprite_radius := 60.0 if k % 2 == 0 else 40.0
+		var sprite_radius := rock.size if rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
 		var i := enemies.spawn(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i
 		rock.row_id = table.id[i]
+
+# ── 彗星（仕様書 13.1） ─────────────────────────────────────────────
+
+func _tick_comets(dt: float) -> void:
+	_comet_t -= dt
+	if _comet_t > 0.0:
+		return
+	_comet_t = state.rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
+	spawn_comet(state.rng.randf() < cfg.rare_comet_chance)
+
+## 画面の端の近くを横切る彗星を1つ出す。惑星を通らない向きを選ぶ。
+func spawn_comet(rare: bool) -> void:
+	var rng := state.rng
+	var vc := state.view_center
+	var vh := state.view_half
+	var lead := vh.length() + 700.0
+	for attempt in 12:
+		var u := Vector2.from_angle(rng.randf() * TAU)
+		var side := Vector2(-u.y, u.x) * (1.0 if rng.randf() < 0.5 else -1.0)
+		var edge := absf(side.x) * vh.x + absf(side.y) * vh.y
+		var start := vc - u * lead + side * edge * rng.randf_range(0.55, 0.9)
+		var end := start + u * lead * 2.0
+		if Geom.seg_circle_t(start, end, Vector2.ZERO, cfg.planet_radius + 150.0) >= 0.0 and attempt < 11:
+			continue
+		var r := Rock.new()
+		r.kind = &"comet"
+		r.pos = start
+		r.vel = u * cfg.comet_speed
+		r.born = state.world_time
+		r.gone = state.world_time + lead * 2.0 / cfg.comet_speed
+		r.size = rng.randf_range(35.0, 55.0)
+		r.facing = u.angle()
+		if rare:
+			var ids: Array = ConfigManager.weapons.keys().filter(func(id): return ConfigManager.weapons[id].comet_only)
+			if not ids.is_empty():
+				r.rare_weapon = ids[rng.randi_range(0, ids.size() - 1)]
+		rocks.append(r)
+		_stream_t = 0.0
+		return
+
+## 隕石の配置の番号 index が彗星なら、その彗星の情報を返す（彗星でなければ null）。
+func comet_at(index: int) -> Rock:
+	if index < 0 or index >= rocks.size() or rocks[index].kind != &"comet":
+		return null
+	return rocks[index]
+
+## 隕石の配置の番号 index がレアな彗星なら、落とす彗星限定の武器の管理 ID（そうでなければ空）。
+func comet_weapon(index: int) -> StringName:
+	var c := comet_at(index)
+	return c.rare_weapon if c != null else &""
 
 func _update_moons() -> void:
 	for m in moons:
