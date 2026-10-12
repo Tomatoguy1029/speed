@@ -8,8 +8,8 @@ extends Control
 const RING_PULSE_TIME := 0.35
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（画面px）
-const LOADOUT_WEAPON := 64.0
-const LOADOUT_TRAIT := 52.0
+const LOADOUT_WEAPON := 50.0
+const LOADOUT_TRAIT := 40.0
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
@@ -279,15 +279,15 @@ func _draw_speed(W: float, H: float) -> void:
 func _draw_loadout(H: float) -> void:
 	var s := run.state
 	var cfg := run.cfg
-	var trait_y := H - 56.0 - LOADOUT_TRAIT
-	var weapon_y := trait_y - 8.0 - LOADOUT_WEAPON
+	var trait_y := H - 8.0 - LOADOUT_TRAIT
+	var weapon_y := trait_y - 5.0 - LOADOUT_WEAPON
 	_draw_slot_row(weapon_y, LOADOUT_WEAPON, 2, cfg.weapon_slots, cfg.weapon_max_level, s.weapons, ConfigManager.weapons)
-	_draw_slot_row(trait_y, LOADOUT_TRAIT, 16, cfg.trait_slots, cfg.trait_max_stacks, s.traits, ConfigManager.traits)
+	_draw_slot_row(trait_y, LOADOUT_TRAIT, 12, cfg.trait_slots, cfg.trait_max_stacks, s.traits, ConfigManager.traits)
 
 func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
 	for k in slots:
-		var rect := Rect2(16.0 + k * (size_px + 6.0), y, size_px, size_px)
+		var rect := Rect2(8.0 + k * (size_px + 4.0), y, size_px, size_px)
 		var box := StyleBoxFlat.new()
 		box.set_corner_radius_all(corner)
 		box.set_border_width_all(2)
@@ -301,11 +301,11 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
 		box.border_color = col
 		draw_style_box(box, rect)
-		_draw_fit_text(defs[ids[k]].get_display_name(), Rect2(rect.position + Vector2(4, 4), Vector2(size_px - 8.0, size_px - 16.0)), col)
+		_draw_fit_text(defs[ids[k]].get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), col)
 		# 段階の目盛り
-		var pip_w := (size_px - 12.0 - (max_level - 1) * 2.0) / max_level
+		var pip_w := (size_px - 10.0 - (max_level - 1) * 2.0) / max_level
 		for j in max_level:
-			var pip := Rect2(rect.position.x + 6.0 + j * (pip_w + 2.0), rect.end.y - 8.0, pip_w, 3.0)
+			var pip := Rect2(rect.position.x + 5.0 + j * (pip_w + 2.0), rect.end.y - 7.0, pip_w, 3.0)
 			draw_rect(pip, col if j < lv else Color(1, 1, 1, 0.15))
 
 ## 枠に収まる大きさまで文字を小さくして、上寄せ・中央揃えで描く。
