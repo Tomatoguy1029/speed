@@ -10,6 +10,8 @@ const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（画面px）
 const LOADOUT_WEAPON := 50.0
 const LOADOUT_TRAIT := 40.0
+## 彗星限定の武器の枠の色（段階の色と重ならない赤）
+const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
@@ -313,10 +315,23 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 			continue
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
+		var def = defs[ids[k]]
 		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
 		box.border_color = col
+		var text_col := col
+		# 彗星限定の武器は赤い枠で、ほかの武器と見分ける。段階は目盛りの色で見せる
+		if def is WeaponDef and def.comet_only:
+			var glow := box.duplicate() as StyleBoxFlat
+			glow.bg_color = Color.TRANSPARENT
+			glow.border_color = Color(COMET_ONLY_COLOR, 0.35 + 0.25 * sin(Time.get_ticks_msec() / 250.0))
+			glow.set_border_width_all(3)
+			glow.set_expand_margin_all(3)
+			draw_style_box(glow, rect)
+			box.bg_color = Color(0.25, 0.03, 0.06, 0.88)
+			box.border_color = COMET_ONLY_COLOR
+			text_col = Color("#ffd9d9")
 		draw_style_box(box, rect)
-		_draw_fit_text(defs[ids[k]].get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), col)
+		_draw_fit_text(def.get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), text_col)
 		# 段階の目盛り
 		var pip_w := (size_px - 10.0 - (max_level - 1) * 2.0) / max_level
 		for j in max_level:
