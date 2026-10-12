@@ -7,6 +7,9 @@ extends Control
 ## 描けるようになったときに広がる輪の時間（実秒）
 const RING_PULSE_TIME := 0.35
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
+## 装備一覧の枠の大きさ（画面px）
+const LOADOUT_WEAPON := 64.0
+const LOADOUT_TRAIT := 52.0
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
@@ -270,18 +273,56 @@ func _draw_speed(W: float, H: float) -> void:
 	draw_line(Vector2(mx, by - 4), Vector2(mx, by + 14), Color("#ffd24a"), 2.0)
 	draw_string(_font, Vector2(bx, by - 8), tr("hud.speed").format({speed = "%.2f" % (sp * k), max = "%.2f" % (s.stats.max_speed * k), peak = "%.2f" % (s.peak_speed * k)}), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#e8f0ff"))
 
-## 装備一覧（左下）。文字の色は強化の段階（仕様書 8）。
+## 装備一覧（左下）。武器と特性を別の段の枠に並べ、空き枠も薄く描いて持てる数を見せる（仕様書 17）。
+## 武器は角の四角、特性は丸い四角。枠の色と下の目盛りは強化の段階（仕様書 8）。
+## 枠の中は名前（アイコンができたら差し替える）。
 func _draw_loadout(H: float) -> void:
 	var s := run.state
-	var lines: Array = []
-	for id in s.weapons:
-		lines.append([ConfigManager.weapons[id].get_display_name() + " Lv%d" % s.weapons[id], s.weapons[id]])
-	for id in s.traits:
-		lines.append([ConfigManager.traits[id].get_display_name() + " %d/5" % s.traits[id], s.traits[id]])
-	var y := H - 60.0 - lines.size() * 18.0
-	for l in lines:
-		draw_string(_font, Vector2(16, y), l[0], HORIZONTAL_ALIGNMENT_LEFT, -1, 15, RANK_COLORS[clampi(l[1] - 1, 0, 4)])
-		y += 18.0
+	var cfg := run.cfg
+	var trait_y := H - 56.0 - LOADOUT_TRAIT
+	var weapon_y := trait_y - 8.0 - LOADOUT_WEAPON
+	_draw_slot_row(weapon_y, LOADOUT_WEAPON, 2, cfg.weapon_slots, cfg.weapon_max_level, s.weapons, ConfigManager.weapons)
+	_draw_slot_row(trait_y, LOADOUT_TRAIT, 16, cfg.trait_slots, cfg.trait_max_stacks, s.traits, ConfigManager.traits)
+
+func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
+	var ids := owned.keys()
+	for k in slots:
+		var rect := Rect2(16.0 + k * (size_px + 6.0), y, size_px, size_px)
+		var box := StyleBoxFlat.new()
+		box.set_corner_radius_all(corner)
+		box.set_border_width_all(2)
+		if k >= ids.size():
+			box.bg_color = Color(1, 1, 1, 0.03)
+			box.border_color = Color(1, 1, 1, 0.18)
+			draw_style_box(box, rect)
+			continue
+		var lv: int = owned[ids[k]]
+		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
+		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
+		box.border_color = col
+		draw_style_box(box, rect)
+		_draw_fit_text(defs[ids[k]].get_display_name(), Rect2(rect.position + Vector2(4, 4), Vector2(size_px - 8.0, size_px - 16.0)), col)
+		# 段階の目盛り
+		var pip_w := (size_px - 12.0 - (max_level - 1) * 2.0) / max_level
+		for j in max_level:
+			var pip := Rect2(rect.position.x + 6.0 + j * (pip_w + 2.0), rect.end.y - 8.0, pip_w, 3.0)
+			draw_rect(pip, col if j < lv else Color(1, 1, 1, 0.15))
+
+## 枠に収まる大きさまで文字を小さくして、上寄せ・中央揃えで描く。
+func _draw_fit_text(text: String, area: Rect2, col: Color) -> void:
+	# 単語の途中では折らない。どの大きさでも収まらなければ、いちばん小さい大きさで途中でも折る
+	var flags := TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
+	var font_size := 12
+	while true:
+		var sz := _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, font_size, -1, flags)
+		if sz.x <= area.size.x + 0.5 and sz.y <= area.size.y:
+			break
+		if font_size <= 8:
+			flags |= TextServer.BREAK_ADAPTIVE
+			break
+		font_size -= 1
+	draw_multiline_string(_font, area.position + Vector2(0, _font.get_ascent(font_size)), text, HORIZONTAL_ALIGNMENT_CENTER,
+		area.size.x, font_size, -1, col, flags)
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses
