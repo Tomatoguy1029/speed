@@ -14,6 +14,8 @@ var intent: Intent = Intent.new()
 var run: TraceRun = null
 var _ready_emitted := true
 var _pre_dash_speed := 0.0
+## 線の最初の点を置いた時刻（ミリ秒）。確定を受け付けるまでの時間を数える
+var _first_point_msec := 0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -71,6 +73,7 @@ func _start(it: Intent) -> void:
 	state.draw_points = PackedVector2Array()
 	if it.press:
 		state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
+		_first_point_msec = Time.get_ticks_msec()
 	state.emit(&"draw_start")
 
 func _update_drawing(it: Intent) -> void:
@@ -78,6 +81,7 @@ func _update_drawing(it: Intent) -> void:
 		if it.press:
 			state.draw_started = true
 			state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
+			_first_point_msec = Time.get_ticks_msec()
 		elif it.touch and it.pen_release:
 			_cancel()
 		return
@@ -88,8 +92,14 @@ func _update_drawing(it: Intent) -> void:
 			_commit(it)
 		else:
 			_cancel()
-	elif it.press or state.draw_length >= state.draw_limit - 0.5 or state.draw_blocked:
+	elif state.draw_length >= state.draw_limit - 0.5 or state.draw_blocked:
 		_commit(it)
+	elif it.press and _can_confirm():
+		_commit(it)
+
+## クリックで確定できるか：描き始めから config.draw_confirm_delay 秒たち、線ができていること（仕様書 6.3）。
+func _can_confirm() -> bool:
+	return Time.get_ticks_msec() - _first_point_msec >= cfg.draw_confirm_delay * 1000.0 and state.draw_points.size() >= 2
 
 func _cancel() -> void:
 	state.drawing = false
@@ -141,21 +151,11 @@ func _smooth_last_corner() -> void:
 	state.draw_length += new_length - old_length
 
 ## 線を確定して、なぞりを始める（仕様書 6.3〜4.5）。
-func _commit(it: Intent) -> void:
+func _commit(_it: Intent) -> void:
 	if state.draw_points.size() < 2:
-		# 何も描かなかった：描き始めの点（なければ機体の位置）から、まっすぐ上限の長さだけ進む
-		var u := state.ship_heading
-		if state.draw_points.is_empty():
-			state.draw_points.append(state.ship_pos)
-		var o := state.draw_points[0]
-		var tgt := o if o.distance_to(state.ship_pos) > 1.0 else it.pen
-		var d := tgt - state.ship_pos
-		if d.length() > 1.0:
-			u = d.normalized()
-		_extend(o + u * state.draw_limit)
-		if state.draw_points.size() < 2:
-			_cancel()
-			return
+		# 線ができていない（描き始めの点がすぐ惑星・月に当たったとき）：描くのをやめ、ゲージは減らない
+		_cancel()
+		return
 	state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
 	var pts := state.draw_points
 	_warp(pts[0])

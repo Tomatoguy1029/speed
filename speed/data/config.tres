@@ -72,6 +72,7 @@ draw_run_slow_ref = 260.0
 draw_run_scale_min = 0.03
 draw_run_time = 0.5
 draw_step = 8.0
+draw_confirm_delay = 0.2
 wave_radius = 45.0
 wave_damage = 0.5
 base_attack = 10.0
