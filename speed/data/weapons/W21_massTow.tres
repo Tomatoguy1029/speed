@@ -15,6 +15,7 @@ params = {
 "knock": 1200.0,
 "size_ref": 25.0,
 "follow": 18.0,
-"visible": 32
+"visible": 32,
+"clump_spacing": 40.0
 }
 comet_only = true

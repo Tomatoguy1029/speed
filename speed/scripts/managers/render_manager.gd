@@ -474,10 +474,11 @@ func _enemy_texture(type: StringName) -> Texture2D:
 		_enemy_textures[type] = load(path) if String(type) in SPRITE_IDS and ResourceLoader.exists(path) else null
 	return _enemy_textures[type]
 
-## 敵の船体を絵で描く（牽引中・撃ち出した船体）。outline は縁の色。
-func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, outline: Color) -> void:
+## 敵の船体を絵で描く（牽引中・撃ち出した船体）。glow は周りの光の色（透明なら光らせない）。
+func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color) -> void:
 	var tex := _enemy_texture(type)
-	c.draw_circle(p, r * 1.1, Color(outline, 0.25))
+	if glow.a > 0.0:
+		c.draw_circle(p, r * 1.1, Color(glow, 0.25))
 	if tex == null:
 		c.draw_circle(p, r, Color("#aeb6c4"))
 		return
@@ -589,7 +590,7 @@ func _draw_build_objects(c: CanvasItem) -> void:
 	if tow != null:
 		for j in mini(int(tow.p("visible")), tow.cargo.size()):
 			var h: Dictionary = tow.cargo[j]
-			_draw_hull(c, h.type, h.pos, h.angle, h.r, Color("#ffc778"))
+			_draw_hull(c, h.type, h.pos, h.angle, h.r, Color.TRANSPARENT)
 	var bipolar = b.weapon_behaviors.get(&"W22")
 	if bipolar != null and bipolar.origin != null:
 		var o: Vector2 = bipolar.origin

@@ -8,6 +8,7 @@ const CAUSES: Array[StringName] = [&"ram", &"bump", &"wave", &"sonic", &"killSon
 
 ## 牽引中の船体。pos・r・type・color・angle・source_id・ready（撃ち出せるか）
 var cargo: Array[Dictionary] = []
+const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
 
 ## 行 i の敵を倒した原因が cause のとき、船体を牽引するか決める。牽引したら true（破片は出さない）。
@@ -32,15 +33,17 @@ func tick(dt: float, _busy: bool) -> void:
 	var v := state.ship_vel
 	var sp := v.length()
 	var u := v / sp if sp > 1.0 else state.ship_heading
-	# 機体の後ろに4列で並べる。弾の数に上限はなく、見せるのは先頭だけ
+	# 機体の後ろに1つの塊にまとめる（ひまわりの種の並び）。弾の数に上限はなく、見せるのは先頭だけ
 	var follow := 1.0 - exp(-float(p("follow")) * dt)
-	for j in mini(int(p("visible")), cargo.size()):
+	var count := mini(int(p("visible")), cargo.size())
+	var spacing := float(p("clump_spacing"))
+	var center := state.ship_pos - u * (70.0 + spacing * sqrt(float(count)) * 0.6)
+	for j in count:
 		var c: Dictionary = cargo[j]
-		var back := 85.0 + floorf(j / 4.0) * 85.0 + float(c.r)
-		var side := (j % 4 - 1.5) * 65.0
-		var target := state.ship_pos - u * back + Vector2(-u.y, u.x) * side
-		c.pos += (target - c.pos) * follow
-		c.angle = u.angle() + PI
+		var offset := Vector2.from_angle(j * GOLDEN_ANGLE) * spacing * 0.6 * sqrt(float(j))
+		var wobble := Vector2(sin(state.time * 2.0 + j), cos(state.time * 1.7 + j * 1.3)) * 5.0
+		c.pos += (center + offset + wobble - c.pos) * follow
+		c.angle += dt * (0.6 if j % 2 == 0 else -0.6)
 	_fire_t -= dt
 	var interval := float(p("interval")) / rate_k()
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:

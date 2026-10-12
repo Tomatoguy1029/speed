@@ -70,7 +70,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		if run != null:
 			if run.inside.has(t.id[i]):
 				continue
-		elif t.hit_cd[i] > 0.0:
+		elif t.hit_cd[i] > 0.0 and t.type[i] != &"meteor":
 			continue
 		var hit_t := Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R)
 		if hit_t >= 0.0:
@@ -89,6 +89,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var atk := attack_power()
 		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
+		if not fast and t.type[i] == &"meteor":
+			_bump_meteor(i, hit_pos, R, dir)
+			continue
 		if not fast:
 			# 普段の接触：攻撃にならず、敵の接触ダメージを受ける
 			t.hit_cd[i] = cfg.contact_cooldown
@@ -132,7 +135,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		state.ship_boost_t = 0.0
 		damage_enemy(i, atk * 0.25, {"crit": crit, "cause": &"bump", "dir": -n})
 		t.hit_cd[i] = 0.25
-		ship.damage(t.contact[i], 0.0, StringName("bump:" + String(t.type[i])))
+		# 隕石は固い障害物で、ぶつかっても被弾しない
+		if t.type[i] != &"meteor":
+			ship.damage(t.contact[i], 0.0, StringName("bump:" + String(t.type[i])))
 		build.on_contact(i, hit_pos, dir)
 		state.emit(&"bounce", {"pos": state.ship_pos})
 		return true
@@ -209,6 +214,23 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 			t.knock_t[i] = 0.3
 	if crit and not opts.get("no_crit", false):
 		build.on_critical(opts.get("impact", t.pos[i]))
+
+## 普段の速さで隕石（行 i）に触れた：隕石の外へ押し出して跳ね返る。被弾はせず、
+## 攻撃力の 1/4 を与える（同じ隕石には 0.25 世界秒に1回）。触れている間は毎回押し出すので、上を通り抜けない。
+func _bump_meteor(i: int, hit_pos: Vector2, R: float, dir: Vector2) -> void:
+	var t := enemies.table
+	var n := hit_pos - t.pos[i]
+	n = n.normalized() if n.length_squared() > 0.0 else -dir
+	state.ship_pos = t.pos[i] + n * (t.r[i] + R + 1.0)
+	var vn := state.ship_vel.dot(n)
+	if vn < 0.0:
+		state.ship_vel -= n * 2.0 * vn
+		state.ship_vel *= cfg.bounce_keep
+	if t.hit_cd[i] > 0.0:
+		return
+	t.hit_cd[i] = 0.25
+	state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
+	damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
 
 ## 一撃で倒したときのヒットストップ（仕様書 7.4）。
 func _kill_stop(i: int, crit: bool) -> void:
