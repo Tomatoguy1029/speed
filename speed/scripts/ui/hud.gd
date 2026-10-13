@@ -181,7 +181,8 @@ static func card_info(c: Dictionary) -> Dictionary:
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
 		var old_def: WeaponDef = ConfigManager.weapons[c.id]
-		return {"tag": TranslationServer.translate("card.swap_tag"), "name": "%s Lv%d" % [old_def.get_display_name(), c.level],
+		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
+		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
 			"desc": TranslationServer.translate("card.swap_desc").format({name = new_def.get_display_name()}),
 			"color": Color("#efcb70")}
 	if c.kind == &"heal":
@@ -319,7 +320,7 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
 		box.border_color = col
 		var text_col := col
-		# 彗星限定の武器は赤い枠で、ほかの武器と見分ける。段階は目盛りの色で見せる
+		# 彗星限定の武器は赤い枠で、ほかの武器と見分ける
 		if def is WeaponDef and def.comet_only:
 			var glow := box.duplicate() as StyleBoxFlat
 			glow.bg_color = Color.TRANSPARENT
@@ -332,7 +333,9 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 			text_col = Color("#ffd9d9")
 		draw_style_box(box, rect)
 		_draw_fit_text(def.get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), text_col)
-		# 段階の目盛り
+		# 段階の目盛り（強化のない彗星限定の武器には出さない）
+		if def is WeaponDef and def.comet_only:
+			continue
 		var pip_w := (size_px - 10.0 - (max_level - 1) * 2.0) / max_level
 		for j in max_level:
 			var pip := Rect2(rect.position.x + 5.0 + j * (pip_w + 2.0), rect.end.y - 7.0, pip_w, 3.0)

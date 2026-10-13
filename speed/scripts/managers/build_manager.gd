@@ -171,8 +171,8 @@ func roll_cards() -> Array[Dictionary]:
 			var lv: int = owned.get(id, 0)
 			if lv >= max_lv or (lv == 0 and not free):
 				continue
-			# 彗星限定の武器は、持っているときの強化だけ3択に出す
-			if lv == 0 and kind == &"weapon" and defs[id].comet_only:
+			# 彗星限定の武器は3択に出さない（強化もない）
+			if kind == &"weapon" and defs[id].comet_only:
 				continue
 			pool.append({"kind": kind, "id": id, "level": lv + 1, "weight": cfg.owned_card_bias if lv > 0 else 1.0})
 	var out: Array[Dictionary] = []
@@ -209,7 +209,7 @@ func choose_card(index: int) -> bool:
 	if state.swap_pick != &"":
 		if c.kind == &"swap":
 			remove_weapon(c.id)
-			grant(&"weapon", state.swap_pick)
+			grant(&"weapon", state.swap_pick, cfg.weapon_max_level)
 			state.emit(&"upgrade", {"card": c})
 		state.swap_pick = &""
 		state.cards = []
@@ -278,14 +278,13 @@ func remove_weapon(id: StringName) -> void:
 	weapon_behaviors.erase(id)
 	refresh_stats()
 
-## 彗星限定の武器を受け取る（仕様書 13.1）。空き枠があれば装備し、持っていれば1段階上げる。
+## 彗星限定の武器を受け取る（仕様書 8）。強化はなく、Lv の上限で装備する。持っていれば何もしない。
 ## 枠が満員なら、入れ替える武器を選ぶカードを開いて true を返す。
 func _receive_comet_weapon(id: StringName) -> bool:
-	var lv: int = state.weapons.get(id, 0)
-	if lv >= cfg.weapon_max_level:
+	if state.weapons.has(id):
 		return false
-	if lv > 0 or state.weapons.size() < cfg.weapon_slots:
-		grant(&"weapon", id)
+	if state.weapons.size() < cfg.weapon_slots:
+		grant(&"weapon", id, cfg.weapon_max_level)
 		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ConfigManager.weapons[id].get_display_name(),
 			"color": Color("#efcb70"), "size": 24})
 		return false

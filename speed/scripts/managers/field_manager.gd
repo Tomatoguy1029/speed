@@ -213,7 +213,9 @@ func spawn_comet(rare: bool) -> void:
 		r.size = rng.randf_range(35.0, 55.0)
 		r.facing = u.angle()
 		if rare:
-			var ids: Array = ConfigManager.weapons.keys().filter(func(id): return ConfigManager.weapons[id].comet_only)
+			# まだ持っていない彗星限定の武器から選ぶ。すべて持っていれば普通の彗星にする
+			var ids: Array = ConfigManager.weapons.keys().filter(func(id):
+				return ConfigManager.weapons[id].comet_only and not state.weapons.has(id))
 			if not ids.is_empty():
 				r.rare_weapon = ids[rng.randi_range(0, ids.size() - 1)]
 		rocks.append(r)
