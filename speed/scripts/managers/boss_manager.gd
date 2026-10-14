@@ -39,6 +39,12 @@ func has_boss() -> bool:
 func boss_alive() -> bool:
 	return has_boss() and enemies.table.dead[boss_row] == 0
 
+## 敵の行を解放する前に、今のボスの撃破済みの部位を役者へ渡す。
+func part_defeated(row: int) -> void:
+	var t := enemies.table
+	if actor != null and has_boss() and t.parent[row] == boss_row and t.parent_id[row] == boss_id:
+		actor.on_part_defeated(row)
+
 ## ボスの位置。ボスがいなければ fallback。
 func boss_pos(fallback: Vector2) -> Vector2:
 	return enemies.table.pos[boss_row] if has_boss() else fallback

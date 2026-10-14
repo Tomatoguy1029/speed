@@ -32,6 +32,11 @@ func _on_bound() -> void:
 func sim_tick(_real_dt: float, _world_dt: float) -> void:
 	pass
 
+## 撃破済みの部位の行を空きへ戻す前の通知。row の HP・攻撃情報はまだ読み取れる。
+## 部位の撃破で本体や再生の状態を変えるボスが上書きする。
+func on_part_defeated(_row: int) -> void:
+	pass
+
 func _process(_delta: float) -> void:
 	if manager != null and manager.has_boss():
 		position = table.pos[body]

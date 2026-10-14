@@ -177,6 +177,15 @@ func _head_pos(neck: Neck) -> Vector2:
 func _alive(neck: Neck) -> bool:
 	return neck.row >= 0 and manager.enemies.is_same(neck.row, neck.row_id) and table.dead[neck.row] == 0
 
+## 頭の行が再利用される前に、火で落ちたかと本体へのダメージを確定する。
+func on_part_defeated(row: int) -> void:
+	for neck in necks:
+		if neck.row == row and neck.row_id == table.id[row]:
+			_on_head_lost(neck)
+			return
+	if immortal_row == row and immortal_id == table.id[row]:
+		_tick_immortal(0.0)
+
 ## 首1本の更新：頭へのダメージを本体へ移し、頭が落ちたら生え直しを待つ。頭の位置を決め、節が追う。
 func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	var p: Dictionary = def.params

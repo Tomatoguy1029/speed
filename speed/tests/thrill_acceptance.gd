@@ -18,6 +18,9 @@ func _ready() -> void:
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.settings = settings
 	await _start(4)
+	_test_head_world_steps()
+	await _close()
+	await _start(4)
 	_test_immortal_hit()
 	await _close()
 	await _start(4)
@@ -559,3 +562,18 @@ func _test_immortal_hit() -> void:
 	_ram(t.pos[immortal], Vector2.RIGHT)
 	boss.sim_tick(0.01, 0.01)
 	_check(t.hp[boss.body] <= body_hp - t.max_hp[boss.body] * float(boss.def.params.immortal_dmg) + 0.01, "タスク20：不死の首を一度貫くと本体へ大きなダメージ")
+
+func _test_head_world_steps() -> void:
+	run.bosses.spawn()
+	var boss = run.bosses.actor
+	var neck = boss.necks[0]
+	var old_row: int = neck.row
+	var at := run.enemies.table.pos[old_row]
+	run.state.world_time = 10.0
+	run.combat.damage_enemy(old_row, 1000, {"cause": &"fire", "no_crit": true})
+	run.state.pending_levels = 0
+	# 世界側を進めない物理更新で頭が片付くと、次の世界更新までに分裂体が行を再利用できる。
+	run._play_tick(1.0 / 120.0)
+	_enemy(&"splitling", at + Vector2(500, 0))
+	run._play_tick(1.0 / 120.0)
+	_check(neck.row < 0 and neck.burned, "タスク20・23：世界更新の間に倒れた頭も、火による再生停止を保つ")

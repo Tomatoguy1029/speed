@@ -1317,6 +1317,8 @@ func cleanup() -> void:
 		return
 	for i in _dead_rows:
 		if table.alive[i] != 0 and table.dead[i] != 0:
+			if bosses != null and table.parent[i] >= 0:
+				bosses.part_defeated(i)
 			_release_row(i)
 	_dead_rows.clear()
 

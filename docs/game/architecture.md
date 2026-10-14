@@ -242,7 +242,7 @@ Main (Node)
 
 **うみへび座の役者**
 
-`scenes/bosses/hydra_boss.tscn` と `scripts/bosses/hydra_boss.gd` が本体・首・頭を組み合わせる。本体と頭の当たり判定は敵の表に登録し、首の節は役者が描く。頭の位置をコードで決め、節の位置が後ろから追う。頭の行は親の本体の行と結び、行の再利用を ID でも確かめる。
+`scenes/bosses/hydra_boss.tscn` と `scripts/bosses/hydra_boss.gd` が本体・首・頭を組み合わせる。本体と頭の当たり判定は敵の表に登録し、首の節は役者が描く。頭の位置をコードで決め、節の位置が後ろから追う。頭の行は親の本体の行と結び、行の再利用を ID でも確かめる。`EnemyManager.cleanup()` は行を解放する前に `BossManager.part_defeated()` から役者の `on_part_defeated()` へ通知し、頭へのダメージと火による再生停止を確定する。
 
 強めの技は `AnimationPlayer` のタイムラインを世界秒で進める。Behavior Tree が必要な首のそろった技を選び、役者が羅針盤の予告と各首の動きをまとめて扱う。必要な首が落ちたときはタイムラインを止める。首ごとの通常攻撃・生え直しは役者の状態で持ち、仕様は [仕様書](spec.md) の12.3。
 
