@@ -259,6 +259,8 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, W * clampf(s.xp / run.build.xp_needed(), 0.0, 1.0), 5), Color("#b8a0ff"))
 	# 経過時間（上部中央）
 	draw_string(_font, Vector2(W / 2.0 - 40, 44), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 30, Color("#e8f0ff"))
+	if s.bonus_t > 0.0:
+		draw_string(_font, Vector2(W / 2.0 - 120, 76), tr("hud.bonus").format({n = ceili(s.bonus_t)}), HORIZONTAL_ALIGNMENT_CENTER, 240, 22, Color("#d9a8ff"))
 	# 状態の文字（左上）
 	var atk := run.combat.attack_power()
 	var x := 16.0

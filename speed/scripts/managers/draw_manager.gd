@@ -157,6 +157,9 @@ func _commit(_it: Intent) -> void:
 		_cancel()
 		return
 	state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
+	if state.bonus_t > 0.0:
+		# ボーナスステージ：放つとすぐ満タンに戻る
+		state.gauge = 1.0
 	var pts := state.draw_points
 	_warp(pts[0])
 	var dir := (pts[1] - pts[0]).normalized()

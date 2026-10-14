@@ -63,6 +63,9 @@ var _stream_t := 0.0
 ## 次の彗星までの世界秒
 var _comet_t := 0.0
 var wells: Array[Well] = []
+## ワープホールの位置と消える世界時刻（無ければ warp_gone が負）
+var warp_pos := Vector2.ZERO
+var warp_gone := -1.0
 var _well_t := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
@@ -98,6 +101,7 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	_place_rocks(rng)
 	_update_moons()
 	wells.clear()
+	warp_gone = -1.0
 	_well_t = rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
 
 func tick(_real_dt: float, world_dt: float) -> void:
@@ -267,7 +271,36 @@ func _tick_comets(dt: float) -> void:
 	if _comet_t > 0.0:
 		return
 	_comet_t = state.rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
+	if state.bonus_t <= 0.0 and not state.boss_spawned and warp_gone < 0.0 and state.time >= cfg.rare_comet_after \
+			and state.rng.randf() < cfg.warp_chance:
+		spawn_warp()
+		return
 	spawn_comet(state.time >= cfg.rare_comet_after and state.rng.randf() < cfg.rare_comet_chance)
+
+# ── ワープホール（仕様書 13.1） ───────────────────────────────────────
+
+## 画面の端の近くにワープホールを出す。
+func spawn_warp() -> void:
+	for attempt in 8:
+		var u := Vector2.from_angle(state.rng.randf() * TAU)
+		var edge := minf(state.view_half.x / maxf(absf(u.x), 0.001), state.view_half.y / maxf(absf(u.y), 0.001))
+		warp_pos = state.view_center + u * edge * 0.8
+		if body_gap(warp_pos, cfg.warp_radius) > 50.0 and warp_pos.length() < cfg.field_radius - 200.0:
+			break
+	warp_gone = state.world_time + cfg.warp_life
+
+## 機体がワープホールに触れたか。触れたらワープホールは消える。
+func take_warp() -> bool:
+	if warp_gone < 0.0:
+		return false
+	if state.world_time >= warp_gone:
+		warp_gone = -1.0
+		return false
+	var reach := cfg.warp_radius + cfg.ship_radius
+	if state.ship_pos.distance_squared_to(warp_pos) > reach * reach:
+		return false
+	warp_gone = -1.0
+	return true
 
 ## 画面の端の近くを横切る彗星を1つ出す。惑星を通らない向きを選ぶ。
 func spawn_comet(rare: bool) -> void:

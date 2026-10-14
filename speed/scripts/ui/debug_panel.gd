@@ -58,7 +58,7 @@ func _ready() -> void:
 			["敵を消す", &"debug_clear_enemies", {}], ["部品 +100", &"debug_coins", {"amount": 100}],
 			["被弾を確認", &"debug_hurt", {}], ["致命傷を確認", &"debug_die", {}],
 			["彗星を出す", &"debug_comet", {"rare": false}], ["レアな彗星を出す", &"debug_comet", {"rare": true}],
-			["重力を出す", &"debug_gravity", {}], ["攻撃の形を試す", &"debug_hazards", {}]]:
+			["重力を出す", &"debug_gravity", {}], ["ワープホールを出す", &"debug_warp", {}], ["攻撃の形を試す", &"debug_hazards", {}]]:
 		var btn := Button.new()
 		btn.text = b[0]
 		btn.add_theme_font_size_override("font_size", 15)

@@ -360,7 +360,7 @@ func _build_star_batch() -> void:
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := state.view_rect().grow(200.0)
-	c.draw_rect(view, Color(0.02, 0.03, 0.07))
+	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
 	_star_material.set_shader_parameter("view_center", state.view_center)
 	_star_material.set_shader_parameter("view_half", state.view_half)
 	_star_material.set_shader_parameter("camera_zoom", state.camera_zoom)
@@ -373,6 +373,13 @@ func _draw_field(c: CanvasItem) -> void:
 		if view.has_point(center) or view.grow(d.z).has_point(center):
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
 	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+	# ワープホール：回る輪
+	if f.warp_gone >= 0.0:
+		var wr := cfg.warp_radius
+		c.draw_circle(f.warp_pos, wr, Color(0.6, 0.3, 1.0, 0.25))
+		for n in 3:
+			var a0 := state.world_time * (2.0 + n) + n * 2.1
+			c.draw_arc(f.warp_pos, wr * (0.5 + 0.2 * n), a0, a0 + PI * 1.4, 24, Color(0.85, 0.7, 1.0, 0.8), _px(3.0))
 	# 重力：縮みながら渦を巻く
 	for w in f.wells:
 		var k := 1.0 - (state.world_time - w.born) / w.life

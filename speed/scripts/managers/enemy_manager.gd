@@ -273,6 +273,13 @@ func mark_dead(i: int) -> void:
 func count() -> int:
 	return slots.live
 
+## ボスと障害物のほかの敵を、撃破にせずに消す（ボーナスステージの出入り）。
+func clear_regular() -> void:
+	var t := table
+	for i in t.alive.size():
+		if t.alive[i] != 0 and t.is_boss[i] == 0 and t.meteor_index[i] < 0:
+			mark_dead(i)
+
 ## 全部の敵を消す（計測・確認用のツールが使う）。
 func clear_all() -> void:
 	slots.clear()
@@ -1248,6 +1255,10 @@ func _target() -> Dictionary:
 	var p := current_phase()
 	var k := clampf((state.time - p.start) / maxf(0.001, p.end - p.start), 0.0, 1.0)
 	var steps := surge_steps()
+	if state.bonus_t > 0.0:
+		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
+		return {"phase": p, "steps": steps, "pop": cfg.bonus_pop * cfg.density_mult,
+			"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
 	return {"phase": p, "steps": steps,
 		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
 		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
@@ -1403,9 +1414,13 @@ func _pick_type(phase: PhaseDef, steps: int) -> StringName:
 	for k in phase.mix:
 		var w := float(phase.mix[k])
 		var def := def_of(StringName(k))
+		if def != null and def.max_alive > 0 and state.bonus_t > 0.0:
+			continue
 		if def != null and def.ranged:
 			w *= 1.0 + cfg.surge_ranged * steps
 		items.append([StringName(k), w])
+	if items.is_empty():
+		return phase.mix.keys()[0]
 	for it in items:
 		total += it[1]
 	var roll := state.rng.randf() * total

@@ -123,6 +123,21 @@ func _read_settings() -> void:
 	state.hitstop_enabled = bool(SaveManager.settings.hitstop)
 
 ## 更新の順番（設計書 4.3）。
+## ワープホールからボーナスステージに入る：周りの敵と敵の攻撃を消し、雑魚と硬めの敵を多く出す（仕様書 13.1）。
+func _enter_bonus() -> void:
+	state.bonus_t = cfg.bonus_time
+	state.gauge = 1.0
+	enemies.clear_regular()
+	projectiles.clear_hostile()
+	state.emit(&"bonus", {"enter": true, "pos": state.ship_pos})
+
+## ボーナスステージから戻る：ボーナスステージの敵と敵の攻撃を消し、通常の出現に戻る。
+func _leave_bonus() -> void:
+	state.bonus_t = 0.0
+	enemies.clear_regular()
+	projectiles.clear_hostile()
+	state.emit(&"bonus", {"enter": false, "pos": state.ship_pos})
+
 func _play_tick(real_dt: float) -> void:
 	var it := input.poll()
 	input.drawing = state.drawing
@@ -142,7 +157,13 @@ func _play_tick(real_dt: float) -> void:
 		return
 	state.world_scale = draw.world_scale()
 	var world_dt := real_dt * state.world_scale
-	state.time += real_dt
+	if state.bonus_t > 0.0:
+		# ボーナスステージの間は、ランの時計が止まる
+		state.bonus_t -= real_dt
+		if state.bonus_t <= 0.0:
+			_leave_bonus()
+	else:
+		state.time += real_dt
 	state.world_time += world_dt
 	# 世界側は config.world_tick_div 回に1回、たまった時間でまとめて進める
 	_world_real_dt += real_dt
@@ -169,6 +190,8 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
 		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()
+	if state.phase == RunState.Phase.PLAY and state.bonus_t <= 0.0 and field.take_warp():
+		_enter_bonus()
 	_update_camera(real_dt)
 	_check_end()
 	if state.phase == RunState.Phase.PLAY:
@@ -391,6 +414,9 @@ func command(name: StringName, args := {}) -> void:
 		&"debug_gravity":
 			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
 				field.spawn_well()
+		&"debug_warp":
+			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
+				field.spawn_warp()
 		&"debug_comet":
 			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
 				field.spawn_comet(bool(args.get("rare", false)))
