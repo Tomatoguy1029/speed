@@ -22,5 +22,10 @@ mix = {
 "bomber": 2.667,
 "volatile": 2.667,
 "beamer": 0.15,
-"spreader": 0.15
+"spreader": 0.15,
+"triangle": 0.1,
+"lynx": 0.05,
+"cross": 0.05,
+"reticle": 0.05,
+"ruler": 0.05
 }

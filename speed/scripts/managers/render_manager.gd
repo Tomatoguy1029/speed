@@ -547,6 +547,11 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 			# 殻：傷が増えるほど欠ける
 			var hurt := clampf(t.shell_dmg[i] / float(t.def[i].params.shell_hp), 0.0, 1.0)
 			c.draw_arc(p, r + _px(3.0), t.facing[i], t.facing[i] + TAU * (1.0 - hurt), 24, Color("#d9dde6"), _px(4.0))
+	if t.beh[i] == EnemyTable.Beh.TRIANGLE and t.mode[i] != EnemyTable.Mode.RECOVER and t.parts[i].size() == 6:
+		# 3つの星の間に張った光の膜
+		var parts := t.parts[i]
+		c.draw_colored_polygon(PackedVector2Array([t.pos[parts[0]], t.pos[parts[2]], t.pos[parts[4]]]),
+			Color(t.color[i], 0.16))
 	if t.beh[i] == EnemyTable.Beh.CROW and t.buds[i] > 0:
 		# 集めた残骸の塊
 		var lump: float = t.def[i].params.lump_r * sqrt(float(t.buds[i]) / float(t.def[i].params.throw_min))

@@ -16,9 +16,11 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"bomber": EnemyTable.Beh.BOMBER, &"beamer": EnemyTable.Beh.BEAMER, &"pulser": EnemyTable.Beh.PULSER,
 	&"pump": EnemyTable.Beh.PUMP, &"sniper": EnemyTable.Beh.SNIPER, &"shield": EnemyTable.Beh.SHIELD,
 	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK, &"lynx": EnemyTable.Beh.LYNX,
-	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE}
+	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE, &"triangle": EnemyTable.Beh.TRIANGLE,
+	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
-const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL}
+const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
+	&"membrane": EnemyTable.Gate.MEMBRANE}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -94,7 +96,29 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	t.meteor_index[i] = opts.get("meteor_index", -1)
 	if t.meteor_index[i] < 0:
 		_add_beh(i)
+	if t.beh[i] == EnemyTable.Beh.TRIANGLE:
+		_spawn_triangle_stars(i)
 	return i
+
+## 部位を1つ出し、親（行 i）に付ける。
+func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
+	var j := spawn(def, table.level[i], pos)
+	table.parent[j] = i
+	table.parent_id[j] = table.id[i]
+	var parts := table.parts[i]
+	parts.append(j)
+	parts.append(table.id[j])
+	table.parts[i] = parts
+	return j
+
+## 部位のうち、生きているものの数。
+func parts_alive(i: int) -> int:
+	var parts := table.parts[i]
+	var n := 0
+	for k in range(0, parts.size(), 2):
+		if is_same(parts[k], parts[k + 1]) and table.dead[parts[k]] == 0:
+			n += 1
+	return n
 
 ## ボスの当たり判定の行を出し、その行番号を返す。ボスの行動は BossActor が動かす。
 func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: float,
@@ -174,6 +198,9 @@ func _reset_row(i: int) -> void:
 	t.shell_dmg[i] = 0.0
 	t.shell_open[i] = 0.0
 	t.shell_rest[i] = 0.0
+	t.parent[i] = -1
+	t.parent_id[i] = -1
+	t.parts[i] = PackedInt32Array()
 
 ## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で出す（仕様書 11.3）。
 func spawn_later(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> void:
@@ -200,6 +227,9 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 			if from_back:
 				return EnemyTable.GateResult.ALLOW
 			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.MEMBRANE:
+			# 膜が消えている（頂点の星が欠けている）間だけ、中の核を倒せる
+			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.RECOVER else EnemyTable.GateResult.PASS
 		EnemyTable.Gate.SHELL:
 			# 殻が割れている間に当たると倒れる
 			if t.shell_open[i] > 0.0:
@@ -261,7 +291,7 @@ func debug_spawn_random(count_n: int) -> void:
 		return
 	var choices: Array[EnemyDef] = []
 	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
-		if def.id != &"meteor":
+		if def.id != &"meteor" and def.behavior != &"part":
 			choices.append(def)
 	if choices.is_empty():
 		return
@@ -292,7 +322,8 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
 			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
 			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
-			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE]:
+			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
+			EnemyTable.Beh.PHOENIX]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -452,6 +483,16 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.RETICLE:
 					_keep_distance(i, dt)
 					_reticle(i, dt)
+				EnemyTable.Beh.TRIANGLE:
+					_chase(i, dt)
+					_triangle(i, dt)
+				EnemyTable.Beh.PART:
+					# 位置は親が決める。親が倒れたら一緒に消える
+					if not is_same(t.parent[i], t.parent_id[i]) or t.dead[t.parent[i]] != 0:
+						mark_dead(i)
+					vel[i] = Vector2.ZERO
+				EnemyTable.Beh.PHOENIX:
+					_phoenix(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -684,8 +725,13 @@ func _beamer(i: int, dt: float) -> void:
 			t.facing[i] = a
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.telegraph) + float(p.beam_time)
-			projectiles.fire_beam(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.beam_len), float(p.beam_width),
-				float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
+			if p.get("cross", false):
+				# みなみじゅうじ座：十字のレーザー
+				projectiles.fire_cross(t.pos[i], a + PI / 4.0, float(p.beam_len), float(p.beam_width),
+					float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
+			else:
+				projectiles.fire_beam(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.beam_len), float(p.beam_width),
+					float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
 		return
 	t.timer[i] -= dt
 	if t.timer[i] <= 0.0:
@@ -856,6 +902,68 @@ func _reticle(i: int, dt: float) -> void:
 		var at := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * float(p.scatter) * float(k)
 		projectiles.fire_zone(at, float(p.blast_radius), float(p.blast_delay) + float(k) * 0.25,
 			_attack_dmg(i, float(p.bullet_dmg)), ProjectileManager.HazardStyle.LIGHTNING, t.color[i].lightened(0.3))
+
+## みなみのさんかく座：核の周りに3つの星を出す。
+func _spawn_triangle_stars(i: int) -> void:
+	var star := def_of(&"triangle_star")
+	for k in 3:
+		spawn_part(i, star, table.pos[i] + Vector2.from_angle(TAU * k / 3.0) * float(table.def[i].params.span))
+
+## みなみのさんかく座：3つの星を核の周りでゆっくり回し、星の間に光の膜（触れると被弾する線）を張る。
+## 星が1つでも欠けると膜が消え（mode が RECOVER）、中の核を倒せる。
+func _triangle(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.facing[i] += float(p.spin) * dt
+	var parts := t.parts[i]
+	var verts := PackedVector2Array()
+	for k in range(0, parts.size(), 2):
+		var j := parts[k]
+		var a := t.facing[i] + TAU * (k / 2) / 3.0
+		var at := t.pos[i] + Vector2.from_angle(a) * float(p.span)
+		if is_same(j, parts[k + 1]) and t.dead[j] == 0:
+			t.pos[j] = at
+		verts.append(at)
+	var links := t.links[i]
+	if t.mode[i] != EnemyTable.Mode.RECOVER and parts_alive(i) < 3:
+		t.mode[i] = EnemyTable.Mode.RECOVER
+		for h in links:
+			projectiles.release_hazard(h)
+		t.links[i] = PackedInt32Array()
+		state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": t.r[i]})
+		return
+	if t.mode[i] == EnemyTable.Mode.RECOVER or verts.size() < 3:
+		return
+	if links.is_empty():
+		for k in 3:
+			var h := projectiles.fire_wall(verts[k], 0.0, 0.0, float(p.wall_width), float(p.telegraph), 1e9,
+				_attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+			projectiles.attach_hazard(h, i)
+			links.append(h)
+		t.links[i] = links
+	for k in 3:
+		var a := verts[k]
+		var b := verts[(k + 1) % 3]
+		projectiles.move_hazard(links[k], a, (b - a).angle(), a.distance_to(b))
+
+## ほうおう座：機体の周りを大きく旋回しながら飛び、飛んだ跡に炎（残る線）を残す。
+func _phoenix(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var d := t.pos[i] - state.enemy_aim
+	var ring := float(p.orbit) * (0.75 + 0.25 * sin(t.age[i] * 0.7 + float(t.id[i])))
+	var side := Vector2(-d.y, d.x).normalized()
+	var target := state.enemy_aim + d.normalized() * ring + side * 260.0
+	_steer_to(i, target, t.speed[i], t.accel[i], dt)
+	_turn_moving(i, t.turn[i], dt)
+	t.fire_t[i] -= dt
+	if t.fire_t[i] <= 0.0:
+		t.fire_t[i] = float(p.trail_step)
+		var back := t.pos[i] - t.vel[i] * float(p.trail_step)
+		var seg := t.pos[i] - back
+		if seg.length() > 1.0:
+			projectiles.fire_wall(back, seg.angle(), seg.length(), float(p.trail_width), 0.0, float(p.trail_time),
+				_attack_dmg(i, float(p.bullet_dmg)), Color("#ff8a3c"))
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
 ## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。

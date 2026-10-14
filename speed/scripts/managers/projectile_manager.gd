@@ -435,10 +435,17 @@ func attach_hazard(h: int, e: int) -> void:
 func owns_hazard(h: int, e: int, id: int) -> bool:
 	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
-## 付いている攻撃の形（行 h）を動かす。
-func move_hazard(h: int, pos: Vector2, angle: float) -> void:
+## 付いている攻撃の形（行 h）を動かす。length が 0 以上なら長さも変える。
+func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 	hazard_pos[h] = pos
 	hazard_angle[h] = angle
+	if length >= 0.0:
+		hazard_len[h] = length
+
+## 攻撃の形（行 h）を消す。
+func release_hazard(h: int) -> void:
+	if h < hazard_alive.size() and hazard_alive[h] != 0:
+		hazard_slots.release(h)
 
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
