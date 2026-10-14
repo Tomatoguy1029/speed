@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"pump"
 display_name = "ポンプ座"
+rank = 3
 radius = 26.0
 hp = 60.0
 armor = 8.0

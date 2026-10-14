@@ -206,6 +206,7 @@ func _reset_row(i: int) -> void:
 	t.shell_open[i] = 0.0
 	t.shell_rest[i] = 0.0
 	t.stone[i] = 0.0
+	t.landmark[i] = 0
 	t.parent[i] = -1
 	t.parent_id[i] = -1
 	t.parts[i] = PackedInt32Array()

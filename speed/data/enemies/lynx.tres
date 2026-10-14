@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"lynx"
 display_name = "やまねこ座"
+rank = 4
 radius = 24.0
 hp = 20.0
 armor = 4.0

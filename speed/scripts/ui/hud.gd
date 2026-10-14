@@ -10,6 +10,8 @@ const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（画面px）
 const LOADOUT_WEAPON := 50.0
 const LOADOUT_TRAIT := 40.0
+## ミニマップの半径（画面px）
+const MINIMAP_R := 78.0
 ## 彗星限定の武器の枠の色（段階の色と重ならない赤）
 const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
@@ -273,8 +275,84 @@ func _draw() -> void:
 		draw_string(_font, Vector2(x, 52), "ATK %.1f   %s   Lv %d" % [atk, tr("hud.kills").format({n = s.kills}), s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
 		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
 	_draw_loadout(H)
+	_draw_minimap(W)
 	_draw_boss(W)
 	_draw_gauge_ring()
+
+var _dense := PackedVector2Array()
+
+## ミニマップ（右上）。円形の星図のようなレーダーに、フィールド全体を縮めて出す（仕様書 17）。
+## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
+func _draw_minimap(W: float) -> void:
+	var s := run.state
+	var cfg := run.cfg
+	var R := MINIMAP_R
+	var c := Vector2(W - R - 14.0, R + 14.0)
+	var k := R / cfg.field_radius
+	var line := Color(0.65, 0.78, 1.0, 0.14)
+	draw_circle(c, R, Color(0.03, 0.05, 0.12, 0.82))
+	for f in [0.33, 0.66]:
+		draw_arc(c, R * f, 0, TAU, 48, line, 1.0)
+	for n in 4:
+		var u := Vector2.from_angle(n * PI / 4.0) * R
+		draw_line(c - u, c + u, line, 1.0)
+	draw_arc(c, R, 0, TAU, 64, Color(0.7, 0.8, 1.0, 0.55), 1.5)
+	for n in 36:
+		var u := Vector2.from_angle(n * TAU / 36.0)
+		draw_line(c + u * R, c + u * (R - (5.0 if n % 3 == 0 else 2.5)), Color(0.7, 0.8, 1.0, 0.45), 1.0)
+	draw_circle(c, cfg.planet_radius * k, Color(0.45, 0.5, 0.65, 0.6))
+	# 敵の多い所（数フレームに1回数え直す）
+	if Engine.get_process_frames() % 15 == 0:
+		_dense = _dense_cells()
+	for p in _dense:
+		draw_circle(c + p * k, 3.5, Color(1.0, 0.35, 0.35, 0.35))
+	for cap: Pickup in run.pickups.capsules:
+		draw_circle(c + cap.pos * k, 2.0, Color("#ffd24a"))
+	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2本で交わる
+	var h := run.heroes
+	var gold := Color("#ffe8a0")
+	if h.hero != null and h.is_captive():
+		for q in s.landmarks:
+			var a := q * k
+			var u := (h.center - q).normalized()
+			var b := a.dot(u)
+			var disc := b * b - a.length_squared() + R * R
+			if disc > 0.0:
+				var r0 := sqrt(disc)
+				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
+			draw_circle(c + a, 3.0, gold)
+	if h.revealed():
+		var at := c + h.center * k
+		var tw := 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
+		draw_circle(at, 6.0 * tw, Color(gold, 0.35))
+		draw_circle(at, 3.0, gold if h.is_captive() else Color(gold, 0.45))
+	if run.bosses.boss_alive():
+		draw_circle(c + run.bosses.boss_pos(Vector2.ZERO) * k, 4.0, Color("#ff526e"))
+	var head := s.ship_heading if s.ship_heading != Vector2.ZERO else Vector2.UP
+	var sp := c + s.ship_pos * k
+	var side := Vector2(-head.y, head.x)
+	draw_colored_polygon(PackedVector2Array([sp + head * 6.0, sp - head * 4.0 + side * 4.0, sp - head * 4.0 - side * 4.0]),
+		Color.WHITE)
+
+## 敵の多い所：フィールドを升目に分け、敵が一定より多い升目の中心（世界座標）。
+func _dense_cells() -> PackedVector2Array:
+	var t := run.enemies.table
+	var fr := run.cfg.field_radius
+	var n := 16
+	var cell := fr * 2.0 / n
+	var counts := PackedInt32Array()
+	counts.resize(n * n)
+	for i in t.alive.size():
+		if t.alive[i] == 0 or t.dead[i] != 0 or t.meteor_index[i] >= 0:
+			continue
+		var gx := clampi(int((t.pos[i].x + fr) / cell), 0, n - 1)
+		var gy := clampi(int((t.pos[i].y + fr) / cell), 0, n - 1)
+		counts[gy * n + gx] += 1
+	var out := PackedVector2Array()
+	for g in counts.size():
+		if counts[g] >= 12:
+			out.append(Vector2((g % n + 0.5) * cell - fr, (g / n + 0.5) * cell - fr))
+	return out
 
 ## 装備一覧（左下）。武器と特性を別の段の枠に並べ、空き枠も薄く描いて持てる数を見せる（仕様書 17）。
 ## 武器は角の四角、特性は丸い四角。枠の色と下の目盛りは強化の段階（仕様書 8）。

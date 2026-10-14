@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"rocket"
 display_name = "ミサイル"
+rank = 1
 radius = 10.0
 hp = 3.0
 armor = 1.0

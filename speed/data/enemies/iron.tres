@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"iron"
 display_name = "鉄のがれき"
+rank = 0
 radius = 40.0
 hp = 40.0
 armor = 60.0

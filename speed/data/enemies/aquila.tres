@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"aquila"
 display_name = "わし座"
+rank = 10
 radius = 64.0
 hp = 2400.0
 armor = 16.0

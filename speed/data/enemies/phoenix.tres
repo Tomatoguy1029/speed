@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"phoenix"
 display_name = "ほうおう座"
+rank = 7
 radius = 56.0
 hp = 900.0
 armor = 12.0

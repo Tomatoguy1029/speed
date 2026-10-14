@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"drifter"
 display_name = "ドリフター"
+rank = 0
 radius = 11.5
 hp = 6.0
 armor = 2.0

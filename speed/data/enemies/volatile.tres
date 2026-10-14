@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"volatile"
 display_name = "誘爆する雑魚"
+rank = 1
 radius = 12.0
 hp = 5.0
 armor = 2.0

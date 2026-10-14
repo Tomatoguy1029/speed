@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"battleship"
 display_name = "戦艦"
+rank = 0
 radius = 95.0
 hp = 420.0
 armor = 20.0

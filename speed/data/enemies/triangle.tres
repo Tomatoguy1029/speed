@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"triangle"
 display_name = "みなみのさんかく座"
+rank = 3
 radius = 22.0
 hp = 40.0
 armor = 4.0

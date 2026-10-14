@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"cepheus"
 display_name = "ケフェウス座"
+rank = 7
 radius = 50.0
 hp = 1100.0
 armor = 12.0

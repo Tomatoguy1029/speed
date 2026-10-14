@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"missile"
 display_name = "ホーミングミサイルの敵"
+rank = 2
 radius = 22.0
 hp = 20.0
 armor = 6.0

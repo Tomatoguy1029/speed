@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"beamer"
 display_name = "ビームの敵"
+rank = 2
 radius = 18.0
 hp = 16.0
 armor = 5.0

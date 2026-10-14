@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"aquarius"
 display_name = "みずがめ座"
+rank = 10
 radius = 70.0
 hp = 2200.0
 armor = 16.0

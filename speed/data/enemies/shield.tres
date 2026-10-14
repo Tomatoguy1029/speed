@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"shield"
 display_name = "たて座"
+rank = 4
 radius = 30.0
 hp = 90.0
 armor = 6.0

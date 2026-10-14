@@ -321,6 +321,10 @@ func kill_enemy(i: int, opts := {}) -> void:
 		return
 	enemies.mark_dead(i)
 	state.kills += 1
+	if t.landmark[i] != 0:
+		# 目印の星を取り戻した
+		state.landmarks.append(t.pos[i])
+		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
 	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i],

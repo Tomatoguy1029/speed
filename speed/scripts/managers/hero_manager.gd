@@ -15,6 +15,12 @@ var falls: Array[Vector3] = []
 var burns: Array[Vector3] = []
 var _fire_t := 0.0
 var _burn_tick := 0.0
+## 目印の星を選ぶまでの時間と、目印の星を持つ敵（行番号と id。いなければ -1）
+var _landmark_t := 0.0
+var _landmark_row := -1
+var _landmark_id := 0
+## 機体が近くまで来て、英雄の星座の場所を見たか（ミニマップに出す）
+var seen := false
 
 ## 今フィールドにある英雄の星座（無ければ null）
 var hero: HeroDef
@@ -68,7 +74,11 @@ func _place(def: HeroDef) -> void:
 	lit = PackedByteArray()
 	lit.resize(def.links.size() / 2)
 	guarded = false
+	seen = false
 	_last_star = -1
+	state.landmarks = PackedVector2Array()
+	_landmark_row = -1
+	_landmark_t = cfg.landmark_interval
 
 func tick(real_dt: float, _world_dt: float) -> void:
 	if state.hero_cd > 0.0:
@@ -88,12 +98,54 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		return
 	if not guarded and state.ship_pos.distance_squared_to(center) < cfg.hero_guard_range * cfg.hero_guard_range:
 		_spawn_guards()
+	if state.ship_pos.distance_squared_to(center) < cfg.hero_glow_range * cfg.hero_glow_range:
+		seen = true
+	_tick_landmark(real_dt)
 	if not state.tracing:
 		return
 	if state.dash_id != _last_dash:
 		_last_dash = state.dash_id
 		_last_star = -1
 	_pass_stars(from, state.ship_pos)
+
+## ミニマップに英雄の星座を出すか：近くまで来たか、目印の星の線が2本そろったか、解放したとき。
+func revealed() -> bool:
+	return hero != null and (seen or state.landmarks.size() >= 2 or not is_captive())
+
+## 目印の星：間隔ごとに、機体の近くの強めの敵から1体を選んで持たせる（仕様書 13.1）。
+func _tick_landmark(dt: float) -> void:
+	if state.landmarks.size() >= 2:
+		return
+	var t := enemies.table
+	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id) and t.dead[_landmark_row] == 0:
+		return
+	_landmark_row = -1
+	_landmark_t -= dt
+	if _landmark_t > 0.0:
+		return
+	_landmark_t = cfg.landmark_interval
+	if state.rng.randf() >= cfg.landmark_chance or combat.grid.table == null:
+		return
+	var rows := PackedInt32Array()
+	combat.grid.query_radius(state.ship_pos, state.view_half.length() * 1.3, cfg.max_enemy_radius, rows)
+	var picks := PackedInt32Array()
+	for i in rows:
+		if t.dead[i] != 0 or t.def[i] == null or t.def[i].rank < 2 or t.def[i].rank > 5 or t.parent[i] >= 0:
+			continue
+		if t.pos[i].distance_to(center) < cfg.landmark_spacing:
+			continue
+		var far := true
+		for q in state.landmarks:
+			if t.pos[i].distance_to(q) < cfg.landmark_spacing:
+				far = false
+		if far:
+			picks.append(i)
+	if picks.is_empty():
+		return
+	var i := picks[state.rng.randi_range(0, picks.size() - 1)]
+	t.landmark[i] = 1
+	_landmark_row = i
+	_landmark_id = t.id[i]
 
 ## まだ解放されていない星座がフィールドにあるか。
 func is_captive() -> bool:
@@ -228,6 +280,8 @@ func _tick_hercules(dt: float) -> void:
 ## 火の隕石を落とす位置：機体の周り（画面の半分くらいの範囲）のランダムな位置。敵がいれば、その位置に寄せる。
 func _fire_target() -> Vector2:
 	var half := state.view_half * 0.5
+	if combat.grid.table == null:
+		return state.ship_pos
 	var rows := PackedInt32Array()
 	combat.grid.query_radius(state.ship_pos, half.length(), cfg.max_enemy_radius, rows)
 	var t := enemies.table

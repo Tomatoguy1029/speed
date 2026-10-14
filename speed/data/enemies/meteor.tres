@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"meteor"
 display_name = "隕石"
+rank = 0
 radius = 40.0
 hp = 20.0
 armor = 5.0

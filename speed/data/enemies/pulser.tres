@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"pulser"
 display_name = "波動の敵"
+rank = 2
 radius = 18.0
 hp = 18.0
 armor = 5.0

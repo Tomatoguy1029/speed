@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"splitter"
 display_name = "分裂する雑魚"
+rank = 1
 radius = 22.5
 hp = 14.0
 armor = 4.0

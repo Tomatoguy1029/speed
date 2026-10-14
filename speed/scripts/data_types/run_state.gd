@@ -106,6 +106,8 @@ var hero_power: StringName = &""
 var hero_cd := 0.0
 var hero_active_t := 0.0
 ## ふたご座の力：1本目の線（2本目を描いている間）と、双子の機体がなぞる線・位置・なぞっているか
+## 取り戻した目印の星の位置（英雄の星座が変わると空に戻る）
+var landmarks := PackedVector2Array()
 var twin_first := PackedVector2Array()
 var twin_path := PackedVector2Array()
 var twin_pos := Vector2.ZERO

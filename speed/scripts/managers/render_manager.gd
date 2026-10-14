@@ -426,9 +426,13 @@ func _draw_hero(c: CanvasItem) -> void:
 	var pulse := 0.85 + 0.15 * sin(state.world_time * 3.0)
 	for p in h.stars:
 		if near > 0.0:
-			c.draw_circle(p, cfg.hero_star_radius * (1.5 + 2.5 * near) * pulse, Color(1.0, 0.95, 0.75, 0.12 * near))
-			c.draw_circle(p, cfg.hero_star_radius * (0.8 + 1.0 * near), Color(1.0, 0.97, 0.85, 0.25 * near))
-		c.draw_circle(p, maxf(_px(3.0), cfg.hero_star_radius * 0.35), Color(1.0, 0.98, 0.9, 0.6 + 0.4 * near))
+			# 恒星のような光：中心の芯と、細い光の筋
+			c.draw_circle(p, cfg.hero_star_radius * (0.9 + 0.6 * near) * pulse, Color(1.0, 0.95, 0.75, 0.1 * near))
+			c.draw_circle(p, cfg.hero_star_radius * 0.6, Color(1.0, 0.97, 0.85, 0.3 * near))
+			for k in 4:
+				var u := Vector2.from_angle(k * PI / 4.0) * cfg.hero_star_radius * (1.2 + 2.0 * near) * pulse
+				c.draw_line(p - u, p + u, Color(1.0, 0.96, 0.8, (0.5 if k % 2 == 0 else 0.25) * near), _px(2.0))
+		c.draw_circle(p, maxf(_px(3.0), cfg.hero_star_radius * 0.3), Color(1.0, 0.98, 0.9, 0.6 + 0.4 * near))
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
@@ -588,6 +592,14 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if weak > 0.0 and t.type[i] != &"armored":
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
+	if t.landmark[i] != 0:
+		# 目印の星：金色とも白ともつかない特別な光
+		var tw := 0.75 + 0.25 * sin(state.world_time * 5.0 + float(t.id[i]))
+		c.draw_circle(p, r * 2.2 * tw, Color(1.0, 0.95, 0.8, 0.16))
+		c.draw_circle(p, r * 0.5, Color(1.0, 0.97, 0.88, 0.95))
+		for k in 4:
+			var u := Vector2.from_angle(k * PI / 2.0 + state.world_time) * r * 1.8 * tw
+			c.draw_line(p - u, p + u, Color(1.0, 0.95, 0.75, 0.6), _px(2.0))
 	if t.stone[i] > 0.0:
 		# 石になっている
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))

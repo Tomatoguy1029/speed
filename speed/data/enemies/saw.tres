@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"saw"
 display_name = "回る丸鋸"
+rank = 0
 radius = 30.0
 hp = 1.0
 armor = 0.0

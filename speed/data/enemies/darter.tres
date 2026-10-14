@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"darter"
 display_name = "ダーター"
+rank = 0
 radius = 18.0
 hp = 9.0
 armor = 3.5

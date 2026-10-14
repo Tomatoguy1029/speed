@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"splitling"
 display_name = "分裂体"
+rank = 1
 radius = 13.0
 hp = 3.0
 armor = 1.5

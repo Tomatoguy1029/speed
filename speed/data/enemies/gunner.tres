@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"gunner"
 display_name = "射撃型"
+rank = 0
 radius = 18.0
 hp = 12.0
 armor = 4.0

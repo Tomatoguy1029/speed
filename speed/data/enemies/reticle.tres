@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"reticle"
 display_name = "レチクル座"
+rank = 4
 radius = 22.0
 hp = 45.0
 armor = 6.0

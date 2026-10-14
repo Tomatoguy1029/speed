@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"titan"
 display_name = "タイタン"
+rank = 0
 radius = 75.0
 hp = 160.0
 armor = 6.0

@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"corona_star"
 display_name = "みなみのかんむり座の星"
+rank = 0
 radius = 14.0
 hp = 30.0
 armor = 0.0

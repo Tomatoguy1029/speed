@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"triangle_star"
 display_name = "みなみのさんかく座の星"
+rank = 0
 radius = 12.0
 hp = 6.0
 armor = 0.0

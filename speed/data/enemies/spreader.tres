@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"spreader"
 display_name = "拡散弾の敵"
+rank = 2
 radius = 20.0
 hp = 22.0
 armor = 6.0

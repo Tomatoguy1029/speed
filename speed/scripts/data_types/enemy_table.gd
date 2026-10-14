@@ -91,6 +91,8 @@ var links: Array[PackedInt32Array] = []
 var parent := PackedInt32Array()
 var parent_id := PackedInt32Array()
 var parts: Array[PackedInt32Array] = []
+## 1 なら目印の星を持つ敵（倒すと、ミニマップに英雄の星座への線が出る）
+var landmark := PackedByteArray()
 ## 石になっている残り時間（ペルセウス座の力。石の間は動かず、触れると砕ける）
 var stone := PackedFloat64Array()
 ## 殻の傷、殻が割れている残り時間、最後に攻撃が当たってからの時間（やまねこ座）

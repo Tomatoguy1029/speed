@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"swarm"
 display_name = "スウォーム"
+rank = 0
 radius = 16.0
 hp = 3.0
 armor = 1.2

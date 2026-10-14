@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"dolphin"
 display_name = "いるか座"
+rank = 5
 radius = 26.0
 hp = 80.0
 armor = 7.0

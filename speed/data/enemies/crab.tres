@@ -6,6 +6,7 @@
 script = ExtResource("1")
 id = &"crab"
 display_name = "かに座"
+rank = 5
 radius = 30.0
 hp = 90.0
 armor = 8.0
