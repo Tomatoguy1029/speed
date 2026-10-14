@@ -258,10 +258,10 @@ func _tick_immortal(dt: float) -> void:
 		exposed_t = 0.0
 		_expose_cd = 3.0
 		immortal_row = -1
-		# 普段の首がすぐ生え直す
+		# 焼いた首は段階が変わるまで戻らない。焼いていない首だけ生え直す。
 		for neck in necks:
-			neck.burned = false
-			neck.regrow = minf(neck.regrow, 0.8)
+			if not neck.burned:
+				neck.regrow = minf(neck.regrow, 0.8)
 
 func _expose() -> void:
 	var p: Dictionary = def.params
