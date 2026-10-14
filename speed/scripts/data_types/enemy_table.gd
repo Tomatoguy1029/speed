@@ -10,9 +10,9 @@ extends RefCounted
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
 enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBER, BEAMER, PULSER, PUMP, SNIPER,
-	SHIELD, RULER, CLOCK }
+	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
-enum Gate { NONE, MOUTH, BACK }
+enum Gate { NONE, MOUTH, BACK, SHELL }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
 enum GateResult { ALLOW, PASS, BOUNCE }
 
@@ -86,6 +86,10 @@ var buds := PackedInt32Array()
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）
 var links: Array[PackedInt32Array] = []
+## 殻の傷、殻が割れている残り時間、最後に攻撃が当たってからの時間（やまねこ座）
+var shell_dmg := PackedFloat64Array()
+var shell_open := PackedFloat64Array()
+var shell_rest := PackedFloat64Array()
 
 # ── 吹き飛ばされている間 ──────────────────────────────────────────
 

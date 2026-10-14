@@ -539,6 +539,18 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		# 吸い込んでいる間は口が開いている
 		c.draw_circle(p + Vector2.from_angle(t.facing[i]) * r * 0.6, r * 0.45, Color(0.1, 0.05, 0.15, 0.9))
 		c.draw_arc(p, r * 2.4, 0, TAU, 32, Color(t.color[i], 0.25), _px(2.0))
+	if t.gate[i] == EnemyTable.Gate.SHELL:
+		if t.shell_open[i] > 0.0:
+			# 殻が割れて、星がむき出しになっている
+			c.draw_circle(p, r * 0.45, Color("#fff4b0"))
+		else:
+			# 殻：傷が増えるほど欠ける
+			var hurt := clampf(t.shell_dmg[i] / float(t.def[i].params.shell_hp), 0.0, 1.0)
+			c.draw_arc(p, r + _px(3.0), t.facing[i], t.facing[i] + TAU * (1.0 - hurt), 24, Color("#d9dde6"), _px(4.0))
+	if t.beh[i] == EnemyTable.Beh.CROW and t.buds[i] > 0:
+		# 集めた残骸の塊
+		var lump: float = t.def[i].params.lump_r * sqrt(float(t.buds[i]) / float(t.def[i].params.throw_min))
+		c.draw_circle(p + Vector2.from_angle(t.facing[i] + 0.9) * (r + lump), lump, Color("#8d8f99"))
 	var hp := t.hp[i]
 	var max_hp := t.max_hp[i]
 	if (r >= 25.0 or t.is_boss[i] != 0) and hp < max_hp:

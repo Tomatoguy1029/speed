@@ -23,5 +23,10 @@ mix = {
 "volatile": 2.0,
 "splitter": 2.0,
 "beamer": 0.15,
-"missile": 0.15
+"missile": 0.15,
+"pump": 0.1,
+"crow": 0.1,
+"lynx": 0.1,
+"reticle": 0.05,
+"dolphin": 0.05
 }

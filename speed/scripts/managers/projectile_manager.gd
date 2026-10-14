@@ -284,6 +284,13 @@ func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := 
 		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": pos, "kind": kind})
 
+## からす座の塊を投げる。大きさ r とダメージ dmg は集めた残骸の数で決まる。
+func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void:
+	var t := combat.enemies.table
+	var u := Vector2.from_angle(angle)
+	_add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, 4.0, dmg, 0.0, 0.0, HostileKind.BULLET)
+	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"lump"})
+
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:

@@ -240,7 +240,7 @@ Main (Node)
 
 ### 6.2 敵の表の列
 
-`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `volatile`・`splitling`、分裂（`split`）が `splitter`、誘導弾（`missile`）が `missile`、扇状の弾（`battleship`）が `spreader`、一直線（`rocket`）が `rocket`、自爆（`bomber`）が `bomber`、ビーム（`beamer`）が `beamer`、波動（`pulser`）が `pulser`。突進（`dash`）と射撃（`gunner`）は、出現から外した敵（[敵一覧](catalog/enemies.md)）の行動。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
+`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `volatile`・`splitling`、分裂（`split`）が `splitter`、誘導弾（`missile`）が `missile`、扇状の弾（`battleship`）が `spreader`、一直線（`rocket`）が `rocket`、自爆（`bomber`）が `bomber`、ビーム（`beamer`）が `beamer`、波動（`pulser`）が `pulser`・`dolphin`。強敵は、`telescope` が狙撃（`sniper`）、ほかは type ID と同じ名前の行動（`pump`・`shield`・`ruler`・`clock`・`lynx`・`crow`・`reticle`）を使う。突進（`dash`）と射撃（`gunner`）は、出現から外した敵（[敵一覧](catalog/enemies.md)）の行動。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
 
 | 列 | 使う敵 | 中身 |
 |---|---|---|
@@ -279,14 +279,17 @@ Main (Node)
 | `roam_phase` | 追跡で動く雑魚（追跡・分裂・戦艦、接近中の `darter`） | 広域移動の周期のずれ |
 | `roam_angle` | 追跡で動く雑魚 | 広域移動の向き |
 | `roam_radius` | 追跡で動く雑魚 | 広域移動の広がり |
-| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser` | 行動の段階（動く → 構える・飛ぶ など） |
+| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間 |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
-| `charge` | `gunner`・`missile`・`battleship`・ボス | 射撃の予告の溜め（0〜1） |
+| `charge` | `gunner`・`missile`・`battleship`・`telescope`・`crow`・`reticle`・ボス | 射撃の予告の溜め（0〜1） |
 | `bud_t` | `splitter` | 次の分裂までの時間 |
-| `buds` | `splitter` | 分裂した数 |
-| `spin` | 漂流（`drift`）の雑魚 | 回転の速さ |
+| `buds` | `splitter`・`crow` | 分裂した数。からす座は集めた残骸の数 |
+| `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針が回り始めてからの時間 |
 | `links` | とけい座 | 付いて動く攻撃の形の行番号（`ProjectileManager` の `hazard_` の行） |
+| `shell_dmg` | やまねこ座 | 殻の傷 |
+| `shell_open` | やまねこ座 | 殻が割れている残り時間 |
+| `shell_rest` | やまねこ座 | 最後に攻撃が当たってからの時間 |
 | `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
 | `shove_time` | 吹き飛ばし衝角（W03）で押し出された敵 | 押し出しの残り時間 |
 | `shove_vel` | 同上 | 押し出しの速度 |

@@ -15,9 +15,10 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"battleship": EnemyTable.Beh.BATTLESHIP, &"drift": EnemyTable.Beh.DRIFT, &"rocket": EnemyTable.Beh.ROCKET,
 	&"bomber": EnemyTable.Beh.BOMBER, &"beamer": EnemyTable.Beh.BEAMER, &"pulser": EnemyTable.Beh.PULSER,
 	&"pump": EnemyTable.Beh.PUMP, &"sniper": EnemyTable.Beh.SNIPER, &"shield": EnemyTable.Beh.SHIELD,
-	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK}
+	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK, &"lynx": EnemyTable.Beh.LYNX,
+	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
-const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK}
+const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -170,6 +171,9 @@ func _reset_row(i: int) -> void:
 	t.dash_seen[i] = -1
 	t.dash_fresh[i] = 0
 	t.links[i] = PackedInt32Array()
+	t.shell_dmg[i] = 0.0
+	t.shell_open[i] = 0.0
+	t.shell_rest[i] = 0.0
 
 ## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で出す（仕様書 11.3）。
 func spawn_later(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> void:
@@ -182,8 +186,8 @@ func is_same(i: int, id: int) -> bool:
 ## 撃破済みにする。行はその回の終わり（cleanup）に空きへ戻る。
 ## 行 i の敵に、位置 hit から向き dir の攻撃（cause）が当たったときの扱い（EnemyTable.GateResult）。
 ## 特殊な倒し方の条件を満たさない攻撃は、体当たりなら貫通するがダメージを与えない（PASS）。
-## 弾かれるのは失敗のとき（BOUNCE）だけ。
-func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName) -> int:
+## 弾かれるのは失敗のとき（BOUNCE）だけ。dmg は当たった攻撃のダメージで、殻（やまねこ座）にはこの判定で傷を付ける。
+func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0.0) -> int:
 	var t := table
 	match t.gate[i]:
 		EnemyTable.Gate.MOUTH:
@@ -196,6 +200,21 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName) -> int:
 			if from_back:
 				return EnemyTable.GateResult.ALLOW
 			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.SHELL:
+			# 殻が割れている間に当たると倒れる
+			if t.shell_open[i] > 0.0:
+				t.hp[i] = minf(t.hp[i], 0.001)
+				return EnemyTable.GateResult.ALLOW
+			# 体当たりなら1回、ほかの攻撃は傷が殻の耐久に届くと割れる
+			var p: Dictionary = t.def[i].params
+			t.shell_rest[i] = 0.0
+			t.shell_dmg[i] += INF if cause == &"ram" else dmg
+			t.flash[i] = 0.08
+			if t.shell_dmg[i] >= float(p.shell_hp):
+				t.shell_open[i] = float(p.shell_time)
+				t.shell_dmg[i] = 0.0
+				state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
+			return EnemyTable.GateResult.PASS
 	return EnemyTable.GateResult.ALLOW
 
 func mark_dead(i: int) -> void:
@@ -272,7 +291,8 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE,
 			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
 			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
-			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK]:
+			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
+			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -424,6 +444,14 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.CLOCK:
 					_chase(i, dt)
 					_clock(i, dt)
+				EnemyTable.Beh.LYNX:
+					_lynx(i, dt)
+				EnemyTable.Beh.CROW:
+					_keep_distance(i, dt)
+					_crow(i, dt)
+				EnemyTable.Beh.RETICLE:
+					_keep_distance(i, dt)
+					_reticle(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -675,8 +703,15 @@ func _pulser(i: int, dt: float) -> void:
 			t.facing[i] = a
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.telegraph)
-			projectiles.fire_wave(t.pos[i], a, float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
-				float(p.wave_width), float(p.telegraph), _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
+			if int(p.get("layers", 1)) > 1:
+				# いるか座：何層もの輪。層ごとに切れ目がずれる
+				projectiles.fire_rings(t.pos[i], int(p.layers), float(p.layer_interval), float(p.wave_radius),
+					float(p.wave_speed), float(p.wave_width), float(p.telegraph), _attack_dmg(i, float(p.bullet_dmg)),
+					a + state.rng.randf_range(-1.0, 1.0), float(p.gap_width), float(p.gap_step) * (1.0 if t.id[i] % 2 == 1 else -1.0),
+					t.color[i])
+			else:
+				projectiles.fire_wave(t.pos[i], a, float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
+					float(p.wave_width), float(p.telegraph), _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
 		return
 	t.timer[i] -= dt
 	if t.timer[i] <= 0.0:
@@ -765,10 +800,73 @@ func _clock(i: int, dt: float) -> void:
 	projectiles.move_hazard(links[0], t.pos[i], a0)
 	projectiles.move_hazard(links[1], t.pos[i], a1)
 
+## やまねこ座：近づいてきて、機体が届く距離に入ると前方を扇形に爪で薙ぐ。構えはない。
+## 殻が割れている間は、爪を振るう間隔が短くなる。攻撃が当たらない時間が続くと、殻の傷は戻る。
+func _lynx(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+	_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
+	var open := t.shell_open[i] > 0.0
+	if open:
+		t.shell_open[i] -= dt
+	else:
+		t.shell_rest[i] += dt
+		if t.shell_rest[i] > float(p.shell_heal_delay):
+			t.shell_dmg[i] = maxf(0.0, t.shell_dmg[i] - float(p.shell_hp) * dt / float(p.shell_heal_time))
+	t.fire_t[i] -= dt * (float(p.fire_interval) / float(p.open_interval) if open else 1.0)
+	var reach := float(p.wave_radius) + t.r[i]
+	if t.fire_t[i] <= 0.0 and t.pos[i].distance_squared_to(state.ship_pos) < reach * reach:
+		t.fire_t[i] = float(p.fire_interval)
+		projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
+			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
+
+## からす座：周りで倒された敵の残骸を集めて塊にし（buds が集めた数）、集まると機体へ投げる。
+func _crow(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.buds[i] < int(p.throw_min):
+		t.charge[i] = 0.0
+		return
+	if _gun_timer(i, dt):
+		var n := t.buds[i]
+		t.buds[i] = 0
+		var size := float(p.lump_r) * sqrt(float(n) / float(p.throw_min))
+		projectiles.fire_lump(i, (state.enemy_aim - t.pos[i]).angle(), float(p.bullet_speed), size,
+			_attack_dmg(i, float(p.bullet_dmg)) * sqrt(float(n) / float(p.throw_min)))
+
+## 倒された敵の残骸を、近くのからす座が集める。
+func _gather_debris(pos: Vector2) -> void:
+	var t := table
+	for j in beh_rows[EnemyTable.Beh.CROW]:
+		if t.dead[j] != 0:
+			continue
+		var p: Dictionary = t.def[j].params
+		if t.pos[j].distance_squared_to(pos) < float(p.gather_radius) * float(p.gather_radius):
+			t.buds[j] = mini(t.buds[j] + 1, int(p.lump_max))
+			return
+
+## レチクル座：距離を保ち、間隔ごとに機体のいた位置へ照準の模様を刻む。少し遅れてそこに雷が落ちる。
+func _reticle(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if not _gun_timer(i, dt):
+		return
+	for k in int(p.strikes):
+		var at := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * float(p.scatter) * float(k)
+		projectiles.fire_zone(at, float(p.blast_radius), float(p.blast_delay) + float(k) * 0.25,
+			_attack_dmg(i, float(p.bullet_dmg)), ProjectileManager.HazardStyle.LIGHTNING, t.color[i].lightened(0.3))
+
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
+## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。
 func on_enemy_death(i: int, atk: float) -> void:
 	var t := table
 	var dp: Dictionary = t.def[i].params if t.def[i] != null else {}
+	if t.beh[i] == EnemyTable.Beh.CROW:
+		for k in t.buds[i] * int(dp.shards):
+			projectiles.fire_enemy(i, state.rng.randf() * TAU, float(dp.bullet_speed) * state.rng.randf_range(0.6, 1.0), &"bullet")
+	elif t.is_boss[i] == 0 and t.type[i] != &"meteor":
+		_gather_debris(t.pos[i])
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),
 			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))

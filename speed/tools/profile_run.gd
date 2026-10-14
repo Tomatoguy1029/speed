@@ -1,5 +1,5 @@
 ## 短時間の性能計測専用。実ゲームの仕様・セーブは変更しない。
-## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on
+## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on --types=pump,lynx
 extends Node
 
 var run: RunManager
@@ -75,6 +75,13 @@ func _ready() -> void:
 	run.state.time = float(options.get("time", "10"))
 	if options.has("enemies"):
 		run.enemies.debug_spawn_random(int(options.enemies))
+		run.combat.rebuild_grid()
+	if options.has("types"):
+		# --types=pump,lynx で、指定した種類の敵を機体の周りに2体ずつ出す
+		for type in String(options.types).split(",", false):
+			for k in 2:
+				run.enemies.spawn(run.enemies.def_of(StringName(type)), 1.0,
+					run.state.ship_pos + Vector2.from_angle(run.state.rng.randf() * TAU) * 450.0)
 		run.combat.rebuild_grid()
 	if options.has("size") and DisplayServer.get_name() != "headless":
 		var size := String(options.size).split("x")

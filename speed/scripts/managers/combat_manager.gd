@@ -194,7 +194,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var cause: StringName = opts.get("cause", &"")
 	# 体当たりの通り抜けは collide_ship で扱う。ここでは、条件を満たさない攻撃のダメージを止める
 	if cause != &"ram" and cause != &"bump" and enemies.gate_check(i, opts.get("impact", t.pos[i]),
-			opts.get("dir", Vector2.ZERO), cause) != EnemyTable.GateResult.ALLOW:
+			opts.get("dir", Vector2.ZERO), cause, dmg) != EnemyTable.GateResult.ALLOW:
 		return
 	var crit: bool = opts.get("crit", false)
 	if not opts.has("crit") and not opts.get("no_crit", false):

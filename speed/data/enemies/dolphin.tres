@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"dolphin"
+display_name = "いるか座"
+radius = 26.0
+hp = 80.0
+armor = 7.0
+speed = 110.0
+accel = 1.5
+turn = 2.5
+xp = 16.0
+color = Color(0.5, 0.8, 1, 1)
+shape = &"orb"
+behavior = &"pulser"
+max_alive = 2
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 480.0,
+"fire_interval": 5.0,
+"telegraph": 0.8,
+"layers": 4,
+"layer_interval": 0.4,
+"wave_radius": 1300.0,
+"wave_speed": 420.0,
+"wave_width": 18.0,
+"gap_width": 0.45,
+"gap_step": 0.7,
+"wave_arc": 3.14159,
+"bullet_dmg": 12.0
+}

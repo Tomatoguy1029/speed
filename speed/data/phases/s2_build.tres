@@ -23,5 +23,8 @@ mix = {
 "volatile": 1.25,
 "splitter": 1.25,
 "beamer": 0.3,
-"missile": 0.3
+"missile": 0.3,
+"pump": 0.1,
+"lynx": 0.1,
+"reticle": 0.1
 }
