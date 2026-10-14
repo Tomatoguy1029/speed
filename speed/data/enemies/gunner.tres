@@ -16,6 +16,7 @@ xp = 3.0
 color = Color(1.0, 0.4196, 0.6039, 1)
 shape = &"ship"
 behavior = &"gunner"
+ranged = true
 size_var = false
 weak_arc = 0.0
 params = {

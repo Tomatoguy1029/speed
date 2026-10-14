@@ -588,7 +588,16 @@ func current_phase() -> PhaseDef:
 func _target() -> Dictionary:
 	var p := current_phase()
 	var k := clampf((state.time - p.start) / maxf(0.001, p.end - p.start), 0.0, 1.0)
-	return {"phase": p, "pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult, "level": lerpf(p.level_from, p.level_to, k)}
+	var steps := surge_steps()
+	return {"phase": p, "steps": steps,
+		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
+		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
+
+## 10:00 以降の強まりの段（仕様書 4.2）。始まる前は0、始まると1から一定時間ごとに増える。
+func surge_steps() -> int:
+	if state.time < cfg.surge_start:
+		return 0
+	return 1 + int((state.time - cfg.surge_start) / maxf(1.0, cfg.surge_interval))
 
 ## 通常の敵の数。in_view が true なら、再配置の範囲の中だけを数える。
 func _count_population(in_view: bool) -> int:
@@ -637,13 +646,11 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 var _type_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
 
-## 1回の走査で、外周の辺ごとの数・出現上限のある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
+## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
 ## 戻り値は再配置の範囲の中の通常の敵の数。
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
-	var battleships := 0
-	var titans := 0
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -653,17 +660,15 @@ func _survey() -> int:
 	var pos := table.pos
 	var dead := table.dead
 	var type := table.type
+	var defs := table.def
 	_far_rows.clear()
 	for rows in beh_rows:
 		for i in rows:
 			if dead[i] != 0:
 				continue
-			# 種類別上限を使う2種類だけ集計。全種類の辞書更新は不要。
-			var ty := type[i]
-			if ty == &"battleship":
-				battleships += 1
-			elif ty == &"titan":
-				titans += 1
+			# 上限のある種類だけ数える
+			if defs[i].max_alive > 0:
+				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
 				_far_rows.append(i)
@@ -676,8 +681,6 @@ func _survey() -> int:
 			# 正規化した距離の比較を交差乗算にし、個体ごとの除算を省く。
 			var side := (0 if rel.x < 0.0 else 1) if ax * vh.y > ay * vh.x else (2 if rel.y < 0.0 else 3)
 			_edge_counts[side] += 1
-	_type_counts[&"battleship"] = battleships
-	_type_counts[&"titan"] = titans
 	for i in _far_rows:
 		if _recycle(i):
 			alive_n += 1
@@ -718,34 +721,32 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	var phase: PhaseDef = t.phase
 	var danger := field.danger_at(p.length())
-	var type := _pick_type(phase, danger)
-	if type == &"battleship" and _type_counts.get(type, 0) >= cfg.battleship_max:
-		return false
-	if type == &"titan" and _type_counts.get(type, 0) >= cfg.titan_max:
-		return false
+	var type := _pick_type(phase, t.steps)
 	var def := def_of(type)
 	if def == null:
 		return false
-	var late := phase.id == &"tension" or phase.id == &"escape"
-	var elite := type != &"battleship" and state.rng.randf() < 0.01 + 0.06 * danger + (0.02 if late else 0.0)
+	if def.max_alive > 0 and _type_counts.get(type, 0) >= def.max_alive:
+		return false
+	var elite: bool = def.max_alive == 0 and state.rng.randf() < 0.01 + 0.06 * danger + cfg.surge_elite * t.steps
 	var level: float = t.level + danger * cfg.danger_level
 	var opts := {"elite": elite, "facing": (state.ship_pos - p).angle()}
 	if def.size_var:
 		opts.size = def.radius * (0.85 + state.rng.randf() * 0.45)
 	spawn(def, level, p, opts)
-	_type_counts[type] = _type_counts.get(type, 0) + 1
+	if def.max_alive > 0:
+		_type_counts[type] = _type_counts.get(type, 0) + 1
 	return true
 
-func _pick_type(phase: PhaseDef, danger: float) -> StringName:
+## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
+func _pick_type(phase: PhaseDef, steps: int) -> StringName:
 	var items: Array = []
 	var total := 0.0
 	for k in phase.mix:
-		items.append([StringName(k), float(phase.mix[k])])
-	if danger > 0.25:
-		var ramp := clampf(state.time / 150.0, 0.15, 1.0)
-		items.append([&"armored", 2.0 * danger])
-		items.append([&"gunner", danger * ramp])
-		items.append([&"missile", 0.7 * danger * ramp])
+		var w := float(phase.mix[k])
+		var def := def_of(StringName(k))
+		if def != null and def.ranged:
+			w *= 1.0 + cfg.surge_ranged * steps
+		items.append([StringName(k), w])
 	for it in items:
 		total += it[1]
 	var roll := state.rng.randf() * total

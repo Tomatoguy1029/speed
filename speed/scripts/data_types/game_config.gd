@@ -431,10 +431,30 @@ extends Resource
 ## 画面の半分の大きさ × この値 ＋ 200 より離れた敵は、画面外の出現位置へ移す。
 ## 単位：倍
 @export var spawn_recycle_scale: float
-## タイタンの同時数の上限
-## タイタンが同時に出ていられる数。
-## 単位：体
-@export var titan_max: int
+## 10:00 以降の強まりの開始
+## この時刻から、一定時間ごとに敵の波が大きく・強くなる。
+## 単位：実秒
+@export var surge_start: float
+## 強まりの間隔
+## この間隔ごとに、敵の波が1段強くなる。
+## 単位：実秒
+@export var surge_interval: float
+## 強まり1段の敵の数
+## 1段ごとに、目標の敵の数をこの割合だけ増やす。
+## 単位：割合
+@export var surge_pop: float
+## 強まり1段の敵のレベル
+## 1段ごとに、敵のレベルにこの値を足す。
+## 単位：レベル
+@export var surge_level: float
+## 強まり1段の撃つ敵の出やすさ
+## 1段ごとに、弾やビームを撃つ敵（敵の定義の「撃つ敵」）の出現の重みをこの割合だけ増やす。
+## 単位：割合
+@export var surge_ranged: float
+## 強まり1段のエリートの確率
+## 1段ごとに、エリートになる確率にこの値を足す。
+## 単位：確率
+@export var surge_elite: float
 ## 当たり判定の格子の大きさ
 ## 当たり判定を探すための区切りの大きさ。性能の調整用で、遊びは変わらない。
 ## 単位：単位（距離）
@@ -447,10 +467,6 @@ extends Resource
 ## 当たり判定を探すときの余白。一番大きい敵の半径以上にする。
 ## 単位：単位（距離）
 @export var max_enemy_radius: float
-## 戦艦の同時数の上限
-## 戦艦が同時に出ていられる数。
-## 単位：体
-@export var battleship_max: int
 
 ## 大型の敵を倒したときに飛ぶ、攻撃する破片
 @export_group("大型の敵の破片")

@@ -72,6 +72,14 @@ const PARAMS_DOCS := {
 ## chase（追う）、dash（構えて突進）、split（分裂体を生む）、gunner（距離を保って撃つ）、missile（ミサイルを撃つ）、battleship（扇状に撃つ）、drift（漂う）。
 ## 単位：文字
 @export var behavior: StringName
+## 同時に出る数の上限
+## この種類が同時に出ていられる数。0 なら上限なし。強敵を出しすぎないために使う。
+## 単位：体
+@export var max_alive: int
+## 撃つ敵
+## オンにすると、弾やビームを撃つ敵として、10:00 以降の強まりで出やすくなる。
+## 単位：オン／オフ
+@export var ranged: bool
 ## 大きさのばらつき
 ## オンにすると、標準の 0.85〜1.30 倍の大きさで出る。大きいほど HP・装甲・経験値も増える。
 ## 単位：オン／オフ

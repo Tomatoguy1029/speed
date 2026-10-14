@@ -253,8 +253,6 @@ func _update_moons() -> void:
 
 ## 中心からの距離 r の危険度（0〜1）。中間の環で 0、惑星の表面と外縁に向かって 1。
 func danger_at(r: float) -> float:
-	if r < cfg.zone_inner:
-		return clampf((cfg.zone_inner - r) / (cfg.zone_inner - cfg.planet_radius), 0.0, 1.0)
 	if r > cfg.zone_outer:
 		return clampf((r - cfg.zone_outer) / (cfg.field_radius - cfg.zone_outer), 0.0, 1.0)
 	return 0.0
