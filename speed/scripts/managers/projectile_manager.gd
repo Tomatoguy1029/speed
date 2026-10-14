@@ -64,10 +64,13 @@ var _hostile_clear_pending := false
 ## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
 ##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる
 ##   ZONE：pos を中心に半径 len の円。予告（delay）のあと一瞬弾ける
-enum HazardKind { BEAM, ZONE }
+##   WAVE：pos から広がる輪・扇。angle の向きを中心に左右 arc の角度、速さ speed で半径 len まで広がる。
+##         幅 width。gap_w が 0 より大きければ、gap の向きの左右 gap_w の角度に切れ目がある
+##   WALL：pos から angle の向きへ長さ len・幅 width の残る線。予告のあと active の間、触れると被弾する
+enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
 enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST }
-const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast"]
+const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
 var hazard_alive := PackedByteArray()
@@ -85,6 +88,11 @@ var hazard_dmg := PackedFloat64Array()
 ## 1 なら、もう機体に当たった（1つの攻撃は1回だけ当たる）
 var hazard_hit := PackedByteArray()
 var hazard_color := PackedColorArray()
+## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
+var hazard_speed := PackedFloat32Array()
+var hazard_arc := PackedFloat32Array()
+var hazard_gap := PackedFloat32Array()
+var hazard_gap_w := PackedFloat32Array()
 var hazard_slots: RowSlots
 
 func setup(run_state: RunState, config: GameConfig) -> void:
@@ -103,7 +111,8 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	hostile_slots.clear()
 	hazard_slots = RowSlots.new(self, "hazard_")
 	assert(Columns.check_add(self, hazard_slots.cols,
-		func(): return _add_hazard(HazardKind.ZONE, HazardStyle.BLAST, Vector2.ONE, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, Color.RED),
+		func(): return _add_hazard(HazardKind.ZONE, HazardStyle.BLAST, Vector2.ONE, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, Color.RED,
+			1.0, 1.0, 1.0, 1.0),
 		hazard_slots.release))
 	hazard_slots.clear()
 
@@ -384,9 +393,27 @@ func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style :
 		color := Color("#ffb36b")) -> int:
 	return _add_hazard(HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ZONE_FLASH, dmg, color)
 
+## 広がる輪・扇を出す。arc は扇の左右の角度（PI で全周）。gap_w が 0 より大きければ、gap の向きに切れ目を空ける。
+## delay の予告のあと、速さ speed で半径 radius まで広がる。
+func fire_wave(center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
+		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
+	return _add_hazard(HazardKind.WAVE, HazardStyle.PLAIN, center, angle, radius, width, delay, radius / maxf(speed, 1.0),
+		dmg, color, speed, arc, gap, gap_w)
+
+## 何層もの輪を出す。層ごとに interval ずつ遅れて広がり、切れ目の向きが gap_step ずつずれる。
+func fire_rings(center: Vector2, layers: int, interval: float, radius: float, speed: float, width: float, delay: float,
+		dmg: float, gap: float, gap_w: float, gap_step: float, color := Color("#9ad8ff")) -> void:
+	for k in layers:
+		fire_wave(center, 0.0, PI, radius, speed, width, delay + k * interval, dmg, gap + k * gap_step, gap_w, color)
+
+## 残る線を出す。from から angle の向きへ長さ length・幅 width。delay のあと active の間、触れると被弾する。
+func fire_wall(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
+		color := Color("#ffd27a")) -> int:
+	return _add_hazard(HazardKind.WALL, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
+
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
-		delay: float, active: float, dmg: float, color: Color) -> int:
+		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
 	var i := hazard_slots.take()
 	hazard_kind[i] = kind
 	hazard_style[i] = style
@@ -400,7 +427,15 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_dmg[i] = dmg
 	hazard_hit[i] = 0
 	hazard_color[i] = color
+	hazard_speed[i] = speed
+	hazard_arc[i] = arc
+	hazard_gap[i] = gap
+	hazard_gap_w[i] = gap_w
 	return i
+
+## 広がる波の、今の半径。
+func wave_radius(i: int) -> float:
+	return minf(hazard_len[i], maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
 
 ## 使用中の攻撃の形の数。
 func hazard_count() -> int:
@@ -432,6 +467,25 @@ func _update_hazards(dt: float) -> void:
 				# 弾けた瞬間だけ当たる
 				var reach := hazard_len[i] + R
 				hit = t - dt < delay and hazard_pos[i].distance_squared_to(ship_pos) <= reach * reach
+			HazardKind.WAVE:
+				var d := ship_pos - hazard_pos[i]
+				var dist := d.length()
+				var band := hazard_width[i] * 0.5 + R
+				if absf(dist - wave_radius(i)) <= band:
+					var a := d.angle()
+					hit = absf(Geom.angle_diff(a, hazard_angle[i])) <= hazard_arc[i]
+					if hit and hazard_gap_w[i] > 0.0:
+						hit = absf(Geom.angle_diff(a, hazard_gap[i])) > hazard_gap_w[i]
+			HazardKind.WALL:
+				# 残る線は、触れている間ずっと危ない（被弾後の無敵の間は当たらない）
+				var a := hazard_pos[i]
+				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
+				var reach := hazard_width[i] * 0.5 + R
+				if Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach:
+					ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+					if state.phase != RunState.Phase.PLAY:
+						return
+				continue
 		if hit:
 			hazard_hit[i] = 1
 			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])

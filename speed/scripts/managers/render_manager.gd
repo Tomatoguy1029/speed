@@ -637,6 +637,36 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 						pts.append(q)
 					pts.append(p)
 					c.draw_polyline(pts, Color(1, 1, 0.85, f), _px(4.0))
+			ProjectileManager.HazardKind.WAVE:
+				if charging:
+					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
+					continue
+				var rad := pr.wave_radius(i)
+				if rad <= 0.0 or not view.grow(rad).has_point(p):
+					continue
+				var w := pr.hazard_width[i]
+				var arc := pr.hazard_arc[i]
+				var center := pr.hazard_angle[i]
+				var gap_w := pr.hazard_gap_w[i]
+				var fade := 1.0 - 0.5 * clampf(rad / maxf(len, 1.0), 0.0, 1.0)
+				if gap_w > 0.0:
+					# 切れ目の反対側から一周、切れ目を空けて描く
+					var g := pr.hazard_gap[i]
+					c.draw_arc(p, rad, g + gap_w, g + TAU - gap_w, 48, Color(col, 0.85 * fade), w)
+				else:
+					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.85 * fade), w)
+			ProjectileManager.HazardKind.WALL:
+				var b := p + Vector2.from_angle(pr.hazard_angle[i]) * len
+				if not view.grow(len).has_point(p):
+					continue
+				var w := pr.hazard_width[i]
+				if charging:
+					c.draw_line(p, b, Color(col, 0.15 + 0.35 * k), maxf(_px(2.0), w * 0.25 * k))
+					continue
+				var left := delay + pr.hazard_active[i] - t
+				var f := clampf(left / 0.4, 0.0, 1.0)
+				c.draw_line(p, b, Color(col, 0.35 * f), w * 1.5)
+				c.draw_line(p, b, Color(col, 0.9 * f), w)
 
 func _draw_path_band(c: CanvasItem) -> void:
 	var pts := state.draw_points if state.drawing else state.trace_path

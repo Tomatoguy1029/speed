@@ -361,6 +361,10 @@ func command(name: StringName, args := {}) -> void:
 				ProjectileManager.HazardStyle.RETICLE)
 			projectiles.fire_zone(p, 70.0, 1.2, 10.0, ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
 			projectiles.fire_zone(p + Vector2.from_angle(a + 1.0) * 220.0, 110.0, 0.6, 10.0)
+			projectiles.fire_wave(p + Vector2.from_angle(a + 3.0) * 300.0, a, 0.5, 500.0, 420.0, 18.0, 0.5, 10.0)
+			projectiles.fire_rings(p + Vector2.from_angle(a + 5.0) * 350.0, 4, 0.35, 700.0, 380.0, 16.0, 0.6, 10.0,
+				a, 0.35, 0.6)
+			projectiles.fire_wall(p + Vector2.from_angle(a + 0.5) * 200.0, a + PI / 2.0, 500.0, 16.0, 0.5, 3.0, 10.0)
 		&"debug_boss_time":
 			state.time = maxf(state.time, state.boss_at - 1.0)
 		&"debug_kill_boss":
