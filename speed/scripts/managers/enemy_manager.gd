@@ -13,9 +13,11 @@ var bosses: BossManager
 const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"split": EnemyTable.Beh.SPLIT,
 	&"gunner": EnemyTable.Beh.GUNNER, &"missile": EnemyTable.Beh.MISSILE,
 	&"battleship": EnemyTable.Beh.BATTLESHIP, &"drift": EnemyTable.Beh.DRIFT, &"rocket": EnemyTable.Beh.ROCKET,
-	&"bomber": EnemyTable.Beh.BOMBER, &"beamer": EnemyTable.Beh.BEAMER, &"pulser": EnemyTable.Beh.PULSER}
+	&"bomber": EnemyTable.Beh.BOMBER, &"beamer": EnemyTable.Beh.BEAMER, &"pulser": EnemyTable.Beh.PULSER,
+	&"pump": EnemyTable.Beh.PUMP, &"sniper": EnemyTable.Beh.SNIPER, &"shield": EnemyTable.Beh.SHIELD,
+	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
-const GATE := {}
+const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -167,6 +169,7 @@ func _reset_row(i: int) -> void:
 	t.shoved[i] = 0
 	t.dash_seen[i] = -1
 	t.dash_fresh[i] = 0
+	t.links[i] = PackedInt32Array()
 
 ## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で出す（仕様書 11.3）。
 func spawn_later(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> void:
@@ -180,10 +183,20 @@ func is_same(i: int, id: int) -> bool:
 ## 行 i の敵に、位置 hit から向き dir の攻撃（cause）が当たったときの扱い（EnemyTable.GateResult）。
 ## 特殊な倒し方の条件を満たさない攻撃は、体当たりなら貫通するがダメージを与えない（PASS）。
 ## 弾かれるのは失敗のとき（BOUNCE）だけ。
-func gate_check(i: int, _hit: Vector2, _dir: Vector2, _cause: StringName) -> int:
-	match table.gate[i]:
-		_:
-			return EnemyTable.GateResult.ALLOW
+func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName) -> int:
+	var t := table
+	match t.gate[i]:
+		EnemyTable.Gate.MOUTH:
+			# 口が開いている（吸い込んでいる）間だけ倒せる
+			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.WINDUP else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.BACK:
+			# 攻撃が背面から来たときだけ倒せる。前から当たった体当たりは弾かれる（失敗）
+			var arc: float = t.def[i].params.get("front_arc", 1.6)
+			var from_back := dir != Vector2.ZERO and absf(Geom.angle_diff(dir.angle(), t.facing[i])) < PI - arc
+			if from_back:
+				return EnemyTable.GateResult.ALLOW
+			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.PASS
+	return EnemyTable.GateResult.ALLOW
 
 func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
@@ -258,7 +271,8 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	_tick_chase(world_dt)
 	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE,
 			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
-			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER]:
+			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
+			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -394,6 +408,22 @@ func _tick_behavior(b: int, dt: float) -> void:
 					else:
 						_hold(i, dt)
 					_pulser(i, dt)
+				EnemyTable.Beh.PUMP:
+					_pump(i, dt)
+				EnemyTable.Beh.SNIPER:
+					_keep_distance(i, dt)
+					if _gun_timer(i, dt):
+						var sp: Dictionary = t.def[i].params
+						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), sp.bullet_speed, &"bullet")
+				EnemyTable.Beh.SHIELD:
+					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], dt)
+				EnemyTable.Beh.RULER:
+					_keep_distance(i, dt)
+					_ruler(i, dt)
+				EnemyTable.Beh.CLOCK:
+					_chase(i, dt)
+					_clock(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -652,6 +682,88 @@ func _pulser(i: int, dt: float) -> void:
 	if t.timer[i] <= 0.0:
 		t.mode[i] = EnemyTable.Mode.MOVE
 		t.fire_t[i] = float(p.fire_interval)
+
+# ── 強敵（仕様書 11.7・敵一覧） ──────────────────────────────────
+
+## 機体が高速か（なぞり中・勢いの間・速い移動）。引き寄せる力は、高速の機体には効かない。
+func _ship_fast() -> bool:
+	return state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
+
+## ポンプ座：距離を保ち、周期的に止まって周りの敵と遅い機体を吸い寄せ（口が開いて倒せる）、
+## そのあと前方へ一気に吐き出す（扇形の波）。
+func _pump(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		_keep_distance(i, dt)
+		t.fire_t[i] -= dt
+		if t.fire_t[i] <= 0.0:
+			t.mode[i] = EnemyTable.Mode.WINDUP
+			t.timer[i] = float(p.suck_time)
+		return
+	_hold(i, dt)
+	t.timer[i] -= dt
+	var a := (state.ship_pos - t.pos[i]).angle()
+	_turn_toward(i, a, 2.0, dt)
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		# 吸い寄せる
+		var reach := float(p.pull_radius)
+		var pull := float(p.pull) * dt
+		var d := t.pos[i] - state.ship_pos
+		if d.length_squared() < reach * reach and not _ship_fast():
+			state.ship_vel += d.normalized() * pull
+		var rows := PackedInt32Array()
+		projectiles.combat.nearby(t.pos[i], reach, rows)
+		for j in rows:
+			if j != i and t.is_boss[j] == 0 and t.type[j] != &"meteor" and t.dead[j] == 0:
+				var dj := t.pos[i] - t.pos[j]
+				t.vel[j] += dj.normalized() * pull
+		if t.timer[i] <= 0.0:
+			# 吐き出す
+			projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
+				float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
+			t.mode[i] = EnemyTable.Mode.RECOVER
+			t.timer[i] = 0.6
+	elif t.timer[i] <= 0.0:
+		t.mode[i] = EnemyTable.Mode.MOVE
+		t.fire_t[i] = float(p.fire_interval)
+
+## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
+func _ruler(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.fire_t[i] -= dt
+	if t.fire_t[i] > 0.0:
+		return
+	t.fire_t[i] = float(p.fire_interval)
+	var to_ship := (state.enemy_aim - t.pos[i]).normalized()
+	var across := Vector2(-to_ship.y, to_ship.x)
+	var length := float(p.wall_len)
+	var center := state.enemy_aim + to_ship * float(p.wall_offset)
+	projectiles.fire_wall(center - across * length * 0.5, across.angle(), length, float(p.wall_width),
+		float(p.telegraph), float(p.wall_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+
+## とけい座：長針と短針が刃として回り続ける。針は付いて動く残る線で、速さが違う。
+func _clock(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var links := t.links[i]
+	# 針が消されていたら（ボスの撃破など）作り直す
+	if not links.is_empty() and not (projectiles.owns_hazard(links[0], i, t.id[i]) and projectiles.owns_hazard(links[1], i, t.id[i])):
+		links = PackedInt32Array()
+	if links.is_empty():
+		var dmg := _attack_dmg(i, float(p.bullet_dmg))
+		for k in 2:
+			var length := float(p.hand_long) if k == 0 else float(p.hand_short)
+			var h := projectiles.fire_wall(t.pos[i], 0.0, length, float(p.hand_width), float(p.telegraph), 1e9, dmg, t.color[i])
+			projectiles.attach_hazard(h, i)
+			links.append(h)
+		t.links[i] = links
+	t.spin[i] += dt
+	var a0 := t.spin[i] * float(p.long_speed)
+	var a1 := t.spin[i] * float(p.short_speed) + PI
+	projectiles.move_hazard(links[0], t.pos[i], a0)
+	projectiles.move_hazard(links[1], t.pos[i], a1)
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
 func on_enemy_death(i: int, atk: float) -> void:

@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"clock"
+display_name = "とけい座"
+radius = 26.0
+hp = 70.0
+armor = 7.0
+speed = 70.0
+accel = 1.5
+turn = 2.0
+xp = 14.0
+color = Color(0.95, 0.9, 0.7, 1)
+shape = &"orb"
+behavior = &"clock"
+max_alive = 2
+ranged = false
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"hand_long": 170.0,
+"hand_short": 110.0,
+"hand_width": 12.0,
+"long_speed": 1.6,
+"short_speed": -0.7,
+"telegraph": 0.8,
+"bullet_dmg": 10.0
+}

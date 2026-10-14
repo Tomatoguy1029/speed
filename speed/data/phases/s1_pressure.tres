@@ -21,5 +21,10 @@ mix = {
 "rocket": 2.0,
 "bomber": 2.0,
 "beamer": 0.75,
-"pulser": 0.75
+"pulser": 0.75,
+"pump": 0.25,
+"telescope": 0.25,
+"shield": 0.25,
+"ruler": 0.2,
+"clock": 0.15
 }

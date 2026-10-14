@@ -532,7 +532,13 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
 	var charge := t.charge[i]
 	if charge > 0.0:
-		c.draw_arc(p, r + _px(6.0), 0, TAU * charge, 24, Color(1, 0.3, 0.3, 0.8), _px(2.5))
+		# 撃つ前の予告：前の方に光が集まっていく
+		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
+		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))
+	if t.gate[i] == EnemyTable.Gate.MOUTH and t.mode[i] == EnemyTable.Mode.WINDUP:
+		# 吸い込んでいる間は口が開いている
+		c.draw_circle(p + Vector2.from_angle(t.facing[i]) * r * 0.6, r * 0.45, Color(0.1, 0.05, 0.15, 0.9))
+		c.draw_arc(p, r * 2.4, 0, TAU, 32, Color(t.color[i], 0.25), _px(2.0))
 	var hp := t.hp[i]
 	var max_hp := t.max_hp[i]
 	if (r >= 25.0 or t.is_boss[i] != 0) and hp < max_hp:

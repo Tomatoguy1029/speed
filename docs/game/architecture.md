@@ -286,6 +286,7 @@ Main (Node)
 | `bud_t` | `splitter` | 次の分裂までの時間 |
 | `buds` | `splitter` | 分裂した数 |
 | `spin` | 漂流（`drift`）の雑魚 | 回転の速さ |
+| `links` | とけい座 | 付いて動く攻撃の形の行番号（`ProjectileManager` の `hazard_` の行） |
 | `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
 | `shove_time` | 吹き飛ばし衝角（W03）で押し出された敵 | 押し出しの残り時間 |
 | `shove_vel` | 同上 | 押し出しの速度 |

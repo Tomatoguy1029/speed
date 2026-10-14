@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"ruler"
+display_name = "じょうぎ座"
+radius = 22.0
+hp = 40.0
+armor = 6.0
+speed = 80.0
+accel = 1.5
+turn = 3.0
+xp = 10.0
+color = Color(1, 0.85, 0.5, 1)
+shape = &"square"
+behavior = &"ruler"
+max_alive = 2
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 600.0,
+"fire_interval": 4.5,
+"telegraph": 0.9,
+"wall_len": 900.0,
+"wall_width": 18.0,
+"wall_time": 3.5,
+"wall_offset": 120.0,
+"bullet_dmg": 10.0
+}

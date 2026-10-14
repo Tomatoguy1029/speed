@@ -88,6 +88,9 @@ var hazard_dmg := PackedFloat64Array()
 ## 1 なら、もう機体に当たった（1つの攻撃は1回だけ当たる）
 var hazard_hit := PackedByteArray()
 var hazard_color := PackedColorArray()
+## 付いている敵の行と id（付いていなければ -1）。敵が倒れると、その攻撃の形も消える
+var hazard_owner := PackedInt32Array()
+var hazard_owner_id := PackedInt32Array()
 ## 遅れて弾ける範囲が、敵に与えるダメージ（0 なら敵には当たらない。誘爆に使う）
 var hazard_edmg := PackedFloat64Array()
 ## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
@@ -416,6 +419,20 @@ func fire_wall(from: Vector2, angle: float, length: float, width: float, delay: 
 		color := Color("#ffd27a")) -> int:
 	return _add_hazard(HazardKind.WALL, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
 
+## 攻撃の形（行 h）を敵（行 e）に付ける。敵が倒れると消え、位置と向きは敵が move_hazard で動かす。
+func attach_hazard(h: int, e: int) -> void:
+	hazard_owner[h] = e
+	hazard_owner_id[h] = combat.enemies.table.id[e]
+
+## 行 h の攻撃の形が、敵（行 e、id）に付いたまま残っているか。
+func owns_hazard(h: int, e: int, id: int) -> bool:
+	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
+
+## 付いている攻撃の形（行 h）を動かす。
+func move_hazard(h: int, pos: Vector2, angle: float) -> void:
+	hazard_pos[h] = pos
+	hazard_angle[h] = angle
+
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
 		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
@@ -433,6 +450,8 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_hit[i] = 0
 	hazard_color[i] = color
 	hazard_edmg[i] = 0.0
+	hazard_owner[i] = -1
+	hazard_owner_id[i] = 0
 	hazard_speed[i] = speed
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
@@ -456,7 +475,9 @@ func _update_hazards(dt: float) -> void:
 		var t := hazard_t[i] + dt
 		hazard_t[i] = t
 		var delay := hazard_delay[i]
-		if t >= delay + hazard_active[i]:
+		var owner := hazard_owner[i]
+		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
+				or combat.enemies.table.dead[owner] != 0)):
 			hazard_slots.release(i)
 			continue
 		if t < delay or hazard_hit[i] != 0:

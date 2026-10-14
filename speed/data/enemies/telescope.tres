@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"telescope"
+display_name = "ぼうえんきょう座"
+radius = 20.0
+hp = 30.0
+armor = 6.0
+speed = 80.0
+accel = 1.5
+turn = 3.0
+xp = 8.0
+color = Color(0.6, 0.85, 1, 1)
+shape = &"diamond"
+behavior = &"sniper"
+max_alive = 2
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 560.0,
+"fire_interval": 3.5,
+"telegraph": 0.9,
+"bullet_speed": 1100.0,
+"bullet_dmg": 14.0,
+"slow": 0.0
+}
