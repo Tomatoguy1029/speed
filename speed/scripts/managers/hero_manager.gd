@@ -8,6 +8,7 @@ extends RunSystem
 var enemies: EnemyManager
 var field: FieldManager
 var combat: CombatManager
+var projectiles: ProjectileManager
 
 ## ヘルクレス座の火の隕石：落ちてくる途中（位置と、落ちるまでの残り時間）と、燃えている跡（位置と残り時間）
 var falls: Array[Vector3] = []
@@ -166,6 +167,23 @@ func activate() -> void:
 	state.hero_cd = def.cooldown
 	state.hero_active_t = def.duration
 	state.emit(&"hero_power", {"id": def.id, "pos": state.ship_pos})
+	if def.id == &"perseus":
+		_medusa(def)
+
+## ペルセウス座（メドゥーサの首）：画面の中の敵と敵の弾を、効いている間、石にして止める。ボスは少しの間止まるだけ。
+func _medusa(def: HeroDef) -> void:
+	var view := state.view_rect()
+	var t := enemies.table
+	for i in t.alive.size():
+		if t.alive[i] == 0 or t.dead[i] != 0 or t.meteor_index[i] >= 0:
+			continue
+		if not view.has_point(t.pos[i]):
+			continue
+		if t.is_boss[i] != 0:
+			state.boss_stun = float(def.params.get("boss_stun", 1.5))
+		else:
+			t.stone[i] = def.duration
+	projectiles.stone_hostile(view, def.duration)
 
 # ── ヘルクレス座：火の隕石（仕様書 8.1） ─────────────────────────────
 

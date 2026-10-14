@@ -24,6 +24,11 @@ func tick(real_dt: float, world_dt: float) -> void:
 	if not state.boss_spawned and not state.endless and state.time >= state.boss_at:
 		spawn()
 	if actor != null and boss_alive():
+		if state.boss_stun > 0.0:
+			# ペルセウス座の力で、少しの間止まる
+			state.boss_stun -= real_dt
+			enemies.table.vel[boss_row] = Vector2.ZERO
+			return
 		actor.sim_tick(real_dt, world_dt)
 
 ## ボスの行が残っているか（撃破の演出中を含む）。

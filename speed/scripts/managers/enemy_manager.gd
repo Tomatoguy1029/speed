@@ -205,6 +205,7 @@ func _reset_row(i: int) -> void:
 	t.shell_dmg[i] = 0.0
 	t.shell_open[i] = 0.0
 	t.shell_rest[i] = 0.0
+	t.stone[i] = 0.0
 	t.parent[i] = -1
 	t.parent_id[i] = -1
 	t.parts[i] = PackedInt32Array()
@@ -380,8 +381,13 @@ func _tick_chase(dt: float) -> void:
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
+	var stone := t.stone
 	for i in beh_rows[EnemyTable.Beh.CHASE]:
 		if dead[i] != 0:
+			continue
+		if stone[i] > 0.0:
+			stone[i] -= dt
+			vel[i] = Vector2.ZERO
 			continue
 		var a := age[i] + dt
 		age[i] = a
@@ -435,8 +441,14 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var shove_time := t.shove_time
 	var knock_t := t.knock_t
 	var r := t.r
+	var stone := t.stone
 	for i in beh_rows[b]:
 		if dead[i] != 0:
+			continue
+		if stone[i] > 0.0:
+			# 石になっている間は動かない
+			stone[i] -= dt
+			vel[i] = Vector2.ZERO
 			continue
 		age[i] += dt
 		if hit_cd[i] > 0.0:

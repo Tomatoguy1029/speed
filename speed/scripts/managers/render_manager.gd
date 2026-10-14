@@ -588,6 +588,10 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if weak > 0.0 and t.type[i] != &"armored":
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
+	if t.stone[i] > 0.0:
+		# 石になっている
+		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
+		c.draw_arc(p, r * 1.05, 0, TAU, 20, Color(0.35, 0.33, 0.32), _px(2.0))
 	var charge := t.charge[i]
 	if charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
@@ -679,6 +683,8 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
 			_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
+			if run.projectiles.hostile_stone[i] > 0.0:
+				c.draw_circle(pos, hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
 	_hostile_batch.end()
 	_draw_hazards(c, view)
 
@@ -771,6 +777,14 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				c.draw_line(p, b, Color(col, 0.9 * f), w)
 
 func _draw_path_band(c: CanvasItem) -> void:
+	# ふたご座：取っておいた1本目と、双子の機体がなぞる線
+	for twin in [state.twin_first, state.twin_path]:
+		var tp: PackedVector2Array = twin
+		if tp.size() > 1:
+			c.draw_polyline(tp, Color(0.75, 0.9, 1.0, 0.5), cfg.wave_radius * 2.0)
+	if state.twin_tracing:
+		c.draw_circle(state.twin_pos, cfg.ship_radius * 1.3, Color(0.75, 0.92, 1.0, 0.55))
+		c.draw_circle(state.twin_pos, cfg.ship_radius * 0.7, Color(1.0, 1.0, 1.0, 0.9))
 	var pts := state.draw_points if state.drawing else state.trace_path
 	if pts.size() < 2:
 		return

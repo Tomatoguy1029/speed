@@ -71,6 +71,7 @@ func _wire() -> void:
 	heroes.enemies = enemies
 	heroes.field = field
 	heroes.combat = combat
+	heroes.projectiles = projectiles
 	field.projectiles = projectiles
 	ship.field = field
 	ship.combat = combat

@@ -105,6 +105,13 @@ var hero_power: StringName = &""
 ## 次に使えるまでの時間と、効いている残り時間（実秒）
 var hero_cd := 0.0
 var hero_active_t := 0.0
+## ふたご座の力：1本目の線（2本目を描いている間）と、双子の機体がなぞる線・位置・なぞっているか
+var twin_first := PackedVector2Array()
+var twin_path := PackedVector2Array()
+var twin_pos := Vector2.ZERO
+var twin_tracing := false
+## ボスが止まっている残り時間（ペルセウス座の力。実秒）
+var boss_stun := 0.0
 
 # ── ボーナスステージ（仕様書 13.1） ───────────────────────────────────
 ## ボーナスステージの残り時間（実秒。0 ならボーナスステージの外）

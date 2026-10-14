@@ -89,6 +89,14 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var atk := attack_power()
 		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
+		if t.stone[i] > 0.0:
+			# 石になった敵は、触れると装甲や倒し方に関係なく一撃で砕ける
+			t.hit_cd[i] = cfg.contact_cooldown
+			if run != null:
+				run.inside[t.id[i]] = i
+			state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
+			kill_enemy(i, {"cause": &"ram" if fast else &"touch", "dir": dir})
+			continue
 		if t.type[i] == &"saw":
 			_launch_saw(i, dir if dir != Vector2.ZERO else (t.pos[i] - from).normalized(), sp)
 			continue
@@ -200,6 +208,29 @@ func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 		if run.wave_acc >= 45.0:
 			run.wave_acc = 0.0
 			state.emit(&"ring", {"pos": p, "radius": W, "color": Color(0.51, 0.88, 1.0, 0.9), "life": 0.35})
+
+## ふたご座の双子の機体が from から to へ動いた：通った敵に体当たりと同じように当てる（弾かれず、被弾もしない）。
+func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
+	var t := enemies.table
+	var R := cfg.ship_radius
+	var pad := Vector2(R + cfg.max_enemy_radius, R + cfg.max_enemy_radius)
+	var rows := PackedInt32Array()
+	grid.query(from.min(to) - pad, from.max(to) + pad, rows)
+	var dir := (to - from).normalized()
+	var atk := attack_power()
+	for i in rows:
+		if t.dead[i] != 0 or t.meteor_index[i] >= 0 or run.inside.has(t.id[i]):
+			continue
+		if Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R) < 0.0:
+			continue
+		run.inside[t.id[i]] = i
+		if t.stone[i] > 0.0:
+			kill_enemy(i, {"cause": &"ram", "dir": dir})
+		elif enemies.gate_check(i, to, dir, &"ram", atk) == EnemyTable.GateResult.ALLOW \
+				and (ignore_armor or can_pierce(atk, i, false)):
+			damage_enemy(i, atk, {"cause": &"ram", "dir": dir, "impact": t.pos[i]})
+		if state.phase != RunState.Phase.PLAY:
+			return
 
 # ── ダメージと撃破 ────────────────────────────────────────────────
 

@@ -57,6 +57,8 @@ var hostile_turn := PackedFloat32Array()
 var hostile_kind := PackedByteArray()
 ## 天体の表面までの余裕の下限。これが移動量より大きい間は天体の判定を省く
 var hostile_gap := PackedFloat32Array()
+## 石になっている残り時間（ペルセウス座の力。石の間は止まり、触れると砕けて被弾しない）
+var hostile_stone := PackedFloat32Array()
 var hostile_slots: RowSlots
 var _hostile_updating := false
 var _hostile_clear_pending := false
@@ -310,7 +312,14 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_turn[i] = turn
 	hostile_kind[i] = kind
 	hostile_gap[i] = 0.0
+	hostile_stone[i] = 0.0
 	return i
+
+## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
+func stone_hostile(view: Rect2, seconds: float) -> void:
+	for i in hostile_alive.size():
+		if hostile_alive[i] != 0 and view.has_point(hostile_pos[i]):
+			hostile_stone[i] = seconds
 
 ## 使用中の敵の弾の数。
 func hostile_count() -> int:
@@ -334,6 +343,13 @@ func _update_hostile(dt: float) -> void:
 			i += 1
 			continue
 		var from := hostile_pos[i]
+		if hostile_stone[i] > 0.0:
+			hostile_stone[i] -= dt
+			var reach_s := hostile_r[i] + R
+			if ship_pos.distance_squared_to(from) <= reach_s * reach_s:
+				hostile_slots.release(i)
+			i += 1
+			continue
 		var vel := hostile_vel[i]
 		var speed := hostile_speed[i]
 		var kind := hostile_kind[i]

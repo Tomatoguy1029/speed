@@ -12,6 +12,8 @@ var ship: ShipManager
 
 var intent: Intent = Intent.new()
 var run: TraceRun = null
+## ふたご座の力：双子の機体のなぞりの記録と速さ
+var twin_run: TraceRun = null
 var _ready_emitted := true
 var _pre_dash_speed := 0.0
 ## 線の最初の点を置いた時刻（ミリ秒）。確定を受け付けるまでの時間を数える
@@ -44,6 +46,8 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		_trace(real_dt)
 	elif not state.drawing:
 		_charge(real_dt)
+	if state.twin_tracing and state.phase == RunState.Phase.PLAY:
+		_trace_twin(real_dt)
 
 # ── 充填（仕様書 6.1） ───────────────────────────────────────────
 
@@ -104,6 +108,7 @@ func _can_confirm() -> bool:
 func _cancel() -> void:
 	state.drawing = false
 	state.draw_points = PackedVector2Array()
+	state.twin_first = PackedVector2Array()
 
 func _extend(to: Vector2) -> void:
 	var last := state.draw_points[state.draw_points.size() - 1]
@@ -156,7 +161,24 @@ func _commit(_it: Intent) -> void:
 		# 線ができていない（描き始めの点がすぐ惑星・月に当たったとき）：描くのをやめ、ゲージは減らない
 		_cancel()
 		return
-	state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
+	if state.twin_first.is_empty() and state.hero_active_t > 0.0 and state.hero_power == &"gemini":
+		# ふたご座の力：1本目を取っておき、2本目を好きな所から描く（長さの上限は同じ）
+		state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
+		state.twin_first = state.draw_points
+		state.draw_points = PackedVector2Array()
+		state.draw_length = 0.0
+		state.draw_started = false
+		state.draw_blocked = false
+		state.emit(&"twin_first")
+		return
+	var twin := state.twin_first
+	if twin.is_empty():
+		state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
+	else:
+		# 自分は1本目を、双子のもう1機は2本目を駆け抜ける
+		state.twin_path = state.draw_points
+		state.draw_points = twin
+		state.twin_first = PackedVector2Array()
 	if state.bonus_t > 0.0:
 		# ボーナスステージ：放つとすぐ満タンに戻る
 		state.gauge = 1.0
@@ -184,6 +206,12 @@ func _commit(_it: Intent) -> void:
 	state.drawing = false
 	state.tracing = true
 	combat.dash_stop = 0.0
+	if not twin.is_empty():
+		twin_run = TraceRun.new()
+		twin_run.speed = speed
+		twin_run.rate = run.rate
+		state.twin_pos = state.twin_path[0]
+		state.twin_tracing = true
 	build.on_launch(state.trace_full_charge)
 	state.emit(&"launch", {"pos": state.ship_pos, "dir": dir, "gauge": state.draw_gauge})
 
@@ -252,6 +280,31 @@ func _trace(real_dt: float) -> void:
 	state.trace_progress = clampf(float(run.seg) / maxf(1.0, pts.size() - 1), 0.0, 1.0)
 	if run.seg >= pts.size() - 1:
 		_end_trace(true)
+
+## 双子の機体が2本目の線を、自分と同じ速さで駆け抜ける。敵には体当たりと同じように当たり、弾かれない。
+func _trace_twin(real_dt: float) -> void:
+	var pts := state.twin_path
+	var dist := twin_run.rate * real_dt
+	while dist > 1e-9 and twin_run.seg < pts.size() - 1:
+		var a := pts[twin_run.seg]
+		var b := pts[twin_run.seg + 1]
+		var seg_len := a.distance_to(b)
+		var move := minf(dist, seg_len - twin_run.seg_pos)
+		var from := state.twin_pos
+		twin_run.seg_pos += move
+		dist -= move
+		state.twin_pos = a + (b - a) / maxf(seg_len, 1e-6) * twin_run.seg_pos
+		combat.wave_along(twin_run, from, state.twin_pos)
+		combat.twin_sweep(twin_run, from, state.twin_pos)
+		if state.phase != RunState.Phase.PLAY:
+			return
+		if twin_run.seg_pos >= seg_len - 1e-9:
+			twin_run.seg += 1
+			twin_run.seg_pos = 0.0
+	if twin_run.seg >= pts.size() - 1:
+		state.twin_tracing = false
+		state.twin_path = PackedVector2Array()
+		twin_run = null
 
 ## なぞりの終わり。最後まで走り切ったら勢いを残す（glide）。
 func _end_trace(completed: bool) -> void:
