@@ -26,6 +26,9 @@ func _ready() -> void:
 	_test_enemy_roster()
 	_test_enemy_gates()
 	await _close()
+	await _start(1)
+	_test_field()
+	await _close()
 	print("[acceptance] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
 
@@ -325,3 +328,85 @@ func _test_enemy_gates() -> void:
 	_advance_enemies(2.0)
 	_check(run.projectiles.hazard_count() > 0, "タスク12：王の号令で近くの強敵が攻撃する")
 	run.state.stats.attack_mult = 1.0
+
+func _line(points: PackedVector2Array) -> void:
+	var it := Intent.new()
+	it.pen = points[0]
+	it.press = true
+	run.draw.intent = it
+	run.draw.handle_input()
+	for k in range(1, points.size()):
+		it = Intent.new()
+		it.pen = points[k]
+		it.has_cursor = true
+		run.draw.intent = it
+		run.draw.handle_input()
+	it.press = true
+	run.draw._first_point_msec -= ceili(run.cfg.draw_confirm_delay * 1000.0)
+	run.draw.handle_input()
+
+func _test_field() -> void:
+	var s := run.state
+	var t := run.enemies.table
+	var f := run.field
+	var p := run.projectiles
+	var at := Vector2(-2000, -2000)
+	s.ship_pos = at
+	s.view_center = at
+	f._add_rock(s.rng, at + Vector2(100, 0), &"iron", Vector2.ZERO)
+	var iron = f.rocks[-1]
+	f._add_rock(s.rng, at + Vector2(100, 200), &"saw", Vector2.ZERO)
+	var saw = f.rocks[-1]
+	f._stream_t = 0.0
+	f._stream_rocks(0.01)
+	var hp := s.ship_hp
+	_check(_ram(t.pos[iron.row], Vector2.RIGHT) and s.ship_hp == hp and not t.dead[iron.row], "タスク13：鉄のがれきは弾いて火花を出す")
+	var target := _enemy(&"splitling", t.pos[saw.row] + Vector2(200, 0))
+	var row: int = saw.row
+	_ram(t.pos[row], Vector2.RIGHT)
+	_check(t.dead[row] != 0 and p.friend_count() > 0, "タスク13：丸鋸は進んでいた向きへ飛び、一度で壊れる")
+	run.combat.rebuild_grid()
+	p._update_friendly(0.5)
+	_check(t.dead[target] != 0, "タスク13：飛んだ丸鋸はその先の敵を巻き込む")
+	f._stream_rocks(0.01)
+	_check(saw.destroyed, "タスク13：使った丸鋸は再出現しない")
+	_clear()
+	s.ship_pos = at + Vector2(200, 0)
+	s.world_time = 10.0
+	f._well_t = 1e6
+	f.add_well(at, 3.0, 600.0, 1000.0)
+	var enemy := _enemy(&"splitling", at + Vector2(180, 0))
+	p.fire_enemy(enemy, 0, 100, &"bullet")
+	var bullet := 0
+	var old_velocity := p.hostile_vel[bullet]
+	f._tick_wells(0.1)
+	_check(s.ship_vel.x < 0 and t.vel[enemy].x < 0 and p.hostile_vel[bullet].x < old_velocity.x, "タスク14：重力は遅い機体・敵・敵弾の進路を曲げる")
+	s.ship_vel = Vector2(10000, 0)
+	f._tick_wells(0.1)
+	_check(s.ship_vel == Vector2(10000, 0), "タスク14：高速の機体には重力が効かない")
+	s.world_time = 13.1
+	f._tick_wells(0.1)
+	_check(f.wells.is_empty(), "タスク14：重力は寿命で消える")
+	_clear()
+	s.time = 240.0
+	run.ship.invincible = true
+	s.view_center = at
+	s.ship_pos = at
+	run.input._touch = true
+	run.command(&"debug_warp")
+	_check(f.warp_gone > s.world_time and f.warp_pos.distance_to(s.view_center) > 100, "タスク15：ワープホールは画面の端の近くに現れる")
+	s.ship_pos = f.warp_pos
+	run._play_tick(0.01)
+	_check(s.bonus_t == run.cfg.bonus_time and f.warp_gone < 0, "タスク15：ホールに触れるとボーナスへ入る")
+	var clock := s.time
+	_line(PackedVector2Array([at, at + Vector2(300, 0)]))
+	_check(s.tracing and s.gauge == 1.0, "タスク15：ボーナスは放つとゲージが満タンになる")
+	for tick in ceili(run.cfg.bonus_time / 0.1) + 2:
+		if s.bonus_t <= 0.0:
+			break
+		run._play_tick(0.1)
+		if s.phase == RunState.Phase.LEVELUP:
+			run.command(&"choose_card", {"index": 0})
+	_check(s.time == clock and s.bonus_t == 0, "タスク15：時計を止めたまま30秒で通常フィールドへ戻る")
+	run._play_tick(0.1)
+	_check(s.time > clock, "タスク15：戻ったあとはランの時計が進む")
