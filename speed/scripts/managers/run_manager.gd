@@ -67,6 +67,7 @@ func _ready() -> void:
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
 	field.enemies = enemies
+	field.projectiles = projectiles
 	ship.field = field
 	ship.combat = combat
 	ship.build = build
@@ -387,6 +388,9 @@ func command(name: StringName, args := {}) -> void:
 			for i in t.alive.size():
 				if t.alive[i] != 0 and t.is_boss[i] == 0:
 					enemies.mark_dead(i)
+		&"debug_gravity":
+			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
+				field.spawn_well()
 		&"debug_comet":
 			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
 				field.spawn_comet(bool(args.get("rare", false)))

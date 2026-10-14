@@ -557,6 +557,26 @@ extends Resource
 ## 飛んでいく丸鋸が壊れるまでの時間。
 ## 単位：世界秒
 @export var saw_life: float
+## 重力の間隔（最短）
+## 重力が画面の中に現れる間隔の最短。間隔は最短と最長の間でランダム。置き方は仮。
+## 単位：世界秒
+@export var gravity_interval_min: float
+## 重力の間隔（最長）
+## 重力が画面の中に現れる間隔の最長。
+## 単位：世界秒
+@export var gravity_interval_max: float
+## 重力の時間
+## 重力が現れてから、縮んで消えるまでの時間。
+## 単位：世界秒
+@export var gravity_life: float
+## 重力の範囲
+## 現れたときの重力の届く半径。時間とともに縮む。
+## 単位：単位（距離）
+@export var gravity_radius: float
+## 重力の強さ
+## 重力の中心での引き寄せる加速。中心から離れるほど、時間がたつほど弱くなる。
+## 単位：単位/秒²
+@export var gravity_pull: float
 ## 彗星の間隔（最短）
 ## 彗星が画面の端の近くを横切る間隔の最短。間隔は最短と最長の間でランダム。
 ## 単位：世界秒

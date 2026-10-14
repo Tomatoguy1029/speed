@@ -25,6 +25,12 @@ class Rock:
 	var row := -1
 	var row_id := 0
 
+## 重力1つ（仕様書 13.1）。現れてから life 世界秒で縮んで消える
+class Well:
+	var pos := Vector2.ZERO
+	var born := 0.0
+	var life := 3.0
+
 ## 障害物1つ（惑星か月）
 class Body:
 	var pos := Vector2.ZERO
@@ -35,6 +41,7 @@ class Body:
 	var dir := 1.0
 
 var enemies: EnemyManager
+var projectiles: ProjectileManager
 
 var planet: Body
 var moons: Array[Body] = []
@@ -55,6 +62,8 @@ var rocks: Array[Rock] = []
 var _stream_t := 0.0
 ## 次の彗星までの世界秒
 var _comet_t := 0.0
+var wells: Array[Well] = []
+var _well_t := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -88,12 +97,15 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	_body_used.clear()
 	_place_rocks(rng)
 	_update_moons()
+	wells.clear()
+	_well_t = rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	_update_moons()
 	if world_dt > 0.0:
 		_tick_comets(world_dt)
 		_stream_rocks(world_dt)
+		_tick_wells(world_dt)
 
 # ── 隕石（仕様書 13.1） ─────────────────────────────────────────────
 
@@ -196,6 +208,57 @@ func _stream_rocks(dt: float) -> void:
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i
 		rock.row_id = table.id[i]
+
+# ── 重力（仕様書 13.1） ─────────────────────────────────────────────
+
+## 重力を出し、敵・敵の弾・遅い機体を引き寄せる。高速の機体には効かない。
+func _tick_wells(dt: float) -> void:
+	_well_t -= dt
+	if _well_t <= 0.0:
+		_well_t = state.rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
+		spawn_well()
+	var now := state.world_time
+	for k in range(wells.size() - 1, -1, -1):
+		if now - wells[k].born >= wells[k].life:
+			wells.remove_at(k)
+	if wells.is_empty():
+		return
+	var fast := state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
+	var t := enemies.table
+	for w in wells:
+		var k := 1.0 - (now - w.born) / w.life
+		var reach := cfg.gravity_radius * k
+		var pull := cfg.gravity_pull * k * dt
+		if not fast:
+			state.ship_vel += _well_pull(w.pos, state.ship_pos, reach, pull)
+		for i in t.alive.size():
+			if t.alive[i] != 0 and t.dead[i] == 0 and t.is_boss[i] == 0 and t.meteor_index[i] < 0 and t.parent[i] < 0:
+				t.vel[i] += _well_pull(w.pos, t.pos[i], reach, pull)
+		var hostile_alive := projectiles.hostile_alive
+		for i in hostile_alive.size():
+			if hostile_alive[i] != 0:
+				projectiles.hostile_vel[i] += _well_pull(w.pos, projectiles.hostile_pos[i], reach, pull)
+
+## 重力の中心 center が、位置 p のものに与える速度の変化（届かなければ 0）。
+func _well_pull(center: Vector2, p: Vector2, reach: float, pull: float) -> Vector2:
+	var d := center - p
+	var dist := d.length()
+	if dist >= reach or dist < 1.0:
+		return Vector2.ZERO
+	return d / dist * pull * (1.0 - dist / reach)
+
+## 画面の中の、機体から少し離れた位置に重力を1つ出す。
+func spawn_well() -> void:
+	var w := Well.new()
+	for attempt in 8:
+		var p := state.view_center + Vector2(state.rng.randf_range(-0.7, 0.7) * state.view_half.x,
+			state.rng.randf_range(-0.7, 0.7) * state.view_half.y)
+		w.pos = p
+		if p.distance_to(state.ship_pos) > 300.0 and body_gap(p, 0.0) > 100.0:
+			break
+	w.born = state.world_time
+	w.life = cfg.gravity_life
+	wells.append(w)
 
 # ── 彗星（仕様書 13.1） ─────────────────────────────────────────────
 

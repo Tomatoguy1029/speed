@@ -373,6 +373,15 @@ func _draw_field(c: CanvasItem) -> void:
 		if view.has_point(center) or view.grow(d.z).has_point(center):
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
 	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+	# 重力：縮みながら渦を巻く
+	for w in f.wells:
+		var k := 1.0 - (state.world_time - w.born) / w.life
+		var reach := cfg.gravity_radius * k
+		c.draw_circle(w.pos, reach, Color(0.35, 0.2, 0.6, 0.12))
+		for n in 3:
+			var rr := reach * fposmod(1.0 - state.world_time * 0.6 - n / 3.0, 1.0)
+			c.draw_arc(w.pos, maxf(rr, 1.0), 0, TAU, 40, Color(0.7, 0.55, 1.0, 0.35), _px(2.0))
+		c.draw_circle(w.pos, maxf(6.0, reach * 0.08), Color(0.08, 0.02, 0.15, 0.9))
 	for b in f.bodies:
 		if view.grow(b.r).has_point(b.pos):
 			c.draw_texture_rect(PLANET if b.is_planet else MOON,
