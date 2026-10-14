@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"s4_horde"
+display_name = "ステージ4・無双期"
+start = 330.0
+end = 390.0
+pop_from = 140.0
+pop_to = 260.0
+level_from = 1.3
+level_to = 1.6
+rate = 60.0
+xp_bonus = 0.0
+wave_interval = 3.5
+wave_type = &"splitter"
+cores = false
+mix = {
+"rocket": 2.667,
+"volatile": 2.667,
+"splitter": 2.667,
+"pulser": 0.1,
+"missile": 0.1,
+"spreader": 0.1
+}

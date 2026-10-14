@@ -4,25 +4,22 @@
 
 [resource]
 script = ExtResource("1")
-id = &"escape"
-display_name = "脱出期"
-start = 510.0
+id = &"s1_late"
+display_name = "ステージ1・終盤"
+start = 390.0
 end = 600.0
-pop_from = 90.0
+pop_from = 75.0
 pop_to = 120.0
-level_from = 4.2
+level_from = 3.0
 level_to = 5.0
-rate = 12.0
+rate = 10.0
 xp_bonus = 0.0
 wave_interval = 0.0
+wave_type = &""
 cores = true
 mix = {
-"darter": 3.0,
-"armored": 3.0,
-"gunner": 2.0,
-"missile": 1.6,
-"splitter": 1.5,
-"swarm": 3.0,
-"titan": 2.0,
-"battleship": 0.6
+"rocket": 1.75,
+"bomber": 1.75,
+"beamer": 1.0,
+"pulser": 1.0
 }

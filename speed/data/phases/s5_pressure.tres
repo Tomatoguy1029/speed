@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"s5_pressure"
+display_name = "ステージ5・圧力期"
+start = 150.0
+end = 330.0
+pop_from = 45.0
+pop_to = 75.0
+level_from = 1.6
+level_to = 2.4
+rate = 8.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = false
+mix = {
+"rocket": 1.0,
+"bomber": 1.0,
+"volatile": 1.0,
+"splitter": 1.0,
+"beamer": 0.375,
+"pulser": 0.375,
+"missile": 0.375,
+"spreader": 0.375
+}

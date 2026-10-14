@@ -133,9 +133,7 @@ func _add_coin(p: Vector2) -> int:
 func _drop_coins(i: int, danger: float) -> void:
 	var t := enemies.table
 	var n := 0
-	if t.type[i] == &"battleship":
-		n = 12
-	elif t.elite[i] != 0:
+	if t.elite[i] != 0:
 		n = 3 + state.rng.randi_range(0, 3)
 	elif t.type[i] == &"meteor":
 		n = (1 + state.rng.randi_range(0, 2)) if state.rng.randf() < cfg.meteor_coin_chance else 0

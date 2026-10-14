@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = &"missile"
-display_name = "ミサイル艇"
+display_name = "ホーミングミサイルの敵"
 radius = 22.0
 hp = 20.0
 armor = 6.0

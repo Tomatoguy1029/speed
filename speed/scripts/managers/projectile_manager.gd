@@ -88,6 +88,8 @@ var hazard_dmg := PackedFloat64Array()
 ## 1 なら、もう機体に当たった（1つの攻撃は1回だけ当たる）
 var hazard_hit := PackedByteArray()
 var hazard_color := PackedColorArray()
+## 遅れて弾ける範囲が、敵に与えるダメージ（0 なら敵には当たらない。誘爆に使う）
+var hazard_edmg := PackedFloat64Array()
 ## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
@@ -389,9 +391,12 @@ func fire_cross(center: Vector2, angle: float, length: float, width: float, dela
 		fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color)
 
 ## 遅れて弾ける範囲を出す。center を中心に半径 radius。delay の予告のあと一瞬弾ける。style は見た目。
+## edmg が 0 より大きければ、弾けたときに範囲の敵にもダメージを与える（誘爆）。
 func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style := HazardStyle.BLAST,
-		color := Color("#ffb36b")) -> int:
-	return _add_hazard(HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ZONE_FLASH, dmg, color)
+		color := Color("#ffb36b"), edmg := 0.0) -> int:
+	var i := _add_hazard(HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ZONE_FLASH, dmg, color)
+	hazard_edmg[i] = edmg
+	return i
 
 ## 広がる輪・扇を出す。arc は扇の左右の角度（PI で全周）。gap_w が 0 より大きければ、gap の向きに切れ目を空ける。
 ## delay の予告のあと、速さ speed で半径 radius まで広がる。
@@ -427,6 +432,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_dmg[i] = dmg
 	hazard_hit[i] = 0
 	hazard_color[i] = color
+	hazard_edmg[i] = 0.0
 	hazard_speed[i] = speed
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
@@ -464,9 +470,15 @@ func _update_hazards(dt: float) -> void:
 				var reach := hazard_width[i] * 0.5 + R
 				hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
 			HazardKind.ZONE:
-				# 弾けた瞬間だけ当たる
+				# 弾けた瞬間だけ当たる（弾けたら hit を 1 にして、以後は見た目だけ）
+				hazard_hit[i] = 1
 				var reach := hazard_len[i] + R
-				hit = t - dt < delay and hazard_pos[i].distance_squared_to(ship_pos) <= reach * reach
+				hit = hazard_pos[i].distance_squared_to(ship_pos) <= reach * reach
+				if hazard_edmg[i] > 0.0:
+					combat.explode(hazard_pos[i], hazard_len[i], hazard_edmg[i],
+						{"cause": &"chain", "no_crit": true, "color": hazard_color[i], "life": 0.3})
+					if state.phase != RunState.Phase.PLAY:
+						return
 			HazardKind.WAVE:
 				var d := ship_pos - hazard_pos[i]
 				var dist := d.length()

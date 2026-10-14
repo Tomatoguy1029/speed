@@ -277,7 +277,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
 		projectiles.scatter_hull(i, dir, speed, attack_power() * cfg.hull_debris_damage)
-	enemies.on_enemy_death(i)
+	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
 	build.on_kill(cause)
 

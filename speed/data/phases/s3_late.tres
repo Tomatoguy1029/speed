@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"s3_late"
+display_name = "ステージ3・終盤"
+start = 390.0
+end = 600.0
+pop_from = 75.0
+pop_to = 120.0
+level_from = 3.0
+level_to = 5.0
+rate = 10.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = true
+mix = {
+"rocket": 1.167,
+"bomber": 1.167,
+"volatile": 1.167,
+"beamer": 1.0,
+"spreader": 1.0
+}

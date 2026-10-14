@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1")
 id = &"splitter"
-display_name = "分裂型"
+display_name = "分裂する雑魚"
 radius = 22.5
 hp = 14.0
 armor = 4.0
@@ -20,7 +20,8 @@ size_var = false
 weak_arc = 0.0
 params = {
 "bud_interval": 5.0,
-"max_buds": 5,
+"max_buds": 0,
 "death_split": 2,
+"split_extra": 1,
 "split_speed": 200.0
 }

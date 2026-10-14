@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"rocket"
+display_name = "ミサイル"
+radius = 10.0
+hp = 3.0
+armor = 1.0
+speed = 360.0
+accel = 1.0
+turn = 0.0
+xp = 1.0
+color = Color(1, 0.62, 0.3, 1)
+shape = &"dart"
+behavior = &"rocket"
+max_alive = 0
+ranged = false
+size_var = false
+weak_arc = 0.0
+params = {
+"fuse": 46.0,
+"life": 5.0,
+"blast_radius": 70.0,
+"blast_dmg": 8.0
+}

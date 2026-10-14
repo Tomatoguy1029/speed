@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"s5_late"
+display_name = "ステージ5・終盤"
+start = 390.0
+end = 600.0
+pop_from = 75.0
+pop_to = 120.0
+level_from = 3.0
+level_to = 5.0
+rate = 10.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = true
+mix = {
+"rocket": 0.875,
+"bomber": 0.875,
+"volatile": 0.875,
+"splitter": 0.875,
+"beamer": 0.5,
+"pulser": 0.5,
+"missile": 0.5,
+"spreader": 0.5
+}

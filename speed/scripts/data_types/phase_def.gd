@@ -42,9 +42,13 @@ const EDITOR_ORDER := 4
 ## 単位：倍
 @export var xp_bonus: float
 ## 群れの間隔
-## この間隔ごとに、スウォームの群れをまとめて出す。0 なら出さない。
+## この間隔ごとに、群れの種類の敵をまとめて出す。0 なら出さない。
 ## 単位：実秒
 @export var wave_interval: float
+## 群れの種類
+## 群れとしてまとめて出す敵の ID。
+## 単位：文字
+@export var wave_type: StringName
 ## 出力コアを出す
 ## オンにすると、この時間帯にフィールドの中心付近へ出力コアが出る。
 ## 単位：オン／オフ

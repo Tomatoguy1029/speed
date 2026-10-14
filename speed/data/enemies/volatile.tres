@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"volatile"
+display_name = "誘爆する雑魚"
+radius = 12.0
+hp = 5.0
+armor = 2.0
+speed = 120.0
+accel = 2.5
+turn = 4.0
+xp = 1.0
+color = Color(1, 0.86, 0.3, 1)
+shape = &"hex"
+behavior = &"chase"
+max_alive = 0
+ranged = false
+size_var = false
+weak_arc = 0.0
+params = {
+"blast_radius": 120.0,
+"blast_delay": 0.35,
+"blast_dmg": 9.0,
+"chain_power": 2.0
+}

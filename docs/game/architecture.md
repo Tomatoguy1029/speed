@@ -240,7 +240,7 @@ Main (Node)
 
 ### 6.2 敵の表の列
 
-`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `drifter`・`swarm`・`armored`・`splitling`・`titan`、突進（`dash`）が `darter`、分裂（`split`）が `splitter`、射撃（`gunner`）が `gunner`、誘導弾（`missile`）が `missile`、戦艦（`battleship`）が `battleship`。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
+`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `volatile`・`splitling`、分裂（`split`）が `splitter`、誘導弾（`missile`）が `missile`、扇状の弾（`battleship`）が `spreader`、一直線（`rocket`）が `rocket`、自爆（`bomber`）が `bomber`、ビーム（`beamer`）が `beamer`、波動（`pulser`）が `pulser`。突進（`dash`）と射撃（`gunner`）は、出現から外した敵（[敵一覧](catalog/enemies.md)）の行動。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
 
 | 列 | 使う敵 | 中身 |
 |---|---|---|
@@ -279,9 +279,9 @@ Main (Node)
 | `roam_phase` | 追跡で動く雑魚（追跡・分裂・戦艦、接近中の `darter`） | 広域移動の周期のずれ |
 | `roam_angle` | 追跡で動く雑魚 | 広域移動の向き |
 | `roam_radius` | 追跡で動く雑魚 | 広域移動の広がり |
-| `mode` | `darter` | 予告 → 突進 → 回復の段階 |
-| `timer` | `darter` | 段階の残り時間 |
-| `fire_t` | `gunner`・`missile`・`battleship` | 次の射撃までの時間 |
+| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser` | 行動の段階（動く → 構える・飛ぶ など） |
+| `timer` | `mode` を使う敵 | 段階の残り時間 |
+| `fire_t` | 撃つ敵 | 次の射撃までの時間 |
 | `charge` | `gunner`・`missile`・`battleship`・ボス | 射撃の予告の溜め（0〜1） |
 | `bud_t` | `splitter` | 次の分裂までの時間 |
 | `buds` | `splitter` | 分裂した数 |

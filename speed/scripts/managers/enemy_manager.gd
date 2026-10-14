@@ -12,7 +12,8 @@ var bosses: BossManager
 
 const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"split": EnemyTable.Beh.SPLIT,
 	&"gunner": EnemyTable.Beh.GUNNER, &"missile": EnemyTable.Beh.MISSILE,
-	&"battleship": EnemyTable.Beh.BATTLESHIP, &"drift": EnemyTable.Beh.DRIFT}
+	&"battleship": EnemyTable.Beh.BATTLESHIP, &"drift": EnemyTable.Beh.DRIFT, &"rocket": EnemyTable.Beh.ROCKET,
+	&"bomber": EnemyTable.Beh.BOMBER, &"beamer": EnemyTable.Beh.BEAMER, &"pulser": EnemyTable.Beh.PULSER}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {}
 
@@ -255,7 +256,9 @@ func tick(_real_dt: float, world_dt: float) -> void:
 		return
 	_update_aim(world_dt)
 	_tick_chase(world_dt)
-	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE, EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT]:
+	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE,
+			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
+			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -375,6 +378,24 @@ func _tick_behavior(b: int, dt: float) -> void:
 						fire_volley(i)
 				EnemyTable.Beh.DRIFT:
 					t.facing[i] += t.spin[i] * dt
+				EnemyTable.Beh.ROCKET:
+					_rocket(i, dt)
+				EnemyTable.Beh.BOMBER:
+					_bomber(i, dt)
+				EnemyTable.Beh.BEAMER:
+					if t.mode[i] == EnemyTable.Mode.MOVE:
+						_keep_distance(i, dt)
+					else:
+						_hold(i, dt)
+					_beamer(i, dt)
+				EnemyTable.Beh.PULSER:
+					if t.mode[i] == EnemyTable.Mode.MOVE:
+						_keep_distance(i, dt)
+					else:
+						_hold(i, dt)
+					_pulser(i, dt)
+			if dead[i] != 0:
+				continue
 			pos[i] += vel[i] * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
@@ -541,13 +562,108 @@ func _gun_timer(i: int, dt: float) -> bool:
 		return true
 	return false
 
-## 撃破されたときの処理（分裂型は2体に分かれる）。
-func on_enemy_death(i: int) -> void:
+# ── 雑魚と硬めの敵の攻撃（仕様書 11.7） ─────────────────────────────
+
+## 敵のレベルで増えた攻撃のダメージ。
+func _attack_dmg(i: int, base: float) -> float:
+	return base * (1.0 + 0.25 * (table.level[i] - 1.0))
+
+## 予告や攻撃の間、その場で止まる。
+func _hold(i: int, dt: float) -> void:
+	table.vel[i] *= maxf(0.0, 1.0 - 8.0 * dt)
+
+## 自分の周りで爆発して消える（倒されたことにはならない）。
+func _self_destruct(i: int) -> void:
 	var t := table
+	var p: Dictionary = t.def[i].params
+	projectiles.fire_zone(t.pos[i], float(p.blast_radius), 0.0, _attack_dmg(i, float(p.blast_dmg)),
+		ProjectileManager.HazardStyle.BLAST, t.color[i])
+	mark_dead(i)
+
+## ミサイル：出た向きのまま一直線に飛ぶ。機体に近づくと爆発し、飛ぶ時間が過ぎると消える。
+func _rocket(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		var a := (state.enemy_aim - t.pos[i]).angle()
+		t.facing[i] = a
+		t.vel[i] = Vector2.from_angle(a) * t.speed[i]
+		t.mode[i] = EnemyTable.Mode.DASH
+		t.timer[i] = float(p.life)
+		return
+	t.timer[i] -= dt
+	if t.pos[i].distance_squared_to(state.ship_pos) <= float(p.fuse) * float(p.fuse):
+		_self_destruct(i)
+	elif t.timer[i] <= 0.0:
+		mark_dead(i)
+
+## 自爆する雑魚：追ってきて、近づくと2回明滅してから爆発する。明滅し終わる前に倒せば爆発しない。
+func _bomber(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		_chase(i, dt)
+		if t.pos[i].distance_squared_to(state.ship_pos) <= float(p.trigger) * float(p.trigger):
+			t.mode[i] = EnemyTable.Mode.WINDUP
+			t.timer[i] = float(p.blast_delay)
+		return
+	_hold(i, dt)
+	t.timer[i] -= dt
+	# 2回明滅する
+	var phase := 1.0 - t.timer[i] / maxf(float(p.blast_delay), 0.001)
+	t.flash[i] = 0.05 if fmod(phase * 2.0, 1.0) < 0.5 else 0.0
+	if t.timer[i] <= 0.0:
+		_self_destruct(i)
+
+## ビームの敵：距離を保ち、間隔ごとに止まって砲口に光を集め、ビームを撃つ。
+func _beamer(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		t.fire_t[i] -= dt
+		if t.fire_t[i] <= 0.0:
+			var a := (state.enemy_aim - t.pos[i]).angle()
+			t.facing[i] = a
+			t.mode[i] = EnemyTable.Mode.WINDUP
+			t.timer[i] = float(p.telegraph) + float(p.beam_time)
+			projectiles.fire_beam(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.beam_len), float(p.beam_width),
+				float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
+		return
+	t.timer[i] -= dt
+	if t.timer[i] <= 0.0:
+		t.mode[i] = EnemyTable.Mode.MOVE
+		t.fire_t[i] = float(p.fire_interval)
+
+## 波動の敵：距離を保ち、間隔ごとに止まって、1枚の輪か扇を出す。
+func _pulser(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		t.fire_t[i] -= dt
+		if t.fire_t[i] <= 0.0:
+			var a := (state.enemy_aim - t.pos[i]).angle()
+			t.facing[i] = a
+			t.mode[i] = EnemyTable.Mode.WINDUP
+			t.timer[i] = float(p.telegraph)
+			projectiles.fire_wave(t.pos[i], a, float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
+				float(p.wave_width), float(p.telegraph), _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
+		return
+	t.timer[i] -= dt
+	if t.timer[i] <= 0.0:
+		t.mode[i] = EnemyTable.Mode.MOVE
+		t.fire_t[i] = float(p.fire_interval)
+
+## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
+func on_enemy_death(i: int, atk: float) -> void:
+	var t := table
+	var dp: Dictionary = t.def[i].params if t.def[i] != null else {}
+	if dp.has("chain_power"):
+		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),
+			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
 	if t.type[i] != &"splitter":
 		return
 	var p: Dictionary = t.def[i].params
-	var n := maxi(1, int(p.get("death_split", 2)))
+	var n := maxi(1, int(p.get("death_split", 2)) + state.rng.randi_range(0, int(p.get("split_extra", 0))))
 	var facing := t.facing[i]
 	for k in n:
 		var a := facing + PI / 2.0 + TAU * float(k) / float(n) if n > 2 else facing + (1.0 if k == 1 else -1.0) * PI / 2.0
@@ -759,7 +875,9 @@ func _pick_type(phase: PhaseDef, steps: int) -> StringName:
 ## 無双期の群れ：環状に囲むか、一方向から流れ込む。
 func _spawn_wave(t: Dictionary, remaining: float) -> void:
 	var n := mini(roundi(30 * cfg.density_mult), ceili(remaining))
-	var def := def_of(&"swarm")
+	var def := def_of(t.phase.wave_type)
+	if def == null:
+		return
 	var half := state.view_half
 	if state.rng.randf() < 0.5:
 		for k in n:

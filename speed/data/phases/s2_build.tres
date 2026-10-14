@@ -4,23 +4,24 @@
 
 [resource]
 script = ExtResource("1")
-id = &"build2"
-display_name = "強化期 II"
-start = 240.0
-end = 300.0
-pop_from = 38.0
+id = &"s2_build"
+display_name = "ステージ2・序盤"
+start = 0.0
+end = 150.0
+pop_from = 14.0
 pop_to = 45.0
-level_from = 2.0
-level_to = 2.2
+level_from = 1.0
+level_to = 1.35
 rate = 6.0
-xp_bonus = 1.4
+xp_bonus = 0.0
 wave_interval = 0.0
+wave_type = &""
 cores = false
 mix = {
-"drifter": 4.0,
-"darter": 2.0,
-"splitter": 2.0,
-"gunner": 1.0,
-"swarm": 2.0,
-"titan": 0.4
+"rocket": 1.25,
+"bomber": 1.25,
+"volatile": 1.25,
+"splitter": 1.25,
+"beamer": 0.3,
+"missile": 0.3
 }
