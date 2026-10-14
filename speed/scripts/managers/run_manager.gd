@@ -401,7 +401,7 @@ func command(name: StringName, args := {}) -> void:
 			state.time = maxf(state.time, state.boss_at - 1.0)
 		&"debug_kill_boss":
 			if bosses.boss_alive():
-				combat.damage_enemy(bosses.boss_row, enemies.table.hp[bosses.boss_row] + 1.0, {"crit": false, "cause": &"debug"})
+				bosses.on_boss_defeated(bosses.boss_row, {"cause": &"debug"})
 		&"debug_grant":
 			build.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
 		&"debug_reset_loadout":

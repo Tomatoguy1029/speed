@@ -22,6 +22,8 @@ func _ready() -> void:
 	await _close()
 	await _start(4)
 	_test_fire_regrowth()
+	run.command(&"debug_kill_boss")
+	_check(run.state.boss_dead, "タスク20・調整機能：倒し方を持つボスも撃破コマンドで倒せる")
 	await _close()
 	await _start(1)
 	_test_foundation()
