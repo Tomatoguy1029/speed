@@ -82,9 +82,10 @@ func add_coins(amount: int) -> void:
 	data.coins = coins() + amount
 	save()
 
-## ステージが選べるか。前のステージをクリアしていれば選べる。
+## ステージが選べるか。初めから選べる設定か、前のステージをクリアしていれば選べる。
 func is_stage_unlocked(index: int) -> bool:
-	return index <= int(data.cleared_stage) + 1
+	var stage := ConfigManager.stage(index)
+	return stage != null and (stage.available_from_start or index <= int(data.cleared_stage) + 1)
 
 func mark_stage_cleared(index: int) -> void:
 	data.cleared_stage = maxi(int(data.cleared_stage), index)

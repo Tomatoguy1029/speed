@@ -9,9 +9,13 @@ extends Resource
 const EDITOR_ORDER := 5
 
 ## 番号
-## ステージの番号。前の番号のステージをクリアすると選べるようになる。
+## ステージの番号。
 ## 単位：番号
 @export var index: int
+## 初めから選べる
+## クリア記録に関係なくステージ選択に表示し、選べるようにする。
+## 単位：有効／無効
+@export var available_from_start := false
 ## 配置のシーン
 ## ステージの配置を置いたシーンのファイル。
 ## 単位：ファイル

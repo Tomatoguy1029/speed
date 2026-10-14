@@ -9,6 +9,7 @@
 [resource]
 script = ExtResource("1")
 index = 4
+available_from_start = true
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5")]
 boss_id = &"hydra"
