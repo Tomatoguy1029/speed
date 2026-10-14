@@ -552,6 +552,19 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var parts := t.parts[i]
 		c.draw_colored_polygon(PackedVector2Array([t.pos[parts[0]], t.pos[parts[2]], t.pos[parts[4]]]),
 			Color(t.color[i], 0.16))
+	if t.gate[i] == EnemyTable.Gate.CLAW:
+		# ハサミ：構えから挟んだ直後まで開いている
+		var open := t.mode[i] == EnemyTable.Mode.WINDUP or t.mode[i] == EnemyTable.Mode.RECOVER
+		for side: float in [-1.0, 1.0]:
+			var a := t.facing[i] + side * (0.75 if open else 0.35)
+			c.draw_circle(p + Vector2.from_angle(a) * r * 1.15, r * 0.38, Color("#ffb38a") if open else t.color[i])
+	if t.beh[i] == EnemyTable.Beh.AQUARIUS and t.mode[i] == EnemyTable.Mode.DASH:
+		# 太い水流
+		var u := Vector2.from_angle(t.facing[i])
+		var v := Vector2(-u.y, u.x) * float(t.def[i].params.stream_width) * 0.5
+		var a0 := p + u * r
+		var a1 := a0 + u * float(t.def[i].params.stream_len)
+		c.draw_colored_polygon(PackedVector2Array([a0 + v * 0.5, a1 + v, a1 - v, a0 - v * 0.5]), Color(0.45, 0.75, 1.0, 0.22))
 	if t.beh[i] == EnemyTable.Beh.CROW and t.buds[i] > 0:
 		# 集めた残骸の塊
 		var lump: float = t.def[i].params.lump_r * sqrt(float(t.buds[i]) / float(t.def[i].params.throw_min))

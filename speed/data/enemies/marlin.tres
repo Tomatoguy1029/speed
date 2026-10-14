@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"marlin"
+display_name = "かじき座"
+radius = 26.0
+hp = 70.0
+armor = 7.0
+speed = 140.0
+accel = 1.5
+turn = 3.0
+xp = 16.0
+color = Color(0.45, 0.6, 1, 1)
+shape = &"dart"
+behavior = &"marlin"
+max_alive = 2
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 520.0,
+"fire_interval": 4.0,
+"telegraph": 0.8,
+"dash_speed": 1300.0,
+"dash_time": 0.9,
+"spray_step": 0.15,
+"spray": 3,
+"spread": 0.6,
+"bullet_speed": 380.0,
+"bullet_dmg": 10.0
+}

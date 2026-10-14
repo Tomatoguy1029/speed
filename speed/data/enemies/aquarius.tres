@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"aquarius"
+display_name = "みずがめ座"
+radius = 70.0
+hp = 2200.0
+armor = 16.0
+speed = 60.0
+accel = 1.0
+turn = 1.5
+xp = 160.0
+color = Color(0.5, 0.75, 1, 1)
+shape = &"orb"
+behavior = &"aquarius"
+max_alive = 1
+ranged = false
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 620.0,
+"fire_interval": 7.0,
+"telegraph": 1.2,
+"pour_time": 4.0,
+"pour_turn": 0.35,
+"stream_len": 1300.0,
+"stream_width": 220.0,
+"push": 1400.0
+}

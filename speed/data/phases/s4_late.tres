@@ -23,5 +23,11 @@ mix = {
 "splitter": 1.167,
 "pulser": 0.667,
 "missile": 0.667,
-"spreader": 0.667
+"spreader": 0.667,
+"triangle": 0.3,
+"crow": 0.3,
+"crab": 0.35,
+"dolphin": 0.3,
+"marlin": 0.3,
+"aquarius": 0.08
 }

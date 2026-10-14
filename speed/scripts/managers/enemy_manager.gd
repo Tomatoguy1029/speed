@@ -17,10 +17,11 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"pump": EnemyTable.Beh.PUMP, &"sniper": EnemyTable.Beh.SNIPER, &"shield": EnemyTable.Beh.SHIELD,
 	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK, &"lynx": EnemyTable.Beh.LYNX,
 	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE, &"triangle": EnemyTable.Beh.TRIANGLE,
-	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX}
+	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
+	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
-	&"membrane": EnemyTable.Gate.MEMBRANE}
+	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -220,8 +221,11 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 		EnemyTable.Gate.MOUTH:
 			# 口が開いている（吸い込んでいる）間だけ倒せる
 			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.WINDUP else EnemyTable.GateResult.PASS
-		EnemyTable.Gate.BACK:
+		EnemyTable.Gate.BACK, EnemyTable.Gate.CLAW:
 			# 攻撃が背面から来たときだけ倒せる。前から当たった体当たりは弾かれる（失敗）
+			# かに座は、挟んだ直後（ハサミが開いたまま）なら正面からでも倒せる
+			if t.gate[i] == EnemyTable.Gate.CLAW and t.mode[i] == EnemyTable.Mode.RECOVER:
+				return EnemyTable.GateResult.ALLOW
 			var arc: float = t.def[i].params.get("front_arc", 1.6)
 			var from_back := dir != Vector2.ZERO and absf(Geom.angle_diff(dir.angle(), t.facing[i])) < PI - arc
 			if from_back:
@@ -323,7 +327,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
 			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
-			EnemyTable.Beh.PHOENIX]:
+			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -493,6 +497,12 @@ func _tick_behavior(b: int, dt: float) -> void:
 					vel[i] = Vector2.ZERO
 				EnemyTable.Beh.PHOENIX:
 					_phoenix(i, dt)
+				EnemyTable.Beh.CRAB:
+					_crab(i, dt)
+				EnemyTable.Beh.MARLIN:
+					_marlin(i, dt)
+				EnemyTable.Beh.AQUARIUS:
+					_aquarius(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -964,6 +974,116 @@ func _phoenix(i: int, dt: float) -> void:
 		if seg.length() > 1.0:
 			projectiles.fire_wall(back, seg.angle(), seg.length(), float(p.trail_width), 0.0, float(p.trail_time),
 				_attack_dmg(i, float(p.bullet_dmg)), Color("#ff8a3c"))
+
+## かに座：近づいてきて、機体が届く距離に入るとハサミを開き（構え）、前方を挟む。
+## 挟んだ直後はハサミが開いたままで（mode が RECOVER）、正面からでも倒せる。
+func _crab(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
+			t.fire_t[i] -= dt
+			var reach := float(p.reach) + t.r[i]
+			if t.fire_t[i] <= 0.0 and t.pos[i].distance_squared_to(state.ship_pos) < reach * reach * 1.6:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 0.5, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				var at := t.pos[i] + Vector2.from_angle(t.facing[i]) * (t.r[i] + float(p.reach) * 0.5)
+				projectiles.fire_zone(at, float(p.reach) * 0.6, 0.0, _attack_dmg(i, float(p.bullet_dmg)),
+					ProjectileManager.HazardStyle.PLAIN, t.color[i].lightened(0.3))
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.open_time)
+		_:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+				t.fire_t[i] = float(p.fire_interval)
+
+## かじき座：距離を保ち、光って予告してから、機体の方へ高速で泳ぎ抜ける。泳いでいる間、左右へ扇状にしぶきを撒く。
+func _marlin(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			_keep_distance(i, dt)
+			if _gun_timer(i, dt):
+				var a := (state.enemy_aim - t.pos[i]).angle()
+				t.facing[i] = a
+				t.vel[i] = Vector2.from_angle(a) * float(p.dash_speed)
+				t.mode[i] = EnemyTable.Mode.DASH
+				t.timer[i] = float(p.dash_time)
+				t.bud_t[i] = 0.0
+		EnemyTable.Mode.DASH:
+			t.timer[i] -= dt
+			t.bud_t[i] -= dt
+			if t.bud_t[i] <= 0.0:
+				t.bud_t[i] = float(p.spray_step)
+				var n := int(p.spray)
+				for side: float in [-1.0, 1.0]:
+					for k in n:
+						var a := t.facing[i] + side * PI / 2.0 + (float(k) / maxf(n - 1, 1) - 0.5) * float(p.spread)
+						projectiles.fire_enemy(i, a, float(p.bullet_speed), &"bullet")
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = 0.8
+		_:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+
+## みずがめ座：遠くに留まり、水瓶を傾けて（予告）から、機体の方へ太い水流を流し続ける。
+## 水流は、中の敵と遅い機体を流れの向きへ押し流す（ダメージはない）。mode が DASH の間が水流。
+func _aquarius(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			_keep_distance(i, dt)
+			if _gun_timer(i, dt):
+				t.mode[i] = EnemyTable.Mode.DASH
+				t.timer[i] = float(p.pour_time)
+		_:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.pour_turn), dt)
+			t.timer[i] -= dt
+			_pour(i, dt)
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+
+## みずがめ座の水流で、帯の中の敵と遅い機体を押し流す。
+func _pour(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var u := Vector2.from_angle(t.facing[i])
+	var from := t.pos[i] + u * t.r[i]
+	var length := float(p.stream_len)
+	var half := float(p.stream_width) * 0.5
+	var push := u * float(p.push) * dt
+	var rel := state.ship_pos - from
+	var along := rel.dot(u)
+	if along > 0.0 and along < length and absf(rel.cross(u)) < half and not _ship_fast():
+		state.ship_vel += push
+	var rows := PackedInt32Array()
+	var seen := {}
+	var step := half * 1.6
+	var d := 0.0
+	while d < length:
+		rows.clear()
+		projectiles.combat.nearby(from + u * d, half, rows)
+		for j in rows:
+			if j != i and not seen.has(j) and t.is_boss[j] == 0 and t.type[j] != &"meteor" and t.dead[j] == 0 \
+					and t.parent[j] < 0:
+				seen[j] = true
+				t.vel[j] += push
+		d += step
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
 ## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。

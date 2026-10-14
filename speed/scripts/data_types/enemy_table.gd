@@ -10,9 +10,10 @@ extends RefCounted
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
 enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBER, BEAMER, PULSER, PUMP, SNIPER,
-	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX }
+	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX,
+	CRAB, MARLIN, AQUARIUS }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
-enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE }
+enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
 enum GateResult { ALLOW, PASS, BOUNCE }
 
