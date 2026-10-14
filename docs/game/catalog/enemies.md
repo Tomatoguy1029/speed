@@ -31,12 +31,12 @@
 | `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser` |
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
-| （未定） | ぎょしゃ座 | 5 | 採用 | 未実装 | 車輪の跡が燃えて残る | — | 5 |  |
-| （未定） | みなみのかんむり座 | 6 | 採用 | 未実装 | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器や波動で壊せる | 5 |  |
+| `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器や波動で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
-| （未定） | ケフェウス座 | 7 | 採用 | 未実装 | 号令で、周りの強敵が一斉に攻撃する | — | 5 |  |
+| `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |
-| （未定） | わし座 | 10 | 採用 | 未実装 | 通り道に沿って雷を落とす | — | 5 |  |
+| `aquila` | わし座 | 10 | 採用 | 実装済み | 通り道に沿って雷を落とす | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila` |
 
 ### 見た目の実装
 

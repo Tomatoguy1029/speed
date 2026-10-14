@@ -18,10 +18,12 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"ruler": EnemyTable.Beh.RULER, &"clock": EnemyTable.Beh.CLOCK, &"lynx": EnemyTable.Beh.LYNX,
 	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE, &"triangle": EnemyTable.Beh.TRIANGLE,
 	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
-	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS}
+	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS, &"auriga": EnemyTable.Beh.AURIGA,
+	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA}
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
-	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW}
+	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
+	&"guard": EnemyTable.Gate.GUARD}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -99,6 +101,10 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 		_add_beh(i)
 	if t.beh[i] == EnemyTable.Beh.TRIANGLE:
 		_spawn_triangle_stars(i)
+	elif t.beh[i] == EnemyTable.Beh.CORONA:
+		var star := def_of(&"corona_star")
+		for k in int(def.params.stars):
+			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
 	return i
 
 ## 部位を1つ出し、親（行 i）に付ける。
@@ -234,6 +240,9 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 		EnemyTable.Gate.MEMBRANE:
 			# 膜が消えている（頂点の星が欠けている）間だけ、中の核を倒せる
 			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.RECOVER else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.GUARD:
+			# 体当たりは弾かれる（失敗）。武器や波動では壊せる
+			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.ALLOW
 		EnemyTable.Gate.SHELL:
 			# 殻が割れている間に当たると倒れる
 			if t.shell_open[i] > 0.0:
@@ -327,7 +336,8 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
 			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
-			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS]:
+			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS,
+			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -503,6 +513,18 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_marlin(i, dt)
 				EnemyTable.Beh.AQUARIUS:
 					_aquarius(i, dt)
+				EnemyTable.Beh.AURIGA:
+					_drive(i, dt)
+					_auriga(i, dt)
+				EnemyTable.Beh.CORONA:
+					_chase(i, dt)
+					_corona(i, dt)
+				EnemyTable.Beh.CEPHEUS:
+					_keep_distance(i, dt)
+					_cepheus(i, dt)
+				EnemyTable.Beh.AQUILA:
+					_drive(i, dt)
+					_aquila(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -1084,6 +1106,86 @@ func _pour(i: int, dt: float) -> void:
 				seen[j] = true
 				t.vel[j] += push
 		d += step
+
+## 大きく旋回しながら一定の速さで走る（ぎょしゃ座・わし座）。向きは turn の速さでしか変わらない。
+func _drive(i: int, dt: float) -> void:
+	var t := table
+	_turn_toward(i, (state.enemy_aim - t.pos[i]).angle(), t.turn[i], dt)
+	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
+
+## ぎょしゃ座：王の戦車。走った跡に、左右の車輪の跡が燃えて残る。
+func _auriga(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.fire_t[i] -= dt
+	if t.fire_t[i] > 0.0:
+		return
+	t.fire_t[i] = float(p.trail_step)
+	var seg := t.vel[i] * float(p.trail_step)
+	var side := Vector2.from_angle(t.facing[i] + PI / 2.0) * float(p.wheel_gap)
+	for s: float in [-1.0, 1.0]:
+		var from := t.pos[i] - seg + side * s
+		projectiles.fire_wall(from, seg.angle(), seg.length(), float(p.trail_width), 0.0, float(p.trail_time),
+			_attack_dmg(i, float(p.bullet_dmg)), Color("#ff8a3c"))
+
+## みなみのかんむり座：周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る。
+## 輪が広がっている間（mode が DASH）、輪の星に触れた機体は外へ押し出される。
+func _corona(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.facing[i] += float(p.spin) * dt
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			t.fire_t[i] -= dt
+			t.timer[i] = maxf(0.0, t.timer[i] - dt / float(p.expand_time))
+			if t.fire_t[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.DASH
+				t.fire_t[i] = float(p.fire_interval)
+		_:
+			t.timer[i] += dt / float(p.expand_time)
+			if t.timer[i] >= 1.0 + float(p.hold_time) / float(p.expand_time):
+				t.mode[i] = EnemyTable.Mode.MOVE
+	var ring := float(p.ring) * (1.0 + (float(p.expand) - 1.0) * smoothstep(0.0, 1.0, minf(t.timer[i], 1.0)))
+	var parts := t.parts[i]
+	var n := parts.size() / 2
+	for k in n:
+		var j := parts[k * 2]
+		if not is_same(j, parts[k * 2 + 1]) or t.dead[j] != 0:
+			continue
+		t.pos[j] = t.pos[i] + Vector2.from_angle(t.facing[i] + TAU * k / float(n)) * ring
+		if t.mode[i] == EnemyTable.Mode.DASH:
+			var d := state.ship_pos - t.pos[j]
+			var reach := t.r[j] + cfg.ship_radius
+			if d.length_squared() < reach * reach:
+				var out := (state.ship_pos - t.pos[i]).normalized()
+				state.ship_vel += out * float(p.push) * dt
+
+## ケフェウス座：間隔ごとに光って号令をかけ、周りの強敵に一斉に攻撃させる。
+func _cepheus(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	if not _gun_timer(i, dt):
+		return
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby(t.pos[i], float(p.command_radius), rows)
+	for j in rows:
+		if j == i or t.dead[j] != 0 or t.def[j] == null or t.def[j].max_alive <= 0 or t.parent[j] >= 0:
+			continue
+		var jp: Dictionary = t.def[j].params
+		t.fire_t[j] = minf(t.fire_t[j], float(jp.get("telegraph", 0.0)) + 0.05)
+		t.flash[j] = 0.15
+	state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": float(p.command_radius) * 0.2})
+
+## わし座：雷を運ぶ鷲。大きく旋回しながら飛び、通り道に沿って雷を落とす。
+func _aquila(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.fire_t[i] -= dt
+	if t.fire_t[i] > 0.0:
+		return
+	t.fire_t[i] = float(p.drop_step)
+	projectiles.fire_zone(t.pos[i], float(p.blast_radius), float(p.blast_delay), _attack_dmg(i, float(p.bullet_dmg)),
+		ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
 ## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。

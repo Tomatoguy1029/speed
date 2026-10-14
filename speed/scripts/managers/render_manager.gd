@@ -565,6 +565,9 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var a0 := p + u * r
 		var a1 := a0 + u * float(t.def[i].params.stream_len)
 		c.draw_colored_polygon(PackedVector2Array([a0 + v * 0.5, a1 + v, a1 - v, a0 - v * 0.5]), Color(0.45, 0.75, 1.0, 0.22))
+	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.charge[i] > 0.0:
+		# 号令の前の光
+		c.draw_arc(p, r * (1.3 + 1.5 * t.charge[i]), 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.6 * t.charge[i]), _px(3.0))
 	if t.beh[i] == EnemyTable.Beh.CROW and t.buds[i] > 0:
 		# 集めた残骸の塊
 		var lump: float = t.def[i].params.lump_r * sqrt(float(t.buds[i]) / float(t.def[i].params.throw_min))

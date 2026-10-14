@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"cepheus"
+display_name = "ケフェウス座"
+radius = 50.0
+hp = 1100.0
+armor = 12.0
+speed = 70.0
+accel = 1.2
+turn = 2.0
+xp = 110.0
+color = Color(0.75, 0.6, 1, 1)
+shape = &"hex"
+behavior = &"cepheus"
+max_alive = 1
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"keep": 560.0,
+"fire_interval": 8.0,
+"telegraph": 1.5,
+"command_radius": 1200.0
+}

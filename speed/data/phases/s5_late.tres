@@ -25,5 +25,11 @@ mix = {
 "beamer": 0.5,
 "pulser": 0.5,
 "missile": 0.5,
-"spreader": 0.5
+"spreader": 0.5,
+"shield": 0.35,
+"cross": 0.35,
+"auriga": 0.3,
+"corona": 0.06,
+"cepheus": 0.06,
+"aquila": 0.05
 }
