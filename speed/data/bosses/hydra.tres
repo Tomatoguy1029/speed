@@ -41,5 +41,8 @@ params = {
 "missile_speed": 420.0,
 "missile_dmg": 10.0,
 "ring_speed": 380.0,
-"shock_radius": 240.0
+"shock_radius": 240.0,
+"tech_cd": 14.0,
+"shard_speed": 420.0,
+"shard_dmg": 10.0
 }

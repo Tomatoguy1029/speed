@@ -1,6 +1,21 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/bosses/hydra_boss.gd" id="1"]
+[ext_resource type="BehaviorTree" path="res://scenes/bosses/hydra_boss_bt.tres" id="2"]
+[ext_resource type="AnimationLibrary" path="res://scenes/bosses/hydra_boss_timeline.tres" id="3"]
+
+[sub_resource type="BlackboardPlan" id="BlackboardPlan_hydra"]
 
 [node name="HydraBoss" type="Node2D"]
 script = ExtResource("1")
+
+[node name="LimboHSM" type="LimboHSM" parent="."]
+update_mode = 2
+
+[node name="Form1" type="BTState" parent="LimboHSM"]
+behavior_tree = ExtResource("2")
+blackboard_plan = SubResource("BlackboardPlan_hydra")
+
+[node name="Timeline" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+libraries/ = ExtResource("3")

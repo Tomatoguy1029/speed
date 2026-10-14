@@ -1,0 +1,122 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[sub_resource type="Animation" id="Animation_north"]
+length = 3.8
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 1.4, 2.4, 2.7, 3.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"values": [{
+"args": [&"north"],
+"method": &"tech_compass"
+}, {
+"args": [],
+"method": &"north_curl"
+}, {
+"args": [],
+"method": &"north_burst"
+}, {
+"args": [],
+"method": &"north_follow"
+}, {
+"args": [],
+"method": &"tech_end"
+}]
+}
+
+[sub_resource type="Animation" id="Animation_east"]
+length = 5.2
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 1.4, 2.2, 3.0, 5.0),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"values": [{
+"args": [&"east"],
+"method": &"tech_compass"
+}, {
+"args": [],
+"method": &"east_debris"
+}, {
+"args": [],
+"method": &"east_charge"
+}, {
+"args": [],
+"method": &"east_sweep"
+}, {
+"args": [],
+"method": &"tech_end"
+}]
+}
+
+[sub_resource type="Animation" id="Animation_south"]
+length = 5.8
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 1.4, 2.0, 5.0, 5.6),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
+"values": [{
+"args": [&"south"],
+"method": &"tech_compass"
+}, {
+"args": [],
+"method": &"south_vortex"
+}, {
+"args": [],
+"method": &"south_debris"
+}, {
+"args": [],
+"method": &"south_burst"
+}, {
+"args": [],
+"method": &"tech_end"
+}]
+}
+
+[sub_resource type="Animation" id="Animation_west"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0.0, 1.4, 2.4, 4.2),
+"transitions": PackedFloat32Array(1, 1, 1, 1),
+"values": [{
+"args": [&"west"],
+"method": &"tech_compass"
+}, {
+"args": [],
+"method": &"west_charge"
+}, {
+"args": [],
+"method": &"west_sweep"
+}, {
+"args": [],
+"method": &"tech_end"
+}]
+}
+
+[resource]
+_data = {
+&"north": SubResource("Animation_north"),
+&"east": SubResource("Animation_east"),
+&"south": SubResource("Animation_south"),
+&"west": SubResource("Animation_west")
+}
