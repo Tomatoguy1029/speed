@@ -1,5 +1,5 @@
 ## 短時間の性能計測専用。実ゲームの仕様・セーブは変更しない。
-## -- --time=320 --size=1280x720 --sparks=off --glow=off
+## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off
 extends Node
 
 var run: RunManager
@@ -31,7 +31,7 @@ func _ready() -> void:
 		if parts.size() == 2:
 			options[parts[0]] = parts[1]
 	SaveManager.data = SaveManager.default_data()
-	GameManager.run_stage = 1
+	GameManager.run_stage = int(options.get("stage", "1"))
 	GameManager.run_endless = false
 	if options.has("overlay"):
 		# --overlay=compact|detail で性能の表示を出した状態で始める

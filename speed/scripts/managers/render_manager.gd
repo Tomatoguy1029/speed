@@ -38,6 +38,8 @@ var _layers: Dictionary = {}
 var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
+## 絵がまだない敵の種類（仮の図形で、敵の色で描く）
+var _shape_ids: Dictionary = {}
 var _camera: Camera2D
 var _font: Font
 var _path_band_group: CanvasGroup
@@ -125,6 +127,22 @@ func _build_batches() -> void:
 		b.z_index = -1
 		_layers.enemies.add_child(b)
 		_batches[StringName(id)] = b
+	# ほかの種類は、assets/pixel/<type ID>.png があればその絵で、なければ敵の定義の形（EnemyDef.shape）の
+	# 図形で描く。png を置けば絵に替わる
+	for def: EnemyDef in ConfigManager.enemies.values():
+		if def.id == &"meteor" or _batches.has(def.id):
+			continue
+		var b := InstanceBatch.new()
+		var path := "res://assets/pixel/%s.png" % def.id
+		if ResourceLoader.exists(path):
+			b.setup_texture(load(path) as Texture2D)
+			b.material = enemy_mat
+		else:
+			b.setup_polygon(_placeholder_points(def.shape))
+			_shape_ids[def.id] = true
+		b.z_index = -1
+		_layers.enemies.add_child(b)
+		_batches[def.id] = b
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -437,7 +455,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 			rock_batch.add(p, t.facing[i], METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
-		if type in NATIVE_SPRITES:
+		if _shape_ids.has(type):
+			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
+		elif type in NATIVE_SPRITES:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
 			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
@@ -467,11 +487,24 @@ func _draw_comet(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool) 
 			var a := state.time * 3.0 + k * TAU / 4.0
 			c.draw_circle(p + Vector2.from_angle(a) * r * 1.7, maxf(3.0, r * 0.12), Color("#fff3c4"))
 
+## 絵がまだない敵の仮の図形（+X が前、半径 1）。orb は円、diamond は菱形、hex は六角形、dart は矢じり、それ以外は四角。
+static func _placeholder_points(shape: StringName) -> PackedVector2Array:
+	match shape:
+		&"orb":
+			return InstanceBatch.circle_points(20)
+		&"diamond":
+			return PackedVector2Array([Vector2(1, 0), Vector2(0, 0.75), Vector2(-1, 0), Vector2(0, -0.75)])
+		&"hex":
+			return InstanceBatch.circle_points(6)
+		&"dart":
+			return PackedVector2Array([Vector2(1, 0), Vector2(-0.8, 0.7), Vector2(-0.4, 0), Vector2(-0.8, -0.7)])
+	return PackedVector2Array([Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)])
+
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
 		var path := "res://assets/pixel/%s.png" % type
-		_enemy_textures[type] = load(path) if String(type) in SPRITE_IDS and ResourceLoader.exists(path) else null
+		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
 	return _enemy_textures[type]
 
 ## 敵の船体を絵で描く（牽引中・撃ち出した船体）。glow は周りの光の色（透明なら光らせない）。

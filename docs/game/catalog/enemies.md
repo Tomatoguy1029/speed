@@ -24,6 +24,7 @@
 - 各敵は `speed/assets/pixel/<type ID>.png` のピクセルスプライトを Nearest で描く（`RenderManager`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
 - `drifter`・`swarm`・`darter`・`armored`・`splitter`・`splitling` は手描きの PNG を、透明な余白込みの原寸で表示する。エリートも同じ大きさ。基礎半径は各 `.tres` で画像に合わせる。
 - `gunner`・`missile`・`battleship`・`titan` は試遊用のスプライト。最終の見た目は未確定。
+- 絵（`speed/assets/pixel/<type ID>.png`）がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。
 - 全敵とボスの表示と当たり判定に `config.character_scale` を掛ける。
 - `armored` は背面の弱点を示す弧を表示しない。弱点の判定とエリートの輪はある。
 - 静止スプライトで、個別のアニメーションはない。
