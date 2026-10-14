@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="HeroDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/hero_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hercules"
+display_name = "ヘルクレス座"
+stage = 4
+stars = PackedVector2Array(0, 0, -20, 100, 80, 120, 100, 10, -90, 200, -110, 320, 160, 220, 200, -80, -80, -110)
+links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 0, 1, 4, 4, 5, 2, 6, 3, 7, 0, 8)
+cooldown = 50.0
+duration = 10.0
+params = {
+"interval": 0.35,
+"radius": 110.0,
+"burn_time": 3.0,
+"power": 3.0
+}

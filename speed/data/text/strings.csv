@@ -37,6 +37,7 @@ settings.no_key,（なし）,(None)
 settings.press_key,キーを押す…,Press a key…
 ,■ キー設定のアクション（action.<アクション名>）,
 action.draw_alt,描画の補助,Draw (Assist)
+action.hero,英雄の星座の力,Hero Constellation Power
 action.pause,ポーズ,Pause
 action.mute,消音の切り替え,Toggle Mute
 action.card_1,3択の1枚目,Card 1

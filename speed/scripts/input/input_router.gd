@@ -10,6 +10,7 @@ var stick_radius := 70.0
 
 var _press := false
 var _alt_press := false
+var _hero_press := false
 var _pen_release := false
 var _touch := false
 var _stick_index := -1
@@ -34,6 +35,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_touch = false
 	elif event.is_action_pressed(&"draw_alt"):
 		_alt_press = true
+	elif event.is_action_pressed(&"hero"):
+		_hero_press = true
 	elif event is InputEventScreenTouch:
 		_touch = true
 		if event.pressed:
@@ -79,6 +82,8 @@ func poll() -> Intent:
 		it.pen = it.cursor
 	it.press = _press
 	it.alt_press = _alt_press
+	it.hero_press = _hero_press
+	_hero_press = false
 	it.pen_release = _pen_release
 	_press = false
 	_alt_press = false

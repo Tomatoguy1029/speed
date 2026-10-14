@@ -26,6 +26,7 @@ var cfg: GameConfig
 @onready var projectiles: ProjectileManager = $"../ProjectileManager"
 @onready var build: BuildManager = $"../BuildManager"
 @onready var pickups: PickupManager = $"../PickupManager"
+@onready var heroes: HeroManager = $"../HeroManager"
 @onready var input: InputRouter = get_node(input_path)
 
 ## 敗北・クリアの演出の経過時間（実秒）
@@ -55,7 +56,7 @@ func _ready() -> void:
 	SaveManager.settings_changed.connect(_read_settings)
 	_wire()
 	# 能力値を先に計算してから機体を置く
-	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups]:
+	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
 		m.setup(state, cfg)
 	build.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
@@ -67,6 +68,8 @@ func _ready() -> void:
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
 	field.enemies = enemies
+	heroes.enemies = enemies
+	heroes.field = field
 	field.projectiles = projectiles
 	ship.field = field
 	ship.combat = combat
@@ -181,6 +184,9 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"bosses", func(): bosses.tick(wr, wd))
 		_run(&"grid", func(): combat.rebuild_grid())
 	_run(&"ship", func(): ship.tick(real_dt, world_dt))
+	if it.hero_press:
+		heroes.activate()
+	_run(&"heroes", func(): heroes.tick(real_dt, world_dt))
 	if state.phase == RunState.Phase.PLAY:
 		_run(&"build", func(): build.tick(real_dt, world_dt))
 	if world_step and state.phase == RunState.Phase.PLAY:

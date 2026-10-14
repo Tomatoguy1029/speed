@@ -7,12 +7,13 @@ extends RefCounted
 
 ## キー設定の画面で変えられるアクション（表示順）。表示名は文章のマスタの action.<アクション名>。
 const REBINDABLE: Array[StringName] = [
-	&"draw_alt", &"pause", &"mute", &"card_1", &"card_2", &"card_3", &"reroll", &"debug_panel", &"debug_perf",
+	&"draw_alt", &"hero", &"pause", &"mute", &"card_1", &"card_2", &"card_3", &"reroll", &"debug_panel", &"debug_perf",
 ]
 
 ## アクション → 既定のキー（物理キー）。
 const DEFAULT_KEYS := {
 	&"draw_alt": KEY_SPACE,
+	&"hero": KEY_Q,
 	&"pause": KEY_ESCAPE,
 	&"mute": KEY_M,
 	&"card_1": KEY_1,

@@ -1263,6 +1263,10 @@ func _target() -> Dictionary:
 		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
 		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
 
+## 今の時間帯の敵のレベル（ほかの Manager が敵を出すときに使う）。
+func spawn_level() -> float:
+	return _target().level
+
 ## 10:00 以降の強まりの段（仕様書 4.2）。始まる前は0、始まると1から一定時間ごとに増える。
 func surge_steps() -> int:
 	if state.time < cfg.surge_start:

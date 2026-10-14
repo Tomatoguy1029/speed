@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="HeroDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/hero_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"leo"
+display_name = "しし座"
+stage = 1
+stars = PackedVector2Array(0, 0, -20, -110, 30, -200, -10, -290, -90, -320, -150, -260, 260, -170, 400, -90, 250, -60)
+links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 2, 6, 6, 7, 7, 8, 8, 0)
+cooldown = 45.0
+duration = 8.0
+params = {
+"width_mult": 4.0
+}

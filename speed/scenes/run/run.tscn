@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/run_manager.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/managers/field_manager.gd" id="2"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/ui/debug_panel.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/ui/perf_overlay.gd" id="15"]
+[ext_resource type="Script" path="res://scripts/managers/hero_manager.gd" id="16"]
 
 [node name="Run" type="Node"]
 
@@ -51,6 +52,9 @@ script = ExtResource("9")
 
 [node name="PickupManager" type="Node" parent="Managers"]
 script = ExtResource("10")
+
+[node name="HeroManager" type="Node" parent="Managers"]
+script = ExtResource("16")
 
 [node name="RenderManager" type="Node" parent="Managers"]
 script = ExtResource("11")

@@ -286,6 +286,40 @@ func _draw_loadout(H: float) -> void:
 	var weapon_y := trait_y - 5.0 - LOADOUT_WEAPON
 	_draw_slot_row(weapon_y, LOADOUT_WEAPON, 2, cfg.weapon_slots, cfg.weapon_max_level, s.weapons, ConfigManager.weapons)
 	_draw_slot_row(trait_y, LOADOUT_TRAIT, 12, cfg.trait_slots, cfg.trait_max_stacks, s.traits, ConfigManager.traits)
+	_draw_hero_slot(Vector2(8.0 + cfg.weapon_slots * (LOADOUT_WEAPON + 4.0) + 8.0, weapon_y))
+
+## 特別な枠（英雄の星座の力）。武器の段の横に置く。使えるまでの時間は下から暗く覆う（仕様書 17）。
+func _draw_hero_slot(at: Vector2) -> void:
+	var s := run.state
+	var rect := Rect2(at, Vector2(LOADOUT_WEAPON, LOADOUT_WEAPON))
+	var box := StyleBoxFlat.new()
+	box.set_corner_radius_all(LOADOUT_WEAPON / 2.0)
+	box.set_border_width_all(2)
+	var gold := Color("#ffe8a0")
+	if s.hero_power == &"":
+		box.bg_color = Color(1, 1, 1, 0.03)
+		box.border_color = Color(gold, 0.25)
+		draw_style_box(box, rect)
+		return
+	var def: HeroDef = ConfigManager.heroes.get(s.hero_power)
+	box.bg_color = Color(0.1, 0.08, 0.03, 0.85)
+	box.border_color = gold
+	if s.hero_active_t > 0.0:
+		var glow := box.duplicate() as StyleBoxFlat
+		glow.bg_color = Color.TRANSPARENT
+		glow.border_color = Color(gold, 0.4 + 0.3 * sin(Time.get_ticks_msec() / 120.0))
+		glow.set_border_width_all(3)
+		glow.set_expand_margin_all(4)
+		draw_style_box(glow, rect)
+	draw_style_box(box, rect)
+	_draw_fit_text(def.display_name if def != null else String(s.hero_power), rect.grow(-6.0), gold)
+	if s.hero_cd > 0.0 and def != null and def.cooldown > 0.0:
+		var k := s.hero_cd / def.cooldown
+		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1.0 - k)), Vector2(rect.size.x, rect.size.y * k)),
+			Color(0, 0, 0, 0.55))
+	var key := OS.get_keycode_string(InputActions.key_of(&"hero"))
+	draw_string(_font, rect.position + Vector2(rect.size.x - 12.0, rect.size.y + 2.0), key, HORIZONTAL_ALIGNMENT_LEFT,
+		-1, 12, Color(gold, 0.8))
 
 func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()

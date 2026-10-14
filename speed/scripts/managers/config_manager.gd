@@ -19,6 +19,7 @@ var weapons: Dictionary = {}
 var traits: Dictionary = {}
 var meta_upgrades: Dictionary = {}
 var legendary_modules: Dictionary = {}
+var heroes: Dictionary = {}
 
 func _ready() -> void:
 	base = load(CONFIG_PATH) as GameConfig
@@ -31,6 +32,7 @@ func _ready() -> void:
 	_load_dir("res://data/traits", traits, "id")
 	_load_dir("res://data/meta_upgrades", meta_upgrades, "id")
 	_load_dir("res://data/legendary_modules", legendary_modules, "id")
+	_load_dir("res://data/heroes", heroes, "id")
 
 ## 調整値を .tres の値に戻す。
 func reset_runtime() -> void:

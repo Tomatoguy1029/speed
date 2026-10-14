@@ -373,6 +373,7 @@ func _draw_field(c: CanvasItem) -> void:
 		if view.has_point(center) or view.grow(d.z).has_point(center):
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
 	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+	_draw_hero(c)
 	# ワープホール：回る輪
 	if f.warp_gone >= 0.0:
 		var wr := cfg.warp_radius
@@ -393,6 +394,32 @@ func _draw_field(c: CanvasItem) -> void:
 		if view.grow(b.r).has_point(b.pos):
 			c.draw_texture_rect(PLANET if b.is_planet else MOON,
 				Rect2(b.pos - Vector2.ONE * b.r, Vector2.ONE * b.r * 2.0), false)
+
+## 英雄の星座：うっすらと見える点線の星座線と、光った線。近くまで来ると星が恒星のように強く光る。
+func _draw_hero(c: CanvasItem) -> void:
+	var h := run.heroes
+	if h.hero == null:
+		return
+	var view := state.view_rect().grow(900.0)
+	if not view.has_point(h.center):
+		return
+	var near := clampf(1.0 - h.center.distance_to(state.ship_pos) / cfg.hero_glow_range, 0.0, 1.0)
+	var gold := Color("#ffe8a0")
+	var links := h.hero.links
+	for n in h.lit.size():
+		var a := h.stars[links[n * 2]]
+		var b := h.stars[links[n * 2 + 1]]
+		if h.lit[n] != 0:
+			c.draw_line(a, b, Color(gold, 0.35), _px(9.0))
+			c.draw_line(a, b, gold, _px(3.0))
+		else:
+			c.draw_dashed_line(a, b, Color(0.8, 0.85, 1.0, 0.25 + 0.25 * near), _px(2.0), _px(10.0))
+	var pulse := 0.85 + 0.15 * sin(state.world_time * 3.0)
+	for p in h.stars:
+		if near > 0.0:
+			c.draw_circle(p, cfg.hero_star_radius * (1.5 + 2.5 * near) * pulse, Color(1.0, 0.95, 0.75, 0.12 * near))
+			c.draw_circle(p, cfg.hero_star_radius * (0.8 + 1.0 * near), Color(1.0, 0.97, 0.85, 0.25 * near))
+		c.draw_circle(p, maxf(_px(3.0), cfg.hero_star_radius * 0.35), Color(1.0, 0.98, 0.9, 0.6 + 0.4 * near))
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups

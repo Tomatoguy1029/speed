@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="HeroDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/hero_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"perseus"
+display_name = "ペルセウス座"
+stage = 2
+stars = PackedVector2Array(-120, -200, -60, -100, 0, 0, 60, 110, 100, 220, 60, 330, 140, 40, 220, 80)
+links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 2, 6, 6, 7)
+cooldown = 60.0
+duration = 6.0
+params = {
+
+}

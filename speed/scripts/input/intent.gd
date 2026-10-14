@@ -12,6 +12,8 @@ var pen := Vector2.ZERO
 var press := false
 ## 描画の補助（Space）。押した瞬間
 var alt_press := false
+## 英雄の星座の力（Q）。押した瞬間
+var hero_press := false
 ## タッチで描いている指を離した
 var pen_release := false
 var touch := false
