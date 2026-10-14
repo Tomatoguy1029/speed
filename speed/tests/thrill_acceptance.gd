@@ -29,6 +29,13 @@ func _ready() -> void:
 	await _start(1)
 	_test_field()
 	await _close()
+	for stage in range(1, 5):
+		await _start(stage)
+		_test_hero()
+		await _close()
+	await _start(1)
+	_test_landmarks()
+	await _close()
 	print("[acceptance] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
 
@@ -410,3 +417,121 @@ func _test_field() -> void:
 	_check(s.time == clock and s.bonus_t == 0, "タスク15：時計を止めたまま30秒で通常フィールドへ戻る")
 	run._play_tick(0.1)
 	_check(s.time > clock, "タスク15：戻ったあとはランの時計が進む")
+
+func _finish_trace() -> void:
+	for tick in 500:
+		if not run.state.tracing and not run.state.twin_tracing:
+			break
+		run.draw.tick(0.01, 0.01)
+		run.heroes.tick(0.01, 0.01)
+
+func _test_hero() -> void:
+	var h := run.heroes
+	var s := run.state
+	var t := run.enemies.table
+	var def := h.hero
+	_check(def != null and def.stage == s.stage_index, "タスク16：ステージ%dの英雄が配置される" % s.stage_index)
+	_check(h.center.length() > run.cfg.field_radius * 0.7, "タスク16：英雄はフィールドの端に配置される")
+	s.ship_pos = h.center
+	s.view_center = h.center
+	h.tick(0.01, 0.01)
+	var guards := 0
+	for i in t.alive.size():
+		if t.alive[i] and not t.dead[i] and t.def[i] != null and t.def[i].rank >= 3 and t.def[i].rank <= 5:
+			guards += 1
+	_check(guards == run.cfg.hero_guards, "タスク16：そのステージの強敵が英雄を守る")
+	_clear()
+	for k in range(0, def.links.size(), 2):
+		var a := h.stars[def.links[k]]
+		var b := h.stars[def.links[k + 1]]
+		var u := (b - a).normalized()
+		s.gauge = 1.0
+		_line(PackedVector2Array([a - u * 80, b + u * 80]))
+		_finish_trace()
+	_check(not h.is_captive() and s.hero_power == def.id and h.lit.count(1) == h.lit.size(), "タスク16：星座の線を全部なぞって%sを解放できる" % def.id)
+	s.ship_pos = h.center
+	s.view_center = h.center
+	s.ship_vel = Vector2.ZERO
+	s.glide = false
+	var victim := _enemy(&"shield" if def.id == &"perseus" else &"beamer", s.ship_pos + Vector2(150, 0))
+	t.hp[victim] = 1.0
+	t.armor[victim] = 1e6
+	run.combat.rebuild_grid()
+	run.projectiles.fire_enemy(victim, PI, 100, &"bullet")
+	InputActions.register_defaults()
+	var key := InputEventKey.new()
+	key.physical_keycode = KEY_Q
+	key.pressed = true
+	run.input._touch = true
+	run.input._unhandled_input(key)
+	run._play_tick(0.01)
+	_check(s.hero_power == def.id and s.hero_cd > 0 and s.hero_active_t > 0, "タスク16：Q入力から%sの力が発動する" % def.id)
+	var cd := s.hero_cd
+	h.activate()
+	_check(s.hero_cd == cd, "タスク16：クールダウン中は再発動しない")
+	match def.id:
+		&"leo":
+			_check(run.combat.leo_width() > 1, "タスク17：しし座は帯を太くする")
+			var a := s.ship_pos - Vector2(100, 0)
+			var b := s.ship_pos + Vector2(300, 0)
+			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.wave_radius * 1.5)
+			run.combat.rebuild_grid()
+			run.combat.wave_along(TraceRun.new(), a, b)
+			_check(t.dead[victim] != 0, "タスク17：太い帯の敵は装甲に関係なく貫ける")
+		&"perseus":
+			var before := t.pos[victim]
+			_advance_enemies(0.1)
+			_check(t.stone[victim] > 0 and t.pos[victim] == before, "タスク18：メドゥーサで敵が石になり止まる")
+			var hp := s.ship_hp
+			run.projectiles.hostile_pos[0] = s.ship_pos
+			run.projectiles._update_hostile(0.01)
+			_check(run.projectiles.hostile_count() == 0 and s.ship_hp == hp, "タスク18：石の弾に触れると安全に砕ける")
+			_ram(t.pos[victim], Vector2.LEFT)
+			_check(t.dead[victim] != 0, "タスク18：石の敵は装甲と倒し方に関係なく一撃で砕ける")
+		&"gemini":
+			t.armor[victim] = 0.0
+			var at := s.ship_pos
+			t.pos[victim] = at + Vector2(150, 0)
+			var other := _enemy(&"beamer", at + Vector2(150, 200))
+			t.hp[other] = 1.0
+			t.armor[other] = 0.0
+			run.combat.rebuild_grid()
+			s.gauge = 1.0
+			_line(PackedVector2Array([at, at + Vector2(300, 0)]))
+			_check(s.drawing and not s.tracing and s.twin_first.size() >= 2, "タスク18：1本目のあとに2本目を描ける")
+			_line(PackedVector2Array([at + Vector2(0, 200), at + Vector2(300, 200)]))
+			_check(s.tracing and s.twin_tracing, "タスク18：自分と双子が同時に駆ける")
+			_finish_trace()
+			_check(t.dead[victim] != 0 and t.dead[other] != 0, "タスク18：2本それぞれの線の敵を貫ける")
+		&"hercules":
+			_check(not h.falls.is_empty(), "タスク17：火の隕石が降り始める")
+			h.tick(float(def.params.fall_time) + 0.01, 0.01)
+			_check(not h.burns.is_empty() and t.dead[victim] != 0, "タスク17：火の隕石は装甲を無視して焼き、燃える跡を残す")
+
+func _test_landmarks() -> void:
+	var h := run.heroes
+	var s := run.state
+	var t := run.enemies.table
+	run.cfg.landmark_chance = 1.0
+	_check(not h.revealed() and s.landmarks.is_empty(), "タスク19：英雄の場所は最初は隠れている")
+	var places := [Vector2(-2000, -2000), Vector2(-4000, -2000)]
+	for k in 2:
+		s.ship_pos = places[k]
+		s.view_center = places[k]
+		var enemy := _enemy(&"beamer", s.ship_pos + Vector2(60, 0))
+		run.combat.rebuild_grid()
+		h._landmark_t = 0.0
+		h.tick(0.01, 0.01)
+		_check(t.landmark[enemy] == 1, "タスク19：%dつ目の目印の星を強めの敵に持たせる" % (k + 1))
+		run.combat.damage_enemy(enemy, 1e6, {"cause": &"shot", "no_crit": true})
+		_check(s.landmarks.size() == k + 1, "タスク19：倒した地点からヒントの線が増える")
+	_check(h.revealed(), "タスク19：2本の線がそろうと英雄の場所が分かる")
+	var a := s.landmarks[0]
+	var b := s.landmarks[1]
+	_check(absf((h.center - a).cross(h.center - b)) > 1.0, "タスク19：別の方向からの線が英雄の位置で交わる")
+	s.endless = true
+	h.setup(s, run.cfg)
+	var previous := h.hero.id
+	h._free()
+	h.tick(run.cfg.hero_next_time + 0.01, 0.01)
+	_check(h.hero.id != previous and h.is_captive() and s.landmarks.is_empty(), "タスク16・19：エンドレスは次の英雄へ替わり、ヒントを消す")
