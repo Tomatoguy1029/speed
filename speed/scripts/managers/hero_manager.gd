@@ -278,6 +278,7 @@ func _tick_hercules(dt: float) -> void:
 			_burn_enemies(Vector2(b.x, b.y), float(p.radius) * 0.8, dmg * float(p.burn_power))
 
 ## 火の隕石を落とす位置：機体の周り（画面の半分くらいの範囲）のランダムな位置。敵がいれば、その位置に寄せる。
+## ボス戦の間は、35% の確率でボスの部位（うみへび座の頭）に寄せる。
 func _fire_target() -> Vector2:
 	var half := state.view_half * 0.5
 	if combat.grid.table == null:
@@ -285,6 +286,11 @@ func _fire_target() -> Vector2:
 	var rows := PackedInt32Array()
 	combat.grid.query_radius(state.ship_pos, half.length(), cfg.max_enemy_radius, rows)
 	var t := enemies.table
+	# ボス戦の間は、ボスの部位（うみへび座の頭）に少しだけ寄せる
+	if state.rng.randf() < 0.35:
+		for i in rows:
+			if t.dead[i] == 0 and t.parent[i] >= 0 and t.is_boss[t.parent[i]] != 0:
+				return t.pos[i] + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * 60.0
 	for attempt in 6:
 		if rows.is_empty():
 			break
