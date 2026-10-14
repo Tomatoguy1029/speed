@@ -52,12 +52,16 @@ var immortal_segs := PackedVector2Array()
 var _expose_cd := 0.0
 ## 1本の線（突進の番号）ごとに落とした頭の数
 var _dash_kills: Dictionary = {}
+var _shock_t := 0.0
+## 強めの技の最中（普段の首の攻撃を止める）
+var busy := false
 var _time := 0.0
 
 func _on_bound() -> void:
 	draws_self = true
 	table.gate[body] = EnemyTable.Gate.GHOST
-	z_index = -1
+	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）
+	z_index = 5
 	_set_count(3)
 
 func _process(_delta: float) -> void:
@@ -244,14 +248,170 @@ func _expose() -> void:
 
 # ── 首の攻撃（各首の種類ごと） ──────────────────────────────────────
 
-## 首の攻撃の更新。普段は機体の方へゆらゆら向く。
+## 首の攻撃の更新。普段は機体の方へゆらゆら向き、間隔ごとに種類ごとの2つの攻撃のどちらかを出す。
+## 普段の首の攻撃は予告しない（噛みつきの引き・ビームの溜めなど、首の動きと光で見せる）。
 func _attack(neck: Neck, _k: int, dt: float) -> void:
 	var p: Dictionary = def.params
 	var aim := (run_state.ship_pos - table.pos[body]).angle()
-	var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
-	var home := neck.base_angle + table.facing[body] + sway
-	neck.angle = lerp_angle(neck.angle, lerp_angle(home, aim, 0.35), minf(1.0, dt * 2.0))
-	neck.length = move_toward(neck.length, float(p.neck_rest), float(p.neck_rest) * dt * 2.0)
+	if neck.mode == &"idle":
+		var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
+		var home := neck.base_angle + table.facing[body] + sway
+		neck.angle = lerp_angle(neck.angle, lerp_angle(home, aim, 0.35), minf(1.0, dt * 2.0))
+		neck.length = move_toward(neck.length, float(p.neck_rest), float(p.neck_rest) * dt * 2.0)
+		neck.glow = maxf(0.0, neck.glow - dt * 3.0)
+		neck.cd -= dt
+		if neck.cd <= 0.0 and not busy and table.pos[body].distance_to(run_state.ship_pos) < float(p.engage) * 1.3:
+			neck.cd = float(p.attack_cd) * (0.8 + 0.4 * randf())
+			neck.step = 0
+			neck.mode = StringName(String(neck.kind) + ("_a" if randf() < 0.5 else "_b"))
+			neck.t = 0.0
+		return
+	neck.t += dt
+	match neck.mode:
+		&"bite_a", &"bite_b":
+			_bite(neck, aim, dt)
+		&"vortex_a", &"vortex_b":
+			_vortex(neck, aim, dt)
+		&"debris_a", &"debris_b":
+			_debris(neck, aim, dt)
+		&"beam_a", &"beam_b":
+			_beam(neck, aim, dt)
+		&"homing_a", &"homing_b":
+			_homing(neck, aim, dt)
+		_:
+			neck.mode = &"idle"
+
+func _end(neck: Neck) -> void:
+	neck.mode = &"idle"
+	neck.t = 0.0
+	neck.step = 0
+	neck.glow = 0.0
+
+## 噛みつく首。a：首を後ろに引いてから、前へ大きく伸びて噛みつく。噛みついた直後は伸びきって止まる。
+## b：短く3回、続けて噛みつきながら前へ出てくる。
+func _bite(neck: Neck, aim: float, dt: float) -> void:
+	var p: Dictionary = def.params
+	var rest := float(p.neck_rest)
+	var reach := float(p.bite_reach)
+	var multi := neck.mode == &"bite_b"
+	var pull_t := 0.3 if multi else 0.6
+	var lunge_t := 0.1 if multi else 0.14
+	var hold_t := 0.25 if multi else 0.9
+	var phase_t := pull_t + lunge_t + hold_t
+	var local := neck.t - neck.step * phase_t
+	if local < pull_t:
+		# 引く
+		neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 6.0))
+		neck.length = move_toward(neck.length, rest * 0.55, rest * dt * 2.5)
+		neck.glow = local / pull_t
+	elif local < pull_t + lunge_t:
+		var target := rest + (reach - rest) * ((neck.step + 1) / 3.0 if multi else 1.0)
+		neck.length = move_toward(neck.length, target, (target - rest * 0.5) * dt / lunge_t * 1.2)
+		neck.glow = 1.0
+		if local + dt >= pull_t + lunge_t:
+			manager.projectiles.fire_zone(_head_pos(neck), float(p.bite_radius), 0.0, float(p.bite_dmg),
+				ProjectileManager.HazardStyle.PLAIN, Color("#ff7a5a"))
+	elif local < phase_t:
+		neck.glow = 0.0
+	else:
+		neck.step += 1
+		if not multi or neck.step >= 3:
+			_end(neck)
+
+## 渦の首。a：渦を巻く息を吐き、ボスの周りに渦を1つ置く。b：息を長く吐きながら首を振り、渦を3つ並べて置く。
+func _vortex(neck: Neck, aim: float, dt: float) -> void:
+	var p: Dictionary = def.params
+	var multi := neck.mode == &"vortex_b"
+	neck.angle = lerp_angle(neck.angle, aim + (sin(neck.t * 2.0) * 0.9 if multi else 0.0), minf(1.0, dt * 3.0))
+	neck.glow = minf(1.0, neck.t / 0.5)
+	var times := [0.5, 1.0, 1.5] if multi else [0.5]
+	if neck.step < times.size() and neck.t >= times[neck.step]:
+		neck.step += 1
+		var at := _head_pos(neck) + Vector2.from_angle(neck.angle) * float(p.vortex_radius) * 0.8
+		manager.field.add_well(at, float(p.vortex_life), float(p.vortex_radius), float(p.vortex_pull))
+	if neck.t >= times[times.size() - 1] + 0.4:
+		_end(neck)
+
+## 瓦礫の首。a：鉄の瓦礫を吐き出し、ほかの首の周りに漂わせる（当たると弾かれる。少しすると消える）。
+## b：瓦礫を固めて塊にし、投げつける。
+func _debris(neck: Neck, aim: float, dt: float) -> void:
+	var p: Dictionary = def.params
+	neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 3.0))
+	neck.glow = minf(1.0, neck.t / 0.6)
+	if neck.t < 0.6:
+		return
+	if neck.mode == &"debris_a":
+		spit_rubble(neck, int(p.rubble_count))
+	else:
+		manager.projectiles.fire_lump(neck.row, aim, float(p.lump_speed), float(p.lump_r), float(p.lump_dmg))
+	_end(neck)
+
+## 瓦礫を n 個吐き出し、ほかの首の頭の周りに漂わせる。
+func spit_rubble(neck: Neck, n: int) -> void:
+	var rubble := manager.enemies.def_of(&"hydra_rubble")
+	var heads: Array[Vector2] = []
+	for other in necks:
+		if other != neck and _alive(other):
+			heads.append(_head_pos(other))
+	if heads.is_empty():
+		heads.append(table.pos[body])
+	for k in n:
+		var around: Vector2 = heads[k % heads.size()]
+		var at := around + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 160.0)
+		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": randf_range(-2.0, 2.0)})
+		table.vel[j] = (at - table.pos[j]) * 1.2
+
+## ビームの首。a：首を高く持ち上げて光を溜め、首を振りながら太いビームで本体の周りを薙ぐ。
+## b：細いビームを、機体の方へ3回続けて撃つ。
+func _beam(neck: Neck, aim: float, dt: float) -> void:
+	var p: Dictionary = def.params
+	if neck.mode == &"beam_b":
+		neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 4.0))
+		neck.glow = 0.6
+		var times := [0.2, 0.8, 1.4]
+		if neck.step < 3 and neck.t >= times[neck.step]:
+			neck.step += 1
+			var from := _head_pos(neck)
+			manager.projectiles.fire_beam(from, (run_state.ship_pos - from).angle(), float(p.beam_len), 14.0, 0.45, 0.25,
+				float(p.beam_dmg) * 0.7)
+		if neck.t >= 2.2:
+			_end(neck)
+		return
+	var charge := 1.0
+	var sweep := 1.6
+	if neck.t < charge:
+		# 首を高く持ち上げて光を溜める
+		neck.length = move_toward(neck.length, float(p.neck_rest) * 1.25, float(p.neck_rest) * dt)
+		neck.angle = lerp_angle(neck.angle, aim - 1.1, minf(1.0, dt * 3.0))
+		neck.glow = neck.t / charge
+		return
+	if neck.hazard < 0:
+		neck.step = 0
+		neck.hazard = manager.projectiles.fire_beam(_head_pos(neck), neck.angle, float(p.beam_len), 40.0, 0.0, sweep,
+			float(p.beam_dmg))
+		manager.projectiles.attach_hazard(neck.hazard, neck.row)
+	neck.angle += 2.2 / sweep * dt
+	neck.glow = 1.0
+	if neck.hazard >= 0:
+		manager.projectiles.move_hazard(neck.hazard, _head_pos(neck), neck.angle)
+	if neck.t >= charge + sweep:
+		_release_attack(neck)
+		_end(neck)
+
+## ホーミング弾の首。a：ホーミング弾を4発吐き出す。b：自分の周りに弾を輪のように浮かべ、少しして全部を外へ放つ。
+func _homing(neck: Neck, aim: float, dt: float) -> void:
+	var p: Dictionary = def.params
+	neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 3.0))
+	neck.glow = minf(1.0, neck.t / 0.5)
+	if neck.t < 0.5:
+		return
+	if neck.mode == &"homing_a":
+		for k in 4:
+			manager.projectiles.fire_enemy(neck.row, aim + (k - 1.5) * 0.35, float(p.missile_speed), &"missile",
+				{"bullet_dmg": float(p.missile_dmg), "missile_turn": 2.2})
+	else:
+		manager.projectiles.fire_ring_hold(neck.row, 12, 70.0, 0.9, float(p.ring_speed), float(p.missile_dmg))
+	_end(neck)
 
 ## 首の攻撃の後片付け（頭が落ちたとき）。
 func _release_attack(neck: Neck) -> void:
@@ -260,9 +420,14 @@ func _release_attack(neck: Neck) -> void:
 		neck.hazard = -1
 	neck.glow = 0.0
 
-## むき出しの不死の首の攻撃。
-func _immortal_attack(_dt: float) -> void:
-	pass
+## むき出しの不死の首：周りへ短い衝撃を出して暴れる。
+func _immortal_attack(dt: float) -> void:
+	var p: Dictionary = def.params
+	_shock_t -= dt
+	if _shock_t <= 0.0:
+		_shock_t = 0.9
+		manager.projectiles.fire_wave(table.pos[immortal_row], 0.0, PI, float(p.shock_radius), 700.0, 24.0, 0.0,
+			float(p.bite_dmg) * 0.6, 0.0, 0.0, Color("#ffd27a"))
 
 # ── 見た目 ────────────────────────────────────────────────────────
 

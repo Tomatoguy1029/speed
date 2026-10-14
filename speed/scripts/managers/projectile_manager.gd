@@ -59,6 +59,8 @@ var hostile_kind := PackedByteArray()
 var hostile_gap := PackedFloat32Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は止まり、触れると砕けて被弾しない）
 var hostile_stone := PackedFloat32Array()
+## 浮かんで待つ残り時間（その間は動かないが、触れると被弾する）
+var hostile_wait := PackedFloat32Array()
 var hostile_slots: RowSlots
 var _hostile_updating := false
 var _hostile_clear_pending := false
@@ -300,6 +302,14 @@ func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := 
 		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": pos, "kind": kind})
 
+## 敵（行 i）の周りに弾を輪のように n 発浮かべ、wait 世界秒のあと全部を外へ放つ（うみへび座のホーミング弾の首）。
+func fire_ring_hold(i: int, n: int, radius: float, wait: float, speed: float, dmg: float) -> void:
+	var c := combat.enemies.table.pos[i]
+	for k in n:
+		var u := Vector2.from_angle(TAU * k / float(n))
+		var h := _add_hostile(c + u * radius, u * speed, speed, 8.0, 4.0 + wait, dmg, 0.0, 0.0, HostileKind.BULLET)
+		hostile_wait[h] = wait
+
 ## からす座の塊を投げる。大きさ r とダメージ dmg は集めた残骸の数で決まる。
 func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void:
 	var t := combat.enemies.table
@@ -322,6 +332,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_kind[i] = kind
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
+	hostile_wait[i] = 0.0
 	return i
 
 ## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
@@ -339,6 +350,8 @@ func _update_hostile(dt: float) -> void:
 	var body_move := field.body_speed_max * dt
 	var ship_pos := state.ship_pos
 	var aim := state.enemy_aim
+	var vc := state.view_center
+	var keep := state.view_half + Vector2(400, 400)
 	_hostile_updating = true
 	var i := 0
 	while i < hostile_alive.size():
@@ -360,6 +373,9 @@ func _update_hostile(dt: float) -> void:
 			i += 1
 			continue
 		var vel := hostile_vel[i]
+		if hostile_wait[i] > 0.0:
+			hostile_wait[i] -= dt
+			vel = Vector2.ZERO
 		var speed := hostile_speed[i]
 		var kind := hostile_kind[i]
 		if kind == HostileKind.MISSILE:
@@ -370,6 +386,10 @@ func _update_hostile(dt: float) -> void:
 			hostile_vel[i] = vel
 		var to := from + vel * dt
 		life -= dt
+		# 画面の外で、画面から離れていく弾（ホーミングしない弾）は、もう当たらないので消す
+		var rel := to - vc
+		if kind == HostileKind.BULLET and (absf(rel.x) > keep.x or absf(rel.y) > keep.y) and rel.dot(vel) > 0.0:
+			life = 0.0
 		var r := hostile_r[i]
 		# 敵の弾は等速。天体の表面までの余裕が、この更新の弾と天体の移動量より大きい間は判定を省く。
 		var step := speed * dt

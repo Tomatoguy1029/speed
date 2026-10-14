@@ -39,6 +39,14 @@ var _spawn_acc := 0.0
 var _wave_t := 0.0
 var _edge_counts := [0, 0, 0, 0]
 var _phase_id: StringName = &""
+## 画面から遠い敵の判断を間引く回数（LOD 回に1回、まとめた時間で判断する。移動は毎回）と、更新の通し番号
+const LOD := 3
+var _lod := 0
+## 1回の更新の中で何度も読む値（更新の始めに読む）
+var _aim := Vector2.ZERO
+var _vc := Vector2.ZERO
+var _vh := Vector2.ZERO
+var _face_move := 0.0
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -124,7 +132,7 @@ func parts_alive(i: int) -> int:
 	var parts := table.parts[i]
 	var n := 0
 	for k in range(0, parts.size(), 2):
-		if is_same(parts[k], parts[k + 1]) and table.dead[parts[k]] == 0:
+		if self.is_same(parts[k], parts[k + 1]) and table.dead[parts[k]] == 0:
 			n += 1
 	return n
 
@@ -350,6 +358,11 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
 	_update_aim(world_dt)
+	_lod += 1
+	_aim = state.enemy_aim
+	_vc = state.view_center
+	_vh = state.view_half
+	_face_move = cfg.enemy_face_move
 	_tick_chase(world_dt)
 	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE,
 			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
@@ -391,6 +404,7 @@ func _tick_chase(dt: float) -> void:
 	var now := state.world_time
 	var body_move := field.body_speed_max
 	var stone := t.stone
+	var lod_lim := vh * 1.25 + Vector2(300, 300)
 	for i in beh_rows[EnemyTable.Beh.CHASE]:
 		if dead[i] != 0:
 			continue
@@ -405,6 +419,13 @@ func _tick_chase(dt: float) -> void:
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
+		var cdt := dt
+		var rel := from - vc
+		if absf(rel.x) > lod_lim.x or absf(rel.y) > lod_lim.y:
+			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
+				pos[i] = from + vel[i] * dt
+				continue
+			cdt = dt * LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
@@ -421,7 +442,7 @@ func _tick_chase(dt: float) -> void:
 			var dist := d.length()
 			if dist < 0.001:
 				dist = 1.0
-			var k := minf(1.0, accel[i] * dt)
+			var k := minf(1.0, accel[i] * cdt)
 			var v := vel[i]
 			v += (d * (speed[i] / dist) - v) * k
 			vel[i] = v
@@ -430,7 +451,7 @@ func _tick_chase(dt: float) -> void:
 			var face := v.normalized() * w + (aim - from).normalized() * (1.0 - w)
 			if face.length_squared() > 0.0025:
 				var f := facing[i]
-				var turn_max := turn[i] * dt
+				var turn_max := turn[i] * cdt
 				facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
@@ -451,6 +472,8 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var knock_t := t.knock_t
 	var r := t.r
 	var stone := t.stone
+	var vc := state.view_center
+	var lim := state.view_half * 1.25 + Vector2(300, 300)
 	for i in beh_rows[b]:
 		if dead[i] != 0:
 			continue
@@ -465,97 +488,110 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
+		# 画面から遠い敵は、LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
+		var bdt := dt
+		var rel := from - vc
+		if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
+			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
+				pos[i] = from + vel[i] * dt
+				continue
+			bdt = dt * LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
 			match b:
 				EnemyTable.Beh.DASH:
-					_dash(i, dt)
+					_dash(i, bdt)
 				EnemyTable.Beh.SPLIT:
-					_chase(i, dt)
-					_split(i, dt)
+					_chase(i, bdt)
+					_split(i, bdt)
 				EnemyTable.Beh.GUNNER:
-					_keep_distance(i, dt)
-					if _gun_timer(i, dt):
+					_keep_distance(i, bdt)
+					if _gun_timer(i, bdt):
 						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), t.def[i].params.bullet_speed, &"bullet")
 				EnemyTable.Beh.MISSILE:
-					_keep_distance(i, dt)
-					if _gun_timer(i, dt):
+					_keep_distance(i, bdt)
+					if _gun_timer(i, bdt):
 						projectiles.fire_enemy(i, t.facing[i], t.def[i].params.missile_speed, &"missile")
 				EnemyTable.Beh.BATTLESHIP:
-					_chase(i, dt)
-					if _gun_timer(i, dt):
+					_chase(i, bdt)
+					if _gun_timer(i, bdt):
 						fire_volley(i)
 				EnemyTable.Beh.DRIFT:
-					t.facing[i] += t.spin[i] * dt
+					t.facing[i] += t.spin[i] * bdt
+					# 時間で消える漂流物（うみへび座の瓦礫など）。吐き出された勢いは少しずつ落ちる
+					if t.def[i].params.has("life"):
+						vel[i] *= maxf(0.0, 1.0 - 1.5 * bdt)
+						if t.age[i] > float(t.def[i].params.life):
+							mark_dead(i)
 				EnemyTable.Beh.ROCKET:
-					_rocket(i, dt)
+					_rocket(i, bdt)
 				EnemyTable.Beh.BOMBER:
-					_bomber(i, dt)
+					_bomber(i, bdt)
 				EnemyTable.Beh.BEAMER:
 					if t.mode[i] == EnemyTable.Mode.MOVE:
-						_keep_distance(i, dt)
+						_keep_distance(i, bdt)
 					else:
-						_hold(i, dt)
-					_beamer(i, dt)
+						_hold(i, bdt)
+					_beamer(i, bdt)
 				EnemyTable.Beh.PULSER:
 					if t.mode[i] == EnemyTable.Mode.MOVE:
-						_keep_distance(i, dt)
+						_keep_distance(i, bdt)
 					else:
-						_hold(i, dt)
-					_pulser(i, dt)
+						_hold(i, bdt)
+					_pulser(i, bdt)
 				EnemyTable.Beh.PUMP:
-					_pump(i, dt)
+					_pump(i, bdt)
 				EnemyTable.Beh.SNIPER:
-					_keep_distance(i, dt)
-					if _gun_timer(i, dt):
+					_keep_distance(i, bdt)
+					if _gun_timer(i, bdt):
 						var sp: Dictionary = t.def[i].params
 						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), sp.bullet_speed, &"bullet")
 				EnemyTable.Beh.SHIELD:
-					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
-					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], dt)
+					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], bdt)
+					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], bdt)
 				EnemyTable.Beh.RULER:
-					_keep_distance(i, dt)
-					_ruler(i, dt)
+					_keep_distance(i, bdt)
+					_ruler(i, bdt)
 				EnemyTable.Beh.CLOCK:
-					_chase(i, dt)
-					_clock(i, dt)
+					_chase(i, bdt)
+					_clock(i, bdt)
 				EnemyTable.Beh.LYNX:
-					_lynx(i, dt)
+					_lynx(i, bdt)
 				EnemyTable.Beh.CROW:
-					_keep_distance(i, dt)
-					_crow(i, dt)
+					_keep_distance(i, bdt)
+					_crow(i, bdt)
 				EnemyTable.Beh.RETICLE:
-					_keep_distance(i, dt)
-					_reticle(i, dt)
+					_keep_distance(i, bdt)
+					_reticle(i, bdt)
 				EnemyTable.Beh.TRIANGLE:
-					_chase(i, dt)
-					_triangle(i, dt)
+					_chase(i, bdt)
+					_triangle(i, bdt)
 				EnemyTable.Beh.PART:
 					# 位置は親が決める。親が倒れたら一緒に消える
-					if not is_same(t.parent[i], t.parent_id[i]) or t.dead[t.parent[i]] != 0:
+					if not self.is_same(t.parent[i], t.parent_id[i]) or t.dead[t.parent[i]] != 0:
 						mark_dead(i)
 					vel[i] = Vector2.ZERO
 				EnemyTable.Beh.PHOENIX:
-					_phoenix(i, dt)
+					_phoenix(i, bdt)
 				EnemyTable.Beh.CRAB:
-					_crab(i, dt)
+					_crab(i, bdt)
 				EnemyTable.Beh.MARLIN:
-					_marlin(i, dt)
+					_marlin(i, bdt)
 				EnemyTable.Beh.AQUARIUS:
-					_aquarius(i, dt)
+					_aquarius(i, bdt)
 				EnemyTable.Beh.AURIGA:
-					_drive(i, dt)
-					_auriga(i, dt)
+					_drive(i, bdt)
+					_auriga(i, bdt)
 				EnemyTable.Beh.CORONA:
-					_chase(i, dt)
-					_corona(i, dt)
+					_chase(i, bdt)
+					_corona(i, bdt)
 				EnemyTable.Beh.CEPHEUS:
-					_keep_distance(i, dt)
-					_cepheus(i, dt)
+					_keep_distance(i, bdt)
+					_cepheus(i, bdt)
 				EnemyTable.Beh.AQUILA:
-					_drive(i, dt)
-					_aquila(i, dt)
+					_drive(i, bdt)
+					_aquila(i, bdt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -639,19 +675,39 @@ func _turn_moving(i: int, rate: float, dt: float) -> void:
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
 func _chase(i: int, dt: float) -> void:
 	var t := table
-	var aim := state.enemy_aim
-	var cycle := fmod(t.age[i] + t.roam_phase[i], cfg.enemy_approach_cycle)
-	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / cfg.enemy_approach_blend,
-		(cfg.enemy_approach_cycle - cycle) / cfg.enemy_approach_blend), 0.0, 1.0)
+	var aim := _aim
+	var a := t.age[i]
+	var cycle_len := cfg.enemy_approach_cycle
+	var blend := cfg.enemy_approach_blend
+	var cycle := fmod(a + t.roam_phase[i], cycle_len)
+	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
 	var target := aim
 	if roam > 0.0:
-		var ang := t.roam_angle[i] + t.age[i] * cfg.enemy_roam_turn
-		var u := Vector2(cos(ang), sin(ang))
-		var edge := t.roam_radius[i] / maxf(absf(u.x), absf(u.y))
-		var roam_target := state.view_center + Vector2(u.x * edge * state.view_half.x, u.y * edge * state.view_half.y)
-		target = aim + (roam_target - aim) * roam
-	_steer_to(i, target, t.speed[i], t.accel[i], dt)
-	_turn_moving(i, t.turn[i], dt)
+		var ang := t.roam_angle[i] + a * cfg.enemy_roam_turn
+		var ux := cos(ang)
+		var uy := sin(ang)
+		var edge := t.roam_radius[i] / maxf(absf(ux), absf(uy))
+		target = aim + (Vector2(_vc.x + ux * edge * _vh.x, _vc.y + uy * edge * _vh.y) - aim) * roam
+	_move_to(i, target, t.speed[i], t.accel[i], t.turn[i], dt)
+
+## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
+## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。
+func _move_to(i: int, target: Vector2, speed: float, accel: float, turn: float, dt: float) -> void:
+	var t := table
+	var from := t.pos[i]
+	var d := target - from
+	var dist := d.length()
+	if dist < 0.001:
+		dist = 1.0
+	var v := t.vel[i]
+	v += (d * (speed / dist) - v) * minf(1.0, accel * dt)
+	t.vel[i] = v
+	var w := _face_move * minf(1.0, v.length() / maxf(t.speed[i], 1.0))
+	var face := v.normalized() * w + (_aim - from).normalized() * (1.0 - w)
+	if face.length_squared() > 0.0025:
+		var f := t.facing[i]
+		var turn_max := turn * dt
+		t.facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 
 func _dash(i: int, dt: float) -> void:
 	var t := table
@@ -696,21 +752,22 @@ func _split(i: int, dt: float) -> void:
 ## 射撃型・ミサイル艇：機体の周りの keep の距離を保ち、回り込む。
 func _keep_distance(i: int, dt: float) -> void:
 	var t := table
-	var aim := state.enemy_aim
+	var aim := _aim
 	var d := t.pos[i] - aim
 	var dist := d.length()
 	if dist < 0.001:
 		dist = 1.0
 	var u := d / dist
 	var side := 1.0 if t.id[i] % 2 == 1 else -1.0
-	var keep: float = t.def[i].params.keep
+	var def := t.def[i]
+	var keep: float = def.params.keep
 	var target := aim + u * keep + Vector2(-u.y, u.x) * 200.0 * side
-	_steer_to(i, target, t.speed[i], t.def[i].accel, dt)
-	# 撃つ前の予告の間は機体の方を向く
 	if t.charge[i] > 0.0:
+		# 撃つ前の予告の間は機体の方を向く
+		_steer_to(i, target, t.speed[i], def.accel, dt)
 		_turn_toward(i, (aim - t.pos[i]).angle(), 3.0, dt)
 	else:
-		_turn_moving(i, 3.0, dt)
+		_move_to(i, target, t.speed[i], def.accel, 3.0, dt)
 
 ## 発射までの時間を進める。予告の間は charge が 0〜1 で増える。撃つときに true。
 func _gun_timer(i: int, dt: float) -> bool:
@@ -984,7 +1041,7 @@ func _triangle(i: int, dt: float) -> void:
 		var j := parts[k]
 		var a := t.facing[i] + TAU * (k / 2) / 3.0
 		var at := t.pos[i] + Vector2.from_angle(a) * float(p.span)
-		if is_same(j, parts[k + 1]) and t.dead[j] == 0:
+		if self.is_same(j, parts[k + 1]) and t.dead[j] == 0:
 			t.pos[j] = at
 		verts.append(at)
 	var links := t.links[i]
@@ -1181,7 +1238,7 @@ func _corona(i: int, dt: float) -> void:
 	var n := parts.size() / 2
 	for k in n:
 		var j := parts[k * 2]
-		if not is_same(j, parts[k * 2 + 1]) or t.dead[j] != 0:
+		if not self.is_same(j, parts[k * 2 + 1]) or t.dead[j] != 0:
 			continue
 		t.pos[j] = t.pos[i] + Vector2.from_angle(t.facing[i] + TAU * k / float(n)) * ring
 		if t.mode[i] == EnemyTable.Mode.DASH:
@@ -1366,7 +1423,9 @@ func _survey() -> int:
 				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
-				_far_rows.append(i)
+				# 部位は親と一緒に動くので、離れても再配置しない
+				if table.parent[i] < 0:
+					_far_rows.append(i)
 				continue
 			alive_n += 1
 			var ax := absf(rel.x)

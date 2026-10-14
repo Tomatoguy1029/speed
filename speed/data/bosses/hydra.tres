@@ -25,5 +25,21 @@ params = {
 "expose_time": 4.0,
 "immortal_dmg": 0.12,
 "debris_dmg": 8.0,
-"attack_cd": 3.0
+"attack_cd": 3.0,
+"bite_reach": 520.0,
+"bite_radius": 75.0,
+"bite_dmg": 16.0,
+"vortex_radius": 300.0,
+"vortex_life": 3.5,
+"vortex_pull": 1800.0,
+"rubble_count": 6,
+"lump_speed": 520.0,
+"lump_r": 26.0,
+"lump_dmg": 16.0,
+"beam_len": 1400.0,
+"beam_dmg": 18.0,
+"missile_speed": 420.0,
+"missile_dmg": 10.0,
+"ring_speed": 380.0,
+"shock_radius": 240.0
 }

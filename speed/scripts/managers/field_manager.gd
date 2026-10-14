@@ -30,6 +30,9 @@ class Well:
 	var pos := Vector2.ZERO
 	var born := 0.0
 	var life := 3.0
+	## 現れたときの届く半径と、中心の引き寄せる加速
+	var radius := 0.0
+	var pull := 0.0
 
 ## 障害物1つ（惑星か月）
 class Body:
@@ -231,8 +234,8 @@ func _tick_wells(dt: float) -> void:
 	var t := enemies.table
 	for w in wells:
 		var k := 1.0 - (now - w.born) / w.life
-		var reach := cfg.gravity_radius * k
-		var pull := cfg.gravity_pull * k * dt
+		var reach := w.radius * k
+		var pull := w.pull * k * dt
 		if not fast:
 			state.ship_vel += _well_pull(w.pos, state.ship_pos, reach, pull)
 		for i in t.alive.size():
@@ -262,6 +265,18 @@ func spawn_well() -> void:
 			break
 	w.born = state.world_time
 	w.life = cfg.gravity_life
+	w.radius = cfg.gravity_radius
+	w.pull = cfg.gravity_pull
+	wells.append(w)
+
+## 位置 pos に、引き寄せる領域を1つ置く（うみへび座の渦の首の渦など）。重力と同じく、縮んで消える。
+func add_well(pos: Vector2, life: float, radius: float, pull: float) -> void:
+	var w := Well.new()
+	w.pos = pos
+	w.born = state.world_time
+	w.life = life
+	w.radius = radius
+	w.pull = pull
 	wells.append(w)
 
 # ── 彗星（仕様書 13.1） ─────────────────────────────────────────────

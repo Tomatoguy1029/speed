@@ -42,6 +42,8 @@ var _batches: Dictionary = {}
 var _shape_ids: Dictionary = {}
 var _camera: Camera2D
 var _font: Font
+## いつも飾りを描く敵の種類（type ID → true）
+var _always_marked: Dictionary = {}
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
 
@@ -130,6 +132,9 @@ func _build_batches() -> void:
 	# ほかの種類は、assets/pixel/<type ID>.png があればその絵で、なければ敵の定義の形（EnemyDef.shape）の
 	# 図形で描く。png を置けば絵に替わる
 	for def: EnemyDef in ConfigManager.enemies.values():
+		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
+		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow"]:
+			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
 		var b := InstanceBatch.new()
@@ -393,7 +398,7 @@ func _draw_field(c: CanvasItem) -> void:
 	# 重力：縮みながら渦を巻く
 	for w in f.wells:
 		var k := 1.0 - (state.world_time - w.born) / w.life
-		var reach := cfg.gravity_radius * k
+		var reach := w.radius * k
 		c.draw_circle(w.pos, reach, Color(0.35, 0.2, 0.6, 0.12))
 		for n in 3:
 			var rr := reach * fposmod(1.0 - state.world_time * 0.6 - n / 3.0, 1.0)
@@ -489,6 +494,14 @@ func _draw_enemies(c: CanvasItem) -> void:
 	var alive := t.alive
 	var dead := t.dead
 	var pos := t.pos
+	var elite := t.elite
+	var weak := t.weak_arc
+	var charge := t.charge
+	var landmark := t.landmark
+	var stone := t.stone
+	var radius := t.r
+	var hp := t.hp
+	var max_hp := t.max_hp
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
@@ -519,7 +532,10 @@ func _draw_enemies(c: CanvasItem) -> void:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
 			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
-		_draw_enemy_marks(c, t, i)
+		# 飾りのある敵だけ、飾りを描く
+		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
+				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type):
+			_draw_enemy_marks(c, t, i)
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
