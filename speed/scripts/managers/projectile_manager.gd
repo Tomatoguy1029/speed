@@ -141,6 +141,15 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 		opts.get("r", 5.0), dmg, opts.get("life", 0.9), false, opts.get("pierce_left", 0),
 		opts.get("color", Color("#ffe46b")), false, 250.0, 0.0, 0.0, -1)
 
+## 位置 pos から、攻撃する破片を count 個、全方向へ飛ばす（うみへび座の首の残骸など）。source_id の敵には当たらない。
+func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int) -> void:
+	for k in count:
+		var u := Vector2.from_angle(TAU * k / float(count) + state.rng.randf() * 0.4)
+		_add_friend(FriendKind.DEBRIS, &"hullDebris", pos + u * 10.0, u * speed * (0.8 + 0.3 * state.rng.randf()),
+			12.0, dmg, cfg.hull_debris_life, true, 0, color, true, cfg.hull_debris_knock, state.rng.randf() * TAU,
+			10.0 * (1.0 if k % 2 == 0 else -1.0), source_id)
+	state.emit(&"hull_scatter", {"pos": pos, "count": count})
+
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
 func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
 	var t := combat.enemies.table

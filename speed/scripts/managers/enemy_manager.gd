@@ -23,7 +23,8 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
 	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
-	&"guard": EnemyTable.Gate.GUARD, &"solid": EnemyTable.Gate.SOLID}
+	&"guard": EnemyTable.Gate.GUARD, &"solid": EnemyTable.Gate.SOLID,
+	&"ghost": EnemyTable.Gate.GHOST, &"immortal": EnemyTable.Gate.IMMORTAL}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -207,6 +208,7 @@ func _reset_row(i: int) -> void:
 	t.shell_rest[i] = 0.0
 	t.stone[i] = 0.0
 	t.landmark[i] = 0
+	t.fire_hit[i] = -1e9
 	t.parent[i] = -1
 	t.parent_id[i] = -1
 	t.parts[i] = PackedInt32Array()
@@ -242,6 +244,12 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 		EnemyTable.Gate.MEMBRANE:
 			# 膜が消えている（頂点の星が欠けている）間だけ、中の核を倒せる
 			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.RECOVER else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.GHOST:
+			# うみへび座の本体：体当たりも武器もすり抜ける（ダメージなし、弾かれない）
+			return EnemyTable.GateResult.PASS
+		EnemyTable.Gate.IMMORTAL:
+			# うみへび座の不死の首：貫いたときだけ。火では焼けない
+			return EnemyTable.GateResult.ALLOW if cause == &"ram" else EnemyTable.GateResult.PASS
 		EnemyTable.Gate.SOLID:
 			# 回る丸鋸：攻撃では壊れない（体当たりで飛ばす扱いは CombatManager）
 			return EnemyTable.GateResult.PASS

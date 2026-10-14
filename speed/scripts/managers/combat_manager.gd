@@ -244,6 +244,8 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if cause != &"ram" and cause != &"bump" and enemies.gate_check(i, opts.get("impact", t.pos[i]),
 			opts.get("dir", Vector2.ZERO), cause, dmg) != EnemyTable.GateResult.ALLOW:
 		return
+	if cause == &"fire":
+		t.fire_hit[i] = state.world_time
 	var crit: bool = opts.get("crit", false)
 	if not opts.has("crit") and not opts.get("no_crit", false):
 		crit = state.rng.randf() < state.stats.crit_chance

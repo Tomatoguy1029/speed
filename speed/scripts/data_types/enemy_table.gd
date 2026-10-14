@@ -13,7 +13,7 @@ enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBE
 	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX,
 	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
-enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW, GUARD, SOLID }
+enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW, GUARD, SOLID, GHOST, IMMORTAL }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
 enum GateResult { ALLOW, PASS, BOUNCE }
 
@@ -93,6 +93,8 @@ var parent_id := PackedInt32Array()
 var parts: Array[PackedInt32Array] = []
 ## 1 なら目印の星を持つ敵（倒すと、ミニマップに英雄の星座への線が出る）
 var landmark := PackedByteArray()
+## 最後に火（ヘルクレス座の力）でダメージを受けた世界時刻
+var fire_hit := PackedFloat64Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は動かず、触れると砕ける）
 var stone := PackedFloat64Array()
 ## 殻の傷、殻が割れている残り時間、最後に攻撃が当たってからの時間（やまねこ座）

@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="BossDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"hydra"
+display_name = "うみへび座"
+scene_path = "res://scenes/bosses/hydra_boss.tscn"
+radius = 110.0
+hp = 2200.0
+armor = 14.0
+speed = 160.0
+accel = 0.8
+turn = 0.6
+xp = 150.0
+weak_arc = 0.0
+params = {
+"engage": 1100.0,
+"neck_rest": 230.0,
+"head_hp": 120.0,
+"head_share": 0.8,
+"regrow": 6.0,
+"regrow_combo": 0.25,
+"expose_time": 4.0,
+"immortal_dmg": 0.12,
+"debris_dmg": 8.0,
+"attack_cd": 3.0
+}

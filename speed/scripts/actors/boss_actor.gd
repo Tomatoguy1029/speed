@@ -9,6 +9,8 @@ var manager: BossManager
 ## 当たり判定の円の、敵の表での行番号
 var body := -1
 var def: BossDef
+## true なら、役者が本体を自分で描く（RenderManager はボスの行を描かない）
+var draws_self := false
 
 var run_state: RunState:
 	get: return manager.state

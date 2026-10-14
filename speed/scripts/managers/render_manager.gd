@@ -510,6 +510,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 			var rock_batch: InstanceBatch = _batches[rock_key]
 			rock_batch.add(p, t.facing[i], METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
+		if t.is_boss[i] != 0 and run.bosses.actor != null and run.bosses.actor.draws_self:
+			continue
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
