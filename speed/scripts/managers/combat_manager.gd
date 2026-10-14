@@ -157,10 +157,19 @@ func _pierce_keep(i: int) -> float:
 	var loss := (0.004 + r * 0.0006) if enemies.table.dead[i] != 0 else (0.1 + r * 0.002)
 	return 1.0 - minf(0.6, loss)
 
+## しし座の力が効いているときの、波動の帯の太さの倍率（効いていなければ 1）。
+func leo_width() -> float:
+	if state.hero_active_t <= 0.0 or state.hero_power != &"leo":
+		return 1.0
+	var def: HeroDef = ConfigManager.heroes.get(&"leo")
+	return float(def.params.get("width_mult", 1.0)) if def != null else 1.0
+
 ## なぞりの線から出る波動（仕様書 6.5）。帯から一度外れた敵には、もう一度当たる。
+## しし座の力が効いている間は帯が太くなり、帯に入った敵は体当たりと同じ扱いで、装甲に関係なく貫く（仕様書 8.1）。
 func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 	var t := enemies.table
-	var W := cfg.wave_radius
+	var leo := leo_width()
+	var W := cfg.wave_radius * leo
 	var length := p0.distance_to(p1)
 	var n := maxi(1, ceili(length / minf(W, 40.0)))
 	var dmg := attack_power() * cfg.wave_damage
@@ -179,7 +188,12 @@ func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 			run.wave_inside[id] = i
 			var d := t.pos[i] - p
 			var dist := d.length()
-			damage_enemy(i, dmg, {"cause": &"wave", "dir": d / dist if dist > 0.0 else Vector2.ZERO, "knock": 260.0, "impact": p})
+			var dir := d / dist if dist > 0.0 else Vector2.ZERO
+			if leo > 1.0:
+				if enemies.gate_check(i, p, (p1 - p0).normalized(), &"ram", attack_power()) == EnemyTable.GateResult.ALLOW:
+					damage_enemy(i, attack_power(), {"cause": &"ram", "dir": dir, "knock": 260.0, "impact": p})
+			else:
+				damage_enemy(i, dmg, {"cause": &"wave", "dir": dir, "knock": 260.0, "impact": p})
 			if state.phase != RunState.Phase.PLAY:
 				return
 		run.wave_acc += length / n

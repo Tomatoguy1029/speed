@@ -7,6 +7,13 @@ extends RunSystem
 
 var enemies: EnemyManager
 var field: FieldManager
+var combat: CombatManager
+
+## ヘルクレス座の火の隕石：落ちてくる途中（位置と、落ちるまでの残り時間）と、燃えている跡（位置と残り時間）
+var falls: Array[Vector3] = []
+var burns: Array[Vector3] = []
+var _fire_t := 0.0
+var _burn_tick := 0.0
 
 ## 今フィールドにある英雄の星座（無ければ null）
 var hero: HeroDef
@@ -27,6 +34,8 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
 	hero = null
 	_next_t = -1.0
+	falls.clear()
+	burns.clear()
 	_prev_pos = state.ship_pos
 	if state.endless:
 		_place(_random_hero(&""))
@@ -71,6 +80,7 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		_next_t -= real_dt
 		if _next_t < 0.0:
 			_place(_random_hero(state.hero_power))
+	_tick_hercules(real_dt)
 	var from := _prev_pos
 	_prev_pos = state.ship_pos
 	if hero == null or not is_captive():
@@ -156,6 +166,72 @@ func activate() -> void:
 	state.hero_cd = def.cooldown
 	state.hero_active_t = def.duration
 	state.emit(&"hero_power", {"id": def.id, "pos": state.ship_pos})
+
+# ── ヘルクレス座：火の隕石（仕様書 8.1） ─────────────────────────────
+
+## 効いている間、間隔ごとに機体の周りへ火の隕石を落とす。落ちた所で爆発し、跡はしばらく燃える。
+func _tick_hercules(dt: float) -> void:
+	var def: HeroDef = ConfigManager.heroes.get(&"hercules")
+	if def == null:
+		return
+	var p := def.params
+	if active_power() == &"hercules":
+		_fire_t -= dt
+		if _fire_t <= 0.0:
+			_fire_t = float(p.interval)
+			var at := _fire_target()
+			falls.append(Vector3(at.x, at.y, float(p.fall_time)))
+	var dmg := combat.attack_power() * float(p.power)
+	for k in range(falls.size() - 1, -1, -1):
+		var f := falls[k]
+		f.z -= dt
+		if f.z > 0.0:
+			falls[k] = f
+			continue
+		falls.remove_at(k)
+		var at := Vector2(f.x, f.y)
+		_burn_enemies(at, float(p.radius), dmg)
+		state.emit(&"explode", {"pos": at, "radius": float(p.radius), "cause": &"fire", "color": Color("#ff7a2e"), "life": 0.45})
+		burns.append(Vector3(at.x, at.y, float(p.burn_time)))
+	_burn_tick -= dt
+	var tick := _burn_tick <= 0.0
+	if tick:
+		_burn_tick = 0.25
+	for k in range(burns.size() - 1, -1, -1):
+		var b := burns[k]
+		b.z -= dt
+		if b.z <= 0.0:
+			burns.remove_at(k)
+			continue
+		burns[k] = b
+		if tick:
+			_burn_enemies(Vector2(b.x, b.y), float(p.radius) * 0.8, dmg * float(p.burn_power))
+
+## 火の隕石を落とす位置：機体の周り（画面の半分くらいの範囲）のランダムな位置。敵がいれば、その位置に寄せる。
+func _fire_target() -> Vector2:
+	var half := state.view_half * 0.5
+	var rows := PackedInt32Array()
+	combat.grid.query_radius(state.ship_pos, half.length(), cfg.max_enemy_radius, rows)
+	var t := enemies.table
+	for attempt in 6:
+		if rows.is_empty():
+			break
+		var i := rows[state.rng.randi_range(0, rows.size() - 1)]
+		if t.dead[i] == 0 and t.meteor_index[i] < 0:
+			return t.pos[i] + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * 40.0
+	return state.ship_pos + Vector2(state.rng.randf_range(-half.x, half.x), state.rng.randf_range(-half.y, half.y))
+
+## 範囲の敵を、装甲に関係なく焼く。
+func _burn_enemies(center: Vector2, radius: float, dmg: float) -> void:
+	var rows := PackedInt32Array()
+	combat.grid.query_radius(center, radius, cfg.max_enemy_radius, rows)
+	var t := enemies.table
+	for i in rows:
+		if t.dead[i] == 0 and t.meteor_index[i] < 0 and t.pos[i].distance_to(center) <= radius + t.r[i]:
+			combat.damage_enemy(i, dmg, {"cause": &"fire", "no_crit": true, "knock": 80.0,
+				"dir": (t.pos[i] - center).normalized(), "impact": center})
+			if state.phase != RunState.Phase.PLAY:
+				return
 
 ## 効いている力（無ければ空）。
 func active_power() -> StringName:

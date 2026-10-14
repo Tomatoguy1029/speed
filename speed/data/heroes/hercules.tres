@@ -13,7 +13,9 @@ cooldown = 50.0
 duration = 10.0
 params = {
 "interval": 0.35,
+"fall_time": 0.6,
 "radius": 110.0,
+"power": 3.0,
 "burn_time": 3.0,
-"power": 3.0
+"burn_power": 0.3
 }
