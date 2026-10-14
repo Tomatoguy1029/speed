@@ -29,7 +29,7 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.settings = settings
-	await _test_initial_hydra_selection()
+	await _test_debug_stage_selection()
 	await _start(4)
 	_test_head_world_steps()
 	await _close()
@@ -72,33 +72,36 @@ func _ready() -> void:
 	print("[acceptance] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
 
-func _test_initial_hydra_selection() -> void:
-	_check(SaveManager.is_stage_unlocked(1) and SaveManager.is_stage_unlocked(4), "ステージ選択：新規セーブでいっかくじゅう座とうみへび座を選べる")
-	_check(not SaveManager.is_stage_unlocked(2) and not SaveManager.is_stage_unlocked(3) and not SaveManager.is_stage_unlocked(5), "ステージ選択：ほかのステージはクリアで解放する")
+func _test_debug_stage_selection() -> void:
+	_check(OS.is_debug_build(), "ステージ選択：開発版で確認する")
+	_check(SaveManager.is_stage_unlocked(1), "ステージ選択：通常の進行では最初にステージ1が開く")
+	for stage in range(2, ConfigManager.stage_count() + 1):
+		_check(not SaveManager.is_stage_unlocked(stage), "ステージ選択：ステージ%dのクリア記録は未解放のまま" % stage)
 	_check(not SaveManager.is_stage_unlocked(0) and not SaveManager.is_stage_unlocked(6), "ステージ選択：存在しないステージは選べない")
-	_check(SaveManager.data.cleared_stage == 0, "ステージ選択：選べるようにするためにクリア記録を書き換えない")
 	SaveManager.data = SaveManager._migrate({"version": 1, "cleared_stage": 0, "coins": 123}, SaveManager.default_data())
-	_check(SaveManager.is_stage_unlocked(4) and SaveManager.coins() == 123, "ステージ選択：既存の未クリアセーブでも記録を保ってうみへび座を選べる")
-	SaveManager.data = SaveManager.default_data()
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
 	add_child(app)
 	await get_tree().process_frame
-	GameManager.goto(GameManager.Screen.STAGE_SELECT)
-	await get_tree().process_frame
-	var buttons: Array = app._current.get_node("%Content").get_children().filter(func(n): return n is Button)
-	var hydra_button: Button = buttons[3]
-	_check(not hydra_button.disabled and hydra_button.text.contains(ConfigManager.stage(4).get_display_name()), "ステージ選択：未クリアでもうみへび座の名前と有効なボタンを表示する")
-	await _shot("stage_select_initial")
-	if not hydra_button.disabled:
-		hydra_button.pressed.emit()
+	for stage in range(1, ConfigManager.stage_count() + 1):
+		GameManager.goto(GameManager.Screen.STAGE_SELECT)
 		await get_tree().process_frame
-		var initial_run: RunManager = app._current.get_node("Managers/RunManager")
-		initial_run.set_physics_process(false)
-		_check(GameManager.run_stage == 4 and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：うみへび座を開始すると0秒の最初の武器選択になる")
-		await _shot("hydra_initial_weapon")
-		initial_run.command(&"choose_card", {"index": 0})
-		_check(initial_run.state.phase == RunState.Phase.PLAY and ConfigManager.stage(GameManager.run_stage).boss_id == &"hydra", "ステージ選択：最初の武器を選ぶとうみへび座の通常ランを開始する")
-		GameManager.abort_run()
+		var buttons: Array = app._current.get_node("%Content").get_children().filter(func(n): return n is Button)
+		var stage_button: Button = buttons[stage - 1]
+		_check(not stage_button.disabled and stage_button.text.contains(ConfigManager.stage(stage).get_display_name()), "ステージ選択：未クリアの開発版でステージ%dを選べる" % stage)
+		_check(buttons[-1].disabled, "ステージ選択：未実装のエンドレスは閉じている")
+		if stage == 1:
+			await _shot("debug_stage_select")
+		if not stage_button.disabled:
+			stage_button.pressed.emit()
+			await get_tree().process_frame
+			var initial_run: RunManager = app._current.get_node("Managers/RunManager")
+			initial_run.set_physics_process(false)
+			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
+			await _shot("debug_stage_%d_start" % stage)
+			initial_run.command(&"choose_card", {"index": 0})
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage == 4 else &"provisional"), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			GameManager.abort_run()
+	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
 	app.queue_free()
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -813,7 +816,7 @@ func _test_app_flow() -> void:
 		var buttons: Array = app._current.get_node("%Content").get_children().filter(func(n): return n is Button)
 		_check(not buttons[stage - 1].disabled, "通し確認：ステージ%dが選択できる" % stage)
 		if stage == 1:
-			_check(buttons[1].disabled, "通し確認：未クリアの先のステージは閉じている")
+			_check(not buttons[1].disabled, "通し確認：開発版では未クリアの先のステージも選べる")
 		buttons[stage - 1].pressed.emit()
 		scene = app._current
 		run = scene.get_node("Managers/RunManager")
