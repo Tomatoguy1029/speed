@@ -42,10 +42,6 @@ const PARAMS_DOCS := {
 ## 機体の方を向く速さ。
 ## 単位：ラジアン/秒
 @export var turn: float
-## 接触ダメージ
-## 機体が触れたときに受けるダメージ。
-## 単位：HP
-@export var contact: float
 ## 経験値
 ## 倒したときに落とす経験値。
 ## 単位：経験値

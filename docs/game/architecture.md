@@ -262,8 +262,8 @@ Main (Node)
 | `hp` | 全部 | HP |
 | `max_hp` | 全部 | 最大 HP |
 | `armor` | 全部 | 装甲 |
-| `contact` | 全部 | 接触ダメージ |
 | `xp` | 全部 | 経験値 |
+| `gate` | 特殊な倒し方を持つ敵 | 倒し方の種類（`EnemyTable.Gate`） |
 | `weak_arc` | `armored`・`battleship`・ボス | 背面の弱点の半角 |
 | `color` | 全部 | 色（撃破の演出・破片） |
 | `hit_cd` | 全部 | 同じ敵に続けて当たらない時間 |
@@ -322,7 +322,7 @@ Main (Node)
 |---|---|---|
 | `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](catalog/weapons.md) |
 | `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](catalog/traits.md) |
-| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、接触ダメージ、経験値、行動の種類と値 | [enemies.md](catalog/enemies.md) |
+| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値 | [enemies.md](catalog/enemies.md) |
 | `PhaseDef` | 開始と終了、敵の数、敵レベル、補充の速さ、出現の重み、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
 | `StageDef` | 星系、フィールドの配置、仕掛けの領域、時間帯の表、中ボス、伝説のモジュール | 仕様書 2〜22 |

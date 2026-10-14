@@ -13,7 +13,6 @@ armor = 14.0
 speed = 100.0
 accel = 0.8
 turn = 0.7
-contact = 28.0
 xp = 100.0
 weak_arc = 0.7
 params = {

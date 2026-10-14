@@ -153,10 +153,10 @@ extends Resource
 ## 惑星・月にぶつかったときの跳ね返りの強さ。0 で跳ね返らず止まる、1 で同じ速さで跳ね返る。
 ## 単位：割合（0〜1）
 @export var crash_restitution: float
-## 地形の衝突ダメージ
-## 惑星・月にぶつかったとき、ぶつかる速さが 200 を超えた分に掛けてダメージにする。
-## 単位：HP/速さ
-@export var crash_damage: float
+## 普段の接触の攻撃
+## 普段の速さで敵に触れたとき、攻撃力にこの割合を掛けたダメージを与える。
+## 単位：倍
+@export var touch_damage: float
 
 ## 機体の基本の能力、マウス・タッチでの動かし方、速さの落ち方
 @export_group("機体")

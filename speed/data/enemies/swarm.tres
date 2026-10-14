@@ -12,7 +12,6 @@ armor = 1.2
 speed = 200.0
 accel = 3.0
 turn = 4.0
-contact = 4.0
 xp = 0.6
 color = Color(0.6157, 0.9412, 1.0, 1)
 shape = &"dart"

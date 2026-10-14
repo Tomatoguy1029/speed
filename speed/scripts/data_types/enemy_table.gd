@@ -10,6 +10,10 @@ extends RefCounted
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
 enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT }
+## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
+enum Gate { NONE }
+## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
+enum GateResult { ALLOW, PASS, BOUNCE }
 
 # ── 共通：全部の行 ────────────────────────────────────────────────
 
@@ -36,10 +40,11 @@ var r := PackedFloat64Array()
 var hp := PackedFloat64Array()
 var max_hp := PackedFloat64Array()
 var armor := PackedFloat64Array()
-var contact := PackedFloat64Array()
 var xp := PackedFloat64Array()
 ## 背面の弱点の半角（0 なら弱点なし）
 var weak_arc := PackedFloat64Array()
+## 特殊な倒し方の種類（Gate）
+var gate := PackedByteArray()
 var color := PackedColorArray()
 ## 同じ敵に続けて当たらない時間、被弾の光、年齢
 var hit_cd := PackedFloat64Array()

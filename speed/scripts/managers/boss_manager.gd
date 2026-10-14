@@ -49,7 +49,7 @@ func spawn() -> void:
 	if p.length() > cfg.field_radius - 160.0:
 		p = p.normalized() * (cfg.field_radius - 160.0)
 	boss_row = enemies.spawn_boss(def.id, p, def.radius * cfg.character_scale, cfg.boss_hp * cfg.enemy_hp_mult,
-		cfg.boss_armor * cfg.enemy_armor_mult, def.contact, def.xp, def.speed, def.weak_arc,
+		cfg.boss_armor * cfg.enemy_armor_mult, def.xp, def.speed, def.weak_arc,
 		(state.ship_pos - p).angle(), Color("#ff526e"))
 	boss_id = enemies.table.id[boss_row]
 	var scene := load(def.scene_path) as PackedScene

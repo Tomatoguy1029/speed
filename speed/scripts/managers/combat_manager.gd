@@ -93,13 +93,20 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			_bump_meteor(i, hit_pos, R, dir)
 			continue
 		if not fast:
-			# 普段の接触：攻撃にならず、敵の接触ダメージを受ける
+			# 普段の接触：弱い攻撃になる。機体は被弾しない
 			t.hit_cd[i] = cfg.contact_cooldown
-			ship.damage(t.contact[i], 0.1, StringName("contact:" + String(t.type[i])))
+			damage_enemy(i, atk * cfg.touch_damage, {"cause": &"touch", "dir": dir, "no_crit": true})
 			if state.phase == RunState.Phase.PLAY:
 				build.on_electric_contact(i)
 			continue
-		if ignore_armor or can_pierce(atk, i, crit):
+		var gate := enemies.gate_check(i, hit_pos, dir, &"ram")
+		if gate == EnemyTable.GateResult.PASS:
+			# 特殊な倒し方の条件を満たさない：貫通するが倒れない
+			t.hit_cd[i] = cfg.contact_cooldown
+			if run != null:
+				run.inside[t.id[i]] = i
+			continue
+		if gate == EnemyTable.GateResult.ALLOW and (ignore_armor or can_pierce(atk, i, crit)):
 			var dmg := atk * (state.stats.crit_mult if crit else 1.0)
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
 			if crit:
@@ -133,11 +140,10 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		if state.ship_vel.length() < cfg.bounce_min_speed:
 			state.ship_vel = n * cfg.bounce_min_speed
 		state.ship_boost_t = 0.0
-		damage_enemy(i, atk * 0.25, {"crit": crit, "cause": &"bump", "dir": -n})
+		if gate == EnemyTable.GateResult.ALLOW:
+			damage_enemy(i, atk * 0.25, {"crit": crit, "cause": &"bump", "dir": -n})
 		t.hit_cd[i] = 0.25
-		# 隕石は固い障害物で、ぶつかっても被弾しない
-		if t.type[i] != &"meteor":
-			ship.damage(t.contact[i], 0.0, StringName("bump:" + String(t.type[i])))
+		# 弾かれるのは失敗で、被弾はしない
 		build.on_contact(i, hit_pos, dir)
 		state.emit(&"bounce", {"pos": state.ship_pos})
 		return true
@@ -185,6 +191,11 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var t := enemies.table
 	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY:
 		return
+	var cause: StringName = opts.get("cause", &"")
+	# 体当たりの通り抜けは collide_ship で扱う。ここでは、条件を満たさない攻撃のダメージを止める
+	if cause != &"ram" and cause != &"bump" and enemies.gate_check(i, opts.get("impact", t.pos[i]),
+			opts.get("dir", Vector2.ZERO), cause) != EnemyTable.GateResult.ALLOW:
+		return
 	var crit: bool = opts.get("crit", false)
 	if not opts.has("crit") and not opts.get("no_crit", false):
 		crit = state.rng.randf() < state.stats.crit_chance
@@ -199,7 +210,6 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		fresh = t.dash_fresh[i] != 0
 	t.hp[i] -= dmg
 	t.flash[i] = 0.12
-	var cause: StringName = opts.get("cause", &"")
 	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause})
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})

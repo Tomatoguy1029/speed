@@ -12,7 +12,6 @@ armor = 4.0
 speed = 60.0
 accel = 1.5
 turn = 1.5
-contact = 8.0
 xp = 2.0
 color = Color(0.6588, 1.0, 0.4784, 1)
 shape = &"blob"

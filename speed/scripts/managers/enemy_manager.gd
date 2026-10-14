@@ -13,6 +13,8 @@ var bosses: BossManager
 const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"split": EnemyTable.Beh.SPLIT,
 	&"gunner": EnemyTable.Beh.GUNNER, &"missile": EnemyTable.Beh.MISSILE,
 	&"battleship": EnemyTable.Beh.BATTLESHIP, &"drift": EnemyTable.Beh.DRIFT}
+## 特殊な倒し方（EnemyDef.gate）の名前と種類
+const GATE := {}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -66,7 +68,6 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
 	t.hp[i] = t.max_hp[i]
 	t.armor[i] = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
-	t.contact[i] = def.contact * (1.0 + 0.2 * (L - 1.0))
 	t.xp[i] = def.xp * z * (1.0 + 0.5 * (L - 1.0)) * (4.0 if elite else 1.0)
 	t.speed[i] = def.speed * (1.0 + 0.04 * (L - 1.0))
 	t.pos[i] = pos
@@ -75,6 +76,7 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	t.spin[i] = opts.get("spin", 0.0)
 	t.hit_cd[i] = opts.get("hit_cd", 0.0)
 	t.weak_arc[i] = def.weak_arc
+	t.gate[i] = GATE.get(def.gate, EnemyTable.Gate.NONE)
 	t.color[i] = def.color
 	var fire_interval: float = def.params.get("fire_interval", 0.0)
 	t.fire_t[i] = fire_interval * (0.5 + state.rng.randf() * 0.5)
@@ -91,7 +93,7 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	return i
 
 ## ボスの当たり判定の行を出し、その行番号を返す。ボスの行動は BossActor が動かす。
-func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: float, contact: float,
+func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: float,
 		xp: float, speed: float, weak_arc: float, facing: float, color: Color) -> int:
 	var i := slots.take()
 	_reset_row(i)
@@ -103,7 +105,6 @@ func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: 
 	t.max_hp[i] = max_hp
 	t.hp[i] = max_hp
 	t.armor[i] = armor
-	t.contact[i] = contact
 	t.xp[i] = xp
 	t.speed[i] = speed
 	t.weak_arc[i] = weak_arc
@@ -132,7 +133,7 @@ func _reset_row(i: int) -> void:
 	t.hp[i] = 1.0
 	t.max_hp[i] = 1.0
 	t.armor[i] = 0.0
-	t.contact[i] = 0.0
+	t.gate[i] = EnemyTable.Gate.NONE
 	t.xp[i] = 0.0
 	t.weak_arc[i] = 0.0
 	t.color[i] = Color.WHITE
@@ -175,6 +176,14 @@ func is_same(i: int, id: int) -> bool:
 	return i >= 0 and i < table.alive.size() and table.alive[i] != 0 and table.id[i] == id
 
 ## 撃破済みにする。行はその回の終わり（cleanup）に空きへ戻る。
+## 行 i の敵に、位置 hit から向き dir の攻撃（cause）が当たったときの扱い（EnemyTable.GateResult）。
+## 特殊な倒し方の条件を満たさない攻撃は、体当たりなら貫通するがダメージを与えない（PASS）。
+## 弾かれるのは失敗のとき（BOUNCE）だけ。
+func gate_check(i: int, _hit: Vector2, _dir: Vector2, _cause: StringName) -> int:
+	match table.gate[i]:
+		_:
+			return EnemyTable.GateResult.ALLOW
+
 func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
 		return

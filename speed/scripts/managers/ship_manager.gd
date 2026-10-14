@@ -120,11 +120,6 @@ func _collide_bodies() -> void:
 		if vn < 0.0:
 			state.glide = false
 			state.ship_vel -= n * vn * (1.0 + cfg.crash_restitution)
-			var dmg := maxf(0.0, -vn - 200.0) * cfg.crash_damage
-			if dmg > 0.0:
-				damage(dmg, 0.0, &"planet" if b.is_planet else &"moon")
-			if state.phase != RunState.Phase.PLAY:
-				return
 			state.emit(&"crash", {"pos": state.ship_pos, "power": -vn})
 	var r := state.ship_pos.length()
 	var wall := cfg.field_radius + 500.0
