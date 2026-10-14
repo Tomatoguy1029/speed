@@ -18,6 +18,9 @@ func _ready() -> void:
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.settings = settings
 	await _start(4)
+	_test_immortal_hit()
+	await _close()
+	await _start(4)
 	_test_fire_regrowth()
 	await _close()
 	await _start(1)
@@ -535,3 +538,22 @@ func _test_landmarks() -> void:
 	h._free()
 	h.tick(run.cfg.hero_next_time + 0.01, 0.01)
 	_check(h.hero.id != previous and h.is_captive() and s.landmarks.is_empty(), "タスク16・19：エンドレスは次の英雄へ替わり、ヒントを消す")
+
+func _test_immortal_hit() -> void:
+	run.bosses.spawn()
+	var boss = run.bosses.actor
+	var t := run.enemies.table
+	run.state.stats.crit_chance = 0.0
+	run.state.world_time = 10.0
+	for neck in boss.necks:
+		run.combat.damage_enemy(neck.row, 1000, {"cause": &"shot", "no_crit": true})
+	boss.sim_tick(0.01, 0.01)
+	boss.sim_tick(0.01, 0.01)
+	var immortal: int = boss.immortal_row
+	var head_hp: float = t.hp[immortal]
+	run.combat.damage_enemy(immortal, 1e6, {"cause": &"fire", "no_crit": true})
+	_check(t.hp[immortal] == head_hp, "タスク20・23：不死の首は火で焼けない")
+	var body_hp: float = t.hp[boss.body]
+	_ram(t.pos[immortal], Vector2.RIGHT)
+	boss.sim_tick(0.01, 0.01)
+	_check(t.hp[boss.body] <= body_hp - t.max_hp[boss.body] * float(boss.def.params.immortal_dmg) + 0.01, "タスク20：不死の首を一度貫くと本体へ大きなダメージ")

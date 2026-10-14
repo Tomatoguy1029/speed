@@ -246,6 +246,10 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		return
 	if cause == &"fire":
 		t.fire_hit[i] = state.world_time
+	# 装甲を貫いた不死の首は、その1回で本体への攻撃になる。
+	# 通常の頭の HP を繰り返し削る必要はない。
+	if cause == &"ram" and t.gate[i] == EnemyTable.Gate.IMMORTAL:
+		dmg = maxf(dmg, t.hp[i])
 	var crit: bool = opts.get("crit", false)
 	if not opts.has("crit") and not opts.get("no_crit", false):
 		crit = state.rng.randf() < state.stats.crit_chance
