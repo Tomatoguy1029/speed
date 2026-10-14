@@ -16,7 +16,7 @@ func capture(i: int, cause: StringName) -> bool:
 	if not state.tracing or not CAUSES.has(cause):
 		return false
 	var t := build.enemies.table
-	if t.type[i] == &"meteor" or t.is_boss[i] != 0:
+	if t.meteor_index[i] >= 0 or t.is_boss[i] != 0:
 		return false
 	cargo.append({"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "color": t.color[i],
 		"angle": t.facing[i], "source_id": t.id[i], "ready": false})

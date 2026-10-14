@@ -23,7 +23,7 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
 	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
-	&"guard": EnemyTable.Gate.GUARD}
+	&"guard": EnemyTable.Gate.GUARD, &"solid": EnemyTable.Gate.SOLID}
 
 var table := EnemyTable.new()
 var slots: RowSlots
@@ -71,7 +71,7 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	# 手描き素材はエリートも同じ基準サイズで運用する。
 	if def.id in RenderManager.NATIVE_SPRITES:
 		r = def.radius
-	if def.id != &"meteor":
+	if opts.get("meteor_index", -1) < 0:
 		r *= cfg.character_scale
 	t.r[i] = r
 	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
@@ -240,6 +240,9 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 		EnemyTable.Gate.MEMBRANE:
 			# 膜が消えている（頂点の星が欠けている）間だけ、中の核を倒せる
 			return EnemyTable.GateResult.ALLOW if t.mode[i] == EnemyTable.Mode.RECOVER else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.SOLID:
+			# 回る丸鋸：攻撃では壊れない（体当たりで飛ばす扱いは CombatManager）
+			return EnemyTable.GateResult.PASS
 		EnemyTable.Gate.GUARD:
 			# 体当たりは弾かれる（失敗）。武器や波動では壊せる
 			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.ALLOW
@@ -304,7 +307,7 @@ func debug_spawn_random(count_n: int) -> void:
 		return
 	var choices: Array[EnemyDef] = []
 	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
-		if def.id != &"meteor" and def.behavior != &"part":
+		if def.id != &"meteor" and def.behavior != &"part" and def.behavior != &"obstacle":
 			choices.append(def)
 	if choices.is_empty():
 		return
@@ -828,7 +831,7 @@ func _pump(i: int, dt: float) -> void:
 		var rows := PackedInt32Array()
 		projectiles.combat.nearby(t.pos[i], reach, rows)
 		for j in rows:
-			if j != i and t.is_boss[j] == 0 and t.type[j] != &"meteor" and t.dead[j] == 0:
+			if j != i and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0:
 				var dj := t.pos[i] - t.pos[j]
 				t.vel[j] += dj.normalized() * pull
 		if t.timer[i] <= 0.0:
@@ -1101,7 +1104,7 @@ func _pour(i: int, dt: float) -> void:
 		rows.clear()
 		projectiles.combat.nearby(from + u * d, half, rows)
 		for j in rows:
-			if j != i and not seen.has(j) and t.is_boss[j] == 0 and t.type[j] != &"meteor" and t.dead[j] == 0 \
+			if j != i and not seen.has(j) and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0 \
 					and t.parent[j] < 0:
 				seen[j] = true
 				t.vel[j] += push
@@ -1195,7 +1198,7 @@ func on_enemy_death(i: int, atk: float) -> void:
 	if t.beh[i] == EnemyTable.Beh.CROW:
 		for k in t.buds[i] * int(dp.shards):
 			projectiles.fire_enemy(i, state.rng.randf() * TAU, float(dp.bullet_speed) * state.rng.randf_range(0.6, 1.0), &"bullet")
-	elif t.is_boss[i] == 0 and t.type[i] != &"meteor":
+	elif t.is_boss[i] == 0 and t.meteor_index[i] < 0:
 		_gather_debris(t.pos[i])
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),

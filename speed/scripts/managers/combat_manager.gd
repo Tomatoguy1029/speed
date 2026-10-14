@@ -70,7 +70,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		if run != null:
 			if run.inside.has(t.id[i]):
 				continue
-		elif t.hit_cd[i] > 0.0 and t.type[i] != &"meteor":
+		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0:
 			continue
 		var hit_t := Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R)
 		if hit_t >= 0.0:
@@ -89,7 +89,10 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var atk := attack_power()
 		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
-		if not fast and t.type[i] == &"meteor":
+		if t.type[i] == &"saw":
+			_launch_saw(i, dir if dir != Vector2.ZERO else (t.pos[i] - from).normalized(), sp)
+			continue
+		if not fast and t.meteor_index[i] >= 0:
 			_bump_meteor(i, hit_pos, R, dir)
 			continue
 		if not fast:
@@ -241,6 +244,14 @@ func _bump_meteor(i: int, hit_pos: Vector2, R: float, dir: Vector2) -> void:
 	t.hit_cd[i] = 0.25
 	state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
 	damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
+
+## 回る丸鋸（行 i）に触れた：丸鋸が機体の進んでいた向き u へ飛んでいき、その先の敵を巻き込む。1回で壊れる。
+func _launch_saw(i: int, u: Vector2, ship_speed: float) -> void:
+	var t := enemies.table
+	var speed := maxf(cfg.saw_speed, ship_speed)
+	projectiles.fire_saw(t.pos[i], u * speed, t.r[i], attack_power() * cfg.saw_power, cfg.saw_life)
+	state.emit(&"block_impact", {"pos": t.pos[i], "normal": -u, "enemy_pos": t.pos[i], "r": t.r[i]})
+	enemies.mark_dead(i)
 
 ## 一撃で倒したときのヒットストップ（仕様書 7.4）。
 func _kill_stop(i: int, crit: bool) -> void:

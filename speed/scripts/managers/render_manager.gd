@@ -498,6 +498,12 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 			return InstanceBatch.circle_points(6)
 		&"dart":
 			return PackedVector2Array([Vector2(1, 0), Vector2(-0.8, 0.7), Vector2(-0.4, 0), Vector2(-0.8, -0.7)])
+		&"saw":
+			# 歯の付いた円
+			var pts := PackedVector2Array()
+			for k in 24:
+				pts.append(Vector2.from_angle(TAU * k / 24.0) * (1.0 if k % 2 == 0 else 0.78))
+			return pts
 	return PackedVector2Array([Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)])
 
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
@@ -595,7 +601,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		var r := pr.friend_r[i]
-		if pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
+		if pr.friend_type[i] == &"saw":
+			var pts := PackedVector2Array()
+			for k in 24:
+				pts.append(pos + Vector2.from_angle(pr.friend_angle[i] + TAU * k / 24.0) * r * (1.0 if k % 2 == 0 else 0.78))
+			c.draw_colored_polygon(pts, Color("#d9dde6"))
+		elif pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
 			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
 		elif pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
 			var trail := pr.friend_trail[i]

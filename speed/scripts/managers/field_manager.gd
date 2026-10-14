@@ -5,7 +5,8 @@
 class_name FieldManager
 extends RunSystem
 
-## 隕石1つの配置（仕様書 13.1）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）
+## 隕石1つの配置（仕様書 13.1）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）、
+## iron（鉄のがれき、固定）、saw（回る丸鋸、固定）。鉄のがれきと丸鋸も、隕石と同じしくみで敵の表に入る
 class Rock:
 	var kind: StringName
 	## 漂流は世界時刻0の位置、彗星は現れた時刻の位置
@@ -107,6 +108,14 @@ func _place_rocks(rng: RandomNumberGenerator) -> void:
 		var d := sqrt(rng.randf_range(800.0 * 800.0, pow(cfg.field_radius - 300.0, 2.0)))
 		var heading := rng.randf() * TAU
 		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"drift", Vector2.from_angle(heading) * rng.randf_range(15.0, 35.0))
+	# 鉄のがれきと回る丸鋸（置き方は仮：フィールドの全体に散らす）
+	for i in cfg.iron_count:
+		var center := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1100.0, cfg.field_radius - 650.0)
+		for j in rng.randi_range(3, 5):
+			_add_rock(rng, center + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * 240.0, &"iron", Vector2.ZERO)
+	for i in cfg.saw_count:
+		var d := sqrt(rng.randf_range(900.0 * 900.0, pow(cfg.field_radius - 400.0, 2.0)))
+		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"saw", Vector2.ZERO)
 	_comet_t = rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
 
 func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Vector2) -> void:
@@ -120,6 +129,11 @@ func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Ve
 	rock.size = rng.randf_range(24.0, 65.0)
 	rock.facing = rng.randf() * TAU
 	rock.spin = rng.randf_range(-0.5, 0.5)
+	if kind == &"iron":
+		rock.size = rng.randf_range(30.0, 50.0)
+	elif kind == &"saw":
+		rock.size = 30.0
+		rock.spin = 8.0
 	rocks.append(rock)
 
 ## 世界時刻 t の隕石の位置と速度。
@@ -164,7 +178,8 @@ func _stream_rocks(dt: float) -> void:
 	if _stream_t > 0.0:
 		return
 	_stream_t = 0.2
-	var def: EnemyDef = ConfigManager.enemies.get(&"meteor")
+	var defs := {&"iron": ConfigManager.enemies.get(&"iron"), &"saw": ConfigManager.enemies.get(&"saw")}
+	var meteor: EnemyDef = ConfigManager.enemies.get(&"meteor")
 	for k in rocks.size():
 		var rock := rocks[k]
 		if rock.destroyed or rock.row >= 0:
@@ -175,7 +190,8 @@ func _stream_rocks(dt: float) -> void:
 		var pv := _rock_at(rock, t)
 		if not _near(pv[0], 300.0):
 			continue
-		var sprite_radius := rock.size if rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
+		var def: EnemyDef = defs.get(rock.kind, meteor)
+		var sprite_radius := rock.size if def != meteor or rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
 		var i := enemies.spawn(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i

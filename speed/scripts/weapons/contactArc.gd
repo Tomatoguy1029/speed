@@ -6,7 +6,7 @@ var _buf := PackedInt32Array()
 
 func on_any_contact(target: int) -> void:
 	var t := build.enemies.table
-	if t.type[target] == &"meteor":
+	if t.meteor_index[target] >= 0:
 		return
 	var dmg := atk() * float(p("damage")) * dmg_k()
 	var used := {t.id[target]: true}
@@ -22,7 +22,7 @@ func on_any_contact(target: int) -> void:
 		var next := -1
 		var best := reach * reach
 		for i in _buf:
-			if t.type[i] == &"meteor" or used.has(t.id[i]):
+			if t.meteor_index[i] >= 0 or used.has(t.id[i]):
 				continue
 			var d := t.pos[i].distance_squared_to(from)
 			if d < best:

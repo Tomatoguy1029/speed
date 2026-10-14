@@ -168,6 +168,11 @@ func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, kn
 	_add_friend(FriendKind.HULL, &"towShot", pos, vel, r, dmg, life, true, 0, Color("#ffbe65"), true, knock,
 		angle, 0.0, source_id, type)
 
+## 体当たりされた回る丸鋸を飛ばす。敵を貫いて巻き込み、クリティカルにならない。
+func fire_saw(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float) -> void:
+	_add_friend(FriendKind.HULL, &"saw", pos, vel, r, dmg, life, true, 0, Color("#d9dde6"), true, 300.0,
+		vel.angle(), 14.0, -1, &"saw")
+
 ## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
 func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
 	var t := combat.enemies.table
