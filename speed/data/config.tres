@@ -4,8 +4,8 @@
 
 [resource]
 script = ExtResource("1")
-run_time = 600.0
-boss_time = 420.0
+boss_time = 600.0
+boss_time_spread = 20.0
 boss_hp = 2200.0
 boss_armor = 14.0
 clear_bonus = 30

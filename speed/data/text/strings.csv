@@ -52,7 +52,6 @@ stage_select.endless,エンドレス（準備中）,Endless (Coming Soon)
 ,■ ラン中（HUD・3択・ポーズ）,
 hud.draw,描く,Draw
 hud.kills,撃破 {n},Kills {n}
-hud.speed,{speed} km/s　上限 {max}　最高 {peak},{speed} km/s  Max {max}  Peak {peak}
 hud.warning,WARNING!!,WARNING!!
 hud.clear,CLEAR!,CLEAR!
 hud.game_over,GAME OVER,GAME OVER

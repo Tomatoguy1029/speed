@@ -19,7 +19,9 @@ var boss_row := -1
 var boss_id := 0
 
 func tick(real_dt: float, world_dt: float) -> void:
-	if not state.boss_spawned and not state.endless and state.time >= cfg.boss_time:
+	if state.boss_at < 0.0:
+		state.boss_at = cfg.boss_time + state.rng.randf() * cfg.boss_time_spread
+	if not state.boss_spawned and not state.endless and state.time >= state.boss_at:
 		spawn()
 	if actor != null and boss_alive():
 		actor.sim_tick(real_dt, world_dt)

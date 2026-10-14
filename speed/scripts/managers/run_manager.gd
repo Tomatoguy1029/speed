@@ -201,8 +201,6 @@ func _check_end() -> void:
 		_begin_death()
 	elif state.boss_dead:
 		_begin_finish()
-	elif state.time >= cfg.run_time and not state.endless:
-		finish(false)
 
 func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
@@ -354,7 +352,7 @@ func command(name: StringName, args := {}) -> void:
 		&"debug_time":
 			state.time += float(args.get("seconds", 30.0))
 		&"debug_boss_time":
-			state.time = maxf(state.time, cfg.boss_time - 1.0)
+			state.time = maxf(state.time, state.boss_at - 1.0)
 		&"debug_kill_boss":
 			if bosses.boss_alive():
 				combat.damage_enemy(bosses.boss_row, enemies.table.hp[bosses.boss_row] + 1.0, {"crit": false, "cause": &"debug"})

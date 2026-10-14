@@ -1,6 +1,6 @@
 ## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunManager に命令として渡す。
 ##
-## 時間・経験値バー・状態の文字・速度メーター・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
+## 時間・経験値バー・状態の文字・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
@@ -257,10 +257,8 @@ func _draw() -> void:
 	# 経験値バー（画面の上端）
 	draw_rect(Rect2(0, 0, W, 5), Color(1, 1, 1, 0.08))
 	draw_rect(Rect2(0, 0, W * clampf(s.xp / run.build.xp_needed(), 0.0, 1.0), 5), Color("#b8a0ff"))
-	# 残り時間（上部中央。残り60秒を切ると橙）
-	var left := maxf(0.0, cfg.run_time - s.time)
-	var tcol := Color("#ff8a6b") if left < 60.0 else Color("#e8f0ff")
-	draw_string(_font, Vector2(W / 2.0 - 40, 44), "%d:%02d" % [int(left) / 60, int(left) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 30, tcol)
+	# 経過時間（上部中央）
+	draw_string(_font, Vector2(W / 2.0 - 40, 44), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 30, Color("#e8f0ff"))
 	# 状態の文字（左上）
 	var atk := run.combat.attack_power()
 	var x := 16.0
@@ -272,24 +270,9 @@ func _draw() -> void:
 	else:
 		draw_string(_font, Vector2(x, 52), "ATK %.1f   %s   Lv %d" % [atk, tr("hud.kills").format({n = s.kills}), s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
 		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
-	_draw_speed(W, H)
 	_draw_loadout(H)
 	_draw_boss(W)
 	_draw_gauge_ring()
-
-func _draw_speed(W: float, H: float) -> void:
-	var s := run.state
-	var k := run.cfg.speed_to_kms
-	var sp := s.ship_vel.length()
-	var bw := minf(420.0, W * 0.5)
-	var bx := W / 2.0 - bw / 2.0
-	var by := H - 34.0
-	var cap := maxf(s.stats.max_speed * 1.6, s.peak_speed)
-	draw_rect(Rect2(bx, by, bw, 10), Color(1, 1, 1, 0.08))
-	draw_rect(Rect2(bx, by, bw * clampf(sp / cap, 0.0, 1.0), 10), Color("#5fd8ff"))
-	var mx := bx + bw * clampf(s.stats.max_speed / cap, 0.0, 1.0)
-	draw_line(Vector2(mx, by - 4), Vector2(mx, by + 14), Color("#ffd24a"), 2.0)
-	draw_string(_font, Vector2(bx, by - 8), tr("hud.speed").format({speed = "%.2f" % (sp * k), max = "%.2f" % (s.stats.max_speed * k), peak = "%.2f" % (s.peak_speed * k)}), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#e8f0ff"))
 
 ## 装備一覧（左下）。武器と特性を別の段の枠に並べ、空き枠も薄く描いて持てる数を見せる（仕様書 17）。
 ## 武器は角の四角、特性は丸い四角。枠の色と下の目盛りは強化の段階（仕様書 8）。
