@@ -1,6 +1,7 @@
-## 弾と破片（設計書 4.3）。味方の弾・敵の弾・大型の敵の破片（仕様書 8・11.6）。
+## 弾と破片（設計書 4.3）。味方の弾・敵の弾・大型の敵の破片（仕様書 8・11.6）と、敵の攻撃の形（仕様書 11.7）。
 ##
-## 物理的な弾と破片は、惑星と月で止まる。波動・範囲攻撃・ビームはここでは扱わない。
+## 物理的な弾と破片は、惑星と月で止まる。味方の波動・範囲攻撃・ビームはここでは扱わない。
+## 敵の攻撃の形（ビーム・遅れて弾ける範囲など）は、予告のあとに当たり判定を持ち、地形では止まらない。
 class_name ProjectileManager
 extends RunSystem
 
@@ -60,6 +61,32 @@ var hostile_slots: RowSlots
 var _hostile_updating := false
 var _hostile_clear_pending := false
 
+## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
+##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる
+##   ZONE：pos を中心に半径 len の円。予告（delay）のあと一瞬弾ける
+enum HazardKind { BEAM, ZONE }
+## 見た目の種類（描画が読む）
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST }
+const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast"]
+## 弾けた範囲を見せる時間
+const ZONE_FLASH := 0.25
+var hazard_alive := PackedByteArray()
+var hazard_kind := PackedByteArray()
+var hazard_style := PackedByteArray()
+var hazard_pos := PackedVector2Array()
+var hazard_angle := PackedFloat32Array()
+var hazard_len := PackedFloat32Array()
+var hazard_width := PackedFloat32Array()
+## 出てからの時間、予告の時間、当たる時間（世界秒）
+var hazard_t := PackedFloat32Array()
+var hazard_delay := PackedFloat32Array()
+var hazard_active := PackedFloat32Array()
+var hazard_dmg := PackedFloat64Array()
+## 1 なら、もう機体に当たった（1つの攻撃は1回だけ当たる）
+var hazard_hit := PackedByteArray()
+var hazard_color := PackedColorArray()
+var hazard_slots: RowSlots
+
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
 	friend_slots = RowSlots.new(self, "friend_")
@@ -74,6 +101,11 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 		func(): return _add_hostile(Vector2.ONE, Vector2.ONE, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, HostileKind.MISSILE),
 		hostile_slots.release))
 	hostile_slots.clear()
+	hazard_slots = RowSlots.new(self, "hazard_")
+	assert(Columns.check_add(self, hazard_slots.cols,
+		func(): return _add_hazard(HazardKind.ZONE, HazardStyle.BLAST, Vector2.ONE, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, Color.RED),
+		hazard_slots.release))
+	hazard_slots.clear()
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
@@ -82,6 +114,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	if state.phase != RunState.Phase.PLAY:
 		return
 	_update_hostile(world_dt)
+	_update_hazards(world_dt)
 
 # ── 味方の弾と破片 ───────────────────────────────────────────────
 
@@ -325,9 +358,82 @@ func block_one(center: Vector2, radius: float) -> bool:
 			return true
 	return false
 
-## ボスの撃破などで、敵の弾をすべて消す。
+## ボスの撃破などで、敵の弾と攻撃の形をすべて消す。
 func clear_hostile() -> void:
+	hazard_slots.clear()
 	if _hostile_updating:
 		_hostile_clear_pending = true
 		return
 	hostile_slots.clear()
+
+# ── 敵の攻撃の形（仕様書 11.7） ──────────────────────────────────
+
+## ビームを出す。from から angle の向きへ長さ length・幅 width。delay の予告のあと active の間当たる。
+func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
+		color := Color("#ff5a6e")) -> int:
+	return _add_hazard(HazardKind.BEAM, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
+
+## 十字のビームを出す（4方向の fire_beam）。
+func fire_cross(center: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
+		color := Color("#ffe0a0")) -> void:
+	for k in 4:
+		fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color)
+
+## 遅れて弾ける範囲を出す。center を中心に半径 radius。delay の予告のあと一瞬弾ける。style は見た目。
+func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style := HazardStyle.BLAST,
+		color := Color("#ffb36b")) -> int:
+	return _add_hazard(HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ZONE_FLASH, dmg, color)
+
+## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
+func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
+		delay: float, active: float, dmg: float, color: Color) -> int:
+	var i := hazard_slots.take()
+	hazard_kind[i] = kind
+	hazard_style[i] = style
+	hazard_pos[i] = pos
+	hazard_angle[i] = angle
+	hazard_len[i] = length
+	hazard_width[i] = width
+	hazard_t[i] = 0.0
+	hazard_delay[i] = delay
+	hazard_active[i] = active
+	hazard_dmg[i] = dmg
+	hazard_hit[i] = 0
+	hazard_color[i] = color
+	return i
+
+## 使用中の攻撃の形の数。
+func hazard_count() -> int:
+	return hazard_slots.live
+
+func _update_hazards(dt: float) -> void:
+	var R := cfg.ship_radius
+	var ship_pos := state.ship_pos
+	for i in hazard_alive.size():
+		if hazard_alive[i] == 0:
+			continue
+		var t := hazard_t[i] + dt
+		hazard_t[i] = t
+		var delay := hazard_delay[i]
+		if t >= delay + hazard_active[i]:
+			hazard_slots.release(i)
+			continue
+		if t < delay or hazard_hit[i] != 0:
+			continue
+		var kind := hazard_kind[i]
+		var hit := false
+		match kind:
+			HazardKind.BEAM:
+				var a := hazard_pos[i]
+				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
+				var reach := hazard_width[i] * 0.5 + R
+				hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
+			HazardKind.ZONE:
+				# 弾けた瞬間だけ当たる
+				var reach := hazard_len[i] + R
+				hit = t - dt < delay and hazard_pos[i].distance_squared_to(ship_pos) <= reach * reach
+		if hit:
+			hazard_hit[i] = 1
+			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+			if state.phase != RunState.Phase.PLAY:
+				return

@@ -578,6 +578,65 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		if hostile_alive[i] != 0 and view.has_point(pos):
 			_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
 	_hostile_batch.end()
+	_draw_hazards(c, view)
+
+## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
+func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
+	var pr := run.projectiles
+	var alive := pr.hazard_alive
+	for i in alive.size():
+		if alive[i] == 0:
+			continue
+		var p := pr.hazard_pos[i]
+		var t := pr.hazard_t[i]
+		var delay := pr.hazard_delay[i]
+		var col := pr.hazard_color[i]
+		var len := pr.hazard_len[i]
+		var charging := t < delay
+		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
+		match pr.hazard_kind[i]:
+			ProjectileManager.HazardKind.BEAM:
+				if charging:
+					# 砲口に光が集まっていく
+					c.draw_circle(p, _px(4.0) + 10.0 * k, Color(col, 0.25 + 0.5 * k))
+					continue
+				var b := p + Vector2.from_angle(pr.hazard_angle[i]) * len
+				if not view.grow(len).has_point(p):
+					continue
+				var w := pr.hazard_width[i]
+				var fade := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0) * 0.6
+				c.draw_line(p, b, Color(col, 0.35 * fade), w * 1.6)
+				c.draw_line(p, b, Color(col, 0.9 * fade), w)
+				c.draw_line(p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
+			ProjectileManager.HazardKind.ZONE:
+				if not view.grow(len).has_point(p):
+					continue
+				var style := pr.hazard_style[i]
+				if charging:
+					if style == ProjectileManager.HazardStyle.RETICLE or style == ProjectileManager.HazardStyle.LIGHTNING:
+						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
+						var a := 0.25 + 0.55 * k
+						c.draw_arc(p, len, 0.0, TAU, 40, Color(col, a), _px(2.0))
+						c.draw_arc(p, len * (1.0 - 0.7 * k), 0.0, TAU, 32, Color(col, a), _px(1.5))
+						for q in 4:
+							var u := Vector2.from_angle(q * PI / 2.0 + PI / 4.0)
+							c.draw_line(p + u * len * 0.55, p + u * len * 1.15, Color(col, a), _px(2.0))
+					else:
+						# 弾ける前の点滅
+						if fmod(t, 0.16) < 0.08:
+							c.draw_circle(p, _px(6.0), Color(col, 0.9))
+					continue
+				var f := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0)
+				c.draw_circle(p, len, Color(col, 0.45 * f))
+				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
+				if style == ProjectileManager.HazardStyle.LIGHTNING:
+					var q := p + Vector2(0, -len * 3.0)
+					var pts := PackedVector2Array([q])
+					for s in 6:
+						q = q.lerp(p, 0.4) + Vector2((s % 2 * 2 - 1) * len * 0.25, 0)
+						pts.append(q)
+					pts.append(p)
+					c.draw_polyline(pts, Color(1, 1, 0.85, f), _px(4.0))
 
 func _draw_path_band(c: CanvasItem) -> void:
 	var pts := state.draw_points if state.drawing else state.trace_path

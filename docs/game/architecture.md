@@ -131,7 +131,7 @@ Manager は特定のステージ・ボス・仕掛けを知らない。コンテ
 | CombatManager | 当たり判定の格子、ダメージ、ヒットストップ（7） |
 | EnemyManager | 雑魚の配列、出現、動き（11） |
 | BossManager | ボスの役者の登録と形態（12） |
-| ProjectileManager | 弾と破片 |
+| ProjectileManager | 弾と破片、敵の攻撃の形（仕様書 11.7） |
 | BuildManager | 経験値、レベル、3択、武器・特性の発動、リロール（8・9） |
 | PickupManager | ドロップと回収（10） |
 | FieldManager | 地形、隕石、フィールドの仕掛け（13） |

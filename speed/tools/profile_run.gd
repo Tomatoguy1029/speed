@@ -1,5 +1,5 @@
 ## 短時間の性能計測専用。実ゲームの仕様・セーブは変更しない。
-## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off
+## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on
 extends Node
 
 var run: RunManager
@@ -12,7 +12,7 @@ var draws: Array[float] = []
 var measuring := false
 var previous_us := 0
 var start_us := 0
-var counts := {"enemies": 0.0, "hostile": 0.0, "friendly": 0.0, "gems": 0.0}
+var counts := {"enemies": 0.0, "hostile": 0.0, "hazards": 0.0, "friendly": 0.0, "gems": 0.0}
 var options: Dictionary = {}
 var saved_rd: RenderingDevice
 var attacked := false
@@ -150,6 +150,9 @@ func _process(_delta: float) -> void:
 		run.command(&"resume")
 	elif run.state.phase == RunState.Phase.LEVELUP:
 		run.command(&"choose_card", {"index": 0})
+	# --hazards=on で、敵の攻撃の形を一定間隔で出す（描画と当たり判定の確認用）
+	if options.get("hazards", "off") == "on" and Engine.get_process_frames() % 90 == 0:
+		run.command(&"debug_hazards")
 	if not measuring:
 		return
 	var now := Time.get_ticks_usec()
@@ -191,6 +194,7 @@ func _process(_delta: float) -> void:
 	draws.append(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	counts.enemies += run.enemies.count()
 	counts.hostile += run.projectiles.hostile_count()
+	counts.hazards += run.projectiles.hazard_count()
 	counts.friendly += run.projectiles.friend_count()
 	counts.gems += run.pickups.gem_slots.live
 	if now - start_us >= int(float(options.get("seconds", "6")) * 1000000.0):
