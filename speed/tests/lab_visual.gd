@@ -20,8 +20,7 @@ func _ready() -> void:
 	lab.pattern = lab.generator.capture(lab.session, lab.canvas.route, 20)
 	lab.canvas.pattern = lab.pattern
 	lab.canvas.mode = 4
-	lab._right.current_tab = 1
-	lab.controls.current_tab = 3
+	lab.workspace.open_settings(3)
 	await get_tree().process_frame
 	RenderingServer.force_draw(false)
 	RenderingServer.force_sync()
@@ -36,6 +35,7 @@ func _ready() -> void:
 	DisplayServer.window_set_size(Vector2i(960, 720))
 	lab._left.hide()
 	lab._right.hide()
+	lab.workspace.settings.hide()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	RenderingServer.force_draw(false)
@@ -60,8 +60,7 @@ func _ready() -> void:
 	lab.canvas.pattern = lab.pattern
 	lab.canvas.center = Vector2.ZERO
 	lab._right.show()
-	lab._right.current_tab = 1
-	lab.controls.current_tab = 3
+	lab.workspace.open_settings(3)
 	await lab._generate_candidates()
 	lab.controls.get_children()[3].scroll_vertical = 1200
 	await get_tree().process_frame

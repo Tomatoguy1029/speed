@@ -474,3 +474,55 @@ lab.ship_level,機体のレベル,Ship level
 lab.reload_data,本番データを再読込して新しい実験,Reload production data and start a new experiment
 lab.data_reloaded,敵・ボス・時間帯・共通値を読み直しました,"Reloaded enemies, bosses, phases and shared values"
 lab.reload_failed,本番データの再読込に失敗しました。ファイルの形式を確認してください,Could not reload production data. Check the resource files.
+lab.ui.conditions,実験条件,Conditions
+lab.ui.random,ランダム配置,Random layouts
+lab.ui.files,保存,Save
+lab.ui.help,操作のヒント,Controls
+lab.ui.help_text,中ドラッグで移動・ホイールで拡大縮小。Spaceで再生／停止。選択した敵はDeleteで削除、Q／Eで回転。,Middle-drag to pan; wheel to zoom. Space to play/pause. Delete removes selected enemies; Q/E rotates them.
+lab.ui.enemies,敵,Enemies
+lab.ui.search,敵を検索,Find an enemy
+lab.ui.all,すべて,All enemies
+lab.ui.drag_hint,ドラッグして配置,Drag onto the field
+lab.ui.placement_options,配置オプション,Placement options
+lab.ui.select,選択,Select
+lab.ui.place,配置,Place
+lab.ui.route,ルート,Route
+lab.ui.try,試遊,Play as ship
+lab.ui.range,範囲,Range
+lab.ui.view,表示する情報,Display options
+lab.ui.center,自機を中心に表示,Center on ship
+lab.ui.edit_more,消去メニュー,Clear menu
+lab.ui.evaluate,ルートを試す,Try route
+lab.ui.tune,敵を調整,Tune enemy
+lab.ui.close,閉じる,Close
+lab.ui.field,フィールド,Field
+lab.ui.field_objects,地形・仕掛け,Terrain and events
+lab.ui.data,データの再読込,Reload data
+lab.ui.play,再生,Play
+lab.ui.pause,停止,Pause
+lab.ui.history,履歴,History
+lab.ui.transport_status,%.2f / %.2f 秒   敵 %d体,%.2f / %.2f s   %d enemies
+lab.ui.select_hint,敵をドラッグして移動,Drag an enemy to move it
+lab.ui.place_hint,フィールドをクリックして配置,Click the field to place enemies
+lab.ui.route_hint,クリックで点を追加・ドラッグで線を調整,Click to add points; drag points to edit
+lab.ui.try_hint,再生して自機を操作,Press Play to control the ship
+lab.ui.range_hint,選んだ敵からドラッグして範囲・向きを調整,Drag from the selected enemy to adjust range and direction
+lab.ui.enemy_tooltip,"%s（%s）
+ドラッグして配置／クリックして連続配置","%s (%s)
+Drag to place / click for repeated placement"
+lab.ui.basic,基本,Basics
+lab.ui.attack_details,攻撃・行動の詳細,Attack and behavior details
+lab.ui.individual,この個体,This instance
+lab.ui.live_details,詳しい状態,Live details
+lab.ui.type_values,同じ種類の敵に適用,Applies to this enemy type
+lab.ui.hp,HP %.0f / %.0f,HP %.0f / %.0f
+lab.ui.player,自機,Ship
+lab.ui.player_stats,自機・ボスの数値,Ship and boss values
+lab.ui.loadout,装備・英雄,Loadout and hero
+lab.ui.stage_time,時間帯,Stage phases
+lab.ui.attack_limits,分類ごとの制限,Limits by category
+lab.ui.route_settings,検証条件,Validation settings
+lab.ui.route_comparisons,比較したルート,Route comparisons
+lab.ui.pattern_settings,配置のランダム化,Randomize layout
+lab.ui.production_export,AI用の書き出し,Export for AI
+lab.ui.empty_field,左の敵をここへドラッグ,Drag an enemy here from the palette

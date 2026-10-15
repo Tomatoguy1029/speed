@@ -1,5 +1,6 @@
 ## 実験条件・攻撃・出現・配置規則・保存の編集ドック。
 extends TabContainer
+const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 var lab
 var result_list: ItemList
 var candidates: ItemList
@@ -23,7 +24,7 @@ var _spawn_entries: ItemList
 var _schedule_hash := 0
 
 func _ready() -> void:
-	custom_minimum_size.x = 320
+	custom_minimum_size.x = 368
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_conditions(_page(TranslationServer.translate("lab.message_72f1cf759c")))
 	_attacks(_page(TranslationServer.translate("lab.message_63d8f43c5b")))
@@ -49,13 +50,19 @@ func _text(parent: Node, value: String) -> Label:
 	return label
 
 func _number(parent: Node, title: String, value: float, lo: float, hi: float, step_value := 1.0, action := Callable()) -> SpinBox:
-	_text(parent, title)
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var label := _text(row, title)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_stretch_ratio = 1.5
 	var box := SpinBox.new()
+	box.custom_minimum_size.x = 112
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.min_value = lo
 	box.max_value = hi
 	box.step = step_value
 	box.value = value
-	parent.add_child(box)
+	row.add_child(box)
 	if action.is_valid():
 		box.value_changed.connect(action)
 	return box
@@ -63,8 +70,9 @@ func _number(parent: Node, title: String, value: float, lo: float, hi: float, st
 func _button(parent: Node, title: String, action: Callable) -> Button:
 	return lab._button(parent, title, action)
 
-func _conditions(box: Node) -> void:
-	_text(box, TranslationServer.translate("lab.message_fc23b9c287"))
+func _conditions(page: Node) -> void:
+	lab.workspace.environment(page)
+	var box := UI.fold(page, tr("lab.ui.player"), true)
 	var invincible := CheckButton.new()
 	invincible.text = TranslationServer.translate("lab.message_9e4c412d75")
 	invincible.button_pressed = true
@@ -73,6 +81,7 @@ func _conditions(box: Node) -> void:
 	_ship_level = _number(box, tr("lab.ship_level"), 1, 1, 1000, 1, func(value): lab.session.perform("level", {"value": int(value)}))
 	var gauge := _number(box, TranslationServer.translate("lab.message_d79714f205"), 1, 0, 1, 0.05)
 	_button(box, TranslationServer.translate("lab.message_cdff100dfe"), func(): lab.session.perform("ship", {"pos": [lab.canvas.center.x, lab.canvas.center.y], "gauge": gauge.value}))
+	box = UI.fold(page, tr("lab.ui.stage_time"))
 	var time := _number(box, TranslationServer.translate("lab.message_c66777f550"), 0, 0, 10000, 1)
 	_button(box, TranslationServer.translate("lab.message_54036730a6"), func(): lab.session.perform("time", {"value": time.value}))
 	var phase_set := OptionButton.new()
@@ -88,8 +97,10 @@ func _conditions(box: Node) -> void:
 				var id := "s%d_%s" % [int(lab.session.spec.stage), suffix]
 				if ConfigManager.phases.has(StringName(id)): ids.append(id)
 		lab.session.perform("phase_set", {"ids": ids}))
+	box = UI.fold(page, tr("lab.ui.player_stats"))
 	for entry in [["base_attack", TranslationServer.translate("lab.message_0c0e2d79f0"), 10.2], ["base_max_speed", TranslationServer.translate("lab.message_0aee0183fd"), 400.0], ["draw_length", TranslationServer.translate("lab.message_017dfdb22a"), 1020.0], ["wave_radius", TranslationServer.translate("lab.message_ec7bdd3fb0"), 28.0], ["draw_time_scale", TranslationServer.translate("lab.message_355273af8a"), 0.03], ["draw_confirm_delay", TranslationServer.translate("lab.message_ab276f5393"), 0.1], ["boss_hp", TranslationServer.translate("lab.message_6384a9a6f0"), 1000], ["boss_armor", TranslationServer.translate("lab.message_391c98f217"), 30]]:
 		_condition_fields[entry[0]] = _number(box, entry[1], float(ConfigManager.base.get(entry[0])), 0.01, 100000, 1, func(value): lab.session.perform("config", {"key": entry[0], "value": value}))
+	box = UI.fold(page, tr("lab.ui.loadout"))
 	var meta := OptionButton.new()
 	box.add_child(meta)
 	for id in ConfigManager.meta_upgrades:
@@ -140,11 +151,12 @@ func _attacks(box: Node) -> void:
 	_attack_meter = meter
 	meter.session = lab.session
 	box.add_child(meter)
-	_text(box, tr("lab.attack_legend"))
+	meter.tooltip_text = tr("lab.attack_legend")
+	box = UI.fold(box, tr("lab.ui.attack_limits"))
 	var names := {"aimed": TranslationServer.translate("lab.message_e25e93d055"), "homing": TranslationServer.translate("lab.message_bbcc068b7e"), "dash": TranslationServer.translate("lab.message_437d9cf8d0"), "beam": TranslationServer.translate("lab.message_421607de84"), "zone": TranslationServer.translate("lab.message_1133c374e7"), "wave": TranslationServer.translate("lab.message_f3482a22c0"), "residue": TranslationServer.translate("lab.message_c04c40391d")}
 	for category in names:
 		_text(box, names[category])
-		var row := HBoxContainer.new()
+		var row := VBoxContainer.new()
 		box.add_child(row)
 		for setting in [["slots", TranslationServer.translate("lab.message_61bf2700ce"), 1.0, 1.0], ["weights", TranslationServer.translate("lab.message_d0fdf2aa39"), 1.0, 0.25], ["gaps", TranslationServer.translate("lab.message_c7f2b1e003"), 0.35, 0.05]]:
 			var column := VBoxContainer.new()
@@ -152,14 +164,14 @@ func _attacks(box: Node) -> void:
 			row.add_child(column)
 			_settings[setting[0]][category] = setting[2]
 			_attack_fields[setting[0] + ":" + category] = _number(column, setting[1], setting[2], 0, 100, setting[3], func(value): _settings[setting[0]][category] = value; _apply_director())
-	_text(box, TranslationServer.translate("lab.message_1a59dadeb6"))
+	_attack_toggle.tooltip_text = tr("lab.message_1a59dadeb6")
 
 func _apply_director() -> void:
 	if is_instance_valid(lab.session.run):
 		lab.session.perform("director", _settings)
 
 func _spawns(box: Node) -> void:
-	_text(box, TranslationServer.translate("lab.message_dc8d5ae40c"))
+	box.tooltip_text = tr("lab.message_dc8d5ae40c")
 	var start := _number(box, TranslationServer.translate("lab.message_5fdbd8f764"), 0, 0, 3600, 0.1)
 	var end := _number(box, TranslationServer.translate("lab.message_51b9d6157a"), 30, 0, 3600, 0.1)
 	var interval := _number(box, TranslationServer.translate("lab.message_274c228534"), 2, 0.1, 300, 0.1)
@@ -196,7 +208,8 @@ func _spawns(box: Node) -> void:
 		lab.session.perform("schedule", {"entries": values}))
 	_button(box, TranslationServer.translate("lab.message_0113c8102f"), func(): lab.session.perform("schedule", {"entries": []}))
 
-func _patterns(box: Node) -> void:
+func _patterns(page: Node) -> void:
+	var box := UI.fold(page, tr("lab.ui.route_settings"))
 	draw_seconds = _number(box, TranslationServer.translate("lab.message_d144e6855f"), 0.5, 0.05, 20, 0.05)
 	margin = _number(box, TranslationServer.translate("lab.message_2fcfd99d3b"), 20, 0, 1000, 1)
 	exit_clearance = _number(box, tr("lab.exit_clearance"), 0, 0, 1000, 10, func(value): lab.canvas.exit_clearance = value; lab.canvas.result.clear())
@@ -211,11 +224,13 @@ func _patterns(box: Node) -> void:
 			return
 		lab.session.perform("guard", {"route": lab.canvas.route, "margin": margin.value, "until": lab.session.run.state.world_time + window_seconds.value})
 		lab._messages.text = TranslationServer.translate("lab.message_47a613a504"))
+	box = UI.fold(page, tr("lab.ui.route_comparisons"))
 	_button(box, TranslationServer.translate("lab.message_93025fc5b1"), func(): lab.comparisons.append({"route": lab.canvas.route.duplicate(), "result": lab.canvas.result.duplicate(true)}); lab._update_comparisons())
 	result_list = ItemList.new()
 	result_list.custom_minimum_size.y = 100
 	box.add_child(result_list)
 	result_list.item_selected.connect(lab._select_comparison)
+	box = UI.fold(page, tr("lab.ui.pattern_settings"), true)
 	var jitter := _number(box, TranslationServer.translate("lab.message_0a50b49bd2"), 60, 0, 1000)
 	_button(box, TranslationServer.translate("lab.message_4855e0d71e"), func():
 		lab.pattern = lab.generator.capture(lab.session, lab.canvas.route, jitter.value, margin.value)
@@ -224,7 +239,7 @@ func _patterns(box: Node) -> void:
 		lab.pattern["exit_clearance"] = exit_clearance.value
 		lab.pattern["min_spacing"] = spacing.value
 		lab.canvas.pattern = lab.pattern
-		lab.canvas.mode = 4
+		lab._set_mode(4)
 		lab._messages.text = TranslationServer.translate("lab.message_277d733b3c"))
 	var roles := OptionButton.new()
 	roles.add_item(TranslationServer.translate("lab.message_facbd979fc"))
@@ -266,7 +281,8 @@ func _files(box: Node) -> void:
 	_button(box, TranslationServer.translate("lab.message_3e46ee4fc1"), func(): lab._save(false))
 	_button(box, TranslationServer.translate("lab.message_0a6f61cf06"), func(): lab._save(true))
 	_button(box, TranslationServer.translate("lab.message_c1df88bfc2"), lab._choose_file)
-	_text(box, TranslationServer.translate("lab.message_e419196088"))
+	box = UI.fold(box, tr("lab.ui.production_export"))
+	box.tooltip_text = tr("lab.message_e419196088")
 	export_stage = _number(box, TranslationServer.translate("lab.message_b8d712fc9b"), 1, 1, ConfigManager.stage_count())
 	export_phase = OptionButton.new()
 	export_phase.add_item(TranslationServer.translate("lab.message_82b885c33d"))
@@ -283,7 +299,7 @@ func _files(box: Node) -> void:
 		export_targets.set_item_metadata(export_targets.item_count - 1, String(def.id))
 	box.add_child(export_targets)
 	_button(box, TranslationServer.translate("lab.message_e98240632d"), lab._export)
-	_text(box, TranslationServer.translate("lab.message_5da55226e3"))
+	export_targets.tooltip_text = tr("lab.message_5da55226e3")
 
 func sync_from_session() -> void:
 	if not is_instance_valid(lab.session.run): return

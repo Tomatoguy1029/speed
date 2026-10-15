@@ -11,6 +11,8 @@ const ICON := preload("res://gyms/enemy_lab/lab_icon.gd")
 const TIMELINE := preload("res://gyms/enemy_lab/lab_timeline.gd")
 const TRIAL := preload("res://gyms/enemy_lab/route_trial.gd")
 const GENERATOR := preload("res://gyms/enemy_lab/encounter_pattern.gd")
+const WORKSPACE := preload("res://gyms/enemy_lab/lab_workspace.gd")
+const PALETTE_ITEM := preload("res://gyms/enemy_lab/lab_palette_item.gd")
 const INSPECTOR := preload("res://gyms/enemy_lab/lab_inspector.gd")
 
 var session
@@ -25,7 +27,8 @@ var _evaluation_revision := -1
 var _file_dialog: FileDialog
 var canvas
 var inspector
-var _palette: VBoxContainer
+var workspace
+var _palette: GridContainer
 var _filter: LineEdit
 var _status: Label
 var _result: Label
@@ -90,196 +93,51 @@ func _spin(parent: Node, minimum: float, maximum: float, value: float) -> SpinBo
 	return box
 
 func _build_ui() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color("#101825")
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 12)
-	add_child(margin)
-	var layout := VBoxContainer.new()
-	margin.add_child(layout)
-	var top := HFlowContainer.new()
-	layout.add_child(top)
-	_button(top, TranslationServer.translate("lab.message_60a1005be6"), _leave)
-	_label(top, TranslationServer.translate("lab.message_922c39d8ac"))
-	_label(top, "Seed")
-	_seed = _spin(top, 0, 2147483647, 932)
-	_stage = OptionButton.new()
-	for n in range(1, ConfigManager.stage_count() + 1):
-		_stage.add_item(TranslationServer.translate("lab.message_c83172920b") % n, n)
-	top.add_child(_stage)
-	_empty = CheckButton.new()
-	_empty.text = TranslationServer.translate("lab.message_528e1c7048")
-	_empty.button_pressed = true
-	top.add_child(_empty)
-	_auto = CheckButton.new()
-	_auto.text = TranslationServer.translate("lab.message_bb051fda3b")
-	top.add_child(_auto)
-	_terrain = CheckButton.new()
-	_terrain.text = tr("lab.terrain")
-	top.add_child(_terrain)
-	_rocks = CheckButton.new()
-	_rocks.text = tr("lab.rocks")
-	top.add_child(_rocks)
-	_gimmicks = CheckButton.new()
-	_gimmicks.text = tr("lab.gimmicks")
-	top.add_child(_gimmicks)
-	_empty.toggled.connect(func(on): _terrain.button_pressed = not on; _rocks.button_pressed = not on; _gimmicks.button_pressed = not on)
-	_button(top, TranslationServer.translate("lab.message_dfa32d64eb"), _reset)
-	_button(top, tr("lab.reload_data"), _reload_data)
-	var toolbar := HFlowContainer.new()
-	layout.add_child(toolbar)
-	_play = _button(toolbar, TranslationServer.translate("lab.message_bf1c2f34ef"), _toggle_play)
-	_button(toolbar, TranslationServer.translate("lab.message_2555a92b57"), func(): session.playing = false)
-	_button(toolbar, TranslationServer.translate("lab.message_87b386148b"), func(): session.playing = false; session.step(); _refresh())
-	_button(toolbar, TranslationServer.translate("lab.message_e2ff3a1576"), func(): await session.seek(0); _refresh())
-	var speeds := OptionButton.new()
-	for value in [0.25, 0.5, 1.0, 2.0, 4.0]:
-		speeds.add_item("×%s" % value)
-	speeds.selected = 2
-	speeds.item_selected.connect(func(i): session.speed = [0.25, 0.5, 1.0, 2.0, 4.0][i])
-	toolbar.add_child(speeds)
-	_button(toolbar, tr("lab.undo"), func():
-		if canvas.mode == 2: canvas.undo_route()
-		else: await session.undo_edit())
-	_button(toolbar, tr("lab.redo"), func():
-		if canvas.mode == 2: canvas.undo_route(true)
-		else: await session.redo_edit())
-	for item in [[TranslationServer.translate("lab.message_8e4350198b"), 0], [TranslationServer.translate("lab.message_7b82dc2a06"), 1], [TranslationServer.translate("lab.message_096f45921a"), 2], [TranslationServer.translate("lab.message_605c5bd311"), 3], [tr("lab.range_edit"), 5]]:
-		_button(toolbar, item[0], _set_mode.bind(item[1]))
-	_button(toolbar, TranslationServer.translate("lab.message_685d3cd5a7"), func(): canvas.clear_route())
-	_button(toolbar, TranslationServer.translate("lab.message_31c4ccdbbf"), _evaluate)
-	_button(toolbar, TranslationServer.translate("lab.message_67847e89ae"), func(): trial.cancel(); generator.cancelled = true; session.cancel_seek())
-	_button(toolbar, TranslationServer.translate("lab.message_97c3c6246b"), func(): session.perform("clear"))
-	var ranges := CheckButton.new()
-	ranges.text = TranslationServer.translate("lab.message_fb93512f75")
-	ranges.button_pressed = true
-	ranges.toggled.connect(func(on): canvas.show_ranges = on)
-	toolbar.add_child(ranges)
-	var names := CheckButton.new()
-	names.text = tr("lab.names")
-	names.button_pressed = true
-	names.toggled.connect(func(on): canvas.show_ids = on)
-	toolbar.add_child(names)
-	var middle := HBoxContainer.new()
-	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	layout.add_child(middle)
-	_left = VBoxContainer.new()
-	_left.custom_minimum_size.x = 210
-	middle.add_child(_left)
-	_filter = LineEdit.new()
-	_filter.placeholder_text = TranslationServer.translate("lab.message_19e1e846a4")
-	_filter.text_changed.connect(func(_v): _fill_palette())
-	_left.add_child(_filter)
-	var row := HBoxContainer.new()
-	_left.add_child(row)
-	_label(row, TranslationServer.translate("lab.message_da1f520c6f"))
-	_count = _spin(row, 1, 10000, 1)
-	_label(row, "Lv")
-	_level = _spin(row, 1, 100, 1)
-	_count.value_changed.connect(func(v): canvas.spawn_count = int(v))
-	_level.value_changed.connect(func(v): canvas.spawn_level = v)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_left.add_child(scroll)
-	_palette = VBoxContainer.new()
-	_palette.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_palette)
-	canvas = CANVAS.new()
-	canvas.session = session
-	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	middle.add_child(canvas)
-	_right = TabContainer.new()
-	_right.custom_minimum_size.x = 330
-	middle.add_child(_right)
-	inspector = INSPECTOR.new()
-	inspector.session = session
-	inspector.canvas = canvas
-	inspector.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inspector.name = TranslationServer.translate("lab.message_4db93d1888")
-	_right.add_child(inspector)
-	controls = CONTROLS.new()
-	controls.lab = self
-	controls.name = TranslationServer.translate("lab.message_69a0de30fa")
-	_right.add_child(controls)
-	canvas.picked.connect(func(_i): inspector.refresh(true))
-	canvas.route_edited.connect(func(): trial.cancel(); _result.text = TranslationServer.translate("lab.message_e2160dc29a"))
-	var bottom := HBoxContainer.new()
-	layout.add_child(bottom)
-	_button(bottom, TranslationServer.translate("lab.message_c811c512d0"), func(): _left.visible = not _left.visible)
-	_button(bottom, TranslationServer.translate("lab.message_2041b03309"), func(): _right.visible = not _right.visible)
-	_status = _label(bottom, "")
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_branch = OptionButton.new()
-	bottom.add_child(_branch)
-	_branch.item_selected.connect(_select_branch)
-	_seek = HSlider.new()
-	_seek.min_value = 0
-	_seek.max_value = 1
-	_seek.step = 1
-	_seek.custom_minimum_size.y = 24
-	layout.add_child(_seek)
-	_timeline = TIMELINE.new()
-	_timeline.session = session
-	layout.add_child(_timeline)
-	_timeline.seek_requested.connect(func(t): await session.seek(t); _refresh())
-	_seek.drag_started.connect(func(): session.playing = false; _scrubbing = true)
-	_seek.drag_ended.connect(func(_change): _scrubbing = false; await session.seek(roundi(_seek.value)); _refresh())
-	_result = _label(layout, TranslationServer.translate("lab.message_25446d5b84"))
-	_result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_messages = _label(layout, TranslationServer.translate("lab.message_787af9549a"))
-	_messages.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	workspace = WORKSPACE.new()
+	workspace.build(self)
 	_fill_palette()
 
 func _fill_palette() -> void:
 	for child in _palette.get_children():
+		_palette.remove_child(child)
 		child.queue_free()
+	workspace.palette_buttons.clear()
 	var filter := _filter.text.to_lower()
 	var definitions := ConfigManager.sorted(ConfigManager.enemies)
 	definitions.append_array(ConfigManager.sorted(ConfigManager.bosses))
+	var regular := ["drifter", "swarm", "darter", "armored", "gunner", "missile", "splitter", "splitling", "titan", "battleship"]
 	definitions.sort_custom(func(a, b):
-		var regular := ["drifter", "swarm", "darter", "armored", "gunner", "missile", "splitter", "splitling", "titan", "battleship"]
-		var left := 2 if a is BossDef else (0 if String(a.id) in regular else 1)
-		var right := 2 if b is BossDef else (0 if String(b.id) in regular else 1)
+		var left := 3 if a is BossDef else (1 if String(a.id) in regular else 2)
+		var right := 3 if b is BossDef else (1 if String(b.id) in regular else 2)
 		return String(a.id) < String(b.id) if left == right else left < right)
 	for def in definitions:
-		if def is EnemyDef and def.behavior == &"part":
-			continue
-		var name: String = def.display_name
+		if def is EnemyDef and def.behavior == &"part": continue
 		var id := String(def.id)
-		if not filter.is_empty() and not (id.to_lower().contains(filter) or name.to_lower().contains(filter)):
-			continue
-		var button := Button.new()
-		button.custom_minimum_size = Vector2(200, 62)
-		button.tooltip_text = TranslationServer.translate("lab.message_2e31753d0b") % [name, id]
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		button.add_child(row)
-		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 6)
-		var picture = ICON.new()
-		picture.texture = canvas.texture_for(id)
-		picture.definition = def
-		row.add_child(picture)
-		var label := Label.new()
-		var regular: bool = id in ["drifter", "swarm", "darter", "armored", "gunner", "missile", "splitter", "splitling", "titan", "battleship"]
-		var category := TranslationServer.translate("lab.message_bd3455e23b") if regular else (TranslationServer.translate("lab.message_cab5ef8006") if def is BossDef else TranslationServer.translate("lab.message_0033dbf5f7"))
-		label.text = TranslationServer.translate("lab.message_e6152035cf") % [name, id, category]
-		label.add_theme_font_size_override("font_size", 13)
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(label)
-		button.pressed.connect(func(): canvas.spawn_type = id; canvas.mode = 1; _messages.text = name + TranslationServer.translate("lab.message_30308e98b5"))
+		var group := 3 if def is BossDef else (1 if id in regular else 2)
+		if workspace.category.selected > 0 and workspace.category.selected != group: continue
+		if not filter.is_empty() and not (id.to_lower().contains(filter) or def.display_name.to_lower().contains(filter)): continue
+		var button = PALETTE_ITEM.new()
+		button.definition = def
+		button.picture = canvas.texture_for(id)
+		button.tooltip_text = tr("lab.ui.enemy_tooltip") % [def.display_name, id]
+		button.pressed.connect(func():
+			canvas.spawn_type = id
+			workspace._last_mode = -1
+			_set_mode(1))
+		workspace.palette_buttons[id] = button
 		_palette.add_child(button)
+	workspace._last_mode = -1
 
 func _set_mode(mode: int) -> void:
 	canvas.mode = mode
-	_messages.text = [TranslationServer.translate("lab.message_992b3b0d94"), TranslationServer.translate("lab.message_d01d58488a"), TranslationServer.translate("lab.message_6959dce1bf"), TranslationServer.translate("lab.message_e032c78766"), tr("lab.range_edit"), tr("lab.range_edit")][clampi(mode, 0, 5)]
+	canvas.cancel_gesture()
+	canvas.grab_focus()
+	workspace._last_mode = -1
+
 
 func _toggle_play() -> void:
 	session.playing = not session.playing
+	canvas.grab_focus()
 	_refresh()
 
 func _reset() -> void:
@@ -330,6 +188,7 @@ func _validate_route() -> void:
 	_show_result(canvas.result)
 
 func _show_result(value: Dictionary) -> void:
+	_result.show()
 	_result.text = _status_title(value)
 	if value.get("status") == "replayed":
 		_result.text += TranslationServer.translate("lab.message_511972b218") % [value.kills, value.damage, value.gauge]
@@ -486,11 +345,11 @@ func _export() -> void:
 func _refresh() -> void:
 	if not is_instance_valid(session.run):
 		return
-	_play.text = TranslationServer.translate("lab.message_c2ddab60b8") if session.playing else TranslationServer.translate("lab.message_bf1c2f34ef")
+	workspace.sync()
 	_seek.max_value = maxf(1, session.furthest)
 	if not _scrubbing:
 		_seek.set_value_no_signal(session.tick)
-	_status.text = TranslationServer.translate("lab.message_15d10dbb3a") % [session.tick * session.DT, session.furthest * session.DT, session.run.state.world_time, session.run.enemies.count(), int(session.spec.seed)]
+	_status.text = tr("lab.ui.transport_status") % [session.tick * session.DT, session.furthest * session.DT, session.run.enemies.count()]
 	if _branch.item_count != session.branches.size() + 1:
 		_branch.clear()
 		_branch.add_item(TranslationServer.translate("lab.message_98f82d7b9f"))
@@ -499,7 +358,7 @@ func _refresh() -> void:
 	_branch.set_item_text(0, TranslationServer.translate("lab.message_98f82d7b9f") + " " + session.current_branch)
 	for index in session.branches.size():
 		_branch.set_item_text(index + 1, String(session.branches[index].name))
-	_status.text += "　" + tr("lab.route_length") % [CHECK.length(canvas.route), session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge), 100 * CHECK.length(canvas.route) / maxf(0.01, session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge))]
+	_status.tooltip_text = tr("lab.message_15d10dbb3a") % [session.tick * session.DT, session.furthest * session.DT, session.run.state.world_time, session.run.enemies.count(), int(session.spec.seed)] + "\n" + tr("lab.route_length") % [CHECK.length(canvas.route), session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge), 100 * CHECK.length(canvas.route) / maxf(0.01, session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge))]
 	canvas.queue_redraw()
 	_timeline.queue_redraw()
 	if not canvas.result.is_empty() and _evaluation_revision >= 0 and _evaluation_revision != session.revision:

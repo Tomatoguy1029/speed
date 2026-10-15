@@ -1,6 +1,7 @@
 extends Control
 var session
 const KEYS := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
+const NAMES := ["lab.message_e25e93d055", "lab.message_bbcc068b7e", "lab.message_437d9cf8d0", "lab.message_421607de84", "lab.message_1133c374e7", "lab.message_f3482a22c0", "lab.message_c04c40391d"]
 func _ready() -> void:
 	custom_minimum_size = Vector2(280, 135)
 func _draw() -> void:
@@ -16,12 +17,12 @@ func _draw() -> void:
 				else: residual += 1
 		var slots := int(d.settings.slots.get(category, 1))
 		var y := float(n) * 19
-		draw_string(ThemeDB.fallback_font, Vector2(0, y + 13), category, HORIZONTAL_ALIGNMENT_LEFT, 70, 12)
+		draw_string(get_theme_default_font(), Vector2(0, y + 13), tr(NAMES[n]), HORIZONTAL_ALIGNMENT_LEFT, 108, 12)
 		for index in mini(10, maxi(slots, active + residual)):
-			var rect := Rect2(75 + index * 12, y + 2, 9, 12)
+			var rect := Rect2(112 + index * 12, y + 2, 9, 12)
 			draw_rect(rect, Color("#555f6e"), false, 1)
 			if index < active: draw_rect(rect.grow(-1), Color("#ffbe76"))
 			elif index < active + residual:
 				draw_line(rect.position, rect.end, Color("#f98585"), 2)
 				draw_line(rect.position + Vector2(0, 5), rect.end - Vector2(0, 5), Color("#f98585"), 2)
-		draw_string(ThemeDB.fallback_font, Vector2(205, y + 13), "%d+%d / %d" % [active, residual, slots], HORIZONTAL_ALIGNMENT_LEFT, 80, 11)
+		draw_string(ThemeDB.fallback_font, Vector2(238, y + 13), "%d+%d / %d" % [active, residual, slots], HORIZONTAL_ALIGNMENT_LEFT, 80, 11)

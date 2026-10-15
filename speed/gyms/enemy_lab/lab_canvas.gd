@@ -1,5 +1,6 @@
 ## 本番の敵・弾・範囲を表示する、実験場の編集キャンバス。
 extends Control
+const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
 signal route_edited
@@ -13,7 +14,7 @@ var center := Vector2.ZERO
 var zoom := 0.6
 var exit_clearance := 0.0
 var show_ranges := true
-var show_ids := true
+var show_ids := false
 var route := PackedVector2Array()
 var result: Dictionary = {}
 var pattern: Dictionary = {}
@@ -55,6 +56,23 @@ func texture_for(id: String) -> Texture2D:
 		_textures[id] = load(path) if ResourceLoader.exists(path) else null
 	return _textures[id]
 
+func _can_drop_data(_position: Vector2, data: Variant) -> bool:
+	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)))
+
+func _drop_data(position: Vector2, data: Variant) -> void:
+	spawn_type = String(data.lab_enemy)
+	session.playing = false
+	_place(world(position))
+	mode = 0
+	grab_focus()
+
+func _place(point: Vector2) -> void:
+	var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
+	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count, "level": spawn_level})
+	selection.clear()
+	if session.selected >= 0: selection.append(session.run.enemies.table.id[session.selected])
+	picked.emit(session.selected)
+
 func _gui_input(event: InputEvent) -> void:
 	if session == null or not is_instance_valid(session.run) or session.seeking:
 		return
@@ -84,9 +102,7 @@ func _gui_input(event: InputEvent) -> void:
 					selected_region = _region
 					_resize_region = event.alt_pressed
 				elif mode == 1:
-					var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
-					session.perform(kind, {"type": spawn_type, "pos": [p.x, p.y], "count": spawn_count, "level": spawn_level})
-					picked.emit(session.selected)
+					_place(p)
 				elif mode == 2:
 					_remember_route()
 					if event.alt_pressed:
@@ -108,6 +124,7 @@ func _gui_input(event: InputEvent) -> void:
 				else:
 					var row := _pick(p, event.alt_pressed)
 					session.selected = row
+					if row < 0 and not event.shift_pressed: selection.clear()
 					picked.emit(row)
 					if row >= 0:
 						_drag_id = session.run.enemies.table.id[row]
@@ -205,6 +222,7 @@ func _gui_input(event: InputEvent) -> void:
 			_drag_point = -1
 			_drag_route = false
 			_region = -1
+			mode = 0
 		accept_event()
 
 func _pick(pos: Vector2, cycle := false) -> int:
@@ -235,6 +253,13 @@ func _draw() -> void:
 	if session == null or not is_instance_valid(session.run):
 		return
 	var run: RunManager = session.run
+	if run.enemies.count() == 0 and route.is_empty() and mode != 3:
+		var message := tr("lab.ui.empty_field")
+		var font := get_theme_default_font()
+		var width := font.get_string_size(message, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+		var at := size * 0.5 + Vector2(0, 64)
+		draw_texture_rect(UI.icon("plus"), Rect2(at - Vector2(12, 36), Vector2(24, 24)), false, Color(1, 1, 1, 0.5))
+		draw_string(font, at - Vector2(width / 2, 0), message, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.MUTED)
 	for body in run.field.bodies:
 		draw_circle(screen(body.pos), maxf(body.r * zoom, 1), Color("#333f59"))
 	for entry in session.schedule:
