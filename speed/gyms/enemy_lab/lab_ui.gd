@@ -18,6 +18,8 @@ static func icon(kind: String) -> Texture2D:
 		"undo": '<path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12" transform="translate(0 -2)"/>',
 		"redo": '<path d="m15 5 5 5-5 5m5-5H10a6 6 0 0 0 0 12" transform="translate(0 -2)"/>',
 		"close": '<path d="m6 6 12 12M18 6 6 18"/>',
+		"minus": '<path d="M5 12h14"/>',
+		"chevron_left": '<path d="m15 6-6 6 6 6"/>',
 		"plus": '<path d="M12 5v14M5 12h14"/>',
 		"pointer": '<path d="m5 3 14 10-7 1-3 7Z"/>',
 		"pencil": '<path d="m4 20 1-6L16 3l5 5L10 19Zm10-15 5 5"/>',

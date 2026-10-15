@@ -19,6 +19,18 @@ var _budget: ProgressBar
 var _route_cost: Label
 var _palette_auto_hidden := false
 var _last_mode := -1
+var _left_split: HSplitContainer
+var _right_split: HSplitContainer
+var _vertical_split: VSplitContainer
+var _right_dock: VBoxContainer
+var _left_toggle: Button
+var _right_toggle: Button
+var _right_collapsed := false
+var _restore_settings := true
+var _restore_page := 0
+var _history_offset := 0
+var _zoom_label: Label
+var _track_scroll: HScrollBar
 
 func build(owner: Control) -> void:
 	lab = owner
@@ -34,25 +46,54 @@ func build(owner: Control) -> void:
 	var layout := VBoxContainer.new()
 	margin.add_child(layout)
 	_header(layout)
+	_vertical_split = VSplitContainer.new()
+	_vertical_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_vertical_split.add_theme_constant_override("separation", 12)
+	layout.add_child(_vertical_split)
 	_body = HBoxContainer.new()
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	layout.add_child(_body)
-	_palette(_body)
+	_vertical_split.add_child(_body)
+	_left_toggle = _edge_button(_body, _toggle_palette)
+	_left_split = HSplitContainer.new()
+	_left_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_left_split.add_theme_constant_override("separation", 12)
+	_body.add_child(_left_split)
+	_palette(_left_split)
+	_right_split = HSplitContainer.new()
+	_right_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_right_split.add_theme_constant_override("separation", 12)
+	_left_split.add_child(_right_split)
 	_center = VBoxContainer.new()
 	_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_body.add_child(_center)
+	_right_split.add_child(_center)
 	_toolbar(_center)
 	lab.canvas = lab.CANVAS.new()
 	lab.canvas.session = lab.session
 	lab.canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_center.add_child(lab.canvas)
 	_hint_row(_center)
-	_inspector(_body)
-	_settings(_body)
+	_right_dock = VBoxContainer.new()
+	_right_split.add_child(_right_dock)
+	_inspector(_right_dock)
+	_settings(_right_dock)
+	_right_dock.hide()
+	_right_toggle = _edge_button(_body, _toggle_right)
 	lab.resized.connect(_fit_panels)
 	lab._right.visibility_changed.connect(_fit_panels)
 	settings.visibility_changed.connect(_fit_panels)
-	_transport(layout)
+	_transport(_vertical_split)
+	for splitter in [_left_split, _right_split, _vertical_split]:
+		splitter.add_theme_constant_override("autohide", 0)
+		splitter.add_theme_constant_override("minimum_grab_thickness", 12)
+		var line := StyleBoxLine.new()
+		line.color = Color("#30435b")
+		line.thickness = 1
+		line.vertical = not splitter.vertical
+		splitter.add_theme_stylebox_override("split_bar_background", line)
+		splitter.get_drag_area_controls()[0].tooltip_text = tr("lab.ui.resize_panel")
+	_vertical_split.dragged.connect(func(_offset):
+		if not _history.visible: _history.show()
+		_history_offset = _offset)
 	_notice = HBoxContainer.new()
 	layout.add_child(_notice)
 	lab._messages = lab._label(_notice, "")
@@ -63,7 +104,10 @@ func build(owner: Control) -> void:
 	UI.button(_notice, tr("lab.ui.close"), func(): lab._messages.text = "", "close", true)
 	lab.canvas.picked.connect(func(_row):
 		lab.inspector.refresh(true)
-		if lab.session.selected >= 0: settings.hide(); lab._right.show())
+		if lab.session.selected >= 0:
+			_restore_settings = false
+			settings.hide()
+			if not _right_collapsed: lab._right.show())
 	lab.canvas.route_edited.connect(func():
 		lab.trial.cancel()
 		lab._result.text = ""
@@ -73,7 +117,6 @@ func _header(parent: Node) -> void:
 	var header := HBoxContainer.new()
 	parent.add_child(header)
 	UI.button(header, tr("common.back"), lab._leave, "back", true)
-	UI.button(header, tr("lab.message_c811c512d0"), _toggle_palette, "grid", true)
 	var title: Label = lab._label(header, tr("lab.message_922c39d8ac"))
 	title.add_theme_font_size_override("font_size", 18)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -83,9 +126,18 @@ func _header(parent: Node) -> void:
 	UI.button(header, tr("lab.ui.files"), open_settings.bind(4), "save")
 	UI.button(header, tr("lab.ui.help"), func(): lab._messages.text = tr("lab.ui.help_text"), "help", true)
 
+func _edge_button(parent: Node, action: Callable) -> Button:
+	var button := UI.button(parent, "", action, "chevron_left", true)
+	button.custom_minimum_size = Vector2(24, 48)
+	button.add_theme_constant_override("icon_max_width", 16)
+	button.add_theme_stylebox_override("normal", UI.style(Color("#152131"), Color.TRANSPARENT, 3))
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return button
+
 func _palette(parent: Node) -> void:
 	lab._left = PanelContainer.new()
 	lab._left.custom_minimum_size.x = 196
+	lab._left.size_flags_horizontal = Control.SIZE_FILL
 	parent.add_child(lab._left)
 	var box := VBoxContainer.new()
 	lab._left.add_child(box)
@@ -190,6 +242,7 @@ func _hint_row(parent: Node) -> void:
 func _inspector(parent: Node) -> void:
 	lab._right = PanelContainer.new()
 	lab._right.custom_minimum_size.x = 292
+	lab._right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	parent.add_child(lab._right)
 	var box := VBoxContainer.new()
 	lab._right.add_child(box)
@@ -197,7 +250,7 @@ func _inspector(parent: Node) -> void:
 	box.add_child(header)
 	var title: Label = lab._label(header, tr("lab.ui.tune"))
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UI.button(header, tr("lab.ui.close"), func(): lab._right.hide(), "close", true)
+	UI.button(header, tr("lab.ui.collapse_right"), _toggle_right, "chevron_right", true)
 	lab.inspector = lab.INSPECTOR.new()
 	lab.inspector.session = lab.session
 	lab.inspector.canvas = lab.canvas
@@ -208,6 +261,7 @@ func _inspector(parent: Node) -> void:
 func _settings(parent: Node) -> void:
 	settings = PanelContainer.new()
 	settings.custom_minimum_size.x = 392
+	settings.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	parent.add_child(settings)
 	var box := VBoxContainer.new()
 	settings.add_child(box)
@@ -215,7 +269,7 @@ func _settings(parent: Node) -> void:
 	box.add_child(header)
 	_settings_title = lab._label(header, tr("lab.message_69a0de30fa"))
 	_settings_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UI.button(header, tr("lab.ui.close"), close_settings, "close", true)
+	UI.button(header, tr("lab.ui.collapse_right"), _toggle_right, "chevron_right", true)
 	lab.controls = lab.CONTROLS.new()
 	lab.controls.lab = lab
 	lab.controls.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -269,7 +323,7 @@ func _transport(parent: Node) -> void:
 	lab._status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab._status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_cancel = UI.button(bar, tr("lab.message_67847e89ae"), func(): lab.trial.cancel(); lab.generator.cancelled = true; lab.session.cancel_seek(), "close")
-	_history_button = UI.button(bar, tr("lab.ui.history"), func(): _history.visible = not _history.visible, "clock")
+	_history_button = UI.button(bar, tr("lab.ui.history"), func(): _set_history(not _history.visible), "clock")
 	_history_button.toggle_mode = true
 	lab._seek = HSlider.new()
 	lab._seek.min_value = 0
@@ -280,18 +334,39 @@ func _transport(parent: Node) -> void:
 	lab._seek.drag_started.connect(func(): lab.session.playing = false; lab._scrubbing = true)
 	lab._seek.drag_ended.connect(func(_change): lab._scrubbing = false; await lab.session.seek(roundi(lab._seek.value)); lab._refresh())
 	_history = VBoxContainer.new()
+	_history.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(_history)
 	lab._timeline = lab.TIMELINE.new()
 	lab._timeline.session = lab.session
+	lab._timeline.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_history.add_child(lab._timeline)
 	lab._timeline.seek_requested.connect(func(t): await lab.session.seek(t); lab._refresh())
+	_track_scroll = HScrollBar.new()
+	_track_scroll.step = 1
+	_track_scroll.value_changed.connect(func(value): lab._timeline.view_start = value; lab._timeline.queue_redraw())
+	_history.add_child(_track_scroll)
+	var track_tools := HBoxContainer.new()
+	_history.add_child(track_tools)
 	lab._branch = OptionButton.new()
-	_history.add_child(lab._branch)
+	lab._branch.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	track_tools.add_child(lab._branch)
 	lab._branch.item_selected.connect(lab._select_branch)
+	UI.button(track_tools, tr("lab.ui.zoom_out"), func(): lab._timeline.zoom_at(1.0 / 1.5), "minus", true)
+	_zoom_label = lab._label(track_tools, "")
+	UI.button(track_tools, tr("lab.ui.zoom_in"), func(): lab._timeline.zoom_at(1.5), "plus", true)
+	UI.button(track_tools, tr("lab.ui.show_all"), func(): lab._timeline.reset_view(), "focus", true)
 	_history.hide()
+
+func _set_history(open: bool) -> void:
+	if _history.visible and not open: _history_offset = _vertical_split.split_offsets[0]
+	_history.visible = open
+	_vertical_split.split_offsets = PackedInt32Array([_history_offset if open else 0])
 
 func open_settings(page: int) -> void:
 	lab.session.playing = false
+	_right_collapsed = false
+	_restore_settings = true
+	_restore_page = page
 	lab._right.hide()
 	settings.show()
 	lab.controls.current_tab = page
@@ -303,6 +378,7 @@ func close_settings() -> void:
 
 func _fit_panels() -> void:
 	if not is_instance_valid(settings): return
+	_right_dock.visible = settings.visible or lab._right.visible
 	var narrow: bool = lab.size.x < 1000 and (settings.visible or lab._right.visible)
 	if narrow and lab._left.visible:
 		_palette_auto_hidden = true
@@ -319,12 +395,36 @@ func _toggle_palette() -> void:
 		lab._right.hide()
 	lab._left.visible = show
 
+func _toggle_right() -> void:
+	if _right_dock.visible:
+		_right_collapsed = true
+		_restore_settings = settings.visible
+		_restore_page = lab.controls.current_tab
+		settings.hide()
+		lab._right.hide()
+	else:
+		_right_collapsed = false
+		if _restore_settings: open_settings(_restore_page)
+		elif lab.session.selected >= 0: lab._right.show()
+		else: open_settings(0)
+
 func sync() -> void:
 	lab._play.icon = UI.icon("pause" if lab.session.playing else "play")
 	lab._play.text = tr("lab.ui.pause" if lab.session.playing else "lab.ui.play")
 	lab._play.tooltip_text = lab._play.text + " · Space"
 	_cancel.visible = lab._busy or lab.session.seeking
 	_history_button.set_pressed_no_signal(_history.visible)
+	_left_toggle.icon = UI.icon("chevron_left" if lab._left.visible else "chevron_right")
+	_left_toggle.tooltip_text = tr("lab.ui.collapse_left" if lab._left.visible else "lab.ui.expand_left")
+	_right_toggle.icon = UI.icon("chevron_right" if _right_dock.visible else "chevron_left")
+	_right_toggle.tooltip_text = tr("lab.ui.collapse_right" if _right_dock.visible else "lab.ui.expand_right")
+	lab._timeline.sync_view(lab.session.playing)
+	_zoom_label.text = "×%.1f" % lab._timeline.zoom
+	var span: float = lab._timeline.visible_span()
+	_track_scroll.max_value = maxf(1, lab.session.furthest)
+	_track_scroll.page = span
+	_track_scroll.set_value_no_signal(lab._timeline.view_start)
+	_track_scroll.visible = lab._timeline.zoom > 1
 	if _last_mode != lab.canvas.mode:
 		_last_mode = lab.canvas.mode
 		for mode in tools: tools[mode].set_pressed_no_signal(mode == _last_mode)

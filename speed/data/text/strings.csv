@@ -526,3 +526,13 @@ lab.ui.route_comparisons,比較したルート,Route comparisons
 lab.ui.pattern_settings,配置のランダム化,Randomize layout
 lab.ui.production_export,AI用の書き出し,Export for AI
 lab.ui.empty_field,左の敵をここへドラッグ,Drag an enemy here from the palette
+lab.ui.resize_panel,境界をドラッグしてパネルの大きさを変更,Drag the divider to resize the panels
+lab.ui.collapse_left,左の一覧を折りたたむ,Collapse the left list
+lab.ui.expand_left,左の一覧を開く,Expand the left list
+lab.ui.collapse_right,右のパネルを折りたたむ,Collapse the right panel
+lab.ui.expand_right,右のパネルを開く,Expand the right panel
+lab.ui.zoom_in,時間軸を拡大,Zoom in on the timeline
+lab.ui.zoom_out,時間軸を縮小,Zoom out on the timeline
+lab.ui.show_all,時間軸の全体を表示,Show the entire timeline
+lab.ui.track_help,ホイールで時間軸を拡大縮小・中ドラッグで横移動・クリックで時刻を移動,Wheel to zoom; middle-drag to pan; click to seek
+lab.ui.track_time,%s秒,%ss
