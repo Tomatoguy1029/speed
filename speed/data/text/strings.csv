@@ -536,3 +536,10 @@ lab.ui.zoom_out,時間軸を縮小,Zoom out on the timeline
 lab.ui.show_all,時間軸の全体を表示,Show the entire timeline
 lab.ui.track_help,ホイールで時間軸を拡大縮小・中ドラッグで横移動・クリックで時刻を移動,Wheel to zoom; middle-drag to pan; click to seek
 lab.ui.track_time,%s秒,%ss
+lab.ui.freehand,自由に描く,Freehand
+lab.ui.edit_points,点を編集,Edit points
+lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points
+lab.ui.freehand_hint,クリックで描き始め・もう一度クリックで確定（ドラッグ描画も可）,Click to start and click again to finish; dragging also works
+lab.ui.drawing_route,描画中：クリックで確定・右クリック／Escで取り消し,Drawing: click to finish; right-click or Esc to cancel
+lab.ui.collapse_bottom,下のバー全体を折りたたむ,Collapse the entire bottom bar
+lab.ui.expand_bottom,下のバーを開く,Expand the bottom bar

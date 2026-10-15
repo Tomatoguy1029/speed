@@ -233,6 +233,7 @@ func _patterns(page: Node) -> void:
 	box = UI.fold(page, tr("lab.ui.pattern_settings"), true)
 	var jitter := _number(box, TranslationServer.translate("lab.message_0a50b49bd2"), 60, 0, 1000)
 	_button(box, TranslationServer.translate("lab.message_4855e0d71e"), func():
+		lab.canvas.finish_route()
 		lab.pattern = lab.generator.capture(lab.session, lab.canvas.route, jitter.value, margin.value)
 		lab.pattern["window"] = window_seconds.value
 		lab.pattern["draw_seconds"] = draw_seconds.value

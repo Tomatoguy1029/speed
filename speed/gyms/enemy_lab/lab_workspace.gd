@@ -31,6 +31,10 @@ var _restore_page := 0
 var _history_offset := 0
 var _zoom_label: Label
 var _track_scroll: HScrollBar
+var _route_tool: OptionButton
+var _transport_panel: PanelContainer
+var _transport_tab: Button
+var _transport_offset := 0
 
 func build(owner: Control) -> void:
 	lab = owner
@@ -185,6 +189,16 @@ func _toolbar(parent: Node) -> void:
 		var button := UI.button(bar, tr(item[1]), lab._set_mode.bind(item[0]), item[2])
 		button.toggle_mode = true
 		tools[item[0]] = button
+	_route_tool = OptionButton.new()
+	_route_tool.add_item(tr("lab.ui.freehand"))
+	_route_tool.add_item(tr("lab.ui.edit_points"))
+	_route_tool.tooltip_text = tr("lab.ui.route_tool_help")
+	_route_tool.item_selected.connect(func(index):
+		lab.canvas.finish_route()
+		lab.canvas.cancel_gesture()
+		lab.canvas.route_tool = index
+		lab.canvas.grab_focus())
+	bar.add_child(_route_tool)
 	UI.button(bar, tr("lab.undo"), func():
 		if lab.canvas.mode == 2: lab.canvas.undo_route()
 		else: await lab.session.undo_edit(), "undo", true)
@@ -306,6 +320,7 @@ func _check(parent: Node, key: String, on := false) -> CheckButton:
 
 func _transport(parent: Node) -> void:
 	var panel := PanelContainer.new()
+	_transport_panel = panel
 	parent.add_child(panel)
 	var box := VBoxContainer.new()
 	panel.add_child(box)
@@ -325,6 +340,20 @@ func _transport(parent: Node) -> void:
 	_cancel = UI.button(bar, tr("lab.message_67847e89ae"), func(): lab.trial.cancel(); lab.generator.cancelled = true; lab.session.cancel_seek(), "close")
 	_history_button = UI.button(bar, tr("lab.ui.history"), func(): _set_history(not _history.visible), "clock")
 	_history_button.toggle_mode = true
+	UI.button(bar, tr("lab.ui.collapse_bottom"), _toggle_transport, "chevron", true)
+	_transport_tab = UI.button(lab, tr("lab.ui.expand_bottom"), _toggle_transport, "chevron_up", true)
+	_transport_tab.custom_minimum_size = Vector2(48, 24)
+	_transport_tab.add_theme_constant_override("icon_max_width", 16)
+	_transport_tab.add_theme_stylebox_override("normal", UI.style(UI.SURFACE, Color("#30435b"), 3))
+	_transport_tab.anchor_left = 0.5
+	_transport_tab.anchor_right = 0.5
+	_transport_tab.anchor_top = 1
+	_transport_tab.anchor_bottom = 1
+	_transport_tab.offset_left = -24
+	_transport_tab.offset_right = 24
+	_transport_tab.offset_top = -24
+	_transport_tab.offset_bottom = 0
+	_transport_tab.hide()
 	lab._seek = HSlider.new()
 	lab._seek.min_value = 0
 	lab._seek.max_value = 1
@@ -356,6 +385,18 @@ func _transport(parent: Node) -> void:
 	UI.button(track_tools, tr("lab.ui.zoom_in"), func(): lab._timeline.zoom_at(1.5), "plus", true)
 	UI.button(track_tools, tr("lab.ui.show_all"), func(): lab._timeline.reset_view(), "focus", true)
 	_history.hide()
+
+func _toggle_transport() -> void:
+	lab.canvas.finish_route()
+	if _transport_panel.visible:
+		_transport_offset = _vertical_split.split_offsets[0]
+		_transport_panel.hide()
+		_transport_tab.show()
+	else:
+		_transport_panel.show()
+		_transport_tab.hide()
+		_vertical_split.split_offsets = PackedInt32Array([_transport_offset])
+	lab.canvas.grab_focus()
 
 func _set_history(open: bool) -> void:
 	if _history.visible and not open: _history_offset = _vertical_split.split_offsets[0]
@@ -432,6 +473,10 @@ func sync() -> void:
 		_mode_hint.text = tr(hints.get(_last_mode, "lab.ui.select_hint"))
 		_mode_hint.tooltip_text = _mode_hint.text
 		for id in palette_buttons: palette_buttons[id].set_pressed_no_signal(id == lab.canvas.spawn_type and _last_mode == 1)
+	_route_tool.visible = lab.canvas.mode == 2
+	if lab.canvas.mode == 2:
+		_mode_hint.text = tr("lab.ui.drawing_route" if lab.canvas._freehand else ("lab.ui.freehand_hint" if lab.canvas.route_tool == 0 else "lab.ui.route_hint"))
+		_mode_hint.tooltip_text = _mode_hint.text
 	_route_actions.visible = lab.canvas.route.size() >= 2
 	var length: float = lab.CHECK.length(lab.canvas.route)
 	var limit: float = lab.session.run.draw.budget(lab.session.run.state.stats.capacity * lab.session.run.state.gauge)

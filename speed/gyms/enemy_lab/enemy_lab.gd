@@ -129,6 +129,7 @@ func _fill_palette() -> void:
 	workspace._last_mode = -1
 
 func _set_mode(mode: int) -> void:
+	canvas.finish_route()
 	canvas.mode = mode
 	canvas.cancel_gesture()
 	canvas.grab_focus()
@@ -136,6 +137,7 @@ func _set_mode(mode: int) -> void:
 
 
 func _toggle_play() -> void:
+	canvas.finish_route()
 	session.playing = not session.playing
 	canvas.grab_focus()
 	_refresh()
@@ -143,6 +145,7 @@ func _toggle_play() -> void:
 func _reset() -> void:
 	if _busy:
 		return
+	canvas.cancel_gesture()
 	_busy = true
 	await session.reset({"seed": int(_seed.value), "stage": _stage.selected + 1, "empty": _empty.button_pressed, "auto_spawn": _auto.button_pressed, "field": {"terrain": _terrain.button_pressed, "rocks": _rocks.button_pressed, "gimmicks": _gimmicks.button_pressed}})
 	canvas.route.clear()
@@ -168,6 +171,7 @@ func _select_branch(index: int) -> void:
 func _evaluate() -> void:
 	if _busy or session.seeking:
 		return
+	canvas.finish_route()
 	_busy = true
 	session.playing = false
 	var path: PackedVector2Array = canvas.route.duplicate()
@@ -183,6 +187,7 @@ func _evaluate() -> void:
 	_busy = false
 
 func _validate_route() -> void:
+	canvas.finish_route()
 	canvas.result = CHECK.validate(session, canvas.route, controls.margin.value, controls.window_seconds.value, controls.draw_seconds.value, controls.exit_clearance.value)
 	_evaluation_revision = session.revision
 	_show_result(canvas.result)
@@ -256,6 +261,7 @@ func _apply_candidate() -> void:
 	_validate_route()
 
 func _save(record_history: bool) -> void:
+	canvas.finish_route()
 	var data := IO.record(session, canvas.route, pattern, comparisons, candidate_values) if record_history else IO.preset(session, canvas.route, pattern)
 	var path := "%s/%s-%s.json" % [IO.ROOT, IO.safe_name(controls.name_field.text), "record" if record_history else "preset"]
 	data["candidates"] = IO.plain(candidate_values)
@@ -277,6 +283,7 @@ func _choose_file() -> void:
 func _load_file(path: String) -> void:
 	if _busy:
 		return
+	canvas.cancel_gesture()
 	var data := IO.read_json(path)
 	if data.has("error"):
 		_messages.text = data.error
@@ -324,6 +331,7 @@ func _load_file(path: String) -> void:
 	_busy = false
 
 func _export() -> void:
+	canvas.finish_route()
 	var targets := []
 	for index in controls.export_targets.get_selected_items(): targets.append(controls.export_targets.get_item_metadata(index))
 	var folder := "%s/exports/%s" % [IO.ROOT, IO.safe_name(controls.name_field.text)]
@@ -377,6 +385,7 @@ func _notification(what: int) -> void:
 			canvas.cancel_gesture()
 
 func _select_comparison(index: int) -> void:
+	canvas.finish_route()
 	var value: Dictionary = comparisons[index]
 	canvas.route = value.route.duplicate()
 	canvas.result = value.result.duplicate(true)

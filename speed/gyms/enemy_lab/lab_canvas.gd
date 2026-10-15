@@ -16,6 +16,12 @@ var exit_clearance := 0.0
 var show_ranges := true
 var show_ids := false
 var route := PackedVector2Array()
+var route_tool := 0 # 0 自由描画、1 点編集
+var _freehand := false
+var _stroke_pressed := false
+var _stroke_dragged := false
+var _stroke_start := Vector2.ZERO
+var _stroke_before := PackedVector2Array()
 var result: Dictionary = {}
 var pattern: Dictionary = {}
 var candidate: Dictionary = {}
@@ -43,6 +49,8 @@ func _ready() -> void:
 	clip_contents = true
 	focus_mode = Control.FOCUS_ALL
 	custom_minimum_size = Vector2(300, 240)
+	mouse_exited.connect(func():
+		if _freehand and not _stroke_pressed: finish_route())
 
 func world(p: Vector2) -> Vector2:
 	return (p - size / 2.0) / zoom + center
@@ -104,21 +112,26 @@ func _gui_input(event: InputEvent) -> void:
 				elif mode == 1:
 					_place(p)
 				elif mode == 2:
-					_remember_route()
-					if event.alt_pressed:
-						_drag_route = true
-						_group_origin = p
-						_route_origin = route.duplicate()
-						return
-					_drag_point = -1
-					for i in route.size():
-						if screen(route[i]).distance_to(event.position) < 12:
-							_drag_point = i
-					if _drag_point < 0:
-						route.append(p)
-						_drag_point = route.size() - 1
-					result.clear()
-					route_edited.emit()
+					if event.alt_pressed: finish_route()
+					if route_tool == 0 and not event.alt_pressed:
+						if _freehand:
+							_extend_freehand(p, true)
+							finish_route()
+						else:
+							_begin_freehand(p, event.position)
+					else:
+						_remember_route()
+						if event.alt_pressed:
+							_drag_route = true
+							_group_origin = p
+							_route_origin = route.duplicate()
+							return
+						_drag_point = _nearest_route_point(event.position)
+						if _drag_point < 0:
+							route.append(p)
+							_drag_point = route.size() - 1
+						result.clear()
+						route_edited.emit()
 				elif mode == 3:
 					session.perform("input", {"cursor": [p.x, p.y], "press": true})
 				else:
@@ -139,6 +152,11 @@ func _gui_input(event: InputEvent) -> void:
 						_ghost = p
 						_dragging = true
 			else:
+				if _freehand:
+					if _stroke_pressed and _stroke_dragged:
+						_extend_freehand(world(event.position), true)
+						finish_route()
+					_stroke_pressed = false
 				if _range_drag and session.selected >= 0:
 					var t: EnemyTable = session.run.enemies.table
 					var row: int = session.selected
@@ -158,7 +176,11 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and mode == 2:
-			if not route.is_empty():
+			if _freehand:
+				_cancel_freehand()
+				accept_event()
+				return
+			if route_tool == 1 and not route.is_empty():
 				_remember_route()
 				var point := _nearest_route_point(event.position)
 				route.remove_at(point if point >= 0 else route.size() - 1)
@@ -166,6 +188,9 @@ func _gui_input(event: InputEvent) -> void:
 				route_edited.emit()
 			queue_redraw()
 	elif event is InputEventMouseMotion:
+		if _freehand and not _pan:
+			if _stroke_pressed and event.position.distance_to(_stroke_start) >= 8: _stroke_dragged = true
+			_extend_freehand(world(event.position))
 		if _range_drag: _ghost = world(event.position)
 		if _region >= 0:
 			var region: Dictionary = pattern.regions[_region]
@@ -216,8 +241,13 @@ func _gui_input(event: InputEvent) -> void:
 					var point := t.pos[row] + Vector2(60, 60)
 					session.perform("boss" if t.is_boss[row] else "spawn", {"type": String(t.type[row]), "pos": [point.x, point.y], "level": t.level[row], "elite": t.elite[row] != 0, "angle": t.facing[row]})
 		elif event.keycode == KEY_SPACE:
+			finish_route()
 			session.playing = not session.playing
 		elif event.keycode == KEY_ESCAPE:
+			if _freehand:
+				_cancel_freehand()
+				accept_event()
+				return
 			_dragging = false
 			_drag_point = -1
 			_drag_route = false
@@ -331,7 +361,7 @@ func _draw() -> void:
 		_draw_route(run.state.trace_path, Color("#6db9ff"), 2)
 	if not route.is_empty():
 		if exit_clearance > 0: draw_arc(screen(route[route.size() - 1]), (session.run.cfg.ship_radius + exit_clearance) * zoom, 0, TAU, 40, Color("#77e4bc"), 1.5)
-		_draw_route(route, Color("#77e4bc"), 3)
+		_draw_route(route, Color("#77e4bc"), 3, mode == 2 and route_tool == 1)
 	for comparison in comparisons:
 		if comparison.get("route") is PackedVector2Array:
 			_draw_route(comparison.route, Color(0.7, 0.65, 1.0, 0.25), 1)
@@ -367,7 +397,7 @@ func _draw() -> void:
 	if result.has("end"):
 		draw_circle(screen(Vector2(result.end[0], result.end[1])), 12, Color("#ffca6e"), false, 3)
 
-func _draw_route(points: PackedVector2Array, color: Color, width: float) -> void:
+func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_points := false) -> void:
 	var pts := PackedVector2Array()
 	for p in points:
 		pts.append(screen(p))
@@ -376,8 +406,12 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float) -> void
 		draw_polyline(pts, Color(color, 0.2), maxf(2, session.run.cfg.ship_radius * 2 * zoom), true)
 		draw_polyline(pts, color, width, true)
 	for i in pts.size():
-		draw_circle(pts[i], 5, color)
-		draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
+		var endpoint := i == 0 or i == pts.size() - 1
+		if not edit_points and not endpoint: continue
+		draw_circle(pts[i], 5 if endpoint or pts.size() <= 16 else 2, color)
+		if endpoint or (edit_points and pts.size() <= 16):
+			var number := str(i + 1) if edit_points else ("1" if i == 0 else "2")
+			draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), number, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
 
 func _draw_projectiles(p: ProjectileManager) -> void:
 	if show_ranges and p.director != null:
@@ -439,12 +473,57 @@ func _source_line(p: ProjectileManager, token: int, at: Vector2) -> void:
 	draw_line(to, to - direction.rotated(0.5) * 7, Color.ORANGE, 1)
 	draw_line(to, to - direction.rotated(-0.5) * 7, Color.ORANGE, 1)
 
+func _begin_freehand(point: Vector2, at: Vector2) -> void:
+	session.playing = false
+	_stroke_before = route.duplicate()
+	route = PackedVector2Array([point])
+	_freehand = true
+	_stroke_pressed = true
+	_stroke_dragged = false
+	_stroke_start = at
+	result.clear()
+	route_edited.emit()
+
+func _extend_freehand(point: Vector2, final := false) -> void:
+	if not _freehand: return
+	var distance := route[route.size() - 1].distance_to(point)
+	var spacing: float = maxf(session.run.cfg.draw_step, 2.0 / zoom)
+	if distance < (0.01 if final else spacing): return
+	route.append(point)
+	result.clear()
+	route_edited.emit()
+	if route.size() >= 10000: finish_route()
+
+func finish_route() -> void:
+	if not _freehand: return
+	if route.size() < 2:
+		_cancel_freehand()
+		return
+	_freehand = false
+	_stroke_pressed = false
+	route_undo.append(_stroke_before)
+	if route_undo.size() > 50: route_undo.pop_front()
+	route_redo.clear()
+	_stroke_before = PackedVector2Array()
+	queue_redraw()
+
+func _cancel_freehand() -> void:
+	if not _freehand: return
+	route = _stroke_before
+	_stroke_before = PackedVector2Array()
+	_freehand = false
+	_stroke_pressed = false
+	result.clear()
+	route_edited.emit()
+	queue_redraw()
+
 func _nearest_route_point(at: Vector2) -> int:
 	for i in route.size():
 		if screen(route[i]).distance_to(at) < 16: return i
 	return -1
 
 func cancel_gesture() -> void:
+	_cancel_freehand()
 	_range_drag = false
 	_dragging = false
 	_drag_point = -1
@@ -464,6 +543,7 @@ func _remember_route() -> void:
 	route_redo.clear()
 
 func clear_route() -> void:
+	cancel_gesture()
 	_remember_route()
 	route.clear()
 	result.clear()
@@ -471,6 +551,9 @@ func clear_route() -> void:
 	queue_redraw()
 
 func undo_route(redo := false) -> void:
+	if _freehand:
+		_cancel_freehand()
+		return
 	var source := route_redo if redo else route_undo
 	var target := route_undo if redo else route_redo
 	if source.is_empty(): return

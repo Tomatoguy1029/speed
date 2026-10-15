@@ -33,6 +33,7 @@ static func icon(kind: String) -> Texture2D:
 		"clock": '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 3"/>',
 		"help": '<circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 1 1 5 3c-2 1-2 2-2 3m0 3h.1"/>',
 		"more": '<path d="M5 12h.1m7 0h.1m7 0h.1" stroke-width="4"/>',
+		"chevron_up": '<path d="m6 15 6-6 6 6"/>',
 		"chevron": '<path d="m6 9 6 6 6-6"/>',
 		"chevron_right": '<path d="m9 6 6 6-6 6"/>',
 		"grid": '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
