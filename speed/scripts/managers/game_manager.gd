@@ -4,7 +4,7 @@
 ## screen_changed を受けて、対応する画面のシーンに差し替える。
 extends Node
 
-enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT }
+enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB }
 
 signal screen_changed(screen: Screen)
 signal run_requested(stage: int, endless: bool)

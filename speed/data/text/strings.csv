@@ -13,6 +13,7 @@ menu.settings,設定,Settings
 menu.quit,終了,Quit
 menu.main_menu,メインメニュー,Main Menu
 menu.stage_select,ステージ選択,Stage Select
+menu.enemy_lab,敵・ルート実験場（開発版）,Enemy & Route Lab (Dev Build)
 menu.upgrade,機体の強化,Ship Upgrades
 menu.encyclopedia,図鑑,Codex
 ,■ 設定,

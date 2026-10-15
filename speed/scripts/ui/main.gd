@@ -14,6 +14,7 @@ const SCREENS := {
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
 	GameManager.Screen.RUN: "res://scenes/run/run.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
+	GameManager.Screen.ENEMY_LAB: "res://gyms/enemy_lab/enemy_lab.tscn",
 }
 
 var _current: Node = null

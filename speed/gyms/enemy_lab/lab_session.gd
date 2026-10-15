@@ -68,6 +68,7 @@ func _rebuild() -> void:
 	scene = RUN_SCENE.instantiate()
 	scene.get_node("Hud").free()
 	scene.get_node("Managers/RenderManager").free()
+	scene.get_node("World/Camera2D").enabled = false
 	run = scene.get_node("Managers/RunManager")
 	run.options = {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
 		"seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),

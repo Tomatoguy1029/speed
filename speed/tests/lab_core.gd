@@ -37,6 +37,17 @@ func _ready() -> void:
 	check(JSON.stringify(SaveManager.data) == data_before and ConfigManager.cfg.enemy_hp_mult == config_before, "実験でセーブと本番設定を変えない")
 	await lab.reset({"seed": 932, "empty": true})
 	check(lab.run.enemies.count() == 0, "実験を空の状態へ戻せる")
+	await lab.reset({"seed": 801, "empty": true, "stage": 4})
+	lab.perform("boss", {"type": "hydra", "pos": [400, 0]})
+	for n in 150:
+		lab.step()
+	var boss_digest: String = lab.digest()
+	await lab.seek(0)
+	await lab.seek(150)
+	check(lab.digest() == boss_digest, "うみへびの首と乱数も巻き戻して再現できる")
+	await lab.seek(60)
+	lab.perform("spawn", {"type": "rocket", "pos": [-300, 0]})
+	check(lab.branches.size() == 1 and lab.furthest == 60, "過去を編集すると元の履歴を残して分岐する")
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[lab_core] passed=%d failed=%d" % [passed, failed])
