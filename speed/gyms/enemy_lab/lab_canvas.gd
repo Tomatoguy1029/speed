@@ -16,6 +16,10 @@ var zoom := 0.6
 var exit_clearance := 0.0
 var show_ranges := true
 var show_ids := false
+## 本番の画面のうち、HUD・ミニマップ・背景の星を出すか（初めは出さない）
+var show_hud := false
+var show_minimap := false
+var show_background := false
 var route := PackedVector2Array()
 var route_tool := 0 # 0 自由描画、1 点編集
 var _freehand := false

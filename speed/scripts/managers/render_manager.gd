@@ -47,6 +47,8 @@ var cam_center := Vector2.ZERO
 var cam_zoom := 1.0
 ## 実験場（デバッグ）用：{"center": Vector2, "zoom": float} を入れると、ゲームの状態を変えずに描画のカメラだけをそこへ動かす
 var view_override: Variant = null
+## 背景の星を描くか（実験場では初めは消す）
+var show_background := true
 ## いつも飾りを描く敵の種類（type ID → true）
 var _always_marked: Dictionary = {}
 var _path_band_group: CanvasGroup
@@ -391,6 +393,7 @@ func _build_star_batch() -> void:
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
 	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
+	_star_batch.visible = show_background
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)

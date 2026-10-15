@@ -143,6 +143,9 @@ func _rebuild() -> void:
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
 	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
+	# 機体を置き直したので、カメラと敵の狙いも機体の位置から始める
+	run.state.view_center = run.state.ship_pos
+	run.state.enemy_aim = run.state.ship_pos
 	run.state.time = float(spec.get("time", 0.0))
 	run.state.gauge = float(spec.get("gauge", 1.0))
 	if not rocks: run.field.rocks.clear()

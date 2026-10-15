@@ -12,6 +12,11 @@ const LOADOUT_WEAPON := 50.0
 const LOADOUT_TRAIT := 40.0
 ## ミニマップの半径（画面px）
 const MINIMAP_R := 78.0
+
+## ミニマップと、ミニマップ以外の表示（経験値バー・時間・状態の文字・装備一覧・ボス・ゲージのリング）を描くか
+## （実験場では初めは消す）
+var show_minimap := true
+var show_status := true
 ## 彗星限定の武器の枠の色（段階の色と重ならない赤）
 const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
@@ -257,6 +262,10 @@ func _draw() -> void:
 	if s.phase == RunState.Phase.DYING or s.phase == RunState.Phase.FINISHING:
 		_draw_banner()
 		return
+	if show_minimap:
+		_draw_minimap(W)
+	if not show_status:
+		return
 	# 経験値バー（画面の上端）
 	draw_rect(Rect2(0, 0, W, 5), Color(1, 1, 1, 0.08))
 	draw_rect(Rect2(0, 0, W * clampf(s.xp / run.build.xp_needed(), 0.0, 1.0), 5), Color("#b8a0ff"))
@@ -276,7 +285,6 @@ func _draw() -> void:
 		draw_string(_font, Vector2(x, 52), "ATK %.1f   %s   Lv %d" % [atk, tr("hud.kills").format({n = s.kills}), s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
 		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
 	_draw_loadout(H)
-	_draw_minimap(W)
 	_draw_boss(W)
 	_draw_gauge_ring()
 

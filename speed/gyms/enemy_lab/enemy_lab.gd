@@ -137,6 +137,9 @@ func _set_mode(mode: int) -> void:
 	canvas.finish_route()
 	canvas.mode = mode
 	canvas.cancel_gesture()
+	# 試遊を選んだら、そのまま再生して操作できるようにする
+	if mode == 3 and not session.playing and not session.seeking:
+		session.playing = true
 	_focus_play_area()
 	workspace._last_mode = -1
 
@@ -401,7 +404,16 @@ func _sync_view() -> void:
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
 	if render == null:
 		return
-	if playing:
+	# 本番の画面のうち HUD・ミニマップ・背景の星は、表示メニューで選んだときだけ出す
+	render.show_background = canvas.show_background
+	var hud: CanvasLayer = session.scene.get_node_or_null("Hud")
+	if hud != null:
+		hud.visible = canvas.show_hud or canvas.show_minimap
+		var hud_root = hud.get_node_or_null("HudRoot")
+		if hud_root != null:
+			hud_root.show_minimap = canvas.show_minimap
+			hud_root.show_status = canvas.show_hud
+	if playing and render.cam_zoom > 0.0001:
 		render.view_override = null
 		canvas.center = render.cam_center
 		canvas.zoom = render.cam_zoom

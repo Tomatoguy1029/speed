@@ -230,11 +230,16 @@ func _toolbar(parent: Node) -> void:
 	view.get_popup().add_check_item(tr("lab.message_fb93512f75"), 0)
 	view.get_popup().set_item_checked(0, true)
 	view.get_popup().add_check_item(tr("lab.names"), 1)
+	view.get_popup().add_separator()
+	view.get_popup().add_check_item(tr("lab.ui.show_hud"), 2)
+	view.get_popup().add_check_item(tr("lab.ui.show_minimap"), 3)
+	view.get_popup().add_check_item(tr("lab.ui.show_background"), 4)
 	view.get_popup().id_pressed.connect(func(id):
-		var on := not view.get_popup().is_item_checked(id)
-		view.get_popup().set_item_checked(id, on)
-		if id == 0: lab.canvas.show_ranges = on
-		else: lab.canvas.show_ids = on)
+		var index := view.get_popup().get_item_index(id)
+		var on := not view.get_popup().is_item_checked(index)
+		view.get_popup().set_item_checked(index, on)
+		var key: String = ["show_ranges", "show_ids", "show_hud", "show_minimap", "show_background"][id]
+		lab.canvas.set(key, on))
 	UI.button(bar, tr("lab.ui.center"), func(): lab.canvas.center = lab.session.run.state.ship_pos; lab.canvas.zoom = 0.6, "focus", true)
 	var more := MenuButton.new()
 	more.icon = UI.icon("more")

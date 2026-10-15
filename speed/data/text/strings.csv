@@ -536,6 +536,9 @@ lab.ui.zoom_out,時間軸を縮小,Zoom out on the timeline
 lab.ui.show_all,時間軸の全体を表示,Show the entire timeline
 lab.ui.track_help,ホイールで時間軸を拡大縮小・中ドラッグで横移動・クリックで時刻を移動,Wheel to zoom; middle-drag to pan; click to seek
 lab.ui.track_time,%s秒,%ss
+lab.ui.show_hud,HP・装備などの表示,HUD (HP and loadout)
+lab.ui.show_minimap,ミニマップ,Minimap
+lab.ui.show_background,背景の星,Background stars
 lab.ui.freehand,自由に描く,Freehand
 lab.ui.edit_points,点を編集,Edit points
 lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points
