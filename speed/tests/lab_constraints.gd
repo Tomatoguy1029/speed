@@ -1,0 +1,43 @@
+extends Node
+const CHECK := preload("res://scripts/encounters/route_constraints.gd")
+const IO := preload("res://gyms/enemy_lab/lab_io.gd")
+var failed := 0
+func check(ok: bool, label: String) -> void:
+	if not ok:
+		failed += 1
+		push_error(label)
+func _ready() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset()
+	var route := PackedVector2Array([Vector2(-300, 0), Vector2(300, 0)])
+	lab.perform("spawn", {"type": "drifter", "pos": [0, 0]})
+	check(CHECK.validate(lab, route).valid, "弱い敵はルートの障害物にしない")
+	check(CHECK.validate(lab, route, 20, 1).status == "unsupported", "動く敵の静止判定を時間幅の保証にしない")
+	lab.perform("spawn", {"type": "armored", "pos": [0, 0]})
+	check(not CHECK.validate(lab, route).valid, "線の両端が安全でも中間の装甲を検出する")
+	lab.perform("clear")
+	lab.perform("spawn", {"type": "drifter", "pos": [0, 0]})
+	lab.perform("parameter", {"type": "drifter", "key": "speed", "value": 0})
+	lab.run.enemies.table.vel[lab.selected] = Vector2.ZERO
+	check(CHECK.validate(lab, route, 20, 1).status == "window", "対応する静止モデルだけ時間幅を認証する")
+	var record := IO.record(lab, route, {}, [])
+	check(IO.save_json("/private/tmp/speed-lab-roundtrip.json", record) == OK, "JSON を保存できる")
+	var read := IO.read_json("/private/tmp/speed-lab-roundtrip.json")
+	check(not read.has("error") and not read.stale, "基準付きで JSON を再読込できる")
+	read.history.append({"tick": 0, "kind": "spawn", "args": {"type": "unknown"}})
+	check(not IO.validate(read).is_empty(), "未知の敵を黙って読み込まない")
+	var generator = load("res://gyms/enemy_lab/encounter_pattern.gd").new()
+	add_child(generator)
+	var pattern: Dictionary = generator.capture(lab, route, 0)
+	var result: Dictionary = await generator.generate(lab, pattern, 34)
+	check(result.status == "static", "ルートと領域から検証済みランダム候補を生成する")
+	var runtime = load("res://scripts/encounters/encounter_coordinator.gd").new()
+	add_child(runtime)
+	await lab.reset({"empty": true})
+	runtime.setup(lab.run, {"enabled": true, "patterns": [pattern], "director": {"enabled": true}})
+	runtime.advance()
+	check(not runtime.opportunity.is_empty() and lab.run.enemies.count() > 0, "採用した規則だけを本番と同じ入口で追加できる")
+	check(ConfigManager.stage(1).encounter_profile.is_empty(), "通常ステージでは採用前の機能を有効にしない")
+	print("[lab_constraints] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
