@@ -17,10 +17,11 @@
 | `gunner`     | 射撃型     | 採用     | 実装済み       | 距離を保って回り込み、予告のあと弾を撃つ                                         | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md)     |
 | `missile`    | ミサイル艇 | 採用     | 実装済み       | さらに遠い距離を保ち、予告のあと誘導弾を撃つ                                     | 緊張期・脱出期、危険地帯             | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md)    |
 | `titan`      | タイタン   | 採用     | 実装済み       | 大型の追跡敵。生成時に大きさが変わる                                             | 無双期以外。同時に出る数に上限       | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../../../demo/docs/enemies.md)      |
+| `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres`、`enemy_manager.gd` |
 
 ## 調整用に保持する敵
 
-追加版の敵は実装を保持し、通常出現への組み込みを実験場で調整する。ステージ1〜5の通常出現は共通の元の時間帯を使う。
+追加版の敵は専用の[敵・ルート実験場](../spec.md#201-敵ルート実験場)から呼び出し、単体と混成を調整してから通常出現へ採用する。共有 ID の種類は上の通常構成でも使い、追加版の設定を実験用に保持する。ステージ1〜5の通常出現は共通の元の時間帯を使う。
 
 区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。通常ステージは共通の6時間帯を使う。追加版の `speed/data/phases/s<ステージ>_*.tres` は調整用に保持する。
 
