@@ -540,6 +540,106 @@ lab.ui.show_hud,HP・装備などの表示,HUD (HP and loadout)
 lab.ui.show_minimap,ミニマップ,Minimap
 lab.ui.show_background,背景の星,Background stars
 lab.ui.clear_route,線を消す,Clear route
+lab.ui.how_moves,動き,Behavior
+lab.ui.how_to_kill,倒し方,How to defeat
+lab.enemy.drifter.move,追ってくる。ときどき画面の中を広く回る,Chases you and sometimes roams widely across the screen
+lab.enemy.drifter.kill,HP を削る（体当たり・武器）,Wear down its HP (ram or weapons)
+lab.enemy.swarm.move,小さな体で群れになって追ってくる,Small bodies that chase you in packs
+lab.enemy.swarm.kill,HP を削る,Wear down its HP
+lab.enemy.darter.move,近づくと構えてから突進し、突進のあとしばらく止まる,Winds up when close then dashes and stops for a while
+lab.enemy.darter.kill,HP を削る。止まっている間が狙いどき,Wear down its HP. Strike while it is stopped
+lab.enemy.armored.move,硬い装甲で追ってくる,Chases you behind heavy armor
+lab.enemy.armored.kill,攻撃力が装甲以上なら貫ける。背面に当てると必ずクリティカル,Pierce it when your attack meets its armor. Hits on its back always crit
+lab.enemy.splitter.move,追いながら分裂体を生み、倒すと2体に分かれる,Spawns splitlings while chasing and splits in two when defeated
+lab.enemy.splitter.kill,分かれた体もすべて倒す,Defeat every split body too
+lab.enemy.splitling.move,小さな体で追ってくる,A small body that chases you
+lab.enemy.splitling.kill,HP を削る,Wear down its HP
+lab.enemy.gunner.move,距離を保って回り込み、光ってから弾を撃つ,Keeps its distance and circles then fires after a flash
+lab.enemy.gunner.kill,HP を削る,Wear down its HP
+lab.enemy.missile.move,遠い距離を保ち、予告のあとホーミングミサイルを撃つ,Keeps far away and fires homing missiles after a warning
+lab.enemy.missile.kill,HP を削る,Wear down its HP
+lab.enemy.titan.move,大きな体で追ってくる。大きさは毎回変わる,A large chaser whose size varies each time
+lab.enemy.titan.kill,HP が多い。何度も貫く,High HP. Pierce it many times
+lab.enemy.battleship.move,追ってきて、予告のあと扇状に弾を撃つ,Chases you and fires a fan of bullets after a warning
+lab.enemy.battleship.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
+lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づくと爆発する。少しすると消える,Flies straight in its spawn direction and explodes near you then fades
+lab.enemy.rocket.kill,HP を削る,Wear down its HP
+lab.enemy.bomber.move,追ってきて、近づくと2回明滅して爆発する,Chases you and blinks twice before exploding when close
+lab.enemy.bomber.kill,明滅し終わる前に貫けば、爆発させずに倒せる,Pierce it before it finishes blinking to defeat it without an explosion
+lab.enemy.volatile.move,追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む（連鎖する）,Chases you. Explodes shortly after defeat and catches enemies and you (chains)
+lab.enemy.volatile.kill,HP を削る。倒したら爆発から離れる,Wear down its HP then get clear of the blast
+lab.enemy.beamer.move,距離を保ち、止まって砲口に光を集めてからビームを撃つ,Keeps its distance and stops to charge its muzzle before firing a beam
+lab.enemy.beamer.kill,HP を削る,Wear down its HP
+lab.enemy.pulser.move,距離を保ち、止まって届く距離の短い輪を1枚出す,Keeps its distance and stops to emit one short-range ring
+lab.enemy.pulser.kill,HP を削る,Wear down its HP
+lab.enemy.spreader.move,追ってきて、予告のあと扇状に弾をばらまく,Chases you and sprays a fan of bullets after a warning
+lab.enemy.spreader.kill,HP を削る,Wear down its HP
+lab.enemy.pump.move,距離を保ち、止まって周りの敵と遅い機体を吸い寄せてから、前へ一気に吐き出す,Keeps its distance and stops to pull in enemies and a slow ship then blasts them forward
+lab.enemy.pump.kill,吸っている間（口が開いている間）だけ倒せる。ほかの時は貫いても無傷,Only while it is sucking (mouth open). Otherwise piercing does nothing
+lab.enemy.telescope.move,距離を保ち、レンズが光ってから細く速い弾を撃つ,Keeps its distance and fires a thin fast bullet after its lens flashes
+lab.enemy.telescope.kill,HP を削る,Wear down its HP
+lab.enemy.triangle.move,3つの星の間に光の膜を張って追ってくる。膜に触れると被弾する,Chases you with a light membrane between three stars. Touching it hurts
+lab.enemy.triangle.kill,頂点の星を1つ倒すと膜が消え、中の核を倒せる,Destroy one corner star to drop the membrane and expose the core
+lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と一緒に動く,A corner star of the Southern Triangle that moves with the core
+lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
+lab.enemy.shield.move,機体の方へゆっくり向き直りながら近づく。攻撃はしない,Slowly turns to face you while approaching. Does not attack
+lab.enemy.shield.kill,背面から貫くと倒れる。前から体当たりすると弾かれる,Pierce it from behind. Ramming its front bounces you off
+lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置く,Keeps its distance and places a long light wall near you
+lab.enemy.ruler.kill,HP を削る,Wear down its HP
+lab.enemy.crow.move,周りで倒された敵の残骸を集め、塊にして投げてくる,Gathers the debris of nearby defeated enemies into a lump and throws it
+lab.enemy.crow.kill,HP を削る。倒すと集めた塊が砕けて破片が飛ぶ,Wear down its HP. Defeating it shatters the lump into shards
+lab.enemy.lynx.move,近づいてきて、前方を扇形に爪で薙ぐ。殻が割れている間は速く振る,Approaches and slashes a fan in front of it. Slashes faster while its shell is broken
+lab.enemy.lynx.kill,殻を割り、数秒のうちにもう1回当てる。殻は体当たり1回か、弾・波動を当て続けると割れる,Break the shell then hit it again within seconds. One ram or sustained shots and waves break the shell
+lab.enemy.reticle.move,距離を保ち、機体のいた位置に照準を刻んで雷を落とす,Keeps its distance and marks where you were then drops lightning there
+lab.enemy.reticle.kill,HP を削る,Wear down its HP
+lab.enemy.cross.move,距離を保ち、光を集めてから十字にレーザーを撃つ,Keeps its distance and gathers light before firing a cross of lasers
+lab.enemy.cross.kill,HP を削る,Wear down its HP
+lab.enemy.clock.move,長針と短針が刃として回り続ける。2本の速さが違う,Its long and short hands spin as blades at different speeds
+lab.enemy.clock.kill,針の隙間から本体を狙う,Hit the body through the gap between the hands
+lab.enemy.dolphin.move,距離を保ち、切れ目のずれた何層もの輪を出す,Keeps its distance and emits layered rings with shifting gaps
+lab.enemy.dolphin.kill,HP を削る,Wear down its HP
+lab.enemy.crab.move,近づいてハサミを開き、前方を挟む,Approaches and opens its claws then pinches in front
+lab.enemy.crab.kill,背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる,Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front
+lab.enemy.marlin.move,距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く,Keeps its distance then flashes and darts past you spraying both sides
+lab.enemy.marlin.kill,HP を削る,Wear down its HP
+lab.enemy.auriga.move,大きく旋回しながら走り、車輪の跡が燃えて残る,Drives in wide turns leaving burning wheel tracks
+lab.enemy.auriga.kill,HP を削る,Wear down its HP
+lab.enemy.corona.move,周りを星の輪が回り、ときどき輪を広げて押し出す,A ring of stars circles it and periodically expands to push outward
+lab.enemy.corona.kill,回る星に体当たりすると弾かれる。隙間を通して本体を貫く。星は武器で壊せる,Ramming a ring star bounces you. Pierce the body through a gap. Weapons break the stars
+lab.enemy.corona_star.move,みなみのかんむり座の周りを回る星,A star circling the Southern Crown
+lab.enemy.corona_star.kill,体当たりは弾かれる。武器・波動で壊せる,Rams bounce off. Weapons and waves break it
+lab.enemy.phoenix.move,機体の周りを旋回し、飛んだ跡に炎を残す,Circles you and leaves a trail of fire
+lab.enemy.phoenix.kill,HP を削る。倒すと周りを焼き払い、近いと自分も焼かれる,Wear down its HP. Defeat scorches the area and burns you if close
+lab.enemy.cepheus.move,距離を保ち、光ってから周りの強敵に一斉に攻撃させる,Keeps its distance and flashes to order nearby strong enemies to attack at once
+lab.enemy.cepheus.kill,HP を削る,Wear down its HP
+lab.enemy.aquarius.move,遠くから太い水流を流し続け、敵と遅い機体を押し流す,Pours a thick stream from afar that pushes enemies and a slow ship
+lab.enemy.aquarius.kill,HP を削る,Wear down its HP
+lab.enemy.aquila.move,大きく旋回して飛び、通り道に雷を落とす,Flies in wide turns dropping lightning along its path
+lab.enemy.aquila.kill,HP を削る,Wear down its HP
+lab.enemy.meteor.move,固い障害物。止まっているものと、ゆっくり漂うものがある,A solid obstacle. Some stay still and some drift slowly
+lab.enemy.meteor.kill,攻撃力が装甲以上の体当たりで砕く。普段の速さで触れると跳ね返る,Smash it with a ram that meets its armor. Touching it at normal speed bounces you
+lab.enemy.iron.move,動かない固い障害物（鉄のがれき）,An immovable solid obstacle (iron debris)
+lab.enemy.iron.kill,装甲がとても高い。十分な攻撃力の体当たりで割れる,Very high armor. A strong enough ram breaks it
+lab.enemy.saw.move,その場で回る丸鋸,A saw blade spinning in place
+lab.enemy.saw.kill,壊すのではなく、触れて飛ばす。進んでいた向きへ飛び、先の敵を巻き込む,Launch it by touching it rather than destroying it. It flies your way and cuts through enemies
+lab.enemy.hydra_bite.move,うみへび座の首。首を引いてから前へ伸びて噛みつく。3回続けて噛むこともある,A Hydra neck. Pulls back then lunges to bite. Sometimes bites three times in a row
+lab.enemy.hydra_bite.kill,頭を削って落とす（本体の体力も減る）。落ちた頭は生え直す,Wear the head down (also hurts the body). Lost heads regrow
+lab.enemy.hydra_vortex.move,うみへび座の首。渦を巻く息で、引き寄せる渦を置く,A Hydra neck. Breathes out a pulling vortex
+lab.enemy.hydra_vortex.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_debris.move,うみへび座の首。瓦礫を吐いて漂わせる。瓦礫を固めて投げることもある,A Hydra neck. Spits drifting debris or throws a packed lump
+lab.enemy.hydra_debris.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_beam.move,うみへび座の首。光を溜めて太いビームで薙ぐ。細いビームを3回撃つこともある,A Hydra neck. Charges then sweeps a thick beam or fires three thin beams
+lab.enemy.hydra_beam.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_homing.move,うみへび座の首。ホーミング弾を吐く。弾の輪を浮かべて放つこともある,A Hydra neck. Spits homing shots or floats a ring of bullets and releases it
+lab.enemy.hydra_homing.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_immortal.move,うみへび座の不死の首。むき出しの間、周りへ衝撃を出して暴れる,The immortal Hydra neck. Lashes out with shockwaves while exposed
+lab.enemy.hydra_immortal.kill,むき出しの数秒のうちに貫くと本体に大ダメージ。火は効かない,Pierce it within the exposed seconds for heavy body damage. Fire has no effect
+lab.enemy.hydra_rubble.move,うみへび座が吐いた瓦礫。漂って、少しすると消える,Debris spat by the Hydra. Drifts and vanishes after a while
+lab.enemy.hydra_rubble.kill,体当たりは弾かれる。武器で壊せる,Rams bounce off. Weapons break it
+lab.enemy.provisional.move,機体を直接追い、予告のあと扇状に弾を撃つ,Chases you directly and fires a fan of bullets after a warning
+lab.enemy.provisional.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
+lab.enemy.hydra.move,その場で構え、機体が離れると泳いで近づく。首（3〜9本）がそれぞれ攻撃し、羅針盤で予告して強めの技を出す,Holds its ground and swims closer when you are far. Each neck (3 to 9) attacks and its compass signals strong techniques
+lab.enemy.hydra.kill,本体と首はすり抜ける。頭だけにダメージが通る。全部の頭を落とすと出る不死の首を貫くと大ダメージ,The body and necks are intangible. Only heads take damage. Pierce the immortal neck exposed after all heads fall
 lab.ui.freehand,自由に描く,Freehand
 lab.ui.edit_points,点を編集,Edit points
 lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points

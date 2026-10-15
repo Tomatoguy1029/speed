@@ -17,6 +17,9 @@ var _controls: Dictionary = {}
 var _level: SpinBox
 var _elite: CheckButton
 var _individual_snapshot := Vector2.ZERO
+## どう動いて攻撃するか、どう倒すかの短い説明（文章のマスタの lab.enemy.<type ID>.move / .kill）
+var _how: Label
+var _kill: Label
 
 func _ready() -> void:
 	var heading := HBoxContainer.new()
@@ -38,6 +41,8 @@ func _ready() -> void:
 	_health.add_theme_stylebox_override("background", UI.style(Color("#29394c"), Color.TRANSPARENT, 0))
 	_health.add_theme_stylebox_override("fill", UI.style(UI.ACCENT, Color.TRANSPARENT, 0))
 	add_child(_health)
+	_how = _note(tr("lab.ui.how_moves"))
+	_kill = _note(tr("lab.ui.how_to_kill"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -45,6 +50,27 @@ func _ready() -> void:
 	_values = VBoxContainer.new()
 	_values.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_values)
+
+## 小さな見出しと、折り返す説明の文を置き、説明の文を返す。
+func _note(heading: String) -> Label:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	add_child(box)
+	var title := _text(box, heading)
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", UI.MUTED)
+	var body := _text(box, "")
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size.x = 120
+	return body
+
+## 敵の種類の説明を出す。説明が無い種類は隠す。
+func _describe(type: StringName) -> void:
+	for pair in [[_how, "lab.enemy.%s.move" % type], [_kill, "lab.enemy.%s.kill" % type]]:
+		var label: Label = pair[0]
+		var text := tr(pair[1])
+		label.text = text
+		label.get_parent().visible = text != pair[1]
 
 func _text(parent: Node, value: String) -> Label:
 	var label := Label.new()
@@ -63,6 +89,7 @@ func refresh(force := false) -> void:
 	var def: Resource = session.definition_for_row(i)
 	if def == null: return
 	_title.text = def.display_name
+	_describe(t.type[i])
 	_title.tooltip_text = "%s #%d" % [t.type[i], t.id[i]]
 	_portrait.definition = def
 	_portrait.texture = canvas.texture_for(String(t.type[i]))
