@@ -9,6 +9,8 @@ extends RunSystem
 var field: FieldManager
 var projectiles: ProjectileManager
 var bosses: BossManager
+## 実験場が複製した定義。未指定時は本番の定義を読む。
+var definitions: Dictionary = {}
 
 const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"split": EnemyTable.Beh.SPLIT,
 	&"gunner": EnemyTable.Beh.GUNNER, &"missile": EnemyTable.Beh.MISSILE,
@@ -324,7 +326,7 @@ func _release_row(i: int) -> void:
 	slots.release(i)
 
 func def_of(type: StringName) -> EnemyDef:
-	return ConfigManager.enemies.get(type) as EnemyDef
+	return definitions.get(type, ConfigManager.enemies.get(type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
 func debug_spawn_random(count_n: int) -> void:

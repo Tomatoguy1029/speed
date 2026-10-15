@@ -16,6 +16,9 @@ signal frame_events(events: Array[Dictionary])
 
 var state: RunState
 var cfg: GameConfig
+## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
+var options: Dictionary = {}
+var input_source: Callable
 
 @onready var field: FieldManager = $"../FieldManager"
 @onready var ship: ShipManager = $"../ShipManager"
@@ -45,16 +48,24 @@ var profile: Dictionary = {}
 var profiling := false
 
 func _ready() -> void:
-	cfg = ConfigManager.cfg
+	if not OS.is_debug_build():
+		options = {}
+	cfg = options.get("config", ConfigManager.cfg)
 	state = RunState.new()
-	state.stage_index = GameManager.run_stage
+	state.lab_mode = bool(options.get("lab", false))
+	state.meta_override = options.get("meta", {})
+	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
 	state.endless = GameManager.run_endless
-	state.stage = ConfigManager.stage(state.stage_index)
-	state.rng.randomize()
+	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
+	if options.has("seed"):
+		state.rng.seed = int(options.seed)
+	else:
+		state.rng.randomize()
 	state.hitstop_budget = cfg.kill_hitstop_cap
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
 	_wire()
+	enemies.definitions = options.get("enemies", {})
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
 		m.setup(state, cfg)
@@ -63,7 +74,8 @@ func _ready() -> void:
 		cards_changed.emit())
 	_update_camera(1.0)
 	# 最初の武器を選ぶ。HUD がつながってから開く
-	build.open_start_cards.call_deferred()
+	if not state.lab_mode:
+		build.open_start_cards.call_deferred()
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
@@ -112,6 +124,8 @@ func _wire() -> void:
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
+	if state.lab_mode:
+		return
 	match state.phase:
 		RunState.Phase.PLAY:
 			if profiling:
@@ -144,7 +158,8 @@ func _leave_bonus() -> void:
 	state.emit(&"bonus", {"enter": false, "pos": state.ship_pos})
 
 func _play_tick(real_dt: float) -> void:
-	var it := input.poll()
+	state.sim_time += real_dt
+	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
 	input.drawing = state.drawing
 	ship.intent = it
 	draw.intent = it
@@ -195,14 +210,15 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"projectiles", func(): projectiles.tick(wr, wd))
 	_run(&"cleanup", func(): enemies.cleanup())
 	if world_step:
-		_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
+		if not state.lab_mode or options.get("auto_spawn", false):
+			_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
 		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()
 	if state.phase == RunState.Phase.PLAY and state.bonus_t <= 0.0 and field.take_warp():
 		_enter_bonus()
 	_update_camera(real_dt)
 	_check_end()
-	if state.phase == RunState.Phase.PLAY:
+	if state.phase == RunState.Phase.PLAY and not state.lab_mode:
 		build.try_open_cards()
 
 ## 処理を呼ぶ。計測中なら時間を測る。
@@ -227,6 +243,8 @@ func _process(_delta: float) -> void:
 	frame_events.emit(events)
 
 func _check_end() -> void:
+	if state.lab_mode:
+		return
 	if state.phase != RunState.Phase.PLAY:
 		return
 	if state.ship_hp <= 0.0:
@@ -243,12 +261,15 @@ func set_phase(phase: RunState.Phase) -> void:
 # ── カメラ（仕様書 15） ──────────────────────────────────────────
 
 func _base_zoom() -> float:
-	var size := get_viewport().get_visible_rect().size
+	var size := _view_size()
 	var f := pow(cfg.zoom_ref_speed / maxf(cfg.zoom_ref_speed, state.stats.max_speed), cfg.zoom_exp)
 	return minf(size.x, size.y) / cfg.base_view * clampf(f, cfg.zoom_min, 1.0)
 
+func _view_size() -> Vector2:
+	return options.get("view_size", get_viewport().get_visible_rect().size)
+
 func _update_camera(real_dt: float) -> void:
-	var size := get_viewport().get_visible_rect().size
+	var size := _view_size()
 	var zoom_t := _base_zoom()
 	if not _cam_ready:
 		state.view_center = state.ship_pos
@@ -344,6 +365,9 @@ func _finishing_tick(real_dt: float) -> void:
 
 ## ランを終えて結果画面へ。
 func finish(cleared: bool) -> void:
+	if state.lab_mode:
+		state.emit(&"lab_result", {"cleared": cleared})
+		return
 	if state.phase == RunState.Phase.ENDED:
 		return
 	state.cleared = cleared

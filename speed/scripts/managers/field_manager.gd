@@ -197,8 +197,8 @@ func _stream_rocks(dt: float) -> void:
 	if _stream_t > 0.0:
 		return
 	_stream_t = 0.2
-	var defs := {&"iron": ConfigManager.enemies.get(&"iron"), &"saw": ConfigManager.enemies.get(&"saw")}
-	var meteor: EnemyDef = ConfigManager.enemies.get(&"meteor")
+	var defs := {&"iron": enemies.def_of(&"iron"), &"saw": enemies.def_of(&"saw")}
+	var meteor: EnemyDef = enemies.def_of(&"meteor")
 	for k in rocks.size():
 		var rock := rocks[k]
 		if rock.destroyed or rock.row >= 0:

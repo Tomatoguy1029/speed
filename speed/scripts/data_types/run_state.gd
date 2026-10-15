@@ -12,6 +12,10 @@ var endless := false
 var stage: StageDef
 var phase: Phase = Phase.PLAY
 var rng := RandomNumberGenerator.new()
+## 実験用の時計と設定。通常ランは既定のまま使う。
+var lab_mode := false
+var sim_time := 0.0
+var meta_override: Dictionary = {}
 
 # ── 時計（仕様書 1・4.1） ────────────────────────────────────────────
 ## ランの時計（実秒）。ポーズ・3択で止まる

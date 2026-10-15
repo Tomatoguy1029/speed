@@ -143,7 +143,7 @@ func _set_count(n: int) -> void:
 		else:
 			neck = Neck.new()
 			neck.kind = kinds[k]
-			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * randf())
+			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * run_state.rng.randf())
 			necks.append(neck)
 		neck.base_angle = TAU * k / float(n)
 		neck.burned = false
@@ -302,9 +302,9 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 		neck.glow = maxf(0.0, neck.glow - dt * 3.0)
 		neck.cd -= dt
 		if neck.cd <= 0.0 and not busy and table.pos[body].distance_to(run_state.ship_pos) < float(p.engage) * 1.3:
-			neck.cd = float(p.attack_cd) * (0.8 + 0.4 * randf())
+			neck.cd = float(p.attack_cd) * (0.8 + 0.4 * run_state.rng.randf())
 			neck.step = 0
-			neck.mode = StringName(String(neck.kind) + ("_a" if randf() < 0.5 else "_b"))
+			neck.mode = StringName(String(neck.kind) + ("_a" if run_state.rng.randf() < 0.5 else "_b"))
 			neck.t = 0.0
 		return
 	neck.t += dt
@@ -420,8 +420,8 @@ func spit_rubble(neck: Neck, n: int) -> void:
 		heads.append(table.pos[body])
 	for k in n:
 		var around: Vector2 = heads[k % heads.size()]
-		var at := around + Vector2.from_angle(randf() * TAU) * randf_range(70.0, 160.0)
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": randf_range(-2.0, 2.0)})
+		var at := around + Vector2.from_angle(run_state.rng.randf() * TAU) * run_state.rng.randf_range(70.0, 160.0)
+		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
 		table.vel[j] = (at - table.pos[j]) * 1.2
 
 ## ビームの首。a：首を高く持ち上げて光を溜め、首を振りながら太いビームで本体の周りを薙ぐ。
@@ -502,7 +502,7 @@ func attack_ready(attack: StringName) -> bool:
 ## 使える技から1つ選んで、そのタイムラインを再生する（判断の層の PlayAttack）。
 func start_attack(_attack: StringName) -> void:
 	var list := _available()
-	tech = list[randi() % list.size()]
+	tech = list[run_state.rng.randi() % list.size()]
 	busy = true
 	for neck in necks:
 		_release_attack(neck)
@@ -597,8 +597,8 @@ func east_debris() -> void:
 		return
 	var rubble := manager.enemies.def_of(&"hydra_rubble")
 	for k in 10:
-		var at := table.pos[body] + Vector2.from_angle(TAU * k / 10.0 + randf() * 0.3) * randf_range(300.0, 480.0)
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": randf_range(-2.0, 2.0)})
+		var at := table.pos[body] + Vector2.from_angle(TAU * k / 10.0 + run_state.rng.randf() * 0.3) * run_state.rng.randf_range(300.0, 480.0)
+		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
 		table.vel[j] = (at - table.pos[j]) * 1.2
 		_rubble.append(Vector2i(j, table.id[j]))
 
@@ -634,7 +634,7 @@ func _shatter_on_beams() -> void:
 ## 瓦礫を砕き、破片を飛ばす。from が 0 でなければ、その向きを中心に飛ばす。
 func _burst_rubble(j: int, from: Vector2) -> void:
 	var p: Dictionary = def.params
-	var base := from.angle() if from != Vector2.ZERO else randf() * TAU
+	var base := from.angle() if from != Vector2.ZERO else run_state.rng.randf() * TAU
 	for k in 6:
 		manager.projectiles.fire_enemy(j, base + (k - 2.5) * (0.45 if from != Vector2.ZERO else TAU / 6.0),
 			float(p.shard_speed), &"bullet", {"bullet_dmg": float(p.shard_dmg)})
@@ -658,8 +658,8 @@ func south_debris() -> void:
 		return
 	var rubble := manager.enemies.def_of(&"hydra_rubble")
 	for k in 8:
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": randf_range(-3.0, 3.0)})
-		var to := _vortex_at + Vector2.from_angle(randf() * TAU) * 120.0
+		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-3.0, 3.0)})
+		var to := _vortex_at + Vector2.from_angle(run_state.rng.randf() * TAU) * 120.0
 		table.vel[j] = (to - table.pos[j]) * 0.9
 		_rubble.append(Vector2i(j, table.id[j]))
 

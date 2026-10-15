@@ -67,7 +67,8 @@ func _meta_level(stat: StringName) -> Array:
 	var out := []
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
 		if def.stat == stat:
-			out.append([def.per_level, SaveManager.meta_level(def.id)])
+			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.meta_level(def.id)
+			out.append([def.per_level, level])
 	return out
 
 func _meta_mult(stat: StringName) -> float:

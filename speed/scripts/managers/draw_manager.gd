@@ -77,7 +77,7 @@ func _start(it: Intent) -> void:
 	state.draw_points = PackedVector2Array()
 	if it.press:
 		state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
-		_first_point_msec = Time.get_ticks_msec()
+		_first_point_msec = _clock_msec()
 	state.emit(&"draw_start")
 
 func _update_drawing(it: Intent) -> void:
@@ -85,7 +85,7 @@ func _update_drawing(it: Intent) -> void:
 		if it.press:
 			state.draw_started = true
 			state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
-			_first_point_msec = Time.get_ticks_msec()
+			_first_point_msec = _clock_msec()
 		elif it.touch and it.pen_release:
 			_cancel()
 		return
@@ -103,7 +103,10 @@ func _update_drawing(it: Intent) -> void:
 
 ## クリックで確定できるか：描き始めから config.draw_confirm_delay 秒たち、線ができていること（仕様書 6.3）。
 func _can_confirm() -> bool:
-	return Time.get_ticks_msec() - _first_point_msec >= cfg.draw_confirm_delay * 1000.0 and state.draw_points.size() >= 2
+	return _clock_msec() - _first_point_msec >= cfg.draw_confirm_delay * 1000.0 and state.draw_points.size() >= 2
+
+func _clock_msec() -> int:
+	return roundi(state.sim_time * 1000.0) if state.lab_mode else Time.get_ticks_msec()
 
 func _cancel() -> void:
 	state.drawing = false
