@@ -33,6 +33,13 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	for n in clampi(start_offset, 0, 3600):
 		worker.step()
 	var run: RunManager = worker.run
+	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
+		return await _finish({"status": "invalid", "reason": tr("lab.trace_in_progress")})
+	if run.state.gauge < run.cfg.draw_min_charge:
+		return await _finish({"status": "invalid", "reason": tr("lab.low_charge")})
+	worker.history = worker.history.filter(func(e): return int(e.tick) <= source_tick)
+	worker._cursor = worker.history.size()
+	worker._intent = Intent.new()
 	# 被弾を測るため、評価側では無敵を解除する。
 	run.ship.invincible = false
 	worker.events.clear()
@@ -44,7 +51,6 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	it.cursor = path[0]
 	run.draw._start(it)
 	var frames: int = clampi(ceili(maxf(draw_seconds, run.cfg.draw_confirm_delay) / worker.DT), 1, 1800)
-	var drawn := false
 	for n in frames:
 		if cancelled:
 			return await _finish({"status": "cancelled"})
@@ -58,7 +64,6 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 		run.draw._extend(path[lo].lerp(path[lo + 1], index - lo))
 		worker.step()
 		if not run.state.drawing:
-			drawn = true
 			break
 		if n % 60 == 0:
 			progress.emit(0.5 + 0.15 * float(n) / frames)
@@ -79,19 +84,21 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 		if n % 120 == 0:
 			progress.emit(0.65 + 0.3 * float(n) / 3600)
 			await get_tree().process_frame
+	var damage_total := 0.0
 	var kills := 0
 	var impacts := []
 	for event in worker.events:
+		if event.get("type") == &"hurt": damage_total += maxf(0, float(event.get("amount", 0)))
 		if event.get("type") == &"kill":
 			kills += 1
-		if event.get("type") in [&"kill", &"hit", &"bounce", &"block_impact", &"damage", &"ship_hit"]:
+		if event.get("type") in [&"kill", &"hit", &"bounce", &"block_impact", &"hurt", &"crash", &"damage", &"ship_hit"]:
 			impacts.append(event.duplicate(true))
 	var result := {"status": "replayed", "key": key, "source_tick": source_tick, "source_digest": source_digest,
 		"seed": source_spec.seed, "draw_seconds": draw_seconds, "offset": start_offset,
-		"completed": completed, "kills": kills, "damage": maxf(0, initial_hp - run.state.ship_hp),
+		"completed": completed, "kills": kills, "damage": damage_total, "initial_hp": initial_hp, "final_hp": run.state.ship_hp,
 		"gauge": run.state.gauge, "end": [run.state.ship_pos.x, run.state.ship_pos.y],
 		"trajectory": trajectory, "events": impacts, "accepted": accepted,
-		"success": completed and initial_hp <= run.state.ship_hp}
+		"success": completed and damage_total <= 1e-6}
 	cache[key] = result.duplicate(true)
 	if cache.size() > 8: cache.erase(cache.keys()[0])
 	progress.emit(1.0)

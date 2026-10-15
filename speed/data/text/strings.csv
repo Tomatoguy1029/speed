@@ -450,3 +450,27 @@ lab.status_wait,待機,Waiting
 lab.exit_clearance,抜けた先に残す余裕の半径,Exit clearance radius
 lab.min_spacing,敵中心どうしの最小距離,Minimum distance between enemy centers
 lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留 / 枠,■ Telegraph / active  / Lingering; active + lingering / slots
+lab.error_b03790ec83,時間帯一覧の形式が違います,Invalid phase list
+lab.error_1ba7e23ea5,未知の時間帯です,Unknown phase ID
+lab.error_ea2fd16cf8,攻撃量の上限が不正です,Invalid attack budget
+lab.error_76545bdd1e,攻撃管理の形式が違います,Invalid attack settings
+lab.error_141fdea6d8,攻撃分類の値が不正です,Invalid attack category value
+lab.error_b356dea242,配置規則の形式が違います,Invalid pattern
+lab.error_46cc43be42,候補一覧の形式が違います,Invalid candidates
+lab.error_f5899d482e,候補の形式が違います,Invalid candidate
+lab.error_51df4a5681,候補の線の座標が不正です,Invalid candidate route
+lab.error_34dfb05e18,候補の命令一覧が不正です,Invalid candidate commands
+lab.error_f2c0bc8a77,候補の命令が不正です,Invalid candidate command
+lab.error_d1d25618ab,配置規則の上限を超えています,Invalid pattern limits
+lab.error_59317e2e86,配置規則の線が不正です,Invalid pattern route
+lab.error_8a4eb2caa3,配置規則の数値が不正です,Invalid pattern number
+lab.error_956b200251,配置領域の形式が違います,Invalid placement region
+lab.error_1c4f35b1cc,配置領域に未知の敵があります,Unknown placement enemy
+lab.error_28ac733ef0,配置領域の数値が不正です,Invalid placement number
+lab.low_charge,線を描くための充填が不足しています,Insufficient charge to draw a route
+lab.trace_in_progress,実行中の線は開始前へ戻して評価してください,Rewind to before the active trace to evaluate another route
+lab.initial_branch,初期実験,Initial experiment
+lab.ship_level,機体のレベル,Ship level
+lab.reload_data,本番データを再読込して新しい実験,Reload production data and start a new experiment
+lab.data_reloaded,敵・ボス・時間帯・共通値を読み直しました,"Reloaded enemies, bosses, phases and shared values"
+lab.reload_failed,本番データの再読込に失敗しました。ファイルの形式を確認してください,Could not reload production data. Check the resource files.

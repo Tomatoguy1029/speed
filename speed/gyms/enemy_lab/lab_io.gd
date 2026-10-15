@@ -2,7 +2,7 @@
 extends RefCounted
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range"]
+const COMMANDS := ["spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level"]
 
 static func plain(value):
 	if value is Vector2:
@@ -24,20 +24,14 @@ static func plain(value):
 	return value
 
 static func baseline() -> Dictionary:
-	var hashes := {}
-	for registry in [ConfigManager.enemies, ConfigManager.bosses, ConfigManager.weapons, ConfigManager.traits, ConfigManager.phases, ConfigManager.stages, ConfigManager.heroes]:
-		for def: Resource in registry.values():
-			hashes[def.resource_path] = FileAccess.get_sha256(def.resource_path)
-	for path in ["res://data/config.tres", "res://scripts/managers/draw_manager.gd", "res://scripts/managers/combat_manager.gd", "res://scripts/managers/enemy_manager.gd", "res://scripts/bosses/hydra_boss.gd"]:
-		if FileAccess.file_exists(path):
-			hashes[path] = FileAccess.get_sha256(path)
+	var hashes: Dictionary = ConfigManager.source_hashes.duplicate()
 	_hash_sources("res://scripts", hashes)
 	_hash_sources("res://gyms/enemy_lab", hashes)
 	return {"engine": Engine.get_version_info().string, "files": hashes}
 
 static func record(session, route: PackedVector2Array, pattern: Dictionary, results: Array, candidates: Array = []) -> Dictionary:
-	return plain({"version": VERSION, "kind": "record", "baseline": baseline(), "spec": session.spec,
-		"history": session.history, "branches": session.branches, "tick": session.tick, "end": session.furthest,
+	return plain({"version": VERSION, "kind": "record", "baseline": session.baseline.duplicate(true), "spec": session.spec,
+		"history": session.history, "branches": session.branches, "branch_name": session.current_branch, "branch_serial": session.branch_serial, "tick": session.tick, "end": session.furthest,
 		"route": route, "pattern": pattern, "results": results, "candidates": candidates})
 
 static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> Dictionary:
@@ -54,6 +48,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 	spec["traits"] = {}
 	for id in session.run.state.traits: spec.traits[String(id)] = session.run.state.traits[id]
 	spec["hero"] = String(session.run.state.hero_power)
+	spec["level"] = session.run.state.level
 	spec["meta"] = session.run.state.meta_override.duplicate(true)
 	spec["director"] = session.run.projectiles.director.settings.duplicate(true)
 	spec.director["enabled"] = session.run.projectiles.director.enabled
@@ -70,7 +65,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 			continue
 		commands.append({"tick": 0, "kind": "boss" if t.is_boss[i] else "spawn",
 			"args": {"type": String(t.type[i]), "pos": plain(t.pos[i]), "level": t.level[i], "angle": t.facing[i], "elite": t.elite[i] != 0}})
-	return plain({"version": VERSION, "kind": "preset", "baseline": baseline(), "spec": spec,
+	return plain({"version": VERSION, "kind": "preset", "baseline": session.baseline.duplicate(true), "spec": spec,
 		"history": commands, "branches": [], "tick": 0, "end": 0, "route": route, "pattern": pattern, "results": []})
 
 static func differences(session) -> Dictionary:
@@ -91,11 +86,16 @@ static func differences(session) -> Dictionary:
 
 static func save_json(path: String, data: Dictionary) -> Error:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	var file := FileAccess.open(path, FileAccess.WRITE)
+	var temporary := path + ".tmp"
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
 	file.store_string(JSON.stringify(plain(data), "\t", true, true))
-	return OK
+	file.flush()
+	var error := file.get_error()
+	file.close()
+	if error != OK: return error
+	return DirAccess.rename_absolute(temporary, path)
 
 static func safe_name(value: String) -> String:
 	return value.validate_filename().replace("..", "_").replace("/", "_").left(80) if not value.strip_edges().is_empty() else "experiment"
@@ -119,27 +119,51 @@ static func validate(data: Dictionary) -> String:
 		return TranslationServer.translate("lab.message_5aa5077c96")
 	if not data.get("spec") is Dictionary or not data.get("history") is Array or not data.get("branches", []) is Array:
 		return TranslationServer.translate("lab.message_03af38d54f")
+	var format_error := TranslationServer.translate("lab.message_03af38d54f")
+	for key in ["tick", "end", "branch_serial"]:
+		if data.has(key) and (not _number_ok(data[key]) or float(data[key]) < 0): return format_error
+	if int(data.get("tick", 0)) > int(data.get("end", 0)): return format_error
+	if data.has("branch_name") and not data.branch_name is String: return format_error
+	if not data.get("results", []) is Array: return format_error
+	for comparison in data.get("results", []):
+		if not comparison is Dictionary or not comparison.get("route", []) is Array or not comparison.get("result", {}) is Dictionary: return format_error
+		for point in comparison.get("route", []):
+			if not _vector_ok(point): return format_error
+		var result: Dictionary = comparison.get("result", {})
+		if result.has("end") and not _vector_ok(result.end): return format_error
+		if result.get("status") == "replayed":
+			for key in ["kills", "damage", "gauge"]:
+				if not _number_ok(result.get(key)): return format_error
+	var previous_tick := -1
+	for command in data.history:
+		if not command is Dictionary or not _number_ok(command.get("tick")): return format_error
+		if int(command.tick) < previous_tick or int(command.tick) > int(data.get("end", 0)): return format_error
+		previous_tick = int(command.tick)
+	for branch in data.get("branches", []):
+		if not branch is Dictionary or not branch.get("name") is String or not _number_ok(branch.get("end")): return format_error
 	if data.history.size() > 100000 or data.branches.size() > 128 or int(data.get("end", 0)) > 216000:
 		return TranslationServer.translate("lab.message_5411903cfb")
 	var spec: Dictionary = data.spec
 	for key in ["seed", "stage", "time", "gauge", "level"]:
 		if spec.has(key) and not _number_ok(spec[key]): return TranslationServer.translate("lab.message_6d6845a8d1")
-	if not data.get("pattern", {}) is Dictionary: return "Invalid pattern"
+	if not data.get("pattern", {}) is Dictionary: return TranslationServer.translate("lab.error_b356dea242")
 	var pattern_error := _pattern_problem(data.get("pattern", {}))
 	if not pattern_error.is_empty(): return pattern_error
-	if not data.get("candidates", []) is Array or data.get("candidates", []).size() > 128: return "Invalid candidates"
+	if not data.get("candidates", []) is Array or data.get("candidates", []).size() > 128: return TranslationServer.translate("lab.error_46cc43be42")
 	for candidate in data.get("candidates", []):
-		if not candidate is Dictionary or not candidate.get("route", []) is Array: return "Invalid candidate"
+		if not candidate is Dictionary or not candidate.get("route", []) is Array: return TranslationServer.translate("lab.error_f5899d482e")
 		for point in candidate.get("route", []):
-			if not _vector_ok(point): return "Invalid candidate route"
-		if not candidate.get("commands", []) is Array: return "Invalid candidate commands"
+			if not _vector_ok(point): return TranslationServer.translate("lab.error_51df4a5681")
+		if not candidate.get("commands", []) is Array: return TranslationServer.translate("lab.error_34dfb05e18")
 		for command in candidate.get("commands", []):
-			if not command is Dictionary: return "Invalid candidate command"
+			if not command is Dictionary: return TranslationServer.translate("lab.error_f2c0bc8a77")
 			var item: Dictionary = command.duplicate(true)
 			item["tick"] = 0
 			var error := _validate_command(item)
 			if not error.is_empty(): return error
 
+	for key in ["empty", "auto_spawn", "auto_boss", "invincible"]:
+		if spec.has(key) and not spec[key] is bool: return TranslationServer.translate("lab.message_03af38d54f")
 	for key in spec:
 		if key not in ["seed", "empty", "stage", "auto_spawn", "auto_boss", "invincible", "config", "overrides", "boss_overrides", "meta", "ship_pos", "time", "gauge", "weapons", "traits", "level", "hero", "schedule", "director", "field"]:
 			return TranslationServer.translate("lab.message_516be31176") + String(key)
@@ -150,6 +174,9 @@ static func validate(data: Dictionary) -> String:
 	for pair in [["overrides", false], ["boss_overrides", true]]:
 		var error := _definition_problem(spec.get(pair[0], {}), pair[1])
 		if not error.is_empty(): return error
+	for id in spec.get("meta", {}):
+		if not ConfigManager.meta_upgrades.has(StringName(id)) or not _number_ok(spec.meta[id]) or float(spec.meta[id]) < 0 or float(spec.meta[id]) > 100: return TranslationServer.translate("lab.message_dcb428f285")
+	if not spec.get("hero", "") is String or (not String(spec.get("hero", "")).is_empty() and not ConfigManager.heroes.has(StringName(spec.hero))): return TranslationServer.translate("lab.message_dcb428f285")
 	var director_error := _director_problem(spec.get("director", {}))
 	if not director_error.is_empty(): return director_error
 	var schedule_error := _schedule_problem(spec.get("schedule", []))
@@ -193,7 +220,8 @@ static func _validate_command(command) -> String:
 		return TranslationServer.translate("lab.message_2fa6cacf94")
 	if int(command.get("tick", -1)) < 0 or int(command.tick) > 216000:
 		return TranslationServer.translate("lab.message_884b1ef739")
-	if command.kind in ["spawn", "boss", "parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range"]:
+	if command.kind in ["spawn", "boss", "parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level"]:
+		if not command.args.get("type", "") is String and not command.args.get("type", "") is StringName: return TranslationServer.translate("lab.message_03af38d54f")
 		var id := StringName(command.args.get("type", ""))
 		if not ConfigManager.enemies.has(id) and not ConfigManager.bosses.has(id):
 			return TranslationServer.translate("lab.message_3fc0d7300b") + String(id)
@@ -201,17 +229,24 @@ static func _validate_command(command) -> String:
 	if args.has("pos") and not _vector_ok(args.pos): return TranslationServer.translate("lab.message_2a897624ac")
 	for key in ["cursor", "pen"]:
 		if args.has(key) and not _vector_ok(args[key]): return TranslationServer.translate("lab.message_c547a6d3c5")
-	if command.kind in ["parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range"]:
+	if command.kind in ["parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level"]:
 		if not _number_ok(args.get("value")) and not args.get("value") is bool: return TranslationServer.translate("lab.message_6b1292dfc2")
 	for key in ["count", "level", "angle", "gauge", "id", "size"]:
 		if args.has(key) and not _number_ok(args[key]) and not (command.kind in ["loadout", "hero"] and key == "id"): return TranslationServer.translate("lab.message_6d6845a8d1")
+	if command.kind in ["config", "parameter", "boss_parameter", "edit_range"] and not args.get("key", "") is String: return TranslationServer.translate("lab.message_dcb428f285")
+	if command.kind == "loadout" and not args.get("reset", false):
+		if not args.get("id", "") is String or args.get("kind", "weapon") not in ["weapon", "trait"]: return TranslationServer.translate("lab.message_dcb428f285")
+		var registry: Dictionary = ConfigManager.weapons if args.get("kind", "weapon") == "weapon" else ConfigManager.traits
+		if not registry.has(StringName(args.get("id", ""))): return TranslationServer.translate("lab.message_dcb428f285")
+	if command.kind == "hero":
+		if not args.get("id", "") is String or (not String(args.get("id", "")).is_empty() and not ConfigManager.heroes.has(StringName(args.id))): return TranslationServer.translate("lab.message_dcb428f285")
 	if command.kind == "director":
 		var error := _director_problem(args)
 		if not error.is_empty(): return error
 	if command.kind == "phase_set":
-		if not args.get("ids", []) is Array: return "Invalid phase list"
+		if not args.get("ids", []) is Array: return TranslationServer.translate("lab.error_b03790ec83")
 		for id in args.get("ids", []):
-			if not ConfigManager.phases.has(StringName(id)): return "Unknown phase ID"
+			if not ConfigManager.phases.has(StringName(id)): return TranslationServer.translate("lab.error_1ba7e23ea5")
 	if command.kind == "schedule":
 		var error := _schedule_problem(args.get("entries", []))
 		if not error.is_empty(): return error
@@ -273,23 +308,29 @@ static func _hash_sources(folder: String, into: Dictionary) -> void:
 	for child in dir.get_directories(): _hash_sources(folder.path_join(child), into)
 
 static func _director_problem(value: Dictionary) -> String:
-	if value.has("budget") and (not _number_ok(value.budget) or float(value.budget) < 0): return "Invalid attack budget"
+	if value.has("budget") and (not _number_ok(value.budget) or float(value.budget) < 0): return TranslationServer.translate("lab.error_ea2fd16cf8")
 	for key in ["slots", "weights", "gaps"]:
-		if not value.get(key, {}) is Dictionary: return "Invalid attack settings"
+		if not value.get(key, {}) is Dictionary: return TranslationServer.translate("lab.error_76545bdd1e")
 		for category in value.get(key, {}):
-			if category not in ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"] or not _number_ok(value[key][category]) or float(value[key][category]) < 0: return "Invalid attack category value"
+			if category not in ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"] or not _number_ok(value[key][category]) or float(value[key][category]) < 0: return TranslationServer.translate("lab.error_141fdea6d8")
 	return ""
 
 static func _pattern_problem(value: Dictionary) -> String:
 	if value.is_empty(): return ""
-	if not value.get("route", []) is Array or value.get("route", []).size() > 10000 or not value.get("regions", []) is Array or value.get("regions", []).size() > 10000: return "Invalid pattern limits"
+	if not value.get("route", []) is Array or value.get("route", []).size() > 10000 or not value.get("regions", []) is Array or value.get("regions", []).size() > 10000: return TranslationServer.translate("lab.error_d1d25618ab")
 	for point in value.get("route", []):
-		if not _vector_ok(point): return "Invalid pattern route"
+		if not _vector_ok(point): return TranslationServer.translate("lab.error_59317e2e86")
 	for key in ["margin", "rotation", "scale_min", "scale_max", "min_fodder", "window", "attempts", "draw_seconds", "exit_clearance", "min_spacing"]:
-		if value.has(key) and not _number_ok(value[key]): return "Invalid pattern number"
+		if value.has(key) and not _number_ok(value[key]): return TranslationServer.translate("lab.error_8a4eb2caa3")
 	for region in value.get("regions", []):
-		if not region is Dictionary or not _vector_ok(region.get("pos", [0, 0])): return "Invalid placement region"
-		if not ConfigManager.enemies.has(StringName(region.get("type", ""))) and not ConfigManager.bosses.has(StringName(region.get("type", ""))): return "Unknown placement enemy"
+		if not region is Dictionary or not _vector_ok(region.get("pos", [0, 0])): return TranslationServer.translate("lab.error_956b200251")
+		if not ConfigManager.enemies.has(StringName(region.get("type", ""))) and not ConfigManager.bosses.has(StringName(region.get("type", ""))): return TranslationServer.translate("lab.error_1c4f35b1cc")
 		for key in ["jitter", "level", "angle", "min_count", "max_count"]:
-			if region.has(key) and not _number_ok(region[key]): return "Invalid placement number"
+			if region.has(key) and not _number_ok(region[key]): return TranslationServer.translate("lab.error_28ac733ef0")
 	return ""
+
+static func adoption_baseline() -> Dictionary:
+	var result: Dictionary = baseline().files
+	for path in result.keys():
+		if String(path).begins_with("res://data/stages/"): result.erase(path)
+	return result

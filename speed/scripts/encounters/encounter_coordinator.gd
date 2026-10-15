@@ -7,6 +7,7 @@ var tick: int:
 	get: return roundi(run.state.sim_time * 60.0)
 var spec: Dictionary = {}
 var schedule: Array = []
+var history: Array = []
 var profile: Dictionary = {}
 var _next := 0.0
 var opportunity: Dictionary = {}
@@ -17,6 +18,8 @@ func setup(manager: RunManager, value: Dictionary) -> void:
 	if not profile.get("enabled", false):
 		return
 	for path in profile.get("baseline", {}):
+		# 採用設定を内包するステージ自身をハッシュの依存に含めない。
+		if String(path).begins_with("res://data/stages/"): continue
 		if not (String(path).begins_with("res://data/") or String(path).begins_with("res://scripts/") or String(path).begins_with("res://gyms/enemy_lab/")) or FileAccess.get_sha256(path) != profile.baseline[path]:
 			profile.enabled = false
 			push_warning(TranslationServer.translate("lab.message_d51f72362d"))
@@ -35,6 +38,7 @@ func before_world() -> void:
 		run.projectiles.director.advance(run.state.world_time, run.enemies)
 
 func advance() -> void:
+	if run.projectiles.director != null and run.projectiles.director.guard_active(): return
 	if not profile.get("enabled", false) or run.state.world_time < _next:
 		return
 	_next = run.state.world_time + maxf(0.5, float(profile.get("interval", 5)))
@@ -97,9 +101,9 @@ func _admit_candidates(commands: Array, path: PackedVector2Array, margin: float,
 		for point in positions:
 			if point.distance_to(pos) < float(pattern.get("min_spacing", 0)): return false
 		positions.append(pos)
-		var radius := def.radius * run.cfg.character_scale + run.cfg.ship_radius + margin
+		var radius := def.radius * run.cfg.character_scale + CHECK.sweep_radius(run, margin)
 		var can_kill := def.gate == &"" and def.hp * run.cfg.enemy_hp_mult <= run.combat.attack_power() and def.armor * run.cfg.enemy_armor_mult <= run.combat.attack_power()
-		if window > 0 and (def.speed > 0 or def.behavior not in [&"drift", &"chase"] or def.params.has("chain_power")):
+		if window > 0 and (def.speed > 0 or def.behavior not in [&"drift", &"chase"] or def.params.has("chain_power") or def.params.has("life") or def.params.has("death_split")):
 			return false
 		if pos.length() + radius >= run.cfg.field_radius or run.field.body_gap(pos, radius) <= 0:
 			return false

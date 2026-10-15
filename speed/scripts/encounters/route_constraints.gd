@@ -20,10 +20,13 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 	var fodder := []
 	var unsupported := []
 	var horizon := maxf(0, window) + maxf(draw_seconds, run.cfg.draw_confirm_delay) + run.cfg.draw_run_time + run.cfg.kill_hitstop_cap
-	var radius := run.cfg.ship_radius + maxf(0, margin)
+	horizon = horizon * maxf(1, maxf(run.cfg.draw_time_scale, run.cfg.draw_run_scale_min)) + run.world_time_pending()
+	var radius := sweep_radius(run, margin)
 	var budget := run.draw.budget(run.state.stats.capacity * run.state.gauge)
 	if path.size() < 2:
 		return {"status": "invalid", "reason": TranslationServer.translate("lab.message_7474db4292"), "valid": false}
+	if run.state.gauge < run.cfg.draw_min_charge: blockers.append({"reason": TranslationServer.translate("lab.low_charge"), "pos": path[0]})
+	if path[path.size() - 1].length() + radius + exit_clearance >= run.cfg.field_radius: blockers.append({"reason": TranslationServer.translate("lab.message_fdee8bc433"), "pos": path[path.size() - 1]})
 	if length(path) > budget + 0.01:
 		blockers.append({"reason": TranslationServer.translate("lab.message_ace1dcf08b"), "pos": path[path.size() - 1]})
 	for p in path:
@@ -41,7 +44,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 			continue
 		var def: EnemyDef = t.def[i]
 		# 時間幅の証明は静止した非攻撃の対象に限定する。
-		if window > 0 and (t.is_boss[i] or def == null or def.behavior not in [&"drift", &"chase"] or t.speed[i] > 0 or t.vel[i].length() > 0.01 or def.params.has("chain_power") or def.params.has("death_split") or t.gate[i] != EnemyTable.Gate.NONE):
+		if window > 0 and (t.is_boss[i] or def == null or def.behavior not in [&"drift", &"chase"] or t.speed[i] > 0 or t.vel[i].length() > 0.01 or def.params.has("chain_power") or def.params.has("death_split") or def.params.has("life") or t.gate[i] != EnemyTable.Gate.NONE):
 			unsupported.append(t.id[i])
 		if minf(distance_to_path(t.pos[i], path), t.pos[i].distance_to(path[path.size() - 1]) - exit_clearance) > t.r[i] + radius:
 			continue
@@ -54,6 +57,9 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		else:
 			fodder.append(t.id[i])
 	if window > 0:
+		if run.field.body_speed_max > 0 or not run.field.rocks.is_empty(): unsupported.append("moving terrain / streamed rocks")
+		for command in session.history:
+			if int(command.tick) > session.tick and int(command.tick) <= session.tick + ceili(horizon * 60): unsupported.append("recorded future commands")
 		if not run.state.weapons.is_empty() or not run.state.traits.is_empty() or run.state.hero_active_t > 0 or not run.field.wells.is_empty(): unsupported.append(TranslationServer.translate("lab.message_eaf4530ecf"))
 		if run.field._comet_t <= horizon or run.field._well_t <= horizon: unsupported.append(TranslationServer.translate("lab.message_feb890132f"))
 	var p := run.projectiles
@@ -95,3 +101,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		"blockers": blockers, "fodder": fodder, "unsupported": unsupported, "length": length(path),
 		"budget": budget, "margin": margin, "window": window, "tick": session.tick,
 		"digest": session.digest(), "critical_dependent": false, "horizon": horizon, "draw_seconds": draw_seconds, "exit_clearance": exit_clearance}
+
+## 入力点の省略と角の補正で線が寄る範囲も、通過する円に加える。
+static func sweep_radius(run: RunManager, margin: float) -> float:
+	return run.cfg.ship_radius + maxf(0, margin) + run.cfg.draw_step + 2.5 / maxf(run.state.camera_zoom, 0.01)

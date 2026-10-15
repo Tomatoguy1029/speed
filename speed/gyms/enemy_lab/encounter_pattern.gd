@@ -35,6 +35,9 @@ func generate(source, pattern: Dictionary, seed_value: int) -> Dictionary:
 	worker.history.assign(source.history.duplicate(true))
 	worker.furthest = source.tick
 	var reasons := []
+	var last_candidate: Dictionary = {}
+	var last_validation: Dictionary = {}
+	var supported_seen := false
 	for attempt in clampi(int(pattern.get("attempts", 32)), 1, 128):
 		if cancelled:
 			break
@@ -54,17 +57,23 @@ func generate(source, pattern: Dictionary, seed_value: int) -> Dictionary:
 			if command.args.get("role") == "avoid":
 				var t: EnemyTable = worker.run.enemies.table
 				var row: int = worker.selected
-				if row >= 0 and CHECK.distance_to_path(t.pos[row], path) <= t.r[row] + worker.run.cfg.ship_radius + float(pattern.get("margin", 20)):
+				if row >= 0 and CHECK.distance_to_path(t.pos[row], path) <= t.r[row] + CHECK.sweep_radius(worker.run, float(pattern.get("margin", 20))):
 					roles_valid = false
+		last_candidate = candidate
 		var result := CHECK.validate(worker, path, float(pattern.get("margin", 20)), float(pattern.get("window", 0)), float(pattern.get("draw_seconds", 0.5)), float(pattern.get("exit_clearance", 0)))
+		last_validation = result
+		if result.status != "unsupported": supported_seen = true
 		progress.emit(attempt + 1)
 		if roles_valid and result.valid and result.fodder.size() >= int(pattern.get("min_fodder", 1)):
 			worker.queue_free()
-			return {"status": result.status, "commands": commands, "route": path, "validation": result,
+			return {"status": result.status, "admitted": true, "commands": commands, "route": path, "validation": result,
 				"seed": seed_value, "attempt": attempt + 1, "source_digest": source.digest(), "source_tick": source.tick}
 		reasons = result.blockers
 		worker.history.assign(source.history.duplicate(true))
 		worker.furthest = source.tick
 		await get_tree().process_frame
 	worker.queue_free()
-	return {"status": "cancelled" if cancelled else "unfound", "reasons": reasons, "reason": TranslationServer.translate("lab.message_5931a7be25")}
+	return {"status": "cancelled" if cancelled else ("unfound" if supported_seen else "unsupported"), "admitted": false,
+		"route": last_candidate.get("route", PackedVector2Array()), "commands": last_candidate.get("commands", []),
+		"validation": last_validation, "seed": seed_value, "source_digest": source.digest(), "reasons": reasons,
+		"reason": TranslationServer.translate("lab.message_5931a7be25" )}

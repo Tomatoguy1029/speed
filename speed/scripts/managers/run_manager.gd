@@ -482,3 +482,7 @@ func command(name: StringName, args := {}) -> void:
 			finish(true)
 		&"debug_fail":
 			finish(false)
+
+## まだ世界側へ渡していない時間。保守的な予測の先頭に含める。
+func world_time_pending() -> float:
+	return maxf(0, _world_dt)

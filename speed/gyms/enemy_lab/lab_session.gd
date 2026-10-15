@@ -5,15 +5,19 @@ signal changed
 signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
+const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
 const RUN_SCENE := preload("res://scenes/run/run.tscn")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 const DT := 1.0 / 60.0
 
 var scene: Node
 var run: RunManager
+var baseline: Dictionary = {}
 var spec: Dictionary = {}
 var history: Array[Dictionary] = []
 var branches: Array[Dictionary] = []
+var current_branch := ""
+var branch_serial := 0
 var events: Array[Dictionary] = []
 var checkpoints: Array[Dictionary] = []
 var edit_undo: Array[Dictionary] = []
@@ -29,7 +33,14 @@ var _epoch := 0
 var _seek_serial := 0
 var _state_key := ""
 var _intent := Intent.new()
-var selected := -1
+var _selected_row := -1
+var _selected_id := -1
+var selected: int:
+	get:
+		return _selected_row if is_instance_valid(run) and run.enemies.is_same(_selected_row, _selected_id) and not run.enemies.table.dead[_selected_row] else -1
+	set(value):
+		_selected_row = value
+		_selected_id = run.enemies.table.id[value] if is_instance_valid(run) and value >= 0 and value < run.enemies.table.id.size() else -1
 var schedule: Array = []
 var _accumulator := 0.0
 
@@ -44,8 +55,11 @@ func reset(settings := {}) -> void:
 	edit_undo.clear()
 	edit_redo.clear()
 	branches.clear()
+	branch_serial = 0
+	current_branch = tr("lab.initial_branch")
 	spec = {"seed": 932, "empty": true, "stage": 1, "auto_spawn": false, "invincible": true}
 	spec.merge(settings.duplicate(true), true)
+	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
 	changed.emit()
@@ -138,6 +152,7 @@ func _rebuild() -> void:
 	run.build.refresh_stats()
 	run.state.hero_power = StringName(spec.get("hero", ""))
 	tick = 0
+	selected = -1
 	_cursor = 0
 	_state_key = ""
 	_intent = Intent.new()
@@ -200,7 +215,9 @@ func perform(kind: String, args := {}) -> void:
 		if edit_undo.size() > 20: edit_undo.pop_front()
 		edit_redo.clear()
 	if tick < furthest:
-		branches.append({"name": TranslationServer.translate("lab.message_549e9c3c03") % (branches.size() + 1), "history": history.duplicate(true), "end": furthest})
+		branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
+		branch_serial += 1
+		current_branch = TranslationServer.translate("lab.message_549e9c3c03") % branch_serial
 		history = history.filter(func(e): return int(e.tick) <= tick)
 		furthest = tick
 	revision += 1
@@ -223,6 +240,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 				var opts := {"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)}
 				if def.id in [&"meteor", &"iron", &"saw"]:
 					var rock := FieldManager.Rock.new()
+					rock.lab_manual = true
 					rock.kind = &"belt" if def.id == &"meteor" else def.id
 					rock.pos = origin + offset
 					rock.size = def.radius * run.cfg.character_scale
@@ -320,6 +338,9 @@ func _apply(kind: String, args: Dictionary) -> void:
 			run.build.refresh_stats()
 		"time":
 			run.state.time = maxf(0, float(args.get("value", 0)))
+		"level":
+			run.state.level = clampi(int(args.get("value", 1)), 1, 1000)
+			run.build.refresh_stats()
 		"hero":
 			run.state.hero_power = StringName(args.get("id", ""))
 			run.state.hero_active_t = 0
@@ -403,6 +424,7 @@ func seek(target: int) -> void:
 		run = item.run
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
 		tick = int(item.tick)
+		selected = int(item.get("selected", -1))
 		_cursor = int(item.cursor)
 		_state_key = item.key
 		_intent = item.intent
@@ -451,7 +473,7 @@ func digest() -> String:
 	for instance in run.bosses.lab_instances:
 		if is_instance_valid(instance.actor):
 			actors.append(_stable(instance.actor, 0))
-	return str(hash(var_to_bytes([tick, _stable(run.state, 0), _stable(run.enemies.table, 0),
+	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
 
@@ -489,7 +511,7 @@ func _checkpoint_key(at: int) -> String:
 func _cache_current() -> void:
 	if not is_instance_valid(scene) or not is_instance_valid(run): return
 	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent,
-		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "key": _state_key})
+		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	scene = null
 	run = null

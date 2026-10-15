@@ -7,6 +7,7 @@ extends Node
 const CONFIG_PATH := "res://data/config.tres"
 
 ## 元の調整値（読み込んだまま）
+var source_hashes: Dictionary = {}
 var base: GameConfig
 ## 実行時に使う調整値（調整パネルが書き換える）
 var cfg: GameConfig
@@ -23,6 +24,7 @@ var heroes: Dictionary = {}
 
 func _ready() -> void:
 	base = load(CONFIG_PATH) as GameConfig
+	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
 	_load_dir("res://data/enemies", enemies, "id")
 	_load_dir("res://data/phases", phases, "id")
@@ -59,16 +61,48 @@ func _order_key(def: Resource) -> String:
 
 ## フォルダ内の .tres を読み、key の値で引けるようにする。
 ## 書き出したゲームでは .tres が .tres.remap になっているので、その末尾を外して読む。
-func _load_dir(dir_path: String, into: Dictionary, key: String) -> void:
+func _load_dir(dir_path: String, into: Dictionary, key: String, mode := ResourceLoader.CACHE_MODE_REUSE) -> bool:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
-		return
+		return false
+	var healthy := true
 	for file in dir.get_files():
 		var name := file.trim_suffix(".remap")
 		if not name.ends_with(".tres"):
 			continue
-		var res := load(dir_path.path_join(name))
-		if res == null:
+		var res := ResourceLoader.load(dir_path.path_join(name), "", mode)
+		if res == null or res.get(key) == null:
+			healthy = false
 			push_warning("ConfigManager: %s を読めない" % name)
 			continue
 		into[res.get(key)] = res
+		source_hashes[dir_path.path_join(name)] = FileAccess.get_sha256(dir_path.path_join(name))
+	return healthy
+
+## 調整した敵と出現・ボス・共通値を新しいリソースとして読む。既存ランの参照を変更しない。
+func reload_experiment_data() -> bool:
+	var fresh := ResourceLoader.load(CONFIG_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as GameConfig
+	if fresh == null: return false
+	var registries := {"enemies": "id", "phases": "id", "stages": "index", "bosses": "id"}
+	var loaded := {}
+	var old_hashes := source_hashes.duplicate()
+	for name in registries:
+		var table := {}
+		var healthy := _load_dir("res://data/" + name, table, registries[name], ResourceLoader.CACHE_MODE_IGNORE)
+		if not healthy or table.is_empty():
+			source_hashes = old_hashes
+			return false
+		loaded[name] = table
+	for stage: StageDef in loaded.stages.values():
+		var phase_list := []
+		for phase: PhaseDef in stage.phases:
+			if not loaded.phases.has(phase.id):
+				source_hashes = old_hashes
+				return false
+			phase_list.append(loaded.phases[phase.id])
+		stage.phases = phase_list
+	for name in registries: set(name, loaded[name])
+	base = fresh
+	reset_runtime()
+	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
+	return true

@@ -87,7 +87,7 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		reasons[owner] = reason
 		return false
 	serial += 1
-	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row)}
+	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row), "type": _source_type(row)}
 	owners[owner] = serial
 	for category in cats:
 		last_start[category] = now
@@ -118,7 +118,7 @@ func token(owner: String) -> int:
 
 func passive(owner: String, row: int, id: int) -> int:
 	serial += 1
-	groups[serial] = {"owner": owner + ":passive:" + str(serial), "row": row, "id": id, "categories": ["zone"], "until": now, "start": now, "passive": true, "pos": _source_position(row)}
+	groups[serial] = {"owner": owner + ":passive:" + str(serial), "row": row, "id": id, "categories": ["zone"], "until": now, "start": now, "passive": true, "pos": _source_position(row), "type": _source_type(row)}
 	return serial
 
 ## 有限時間の認証中は、対応する静止対象以外の新しい能動攻撃を許可しない。
@@ -134,3 +134,7 @@ func guard_active() -> bool:
 func _source_position(row: int) -> Vector2:
 	if projectiles != null and projectiles.combat != null and row >= 0 and row < projectiles.combat.enemies.table.pos.size(): return projectiles.combat.enemies.table.pos[row]
 	return Vector2.ZERO
+
+func _source_type(row: int) -> String:
+	if projectiles != null and projectiles.combat != null and row >= 0 and row < projectiles.combat.enemies.table.type.size(): return String(projectiles.combat.enemies.table.type[row])
+	return ""
