@@ -4,7 +4,23 @@
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
-## 通常敵
+## 通常出現する敵
+
+| type ID      | 名称       | 採用状態 | 本番の実装状況 | 行動・攻撃                                                                       | 出現条件                             | コード・demo参照／未決事項                                                                                 |
+| ------------ | ---------- | -------- | -------------- | -------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `drifter`    | ドリフター | 採用     | 実装済み       | 追跡と広域移動                                                                   | 全時間帯                             | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../../../demo/docs/enemies.md)    |
+| `swarm`      | スウォーム | 採用     | 実装済み       | 小型の追跡敵                                                                     | 強化期・強化期II・無双期・脱出期     | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../../../demo/docs/enemies.md)      |
+| `darter`     | ダーター   | 採用     | 実装済み       | 近づくと予告してから突進し、しばらく止まる                                       | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../../../demo/docs/enemies.md)     |
+| `armored`    | 装甲型     | 採用     | 実装済み       | 装甲の硬い追跡敵。背面に当てると必ずクリティカル                                 | 圧力期・緊張期・脱出期、危険地帯     | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../../../demo/docs/enemies.md)    |
+| `splitter`   | 分裂型     | 採用     | 実装済み       | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも分かれる                   | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md)   |
+| `splitling`  | 分裂体     | 採用     | 実装済み       | 小型の追跡敵                                                                     | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../../../demo/docs/enemies.md)  |
+| `gunner`     | 射撃型     | 採用     | 実装済み       | 距離を保って回り込み、予告のあと弾を撃つ                                         | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md)     |
+| `missile`    | ミサイル艇 | 採用     | 実装済み       | さらに遠い距離を保ち、予告のあと誘導弾を撃つ                                     | 緊張期・脱出期、危険地帯             | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md)    |
+| `titan`      | タイタン   | 採用     | 実装済み       | 大型の追跡敵。生成時に大きさが変わる                                             | 無双期以外。同時に出る数に上限       | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../../../demo/docs/enemies.md)      |
+
+## 調整用に保持する敵
+
+追加版の敵は実装を保持し、通常出現への組み込みを実験場で調整する。ステージ1〜3の通常出現は共通の元の時間帯を使う。
 
 区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。ステージごとの出現は `speed/data/phases/s<ステージ>_*.tres`。
 
@@ -73,15 +89,12 @@
 - 被弾しても白く光らせない。
 - 月と惑星は `moon.png`・`planet.png` を障害物の半径に合わせて表示する。
 
+## 出現状態の参照
+
+`drifter`・`swarm`・`darter`・`armored`・`gunner`・`battleship`・`titan` は上の通常出現表を参照する。
+
 ## 廃止
 
 | type ID | 名称   | 採用状態       | 実装状況                       | 理由・参照                                                                                                                                                                                                                                                  |
 | ------- | ------ | -------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `drifter` | ドリフター | 不採用（出現から外した） | 定義（`speed/data/enemies/drifter.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `swarm` | スウォーム | 不採用（出現から外した） | 定義（`speed/data/enemies/swarm.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `darter` | ダーター | 不採用（出現から外した） | 定義（`speed/data/enemies/darter.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `armored` | 装甲型 | 不採用（出現から外した） | 定義（`speed/data/enemies/armored.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `gunner` | 射撃型 | 不採用（出現から外した） | 定義（`speed/data/enemies/gunner.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `battleship` | 戦艦 | 不採用（出現から外した） | 定義（`speed/data/enemies/battleship.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
-| `titan` | タイタン | 不採用（出現から外した） | 定義（`speed/data/enemies/titan.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
 | `leech` | 減速型 | 不採用（廃止） | 定義・出現・減速処理を削除済み | 近くを通るだけで減速する仕組みは、速度を軸にしたゲームでストレスになるため。旧実装はコミット `7281ad9` の `speed/data/enemies/leech.tres`・`enemy_manager.gd`・`combat_manager.gd`。ID は再利用しない。[demo](../../../demo/docs/enemies.md) には残っている |
