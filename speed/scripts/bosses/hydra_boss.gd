@@ -76,6 +76,8 @@ var _vortex_at := Vector2.ZERO
 var _time := 0.0
 
 func _on_bound() -> void:
+	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
+	timeline.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
 	draws_self = true
 	table.gate[body] = EnemyTable.Gate.GHOST
 	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）

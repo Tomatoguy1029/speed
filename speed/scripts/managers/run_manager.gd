@@ -19,6 +19,8 @@ var cfg: GameConfig
 ## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
 var options: Dictionary = {}
 var input_source: Callable
+var encounters
+const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
 
 @onready var field: FieldManager = $"../FieldManager"
 @onready var ship: ShipManager = $"../ShipManager"
@@ -55,7 +57,7 @@ func _ready() -> void:
 	state.lab_mode = bool(options.get("lab", false))
 	state.meta_override = options.get("meta", {})
 	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
-	state.endless = GameManager.run_endless
+	state.endless = bool(options.get("endless", GameManager.run_endless))
 	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
 	if options.has("seed"):
 		state.rng.seed = int(options.seed)
@@ -69,6 +71,10 @@ func _ready() -> void:
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
 		m.setup(state, cfg)
+	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
+		encounters = ENCOUNTERS.new()
+		add_child(encounters)
+		encounters.setup(self, state.stage.encounter_profile)
 	build.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
@@ -139,7 +145,7 @@ func _physics_process(delta: float) -> void:
 
 ## 設定のうちランに効くもの（ポーズ中に変えるとすぐ反映）。
 func _read_settings() -> void:
-	state.hitstop_enabled = bool(SaveManager.settings.hitstop)
+	state.hitstop_enabled = bool(options.get("hitstop", true)) if state.lab_mode else bool(SaveManager.settings.hitstop)
 
 ## 更新の順番（設計書 4.3）。
 ## ワープホールからボーナスステージに入る：周りの敵と敵の攻撃を消し、雑魚と硬めの敵を多く出す（仕様書 13.1）。
@@ -196,6 +202,8 @@ func _play_tick(real_dt: float) -> void:
 		_world_real_dt = 0.0
 		_world_dt = 0.0
 		_world_steps = 0
+		if encounters != null:
+			encounters.before_world()
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))
@@ -210,7 +218,9 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"projectiles", func(): projectiles.tick(wr, wd))
 	_run(&"cleanup", func(): enemies.cleanup())
 	if world_step:
-		if not state.lab_mode or options.get("auto_spawn", false):
+		if encounters != null:
+			encounters.advance()
+		if (not state.lab_mode or options.get("auto_spawn", false)) and (projectiles.director == null or not projectiles.director.guard_active()):
 			_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
 		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()

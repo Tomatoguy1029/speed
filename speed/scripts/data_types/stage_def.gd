@@ -32,3 +32,8 @@ const EDITOR_ORDER := 5
 ## ステージ選択に出る名前。文章の正は res://data/text/strings.csv の stage.<番号>.name。
 func get_display_name() -> String:
 	return tr("stage.%d.name" % index)
+
+## 採用した実験の設定
+## enabled を指定したステージと時間帯で使う攻撃枠・配置規則。
+## 単位：設定
+@export var encounter_profile: Dictionary = {}

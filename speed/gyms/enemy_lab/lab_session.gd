@@ -6,7 +6,7 @@ signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
 const RUN_SCENE := preload("res://scenes/run/run.tscn")
-const DIRECTOR := preload("res://gyms/enemy_lab/attack_director.gd")
+const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 const DT := 1.0 / 60.0
 
 var scene: Node
@@ -15,6 +15,10 @@ var spec: Dictionary = {}
 var history: Array[Dictionary] = []
 var branches: Array[Dictionary] = []
 var events: Array[Dictionary] = []
+var checkpoints: Array[Dictionary] = []
+var edit_undo: Array[Dictionary] = []
+var edit_redo: Array[Dictionary] = []
+var revision := 0
 var tick := 0
 var furthest := 0
 var playing := false
@@ -22,13 +26,23 @@ var seeking := false
 var speed := 1.0
 var _cursor := 0
 var _epoch := 0
+var _seek_serial := 0
+var _state_key := ""
 var _intent := Intent.new()
 var selected := -1
+var schedule: Array = []
 var _accumulator := 0.0
 
 func reset(settings := {}) -> void:
 	playing = false
+	_seek_serial += 1
+	seeking = false
+	for checkpoint in checkpoints:
+		if is_instance_valid(checkpoint.scene): checkpoint.scene.queue_free()
+	checkpoints.clear()
 	history.clear()
+	edit_undo.clear()
+	edit_redo.clear()
 	branches.clear()
 	spec = {"seed": 932, "empty": true, "stage": 1, "auto_spawn": false, "invincible": true}
 	spec.merge(settings.duplicate(true), true)
@@ -37,23 +51,25 @@ func reset(settings := {}) -> void:
 	changed.emit()
 
 func _rebuild() -> void:
+	revision += 1
 	_epoch += 1
-	var revision := _epoch
 	if is_instance_valid(scene):
+		remove_child(scene)
 		scene.queue_free()
-		await get_tree().process_frame
-		await get_tree().process_frame
-	if revision != _epoch:
-		return
 	var cfg: GameConfig = ConfigManager.base.duplicate(true)
 	for key in spec.get("config", {}):
 		cfg.set(key, spec.config[key])
-	if spec.get("empty", true):
-		cfg.moon_count = 0
-		cfg.dust_count = 0
+	var field_flags: Dictionary = spec.get("field", {})
+	var terrain: bool = field_flags.get("terrain", not spec.get("empty", true))
+	var rocks: bool = field_flags.get("rocks", not spec.get("empty", true))
+	var gimmicks: bool = field_flags.get("gimmicks", not spec.get("empty", true))
+	if not terrain: cfg.moon_count = 0
+	if not rocks:
 		cfg.meteor_count = 0
 		cfg.iron_count = 0
 		cfg.saw_count = 0
+	if not gimmicks:
+		cfg.dust_count = 0
 		cfg.comet_interval_min = 1e8
 		cfg.comet_interval_max = 1e8
 		cfg.gravity_interval_min = 1e8
@@ -64,18 +80,30 @@ func _rebuild() -> void:
 		if defs.has(StringName(id)):
 			var def: EnemyDef = defs[StringName(id)].duplicate(true)
 			for key in spec.overrides[id]:
-				def.set(key, spec.overrides[id][key])
+				if key == "params":
+					for param in spec.overrides[id][key]: def.params[param] = safe_parameter(param, spec.overrides[id][key][param])
+				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
 	scene = RUN_SCENE.instantiate()
 	scene.get_node("Hud").free()
 	scene.get_node("Managers/RenderManager").free()
 	scene.get_node("World/Camera2D").enabled = false
+	scene.get_node("World").visible = false
 	run = scene.get_node("Managers/RunManager")
 	run.options = {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
-		"seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
+		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
 	add_child(scene)
 	run.set_process(false)
+	run.bosses.definitions = ConfigManager.bosses.duplicate()
+	for id in spec.get("boss_overrides", {}):
+		if ConfigManager.bosses.has(StringName(id)):
+			var boss: BossDef = ConfigManager.bosses[StringName(id)].duplicate(true)
+			for key in spec.boss_overrides[id]:
+				if key == "params":
+					for param in spec.boss_overrides[id][key]: boss.params[param] = safe_parameter(param, spec.boss_overrides[id][key][param])
+				else: boss.set(key, spec.boss_overrides[id][key])
+			run.bosses.definitions[StringName(id)] = boss
 	var director = DIRECTOR.new()
 	director.state = run.state
 	director.projectiles = run.projectiles
@@ -85,31 +113,37 @@ func _rebuild() -> void:
 	run.input.set_process_unhandled_input(false)
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
-	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if spec.get("empty", true) else run.state.ship_pos
+	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
 	run.state.time = float(spec.get("time", 0.0))
 	run.state.gauge = float(spec.get("gauge", 1.0))
-	if spec.get("empty", true):
+	if not rocks: run.field.rocks.clear()
+	if not gimmicks: run.field.dust.clear()
+	if not terrain:
 		run.field.bodies.clear()
 		run.field.moons.clear()
-		run.field.rocks.clear()
-		run.field.dust.clear()
 		run.field.planet.pos = Vector2(1e7, 1e7)
 		run.field.planet.r = 0
 		run.field._update_moons()
 	if not spec.get("auto_boss", false):
 		run.state.boss_spawned = true
-	for id in spec.get("weapons", {}):
+	var weapon_ids: Array = spec.get("weapons", {}).keys()
+	weapon_ids.sort()
+	for id in weapon_ids:
 		run.build.grant(&"weapon", StringName(id), int(spec.weapons[id]))
-	for id in spec.get("traits", {}):
+	var trait_ids: Array = spec.get("traits", {}).keys()
+	trait_ids.sort()
+	for id in trait_ids:
 		run.build.grant(&"trait", StringName(id), int(spec.traits[id]))
 	run.state.level = int(spec.get("level", 1))
 	run.build.refresh_stats()
 	run.state.hero_power = StringName(spec.get("hero", ""))
 	tick = 0
 	_cursor = 0
+	_state_key = ""
 	_intent = Intent.new()
 	_accumulator = 0
 	events.clear()
+	schedule = spec.get("schedule", []).duplicate(true)
 	_apply_recorded()
 	run.combat.rebuild_grid()
 
@@ -145,25 +179,35 @@ func step() -> void:
 		events.append(event)
 		event_recorded.emit(event)
 	run.state.events.clear()
+	revision += 1
 	tick += 1
 	furthest = maxi(furthest, tick)
 	_apply_recorded()
 
 func _apply_recorded() -> void:
+	var old_cursor := _cursor
 	while _cursor < history.size() and int(history[_cursor].tick) <= tick:
 		_apply(String(history[_cursor].kind), history[_cursor].args)
 		_cursor += 1
+	if _state_key.is_empty() or old_cursor != _cursor:
+		_state_key = _checkpoint_key(tick)
 
 func perform(kind: String, args := {}) -> void:
 	if seeking or not is_instance_valid(run):
 		return
+	if kind != "input":
+		edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
+		if edit_undo.size() > 20: edit_undo.pop_front()
+		edit_redo.clear()
 	if tick < furthest:
-		branches.append({"name": "分岐 %d" % (branches.size() + 1), "history": history.duplicate(true), "end": furthest})
+		branches.append({"name": TranslationServer.translate("lab.message_549e9c3c03") % (branches.size() + 1), "history": history.duplicate(true), "end": furthest})
 		history = history.filter(func(e): return int(e.tick) <= tick)
 		furthest = tick
+	revision += 1
 	history.append({"tick": tick, "kind": kind, "args": args.duplicate(true)})
 	_cursor = history.size()
 	_apply(kind, args)
+	_state_key = _checkpoint_key(tick)
 	run.combat.rebuild_grid()
 	changed.emit()
 
@@ -191,13 +235,45 @@ func _apply(kind: String, args: Dictionary) -> void:
 					var rock = run.field.rocks[opts.meteor_index]
 					rock.row = selected
 					rock.row_id = run.enemies.table.id[selected]
+			run.state.emit(&"lab_spawn", {"pos": origin, "enemy_type": def.id})
+		"edit_range":
+			var row := row_for_id(int(args.get("id", -1)))
+			if row >= 0:
+				var definition := definition_for_row(row)
+				var edit := {"type": String(run.enemies.table.type[row]), "key": "params." + String(args.get("key", "")), "value": maxf(0.01, float(args.get("length", 1)))}
+				if definition is BossDef: _edit_boss_definition(edit)
+				else: _edit_definition(edit)
+				_apply("move", {"id": int(args.id), "pos": run.enemies.table.pos[row], "angle": float(args.get("angle", run.enemies.table.facing[row]))})
 		"move":
 			var row := row_for_id(int(args.get("id", -1)))
 			if row >= 0:
+				var t := run.enemies.table
+				var origin := t.pos[row]
+				var delta_angle := float(args.get("angle", t.facing[row])) - t.facing[row]
+				var delta := vector(args.pos) - origin
+				var family := [row]
+				for n in range(0, t.parts[row].size(), 2):
+					if run.enemies.is_same(t.parts[row][n], t.parts[row][n + 1]):
+						family.append(t.parts[row][n])
+				for child in family:
+					if child != row:
+						t.pos[child] = origin + (t.pos[child] - origin).rotated(delta_angle) + delta
+						t.facing[child] += delta_angle
+					for h in t.links[child]:
+						if run.projectiles.owns_hazard(h, child, t.id[child]):
+							var point := origin + (run.projectiles.hazard_pos[h] - origin).rotated(delta_angle) + delta
+							run.projectiles.move_hazard(h, point, run.projectiles.hazard_angle[h] + delta_angle)
 				run.enemies.table.pos[row] = vector(args.pos)
 				if run.enemies.table.meteor_index[row] >= 0:
 					run.field.rocks[run.enemies.table.meteor_index[row]].pos = vector(args.pos)
 				run.enemies.table.facing[row] = float(args.get("angle", run.enemies.table.facing[row]))
+		"individual":
+			var row := row_for_id(int(args.get("id", -1)))
+			if row >= 0 and run.enemies.table.def[row] != null:
+				var t := run.enemies.table
+				var ratio := t.hp[row] / maxf(0.001, t.max_hp[row])
+				run.enemies.apply_scaling(row, t.def[row], float(args.get("level", t.level[row])), {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
+				t.hp[row] = t.max_hp[row] * ratio
 		"delete":
 			var row := row_for_id(int(args.get("id", -1)))
 			if row >= 0:
@@ -213,20 +289,53 @@ func _apply(kind: String, args: Dictionary) -> void:
 		"command":
 			run.command(StringName(args.get("name", "")), args.get("args", {}))
 		"input":
+			var previous := _intent
 			_intent = Intent.new()
 			_intent.has_cursor = args.get("has_cursor", true)
 			_intent.cursor = vector(args.get("cursor", [0, 0]))
 			_intent.pen = vector(args.get("pen", args.get("cursor", [0, 0])))
-			_intent.press = args.get("press", false)
-			_intent.hero_press = args.get("hero", false)
+			_intent.press = previous.press or args.get("press", false)
+			_intent.hero_press = previous.hero_press or args.get("hero", false)
+			_intent.alt_press = previous.alt_press or args.get("alt_press", false)
+			_intent.touch = args.get("touch", false)
+			_intent.pen_release = args.get("release", false)
 		"invincible":
 			run.ship.invincible = args.get("value", true)
 		"ship":
 			run.state.ship_pos = vector(args.get("pos", [0, 0]))
 			run.state.ship_vel = Vector2.ZERO
 			run.state.gauge = float(args.get("gauge", run.state.gauge))
+		"config":
+			var key := String(args.get("key", ""))
+			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "wave_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
+				run.cfg.set(key, clampf(float(args.value), 0.001, 1.0) if key == "draw_time_scale" else maxf(0.01, float(args.value)))
+				run.build.refresh_stats()
+		"phase_set":
+			var phases := []
+			for id in args.get("ids", []):
+				if ConfigManager.phases.has(StringName(id)): phases.append(ConfigManager.phases[StringName(id)])
+			if not phases.is_empty(): run.state.stage.phases = phases
+		"meta":
+			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
+			run.build.refresh_stats()
+		"time":
+			run.state.time = maxf(0, float(args.get("value", 0)))
+		"hero":
+			run.state.hero_power = StringName(args.get("id", ""))
+			run.state.hero_active_t = 0
+		"loadout":
+			if args.get("reset", false):
+				run.build.reset_loadout()
+			else:
+				run.build.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
+		"schedule":
+			schedule = args.get("entries", []).duplicate(true)
+		"guard":
+			run.projectiles.director.guard = args.duplicate(true)
 		"director":
 			run.projectiles.director.configure(args)
+		"boss_parameter":
+			_edit_boss_definition(args)
 		"parameter":
 			_edit_definition(args)
 
@@ -244,7 +353,7 @@ func _edit_definition(args: Dictionary) -> void:
 	if key.begins_with("params."):
 		if not def.params.has(key.trim_prefix("params.")):
 			return
-		def.params[key.trim_prefix("params.")] = args.value
+		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
 		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc"]:
 			return
@@ -275,45 +384,165 @@ func row_for_id(id: int) -> int:
 	return -1
 
 func seek(target: int) -> void:
+	_seek_serial += 1
+	var request := _seek_serial
 	playing = false
 	seeking = true
 	var end := furthest
 	target = clampi(target, 0, end)
-	await _rebuild()
+	_cache_current()
+	var nearest := -1
+	for n in checkpoints.size():
+		var item: Dictionary = checkpoints[n]
+		if int(item.tick) <= target and item.key == _checkpoint_key(int(item.tick)) and (nearest < 0 or int(item.tick) > int(checkpoints[nearest].tick)):
+			nearest = n
+	if nearest >= 0:
+		var item: Dictionary = checkpoints[nearest]
+		checkpoints.remove_at(nearest)
+		scene = item.scene
+		run = item.run
+		scene.process_mode = Node.PROCESS_MODE_INHERIT
+		tick = int(item.tick)
+		_cursor = int(item.cursor)
+		_state_key = item.key
+		_intent = item.intent
+		schedule = item.schedule.duplicate(true)
+		events.assign(item.events.duplicate(true))
+		revision += 1
+	else:
+		await _rebuild()
+	if request != _seek_serial:
+		return
 	var epoch := _epoch
 	while tick < target:
 		for n in mini(120, target - tick):
 			step()
 		seek_progress.emit(float(tick) / maxf(1, target))
 		await get_tree().process_frame
-		if epoch != _epoch:
+		if epoch != _epoch or request != _seek_serial:
 			return
 	furthest = end
 	seeking = false
 	changed.emit()
 
 func cancel_seek() -> void:
-	_epoch += 1
+	_seek_serial += 1
 	seeking = false
 	playing = false
 
 func _run_schedule() -> void:
-	for entry in spec.get("schedule", []):
+	if run.projectiles.director.guard_active():
+		return
+	for entry in schedule:
 		if not entry.get("enabled", true):
 			continue
 		var start := roundi(float(entry.get("start", 0)) / DT)
 		var interval := maxi(1, roundi(float(entry.get("interval", 1)) / DT))
 		var end := roundi(float(entry.get("end", 600)) / DT)
 		if tick >= start and tick <= end and (tick - start) % interval == 0:
-			_apply("spawn", entry)
+			if run.state.rng.randf() > float(entry.get("probability", 1)): continue
+			var at := vector(entry.get("pos", [0, 0])) + Vector2.from_angle(run.state.rng.randf() * TAU) * sqrt(run.state.rng.randf()) * float(entry.get("radius", 0))
+			entry = entry.duplicate(true)
+			entry.pos = [at.x, at.y]
+			_apply("boss" if ConfigManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
 
 func digest() -> String:
+	var actors := []
+	for instance in run.bosses.lab_instances:
+		if is_instance_valid(instance.actor):
+			actors.append(_stable(instance.actor, 0))
+	return str(hash(var_to_bytes([tick, _stable(run.state, 0), _stable(run.enemies.table, 0),
+		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
+		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
+
+## オブジェクトのアドレスを比較せず、戦闘値・部位・攻撃タイマーを比較する。
+func _stable(value, depth: int):
+	if depth > 5: return null
+	if value is RandomNumberGenerator: return [value.seed, value.state]
+	if value is Dictionary:
+		var out := {}
+		for key in value: out[key] = _stable(value[key], depth + 1)
+		return out
+	if value is Array:
+		var out := []
+		for item in value: out.append(_stable(item, depth + 1))
+		return out
+	if value is Object:
+		var out := {}
+		for property in value.get_property_list():
+			if not int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE: continue
+			var key: String = property.name
+			var item = value.get(key)
+			if item is Node or item is Callable or item is Signal or item is GDScript: continue
+			if key in ["director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
+			out[key] = _stable(item, depth + 1)
+		if value is BossActor and value.has_node("Timeline"):
+			var timeline: AnimationPlayer = value.get_node("Timeline")
+			out["timeline"] = [timeline.current_animation, timeline.current_animation_position if timeline.is_playing() else 0.0]
+		return out
+	return value
+
+func _checkpoint_key(at: int) -> String:
+	return str(hash(var_to_bytes([spec, history.filter(func(e): return int(e.tick) <= at)])))
+
+## 状態をコピーせず、停止したシーン全体を保持する。HSM とタイムラインも同じ実体で復元する。
+func _cache_current() -> void:
+	if not is_instance_valid(scene) or not is_instance_valid(run): return
+	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent,
+		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "key": _state_key})
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	scene = null
+	run = null
+	while checkpoints.size() > 3:
+		var old: Dictionary = checkpoints.pop_front()
+		if is_instance_valid(old.scene): old.scene.queue_free()
+
+func definition_for_row(row: int) -> Resource:
 	var t := run.enemies.table
-	var enemies := []
-	for i in t.alive.size():
-		if t.alive[i] and not t.dead[i]:
-			enemies.append([t.id[i], t.type[i], t.pos[i], t.vel[i], t.hp[i], t.facing[i], t.charge[i], t.fire_t[i]])
-	var p := run.projectiles
-	return str(hash(var_to_bytes([tick, run.state.ship_pos, run.state.ship_vel, run.state.ship_hp,
-		run.state.gauge, run.state.rng.state, enemies, p.hostile_pos, p.hostile_alive,
-		p.hazard_pos, p.hazard_t, run.state.time, run.state.world_time])))
+	return run.bosses.definitions.get(t.type[row]) if t.is_boss[row] else t.def[row]
+
+func _edit_boss_definition(args: Dictionary) -> void:
+	var type := StringName(args.get("type", ""))
+	var original: BossDef = run.bosses.definitions.get(type)
+	if original == null or not args.has("value") or typeof(args.value) not in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL]: return
+	var def: BossDef = original.duplicate(true)
+	var key := String(args.get("key", ""))
+	if key.begins_with("params.") and def.params.has(key.trim_prefix("params.")):
+		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
+	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc"]:
+		def.set(key, maxf(0.01, float(args.value)))
+	else:
+		return
+	run.bosses.definitions[type] = def
+	for instance in run.bosses.lab_instances:
+		if instance.has_boss() and instance.actor.def.id == type:
+			instance.actor.def = def
+			var row: int = instance.boss_row
+			if key == "speed": run.enemies.table.speed[row] = def.speed
+			if key == "radius": run.enemies.table.r[row] = def.radius * run.cfg.character_scale
+
+static func safe_parameter(key: String, value):
+	if value is bool: return value
+	var number := float(value)
+	if not is_finite(number): return 0.01
+	if key in ["telegraph", "windup", "life", "recover"] or key.ends_with("_interval") or key.ends_with("_time") or key.ends_with("_delay") or key.ends_with("_cd"):
+		number = clampf(number, 0.01, 100000)
+	if key in ["volley", "layers", "strikes", "stars", "rubble_count", "shards", "lump_max", "throw_min", "death_split"]:
+		number = clampf(number, 1, 512)
+	return int(number) if value is int else number
+
+func undo_edit() -> void:
+	if edit_undo.is_empty() or seeking: return
+	edit_redo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
+	var item: Dictionary = edit_undo.pop_back()
+	history.assign(item.history)
+	furthest = int(item.end)
+	await seek(int(item.tick))
+
+func redo_edit() -> void:
+	if edit_redo.is_empty() or seeking: return
+	edit_undo.append({"history": history.duplicate(true), "end": furthest, "tick": tick})
+	var item: Dictionary = edit_redo.pop_back()
+	history.assign(item.history)
+	furthest = int(item.end)
+	await seek(int(item.tick))

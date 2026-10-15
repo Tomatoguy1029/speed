@@ -190,3 +190,263 @@ stage.2.name,ケンタウルス座の星系,Centaurus System
 stage.3.name,おおいぬ座の星系,Canis Major System
 stage.4.name,うみへび座の星系,Hydra System
 stage.5.name,元凶の待つ星系,Where the Source Awaits
+lab.message_7474db4292,線には2点以上必要です,A route needs at least two points
+lab.message_26fa279ba2,出現,Spawns
+lab.message_63d8f43c5b,攻撃,Attacks
+lab.message_1c155a99a1,被弾,Damage
+lab.message_c3775f8a58,撃破,Kills
+lab.message_72f1cf759c,条件,Conditions
+lab.message_d7d7ce790b,配置,Layout
+lab.message_fadf24dbc5,保存,Files
+lab.message_fc23b9c287,変更はこの実験に適用されます。初期条件へ戻る操作は新しい実験です。,Changes apply to this experiment. New experiment resets the initial conditions.
+lab.message_9e4c412d75,試遊中の無敵,Invincible while playing
+lab.message_d79714f205,充填率,Charge
+lab.message_cdff100dfe,自機を表示中心へ移動・充填,Move ship to view center and charge
+lab.message_c66777f550,ステージ経過（実秒）,Stage time (real seconds)
+lab.message_54036730a6,ステージ時計へ適用,Set stage clock
+lab.message_568b393d89,復元した通常の出現,Original stage roster
+lab.message_df7c5eeb44,追加版の出現（実験のみ）,Added roster (lab only)
+lab.message_ace6599b1c,出現の時間帯を切替,Switch phase roster
+lab.message_0c0e2d79f0,基礎攻撃力,Base attack
+lab.message_0aee0183fd,最高速度,Maximum speed
+lab.message_017dfdb22a,線の長さ,Drawing length
+lab.message_ec7bdd3fb0,波動の幅,Shockwave width
+lab.message_355273af8a,描画中の世界の速さ,World speed while drawing
+lab.message_ab276f5393,描画の確定待ち時間,Drawing confirmation delay
+lab.message_6384a9a6f0,ボスの基礎HP,Boss base HP
+lab.message_391c98f217,ボスの基礎装甲,Boss base armor
+lab.message_761cc8db45,機体の強化レベル,Ship upgrade level
+lab.message_c2080e1bd3,機体の強化を適用,Apply ship upgrade
+lab.message_6f0f16e0c0,武器,Weapon
+lab.message_b62ed716e3,特性,Trait
+lab.message_5c146b19a7,装備レベル,Equipment level
+lab.message_030e3f7f9b,装備に追加,Add equipment
+lab.message_c1f482ed04,装備を解除,Clear equipment
+lab.message_7a50a34743,英雄なし,No hero
+lab.message_3b8a4d49ef,英雄を発動,Activate hero
+lab.message_e52adaaa4c,追加版の分裂設定を適用,Apply added splitter variant
+lab.message_e2074e817f,攻撃の優先度管理を使う,Manage attack priorities
+lab.message_f4a90d8530,全体の重み付き上限,Total weighted budget
+lab.message_e25e93d055,狙い弾,Aimed shots
+lab.message_bbcc068b7e,誘導弾,Homing shots
+lab.message_437d9cf8d0,突進,Dashes
+lab.message_421607de84,ビーム,Beams
+lab.message_1133c374e7,遅延範囲,Delayed areas
+lab.message_f3482a22c0,広がる輪,Expanding waves
+lab.message_c04c40391d,残留範囲,Lingering areas
+lab.message_61bf2700ce,枠,Slots
+lab.message_d0fdf2aa39,重み,Weight
+lab.message_c7f2b1e003,間隔,Gap
+lab.message_1a59dadeb6,表示中の敵を優先し、待った時間で優先度を上げます。攻撃元から残った弾・範囲への線をフィールドに表示します。,Visible enemies get priority; waiting raises it. Lines connect attackers to their remaining shots and areas.
+lab.message_dc8d5ae40c,パレットで選んだ敵を、表示中心へ指定した時間から繰り返し出します。,Repeat the selected enemy at the view center during the chosen time range.
+lab.message_5fdbd8f764,開始（実秒）,Start (real seconds)
+lab.message_51b9d6157a,終了（実秒）,End (real seconds)
+lab.message_274c228534,間隔（実秒）,Interval (real seconds)
+lab.message_7c4fd18609,出現レーンに追加,Add spawn lane
+lab.message_25c440c98a,選択したレーンを削除,Delete selected lane
+lab.message_0113c8102f,すべてのレーンを止める,Stop all lanes
+lab.message_d144e6855f,線を描く時間（実秒）,Drawing duration (real seconds)
+lab.message_2fcfd99d3b,ルートに残す余裕幅,Route clearance
+lab.message_e10ded50d8,開始時間の幅（対応モデルのみ）,Start window (supported models)
+lab.message_f7df32cd04,静止配置の掃引を確認,Check static swept route
+lab.message_fb60080a99,描いた線を隔離して再生,Replay route in isolation
+lab.message_6cc4ba4282,認証した開始時間幅を保護,Protect certified start window
+lab.message_65f985536b,対応モデルで開始時間幅を確認してから有効にしてください,Certify a supported start window before enabling protection.
+lab.message_47a613a504,指定した時間幅の間、新しい攻撃と自動出現を見送ります,New attacks and automatic spawns are deferred during the specified window.
+lab.message_93025fc5b1,線を比較対象として複製,Duplicate route for comparison
+lab.message_0a50b49bd2,敵が動いてよい領域の半径,Placement region radius
+lab.message_4855e0d71e,現在の配置を生成規則にする,Capture layout as a generation rule
+lab.message_277d733b3c,領域の中心をドラッグ。Alt＋ドラッグで半径。ルートを変えると規則を再取得してください。,Drag a region center; Alt-drag changes its radius. Capture again after changing the route.
+lab.message_facbd979fc,貫く群れ,Fodder to pierce
+lab.message_098b17ccc2,避ける対象,Objects to avoid
+lab.message_1dafdf40bb,選んだ領域の最小数,Selected region minimum count
+lab.message_482249e12a,選んだ領域の最大数,Selected region maximum count
+lab.message_21716b1b31,選んだ領域の種類・役割・数を変更,"Apply selected enemy, role and counts"
+lab.message_6ffb4b865c,ランダムに回す角度（度）,Random rotation (degrees)
+lab.message_2abddd7072,長さの最小倍率,Minimum length scale
+lab.message_66086de6d6,ルート上で貫く弱い敵の最小数,Minimum fodder on route
+lab.message_d8cfb525ed,ランダム候補を3つ生成,Generate three random candidates
+lab.message_a19b200d4f,先に配置を生成規則にしてください,Capture a generation rule first.
+lab.message_f90284f87e,選んだ候補を配置に追加,Add selected candidate
+lab.message_4499d20c4e,実験名,Experiment name
+lab.message_3e46ee4fc1,配置・条件のプリセットを保存,Save layout and condition preset
+lab.message_0a6f61cf06,再生履歴と分岐を保存,Save replay and branches
+lab.message_c1df88bfc2,JSONを読み込む,Load JSON
+lab.message_e419196088,本番へ反映する対象（書き出しに明記）,Production targets (included in export)
+lab.message_b8d712fc9b,対象ステージ,Target stage
+lab.message_82b885c33d,時間帯を限定しない,All phases
+lab.message_e98240632d,AI用フォルダを書き出す,Export folder for AI
+lab.message_5da55226e3,書き出しは敵の差分、配置規則、攻撃枠、再現条件、画像をまとめます。通常ステージへの採用は対象を指定して反映します。,"Export includes definition changes, placement rules, attack limits, replay conditions and images. Specify targets when adopting changes in normal stages."
+lab.message_5931a7be25,指定した探索範囲で候補を発見できませんでした,No candidate found within the search limits.
+lab.message_7b47f8fa60,ルートを検証中 %d%%,Evaluating route %d%%
+lab.message_0db4675b27,候補を検査中 %d,Checking candidate %d
+lab.message_7591fff9f2,再構築中 %d%%,Reconstructing %d%%
+lab.message_60a1005be6,戻る,Back
+lab.message_922c39d8ac,敵・ルート実験場,Enemy & Route Lab
+lab.message_c83172920b,ステージ %d,Stage %d
+lab.message_528e1c7048,空のフィールド,Empty field
+lab.message_bb051fda3b,通常の自動出現,Normal automatic spawns
+lab.message_dfa32d64eb,新しい実験,New experiment
+lab.message_bf1c2f34ef,▶ 再生,▶ Play
+lab.message_2555a92b57,❚❚ 停止,❚❚ Pause
+lab.message_87b386148b,1コマ,Step
+lab.message_e2ff3a1576,開始へ,To start
+lab.message_8e4350198b,選択・移動,Select / move
+lab.message_7b82dc2a06,敵を配置,Place enemies
+lab.message_096f45921a,線を編集,Edit route
+lab.message_605c5bd311,自機で試遊,Play as ship
+lab.message_685d3cd5a7,線を消す,Clear route
+lab.message_31c4ccdbbf,線の結果を確認,Evaluate route
+lab.message_67847e89ae,中止,Cancel
+lab.message_97c3c6246b,敵を消す,Clear enemies
+lab.message_fb93512f75,攻撃範囲,Attack ranges
+lab.message_19e1e846a4,敵の名前・IDで検索,Search enemy name or ID
+lab.message_da1f520c6f,数,Count
+lab.message_4db93d1888,選択情報,Selection
+lab.message_69a0de30fa,実験設定,Experiment
+lab.message_e2160dc29a,編集中：線の結果を確認してください,Editing: evaluate the route again.
+lab.message_c811c512d0,敵パレット,Palette
+lab.message_2041b03309,情報パネル,Inspector
+lab.message_25446d5b84,線編集：クリックで点を追加、点をドラッグ、右クリックで最後の点を削除,"Route: click to add, drag to move, right-click a point to delete."
+lab.message_787af9549a,中ボタン：移動　ホイール：拡大縮小　配置してから再生してください,"Middle-drag to pan; wheel to zoom. Place enemies, then play."
+lab.message_2e31753d0b,"%s　%s
+選択してフィールドをクリック","%s  %s
+Select, then click the field"
+lab.message_bd3455e23b,通常,Normal
+lab.message_cab5ef8006,ボス,Boss
+lab.message_0033dbf5f7,調整待ち,To tune
+lab.message_e6152035cf,"%s
+%s ・%s","%s
+%s / %s"
+lab.message_30308e98b5,：配置する位置をクリック,: click to place
+lab.message_992b3b0d94,敵を選択してドラッグ移動,Select an enemy and drag to move
+lab.message_d01d58488a,配置する位置をクリック,Click a placement position
+lab.message_6959dce1bf,線の点を追加・移動して結果を確認,"Add or move route points, then evaluate"
+lab.message_e032c78766,通常の描画操作で試遊。再生を押してください,Use normal drawing controls. Press Play to begin.
+lab.message_549e9c3c03,分岐 %d,Branch %d
+lab.message_9ec7700849,静止配置で成立,Valid in static layout
+lab.message_0df05349ff,指定時間幅で成立,Valid within the specified window
+lab.message_af33e7e17b,時間幅の評価モデルが未対応,Time-window model unsupported
+lab.message_3aee526f77,この条件で成立する候補は未確認,No valid candidate confirmed for these conditions
+lab.message_aa259c678f,線の条件を確認,Check route conditions
+lab.message_dd16bfc556,この再生条件で成立,Valid for this replay
+lab.message_b8f8f95d8c,この再生では終点到達・無被弾の条件を未達,Endpoint or no-damage condition not met in this replay
+lab.message_94deee7e2e,再確認が必要,Recheck required
+lab.message_68dc5e1c46,編集中,Editing
+lab.message_511972b218,　撃破 %d　被ダメージ %.1f　残り充填 %.2f,  Kills %d  Damage %.1f  Charge %.2f
+lab.message_198ce2dd32,　衝突・未確認 %d箇所　余裕幅 %.0f,  Collisions / unconfirmed %d  Clearance %.0f
+lab.message_c93b3203d0,線%d　%s　撃破%d,Route %d  %s  Kills %d
+lab.message_82b17798e4,候補%d　%s　Seed%d,Candidate %d  %s  Seed %d
+lab.message_e3178fc873,候補を選ぶと線と出現位置を重ねて表示します,Select a candidate to overlay its route and positions.
+lab.message_4949196244,候補が古いか未成立です。生成し直してください,Candidate is stale or invalid. Generate it again.
+lab.message_e104208879,保存できませんでした：%s,Could not save: %s
+lab.message_edf19cb8e9,*.json ; 実験のJSON,*.json ; Experiment JSON
+lab.message_10ccd95682,基準データが違います。結果の再確認が必要です,Baseline differs. Re-evaluate the results.
+lab.message_0d4f7fc305,読み込みました,Loaded
+lab.message_6d49e93edd,書き出しました：,"Exported: "
+lab.message_f6f81b6554,書き出しに失敗：,"Export failed: "
+lab.message_c2ddab60b8,❚❚ 再生中,❚❚ Playing
+lab.message_15d10dbb3a,%.2f 秒 / %.2f 秒　世界 %.2f 秒　敵 %d体　Seed %d,%.2f s / %.2f s  World %.2f s  Enemies %d  Seed %d
+lab.message_98f82d7b9f,現在の分岐,Current branch
+lab.message_91f8bdc328,再確認が必要：配置・装備・時間が変わっています,"Recheck required: layout, equipment or time changed."
+lab.message_87b29ea1a5,ファイルを読み込めません（上限16MB）,Cannot read file (16 MB limit).
+lab.message_d2cbd5f4c9,JSON の形式を確認してください,Check the JSON format.
+lab.message_5aa5077c96,対応していない記録の版・種類です,Unsupported record version or kind.
+lab.message_03af38d54f,初期条件・履歴の形式が違います,Invalid initial conditions or history format.
+lab.message_5411903cfb,記録の上限を超えています,Record exceeds limits.
+lab.message_516be31176,未知の初期条件：,"Unknown initial condition: "
+lab.message_da5e2e784c,未知のステージです,Unknown stage.
+lab.message_5023536a4b,初期条件の形式が違います：,"Invalid initial condition format: "
+lab.message_c6f64ef280,自機の位置が不正です,Invalid ship position.
+lab.message_dcb428f285,装備のID・レベルが不正です,Invalid equipment ID or level.
+lab.message_97502315d3,線の形式・上限を確認してください,Check route format and point limit.
+lab.message_275c3dbb23,線の座標が不正です,Invalid route coordinates.
+lab.message_1ea25ab8b0,配置規則の形式が違います,Invalid placement rule format.
+lab.message_3b1b000e8b,未知の調整値：,"Unknown tuning value: "
+lab.message_3fc0d7300b,未知の敵：,"Unknown enemy: "
+lab.message_8cfee97b22,変更できない敵の項目：,"Enemy property cannot be changed: "
+lab.message_8c395a3b3b,分岐の形式が違います,Invalid branch format.
+lab.message_2fa6cacf94,未知の命令・形式です,Unknown command or format.
+lab.message_884b1ef739,命令の時刻が範囲外です,Command time is out of range.
+lab.message_2a897624ac,命令の位置が不正です,Invalid command position.
+lab.message_c547a6d3c5,入力の座標が不正です,Invalid input coordinates.
+lab.message_6b1292dfc2,敵の値が不正です,Invalid enemy value.
+lab.message_6d6845a8d1,命令の数値が不正です,Invalid command number.
+lab.message_e4cadb1cab,許可していないラン命令です,Run command is not allowed.
+lab.message_3313855ba5,出現レーンの形式・上限を確認してください,Check spawn lane format and limits.
+lab.message_e33e75d642,出現レーンの形式が違います,Invalid spawn lane format.
+lab.message_f9993c711a,出現レーンに未知の敵があります,Unknown enemy in spawn lane.
+lab.message_bb508ec943,出現位置の形式が違います,Invalid spawn position format.
+lab.message_b58910d240,出現レーンの数値が不正です,Invalid spawn lane number.
+lab.message_94331992ec,出現間隔には正の値が必要です,Spawn interval must be positive.
+lab.message_1f862285cc,定義の形式が違います,Invalid definition format.
+lab.message_3c66a49d71,未知の敵・定義です,Unknown enemy or definition.
+lab.message_2dac0fe5e5,攻撃の値の形式が違います,Invalid attack parameter format.
+lab.message_7241f95e31,未知の攻撃の値です,Unknown attack parameter.
+lab.message_00769fb623,変更できない定義の値です,Definition value cannot be changed.
+lab.message_7d67422141,大きさと強さには有効な正の値が必要です,Size and strength require valid positive values.
+lab.message_f111d0afe0,敵を選択すると情報を表示,Select an enemy to inspect
+lab.message_479576c49c,"数値はこの実験の同じ種類に適用
+本番データは書き換えません","Values apply to this enemy type in the experiment.
+Production data stays unchanged."
+lab.message_a19e004551,姿・当たり判定・攻撃範囲を確認できます,"Inspect appearance, collision and attack ranges."
+lab.message_6170cb0f1e,"HP %.1f / %.1f
+装甲 %.1f　自機の攻撃 %.1f
+%s
+状態：%s
+位置 (%.0f, %.0f)　向き %.0f°","HP %.1f / %.1f
+Armor %.1f  Ship attack %.1f
+%s
+State: %s
+Position (%.0f, %.0f)  Angle %.0f°"
+lab.message_6fb30df6c1,貫通できる,Can pierce
+lab.message_2c343fabe5,装甲で弾かれる,Blocked by armor
+lab.message_09a8e159ad,予告中,Telegraphing
+lab.message_d44a3e6526,移動／待機,Moving / waiting
+lab.message_684f07d574,エリート,Elite
+lab.message_597e81eb3a,個体へ適用,Apply to individual
+lab.message_341a7b515f,基礎 HP,Base HP
+lab.message_7d629f79a9,基礎装甲,Base armor
+lab.message_80c64a0375,基礎速度,Base speed
+lab.message_b982dccaae,基礎半径,Base radius
+lab.message_4212b2ec66,攻撃・行動の設定,Attack and behavior settings
+lab.message_eb3d91decb,残留する攻撃の終了待ち,Waiting for lingering attacks to end
+lab.message_aa5d4e5983,優先順位の高い要求を先に処理,Waiting for a higher-priority request
+lab.message_377bd2f0f5,：分類の枠待ち,: category slots full
+lab.message_49b3b4a997,：共通の開始間隔待ち,: shared start gap
+lab.message_9ce7705ba3,全体の攻撃量の上限,Total attack budget reached
+lab.message_e98c560853,認証したルートの開始時間幅を保護中,Protecting a certified route start window
+lab.message_ace1dcf08b,描ける長さを超過,Drawing length exceeded
+lab.message_fdee8bc433,外縁,Outer boundary
+lab.message_409189caf0,地形の掃引,Swept terrain
+lab.message_416deae061,特殊な倒し方は再生で確認,Replay required for special defeat conditions
+lab.message_676b643ad5,通常攻撃での確実な撃破を未確認,Guaranteed kill with normal attack unconfirmed
+lab.message_eaf4530ecf,自機の自動攻撃・英雄・重力,"Automatic weapons, hero or gravity"
+lab.message_feb890132f,ランダムな地形の追加,Random terrain additions
+lab.message_8e84357015,敵弾,Enemy shot
+lab.message_c977ed9a15,攻撃範囲の保守的な包絡,Conservative attack envelope
+lab.message_d51f72362d,Encounter profile: 採用時の基準が異なるため無効,Encounter profile disabled: adoption baseline differs.
+lab.message_5e0ec7996a,現在の状態で適用できる候補が未発見,No applicable candidate found in the current state.
+lab.message_461a6d1eec,未知の敵です,Unknown enemy.
+lab.range_edit,範囲・向き,Range / direction
+lab.undo,取り消す,Undo
+lab.redo,やり直す,Redo
+lab.names,名前・ID,Names / IDs
+lab.terrain,天体,Terrain
+lab.rocks,隕石・がれき,Rocks / debris
+lab.gimmicks,フィールドの仕掛け,Field events
+lab.route_length,線 %.0f / %.0f　消費 %.0f%%,Route %.0f / %.0f  Cost %.0f%%
+lab.manual_exception,手動配置：地形や外縁と重なる例外を含みます,Manual layout includes terrain or boundary overlaps
+lab.info_categories,"攻撃 %s　優先度 %.1f　待機 %.2f秒
+%s","Attacks %s  Priority %.1f  Wait %.2fs
+%s"
+lab.spawn_probability,出現する確率（0〜1）,Spawn probability (0–1)
+lab.spawn_radius,出現領域の半径,Spawn region radius
+lab.lane_toggle,選択したレーンをON/OFF,Toggle selected lane
+lab.lane_apply,選択したレーンへ条件を適用,Apply conditions to selected lane
+lab.status_active,発動・予告,Active / telegraph
+lab.status_residue,残留,Lingering
+lab.status_wait,待機,Waiting
+lab.exit_clearance,抜けた先に残す余裕の半径,Exit clearance radius
+lab.min_spacing,敵中心どうしの最小距離,Minimum distance between enemy centers
+lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留 / 枠,■ Telegraph / active  / Lingering; active + lingering / slots

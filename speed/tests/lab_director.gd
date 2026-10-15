@@ -5,7 +5,7 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
-	var director = load("res://gyms/enemy_lab/attack_director.gd").new()
+	var director = load("res://scripts/encounters/attack_director.gd").new()
 	director.configure({"enabled": true, "budget": 2, "gaps": {"beam": 0.5}})
 	check(director.request("a", ["beam"], 0, 1, 1), "最初の攻撃を許可")
 	check(not director.request("b", ["beam"], 1, 2, 1), "同じ分類の重複を拒否")

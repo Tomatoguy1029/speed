@@ -11,6 +11,8 @@ extends BossActor
 var _cooldown := 0.0
 
 func _on_bound() -> void:
+	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
+	timeline.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
 	_cooldown = float(def.params.fire_interval) * 0.5
 	hsm.initialize(self)
 	hsm.set_active(true)
@@ -64,4 +66,4 @@ func fire_volley() -> void:
 	var spread: float = def.params.spread
 	var base := (run_state.enemy_aim - table.pos[body]).angle()
 	for i in n:
-		manager.fire(base + (float(i) / (n - 1) - 0.5) * spread, def.params.bullet_speed, def.params)
+		manager.fire(base + (float(i) / maxi(1, n - 1) - 0.5) * spread, def.params.bullet_speed, def.params)

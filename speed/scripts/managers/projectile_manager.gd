@@ -326,7 +326,8 @@ func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
-	lab_hostile_group[i] = lab_context
+	if director != null:
+		lab_hostile_group[i] = lab_context
 	hostile_pos[i] = pos
 	hostile_vel[i] = vel
 	hostile_speed[i] = speed
@@ -507,7 +508,8 @@ func release_hazard(h: int) -> void:
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
 		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
 	var i := hazard_slots.take()
-	lab_hazard_group[i] = lab_context
+	if director != null:
+		lab_hazard_group[i] = lab_context
 	hazard_kind[i] = kind
 	hazard_style[i] = style
 	hazard_pos[i] = pos

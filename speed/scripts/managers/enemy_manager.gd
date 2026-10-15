@@ -72,24 +72,7 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	var t := table
 	t.def[i] = def
 	t.type[i] = def.id
-	var L := maxf(1.0, level)
-	t.level[i] = L
-	var elite: bool = opts.get("elite", false)
-	t.elite[i] = 1 if elite else 0
-	var size: float = opts.get("size", def.radius)
-	var z := size / def.radius
-	var r := size * (1.25 if elite else 1.0)
-	# 手描き素材はエリートも同じ基準サイズで運用する。
-	if def.id in RenderManager.NATIVE_SPRITES:
-		r = def.radius
-	if opts.get("meteor_index", -1) < 0:
-		r *= cfg.character_scale
-	t.r[i] = r
-	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
-	t.hp[i] = t.max_hp[i]
-	t.armor[i] = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
-	t.xp[i] = def.xp * z * (1.0 + 0.5 * (L - 1.0)) * (4.0 if elite else 1.0)
-	t.speed[i] = def.speed * (1.0 + 0.04 * (L - 1.0))
+	apply_scaling(i, def, level, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
 	t.facing[i] = opts.get("facing", 0.0)
@@ -117,6 +100,28 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 		for k in int(def.params.stars):
 			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
 	return i
+
+## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
+func apply_scaling(i: int, def: EnemyDef, level: float, opts := {}) -> void:
+	var t := table
+	var L := maxf(1.0, level)
+	t.level[i] = L
+	var elite: bool = opts.get("elite", false)
+	t.elite[i] = 1 if elite else 0
+	var size: float = opts.get("size", def.radius)
+	var z := size / def.radius
+	var r := size * (1.25 if elite else 1.0)
+	# 手描き素材はエリートも同じ基準サイズで運用する。
+	if def.id in RenderManager.NATIVE_SPRITES:
+		r = def.radius
+	if opts.get("meteor_index", -1) < 0:
+		r *= cfg.character_scale
+	t.r[i] = r
+	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
+	t.hp[i] = t.max_hp[i]
+	t.armor[i] = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
+	t.xp[i] = def.xp * z * (1.0 + 0.5 * (L - 1.0)) * (4.0 if elite else 1.0)
+	t.speed[i] = def.speed * (1.0 + 0.04 * (L - 1.0))
 
 ## 部位を1つ出し、親（行 i）に付ける。
 func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
@@ -659,7 +664,7 @@ func fire_volley(i: int) -> void:
 	var n: int = p.volley
 	var spread: float = p.spread
 	for k in n:
-		projectiles.fire_enemy(i, base + (float(k) / (n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")
+		projectiles.fire_enemy(i, base + (float(k) / maxi(1, n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")
 
 func _steer_to(i: int, target: Vector2, speed: float, accel: float, dt: float) -> void:
 	var d := target - table.pos[i]

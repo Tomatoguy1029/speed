@@ -13,6 +13,7 @@ var field: FieldManager
 ## ボスの役者を置く場所（World の子）
 var actor_parent: Node
 
+var definitions: Dictionary = {}
 var actor: BossActor = null
 ## ボスの当たり判定の行と、その id（ボスがいなければ boss_row は -1）
 var boss_row := -1
@@ -59,7 +60,7 @@ func boss_pos(fallback: Vector2) -> Vector2:
 
 ## ボスを出す（仕様書 12.2）。機体から少し離れた位置に出し、惑星の中と外縁の外は避ける。
 func spawn(def_override: BossDef = null, position_override := Vector2.INF) -> void:
-	var def: BossDef = def_override if def_override != null else ConfigManager.bosses.get(state.stage.boss_id)
+	var def: BossDef = def_override if def_override != null else definitions.get(state.stage.boss_id, ConfigManager.bosses.get(state.stage.boss_id))
 	if def == null:
 		return
 	state.boss_spawned = true
@@ -128,7 +129,8 @@ func spawn_lab(type: StringName, pos: Vector2) -> int:
 	instance.actor_parent = actor_parent
 	instance.setup(state, cfg)
 	lab_instances.append(instance)
-	instance.spawn(ConfigManager.bosses[type], pos)
+	instance.definitions = definitions
+	instance.spawn(definitions.get(type, ConfigManager.bosses[type]), pos)
 	return instance.boss_row
 
 ## 技を構える前に、必要な分類を同時取得する。
