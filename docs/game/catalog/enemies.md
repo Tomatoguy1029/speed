@@ -29,7 +29,7 @@
 | `rocket` | ミサイル | 1 | 採用 | 実装済み | 出た向きのまま一直線に飛ぶ。機体に近づくと爆発する。飛ぶ時間が過ぎると消える | — | 1〜5 | `data/enemies/rocket.tres`、`enemy_manager.gd` の `_rocket` |
 | `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | 1・2・3・5 | `data/enemies/bomber.tres`、`_bomber` |
 | `volatile` | 誘爆する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む。誘爆は連鎖する | — | 2〜5 | `data/enemies/volatile.tres`、`on_enemy_death` |
-| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと小さな2〜3体（`splitling`）に分かれる。分かれた体はそれ以上分かれない | 分かれた体もすべて倒す | 2・4・5 | `data/enemies/splitter.tres`・`splitling.tres` |
+| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 通常出現では追跡中にも分裂体を生み、撃破時に2体へ分かれる。追加版の生存中は分裂せず撃破時に2〜3体へ分かれる設定も保持する | 分かれた体もすべて倒す | 元の通常出現。追加版は `data/lab/enemy_variants.json` に保持 | `data/enemies/splitter.tres`・`splitling.tres` |
 | `splitling` | 分裂体 | 1 | 採用 | 実装済み | 分裂する雑魚から生まれ、機体を追う | — | 2・4・5の分裂時 | `data/enemies/splitling.tres`（行動は `chase`） |
 | `beamer` | ビームの敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって砲口に光を集めてからビームを撃つ | — | 1・2・3・5 | `data/enemies/beamer.tres`、`_beamer` |
 | `pulser` | 波動の敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって1枚だけの輪を出す。切れ目はなく、届く距離は短い | — | 1・4・5 | `data/enemies/pulser.tres`、`_pulser` |

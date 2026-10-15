@@ -115,8 +115,11 @@ func _start(stage: int) -> void:
 	scene = load("res://scenes/run/run.tscn").instantiate()
 	add_child(scene)
 	run = scene.get_node("Managers/RunManager")
+	run.state.stage = run.state.stage.duplicate()
+	run.state.stage.phases = []
+	for phase_name in ["build", "pressure", "horde", "late"]:
+		run.state.stage.phases.append(ConfigManager.phases[StringName("s%d_%s" % [stage, phase_name])])
 	if stage == 4:
-		run.state.stage = run.state.stage.duplicate()
 		run.state.stage.boss_id = &"hydra"
 	run.set_physics_process(false)
 	run.input.set_process_input(false)
@@ -212,7 +215,7 @@ func _test_foundation() -> void:
 	s.ship_vel = Vector2(-100, 0)
 	run.ship._collide_bodies()
 	_check(s.ship_vel.x > 0 and s.ship_hp == hp, "タスク1：惑星は被弾せず跳ね返る")
-	_check(ConfigManager.stage(1).phases[0].mix != ConfigManager.stage(2).phases[0].mix, "タスク2：出現の重みはステージごとに異なる")
+	_check(ConfigManager.stage(1).phases[0].mix == ConfigManager.stage(2).phases[0].mix, "復元：通常ステージは元の共通の出現構成を使う")
 	s.time = run.cfg.boss_time - 1.0
 	run.bosses.tick(0.0, 0.0)
 	_check(not s.boss_spawned and s.boss_at >= run.cfg.boss_time and s.boss_at <= run.cfg.boss_time + run.cfg.boss_time_spread, "タスク3：ボス時刻は指定範囲で決まる")
@@ -874,7 +877,7 @@ func _test_app_flow() -> void:
 			run.state.stats.attack_mult = 1000.0
 			var boss = run.bosses.actor
 			var target: Vector2 = run.enemies.table.pos[boss.body]
-			if stage == 4:
+			if boss.def.id == &"hydra":
 				if boss.immortal_row >= 0:
 					target = run.enemies.table.pos[boss.immortal_row]
 				else:

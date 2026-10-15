@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "variants": [
+    {
+      "id": "splitter_added",
+      "enemy": "splitter",
+      "name": "分裂する雑魚（追加版）",
+      "overrides": {
+        "params": {
+          "bud_interval": 5.0,
+          "max_buds": 0,
+          "death_split": 2,
+          "split_extra": 1,
+          "split_speed": 200.0
+        }
+      }
+    }
+  ]
+}
