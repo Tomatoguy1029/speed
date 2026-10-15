@@ -6,6 +6,7 @@ signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
 const RUN_SCENE := preload("res://scenes/run/run.tscn")
+const DIRECTOR := preload("res://gyms/enemy_lab/attack_director.gd")
 const DT := 1.0 / 60.0
 
 var scene: Node
@@ -74,6 +75,12 @@ func _rebuild() -> void:
 		"seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
 	add_child(scene)
+	run.set_process(false)
+	var director = DIRECTOR.new()
+	director.state = run.state
+	director.projectiles = run.projectiles
+	director.configure(spec.get("director", {}))
+	run.projectiles.director = director
 	run.input.set_process_input(false)
 	run.input.set_process_unhandled_input(false)
 	run.input_source = func(): return _intent
@@ -126,10 +133,12 @@ func step() -> void:
 	if not is_instance_valid(run):
 		return
 	_run_schedule()
+	run.projectiles.director.advance(run.state.world_time, run.enemies)
 	run._play_tick(DT)
 	_intent.press = false
 	_intent.alt_press = false
 	_intent.hero_press = false
+	_intent.pen_release = false
 	for item in run.state.events:
 		var event: Dictionary = item.duplicate(true)
 		event["tick"] = tick
@@ -167,12 +176,27 @@ func _apply(kind: String, args: Dictionary) -> void:
 			var origin := vector(args.get("pos", [0, 0]))
 			for k in clampi(int(args.get("count", 1)), 1, 10000):
 				var offset := Vector2.from_angle(k * 2.399963) * sqrt(float(k)) * float(args.get("spacing", 60))
-				selected = run.enemies.spawn(def, float(args.get("level", 1)), origin + offset,
-					{"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)})
+				var opts := {"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)}
+				if def.id in [&"meteor", &"iron", &"saw"]:
+					var rock := FieldManager.Rock.new()
+					rock.kind = &"belt" if def.id == &"meteor" else def.id
+					rock.pos = origin + offset
+					rock.size = def.radius * run.cfg.character_scale
+					rock.facing = float(opts.facing)
+					opts.meteor_index = run.field.rocks.size()
+					opts.size = rock.size
+					run.field.rocks.append(rock)
+				selected = run.enemies.spawn(def, float(args.get("level", 1)), origin + offset, opts)
+				if opts.has("meteor_index"):
+					var rock = run.field.rocks[opts.meteor_index]
+					rock.row = selected
+					rock.row_id = run.enemies.table.id[selected]
 		"move":
 			var row := row_for_id(int(args.get("id", -1)))
 			if row >= 0:
 				run.enemies.table.pos[row] = vector(args.pos)
+				if run.enemies.table.meteor_index[row] >= 0:
+					run.field.rocks[run.enemies.table.meteor_index[row]].pos = vector(args.pos)
 				run.enemies.table.facing[row] = float(args.get("angle", run.enemies.table.facing[row]))
 		"delete":
 			var row := row_for_id(int(args.get("id", -1)))
@@ -184,14 +208,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			run.enemies.clear_all()
 			run.projectiles.clear_hostile()
 		"boss":
-			run.bosses.remove_boss()
-			run.enemies.cleanup()
-			run.state.boss_dead = false
-			run.state.stage.boss_id = StringName(args.get("type", "hydra"))
-			run.bosses.spawn()
-			if args.has("pos"):
-				run.enemies.table.pos[run.bosses.boss_row] = vector(args.pos)
-			selected = run.bosses.boss_row
+			for k in clampi(int(args.get("count", 1)), 1, 32):
+				selected = run.bosses.spawn_lab(StringName(args.get("type", "hydra")), vector(args.get("pos", [0, 0])) + Vector2(k * 400, 0))
 		"command":
 			run.command(StringName(args.get("name", "")), args.get("args", {}))
 		"input":
@@ -207,6 +225,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			run.state.ship_pos = vector(args.get("pos", [0, 0]))
 			run.state.ship_vel = Vector2.ZERO
 			run.state.gauge = float(args.get("gauge", run.state.gauge))
+		"director":
+			run.projectiles.director.configure(args)
 		"parameter":
 			_edit_definition(args)
 
@@ -217,10 +237,18 @@ func _edit_definition(args: Dictionary) -> void:
 		return
 	def = def.duplicate(true)
 	var key := String(args.get("key", ""))
+	if not args.has("value") or typeof(args.value) not in [TYPE_INT, TYPE_FLOAT, TYPE_BOOL]:
+		return
+	if typeof(args.value) == TYPE_FLOAT and not is_finite(args.value):
+		return
 	if key.begins_with("params."):
+		if not def.params.has(key.trim_prefix("params.")):
+			return
 		def.params[key.trim_prefix("params.")] = args.value
 	else:
-		def.set(key, args.value)
+		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc"]:
+			return
+		def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
 	run.enemies.definitions[type] = def
 	var t := run.enemies.table
 	for i in t.alive.size():

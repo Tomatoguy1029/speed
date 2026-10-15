@@ -501,6 +501,12 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
+			if not _lab_admit(i, bdt):
+				_chase(i, bdt)
+				pos[i] += vel[i] * dt
+				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
+					field.collide_enemy(i, from)
+				continue
 			match b:
 				EnemyTable.Beh.DASH:
 					_dash(i, bdt)
@@ -599,6 +605,8 @@ func _tick_behavior(b: int, dt: float) -> void:
 			pos[i] += vel[i] * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
+
+	projectiles.lab_context = 0
 
 ## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldManager.near_body と同じ条件）。
 ## 前回確かめたときの天体の表面までの距離から、その後に動いた距離と月が動けた距離を引き、
@@ -1282,6 +1290,9 @@ func _aquila(i: int, dt: float) -> void:
 func on_enemy_death(i: int, atk: float) -> void:
 	var t := table
 	var dp: Dictionary = t.def[i].params if t.def[i] != null else {}
+	var prior_context := projectiles.lab_context
+	if projectiles.director != null:
+		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
 	if t.beh[i] == EnemyTable.Beh.CROW:
 		for k in t.buds[i] * int(dp.shards):
 			projectiles.fire_enemy(i, state.rng.randf() * TAU, float(dp.bullet_speed) * state.rng.randf_range(0.6, 1.0), &"bullet")
@@ -1290,6 +1301,7 @@ func on_enemy_death(i: int, atk: float) -> void:
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),
 			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
+	projectiles.lab_context = prior_context
 	if t.type[i] != &"splitter":
 		return
 	var p: Dictionary = t.def[i].params
@@ -1554,4 +1566,34 @@ func _recycle(i: int) -> bool:
 	t.timer[i] = 0.0
 	t.charge[i] = 0.0
 	t.fire_t[i] = t.def[i].params.get("fire_interval", 0.0)
+	return true
+
+## 制限は実験または明示した採用設定だけで有効。予告へ入る前に取得する。
+func _lab_admit(i: int, dt: float) -> bool:
+	var d = projectiles.director
+	projectiles.lab_context = 0
+	if d == null:
+		return true
+	var def := table.def[i]
+	if def == null:
+		return true
+	var cats: Array = d.categories(def.behavior)
+	if cats.is_empty():
+		return true
+	var owner := str(table.id[i])
+	var p := def.params
+	var active := table.mode[i] != EnemyTable.Mode.MOVE or not table.links[i].is_empty()
+	var due := table.fire_t[i] <= float(p.get("telegraph", 0)) + dt
+	if def.behavior == &"dash":
+		due = table.pos[i].distance_to(state.enemy_aim) <= float(p.range)
+	elif def.behavior == &"bomber":
+		due = table.pos[i].distance_to(state.ship_pos) <= float(p.trigger)
+	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
+		due = true
+	if not active and due:
+		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
+		if not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0):
+			table.charge[i] = 0
+			return false
+	projectiles.lab_context = d.token(owner)
 	return true

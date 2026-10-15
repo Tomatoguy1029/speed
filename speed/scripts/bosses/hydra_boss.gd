@@ -105,6 +105,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_tech_cd -= dt
 	_spin_t -= dt
 	hsm.update(dt)
+	if manager.projectiles.director != null:
+		manager.projectiles.lab_context = manager.projectiles.director.token("boss:" + str(table.id[body]))
 	if timeline.is_playing():
 		timeline.advance(dt)
 		if tech != &"" and not _tech_ok(tech):
@@ -293,6 +295,9 @@ func _expose() -> void:
 ## 普段の首の攻撃は予告しない（噛みつきの引き・ビームの溜めなど、首の動きと光で見せる）。
 func _attack(neck: Neck, _k: int, dt: float) -> void:
 	var p: Dictionary = def.params
+	var owner := "neck:" + str(neck.row_id)
+	if manager.projectiles.director != null:
+		manager.projectiles.lab_context = manager.projectiles.director.token(owner)
 	var aim := (run_state.ship_pos - table.pos[body]).angle()
 	if neck.mode == &"idle":
 		var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
@@ -302,6 +307,9 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 		neck.glow = maxf(0.0, neck.glow - dt * 3.0)
 		neck.cd -= dt
 		if neck.cd <= 0.0 and not busy and table.pos[body].distance_to(run_state.ship_pos) < float(p.engage) * 1.3:
+			var cats: Array = {&"bite": ["dash"], &"vortex": ["wave"], &"debris": ["aimed"], &"beam": ["beam"], &"homing": ["homing"]}.get(neck.kind, ["aimed"])
+			if not manager.admit(owner, cats, neck.row, 5.0):
+				return
 			neck.cd = float(p.attack_cd) * (0.8 + 0.4 * run_state.rng.randf())
 			neck.step = 0
 			neck.mode = StringName(String(neck.kind) + ("_a" if run_state.rng.randf() < 0.5 else "_b"))
@@ -497,7 +505,7 @@ func _immortal_attack(dt: float) -> void:
 ## 強めの技を出せるか（判断の層の AttackReady）。
 func attack_ready(attack: StringName) -> bool:
 	return attack == &"technique" and _tech_cd <= 0.0 and not timeline.is_playing() and exposed_t <= 0.0 \
-		and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.engage) * 1.3 and not _available().is_empty()
+		and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.engage) * 1.3 and not _available().is_empty() and manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0)
 
 ## 使える技から1つ選んで、そのタイムラインを再生する（判断の層の PlayAttack）。
 func start_attack(_attack: StringName) -> void:

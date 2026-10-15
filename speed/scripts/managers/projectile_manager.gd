@@ -62,6 +62,11 @@ var hostile_stone := PackedFloat32Array()
 ## 浮かんで待つ残り時間（その間は動かないが、触れると被弾する）
 var hostile_wait := PackedFloat32Array()
 var hostile_slots: RowSlots
+## 実験の攻撃グループ。行の再利用時に必ず上書きする。
+var lab_context := 0
+var lab_hostile_group: Dictionary = {}
+var lab_hazard_group: Dictionary = {}
+var director
 var _hostile_updating := false
 var _hostile_clear_pending := false
 
@@ -321,6 +326,7 @@ func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
+	lab_hostile_group[i] = lab_context
 	hostile_pos[i] = pos
 	hostile_vel[i] = vel
 	hostile_speed[i] = speed
@@ -501,6 +507,7 @@ func release_hazard(h: int) -> void:
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
 		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
 	var i := hazard_slots.take()
+	lab_hazard_group[i] = lab_context
 	hazard_kind[i] = kind
 	hazard_style[i] = style
 	hazard_pos[i] = pos

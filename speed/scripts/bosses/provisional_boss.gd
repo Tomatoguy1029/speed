@@ -46,7 +46,7 @@ func _move(dt: float) -> void:
 # ── 判断の層から呼ばれる ──────────────────────────────────────────
 
 func attack_ready(_attack: StringName) -> bool:
-	return _cooldown <= 0.0 and not timeline.is_playing()
+	return _cooldown <= 0.0 and not timeline.is_playing() and manager.admit("boss:" + str(table.id[body]), ["aimed"], body, 2.0)
 
 func start_attack(attack: StringName) -> void:
 	timeline.play(attack)
