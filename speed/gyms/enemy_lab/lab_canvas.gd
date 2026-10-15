@@ -1,4 +1,5 @@
-## 本番の敵・弾・範囲を表示する、実験場の編集キャンバス。
+## 本番のランの表示枠に重ねる、実験場の編集用の層。
+## 敵・弾・地形・機体は本番の描画が描く。ここでは選択・射程・ID・線・配置の目印だけを描く。
 extends Control
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
@@ -271,15 +272,6 @@ func _pick(pos: Vector2, cycle := false) -> int:
 	return best
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#090f1a"))
-	var grid := 200.0 * zoom
-	var offset := screen(Vector2.ZERO)
-	for x in range(ceili(size.x / grid) + 1):
-		var a := fposmod(offset.x, grid) + x * grid
-		draw_line(Vector2(a, 0), Vector2(a, size.y), Color("#172131"))
-	for y in range(ceili(size.y / grid) + 1):
-		var a := fposmod(offset.y, grid) + y * grid
-		draw_line(Vector2(0, a), Vector2(size.x, a), Color("#172131"))
 	if session == null or not is_instance_valid(session.run):
 		return
 	var run: RunManager = session.run
@@ -290,21 +282,12 @@ func _draw() -> void:
 		var at := size * 0.5 + Vector2(0, 64)
 		draw_texture_rect(UI.icon("plus"), Rect2(at - Vector2(12, 36), Vector2(24, 24)), false, Color(1, 1, 1, 0.5))
 		draw_string(font, at - Vector2(width / 2, 0), message, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.MUTED)
-	for body in run.field.bodies:
-		draw_circle(screen(body.pos), maxf(body.r * zoom, 1), Color("#333f59"))
 	for entry in session.schedule:
 		if entry.get("enabled", true):
 			var point := screen(session.vector(entry.get("pos", [0, 0])))
 			draw_arc(point, maxf(8, float(entry.get("radius", 0)) * zoom), 0, TAU, 32, Color("#9d8ccf"), 1)
 			draw_string(ThemeDB.fallback_font, point + Vector2(8, 8), "%s ×%d / %.1fs" % [String(entry.get("type", "")), int(entry.get("count", 1)), float(entry.get("interval", 1))], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c0b0e2"))
 	_draw_projectiles(run.projectiles)
-	var drawn_bodies := {}
-	for instance in run.bosses.lab_instances:
-		if instance.boss_alive() and is_instance_valid(instance.actor) and instance.actor.has_method("draw_on"):
-			draw_set_transform(screen(run.enemies.table.pos[instance.boss_row]), 0, Vector2.ONE * zoom)
-			instance.actor.draw_on(self)
-			draw_set_transform(Vector2.ZERO)
-			drawn_bodies[instance.boss_row] = true
 	var t := run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i]:
@@ -323,29 +306,10 @@ func _draw() -> void:
 				var end := pos + Vector2.from_angle(t.facing[i]) * length * zoom
 				draw_line(pos, end, Color(0.98, 0.65, 0.3, 0.5), 2)
 				draw_circle(end, 6, Color.ORANGE, false, 2)
-		var tex := texture_for(String(t.type[i]))
-		if drawn_bodies.has(i):
-			pass
-		elif tex != null:
-			draw_set_transform(pos, t.facing[i], Vector2.ONE)
-			var dimensions := Vector2(tex.get_size())
-			dimensions *= radius * 2 / maxf(dimensions.x, dimensions.y)
-			draw_texture_rect(tex, Rect2(-dimensions / 2, dimensions), false)
-			draw_set_transform(Vector2.ZERO)
-		else:
-			if def != null:
-				var polygon := RenderManager._placeholder_points(def.shape)
-				for k in polygon.size(): polygon[k] = pos + (polygon[k] * radius).rotated(t.facing[i])
-				draw_colored_polygon(polygon, t.color[i])
-			else:
-				draw_circle(pos, radius, t.color[i])
-			draw_line(pos, pos + Vector2.from_angle(t.facing[i]) * radius, Color.WHITE, 2)
 		var reason: String = run.projectiles.director.reasons.get(str(t.id[i]), "")
 		if show_ranges and not reason.is_empty():
 			draw_arc(pos, radius + 6, -PI / 2, PI, 12, Color("#7d8b9d"), 2)
 			if selected: draw_string(ThemeDB.fallback_font, pos + Vector2(-radius, radius + 22), reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#a5b4cb"))
-		if t.charge[i] > 0:
-			draw_arc(pos, radius + 5, 0, TAU, 24, Color("#ffbf63"), 2)
 		if selected:
 			draw_arc(pos, radius + 9, 0, TAU, 32, Color("#71e4e0"), 2)
 			var width := radius * 2
@@ -353,12 +317,6 @@ func _draw() -> void:
 			draw_rect(Rect2(pos + Vector2(-radius, -radius - 18), Vector2(width * t.hp[i] / maxf(1, t.max_hp[i]), 4)), Color("#88d8a0"))
 		if show_ids or selected:
 			draw_string(ThemeDB.fallback_font, pos + Vector2(radius + 3, 0), "%s #%d" % [t.type[i], t.id[i]], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#b8c6da"))
-	var ship := screen(run.state.ship_pos)
-	var angle := run.state.ship_heading.angle()
-	var triangle := PackedVector2Array([ship + Vector2.from_angle(angle) * 14, ship + Vector2.from_angle(angle + 2.5) * 10, ship + Vector2.from_angle(angle - 2.5) * 10])
-	draw_colored_polygon(triangle, Color("#d8f2ff"))
-	if run.state.tracing:
-		_draw_route(run.state.trace_path, Color("#6db9ff"), 2)
 	if not route.is_empty():
 		if exit_clearance > 0: draw_arc(screen(route[route.size() - 1]), (session.run.cfg.ship_radius + exit_clearance) * zoom, 0, TAU, 40, Color("#77e4bc"), 1.5)
 		_draw_route(route, Color("#77e4bc"), 3, mode == 2 and route_tool == 1)
@@ -419,12 +377,9 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 			if p.hazard_alive[i]: _source_line(p, int(p.lab_hazard_group.get(i, 0)), p.hazard_pos[i])
 		for i in p.hostile_alive.size():
 			if p.hostile_alive[i]: _source_line(p, int(p.lab_hostile_group.get(i, 0)), p.hostile_pos[i])
-	for i in p.hostile_alive.size():
-		if p.hostile_alive[i]:
-			draw_circle(screen(p.hostile_pos[i]), maxf(2, p.hostile_r[i] * zoom), Color("#ff9c83"))
-	for i in p.friend_alive.size():
-		if p.friend_alive[i]:
-			draw_circle(screen(p.friend_pos[i]), maxf(1.5, p.friend_r[i] * zoom), Color("#8bd7ff"))
+	# 弾と攻撃の形そのものは本番の描画が描く。ここでは攻撃範囲の表示だけを重ねる
+	if not show_ranges:
+		return
 	for i in p.hazard_alive.size():
 		if not p.hazard_alive[i]:
 			continue
@@ -432,9 +387,6 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
 		var kind := p.hazard_kind[i]
-		if charging and not show_ranges:
-			draw_circle(pos, 6, color)
-			continue
 		if kind == ProjectileManager.HazardKind.BEAM or kind == ProjectileManager.HazardKind.WALL:
 			var end := pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)

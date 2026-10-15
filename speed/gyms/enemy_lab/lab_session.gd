@@ -43,6 +43,11 @@ var selected: int:
 		_selected_id = run.enemies.table.id[value] if is_instance_valid(run) and value >= 0 and value < run.enemies.table.id.size() else -1
 var schedule: Array = []
 var _accumulator := 0.0
+## 本番のランを映す表示枠。入っていれば、本番の描画・HUD・カメラ・入力をそのまま使う（作業用のセッションは空で、描画しない）
+var viewport: SubViewport
+## 試遊中の本番の入力を返す（試遊していなければ null）。記録して再生すると同じ展開になる
+var live_input: Callable
+var _last_input := {}
 
 func reset(settings := {}) -> void:
 	playing = false
@@ -68,7 +73,8 @@ func _rebuild() -> void:
 	revision += 1
 	_epoch += 1
 	if is_instance_valid(scene):
-		remove_child(scene)
+		if scene.get_parent() != null:
+			scene.get_parent().remove_child(scene)
 		scene.queue_free()
 	var cfg: GameConfig = ConfigManager.base.duplicate(true)
 	for key in spec.get("config", {}):
@@ -99,15 +105,23 @@ func _rebuild() -> void:
 				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
 	scene = RUN_SCENE.instantiate()
-	scene.get_node("Hud").free()
-	scene.get_node("Managers/RenderManager").free()
-	scene.get_node("World/Camera2D").enabled = false
-	scene.get_node("World").visible = false
+	if viewport == null:
+		scene.get_node("Hud").free()
+		scene.get_node("Managers/RenderManager").free()
+		scene.get_node("World/Camera2D").enabled = false
+		scene.get_node("World").visible = false
+	else:
+		# 実験場の調整は実験場のパネルで行う。本番の調整パネル・性能表示は使わない
+		scene.get_node("Hud/DebugPanel").free()
+		scene.get_node("Hud/PerfOverlay").free()
 	run = scene.get_node("Managers/RunManager")
 	run.options = {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
-	add_child(scene)
+	if viewport != null:
+		viewport.add_child(scene)
+	else:
+		add_child(scene)
 	run.set_process(false)
 	run.bosses.definitions = ConfigManager.bosses.duplicate()
 	for id in spec.get("boss_overrides", {}):
@@ -123,8 +137,9 @@ func _rebuild() -> void:
 	director.projectiles = run.projectiles
 	director.configure(spec.get("director", {}))
 	run.projectiles.director = director
-	run.input.set_process_input(false)
-	run.input.set_process_unhandled_input(false)
+	if viewport == null:
+		run.input.set_process_input(false)
+		run.input.set_process_unhandled_input(false)
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
 	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
@@ -156,6 +171,7 @@ func _rebuild() -> void:
 	_cursor = 0
 	_state_key = ""
 	_intent = Intent.new()
+	_last_input = {}
 	_accumulator = 0
 	events.clear()
 	schedule = spec.get("schedule", []).duplicate(true)
@@ -173,10 +189,29 @@ func _physics_process(delta: float) -> void:
 	_accumulator += delta * speed
 	var budget := 0
 	while _accumulator >= DT and budget < 20:
+		_take_live_input()
 		step()
 		_accumulator -= DT
 		budget += 1
 	changed.emit()
+
+## 試遊中は、本番の入力をその回の操作として記録してから進める。
+## 記録済みの時刻を再生している間は記録どおりに進め、押す操作があったときだけ、そこから新しい分岐にする。
+func _take_live_input() -> void:
+	if not live_input.is_valid():
+		return
+	var it = live_input.call()
+	if it == null:
+		return
+	var pressed: bool = it.press or it.alt_press or it.hero_press or it.pen_release
+	if tick < furthest and not pressed:
+		return
+	var args := {"has_cursor": it.has_cursor, "cursor": [it.cursor.x, it.cursor.y], "pen": [it.pen.x, it.pen.y],
+		"press": it.press, "alt_press": it.alt_press, "hero": it.hero_press, "release": it.pen_release, "touch": it.touch}
+	if not pressed and args == _last_input:
+		return
+	_last_input = args
+	perform("input", args)
 
 func step() -> void:
 	if not is_instance_valid(run):
@@ -188,12 +223,17 @@ func step() -> void:
 	_intent.alt_press = false
 	_intent.hero_press = false
 	_intent.pen_release = false
+	var shown: Array[Dictionary] = []
 	for item in run.state.events:
 		var event: Dictionary = item.duplicate(true)
 		event["tick"] = tick
 		events.append(event)
 		event_recorded.emit(event)
+		shown.append(item)
 	run.state.events.clear()
+	# 本番の描画と HUD へ出来事を渡す（爆発・文字など）。早送りの間は渡さない
+	if viewport != null and not seeking and not shown.is_empty():
+		run.frame_events.emit(shown)
 	revision += 1
 	tick += 1
 	furthest = maxi(furthest, tick)
@@ -225,7 +265,9 @@ func perform(kind: String, args := {}) -> void:
 	_cursor = history.size()
 	_apply(kind, args)
 	_state_key = _checkpoint_key(tick)
-	run.combat.rebuild_grid()
+	# 入力は再生のときと同じく格子を作り直さない（作り直すと再生と展開がずれる）
+	if kind != "input":
+		run.combat.rebuild_grid()
 	changed.emit()
 
 func _apply(kind: String, args: Dictionary) -> void:
@@ -423,6 +465,8 @@ func seek(target: int) -> void:
 		scene = item.scene
 		run = item.run
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
+		if viewport != null and scene.get_parent() == null:
+			viewport.add_child(scene)
 		tick = int(item.tick)
 		selected = int(item.get("selected", -1))
 		_cursor = int(item.cursor)
@@ -513,6 +557,9 @@ func _cache_current() -> void:
 	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent,
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	# 表示枠に残すと、保存した過去の場面も重なって描かれる
+	if viewport != null and scene.get_parent() == viewport:
+		viewport.remove_child(scene)
 	scene = null
 	run = null
 	while checkpoints.size() > 3:

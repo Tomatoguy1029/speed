@@ -71,10 +71,27 @@ func build(owner: Control) -> void:
 	_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_right_split.add_child(_center)
 	_toolbar(_center)
+	# 本番のランをそのまま映す表示枠と、その上に重ねる編集用の層
+	var stage := Control.new()
+	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stage.custom_minimum_size = Vector2(300, 240)
+	stage.clip_contents = true
+	_center.add_child(stage)
+	var frame := SubViewportContainer.new()
+	frame.stretch = true
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.focus_mode = Control.FOCUS_ALL
+	stage.add_child(frame)
+	var viewport := SubViewport.new()
+	viewport.handle_input_locally = false
+	viewport.audio_listener_enable_2d = true
+	frame.add_child(viewport)
+	lab.session.viewport = viewport
+	lab.game_frame = frame
 	lab.canvas = lab.CANVAS.new()
 	lab.canvas.session = lab.session
-	lab.canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_center.add_child(lab.canvas)
+	lab.canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage.add_child(lab.canvas)
 	_hint_row(_center)
 	_right_dock = VBoxContainer.new()
 	_right_split.add_child(_right_dock)

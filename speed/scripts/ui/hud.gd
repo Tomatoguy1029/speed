@@ -88,7 +88,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"boom")
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _settings != null:
+	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
+	if _settings != null or run.state.lab_mode:
 		return
 	var s := run.state
 	if event.is_action_pressed(&"pause"):
@@ -104,7 +105,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			run.command(&"reroll")
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null and not run.state.lab_mode:
 		run.command(&"pause")
 
 func _process(delta: float) -> void:

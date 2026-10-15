@@ -26,6 +26,8 @@ var _timeline
 var _evaluation_revision := -1
 var _file_dialog: FileDialog
 var canvas
+## 本番のランを映す表示枠
+var game_frame: SubViewportContainer
 var inspector
 var workspace
 var _palette: GridContainer
@@ -59,6 +61,9 @@ func _ready() -> void:
 	theme.default_font_size = 15
 	session = SESSION.new()
 	add_child(session)
+	# 試遊中だけ、本番の入力をそのまま操作として記録する
+	session.live_input = func():
+		return session.run.input.poll() if canvas.mode == 3 and is_instance_valid(session.run) else null
 	trial = TRIAL.new()
 	add_child(trial)
 	generator = GENERATOR.new()
@@ -132,14 +137,23 @@ func _set_mode(mode: int) -> void:
 	canvas.finish_route()
 	canvas.mode = mode
 	canvas.cancel_gesture()
-	canvas.grab_focus()
+	_focus_play_area()
 	workspace._last_mode = -1
+
+## 試遊では本番の表示枠に、編集では編集用の層に、入力を向ける。試遊に入る前にたまった入力は捨てる。
+func _focus_play_area() -> void:
+	if canvas.mode == 3:
+		if is_instance_valid(session.run):
+			session.run.input.poll()
+		game_frame.grab_focus()
+	else:
+		canvas.grab_focus()
 
 
 func _toggle_play() -> void:
 	canvas.finish_route()
 	session.playing = not session.playing
-	canvas.grab_focus()
+	_focus_play_area()
 	_refresh()
 
 func _reset() -> void:
@@ -376,7 +390,23 @@ func _refresh() -> void:
 
 func _process(_delta: float) -> void:
 	if session != null and is_instance_valid(session.run):
+		_sync_view()
 		_refresh()
+
+## 試遊中は本番のカメラが機体を追い、編集用の層もその視点に合わせる。
+## 編集中は編集用の層の視点（ホイール・中ドラッグで動かす）を、本番の描画のカメラに渡す。ゲームの状態は変えない。
+func _sync_view() -> void:
+	var render: RenderManager = session.run.get_node_or_null("../RenderManager")
+	var playing: bool = canvas.mode == 3
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
+	if render == null:
+		return
+	if playing:
+		render.view_override = null
+		canvas.center = render.cam_center
+		canvas.zoom = render.cam_zoom
+	else:
+		render.view_override = {"center": canvas.center, "zoom": canvas.zoom}
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and session != null:

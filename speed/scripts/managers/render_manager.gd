@@ -42,6 +42,11 @@ var _batches: Dictionary = {}
 var _shape_ids: Dictionary = {}
 var _camera: Camera2D
 var _font: Font
+## 描画のカメラの中心と倍率（毎フレーム決める）。普段はゲームの表示範囲と同じ。
+var cam_center := Vector2.ZERO
+var cam_zoom := 1.0
+## 実験場（デバッグ）用：{"center": Vector2, "zoom": float} を入れると、ゲームの状態を変えずに描画のカメラだけをそこへ動かす
+var view_override: Variant = null
 ## いつも飾りを描く敵の種類（type ID → true）
 var _always_marked: Dictionary = {}
 var _path_band_group: CanvasGroup
@@ -196,12 +201,13 @@ func _process(delta: float) -> void:
 		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
+	_update_view()
 	var offset := Vector2.ZERO
-	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING:
-		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(state.camera_zoom, 0.01)
-	_camera.position = state.view_center + offset
-	_camera.zoom = Vector2(state.camera_zoom, state.camera_zoom)
-	pipeline.step(dt, _camera.position, state.camera_zoom)
+	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
+		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(cam_zoom, 0.01)
+	_camera.position = cam_center + offset
+	_camera.zoom = Vector2(cam_zoom, cam_zoom)
+	pipeline.step(dt, _camera.position, cam_zoom)
 	for layer in _layers.values():
 		layer.queue_redraw()
 	_path_band_group.visible = state.drawing or state.tracing
@@ -344,7 +350,26 @@ func _update_fx(dt: float) -> void:
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
 func _px(px: float) -> float:
-	return px / maxf(state.camera_zoom, 0.01)
+	return px / maxf(cam_zoom, 0.01)
+
+## 描画のカメラを決める。実験場では、ゲームの表示範囲（固定の大きさ）が表示枠に収まるように倍率を合わせる。
+func _update_view() -> void:
+	if view_override != null:
+		cam_center = view_override.center
+		cam_zoom = float(view_override.zoom)
+		return
+	cam_center = state.view_center
+	cam_zoom = state.camera_zoom
+	if state.lab_mode:
+		var sim: Vector2 = run.options.get("view_size", Vector2.ZERO)
+		var shown := get_viewport().get_visible_rect().size
+		if sim.x > 0.0 and sim.y > 0.0:
+			cam_zoom *= minf(shown.x / sim.x, shown.y / sim.y)
+
+## 描画のカメラに映る範囲（ワールド座標）。
+func view_rect() -> Rect2:
+	var half := get_viewport().get_visible_rect().size / 2.0 / maxf(cam_zoom, 0.0001)
+	return Rect2(cam_center - half, half * 2.0)
 
 ## 星の円メッシュと乱数データは開始時に作り、GPUで位置・視差だけ更新する。
 func _build_star_batch() -> void:
@@ -364,15 +389,15 @@ func _build_star_batch() -> void:
 	_layers.background.add_child(_star_batch)
 
 func _draw_background(c: CanvasItem) -> void:
-	var view := state.view_rect().grow(200.0)
+	var view := view_rect().grow(200.0)
 	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
-	_star_material.set_shader_parameter("view_center", state.view_center)
-	_star_material.set_shader_parameter("view_half", state.view_half)
-	_star_material.set_shader_parameter("camera_zoom", state.camera_zoom)
+	_star_material.set_shader_parameter("view_center", cam_center)
+	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
+	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
 
 func _draw_field(c: CanvasItem) -> void:
 	var f := run.field
-	var view := state.view_rect().grow(700.0)
+	var view := view_rect().grow(700.0)
 	for d in f.dust:
 		var center := Vector2(d.x, d.y)
 		if view.has_point(center) or view.grow(d.z).has_point(center):
@@ -414,7 +439,7 @@ func _draw_hero(c: CanvasItem) -> void:
 	var h := run.heroes
 	if h.hero == null:
 		return
-	var view := state.view_rect().grow(900.0)
+	var view := view_rect().grow(900.0)
 	if not view.has_point(h.center):
 		return
 	var near := clampf(1.0 - h.center.distance_to(state.ship_pos) / cfg.hero_glow_range, 0.0, 1.0)
@@ -441,7 +466,7 @@ func _draw_hero(c: CanvasItem) -> void:
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
-	var view := state.view_rect().grow(60.0)
+	var view := view_rect().grow(60.0)
 	# 経験値の結晶：画面上で最低 8px の高さ（仕様書 17）
 	var gs := maxf(5.0, _px(4.0))
 	var gems: InstanceBatch = _batches[&"gem"]
@@ -486,7 +511,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_arc(cap.pos, 16.0, 0, TAU, 24, XP_COLOR.lightened(0.3), _px(2.0))
 
 func _draw_enemies(c: CanvasItem) -> void:
-	var view := state.view_rect().grow(cfg.max_enemy_radius)
+	var view := view_rect().grow(cfg.max_enemy_radius)
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].begin()
@@ -673,7 +698,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
 
 func _draw_projectiles(c: CanvasItem) -> void:
-	var view := state.view_rect().grow(40.0)
+	var view := view_rect().grow(40.0)
 	for t in trails:
 		var a: float = t.life / t.max
 		var pts: PackedVector2Array = t.points
@@ -913,13 +938,13 @@ func _draw_fx(c: CanvasItem) -> void:
 	for t in texts:
 		var col: Color = t.color
 		col.a = clampf(t.life / 0.5, 0.0, 1.0)
-		var size := int(t.size / maxf(state.camera_zoom, 0.25))
+		var size := int(t.size / maxf(cam_zoom, 0.25))
 		c.draw_string(_font, t.pos - Vector2(size * 0.8, 0), t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
 
 ## 敗北の暗転（機体以外を暗くする。仕様書 16）。
 func _draw_dim(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING:
-		c.draw_rect(state.view_rect().grow(400.0), Color(0, 0, 0, cfg.death_world_dim))
+		c.draw_rect(view_rect().grow(400.0), Color(0, 0, 0, cfg.death_world_dim))
 
 func _update_exhaust(dt: float) -> void:
 	if dt <= 0.0:
@@ -1022,4 +1047,4 @@ func _draw_ship(c: CanvasItem) -> void:
 
 func _draw_top(c: CanvasItem) -> void:
 	if flash > 0.0:
-		c.draw_rect(state.view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
+		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
