@@ -708,38 +708,42 @@ func _start_sweep(neck: Neck, rate: float, time: float) -> void:
 # ── 見た目 ────────────────────────────────────────────────────────
 
 func _draw() -> void:
+	draw_on(self)
+
+## 実験キャンバスも同じ本体・首・羅針盤を描く。
+func draw_on(c: CanvasItem) -> void:
 	if manager == null or not manager.has_boss():
 		return
 	var t := table
 	var r := t.r[body]
 	for neck in necks:
-		_draw_neck(neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
+		_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if exposed_t > 0.0:
-		_draw_neck(immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
-	draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
-	draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
-	_draw_compass(r * 0.75)
+		_draw_neck(c, immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
+	c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
+	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
+	_draw_compass(c, r * 0.75)
 
-func _draw_neck(segs: PackedVector2Array, body_r: float, col: Color, glow: float) -> void:
+func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Color, glow: float) -> void:
 	for s in segs.size():
-		var at := to_local(segs[s])
+		var at := segs[s] - table.pos[body]
 		var size := body_r * (0.32 - 0.14 * float(s) / segs.size())
-		draw_circle(at, size, col.darkened(0.15 * (s % 2)))
+		c.draw_circle(at, size, col.darkened(0.15 * (s % 2)))
 	if glow > 0.0 and not segs.is_empty():
-		draw_circle(to_local(segs[segs.size() - 1]), body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
+		c.draw_circle(segs[segs.size() - 1] - table.pos[body], body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
 
 ## 本体に埋め込まれた羅針盤。強めの技の前だけ針が回る（強めの技で使う）。
-func _draw_compass(R: float) -> void:
-	draw_circle(Vector2.ZERO, R, Color("#e8dcc0"))
-	draw_arc(Vector2.ZERO, R, 0, TAU, 48, Color("#3a2f25"), 3.0)
+func _draw_compass(c: CanvasItem, R: float) -> void:
+	c.draw_circle(Vector2.ZERO, R, Color("#e8dcc0"))
+	c.draw_arc(Vector2.ZERO, R, 0, TAU, 48, Color("#3a2f25"), 3.0)
 	var font := ThemeDB.fallback_font
 	var marks := ["N", "E", "S", "W"]
 	for k in 4:
 		var u := Vector2.from_angle(-PI / 2.0 + k * PI / 2.0)
-		draw_string(font, u * R * 0.72 + Vector2(-9, 9), marks[k], HORIZONTAL_ALIGNMENT_CENTER, 18, 22, Color("#3a2f25"))
+		c.draw_string(font, u * R * 0.72 + Vector2(-9, 9), marks[k], HORIZONTAL_ALIGNMENT_CENTER, 18, 22, Color("#3a2f25"))
 	var needle := Vector2.from_angle(compass_angle()) * R * 0.6
-	draw_line(-needle * 0.4, needle, Color("#b8322a"), 5.0)
-	draw_circle(Vector2.ZERO, 5.0, Color("#3a2f25"))
+	c.draw_line(-needle * 0.4, needle, Color("#b8322a"), 5.0)
+	c.draw_circle(Vector2.ZERO, 5.0, Color("#3a2f25"))
 
 ## 羅針盤の針の向き。強めの技の前だけくるくる回り、技の方位を指して止まる。普段は北を指す。
 func compass_angle() -> float:
