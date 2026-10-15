@@ -48,6 +48,8 @@ var viewport: SubViewport
 ## 試遊中の本番の入力を返す（試遊していなければ null）。記録して再生すると同じ展開になる
 var live_input: Callable
 var _last_input := {}
+## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
+var _route_play := {}
 
 func reset(settings := {}) -> void:
 	playing = false
@@ -175,6 +177,7 @@ func _rebuild() -> void:
 	_state_key = ""
 	_intent = Intent.new()
 	_last_input = {}
+	_route_play = {}
 	_accumulator = 0
 	events.clear()
 	schedule = spec.get("schedule", []).duplicate(true)
@@ -216,11 +219,47 @@ func _take_live_input() -> void:
 	_last_input = args
 	perform("input", args)
 
+## 描いたルートを、本番の描画と同じ処理で少しずつ描き、描き終えたら確定して駆け抜けさせる。
+## 長さの上限・地形・角の補正は本番どおりにかかる。操作の履歴の "route" から始まるので、再生しても同じになる。
+func _draw_route_step() -> void:
+	if _route_play.is_empty():
+		return
+	var path: PackedVector2Array = _route_play.points
+	var frames: int = _route_play.frames
+	var n: int = _route_play.n
+	var draw := run.draw
+	if n == 0:
+		if run.state.drawing or run.state.tracing or run.state.gauge < run.cfg.draw_min_charge:
+			_route_play = {}
+			return
+		var it := Intent.new()
+		it.press = true
+		it.has_cursor = true
+		it.pen = path[0]
+		it.cursor = path[0]
+		draw._start(it)
+	if not run.state.drawing:
+		_route_play = {}
+		return
+	var index := clampf(float(n + 1) / frames * (path.size() - 1), 0, path.size() - 1)
+	var previous := float(n) / frames * (path.size() - 1)
+	for k in range(ceili(previous), floori(index) + 1):
+		if k > 0 and k < path.size():
+			draw._extend(path[k])
+	var lo := mini(floori(index), path.size() - 2)
+	draw._extend(path[lo].lerp(path[lo + 1], index - lo))
+	_route_play.n = n + 1
+	if n + 1 >= frames:
+		if run.state.drawing:
+			draw._commit(Intent.new())
+		_route_play = {}
+
 func step() -> void:
 	if not is_instance_valid(run):
 		return
 	_run_schedule()
 	run.projectiles.director.advance(run.state.world_time, run.enemies)
+	_draw_route_step()
 	run._play_tick(DT)
 	_intent.press = false
 	_intent.alt_press = false
@@ -362,6 +401,13 @@ func _apply(kind: String, args: Dictionary) -> void:
 			_intent.alt_press = previous.alt_press or args.get("alt_press", false)
 			_intent.touch = args.get("touch", false)
 			_intent.pen_release = args.get("release", false)
+		"route":
+			var points := PackedVector2Array()
+			for p in args.get("points", []):
+				points.append(vector(p))
+			if points.size() >= 2:
+				_route_play = {"points": points, "n": 0,
+					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, 1800)}
 		"invincible":
 			run.ship.invincible = args.get("value", true)
 		"ship":
@@ -475,6 +521,7 @@ func seek(target: int) -> void:
 		_cursor = int(item.cursor)
 		_state_key = item.key
 		_intent = item.intent
+		_route_play = item.get("route_play", {}).duplicate(true)
 		schedule = item.schedule.duplicate(true)
 		events.assign(item.events.duplicate(true))
 		revision += 1
@@ -557,7 +604,7 @@ func _checkpoint_key(at: int) -> String:
 ## 状態をコピーせず、停止したシーン全体を保持する。HSM とタイムラインも同じ実体で復元する。
 func _cache_current() -> void:
 	if not is_instance_valid(scene) or not is_instance_valid(run): return
-	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent,
+	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true),
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	# 表示枠に残すと、保存した過去の場面も重なって描かれる

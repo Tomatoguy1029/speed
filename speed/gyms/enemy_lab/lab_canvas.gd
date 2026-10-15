@@ -16,6 +16,8 @@ var zoom := 0.6
 var exit_clearance := 0.0
 var show_ranges := true
 var show_ids := false
+## true なら、試遊以外でもカメラが機体を追う（ルートを試したとき）。ホイール・中ドラッグで視点を動かすとやめる
+var follow := false
 ## 本番の画面のうち、HUD・ミニマップ・背景の星を出すか（初めは出さない）
 var show_hud := false
 var show_minimap := false
@@ -91,6 +93,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			follow = false
 			var old := world(event.position)
 			zoom = clampf(zoom * (1.15 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), 0.08, 3.0)
 			center += old - world(event.position)
@@ -98,6 +101,7 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif event.button_index == MOUSE_BUTTON_MIDDLE:
 			_pan = event.pressed
+			if _pan: follow = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				grab_focus()

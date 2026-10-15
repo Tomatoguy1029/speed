@@ -135,6 +135,9 @@ func _fill_palette() -> void:
 
 func _set_mode(mode: int) -> void:
 	canvas.finish_route()
+	# 試遊からほかのモードへ切り替えたら、再生を止める
+	if canvas.mode == 3 and mode != 3:
+		session.playing = false
 	canvas.mode = mode
 	canvas.cancel_gesture()
 	# 試遊を選んだら、そのまま再生して操作できるようにする
@@ -183,6 +186,22 @@ func _select_branch(index: int) -> void:
 	session.branches[index - 1] = current
 	await session.seek(session.furthest)
 	_branch.select(0)
+	_refresh()
+
+## 描いたルートを、今の場面のまま本番どおりに描いて駆け抜けさせ、カメラで機体を追って普通に再生する。
+func _try_route() -> void:
+	if _busy or session.seeking:
+		return
+	canvas.finish_route()
+	if canvas.route.size() < 2:
+		_messages.text = tr("lab.message_7474db4292")
+		return
+	var points := []
+	for p in canvas.route:
+		points.append([p.x, p.y])
+	session.perform("route", {"points": points, "draw_seconds": controls.draw_seconds.value})
+	canvas.follow = true
+	session.playing = true
 	_refresh()
 
 func _evaluate() -> void:
@@ -401,6 +420,7 @@ func _process(_delta: float) -> void:
 func _sync_view() -> void:
 	var render: RenderManager = session.run.get_node_or_null("../RenderManager")
 	var playing: bool = canvas.mode == 3
+	var following: bool = playing or canvas.follow
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
 	if render == null:
 		return
@@ -413,7 +433,7 @@ func _sync_view() -> void:
 		if hud_root != null:
 			hud_root.show_minimap = canvas.show_minimap
 			hud_root.show_status = canvas.show_hud
-	if playing and render.cam_zoom > 0.0001:
+	if following and render.cam_zoom > 0.0001:
 		render.view_override = null
 		canvas.center = render.cam_center
 		canvas.zoom = render.cam_zoom

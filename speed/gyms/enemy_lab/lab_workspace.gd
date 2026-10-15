@@ -270,7 +270,10 @@ func _hint_row(parent: Node) -> void:
 	_budget.add_theme_stylebox_override("fill", UI.style(UI.ACCENT, Color.TRANSPARENT, 0))
 	_route_actions.add_child(_budget)
 	_route_cost = lab._label(_route_actions, "")
-	UI.button(_route_actions, tr("lab.ui.evaluate"), lab._evaluate, "play")
+	UI.button(_route_actions, tr("lab.ui.clear_route"), func():
+		lab.canvas.clear_route()
+		lab.canvas.grab_focus(), "trash")
+	UI.button(_route_actions, tr("lab.ui.evaluate"), lab._try_route, "play")
 	lab._result = lab._label(parent, "")
 	lab._result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lab._result.hide()

@@ -539,6 +539,7 @@ lab.ui.track_time,%s秒,%ss
 lab.ui.show_hud,HP・装備などの表示,HUD (HP and loadout)
 lab.ui.show_minimap,ミニマップ,Minimap
 lab.ui.show_background,背景の星,Background stars
+lab.ui.clear_route,線を消す,Clear route
 lab.ui.freehand,自由に描く,Freehand
 lab.ui.edit_points,点を編集,Edit points
 lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points
