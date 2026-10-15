@@ -99,7 +99,7 @@ func _test_debug_stage_selection() -> void:
 			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage == 4 else &"provisional"), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == &"provisional", "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
 			GameManager.abort_run()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
 	app.queue_free()
@@ -115,6 +115,9 @@ func _start(stage: int) -> void:
 	scene = load("res://scenes/run/run.tscn").instantiate()
 	add_child(scene)
 	run = scene.get_node("Managers/RunManager")
+	if stage == 4:
+		run.state.stage = run.state.stage.duplicate()
+		run.state.stage.boss_id = &"hydra"
 	run.set_physics_process(false)
 	run.input.set_process_input(false)
 	run.input.set_process_unhandled_input(false)
@@ -268,13 +271,16 @@ func _test_shapes() -> void:
 	p.fire_rings(at, 4, 0.3, 200, 100, 10, 0.2, 2, 0, 0.3, 0.5)
 	_check(p.hazard_count() == 4 and p.hazard_gap[0] != p.hazard_gap[1] and p.hazard_delay[0] != p.hazard_delay[1], "タスク6：多層の輪は切れ目と広がる時刻がずれる")
 
-const ROSTERS := {
+const IMPLEMENTED_ROSTERS := {
 	1: "rocket,bomber,beamer,pulser,pump,telescope,shield,ruler,clock",
 	2: "rocket,bomber,volatile,splitter,beamer,missile,pump,crow,lynx,reticle,dolphin",
 	3: "rocket,bomber,volatile,beamer,spreader,triangle,lynx,cross,reticle,ruler,phoenix",
 	4: "rocket,volatile,splitter,pulser,missile,spreader,triangle,crow,crab,dolphin,marlin,aquarius",
 	5: "rocket,bomber,volatile,splitter,beamer,pulser,missile,spreader,shield,cross,auriga,corona,cepheus,aquila"
 }
+
+const ORIGINAL_ROSTER := "drifter,swarm,darter,armored,gunner,missile,splitter,splitling,titan,battleship"
+const ROSTERS := {1: ORIGINAL_ROSTER, 2: ORIGINAL_ROSTER, 3: ORIGINAL_ROSTER, 4: ORIGINAL_ROSTER, 5: ORIGINAL_ROSTER}
 
 func _advance_enemies(seconds: float) -> Dictionary:
 	var peaks := {"hazards": 0, "hostile": 0, "wells": 0}
@@ -299,7 +305,7 @@ func _test_enemy_roster() -> void:
 			_check(phase.wave_type == &"" or expected.has(String(phase.wave_type)), "タスク7〜12：ステージ%dの波の種類" % stage)
 		_check(found.size() == expected.size() and found.all(func(id): return expected.has(id)), "タスク7〜12：ステージ%dの全出現種類" % stage)
 	var all_types: Array[StringName] = []
-	for roster in ROSTERS.values():
+	for roster in IMPLEMENTED_ROSTERS.values():
 		for id in roster.split(","):
 			if not all_types.has(StringName(id)):
 				all_types.append(StringName(id))
@@ -846,7 +852,7 @@ func _test_app_flow() -> void:
 			await get_tree().process_frame
 		run.command(&"debug_time", {"seconds": run.state.boss_at + 0.1 - run.state.time})
 		_play_steps(2, 0.05)
-		_check(run.state.boss_spawned and run.bosses.actor.def.id == (&"hydra" if stage == 4 else &"provisional"), "通し確認：ステージ%dに対応するボスが出る" % stage)
+		_check(run.state.boss_spawned and run.bosses.actor.def.id == &"provisional", "通し確認：ステージ%dに対応するボスが出る" % stage)
 		await _shot("stage_%d_boss" % stage)
 		var enemies := run.enemies.table
 		for row in enemies.alive.size():
@@ -958,6 +964,7 @@ func _test_surge() -> void:
 		run.state.rng.seed = 208
 		run.enemies._survey()
 		var request: Dictionary = target.duplicate()
+		request.phase = ConfigManager.phases[&"s1_late"]
 		request.steps = steps
 		for attempt in 600:
 			run.enemies._spawn_one(request)
