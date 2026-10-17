@@ -30,6 +30,7 @@ static func icon(kind: String) -> Texture2D:
 		"settings": '<path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 3v6m8 0v6M10 15v6" stroke-width="4"/>',
 		"dice": '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h.1M17 7h.1M12 12h.1M7 17h.1M17 17h.1" stroke-width="3"/>',
 		"ruler": '<path d="m3 16 13-13 5 5L8 21Zm5-5 3 3m0-6 3 3m0-6 3 3"/>',
+		"lock": '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
 		"reset": '<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>',
 		"clock": '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 3"/>',
 		"help": '<circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 1 1 5 3c-2 1-2 2-2 3m0 3h.1"/>',

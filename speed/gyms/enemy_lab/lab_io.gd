@@ -2,7 +2,7 @@
 extends RefCounted
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route"]
+const COMMANDS := ["spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin"]
 
 static func plain(value):
 	if value is Vector2:

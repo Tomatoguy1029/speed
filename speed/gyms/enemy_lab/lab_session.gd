@@ -50,6 +50,8 @@ var live_input: Callable
 var _last_input := {}
 ## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
 var _route_play := {}
+## 機体を固定している位置（固定していなければ null）。固定中は機体を動かさず、敵だけが動く
+var pinned: Variant = null
 
 func reset(settings := {}) -> void:
 	playing = false
@@ -178,6 +180,7 @@ func _rebuild() -> void:
 	_intent = Intent.new()
 	_last_input = {}
 	_route_play = {}
+	pinned = null
 	_accumulator = 0
 	events.clear()
 	schedule = spec.get("schedule", []).duplicate(true)
@@ -254,13 +257,22 @@ func _draw_route_step() -> void:
 			draw._commit(Intent.new())
 		_route_play = {}
 
+## 機体を固定している間は、毎回の更新の前後で機体を固定した位置に戻し、速度を0にする。
+func _hold_ship() -> void:
+	if pinned == null:
+		return
+	run.state.ship_pos = pinned
+	run.state.ship_vel = Vector2.ZERO
+
 func step() -> void:
 	if not is_instance_valid(run):
 		return
 	_run_schedule()
 	run.projectiles.director.advance(run.state.world_time, run.enemies)
 	_draw_route_step()
+	_hold_ship()
 	run._play_tick(DT)
+	_hold_ship()
 	_intent.press = false
 	_intent.alt_press = false
 	_intent.hero_press = false
@@ -408,6 +420,11 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if points.size() >= 2:
 				_route_play = {"points": points, "n": 0,
 					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, 1800)}
+		"pin":
+			pinned = vector(args.pos) if args.get("value", false) else null
+			if pinned != null:
+				run.state.ship_pos = pinned
+				run.state.ship_vel = Vector2.ZERO
 		"invincible":
 			run.ship.invincible = args.get("value", true)
 		"ship":
@@ -522,6 +539,7 @@ func seek(target: int) -> void:
 		_state_key = item.key
 		_intent = item.intent
 		_route_play = item.get("route_play", {}).duplicate(true)
+		pinned = item.get("pinned")
 		schedule = item.schedule.duplicate(true)
 		events.assign(item.events.duplicate(true))
 		revision += 1
@@ -604,7 +622,7 @@ func _checkpoint_key(at: int) -> String:
 ## 状態をコピーせず、停止したシーン全体を保持する。HSM とタイムラインも同じ実体で復元する。
 func _cache_current() -> void:
 	if not is_instance_valid(scene) or not is_instance_valid(run): return
-	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true),
+	checkpoints.append({"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	# 表示枠に残すと、保存した過去の場面も重なって描かれる

@@ -32,6 +32,7 @@ var _history_offset := 0
 var _zoom_label: Label
 var _track_scroll: HScrollBar
 var _route_tool: OptionButton
+var _pin: Button
 var _transport_panel: PanelContainer
 var _transport_tab: Button
 var _transport_offset := 0
@@ -354,6 +355,13 @@ func _transport(parent: Node) -> void:
 	UI.button(bar, tr("lab.ui.reset"), func(): await lab._reset(), "reset").tooltip_text = tr("lab.ui.reset_all")
 	UI.button(bar, tr("lab.message_e2ff3a1576"), func(): await lab.session.seek(0); lab._refresh(), "start", true)
 	lab._play = UI.button(bar, tr("lab.ui.play"), lab._toggle_play, "play")
+	_pin = UI.button(bar, tr("lab.ui.pin_ship"), func():
+		var on: bool = lab.session.pinned == null
+		var at: Vector2 = lab.session.run.state.ship_pos
+		lab.session.perform("pin", {"value": on, "pos": [at.x, at.y]})
+		lab._refresh(), "lock")
+	_pin.toggle_mode = true
+	_pin.tooltip_text = tr("lab.ui.pin_ship_help")
 	UI.button(bar, tr("lab.message_87b386148b"), func(): lab.session.playing = false; lab.session.step(); lab._refresh(), "step", true)
 	var speeds := OptionButton.new()
 	for value in [0.25, 0.5, 1.0, 2.0, 4.0]: speeds.add_item("×%s" % value)
@@ -476,6 +484,7 @@ func _toggle_right() -> void:
 		else: open_settings(0)
 
 func sync() -> void:
+	_pin.set_pressed_no_signal(lab.session.pinned != null)
 	lab._play.icon = UI.icon("pause" if lab.session.playing else "play")
 	lab._play.text = tr("lab.ui.pause" if lab.session.playing else "lab.ui.play")
 	lab._play.tooltip_text = lab._play.text + " · Space"
