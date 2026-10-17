@@ -4,6 +4,8 @@ signal seek_requested(tick: int)
 const LANES := [["lab.message_26fa279ba2", [&"lab_spawn", &"boss_spawn"]], ["lab.message_63d8f43c5b", [&"attack_start", &"shoot"]], ["lab.message_1c155a99a1", [&"hurt", &"crash", &"ship_hit", &"damage", &"bounce"]], ["lab.message_c3775f8a58", [&"kill", &"boss_defeated"]]]
 const GUTTER := 64.0
 const RULER := 20.0
+## 拡大率1で1画面に見せる秒数。記録の長さによらず、目盛りの間隔は変わらない
+const BASE_SECONDS := 10.0
 var session
 var zoom := 1.0
 var view_start := 0.0
@@ -17,14 +19,17 @@ func _ready() -> void:
 	tooltip_text = tr("lab.ui.track_help")
 
 func visible_span() -> float:
-	return maxf(1, session.furthest) / zoom if session != null else 1.0
+	return BASE_SECONDS / session.DT / zoom if session != null else 1.0
 
+## 表示範囲を整える。follow なら、再生位置が右寄り（8割）を越えたぶん左へ流す。
 func sync_view(follow := false) -> void:
 	if session == null: return
-	zoom = clampf(zoom, 1, maxf(1, minf(64, session.furthest / 6.0)))
+	zoom = clampf(zoom, 0.02, 40)
 	var span := visible_span()
-	if follow and (session.tick < view_start or session.tick > view_start + span): view_start = session.tick - span
-	view_start = clampf(view_start, 0, maxf(0, session.furthest - span))
+	if follow:
+		if session.tick > view_start + span * 0.8: view_start = session.tick - span * 0.8
+		elif session.tick < view_start: view_start = session.tick - span * 0.2
+	view_start = clampf(view_start, 0, maxf(0, session.furthest - span * 0.2))
 
 func zoom_at(factor: float, fraction := 0.5) -> void:
 	if session == null: return
@@ -36,8 +41,9 @@ func zoom_at(factor: float, fraction := 0.5) -> void:
 	sync_view()
 	queue_redraw()
 
+## 記録全体が1画面に収まる拡大率にする。
 func reset_view() -> void:
-	zoom = 1
+	zoom = minf(1.0, BASE_SECONDS / session.DT / maxf(1, session.furthest)) if session != null else 1.0
 	view_start = 0
 	queue_redraw()
 
