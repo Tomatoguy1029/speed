@@ -110,16 +110,19 @@ func _fill_palette() -> void:
 	var filter := _filter.text.to_lower()
 	var definitions := ConfigManager.sorted(ConfigManager.enemies)
 	definitions.append_array(ConfigManager.sorted(ConfigManager.bosses))
-	var regular := ["drifter", "swarm", "darter", "armored", "gunner", "missile", "splitter", "splitling", "titan", "battleship"]
+	# 並びは「スリルと寄り道」の敵ごとの情報の表の順。そのあとにボス、出現から外した敵・障害物
 	definitions.sort_custom(func(a, b):
-		var left := 3 if a is BossDef else (1 if String(a.id) in regular else 2)
-		var right := 3 if b is BossDef else (1 if String(b.id) in regular else 2)
+		var left := _palette_order(a)
+		var right := _palette_order(b)
 		return String(a.id) < String(b.id) if left == right else left < right)
+	var wanted_class: int = workspace.category.selected
+	var wanted_stars: int = workspace.stars.selected
 	for def in definitions:
 		if def is EnemyDef and def.behavior == &"part": continue
 		var id := String(def.id)
-		var group := 3 if def is BossDef else (1 if id in regular else 2)
-		if workspace.category.selected > 0 and workspace.category.selected != group: continue
+		if wanted_class > 0 and wanted_class != _palette_class(def): continue
+		# 星の数：1〜5 はその数、6 は 6〜10 をまとめて選ぶ。ボスは区分で選ぶ
+		if wanted_stars > 0 and not (def is EnemyDef and (def.rank >= 6 if wanted_stars == 6 else def.rank == wanted_stars)): continue
 		if not filter.is_empty() and not (id.to_lower().contains(filter) or def.display_name.to_lower().contains(filter)): continue
 		var button = PALETTE_ITEM.new()
 		button.definition = def
@@ -132,6 +135,26 @@ func _fill_palette() -> void:
 		workspace.palette_buttons[id] = button
 		_palette.add_child(button)
 	workspace._last_mode = -1
+
+## 敵一覧の並び：「スリルと寄り道」の敵ごとの情報の表の順（分裂体は分裂する雑魚の次）。
+const PALETTE_ORDER := ["rocket", "bomber", "volatile", "splitter", "splitling", "beamer", "pulser", "missile", "spreader",
+	"pump", "telescope", "triangle", "shield", "ruler", "crow", "lynx", "reticle", "cross", "clock", "dolphin", "crab",
+	"marlin", "auriga", "corona", "phoenix", "cepheus", "aquarius", "aquila"]
+
+func _palette_order(def: Resource) -> int:
+	var at := PALETTE_ORDER.find(String(def.id))
+	if at >= 0: return at
+	return 200 if def is BossDef else 300
+
+## 敵一覧の区分（絞り込みの番号）：1 雑魚（星1）、2 硬めの敵（星2）、3 強敵（星3〜5）、4 大物（星6〜10）、5 ボス、6 出現から外した敵・障害物。
+func _palette_class(def: Resource) -> int:
+	if def is BossDef: return 5
+	var rank: int = def.rank
+	if rank == 1: return 1
+	if rank == 2: return 2
+	if rank >= 3 and rank <= 5: return 3
+	if rank >= 6: return 4
+	return 6
 
 func _set_mode(mode: int) -> void:
 	canvas.finish_route()

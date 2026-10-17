@@ -542,6 +542,14 @@ lab.ui.show_background,背景の星,Background stars
 lab.ui.clear_route,線を消す,Clear route
 lab.ui.pin_ship,機体を固定,Pin ship
 lab.ui.pin_ship_help,機体を今の位置に止め、敵だけを動かす（もう一度押すと解除）,Hold the ship in place so only enemies move (press again to release)
+lab.ui.class_fodder,雑魚（星1）,Fodder (1 star)
+lab.ui.class_tough,硬めの敵（星2）,Tough (2 stars)
+lab.ui.class_strong,強敵（星3〜5）,Strong (3-5 stars)
+lab.ui.class_big,大物（星6〜10）,Big (6-10 stars)
+lab.ui.class_boss,ボス,Bosses
+lab.ui.class_other,外した敵・障害物,Retired and obstacles
+lab.ui.stars_all,星：すべて,Stars: all
+lab.ui.stars_help,星の数で絞り込む,Filter by star count
 lab.ui.reset,リセット,Reset
 lab.ui.reset_all,リセット（配置・線・履歴を消して最初の状態に戻す）,Reset (clear placements route and history)
 lab.ui.how_moves,動き,Behavior

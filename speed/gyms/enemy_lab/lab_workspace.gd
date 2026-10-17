@@ -6,6 +6,7 @@ var settings: PanelContainer
 var tools: Dictionary = {}
 var palette_buttons: Dictionary = {}
 var category: OptionButton
+var stars: OptionButton
 var _mode_hint: Label
 var _route_actions: HBoxContainer
 var _cancel: Button
@@ -170,10 +171,22 @@ func _palette(parent: Node) -> void:
 	lab._filter.right_icon = UI.icon("search")
 	lab._filter.text_changed.connect(func(_v): lab._fill_palette())
 	box.add_child(lab._filter)
+	# 区分（星の数で決まる）と星の数で絞り込む
+	var filters := HBoxContainer.new()
+	box.add_child(filters)
 	category = OptionButton.new()
-	for key in ["lab.ui.all", "lab.message_bd3455e23b", "lab.message_0033dbf5f7", "lab.message_cab5ef8006"]: category.add_item(tr(key))
+	category.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for key in ["lab.ui.all", "lab.ui.class_fodder", "lab.ui.class_tough", "lab.ui.class_strong", "lab.ui.class_big", "lab.ui.class_boss", "lab.ui.class_other"]:
+		category.add_item(tr(key))
 	category.item_selected.connect(func(_i): lab._fill_palette())
-	box.add_child(category)
+	filters.add_child(category)
+	stars = OptionButton.new()
+	stars.add_item(tr("lab.ui.stars_all"))
+	for n in range(1, 6): stars.add_item("★%d" % n)
+	stars.add_item("★6〜10")
+	stars.tooltip_text = tr("lab.ui.stars_help")
+	stars.item_selected.connect(func(_i): lab._fill_palette())
+	filters.add_child(stars)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

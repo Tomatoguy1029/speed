@@ -6,7 +6,7 @@ var picture: Texture2D
 
 func _ready() -> void:
 	toggle_mode = true
-	custom_minimum_size = Vector2(88, 86)
+	custom_minimum_size = Vector2(88, 100)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -25,6 +25,15 @@ func _ready() -> void:
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(label)
+	# 星の数（区分）。ボスと、出現から外した敵・障害物（星0）には出さない
+	if definition is EnemyDef and definition.rank > 0:
+		var rank := Label.new()
+		rank.text = "★%d" % definition.rank
+		rank.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		rank.add_theme_font_size_override("font_size", 11)
+		rank.add_theme_color_override("font_color", Color("#ffd27a"))
+		rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(rank)
 
 func _get_drag_data(_position: Vector2):
 	var preview := ICON.new()
