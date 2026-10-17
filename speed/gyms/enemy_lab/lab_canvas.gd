@@ -249,9 +249,6 @@ func _gui_input(event: InputEvent) -> void:
 				if row >= 0:
 					var point := t.pos[row] + Vector2(60, 60)
 					session.perform("boss" if t.is_boss[row] else "spawn", {"type": String(t.type[row]), "pos": [point.x, point.y], "level": t.level[row], "elite": t.elite[row] != 0, "angle": t.facing[row]})
-		elif event.keycode == KEY_SPACE:
-			finish_route()
-			session.playing = not session.playing
 		elif event.keycode == KEY_ESCAPE:
 			if _freehand:
 				_cancel_freehand()

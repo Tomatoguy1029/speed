@@ -440,6 +440,21 @@ func _sync_view() -> void:
 	else:
 		render.view_override = {"center": canvas.center, "zoom": canvas.zoom}
 
+## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。
+## ボタンや本番の入力（描画の補助）には渡さない。
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE):
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return
+	get_viewport().set_input_as_handled()
+	if session == null or session.seeking or not is_instance_valid(session.run):
+		return
+	_toggle_play()
+	# 表示枠を通って本番の入力に届いた Space（描画の補助）は捨てる
+	session.run.input.poll()
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and session != null:
 		session.playing = false
