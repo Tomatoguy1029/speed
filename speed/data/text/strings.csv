@@ -546,12 +546,19 @@ lab.ui.class_fodder,雑魚（星1）,Fodder (1 star)
 lab.ui.class_tough,硬めの敵（星2）,Tough (2 stars)
 lab.ui.class_strong,強敵（星3〜5）,Strong (3-5 stars)
 lab.ui.class_big,大物（星6〜10）,Big (6-10 stars)
+lab.ui.class_field,障害物・仕掛け,Obstacles and gimmicks
+lab.field.planet_small,惑星（小）,Planet (small)
+lab.field.planet,惑星（中）,Planet (medium)
+lab.field.planet_large,惑星（大）,Planet (large)
+lab.field.comet,彗星,Comet
+lab.field.gravity,重力,Gravity well
+lab.field.warp,ワープホール,Warp hole
 lab.ui.class_boss,ボス,Bosses
-lab.ui.class_other,外した敵・障害物,Retired and obstacles
+lab.ui.class_other,出現から外した敵,Retired enemies
 lab.ui.stars_all,星：すべて,Stars: all
 lab.ui.stars_help,星の数で絞り込む,Filter by star count
 lab.ui.reset,リセット,Reset
-lab.ui.reset_all,リセット（配置・線・履歴を消して最初の状態に戻す）,Reset (clear placements route and history)
+lab.ui.reset_help,再生を始めた時の状態に戻す（配置は残す。それ以降の記録は分岐として残す）,Back to when playback started (keeps placements; later records stay as a branch)
 lab.ui.how_moves,動き,Behavior
 lab.ui.how_to_kill,倒し方,How to defeat
 lab.enemy.drifter.move,追ってくる。ときどき画面の中を広く回る,Chases you and sometimes roams widely across the screen

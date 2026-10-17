@@ -92,6 +92,7 @@ func build(owner: Control) -> void:
 	lab.game_frame = frame
 	lab.canvas = lab.CANVAS.new()
 	lab.canvas.session = lab.session
+	lab.canvas.field_lookup = lab.field_item
 	lab.canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage.add_child(lab.canvas)
 	_hint_row(_center)
@@ -176,7 +177,7 @@ func _palette(parent: Node) -> void:
 	box.add_child(filters)
 	category = OptionButton.new()
 	category.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for key in ["lab.ui.all", "lab.ui.class_fodder", "lab.ui.class_tough", "lab.ui.class_strong", "lab.ui.class_big", "lab.ui.class_boss", "lab.ui.class_other"]:
+	for key in ["lab.ui.all", "lab.ui.class_fodder", "lab.ui.class_tough", "lab.ui.class_strong", "lab.ui.class_big", "lab.ui.class_field", "lab.ui.class_boss", "lab.ui.class_other"]:
 		category.add_item(tr(key))
 	category.item_selected.connect(func(_i): lab._fill_palette())
 	filters.add_child(category)
@@ -365,7 +366,10 @@ func _transport(parent: Node) -> void:
 	panel.add_child(box)
 	var bar := HBoxContainer.new()
 	box.add_child(bar)
-	UI.button(bar, tr("lab.ui.reset"), func(): await lab._reset(), "reset").tooltip_text = tr("lab.ui.reset_all")
+	UI.button(bar, tr("lab.ui.reset"), func():
+		lab.canvas.cancel_gesture()
+		await lab.session.back_to_play_start()
+		lab._refresh(), "reset").tooltip_text = tr("lab.ui.reset_help")
 	UI.button(bar, tr("lab.message_e2ff3a1576"), func(): await lab.session.seek(0); lab._refresh(), "start", true)
 	lab._play = UI.button(bar, tr("lab.ui.play"), lab._toggle_play, "play")
 	_pin = UI.button(bar, tr("lab.ui.pin_ship"), func():

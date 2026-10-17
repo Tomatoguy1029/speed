@@ -14,6 +14,7 @@ const GENERATOR := preload("res://gyms/enemy_lab/encounter_pattern.gd")
 const WORKSPACE := preload("res://gyms/enemy_lab/lab_workspace.gd")
 const PALETTE_ITEM := preload("res://gyms/enemy_lab/lab_palette_item.gd")
 const INSPECTOR := preload("res://gyms/enemy_lab/lab_inspector.gd")
+const FIELD_ITEM := preload("res://gyms/enemy_lab/lab_field_item.gd")
 
 var session
 var controls
@@ -110,6 +111,7 @@ func _fill_palette() -> void:
 	var filter := _filter.text.to_lower()
 	var definitions := ConfigManager.sorted(ConfigManager.enemies)
 	definitions.append_array(ConfigManager.sorted(ConfigManager.bosses))
+	definitions.append_array(field_items())
 	# 並びは「スリルと寄り道」の敵ごとの情報の表の順。そのあとにボス、出現から外した敵・障害物
 	definitions.sort_custom(func(a, b):
 		var left := _palette_order(a)
@@ -119,6 +121,7 @@ func _fill_palette() -> void:
 	var wanted_stars: int = workspace.stars.selected
 	for def in definitions:
 		if def is EnemyDef and def.behavior == &"part": continue
+		if def is EnemyDef and def.id in [&"triangle_star", &"corona_star"]: continue
 		var id := String(def.id)
 		if wanted_class > 0 and wanted_class != _palette_class(def): continue
 		# 星の数：1〜5 はその数、6 は 6〜10 をまとめて選ぶ。ボスは区分で選ぶ
@@ -136,25 +139,51 @@ func _fill_palette() -> void:
 		_palette.add_child(button)
 	workspace._last_mode = -1
 
-## 敵一覧の並び：「スリルと寄り道」の敵ごとの情報の表の順（分裂体は分裂する雑魚の次）。
+## 敵一覧の並び：「スリルと寄り道」の敵ごとの情報の表の順（分裂体は分裂する雑魚の次）。そのあとに障害物・仕掛け
 const PALETTE_ORDER := ["rocket", "bomber", "volatile", "splitter", "splitling", "beamer", "pulser", "missile", "spreader",
 	"pump", "telescope", "triangle", "shield", "ruler", "crow", "lynx", "reticle", "cross", "clock", "dolphin", "crab",
-	"marlin", "auriga", "corona", "phoenix", "cepheus", "aquarius", "aquila"]
+	"marlin", "auriga", "corona", "phoenix", "cepheus", "aquarius", "aquila",
+	"field_planet_small", "field_planet", "field_planet_large", "meteor", "field_comet", "iron", "saw", "hydra_rubble",
+	"field_gravity", "field_warp"]
+## 障害物・仕掛けに入る敵の表の種類
+const OBSTACLES := ["meteor", "iron", "saw", "hydra_rubble"]
+
+var _field_items: Array = []
+
+## 一覧から置けるフィールドの要素（惑星・彗星・重力・ワープホール）。
+func field_items() -> Array:
+	if _field_items.is_empty():
+		_field_items = [
+			FIELD_ITEM.make(&"field_planet_small", tr("lab.field.planet_small"), &"planet", 120.0, Color("#6f7fa8")),
+			FIELD_ITEM.make(&"field_planet", tr("lab.field.planet"), &"planet", 260.0, Color("#6f7fa8")),
+			FIELD_ITEM.make(&"field_planet_large", tr("lab.field.planet_large"), &"planet", 520.0, Color("#6f7fa8")),
+			FIELD_ITEM.make(&"field_comet", tr("lab.field.comet"), &"comet", 45.0, Color("#9fd6ff")),
+			FIELD_ITEM.make(&"field_gravity", tr("lab.field.gravity"), &"gravity", 0.0, Color("#a98cff")),
+			FIELD_ITEM.make(&"field_warp", tr("lab.field.warp"), &"warp", 0.0, Color("#d6a8ff")),
+		]
+	return _field_items
+
+func field_item(id: String) -> Resource:
+	for item in field_items():
+		if String(item.id) == id: return item
+	return null
 
 func _palette_order(def: Resource) -> int:
 	var at := PALETTE_ORDER.find(String(def.id))
 	if at >= 0: return at
 	return 200 if def is BossDef else 300
 
-## 敵一覧の区分（絞り込みの番号）：1 雑魚（星1）、2 硬めの敵（星2）、3 強敵（星3〜5）、4 大物（星6〜10）、5 ボス、6 出現から外した敵・障害物。
+## 敵一覧の区分（絞り込みの番号）：1 雑魚（星1）、2 硬めの敵（星2）、3 強敵（星3〜5）、4 大物（星6〜10）、
+## 5 障害物・仕掛け、6 ボス、7 出現から外した敵。
 func _palette_class(def: Resource) -> int:
-	if def is BossDef: return 5
+	if def is BossDef: return 6
+	if not def is EnemyDef or String(def.id) in OBSTACLES: return 5
 	var rank: int = def.rank
 	if rank == 1: return 1
 	if rank == 2: return 2
 	if rank >= 3 and rank <= 5: return 3
 	if rank >= 6: return 4
-	return 6
+	return 7
 
 func _set_mode(mode: int) -> void:
 	canvas.finish_route()

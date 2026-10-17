@@ -18,6 +18,8 @@ var show_ranges := true
 var show_ids := false
 ## true なら、試遊以外でもカメラが機体を追う（ルートを試したとき）。ホイール・中ドラッグで視点を動かすとやめる
 var follow := false
+## 一覧のフィールドの要素を ID から引く（実験場が入れる）
+var field_lookup: Callable
 ## 本番の画面のうち、HUD・ミニマップ・背景の星を出すか（初めは出さない）
 var show_hud := false
 var show_minimap := false
@@ -66,13 +68,15 @@ func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
 func texture_for(id: String) -> Texture2D:
+	if id.begins_with("field_planet"):
+		return RenderManager.PLANET
 	if not _textures.has(id):
 		var path := "res://assets/pixel/%s.png" % id
 		_textures[id] = load(path) if ResourceLoader.exists(path) else null
 	return _textures[id]
 
 func _can_drop_data(_position: Vector2, data: Variant) -> bool:
-	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)))
+	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
 
 func _drop_data(position: Vector2, data: Variant) -> void:
 	spawn_type = String(data.lab_enemy)
@@ -82,6 +86,12 @@ func _drop_data(position: Vector2, data: Variant) -> void:
 	grab_focus()
 
 func _place(point: Vector2) -> void:
+	if spawn_type.begins_with("field_"):
+		# フィールドの要素（惑星・彗星・重力・ワープホール）
+		var field = field_lookup.call(spawn_type) if field_lookup.is_valid() else null
+		if field != null:
+			session.perform("field", {"kind": String(field.kind), "pos": [point.x, point.y], "radius": field.radius})
+		return
 	var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
 	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count, "level": spawn_level})
 	selection.clear()

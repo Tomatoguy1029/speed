@@ -52,6 +52,9 @@ var _last_input := {}
 var _route_play := {}
 ## 機体を固定している位置（固定していなければ null）。固定中は機体を動かさず、敵だけが動く
 var pinned: Variant = null
+## 最後に再生を始めた時刻（リセットで戻る所）
+var play_start := 0
+var _was_playing := false
 
 func reset(settings := {}) -> void:
 	playing = false
@@ -193,6 +196,9 @@ func vector(value) -> Vector2:
 	return Vector2(float(value[0]), float(value[1])) if value is Array and value.size() == 2 else Vector2.ZERO
 
 func _physics_process(delta: float) -> void:
+	if playing and not _was_playing and not seeking:
+		play_start = tick
+	_was_playing = playing
 	if not playing or seeking or not is_instance_valid(run):
 		return
 	_accumulator += delta * speed
@@ -256,6 +262,42 @@ func _draw_route_step() -> void:
 		if run.state.drawing:
 			draw._commit(Intent.new())
 		_route_play = {}
+
+## 一覧から置いたフィールドの要素を加える。惑星は動かない障害物、彗星は機体の方へまっすぐ横切る。
+## 重力とワープホールは、現れたときと同じ大きさ・時間で置く。
+func _add_field(kind: String, at: Vector2, radius: float) -> void:
+	var field := run.field
+	var cfg := run.cfg
+	match kind:
+		"planet":
+			var body := FieldManager.Body.new()
+			body.pos = at
+			body.r = maxf(10.0, radius)
+			body.is_planet = true
+			field.bodies.append(body)
+			field._update_moons()
+			# 天体までの距離の覚えを捨てて、新しい惑星を確かめ直させる
+			run.enemies.table.body_gap.fill(-1.0)
+			run.projectiles.hostile_gap.fill(0.0)
+		"comet":
+			var rock := FieldManager.Rock.new()
+			rock.lab_manual = true
+			rock.kind = &"comet"
+			var u := (run.state.ship_pos - at).normalized()
+			if u == Vector2.ZERO: u = Vector2.RIGHT
+			rock.pos = at
+			rock.vel = u * cfg.comet_speed
+			rock.born = run.state.world_time
+			rock.gone = rock.born + (at.distance_to(run.state.ship_pos) + 2500.0) / cfg.comet_speed
+			rock.size = maxf(20.0, radius)
+			rock.facing = u.angle()
+			field.rocks.append(rock)
+			field._stream_t = 0.0
+		"gravity":
+			field.add_well(at, cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
+		"warp":
+			field.warp_pos = at
+			field.warp_gone = run.state.world_time + cfg.warp_life
 
 ## 機体を固定している間は、毎回の更新の前後で機体を固定した位置に戻し、速度を0にする。
 func _hold_ship() -> void:
@@ -420,6 +462,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if points.size() >= 2:
 				_route_play = {"points": points, "n": 0,
 					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, 1800)}
+		"field":
+			_add_field(String(args.get("kind", "")), vector(args.get("pos", [0, 0])), float(args.get("radius", 0)))
 		"pin":
 			pinned = vector(args.pos) if args.get("value", false) else null
 			if pinned != null:
@@ -558,6 +602,30 @@ func seek(target: int) -> void:
 	furthest = end
 	seeking = false
 	changed.emit()
+
+## 最後に再生を始めた時刻の状態に戻す（配置は残す）。それ以降の記録は分岐として残し、そこから新しく遊べるようにする。
+## 再生を始めた時刻に記録した入力とルートの再生も取り除く（始める前の状態に戻すため）。
+func back_to_play_start() -> void:
+	if seeking or not is_instance_valid(run):
+		return
+	playing = false
+	_was_playing = false
+	var at := mini(play_start, furthest)
+	if furthest > at or history.any(func(e): return int(e.tick) == at and String(e.kind) in ["input", "route"]):
+		branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
+		branch_serial += 1
+		current_branch = TranslationServer.translate("lab.message_549e9c3c03") % branch_serial
+		history = history.filter(func(e): return int(e.tick) < at or (int(e.tick) == at and String(e.kind) not in ["input", "route"]))
+		furthest = at
+		_cursor = 0
+		# 今の場面は消した記録を含むので、保存せずに作り直す
+		if is_instance_valid(scene):
+			if scene.get_parent() != null:
+				scene.get_parent().remove_child(scene)
+			scene.queue_free()
+		scene = null
+		run = null
+	await seek(at)
 
 func cancel_seek() -> void:
 	_seek_serial += 1
