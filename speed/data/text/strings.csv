@@ -290,7 +290,7 @@ lab.message_dfa32d64eb,新しい実験,New experiment
 lab.message_bf1c2f34ef,▶ 再生,▶ Play
 lab.message_2555a92b57,❚❚ 停止,❚❚ Pause
 lab.message_87b386148b,1コマ,Step
-lab.message_e2ff3a1576,開始へ,To start
+lab.message_e2ff3a1576,最初の時刻へ戻す（配置は残す）,Back to the start (keep placements)
 lab.message_8e4350198b,選択・移動,Select / move
 lab.message_7b82dc2a06,敵を配置,Place enemies
 lab.message_096f45921a,線を編集,Edit route
@@ -540,6 +540,8 @@ lab.ui.show_hud,HP・装備などの表示,HUD (HP and loadout)
 lab.ui.show_minimap,ミニマップ,Minimap
 lab.ui.show_background,背景の星,Background stars
 lab.ui.clear_route,線を消す,Clear route
+lab.ui.reset,リセット,Reset
+lab.ui.reset_all,リセット（配置・線・履歴を消して最初の状態に戻す）,Reset (clear placements route and history)
 lab.ui.how_moves,動き,Behavior
 lab.ui.how_to_kill,倒し方,How to defeat
 lab.enemy.drifter.move,追ってくる。ときどき画面の中を広く回る,Chases you and sometimes roams widely across the screen

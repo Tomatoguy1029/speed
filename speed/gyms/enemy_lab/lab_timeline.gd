@@ -68,6 +68,14 @@ func _gui_input(event: InputEvent) -> void:
 		queue_redraw()
 		accept_event()
 
+## least 以上で、1・2・5 × 10の累乗のうちいちばん小さい間隔（秒）。
+static func _nice_step(least: float) -> float:
+	var base := pow(10.0, floorf(log(maxf(least, 1e-4)) / log(10.0)))
+	for k in [1.0, 2.0, 5.0, 10.0]:
+		if base * k >= least - 1e-9:
+			return base * k
+	return base * 10.0
+
 func _x(tick: float) -> float:
 	return GUTTER + (tick - view_start) / visible_span() * (size.x - GUTTER)
 
@@ -82,13 +90,16 @@ func _draw() -> void:
 	sync_view()
 	var font := get_theme_default_font()
 	var lane_height := (size.y - RULER) / LANES.size()
+	# 目盛りは切りのいい間隔（0.1・0.2・0.5・1・2・5・10…秒）で、ちょうどの時刻に打つ。80px に1本くらいになる間隔を選ぶ
 	var seconds: float = visible_span() * session.DT
-	var decimals := 3 if seconds < 0.1 else (2 if seconds < 1 else 1)
-	for mark in 6:
-		var tick := view_start + visible_span() * mark / 5.0
-		var x := _x(tick)
+	var step := _nice_step(seconds * 80.0 / maxf(1.0, size.x - GUTTER))
+	var decimals := 0 if step >= 1.0 else (1 if step >= 0.1 else 2)
+	var first := ceilf(view_start * session.DT / step - 1e-6)
+	var last := floorf((view_start + visible_span()) * session.DT / step + 1e-6)
+	for n in range(int(first), int(last) + 1):
+		var x := _x(n * step / session.DT)
 		draw_line(Vector2(x, RULER), Vector2(x, size.y), Color("#243248"))
-		var caption := tr("lab.ui.track_time") % String.num(tick * session.DT, decimals)
+		var caption := tr("lab.ui.track_time") % String.num(n * step, decimals)
 		draw_string(font, Vector2(clampf(x - 20, GUTTER, maxf(GUTTER, size.x - 44)), 13), caption, HORIZONTAL_ALIGNMENT_LEFT, 64, 11, Color("#9daec3"))
 	for lane in LANES.size():
 		var y := RULER + float(lane) * lane_height

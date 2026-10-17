@@ -351,6 +351,7 @@ func _transport(parent: Node) -> void:
 	panel.add_child(box)
 	var bar := HBoxContainer.new()
 	box.add_child(bar)
+	UI.button(bar, tr("lab.ui.reset"), func(): await lab._reset(), "reset").tooltip_text = tr("lab.ui.reset_all")
 	UI.button(bar, tr("lab.message_e2ff3a1576"), func(): await lab.session.seek(0); lab._refresh(), "start", true)
 	lab._play = UI.button(bar, tr("lab.ui.play"), lab._toggle_play, "play")
 	UI.button(bar, tr("lab.message_87b386148b"), func(): lab.session.playing = false; lab.session.step(); lab._refresh(), "step", true)
