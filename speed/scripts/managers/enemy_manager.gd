@@ -1114,26 +1114,25 @@ func _clock(i: int, dt: float) -> void:
 	projectiles.move_hazard(links[0], t.pos[i], a0)
 	projectiles.move_hazard(links[1], t.pos[i], a1)
 
-## やまねこ座：近づいてきて、機体が届く距離に入ると前方を扇形に爪で薙ぐ。構えはない。
-## 殻が割れている間は、爪を振るう間隔が短くなる。攻撃が当たらない時間が続くと、殻の傷は戻る。
+## やまねこ座：距離を保ち、間隔ごとに爪を構えて（charge が構えの進み）、湾曲した3本の爪痕の斬撃を飛ばし続ける。
+## 斬撃は撃ったときの機体の向きへ形を保って直進し、追尾しない。左右の手で交互に撃ち（buds が撃った数）、
+## 斬撃の筋を機体への線から slash_shift だけ左右交互にずらすので、空いている側が1発ごとに入れ替わる。
 func _lynx(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
-	_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
-	var open := t.shell_open[i] > 0.0
-	if open:
-		t.shell_open[i] -= dt
-	else:
-		t.shell_rest[i] += dt
-		if t.shell_rest[i] > float(p.shell_heal_delay):
-			t.shell_dmg[i] = maxf(0.0, t.shell_dmg[i] - float(p.shell_hp) * dt / float(p.shell_heal_time))
-	t.fire_t[i] -= dt * (float(p.fire_interval) / float(p.open_interval) if open else 1.0)
-	var reach := float(p.wave_radius) + t.r[i]
-	if t.fire_t[i] <= 0.0 and t.pos[i].distance_squared_to(state.ship_pos) < reach * reach:
-		t.fire_t[i] = float(p.fire_interval)
-		projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
-			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
+	_keep_distance(i, dt)
+	if _gun_timer(i, dt):
+		var hand := 1.0 if t.buds[i] % 2 == 0 else -1.0
+		t.buds[i] += 1
+		var a := (state.ship_pos - t.pos[i]).angle()
+		var u := Vector2.from_angle(a)
+		var from := t.pos[i] + u * t.r[i] + Vector2(-u.y, u.x) * hand * float(p.slash_shift)
+		projectiles.fire_slash(from, a, float(p.slash_speed), float(p.slash_r), float(p.slash_range),
+			_attack_dmg(i, float(p.bullet_dmg)), hand)
+
+## やまねこ座が次に撃つ手（1 か -1。構えの見た目に使う）。
+func lynx_hand(i: int) -> float:
+	return 1.0 if table.buds[i] % 2 == 0 else -1.0
 
 ## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
 ## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。

@@ -608,8 +608,8 @@ lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置�
 lab.enemy.ruler.kill,HP を削る,Wear down its HP
 lab.enemy.crow.move,4羽の群れで隊列を組み、機体を追わずに一直線に戦場を横断する。横を通り過ぎた経験値を1羽ずつ拾い、画面の外へ持ち去る。攻撃はしない,Four birds fly in formation straight across the field without chasing. Each picks up experience it passes on either side and carries it off screen. They never attack
 lab.enemy.crow.kill,1羽ずつもろく、普通に当てれば倒れる。退場する前に倒すと、その1羽が回収した経験値をその場にまとめて落とす,Each bird is fragile and falls to any hit. Defeat one before it leaves to drop the experience it collected in one spot
-lab.enemy.lynx.move,近づいてきて、前方を扇形に爪で薙ぐ。殻が割れている間は速く振る,Approaches and slashes a fan in front of it. Slashes faster while its shell is broken
-lab.enemy.lynx.kill,殻を割り、数秒のうちにもう1回当てる。殻は体当たり1回か、弾・波動を当て続けると割れる,Break the shell then hit it again within seconds. One ram or sustained shots and waves break the shell
+lab.enemy.lynx.move,距離を保ち、湾曲した3本の爪痕の斬撃を左右の手で交互に飛ばし続ける。斬撃は機体の方へ形を保って直進し、追尾しない。空いている側が1発ごとに入れ替わる,Keeps its distance and keeps hurling slashes of three curved claw marks with alternating paws. Each flies straight toward the ship keeping its shape without homing and the open side switches every slash
+lab.enemy.lynx.kill,斬撃の外側を抜けながら近づき、本体を普通に倒す,Slip past the outside of each slash while closing in and defeat the body normally
 lab.enemy.reticle.move,距離を保ち、機体のいた位置に照準を刻んで雷を落とす,Keeps its distance and marks where you were then drops lightning there
 lab.enemy.reticle.kill,HP を削る,Wear down its HP
 lab.enemy.cross.move,距離を保ち、光を集めてから十字にレーザーを撃つ,Keeps its distance and gathers light before firing a cross of lasers

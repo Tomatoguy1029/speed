@@ -42,8 +42,15 @@ var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
 ## SHELL はポンプ座の圧縮弾。直進し、届く距離を飛ぶか何かに当たると、その場で大きく破裂する（破裂が当たる）
-enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast"]
+## SLASH はやまねこ座の斬撃。湾曲した3本の爪痕をひと組にして、形を保ったまま直進する。hostile_r が爪痕の弧の半径、
+## hostile_turn が爪痕の並びの向き（1 か -1。左右の手で反転する）
+enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash"]
+## 斬撃の爪痕の形（弧の半径に対する割合）：弧の左右の角度、太さ、爪痕どうしの横の間隔と前後のずれ
+const SLASH_SPAN := 0.62
+const SLASH_THICK := 0.13
+const SLASH_GAP := 0.36
+const SLASH_STAGGER := 0.25
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -363,6 +370,30 @@ func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burs
 	hostile_burst[h] = burst
 	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
 
+## やまねこ座の斬撃を飛ばす。from から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
+## arc_r は爪痕の弧の半径、hand は爪痕の並びの向き（1 か -1）。
+func fire_slash(from: Vector2, angle: float, speed: float, arc_r: float, range: float, dmg: float, hand: float) -> void:
+	var u := Vector2.from_angle(angle)
+	_add_hostile(from, u * speed, speed, arc_r, range / maxf(speed, 1.0), dmg, 0.0, hand, HostileKind.SLASH)
+	state.emit(&"shoot", {"pos": from, "kind": &"slash"})
+
+## 斬撃（位置 pos、進む向き angle、弧の半径 arc_r、並びの向き hand）の k 本目（0〜2）の爪痕の弧の中心。弧は前へふくらむ。
+static func slash_center(pos: Vector2, angle: float, arc_r: float, k: int, hand: float) -> Vector2:
+	var u := Vector2.from_angle(angle)
+	var side := Vector2(-u.y, u.x)
+	var o := float(k - 1)
+	return pos + side * o * SLASH_GAP * arc_r - u * (o * hand * SLASH_STAGGER * arc_r + arc_r)
+
+## 位置 at（半径 reach の円）が斬撃の爪痕のどれかに触れているか。
+static func slash_touches(pos: Vector2, angle: float, arc_r: float, hand: float, at: Vector2, reach: float) -> bool:
+	for k in 3:
+		var d := at - slash_center(pos, angle, arc_r, k, hand)
+		var dist := d.length()
+		if absf(dist - arc_r) <= SLASH_THICK * arc_r * 0.5 + reach \
+				and absf(Geom.angle_diff(d.angle(), angle)) <= SLASH_SPAN + reach / arc_r:
+			return true
+	return false
+
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
@@ -452,7 +483,11 @@ func _update_hostile(dt: float) -> void:
 		# 高速な弾も線分全体を確認する。
 		var rr := r + R
 		var reach := rr + step
-		if ship_pos.distance_squared_to(to) <= reach * reach:
+		if kind == HostileKind.SLASH:
+			if slash_touches(to, vel.angle(), r, hostile_turn[i], ship_pos, R):
+				ship.damage(hostile_dmg[i], 0.0, HOSTILE_CAUSE[kind])
+				life = 0.0
+		elif ship_pos.distance_squared_to(to) <= reach * reach:
 			var t := Geom.seg_circle_t(from, to, ship_pos, rr)
 			if t >= 0.0 and (body_hit == null or t < body_hit.t):
 				if kind != HostileKind.SHELL:

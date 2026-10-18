@@ -7,10 +7,10 @@ script = ExtResource("1")
 id = &"lynx"
 display_name = "やまねこ座"
 rank = 4
-radius = 24.0
+radius = 30.0
 hp = 20.0
 armor = 4.0
-speed = 150.0
+speed = 120.0
 accel = 2.0
 turn = 3.0
 xp = 12.0
@@ -21,17 +21,14 @@ max_alive = 3
 ranged = false
 size_var = false
 weak_arc = 0.0
-gate = &"shell"
+gate = &""
 params = {
-"fire_interval": 1.6,
-"open_interval": 0.7,
-"wave_arc": 0.9,
-"wave_radius": 170.0,
-"wave_speed": 1100.0,
-"wave_width": 30.0,
-"bullet_dmg": 12.0,
-"shell_hp": 60.0,
-"shell_time": 3.0,
-"shell_heal_delay": 2.0,
-"shell_heal_time": 2.0
+"keep": 640.0,
+"fire_interval": 0.6,
+"telegraph": 0.35,
+"slash_r": 160.0,
+"slash_speed": 320.0,
+"slash_range": 1500.0,
+"slash_shift": 95.0,
+"bullet_dmg": 12.0
 }

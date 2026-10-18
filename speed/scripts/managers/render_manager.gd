@@ -145,7 +145,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope"]:
+				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -726,6 +726,8 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_pulser(c, t, i)
 	elif type == &"telescope":
 		_draw_telescope(c, t, i)
+	elif type == &"lynx":
+		_draw_lynx(c, t, i)
 	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
@@ -890,6 +892,29 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if k > 0.0:
 		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
 
+## やまねこ座の斬撃：湾曲した3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
+func _draw_slash(c: CanvasItem, pos: Vector2, angle: float, arc_r: float, hand: float, a: float) -> void:
+	var span := ProjectileManager.SLASH_SPAN
+	var thick := ProjectileManager.SLASH_THICK * arc_r
+	for k in 3:
+		var center := ProjectileManager.slash_center(pos, angle, arc_r, k, hand)
+		c.draw_arc(center, arc_r, angle - span, angle + span, 20, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
+		c.draw_arc(center, arc_r, angle - span * 0.96, angle + span * 0.96, 20, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
+		c.draw_arc(center, arc_r, angle - span * 0.8, angle + span * 0.8, 20, Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
+
+## やまねこ座：次に振るう側の前足に、爪痕の形の光が構えとともに強まる。
+func _draw_lynx(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var k := t.charge[i]
+	if k <= 0.0:
+		return
+	var r := t.r[i]
+	var hand := run.enemies.lynx_hand(i)
+	var f := t.facing[i]
+	var u := Vector2.from_angle(f)
+	var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * hand * r * 0.75
+	c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
+	_draw_slash(c, paw + u * r * 0.3, f, r * (0.35 + 0.35 * k), hand, 0.3 + 0.7 * k)
+
 ## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
 const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]
 
@@ -1021,7 +1046,9 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
-			if pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
+			if pr.hostile_kind[i] == ProjectileManager.HostileKind.SLASH:
+				_draw_slash(c, pos, pr.hostile_vel[i].angle(), hostile_r[i], pr.hostile_turn[i], 1.0)
+			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
 				# ポンプ座の圧縮弾：後ろに尾を引く
 				var u := pr.hostile_vel[i].normalized()
 				var n := Vector2(-u.y, u.x) * hostile_r[i] * 0.8

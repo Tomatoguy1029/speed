@@ -5,7 +5,7 @@ const BEHAVIORS := {
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["residue"], "clock": ["residue"],
-	"lynx": ["wave"], "reticle": ["zone"], "triangle": ["residue"],
+	"lynx": ["aimed"], "reticle": ["zone"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
 	"aquarius": ["aimed"], "auriga": ["residue"], "corona": ["residue"],
 	"cepheus": ["aimed"], "aquila": ["zone"]}
