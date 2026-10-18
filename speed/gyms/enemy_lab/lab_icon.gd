@@ -23,6 +23,10 @@ func _draw() -> void:
 			"comet":
 				draw_line(center + Vector2(14, -10), center - Vector2(4, -3), Color(col, 0.5), 6)
 				draw_circle(center - Vector2(6, -4), 9, col)
+			"gem":
+				for k in 3:
+					var q := center + Vector2((k - 1) * 11, 4 if k == 1 else -2)
+					draw_colored_polygon(PackedVector2Array([q + Vector2(0, -12), q + Vector2(7, 0), q + Vector2(0, 12), q + Vector2(-7, 0)]), col)
 			"gravity", "warp":
 				draw_circle(center, 16, Color(col, 0.25))
 				draw_arc(center, 16, 0, TAU, 32, col, 2)

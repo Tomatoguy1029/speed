@@ -23,7 +23,7 @@ size_var = false
 weak_arc = 0.0
 gate = &""
 params = {
-"gather_radius": 240.0,
+"gather_radius": 360.0,
 "gather_speed": 650.0,
 "aim_spread": 0.35,
 "exit_margin": 500.0

@@ -264,7 +264,7 @@ func _draw_route_step() -> void:
 		_route_play = {}
 
 ## 一覧から置いたフィールドの要素を加える。惑星は動かない障害物、彗星は機体の方へまっすぐ横切る。
-## 重力とワープホールは、現れたときと同じ大きさ・時間で置く。
+## 重力とワープホールは、現れたときと同じ大きさ・時間で置く。経験値の結晶はひとまとまりで散らす。
 func _add_field(kind: String, at: Vector2, radius: float) -> void:
 	var field := run.field
 	var cfg := run.cfg
@@ -298,6 +298,11 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 		"warp":
 			field.warp_pos = at
 			field.warp_gone = run.state.world_time + cfg.warp_life
+		"gem":
+			# 経験値の結晶を12個、半径 radius の中に散らす（からす座の回収を試す）
+			for k in 12:
+				var u := Vector2.from_angle(k * 2.399963) * sqrt((k + 0.5) / 12.0) * radius
+				run.pickups.drop_gem(at + u, 1.0)
 
 ## 機体を固定している間は、毎回の更新の前後で機体を固定した位置に戻し、速度を0にする。
 func _hold_ship() -> void:

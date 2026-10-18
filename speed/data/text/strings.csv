@@ -553,6 +553,7 @@ lab.field.planet_large,惑星（大）,Planet (large)
 lab.field.comet,彗星,Comet
 lab.field.gravity,重力,Gravity well
 lab.field.warp,ワープホール,Warp hole
+lab.field.gem,経験値の結晶,Experience crystals
 lab.ui.class_boss,ボス,Bosses
 lab.ui.class_other,出現から外した敵,Retired enemies
 lab.ui.stars_all,星：すべて,Stars: all

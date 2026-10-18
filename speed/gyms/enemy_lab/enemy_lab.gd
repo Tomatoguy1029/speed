@@ -144,13 +144,13 @@ const PALETTE_ORDER := ["rocket", "bomber", "volatile", "splitter", "splitling",
 	"pump", "telescope", "triangle", "shield", "ruler", "crow", "lynx", "reticle", "cross", "clock", "dolphin", "crab",
 	"marlin", "auriga", "corona", "phoenix", "cepheus", "aquarius", "aquila",
 	"field_planet_small", "field_planet", "field_planet_large", "meteor", "field_comet", "iron", "saw", "hydra_rubble",
-	"field_gravity", "field_warp"]
+	"field_gravity", "field_warp", "field_gem"]
 ## 障害物・仕掛けに入る敵の表の種類
 const OBSTACLES := ["meteor", "iron", "saw", "hydra_rubble"]
 
 var _field_items: Array = []
 
-## 一覧から置けるフィールドの要素（惑星・彗星・重力・ワープホール）。
+## 一覧から置けるフィールドの要素（惑星・彗星・重力・ワープホール・経験値の結晶）。
 func field_items() -> Array:
 	if _field_items.is_empty():
 		_field_items = [
@@ -160,6 +160,7 @@ func field_items() -> Array:
 			FIELD_ITEM.make(&"field_comet", tr("lab.field.comet"), &"comet", 45.0, Color("#9fd6ff")),
 			FIELD_ITEM.make(&"field_gravity", tr("lab.field.gravity"), &"gravity", 0.0, Color("#a98cff")),
 			FIELD_ITEM.make(&"field_warp", tr("lab.field.warp"), &"warp", 0.0, Color("#d6a8ff")),
+			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RenderManager.XP_COLOR),
 		]
 	return _field_items
 

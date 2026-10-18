@@ -4,9 +4,9 @@ extends Resource
 
 var id: StringName
 var display_name: String
-## planet・comet・gravity・warp
+## planet・comet・gravity・warp・gem
 var kind: StringName
-## 惑星の半径（ほかは使わない）
+## 惑星の半径、経験値の結晶を散らす半径（ほかは使わない）
 var radius := 0.0
 var color := Color.WHITE
 

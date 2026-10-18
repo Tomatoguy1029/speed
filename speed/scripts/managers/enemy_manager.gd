@@ -1046,18 +1046,17 @@ func _lynx(i: int, dt: float) -> void:
 			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
 
 ## からす座：機体を追わず、一直線に戦場を横断する。経験値の回収は PickupManager が行う（carry が運んでいる量）。
-## 画面の外から出たものは画面の中を通る向きに決め、画面の中に置かれたもの（実験場）は置いた向きのまま進む。
+## 動き始めに、画面の中心から aim_spread だけずれた所を通る向きに決める。画面の中心のすぐ近くに置かれたものは、置いた向きのまま進む。
 ## 画面の外で exit_margin より離れ、さらに離れていくと、運んでいる経験値ごと退場する（撃破にはならない）。
 func _crow(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	var rel := t.pos[i] - _vc
-	var outside := absf(rel.x) > _vh.x or absf(rel.y) > _vh.y
 	if t.mode[i] == EnemyTable.Mode.MOVE:
 		t.mode[i] = EnemyTable.Mode.DASH
-		if outside:
-			var spread := float(p.aim_spread)
-			var target := _vc + Vector2(state.rng.randf_range(-spread, spread) * _vh.x, state.rng.randf_range(-spread, spread) * _vh.y)
+		var spread := float(p.aim_spread)
+		var target := _vc + Vector2(state.rng.randf_range(-spread, spread) * _vh.x, state.rng.randf_range(-spread, spread) * _vh.y)
+		if target.distance_to(t.pos[i]) > minf(_vh.x, _vh.y) * 0.25:
 			t.facing[i] = (target - t.pos[i]).angle()
 	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
 	var margin := float(p.exit_margin)
