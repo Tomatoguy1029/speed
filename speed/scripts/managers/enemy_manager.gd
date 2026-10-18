@@ -242,6 +242,10 @@ func is_same(i: int, id: int) -> bool:
 ## 弾かれるのは失敗のとき（BOUNCE）だけ。dmg は当たった攻撃のダメージで、殻（やまねこ座）にはこの判定で傷を付ける。
 func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0.0) -> int:
 	var t := table
+	if t.beh[i] == EnemyTable.Beh.SHIELD:
+		if shield_blocks(i, _hit, dir):
+			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.PASS
+		return EnemyTable.GateResult.ALLOW
 	match t.gate[i]:
 		EnemyTable.Gate.MOUTH:
 			# 口が開いている（吸い込んでいる）間だけ倒せる
@@ -287,6 +291,17 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 				state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
 			return EnemyTable.GateResult.PASS
 	return EnemyTable.GateResult.ALLOW
+
+## たて座の前面。命中した位置を使い、位置のない攻撃は飛んできた向きから判定する。
+func shield_blocks(i: int, hit: Vector2, dir: Vector2) -> bool:
+	var d := hit - table.pos[i]
+	if d.length_squared() < 0.01:
+		d = -dir
+	return d.length_squared() > 0.0 and absf(Geom.angle_diff(d.angle(), table.facing[i])) <= float(table.def[i].params.front_arc)
+
+## 盾を奪える背面。側面の通常攻撃と、背後からの高速体当たりを分ける。
+func shield_rear(i: int, hit: Vector2) -> bool:
+	return absf(Geom.angle_diff((hit - table.pos[i]).angle(), table.facing[i] + PI)) <= table.weak_arc[i]
 
 func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
@@ -561,6 +576,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 						var sp: Dictionary = t.def[i].params
 						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), sp.bullet_speed, &"bullet")
 				EnemyTable.Beh.SHIELD:
+					t.fire_t[i] = maxf(0.0, t.fire_t[i] - bdt)
 					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], bdt)
 					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], bdt)
 				EnemyTable.Beh.RULER:

@@ -470,11 +470,15 @@ func command(name: StringName, args := {}) -> void:
 			var keep := ship.invincible
 			ship.invincible = false
 			state.ship_invuln = 0.0
+			var shield_t := state.ship_shield_t
+			state.ship_shield_t = 0.0
 			ship.damage(1.0, 0.0, &"debug")
+			state.ship_shield_t = shield_t
 			ship.invincible = keep
 		&"debug_die":
 			ship.invincible = false
 			state.ship_invuln = 0.0
+			state.ship_shield_t = 0.0
 			ship.damage(state.ship_hp + 1.0, 0.0, &"debug")
 		&"debug_coins":
 			state.coins += int(args.get("amount", 100))

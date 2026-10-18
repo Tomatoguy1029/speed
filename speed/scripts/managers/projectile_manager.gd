@@ -41,8 +41,8 @@ var _buf := PackedInt32Array()
 var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
-enum HostileKind { BULLET, MISSILE }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile"]
+enum HostileKind { BULLET, MISSILE, REFLECTED }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -268,9 +268,15 @@ func _update_friendly(dt: float) -> void:
 			var row: int = h[1]
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
+			var impact := from.lerp(to, h[0])
+			if kind == FriendKind.SHOT and _reflect_shot(i, row, impact):
+				pos = impact
+				life = 0.0
+				body_hit = null
+				break
 			hit[et.id[row]] = true
 			combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
-				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i]})
+				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
 				friend_pos[i] = pos
@@ -292,6 +298,29 @@ func _update_friendly(dt: float) -> void:
 				state.emit(&"debris_trail", {"points": trail, "color": friend_color[i]})
 			friend_slots.release(i)
 		i += 1
+
+## たて座の正面に当たった弾を消し、一定間隔で危険な反射弾へ変える。貫通弾も盾で止まる。
+func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
+	var t := combat.enemies.table
+	var vel := friend_vel[shot]
+	if t.beh[enemy] != EnemyTable.Beh.SHIELD or t.stone[enemy] > 0.0 \
+			or not combat.enemies.shield_blocks(enemy, impact, vel):
+		return false
+	if t.fire_t[enemy] > 0.0:
+		return true
+	var p: Dictionary = t.def[enemy].params
+	var normal := (impact - t.pos[enemy]).normalized()
+	if normal.is_zero_approx():
+		normal = Vector2.from_angle(t.facing[enemy])
+	var dir := (vel - normal * 2.0 * vel.dot(normal)).normalized()
+	var speed := float(p.reflect_speed)
+	_add_hostile(impact + normal * 2.0, dir * speed, speed, clampf(friend_r[shot], 5.0, 10.0),
+		float(p.reflect_life), float(p.reflect_dmg) * (1.0 + 0.25 * (t.level[enemy] - 1.0)),
+		0.0, 0.0, HostileKind.REFLECTED)
+	t.fire_t[enemy] = maxf(0.01, float(p.reflect_interval))
+	t.flash[enemy] = 0.1
+	state.emit(&"shield_reflect", {"pos": impact, "normal": normal})
+	return true
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
@@ -395,7 +424,7 @@ func _update_hostile(dt: float) -> void:
 		life -= dt
 		# 画面の外で、画面から離れていく弾（ホーミングしない弾）は、もう当たらないので消す
 		var rel := to - vc
-		if kind == HostileKind.BULLET and (absf(rel.x) > keep.x or absf(rel.y) > keep.y) and rel.dot(vel) > 0.0:
+		if kind != HostileKind.MISSILE and (absf(rel.x) > keep.x or absf(rel.y) > keep.y) and rel.dot(vel) > 0.0:
 			life = 0.0
 		var r := hostile_r[i]
 		# 敵の弾は等速。天体の表面までの余裕が、この更新の弾と天体の移動量より大きい間は判定を省く。

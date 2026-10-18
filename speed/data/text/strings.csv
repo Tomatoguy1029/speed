@@ -601,8 +601,8 @@ lab.enemy.triangle.move,3つの星の間に光の膜を張って追ってくる�
 lab.enemy.triangle.kill,頂点の星を1つ倒すと膜が消え、中の核を倒せる,Destroy one corner star to drop the membrane and expose the core
 lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と一緒に動く,A corner star of the Southern Triangle that moves with the core
 lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
-lab.enemy.shield.move,機体の方へゆっくり向き直りながら近づく。攻撃はしない,Slowly turns to face you while approaching. Does not attack
-lab.enemy.shield.kill,背面から貫くと倒れる。前から体当たりすると弾かれる,Pierce it from behind. Ramming its front bounces you off
+lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾で弾を反射する,Approaches while slowly turning toward you. Its front shield reflects shots
+lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
 lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置く,Keeps its distance and places a long light wall near you
 lab.enemy.ruler.kill,HP を削る,Wear down its HP
 lab.enemy.crow.move,周りで倒された敵の残骸を集め、塊にして投げてくる,Gathers the debris of nearby defeated enemies into a lump and throws it

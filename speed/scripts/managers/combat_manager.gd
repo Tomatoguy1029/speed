@@ -70,7 +70,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		if run != null:
 			if run.inside.has(t.id[i]):
 				continue
-		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0:
+		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0 and t.beh[i] != EnemyTable.Beh.SHIELD:
 			continue
 		var hit_t := Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R)
 		if hit_t >= 0.0:
@@ -87,8 +87,16 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var sp := vel.length()
 		var dir := vel / sp if sp > 0.0 else Vector2.ZERO
 		var atk := attack_power()
-		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
+		var shield_front := t.beh[i] == EnemyTable.Beh.SHIELD and t.stone[i] <= 0.0 \
+			and enemies.shield_blocks(i, hit_pos, dir)
+		if shield_front and (not fast or (run == null and t.hit_cd[i] > 0.0)):
+			# 接触のクールダウン中も押し戻し、普通の移動で盾をすり抜けるのを防ぐ。
+			_bump_obstacle(i, hit_pos, R, dir, false)
+			return true
+		if run == null and t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0:
+			continue
+		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		if t.stone[i] > 0.0:
 			# 石になった敵は、触れると装甲や倒し方に関係なく一撃で砕ける
 			t.hit_cd[i] = cfg.contact_cooldown
@@ -101,12 +109,12 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			_launch_saw(i, dir if dir != Vector2.ZERO else (t.pos[i] - from).normalized(), sp)
 			continue
 		if not fast and t.meteor_index[i] >= 0:
-			_bump_meteor(i, hit_pos, R, dir)
+			_bump_obstacle(i, hit_pos, R, dir)
 			continue
 		if not fast:
 			# 普段の接触：弱い攻撃になる。機体は被弾しない
 			t.hit_cd[i] = cfg.contact_cooldown
-			damage_enemy(i, atk * cfg.touch_damage, {"cause": &"touch", "dir": dir, "no_crit": true})
+			damage_enemy(i, atk * cfg.touch_damage, {"cause": &"touch", "dir": dir, "no_crit": true, "impact": hit_pos})
 			if state.phase == RunState.Phase.PLAY:
 				build.on_electric_contact(i)
 			continue
@@ -119,6 +127,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			continue
 		if gate == EnemyTable.GateResult.ALLOW and (ignore_armor or can_pierce(atk, i, crit)):
 			var dmg := atk * (state.stats.crit_mult if crit else 1.0)
+			if t.beh[i] == EnemyTable.Beh.SHIELD and enemies.shield_rear(i, hit_pos):
+				ship.steal_shield(i)
+				dmg = maxf(dmg, t.hp[i])
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
 			if crit:
 				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
@@ -194,6 +205,9 @@ func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 			if run.wave_inside.has(id):
 				continue
 			run.wave_inside[id] = i
+			# 盾を奪う経路では、先行する波動で本体を倒さず、機体の背面貫通を先に成立させる。
+			if t.beh[i] == EnemyTable.Beh.SHIELD and _shield_on_route(run, i, p0):
+				continue
 			var d := t.pos[i] - p
 			var dist := d.length()
 			var dir := d / dist if dist > 0.0 else Vector2.ZERO
@@ -208,6 +222,17 @@ func wave_along(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 		if run.wave_acc >= 45.0:
 			run.wave_acc = 0.0
 			state.emit(&"ring", {"pos": p, "radius": W, "color": Color(0.51, 0.88, 1.0, 0.9), "life": 0.35})
+
+func _shield_on_route(run: TraceRun, i: int, from: Vector2) -> bool:
+	var t := enemies.table
+	var pts := state.trace_path
+	for seg in range(run.seg, pts.size() - 1):
+		var a := from if seg == run.seg else pts[seg]
+		var b := pts[seg + 1]
+		var hit := Geom.seg_circle_t(a, b, t.pos[i], t.r[i] + cfg.ship_radius)
+		if hit >= 0.0 and enemies.shield_rear(i, a.lerp(b, hit)):
+			return true
+	return false
 
 ## ふたご座の双子の機体が from から to へ動いた：通った敵に体当たりと同じように当てる（弾かれず、被弾もしない）。
 func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
@@ -279,9 +304,9 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if crit and not opts.get("no_crit", false):
 		build.on_critical(opts.get("impact", t.pos[i]))
 
-## 普段の速さで隕石（行 i）に触れた：隕石の外へ押し出して跳ね返る。被弾はせず、
-## 攻撃力の 1/4 を与える（同じ隕石には 0.25 世界秒に1回）。触れている間は毎回押し出すので、上を通り抜けない。
-func _bump_meteor(i: int, hit_pos: Vector2, R: float, dir: Vector2) -> void:
+## 普段の速さで隕石・盾の前面に触れた：外へ押し出して跳ね返る。
+## 隕石には攻撃力の 1/4 を与え、盾は接触を防ぐ。押し戻しはクールダウン中も毎回行う。
+func _bump_obstacle(i: int, hit_pos: Vector2, R: float, dir: Vector2, damage := true) -> void:
 	var t := enemies.table
 	var n := hit_pos - t.pos[i]
 	n = n.normalized() if n.length_squared() > 0.0 else -dir
@@ -294,7 +319,8 @@ func _bump_meteor(i: int, hit_pos: Vector2, R: float, dir: Vector2) -> void:
 		return
 	t.hit_cd[i] = 0.25
 	state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
-	damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
+	if damage:
+		damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
 
 ## 回る丸鋸（行 i）に触れた：丸鋸が機体の進んでいた向き u へ飛んでいき、その先の敵を巻き込む。1回で壊れる。
 func _launch_saw(i: int, u: Vector2, ship_speed: float) -> void:

@@ -89,6 +89,12 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"dash", -6.0)
 			&"bounce", &"block_impact":
 				AudioManager.play(&"block", -8.0)
+			&"shield_reflect":
+				AudioManager.play(&"block", -10.0, 1.8)
+			&"shield_stolen":
+				AudioManager.play(&"pickup", -5.0, 0.7)
+			&"shield_block":
+				AudioManager.play(&"block", -10.0, 1.3)
 			&"boss_explode":
 				AudioManager.play(&"boom")
 

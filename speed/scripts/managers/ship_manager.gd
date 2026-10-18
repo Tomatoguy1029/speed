@@ -25,6 +25,11 @@ func tick(real_dt: float, world_dt: float) -> void:
 		state.ship_hurt -= real_dt
 	if state.ship_invuln > 0.0:
 		state.ship_invuln -= world_dt
+	state.ship_shield_flash = maxf(0.0, state.ship_shield_flash - world_dt)
+	if state.ship_shield_t > 0.0:
+		state.ship_shield_t = maxf(0.0, state.ship_shield_t - world_dt)
+		if state.ship_shield_t <= 0.0:
+			state.emit(&"shield_expired", {"pos": state.ship_pos})
 	if state.tracing or state.drawing:
 		return
 	if world_dt <= 0.0:
@@ -133,9 +138,26 @@ func _collide_bodies() -> void:
 
 # ── 被弾（仕様書 5・7.2） ─────────────────────────────────────────
 
+## 背後から貫いたたて座の盾を装備する。取り直したときは持続時間を更新する。
+func steal_shield(i: int) -> void:
+	var t := combat.enemies.table
+	var duration := maxf(0.0, float(t.def[i].params.shield_time))
+	state.ship_shield_t = duration
+	state.ship_shield_max = duration
+	state.ship_shield_flash = 0.2
+	state.emit(&"shield_stolen", {"pos": t.pos[i], "facing": t.facing[i], "r": t.r[i],
+		"arc": float(t.def[i].params.front_arc)})
+
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 func damage(amount: float, slow: float, cause: StringName) -> bool:
-	if state.phase != RunState.Phase.PLAY or state.ship_invuln > 0.0 or invincible:
+	if state.phase != RunState.Phase.PLAY:
+		return false
+	if state.ship_shield_t > 0.0:
+		if state.ship_shield_flash <= 0.0:
+			state.emit(&"shield_block", {"pos": state.ship_pos})
+		state.ship_shield_flash = 0.12
+		return false
+	if state.ship_invuln > 0.0 or invincible:
 		return false
 	state.ship_hp -= amount
 	if slow > 0.0:

@@ -23,5 +23,10 @@ size_var = false
 weak_arc = 1.0
 gate = &"back"
 params = {
-"front_arc": 1.6
+"front_arc": 1.2,
+"shield_time": 5.0,
+"reflect_interval": 0.18,
+"reflect_speed": 700.0,
+"reflect_dmg": 7.0,
+"reflect_life": 2.5
 }

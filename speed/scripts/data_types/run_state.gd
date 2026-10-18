@@ -40,6 +40,10 @@ var ship_boost_t := 0.0
 var ship_fade_t := 0.0
 var ship_hp := 0.0
 var ship_invuln := 0.0
+## たて座から奪った盾の残り時間・持続時間・防御時の光（世界秒）
+var ship_shield_t := 0.0
+var ship_shield_max := 0.0
+var ship_shield_flash := 0.0
 ## 被弾の赤い表示の残り（実秒）
 var ship_hurt := 0.0
 ## なぞり終えたあとの勢いがあるか（仕様書 6.6）

@@ -39,7 +39,7 @@
 | `pump` | ポンプ座 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せてから、前方へ一気に吐き出す | 吸っている間だけ口が開き、倒せる | 1・2 | `data/enemies/pump.tres`、`enemy_manager.gd` の `_pump` |
 | `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper` |
 | `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle` |
-| `shield` | たて座 | 4 | 採用 | 実装済み | 自分の方へゆっくり向き直る | 背面から貫くと倒れる。前面に当たると弾かれる（失敗） | 1・5 | `data/enemies/shield.tres`、`enemy_manager.gd` の行動 `shield` |
+| `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
 | `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や波動なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |

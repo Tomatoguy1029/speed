@@ -8,6 +8,7 @@ extends Node
 const XP_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
+const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
 	"gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
 const MOON := preload("res://assets/pixel/moon.png")
@@ -65,6 +66,7 @@ var trails: Array = []
 var beams: Array = []
 var _enemy_textures: Dictionary = {}
 var bolts: Array = []
+var shield_transfers: Array = []
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -140,7 +142,7 @@ func _build_batches() -> void:
 	# 図形で描く。png を置けば絵に替わる
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
-		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow"]:
+		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -245,6 +247,18 @@ func _on_events(events: Array[Dictionary]) -> void:
 				var d: Vector2 = (ev.pos - ev.enemy_pos).normalized()
 				_sparks(ev.pos, d, cfg.weak_flame_count, Color("#ff6a2a"))
 				impacts.append({"pos": ev.enemy_pos, "r": ev.r, "dir": d, "life": cfg.weak_impact_life, "max": cfg.weak_impact_life, "color": Color("#ff5a2a")})
+			&"shield_reflect":
+				_sparks(ev.pos, ev.normal, 8, Color("#ffa4ef"))
+				_ring(ev.pos, 22.0, Color("#ff9de9"), 0.18)
+			&"shield_stolen":
+				shield_transfers.append({"pos": ev.pos, "facing": ev.facing, "r": ev.r, "arc": ev.arc,
+					"life": 0.3, "max": 0.3})
+				_ring(ev.pos, ev.r * 1.7, Color("#65e8ff"), 0.3)
+				shake = maxf(shake, 6.0)
+			&"shield_block":
+				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
+			&"shield_expired":
+				_burst(ev.pos, Color("#65e8ff"), 12, Vector2.ZERO, 180.0)
 			&"bounce":
 				shake = maxf(shake, 10.0)
 			&"crash":
@@ -336,7 +350,7 @@ func _update_fx(dt: float) -> void:
 		p.vel *= 1.0 - 2.5 * dt
 		p.life -= dt
 	particles = particles.filter(func(p): return p.life > 0.0)
-	for list in [rings, texts, ghosts, impacts, trails, beams, bolts]:
+	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers]:
 		for f in list:
 			f.life -= dt
 	for t in texts:
@@ -348,6 +362,7 @@ func _update_fx(dt: float) -> void:
 	trails = trails.filter(func(f): return f.life > 0.0)
 	beams = beams.filter(func(f): return f.life > 0.0)
 	bolts = bolts.filter(func(f): return f.life > 0.0)
+	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
 
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
@@ -632,10 +647,12 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
+	if t.beh[i] == EnemyTable.Beh.SHIELD:
+		SHIELD_VISUAL.enemy(c, t, i)
 	if t.elite[i] != 0:
 		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	var weak := t.weak_arc[i]
-	if weak > 0.0 and t.type[i] != &"armored":
+	if weak > 0.0 and t.type[i] != &"armored" and t.beh[i] != EnemyTable.Beh.SHIELD:
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
 	if t.landmark[i] != 0:
@@ -740,7 +757,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
-			_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
+			if pr.hostile_kind[i] == ProjectileManager.HostileKind.REFLECTED:
+				var u := pr.hostile_vel[i].normalized()
+				c.draw_line(pos - u * hostile_r[i] * 3.0, pos, Color("#ff84df"), hostile_r[i] * 0.9)
+				c.draw_circle(pos, hostile_r[i], Color("#f45ec5"))
+				c.draw_circle(pos, hostile_r[i] * 0.5, Color("#fff0fc"))
+			else:
+				_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
 			if run.projectiles.hostile_stone[i] > 0.0:
 				c.draw_circle(pos, hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
 	_hostile_batch.end()
@@ -1041,6 +1064,9 @@ func _draw_ship(c: CanvasItem) -> void:
 		c.draw_texture_rect(AIRSHIP_TURRET,
 			Rect2(-rear.MOUNT_PIXEL * cfg.character_scale, size), false, col)
 		c.draw_set_transform(Vector2.ZERO)
+	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale)
+	for effect in shield_transfers:
+		SHIELD_VISUAL.transfer(c, effect, state.ship_pos)
 	# HP バー（機体の真下、仕様書 17）
 	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)
 	var w := _px(44.0)
