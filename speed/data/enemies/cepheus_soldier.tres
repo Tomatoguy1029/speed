@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"cepheus_soldier"
+display_name = "ケフェウス座の兵"
+rank = 0
+radius = 16.0
+hp = 10.0
+armor = 2.0
+speed = 420.0
+accel = 6.0
+turn = 6.0
+xp = 1.0
+color = Color(0.72, 0.62, 1, 1)
+shape = &"dart"
+behavior = &"soldier"
+max_alive = 0
+ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+"bolt_speed": 640.0,
+"bullet_dmg": 10.0,
+"mutiny_shot": 0.3
+}

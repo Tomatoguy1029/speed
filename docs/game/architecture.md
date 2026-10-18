@@ -294,8 +294,9 @@ Main (Node)
 | `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間、ポンプ座は次に吸い込めるまでの時間 |
 | `buds` | `splitter`・`pump`・`crow` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数 |
 | `carry` | `crow` | 回収して運んでいる経験値の量 |
-| `target` | `reticle` | 狙っている岩の行番号（狙っていなければ -1） |
-| `target_id` | `reticle` | 狙っている岩の id |
+| `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
+| `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
+| `anchor` | `cepheus` | 隊列の基準の位置（増援で組み直すときに決める） |
 | `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針が回り始めてからの時間 |
 | `links` | とけい座・みなみのさんかく座 | 付いて動く攻撃の形の行番号（`ProjectileManager` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |

@@ -44,8 +44,9 @@ var _hits: Array = []
 ## SHELL はポンプ座の圧縮弾。直進し、届く距離を飛ぶか何かに当たると、その場で大きく破裂する（破裂が当たる）
 ## SLASH はやまねこ座の斬撃。片側1組の、潰れた弧の3本の爪痕。真ん中の少し先から外側へ横に伸び、外側で本体の方へ反り上がる。
 ## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
-enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash"]
+## BOLT はケフェウス座の兵の細長い光弾。直進し、追尾しない
+enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt"]
 ## 斬撃の爪痕の形。横の大きさ（hostile_r）に対する割合：縦の大きさ、爪痕どうしの間隔、外側の爪痕ほど縦に伸びる量、
 ## 真ん中を越えて伸びる量、太さ。爪痕は楕円の弧で、本体の方を上・伸びる側を右にしたとき SLASH_FROM の角度（−100°）から
 ## 反り上がる。外側（機体側）の爪痕ほど反り上がりが長く（SLASH_RISE ずつ先まで回り込む）、外からの回り込みを防ぐ
@@ -378,6 +379,11 @@ func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burs
 		HostileKind.SHELL)
 	hostile_burst[h] = burst
 	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
+
+## ケフェウス座の兵の細長い光弾を、from から向き angle へ撃つ。直進し、追尾しない。
+func fire_bolt(from: Vector2, angle: float, speed: float, dmg: float) -> void:
+	_add_hostile(from, Vector2.from_angle(angle) * speed, speed, 7.0, 4.0, dmg, 0.0, 0.0, HostileKind.BOLT)
+	state.emit(&"shoot", {"pos": from, "kind": &"bolt"})
 
 ## やまねこ座の斬撃を飛ばす。from（真ん中の先端）から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
 ## size は爪痕の横の大きさ、side は伸びる側（進む向きに対して 1 なら左、-1 なら右）。

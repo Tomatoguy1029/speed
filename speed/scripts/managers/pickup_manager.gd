@@ -60,7 +60,11 @@ func on_enemy_killed(i: int) -> void:
 	var danger := field.danger_at(pos.length())
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
-	drop_gem(pos, t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger))
+	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けてその場に落とす
+	var value := t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger)
+	var gems := int(t.def[i].params.get("gem_count", 1)) if t.def[i] != null else 1
+	for k in gems:
+		drop_gem(pos + (Vector2.from_angle(TAU * k / float(gems)) * t.r[i] * 0.5 if gems > 1 else Vector2.ZERO), value / float(gems))
 	if t.carry[i] > 0.0:
 		# からす座が運んでいた経験値を、倒した場所へまとめて落とす
 		var n := clampi(t.buds[i], 1, 16)

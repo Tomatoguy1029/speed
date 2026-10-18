@@ -21,7 +21,8 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE, &"triangle": EnemyTable.Beh.TRIANGLE,
 	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
 	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS, &"auriga": EnemyTable.Beh.AURIGA,
-	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA}
+	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA,
+	&"soldier": EnemyTable.Beh.SOLDIER}
 ## ポンプ座の吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
 const PUMP_MOUTH := 0.85
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
@@ -238,6 +239,7 @@ func _reset_row(i: int) -> void:
 	t.carry[i] = 0.0
 	t.target[i] = -1
 	t.target_id[i] = -1
+	t.anchor[i] = Vector2.ZERO
 	t.spin[i] = 0.0
 	t.knock_t[i] = 0.0
 	t.shove_time[i] = 0.0
@@ -424,7 +426,8 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
 			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS,
-			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA]:
+			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA,
+			EnemyTable.Beh.SOLDIER]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -644,8 +647,9 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_chase(i, bdt)
 					_corona(i, bdt)
 				EnemyTable.Beh.CEPHEUS:
-					_keep_distance(i, bdt)
 					_cepheus(i, bdt)
+				EnemyTable.Beh.SOLDIER:
+					_soldier(i, bdt)
 				EnemyTable.Beh.AQUILA:
 					_drive(i, bdt)
 					_aquila(i, bdt)
@@ -1623,21 +1627,185 @@ func _corona(i: int, dt: float) -> void:
 				var out := (state.ship_pos - t.pos[i]).normalized()
 				state.ship_vel += out * float(p.push) * dt
 
-## ケフェウス座：間隔ごとに光って号令をかけ、周りの強敵に一斉に攻撃させる。
+## ケフェウス座の隊列の兵の数（段階ごと）。3体は横一列、5体は扇形、7体は千鳥の二重隊列（前列4体・後列3体）
+const CEPHEUS_TIERS := [3, 5, 7]
+
+## ケフェウス座：距離を保ち、専用の兵を召喚して隊列を組ませる王（buds が今の段階 1〜3。0 は召喚前）。
+## reinforce_interval ごとに増援して段階を上げ（3→5→7体）、そのときだけ隊列を組み直す（WINDUP：射撃を休み、新しい兵の出現位置を
+## 予告してから召喚し、全員が配置に着くと射撃を再開する）。組み直したあとは、兵の位置と撃つ向きを固定する。
+## 倒された兵の穴は、次の増援まで残す。射撃は王が号令する（MOVE：fire_interval ごとに一斉射撃。7体は前列と後列が交互に撃つ）。
 func _cepheus(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if not _gun_timer(i, dt):
+	# 機体から keep の距離を保つ。向き（facing）は隊列の向きなので、動いても変えない
+	var away := (t.pos[i] - _aim).normalized()
+	_steer_to(i, _aim + away * float(p.keep), t.speed[i], t.accel[i], dt)
+	if t.buds[i] == 0:
+		_cepheus_reform(i)
 		return
-	var rows := PackedInt32Array()
-	projectiles.combat.nearby(t.pos[i], float(p.command_radius), rows)
-	for j in rows:
-		if j == i or t.dead[j] != 0 or t.def[j] == null or t.def[j].max_alive <= 0 or t.parent[j] >= 0:
+	t.fire_t[i] -= dt
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - clampf(t.timer[i] / float(p.summon_time), 0.0, 1.0)
+			if t.timer[i] > 0.0:
+				return
+			var size: int = CEPHEUS_TIERS[t.buds[i] - 1]
+			if t.timer[i] > -dt * 1.5:
+				# 予告した位置に兵を召喚する
+				var taken := {}
+				for j in _soldiers_of(i):
+					taken[t.buds[j]] = true
+				for k in size:
+					if not taken.has(k):
+						var j := spawn(def_of(&"cepheus_soldier"), t.level[i], cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1]})
+						t.target[j] = i
+						t.target_id[j] = t.id[i]
+						t.buds[j] = k
+						t.mode[j] = EnemyTable.Mode.MOVE
+				state.emit(&"cepheus_summon", {"pos": t.pos[i], "color": t.color[i]})
+			for j in _soldiers_of(i):
+				if t.mode[j] != EnemyTable.Mode.MOVE:
+					return
+			# 全員が配置に着いた：射撃を再開する
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.charge[i] = 0.0
+			t.timer[i] = float(p.fire_interval)
+			t.fire_t[i] = float(p.reinforce_interval)
+		_:
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				_cepheus_volley(i)
+				t.timer[i] = float(p.fire_interval) * (0.5 if t.buds[i] == 3 else 1.0)
+			if t.fire_t[i] <= 0.0:
+				_cepheus_reform(i)
+
+## ケフェウス座（行 i）の兵の行の一覧（倒れた兵は含めない）。
+func _soldiers_of(i: int) -> PackedInt32Array:
+	var t := table
+	var out := PackedInt32Array()
+	for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+		if t.dead[j] == 0 and t.target[j] == i and t.target_id[j] == t.id[i] and t.mode[j] != EnemyTable.Mode.RECOVER:
+			out.append(j)
+	return out
+
+## 増援：段階を1つ上げ（7体で止まる）、隊列の基準と向きを今の機体の方へ決め直す。残っている兵は新しい位置へ動き、
+## 足りない位置は出現位置を予告してから召喚する。
+func _cepheus_reform(i: int) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.buds[i] = mini(t.buds[i] + 1, CEPHEUS_TIERS.size())
+	t.anchor[i] = t.pos[i]
+	t.facing[i] = (state.ship_pos - t.pos[i]).angle()
+	var size: int = CEPHEUS_TIERS[t.buds[i] - 1]
+	var soldiers := _soldiers_of(i)
+	var k := 0
+	for j in soldiers:
+		if k >= size:
+			break
+		t.buds[j] = k
+		t.mode[j] = EnemyTable.Mode.DASH
+		k += 1
+	for n in range(k, size):
+		state.emit(&"summon_mark", {"pos": cepheus_slot(i, n)[0], "king": t.pos[i], "life": float(p.summon_time), "color": t.color[i]})
+	t.mode[i] = EnemyTable.Mode.WINDUP
+	t.timer[i] = float(p.summon_time)
+	t.bud_t[i] = 0.0
+
+## ケフェウス座（行 i）の隊列の k 番目の位置と、そこで撃つ向き。[位置, 向き]
+func cepheus_slot(i: int, k: int) -> Array:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var a := t.facing[i]
+	var u := Vector2.from_angle(a)
+	var n := Vector2(-u.y, u.x)
+	var base := t.anchor[i]
+	var spacing := float(p.spacing)
+	match CEPHEUS_TIERS[maxi(t.buds[i], 1) - 1]:
+		3:
+			return [base + u * float(p.row_near) + n * float(k - 1) * spacing, a]
+		5:
+			var ang := a + float(k - 2) * float(p.fan_step)
+			return [base + Vector2.from_angle(ang) * float(p.fan_radius), ang]
+		_:
+			if k < 4:
+				return [base + u * float(p.row_far) + n * (float(k) - 1.5) * spacing, a]
+			return [base + u * float(p.row_near) + n * float(k - 5) * spacing, a]
+
+## 王の号令で兵が撃つ。7体の隊列は前列（0〜3番）と後列（4〜6番）が交互に撃つ（bud_t が号令の回数）。
+func _cepheus_volley(i: int) -> void:
+	var t := table
+	var staggered := t.buds[i] == 3
+	var back := int(t.bud_t[i]) % 2 == 1
+	t.bud_t[i] += 1.0
+	for j in _soldiers_of(i):
+		if t.mode[j] != EnemyTable.Mode.MOVE:
 			continue
-		var jp: Dictionary = t.def[j].params
-		t.fire_t[j] = minf(t.fire_t[j], float(jp.get("telegraph", 0.0)) + 0.05)
-		t.flash[j] = 0.15
-	state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": float(p.command_radius) * 0.2})
+		if staggered and (t.buds[j] >= 4) != back:
+			continue
+		var sp: Dictionary = t.def[j].params
+		projectiles.fire_bolt(t.pos[j] + Vector2.from_angle(t.facing[j]) * t.r[j], t.facing[j], float(sp.bolt_speed),
+			_attack_dmg(j, float(sp.bullet_dmg)))
+
+## ケフェウス座の兵：王が決めた隊列の位置へ動き（DASH）、着いたら止まって撃つ向きを向く（MOVE。撃つのは王の号令）。
+## 王が倒れると（RECOVER）、機体への攻撃をやめ、近くの兵へ向き直って撃ち合い、mutiny の時間が過ぎると崩れて倒れる。
+## 王がいないまま置かれた兵は、すぐに崩れる。
+func _soldier(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var king := t.target[i]
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		_hold(i, dt)
+		t.timer[i] -= dt
+		t.fire_t[i] -= dt
+		var foe := _nearest_soldier(i)
+		if foe >= 0:
+			_turn_toward(i, (t.pos[foe] - t.pos[i]).angle(), t.turn[i], dt)
+			if t.fire_t[i] <= 0.0:
+				t.fire_t[i] = float(p.mutiny_shot)
+				state.emit(&"beam", {"from": t.pos[i], "to": t.pos[foe], "width": 4.0, "life": 0.12, "color": t.color[i].lightened(0.3)})
+				projectiles.combat.damage_enemy(foe, t.max_hp[foe] * 0.35, {"cause": &"collapse", "no_crit": true})
+		if t.timer[i] <= 0.0 and t.dead[i] == 0:
+			projectiles.combat.kill_enemy(i, {"cause": &"collapse"})
+		return
+	if not self.is_same(king, t.target_id[i]) or t.dead[king] != 0:
+		_start_mutiny(i, 0.4)
+		return
+	var slot := cepheus_slot(king, t.buds[i])
+	if t.mode[i] == EnemyTable.Mode.DASH:
+		var goal: Vector2 = slot[0]
+		_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+		_turn_toward(i, (goal - t.pos[i]).angle(), t.turn[i], dt)
+		if t.pos[i].distance_to(goal) < 8.0:
+			t.pos[i] = goal
+			t.vel[i] = Vector2.ZERO
+			t.facing[i] = slot[1]
+			t.mode[i] = EnemyTable.Mode.MOVE
+		return
+	t.vel[i] = Vector2.ZERO
+	t.pos[i] = slot[0]
+	_turn_toward(i, slot[1], t.turn[i], dt)
+
+## 兵（行 i）の崩壊を始める。seconds ののちに崩れて倒れる。
+func _start_mutiny(i: int, seconds: float) -> void:
+	var t := table
+	t.mode[i] = EnemyTable.Mode.RECOVER
+	t.timer[i] = seconds
+	t.fire_t[i] = state.rng.randf() * float(t.def[i].params.mutiny_shot)
+
+## 兵（行 i）にいちばん近い、ほかの兵（いなければ -1）。
+func _nearest_soldier(i: int) -> int:
+	var t := table
+	var best := -1
+	var best_d := INF
+	for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+		if j == i or t.dead[j] != 0:
+			continue
+		var d := t.pos[i].distance_squared_to(t.pos[j])
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
 
 ## わし座：雷を運ぶ鷲。大きく旋回しながら飛び、通り道に沿って雷を落とす。
 func _aquila(i: int, dt: float) -> void:
@@ -1660,6 +1828,11 @@ func on_enemy_death(i: int, atk: float) -> void:
 		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
 	if t.beh[i] == EnemyTable.Beh.SNIPER:
 		_tele_rays.erase(t.id[i])
+	if t.beh[i] == EnemyTable.Beh.CEPHEUS:
+		# 王が倒れた：召喚と兵の攻撃が止まり、残った兵は撃ち合って崩れる
+		for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+			if t.dead[j] == 0 and t.target[j] == i and t.target_id[j] == t.id[i] and t.mode[j] != EnemyTable.Mode.RECOVER:
+				_start_mutiny(j, float(dp.mutiny_time) + state.rng.randf() * 0.6)
 	if t.beh[i] == EnemyTable.Beh.PUMP:
 		var full := float(t.buds[i]) / float(dp.store_max)
 		projectiles.burst_debris(t.pos[i], int(dp.release_base) + int(float(dp.release_per) * float(t.buds[i])),

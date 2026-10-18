@@ -18,13 +18,19 @@ color = Color(0.75, 0.6, 1, 1)
 shape = &"hex"
 behavior = &"cepheus"
 max_alive = 1
-ranged = true
+ranged = false
 size_var = false
 weak_arc = 0.0
 gate = &""
 params = {
-"keep": 560.0,
-"fire_interval": 8.0,
-"telegraph": 1.5,
-"command_radius": 1200.0
+"keep": 620.0,
+"reinforce_interval": 9.0,
+"summon_time": 0.9,
+"fire_interval": 0.8,
+"row_near": 120.0,
+"row_far": 230.0,
+"spacing": 120.0,
+"fan_radius": 190.0,
+"fan_step": 0.42,
+"mutiny_time": 2.2
 }

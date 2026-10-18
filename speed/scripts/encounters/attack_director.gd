@@ -8,7 +8,7 @@ const BEHAVIORS := {
 	"lynx": ["aimed"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
 	"aquarius": ["aimed"], "auriga": ["residue"], "corona": ["residue"],
-	"cepheus": ["aimed"], "aquila": ["zone"]}
+	"aquila": ["zone"]}
 var guard: Dictionary = {}
 var enabled := false
 var settings: Dictionary = {"budget": 4.0, "slots": {}, "weights": {}, "gaps": {}}

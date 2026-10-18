@@ -69,6 +69,8 @@ var bolts: Array = []
 var shield_transfers: Array = []
 ## ポンプ座に吸い込まれていく敵（回りながら小さくなって口へ飛び込む）
 var swallows: Array = []
+## ケフェウス座が兵を召喚する位置の予告
+var summon_marks: Array = []
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -144,7 +146,7 @@ func _build_batches() -> void:
 	# 図形で描く。png を置けば絵に替わる
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
-		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"] \
+		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
 				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
@@ -262,6 +264,10 @@ func _on_events(events: Array[Dictionary]) -> void:
 				if swallows.size() < 120:
 					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
+			&"summon_mark":
+				summon_marks.append({"pos": ev.pos, "king": ev.king, "color": ev.color, "life": ev.life, "max": ev.life})
+			&"cepheus_summon":
+				_ring(ev.pos, 70.0, (ev.color as Color).lightened(0.4), 0.3)
 			&"rock_break":
 				_shatter_meteor(ev)
 				_burst(ev.pos, ev.color, 10, ev.dir, 300.0)
@@ -386,7 +392,7 @@ func _update_fx(dt: float) -> void:
 		p.vel *= 1.0 - 2.5 * dt
 		p.life -= dt
 	particles = particles.filter(func(p): return p.life > 0.0)
-	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers, swallows]:
+	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers, swallows, summon_marks]:
 		for f in list:
 			f.life -= dt
 	for t in texts:
@@ -400,6 +406,7 @@ func _update_fx(dt: float) -> void:
 	bolts = bolts.filter(func(f): return f.life > 0.0)
 	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
 	swallows = swallows.filter(func(f): return f.life > 0.0)
+	summon_marks = summon_marks.filter(func(f): return f.life > 0.0)
 
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
@@ -621,6 +628,20 @@ func _draw_enemies(c: CanvasItem) -> void:
 			_batches[key].end()
 	_draw_meteor_shards(c)
 	_draw_swallows(c)
+	_draw_summon_marks(c)
+
+## ケフェウス座の召喚の予告：王から金の光が伸び、兵が現れる位置に紋章の輪が閉じていく。
+func _draw_summon_marks(c: CanvasItem) -> void:
+	for m in summon_marks:
+		var k := 1.0 - float(m.life) / float(m.max)
+		var col: Color = (m.color as Color).lightened(0.35)
+		var at: Vector2 = m.pos
+		c.draw_line(m.king, at, Color(1.0, 0.85, 0.45, 0.25 + 0.35 * k), _px(2.0))
+		c.draw_arc(at, 30.0 * (1.6 - 0.6 * k), 0, TAU, 32, Color(col, 0.4 + 0.5 * k), _px(2.5))
+		for q in 5:
+			var a := state.world_time * 2.0 + q * TAU / 5.0
+			c.draw_line(at + Vector2.from_angle(a) * 18.0, at + Vector2.from_angle(a) * (26.0 + 10.0 * (1.0 - k)), Color(1.0, 0.85, 0.45, 0.6 * k), _px(2.0))
+		c.draw_circle(at, 6.0 + 8.0 * k, Color(1.0, 0.95, 0.75, 0.3 + 0.5 * k))
 
 ## ポンプ座に吸い込まれていく敵。自転しながら小さくなり、ポンプ座の口へ飛び込む。
 func _draw_swallows(c: CanvasItem) -> void:
@@ -732,7 +753,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	elif type == &"bomber":
 		_draw_bomber(c, t, i)
 	elif type == &"splitter":
-		_draw_splitter_bud(c, t, i)
+		_draw_splitter_crystals(c, t, i)
 	elif type == &"beamer":
 		_draw_beamer(c, t, i)
 	elif type == &"pulser":
@@ -787,9 +808,15 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var a0 := p + u * r
 		var a1 := a0 + u * float(t.def[i].params.stream_len)
 		c.draw_colored_polygon(PackedVector2Array([a0 + v * 0.5, a1 + v, a1 - v, a0 - v * 0.5]), Color(0.45, 0.75, 1.0, 0.22))
-	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.charge[i] > 0.0:
-		# 号令の前の光
-		c.draw_arc(p, r * (1.3 + 1.5 * t.charge[i]), 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.6 * t.charge[i]), _px(3.0))
+	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.mode[i] == EnemyTable.Mode.WINDUP:
+		# 召喚の間、王冠の光が強まる
+		var k := t.charge[i]
+		c.draw_arc(p, r * (1.15 + 0.3 * k), 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.35 + 0.5 * k), _px(3.0))
+		c.draw_circle(p - Vector2.from_angle(t.facing[i]) * r * 0.55, r * (0.15 + 0.2 * k), Color(1.0, 0.92, 0.6, 0.5 + 0.4 * k))
+	if t.beh[i] == EnemyTable.Beh.SOLDIER and t.mode[i] == EnemyTable.Mode.RECOVER:
+		# 王を失って崩れていく兵
+		var flick := 0.5 + 0.5 * sin(state.world_time * 30.0 + float(t.id[i]))
+		c.draw_arc(p, r * 1.3, 0, TAU, 20, Color(1.0, 0.3, 0.3, 0.4 + 0.4 * flick), _px(2.0))
 	if t.beh[i] == EnemyTable.Beh.CROW and t.carry[i] > 0.0:
 		_draw_crow_bundle(c, t, i)
 	var hp := t.hp[i]
@@ -818,27 +845,22 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
 		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
 
-## 分裂する雑魚：次の分裂体の芽が体の縁で育ち、生まれる直前に脈打つ。
-func _draw_splitter_bud(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var dp: Dictionary = t.def[i].params
-	if t.buds[i] >= int(dp.max_buds):
-		return
-	var k := clampf(t.bud_t[i] / float(dp.bud_interval), 0.0, 1.0)
-	var a := run.enemies.bud_angle(i)
+## 分裂する雑魚：体に詰まった経験値の結晶が透けて光る。倒すとこれがその場に全部落ちる。
+func _draw_splitter_crystals(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
 	var r := t.r[i]
-	var q := t.pos[i] + Vector2.from_angle(a) * r * (0.5 + 0.4 * k)
-	var size := r * 0.55 * (0.3 + 0.7 * k)
-	if k > 0.75:
-		var pulse := 0.5 + 0.5 * sin(state.world_time * 24.0)
-		c.draw_circle(q, size * (1.3 + 0.2 * pulse), Color(t.color[i].lightened(0.4), 0.35 * (k - 0.75) * 4.0))
-	var tex := _enemy_texture(&"splitling")
-	if tex == null:
-		c.draw_circle(q, size * 0.5, t.color[i])
-		return
-	var ext := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * size * 2.0
-	c.draw_set_transform(q, a + PI / 2.0)
-	c.draw_texture_rect(tex, Rect2(-ext / 2.0, ext), false)
-	c.draw_set_transform(Vector2.ZERO)
+	var u := Vector2.from_angle(t.facing[i])
+	var v := Vector2(-u.y, u.x)
+	var pulse := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
+	c.draw_circle(p, r * 0.75, Color(1.0, 0.85, 0.3, 0.12 + 0.08 * pulse))
+	for k in 3:
+		var o := float(k - 1)
+		var q := p + v * o * r * 0.42 - u * absf(o) * r * 0.1
+		var s := r * (0.34 if k == 1 else 0.24)
+		var pts := PackedVector2Array([q - u * s * 1.3, q + v * s * 0.75, q + u * s * 1.3, q - v * s * 0.75])
+		c.draw_colored_polygon(pts, Color("#ffd23f"))
+		pts.append(pts[0])
+		c.draw_polyline(pts, Color("#fff4c0"), maxf(_px(1.0), s * 0.18))
 
 ## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
 func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
@@ -1131,7 +1153,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
-			if pr.hostile_kind[i] == ProjectileManager.HostileKind.SLASH:
+			if pr.hostile_kind[i] == ProjectileManager.HostileKind.BOLT:
+				# ケフェウス座の兵の細長い光弾
+				var u := pr.hostile_vel[i].normalized()
+				c.draw_line(pos - u * 34.0, pos + u * 6.0, Color(0.75, 0.6, 1.0, 0.35), 14.0)
+				c.draw_line(pos - u * 30.0, pos + u * 4.0, Color(0.85, 0.75, 1.0), 6.0)
+				c.draw_line(pos - u * 24.0, pos + u * 2.0, Color(1, 1, 1, 0.95), 2.5)
+			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.SLASH:
 				_draw_slash(c, pos, pr.hostile_vel[i].angle(), hostile_r[i], pr.hostile_turn[i], 1.0)
 			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
 				# ポンプ座の圧縮弾：後ろに尾を引く

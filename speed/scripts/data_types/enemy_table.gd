@@ -11,7 +11,7 @@ enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
 enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBER, BEAMER, PULSER, PUMP, SNIPER,
 	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX,
-	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA }
+	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA, SOLDIER }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
 enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW, GUARD, SOLID, GHOST, IMMORTAL }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
@@ -85,9 +85,11 @@ var bud_t := PackedFloat64Array()
 var buds := PackedInt32Array()
 ## からす座：回収して運んでいる経験値の量
 var carry := PackedFloat64Array()
-## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）
+## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）。ケフェウス座の兵：仕える王の行番号と id
 var target := PackedInt32Array()
 var target_id := PackedInt32Array()
+## ケフェウス座：隊列の基準の位置（増援で組み直すときに決める）
+var anchor := PackedVector2Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）

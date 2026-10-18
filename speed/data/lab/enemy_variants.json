@@ -7,11 +7,12 @@
       "name": "分裂する雑魚（追加版）",
       "overrides": {
         "params": {
-          "bud_interval": 4.0,
-          "max_buds": 6,
-          "death_split": 0,
+          "bud_interval": 0.0,
+          "max_buds": 0,
+          "death_split": 2,
           "split_extra": 0,
-          "split_speed": 200.0
+          "split_speed": 260.0,
+          "gem_count": 6
         }
       }
     }
