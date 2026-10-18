@@ -145,7 +145,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler"]:
+				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -262,6 +262,10 @@ func _on_events(events: Array[Dictionary]) -> void:
 				if swallows.size() < 120:
 					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
+			&"rock_break":
+				_shatter_meteor(ev)
+				_burst(ev.pos, ev.color, 10, ev.dir, 300.0)
+				_ring(ev.pos, ev.r * 1.2, Color(1.0, 0.95, 0.6), 0.2)
 			&"ruler_split":
 				_ring(ev.pos, 46.0, (ev.color as Color).lightened(0.4), 0.3)
 				_burst(ev.pos, ev.color, 10, Vector2.ZERO, 260.0)
@@ -734,6 +738,8 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_lynx(c, t, i)
 	elif type == &"ruler":
 		_draw_ruler(c, t, i)
+	elif type == &"reticle":
+		_draw_reticle(c, t, i)
 	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
@@ -906,6 +912,36 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
 	if k > 0.0:
 		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
+
+## レチクル座：狙っている岩の周りに照準の四隅が縮みながら回り込み、本体から岩へ細い照準線が伸びる。
+func _draw_reticle(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var col := t.color[i].lightened(0.2)
+	var p := t.pos[i]
+	var r := t.r[i]
+	var lens := p + Vector2.from_angle(t.facing[i]) * r
+	c.draw_circle(lens, maxf(_px(1.5), r * 0.12), Color(col, 0.7))
+	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		return
+	var rock := t.target[i]
+	if not run.enemies.is_same(rock, t.target_id[i]):
+		return
+	var k := t.charge[i]
+	var at := t.pos[rock]
+	var size := t.r[rock] * (1.6 - 0.5 * k)
+	var spin := PI / 4.0 * (1.0 - k)
+	for q in 4:
+		var a := spin + q * PI / 2.0
+		var corner := at + Vector2.from_angle(a) * size * 1.41
+		var u := Vector2.from_angle(a + PI * 0.75)
+		var v := Vector2.from_angle(a - PI * 0.75)
+		c.draw_line(corner, corner + u * size * 0.5, Color(col, 0.5 + 0.5 * k), maxf(_px(2.0), 3.0))
+		c.draw_line(corner, corner + v * size * 0.5, Color(col, 0.5 + 0.5 * k), maxf(_px(2.0), 3.0))
+	c.draw_line(at - Vector2(size * 0.3, 0), at + Vector2(size * 0.3, 0), Color(col, 0.6 * k), _px(1.5))
+	c.draw_line(at - Vector2(0, size * 0.3), at + Vector2(0, size * 0.3), Color(col, 0.6 * k), _px(1.5))
+	var gap := at - lens
+	var steps := int(gap.length() / 18.0)
+	for n in range(0, steps, 2):
+		c.draw_line(lens + gap * (float(n) / steps), lens + gap * (float(n + 1) / steps), Color(col, 0.25 + 0.5 * k), _px(1.5))
 
 ## じょうぎ座：照射の予告は、発射元から照射の向きへ伸びる点線。予告が進むほど濃く、先端の光が強まる。
 func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:

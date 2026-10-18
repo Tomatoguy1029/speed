@@ -85,6 +85,9 @@ var bud_t := PackedFloat64Array()
 var buds := PackedInt32Array()
 ## からす座：回収して運んでいる経験値の量
 var carry := PackedFloat64Array()
+## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）
+var target := PackedInt32Array()
+var target_id := PackedInt32Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）

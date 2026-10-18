@@ -610,8 +610,8 @@ lab.enemy.crow.move,4羽の群れで隊列を組み、機体を追わずに一�
 lab.enemy.crow.kill,1羽ずつもろく、普通に当てれば倒れる。退場する前に倒すと、その1羽が回収した経験値をその場にまとめて落とす,Each bird is fragile and falls to any hit. Defeat one before it leaves to drop the experience it collected in one spot
 lab.enemy.lynx.move,距離を保ち、潰れた弧の3本の爪痕の斬撃を左右交互に飛ばし続ける。斬撃は真ん中の少し先から外側へ伸び、外側で本体の方へ反り上がる。機体の方へ形を保って直進し、追尾しない,Keeps its distance and keeps hurling slashes of three flattened claw arcs on alternating sides. Each reaches just past the middle and sweeps outward curling back toward the lynx. They fly straight toward the ship keeping their shape without homing
 lab.enemy.lynx.kill,内側の端を左右交互によけながら真ん中を抜けて近づき、本体を普通に倒す。外側からは回り込みにくい,Weave past the inner tips through the middle to close in and defeat the body normally. Going around the outside is hard
-lab.enemy.reticle.move,距離を保ち、機体のいた位置に照準を刻んで雷を落とす,Keeps its distance and marks where you were then drops lightning there
-lab.enemy.reticle.kill,HP を削る,Wear down its HP
+lab.enemy.reticle.move,近くのぼうえんきょう座に付き従う支援機。ぼうえんきょう座と機体の間で視線を遮る小隕石に照準を出し、ビームで壊す。機体は直接攻撃しない。支援先がいなければ退却する,A support craft that follows the nearest telescope. It marks small rocks that block the telescope’s line of sight to the ship and breaks them with a beam. It never attacks the ship directly and retreats when it has no telescope to support
+lab.enemy.reticle.kill,本体を普通に倒して岩陰を守るか、先にぼうえんきょう座を倒して連携を崩す,Defeat it normally to keep your cover or take down the telescope first to break up the pair
 lab.enemy.cross.move,距離を保ち、光を集めてから十字にレーザーを撃つ,Keeps its distance and gathers light before firing a cross of lasers
 lab.enemy.cross.kill,HP を削る,Wear down its HP
 lab.enemy.clock.move,長針と短針が刃として回り続ける。2本の速さが違う,Its long and short hands spin as blades at different speeds
