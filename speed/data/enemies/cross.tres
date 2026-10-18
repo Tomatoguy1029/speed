@@ -10,25 +10,26 @@ rank = 4
 radius = 26.0
 hp = 70.0
 armor = 7.0
-speed = 80.0
+speed = 260.0
 accel = 1.5
 turn = 2.0
 xp = 14.0
 color = Color(1, 0.95, 0.7, 1)
 shape = &"diamond"
-behavior = &"beamer"
+behavior = &"cross"
 max_alive = 2
 ranged = true
 size_var = false
 weak_arc = 0.0
 gate = &""
 params = {
-"keep": 420.0,
-"fire_interval": 4.5,
-"telegraph": 1.0,
-"beam_len": 1100.0,
+"stand_off": 380.0,
+"align_tol": 28.0,
+"fire_interval": 2.4,
+"telegraph": 0.8,
+"beam_len": 1600.0,
 "beam_width": 26.0,
 "beam_time": 0.5,
-"bullet_dmg": 14.0,
-"cross": true
+"rest": 0.5,
+"bullet_dmg": 14.0
 }

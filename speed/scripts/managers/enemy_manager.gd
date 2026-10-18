@@ -22,7 +22,8 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
 	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS, &"auriga": EnemyTable.Beh.AURIGA,
 	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA,
-	&"soldier": EnemyTable.Beh.SOLDIER}
+	&"soldier": EnemyTable.Beh.SOLDIER, &"biter": EnemyTable.Beh.BITER, &"dolphin": EnemyTable.Beh.DOLPHIN,
+	&"cross": EnemyTable.Beh.CROSS}
 ## ポンプ座の吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
 const PUMP_MOUTH := 0.85
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
@@ -430,7 +431,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
 			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS,
 			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA,
-			EnemyTable.Beh.SOLDIER]:
+			EnemyTable.Beh.SOLDIER, EnemyTable.Beh.BITER, EnemyTable.Beh.DOLPHIN, EnemyTable.Beh.CROSS]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
@@ -659,6 +660,12 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_cepheus(i, bdt)
 				EnemyTable.Beh.SOLDIER:
 					_soldier(i, bdt)
+				EnemyTable.Beh.BITER:
+					_biter(i, bdt)
+				EnemyTable.Beh.DOLPHIN:
+					_dolphin(i, bdt)
+				EnemyTable.Beh.CROSS:
+					_cross(i, bdt)
 				EnemyTable.Beh.AQUILA:
 					_drive(i, bdt)
 					_aquila(i, bdt)
@@ -1635,6 +1642,106 @@ func _corona(i: int, dt: float) -> void:
 			if d.length_squared() < reach * reach:
 				var out := (state.ship_pos - t.pos[i]).normalized()
 				state.ship_vel += out * float(p.push) * dt
+
+## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
+## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
+func _biter(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var reach := t.r[i] + float(p.bite_reach) + cfg.ship_radius
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.bite_telegraph)
+			if t.timer[i] <= 0.0:
+				var at := t.pos[i] + Vector2.from_angle(t.facing[i]) * (t.r[i] + float(p.bite_reach) * 0.5)
+				projectiles.fire_zone(at, float(p.bite_radius), 0.0, _attack_dmg(i, float(p.bullet_dmg)),
+					ProjectileManager.HazardStyle.BITE, t.color[i].lightened(0.4))
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.bite_rest)
+		EnemyTable.Mode.RECOVER:
+			_chase(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+		_:
+			_chase(i, dt)
+			if t.pos[i].distance_squared_to(state.ship_pos) <= reach * reach:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.bite_telegraph)
+				t.flash[i] = 0.1
+
+## いるか座：距離を保ち、間隔ごとに構えて（WINDUP。機体の方へ向き直りながら、撃つ向きを予告する）、機体の方へ大きな扇の波動を撃つ。
+## 波動は数層の弧でできたひとまとまりの一発で、当たるのは先頭の1枚だけ。機体にもほかの敵にも当たる（敵に敵を倒させる）。
+func _dolphin(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.aim_turn), dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				var h := projectiles.fire_wave(t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], t.facing[i], float(p.wave_arc),
+					float(p.wave_radius), float(p.wave_speed), float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
+				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RIPPLE
+				projectiles.hazard_edmg[h] = float(p.enemy_dmg)
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = 0.6
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+				t.fire_t[i] = float(p.fire_interval)
+		_:
+			_keep_distance(i, dt)
+			t.fire_t[i] -= dt
+			if t.fire_t[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+
+## みなみじゅうじ座：動き回り、機体と縦か横にそろう位置（十字の線が機体に当たる位置）へ回り込む。そろったら止まり、
+## 予告してから十字のレーザーを撃つ（線はいつも縦と横）。撃ったあとは少し休む。
+func _cross(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var d := state.ship_pos - t.pos[i]
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.beam_time) + float(p.rest)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+				t.fire_t[i] = float(p.fire_interval)
+		_:
+			# 縦か横の近い方の軸で、機体から stand_off だけ離れた所へ回り込む
+			var off := float(p.stand_off)
+			var goal := Vector2(state.ship_pos.x, state.ship_pos.y - signf(d.y if d.y != 0.0 else 1.0) * off) \
+				if absf(d.x) < absf(d.y) else Vector2(state.ship_pos.x - signf(d.x if d.x != 0.0 else 1.0) * off, state.ship_pos.y)
+			_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+			t.facing[i] += dt * 1.5
+			t.fire_t[i] -= dt
+			var aligned := minf(absf(d.x), absf(d.y)) <= float(p.align_tol)
+			if aligned and t.fire_t[i] <= 0.0 and d.length() <= float(p.beam_len) * 0.8:
+				projectiles.fire_cross(t.pos[i], 0.0, float(p.beam_len), float(p.beam_width), float(p.telegraph),
+					float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+				t.facing[i] = 0.0
 
 ## ケフェウス座の隊列の兵の数（段階ごと）。3体は横一列、5体は扇形、7体は千鳥の二重隊列（前列4体・後列3体）
 const CEPHEUS_TIERS := [3, 5, 7]

@@ -147,7 +147,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle"]:
+				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -778,6 +778,10 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_ruler(c, t, i)
 	elif type == &"reticle":
 		_draw_reticle(c, t, i)
+	elif type == &"dolphin":
+		_draw_dolphin(c, t, i)
+	elif type == &"cross":
+		_draw_cross(c, t, i)
 	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
@@ -962,6 +966,41 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
 	if k > 0.0:
 		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
+
+## いるか座：構えている間、撃つ向きへ扇の輪郭と数層の弧が伸びていき、撃つ向きを予告する。
+func _draw_dolphin(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		return
+	var p := t.pos[i]
+	var r := t.r[i]
+	var k := t.charge[i]
+	var dp: Dictionary = t.def[i].params
+	var arc := float(dp.wave_arc)
+	var f := t.facing[i]
+	var col := t.color[i].lightened(0.3)
+	var reach := r * (2.0 + 4.0 * k)
+	for s: float in [-1.0, 1.0]:
+		c.draw_line(p, p + Vector2.from_angle(f + s * arc) * reach, Color(col, 0.25 + 0.4 * k), _px(2.0))
+	for n in 3:
+		var fr := fmod(k * 2.0 + n / 3.0, 1.0)
+		c.draw_arc(p, r * (1.2 + 3.5 * fr), f - arc, f + arc, 24, Color(col, (1.0 - fr) * (0.3 + 0.5 * k)), _px(3.0))
+	c.draw_circle(p + Vector2.from_angle(f) * r, r * (0.2 + 0.25 * k), Color(1, 1, 1, 0.5 + 0.4 * k))
+
+## みなみじゅうじ座：構えている間、縦と横に十字の予告線が伸び、中心の光が強まる。
+func _draw_cross(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		return
+	var p := t.pos[i]
+	var k := t.charge[i]
+	var col := t.color[i].lightened(0.2)
+	var length := float(t.def[i].params.beam_len) * (0.25 + 0.75 * k)
+	for q in 4:
+		var u := Vector2.from_angle(q * PI / 2.0)
+		var s := 0.0
+		while s < length:
+			c.draw_line(p + u * s, p + u * minf(s + 20.0, length), Color(col, 0.2 + 0.5 * k), maxf(_px(1.5), 2.0 + 3.0 * k))
+			s += 36.0
+	c.draw_circle(p, t.r[i] * (0.4 + 0.5 * k), Color(1, 1, 0.9, 0.35 + 0.5 * k))
 
 ## レチクル座：狙っている岩の周りに照準の四隅が縮みながら回り込み、本体から岩へ細い照準線が伸びる。
 func _draw_reticle(c: CanvasItem, t: EnemyTable, i: int) -> void:
@@ -1239,6 +1278,14 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 							c.draw_circle(p, _px(6.0), Color(col, 0.9))
 					continue
 				var f := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0)
+				if style == ProjectileManager.HazardStyle.BITE:
+					# 噛みつき：上下のあごが閉じる
+					var shut := 1.0 - f
+					for side: float in [-1.0, 1.0]:
+						var a0 := PI / 2.0 * side * (1.0 - shut * 0.8)
+						c.draw_arc(p, len * 0.75, a0 - 0.9, a0 + 0.9, 10, Color(1, 1, 1, f), _px(3.0))
+					c.draw_circle(p, len * 0.4, Color(col, 0.35 * f))
+					continue
 				c.draw_circle(p, len, Color(col, 0.45 * f))
 				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
 				if style == ProjectileManager.HazardStyle.LIGHTNING:
@@ -1261,6 +1308,15 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				var center := pr.hazard_angle[i]
 				var gap_w := pr.hazard_gap_w[i]
 				var fade := 1.0 - 0.5 * clampf(rad / maxf(len, 1.0), 0.0, 1.0)
+				if pr.hazard_style[i] == ProjectileManager.HazardStyle.RIPPLE:
+					# いるか座の波動：先頭の1枚（当たる）と、その後ろの薄い数枚（見た目だけ）
+					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.3 * fade), w * 2.0)
+					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col.lightened(0.3), 0.95 * fade), w)
+					for n in range(1, 4):
+						var back := rad - float(n) * w * 1.6
+						if back > 0.0:
+							c.draw_arc(p, back, center - arc, center + arc, 40, Color(col, 0.28 * fade / float(n)), w * 0.45)
+					continue
 				if gap_w > 0.0:
 					# 切れ目の反対側から一周、切れ目を空けて描く
 					var g := pr.hazard_gap[i]

@@ -141,7 +141,7 @@ func _fill_palette() -> void:
 	workspace._last_mode = -1
 
 ## 敵一覧の並び：「スリルと寄り道」の敵ごとの情報の表の順（分裂体は分裂する雑魚の次）。そのあとに障害物・仕掛け
-const PALETTE_ORDER := ["rocket", "bomber", "volatile", "splitter", "splitling", "beamer", "pulser", "missile", "spreader",
+const PALETTE_ORDER := ["snake", "rocket", "bomber", "volatile", "splitter", "splitling", "beamer", "pulser", "missile", "spreader",
 	"pump", "telescope", "triangle", "shield", "ruler", "crow", "lynx", "reticle", "cross", "clock", "dolphin", "crab",
 	"marlin", "auriga", "corona", "phoenix", "cepheus", "aquarius", "aquila",
 	"field_planet_small", "field_planet", "field_planet_large", "meteor", "field_comet", "iron", "saw", "hydra_rubble",

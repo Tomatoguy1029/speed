@@ -16,23 +16,21 @@ turn = 2.5
 xp = 16.0
 color = Color(0.5, 0.8, 1, 1)
 shape = &"orb"
-behavior = &"pulser"
+behavior = &"dolphin"
 max_alive = 2
 ranged = true
 size_var = false
 weak_arc = 0.0
 gate = &""
 params = {
-"keep": 480.0,
-"fire_interval": 5.0,
-"telegraph": 0.8,
-"layers": 4,
-"layer_interval": 0.4,
+"keep": 520.0,
+"fire_interval": 3.4,
+"telegraph": 1.0,
+"aim_turn": 2.0,
+"wave_arc": 0.6,
 "wave_radius": 1300.0,
-"wave_speed": 420.0,
-"wave_width": 18.0,
-"gap_width": 0.45,
-"gap_step": 0.7,
-"wave_arc": 3.14159,
-"bullet_dmg": 12.0
+"wave_speed": 460.0,
+"wave_width": 34.0,
+"bullet_dmg": 14.0,
+"enemy_dmg": 40.0
 }

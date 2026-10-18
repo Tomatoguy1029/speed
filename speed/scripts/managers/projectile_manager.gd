@@ -95,8 +95,8 @@ var _hostile_clear_pending := false
 ##   WALL：pos から angle の向きへ長さ len・幅 width の残る線。予告のあと active の間、触れると被弾する
 enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
-## RAY は残る線をビームとして描く（じょうぎ座）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY }
+## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -118,7 +118,7 @@ var hazard_color := PackedColorArray()
 ## 付いている敵の行と id（付いていなければ -1）。敵が倒れると、その攻撃の形も消える
 var hazard_owner := PackedInt32Array()
 var hazard_owner_id := PackedInt32Array()
-## 遅れて弾ける範囲が、敵に与えるダメージ（0 なら敵には当たらない。誘爆に使う）
+## 遅れて弾ける範囲・広がる波が、敵に与えるダメージ（0 なら敵には当たらない。誘爆・いるか座の波動に使う）
 var hazard_edmg := PackedFloat64Array()
 ## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
 var hazard_block := PackedByteArray()
@@ -675,6 +675,28 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	return i
 
 ## 広がる波の、今の半径。
+## 広がる波（行 h）の先頭が、この更新で通り過ぎた敵に1回ずつ当たる（いるか座の波動）。
+func _wave_hits_enemies(h: int, dt: float) -> void:
+	var t := combat.enemies.table
+	var now := wave_radius(h)
+	var before := minf(hazard_len[h], maxf(0.0, hazard_t[h] - dt - hazard_delay[h]) * hazard_speed[h])
+	var half := hazard_width[h] * 0.5
+	var lo := maxf(before - half, 30.0)
+	var rows := PackedInt32Array()
+	combat.nearby(hazard_pos[h], now + half, rows)
+	for j in rows:
+		if t.dead[j] != 0 or t.meteor_index[j] >= 0:
+			continue
+		var d := t.pos[j] - hazard_pos[h]
+		var dist := d.length()
+		if dist + t.r[j] < lo or dist - t.r[j] > now + half:
+			continue
+		if absf(Geom.angle_diff(d.angle(), hazard_angle[h])) > hazard_arc[h] + t.r[j] / maxf(dist, 1.0):
+			continue
+		combat.damage_enemy(j, hazard_edmg[h], {"cause": &"wave", "dir": d / maxf(dist, 1.0), "knock": 300.0, "no_crit": true})
+		if state.phase != RunState.Phase.PLAY:
+			return
+
 func wave_radius(i: int) -> float:
 	return minf(hazard_len[i], maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
 
@@ -696,6 +718,10 @@ func _update_hazards(dt: float) -> void:
 				or combat.enemies.table.dead[owner] != 0)):
 			hazard_slots.release(i)
 			continue
+		if t >= delay and hazard_kind[i] == HazardKind.WAVE and hazard_edmg[i] > 0.0:
+			_wave_hits_enemies(i, dt)
+			if state.phase != RunState.Phase.PLAY:
+				return
 		if t < delay or hazard_hit[i] != 0:
 			continue
 		var kind := hazard_kind[i]

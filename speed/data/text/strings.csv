@@ -586,6 +586,8 @@ lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づ�
 lab.enemy.rocket.kill,HP を削る,Wear down its HP
 lab.enemy.bomber.move,追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する,Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice
 lab.enemy.bomber.kill,明滅し終わる前に貫けば、爆発させずに倒せる,Pierce it before it finishes blinking to defeat it without an explosion
+lab.enemy.snake.move,小さなヘビ。追ってきて、近づくと一瞬光ってから、その場で小さく噛みつく。弾は出さない,A small snake that chases you and when close flashes for an instant then snaps right where it is. It never shoots
+lab.enemy.snake.kill,普通に倒せる。群れの中で止まらずに駆け抜ける,Falls to ordinary attacks. Keep moving through the crowd instead of stopping
 lab.enemy.volatile.move,追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む（連鎖する）,Chases you. Explodes shortly after defeat and catches enemies and you (chains)
 lab.enemy.volatile.kill,HP を削る。倒したら爆発から離れる,Wear down its HP then get clear of the blast
 lab.enemy.beamer.move,距離を保ち、止まって砲口に光を集めてからビームを撃つ,Keeps its distance and stops to charge its muzzle before firing a beam
@@ -612,12 +614,12 @@ lab.enemy.lynx.move,距離を保ち、潰れた弧の3本の爪痕の斬撃を�
 lab.enemy.lynx.kill,内側の端を左右交互によけながら真ん中を抜けて近づき、本体を普通に倒す。外側からは回り込みにくい,Weave past the inner tips through the middle to close in and defeat the body normally. Going around the outside is hard
 lab.enemy.reticle.move,近くのぼうえんきょう座に付き従う支援機。ぼうえんきょう座と機体の間で視線を遮る小隕石に照準を出し、ビームで壊す。機体は直接攻撃しない。支援先がいなければ退却する,A support craft that follows the nearest telescope. It marks small rocks that block the telescope’s line of sight to the ship and breaks them with a beam. It never attacks the ship directly and retreats when it has no telescope to support
 lab.enemy.reticle.kill,本体を普通に倒して岩陰を守るか、先にぼうえんきょう座を倒して連携を崩す,Defeat it normally to keep your cover or take down the telescope first to break up the pair
-lab.enemy.cross.move,距離を保ち、光を集めてから十字にレーザーを撃つ,Keeps its distance and gathers light before firing a cross of lasers
-lab.enemy.cross.kill,HP を削る,Wear down its HP
+lab.enemy.cross.move,動き回り、機体と縦か横にそろう位置で止まって、予告してから十字のレーザーを撃つ,Roams then stops where it lines up with the ship vertically or horizontally and fires a cross of lasers after a telegraph
+lab.enemy.cross.kill,HP を削る。止まって構えている間が狙い目,Wear down its HP. It is open while it stops to charge
 lab.enemy.clock.move,長針と短針が刃として回り続ける。2本の速さが違う,Its long and short hands spin as blades at different speeds
 lab.enemy.clock.kill,針の隙間から本体を狙う,Hit the body through the gap between the hands
-lab.enemy.dolphin.move,距離を保ち、切れ目のずれた何層もの輪を出す,Keeps its distance and emits layered rings with shifting gaps
-lab.enemy.dolphin.kill,HP を削る,Wear down its HP
+lab.enemy.dolphin.move,距離を保ち、構えて撃つ向きを予告してから、機体の方へ数層の弧の大きな扇の波動を撃つ。当たるのは先頭の1枚だけで、機体にもほかの敵にも当たる。追尾しない,Keeps its distance and after marking its aim fires a big fan of layered arcs toward the ship. Only the leading arc hits and it hits the ship and other enemies alike. It does not home
+lab.enemy.dolphin.kill,群れを射線に挟んで撃たせ、自分は離れる。本体は普通に倒す,Put a crowd in its line of fire then slip away. Defeat the body normally
 lab.enemy.crab.move,近づいてハサミを開き、前方を挟む,Approaches and opens its claws then pinches in front
 lab.enemy.crab.kill,背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる,Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front
 lab.enemy.marlin.move,距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く,Keeps its distance then flashes and darts past you spraying both sides
