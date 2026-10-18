@@ -290,7 +290,7 @@ Main (Node)
 | `roam_phase` | 追跡で動く雑魚（追跡・分裂・戦艦、接近中の `darter`） | 広域移動の周期のずれ |
 | `roam_angle` | 追跡で動く雑魚 | 広域移動の向き |
 | `roam_radius` | 追跡で動く雑魚 | 広域移動の広がり |
-| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`DASH` が水流の間）・`corona`（`DASH` が輪の広がった間） | 行動の段階（動く → 構える・飛ぶ など） |
+| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`DASH` が輪の広がった間） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間。みなみのかんむり座は輪の広がり具合（0〜1） |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
 | `charge` | `gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |

@@ -402,7 +402,17 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
 		var kind := p.hazard_kind[i]
-		if kind == ProjectileManager.HazardKind.BEAM or kind == ProjectileManager.HazardKind.WALL:
+		if kind == ProjectileManager.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
+			# 先へ行くほど広がるビーム（みずがめ座）は、範囲の輪郭を描く
+			var u := Vector2.from_angle(p.hazard_angle[i])
+			var v := Vector2(-u.y, u.x)
+			var w0 := p.flood_half(i, 0.0) * zoom
+			var w1 := p.flood_half(i, p.hazard_len[i]) * zoom
+			var tip := pos + u * p.hazard_len[i] * zoom
+			var outline := PackedVector2Array([pos + v * w0, tip + v * w1, tip - v * w1, pos - v * w0, pos + v * w0])
+			draw_colored_polygon(outline, Color(color, 0.06 if charging else 0.1))
+			draw_polyline(outline, color, 1.5, true)
+		elif kind == ProjectileManager.HazardKind.BEAM or kind == ProjectileManager.HazardKind.WALL:
 			var end := pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)
 			draw_line(pos, end, color, 1.5, true)

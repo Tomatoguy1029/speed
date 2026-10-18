@@ -817,13 +817,13 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		for side: float in [-1.0, 1.0]:
 			var a := t.facing[i] + side * (0.75 if open else 0.35)
 			c.draw_circle(p + Vector2.from_angle(a) * r * 1.15, r * 0.38, Color("#ffb38a") if open else t.color[i])
-	if t.beh[i] == EnemyTable.Beh.AQUARIUS and t.mode[i] == EnemyTable.Mode.DASH:
-		# 太い水流
-		var u := Vector2.from_angle(t.facing[i])
-		var v := Vector2(-u.y, u.x) * float(t.def[i].params.stream_width) * 0.5
-		var a0 := p + u * r
-		var a1 := a0 + u * float(t.def[i].params.stream_len)
-		c.draw_colored_polygon(PackedVector2Array([a0 + v * 0.5, a1 + v, a1 - v, a0 - v * 0.5]), Color(0.45, 0.75, 1.0, 0.22))
+	if t.beh[i] == EnemyTable.Beh.AQUARIUS and t.mode[i] == EnemyTable.Mode.WINDUP:
+		# 瓶の口に水の光が溜まり、照射の間は強く光る
+		var k := t.charge[i]
+		var mouth := p + Vector2.from_angle(t.facing[i]) * r * 0.8
+		var lit := k if k > 0.0 else 1.0
+		c.draw_circle(mouth, r * (0.25 + 0.3 * lit), Color(0.55, 0.85, 1.0, 0.25 + 0.4 * lit))
+		c.draw_circle(mouth, r * (0.12 + 0.14 * lit), Color(0.9, 0.97, 1.0, 0.5 + 0.45 * lit))
 	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.mode[i] == EnemyTable.Mode.WINDUP:
 		# 召喚の間、王冠の光が強まる
 		var k := t.charge[i]
@@ -1232,6 +1232,35 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	_draw_hazards(c, view)
 
 ## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
+## みずがめ座の広がるビーム（行 i）。予告の間は照射する範囲全体を薄く見せ、根元から先へ溜まっていく帯で
+## 照射までの残りを示す。照射の間は範囲全体が明るく光る。
+func _draw_flood(c: CanvasItem, pr: ProjectileManager, i: int, charging: bool, k: float) -> void:
+	var p := pr.hazard_pos[i]
+	var u := Vector2.from_angle(pr.hazard_angle[i])
+	var v := Vector2(-u.y, u.x)
+	var len := pr.hazard_len[i]
+	var col := pr.hazard_color[i]
+	var w0 := pr.flood_half(i, 0.0)
+	var w1 := pr.flood_half(i, len)
+	var area := PackedVector2Array([p + v * w0, p + u * len + v * w1, p + u * len - v * w1, p - v * w0])
+	if charging:
+		c.draw_colored_polygon(area, Color(col, 0.08 + 0.1 * k))
+		var reach := len * k
+		var wr := pr.flood_half(i, reach)
+		c.draw_colored_polygon(PackedVector2Array([p + v * w0, p + u * reach + v * wr, p + u * reach - v * wr, p - v * w0]),
+			Color(col, 0.1 + 0.12 * k))
+		var edge := Color(col.lightened(0.3), 0.35 + 0.45 * k)
+		c.draw_line(area[0], area[1], edge, _px(2.0))
+		c.draw_line(area[3], area[2], edge, _px(2.0))
+		c.draw_line(p + u * reach + v * wr, p + u * reach - v * wr, Color(col.lightened(0.5), 0.6 + 0.3 * k), _px(2.0))
+		return
+	var f := 1.0 - clampf((pr.hazard_t[i] - pr.hazard_delay[i]) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0)
+	c.draw_colored_polygon(area, Color(col, 0.55 * f + 0.15))
+	var core := PackedVector2Array([p + v * w0 * 0.4, p + u * len + v * w1 * 0.45, p + u * len - v * w1 * 0.45, p - v * w0 * 0.4])
+	c.draw_colored_polygon(core, Color(0.92, 0.98, 1.0, 0.65 * f + 0.15))
+	c.draw_line(area[0], area[1], Color(1, 1, 1, 0.8 * f), _px(3.0))
+	c.draw_line(area[3], area[2], Color(1, 1, 1, 0.8 * f), _px(3.0))
+
 func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
 	var alive := pr.hazard_alive
@@ -1247,6 +1276,9 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
 		match pr.hazard_kind[i]:
 			ProjectileManager.HazardKind.BEAM:
+				if pr.hazard_style[i] == ProjectileManager.HazardStyle.FLOOD:
+					_draw_flood(c, pr, i, charging, k)
+					continue
 				if charging:
 					# 砲口に光が集まっていく
 					c.draw_circle(p, _px(4.0) + 10.0 * k, Color(col, 0.25 + 0.5 * k))

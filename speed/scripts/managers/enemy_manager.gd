@@ -977,10 +977,6 @@ func _pulser(i: int, dt: float) -> void:
 
 # ── 強敵（仕様書 11.7・敵一覧） ──────────────────────────────────
 
-## 機体が高速か（なぞり中・勢いの間・速い移動）。引き寄せる力は、高速の機体には効かない。
-func _ship_fast() -> bool:
-	return state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
-
 ## ポンプ座：機体を追いながら周りの敵を吸い込んで圧縮する（buds が吸い込んだ数）。数に応じて胴体が膨らむ。
 ## 満タンになると吸い込みを止めて構え（WINDUP）、向きを固定して圧縮弾を一発撃つ。撃ったあとはしぼむ（RECOVER）。
 func _pump(i: int, dt: float) -> void:
@@ -1544,51 +1540,42 @@ func _marlin(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
-## みずがめ座：遠くに留まり、水瓶を傾けて（予告）から、機体の方へ太い水流を流し続ける。
-## 水流は、中の敵と遅い機体を流れの向きへ押し流す（ダメージはない）。mode が DASH の間が水流。
+## みずがめ座：遠くに留まり、機体の方へ、先へ行くほど広がる極太ビームを扇状に3本、一斉に照射する。
+## 撃つ向きは予告の始めに決め、照射する範囲全体を telegraph の間見せてから、beam_time の間だけ当てる。
+## ビームの間には安全な隙間が残る。WINDUP が予告と照射、RECOVER が照射後の休み。
 func _aquarius(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	match t.mode[i]:
-		EnemyTable.Mode.MOVE:
-			_keep_distance(i, dt)
-			if _gun_timer(i, dt):
-				t.mode[i] = EnemyTable.Mode.DASH
-				t.timer[i] = float(p.pour_time)
-		_:
+		EnemyTable.Mode.WINDUP:
 			_hold(i, dt)
-			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.pour_turn), dt)
 			t.timer[i] -= dt
-			_pour(i, dt)
+			t.charge[i] = clampf(1.0 - (t.timer[i] - float(p.beam_time)) / float(p.telegraph), 0.0, 1.0)
+			if t.timer[i] <= 0.0:
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.rest)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
-
-## みずがめ座の水流で、帯の中の敵と遅い機体を押し流す。
-func _pour(i: int, dt: float) -> void:
-	var t := table
-	var p: Dictionary = t.def[i].params
-	var u := Vector2.from_angle(t.facing[i])
-	var from := t.pos[i] + u * t.r[i]
-	var length := float(p.stream_len)
-	var half := float(p.stream_width) * 0.5
-	var push := u * float(p.push) * dt
-	var rel := state.ship_pos - from
-	var along := rel.dot(u)
-	if along > 0.0 and along < length and absf(rel.cross(u)) < half and not _ship_fast():
-		state.ship_vel += push
-	var rows := PackedInt32Array()
-	var seen := {}
-	var step := half * 1.6
-	var d := 0.0
-	while d < length:
-		rows.clear()
-		projectiles.combat.nearby(from + u * d, half, rows)
-		for j in rows:
-			if j != i and not seen.has(j) and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0 \
-					and t.parent[j] < 0:
-				seen[j] = true
-				t.vel[j] += push
-		d += step
+		_:
+			_keep_distance(i, dt)
+			t.fire_t[i] -= dt
+			if t.fire_t[i] <= 0.0:
+				t.fire_t[i] = float(p.fire_interval)
+				var a := (state.ship_pos - t.pos[i]).angle()
+				t.facing[i] = a
+				var from := t.pos[i] + Vector2.from_angle(a) * t.r[i] * 0.8
+				for k in [-1, 0, 1]:
+					var h := projectiles.fire_flood(from, a + k * float(p.beam_gap), float(p.beam_len), float(p.beam_width),
+						float(p.beam_spread), float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)),
+						t.color[i].lightened(0.25))
+					# 予告中・照射中に倒されたら消える
+					projectiles.attach_hazard(h, i)
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph) + float(p.beam_time)
 
 ## 大きく旋回しながら一定の速さで走る（ぎょしゃ座・わし座）。向きは turn の速さでしか変わらない。
 func _drive(i: int, dt: float) -> void:

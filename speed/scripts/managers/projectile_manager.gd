@@ -88,15 +88,17 @@ var _hostile_updating := false
 var _hostile_clear_pending := false
 
 ## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
-##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる
+##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる。
+##         arc が 0 より大きければ、先へ行くほど左右に arc の角度で広がる（みずがめ座の極太ビーム）
 ##   ZONE：pos を中心に半径 len の円。予告（delay）のあと一瞬弾ける
 ##   WAVE：pos から広がる輪・扇。angle の向きを中心に左右 arc の角度、速さ speed で半径 len まで広がる。
 ##         幅 width。gap_w が 0 より大きければ、gap の向きの左右 gap_w の角度に切れ目がある
 ##   WALL：pos から angle の向きへ長さ len・幅 width の残る線。予告のあと active の間、触れると被弾する
 enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
-## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE }
+## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
+## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -122,7 +124,7 @@ var hazard_owner_id := PackedInt32Array()
 var hazard_edmg := PackedFloat64Array()
 ## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
 var hazard_block := PackedByteArray()
-## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
+## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
 var hazard_gap := PackedFloat32Array()
@@ -565,6 +567,17 @@ func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: 
 		color := Color("#ff5a6e")) -> int:
 	return _add_hazard(HazardKind.BEAM, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
 
+## 先へ行くほど広がるビームを出す。from で幅 width、そこから左右に spread の角度で広がる。
+## 予告（delay）の間は照射する範囲全体を見せ、そのあと active の間だけ当たる。
+func fire_flood(from: Vector2, angle: float, length: float, width: float, spread: float, delay: float, active: float,
+		dmg: float, color := Color("#8fd0ff")) -> int:
+	return _add_hazard(HazardKind.BEAM, HazardStyle.FLOOD, from, angle, length, width, delay, active, dmg, color,
+		0.0, spread)
+
+## 広がるビーム（行 h）の、根元から along の距離での幅の半分。
+func flood_half(h: int, along: float) -> float:
+	return hazard_width[h] * 0.5 + maxf(along, 0.0) * tan(hazard_arc[h])
+
 ## 十字のビームを出す（4方向の fire_beam）。出した4本の行番号を返す。
 func fire_cross(center: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
 		color := Color("#ffe0a0")) -> PackedInt32Array:
@@ -731,9 +744,15 @@ func _update_hazards(dt: float) -> void:
 		match kind:
 			HazardKind.BEAM:
 				var a := hazard_pos[i]
-				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
-				var reach := hazard_width[i] * 0.5 + R
-				hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
+				var u := Vector2.from_angle(hazard_angle[i])
+				if hazard_arc[i] > 0.0:
+					var rel := ship_pos - a
+					var along := rel.dot(u)
+					hit = along > -R and along < hazard_len[i] + R and absf(rel.cross(u)) <= flood_half(i, along) + R
+				else:
+					var b := a + u * hazard_len[i]
+					var reach := hazard_width[i] * 0.5 + R
+					hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
 			HazardKind.ZONE:
 				# 弾けた瞬間だけ当たる（弾けたら hit を 1 にして、以後は見た目だけ）
 				hazard_hit[i] = 1
