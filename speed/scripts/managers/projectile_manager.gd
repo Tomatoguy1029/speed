@@ -565,11 +565,13 @@ func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: 
 		color := Color("#ff5a6e")) -> int:
 	return _add_hazard(HazardKind.BEAM, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
 
-## 十字のビームを出す（4方向の fire_beam）。
+## 十字のビームを出す（4方向の fire_beam）。出した4本の行番号を返す。
 func fire_cross(center: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
-		color := Color("#ffe0a0")) -> void:
+		color := Color("#ffe0a0")) -> PackedInt32Array:
+	var rows := PackedInt32Array()
 	for k in 4:
-		fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color)
+		rows.append(fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color))
+	return rows
 
 ## 遅れて弾ける範囲を出す。center を中心に半径 radius。delay の予告のあと一瞬弾ける。style は見た目。
 ## edmg が 0 より大きければ、弾けたときに範囲の敵にもダメージを与える（誘爆）。

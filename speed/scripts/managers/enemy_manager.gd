@@ -1737,8 +1737,10 @@ func _cross(i: int, dt: float) -> void:
 			t.fire_t[i] -= dt
 			var aligned := minf(absf(d.x), absf(d.y)) <= float(p.align_tol)
 			if aligned and t.fire_t[i] <= 0.0 and d.length() <= float(p.beam_len) * 0.8:
-				projectiles.fire_cross(t.pos[i], 0.0, float(p.beam_len), float(p.beam_width), float(p.telegraph),
-					float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
+				# 本体に付け、予告中・照射中に倒されたらレーザーも消す
+				for h in projectiles.fire_cross(t.pos[i], 0.0, float(p.beam_len), float(p.beam_width), float(p.telegraph),
+						float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3)):
+					projectiles.attach_hazard(h, i)
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph)
 				t.facing[i] = 0.0
