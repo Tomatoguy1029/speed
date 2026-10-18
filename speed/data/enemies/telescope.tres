@@ -32,6 +32,7 @@ params = {
 "lock_fill": 0.9,
 "lock_decay": 0.7,
 "cooldown": 1.4,
+"laser_charge": 0.5,
 "laser_width": 30.0,
 "laser_delay": 0.04,
 "laser_time": 0.18,

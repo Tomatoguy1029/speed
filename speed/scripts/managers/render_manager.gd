@@ -281,6 +281,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 					for s in 4:
 						_burst(a.lerp(b, (s + 0.5) / 4.0), (ev.color as Color).lightened(0.4), 4, Vector2.ZERO, 240.0)
 				shake = maxf(shake, 5.0)
+			&"telescope_charge":
+				_ring(ev.pos, 30.0, Color(1.0, 0.4, 0.3), 0.2)
 			&"telescope_fire":
 				# 太いレーザーの残光と、レンズの閃光
 				var dir := Vector2.from_angle(ev.angle)
@@ -905,6 +907,21 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var reach := rays[n]
 		pts.append(lens + Vector2.from_angle(f - half + 2.0 * half * n / float(count - 1)) * reach)
 		cols.append(Color(col, a0 * (1.0 - reach / length)))
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		# レーザーの溜め：帯がすぼまって赤い照準線になり脈打つ。光の粒がレンズへ吸い込まれ、レンズの光が膨らむ
+		var w := 1.0 - clampf(t.timer[i] / float(dp.laser_charge), 0.0, 1.0)
+		var reach := run.enemies.telescope_reach(i, f)
+		var pulse := 0.5 + 0.5 * sin(state.world_time * (30.0 + 40.0 * w))
+		var tip := lens + Vector2.from_angle(f) * reach
+		c.draw_line(lens, tip, Color(1.0, 0.25, 0.2, 0.25 + 0.35 * pulse), maxf(_px(2.0), 4.0 + 10.0 * w))
+		c.draw_line(lens, tip, Color(1.0, 0.85, 0.8, 0.5 + 0.4 * pulse), maxf(_px(1.0), 1.5 + 2.0 * w))
+		for n in 10:
+			var fr := fmod(w * 3.0 + n / 10.0, 1.0)
+			var q := lens + Vector2.from_angle(n * TAU / 10.0 + w * 4.0) * r * (2.4 - 2.2 * fr)
+			c.draw_circle(q, maxf(_px(1.5), r * 0.07), Color(1.0, 0.45, 0.3, fr))
+		c.draw_circle(lens, r * (0.35 + 0.6 * w), Color(1.0, 0.3, 0.22, 0.35 + 0.3 * pulse))
+		c.draw_circle(lens, r * (0.18 + 0.3 * w), Color(1.0, 0.92, 0.85, 0.9))
+		return
 	c.draw_polygon(pts, cols)
 	# 光が岩に当たって切れている所は、縁を明るくして「ここから先は陰」と分かるようにする
 	for n in range(1, count + 1):

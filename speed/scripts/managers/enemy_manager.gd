@@ -1039,8 +1039,9 @@ var _tele_rays: Dictionary = {}
 ## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。帯はゆっくり回り、
 ## 機体が光の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
 ## 光は隕石・惑星・月で遮られ、その陰では見つからない。狙いの途中でも陰に入れば、狙いはすぐ外れる。
-## 帯は狙いが溜まるほど細くなる。溜まりきった瞬間に、レンズから機体の方へ太いレーザーを撃つ（laser_delay ののち laser_time の間
-## 当たる。光と同じく隕石などで止まる）。撃ったあと cooldown の間は休む（RECOVER）。
+## 帯は狙いが溜まるほど細くなる。溜まりきると laser_charge の間レーザーを溜め（WINDUP。機体を追い続け、岩陰に入られたら取り消す）、
+## 溜め終わりの向きへ太いレーザーを撃つ（laser_delay ののち laser_time の間当たる。光と同じく隕石などで止まる）。
+## 撃ったあと cooldown の間は休む（RECOVER）。
 func _telescope(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
@@ -1058,6 +1059,24 @@ func _telescope(i: int, dt: float) -> void:
 		return
 	_cast_telescope(i)
 	var seen := telescope_sight(i, state.ship_pos)
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		if seen == 2:
+			# 溜めの間に岩陰へ逃げられた：取り消して探し直す
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.charge[i] = 0.0
+			return
+		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
+		t.timer[i] -= dt
+		if t.timer[i] <= 0.0:
+			var lens := telescope_lens(i)
+			var reach := telescope_reach(i, t.facing[i])
+			projectiles.fire_beam(lens, t.facing[i], reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
+				_attack_dmg(i, float(p.bullet_dmg)), Color(1.0, 0.3, 0.25))
+			state.emit(&"telescope_fire", {"pos": lens, "angle": t.facing[i], "length": reach, "width": float(p.laser_width)})
+			t.charge[i] = 0.0
+			t.mode[i] = EnemyTable.Mode.RECOVER
+			t.timer[i] = float(p.cooldown)
+		return
 	if seen == 1:
 		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
 		t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
@@ -1069,15 +1088,9 @@ func _telescope(i: int, dt: float) -> void:
 		t.facing[i] += float(p.sweep_speed) * side * dt
 		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
 	if t.charge[i] >= 1.0:
-		var lens := telescope_lens(i)
-		var a := (state.ship_pos - lens).angle()
-		var reach := telescope_reach(i, a)
-		projectiles.fire_beam(lens, a, reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
-			_attack_dmg(i, float(p.bullet_dmg)), Color(1.0, 0.3, 0.25))
-		state.emit(&"telescope_fire", {"pos": lens, "angle": a, "length": reach, "width": float(p.laser_width)})
-		t.charge[i] = 0.0
-		t.mode[i] = EnemyTable.Mode.RECOVER
-		t.timer[i] = float(p.cooldown)
+		t.mode[i] = EnemyTable.Mode.WINDUP
+		t.timer[i] = float(p.laser_charge)
+		state.emit(&"telescope_charge", {"pos": telescope_lens(i)})
 
 ## ぼうえんきょう座の帯の左右の角度（狙いが溜まるほど細い）。
 func telescope_half(i: int) -> float:
@@ -1941,6 +1954,7 @@ func _lab_admit(i: int, dt: float) -> bool:
 		due = table.buds[i] >= int(p.store_max)
 	elif def.behavior == &"sniper":
 		due = table.charge[i] >= 0.8
+		active = table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER
 	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
 		due = true
 	if not active and due:
