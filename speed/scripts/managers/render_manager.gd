@@ -1281,9 +1281,16 @@ func _flood_half(width: float, spread: float, d: float) -> float:
 ## みずがめ座の水の層（シェーダー water_flood が描く）。予告のさざ波、照射の水流、崩れていく水流と霧、溜めの光。
 func _draw_floods(c: CanvasItem) -> void:
 	var pr := run.projectiles
+	var mat := _flood_layer.material as ShaderMaterial
+	var shaped := false
 	for i in pr.hazard_alive.size():
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileManager.HazardStyle.FLOOD:
 			continue
+		if not shaped:
+			# 帯の中の位置を世界の距離に直す値（みずがめ座はみな同じ形）
+			mat.set_shader_parameter("half0", pr.hazard_width[i] * 0.5)
+			mat.set_shader_parameter("slope", tan(pr.hazard_arc[i]))
+			shaped = true
 		var t := pr.hazard_t[i]
 		var delay := pr.hazard_delay[i]
 		var charging := t < delay
