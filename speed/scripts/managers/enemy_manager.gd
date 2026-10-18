@@ -1237,7 +1237,13 @@ func _clock(i: int, dt: float) -> void:
 func _lynx(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	_keep_distance(i, dt)
+	# 遠くから撃つが、どこから撃っているか見えるように、本体は画面の中に収まる位置を保つ
+	var d := t.pos[i] - _aim
+	var u := d / maxf(d.length(), 1.0)
+	var room := _vh - Vector2.ONE * (t.r[i] + 40.0)
+	var goal := (_aim + u * float(p.keep)).clamp(_vc - room, _vc + room)
+	_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+	_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
 	if _gun_timer(i, dt):
 		var side := lynx_side(i)
 		t.buds[i] += 1
