@@ -352,6 +352,7 @@ func clear_regular() -> void:
 ## 全部の敵を消す（計測・確認用のツールが使う）。
 func clear_all() -> void:
 	slots.clear()
+	_tele_rays.clear()
 	for b in EnemyTable.Beh.size():
 		beh_rows[b].clear()
 	_dead_rows.clear()
@@ -1030,8 +1031,13 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 		t.vel[j] = d / maxf(dist, 1.0) * pull * (0.3 + 0.7 * near)
 		t.facing[j] += spin * (0.4 + 0.6 * near) * dt
 
+## ぼうえんきょう座のサーチライトの光線の数と、光線ごとの届く長さ（敵の id → 長さの並び。帯の右端から左端の順）
+const TELE_RAYS := 48
+var _tele_rays: Dictionary = {}
+
 ## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。帯はゆっくり回り、
-## 機体が帯の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
+## 機体が光の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
+## 光は隕石・惑星・月で遮られ、その陰では見つからない。狙いの途中でも陰に入れば、狙いはすぐ外れる。
 ## 帯は狙いが溜まるほど細くなる。溜まりきった瞬間に機体へ細く速い弾を撃ち、cooldown の間は休む（RECOVER）。
 func _telescope(i: int, dt: float) -> void:
 	var t := table
@@ -1044,12 +1050,19 @@ func _telescope(i: int, dt: float) -> void:
 	if t.mode[i] == EnemyTable.Mode.RECOVER:
 		t.timer[i] -= dt
 		t.facing[i] += float(p.sweep_speed) * side * dt
+		_cast_telescope(i)
 		if t.timer[i] <= 0.0:
 			t.mode[i] = EnemyTable.Mode.MOVE
 		return
-	if telescope_sees(i, state.ship_pos):
+	_cast_telescope(i)
+	var seen := telescope_sight(i, state.ship_pos)
+	if seen == 1:
 		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
 		t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
+	elif seen == 2:
+		# 岩陰に隠れた：狙いを外し、探し直す
+		t.charge[i] = 0.0
+		t.facing[i] += float(p.sweep_speed) * side * dt
 	else:
 		t.facing[i] += float(p.sweep_speed) * side * dt
 		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
@@ -1065,16 +1078,70 @@ func telescope_half(i: int) -> float:
 	var p: Dictionary = table.def[i].params
 	return lerpf(float(p.band_width), float(p.band_narrow), table.charge[i])
 
-## 位置 at が、ぼうえんきょう座（行 i）のサーチライトの帯の中か。休んでいる間は見えない。
-func telescope_sees(i: int, at: Vector2) -> bool:
+## ぼうえんきょう座のサーチライトの光が出る位置（レンズ）。
+func telescope_lens(i: int) -> Vector2:
+	return table.pos[i] + Vector2.from_angle(table.facing[i]) * table.r[i] * 0.9
+
+## ぼうえんきょう座（行 i）の光線を投げ、光線ごとの届く長さを隕石・惑星・月で切って覚える。
+func _cast_telescope(i: int) -> void:
+	var t := table
+	var length := float(t.def[i].params.band_len)
+	var lens := telescope_lens(i)
+	var half := telescope_half(i)
+	# 遮るもの：帯の届く範囲の隕石・鉄のがれきと、惑星・月
+	var blockers: Array = []
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby(lens, length, rows)
+	for j in rows:
+		if t.meteor_index[j] >= 0 and t.dead[j] == 0:
+			blockers.append([t.pos[j], t.r[j]])
+	for b in field.bodies:
+		if b.pos.distance_to(lens) < length + b.r:
+			blockers.append([b.pos, b.r])
+	var rays := PackedFloat32Array()
+	rays.resize(TELE_RAYS)
+	for n in TELE_RAYS:
+		var v := Vector2.from_angle(t.facing[i] - half + 2.0 * half * n / float(TELE_RAYS - 1))
+		var reach := length
+		for blk in blockers:
+			var c: Vector2 = blk[0] - lens
+			var r: float = blk[1]
+			var along := c.dot(v)
+			if along < -r:
+				continue
+			var d2 := c.length_squared() - along * along
+			if d2 > r * r:
+				continue
+			reach = minf(reach, maxf(0.0, along - sqrt(r * r - d2)))
+		rays[n] = reach
+	_tele_rays[t.id[i]] = rays
+
+## ぼうえんきょう座（行 i）の光線ごとの届く長さ（まだ投げていなければ空）。
+func telescope_rays(i: int) -> PackedFloat32Array:
+	return _tele_rays.get(table.id[i], PackedFloat32Array())
+
+## 位置 at が、ぼうえんきょう座（行 i）の光の中か：0 は帯の外、1 は光の中、2 は帯の中だが隕石などの陰。
+## 描く光と同じ光線の長さで判定する。休んでいる間は見えない。
+func telescope_sight(i: int, at: Vector2) -> int:
 	var t := table
 	if t.mode[i] == EnemyTable.Mode.RECOVER:
-		return false
-	var d := at - t.pos[i]
+		return 0
+	var lens := telescope_lens(i)
+	var d := at - lens
 	var dist := d.length()
 	if dist > float(t.def[i].params.band_len) or dist < 1.0:
-		return false
-	return absf(Geom.angle_diff(d.angle(), t.facing[i])) <= telescope_half(i) + atan(cfg.ship_radius / dist)
+		return 0
+	var half := telescope_half(i)
+	var off := Geom.angle_diff(d.angle(), t.facing[i])
+	if absf(off) > half + atan(cfg.ship_radius / dist):
+		return 0
+	var rays := telescope_rays(i)
+	if rays.is_empty():
+		return 1
+	var f := clampf((off + half) / (2.0 * half), 0.0, 1.0) * (TELE_RAYS - 1)
+	var n := mini(int(f), TELE_RAYS - 2)
+	var reach := lerpf(rays[n], rays[n + 1], f - n)
+	return 1 if dist <= reach else 2
 
 ## じょうぎ座：1体の定規として現れ、split_delay たつと二つに分かれる（buds が左右の印 1・-1。0 は分かれる前）。
 ## 2体は、機体の方へ向かう縦か横の軸（facing）をそろえ、機体を左右から挟む位置へ展開する（DASH）。
@@ -1164,20 +1231,23 @@ func _clock(i: int, dt: float) -> void:
 	projectiles.move_hazard(links[0], t.pos[i], a0)
 	projectiles.move_hazard(links[1], t.pos[i], a1)
 
-## やまねこ座：距離を保ち、間隔ごとに両前足を構えて（charge が構えの進み）、本体を左右から守るように斬撃を2組飛ばし続ける。
-## 2組は機体への線から左右へ lane_half ずつ離れ、湾曲した爪痕を外側へふくらませて、真ん中の通り道を挟む。
-## 斬撃は撃ったときの機体の向きへ形を保って直進し、追尾しない。横へ逃げずに真ん中を抜けて本体へ近づかせる。
+## やまねこ座：距離を保ち、間隔ごとに前足を構えて（charge が構えの進み）、片側1組の斬撃を左右交互に飛ばし続ける
+## （buds が撃った数）。斬撃は真ん中の少し先から外側へ伸び、外側で本体の方へ反り上がる。撃ったときの機体の向きへ
+## 形を保って直進し、追尾しない。内側の端を左右交互によけて真ん中を抜けさせ、外側からの回り込みを難しくする。
 func _lynx(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	_keep_distance(i, dt)
 	if _gun_timer(i, dt):
+		var side := lynx_side(i)
+		t.buds[i] += 1
 		var a := (state.ship_pos - t.pos[i]).angle()
-		var u := Vector2.from_angle(a)
-		var n := Vector2(-u.y, u.x)
-		for side: float in [1.0, -1.0]:
-			projectiles.fire_slash(t.pos[i] + u * t.r[i] + n * side * float(p.lane_half), a, float(p.slash_speed),
-				float(p.slash_r), float(p.slash_range), _attack_dmg(i, float(p.bullet_dmg)), side)
+		projectiles.fire_slash(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.slash_speed), float(p.slash_size),
+			float(p.slash_range), _attack_dmg(i, float(p.bullet_dmg)), side)
+
+## やまねこ座が次に斬撃を伸ばす側（1 か -1。構えの見た目にも使う）。
+func lynx_side(i: int) -> float:
+	return 1.0 if table.buds[i] % 2 == 0 else -1.0
 
 ## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
 ## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。
@@ -1463,6 +1533,8 @@ func on_enemy_death(i: int, atk: float) -> void:
 	var prior_context := projectiles.lab_context
 	if projectiles.director != null:
 		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
+	if t.beh[i] == EnemyTable.Beh.SNIPER:
+		_tele_rays.erase(t.id[i])
 	if t.beh[i] == EnemyTable.Beh.PUMP:
 		var full := float(t.buds[i]) / float(dp.store_max)
 		projectiles.burst_debris(t.pos[i], int(dp.release_base) + int(float(dp.release_per) * float(t.buds[i])),

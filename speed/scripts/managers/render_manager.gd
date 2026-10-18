@@ -871,29 +871,38 @@ func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_arc(p, r * 1.18, a, a + 0.8 * ready, 8, Color(col, 0.6 * ready), _px(2.0))
 
 ## ぼうえんきょう座：レンズから伸びるサーチライトの帯。狙いが溜まるほど細く赤くなり、本体の周りの輪が狙いの溜まり具合を示す。
-## 機体が帯の中にいる間は帯がちらついて明るくなる。撃ったあとの休みの間は暗い。
+## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。光が当たった岩の縁は明るく光る。
+## 機体が光の中にいる間は帯がちらついて明るくなる。撃ったあとの休みの間は暗い。
 func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var dp: Dictionary = t.def[i].params
 	var k := t.charge[i]
 	var f := t.facing[i]
-	var lens := p + Vector2.from_angle(f) * r * 0.9
+	var lens := run.enemies.telescope_lens(i)
 	var half := run.enemies.telescope_half(i)
 	var length := float(dp.band_len)
+	var rays := run.enemies.telescope_rays(i)
 	var col := Color(0.62, 0.9, 1.0).lerp(Color(1.0, 0.22, 0.2), k)
 	var resting := t.mode[i] == EnemyTable.Mode.RECOVER
-	var seen := run.enemies.telescope_sees(i, state.ship_pos)
+	var seen := run.enemies.telescope_sight(i, state.ship_pos) == 1
 	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 * (0.5 + 0.5 * sin(state.world_time * 40.0)) if seen else 0.0)
+	var count := rays.size()
+	if count < 2:
+		return
 	var pts := PackedVector2Array([lens])
 	var cols := PackedColorArray([Color(col, a0)])
-	for n in 13:
-		var a := f - half + 2.0 * half * n / 12.0
-		pts.append(p + Vector2.from_angle(a) * length)
-		cols.append(Color(col, 0.0))
+	for n in count:
+		var reach := rays[n]
+		pts.append(lens + Vector2.from_angle(f - half + 2.0 * half * n / float(count - 1)) * reach)
+		cols.append(Color(col, a0 * (1.0 - reach / length)))
 	c.draw_polygon(pts, cols)
-	for s: float in [-1.0, 1.0]:
-		c.draw_line(lens, p + Vector2.from_angle(f + s * half) * length * 0.7, Color(col, a0 * 1.6), _px(1.5))
+	# 光が岩に当たって切れている所は、縁を明るくして「ここから先は陰」と分かるようにする
+	for n in range(1, count + 1):
+		if rays[n - 1] < length - 1.0:
+			c.draw_circle(pts[n], maxf(_px(1.5), 3.0), Color(col.lightened(0.4), minf(1.0, a0 * 3.0)))
+	c.draw_line(lens, pts[1], Color(col, a0 * 1.6), _px(1.5))
+	c.draw_line(lens, pts[count], Color(col, a0 * 1.6), _px(1.5))
 	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
 	if k > 0.0:
 		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
@@ -917,18 +926,16 @@ func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	elif t.mode[i] == EnemyTable.Mode.DASH and t.buds[i] != 0:
 		c.draw_circle(tip, r * 0.18, Color(col, 0.6))
 
-## やまねこ座の斬撃：湾曲した3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
-func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, arc_r: float, side: float, a: float) -> void:
-	var span := ProjectileManager.SLASH_SPAN
-	var thick := ProjectileManager.SLASH_THICK * arc_r
-	var angle := ProjectileManager.slash_bulge(travel, side)
+## やまねこ座の斬撃：潰れた弧の3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
+func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
+	var thick := ProjectileManager.SLASH_THICK * size
 	for k in 3:
-		var center := ProjectileManager.slash_center(pos, travel, arc_r, k, side)
-		c.draw_arc(center, arc_r, angle - span, angle + span, 20, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
-		c.draw_arc(center, arc_r, angle - span * 0.96, angle + span * 0.96, 20, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
-		c.draw_arc(center, arc_r, angle - span * 0.8, angle + span * 0.8, 20, Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
+		var pts := ProjectileManager.slash_points(pos, travel, size, side, k)
+		c.draw_polyline(pts, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
+		c.draw_polyline(pts, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
+		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
 
-## やまねこ座：構えると、両前足に外側へふくらむ爪痕の光が強まる。
+## やまねこ座：構えると、次に斬撃を伸ばす側の前足に、爪痕の光が強まる。
 func _draw_lynx(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var k := t.charge[i]
 	if k <= 0.0:
@@ -936,10 +943,10 @@ func _draw_lynx(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var r := t.r[i]
 	var f := t.facing[i]
 	var u := Vector2.from_angle(f)
-	for side: float in [1.0, -1.0]:
-		var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * side * r * 0.9
-		c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
-		_draw_slash(c, paw, f, r * (0.3 + 0.3 * k), side, 0.3 + 0.7 * k)
+	var side := run.enemies.lynx_side(i)
+	var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * side * r * 0.6
+	c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
+	_draw_slash(c, paw, f, r * (0.5 + 0.5 * k), side, 0.3 + 0.7 * k)
 
 ## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
 const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]

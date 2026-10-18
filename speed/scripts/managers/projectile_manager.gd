@@ -42,14 +42,21 @@ var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
 ## SHELL はポンプ座の圧縮弾。直進し、届く距離を飛ぶか何かに当たると、その場で大きく破裂する（破裂が当たる）
-## SLASH はやまねこ座の斬撃。湾曲した3本の爪痕をひと組にして、形を保ったまま直進する。hostile_r が爪痕の弧の半径、
-## hostile_turn が爪痕のふくらむ側（進む向きに対して 1 なら左、-1 なら右。通り道の外側へふくらむ）
+## SLASH はやまねこ座の斬撃。片側1組の、潰れた弧の3本の爪痕。真ん中の少し先から外側へ横に伸び、外側で本体の方へ反り上がる。
+## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
 enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH }
 const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash"]
-## 斬撃の爪痕の形（弧の半径に対する割合）：弧の左右の角度、太さ、3本の爪痕の間隔
-const SLASH_SPAN := 0.62
-const SLASH_THICK := 0.13
-const SLASH_GAP := 0.36
+## 斬撃の爪痕の形。横の大きさ（hostile_r）に対する割合：縦の大きさ、爪痕どうしの間隔、外側の爪痕ほど縦に伸びる量、
+## 真ん中を越えて伸びる量、太さ。爪痕は楕円の弧で、本体の方を上・伸びる側を右にしたとき SLASH_FROM の角度（−100°）から
+## 反り上がる。外側（機体側）の爪痕ほど反り上がりが長く（SLASH_RISE ずつ先まで回り込む）、外からの回り込みを防ぐ
+const SLASH_TALL := 0.48
+const SLASH_STEP := 0.15
+const SLASH_STRETCH := 0.22
+const SLASH_INNER := 0.12
+const SLASH_THICK := 0.07
+const SLASH_FROM := -100.0 * PI / 180.0
+const SLASH_RISE := 16.0 * PI / 180.0
+const SLASH_SAMPLES := 16
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -372,32 +379,44 @@ func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burs
 	hostile_burst[h] = burst
 	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
 
-## やまねこ座の斬撃を飛ばす。from から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
-## arc_r は爪痕の弧の半径、side は爪痕のふくらむ側（進む向きに対して 1 なら左、-1 なら右）。
-func fire_slash(from: Vector2, angle: float, speed: float, arc_r: float, range: float, dmg: float, side: float) -> void:
+## やまねこ座の斬撃を飛ばす。from（真ん中の先端）から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
+## size は爪痕の横の大きさ、side は伸びる側（進む向きに対して 1 なら左、-1 なら右）。
+func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: float, dmg: float, side: float) -> void:
 	var u := Vector2.from_angle(angle)
-	_add_hostile(from, u * speed, speed, arc_r, range / maxf(speed, 1.0), dmg, 0.0, side, HostileKind.SLASH)
+	_add_hostile(from, u * speed, speed, size, range / maxf(speed, 1.0), dmg, 0.0, side, HostileKind.SLASH)
 	state.emit(&"shoot", {"pos": from, "kind": &"slash"})
 
-## 斬撃の爪痕がふくらむ向き（進む向き angle を、side の側へ直角に回した向き）。
-static func slash_bulge(angle: float, side: float) -> float:
-	return angle + side * PI / 2.0
+## 斬撃の k 本目（0〜2）の爪痕の点（斬撃の向きの座標。x が伸びる側、y が本体の方。横の大きさ 1）。k が大きいほど外側（機体側）。
+static func slash_local(k: int) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var a := 1.0 + SLASH_STEP * float(k)
+	var b := SLASH_TALL + (SLASH_STEP + SLASH_STRETCH) * float(k)
+	var center := Vector2(SLASH_INNER, SLASH_TALL + SLASH_STRETCH * float(k))
+	for n in SLASH_SAMPLES + 1:
+		var phi := lerpf(SLASH_FROM, SLASH_RISE * float(k), float(n) / SLASH_SAMPLES)
+		pts.append(center + Vector2(a * cos(phi), b * sin(phi)))
+	return pts
 
-## 斬撃（位置 pos、進む向き angle、弧の半径 arc_r、ふくらむ側 side）の k 本目（0〜2）の爪痕の弧の中心。
-## 3本の爪痕は、ふくらむ向きに SLASH_GAP ずつずれて重なる。
-static func slash_center(pos: Vector2, angle: float, arc_r: float, k: int, side: float) -> Vector2:
-	var u := Vector2.from_angle(slash_bulge(angle, side))
-	return pos + u * (float(k - 1) * SLASH_GAP * arc_r - arc_r)
+## 斬撃（真ん中の先端 pos、進む向き angle、横の大きさ size、伸びる側 side）の k 本目の爪痕の点（世界の座標）。
+static func slash_points(pos: Vector2, angle: float, size: float, side: float, k: int) -> PackedVector2Array:
+	var u := Vector2.from_angle(angle)
+	var across := Vector2(-u.y, u.x) * side
+	var pts := slash_local(k)
+	for n in pts.size():
+		pts[n] = pos + (across * pts[n].x - u * pts[n].y) * size
+	return pts
 
 ## 位置 at（半径 reach の円）が斬撃の爪痕のどれかに触れているか。
-static func slash_touches(pos: Vector2, angle: float, arc_r: float, side: float, at: Vector2, reach: float) -> bool:
-	var bulge := slash_bulge(angle, side)
+static func slash_touches(pos: Vector2, angle: float, size: float, side: float, at: Vector2, reach: float) -> bool:
+	var u := Vector2.from_angle(angle)
+	var d := at - pos
+	var local := Vector2(d.dot(Vector2(-u.y, u.x)) * side, -d.dot(u)) / size
+	var m := (SLASH_THICK * 0.5 * size + reach) / size
 	for k in 3:
-		var d := at - slash_center(pos, angle, arc_r, k, side)
-		var dist := d.length()
-		if absf(dist - arc_r) <= SLASH_THICK * arc_r * 0.5 + reach \
-				and absf(Geom.angle_diff(d.angle(), bulge)) <= SLASH_SPAN + reach / arc_r:
-			return true
+		var pts := slash_local(k)
+		for n in range(1, pts.size()):
+			if Geometry2D.get_closest_point_to_segment(local, pts[n - 1], pts[n]).distance_squared_to(local) <= m * m:
+				return true
 	return false
 
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
