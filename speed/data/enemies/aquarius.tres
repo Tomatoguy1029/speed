@@ -21,7 +21,7 @@ params = {
 "beam_len": 2200.0,
 "beam_spread": 0.32,
 "beam_time": 3.0,
-"beam_width": 70.0,
+"beam_width": 0.0,
 "beams": 6,
 "bullet_dmg": 20.0,
 "fire_interval": 11.0,

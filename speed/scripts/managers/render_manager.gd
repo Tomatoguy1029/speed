@@ -120,6 +120,8 @@ func _ready() -> void:
 	_flood_layer.draw_fn = Callable(self, "_draw_floods")
 	var flood_mat := ShaderMaterial.new()
 	flood_mat.shader = load("res://shaders/water_flood.gdshader")
+	# ノイズは作っておいた画像を使い回す
+	flood_mat.set_shader_parameter("noise_tex", load("res://assets/fx/water_noise.png"))
 	_flood_layer.material = flood_mat
 	world.add_child(_flood_layer)
 	_build_batches()
@@ -1289,9 +1291,10 @@ func _draw_floods(c: CanvasItem) -> void:
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileManager.HazardStyle.FLOOD:
 			continue
 		if not shaped:
-			# 帯の中の位置を世界の距離に直す値（みずがめ座はみな同じ形）
+			# ビームの形（みずがめ座はみな同じ形）
 			mat.set_shader_parameter("half0", pr.hazard_width[i] * 0.5)
 			mat.set_shader_parameter("slope", tan(pr.hazard_arc[i]))
+			mat.set_shader_parameter("beam_len", pr.hazard_len[i])
 			shaped = true
 		var t := pr.hazard_t[i]
 		var delay := pr.hazard_delay[i]
@@ -1313,28 +1316,18 @@ func _draw_floods(c: CanvasItem) -> void:
 				_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0 / 3.0, collapse, seed)
 			_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0, life * (1.0 - collapse * 0.6), seed)
 
-## 広がるビーム1本ぶんの帯を、根元から先へ細かく区切って描く（シェーダーへ渡す UV と色は water_flood の決まり）。
-## 両端の外に、飛沫を描く余白を足す。先の方は薄くする。
+## 広がるビーム1本ぶんを、本体の中心 p を頂点とする三角形1枚で描く（どのビームも本体の中心の一点に集まる）。
+## UV はビームの向きに沿った距離と横のずれ（世界の単位の 1/1000、shader water_flood の決まり）。両端の外に飛沫の余白を足す。
 func _water_strip(c: CanvasItem, p: Vector2, angle: float, length: float, width: float, spread: float,
 		mode: float, strength: float, seed: float) -> void:
-	const SEGMENTS := 24
 	const MARGIN := 1.12
 	var u := Vector2.from_angle(angle)
 	var v := Vector2(-u.y, u.x)
-	var prev_d := 0.0
-	var prev_h := _flood_half(width, spread, 0.0) * MARGIN
-	for j in range(1, SEGMENTS + 1):
-		var d := length * float(j) / SEGMENTS
-		var h := _flood_half(width, spread, d) * MARGIN
-		var a0 := 1.0 - smoothstep(0.7, 1.0, prev_d / length)
-		var a1 := 1.0 - smoothstep(0.7, 1.0, d / length)
-		var c0 := Color(mode, strength, seed, a0)
-		var c1 := Color(mode, strength, seed, a1)
-		c.draw_polygon(PackedVector2Array([p + u * prev_d + v * prev_h, p + u * d + v * h, p + u * d - v * h, p + u * prev_d - v * prev_h]),
-			PackedColorArray([c0, c1, c1, c0]),
-			PackedVector2Array([Vector2(prev_d / 1000.0, MARGIN), Vector2(d / 1000.0, MARGIN), Vector2(d / 1000.0, -MARGIN), Vector2(prev_d / 1000.0, -MARGIN)]))
-		prev_d = d
-		prev_h = h
+	var h := _flood_half(width, spread, length) * MARGIN
+	var col := Color(mode, strength, seed, 1.0)
+	c.draw_polygon(PackedVector2Array([p, p + u * length + v * h, p + u * length - v * h]),
+		PackedColorArray([col, col, col]),
+		PackedVector2Array([Vector2.ZERO, Vector2(length, h) / 1000.0, Vector2(length, -h) / 1000.0]))
 
 func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
