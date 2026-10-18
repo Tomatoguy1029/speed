@@ -264,6 +264,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 				if swallows.size() < 120:
 					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
+			&"gem_burst":
+				_ring(ev.pos, float(ev.r) * 2.4, Color("#ffe27a"), 0.3)
+				_burst(ev.pos, Color("#ffd23f"), 14, Vector2.ZERO, 360.0)
 			&"summon_mark":
 				summon_marks.append({"pos": ev.pos, "king": ev.king, "color": ev.color, "life": ev.life, "max": ev.life})
 			&"cepheus_summon":

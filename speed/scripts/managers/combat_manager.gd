@@ -282,7 +282,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 ## 行 i の敵にダメージを与える。opts：crit（なければ確率で判定）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var t := enemies.table
-	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY:
+	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY or t.guard[i] > 0.0:
 		return
 	var cause: StringName = opts.get("cause", &"")
 	# 体当たりの通り抜けは collide_ship で扱う。ここでは、条件を満たさない攻撃のダメージを止める

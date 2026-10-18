@@ -81,6 +81,8 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	t.facing[i] = opts.get("facing", 0.0)
 	t.spin[i] = opts.get("spin", 0.0)
 	t.hit_cd[i] = opts.get("hit_cd", 0.0)
+	t.guard[i] = opts.get("guard", 0.0)
+	t.knock_t[i] = opts.get("knock", 0.0)
 	t.weak_arc[i] = def.weak_arc
 	t.gate[i] = GATE.get(def.gate, EnemyTable.Gate.NONE)
 	t.color[i] = def.color
@@ -218,6 +220,7 @@ func _reset_row(i: int) -> void:
 	t.weak_arc[i] = 0.0
 	t.color[i] = Color.WHITE
 	t.hit_cd[i] = 0.0
+	t.guard[i] = 0.0
 	t.flash[i] = 0.0
 	t.age[i] = 0.0
 	t.hull_scattered[i] = 0
@@ -447,6 +450,7 @@ func _tick_chase(dt: float) -> void:
 	var facing := t.facing
 	var age := t.age
 	var hit_cd := t.hit_cd
+	var guard := t.guard
 	var flash := t.flash
 	var dead := t.dead
 	var shove_time := t.shove_time
@@ -473,6 +477,8 @@ func _tick_chase(dt: float) -> void:
 		age[i] = a
 		if hit_cd[i] > 0.0:
 			hit_cd[i] -= dt
+		if guard[i] > 0.0:
+			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
@@ -523,6 +529,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var vel := t.vel
 	var age := t.age
 	var hit_cd := t.hit_cd
+	var guard := t.guard
 	var flash := t.flash
 	var dead := t.dead
 	var shove_time := t.shove_time
@@ -542,6 +549,8 @@ func _tick_behavior(b: int, dt: float) -> void:
 		age[i] += dt
 		if hit_cd[i] > 0.0:
 			hit_cd[i] -= dt
+		if guard[i] > 0.0:
+			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
@@ -1853,7 +1862,8 @@ func on_enemy_death(i: int, atk: float) -> void:
 	for k in n:
 		var a := facing + PI / 2.0 + TAU * float(k) / float(n) if n > 2 else facing + (1.0 if k == 1 else -1.0) * PI / 2.0
 		spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i],
-			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35})
+			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35,
+			"guard": float(p.get("split_guard", 0.0)), "knock": float(p.get("split_guard", 0.0))})
 
 ## 分裂などで増えた敵を、個体数の上限の範囲で出す（仕様書 11.3）。
 func _flush_new() -> void:

@@ -50,6 +50,8 @@ var gate := PackedByteArray()
 var color := PackedColorArray()
 ## 同じ敵に続けて当たらない時間、被弾の光、年齢
 var hit_cd := PackedFloat64Array()
+## 生まれてから攻撃を受けない残り時間（分裂体が、親を倒した攻撃で一緒に倒れないように）
+var guard := PackedFloat64Array()
 var flash := PackedFloat64Array()
 var age := PackedFloat64Array()
 ## 大型の敵の撃破で、破片を飛ばし終えたか

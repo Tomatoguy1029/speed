@@ -16,6 +16,9 @@ var gem_value := PackedFloat64Array()
 var gem_pulled := PackedByteArray()
 ## 落ちた順の通し番号。上限を超えたとき、いちばん古い結晶を選ぶのに使う
 var gem_seq := PackedInt32Array()
+## はじけ飛んでいる結晶の速さと、拾えるようになるまでの残り時間（分裂する雑魚の撃破など。ふつうは 0）
+var gem_vel := PackedVector2Array()
+var gem_wait := PackedFloat32Array()
 var gem_slots: RowSlots
 ## 1 なら使用中の行
 var coin_alive := PackedByteArray()
@@ -60,11 +63,16 @@ func on_enemy_killed(i: int) -> void:
 	var danger := field.danger_at(pos.length())
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
-	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けてその場に落とす
+	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けて、その場からはじけ飛ばす
 	var value := t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger)
 	var gems := int(t.def[i].params.get("gem_count", 1)) if t.def[i] != null else 1
-	for k in gems:
-		drop_gem(pos + (Vector2.from_angle(TAU * k / float(gems)) * t.r[i] * 0.5 if gems > 1 else Vector2.ZERO), value / float(gems))
+	if gems > 1:
+		for k in gems:
+			var u := Vector2.from_angle(TAU * k / float(gems) + state.rng.randf() * 0.5)
+			fling_gem(pos + u * t.r[i] * 0.3, value / float(gems), u * state.rng.randf_range(240.0, 380.0), 0.35)
+		state.emit(&"gem_burst", {"pos": pos, "r": t.r[i]})
+	else:
+		drop_gem(pos, value)
 	if t.carry[i] > 0.0:
 		# からす座が運んでいた経験値を、倒した場所へまとめて落とす
 		var n := clampi(t.buds[i], 1, 16)
@@ -85,14 +93,20 @@ func on_enemy_killed(i: int) -> void:
 	if state.rng.randf() < chance:
 		_add_capsule(Pickup.Kind.CACHE, &"drop", pos, build.xp_needed() * cfg.capsule_xp_frac)
 
-func drop_gem(p: Vector2, v: float) -> void:
+func drop_gem(p: Vector2, v: float) -> int:
 	if gem_slots.live > cfg.gem_max:
 		# いちばん古い結晶を、新しい結晶にまとめる
 		var oldest := _pop_oldest_gem()
 		if oldest >= 0:
 			v += gem_value[oldest]
 			gem_slots.release(oldest)
-	_add_gem(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0, v)
+	return _add_gem(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0, v)
+
+## 結晶を p から速さ vel ではじけ飛ばす。wait 世界秒たつまでは拾えず、勢いが落ちながら散らばる。
+func fling_gem(p: Vector2, v: float, vel: Vector2, wait: float) -> void:
+	var i := drop_gem(p, v)
+	gem_vel[i] = vel
+	gem_wait[i] = wait
 
 ## 結晶を1行加え、その行番号を返す。空いた行を使い回すので、gem_ の全部の列をここで書き直す。
 func _add_gem(p: Vector2, v: float) -> int:
@@ -100,6 +114,8 @@ func _add_gem(p: Vector2, v: float) -> int:
 	gem_pos[i] = p
 	gem_value[i] = v
 	gem_pulled[i] = 0
+	gem_vel[i] = Vector2.ZERO
+	gem_wait[i] = 0.0
 	gem_seq[i] = _gem_next_seq
 	_gem_queue_row.append(i)
 	_gem_queue_seq.append(_gem_next_seq)
@@ -206,6 +222,7 @@ func _spawn_cores(dt: float) -> void:
 # ── 拾う ──────────────────────────────────────────────────────────
 
 func _collect_gems(dt: float) -> void:
+	_fly_gems(dt)
 	_crow_gather(dt)
 	var reach := cfg.ship_radius + 14.0
 	var radius := state.stats.pickup_radius
@@ -216,6 +233,8 @@ func _collect_gems(dt: float) -> void:
 	var ship_pos := state.ship_pos
 	for i in gem_alive.size():
 		if gem_alive[i] == 0:
+			continue
+		if gem_wait[i] > 0.0:
 			continue
 		var p := gem_pos[i]
 		var pulled := gem_pulled[i]
@@ -230,6 +249,15 @@ func _collect_gems(dt: float) -> void:
 			build.add_xp(gem_value[i])
 			state.emit(&"pickup", {"kind": &"gem"})
 			gem_slots.release(i)
+
+## はじけ飛んでいる結晶を動かす。勢いは落ちていき、拾えるようになるまでの時間を減らす。
+func _fly_gems(dt: float) -> void:
+	for i in gem_alive.size():
+		if gem_alive[i] == 0 or gem_wait[i] <= 0.0:
+			continue
+		gem_pos[i] += gem_vel[i] * dt
+		gem_vel[i] *= exp(-dt * 5.0)
+		gem_wait[i] -= dt
 
 ## からす座が、横を通り過ぎる経験値の結晶を拾う（敵の表の carry に足す）。拾うのは、体の真横から少し後ろまでにあり、
 ## 左右 gather_width の中にある結晶。前方の結晶は、横に来るまで拾わない。拾った結晶は足元の束へ飛び込む。
@@ -251,7 +279,7 @@ func _crow_gather(dt: float) -> void:
 		var u := Vector2.from_angle(t.facing[j])
 		var feet := t.pos[j] - u * t.r[j] * 0.62
 		for i in gem_alive.size():
-			if gem_alive[i] == 0 or gem_pulled[i] != 0:
+			if gem_alive[i] == 0 or gem_pulled[i] != 0 or gem_wait[i] > 0.0:
 				continue
 			var rel := gem_pos[i] - t.pos[j]
 			if rel.length_squared() >= reach_sq:
