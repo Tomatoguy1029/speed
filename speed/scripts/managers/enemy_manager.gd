@@ -1540,7 +1540,8 @@ func _marlin(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
-## みずがめ座：遠くに留まり、先へ行くほど広がる極太ビームを全方位へ beams 本、等間隔で一斉に照射する。
+## みずがめ座：瓶の口をいつも機体へ向けたまま機体へ近づき、approach の距離まで来たら、
+## 先へ行くほど広がる極太ビームを全方位へ beams 本、等間隔で一斉に照射する。
 ## 1本は機体の方を向く。撃つ向きは予告の始めに決め、telegraph の間は溜めながら通り道に水の流れを流して予告し、
 ## 撃つと beam_time の間だけ当てる。溜めの間はだんだん遅くなって止まり、瓶の口を機体の方へ向ける。
 ## ビームの間には安全な隙間が残る。WINDUP が溜め・予告と照射、RECOVER が照射後の休み。
@@ -1568,11 +1569,18 @@ func _aquarius(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 		_:
-			_keep_distance(i, dt)
+			# 機体の方へ、approach の距離の所まで寄る。瓶の口はいつも機体を向く
+			var to_ship := state.ship_pos - t.pos[i]
+			var dist := to_ship.length()
+			var approach := float(p.approach)
+			var goal := state.ship_pos - to_ship / maxf(dist, 1.0) * approach
+			var speed := t.speed[i] * clampf((dist - approach) / 200.0, 0.0, 1.0)
+			_steer_to(i, goal, speed, t.def[i].accel, dt)
+			_turn_toward(i, to_ship.angle(), t.turn[i], dt)
 			t.fire_t[i] -= dt
-			if t.fire_t[i] <= 0.0:
+			if t.fire_t[i] <= 0.0 and dist <= approach * 1.25:
 				t.fire_t[i] = float(p.fire_interval)
-				var a := (state.ship_pos - t.pos[i]).angle()
+				var a := to_ship.angle()
 				var n := int(p.beams)
 				# 照射の瞬間の衝撃と、照射後に崩れて残る水しぶきの演出（描画が本体の生存を確かめる）
 				state.emit(&"aquarius_aim", {"pos": t.pos[i], "angle": a, "count": n, "length": float(p.beam_len),
