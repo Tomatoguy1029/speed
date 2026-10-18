@@ -74,7 +74,9 @@ var summon_marks: Array = []
 ## みずがめ座の照射の演出（照射の瞬間の衝撃と、照射後に崩れて残る水しぶき）。t は狙ってからの時間、end は照射の終わり
 var floods: Array = []
 ## 照射が終わってから、水の流れが細くなって崩れ、霧と水滴が消えるまでの時間
-const FLOOD_TAIL := 1.1
+const FLOOD_TAIL := 1.4
+## みずがめ座の水を描く層（シェーダー water_flood）
+var _flood_layer: DrawLayer
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -111,10 +113,21 @@ func _ready() -> void:
 	_path_band = DrawLayer.new()
 	_path_band.draw_fn = Callable(self, "_draw_path_band")
 	_path_band_group.add_child(_path_band)
+	# みずがめ座の水はシェーダーで描く。頂点の色で描き方を渡すので、色を変える modulate の掛からない層にする
+	_flood_layer = DrawLayer.new()
+	_flood_layer.name = "Flood"
+	_flood_layer.z_index = _layers.projectiles.z_index + 1
+	_flood_layer.draw_fn = Callable(self, "_draw_floods")
+	var flood_mat := ShaderMaterial.new()
+	flood_mat.shader = load("res://shaders/water_flood.gdshader")
+	_flood_layer.material = flood_mat
+	world.add_child(_flood_layer)
 	_build_batches()
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust])
+	if not pipeline.rich:
+		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
@@ -223,6 +236,7 @@ func _process(delta: float) -> void:
 	pipeline.step(dt, _camera.position, cam_zoom)
 	for layer in _layers.values():
 		layer.queue_redraw()
+	_flood_layer.queue_redraw()
 	_path_band_group.visible = state.drawing or state.tracing
 	_path_band_group.self_modulate = Color(1, 1, 1, 0.25 if state.drawing else 0.18)
 	_path_band.queue_redraw()
@@ -438,7 +452,6 @@ func _update_floods(dt: float) -> void:
 				var col: Color = f.color
 				shake = maxf(shake, 16.0)
 				pipeline.add_wave(f.pos, 800.0, 0.7)
-				_ring(f.pos, 110.0, col.lightened(0.5), 0.4)
 				_burst(f.pos, col.lightened(0.3), 36, Vector2.ZERO, 760.0)
 		elif f.t < float(f.end):
 			if not alive:
@@ -853,8 +866,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		for side: float in [-1.0, 1.0]:
 			var a := t.facing[i] + side * (0.75 if open else 0.35)
 			c.draw_circle(p + Vector2.from_angle(a) * r * 1.15, r * 0.38, Color("#ffb38a") if open else t.color[i])
-	if t.beh[i] == EnemyTable.Beh.AQUARIUS and t.mode[i] == EnemyTable.Mode.WINDUP:
-		_draw_aquarius_gather(c, t, i)
 	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.mode[i] == EnemyTable.Mode.WINDUP:
 		# 召喚の間、王冠の光が強まる
 		var k := t.charge[i]
@@ -1263,154 +1274,68 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	_draw_hazards(c, view)
 
 ## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
-## 0〜1 の決まった乱数（n ごとに同じ値）。演出の粒の配置に使う。
-func _hash01(n: float) -> float:
-	return fposmod(sin(n * 12.9898) * 43758.5453, 1.0)
-
-## みずがめ座の溜め：周りから光の粒が瓶の口へ集まり、口がだんだん明るくなる。照射の間は口が強く光る。
-func _draw_aquarius_gather(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var k := t.charge[i]
-	var mouth := p + Vector2.from_angle(t.facing[i]) * r * 0.8
-	var firing := k >= 1.0
-	if not firing:
-		var now := state.world_time
-		var n := 10 + int(22.0 * k)
-		for j in n:
-			var seed := float(t.id[i] * 37 + j)
-			var ph := fposmod(now * (0.55 + 0.5 * k) + _hash01(seed), 1.0)
-			var a := _hash01(seed + 0.5) * TAU + ph * 0.9
-			var dist := r * (4.2 - 1.0 * k) * pow(1.0 - ph, 1.4)
-			var q := mouth + Vector2.from_angle(a) * dist
-			var tail := mouth + Vector2.from_angle(a) * (dist + r * 0.35 * (0.4 + k))
-			var al := (0.15 + 0.75 * ph) * (0.45 + 0.55 * k)
-			c.draw_line(tail, q, Color(0.6, 0.88, 1.0, al * 0.5), _px(1.5))
-			c.draw_circle(q, _px(1.5) + 2.5 * ph, Color(0.85, 0.96, 1.0, al))
-	var lit := 1.0 if firing else k
-	c.draw_circle(mouth, r * (0.2 + 0.35 * lit), Color(0.5, 0.82, 1.0, 0.2 + 0.4 * lit))
-	c.draw_circle(mouth, r * (0.1 + 0.16 * lit), Color(0.88, 0.97, 1.0, 0.35 + 0.6 * lit))
-
 ## 広がるビームの、根元から d の距離での幅の半分。
 func _flood_half(width: float, spread: float, d: float) -> float:
 	return width * 0.5 + maxf(d, 0.0) * tan(spread)
 
-## 根元 p から angle の向きへ広がる、高速で外へ流れる水の帯。scale で幅を細め、alpha で薄める。
-## seed ごとに筋の並びが変わる。
-func _draw_water_beam(c: CanvasItem, p: Vector2, angle: float, length: float, width: float, spread: float,
-		col: Color, scale: float, alpha: float, seed: float) -> void:
+## みずがめ座の水の層（シェーダー water_flood が描く）。予告のさざ波、照射の水流、崩れていく水流と霧、溜めの光。
+func _draw_floods(c: CanvasItem) -> void:
+	var pr := run.projectiles
+	for i in pr.hazard_alive.size():
+		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileManager.HazardStyle.FLOOD:
+			continue
+		var t := pr.hazard_t[i]
+		var delay := pr.hazard_delay[i]
+		var charging := t < delay
+		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0) if charging else 1.0
+		_water_strip(c, pr.hazard_pos[i], pr.hazard_angle[i], pr.hazard_len[i], pr.hazard_width[i], pr.hazard_arc[i],
+			0.0 if charging else 1.0 / 3.0, k, float(i % 17) / 17.0)
+	for f in floods:
+		if f.t < float(f.end):
+			continue
+		var age: float = f.t - float(f.end)
+		var collapse := clampf(1.0 - age / 0.35, 0.0, 1.0)
+		var life := clampf(1.0 - age / FLOOD_TAIL, 0.0, 1.0)
+		var n := int(f.count)
+		for k in n:
+			var a := float(f.angle) + k * TAU / n
+			var seed := float((int(f.id) * 7 + k) % 17) / 17.0
+			if collapse > 0.0:
+				_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0 / 3.0, collapse, seed)
+			_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0, life * (1.0 - collapse * 0.6), seed)
+	var t := run.enemies.table
+	for i in t.alive.size():
+		if t.alive[i] == 0 or t.dead[i] != 0 or t.beh[i] != EnemyTable.Beh.AQUARIUS or t.mode[i] != EnemyTable.Mode.WINDUP:
+			continue
+		var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * 0.8
+		var size := t.r[i] * 4.5
+		var col := Color(2.0 / 3.0, t.charge[i], float(t.id[i] % 17) / 17.0, 1.0)
+		c.draw_polygon(PackedVector2Array([mouth + Vector2(-size, -size), mouth + Vector2(size, -size),
+			mouth + Vector2(size, size), mouth + Vector2(-size, size)]), PackedColorArray([col, col, col, col]),
+			PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]))
+
+## 広がるビーム1本ぶんの帯を、根元から先へ細かく区切って描く（シェーダーへ渡す UV と色は water_flood の決まり）。
+## 両端の外に、飛沫を描く余白を足す。先の方は薄くする。
+func _water_strip(c: CanvasItem, p: Vector2, angle: float, length: float, width: float, spread: float,
+		mode: float, strength: float, seed: float) -> void:
+	const SEGMENTS := 24
+	const MARGIN := 1.12
 	var u := Vector2.from_angle(angle)
 	var v := Vector2(-u.y, u.x)
-	var w0 := _flood_half(width, spread, 0.0) * scale
-	var w1 := _flood_half(width, spread, length) * scale
-	var area := PackedVector2Array([p + v * w0, p + u * length + v * w1, p + u * length - v * w1, p - v * w0])
-	c.draw_colored_polygon(area, Color(col, 0.42 * alpha))
-	c.draw_colored_polygon(PackedVector2Array([p + v * w0 * 0.75, p + u * length + v * w1 * 0.7,
-		p + u * length - v * w1 * 0.7, p - v * w0 * 0.75]), Color(col.lightened(0.15), 0.25 * alpha))
-	var now := state.world_time
-	# 外へ高速で流れる水の筋
-	for lane in 14:
-		var h := _hash01(seed + lane * 3.1)
-		var s := (float(lane) + 0.5) / 14.0 * 1.8 - 0.9 + (h - 0.5) * 0.08
-		var speed := 2200.0 + 900.0 * h
-		var piece := 230.0 + 160.0 * _hash01(seed + lane * 7.7)
-		var gap := length / 3.0
-		for m in 3:
-			var d := fposmod(now * speed + h * length + m * gap, length + piece) - piece
-			var d0 := clampf(d, 0.0, length)
-			var d1 := clampf(d + piece, 0.0, length)
-			if d1 - d0 < 4.0:
-				continue
-			var a0 := p + u * d0 + v * _flood_half(width, spread, d0) * scale * s
-			var a1 := p + u * d1 + v * _flood_half(width, spread, d1) * scale * s
-			var thick := maxf(_px(2.0), _flood_half(width, spread, (d0 + d1) * 0.5) * scale * 0.05)
-			var light := lane % 3 == 0
-			c.draw_line(a0, a1, Color(col.lightened(0.6 if light else 0.4), (0.55 if light else 0.4) * alpha), thick)
-	# 縁から飛ぶ飛沫
-	for side: float in [-1.0, 1.0]:
-		for j in 26:
-			var h := _hash01(seed + side * 17.0 + j * 1.7)
-			var d := fposmod(now * (1500.0 + 700.0 * h) + h * length, length)
-			var out := fposmod(now * 3.0 + h * 5.0, 1.0)
-			var edge := p + u * d + v * side * _flood_half(width, spread, d) * scale
-			var q := edge + v * side * (6.0 + 46.0 * out) + u * 30.0 * out
-			c.draw_circle(q, _px(1.5) + 4.0 * (1.0 - out), Color(col.lightened(0.6), 0.75 * (1.0 - out) * alpha))
-		c.draw_line(p + v * side * w0, p + u * length + v * side * w1, Color(col.lightened(0.55), 0.7 * alpha), _px(2.5))
-
-## みずがめ座の広がるビーム（行 i）。予告の間は、通り道に薄い水の流れ（さざ波）を外へ流し、
-## 範囲の端に沿って水しぶきの線を走らせる。照射が近づくほど流れに勢いが出る。照射の間は高速で流れる水の帯。
-func _draw_flood(c: CanvasItem, pr: ProjectileManager, i: int, charging: bool, k: float) -> void:
-	var p := pr.hazard_pos[i]
-	var angle := pr.hazard_angle[i]
-	var len := pr.hazard_len[i]
-	var col := pr.hazard_color[i]
-	var width := pr.hazard_width[i]
-	var spread := pr.hazard_arc[i]
-	var seed := float(i) * 13.0
-	if not charging:
-		_draw_water_beam(c, p, angle, len, width, spread, col, 1.0, 1.0, seed)
-		return
-	var u := Vector2.from_angle(angle)
-	var v := Vector2(-u.y, u.x)
-	var now := state.world_time
-	# 薄い水の帯
-	var w0 := _flood_half(width, spread, 0.0)
-	var w1 := _flood_half(width, spread, len)
-	c.draw_colored_polygon(PackedVector2Array([p + v * w0, p + u * len + v * w1, p + u * len - v * w1, p - v * w0]),
-		Color(col, 0.04 + 0.06 * k))
-	# 外へ流れるさざ波
-	var spacing := lerpf(260.0, 120.0, k)
-	var speed := lerpf(240.0, 760.0, k * k)
-	var d := fposmod(now * speed, spacing)
-	while d < len:
-		var h := _flood_half(width, spread, d) * 0.94
-		var bow := h * 0.16
-		var pts := PackedVector2Array()
-		for q in 9:
-			var s := float(q) / 4.0 - 1.0
-			pts.append(p + u * (d + bow * (1.0 - s * s)) + v * h * s)
-		var fade := clampf(d / 160.0, 0.0, 1.0) * (1.0 - 0.6 * d / len)
-		c.draw_polyline(pts, Color(col.lightened(0.35), (0.12 + 0.3 * k) * fade), _px(1.5 + 2.0 * k))
-		d += spacing
-	# 範囲の端に沿って走る水しぶきの線
-	var edge_speed := lerpf(380.0, 1100.0, k)
-	for side: float in [-1.0, 1.0]:
-		var dir := (u * len + v * side * (w1 - w0)).normalized()
-		var n := 34
-		for j in n:
-			var hj := _hash01(seed + side * 11.0 + j * 2.3)
-			var de := fposmod(now * edge_speed + float(j) / n * len + hj * 40.0, len)
-			var e := p + u * de + v * side * _flood_half(width, spread, de) + v * side * (hj - 0.3) * 10.0
-			var dash := 14.0 + 18.0 * k + 10.0 * hj
-			var al := (0.35 + 0.5 * k) * (1.0 - 0.5 * de / len)
-			c.draw_line(e, e + dir * dash, Color(col.lightened(0.55), al), _px(2.0))
-			if j % 3 == 0:
-				c.draw_circle(e + v * side * 8.0 * hj, _px(1.5) + 1.5 * k, Color(col.lightened(0.7), al))
-
-## みずがめ座の照射が終わったあと：水の流れが細くなって飛沫に崩れ、霧と水滴が少しの間残る。
-func _draw_flood_tail(c: CanvasItem, f: Dictionary) -> void:
-	var age: float = f.t - float(f.end)
-	var col: Color = f.color
-	var n := int(f.count)
-	var length := float(f.length)
-	var width := float(f.width)
-	var spread := float(f.spread)
-	var collapse := clampf(1.0 - age / 0.3, 0.0, 1.0)
-	var mist := clampf(1.0 - age / FLOOD_TAIL, 0.0, 1.0)
-	for k in n:
-		var a := float(f.angle) + k * TAU / n
-		var seed := float(f.id) * 5.0 + k * 13.0
-		if collapse > 0.0:
-			_draw_water_beam(c, f.pos, a, length, width, spread, col, collapse * collapse, collapse, seed)
-		var u := Vector2.from_angle(a)
-		var v := Vector2(-u.y, u.x)
-		for j in 22:
-			var h := _hash01(seed + j * 4.3)
-			var d := (0.05 + 0.9 * _hash01(seed + j * 9.1)) * length
-			var s := (h * 2.0 - 1.0) * 0.9
-			var q: Vector2 = f.pos + u * (d + 90.0 * age) + v * _flood_half(width, spread, d) * s
-			c.draw_circle(q, 18.0 + 40.0 * h + 30.0 * age, Color(col, 0.06 * mist))
-			c.draw_circle(q + v * 12.0 * (h - 0.5), _px(1.5) + 2.5 * h, Color(col.lightened(0.6), 0.6 * mist))
+	var prev_d := 0.0
+	var prev_h := _flood_half(width, spread, 0.0) * MARGIN
+	for j in range(1, SEGMENTS + 1):
+		var d := length * float(j) / SEGMENTS
+		var h := _flood_half(width, spread, d) * MARGIN
+		var a0 := 1.0 - smoothstep(0.7, 1.0, prev_d / length)
+		var a1 := 1.0 - smoothstep(0.7, 1.0, d / length)
+		var c0 := Color(mode, strength, seed, a0)
+		var c1 := Color(mode, strength, seed, a1)
+		c.draw_polygon(PackedVector2Array([p + u * prev_d + v * prev_h, p + u * d + v * h, p + u * d - v * h, p + u * prev_d - v * prev_h]),
+			PackedColorArray([c0, c1, c1, c0]),
+			PackedVector2Array([Vector2(prev_d / 1000.0, MARGIN), Vector2(d / 1000.0, MARGIN), Vector2(d / 1000.0, -MARGIN), Vector2(prev_d / 1000.0, -MARGIN)]))
+		prev_d = d
+		prev_h = h
 
 func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
@@ -1428,7 +1353,7 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 		match pr.hazard_kind[i]:
 			ProjectileManager.HazardKind.BEAM:
 				if pr.hazard_style[i] == ProjectileManager.HazardStyle.FLOOD:
-					_draw_flood(c, pr, i, charging, k)
+					# みずがめ座の水は水の層（_draw_floods）が描く
 					continue
 				if charging:
 					# 砲口に光が集まっていく
@@ -1613,9 +1538,6 @@ func _draw_meteor_shards(c: CanvasItem) -> void:
 
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
-	for f in floods:
-		if f.t >= float(f.end):
-			_draw_flood_tail(c, f)
 	for bm in beams:
 		var k: float = bm.life / bm.max
 		var bc: Color = bm.color
