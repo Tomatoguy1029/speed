@@ -6,8 +6,10 @@
 ##
 ## 本体と首は、体当たりも武器もすり抜ける。ダメージが通るのは頭だけで、頭に与えたダメージの一部が本体の体力を削る。
 ## 頭は敵の表の1行（部位。種類ごとの敵の定義 hydra_<首の種類>）で、位置はこの役者が決める。
-## 首の節（瓦礫の塊）は頭を追いかけて動き、この役者が描く。
+## 首の節は FABRIK で本体と頭をつなぎ、この役者が描く。
 extends BossActor
+
+const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 
 ## 首1本の状態
 class Neck:
@@ -24,7 +26,7 @@ class Neck:
 	## 生え直すまでの時間。burned なら次の段階まで生え直さない（火で落ちた頭）
 	var regrow := 0.0
 	var burned := false
-	## 首の節の位置（頭を追う）
+	## 首の骨組みの点列（付け根から頭まで）
 	var segs := PackedVector2Array()
 	## 攻撃の段階と残り時間、次の攻撃までの時間、続けた回数、予告の光（0〜1）
 	var mode: StringName = &"idle"
@@ -43,7 +45,6 @@ const NECKS := {
 	7: [&"bite", &"vortex", &"debris", &"beam", &"bite", &"homing", &"beam"],
 	9: [&"bite", &"vortex", &"debris", &"beam", &"bite", &"homing", &"beam", &"vortex", &"debris"],
 }
-const SEGS := 9
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
 const TECH_DIR := {&"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
@@ -86,11 +87,17 @@ func _on_bound() -> void:
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	hsm.initialize(self)
 	hsm.set_active(true)
+	queue_redraw()
 
 func _process(_delta: float) -> void:
-	if manager != null and manager.has_boss():
+	if manager == null or not manager.has_boss():
+		return
+	# 実験場で停止中に本体を移動・拡縮した場合も表示を更新する。
+	if position != table.pos[body]:
 		position = table.pos[body]
-	queue_redraw()
+		queue_redraw()
+	if get_meta(&"draw_radius", -1.0) != table.r[body]:
+		queue_redraw()
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
@@ -119,6 +126,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and not run_state.boss_dead:
 		manager.on_boss_defeated(body, {"cause": &"ram"})
+	queue_redraw()
 
 ## 本体：基本はその場で構える。機体が一定より離れると、機体の方へ泳いで近づく。
 func _move(dt: float) -> void:
@@ -170,10 +178,8 @@ func _grow(neck: Neck) -> void:
 	neck.head_hp = hp
 	neck.mode = &"idle"
 	neck.glow = 0.0
-	if neck.segs.is_empty():
-		neck.segs.resize(SEGS)
-		for s in SEGS:
-			neck.segs[s] = table.pos[body]
+	neck.segs.clear()
+	_follow_neck(neck, 0.0)
 
 func _head_pos(neck: Neck) -> Vector2:
 	return table.pos[body] + Vector2.from_angle(neck.angle) * (table.r[body] + neck.length)
@@ -183,6 +189,7 @@ func _alive(neck: Neck) -> bool:
 
 ## 頭の行が再利用される前に、火で落ちたかと本体へのダメージを確定する。
 func on_part_defeated(row: int) -> void:
+	queue_redraw()
 	for neck in necks:
 		if neck.row == row and neck.row_id == table.id[row]:
 			_on_head_lost(neck)
@@ -190,7 +197,7 @@ func on_part_defeated(row: int) -> void:
 	if immortal_row == row and immortal_id == table.id[row]:
 		_tick_immortal(0.0)
 
-## 首1本の更新：頭へのダメージを本体へ移し、頭が落ちたら生え直しを待つ。頭の位置を決め、節が追う。
+## 首1本の更新：頭へのダメージを本体へ移し、頭が落ちたら生え直しを待つ。頭の位置を決め、首でつなぐ。
 func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	var p: Dictionary = def.params
 	if neck.row >= 0 and not _alive(neck):
@@ -210,7 +217,8 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		_attack(neck, k, dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
-	_follow(neck.segs, table.pos[body], _head_pos(neck), dt)
+	if neck.row >= 0 or neck.length > 0.0:
+		_follow_neck(neck, dt)
 
 ## 頭が落ちた：残りの HP ぶんを本体へ移し、首の残骸を破片にして飛ばす。生え直しの時間を決める。
 ## 1本の線でまとめて落とした本数が多いほど、生え直しが少しだけ遅くなる。火で落ちた頭は次の段階まで生え直さない。
@@ -230,14 +238,13 @@ func _on_head_lost(neck: Neck) -> void:
 	neck.row = -1
 	neck.mode = &"idle"
 
-## 節を、付け根から頭までの曲線に向かって遅れて動かす。
-func _follow(segs: PackedVector2Array, base: Vector2, head: Vector2, dt: float) -> void:
-	var side := (head - base).orthogonal().normalized() * sin(_time * 1.3 + base.x * 0.01) * 30.0
-	var k := minf(1.0, dt * 14.0)
-	for s in segs.size():
-		var f := float(s + 1) / float(segs.size())
-		var target := base.lerp(head, f) + side * sin(f * PI)
-		segs[s] = segs[s].lerp(target, k)
+## 頭の位置・向きは攻撃側が決め、描画用の点列だけを解く。頭を失った首は短く畳む。
+func _follow_neck(neck: Neck, dt: float) -> void:
+	var rest := float(def.params.neck_rest)
+	if neck.row < 0:
+		rest = minf(rest, neck.length)
+	NECK_CHAIN.update(neck.segs, table.pos[body], _head_pos(neck), table.r[body] + rest,
+		neck.base_angle * 2.4, _time, dt, def.params)
 
 # ── 不死の首 ──────────────────────────────────────────────────────
 
@@ -259,7 +266,8 @@ func _tick_immortal(dt: float) -> void:
 		var a := (run_state.ship_pos - table.pos[body]).angle()
 		var at := table.pos[body] + Vector2.from_angle(a) * (table.r[body] + float(p.neck_rest) * 0.8)
 		table.pos[immortal_row] = at
-		_follow(immortal_segs, table.pos[body], at, dt)
+		NECK_CHAIN.update(immortal_segs, table.pos[body], at, table.r[body] + float(p.neck_rest) * 0.8,
+			1.2, _time, dt, p)
 		_immortal_attack(dt)
 	if lost or exposed_t <= 0.0:
 		if lost:
@@ -286,9 +294,7 @@ func _expose() -> void:
 	table.gate[j] = EnemyTable.Gate.IMMORTAL
 	immortal_row = j
 	immortal_id = table.id[j]
-	immortal_segs.resize(SEGS)
-	for s in SEGS:
-		immortal_segs[s] = table.pos[body]
+	immortal_segs.clear()
 	run_state.emit(&"text", {"pos": table.pos[body] + Vector2(0, -table.r[body] - 40.0), "text": "!", "color": Color("#ffe46b"), "size": 48})
 
 # ── 首の攻撃（各首の種類ごと） ──────────────────────────────────────
@@ -709,6 +715,9 @@ func _start_sweep(neck: Neck, rate: float, time: float) -> void:
 
 func _draw() -> void:
 	draw_on(self)
+	if manager != null and manager.has_boss():
+		# 描画キャッシュはメタデータに置き、実験場の戦闘状態の比較から分ける。
+		set_meta(&"draw_radius", table.r[body])
 
 ## 実験キャンバスも同じ本体・首・羅針盤を描く。
 func draw_on(c: CanvasItem) -> void:
@@ -717,7 +726,8 @@ func draw_on(c: CanvasItem) -> void:
 	var t := table
 	var r := t.r[body]
 	for neck in necks:
-		_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
+		if neck.row >= 0 or neck.length > 0.0:
+			_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if exposed_t > 0.0:
 		_draw_neck(c, immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
 	c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
@@ -725,12 +735,19 @@ func draw_on(c: CanvasItem) -> void:
 	_draw_compass(c, r * 0.75)
 
 func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Color, glow: float) -> void:
-	for s in segs.size():
-		var at := segs[s] - table.pos[body]
-		var size := body_r * (0.32 - 0.14 * float(s) / segs.size())
-		c.draw_circle(at, size, col.darkened(0.15 * (s % 2)))
+	var origin := table.pos[body]
+	var point_count := segs.size()
+	var dark := col.darkened(0.15)
+	var previous := Vector2.ZERO
+	for s in point_count:
+		var at := segs[s] - origin
+		var size := body_r * (0.32 - 0.14 * float(s) / point_count)
+		if s > 0:
+			c.draw_line(previous, at, col, size * 2.0)
+		c.draw_circle(at, size, col if s % 2 == 0 else dark)
+		previous = at
 	if glow > 0.0 and not segs.is_empty():
-		c.draw_circle(segs[segs.size() - 1] - table.pos[body], body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
+		c.draw_circle(previous, body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
 
 ## 本体に埋め込まれた羅針盤。強めの技の前だけ針が回る（強めの技で使う）。
 func _draw_compass(c: CanvasItem, R: float) -> void:

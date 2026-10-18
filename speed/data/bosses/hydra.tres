@@ -18,6 +18,13 @@ weak_arc = 0.0
 params = {
 "engage": 1100.0,
 "neck_rest": 230.0,
+"neck_segments": 16,
+"neck_iterations": 4,
+"neck_slack": 1.12,
+"neck_wave_amplitude": 18.0,
+"neck_wave_frequency": 1.5,
+"neck_wave_speed": 2.5,
+"neck_response": 10.0,
 "head_hp": 120.0,
 "head_share": 0.8,
 "regrow": 6.0,
