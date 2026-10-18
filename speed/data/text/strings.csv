@@ -604,8 +604,8 @@ lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と
 lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
 lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾で弾を反射する,Approaches while slowly turning toward you. Its front shield reflects shots
 lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
-lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置く,Keeps its distance and places a long light wall near you
-lab.enemy.ruler.kill,HP を削る,Wear down its HP
+lab.enemy.ruler.move,1体で現れ、二つに分かれて機体を左右（上下）から挟む位置へ展開する。照射の向きを予告してから、それぞれ長いビームを出し続ける。ビームは発射元につながり、壁になって移動を止める,Appears as one ruler then splits in two and spreads to flank the ship. After marking where it will fire each half keeps a long beam on. The beams stay tied to their emitters and act as walls that stop movement
+lab.enemy.ruler.kill,分かれた2体をそれぞれ普通に倒す。倒した側のビームが止まり、そちらへ動けるようになる,Defeat each half normally. Its beam stops and that side opens up
 lab.enemy.crow.move,4羽の群れで隊列を組み、機体を追わずに一直線に戦場を横断する。横を通り過ぎた経験値を1羽ずつ拾い、画面の外へ持ち去る。攻撃はしない,Four birds fly in formation straight across the field without chasing. Each picks up experience it passes on either side and carries it off screen. They never attack
 lab.enemy.crow.kill,1羽ずつもろく、普通に当てれば倒れる。退場する前に倒すと、その1羽が回収した経験値をその場にまとめて落とす,Each bird is fragile and falls to any hit. Defeat one before it leaves to drop the experience it collected in one spot
 lab.enemy.lynx.move,距離を保ち、湾曲した3本の爪痕の斬撃を左右の手で交互に飛ばし続ける。斬撃は機体の方へ形を保って直進し、追尾しない。空いている側が1発ごとに入れ替わる,Keeps its distance and keeps hurling slashes of three curved claw marks with alternating paws. Each flies straight toward the ship keeping its shape without homing and the open side switches every slash

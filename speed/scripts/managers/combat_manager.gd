@@ -171,6 +171,26 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		return true
 	return false
 
+## 機体が from から今の位置へ動く途中で、移動を止める壁（じょうぎ座のビーム）にぶつかったら、壁の手前で止めて弾く。
+## 弾いたら true。弾かれるのは失敗で、被弾はしない。
+func wall_bounce(from: Vector2) -> bool:
+	var hit := projectiles.block_hit(from, state.ship_pos, cfg.ship_radius)
+	if hit.is_empty():
+		return false
+	var n: Vector2 = hit.normal
+	state.ship_pos = hit.pos
+	var vn := state.ship_vel.dot(n)
+	if vn < 0.0:
+		state.ship_vel -= n * 2.0 * vn
+	state.ship_vel *= cfg.bounce_keep
+	if state.ship_vel.length() < cfg.bounce_min_speed:
+		state.ship_vel = n * cfg.bounce_min_speed
+	state.ship_boost_t = 0.0
+	state.glide = false
+	state.emit(&"block_impact", {"pos": state.ship_pos - n * cfg.ship_radius, "normal": n, "enemy_pos": state.ship_pos, "r": cfg.ship_radius})
+	state.emit(&"bounce", {"pos": state.ship_pos})
+	return true
+
 func _pierce_keep(i: int) -> float:
 	var r := enemies.table.r[i]
 	var loss := (0.004 + r * 0.0006) if enemies.table.dead[i] != 0 else (0.1 + r * 0.002)

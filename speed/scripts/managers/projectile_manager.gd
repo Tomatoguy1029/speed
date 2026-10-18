@@ -88,7 +88,8 @@ var _hostile_clear_pending := false
 ##   WALL：pos から angle の向きへ長さ len・幅 width の残る線。予告のあと active の間、触れると被弾する
 enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST }
+## RAY は残る線をビームとして描く（じょうぎ座）
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -112,6 +113,8 @@ var hazard_owner := PackedInt32Array()
 var hazard_owner_id := PackedInt32Array()
 ## 遅れて弾ける範囲が、敵に与えるダメージ（0 なら敵には当たらない。誘爆に使う）
 var hazard_edmg := PackedFloat64Array()
+## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
+var hazard_block := PackedByteArray()
 ## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
@@ -575,6 +578,34 @@ func attach_hazard(h: int, e: int) -> void:
 func owns_hazard(h: int, e: int, id: int) -> bool:
 	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
+## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
+## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
+func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
+	var best := {}
+	var best_t := INF
+	for h in hazard_alive.size():
+		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
+			continue
+		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
+			continue
+		var a := hazard_pos[h]
+		var u := Vector2.from_angle(hazard_angle[h])
+		var m := hazard_width[h] * 0.5 + radius
+		var d0 := u.cross(from - a)
+		var d1 := u.cross(to - a)
+		if absf(d1) >= m and signf(d0) == signf(d1):
+			continue
+		var t := 0.0
+		if absf(d0) > m and absf(d0 - d1) > 1e-6:
+			t = (d0 - signf(d0) * m) / (d0 - d1)
+		var along := u.dot(from.lerp(to, t) - a)
+		if along < -m or along > hazard_len[h] + m or t >= best_t:
+			continue
+		best_t = t
+		var n := Vector2(-u.y, u.x) * (1.0 if d0 >= 0.0 else -1.0)
+		best = {"t": t, "normal": n, "pos": from.lerp(to, t)}
+	return best
+
 ## 付いている攻撃の形（行 h）を動かす。length が 0 以上なら長さも変える。
 func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 	hazard_pos[h] = pos
@@ -606,6 +637,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_hit[i] = 0
 	hazard_color[i] = color
 	hazard_edmg[i] = 0.0
+	hazard_block[i] = 0
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
 	hazard_speed[i] = speed

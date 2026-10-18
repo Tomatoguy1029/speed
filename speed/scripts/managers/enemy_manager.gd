@@ -606,7 +606,6 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], bdt)
 					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], bdt)
 				EnemyTable.Beh.RULER:
-					_keep_distance(i, bdt)
 					_ruler(i, bdt)
 				EnemyTable.Beh.CLOCK:
 					_chase(i, bdt)
@@ -1077,20 +1076,71 @@ func telescope_sees(i: int, at: Vector2) -> bool:
 		return false
 	return absf(Geom.angle_diff(d.angle(), t.facing[i])) <= telescope_half(i) + atan(cfg.ship_radius / dist)
 
-## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
+## じょうぎ座：1体の定規として現れ、split_delay たつと二つに分かれる（buds が左右の印 1・-1。0 は分かれる前）。
+## 2体は、機体の方へ向かう縦か横の軸（facing）をそろえ、機体を左右から挟む位置へ展開する（DASH）。
+## 照射の向きを予告し（WINDUP、charge が予告の進み）、それぞれ長いビームを出し続ける（RECOVER）。ビームは発射元に
+## つながり、機体の移動を止める壁になる。照射が終わると、また機体を挟む位置へ展開し直す。倒した個体のビームは消える。
 func _ruler(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	t.fire_t[i] -= dt
-	if t.fire_t[i] > 0.0:
+	if t.buds[i] == 0:
+		_keep_distance(i, dt)
+		if t.age[i] >= float(p.split_delay):
+			_split_ruler(i)
 		return
-	t.fire_t[i] = float(p.fire_interval)
-	var to_ship := (state.enemy_aim - t.pos[i]).normalized()
-	var across := Vector2(-to_ship.y, to_ship.x)
-	var length := float(p.wall_len)
-	var center := state.enemy_aim + to_ship * float(p.wall_offset)
-	projectiles.fire_wall(center - across * length * 0.5, across.angle(), length, float(p.wall_width),
-		float(p.telegraph), float(p.wall_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+	var d := Vector2.from_angle(t.facing[i])
+	t.timer[i] -= dt
+	match t.mode[i]:
+		EnemyTable.Mode.DASH:
+			var n := Vector2(-d.y, d.x)
+			var goal := state.ship_pos + n * float(t.buds[i]) * float(p.half_gap) - d * float(p.emit_back)
+			_steer_to(i, goal, float(p.deploy_speed), 6.0, dt)
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				var h := projectiles.fire_wall(t.pos[i] + d * t.r[i], t.facing[i], float(p.beam_len), float(p.beam_width), 0.0,
+					float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RAY
+				projectiles.hazard_block[h] = 1
+				projectiles.attach_hazard(h, i)
+				t.links[i] = PackedInt32Array([h])
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.beam_time)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			for h in t.links[i]:
+				if projectiles.owns_hazard(h, i, t.id[i]):
+					projectiles.move_hazard(h, t.pos[i] + d * t.r[i], t.facing[i])
+			if t.timer[i] <= 0.0:
+				for h in t.links[i]:
+					if projectiles.owns_hazard(h, i, t.id[i]):
+						projectiles.release_hazard(h)
+				t.links[i] = PackedInt32Array()
+				t.mode[i] = EnemyTable.Mode.DASH
+				t.timer[i] = float(p.deploy_time)
+
+## じょうぎ座（行 i）が二つに分かれる。機体への向きの縦横の大きい方を照射の軸にし、もう1体を同じ位置に出して展開を始める。
+func _split_ruler(i: int) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var rel := state.ship_pos - t.pos[i]
+	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
+	if d == Vector2.ZERO:
+		d = Vector2.DOWN
+	var halves := [i, spawn(t.def[i], t.level[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0})]
+	for k in 2:
+		var j: int = halves[k]
+		t.buds[j] = 1 if k == 0 else -1
+		t.facing[j] = d.angle()
+		t.mode[j] = EnemyTable.Mode.DASH
+		t.timer[j] = float(p.deploy_time)
+		t.vel[j] = Vector2(-d.y, d.x) * float(t.buds[j]) * float(p.deploy_speed) * 0.6
+	state.emit(&"ruler_split", {"pos": t.pos[i], "angle": d.angle(), "color": t.color[i]})
 
 ## とけい座：長針と短針が刃として回り続ける。針は付いて動く残る線で、速さが違う。
 func _clock(i: int, dt: float) -> void:

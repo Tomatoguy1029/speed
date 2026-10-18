@@ -38,6 +38,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 	var from := state.ship_pos
 	var drag := field.dust_drag_at(from)
 	_step(world_dt, field.boundary_accel(from), drag)
+	combat.wall_bounce(from)
 	combat.collide_ship(from, cfg.ship_radius, null)
 	if state.phase != RunState.Phase.PLAY:
 		return

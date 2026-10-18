@@ -186,7 +186,9 @@ func _commit(_it: Intent) -> void:
 		# ボーナスステージ：放つとすぐ満タンに戻る
 		state.gauge = 1.0
 	var pts := state.draw_points
-	_warp(pts[0])
+	# 今の位置から描き始めまでも、つながった移動として駆け抜ける（途中の敵にも壁にも当たる）
+	if state.ship_pos.distance_to(pts[0]) > 1.0:
+		pts.insert(0, state.ship_pos)
 	var dir := (pts[1] - pts[0]).normalized()
 	var speed := maxf(_launch_speed(dir, state.draw_gauge), 1.0)
 	state.ship_vel = dir * speed
@@ -228,14 +230,6 @@ func _launch_speed(dir: Vector2, gauge_amount: float) -> float:
 	var limit := state.stats.max_speed * maxf(1.0, gauge_amount)
 	return maxf(minf(carried + thrust, limit), sp * c)
 
-## 線の始点へ跳ぶ。跡を残す。
-func _warp(to: Vector2) -> void:
-	var from := state.ship_pos
-	if from.distance_to(to) < 1.0:
-		return
-	state.emit(&"warp", {"from": from, "to": to})
-	state.ship_pos = to
-
 # ── なぞり（仕様書 6.5・6.6） ────────────────────────────────────
 
 func _trace(real_dt: float) -> void:
@@ -264,6 +258,9 @@ func _trace(real_dt: float) -> void:
 		state.ship_pos = a + u * run.seg_pos
 		state.ship_vel = u * run.speed
 		state.ship_heading = u
+		if combat.wall_bounce(from):
+			_end_trace(false)
+			return
 		combat.wave_along(run, from, state.ship_pos)
 		if state.phase != RunState.Phase.PLAY:
 			return

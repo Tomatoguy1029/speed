@@ -145,7 +145,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx"]:
+				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -262,6 +262,10 @@ func _on_events(events: Array[Dictionary]) -> void:
 				if swallows.size() < 120:
 					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
+			&"ruler_split":
+				_ring(ev.pos, 46.0, (ev.color as Color).lightened(0.4), 0.3)
+				_burst(ev.pos, ev.color, 10, Vector2.ZERO, 260.0)
+				shake = maxf(shake, 4.0)
 			&"bud":
 				_ring(ev.pos, 20.0, ev.color, 0.25)
 				_burst(ev.pos, ev.color, 6, Vector2.ZERO, 160.0)
@@ -728,6 +732,8 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_telescope(c, t, i)
 	elif type == &"lynx":
 		_draw_lynx(c, t, i)
+	elif type == &"ruler":
+		_draw_ruler(c, t, i)
 	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
@@ -891,6 +897,25 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
 	if k > 0.0:
 		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
+
+## じょうぎ座：照射の予告は、発射元から照射の向きへ伸びる点線。予告が進むほど濃く、先端の光が強まる。
+func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var u := Vector2.from_angle(t.facing[i])
+	var tip := p + u * r
+	var col := t.color[i].lightened(0.2)
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		var k := t.charge[i]
+		var length := float(t.def[i].params.beam_len)
+		var dash := 36.0
+		var s := 0.0
+		while s < length:
+			c.draw_line(tip + u * s, tip + u * minf(s + dash * 0.55, length), Color(col, 0.25 + 0.6 * k), maxf(_px(2.0), 3.0 + 4.0 * k))
+			s += dash
+		c.draw_circle(tip, r * (0.2 + 0.4 * k), Color(1, 1, 1, 0.4 + 0.5 * k))
+	elif t.mode[i] == EnemyTable.Mode.DASH and t.buds[i] != 0:
+		c.draw_circle(tip, r * 0.18, Color(col, 0.6))
 
 ## やまねこ座の斬撃：湾曲した3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
 func _draw_slash(c: CanvasItem, pos: Vector2, angle: float, arc_r: float, hand: float, a: float) -> void:
@@ -1147,6 +1172,16 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				if not view.grow(len).has_point(p):
 					continue
 				var w := pr.hazard_width[i]
+				if pr.hazard_style[i] == ProjectileManager.HazardStyle.RAY and not charging:
+					# じょうぎ座のビーム：発射元から伸びる、揺らめく光の柱
+					var left := delay + pr.hazard_active[i] - t
+					var f := clampf(left / 0.3, 0.0, 1.0) * clampf((t - delay) / 0.12, 0.0, 1.0)
+					var flick := 0.85 + 0.15 * sin(t * 50.0 + float(i))
+					c.draw_line(p, b, Color(col, 0.22 * f), w * 2.6 * flick)
+					c.draw_line(p, b, Color(col.lightened(0.2), 0.9 * f), w)
+					c.draw_line(p, b, Color(1, 1, 1, 0.9 * f), maxf(_px(2.0), w * 0.35))
+					c.draw_circle(p, w * (0.9 + 0.2 * flick), Color(1, 1, 1, 0.8 * f))
+					continue
 				if charging:
 					c.draw_line(p, b, Color(col, 0.15 + 0.35 * k), maxf(_px(2.0), w * 0.25 * k))
 					continue
@@ -1178,6 +1213,11 @@ func _draw_path_band(c: CanvasItem) -> void:
 func _draw_path(c: CanvasItem) -> void:
 	if state.drawing and state.draw_points.size() > 0:
 		var pts := state.draw_points
+		# 今の位置から描き始めまでの移動（なぞりで一緒に駆け抜ける）を点線で示す
+		var gap := pts[0] - state.ship_pos
+		var steps := int(gap.length() / _px(14.0))
+		for k in range(0, steps, 2):
+			c.draw_line(state.ship_pos + gap * (float(k) / steps), state.ship_pos + gap * (float(k + 1) / steps), Color(0.8, 0.97, 1.0, 0.55), _px(2.0))
 		if pts.size() > 1:
 			c.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.95), _px(3.0))
 		c.draw_circle(pts[0], _px(6.0), Color("#c8f7ff"))
