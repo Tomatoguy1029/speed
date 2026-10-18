@@ -1,4 +1,4 @@
-## ツールバーに「▶ ステージ」ボタンを足すエディタプラグイン（設計書 14.1）。
+## ツールバーに「▶ ステージ」「▶ 実験場」ボタンを足すエディタプラグイン（設計書 14.1）。
 ##
 ## 押すと起動するステージを予約し、通常どおりメインシーンを実行する。予約はゲーム側が
 ## 起動時に1回だけ消費するので、F5（通常実行）はこれまでどおりタイトルから始まる。
@@ -6,8 +6,10 @@
 extends EditorPlugin
 
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
+const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 
 var _button: Button = null
+var _lab_button: Button = null
 
 func _enter_tree() -> void:
 	_button = Button.new()
@@ -15,6 +17,11 @@ func _enter_tree() -> void:
 	_button.tooltip_text = "編集中のステージを直接起動する（F5 は通常どおりタイトルから）"
 	_button.pressed.connect(_on_pressed)
 	add_control_to_container(CONTAINER_TOOLBAR, _button)
+	_lab_button = Button.new()
+	_lab_button.text = "▶ 実験場"
+	_lab_button.tooltip_text = "敵・ルート実験場を直接起動する（編集中のシーンに関係なく起動）"
+	_lab_button.pressed.connect(_on_lab_pressed)
+	add_control_to_container(CONTAINER_TOOLBAR, _lab_button)
 	_move_next_to_main_screen_buttons()
 
 ## 既定では右端に置かれて見つけにくいので、「2D／3D／スクリプト」の並びの直後へ移す。
@@ -28,8 +35,13 @@ func _move_next_to_main_screen_buttons() -> void:
 		push_warning("Stage Launcher: ツールバーの並び替え先が見つからないので既定の位置に置く")
 		return
 	bar.move_child(_button, anchor.get_index() + 1)
+	bar.move_child(_lab_button, _button.get_index() + 1)
 
 func _exit_tree() -> void:
+	if _lab_button != null:
+		remove_control_from_container(CONTAINER_TOOLBAR, _lab_button)
+		_lab_button.queue_free()
+		_lab_button = null
 	if _button != null:
 		remove_control_from_container(CONTAINER_TOOLBAR, _button)
 		_button.queue_free()
@@ -40,6 +52,10 @@ func _on_pressed() -> void:
 	print("[Stage Launcher] ステージ %d で起動します" % stage)
 	Request.request(stage)
 	EditorInterface.play_main_scene()
+
+func _on_lab_pressed() -> void:
+	print("[Stage Launcher] 敵・ルート実験場を起動します")
+	EditorInterface.play_custom_scene(LAB_SCENE)
 
 ## 編集中のシーンのパス。起動するのは保存済みの内容なので、先に保存する。
 func _current_scene_path() -> String:
