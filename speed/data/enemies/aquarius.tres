@@ -17,9 +17,9 @@ shape = &"orb"
 behavior = &"aquarius"
 max_alive = 1
 params = {
-"beam_gap": 0.62,
+"beam_gap": 0.95,
 "beam_len": 2200.0,
-"beam_spread": 0.17,
+"beam_spread": 0.32,
 "beam_time": 0.35,
 "beam_width": 70.0,
 "bullet_dmg": 20.0,
