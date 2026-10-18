@@ -80,9 +80,11 @@ var timer := PackedFloat64Array()
 ## 射撃型・ミサイル艇・戦艦：次の射撃までの時間、予告の溜め（0〜1。ボスも使う）
 var fire_t := PackedFloat64Array()
 var charge := PackedFloat64Array()
-## 分裂型：次の分裂までの時間と、分裂した数
+## 分裂型：次の分裂までの時間と、分裂した数。ポンプ座は buds に吸い込んだ敵の数を持つ
 var bud_t := PackedFloat64Array()
 var buds := PackedInt32Array()
+## からす座：回収して運んでいる経験値の量
+var carry := PackedFloat64Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）

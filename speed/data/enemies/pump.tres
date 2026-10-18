@@ -10,7 +10,7 @@ rank = 3
 radius = 26.0
 hp = 60.0
 armor = 8.0
-speed = 80.0
+speed = 95.0
 accel = 1.5
 turn = 2.0
 xp = 12.0
@@ -21,16 +21,25 @@ max_alive = 2
 ranged = false
 size_var = false
 weak_arc = 0.0
-gate = &"mouth"
+gate = &""
 params = {
-"keep": 380.0,
-"fire_interval": 4.0,
-"suck_time": 2.0,
-"pull_radius": 420.0,
+"pull_radius": 360.0,
 "pull": 900.0,
-"wave_arc": 0.55,
-"wave_radius": 520.0,
-"wave_speed": 900.0,
-"wave_width": 40.0,
-"bullet_dmg": 12.0
+"swallow_reach": 30.0,
+"swallow_interval": 0.12,
+"store_max": 20,
+"grow": 0.9,
+"telegraph": 1.4,
+"lock_time": 0.5,
+"recover": 1.2,
+"shell_speed": 520.0,
+"shell_r": 26.0,
+"shell_range": 640.0,
+"burst_radius": 150.0,
+"bullet_dmg": 22.0,
+"release_base": 8,
+"release_per": 1.0,
+"release_speed": 900.0,
+"release_dmg": 1.2,
+"release_radius": 150.0
 }

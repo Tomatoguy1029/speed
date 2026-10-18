@@ -593,8 +593,8 @@ lab.enemy.pulser.move,距離を保ち、止まって届く距離の短い輪を1
 lab.enemy.pulser.kill,HP を削る,Wear down its HP
 lab.enemy.spreader.move,追ってきて、予告のあと扇状に弾をばらまく,Chases you and sprays a fan of bullets after a warning
 lab.enemy.spreader.kill,HP を削る,Wear down its HP
-lab.enemy.pump.move,距離を保ち、止まって周りの敵と遅い機体を吸い寄せてから、前へ一気に吐き出す,Keeps its distance and stops to pull in enemies and a slow ship then blasts them forward
-lab.enemy.pump.kill,吸っている間（口が開いている間）だけ倒せる。ほかの時は貫いても無傷,Only while it is sucking (mouth open). Otherwise piercing does nothing
+lab.enemy.pump.move,機体を追いながら周りの敵を吸い込んで膨らむ。満タンになると構え、圧縮した敵を巨大な弾にして撃つ。弾は直進して一定の距離で破裂する,Chases the ship while swallowing nearby enemies and swelling. When full it braces and fires them as one huge shell that bursts after a set distance
+lab.enemy.pump.kill,HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる,Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst
 lab.enemy.telescope.move,距離を保ち、レンズが光ってから細く速い弾を撃つ,Keeps its distance and fires a thin fast bullet after its lens flashes
 lab.enemy.telescope.kill,HP を削る,Wear down its HP
 lab.enemy.triangle.move,3つの星の間に光の膜を張って追ってくる。膜に触れると被弾する,Chases you with a light membrane between three stars. Touching it hurts
@@ -605,8 +605,8 @@ lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾�
 lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
 lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置く,Keeps its distance and places a long light wall near you
 lab.enemy.ruler.kill,HP を削る,Wear down its HP
-lab.enemy.crow.move,周りで倒された敵の残骸を集め、塊にして投げてくる,Gathers the debris of nearby defeated enemies into a lump and throws it
-lab.enemy.crow.kill,HP を削る。倒すと集めた塊が砕けて破片が飛ぶ,Wear down its HP. Defeating it shatters the lump into shards
+lab.enemy.crow.move,機体を追わず、一直線に戦場を横断する。通り道の経験値を吸い寄せて回収し、画面の外へ持ち去る。攻撃はしない,Crosses the field in a straight line without chasing. It pulls in experience along its path and carries it off screen. It never attacks
+lab.enemy.crow.kill,もろく、普通に当てれば倒れる。退場する前に倒すと、回収した経験値をその場にまとめて落とす,Fragile and falls to any hit. Defeat it before it leaves to drop all the experience it collected in one spot
 lab.enemy.lynx.move,近づいてきて、前方を扇形に爪で薙ぐ。殻が割れている間は速く振る,Approaches and slashes a fan in front of it. Slashes faster while its shell is broken
 lab.enemy.lynx.kill,殻を割り、数秒のうちにもう1回当てる。殻は体当たり1回か、弾・波動を当て続けると割れる,Break the shell then hit it again within seconds. One ram or sustained shots and waves break the shell
 lab.enemy.reticle.move,距離を保ち、機体のいた位置に照準を刻んで雷を落とす,Keeps its distance and marks where you were then drops lightning there

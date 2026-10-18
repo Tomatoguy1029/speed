@@ -290,9 +290,10 @@ Main (Node)
 | `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`DASH` が水流の間）・`corona`（`DASH` が輪の広がった間） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間。みなみのかんむり座は輪の広がり具合（0〜1） |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
-| `charge` | `gunner`・`missile`・`battleship`・`telescope`・`crow`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |
-| `bud_t` | `splitter`・`marlin` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間 |
-| `buds` | `splitter`・`crow` | 分裂した数。からす座は集めた残骸の数 |
+| `charge` | `gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |
+| `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間、ポンプ座は次に吸い込めるまでの時間 |
+| `buds` | `splitter`・`pump`・`crow` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数 |
+| `carry` | `crow` | 回収して運んでいる経験値の量 |
 | `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針が回り始めてからの時間 |
 | `links` | とけい座・みなみのさんかく座 | 付いて動く攻撃の形の行番号（`ProjectileManager` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |

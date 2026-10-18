@@ -4,8 +4,8 @@ const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue
 const BEHAVIORS := {
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
-	"pump": ["wave"], "sniper": ["aimed"], "ruler": ["residue"], "clock": ["residue"],
-	"lynx": ["wave"], "crow": ["aimed"], "reticle": ["zone"], "triangle": ["residue"],
+	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["residue"], "clock": ["residue"],
+	"lynx": ["wave"], "reticle": ["zone"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
 	"aquarius": ["aimed"], "auriga": ["residue"], "corona": ["residue"],
 	"cepheus": ["aimed"], "aquila": ["zone"]}

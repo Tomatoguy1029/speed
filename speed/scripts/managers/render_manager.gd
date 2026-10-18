@@ -67,6 +67,8 @@ var beams: Array = []
 var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var shield_transfers: Array = []
+## ポンプ座に吸い込まれていく敵（回りながら小さくなって口へ飛び込む）
+var swallows: Array = []
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -142,7 +144,7 @@ func _build_batches() -> void:
 	# 図形で描く。png を置けば絵に替わる
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
-		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield"]:
+		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -255,6 +257,10 @@ func _on_events(events: Array[Dictionary]) -> void:
 					"life": 0.3, "max": 0.3})
 				_ring(ev.pos, ev.r * 1.7, Color("#65e8ff"), 0.3)
 				shake = maxf(shake, 6.0)
+			&"swallow":
+				if swallows.size() < 120:
+					swallows.append({"type": ev.type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
+						"row": ev.row, "id": ev.id, "life": 0.3, "max": 0.3})
 			&"shield_block":
 				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
 			&"shield_expired":
@@ -350,7 +356,7 @@ func _update_fx(dt: float) -> void:
 		p.vel *= 1.0 - 2.5 * dt
 		p.life -= dt
 	particles = particles.filter(func(p): return p.life > 0.0)
-	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers]:
+	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers, swallows]:
 		for f in list:
 			f.life -= dt
 	for t in texts:
@@ -363,6 +369,7 @@ func _update_fx(dt: float) -> void:
 	beams = beams.filter(func(f): return f.life > 0.0)
 	bolts = bolts.filter(func(f): return f.life > 0.0)
 	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
+	swallows = swallows.filter(func(f): return f.life > 0.0)
 
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
@@ -583,6 +590,27 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if key != &"gem":
 			_batches[key].end()
 	_draw_meteor_shards(c)
+	_draw_swallows(c)
+
+## ポンプ座に吸い込まれていく敵。回りながら小さくなり、ポンプ座の口へ飛び込む。
+func _draw_swallows(c: CanvasItem) -> void:
+	var t := run.enemies.table
+	for sw in swallows:
+		var k := 1.0 - float(sw.life) / float(sw.max)
+		var target: Vector2 = sw.pos
+		if run.enemies.is_same(sw.row, sw.id):
+			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * 0.6
+		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
+		var r: float = sw.r * (1.0 - 0.85 * k)
+		var angle: float = sw.facing + k * TAU * 2.0
+		var tex := _enemy_texture(sw.type)
+		if tex == null:
+			c.draw_circle(p, r, sw.color)
+			continue
+		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
+		c.draw_set_transform(p, angle + (PI / 2.0 if sw.type in NATIVE_SPRITES else -PI / 2.0))
+		c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
+		c.draw_set_transform(Vector2.ZERO)
 
 ## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
 ## 専用の絵ができるまでの仮の描き方。
@@ -668,7 +696,9 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
 		c.draw_arc(p, r * 1.05, 0, TAU, 20, Color(0.35, 0.33, 0.32), _px(2.0))
 	var charge := t.charge[i]
-	if charge > 0.0:
+	if t.beh[i] == EnemyTable.Beh.PUMP:
+		_draw_pump(c, t, i)
+	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
 		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))
@@ -705,10 +735,8 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.charge[i] > 0.0:
 		# 号令の前の光
 		c.draw_arc(p, r * (1.3 + 1.5 * t.charge[i]), 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.6 * t.charge[i]), _px(3.0))
-	if t.beh[i] == EnemyTable.Beh.CROW and t.buds[i] > 0:
-		# 集めた残骸の塊
-		var lump: float = t.def[i].params.lump_r * sqrt(float(t.buds[i]) / float(t.def[i].params.throw_min))
-		c.draw_circle(p + Vector2.from_angle(t.facing[i] + 0.9) * (r + lump), lump, Color("#8d8f99"))
+	if t.beh[i] == EnemyTable.Beh.CROW and t.carry[i] > 0.0:
+		_draw_crow_bundle(c, t, i)
 	var hp := t.hp[i]
 	var max_hp := t.max_hp[i]
 	if (r >= 25.0 or t.is_boss[i] != 0) and hp < max_hp:
@@ -716,6 +744,47 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var top := p + Vector2(-w / 2.0, -r - _px(10.0))
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
+
+## ポンプ座：吸い込んだ数に応じて継ぎ目から光が漏れる。構えている間は胴体が張り詰め、口元に巨大な塊がせり出す。
+func _draw_pump(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var dp: Dictionary = t.def[i].params
+	var full := clampf(float(t.buds[i]) / float(dp.store_max), 0.0, 1.0)
+	var aiming := t.mode[i] == EnemyTable.Mode.WINDUP
+	var glow := Color("#ffe2a8") if aiming else t.color[i].lightened(0.5)
+	var pulse := 0.5 + 0.5 * sin(state.world_time * (18.0 if aiming else 6.0))
+	if full > 0.0 or aiming:
+		var a := 0.25 + 0.55 * full + (0.2 * pulse if aiming else 0.0)
+		for k in 3:
+			var seam := t.facing[i] + PI / 2.0 + (float(k) - 1.0) * 0.55
+			var u := Vector2.from_angle(seam) * r * 0.85
+			c.draw_line(p - u, p + u, Color(glow, a), _px(2.0 + 3.0 * full))
+		c.draw_arc(p, r * (1.04 + 0.04 * pulse * full), 0, TAU, 40, Color(glow, a * 0.8), _px(2.0 + 2.0 * full))
+	if aiming:
+		var ball := float(dp.shell_r) * (0.4 + 0.6 * t.charge[i])
+		var mouth := p + Vector2.from_angle(t.facing[i]) * (r + ball * 0.4)
+		c.draw_circle(mouth, ball * 1.3, Color(glow, 0.3))
+		c.draw_circle(mouth, ball, t.color[i].lightened(0.2))
+		c.draw_circle(mouth, ball * 0.55, Color("#fff4dc"))
+
+## からす座が足に抱えた経験値の結晶の束。運んでいる量が多いほど大きく、明るい。
+func _draw_crow_bundle(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var n := clampi(t.buds[i], 1, 12)
+	var amount := clampf(sqrt(t.carry[i]) / 8.0, 0.0, 1.0)
+	var back := Vector2.from_angle(t.facing[i] + PI)
+	var side := Vector2(-back.y, back.x)
+	var center := p + back * r * 0.75
+	var s := maxf(_px(3.0), r * (0.18 + 0.14 * amount))
+	var col := XP_COLOR.lightened(0.15 + 0.45 * amount)
+	c.draw_circle(center, s * (2.2 + 1.2 * amount), Color(XP_COLOR, 0.15 + 0.25 * amount))
+	for k in n:
+		var off := side * (float(k % 4) - 1.5) * s * 0.9 + back * floorf(k / 4.0) * s * 0.9
+		var q := center + off
+		c.draw_colored_polygon(PackedVector2Array([q + Vector2(0, -1.4) * s, q + Vector2(1, 0) * s,
+			q + Vector2(0, 1.4) * s, q + Vector2(-1, 0) * s]), col)
 
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := view_rect().grow(40.0)
@@ -757,7 +826,14 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
-			if pr.hostile_kind[i] == ProjectileManager.HostileKind.REFLECTED:
+			if pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
+				# ポンプ座の圧縮弾
+				var u := pr.hostile_vel[i].normalized()
+				c.draw_line(pos - u * hostile_r[i] * 2.5, pos, Color(0.85, 0.7, 1.0, 0.5), hostile_r[i] * 1.2)
+				c.draw_circle(pos, hostile_r[i] * 1.25, Color(1.0, 0.85, 0.6, 0.35))
+				c.draw_circle(pos, hostile_r[i], Color("#b78cff"))
+				c.draw_circle(pos, hostile_r[i] * 0.55, Color("#fff4dc"))
+			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.REFLECTED:
 				var u := pr.hostile_vel[i].normalized()
 				c.draw_line(pos - u * hostile_r[i] * 3.0, pos, Color("#ff84df"), hostile_r[i] * 0.9)
 				c.draw_circle(pos, hostile_r[i], Color("#f45ec5"))

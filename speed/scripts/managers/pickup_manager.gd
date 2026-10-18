@@ -61,6 +61,11 @@ func on_enemy_killed(i: int) -> void:
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
 	drop_gem(pos, t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger))
+	if t.carry[i] > 0.0:
+		# からす座が運んでいた経験値を、倒した場所へまとめて落とす
+		var n := clampi(t.buds[i], 1, 16)
+		for k in n:
+			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n))
 	_drop_coins(i, danger)
 	if t.type[i] == &"meteor":
 		if state.rng.randf() < cfg.meteor_heal_chance:
@@ -197,6 +202,7 @@ func _spawn_cores(dt: float) -> void:
 # ── 拾う ──────────────────────────────────────────────────────────
 
 func _collect_gems(dt: float) -> void:
+	_crow_gather(dt)
 	var reach := cfg.ship_radius + 14.0
 	var radius := state.stats.pickup_radius
 	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
@@ -220,6 +226,36 @@ func _collect_gems(dt: float) -> void:
 			build.add_xp(gem_value[i])
 			state.emit(&"pickup", {"kind": &"gem"})
 			gem_slots.release(i)
+
+## からす座が通り道の周りの経験値の結晶を吸い寄せて回収する（敵の表の carry に足す）。
+## 機体が吸い寄せ始めた結晶は機体が先に取る。
+func _crow_gather(dt: float) -> void:
+	var t := enemies.table
+	var rows := enemies.beh_rows[EnemyTable.Beh.CROW]
+	if rows.is_empty():
+		return
+	for j in rows:
+		if t.dead[j] != 0:
+			continue
+		var p: Dictionary = t.def[j].params
+		var radius := float(p.gather_radius)
+		var radius_sq := radius * radius
+		var step := float(p.gather_speed) * dt
+		var c := t.pos[j]
+		for i in gem_alive.size():
+			if gem_alive[i] == 0 or gem_pulled[i] != 0:
+				continue
+			var d := c - gem_pos[i]
+			var dist_sq := d.length_squared()
+			if dist_sq >= radius_sq:
+				continue
+			var dist := sqrt(dist_sq)
+			if dist <= t.r[j] + step:
+				t.carry[j] += gem_value[i]
+				t.buds[j] += 1
+				gem_slots.release(i)
+			else:
+				gem_pos[i] += d / dist * step
 
 func _collect_coins(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0

@@ -207,6 +207,7 @@ func _reset_row(i: int) -> void:
 	t.charge[i] = 0.0
 	t.bud_t[i] = 0.0
 	t.buds[i] = 0
+	t.carry[i] = 0.0
 	t.spin[i] = 0.0
 	t.knock_t[i] = 0.0
 	t.shove_time[i] = 0.0
@@ -588,7 +589,6 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.LYNX:
 					_lynx(i, bdt)
 				EnemyTable.Beh.CROW:
-					_keep_distance(i, bdt)
 					_crow(i, bdt)
 				EnemyTable.Beh.RETICLE:
 					_keep_distance(i, bdt)
@@ -921,44 +921,71 @@ func _pulser(i: int, dt: float) -> void:
 func _ship_fast() -> bool:
 	return state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
 
-## ポンプ座：距離を保ち、周期的に止まって周りの敵と遅い機体を吸い寄せ（口が開いて倒せる）、
-## そのあと前方へ一気に吐き出す（扇形の波）。
+## ポンプ座：機体を追いながら周りの敵を吸い込んで圧縮する（buds が吸い込んだ数）。数に応じて胴体が膨らむ。
+## 満タンになると吸い込みを止めて構え（WINDUP）、向きを固定して圧縮弾を一発撃つ。撃ったあとはしぼむ（RECOVER）。
 func _pump(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if t.mode[i] == EnemyTable.Mode.MOVE:
-		_keep_distance(i, dt)
-		t.fire_t[i] -= dt
-		if t.fire_t[i] <= 0.0:
-			t.mode[i] = EnemyTable.Mode.WINDUP
-			t.timer[i] = float(p.suck_time)
-		return
-	_hold(i, dt)
+	var store_max := int(p.store_max)
+	var full := float(t.buds[i]) / float(store_max)
+	# 胴体は吸い込んだ数に応じて膨らみ、撃ったあとはしぼむ
+	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale
+	t.r[i] += (base_r * (1.0 + float(p.grow) * full) - t.r[i]) * minf(1.0, 6.0 * dt)
 	t.timer[i] -= dt
-	var a := (state.ship_pos - t.pos[i]).angle()
-	_turn_toward(i, a, 2.0, dt)
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		# 吸い寄せる
-		var reach := float(p.pull_radius)
-		var pull := float(p.pull) * dt
-		var d := t.pos[i] - state.ship_pos
-		if d.length_squared() < reach * reach and not _ship_fast():
-			state.ship_vel += d.normalized() * pull
-		var rows := PackedInt32Array()
-		projectiles.combat.nearby(t.pos[i], reach, rows)
-		for j in rows:
-			if j != i and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0:
-				var dj := t.pos[i] - t.pos[j]
-				t.vel[j] += dj.normalized() * pull
-		if t.timer[i] <= 0.0:
-			# 吐き出す
-			projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
-				float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
-			t.mode[i] = EnemyTable.Mode.RECOVER
-			t.timer[i] = 0.6
-	elif t.timer[i] <= 0.0:
-		t.mode[i] = EnemyTable.Mode.MOVE
-		t.fire_t[i] = float(p.fire_interval)
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
+			_pump_suck(i, p, dt)
+			if t.buds[i] >= store_max:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			# 撃つ直前の lock_time は向きを固定する
+			if t.timer[i] > float(p.lock_time):
+				_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
+			if t.timer[i] <= 0.0:
+				projectiles.fire_shell(i, t.facing[i], float(p.shell_speed), float(p.shell_r), float(p.shell_range),
+					float(p.burst_radius), _attack_dmg(i, float(p.bullet_dmg)))
+				t.buds[i] = 0
+				t.charge[i] = 0.0
+				t.vel[i] -= Vector2.from_angle(t.facing[i]) * float(p.shell_speed) * 0.3
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.recover)
+		_:
+			_hold(i, dt)
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+
+## ポンプ座が周りの敵を吸い寄せ、口に届いた敵を一定の間隔で吸い込む。吸い込める敵は、上限を持たない雑魚と硬めの敵。
+## 吸い込んだ敵は撃破にせずに消し、回りながら口へ飛び込む見た目を描画へ知らせる。
+func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
+	var t := table
+	var reach := float(p.pull_radius)
+	var pull := float(p.pull) * dt
+	var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * 0.6
+	var bite := t.r[i] + float(p.swallow_reach)
+	t.bud_t[i] -= dt
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby(t.pos[i], reach, rows)
+	for j in rows:
+		if j == i or t.dead[j] != 0 or t.is_boss[j] != 0 or t.meteor_index[j] >= 0 or t.parent[j] >= 0 \
+				or t.landmark[j] != 0:
+			continue
+		if t.def[j] == null or t.def[j].max_alive > 0 or t.beh[j] == EnemyTable.Beh.PUMP:
+			continue
+		var d := mouth - t.pos[j]
+		var dist := d.length()
+		if dist < bite and t.bud_t[i] <= 0.0 and t.buds[i] < int(p.store_max):
+			t.buds[i] += 1
+			t.bud_t[i] = float(p.swallow_interval)
+			state.emit(&"swallow", {"type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],
+				"color": t.color[j], "row": i, "id": t.id[i]})
+			mark_dead(j)
+			continue
+		t.vel[j] += d / maxf(dist, 1.0) * pull
 
 ## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
 func _ruler(i: int, dt: float) -> void:
@@ -1018,30 +1045,24 @@ func _lynx(i: int, dt: float) -> void:
 		projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
 			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
 
-## からす座：周りで倒された敵の残骸を集めて塊にし（buds が集めた数）、集まると機体へ投げる。
+## からす座：機体を追わず、一直線に戦場を横断する。経験値の回収は PickupManager が行う（carry が運んでいる量）。
+## 画面の外から出たものは画面の中を通る向きに決め、画面の中に置かれたもの（実験場）は置いた向きのまま進む。
+## 画面の外で exit_margin より離れ、さらに離れていくと、運んでいる経験値ごと退場する（撃破にはならない）。
 func _crow(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if t.buds[i] < int(p.throw_min):
-		t.charge[i] = 0.0
-		return
-	if _gun_timer(i, dt):
-		var n := t.buds[i]
-		t.buds[i] = 0
-		var size := float(p.lump_r) * sqrt(float(n) / float(p.throw_min))
-		projectiles.fire_lump(i, (state.enemy_aim - t.pos[i]).angle(), float(p.bullet_speed), size,
-			_attack_dmg(i, float(p.bullet_dmg)) * sqrt(float(n) / float(p.throw_min)))
-
-## 倒された敵の残骸を、近くのからす座が集める。
-func _gather_debris(pos: Vector2) -> void:
-	var t := table
-	for j in beh_rows[EnemyTable.Beh.CROW]:
-		if t.dead[j] != 0:
-			continue
-		var p: Dictionary = t.def[j].params
-		if t.pos[j].distance_squared_to(pos) < float(p.gather_radius) * float(p.gather_radius):
-			t.buds[j] = mini(t.buds[j] + 1, int(p.lump_max))
-			return
+	var rel := t.pos[i] - _vc
+	var outside := absf(rel.x) > _vh.x or absf(rel.y) > _vh.y
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		t.mode[i] = EnemyTable.Mode.DASH
+		if outside:
+			var spread := float(p.aim_spread)
+			var target := _vc + Vector2(state.rng.randf_range(-spread, spread) * _vh.x, state.rng.randf_range(-spread, spread) * _vh.y)
+			t.facing[i] = (target - t.pos[i]).angle()
+	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
+	var margin := float(p.exit_margin)
+	if (absf(rel.x) > _vh.x + margin or absf(rel.y) > _vh.y + margin) and rel.dot(t.vel[i]) > 0.0:
+		mark_dead(i)
 
 ## レチクル座：距離を保ち、間隔ごとに機体のいた位置へ照準の模様を刻む。少し遅れてそこに雷が落ちる。
 func _reticle(i: int, dt: float) -> void:
@@ -1307,18 +1328,19 @@ func _aquila(i: int, dt: float) -> void:
 		ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
-## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。
+## ポンプ座は、圧縮していた敵を一気に解放する。飛び散る敵と破裂は機体の側の攻撃で、蓄積が多いほど強い。
 func on_enemy_death(i: int, atk: float) -> void:
 	var t := table
 	var dp: Dictionary = t.def[i].params if t.def[i] != null else {}
 	var prior_context := projectiles.lab_context
 	if projectiles.director != null:
 		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
-	if t.beh[i] == EnemyTable.Beh.CROW:
-		for k in t.buds[i] * int(dp.shards):
-			projectiles.fire_enemy(i, state.rng.randf() * TAU, float(dp.bullet_speed) * state.rng.randf_range(0.6, 1.0), &"bullet")
-	elif t.is_boss[i] == 0 and t.meteor_index[i] < 0:
-		_gather_debris(t.pos[i])
+	if t.beh[i] == EnemyTable.Beh.PUMP:
+		var full := float(t.buds[i]) / float(dp.store_max)
+		projectiles.burst_debris(t.pos[i], int(dp.release_base) + int(float(dp.release_per) * float(t.buds[i])),
+			float(dp.release_speed), atk * float(dp.release_dmg), t.color[i].lightened(0.3), t.id[i])
+		projectiles.combat.explode(t.pos[i], float(dp.release_radius) * (1.0 + full), atk * float(dp.release_dmg),
+			{"cause": &"pump_burst", "no_crit": true, "color": t.color[i].lightened(0.4), "life": 0.35, "knock": 500.0 + 400.0 * full})
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),
 			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
@@ -1460,8 +1482,8 @@ func _survey() -> int:
 				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
-				# 部位は親と一緒に動くので、離れても再配置しない
-				if table.parent[i] < 0:
+				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
+				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW:
 					_far_rows.append(i)
 				continue
 			alive_n += 1
@@ -1609,6 +1631,8 @@ func _lab_admit(i: int, dt: float) -> bool:
 		due = table.pos[i].distance_to(state.enemy_aim) <= float(p.range)
 	elif def.behavior == &"bomber":
 		due = table.pos[i].distance_to(state.ship_pos) <= float(p.trigger)
+	elif def.behavior == &"pump":
+		due = table.buds[i] >= int(p.store_max)
 	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
 		due = true
 	if not active and due:

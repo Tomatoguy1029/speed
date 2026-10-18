@@ -41,8 +41,9 @@ var _buf := PackedInt32Array()
 var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
-enum HostileKind { BULLET, MISSILE, REFLECTED }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected"]
+## SHELL はポンプ座の圧縮弾。直進し、届く距離を飛ぶか何かに当たると、その場で大きく破裂する（破裂が当たる）
+enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -61,6 +62,8 @@ var hostile_gap := PackedFloat32Array()
 var hostile_stone := PackedFloat32Array()
 ## 浮かんで待つ残り時間（その間は動かないが、触れると被弾する）
 var hostile_wait := PackedFloat32Array()
+## 圧縮弾が破裂する範囲の半径（圧縮弾のほかは 0）
+var hostile_burst := PackedFloat32Array()
 var hostile_slots: RowSlots
 ## 実験の攻撃グループ。行の再利用時に必ず上書きする。
 var lab_context := 0
@@ -344,12 +347,21 @@ func fire_ring_hold(i: int, n: int, radius: float, wait: float, speed: float, dm
 		var h := _add_hostile(c + u * radius, u * speed, speed, 8.0, 4.0 + wait, dmg, 0.0, 0.0, HostileKind.BULLET)
 		hostile_wait[h] = wait
 
-## からす座の塊を投げる。大きさ r とダメージ dmg は集めた残骸の数で決まる。
+## 塊を投げる（うみへび座の瓦礫の首）。大きさ r、ダメージ dmg。
 func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void:
 	var t := combat.enemies.table
 	var u := Vector2.from_angle(angle)
 	_add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, 4.0, dmg, 0.0, 0.0, HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"lump"})
+
+## ポンプ座の圧縮弾を撃つ。距離 range を飛ぶか何かに当たると、半径 burst で破裂して dmg を与える。
+func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
+	var t := combat.enemies.table
+	var u := Vector2.from_angle(angle)
+	var h := _add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, range / maxf(speed, 1.0), dmg, 0.0, 0.0,
+		HostileKind.SHELL)
+	hostile_burst[h] = burst
+	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
 
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
@@ -369,6 +381,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
+	hostile_burst[i] = 0.0
 	return i
 
 ## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
@@ -442,9 +455,15 @@ func _update_hostile(dt: float) -> void:
 		if ship_pos.distance_squared_to(to) <= reach * reach:
 			var t := Geom.seg_circle_t(from, to, ship_pos, rr)
 			if t >= 0.0 and (body_hit == null or t < body_hit.t):
-				ship.damage(hostile_dmg[i], hostile_slow[i], HOSTILE_CAUSE[kind])
+				if kind != HostileKind.SHELL:
+					ship.damage(hostile_dmg[i], hostile_slow[i], HOSTILE_CAUSE[kind])
 				life = 0.0
+				to = from + (to - from) * t
 		if body_hit != null or life <= 0.0:
+			if kind == HostileKind.SHELL and hostile_life[i] > 0.0:
+				# 圧縮弾は、飛びきるか何かに当たった位置で破裂する
+				var at: Vector2 = to if body_hit == null else from + (to - from) * float(body_hit.t)
+				fire_zone(at, hostile_burst[i], 0.0, hostile_dmg[i], HazardStyle.BLAST, Color("#c9a6ff"))
 			hostile_slots.release(i)
 		else:
 			hostile_pos[i] = to
