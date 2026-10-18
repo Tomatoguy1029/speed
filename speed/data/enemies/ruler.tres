@@ -24,12 +24,12 @@ weak_arc = 0.0
 gate = &""
 params = {
 "keep": 520.0,
-"split_delay": 1.2,
+"split_delay": 0.4,
 "half_gap": 190.0,
 "emit_back": 520.0,
-"deploy_time": 1.0,
-"deploy_speed": 700.0,
-"telegraph": 1.0,
+"deploy_time": 0.5,
+"deploy_speed": 1200.0,
+"telegraph": 0.6,
 "beam_len": 2600.0,
 "beam_width": 26.0,
 "beam_time": 5.0,

@@ -918,27 +918,28 @@ func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(tip, r * 0.18, Color(col, 0.6))
 
 ## やまねこ座の斬撃：湾曲した3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
-func _draw_slash(c: CanvasItem, pos: Vector2, angle: float, arc_r: float, hand: float, a: float) -> void:
+func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, arc_r: float, side: float, a: float) -> void:
 	var span := ProjectileManager.SLASH_SPAN
 	var thick := ProjectileManager.SLASH_THICK * arc_r
+	var angle := ProjectileManager.slash_bulge(travel, side)
 	for k in 3:
-		var center := ProjectileManager.slash_center(pos, angle, arc_r, k, hand)
+		var center := ProjectileManager.slash_center(pos, travel, arc_r, k, side)
 		c.draw_arc(center, arc_r, angle - span, angle + span, 20, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
 		c.draw_arc(center, arc_r, angle - span * 0.96, angle + span * 0.96, 20, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
 		c.draw_arc(center, arc_r, angle - span * 0.8, angle + span * 0.8, 20, Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
 
-## やまねこ座：次に振るう側の前足に、爪痕の形の光が構えとともに強まる。
+## やまねこ座：構えると、両前足に外側へふくらむ爪痕の光が強まる。
 func _draw_lynx(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var k := t.charge[i]
 	if k <= 0.0:
 		return
 	var r := t.r[i]
-	var hand := run.enemies.lynx_hand(i)
 	var f := t.facing[i]
 	var u := Vector2.from_angle(f)
-	var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * hand * r * 0.75
-	c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
-	_draw_slash(c, paw + u * r * 0.3, f, r * (0.35 + 0.35 * k), hand, 0.3 + 0.7 * k)
+	for side: float in [1.0, -1.0]:
+		var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * side * r * 0.9
+		c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
+		_draw_slash(c, paw, f, r * (0.3 + 0.3 * k), side, 0.3 + 0.7 * k)
 
 ## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
 const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]

@@ -1164,25 +1164,20 @@ func _clock(i: int, dt: float) -> void:
 	projectiles.move_hazard(links[0], t.pos[i], a0)
 	projectiles.move_hazard(links[1], t.pos[i], a1)
 
-## やまねこ座：距離を保ち、間隔ごとに爪を構えて（charge が構えの進み）、湾曲した3本の爪痕の斬撃を飛ばし続ける。
-## 斬撃は撃ったときの機体の向きへ形を保って直進し、追尾しない。左右の手で交互に撃ち（buds が撃った数）、
-## 斬撃の筋を機体への線から slash_shift だけ左右交互にずらすので、空いている側が1発ごとに入れ替わる。
+## やまねこ座：距離を保ち、間隔ごとに両前足を構えて（charge が構えの進み）、本体を左右から守るように斬撃を2組飛ばし続ける。
+## 2組は機体への線から左右へ lane_half ずつ離れ、湾曲した爪痕を外側へふくらませて、真ん中の通り道を挟む。
+## 斬撃は撃ったときの機体の向きへ形を保って直進し、追尾しない。横へ逃げずに真ん中を抜けて本体へ近づかせる。
 func _lynx(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	_keep_distance(i, dt)
 	if _gun_timer(i, dt):
-		var hand := 1.0 if t.buds[i] % 2 == 0 else -1.0
-		t.buds[i] += 1
 		var a := (state.ship_pos - t.pos[i]).angle()
 		var u := Vector2.from_angle(a)
-		var from := t.pos[i] + u * t.r[i] + Vector2(-u.y, u.x) * hand * float(p.slash_shift)
-		projectiles.fire_slash(from, a, float(p.slash_speed), float(p.slash_r), float(p.slash_range),
-			_attack_dmg(i, float(p.bullet_dmg)), hand)
-
-## やまねこ座が次に撃つ手（1 か -1。構えの見た目に使う）。
-func lynx_hand(i: int) -> float:
-	return 1.0 if table.buds[i] % 2 == 0 else -1.0
+		var n := Vector2(-u.y, u.x)
+		for side: float in [1.0, -1.0]:
+			projectiles.fire_slash(t.pos[i] + u * t.r[i] + n * side * float(p.lane_half), a, float(p.slash_speed),
+				float(p.slash_r), float(p.slash_range), _attack_dmg(i, float(p.bullet_dmg)), side)
 
 ## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
 ## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。

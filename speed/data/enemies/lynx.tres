@@ -29,6 +29,6 @@ params = {
 "slash_r": 160.0,
 "slash_speed": 320.0,
 "slash_range": 1500.0,
-"slash_shift": 95.0,
+"lane_half": 200.0,
 "bullet_dmg": 12.0
 }
