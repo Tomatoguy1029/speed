@@ -32,7 +32,7 @@ params = {
 "lock_fill": 0.9,
 "search_period": 2.6,
 "search_sway": 0.6,
-"search_turn": 1.1,
+"search_turn": 0.6,
 "track_turn": 0.8
 }
 id = &"telescope"
