@@ -260,7 +260,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"swallow":
 				if swallows.size() < 120:
 					swallows.append({"type": ev.type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
-						"row": ev.row, "id": ev.id, "life": 0.3, "max": 0.3})
+						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
 			&"shield_block":
 				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
 			&"shield_expired":
@@ -592,7 +592,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	_draw_meteor_shards(c)
 	_draw_swallows(c)
 
-## ポンプ座に吸い込まれていく敵。回りながら小さくなり、ポンプ座の口へ飛び込む。
+## ポンプ座に吸い込まれていく敵。自転しながら小さくなり、ポンプ座の口へ飛び込む。
 func _draw_swallows(c: CanvasItem) -> void:
 	var t := run.enemies.table
 	for sw in swallows:
@@ -602,7 +602,7 @@ func _draw_swallows(c: CanvasItem) -> void:
 			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * 0.6
 		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
 		var r: float = sw.r * (1.0 - 0.85 * k)
-		var angle: float = sw.facing + k * TAU * 2.0
+		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
 		var tex := _enemy_texture(sw.type)
 		if tex == null:
 			c.draw_circle(p, r, sw.color)

@@ -960,11 +960,13 @@ func _pump(i: int, dt: float) -> void:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
 ## ポンプ座が周りの敵を吸い寄せ、口に届いた敵を一定の間隔で吸い込む。吸い込める敵は、上限を持たない雑魚と硬めの敵。
-## 吸い込んだ敵は撃破にせずに消し、回りながら口へ飛び込む見た目を描画へ知らせる。
+## 吸い寄せられている敵は自分の動きをやめ（knock_t）、自転しながら口へまっすぐ進む。口に近いほど速く、速く回る。
+## 吸い込んだ敵は撃破にせずに消し、自転しながら小さくなって口へ飛び込む見た目を描画へ知らせる。
 func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 	var t := table
 	var reach := float(p.pull_radius)
-	var pull := float(p.pull) * dt
+	var pull := float(p.pull)
+	var spin := float(p.pull_spin)
 	var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * 0.6
 	var bite := t.r[i] + float(p.swallow_reach)
 	t.bud_t[i] -= dt
@@ -982,10 +984,13 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 			t.buds[i] += 1
 			t.bud_t[i] = float(p.swallow_interval)
 			state.emit(&"swallow", {"type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],
-				"color": t.color[j], "row": i, "id": t.id[i]})
+				"color": t.color[j], "row": i, "id": t.id[i], "spin": spin * 2.0})
 			mark_dead(j)
 			continue
-		t.vel[j] += d / maxf(dist, 1.0) * pull
+		var near := 1.0 - clampf(dist / reach, 0.0, 1.0)
+		t.knock_t[j] = maxf(t.knock_t[j], dt * 2.0)
+		t.vel[j] = d / maxf(dist, 1.0) * pull * (0.3 + 0.7 * near)
+		t.facing[j] += spin * (0.4 + 0.6 * near) * dt
 
 ## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
 func _ruler(i: int, dt: float) -> void:

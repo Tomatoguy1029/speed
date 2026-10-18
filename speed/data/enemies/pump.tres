@@ -24,7 +24,8 @@ weak_arc = 0.0
 gate = &""
 params = {
 "pull_radius": 360.0,
-"pull": 900.0,
+"pull": 520.0,
+"pull_spin": 9.0,
 "swallow_reach": 30.0,
 "swallow_interval": 0.12,
 "store_max": 20,
