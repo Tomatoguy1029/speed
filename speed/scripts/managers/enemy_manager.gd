@@ -1540,8 +1540,8 @@ func _marlin(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
-## みずがめ座：遠くに留まり、機体の方へ、先へ行くほど広がる極太ビームを扇状に3本、一斉に照射する。
-## 撃つ向きは予告の始めに決め、照射する範囲全体を telegraph の間見せてから、beam_time の間だけ当てる。
+## みずがめ座：遠くに留まり、先へ行くほど広がる極太ビームを全方位へ beams 本、等間隔で一斉に照射する。
+## 1本は機体の方を向く。撃つ向きは予告の始めに決め、照射する範囲全体を telegraph の間見せてから、beam_time の間だけ当てる。
 ## ビームの間には安全な隙間が残る。WINDUP が予告と照射、RECOVER が照射後の休み。
 func _aquarius(i: int, dt: float) -> void:
 	var t := table
@@ -1567,9 +1567,9 @@ func _aquarius(i: int, dt: float) -> void:
 				t.fire_t[i] = float(p.fire_interval)
 				var a := (state.ship_pos - t.pos[i]).angle()
 				t.facing[i] = a
-				var from := t.pos[i] + Vector2.from_angle(a) * t.r[i] * 0.8
-				for k in [-1, 0, 1]:
-					var h := projectiles.fire_flood(from, a + k * float(p.beam_gap), float(p.beam_len), float(p.beam_width),
+				var n := int(p.beams)
+				for k in n:
+					var h := projectiles.fire_flood(t.pos[i], a + k * TAU / n, float(p.beam_len), float(p.beam_width),
 						float(p.beam_spread), float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)),
 						t.color[i].lightened(0.25))
 					# 予告中・照射中に倒されたら消える
