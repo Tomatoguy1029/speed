@@ -1,8 +1,10 @@
-// みずがめ座の水の演出（RenderManager の水の層が描く）。流れるノイズで水の動きを描く。
-// 頂点の色で描き方を渡す：r が種類（0 予告のさざ波、1/3 照射の水流、2/3 光を集める溜め、1 霧）、g が強さ、b がずらし、a が濃さ。
-// ビーム（種類 0・1/3・1）の UV：x は根元からの距離（世界の単位の 1/1000）、y は帯の中の左右の位置（端が ±1、外側に飛沫の余白）。
-// 溜め（種類 2/3）の UV：瓶の口を中心に -1〜1（半径 1 の円の外は描かない）。
+// みずがめ座の水の演出（RenderManager の水の層が描く）。流れるノイズで水と光の動きを描く。
+// 頂点の色で描き方を渡す：r が種類（0 予告のさざ波、1/3 照射の光、1 霧）、g が強さ、b がずらし、a が濃さ。
+// UV：x は根元からの距離（世界の単位の 1/1000）、y は帯の中の左右の位置（端が ±1、外側に飛沫の余白）。
 shader_type canvas_item;
+
+// HDR の描画では頂点の色が線形に直されて届く。そのときは元の値（sRGB）に戻して読む
+uniform bool linear_colors = false;
 
 // ビームの根元の幅の半分と、先へ行くほど広がる割合（世界の単位）。帯の中の位置を世界の距離に直すのに使う
 uniform float half0 = 35.0;
@@ -43,33 +45,31 @@ float dots(vec2 p, float density, float radius) {
 	return smoothstep(radius, radius * 0.35, length(f - c));
 }
 
-// 照射の水流：幅いっぱいが明るく光る、高速で外へ噴き出す水。g が 1 未満なら細くなって飛沫にちぎれていく
+// 照射の光：幅いっぱいが白く強く光り、外へ高速で流れる。g が 1 未満なら細くなって飛沫にちぎれていく
 vec4 rushing(float along, float across, float side, float g, float seed) {
 	float t = TIME;
 	float half = half0 + along * slope;
 	float cw = across * half;
-	// 外へ長く伸びる筋（流れの向きに引き伸ばしたノイズを速く流す）
-	float long_streak = fbm(vec2(along * 0.0016 - t * 5.5, cw * 0.012 + seed));
-	float fine_streak = fbm(vec2(along * 0.0045 - t * 13.0, cw * 0.05 + seed * 1.7));
-	float flow = long_streak * 0.6 + fine_streak * 0.4;
-	// 輪郭は水らしく揺れる
-	float wobble = (fbm(vec2(along * 0.006 - t * 9.0, seed + side * 3.0)) - 0.5) * 0.08;
-	float body = 1.0 - smoothstep(g * 0.9, g * 0.98, side + wobble);
-	// 外側へにじむ光
-	float halo = (1.0 - smoothstep(g * 0.95, g * 0.95 + 0.14, side)) * (1.0 - body);
+	// 外へ高速で流れる光の筋（流れの向きに引き伸ばしたノイズ）
+	float long_streak = fbm(vec2(along * 0.0012 - t * 11.0, cw * 0.01 + seed));
+	float fine_streak = fbm(vec2(along * 0.0035 - t * 26.0, cw * 0.045 + seed * 1.7));
+	float flow = long_streak * 0.55 + fine_streak * 0.45;
+	// 輪郭は細かく震える
+	float wobble = (noise(vec2(along * 0.02 - t * 40.0, seed)) - 0.5) * 0.05;
+	float body = 1.0 - smoothstep(g * 0.92, g * 0.99, side + wobble);
+	// 外側へにじむ強い光
+	float halo = (1.0 - smoothstep(g * 0.9, g * 0.9 + 0.2, side)) * (1.0 - body);
 	// ちぎれていくときは、流れの薄い所から抜ける
 	float breakup = smoothstep(0.75 - 0.62 * g, 0.85 - 0.62 * g, flow);
-	// 縁から外へ飛ぶ飛沫（丸い粒）
-	float spray = dots(vec2(along / 22.0 - t * 75.0, (side - 0.9) * half / 12.0 + seed), 0.45, 0.32)
+	// 縁から外へ飛ぶ光の粒
+	float spray = dots(vec2(along / 22.0 - t * 120.0, (side - 0.9) * half / 12.0 + seed), 0.45, 0.3)
 		* smoothstep(0.88 * g, 0.97 * g, side) * smoothstep(1.12, 1.0, side);
-	vec3 trough = vec3(0.08, 0.42, 0.95);
-	vec3 crest = vec3(0.45, 1.05, 1.45);
-	vec3 col = mix(trough, crest, smoothstep(0.3, 0.75, flow));
-	// 縁は泡立って明るい
-	col = mix(col, vec3(0.85, 1.25, 1.55), smoothstep(0.65, 0.95, side) * 0.7);
-	col += vec3(0.6, 1.0, 1.3) * pow(fine_streak, 4.0) * 1.2;
-	float a = body * breakup * (0.86 + 0.14 * flow) + halo * 0.45 * g + spray * 0.9;
-	col = mix(col, vec3(0.7, 1.0, 1.3), clamp(spray, 0.0, 1.0));
+	// 白い強い光。筋の明るい所はさらに強く、縁だけわずかに水色
+	float intensity = 2.0 + 1.6 * smoothstep(0.35, 0.8, flow) + 1.5 * pow(fine_streak, 3.0);
+	vec3 col = vec3(1.0) * intensity;
+	col = mix(col, vec3(0.75, 1.0, 1.25) * 1.8, smoothstep(0.7, 0.99, side) * 0.6);
+	float a = body * breakup + halo * 0.6 * g + spray;
+	col = mix(col, vec3(0.9, 1.05, 1.25) * 2.2, clamp(spray, 0.0, 1.0) * (1.0 - body));
 	return vec4(col, clamp(a, 0.0, 1.0));
 }
 
@@ -95,23 +95,6 @@ vec4 ripples(float along, float across, float side, float k, float seed) {
 	return vec4(col, clamp(a, 0.0, 1.0));
 }
 
-// 溜め：周りから細い光の筋が渦を巻いて瓶の口へ吸い込まれ、口が明るくなる（円の外は描かない）
-vec4 gather(vec2 uv, float k, float seed) {
-	float t = TIME;
-	float rad = length(uv);
-	float mask = 1.0 - smoothstep(0.6, 1.0, rad);
-	float ang = atan(uv.y, uv.x);
-	float swirl = ang + rad * 1.4;
-	// 角度は整数倍で回すので継ぎ目が出ない
-	float ray = pow(0.5 + 0.5 * sin(swirl * 14.0 + 2.5 * sin(swirl * 5.0 + seed)), 10.0);
-	float pulse = fract(rad * 2.4 + t * (0.9 + 1.8 * k) + 0.3 * sin(swirl * 3.0 + seed));
-	float streak = ray * smoothstep(0.0, 0.25, pulse) * (1.0 - smoothstep(0.25, 0.7, pulse)) * smoothstep(0.08, 0.22, rad);
-	float core = exp(-rad * rad * 90.0) * (0.25 + 0.75 * k);
-	float a = (streak * (0.25 + 0.6 * k) + core) * mask;
-	vec3 col = mix(vec3(0.45, 0.82, 1.05), vec3(0.9, 1.1, 1.25), clamp(core * 2.0, 0.0, 1.0));
-	return vec4(col, clamp(a, 0.0, 1.0));
-}
-
 // 照射のあとに残る霧と丸い水滴
 vec4 mist(float along, float across, float side, float life, float seed) {
 	float t = TIME;
@@ -125,20 +108,23 @@ vec4 mist(float along, float across, float side, float life, float seed) {
 	return vec4(col, clamp(a, 0.0, 1.0));
 }
 
+vec3 to_srgb(vec3 c) {
+	return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
 void fragment() {
-	float mode = COLOR.r;
-	float g = COLOR.g;
-	float seed = COLOR.b * 97.0;
+	vec3 raw = linear_colors ? to_srgb(COLOR.rgb) : COLOR.rgb;
+	float mode = raw.r;
+	float g = raw.g;
+	float seed = raw.b * 97.0;
 	float fade = COLOR.a;
 	float along = UV.x * 1000.0;
 	float side = abs(UV.y);
 	vec4 c;
 	if (mode < 0.15) {
 		c = ripples(along, UV.y, side, g, seed);
-	} else if (mode < 0.5) {
+	} else if (mode < 0.66) {
 		c = rushing(along, UV.y, side, g, seed);
-	} else if (mode < 0.85) {
-		c = gather(UV, g, seed);
 	} else {
 		c = mist(along, UV.y, side, g, seed);
 	}

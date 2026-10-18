@@ -1278,10 +1278,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 func _flood_half(width: float, spread: float, d: float) -> float:
 	return width * 0.5 + maxf(d, 0.0) * tan(spread)
 
-## みずがめ座の水の層（シェーダー water_flood が描く）。予告のさざ波、照射の水流、崩れていく水流と霧、溜めの光。
+## みずがめ座の水の層（シェーダー water_flood が描く）。予告のさざ波、照射の光、崩れていく光と霧。
 func _draw_floods(c: CanvasItem) -> void:
 	var pr := run.projectiles
 	var mat := _flood_layer.material as ShaderMaterial
+	# HDR の描画では頂点の色が線形に直されて届くので、シェーダーで元の値に戻す
+	mat.set_shader_parameter("linear_colors", _flood_layer.get_viewport().use_hdr_2d)
 	var shaped := false
 	for i in pr.hazard_alive.size():
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileManager.HazardStyle.FLOOD:
@@ -1310,16 +1312,6 @@ func _draw_floods(c: CanvasItem) -> void:
 			if collapse > 0.0:
 				_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0 / 3.0, collapse, seed)
 			_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0, life * (1.0 - collapse * 0.6), seed)
-	var t := run.enemies.table
-	for i in t.alive.size():
-		if t.alive[i] == 0 or t.dead[i] != 0 or t.beh[i] != EnemyTable.Beh.AQUARIUS or t.mode[i] != EnemyTable.Mode.WINDUP:
-			continue
-		var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * 0.8
-		var size := t.r[i] * 4.5
-		var col := Color(2.0 / 3.0, t.charge[i], float(t.id[i] % 17) / 17.0, 1.0)
-		c.draw_polygon(PackedVector2Array([mouth + Vector2(-size, -size), mouth + Vector2(size, -size),
-			mouth + Vector2(size, size), mouth + Vector2(-size, size)]), PackedColorArray([col, col, col, col]),
-			PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]))
 
 ## 広がるビーム1本ぶんの帯を、根元から先へ細かく区切って描く（シェーダーへ渡す UV と色は water_flood の決まり）。
 ## 両端の外に、飛沫を描く余白を足す。先の方は薄くする。
