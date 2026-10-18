@@ -101,7 +101,33 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 		var star := def_of(&"corona_star")
 		for k in int(def.params.stars):
 			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
+	elif t.beh[i] == EnemyTable.Beh.CROW and not opts.get("flock_member", false):
+		_spawn_flock(i, level, opts)
 	return i
+
+## からす座の群れの隊列（先頭からの位置。前へ x、右へ y、flock_gap 単位）。からす座の4つの星の並びにそろえる
+const CROW_FORMATION := [Vector2(-1.0, -1.1), Vector2(-1.1, 1.0), Vector2(-2.1, 0.2)]
+
+## からす座：先頭の1羽（行 i）の向きを決め、残りを隊列に並べて同じ向き・同じ速さで出す。
+## 向きは、画面の中心から aim_spread だけずれた所を通る向き。画面の中心のすぐ近くに置かれた群れは、置いた向きのまま進む。
+func _spawn_flock(i: int, level: float, opts: Dictionary) -> void:
+	var t := table
+	var def := t.def[i]
+	var p: Dictionary = def.params
+	var vc := state.view_center
+	var vh := state.view_half
+	var spread := float(p.aim_spread)
+	var target := vc + Vector2(state.rng.randf_range(-spread, spread) * vh.x, state.rng.randf_range(-spread, spread) * vh.y)
+	if target.distance_to(t.pos[i]) > minf(vh.x, vh.y) * 0.25:
+		t.facing[i] = (target - t.pos[i]).angle()
+	t.mode[i] = EnemyTable.Mode.DASH
+	var u := Vector2.from_angle(t.facing[i])
+	var side := Vector2(-u.y, u.x)
+	var gap := float(p.flock_gap)
+	for k in mini(int(p.flock) - 1, CROW_FORMATION.size()):
+		var at: Vector2 = t.pos[i] + (u * CROW_FORMATION[k].x + side * CROW_FORMATION[k].y) * gap
+		var j := spawn(def, level, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true})
+		t.mode[j] = EnemyTable.Mode.DASH
 
 ## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
 func apply_scaling(i: int, def: EnemyDef, level: float, opts := {}) -> void:
@@ -1052,19 +1078,13 @@ func _lynx(i: int, dt: float) -> void:
 		projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
 			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
 
-## からす座：機体を追わず、一直線に戦場を横断する。経験値の回収は PickupManager が行う（carry が運んでいる量）。
-## 動き始めに、画面の中心から aim_spread だけずれた所を通る向きに決める。画面の中心のすぐ近くに置かれたものは、置いた向きのまま進む。
+## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
+## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。
 ## 画面の外で exit_margin より離れ、さらに離れていくと、運んでいる経験値ごと退場する（撃破にはならない）。
 func _crow(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	var rel := t.pos[i] - _vc
-	if t.mode[i] == EnemyTable.Mode.MOVE:
-		t.mode[i] = EnemyTable.Mode.DASH
-		var spread := float(p.aim_spread)
-		var target := _vc + Vector2(state.rng.randf_range(-spread, spread) * _vh.x, state.rng.randf_range(-spread, spread) * _vh.y)
-		if target.distance_to(t.pos[i]) > minf(_vh.x, _vh.y) * 0.25:
-			t.facing[i] = (target - t.pos[i]).angle()
 	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
 	var margin := float(p.exit_margin)
 	if (absf(rel.x) > _vh.x + margin or absf(rel.y) > _vh.y + margin) and rel.dot(t.vel[i]) > 0.0:

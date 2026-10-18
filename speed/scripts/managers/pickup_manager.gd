@@ -227,7 +227,8 @@ func _collect_gems(dt: float) -> void:
 			state.emit(&"pickup", {"kind": &"gem"})
 			gem_slots.release(i)
 
-## からす座が通り道の周りの経験値の結晶を吸い寄せて回収する（敵の表の carry に足す）。
+## からす座が、横を通り過ぎる経験値の結晶を拾う（敵の表の carry に足す）。拾うのは、体の真横から少し後ろまでにあり、
+## 左右 gather_width の中にある結晶。前方の結晶は、横に来るまで拾わない。拾った結晶は足元の束へ飛び込む。
 ## 機体が吸い寄せ始めた結晶は機体が先に取る。
 func _crow_gather(dt: float) -> void:
 	var t := enemies.table
@@ -238,19 +239,25 @@ func _crow_gather(dt: float) -> void:
 		if t.dead[j] != 0:
 			continue
 		var p: Dictionary = t.def[j].params
-		var radius := float(p.gather_radius)
-		var radius_sq := radius * radius
+		var width := float(p.gather_width)
+		var behind := float(p.gather_behind)
+		var reach := maxf(width, behind) + t.r[j]
+		var reach_sq := reach * reach
 		var step := float(p.gather_speed) * dt
-		var c := t.pos[j]
+		var u := Vector2.from_angle(t.facing[j])
+		var feet := t.pos[j] - u * t.r[j] * 0.62
 		for i in gem_alive.size():
 			if gem_alive[i] == 0 or gem_pulled[i] != 0:
 				continue
-			var d := c - gem_pos[i]
-			var dist_sq := d.length_squared()
-			if dist_sq >= radius_sq:
+			var rel := gem_pos[i] - t.pos[j]
+			if rel.length_squared() >= reach_sq:
 				continue
-			var dist := sqrt(dist_sq)
-			if dist <= t.r[j] + step:
+			var along := rel.dot(u)
+			if along > t.r[j] * 0.3 or along < -behind or absf(rel.cross(u)) > width:
+				continue
+			var d := feet - gem_pos[i]
+			var dist := d.length()
+			if dist <= step + 4.0:
 				t.carry[j] += gem_value[i]
 				t.buds[j] += 1
 				gem_slots.release(i)

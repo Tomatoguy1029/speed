@@ -606,8 +606,8 @@ lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾�
 lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
 lab.enemy.ruler.move,距離を保ち、機体の近くに長い光の壁を置く,Keeps its distance and places a long light wall near you
 lab.enemy.ruler.kill,HP を削る,Wear down its HP
-lab.enemy.crow.move,機体を追わず、一直線に戦場を横断する。通り道の経験値を吸い寄せて回収し、画面の外へ持ち去る。攻撃はしない,Crosses the field in a straight line without chasing. It pulls in experience along its path and carries it off screen. It never attacks
-lab.enemy.crow.kill,もろく、普通に当てれば倒れる。退場する前に倒すと、回収した経験値をその場にまとめて落とす,Fragile and falls to any hit. Defeat it before it leaves to drop all the experience it collected in one spot
+lab.enemy.crow.move,4羽の群れで隊列を組み、機体を追わずに一直線に戦場を横断する。横を通り過ぎた経験値を1羽ずつ拾い、画面の外へ持ち去る。攻撃はしない,Four birds fly in formation straight across the field without chasing. Each picks up experience it passes on either side and carries it off screen. They never attack
+lab.enemy.crow.kill,1羽ずつもろく、普通に当てれば倒れる。退場する前に倒すと、その1羽が回収した経験値をその場にまとめて落とす,Each bird is fragile and falls to any hit. Defeat one before it leaves to drop the experience it collected in one spot
 lab.enemy.lynx.move,近づいてきて、前方を扇形に爪で薙ぐ。殻が割れている間は速く振る,Approaches and slashes a fan in front of it. Slashes faster while its shell is broken
 lab.enemy.lynx.kill,殻を割り、数秒のうちにもう1回当てる。殻は体当たり1回か、弾・波動を当て続けると割れる,Break the shell then hit it again within seconds. One ram or sustained shots and waves break the shell
 lab.enemy.reticle.move,距離を保ち、機体のいた位置に照準を刻んで雷を落とす,Keeps its distance and marks where you were then drops lightning there
