@@ -570,8 +570,8 @@ lab.enemy.darter.move,近づくと構えてから突進し、突進のあとし�
 lab.enemy.darter.kill,HP を削る。止まっている間が狙いどき,Wear down its HP. Strike while it is stopped
 lab.enemy.armored.move,硬い装甲で追ってくる,Chases you behind heavy armor
 lab.enemy.armored.kill,攻撃力が装甲以上なら貫ける。背面に当てると必ずクリティカル,Pierce it when your attack meets its armor. Hits on its back always crit
-lab.enemy.splitter.move,追いながら分裂体を生み、倒すと2体に分かれる,Spawns splitlings while chasing and splits in two when defeated
-lab.enemy.splitter.kill,分かれた体もすべて倒す,Defeat every split body too
+lab.enemy.splitter.move,追いながら、体に育っていく芽を一定の間隔で分裂体として生む。倒しても分かれない,Grows a bud on its body and releases it as a splitling at a set interval while chasing. It does not split when defeated
+lab.enemy.splitter.kill,増える前に倒す。HP を削る,Defeat it before it multiplies. Wear down its HP
 lab.enemy.splitling.move,小さな体で追ってくる,A small body that chases you
 lab.enemy.splitling.kill,HP を削る,Wear down its HP
 lab.enemy.gunner.move,距離を保って回り込み、光ってから弾を撃つ,Keeps its distance and circles then fires after a flash
@@ -584,7 +584,7 @@ lab.enemy.battleship.move,追ってきて、予告のあと扇状に弾を撃つ
 lab.enemy.battleship.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
 lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づくと爆発する。少しすると消える,Flies straight in its spawn direction and explodes near you then fades
 lab.enemy.rocket.kill,HP を削る,Wear down its HP
-lab.enemy.bomber.move,追ってきて、近づくと2回明滅して爆発する,Chases you and blinks twice before exploding when close
+lab.enemy.bomber.move,追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する,Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice
 lab.enemy.bomber.kill,明滅し終わる前に貫けば、爆発させずに倒せる,Pierce it before it finishes blinking to defeat it without an explosion
 lab.enemy.volatile.move,追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む（連鎖する）,Chases you. Explodes shortly after defeat and catches enemies and you (chains)
 lab.enemy.volatile.kill,HP を削る。倒したら爆発から離れる,Wear down its HP then get clear of the blast
@@ -596,10 +596,10 @@ lab.enemy.spreader.move,追ってきて、予告のあと扇状に弾をばら�
 lab.enemy.spreader.kill,HP を削る,Wear down its HP
 lab.enemy.pump.move,機体を追いながら周りの敵を吸い込んで膨らむ。満タンになると構え、圧縮した敵を巨大な弾にして撃つ。弾は直進して一定の距離で破裂する,Chases the ship while swallowing nearby enemies and swelling. When full it braces and fires them as one huge shell that bursts after a set distance
 lab.enemy.pump.kill,HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる,Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst
-lab.enemy.telescope.move,距離を保ち、レンズが光ってから細く速い弾を撃つ,Keeps its distance and fires a thin fast bullet after its lens flashes
-lab.enemy.telescope.kill,HP を削る,Wear down its HP
-lab.enemy.triangle.move,3つの星の間に光の膜を張って追ってくる。膜に触れると被弾する,Chases you with a light membrane between three stars. Touching it hurts
-lab.enemy.triangle.kill,頂点の星を1つ倒すと膜が消え、中の核を倒せる,Destroy one corner star to drop the membrane and expose the core
+lab.enemy.telescope.move,距離を保ち、ゆっくり回るサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると細く速い弾を撃つ,Keeps its distance and sweeps a slow searchlight band. Inside the band it tracks you and locks on as the band narrows and turns red. When fully locked it fires a thin fast bullet
+lab.enemy.telescope.kill,HP を削る。速く横切れば狙いは溜まらない,Wear down its HP. Crossing the band quickly barely builds the lock
+lab.enemy.triangle.move,3つの星の間に光の膜を張り、膜の中の砲台が距離を保って撃ってくる。膜に触れると被弾する,A turret inside a light membrane between three stars keeps its distance and shoots. Touching the membrane hurts
+lab.enemy.triangle.kill,先に頂点の星を1つ倒して膜を消し、次に中の砲台を倒す,First destroy a corner star to drop the membrane then destroy the turret inside
 lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と一緒に動く,A corner star of the Southern Triangle that moves with the core
 lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
 lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾で弾を反射する,Approaches while slowly turning toward you. Its front shield reflects shots

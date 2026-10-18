@@ -22,8 +22,9 @@ ranged = false
 size_var = false
 weak_arc = 0.0
 params = {
-"trigger": 150.0,
-"blast_delay": 0.7,
+"trigger": 170.0,
+"blast_delay": 1.0,
+"rush": 1.3,
 "blast_radius": 110.0,
 "blast_dmg": 10.0
 }

@@ -26,6 +26,11 @@ params = {
 "span": 150.0,
 "spin": 0.5,
 "wall_width": 10.0,
+"keep": 420.0,
+"fire_interval": 2.6,
 "telegraph": 0.8,
+"volley": 3,
+"spread": 0.3,
+"bullet_speed": 460.0,
 "bullet_dmg": 10.0
 }

@@ -24,9 +24,14 @@ weak_arc = 0.0
 gate = &""
 params = {
 "keep": 560.0,
-"fire_interval": 3.5,
-"telegraph": 0.9,
-"bullet_speed": 1100.0,
-"bullet_dmg": 14.0,
-"slow": 0.0
+"band_len": 1000.0,
+"band_width": 0.24,
+"band_narrow": 0.07,
+"sweep_speed": 0.35,
+"track_turn": 0.8,
+"lock_fill": 1.5,
+"lock_decay": 0.7,
+"cooldown": 1.4,
+"bullet_speed": 1300.0,
+"bullet_dmg": 14.0
 }

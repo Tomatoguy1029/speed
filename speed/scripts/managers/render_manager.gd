@@ -144,7 +144,8 @@ func _build_batches() -> void:
 	# 図形で描く。png を置けば絵に替わる
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
-		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"]:
+		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump"] \
+				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -261,6 +262,22 @@ func _on_events(events: Array[Dictionary]) -> void:
 				if swallows.size() < 120:
 					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
+			&"bud":
+				_ring(ev.pos, 20.0, ev.color, 0.25)
+				_burst(ev.pos, ev.color, 6, Vector2.ZERO, 160.0)
+			&"membrane_break":
+				var pts: PackedVector2Array = ev.points
+				for k in pts.size():
+					var a: Vector2 = pts[k]
+					var b: Vector2 = pts[(k + 1) % pts.size()]
+					for s in 4:
+						_burst(a.lerp(b, (s + 0.5) / 4.0), (ev.color as Color).lightened(0.4), 4, Vector2.ZERO, 240.0)
+				shake = maxf(shake, 5.0)
+			&"telescope_fire":
+				var dir := Vector2.from_angle(ev.angle)
+				beams.append({"from": ev.pos, "to": ev.pos + dir * 260.0, "width": 6.0, "life": 0.12, "max": 0.12,
+					"color": Color(1.0, 0.35, 0.3)})
+				_ring(ev.pos, 22.0, Color(1.0, 0.5, 0.4), 0.18)
 			&"shield_block":
 				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
 			&"shield_expired":
@@ -696,8 +713,19 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
 		c.draw_arc(p, r * 1.05, 0, TAU, 20, Color(0.35, 0.33, 0.32), _px(2.0))
 	var charge := t.charge[i]
+	var type := t.type[i]
 	if t.beh[i] == EnemyTable.Beh.PUMP:
 		_draw_pump(c, t, i)
+	elif type == &"bomber":
+		_draw_bomber(c, t, i)
+	elif type == &"splitter":
+		_draw_splitter_bud(c, t, i)
+	elif type == &"beamer":
+		_draw_beamer(c, t, i)
+	elif type == &"pulser":
+		_draw_pulser(c, t, i)
+	elif type == &"telescope":
+		_draw_telescope(c, t, i)
 	elif charge > 0.0:
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
@@ -715,10 +743,18 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 			var hurt := clampf(t.shell_dmg[i] / float(t.def[i].params.shell_hp), 0.0, 1.0)
 			c.draw_arc(p, r + _px(3.0), t.facing[i], t.facing[i] + TAU * (1.0 - hurt), 24, Color("#d9dde6"), _px(4.0))
 	if t.beh[i] == EnemyTable.Beh.TRIANGLE and t.mode[i] != EnemyTable.Mode.RECOVER and t.parts[i].size() == 6:
-		# 3つの星の間に張った光の膜
+		# 3つの星の間に張った光の膜。揺らめく内側の縁で厚みを見せる
 		var parts := t.parts[i]
-		c.draw_colored_polygon(PackedVector2Array([t.pos[parts[0]], t.pos[parts[2]], t.pos[parts[4]]]),
-			Color(t.color[i], 0.16))
+		var tri := PackedVector2Array([t.pos[parts[0]], t.pos[parts[2]], t.pos[parts[4]]])
+		var shimmer := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
+		c.draw_colored_polygon(tri, Color(t.color[i], 0.1 + 0.06 * shimmer))
+		var mid := (tri[0] + tri[1] + tri[2]) / 3.0
+		for s: float in [0.82, 0.6]:
+			var inner := PackedVector2Array()
+			for v in tri:
+				inner.append(mid + (v - mid) * (s + 0.04 * shimmer))
+			inner.append(inner[0])
+			c.draw_polyline(inner, Color(t.color[i].lightened(0.4), 0.18 * s), _px(1.5))
 	if t.gate[i] == EnemyTable.Gate.CLAW:
 		# ハサミ：構えから挟んだ直後まで開いている
 		var open := t.mode[i] == EnemyTable.Mode.WINDUP or t.mode[i] == EnemyTable.Mode.RECOVER
@@ -744,6 +780,115 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var top := p + Vector2(-w / 2.0, -r - _px(10.0))
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
+
+## 自爆する雑魚：カウントダウンに入ると赤く膨らむ光と、残り時間の輪、後ろの導火線の火花が強まる。
+func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var u := Vector2.from_angle(t.facing[i])
+	var fuse := p - u * r * 0.95
+	var now := state.world_time
+	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
+		return
+	var k := t.charge[i]
+	var throb := 0.5 + 0.5 * sin(state.world_time * (10.0 + 20.0 * k))
+	c.draw_arc(p, r * (1.05 + 0.25 * k * throb), 0, TAU, 32, Color(1.0, 0.3, 0.2, 0.35 + 0.45 * k), maxf(_px(2.0), r * (0.15 + 0.2 * k)))
+	c.draw_arc(p, r * 1.45, -PI / 2.0, -PI / 2.0 + TAU * (1.0 - k), 32, Color(1.0, 0.85, 0.5, 0.9), maxf(_px(2.0), r * 0.18))
+	for n in 4:
+		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
+		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
+
+## 分裂する雑魚：次の分裂体の芽が体の縁で育ち、生まれる直前に脈打つ。
+func _draw_splitter_bud(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var dp: Dictionary = t.def[i].params
+	if t.buds[i] >= int(dp.max_buds):
+		return
+	var k := clampf(t.bud_t[i] / float(dp.bud_interval), 0.0, 1.0)
+	var a := run.enemies.bud_angle(i)
+	var r := t.r[i]
+	var q := t.pos[i] + Vector2.from_angle(a) * r * (0.5 + 0.4 * k)
+	var size := r * 0.55 * (0.3 + 0.7 * k)
+	if k > 0.75:
+		var pulse := 0.5 + 0.5 * sin(state.world_time * 24.0)
+		c.draw_circle(q, size * (1.3 + 0.2 * pulse), Color(t.color[i].lightened(0.4), 0.35 * (k - 0.75) * 4.0))
+	var tex := _enemy_texture(&"splitling")
+	if tex == null:
+		c.draw_circle(q, size * 0.5, t.color[i])
+		return
+	var ext := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * size * 2.0
+	c.draw_set_transform(q, a + PI / 2.0)
+	c.draw_texture_rect(tex, Rect2(-ext / 2.0, ext), false)
+	c.draw_set_transform(Vector2.ZERO)
+
+## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
+func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var muzzle := p + Vector2.from_angle(t.facing[i]) * r * 0.9
+	var col := t.color[i].lightened(0.35)
+	var k := t.charge[i]
+	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		c.draw_circle(muzzle, maxf(_px(1.5), r * 0.1), Color(col, 0.6))
+		return
+	if k < 1.0:
+		for n in 8:
+			var f := fmod(k * 2.5 + n / 8.0, 1.0)
+			var q := muzzle + Vector2.from_angle(n * TAU / 8.0 + k * 3.0) * r * (1.8 - 1.6 * f)
+			c.draw_circle(q, maxf(_px(1.5), r * 0.08), Color(col, f))
+		c.draw_circle(muzzle, _px(2.0) + r * 0.45 * k, Color(col, 0.25 + 0.5 * k))
+		c.draw_circle(muzzle, _px(1.5) + r * 0.2 * k, Color(1, 1, 1, 0.5 + 0.5 * k))
+	else:
+		c.draw_circle(muzzle, r * 0.7, Color(1, 1, 1, 0.55))
+		c.draw_circle(muzzle, r * 0.45, Color(col, 0.9))
+
+## 波動の敵：次の輪までの溜まり具合で中心の光が強まり、構えると光の輪が中心へ縮んで集まる。
+func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var dp: Dictionary = t.def[i].params
+	var col := t.color[i].lightened(0.4)
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		var k := 1.0 - clampf(t.timer[i] / float(dp.telegraph), 0.0, 1.0)
+		for n in 3:
+			var f := fmod(k * 1.5 + n / 3.0, 1.0)
+			c.draw_arc(p, r * (2.4 - 2.0 * f), 0, TAU, 32, Color(col, f * 0.8), _px(2.0))
+		c.draw_circle(p, r * (0.25 + 0.2 * k), Color(1, 1, 1, 0.6 + 0.4 * k))
+		return
+	var ready := 1.0 - clampf(t.fire_t[i] / float(dp.fire_interval), 0.0, 1.0)
+	c.draw_circle(p, r * (0.12 + 0.14 * ready), Color(col, 0.3 + 0.6 * ready))
+	var spin := state.world_time * 2.0
+	for n in 3:
+		var a := spin + n * TAU / 3.0
+		c.draw_arc(p, r * 1.18, a, a + 0.8 * ready, 8, Color(col, 0.6 * ready), _px(2.0))
+
+## ぼうえんきょう座：レンズから伸びるサーチライトの帯。狙いが溜まるほど細く赤くなり、本体の周りの輪が狙いの溜まり具合を示す。
+## 機体が帯の中にいる間は帯がちらついて明るくなる。撃ったあとの休みの間は暗い。
+func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	var p := t.pos[i]
+	var r := t.r[i]
+	var dp: Dictionary = t.def[i].params
+	var k := t.charge[i]
+	var f := t.facing[i]
+	var lens := p + Vector2.from_angle(f) * r * 0.9
+	var half := run.enemies.telescope_half(i)
+	var length := float(dp.band_len)
+	var col := Color(0.62, 0.9, 1.0).lerp(Color(1.0, 0.22, 0.2), k)
+	var resting := t.mode[i] == EnemyTable.Mode.RECOVER
+	var seen := run.enemies.telescope_sees(i, state.ship_pos)
+	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 * (0.5 + 0.5 * sin(state.world_time * 40.0)) if seen else 0.0)
+	var pts := PackedVector2Array([lens])
+	var cols := PackedColorArray([Color(col, a0)])
+	for n in 13:
+		var a := f - half + 2.0 * half * n / 12.0
+		pts.append(p + Vector2.from_angle(a) * length)
+		cols.append(Color(col, 0.0))
+	c.draw_polygon(pts, cols)
+	for s: float in [-1.0, 1.0]:
+		c.draw_line(lens, p + Vector2.from_angle(f + s * half) * length * 0.7, Color(col, a0 * 1.6), _px(1.5))
+	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
+	if k > 0.0:
+		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
 
 ## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
 const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]

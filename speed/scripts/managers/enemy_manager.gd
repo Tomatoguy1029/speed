@@ -600,10 +600,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.PUMP:
 					_pump(i, bdt)
 				EnemyTable.Beh.SNIPER:
-					_keep_distance(i, bdt)
-					if _gun_timer(i, bdt):
-						var sp: Dictionary = t.def[i].params
-						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), sp.bullet_speed, &"bullet")
+					_telescope(i, bdt)
 				EnemyTable.Beh.SHIELD:
 					t.fire_t[i] = maxf(0.0, t.fire_t[i] - bdt)
 					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], bdt)
@@ -622,8 +619,10 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_keep_distance(i, bdt)
 					_reticle(i, bdt)
 				EnemyTable.Beh.TRIANGLE:
-					_chase(i, bdt)
+					_keep_distance(i, bdt)
 					_triangle(i, bdt)
+					if t.mode[i] != EnemyTable.Mode.RECOVER and _gun_timer(i, bdt):
+						fire_volley(i)
 				EnemyTable.Beh.PART:
 					# 位置は親が決める。親が倒れたら一緒に消える
 					if not self.is_same(t.parent[i], t.parent_id[i]) or t.dead[t.parent[i]] != 0:
@@ -804,9 +803,15 @@ func _split(i: int, dt: float) -> void:
 	t.bud_t[i] = 0.0
 	if t.buds[i] >= int(p.max_buds):
 		return
+	var a := bud_angle(i)
 	t.buds[i] += 1
-	var a := state.rng.randf() * TAU
-	spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i] * 1.5, {"facing": a})
+	spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i] * 1.2,
+		{"facing": a, "vel": Vector2.from_angle(a) * 160.0, "hit_cd": 0.2})
+	state.emit(&"bud", {"pos": t.pos[i] + Vector2.from_angle(a) * t.r[i], "color": t.color[i]})
+
+## 分裂する雑魚が次の分裂体を生む向き（育っていく芽の位置。描画も同じ向きを使う）。
+func bud_angle(i: int) -> float:
+	return table.roam_angle[i] + float(table.buds[i]) * 2.399963
 
 ## 射撃型・ミサイル艇：機体の周りの keep の距離を保ち、回り込む。
 func _keep_distance(i: int, dt: float) -> void:
@@ -875,7 +880,8 @@ func _rocket(i: int, dt: float) -> void:
 	elif t.timer[i] <= 0.0:
 		mark_dead(i)
 
-## 自爆する雑魚：追ってきて、近づくと2回明滅してから爆発する。明滅し終わる前に倒せば爆発しない。
+## 自爆する雑魚：追ってきて、機体が trigger に入るとカウントダウンに入る。カウントダウンの間も止まらず、
+## rush 倍の速さで機体へ詰め寄る。2回明滅し終わると爆発する。明滅し終わる前に倒せば爆発しない。
 func _bomber(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
@@ -885,11 +891,13 @@ func _bomber(i: int, dt: float) -> void:
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.blast_delay)
 		return
-	_hold(i, dt)
+	_steer_to(i, state.ship_pos, t.speed[i] * float(p.rush), t.accel[i] * 2.0, dt)
+	_turn_moving(i, t.turn[i] * 2.0, dt)
 	t.timer[i] -= dt
-	# 2回明滅する
+	# 2回明滅する。charge はカウントダウンの進み（0〜1）
 	var phase := 1.0 - t.timer[i] / maxf(float(p.blast_delay), 0.001)
-	t.flash[i] = 0.05 if fmod(phase * 2.0, 1.0) < 0.5 else 0.0
+	t.charge[i] = clampf(phase, 0.0, 1.0)
+	t.flash[i] = 0.05 if fmod(phase * 2.0, 1.0) > 0.75 else 0.0
 	if t.timer[i] <= 0.0:
 		_self_destruct(i)
 
@@ -913,9 +921,12 @@ func _beamer(i: int, dt: float) -> void:
 					float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
 		return
 	t.timer[i] -= dt
+	# charge は砲口に光が集まる進み（0〜1）。撃っている間は 1
+	t.charge[i] = clampf(1.0 - (t.timer[i] - float(p.beam_time)) / float(p.telegraph), 0.0, 1.0)
 	if t.timer[i] <= 0.0:
 		t.mode[i] = EnemyTable.Mode.MOVE
 		t.fire_t[i] = float(p.fire_interval)
+		t.charge[i] = 0.0
 
 ## 波動の敵：距離を保ち、間隔ごとに止まって、1枚の輪か扇を出す。
 func _pulser(i: int, dt: float) -> void:
@@ -1019,6 +1030,52 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 		t.knock_t[j] = maxf(t.knock_t[j], dt * 2.0)
 		t.vel[j] = d / maxf(dist, 1.0) * pull * (0.3 + 0.7 * near)
 		t.facing[j] += spin * (0.4 + 0.6 * near) * dt
+
+## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。帯はゆっくり回り、
+## 機体が帯の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
+## 帯は狙いが溜まるほど細くなる。溜まりきった瞬間に機体へ細く速い弾を撃ち、cooldown の間は休む（RECOVER）。
+func _telescope(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var d := t.pos[i] - _aim
+	var dist := maxf(d.length(), 1.0)
+	var u := d / dist
+	var side := 1.0 if t.id[i] % 2 == 1 else -1.0
+	_steer_to(i, _aim + u * float(p.keep) + Vector2(-u.y, u.x) * 150.0 * side, t.speed[i], t.accel[i], dt)
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		t.timer[i] -= dt
+		t.facing[i] += float(p.sweep_speed) * side * dt
+		if t.timer[i] <= 0.0:
+			t.mode[i] = EnemyTable.Mode.MOVE
+		return
+	if telescope_sees(i, state.ship_pos):
+		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
+		t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
+	else:
+		t.facing[i] += float(p.sweep_speed) * side * dt
+		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
+	if t.charge[i] >= 1.0:
+		projectiles.fire_enemy(i, (state.ship_pos - t.pos[i]).angle(), float(p.bullet_speed), &"bullet")
+		state.emit(&"telescope_fire", {"pos": t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], "angle": t.facing[i]})
+		t.charge[i] = 0.0
+		t.mode[i] = EnemyTable.Mode.RECOVER
+		t.timer[i] = float(p.cooldown)
+
+## ぼうえんきょう座の帯の左右の角度（狙いが溜まるほど細い）。
+func telescope_half(i: int) -> float:
+	var p: Dictionary = table.def[i].params
+	return lerpf(float(p.band_width), float(p.band_narrow), table.charge[i])
+
+## 位置 at が、ぼうえんきょう座（行 i）のサーチライトの帯の中か。休んでいる間は見えない。
+func telescope_sees(i: int, at: Vector2) -> bool:
+	var t := table
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		return false
+	var d := at - t.pos[i]
+	var dist := d.length()
+	if dist > float(t.def[i].params.band_len) or dist < 1.0:
+		return false
+	return absf(Geom.angle_diff(d.angle(), t.facing[i])) <= telescope_half(i) + atan(cfg.ship_radius / dist)
 
 ## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
 func _ruler(i: int, dt: float) -> void:
@@ -1128,7 +1185,8 @@ func _triangle(i: int, dt: float) -> void:
 		for h in links:
 			projectiles.release_hazard(h)
 		t.links[i] = PackedInt32Array()
-		state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": t.r[i]})
+		t.charge[i] = 0.0
+		state.emit(&"membrane_break", {"points": verts, "color": t.color[i]})
 		return
 	if t.mode[i] == EnemyTable.Mode.RECOVER or verts.size() < 3:
 		return
@@ -1374,6 +1432,8 @@ func on_enemy_death(i: int, atk: float) -> void:
 	if t.type[i] != &"splitter":
 		return
 	var p: Dictionary = t.def[i].params
+	if int(p.get("death_split", 0)) <= 0:
+		return
 	var n := maxi(1, int(p.get("death_split", 2)) + state.rng.randi_range(0, int(p.get("split_extra", 0))))
 	var facing := t.facing[i]
 	for k in n:
@@ -1659,6 +1719,8 @@ func _lab_admit(i: int, dt: float) -> bool:
 		due = table.pos[i].distance_to(state.ship_pos) <= float(p.trigger)
 	elif def.behavior == &"pump":
 		due = table.buds[i] >= int(p.store_max)
+	elif def.behavior == &"sniper":
+		due = table.charge[i] >= 0.8
 	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
 		due = true
 	if not active and due:
