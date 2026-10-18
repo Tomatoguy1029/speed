@@ -596,7 +596,7 @@ lab.enemy.spreader.move,追ってきて、予告のあと扇状に弾をばら�
 lab.enemy.spreader.kill,HP を削る,Wear down its HP
 lab.enemy.pump.move,機体を追いながら周りの敵を吸い込んで膨らむ。満タンになると構え、圧縮した敵を巨大な弾にして撃つ。弾は直進して一定の距離で破裂する,Chases the ship while swallowing nearby enemies and swelling. When full it braces and fires them as one huge shell that bursts after a set distance
 lab.enemy.pump.kill,HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる,Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst
-lab.enemy.telescope.move,距離を保ち、ゆっくり回るサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると一瞬溜めてから、レンズから機体の方へ太いレーザーを撃つ。光とレーザーは隕石で遮られる,Keeps its distance and sweeps a slow searchlight band. Inside the band it tracks you and locks on as the band narrows and turns red. Once the lock is full it charges for a moment then fires a thick laser at the ship. Rocks block both the light and the laser
+lab.enemy.telescope.move,距離を保ち、機体のいる方を左右に振って探すサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると一瞬溜めてから、レンズから機体の方へ太いレーザーを撃つ。光とレーザーは隕石で遮られる,Keeps its distance and swings a searchlight band back and forth around where the ship is. Inside the band it tracks you and locks on as the band narrows and turns red. Once the lock is full it charges for a moment then fires a thick laser at the ship. Rocks block both the light and the laser
 lab.enemy.telescope.kill,HP を削る。速く横切れば狙いは溜まらない,Wear down its HP. Crossing the band quickly barely builds the lock
 lab.enemy.triangle.move,3つの星の間に光の膜を張り、膜の中の砲台が距離を保って撃ってくる。膜に触れると被弾する,A turret inside a light membrane between three stars keeps its distance and shoots. Touching the membrane hurts
 lab.enemy.triangle.kill,先に頂点の星を1つ倒して膜を消し、次に中の砲台を倒す,First destroy a corner star to drop the membrane then destroy the turret inside

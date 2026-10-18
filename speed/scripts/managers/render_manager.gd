@@ -882,8 +882,8 @@ func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_arc(p, r * 1.18, a, a + 0.8 * ready, 8, Color(col, 0.6 * ready), _px(2.0))
 
 ## ぼうえんきょう座：レンズから伸びるサーチライトの帯。狙いが溜まるほど細く赤くなり、本体の周りの輪が狙いの溜まり具合を示す。
-## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。光が当たった岩の縁は明るく光る。
-## 機体が光の中にいる間は帯がちらついて明るくなる。撃ったあとの休みの間は暗い。
+## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。
+## 機体が光の中にいる間は帯が明るくなる。撃ったあとの休みの間は暗い。
 func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
@@ -897,7 +897,7 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var col := Color(0.62, 0.9, 1.0).lerp(Color(1.0, 0.22, 0.2), k)
 	var resting := t.mode[i] == EnemyTable.Mode.RECOVER
 	var seen := run.enemies.telescope_sight(i, state.ship_pos) == 1
-	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 * (0.5 + 0.5 * sin(state.world_time * 40.0)) if seen else 0.0)
+	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 if seen else 0.0)
 	var count := rays.size()
 	if count < 2:
 		return
@@ -923,10 +923,6 @@ func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(lens, r * (0.18 + 0.3 * w), Color(1.0, 0.92, 0.85, 0.9))
 		return
 	c.draw_polygon(pts, cols)
-	# 光が岩に当たって切れている所は、縁を明るくして「ここから先は陰」と分かるようにする
-	for n in range(1, count + 1):
-		if rays[n - 1] < length - 1.0:
-			c.draw_circle(pts[n], maxf(_px(1.5), 3.0), Color(col.lightened(0.4), minf(1.0, a0 * 3.0)))
 	c.draw_line(lens, pts[1], Color(col, a0 * 1.6), _px(1.5))
 	c.draw_line(lens, pts[count], Color(col, a0 * 1.6), _px(1.5))
 	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))

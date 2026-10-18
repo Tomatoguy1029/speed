@@ -1036,7 +1036,8 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 const TELE_RAYS := 48
 var _tele_rays: Dictionary = {}
 
-## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。帯はゆっくり回り、
+## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。見失っている間は、機体のいる方へ
+## search_turn の速さで向き直りながら、その周りを左右へ search_sway の幅で振って探す。
 ## 機体が光の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
 ## 光は隕石・惑星・月で遮られ、その陰では見つからない。狙いの途中でも陰に入れば、狙いはすぐ外れる。
 ## 帯は狙いが溜まるほど細くなる。溜まりきると laser_charge の間レーザーを溜め（WINDUP。機体を追い続け、岩陰に入られたら取り消す）、
@@ -1052,7 +1053,7 @@ func _telescope(i: int, dt: float) -> void:
 	_steer_to(i, _aim + u * float(p.keep) + Vector2(-u.y, u.x) * 150.0 * side, t.speed[i], t.accel[i], dt)
 	if t.mode[i] == EnemyTable.Mode.RECOVER:
 		t.timer[i] -= dt
-		t.facing[i] += float(p.sweep_speed) * side * dt
+		_search_telescope(i, dt)
 		_cast_telescope(i)
 		if t.timer[i] <= 0.0:
 			t.mode[i] = EnemyTable.Mode.MOVE
@@ -1083,14 +1084,21 @@ func _telescope(i: int, dt: float) -> void:
 	elif seen == 2:
 		# 岩陰に隠れた：狙いを外し、探し直す
 		t.charge[i] = 0.0
-		t.facing[i] += float(p.sweep_speed) * side * dt
+		_search_telescope(i, dt)
 	else:
-		t.facing[i] += float(p.sweep_speed) * side * dt
+		_search_telescope(i, dt)
 		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
 	if t.charge[i] >= 1.0:
 		t.mode[i] = EnemyTable.Mode.WINDUP
 		t.timer[i] = float(p.laser_charge)
 		state.emit(&"telescope_charge", {"pos": telescope_lens(i)})
+
+## ぼうえんきょう座が機体を探す：機体のいる方を中心に、左右へ振りながら向きを変える。
+func _search_telescope(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var sway := sin(t.age[i] * TAU / float(p.search_period) + float(t.id[i])) * float(p.search_sway)
+	_turn_toward(i, (state.ship_pos - t.pos[i]).angle() + sway, float(p.search_turn), dt)
 
 ## ぼうえんきょう座の帯の左右の角度（狙いが溜まるほど細い）。
 func telescope_half(i: int) -> float:
