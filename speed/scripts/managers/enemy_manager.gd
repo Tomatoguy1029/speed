@@ -22,6 +22,8 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
 	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS, &"auriga": EnemyTable.Beh.AURIGA,
 	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA}
+## ポンプ座の吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
+const PUMP_MOUTH := 0.85
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
 	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
@@ -967,7 +969,7 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 	var reach := float(p.pull_radius)
 	var pull := float(p.pull)
 	var spin := float(p.pull_spin)
-	var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * 0.6
+	var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * PUMP_MOUTH
 	var bite := t.r[i] + float(p.swallow_reach)
 	t.bud_t[i] -= dt
 	var rows := PackedInt32Array()
@@ -983,7 +985,7 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 		if dist < bite and t.bud_t[i] <= 0.0 and t.buds[i] < int(p.store_max):
 			t.buds[i] += 1
 			t.bud_t[i] = float(p.swallow_interval)
-			state.emit(&"swallow", {"type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],
+			state.emit(&"swallow", {"enemy_type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],
 				"color": t.color[j], "row": i, "id": t.id[i], "spin": spin * 2.0})
 			mark_dead(j)
 			continue

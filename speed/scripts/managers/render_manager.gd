@@ -259,7 +259,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				shake = maxf(shake, 6.0)
 			&"swallow":
 				if swallows.size() < 120:
-					swallows.append({"type": ev.type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
+					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
 						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
 			&"shield_block":
 				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
@@ -599,7 +599,7 @@ func _draw_swallows(c: CanvasItem) -> void:
 		var k := 1.0 - float(sw.life) / float(sw.max)
 		var target: Vector2 = sw.pos
 		if run.enemies.is_same(sw.row, sw.id):
-			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * 0.6
+			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemyManager.PUMP_MOUTH
 		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
 		var r: float = sw.r * (1.0 - 0.85 * k)
 		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
@@ -745,46 +745,96 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
 
-## ポンプ座：吸い込んだ数に応じて継ぎ目から光が漏れる。構えている間は胴体が張り詰め、口元に巨大な塊がせり出す。
+## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
+const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]
+
+## ポンプ座：吸い込んだ数に応じて継ぎ目から光が漏れ、口へ流れ込む吸い込みの筋を描く。
+## 構えている間は胴体が張り詰めて脈打ち、継ぎ目が強く光り、口元に巨大な塊がせり出す。
 func _draw_pump(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var dp: Dictionary = t.def[i].params
 	var full := clampf(float(t.buds[i]) / float(dp.store_max), 0.0, 1.0)
 	var aiming := t.mode[i] == EnemyTable.Mode.WINDUP
-	var glow := Color("#ffe2a8") if aiming else t.color[i].lightened(0.5)
-	var pulse := 0.5 + 0.5 * sin(state.world_time * (18.0 if aiming else 6.0))
-	if full > 0.0 or aiming:
-		var a := 0.25 + 0.55 * full + (0.2 * pulse if aiming else 0.0)
-		for k in 3:
-			var seam := t.facing[i] + PI / 2.0 + (float(k) - 1.0) * 0.55
-			var u := Vector2.from_angle(seam) * r * 0.85
-			c.draw_line(p - u, p + u, Color(glow, a), _px(2.0 + 3.0 * full))
-		c.draw_arc(p, r * (1.04 + 0.04 * pulse * full), 0, TAU, 40, Color(glow, a * 0.8), _px(2.0 + 2.0 * full))
+	var px := r / 24.0
+	var u := Vector2.from_angle(t.facing[i])
+	var side := Vector2(-u.y, u.x)
+	var mouth := p + u * r * EnemyManager.PUMP_MOUTH
+	var now := state.world_time
+	if t.mode[i] == EnemyTable.Mode.MOVE:
+		# 口へ流れ込む吸い込みの筋（外から口へ動く短い光）
+		for k in 9:
+			var phase := fmod(now * 1.4 + k * 0.381966, 1.0)
+			var ang := t.facing[i] + (float(k) - 4.0) * 0.26
+			var dist := r * (2.6 - 2.2 * phase)
+			var head := mouth + Vector2.from_angle(ang) * dist
+			var tail := mouth + Vector2.from_angle(ang) * (dist + r * 0.5)
+			c.draw_line(tail, head, Color(t.color[i].lightened(0.55), 0.55 * sin(phase * PI)), _px(2.0))
+	# 継ぎ目から漏れる光：吸い込むほど強く、構えると白熱して脈打つ
+	var pulse := 0.5 + 0.5 * sin(now * (22.0 if aiming else 5.0))
+	var glow := Color("#fff0c8") if aiming else t.color[i].lightened(0.55)
+	var a := (0.85 + 0.15 * pulse) if aiming else full * (0.55 + 0.25 * pulse)
+	if a > 0.02:
+		for seam in PUMP_SEAMS:
+			var center: Vector2 = p + u * float(seam[0]) * px
+			var half: Vector2 = side * float(seam[1]) * px * 0.92
+			c.draw_line(center - half, center + half, Color(glow, a * 0.35), maxf(_px(2.0), px * 4.5))
+			c.draw_line(center - half, center + half, Color(glow, a), maxf(_px(1.0), px * 1.6))
 	if aiming:
-		var ball := float(dp.shell_r) * (0.4 + 0.6 * t.charge[i])
-		var mouth := p + Vector2.from_angle(t.facing[i]) * (r + ball * 0.4)
-		c.draw_circle(mouth, ball * 1.3, Color(glow, 0.3))
-		c.draw_circle(mouth, ball, t.color[i].lightened(0.2))
-		c.draw_circle(mouth, ball * 0.55, Color("#fff4dc"))
+		# 張り詰めた胴体の縁と、口元にせり出す塊
+		c.draw_arc(p + u * -3.0 * px, 16.5 * px * (1.03 + 0.03 * pulse), 0, TAU, 48, Color(glow, 0.55 + 0.35 * pulse), maxf(_px(2.0), px * 1.5))
+		var ball := float(dp.shell_r) * (0.35 + 0.65 * t.charge[i])
+		var at := mouth + u * ball * 0.55
+		_draw_shell_ball(c, at, ball, t.color[i], now)
 
-## からす座が足に抱えた経験値の結晶の束。運んでいる量が多いほど大きく、明るい。
+## 圧縮した敵の塊（構えている口元と、撃った圧縮弾）。張り詰めた膜の中に、押し込められた敵がひしめいて回る。
+func _draw_shell_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: float) -> void:
+	var pulse := 0.5 + 0.5 * sin(now * 14.0)
+	c.draw_circle(at, r * (1.25 + 0.08 * pulse), Color(base.lightened(0.5), 0.22))
+	c.draw_circle(at, r, base.darkened(0.45))
+	var kinds: Array[StringName] = [&"drifter", &"swarm", &"drifter", &"splitling", &"swarm", &"drifter", &"swarm"]
+	for k in kinds.size():
+		var ring := 0.0 if k == 0 else 0.55
+		var a := now * (1.5 if k % 2 == 0 else -1.1) + k * TAU / 6.0
+		var q := at + Vector2.from_angle(a) * r * ring
+		var tex := _enemy_texture(kinds[k])
+		var size := r * (0.62 if k == 0 else 0.5)
+		if tex == null:
+			c.draw_circle(q, size * 0.5, base)
+			continue
+		var ext := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * size
+		c.draw_set_transform(q, a * 2.0)
+		c.draw_texture_rect(tex, Rect2(-ext / 2.0, ext), false, Color(1, 1, 1, 0.9))
+		c.draw_set_transform(Vector2.ZERO)
+	c.draw_circle(at, r, Color(base.lightened(0.3), 0.18))
+	c.draw_arc(at, r, 0, TAU, 40, Color("#fff0c8", 0.75 + 0.25 * pulse), maxf(_px(1.5), r * 0.1))
+
+## からす座が足に抱えた経験値の結晶の束（尾の側の足元）。運んでいる量が多いほど大きく、明るく光る。
 func _draw_crow_bundle(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var n := clampi(t.buds[i], 1, 12)
 	var amount := clampf(sqrt(t.carry[i]) / 8.0, 0.0, 1.0)
-	var back := Vector2.from_angle(t.facing[i] + PI)
-	var side := Vector2(-back.y, back.x)
-	var center := p + back * r * 0.75
-	var s := maxf(_px(3.0), r * (0.18 + 0.14 * amount))
-	var col := XP_COLOR.lightened(0.15 + 0.45 * amount)
-	c.draw_circle(center, s * (2.2 + 1.2 * amount), Color(XP_COLOR, 0.15 + 0.25 * amount))
+	var u := Vector2.from_angle(t.facing[i])
+	var side := Vector2(-u.y, u.x)
+	var center := p - u * r * 0.62
+	var s := maxf(_px(2.0), r * (0.07 + 0.05 * amount))
+	var pulse := 0.5 + 0.5 * sin(state.world_time * 6.0)
+	c.draw_circle(center, s * (2.2 + 1.6 * amount), Color(XP_COLOR.lightened(0.3), 0.1 + 0.2 * amount * (0.6 + 0.4 * pulse)))
+	# 足の爪
+	for k: float in [-1.0, 1.0]:
+		c.draw_line(center + side * s * 1.2 * k + u * s * 2.2, center + side * s * 1.8 * k + u * s * 0.4, Color("#d8d2dc"), maxf(_px(1.0), s * 0.4))
+	var col := XP_COLOR.lightened(0.15 + 0.4 * amount)
+	var edge := XP_COLOR.darkened(0.55)
 	for k in n:
-		var off := side * (float(k % 4) - 1.5) * s * 0.9 + back * floorf(k / 4.0) * s * 0.9
-		var q := center + off
-		c.draw_colored_polygon(PackedVector2Array([q + Vector2(0, -1.4) * s, q + Vector2(1, 0) * s,
-			q + Vector2(0, 1.4) * s, q + Vector2(-1, 0) * s]), col)
+		var ring := 0 if k == 0 else (1 if k < 7 else 2)
+		var a := float(k) * 2.399963
+		var q := center + (side * cos(a) - u * sin(a) * 0.8) * s * 1.4 * float(ring)
+		var pts := PackedVector2Array([q - u * s * 1.3, q + side * s * 0.8, q + u * s * 1.3, q - side * s * 0.8])
+		c.draw_colored_polygon(pts, col)
+		pts.append(pts[0])
+		c.draw_polyline(pts, edge, maxf(_px(1.0), s * 0.22))
+		c.draw_line(q - u * s * 0.8, q - side * s * 0.3, Color(1, 1, 1, 0.75), maxf(_px(1.0), s * 0.22))
 
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := view_rect().grow(40.0)
@@ -827,12 +877,12 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
 			if pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
-				# ポンプ座の圧縮弾
+				# ポンプ座の圧縮弾：後ろに尾を引く
 				var u := pr.hostile_vel[i].normalized()
-				c.draw_line(pos - u * hostile_r[i] * 2.5, pos, Color(0.85, 0.7, 1.0, 0.5), hostile_r[i] * 1.2)
-				c.draw_circle(pos, hostile_r[i] * 1.25, Color(1.0, 0.85, 0.6, 0.35))
-				c.draw_circle(pos, hostile_r[i], Color("#b78cff"))
-				c.draw_circle(pos, hostile_r[i] * 0.55, Color("#fff4dc"))
+				var n := Vector2(-u.y, u.x) * hostile_r[i] * 0.8
+				c.draw_polygon(PackedVector2Array([pos + n, pos - u * hostile_r[i] * 2.2, pos - n]),
+					PackedColorArray([Color(0.85, 0.7, 1.0, 0.45), Color(0.85, 0.7, 1.0, 0.0), Color(0.85, 0.7, 1.0, 0.45)]))
+				_draw_shell_ball(c, pos, hostile_r[i], Color("#b78cff"), state.world_time)
 			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.REFLECTED:
 				var u := pr.hostile_vel[i].normalized()
 				c.draw_line(pos - u * hostile_r[i] * 3.0, pos, Color("#ff84df"), hostile_r[i] * 0.9)
