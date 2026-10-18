@@ -282,10 +282,13 @@ func _on_events(events: Array[Dictionary]) -> void:
 						_burst(a.lerp(b, (s + 0.5) / 4.0), (ev.color as Color).lightened(0.4), 4, Vector2.ZERO, 240.0)
 				shake = maxf(shake, 5.0)
 			&"telescope_fire":
+				# 太いレーザーの残光と、レンズの閃光
 				var dir := Vector2.from_angle(ev.angle)
-				beams.append({"from": ev.pos, "to": ev.pos + dir * 260.0, "width": 6.0, "life": 0.12, "max": 0.12,
-					"color": Color(1.0, 0.35, 0.3)})
-				_ring(ev.pos, 22.0, Color(1.0, 0.5, 0.4), 0.18)
+				beams.append({"from": ev.pos, "to": ev.pos + dir * float(ev.length), "width": float(ev.width) * 1.6, "life": 0.28,
+					"max": 0.28, "color": Color(1.0, 0.3, 0.22)})
+				_ring(ev.pos, 40.0, Color(1.0, 0.75, 0.6), 0.22)
+				_burst(ev.pos, Color(1.0, 0.5, 0.35), 10, dir, 500.0)
+				shake = maxf(shake, 9.0)
 			&"shield_block":
 				_ring(ev.pos, cfg.ship_radius * 3.0, Color("#bcefff"), 0.18)
 			&"shield_expired":

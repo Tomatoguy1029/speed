@@ -1039,7 +1039,8 @@ var _tele_rays: Dictionary = {}
 ## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。帯はゆっくり回り、
 ## 機体が光の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
 ## 光は隕石・惑星・月で遮られ、その陰では見つからない。狙いの途中でも陰に入れば、狙いはすぐ外れる。
-## 帯は狙いが溜まるほど細くなる。溜まりきった瞬間に機体へ細く速い弾を撃ち、cooldown の間は休む（RECOVER）。
+## 帯は狙いが溜まるほど細くなる。溜まりきった瞬間に、レンズから機体の方へ太いレーザーを撃つ（laser_delay ののち laser_time の間
+## 当たる。光と同じく隕石などで止まる）。撃ったあと cooldown の間は休む（RECOVER）。
 func _telescope(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
@@ -1068,8 +1069,12 @@ func _telescope(i: int, dt: float) -> void:
 		t.facing[i] += float(p.sweep_speed) * side * dt
 		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
 	if t.charge[i] >= 1.0:
-		projectiles.fire_enemy(i, (state.ship_pos - t.pos[i]).angle(), float(p.bullet_speed), &"bullet")
-		state.emit(&"telescope_fire", {"pos": t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], "angle": t.facing[i]})
+		var lens := telescope_lens(i)
+		var a := (state.ship_pos - lens).angle()
+		var reach := telescope_reach(i, a)
+		projectiles.fire_beam(lens, a, reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
+			_attack_dmg(i, float(p.bullet_dmg)), Color(1.0, 0.3, 0.25))
+		state.emit(&"telescope_fire", {"pos": lens, "angle": a, "length": reach, "width": float(p.laser_width)})
 		t.charge[i] = 0.0
 		t.mode[i] = EnemyTable.Mode.RECOVER
 		t.timer[i] = float(p.cooldown)
@@ -1136,13 +1141,19 @@ func telescope_sight(i: int, at: Vector2) -> int:
 	var off := Geom.angle_diff(d.angle(), t.facing[i])
 	if absf(off) > half + atan(cfg.ship_radius / dist):
 		return 0
+	return 1 if dist <= telescope_reach(i, d.angle()) else 2
+
+## ぼうえんきょう座（行 i）の光が、向き angle にどこまで届くか（帯の中の光線の長さを補間する）。
+func telescope_reach(i: int, angle: float) -> float:
 	var rays := telescope_rays(i)
+	var length := float(table.def[i].params.band_len)
 	if rays.is_empty():
-		return 1
+		return length
+	var half := telescope_half(i)
+	var off := Geom.angle_diff(angle, table.facing[i])
 	var f := clampf((off + half) / (2.0 * half), 0.0, 1.0) * (TELE_RAYS - 1)
 	var n := mini(int(f), TELE_RAYS - 2)
-	var reach := lerpf(rays[n], rays[n + 1], f - n)
-	return 1 if dist <= reach else 2
+	return lerpf(rays[n], rays[n + 1], f - n)
 
 ## じょうぎ座：1体の定規として現れ、split_delay たつと二つに分かれる（buds が左右の印 1・-1。0 は分かれる前）。
 ## 2体は、機体の方へ向かう縦か横の軸（facing）をそろえ、機体を左右から挟む位置へ展開する（DASH）。
