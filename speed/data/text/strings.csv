@@ -636,7 +636,7 @@ lab.enemy.cepheus.move,距離を保ち、専用の兵を召喚して隊列を組
 lab.enemy.cepheus.kill,隊列を抜けて王を倒すと、召喚と兵の攻撃が止まり、残った兵は撃ち合って崩れる,Break through the ranks and defeat the king. Summoning and the soldiers’ attacks stop and the rest turn on each other and fall apart
 lab.enemy.cepheus_soldier.move,ケフェウス座が召喚する兵。王が決めた隊列の位置で止まり、王の号令で決まった向きへ細長い光弾を撃つ。追尾しない,A soldier summoned by Cepheus. It holds the post the king assigns and fires long light bolts in a fixed direction on the king’s command. They do not home
 lab.enemy.cepheus_soldier.kill,普通に倒せる。倒した穴は次の増援まで空く,Falls to ordinary attacks. The gap stays until the next reinforcement
-lab.enemy.aquarius.move,遠くから、先へ行くほど広がる極太ビームを全方位へ6本、予告してから一斉に短く照射する,"From afar, telegraphs six widening beams in every direction, then fires them all at once briefly"
+lab.enemy.aquarius.move,遠くで止まって溜めながら通り道に水の流れを流して予告し、先へ行くほど広がる水のビームを全方位へ6本、一斉に照射する,"Stops far away and charges while ripples flow along the beam paths, then fires six widening water beams in every direction at once"
 lab.enemy.aquarius.kill,HP を削る,Wear down its HP
 lab.enemy.aquila.move,大きく旋回して飛び、通り道に雷を落とす,Flies in wide turns dropping lightning along its path
 lab.enemy.aquila.kill,HP を削る,Wear down its HP
