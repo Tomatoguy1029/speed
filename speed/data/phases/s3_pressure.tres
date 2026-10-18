@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://b8luqf83m23rt"]
 
-[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"s3_pressure"
-display_name = "ステージ3・圧力期"
 start = 150.0
 end = 330.0
 pop_from = 45.0
@@ -13,20 +11,18 @@ pop_to = 75.0
 level_from = 1.6
 level_to = 2.4
 rate = 8.0
-xp_bonus = 0.0
-wave_interval = 0.0
-wave_type = &""
-cores = false
 mix = {
-"rocket": 1.333,
-"bomber": 1.333,
-"volatile": 1.333,
 "beamer": 0.75,
+"bomber": 1.333,
+"cross": 0.2,
+"lynx": 0.2,
+"phoenix": 0.02,
+"reticle": 0.2,
+"rocket": 1.333,
+"ruler": 0.15,
 "spreader": 0.75,
 "triangle": 0.25,
-"lynx": 0.2,
-"cross": 0.2,
-"reticle": 0.2,
-"ruler": 0.15,
-"phoenix": 0.02
+"volatile": 1.333
 }
+id = &"s3_pressure"
+display_name = "ステージ3・圧力期"

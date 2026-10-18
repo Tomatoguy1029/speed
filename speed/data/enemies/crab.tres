@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://5vab5hm8ajrw"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"crab"
-display_name = "かに座"
 rank = 5
 radius = 30.0
 hp = 90.0
@@ -18,15 +16,15 @@ color = Color(1, 0.5, 0.4, 1)
 shape = &"hex"
 behavior = &"crab"
 max_alive = 3
-ranged = false
-size_var = false
 weak_arc = 1.0
 gate = &"claw"
 params = {
-"reach": 150.0,
-"telegraph": 0.7,
-"open_time": 1.4,
+"bullet_dmg": 16.0,
 "fire_interval": 2.2,
 "front_arc": 1.6,
-"bullet_dmg": 16.0
+"open_time": 1.4,
+"reach": 150.0,
+"telegraph": 0.7
 }
+id = &"crab"
+display_name = "かに座"

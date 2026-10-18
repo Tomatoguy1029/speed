@@ -1,12 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://bi23tihldhqml"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"titan"
-display_name = "タイタン"
-rank = 0
 radius = 75.0
 hp = 160.0
 armor = 6.0
@@ -14,12 +11,10 @@ speed = 38.0
 accel = 0.8
 turn = 0.8
 xp = 25.0
-color = Color(1.0, 0.5608, 0.8196, 1)
+color = Color(1, 0.5608, 0.8196, 1)
 shape = &"blob"
 behavior = &"chase"
 max_alive = 6
 size_var = true
-weak_arc = 0.0
-params = {
-
-}
+id = &"titan"
+display_name = "タイタン"

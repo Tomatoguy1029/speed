@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://inwplod2bxq0"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"marlin"
-display_name = "かじき座"
 rank = 5
 radius = 26.0
 hp = 70.0
@@ -19,18 +17,17 @@ shape = &"dart"
 behavior = &"marlin"
 max_alive = 2
 ranged = true
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"keep": 520.0,
-"fire_interval": 4.0,
-"telegraph": 0.8,
+"bullet_dmg": 10.0,
+"bullet_speed": 380.0,
 "dash_speed": 1300.0,
 "dash_time": 0.9,
-"spray_step": 0.15,
+"fire_interval": 4.0,
+"keep": 520.0,
 "spray": 3,
+"spray_step": 0.15,
 "spread": 0.6,
-"bullet_speed": 380.0,
-"bullet_dmg": 10.0
+"telegraph": 0.8
 }
+id = &"marlin"
+display_name = "かじき座"

@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://hm5frkto2fwd"]
 
-[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"tension"
-display_name = "緊張期"
 start = 360.0
 end = 510.0
 pop_from = 70.0
@@ -13,16 +11,15 @@ pop_to = 110.0
 level_from = 3.0
 level_to = 4.4
 rate = 10.0
-xp_bonus = 0.0
-wave_interval = 0.0
-cores = false
 mix = {
-"darter": 3.0,
 "armored": 3.0,
+"battleship": 0.3,
+"darter": 3.0,
+"drifter": 2.5,
 "gunner": 2.0,
 "missile": 1.3,
 "splitter": 2.0,
-"drifter": 2.5,
-"titan": 1.2,
-"battleship": 0.3
+"titan": 1.2
 }
+id = &"tension"
+display_name = "緊張期"

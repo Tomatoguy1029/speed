@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://c1baisayyxt78"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"lynx"
-display_name = "やまねこ座"
 rank = 4
 radius = 85.0
 hp = 160.0
@@ -18,16 +16,14 @@ color = Color(0.85, 0.75, 0.55, 1)
 shape = &"hex"
 behavior = &"lynx"
 max_alive = 3
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"keep": 760.0,
+"bullet_dmg": 12.0,
 "fire_interval": 0.9,
-"telegraph": 0.35,
+"keep": 760.0,
+"slash_range": 2400.0,
 "slash_size": 200.0,
 "slash_speed": 380.0,
-"slash_range": 2400.0,
-"bullet_dmg": 12.0
+"telegraph": 0.35
 }
+id = &"lynx"
+display_name = "やまねこ座"

@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://ci0qobf11l5rk"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"crow"
-display_name = "からす座"
 rank = 4
 radius = 16.0
 hp = 8.0
@@ -18,16 +16,14 @@ color = Color(0.45, 0.42, 0.6, 1)
 shape = &"dart"
 behavior = &"crow"
 max_alive = 8
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"gather_width": 80.0,
-"gather_behind": 110.0,
-"gather_speed": 900.0,
 "aim_spread": 0.35,
 "exit_margin": 500.0,
 "flock": 4,
-"flock_gap": 56.0
+"flock_gap": 56.0,
+"gather_behind": 110.0,
+"gather_speed": 900.0,
+"gather_width": 80.0
 }
+id = &"crow"
+display_name = "からす座"

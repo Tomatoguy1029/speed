@@ -1,12 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cwcb2hh6m0ncx"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"swarm"
-display_name = "スウォーム"
-rank = 0
 radius = 16.0
 hp = 3.0
 armor = 1.2
@@ -14,11 +11,8 @@ speed = 200.0
 accel = 3.0
 turn = 4.0
 xp = 0.6
-color = Color(0.6157, 0.9412, 1.0, 1)
+color = Color(0.6157, 0.9412, 1, 1)
 shape = &"dart"
 behavior = &"chase"
-size_var = false
-weak_arc = 0.0
-params = {
-
-}
+id = &"swarm"
+display_name = "スウォーム"

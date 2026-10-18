@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cyydpd0dxfjf5"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"dolphin"
-display_name = "いるか座"
 rank = 5
 radius = 26.0
 hp = 80.0
@@ -19,18 +17,17 @@ shape = &"orb"
 behavior = &"dolphin"
 max_alive = 2
 ranged = true
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"keep": 520.0,
-"fire_interval": 3.4,
-"telegraph": 1.0,
 "aim_turn": 2.0,
+"bullet_dmg": 14.0,
+"enemy_dmg": 40.0,
+"fire_interval": 3.4,
+"keep": 520.0,
+"telegraph": 1.0,
 "wave_arc": 0.6,
 "wave_radius": 1300.0,
 "wave_speed": 460.0,
-"wave_width": 34.0,
-"bullet_dmg": 14.0,
-"enemy_dmg": 40.0
+"wave_width": 34.0
 }
+id = &"dolphin"
+display_name = "いるか座"

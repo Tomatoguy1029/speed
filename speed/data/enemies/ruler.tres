@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://b8ob4dm22igvr"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"ruler"
-display_name = "じょうぎ座"
 rank = 4
 radius = 22.0
 hp = 40.0
@@ -19,19 +17,18 @@ shape = &"square"
 behavior = &"ruler"
 max_alive = 4
 ranged = true
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
+"beam_len": 2600.0,
+"beam_time": 5.0,
+"beam_width": 26.0,
+"bullet_dmg": 12.0,
+"deploy_speed": 1200.0,
+"deploy_time": 0.5,
+"emit_back": 520.0,
+"half_gap": 190.0,
 "keep": 520.0,
 "split_delay": 0.4,
-"half_gap": 190.0,
-"emit_back": 520.0,
-"deploy_time": 0.5,
-"deploy_speed": 1200.0,
-"telegraph": 0.6,
-"beam_len": 2600.0,
-"beam_width": 26.0,
-"beam_time": 5.0,
-"bullet_dmg": 12.0
+"telegraph": 0.6
 }
+id = &"ruler"
+display_name = "じょうぎ座"

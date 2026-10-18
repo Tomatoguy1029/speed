@@ -1,12 +1,9 @@
-[gd_resource type="Resource" script_class="BossDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="BossDef" format=3 uid="uid://db7iottqmpwqr"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://do4h6a740mn2v" path="res://scripts/data_types/boss_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"hydra"
-display_name = "うみへび座"
-scene_path = "res://scenes/bosses/hydra_boss.tscn"
 radius = 110.0
 hp = 2200.0
 armor = 14.0
@@ -14,42 +11,44 @@ speed = 160.0
 accel = 0.8
 turn = 0.6
 xp = 150.0
-weak_arc = 0.0
 params = {
+"attack_cd": 3.0,
+"beam_dmg": 18.0,
+"beam_len": 1400.0,
+"bite_dmg": 16.0,
+"bite_radius": 75.0,
+"bite_reach": 520.0,
+"debris_dmg": 8.0,
 "engage": 1100.0,
+"expose_time": 4.0,
+"head_hp": 120.0,
+"head_share": 0.8,
+"immortal_dmg": 0.12,
+"lump_dmg": 16.0,
+"lump_r": 26.0,
+"lump_speed": 520.0,
+"missile_dmg": 10.0,
+"missile_speed": 420.0,
+"neck_iterations": 4,
+"neck_response": 10.0,
 "neck_rest": 230.0,
 "neck_segments": 16,
-"neck_iterations": 4,
 "neck_slack": 1.12,
 "neck_wave_amplitude": 18.0,
 "neck_wave_frequency": 1.5,
 "neck_wave_speed": 2.5,
-"neck_response": 10.0,
-"head_hp": 120.0,
-"head_share": 0.8,
 "regrow": 6.0,
 "regrow_combo": 0.25,
-"expose_time": 4.0,
-"immortal_dmg": 0.12,
-"debris_dmg": 8.0,
-"attack_cd": 3.0,
-"bite_reach": 520.0,
-"bite_radius": 75.0,
-"bite_dmg": 16.0,
-"vortex_radius": 300.0,
-"vortex_life": 3.5,
-"vortex_pull": 1800.0,
-"rubble_count": 6,
-"lump_speed": 520.0,
-"lump_r": 26.0,
-"lump_dmg": 16.0,
-"beam_len": 1400.0,
-"beam_dmg": 18.0,
-"missile_speed": 420.0,
-"missile_dmg": 10.0,
 "ring_speed": 380.0,
+"rubble_count": 6,
+"shard_dmg": 10.0,
+"shard_speed": 420.0,
 "shock_radius": 240.0,
 "tech_cd": 14.0,
-"shard_speed": 420.0,
-"shard_dmg": 10.0
+"vortex_life": 3.5,
+"vortex_pull": 1800.0,
+"vortex_radius": 300.0
 }
+id = &"hydra"
+display_name = "うみへび座"
+scene_path = "res://scenes/bosses/hydra_boss.tscn"

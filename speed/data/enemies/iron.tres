@@ -1,25 +1,15 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dxmdif1xmmmru"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"iron"
-display_name = "鉄のがれき"
-rank = 0
 radius = 40.0
 hp = 40.0
 armor = 60.0
-speed = 0.0
-accel = 0.0
-turn = 0.0
 xp = 2.0
 color = Color(0.55, 0.58, 0.64, 1)
 shape = &"hex"
 behavior = &"obstacle"
-max_alive = 0
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
-params = {}
+id = &"iron"
+display_name = "鉄のがれき"

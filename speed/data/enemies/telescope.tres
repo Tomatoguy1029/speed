@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://s3uv8f1eqlr"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"telescope"
-display_name = "ぼうえんきょう座"
 rank = 3
 radius = 20.0
 hp = 30.0
@@ -19,24 +17,23 @@ shape = &"diamond"
 behavior = &"sniper"
 max_alive = 2
 ranged = true
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"keep": 560.0,
 "band_len": 1000.0,
-"band_width": 0.36,
 "band_narrow": 0.09,
-"search_turn": 1.1,
-"search_sway": 0.6,
-"search_period": 2.6,
-"track_turn": 0.8,
-"lock_fill": 0.9,
-"lock_decay": 0.7,
+"band_width": 0.36,
+"bullet_dmg": 20.0,
 "cooldown": 1.4,
+"keep": 560.0,
 "laser_charge": 0.5,
-"laser_width": 30.0,
 "laser_delay": 0.04,
 "laser_time": 0.18,
-"bullet_dmg": 20.0
+"laser_width": 30.0,
+"lock_decay": 0.7,
+"lock_fill": 0.9,
+"search_period": 2.6,
+"search_sway": 0.6,
+"search_turn": 1.1,
+"track_turn": 0.8
 }
+id = &"telescope"
+display_name = "ぼうえんきょう座"

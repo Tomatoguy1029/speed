@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://bqd5m3e7p260d"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"auriga"
-display_name = "ぎょしゃ座"
 rank = 5
 radius = 30.0
 hp = 110.0
@@ -18,14 +16,12 @@ color = Color(1, 0.8, 0.35, 1)
 shape = &"hex"
 behavior = &"auriga"
 max_alive = 2
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
+"bullet_dmg": 12.0,
 "trail_step": 0.12,
-"trail_width": 16.0,
 "trail_time": 3.5,
-"wheel_gap": 26.0,
-"bullet_dmg": 12.0
+"trail_width": 16.0,
+"wheel_gap": 26.0
 }
+id = &"auriga"
+display_name = "ぎょしゃ座"

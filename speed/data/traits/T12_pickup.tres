@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TraitDef" format=3 uid="uid://6vouyhd04obe"]
 
-[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://chiv0uib8kxw0" path="res://scripts/data_types/trait_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"T12"
-code_id = &"pickup"
 params = {
 "per_stack": 0.3
 }
+id = &"T12"
+code_id = &"pickup"
