@@ -423,12 +423,18 @@ func _update_view() -> void:
 		cam_zoom = float(view_override.zoom)
 		return
 	cam_center = state.view_center
-	cam_zoom = state.camera_zoom
+	cam_zoom = game_zoom()
+
+## 本番の画面と同じ大きさで映す倍率。実験場は決まった大きさの画面（view_size）で計算するので、
+## ウィンドウの大きさに合わせて直し、本番でこのウィンドウに映るのと同じ大きさにする（枠に収まらない端は切れる）。
+func game_zoom() -> float:
+	var zoom := state.camera_zoom if state.camera_zoom > 0.0 else run._base_zoom()
 	if state.lab_mode:
 		var sim: Vector2 = run.options.get("view_size", Vector2.ZERO)
-		var shown := get_viewport().get_visible_rect().size
+		var window := get_tree().root.get_visible_rect().size
 		if sim.x > 0.0 and sim.y > 0.0:
-			cam_zoom *= minf(shown.x / sim.x, shown.y / sim.y)
+			zoom *= minf(window.x, window.y) / minf(sim.x, sim.y)
+	return zoom
 
 ## 描画のカメラに映る範囲（ワールド座標）。
 func view_rect() -> Rect2:

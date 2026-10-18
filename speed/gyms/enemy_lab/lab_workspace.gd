@@ -255,7 +255,7 @@ func _toolbar(parent: Node) -> void:
 		view.get_popup().set_item_checked(index, on)
 		var key: String = ["show_ranges", "show_ids", "show_hud", "show_minimap", "show_background"][id]
 		lab.canvas.set(key, on))
-	UI.button(bar, tr("lab.ui.center"), func(): lab.canvas.center = lab.session.run.state.ship_pos; lab.canvas.zoom = 1.0, "focus", true)
+	UI.button(bar, tr("lab.ui.center"), func(): lab.canvas.center = lab.session.run.state.ship_pos; lab.canvas.zoom = lab.game_zoom(), "focus", true)
 	var more := MenuButton.new()
 	more.icon = UI.icon("more")
 	more.tooltip_text = tr("lab.ui.edit_more")

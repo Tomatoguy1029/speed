@@ -75,6 +75,7 @@ func _ready() -> void:
 	session.changed.connect(_refresh)
 	session.seek_progress.connect(func(v): _messages.text = TranslationServer.translate("lab.message_7591fff9f2") % roundi(v * 100))
 	await session.reset()
+	canvas.zoom = game_zoom()
 	_refresh()
 
 func _button(parent: Node, text: String, action: Callable) -> Button:
@@ -225,6 +226,9 @@ func _reset() -> void:
 	canvas.selection.clear()
 	canvas.result.clear()
 	canvas.center = session.run.state.ship_pos
+	var render: RenderManager = session.run.get_node_or_null("../RenderManager")
+	if render != null:
+		canvas.zoom = render.game_zoom()
 	_busy = false
 	_refresh()
 
@@ -492,6 +496,11 @@ func _sync_view() -> void:
 		canvas.zoom = render.cam_zoom
 	else:
 		render.view_override = {"center": canvas.center, "zoom": canvas.zoom}
+
+## 本番の画面と同じ大きさで映す倍率（描画がまだなければ 1）。
+func game_zoom() -> float:
+	var render: RenderManager = session.run.get_node_or_null("../RenderManager") if is_instance_valid(session.run) else null
+	return render.game_zoom() if render != null else 1.0
 
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。
 ## ボタンや本番の入力（描画の補助）には渡さない。
