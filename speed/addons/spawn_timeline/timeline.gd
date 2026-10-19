@@ -5,7 +5,17 @@ extends VBoxContainer
 
 const Canvas := preload("res://addons/spawn_timeline/timeline_canvas.gd")
 
+## 「大きく表示」を押したとき（エディターの上部の画面のタブ「出現タイムライン」へ切り替える）
+signal open_large
+
 var undo_redo: EditorUndoRedoManager
+## 上部の画面のタブに出すタイムラインなら true（「大きく表示」のボタンを出さない）
+var large := false:
+	set(value):
+		large = value
+		if _large_button != null:
+			_large_button.visible = not value
+var _large_button: Button = null
 var stage: Resource = null
 var canvas: Control
 var _title: Label
@@ -34,11 +44,13 @@ func _init() -> void:
 	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu], ["曲線を消す", _remove_curve],
 			["▶ ここから試す", _launch_here],
 			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
-			["別ウィンドウ", _open_window]]:
+			["大きく表示", func() -> void: open_large.emit()]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		bar.add_child(b)
+		if spec[0] == "大きく表示":
+			_large_button = b
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
@@ -52,6 +64,11 @@ func _init() -> void:
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(canvas)
 	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: canvas.queue_redraw())
+
+func _notification(what: int) -> void:
+	# 下のパネルと上部の画面のどちらで編集しても、表示し直したときに最新を描く
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and stage != null:
+		refresh()
 
 func set_stage(value: Resource) -> void:
 	stage = value
@@ -225,30 +242,6 @@ func _remove_clip() -> void:
 	stage.set("clips", after)
 	canvas.selected = -1
 	commit("クリップを消す", [[stage, "clips", before, after]])
-
-var _window: Window = null
-
-## このパネルと同じステージを、別のウィンドウのタイムラインで開く（編集は同じステージに入る）。
-func _open_window() -> void:
-	if stage == null:
-		return
-	if is_instance_valid(_window):
-		_window.grab_focus()
-		return
-	_window = Window.new()
-	_window.title = "出現タイムライン - " + stage.resource_path.get_file()
-	_window.size = Vector2i(1500, 560)
-	_window.close_requested.connect(func() -> void:
-		_window.queue_free()
-		_window = null
-		refresh())
-	var other: Control = (get_script() as GDScript).new()
-	other.undo_redo = undo_redo
-	other.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_window.add_child(other)
-	EditorInterface.get_base_control().add_child(_window)
-	other.set_stage(stage)
-	_window.popup_centered()
 
 ## 再生位置の時刻から、このステージを起動する（ステージの起動の道具 stage_launcher の予約を使う）。
 func _launch_here() -> void:
