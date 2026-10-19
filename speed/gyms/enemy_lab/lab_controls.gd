@@ -189,7 +189,7 @@ func _attacks(box: Node) -> void:
 	var heavy := UI.fold(box, tr("lab.attack.danger"))
 	for def in ConfigManager.sorted(ConfigManager.enemies):
 		if def.rank >= 3 and preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
-			_number(heavy, "%s %s" % [def.get_display_name(), def.id], def.attack_weight, 0, 20, 0.25,
+			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
 	var meter = load("res://gyms/enemy_lab/lab_attack_meter.gd").new()
 	_attack_meter = meter
