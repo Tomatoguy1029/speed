@@ -90,10 +90,6 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	var fire_interval: float = def.params.get("fire_interval", 0.0)
 	t.fire_t[i] = fire_interval * (0.5 + state.rng.randf() * 0.5)
 	t.beh[i] = BEH.get(def.behavior, EnemyTable.Beh.CHASE)
-	var n := t.id[i]
-	t.roam_phase[i] = n * 1.61803398875
-	t.roam_angle[i] = n * 2.39996322973
-	t.roam_radius[i] = (0.45 + 0.5 * sqrt(fmod(n * 0.61803398875, 1.0))) * minf(1.0, cfg.enemy_pursuit_spread / 480.0)
 	t.accel[i] = def.accel if def.accel > 0.0 else 2.0
 	t.turn[i] = def.turn if def.turn > 0.0 else 4.0
 	t.meteor_index[i] = opts.get("meteor_index", -1)
@@ -231,9 +227,6 @@ func _reset_row(i: int) -> void:
 	t.body_gap[i] = -1.0
 	t.body_gap_pos[i] = Vector2.ZERO
 	t.body_gap_time[i] = 0.0
-	t.roam_phase[i] = 0.0
-	t.roam_angle[i] = 0.0
-	t.roam_radius[i] = 0.0
 	t.mode[i] = EnemyTable.Mode.MOVE
 	t.timer[i] = 0.0
 	t.fire_t[i] = 0.0
@@ -438,14 +431,9 @@ func tick(_real_dt: float, world_dt: float) -> void:
 ## 追跡（いちばん多い雑魚）は、関数を呼ばずにここで計算する（仕様書 11.5）。
 func _tick_chase(dt: float) -> void:
 	var t := table
-	var aim := state.enemy_aim
 	var vc := state.view_center
 	var vh := state.view_half
-	var cycle_len := cfg.enemy_approach_cycle
-	var appr := cfg.enemy_approach_time
-	var blend := cfg.enemy_approach_blend
-	var roam_turn := cfg.enemy_roam_turn
-	var face_move := cfg.enemy_face_move
+	var ship := state.ship_pos
 	var pos := t.pos
 	var vel := t.vel
 	var facing := t.facing
@@ -456,12 +444,7 @@ func _tick_chase(dt: float) -> void:
 	var dead := t.dead
 	var shove_time := t.shove_time
 	var knock_t := t.knock_t
-	var roam_phase := t.roam_phase
-	var roam_angle := t.roam_angle
-	var roam_radius := t.roam_radius
 	var speed := t.speed
-	var accel := t.accel
-	var turn := t.turn
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -483,40 +466,24 @@ func _tick_chase(dt: float) -> void:
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
-		var cdt := dt
 		var rel := from - vc
+		# 画面から遠い敵は、LOD 回に1回だけ向きを決め直す。間の回は今の速度で進むだけ
 		if absf(rel.x) > lod_lim.x or absf(rel.y) > lod_lim.y:
 			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
 				pos[i] = from + vel[i] * dt
 				continue
-			cdt = dt * LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			var cycle := fmod(a + roam_phase[i], cycle_len)
-			var roam := clampf(minf((cycle - appr) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-			var target := aim
-			if roam > 0.0:
-				var ang := roam_angle[i] + a * roam_turn
-				var ux := cos(ang)
-				var uy := sin(ang)
-				var edge := roam_radius[i] / maxf(absf(ux), absf(uy))
-				target = aim + (Vector2(vc.x + ux * edge * vh.x, vc.y + uy * edge * vh.y) - aim) * roam
-			var d := target - from
+			# 機体へまっすぐ、決まった速さで向かう（旋回・慣性なし）
+			var d := ship - from
 			var dist := d.length()
-			if dist < 0.001:
-				dist = 1.0
-			var k := minf(1.0, accel[i] * cdt)
-			var v := vel[i]
-			v += (d * (speed[i] / dist) - v) * k
+			var v := Vector2.ZERO
+			if dist > 0.001:
+				var u := d / dist
+				v = u * speed[i]
+				facing[i] = u.angle()
 			vel[i] = v
-			# 向き：進む向きと機体への向きを混ぜ、毎秒 turn までしか回さない
-			var w := face_move * minf(1.0, v.length() / maxf(speed[i], 1.0))
-			var face := v.normalized() * w + (aim - from).normalized() * (1.0 - w)
-			if face.length_squared() > 0.0025:
-				var f := facing[i]
-				var turn_max := turn[i] * cdt
-				facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
@@ -752,22 +719,16 @@ func _turn_moving(i: int, rate: float, dt: float) -> void:
 		_turn_toward(i, face.angle(), rate, dt)
 
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
-func _chase(i: int, dt: float) -> void:
+func _chase(i: int, _dt: float) -> void:
 	var t := table
-	var aim := _aim
-	var a := t.age[i]
-	var cycle_len := cfg.enemy_approach_cycle
-	var blend := cfg.enemy_approach_blend
-	var cycle := fmod(a + t.roam_phase[i], cycle_len)
-	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-	var target := aim
-	if roam > 0.0:
-		var ang := t.roam_angle[i] + a * cfg.enemy_roam_turn
-		var ux := cos(ang)
-		var uy := sin(ang)
-		var edge := t.roam_radius[i] / maxf(absf(ux), absf(uy))
-		target = aim + (Vector2(_vc.x + ux * edge * _vh.x, _vc.y + uy * edge * _vh.y) - aim) * roam
-	_move_to(i, target, t.speed[i], t.accel[i], t.turn[i], dt)
+	var d := state.ship_pos - t.pos[i]
+	var dist := d.length()
+	if dist < 0.001:
+		t.vel[i] = Vector2.ZERO
+		return
+	var u := d / dist
+	t.vel[i] = u * t.speed[i]
+	t.facing[i] = u.angle()
 
 ## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
 ## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。
@@ -832,7 +793,7 @@ func _split(i: int, dt: float) -> void:
 
 ## 分裂する雑魚が次の分裂体を生む向き（育っていく芽の位置。描画も同じ向きを使う）。
 func bud_angle(i: int) -> float:
-	return table.roam_angle[i] + float(table.buds[i]) * 2.399963
+	return float(table.id[i]) * 2.39996322973 + float(table.buds[i]) * 2.399963
 
 ## 射撃型・ミサイル艇：機体の周りの keep の距離を保ち、回り込む。
 func _keep_distance(i: int, dt: float) -> void:

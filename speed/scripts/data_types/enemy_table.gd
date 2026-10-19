@@ -67,12 +67,6 @@ var body_gap := PackedFloat64Array()
 var body_gap_pos := PackedVector2Array()
 var body_gap_time := PackedFloat64Array()
 
-# ── 追跡の広域移動：追跡する雑魚（仕様書 11.5）─────────────────────
-
-## 周期のずれ、移動先の向きと広がり（敵ごとに決まった値）
-var roam_phase := PackedFloat64Array()
-var roam_angle := PackedFloat64Array()
-var roam_radius := PackedFloat64Array()
 
 # ── 行動の状態：種類ごと ──────────────────────────────────────────
 
