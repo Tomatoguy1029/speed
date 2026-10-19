@@ -8,6 +8,8 @@ extends Resource
 
 ## データ編集の画面での並び順
 const EDITOR_ORDER := 3
+## 絵の正面が上向きの種類（ほかの種類の絵は、正面が下向き）
+const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
 
 ## 行動の値（params）の名前・説明・単位
 const PARAMS_DOCS := {

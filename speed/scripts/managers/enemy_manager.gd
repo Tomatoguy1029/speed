@@ -144,7 +144,7 @@ func apply_scaling(i: int, def: EnemyDef, level: float, opts := {}) -> void:
 	var z := size / def.radius
 	var r := size * (1.25 if elite else 1.0)
 	# 手描き素材はエリートも同じ基準サイズで運用する。
-	if def.id in RenderManager.NATIVE_SPRITES:
+	if def.id in EnemyDef.NATIVE_SPRITES:
 		r = def.radius
 	if opts.get("meteor_index", -1) < 0:
 		r *= cfg.character_scale

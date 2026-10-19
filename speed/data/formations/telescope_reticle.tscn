@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://b0sce1j2r44rr"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="TelescopeReticle" type="Node2D"]
+script = ExtResource("1")
+
+[node name="並びA" type="Node2D" parent="."]
+position = Vector2(-2400, 0)
+script = ExtResource("2")
+
+[node name="ぼうえんきょう座" type="Node2D" parent="並びA"]
+script = ExtResource("3")
+enemy = &"telescope"
+
+[node name="レチクル座" type="Node2D" parent="並びA"]
+position = Vector2(-90, 70)
+script = ExtResource("3")
+enemy = &"reticle"
+
+[node name="並びB" type="Node2D" parent="."]
+position = Vector2(-2400, 400)
+script = ExtResource("2")
+
+[node name="ぼうえんきょう座" type="Node2D" parent="並びB"]
+script = ExtResource("3")
+enemy = &"telescope"
+
+[node name="レチクル座左" type="Node2D" parent="並びB"]
+position = Vector2(-110, 70)
+script = ExtResource("3")
+enemy = &"reticle"
+
+[node name="レチクル座右" type="Node2D" parent="並びB"]
+position = Vector2(110, 70)
+script = ExtResource("3")
+enemy = &"reticle"
+
+[node name="正面" type="Node2D" parent="."]
+position = Vector2(0, -1500)
+rotation = 3.1416
+script = ExtResource("4")
+
+[node name="左前" type="Node2D" parent="."]
+position = Vector2(-1100, -1050)
+rotation = 2.3329
+script = ExtResource("4")
+
+[node name="右前" type="Node2D" parent="."]
+position = Vector2(1100, -1050)
+rotation = -2.3329
+script = ExtResource("4")

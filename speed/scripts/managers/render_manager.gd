@@ -26,7 +26,6 @@ const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
-const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -171,7 +170,7 @@ func _build_batches() -> void:
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
 		var b := InstanceBatch.new()
-		var path := "res://assets/pixel/%s.png" % def.id
+		var path := _enemy_sprite_path(def.id)
 		if ResourceLoader.exists(path):
 			b.setup_texture(load(path) as Texture2D)
 			b.material = enemy_mat
@@ -678,7 +677,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
-		elif type in NATIVE_SPRITES:
+		elif type in EnemyDef.NATIVE_SPRITES:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
 			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
@@ -722,7 +721,7 @@ func _draw_swallows(c: CanvasItem) -> void:
 			c.draw_circle(p, r, sw.color)
 			continue
 		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-		c.draw_set_transform(p, angle + (PI / 2.0 if sw.type in NATIVE_SPRITES else -PI / 2.0))
+		c.draw_set_transform(p, angle + (PI / 2.0 if sw.type in EnemyDef.NATIVE_SPRITES else -PI / 2.0))
 		c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 		c.draw_set_transform(Vector2.ZERO)
 
@@ -768,9 +767,15 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
-		var path := "res://assets/pixel/%s.png" % type
+		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
 	return _enemy_textures[type]
+
+## 敵の種類の絵のファイル（ステージの敵の見た目に従う）。
+func _enemy_sprite_path(type: StringName) -> String:
+	if state.stage != null:
+		return state.stage.enemy_sprite_path(type)
+	return "res://assets/pixel/%s.png" % type
 
 ## 敵の船体を絵で描く（牽引中・撃ち出した船体）。glow は周りの光の色（透明なら光らせない）。
 func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color) -> void:
@@ -781,7 +786,7 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 		c.draw_circle(p, r, Color("#aeb6c4"))
 		return
 	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-	c.draw_set_transform(p, angle + (PI / 2.0 if type in NATIVE_SPRITES else -PI / 2.0))
+	c.draw_set_transform(p, angle + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0))
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 	c.draw_set_transform(Vector2.ZERO)
 
