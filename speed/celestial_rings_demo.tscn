@@ -1,0 +1,82 @@
+[gd_scene format=3 uid="uid://dcc1jvjlray7a"]
+
+[ext_resource type="Script" path="res://tools/celestial_rings/celestial_rings.gd" id="1_17ir5"]
+[ext_resource type="Script" path="res://tools/celestial_rings/celestial_ring.gd" id="2_0jiya"]
+[ext_resource type="Texture2D" path="res://tools/celestial_rings/assets/ui_circle.png" id="3_rujik"]
+[ext_resource type="Texture2D" path="res://tools/celestial_rings/assets/ui_inner_circle1.png" id="4_nmops"]
+[ext_resource type="Texture2D" path="res://tools/celestial_rings/assets/ui_inner_circle2.png" id="5_p8yjf"]
+
+[node name="CelestialRingsDemo" type="Node2D" unique_id=1511660855]
+editor_description = "F6で星座マップの独立デモを実行。４つの星座をクリックすると選択した星座が手前へ回る。スライダーで任意回転、最も手前の星座を選択。自動再生は無効。
+手前1.0倍、左右0.85倍、奥0.7倍を位置に応じて連続補間。選択中は白、他は灰色。絵は正面を保ち、盤上の座標だけを投影する。星座は常に円より手前に描画。初期公転半径72px。Constellation Radiusで星座の公転半径、Selection Durationで選択時の移動時間を調整。
+OuterAxisのTilt Deg / Axis Angle Degで全体の投影を調整。内円は直径299pxの境界内。元PNGは未加工、Nearest。自転30・中円公転-30・小円公転30の比率を手動角度に同期させる。
+ゲーム本体のステージ選択には未統合。クリックは選択のみで、ステージ開始やセーブは行わない。"
+script = ExtResource("1_17ir5")
+
+[node name="Background" type="CanvasLayer" parent="." unique_id=1795415482]
+layer = -1
+
+[node name="Color" type="ColorRect" parent="Background" unique_id=1510042458]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.012, 0.035, 0.06, 1)
+
+[node name="CelestialRings" type="Node2D" parent="." unique_id=1812985615]
+position = Vector2(673, 244)
+
+[node name="OuterAxis" type="Node2D" parent="CelestialRings" unique_id=563165355]
+texture_filter = 1
+script = ExtResource("2_0jiya")
+spin_speed_deg = 30.0
+tilt_deg = 64.0
+
+[node name="Projection" type="Node2D" parent="CelestialRings/OuterAxis" unique_id=1605934913]
+scale = Vector2(1, 0.43837115)
+
+[node name="Spin" type="Node2D" parent="CelestialRings/OuterAxis/Projection" unique_id=69285379]
+
+[node name="Sprite" type="Sprite2D" parent="CelestialRings/OuterAxis/Projection/Spin" unique_id=473393154]
+texture_filter = 1
+texture = ExtResource("3_rujik")
+
+[node name="Inner1Axis" type="Node2D" parent="CelestialRings/OuterAxis/Projection" unique_id=1357758892]
+z_index = 1
+texture_filter = 1
+position = Vector2(0, -48)
+script = ExtResource("2_0jiya")
+spin_speed_deg = -150.0
+orbit_speed_deg = -30.0
+tilt_deg = 0.0
+
+[node name="Projection" type="Node2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis" unique_id=1573446431]
+
+[node name="Spin" type="Node2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection" unique_id=89217103]
+
+[node name="Sprite" type="Sprite2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection/Spin" unique_id=318162012]
+texture_filter = 1
+texture = ExtResource("4_nmops")
+offset = Vector2(48, 1)
+
+[node name="Inner2Axis" type="Node2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection" unique_id=1037964884]
+z_index = 2
+texture_filter = 1
+position = Vector2(-40, 38)
+scale = Vector2(0.7, 0.7)
+script = ExtResource("2_0jiya")
+spin_speed_deg = 35.0
+orbit_speed_deg = 30.0
+tilt_deg = 0.0
+size_scale = 0.7
+
+[node name="Projection" type="Node2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection/Inner2Axis" unique_id=1824375869]
+
+[node name="Spin" type="Node2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection/Inner2Axis/Projection" unique_id=1900461689]
+
+[node name="Sprite" type="Sprite2D" parent="CelestialRings/OuterAxis/Projection/Inner1Axis/Projection/Inner2Axis/Projection/Spin" unique_id=394623580]
+texture_filter = 1
+texture = ExtResource("5_p8yjf")
+offset = Vector2(61, 35)

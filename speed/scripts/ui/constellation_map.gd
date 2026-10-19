@@ -1,9 +1,12 @@
 extends Control
 
 signal back_requested
+signal rotation_changed(radians: float)
 
 const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
+const CONSTELLATION_RADIUS := 84.0
+const SYMBOL_ANGLES := [90.0, 180.0, 270.0, 0.0]
 const TEXTURES := [
 	preload("res://assets/ui/map/constellations_unicorn.png"),
 	preload("res://assets/ui/map/constellations_centeur.png"),
@@ -11,7 +14,6 @@ const TEXTURES := [
 	preload("res://assets/ui/map/constellations_snake.png"),
 ]
 var _stars: Array[TextureButton] = []
-var _outer: Sprite2D
 var _inner1: Sprite2D
 var _inner2: Sprite2D
 var _preview: TextureRect
@@ -25,16 +27,23 @@ var _turn: Tween
 var _projection: Node2D
 var _origin := ORIGIN
 var _flatten := 0.5
+var _details: Control
+var _detail_fade: Tween
+var _transition_progress := 0.0
+var _dragging := false
 
 func _ready() -> void:
 	size = Vector2(640, 360)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame := _artwork(preload("res://assets/ui/map/selection_screen_ui.png"), self)
+	var frame_material := ShaderMaterial.new()
+	frame_material.shader = preload("res://assets/ui/map/selection_frame.gdshader")
+	frame.material = frame_material
 	var projection := Node2D.new()
 	_projection = projection
 	projection.position = ORIGIN
 	projection.scale = Vector2(1, 0.5)
 	add_child(projection)
-	_outer = _ring(projection, preload("res://assets/ui/map/ui_circle.png"))
 	_inner1 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle1.png"))
 	_inner1.offset = Vector2(48, 1)
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
@@ -49,33 +58,85 @@ func _ready() -> void:
 		star.pressed.connect(select_constellation.bind(i))
 		add_child(star)
 		_stars.append(star)
-	var back := _button(tr("common.back"), Vector2(24, 18), Vector2(70, 28))
+	var back := _button("", Vector2(14, 7), Vector2(72, 34))
+	back.tooltip_text = tr("common.back")
+	_transparent_button(back)
 	back.pressed.connect(func(): back_requested.emit())
+	_details = Control.new()
+	_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_details.size = size
+	add_child(_details)
+	_artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), _details)
 	_preview = TextureRect.new()
-	_preview.position = Vector2(420, 50)
-	_preview.size = Vector2(172, 106)
+	_preview.position = Vector2(429, 87)
+	_preview.size = Vector2(157, 96)
 	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_preview)
-	_heading = _label(Vector2(420, 175), Vector2(172, 50), 16)
-	_status = _label(Vector2(420, 229), Vector2(172, 38), 12)
-	_launch = _button(tr("stage_select.launch"), Vector2(420, 275), Vector2(172, 38))
+	_details.add_child(_preview)
+	_heading = _label(Vector2(420, 203), Vector2(174, 50), 16)
+	_status = _label(Vector2(420, 258), Vector2(174, 38), 12)
+	_launch = _button(tr("stage_select.launch"), Vector2(421, 307), Vector2(173, 30))
+	_transparent_button(_launch)
+	for content: Control in [_heading, _status, _launch]:
+		content.reparent(_details)
 	_launch.pressed.connect(_start)
 	if ConfigManager.stage_count() > 4:
-		var final_stage := _button(tr("stage.5.name"), Vector2(224, 304), Vector2(150, 24))
+		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
 		final_stage.add_theme_font_size_override("font_size", 11)
-		final_stage.pressed.connect(func(): _select(4))
+		_transparent_button(final_stage)
+		final_stage.size = Vector2(150, 16)
+		final_stage.pressed.connect(func():
+			if _turn != null:
+				_turn.kill()
+			_select(4)
+			_reveal_details()
+		)
 	_slider = HSlider.new()
-	_slider.position = Vector2(34, 300)
-	_slider.size = Vector2(170, 24)
+	_slider.position = Vector2(34, 333)
+	_slider.size = Vector2(170, 14)
 	_slider.min_value = -180
 	_slider.max_value = 180
 	_slider.step = 0.1
 	_slider.value_changed.connect(_slide)
+	_slider.drag_started.connect(func(): _dragging = true)
+	_slider.drag_ended.connect(func(_changed: bool):
+		_dragging = false
+		select_constellation(posmod(roundi(-_angle / 90.0), 4))
+	)
 	add_child(_slider)
 	_select(0)
 	_apply_rotation(0.0)
+	_hide_details()
+
+func _artwork(texture: Texture2D, parent: Control) -> TextureRect:
+	var art := TextureRect.new()
+	art.texture = texture
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.size = Vector2(640, 360)
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(art)
+	return art
+
+func _transparent_button(button: Button) -> void:
+	for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	button.add_theme_color_override("font_hover_color", CYAN)
+
+func _hide_details() -> void:
+	if _detail_fade != null:
+		_detail_fade.kill()
+	_details.modulate.a = 0.0
+	_details.hide()
+
+func _reveal_details() -> void:
+	if _transition_progress < 1.0:
+		return
+	_hide_details()
+	_details.show()
+	_detail_fade = create_tween()
+	_detail_fade.tween_property(_details, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE)
 
 func _ring(parent: Node2D, texture: Texture2D) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -102,27 +163,26 @@ func _label(at: Vector2, dimensions: Vector2, font_size: int) -> Label:
 	add_child(label)
 	return label
 
-func _draw() -> void:
-	draw_rect(Rect2(14, 14, 612, 332), CYAN, false, 1)
-	draw_line(Vector2(112, 24), Vector2(616, 24), CYAN)
-	draw_rect(Rect2(402, 32, 208, 298), Color("20343e"))
-	draw_rect(Rect2(402, 32, 208, 298), CYAN, false)
-	draw_rect(Rect2(418, 48, 176, 110), Color("03151d"))
-	draw_rect(Rect2(418, 48, 176, 110), CYAN, false)
-
 func select_constellation(index: int) -> void:
 	if _turn != null:
 		_turn.kill()
+	_hide_details()
 	_select(index)
-	var target := _angle + wrapf(-index * 90.0 - _angle, -180.0, 180.0)
+	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
 	_turn = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_turn.tween_method(_apply_rotation, _angle, target, 0.65)
+	_turn.tween_callback(_reveal_details)
 
 func _slide(value: float) -> void:
 	if _turn != null:
 		_turn.kill()
+	_hide_details()
 	_select(posmod(roundi(-value / 90.0), 4))
 	_apply_rotation(value)
+	if not _dragging:
+		_turn = create_tween()
+		_turn.tween_interval(0.15)
+		_turn.tween_callback(func(): select_constellation(_selected))
 
 func _select(index: int) -> void:
 	_selected = index
@@ -137,24 +197,27 @@ func _select(index: int) -> void:
 func _apply_rotation(degrees: float) -> void:
 	_angle = degrees
 	var radians := deg_to_rad(degrees)
-	_outer.rotation = radians
+	rotation_changed.emit(radians)
 	_inner1.position = Vector2(0, -48).rotated(-radians)
 	_inner1.rotation = -radians * 5.0
 	_inner2.position = _inner1.position + Vector2(-40, 38).rotated(radians)
 	_inner2.rotation = radians * 35.0 / 30.0
 	for i in _stars.size():
-		var angle := deg_to_rad(degrees + i * 90.0 + 90.0)
+		var angle := deg_to_rad(degrees + SYMBOL_ANGLES[i])
 		var depth := sin(angle)
 		var factor := 0.85 + depth * 0.15
 		var star := _stars[i]
 		star.scale = Vector2.ONE * factor
-		star.position = _origin + Vector2(cos(angle), depth * _flatten) * 108.0 - TEXTURES[i].get_size() * factor * 0.5
+		star.position = _origin + Vector2(cos(angle), depth * _flatten) * CONSTELLATION_RADIUS - TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
 	if _slider != null:
 		_slider.set_value_no_signal(wrapf(degrees, -180.0, 180.0))
 
 func set_transition(progress: float) -> void:
+	_transition_progress = progress
+	if progress < 1.0:
+		_hide_details()
 	_origin = Vector2(462, 176).lerp(ORIGIN, progress)
 	_flatten = lerpf(1.0, 0.5, progress)
 	_projection.position = _origin
@@ -163,6 +226,7 @@ func set_transition(progress: float) -> void:
 
 func focus_selection() -> void:
 	_stars[mini(_selected, 3)].grab_focus()
+	_reveal_details()
 
 func _start() -> void:
 	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):

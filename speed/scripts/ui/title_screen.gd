@@ -73,7 +73,7 @@ func _build_title_art() -> void:
 	_radar_material.shader = RADAR_SHADER
 	_radar_material.set_shader_parameter("sweep_texture", SWEEP_TEXTURE)
 	_radar_material.set_shader_parameter("stars_texture", STARS_TEXTURE)
-	_radar_material.set_shader_parameter("circle_texture", preload("res://assets/ui/map/ui_title_screen_circle_only.png"))
+	_radar_material.set_shader_parameter("map_ring_texture", preload("res://assets/ui/map/ui_circle.png"))
 	background.material = _radar_material
 	canvas.add_child(background)
 	var menu := $Center/Box as VBoxContainer
@@ -93,6 +93,7 @@ func _build_title_art() -> void:
 	_map.set_script(MAP_SCRIPT)
 	canvas.add_child(_map)
 	_map.back_requested.connect(_close_start_panel)
+	_map.rotation_changed.connect(func(angle: float): _radar_material.set_shader_parameter("map_angle", angle))
 	_map.hide()
 	resized.connect(_layout_title)
 	_layout_title()
@@ -132,7 +133,7 @@ func _build_start_panel(canvas: Control) -> void:
 		var button := Button.new()
 		button.text = labels[i]
 		_style_menu_button(button)
-		button.position = Vector2(60, [88, 138, 188, 264][i])
+		button.position = Vector2(52, [88, 138, 188, 264][i])
 		_start_panel.add_child(button)
 		if i < destinations.size():
 			button.pressed.connect(_go.bind(destinations[i]))

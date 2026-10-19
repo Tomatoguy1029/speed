@@ -6,7 +6,8 @@ uniform sampler2D stars_texture : filter_nearest, repeat_disable;
 uniform float elapsed = 0.0;
 uniform bool panel_open = false;
 uniform float map_progress = 0.0;
-uniform sampler2D circle_texture : filter_nearest, repeat_disable;
+uniform sampler2D map_ring_texture : filter_nearest, repeat_disable;
+uniform float map_angle = 0.0;
 
 void fragment() {
 	vec2 canvas = vec2(640.0, 360.0);
@@ -35,8 +36,15 @@ void fragment() {
 		base.rgb = mix(base.rgb, vec3(0.012, 0.035, 0.045), map_progress);
 	}
 	vec3 radar = sweep.rgb * sweep.a * 0.45 + stars.rgb * stars.a * fade;
-	vec4 circle = texture(circle_texture, radar_uv);
 	float reveal = smoothstep(0.55, 1.0, map_progress);
-	vec3 moving_ring = circle.rgb * circle.a * inside * (1.0 - reveal);
+	float rc = cos(map_angle * map_progress);
+	float rs = sin(map_angle * map_progress);
+	vec2 ring_offset = vec2(rc * offset.x + rs * offset.y, -rs * offset.x + rc * offset.y);
+	vec2 ring_uv = (ring_offset + vec2(175.0)) / vec2(351.0);
+	vec4 circle = texture(map_ring_texture, clamp(ring_uv, vec2(0.0), vec2(1.0)));
+	float ring_bounds = step(0.0, ring_uv.x) * step(ring_uv.x, 1.0) * step(0.0, ring_uv.y) * step(ring_uv.y, 1.0);
+	// 共通の円と格子は常に描き、外側の文様だけを出現させる。
+	float ring_visibility = length(ring_offset) <= 150.5 ? 1.0 : reveal;
+	vec3 moving_ring = circle.rgb * circle.a * ring_bounds * ring_visibility;
 	COLOR = vec4(max(base.rgb, max(moving_ring, radar * inside * (1.0 - map_progress))), 1.0);
 }
