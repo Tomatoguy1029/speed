@@ -489,7 +489,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			run.state.gauge = float(args.get("gauge", run.state.gauge))
 		"config":
 			var key := String(args.get("key", ""))
-			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "wave_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
+			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "trace_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
 				run.cfg.set(key, clampf(float(args.value), 0.001, 1.0) if key == "draw_time_scale" else maxf(0.01, float(args.value)))
 				run.build.refresh_stats()
 		"phase_set":

@@ -235,7 +235,8 @@ func _launch_speed(dir: Vector2, gauge_amount: float) -> float:
 func _trace(real_dt: float) -> void:
 	var pts := state.trace_path
 	var dist := run.rate * real_dt
-	var R := cfg.ship_radius
+	# なぞり中の当たり判定は、線の左右の帯の太さ
+	var R := combat.trace_radius()
 	while dist > 1e-9 and run.seg < pts.size() - 1:
 		var a := pts[run.seg]
 		var b := pts[run.seg + 1]
@@ -260,9 +261,6 @@ func _trace(real_dt: float) -> void:
 		state.ship_heading = u
 		if combat.wall_bounce(from):
 			_end_trace(false)
-			return
-		combat.wave_along(run, from, state.ship_pos)
-		if state.phase != RunState.Phase.PLAY:
 			return
 		if combat.collide_ship(from, R, run):
 			build.on_trail(run, from, state.ship_pos)
@@ -294,7 +292,6 @@ func _trace_twin(real_dt: float) -> void:
 		twin_run.seg_pos += move
 		dist -= move
 		state.twin_pos = a + (b - a) / maxf(seg_len, 1e-6) * twin_run.seg_pos
-		combat.wave_along(twin_run, from, state.twin_pos)
 		combat.twin_sweep(twin_run, from, state.twin_pos)
 		if state.phase != RunState.Phase.PLAY:
 			return

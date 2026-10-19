@@ -1456,7 +1456,7 @@ func _draw_path_band(c: CanvasItem) -> void:
 	for twin in [state.twin_first, state.twin_path]:
 		var tp: PackedVector2Array = twin
 		if tp.size() > 1:
-			c.draw_polyline(tp, Color(0.75, 0.9, 1.0, 0.5), cfg.wave_radius * 2.0)
+			c.draw_polyline(tp, Color(0.75, 0.9, 1.0, 0.5), cfg.trace_radius * 2.0)
 	if state.twin_tracing:
 		c.draw_circle(state.twin_pos, cfg.ship_radius * 1.3, Color(0.75, 0.92, 1.0, 0.55))
 		c.draw_circle(state.twin_pos, cfg.ship_radius * 0.7, Color(1.0, 1.0, 1.0, 0.9))
@@ -1465,7 +1465,7 @@ func _draw_path_band(c: CanvasItem) -> void:
 		return
 	var leo := run.combat.leo_width()
 	var color := Color(1.0, 0.85, 0.45) if leo > 1.0 else Color(0.55, 0.9, 1.0)
-	var w := cfg.wave_radius * leo
+	var w := cfg.trace_radius * leo
 	for i in pts.size() - 1:
 		c.draw_line(pts[i], pts[i + 1], color, w * 2.0)
 	for point in pts:

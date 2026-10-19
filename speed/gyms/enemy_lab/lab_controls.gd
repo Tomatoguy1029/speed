@@ -99,7 +99,7 @@ func _conditions(page: Node) -> void:
 				if ConfigManager.phases.has(StringName(id)): ids.append(id)
 		lab.session.perform("phase_set", {"ids": ids}))
 	box = UI.fold(page, tr("lab.ui.player_stats"))
-	for entry in [["base_attack", TranslationServer.translate("lab.message_0c0e2d79f0"), 10.2], ["base_max_speed", TranslationServer.translate("lab.message_0aee0183fd"), 400.0], ["draw_length", TranslationServer.translate("lab.message_017dfdb22a"), 1020.0], ["wave_radius", TranslationServer.translate("lab.message_ec7bdd3fb0"), 28.0], ["draw_time_scale", TranslationServer.translate("lab.message_355273af8a"), 0.03], ["draw_confirm_delay", TranslationServer.translate("lab.message_ab276f5393"), 0.1], ["boss_hp", TranslationServer.translate("lab.message_6384a9a6f0"), 1000], ["boss_armor", TranslationServer.translate("lab.message_391c98f217"), 30]]:
+	for entry in [["base_attack", TranslationServer.translate("lab.message_0c0e2d79f0"), 10.2], ["base_max_speed", TranslationServer.translate("lab.message_0aee0183fd"), 400.0], ["draw_length", TranslationServer.translate("lab.message_017dfdb22a"), 1020.0], ["trace_radius", TranslationServer.translate("lab.message_ec7bdd3fb0"), 28.0], ["draw_time_scale", TranslationServer.translate("lab.message_355273af8a"), 0.03], ["draw_confirm_delay", TranslationServer.translate("lab.message_ab276f5393"), 0.1], ["boss_hp", TranslationServer.translate("lab.message_6384a9a6f0"), 1000], ["boss_armor", TranslationServer.translate("lab.message_391c98f217"), 30]]:
 		_condition_fields[entry[0]] = _number(box, entry[1], float(ConfigManager.base.get(entry[0])), 0.01, 100000, 1, func(value): lab.session.perform("config", {"key": entry[0], "value": value}))
 	box = UI.fold(page, tr("lab.ui.loadout"))
 	var meta := OptionButton.new()

@@ -42,7 +42,7 @@
 | `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
-| `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や波動なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
+| `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
 | `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle` |
 | `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
@@ -50,7 +50,7 @@
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器や波動で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |

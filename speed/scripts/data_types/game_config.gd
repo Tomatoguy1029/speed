@@ -297,14 +297,10 @@ extends Resource
 ## 描き始めてからこの時間の間は、クリックで線を確定しない。ダブルクリックで線ができる前に確定するのを防ぐ。
 ## 単位：実秒
 @export var draw_confirm_delay: float
-## なぞりの波動の幅
-## なぞった線の左右この距離の帯にいる敵に、装甲を無視する波動が当たる。
+## なぞりの当たり判定の太さ
+## なぞり中は、なぞった線の左右この距離に触れた敵に体当たりが当たる（機体の本体の半径の代わり）。
 ## 単位：単位（距離）
-@export var wave_radius: float
-## なぞりの波動の威力
-## 波動のダメージ ＝ 攻撃力 × この値。
-## 単位：倍
-@export var wave_damage: float
+@export var trace_radius: float
 
 ## 攻撃力・装甲・クリティカル・弾かれ・ヒットストップ、敵の狙い方
 @export_group("戦闘")

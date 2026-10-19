@@ -378,7 +378,7 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_po
 	for p in points:
 		pts.append(screen(p))
 	if pts.size() >= 2:
-		draw_polyline(pts, Color(color, 0.13), maxf(3, session.run.cfg.wave_radius * 2 * zoom), true)
+		draw_polyline(pts, Color(color, 0.13), maxf(3, session.run.cfg.trace_radius * 2 * zoom), true)
 		draw_polyline(pts, Color(color, 0.2), maxf(2, session.run.cfg.ship_radius * 2 * zoom), true)
 		draw_polyline(pts, color, width, true)
 	for i in pts.size():
