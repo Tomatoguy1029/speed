@@ -10,6 +10,8 @@ uniform sampler2D map_ring_texture : filter_nearest, repeat_disable;
 uniform float map_angle = 0.0;
 uniform sampler2D menu_stars_texture : filter_nearest, repeat_disable;
 uniform float upgrade_progress = 0.0;
+uniform sampler2D increments_texture : filter_nearest, repeat_disable;
+uniform float increments_alpha = 0.0;
 
 void fragment() {
 	vec2 canvas = vec2(640.0, 360.0);
@@ -27,16 +29,15 @@ void fragment() {
 	float age = mod(rotation - (atan(offset.y, offset.x) + PI * 0.5) + TAU, TAU);
 	float fade = exp(-age * 0.625) * step(age, rotation);
 	vec4 stars = texture(stars_texture, radar_uv);
-	vec4 base = texture(TEXTURE, UV);
-	if (panel_open) {
-		base = texture(menu_stars_texture, UV);
-	}
-	base.rgb *= base.a;
-	if (map_progress > 0.0) {
-		if (distance(UV * canvas, center) < 154.0) {
-			base.rgb = vec3(0.0);
+	vec4 starfield = texture(menu_stars_texture, UV);
+	vec3 base = mix(starfield.rgb * starfield.a, vec3(0.012, 0.035, 0.045), map_progress);
+	vec2 pixel = UV * canvas;
+	if (!panel_open) {
+		bool logo_area = pixel.x >= 20.0 && pixel.x < 275.0 && pixel.y >= 79.0 && pixel.y < 133.0;
+		if (logo_area) {
+			vec4 logo = texture(TEXTURE, UV);
+			base = max(base, logo.rgb * logo.a * (1.0 - map_progress));
 		}
-		base.rgb = mix(base.rgb, vec3(0.012, 0.035, 0.045), map_progress);
 	}
 	vec3 radar = sweep.rgb * sweep.a * 0.45 + stars.rgb * stars.a * fade;
 	float reveal = smoothstep(0.55, 1.0, map_progress);
@@ -49,5 +50,7 @@ void fragment() {
 	// 共通の円と格子は常に描き、外側の文様だけを出現させる。
 	float ring_visibility = length(ring_offset) <= 150.5 ? 1.0 : reveal;
 	vec3 moving_ring = circle.rgb * circle.a * ring_bounds * ring_visibility;
-	COLOR = vec4(max(base.rgb, max(moving_ring, radar * inside * (1.0 - map_progress))) * (1.0 - upgrade_progress), 1.0);
+	vec4 increments = texture(increments_texture, UV);
+	vec3 overlay = increments.rgb * increments.a * increments_alpha;
+	COLOR = vec4(max(overlay, max(base, max(moving_ring, radar * inside * (1.0 - map_progress)))) * (1.0 - upgrade_progress), 1.0);
 }

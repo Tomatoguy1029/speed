@@ -23,6 +23,7 @@ var _menu_frame: Control
 var _menu_options: Control
 var _menu_back: Control
 var _morphing := false
+var _increments_alpha := 1.0
 
 func _ready() -> void:
 	_build_title_art()
@@ -80,6 +81,8 @@ func _build_title_art() -> void:
 	_radar_material.set_shader_parameter("sweep_texture", SWEEP_TEXTURE)
 	_radar_material.set_shader_parameter("stars_texture", STARS_TEXTURE)
 	_radar_material.set_shader_parameter("menu_stars_texture", preload("res://assets/ui/title/ui_title_screen_stars.png"))
+	_radar_material.set_shader_parameter("increments_texture", preload("res://assets/ui/title/ui_title_screen_incrementsl.png"))
+	_radar_material.set_shader_parameter("increments_alpha", _increments_alpha)
 	_radar_material.set_shader_parameter("map_ring_texture", preload("res://assets/ui/map/ui_circle.png"))
 	background.material = _radar_material
 	canvas.add_child(background)
@@ -184,6 +187,10 @@ func show_start_panel(open: bool) -> void:
 func show_screen(screen: GameManager.Screen, animate := true) -> void:
 	var mapping := screen == GameManager.Screen.STAGE_SELECT
 	var returning_from_map := animate and not mapping and _map_progress > 0.0
+	if mapping:
+		_set_increments_alpha(0.0)
+	elif not returning_from_map:
+		_set_increments_alpha(1.0)
 	if _transition != null:
 		_transition.kill()
 	show_start_panel(screen == GameManager.Screen.MAIN_MENU)
@@ -203,6 +210,7 @@ func show_screen(screen: GameManager.Screen, animate := true) -> void:
 		)
 		if returning_from_map:
 			_transition.tween_property(_start_panel, "modulate:a", 1.0, 0.25)
+			_transition.parallel().tween_method(_set_increments_alpha, 0.0, 1.0, 0.35)
 			_transition.tween_callback(func():
 				_start_panel.process_mode = Node.PROCESS_MODE_INHERIT
 				if _start_panel.visible:
@@ -220,6 +228,10 @@ func _set_map_progress(value: float) -> void:
 	_radar_material.set_shader_parameter("map_progress", value)
 	_map.modulate.a = smoothstep(0.55, 1.0, value)
 	_map.set_transition(value)
+
+func _set_increments_alpha(value: float) -> void:
+	_increments_alpha = value
+	_radar_material.set_shader_parameter("increments_alpha", value)
 
 func _close_start_panel() -> void:
 	if _morphing:

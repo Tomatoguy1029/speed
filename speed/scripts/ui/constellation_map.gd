@@ -58,9 +58,19 @@ func _ready() -> void:
 		star.pressed.connect(select_constellation.bind(i))
 		add_child(star)
 		_stars.append(star)
-	var back := _button("", Vector2(14, 7), Vector2(72, 34))
+	var back_fill := Polygon2D.new()
+	back_fill.polygon = PackedVector2Array([Vector2(9, 9), Vector2(46, 9), Vector2(74, 34), Vector2(9, 34)])
+	back_fill.color = Color("1f323d")
+	add_child(back_fill)
+	back_fill.hide()
+	_artwork(preload("res://assets/ui/map/selection_screen_back_button.png"), self)
+	var back := _button("", Vector2(7, 7), Vector2(74, 30))
 	back.tooltip_text = tr("common.back")
 	_transparent_button(back)
+	back.mouse_entered.connect(back_fill.show)
+	back.mouse_exited.connect(back_fill.hide)
+	back.focus_entered.connect(back_fill.show)
+	back.focus_exited.connect(back_fill.hide)
 	back.pressed.connect(func(): back_requested.emit())
 	_details = Control.new()
 	_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -68,15 +78,15 @@ func _ready() -> void:
 	add_child(_details)
 	_artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), _details)
 	_preview = TextureRect.new()
-	_preview.position = Vector2(429, 87)
-	_preview.size = Vector2(157, 96)
+	_preview.position = Vector2(451, 88)
+	_preview.size = Vector2(135, 82)
 	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_details.add_child(_preview)
-	_heading = _label(Vector2(420, 203), Vector2(174, 50), 16)
-	_status = _label(Vector2(420, 258), Vector2(174, 38), 12)
-	_launch = _button(tr("stage_select.launch"), Vector2(421, 307), Vector2(173, 30))
+	_heading = _label(Vector2(444, 188), Vector2(152, 38), 14)
+	_status = _label(Vector2(444, 235), Vector2(152, 24), 10)
+	_launch = _button(tr("stage_select.launch"), Vector2(431, 293), Vector2(175, 34))
 	_transparent_button(_launch)
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
@@ -120,7 +130,7 @@ func _artwork(texture: Texture2D, parent: Control) -> TextureRect:
 	return art
 
 func _transparent_button(button: Button) -> void:
-	for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
+	for state: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	button.add_theme_color_override("font_hover_color", CYAN)
 
