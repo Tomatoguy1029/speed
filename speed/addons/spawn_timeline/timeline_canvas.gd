@@ -20,6 +20,9 @@ var CURVE_ROW := 84.0
 ## 選んでいる雑魚の曲線と、その点の番号（-1 ならなし）
 var curve_selected := -1
 var point_selected := -1
+## マウスが近くにある曲線の点（-1 ならなし）
+var _hover_curve := -1
+var _hover_point := -1
 
 var timeline
 ## 再生位置（秒）
@@ -49,7 +52,7 @@ func _init() -> void:
 	CURVE_ROW = BASE.curve * ui
 	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯・クリップのラベルをダブルクリック：名前　目盛りをクリック：再生位置\n" + \
-		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　Delete で点を消す\n" + \
+		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -87,9 +90,44 @@ func _curve_values(c: Resource, end: float) -> PackedFloat32Array:
 	var values := PackedFloat32Array()
 	values.resize(int(end) + 2)
 	for n in values.size():
-		values[n] = float(c.call("value_at", float(n)))
+		values[n] = _sample(pts, float(n))
 	_curve_cache[c] = {"key": key, "values": values}
 	return values
+
+## 点の並び pts を、行き過ぎないなめらかな曲線（単調な3次補間）でつないだときの、時刻 t の値。
+## ゲームの雑魚の目標の数の曲線（data_types/spawn_curve.gd の sample）と同じつなぎ方。この道具は Godot 本体だけに
+## 依存するので（設計書 4.1）、ゲームのスクリプトを呼ばずに、ここでも同じ計算をする。
+static func _sample(pts: PackedVector2Array, t: float) -> float:
+	var n := pts.size()
+	if n == 0:
+		return 0.0
+	if n == 1 or t <= pts[0].x:
+		return pts[0].y
+	if t >= pts[n - 1].x:
+		return pts[n - 1].y
+	var k := 0
+	while k < n - 2 and t > pts[k + 1].x:
+		k += 1
+	var h := maxf(pts[k + 1].x - pts[k].x, 0.0001)
+	var s := (t - pts[k].x) / h
+	var m0 := _slope(pts, k)
+	var m1 := _slope(pts, k + 1)
+	var s2 := s * s
+	var s3 := s2 * s
+	return (2.0 * s3 - 3.0 * s2 + 1.0) * pts[k].y + (s3 - 2.0 * s2 + s) * h * m0 \
+		+ (-2.0 * s3 + 3.0 * s2) * pts[k + 1].y + (s3 - s2) * h * m1
+
+static func _slope(pts: PackedVector2Array, k: int) -> float:
+	var n := pts.size()
+	var left := (pts[k].y - pts[k - 1].y) / maxf(pts[k].x - pts[k - 1].x, 0.0001) if k > 0 else 0.0
+	var right := (pts[k + 1].y - pts[k].y) / maxf(pts[k + 1].x - pts[k].x, 0.0001) if k < n - 1 else 0.0
+	if k == 0:
+		return right
+	if k == n - 1:
+		return left
+	if left * right <= 0.0:
+		return 0.0
+	return 2.0 * left * right / (left + right)
 
 ## 1秒ごとの値 values の、時刻 t の値（間はまっすぐつなぐ）。
 static func _value_at(values: PackedFloat32Array, t: float) -> float:
@@ -116,6 +154,10 @@ func _curve_y(k: int, v: float, vmax: float) -> float:
 func _curve_v(k: int, y: float, vmax: float) -> float:
 	var top := _curves_top() + k * CURVE_ROW
 	return maxf(0.0, (top + CURVE_ROW - 6.0 * ui - y) / (CURVE_ROW - 14.0 * ui) * vmax)
+
+## 数を、整数ならそのまま、そうでなければ小数1桁で。
+static func _num(v: float) -> String:
+	return "%d" % int(v) if is_equal_approx(v, roundf(v)) else "%.1f" % v
 
 ## m:ss の形の時刻。
 static func clock(t: float) -> String:
@@ -228,6 +270,18 @@ func _draw() -> void:
 		draw_rect(Rect2(0, top, size.x, CURVE_ROW), Color(0.3, 0.9, 0.5, 0.06 if k == curve_selected else 0.03))
 		draw_line(Vector2(0, top + CURVE_ROW), Vector2(size.x, top + CURVE_ROW), Color(1, 1, 1, 0.08))
 		var vmax := _curve_max(c)
+		# 縦の目盛り：切りのいい間隔で横線と数を描く
+		var grid_step := 1.0
+		for gs: float in [1.0, 2.0, 5.0, 10.0, 20.0, 25.0, 50.0, 100.0, 200.0, 250.0, 500.0, 1000.0]:
+			grid_step = gs
+			if vmax / gs <= 4.0:
+				break
+		var gv := 0.0
+		while gv <= vmax + 0.001:
+			var gy := _curve_y(k, gv, vmax)
+			draw_line(Vector2(GUTTER, gy), Vector2(size.x, gy), Color(1, 1, 1, 0.07 if gv > 0.0 else 0.15))
+			draw_string(font, Vector2(GUTTER + 4 * ui, gy - 2 * ui), "%d" % int(gv), HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(11), Color(1, 1, 1, 0.45))
+			gv += grid_step
 		var values := _curve_values(c, end)
 		var pts := PackedVector2Array()
 		var x := GUTTER
@@ -241,6 +295,16 @@ func _draw() -> void:
 			var q := Vector2(_x(ps_[n].x), _curve_y(k, ps_[n].y, vmax))
 			var on := k == curve_selected and n == point_selected
 			draw_circle(q, (6.0 if on else 4.5) * ui, Color(1, 0.9, 0.4) if on else Color(0.85, 1.0, 0.9))
+			# 選んでいる点・マウスが近い点・動かしている点は、時刻と数を出す
+			if on or (k == _hover_curve and n == _hover_point):
+				var text := "%s　%s体" % [clock(ps_[n].x), _num(ps_[n].y)]
+				var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(13)).x
+				var tp := q + Vector2(8 * ui, -8 * ui)
+				if tp.x + tw > size.x:
+					tp.x = q.x - tw - 8 * ui
+				tp.y = clampf(tp.y, top + 14 * ui, top + CURVE_ROW - 4 * ui)
+				draw_rect(Rect2(tp + Vector2(-3 * ui, -13 * ui), Vector2(tw + 6 * ui, 17 * ui)), Color(0, 0, 0, 0.75))
+				draw_string(font, tp, text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(13), Color(1, 0.95, 0.6))
 		draw_string(font, Vector2(8 * ui, top + 20 * ui), timeline.enemy_name(c.get("type")), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15),
 			Color(1, 1, 0.8) if k == curve_selected else Color(0.7, 1.0, 0.8))
 		draw_string(font, Vector2(8 * ui, top + 40 * ui), "最大 %d 体" % int(vmax), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12), Color(1, 1, 1, 0.6))
@@ -410,6 +474,8 @@ func _gui_input(event: InputEvent) -> void:
 				point_selected = h.get("point", -1)
 				if h.kind == "curve_body" and mb.double_click:
 					_add_point(h.curve, mb.position)
+				elif h.kind == "point" and mb.double_click:
+					_start_point_edit(h.curve, h.point)
 				elif h.kind == "point":
 					_begin_point_drag(h.curve, h.point)
 				queue_redraw()
@@ -422,6 +488,14 @@ func _gui_input(event: InputEvent) -> void:
 			_end_drag()
 	elif event is InputEventMouseMotion and not _drag.is_empty():
 		_move_drag((event as InputEventMouseMotion).position, (event as InputEventMouseMotion).shift_pressed)
+	elif event is InputEventMouseMotion:
+		var h := _hit((event as InputEventMouseMotion).position)
+		var hc: int = h.get("curve", -1) if h.get("kind", "") == "point" else -1
+		var hp: int = h.get("point", -1) if h.get("kind", "") == "point" else -1
+		if hc != _hover_curve or hp != _hover_point:
+			_hover_curve = hc
+			_hover_point = hp
+			queue_redraw()
 	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		if point_selected >= 0:
 			_remove_point()
@@ -463,6 +537,28 @@ func _add_point(k: int, at: Vector2) -> void:
 	c.set("points", after)
 	point_selected = n
 	timeline.commit("雑魚の曲線に点を足す", [[c, "points", before, after]])
+
+## 点の時刻と数を文字で入れる（「m:ss 体数」または「秒 体数」）。
+func _start_point_edit(k: int, n: int) -> void:
+	var c: Resource = timeline.curves()[k]
+	var pts: PackedVector2Array = c.get("points")
+	var vmax := _curve_max(c)
+	var q := Vector2(_x(pts[n].x), _curve_y(k, pts[n].y, vmax))
+	_open_editor("%s %s" % [clock(pts[n].x), _num(pts[n].y)], Rect2(q + Vector2(8 * ui, -14 * ui), Vector2(170 * ui, 30 * ui)),
+		func(text: String) -> void:
+			var parts := text.strip_edges().replace("　", " ").split(" ", false)
+			if parts.size() < 2:
+				return
+			var tt := String(parts[0])
+			var secs := float(tt.get_slice(":", 0)) * 60.0 + float(tt.get_slice(":", 1)) if tt.contains(":") else float(tt)
+			var before: PackedVector2Array = c.get("points")
+			var after := before.duplicate()
+			var lo := after[n - 1].x + 0.1 if n > 0 else 0.0
+			var hi := after[n + 1].x - 0.1 if n + 1 < after.size() else 1e9
+			after[n] = Vector2(clampf(secs, lo, hi), maxf(0.0, float(parts[1])))
+			if after != before:
+				c.set("points", after)
+				timeline.commit("雑魚の曲線の点を変える", [[c, "points", before, after]]))
 
 func _remove_point() -> void:
 	var curves: Array = timeline.curves()
