@@ -18,6 +18,18 @@ var _stage_button: Button
 
 func _ready() -> void:
 	_build_title_art()
+	if OS.is_debug_build():
+		var lab := Button.new()
+		lab.name = "EnemyLabButton"
+		lab.text = tr("menu.enemy_lab")
+		lab.add_theme_font_size_override("font_size", 18)
+		lab.pressed.connect(_go.bind(GameManager.Screen.ENEMY_LAB))
+		add_child(lab)
+		lab.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		lab.offset_left = -330.0
+		lab.offset_right = -24.0
+		lab.offset_top = 24.0
+		lab.offset_bottom = 68.0
 	%StartButton.pressed.connect(func(): _go(GameManager.Screen.MAIN_MENU))
 	%SettingsButton.pressed.connect(func(): _go(GameManager.Screen.SETTINGS))
 	%QuitButton.pressed.connect(GameManager.quit_game)
