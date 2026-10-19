@@ -2206,6 +2206,12 @@ func _survey() -> int:
 	var type := table.type
 	var defs := table.def
 	_far_rows.clear()
+	# クリップから出た群れは、隊列のまま近づけるため、遠くにいても再配置しない
+	var grouped := {}
+	for groups: Array in _clip_groups.values():
+		for rows: PackedInt32Array in groups:
+			for k in range(0, rows.size(), 2):
+				grouped[rows[k]] = true
 	for rows in beh_rows:
 		for i in rows:
 			if dead[i] != 0:
@@ -2216,7 +2222,7 @@ func _survey() -> int:
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
 				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
-				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW:
+				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW and not grouped.has(i):
 					_far_rows.append(i)
 				continue
 			alive_n += 1

@@ -152,6 +152,19 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	em._tick_clips(1.0)
 	check(groups.call() == 1, "空いたら出す")
 	kill.call()
+	# クリップから出た群れは、遠くにいても再配置しない（隊列がばらばらにならない）
+	em._clip_groups.clear()
+	em._clip_next.clear()
+	clip.formations = forms
+	clip.types = types
+	state.time = 6.0
+	em._tick_clips(1.0)
+	var rows: PackedInt32Array = em._clip_groups[0][0]
+	var far := state.view_center + Vector2(0, -5000)
+	em.table.pos[rows[0]] = far
+	em._survey()
+	check(em.table.pos[rows[0]] == far, "クリップの群れは再配置しない")
+	kill.call()
 
 ## 攻撃の重さの合計が予算を超えないように待たせる。待っていた攻撃は、ばらつきの分だけ遅れて始める。
 ## 雑魚は管理しない。本番のランでは、時間帯の攻撃の予算で管理を切り替える。
