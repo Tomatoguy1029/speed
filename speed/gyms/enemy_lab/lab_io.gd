@@ -64,7 +64,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 		if not t.alive[i] or t.dead[i] or t.parent[i] >= 0:
 			continue
 		commands.append({"tick": 0, "kind": "boss" if t.is_boss[i] else "spawn",
-			"args": {"type": String(t.type[i]), "pos": plain(t.pos[i]), "level": t.level[i], "angle": t.facing[i], "elite": t.elite[i] != 0}})
+			"args": {"type": String(t.type[i]), "pos": plain(t.pos[i]), "angle": t.facing[i], "elite": t.elite[i] != 0}})
 	return plain({"version": VERSION, "kind": "preset", "baseline": session.baseline.duplicate(true), "spec": spec,
 		"history": commands, "branches": [], "tick": 0, "end": 0, "route": route, "pattern": pattern, "results": []})
 

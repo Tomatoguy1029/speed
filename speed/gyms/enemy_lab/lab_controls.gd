@@ -240,12 +240,11 @@ func _formations(page: Node) -> void:
 	_text(box, tr("lab.formation.entry"))
 	box.add_child(entries)
 	fill.call(0)
-	var level := _number(box, tr("lab.formation.level"), 1, 1, 100)
 	_button(box, tr("lab.formation.place"), func():
 		if files.item_count == 0:
 			return
 		lab.session.perform("formation", {"path": files.get_item_metadata(files.selected), "layout": layouts.selected,
-			"entry": entries.selected, "level": level.value}))
+			"entry": entries.selected}))
 
 func _attacks(box: Node) -> void:
 	var toggle := CheckButton.new()
@@ -298,7 +297,7 @@ func _spawns(box: Node) -> void:
 	box.add_child(entries)
 	_button(box, TranslationServer.translate("lab.message_7c4fd18609"), func():
 		var values: Array = lab.session.schedule.duplicate(true)
-		values.append({"type": lab.canvas.spawn_type, "pos": [lab.canvas.center.x, lab.canvas.center.y], "count": lab.canvas.spawn_count, "level": lab.canvas.spawn_level, "start": start.value, "end": end.value, "interval": interval.value, "enabled": true, "probability": probability.value, "radius": radius.value})
+		values.append({"type": lab.canvas.spawn_type, "pos": [lab.canvas.center.x, lab.canvas.center.y], "count": lab.canvas.spawn_count, "start": start.value, "end": end.value, "interval": interval.value, "enabled": true, "probability": probability.value, "radius": radius.value})
 		lab.session.perform("schedule", {"entries": values}))
 	_button(box, tr("lab.lane_toggle"), func():
 		if entries.get_selected_items().is_empty(): return

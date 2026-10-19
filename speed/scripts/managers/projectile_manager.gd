@@ -337,7 +337,7 @@ func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
 	var dir := (vel - normal * 2.0 * vel.dot(normal)).normalized()
 	var speed := float(p.reflect_speed)
 	_add_hostile(impact + normal * 2.0, dir * speed, speed, clampf(friend_r[shot], 5.0, 10.0),
-		float(p.reflect_life), float(p.reflect_dmg) * (1.0 + 0.25 * (t.level[enemy] - 1.0)),
+		float(p.reflect_life), float(p.reflect_dmg),
 		0.0, 0.0, HostileKind.REFLECTED)
 	t.fire_t[enemy] = maxf(0.01, float(p.reflect_interval))
 	t.flash[enemy] = 0.1
@@ -354,7 +354,7 @@ func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := 
 	var u := Vector2.from_angle(angle)
 	var pos := t.pos[i]
 	_add_hostile(pos + u * t.r[i], u * speed, speed, 9.0 if missile else 7.0, 4.5 if missile else 4.0,
-		float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (t.level[i] - 1.0)), p.get("slow", 0.0),
+		float(p.get("bullet_dmg", 7.0)), p.get("slow", 0.0),
 		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": pos, "kind": kind})
 

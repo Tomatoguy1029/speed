@@ -7,8 +7,6 @@ script = ExtResource("1")
 start = 150.0
 pop_from = 45.0
 pop_to = 75.0
-level_from = 1.6
-level_to = 2.4
 rate = 8.0
 mix = {
 "aquarius": 0.02,

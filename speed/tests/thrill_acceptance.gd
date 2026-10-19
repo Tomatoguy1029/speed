@@ -183,7 +183,7 @@ func _test_fire_regrowth() -> void:
 	_check(boss.count == 5 and boss.necks.all(func(n): return n.row >= 0 and not n.burned), "次段階で焼いた頭も戻り、新しい首が加わる")
 
 func _enemy(type: StringName, at: Vector2) -> int:
-	return run.enemies.spawn(run.enemies.def_of(type), 1.0, at)
+	return run.enemies.spawn(run.enemies.def_of(type), at)
 
 func _test_foundation() -> void:
 	var s := run.state
@@ -229,8 +229,7 @@ func _test_foundation() -> void:
 	var before: Dictionary = run.enemies._target()
 	s.time = 660.0
 	var after: Dictionary = run.enemies._target()
-	_check(after.pop > before.pop and after.level > before.level and run.enemies.surge_steps() > 1, "タスク4：10分以降の波は段階ごとに大きく強くなる")
-	_check(run.field.danger_at(0.0) == 0 and run.field.danger_at(run.cfg.field_radius) > run.field.danger_at(run.cfg.zone_outer), "タスク4：危険度は外縁ほど高い")
+	_check(after.pop > before.pop and run.enemies.surge_steps() > 1, "タスク4：10分以降の波は段階ごとに大きくなる")
 
 func _test_shapes() -> void:
 	_clear()

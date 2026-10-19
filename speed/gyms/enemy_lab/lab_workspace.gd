@@ -212,12 +212,6 @@ func _palette(parent: Node) -> void:
 	lab._count = lab._spin(row, 1, 10000, 1)
 	lab._count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab._count.value_changed.connect(func(v): lab.canvas.spawn_count = int(v))
-	var level_box := UI.fold(box, tr("lab.ui.placement_options"))
-	var levels := HBoxContainer.new()
-	level_box.add_child(levels)
-	lab._label(levels, "Lv")
-	lab._level = lab._spin(levels, 1, 100, 1)
-	lab._level.value_changed.connect(func(v): lab.canvas.spawn_level = v)
 
 func _toolbar(parent: Node) -> void:
 	var bar := HFlowContainer.new()
