@@ -1,18 +1,206 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://d30gdh43u6kli"]
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
-[ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
-[ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
-[ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
-[ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
-[ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
-[ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="1_3ghul"]
+[ext_resource type="PackedScene" uid="uid://b0sce1j2r44rr" path="res://data/formations/telescope_reticle.tscn" id="2_xsgcl"]
+[ext_resource type="PackedScene" uid="uid://bxl2barjiuk3s" path="res://data/formations/dolphin.tscn" id="3_pea44"]
+[ext_resource type="PackedScene" uid="uid://c7he0y13h5761" path="res://data/formations/aquarius_solo.tscn" id="4_blxf3"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
+[ext_resource type="PackedScene" uid="uid://qsuhj8vo0blj" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
+
+[sub_resource type="Resource" id="Resource_oe0ic"]
+script = ExtResource("1_3ghul")
+label = "望遠鏡の初登場"
+formation = ExtResource("2_xsgcl")
+time = 95.0
+stay = 40.0
+
+[sub_resource type="Resource" id="Resource_4bt7u"]
+script = ExtResource("1_3ghul")
+label = "攻められる山：望遠鏡"
+formation = ExtResource("2_xsgcl")
+time = 182.0
+stay = 35.0
+
+[sub_resource type="Resource" id="Resource_pmvkf"]
+script = ExtResource("1_3ghul")
+label = "攻められる山：いるか座"
+formation = ExtResource("3_pea44")
+time = 190.0
+
+[sub_resource type="Resource" id="Resource_fkgl6"]
+script = ExtResource("1_3ghul")
+label = "みずがめ座 1"
+formation = ExtResource("4_blxf3")
+time = 365.0
+stay = 60.0
+
+[sub_resource type="Resource" id="Resource_bab1x"]
+script = ExtResource("1_3ghul")
+label = "みずがめ座 2"
+formation = ExtResource("4_blxf3")
+time = 445.0
+stay = 60.0
+
+[sub_resource type="Resource" id="Resource_unpfa"]
+script = ExtResource("5_ha4ve")
+pop_from = 14.0
+pop_to = 40.0
+level_from = 1.0
+level_to = 1.3
+rate = 6.0
+mix = {
+"biter": 6.0,
+"splitter": 1.0
+}
+id = &"s4_grow"
+display_name = "育つ"
+
+[sub_resource type="Resource" id="Resource_mwefo"]
+script = ExtResource("5_ha4ve")
+start = 90.0
+pop_from = 40.0
+pop_to = 55.0
+level_from = 1.3
+level_to = 1.6
+rate = 7.0
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+formations = Dictionary[PackedScene, float]({
+ExtResource("2_xsgcl"): 1.0
+})
+formation_count = 1
+formation_interval = 25.0
+id = &"s4_rise"
+display_name = "少し増える"
+
+[sub_resource type="Resource" id="Resource_05gyn"]
+script = ExtResource("5_ha4ve")
+start = 150.0
+pop_from = 35.0
+pop_to = 30.0
+level_from = 1.6
+level_to = 1.7
+rate = 4.0
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+id = &"s4_ebb"
+display_name = "減る"
+
+[sub_resource type="Resource" id="Resource_0kp78"]
+script = ExtResource("5_ha4ve")
+start = 180.0
+pop_from = 50.0
+pop_to = 70.0
+level_from = 1.7
+level_to = 2.2
+rate = 8.0
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+formations = Dictionary[PackedScene, float]({
+ExtResource("2_xsgcl"): 1.0,
+ExtResource("3_pea44"): 1.0
+})
+formation_count = 2
+formation_interval = 12.0
+id = &"s4_siege"
+display_name = "攻められる山"
+
+[sub_resource type="Resource" id="Resource_mpbfx"]
+script = ExtResource("5_ha4ve")
+start = 240.0
+pop_from = 40.0
+pop_to = 50.0
+level_from = 2.2
+level_to = 2.4
+rate = 6.0
+xp_bonus = 1.4
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+id = &"s4_grow2"
+display_name = "育つ II"
+
+[sub_resource type="Resource" id="Resource_vh3c5"]
+script = ExtResource("5_ha4ve")
+start = 300.0
+pop_from = 140.0
+pop_to = 260.0
+level_from = 1.3
+level_to = 1.6
+rate = 60.0
+wave_interval = 3.5
+wave_type = &"biter"
+mix = {
+"biter": 8.0,
+"splitter": 2.0
+}
+id = &"s4_horde"
+display_name = "大群を貫く"
+
+[sub_resource type="Resource" id="Resource_02yv8"]
+script = ExtResource("5_ha4ve")
+start = 360.0
+pop_from = 70.0
+pop_to = 110.0
+level_from = 3.0
+level_to = 4.2
+rate = 10.0
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+formations = Dictionary[PackedScene, float]({
+ExtResource("6_3vyts"): 1.0,
+ExtResource("3_pea44"): 1.0
+})
+formation_count = 2
+formation_interval = 15.0
+id = &"s4_storm"
+display_name = "強めに攻められる"
+
+[sub_resource type="Resource" id="Resource_gbu6c"]
+script = ExtResource("5_ha4ve")
+start = 510.0
+pop_from = 90.0
+pop_to = 120.0
+level_from = 4.2
+level_to = 5.0
+rate = 12.0
+cores = true
+mix = {
+"biter": 5.0,
+"bomber": 2.0,
+"splitter": 1.5
+}
+formations = Dictionary[PackedScene, float]({
+ExtResource("2_xsgcl"): 1.0,
+ExtResource("6_3vyts"): 1.0,
+ExtResource("3_pea44"): 1.0
+})
+formation_count = 2
+formation_interval = 15.0
+id = &"s4_eve"
+display_name = "ボス前"
 
 [resource]
 script = ExtResource("1")
 index = 4
 scene_path = "res://scenes/stages/stage_4.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
+phases = [SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_0kp78"), SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8"), SubResource("Resource_gbu6c")]
+clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_oe0ic"), SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x")])
 boss_id = &"provisional"
 legendary_module_id = &"legendary_compass"
 enemy_looks = {

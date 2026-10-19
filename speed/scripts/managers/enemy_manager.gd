@@ -2208,6 +2208,7 @@ func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
 		_formation_t = phase.formation_interval
 
 ## ステージのクリップを、決めた時刻に出す。途中の時刻から始めたランでは、それより前の出現は出さない。
+## 種類ごと・強敵の全体の上限に達している間は待ち、空いたら出す（同じ大物のクリップは入れ替わりになる）。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
 	if not _clips_ready:
@@ -2223,8 +2224,11 @@ func _tick_clips(level: float) -> void:
 		var fired: int = _clip_fired.get(n, 0)
 		if fired >= maxi(1, clip.count) or state.time < clip.time + fired * clip.interval:
 			continue
+		var data := formation_data(clip.formation)
+		if _formation_capped(data):
+			continue
 		_clip_fired[n] = fired + 1
-		spawn_formation(formation_data(clip.formation), level)
+		spawn_formation(data, level)
 
 var _type_counts: Dictionary = {}
 ## 強敵と大物（星3以上）の数（部位は数えない）

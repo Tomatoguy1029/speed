@@ -90,6 +90,9 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	stage.clips = [clip]
 	state.stage = stage
 	em._clip_fired.clear()
+	em._type_counts.clear()
+	em._strong_count = 0
+	run.cfg.attack_rules = null
 	var fired := func() -> int: return int(em._clip_fired.get(0, 0))
 	for pair in [[4.0, 0], [5.0, 1], [7.0, 1], [8.0, 2], [30.0, 2]]:
 		state.time = pair[0]
@@ -105,6 +108,20 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	state.time = 8.0
 	em._tick_clips(1.0)
 	check(fired.call() == 2 and em.count() > before, "始めた時刻のあとの出現は出す")
+	# 上限に達している間は待ち、空いたら出す
+	var rules := AttackRules.new()
+	rules.strong_cap = 1
+	run.cfg.attack_rules = rules
+	em._clip_fired.clear()
+	em._clips_ready = true
+	em._strong_count = 1
+	state.time = 5.0
+	em._tick_clips(1.0)
+	check(fired.call() == 0, "上限に達している間は待つ")
+	rules.strong_cap = 9
+	em._tick_clips(1.0)
+	check(fired.call() == 1, "空いたら出す")
+	run.cfg.attack_rules = null
 
 ## 強敵の群れは、目標の数まで、間隔を空けて補充する。
 func _check_refill(run: RunManager, scene: PackedScene) -> void:
