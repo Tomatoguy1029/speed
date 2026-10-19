@@ -33,6 +33,16 @@ const EDITOR_ORDER := 5
 func get_display_name() -> String:
 	return tr("stage.%d.name" % index)
 
+## 敵の見た目
+## このステージで、敵の絵を替える種類（type ID → 絵の名前。絵は res://assets/pixel/<絵の名前>.png）。
+## 全ステージ共通の雑魚の見た目を、ステージごとに替えるのに使う。載っていない種類は type ID と同じ名前の絵。
+## 単位：—
+@export var enemy_looks: Dictionary = {}
+
+## このステージでの、敵の種類 type の絵のファイル。
+func enemy_sprite_path(type: StringName) -> String:
+	return "res://assets/pixel/%s.png" % String(enemy_looks.get(String(type), type))
+
 ## 採用した実験の設定
 ## enabled を指定したステージと時間帯で使う攻撃枠・配置規則。
 ## 単位：設定

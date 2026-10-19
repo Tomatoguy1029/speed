@@ -588,8 +588,8 @@ lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づ�
 lab.enemy.rocket.kill,HP を削る,Wear down its HP
 lab.enemy.bomber.move,追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する,Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice
 lab.enemy.bomber.kill,明滅し終わる前に貫けば、爆発させずに倒せる,Pierce it before it finishes blinking to defeat it without an explosion
-lab.enemy.snake.move,小さなヘビ。追ってきて、近づくと一瞬光ってから、その場で小さく噛みつく。弾は出さない,A small snake that chases you and when close flashes for an instant then snaps right where it is. It never shoots
-lab.enemy.snake.kill,普通に倒せる。群れの中で止まらずに駆け抜ける,Falls to ordinary attacks. Keep moving through the crowd instead of stopping
+lab.enemy.biter.move,全ステージ共通の雑魚（見た目はステージごと。うみへび座のステージではヘビ）。追ってきて、近づくと一瞬光ってから、その場で小さく噛みつく。弾は出さない,"A small fry shared by every stage (its look changes per stage; a snake in the Hydra stage). Chases you and when close flashes for an instant, then snaps right where it is. It never shoots"
+lab.enemy.biter.kill,普通に倒せる。群れの中で止まらずに駆け抜ける,Falls to ordinary attacks. Keep moving through the crowd instead of stopping
 lab.enemy.volatile.move,追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む（連鎖する）,Chases you. Explodes shortly after defeat and catches enemies and you (chains)
 lab.enemy.volatile.kill,HP を削る。倒したら爆発から離れる,Wear down its HP then get clear of the blast
 lab.enemy.beamer.move,距離を保ち、止まって砲口に光を集めてからビームを撃つ,Keeps its distance and stops to charge its muzzle before firing a beam

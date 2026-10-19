@@ -22,5 +22,5 @@ params = {
 "bite_telegraph": 0.3,
 "bullet_dmg": 8.0
 }
-id = &"snake"
-display_name = "小さなヘビ"
+id = &"biter"
+display_name = "噛みつく雑魚"

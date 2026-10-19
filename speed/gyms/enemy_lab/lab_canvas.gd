@@ -70,10 +70,13 @@ func screen(p: Vector2) -> Vector2:
 func texture_for(id: String) -> Texture2D:
 	if id.begins_with("field_planet"):
 		return RenderManager.PLANET
-	if not _textures.has(id):
-		var path := "res://assets/pixel/%s.png" % id
-		_textures[id] = load(path) if ResourceLoader.exists(path) else null
-	return _textures[id]
+	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
+	var path := "res://assets/pixel/%s.png" % id
+	if session != null and is_instance_valid(session.run) and session.run.state.stage != null:
+		path = session.run.state.stage.enemy_sprite_path(StringName(id))
+	if not _textures.has(path):
+		_textures[path] = load(path) if ResourceLoader.exists(path) else null
+	return _textures[path]
 
 func _can_drop_data(_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
