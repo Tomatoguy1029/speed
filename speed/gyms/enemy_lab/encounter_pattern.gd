@@ -16,7 +16,7 @@ func capture(session, path: PackedVector2Array, jitter := 60.0, margin := 20.0) 
 		if t.alive[i] and not t.dead[i]:
 			var offset := t.pos[i] - origin
 			regions.append({"type": String(t.type[i]), "pos": [offset.x, offset.y], "jitter": maxf(0, jitter),
-				"level": t.level[i], "angle": t.facing[i], "elite": t.elite[i] != 0,
+				"angle": t.facing[i], "elite": t.elite[i] != 0,
 				"role": "fodder" if t.gate[i] == EnemyTable.Gate.NONE and t.hp[i] <= session.run.combat.attack_power() and t.armor[i] <= session.run.combat.attack_power() else "avoid"})
 	var points := []
 	for point in path:

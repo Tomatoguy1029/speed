@@ -207,7 +207,7 @@ func _spawn_guards() -> void:
 	for n in cfg.hero_guards:
 		var def := enemies.def_of(types[state.rng.randi_range(0, types.size() - 1)])
 		var p := center + Vector2.from_angle(TAU * n / float(cfg.hero_guards)) * 420.0
-		enemies.spawn(def, enemies.spawn_level(), p, {"facing": (state.ship_pos - p).angle()})
+		enemies.spawn(def, p, {"facing": (state.ship_pos - p).angle()})
 
 ## 特別な枠の力を使う（Q）。使えなければ何もしない。
 func activate() -> void:

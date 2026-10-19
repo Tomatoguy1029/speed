@@ -213,7 +213,7 @@ func _stream_rocks(dt: float) -> void:
 			continue
 		var def: EnemyDef = defs.get(rock.kind, meteor)
 		var sprite_radius := rock.size if def != meteor or rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
-		var i := enemies.spawn(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
+		var i := enemies.spawn(def, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i
 		rock.row_id = table.id[i]
@@ -379,12 +379,6 @@ func _update_moons() -> void:
 				if _body_cells[cell].is_empty():
 					_body_used.append(cell)
 				_body_cells[cell].append(b)
-
-## 中心からの距離 r の危険度（0〜1）。中間の環で 0、惑星の表面と外縁に向かって 1。
-func danger_at(r: float) -> float:
-	if r > cfg.zone_outer:
-		return clampf((r - cfg.zone_outer) / (cfg.field_radius - cfg.zone_outer), 0.0, 1.0)
-	return 0.0
 
 func dust_drag_at(p: Vector2) -> float:
 	for d in dust:

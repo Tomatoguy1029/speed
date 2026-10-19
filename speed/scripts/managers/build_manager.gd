@@ -31,15 +31,14 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
-## 基礎値・レベル・特性・強化画面での強化・出力コアから能力値を計算し直す。
+## 基礎値・特性・強化画面での強化・出力コアから能力値を計算し直す（レベルでは変わらない）。
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	var lv := float(state.level)
-	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + cfg.level_speed_growth * lv) \
+	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") \
 		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
-	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + _per(&"T11") * _n(&"T11"))
-	s.max_hp = cfg.base_hp + _meta_add(&"max_hp") + cfg.level_hp_growth * lv
+	s.attack_mult = _meta_mult(&"attack") * (1.0 + _per(&"T11") * _n(&"T11"))
+	s.max_hp = cfg.base_hp + _meta_add(&"max_hp")
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
 	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + _per(&"T07") * _n(&"T07"))
 	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))

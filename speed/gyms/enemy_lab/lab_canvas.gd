@@ -10,7 +10,6 @@ var session
 var mode := 0 # 0 選択、1 配置、2 線、3 試遊
 var spawn_type := "drifter"
 var spawn_count := 1
-var spawn_level := 1.0
 var center := Vector2.ZERO
 var zoom := 1.0
 var exit_clearance := 0.0
@@ -96,7 +95,7 @@ func _place(point: Vector2) -> void:
 			session.perform("field", {"kind": String(field.kind), "pos": [point.x, point.y], "radius": field.radius})
 		return
 	var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
-	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count, "level": spawn_level})
+	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count})
 	selection.clear()
 	if session.selected >= 0: selection.append(session.run.enemies.table.id[session.selected])
 	picked.emit(session.selected)
@@ -261,7 +260,7 @@ func _gui_input(event: InputEvent) -> void:
 				var row: int = session.row_for_id(id)
 				if row >= 0:
 					var point := t.pos[row] + Vector2(60, 60)
-					session.perform("boss" if t.is_boss[row] else "spawn", {"type": String(t.type[row]), "pos": [point.x, point.y], "level": t.level[row], "elite": t.elite[row] != 0, "angle": t.facing[row]})
+					session.perform("boss" if t.is_boss[row] else "spawn", {"type": String(t.type[row]), "pos": [point.x, point.y], "elite": t.elite[row] != 0, "angle": t.facing[row]})
 		elif event.keycode == KEY_ESCAPE:
 			if _freehand:
 				_cancel_freehand()

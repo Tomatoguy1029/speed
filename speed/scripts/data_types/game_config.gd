@@ -117,14 +117,10 @@ extends Resource
 ## 中心の惑星の大きさ。惑星は障害物で、通り抜けられない。
 ## 単位：単位（距離）
 @export var planet_radius: float
-## 安全な区域の内側
-## 中心からこの距離までは、惑星に近いほど危険度が上がる（強い敵・ドロップが増える）。
+## コアを置く範囲の外側
+## コアのカプセルは、惑星の表面の少し外から、この距離の少し内側までに置く。
 ## 単位：単位（距離）
 @export var zone_inner: float
-## 安全な区域の外側
-## 中心からこの距離より外は、外縁に近いほど危険度が上がる。内側との間は危険度0。
-## 単位：単位（距離）
-@export var zone_outer: float
 ## 開始位置
 ## ラン開始時に機体を置く、中心からの距離。
 ## 単位：単位（距離）
@@ -167,7 +163,7 @@ extends Resource
 ## 単位：単位/秒
 @export var base_max_speed: float
 ## 基本の最大 HP
-## レベル・強化で増える前の最大 HP。
+## 強化画面での強化で増える前の最大 HP。
 ## 単位：HP
 @export var base_hp: float
 ## 機体の当たり判定の半径
@@ -182,18 +178,6 @@ extends Resource
 ## ドロップを吸い寄せ始める距離。特性・強化で広がる。
 ## 単位：単位（距離）
 @export var pickup_radius: float
-## レベルごとの最高速度の伸び
-## レベルが1上がるごとに、最高速度をこの割合だけ伸ばす。0.02 なら 2%。
-## 単位：割合
-@export var level_speed_growth: float
-## レベルごとの攻撃力の伸び
-## レベルが1上がるごとに、攻撃力をこの割合だけ伸ばす。
-## 単位：割合
-@export var level_atk_growth: float
-## レベルごとの最大 HP の増加
-## レベルが1上がるごとに、最大 HP に足す量。
-## 単位：HP
-@export var level_hp_growth: float
 ## レベルアップの回復
 ## レベルが上がったとき、最大 HP のこの割合だけ回復する。
 ## 単位：割合（0〜1）
@@ -313,7 +297,7 @@ extends Resource
 ## 単位：倍
 @export var atk_scale: float
 ## 基本のクリティカル率
-## 攻撃がクリティカルになる確率。特性で上がる。
+## 体当たりがクリティカルになる確率。特性で上がる。
 ## 単位：割合（0〜1）
 @export var base_crit_chance: float
 ## クリティカルの威力
@@ -395,10 +379,6 @@ extends Resource
 ## 分裂で増える敵は、その時点の目標の数の (1 ＋ この値) 倍までにする。
 ## 単位：割合
 @export var enemy_split_overflow: float
-## 危険度による敵レベルの上乗せ
-## 危険度が最大（1）の場所で出る敵に、レベルをこれだけ足す。
-## 単位：レベル
-@export var danger_level: float
 ## 出現位置の余白
 ## 敵を、画面の外側この距離のところに出す。
 ## 単位：単位（距離）
@@ -423,10 +403,6 @@ extends Resource
 ## 1段ごとに、目標の敵の数をこの割合だけ増やす。
 ## 単位：割合
 @export var surge_pop: float
-## 強まり1段の敵のレベル
-## 1段ごとに、敵のレベルにこの値を足す。
-## 単位：レベル
-@export var surge_level: float
 ## 強まり1段の撃つ敵の出やすさ
 ## 1段ごとに、弾やビームを撃つ敵（敵の定義の「撃つ敵」）の出現の重みをこの割合だけ増やす。
 ## 単位：割合

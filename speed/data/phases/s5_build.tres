@@ -6,8 +6,6 @@
 script = ExtResource("1")
 pop_from = 14.0
 pop_to = 45.0
-level_from = 1.0
-level_to = 1.35
 rate = 6.0
 mix = {
 "auriga": 0.1,

@@ -7,8 +7,6 @@ script = ExtResource("1")
 start = 150.0
 pop_from = 45.0
 pop_to = 70.0
-level_from = 1.7
-level_to = 2.3
 rate = 8.0
 mix = {
 "armored": 2.2,

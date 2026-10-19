@@ -60,7 +60,7 @@ func advance() -> void:
 			continue
 		for command in candidate.commands:
 			var args: Dictionary = command.args
-			run.enemies.spawn(run.enemies.def_of(StringName(args.type)), 1.0, Vector2(args.pos[0], args.pos[1]), {"facing": args.angle})
+			run.enemies.spawn(run.enemies.def_of(StringName(args.type)), Vector2(args.pos[0], args.pos[1]), {"facing": args.angle})
 		opportunity = {"route": path, "status": result.status, "start": run.state.world_time, "window": window, "margin": result.margin}
 		if window > 0:
 			run.projectiles.director.guard = {"route": path, "until": run.state.world_time + window, "margin": result.margin}
@@ -85,7 +85,7 @@ static func construct(pattern: Dictionary, rng: RandomNumberGenerator, anchor: V
 			var point := Vector2(float(region.pos[0]), float(region.pos[1]))
 			point += Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * float(region.get("jitter", 0))
 			point = anchor + point.rotated(angle) * scale_value
-			commands.append({"kind": "boss" if ConfigManager.bosses.has(type) else "spawn", "args": {"type": region.type, "pos": [point.x, point.y], "angle": float(region.get("angle", 0)) + angle, "role": region.get("role", "avoid"), "level": float(region.get("level", 1)), "elite": region.get("elite", false)}})
+			commands.append({"kind": "boss" if ConfigManager.bosses.has(type) else "spawn", "args": {"type": region.type, "pos": [point.x, point.y], "angle": float(region.get("angle", 0)) + angle, "role": region.get("role", "avoid"), "elite": region.get("elite", false)}})
 	return {"valid": path.size() >= 2, "route": path, "commands": commands}
 
 func _admit_candidates(commands: Array, path: PackedVector2Array, margin: float, window: float, pattern: Dictionary) -> bool:
@@ -93,7 +93,7 @@ func _admit_candidates(commands: Array, path: PackedVector2Array, margin: float,
 	var positions := []
 	for command in commands:
 		var args: Dictionary = command.args
-		if command.kind != "spawn" or int(args.get("level", 1)) != 1 or args.get("elite", false): return false
+		if command.kind != "spawn" or args.get("elite", false): return false
 		var def := run.enemies.def_of(StringName(args.type))
 		if def == null or def.id in [&"meteor", &"saw", &"iron"] or def.behavior == &"part":
 			return false

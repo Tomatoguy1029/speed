@@ -236,7 +236,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 
 # ── ダメージと撃破 ────────────────────────────────────────────────
 
-## 行 i の敵にダメージを与える。opts：crit（なければ確率で判定）、no_crit、cause、dir、knock、impact。
+## 行 i の敵にダメージを与える。opts：crit（体当たりで判定したクリティカル。武器などの当たりはクリティカルにならない）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var t := enemies.table
 	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY or t.guard[i] > 0.0:
@@ -253,10 +253,6 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if cause == &"ram" and t.gate[i] == EnemyTable.Gate.IMMORTAL:
 		dmg = maxf(dmg, t.hp[i])
 	var crit: bool = opts.get("crit", false)
-	if not opts.has("crit") and not opts.get("no_crit", false):
-		crit = state.rng.randf() < state.stats.crit_chance
-		if crit:
-			dmg *= state.stats.crit_mult
 	var fresh := t.hp[i] >= t.max_hp[i] - 1e-6
 	# 一撃かどうかは、この突進で最初に触れた時点の HP で判定する
 	if state.tracing:

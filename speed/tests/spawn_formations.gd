@@ -24,7 +24,7 @@ func _ready() -> void:
 	var scene: PackedScene = load(FORMATION)
 	# 実験場で、選んだ配置と出現位置のとおりに並べる
 	var before := run.enemies.count()
-	lab.perform("formation", {"path": FORMATION, "layout": 1, "entry": 0, "level": 1})
+	lab.perform("formation", {"path": FORMATION, "layout": 1, "entry": 0})
 	check(run.enemies.count() == before + 3, "実験場で選んだ配置（3体）を並べる")
 	_check_phases(run)
 	_check_spawn(run, scene)
@@ -65,7 +65,7 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 	for heading in [Vector2.UP, Vector2.RIGHT, Vector2(-1, 1).normalized()]:
 		state.ship_heading = heading
 		for n in 12:
-			var rows := em.spawn_formation(data, 1.0)
+			var rows := em.spawn_formation(data)
 			check(rows.size() >= 2, "群れの敵が出る")
 			for k in range(0, rows.size(), 2):
 				var i := rows[k]
@@ -189,7 +189,7 @@ func _check_budget(run: RunManager) -> void:
 	check(first or d.request("c", ["wave"], 2, 3, 5.0, 0.0, 0.5), "ばらつきの時間が過ぎたら始める")
 	# 雑魚は管理しない
 	run.projectiles.director.configure({"enabled": true, "budget": 0.0})
-	var biter := em.spawn(em.def_of(&"biter"), 1.0, state.ship_pos + Vector2(300, 0))
+	var biter := em.spawn(em.def_of(&"biter"), state.ship_pos + Vector2(300, 0))
 	check(em._lab_admit(biter, 0.016), "雑魚の攻撃は予算で止めない")
 	run.projectiles.director.configure({"enabled": false, "budget": 4.0})
 	# 本番のランでは、時間帯の攻撃の予算で管理する

@@ -391,7 +391,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 					opts.meteor_index = run.field.rocks.size()
 					opts.size = rock.size
 					run.field.rocks.append(rock)
-				selected = run.enemies.spawn(def, float(args.get("level", 1)), origin + offset, opts)
+				selected = run.enemies.spawn(def, origin + offset, opts)
 				if opts.has("meteor_index"):
 					var rock = run.field.rocks[opts.meteor_index]
 					rock.row = selected
@@ -402,7 +402,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			var path := String(args.get("path", ""))
 			if ResourceLoader.exists(path):
 				var data := run.enemies.formation_data(load(path))
-				run.enemies.spawn_formation(data, float(args.get("level", 1)), int(args.get("layout", 0)), int(args.get("entry", 0)))
+				run.enemies.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
 				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
 		"edit_range":
 			var row := row_for_id(int(args.get("id", -1)))
@@ -440,7 +440,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if row >= 0 and run.enemies.table.def[row] != null:
 				var t := run.enemies.table
 				var ratio := t.hp[row] / maxf(0.001, t.max_hp[row])
-				run.enemies.apply_scaling(row, t.def[row], float(args.get("level", t.level[row])), {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
+				run.enemies.apply_scaling(row, t.def[row], {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
 				t.hp[row] = t.max_hp[row] * ratio
 		"delete":
 			var row := row_for_id(int(args.get("id", -1)))

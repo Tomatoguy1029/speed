@@ -33,7 +33,6 @@ var is_boss := PackedByteArray()
 var meteor_index := PackedInt32Array()
 ## 1 なら撃破済み（その回の終わりに空きへ戻る）
 var dead := PackedByteArray()
-var level := PackedFloat64Array()
 var elite := PackedByteArray()
 var pos := PackedVector2Array()
 var vel := PackedVector2Array()

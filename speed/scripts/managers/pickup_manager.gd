@@ -60,11 +60,10 @@ func tick(_real_dt: float, world_dt: float) -> void:
 func on_enemy_killed(i: int) -> void:
 	var t := enemies.table
 	var pos := t.pos[i]
-	var danger := field.danger_at(pos.length())
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
 	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けて、その場からはじけ飛ばす
-	var value := t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger)
+	var value := t.xp[i] * state.stats.xp_mult * bonus
 	var gems := int(t.def[i].params.get("gem_count", 1)) if t.def[i] != null else 1
 	if gems > 1:
 		for k in gems:
@@ -78,7 +77,7 @@ func on_enemy_killed(i: int) -> void:
 		var n := clampi(t.buds[i], 1, 16)
 		for k in n:
 			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n))
-	_drop_coins(i, danger)
+	_drop_coins(i)
 	if t.type[i] == &"meteor":
 		if state.rng.randf() < cfg.meteor_heal_chance:
 			_add_capsule(Pickup.Kind.HEAL, &"drop", pos, 0.0)
@@ -155,14 +154,14 @@ func _add_coin(p: Vector2) -> int:
 	coin_pulled[i] = 0
 	return i
 
-func _drop_coins(i: int, danger: float) -> void:
+func _drop_coins(i: int) -> void:
 	var t := enemies.table
 	var n := 0
 	if t.elite[i] != 0:
 		n = 3 + state.rng.randi_range(0, 3)
 	elif t.type[i] == &"meteor":
 		n = (1 + state.rng.randi_range(0, 2)) if state.rng.randf() < cfg.meteor_coin_chance else 0
-	elif state.rng.randf() < 0.03 * (1.0 + danger * 2.0):
+	elif state.rng.randf() < 0.03:
 		n = 1
 	var pos := t.pos[i]
 	var r := t.r[i]

@@ -45,7 +45,6 @@ var _terrain: CheckButton
 var _rocks: CheckButton
 var _gimmicks: CheckButton
 var _count: SpinBox
-var _level: SpinBox
 var _updating := false
 var _scrubbing := false
 var _busy := false

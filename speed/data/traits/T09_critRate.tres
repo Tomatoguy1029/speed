@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 params = {
-"max": 0.9,
-"per_stack": 0.08
+"max": 0.3,
+"per_stack": 0.05
 }
 id = &"T09"
 code_id = &"critRate"

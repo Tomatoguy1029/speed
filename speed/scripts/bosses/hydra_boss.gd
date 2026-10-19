@@ -437,7 +437,7 @@ func spit_rubble(neck: Neck, n: int) -> void:
 	for k in n:
 		var around: Vector2 = heads[k % heads.size()]
 		var at := around + Vector2.from_angle(run_state.rng.randf() * TAU) * run_state.rng.randf_range(70.0, 160.0)
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
+		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
 		table.vel[j] = (at - table.pos[j]) * 1.2
 
 ## ビームの首。a：首を高く持ち上げて光を溜め、首を振りながら太いビームで本体の周りを薙ぐ。
@@ -614,7 +614,7 @@ func east_debris() -> void:
 	var rubble := manager.enemies.def_of(&"hydra_rubble")
 	for k in 10:
 		var at := table.pos[body] + Vector2.from_angle(TAU * k / 10.0 + run_state.rng.randf() * 0.3) * run_state.rng.randf_range(300.0, 480.0)
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
+		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
 		table.vel[j] = (at - table.pos[j]) * 1.2
 		_rubble.append(Vector2i(j, table.id[j]))
 
@@ -674,7 +674,7 @@ func south_debris() -> void:
 		return
 	var rubble := manager.enemies.def_of(&"hydra_rubble")
 	for k in 8:
-		var j := manager.enemies.spawn(rubble, 1.0, _head_pos(neck), {"spin": run_state.rng.randf_range(-3.0, 3.0)})
+		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-3.0, 3.0)})
 		var to := _vortex_at + Vector2.from_angle(run_state.rng.randf() * TAU) * 120.0
 		table.vel[j] = (to - table.pos[j]) * 0.9
 		_rubble.append(Vector2i(j, table.id[j]))
