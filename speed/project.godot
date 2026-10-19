@@ -52,7 +52,7 @@ rendering_device/driver.windows="d3d12"
 
 [spawn_timeline]
 
-attack_rules="res://data/attack_rules.tres"
+enemy_dir="res://data/enemies"
 
 [speed_data_editor]
 

@@ -8,41 +8,68 @@
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
 [ext_resource type="PackedScene" uid="uid://qsuhj8vo0blj" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
 
-[sub_resource type="Resource" id="Resource_oe0ic"]
+[sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
-label = "望遠鏡の初登場"
-formation = ExtResource("2_xsgcl")
-time = 95.0
-stay = 40.0
+label = "ぼうえんきょう座"
+types = Array[StringName]([&"telescope", &"reticle"])
+formations = Array[PackedScene]([ExtResource("2_xsgcl")])
+time = 90.0
+interval = 25.0
 
-[sub_resource type="Resource" id="Resource_4bt7u"]
+[sub_resource type="Resource" id="Resource_xsgcl"]
 script = ExtResource("1_3ghul")
-label = "攻められる山：望遠鏡"
-formation = ExtResource("2_xsgcl")
-time = 182.0
-stay = 35.0
+label = "攻められる山：ぼうえんきょう座"
+types = Array[StringName]([&"telescope", &"reticle"])
+formations = Array[PackedScene]([ExtResource("2_xsgcl")])
+time = 180.0
+interval = 15.0
 
-[sub_resource type="Resource" id="Resource_pmvkf"]
+[sub_resource type="Resource" id="Resource_pea44"]
 script = ExtResource("1_3ghul")
 label = "攻められる山：いるか座"
-formation = ExtResource("3_pea44")
-time = 190.0
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("3_pea44")])
+time = 180.0
+interval = 15.0
 
-[sub_resource type="Resource" id="Resource_fkgl6"]
+[sub_resource type="Resource" id="Resource_blxf3"]
 script = ExtResource("1_3ghul")
-label = "みずがめ座 1"
-formation = ExtResource("4_blxf3")
-time = 365.0
-stay = 60.0
+label = "強め：みなみじゅうじ座"
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("6_3vyts")])
+time = 360.0
+length = 150.0
+interval = 15.0
 
-[sub_resource type="Resource" id="Resource_bab1x"]
+[sub_resource type="Resource" id="Resource_ha4ve"]
 script = ExtResource("1_3ghul")
-label = "みずがめ座 2"
-formation = ExtResource("4_blxf3")
-time = 445.0
-stay = 60.0
+label = "強め：いるか座"
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("3_pea44")])
+time = 360.0
+length = 150.0
+interval = 15.0
 
-[sub_resource type="Resource" id="Resource_unpfa"]
+[sub_resource type="Resource" id="Resource_3vyts"]
+script = ExtResource("1_3ghul")
+label = "みずがめ座"
+types = Array[StringName]([&"aquarius"])
+formations = Array[PackedScene]([ExtResource("4_blxf3")])
+time = 360.0
+length = 150.0
+interval = 20.0
+
+[sub_resource type="Resource" id="Resource_oe0ic"]
+script = ExtResource("1_3ghul")
+label = "ボス前：混ざる"
+types = Array[StringName]([&"telescope", &"reticle", &"cross", &"dolphin"])
+formations = Array[PackedScene]([ExtResource("2_xsgcl"), ExtResource("6_3vyts"), ExtResource("3_pea44")])
+time = 510.0
+length = 90.0
+groups = 2
+interval = 15.0
+
+[sub_resource type="Resource" id="Resource_4bt7u"]
 script = ExtResource("5_ha4ve")
 pop_from = 14.0
 pop_to = 40.0
@@ -56,7 +83,7 @@ mix = {
 id = &"s4_grow"
 display_name = "育つ"
 
-[sub_resource type="Resource" id="Resource_mwefo"]
+[sub_resource type="Resource" id="Resource_pmvkf"]
 script = ExtResource("5_ha4ve")
 start = 90.0
 pop_from = 40.0
@@ -69,15 +96,10 @@ mix = {
 "bomber": 2.0,
 "splitter": 1.5
 }
-formations = Dictionary[PackedScene, float]({
-ExtResource("2_xsgcl"): 1.0
-})
-formation_count = 1
-formation_interval = 25.0
 id = &"s4_rise"
 display_name = "少し増える"
 
-[sub_resource type="Resource" id="Resource_05gyn"]
+[sub_resource type="Resource" id="Resource_fkgl6"]
 script = ExtResource("5_ha4ve")
 start = 150.0
 pop_from = 35.0
@@ -93,7 +115,7 @@ mix = {
 id = &"s4_ebb"
 display_name = "減る"
 
-[sub_resource type="Resource" id="Resource_0kp78"]
+[sub_resource type="Resource" id="Resource_bab1x"]
 script = ExtResource("5_ha4ve")
 start = 180.0
 pop_from = 50.0
@@ -106,16 +128,10 @@ mix = {
 "bomber": 2.0,
 "splitter": 1.5
 }
-formations = Dictionary[PackedScene, float]({
-ExtResource("2_xsgcl"): 1.0,
-ExtResource("3_pea44"): 1.0
-})
-formation_count = 2
-formation_interval = 12.0
 id = &"s4_siege"
 display_name = "攻められる山"
 
-[sub_resource type="Resource" id="Resource_mpbfx"]
+[sub_resource type="Resource" id="Resource_unpfa"]
 script = ExtResource("5_ha4ve")
 start = 240.0
 pop_from = 40.0
@@ -132,7 +148,7 @@ mix = {
 id = &"s4_grow2"
 display_name = "育つ II"
 
-[sub_resource type="Resource" id="Resource_vh3c5"]
+[sub_resource type="Resource" id="Resource_mwefo"]
 script = ExtResource("5_ha4ve")
 start = 300.0
 pop_from = 140.0
@@ -149,7 +165,7 @@ mix = {
 id = &"s4_horde"
 display_name = "大群を貫く"
 
-[sub_resource type="Resource" id="Resource_02yv8"]
+[sub_resource type="Resource" id="Resource_05gyn"]
 script = ExtResource("5_ha4ve")
 start = 360.0
 pop_from = 70.0
@@ -162,16 +178,10 @@ mix = {
 "bomber": 2.0,
 "splitter": 1.5
 }
-formations = Dictionary[PackedScene, float]({
-ExtResource("6_3vyts"): 1.0,
-ExtResource("3_pea44"): 1.0
-})
-formation_count = 2
-formation_interval = 15.0
 id = &"s4_storm"
 display_name = "強めに攻められる"
 
-[sub_resource type="Resource" id="Resource_gbu6c"]
+[sub_resource type="Resource" id="Resource_0kp78"]
 script = ExtResource("5_ha4ve")
 start = 510.0
 pop_from = 90.0
@@ -185,13 +195,6 @@ mix = {
 "bomber": 2.0,
 "splitter": 1.5
 }
-formations = Dictionary[PackedScene, float]({
-ExtResource("2_xsgcl"): 1.0,
-ExtResource("6_3vyts"): 1.0,
-ExtResource("3_pea44"): 1.0
-})
-formation_count = 2
-formation_interval = 15.0
 id = &"s4_eve"
 display_name = "ボス前"
 
@@ -199,8 +202,9 @@ display_name = "ボス前"
 script = ExtResource("1")
 index = 4
 scene_path = "res://scenes/stages/stage_4.tscn"
-phases = [SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_0kp78"), SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8"), SubResource("Resource_gbu6c")]
-clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_oe0ic"), SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x")])
+phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_0kp78")]
+enemies = Array[StringName]([&"biter", &"splitter", &"bomber", &"telescope", &"reticle", &"cross", &"dolphin", &"aquarius"])
+clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_oe0ic")])
 boss_id = &"provisional"
 legendary_module_id = &"legendary_compass"
 enemy_looks = {

@@ -19,9 +19,16 @@ var _radius := 0.0
 func _validate_property(property: Dictionary) -> void:
 	if property.name == "enemy":
 		var ids := PackedStringArray()
-		for f in DirAccess.get_files_at("res://data/enemies"):
-			if f.ends_with(".tres"):
-				ids.append(f.get_basename())
+		# 組み合わせのシーンに置ける種類が決まっていれば、その中から選ぶ
+		var root := get_parent().get_parent() if get_parent() != null else null
+		var allowed: Array = root.get("types") if root != null and root.get("types") != null else []
+		if not allowed.is_empty():
+			for t in allowed:
+				ids.append(String(t))
+		else:
+			for f in DirAccess.get_files_at("res://data/enemies"):
+				if f.ends_with(".tres"):
+					ids.append(f.get_basename())
 		ids.sort()
 		property.hint = PROPERTY_HINT_ENUM_SUGGESTION
 		property.hint_string = ",".join(ids)

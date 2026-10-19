@@ -2092,7 +2092,6 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 			_wave_t = 0.0
 			if alive_n < t.pop:
 				_spawn_wave(t, t.pop - alive_n)
-	_tick_formations(phase, world_dt, t.level)
 	_tick_clips(t.level)
 	_sync_attack_budget(phase)
 
@@ -2110,14 +2109,10 @@ func _sync_attack_budget(phase: PhaseDef) -> void:
 
 ## 組み合わせのシーンのパス → ゲーム中に使う形（EnemyFormation.to_data）
 var _formation_cache: Dictionary = {}
-## 補充で出した強敵の群れ（各群れの行番号と id を交互に並べたもの）
-var _groups: Array[PackedInt32Array] = []
-## 次に補充で強敵の群れを出せるまでの時間
-var _formation_t := 0.0
-## クリップの番号 → 出した回数
-var _clip_fired: Dictionary = {}
-## 途中の時刻から始めたランで、それより前の出現を出したことにしたか
-var _clips_ready := false
+## クリップの番号 → そのクリップから出た群れ（各群れの行番号と id を交互に並べたもの）
+var _clip_groups: Dictionary = {}
+## クリップの番号 → 次に群れを出せる時刻（実秒）
+var _clip_next: Dictionary = {}
 
 ## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
 func formation_data(scene: PackedScene) -> Dictionary:
@@ -2145,8 +2140,8 @@ func _pick_weighted(items: Array) -> int:
 
 ## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
-## 出した敵の行番号と id を交互に並べて返す。
-func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index := -1) -> PackedInt32Array:
+## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
+func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index := -1, types: Array = []) -> PackedInt32Array:
 	var rows := PackedInt32Array()
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
@@ -2161,6 +2156,8 @@ func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index :
 	var stretch := maxf(1.0, minf(state.view_half.x, state.view_half.y) * 2.0 / maxf(cfg.base_view, 1.0))
 	var entry_xf := Transform2D(float(entry.rot), Vector2(entry.pos) * stretch)
 	for m: Dictionary in data.layouts[li].markers:
+		if not types.is_empty() and not types.has(StringName(m.type)):
+			continue
 		var def := def_of(StringName(m.type))
 		if def == null:
 			continue
@@ -2189,47 +2186,31 @@ func _formation_capped(data: Dictionary) -> bool:
 				return true
 	return false
 
-## 時間帯の強敵の群れを補充する。いる群れが目標の数より少なく、前の群れから間隔が空いていれば、重みで1つ選んで出す。
-func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
-	_formation_t -= world_dt
-	_groups = _groups.filter(_group_alive)
-	if phase.formations.is_empty() or _groups.size() >= phase.formation_count or _formation_t > 0.0:
-		return
-	var items := []
-	for scene: PackedScene in phase.formations:
-		var data := formation_data(scene)
-		if not data.is_empty() and not _formation_capped(data):
-			items.append({"data": data, "weight": float(phase.formations[scene])})
-	var k := _pick_weighted(items)
-	if k < 0:
-		return
-	var rows := spawn_formation(items[k].data, level)
-	if not rows.is_empty():
-		_groups.append(rows)
-		_formation_t = phase.formation_interval
-
-## ステージのクリップを、決めた時刻に出す。途中の時刻から始めたランでは、それより前の出現は出さない。
-## 種類ごとの上限（max_alive）に達している間は待ち、空いたら出す（同じ大物のクリップは入れ替わりになる）。
+## ステージのクリップから強敵の群れを出す。クリップは開始から長さの間だけ働き、そのクリップから出た群れが同時の群れの数より
+## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選んで、クリップの種類の敵だけを出す。
+## 種類ごとの上限（max_alive）に達するフォーメーションは選ばない。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
-	if not _clips_ready:
-		_clips_ready = true
-		for n in clips.size():
-			var clip: SpawnClip = clips[n]
-			var past := 0
-			while past < maxi(1, clip.count) and clip.time + past * clip.interval < state.time - 0.5:
-				past += 1
-			_clip_fired[n] = past
 	for n in clips.size():
 		var clip: SpawnClip = clips[n]
-		var fired: int = _clip_fired.get(n, 0)
-		if fired >= maxi(1, clip.count) or state.time < clip.time + fired * clip.interval:
+		var groups: Array = _clip_groups.get(n, []).filter(_group_alive)
+		_clip_groups[n] = groups
+		if state.time < clip.time or state.time >= clip.end_time():
 			continue
-		var data := formation_data(clip.formation)
-		if _formation_capped(data):
+		if groups.size() >= clip.groups or state.time < float(_clip_next.get(n, -1e9)):
 			continue
-		_clip_fired[n] = fired + 1
-		spawn_formation(data, level)
+		var items := []
+		for scene: PackedScene in clip.formations:
+			var data := formation_data(scene)
+			if not data.is_empty() and not _formation_capped(data):
+				items.append({"data": data, "weight": 1.0})
+		var k := _pick_weighted(items)
+		if k < 0:
+			continue
+		var rows := spawn_formation(items[k].data, level, -1, -1, clip.types)
+		if not rows.is_empty():
+			groups.append(rows)
+			_clip_next[n] = state.time + clip.interval
 
 var _type_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
@@ -2388,20 +2369,16 @@ func _recycle(i: int) -> bool:
 	t.fire_t[i] = t.def[i].params.get("fire_interval", 0.0)
 	return true
 
-## 予告へ入る前に取る、攻撃の許可。強敵と大物は攻撃の組み合わせの表（config.attack_rules）で確かめる。
-## 実験場と明示した採用設定では、攻撃枠（分類ごとの枠）でも確かめる。許可がなければ、攻撃せずに追う。
+## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
 	projectiles.lab_context = 0
 	var def := table.def[i]
 	if def == null:
 		return true
-	var rules: AttackRules = cfg.attack_rules
-	# 強敵と大物は、攻撃の組み合わせの表で許可を取る
-	var gated := rules != null and def.rank >= 3 and not rules.pairs.is_empty()
 	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
 	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
-	if not gated and cats.is_empty():
+	if cats.is_empty():
 		return true
 	var owner := str(table.id[i])
 	var p := def.params
@@ -2423,34 +2400,9 @@ func _lab_admit(i: int, dt: float) -> bool:
 		due = true
 	if not active and due:
 		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
-		if gated and not _rules_admit(i, rules, duration):
-			table.charge[i] = 0
-			return false
 		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, def.attack_weight):
 			table.charge[i] = 0
 			return false
 	if not cats.is_empty():
 		projectiles.lab_context = d.token(owner)
-	return true
-
-## 許可した強敵の攻撃（type、id、終わる世界時刻 until）
-var _attacks: Array[Dictionary] = []
-
-## 攻撃の組み合わせの表で、行 i の強敵が duration 秒の攻撃を始めてよいか。よければ攻撃として覚える。
-## 表の組み合わせの相手が攻撃中か、終わってから決めた時間が経っていなければ待たせる。
-func _rules_admit(i: int, rules: AttackRules, duration: float) -> bool:
-	var now := state.world_time
-	var keep := rules.longest_gap()
-	_attacks = _attacks.filter(func(a: Dictionary) -> bool: return float(a.until) + keep > now)
-	var id := table.id[i]
-	var type := table.type[i]
-	for a in _attacks:
-		if int(a.id) == id:
-			if float(a.until) > now:
-				return true
-			continue
-		var g := rules.gap(type, StringName(a.type))
-		if g >= 0.0 and now < float(a.until) + g:
-			return false
-	_attacks.append({"type": type, "id": id, "until": now + duration})
 	return true

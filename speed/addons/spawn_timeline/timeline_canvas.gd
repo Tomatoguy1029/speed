@@ -1,6 +1,6 @@
 ## 出現タイムラインのトラック。上から目盛り・時間帯・雑魚の補充の目標の数・クリップ（1本が1つ）を並べる。
-## 時間帯の境目と、クリップの時刻・いる時間・回数・間隔をドラッグで変える。ラベルはダブルクリックで変える。
-## 攻撃の組み合わせの表で禁止した組み合わせが同じ時間に重なるところを赤く出す。
+## 時間帯の境目と、クリップの開始・長さをドラッグで変える。ラベルはダブルクリックで変える。
+## フォーメーションに、クリップの種類の組み合わせにない敵を置いているクリップを赤く出す。
 @tool
 extends Control
 
@@ -21,14 +21,14 @@ var view_start := 0.0
 var px_per_sec := 2.0
 ## 拡大縮小・横移動をしたか（していなければ、大きさが変わるたびに全体を表示し直す）
 var _user_view := false
-## ドラッグ中：種類（"phase"・"time"・"stay"・"count"・"interval"・"pan"・"playhead"）、対象、押した所の時刻、前の値
+## ドラッグ中：種類（"phase"・"time"・"length"・"pan"・"playhead"）、対象、押した所の時刻、前の値
 var _drag := {}
 var _rename: LineEdit = null
 
 func _init() -> void:
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
-	tooltip_text = "クリップをドラッグ：時刻　右端：いる時間　Shift＋右端：回数　2つ目の目盛り：間隔\n" + \
+	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　目盛りをクリック：再生位置　ラベルをダブルクリック：名前\n" + \
 		"ホイール・2本指の横スクロール：横に動かす　Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -94,44 +94,16 @@ func _end_time() -> float:
 		t = maxf(t, _clip_end(c) + 30.0)
 	return t
 
-## クリップの最後の群れが出る時刻。
-static func _last_spawn(c: Resource) -> float:
-	return float(c.get("time")) + maxf(0.0, float(c.get("interval"))) * maxi(0, int(c.get("count")) - 1)
-
 static func _clip_end(c: Resource) -> float:
-	return _last_spawn(c) + maxf(0.0, float(c.get("stay")))
+	return float(c.get("time")) + maxf(0.0, float(c.get("length")))
 
-## 禁止した組み合わせの重なり：[{"a": クリップの番号, "b": 番号, "from": 時刻, "to": 時刻}]
-func conflicts() -> Array:
+## 種類が合わないクリップの番号の一覧。
+func mismatches() -> Array:
 	var out := []
-	var rules: Resource = timeline.rules()
-	if rules == null:
-		return out
 	var cs: Array = timeline.clips()
-	for a in cs.size():
-		for b in range(a, cs.size()):
-			var ta: Array = timeline.formation_types(cs[a])
-			var tb: Array = timeline.formation_types(cs[b])
-			var g := -1.0
-			for x in ta:
-				for y in tb:
-					g = maxf(g, float(rules.call("gap", x, y)))
-			if g < 0.0:
-				continue
-			for sa: float in _spawns(cs[a]):
-				for sb: float in _spawns(cs[b]):
-					if a == b and sa >= sb:
-						continue
-					var ea := sa + float(cs[a].get("stay"))
-					var eb := sb + float(cs[b].get("stay"))
-					if sa < eb + g and sb < ea + g:
-						out.append({"a": a, "b": b, "from": maxf(sa, sb), "to": maxf(minf(ea, eb), maxf(sa, sb) + 1.0)})
-	return out
-
-static func _spawns(c: Resource) -> Array:
-	var out := []
-	for k in maxi(1, int(c.get("count"))):
-		out.append(float(c.get("time")) + k * maxf(0.0, float(c.get("interval"))))
+	for k in cs.size():
+		if not timeline.clip_mismatch(cs[k]).is_empty():
+			out.append(k)
 	return out
 
 func _draw() -> void:
@@ -189,9 +161,9 @@ func _draw() -> void:
 		draw_line(Vector2(_x(s), y0 - h * float(p.get("pop_from")) / max_pop), Vector2(_x(e), y0 - h * float(p.get("pop_to")) / max_pop), Color(0.5, 0.9, 0.6), 2.0)
 	draw_string(font, Vector2(6, RULER + 16), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
 	draw_string(font, Vector2(6, RULER + PHASE_ROW + 16), "雑魚の数（最大 %d）" % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
-	# クリップ
+	# クリップ：開始から長さの間の棒。中に種類・同時の群れの数・出す間隔を書く
 	var cs: Array = timeline.clips()
-	var bad := conflicts()
+	var bad := mismatches()
 	for k in cs.size():
 		var c: Resource = cs[k]
 		var y := _tracks_top() + k * TRACK
@@ -201,16 +173,16 @@ func _draw() -> void:
 		var x0 := _x(float(c.get("time")))
 		var x1 := _x(_clip_end(c))
 		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
-		draw_rect(Rect2(x0, y + 4, maxf(2.0, x1 - x0), TRACK - 8), Color(base, 0.35))
-		for st in _spawns(c):
-			var sx := _x(st)
-			draw_rect(Rect2(sx, y + 4, maxf(2.0, float(c.get("stay")) * px_per_sec), TRACK - 8), Color(base, 0.45))
-			draw_line(Vector2(sx, y + 2), Vector2(sx, y + TRACK - 2), Color.WHITE, 2.0)
-		draw_rect(Rect2(x1 - 3, y + 4, 3, TRACK - 8), Color.WHITE)
-	for b in bad:
-		for idx: int in [b.a, b.b]:
-			var y := _tracks_top() + idx * TRACK
-			draw_rect(Rect2(_x(b.from), y + 2, maxf(3.0, (b.to - b.from) * px_per_sec), TRACK - 4), Color(1, 0.2, 0.2, 0.45))
+		var r := Rect2(x0, y + 3, maxf(3.0, x1 - x0), TRACK - 6)
+		draw_rect(r, Color(base, 0.55))
+		if k in bad:
+			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0)
+		var names := []
+		for type_id in c.get("types"):
+			names.append(String(type_id))
+		var text := "%s　×%d　%ds" % ["・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
+		draw_string(font, r.position + Vector2(4, 14), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 8), 11)
+		draw_rect(Rect2(x1 - 3, y + 3, 3, TRACK - 6), Color.WHITE)
 	# 再生位置
 	var px := _x(playhead)
 	draw_line(Vector2(px, 0), Vector2(px, size.y), Color(1, 0.8, 0.2), 2.0)
@@ -234,11 +206,8 @@ func _hit(p: Vector2) -> Dictionary:
 	var c: Resource = cs[k]
 	if p.x < GUTTER:
 		return {"kind": "label", "index": k}
-	var sp := _spawns(c)
 	if absf(p.x - _x(_clip_end(c))) <= HANDLE:
-		return {"kind": "count" if Input.is_key_pressed(KEY_SHIFT) else "stay", "index": k}
-	if sp.size() >= 2 and absf(p.x - _x(sp[1])) <= HANDLE:
-		return {"kind": "interval", "index": k}
+		return {"kind": "length", "index": k}
 	if p.x >= _x(float(c.get("time"))) - HANDLE and p.x <= _x(_clip_end(c)):
 		return {"kind": "time", "index": k}
 	return {}
@@ -303,15 +272,9 @@ func _begin_drag(h: Dictionary, p: Vector2) -> void:
 		"time":
 			_drag.target = timeline.clips()[h.index]
 			_drag.props = ["time"]
-		"stay":
+		"length":
 			_drag.target = timeline.clips()[h.index]
-			_drag.props = ["stay"]
-		"count":
-			_drag.target = timeline.clips()[h.index]
-			_drag.props = ["count", "interval"]
-		"interval":
-			_drag.target = timeline.clips()[h.index]
-			_drag.props = ["interval"]
+			_drag.props = ["length"]
 	if _drag.has("target"):
 		_drag.before = {}
 		for prop in _drag.props:
@@ -335,19 +298,8 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 			_drag.target.set("start", clampf(snappedf(t, snap), lo, hi))
 		"time":
 			_drag.target.set("time", maxf(0.0, snappedf(float(_drag.before.time) + t - _drag.t0, snap)))
-		"stay":
-			_drag.target.set("stay", maxf(1.0, snappedf(t - _last_spawn(_drag.target), snap)))
-		"interval":
-			var first := float(_drag.target.get("time"))
-			_drag.target.set("interval", maxf(1.0, snappedf(t - first, snap)))
-		"count":
-			var c: Resource = _drag.target
-			var gap := float(c.get("interval"))
-			if gap <= 0.0:
-				gap = maxf(1.0, float(c.get("stay")))
-				c.set("interval", gap)
-			var last := t - float(c.get("stay"))
-			c.set("count", maxi(1, int(round((last - float(c.get("time"))) / gap)) + 1))
+		"length":
+			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
 	timeline.refresh()
 
 func _end_drag() -> void:

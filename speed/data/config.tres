@@ -1,7 +1,6 @@
 [gd_resource type="Resource" script_class="GameConfig" format=3 uid="uid://cokmr01hunlnf"]
 
 [ext_resource type="Script" uid="uid://b0iaw5utoqs3t" path="res://scripts/data_types/game_config.gd" id="1"]
-[ext_resource type="Resource" uid="uid://bjns1ce4xykgs" path="res://data/attack_rules.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
@@ -92,7 +91,6 @@ hitstop_big_mult = 1.8
 hitstop_crit_mult = 1.3
 enemy_aim_lag = 0.5
 enemy_aim_speed = 450.0
-attack_rules = ExtResource("2")
 attack_jitter = 0.3
 enemy_hp_mult = 1.0
 enemy_armor_mult = 1.0

@@ -1,6 +1,6 @@
 ## 出現のクリップ
-## ステージのタイムラインに置く、山場の出現。決めた時刻に、敵の組み合わせのシーンから配置と出現位置を
-## ランダムに1つずつ選んで、群れを出す。
+## ステージのタイムラインに置く、強敵の出現。開始から長さの間だけ働き、その間、選んだ種類の組み合わせの群れを出し続ける。
+## 群れは、フォーメーション（敵の組み合わせのシーン）からランダムに1つ選び、その配置と出現位置をランダムに1つずつ選んで出す。
 ## ---
 ## 値の正は res://data/stages/*.tres の clips。
 class_name SpawnClip
@@ -10,23 +10,31 @@ extends Resource
 ## タイムラインに出す名前（作り手用）。
 ## 単位：文字
 @export var label: String
-## 敵の組み合わせ
-## 出す群れの組み合わせのシーン（res://data/formations/*.tscn）。
+## 種類の組み合わせ
+## このクリップが出す敵の種類。ステージの敵の一覧から選ぶ。フォーメーションには、ここで選んだ種類だけを置ける。
+## 単位：type ID
+@export var types: Array[StringName] = []
+## フォーメーション
+## 群れの形（res://data/formations/*.tscn）。出すたびにランダムに1つ選ぶ。
 ## 単位：シーン
-@export var formation: PackedScene
-## 時刻
-## ラン開始からこの時刻に、最初の群れを出す。
+@export var formations: Array[PackedScene] = []
+## 開始の時刻
+## ラン開始からこの時刻に、このクリップが働き始める。
 ## 単位：実秒
 @export var time: float
-## 繰り返しの間隔
-## 2回目からの群れを、この間隔ごとに出す。
+## 長さ
+## 開始からこの時間だけ働く。
 ## 単位：実秒
-@export var interval: float
-## 回数
-## 群れを出す回数。1 なら1回だけ。
-## 単位：回
-@export var count: int = 1
-## いる時間の目安
-## 出した群れがフィールドにいると見込む時間。タイムラインで、強敵どうしの重なりを調べるのに使う。
+@export var length: float = 60.0
+## 同時の群れの数
+## 働いている間、このクリップから出た群れがフィールドにいてほしい数。足りなければ出す。
+## 単位：群れ
+@export var groups: int = 1
+## 出す間隔
+## このクリップから群れを出してから、次の群れを出すまでの最短の時間。
 ## 単位：実秒
-@export var stay: float = 30.0
+@export var interval: float = 10.0
+
+## 終わりの時刻。
+func end_time() -> float:
+	return time + length

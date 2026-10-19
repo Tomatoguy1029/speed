@@ -4,8 +4,6 @@
 extends VBoxContainer
 
 const Canvas := preload("res://addons/spawn_timeline/timeline_canvas.gd")
-## 攻撃の組み合わせの表の場所を書くプロジェクト設定
-const SETTING_RULES := "spawn_timeline/attack_rules"
 
 var undo_redo: EditorUndoRedoManager
 var stage: Resource = null
@@ -55,8 +53,8 @@ func set_stage(value: Resource) -> void:
 	refresh()
 
 func refresh() -> void:
-	var n: int = canvas.conflicts().size() if stage != null else 0
-	_info.text = "再生位置 %s　　重なり %d" % [Canvas.clock(canvas.playhead), n]
+	var n: int = canvas.mismatches().size() if stage != null else 0
+	_info.text = "再生位置 %s　　種類が合わないクリップ %d" % [Canvas.clock(canvas.playhead), n]
 	canvas.queue_redraw()
 
 func phases() -> Array:
@@ -65,10 +63,9 @@ func phases() -> Array:
 func clips() -> Array:
 	return stage.get("clips") if stage != null else []
 
-## 組み合わせのシーンに置いた敵の種類（置き場所のノードの enemy）。シーンごとに1回だけ調べる。
-func formation_types(clip: Resource) -> Array:
-	var scene = clip.get("formation")
-	if not scene is PackedScene:
+## フォーメーション（組み合わせのシーン）に置いた敵の種類（置き場所のノードの enemy）。シーンごとに1回だけ調べる。
+func scene_types(scene: PackedScene) -> Array:
+	if scene == null:
 		return []
 	var path: String = scene.resource_path
 	if not _types_cache.has(path):
@@ -85,13 +82,15 @@ func formation_types(clip: Resource) -> Array:
 		_types_cache[path] = found.keys()
 	return _types_cache[path]
 
-## 攻撃の組み合わせの表（gap(a, b) を持つリソース）。設定がなければ null。
-func rules() -> Resource:
-	var path := str(ProjectSettings.get_setting(SETTING_RULES, ""))
-	if path == "" or not ResourceLoader.exists(path):
-		return null
-	var r: Resource = load(path)
-	return r if r != null and r.has_method("gap") else null
+## クリップのフォーメーションのうち、クリップの種類の組み合わせにない敵を置いているもの：[[シーンの名前, 種類], …]
+func clip_mismatch(clip: Resource) -> Array:
+	var out := []
+	var allowed: Array = clip.get("types")
+	for scene in clip.get("formations"):
+		for t in scene_types(scene):
+			if not allowed.has(t):
+				out.append([scene.resource_path.get_file().get_basename(), t])
+	return out
 
 ## 編集を取り消し・やり直しに載せる。changes は [対象, プロパティ, 前の値, 後の値] の並び。
 ## 値はすでに後の値になっている前提で、実行はしない。
@@ -134,6 +133,7 @@ func _add_clip() -> void:
 		return
 	clip.set("label", "新しいクリップ")
 	clip.set("time", snappedf(canvas.playhead, 1.0))
+	clip.set("length", 60.0)
 	var before: Array = clips()
 	var after: Array = before.duplicate()
 	after.append(clip)

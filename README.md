@@ -24,7 +24,7 @@ godot --editor --path speed
 
 接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
 
-敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の組み合わせの表）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
+敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
 
 短時間の性能計測は `godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350`。セーブへ書き込まず、ゲームの進行を指定秒へ進めて6秒準備・6秒計測します。
 

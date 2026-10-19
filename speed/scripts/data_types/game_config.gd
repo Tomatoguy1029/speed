@@ -375,10 +375,6 @@ extends Resource
 
 ## 敵全体の強さ・数、動き方、出現の決まり
 @export_group("敵")
-## 攻撃の組み合わせ
-## 強敵と大物の、種類どうしの攻撃の組み合わせの表（res://data/attack_rules.tres）。
-## 単位：—
-@export var attack_rules: AttackRules
 ## 待ち方のばらつき
 ## 攻撃の管理で待たされた強敵が、許可が出てから攻撃を始めるまでの乱数の遅れの最大。順番待ちが透けて見えないようにする。
 ## 単位：世界秒

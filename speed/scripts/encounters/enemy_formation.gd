@@ -13,6 +13,11 @@ const SAFE_MARGIN := 300.0
 ## 画面の縦横比（エディターの目安の枠に使う）
 const ASPECT := 16.0 / 9.0
 
+## 置ける敵の種類（空なら、どの種類でも置ける）。クリップの種類の組み合わせに合わせる
+@export var types: Array[StringName] = []:
+	set(value):
+		types = value
+		update_configuration_warnings()
 ## エディターで重ねて見る配置と出現位置の番号（-1 なら見せない）
 @export var preview_layout := 0:
 	set(value):
@@ -87,6 +92,9 @@ func _get_configuration_warnings() -> PackedStringArray:
 		out.append("出現位置（FormationEntry）が1つもない")
 	var r := safe_radius()
 	for l in ls:
+		for m in l.markers():
+			if not types.is_empty() and m.enemy != &"" and not types.has(m.enemy):
+				out.append("%s の %s（%s）は、置ける種類（types）にない" % [l.name, m.name, m.enemy])
 		for e in es:
 			for m in l.markers():
 				if placed(e, m).origin.length() < r:
