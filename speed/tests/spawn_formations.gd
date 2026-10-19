@@ -1,4 +1,4 @@
-## 時間帯・強敵の群れ・出現のクリップの出し方と、攻撃の予算を確かめる。
+## 時間帯・雑魚の目標の数の曲線・強敵の群れ・出現のクリップの出し方と、攻撃の予算を確かめる。
 ##   Godot --headless --path speed res://tests/spawn_formations.tscn
 extends Node
 
@@ -30,6 +30,7 @@ func _ready() -> void:
 	_check_spawn(run, scene)
 	_check_clips(run, scene)
 	_check_budget(run)
+	_check_curves(run)
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[spawn_formations] passed=%d failed=%d" % [passed, failed])
@@ -185,3 +186,34 @@ func _check_budget(run: RunManager) -> void:
 	em._sync_attack_budget(phase)
 	check(not run.projectiles.director.enabled, "予算が 0 の時間帯は管理しない")
 	state.lab_mode = true
+
+## 雑魚の目標の数の曲線は点を通り、点の間で行き過ぎない。曲線のあるステージは、種類ごとに足りない分を補充する。
+func _check_curves(run: RunManager) -> void:
+	var pts := PackedVector2Array([Vector2(0, 10), Vector2(60, 40), Vector2(90, 40), Vector2(120, 5)])
+	check(is_equal_approx(SpawnCurve.sample(pts, 60.0), 40.0), "曲線は点を通る")
+	check(is_equal_approx(SpawnCurve.sample(pts, -5.0), 10.0) and is_equal_approx(SpawnCurve.sample(pts, 500.0), 5.0), "点の外は端の点の数")
+	var ok := true
+	for k in 1200:
+		var v := SpawnCurve.sample(pts, k * 0.1)
+		ok = ok and v >= 5.0 - 0.001 and v <= 40.0 + 0.001
+	check(ok, "点の間で行き過ぎない")
+	check(absf(SpawnCurve.sample(pts, 75.0) - 40.0) < 0.001, "平らな所は平らのまま")
+	var em := run.enemies
+	var state := run.state
+	var stage: StageDef = state.stage.duplicate()
+	var a := SpawnCurve.new()
+	a.type = &"biter"
+	a.points = PackedVector2Array([Vector2(0, 6)])
+	var b := SpawnCurve.new()
+	b.type = &"bomber"
+	b.points = PackedVector2Array([Vector2(0, 0)])
+	var curves: Array[SpawnCurve] = [a, b]
+	stage.zako_curves = curves
+	state.stage = stage
+	state.time = 10.0
+	var t := em._target()
+	check(t.has("per_type") and is_equal_approx(float(t.per_type[&"biter"]), 6.0 * run.cfg.density_mult), "目標の数は曲線の値（密度倍率を掛ける）")
+	em._zako_counts.clear()
+	check(em._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
+	em._zako_counts[&"biter"] = int(6.0 * run.cfg.density_mult)
+	check(em._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")

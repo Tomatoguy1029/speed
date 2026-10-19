@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://c7he0y13h5761" path="res://data/formations/aquarius_solo.tscn" id="4_blxf3"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
 [ext_resource type="PackedScene" uid="uid://qsuhj8vo0blj" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="8_xsgcl"]
 
 [sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
@@ -198,12 +199,28 @@ mix = {
 id = &"s4_eve"
 display_name = "ボス前"
 
+[sub_resource type="Resource" id="Resource_mpbfx"]
+script = ExtResource("8_xsgcl")
+type = &"biter"
+points = PackedVector2Array(0, 12, 89, 34.3, 90, 23.5, 149, 32.4, 150, 20.6, 179, 17.6, 180, 29.4, 239, 41.2, 240, 23.5, 299, 29.4, 300, 112, 359, 208, 360, 41.2, 509, 64.7, 510, 52.9, 600, 70.6)
+
+[sub_resource type="Resource" id="Resource_vh3c5"]
+script = ExtResource("8_xsgcl")
+type = &"splitter"
+points = PackedVector2Array(0, 2, 89, 5.7, 90, 7.1, 149, 9.7, 150, 6.2, 179, 5.3, 180, 8.8, 239, 12.4, 240, 7.1, 299, 8.8, 300, 28, 359, 52, 360, 12.4, 509, 19.4, 510, 15.9, 600, 21.2)
+
+[sub_resource type="Resource" id="Resource_02yv8"]
+script = ExtResource("8_xsgcl")
+type = &"bomber"
+points = PackedVector2Array(0, 0, 89, 0, 90, 9.4, 149, 12.9, 150, 8.2, 179, 7.1, 180, 11.8, 239, 16.5, 240, 9.4, 299, 11.8, 300, 0, 359, 0, 360, 16.5, 509, 25.9, 510, 21.2, 600, 28.2)
+
 [resource]
 script = ExtResource("1")
 index = 4
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_0kp78")]
 enemies = Array[StringName]([&"biter", &"splitter", &"bomber", &"telescope", &"reticle", &"cross", &"dolphin", &"aquarius"])
+zako_curves = Array[ExtResource("8_xsgcl")]([SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8")])
 clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_oe0ic")])
 boss_id = &"provisional"
 legendary_module_id = &"legendary_compass"

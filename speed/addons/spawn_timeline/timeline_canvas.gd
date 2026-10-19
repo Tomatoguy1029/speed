@@ -6,7 +6,7 @@
 extends Control
 
 ## 大きさ（表示倍率 1 のとき）
-const BASE := {"gutter": 230.0, "ruler": 30.0, "phase": 50.0, "pop": 48.0, "track": 38.0, "handle": 8.0}
+const BASE := {"gutter": 230.0, "ruler": 30.0, "phase": 50.0, "pop": 48.0, "track": 38.0, "handle": 8.0, "curve": 84.0}
 
 ## 表示倍率と、それを掛けた大きさ
 var ui := 1.0
@@ -16,6 +16,10 @@ var PHASE_ROW := 50.0
 var POP_ROW := 48.0
 var TRACK := 38.0
 var HANDLE := 8.0
+var CURVE_ROW := 84.0
+## 選んでいる雑魚の曲線と、その点の番号（-1 ならなし）
+var curve_selected := -1
+var point_selected := -1
 
 var timeline
 ## 再生位置（秒）
@@ -42,8 +46,10 @@ func _init() -> void:
 	POP_ROW = BASE.pop * ui
 	TRACK = BASE.track * ui
 	HANDLE = BASE.handle * ui
+	CURVE_ROW = BASE.curve * ui
 	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯・クリップのラベルをダブルクリック：名前　目盛りをクリック：再生位置\n" + \
+		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -59,7 +65,32 @@ func _scroll_y() -> float:
 
 ## 中身の高さ（縦のスクロールに使う）。
 func content_height() -> float:
-	return _tracks_top() + timeline.clips().size() * TRACK + 12.0 * ui
+	return _clips_top() + timeline.clips().size() * TRACK + 12.0 * ui
+
+## 雑魚の曲線の行の上端と、クリップの行の上端。
+func _curves_top() -> float:
+	return _tracks_top()
+
+func _clips_top() -> float:
+	return _curves_top() + timeline.curves().size() * CURVE_ROW
+
+## 曲線の行の縦の目盛りの最大（点の最大より少し上。ドラッグ中は変えない）。
+func _curve_max(c: Resource) -> float:
+	if _drag.get("kind", "") == "point" and _drag.get("curve") == c:
+		return float(_drag.vmax)
+	var m := 10.0
+	for p: Vector2 in c.get("points"):
+		m = maxf(m, p.y)
+	return ceilf(m * 1.25 / 5.0) * 5.0
+
+## 曲線の行 k で、目標の数 v の y と、y の目標の数。
+func _curve_y(k: int, v: float, vmax: float) -> float:
+	var top := _curves_top() + k * CURVE_ROW
+	return top + CURVE_ROW - 6.0 * ui - (CURVE_ROW - 14.0 * ui) * v / vmax
+
+func _curve_v(k: int, y: float, vmax: float) -> float:
+	var top := _curves_top() + k * CURVE_ROW
+	return maxf(0.0, (top + CURVE_ROW - 6.0 * ui - y) / (CURVE_ROW - 14.0 * ui) * vmax)
 
 ## m:ss の形の時刻。
 static func clock(t: float) -> String:
@@ -147,7 +178,7 @@ func _draw() -> void:
 	var bad := mismatches()
 	for k in cs.size():
 		var c: Resource = cs[k]
-		var y := _tracks_top() + k * TRACK
+		var y := _clips_top() + k * TRACK
 		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if k % 2 == 0 else 0.0))
 		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
 		draw_string(font, Vector2(8 * ui, y + TRACK * 0.66), label, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15), Color(1, 1, 0.8) if k == selected else Color.WHITE)
@@ -160,10 +191,33 @@ func _draw() -> void:
 			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0 * ui)
 		var names := []
 		for type_id in c.get("types"):
-			names.append(String(type_id))
+			names.append(timeline.enemy_name(type_id))
 		var text := "%s　×%d　%ds" % ["・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
 		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
 		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
+	# 雑魚の目標の数の曲線：種類ごとの行に、曲線と点を描く
+	var curves: Array = timeline.curves()
+	for k in curves.size():
+		var c: Resource = curves[k]
+		var top := _curves_top() + k * CURVE_ROW
+		draw_rect(Rect2(0, top, size.x, CURVE_ROW), Color(0.3, 0.9, 0.5, 0.06 if k == curve_selected else 0.03))
+		draw_line(Vector2(0, top + CURVE_ROW), Vector2(size.x, top + CURVE_ROW), Color(1, 1, 1, 0.08))
+		var vmax := _curve_max(c)
+		var pts := PackedVector2Array()
+		var x := GUTTER
+		while x <= minf(size.x, _x(end)):
+			pts.append(Vector2(x, _curve_y(k, float(c.call("value_at", _t(x))), vmax)))
+			x += 4.0 * ui
+		if pts.size() > 1:
+			draw_polyline(pts, Color(0.5, 0.95, 0.6), 2.0 * ui, true)
+		var ps_: PackedVector2Array = c.get("points")
+		for n in ps_.size():
+			var q := Vector2(_x(ps_[n].x), _curve_y(k, ps_[n].y, vmax))
+			var on := k == curve_selected and n == point_selected
+			draw_circle(q, (6.0 if on else 4.5) * ui, Color(1, 0.9, 0.4) if on else Color(0.85, 1.0, 0.9))
+		draw_string(font, Vector2(8 * ui, top + 20 * ui), timeline.enemy_name(c.get("type")), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15),
+			Color(1, 1, 0.8) if k == curve_selected else Color(0.7, 1.0, 0.8))
+		draw_string(font, Vector2(8 * ui, top + 40 * ui), "最大 %d 体" % int(vmax), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12), Color(1, 1, 1, 0.6))
 	# 終わりより先は暗くする
 	if _x(end) < size.x:
 		draw_rect(Rect2(_x(end), 0, size.x - _x(end), size.y), Color(0, 0, 0, 0.45))
@@ -201,14 +255,36 @@ func _draw() -> void:
 		draw_line(Vector2(r.position.x, top), Vector2(r.position.x, size.y), Color(1, 1, 1, 0.35), 2.0 * ui)
 		var name_ := str(p.get("display_name")) if str(p.get("display_name")) != "" else str(p.get("id"))
 		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 8 * ui), _fs(15))
-		# 雑魚の補充の目標の数
+		# 雑魚の補充の目標の数（曲線がなければ時間帯の値）
+		if curves.is_empty():
+			var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
+			var h := POP_ROW - 12.0 * ui
+			draw_line(Vector2(_x(s), y0 - h * float(p.get("pop_from")) / max_pop), Vector2(_x(e), y0 - h * float(p.get("pop_to")) / max_pop), Color(0.5, 0.9, 0.6), 2.0 * ui)
+	if not curves.is_empty():
+		# 曲線の合計
+		var sums := []
+		var xs := []
+		var x := GUTTER
+		max_pop = 1.0
+		while x <= minf(size.x, _x(end)):
+			var total := 0.0
+			for c in curves:
+				total += float(c.call("value_at", _t(x)))
+			sums.append(total)
+			xs.append(x)
+			max_pop = maxf(max_pop, total)
+			x += 4.0 * ui
 		var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
 		var h := POP_ROW - 12.0 * ui
-		draw_line(Vector2(_x(s), y0 - h * float(p.get("pop_from")) / max_pop), Vector2(_x(e), y0 - h * float(p.get("pop_to")) / max_pop), Color(0.5, 0.9, 0.6), 2.0 * ui)
+		var line := PackedVector2Array()
+		for n in xs.size():
+			line.append(Vector2(xs[n], y0 - h * float(sums[n]) / max_pop))
+		if line.size() > 1:
+			draw_polyline(line, Color(0.5, 0.9, 0.6), 2.0 * ui, true)
 	draw_rect(Rect2(0, off, GUTTER, _tracks_top()), Color(0.1, 0.11, 0.14))
 	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
-	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), "雑魚の数（最大 %d）" % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の合計（最大 %d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
 	# 再生位置
 	var px := _x(playhead)
@@ -232,9 +308,23 @@ func _hit(p: Vector2) -> Dictionary:
 			if at >= float(ps[k].get("start")):
 				return {"kind": "phase_body", "index": k}
 		return {}
-	var k := int(floor((p.y - _tracks_top()) / TRACK))
+	if p.y < _clips_top():
+		var ck := int(floor((p.y - _curves_top()) / CURVE_ROW))
+		var curves: Array = timeline.curves()
+		if ck < 0 or ck >= curves.size():
+			return {}
+		if p.x < GUTTER:
+			return {"kind": "curve_label", "curve": ck}
+		var c: Resource = curves[ck]
+		var vmax := _curve_max(c)
+		var pts: PackedVector2Array = c.get("points")
+		for n in pts.size():
+			if Vector2(_x(pts[n].x), _curve_y(ck, pts[n].y, vmax)).distance_to(p) <= 9.0 * ui:
+				return {"kind": "point", "curve": ck, "point": n}
+		return {"kind": "curve_body", "curve": ck}
+	var k := int(floor((p.y - _clips_top()) / TRACK))
 	var cs: Array = timeline.clips()
-	if p.y < _tracks_top() or k < 0 or k >= cs.size():
+	if k < 0 or k >= cs.size():
 		return {}
 	var c: Resource = cs[k]
 	if p.x < GUTTER:
@@ -286,6 +376,15 @@ func _gui_input(event: InputEvent) -> void:
 				if mb.double_click:
 					_start_phase_rename(h.index)
 				return
+			if h.kind in ["curve_label", "curve_body", "point"]:
+				curve_selected = h.curve
+				point_selected = h.get("point", -1)
+				if h.kind == "curve_body" and mb.double_click:
+					_add_point(h.curve, mb.position)
+				elif h.kind == "point":
+					_begin_point_drag(h.curve, h.point)
+				queue_redraw()
+				return
 			if h.has("index") and h.kind != "phase":
 				selected = h.index
 				EditorInterface.inspect_object(timeline.clips()[selected], "", true)
@@ -294,8 +393,11 @@ func _gui_input(event: InputEvent) -> void:
 			_end_drag()
 	elif event is InputEventMouseMotion and not _drag.is_empty():
 		_move_drag((event as InputEventMouseMotion).position, (event as InputEventMouseMotion).shift_pressed)
-	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_DELETE:
-		timeline._remove_clip()
+	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
+		if point_selected >= 0:
+			_remove_point()
+		else:
+			timeline._remove_clip()
 		accept_event()
 
 func _begin_drag(h: Dictionary, p: Vector2) -> void:
@@ -319,10 +421,50 @@ func _begin_drag(h: Dictionary, p: Vector2) -> void:
 		for prop in _drag.props:
 			_drag.before[prop] = _drag.target.get(prop)
 
+## 曲線 k の、位置 at に点を足す。
+func _add_point(k: int, at: Vector2) -> void:
+	var c: Resource = timeline.curves()[k]
+	var before: PackedVector2Array = c.get("points")
+	var after := before.duplicate()
+	var pt := Vector2(maxf(0.0, snappedf(_t(at.x), 1.0)), snappedf(_curve_v(k, at.y, _curve_max(c)), 1.0))
+	var n := 0
+	while n < after.size() and after[n].x < pt.x:
+		n += 1
+	after.insert(n, pt)
+	c.set("points", after)
+	point_selected = n
+	timeline.commit("雑魚の曲線に点を足す", [[c, "points", before, after]])
+
+func _remove_point() -> void:
+	var curves: Array = timeline.curves()
+	if curve_selected < 0 or curve_selected >= curves.size():
+		return
+	var c: Resource = curves[curve_selected]
+	var before: PackedVector2Array = c.get("points")
+	if point_selected < 0 or point_selected >= before.size():
+		return
+	var after := before.duplicate()
+	after.remove_at(point_selected)
+	c.set("points", after)
+	point_selected = -1
+	timeline.commit("雑魚の曲線の点を消す", [[c, "points", before, after]])
+
+func _begin_point_drag(k: int, n: int) -> void:
+	var c: Resource = timeline.curves()[k]
+	_drag = {"kind": "point", "curve": c, "k": k, "n": n, "vmax": _curve_max(c), "target": c, "props": ["points"],
+		"before": {"points": (c.get("points") as PackedVector2Array).duplicate()}}
+
 func _move_drag(p: Vector2, fine: bool) -> void:
 	var t := _t(p.x)
 	var snap := 0.1 if fine else 1.0
 	match _drag.kind:
+		"point":
+			var pts: PackedVector2Array = (_drag.curve.get("points") as PackedVector2Array).duplicate()
+			var n: int = _drag.n
+			var lo := pts[n - 1].x + 0.1 if n > 0 else 0.0
+			var hi := pts[n + 1].x - 0.1 if n + 1 < pts.size() else 1e9
+			pts[n] = Vector2(clampf(snappedf(t, snap), lo, hi), snappedf(_curve_v(_drag.k, p.y, _drag.vmax), 0.1 if fine else 1.0))
+			_drag.curve.set("points", pts)
 		"pan":
 			view_start = _drag.start - (p.x - _drag.x) / px_per_sec
 			_user_view = true
@@ -388,7 +530,7 @@ func _open_editor(text: String, rect: Rect2, done: Callable) -> void:
 
 func _start_rename(k: int) -> void:
 	var c: Resource = timeline.clips()[k]
-	_open_editor(str(c.get("label")), Rect2(2.0, _tracks_top() + k * TRACK, GUTTER - 4.0, TRACK),
+	_open_editor(str(c.get("label")), Rect2(2.0, _clips_top() + k * TRACK, GUTTER - 4.0, TRACK),
 		func(text: String) -> void:
 			var before := str(c.get("label"))
 			if text != before:

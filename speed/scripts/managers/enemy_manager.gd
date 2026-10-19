@@ -2035,9 +2035,19 @@ func _target() -> Dictionary:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
 		return {"phase": p, "steps": steps, "pop": cfg.bonus_pop * cfg.density_mult,
 			"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
-	return {"phase": p, "steps": steps,
-		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
-		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
+	var scale := cfg.density_mult * (1.0 + cfg.surge_pop * steps)
+	var level := lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps
+	var curves: Array = state.stage.zako_curves
+	if not curves.is_empty():
+		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）
+		var per := {}
+		var total := 0.0
+		for c: SpawnCurve in curves:
+			var v := maxf(0.0, c.value_at(state.time)) * scale
+			per[c.type] = float(per.get(c.type, 0.0)) + v
+			total += v
+		return {"phase": p, "steps": steps, "pop": total, "level": level, "per_type": per}
+	return {"phase": p, "steps": steps, "pop": lerpf(p.pop_from, p.pop_to, k) * scale, "level": level}
 
 ## 今の時間帯の敵のレベル（ほかの Manager が敵を出すときに使う）。
 func spawn_level() -> float:
@@ -2213,6 +2223,8 @@ func _tick_clips(level: float) -> void:
 			_clip_next[n] = state.time + clip.interval
 
 var _type_counts: Dictionary = {}
+## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数
+var _zako_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
@@ -2220,6 +2232,7 @@ var _far_rows := PackedInt32Array()
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
+	_zako_counts.clear()
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -2245,6 +2258,7 @@ func _survey() -> int:
 					_far_rows.append(i)
 				continue
 			alive_n += 1
+			_zako_counts[type[i]] = int(_zako_counts.get(type[i], 0)) + 1
 			var ax := absf(rel.x)
 			var ay := absf(rel.y)
 			if ax < center_x and ay < center_y:
@@ -2292,7 +2306,9 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	var phase: PhaseDef = t.phase
 	var danger := field.danger_at(p.length())
-	var type := _pick_type(phase, t.steps)
+	var type := _pick_short_type(t.per_type) if t.has("per_type") else _pick_type(phase, t.steps)
+	if type == &"":
+		return false
 	var def := def_of(type)
 	if def == null:
 		return false
@@ -2306,7 +2322,18 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, level, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
+	_zako_counts[type] = int(_zako_counts.get(type, 0)) + 1
 	return true
+
+## 雑魚の目標の数の曲線から種類を選ぶ。目標の数に足りない分が大きい種類ほど選ばれやすい。足りない種類がなければ空。
+func _pick_short_type(per_type: Dictionary) -> StringName:
+	var items := []
+	for type in per_type:
+		var short := float(per_type[type]) - float(_zako_counts.get(type, 0))
+		if short > 0.0:
+			items.append({"type": type, "weight": short})
+	var k := _pick_weighted(items)
+	return StringName(items[k].type) if k >= 0 else &""
 
 ## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
 func _pick_type(phase: PhaseDef, steps: int) -> StringName:

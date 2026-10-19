@@ -31,7 +31,8 @@ func _init() -> void:
 	_title = Label.new()
 	_title.text = "ステージを開くと表示します"
 	bar.add_child(_title)
-	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["▶ ここから試す", _launch_here],
+	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu], ["曲線を消す", _remove_curve],
+			["▶ ここから試す", _launch_here],
 			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
 			["別ウィンドウ", _open_window]]:
 		var b := Button.new()
@@ -71,6 +72,21 @@ func phases() -> Array:
 
 func clips() -> Array:
 	return stage.get("clips") if stage != null else []
+
+## 敵の種類の名前（敵の定義の display_name。読めなければ type ID）。
+func enemy_name(id: StringName) -> String:
+	if not _names.has(id):
+		var dir := str(ProjectSettings.get_setting("spawn_timeline/enemy_dir", ""))
+		var path := dir.path_join(String(id) + ".tres")
+		var res: Resource = load(path) if dir != "" and ResourceLoader.exists(path) else null
+		_names[id] = str(res.get("display_name")) if res != null and res.get("display_name") != null and str(res.get("display_name")) != "" else String(id)
+	return _names[id]
+
+var _names: Dictionary = {}
+
+## 雑魚の目標の数の曲線（zako_curves）。
+func curves() -> Array:
+	return stage.get("zako_curves") if stage != null and stage.get("zako_curves") != null else []
 
 ## フォーメーション（組み合わせのシーン）に置いた敵の種類（置き場所のノードの enemy）。シーンごとに1回だけ調べる。
 func scene_types(scene: PackedScene) -> Array:
@@ -125,8 +141,12 @@ func _save() -> void:
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。
 func _new_clip() -> Resource:
+	return _new_element("clips")
+
+## 配列のプロパティ prop の要素の型のリソースを作る。
+func _new_element(prop: String) -> Resource:
 	for p in stage.get_property_list():
-		if p.name != "clips":
+		if p.name != prop:
 			continue
 		var cls := String(p.hint_string).get_slice(":", 1)
 		for g in ProjectSettings.get_global_class_list():
@@ -150,6 +170,51 @@ func _add_clip() -> void:
 	canvas.selected = after.size() - 1
 	commit("クリップを足す", [[stage, "clips", before, after]])
 	EditorInterface.inspect_object(clip, "", true)
+
+## ステージの敵のうち、まだ曲線のない種類を選んで、雑魚の目標の数の曲線を足す。
+func _add_curve_menu() -> void:
+	if stage == null:
+		return
+	var have := {}
+	for c in curves():
+		have[c.get("type")] = true
+	var menu := PopupMenu.new()
+	for id in stage.get("enemies"):
+		if not have.has(id):
+			menu.add_item(String(id))
+	if menu.item_count == 0:
+		menu.add_item("（ステージの敵の一覧に、曲線のない種類がない）")
+		menu.set_item_disabled(0, true)
+	menu.id_pressed.connect(func(index: int) -> void:
+		_add_curve(StringName(menu.get_item_text(index)))
+		menu.queue_free())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(get_screen_position() + get_local_mouse_position(), Vector2i.ZERO))
+
+func _add_curve(type: StringName) -> void:
+	var curve := _new_element("zako_curves")
+	if curve == null:
+		return
+	curve.set("type", type)
+	curve.set("points", PackedVector2Array([Vector2(0.0, 10.0)]))
+	var before: Array = curves()
+	var after: Array = before.duplicate()
+	after.append(curve)
+	stage.set("zako_curves", after)
+	commit("雑魚の曲線を足す", [[stage, "zako_curves", before, after]])
+
+## 選んでいる雑魚の曲線を消す。
+func _remove_curve() -> void:
+	if stage == null or canvas.curve_selected < 0 or canvas.curve_selected >= curves().size():
+		return
+	var before: Array = curves()
+	var after: Array = before.duplicate()
+	after.remove_at(canvas.curve_selected)
+	stage.set("zako_curves", after)
+	canvas.curve_selected = -1
+	canvas.point_selected = -1
+	commit("雑魚の曲線を消す", [[stage, "zako_curves", before, after]])
 
 func _remove_clip() -> void:
 	if stage == null or canvas.selected < 0 or canvas.selected >= clips().size():
