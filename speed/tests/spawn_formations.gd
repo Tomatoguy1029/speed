@@ -91,6 +91,16 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 		state.time = pair[0]
 		em._tick_clips(1.0)
 		check(fired.call() == pair[1], "時刻 %.0f までに %d 回出す" % [pair[0], pair[1]])
+	# 途中の時刻から始めたランでは、それより前の出現は出さない
+	em._clip_fired.clear()
+	em._clips_ready = false
+	state.time = 6.0
+	var before := em.count()
+	em._tick_clips(1.0)
+	check(fired.call() == 1 and em.count() == before, "始めた時刻より前の出現は出さない")
+	state.time = 8.0
+	em._tick_clips(1.0)
+	check(fired.call() == 2 and em.count() > before, "始めた時刻のあとの出現は出す")
 
 ## 強敵の群れは、目標の数まで、間隔を空けて補充する。
 func _check_refill(run: RunManager, scene: PackedScene) -> void:

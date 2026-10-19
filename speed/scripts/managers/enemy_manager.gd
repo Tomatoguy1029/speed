@@ -2105,6 +2105,8 @@ var _groups: Array[PackedInt32Array] = []
 var _formation_t := 0.0
 ## クリップの番号 → 出した回数
 var _clip_fired: Dictionary = {}
+## 途中の時刻から始めたランで、それより前の出現を出したことにしたか
+var _clips_ready := false
 
 ## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
 func formation_data(scene: PackedScene) -> Dictionary:
@@ -2205,9 +2207,17 @@ func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
 		_groups.append(rows)
 		_formation_t = phase.formation_interval
 
-## ステージのクリップを、決めた時刻に出す。
+## ステージのクリップを、決めた時刻に出す。途中の時刻から始めたランでは、それより前の出現は出さない。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
+	if not _clips_ready:
+		_clips_ready = true
+		for n in clips.size():
+			var clip: SpawnClip = clips[n]
+			var past := 0
+			while past < maxi(1, clip.count) and clip.time + past * clip.interval < state.time - 0.5:
+				past += 1
+			_clip_fired[n] = past
 	for n in clips.size():
 		var clip: SpawnClip = clips[n]
 		var fired: int = _clip_fired.get(n, 0)

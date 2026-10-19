@@ -59,6 +59,9 @@ func _ready() -> void:
 	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
 	state.endless = bool(options.get("endless", GameManager.run_endless))
 	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
+	if OS.is_debug_build() and not state.lab_mode:
+		state.time = GameManager.run_start_time
+	GameManager.run_start_time = 0.0
 	if options.has("seed"):
 		state.rng.seed = int(options.seed)
 	else:
