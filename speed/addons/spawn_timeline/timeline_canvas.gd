@@ -7,7 +7,7 @@ extends Control
 
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
-		"クリップを上下にドラッグ：トラックを移す　クリップをダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
+		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
@@ -77,6 +77,29 @@ func content_height() -> float:
 func clip_track(k: int) -> int:
 	var t := int(timeline.clips()[k].get("track"))
 	return t if t >= 0 else k
+
+## トラック row の名前（ステージの track_names。なければ番号）。
+func track_name(row: int) -> String:
+	var names = timeline.stage.get("track_names")
+	if names != null and row < names.size() and String(names[row]) != "":
+		return String(names[row])
+	return "トラック %d" % (row + 1)
+
+## トラック row の名前を、左の欄の上で書き換える。
+func _start_track_rename(row: int) -> void:
+	_open_editor(track_name(row), Rect2(2.0, _clips_top() + row * TRACK, GUTTER - 4.0, TRACK),
+		func(text: String) -> void:
+			var stage: Resource = timeline.stage
+			if stage.get("track_names") == null:
+				return
+			var before: PackedStringArray = stage.get("track_names")
+			var after := before.duplicate()
+			while after.size() <= row:
+				after.append("")
+			after[row] = text
+			if after != before:
+				stage.set("track_names", after)
+				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]))
 
 ## トラックの数（クリップのある一番下のトラックの次に、空のトラックを1本足す）。
 func track_count() -> int:
@@ -279,7 +302,7 @@ func _draw() -> void:
 	for row in track_count():
 		var y := _clips_top() + row * TRACK
 		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if row % 2 == 0 else 0.0))
-		var title := "トラック %d" % (row + 1) if row < track_count() - 1 else "（新しいトラック）"
+		var title := track_name(row) if row < track_count() - 1 else "（新しいトラック）"
 		draw_string(font, Vector2(8 * ui, y + TRACK * 0.66), title, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14), Color(1, 1, 1, 0.75 if row < track_count() - 1 else 0.35))
 	for k in cs.size():
 		var c: Resource = cs[k]
@@ -454,8 +477,10 @@ func _hit(p: Vector2) -> Dictionary:
 				return {"kind": "point", "curve": ck, "point": n}
 		return {"kind": "curve_body", "curve": ck}
 	var row := int(floor((p.y - _clips_top()) / TRACK))
-	if row < 0 or row >= track_count() or p.x < GUTTER:
+	if row < 0 or row >= track_count():
 		return {}
+	if p.x < GUTTER:
+		return {"kind": "track_label", "row": row} if row < track_count() - 1 else {}
 	var cs: Array = timeline.clips()
 	# 選んでいるクリップを先に調べる（重なっていても選んだものをつかめるように）
 	var order := range(cs.size())
@@ -521,6 +546,10 @@ func _gui_input(event: InputEvent) -> void:
 			if h.kind == "track":
 				selected = -1
 				queue_redraw()
+				return
+			if h.kind == "track_label":
+				if mb.double_click:
+					_start_track_rename(h.row)
 				return
 			if h.kind == "phase_body":
 				if mb.double_click:

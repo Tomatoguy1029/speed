@@ -32,6 +32,10 @@ const EDITOR_ORDER := 5
 ## 強敵の出現。タイムラインに置き、開始から長さの間、選んだ種類の群れを出し続ける（ステージ全体の時刻で持つ）。
 ## 単位：—
 @export var clips: Array[SpawnClip] = []
+## トラックの名前
+## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
+## 単位：文字
+@export var track_names: PackedStringArray = PackedStringArray()
 ## ボス
 ## このステージのボスの ID。
 ## 単位：文字
