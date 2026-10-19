@@ -8,7 +8,7 @@ extends Control
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
-		"トラック名を上下にドラッグ：トラックごと並べ替える　トラック名を右クリック：トラックごと複製・消す\n" + \
+		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
@@ -39,6 +39,8 @@ var timeline
 var playhead := 0.0
 ## 選んでいるクリップの番号（-1 ならなし）
 var selected := -1
+## 選んでいるトラックの行（-1 なら選んでいない）
+var track_selected := -1
 ## 見えている範囲の左端の時刻と、1秒の幅
 var view_start := 0.0
 var px_per_sec := 2.0
@@ -81,15 +83,28 @@ func clip_track(k: int) -> int:
 
 ## トラック row の名前（ステージの track_names。なければ番号）。
 func track_name(row: int) -> String:
+	var own := _own_track_name(row)
+	return own if own != "" else "トラック %d" % (row + 1)
+
+## トラック row に付けた名前（付けていなければ空）。番号の表示と同じ形（「トラック 3」）は名前として扱わない。
+func _own_track_name(row: int) -> String:
 	var names = timeline.stage.get("track_names")
-	if names != null and row < names.size() and String(names[row]) != "":
-		return String(names[row])
-	return "トラック %d" % (row + 1)
+	if names == null or row >= names.size():
+		return ""
+	var text := String(names[row]).strip_edges()
+	return "" if _is_number_label(text) else text
+
+static func _is_number_label(text: String) -> bool:
+	var rx := RegEx.create_from_string("^トラック\\s*\\d+$")
+	return rx.search(text) != null
 
 ## トラック row の名前を、左の欄の上で書き換える。
 func _start_track_rename(row: int) -> void:
-	_open_editor(track_name(row), Rect2(2.0, _clips_top() + row * TRACK, GUTTER - 4.0, TRACK),
+	_open_editor(_own_track_name(row), Rect2(2.0, _clips_top() + row * TRACK, GUTTER - 4.0, TRACK),
 		func(text: String) -> void:
+			text = text.strip_edges()
+			if _is_number_label(text):
+				text = ""
 			var stage: Resource = timeline.stage
 			# エディターではステージのスクリプトが仮の状態なので、まだ名前がなければ null が返る
 			var before = stage.get("track_names")
@@ -99,14 +114,15 @@ func _start_track_rename(row: int) -> void:
 			after[row] = text
 			if before == null or after != PackedStringArray(before):
 				stage.set("track_names", after)
-				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]))
+				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]),
+		"トラック %d" % (row + 1))
 
 ## 今のトラックの名前の並び（名前のないトラックは空）。長さはクリップのあるトラックの数。
 func _track_names_now() -> PackedStringArray:
 	var out := PackedStringArray()
 	var names = timeline.stage.get("track_names")
 	for row in track_count() - 1:
-		out.append(String(names[row]) if names != null and row < names.size() else "")
+		out.append(_own_track_name(row))
 	return out
 
 ## トラックを並べ替え・消す・複製する。remap[行] はその行のクリップの新しい行（-1 なら消す）、
@@ -188,6 +204,7 @@ func duplicate_track(row: int) -> void:
 	var names := _track_names_now()
 	names.insert(row + 1, names[row])
 	_change_tracks("トラックを複製", remap, copies, names)
+	track_selected = row + 1
 
 ## トラック名の右クリックのメニュー：複製・消す。
 func _track_menu(row: int, at: Vector2) -> void:
@@ -429,9 +446,25 @@ func _draw() -> void:
 		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
 		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
 	# トラックを動かしている間は、動かすトラックと落とす先を示す
-	if _drag.get("kind", "") == "track_move":
-		draw_rect(Rect2(0, _clips_top() + int(_drag.row) * TRACK, size.x, TRACK), Color(1, 1, 0.8, 0.08))
-		draw_rect(Rect2(0, _clips_top() + int(_drag.to) * TRACK, size.x, TRACK), Color(1, 1, 0.8), false, 2.0 * ui)
+	if track_selected >= 0 and track_selected < track_count() - 1:
+		draw_rect(Rect2(0, _clips_top() + track_selected * TRACK, GUTTER, TRACK), Color(0.45, 0.65, 1.0, 0.35))
+	if _drag.get("kind", "") == "track_move" and _drag.moved:
+		var from: int = _drag.row
+		# 元の場所は暗くし、差し込む所に線を引き、つかんだトラックはマウスに付いて浮く
+		draw_rect(Rect2(0, _clips_top() + from * TRACK, size.x, TRACK), Color(0, 0, 0, 0.45))
+		var gy := _clips_top() + int(_drag.gap) * TRACK
+		draw_rect(Rect2(0, gy - 2.0 * ui, size.x, 4.0 * ui), Color(1, 0.85, 0.3))
+		var fy := float(_drag.y) - TRACK / 2.0
+		draw_rect(Rect2(0, fy, size.x, TRACK), Color(0.2, 0.25, 0.35, 0.85))
+		draw_rect(Rect2(0, fy, size.x, TRACK), Color(0.45, 0.65, 1.0), false, 2.0 * ui)
+		draw_string(font, Vector2(8 * ui, fy + TRACK * 0.66), track_name(from), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
+		for k in cs.size():
+			if clip_track(k) != from:
+				continue
+			var fx0 := maxf(_x(float(cs[k].get("time"))), GUTTER)
+			var fx1 := _x(_clip_end(cs[k]))
+			if fx1 > GUTTER:
+				draw_rect(Rect2(fx0, fy + 4 * ui, maxf(3.0, fx1 - fx0), TRACK - 8 * ui), Color(0.35, 0.55, 0.95, 0.6))
 	# 雑魚の目標の数の曲線：種類ごとの行に、曲線と点を描く
 	var curves: Array = timeline.curves()
 	for k in curves.size():
@@ -639,6 +672,9 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
 			if h.get("kind", "") == "track_label":
+				selected = -1
+				track_selected = h.row
+				queue_redraw()
 				_track_menu(h.row, mb.position)
 				accept_event()
 				return
@@ -660,14 +696,20 @@ func _gui_input(event: InputEvent) -> void:
 				return
 			if h.kind == "track":
 				selected = -1
+				track_selected = -1
 				queue_redraw()
 				return
 			if h.kind == "track_label":
+				# クリックで選び、つかんで動かすと浮いて、落とした所へ差し込む
+				selected = -1
+				track_selected = h.row
 				if mb.double_click:
 					_start_track_rename(h.row)
 				else:
-					_drag = {"kind": "track_move", "row": h.row, "to": h.row}
+					_drag = {"kind": "track_move", "row": h.row, "gap": h.row, "y": mb.position.y, "y0": mb.position.y, "moved": false}
+				queue_redraw()
 				return
+			track_selected = -1
 			if h.kind == "phase_body":
 				if mb.double_click:
 					_start_phase_rename(h.index)
@@ -712,10 +754,17 @@ func _gui_input(event: InputEvent) -> void:
 			KEY_V:
 				paste_clip()
 			KEY_D:
-				duplicate_clip()
+				if track_selected >= 0:
+					duplicate_track(track_selected)
+				else:
+					duplicate_clip()
 		accept_event()
 	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
-		if point_selected >= 0:
+		if track_selected >= 0:
+			var row := track_selected
+			track_selected = -1
+			remove_track(row)
+		elif point_selected >= 0:
 			_remove_point()
 		else:
 			timeline._remove_clip()
@@ -843,15 +892,23 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 		"length":
 			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
 		"track_move":
-			_drag.to = clampi(int(floor((p.y - _clips_top()) / TRACK)), 0, track_count() - 2)
+			_drag.y = p.y
+			if absf(p.y - float(_drag.y0)) > 4.0 * ui:
+				_drag.moved = true
+			# 差し込む所：トラックの間（0 なら一番上、トラックの数なら一番下）
+			_drag.gap = clampi(int(round((p.y - _clips_top()) / TRACK)), 0, track_count() - 1)
 	timeline.refresh()
 
 func _end_drag() -> void:
 	if _drag.get("kind", "") == "track_move":
 		var from: int = _drag.row
-		var to: int = _drag.to
+		var gap: int = _drag.gap
+		var moved: bool = _drag.moved
 		_drag = {}
-		move_track(from, to)
+		var to := gap if gap <= from else gap - 1
+		if moved and to != from:
+			move_track(from, to)
+			track_selected = to
 		queue_redraw()
 		return
 	# クリップを落とした先で、ほかのクリップと重なるなら元の位置に戻す
@@ -886,11 +943,12 @@ func _start_phase_rename(k: int) -> void:
 				timeline.commit("時間帯の名前を変える", [[p, "display_name", before, text]]))
 
 ## 文字の入力欄を rect に出し、確定したら done(文字) を呼ぶ。
-func _open_editor(text: String, rect: Rect2, done: Callable) -> void:
+func _open_editor(text: String, rect: Rect2, done: Callable, hint := "") -> void:
 	if _rename != null:
 		_rename.queue_free()
 	_rename = LineEdit.new()
 	_rename.text = text
+	_rename.placeholder_text = hint
 	_rename.position = rect.position
 	_rename.size = rect.size
 	_rename.add_theme_font_size_override("font_size", _fs(15))
