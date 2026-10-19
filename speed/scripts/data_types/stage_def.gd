@@ -35,7 +35,7 @@ const EDITOR_ORDER := 5
 ## トラックの名前
 ## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
 ## 単位：文字
-@export var track_names: PackedStringArray = PackedStringArray()
+@export var track_names: PackedStringArray
 ## ボス
 ## このステージのボスの ID。
 ## 単位：文字

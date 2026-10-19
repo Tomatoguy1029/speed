@@ -90,14 +90,13 @@ func _start_track_rename(row: int) -> void:
 	_open_editor(track_name(row), Rect2(2.0, _clips_top() + row * TRACK, GUTTER - 4.0, TRACK),
 		func(text: String) -> void:
 			var stage: Resource = timeline.stage
-			if stage.get("track_names") == null:
-				return
-			var before: PackedStringArray = stage.get("track_names")
-			var after := before.duplicate()
+			# エディターではステージのスクリプトが仮の状態なので、まだ名前がなければ null が返る
+			var before = stage.get("track_names")
+			var after := PackedStringArray(before) if before != null else PackedStringArray()
 			while after.size() <= row:
 				after.append("")
 			after[row] = text
-			if after != before:
+			if before == null or after != PackedStringArray(before):
 				stage.set("track_names", after)
 				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]))
 
@@ -307,8 +306,11 @@ func _draw() -> void:
 	for k in cs.size():
 		var c: Resource = cs[k]
 		var y := _clips_top() + clip_track(k) * TRACK
-		var x0 := _x(float(c.get("time")))
+		var x0 := maxf(_x(float(c.get("time"))), GUTTER)
 		var x1 := _x(_clip_end(c))
+		# 左の欄（トラックの名前）より左にはみ出す部分は描かない
+		if x1 <= GUTTER:
+			continue
 		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
 		var r := Rect2(x0, y + 4 * ui, maxf(3.0, x1 - x0), TRACK - 8 * ui)
 		draw_rect(r, Color(base, 0.7))
@@ -354,6 +356,8 @@ func _draw() -> void:
 		var ps_: PackedVector2Array = c.get("points")
 		for n in ps_.size():
 			var q := Vector2(_x(ps_[n].x), _curve_y(k, ps_[n].y, vmax))
+			if q.x < GUTTER:
+				continue
 			var on := k == curve_selected and n == point_selected
 			draw_circle(q, (6.0 if on else 4.5) * ui, Color(1, 0.9, 0.4) if on else Color(0.85, 1.0, 0.9))
 			# 選んでいる点・マウスが近い点・動かしている点は、時刻と数を出す
