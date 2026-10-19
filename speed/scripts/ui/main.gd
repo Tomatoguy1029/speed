@@ -8,7 +8,7 @@ extends Node
 const SCREENS := {
 	GameManager.Screen.TITLE: "res://scenes/app/title.tscn",
 	GameManager.Screen.SETTINGS: "res://scenes/app/settings.tscn",
-	GameManager.Screen.MAIN_MENU: "res://scenes/app/main_menu.tscn",
+	GameManager.Screen.MAIN_MENU: "res://scenes/app/title.tscn",
 	GameManager.Screen.STAGE_SELECT: "res://scenes/app/stage_select.tscn",
 	GameManager.Screen.UPGRADE: "res://scenes/app/upgrade.tscn",
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
@@ -31,6 +31,9 @@ func _ready() -> void:
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
+	if screen in [GameManager.Screen.TITLE, GameManager.Screen.MAIN_MENU] and is_instance_valid(_current) and _current.has_method("show_start_panel"):
+		_current.show_start_panel(screen == GameManager.Screen.MAIN_MENU)
+		return
 	if _current != null:
 		_current.queue_free()
 		_current = null
