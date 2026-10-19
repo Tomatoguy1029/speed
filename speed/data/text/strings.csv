@@ -52,6 +52,8 @@ stage_select.stage,ステージ {n}　{name},Stage {n}  {name}
 stage_select.debug,開発版：全ステージを選べます,Dev Build: All stages are available
 stage_select.locked,ステージ {n}　（前のステージをクリアすると選べる）,Stage {n}  (Clear the previous stage to unlock)
 stage_select.endless,エンドレス（準備中）,Endless (Coming Soon)
+stage_select.launch,出撃,Launch
+stage_select.available,出撃可能,Ready to launch
 ,■ ラン中（HUD・3択・ポーズ）,
 hud.draw,描く,Draw
 hud.kills,撃破 {n},Kills {n}

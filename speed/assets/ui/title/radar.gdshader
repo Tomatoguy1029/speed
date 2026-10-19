@@ -5,11 +5,15 @@ uniform sampler2D sweep_texture : filter_nearest, repeat_disable;
 uniform sampler2D stars_texture : filter_nearest, repeat_disable;
 uniform float elapsed = 0.0;
 uniform bool panel_open = false;
+uniform float map_progress = 0.0;
+uniform sampler2D circle_texture : filter_nearest, repeat_disable;
 
 void fragment() {
 	vec2 canvas = vec2(640.0, 360.0);
 	vec2 center = vec2(462.0, 176.0);
-	vec2 offset = UV * canvas - center;
+	vec2 map_center = mix(center, vec2(198.0, 195.0), map_progress);
+	vec2 offset = (UV * canvas - map_center) / vec2(1.0, mix(1.0, 0.5, map_progress));
+	vec2 radar_uv = (offset + center) / canvas;
 	float rotation = elapsed * TAU / 16.0;
 	float c = cos(rotation);
 	float s = sin(rotation);
@@ -19,11 +23,20 @@ void fragment() {
 	float inside = step(length(offset), 150.0);
 	float age = mod(rotation - (atan(offset.y, offset.x) + PI * 0.5) + TAU, TAU);
 	float fade = exp(-age * 0.625) * step(age, rotation);
-	vec4 stars = texture(stars_texture, UV);
+	vec4 stars = texture(stars_texture, radar_uv);
 	vec4 base = texture(TEXTURE, UV);
 	if (panel_open && UV.x * canvas.x < 280.0 && UV.y * canvas.y > 65.0 && UV.y * canvas.y < 140.0) {
 		base.rgb = vec3(0.0);
 	}
+	if (map_progress > 0.0) {
+		if (distance(UV * canvas, center) < 154.0) {
+			base.rgb = vec3(0.0);
+		}
+		base.rgb = mix(base.rgb, vec3(0.012, 0.035, 0.045), map_progress);
+	}
 	vec3 radar = sweep.rgb * sweep.a * 0.45 + stars.rgb * stars.a * fade;
-	COLOR = vec4(max(base.rgb, radar * inside), 1.0);
+	vec4 circle = texture(circle_texture, radar_uv);
+	float reveal = smoothstep(0.55, 1.0, map_progress);
+	vec3 moving_ring = circle.rgb * circle.a * inside * (1.0 - reveal);
+	COLOR = vec4(max(base.rgb, max(moving_ring, radar * inside * (1.0 - map_progress))), 1.0);
 }

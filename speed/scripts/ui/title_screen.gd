@@ -6,6 +6,7 @@ const SWEEP_TEXTURE := preload("res://assets/ui/title/ui_title_screen_sweep.png"
 const STARS_TEXTURE := preload("res://assets/ui/title/ui_title_screen_stars_in_ring.png")
 const RADAR_SHADER := preload("res://assets/ui/title/radar.gdshader")
 const FRAME_TEXTURE := preload("res://assets/ui/title/ui_title_screen_frame.png")
+const MAP_SCRIPT := preload("res://scripts/ui/constellation_map.gd")
 const ART_SIZE := Vector2(1280, 720)
 const MENU_CYAN := Color("5bc8db")
 
@@ -15,6 +16,9 @@ var _elapsed := 0.0
 var _title_menu: VBoxContainer
 var _start_panel: Control
 var _stage_button: Button
+var _map: Control
+var _map_progress := 0.0
+var _transition: Tween
 
 func _ready() -> void:
 	_build_title_art()
@@ -36,7 +40,7 @@ func _ready() -> void:
 	# ブラウザ版ではアプリを終了できないので、終了ボタンを出さない
 	%QuitButton.visible = not OS.has_feature("web")
 	super()
-	show_start_panel(GameManager.screen == GameManager.Screen.MAIN_MENU)
+	show_screen(GameManager.screen, false)
 
 func _build_title_art() -> void:
 	$Background.color = Color.BLACK
@@ -55,6 +59,7 @@ func _build_title_art() -> void:
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	viewport_container.add_child(viewport)
 	var canvas := Control.new()
+	canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	canvas.size = ART_SIZE / 2.0
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	viewport.add_child(canvas)
@@ -68,6 +73,7 @@ func _build_title_art() -> void:
 	_radar_material.shader = RADAR_SHADER
 	_radar_material.set_shader_parameter("sweep_texture", SWEEP_TEXTURE)
 	_radar_material.set_shader_parameter("stars_texture", STARS_TEXTURE)
+	_radar_material.set_shader_parameter("circle_texture", preload("res://assets/ui/map/ui_title_screen_circle_only.png"))
 	background.material = _radar_material
 	canvas.add_child(background)
 	var menu := $Center/Box as VBoxContainer
@@ -83,6 +89,11 @@ func _build_title_art() -> void:
 	for button: Button in [%StartButton, %SettingsButton, %QuitButton]:
 		_style_menu_button(button)
 	_build_start_panel(canvas)
+	_map = Control.new()
+	_map.set_script(MAP_SCRIPT)
+	canvas.add_child(_map)
+	_map.back_requested.connect(_close_start_panel)
+	_map.hide()
 	resized.connect(_layout_title)
 	_layout_title()
 
@@ -139,12 +150,42 @@ func show_start_panel(open: bool) -> void:
 	else:
 		%StartButton.grab_focus.call_deferred()
 
+func show_screen(screen: GameManager.Screen, animate := true) -> void:
+	var mapping := screen == GameManager.Screen.STAGE_SELECT
+	if _transition != null:
+		_transition.kill()
+	show_start_panel(screen == GameManager.Screen.MAIN_MENU)
+	_title_menu.visible = screen == GameManager.Screen.TITLE
+	_map.visible = mapping or _map_progress > 0.0
+	_map.process_mode = Node.PROCESS_MODE_DISABLED
+	if animate and (mapping or _map_progress > 0.0):
+		_transition = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_transition.tween_method(_set_map_progress, _map_progress, 1.0 if mapping else 0.0, 1.2)
+		_transition.tween_callback(func():
+			_map.visible = mapping
+			_map.process_mode = Node.PROCESS_MODE_INHERIT
+			if mapping:
+				_map.focus_selection()
+		)
+	else:
+		_set_map_progress(1.0 if mapping else 0.0)
+		_map.visible = mapping
+		_map.process_mode = Node.PROCESS_MODE_INHERIT
+		if mapping:
+			_map.focus_selection.call_deferred()
+
+func _set_map_progress(value: float) -> void:
+	_map_progress = value
+	_radar_material.set_shader_parameter("map_progress", value)
+	_map.modulate.a = smoothstep(0.55, 1.0, value)
+	_map.set_transition(value)
+
 func _close_start_panel() -> void:
 	AudioManager.play(&"ui")
 	GameManager.back()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _start_panel.visible and event.is_action_pressed(&"ui_cancel"):
+	if (_start_panel.visible or GameManager.screen == GameManager.Screen.STAGE_SELECT) and event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
 		_close_start_panel()
 	else:
