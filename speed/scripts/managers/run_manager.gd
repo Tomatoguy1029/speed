@@ -21,6 +21,7 @@ var options: Dictionary = {}
 var input_source: Callable
 var encounters
 const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
+const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
 @onready var field: FieldManager = $"../FieldManager"
 @onready var ship: ShipManager = $"../ShipManager"
@@ -78,6 +79,13 @@ func _ready() -> void:
 		encounters = ENCOUNTERS.new()
 		add_child(encounters)
 		encounters.setup(self, state.stage.encounter_profile)
+	if not state.lab_mode and projectiles.director == null:
+		# 強敵と大物の攻撃の管理（時間帯の攻撃の予算で動く。仕様書 11.7）
+		var director = DIRECTOR.new()
+		director.state = state
+		director.projectiles = projectiles
+		director.configure({"enabled": false})
+		projectiles.director = director
 	build.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
@@ -207,6 +215,8 @@ func _play_tick(real_dt: float) -> void:
 		_world_steps = 0
 		if encounters != null:
 			encounters.before_world()
+		elif not state.lab_mode and projectiles.director != null:
+			projectiles.director.advance(state.world_time, enemies)
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))

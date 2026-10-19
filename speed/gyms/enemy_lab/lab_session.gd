@@ -540,7 +540,7 @@ func _edit_definition(args: Dictionary) -> void:
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
-		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc"]:
+		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
 			return
 		def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
 	run.enemies.definitions[type] = def

@@ -93,6 +93,7 @@ hitstop_crit_mult = 1.3
 enemy_aim_lag = 0.5
 enemy_aim_speed = 450.0
 attack_rules = ExtResource("2")
+attack_jitter = 0.3
 enemy_hp_mult = 1.0
 enemy_armor_mult = 1.0
 density_mult = 5.0

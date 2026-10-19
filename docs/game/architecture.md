@@ -350,8 +350,8 @@ Main (Node)
 |---|---|---|
 | `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](catalog/weapons.md) |
 | `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](catalog/traits.md) |
-| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値 | [enemies.md](catalog/enemies.md) |
-| `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、強敵の組み合わせの重みと群れの数・間隔、特別なルール | 仕様書 4.2 |
+| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](catalog/enemies.md) |
+| `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、強敵の組み合わせの重みと群れの数・間隔、攻撃の予算、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
 | `StageDef` | 星系、フィールドの配置、仕掛けの領域、時間帯の表、出現のクリップ、敵の見た目、中ボス、伝説のモジュール | 仕様書 2〜22 |
 | `SpawnClip` | ラベル、敵の組み合わせ、時刻・間隔・回数、いる時間の目安 | 仕様書 11.3 |

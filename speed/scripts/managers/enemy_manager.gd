@@ -2094,6 +2094,17 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 				_spawn_wave(t, t.pop - alive_n)
 	_tick_formations(phase, world_dt, t.level)
 	_tick_clips(t.level)
+	_sync_attack_budget(phase)
+
+## 本番のランでは、攻撃の管理の予算を今の時間帯の「攻撃の予算」にする（0 なら管理しない）。
+## 実験場と採用した実験の設定では、それぞれの設定に任せる。
+func _sync_attack_budget(phase: PhaseDef) -> void:
+	var d = projectiles.director
+	if d == null or state.lab_mode or state.stage.encounter_profile.get("enabled", false):
+		return
+	d.enabled = phase.attack_budget > 0.0
+	d.settings.budget = phase.attack_budget
+	d.settings.jitter = cfg.attack_jitter
 
 # ── 強敵の群れ（敵の組み合わせのシーン） ────────────────────────────
 
@@ -2388,7 +2399,8 @@ func _lab_admit(i: int, dt: float) -> bool:
 	var rules: AttackRules = cfg.attack_rules
 	# 強敵と大物は、攻撃の組み合わせの表で許可を取る
 	var gated := rules != null and def.rank >= 3 and not rules.pairs.is_empty()
-	var cats: Array = d.categories(def.behavior) if d != null else []
+	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
+	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
 	if not gated and cats.is_empty():
 		return true
 	var owner := str(table.id[i])
@@ -2414,7 +2426,7 @@ func _lab_admit(i: int, dt: float) -> bool:
 		if gated and not _rules_admit(i, rules, duration):
 			table.charge[i] = 0
 			return false
-		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0):
+		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, def.attack_weight):
 			table.charge[i] = 0
 			return false
 	if not cats.is_empty():

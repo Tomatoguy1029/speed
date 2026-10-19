@@ -1,4 +1,6 @@
-## 予告前に分類をまとめて取得する、ラン単位の攻撃枠。
+## 予告前に分類をまとめて取得する、ラン単位の攻撃枠（仕様書 11.7）。
+## 同時に出ている攻撃の重さ（cost）の合計が予算（budget）を超えないように待たせる。分類ごとの枠と間隔も使う。
+## 待っていた攻撃は、許可が出てもばらつき（jitter 秒までの乱数）だけ遅れて始める。
 extends RefCounted
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
 const BEHAVIORS := {
@@ -7,11 +9,11 @@ const BEHAVIORS := {
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 	"lynx": ["aimed"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
-	"aquarius": ["aimed"], "auriga": ["residue"], "corona": ["residue"],
-	"aquila": ["zone"]}
+	"aquarius": ["beam"], "auriga": ["residue"], "corona": ["residue"],
+	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
 var enabled := false
-var settings: Dictionary = {"budget": 4.0, "slots": {}, "weights": {}, "gaps": {}}
+var settings: Dictionary = {"budget": 4.0, "slots": {}, "weights": {}, "gaps": {}, "jitter": 0.3}
 var groups: Dictionary = {}
 var owners: Dictionary = {}
 var waiting: Dictionary = {}
@@ -24,7 +26,7 @@ var projectiles: ProjectileManager
 
 func configure(value: Dictionary) -> void:
 	enabled = value.get("enabled", false)
-	for key in ["budget", "slots", "weights", "gaps"]:
+	for key in ["budget", "slots", "weights", "gaps", "jitter"]:
 		if value.has(key):
 			settings[key] = value[key].duplicate(true) if value[key] is Dictionary else float(value[key])
 
@@ -58,7 +60,8 @@ func queue(owner: String, cats: Array, row: int, id: int, priority := 0.0) -> vo
 	if not waiting.has(owner):
 		waiting[owner] = {"cats": cats, "row": row, "id": id, "since": now, "priority": priority}
 
-func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0) -> bool:
+## cost は攻撃の重さ（負なら、分類の重みの合計）。
+func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0, cost := -1.0) -> bool:
 	if cats.is_empty():
 		return true
 	if owners.has(owner):
@@ -67,7 +70,10 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		if enabled:
 			reasons[owner] = TranslationServer.translate("lab.message_eb3d91decb")
 			return false
+	if cost < 0.0:
+		cost = _weights(cats)
 	queue(owner, cats, row, id, priority)
+	waiting[owner].cost = cost
 	var ordered := waiting.keys()
 	ordered.sort_custom(func(a, b):
 		var pa: float = float(waiting[a].priority) + (now - float(waiting[a].since)) * 0.2
@@ -75,19 +81,26 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		return a < b if is_equal_approx(pa, pb) else pa > pb)
 	# 適合しない先頭によって別分類まで止めない。
 	for candidate in ordered if enabled else []:
-		if _capacity(waiting[candidate].cats).is_empty():
+		if _capacity(waiting[candidate].cats, float(waiting[candidate].get("cost", _weights(waiting[candidate].cats)))).is_empty():
 			if candidate != owner:
 				reasons[owner] = TranslationServer.translate("lab.message_aa5d4e5983")
 				return false
 			break
 	var reason := _guard_reason(row)
 	if reason.is_empty():
-		reason = _capacity(cats) if enabled else ""
+		reason = _capacity(cats, cost) if enabled else ""
 	if not reason.is_empty():
 		reasons[owner] = reason
+		waiting[owner].erase("ready")
 		return false
+	# 待っていた攻撃は、少しばらつかせてから始める（順番待ちが透けて見えないように）
+	if enabled and now > float(waiting[owner].since) + 0.001 and float(settings.get("jitter", 0.0)) > 0.0:
+		if not waiting[owner].has("ready"):
+			waiting[owner].ready = now + (state.rng.randf() if state != null else 0.5) * float(settings.jitter)
+		if now < float(waiting[owner].ready):
+			return false
 	serial += 1
-	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row), "type": _source_type(row)}
+	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row), "type": _source_type(row), "cost": cost}
 	owners[owner] = serial
 	for category in cats:
 		last_start[category] = now
@@ -97,16 +110,27 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		state.emit(&"attack_start", {"owner": owner, "row": row, "id": id, "categories": cats, "token": serial})
 	return true
 
-func _capacity(cats: Array) -> String:
-	var used := {}
+## 分類の重みの合計。
+func _weights(cats: Array) -> float:
+	var w := 0.0
+	for category in cats:
+		w += float(settings.weights.get(category, 1.0))
+	return w
+
+## 今出ている攻撃の重さの合計。
+func used_cost() -> float:
 	var total := 0.0
+	for group in groups.values():
+		total += float(group.get("cost", _weights(group.categories)))
+	return total
+
+func _capacity(cats: Array, cost: float) -> String:
+	var used := {}
+	var total := used_cost()
 	for group in groups.values():
 		for category in group.categories:
 			used[category] = int(used.get(category, 0)) + 1
-			total += float(settings.weights.get(category, 1.0))
-	var cost := 0.0
 	for category in cats:
-		cost += float(settings.weights.get(category, 1.0))
 		if int(used.get(category, 0)) >= int(settings.slots.get(category, 1)):
 			return category + TranslationServer.translate("lab.message_377bd2f0f5")
 		if now - float(last_start.get(category, -1e9)) < float(settings.gaps.get(category, 0.35)):

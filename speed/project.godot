@@ -50,13 +50,13 @@ common/physics_ticks_per_second=120
 
 rendering_device/driver.windows="d3d12"
 
-[speed_data_editor]
-
-data_dir="res://data"
-
 [spawn_timeline]
 
 attack_rules="res://data/attack_rules.tres"
+
+[speed_data_editor]
+
+data_dir="res://data"
 
 [stage_launcher]
 

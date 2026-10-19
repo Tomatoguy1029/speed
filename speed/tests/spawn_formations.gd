@@ -1,4 +1,4 @@
-## 時間帯・強敵の群れ・クリップの出し方と、攻撃の組み合わせの表を確かめる。
+## 時間帯・強敵の群れ・クリップの出し方と、攻撃の組み合わせの表・攻撃の予算を確かめる。
 ##   Godot --headless --path speed res://tests/spawn_formations.tscn
 extends Node
 
@@ -31,6 +31,7 @@ func _ready() -> void:
 	_check_clips(run, scene)
 	_check_refill(run, scene)
 	_check_rules(run, scene)
+	_check_budget(run)
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[spawn_formations] passed=%d failed=%d" % [passed, failed])
@@ -160,3 +161,41 @@ func _check_rules(run: RunManager, scene: PackedScene) -> void:
 	state.world_time = t0 + 5.1
 	check(em._rules_admit(aqua, rules, 3.0), "決めた時間が経てば撃てる")
 	check(AttackRules.key(&"telescope", &"aquarius") == "aquarius/telescope", "組み合わせのキーは並びをそろえる")
+
+## 攻撃の重さの合計が予算を超えないように待たせる。待っていた攻撃は、ばらつきの分だけ遅れて始める。
+## 雑魚は管理しない。本番のランでは、時間帯の攻撃の予算で管理を切り替える。
+func _check_budget(run: RunManager) -> void:
+	var em := run.enemies
+	var state := run.state
+	run.cfg.attack_rules = null
+	var d = load("res://scripts/encounters/attack_director.gd").new()
+	d.state = state
+	d.projectiles = run.projectiles
+	d.configure({"enabled": true, "budget": 3.0, "slots": {"beam": 5, "aimed": 5, "wave": 5}, "gaps": {"beam": 0.0, "aimed": 0.0, "wave": 0.0}, "jitter": 0.0})
+	d.advance(10.0, em)
+	check(d.request("a", ["beam"], 0, 1, 5.0, 0.0, 2.0), "重さ 2 の攻撃は予算 3 に収まる")
+	check(d.request("b", ["aimed"], 1, 2, 5.0, 0.0, 1.0), "重さの合計 3 までは同時に撃てる")
+	check(not d.request("c", ["wave"], 2, 3, 5.0, 0.0, 0.5), "予算を超える攻撃は待たせる")
+	check(is_equal_approx(d.used_cost(), 3.0), "今の重さの合計を数える")
+	d.configure({"jitter": 2.0})
+	d.advance(15.5, em)
+	var first: bool = d.request("c", ["wave"], 2, 3, 5.0, 0.0, 0.5)
+	var ready: float = float(d.waiting["c"].get("ready", 0.0)) if d.waiting.has("c") else 15.5
+	check(first == (ready <= 15.5), "待っていた攻撃は、ばらつきの分だけ遅れて始める")
+	d.advance(17.6, em)
+	check(first or d.request("c", ["wave"], 2, 3, 5.0, 0.0, 0.5), "ばらつきの時間が過ぎたら始める")
+	# 雑魚は管理しない
+	run.projectiles.director.configure({"enabled": true, "budget": 0.0})
+	var biter := em.spawn(em.def_of(&"biter"), 1.0, state.ship_pos + Vector2(300, 0))
+	check(em._lab_admit(biter, 0.016), "雑魚の攻撃は予算で止めない")
+	run.projectiles.director.configure({"enabled": false, "budget": 4.0})
+	# 本番のランでは、時間帯の攻撃の予算で管理する
+	var phase := PhaseDef.new()
+	phase.attack_budget = 5.0
+	state.lab_mode = false
+	em._sync_attack_budget(phase)
+	check(run.projectiles.director.enabled and is_equal_approx(float(run.projectiles.director.settings.budget), 5.0), "時間帯の予算で管理する")
+	phase.attack_budget = 0.0
+	em._sync_attack_budget(phase)
+	check(not run.projectiles.director.enabled, "予算が 0 の時間帯は管理しない")
+	state.lab_mode = true
