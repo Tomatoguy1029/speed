@@ -24,7 +24,7 @@ static func is_stage(object: Object) -> bool:
 
 func _init() -> void:
 	name = "SpawnTimeline"
-	custom_minimum_size = Vector2(0, 260)
+	custom_minimum_size = Vector2(0, 300)
 	# 幅が足りなければ折り返す（トラックの幅をボタンの並びに引っ張られないようにする）
 	var bar := HFlowContainer.new()
 	add_child(bar)
@@ -40,10 +40,17 @@ func _init() -> void:
 		bar.add_child(b)
 	_info = Label.new()
 	bar.add_child(_info)
+	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	canvas = Canvas.new()
 	canvas.timeline = self
+	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(canvas)
+	scroll.add_child(canvas)
+	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: canvas.queue_redraw())
 
 func set_stage(value: Resource) -> void:
 	stage = value
@@ -55,6 +62,8 @@ func set_stage(value: Resource) -> void:
 func refresh() -> void:
 	var n: int = canvas.mismatches().size() if stage != null else 0
 	_info.text = "再生位置 %s　　種類が合わないクリップ %d" % [Canvas.clock(canvas.playhead), n]
+	if stage != null:
+		canvas.custom_minimum_size.y = canvas.content_height()
 	canvas.queue_redraw()
 
 func phases() -> Array:

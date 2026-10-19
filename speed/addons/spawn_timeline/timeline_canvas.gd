@@ -1,15 +1,21 @@
 ## 出現タイムラインのトラック。上から目盛り・時間帯・雑魚の補充の目標の数・クリップ（1本が1つ）を並べる。
 ## 時間帯の境目と、クリップの開始・長さをドラッグで変える。ラベルはダブルクリックで変える。
 ## フォーメーションに、クリップの種類の組み合わせにない敵を置いているクリップを赤く出す。
+## 大きさはエディタの表示倍率に合わせる。トラックは縦にスクロールし、目盛り・時間帯・雑魚の数は上に留める。
 @tool
 extends Control
 
-const GUTTER := 170.0
-const RULER := 22.0
-const PHASE_ROW := 44.0
-const POP_ROW := 40.0
-const TRACK := 26.0
-const HANDLE := 6.0
+## 大きさ（表示倍率 1 のとき）
+const BASE := {"gutter": 230.0, "ruler": 30.0, "phase": 50.0, "pop": 48.0, "track": 38.0, "handle": 8.0}
+
+## 表示倍率と、それを掛けた大きさ
+var ui := 1.0
+var GUTTER := 230.0
+var RULER := 30.0
+var PHASE_ROW := 50.0
+var POP_ROW := 48.0
+var TRACK := 38.0
+var HANDLE := 8.0
 
 var timeline
 ## 再生位置（秒）
@@ -28,10 +34,32 @@ var _rename: LineEdit = null
 func _init() -> void:
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
+	if Engine.is_editor_hint():
+		ui = EditorInterface.get_editor_scale()
+	GUTTER = BASE.gutter * ui
+	RULER = BASE.ruler * ui
+	PHASE_ROW = BASE.phase * ui
+	POP_ROW = BASE.pop * ui
+	TRACK = BASE.track * ui
+	HANDLE = BASE.handle * ui
 	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　目盛りをクリック：再生位置　ラベルをダブルクリック：名前\n" + \
-		"ホイール・2本指の横スクロール：横に動かす　Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
+		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
+		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
+
+## 文字の大きさ（表示倍率を掛ける）。
+func _fs(n: float) -> int:
+	return int(round(n * ui))
+
+## トラックを縦にスクロールしている量（上に留める部分の位置）。
+func _scroll_y() -> float:
+	var sc := get_parent() as ScrollContainer
+	return float(sc.scroll_vertical) if sc != null else 0.0
+
+## 中身の高さ（縦のスクロールに使う）。
+func content_height() -> float:
+	return _tracks_top() + timeline.clips().size() * TRACK + 12.0 * ui
 
 ## m:ss の形の時刻。
 static func clock(t: float) -> String:
@@ -110,32 +138,56 @@ func _draw() -> void:
 	var font := get_theme_default_font()
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.1, 0.11, 0.14))
 	if timeline == null or timeline.stage == null:
-		draw_string(font, Vector2(16, 30), "ステージ（data/stages/*.tres）をインスペクターで開いてください")
+		draw_string(font, Vector2(16, 30) * ui, "ステージ（data/stages/*.tres）をインスペクターで開いてください", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
 		return
 	var end := _end_time()
+	var off := _scroll_y()
+	# クリップ：開始から長さの間の棒。中に種類・同時の群れの数・出す間隔を書く
+	var cs: Array = timeline.clips()
+	var bad := mismatches()
+	for k in cs.size():
+		var c: Resource = cs[k]
+		var y := _tracks_top() + k * TRACK
+		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if k % 2 == 0 else 0.0))
+		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
+		draw_string(font, Vector2(8 * ui, y + TRACK * 0.66), label, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15), Color(1, 1, 0.8) if k == selected else Color.WHITE)
+		var x0 := _x(float(c.get("time")))
+		var x1 := _x(_clip_end(c))
+		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
+		var r := Rect2(x0, y + 4 * ui, maxf(3.0, x1 - x0), TRACK - 8 * ui)
+		draw_rect(r, Color(base, 0.55))
+		if k in bad:
+			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0 * ui)
+		var names := []
+		for type_id in c.get("types"):
+			names.append(String(type_id))
+		var text := "%s　×%d　%ds" % ["・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
+		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
+		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
 	# 終わりより先は暗くする
 	if _x(end) < size.x:
 		draw_rect(Rect2(_x(end), 0, size.x - _x(end), size.y), Color(0, 0, 0, 0.45))
-	# 目盛り：ラベルの間隔が 70px 以上になる、切りのいい間隔
-	draw_rect(Rect2(0, 0, size.x, RULER), Color(0.16, 0.17, 0.21))
+	# ここから上に留める部分（目盛り・時間帯・雑魚の数）
+	draw_rect(Rect2(0, off, size.x, _tracks_top()), Color(0.1, 0.11, 0.14))
+	draw_rect(Rect2(0, off, size.x, RULER), Color(0.16, 0.17, 0.21))
+	# 目盛り：ラベルの間隔が十分空く、切りのいい間隔
 	var step := 300.0
-	for s: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0]:
-		if s * px_per_sec >= 70.0:
-			step = s
+	for st: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0]:
+		if st * px_per_sec >= 80.0 * ui:
+			step = st
 			break
-	var minor := step / 5.0 if step / 5.0 * px_per_sec >= 8.0 else step
+	var minor := step / 5.0 if step / 5.0 * px_per_sec >= 10.0 * ui else step
 	var t := floorf(view_start / minor) * minor
 	while _x(t) < size.x and t <= end + 0.001:
 		var x := _x(t)
 		if x >= GUTTER:
-			var major := is_zero_approx(fmod(t + 0.0001, step)) or fmod(t + 0.0001, step) < 0.001
-			draw_line(Vector2(x, RULER - (10.0 if major else 4.0)), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.04))
+			var major := fmod(t + 0.0001, step) < 0.001
+			draw_line(Vector2(x, off + RULER - (12.0 if major else 5.0) * ui), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.04))
 			if major:
-				draw_string(font, Vector2(x + 3, 15), clock(t) if step >= 1.0 else "%.1f" % t, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+				draw_string(font, Vector2(x + 4 * ui, off + RULER * 0.66), clock(t), HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14))
 		t += minor
-	# 時間帯
 	var ps: Array = timeline.phases()
-	var top := RULER
+	var top := off + RULER
 	var max_pop := 1.0
 	for p in ps:
 		max_pop = maxf(max_pop, maxf(float(p.get("pop_from")), float(p.get("pop_to"))))
@@ -144,57 +196,34 @@ func _draw() -> void:
 		var s := float(p.get("start"))
 		var e := float(ps[k + 1].get("start")) if k + 1 < ps.size() else end
 		var col := Color.from_hsv(fmod(k * 0.13, 1.0), 0.35, 0.45)
-		var r := Rect2(_x(s), top + 2, (e - s) * px_per_sec, PHASE_ROW - 4)
+		var r := Rect2(_x(s), top + 3 * ui, (e - s) * px_per_sec, PHASE_ROW - 6 * ui)
 		draw_rect(r, col)
-		draw_line(Vector2(r.position.x, top), Vector2(r.position.x, size.y), Color(1, 1, 1, 0.35), 2.0)
+		draw_line(Vector2(r.position.x, top), Vector2(r.position.x, size.y), Color(1, 1, 1, 0.35), 2.0 * ui)
 		var name_ := str(p.get("display_name")) if str(p.get("display_name")) != "" else str(p.get("id"))
-		draw_string(font, r.position + Vector2(4, 15), name_, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 6), 13)
-		var forms: Dictionary = p.get("formations") if p.get("formations") != null else {}
-		var names := []
-		for scene in forms:
-			names.append("%s×%s" % [scene.resource_path.get_file().get_basename(), str(forms[scene])])
-		if not names.is_empty():
-			draw_string(font, r.position + Vector2(4, 32), "強敵 " + ", ".join(names), HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 6), 11, Color(1, 0.85, 0.6))
+		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 8 * ui), _fs(15))
 		# 雑魚の補充の目標の数
-		var y0 := RULER + PHASE_ROW + POP_ROW - 4.0
-		var h := POP_ROW - 8.0
-		draw_line(Vector2(_x(s), y0 - h * float(p.get("pop_from")) / max_pop), Vector2(_x(e), y0 - h * float(p.get("pop_to")) / max_pop), Color(0.5, 0.9, 0.6), 2.0)
-	draw_string(font, Vector2(6, RULER + 16), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, 13)
-	draw_string(font, Vector2(6, RULER + PHASE_ROW + 16), "雑魚の数（最大 %d）" % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
-	# クリップ：開始から長さの間の棒。中に種類・同時の群れの数・出す間隔を書く
-	var cs: Array = timeline.clips()
-	var bad := mismatches()
-	for k in cs.size():
-		var c: Resource = cs[k]
-		var y := _tracks_top() + k * TRACK
-		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.03 if k % 2 == 0 else 0.0))
-		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
-		draw_string(font, Vector2(6, y + 17), label, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 10, 13, Color(1, 1, 0.8) if k == selected else Color.WHITE)
-		var x0 := _x(float(c.get("time")))
-		var x1 := _x(_clip_end(c))
-		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
-		var r := Rect2(x0, y + 3, maxf(3.0, x1 - x0), TRACK - 6)
-		draw_rect(r, Color(base, 0.55))
-		if k in bad:
-			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0)
-		var names := []
-		for type_id in c.get("types"):
-			names.append(String(type_id))
-		var text := "%s　×%d　%ds" % ["・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
-		draw_string(font, r.position + Vector2(4, 14), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 8), 11)
-		draw_rect(Rect2(x1 - 3, y + 3, 3, TRACK - 6), Color.WHITE)
+		var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
+		var h := POP_ROW - 12.0 * ui
+		draw_line(Vector2(_x(s), y0 - h * float(p.get("pop_from")) / max_pop), Vector2(_x(e), y0 - h * float(p.get("pop_to")) / max_pop), Color(0.5, 0.9, 0.6), 2.0 * ui)
+	draw_rect(Rect2(0, off, GUTTER, _tracks_top()), Color(0.1, 0.11, 0.14))
+	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), "雑魚の数（最大 %d）" % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
+	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
 	# 再生位置
 	var px := _x(playhead)
-	draw_line(Vector2(px, 0), Vector2(px, size.y), Color(1, 0.8, 0.2), 2.0)
-	draw_rect(Rect2(0, 0, GUTTER, RULER), Color(0.16, 0.17, 0.21))
+	draw_line(Vector2(px, off), Vector2(px, size.y), Color(1, 0.8, 0.2), 2.0 * ui)
 	draw_line(Vector2(GUTTER, 0), Vector2(GUTTER, size.y), Color(1, 1, 1, 0.2))
 
 ## 位置 p にあるもの：{"kind", "index"}。
 func _hit(p: Vector2) -> Dictionary:
-	if p.y < RULER:
+	var hy := p.y - _scroll_y()
+	if hy < RULER:
 		return {"kind": "playhead"}
 	var ps: Array = timeline.phases()
-	if p.y < RULER + PHASE_ROW:
+	if hy < _tracks_top() and hy >= RULER + PHASE_ROW:
+		return {}
+	if hy < RULER + PHASE_ROW:
 		for k in range(1, ps.size()):
 			if absf(p.x - _x(float(ps[k].get("start")))) <= HANDLE:
 				return {"kind": "phase", "index": k}
@@ -220,9 +249,10 @@ func _gui_input(event: InputEvent) -> void:
 		var pg := event as InputEventPanGesture
 		if pg.ctrl_pressed or pg.meta_pressed:
 			zoom(exp(-pg.delta.y * 0.08), pg.position.x)
-		else:
-			pan((pg.delta.x + pg.delta.y) * 12.0 / px_per_sec)
-		accept_event()
+			accept_event()
+		elif absf(pg.delta.x) > absf(pg.delta.y):
+			pan(pg.delta.x * 12.0 / px_per_sec)
+			accept_event()
 	elif event is InputEventMagnifyGesture:
 		var mg := event as InputEventMagnifyGesture
 		zoom(mg.factor, mg.position.x)
@@ -230,7 +260,8 @@ func _gui_input(event: InputEvent) -> void:
 	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		var wheel := mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]
-		if mb.pressed and wheel:
+		var sideways := mb.shift_pressed or mb.button_index in [MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]
+		if mb.pressed and wheel and (mb.ctrl_pressed or mb.meta_pressed or sideways):
 			var dir := 1.0 if mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT] else -1.0
 			if mb.ctrl_pressed or mb.meta_pressed:
 				zoom(1.0 + 0.15 * dir, mb.position.x)
