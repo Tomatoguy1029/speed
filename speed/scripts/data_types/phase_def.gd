@@ -57,6 +57,19 @@ const EDITOR_ORDER := 4
 
 ## 見分けるための ID と、画面に出る名前・説明
 @export_group("名前と ID")
+## 強敵の組み合わせの重み
+## 強敵を群れの単位で補充するときの、組み合わせのシーン（res://data/formations/*.tscn）ごとの出やすさ。
+## 大きいほどよく出る（全体に対する比で決まる）。
+## 単位：重み
+@export var formations: Dictionary[PackedScene, float] = {}
+## 強敵の群れの数
+## この時間帯にフィールドにいてほしい、補充で出した強敵の群れの数。
+## 単位：群れ
+@export var formation_count: int
+## 強敵の群れの間隔
+## 補充で強敵の群れを出してから、次の群れを出すまでの最短の時間。
+## 単位：実秒
+@export var formation_interval: float
 ## ID
 ## 時間帯を見分ける名前。ステージのデータがこの時間帯を指すのに使う。
 ## 単位：文字

@@ -2092,6 +2092,119 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 			_wave_t = 0.0
 			if alive_n < t.pop:
 				_spawn_wave(t, t.pop - alive_n)
+	_tick_formations(phase, world_dt, t.level)
+	_tick_clips(t.level)
+
+# ── 強敵の群れ（敵の組み合わせのシーン） ────────────────────────────
+
+## 組み合わせのシーンのパス → ゲーム中に使う形（EnemyFormation.to_data）
+var _formation_cache: Dictionary = {}
+## 補充で出した強敵の群れ（各群れの行番号と id を交互に並べたもの）
+var _groups: Array[PackedInt32Array] = []
+## 次に補充で強敵の群れを出せるまでの時間
+var _formation_t := 0.0
+## クリップの番号 → 出した回数
+var _clip_fired: Dictionary = {}
+
+## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
+func formation_data(scene: PackedScene) -> Dictionary:
+	if scene == null:
+		return {}
+	if not _formation_cache.has(scene.resource_path):
+		var node := scene.instantiate()
+		_formation_cache[scene.resource_path] = node.to_data() if node.has_method("to_data") else {}
+		node.free()
+	return _formation_cache[scene.resource_path]
+
+## 重み（weight）で1つ選んだ番号。空なら -1。
+func _pick_weighted(items: Array) -> int:
+	var total := 0.0
+	for it in items:
+		total += float(it.weight)
+	if items.is_empty() or total <= 0.0:
+		return -1
+	var roll := state.rng.randf() * total
+	for k in items.size():
+		roll -= float(items[k].weight)
+		if roll < 0.0:
+			return k
+	return items.size() - 1
+
+## 組み合わせ data から配置と出現位置を1つずつ選び、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
+## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
+## 出した敵の行番号と id を交互に並べて返す。
+func spawn_formation(data: Dictionary, level: float) -> PackedInt32Array:
+	var rows := PackedInt32Array()
+	var li := _pick_weighted(data.get("layouts", []))
+	var ei := _pick_weighted(data.get("entries", []))
+	if li < 0 or ei < 0:
+		return rows
+	var entry: Dictionary = data.entries[ei]
+	var heading := state.ship_vel.normalized() if state.ship_vel.length() > 40.0 else state.ship_heading
+	if heading == Vector2.ZERO:
+		heading = Vector2.UP
+	# 作るときの機体は上（y の負）向き。今の向きとの差だけ回す
+	var turn := heading.angle() + PI / 2.0
+	var stretch := maxf(1.0, minf(state.view_half.x, state.view_half.y) * 2.0 / maxf(cfg.base_view, 1.0))
+	var entry_xf := Transform2D(float(entry.rot), Vector2(entry.pos) * stretch)
+	for m: Dictionary in data.layouts[li].markers:
+		var def := def_of(StringName(m.type))
+		if def == null:
+			continue
+		var local := entry_xf * Transform2D(float(m.rot), Vector2(m.pos))
+		var pos := state.ship_pos + local.origin.rotated(turn)
+		# 置き場所の正面は y の負の向き
+		var facing := turn + local.get_rotation() - PI / 2.0
+		var i := spawn(def, level, pos, {"facing": facing})
+		rows.append(i)
+		rows.append(table.id[i])
+	return rows
+
+## 群れのうち、生きている敵がいるか。
+func _group_alive(rows: PackedInt32Array) -> bool:
+	for k in range(0, rows.size(), 2):
+		if self.is_same(rows[k], rows[k + 1]) and table.dead[rows[k]] == 0:
+			return true
+	return false
+
+## 組み合わせの敵のうち、同時に出る数の上限に達している種類があるか。
+func _formation_capped(data: Dictionary) -> bool:
+	for l: Dictionary in data.get("layouts", []):
+		for m: Dictionary in l.markers:
+			var def := def_of(StringName(m.type))
+			if def != null and def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
+				return true
+	return false
+
+## 時間帯の強敵の群れを補充する。いる群れが目標の数より少なく、前の群れから間隔が空いていれば、重みで1つ選んで出す。
+func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
+	_formation_t -= world_dt
+	_groups = _groups.filter(_group_alive)
+	if phase.formations.is_empty() or _groups.size() >= phase.formation_count or _formation_t > 0.0:
+		return
+	var items := []
+	for scene: PackedScene in phase.formations:
+		var data := formation_data(scene)
+		if not data.is_empty() and not _formation_capped(data):
+			items.append({"data": data, "weight": float(phase.formations[scene])})
+	var k := _pick_weighted(items)
+	if k < 0:
+		return
+	var rows := spawn_formation(items[k].data, level)
+	if not rows.is_empty():
+		_groups.append(rows)
+		_formation_t = phase.formation_interval
+
+## ステージのクリップを、決めた時刻に出す。
+func _tick_clips(level: float) -> void:
+	var clips: Array = state.stage.clips if state.stage != null else []
+	for n in clips.size():
+		var clip: SpawnClip = clips[n]
+		var fired: int = _clip_fired.get(n, 0)
+		if fired >= maxi(1, clip.count) or state.time < clip.time + fired * clip.interval:
+			continue
+		_clip_fired[n] = fired + 1
+		spawn_formation(formation_data(clip.formation), level)
 
 var _type_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
