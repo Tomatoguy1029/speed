@@ -212,8 +212,8 @@ func _check_curves(run: RunManager) -> void:
 	state.stage = stage
 	state.time = 10.0
 	var t := em._target()
-	check(t.has("per_type") and is_equal_approx(float(t.per_type[&"biter"]), 6.0 * run.cfg.density_mult), "目標の数は曲線の値（密度倍率を掛ける）")
+	check(t.has("per_type") and is_equal_approx(float(t.per_type[&"biter"]), 6.0), "目標の数は曲線の値そのまま（密度倍率は掛けない）")
 	em._zako_counts.clear()
 	check(em._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
-	em._zako_counts[&"biter"] = int(6.0 * run.cfg.density_mult)
+	em._zako_counts[&"biter"] = 6
 	check(em._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")

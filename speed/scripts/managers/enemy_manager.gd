@@ -2039,11 +2039,12 @@ func _target() -> Dictionary:
 	var level := lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps
 	var curves: Array = state.stage.zako_curves
 	if not curves.is_empty():
-		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）
+		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）。曲線の値がそのまま実際の数で、敵の密度倍率は掛けない
+		var surge := 1.0 + cfg.surge_pop * steps
 		var per := {}
 		var total := 0.0
 		for c: SpawnCurve in curves:
-			var v := maxf(0.0, c.value_at(state.time)) * scale
+			var v := maxf(0.0, c.value_at(state.time)) * surge
 			per[c.type] = float(per.get(c.type, 0.0)) + v
 			total += v
 		return {"phase": p, "steps": steps, "pop": total, "level": level, "per_type": per}
