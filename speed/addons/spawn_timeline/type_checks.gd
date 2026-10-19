@@ -2,6 +2,7 @@
 ##   ステージの敵（enemies）：プロジェクト設定 spawn_timeline/enemy_dir にある、すべての敵から選ぶ
 ##   出現のクリップの種類の組み合わせ（types）：出現タイムラインで開いているステージの敵から選ぶ
 ##   敵の組み合わせのシーンの置ける種類（types）：すべての敵から選ぶ
+##   出現のクリップの使う並び（layouts）：クリップのフォーメーションの配置から選ぶ（「ファイル名/配置のノード名」）
 ## この道具は Godot 本体だけに依存する（設計書 4.1）。中身はプロパティ名で読み書きする。
 @tool
 extends EditorInspectorPlugin
@@ -13,13 +14,18 @@ const SETTING_ENEMIES := "spawn_timeline/enemy_dir"
 var timeline
 
 func _can_handle(object: Object) -> bool:
-	return object != null and (object.get("types") is Array or object.get("enemies") is Array)
+	return object != null and (object.get("types") is Array or object.get("enemies") is Array or object.get("layouts") is Array)
 
 func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_type: PropertyHint, _hint_string: String,
 		_usage_flags: int, _wide: bool) -> bool:
 	if name == "enemies" and object.get("clips") != null:
 		# 敵の数が多いので、初めは折りたたむ
 		add_property_editor(name, Checks.new(_all_enemies(), true))
+		return true
+	if name == "layouts" and object.get("formations") != null:
+		# フォーメーションを足したり、シーンの配置を変えたりしたら、選べる並びも変わる
+		var clip := object
+		add_property_editor(name, Checks.new([], false, func() -> Array: return _layout_options(clip), "すべての並びを使う", "個の並びを使う"))
 		return true
 	if name == "types":
 		var options := _all_enemies()
@@ -33,6 +39,33 @@ func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_ty
 		add_property_editor(name, Checks.new(options, false))
 		return true
 	return false
+
+## フォーメーションのシーンのパス → [変更の時刻, その配置の名前の並び]
+var _layout_cache: Dictionary = {}
+
+## クリップのフォーメーションの配置：[[「ファイル名/配置の名前」, 表示名], …]。配置は、置き場所（markers）を持つ子のノード。
+func _layout_options(clip: Object) -> Array:
+	var out := []
+	var scenes = clip.get("formations")
+	if scenes == null:
+		return out
+	for scene in scenes:
+		if not scene is PackedScene or scene.resource_path == "":
+			continue
+		var path: String = scene.resource_path
+		var stamp := FileAccess.get_modified_time(path)
+		if not _layout_cache.has(path) or _layout_cache[path][0] != stamp:
+			var names := []
+			var root := (scene as PackedScene).instantiate()
+			for child in root.get_children():
+				if child.has_method("markers"):
+					names.append(String(child.name))
+			root.free()
+			_layout_cache[path] = [stamp, names]
+		var base := path.get_file().get_basename()
+		for n in _layout_cache[path][1]:
+			out.append([StringName(base + "/" + n), "%s：%s" % [base, n]])
+	return out
 
 ## すべての敵：[[type ID, 表示名], …]
 func _all_enemies() -> Array:
@@ -55,7 +88,8 @@ func _display_name(id: StringName) -> String:
 	var shown := str(res.get("display_name")) if res != null and res.get("display_name") != null else ""
 	return "%s（%s）" % [shown, id] if shown != "" else String(id)
 
-## type ID の配列を、チェックボックスの並びで編集する。見出しのボタンで折りたためる（開閉はプロパティごとに覚える）。
+## 名前（type ID・並びの名前）の配列を、チェックボックスの並びで編集する。見出しのボタンで折りたためる（開閉はプロパティごとに覚える）。
+## source を渡すと、表示を更新するたびに選べるものを読み直す。
 class Checks extends EditorProperty:
 	## プロパティ名 → 開いているか
 	static var _open: Dictionary = {}
@@ -65,10 +99,16 @@ class Checks extends EditorProperty:
 	var _toggle: Button
 	var _grid: GridContainer
 	var _folded_default := false
+	var _source: Callable
+	## 何も選んでいないときの見出しと、選んだ数につける言葉
+	var _none_text := ""
+	var _unit := "種類を選択中"
 
-	func _init(options: Array, folded: bool) -> void:
-		_options = options
+	func _init(options: Array, folded: bool, source := Callable(), none_text := "", unit := "種類を選択中") -> void:
 		_folded_default = folded
+		_source = source
+		_none_text = none_text
+		_unit = unit
 		_toggle = Button.new()
 		_toggle.flat = true
 		_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -79,16 +119,26 @@ class Checks extends EditorProperty:
 		_grid.columns = 2
 		add_child(_grid)
 		set_bottom_editor(_grid)
-		var grid := _grid
+		_set_options(options)
+
+	func _set_options(options: Array) -> void:
+		_options = options
+		for box in _boxes:
+			box.queue_free()
+		_boxes.clear()
 		for opt in options:
 			var box := CheckBox.new()
 			box.text = str(opt[1])
 			box.toggled.connect(_on_toggled)
-			grid.add_child(box)
+			_grid.add_child(box)
 			_boxes.append(box)
 
 	func _update_property() -> void:
-		var current: Array = get_edited_object().get(get_edited_property())
+		if _source.is_valid():
+			var options: Array = _source.call()
+			if options != _options:
+				_set_options(options)
+		var current := _current()
 		_updating = true
 		for k in _options.size():
 			_boxes[k].button_pressed = current.has(_options[k][0])
@@ -100,12 +150,17 @@ class Checks extends EditorProperty:
 
 	func _on_fold() -> void:
 		_open[get_edited_property()] = not _is_open()
-		var current: Array = get_edited_object().get(get_edited_property())
-		_show_fold(current.size())
+		_show_fold(_current().size())
+
+	## 今の値（エディターでまだ値がなければ空）。
+	func _current() -> Array:
+		var value = get_edited_object().get(get_edited_property())
+		return value if value is Array else []
 
 	func _show_fold(chosen: int) -> void:
 		_grid.visible = _is_open()
-		_toggle.text = "%s %d種類を選択中" % ["▼" if _is_open() else "▶", chosen]
+		var arrow := "▼" if _is_open() else "▶"
+		_toggle.text = "%s %s" % [arrow, _none_text] if chosen == 0 and _none_text != "" else "%s %d%s" % [arrow, chosen, _unit]
 
 	func _on_toggled(_pressed: bool) -> void:
 		if _updating:

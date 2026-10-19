@@ -1,6 +1,6 @@
 ## 出現のクリップ
 ## ステージのタイムラインに置く、強敵の出現。開始から長さの間だけ働き、その間、選んだ種類の組み合わせの群れを出し続ける。
-## 群れは、フォーメーション（敵の組み合わせのシーン）からランダムに1つ選び、その配置と出現位置をランダムに1つずつ選んで出す。
+## 群れは、フォーメーション（敵の組み合わせのシーン）からランダムに1つ選び、その配置（使う並び）と出現位置をランダムに1つずつ選んで出す。
 ## ---
 ## 値の正は res://data/stages/*.tres の clips。
 class_name SpawnClip
@@ -22,6 +22,11 @@ extends Resource
 ## 群れの形（res://data/formations/*.tscn）。出すたびにランダムに1つ選ぶ。
 ## 単位：シーン
 @export var formations: Array[PackedScene] = []
+## 使う並び
+## フォーメーションの配置のうち、このクリップで使うもの（「フォーメーションのファイル名/配置のノード名」）。
+## 選んだ並びが1つもないフォーメーションは使わない。空なら、すべての並びを使う。
+## 単位：並びの名前
+@export var layouts: Array[StringName] = []
 ## 開始の時刻
 ## ラン開始からこの時刻に、このクリップが働き始める。
 ## 単位：実秒
@@ -42,3 +47,16 @@ extends Resource
 ## 終わりの時刻。
 func end_time() -> float:
 	return time + length
+
+## フォーメーション scene の配置 layout_name を指す、使う並びの名前。
+static func layout_key(scene_path: String, layout_name: String) -> StringName:
+	return StringName(scene_path.get_file().get_basename() + "/" + layout_name)
+
+## フォーメーション scene の、ゲーム中に使う形 data のうち、このクリップで使う配置の番号。
+func allowed_layouts(scene_path: String, data: Dictionary) -> Array[int]:
+	var out: Array[int] = []
+	var ls: Array = data.get("layouts", [])
+	for k in ls.size():
+		if layouts.is_empty() or layouts.has(layout_key(scene_path, str(ls[k].get("name", "")))):
+			out.append(k)
+	return out

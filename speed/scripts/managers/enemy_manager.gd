@@ -2159,7 +2159,7 @@ func _formation_capped(data: Dictionary) -> bool:
 	return false
 
 ## ステージのクリップから強敵の群れを出す。クリップは開始から長さの間だけ働き、そのクリップから出た群れが同時の群れの数より
-## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選んで、クリップの種類の敵だけを出す。
+## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選び、クリップの使う並びから配置を重みで1つ選んで、クリップの種類の敵だけを出す。
 ## 種類ごとの上限（max_alive）に達するフォーメーションは選ばない。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
@@ -2174,12 +2174,21 @@ func _tick_clips(level: float) -> void:
 		var items := []
 		for scene: PackedScene in clip.formations:
 			var data := formation_data(scene)
-			if not data.is_empty() and not _formation_capped(data):
-				items.append({"data": data, "weight": 1.0})
+			if data.is_empty() or _formation_capped(data):
+				continue
+			var allowed := clip.allowed_layouts(scene.resource_path, data)
+			if not allowed.is_empty():
+				items.append({"data": data, "layouts": allowed, "weight": 1.0})
 		var k := _pick_weighted(items)
 		if k < 0:
 			continue
-		var rows := spawn_formation(items[k].data, level, -1, -1, clip.types)
+		var choices := []
+		for li: int in items[k].layouts:
+			choices.append({"index": li, "weight": items[k].data.layouts[li].weight})
+		var c := _pick_weighted(choices)
+		if c < 0:
+			continue
+		var rows := spawn_formation(items[k].data, level, choices[c].index, -1, clip.types)
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
