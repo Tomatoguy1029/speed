@@ -4,7 +4,6 @@
 
 [resource]
 script = ExtResource("1")
-end = 150.0
 pop_from = 14.0
 pop_to = 45.0
 level_from = 1.0

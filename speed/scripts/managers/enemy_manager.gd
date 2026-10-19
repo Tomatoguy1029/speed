@@ -2007,14 +2007,29 @@ func cleanup() -> void:
 
 func current_phase() -> PhaseDef:
 	var phases: Array = state.stage.phases
-	for p: PhaseDef in phases:
-		if state.time < p.end:
-			return p
-	return phases[phases.size() - 1]
+	return phases[_phase_index()]
+
+## 今の時間帯の番号。時間帯は開始の時刻だけを持ち、次の時間帯の開始まで続く。
+func _phase_index() -> int:
+	var phases: Array = state.stage.phases
+	var n := 0
+	for k in range(1, phases.size()):
+		if (phases[k] as PhaseDef).start > state.time:
+			break
+		n = k
+	return n
+
+## 時間帯 n の終わりの時刻（次の時間帯の開始。最後の時間帯はボスの出現時刻）。
+func _phase_end(n: int) -> float:
+	var phases: Array = state.stage.phases
+	if n + 1 < phases.size():
+		return (phases[n + 1] as PhaseDef).start
+	return cfg.boss_time
 
 func _target() -> Dictionary:
-	var p := current_phase()
-	var k := clampf((state.time - p.start) / maxf(0.001, p.end - p.start), 0.0, 1.0)
+	var n := _phase_index()
+	var p: PhaseDef = state.stage.phases[n]
+	var k := clampf((state.time - p.start) / maxf(0.001, _phase_end(n) - p.start), 0.0, 1.0)
 	var steps := surge_steps()
 	if state.bonus_t > 0.0:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
