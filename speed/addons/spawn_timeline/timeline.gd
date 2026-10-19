@@ -27,19 +27,20 @@ static func is_stage(object: Object) -> bool:
 func _init() -> void:
 	name = "SpawnTimeline"
 	custom_minimum_size = Vector2(0, 260)
-	var bar := HBoxContainer.new()
+	# 幅が足りなければ折り返す（トラックの幅をボタンの並びに引っ張られないようにする）
+	var bar := HFlowContainer.new()
 	add_child(bar)
 	_title = Label.new()
 	_title.text = "ステージを開くと表示します"
 	bar.add_child(_title)
-	for spec in [["クリップを足す", _add_clip], ["選んだクリップを消す", _remove_clip], ["ここから試す", _launch_here]]:
+	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["▶ ここから試す", _launch_here],
+			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
+			["別ウィンドウ", _open_window]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		bar.add_child(b)
 	_info = Label.new()
-	_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	bar.add_child(_info)
 	canvas = Canvas.new()
 	canvas.timeline = self
@@ -150,6 +151,30 @@ func _remove_clip() -> void:
 	stage.set("clips", after)
 	canvas.selected = -1
 	commit("クリップを消す", [[stage, "clips", before, after]])
+
+var _window: Window = null
+
+## このパネルと同じステージを、別のウィンドウのタイムラインで開く（編集は同じステージに入る）。
+func _open_window() -> void:
+	if stage == null:
+		return
+	if is_instance_valid(_window):
+		_window.grab_focus()
+		return
+	_window = Window.new()
+	_window.title = "出現タイムライン - " + stage.resource_path.get_file()
+	_window.size = Vector2i(1500, 560)
+	_window.close_requested.connect(func() -> void:
+		_window.queue_free()
+		_window = null
+		refresh())
+	var other: Control = (get_script() as GDScript).new()
+	other.undo_redo = undo_redo
+	other.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_window.add_child(other)
+	EditorInterface.get_base_control().add_child(_window)
+	other.set_stage(stage)
+	_window.popup_centered()
 
 ## 再生位置の時刻から、このステージを起動する（ステージの起動の道具 stage_launcher の予約を使う）。
 func _launch_here() -> void:

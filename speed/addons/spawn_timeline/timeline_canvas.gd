@@ -19,6 +19,8 @@ var selected := -1
 ## 見えている範囲の左端の時刻と、1秒の幅
 var view_start := 0.0
 var px_per_sec := 2.0
+## 拡大縮小・横移動をしたか（していなければ、大きさが変わるたびに全体を表示し直す）
+var _user_view := false
 ## ドラッグ中：種類（"phase"・"time"・"stay"・"count"・"interval"・"pan"・"playhead"）、対象、押した所の時刻、前の値
 var _drag := {}
 var _rename: LineEdit = null
@@ -28,15 +30,48 @@ func _init() -> void:
 	clip_contents = true
 	tooltip_text = "クリップをドラッグ：時刻　右端：いる時間　Shift＋右端：回数　2つ目の目盛り：間隔\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　目盛りをクリック：再生位置　ラベルをダブルクリック：名前\n" + \
-		"ホイール：横に動かす　Ctrl（⌘）＋ホイール：拡大縮小　Delete：選んだクリップを消す\nShift を押しながらドラッグすると 0.1 秒刻み"
+		"ホイール・2本指の横スクロール：横に動かす　Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
+		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
 
 ## m:ss の形の時刻。
 static func clock(t: float) -> String:
 	return "%d:%02d" % [int(t) / 60, int(t) % 60]
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and not _user_view:
+		fit()
+
+## ステージの長さ全体が収まるように表示する。
 func fit() -> void:
+	_user_view = false
 	view_start = 0.0
-	px_per_sec = maxf(0.5, (size.x - GUTTER - 20.0) / maxf(60.0, _end_time()))
+	px_per_sec = _min_px()
+	queue_redraw()
+
+## 一番縮めたときの1秒の幅（ステージの長さ全体が収まる幅）。
+func _min_px() -> float:
+	return maxf(0.05, (size.x - GUTTER - 16.0)) / maxf(60.0, _end_time())
+
+## 拡大縮小する。factor が 1 より大きければ拡大。at_x の位置の時刻を動かさない。
+func zoom(factor: float, at_x := -1.0) -> void:
+	if at_x < 0.0:
+		at_x = GUTTER + (size.x - GUTTER) / 2.0
+	var at := _t(at_x)
+	px_per_sec = clampf(px_per_sec * factor, _min_px(), 40.0)
+	view_start = at - (at_x - GUTTER) / px_per_sec
+	_user_view = true
+	_clamp_view()
+
+## 横に動かす（秒）。
+func pan(seconds: float) -> void:
+	view_start += seconds
+	_user_view = true
+	_clamp_view()
+
+func _clamp_view() -> void:
+	var shown := (size.x - GUTTER) / px_per_sec
+	view_start = clampf(view_start, 0.0, maxf(0.0, _end_time() - shown + 8.0 / px_per_sec))
+	queue_redraw()
 
 func _x(t: float) -> float:
 	return GUTTER + (t - view_start) * px_per_sec
@@ -47,14 +82,16 @@ func _t(x: float) -> float:
 func _tracks_top() -> float:
 	return RULER + PHASE_ROW + POP_ROW
 
-## 表示する時刻の終わり（最後の時間帯の開始と、クリップの終わりの遅い方に余白を足す）。
+## タイムラインの終わりの時刻（10:00 か、最後の時間帯の開始・クリップの終わりに少し足した遅い方）。
 func _end_time() -> float:
 	var t := 600.0
+	if timeline == null:
+		return t
 	var ps: Array = timeline.phases()
 	if not ps.is_empty():
-		t = maxf(t, float(ps[ps.size() - 1].get("start")) + 120.0)
+		t = maxf(t, float(ps[ps.size() - 1].get("start")) + 60.0)
 	for c in timeline.clips():
-		t = maxf(t, _clip_end(c) + 60.0)
+		t = maxf(t, _clip_end(c) + 30.0)
 	return t
 
 ## クリップの最後の群れが出る時刻。
@@ -104,18 +141,26 @@ func _draw() -> void:
 		draw_string(font, Vector2(16, 30), "ステージ（data/stages/*.tres）をインスペクターで開いてください")
 		return
 	var end := _end_time()
-	# 目盛り
+	# 終わりより先は暗くする
+	if _x(end) < size.x:
+		draw_rect(Rect2(_x(end), 0, size.x - _x(end), size.y), Color(0, 0, 0, 0.45))
+	# 目盛り：ラベルの間隔が 70px 以上になる、切りのいい間隔
 	draw_rect(Rect2(0, 0, size.x, RULER), Color(0.16, 0.17, 0.21))
-	var step := 10.0 if px_per_sec >= 3.0 else (30.0 if px_per_sec >= 1.2 else 60.0)
-	var t := floorf(view_start / step) * step
-	while _x(t) < size.x:
+	var step := 300.0
+	for s: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0]:
+		if s * px_per_sec >= 70.0:
+			step = s
+			break
+	var minor := step / 5.0 if step / 5.0 * px_per_sec >= 8.0 else step
+	var t := floorf(view_start / minor) * minor
+	while _x(t) < size.x and t <= end + 0.001:
 		var x := _x(t)
 		if x >= GUTTER:
-			var major := is_zero_approx(fmod(t, 60.0))
-			draw_line(Vector2(x, RULER - (10.0 if major else 5.0)), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.05))
-			if major or step >= 30.0:
-				draw_string(font, Vector2(x + 3, 15), clock(t), HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
-		t += step
+			var major := is_zero_approx(fmod(t + 0.0001, step)) or fmod(t + 0.0001, step) < 0.001
+			draw_line(Vector2(x, RULER - (10.0 if major else 4.0)), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.04))
+			if major:
+				draw_string(font, Vector2(x + 3, 15), clock(t) if step >= 1.0 else "%.1f" % t, HORIZONTAL_ALIGNMENT_LEFT, -1, 12)
+		t += minor
 	# 時間帯
 	var ps: Array = timeline.phases()
 	var top := RULER
@@ -201,17 +246,27 @@ func _hit(p: Vector2) -> Dictionary:
 func _gui_input(event: InputEvent) -> void:
 	if timeline == null or timeline.stage == null:
 		return
-	if event is InputEventMouseButton:
+	if event is InputEventPanGesture:
+		# トラックパッドの2本指スクロール。Ctrl（⌘）を押していれば拡大縮小
+		var pg := event as InputEventPanGesture
+		if pg.ctrl_pressed or pg.meta_pressed:
+			zoom(exp(-pg.delta.y * 0.08), pg.position.x)
+		else:
+			pan((pg.delta.x + pg.delta.y) * 12.0 / px_per_sec)
+		accept_event()
+	elif event is InputEventMagnifyGesture:
+		var mg := event as InputEventMagnifyGesture
+		zoom(mg.factor, mg.position.x)
+		accept_event()
+	elif event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
-			var dir := 1.0 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+		var wheel := mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]
+		if mb.pressed and wheel:
+			var dir := 1.0 if mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT] else -1.0
 			if mb.ctrl_pressed or mb.meta_pressed:
-				var at := _t(mb.position.x)
-				px_per_sec = clampf(px_per_sec * (1.0 + 0.15 * dir), 0.2, 40.0)
-				view_start = at - (mb.position.x - GUTTER) / px_per_sec
+				zoom(1.0 + 0.15 * dir, mb.position.x)
 			else:
-				view_start = maxf(0.0, view_start - dir * 40.0 / px_per_sec)
-			queue_redraw()
+				pan(-dir * 40.0 / px_per_sec)
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_drag = {"kind": "pan", "x": mb.position.x, "start": view_start} if mb.pressed else {}
@@ -267,7 +322,9 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 	var snap := 0.1 if fine else 1.0
 	match _drag.kind:
 		"pan":
-			view_start = maxf(0.0, _drag.start - (p.x - _drag.x) / px_per_sec)
+			view_start = _drag.start - (p.x - _drag.x) / px_per_sec
+			_user_view = true
+			_clamp_view()
 		"playhead":
 			playhead = maxf(0.0, t)
 		"phase":
