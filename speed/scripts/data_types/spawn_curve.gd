@@ -3,6 +3,8 @@
 ## （点より行き過ぎないつなぎ方）。最初の点より前は最初の点の数、最後の点より後は最後の点の数。
 ## ---
 ## 値の正は res://data/stages/*.tres の zako_curves。
+## エディターの出現タイムラインが value_at で曲線を描くので、エディターでも動くようにする（@tool）。
+@tool
 class_name SpawnCurve
 extends Resource
 

@@ -184,7 +184,9 @@ func apply_settings() -> void:
 	settings_changed.emit()
 
 func _apply_window_mode() -> void:
-	if DisplayServer.get_name() == "headless":
+	# エディターの「ゲーム」の画面に埋め込んで動かしているときは、窓の大きさと位置はエディターに任せる
+	# （自分で動かすと、埋め込んだ窓がエディターを覆って戻れなくなる）
+	if DisplayServer.get_name() == "headless" or Engine.is_embedded_in_editor():
 		return
 	var mode := DisplayServer.WINDOW_MODE_WINDOWED
 	match settings.window_mode:
