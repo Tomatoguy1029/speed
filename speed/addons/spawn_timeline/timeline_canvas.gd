@@ -43,7 +43,7 @@ func _init() -> void:
 	TRACK = BASE.track * ui
 	HANDLE = BASE.handle * ui
 	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
-		"時間帯の境目をドラッグ：開始の時刻　目盛りをクリック：再生位置　ラベルをダブルクリック：名前\n" + \
+		"時間帯の境目をドラッグ：開始の時刻　時間帯・クリップのラベルをダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -227,6 +227,10 @@ func _hit(p: Vector2) -> Dictionary:
 		for k in range(1, ps.size()):
 			if absf(p.x - _x(float(ps[k].get("start")))) <= HANDLE:
 				return {"kind": "phase", "index": k}
+		var at := _t(p.x)
+		for k in range(ps.size() - 1, -1, -1):
+			if at >= float(ps[k].get("start")):
+				return {"kind": "phase_body", "index": k}
 		return {}
 	var k := int(floor((p.y - _tracks_top()) / TRACK))
 	var cs: Array = timeline.clips()
@@ -277,6 +281,10 @@ func _gui_input(event: InputEvent) -> void:
 				return
 			if h.kind == "label" and mb.double_click:
 				_start_rename(h.index)
+				return
+			if h.kind == "phase_body":
+				if mb.double_click:
+					_start_phase_rename(h.index)
 				return
 			if h.has("index") and h.kind != "phase":
 				selected = h.index
@@ -343,26 +351,46 @@ func _end_drag() -> void:
 			timeline.commit("出現タイムラインを編集", changes)
 	_drag = {}
 
-func _start_rename(k: int) -> void:
-	var c: Resource = timeline.clips()[k]
+## 時間帯 k の名前（display_name）を、その区間の上で書き換える。
+func _start_phase_rename(k: int) -> void:
+	var p: Resource = timeline.phases()[k]
+	var ps: Array = timeline.phases()
+	var x0 := maxf(GUTTER, _x(float(p.get("start"))))
+	var x1 := _x(float(ps[k + 1].get("start"))) if k + 1 < ps.size() else size.x
+	_open_editor(str(p.get("display_name")), Rect2(x0, _scroll_y() + RULER, maxf(160.0 * ui, x1 - x0), PHASE_ROW),
+		func(text: String) -> void:
+			var before := str(p.get("display_name"))
+			if text != before:
+				p.set("display_name", text)
+				timeline.commit("時間帯の名前を変える", [[p, "display_name", before, text]]))
+
+## 文字の入力欄を rect に出し、確定したら done(文字) を呼ぶ。
+func _open_editor(text: String, rect: Rect2, done: Callable) -> void:
 	if _rename != null:
 		_rename.queue_free()
 	_rename = LineEdit.new()
-	_rename.text = str(c.get("label"))
-	_rename.position = Vector2(2, _tracks_top() + k * TRACK)
-	_rename.size = Vector2(GUTTER - 4, TRACK)
+	_rename.text = text
+	_rename.position = rect.position
+	_rename.size = rect.size
+	_rename.add_theme_font_size_override("font_size", _fs(15))
 	add_child(_rename)
 	_rename.grab_focus()
 	_rename.select_all()
-	var done := func() -> void:
+	var finish := func() -> void:
 		if _rename == null:
 			return
-		var before := str(c.get("label"))
-		var after := _rename.text
+		var value := _rename.text
 		_rename.queue_free()
 		_rename = null
-		if after != before:
-			c.set("label", after)
-			timeline.commit("クリップの名前を変える", [[c, "label", before, after]])
-	_rename.text_submitted.connect(func(_text: String) -> void: done.call())
-	_rename.focus_exited.connect(done)
+		done.call(value)
+	_rename.text_submitted.connect(func(_text: String) -> void: finish.call())
+	_rename.focus_exited.connect(finish)
+
+func _start_rename(k: int) -> void:
+	var c: Resource = timeline.clips()[k]
+	_open_editor(str(c.get("label")), Rect2(2.0, _tracks_top() + k * TRACK, GUTTER - 4.0, TRACK),
+		func(text: String) -> void:
+			var before := str(c.get("label"))
+			if text != before:
+				c.set("label", text)
+				timeline.commit("クリップの名前を変える", [[c, "label", before, text]]))
