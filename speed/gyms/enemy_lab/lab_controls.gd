@@ -81,6 +81,7 @@ func _conditions(page: Node) -> void:
 	_ship_level = _number(box, tr("lab.ship_level"), 1, 1, 1000, 1, func(value): lab.session.perform("level", {"value": int(value)}))
 	var gauge := _number(box, TranslationServer.translate("lab.message_d79714f205"), 1, 0, 1, 0.05)
 	_button(box, TranslationServer.translate("lab.message_cdff100dfe"), func(): lab.session.perform("ship", {"pos": [lab.canvas.center.x, lab.canvas.center.y], "gauge": gauge.value}))
+	_formations(page)
 	box = UI.fold(page, tr("lab.ui.stage_time"))
 	var time := _number(box, TranslationServer.translate("lab.message_c66777f550"), 0, 0, 10000, 1)
 	_button(box, TranslationServer.translate("lab.message_54036730a6"), func(): lab.session.perform("time", {"value": time.value}))
@@ -138,6 +139,42 @@ func _conditions(page: Node) -> void:
 		for variant in data.variants:
 			for key in variant.overrides.params:
 				lab.session.perform("parameter", {"type": variant.enemy, "key": "params." + key, "value": variant.overrides.params[key]}))
+
+## 敵の組み合わせ（res://data/formations/*.tscn）の配置と出現位置を選んで、機体のまわりに並べる。
+func _formations(page: Node) -> void:
+	var box := UI.fold(page, tr("lab.ui.formation"))
+	var files := OptionButton.new()
+	var layouts := OptionButton.new()
+	var entries := OptionButton.new()
+	for f in DirAccess.get_files_at("res://data/formations"):
+		if f.ends_with(".tscn"):
+			files.add_item(f.get_basename())
+			files.set_item_metadata(files.item_count - 1, "res://data/formations/" + f)
+	var fill := func(_i: int) -> void:
+		layouts.clear()
+		entries.clear()
+		if files.item_count == 0:
+			return
+		var node: Node = load(String(files.get_item_metadata(files.selected))).instantiate()
+		for c in node.get_children():
+			if c is FormationLayout:
+				layouts.add_item(c.name)
+			elif c is FormationEntry:
+				entries.add_item(c.name)
+		node.free()
+	files.item_selected.connect(fill)
+	box.add_child(files)
+	_text(box, tr("lab.formation.layout"))
+	box.add_child(layouts)
+	_text(box, tr("lab.formation.entry"))
+	box.add_child(entries)
+	fill.call(0)
+	var level := _number(box, tr("lab.formation.level"), 1, 1, 100)
+	_button(box, tr("lab.formation.place"), func():
+		if files.item_count == 0:
+			return
+		lab.session.perform("formation", {"path": files.get_item_metadata(files.selected), "layout": layouts.selected,
+			"entry": entries.selected, "level": level.value}))
 
 func _attacks(box: Node) -> void:
 	var toggle := CheckButton.new()

@@ -2132,13 +2132,13 @@ func _pick_weighted(items: Array) -> int:
 			return k
 	return items.size() - 1
 
-## 組み合わせ data から配置と出現位置を1つずつ選び、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
+## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## 出した敵の行番号と id を交互に並べて返す。
-func spawn_formation(data: Dictionary, level: float) -> PackedInt32Array:
+func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index := -1) -> PackedInt32Array:
 	var rows := PackedInt32Array()
-	var li := _pick_weighted(data.get("layouts", []))
-	var ei := _pick_weighted(data.get("entries", []))
+	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
+	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:
 		return rows
 	var entry: Dictionary = data.entries[ei]

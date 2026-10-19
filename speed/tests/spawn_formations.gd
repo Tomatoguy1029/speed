@@ -22,6 +22,10 @@ func _ready() -> void:
 	var em: EnemyManager = run.enemies
 	var state := run.state
 	var scene: PackedScene = load(FORMATION)
+	# 実験場で、選んだ配置と出現位置のとおりに並べる
+	var before := run.enemies.count()
+	lab.perform("formation", {"path": FORMATION, "layout": 1, "entry": 0, "level": 1})
+	check(run.enemies.count() == before + 3, "実験場で選んだ配置（3体）を並べる")
 	_check_phases(run)
 	_check_spawn(run, scene)
 	_check_clips(run, scene)
