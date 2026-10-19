@@ -44,7 +44,7 @@ func _init() -> void:
 	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu], ["曲線を消す", _remove_curve],
 			["▶ ここから試す", _launch_here],
 			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
-			["大きく表示", func() -> void: open_large.emit()]]:
+			["大きく表示", func() -> void: open_large.emit()], ["操作", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
@@ -250,6 +250,16 @@ func _remove_clip() -> void:
 	stage.set("clips", after)
 	canvas.selected = -1
 	commit("クリップを消す", [[stage, "clips", before, after]])
+
+## 操作の説明を、ボタンの下に出す（外をクリックすると閉じる）。
+func _show_help() -> void:
+	var panel := PopupPanel.new()
+	var label := Label.new()
+	label.text = Canvas.HELP
+	panel.add_child(label)
+	panel.popup_hide.connect(panel.queue_free)
+	add_child(panel)
+	panel.popup(Rect2i(get_screen_position() + get_local_mouse_position() + Vector2(0, 24), Vector2i.ZERO))
 
 ## 再生位置の時刻から、このステージを起動する（ステージの起動の道具 stage_launcher の予約を使う）。
 func _launch_here() -> void:
