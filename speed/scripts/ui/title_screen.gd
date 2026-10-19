@@ -5,7 +5,7 @@ const TITLE_TEXTURE := preload("res://assets/ui/title/ui_title_screen.png")
 const SWEEP_TEXTURE := preload("res://assets/ui/title/ui_title_screen_sweep.png")
 const STARS_TEXTURE := preload("res://assets/ui/title/ui_title_screen_stars_in_ring.png")
 const RADAR_SHADER := preload("res://assets/ui/title/radar.gdshader")
-const FRAME_TEXTURE := preload("res://assets/ui/title/ui_title_screen_frame.png")
+const MORPH_PANEL := preload("res://scripts/ui/morph_panel.gd")
 const MAP_SCRIPT := preload("res://scripts/ui/constellation_map.gd")
 const ART_SIZE := Vector2(1280, 720)
 const MENU_CYAN := Color("5bc8db")
@@ -19,6 +19,10 @@ var _stage_button: Button
 var _map: Control
 var _map_progress := 0.0
 var _transition: Tween
+var _menu_frame: Control
+var _menu_options: Control
+var _menu_back: Control
+var _morphing := false
 
 func _ready() -> void:
 	_build_title_art()
@@ -41,6 +45,8 @@ func _ready() -> void:
 	%QuitButton.visible = not OS.has_feature("web")
 	super()
 	show_screen(GameManager.screen, false)
+	if get_meta("morph_from_upgrade", false):
+		_transition_from_upgrade()
 
 func _build_title_art() -> void:
 	$Background.color = Color.BLACK
@@ -73,6 +79,7 @@ func _build_title_art() -> void:
 	_radar_material.shader = RADAR_SHADER
 	_radar_material.set_shader_parameter("sweep_texture", SWEEP_TEXTURE)
 	_radar_material.set_shader_parameter("stars_texture", STARS_TEXTURE)
+	_radar_material.set_shader_parameter("menu_stars_texture", preload("res://assets/ui/title/ui_title_screen_stars.png"))
 	_radar_material.set_shader_parameter("map_ring_texture", preload("res://assets/ui/map/ui_circle.png"))
 	background.material = _radar_material
 	canvas.add_child(background)
@@ -122,23 +129,46 @@ func _build_start_panel(canvas: Control) -> void:
 	_start_panel.size = ART_SIZE / 2.0
 	_start_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.add_child(_start_panel)
-	var frame := TextureRect.new()
-	frame.texture = FRAME_TEXTURE
-	frame.size = ART_SIZE / 2.0
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_start_panel.add_child(frame)
-	var labels := ["ステージセレクト", "機体強化", "コーデックス", "タイトルへ戻る"]
+	_menu_frame = MORPH_PANEL.new()
+	_menu_frame.position = MORPH_PANEL.MENU_RECT.position
+	_menu_frame.size = MORPH_PANEL.MENU_RECT.size
+	_start_panel.add_child(_menu_frame)
+	_menu_options = Control.new()
+	_menu_options.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_panel.add_child(_menu_options)
+	_menu_back = Control.new()
+	_menu_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_panel.add_child(_menu_back)
+	var fill := TextureRect.new()
+	fill.texture = preload("res://assets/ui/title/ui_title_screen_back_button_infil.png")
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu_back.add_child(fill)
+	fill.hide()
+	var back_art := TextureRect.new()
+	back_art.texture = preload("res://assets/ui/title/ui_title_screen_back_button.png")
+	back_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_menu_back.add_child(back_art)
+	var back := Button.new()
+	back.position = Vector2(7, 7)
+	back.size = Vector2(71, 30)
+	back.tooltip_text = tr("common.back")
+	for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		back.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	back.mouse_entered.connect(fill.show)
+	back.mouse_exited.connect(fill.hide)
+	back.focus_entered.connect(fill.show)
+	back.focus_exited.connect(fill.hide)
+	back.pressed.connect(_close_start_panel)
+	_menu_back.add_child(back)
+	var labels := ["ステージセレクト", "機体強化", "コーデックス"]
 	var destinations := [GameManager.Screen.STAGE_SELECT, GameManager.Screen.UPGRADE, GameManager.Screen.ENCYCLOPEDIA]
 	for i in labels.size():
 		var button := Button.new()
 		button.text = labels[i]
 		_style_menu_button(button)
-		button.position = Vector2(52, [88, 138, 188, 264][i])
-		_start_panel.add_child(button)
-		if i < destinations.size():
-			button.pressed.connect(_go.bind(destinations[i]))
-		else:
-			button.pressed.connect(_close_start_panel)
+		button.position = Vector2(56, [88, 138, 188][i])
+		_menu_options.add_child(button)
+		button.pressed.connect(_go.bind(destinations[i]))
 		if i == 0:
 			_stage_button = button
 
@@ -153,9 +183,12 @@ func show_start_panel(open: bool) -> void:
 
 func show_screen(screen: GameManager.Screen, animate := true) -> void:
 	var mapping := screen == GameManager.Screen.STAGE_SELECT
+	var returning_from_map := animate and not mapping and _map_progress > 0.0
 	if _transition != null:
 		_transition.kill()
 	show_start_panel(screen == GameManager.Screen.MAIN_MENU)
+	_start_panel.modulate.a = 0.0 if returning_from_map else 1.0
+	_start_panel.process_mode = Node.PROCESS_MODE_DISABLED if returning_from_map else Node.PROCESS_MODE_INHERIT
 	_title_menu.visible = screen == GameManager.Screen.TITLE
 	_map.visible = mapping or _map_progress > 0.0
 	_map.process_mode = Node.PROCESS_MODE_DISABLED
@@ -168,6 +201,13 @@ func show_screen(screen: GameManager.Screen, animate := true) -> void:
 			if mapping:
 				_map.focus_selection()
 		)
+		if returning_from_map:
+			_transition.tween_property(_start_panel, "modulate:a", 1.0, 0.25)
+			_transition.tween_callback(func():
+				_start_panel.process_mode = Node.PROCESS_MODE_INHERIT
+				if _start_panel.visible:
+					_stage_button.grab_focus()
+			)
 	else:
 		_set_map_progress(1.0 if mapping else 0.0)
 		_map.visible = mapping
@@ -182,6 +222,8 @@ func _set_map_progress(value: float) -> void:
 	_map.set_transition(value)
 
 func _close_start_panel() -> void:
+	if _morphing:
+		return
 	AudioManager.play(&"ui")
 	GameManager.back()
 
@@ -211,5 +253,49 @@ func _process(delta: float) -> void:
 	_radar_material.set_shader_parameter("elapsed", _elapsed)
 
 func _go(screen: GameManager.Screen) -> void:
+	if _morphing:
+		return
 	AudioManager.play(&"ui")
 	GameManager.goto(screen)
+
+func can_morph_to_upgrade() -> bool:
+	return _start_panel.visible and not _morphing
+
+func transition_to_upgrade() -> void:
+	_morphing = true
+	_menu_options.hide()
+	_menu_back.hide()
+	var lab := get_node_or_null("EnemyLabButton")
+	if lab != null:
+		lab.hide()
+	var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_menu_frame, "position", MORPH_PANEL.UPGRADE_RECT.position, 0.7)
+	tween.tween_property(_menu_frame, "size", MORPH_PANEL.UPGRADE_RECT.size, 0.7)
+	tween.tween_property(_menu_frame, "fill_color", Color.BLACK, 0.7)
+	tween.tween_method(func(value: float): _radar_material.set_shader_parameter("upgrade_progress", value), 0.0, 1.0, 0.7)
+	await tween.finished
+
+func _transition_from_upgrade() -> void:
+	_morphing = true
+	_menu_options.hide()
+	_menu_back.hide()
+	_menu_frame.position = MORPH_PANEL.UPGRADE_RECT.position
+	_menu_frame.size = MORPH_PANEL.UPGRADE_RECT.size
+	_menu_frame.fill_color = Color.BLACK
+	_radar_material.set_shader_parameter("upgrade_progress", 1.0)
+	var lab := get_node_or_null("EnemyLabButton")
+	if lab != null:
+		lab.hide()
+	_transition = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_transition.tween_property(_menu_frame, "position", MORPH_PANEL.MENU_RECT.position, 0.7)
+	_transition.tween_property(_menu_frame, "size", MORPH_PANEL.MENU_RECT.size, 0.7)
+	_transition.tween_property(_menu_frame, "fill_color", MORPH_PANEL.MENU_FILL, 0.7)
+	_transition.tween_method(func(value: float): _radar_material.set_shader_parameter("upgrade_progress", value), 1.0, 0.0, 0.7)
+	_transition.chain().tween_callback(func():
+		_menu_options.show()
+		_menu_back.show()
+		_morphing = false
+		if lab != null:
+			lab.show()
+		_stage_button.grab_focus()
+	)

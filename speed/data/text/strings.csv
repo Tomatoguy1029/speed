@@ -99,6 +99,18 @@ result.fastest,最速クリア　{time},Fastest Clear  {time}
 upgrade.row,{name}　{desc}　（{lv} / {max}）,{name}  {desc}  ({lv} / {max})
 upgrade.buy,強化（部品 {n}）,Upgrade ({n} Parts)
 upgrade.max,最大,Maxed
+upgrade.select_part,パーツを選択,Select a part
+upgrade.action,強化,Upgrade
+upgrade.price,必要部品：{n},Cost: {n} Parts
+upgrade.details,{desc}　（{lv} / {max}）,{desc}  ({lv} / {max})
+upgrade.part.atk,パワースパイク,Power Spike
+upgrade.part.hp,フレーム強度,Frame Strength
+upgrade.part.charge,充電効率,Charge Efficiency
+upgrade.part.xp,学習回路,Learning Circuit
+upgrade.part.length,エンジンタンク,Engine Tank
+upgrade.part.pickup,コレクター,Collector
+upgrade.part.speed,ブースター,Booster
+upgrade.part.reroll,演算予備,Spare Processor
 ,■ 図鑑,
 codex.title,図鑑　（{known} / {total}）,Codex  ({known} / {total})
 codex.weapons,武器,Weapons
@@ -186,6 +198,8 @@ meta.speed.name,主推進器,Main Thruster
 meta.speed.desc,最高速度 +5%,Top speed +5%
 meta.xp.name,学習回路,Learning Circuit
 meta.xp.desc,経験値 +8%,XP +8%
+meta.length.name,エンジンタンク,Engine Tank
+meta.length.desc,線の長さ +5%,Line length +5%
 ,■ ステージ（stage.<番号>）,
 stage.1.name,いっかくじゅう座の星系,Monoceros System
 stage.2.name,ケンタウルス座の星系,Centaurus System

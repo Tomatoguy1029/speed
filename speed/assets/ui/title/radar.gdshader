@@ -8,6 +8,8 @@ uniform bool panel_open = false;
 uniform float map_progress = 0.0;
 uniform sampler2D map_ring_texture : filter_nearest, repeat_disable;
 uniform float map_angle = 0.0;
+uniform sampler2D menu_stars_texture : filter_nearest, repeat_disable;
+uniform float upgrade_progress = 0.0;
 
 void fragment() {
 	vec2 canvas = vec2(640.0, 360.0);
@@ -26,9 +28,10 @@ void fragment() {
 	float fade = exp(-age * 0.625) * step(age, rotation);
 	vec4 stars = texture(stars_texture, radar_uv);
 	vec4 base = texture(TEXTURE, UV);
-	if (panel_open && UV.x * canvas.x < 280.0 && UV.y * canvas.y > 65.0 && UV.y * canvas.y < 140.0) {
-		base.rgb = vec3(0.0);
+	if (panel_open) {
+		base = texture(menu_stars_texture, UV);
 	}
+	base.rgb *= base.a;
 	if (map_progress > 0.0) {
 		if (distance(UV * canvas, center) < 154.0) {
 			base.rgb = vec3(0.0);
@@ -46,5 +49,5 @@ void fragment() {
 	// 共通の円と格子は常に描き、外側の文様だけを出現させる。
 	float ring_visibility = length(ring_offset) <= 150.5 ? 1.0 : reveal;
 	vec3 moving_ring = circle.rgb * circle.a * ring_bounds * ring_visibility;
-	COLOR = vec4(max(base.rgb, max(moving_ring, radar * inside * (1.0 - map_progress))), 1.0);
+	COLOR = vec4(max(base.rgb, max(moving_ring, radar * inside * (1.0 - map_progress))) * (1.0 - upgrade_progress), 1.0);
 }

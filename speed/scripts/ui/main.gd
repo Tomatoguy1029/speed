@@ -18,6 +18,7 @@ const SCREENS := {
 }
 
 var _current: Node = null
+var _screen_request := 0
 
 func _ready() -> void:
 	GameManager.screen_changed.connect(_show)
@@ -32,6 +33,18 @@ func _ready() -> void:
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
+	_screen_request += 1
+	var request := _screen_request
+	var morph: bool = screen == GameManager.Screen.UPGRADE and is_instance_valid(_current) and _current.has_method("can_morph_to_upgrade") and _current.can_morph_to_upgrade()
+	var return_morph: bool = screen == GameManager.Screen.MAIN_MENU and is_instance_valid(_current) and _current.has_method("transition_to_menu")
+	if morph:
+		await _current.transition_to_upgrade()
+		if request != _screen_request:
+			return
+	if return_morph:
+		await _current.transition_to_menu()
+		if request != _screen_request:
+			return
 	if screen in [GameManager.Screen.TITLE, GameManager.Screen.MAIN_MENU, GameManager.Screen.STAGE_SELECT] and is_instance_valid(_current) and _current.has_method("show_screen"):
 		_current.show_screen(screen)
 		return
@@ -40,4 +53,8 @@ func _show(screen: GameManager.Screen) -> void:
 		_current = null
 	var scene := load(SCREENS[screen]) as PackedScene
 	_current = scene.instantiate()
+	if morph:
+		_current.set_meta("fade_from_menu", true)
+	if return_morph:
+		_current.set_meta("morph_from_upgrade", true)
 	add_child(_current)
