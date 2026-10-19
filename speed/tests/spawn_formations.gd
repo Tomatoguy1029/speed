@@ -1,4 +1,4 @@
-## 時間帯・強敵の群れ・クリップの出し方を確かめる。
+## 時間帯・強敵の群れ・クリップの出し方と、攻撃の組み合わせの表・強敵の上限を確かめる。
 ##   Godot --headless --path speed res://tests/spawn_formations.tscn
 extends Node
 
@@ -26,6 +26,7 @@ func _ready() -> void:
 	_check_spawn(run, scene)
 	_check_clips(run, scene)
 	_check_refill(run, scene)
+	_check_rules(run, scene)
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[spawn_formations] passed=%d failed=%d" % [passed, failed])
@@ -101,6 +102,7 @@ func _check_refill(run: RunManager, scene: PackedScene) -> void:
 	em._groups.clear()
 	em._formation_t = 0.0
 	em._type_counts.clear()
+	em._strong_count = 0
 	em._tick_formations(phase, 0.1, 1.0)
 	check(em._groups.size() == 1, "目標の数まで群れを出す")
 	em._tick_formations(phase, 0.1, 1.0)
@@ -111,3 +113,33 @@ func _check_refill(run: RunManager, scene: PackedScene) -> void:
 	check(em._groups.is_empty(), "倒した群れは数えない")
 	em._tick_formations(phase, 9.0, 1.0)
 	check(em._groups.size() == 1, "間隔が空いたら次の群れを出す")
+
+## 表の組み合わせは、相手の攻撃が終わって決めた時間が経つまで待たせる。表にない組み合わせは同時に撃ってよい。
+## 強敵の全体の上限を超える群れは出さない。
+func _check_rules(run: RunManager, scene: PackedScene) -> void:
+	var em := run.enemies
+	var state := run.state
+	var rules := AttackRules.new()
+	rules.pairs = {"aquarius/telescope": 2.0}
+	run.cfg.attack_rules = rules
+	em._attacks.clear()
+	var tele := em.spawn(em.def_of(&"telescope"), 1.0, state.ship_pos + Vector2(900, 0))
+	var aqua := em.spawn(em.def_of(&"aquarius"), 1.0, state.ship_pos + Vector2(-900, 0))
+	var cross := em.spawn(em.def_of(&"cross"), 1.0, state.ship_pos + Vector2(0, 900))
+	var t0 := state.world_time
+	check(em._rules_admit(tele, rules, 3.0), "最初の攻撃は撃てる")
+	check(em._rules_admit(tele, rules, 3.0), "許可した攻撃の間は、同じ敵にまた許可する")
+	check(not em._rules_admit(aqua, rules, 3.0), "表の相手が攻撃中なら待たせる")
+	check(em._rules_admit(cross, rules, 3.0), "表にない組み合わせは同時に撃てる")
+	state.world_time = t0 + 4.0
+	check(not em._rules_admit(aqua, rules, 3.0), "終わってから決めた時間が経つまで待たせる")
+	state.world_time = t0 + 5.1
+	check(em._rules_admit(aqua, rules, 3.0), "決めた時間が経てば撃てる")
+	check(AttackRules.key(&"telescope", &"aquarius") == "aquarius/telescope", "組み合わせのキーは並びをそろえる")
+	rules.strong_cap = 2
+	em._type_counts.clear()
+	em._strong_count = 1
+	check(em._formation_capped(em.formation_data(scene)), "強敵の上限を超える群れは出さない")
+	em._strong_count = 0
+	rules.strong_cap = 3
+	check(not em._formation_capped(em.formation_data(scene)), "上限の中なら群れを出せる")

@@ -2156,6 +2156,8 @@ func spawn_formation(data: Dictionary, level: float) -> PackedInt32Array:
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
 		var i := spawn(def, level, pos, {"facing": facing})
+		if def.rank >= 3:
+			_strong_count += 1
 		rows.append(i)
 		rows.append(table.id[i])
 	return rows
@@ -2167,14 +2169,22 @@ func _group_alive(rows: PackedInt32Array) -> bool:
 			return true
 	return false
 
-## 組み合わせの敵のうち、同時に出る数の上限に達している種類があるか。
+## 組み合わせの敵のうち、同時に出る数の上限に達している種類があるか、強敵を足すと強敵の全体の上限を超えるか。
+## 配置ごとに数が違うときは、一番多い配置で数える。
 func _formation_capped(data: Dictionary) -> bool:
+	var most := 0
 	for l: Dictionary in data.get("layouts", []):
+		var strong := 0
 		for m: Dictionary in l.markers:
 			var def := def_of(StringName(m.type))
-			if def != null and def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
+			if def == null:
+				continue
+			if def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
 				return true
-	return false
+			if def.rank >= 3:
+				strong += 1
+		most = maxi(most, strong)
+	return _strong_full(most)
 
 ## 時間帯の強敵の群れを補充する。いる群れが目標の数より少なく、前の群れから間隔が空いていれば、重みで1つ選んで出す。
 func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
@@ -2207,6 +2217,8 @@ func _tick_clips(level: float) -> void:
 		spawn_formation(formation_data(clip.formation), level)
 
 var _type_counts: Dictionary = {}
+## 強敵と大物（星3以上）の数（部位は数えない）
+var _strong_count := 0
 var _far_rows := PackedInt32Array()
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
@@ -2214,6 +2226,7 @@ var _far_rows := PackedInt32Array()
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
+	_strong_count = 0
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -2232,6 +2245,8 @@ func _survey() -> int:
 			# 上限のある種類だけ数える
 			if defs[i].max_alive > 0:
 				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
+			if defs[i].rank >= 3 and table.parent[i] < 0:
+				_strong_count += 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
 				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
@@ -2292,6 +2307,8 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	if def.max_alive > 0 and _type_counts.get(type, 0) >= def.max_alive:
 		return false
+	if def.rank >= 3 and _strong_full(1):
+		return false
 	var elite: bool = def.max_alive == 0 and state.rng.randf() < 0.01 + 0.06 * danger + cfg.surge_elite * t.steps
 	var level: float = t.level + danger * cfg.danger_level
 	var opts := {"elite": elite, "facing": (state.ship_pos - p).angle()}
@@ -2300,7 +2317,14 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, level, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
+	if def.rank >= 3:
+		_strong_count += 1
 	return true
+
+## 強敵を n 体足すと、強敵の全体の上限（config.attack_rules.strong_cap）を超えるか。
+func _strong_full(n: int) -> bool:
+	var rules: AttackRules = cfg.attack_rules
+	return rules != null and rules.strong_cap > 0 and _strong_count + n > rules.strong_cap
 
 ## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
 func _pick_type(phase: PhaseDef, steps: int) -> StringName:
@@ -2363,17 +2387,19 @@ func _recycle(i: int) -> bool:
 	t.fire_t[i] = t.def[i].params.get("fire_interval", 0.0)
 	return true
 
-## 制限は実験または明示した採用設定だけで有効。予告へ入る前に取得する。
+## 予告へ入る前に取る、攻撃の許可。強敵と大物は攻撃の組み合わせの表（config.attack_rules）で確かめる。
+## 実験場と明示した採用設定では、攻撃枠（分類ごとの枠）でも確かめる。許可がなければ、攻撃せずに追う。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
 	projectiles.lab_context = 0
-	if d == null:
-		return true
 	var def := table.def[i]
 	if def == null:
 		return true
-	var cats: Array = d.categories(def.behavior)
-	if cats.is_empty():
+	var rules: AttackRules = cfg.attack_rules
+	# 強敵と大物は、攻撃の組み合わせの表で許可を取る
+	var gated := rules != null and def.rank >= 3 and not rules.pairs.is_empty()
+	var cats: Array = d.categories(def.behavior) if d != null else []
+	if not gated and cats.is_empty():
 		return true
 	var owner := str(table.id[i])
 	var p := def.params
@@ -2388,12 +2414,41 @@ func _lab_admit(i: int, dt: float) -> bool:
 	elif def.behavior == &"sniper":
 		due = table.charge[i] >= 0.8
 		active = table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER
+	elif def.behavior in [&"aquarius", &"cross", &"dolphin"]:
+		# 間隔が過ぎた瞬間から予告を始める種類
+		due = table.fire_t[i] <= dt
 	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
 		due = true
 	if not active and due:
 		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
-		if not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0):
+		if gated and not _rules_admit(i, rules, duration):
 			table.charge[i] = 0
 			return false
-	projectiles.lab_context = d.token(owner)
+		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0):
+			table.charge[i] = 0
+			return false
+	if not cats.is_empty():
+		projectiles.lab_context = d.token(owner)
+	return true
+
+## 許可した強敵の攻撃（type、id、終わる世界時刻 until）
+var _attacks: Array[Dictionary] = []
+
+## 攻撃の組み合わせの表で、行 i の強敵が duration 秒の攻撃を始めてよいか。よければ攻撃として覚える。
+## 表の組み合わせの相手が攻撃中か、終わってから決めた時間が経っていなければ待たせる。
+func _rules_admit(i: int, rules: AttackRules, duration: float) -> bool:
+	var now := state.world_time
+	var keep := rules.longest_gap()
+	_attacks = _attacks.filter(func(a: Dictionary) -> bool: return float(a.until) + keep > now)
+	var id := table.id[i]
+	var type := table.type[i]
+	for a in _attacks:
+		if int(a.id) == id:
+			if float(a.until) > now:
+				return true
+			continue
+		var g := rules.gap(type, StringName(a.type))
+		if g >= 0.0 and now < float(a.until) + g:
+			return false
+	_attacks.append({"type": type, "id": id, "until": now + duration})
 	return true

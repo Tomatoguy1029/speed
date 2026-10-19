@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="AttackRules" format=3 uid="uid://bjns1ce4xykgs"]
+
+[ext_resource type="Script" uid="uid://cpj2nin6myknm" path="res://scripts/data_types/attack_rules.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+strong_cap = 6
