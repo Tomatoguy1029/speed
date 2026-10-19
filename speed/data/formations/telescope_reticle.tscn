@@ -5,52 +5,76 @@
 [ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
 [ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="TelescopeReticle" type="Node2D"]
+[node name="TelescopeReticle" type="Node2D" unique_id=1105400238]
 script = ExtResource("1")
 types = Array[StringName]([&"telescope", &"reticle"])
 
-[node name="並びA" type="Node2D" parent="."]
-position = Vector2(-2400, 0)
+[node name="並びA" type="Node2D" parent="." unique_id=1589337264]
+position = Vector2(-2207, 0)
 script = ExtResource("2")
 
-[node name="ぼうえんきょう座" type="Node2D" parent="並びA"]
+[node name="ぼうえんきょう座" type="Node2D" parent="並びA" unique_id=632369426]
 script = ExtResource("3")
 enemy = &"telescope"
+metadata/_edit_lock_ = true
 
-[node name="レチクル座" type="Node2D" parent="並びA"]
-position = Vector2(-90, 70)
+[node name="レチクル座" type="Node2D" parent="並びA" unique_id=92487942]
+position = Vector2(-60, 33)
 script = ExtResource("3")
 enemy = &"reticle"
+metadata/_edit_lock_ = true
 
-[node name="並びB" type="Node2D" parent="."]
-position = Vector2(-2400, 400)
+[node name="並びB" type="Node2D" parent="." unique_id=1301143728]
+position = Vector2(-2009, -1)
 script = ExtResource("2")
 
-[node name="ぼうえんきょう座" type="Node2D" parent="並びB"]
+[node name="ぼうえんきょう座" type="Node2D" parent="並びB" unique_id=1240154573]
 script = ExtResource("3")
 enemy = &"telescope"
+metadata/_edit_lock_ = true
 
-[node name="レチクル座左" type="Node2D" parent="並びB"]
-position = Vector2(-110, 70)
+[node name="レチクル座左" type="Node2D" parent="並びB" unique_id=1833573630]
+position = Vector2(-63, 38)
 script = ExtResource("3")
 enemy = &"reticle"
+metadata/_edit_lock_ = true
 
-[node name="レチクル座右" type="Node2D" parent="並びB"]
-position = Vector2(110, 70)
+[node name="レチクル座右" type="Node2D" parent="並びB" unique_id=1757091895]
+position = Vector2(60, 36)
 script = ExtResource("3")
 enemy = &"reticle"
+metadata/_edit_lock_ = true
 
-[node name="正面" type="Node2D" parent="."]
+[node name="並びC" type="Node2D" parent="." unique_id=1498455726]
+position = Vector2(-1799, 1)
+script = ExtResource("2")
+
+[node name="ぼうえんきょう座" type="Node2D" parent="並びC" unique_id=1280037970]
+script = ExtResource("3")
+enemy = &"telescope"
+metadata/_edit_lock_ = true
+
+[node name="正面" type="Node2D" parent="." unique_id=948225832]
 position = Vector2(0, -1500)
 rotation = 3.1416
 script = ExtResource("4")
 
-[node name="左前" type="Node2D" parent="."]
+[node name="左前" type="Node2D" parent="." unique_id=1463328507]
 position = Vector2(-1100, -1050)
-rotation = 2.3329
+rotation = 2.332943
 script = ExtResource("4")
 
-[node name="右前" type="Node2D" parent="."]
+[node name="左前2" type="Node2D" parent="." unique_id=236117411]
+position = Vector2(-646, -1357)
+rotation = 2.6972878
+script = ExtResource("4")
+
+[node name="右前" type="Node2D" parent="." unique_id=1533572715]
 position = Vector2(1100, -1050)
-rotation = -2.3329
+rotation = 3.9502423
+script = ExtResource("4")
+
+[node name="右前2" type="Node2D" parent="." unique_id=1925713500]
+position = Vector2(623, -1349)
+rotation = 3.5742354
 script = ExtResource("4")
