@@ -52,7 +52,7 @@ func _init() -> void:
 	CURVE_ROW = BASE.curve * ui
 	tooltip_text = "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯・クリップのラベルをダブルクリック：名前　目盛りをクリック：再生位置\n" + \
-		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　Delete で点を消す\n" + \
+		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -496,6 +496,11 @@ func _gui_input(event: InputEvent) -> void:
 			_hover_curve = hc
 			_hover_point = hp
 			queue_redraw()
+	elif event is InputEventKey and event.pressed and point_selected >= 0 and (event as InputEventKey).keycode in [KEY_UP, KEY_DOWN]:
+		# 選んでいる点の数を、上下の矢印キーで 1 ずつ（Shift で 10 ずつ）変える
+		var ke := event as InputEventKey
+		_nudge_point((1.0 if ke.keycode == KEY_UP else -1.0) * (10.0 if ke.shift_pressed else 1.0))
+		accept_event()
 	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		if point_selected >= 0:
 			_remove_point()
@@ -559,6 +564,21 @@ func _start_point_edit(k: int, n: int) -> void:
 			if after != before:
 				c.set("points", after)
 				timeline.commit("雑魚の曲線の点を変える", [[c, "points", before, after]]))
+
+## 選んでいる点の数を delta だけ変える（0 より下にはしない）。
+func _nudge_point(delta: float) -> void:
+	var curves: Array = timeline.curves()
+	if curve_selected < 0 or curve_selected >= curves.size():
+		return
+	var c: Resource = curves[curve_selected]
+	var before: PackedVector2Array = c.get("points")
+	if point_selected < 0 or point_selected >= before.size():
+		return
+	var after := before.duplicate()
+	after[point_selected].y = maxf(0.0, after[point_selected].y + delta)
+	if after != before:
+		c.set("points", after)
+		timeline.commit("雑魚の曲線の点を変える", [[c, "points", before, after]])
 
 func _remove_point() -> void:
 	var curves: Array = timeline.curves()

@@ -15,7 +15,6 @@ xp = 16.0
 color = Color(0.45, 0.6, 1, 1)
 shape = &"dart"
 behavior = &"marlin"
-max_alive = 2
 ranged = true
 params = {
 "bullet_dmg": 10.0,

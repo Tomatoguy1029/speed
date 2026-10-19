@@ -15,7 +15,6 @@ xp = 160.0
 color = Color(0.5, 0.75, 1, 1)
 shape = &"orb"
 behavior = &"aquarius"
-max_alive = 1
 params = {
 "approach": 380.0,
 "beam_len": 2200.0,

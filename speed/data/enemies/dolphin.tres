@@ -15,7 +15,6 @@ xp = 16.0
 color = Color(0.5, 0.8, 1, 1)
 shape = &"orb"
 behavior = &"dolphin"
-max_alive = 2
 ranged = true
 params = {
 "aim_turn": 2.0,

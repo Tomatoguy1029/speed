@@ -15,7 +15,6 @@ xp = 12.0
 color = Color(1, 0.9, 0.45, 1)
 shape = &"diamond"
 behavior = &"reticle"
-max_alive = 2
 ranged = true
 params = {
 "aim_time": 0.8,

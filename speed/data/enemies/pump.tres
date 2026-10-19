@@ -15,7 +15,6 @@ xp = 12.0
 color = Color(0.72, 0.55, 1, 1)
 shape = &"orb"
 behavior = &"pump"
-max_alive = 2
 params = {
 "bullet_dmg": 22.0,
 "burst_radius": 150.0,

@@ -15,7 +15,6 @@ xp = 18.0
 color = Color(1, 0.8, 0.35, 1)
 shape = &"hex"
 behavior = &"auriga"
-max_alive = 2
 params = {
 "bullet_dmg": 12.0,
 "trail_step": 0.12,

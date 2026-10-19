@@ -15,7 +15,6 @@ xp = 4.0
 color = Color(0.45, 0.42, 0.6, 1)
 shape = &"dart"
 behavior = &"crow"
-max_alive = 8
 params = {
 "aim_spread": 0.35,
 "exit_margin": 500.0,

@@ -15,7 +15,6 @@ xp = 14.0
 color = Color(0.7, 0.95, 0.8, 1)
 shape = &"orb"
 behavior = &"triangle"
-max_alive = 2
 gate = &"membrane"
 params = {
 "bullet_dmg": 10.0,

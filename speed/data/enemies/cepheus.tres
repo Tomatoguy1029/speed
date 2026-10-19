@@ -15,7 +15,6 @@ xp = 110.0
 color = Color(0.75, 0.6, 1, 1)
 shape = &"hex"
 behavior = &"cepheus"
-max_alive = 1
 params = {
 "fan_radius": 190.0,
 "fan_step": 0.42,

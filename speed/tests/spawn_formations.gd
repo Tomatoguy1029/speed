@@ -135,7 +135,10 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 			all_tele = all_tele and em.table.type[rows[k]] == &"telescope"
 	check(groups.call() == 1 and all_tele, "クリップで選んだ種類の敵だけを出す")
 	kill.call()
-	# 種類ごとの上限に達するフォーメーションは選ばない（みずがめ座は1体まで）
+	# 種類ごとの上限に達するフォーメーションは選ばない（このテストでは、みずがめ座を1体までにする）
+	var capped: EnemyDef = em.def_of(&"aquarius").duplicate()
+	capped.max_alive = 1
+	em.definitions[&"aquarius"] = capped
 	var aqua_forms: Array[PackedScene] = [load("res://data/formations/aquarius_solo.tscn")]
 	clip.formations = aqua_forms
 	var aqua_types: Array[StringName] = [&"aquarius"]

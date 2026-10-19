@@ -15,7 +15,6 @@ xp = 16.0
 color = Color(1, 0.5, 0.4, 1)
 shape = &"hex"
 behavior = &"crab"
-max_alive = 3
 weak_arc = 1.0
 gate = &"claw"
 params = {
