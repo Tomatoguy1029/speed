@@ -74,6 +74,31 @@ func _curves_top() -> float:
 func _clips_top() -> float:
 	return _curves_top() + timeline.curves().size() * CURVE_ROW
 
+## 曲線ごとの、1秒ごとの値（点が変わったときだけ計算し直す）：曲線 → {"key", "values"}
+var _curve_cache: Dictionary = {}
+
+## 曲線 c の、0 秒から終わりまで1秒ごとの値。
+func _curve_values(c: Resource, end: float) -> PackedFloat32Array:
+	var pts: PackedVector2Array = c.get("points")
+	var key := hash([pts, int(end)])
+	var cached: Dictionary = _curve_cache.get(c, {})
+	if cached.get("key", 0) == key:
+		return cached.values
+	var values := PackedFloat32Array()
+	values.resize(int(end) + 2)
+	for n in values.size():
+		values[n] = float(c.call("value_at", float(n)))
+	_curve_cache[c] = {"key": key, "values": values}
+	return values
+
+## 1秒ごとの値 values の、時刻 t の値（間はまっすぐつなぐ）。
+static func _value_at(values: PackedFloat32Array, t: float) -> float:
+	if values.is_empty():
+		return 0.0
+	var i := clampi(int(t), 0, values.size() - 1)
+	var j := mini(i + 1, values.size() - 1)
+	return lerpf(values[i], values[j], clampf(t - float(i), 0.0, 1.0))
+
 ## 曲線の行の縦の目盛りの最大（点の最大より少し上。ドラッグ中は変えない）。
 func _curve_max(c: Resource) -> float:
 	if _drag.get("kind", "") == "point" and _drag.get("curve") == c:
@@ -203,11 +228,12 @@ func _draw() -> void:
 		draw_rect(Rect2(0, top, size.x, CURVE_ROW), Color(0.3, 0.9, 0.5, 0.06 if k == curve_selected else 0.03))
 		draw_line(Vector2(0, top + CURVE_ROW), Vector2(size.x, top + CURVE_ROW), Color(1, 1, 1, 0.08))
 		var vmax := _curve_max(c)
+		var values := _curve_values(c, end)
 		var pts := PackedVector2Array()
 		var x := GUTTER
 		while x <= minf(size.x, _x(end)):
-			pts.append(Vector2(x, _curve_y(k, float(c.call("value_at", _t(x))), vmax)))
-			x += 4.0 * ui
+			pts.append(Vector2(x, _curve_y(k, _value_at(values, _t(x)), vmax)))
+			x += 3.0 * ui
 		if pts.size() > 1:
 			draw_polyline(pts, Color(0.5, 0.95, 0.6), 2.0 * ui, true)
 		var ps_: PackedVector2Array = c.get("points")
@@ -266,10 +292,13 @@ func _draw() -> void:
 		var xs := []
 		var x := GUTTER
 		max_pop = 1.0
+		var all_values := []
+		for c in curves:
+			all_values.append(_curve_values(c, end))
 		while x <= minf(size.x, _x(end)):
 			var total := 0.0
-			for c in curves:
-				total += float(c.call("value_at", _t(x)))
+			for values: PackedFloat32Array in all_values:
+				total += _value_at(values, _t(x))
 			sums.append(total)
 			xs.append(x)
 			max_pop = maxf(max_pop, total)
