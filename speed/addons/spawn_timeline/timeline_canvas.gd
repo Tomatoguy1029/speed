@@ -8,6 +8,7 @@ extends Control
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
+		"トラック名を上下にドラッグ：トラックごと並べ替える　トラック名を右クリック：トラックごと複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
@@ -99,6 +100,108 @@ func _start_track_rename(row: int) -> void:
 			if before == null or after != PackedStringArray(before):
 				stage.set("track_names", after)
 				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]))
+
+## 今のトラックの名前の並び（名前のないトラックは空）。長さはクリップのあるトラックの数。
+func _track_names_now() -> PackedStringArray:
+	var out := PackedStringArray()
+	var names = timeline.stage.get("track_names")
+	for row in track_count() - 1:
+		out.append(String(names[row]) if names != null and row < names.size() else "")
+	return out
+
+## トラックを並べ替え・消す・複製する。remap[行] はその行のクリップの新しい行（-1 なら消す）、
+## copies は足すクリップ（行を決めたもの）、names は新しいトラックの名前の並び。
+func _change_tracks(label: String, remap: Array, copies: Array, names: PackedStringArray) -> void:
+	var stage: Resource = timeline.stage
+	var cs: Array = timeline.clips()
+	var changes := []
+	var kept: Array = cs.duplicate()
+	kept.clear()
+	for k in cs.size():
+		var row := clip_track(k)
+		var to: int = remap[row] if row < remap.size() else row
+		if to < 0:
+			continue
+		kept.append(cs[k])
+		if int(cs[k].get("track")) != to:
+			changes.append([cs[k], "track", int(cs[k].get("track")), to])
+	for ch in changes:
+		ch[0].set("track", ch[3])
+	kept.append_array(copies)
+	if kept.size() != cs.size() or not copies.is_empty():
+		stage.set("clips", kept)
+		changes.append([stage, "clips", cs, kept])
+	while not names.is_empty() and names[names.size() - 1] == "":
+		names.remove_at(names.size() - 1)
+	var before_names = stage.get("track_names")
+	if before_names == null or names != PackedStringArray(before_names):
+		stage.set("track_names", names)
+		changes.append([stage, "track_names", before_names, names])
+	if not changes.is_empty():
+		selected = -1
+		timeline.commit(label, changes)
+
+## トラック from を、to の位置へ動かす（クリップと名前ごと）。
+func move_track(from: int, to: int) -> void:
+	var n := track_count() - 1
+	if from == to or from < 0 or from >= n:
+		return
+	var order := range(n)
+	order.remove_at(from)
+	order.insert(clampi(to, 0, n - 1), from)
+	var remap := []
+	remap.resize(n)
+	var old_names := _track_names_now()
+	var names := PackedStringArray()
+	for i in n:
+		remap[order[i]] = i
+		names.append(old_names[order[i]])
+	_change_tracks("トラックを動かす", remap, [], names)
+
+## トラック row を、そのクリップごと消す（下のトラックが上に詰まる）。
+func remove_track(row: int) -> void:
+	var n := track_count() - 1
+	if row < 0 or row >= n:
+		return
+	var remap := []
+	for i in n:
+		remap.append(i if i < row else (-1 if i == row else i - 1))
+	var names := _track_names_now()
+	names.remove_at(row)
+	_change_tracks("トラックを消す", remap, [], names)
+
+## トラック row を、そのクリップごとすぐ下に複製する（下のトラックは1つずつ下がる）。
+func duplicate_track(row: int) -> void:
+	var n := track_count() - 1
+	if row < 0 or row >= n:
+		return
+	var remap := []
+	for i in n:
+		remap.append(i if i <= row else i + 1)
+	var copies := []
+	var cs: Array = timeline.clips()
+	for k in cs.size():
+		if clip_track(k) == row:
+			var c: Resource = cs[k].duplicate(true)
+			c.set("track", row + 1)
+			copies.append(c)
+	var names := _track_names_now()
+	names.insert(row + 1, names[row])
+	_change_tracks("トラックを複製", remap, copies, names)
+
+## トラック名の右クリックのメニュー：複製・消す。
+func _track_menu(row: int, at: Vector2) -> void:
+	var menu := PopupMenu.new()
+	menu.add_item("トラックを複製", 0)
+	menu.add_item("トラックを消す（クリップごと）", 1)
+	menu.id_pressed.connect(func(id: int) -> void:
+		match id:
+			0: duplicate_track(row)
+			1: remove_track(row)
+		menu.queue_free())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(Vector2i(get_screen_position() + at), Vector2i.ZERO))
 
 ## トラックの数（クリップのある一番下のトラックの次に、空のトラックを1本足す）。
 func track_count() -> int:
@@ -325,6 +428,10 @@ func _draw() -> void:
 		var text := "%s　%s ×%d %ds" % [label, "・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
 		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
 		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
+	# トラックを動かしている間は、動かすトラックと落とす先を示す
+	if _drag.get("kind", "") == "track_move":
+		draw_rect(Rect2(0, _clips_top() + int(_drag.row) * TRACK, size.x, TRACK), Color(1, 1, 0.8, 0.08))
+		draw_rect(Rect2(0, _clips_top() + int(_drag.to) * TRACK, size.x, TRACK), Color(1, 1, 0.8), false, 2.0 * ui)
 	# 雑魚の目標の数の曲線：種類ごとの行に、曲線と点を描く
 	var curves: Array = timeline.curves()
 	for k in curves.size():
@@ -531,6 +638,10 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
+			if h.get("kind", "") == "track_label":
+				_track_menu(h.row, mb.position)
+				accept_event()
+				return
 			if h.get("kind", "") in ["time", "length"]:
 				selected = h.index
 				queue_redraw()
@@ -554,6 +665,8 @@ func _gui_input(event: InputEvent) -> void:
 			if h.kind == "track_label":
 				if mb.double_click:
 					_start_track_rename(h.row)
+				else:
+					_drag = {"kind": "track_move", "row": h.row, "to": h.row}
 				return
 			if h.kind == "phase_body":
 				if mb.double_click:
@@ -729,9 +842,18 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 			_drag.target.set("track", row)
 		"length":
 			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
+		"track_move":
+			_drag.to = clampi(int(floor((p.y - _clips_top()) / TRACK)), 0, track_count() - 2)
 	timeline.refresh()
 
 func _end_drag() -> void:
+	if _drag.get("kind", "") == "track_move":
+		var from: int = _drag.row
+		var to: int = _drag.to
+		_drag = {}
+		move_track(from, to)
+		queue_redraw()
+		return
 	# クリップを落とした先で、ほかのクリップと重なるなら元の位置に戻す
 	if _drag.get("kind", "") in ["time", "length"]:
 		var k: int = _drag.index
