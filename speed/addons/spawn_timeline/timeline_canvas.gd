@@ -7,7 +7,8 @@ extends Control
 
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
-		"時間帯の境目をドラッグ：開始の時刻　時間帯・クリップのラベルをダブルクリック：名前　目盛りをクリック：再生位置\n" + \
+		"クリップを上下にドラッグ：トラックを移す　クリップをダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
+		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
@@ -70,7 +71,37 @@ func _scroll_y() -> float:
 
 ## 中身の高さ（縦のスクロールに使う）。
 func content_height() -> float:
-	return _clips_top() + timeline.clips().size() * TRACK + 12.0 * ui
+	return _clips_top() + track_count() * TRACK + 12.0 * ui
+
+## クリップ k の置かれたトラック（番号を持たないクリップは、並びの番号のトラック）。
+func clip_track(k: int) -> int:
+	var t := int(timeline.clips()[k].get("track"))
+	return t if t >= 0 else k
+
+## トラックの数（クリップのある一番下のトラックの次に、空のトラックを1本足す）。
+func track_count() -> int:
+	var n := 0
+	for k in timeline.clips().size():
+		n = maxi(n, clip_track(k) + 1)
+	return n + 1
+
+## トラック row で、時刻 [from, to) にほかのクリップ（except を除く）があるか。
+func track_busy(row: int, from: float, to: float, except := -1) -> bool:
+	var cs: Array = timeline.clips()
+	for k in cs.size():
+		if k == except or clip_track(k) != row:
+			continue
+		var s0 := float(cs[k].get("time"))
+		if from < _clip_end(cs[k]) and s0 < to:
+			return true
+	return false
+
+## 時刻 [from, to) が空いているトラック（prefer から下へ探す。なければ新しいトラック）。
+func free_track(prefer: int, from: float, to: float) -> int:
+	var row := maxi(0, prefer)
+	while row < track_count() - 1 and track_busy(row, from, to):
+		row += 1
+	return row
 
 ## 雑魚の曲線の行の上端と、クリップの行の上端。
 func _curves_top() -> float:
@@ -242,26 +273,31 @@ func _draw() -> void:
 		return
 	var end := _end_time()
 	var off := _scroll_y()
-	# クリップ：開始から長さの間の棒。中に種類・同時の群れの数・出す間隔を書く
+	# トラック：1行に複数のクリップ。クリップは開始から長さの間の棒で、中に名前・種類・同時の群れの数・出す間隔を書く
 	var cs: Array = timeline.clips()
 	var bad := mismatches()
+	for row in track_count():
+		var y := _clips_top() + row * TRACK
+		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if row % 2 == 0 else 0.0))
+		var title := "トラック %d" % (row + 1) if row < track_count() - 1 else "（新しいトラック）"
+		draw_string(font, Vector2(8 * ui, y + TRACK * 0.66), title, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14), Color(1, 1, 1, 0.75 if row < track_count() - 1 else 0.35))
 	for k in cs.size():
 		var c: Resource = cs[k]
-		var y := _clips_top() + k * TRACK
-		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if k % 2 == 0 else 0.0))
-		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
-		draw_string(font, Vector2(8 * ui, y + TRACK * 0.66), label, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15), Color(1, 1, 0.8) if k == selected else Color.WHITE)
+		var y := _clips_top() + clip_track(k) * TRACK
 		var x0 := _x(float(c.get("time")))
 		var x1 := _x(_clip_end(c))
 		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
 		var r := Rect2(x0, y + 4 * ui, maxf(3.0, x1 - x0), TRACK - 8 * ui)
-		draw_rect(r, Color(base, 0.55))
+		draw_rect(r, Color(base, 0.7))
+		if k == selected:
+			draw_rect(r, Color(1, 1, 0.8), false, 2.0 * ui)
 		if k in bad:
 			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0 * ui)
 		var names := []
 		for type_id in c.get("types"):
 			names.append(timeline.enemy_name(type_id))
-		var text := "%s　×%d　%ds" % ["・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
+		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
+		var text := "%s　%s ×%d %ds" % [label, "・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
 		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
 		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
 	# 雑魚の目標の数の曲線：種類ごとの行に、曲線と点を描く
@@ -417,17 +453,24 @@ func _hit(p: Vector2) -> Dictionary:
 			if Vector2(_x(pts[n].x), _curve_y(ck, pts[n].y, vmax)).distance_to(p) <= 9.0 * ui:
 				return {"kind": "point", "curve": ck, "point": n}
 		return {"kind": "curve_body", "curve": ck}
-	var k := int(floor((p.y - _clips_top()) / TRACK))
-	var cs: Array = timeline.clips()
-	if k < 0 or k >= cs.size():
+	var row := int(floor((p.y - _clips_top()) / TRACK))
+	if row < 0 or row >= track_count() or p.x < GUTTER:
 		return {}
-	var c: Resource = cs[k]
-	if p.x < GUTTER:
-		return {"kind": "label", "index": k}
-	if absf(p.x - _x(_clip_end(c))) <= HANDLE:
-		return {"kind": "length", "index": k}
-	if p.x >= _x(float(c.get("time"))) - HANDLE and p.x <= _x(_clip_end(c)):
-		return {"kind": "time", "index": k}
+	var cs: Array = timeline.clips()
+	# 選んでいるクリップを先に調べる（重なっていても選んだものをつかめるように）
+	var order := range(cs.size())
+	if selected >= 0 and selected < cs.size():
+		order.erase(selected)
+		order.push_front(selected)
+	for k in order:
+		if clip_track(k) != row:
+			continue
+		var c: Resource = cs[k]
+		if absf(p.x - _x(_clip_end(c))) <= HANDLE:
+			return {"kind": "length", "index": k}
+		if p.x >= _x(float(c.get("time"))) - HANDLE and p.x <= _x(_clip_end(c)):
+			return {"kind": "time", "index": k}
+	return {"kind": "track", "row": row}
 	return {}
 
 func _gui_input(event: InputEvent) -> void:
@@ -457,6 +500,13 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				pan(-dir * 40.0 / px_per_sec)
 			accept_event()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
+			var h := _hit(mb.position)
+			if h.get("kind", "") in ["time", "length"]:
+				selected = h.index
+				queue_redraw()
+			_clip_menu(mb.position)
+			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_drag = {"kind": "pan", "x": mb.position.x, "start": view_start} if mb.pressed else {}
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
@@ -464,8 +514,13 @@ func _gui_input(event: InputEvent) -> void:
 			var h := _hit(mb.position)
 			if h.is_empty():
 				return
-			if h.kind == "label" and mb.double_click:
+			if h.kind == "time" and mb.double_click:
+				selected = h.index
 				_start_rename(h.index)
+				return
+			if h.kind == "track":
+				selected = -1
+				queue_redraw()
 				return
 			if h.kind == "phase_body":
 				if mb.double_click:
@@ -503,6 +558,16 @@ func _gui_input(event: InputEvent) -> void:
 		var ke := event as InputEventKey
 		_nudge_point((1.0 if ke.keycode == KEY_UP else -1.0) * (10.0 if ke.shift_pressed else 1.0))
 		accept_event()
+	elif event is InputEventKey and event.pressed and ((event as InputEventKey).ctrl_pressed or (event as InputEventKey).meta_pressed) \
+			and (event as InputEventKey).keycode in [KEY_C, KEY_V, KEY_D]:
+		match (event as InputEventKey).keycode:
+			KEY_C:
+				copy_clip()
+			KEY_V:
+				paste_clip()
+			KEY_D:
+				duplicate_clip()
+		accept_event()
 	elif event is InputEventKey and event.pressed and (event as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		if point_selected >= 0:
 			_remove_point()
@@ -522,7 +587,8 @@ func _begin_drag(h: Dictionary, p: Vector2) -> void:
 			_drag.props = ["start"]
 		"time":
 			_drag.target = timeline.clips()[h.index]
-			_drag.props = ["time"]
+			_drag.props = ["time", "track"]
+			_drag.row0 = clip_track(h.index)
 		"length":
 			_drag.target = timeline.clips()[h.index]
 			_drag.props = ["length"]
@@ -626,11 +692,22 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 			_drag.target.set("start", clampf(snappedf(t, snap), lo, hi))
 		"time":
 			_drag.target.set("time", maxf(0.0, snappedf(float(_drag.before.time) + t - _drag.t0, snap)))
+			var row := clampi(int(floor((p.y - _clips_top()) / TRACK)), 0, track_count() - 1)
+			_drag.target.set("track", row)
 		"length":
 			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
 	timeline.refresh()
 
 func _end_drag() -> void:
+	# クリップを落とした先で、ほかのクリップと重なるなら元の位置に戻す
+	if _drag.get("kind", "") in ["time", "length"]:
+		var k: int = _drag.index
+		var c: Resource = _drag.target
+		if track_busy(clip_track(k), float(c.get("time")), _clip_end(c), k):
+			for prop in _drag.props:
+				c.set(prop, _drag.before[prop])
+			if _drag.kind == "time" and int(_drag.before.get("track", -1)) < 0:
+				c.set("track", -1)
 	if _drag.has("target"):
 		var changes := []
 		for prop in _drag.props:
@@ -675,9 +752,74 @@ func _open_editor(text: String, rect: Rect2, done: Callable) -> void:
 	_rename.text_submitted.connect(func(_text: String) -> void: finish.call())
 	_rename.focus_exited.connect(finish)
 
+## コピーしたクリップ（貼り付けるたびに複製する）
+var _clipboard: Resource = null
+
+func copy_clip() -> void:
+	var cs: Array = timeline.clips()
+	if selected >= 0 and selected < cs.size():
+		_clipboard = cs[selected].duplicate(true)
+
+## コピーしたクリップを、再生位置の時刻に置く（重なるなら空いているトラックへ）。
+func paste_clip() -> void:
+	if _clipboard == null:
+		return
+	var row := clip_track(selected) if selected >= 0 and selected < timeline.clips().size() else 0
+	_insert_clip(_clipboard.duplicate(true), maxf(0.0, snappedf(playhead, 1.0)), row, "クリップを貼り付ける")
+
+## 選んでいるクリップを、そのすぐ後ろに複製する（重なるなら空いているトラックへ）。
+func duplicate_clip() -> void:
+	var cs: Array = timeline.clips()
+	if selected < 0 or selected >= cs.size():
+		return
+	_insert_clip(cs[selected].duplicate(true), _clip_end(cs[selected]), clip_track(selected), "クリップを複製する")
+
+func _insert_clip(c: Resource, time: float, prefer_row: int, label: String) -> void:
+	var stage: Resource = timeline.stage
+	# 番号を持たないクリップは、今の行を番号にしてから足す（並びが変わっても行が動かないように）
+	var cs: Array = timeline.clips()
+	var fixes := []
+	for k in cs.size():
+		if int(cs[k].get("track")) < 0:
+			fixes.append([cs[k], "track", -1, k])
+	for f in fixes:
+		f[0].set("track", f[3])
+	c.set("time", time)
+	c.set("track", free_track(prefer_row, time, time + float(c.get("length"))))
+	var before: Array = cs
+	var after: Array = before.duplicate()
+	after.append(c)
+	stage.set("clips", after)
+	selected = after.size() - 1
+	timeline.commit(label, fixes + [[stage, "clips", before, after]])
+
+## 右クリックのメニュー：コピー・貼り付け・複製・消す。
+func _clip_menu(at: Vector2) -> void:
+	var menu := PopupMenu.new()
+	var has: bool = selected >= 0 and selected < timeline.clips().size()
+	menu.add_item("コピー（⌘C）", 0)
+	menu.set_item_disabled(0, not has)
+	menu.add_item("貼り付け（⌘V）", 1)
+	menu.set_item_disabled(1, _clipboard == null)
+	menu.add_item("複製（⌘D）", 2)
+	menu.set_item_disabled(2, not has)
+	menu.add_item("消す（Delete）", 3)
+	menu.set_item_disabled(3, not has)
+	menu.id_pressed.connect(func(id: int) -> void:
+		match id:
+			0: copy_clip()
+			1: paste_clip()
+			2: duplicate_clip()
+			3: timeline._remove_clip()
+		menu.queue_free())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(Vector2i(get_screen_position() + at), Vector2i.ZERO))
+
 func _start_rename(k: int) -> void:
 	var c: Resource = timeline.clips()[k]
-	_open_editor(str(c.get("label")), Rect2(2.0, _clips_top() + k * TRACK, GUTTER - 4.0, TRACK),
+	var x0 := maxf(GUTTER, _x(float(c.get("time"))))
+	_open_editor(str(c.get("label")), Rect2(x0, _clips_top() + clip_track(k) * TRACK, maxf(200.0 * ui, _x(_clip_end(c)) - x0), TRACK),
 		func(text: String) -> void:
 			var before := str(c.get("label"))
 			if text != before:
