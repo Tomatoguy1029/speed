@@ -1,4 +1,4 @@
-## 時間帯・強敵の群れ・クリップの出し方と、攻撃の組み合わせの表・強敵の上限を確かめる。
+## 時間帯・強敵の群れ・クリップの出し方と、攻撃の組み合わせの表を確かめる。
 ##   Godot --headless --path speed res://tests/spawn_formations.tscn
 extends Node
 
@@ -91,8 +91,6 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	state.stage = stage
 	em._clip_fired.clear()
 	em._type_counts.clear()
-	em._strong_count = 0
-	run.cfg.attack_rules = null
 	var fired := func() -> int: return int(em._clip_fired.get(0, 0))
 	for pair in [[4.0, 0], [5.0, 1], [7.0, 1], [8.0, 2], [30.0, 2]]:
 		state.time = pair[0]
@@ -108,20 +106,17 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	state.time = 8.0
 	em._tick_clips(1.0)
 	check(fired.call() == 2 and em.count() > before, "始めた時刻のあとの出現は出す")
-	# 上限に達している間は待ち、空いたら出す
-	var rules := AttackRules.new()
-	rules.strong_cap = 1
-	run.cfg.attack_rules = rules
+	# 種類ごとの上限に達している間は待ち、空いたら出す（みずがめ座は1体まで）
+	clip.formation = load("res://data/formations/aquarius_solo.tscn")
 	em._clip_fired.clear()
 	em._clips_ready = true
-	em._strong_count = 1
+	em._type_counts[&"aquarius"] = 1
 	state.time = 5.0
 	em._tick_clips(1.0)
 	check(fired.call() == 0, "上限に達している間は待つ")
-	rules.strong_cap = 9
+	em._type_counts.clear()
 	em._tick_clips(1.0)
 	check(fired.call() == 1, "空いたら出す")
-	run.cfg.attack_rules = null
 
 ## 強敵の群れは、目標の数まで、間隔を空けて補充する。
 func _check_refill(run: RunManager, scene: PackedScene) -> void:
@@ -133,7 +128,6 @@ func _check_refill(run: RunManager, scene: PackedScene) -> void:
 	em._groups.clear()
 	em._formation_t = 0.0
 	em._type_counts.clear()
-	em._strong_count = 0
 	em._tick_formations(phase, 0.1, 1.0)
 	check(em._groups.size() == 1, "目標の数まで群れを出す")
 	em._tick_formations(phase, 0.1, 1.0)
@@ -146,7 +140,6 @@ func _check_refill(run: RunManager, scene: PackedScene) -> void:
 	check(em._groups.size() == 1, "間隔が空いたら次の群れを出す")
 
 ## 表の組み合わせは、相手の攻撃が終わって決めた時間が経つまで待たせる。表にない組み合わせは同時に撃ってよい。
-## 強敵の全体の上限を超える群れは出さない。
 func _check_rules(run: RunManager, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
@@ -167,10 +160,3 @@ func _check_rules(run: RunManager, scene: PackedScene) -> void:
 	state.world_time = t0 + 5.1
 	check(em._rules_admit(aqua, rules, 3.0), "決めた時間が経てば撃てる")
 	check(AttackRules.key(&"telescope", &"aquarius") == "aquarius/telescope", "組み合わせのキーは並びをそろえる")
-	rules.strong_cap = 2
-	em._type_counts.clear()
-	em._strong_count = 1
-	check(em._formation_capped(em.formation_data(scene)), "強敵の上限を超える群れは出さない")
-	em._strong_count = 0
-	rules.strong_cap = 3
-	check(not em._formation_capped(em.formation_data(scene)), "上限の中なら群れを出せる")

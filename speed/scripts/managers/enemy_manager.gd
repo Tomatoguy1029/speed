@@ -2158,8 +2158,6 @@ func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index :
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
 		var i := spawn(def, level, pos, {"facing": facing})
-		if def.rank >= 3:
-			_strong_count += 1
 		rows.append(i)
 		rows.append(table.id[i])
 	return rows
@@ -2171,22 +2169,14 @@ func _group_alive(rows: PackedInt32Array) -> bool:
 			return true
 	return false
 
-## 組み合わせの敵のうち、同時に出る数の上限に達している種類があるか、強敵を足すと強敵の全体の上限を超えるか。
-## 配置ごとに数が違うときは、一番多い配置で数える。
+## 組み合わせの敵のうち、同時に出る数の上限（max_alive）に達している種類があるか。
 func _formation_capped(data: Dictionary) -> bool:
-	var most := 0
 	for l: Dictionary in data.get("layouts", []):
-		var strong := 0
 		for m: Dictionary in l.markers:
 			var def := def_of(StringName(m.type))
-			if def == null:
-				continue
-			if def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
+			if def != null and def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
 				return true
-			if def.rank >= 3:
-				strong += 1
-		most = maxi(most, strong)
-	return _strong_full(most)
+	return false
 
 ## 時間帯の強敵の群れを補充する。いる群れが目標の数より少なく、前の群れから間隔が空いていれば、重みで1つ選んで出す。
 func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
@@ -2208,7 +2198,7 @@ func _tick_formations(phase: PhaseDef, world_dt: float, level: float) -> void:
 		_formation_t = phase.formation_interval
 
 ## ステージのクリップを、決めた時刻に出す。途中の時刻から始めたランでは、それより前の出現は出さない。
-## 種類ごと・強敵の全体の上限に達している間は待ち、空いたら出す（同じ大物のクリップは入れ替わりになる）。
+## 種類ごとの上限（max_alive）に達している間は待ち、空いたら出す（同じ大物のクリップは入れ替わりになる）。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
 	if not _clips_ready:
@@ -2231,8 +2221,6 @@ func _tick_clips(level: float) -> void:
 		spawn_formation(data, level)
 
 var _type_counts: Dictionary = {}
-## 強敵と大物（星3以上）の数（部位は数えない）
-var _strong_count := 0
 var _far_rows := PackedInt32Array()
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
@@ -2240,7 +2228,6 @@ var _far_rows := PackedInt32Array()
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
-	_strong_count = 0
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -2259,8 +2246,6 @@ func _survey() -> int:
 			# 上限のある種類だけ数える
 			if defs[i].max_alive > 0:
 				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
-			if defs[i].rank >= 3 and table.parent[i] < 0:
-				_strong_count += 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
 				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
@@ -2321,8 +2306,6 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	if def.max_alive > 0 and _type_counts.get(type, 0) >= def.max_alive:
 		return false
-	if def.rank >= 3 and _strong_full(1):
-		return false
 	var elite: bool = def.max_alive == 0 and state.rng.randf() < 0.01 + 0.06 * danger + cfg.surge_elite * t.steps
 	var level: float = t.level + danger * cfg.danger_level
 	var opts := {"elite": elite, "facing": (state.ship_pos - p).angle()}
@@ -2331,14 +2314,7 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, level, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
-	if def.rank >= 3:
-		_strong_count += 1
 	return true
-
-## 強敵を n 体足すと、強敵の全体の上限（config.attack_rules.strong_cap）を超えるか。
-func _strong_full(n: int) -> bool:
-	var rules: AttackRules = cfg.attack_rules
-	return rules != null and rules.strong_cap > 0 and _strong_count + n > rules.strong_cap
 
 ## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
 func _pick_type(phase: PhaseDef, steps: int) -> StringName:

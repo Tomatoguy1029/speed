@@ -376,7 +376,7 @@ extends Resource
 ## 敵全体の強さ・数、動き方、出現の決まり
 @export_group("敵")
 ## 攻撃の組み合わせ
-## 強敵と大物の、同時にいてよい数と、種類どうしの攻撃の組み合わせの表（res://data/attack_rules.tres）。
+## 強敵と大物の、種類どうしの攻撃の組み合わせの表（res://data/attack_rules.tres）。
 ## 単位：—
 @export var attack_rules: AttackRules
 ## 敵の HP 倍率

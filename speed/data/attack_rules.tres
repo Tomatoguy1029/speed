@@ -4,7 +4,6 @@
 
 [resource]
 script = ExtResource("1")
-strong_cap = 6
 pairs = Dictionary[String, float]({
 "aquarius/aquarius": 0.0,
 "aquarius/cross": 0.0,
