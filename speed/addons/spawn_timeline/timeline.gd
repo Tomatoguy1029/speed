@@ -101,6 +101,13 @@ func enemy_name(id: StringName) -> String:
 
 var _names: Dictionary = {}
 
+## 敵の種類の区分（敵の定義の rank。雑魚は 1）。読めなければ 0。
+func enemy_rank(id: StringName) -> int:
+	var dir := str(ProjectSettings.get_setting("spawn_timeline/enemy_dir", ""))
+	var path := dir.path_join(String(id) + ".tres")
+	var res: Resource = load(path) if dir != "" and ResourceLoader.exists(path) else null
+	return int(res.get("rank")) if res != null and res.get("rank") != null else 0
+
 ## 雑魚の目標の数の曲線（zako_curves）。
 func curves() -> Array:
 	return stage.get("zako_curves") if stage != null and stage.get("zako_curves") != null else []
@@ -188,7 +195,7 @@ func _add_clip() -> void:
 	commit("クリップを足す", [[stage, "clips", before, after]])
 	EditorInterface.inspect_object(clip, "", true)
 
-## ステージの敵のうち、まだ曲線のない種類を選んで、雑魚の目標の数の曲線を足す。
+## ステージの敵のうち、まだ曲線のない雑魚（区分 1）を選んで、雑魚の目標の数の曲線を足す。
 func _add_curve_menu() -> void:
 	if stage == null:
 		return
@@ -197,13 +204,14 @@ func _add_curve_menu() -> void:
 		have[c.get("type")] = true
 	var menu := PopupMenu.new()
 	for id in stage.get("enemies"):
-		if not have.has(id):
-			menu.add_item(String(id))
+		if not have.has(id) and enemy_rank(id) == 1:
+			menu.add_item(enemy_name(id))
+			menu.set_item_metadata(menu.item_count - 1, String(id))
 	if menu.item_count == 0:
-		menu.add_item("（ステージの敵の一覧に、曲線のない種類がない）")
+		menu.add_item("（ステージの敵の一覧に、曲線のない雑魚がいない）")
 		menu.set_item_disabled(0, true)
 	menu.id_pressed.connect(func(index: int) -> void:
-		_add_curve(StringName(menu.get_item_text(index)))
+		_add_curve(StringName(menu.get_item_metadata(menu.get_item_index(index))))
 		menu.queue_free())
 	menu.popup_hide.connect(menu.queue_free)
 	add_child(menu)
