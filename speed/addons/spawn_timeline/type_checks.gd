@@ -101,7 +101,7 @@ class Checks extends EditorProperty:
 	static var _open: Dictionary = {}
 	var _options: Array
 	var _boxes: Array[CheckBox] = []
-	var _numbers: Array[SpinBox] = []
+	var _numbers: Array[LineEdit] = []
 	var _values_property := ""
 	var _updating := false
 	var _toggle: Button
@@ -132,31 +132,62 @@ class Checks extends EditorProperty:
 
 	func _set_options(options: Array) -> void:
 		_options = options
-		for box in _boxes:
-			_grid.remove_child(box)
-			box.queue_free()
+		for child in _grid.get_children():
+			_grid.remove_child(child)
+			child.queue_free()
 		_boxes.clear()
-		for number in _numbers:
-			_grid.remove_child(number)
-			number.queue_free()
 		_numbers.clear()
-		for opt in options:
+		var table := _values_property != ""
+		_grid.columns = 3 if table else 2
+		if table:
+			_grid.add_theme_constant_override("h_separation", 0)
+			_grid.add_theme_constant_override("v_separation", 0)
+			for title in ["使用", "並び", "value"]:
+				var heading := Label.new()
+				heading.text = title
+				_table_cell(heading, -1)
+		for k in options.size():
+			var opt: Array = options[k]
 			var box := CheckBox.new()
-			box.text = str(opt[1])
 			box.toggled.connect(_on_toggled)
-			_grid.add_child(box)
 			_boxes.append(box)
-			if _values_property != "":
-				var number := SpinBox.new()
-				number.prefix = "value"
-				number.min_value = 1
-				number.max_value = 2147483647
-				number.step = 1
-				number.rounded = true
-				number.custom_minimum_size.x = 110 * EditorInterface.get_editor_scale()
-				number.value_changed.connect(_on_value_changed.bind(String(opt[0])))
-				_grid.add_child(number)
-				_numbers.append(number)
+			if not table:
+				box.text = str(opt[1])
+				_grid.add_child(box)
+				continue
+			box.tooltip_text = "この並びを使用する"
+			box.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			_table_cell(box, k)
+			var label := Label.new()
+			label.text = str(opt[1])
+			label.tooltip_text = label.text
+			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			_table_cell(label, k, true)
+			var number := LineEdit.new()
+			number.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			number.custom_minimum_size.x = 72 * EditorInterface.get_editor_scale()
+			number.tooltip_text = "群れ全体が共有するvalue（1以上の整数）"
+			number.text_submitted.connect(_commit_value.bind(str(opt[0]), k))
+			number.focus_exited.connect(func() -> void: _commit_value(number.text, str(opt[0]), k))
+			_table_cell(number, k)
+			_numbers.append(number)
+
+	func _table_cell(control: Control, row: int, expand := false) -> void:
+		var cell := PanelContainer.new()
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL if expand else Control.SIZE_FILL
+		var style := StyleBoxFlat.new()
+		var base := EditorInterface.get_base_control().get_theme_color("base_color", "Editor")
+		style.bg_color = base.darkened(0.15 if row < 0 else (0.04 if row % 2 == 0 else 0.1))
+		style.border_color = base.lightened(0.16)
+		style.border_width_bottom = 1
+		var ui := EditorInterface.get_editor_scale()
+		style.content_margin_left = 6 * ui
+		style.content_margin_right = 6 * ui
+		style.content_margin_top = 3 * ui
+		style.content_margin_bottom = 3 * ui
+		cell.add_theme_stylebox_override("panel", style)
+		cell.add_child(control)
+		_grid.add_child(cell)
 
 	func _update_property() -> void:
 		if _source.is_valid():
@@ -169,7 +200,7 @@ class Checks extends EditorProperty:
 		for k in _options.size():
 			_boxes[k].set_pressed_no_signal(current.has(_options[k][0]) or (_values_property != "" and current.is_empty()))
 			if _values_property != "":
-				_numbers[k].set_value_no_signal(maxi(1, int(values.get(String(_options[k][0]), 1))))
+				_numbers[k].text = str(maxi(1, int(values.get(String(_options[k][0]), 1))))
 		_updating = false
 		_show_fold(current.size())
 
@@ -206,11 +237,20 @@ class Checks extends EditorProperty:
 			return
 		emit_changed(get_edited_property(), value)
 
-	func _on_value_changed(value: float, key: String) -> void:
+	func _commit_value(text: String, key: String, index: int) -> void:
 		if _updating:
 			return
 		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
-		values[key] = maxi(1, int(value))
+		var previous := maxi(1, int(values.get(key, 1)))
+		var input := text.strip_edges()
+		if not input.is_valid_int() or input.to_int() < 1 or input.to_int() > 2147483647:
+			_numbers[index].text = str(previous)
+			return
+		var value := input.to_int()
+		_numbers[index].text = str(value)
+		if value == previous:
+			return
+		values[key] = value
 		emit_changed(_values_property, values)
 
 ## シーンの参照は、群れの選択と別の欄で編集する。
