@@ -413,6 +413,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	_vh = state.view_half
 	_face_move = cfg.enemy_face_move
 	_tick_chase(world_dt)
+	_tick_biters(world_dt)
 	for b in [EnemyTable.Beh.DASH, EnemyTable.Beh.SPLIT, EnemyTable.Beh.GUNNER, EnemyTable.Beh.MISSILE,
 			EnemyTable.Beh.BATTLESHIP, EnemyTable.Beh.DRIFT, EnemyTable.Beh.ROCKET, EnemyTable.Beh.BOMBER,
 			EnemyTable.Beh.BEAMER, EnemyTable.Beh.PULSER, EnemyTable.Beh.PUMP, EnemyTable.Beh.SNIPER,
@@ -420,9 +421,121 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
 			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS,
 			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA,
-			EnemyTable.Beh.SOLDIER, EnemyTable.Beh.BITER, EnemyTable.Beh.DOLPHIN, EnemyTable.Beh.CROSS]:
+			EnemyTable.Beh.SOLDIER, EnemyTable.Beh.DOLPHIN, EnemyTable.Beh.CROSS]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
+
+## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
+## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
+## 数の多い雑魚なので、関数をまとめて呼ばずにここで計算する。定義の数値は、同じ定義が続くあいだは読み直さない。
+func _tick_biters(dt: float) -> void:
+	var rows: PackedInt32Array = beh_rows[EnemyTable.Beh.BITER]
+	if rows.is_empty():
+		return
+	var t := table
+	var vc := state.view_center
+	var lim := state.view_half * 1.25 + Vector2(300, 300)
+	var ship := state.ship_pos
+	var pos := t.pos
+	var vel := t.vel
+	var facing := t.facing
+	var age := t.age
+	var hit_cd := t.hit_cd
+	var guard := t.guard
+	var flash := t.flash
+	var dead := t.dead
+	var shove_time := t.shove_time
+	var knock_t := t.knock_t
+	var stone := t.stone
+	var speed := t.speed
+	var r := t.r
+	var mode := t.mode
+	var timer := t.timer
+	var charge := t.charge
+	var now := state.world_time
+	var body_move := field.body_speed_max
+	var cached: EnemyDef = null
+	var reach_add := 0.0
+	var half_reach := 0.0
+	var telegraph := 1.0
+	var rest := 0.0
+	var bite_radius := 0.0
+	var bite_dmg := 0.0
+	projectiles.lab_context = 0
+	for i in rows:
+		if dead[i] != 0:
+			continue
+		if stone[i] > 0.0:
+			stone[i] -= dt
+			vel[i] = Vector2.ZERO
+			continue
+		age[i] += dt
+		if hit_cd[i] > 0.0:
+			hit_cd[i] -= dt
+		if guard[i] > 0.0:
+			guard[i] -= dt
+		if flash[i] > 0.0:
+			flash[i] -= dt
+		var from := pos[i]
+		# 画面から遠い敵は、LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
+		var bdt := dt
+		var rel := from - vc
+		if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
+			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
+				pos[i] = from + vel[i] * dt
+				continue
+			bdt = dt * LOD
+		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
+			_update_pushed(i, dt)
+		else:
+			var def: EnemyDef = t.def[i]
+			if def != cached:
+				cached = def
+				var p := def.params
+				reach_add = float(p.bite_reach) + cfg.ship_radius
+				half_reach = float(p.bite_reach) * 0.5
+				telegraph = float(p.bite_telegraph)
+				rest = float(p.bite_rest)
+				bite_radius = float(p.bite_radius)
+				bite_dmg = float(p.bullet_dmg)
+			var m := mode[i]
+			if m == EnemyTable.Mode.WINDUP:
+				# 止まって機体の方へ向き直り、予告が終わったら噛みつく
+				vel[i] *= maxf(0.0, 1.0 - 8.0 * bdt)
+				_turn_toward(i, (ship - from).angle(), t.turn[i] * 2.0, bdt)
+				timer[i] -= bdt
+				charge[i] = 1.0 - maxf(0.0, timer[i]) / telegraph
+				if timer[i] <= 0.0:
+					var at := from + Vector2.from_angle(facing[i]) * (r[i] + half_reach)
+					projectiles.fire_zone(at, bite_radius, 0.0, bite_dmg, ProjectileManager.HazardStyle.BITE, t.color[i].lightened(0.4))
+					charge[i] = 0.0
+					mode[i] = EnemyTable.Mode.RECOVER
+					timer[i] = rest
+			else:
+				# 機体へまっすぐ、決まった速さで向かう（_chase と同じ）
+				var d := ship - from
+				var dist := d.length()
+				if dist < 0.001:
+					vel[i] = Vector2.ZERO
+				else:
+					var u := d / dist
+					vel[i] = u * speed[i]
+					facing[i] = u.angle()
+				if m == EnemyTable.Mode.RECOVER:
+					timer[i] -= bdt
+					if timer[i] <= 0.0:
+						mode[i] = EnemyTable.Mode.MOVE
+				else:
+					var reach := r[i] + reach_add
+					if dist * dist <= reach * reach:
+						mode[i] = EnemyTable.Mode.WINDUP
+						timer[i] = telegraph
+						flash[i] = 0.1
+			if dead[i] != 0:
+				continue
+			pos[i] += vel[i] * dt
+		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
+			field.collide_enemy(i, from)
 
 ## 追跡（いちばん多い雑魚）は、関数を呼ばずにここで計算する（仕様書 11.5）。
 func _tick_chase(dt: float) -> void:
@@ -623,8 +736,6 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_cepheus(i, bdt)
 				EnemyTable.Beh.SOLDIER:
 					_soldier(i, bdt)
-				EnemyTable.Beh.BITER:
-					_biter(i, bdt)
 				EnemyTable.Beh.DOLPHIN:
 					_dolphin(i, bdt)
 				EnemyTable.Beh.CROSS:
@@ -1601,37 +1712,6 @@ func _corona(i: int, dt: float) -> void:
 				var out := (state.ship_pos - t.pos[i]).normalized()
 				state.ship_vel += out * float(p.push) * dt
 
-## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
-## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
-func _biter(i: int, dt: float) -> void:
-	var t := table
-	var p: Dictionary = t.def[i].params
-	var reach := t.r[i] + float(p.bite_reach) + cfg.ship_radius
-	match t.mode[i]:
-		EnemyTable.Mode.WINDUP:
-			_hold(i, dt)
-			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
-			t.timer[i] -= dt
-			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.bite_telegraph)
-			if t.timer[i] <= 0.0:
-				var at := t.pos[i] + Vector2.from_angle(t.facing[i]) * (t.r[i] + float(p.bite_reach) * 0.5)
-				projectiles.fire_zone(at, float(p.bite_radius), 0.0, float(p.bullet_dmg),
-					ProjectileManager.HazardStyle.BITE, t.color[i].lightened(0.4))
-				t.charge[i] = 0.0
-				t.mode[i] = EnemyTable.Mode.RECOVER
-				t.timer[i] = float(p.bite_rest)
-		EnemyTable.Mode.RECOVER:
-			_chase(i, dt)
-			t.timer[i] -= dt
-			if t.timer[i] <= 0.0:
-				t.mode[i] = EnemyTable.Mode.MOVE
-		_:
-			_chase(i, dt)
-			if t.pos[i].distance_squared_to(state.ship_pos) <= reach * reach:
-				t.mode[i] = EnemyTable.Mode.WINDUP
-				t.timer[i] = float(p.bite_telegraph)
-				t.flash[i] = 0.1
-
 ## いるか座：距離を保ち、間隔ごとに構えて（WINDUP。機体の方へ向き直りながら、撃つ向きを予告する）、機体の方へ大きな扇の波動を撃つ。
 ## 波動は数層の弧でできたひとまとまりの一発で、当たるのは先頭の1枚だけ。機体にもほかの敵にも当たる（敵に敵を倒させる）。
 func _dolphin(i: int, dt: float) -> void:
@@ -2034,22 +2114,26 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 		_phase_id = phase.id
 		state.emit(&"phase", {"id": phase.id})
 	var alive_n := _survey(t.pop)
+	# 領域ごとの上限で数えない敵がたまり続けないように、実際の数は目標の数 × spawn_total_cap で止める
+	var raw_n: int = _survey_raw
+	var raw_limit: float = t.pop * cfg.spawn_total_cap if cfg.spawn_total_cap > 0.0 else INF
 	var deficit := maxf(0.0, t.pop - alive_n)
 	var rate := maxf(phase.rate * cfg.density_mult, deficit / cfg.spawn_refill_time)
 	var cap := maxf(8.0, 8.0 * cfg.density_mult)
 	_spawn_acc = minf(_spawn_acc + rate * world_dt, cap)
 	var attempts := 0
-	while _spawn_acc >= 1.0 and alive_n < t.pop and attempts < cap:
+	while _spawn_acc >= 1.0 and alive_n < t.pop and raw_n < raw_limit and attempts < cap:
 		attempts += 1
 		_spawn_acc -= 1.0
 		if _spawn_one(t):
 			alive_n += 1
+			raw_n += 1
 	if phase.wave_interval > 0.0:
 		_wave_t += world_dt
 		if _wave_t >= phase.wave_interval:
 			_wave_t = 0.0
-			if alive_n < t.pop:
-				_spawn_wave(t, t.pop - alive_n)
+			if alive_n < t.pop and raw_n < raw_limit:
+				_spawn_wave(t, minf(t.pop - alive_n, raw_limit - raw_n))
 	_tick_clips()
 	_sync_attack_budget(phase)
 
@@ -2186,6 +2270,8 @@ var _far_rows := PackedInt32Array()
 ## 領域（0〜3：左・右・上・下、4：中心付近）ごとの、数える範囲の敵の数と、種類ごとの数
 var _region_n := PackedInt32Array([0, 0, 0, 0, 0])
 var _region_types: Array[Dictionary] = [{}, {}, {}, {}, {}]
+## 直前の走査での、再配置の範囲の中の敵の実際の数（領域ごとの上限で切る前）
+var _survey_raw := 0
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
 ## 戻り値は、目標の数 pop と比べる、再配置の範囲の中の敵の数。上下左右と中心付近の領域ごとに、
@@ -2239,8 +2325,10 @@ func _survey(pop: float) -> float:
 	# 領域ごとに上限で切って数える（種類ごとの数も同じ割合で減らす）
 	var limit := pop * cfg.spawn_region_cap if pop > 0.0 and cfg.spawn_region_cap > 0.0 else INF
 	var alive_n := 0.0
+	_survey_raw = 0
 	for region in 5:
 		var n := _region_n[region]
+		_survey_raw += n
 		if n == 0:
 			continue
 		var keep := minf(1.0, limit / n)
@@ -2251,6 +2339,7 @@ func _survey(pop: float) -> float:
 	for i in _far_rows:
 		if _recycle(i):
 			alive_n += 1.0
+			_survey_raw += 1
 	return alive_n
 
 ## 画面の四辺の外の出現位置。外周の敵が少ない辺を優先する。

@@ -96,6 +96,7 @@ spawn_margin = 70.0
 spawn_refill_time = 1.0
 spawn_recycle_scale = 1.6
 spawn_region_cap = 0.3
+spawn_total_cap = 1.5
 surge_start = 600.0
 surge_interval = 40.0
 surge_pop = 0.15
