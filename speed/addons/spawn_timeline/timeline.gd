@@ -34,7 +34,7 @@ func _init() -> void:
 	toolbar.add_child(bar)
 	var groups := {}
 	var ui := EditorInterface.get_editor_scale() if Engine.is_editor_hint() else 1.0
-	for spec in [["雑魚敵", _add_curve_menu], ["通常", _add_track],
+	for spec in [["雑魚敵", _add_curve_menu], ["強敵", _add_track],
 			["ボス", func() -> void: canvas.clocks.toggle_pin("boss_time")],
 			["終了", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["-", func() -> void: canvas.zoom(0.8)], ["+", func() -> void: canvas.zoom(1.25)], ["最大", func() -> void: canvas.fit()],
@@ -62,9 +62,9 @@ func _init() -> void:
 			b.disabled = true
 		elif spec[0] in ["-", "+", "最大"]:
 			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
-		elif spec[0] in ["通常", "雑魚敵"]:
+		elif spec[0] in ["強敵", "雑魚敵"]:
 			_set_button_icon(b, "add", ui)
-			b.tooltip_text = "空の通常トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "通常" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
+			b.tooltip_text = "空の強敵トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "強敵" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
 		elif spec[0] == "再生":
 			_set_button_icon(b, "play", ui)
 			b.tooltip_text = "再生位置からステージを起動"
@@ -246,7 +246,7 @@ func _add_track() -> void:
 	stage.set("track_names", after)
 	canvas.selected = -1
 	canvas.track_selected = after.size() - 1
-	commit("通常トラックを追加", [[stage, "track_names", before, after]])
+	commit("強敵トラックを追加", [[stage, "track_names", before, after]])
 
 ## 指定位置に時間帯を追加する。数値はその位置の時間帯から引き継ぐ。
 func _add_phase(at: float) -> void:
