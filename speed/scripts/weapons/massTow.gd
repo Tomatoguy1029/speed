@@ -1,10 +1,10 @@
-## W21 質量牽引砲：なぞり中の体当たりや攻撃で倒した敵の船体を、大型の敵も丸ごと牽引する。
+## W21 質量牽引砲：なぞり中の体当たりで倒した敵の船体を、大型の敵も丸ごと牽引する。
 ## なぞり終えると、進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける（彗星限定。一覧 docs/game/catalog/weapons.md）。
 ## 撃ち出した船体で倒した敵は、牽引しない。隕石とボスは牽引しない。
 extends WeaponBehavior
 
-## 牽引できる撃破の原因（なぞり中の攻撃）
-const CAUSES: Array[StringName] = [&"ram", &"bump", &"sonic", &"killSonic", &"contactWave", &"contactArc", &"critBeam"]
+## 牽引できる撃破の原因（なぞり中の体当たり。弾かれたときの当たりも含む）
+const CAUSES: Array[StringName] = [&"ram", &"bump"]
 
 ## 牽引中の船体。pos・r・type・color・angle・source_id・ready（撃ち出せるか）
 var cargo: Array[Dictionary] = []
