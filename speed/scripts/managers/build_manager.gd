@@ -334,9 +334,9 @@ func _receive_comet_weapon(id: StringName) -> bool:
 	return true
 
 ## 質量牽引砲（W21）が、行 i の敵の船体を牽引するか。牽引したら true。
-func capture_hull(i: int, cause: StringName) -> bool:
+func capture_hull(i: int) -> bool:
 	var tow = weapon_behaviors.get(&"W21")
-	return tow != null and tow.capture(i, cause)
+	return tow != null and tow.capture(i)
 
 ## 装備をすべて外す（調整パネル用）。
 func reset_loadout() -> void:
