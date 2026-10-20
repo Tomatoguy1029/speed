@@ -165,7 +165,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
+				or def.id in [&"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -192,6 +192,12 @@ func _build_batches() -> void:
 	crystals.z_index = -1
 	_layers.enemies.add_child(crystals)
 	_batches[&"splitter_crystals"] = crystals
+	# 自爆する雑魚の導火線の火花（構えていない間）も、まとめて描く
+	var fuse := InstanceBatch.new()
+	fuse.setup_polygon(InstanceBatch.circle_points(12))
+	fuse.z_index = -1
+	_layers.enemies.add_child(fuse)
+	_batches[&"bomber_fuse"] = fuse
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -612,7 +618,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			gems.add(pos, 0.0, gs, XP_COLOR)
+			gems.add_upright(pos, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -621,7 +627,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in coin_alive.size():
 		var pos := coin_pos[i]
 		if coin_alive[i] != 0 and view.has_point(pos):
-			_coin_batch.add(pos, 0.0, cs, COIN_COLOR)
+			_coin_batch.add_upright(pos, cs, COIN_COLOR)
 	_coin_batch.end()
 	for cap: Pickup in p.capsules:
 		match cap.kind:
@@ -693,11 +699,17 @@ func _draw_enemies(c: CanvasItem) -> void:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
 			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
+		var bomber_windup := false
 		if type == &"splitter":
 			_add_splitter_crystals(t, i)
+		elif type == &"bomber":
+			if t.mode[i] == EnemyTable.Mode.WINDUP:
+				bomber_windup = true
+			else:
+				_add_bomber_fuse(t, i)
 		# 飾りのある敵だけ、飾りを描く
 		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
-				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type):
+				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or bomber_windup or _always_marked.has(type):
 			_draw_enemy_marks(c, t, i)
 	for key in _batches:
 		if key != &"gem":
@@ -912,7 +924,6 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var fuse := p - u * r * 0.95
 	var now := state.world_time
 	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
 		return
 	var k := t.charge[i]
 	var throb := 0.5 + 0.5 * sin(state.world_time * (10.0 + 20.0 * k))
@@ -921,6 +932,13 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	for n in 4:
 		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
 		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
+
+## 自爆する雑魚が構えていない間の、導火線の先でちらつく火花（まとめて描く）。構えたあとは _draw_bomber。
+func _add_bomber_fuse(t: EnemyTable, i: int) -> void:
+	var r := t.r[i]
+	var fuse := t.pos[i] - Vector2.from_angle(t.facing[i]) * r * 0.95
+	var size := maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(state.world_time * 30.0 + float(t.id[i])))
+	_batches[&"bomber_fuse"].add(fuse, 0.0, size, Color("#ffd36b"))
 
 ## 分裂する雑魚：体に詰まった経験値の結晶が透けて光る。倒すとこれがその場に全部落ちる。
 ## 光（明滅する円）と結晶3つ（縁取りのある菱形）を、敵の位置・向き・大きさでまとめて描く（_draw_enemies）。
