@@ -101,7 +101,7 @@ class Checks extends EditorProperty:
 	static var _open: Dictionary = {}
 	var _options: Array
 	var _boxes: Array[CheckBox] = []
-	var _numbers: Array[LineEdit] = []
+	var _numbers: Array[SpinBox] = []
 	var _values_property := ""
 	var _updating := false
 	var _toggle: Button
@@ -163,12 +163,15 @@ class Checks extends EditorProperty:
 			label.tooltip_text = label.text
 			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_table_cell(label, k, true)
-			var number := LineEdit.new()
+			var number := SpinBox.new()
+			number.min_value = 1
+			number.max_value = 2147483647
+			number.step = 1
+			number.rounded = true
 			number.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			number.custom_minimum_size.x = 72 * EditorInterface.get_editor_scale()
 			number.tooltip_text = "群れ全体が共有するvalue（1以上の整数）"
-			number.text_submitted.connect(_commit_value.bind(str(opt[0]), k))
-			number.focus_exited.connect(func() -> void: _commit_value(number.text, str(opt[0]), k))
+			number.value_changed.connect(_on_value_changed.bind(str(opt[0])))
 			_table_cell(number, k)
 			_numbers.append(number)
 
@@ -200,7 +203,7 @@ class Checks extends EditorProperty:
 		for k in _options.size():
 			_boxes[k].set_pressed_no_signal(current.has(_options[k][0]) or (_values_property != "" and current.is_empty()))
 			if _values_property != "":
-				_numbers[k].text = str(maxi(1, int(values.get(String(_options[k][0]), 1))))
+				_numbers[k].set_value_no_signal(maxi(1, int(values.get(String(_options[k][0]), 1))))
 		_updating = false
 		_show_fold(current.size())
 
@@ -237,20 +240,14 @@ class Checks extends EditorProperty:
 			return
 		emit_changed(get_edited_property(), value)
 
-	func _commit_value(text: String, key: String, index: int) -> void:
+	func _on_value_changed(value: float, key: String) -> void:
 		if _updating:
 			return
 		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
-		var previous := maxi(1, int(values.get(key, 1)))
-		var input := text.strip_edges()
-		if not input.is_valid_int() or input.to_int() < 1 or input.to_int() > 2147483647:
-			_numbers[index].text = str(previous)
+		var integer := maxi(1, int(value))
+		if integer == int(values.get(key, 1)):
 			return
-		var value := input.to_int()
-		_numbers[index].text = str(value)
-		if value == previous:
-			return
-		values[key] = value
+		values[key] = integer
 		emit_changed(_values_property, values)
 
 ## シーンの参照は、群れの選択と別の欄で編集する。
