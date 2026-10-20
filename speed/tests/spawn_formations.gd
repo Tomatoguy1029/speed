@@ -46,11 +46,14 @@ func _check_phases(run: RunManager) -> void:
 		p.id = StringName("p%d" % int(s))
 		phases.append(p)
 	stage.phases = phases
+	stage.boss_time = 350.0
 	run.state.stage = stage
 	run.state.time = 150.0
 	check(run.enemies.current_phase().id == &"p100", "時刻 150 は2つ目の時間帯")
 	check(is_equal_approx(run.enemies._phase_end(1), 200.0), "2つ目は3つ目の開始で終わる")
-	check(is_equal_approx(run.enemies._phase_end(2), run.cfg.boss_time), "最後はボスの出現時刻で終わる")
+	check(is_equal_approx(run.enemies._phase_end(2), 350.0), "最後はステージのボスピンの時刻で終わる")
+	stage.boss_time = -1.0
+	check(is_equal_approx(run.enemies._phase_end(2), run.cfg.boss_time), "ボス時刻の指定がなければ共通設定を使う")
 	run.state.time = 0.0
 	check(run.enemies.current_phase().id == &"p0", "時刻 0 は最初の時間帯")
 
@@ -103,24 +106,24 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 			for k in range(0, rows.size(), 2):
 				em.table.dead[rows[k]] = 1
 	state.time = 4.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 0, "開始の前は出さない")
 	state.time = 5.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 1, "開始で群れを出す")
 	state.time = 6.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 1, "同時の群れの数を超えて出さない")
 	kill.call()
 	state.time = 7.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 0, "出す間隔が経つまで次を出さない")
 	state.time = 8.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 1, "間隔が経てば次を出す")
 	kill.call()
 	state.time = 20.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 0, "長さが過ぎたら出さない")
 	# 選んだ種類の敵だけを出す
 	var only: Array[StringName] = [&"telescope"]
@@ -128,7 +131,7 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	em._clip_groups.clear()
 	em._clip_next.clear()
 	state.time = 6.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	var all_tele := true
 	for rows: PackedInt32Array in em._clip_groups.get(0, []):
 		for k in range(0, rows.size(), 2):
@@ -146,10 +149,10 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	em._clip_groups.clear()
 	em._clip_next.clear()
 	em._type_counts[&"aquarius"] = 1
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 0, "上限に達している間は出さない")
 	em._type_counts.clear()
-	em._tick_clips(1.0)
+	em._tick_clips()
 	check(groups.call() == 1, "空いたら出す")
 	kill.call()
 	# クリップから出た群れは、遠くにいても再配置しない（隊列がばらばらにならない）
@@ -158,7 +161,7 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	clip.formations = forms
 	clip.types = types
 	state.time = 6.0
-	em._tick_clips(1.0)
+	em._tick_clips()
 	var rows: PackedInt32Array = em._clip_groups[0][0]
 	var far := state.view_center + Vector2(0, -5000)
 	em.table.pos[rows[0]] = far
@@ -167,7 +170,7 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	kill.call()
 
 ## 攻撃の重さの合計が予算を超えないように待たせる。待っていた攻撃は、ばらつきの分だけ遅れて始める。
-## 雑魚は管理しない。本番のランでは、時間帯の攻撃の予算で管理を切り替える。
+## 雑魚は管理しない。本番のランでは、時間帯の整数予算を使う。
 func _check_budget(run: RunManager) -> void:
 	var em := run.enemies
 	var state := run.state
@@ -194,13 +197,13 @@ func _check_budget(run: RunManager) -> void:
 	run.projectiles.director.configure({"enabled": false, "budget": 4.0})
 	# 本番のランでは、時間帯の攻撃の予算で管理する
 	var phase := PhaseDef.new()
-	phase.attack_budget = 5.0
+	phase.attack_budget = 5
 	state.lab_mode = false
 	em._sync_attack_budget(phase)
 	check(run.projectiles.director.enabled and is_equal_approx(float(run.projectiles.director.settings.budget), 5.0), "時間帯の予算で管理する")
-	phase.attack_budget = 0.0
+	phase.attack_budget = 0
 	em._sync_attack_budget(phase)
-	check(not run.projectiles.director.enabled, "予算が 0 の時間帯は管理しない")
+	check(run.projectiles.director.enabled and run.projectiles.director.settings.budget == 0, "予算が0の時間帯も管理し、新しい強敵の攻撃を待たせる")
 	state.lab_mode = true
 
 ## 雑魚の目標の数の曲線は点を通り、点の間で行き過ぎない。曲線のあるステージは、種類ごとに足りない分を補充する。

@@ -137,6 +137,6 @@ func spawn_lab(type: StringName, pos: Vector2) -> int:
 
 ## 技を構える前に、必要な分類を同時取得する。
 func admit(key: String, cats: Array, row: int, duration: float) -> bool:
-	if projectiles.director == null:
+	if projectiles.director == null or projectiles.director.formation_mode:
 		return true
 	return projectiles.director.request(key, cats, row, enemies.table.id[row], duration, 1.5)
