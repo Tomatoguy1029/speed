@@ -2086,13 +2086,14 @@ func _target() -> Dictionary:
 
 ## 強化帯の強まりの段（仕様書 4.2）。右端に達したあとは、その段を保つ。
 func surge_steps() -> int:
-	var start := state.stage.surge_begin(cfg)
-	if state.time < start:
-		return 0
-	var at := state.time
-	if state.stage.surge_end >= 0.0:
-		at = minf(at, maxf(start, state.stage.surge_end))
-	return 1 + int((at - start) / maxf(1.0, cfg.surge_interval))
+	var elapsed := 0.0
+	var started := false
+	for window in state.stage.surge_windows(cfg):
+		if state.time < window.x:
+			break
+		started = true
+		elapsed += maxf(0.0, minf(state.time, window.y) - window.x)
+	return 1 + int(elapsed / maxf(1.0, cfg.surge_interval)) if started else 0
 
 ## 通常の敵の数。in_view が true なら、再配置の範囲の中だけを数える。
 func _count_population(in_view: bool) -> int:

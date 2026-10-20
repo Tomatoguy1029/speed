@@ -96,6 +96,10 @@ func reload_experiment_data() -> bool:
 	for stage: StageDef in loaded.stages.values():
 		var phase_list := []
 		for phase: PhaseDef in stage.phases:
+			# タイムラインで追加した時間帯はステージ内に保存し、その値を直接使う。
+			if phase.resource_path.contains("::"):
+				phase_list.append(phase)
+				continue
 			if not loaded.phases.has(phase.id):
 				source_hashes = old_hashes
 				return false

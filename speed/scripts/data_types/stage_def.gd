@@ -52,6 +52,8 @@ const EDITOR_ORDER := 5
 ## この時刻で強化の進行を止め、その時点の強さを保つ。負の値なら強化を続ける。
 ## 単位：実秒
 @export var surge_end: float = -1.0
+## 時間帯ごとの強化のON/OFF。未指定の時間帯は既存の強化帯を使う。タイムラインから編集する。
+@export_storage var surge_phases: Dictionary = {}
 ## ステージの制限時間
 ## この時刻にランの time_limit_reached フラグを立てる。負の値なら制限時間を使わない。
 ## 単位：実秒
@@ -89,3 +91,31 @@ func boss_start(cfg: GameConfig) -> float:
 
 func surge_begin(cfg: GameConfig) -> float:
 	return surge_start if surge_start >= 0.0 else cfg.surge_start
+
+## 時間帯のON/OFFを反映した強化区間。隣り合う区間はつなげる。
+func surge_windows(cfg: GameConfig) -> Array[Vector2]:
+	var start := surge_begin(cfg)
+	var end := maxf(start, surge_end) if surge_end >= 0.0 else INF
+	var windows: Array[Vector2] = []
+	if surge_phases.is_empty():
+		windows.append(Vector2(start, end))
+		return windows
+	for k in phases.size():
+		var phase: PhaseDef = phases[k]
+		var finish: float = phases[k + 1].start if k + 1 < phases.size() else INF
+		var key := String(phase.id)
+		var from := maxf(phase.start, start)
+		var to := minf(finish, end)
+		if surge_phases.has(key):
+			if not surge_phases[key]:
+				continue
+			from = phase.start
+			to = finish
+		var point_in_phase := start == end and start >= phase.start and start < finish
+		if to < from or (to == from and not point_in_phase):
+			continue
+		if not windows.is_empty() and from <= windows[-1].y:
+			windows[-1] = Vector2(windows[-1].x, maxf(windows[-1].y, to))
+		else:
+			windows.append(Vector2(from, to))
+	return windows

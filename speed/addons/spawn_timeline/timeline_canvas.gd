@@ -14,7 +14,8 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"雑魚敵：雑魚敵を選び、時間帯の下の雑魚敵トラックの末尾へ追加\n" + \
 		"上段のボス・終了：再生位置に配置／再クリックで削除　終了ピンなし：編集上限180:00\n" + \
 		"進行のピンをドラッグ：ボス・制限時間　強化帯をドラッグ：区間を移動　左右の端をドラッグ：強化の開始・終了\n" + \
-		"ピン・帯をダブルクリック：時刻を入力　時間帯を右クリック：設定・解除\n" + \
+		"ピン・帯をダブルクリック：時刻を入力　時間帯を右クリック：時間帯の追加・削除、ピン・強化帯の設定\n" + \
+		"選んだピン・クリップを←→：1秒ずつ移動\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
@@ -47,6 +48,8 @@ var timeline
 var playhead := 0.0
 ## 選んでいるクリップの番号（-1 ならなし）
 var selected := -1
+## 選んでいる進行のピン（boss_time・time_limit。空ならなし）。
+var clock_selected := ""
 ## 選んでいるトラックの行（-1 なら選んでいない）
 var track_selected := -1
 ## 見えている範囲の左端の時刻と、1秒の幅
@@ -687,6 +690,46 @@ func _hit(p: Vector2) -> Dictionary:
 	return {"kind": "track", "row": row}
 	return {}
 
+## 選択対象を切り替え、キー操作が以前の対象へ残るのを防ぐ。
+func _select_hit(hit: Dictionary) -> void:
+	var kind: String = hit.get("kind", "")
+	var field: String = hit.get("field", "")
+	clock_selected = field if kind == "clock" and field in ["boss_time", "time_limit"] else ""
+	selected = int(hit.get("index", -1)) if kind in ["time", "length"] else -1
+	track_selected = int(hit.get("row", -1)) if kind == "track_label" else -1
+	curve_selected = int(hit.get("curve", -1)) if kind in ["curve_label", "curve_body", "point"] else -1
+	point_selected = int(hit.get("point", -1)) if kind == "point" else -1
+	queue_redraw()
+
+## 選んだピンかクリップの開始時刻を動かす。クリップの長さとトラックは保つ。
+func _nudge_time(delta: float) -> void:
+	var target: Resource
+	var prop := "time"
+	var before: float
+	if clock_selected != "":
+		before = clocks.value(clock_selected)
+		if before < 0.0:
+			return
+		target = timeline.stage
+		prop = clock_selected
+	elif selected >= 0 and selected < timeline.clips().size():
+		target = timeline.clips()[selected]
+		before = float(target.get(prop))
+	else:
+		return
+	var after := maxf(0.0, before + delta)
+	if prop == "time" and track_busy(clip_track(selected), after, after + float(target.get("length")), selected):
+		return
+	if after == before:
+		return
+	var stored = target.get(prop)
+	target.set(prop, after)
+	timeline.commit("選択した時刻を移動", [[target, prop, stored, after]])
+	if _x(after) < GUTTER:
+		pan(after - view_start)
+	elif _x(after) > size.x - 16.0 * ui:
+		pan((_x(after) - size.x + 16.0 * ui) / px_per_sec)
+
 func _gui_input(event: InputEvent) -> void:
 	if timeline == null or timeline.stage == null:
 		return
@@ -716,6 +759,7 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
+			_select_hit(h)
 			var phase_y := mb.position.y - _scroll_y() - RULER
 			if phase_y >= 0.0 and phase_y < PHASE_ROW:
 				clocks.menu(mb.position)
@@ -738,6 +782,7 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			grab_focus()
 			var h := _hit(mb.position)
+			_select_hit(h)
 			if h.is_empty():
 				return
 			if h.kind == "clock" and mb.double_click:
@@ -782,7 +827,8 @@ func _gui_input(event: InputEvent) -> void:
 				return
 			if h.has("index") and h.kind != "phase":
 				selected = h.index
-				EditorInterface.inspect_object(timeline.clips()[selected], "", true)
+				if Engine.is_editor_hint():
+					EditorInterface.inspect_object(timeline.clips()[selected], "", true)
 			_begin_drag(h, mb.position)
 		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed and not _drag.is_empty():
 			_end_drag()
@@ -796,6 +842,12 @@ func _gui_input(event: InputEvent) -> void:
 			_hover_curve = hc
 			_hover_point = hp
 			queue_redraw()
+	elif event is InputEventKey and event.pressed and _rename == null and _drag.is_empty() \
+			and (event as InputEventKey).keycode in [KEY_LEFT, KEY_RIGHT] \
+			and not ((event as InputEventKey).ctrl_pressed or (event as InputEventKey).meta_pressed or (event as InputEventKey).alt_pressed) \
+			and (clock_selected != "" or selected >= 0):
+		_nudge_time(-1.0 if (event as InputEventKey).keycode == KEY_LEFT else 1.0)
+		accept_event()
 	elif event is InputEventKey and event.pressed and point_selected >= 0 and (event as InputEventKey).keycode in [KEY_UP, KEY_DOWN]:
 		# 選んでいる点の数を、上下の矢印キーで 1 ずつ（Shift で 10 ずつ）変える
 		var ke := event as InputEventKey
