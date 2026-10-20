@@ -18,9 +18,13 @@ var _last_xp_gained := 0.0
 var _last_xp_dropped := 0.0
 ## 間隔のあいだにたまった数
 var _kills: Dictionary = {}
+## 倒した原因ごとの数と、与えたダメージの原因ごとの合計（倒しきった分の余りも含む）
+var _kills_by: Dictionary = {}
+var _dealt: Dictionary = {}
+## 受けたダメージ（攻撃の種類/撃った敵ごと）
 var _damage: Dictionary = {}
 var _budget_max := 0.0
-## 強敵（星3以上）：id → [種類, 出た時刻, 体当たりの回数, 武器のダメージ]
+## 強敵（星3以上）：id → [種類, 出た時刻, 体当たりの回数, 武器のダメージ, 武器のダメージの原因ごとの合計]
 var _strong: Dictionary = {}
 ## 直前に出たカードと、最後に受けた攻撃
 var _offered: Array = []
@@ -154,7 +158,7 @@ func _sample() -> void:
 	_write({"type": "sample", "t": _r(s.time), "band": String(phase.id),
 		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
 		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
-		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "damage": _damage, "attack_budget_max": _r(_budget_max)})
+		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt, "damage": _damage, "attack_budget_max": _r(_budget_max)})
 	_last_xp_gained = s.xp_gained
 	_last_xp_dropped = s.xp_dropped
 	_reset_counts()
@@ -162,6 +166,8 @@ func _sample() -> void:
 
 func _reset_counts() -> void:
 	_kills = {}
+	_kills_by = {}
+	_dealt = {}
 	_damage = {}
 	_budget_max = 0.0
 
@@ -182,21 +188,26 @@ func _on_events(events: Array[Dictionary]) -> void:
 					continue
 				var ty := String(e.get("enemy_type", &""))
 				_kills[ty] = int(_kills.get(ty, 0)) + 1
+				var by := String(e.get("cause", &""))
+				_kills_by[by] = int(_kills_by.get(by, 0)) + 1
 				var id: int = e.get("id", -1)
 				if _strong.has(id):
 					var rec: Array = _strong[id]
 					_write({"type": "strong", "t": time, "enemy": rec[0], "spawned": rec[1], "life": _r(time - rec[1]),
-						"rams": rec[2], "weapon_damage": _r(rec[3]), "result": "killed"})
+						"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "killed_by": by, "result": "killed"})
 					_strong.erase(id)
 			&"hit":
+				var cause: StringName = e.get("cause", &"")
+				var dmg := float(e.get("dmg", 0.0))
+				_dealt[String(cause)] = _r(float(_dealt.get(String(cause), 0.0)) + dmg)
 				var id: int = e.get("id", -1)
 				if _strong.has(id):
 					var rec: Array = _strong[id]
-					var cause: StringName = e.get("cause", &"")
 					if cause == &"ram":
 						rec[2] += 1
 					elif cause != &"bump" and cause != &"touch":
-						rec[3] += float(e.get("dmg", 0.0))
+						rec[3] += dmg
+						rec[4][String(cause)] = _r(float(rec[4].get(String(cause), 0.0)) + dmg)
 			&"hurt":
 				var key := String(e.get("cause", &""))
 				if String(e.get("source", &"")) != "":
@@ -204,7 +215,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_damage[key] = _r(float(_damage.get(key, 0.0)) + float(e.get("amount", 0.0)))
 				_last_hurt = {"cause": String(e.get("cause", &"")), "source": String(e.get("source", &""))}
 			&"strong_spawn":
-				_strong[e.id] = [String(e.enemy_type), time, 0, 0.0]
+				_strong[e.id] = [String(e.enemy_type), time, 0, 0.0, {}]
 			&"clip_group":
 				_write({"type": "clip_group", "t": time, "clip": e.clip, "key": e.key, "n": e.n})
 			&"clip_group_end":
@@ -239,7 +250,7 @@ func _end(result: String) -> void:
 	for id in _strong:
 		var rec: Array = _strong[id]
 		_write({"type": "strong", "t": _r(s.time), "enemy": rec[0], "spawned": rec[1], "life": _r(s.time - rec[1]),
-			"rams": rec[2], "weapon_damage": _r(rec[3]), "result": "alive"})
+			"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "result": "alive"})
 	_write({"type": "end", "t": _r(s.time), "result": result, "level": s.level, "kills": s.kills,
 		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {}})
 	_saved_text = "保存：" + _file.get_path().get_file()
