@@ -39,7 +39,7 @@ func _init() -> void:
 			["終了", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["▶ ここから試す", _launch_here],
 			["-", func() -> void: canvas.zoom(0.8)], ["+", func() -> void: canvas.zoom(1.25)], ["最大", func() -> void: canvas.fit()],
-			["操作", _show_help]]:
+			["？", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
@@ -64,6 +64,23 @@ func _init() -> void:
 			b.disabled = true
 		elif spec[0] in ["-", "+", "最大"]:
 			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
+		elif spec[0] == "？":
+			b.tooltip_text = "操作方法"
+			b.custom_minimum_size = Vector2.ONE * 36.0 * ui
+			b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			b.add_theme_font_size_override("font_size", int(16.0 * ui))
+			for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+				var style := StyleBoxFlat.new()
+				style.set_corner_radius_all(int(18.0 * ui))
+				style.bg_color = Color(0.32, 0.32, 0.32) if state == "hover" else Color(0.25, 0.25, 0.25)
+				if state == "pressed":
+					style.bg_color = Color(0.18, 0.18, 0.18)
+				if state == "focus":
+					style.draw_center = false
+					style.set_border_width_all(maxi(1, int(2.0 * ui)))
+					style.border_color = Color(0.75, 0.75, 0.75)
+				b.add_theme_stylebox_override(state, style)
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
