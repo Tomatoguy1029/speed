@@ -100,6 +100,7 @@ func xp_needed() -> float:
 
 func add_xp(v: float) -> void:
 	state.xp += v
+	state.xp_gained += v
 	var need := xp_needed()
 	while state.xp >= need:
 		state.xp -= need

@@ -64,6 +64,7 @@ func on_enemy_killed(i: int) -> void:
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
 	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けて、その場からはじけ飛ばす
 	var value := t.xp[i] * state.stats.xp_mult * bonus
+	state.xp_dropped += value
 	var gems := int(t.def[i].params.get("gem_count", 1)) if t.def[i] != null else 1
 	if gems > 1:
 		for k in gems:
