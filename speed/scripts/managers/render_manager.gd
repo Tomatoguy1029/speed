@@ -235,7 +235,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
+				or def.id in [&"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -695,7 +695,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			gems.add(pos, 0.0, gs, XP_COLOR)
+			gems.add_upright(pos, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -704,7 +704,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in coin_alive.size():
 		var pos := coin_pos[i]
 		if coin_alive[i] != 0 and view.has_point(pos):
-			_coin_batch.add(pos, 0.0, cs, COIN_COLOR)
+			_coin_batch.add_upright(pos, cs, COIN_COLOR)
 	_coin_batch.end()
 	for cap: Pickup in p.capsules:
 		match cap.kind:
@@ -1029,7 +1029,6 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var fuse := p - u * r * 0.95
 	var now := state.world_time
 	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
 		return
 	var k := t.charge[i]
 	var throb := 0.5 + 0.5 * sin(state.world_time * (10.0 + 20.0 * k))
