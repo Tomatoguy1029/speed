@@ -34,7 +34,7 @@ func _init() -> void:
 	bar.add_child(_title)
 	var groups := {}
 	var ui := EditorInterface.get_editor_scale() if Engine.is_editor_hint() else 1.0
-	for spec in [["＋クリップ", _add_clip], ["＋雑魚の曲線", _add_curve_menu],
+	for spec in [["+通常", _add_track], ["+雑魚敵", _add_curve_menu],
 			["ボス", func() -> void: canvas.clocks.toggle_pin("boss_time")],
 			["終了", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["▶ ここから試す", _launch_here],
@@ -64,6 +64,8 @@ func _init() -> void:
 			b.disabled = true
 		elif spec[0] in ["-", "+", "最大"]:
 			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
+		elif spec[0] in ["+通常", "+雑魚敵"]:
+			b.tooltip_text = "空の通常トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "+通常" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
 		elif spec[0] == "？":
 			b.tooltip_text = "操作方法"
 			b.custom_minimum_size = Vector2.ONE * 36.0 * ui
@@ -217,22 +219,43 @@ func _new_element(prop: String) -> Resource:
 				return load(g.path).new()
 	return null
 
-func _add_clip() -> void:
+## 通常トラックは、空の行も名前の配列の要素として保持する。
+func _add_track() -> void:
+	if stage == null:
+		return
+	var before = stage.get("track_names")
+	var after: PackedStringArray = canvas._track_names_now()
+	after.append("")
+	stage.set("track_names", after)
+	canvas.selected = -1
+	canvas.track_selected = after.size() - 1
+	commit("通常トラックを追加", [[stage, "track_names", before, after]])
+
+func _add_clip(row := -1, at := -1.0) -> void:
 	if stage == null:
 		return
 	var clip := _new_clip()
 	if clip == null:
 		return
 	clip.set("label", "新しいクリップ")
-	clip.set("time", snappedf(canvas.playhead, 1.0))
-	clip.set("length", 60.0)
+	var start := snappedf(canvas.playhead, 1.0) if at < 0.0 else maxf(0.0, at)
+	var length := 60.0
+	if row >= 0:
+		clip.set("track", row)
+		for k in clips().size():
+			var next_start := float(clips()[k].get("time"))
+			if canvas.clip_track(k) == row and next_start > start:
+				length = minf(length, next_start - start)
+	clip.set("time", start)
+	clip.set("length", length)
 	var before: Array = clips()
 	var after: Array = before.duplicate()
 	after.append(clip)
 	stage.set("clips", after)
 	canvas.selected = after.size() - 1
 	commit("クリップを足す", [[stage, "clips", before, after]])
-	EditorInterface.inspect_object(clip, "", true)
+	if Engine.is_editor_hint():
+		EditorInterface.inspect_object(clip, "", true)
 
 ## ステージの敵のうち、まだ曲線のない雑魚（区分 1）を選んで、雑魚の目標の数の曲線を足す。
 func _add_curve_menu() -> void:

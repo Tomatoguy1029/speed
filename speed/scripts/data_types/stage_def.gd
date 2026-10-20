@@ -33,7 +33,7 @@ const EDITOR_ORDER := 5
 ## 単位：—
 @export var clips: Array[SpawnClip] = []
 ## トラックの名前
-## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
+## 出現タイムラインの通常トラックの名前と行数（番号順。空の名前なら番号を表示する）。空の行も保持する。
 ## 単位：文字
 @export var track_names: PackedStringArray
 ## ボスの出現時刻
