@@ -21,6 +21,8 @@ var ignore_armor := false
 var dash_stop := 0.0
 
 var _buf := PackedInt32Array()
+## 体当たりだけで割れる物（レアな彗星）に武器が当たって火花を出した時刻（個体の id → 世界秒）
+var _ram_only_spark: Dictionary = {}
 var _hits: Array = []
 
 func tick(real_dt: float, _world_dt: float) -> void:
@@ -236,6 +238,16 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 
 # ── ダメージと撃破 ────────────────────────────────────────────────
 
+## 体当たりだけで割れる物に武器が当たったら、弾いた火花を出す（同じ物には0.15世界秒に1回）。
+func _spark_ram_only(i: int, dir: Vector2) -> void:
+	var t := enemies.table
+	var id := t.id[i]
+	if state.world_time - float(_ram_only_spark.get(id, -1.0)) < 0.15:
+		return
+	_ram_only_spark[id] = state.world_time
+	var n := -dir if dir != Vector2.ZERO else Vector2.from_angle(state.rng.randf() * TAU)
+	state.emit(&"block_impact", {"pos": t.pos[i], "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
+
 ## 行 i の敵にダメージを与える。opts：crit（体当たりで判定したクリティカル。武器などの当たりはクリティカルにならない）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var t := enemies.table
@@ -245,6 +257,8 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	# 体当たりの通り抜けは collide_ship で扱う。ここでは、条件を満たさない攻撃のダメージを止める
 	if cause != &"ram" and cause != &"bump" and enemies.gate_check(i, opts.get("impact", t.pos[i]),
 			opts.get("dir", Vector2.ZERO), cause, dmg) != EnemyTable.GateResult.ALLOW:
+		if t.gate[i] == EnemyTable.Gate.RAM_ONLY:
+			_spark_ram_only(i, opts.get("dir", Vector2.ZERO))
 		return
 	if cause == &"fire":
 		t.fire_hit[i] = state.world_time
