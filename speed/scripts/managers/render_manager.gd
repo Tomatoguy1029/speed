@@ -235,7 +235,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
+				or def.id in [&"bomber", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -951,8 +951,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_pump(c, t, i)
 	elif type == &"bomber":
 		_draw_bomber(c, t, i)
-	elif type == &"splitter":
-		_draw_splitter_crystals(c, t, i)
 	elif type == &"beamer":
 		_draw_beamer(c, t, i)
 	elif type == &"pulser":
@@ -1040,23 +1038,6 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	for n in 4:
 		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
 		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
-
-## 分裂する雑魚：体に詰まった経験値の結晶が透けて光る。倒すとこれがその場に全部落ちる。
-func _draw_splitter_crystals(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var u := Vector2.from_angle(t.facing[i])
-	var v := Vector2(-u.y, u.x)
-	var pulse := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
-	c.draw_circle(p, r * 0.75, Color(1.0, 0.85, 0.3, 0.12 + 0.08 * pulse))
-	for k in 3:
-		var o := float(k - 1)
-		var q := p + v * o * r * 0.42 - u * absf(o) * r * 0.1
-		var s := r * (0.34 if k == 1 else 0.24)
-		var pts := PackedVector2Array([q - u * s * 1.3, q + v * s * 0.75, q + u * s * 1.3, q - v * s * 0.75])
-		c.draw_colored_polygon(pts, Color("#ffd23f"))
-		pts.append(pts[0])
-		c.draw_polyline(pts, Color("#fff4c0"), maxf(_px(1.0), s * 0.18))
 
 ## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
 func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
