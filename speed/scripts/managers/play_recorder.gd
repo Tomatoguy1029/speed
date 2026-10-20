@@ -245,11 +245,13 @@ func _update_label() -> void:
 	if _label == null:
 		return
 	_label.visible = armed
+	var text := "● REC 待機"
 	if _run != null:
-		var t: float = _run.state.time
-		_label.text = "● REC %d:%02d" % [int(t) / 60, int(t) % 60]
-	else:
-		_label.text = "● REC 待機"
+		var t := int(_run.state.time)
+		text = "● REC %d:%02d" % [t / 60, t % 60]
+	# 文字が変わったときだけ書き換える（毎フレーム書き換えると、文字の組み直しが毎回走る）
+	if _label.text != text:
+		_label.text = text
 
 static func _r(v: float) -> float:
 	return snappedf(v, 0.01)
