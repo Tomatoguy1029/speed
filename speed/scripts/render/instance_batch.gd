@@ -56,6 +56,16 @@ func _setup_mesh(mesh: Mesh) -> void:
 	mm.custom_aabb = AABB(Vector3(-20000, -20000, -1), Vector3(40000, 40000, 2))
 	multimesh = mm
 
+## 頂点ごとの色を持つ三角形の並び（3頂点ずつ）で形を作る。インスタンスの色は頂点の色に掛かる。
+func setup_colored_triangles(verts: PackedVector2Array, colors: PackedColorArray) -> void:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_COLOR] = colors
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_setup_mesh(mesh)
+
 static func circle_points(segments: int) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for i in segments:

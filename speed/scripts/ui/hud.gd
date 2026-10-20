@@ -418,19 +418,13 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 	var ids := owned.keys()
 	for k in slots:
 		var rect := Rect2(8.0 + k * (size_px + 4.0), y, size_px, size_px)
-		var box := StyleBoxFlat.new()
-		box.set_corner_radius_all(corner)
-		box.set_border_width_all(2)
 		if k >= ids.size():
-			box.bg_color = Color(1, 1, 1, 0.03)
-			box.border_color = Color(1, 1, 1, 0.18)
-			draw_style_box(box, rect)
+			draw_style_box(_slot_box(corner, Color(1, 1, 1, 0.03), Color(1, 1, 1, 0.18)), rect)
 			continue
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var def = defs[ids[k]]
-		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
-		box.border_color = col
+		var box := _slot_box(corner, Color(0.04, 0.06, 0.11, 0.8), col)
 		var text_col := col
 		# 彗星限定の武器は赤い枠で、ほかの武器と見分ける
 		if def is WeaponDef and def.comet_only:
@@ -440,8 +434,7 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 			glow.set_border_width_all(3)
 			glow.set_expand_margin_all(3)
 			draw_style_box(glow, rect)
-			box.bg_color = Color(0.25, 0.03, 0.06, 0.88)
-			box.border_color = COMET_ONLY_COLOR
+			box = _slot_box(corner, Color(0.25, 0.03, 0.06, 0.88), COMET_ONLY_COLOR)
 			text_col = Color("#ffd9d9")
 		draw_style_box(box, rect)
 		_draw_fit_text(def.get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), text_col)
@@ -453,21 +446,47 @@ func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level
 			var pip := Rect2(rect.position.x + 5.0 + j * (pip_w + 2.0), rect.end.y - 7.0, pip_w, 3.0)
 			draw_rect(pip, col if j < lv else Color(1, 1, 1, 0.15))
 
+## 装備の枠の飾り（角の丸み・背景・縁の色ごとに1つ作って使い回す）
+var _slot_boxes: Dictionary = {}
+## 枠に収める文字の大きさと折り方（文字と枠の大きさごとに1回だけ測る）
+var _fit_cache: Dictionary = {}
+
+func _slot_box(corner: int, bg: Color, border: Color) -> StyleBoxFlat:
+	var key := [corner, bg, border]
+	if not _slot_boxes.has(key):
+		var box := StyleBoxFlat.new()
+		box.set_corner_radius_all(corner)
+		box.set_border_width_all(2)
+		box.bg_color = bg
+		box.border_color = border
+		_slot_boxes[key] = box
+	return _slot_boxes[key]
+
 ## 枠に収まる大きさまで文字を小さくして、上寄せ・中央揃えで描く。
 func _draw_fit_text(text: String, area: Rect2, col: Color) -> void:
-	# 単語の途中では折らない。どの大きさでも収まらなければ、いちばん小さい大きさで途中でも折る
+	var key := [text, area.size]
+	if not _fit_cache.has(key):
+		_fit_cache[key] = _fit_text(text, area.size)
+	var fit: Array = _fit_cache[key]
+	var font_size: int = fit[0]
+	var flags: int = fit[1]
+	draw_multiline_string(_font, area.position + Vector2(0, _font.get_ascent(font_size)), text, HORIZONTAL_ALIGNMENT_CENTER,
+		area.size.x, font_size, -1, col, flags)
+
+## 文字 text が大きさ size の枠に収まる文字の大きさと折り方：[大きさ, 折り方]。
+## 単語の途中では折らない。どの大きさでも収まらなければ、いちばん小さい大きさで途中でも折る。
+func _fit_text(text: String, size: Vector2) -> Array:
 	var flags := TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
 	var font_size := 12
 	while true:
-		var sz := _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, font_size, -1, flags)
-		if sz.x <= area.size.x + 0.5 and sz.y <= area.size.y:
+		var sz := _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, size.x, font_size, -1, flags)
+		if sz.x <= size.x + 0.5 and sz.y <= size.y:
 			break
 		if font_size <= 8:
 			flags |= TextServer.BREAK_ADAPTIVE
 			break
 		font_size -= 1
-	draw_multiline_string(_font, area.position + Vector2(0, _font.get_ascent(font_size)), text, HORIZONTAL_ALIGNMENT_CENTER,
-		area.size.x, font_size, -1, col, flags)
+	return [font_size, flags]
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses

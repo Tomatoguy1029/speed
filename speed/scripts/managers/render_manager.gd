@@ -165,7 +165,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
+				or def.id in [&"bomber", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -180,6 +180,18 @@ func _build_batches() -> void:
 		b.z_index = -1
 		_layers.enemies.add_child(b)
 		_batches[def.id] = b
+	# 分裂する雑魚の光と結晶は数が多いので、図形を毎フレーム描かず、絵の上に重ねてまとめて描く
+	var splitter_glow := InstanceBatch.new()
+	splitter_glow.setup_polygon(InstanceBatch.circle_points(20))
+	splitter_glow.z_index = -1
+	_layers.enemies.add_child(splitter_glow)
+	_batches[&"splitter_glow"] = splitter_glow
+	var crystals := InstanceBatch.new()
+	var crystal_shape := _splitter_crystal_triangles()
+	crystals.setup_colored_triangles(crystal_shape[0], crystal_shape[1])
+	crystals.z_index = -1
+	_layers.enemies.add_child(crystals)
+	_batches[&"splitter_crystals"] = crystals
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -681,6 +693,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
 			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
+		if type == &"splitter":
+			_add_splitter_crystals(t, i)
 		# 飾りのある敵だけ、飾りを描く
 		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
 				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type):
@@ -820,8 +834,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_pump(c, t, i)
 	elif type == &"bomber":
 		_draw_bomber(c, t, i)
-	elif type == &"splitter":
-		_draw_splitter_crystals(c, t, i)
 	elif type == &"beamer":
 		_draw_beamer(c, t, i)
 	elif type == &"pulser":
@@ -911,21 +923,38 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
 
 ## 分裂する雑魚：体に詰まった経験値の結晶が透けて光る。倒すとこれがその場に全部落ちる。
-func _draw_splitter_crystals(c: CanvasItem, t: EnemyTable, i: int) -> void:
+## 光（明滅する円）と結晶3つ（縁取りのある菱形）を、敵の位置・向き・大きさでまとめて描く（_draw_enemies）。
+func _add_splitter_crystals(t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
-	var u := Vector2.from_angle(t.facing[i])
-	var v := Vector2(-u.y, u.x)
 	var pulse := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
-	c.draw_circle(p, r * 0.75, Color(1.0, 0.85, 0.3, 0.12 + 0.08 * pulse))
+	_batches[&"splitter_glow"].add(p, 0.0, r * 0.75, Color(1.0, 0.85, 0.3, 0.12 + 0.08 * pulse))
+	_batches[&"splitter_crystals"].add(p, t.facing[i], r, Color.WHITE)
+
+## 結晶3つの形（半径 1、+X が前）：[頂点, 頂点の色]。中は菱形、縁は辺ごとの細い帯。
+static func _splitter_crystal_triangles() -> Array:
+	var verts := PackedVector2Array()
+	var colors := PackedColorArray()
+	var fill := Color("#ffd23f")
+	var rim := Color("#fff4c0")
 	for k in 3:
 		var o := float(k - 1)
-		var q := p + v * o * r * 0.42 - u * absf(o) * r * 0.1
-		var s := r * (0.34 if k == 1 else 0.24)
-		var pts := PackedVector2Array([q - u * s * 1.3, q + v * s * 0.75, q + u * s * 1.3, q - v * s * 0.75])
-		c.draw_colored_polygon(pts, Color("#ffd23f"))
-		pts.append(pts[0])
-		c.draw_polyline(pts, Color("#fff4c0"), maxf(_px(1.0), s * 0.18))
+		var q := Vector2(-absf(o) * 0.1, o * 0.42)
+		var s := 0.34 if k == 1 else 0.24
+		var pts := [q + Vector2(-s * 1.3, 0), q + Vector2(0, s * 0.75), q + Vector2(s * 1.3, 0), q + Vector2(0, -s * 0.75)]
+		for tri in [[0, 1, 2], [0, 2, 3]]:
+			for n in tri:
+				verts.append(pts[n])
+				colors.append(fill)
+		var half := s * 0.09
+		for e in 4:
+			var a: Vector2 = pts[e]
+			var b: Vector2 = pts[(e + 1) % 4]
+			var nrm := (b - a).orthogonal().normalized() * half
+			for corner in [a + nrm, b + nrm, b - nrm, a + nrm, b - nrm, a - nrm]:
+				verts.append(corner)
+				colors.append(rim)
+	return [verts, colors]
 
 ## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
 func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
