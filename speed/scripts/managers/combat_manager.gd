@@ -270,10 +270,13 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 			_kill_stop(i, crit)
 		kill_enemy(i, opts.merged({"crit": crit}))
 	elif opts.has("dir"):
-		var mass := maxf(1.0, t.r[i] / 20.0)
-		t.vel[i] += opts.dir * float(opts.get("knock", 160.0)) / mass
-		if FORCEFUL.has(cause) and t.is_boss[i] == 0:
-			t.knock_t[i] = 0.3
+		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
+		var push := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
+		if push > 0.0:
+			var mass := maxf(1.0, t.r[i] / 20.0)
+			t.vel[i] += opts.dir * float(opts.get("knock", 160.0)) * push / mass
+			if FORCEFUL.has(cause) and t.is_boss[i] == 0:
+				t.knock_t[i] = 0.3
 	if crit and not opts.get("no_crit", false):
 		build.on_critical(opts.get("impact", t.pos[i]))
 

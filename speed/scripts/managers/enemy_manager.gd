@@ -2158,6 +2158,8 @@ var _formation_cache: Dictionary = {}
 var _clip_groups: Dictionary = {}
 ## クリップの番号 → 次に群れを出せる時刻（実秒）
 var _clip_next: Dictionary = {}
+## 一度画面に入ったクリップの群れ（群れの最初の敵の id → true）。入ったあとは遠くなったら再配置する
+var _clip_arrived: Dictionary = {}
 
 ## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
 func formation_data(scene: PackedScene) -> Dictionary:
@@ -2244,6 +2246,7 @@ func _tick_clips() -> void:
 			# 全滅した群れ（プレイの記録が読む。群れは最初の敵の id で見分ける）
 			for g: PackedInt32Array in prev:
 				if not groups.has(g):
+					_clip_arrived.erase(g[1])
 					state.emit(&"clip_group_end", {"clip": clip.label, "key": g[1]})
 		_clip_groups[n] = groups
 		if state.time < clip.time or state.time >= clip.end_time():
@@ -2303,10 +2306,22 @@ func _survey(pop: float) -> float:
 	var type := table.type
 	var defs := table.def
 	_far_rows.clear()
-	# クリップから出た群れは、隊列のまま近づけるため、遠くにいても再配置しない
+	# クリップから出た群れは、隊列のまま近づけるため、画面に入るまでは遠くにいても再配置しない。
+	# 一度画面に入った群れは、ほかの敵と同じく遠くなったら近くへ移す
 	var grouped := {}
+	var view := state.view_rect()
 	for groups: Array in _clip_groups.values():
 		for rows: PackedInt32Array in groups:
+			if _clip_arrived.has(rows[1]):
+				continue
+			var seen := false
+			for k in range(0, rows.size(), 2):
+				if self.is_same(rows[k], rows[k + 1]) and view.has_point(pos[rows[k]]):
+					seen = true
+					break
+			if seen:
+				_clip_arrived[rows[1]] = true
+				continue
 			for k in range(0, rows.size(), 2):
 				grouped[rows[k]] = true
 	for rows in beh_rows:

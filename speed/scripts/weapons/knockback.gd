@@ -17,11 +17,15 @@ func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
 		if t.hull_scattered[i] == 0 and not build.projectiles.scatter_hull(i, dir, v, _dmg()):
 			build.projectiles.fling_corpse(i, dir * v, _dmg())
 	else:
+		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
+		var push := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
+		if push <= 0.0:
+			return
 		t.shove_time[i] = p("shove_time")
-		t.shove_vel[i] = dir * v
+		t.shove_vel[i] = dir * v * push
 		t.shove_dmg[i] = _dmg()
 		t.shove_hits[i] = {t.id[i]: true}
-		t.vel[i] = dir * v
+		t.vel[i] = dir * v * push
 
 ## 押し出されている敵が、ほかの敵にぶつかったらダメージを与える。
 func tick(_dt: float, _busy: bool) -> void:
