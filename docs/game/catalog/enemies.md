@@ -1,6 +1,6 @@
 # 本番の敵一覧
 
-[一覧の運用ルール](rules.md) に従う。type ID は demo から引き継ぐ。レベル・サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](../spec.md) の4.2・11章。
+[一覧の運用ルール](rules.md) に従う。type ID は demo から引き継ぐ。星と HP の属性による HP、サイズ・エリートの補正、出現、動きの共通ルールは [仕様書](../spec.md) の4.2・11章。
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
@@ -37,7 +37,7 @@
 | `missile` | ホーミングミサイルの敵 | 2 | 採用 | 実装済み | 遠い距離を保ち、予告のあとホーミングミサイルを撃つ | — | 2・4・5 | `data/enemies/missile.tres` |
 | `spreader` | 拡散弾の敵 | 2 | 採用 | 実装済み | 追ってきて、予告のあと扇状に弾をばらまく | — | 3・4・5 | `data/enemies/spreader.tres`（行動は `battleship`） |
 | `pump` | ポンプ座 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せてから、前方へ一気に吐き出す | 吸っている間だけ口が開き、倒せる | 1・2 | `data/enemies/pump.tres`、`enemy_manager.gd` の `_pump` |
-| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper` |
+| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | HP は柔らかめ（星3の標準より体当たり1回少ない） | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper` |
 | `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle` |
 | `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
@@ -46,7 +46,7 @@
 | `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle` |
 | `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
-| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser` |
+| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | HP は硬め（星5の標準より体当たり1回多い） | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser` |
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |

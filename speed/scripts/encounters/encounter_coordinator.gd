@@ -102,7 +102,7 @@ func _admit_candidates(commands: Array, path: PackedVector2Array, margin: float,
 			if point.distance_to(pos) < float(pattern.get("min_spacing", 0)): return false
 		positions.append(pos)
 		var radius := def.radius * run.cfg.character_scale + CHECK.sweep_radius(run, margin)
-		var can_kill := def.gate == &"" and def.hp * run.cfg.enemy_hp_mult <= run.combat.attack_power() and def.armor * run.cfg.enemy_armor_mult <= run.combat.attack_power()
+		var can_kill := def.gate == &"" and def.base_hp(run.cfg) * run.cfg.enemy_hp_mult <= run.combat.attack_power() and def.armor * run.cfg.enemy_armor_mult <= run.combat.attack_power()
 		if window > 0 and (def.speed > 0 or def.behavior not in [&"drift", &"chase"] or def.params.has("chain_power") or def.params.has("life") or def.params.has("death_split")):
 			return false
 		if pos.length() + radius >= run.cfg.field_radius or run.field.body_gap(pos, radius) <= 0:

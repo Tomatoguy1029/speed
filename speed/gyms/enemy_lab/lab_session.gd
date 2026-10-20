@@ -540,18 +540,21 @@ func _edit_definition(args: Dictionary) -> void:
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
-		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
+		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
 			return
-		def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
+		if key == "toughness":
+			def.toughness = clampi(int(args.value), -1, 1)
+		else:
+			def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
 	run.enemies.definitions[type] = def
 	var t := run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.type[i] != type:
 			continue
 		var old: EnemyDef = t.def[i]
-		if key == "hp":
+		if key == "hp" or key == "toughness":
 			var ratio := t.hp[i] / maxf(0.001, t.max_hp[i])
-			t.max_hp[i] *= def.hp / maxf(old.hp, 0.001)
+			t.max_hp[i] *= def.base_hp(run.cfg) / maxf(old.base_hp(run.cfg), 0.001)
 			t.hp[i] = t.max_hp[i] * ratio
 		elif key == "armor":
 			t.armor[i] *= def.armor / maxf(old.armor, 0.001)
