@@ -9,7 +9,7 @@ var undo_redo: EditorUndoRedoManager
 var _pin_buttons: Dictionary = {}
 var stage: Resource = null
 var canvas: Control
-var _title: Label
+var _playhead_label: Label
 var _info: Label
 ## 組み合わせのシーンのパス → 中に置いた敵の種類の一覧
 var _types_cache: Dictionary = {}
@@ -27,24 +27,26 @@ func _init() -> void:
 	name = "SpawnTimeline"
 	custom_minimum_size = Vector2(0, 300)
 	# 幅が足りなければ折り返す（トラックの幅をボタンの並びに引っ張られないようにする）
+	var toolbar := HBoxContainer.new()
+	add_child(toolbar)
 	var bar := HFlowContainer.new()
-	add_child(bar)
-	_title = Label.new()
-	_title.text = "ステージを開くと表示します"
-	bar.add_child(_title)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_child(bar)
 	var groups := {}
 	var ui := EditorInterface.get_editor_scale() if Engine.is_editor_hint() else 1.0
-	for spec in [["+通常", _add_track], ["+雑魚敵", _add_curve_menu],
+	for spec in [["雑魚敵", _add_curve_menu], ["通常", _add_track],
 			["ボス", func() -> void: canvas.clocks.toggle_pin("boss_time")],
 			["終了", func() -> void: canvas.clocks.toggle_pin("time_limit")],
-			["▶ ここから試す", _launch_here],
 			["-", func() -> void: canvas.zoom(0.8)], ["+", func() -> void: canvas.zoom(1.25)], ["最大", func() -> void: canvas.fit()],
+			["再生", _launch_here],
 			["？", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		var group := "pins" if spec[0] in ["ボス", "終了"] else ("zoom" if spec[0] in ["-", "+", "最大"] else "")
-		if group == "":
+		if spec[0] == "？":
+			toolbar.add_child(b)
+		elif group == "":
 			bar.add_child(b)
 		else:
 			if not groups.has(group):
@@ -64,8 +66,10 @@ func _init() -> void:
 			b.disabled = true
 		elif spec[0] in ["-", "+", "最大"]:
 			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
-		elif spec[0] in ["+通常", "+雑魚敵"]:
-			b.tooltip_text = "空の通常トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "+通常" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
+		elif spec[0] in ["通常", "雑魚敵"]:
+			b.tooltip_text = "空の通常トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "通常" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
+		elif spec[0] == "再生":
+			b.tooltip_text = "再生位置からステージを起動"
 		elif spec[0] == "？":
 			b.tooltip_text = "操作方法"
 			b.custom_minimum_size = Vector2.ONE * 36.0 * ui
@@ -83,6 +87,8 @@ func _init() -> void:
 					style.set_border_width_all(maxi(1, int(2.0 * ui)))
 					style.border_color = Color(0.75, 0.75, 0.75)
 				b.add_theme_stylebox_override(state, style)
+	_playhead_label = Label.new()
+	bar.add_child(_playhead_label)
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
@@ -105,7 +111,7 @@ func _notification(what: int) -> void:
 func set_stage(value: Resource) -> void:
 	stage = value
 	_types_cache.clear()
-	_title.text = stage.resource_path.get_file() if stage != null else ""
+	tooltip_text = stage.resource_path.get_file() if stage != null else "ステージを開くと表示します"
 	canvas.fit()
 	refresh()
 
@@ -120,7 +126,8 @@ func refresh() -> void:
 		button.self_modulate = Color.WHITE if exists else Color(0.45, 0.45, 0.45)
 		button.tooltip_text = "ON：クリックでOFFに切り替え" if exists else "OFF：クリックで再生位置にピンを配置（0:00なら既存の配置の末尾）"
 	var n: int = canvas.mismatches().size() if stage != null else 0
-	_info.text = "再生位置 %s　　種類が合わないクリップ %d" % [Canvas.clock(canvas.playhead), n]
+	_playhead_label.text = "再生位置 %s　" % Canvas.clock(canvas.playhead)
+	_info.text = "ルール違反のクリップ %d" % n
 	if stage != null:
 		canvas.custom_minimum_size.y = canvas.content_height()
 	canvas.queue_redraw()
