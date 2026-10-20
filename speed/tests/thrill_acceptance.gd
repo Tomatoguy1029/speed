@@ -965,7 +965,7 @@ func _test_surge() -> void:
 	for steps in [0, 20]:
 		_clear()
 		run.state.rng.seed = 208
-		run.enemies._survey()
+		run.enemies._survey(0.0)
 		var request: Dictionary = target.duplicate()
 		request.phase = ConfigManager.phases[&"s1_late"]
 		request.steps = steps
