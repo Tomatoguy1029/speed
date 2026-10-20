@@ -224,6 +224,8 @@ func choose_card(index: int) -> bool:
 	else:
 		grant(c.kind, c.id)
 	state.emit(&"upgrade", {"card": c})
+	if c.kind != &"heal":
+		_level_bonus()
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
 		state.cards = roll_cards()
@@ -231,6 +233,39 @@ func choose_card(index: int) -> bool:
 		return true
 	state.cards = []
 	return false
+
+## レベルアップのおまけ（仕様書 9.2）：選んだあと、確率で持っているものが自動で上がる。
+## 起きたら次の確率で続けて判定し、4つ目（選んだ1枚を含めて）で止まる。
+func _level_bonus() -> void:
+	var count := 0
+	for chance: float in [cfg.levelup_bonus_chance, cfg.levelup_bonus_more, cfg.levelup_bonus_last]:
+		if state.rng.randf() >= chance:
+			return
+		var pick := _bonus_target()
+		if pick.is_empty():
+			return
+		grant(pick.kind, pick.id)
+		count += 1
+		var owned: Dictionary = state.weapons if pick.kind == &"weapon" else state.traits
+		var def: Resource = (ConfigManager.weapons if pick.kind == &"weapon" else ConfigManager.traits)[pick.id]
+		state.emit(&"level_bonus", {"kind": pick.kind, "id": pick.id, "level": owned[pick.id], "count": count})
+		var head := TranslationServer.translate("hud.level_bonus") if count == 1 else TranslationServer.translate("hud.level_bonus_more")
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60 - 26 * count),
+			"text": "%s %s Lv%d" % [head, def.get_display_name(), owned[pick.id]],
+			"color": Color("#efcb70") if count == 1 else Color("#ffe46b"), "size": 20 + 3 * count})
+
+## おまけで上げる候補：持っている武器・特性のうち、上限に達していないものからランダムに1つ。なければ空。
+func _bonus_target() -> Dictionary:
+	var items: Array[Dictionary] = []
+	for id in state.weapons:
+		if state.weapons[id] < cfg.weapon_max_level:
+			items.append({"kind": &"weapon", "id": id})
+	for id in state.traits:
+		if state.traits[id] < cfg.trait_max_stacks:
+			items.append({"kind": &"trait", "id": id})
+	if items.is_empty():
+		return {}
+	return items[state.rng.randi_range(0, items.size() - 1)]
 
 # ── 装備（仕様書 8） ─────────────────────────────────────────────
 
