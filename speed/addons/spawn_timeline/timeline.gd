@@ -105,7 +105,8 @@ func _set_button_icon(button: Button, icon_name: String, ui: float) -> void:
 	var icon_image := Image.new()
 	icon_image.load_svg_from_string(FileAccess.get_file_as_string("res://addons/spawn_timeline/icons/%s.svg" % icon_name), ui)
 	button.icon = ImageTexture.create_from_image(icon_image)
-	button.expand_icon = true
+	# アイコンの幅をボタンの最小幅に含め、文字だけの幅に潰れるのを防ぐ。
+	button.expand_icon = false
 	button.add_theme_constant_override("icon_max_width", int(20.0 * ui))
 
 func _notification(what: int) -> void:
