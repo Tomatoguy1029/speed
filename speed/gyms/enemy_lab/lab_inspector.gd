@@ -135,8 +135,10 @@ func refresh(force := false) -> void:
 	note.add_theme_color_override("font_color", UI.MUTED)
 	note.tooltip_text = tr("lab.message_479576c49c")
 	var basics := UI.fold(_values, tr("lab.ui.basic"), true)
-	var names := {"hp": tr("lab.message_341a7b515f"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
-	for key in (["hp", "armor", "speed", "radius"] if def is EnemyDef else ["speed", "radius"]): _field(basics, key, names[key], def.get(key))
+	var names := {"hp": tr("lab.message_341a7b515f"), "toughness": tr("lab.toughness"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
+	# 星1〜5の敵の HP は星と HP の属性で決まるので、HP の代わりに属性を変える
+	var hp_key := "toughness" if def is EnemyDef and def.uses_hp_table(session.run.cfg) else "hp"
+	for key in ([hp_key, "armor", "speed", "radius"] if def is EnemyDef else ["speed", "radius"]): _field(basics, key, names[key], def.get(key))
 	var frequent := ["fire_interval", "telegraph", "windup", "recover"]
 	for key in frequent:
 		if def.params.has(key): _parameter(basics, def, key)
@@ -180,7 +182,9 @@ func _field(parent: Node, key: String, label: String, value, help := "") -> void
 		var spin := SpinBox.new()
 		spin.max_value = 1000000
 		spin.step = 1 if typeof(value) == TYPE_INT else 0.05
-		spin.min_value = spin.step if key in ["hp", "radius"] else (-100000 if key.begins_with("params.") else 0)
+		spin.min_value = spin.step if key in ["hp", "radius"] else (-100000 if key.begins_with("params.") else (-1 if key == "toughness" else 0))
+		if key == "toughness":
+			spin.max_value = 1
 		spin.value = value
 		spin.custom_minimum_size.x = 104
 		spin.tooltip_text = help

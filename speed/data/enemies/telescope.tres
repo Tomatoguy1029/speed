@@ -6,6 +6,7 @@
 script = ExtResource("1")
 rank = 3
 radius = 20.0
+toughness = -1
 hp = 30.0
 armor = 6.0
 speed = 80.0

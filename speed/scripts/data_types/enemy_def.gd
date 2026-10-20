@@ -180,16 +180,20 @@ const PARAMS_DOCS := {
 ## 当たり判定と見た目の大きさ（標準の大きさのとき）。
 ## 単位：単位（距離）
 @export var radius: float
+## HP の属性
+## 星1〜5の敵の HP を、星の標準の体当たりの回数から、柔らかめは1回少なく（最低1回）、硬めは1回多くする（base_hp）。
+## 単位：-1 柔らかめ・0 標準・1 硬め
+@export_enum("柔らかめ:-1", "標準:0", "硬め:1") var toughness: int = 0
 ## HP
-## 最大 HP。レベルが1上がるごとに 60% ずつ増え、大きさの2乗に比例する。
+## 星のない敵と星6以上の敵の最大 HP（星1〜5の敵は、星と HP の属性から決める）。大きさの2乗に比例する。
 ## 単位：HP
 @export var hp: float
 ## 装甲
-## これより低い攻撃力の体当たりは弾かれる。レベルが1上がるごとに 35% ずつ増える。
+## これより低い攻撃力の体当たりは弾かれる。
 ## 単位：攻撃力
 @export var armor: float
 ## 速さ
-## 追いかけるときの速さ。レベルが1上がるごとに 4% ずつ増える。
+## 追いかけるときの速さ。
 ## 単位：単位/秒
 @export var speed: float
 ## 加速
@@ -256,3 +260,15 @@ const PARAMS_DOCS := {
 ## 作り手が見分けるための名前。
 ## 単位：文字
 @export var display_name: String
+
+## 標準の大きさのときの最大 HP。星1〜5の敵は、星の標準の体当たりの回数（config.rank_hits）に HP の属性を足した回数 n で、
+## 素の体当たり（config.base_attack）n 回でちょうど倒れる HP の真ん中（攻撃力 ×（n − 1）＋ 攻撃力 ÷ 2）。それ以外は hp。
+func base_hp(cfg: GameConfig) -> float:
+	if rank >= 1 and rank <= cfg.rank_hits.size():
+		var hits := maxi(1, cfg.rank_hits[rank - 1] + toughness)
+		return cfg.base_attack * (hits - 1) + cfg.base_attack * 0.5
+	return hp
+
+## HP を星と属性から決める敵か。
+func uses_hp_table(cfg: GameConfig) -> bool:
+	return rank >= 1 and rank <= cfg.rank_hits.size()

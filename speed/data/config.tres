@@ -72,6 +72,7 @@ draw_step = 8.0
 draw_confirm_delay = 0.2
 trace_radius = 45.0
 base_attack = 10.0
+rank_hits = PackedInt32Array(1, 2, 3, 3, 4)
 atk_scale = 1.0
 base_crit_chance = 0.05
 crit_mult = 2.0
