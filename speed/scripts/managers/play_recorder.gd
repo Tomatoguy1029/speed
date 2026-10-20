@@ -94,7 +94,7 @@ func _begin(run: Node) -> void:
 	var phases: Array = run.state.stage.phases
 	for k in phases.size():
 		var p: PhaseDef = phases[k]
-		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start, "target_level": p.target_level})
+		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start})
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands})
 	_update_label()
@@ -192,7 +192,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_write({"type": "clip_group_end", "t": time, "clip": e.clip, "key": e.key})
 			&"phase":
 				var p: PhaseDef = _run.enemies.current_phase()
-				_write({"type": "band", "t": time, "id": String(p.id), "name": p.display_name, "target_level": p.target_level})
+				_write({"type": "band", "t": time, "id": String(p.id), "name": p.display_name})
 			&"levelup":
 				_write({"type": "levelup", "t": time, "level": e.level})
 			&"upgrade":
