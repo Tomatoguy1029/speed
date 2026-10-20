@@ -5,17 +5,8 @@ extends VBoxContainer
 
 const Canvas := preload("res://addons/spawn_timeline/timeline_canvas.gd")
 
-## 「大きく表示」を押したとき（エディターの上部の画面のタブ「出現タイムライン」へ切り替える）
-signal open_large
-
 var undo_redo: EditorUndoRedoManager
-## 上部の画面のタブに出すタイムラインなら true（「大きく表示」のボタンを出さない）
-var large := false:
-	set(value):
-		large = value
-		if _large_button != null:
-			_large_button.visible = not value
-var _large_button: Button = null
+var _pin_buttons: Dictionary = {}
 var stage: Resource = null
 var canvas: Control
 var _title: Label
@@ -41,16 +32,19 @@ func _init() -> void:
 	_title = Label.new()
 	_title.text = "ステージを開くと表示します"
 	bar.add_child(_title)
-	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu], ["曲線を消す", _remove_curve],
+	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu],
+			["ボスピン", func() -> void: canvas.clocks.toggle_pin("boss_time")],
+			["終了ピン", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["▶ ここから試す", _launch_here],
 			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
-			["大きく表示", func() -> void: open_large.emit()], ["操作", _show_help]]:
+			["操作", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		bar.add_child(b)
-		if spec[0] == "大きく表示":
-			_large_button = b
+		if spec[0] in ["ボスピン", "終了ピン"]:
+			_pin_buttons["boss_time" if spec[0] == "ボスピン" else "time_limit"] = b
+			b.disabled = true
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
@@ -78,6 +72,13 @@ func set_stage(value: Resource) -> void:
 	refresh()
 
 func refresh() -> void:
+	for prop in _pin_buttons:
+		var button: Button = _pin_buttons[prop]
+		var label := "ボスピン" if prop == "boss_time" else "終了ピン"
+		var exists: bool = stage != null and canvas.clocks.value(prop) >= 0.0
+		button.text = ("− " if exists else "＋ ") + label + ("を削除" if exists else "を配置")
+		button.disabled = stage == null
+		button.tooltip_text = "ピンを削除します" if exists else "再生位置に配置します。0:00なら既存の配置の末尾に置きます。配置後はドラッグ・ダブルクリックで時刻を変更できます。"
 	var n: int = canvas.mismatches().size() if stage != null else 0
 	_info.text = "再生位置 %s　　種類が合わないクリップ %d" % [Canvas.clock(canvas.playhead), n]
 	if stage != null:
