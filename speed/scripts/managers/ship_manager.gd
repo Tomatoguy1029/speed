@@ -80,6 +80,19 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 
 func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 	if state.glide:
+		# 勢い：glide_hold の間は速さを保ち、そのあと glide_fade かけて巡航の速さまで落として終える（仕様書 6.6）
+		state.glide_t += dt
+		var cruise := state.stats.max_speed * cfg.steer_cruise
+		var sp := state.glide_speed
+		if state.glide_t > cfg.glide_hold:
+			var k := (state.glide_t - cfg.glide_hold) / maxf(0.001, cfg.glide_fade)
+			if k >= 1.0:
+				state.glide = false
+				sp = cruise
+			else:
+				sp = lerpf(state.glide_speed, cruise, k)
+		if not state.ship_vel.is_zero_approx():
+			state.ship_vel = state.ship_vel.normalized() * sp
 		state.ship_boost_t = maxf(0.0, state.ship_boost_t - dt)
 		state.ship_fade_t = 0.0
 		state.ship_pos += state.ship_vel * dt
