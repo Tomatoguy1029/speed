@@ -340,7 +340,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
-	if build.capture_hull(i, cause):
+	if build.capture_hull(i):
 		t.hull_scattered[i] = 1
 	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed

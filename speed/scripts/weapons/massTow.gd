@@ -1,19 +1,16 @@
-## W21 質量牽引砲：なぞり中の体当たりで倒した敵の船体を、大型の敵も丸ごと牽引する。
+## W21 質量牽引砲：なぞり中に倒れた敵の船体を、大型の敵も丸ごと牽引する。
 ## なぞり終えると、進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける（彗星限定。一覧 docs/game/catalog/weapons.md）。
-## 撃ち出した船体で倒した敵は、牽引しない。隕石とボスは牽引しない。
+## 隕石とボスは牽引しない。
 extends WeaponBehavior
-
-## 牽引できる撃破の原因（なぞり中の体当たり。弾かれたときの当たりも含む）
-const CAUSES: Array[StringName] = [&"ram", &"bump"]
 
 ## 牽引中の船体。pos・r・type・color・angle・source_id・ready（撃ち出せるか）
 var cargo: Array[Dictionary] = []
 const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
 
-## 行 i の敵を倒した原因が cause のとき、船体を牽引するか決める。牽引したら true（破片は出さない）。
-func capture(i: int, cause: StringName) -> bool:
-	if not state.tracing or not CAUSES.has(cause):
+## なぞり中なら、行 i の敵の船体を牽引する。牽引したら true（破片は出さない）。
+func capture(i: int) -> bool:
+	if not state.tracing:
 		return false
 	var t := build.enemies.table
 	if t.meteor_index[i] >= 0 or t.is_boss[i] != 0:
