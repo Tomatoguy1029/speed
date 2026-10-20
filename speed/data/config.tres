@@ -153,6 +153,7 @@ comet_interval_max = 40.0
 comet_speed = 950.0
 rare_comet_chance = 0.03
 rare_comet_after = 180.0
+rare_comet_hp_mult = 2.0
 meteor_coin_chance = 0.4
 meteor_heal_chance = 0.08
 meteor_heal_frac = 0.1
