@@ -162,7 +162,7 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	var rows: PackedInt32Array = em._clip_groups[0][0]
 	var far := state.view_center + Vector2(0, -5000)
 	em.table.pos[rows[0]] = far
-	em._survey(0.0)
+	em._survey()
 	check(em.table.pos[rows[0]] == far, "クリップの群れは再配置しない")
 	kill.call()
 
