@@ -8,7 +8,7 @@ extends Control
 const CLOCKS := preload("res://addons/spawn_timeline/stage_clocks.gd")
 var clocks = CLOCKS.new(self)
 
-## 操作の説明（パネルの「操作」ボタンで出す）
+## 操作の説明（パネルの丸い「？」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
 		"上段のボス・終了：再生位置に配置／再クリックで削除　終了ピンなし：編集上限180:00\n" + \
 		"進行のピンをドラッグ：ボス・制限時間　強化帯をドラッグ：区間を移動　左右の端をドラッグ：強化の開始・終了\n" + \
