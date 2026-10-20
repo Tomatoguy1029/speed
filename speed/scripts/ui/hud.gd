@@ -419,6 +419,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
+		for p in run.field.rare_comet_positions():
+			_draw_edge_arrow(p, Color("#ffd24a"))
 		_draw_gauge_ring()
 
 var _dense := PackedVector2Array()
@@ -549,16 +551,20 @@ func _draw_boss(W: float) -> void:
 	var bx := W / 2.0 - bw / 2.0
 	draw_rect(Rect2(bx, 60, bw, 10), Color(0, 0, 0, 0.6))
 	draw_rect(Rect2(bx, 60, bw * clampf(t.hp[b] / t.max_hp[b], 0.0, 1.0), 10), Color("#ff526e"))
-	# 画面外にいるときの方向の矢印
+	_draw_edge_arrow(t.pos[b], Color("#ff526e"))
+
+## 世界の位置 p が画面の外なら、画面の端にその向きの矢印を描く（ボス・レアな彗星）。
+func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 	var s := run.state
-	var rel := t.pos[b] - s.view_center
-	if absf(rel.x) > s.view_half.x or absf(rel.y) > s.view_half.y:
-		var center := size / 2.0
-		var dir := rel.normalized()
-		var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
-		var tip := center + dir * edge
-		var side := Vector2(-dir.y, dir.x) * 12.0
-		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), Color("#ff526e"))
+	var rel := p - s.view_center
+	if absf(rel.x) <= s.view_half.x and absf(rel.y) <= s.view_half.y:
+		return
+	var center := size / 2.0
+	var dir := rel.normalized()
+	var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
+	var tip := center + dir * edge
+	var side := Vector2(-dir.y, dir.x) * 12.0
+	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 
 ## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 6.2）。
 ## 描けるまでは同じ色を暗くして溜まり具合を見せ、描ける割合に目盛りを置く。描けるようになった瞬間に広がる輪を出す。

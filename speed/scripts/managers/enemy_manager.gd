@@ -299,6 +299,9 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 		EnemyTable.Gate.IMMORTAL:
 			# うみへび座の不死の首：貫いたときだけ。火では焼けない
 			return EnemyTable.GateResult.ALLOW if cause == &"ram" else EnemyTable.GateResult.PASS
+		EnemyTable.Gate.RAM_ONLY:
+			# レアな彗星：体当たりだけで割れる。武器は火花を散らしてすり抜ける（CombatManager）
+			return EnemyTable.GateResult.ALLOW if cause == &"ram" else EnemyTable.GateResult.PASS
 		EnemyTable.Gate.SOLID:
 			# 回る丸鋸：攻撃では壊れない（体当たりで飛ばす扱いは CombatManager）
 			return EnemyTable.GateResult.PASS

@@ -217,6 +217,8 @@ func _stream_rocks(dt: float) -> void:
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i
 		rock.row_id = table.id[i]
+		if rock.rare_weapon != &"":
+			table.gate[i] = EnemyTable.Gate.RAM_ONLY
 
 # ── 重力（仕様書 13.1） ─────────────────────────────────────────────
 
@@ -356,6 +358,15 @@ func comet_at(index: int) -> Rock:
 	if index < 0 or index >= rocks.size() or rocks[index].kind != &"comet":
 		return null
 	return rocks[index]
+
+## 今いるレアな彗星の位置（画面の外の向きの矢印に使う）。
+func rare_comet_positions() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var t := state.world_time
+	for rock in rocks:
+		if rock.kind == &"comet" and rock.rare_weapon != &"" and not rock.destroyed and t < rock.gone:
+			out.append(_rock_at(rock, t)[0])
+	return out
 
 ## 隕石の配置の番号 index がレアな彗星なら、落とす彗星限定の武器の管理 ID（そうでなければ空）。
 func comet_weapon(index: int) -> StringName:
