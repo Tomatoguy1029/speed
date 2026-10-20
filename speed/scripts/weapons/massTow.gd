@@ -1,4 +1,4 @@
-## W21 質量牽引砲：なぞり中に倒れた敵の船体を、大型の敵も丸ごと牽引する。
+## W21 質量牽引砲：なぞり中に機体の近くで倒れた敵の船体を、大型の敵も丸ごと牽引する。
 ## なぞり終えると、進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける（彗星限定。一覧 docs/game/catalog/weapons.md）。
 ## 隕石とボスは牽引しない。
 extends WeaponBehavior
@@ -8,12 +8,15 @@ var cargo: Array[Dictionary] = []
 const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
 
-## なぞり中なら、行 i の敵の船体を牽引する。牽引したら true（破片は出さない）。
+## なぞり中に回収範囲へ船体が入っていれば、倒した手段を問わず牽引する。牽引したら true（破片は出さない）。
 func capture(i: int) -> bool:
 	if not state.tracing:
 		return false
 	var t := build.enemies.table
 	if t.meteor_index[i] >= 0 or t.is_boss[i] != 0:
+		return false
+	var reach := float(p("capture_radius")) + t.r[i]
+	if state.ship_pos.distance_squared_to(t.pos[i]) > reach * reach:
 		return false
 	cargo.append({"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "color": t.color[i],
 		"angle": t.facing[i], "source_id": t.id[i], "ready": false})
