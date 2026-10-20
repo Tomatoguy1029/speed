@@ -2033,7 +2033,7 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	if phase.id != _phase_id:
 		_phase_id = phase.id
 		state.emit(&"phase", {"id": phase.id})
-	var alive_n := _survey()
+	var alive_n := _survey(t.pop)
 	var deficit := maxf(0.0, t.pop - alive_n)
 	var rate := maxf(phase.rate * cfg.density_mult, deficit / cfg.spawn_refill_time)
 	var cap := maxf(8.0, 8.0 * cfg.density_mult)
@@ -2183,17 +2183,23 @@ var _type_counts: Dictionary = {}
 ## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数
 var _zako_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
+## 領域（0〜3：左・右・上・下、4：中心付近）ごとの、数える範囲の敵の数と、種類ごとの数
+var _region_n := PackedInt32Array([0, 0, 0, 0, 0])
+var _region_types: Array[Dictionary] = [{}, {}, {}, {}, {}]
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
-## 戻り値は再配置の範囲の中の通常の敵の数。
-func _survey() -> int:
+## 戻り値は、目標の数 pop と比べる、再配置の範囲の中の敵の数。上下左右と中心付近の領域ごとに、
+## pop × config.spawn_region_cap までしか数えない（一か所に固まった敵だけで目標に届かないように）。
+func _survey(pop: float) -> float:
 	_edge_counts.fill(0)
 	_type_counts.clear()
 	_zako_counts.clear()
+	_region_n.fill(0)
+	for d in _region_types:
+		d.clear()
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
-	var alive_n := 0
 	var center_x := vh.x * 0.45
 	var center_y := vh.y * 0.45
 	var pos := table.pos
@@ -2220,18 +2226,31 @@ func _survey() -> int:
 				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW and not grouped.has(i):
 					_far_rows.append(i)
 				continue
-			alive_n += 1
-			_zako_counts[type[i]] = int(_zako_counts.get(type[i], 0)) + 1
 			var ax := absf(rel.x)
 			var ay := absf(rel.y)
-			if ax < center_x and ay < center_y:
-				continue
-			# 正規化した距離の比較を交差乗算にし、個体ごとの除算を省く。
-			var side := (0 if rel.x < 0.0 else 1) if ax * vh.y > ay * vh.x else (2 if rel.y < 0.0 else 3)
-			_edge_counts[side] += 1
+			var region := 4
+			if ax >= center_x or ay >= center_y:
+				# 正規化した距離の比較を交差乗算にし、個体ごとの除算を省く。
+				region = (0 if rel.x < 0.0 else 1) if ax * vh.y > ay * vh.x else (2 if rel.y < 0.0 else 3)
+				_edge_counts[region] += 1
+			_region_n[region] += 1
+			var rt: Dictionary = _region_types[region]
+			rt[type[i]] = int(rt.get(type[i], 0)) + 1
+	# 領域ごとに上限で切って数える（種類ごとの数も同じ割合で減らす）
+	var limit := pop * cfg.spawn_region_cap if pop > 0.0 and cfg.spawn_region_cap > 0.0 else INF
+	var alive_n := 0.0
+	for region in 5:
+		var n := _region_n[region]
+		if n == 0:
+			continue
+		var keep := minf(1.0, limit / n)
+		alive_n += n * keep
+		var rt: Dictionary = _region_types[region]
+		for ty in rt:
+			_zako_counts[ty] = float(_zako_counts.get(ty, 0.0)) + rt[ty] * keep
 	for i in _far_rows:
 		if _recycle(i):
-			alive_n += 1
+			alive_n += 1.0
 	return alive_n
 
 ## 画面の四辺の外の出現位置。外周の敵が少ない辺を優先する。
@@ -2283,7 +2302,7 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
-	_zako_counts[type] = int(_zako_counts.get(type, 0)) + 1
+	_zako_counts[type] = float(_zako_counts.get(type, 0.0)) + 1.0
 	return true
 
 ## 雑魚の目標の数の曲線から種類を選ぶ。目標の数に足りない分が大きい種類ほど選ばれやすい。足りない種類がなければ空。
