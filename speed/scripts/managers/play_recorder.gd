@@ -16,6 +16,10 @@ var _file: FileAccess = null
 var _next_sample := 0.0
 var _last_xp_gained := 0.0
 var _last_xp_dropped := 0.0
+## 記録中だけ保持する。Pickup 自体をキーにして、インスタンス ID の再利用を避ける。
+var _xp_capsules: Dictionary = {}
+var _capsule_next_id := 0
+var _capsule_counts: Dictionary = {}
 ## 間隔のあいだにたまった数
 var _kills: Dictionary = {}
 ## 倒した原因ごとの数と、与えたダメージの原因ごとの合計（倒しきった分の余りも含む）
@@ -116,8 +120,88 @@ func _begin(run: Node) -> void:
 		var p: PhaseDef = phases[k]
 		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start})
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
-		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands})
+		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
+		"schema_version": 2, "capsule_config": _capsule_config()})
+	_start_capsules()
 	_update_label()
+
+## 既存の記録行はそのままにし、カプセルの生成・取得・消失と累計を加える。
+## t はラン秒、level は XP 加算前。spawned が null なら生成時刻は不明。
+func _start_capsules() -> void:
+	_xp_capsules = {}
+	_capsule_next_id = 0
+	_capsule_counts = {}
+	_run.pickups.xp_capsule_event.connect(_on_xp_capsule)
+	_sync_capsules()
+
+func _capsule_config() -> Dictionary:
+	var out := {}
+	for key in ["capsule_xp_frac", "drift_capsule_xp_frac", "drift_capsule_count", "drift_capsule_interval", "pickup_life", "drop_base", "drop_power_exp", "drop_max", "xp_base", "xp_growth", "xp_curve"]:
+		out[key] = _run.cfg.get(key)
+	return out
+
+func _observe_capsule(c: Pickup, spawned: bool) -> void:
+	if _xp_capsules.has(c):
+		return
+	_capsule_next_id += 1
+	var source := "unknown"
+	match c.src:
+		&"drop": source = "enemy_drop"
+		&"field": source = "drift"
+	var rec := {"id": _capsule_next_id, "source": source, "source_raw": String(c.src),
+		"xp": c.value, "spawned": _run.state.time if spawned else null}
+	_xp_capsules[c] = rec
+	var action := "spawn" if spawned else "observed"
+	_count_capsule(action, source, c.value)
+	var event := rec.duplicate()
+	event.merge({"type": "xp_capsule_" + action, "t": _run.state.time, "level": _run.state.level})
+	_write(event)
+
+func _on_xp_capsule(c: Pickup, action: StringName, cause: StringName) -> void:
+	if _run == null:
+		return
+	if action == &"spawn":
+		_observe_capsule(c, true)
+		return
+	if not _xp_capsules.has(c):
+		_observe_capsule(c, false)
+	var event: Dictionary = _xp_capsules[c].duplicate()
+	event.merge({"type": "xp_capsule_" + String(action), "t": _run.state.time,
+		"level": _run.state.level, "cause": String(cause)})
+	_write(event)
+	_count_capsule(String(action), event.source, c.value)
+	_xp_capsules.erase(c)
+
+func _count_capsule(action: String, source: String, xp: float) -> void:
+	if not _capsule_counts.has(source):
+		_capsule_counts[source] = {}
+	var counts: Dictionary = _capsule_counts[source]
+	counts[action] = int(counts.get(action, 0)) + 1
+	counts[action + "_xp"] = float(counts.get(action + "_xp", 0.0)) + xp
+
+## 通知のない追加・除去は生成や期限切れと推測しない。
+func _sync_capsules() -> void:
+	var active := {}
+	for c: Pickup in _run.pickups.capsules:
+		if c.kind != Pickup.Kind.CACHE or c.taken:
+			continue
+		active[c] = true
+		if not _xp_capsules.has(c):
+			_observe_capsule(c, false)
+	for c: Pickup in _xp_capsules.keys():
+		if not active.has(c):
+			_on_xp_capsule(c, &"lost", &"unknown")
+
+## 累計（source 別）。observed は生成未確認。remaining は未回収であり、lost と分ける。
+func _capsule_summary() -> Dictionary:
+	var out := _capsule_counts.duplicate(true)
+	for source in out:
+		out[source]["remaining"] = 0
+		out[source]["remaining_xp"] = 0.0
+	for rec: Dictionary in _xp_capsules.values():
+		out[rec.source]["remaining"] += 1
+		out[rec.source]["remaining_xp"] += rec.xp
+	return out
 
 func _process(delta: float) -> void:
 	if _saved_t > 0.0:
@@ -135,6 +219,7 @@ func _process(delta: float) -> void:
 
 ## 間隔ごとのまとめ。
 func _sample() -> void:
+	_sync_capsules()
 	var s = _run.state
 	var t = _run.enemies.table
 	var by_star := {}
@@ -157,7 +242,7 @@ func _sample() -> void:
 	var phase: PhaseDef = _run.enemies.current_phase()
 	_write({"type": "sample", "t": _r(s.time), "band": String(phase.id),
 		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
-		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
+		"xp_capsules": _capsule_summary(), "level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
 		"enemies": total, "in_view": in_view, "by_star": by_star, "kills": _kills, "kills_by": _kills_by, "dealt": _dealt, "damage": _damage, "attack_budget_max": _r(_budget_max)})
 	_last_xp_gained = s.xp_gained
 	_last_xp_dropped = s.xp_dropped
@@ -252,18 +337,22 @@ func _end(result: String) -> void:
 		_write({"type": "strong", "t": _r(s.time), "enemy": rec[0], "spawned": rec[1], "life": _r(s.time - rec[1]),
 			"rams": rec[2], "weapon_damage": _r(rec[3]), "by_cause": rec[4], "result": "alive"})
 	_write({"type": "end", "t": _r(s.time), "result": result, "level": s.level, "kills": s.kills,
-		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {}})
+		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {},
+		"xp_capsules": _capsule_summary(), "xp_capsules_remaining": _xp_capsules.values()})
 	_saved_text = "保存：" + _file.get_path().get_file()
 	_saved_t = SAVED_NOTICE
 	_file.close()
 	_file = null
-	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.build.cards_opened, _on_cards]]:
+	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.build.cards_opened, _on_cards],
+		[_run.pickups.xp_capsule_event, _on_xp_capsule]]:
 		if sig[0].is_connected(sig[1]):
 			sig[0].disconnect(sig[1])
 	for c in _run.tree_exiting.get_connections():
 		if c.callable.get_object() == self:
 			_run.tree_exiting.disconnect(c.callable)
 	_run = null
+	_xp_capsules = {}
+	_capsule_counts = {}
 	_strong = {}
 	_offered = []
 	_last_hurt = {}
