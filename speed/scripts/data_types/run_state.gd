@@ -48,6 +48,9 @@ var ship_shield_flash := 0.0
 var ship_hurt := 0.0
 ## なぞり終えたあとの勢いがあるか（仕様書 6.6）
 var glide := false
+## 勢いが始まってからの時間（世界秒）と、勢いの初めの速さ
+var glide_t := 0.0
+var glide_speed := 0.0
 ## 能力値（基礎値・レベル・特性・強化から計算する。BuildManager が更新する）
 var stats := ShipStats.new()
 

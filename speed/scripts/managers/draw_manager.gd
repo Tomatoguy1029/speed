@@ -311,7 +311,11 @@ func _end_trace(completed: bool) -> void:
 	state.ship_vel = direction * speed
 	state.ship_heading = direction
 	if completed:
+		# 勢いは突進より遅くし、巡航の速さより下にはしない（仕様書 6.6）
 		state.glide = true
+		state.glide_t = 0.0
+		state.glide_speed = maxf(speed * cfg.glide_speed_ratio, state.stats.max_speed * cfg.steer_cruise)
+		state.ship_vel = direction * state.glide_speed
 		state.ship_boost_t = cfg.boost_duration
 	build.on_end()
 	run = null
