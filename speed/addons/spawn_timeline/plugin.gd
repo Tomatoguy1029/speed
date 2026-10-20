@@ -1,6 +1,6 @@
 ## 出現タイムラインのエディター拡張（設計書 14.2）。インスペクターで開いたリソースのうち、
 ## 時間帯の配列 phases と出現のクリップの配列 clips を持つもの（ステージ）を、トラックで編集する。
-## タイムラインは、エディターの下のパネルと、上部の画面のタブ「出現タイムライン」（大きく表示）の両方に出す。
+## タイムラインは、エディターの下のパネルと、上部の画面のタブ「出現タイムライン」の両方に出す。
 ## ステージの敵とクリップの種類の組み合わせは、インスペクターのチェックボックスで選ぶ（type_checks.gd）。
 ## この道具は Godot 本体だけに依存する（設計書 4.1）。中身はプロパティ名で読み書きし、敵の定義のフォルダは
 ## プロジェクト設定 spawn_timeline/enemy_dir から読む。
@@ -18,11 +18,9 @@ var _checks: EditorInspectorPlugin = null
 func _enter_tree() -> void:
 	_panel = Timeline.new()
 	_panel.undo_redo = get_undo_redo()
-	_panel.open_large.connect(func() -> void: EditorInterface.set_main_screen_editor(TITLE))
 	add_control_to_bottom_panel(_panel, TITLE)
 	_main = Timeline.new()
 	_main.undo_redo = get_undo_redo()
-	_main.large = true
 	_main.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_main.hide()
 	EditorInterface.get_editor_main_screen().add_child(_main)

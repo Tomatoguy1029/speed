@@ -24,11 +24,11 @@ var lab_instances: Array[BossManager] = []
 func tick(real_dt: float, world_dt: float) -> void:
 	for instance in lab_instances:
 		instance.tick(real_dt, world_dt)
-	if state.boss_at < 0.0:
+	if state.stage.boss_enabled and state.boss_at < 0.0:
 		state.boss_at = state.stage.boss_start(cfg)
 		if state.stage.boss_time < 0.0:
 			state.boss_at += state.rng.randf() * cfg.boss_time_spread
-	if not state.boss_spawned and not state.endless and state.time >= state.boss_at:
+	if state.stage.boss_enabled and not state.boss_spawned and not state.endless and state.time >= state.boss_at:
 		spawn()
 	if actor != null and boss_alive():
 		if state.boss_stun > 0.0:

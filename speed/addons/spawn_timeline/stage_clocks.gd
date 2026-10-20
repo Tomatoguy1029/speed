@@ -15,6 +15,8 @@ func _init(owner: Control) -> void:
 		defaults = load(path)
 
 func value(prop: String) -> float:
+	if prop == "boss_time" and canvas.timeline.stage.get("boss_enabled") == false:
+		return -1.0
 	var own := _stored(prop)
 	if own >= 0.0:
 		return own
@@ -26,8 +28,21 @@ func _stored(prop: String) -> float:
 	var own = canvas.timeline.stage.get(prop)
 	return float(own) if own != null else -1.0
 
-func extent() -> float:
-	return maxf(maxf(value("boss_time"), value("time_limit")), maxf(value("surge_start"), value("surge_end")))
+## ピンは再生位置へ置く。先頭では、既存の配置の末尾を使う。
+func toggle_pin(prop: String) -> void:
+	if canvas.timeline.stage == null:
+		return
+	var exists := value(prop) >= 0.0
+	var stage: Resource = canvas.timeline.stage
+	var changes := []
+	if prop == "boss_time":
+		var before = stage.get("boss_enabled")
+		stage.set("boss_enabled", not exists)
+		changes.append([stage, "boss_enabled", before, not exists])
+	var at: float = canvas.playhead if canvas.playhead > 0.0 else canvas.content_end()
+	_change(changes, prop, -1.0 if exists else snappedf(at, 1.0))
+	canvas.timeline.commit("進行のピンを削除" if exists else "進行のピンを配置", changes)
+	canvas.fit()
 
 func _top() -> float:
 	return canvas._scroll_y() + canvas.RULER
@@ -56,7 +71,7 @@ func draw() -> void:
 			if edge >= canvas.GUTTER and edge <= canvas.size.x:
 				canvas.draw_rect(Rect2(edge - 2 * ui, band.position.y, 4 * ui, band.size.y), SURGE)
 	_pin("boss_time", "ボス", BOSS)
-	_pin("time_limit", "制限", LIMIT)
+	_pin("time_limit", "終了", LIMIT)
 	canvas.draw_string(font, Vector2(8 * ui, top + 45 * ui), "右クリック：ピン・強化帯", HORIZONTAL_ALIGNMENT_LEFT, canvas.GUTTER - 12 * ui, canvas._fs(10), Color(1, 1, 1, 0.6))
 
 func _pin(prop: String, label: String, color: Color) -> void:
@@ -147,6 +162,10 @@ func edit(field: String, at: Vector2) -> void:
 				_change(changes, "surge_start", start)
 				_change(changes, "surge_end", end)
 			else:
+				if field == "boss_time" and canvas.timeline.stage.get("boss_enabled") == false:
+					var stage: Resource = canvas.timeline.stage
+					stage.set("boss_enabled", true)
+					changes.append([stage, "boss_enabled", false, true])
 				_change(changes, field, start)
 			if not changes.is_empty():
 				canvas.timeline.commit("ステージの進行時刻を変える", changes),
@@ -184,6 +203,10 @@ func menu(at: Vector2) -> void:
 		elif id == 4:
 			_change(changes, "surge_end", -1.0)
 		else:
+			var stage: Resource = canvas.timeline.stage
+			if stage.get("boss_enabled") == false:
+				stage.set("boss_enabled", true)
+				changes.append([stage, "boss_enabled", false, true])
 			_change(changes, "boss_time", -1.0)
 			_change(changes, "surge_start", -1.0)
 			_change(changes, "surge_end", -1.0)

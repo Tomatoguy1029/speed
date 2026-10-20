@@ -10,6 +10,7 @@ var clocks = CLOCKS.new(self)
 
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
+		"上段のボスピン・終了ピン：再生位置に配置／再クリックで削除　終了ピンなし：編集上限180:00\n" + \
 		"進行のピンをドラッグ：ボス・制限時間　強化帯をドラッグ：区間を移動　左右の端をドラッグ：強化の開始・終了\n" + \
 		"ピン・帯をダブルクリック：時刻を入力　時間帯を右クリック：設定・解除\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
@@ -347,6 +348,21 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and not _user_view:
 		fit()
 
+## ピンを画面の端でつかみ続けると、横へ送って先の時刻まで動かせる。
+func _process(dt: float) -> void:
+	if _drag.get("kind", "") != "clock":
+		return
+	var p := get_local_mouse_position()
+	var edge := 28.0 * ui
+	var direction := 0.0
+	if p.x > size.x - edge:
+		direction = 1.0
+	elif p.x < GUTTER + edge:
+		direction = -1.0
+	if direction != 0.0:
+		pan(direction * 180.0 * ui * dt / px_per_sec)
+		_move_drag(p, Input.is_key_pressed(KEY_SHIFT))
+
 ## ステージの長さ全体が収まるように表示する。
 func fit() -> void:
 	_user_view = false
@@ -388,18 +404,29 @@ func _t(x: float) -> float:
 func _tracks_top() -> float:
 	return RULER + PHASE_ROW + POP_ROW
 
-## タイムラインの終わりの時刻（10:00 か、最後の時間帯の開始・クリップの終わりに少し足した遅い方）。
+## 終了ピンまでを表示し、編集用の余白を残す。終了ピンなしは180分まで扱う。
 func _end_time() -> float:
+	if timeline == null or timeline.stage == null:
+		return 180.0 * 60.0
+	var limit: float = clocks.value("time_limit")
+	return maxf(60.0, limit + 30.0) if limit >= 0.0 else 180.0 * 60.0
+
+## 配置済みの内容の末尾。先頭でピンを追加したときの初期位置に使う。
+func content_end() -> float:
 	var t := 600.0
 	if timeline == null:
 		return t
 	if timeline.stage != null:
-		t = maxf(t, clocks.extent() + 30.0)
+		t = maxf(t, clocks.value("boss_time"))
+		t = maxf(t, clocks.value("surge_end"))
 	var ps: Array = timeline.phases()
 	if not ps.is_empty():
-		t = maxf(t, float(ps[ps.size() - 1].get("start")) + 60.0)
+		t = maxf(t, float(ps[ps.size() - 1].get("start")))
 	for c in timeline.clips():
-		t = maxf(t, _clip_end(c) + 30.0)
+		t = maxf(t, _clip_end(c))
+	for c in timeline.curves():
+		for point: Vector2 in c.get("points"):
+			t = maxf(t, point.x)
 	return t
 
 static func _clip_end(c: Resource) -> float:
@@ -450,7 +477,8 @@ func _draw() -> void:
 			names.append(timeline.enemy_name(type_id))
 		var label := str(c.get("label")) if str(c.get("label")) != "" else "（名前なし）"
 		var text := "%s　%s ×%d %ds" % [label, "・".join(names) if not names.is_empty() else "種類なし", int(c.get("groups")), int(c.get("interval"))]
-		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 10 * ui), _fs(14))
+		if r.size.x > 24.0 * ui:
+			draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.7), text, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 10 * ui, _fs(14))
 		draw_rect(Rect2(x1 - 3 * ui, r.position.y, 3 * ui, r.size.y), Color.WHITE)
 	# トラックを動かしている間は、動かすトラックと落とす先を示す
 	if track_selected >= 0 and track_selected < track_count() - 1:
@@ -527,8 +555,8 @@ func _draw() -> void:
 	draw_rect(Rect2(0, off, size.x, _tracks_top()), Color(0.1, 0.11, 0.14))
 	draw_rect(Rect2(0, off, size.x, RULER), Color(0.16, 0.17, 0.21))
 	# 目盛り：ラベルの間隔が十分空く、切りのいい間隔
-	var step := 300.0
-	for st: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0]:
+	var step := 10800.0
+	for st: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1200.0, 1800.0, 3600.0]:
 		if st * px_per_sec >= 80.0 * ui:
 			step = st
 			break
@@ -540,7 +568,9 @@ func _draw() -> void:
 			var major := fmod(t + 0.0001, step) < 0.001
 			draw_line(Vector2(x, off + RULER - (12.0 if major else 5.0) * ui), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.04))
 			if major:
-				draw_string(font, Vector2(x + 4 * ui, off + RULER * 0.66), clock(t), HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14))
+				var text := clock(t)
+				var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14)).x
+				draw_string(font, Vector2(minf(x + 4 * ui, size.x - width - 4 * ui), off + RULER * 0.66), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14))
 		t += minor
 	var ps: Array = timeline.phases()
 	var top := off + RULER
@@ -550,13 +580,16 @@ func _draw() -> void:
 	for k in ps.size():
 		var p: Resource = ps[k]
 		var s := float(p.get("start"))
+		if s > end:
+			break
 		var e := float(ps[k + 1].get("start")) if k + 1 < ps.size() else end
 		var col := Color.from_hsv(fmod(k * 0.13, 1.0), 0.35, 0.45)
 		var r := Rect2(_x(s), top + 3 * ui, (e - s) * px_per_sec, PHASE_ROW - 6 * ui)
 		draw_rect(r, col)
 		draw_line(Vector2(r.position.x, top), Vector2(r.position.x, size.y), Color(1, 1, 1, 0.35), 2.0 * ui)
 		var name_ := str(p.get("display_name")) if str(p.get("display_name")) != "" else str(p.get("id"))
-		draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, maxf(0.0, r.size.x - 8 * ui), _fs(15))
+		if r.size.x > 24.0 * ui:
+			draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8 * ui, _fs(15))
 		# 雑魚の補充の目標の数（曲線がなければ時間帯の値）
 		if curves.is_empty():
 			var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
