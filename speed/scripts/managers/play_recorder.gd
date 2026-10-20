@@ -1,13 +1,14 @@
-## プレイの記録（開発版だけ。設計書 14.3）。F9 で記録の待機を入・切する。
+## プレイの記録（開発版だけ。設計書 14.3）。F9 で記録の待機を入・切し、待機中に F10 で記録のフォルダを開く。
 ## 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は F9 で切るまで続き、
 ## 次のランは別のファイルにする。実験場のランは記録しない。
-## ファイルは user://recordings/stage<番号>_<日時>.jsonl。1行に1つの記録（JSON）で、メモリにためずに書き出す。
-## 集計はしない（記録を読む側が行う）。
+## ファイルは書類フォルダの SPEED/recordings/stage<番号>_<日時>.jsonl。1行に1つの記録（JSON）で、メモリにためずに書き出す。
+## 記録を閉じたら、保存したファイル名を画面の隅に少しのあいだ出す。集計はしない（記録を読む側が行う）。
 extends Node
 
 ## まとめた数を書く間隔（ランの時計の秒）
 const INTERVAL := 3.0
-const DIR := "user://recordings"
+## 保存したファイル名を出しておく時間（実秒）
+const SAVED_NOTICE := 5.0
 
 var armed := false
 var _run: Node = null
@@ -25,6 +26,16 @@ var _strong: Dictionary = {}
 var _offered: Array = []
 var _last_hurt: Dictionary = {}
 var _label: Label
+## 保存したファイル名の表示の残り時間と、その文字
+var _saved_t := 0.0
+var _saved_text := ""
+
+## 記録を置くフォルダ（書類フォルダの SPEED/recordings。書類フォルダが分からなければユーザーデータの中）。
+static func folder() -> String:
+	var docs := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	if docs == "":
+		return ProjectSettings.globalize_path("user://recordings")
+	return docs.path_join("SPEED").path_join("recordings")
 
 func _ready() -> void:
 	if not OS.is_debug_build():
@@ -39,7 +50,7 @@ func _ready() -> void:
 	_label.anchor_right = 1.0
 	_label.anchor_top = 1.0
 	_label.anchor_bottom = 1.0
-	_label.offset_left = -170.0
+	_label.offset_left = -360.0
 	_label.offset_right = -10.0
 	_label.offset_top = -26.0
 	_label.offset_bottom = -6.0
@@ -52,8 +63,13 @@ func _ready() -> void:
 
 func _input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F9:
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.keycode == KEY_F9:
 		_set_armed(not armed)
+	elif key.keycode == KEY_F10 and armed:
+		DirAccess.make_dir_recursive_absolute(folder())
+		OS.shell_open(folder())
 
 func _set_armed(on: bool) -> void:
 	armed = on
@@ -75,9 +91,9 @@ func _begin(run: Node) -> void:
 		return
 	_end("quit")
 	_run = run
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(DIR))
+	DirAccess.make_dir_recursive_absolute(folder())
 	var stamp := Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "_")
-	var path := "%s/stage%d_%s.jsonl" % [DIR, run.state.stage_index, stamp]
+	var path := folder().path_join("stage%d_%s.jsonl" % [run.state.stage_index, stamp])
 	_file = FileAccess.open(path, FileAccess.WRITE)
 	if _file == null:
 		_run = null
@@ -99,7 +115,10 @@ func _begin(run: Node) -> void:
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands})
 	_update_label()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _saved_t > 0.0:
+		_saved_t -= delta
+		_update_label()
 	if _run == null:
 		return
 	var d = _run.projectiles.director
@@ -223,6 +242,8 @@ func _end(result: String) -> void:
 			"rams": rec[2], "weapon_damage": _r(rec[3]), "result": "alive"})
 	_write({"type": "end", "t": _r(s.time), "result": result, "level": s.level, "kills": s.kills,
 		"weapons": _plain(s.weapons), "traits": _plain(s.traits), "last_hurt": _last_hurt if result == "death" else {}})
+	_saved_text = "保存：" + _file.get_path().get_file()
+	_saved_t = SAVED_NOTICE
 	_file.close()
 	_file = null
 	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.build.cards_opened, _on_cards]]:
@@ -244,9 +265,11 @@ func _write(record: Dictionary) -> void:
 func _update_label() -> void:
 	if _label == null:
 		return
-	_label.visible = armed
+	_label.visible = armed or _saved_t > 0.0
 	var text := "● REC 待機"
-	if _run != null:
+	if _saved_t > 0.0 and _run == null:
+		text = _saved_text
+	elif _run != null:
 		var t := int(_run.state.time)
 		text = "● REC %d:%02d" % [t / 60, t % 60]
 	# 文字が変わったときだけ書き換える（毎フレーム書き換えると、文字の組み直しが毎回走る）
