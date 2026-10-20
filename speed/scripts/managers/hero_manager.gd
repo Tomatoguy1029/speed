@@ -59,6 +59,9 @@ func _random_hero(except: StringName) -> HeroDef:
 
 ## 星座をフィールドの端のほうの、機体から離れたランダムな位置に置く。
 func _place(def: HeroDef) -> void:
+	# 前の英雄の目印を持つ敵が残っていても、次の英雄の手掛かりに混ぜない。
+	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id):
+		enemies.table.landmark[_landmark_row] = 0
 	hero = def
 	if def == null:
 		return
