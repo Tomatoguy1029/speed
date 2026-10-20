@@ -215,9 +215,19 @@ class Checks extends EditorProperty:
 
 ## シーンの参照は、群れの選択と別の欄で編集する。
 class Assets extends EditorProperty:
+	static var _open := false
+	var _toggle := Button.new()
 	var _body := VBoxContainer.new()
+	var _rows := VBoxContainer.new()
 	var _scenes: Array = []
 	func _init() -> void:
+		_toggle.flat = true
+		_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_toggle.pressed.connect(_on_fold)
+		add_child(_toggle)
+		add_focusable(_toggle)
+		add_child(_body)
+		_body.add_child(_rows)
 		var add := Button.new()
 		add.text = "＋ Spawn asset"
 		add.pressed.connect(func() -> void:
@@ -225,17 +235,27 @@ class Assets extends EditorProperty:
 			value.assign(get_edited_object().get(get_edited_property()))
 			value.append(null)
 			emit_changed(get_edited_property(), value))
-		add_child(add)
+		_body.add_child(add)
 		add_focusable(add)
-		add_child(_body)
-		set_bottom_editor(_body)
+		_show_fold()
+	func _on_fold() -> void:
+		_open = not _open
+		_show_fold()
+	func _show_fold() -> void:
+		_toggle.text = "%s %d個のシーン" % ["▼" if _open else "▶", _scenes.size()]
+		_body.visible = _open
+		set_bottom_editor(_body if _open else null)
+		update_minimum_size()
+		queue_sort()
+		queue_redraw()
 	func _update_property() -> void:
 		var current: Array = get_edited_object().get(get_edited_property())
 		if current == _scenes:
+			_show_fold()
 			return
 		_scenes = current.duplicate()
-		for child in _body.get_children():
-			_body.remove_child(child)
+		for child in _rows.get_children():
+			_rows.remove_child(child)
 			child.queue_free()
 		for k in current.size():
 			var row := HBoxContainer.new()
@@ -253,7 +273,8 @@ class Assets extends EditorProperty:
 			remove.tooltip_text = "シーンの登録を外す"
 			remove.pressed.connect(_remove.bind(k))
 			row.add_child(remove)
-			_body.add_child(row)
+			_rows.add_child(row)
+		_show_fold()
 	func _replace(resource: Resource, index: int) -> void:
 		var value: Array[PackedScene] = []
 		value.assign(get_edited_object().get(get_edited_property()))
