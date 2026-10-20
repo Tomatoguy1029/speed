@@ -81,6 +81,9 @@ var dash_id := 0
 # ── 成長（仕様書 8・9） ─────────────────────────────────────────────
 var level := 1
 var xp := 0.0
+## このランで拾った経験値の合計と、敵が落とした経験値の合計（プレイの記録が読む）
+var xp_gained := 0.0
+var xp_dropped := 0.0
 ## 武器の管理 ID → Lv、特性の管理 ID → 重ね数
 var weapons: Dictionary = {}
 var traits: Dictionary = {}

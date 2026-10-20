@@ -562,6 +562,13 @@ func clear_hostile() -> void:
 
 # ── 敵の攻撃の形（仕様書 11.7） ──────────────────────────────────
 
+## 範囲攻撃 i を出した敵の種類（敵に付いていて、その敵がまだいるときだけ。分からなければ空）。
+func _hazard_source(i: int) -> StringName:
+	var owner := hazard_owner[i]
+	if owner >= 0 and combat.enemies.is_same(owner, hazard_owner_id[i]):
+		return combat.enemies.table.type[owner]
+	return &""
+
 ## ビームを出す。from から angle の向きへ長さ length・幅 width。delay の予告のあと active の間当たる。
 func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
 		color := Color("#ff5a6e")) -> int:
@@ -778,12 +785,12 @@ func _update_hazards(dt: float) -> void:
 				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
 				var reach := hazard_width[i] * 0.5 + R
 				if Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach:
-					ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+					ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind], _hazard_source(i))
 					if state.phase != RunState.Phase.PLAY:
 						return
 				continue
 		if hit:
 			hazard_hit[i] = 1
-			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind], _hazard_source(i))
 			if state.phase != RunState.Phase.PLAY:
 				return

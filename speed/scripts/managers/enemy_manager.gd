@@ -103,6 +103,9 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
 	elif t.beh[i] == EnemyTable.Beh.CROW and not opts.get("flock_member", false):
 		_spawn_flock(i, opts)
+	# 強敵と大物の出現は、プレイの記録が倒れるまでを追う
+	if def.rank >= 3:
+		state.emit(&"strong_spawn", {"id": t.id[i], "enemy_type": def.id})
 	return i
 
 ## からす座の群れの隊列（先頭からの位置。前へ x、右へ y、flock_gap 単位）。からす座の4つの星の並びにそろえる
@@ -2235,7 +2238,13 @@ func _tick_clips() -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
 	for n in clips.size():
 		var clip: SpawnClip = clips[n]
-		var groups: Array = _clip_groups.get(n, []).filter(_group_alive)
+		var prev: Array = _clip_groups.get(n, [])
+		var groups: Array = prev.filter(_group_alive)
+		if groups.size() < prev.size():
+			# 全滅した群れ（プレイの記録が読む。群れは最初の敵の id で見分ける）
+			for g: PackedInt32Array in prev:
+				if not groups.has(g):
+					state.emit(&"clip_group_end", {"clip": clip.label, "key": g[1]})
 		_clip_groups[n] = groups
 		if state.time < clip.time or state.time >= clip.end_time():
 			continue
@@ -2262,6 +2271,7 @@ func _tick_clips() -> void:
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
+			state.emit(&"clip_group", {"clip": clip.label, "key": rows[1], "n": rows.size() / 2})
 
 var _type_counts: Dictionary = {}
 ## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数

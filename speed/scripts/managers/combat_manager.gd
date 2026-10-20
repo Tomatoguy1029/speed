@@ -262,7 +262,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		fresh = t.dash_fresh[i] != 0
 	t.hp[i] -= dmg
 	t.flash[i] = 0.12
-	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause})
+	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
 	if t.hp[i] <= 0.0:
@@ -332,7 +332,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
-	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i],
+	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）

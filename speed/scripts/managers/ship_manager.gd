@@ -163,7 +163,8 @@ func steal_shield(i: int) -> void:
 		"arc": float(t.def[i].params.front_arc)})
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
-func damage(amount: float, slow: float, cause: StringName) -> bool:
+## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
+func damage(amount: float, slow: float, cause: StringName, source := &"") -> bool:
 	if state.phase != RunState.Phase.PLAY:
 		return false
 	if state.ship_shield_t > 0.0:
@@ -179,7 +180,7 @@ func damage(amount: float, slow: float, cause: StringName) -> bool:
 	state.ship_vel *= 1.0 - minf(0.9, slow)
 	state.ship_invuln = cfg.invuln_time
 	state.ship_hurt = cfg.ship_hurt_time
-	state.emit(&"hurt", {"pos": state.ship_pos, "amount": amount, "cause": cause})
+	state.emit(&"hurt", {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source})
 	if state.ship_hp > 0.0:
 		build.on_hurt()
 	return true
