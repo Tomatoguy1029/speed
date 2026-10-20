@@ -119,3 +119,34 @@ func surge_windows(cfg: GameConfig) -> Array[Vector2]:
 		else:
 			windows.append(Vector2(from, to))
 	return windows
+
+## 各ON区間の強化内容で増分を積み上げ、OFF区間にも到達済みの強さを残す。
+func surge_effects(cfg: GameConfig, at: float) -> Dictionary:
+	var effects := {"steps": 0, "pop": 0.0, "ranged": 0.0, "elite": 0.0}
+	var progress := 0.0
+	var started := false
+	for window in surge_windows(cfg):
+		if at < window.x:
+			break
+		for k in phases.size():
+			var phase: PhaseDef = phases[k]
+			var finish: float = phases[k + 1].start if k + 1 < phases.size() else INF
+			var from := maxf(window.x, phase.start if k > 0 else 0.0)
+			var to := minf(at, minf(window.y, finish))
+			if from >= finish or to < from:
+				continue
+			if not started:
+				started = true
+				_add_surge_step(effects, phase, cfg, 1)
+			progress += maxf(0.0, to - from) / maxf(1.0, phase.surge_value("surge_interval", cfg))
+			var steps := int(floor(progress + 1e-9))
+			if steps > 0:
+				_add_surge_step(effects, phase, cfg, steps)
+				progress -= steps
+	return effects
+
+func _add_surge_step(effects: Dictionary, phase: PhaseDef, cfg: GameConfig, steps: int) -> void:
+	effects.steps += steps
+	effects.pop += float(steps) * phase.surge_value("surge_pop", cfg)
+	effects.ranged += float(steps) * phase.surge_value("surge_ranged", cfg)
+	effects.elite += float(steps) * phase.surge_value("surge_elite", cfg)

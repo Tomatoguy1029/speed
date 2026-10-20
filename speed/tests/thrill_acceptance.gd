@@ -969,6 +969,7 @@ func _test_surge() -> void:
 		var request: Dictionary = target.duplicate()
 		request.phase = ConfigManager.phases[&"s1_late"]
 		request.steps = steps
+		request.surge = {"ranged": run.cfg.surge_ranged * steps, "elite": run.cfg.surge_elite * steps}
 		for attempt in 600:
 			run.enemies._spawn_one(request)
 		var sample := {"all": 0, "elite": 0, "ranged": 0}

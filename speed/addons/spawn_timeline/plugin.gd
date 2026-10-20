@@ -14,6 +14,8 @@ const TITLE := "出現タイムライン"
 var _panel: Control = null
 var _main: Control = null
 var _checks: EditorInspectorPlugin = null
+var _save_queued := false
+var _phase_histories: Array[UndoRedo] = []
 
 func _enter_tree() -> void:
 	_panel = Timeline.new()
@@ -29,8 +31,15 @@ func _enter_tree() -> void:
 	add_inspector_plugin(_checks)
 	# 開いたステージは、インスペクターの対象が変わったときに拾う（上部の画面へ勝手に切り替えないように _handles は使わない）
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
+	EditorInterface.get_inspector().property_edited.connect(_on_property_edited)
 
 func _exit_tree() -> void:
+	if EditorInterface.get_inspector().property_edited.is_connected(_on_property_edited):
+		EditorInterface.get_inspector().property_edited.disconnect(_on_property_edited)
+	for history in _phase_histories:
+		if history.version_changed.is_connected(_queue_phase_save):
+			history.version_changed.disconnect(_queue_phase_save)
+	_phase_histories.clear()
 	if EditorInterface.get_inspector().edited_object_changed.is_connected(_on_inspected):
 		EditorInterface.get_inspector().edited_object_changed.disconnect(_on_inspected)
 	if _checks != null:
@@ -51,9 +60,36 @@ func _on_inspected() -> void:
 		_panel.set_stage(object as Resource)
 		_main.set_stage(object as Resource)
 		make_bottom_panel_item_visible(_panel)
+	elif _panel != null and _panel.stage != null and _panel.phases().has(object):
+		_watch_phase_history(object)
 
 func _has_main_screen() -> bool:
 	return true
+
+func _on_property_edited(_property: String) -> void:
+	_queue_phase_save()
+
+func _watch_phase_history(object: Object) -> void:
+	var history := get_undo_redo().get_history_undo_redo(get_undo_redo().get_object_history_id(object))
+	if history != null and not _phase_histories.has(history):
+		history.version_changed.connect(_queue_phase_save)
+		_phase_histories.append(history)
+
+## インスペクターの編集と取り消しを、開いているステージと時間帯へ保存する。
+func _queue_phase_save() -> void:
+	if _save_queued or _panel == null or _panel.stage == null:
+		return
+	var edited := EditorInterface.get_inspector().get_edited_object()
+	if not _panel.phases().has(edited):
+		return
+	_save_queued = true
+	_save_phase_changes.call_deferred()
+
+func _save_phase_changes() -> void:
+	_save_queued = false
+	if _panel != null and _panel.stage != null:
+		_panel._save()
+		_main.refresh()
 
 func _get_plugin_name() -> String:
 	return TITLE

@@ -51,6 +51,24 @@ const EDITOR_ORDER := 4
 ## 単位：重み
 @export var mix: Dictionary
 
+@export_group("強化内容（-1：共通設定）")
+## 強化の間隔
+## ON区間で1段強化されるまでの秒数。負の値は共通設定を使う。
+## 単位：実秒
+@export var surge_interval: float = -1.0
+## 1段ごとの敵の数の増加
+## 強化1段につき、目標の敵数へ加える割合。負の値は共通設定を使う。
+## 単位：割合
+@export var surge_pop: float = -1.0
+## 1段ごとの撃つ敵の出やすさ
+## 強化1段につき、撃つ敵の出現の重みへ加える割合。負の値は共通設定を使う。
+## 単位：割合
+@export var surge_ranged: float = -1.0
+## 1段ごとのエリート確率の増加
+## 強化1段につき、エリートになる確率へ加える値。負の値は共通設定を使う。
+## 単位：確率
+@export var surge_elite: float = -1.0
+
 ## 見分けるための ID と、画面に出る名前・説明
 @export_group("名前と ID")
 ## ID
@@ -61,3 +79,7 @@ const EDITOR_ORDER := 4
 ## 作り手用の名前。ゲーム画面には出さない。
 ## 単位：文字
 @export var display_name: String
+
+func surge_value(property: String, cfg: GameConfig) -> float:
+	var own := float(get(property))
+	return own if own >= 0.0 else float(cfg.get(property))
