@@ -363,16 +363,16 @@ func _process(dt: float) -> void:
 		pan(direction * 180.0 * ui * dt / px_per_sec)
 		_move_drag(p, Input.is_key_pressed(KEY_SHIFT))
 
-## ステージの長さ全体が収まるように表示する。
+## 最大ボタン・初期表示は0:00〜11:00が収まるスケールにする。
 func fit() -> void:
 	_user_view = false
 	view_start = 0.0
-	px_per_sec = _min_px()
+	px_per_sec = maxf(0.05, size.x - GUTTER - 16.0) / 660.0
 	queue_redraw()
 
 ## 一番縮めたときの1秒の幅（ステージの長さ全体が収まる幅）。
 func _min_px() -> float:
-	return maxf(0.05, (size.x - GUTTER - 16.0)) / maxf(60.0, _end_time())
+	return maxf(0.05, (size.x - GUTTER - 16.0)) / maxf(660.0, _end_time())
 
 ## 拡大縮小する。factor が 1 より大きければ拡大。at_x の位置の時刻を動かさない。
 func zoom(factor: float, at_x := -1.0) -> void:
