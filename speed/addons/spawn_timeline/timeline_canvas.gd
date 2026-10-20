@@ -50,6 +50,8 @@ var playhead := 0.0
 var selected := -1
 ## 選んでいる進行のピン（boss_time・time_limit。空ならなし）。
 var clock_selected := ""
+## 選んでいる時間帯（-1ならなし）。
+var phase_selected := -1
 ## 選んでいるトラックの行（-1 なら選んでいない）
 var track_selected := -1
 ## 見えている範囲の左端の時刻と、1秒の幅
@@ -436,6 +438,11 @@ func content_end() -> float:
 static func _clip_end(c: Resource) -> float:
 	return float(c.get("time")) + maxf(0.0, float(c.get("length")))
 
+func phase_label(index: int) -> String:
+	var phase: Resource = timeline.phases()[index]
+	var text := str(phase.get("display_name")) if str(phase.get("display_name")) != "" else str(phase.get("id"))
+	return text + "(強化区間)" if clocks.phase_surge_on(index) else text
+
 ## 種類が合わないクリップの番号の一覧。
 func mismatches() -> Array:
 	var out := []
@@ -590,10 +597,13 @@ func _draw() -> void:
 		var col := Color.from_hsv(fmod(k * 0.13, 1.0), 0.35, 0.45)
 		var r := Rect2(_x(s), top + 3 * ui, (e - s) * px_per_sec, PHASE_ROW - 6 * ui)
 		draw_rect(r, col)
+		if k == phase_selected:
+			draw_rect(r, Color.WHITE, false, 2.0 * ui)
 		draw_line(Vector2(r.position.x, top), Vector2(r.position.x, size.y), Color(1, 1, 1, 0.35), 2.0 * ui)
-		var name_ := str(p.get("display_name")) if str(p.get("display_name")) != "" else str(p.get("id"))
+		var name_ := phase_label(k)
+		var name_color := Color("#ff7979") if clocks.phase_surge_on(k) else Color.WHITE
 		if r.size.x > 24.0 * ui:
-			draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8 * ui, _fs(15))
+			draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8 * ui, _fs(15), name_color)
 		# 雑魚の補充の目標の数（曲線がなければ時間帯の値）
 		if curves.is_empty():
 			var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
@@ -695,6 +705,7 @@ func _select_hit(hit: Dictionary) -> void:
 	var kind: String = hit.get("kind", "")
 	var field: String = hit.get("field", "")
 	clock_selected = field if kind == "clock" and field in ["boss_time", "time_limit"] else ""
+	phase_selected = int(hit.get("index", -1)) if kind in ["phase", "phase_body"] else -1
 	selected = int(hit.get("index", -1)) if kind in ["time", "length"] else -1
 	track_selected = int(hit.get("row", -1)) if kind == "track_label" else -1
 	curve_selected = int(hit.get("curve", -1)) if kind in ["curve_label", "curve_body", "point"] else -1
@@ -783,6 +794,8 @@ func _gui_input(event: InputEvent) -> void:
 			grab_focus()
 			var h := _hit(mb.position)
 			_select_hit(h)
+			if h.get("kind", "") in ["phase", "phase_body"]:
+				timeline.inspect_phase(h.index)
 			if h.is_empty():
 				return
 			if h.kind == "clock" and mb.double_click:

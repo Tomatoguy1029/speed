@@ -2066,34 +2066,28 @@ func _target() -> Dictionary:
 	var n := _phase_index()
 	var p: PhaseDef = state.stage.phases[n]
 	var k := clampf((state.time - p.start) / maxf(0.001, _phase_end(n) - p.start), 0.0, 1.0)
-	var steps := surge_steps()
+	var effects := state.stage.surge_effects(cfg, state.time)
+	var steps: int = effects.steps
 	if state.bonus_t > 0.0:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
-		return {"phase": p, "steps": steps, "pop": cfg.bonus_pop * cfg.density_mult}
-	var scale := cfg.density_mult * (1.0 + cfg.surge_pop * steps)
+		return {"phase": p, "steps": steps, "surge": effects, "pop": cfg.bonus_pop * cfg.density_mult}
+	var scale := cfg.density_mult * (1.0 + float(effects.pop))
 	var curves: Array = state.stage.zako_curves
 	if not curves.is_empty():
 		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）。曲線の値がそのまま実際の数で、敵の密度倍率は掛けない
-		var surge := 1.0 + cfg.surge_pop * steps
+		var surge := 1.0 + float(effects.pop)
 		var per := {}
 		var total := 0.0
 		for c: SpawnCurve in curves:
 			var v := maxf(0.0, c.value_at(state.time)) * surge
 			per[c.type] = float(per.get(c.type, 0.0)) + v
 			total += v
-		return {"phase": p, "steps": steps, "pop": total, "per_type": per}
-	return {"phase": p, "steps": steps, "pop": lerpf(p.pop_from, p.pop_to, k) * scale}
+		return {"phase": p, "steps": steps, "surge": effects, "pop": total, "per_type": per}
+	return {"phase": p, "steps": steps, "surge": effects, "pop": lerpf(p.pop_from, p.pop_to, k) * scale}
 
 ## 強化帯の強まりの段（仕様書 4.2）。右端に達したあとは、その段を保つ。
 func surge_steps() -> int:
-	var elapsed := 0.0
-	var started := false
-	for window in state.stage.surge_windows(cfg):
-		if state.time < window.x:
-			break
-		started = true
-		elapsed += maxf(0.0, minf(state.time, window.y) - window.x)
-	return 1 + int(elapsed / maxf(1.0, cfg.surge_interval)) if started else 0
+	return int(state.stage.surge_effects(cfg, state.time).steps)
 
 ## 通常の敵の数。in_view が true なら、再配置の範囲の中だけを数える。
 func _count_population(in_view: bool) -> int:
@@ -2406,7 +2400,7 @@ func _spawn_one(t: Dictionary) -> bool:
 	if p == null:
 		return false
 	var phase: PhaseDef = t.phase
-	var type := _pick_short_type(t.per_type) if t.has("per_type") else _pick_type(phase, t.steps)
+	var type := _pick_short_type(t.per_type) if t.has("per_type") else _pick_type(phase, float(t.surge.ranged))
 	if type == &"":
 		return false
 	var def := def_of(type)
@@ -2414,7 +2408,7 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	if def.max_alive > 0 and _type_counts.get(type, 0) >= def.max_alive:
 		return false
-	var elite: bool = def.max_alive == 0 and state.rng.randf() < 0.01 + cfg.surge_elite * t.steps
+	var elite: bool = def.max_alive == 0 and state.rng.randf() < 0.01 + float(t.surge.elite)
 	var opts := {"elite": elite, "facing": (state.ship_pos - p).angle()}
 	if def.size_var:
 		opts.size = def.radius * (0.85 + state.rng.randf() * 0.45)
@@ -2434,8 +2428,8 @@ func _pick_short_type(per_type: Dictionary) -> StringName:
 	var k := _pick_weighted(items)
 	return StringName(items[k].type) if k >= 0 else &""
 
-## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
-func _pick_type(phase: PhaseDef, steps: int) -> StringName:
+## 時間帯の出現の重みから種類を選ぶ。積み上げた強化の増分に応じて、撃つ敵を出やすくする。
+func _pick_type(phase: PhaseDef, ranged_bonus: float) -> StringName:
 	var items: Array = []
 	var total := 0.0
 	for k in phase.mix:
@@ -2444,7 +2438,7 @@ func _pick_type(phase: PhaseDef, steps: int) -> StringName:
 		if def != null and def.max_alive > 0 and state.bonus_t > 0.0:
 			continue
 		if def != null and def.ranged:
-			w *= 1.0 + cfg.surge_ranged * steps
+			w *= 1.0 + ranged_bonus
 		items.append([StringName(k), w])
 	if items.is_empty():
 		return phase.mix.keys()[0]

@@ -141,6 +141,10 @@ func refresh() -> void:
 func phases() -> Array:
 	return stage.get("phases") if stage != null else []
 
+func inspect_phase(index: int) -> void:
+	if index >= 0 and index < phases().size() and Engine.is_editor_hint():
+		EditorInterface.inspect_object(phases()[index], "", true)
+
 func clips() -> Array:
 	return stage.get("clips") if stage != null else []
 
@@ -209,7 +213,7 @@ func commit(label: String, changes: Array) -> void:
 
 ## ステージと、別のファイルにある時間帯を保存する。
 func _save() -> void:
-	if stage == null:
+	if stage == null or stage.resource_path == "":
 		return
 	for p in phases():
 		if p is Resource and p.resource_path != "" and not p.resource_path.contains("::"):
