@@ -144,7 +144,7 @@ weapon.W08.desc,駆け抜け始めと一定間隔で、進路ごと大きな衝�
 weapon.W17.name,接触電撃,Contact Arc
 weapon.W17.desc,敵に触れると、近くの敵へ電撃がつながる。Lv ごとにつながる数が増える,Touching an enemy arcs lightning to nearby enemies. Each level chains to more.
 weapon.W21.name,質量牽引砲,Mass Tow Cannon
-weapon.W21.desc,なぞり中に倒した敵の船体を牽引し、なぞり終えると進む向きへ次々と撃ち出す,"Tows the hulls of enemies you defeat mid-dash, then fires them ahead one by one when the dash ends."
+weapon.W21.desc,なぞり中に機体の近くで倒れた敵の船体を牽引し、なぞり終えると進む向きへ次々と撃ち出す,"Tows the hulls of enemies defeated near your ship mid-dash, then fires them ahead one by one when the dash ends."
 weapon.W22.name,双極ビーム,Bipolar Beam
 weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
