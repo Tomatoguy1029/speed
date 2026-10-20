@@ -292,6 +292,8 @@ func _draw() -> void:
 		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
 	_draw_loadout(H)
 	_draw_boss(W)
+	if run.heroes.revealed() and run.heroes.is_captive():
+		_draw_edge_arrow(run.heroes.center, Color("#ffd24a"))
 	for p in run.field.rare_comet_positions():
 		_draw_edge_arrow(p, Color("#ffd24a"))
 	_draw_gauge_ring()
@@ -325,7 +327,7 @@ func _draw_minimap(W: float) -> void:
 		draw_circle(c + p * k, 3.5, Color(1.0, 0.35, 0.35, 0.35))
 	for cap: Pickup in run.pickups.capsules:
 		draw_circle(c + cap.pos * k, 2.0, Color("#ffd24a"))
-	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2本で交わる
+	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
 	if h.hero != null and h.is_captive():
@@ -334,7 +336,7 @@ func _draw_minimap(W: float) -> void:
 			var u := (h.center - q).normalized()
 			var b := a.dot(u)
 			var disc := b * b - a.length_squared() + R * R
-			if disc > 0.0:
+			if disc > 0.0 and s.landmarks.size() < 2:
 				var r0 := sqrt(disc)
 				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
 			draw_circle(c + a, 3.0, gold)
@@ -504,7 +506,7 @@ func _draw_boss(W: float) -> void:
 	draw_rect(Rect2(bx, 60, bw * clampf(t.hp[b] / t.max_hp[b], 0.0, 1.0), 10), Color("#ff526e"))
 	_draw_edge_arrow(t.pos[b], Color("#ff526e"))
 
-## 世界の位置 p が画面の外なら、画面の端にその向きの矢印を描く（ボス・レアな彗星）。
+## 世界の位置 p が画面の外なら、画面の端にその向きの矢印を描く（ボス・英雄・レアな彗星）。
 func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 	var s := run.state
 	var rel := p - s.view_center
