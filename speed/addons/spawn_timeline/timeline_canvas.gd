@@ -10,6 +10,8 @@ var clocks = CLOCKS.new(self)
 
 ## 操作の説明（パネルの丸い「？」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
+		"+通常：空の通常トラックを追加　通常トラックの空き部分をダブルクリック：クリップを配置\n" + \
+		"+雑魚敵：雑魚敵を選び、時間帯の下の雑魚敵トラックの末尾へ追加\n" + \
 		"上段のボス・終了：再生位置に配置／再クリックで削除　終了ピンなし：編集上限180:00\n" + \
 		"進行のピンをドラッグ：ボス・制限時間　強化帯をドラッグ：区間を移動　左右の端をドラッグ：強化の開始・終了\n" + \
 		"ピン・帯をダブルクリック：時刻を入力　時間帯を右クリック：設定・解除\n" + \
@@ -123,7 +125,7 @@ func _start_track_rename(row: int) -> void:
 				timeline.commit("トラックの名前を変える", [[stage, "track_names", before, after]]),
 		"トラック %d" % (row + 1))
 
-## 今のトラックの名前の並び（名前のないトラックは空）。長さはクリップのあるトラックの数。
+## 今の通常トラックの名前の並び（名前のないトラックは空）。空の行も保持する。
 func _track_names_now() -> PackedStringArray:
 	var out := PackedStringArray()
 	var names = timeline.stage.get("track_names")
@@ -153,8 +155,6 @@ func _change_tracks(label: String, remap: Array, copies: Array, names: PackedStr
 	if kept.size() != cs.size() or not copies.is_empty():
 		stage.set("clips", kept)
 		changes.append([stage, "clips", cs, kept])
-	while not names.is_empty() and names[names.size() - 1] == "":
-		names.remove_at(names.size() - 1)
 	var before_names = stage.get("track_names")
 	if before_names == null or names != PackedStringArray(before_names):
 		stage.set("track_names", names)
@@ -226,9 +226,10 @@ func _track_menu(row: int, at: Vector2) -> void:
 	add_child(menu)
 	menu.popup(Rect2i(Vector2i(get_screen_position() + at), Vector2i.ZERO))
 
-## トラックの数（クリップのある一番下のトラックの次に、空のトラックを1本足す）。
+## 通常トラックの数（明示した空の行も含め、末尾に配置用の仮の行を1本足す）。
 func track_count() -> int:
-	var n := 0
+	var names = timeline.stage.get("track_names")
+	var n: int = names.size() if names != null else 0
 	for k in timeline.clips().size():
 		n = maxi(n, clip_track(k) + 1)
 	return n + 1
@@ -749,6 +750,8 @@ func _gui_input(event: InputEvent) -> void:
 			if h.kind == "track":
 				selected = -1
 				track_selected = -1
+				if mb.double_click:
+					timeline._add_clip(h.row, maxf(0.0, snappedf(_t(mb.position.x), 1.0)))
 				queue_redraw()
 				return
 			if h.kind == "track_label":
