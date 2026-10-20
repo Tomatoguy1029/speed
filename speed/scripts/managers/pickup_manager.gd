@@ -2,6 +2,9 @@
 class_name PickupManager
 extends RunSystem
 
+## 開発版の記録だけが購読する。XP 加算の前に通知し、ビーコンの合算でも取得前のレベルを保つ。
+signal xp_capsule_event(capsule: Pickup, action: StringName, cause: StringName)
+
 var field: FieldManager
 var ship: ShipManager
 var build: BuildManager
@@ -176,6 +179,11 @@ func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> 
 	c.pos = p
 	c.value = xp
 	capsules.append(c)
+	_record_capsule(c, &"spawn")
+
+func _record_capsule(c: Pickup, action: StringName, cause: StringName = &"unknown") -> void:
+	if OS.is_debug_build() and c.kind == Pickup.Kind.CACHE and xp_capsule_event.has_connections():
+		xp_capsule_event.emit(c, action, cause)
 
 ## 漂流カプセル：フィールドに最大 n 個。16秒ごとに補充（仕様書 10）。
 func _spawn_field_capsules(dt: float) -> void:
@@ -184,6 +192,8 @@ func _spawn_field_capsules(dt: float) -> void:
 	for c: Pickup in capsules:
 		if c.src != &"field" or c.pos.distance_to(state.ship_pos) < view_r * 2.0:
 			kept.append(c)
+		else:
+			_record_capsule(c, &"lost", &"distance_cull")
 	capsules = kept
 	_capsule_t += dt
 	var count := 0
@@ -339,6 +349,7 @@ func _collect_capsules(dt: float) -> void:
 			_apply(c)
 		elif c.src == &"drop" and c.age > cfg.pickup_life:
 			c.taken = true
+			_record_capsule(c, &"lost", &"expired")
 	var kept: Array = []
 	for c: Pickup in capsules:
 		if not c.taken:
@@ -366,9 +377,11 @@ func _apply(c: Pickup) -> void:
 				if other.kind == Pickup.Kind.CACHE and not other.taken:
 					xp += other.value
 					other.taken = true
+					_record_capsule(other, &"collect", &"beacon")
 			build.add_xp(xp)
 			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -45), "text": "XP +%d" % roundi(xp), "color": Color("#b8a0ff"), "size": 22})
 		Pickup.Kind.CACHE:
+			_record_capsule(c, &"collect", &"normal")
 			build.add_xp(c.value)
 			state.emit(&"text", {"pos": c.pos, "text": "XP", "color": Color("#b8a0ff"), "size": 16})
 	state.emit(&"pickup", {"kind": Pickup.Kind.keys()[c.kind].to_lower()})
