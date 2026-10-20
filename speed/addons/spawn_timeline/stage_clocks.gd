@@ -42,7 +42,6 @@ func toggle_pin(prop: String) -> void:
 	var at: float = canvas.playhead if canvas.playhead > 0.0 else canvas.content_end()
 	_change(changes, prop, -1.0 if exists else snappedf(at, 1.0))
 	canvas.timeline.commit("進行のピンを削除" if exists else "進行のピンを配置", changes)
-	canvas.fit()
 
 func _top() -> float:
 	return canvas._scroll_y() + canvas.RULER

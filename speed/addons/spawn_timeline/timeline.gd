@@ -32,19 +32,39 @@ func _init() -> void:
 	_title = Label.new()
 	_title.text = "ステージを開くと表示します"
 	bar.add_child(_title)
-	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu],
+	var groups := {}
+	var ui := EditorInterface.get_editor_scale() if Engine.is_editor_hint() else 1.0
+	for spec in [["＋クリップ", _add_clip], ["＋雑魚の曲線", _add_curve_menu],
 			["ボスピン", func() -> void: canvas.clocks.toggle_pin("boss_time")],
 			["終了ピン", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["▶ ここから試す", _launch_here],
-			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
+			["-", func() -> void: canvas.zoom(0.8)], ["+", func() -> void: canvas.zoom(1.25)], ["最大", func() -> void: canvas.fit()],
 			["操作", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
-		bar.add_child(b)
+		var group := "pins" if spec[0] in ["ボスピン", "終了ピン"] else ("zoom" if spec[0] in ["-", "+", "最大"] else "")
+		if group == "":
+			bar.add_child(b)
+		else:
+			if not groups.has(group):
+				var pair := HBoxContainer.new()
+				bar.add_child(pair)
+				groups[group] = pair
+			groups[group].add_child(b)
 		if spec[0] in ["ボスピン", "終了ピン"]:
 			_pin_buttons["boss_time" if spec[0] == "ボスピン" else "time_limit"] = b
+			var icon_image := Image.new()
+			var icon_name := "boss" if spec[0] == "ボスピン" else "timer"
+			icon_image.load_svg_from_string(FileAccess.get_file_as_string("res://addons/spawn_timeline/icons/%s.svg" % icon_name), ui)
+			b.icon = ImageTexture.create_from_image(icon_image)
+			b.expand_icon = true
+			b.add_theme_constant_override("icon_max_width", int(20.0 * ui))
+			b.custom_minimum_size.x = 120.0 * ui
+			b.toggle_mode = true
 			b.disabled = true
+		elif spec[0] in ["-", "+", "最大"]:
+			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
@@ -74,11 +94,10 @@ func set_stage(value: Resource) -> void:
 func refresh() -> void:
 	for prop in _pin_buttons:
 		var button: Button = _pin_buttons[prop]
-		var label := "ボスピン" if prop == "boss_time" else "終了ピン"
 		var exists: bool = stage != null and canvas.clocks.value(prop) >= 0.0
-		button.text = ("− " if exists else "＋ ") + label + ("を削除" if exists else "を配置")
+		button.set_pressed_no_signal(exists)
 		button.disabled = stage == null
-		button.tooltip_text = "ピンを削除します" if exists else "再生位置に配置します。0:00なら既存の配置の末尾に置きます。配置後はドラッグ・ダブルクリックで時刻を変更できます。"
+		button.tooltip_text = "配置済み：押すとピンを削除します" if exists else "押すと再生位置に配置します。0:00なら既存の配置の末尾に置きます。配置後はドラッグ・ダブルクリックで時刻を変更できます。"
 	var n: int = canvas.mismatches().size() if stage != null else 0
 	_info.text = "再生位置 %s　　種類が合わないクリップ %d" % [Canvas.clock(canvas.playhead), n]
 	if stage != null:
