@@ -272,3 +272,11 @@ func base_hp(cfg: GameConfig) -> float:
 ## HP を星と属性から決める敵か。
 func uses_hp_table(cfg: GameConfig) -> bool:
 	return rank >= 1 and rank <= cfg.rank_hits.size()
+
+## 吹き飛ぶ強さに掛ける倍率（config.rank_knockback）。星6以上は 0（吹き飛ばない）、星のない敵は 1。
+func knockback_scale(cfg: GameConfig) -> float:
+	if rank <= 0:
+		return 1.0
+	if rank <= cfg.rank_knockback.size():
+		return cfg.rank_knockback[rank - 1]
+	return 0.0
