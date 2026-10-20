@@ -43,7 +43,7 @@
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
 | `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | — | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
-| `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
+| `reticle` | レチクル座 | 4 | 採用 | 実装済み。大きい経験値カプセルの報酬は採用・未実装（量は未決） | ぼうえんきょう座に付き従い、視線を遮る小隕石を予告後のビームで壊す。支援先がいなくなると退却する | — | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵)。設定は[星の力](../world.md#5-星の力と機体の強化) |
 | `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
 | `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | HP は硬め（星5の標準より体当たり1回多い） | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser`。外観は[敵の描画](../art-style.md#42-敵) |
