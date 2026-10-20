@@ -56,19 +56,17 @@ func _init() -> void:
 			groups[group].add_child(b)
 		if spec[0] in ["ボス", "終了"]:
 			_pin_buttons["boss_time" if spec[0] == "ボス" else "time_limit"] = b
-			var icon_image := Image.new()
-			icon_image.load_svg_from_string(FileAccess.get_file_as_string("res://addons/spawn_timeline/icons/pin.svg"), ui)
-			b.icon = ImageTexture.create_from_image(icon_image)
-			b.expand_icon = true
-			b.add_theme_constant_override("icon_max_width", int(20.0 * ui))
+			_set_button_icon(b, "pin", ui)
 			b.custom_minimum_size.x = 88.0 * ui
 			b.toggle_mode = true
 			b.disabled = true
 		elif spec[0] in ["-", "+", "最大"]:
 			b.tooltip_text = {"-": "縮小", "+": "拡大", "最大": "0:00〜11:00が収まる表示に戻す"}[spec[0]]
 		elif spec[0] in ["通常", "雑魚敵"]:
+			_set_button_icon(b, "add", ui)
 			b.tooltip_text = "空の通常トラックを追加。空き部分をダブルクリックして出現のクリップを置きます。" if spec[0] == "通常" else "雑魚敵を選び、雑魚敵のトラックの末尾に曲線を追加します。"
 		elif spec[0] == "再生":
+			_set_button_icon(b, "play", ui)
 			b.tooltip_text = "再生位置からステージを起動"
 		elif spec[0] == "？":
 			b.tooltip_text = "操作方法"
@@ -103,6 +101,13 @@ func _init() -> void:
 	scroll.add_child(canvas)
 	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: canvas.queue_redraw())
 
+func _set_button_icon(button: Button, icon_name: String, ui: float) -> void:
+	var icon_image := Image.new()
+	icon_image.load_svg_from_string(FileAccess.get_file_as_string("res://addons/spawn_timeline/icons/%s.svg" % icon_name), ui)
+	button.icon = ImageTexture.create_from_image(icon_image)
+	button.expand_icon = true
+	button.add_theme_constant_override("icon_max_width", int(20.0 * ui))
+
 func _notification(what: int) -> void:
 	# 下のパネルと上部の画面のどちらで編集しても、表示し直したときに最新を描く
 	if what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and stage != null:
@@ -112,6 +117,7 @@ func set_stage(value: Resource) -> void:
 	stage = value
 	_types_cache.clear()
 	tooltip_text = stage.resource_path.get_file() if stage != null else "ステージを開くと表示します"
+	canvas._select_hit({})
 	canvas.fit()
 	refresh()
 
@@ -237,6 +243,46 @@ func _add_track() -> void:
 	canvas.selected = -1
 	canvas.track_selected = after.size() - 1
 	commit("通常トラックを追加", [[stage, "track_names", before, after]])
+
+## 指定位置に時間帯を追加する。数値はその位置の時間帯から引き継ぐ。
+func _add_phase(at: float) -> void:
+	var before := phases()
+	if stage == null or before.is_empty():
+		return
+	var start := maxf(0.0, snappedf(at, 1.0))
+	var index := 0
+	for phase in before:
+		if float(phase.get("start")) <= start:
+			index += 1
+		if is_equal_approx(float(phase.get("start")), start):
+			start += 1.0
+	var source: Resource = before[maxi(0, index - 1)]
+	var phase: Resource = source.duplicate(true)
+	phase.set("start", start)
+	phase.set("id", StringName("phase_%d" % ResourceUID.create_id()))
+	phase.set("display_name", "新しい時間帯")
+	var after := before.duplicate()
+	after.append(phase)
+	after.sort_custom(func(a: Resource, b: Resource) -> bool: return float(a.get("start")) < float(b.get("start")))
+	stage.set("phases", after)
+	var changes := [[stage, "phases", before, after]]
+	var overrides = stage.get("surge_phases")
+	if overrides is Dictionary and overrides.has(String(source.get("id"))):
+		var flags: Dictionary = overrides.duplicate()
+		flags[String(phase.get("id"))] = overrides[String(source.get("id"))]
+		stage.set("surge_phases", flags)
+		changes.append([stage, "surge_phases", overrides, flags])
+	commit("時間帯を追加", changes)
+
+## ステージの並びからだけ外す。残る時間帯の名称・開始時刻と元のリソースは保つ。
+func _remove_phase(index: int) -> void:
+	var before := phases()
+	if stage == null or before.size() <= 1 or index < 0 or index >= before.size():
+		return
+	var after := before.duplicate()
+	after.remove_at(index)
+	stage.set("phases", after)
+	commit("時間帯を削除", [[stage, "phases", before, after]])
 
 func _add_clip(row := -1, at := -1.0) -> void:
 	if stage == null:

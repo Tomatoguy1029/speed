@@ -96,7 +96,7 @@
 - `xp_bonus` があれば、その時間帯の経験値に掛ける。
 - `wave_interval` があれば、その間隔で群れをまとめて出す（11.3）。
 - `cores` が true の時間帯に出力コアが出る（10）。
-- **強化帯**：ステージの `surge_start`（負の値なら `config.surge_start`）から、`config.surge_interval` ごとに段が1つ上がる（始まった時点で1段）。1段ごとに、目標の敵の数を `config.surge_pop` の割合だけ増やし、撃つ敵（敵の定義の `ranged`）の出現の重みを `config.surge_ranged` の割合だけ増やし、エリートになる確率に `config.surge_elite` を足す。ステージの `surge_end` に達したあとは、その時点の段を保つ。負の終了時刻なら段を増やし続ける。
+- **強化帯**：ステージの `surge_start`（負の値なら `config.surge_start`）から、`config.surge_interval` ごとに段が1つ上がる（始まった時点で1段）。1段ごとに、目標の敵の数を `config.surge_pop` の割合だけ増やし、撃つ敵（敵の定義の `ranged`）の出現の重みを `config.surge_ranged` の割合だけ増やし、エリートになる確率に `config.surge_elite` を足す。ステージの `surge_end` に達したあとは、その時点の段を保つ。負の終了時刻なら段を増やし続ける。時間帯ごとのON/OFF（ステージの `surge_phases`）を指定した時間帯は、その区間全体をONまたはOFFにする。未指定の時間帯は既存の強化帯を使う。複数のON区間を扱い、ONの累計時間で強化を進め、OFFの間は強さを保つ。隣接するON区間は1つの区間として扱う。
 
 ## 5. 機体
 
