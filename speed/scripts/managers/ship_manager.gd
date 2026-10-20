@@ -53,8 +53,8 @@ func _steer(dt: float) -> void:
 	if intent.touch:
 		if not intent.stick_active or intent.stick.length() < cfg.stick_dead_zone:
 			return
-		var k := clampf((intent.stick.length() - cfg.stick_dead_zone) / maxf(1.0, cfg.stick_radius - cfg.stick_dead_zone), 0.0, 1.0)
-		_steer_toward(intent.stick.angle(), dt, lerpf(cfg.steer_cruise, cfg.stick_cruise_max, k))
+		# スティックは向きだけを決める（倒し具合で速さは変えない）
+		_steer_toward(intent.stick.angle(), dt, cfg.steer_cruise)
 		return
 	if not intent.has_cursor:
 		return
