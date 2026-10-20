@@ -36,6 +36,22 @@ const EDITOR_ORDER := 5
 ## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
 ## 単位：文字
 @export var track_names: PackedStringArray
+## ボスの出現時刻
+## ラン開始からボスが出る時刻。負の値なら共通設定の時刻と幅を使う。
+## 単位：実秒
+@export var boss_time: float = -1.0
+## 強化帯の開始
+## 敵の数・撃つ敵の割合・エリート確率を段階的に増やし始める時刻。負の値なら共通設定を使う。
+## 単位：実秒
+@export var surge_start: float = -1.0
+## 強化帯の終了
+## この時刻で強化の進行を止め、その時点の強さを保つ。負の値なら強化を続ける。
+## 単位：実秒
+@export var surge_end: float = -1.0
+## ステージの制限時間
+## この時刻にランの time_limit_reached フラグを立てる。負の値なら制限時間を使わない。
+## 単位：実秒
+@export var time_limit: float = -1.0
 ## ボス
 ## このステージのボスの ID。
 ## 単位：文字
@@ -63,3 +79,9 @@ func enemy_sprite_path(type: StringName) -> String:
 ## enabled を指定したステージと時間帯で使う攻撃枠・配置規則。
 ## 単位：設定
 @export var encounter_profile: Dictionary = {}
+
+func boss_start(cfg: GameConfig) -> float:
+	return boss_time if boss_time >= 0.0 else cfg.boss_time
+
+func surge_begin(cfg: GameConfig) -> float:
+	return surge_start if surge_start >= 0.0 else cfg.surge_start

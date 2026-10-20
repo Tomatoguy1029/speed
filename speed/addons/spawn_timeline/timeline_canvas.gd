@@ -5,8 +5,13 @@
 @tool
 extends Control
 
+const CLOCKS := preload("res://addons/spawn_timeline/stage_clocks.gd")
+var clocks = CLOCKS.new(self)
+
 ## 操作の説明（パネルの「操作」ボタンで出す）
 const HELP := "クリップをドラッグ：開始の時刻　右端をドラッグ：長さ\n" + \
+		"進行のピンをドラッグ：ボス・制限時間　強化帯をドラッグ：区間を移動　左右の端をドラッグ：強化の開始・終了\n" + \
+		"ピン・帯をダブルクリック：時刻を入力　時間帯を右クリック：設定・解除\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
@@ -388,6 +393,8 @@ func _end_time() -> float:
 	var t := 600.0
 	if timeline == null:
 		return t
+	if timeline.stage != null:
+		t = maxf(t, clocks.extent() + 30.0)
 	var ps: Array = timeline.phases()
 	if not ps.is_empty():
 		t = maxf(t, float(ps[ps.size() - 1].get("start")) + 60.0)
@@ -583,6 +590,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の合計（最大 %d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
+	clocks.draw()
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
 	# 再生位置
 	var px := _x(playhead)
@@ -598,6 +606,9 @@ func _hit(p: Vector2) -> Dictionary:
 	if hy < _tracks_top() and hy >= RULER + PHASE_ROW:
 		return {}
 	if hy < RULER + PHASE_ROW:
+		var clock_hit: Dictionary = clocks.hit(p)
+		if not clock_hit.is_empty():
+			return clock_hit
 		for k in range(1, ps.size()):
 			if absf(p.x - _x(float(ps[k].get("start")))) <= HANDLE:
 				return {"kind": "phase", "index": k}
@@ -671,6 +682,11 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
+			var phase_y := mb.position.y - _scroll_y() - RULER
+			if phase_y >= 0.0 and phase_y < PHASE_ROW:
+				clocks.menu(mb.position)
+				accept_event()
+				return
 			if h.get("kind", "") == "track_label":
 				selected = -1
 				track_selected = h.row
@@ -689,6 +705,9 @@ func _gui_input(event: InputEvent) -> void:
 			grab_focus()
 			var h := _hit(mb.position)
 			if h.is_empty():
+				return
+			if h.kind == "clock" and mb.double_click:
+				clocks.edit(h.field, mb.position)
 				return
 			if h.kind == "time" and mb.double_click:
 				selected = h.index
@@ -771,6 +790,9 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 func _begin_drag(h: Dictionary, p: Vector2) -> void:
+	if h.kind == "clock":
+		_drag = clocks.begin(h, p)
+		return
 	_drag = h.duplicate()
 	_drag.t0 = _t(p.x)
 	match h.kind:
@@ -866,6 +888,8 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 	var t := _t(p.x)
 	var snap := 0.1 if fine else 1.0
 	match _drag.kind:
+		"clock":
+			clocks.move(_drag, t, snap)
 		"point":
 			var pts: PackedVector2Array = (_drag.curve.get("points") as PackedVector2Array).duplicate()
 			var n: int = _drag.n

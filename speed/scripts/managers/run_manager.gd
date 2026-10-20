@@ -201,6 +201,10 @@ func _play_tick(real_dt: float) -> void:
 			_leave_bonus()
 	else:
 		state.time += real_dt
+	if not state.lab_mode and not state.endless and not state.time_limit_reached \
+			and state.stage.time_limit >= 0.0 and state.time >= state.stage.time_limit:
+		state.time_limit_reached = true
+		state.emit(&"time_limit_reached", {"t": state.time})
 	state.world_time += world_dt
 	# 世界側は config.world_tick_div 回に1回、たまった時間でまとめて進める
 	_world_real_dt += real_dt

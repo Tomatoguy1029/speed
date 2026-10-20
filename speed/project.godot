@@ -54,6 +54,7 @@ rendering_device/driver.windows="d3d12"
 [spawn_timeline]
 
 enemy_dir="res://data/enemies"
+defaults_resource="res://data/config.tres"
 
 [speed_data_editor]
 

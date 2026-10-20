@@ -2060,7 +2060,7 @@ func _phase_end(n: int) -> float:
 	var phases: Array = state.stage.phases
 	if n + 1 < phases.size():
 		return (phases[n + 1] as PhaseDef).start
-	return cfg.boss_time
+	return state.stage.boss_start(cfg)
 
 func _target() -> Dictionary:
 	var n := _phase_index()
@@ -2084,11 +2084,15 @@ func _target() -> Dictionary:
 		return {"phase": p, "steps": steps, "pop": total, "per_type": per}
 	return {"phase": p, "steps": steps, "pop": lerpf(p.pop_from, p.pop_to, k) * scale}
 
-## 10:00 以降の強まりの段（仕様書 4.2）。始まる前は0、始まると1から一定時間ごとに増える。
+## 強化帯の強まりの段（仕様書 4.2）。右端に達したあとは、その段を保つ。
 func surge_steps() -> int:
-	if state.time < cfg.surge_start:
+	var start := state.stage.surge_begin(cfg)
+	if state.time < start:
 		return 0
-	return 1 + int((state.time - cfg.surge_start) / maxf(1.0, cfg.surge_interval))
+	var at := state.time
+	if state.stage.surge_end >= 0.0:
+		at = minf(at, maxf(start, state.stage.surge_end))
+	return 1 + int((at - start) / maxf(1.0, cfg.surge_interval))
 
 ## 通常の敵の数。in_view が true なら、再配置の範囲の中だけを数える。
 func _count_population(in_view: bool) -> int:
