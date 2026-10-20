@@ -5,7 +5,7 @@ extends WeaponBehavior
 ## 機雷：pos、life、armed、dmg、radius
 var mines: Array = []
 var _distance := 0.0
-var _buf: Array = []
+var _buf := PackedInt32Array()
 
 func on_trail(_run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 	var length := p0.distance_to(p1)
