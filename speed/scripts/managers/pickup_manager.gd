@@ -328,7 +328,8 @@ func _collect_capsules(dt: float) -> void:
 			continue
 		c.age += dt
 		var can := c.kind != Pickup.Kind.HEAL or state.ship_hp < state.stats.max_hp
-		if (c.src == &"drop" or c.src == &"comet") and can:
+		# 彗星限定の武器のカプセルは吸い寄せない（自分で触って拾う）
+		if c.src == &"drop" and can:
 			var d := state.ship_pos - c.pos
 			var dist := d.length()
 			if dist < pull_r and dist > 1.0:

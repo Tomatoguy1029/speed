@@ -218,7 +218,8 @@ func _stream_rocks(dt: float) -> void:
 		rock.row = i
 		rock.row_id = table.id[i]
 		if rock.rare_weapon != &"":
-			table.gate[i] = EnemyTable.Gate.RAM_ONLY
+			table.max_hp[i] *= cfg.rare_comet_hp_mult
+			table.hp[i] = table.max_hp[i]
 
 # ── 重力（仕様書 13.1） ─────────────────────────────────────────────
 
