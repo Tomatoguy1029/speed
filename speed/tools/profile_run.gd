@@ -80,7 +80,7 @@ func _ready() -> void:
 		# --types=pump,lynx で、指定した種類の敵を機体の周りに2体ずつ出す
 		for type in String(options.types).split(",", false):
 			for k in 2:
-				run.enemies.spawn(run.enemies.def_of(StringName(type)), 1.0,
+				run.enemies.spawn(run.enemies.def_of(StringName(type)),
 					run.state.ship_pos + Vector2.from_angle(run.state.rng.randf() * TAU) * 450.0)
 		run.combat.rebuild_grid()
 	if options.has("size") and DisplayServer.get_name() != "headless":

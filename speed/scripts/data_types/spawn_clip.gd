@@ -27,14 +27,17 @@ extends Resource
 ## 選んだ並びが1つもないフォーメーションは使わない。空なら、すべての並びを使う。
 ## 単位：並びの名前
 @export var layouts: Array[StringName] = []
+## 並びごとの攻撃value。「シーンのファイル名/並びのノード名」→1以上の整数。未設定は1。
+@export_storage var formation_values: Dictionary = {}
+
 ## 開始の時刻
 ## ラン開始からこの時刻に、このクリップが働き始める。
 ## 単位：実秒
-@export var time: float
+@export_storage var time: float
 ## 長さ
 ## 開始からこの時間だけ働く。
 ## 単位：実秒
-@export var length: float = 60.0
+@export_storage var length: float = 60.0
 ## 同時の群れの数
 ## 働いている間、このクリップから出た群れがフィールドにいてほしい数。足りなければ出す。
 ## 単位：群れ
@@ -43,6 +46,10 @@ extends Resource
 ## このクリップから群れを出してから、次の群れを出すまでの最短の時間。
 ## 単位：実秒
 @export var interval: float = 10.0
+
+## 同じ並びから1回で出た群れ全体が共有する攻撃value。
+func formation_value(scene_path: String, layout_name: String) -> int:
+	return maxi(1, int(formation_values.get(String(layout_key(scene_path, layout_name)), 1)))
 
 ## 終わりの時刻。
 func end_time() -> float:

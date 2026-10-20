@@ -39,9 +39,9 @@ const EDITOR_ORDER := 4
 ## 単位：文字
 @export var wave_type: StringName
 ## 攻撃の予算
-## この時間帯に、強敵と大物の攻撃が同時に使ってよい重さ（敵の定義の「攻撃の重さ」）の合計。0 なら攻撃を管理しない。
-## 単位：重さ
-@export var attack_budget: float
+## 強敵の攻撃が同時に使ってよい、群れごとの value の合計。0 なら新しい攻撃を待たせる。タイムラインで編集する。
+## 単位：整数
+@export_range(0, 1000, 1, "or_greater") var attack_budget: int
 ## 出力コアを出す
 ## オンにすると、この時間帯にフィールドの中心付近へ出力コアが出る。
 ## 単位：オン／オフ

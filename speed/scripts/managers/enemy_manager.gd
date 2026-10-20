@@ -76,6 +76,8 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	var t := table
 	t.def[i] = def
 	t.type[i] = def.id
+	t.attack_group[i] = int(opts.get("attack_group", 0))
+	t.attack_value[i] = maxi(1, int(opts.get("attack_value", 1)))
 	apply_scaling(i, def, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
@@ -129,7 +131,7 @@ func _spawn_flock(i: int, opts: Dictionary) -> void:
 	var gap := float(p.flock_gap)
 	for k in mini(int(p.flock) - 1, CROW_FORMATION.size()):
 		var at: Vector2 = t.pos[i] + (u * CROW_FORMATION[k].x + side * CROW_FORMATION[k].y) * gap
-		var j := spawn(def, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true})
+		var j := spawn(def, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})
 		t.mode[j] = EnemyTable.Mode.DASH
 
 ## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
@@ -154,7 +156,7 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 
 ## 部位を1つ出し、親（行 i）に付ける。
 func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
-	var j := spawn(def, pos)
+	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i]})
 	table.parent[j] = i
 	table.parent_id[j] = table.id[i]
 	var parts := table.parts[i]
@@ -203,6 +205,8 @@ func _reset_row(i: int) -> void:
 	t.beh_slot[i] = -1
 	t.is_boss[i] = 0
 	t.meteor_index[i] = -1
+	t.attack_group[i] = 0
+	t.attack_value[i] = 1
 	t.dead[i] = 0
 	t.elite[i] = 0
 	t.pos[i] = Vector2.ZERO
@@ -1315,7 +1319,7 @@ func _split_ruler(i: int) -> void:
 	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
 	if d == Vector2.ZERO:
 		d = Vector2.DOWN
-	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0})]
+	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})]
 	for k in 2:
 		var j: int = halves[k]
 		t.buds[j] = 1 if k == 0 else -1
@@ -1817,7 +1821,7 @@ func _cepheus(i: int, dt: float) -> void:
 					taken[t.buds[j]] = true
 				for k in size:
 					if not taken.has(k):
-						var j := spawn(def_of(&"cepheus_soldier"), cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1]})
+						var j := spawn(def_of(&"cepheus_soldier"), cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1], "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})
 						t.target[j] = i
 						t.target_id[j] = t.id[i]
 						t.buds[j] = k
@@ -2139,15 +2143,16 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	_tick_clips()
 	_sync_attack_budget(phase)
 
-## 本番のランでは、攻撃の管理の予算を今の時間帯の「攻撃の予算」にする（0 なら管理しない）。
-## 実験場と採用した実験の設定では、それぞれの設定に任せる。
+## 本番のランは、時間帯の整数予算と群れごとの value で攻撃を管理する。
+## 実験場では、実験場の設定に任せる。
 func _sync_attack_budget(phase: PhaseDef) -> void:
 	var d = projectiles.director
-	if d == null or state.lab_mode or state.stage.encounter_profile.get("enabled", false):
+	if d == null or state.lab_mode:
 		return
-	d.enabled = phase.attack_budget > 0.0
-	d.settings.budget = phase.attack_budget
-	d.settings.jitter = cfg.attack_jitter
+	d.formation_mode = true
+	d.enabled = true
+	d.settings.budget = maxi(0, phase.attack_budget)
+	d.settings.jitter = 0.0
 
 # ── 強敵の群れ（敵の組み合わせのシーン） ────────────────────────────
 
@@ -2187,8 +2192,9 @@ func _pick_weighted(items: Array) -> int:
 ## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
-func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = []) -> PackedInt32Array:
+func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := 1) -> PackedInt32Array:
 	var rows := PackedInt32Array()
+	var group := _next_id
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:
@@ -2211,7 +2217,7 @@ func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: A
 		var pos := state.ship_pos + local.origin.rotated(turn)
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
-		var i := spawn(def, pos, {"facing": facing})
+		var i := spawn(def, pos, {"facing": facing, "attack_group": group, "attack_value": value})
 		rows.append(i)
 		rows.append(table.id[i])
 	return rows
@@ -2259,7 +2265,7 @@ func _tick_clips() -> void:
 				continue
 			var allowed := clip.allowed_layouts(scene.resource_path, data)
 			if not allowed.is_empty():
-				items.append({"data": data, "layouts": allowed, "weight": 1.0})
+				items.append({"data": data, "layouts": allowed, "scene_path": scene.resource_path, "weight": 1.0})
 		var k := _pick_weighted(items)
 		if k < 0:
 			continue
@@ -2269,7 +2275,9 @@ func _tick_clips() -> void:
 		var c := _pick_weighted(choices)
 		if c < 0:
 			continue
-		var rows := spawn_formation(items[k].data, choices[c].index, -1, clip.types)
+		var layout_index: int = choices[c].index
+		var value := clip.formation_value(items[k].scene_path, str(items[k].data.layouts[layout_index].get("name", "")))
+		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value)
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
@@ -2500,7 +2508,7 @@ func _lab_admit(i: int, dt: float) -> bool:
 	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
 	if cats.is_empty():
 		return true
-	var owner := str(table.id[i])
+	var owner := "formation:%d" % table.attack_group[i] if d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
 	var p := def.params
 	var active := table.mode[i] != EnemyTable.Mode.MOVE or not table.links[i].is_empty()
 	var due := table.fire_t[i] <= float(p.get("telegraph", 0)) + dt
@@ -2516,11 +2524,17 @@ func _lab_admit(i: int, dt: float) -> bool:
 	elif def.behavior in [&"aquarius", &"cross", &"dolphin"]:
 		# 間隔が過ぎた瞬間から予告を始める種類
 		due = table.fire_t[i] <= dt
+	elif def.behavior == &"ruler":
+		active = table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.RECOVER] or not table.links[i].is_empty()
+		due = table.buds[i] != 0 and table.mode[i] == EnemyTable.Mode.DASH and table.timer[i] <= dt
 	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
 		due = true
 	if not active and due:
 		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
-		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, def.attack_weight):
+		if p.has("laser_charge"):
+			duration = maxf(0.0, 1.0 - table.charge[i]) * float(p.lock_fill) + float(p.laser_charge) + float(p.laser_delay) + float(p.laser_time) + 0.1
+		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
+		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, cost):
 			table.charge[i] = 0
 			return false
 	if not cats.is_empty():

@@ -467,7 +467,7 @@ lab.status_residue,残留,Lingering
 lab.status_wait,待機,Waiting
 lab.exit_clearance,抜けた先に残す余裕の半径,Exit clearance radius
 lab.min_spacing,敵中心どうしの最小距離,Minimum distance between enemy centers
-lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留 / 枠,■ Telegraph / active  / Lingering; active + lingering / slots
+lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留,■ Telegraph / active  / Lingering; active + lingering
 lab.error_b03790ec83,時間帯一覧の形式が違います,Invalid phase list
 lab.error_1ba7e23ea5,未知の時間帯です,Unknown phase ID
 lab.error_ea2fd16cf8,攻撃量の上限が不正です,Invalid attack budget

@@ -15,6 +15,7 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"上段のボス・終了：再生位置に配置／再クリックで削除　終了ピンなし：編集上限180:00\n" + \
 		"進行のピンをドラッグ：ボス・制限時間　ピンをダブルクリック：時刻を入力\n" + \
 		"時間帯を右クリック：追加・削除・名称変更・強化区間のON/OFF　時間帯を選択：インスペクターで強化内容を編集\n" + \
+		"時間帯の予算をクリック：整数を入力（Enterで確定）　予算0：強敵の攻撃を停止　valueはクリップのFormationsで設定\n" + \
 		"選んだピン・クリップを←→：1秒ずつ移動\n" + \
 		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
@@ -137,6 +138,33 @@ func _track_names_now() -> PackedStringArray:
 	for row in track_count() - 1:
 		out.append(_own_track_name(row))
 	return out
+
+func _budget_rect(index: int) -> Rect2:
+	var ps: Array = timeline.phases()
+	var end: float = float(ps[index + 1].get("start")) if index + 1 < ps.size() else _end_time()
+	var left := maxf(GUTTER + 4 * ui, _x(float(ps[index].get("start"))) + 6 * ui)
+	var right := minf(size.x, _x(end)) - 6 * ui
+	return Rect2(left, _scroll_y() + RULER + 29 * ui, maxf(0.0, minf(108 * ui, right - left)), 17 * ui)
+
+func _draw_number(rect: Rect2, text: String) -> void:
+	if rect.size.x < 12 * ui:
+		return
+	draw_rect(rect, Color(0, 0, 0, 0.3))
+	draw_rect(rect, Color(1, 1, 1, 0.3), false, ui)
+	draw_string(get_theme_default_font(), rect.position + Vector2(4, 12) * ui, text, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 8 * ui, _fs(11))
+
+func _edit_budget(index: int) -> void:
+	var phase: Resource = timeline.phases()[index]
+	_edit_integer(phase, "attack_budget", int(phase.get("attack_budget")), _budget_rect(index), 0, "時間帯の予算を変える")
+
+func _edit_integer(target: Resource, prop: String, value: int, rect: Rect2, minimum: int, label: String) -> void:
+	_open_editor(str(value), rect, func(text: String) -> void:
+		if not text.is_valid_int() or int(text) < minimum or int(text) > 2147483647:
+			return
+		var before = target.get(prop)
+		if before != int(text):
+			target.set(prop, int(text))
+			timeline.commit(label, [[target, prop, before, int(text)]]), "%d以上の整数" % minimum)
 
 ## トラックを並べ替え・消す・複製する。remap[行] はその行のクリップの新しい行（-1 なら消す）、
 ## copies は足すクリップ（行を決めたもの）、names は新しいトラックの名前の並び。
@@ -603,7 +631,10 @@ func _draw() -> void:
 		var name_ := phase_label(k)
 		var name_color := Color("#ff7979") if clocks.phase_surge_on(k) else Color.WHITE
 		if r.size.x > 24.0 * ui:
-			draw_string(font, r.position + Vector2(6 * ui, r.size.y * 0.62), name_, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8 * ui, _fs(15), name_color)
+			draw_string(font, r.position + Vector2(6, 20) * ui, name_, HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8 * ui, _fs(15), name_color)
+		var budget_rect := _budget_rect(k)
+		var budget := int(p.get("attack_budget"))
+		_draw_number(budget_rect, "予算 %d" % budget if budget_rect.size.x >= 64 * ui else str(budget))
 		# 雑魚の補充の目標の数（曲線がなければ時間帯の値）
 		if curves.is_empty():
 			var y0 := off + RULER + PHASE_ROW + POP_ROW - 6.0 * ui
@@ -635,7 +666,7 @@ func _draw() -> void:
 			draw_polyline(line, Color(0.5, 0.9, 0.6), 2.0 * ui, true)
 	draw_rect(Rect2(0, off, GUTTER, _tracks_top()), Color(0.1, 0.11, 0.14))
 	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
-	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯 / 予算", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の合計（最大 %d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
 	clocks.draw()
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
@@ -656,6 +687,9 @@ func _hit(p: Vector2) -> Dictionary:
 		var clock_hit: Dictionary = clocks.hit(p)
 		if not clock_hit.is_empty():
 			return clock_hit
+		for k in ps.size():
+			if _budget_rect(k).has_point(p):
+				return {"kind": "phase_budget", "index": k}
 		for k in range(1, ps.size()):
 			if absf(p.x - _x(float(ps[k].get("start")))) <= HANDLE:
 				return {"kind": "phase", "index": k}
@@ -705,7 +739,7 @@ func _select_hit(hit: Dictionary) -> void:
 	var kind: String = hit.get("kind", "")
 	var field: String = hit.get("field", "")
 	clock_selected = field if kind == "clock" and field in ["boss_time", "time_limit"] else ""
-	phase_selected = int(hit.get("index", -1)) if kind in ["phase", "phase_body"] else -1
+	phase_selected = int(hit.get("index", -1)) if kind in ["phase", "phase_body", "phase_budget"] else -1
 	selected = int(hit.get("index", -1)) if kind in ["time", "length"] else -1
 	track_selected = int(hit.get("row", -1)) if kind == "track_label" else -1
 	curve_selected = int(hit.get("curve", -1)) if kind in ["curve_label", "curve_body", "point"] else -1
@@ -794,6 +828,10 @@ func _gui_input(event: InputEvent) -> void:
 			grab_focus()
 			var h := _hit(mb.position)
 			_select_hit(h)
+			if h.get("kind", "") == "phase_budget":
+				_edit_budget(h.index)
+				accept_event()
+				return
 			if h.get("kind", "") in ["phase", "phase_body"]:
 				timeline.inspect_phase(h.index)
 			if h.is_empty():
@@ -849,6 +887,9 @@ func _gui_input(event: InputEvent) -> void:
 		_move_drag((event as InputEventMouseMotion).position, (event as InputEventMouseMotion).shift_pressed)
 	elif event is InputEventMouseMotion:
 		var h := _hit((event as InputEventMouseMotion).position)
+		match h.get("kind", ""):
+			"phase_budget": tooltip_text = "予算 %d：クリックして整数を入力。0は強敵の新しい攻撃を停止。" % int(timeline.phases()[h.index].get("attack_budget"))
+			_: tooltip_text = ""
 		var hc: int = h.get("curve", -1) if h.get("kind", "") == "point" else -1
 		var hp: int = h.get("point", -1) if h.get("kind", "") == "point" else -1
 		if hc != _hover_curve or hp != _hover_point:
@@ -1071,24 +1112,25 @@ func _start_phase_rename(k: int) -> void:
 func _open_editor(text: String, rect: Rect2, done: Callable, hint := "") -> void:
 	if _rename != null:
 		_rename.queue_free()
-	_rename = LineEdit.new()
-	_rename.text = text
-	_rename.placeholder_text = hint
-	_rename.position = rect.position
-	_rename.size = rect.size
-	_rename.add_theme_font_size_override("font_size", _fs(15))
-	add_child(_rename)
-	_rename.grab_focus()
-	_rename.select_all()
+	var editor := LineEdit.new()
+	_rename = editor
+	editor.text = text
+	editor.placeholder_text = hint
+	editor.position = rect.position
+	editor.size = rect.size
+	editor.add_theme_font_size_override("font_size", _fs(15))
+	add_child(editor)
 	var finish := func() -> void:
-		if _rename == null:
+		if _rename != editor:
 			return
-		var value := _rename.text
-		_rename.queue_free()
+		var value := editor.text
 		_rename = null
+		editor.queue_free()
 		done.call(value)
-	_rename.text_submitted.connect(func(_text: String) -> void: finish.call())
-	_rename.focus_exited.connect(finish)
+	editor.text_submitted.connect(func(_text: String) -> void: finish.call())
+	editor.focus_exited.connect(finish)
+	editor.grab_focus()
+	editor.select_all()
 
 ## コピーしたクリップ（貼り付けるたびに複製する）
 var _clipboard: Resource = null

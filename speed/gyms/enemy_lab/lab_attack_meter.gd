@@ -15,17 +15,16 @@ func _draw() -> void:
 			if category in group.categories:
 				if float(group.until) > d.now: active += 1
 				else: residual += 1
-		var slots := int(d.settings.slots.get(category, 1))
 		var y := float(n) * 19
 		draw_string(get_theme_default_font(), Vector2(0, y + 13), tr(NAMES[n]), HORIZONTAL_ALIGNMENT_LEFT, 108, 12)
-		for index in mini(10, maxi(slots, active + residual)):
+		for index in mini(10, active + residual):
 			var rect := Rect2(112 + index * 12, y + 2, 9, 12)
 			draw_rect(rect, Color("#555f6e"), false, 1)
 			if index < active: draw_rect(rect.grow(-1), Color("#ffbe76"))
 			elif index < active + residual:
 				draw_line(rect.position, rect.end, Color("#f98585"), 2)
 				draw_line(rect.position + Vector2(0, 5), rect.end - Vector2(0, 5), Color("#f98585"), 2)
-		draw_string(ThemeDB.fallback_font, Vector2(238, y + 13), "%d+%d / %d" % [active, residual, slots], HORIZONTAL_ALIGNMENT_LEFT, 80, 11)
+		draw_string(ThemeDB.fallback_font, Vector2(238, y + 13), "%d+%d" % [active, residual], HORIZONTAL_ALIGNMENT_LEFT, 80, 11)
 	# 今出ている攻撃の重さの合計と、予算
 	var used: float = d.used_cost()
 	var budget := float(d.settings.budget)

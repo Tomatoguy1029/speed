@@ -35,19 +35,19 @@ func _preview() -> void:
 		var definition := run.enemies.def_of(StringName(ids[i]))
 		assert(definition != null, "敵定義がありません: " + ids[i])
 		var position := Vector2(-550 + (i % 6) * 210, -220 if i < 6 else 130)
-		var enemy := run.enemies.spawn(definition, 1.0, position, {"facing": PI / 2.0})
+		var enemy := run.enemies.spawn(definition, position, {"facing": PI / 2.0})
 		if ids[i] == "gunner":
 			t.charge[enemy] = 0.8
 		if ids[i] == "armored":
 			t.elite[enemy] = 1
 			t.hp[enemy] *= 0.6
 	for i in 2:
-		var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"), 1.0,
+		var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"),
 			Vector2(-180 + 140 * i, 340), {"size": 50.0, "meteor_index": i})
 		if i == 1:
 			t.hp[rock] *= 0.5
 	# 実ゲーム内の同じフラッシュ処理も並べて確認する。
-	var flashed := run.enemies.spawn(run.enemies.def_of(&"drifter"), 1.0, Vector2(120, 0))
+	var flashed := run.enemies.spawn(run.enemies.def_of(&"drifter"), Vector2(120, 0))
 	t.flash[flashed] = 1.0
 	if "--damage-preview" in OS.get_cmdline_user_args():
 		run.enemies.clear_all()
@@ -55,7 +55,7 @@ func _preview() -> void:
 		var renderer := game.get_node("Managers/RenderManager") as RenderManager
 		for variant in 2:
 			for stage in 4:
-				var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"), 1.0,
+				var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"),
 					Vector2(-460 + stage * 300, -150 + variant * 300),
 					{"size": 60.0 if variant == 0 else 40.0, "meteor_index": variant})
 				t.hp[rock] *= [1.0, 0.5, 0.2, 0.0][stage]
