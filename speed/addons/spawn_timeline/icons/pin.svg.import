@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cpw7eq3hu11wa"
-path="res://.godot/imported/timer.svg-0f3d8b52badc185408dbdad6224338bd.ctex"
+uid="uid://tc21wey78xf4"
+path="res://.godot/imported/pin.svg-36b8051899ef6a496d9caa19732afc63.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://addons/spawn_timeline/icons/timer.svg"
-dest_files=["res://.godot/imported/timer.svg-0f3d8b52badc185408dbdad6224338bd.ctex"]
+source_file="res://addons/spawn_timeline/icons/pin.svg"
+dest_files=["res://.godot/imported/pin.svg-36b8051899ef6a496d9caa19732afc63.ctex"]
 
 [params]
 
