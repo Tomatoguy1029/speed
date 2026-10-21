@@ -2,13 +2,28 @@
 ## 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は F9 で切るまで続き、
 ## 次のランは別のファイルにする。実験場のランは記録しない。
 ## ファイルは書類フォルダの SPEED/recordings/stage<番号>_<日時>.jsonl。1行に1つの記録（JSON）で、メモリにためずに書き出す。
-## 記録を閉じたら、保存したファイル名を画面の隅に少しのあいだ出す。集計はしない（記録を読む側が行う）。
+## 記録を閉じたら、保存したファイル名を画面の隅に少しのあいだ出す。性能は実時間窓で集約し、全フレームは保存しない。
 extends Node
 
 ## まとめた数を書く間隔（ランの時計の秒）
 const INTERVAL := 3.0
+const PERF_INTERVAL_US := 3000000
 ## 保存したファイル名を出しておく時間（実秒）
 const SAVED_NOTICE := 5.0
+
+var _real_start_us := 0
+var _perf_last_us := 0
+var _perf_window_us := 0
+var _perf_phase := -1
+var _perf_bonus := false
+var _perf_frames := 0
+var _perf_sum_us := 0
+var _perf_max_us := 0
+var _perf_over_33 := 0
+var _perf_over_50 := 0
+var _perf_hitstop := 0
+var _perf_drawing := 0
+var _perf_tracing := 0
 
 var armed := false
 var _run: Node = null
@@ -114,6 +129,7 @@ func _begin(run: Node) -> void:
 	_last_xp_gained = run.state.xp_gained
 	_last_xp_dropped = run.state.xp_dropped
 	_next_sample = run.state.time + INTERVAL
+	_perf_start(Time.get_ticks_usec())
 	var bands := []
 	var phases: Array = run.state.stage.phases
 	for k in phases.size():
@@ -121,7 +137,9 @@ func _begin(run: Node) -> void:
 		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start})
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 2, "capsule_config": _capsule_config()})
+		"schema_version": 3, "capsule_config": _capsule_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
+		"engine_version": Engine.get_version_info().string,
+		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
 	_start_capsules()
 	_update_label()
 
@@ -209,6 +227,7 @@ func _process(delta: float) -> void:
 		_update_label()
 	if _run == null:
 		return
+	_perf_tick(Time.get_ticks_usec())
 	var d = _run.projectiles.director
 	if d != null:
 		_budget_max = maxf(_budget_max, d.used_cost())
@@ -268,6 +287,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 	var pick: Dictionary = {}
 	for e in events:
 		match e.type:
+			&"bonus":
+				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
 			&"kill":
 				if e.get("cause", &"") == &"finale":
 					continue
@@ -321,7 +342,10 @@ func _on_events(events: Array[Dictionary]) -> void:
 		_write(pick)
 
 func _on_phase_changed(phase: int) -> void:
-	if phase != RunState.Phase.ENDED or _run == null:
+	if _run == null:
+		return
+	_write({"type": "run_phase", "t": _r(_run.state.time), "phase": RunState.Phase.keys()[phase]})
+	if phase != RunState.Phase.ENDED:
 		return
 	var s = _run.state
 	_end("clear" if s.cleared else ("death" if s.ship_hp <= 0.0 else "quit"))
@@ -331,6 +355,7 @@ func _end(result: String) -> void:
 	if _run == null:
 		return
 	var s = _run.state
+	_flush_performance(_perf_last_us)
 	_sample()
 	for id in _strong:
 		var rec: Array = _strong[id]
@@ -360,6 +385,9 @@ func _end(result: String) -> void:
 
 func _write(record: Dictionary) -> void:
 	if _file != null:
+		if _real_start_us > 0:
+			if not record.has("real_t"):
+				record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0
 		_file.store_line(JSON.stringify(record))
 
 func _update_label() -> void:
@@ -384,3 +412,86 @@ static func _plain(d: Dictionary) -> Dictionary:
 	for k in d:
 		out[String(k)] = d[k]
 	return out
+
+## 記録中の描画フレーム間隔を定数個のカウンタへ集約する。停止・カード選択とボーナスの境界で窓を分ける。
+func _perf_start(now_us: int) -> void:
+	_real_start_us = now_us
+	_perf_last_us = now_us
+	_perf_window_us = now_us
+	_perf_phase = _run.state.phase
+	_perf_bonus = _run.state.bonus_t > 0.0
+	_clear_performance()
+
+func _clear_performance() -> void:
+	_perf_frames = 0
+	_perf_sum_us = 0
+	_perf_max_us = 0
+	_perf_over_33 = 0
+	_perf_over_50 = 0
+	_perf_hitstop = 0
+	_perf_drawing = 0
+	_perf_tracing = 0
+
+func _perf_tick(now_us: int) -> void:
+	if _perf_last_us == 0:
+		_perf_start(now_us)
+		return
+	var s = _run.state
+	var phase: int = s.phase
+	var bonus: bool = s.bonus_t > 0.0
+	if phase != _perf_phase or bonus != _perf_bonus:
+		if phase == RunState.Phase.PLAY and phase == _perf_phase:
+			# ボーナスへの出入りも遊んでいる同じ1フレーム。切替時の重さを落とさない。
+			_add_performance_frame(now_us - _perf_last_us)
+			_flush_performance(now_us)
+		else:
+			_flush_performance(_perf_last_us)
+		_perf_phase = phase
+		_perf_bonus = bonus
+		_perf_window_us = now_us
+		_perf_last_us = now_us
+		return
+	var dt := now_us - _perf_last_us
+	_perf_last_us = now_us
+	if phase != RunState.Phase.PLAY or dt <= 0:
+		return
+	_add_performance_frame(dt)
+	if now_us - _perf_window_us >= PERF_INTERVAL_US:
+		_flush_performance(now_us)
+
+func _add_performance_frame(dt: int) -> void:
+	if dt <= 0: return
+	var s = _run.state
+	_perf_frames += 1
+	_perf_sum_us += dt
+	_perf_max_us = maxi(_perf_max_us, dt)
+	if dt > 33333: _perf_over_33 += 1
+	if dt > 50000: _perf_over_50 += 1
+	if s.hitstop > 0.0: _perf_hitstop += 1
+	if s.drawing: _perf_drawing += 1
+	if s.tracing: _perf_tracing += 1
+
+func _flush_performance(now_us: int) -> void:
+	if _perf_frames == 0 or _perf_sum_us <= 0:
+		return
+	var s = _run.state
+	var pk = _run.pickups
+	var pr = _run.projectiles
+	_write({"type": "performance", "t": _r(s.time), "window_end_real": (now_us - _real_start_us) / 1000000.0,
+		"window_start_real": (_perf_window_us - _real_start_us) / 1000000.0,
+		"duration_real": _perf_sum_us / 1000000.0, "world_t": s.world_time, "bonus": _perf_bonus,
+		"frames": _perf_frames, "fps": _perf_frames * 1000000.0 / _perf_sum_us,
+		"frame_ms_mean": _perf_sum_us / 1000.0 / _perf_frames, "frame_ms_max": _perf_max_us / 1000.0,
+		"frames_over_33ms": _perf_over_33, "frames_over_50ms": _perf_over_50,
+		"frames_with_hitstop": _perf_hitstop, "hitstop_frame_ratio": float(_perf_hitstop) / _perf_frames, "frames_drawing": _perf_drawing, "frames_tracing": _perf_tracing,
+		"bonus_at_write": s.bonus_t > 0.0, "objects_at_write": {"enemies": _run.enemies.count(), "enemy_capacity": _run.enemies.slots.capacity(),
+			"friendly": pr.friend_count(), "friendly_capacity": pr.friend_slots.capacity(),
+			"hostile": pr.hostile_count(), "hostile_capacity": pr.hostile_slots.capacity(),
+			"hazards": pr.hazard_count(), "hazard_capacity": pr.hazard_slots.capacity(),
+			"gems": pk.gem_slots.live, "gem_capacity": pk.gem_slots.capacity(),
+			"coins": pk.coin_slots.live, "coin_capacity": pk.coin_slots.capacity(), "capsules": pk.capsules.size(),
+			"corona_members": _run.enemies.corona.members.size()}})
+	if _file != null:
+		_file.flush()
+	_clear_performance()
+	_perf_window_us = now_us

@@ -26,6 +26,7 @@ func _ready() -> void:
 		if row is Dictionary: records.append(row)
 	file.close()
 	verify(records)
+	await verify_performance()
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
 
@@ -162,3 +163,78 @@ func verify(records: Array[Dictionary]) -> void:
 		var counts: Dictionary = end.xp_capsules[source]
 		generated += int(counts.get("spawn", 0))
 	check(generated + observed == collected.size() + lost.size() + end.xp_capsules_remaining.size(), "生成・観測＝取得＋消失＋残存")
+
+func verify_performance() -> void:
+	var lab = load('res://gyms/enemy_lab/lab_session.gd').new()
+	add_child(lab)
+	await lab.reset({'seed':932,'empty':true,'stage':4})
+	var run: RunManager = lab.run
+	run.set_physics_process(false)
+	run.state.phase = RunState.Phase.PLAY
+	run.state.time = 300.0
+	var rec = RECORDER.new()
+	add_child(rec)
+	rec.set_process(false)
+	var directory := '/tmp/speed-performance-recorder-%d' % OS.get_process_id()
+	DirAccess.make_dir_recursive_absolute(directory)
+	var path := directory.path_join('performance.jsonl')
+	rec._file = FileAccess.open(path,FileAccess.WRITE)
+	rec._run = run
+	var stamp := Time.get_ticks_usec()
+	rec._perf_start(stamp)
+	var rng_before := run.state.rng.state
+	var xp_before := run.state.xp
+	for k in 180:
+		stamp += 16667
+		rec._perf_tick(stamp)
+	check(run.state.rng.state==rng_before and run.state.xp==xp_before,"recording preserves RNG and XP")
+	run.state.hitstop = 0.05
+	stamp += 100000
+	rec._perf_tick(stamp)
+	rec._flush_performance(stamp)
+	run.state.hitstop = 0.0
+	run.state.phase = RunState.Phase.PAUSED
+	stamp += 16667
+	rec._perf_tick(stamp)
+	stamp += 100000000
+	rec._perf_tick(stamp)
+	run.state.phase = RunState.Phase.PLAY
+	stamp += 16667
+	rec._perf_tick(stamp)
+	for k in 60:
+		stamp += 16667
+		rec._perf_tick(stamp)
+	run.state.bonus_t = 30.0
+	rec._on_events([{'type':&'bonus','enter':true}])
+	stamp += 100000
+	rec._perf_tick(stamp)
+	for k in 180:
+		stamp += 16667
+		rec._perf_tick(stamp)
+	rec._flush_performance(stamp)
+	rec._file.close()
+	rec._file = null
+	rec._run = null
+	var file := FileAccess.open(path,FileAccess.READ)
+	var rows := []
+	while file.get_position() < file.get_length(): rows.append(JSON.parse_string(file.get_line()))
+	file.close()
+	var perf := rows.filter(func(v):return v.type=='performance')
+	check(perf.size()==4,'4 windows only; no per-frame log')
+	check(perf[0].frames==180,'normal frames')
+	check(absf(perf[0].fps-60.0)<0.01,'60 FPS from real microseconds')
+	check(perf[1].frame_ms_max==100.0,'100ms stall retained')
+	check(perf[1].hitstop_frame_ratio==1.0 and perf[0].hitstop_frame_ratio==0.0,'hitstop observation ratio')
+	check(perf[1].frames_over_33ms==1 and perf[1].frames_over_50ms==1,'slow frame thresholds')
+	check(perf[2].frames==61 and perf[2].duration_real<2.0,'pause and resume gap excluded')
+	check(perf[2].frame_ms_max==100.0,'bonus transition stall retained')
+	check(not perf[0].bonus and perf[3].bonus,'bonus split from normal')
+	check(perf[3].t==300.0 and perf[3].duration_real>3.0,'bonus records despite frozen run clock')
+	check(perf[0].objects_at_write.enemy_capacity>=perf[0].objects_at_write.enemies,'allocated capacity and live count')
+	check(perf[0].has('real_t') and perf[0].has('window_end_real'),'wall timestamp and measurement window distinct')
+	check(rows.filter(func(v):return v.type=='bonus').size()==1,'bonus transition emitted')
+	check(FileAccess.get_file_as_bytes(path).size()<10000,'bounded aggregate log')
+	print('PERF_RECORDER_CHECK passed=',passed,' rows=',rows.size(),' bytes=',FileAccess.get_file_as_bytes(path).size())
+	rec.queue_free()
+	lab.queue_free()
+	await get_tree().process_frame
