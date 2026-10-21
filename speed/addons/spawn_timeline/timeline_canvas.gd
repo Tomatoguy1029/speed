@@ -17,7 +17,7 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"時間帯を右クリック：追加・削除・名称変更・強化区間のON/OFF　時間帯を選択：インスペクターで強化内容を編集\n" + \
 		"時間帯の予算をクリック：整数を入力（Enterで確定）　予算0：強敵の攻撃を停止　valueはクリップのFormationsで設定\n" + \
 		"選んだピン・クリップを←→：1秒ずつ移動\n" + \
-		"クリップを上下にドラッグ：トラックを移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製\n" + \
+		"⌘（Ctrl）＋クリック：複数選択　クリップを上下にドラッグ：同じ種類のトラックへ移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製（元の右側、同じトラック）\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
 		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
@@ -49,6 +49,7 @@ var timeline
 var playhead := 0.0
 ## 選んでいるクリップの番号（-1 ならなし）
 var selected := -1
+var _selected_clips: Array = []
 ## 選んでいる進行のピン（boss_time・time_limit。空ならなし）。
 var clock_selected := ""
 ## 選んでいる時間帯（-1ならなし）。
@@ -491,6 +492,7 @@ func _draw() -> void:
 	# トラック：1行に複数のクリップ。クリップは開始から長さの間の棒で、中に名前・種類・同時の群れの数・出す間隔を書く
 	var cs: Array = timeline.clips()
 	var bad := mismatches()
+	var chosen := selection()
 	for row in track_count():
 		var y := _clips_top() + row * TRACK
 		draw_rect(Rect2(0, y, size.x, TRACK), Color(1, 1, 1, 0.04 if row % 2 == 0 else 0.0))
@@ -504,10 +506,10 @@ func _draw() -> void:
 		# 左の欄（トラックの名前）より左にはみ出す部分は描かない
 		if x1 <= GUTTER:
 			continue
-		var base := Color(0.35, 0.55, 0.95) if k != selected else Color(0.5, 0.75, 1.0)
+		var base := Color(0.35, 0.55, 0.95) if not chosen.has(c) else Color(0.5, 0.75, 1.0)
 		var r := Rect2(x0, y + 4 * ui, maxf(3.0, x1 - x0), TRACK - 8 * ui)
 		draw_rect(r, Color(base, 0.7))
-		if k == selected:
+		if chosen.has(c):
 			draw_rect(r, Color(1, 1, 0.8), false, 2.0 * ui)
 		if k in bad:
 			draw_rect(r, Color(1, 0.3, 0.3), false, 2.0 * ui)
@@ -735,19 +737,107 @@ func _hit(p: Vector2) -> Dictionary:
 	return {}
 
 ## 選択対象を切り替え、キー操作が以前の対象へ残るのを防ぐ。
-func _select_hit(hit: Dictionary) -> void:
+func _select_hit(hit: Dictionary, toggle := false, preserve := false) -> void:
 	var kind: String = hit.get("kind", "")
+	var previous := selection()
 	var field: String = hit.get("field", "")
 	clock_selected = field if kind == "clock" and field in ["boss_time", "time_limit"] else ""
 	phase_selected = int(hit.get("index", -1)) if kind in ["phase", "phase_body", "phase_budget"] else -1
 	selected = int(hit.get("index", -1)) if kind in ["time", "length"] else -1
+	_selected_clips = []
+	if selected >= 0:
+		var c: Resource = timeline.clips()[selected]
+		_selected_clips = previous if toggle or (preserve and previous.has(c)) else []
+		if toggle and _selected_clips.has(c):
+			_selected_clips.erase(c)
+			selected = timeline.clips().find(_selected_clips.back()) if not _selected_clips.is_empty() else -1
+		elif not _selected_clips.has(c):
+			_selected_clips.append(c)
 	track_selected = int(hit.get("row", -1)) if kind == "track_label" else -1
 	curve_selected = int(hit.get("curve", -1)) if kind in ["curve_label", "curve_body", "point"] else -1
 	point_selected = int(hit.get("point", -1)) if kind == "point" else -1
 	queue_redraw()
 
+## Resource の参照で複数選択を保つ。削除・Undo 後の番号のずれを持ち越さない。
+func selection() -> Array:
+	var cs: Array = timeline.clips() if timeline != null else []
+	if selected < 0 or selected >= cs.size():
+		return []
+	if not _selected_clips.has(cs[selected]):
+		return [cs[selected]]
+	return _selected_clips.filter(func(c: Resource) -> bool: return cs.has(c))
+
+## 移動前の時刻と、暗黙の行も含めたトラックを記録する。
+func _clip_positions() -> Array:
+	var out := []
+	for c: Resource in selection():
+		out.append({"clip": c, "time": float(c.get("time")), "track": int(c.get("track")),
+			"row": clip_track(timeline.clips().find(c))})
+	return out
+
+## 種類の組み合わせは順序によらず一致させる。空のトラックは配置したクリップの種類を引き継ぐ。
+func _track_accepts(c: Resource, row: int, except: Array = []) -> bool:
+	if row < 0:
+		return false
+	var types: Array = c.get("types")
+	for k in timeline.clips().size():
+		var other: Resource = timeline.clips()[k]
+		if except.has(other) or clip_track(k) != row:
+			continue
+		var other_types: Array = other.get("types")
+		if types.any(func(t) -> bool: return not other_types.has(t)) or other_types.any(func(t) -> bool: return not types.has(t)):
+			return false
+	return true
+
+## グループ全体の行・時刻を先に確認し、全て置けるときだけ動かす。
+func _move_clips(positions: Array, delta: float, rows: int) -> bool:
+	var moving := positions.map(func(pos: Dictionary) -> Resource: return pos.clip)
+	for pos in positions:
+		var row: int = pos.row + rows
+		var time: float = pos.time + delta
+		if time < 0.0 or row < 0 or (rows != 0 and not _track_accepts(pos.clip, row, moving)):
+			return false
+		for k in timeline.clips().size():
+			var other: Resource = timeline.clips()[k]
+			if moving.has(other) or clip_track(k) != row:
+				continue
+			if time < _clip_end(other) and float(other.get("time")) < time + float(pos.clip.get("length")):
+				return false
+	for pos in positions:
+		pos.clip.set("time", pos.time + delta)
+		pos.clip.set("track", pos.track if rows == 0 else pos.row + rows)
+	return true
+
+func _restore_clips(positions: Array) -> void:
+	for pos in positions:
+		pos.clip.set("time", pos.time)
+		pos.clip.set("track", pos.track)
+
+func _position_changes(positions: Array) -> Array:
+	var changes := []
+	for pos in positions:
+		for prop in ["time", "track"]:
+			if pos.clip.get(prop) != pos[prop]:
+				changes.append([pos.clip, prop, pos[prop], pos.clip.get(prop)])
+	return changes
+
 ## 選んだピンかクリップの開始時刻を動かす。クリップの長さとトラックは保つ。
 func _nudge_time(delta: float) -> void:
+	if clock_selected == "" and not selection().is_empty():
+		var positions := _clip_positions()
+		var first := INF
+		for pos in positions:
+			first = minf(first, pos.time)
+		if _move_clips(positions, maxf(delta, -first), 0):
+			var changes := _position_changes(positions)
+			if not changes.is_empty():
+				timeline.commit("選択した時刻を移動", changes)
+		var after := float(timeline.clips()[selected].get("time"))
+		if _x(after) < GUTTER:
+			pan(after - view_start)
+		elif _x(after) > size.x - 16.0 * ui:
+			pan((_x(after) - size.x + 16.0 * ui) / px_per_sec)
+		return
 	var target: Resource
 	var prop := "time"
 	var before: float
@@ -757,14 +847,9 @@ func _nudge_time(delta: float) -> void:
 			return
 		target = timeline.stage
 		prop = clock_selected
-	elif selected >= 0 and selected < timeline.clips().size():
-		target = timeline.clips()[selected]
-		before = float(target.get(prop))
 	else:
 		return
 	var after := maxf(0.0, before + delta)
-	if prop == "time" and track_busy(clip_track(selected), after, after + float(target.get("length")), selected):
-		return
 	if after == before:
 		return
 	var stored = target.get(prop)
@@ -804,7 +889,7 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
-			_select_hit(h)
+			_select_hit(h, false, true)
 			var phase_y := mb.position.y - _scroll_y() - RULER
 			if phase_y >= 0.0 and phase_y < PHASE_ROW:
 				clocks.menu(mb.position)
@@ -827,7 +912,11 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			grab_focus()
 			var h := _hit(mb.position)
-			_select_hit(h)
+			var toggle: bool = (mb.ctrl_pressed or mb.meta_pressed) and h.get("kind", "") in ["time", "length"]
+			_select_hit(h, toggle, true)
+			if toggle:
+				accept_event()
+				return
 			if h.get("kind", "") == "phase_budget":
 				_edit_budget(h.index)
 				accept_event()
@@ -948,6 +1037,8 @@ func _begin_drag(h: Dictionary, p: Vector2) -> void:
 			_drag.target = timeline.clips()[h.index]
 			_drag.props = ["time", "track"]
 			_drag.row0 = clip_track(h.index)
+			_drag.positions = _clip_positions()
+			_drag.rows = track_count()
 		"length":
 			_drag.target = timeline.clips()[h.index]
 			_drag.props = ["length"]
@@ -1052,9 +1143,13 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 			var hi := float(ps[k + 1].get("start")) - 1.0 if k + 1 < ps.size() else 1e9
 			_drag.target.set("start", clampf(snappedf(t, snap), lo, hi))
 		"time":
-			_drag.target.set("time", maxf(0.0, snappedf(float(_drag.before.time) + t - _drag.t0, snap)))
-			var row := clampi(int(floor((p.y - _clips_top()) / TRACK)), 0, track_count() - 1)
-			_drag.target.set("track", row)
+			var row := int(floor((p.y - _clips_top()) / TRACK))
+			var first := INF
+			for pos in _drag.positions:
+				first = minf(first, pos.time)
+			var delta := maxf(-first, snappedf(float(_drag.before.time) + t - _drag.t0, snap) - float(_drag.before.time))
+			if p.y < _scroll_y() + _tracks_top() or row >= int(_drag.rows) or not _move_clips(_drag.positions, delta, row - int(_drag.row0)):
+				_restore_clips(_drag.positions)
 		"length":
 			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
 		"track_move":
@@ -1077,15 +1172,19 @@ func _end_drag() -> void:
 			track_selected = to
 		queue_redraw()
 		return
+	if _drag.get("kind", "") == "time":
+		var changes := _position_changes(_drag.positions)
+		if not changes.is_empty():
+			timeline.commit("出現タイムラインを編集", changes)
+		_drag = {}
+		return
 	# クリップを落とした先で、ほかのクリップと重なるなら元の位置に戻す
-	if _drag.get("kind", "") in ["time", "length"]:
+	if _drag.get("kind", "") == "length":
 		var k: int = _drag.index
 		var c: Resource = _drag.target
 		if track_busy(clip_track(k), float(c.get("time")), _clip_end(c), k):
 			for prop in _drag.props:
 				c.set(prop, _drag.before[prop])
-			if _drag.kind == "time" and int(_drag.before.get("track", -1)) < 0:
-				c.set("track", -1)
 	if _drag.has("target"):
 		var changes := []
 		for prop in _drag.props:
@@ -1132,45 +1231,70 @@ func _open_editor(text: String, rect: Rect2, done: Callable, hint := "") -> void
 	editor.grab_focus()
 	editor.select_all()
 
-## コピーしたクリップ（貼り付けるたびに複製する）
-var _clipboard: Resource = null
+## コピー時の行と時刻を保存する。選択先や再生位置で貼り付け先を変えない。
+var _clipboard: Array = []
 
 func copy_clip() -> void:
-	var cs: Array = timeline.clips()
-	if selected >= 0 and selected < cs.size():
-		_clipboard = cs[selected].duplicate(true)
+	_clipboard = []
+	for c: Resource in selection():
+		var copy := c.duplicate(true)
+		copy.set("track", clip_track(timeline.clips().find(c)))
+		_clipboard.append(copy)
 
-## コピーしたクリップを、再生位置の時刻に置く（重なるなら空いているトラックへ）。
 func paste_clip() -> void:
-	if _clipboard == null:
-		return
-	var row := clip_track(selected) if selected >= 0 and selected < timeline.clips().size() else 0
-	_insert_clip(_clipboard.duplicate(true), maxf(0.0, snappedf(playhead, 1.0)), row, "クリップを貼り付ける")
+	_insert_clips(_clipboard, "クリップを貼り付ける")
 
-## 選んでいるクリップを、そのすぐ後ろに複製する（重なるなら空いているトラックへ）。
 func duplicate_clip() -> void:
-	var cs: Array = timeline.clips()
-	if selected < 0 or selected >= cs.size():
-		return
-	_insert_clip(cs[selected].duplicate(true), _clip_end(cs[selected]), clip_track(selected), "クリップを複製する")
+	var copies := []
+	for pos in _clip_positions():
+		var copy: Resource = pos.clip.duplicate(true)
+		copy.set("track", pos.row)
+		copies.append(copy)
+	_insert_clips(copies, "クリップを複製する")
 
-func _insert_clip(c: Resource, time: float, prefer_row: int, label: String) -> void:
+## グループの幅だけ右へ複製する。重なる場合は、相対配置と行を保って次の空きまで右へ送る。
+func _insert_clips(copies: Array, label: String) -> void:
+	if copies.is_empty():
+		return
+	var first := INF
+	var last := -INF
+	for c: Resource in copies:
+		if not _track_accepts(c, int(c.get("track"))):
+			return
+		first = minf(first, float(c.get("time")))
+		last = maxf(last, _clip_end(c))
+	var delta := last - first
+	var blocked := true
+	while blocked:
+		blocked = false
+		for c: Resource in copies:
+			var time := float(c.get("time")) + delta
+			for k in timeline.clips().size():
+				var other: Resource = timeline.clips()[k]
+				if clip_track(k) != int(c.get("track")):
+					continue
+				if time < _clip_end(other) and float(other.get("time")) < _clip_end(c) + delta:
+					delta = maxf(delta, _clip_end(other) - float(c.get("time")))
+					blocked = true
 	var stage: Resource = timeline.stage
-	# 番号を持たないクリップは、今の行を番号にしてから足す（並びが変わっても行が動かないように）
-	var cs: Array = timeline.clips()
+	var before: Array = timeline.clips()
 	var fixes := []
-	for k in cs.size():
-		if int(cs[k].get("track")) < 0:
-			fixes.append([cs[k], "track", -1, k])
+	# 暗黙の行を固定してから配列へ追加する。Undo では -1 にも戻す。
+	for k in before.size():
+		if int(before[k].get("track")) < 0:
+			fixes.append([before[k], "track", -1, k])
 	for f in fixes:
 		f[0].set("track", f[3])
-	c.set("time", time)
-	c.set("track", free_track(prefer_row, time, time + float(c.get("length"))))
-	var before: Array = cs
 	var after: Array = before.duplicate()
-	after.append(c)
+	_selected_clips = []
+	for c: Resource in copies:
+		var copy := c.duplicate(true)
+		copy.set("time", float(c.get("time")) + delta)
+		after.append(copy)
+		_selected_clips.append(copy)
 	stage.set("clips", after)
 	selected = after.size() - 1
+	track_selected = -1
 	timeline.commit(label, fixes + [[stage, "clips", before, after]])
 
 ## 右クリックのメニュー：コピー・貼り付け・複製・消す。
@@ -1180,7 +1304,7 @@ func _clip_menu(at: Vector2) -> void:
 	menu.add_item("コピー（⌘C）", 0)
 	menu.set_item_disabled(0, not has)
 	menu.add_item("貼り付け（⌘V）", 1)
-	menu.set_item_disabled(1, _clipboard == null)
+	menu.set_item_disabled(1, _clipboard.is_empty())
 	menu.add_item("複製（⌘D）", 2)
 	menu.set_item_disabled(2, not has)
 	menu.add_item("消す（Delete）", 3)

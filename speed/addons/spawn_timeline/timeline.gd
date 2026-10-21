@@ -115,6 +115,8 @@ func _notification(what: int) -> void:
 		refresh()
 
 func set_stage(value: Resource) -> void:
+	if stage != value:
+		canvas._clipboard = []
 	stage = value
 	_types_cache.clear()
 	tooltip_text = stage.resource_path.get_file() if stage != null else "ステージを開くと表示します"
@@ -203,23 +205,32 @@ func clip_mismatch(clip: Resource) -> Array:
 ## 編集を取り消し・やり直しに載せる。changes は [対象, プロパティ, 前の値, 後の値] の並び。
 ## 値はすでに後の値になっている前提で、実行はしない。
 func commit(label: String, changes: Array) -> void:
-	undo_redo.create_action(label)
+	undo_redo.create_action(label, UndoRedo.MERGE_DISABLE, stage)
+	# 新規・内蔵クリップのパスによる履歴の推測を避け、ステージの1操作にまとめる。
 	for c in changes:
+		undo_redo.force_fixed_history()
 		undo_redo.add_do_property(c[0], c[1], c[3])
+		undo_redo.force_fixed_history()
 		undo_redo.add_undo_property(c[0], c[1], c[2])
-	undo_redo.add_do_method(self, "_save")
-	undo_redo.add_undo_method(self, "_save")
+	undo_redo.force_fixed_history()
+	undo_redo.add_do_method(self, "_save_stage", stage)
+	undo_redo.force_fixed_history()
+	undo_redo.add_undo_method(self, "_save_stage", stage)
 	undo_redo.commit_action(false)
 	_save()
 
 ## ステージと、別のファイルにある時間帯を保存する。
 func _save() -> void:
-	if stage == null or stage.resource_path == "":
+	_save_stage(stage)
+
+## Undo のあと別のステージを表示していても、編集したステージを保存する。
+func _save_stage(target: Resource) -> void:
+	if target == null or target.resource_path == "":
 		return
-	for p in phases():
+	for p in target.get("phases"):
 		if p is Resource and p.resource_path != "" and not p.resource_path.contains("::"):
 			ResourceSaver.save(p)
-	ResourceSaver.save(stage)
+	ResourceSaver.save(target)
 	refresh()
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。
@@ -366,7 +377,8 @@ func _remove_clip() -> void:
 		return
 	var before: Array = clips()
 	var after: Array = before.duplicate()
-	after.remove_at(canvas.selected)
+	for c in canvas.selection():
+		after.erase(c)
 	stage.set("clips", after)
 	canvas.selected = -1
 	commit("クリップを消す", [[stage, "clips", before, after]])
