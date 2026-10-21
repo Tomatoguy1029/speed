@@ -52,6 +52,13 @@ var _cards_box: Control
 var _reroll_button: Button
 var _cards_title: Label
 var _cards_row: Control
+var _swap_box: VBoxContainer
+var _swap_scroll: ScrollContainer
+var _swap_grid: GridContainer
+var _swap_new_name: Label
+var _swap_new_desc: Label
+var _swap_keep: Button
+var _swap_keep_index := -1
 var _frame: TextureRect
 var _loadout_icons: Control
 var _loadout_key := ""
@@ -88,6 +95,7 @@ func _ready() -> void:
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_build_cards()
+	resized.connect(_layout_cards)
 	_build_pause()
 	_draw_button = Button.new()
 	_draw_button.text = "hud.draw"
@@ -228,9 +236,15 @@ func _process(delta: float) -> void:
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	var origin := (size - ART_SIZE * factor) * 0.5
-	for item in [_frame, _loadout_icons, _cards_box]:
+	for item in [_frame, _loadout_icons]:
 		item.position = origin
 		item.scale = Vector2.ONE * factor
+	if _swap_box.visible:
+		_layout_cards()
+	else:
+		_cards_box.position = origin
+		_cards_box.scale = Vector2.ONE * factor
+		_cards_box.size = ART_SIZE
 	_frame.size = ART_SIZE
 	_frame.visible = show_status and run.state != null and run.state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING]
 	_loadout_icons.visible = _frame.visible
@@ -323,6 +337,7 @@ func _build_cards() -> void:
 	_reroll_button.pressed.connect(func(): _card_command(&"reroll"))
 	_cards_box.add_child(_reroll_button)
 	add_child(_cards_box)
+	_build_swap_cards()
 
 func _card_art(button: Button, region: Rect2) -> void:
 	var texture := AtlasTexture.new()
@@ -338,71 +353,175 @@ func _card_art(button: Button, region: Rect2) -> void:
 	button.add_theme_color_override("font_color", CYAN)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 
+func _build_swap_cards() -> void:
+	_swap_box = VBoxContainer.new()
+	_swap_box.hide()
+	_cards_box.add_child(_swap_box)
+	var heading := Label.new()
+	heading.text = "card.new_weapon"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_swap_box.add_child(heading)
+	_swap_scroll = ScrollContainer.new()
+	_swap_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_swap_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_swap_scroll.follow_focus = true
+	_swap_scroll.hide()
+	_swap_box.add_child(_swap_scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 16)
+	_swap_scroll.add_child(content)
+	# 新武器は情報だけを表示し、交換候補と同じボタンにはしない。
+	var info := PanelContainer.new()
+	info.mouse_filter = Control.MOUSE_FILTER_PASS
+	var style := _card_style(COMET_ONLY_COLOR)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	info.add_theme_stylebox_override("panel", style)
+	content.add_child(info)
+	var labels := VBoxContainer.new()
+	info.add_child(labels)
+	_swap_new_name = Label.new()
+	_swap_new_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	labels.add_child(_swap_new_name)
+	_swap_new_desc = Label.new()
+	_swap_new_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	labels.add_child(_swap_new_desc)
+	var title := Label.new()
+	title.text = "hud.swap_title"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(title)
+	_swap_grid = GridContainer.new()
+	_swap_grid.add_theme_constant_override("h_separation", 16)
+	_swap_grid.add_theme_constant_override("v_separation", 16)
+	content.add_child(_swap_grid)
+	_swap_keep = Button.new()
+	_swap_keep.custom_minimum_size.y = 64
+	_swap_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_swap_keep.pressed.connect(func(): _card_command(&"choose_card", {"index": _swap_keep_index}))
+	_swap_keep.hide()
+	_swap_box.add_child(_swap_keep)
+
 func _show_cards() -> void:
 	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 	_card_discard.merge(_card_held)
 	run.input.cancel_gesture()
-	# 古いカードはすぐ外す（消える前の札が並びの幅に残らないように）
-	for c in _cards_row.get_children():
-		_cards_row.remove_child(c)
-		c.queue_free()
+	# 古いカードを外してから、通常カードか交換候補を作る。
+	for row in [_cards_row, _swap_grid]:
+		for c in row.get_children():
+			row.remove_child(c)
+			c.queue_free()
 	var cards := run.state.cards
-	var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
-	for i in cards.size():
-		var info := card_info(cards[i])
-		var b := Button.new()
-		b.position = Vector2(89 + i * (width + 16), 83)
-		b.size = Vector2(width, 193)
-		b.tooltip_text = "%s: %s" % [info.name, info.desc]
-		_card_art(b, Rect2(89, 83, 145, 193))
-		b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
-		_cards_row.add_child(b)
-		var font_size := 10 if cards.size() <= 3 else 8
-		for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
-			[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-			[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
-			var label := Label.new()
-			label.position = entry[0]
-			label.size = entry[1]
-			label.text = entry[2]
-			label.add_theme_font_size_override("font_size", font_size)
-			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			label.clip_text = true
-			label.max_lines_visible = 4 if entry[0].y == 65 else 2
-			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			b.add_child(label)
-		var card: Dictionary = cards[i]
-		var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
-		_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var start: bool = run.state.start_pick
 	var swap: StringName = run.state.swap_pick
+	_cards_title.visible = swap == &""
+	_cards_row.visible = swap == &""
+	_swap_box.visible = swap != &""
+	_swap_scroll.visible = swap != &""
+	_swap_keep.visible = swap != &""
 	if swap != &"":
 		var got: WeaponDef = ConfigManager.weapons[swap]
-		_cards_title.text = tr("hud.swap_title").format({name = got.get_display_name()})
+		_swap_new_name.text = got.get_display_name()
+		_swap_new_desc.text = got.get_description()
+		for i in cards.size():
+			if cards[i].kind == &"keep":
+				_swap_keep_index = i
+				var info := card_info(cards[i])
+				_swap_keep.text = "%s\n%s" % [info.tag, info.desc]
+			else:
+				var b := _card_button(cards[i], i, Vector2(0, 220))
+				b.mouse_filter = Control.MOUSE_FILTER_PASS
+				_swap_grid.add_child(b)
 	else:
 		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
+		var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
+		for i in cards.size():
+			var info := card_info(cards[i])
+			var b := Button.new()
+			b.position = Vector2(89 + i * (width + 16), 83)
+			b.size = Vector2(width, 193)
+			b.tooltip_text = "%s: %s" % [info.name, info.desc]
+			_card_art(b, Rect2(89, 83, 145, 193))
+			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
+			_cards_row.add_child(b)
+			var font_size := 10 if cards.size() <= 3 else 8
+			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
+				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
+				[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
+				var label := Label.new()
+				label.position = entry[0]
+				label.size = entry[1]
+				label.text = entry[2]
+				label.add_theme_font_size_override("font_size", font_size)
+				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.clip_text = true
+				label.max_lines_visible = 4 if entry[0].y == 65 else 2
+				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				b.add_child(label)
+			var card: Dictionary = cards[i]
+			var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
+			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
 	_reroll_button.visible = swap == &""
 	_layout_art()
-	if _cards_row.get_child_count() > 0:
-		_cards_row.get_child(0).grab_focus.call_deferred()
+	_layout_cards()
+	var row: Control = _swap_grid if swap != &"" else _cards_row
+	if row.get_child_count() > 0:
+		row.get_child(0).grab_focus.call_deferred()
+	_swap_scroll.set_deferred("scroll_vertical", 0)
+
+func _layout_cards() -> void:
+	if _swap_box == null or not _swap_box.visible:
+		return
+	var width := maxf(1.0, minf(1100.0, size.x - 32.0))
+	_swap_grid.columns = clampi(int((width + 16.0) / 236.0), 1, maxi(1, _swap_grid.get_child_count()))
+	_cards_box.scale = Vector2.ONE
+	_cards_box.size = Vector2(width, maxf(1.0, minf(600.0, size.y - 32.0)))
+	_cards_box.position = (size - _cards_box.size) / 2.0
+	_swap_box.size = _cards_box.size
+
+func _card_button(card: Dictionary, index: int, minimum_size: Vector2) -> Button:
+	var info := card_info(card)
+	var b := Button.new()
+	b.custom_minimum_size = minimum_size
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.text = "%d. %s\n%s\n\n%s" % [index + 1, info.tag, info.name, info.desc]
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var style := _card_style(info.color)
+	b.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.12, 0.15, 0.24, 0.95)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("focus", hover)
+	b.pressed.connect(func(): _card_command(&"choose_card", {"index": index}))
+	return b
+
+func _card_style(col: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+	style.border_color = col
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(6)
+	return style
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
-		var new_def: WeaponDef = ConfigManager.weapons[c.new]
 		if c.kind == &"keep":
+			var new_def: WeaponDef = ConfigManager.weapons[c.new]
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
 		var old_def: WeaponDef = ConfigManager.weapons[c.id]
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
-			"desc": TranslationServer.translate("card.swap_desc").format({name = new_def.get_display_name()}),
-			"color": Color("#efcb70")}
+			"desc": old_def.get_description(),
+			"color": COMET_ONLY_COLOR if old_def.comet_only else RANK_COLORS[clampi(c.level - 1, 0, 4)]}
 	if c.kind == &"heal":
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
@@ -494,6 +613,8 @@ func _draw() -> void:
 		for p in run.field.rare_comet_positions():
 			_draw_edge_arrow(p, Color("#ffd24a"))
 		_draw_gauge_ring()
+	if _cards_box.visible and _swap_box.visible:
+		draw_rect(_cards_box.get_rect(), Color(0.06, 0.08, 0.14, 0.95))
 
 var _dense := PackedVector2Array()
 

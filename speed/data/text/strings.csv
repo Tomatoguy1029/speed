@@ -69,7 +69,7 @@ hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
 hud.resume,続ける,Resume
 hud.quit_run,メインメニューに戻る（このランは残らない）,Back to Main Menu (This Run Is Lost)
-hud.swap_title,{name}を手に入れた　入れ替える武器を選ぶ,Got {name}: Choose a Weapon to Replace
+hud.swap_title,入れ替えて手放す武器を選ぶ,Choose a Weapon to Replace
 card.new_weapon,新しい武器,New Weapon
 card.new_trait,新しい特性,New Trait
 card.weapon_up,武器強化,Weapon Upgrade
