@@ -345,9 +345,10 @@ class EnemyValues extends EditorProperty:
 				row.add_child(fallback)
 				_defaults.append(fallback)
 				var number := SpinBox.new()
-				number.min_value = -1000000.0 if _priority else 0.001
-				number.max_value = 2147483647
+				number.min_value = 0.0 if _priority else 0.001
+				number.max_value = 5.0 if _priority else 2147483647
 				number.step = 1.0 if _priority else 0.5
+				number.rounded = _priority
 				number.value_changed.connect(_on_value_changed.bind(str(option[0])))
 				row.add_child(number)
 				_numbers.append(number)

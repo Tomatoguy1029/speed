@@ -22,7 +22,7 @@ func _run() -> void:
 		await _editor_checks()
 	else:
 		await _runtime_checks()
-	check(checks == (5 if Engine.is_editor_hint() else 16), "All targeted checks completed")
+	check(checks == (7 if Engine.is_editor_hint() else 16), "All targeted checks completed")
 	DirAccess.remove_absolute(SAVE)
 	print("[clip_attack_priority] %d checks, %d failures" % [checks, failed])
 	quit(1 if failed else 0)
@@ -119,21 +119,28 @@ func _editor_checks() -> void:
 	var stage := StageDef.new()
 	var clip := SpawnClip.new()
 	stage.clips = [clip]
+	stage.enemies = [&"aquarius"]
 	ResourceSaver.save(stage, SAVE)
 	stage = ResourceLoader.load(SAVE, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	clip = stage.clips[0]
 	EditorInterface.inspect_object(stage)
 	for frame in 3:
 		await process_frame
+	var stage_field := _property_field(stage, &"enemy_attack_priorities")
+	var numbers: Array = stage_field.get("_numbers") if stage_field != null else []
+	check(numbers.size() == 1 and numbers[0].min_value == 0.0 and numbers[0].max_value == 5.0
+		and numbers[0].step == 1.0 and numbers[0].rounded, "Stage priority Inspector uses integers zero through five")
 	EditorInterface.inspect_object(clip)
 	await process_frame
-	var field: EditorProperty
-	var stack: Array[Node] = [EditorInterface.get_inspector()]
-	while not stack.is_empty():
-		var node: Node = stack.pop_back()
-		if node is EditorProperty and node.get_edited_object() == clip and node.get_edited_property() == &"attack_priority":
-			field = node
-		stack.append_array(node.get_children())
+	var priority_property: Dictionary = {}
+	for property in clip.get_property_list():
+		if property.name == &"attack_priority":
+			priority_property = property
+	var limits := str(priority_property.get("hint_string", "")).split(",")
+	check(priority_property.get("type") == TYPE_INT and limits.size() == 3 and float(limits[0]) == 0.0
+		and float(limits[1]) == 5.0 and float(limits[2]) == 1.0,
+		"Clip priority Inspector uses integers zero through five")
+	var field := _property_field(clip, &"attack_priority")
 	check(field != null, "Selected clip Inspector exposes Attack Priority")
 	if field == null:
 		return
@@ -155,3 +162,12 @@ func _editor_checks() -> void:
 	EditorInterface.inspect_object(null)
 	history.clear_history()
 	plugin.free()
+
+func _property_field(object: Object, property: StringName) -> EditorProperty:
+	var stack: Array[Node] = [EditorInterface.get_inspector()]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is EditorProperty and node.get_edited_object() == object and node.get_edited_property() == property:
+			return node
+		stack.append_array(node.get_children())
+	return null

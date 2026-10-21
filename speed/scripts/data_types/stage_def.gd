@@ -28,7 +28,7 @@ const EDITOR_ORDER := 5
 ## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
 ## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
 @export var enemy_attack_values: Dictionary = {}
-## クリップ以外から出る敵の、種類ごとの攻撃待ちの優先度。大きいほど先。未設定は0（標準）。
+## クリップ以外から出る敵の、種類ごとの攻撃待ちの優先度（0〜5の整数）。大きいほど先。未設定は0（標準）。
 ## クリップから出る敵は、クリップのattack_priority（0を含む）を使う。
 @export var enemy_attack_priorities: Dictionary = {}
 
