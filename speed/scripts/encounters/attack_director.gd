@@ -105,7 +105,8 @@ func _next_owner() -> String:
 		if float(item.get("cost", 1.0)) > float(settings.budget):
 			continue
 		var score := float(item.priority) - float(item.since) * 0.2
-		if winner == "" or score > best or (is_equal_approx(score, best) and candidate < winner):
+		# 同点は待機登録の順。owner名に含まれる種類や群れの有無で優先しない。
+		if winner == "" or score > best:
 			winner = candidate
 			best = score
 	return winner

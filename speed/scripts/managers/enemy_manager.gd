@@ -80,6 +80,8 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	t.def[i] = def
 	t.type[i] = def.id
 	t.attack_group[i] = int(opts.get("attack_group", 0))
+	var priority := float(opts.get("attack_priority", state.stage.enemy_attack_priority(def.id) if state.stage != null else 0.0))
+	t.attack_priority[i] = priority if is_finite(priority) else 0.0
 	if t.attack_group[i] > 0:
 		t.attack_value[i] = float(opts.get("attack_value", 1.0))
 	else:
@@ -135,7 +137,7 @@ func _spawn_flock(i: int, opts: Dictionary) -> void:
 	var gap := float(p.flock_gap)
 	for k in mini(int(p.flock) - 1, CROW_FORMATION.size()):
 		var at: Vector2 = t.pos[i] + (u * CROW_FORMATION[k].x + side * CROW_FORMATION[k].y) * gap
-		var j := spawn(def, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})
+		var j := spawn(def, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i], "attack_priority": t.attack_priority[i]})
 		t.mode[j] = EnemyTable.Mode.DASH
 
 ## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
@@ -160,7 +162,7 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 
 ## 部位を1つ出し、親（行 i）に付ける。
 func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
-	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i]})
+	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i], "attack_priority": table.attack_priority[i]})
 	table.parent[j] = i
 	table.parent_id[j] = table.id[i]
 	var parts := table.parts[i]
@@ -211,6 +213,7 @@ func _reset_row(i: int) -> void:
 	t.meteor_index[i] = -1
 	t.attack_group[i] = 0
 	t.attack_value[i] = 1
+	t.attack_priority[i] = 0
 	t.dead[i] = 0
 	t.elite[i] = 0
 	t.pos[i] = Vector2.ZERO
@@ -911,7 +914,7 @@ func _split(i: int, dt: float) -> void:
 	var a := bud_angle(i)
 	t.buds[i] += 1
 	spawn_later(def_of(&"splitling"), t.pos[i] + Vector2.from_angle(a) * t.r[i] * 1.2,
-		{"facing": a, "vel": Vector2.from_angle(a) * 160.0, "hit_cd": 0.2})
+		{"facing": a, "vel": Vector2.from_angle(a) * 160.0, "hit_cd": 0.2, "attack_priority": t.attack_priority[i]})
 	state.emit(&"bud", {"pos": t.pos[i] + Vector2.from_angle(a) * t.r[i], "color": t.color[i]})
 
 ## 分裂する雑魚が次の分裂体を生む向き（育っていく芽の位置。描画も同じ向きを使う）。
@@ -1386,7 +1389,7 @@ func _split_ruler(i: int) -> void:
 	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
 	if d == Vector2.ZERO:
 		d = Vector2.DOWN
-	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})]
+	var halves := [i, spawn(t.def[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0, "attack_group": t.attack_group[i], "attack_value": t.attack_value[i], "attack_priority": t.attack_priority[i]})]
 	for k in 2:
 		var j: int = halves[k]
 		t.buds[j] = 1 if k == 0 else -1
@@ -1866,7 +1869,7 @@ func _cepheus(i: int, dt: float) -> void:
 					taken[t.buds[j]] = true
 				for k in size:
 					if not taken.has(k):
-						var j := spawn(def_of(&"cepheus_soldier"), cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1], "attack_group": t.attack_group[i], "attack_value": t.attack_value[i]})
+						var j := spawn(def_of(&"cepheus_soldier"), cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1], "attack_group": t.attack_group[i], "attack_value": t.attack_value[i], "attack_priority": t.attack_priority[i]})
 						t.target[j] = i
 						t.target_id[j] = t.id[i]
 						t.buds[j] = k
@@ -2062,7 +2065,7 @@ func on_enemy_death(i: int, atk: float) -> void:
 		var a := facing + PI / 2.0 + TAU * float(k) / float(n) if n > 2 else facing + (1.0 if k == 1 else -1.0) * PI / 2.0
 		spawn_later(def_of(&"splitling"), t.pos[i] + Vector2.from_angle(a) * t.r[i],
 			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35,
-			"guard": float(p.get("split_guard", 0.0)), "knock": float(p.get("split_guard", 0.0))})
+			"guard": float(p.get("split_guard", 0.0)), "knock": float(p.get("split_guard", 0.0)), "attack_priority": t.attack_priority[i]})
 
 ## 分裂などで増えた敵を、個体数の上限の範囲で出す（仕様書 11.3）。
 func _flush_new() -> void:
@@ -2237,7 +2240,8 @@ func _pick_weighted(items: Array) -> int:
 ## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
-func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0) -> PackedInt32Array:
+## priorityが数値なら0を含めて群れ全員へ渡す。nullならステージの種類別優先度を使う。
+func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null) -> PackedInt32Array:
 	var rows := PackedInt32Array()
 	var group := _next_id if value > 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
@@ -2262,7 +2266,10 @@ func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: A
 		var pos := state.ship_pos + local.origin.rotated(turn)
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
-		var i := spawn(def, pos, {"facing": facing, "attack_group": group, "attack_value": value})
+		var opts := {"facing": facing, "attack_group": group, "attack_value": value}
+		if priority != null:
+			opts.attack_priority = priority
+		var i := spawn(def, pos, opts)
 		rows.append(i)
 		rows.append(table.id[i])
 	return rows
@@ -2322,7 +2329,7 @@ func _tick_clips() -> void:
 			continue
 		var layout_index: int = choices[c].index
 		var value := clip.formation_value(items[k].scene_path, str(items[k].data.layouts[layout_index].get("name", "")))
-		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value)
+		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority)
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
@@ -2593,9 +2600,7 @@ func _lab_admit(i: int, dt: float) -> bool:
 		if p.has("laser_charge"):
 			duration = maxf(0.0, 1.0 - table.charge[i]) * float(p.lock_fill) + float(p.laser_charge) + float(p.laser_delay) + float(p.laser_time) + 0.1
 		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
-		var priority := 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0
-		if state.stage != null:
-			priority += state.stage.enemy_attack_priority(def.id)
+		var priority := table.attack_priority[i]
 		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, priority, cost):
 			table.charge[i] = 0
 			return false

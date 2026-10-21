@@ -35,6 +35,8 @@ var meteor_index := PackedInt32Array()
 var attack_group := PackedInt32Array()
 ## 個体の攻撃value、またはoverride群れが共有するvalue。
 var attack_value := PackedFloat64Array()
+## 出現元から引き継いだ攻撃待ちの優先度。0も独立した値として持つ。
+var attack_priority := PackedFloat64Array()
 ## 1 なら撃破済み（その回の終わりに空きへ戻る）
 var dead := PackedByteArray()
 var elite := PackedByteArray()
