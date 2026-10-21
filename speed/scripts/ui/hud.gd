@@ -324,7 +324,8 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 		return
 	var texture: Texture2D = definition.icon_texture if definition is WeaponDef else null
 	if texture == null:
-		var index := ICON_IDS.find(String(definition.id))
+		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
+		var index := ICON_IDS.find(icon_id)
 		if index < 0:
 			return
 		var atlas := AtlasTexture.new()

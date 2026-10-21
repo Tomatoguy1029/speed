@@ -194,6 +194,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W23.desc | 機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇 | Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage. |
 | weapon.W24.name | 光の槍 | Light Lance |
 | weapon.W24.desc | 突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる | Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage. |
+| weapon.W25.name | 迎撃ドローン | Interceptor Drones |
+| weapon.W25.desc | 周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える | Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts. |
 |  | ■ 特性（trait.&lt;ID&gt;） |  |
 | trait.T01.name | 終端爆縮 | End Implosion |
 | trait.T01.desc | 線の終点で爆発 | Explodes at the end of your line. |

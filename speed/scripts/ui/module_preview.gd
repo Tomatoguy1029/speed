@@ -3,6 +3,7 @@
 class_name ModulePreview
 extends Control
 
+const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
 const SILHOUETTE := preload("res://shaders/module_silhouette.gdshader")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const SHIP := preload("res://assets/pixel/airship.png")
@@ -117,6 +118,20 @@ func _draw_effect(code: String) -> void:
 				var pos := ship + Vector2.from_angle(_clock * 0.8 + i * TAU / 3.0) * 62
 				_sprite(FOLLOWER, pos, 32.0, PI / 2.0)
 				_line(pos + Vector2(15, 0), pos + Vector2(45, 0), CYAN, 2.0)
+		"interceptor":
+			var preview_scale := minf(size.x / 360.0, size.y / 220.0)
+			for i in 6:
+				var a := _clock * 0.75 + i * TAU / 6.0
+				var pos := ship + Vector2.from_angle(a) * 64.0
+				var aim := Vector2(140, pos.y * 1.4)
+				var angle := (aim - pos).angle()
+				INTERCEPTOR_VISUAL.drone(self, size / 2.0 + pos * preview_scale, angle,
+					1.4 * preview_scale, 0.06 if pulse > 0.7 else 0.0)
+				for j in 2:
+					var progress := fmod(_clock * 1.8 + j * 0.3 + i * 0.16, 1.0)
+					INTERCEPTOR_VISUAL.shot(self, size / 2.0 + pos.lerp(aim, progress) * preview_scale,
+						angle, preview_scale)
+			draw_set_transform(size / 2.0, 0.0, Vector2.ONE * preview_scale)
 		"mines":
 			for i in 5:
 				var pos := route[0].lerp(route[1], i / 4.0)

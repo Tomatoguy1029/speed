@@ -43,6 +43,7 @@ const AIRSHIP_CANON := preload("res://assets/pixel/airship_canon.png")
 const AIRSHIP_PROBE := preload("res://assets/pixel/airship_electronic_probe.png")
 const AIRSHIP_MINE := preload("res://assets/pixel/airship_mine.png")
 const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
+const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
@@ -1364,6 +1365,8 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			for k in 24:
 				pts.append(pos + Vector2.from_angle(pr.friend_angle[i] + TAU * k / 24.0) * r * (1.0 if k % 2 == 0 else 0.78))
 			c.draw_colored_polygon(pts, Color("#d9dde6"))
+		elif pr.friend_cause[i] == &"interceptor":
+			INTERCEPTOR_VISUAL.shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
 		elif pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
 			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
 		elif pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
@@ -1636,6 +1639,10 @@ func _draw_build_objects(c: CanvasItem) -> void:
 			c.draw_set_transform(d.pos, angle)
 			c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false)
 			c.draw_set_transform(Vector2.ZERO)
+	var interceptors = b.weapon_behaviors.get(&"W25")
+	if interceptors != null:
+		for d in interceptors.drones:
+			INTERCEPTOR_VISUAL.drone(c, d.pos, d.angle, cfg.character_scale, d.flash)
 	var tow = b.weapon_behaviors.get(&"W21")
 	if tow != null:
 		for j in mini(int(tow.p("visible")), tow.cargo.size()):
