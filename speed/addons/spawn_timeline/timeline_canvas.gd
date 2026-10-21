@@ -16,6 +16,7 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"進行のピンをドラッグ：ボス・制限時間　ピンをダブルクリック：時刻を入力\n" + \
 		"時間帯を右クリック：追加・削除・名称変更・強化区間のON/OFF　時間帯を選択：インスペクターで強化内容を編集\n" + \
 		"時間帯の予算をクリック：整数を入力（Enterで確定）　予算0：強敵の攻撃を停止　valueはクリップのFormationsで設定\n" + \
+		"ルール違反：クリップを選ぶと理由と修正方法を表示　上段の件数の「詳細」：全件を表示\n" + \
 		"選んだピン・クリップを←→：1秒ずつ移動\n" + \
 		"⌘（Ctrl）＋クリック：複数選択　クリップを上下にドラッグ：同じ種類のトラックへ移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製（元の右側、同じトラック）\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
@@ -756,6 +757,8 @@ func _select_hit(hit: Dictionary, toggle := false, preserve := false) -> void:
 	track_selected = int(hit.get("row", -1)) if kind == "track_label" else -1
 	curve_selected = int(hit.get("curve", -1)) if kind in ["curve_label", "curve_body", "point"] else -1
 	point_selected = int(hit.get("point", -1)) if kind == "point" else -1
+	timeline._edit_feedback = ""
+	timeline.refresh_diagnostics()
 	queue_redraw()
 
 ## Resource の参照で複数選択を保つ。削除・Undo 後の番号のずれを持ち越さない。
@@ -777,8 +780,11 @@ func _clip_positions() -> Array:
 
 ## 種類の組み合わせは順序によらず一致させる。空のトラックは配置したクリップの種類を引き継ぐ。
 func _track_accepts(c: Resource, row: int, except: Array = []) -> bool:
+	return _track_rejection(c, row, except).is_empty()
+
+func _track_rejection(c: Resource, row: int, except: Array = []) -> String:
 	if row < 0:
-		return false
+		return "クリップは強敵のトラックへ配置してください。雑魚の曲線や上段には移せません。"
 	var types: Array = c.get("types")
 	for k in timeline.clips().size():
 		var other: Resource = timeline.clips()[k]
@@ -786,23 +792,41 @@ func _track_accepts(c: Resource, row: int, except: Array = []) -> bool:
 			continue
 		var other_types: Array = other.get("types")
 		if types.any(func(t) -> bool: return not other_types.has(t)) or other_types.any(func(t) -> bool: return not types.has(t)):
-			return false
-	return true
+			return "%s\n配置先の行%d「%s」は、クリップ「%s」と種類が異なります。\n配置する種類：%s\n配置先の種類：%s\n同じ種類の組み合わせのトラックか空のトラックへ配置してください。" % [
+				timeline.clip_heading(c), row + 1, track_name(row), other.get("label"), timeline.type_names(types), timeline.type_names(other_types)]
+	return ""
+
+func _overlap_rejection(row: int, from: float, to: float, except: Array = []) -> String:
+	var conflicts := PackedStringArray()
+	for k in timeline.clips().size():
+		var other: Resource = timeline.clips()[k]
+		if except.has(other) or clip_track(k) != row:
+			continue
+		if from < _clip_end(other) and float(other.get("time")) < to:
+			conflicts.append(timeline.clip_heading(other))
+	return "配置先の%s〜%s秒が、次のクリップと重なります。\n%s\n開始時刻・長さを変えるか、同じ種類の空きトラックへ配置してください。" % [
+		_num(from), _num(to), "\n".join(conflicts)] if not conflicts.is_empty() else ""
 
 ## グループ全体の行・時刻を先に確認し、全て置けるときだけ動かす。
 func _move_clips(positions: Array, delta: float, rows: int) -> bool:
 	var moving := positions.map(func(pos: Dictionary) -> Resource: return pos.clip)
+	var reasons := PackedStringArray()
 	for pos in positions:
 		var row: int = pos.row + rows
 		var time: float = pos.time + delta
-		if time < 0.0 or row < 0 or (rows != 0 and not _track_accepts(pos.clip, row, moving)):
-			return false
-		for k in timeline.clips().size():
-			var other: Resource = timeline.clips()[k]
-			if moving.has(other) or clip_track(k) != row:
-				continue
-			if time < _clip_end(other) and float(other.get("time")) < time + float(pos.clip.get("length")):
-				return false
+		if time < 0.0:
+			reasons.append("%s\n開始時刻が0秒より前です。グループ全体が0秒以降に収まる位置へ動かしてください。" % timeline.clip_heading(pos.clip))
+		if row < 0 or rows != 0:
+			var track_reason := _track_rejection(pos.clip, row, moving)
+			if track_reason != "":
+				reasons.append(track_reason)
+		var overlap := _overlap_rejection(row, time, time + float(pos.clip.get("length")), moving)
+		if overlap != "":
+			reasons.append("%s\n%s" % [timeline.clip_heading(pos.clip), overlap])
+	if not reasons.is_empty():
+		timeline.report_edit_rejection("\n\n".join(reasons))
+		return false
+	timeline._edit_feedback = ""
 	for pos in positions:
 		pos.clip.set("time", pos.time + delta)
 		pos.clip.set("track", pos.track if rows == 0 else pos.row + rows)
@@ -859,6 +883,28 @@ func _nudge_time(delta: float) -> void:
 		pan(after - view_start)
 	elif _x(after) > size.x - 16.0 * ui:
 		pan((_x(after) - size.x + 16.0 * ui) / px_per_sec)
+
+func _get_tooltip(at: Vector2) -> String:
+	if timeline == null or timeline.stage == null:
+		return ""
+	var hit := _hit(at)
+	match hit.get("kind", ""):
+		"time", "length": return timeline.clip_rule_report(timeline.clips()[hit.index])
+		"phase_budget": return "予算 %d：クリックして整数を入力。0は強敵の新しい攻撃を停止。" % int(timeline.phases()[hit.index].get("attack_budget"))
+	return ""
+
+## ネイティブのツールチップとして表示し、クリップを離れたときの破棄も Godot に任せる。
+func _make_custom_tooltip(for_text: String) -> Object:
+	if for_text == "":
+		return null
+	var label := Label.new()
+	label.theme_type_variation = "TooltipLabel"
+	label.text = for_text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var width := get_viewport_rect().size.x
+	label.custom_minimum_size.x = minf(720.0 * ui, width * 0.8) if width > 0.0 else 720.0 * ui
+	label.add_theme_font_size_override("font_size", _fs(14))
+	return label
 
 func _gui_input(event: InputEvent) -> void:
 	if timeline == null or timeline.stage == null:
@@ -976,9 +1022,6 @@ func _gui_input(event: InputEvent) -> void:
 		_move_drag((event as InputEventMouseMotion).position, (event as InputEventMouseMotion).shift_pressed)
 	elif event is InputEventMouseMotion:
 		var h := _hit((event as InputEventMouseMotion).position)
-		match h.get("kind", ""):
-			"phase_budget": tooltip_text = "予算 %d：クリックして整数を入力。0は強敵の新しい攻撃を停止。" % int(timeline.phases()[h.index].get("attack_budget"))
-			_: tooltip_text = ""
 		var hc: int = h.get("curve", -1) if h.get("kind", "") == "point" else -1
 		var hp: int = h.get("point", -1) if h.get("kind", "") == "point" else -1
 		if hc != _hover_curve or hp != _hover_point:
@@ -1148,7 +1191,10 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 			for pos in _drag.positions:
 				first = minf(first, pos.time)
 			var delta := maxf(-first, snappedf(float(_drag.before.time) + t - _drag.t0, snap) - float(_drag.before.time))
-			if p.y < _scroll_y() + _tracks_top() or row >= int(_drag.rows) or not _move_clips(_drag.positions, delta, row - int(_drag.row0)):
+			if p.y < _scroll_y() + _tracks_top() or row >= int(_drag.rows):
+				timeline.report_edit_rejection("配置先がクリップのトラックの範囲外です。強敵のトラックの行へドロップしてください。")
+				_restore_clips(_drag.positions)
+			elif not _move_clips(_drag.positions, delta, row - int(_drag.row0)):
 				_restore_clips(_drag.positions)
 		"length":
 			_drag.target.set("length", maxf(1.0, snappedf(t - float(_drag.target.get("time")), snap)))
@@ -1182,7 +1228,9 @@ func _end_drag() -> void:
 	if _drag.get("kind", "") == "length":
 		var k: int = _drag.index
 		var c: Resource = _drag.target
-		if track_busy(clip_track(k), float(c.get("time")), _clip_end(c), k):
+		var reason := _overlap_rejection(clip_track(k), float(c.get("time")), _clip_end(c), [c])
+		if reason != "":
+			timeline.report_edit_rejection("%s\n%s" % [timeline.clip_heading(c), reason])
 			for prop in _drag.props:
 				c.set(prop, _drag.before[prop])
 	if _drag.has("target"):
@@ -1258,11 +1306,16 @@ func _insert_clips(copies: Array, label: String) -> void:
 		return
 	var first := INF
 	var last := -INF
+	var reasons := PackedStringArray()
 	for c: Resource in copies:
-		if not _track_accepts(c, int(c.get("track"))):
-			return
+		var reason := _track_rejection(c, int(c.get("track")))
+		if reason != "":
+			reasons.append(reason)
 		first = minf(first, float(c.get("time")))
 		last = maxf(last, _clip_end(c))
+	if not reasons.is_empty():
+		timeline.report_edit_rejection("\n\n".join(reasons))
+		return
 	var delta := last - first
 	var blocked := true
 	while blocked:
