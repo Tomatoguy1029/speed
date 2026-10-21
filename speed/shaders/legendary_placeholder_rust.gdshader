@@ -36,6 +36,11 @@ void fragment() {
 	// 低い光沢が出現に合わせて一度だけ面を渡る。
 	float sweep = 1.0 - smoothstep(0.0, 0.11, abs(UV.x * 0.7 + UV.y * 0.3 - mix(-0.1, 1.1, reveal)));
 	metal += vec3(0.23, 0.19, 0.10) * sweep * (1.0 - rust);
+	// 面の上をゆっくり渡る細い反射。模様や固有の紋章を追加しない。
+	float flow_path = UV.y + UV.x * 0.38 + sin(UV.x * 8.0) * 0.025;
+	float flow_center = mix(0.15, 0.82, reveal);
+	float flow = exp(-pow((flow_path - flow_center) / 0.006, 2.0));
+	metal += vec3(0.45, 0.36, 0.18) * flow * (1.0 - rust * 0.5);
 	metal += (hash(pixel) - 0.5) * 0.018;
 	float depth = texture(TEXTURE, UV - px * vec2(1.0, 3.0)).a;
 	vec3 surface = mix(metal_color.rgb * 0.24, metal, source.a);

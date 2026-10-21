@@ -7,6 +7,11 @@ const DESIGN := Vector2(640, 360)
 @export var light_color := Color("#e2b96b")
 @export_range(0.0, 1.0) var light_strength := 0.85
 @export_range(0.0, 1.0) var background_dim := 0.9
+@export_group("白金の核と光芒")
+@export_range(0.0, 4.0, 0.05) var white_core_strength := 1.8
+@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 1.25
+@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 1.1
+@export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 1.0
 @export_group("黒い影と後光")
 @export_range(0.0, 3.0, 0.05) var radiance_strength := 1.6
 @export_range(0.0, 1.0, 0.05) var shadow_strength := 1.0
@@ -138,6 +143,10 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("light_color", light_color)
 	_light_material.set_shader_parameter("arrival", arrival)
 	_light_material.set_shader_parameter("exposure", exposure)
+	_light_material.set_shader_parameter("core_strength", white_core_strength)
+	_light_material.set_shader_parameter("broad_ray_strength", broad_ray_strength)
+	_light_material.set_shader_parameter("fine_ray_strength", fine_ray_strength)
+	_light_material.set_shader_parameter("surge_strength", emergence_surge_strength)
 	queue_redraw()
 
 func _draw() -> void:
@@ -146,13 +155,14 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.012, 0.018, 0.03, background_dim * smoothstep(0.0, _appear * 0.28, _progress) * (1.0 - taking)))
 	var factor := minf(size.x / DESIGN.x, size.y / DESIGN.y)
 	draw_set_transform((size - DESIGN * factor) / 2.0, 0, Vector2.ONE * factor)
-	# 仮部品を囲む少量の角形の光。乱数や世界の更新に依存しない。
-	for i in 8:
-		var angle := i * TAU / 8.0 + 0.04 * _progress
-		var radius := 98.0 + (i % 3) * 14.0 - 30.0 * arrival
-		var point := Vector2(320, 168) + Vector2.from_angle(angle) * Vector2(radius, radius * 0.65)
-		point = point.snapped(Vector2(2, 2))
-		var ink := light_color
-		ink.a = arrival * (1.0 - taking) * (0.12 + 0.08 * sin(i * 2.3 + _progress * 2.0))
-		draw_rect(Rect2(point, Vector2(1, 1) if i % 3 else Vector2(2, 2)), ink)
+	# 光の中の微粒子。固定した種で配置し、ゆっくり外へ運ぶ。
+	for i in 32:
+		var angle := i * 2.39996323
+		var seed := fposmod(sin(i * 127.1 + 1.0) * 43758.5, 1.0)
+		var radius := 32.0 + sqrt(seed) * 135.0 + _progress * (5.0 + seed * 8.0)
+		var point := Vector2(320, 168) + Vector2.from_angle(angle) * Vector2(radius, radius * 0.72)
+		point = point.snapped(Vector2.ONE)
+		var ink := light_color.lightened(0.5 if i % 7 == 0 else 0.0)
+		ink.a = arrival * (1.0 - taking) * (0.07 + seed * 0.2)
+		draw_rect(Rect2(point, Vector2.ONE if i % 7 else Vector2(1, 2)), ink)
 	draw_set_transform(Vector2.ZERO)
