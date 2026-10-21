@@ -52,7 +52,7 @@
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | — | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab`。外観は[敵の描画](../art-style.md#42-敵) |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み・数値は試遊用の仮値。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[仕様書 11.8](../spec.md#118-みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと次の投擲の弾薬が減る。通常の戦闘判定を使う | — | 5 | `data/enemies/corona.tres`、`scripts/enemies/corona_vortex.gd`。外観は[仮の冠](../art-style.md#46-みなみのかんむり座) |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み・数値は試遊用の仮値。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[仕様書 11.8](../spec.md#118-みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと次の投擲の弾薬が減る。通常の戦闘判定を使う | — | 4・5 | `data/enemies/corona.tres`、`data/formations/corona_solo.tscn`、`scripts/enemies/corona_vortex.gd`。外観は[仮の冠](../art-style.md#46-みなみのかんむり座) |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 号令で、周りの強敵が一斉に攻撃する | — | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 太い水流を流し続け、敵と遅い自機を押し流す | — | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius`。外観は[敵の描画](../art-style.md#42-敵) |

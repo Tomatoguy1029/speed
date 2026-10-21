@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" uid="uid://qsuhj8vo0blj" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="8_xsgcl"]
 
+[ext_resource type="PackedScene" path="res://data/formations/corona_solo.tscn" id="9_corona"]
+
 [sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
 label = "望遠鏡"
@@ -254,15 +256,41 @@ script = ExtResource("8_xsgcl")
 type = &"bomber"
 points = PackedVector2Array(0, 0, 27, 0, 33, 17, 60, 29, 80, 29, 90, 9, 122, 9, 138, 30, 143, 15, 165, 15, 180, 30, 192, 38, 197, 14, 228, 31, 239.9, 31, 242, 12, 261, 14, 270, 9, 281, 26, 331, 17, 360, 16.5, 509, 25.9, 510, 21.2, 600, 28.2)
 
+[sub_resource type="Resource" id="Resource_corona_intro"]
+script = ExtResource("1_3ghul")
+label = "みなみのかんむり座"
+track = 3
+types = Array[StringName]([&"corona"])
+formations = Array[PackedScene]([ExtResource("9_corona")])
+layouts = Array[StringName]([&"corona_solo/1体"])
+time = 314.0
+length = 28.0
+interval = 30.0
+
+
+[sub_resource type="Resource" id="Resource_corona_late_audit"]
+script = ExtResource("1_3ghul")
+label = "みなみのかんむり座"
+track = 3
+types = Array[StringName]([&"corona"])
+formations = Array[PackedScene]([ExtResource("9_corona")])
+layouts = Array[StringName]([&"corona_solo/1体"])
+time = 420.0
+interval = 20.0
+
+
 [resource]
 script = ExtResource("1")
 index = 4
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
-enemies = Array[StringName]([&"biter", &"splitter", &"bomber", &"telescope", &"reticle", &"cross", &"dolphin", &"aquarius"])
+enemies = Array[StringName]([&"biter", &"splitter", &"bomber", &"telescope", &"reticle", &"cross", &"dolphin", &"aquarius", &"corona"])
+enemy_attack_values = {
+"corona": 1.0
+}
 zako_curves = Array[ExtResource("8_xsgcl")]([SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8")])
-clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_oe0ic"), SubResource("Resource_gbu6c"), SubResource("Resource_xt0ms")])
-track_names = PackedStringArray("望遠鏡&レティクル", "いるか", "トラック 4")
+clips = Array[ExtResource("1_3ghul")]([SubResource("Resource_3ghul"), SubResource("Resource_xsgcl"), SubResource("Resource_pea44"), SubResource("Resource_blxf3"), SubResource("Resource_ha4ve"), SubResource("Resource_3vyts"), SubResource("Resource_oe0ic"), SubResource("Resource_gbu6c"), SubResource("Resource_xt0ms"), SubResource("Resource_corona_intro"), SubResource("Resource_corona_late_audit")])
+track_names = PackedStringArray("望遠鏡&レティクル", "いるか", "トラック 4", "冠")
 boss_time = 490.0
 surge_start = 601.0
 surge_phases = {
