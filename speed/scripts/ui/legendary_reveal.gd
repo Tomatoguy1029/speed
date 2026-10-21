@@ -5,12 +5,14 @@ extends Control
 
 const DESIGN := Vector2(640, 360)
 @export var light_color := Color("#e2b96b")
-@export_range(0.0, 1.0) var light_strength := 0.65
+@export_range(0.0, 1.0) var light_strength := 0.8
 @export_range(0.0, 1.0) var background_dim := 0.97
 @export_group("補助の後光")
-@export_range(0.0, 4.0, 0.05) var white_core_strength := 0.18
-@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 0.6
-@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.38
+@export_range(0.0, 4.0, 0.05) var white_core_strength := 0.65
+@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 1.2
+@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.75
+@export_range(0.3, 2.0, 0.05) var backlight_reach := 1.0
+@export_range(0.5, 2.0, 0.05) var backlight_width := 1.1
 @export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 0.12
 @export_group("黒い影と後光")
 @export_range(0.0, 3.0, 0.05) var radiance_strength := 1.25
@@ -123,13 +125,16 @@ func set_progress(value: float) -> void:
 	var swell := lerpf(0.82, 1.0, arrival) * lerpf(1.0, 0.04, taking)
 	_image.position = center - _image.size / 2.0
 	_image.scale = Vector2.ONE * swell
-	_image.modulate.a = smoothstep(_appear * 0.3, _appear * 0.9, _progress) * (1.0 - taking)
+	# 手前の本体は早期から不透明にし、影を解くことで姿を見せる。
+	# 背面の強い光は本体の材質を透過せず、輪郭の外にだけ残る。
+	_image.modulate.a = smoothstep(0.0, _appear * 0.2, _progress) * (1.0 - taking)
 	var exposure := smoothstep(_appear * shadow_release_start,
 		_appear * maxf(shadow_release_start + 0.01, shadow_release_end), _progress)
 	for layer in [_aura, _occlusion]:
 		layer.position = _image.position
 		layer.scale = _image.scale
 		layer.modulate.a = smoothstep(_appear * 0.12, _appear * 0.55, _progress) * (1.0 - taking)
+	_occlusion.modulate.a = _image.modulate.a
 	var aura_material := _aura.material as ShaderMaterial
 	aura_material.set_shader_parameter("intensity", radiance_strength)
 	aura_material.set_shader_parameter("exposure", exposure)
@@ -153,6 +158,8 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("core_strength", white_core_strength)
 	_light_material.set_shader_parameter("broad_ray_strength", broad_ray_strength)
 	_light_material.set_shader_parameter("fine_ray_strength", fine_ray_strength)
+	_light_material.set_shader_parameter("ray_reach", backlight_reach)
+	_light_material.set_shader_parameter("ray_width", backlight_width)
 	_light_material.set_shader_parameter("surge_strength", emergence_surge_strength)
 	queue_redraw()
 

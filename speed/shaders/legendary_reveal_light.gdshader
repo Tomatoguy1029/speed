@@ -1,4 +1,4 @@
-// モジュール近傍に少量だけ差す補助の後光。進行は UI の実時間で受け取る。
+// 不透明なモジュールの背後から伸びる後光。前面素材とオーラは別パスで保つ。
 shader_type canvas_item;
 render_mode unshaded, blend_add;
 uniform vec2 center = vec2(0.5, 0.47);
@@ -6,9 +6,11 @@ uniform vec4 light_color : source_color = vec4(0.89, 0.73, 0.42, 1.0);
 uniform float intensity : hint_range(0.0, 1.0) = 0.7;
 uniform float arrival : hint_range(0.0, 1.0) = 1.0;
 uniform float exposure : hint_range(0.0, 1.0) = 0.0;
-uniform float core_strength : hint_range(0.0, 4.0) = 0.18;
-uniform float broad_ray_strength : hint_range(0.0, 4.0) = 0.6;
-uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.38;
+uniform float core_strength : hint_range(0.0, 4.0) = 0.65;
+uniform float broad_ray_strength : hint_range(0.0, 4.0) = 1.2;
+uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.75;
+uniform float ray_reach : hint_range(0.3, 2.0) = 1.0;
+uniform float ray_width : hint_range(0.5, 2.0) = 1.1;
 uniform float surge_strength : hint_range(0.0, 3.0) = 0.12;
 float hash(float n) {
 	return fract(sin(n * 127.1) * 43758.5453);
@@ -38,15 +40,15 @@ void fragment() {
 		float seed = sector + 1.0;
 		float a = (sector + hash(seed) * 0.8) * 6.2831853 / 12.0;
 		float d = abs(mod(wrapped_angle - a + 3.14159265, 6.2831853) - 3.14159265);
-		float width = mix(0.018, 0.095, hash(seed + 20.0));
+		float width = mix(0.025, 0.1, hash(seed + 20.0)) * ray_width;
 		float beam = exp(-pow(d / width, 2.0));
-		broad += beam * exp(-radius * mix(2.0, 5.0, hash(seed + 40.0))) * mix(0.35, 1.0, hash(seed + 70.0));
+		broad += beam * exp(-radius / ray_reach * mix(1.8, 3.8, hash(seed + 40.0))) * mix(0.35, 1.0, hash(seed + 70.0));
 		sector = mod(fine_sector + float(i) + 38.0, 38.0);
 		seed = sector + 101.0;
 		a = (sector + hash(seed) * 0.95) * 6.2831853 / 38.0;
 		d = abs(mod(wrapped_angle - a + 3.14159265, 6.2831853) - 3.14159265);
-		width = mix(0.002, 0.009, hash(seed + 20.0));
-		float length_fade = exp(-radius * mix(2.2, 7.5, hash(seed + 40.0)));
+		width = mix(0.003, 0.012, hash(seed + 20.0)) * ray_width;
+		float length_fade = exp(-radius / ray_reach * mix(2.0, 5.0, hash(seed + 40.0)));
 		fine += exp(-pow(d / width, 2.0)) * length_fade * mix(0.3, 1.0, hash(seed + 70.0));
 	}
 	float core = exp(-radius * radius * 52.0) * core_strength;
@@ -54,12 +56,12 @@ void fragment() {
 	float shroud = cloud(p * 14.0 + vec2(arrival * 0.1, 0.0));
 	float veil = mix(0.2 + shroud * 0.8, 1.0, exposure);
 	float ray_mask = smoothstep(0.025, 0.07, radius);
-	float rays = (broad * broad_ray_strength + fine * fine_ray_strength) * ray_mask * veil * exp(-radius * radius * 16.0);
+	float rays = (broad * broad_ray_strength + fine * fine_ray_strength) * ray_mask * veil;
 	// 材質が読める低い明度を保つ。輪郭近傍のオーラは別パスが担う。
 	vec3 white = vec3(1.0, 0.96, 0.82);
 	vec3 gold = light_color.rgb;
 	vec3 emission = white * core * (0.55 + surge * 0.6);
-	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.55 + surge * 0.4);
+	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.85 + surge * 0.4);
 	emission += gold * haze;
 	float noise = fract(sin(dot(pixel, vec2(12.9898, 78.233))) * 43758.5453);
 	// 固定ピクセル上の少数の階調に揃え、滑らかな写実光へ寄せすぎない。
