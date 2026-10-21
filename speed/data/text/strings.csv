@@ -695,3 +695,20 @@ lab.ui.freehand_hint,クリックで描き始め・もう一度クリックで�
 lab.ui.drawing_route,描画中：クリックで確定・右クリック／Escで取り消し,Drawing: click to finish; right-click or Esc to cancel
 lab.ui.collapse_bottom,下のバー全体を折りたたむ,Collapse the entire bottom bar
 lab.ui.expand_bottom,下のバーを開く,Expand the bottom bar
+lab.appearance.title,外観,Appearance
+lab.appearance.help,本番と同じ描画で確認します。拡大後もホイールで倍率、中央ドラッグで視点を変更できます。,Inspect the production renderer. Use the wheel to zoom and middle-drag to pan.
+lab.appearance.bomber,自爆型を配置して拡大,Place and magnify a bomber
+lab.appearance.focus,選択中の敵を拡大,Magnify selected enemy
+lab.appearance.rotation,敵の回転（度）,Enemy rotation (degrees)
+lab.appearance.key_energy,主光の強さ（左上）,Key energy (upper left)
+lab.appearance.fill_energy,補助光の強さ（右下）,Fill energy (lower right)
+lab.appearance.key_angle,主光の角度（度）,Key angle (degrees)
+lab.appearance.fill_angle,補助光の角度（度）,Fill angle (degrees)
+lab.appearance.height,光の高さ（0=横、1=正面）,Light height (0=side 1=front)
+lab.appearance.ambient,環境光（影の明るさ）,Ambient (shadow brightness)
+lab.appearance.normal_strength,法線の強調度（0=平面）,Normal strength (0=flat)
+lab.appearance.light_help,主光を下げると白飛びを抑えられます。補助光と環境光を下げると陰影が強まり、光の高さを下げると横から照らします。変更は即時反映され、保存すると次の本番ステージにも使います。,Lower key energy to reduce clipping. Lower fill or ambient for stronger contrast. Lower height for side lighting. Changes apply immediately; save to use them in future runs.
+lab.appearance.reset,初期の照明へ戻す,Reset lighting
+lab.appearance.save,照明をプロジェクトへ保存,Save lighting to project
+lab.appearance.saved,照明を enemy_lighting.tres に保存しました,Lighting saved to enemy_lighting.tres
+lab.appearance.select_enemy,確認する敵を選択してください,Select an enemy to inspect

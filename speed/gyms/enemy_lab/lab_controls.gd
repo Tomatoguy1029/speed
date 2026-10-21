@@ -1,6 +1,8 @@
 ## 実験条件・攻撃・出現・配置規則・保存の編集ドック。
 extends TabContainer
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
+const LIGHTING := preload("res://data/visuals/enemy_lighting.tres")
+const LIGHTING_DEFAULTS := preload("res://scripts/render/enemy_lighting_settings.gd")
 var lab
 var result_list: ItemList
 var candidates: ItemList
@@ -22,6 +24,8 @@ var _attack_toggle: CheckButton
 var _attack_meter: Control
 var _spawn_entries: ItemList
 var _schedule_hash := 0
+var _lighting_fields: Dictionary = {}
+var _appearance_angle: SpinBox
 
 func _ready() -> void:
 	custom_minimum_size.x = 368
@@ -31,6 +35,73 @@ func _ready() -> void:
 	_spawns(_page(TranslationServer.translate("lab.message_26fa279ba2")))
 	_patterns(_page(TranslationServer.translate("lab.message_d7d7ce790b")))
 	_files(_page(TranslationServer.translate("lab.message_fadf24dbc5")))
+	_appearance(_page(tr("lab.appearance.title")))
+
+func _appearance(page: Node) -> void:
+	_text(page, tr("lab.appearance.help"))
+	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
+	_button(page, tr("lab.appearance.focus"), _focus_appearance)
+	_appearance_angle = _number(page, tr("lab.appearance.rotation"), 0, -180, 180, 5, _rotate_appearance)
+	for entry in [["key_energy", 0.0, 3.0, 0.01], ["fill_energy", 0.0, 3.0, 0.01],
+		["key_angle", -180.0, 180.0, 1.0], ["fill_angle", -180.0, 180.0, 1.0],
+		["height", 0.0, 1.0, 0.01], ["ambient", 0.0, 1.0, 0.01], ["normal_strength", 0.0, 3.0, 0.05]]:
+		var key: String = entry[0]
+		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_lighting.bind(key))
+	_text(page, tr("lab.appearance.light_help"))
+	_button(page, tr("lab.appearance.reset"), func():
+		var defaults := LIGHTING_DEFAULTS.new()
+		for key in _lighting_fields:
+			LIGHTING.set(key, defaults.get(key))
+			_lighting_fields[key].set_value_no_signal(LIGHTING.get(key)))
+	_button(page, tr("lab.appearance.save"), func():
+		for field in _lighting_fields.values():
+			field.apply()
+		var error := ResourceSaver.save(LIGHTING, "res://data/visuals/enemy_lighting.tres")
+		lab._messages.text = tr("lab.appearance.saved") if error == OK else error_string(error))
+
+func _set_lighting(value: float, key: String) -> void:
+	LIGHTING.set(key, value)
+	if is_instance_valid(lab.session.run):
+		var render: RenderManager = lab.session.run.get_node("../RenderManager")
+		render._apply_lighting()
+
+func _inspect_bomber() -> void:
+	if not is_instance_valid(lab.session.run):
+		return
+	lab.session.playing = false
+	var point: Vector2 = lab.session.run.state.ship_pos + Vector2(200, 0)
+	lab.session.perform("spawn", {"type": "bomber", "pos": [point.x, point.y], "count": 1})
+	_focus_appearance()
+
+func _focus_appearance() -> void:
+	if not is_instance_valid(lab.session.run):
+		return
+	var i: int = lab.session.selected
+	var table: EnemyTable = lab.session.run.enemies.table
+	if i < 0 or i >= table.alive.size() or not table.alive[i] or table.dead[i]:
+		lab._messages.text = tr("lab.appearance.select_enemy")
+		return
+	lab._set_mode(0)
+	lab.session.playing = false
+	lab.canvas.follow = false
+	lab.canvas.center = table.pos[i]
+	var available: float = maxf(40.0, minf(lab.canvas.size.x, lab.canvas.size.y) - 80.0)
+	lab.canvas.zoom = minf(8.0, available / maxf(1.0, RenderManager.enemy_sprite_radius(table.type[i], table.r[i], lab.session.run.cfg.character_scale) * 2.0 * sqrt(2.0)))
+	lab.canvas.show_ranges = false
+	lab.canvas.show_ids = false
+	lab.canvas.selection.assign([table.id[i]])
+	_appearance_angle.set_value_no_signal(wrapf(rad_to_deg(table.facing[i]), -180, 180))
+	lab._sync_view()
+	lab._refresh()
+
+func _rotate_appearance(degrees: float) -> void:
+	if not is_instance_valid(lab.session.run):
+		return
+	var i: int = lab.session.selected
+	var table: EnemyTable = lab.session.run.enemies.table
+	if i >= 0 and i < table.alive.size() and table.alive[i] and not table.dead[i]:
+		lab.session.playing = false
+		lab.session.perform("move", {"id": table.id[i], "pos": [table.pos[i].x, table.pos[i].y], "angle": deg_to_rad(degrees)})
 
 func _page(title: String) -> VBoxContainer:
 	var scroll := ScrollContainer.new()

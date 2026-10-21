@@ -28,7 +28,7 @@
 | type ID | 名称 | 星 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 倒し方 | 調整対象のステージ（通常出現は保留） | コード・データ参照 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `rocket` | ミサイル | 1 | 採用 | 実装済み | 出た向きのまま一直線に飛ぶ。機体に近づくと爆発する。飛ぶ時間が過ぎると消える | — | 1〜5 | `data/enemies/rocket.tres`、`enemy_manager.gd` の `_rocket` |
-| `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | 1・2・3・5 | `data/enemies/bomber.tres`、`_bomber` |
+| `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | 1・2・3・5 | `data/enemies/bomber.tres`、`_bomber`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
 | `volatile` | 誘爆する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む。誘爆は連鎖する | — | 2〜5 | `data/enemies/volatile.tres`、`on_enemy_death` |
 | `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 通常出現では追跡中にも分裂体を生み、撃破時に2体へ分かれる。追加版の生存中は分裂せず撃破時に2〜3体へ分かれる設定も保持する | 分かれた体もすべて倒す | 元の通常出現。追加版は `data/lab/enemy_variants.json` に保持 | `data/enemies/splitter.tres`・`splitling.tres` |
 | `splitling` | 分裂体 | 1 | 採用 | 実装済み | 分裂する雑魚から生まれ、機体を追う | — | 2・4・5の分裂時 | `data/enemies/splitling.tres`（行動は `chase`） |
@@ -37,23 +37,23 @@
 | `missile` | ホーミングミサイルの敵 | 2 | 採用 | 実装済み | 遠い距離を保ち、予告のあとホーミングミサイルを撃つ | — | 2・4・5 | `data/enemies/missile.tres` |
 | `spreader` | 拡散弾の敵 | 2 | 採用 | 実装済み | 追ってきて、予告のあと扇状に弾をばらまく | — | 3・4・5 | `data/enemies/spreader.tres`（行動は `battleship`） |
 | `pump` | ポンプ座 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せてから、前方へ一気に吐き出す | 吸っている間だけ口が開き、倒せる | 1・2 | `data/enemies/pump.tres`、`enemy_manager.gd` の `_pump` |
-| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper` |
-| `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle` |
+| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
+| `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle`。外観は[敵の描画](../art-style.md#42-敵) |
 | `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
 | `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
-| `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle` |
+| `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
 | `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
-| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser` |
-| `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
+| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser`。外観は[敵の描画](../art-style.md#42-敵) |
+| `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab`。外観は[敵の描画](../art-style.md#42-敵) |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona`。外観は[敵の描画](../art-style.md#42-敵) |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
-| `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |
+| `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius`。外観は[敵の描画](../art-style.md#42-敵) |
 | `aquila` | わし座 | 10 | 採用 | 実装済み | 通り道に沿って雷を落とす | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila`。雷撃の見た目は [デザインとアートスタイル](../art-style.md#37-雷撃) |
 
 ### 見た目の実装
