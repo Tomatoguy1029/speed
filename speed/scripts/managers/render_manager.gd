@@ -5,6 +5,7 @@
 class_name RenderManager
 extends Node
 
+const PixelLightning := preload("res://scripts/render/pixel_lightning.gd")
 const XP_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
@@ -65,6 +66,7 @@ var trails: Array = []
 var beams: Array = []
 var _enemy_textures: Dictionary = {}
 var bolts: Array = []
+var _bolt_seed := 0
 var shield_transfers: Array = []
 ## ポンプ座に吸い込まれていく敵（回りながら小さくなって口へ飛び込む）
 var swallows: Array = []
@@ -341,7 +343,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": life, "max": life,
 					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
 			&"bolt":
-				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22})
+				_bolt_seed += 1
+				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -1368,6 +1371,8 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				if not view.grow(len).has_point(p):
 					continue
 				var style := pr.hazard_style[i]
+				if style == ProjectileManager.HazardStyle.LIGHTNING:
+					col = PixelLightning.PALE
 				if charging:
 					if style == ProjectileManager.HazardStyle.RETICLE or style == ProjectileManager.HazardStyle.LIGHTNING:
 						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
@@ -1394,13 +1399,9 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				c.draw_circle(p, len, Color(col, 0.45 * f))
 				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
 				if style == ProjectileManager.HazardStyle.LIGHTNING:
-					var q := p + Vector2(0, -len * 3.0)
-					var pts := PackedVector2Array([q])
-					for s in 6:
-						q = q.lerp(p, 0.4) + Vector2((s % 2 * 2 - 1) * len * 0.25, 0)
-						pts.append(q)
-					pts.append(p)
-					c.draw_polyline(pts, Color(1, 1, 0.85, f), _px(4.0))
+					var age := t - delay
+					PixelLightning.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0),
+						i * 977 + int(age / 0.07), PixelLightning.intensity(age, pr.hazard_active[i]))
 			ProjectileManager.HazardKind.WAVE:
 				if charging:
 					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
@@ -1541,10 +1542,11 @@ func _draw_fx(c: CanvasItem) -> void:
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
 		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
 	for bo in bolts:
-		var k: float = bo.life / bo.max
 		var pts := PackedVector2Array(bo.points)
-		if pts.size() > 1:
-			c.draw_polyline(pts, Color(0.7, 0.85, 1.0, k), _px(3.0))
+		var age: float = bo.max - bo.life
+		for i in range(1, pts.size()):
+			PixelLightning.draw(c, pts[i - 1], pts[i], _px(2.0),
+				int(bo.seed) * 977 + i * 31 + int(age / 0.07), PixelLightning.intensity(age, bo.max))
 	for r in rings:
 		var k: float = r.life / r.max
 		var col: Color = r.color

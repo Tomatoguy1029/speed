@@ -54,7 +54,7 @@
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |
-| `aquila` | わし座 | 10 | 採用 | 実装済み | 通り道に沿って雷を落とす | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila` |
+| `aquila` | わし座 | 10 | 採用 | 実装済み | 通り道に沿って雷を落とす | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila`。雷撃の見た目は [デザインとアートスタイル](../art-style.md#37-雷撃) |
 
 ### 見た目の実装
 
