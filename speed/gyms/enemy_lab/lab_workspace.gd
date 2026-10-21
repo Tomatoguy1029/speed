@@ -81,6 +81,10 @@ func build(owner: Control) -> void:
 	_center.add_child(stage)
 	var frame := SubViewportContainer.new()
 	frame.stretch = true
+	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var frame_material := ShaderMaterial.new()
+	frame_material.shader = preload("res://shaders/lab_viewport.gdshader")
+	frame.material = frame_material
 	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	frame.focus_mode = Control.FOCUS_ALL
 	stage.add_child(frame)
@@ -148,6 +152,7 @@ func _header(parent: Node) -> void:
 	UI.button(header, tr("lab.ui.conditions"), open_settings.bind(0), "settings")
 	UI.button(header, tr("lab.ui.random"), open_settings.bind(3), "dice")
 	UI.button(header, tr("lab.ui.files"), open_settings.bind(4), "save")
+	UI.button(header, tr("lab.appearance.title"), open_settings.bind(5), "eye")
 	UI.button(header, tr("lab.ui.help"), func(): lab._messages.text = tr("lab.ui.help_text"), "help", true)
 
 func _edge_button(parent: Node, action: Callable) -> Button:

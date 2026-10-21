@@ -5,7 +5,31 @@
 class_name RenderManager
 extends Node
 
+const PixelLightning := preload("res://scripts/render/pixel_lightning.gd")
 const XP_COLOR := Color("#b8a0ff")
+const LAYERED_ENEMIES := {
+	&"aquarius": [preload("res://assets/pixel/aquarius/aquarius_base.png"),
+		preload("res://assets/pixel/aquarius/aquarius_armor.png"), preload("res://assets/pixel/aquarius/aquarius_normal.png"), PI / 2.0],
+	&"crab": [preload("res://assets/pixel/crab/cancer_base.png"),
+		preload("res://assets/pixel/crab/cancer_armor.png"), preload("res://assets/pixel/crab/cancer_normal.png"), PI / 2.0],
+	&"dolphin": [preload("res://assets/pixel/dolphin/dolphin_base.png"),
+		preload("res://assets/pixel/dolphin/dolphin_armor.png"), preload("res://assets/pixel/dolphin/dolphin_normal.png"), PI / 2.0],
+	&"corona": [preload("res://assets/pixel/corona/crown_base.png"),
+		preload("res://assets/pixel/corona/crown_armor.png"), preload("res://assets/pixel/corona/crown_normal.png"), PI / 2.0],
+	&"corona_star": [preload("res://assets/pixel/corona/crown_pieces_base.png"),
+		preload("res://assets/pixel/corona/crown_pieces_armor.png"), preload("res://assets/pixel/corona/crown_pieces_normal.png"), PI / 2.0],
+	&"triangle": [preload("res://assets/pixel/triangle/triangle_center_base.png"),
+		preload("res://assets/pixel/triangle/triangle_center_armor.png"), preload("res://assets/pixel/triangle/triangle_center_normal.png"), PI / 2.0],
+	&"triangle_star": [preload("res://assets/pixel/triangle/triangle_nodes_base.png"),
+		preload("res://assets/pixel/triangle/triangle_nodes_armor.png"), preload("res://assets/pixel/triangle/triangle_nodes_normal.png"), PI / 2.0],
+	&"bomber": [preload("res://assets/pixel/bomber/drifter_base.png"),
+		preload("res://assets/pixel/bomber/drifter_armor.png"), preload("res://assets/pixel/bomber/drifter_normal.png"), -PI / 2.0],
+	&"telescope": [preload("res://assets/pixel/telescope/telescope_base.png"),
+		preload("res://assets/pixel/telescope/telescope_armor.png"), preload("res://assets/pixel/telescope/telescope_normal.png"), 0.0],
+	&"reticle": [preload("res://assets/pixel/reticle/reticle_base.png"),
+		preload("res://assets/pixel/reticle/reticle_armor.png"), preload("res://assets/pixel/reticle/reticle_normal.png"), 0.0],
+}
+static var _layered_textures: Dictionary = {}
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
@@ -38,6 +62,10 @@ var _layers: Dictionary = {}
 var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
+var _armor_batches: Dictionary = {}
+var _lit_enemy_marks: DrawLayer
+var _directional_lights: Array[DirectionalLight2D] = []
+var lighting_settings: Resource = preload("res://data/visuals/enemy_lighting.tres")
 ## 絵がまだない敵の種類（仮の図形で、敵の色で描く）
 var _shape_ids: Dictionary = {}
 var _camera: Camera2D
@@ -65,6 +93,7 @@ var trails: Array = []
 var beams: Array = []
 var _enemy_textures: Dictionary = {}
 var bolts: Array = []
+var _bolt_seed := 0
 var shield_transfers: Array = []
 ## ポンプ座に吸い込まれていく敵（回りながら小さくなって口へ飛び込む）
 var swallows: Array = []
@@ -124,6 +153,7 @@ func _ready() -> void:
 	_flood_layer.material = flood_mat
 	world.add_child(_flood_layer)
 	_build_batches()
+	_build_directional_lights(world)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust])
@@ -136,6 +166,46 @@ func _ready() -> void:
 		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	_build_star_batch()
 	run.frame_events.connect(_on_events)
+
+## 法線付き装甲の敵と照明を、カメラに追従する専用キャンバスに置く。
+func _build_directional_lights(world: Node2D) -> void:
+	# DirectionalLight2Dはlight_maskを無視するので、敵専用のキャンバスへ分離する。
+	var lighting := CanvasLayer.new()
+	lighting.name = "EnemyLighting"
+	lighting.layer = 1
+	lighting.follow_viewport_enabled = true
+	world.add_child(lighting)
+	for type in _armor_batches:
+		_batches[type].reparent(lighting)
+		_armor_batches[type].reparent(lighting)
+	_lit_enemy_marks = DrawLayer.new()
+	_lit_enemy_marks.draw_fn = _draw_lit_enemy_marks
+	var unshaded := CanvasItemMaterial.new()
+	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	_lit_enemy_marks.material = unshaded
+	lighting.add_child(_lit_enemy_marks)
+	for settings in [["UpperLeftLight", Vector2(-1000, -1000)],
+		["LowerRightLight", Vector2(1000, 1000)]]:
+		var light := DirectionalLight2D.new()
+		light.name = settings[0]
+		light.position = settings[1]
+		light.range_layer_min = lighting.layer
+		light.range_layer_max = lighting.layer
+		lighting.add_child(light)
+		_directional_lights.append(light)
+	_apply_lighting()
+
+func _apply_lighting() -> void:
+	_directional_lights[0].energy = lighting_settings.key_energy
+	_directional_lights[0].rotation_degrees = lighting_settings.key_angle
+	_directional_lights[1].energy = lighting_settings.fill_energy
+	_directional_lights[1].rotation_degrees = lighting_settings.fill_angle
+	for light in _directional_lights:
+		light.height = lighting_settings.height
+	for batch: InstanceBatch in _armor_batches.values():
+		var armor := batch.material as ShaderMaterial
+		armor.set_shader_parameter("ambient", lighting_settings.ambient)
+		armor.set_shader_parameter("normal_strength", lighting_settings.normal_strength)
 
 ## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
 func _build_batches() -> void:
@@ -171,7 +241,10 @@ func _build_batches() -> void:
 			continue
 		var b := InstanceBatch.new()
 		var path := _enemy_sprite_path(def.id)
-		if ResourceLoader.exists(path):
+		if LAYERED_ENEMIES.has(def.id):
+			b.setup_texture(LAYERED_ENEMIES[def.id][0])
+			b.material = enemy_mat.duplicate()
+		elif ResourceLoader.exists(path):
 			b.setup_texture(load(path) as Texture2D)
 			b.material = enemy_mat
 		else:
@@ -180,6 +253,20 @@ func _build_batches() -> void:
 		b.z_index = -1
 		_layers.enemies.add_child(b)
 		_batches[def.id] = b
+	var armor_material := ShaderMaterial.new()
+	armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
+	for type in LAYERED_ENEMIES:
+		var layers: Array = LAYERED_ENEMIES[type]
+		var armor := CanvasTexture.new()
+		armor.diffuse_texture = layers[1]
+		armor.normal_texture = layers[2]
+		var batch := InstanceBatch.new()
+		batch.name = String(type) + "Armor"
+		batch.setup_texture(armor)
+		batch.material = armor_material
+		batch.z_index = -1
+		_layers.enemies.add_child(batch)
+		_armor_batches[type] = batch
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -219,6 +306,7 @@ func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
 func _process(delta: float) -> void:
+	_apply_lighting()
 	var phase := state.phase
 	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -237,6 +325,12 @@ func _process(delta: float) -> void:
 	pipeline.step(dt, _camera.position, cam_zoom)
 	for layer in _layers.values():
 		layer.queue_redraw()
+	_lit_enemy_marks.queue_redraw()
+	var brightness := 1.0 - cfg.death_world_dim if phase == RunState.Phase.DYING else 1.0
+	for type in _armor_batches:
+		(_batches[type].material as ShaderMaterial).set_shader_parameter("brightness", brightness)
+		(_armor_batches[type].material as ShaderMaterial).set_shader_parameter("brightness", brightness)
+	_lit_enemy_marks.self_modulate = Color(brightness, brightness, brightness)
 	_flood_layer.queue_redraw()
 	_path_band_group.visible = state.drawing or state.tracing
 	_path_band_group.self_modulate = Color(1, 1, 1, 0.25 if state.drawing else 0.18)
@@ -341,7 +435,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": life, "max": life,
 					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
 			&"bolt":
-				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22})
+				_bolt_seed += 1
+				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -636,6 +731,8 @@ func _draw_pickups(c: CanvasItem) -> void:
 
 func _draw_enemies(c: CanvasItem) -> void:
 	var view := view_rect().grow(cfg.max_enemy_radius)
+	for batch: InstanceBatch in _armor_batches.values():
+		batch.begin()
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].begin()
@@ -655,9 +752,10 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if alive[i] == 0 or dead[i] != 0:
 			continue
 		var p := pos[i]
-		if not view.has_point(p):
-			continue
 		var type := t.type[i]
+		var sprite_radius := enemy_sprite_radius(type, t.r[i], cfg.character_scale)
+		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - cfg.max_enemy_radius)).has_point(p):
+			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 and type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
 		if type == &"meteor":
@@ -677,20 +775,29 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
-		elif type in EnemyDef.NATIVE_SPRITES:
-			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
-			batch.add(p, t.facing[i] - PI / 2.0, t.r[i], col)
+			batch.add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+		if _armor_batches.has(type):
+			_armor_batches[type].add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
 		# 飾りのある敵だけ、飾りを描く
-		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
-				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type):
+		if not _armor_batches.has(type) and (elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
+				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type)):
 			_draw_enemy_marks(c, t, i)
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
 	_draw_meteor_shards(c)
+	for batch: InstanceBatch in _armor_batches.values():
+		batch.end()
 	_draw_swallows(c)
 	_draw_summon_marks(c)
+
+func _draw_lit_enemy_marks(c: CanvasItem) -> void:
+	var t := run.enemies.table
+	var view := view_rect().grow(cfg.max_enemy_radius)
+	for i in t.alive.size():
+		if t.alive[i] != 0 and t.dead[i] == 0 and _armor_batches.has(t.type[i]) and view.has_point(t.pos[i]):
+			_draw_enemy_marks(c, t, i)
 
 ## ケフェウス座の召喚の予告：王から金の光が伸び、兵が現れる位置に紋章の輪が閉じていく。
 func _draw_summon_marks(c: CanvasItem) -> void:
@@ -714,14 +821,14 @@ func _draw_swallows(c: CanvasItem) -> void:
 		if run.enemies.is_same(sw.row, sw.id):
 			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemyManager.PUMP_MOUTH
 		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
-		var r: float = sw.r * (1.0 - 0.85 * k)
+		var r: float = enemy_sprite_radius(sw.type, sw.r, cfg.character_scale) * (1.0 - 0.85 * k)
 		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
 		var tex := _enemy_texture(sw.type)
 		if tex == null:
 			c.draw_circle(p, r, sw.color)
 			continue
 		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-		c.draw_set_transform(p, angle + (PI / 2.0 if sw.type in EnemyDef.NATIVE_SPRITES else -PI / 2.0))
+		c.draw_set_transform(p, _enemy_sprite_angle(sw.type, angle))
 		c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 		c.draw_set_transform(Vector2.ZERO)
 
@@ -764,9 +871,33 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 			return pts
 	return PackedVector2Array([Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)])
 
+## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
+static func layered_texture(type: StringName) -> Texture2D:
+	if not _layered_textures.has(type):
+		var layers: Array = LAYERED_ENEMIES[type]
+		var body: Image = layers[0].get_image()
+		body.blend_rect(layers[1].get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
+		_layered_textures[type] = ImageTexture.create_from_image(body)
+	return _layered_textures[type]
+
+## 専用のベース・装甲は元画像の寸法に自機と共通のキャラクター倍率を掛ける。
+static func enemy_sprite_radius(type: StringName, collision_radius: float, character_scale: float) -> float:
+	if LAYERED_ENEMIES.has(type):
+		var texture: Texture2D = LAYERED_ENEMIES[type][0]
+		return maxf(texture.get_width(), texture.get_height()) * 0.5 * character_scale
+	return collision_radius
+
+static func _enemy_sprite_angle(type: StringName, facing: float) -> float:
+	if LAYERED_ENEMIES.has(type):
+		return facing + float(LAYERED_ENEMIES[type][3])
+	return facing + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0)
+
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
+		if LAYERED_ENEMIES.has(type):
+			_enemy_textures[type] = layered_texture(type)
+			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
 	return _enemy_textures[type]
@@ -785,8 +916,8 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	if tex == null:
 		c.draw_circle(p, r, Color("#aeb6c4"))
 		return
-	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-	c.draw_set_transform(p, angle + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0))
+	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r, cfg.character_scale) * 2.0
+	c.draw_set_transform(p, _enemy_sprite_angle(type, angle))
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 	c.draw_set_transform(Vector2.ZERO)
 
@@ -867,7 +998,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 				inner.append(mid + (v - mid) * (s + 0.04 * shimmer))
 			inner.append(inner[0])
 			c.draw_polyline(inner, Color(t.color[i].lightened(0.4), 0.18 * s), _px(1.5))
-	if t.gate[i] == EnemyTable.Gate.CLAW:
+	if t.gate[i] == EnemyTable.Gate.CLAW and not LAYERED_ENEMIES.has(type):
 		# ハサミ：構えから挟んだ直後まで開いている
 		var open := t.mode[i] == EnemyTable.Mode.WINDUP or t.mode[i] == EnemyTable.Mode.RECOVER
 		for side: float in [-1.0, 1.0]:
@@ -1368,6 +1499,8 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				if not view.grow(len).has_point(p):
 					continue
 				var style := pr.hazard_style[i]
+				if style == ProjectileManager.HazardStyle.LIGHTNING:
+					col = PixelLightning.PALE
 				if charging:
 					if style == ProjectileManager.HazardStyle.RETICLE or style == ProjectileManager.HazardStyle.LIGHTNING:
 						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
@@ -1394,13 +1527,9 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				c.draw_circle(p, len, Color(col, 0.45 * f))
 				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
 				if style == ProjectileManager.HazardStyle.LIGHTNING:
-					var q := p + Vector2(0, -len * 3.0)
-					var pts := PackedVector2Array([q])
-					for s in 6:
-						q = q.lerp(p, 0.4) + Vector2((s % 2 * 2 - 1) * len * 0.25, 0)
-						pts.append(q)
-					pts.append(p)
-					c.draw_polyline(pts, Color(1, 1, 0.85, f), _px(4.0))
+					var age := t - delay
+					PixelLightning.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0),
+						i * 977 + int(age / 0.07), PixelLightning.intensity(age, pr.hazard_active[i]))
 			ProjectileManager.HazardKind.WAVE:
 				if charging:
 					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
@@ -1541,10 +1670,11 @@ func _draw_fx(c: CanvasItem) -> void:
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
 		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
 	for bo in bolts:
-		var k: float = bo.life / bo.max
 		var pts := PackedVector2Array(bo.points)
-		if pts.size() > 1:
-			c.draw_polyline(pts, Color(0.7, 0.85, 1.0, k), _px(3.0))
+		var age: float = bo.max - bo.life
+		for i in range(1, pts.size()):
+			PixelLightning.draw(c, pts[i - 1], pts[i], _px(2.0),
+				int(bo.seed) * 977 + i * 31 + int(age / 0.07), PixelLightning.intensity(age, bo.max))
 	for r in rings:
 		var k: float = r.life / r.max
 		var col: Color = r.color

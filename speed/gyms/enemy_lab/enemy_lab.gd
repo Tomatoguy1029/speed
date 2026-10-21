@@ -481,6 +481,8 @@ func _sync_view() -> void:
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
 	if render == null:
 		return
+	# HDRの本番映像を通常のUIへ重ねるときだけ、表示用の色へ変換する。
+	(game_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", session.viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	# 本番の画面のうち HUD・ミニマップ・背景の星は、表示メニューで選んだときだけ出す
 	render.show_background = canvas.show_background
 	var hud: CanvasLayer = session.scene.get_node_or_null("Hud")

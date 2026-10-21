@@ -68,6 +68,8 @@ func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
 func texture_for(id: String) -> Texture2D:
+	if RenderManager.LAYERED_ENEMIES.has(StringName(id)):
+		return RenderManager.layered_texture(StringName(id))
 	if id.begins_with("field_planet"):
 		return RenderManager.PLANET
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
@@ -108,7 +110,7 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			follow = false
 			var old := world(event.position)
-			zoom = clampf(zoom * (1.15 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), 0.08, 3.0)
+			zoom = clampf(zoom * (1.15 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), 0.08, 16.0)
 			center += old - world(event.position)
 			queue_redraw()
 			accept_event()
