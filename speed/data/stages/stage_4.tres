@@ -71,6 +71,7 @@ label = "みずがめ座"
 track = 4
 types = Array[StringName]([&"aquarius"])
 formations = Array[PackedScene]([ExtResource("4_blxf3")])
+attack_priority = 1.0
 time = 360.0
 length = 150.0
 interval = 20.0
