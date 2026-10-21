@@ -7,8 +7,8 @@ uniform float intensity : hint_range(0.0, 1.0) = 0.7;
 uniform float arrival : hint_range(0.0, 1.0) = 1.0;
 uniform float exposure : hint_range(0.0, 1.0) = 0.0;
 uniform float core_strength : hint_range(0.0, 4.0) = 0.18;
-uniform float broad_ray_strength : hint_range(0.0, 4.0) = 0.22;
-uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.14;
+uniform float broad_ray_strength : hint_range(0.0, 4.0) = 0.6;
+uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.38;
 uniform float surge_strength : hint_range(0.0, 3.0) = 0.12;
 float hash(float n) {
 	return fract(sin(n * 127.1) * 43758.5453);
@@ -21,8 +21,8 @@ float cloud(vec2 p) {
 	return mix(mix(h.x, h.y, f.x), mix(h.z, h.w, f.x), f.y);
 }
 void fragment() {
-	vec2 pixel = floor(UV * vec2(960.0, 540.0));
-	vec2 p = (pixel / vec2(960.0, 540.0) - center) * vec2(1.77778, 1.0);
+	vec2 pixel = floor(UV * vec2(640.0, 360.0));
+	vec2 p = (pixel / vec2(640.0, 360.0) - center) * vec2(1.77778, 1.0);
 	float radius = length(p);
 	float angle = atan(p.y, p.x);
 	// 一度だけ息を吸って広がる光。角度やノイズをフレーム乱数で変えない。
@@ -59,9 +59,10 @@ void fragment() {
 	vec3 white = vec3(1.0, 0.96, 0.82);
 	vec3 gold = light_color.rgb;
 	vec3 emission = white * core * (0.55 + surge * 0.6);
-	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.28 + surge * 0.4);
+	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.55 + surge * 0.4);
 	emission += gold * haze;
 	float noise = fract(sin(dot(pixel, vec2(12.9898, 78.233))) * 43758.5453);
-	emission *= 0.97 + noise * 0.03;
+	// 固定ピクセル上の少数の階調に揃え、滑らかな写実光へ寄せすぎない。
+	emission = floor(max(emission, vec3(0.0)) * 32.0 + noise * 0.65) / 32.0;
 	COLOR = vec4(emission, intensity);
 }

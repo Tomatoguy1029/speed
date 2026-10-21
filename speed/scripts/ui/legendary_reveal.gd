@@ -9,8 +9,8 @@ const DESIGN := Vector2(640, 360)
 @export_range(0.0, 1.0) var background_dim := 0.97
 @export_group("補助の後光")
 @export_range(0.0, 4.0, 0.05) var white_core_strength := 0.18
-@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 0.22
-@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.14
+@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 0.6
+@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.38
 @export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 0.12
 @export_group("黒い影と後光")
 @export_range(0.0, 3.0, 0.05) var radiance_strength := 1.25

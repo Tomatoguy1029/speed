@@ -44,6 +44,7 @@ void fragment() {
 	float flow = exp(-pow((flow_path - flow_center) / 0.006, 2.0));
 	metal += vec3(0.45, 0.36, 0.18) * flow * flow_strength * (1.0 - rust * 0.5);
 	metal += (hash(pixel) - 0.5) * 0.018;
+	metal = floor(clamp(metal, vec3(0.0), vec3(1.0)) * 10.0 + 0.5) / 10.0;
 	float depth = texture(TEXTURE, UV - px * vec2(1.0, 3.0)).a;
 	vec3 surface = mix(metal_color.rgb * 0.24, metal, source.a);
 	COLOR = vec4(surface, max(source.a, depth)) * tint;
