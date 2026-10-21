@@ -322,12 +322,15 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var index := ICON_IDS.find(String(definition.id))
-	if index < 0:
-		return
-	var texture := AtlasTexture.new()
-	texture.atlas = ICONS
-	texture.region = Rect2(index * 47, 0, 47, 47)
+	var texture: Texture2D = definition.icon_texture if definition is WeaponDef else null
+	if texture == null:
+		var index := ICON_IDS.find(String(definition.id))
+		if index < 0:
+			return
+		var atlas := AtlasTexture.new()
+		atlas.atlas = ICONS
+		atlas.region = Rect2(index * 47, 0, 47, 47)
+		texture = atlas
 	var icon := TextureRect.new()
 	icon.texture = texture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE

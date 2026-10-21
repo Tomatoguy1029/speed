@@ -76,6 +76,10 @@ const PARAMS_DOCS := {
 ## 単位：文字
 @export var code_id: StringName
 
+## カードと装備枠の専用アイコン。未設定なら既存の共通アトラスを使う。
+@export_group("表示")
+@export var icon_texture: Texture2D
+
 ## 図鑑の専用画像。未設定なら効果イメージ／仮の部品図を表示する。
 @export_group("図鑑")
 @export var preview_texture: Texture2D

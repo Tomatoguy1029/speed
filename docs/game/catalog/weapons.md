@@ -76,7 +76,7 @@
 
 ### W24のLv別強化
 
-前方判定の長さ・追加直撃の威力・光跡の長さは `data/weapons/W24_lightLance.tres` のLv別配列で調整する。横の判定幅は全Lv共通。描画は `scripts/render/light_lance.gd` と `shaders/light_lance.gdshader` で、既存機体へ白金色の芯・段階的な発光・ドット光跡を重ねる。
+前方判定の長さ・追加直撃の威力・光跡の長さは `data/weapons/W24_lightLance.tres` のLv別配列で調整する。横の判定幅は全Lv共通。描画は `scripts/render/light_lance.gd` と `shaders/light_lance.gdshader` で、既存機体へ白金色の芯・段階的な発光・ドット光跡を重ねる。カードと装備枠は `assets/ui/combat/light_lance_icon.tres` のアイコンを使う。
 
 | Lv | 強化内容 |
 |---|---|
