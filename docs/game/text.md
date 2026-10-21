@@ -105,6 +105,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hero.gemini.desc | 線を2本描き、機体と双子が同時に駆け抜ける。 | Draw two lines. Your ship and its twin dash along them together. |
 | hero.hercules.power | 火の隕石 | Fiery Meteors |
 | hero.hercules.desc | 機体の周りに火の隕石を落とし、落ちた跡を燃やす。 | Drop fiery meteors around the ship and leave burning ground. |
+| hud.skip&#95;finish | 演出をスキップ | Skip sequence |
 | hud.continuation | モジュール連続強化 | CONSECUTIVE UPGRADE |
 | hud.continuation&#95;count | {n} 連続！ | {n} CHAIN! |
 | hud.start&#95;title | 最初の武器を1つ選ぶ（クリック／1〜3） | Choose Your First Weapon (Click / 1–3) |

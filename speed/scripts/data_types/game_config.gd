@@ -50,10 +50,22 @@ extends Resource
 ## スロー再生中、カメラを機体にこの倍率で寄せる。
 ## 単位：倍
 @export var boss_finish_zoom: float
-## 撃破：爆発から CLEAR! までの時間
-## ボスが爆発して残りの敵が消えたあと、CLEAR! を出すまでの時間。
+## 撃破：爆発から獲得演出までの時間
+## ボスが爆発して残りの敵が消えたあと、モジュールの出現（報酬なしなら CLEAR!）まで待つ時間。
 ## 単位：実秒
 @export var boss_finish_blast_time: float
+## 伝説獲得：出現の時間
+## 既存の伝説モジュールが光の中から現れ、中央へ移る仮演出。
+## 単位：実秒
+@export var boss_finish_relic_appear_time: float
+## 伝説獲得：見せる時間
+## 部品の姿と既存名称を静止して見せる時間。
+## 単位：実秒
+@export var boss_finish_relic_hold_time: float
+## 伝説獲得：回収の時間
+## 部品の光が機体へ収束する時間。報酬の保存は結果へ移るときに行う。
+## 単位：実秒
+@export var boss_finish_relic_collect_time: float
 ## 撃破：CLEAR! の表示時間
 ## CLEAR! を出してから結果画面に移るまでの時間。
 ## 単位：実秒

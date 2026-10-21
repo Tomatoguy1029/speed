@@ -42,6 +42,9 @@ var sequence_t := 0.0
 ## ボスへのトドメの直前の機体の位置の記録（スローの再生に使う。仕様書 16）
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
+var finish_origin := Vector2.ZERO
+var _finish_blast_done := false
+var _finish_clear_shown := false
 var _cam_ready := false
 ## 次の世界側の更新までにたまった時間と回数（config.world_tick_div）
 var _world_real_dt := 0.0
@@ -146,7 +149,12 @@ func _wire() -> void:
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	if state.lab_mode or ui_reward_active:
+	if state.lab_mode:
+		return
+	# 通常報酬の残りより最終勝利を優先する。首の撃破・再生は boss_dead を立てない。
+	if state.phase == RunState.Phase.PLAY and state.boss_dead:
+		_check_end()
+	if ui_reward_active and state.phase != RunState.Phase.FINISHING:
 		return
 	match state.phase:
 		RunState.Phase.PLAY:
@@ -195,6 +203,7 @@ func _play_tick(real_dt: float) -> void:
 	else:
 		combat.tick(real_dt, 0.0)
 		draw.tick(real_dt, 0.0)
+	_check_end()
 	if state.phase != RunState.Phase.PLAY:
 		return
 	state.world_scale = draw.world_scale()
@@ -230,6 +239,9 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))
+		_check_end()
+		if state.phase != RunState.Phase.PLAY:
+			return
 		_run(&"grid", func(): combat.rebuild_grid())
 	_run(&"ship", func(): ship.tick(real_dt, world_dt))
 	if it.hero_press:
@@ -239,6 +251,9 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"build", func(): build.tick(real_dt, world_dt))
 	if world_step and state.phase == RunState.Phase.PLAY:
 		_run(&"projectiles", func(): projectiles.tick(wr, wd))
+	_check_end()
+	if state.phase != RunState.Phase.PLAY:
+		return
 	_run(&"cleanup", func(): enemies.cleanup())
 	if world_step:
 		if encounters != null:
@@ -269,6 +284,9 @@ func _run(key: StringName, f: Callable) -> void:
 	profile[key] = rec
 
 func _process(_delta: float) -> void:
+	_flush_events()
+
+func _flush_events() -> void:
 	if state.events.is_empty():
 		return
 	var events := state.events
@@ -360,44 +378,85 @@ func _record_approach() -> void:
 	while approach.size() > keep:
 		approach.remove_at(0)
 
+## 現在の最終勝利通知 state.boss_dead の接続先。Hydra の段階移行には接続しない。
 func _begin_finish() -> void:
+	if state.phase != RunState.Phase.PLAY or not state.boss_dead:
+		return
 	sequence_t = 0.0
+	_finish_blast_done = false
+	_finish_clear_shown = false
+	finish_origin = bosses.boss_pos(state.ship_pos)
 	finish_replay = approach.duplicate()
-	state.emit(&"boss_finish", {"pos": bosses.boss_pos(state.ship_pos)})
+	finish_replay.append(state.ship_pos)
+	_reset_finish_input()
+	projectiles.clear_hostile()
+	state.emit(&"boss_finish", {"pos": finish_origin})
 	set_phase(RunState.Phase.FINISHING)
 
-## スロー再生 → 爆発で一掃 → 破片が消える → CLEAR! → 結果画面。
+## 表示するだけ。既存の報酬付与は finish → GameManager → SaveManager が1回行う。
+func finish_legendary() -> LegendaryModuleDef:
+	if state.endless or state.stage_index < 1 or state.stage_index > 4 or state.stage == null:
+		return null
+	return ConfigManager.legendary_modules.get(state.stage.legendary_module_id) as LegendaryModuleDef
+
+func finish_reveal_start() -> float:
+	return maxf(0.0, cfg.boss_finish_slow_time) + maxf(0.0, cfg.boss_finish_blast_time)
+
+func finish_reveal_duration() -> float:
+	if finish_legendary() == null:
+		return 0.0
+	return maxf(0.0, cfg.boss_finish_relic_appear_time) + maxf(0.0, cfg.boss_finish_relic_hold_time) + maxf(0.0, cfg.boss_finish_relic_collect_time)
+
+func _reset_finish_input() -> void:
+	input.cancel_gesture()
+	input.drawing = false
+	state.hitstop = 0.0
+	state.world_scale = 1.0
+	state.drawing = false
+	state.tracing = false
+	state.ship_vel = Vector2.ZERO
+	_world_real_dt = 0.0
+	_world_dt = 0.0
+	_world_steps = 0
+
+func _finish_blast() -> void:
+	if _finish_blast_done:
+		return
+	_finish_blast_done = true
+	state.emit(&"boss_explode", {"pos": finish_origin})
+	var t := enemies.table
+	for i in t.alive.size():
+		if t.alive[i] != 0 and t.dead[i] == 0 and t.is_boss[i] == 0:
+			enemies.mark_dead(i)
+			state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "cause": &"finale", "dir": (t.pos[i] - finish_origin).normalized(), "color": t.color[i], "silent": true})
+	projectiles.clear_hostile()
+	bosses.remove_boss()
+	enemies.cleanup()
+
+## 短い再生 → 仮の消滅 → 伝説の姿・名前 → 回収 → CLEAR! → 既存の短フェードと結果。
 func _finishing_tick(real_dt: float) -> void:
 	sequence_t += real_dt
-	var t1 := cfg.boss_finish_slow_time
-	var t2 := t1 + cfg.boss_finish_blast_time
-	var t3 := t2 + cfg.boss_finish_clear_time
+	var t1 := maxf(0.0, cfg.boss_finish_slow_time)
+	var clear_at := finish_reveal_start() + finish_reveal_duration()
 	if sequence_t < t1 and not finish_replay.is_empty():
-		var k := clampf(sequence_t / t1, 0.0, 1.0)
+		var k := clampf(sequence_t / maxf(0.001, t1), 0.0, 1.0)
 		var idx := k * (finish_replay.size() - 1)
 		var i0 := int(idx)
 		var i1 := mini(i0 + 1, finish_replay.size() - 1)
 		state.ship_pos = finish_replay[i0].lerp(finish_replay[i1], idx - i0)
-	# トドメの間は機体に寄る（3.2倍）。爆発からは元のズームへ戻す
+	elif not finish_replay.is_empty():
+		state.ship_pos = finish_replay.back()
 	var follow := 1.0 - exp(-10.0 * real_dt)
 	var zoom_to := _base_zoom() * (cfg.boss_finish_zoom if sequence_t < t1 else 1.0)
 	state.view_center += (state.ship_pos - state.view_center) * follow
 	state.camera_zoom += (zoom_to - state.camera_zoom) * follow
-	state.view_half = get_viewport().get_visible_rect().size / 2.0 / state.camera_zoom
-	if sequence_t >= t1 and sequence_t - real_dt < t1:
-		var center := bosses.boss_pos(state.ship_pos)
-		state.emit(&"boss_explode", {"pos": center})
-		var t := enemies.table
-		for i in t.alive.size():
-			if t.alive[i] != 0 and t.dead[i] == 0 and t.is_boss[i] == 0:
-				enemies.mark_dead(i)
-				state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "cause": &"finale", "dir": (t.pos[i] - center).normalized(), "color": t.color[i], "silent": true})
-		projectiles.clear_hostile()
-		bosses.remove_boss()
-		enemies.cleanup()
-	if sequence_t >= t2 and sequence_t - real_dt < t2:
+	state.view_half = _view_size() / 2.0 / state.camera_zoom
+	if sequence_t >= t1:
+		_finish_blast()
+	if sequence_t >= clear_at and not _finish_clear_shown:
+		_finish_clear_shown = true
 		state.emit(&"clear_banner")
-	if sequence_t >= t3:
+	if sequence_t >= clear_at + maxf(0.0, cfg.boss_finish_clear_time):
 		finish(true)
 
 ## ランを終えて結果画面へ。
@@ -407,8 +466,11 @@ func finish(cleared: bool) -> void:
 		return
 	if state.phase == RunState.Phase.ENDED:
 		return
+	_reset_finish_input()
 	state.cleared = cleared
 	set_phase(RunState.Phase.ENDED)
+	# 時間をゼロに調整しても、結果フェードがランを停止する前に最後の出来事を届ける。
+	_flush_events()
 	var coins := state.coins + (cfg.clear_bonus if cleared else 0)
 	GameManager.finish_run({
 		"stage": state.stage_index,
@@ -426,6 +488,19 @@ func finish(cleared: bool) -> void:
 ## UI と入力からの命令（設計書 4.3）。
 func command(name: StringName, args := {}) -> void:
 	if ui_reward_active and name in [&"choose_card", &"reroll", &"pause", &"resume", &"draw_button"]:
+		return
+	if state.phase == RunState.Phase.FINISHING:
+		if name == &"skip_finish":
+			# スキップも同じ CLEAR! と保存出口を通す。連打で表示時間を伸ばさない。
+			sequence_t = maxf(sequence_t, finish_reveal_start() + finish_reveal_duration())
+			_reset_finish_input()
+			_finishing_tick(0.0)
+		elif name == &"abort":
+			_reset_finish_input()
+			set_phase(RunState.Phase.ENDED)
+			GameManager.abort_run()
+		return
+	if state.phase == RunState.Phase.ENDED:
 		return
 	match name:
 		&"choose_card":

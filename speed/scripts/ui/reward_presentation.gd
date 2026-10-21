@@ -116,6 +116,16 @@ func enqueue_ult(event: Dictionary) -> void:
 	if _current.is_empty():
 		_begin_next()
 
+## 最終勝利への切替用。獲得済みの報酬には触れず、表示だけを閉じる。
+func cancel() -> void:
+	_queue.clear()
+	_current = {}
+	if _cutin != null:
+		_cutin.queue_free()
+		_cutin = null
+	hide()
+	active_changed.emit(false)
+
 func is_active() -> bool:
 	return not _current.is_empty()
 

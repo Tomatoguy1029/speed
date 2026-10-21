@@ -167,7 +167,8 @@ func steal_shield(i: int) -> void:
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
 func damage(amount: float, slow: float, cause: StringName, source := &"") -> bool:
-	if state.phase != RunState.Phase.PLAY:
+	# 最終勝利が通知されたフレームの残りの接触・弾でも HP を減らさない。
+	if state.phase != RunState.Phase.PLAY or state.boss_dead:
 		return false
 	if state.ship_shield_t > 0.0:
 		if state.ship_shield_flash <= 0.0:

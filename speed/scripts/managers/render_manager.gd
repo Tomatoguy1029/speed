@@ -50,6 +50,14 @@ const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
+@export_group("ボス消滅の仮演出")
+## 任意の自動再生 Node2D。World 座標に置き、寿命と素材は差替シーンが持つ。空なら共通の仮破片。
+@export var finish_effect_scene: PackedScene
+@export var finish_color := Color("#e2b96b")
+@export_range(0.0, 1.0) var finish_flash := 0.2
+@export_range(0.0, 40.0) var finish_shake := 6.0
+@export_range(0, 200) var finish_particles := 80
+@export_range(0.1, 3.0) var finish_wave_seconds := 0.8
 
 var run: RunManager
 var state: RunState
@@ -471,10 +479,15 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"boss_spawn":
 				shake = maxf(shake, 8.0)
 			&"boss_explode":
-				flash = 1.0
-				shake = 30.0
-				_burst(ev.pos, Color("#ff526e"), 120, Vector2.ZERO, 900.0)
-				pipeline.add_wave(ev.pos, 1600.0, 1.2)
+				flash = finish_flash
+				shake = finish_shake
+				if finish_effect_scene != null:
+					var effect := finish_effect_scene.instantiate() as Node2D
+					effect.position = ev.pos
+					get_node(world_path).add_child(effect)
+				else:
+					_burst(ev.pos, finish_color, finish_particles, Vector2.ZERO, 700.0)
+				pipeline.add_wave(ev.pos, 1600.0, finish_wave_seconds)
 			&"ship_explode":
 				_burst(ev.pos, Color("#9fe8ff"), 60, Vector2.ZERO, 500.0)
 

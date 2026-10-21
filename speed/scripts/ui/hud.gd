@@ -53,6 +53,11 @@ var _card_blocked_pointer_pos := Vector2.ZERO
 var _card_held: Dictionary = {}
 var _card_discard: Dictionary = {}
 
+## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
+@export_group("伝説獲得の仮演出")
+@export var legendary_reveal_scene: PackedScene = preload("res://scenes/run/legendary_reveal.tscn")
+var _legendary_reveal: Control
+var _finish_skip: Button
 var _rewards: Control
 var run: RunManager
 var _font: Font
@@ -122,6 +127,14 @@ func _ready() -> void:
 	_draw_button.visible = DisplayServer.is_touchscreen_available()
 	_draw_button.pressed.connect(func(): run.command(&"draw_button"))
 	add_child(_draw_button)
+	_finish_skip = Button.new()
+	_finish_skip.text = tr("hud.skip_finish")
+	_finish_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_finish_skip.position = Vector2(-210, -58)
+	_finish_skip.size = Vector2(190, 38)
+	_finish_skip.hide()
+	_finish_skip.pressed.connect(func(): run.command(&"skip_finish"))
+	add_child(_finish_skip)
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
@@ -130,7 +143,7 @@ func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
 	run.input.cancel_gesture()
 	_card_discard.merge(_card_held)
-	_draw_button.visible = not active and DisplayServer.is_touchscreen_available()
+	_draw_button.visible = not active and DisplayServer.is_touchscreen_available() and run.state.phase == RunState.Phase.PLAY
 	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
 	_pause_box.visible = not active and run.state.phase == RunState.Phase.PAUSED
 	if not active:
@@ -140,6 +153,26 @@ func _on_reward_active(active: bool) -> void:
 		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 
 func _on_phase(phase: RunState.Phase) -> void:
+	if phase == RunState.Phase.FINISHING:
+		_pause_after_reward = false
+		_rewards.cancel()
+		_warning_t = 0.0
+		_hero_notice_t = 0.0
+		_draw_button.hide()
+		var definition := run.finish_legendary()
+		if definition != null and legendary_reveal_scene != null:
+			_legendary_reveal = legendary_reveal_scene.instantiate() as Control
+			_legendary_reveal.setup(definition)
+			add_child(_legendary_reveal)
+			_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			if _legendary_reveal.has_method("set_timing"):
+				_legendary_reveal.set_timing(run.cfg.boss_finish_relic_appear_time, run.cfg.boss_finish_relic_hold_time, run.cfg.boss_finish_relic_collect_time)
+			_legendary_reveal.hide()
+			move_child(_finish_skip, -1)
+	elif phase == RunState.Phase.ENDED:
+		_finish_skip.hide()
+		if _legendary_reveal != null:
+			_legendary_reveal.hide()
 	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
 	_pause_box.visible = phase == RunState.Phase.PAUSED and not _rewards.is_active()
 	if _pause_box.visible:
@@ -149,9 +182,11 @@ func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
 			&"level_bonus":
-				_rewards.enqueue_bonus(ev)
+				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+					_rewards.enqueue_bonus(ev)
 			&"hero_freed":
-				_rewards.enqueue_ult(ev)
+				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+					_rewards.enqueue_ult(ev)
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
@@ -187,6 +222,11 @@ func _on_events(events: Array[Dictionary]) -> void:
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
 	if run == null or run.state == null or run.state.lab_mode:
+		return
+	if run.state.phase == RunState.Phase.FINISHING:
+		if run.sequence_t >= 0.35 and not event.is_echo() and (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_accept")):
+			run.command(&"skip_finish")
+			get_viewport().set_input_as_handled()
 		return
 	var id := _card_input_id(event)
 	if id == "":
@@ -239,6 +279,9 @@ func _card_command(command: StringName, args := {}) -> void:
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		get_viewport().set_input_as_handled()
+		return
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
 	if _rewards.is_active():
 		get_viewport().set_input_as_handled()
@@ -269,12 +312,30 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_update_finish_presentation()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
 	_refresh_loadout_icons()
 	queue_redraw()
+
+func _update_finish_presentation() -> void:
+	if run.state.phase != RunState.Phase.FINISHING:
+		return
+	var start := run.finish_reveal_start()
+	var duration := run.finish_reveal_duration()
+	_finish_skip.visible = run.sequence_t >= 0.35 and run.sequence_t < start + duration
+	if _legendary_reveal == null:
+		return
+	_legendary_reveal.visible = duration > 0.0 and run.sequence_t >= start and run.sequence_t < start + duration
+	if not _legendary_reveal.visible:
+		return
+	if _legendary_reveal.has_method("set_endpoints"):
+		var s := run.state
+		_legendary_reveal.set_endpoints((run.finish_origin - s.view_center) * s.camera_zoom + size / 2.0,
+			(s.ship_pos - s.view_center) * s.camera_zoom + size / 2.0)
+	_legendary_reveal.set_progress(clampf((run.sequence_t - start) / maxf(0.001, duration), 0.0, 1.0))
 
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
