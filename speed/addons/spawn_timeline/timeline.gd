@@ -10,7 +10,9 @@ var _pin_buttons: Dictionary = {}
 var stage: Resource = null
 var canvas: Control
 var _playhead_label: Label
-var _info: Label
+var _info: Button
+var _details: RichTextLabel
+var _edit_feedback := ""
 ## 組み合わせのシーンのパス → 中に置いた敵の種類の一覧
 var _types_cache: Dictionary = {}
 
@@ -87,8 +89,16 @@ func _init() -> void:
 				b.add_theme_stylebox_override(state, style)
 	_playhead_label = Label.new()
 	bar.add_child(_playhead_label)
-	_info = Label.new()
+	_info = Button.new()
+	_info.pressed.connect(_show_rule_details)
 	bar.add_child(_info)
+	_details = RichTextLabel.new()
+	_details.custom_minimum_size.y = 104.0 * ui
+	_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_details.add_theme_font_size_override("normal_font_size", int(14.0 * ui))
+	_details.selection_enabled = true
+	_details.hide()
+	add_child(_details)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -134,12 +144,80 @@ func refresh() -> void:
 		button.add_theme_stylebox_override("hover_pressed", button.get_theme_stylebox("hover"))
 		button.self_modulate = Color.WHITE if exists else Color(0.45, 0.45, 0.45)
 		button.tooltip_text = "ON：クリックでOFFに切り替え" if exists else "OFF：クリックで再生位置にピンを配置（0:00なら既存の配置の末尾）"
-	var n: int = canvas.mismatches().size() if stage != null else 0
 	_playhead_label.text = "再生位置 %s　" % Canvas.clock(canvas.playhead)
-	_info.text = "ルール違反のクリップ %d" % n
+	refresh_diagnostics()
 	if stage != null:
 		canvas.custom_minimum_size.y = canvas.content_height()
 	canvas.queue_redraw()
+
+## 件数・赤枠と同じ検証結果を、選択の詳細と全件の詳細で説明する。
+func refresh_diagnostics() -> void:
+	var bad: Array = canvas.mismatches() if stage != null else []
+	_info.text = "ルール違反のクリップ %d%s" % [bad.size(), "（詳細）" if not bad.is_empty() else ""]
+	_info.disabled = bad.is_empty()
+	_info.tooltip_text = all_rule_details()
+	var reports := []
+	if _edit_feedback != "":
+		reports.append(_edit_feedback)
+	for c: Resource in canvas.selection():
+		var report := clip_rule_report(c)
+		if report != "":
+			reports.append(report)
+	_details.text = "\n\n".join(reports)
+	_details.visible = not reports.is_empty()
+
+func report_edit_rejection(reason: String) -> void:
+	_edit_feedback = "操作できません：" + reason
+	refresh_diagnostics()
+
+func all_rule_details() -> String:
+	var reports := []
+	for c: Resource in clips():
+		var report := clip_rule_report(c)
+		if report != "":
+			reports.append(report)
+	return "\n\n".join(reports) if not reports.is_empty() else "ルール違反はありません。"
+
+func _show_rule_details() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "ルール違反の詳細"
+	var text := RichTextLabel.new()
+	text.text = all_rule_details()
+	text.selection_enabled = true
+	var ui := EditorInterface.get_editor_scale() if Engine.is_editor_hint() else 1.0
+	text.add_theme_font_size_override("normal_font_size", int(14.0 * ui))
+	dialog.add_child(text)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered_clamped(Vector2i(800.0 * ui, 460.0 * ui), 0.85)
+
+func type_names(types: Array) -> String:
+	var names := PackedStringArray()
+	for id in types:
+		var shown := enemy_name(StringName(id))
+		names.append("%s（%s）" % [shown, id] if shown != String(id) else String(id))
+	return "・".join(names) if not names.is_empty() else "（未選択）"
+
+func clip_heading(c: Resource) -> String:
+	var index := clips().find(c)
+	var label := String(c.get("label"))
+	var row: int = canvas.clip_track(index) if index >= 0 else int(c.get("track"))
+	return "クリップ「%s」／行%d「%s」／%s〜%s秒" % [label if label != "" else "名前なし", row + 1,
+		canvas.track_name(row), Canvas._num(float(c.get("time"))), Canvas._num(Canvas._clip_end(c))]
+
+## 判定は clip_mismatch に集約する。使用する並びを絞っていても、登録シーン全体が検査対象。
+func clip_rule_report(c: Resource) -> String:
+	var reasons := clip_mismatch(c)
+	if reasons.is_empty():
+		return ""
+	var lines := PackedStringArray([clip_heading(c), "ルール違反："])
+	for reason in reasons:
+		lines.append("・配置シーン「%s」に含まれる敵「%s」が、このクリップの Types にありません。" % [reason[0], type_names([reason[1]])])
+	lines.append("現在の Types：%s" % type_names(c.get("types")))
+	lines.append("修正：Types に不足する敵を追加するか、Spawn assets の配置シーンの敵をクリップの種類に合わせてください。")
+	lines.append("検査対象は登録シーン全体です（Formations の使用する並びの選択にかかわらず）。")
+	return "\n".join(lines)
 
 func phases() -> Array:
 	return stage.get("phases") if stage != null else []
@@ -205,6 +283,7 @@ func clip_mismatch(clip: Resource) -> Array:
 ## 編集を取り消し・やり直しに載せる。changes は [対象, プロパティ, 前の値, 後の値] の並び。
 ## 値はすでに後の値になっている前提で、実行はしない。
 func commit(label: String, changes: Array) -> void:
+	_edit_feedback = ""
 	undo_redo.create_action(label, UndoRedo.MERGE_DISABLE, stage)
 	# 新規・内蔵クリップのパスによる履歴の推測を避け、ステージの1操作にまとめる。
 	for c in changes:
@@ -225,6 +304,7 @@ func _save() -> void:
 
 ## Undo のあと別のステージを表示していても、編集したステージを保存する。
 func _save_stage(target: Resource) -> void:
+	_edit_feedback = ""
 	if target == null or target.resource_path == "":
 		return
 	for p in target.get("phases"):
