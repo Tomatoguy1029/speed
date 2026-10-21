@@ -53,8 +53,8 @@ func _steer(dt: float) -> void:
 	if intent.touch:
 		if not intent.stick_active or intent.stick.length() < cfg.stick_dead_zone:
 			return
-		var k := clampf((intent.stick.length() - cfg.stick_dead_zone) / maxf(1.0, cfg.stick_radius - cfg.stick_dead_zone), 0.0, 1.0)
-		_steer_toward(intent.stick.angle(), dt, lerpf(cfg.steer_cruise, cfg.stick_cruise_max, k))
+		# スティックは向きだけを決める（倒し具合で速さは変えない）
+		_steer_toward(intent.stick.angle(), dt, cfg.steer_cruise)
 		return
 	if not intent.has_cursor:
 		return
@@ -80,6 +80,19 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 
 func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 	if state.glide:
+		# 勢い：glide_hold の間は速さを保ち、そのあと glide_fade かけて巡航の速さまで落として終える（仕様書 6.6）
+		state.glide_t += dt
+		var cruise := state.stats.max_speed * cfg.steer_cruise
+		var sp := state.glide_speed
+		if state.glide_t > cfg.glide_hold:
+			var k := (state.glide_t - cfg.glide_hold) / maxf(0.001, cfg.glide_fade)
+			if k >= 1.0:
+				state.glide = false
+				sp = cruise
+			else:
+				sp = lerpf(state.glide_speed, cruise, k)
+		if not state.ship_vel.is_zero_approx():
+			state.ship_vel = state.ship_vel.normalized() * sp
 		state.ship_boost_t = maxf(0.0, state.ship_boost_t - dt)
 		state.ship_fade_t = 0.0
 		state.ship_pos += state.ship_vel * dt
@@ -150,7 +163,8 @@ func steal_shield(i: int) -> void:
 		"arc": float(t.def[i].params.front_arc)})
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
-func damage(amount: float, slow: float, cause: StringName) -> bool:
+## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
+func damage(amount: float, slow: float, cause: StringName, source := &"") -> bool:
 	if state.phase != RunState.Phase.PLAY:
 		return false
 	if state.ship_shield_t > 0.0:
@@ -166,7 +180,7 @@ func damage(amount: float, slow: float, cause: StringName) -> bool:
 	state.ship_vel *= 1.0 - minf(0.9, slow)
 	state.ship_invuln = cfg.invuln_time
 	state.ship_hurt = cfg.ship_hurt_time
-	state.emit(&"hurt", {"pos": state.ship_pos, "amount": amount, "cause": cause})
+	state.emit(&"hurt", {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source})
 	if state.ship_hp > 0.0:
 		build.on_hurt()
 	return true

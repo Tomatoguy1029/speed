@@ -31,9 +31,14 @@ var beh_slot := PackedInt32Array()
 var is_boss := PackedByteArray()
 ## 隕石の配置の通し番号（隕石でなければ -1）
 var meteor_index := PackedInt32Array()
+## overrideを使う群れの通し番号。0なら個体ごとの攻撃枠。
+var attack_group := PackedInt32Array()
+## 個体の攻撃value、またはoverride群れが共有するvalue。
+var attack_value := PackedFloat64Array()
+## 出現元から引き継いだ攻撃待ちの優先度。0も独立した値として持つ。
+var attack_priority := PackedFloat64Array()
 ## 1 なら撃破済み（その回の終わりに空きへ戻る）
 var dead := PackedByteArray()
-var level := PackedFloat64Array()
 var elite := PackedByteArray()
 var pos := PackedVector2Array()
 var vel := PackedVector2Array()

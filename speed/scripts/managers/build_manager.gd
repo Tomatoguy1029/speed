@@ -31,15 +31,14 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
-## 基礎値・レベル・特性・強化画面での強化・出力コアから能力値を計算し直す。
+## 基礎値・特性・強化画面での強化・出力コアから能力値を計算し直す（レベルでは変わらない）。
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	var lv := float(state.level)
-	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + cfg.level_speed_growth * lv) \
+	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") \
 		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
-	s.attack_mult = _meta_mult(&"attack") * (1.0 + cfg.level_atk_growth * lv) * (1.0 + _per(&"T11") * _n(&"T11"))
-	s.max_hp = cfg.base_hp + _meta_add(&"max_hp") + cfg.level_hp_growth * lv
+	s.attack_mult = _meta_mult(&"attack") * (1.0 + _per(&"T11") * _n(&"T11"))
+	s.max_hp = cfg.base_hp + _meta_add(&"max_hp")
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
 	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + _per(&"T07") * _n(&"T07"))
 	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
@@ -101,6 +100,7 @@ func xp_needed() -> float:
 
 func add_xp(v: float) -> void:
 	state.xp += v
+	state.xp_gained += v
 	var need := xp_needed()
 	while state.xp >= need:
 		state.xp -= need
@@ -225,6 +225,8 @@ func choose_card(index: int) -> bool:
 	else:
 		grant(c.kind, c.id)
 	state.emit(&"upgrade", {"card": c})
+	if c.kind != &"heal":
+		_level_bonus()
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
 		state.cards = roll_cards()
@@ -232,6 +234,39 @@ func choose_card(index: int) -> bool:
 		return true
 	state.cards = []
 	return false
+
+## レベルアップのおまけ（仕様書 9.2）：選んだあと、確率で持っているものが自動で上がる。
+## 起きたら次の確率で続けて判定し、4つ目（選んだ1枚を含めて）で止まる。
+func _level_bonus() -> void:
+	var count := 0
+	for chance: float in [cfg.levelup_bonus_chance, cfg.levelup_bonus_more, cfg.levelup_bonus_last]:
+		if state.rng.randf() >= chance:
+			return
+		var pick := _bonus_target()
+		if pick.is_empty():
+			return
+		grant(pick.kind, pick.id)
+		count += 1
+		var owned: Dictionary = state.weapons if pick.kind == &"weapon" else state.traits
+		var def: Resource = (ConfigManager.weapons if pick.kind == &"weapon" else ConfigManager.traits)[pick.id]
+		state.emit(&"level_bonus", {"kind": pick.kind, "id": pick.id, "level": owned[pick.id], "count": count})
+		var head := TranslationServer.translate("hud.level_bonus") if count == 1 else TranslationServer.translate("hud.level_bonus_more")
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60 - 26 * count),
+			"text": "%s %s Lv%d" % [head, def.get_display_name(), owned[pick.id]],
+			"color": Color("#efcb70") if count == 1 else Color("#ffe46b"), "size": 20 + 3 * count})
+
+## おまけで上げる候補：持っている武器・特性のうち、上限に達していないものからランダムに1つ。なければ空。
+func _bonus_target() -> Dictionary:
+	var items: Array[Dictionary] = []
+	for id in state.weapons:
+		if state.weapons[id] < cfg.weapon_max_level:
+			items.append({"kind": &"weapon", "id": id})
+	for id in state.traits:
+		if state.traits[id] < cfg.trait_max_stacks:
+			items.append({"kind": &"trait", "id": id})
+	if items.is_empty():
+		return {}
+	return items[state.rng.randi_range(0, items.size() - 1)]
 
 # ── 装備（仕様書 8） ─────────────────────────────────────────────
 
@@ -299,9 +334,9 @@ func _receive_comet_weapon(id: StringName) -> bool:
 	return true
 
 ## 質量牽引砲（W21）が、行 i の敵の船体を牽引するか。牽引したら true。
-func capture_hull(i: int, cause: StringName) -> bool:
+func capture_hull(i: int) -> bool:
 	var tow = weapon_behaviors.get(&"W21")
-	return tow != null and tow.capture(i, cause)
+	return tow != null and tow.capture(i)
 
 ## 装備をすべて外す（調整パネル用）。
 func reset_loadout() -> void:

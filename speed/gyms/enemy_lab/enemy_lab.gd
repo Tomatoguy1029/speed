@@ -45,7 +45,6 @@ var _terrain: CheckButton
 var _rocks: CheckButton
 var _gimmicks: CheckButton
 var _count: SpinBox
-var _level: SpinBox
 var _updating := false
 var _scrubbing := false
 var _busy := false
@@ -122,7 +121,7 @@ func _fill_palette() -> void:
 	var wanted_stars: int = workspace.stars.selected
 	for def in definitions:
 		if def is EnemyDef and def.behavior == &"part": continue
-		if def is EnemyDef and def.id in [&"triangle_star", &"corona_star"]: continue
+		if def is EnemyDef and def.id in [&"triangle_star"]: continue
 		var id := String(def.id)
 		if wanted_class > 0 and wanted_class != _palette_class(def): continue
 		# 星の数：1〜5 はその数、6 は 6〜10 をまとめて選ぶ。ボスは区分で選ぶ

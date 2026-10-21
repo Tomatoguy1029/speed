@@ -183,7 +183,7 @@ func _test_fire_regrowth() -> void:
 	_check(boss.count == 5 and boss.necks.all(func(n): return n.row >= 0 and not n.burned), "次段階で焼いた頭も戻り、新しい首が加わる")
 
 func _enemy(type: StringName, at: Vector2) -> int:
-	return run.enemies.spawn(run.enemies.def_of(type), 1.0, at)
+	return run.enemies.spawn(run.enemies.def_of(type), at)
 
 func _test_foundation() -> void:
 	var s := run.state
@@ -229,8 +229,7 @@ func _test_foundation() -> void:
 	var before: Dictionary = run.enemies._target()
 	s.time = 660.0
 	var after: Dictionary = run.enemies._target()
-	_check(after.pop > before.pop and after.level > before.level and run.enemies.surge_steps() > 1, "タスク4：10分以降の波は段階ごとに大きく強くなる")
-	_check(run.field.danger_at(0.0) == 0 and run.field.danger_at(run.cfg.field_radius) > run.field.danger_at(run.cfg.zone_outer), "タスク4：危険度は外縁ほど高い")
+	_check(after.pop > before.pop and run.enemies.surge_steps() > 1, "タスク4：10分以降の波は段階ごとに大きくなる")
 
 func _test_shapes() -> void:
 	_clear()
@@ -334,7 +333,7 @@ func _test_enemy_roster() -> void:
 		elif type == &"shield":
 			_check(absf(t.facing[i]) > 0.5, "タスク8：たて座は機体に向き直る")
 		elif type == &"corona":
-			_check(run.enemies.parts_alive(i) > 3 and t.pos[t.parts[i][0]].distance_to(from) > 50, "タスク12：かんむり座は小さな星の輪を回す")
+			_check(t.parts[i].is_empty() and t.pos[i].distance_to(from) > 50, "かんむり座は弾薬が空でも接近を続ける")
 		elif type == &"cepheus":
 			_check(run.state.events.any(func(e): return e.type == &"block_impact"), "タスク12：ケフェウス座は予告して号令する")
 		elif type == &"aquarius":
@@ -407,15 +406,14 @@ func _test_enemy_gates() -> void:
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "タスク11：かに座の挟んだ直後は正面から倒せる")
 	_clear()
 	var corona := _enemy(&"corona", at)
-	star = t.parts[corona][0]
-	_check(_ram(t.pos[star], Vector2.DOWN) and not t.dead[star], "タスク12：かんむり座の輪の星への突進は弾かれる")
+	star = _enemy(&"drifter", at + Vector2(0, 100))
+	run.combat.rebuild_grid()
+	run.enemies.corona.tick(run.enemies, 0.01)
+	_check(run.enemies.corona.members.has(star), "かんむり座は実在する雑魚を渦に捕捉する")
 	run.combat.damage_enemy(star, 1e6, {"cause": &"shot", "no_crit": true})
-	_check(t.dead[star] != 0, "タスク12：輪の星は武器で壊せる")
-	t.fire_t[corona] = 0.0
-	run.enemies._corona(corona, 0.01)
-	run.enemies._corona(corona, 1.0)
-	_ram(at, Vector2.from_angle(t.facing[corona] + PI / float(t.def[corona].params.stars)), 400.0)
-	_check(t.dead[corona] != 0, "タスク12：輪の隙間を通すと本体を貫ける")
+	_check(t.dead[star] != 0 and not run.enemies.corona.members.has(star), "武器で雑魚を倒すと投擲の弾薬が減る")
+	_ram(at, Vector2.RIGHT, 400.0)
+	_check(t.dead[corona] != 0, "かんむり座の本体を通常の体当たりで貫ける")
 	_clear()
 	var king := _enemy(&"cepheus", at)
 	var ruler := _enemy(&"ruler", at + Vector2(60, 0))
@@ -966,10 +964,11 @@ func _test_surge() -> void:
 	for steps in [0, 20]:
 		_clear()
 		run.state.rng.seed = 208
-		run.enemies._survey()
+		run.enemies._survey(0.0)
 		var request: Dictionary = target.duplicate()
 		request.phase = ConfigManager.phases[&"s1_late"]
 		request.steps = steps
+		request.surge = {"ranged": run.cfg.surge_ranged * steps, "elite": run.cfg.surge_elite * steps}
 		for attempt in 600:
 			run.enemies._spawn_one(request)
 		var sample := {"all": 0, "elite": 0, "ranged": 0}

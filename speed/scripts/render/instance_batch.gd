@@ -86,8 +86,33 @@ func add(pos: Vector2, angle: float, scale_r: float, color: Color) -> void:
 	_buf[i + 11] = color.a
 	_count += 1
 
+## 回さずに置く（向きのない物。add の回転の計算を省く）。
+func add_upright(pos: Vector2, scale_r: float, color: Color) -> void:
+	var need := (_count + 1) * STRIDE
+	if _buf.size() < need:
+		_buf.resize(maxi(need, _buf.size() * 2))
+	var i := _count * STRIDE
+	_buf[i] = scale_r
+	_buf[i + 1] = 0.0
+	_buf[i + 2] = 0.0
+	_buf[i + 3] = pos.x
+	_buf[i + 4] = 0.0
+	_buf[i + 5] = scale_r
+	_buf[i + 6] = 0.0
+	_buf[i + 7] = pos.y
+	_buf[i + 8] = color.r
+	_buf[i + 9] = color.g
+	_buf[i + 10] = color.b
+	_buf[i + 11] = color.a
+	_count += 1
+
 func end() -> void:
 	var mm := multimesh
+	# 描く物がなければ、配列を送り直さずに隠すだけにする（種類ごとの束は多く、ほとんどは空）
+	if _count == 0:
+		if mm.visible_instance_count != 0:
+			mm.visible_instance_count = 0
+		return
 	if mm.instance_count < _count:
 		mm.instance_count = maxi(_count, mm.instance_count * 2 + 64)
 		_buf.resize(mm.instance_count * STRIDE)

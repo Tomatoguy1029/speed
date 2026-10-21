@@ -64,7 +64,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 		if not t.alive[i] or t.dead[i] or t.parent[i] >= 0:
 			continue
 		commands.append({"tick": 0, "kind": "boss" if t.is_boss[i] else "spawn",
-			"args": {"type": String(t.type[i]), "pos": plain(t.pos[i]), "level": t.level[i], "angle": t.facing[i], "elite": t.elite[i] != 0}})
+			"args": {"type": String(t.type[i]), "pos": plain(t.pos[i]), "angle": t.facing[i], "elite": t.elite[i] != 0}})
 	return plain({"version": VERSION, "kind": "preset", "baseline": session.baseline.duplicate(true), "spec": spec,
 		"history": commands, "branches": [], "tick": 0, "end": 0, "route": route, "pattern": pattern, "results": []})
 
@@ -200,7 +200,7 @@ static func validate(data: Dictionary) -> String:
 		if not ConfigManager.enemies.has(StringName(id)):
 			return TranslationServer.translate("lab.message_3fc0d7300b") + String(id)
 		for key in spec.overrides[id]:
-			if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params"]:
+			if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params"]:
 				return TranslationServer.translate("lab.message_8cfee97b22") + String(key)
 	for command in data.history:
 		var problem := _validate_command(command)
@@ -294,9 +294,9 @@ static func _definition_problem(values, boss := false) -> String:
 				if not value is Dictionary: return TranslationServer.translate("lab.message_2dac0fe5e5")
 				for param in value:
 					if not original.params.has(param) or (not _number_ok(value[param]) and not value[param] is bool): return TranslationServer.translate("lab.message_7241f95e31")
-			elif key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc"] or not _number_ok(value):
+			elif key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc"] or not _number_ok(value):
 				return TranslationServer.translate("lab.message_00769fb623")
-			elif float(value) < 0 or (key in ["hp", "radius"] and float(value) <= 0):
+			elif (float(value) < 0 and key != "toughness") or (key in ["hp", "radius"] and float(value) <= 0):
 				return TranslationServer.translate("lab.message_7d67422141")
 	return ""
 

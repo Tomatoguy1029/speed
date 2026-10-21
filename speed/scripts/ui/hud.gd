@@ -36,6 +36,15 @@ const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
+## カードを表示してから選択を受け付けるまでの実秒。
+@export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
+
+var _cards_accept_at := 0
+var _card_blocked_pointer_frame := -1
+var _card_blocked_pointer_pos := Vector2.ZERO
+## 表示切替前からの押下と、離すまで破棄する押下（マウス・タッチ・選択キー）。
+var _card_held: Dictionary = {}
+var _card_discard: Dictionary = {}
 
 var run: RunManager
 var _font: Font
@@ -43,6 +52,13 @@ var _cards_box: Control
 var _reroll_button: Button
 var _cards_title: Label
 var _cards_row: Control
+var _swap_box: VBoxContainer
+var _swap_scroll: ScrollContainer
+var _swap_grid: GridContainer
+var _swap_new_name: Label
+var _swap_new_desc: Label
+var _swap_keep: Button
+var _swap_keep_index := -1
 var _frame: TextureRect
 var _loadout_icons: Control
 var _loadout_key := ""
@@ -54,6 +70,7 @@ var _banner := ""
 var _banner_color := Color.WHITE
 var _banner_t := 0.0
 var _warning_t := 0.0
+var _hero_notice_t := 0.0
 var _ring_usable := true
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
@@ -79,6 +96,7 @@ func _ready() -> void:
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_build_cards()
+	resized.connect(_layout_cards)
 	_build_pause()
 	_draw_button = Button.new()
 	_draw_button.text = "hud.draw"
@@ -101,6 +119,8 @@ func _on_phase(phase: RunState.Phase) -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"hero_discovered":
+				_hero_notice_t = 1.8
 			&"boss_spawn":
 				_warning_t = 3.0
 			&"clear_banner":
@@ -131,6 +151,60 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"boss_explode":
 				AudioManager.play(&"boom")
 
+## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
+func _input(event: InputEvent) -> void:
+	if run == null or run.state == null or run.state.lab_mode:
+		return
+	var id := _card_input_id(event)
+	if id == "":
+		return
+	var choosing := run.state.phase == RunState.Phase.LEVELUP
+	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
+	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
+		if event.device == -1 and blocked:
+			_card_blocked_pointer_frame = Engine.get_process_frames()
+			_card_blocked_pointer_pos = event.position
+		elif event.device != -1 and _card_blocked_pointer_frame == Engine.get_process_frames() and event.position == _card_blocked_pointer_pos:
+			blocked = true
+	if not event is InputEventScreenDrag:
+		if event.is_pressed():
+			_card_held[id] = true
+			if blocked:
+				_card_discard[id] = true
+		else:
+			_card_held.erase(id)
+			_card_discard.erase(id)
+	# タッチの選択は既存のマウス擬似イベントに任せ、元のタッチをゲームへ漏らさない。
+	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
+		get_viewport().set_input_as_handled()
+
+func _card_input_id(event: InputEvent) -> String:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		return "mouse:%d" % event.device
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		return "touch:%d:%d" % [event.device, event.index]
+	var id := ""
+	if event is InputEventKey:
+		id = "key:%d:%d" % [event.device, event.physical_keycode if event.physical_keycode != 0 else event.keycode]
+	elif event is InputEventJoypadButton:
+		id = "joy:%d:%d" % [event.device, event.button_index]
+	elif event is InputEventAction:
+		id = "action:%s" % event.action
+	if id != "":
+		if _card_held.has(id) or _card_discard.has(id):
+			return id
+		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept"]:
+			if event.is_action(action):
+				return id
+	return ""
+
+func _card_command(command: StringName, args := {}) -> void:
+	if run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+		return
+	_card_discard.merge(_card_held)
+	run.command(command, args)
+
 func _unhandled_input(event: InputEvent) -> void:
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
 	if _settings != null or run.state.lab_mode:
@@ -143,16 +217,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		for i in 3:
 			if event.is_action_pressed(StringName("card_%d" % (i + 1))):
 				get_viewport().set_input_as_handled()
-				run.command(&"choose_card", {"index": i})
+				_card_command(&"choose_card", {"index": i})
 		if event.is_action_pressed(&"reroll"):
 			get_viewport().set_input_as_handled()
-			run.command(&"reroll")
+			_card_command(&"reroll")
+		# カードの外を押しても、再開後の描画入力として残さない。
+		if _card_input_id(event) != "":
+			get_viewport().set_input_as_handled()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null and not run.state.lab_mode:
 		run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
@@ -162,9 +240,15 @@ func _process(delta: float) -> void:
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	var origin := (size - ART_SIZE * factor) * 0.5
-	for item in [_frame, _loadout_icons, _cards_box]:
+	for item in [_frame, _loadout_icons]:
 		item.position = origin
 		item.scale = Vector2.ONE * factor
+	if _swap_box.visible:
+		_layout_cards()
+	else:
+		_cards_box.position = origin
+		_cards_box.scale = Vector2.ONE * factor
+		_cards_box.size = ART_SIZE
 	_frame.size = ART_SIZE
 	_frame.visible = show_status and run.state != null and run.state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING]
 	_loadout_icons.visible = _frame.visible
@@ -254,9 +338,10 @@ func _build_cards() -> void:
 	_reroll_button.size = Vector2(112, 29)
 	_reroll_button.add_theme_font_size_override("font_size", 9)
 	_card_art(_reroll_button, Rect2(265, 288, 112, 29))
-	_reroll_button.pressed.connect(func(): run.command(&"reroll"))
+	_reroll_button.pressed.connect(func(): _card_command(&"reroll"))
 	_cards_box.add_child(_reroll_button)
 	add_child(_cards_box)
+	_build_swap_cards()
 
 func _card_art(button: Button, region: Rect2) -> void:
 	var texture := AtlasTexture.new()
@@ -272,67 +357,175 @@ func _card_art(button: Button, region: Rect2) -> void:
 	button.add_theme_color_override("font_color", CYAN)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 
+func _build_swap_cards() -> void:
+	_swap_box = VBoxContainer.new()
+	_swap_box.hide()
+	_cards_box.add_child(_swap_box)
+	var heading := Label.new()
+	heading.text = "card.new_weapon"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_swap_box.add_child(heading)
+	_swap_scroll = ScrollContainer.new()
+	_swap_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_swap_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_swap_scroll.follow_focus = true
+	_swap_scroll.hide()
+	_swap_box.add_child(_swap_scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 16)
+	_swap_scroll.add_child(content)
+	# 新武器は情報だけを表示し、交換候補と同じボタンにはしない。
+	var info := PanelContainer.new()
+	info.mouse_filter = Control.MOUSE_FILTER_PASS
+	var style := _card_style(COMET_ONLY_COLOR)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	info.add_theme_stylebox_override("panel", style)
+	content.add_child(info)
+	var labels := VBoxContainer.new()
+	info.add_child(labels)
+	_swap_new_name = Label.new()
+	_swap_new_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	labels.add_child(_swap_new_name)
+	_swap_new_desc = Label.new()
+	_swap_new_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	labels.add_child(_swap_new_desc)
+	var title := Label.new()
+	title.text = "hud.swap_title"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(title)
+	_swap_grid = GridContainer.new()
+	_swap_grid.add_theme_constant_override("h_separation", 16)
+	_swap_grid.add_theme_constant_override("v_separation", 16)
+	content.add_child(_swap_grid)
+	_swap_keep = Button.new()
+	_swap_keep.custom_minimum_size.y = 64
+	_swap_keep.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_swap_keep.pressed.connect(func(): _card_command(&"choose_card", {"index": _swap_keep_index}))
+	_swap_keep.hide()
+	_swap_box.add_child(_swap_keep)
+
 func _show_cards() -> void:
-	for c in _cards_row.get_children():
-		_cards_row.remove_child(c)
-		c.queue_free()
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_card_discard.merge(_card_held)
+	run.input.cancel_gesture()
+	# 古いカードを外してから、通常カードか交換候補を作る。
+	for row in [_cards_row, _swap_grid]:
+		for c in row.get_children():
+			row.remove_child(c)
+			c.queue_free()
 	var cards := run.state.cards
-	var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
-	for i in cards.size():
-		var info := card_info(cards[i])
-		var b := Button.new()
-		b.position = Vector2(89 + i * (width + 16), 83)
-		b.size = Vector2(width, 193)
-		b.tooltip_text = "%s: %s" % [info.name, info.desc]
-		_card_art(b, Rect2(89, 83, 145, 193))
-		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
-		_cards_row.add_child(b)
-		var font_size := 10 if cards.size() <= 3 else 8
-		for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
-			[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-			[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
-			var label := Label.new()
-			label.position = entry[0]
-			label.size = entry[1]
-			label.text = entry[2]
-			label.add_theme_font_size_override("font_size", font_size)
-			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			label.clip_text = true
-			label.max_lines_visible = 4 if entry[0].y == 65 else 2
-			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			b.add_child(label)
-		var card: Dictionary = cards[i]
-		var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
-		_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var start: bool = run.state.start_pick
 	var swap: StringName = run.state.swap_pick
+	_cards_title.visible = swap == &""
+	_cards_row.visible = swap == &""
+	_swap_box.visible = swap != &""
+	_swap_scroll.visible = swap != &""
+	_swap_keep.visible = swap != &""
 	if swap != &"":
 		var got: WeaponDef = ConfigManager.weapons[swap]
-		_cards_title.text = tr("hud.swap_title").format({name = got.get_display_name()})
+		_swap_new_name.text = got.get_display_name()
+		_swap_new_desc.text = got.get_description()
+		for i in cards.size():
+			if cards[i].kind == &"keep":
+				_swap_keep_index = i
+				var info := card_info(cards[i])
+				_swap_keep.text = "%s\n%s" % [info.tag, info.desc]
+			else:
+				var b := _card_button(cards[i], i, Vector2(0, 220))
+				b.mouse_filter = Control.MOUSE_FILTER_PASS
+				_swap_grid.add_child(b)
 	else:
 		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
+		var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
+		for i in cards.size():
+			var info := card_info(cards[i])
+			var b := Button.new()
+			b.position = Vector2(89 + i * (width + 16), 83)
+			b.size = Vector2(width, 193)
+			b.tooltip_text = "%s: %s" % [info.name, info.desc]
+			_card_art(b, Rect2(89, 83, 145, 193))
+			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
+			_cards_row.add_child(b)
+			var font_size := 10 if cards.size() <= 3 else 8
+			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
+				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
+				[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
+				var label := Label.new()
+				label.position = entry[0]
+				label.size = entry[1]
+				label.text = entry[2]
+				label.add_theme_font_size_override("font_size", font_size)
+				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				label.clip_text = true
+				label.max_lines_visible = 4 if entry[0].y == 65 else 2
+				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				b.add_child(label)
+			var card: Dictionary = cards[i]
+			var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
+			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
 	_reroll_button.visible = swap == &""
 	_layout_art()
-	if _cards_row.get_child_count() > 0:
-		_cards_row.get_child(0).grab_focus.call_deferred()
+	_layout_cards()
+	var row: Control = _swap_grid if swap != &"" else _cards_row
+	if row.get_child_count() > 0:
+		row.get_child(0).grab_focus.call_deferred()
+	_swap_scroll.set_deferred("scroll_vertical", 0)
+
+func _layout_cards() -> void:
+	if _swap_box == null or not _swap_box.visible:
+		return
+	var width := maxf(1.0, minf(1100.0, size.x - 32.0))
+	_swap_grid.columns = clampi(int((width + 16.0) / 236.0), 1, maxi(1, _swap_grid.get_child_count()))
+	_cards_box.scale = Vector2.ONE
+	_cards_box.size = Vector2(width, maxf(1.0, minf(600.0, size.y - 32.0)))
+	_cards_box.position = (size - _cards_box.size) / 2.0
+	_swap_box.size = _cards_box.size
+
+func _card_button(card: Dictionary, index: int, minimum_size: Vector2) -> Button:
+	var info := card_info(card)
+	var b := Button.new()
+	b.custom_minimum_size = minimum_size
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.text = "%d. %s\n%s\n\n%s" % [index + 1, info.tag, info.name, info.desc]
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var style := _card_style(info.color)
+	b.add_theme_stylebox_override("normal", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.12, 0.15, 0.24, 0.95)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("focus", hover)
+	b.pressed.connect(func(): _card_command(&"choose_card", {"index": index}))
+	return b
+
+func _card_style(col: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.08, 0.14, 0.95)
+	style.border_color = col
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(6)
+	return style
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
-		var new_def: WeaponDef = ConfigManager.weapons[c.new]
 		if c.kind == &"keep":
+			var new_def: WeaponDef = ConfigManager.weapons[c.new]
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
 		var old_def: WeaponDef = ConfigManager.weapons[c.id]
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
-			"desc": TranslationServer.translate("card.swap_desc").format({name = new_def.get_display_name()}),
-			"color": Color("#efcb70")}
+			"desc": old_def.get_description(),
+			"color": COMET_ONLY_COLOR if old_def.comet_only else RANK_COLORS[clampi(c.level - 1, 0, 4)]}
 	if c.kind == &"heal":
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
@@ -419,11 +612,22 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
+		if _hero_notice_t > 0.0:
+			var text := tr("hud.hero_discovered")
+			var font_size := mini(24, int((W - 24.0) / maxf(1.0, _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x) * 24.0))
+			draw_string(_font, Vector2(12.0, MINIMAP_R * 2.0 + 42.0 if W < 600.0 else 110.0), text, HORIZONTAL_ALIGNMENT_CENTER, W - 24.0,
+				font_size, Color(1.0, 0.91, 0.63, minf(1.0, _hero_notice_t / 0.4)))
+		if run.heroes.revealed() and run.heroes.is_captive():
+			_draw_edge_arrow(run.heroes.center, Color("#ffd24a"))
+		for p in run.field.rare_comet_positions():
+			_draw_edge_arrow(p, Color("#ffd24a"))
 		_draw_gauge_ring()
+	if _cards_box.visible and _swap_box.visible:
+		draw_rect(_cards_box.get_rect(), Color(0.06, 0.08, 0.14, 0.95))
 
 var _dense := PackedVector2Array()
 
-## ミニマップ（右上）。円形の星図のようなレーダーに、フィールド全体を縮めて出す（仕様書 17）。
+## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
 func _draw_minimap() -> void:
 	var s := run.state
@@ -432,39 +636,85 @@ func _draw_minimap() -> void:
 	var c := Vector2(584, 55)
 	var k := R / cfg.field_radius
 	draw_texture(RADAR, Vector2.ZERO)
-	draw_circle(c, cfg.planet_radius * k, Color(0.45, 0.5, 0.65, 0.6))
+	# 世界の外縁と惑星も自機からの相対位置へ移し、円内だけ描く。
+	var world_center := _minimap_offset(Vector2.ZERO)
+	for n in 96:
+		var a := world_center + Vector2.from_angle(n * TAU / 96.0) * R
+		var b := world_center + Vector2.from_angle((n + 1) * TAU / 96.0) * R
+		var segment := _minimap_segment(a, b)
+		if segment.size() == 2:
+			draw_line(c + segment[0], c + segment[1], Color(0.7, 0.8, 1.0, 0.35), 1.0)
+	var planet_shape := _minimap_disk(_minimap_offset(run.field.planet.pos), cfg.planet_radius * k)
+	for polygon: PackedVector2Array in planet_shape:
+		draw_colored_polygon(Transform2D(0.0, c) * polygon, Color(0.45, 0.5, 0.65, 0.6))
 	# 敵の多い所（数フレームに1回数え直す）
 	if Engine.get_process_frames() % 15 == 0:
 		_dense = _dense_cells()
 	for p in _dense:
-		draw_circle(c + p * k, 3.5, Color(1.0, 0.35, 0.35, 0.35))
+		var offset := _minimap_offset(p)
+		if offset.length() <= R - 3.5:
+			draw_circle(c + offset, 3.5, Color(1.0, 0.35, 0.35, 0.35))
 	for cap: Pickup in run.pickups.capsules:
-		draw_circle(c + cap.pos * k, 2.0, Color("#ffd24a"))
-	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2本で交わる
+		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, Color("#ffd24a"))
+	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
 	if h.hero != null and h.is_captive():
 		for q in s.landmarks:
-			var a := q * k
+			var a := _minimap_offset(q)
 			var u := (h.center - q).normalized()
 			var b := a.dot(u)
 			var disc := b * b - a.length_squared() + R * R
-			if disc > 0.0:
+			if disc > 0.0 and s.landmarks.size() < 2:
 				var r0 := sqrt(disc)
 				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
-			draw_circle(c + a, 3.0, gold)
+			draw_circle(c + _minimap_marker(q, 3.0), 3.0, gold)
 	if h.revealed():
-		var at := c + h.center * k
+		var at := c + _minimap_marker(h.center, 6.0)
 		var tw := 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
 		draw_circle(at, 6.0 * tw, Color(gold, 0.35))
 		draw_circle(at, 3.0, gold if h.is_captive() else Color(gold, 0.45))
 	if run.bosses.boss_alive():
-		draw_circle(c + run.bosses.boss_pos(Vector2.ZERO) * k, 4.0, Color("#ff526e"))
+		draw_circle(c + _minimap_marker(run.bosses.boss_pos(Vector2.ZERO), 4.0), 4.0, Color("#ff526e"))
 	var head := s.ship_heading if s.ship_heading != Vector2.ZERO else Vector2.UP
-	var sp := c + s.ship_pos * k
+	var sp := c
 	var side := Vector2(-head.y, head.x)
 	draw_colored_polygon(PackedVector2Array([sp + head * 6.0, sp - head * 4.0 + side * 4.0, sp - head * 4.0 - side * 4.0]),
 		Color.WHITE)
+
+## 地図は自機を原点にする。方角と距離の縮尺は世界と共通。
+func _minimap_offset(world_pos: Vector2) -> Vector2:
+	return (world_pos - run.state.ship_pos) * MINIMAP_R / run.cfg.field_radius
+
+## 円外の目標は方向を保って内縁へ寄せ、印全体を円内に収める。
+func _minimap_marker(world_pos: Vector2, radius: float) -> Vector2:
+	return _minimap_offset(world_pos).limit_length(MINIMAP_R - radius)
+
+## 円形マスクで線分を切る。世界外縁が円の外へ続く部分を描かない。
+static func _minimap_segment(a: Vector2, b: Vector2) -> PackedVector2Array:
+	var length := a.distance_to(b)
+	if length <= 0.0001:
+		return PackedVector2Array()
+	var u := (b - a) / length
+	var along := a.dot(u)
+	var disc := along * along - a.length_squared() + MINIMAP_R * MINIMAP_R
+	if disc <= 0.0:
+		return PackedVector2Array()
+	var root := sqrt(disc)
+	var first := maxf(0.0, -along - root)
+	var last := minf(length, -along + root)
+	return PackedVector2Array([a + u * first, a + u * last]) if last > first else PackedVector2Array()
+
+static func _minimap_disk(at: Vector2, radius: float) -> Array[PackedVector2Array]:
+	if at.length() >= MINIMAP_R + radius:
+		return []
+	var disk := PackedVector2Array()
+	var mask := PackedVector2Array()
+	for n in 64:
+		var u := Vector2.from_angle(n * TAU / 64.0)
+		disk.append(at + u * radius)
+		mask.append(u * MINIMAP_R)
+	return Geometry2D.intersect_polygons(disk, mask)
 
 ## 敵の多い所：フィールドを升目に分け、敵が一定より多い升目の中心（世界座標）。
 func _dense_cells() -> PackedVector2Array:
@@ -549,16 +799,20 @@ func _draw_boss(W: float) -> void:
 	var bx := W / 2.0 - bw / 2.0
 	draw_rect(Rect2(bx, 60, bw, 10), Color(0, 0, 0, 0.6))
 	draw_rect(Rect2(bx, 60, bw * clampf(t.hp[b] / t.max_hp[b], 0.0, 1.0), 10), Color("#ff526e"))
-	# 画面外にいるときの方向の矢印
+	_draw_edge_arrow(t.pos[b], Color("#ff526e"))
+
+## 世界の位置 p が画面の外なら、画面の端にその向きの矢印を描く（ボス・英雄・レアな彗星）。
+func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 	var s := run.state
-	var rel := t.pos[b] - s.view_center
-	if absf(rel.x) > s.view_half.x or absf(rel.y) > s.view_half.y:
-		var center := size / 2.0
-		var dir := rel.normalized()
-		var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
-		var tip := center + dir * edge
-		var side := Vector2(-dir.y, dir.x) * 12.0
-		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), Color("#ff526e"))
+	var rel := p - s.view_center
+	if absf(rel.x) <= s.view_half.x and absf(rel.y) <= s.view_half.y:
+		return
+	var center := size / 2.0
+	var dir := rel.normalized()
+	var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
+	var tip := center + dir * edge
+	var side := Vector2(-dir.y, dir.x) * 12.0
+	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 
 ## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 6.2）。
 ## 描けるまでは同じ色を暗くして溜まり具合を見せ、描ける割合に目盛りを置く。描けるようになった瞬間に広がる輪を出す。

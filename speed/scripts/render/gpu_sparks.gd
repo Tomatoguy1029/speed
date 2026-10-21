@@ -20,7 +20,8 @@ var _sim_set: RID
 var _raster_set: RID
 var _image_size := Vector2i.ZERO
 var _cursor := 0
-var _pending: Array = []
+var _pending := PackedFloat32Array()
+var _pending_start := 0
 var _tex := Texture2DRD.new()
 
 func available() -> bool:
@@ -96,13 +97,15 @@ func _ensure_image(size_px: Vector2i) -> void:
 func burst(pos: Vector2, color: Color, n: int, dir: Vector2, speed: float, life := 0.7, size := 4.0) -> void:
 	if rd == null:
 		return
+	if _pending.is_empty():
+		_pending_start = _cursor
 	for i in n:
 		var a := randf() * TAU
 		var s := speed * (0.3 + randf())
 		var v := Vector2.from_angle(a) * s * 0.6 + dir * s * 0.8
 		var l := life * (0.6 + randf() * 0.6)
-		_pending.append([_cursor, PackedFloat32Array([pos.x, pos.y, v.x, v.y, l, l, size * (0.6 + randf() * 0.8), 0.0,
-			color.r * 1.6, color.g * 1.6, color.b * 1.6, 1.0])])
+		_pending.append_array(PackedFloat32Array([pos.x, pos.y, v.x, v.y, l, l, size * (0.6 + randf() * 0.8), 0.0,
+			color.r * 1.6, color.g * 1.6, color.b * 1.6, 1.0]))
 		_cursor = (_cursor + 1) % MAX_SPARKS
 
 ## 1フレームぶん進めて描く。dt は演出の時間（ポーズ中は 0）。
@@ -111,15 +114,30 @@ func step(dt: float, view_center: Vector2, zoom: float) -> void:
 		return
 	var size_px := Vector2i(get_viewport_rect().size)
 	var pending := _pending
-	_pending = []
-	RenderingServer.call_on_render_thread(_dispatch.bind(dt, view_center, zoom, size_px, pending))
+	var first := _pending_start
+	_pending = PackedFloat32Array()
+	RenderingServer.call_on_render_thread(_dispatch.bind(dt, view_center, zoom, size_px, pending, first))
 
-func _dispatch(dt: float, view_center: Vector2, zoom: float, size_px: Vector2i, pending: Array) -> void:
+func _dispatch(dt: float, view_center: Vector2, zoom: float, size_px: Vector2i, pending: PackedFloat32Array, first: int) -> void:
 	_ensure_image(size_px)
 	if not _raster_set.is_valid():
 		return
-	for p in pending:
-		rd.buffer_update(_buffer, p[0] * FLOATS * 4, FLOATS * 4, p[1].to_byte_array())
+	# 連続するリングバッファの範囲をまとめて送る。折り返しても最大2回。
+	# 1フレームで容量を超えた場合は、元の逐次上書きと同じ最後の粒を残す。
+	var count := pending.size() / FLOATS
+	if count > MAX_SPARKS:
+		var skip := count - MAX_SPARKS
+		pending = pending.slice(skip * FLOATS)
+		first = (first + skip) % MAX_SPARKS
+		count = MAX_SPARKS
+	if count > 0:
+		var bytes := pending.to_byte_array()
+		var stride := FLOATS * 4
+		var first_bytes := mini(count, MAX_SPARKS - first) * stride
+		rd.buffer_update(_buffer, first * stride, first_bytes, bytes if first_bytes == bytes.size() else bytes.slice(0, first_bytes))
+		if first_bytes < bytes.size():
+			var rest := bytes.slice(first_bytes)
+			rd.buffer_update(_buffer, 0, rest.size(), rest)
 	var sim_pc := PackedByteArray()
 	sim_pc.resize(16)
 	sim_pc.encode_float(0, dt)

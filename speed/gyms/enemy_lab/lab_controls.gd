@@ -19,7 +19,6 @@ var export_targets: ItemList
 var export_phase: OptionButton
 var export_stage: SpinBox
 var _condition_fields: Dictionary = {}
-var _attack_fields: Dictionary = {}
 var _attack_toggle: CheckButton
 var _attack_meter: Control
 var _spawn_entries: ItemList
@@ -240,12 +239,11 @@ func _formations(page: Node) -> void:
 	_text(box, tr("lab.formation.entry"))
 	box.add_child(entries)
 	fill.call(0)
-	var level := _number(box, tr("lab.formation.level"), 1, 1, 100)
 	_button(box, tr("lab.formation.place"), func():
 		if files.item_count == 0:
 			return
 		lab.session.perform("formation", {"path": files.get_item_metadata(files.selected), "layout": layouts.selected,
-			"entry": entries.selected, "level": level.value}))
+			"entry": entries.selected}))
 
 func _attacks(box: Node) -> void:
 	var toggle := CheckButton.new()
@@ -253,7 +251,7 @@ func _attacks(box: Node) -> void:
 	toggle.text = TranslationServer.translate("lab.message_e2074e817f")
 	toggle.toggled.connect(func(value): _settings.enabled = value; _apply_director())
 	box.add_child(toggle)
-	_settings = {"enabled": false, "budget": 4.0, "slots": {}, "weights": {}, "gaps": {}, "jitter": 0.3}
+	_settings = {"enabled": false, "budget": 4.0, "jitter": 0.3}
 	_attack_budget = _number(box, TranslationServer.translate("lab.message_f4a90d8530"), 4, 0, 100, 0.25, func(value): _settings.budget = value; _apply_director())
 	_number(box, tr("lab.attack.jitter"), 0.3, 0, 3, 0.05, func(value): _settings.jitter = value; _apply_director())
 	# 強敵と大物の攻撃の重さ（種類ごと。予算の合計に数える）
@@ -267,18 +265,6 @@ func _attacks(box: Node) -> void:
 	meter.session = lab.session
 	box.add_child(meter)
 	meter.tooltip_text = tr("lab.attack_legend")
-	box = UI.fold(box, tr("lab.ui.attack_limits"))
-	var names := {"aimed": TranslationServer.translate("lab.message_e25e93d055"), "homing": TranslationServer.translate("lab.message_bbcc068b7e"), "dash": TranslationServer.translate("lab.message_437d9cf8d0"), "beam": TranslationServer.translate("lab.message_421607de84"), "zone": TranslationServer.translate("lab.message_1133c374e7"), "wave": TranslationServer.translate("lab.message_f3482a22c0"), "residue": TranslationServer.translate("lab.message_c04c40391d")}
-	for category in names:
-		_text(box, names[category])
-		var row := VBoxContainer.new()
-		box.add_child(row)
-		for setting in [["slots", TranslationServer.translate("lab.message_61bf2700ce"), 1.0, 1.0], ["weights", TranslationServer.translate("lab.message_d0fdf2aa39"), 1.0, 0.25], ["gaps", TranslationServer.translate("lab.message_c7f2b1e003"), 0.35, 0.05]]:
-			var column := VBoxContainer.new()
-			column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(column)
-			_settings[setting[0]][category] = setting[2]
-			_attack_fields[setting[0] + ":" + category] = _number(column, setting[1], setting[2], 0, 100, setting[3], func(value): _settings[setting[0]][category] = value; _apply_director())
 	_attack_toggle.tooltip_text = tr("lab.message_1a59dadeb6")
 
 func _apply_director() -> void:
@@ -298,7 +284,7 @@ func _spawns(box: Node) -> void:
 	box.add_child(entries)
 	_button(box, TranslationServer.translate("lab.message_7c4fd18609"), func():
 		var values: Array = lab.session.schedule.duplicate(true)
-		values.append({"type": lab.canvas.spawn_type, "pos": [lab.canvas.center.x, lab.canvas.center.y], "count": lab.canvas.spawn_count, "level": lab.canvas.spawn_level, "start": start.value, "end": end.value, "interval": interval.value, "enabled": true, "probability": probability.value, "radius": radius.value})
+		values.append({"type": lab.canvas.spawn_type, "pos": [lab.canvas.center.x, lab.canvas.center.y], "count": lab.canvas.spawn_count, "start": start.value, "end": end.value, "interval": interval.value, "enabled": true, "probability": probability.value, "radius": radius.value})
 		lab.session.perform("schedule", {"entries": values}))
 	_button(box, tr("lab.lane_toggle"), func():
 		if entries.get_selected_items().is_empty(): return
@@ -430,11 +416,6 @@ func sync_from_session() -> void:
 	_attack_meter.queue_redraw()
 	_settings = director.settings.duplicate(true)
 	_settings["enabled"] = director.enabled
-	for key in _attack_fields:
-		var pair: PackedStringArray = String(key).split(":")
-		var box: SpinBox = _attack_fields[key]
-		var value := float(_settings.get(pair[0], {}).get(pair[1], 0.35 if pair[0] == "gaps" else 1.0))
-		if not box.get_line_edit().has_focus() and not is_equal_approx(box.value, value): box.set_value_no_signal(value)
 	var schedule_hash := hash(var_to_bytes(lab.session.schedule))
 	if _schedule_hash != schedule_hash:
 		_schedule_hash = schedule_hash

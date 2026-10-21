@@ -24,9 +24,11 @@ var lab_instances: Array[BossManager] = []
 func tick(real_dt: float, world_dt: float) -> void:
 	for instance in lab_instances:
 		instance.tick(real_dt, world_dt)
-	if state.boss_at < 0.0:
-		state.boss_at = cfg.boss_time + state.rng.randf() * cfg.boss_time_spread
-	if not state.boss_spawned and not state.endless and state.time >= state.boss_at:
+	if state.stage.boss_enabled and state.boss_at < 0.0:
+		state.boss_at = state.stage.boss_start(cfg)
+		if state.stage.boss_time < 0.0:
+			state.boss_at += state.rng.randf() * cfg.boss_time_spread
+	if state.stage.boss_enabled and not state.boss_spawned and not state.endless and state.time >= state.boss_at:
 		spawn()
 	if actor != null and boss_alive():
 		if state.boss_stun > 0.0:
@@ -45,6 +47,15 @@ func has_boss() -> bool:
 ## ボスが撃破されずに残っているか。
 func boss_alive() -> bool:
 	return has_boss() and enemies.table.dead[boss_row] == 0
+
+## 描画する本体の役者を、本番・実験場で同じ行と ID の照合で探す。
+func actor_for_row(row: int) -> BossActor:
+	if row == boss_row and has_boss():
+		return actor
+	for instance in lab_instances:
+		if row == instance.boss_row and instance.has_boss():
+			return instance.actor
+	return null
 
 ## 敵の行を解放する前に、今のボスの撃破済みの部位を役者へ渡す。
 func part_defeated(row: int) -> void:
@@ -135,6 +146,6 @@ func spawn_lab(type: StringName, pos: Vector2) -> int:
 
 ## 技を構える前に、必要な分類を同時取得する。
 func admit(key: String, cats: Array, row: int, duration: float) -> bool:
-	if projectiles.director == null:
+	if projectiles.director == null or projectiles.director.formation_mode:
 		return true
 	return projectiles.director.request(key, cats, row, enemies.table.id[row], duration, 1.5)

@@ -5,7 +5,6 @@
 class_name RenderManager
 extends Node
 
-const PixelLightning := preload("res://scripts/render/pixel_lightning.gd")
 const XP_COLOR := Color("#b8a0ff")
 const LAYERED_ENEMIES := {
 	&"aquarius": [preload("res://assets/pixel/aquarius/aquarius_base.png"),
@@ -14,10 +13,6 @@ const LAYERED_ENEMIES := {
 		preload("res://assets/pixel/crab/cancer_armor.png"), preload("res://assets/pixel/crab/cancer_normal.png"), PI / 2.0],
 	&"dolphin": [preload("res://assets/pixel/dolphin/dolphin_base.png"),
 		preload("res://assets/pixel/dolphin/dolphin_armor.png"), preload("res://assets/pixel/dolphin/dolphin_normal.png"), PI / 2.0],
-	&"corona": [preload("res://assets/pixel/corona/crown_base.png"),
-		preload("res://assets/pixel/corona/crown_armor.png"), preload("res://assets/pixel/corona/crown_normal.png"), PI / 2.0],
-	&"corona_star": [preload("res://assets/pixel/corona/crown_pieces_base.png"),
-		preload("res://assets/pixel/corona/crown_pieces_armor.png"), preload("res://assets/pixel/corona/crown_pieces_normal.png"), PI / 2.0],
 	&"triangle": [preload("res://assets/pixel/triangle/triangle_center_base.png"),
 		preload("res://assets/pixel/triangle/triangle_center_armor.png"), preload("res://assets/pixel/triangle/triangle_center_normal.png"), PI / 2.0],
 	&"triangle_star": [preload("res://assets/pixel/triangle/triangle_nodes_base.png"),
@@ -33,6 +28,7 @@ static var _layered_textures: Dictionary = {}
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
+const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
 	"gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
 const MOON := preload("res://assets/pixel/moon.png")
@@ -235,7 +231,7 @@ func _build_batches() -> void:
 	for def: EnemyDef in ConfigManager.enemies.values():
 		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
 		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"bomber", &"splitter", &"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
+				or def.id in [&"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
 			_always_marked[def.id] = true
 		if def.id == &"meteor" or _batches.has(def.id):
 			continue
@@ -436,7 +432,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
 			&"bolt":
 				_bolt_seed += 1
-				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
+				bolts.append({"segments": ev.segments, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -695,7 +691,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			gems.add(pos, 0.0, gs, XP_COLOR)
+			gems.add_upright(pos, gs, XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -704,7 +700,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 	for i in coin_alive.size():
 		var pos := coin_pos[i]
 		if coin_alive[i] != 0 and view.has_point(pos):
-			_coin_batch.add(pos, 0.0, cs, COIN_COLOR)
+			_coin_batch.add_upright(pos, cs, COIN_COLOR)
 	_coin_batch.end()
 	for cap: Pickup in p.capsules:
 		match cap.kind:
@@ -770,8 +766,10 @@ func _draw_enemies(c: CanvasItem) -> void:
 			var rock_batch: InstanceBatch = _batches[rock_key]
 			rock_batch.add(p, t.facing[i], METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
-		if t.is_boss[i] != 0 and run.bosses.actor != null and run.bosses.actor.draws_self:
-			continue
+		if t.is_boss[i] != 0:
+			var boss_actor := run.bosses.actor_for_row(i)
+			if boss_actor != null and boss_actor.draws_self:
+				continue
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
@@ -791,6 +789,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		batch.end()
 	_draw_swallows(c)
 	_draw_summon_marks(c)
+	run.enemies.corona.draw(c, run.enemies, view)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
@@ -888,6 +887,8 @@ static func enemy_sprite_radius(type: StringName, collision_radius: float, chara
 	return collision_radius
 
 static func _enemy_sprite_angle(type: StringName, facing: float) -> float:
+	if type == &"corona":
+		return 0.0
 	if LAYERED_ENEMIES.has(type):
 		return facing + float(LAYERED_ENEMIES[type][3])
 	return facing + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0)
@@ -904,6 +905,9 @@ func _enemy_texture(type: StringName) -> Texture2D:
 
 ## 敵の種類の絵のファイル（ステージの敵の見た目に従う）。
 func _enemy_sprite_path(type: StringName) -> String:
+	# PNG を置けば既存の素材経路で差し替えられる仮の冠。
+	if type == &"corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
+		return "res://assets/placeholders/corona_crown.svg"
 	if state.stage != null:
 		return state.stage.enemy_sprite_path(type)
 	return "res://assets/pixel/%s.png" % type
@@ -951,8 +955,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_pump(c, t, i)
 	elif type == &"bomber":
 		_draw_bomber(c, t, i)
-	elif type == &"splitter":
-		_draw_splitter_crystals(c, t, i)
 	elif type == &"beamer":
 		_draw_beamer(c, t, i)
 	elif type == &"pulser":
@@ -969,7 +971,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_dolphin(c, t, i)
 	elif type == &"cross":
 		_draw_cross(c, t, i)
-	elif charge > 0.0:
+	elif charge > 0.0 and type != &"corona":
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
 		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))
@@ -1041,23 +1043,6 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
 		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
 
-## 分裂する雑魚：体に詰まった経験値の結晶が透けて光る。倒すとこれがその場に全部落ちる。
-func _draw_splitter_crystals(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var u := Vector2.from_angle(t.facing[i])
-	var v := Vector2(-u.y, u.x)
-	var pulse := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
-	c.draw_circle(p, r * 0.75, Color(1.0, 0.85, 0.3, 0.12 + 0.08 * pulse))
-	for k in 3:
-		var o := float(k - 1)
-		var q := p + v * o * r * 0.42 - u * absf(o) * r * 0.1
-		var s := r * (0.34 if k == 1 else 0.24)
-		var pts := PackedVector2Array([q - u * s * 1.3, q + v * s * 0.75, q + u * s * 1.3, q - v * s * 0.75])
-		c.draw_colored_polygon(pts, Color("#ffd23f"))
-		pts.append(pts[0])
-		c.draw_polyline(pts, Color("#fff4c0"), maxf(_px(1.0), s * 0.18))
-
 ## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
 func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
@@ -1103,6 +1088,8 @@ func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
 ## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。
 ## 機体が光の中にいる間は帯が明るくなる。撃ったあとの休みの間は暗い。
 func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	if not run.enemies.telescope_aiming(i):
+		return
 	var p := t.pos[i]
 	var r := t.r[i]
 	var dp: Dictionary = t.def[i].params
@@ -1475,6 +1462,8 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 		var t := pr.hazard_t[i]
 		var delay := pr.hazard_delay[i]
 		var col := pr.hazard_color[i]
+		if pr.hazard_style[i] == ProjectileManager.HazardStyle.LIGHTNING:
+			col = PIXEL_LIGHTNING.COLOR
 		var len := pr.hazard_len[i]
 		var charging := t < delay
 		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
@@ -1499,8 +1488,6 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				if not view.grow(len).has_point(p):
 					continue
 				var style := pr.hazard_style[i]
-				if style == ProjectileManager.HazardStyle.LIGHTNING:
-					col = PixelLightning.PALE
 				if charging:
 					if style == ProjectileManager.HazardStyle.RETICLE or style == ProjectileManager.HazardStyle.LIGHTNING:
 						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
@@ -1528,8 +1515,9 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
 				if style == ProjectileManager.HazardStyle.LIGHTNING:
 					var age := t - delay
-					PixelLightning.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0),
-						i * 977 + int(age / 0.07), PixelLightning.intensity(age, pr.hazard_active[i]))
+					var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
+					PIXEL_LIGHTNING.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0), i * 7919 + shape * 101,
+						PIXEL_LIGHTNING.intensity(age, pr.hazard_active[i]))
 			ProjectileManager.HazardKind.WAVE:
 				if charging:
 					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
@@ -1670,11 +1658,12 @@ func _draw_fx(c: CanvasItem) -> void:
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
 		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
 	for bo in bolts:
-		var pts := PackedVector2Array(bo.points)
 		var age: float = bo.max - bo.life
-		for i in range(1, pts.size()):
-			PixelLightning.draw(c, pts[i - 1], pts[i], _px(2.0),
-				int(bo.seed) * 977 + i * 31 + int(age / 0.07), PixelLightning.intensity(age, bo.max))
+		var alpha := PIXEL_LIGHTNING.intensity(age, bo.max)
+		var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
+		var segments: PackedVector2Array = bo.segments
+		for i in range(0, segments.size(), 2):
+			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1], _px(2.0), int(bo.seed) * 7919 + i * 313 + shape * 101, alpha)
 	for r in rings:
 		var k: float = r.life / r.max
 		var col: Color = r.color

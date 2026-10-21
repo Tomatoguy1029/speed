@@ -3,8 +3,8 @@
 class_name ModulePreview
 extends Control
 
-const PixelLightning := preload("res://scripts/render/pixel_lightning.gd")
 const SILHOUETTE := preload("res://shaders/module_silhouette.gdshader")
+const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const SHIP := preload("res://assets/pixel/airship.png")
 const FOLLOWER := preload("res://assets/pixel/drone.png")
 const ENEMY := preload("res://assets/pixel/drifter.png")
@@ -80,6 +80,8 @@ func _draw_effect(code: String) -> void:
 	var ship := Vector2(-92, 12)
 	if code == "rear":
 		ship.x = 92
+	elif code == "contactArc":
+		ship = Vector2(-140, 75)
 	var end := Vector2(65, 12)
 	var route := PackedVector2Array([Vector2(-145, 65), Vector2(-75, -45), end])
 	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length", "bipolar"]
@@ -121,11 +123,23 @@ func _draw_effect(code: String) -> void:
 				draw_circle(pos, 7, _ink(Color("#ff7b54")))
 				_ring(pos, 11, Color(1, 0.6, 0.4, 0.5))
 		"contactArc":
-			var points := PackedVector2Array([ship + Vector2(20, 0), Vector2(-35, -20), Vector2(25, -45), Vector2(60, -5), Vector2(110, 30)])
-			for i in range(1, points.size()):
-				PixelLightning.draw(self, points[i - 1], points[i], 2.0, i * 31 + int(_clock / 0.07), _ink(Color.WHITE).a)
-			for pos in [Vector2(-35, -20), Vector2(25, -45), Vector2(110, 30)]:
-				_sprite(ENEMY, pos, 30.0)
+			var origin := Vector2(10, -5)
+			var points := PackedVector2Array([ship + Vector2(20, 0), origin])
+			var targets: Array[Vector2] = []
+			var counts: Array = definition.params.branches_by_level
+			var count := int(counts.back())
+			for i in count:
+				var pos := origin + Vector2.from_angle(i * TAU / count) * Vector2(115, 75)
+				points.append(origin)
+				points.append(pos)
+				targets.append(pos)
+			var age := fmod(_clock, 0.8) if animated and known else 0.05
+			var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
+			for i in range(0, points.size(), 2):
+				PIXEL_LIGHTNING.draw(self, points[i], points[i + 1], 2.0, i * 313 + shape * 101, PIXEL_LIGHTNING.intensity(age, 0.22))
+			_sprite(ENEMY, origin, 30.0)
+			for pos in targets:
+				_sprite(ENEMY, pos, 24.0)
 		"endBlast":
 			_burst(end, 42 + pulse * 12)
 		"vortex":

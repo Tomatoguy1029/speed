@@ -213,10 +213,13 @@ func _stream_rocks(dt: float) -> void:
 			continue
 		var def: EnemyDef = defs.get(rock.kind, meteor)
 		var sprite_radius := rock.size if def != meteor or rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
-		var i := enemies.spawn(def, 1.0, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
+		var i := enemies.spawn(def, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
 			"meteor_index": k, "vel": pv[1]})
 		rock.row = i
 		rock.row_id = table.id[i]
+		if rock.rare_weapon != &"":
+			table.max_hp[i] *= cfg.rare_comet_hp_mult
+			table.hp[i] = table.max_hp[i]
 
 # ── 重力（仕様書 13.1） ─────────────────────────────────────────────
 
@@ -357,6 +360,15 @@ func comet_at(index: int) -> Rock:
 		return null
 	return rocks[index]
 
+## 今いるレアな彗星の位置（画面の外の向きの矢印に使う）。
+func rare_comet_positions() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	var t := state.world_time
+	for rock in rocks:
+		if rock.kind == &"comet" and rock.rare_weapon != &"" and not rock.destroyed and t < rock.gone:
+			out.append(_rock_at(rock, t)[0])
+	return out
+
 ## 隕石の配置の番号 index がレアな彗星なら、落とす彗星限定の武器の管理 ID（そうでなければ空）。
 func comet_weapon(index: int) -> StringName:
 	var c := comet_at(index)
@@ -379,12 +391,6 @@ func _update_moons() -> void:
 				if _body_cells[cell].is_empty():
 					_body_used.append(cell)
 				_body_cells[cell].append(b)
-
-## 中心からの距離 r の危険度（0〜1）。中間の環で 0、惑星の表面と外縁に向かって 1。
-func danger_at(r: float) -> float:
-	if r > cfg.zone_outer:
-		return clampf((r - cfg.zone_outer) / (cfg.field_radius - cfg.zone_outer), 0.0, 1.0)
-	return 0.0
 
 func dust_drag_at(p: Vector2) -> float:
 	for d in dust:

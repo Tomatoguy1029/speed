@@ -64,6 +64,15 @@ func _unhandled_input(event: InputEvent) -> void:
 func press_draw_button() -> void:
 	_alt_press = true
 
+## 選択画面へ移るときに、画面を開く前の押下やタッチの移動を取り消す。
+func cancel_gesture() -> void:
+	_press = false
+	_alt_press = false
+	_hero_press = false
+	_pen_release = false
+	_stick_index = -1
+	_pen_index = -1
+
 ## 1回の更新ぶんの意図を作り、押した瞬間の記録を消す。
 func poll() -> Intent:
 	var it := Intent.new()

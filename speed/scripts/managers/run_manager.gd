@@ -80,12 +80,15 @@ func _ready() -> void:
 		add_child(encounters)
 		encounters.setup(self, state.stage.encounter_profile)
 	if not state.lab_mode and projectiles.director == null:
-		# 強敵と大物の攻撃の管理（時間帯の攻撃の予算で動く。仕様書 11.7）
+		# 強敵の攻撃の管理（時間帯の予算と群れごとの value で動く。仕様書 11.7）
 		var director = DIRECTOR.new()
 		director.state = state
 		director.projectiles = projectiles
-		director.configure({"enabled": false})
+		director.formation_mode = true
+		director.configure({"enabled": true, "budget": maxi(0, enemies.current_phase().attack_budget), "jitter": 0.0})
 		projectiles.director = director
+	if not state.lab_mode:
+		enemies._sync_attack_budget(enemies.current_phase())
 	build.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
@@ -201,6 +204,10 @@ func _play_tick(real_dt: float) -> void:
 			_leave_bonus()
 	else:
 		state.time += real_dt
+	if not state.lab_mode and not state.endless and not state.time_limit_reached \
+			and state.stage.time_limit >= 0.0 and state.time >= state.stage.time_limit:
+		state.time_limit_reached = true
+		state.emit(&"time_limit_reached", {"t": state.time})
 	state.world_time += world_dt
 	# 世界側は config.world_tick_div 回に1回、たまった時間でまとめて進める
 	_world_real_dt += real_dt
@@ -213,6 +220,7 @@ func _play_tick(real_dt: float) -> void:
 		_world_real_dt = 0.0
 		_world_dt = 0.0
 		_world_steps = 0
+		enemies._sync_attack_budget(enemies.current_phase())
 		if encounters != null:
 			encounters.before_world()
 		elif not state.lab_mode and projectiles.director != null:

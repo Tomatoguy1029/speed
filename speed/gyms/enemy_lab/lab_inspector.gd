@@ -14,9 +14,8 @@ var _health: ProgressBar
 var _values: VBoxContainer
 var _portrait
 var _controls: Dictionary = {}
-var _level: SpinBox
 var _elite: CheckButton
-var _individual_snapshot := Vector2.ZERO
+var _individual_snapshot := -1
 ## どう動いて攻撃するか、どう倒すかの短い説明（文章のマスタの lab.enemy.<type ID>.move / .kill）
 var _how: Label
 var _kill: Label
@@ -119,10 +118,9 @@ func refresh(force := false) -> void:
 			var control = _controls[key]
 			if control is SpinBox and not control.get_line_edit().has_focus(): control.set_value_no_signal(value)
 			elif control is CheckButton: control.set_pressed_no_signal(value)
-		var individual := Vector2(t.level[i], t.elite[i])
+		var individual := t.elite[i]
 		if individual != _individual_snapshot:
 			_individual_snapshot = individual
-			if is_instance_valid(_level): _level.set_value_no_signal(t.level[i])
 			if is_instance_valid(_elite): _elite.set_pressed_no_signal(t.elite[i] != 0)
 		return
 	_identity = t.id[i]
@@ -131,15 +129,16 @@ func refresh(force := false) -> void:
 		_values.remove_child(node)
 		node.queue_free()
 	_controls.clear()
-	_level = null
 	_elite = null
 	var note := _text(_values, tr("lab.ui.type_values"))
 	note.add_theme_font_size_override("font_size", 12)
 	note.add_theme_color_override("font_color", UI.MUTED)
 	note.tooltip_text = tr("lab.message_479576c49c")
 	var basics := UI.fold(_values, tr("lab.ui.basic"), true)
-	var names := {"hp": tr("lab.message_341a7b515f"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
-	for key in (["hp", "armor", "speed", "radius"] if def is EnemyDef else ["speed", "radius"]): _field(basics, key, names[key], def.get(key))
+	var names := {"hp": tr("lab.message_341a7b515f"), "toughness": tr("lab.toughness"), "armor": tr("lab.message_7d629f79a9"), "speed": tr("lab.message_80c64a0375"), "radius": tr("lab.message_b982dccaae")}
+	# 星1〜5の敵の HP は星と HP の属性で決まるので、HP の代わりに属性を変える
+	var hp_key := "toughness" if def is EnemyDef and def.uses_hp_table(session.run.cfg) else "hp"
+	for key in ([hp_key, "armor", "speed", "radius"] if def is EnemyDef else ["speed", "radius"]): _field(basics, key, names[key], def.get(key))
 	var frequent := ["fire_interval", "telegraph", "windup", "recover"]
 	for key in frequent:
 		if def.params.has(key): _parameter(basics, def, key)
@@ -150,18 +149,12 @@ func refresh(force := false) -> void:
 		var individual := UI.fold(_values, tr("lab.ui.individual"))
 		var row := HBoxContainer.new()
 		individual.add_child(row)
-		_level = SpinBox.new()
-		_level.min_value = 1
-		_level.max_value = 100
-		_level.value = t.level[i]
-		_level.prefix = "Lv"
-		row.add_child(_level)
 		_elite = CheckButton.new()
 		_elite.text = tr("lab.message_684f07d574")
 		_elite.button_pressed = t.elite[i] != 0
-		_individual_snapshot = Vector2(t.level[i], t.elite[i])
+		_individual_snapshot = t.elite[i]
 		row.add_child(_elite)
-		UI.button(individual, tr("lab.message_597e81eb3a"), func(): session.perform("individual", {"id": _identity, "level": _level.value, "elite": _elite.button_pressed}); refresh(true))
+		UI.button(individual, tr("lab.message_597e81eb3a"), func(): session.perform("individual", {"id": _identity, "elite": _elite.button_pressed}); refresh(true))
 	var live_box := UI.fold(_values, tr("lab.ui.live_details"))
 	_details = _text(live_box, live)
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -189,7 +182,9 @@ func _field(parent: Node, key: String, label: String, value, help := "") -> void
 		var spin := SpinBox.new()
 		spin.max_value = 1000000
 		spin.step = 1 if typeof(value) == TYPE_INT else 0.05
-		spin.min_value = spin.step if key in ["hp", "radius"] else (-100000 if key.begins_with("params.") else 0)
+		spin.min_value = spin.step if key in ["hp", "radius"] else (-100000 if key.begins_with("params.") else (-1 if key == "toughness" else 0))
+		if key == "toughness":
+			spin.max_value = 1
 		spin.value = value
 		spin.custom_minimum_size.x = 104
 		spin.tooltip_text = help

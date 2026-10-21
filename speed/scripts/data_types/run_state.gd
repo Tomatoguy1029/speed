@@ -20,6 +20,8 @@ var meta_override: Dictionary = {}
 # ── 時計（仕様書 1・4.1） ────────────────────────────────────────────
 ## ランの時計（実秒）。ポーズ・3択で止まる
 var time := 0.0
+## ステージの制限時間に達したか。終了演出はこのフラグを使って接続する。
+var time_limit_reached := false
 ## 世界の時間（世界秒）
 var world_time := 0.0
 ## 世界の速さ（描画中・なぞり中に遅くなる。ヒットストップ中は 0）
@@ -48,6 +50,9 @@ var ship_shield_flash := 0.0
 var ship_hurt := 0.0
 ## なぞり終えたあとの勢いがあるか（仕様書 6.6）
 var glide := false
+## 勢いが始まってからの時間（世界秒）と、勢いの初めの速さ
+var glide_t := 0.0
+var glide_speed := 0.0
 ## 能力値（基礎値・レベル・特性・強化から計算する。BuildManager が更新する）
 var stats := ShipStats.new()
 
@@ -78,6 +83,9 @@ var dash_id := 0
 # ── 成長（仕様書 8・9） ─────────────────────────────────────────────
 var level := 1
 var xp := 0.0
+## このランで拾った経験値の合計と、敵が落とした経験値の合計（プレイの記録が読む）
+var xp_gained := 0.0
+var xp_dropped := 0.0
 ## 武器の管理 ID → Lv、特性の管理 ID → 重ね数
 var weapons: Dictionary = {}
 var traits: Dictionary = {}

@@ -2,6 +2,9 @@
 class_name PickupManager
 extends RunSystem
 
+## 開発版の記録だけが購読する。XP 加算の前に通知し、ビーコンの合算でも取得前のレベルを保つ。
+signal xp_capsule_event(capsule: Pickup, action: StringName, cause: StringName)
+
 var field: FieldManager
 var ship: ShipManager
 var build: BuildManager
@@ -60,11 +63,11 @@ func tick(_real_dt: float, world_dt: float) -> void:
 func on_enemy_killed(i: int) -> void:
 	var t := enemies.table
 	var pos := t.pos[i]
-	var danger := field.danger_at(pos.length())
 	var phase := enemies.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
 	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けて、その場からはじけ飛ばす
-	var value := t.xp[i] * state.stats.xp_mult * bonus * (1.0 + danger)
+	var value := t.xp[i] * state.stats.xp_mult * bonus
+	state.xp_dropped += value
 	var gems := int(t.def[i].params.get("gem_count", 1)) if t.def[i] != null else 1
 	if gems > 1:
 		for k in gems:
@@ -78,7 +81,7 @@ func on_enemy_killed(i: int) -> void:
 		var n := clampi(t.buds[i], 1, 16)
 		for k in n:
 			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n))
-	_drop_coins(i, danger)
+	_drop_coins(i)
 	if t.type[i] == &"meteor":
 		if state.rng.randf() < cfg.meteor_heal_chance:
 			_add_capsule(Pickup.Kind.HEAL, &"drop", pos, 0.0)
@@ -155,14 +158,14 @@ func _add_coin(p: Vector2) -> int:
 	coin_pulled[i] = 0
 	return i
 
-func _drop_coins(i: int, danger: float) -> void:
+func _drop_coins(i: int) -> void:
 	var t := enemies.table
 	var n := 0
 	if t.elite[i] != 0:
 		n = 3 + state.rng.randi_range(0, 3)
 	elif t.type[i] == &"meteor":
 		n = (1 + state.rng.randi_range(0, 2)) if state.rng.randf() < cfg.meteor_coin_chance else 0
-	elif state.rng.randf() < 0.03 * (1.0 + danger * 2.0):
+	elif state.rng.randf() < 0.03:
 		n = 1
 	var pos := t.pos[i]
 	var r := t.r[i]
@@ -176,6 +179,11 @@ func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> 
 	c.pos = p
 	c.value = xp
 	capsules.append(c)
+	_record_capsule(c, &"spawn")
+
+func _record_capsule(c: Pickup, action: StringName, cause: StringName = &"unknown") -> void:
+	if OS.is_debug_build() and c.kind == Pickup.Kind.CACHE and xp_capsule_event.has_connections():
+		xp_capsule_event.emit(c, action, cause)
 
 ## 漂流カプセル：フィールドに最大 n 個。16秒ごとに補充（仕様書 10）。
 func _spawn_field_capsules(dt: float) -> void:
@@ -184,6 +192,8 @@ func _spawn_field_capsules(dt: float) -> void:
 	for c: Pickup in capsules:
 		if c.src != &"field" or c.pos.distance_to(state.ship_pos) < view_r * 2.0:
 			kept.append(c)
+		else:
+			_record_capsule(c, &"lost", &"distance_cull")
 	capsules = kept
 	_capsule_t += dt
 	var count := 0
@@ -328,7 +338,8 @@ func _collect_capsules(dt: float) -> void:
 			continue
 		c.age += dt
 		var can := c.kind != Pickup.Kind.HEAL or state.ship_hp < state.stats.max_hp
-		if (c.src == &"drop" or c.src == &"comet") and can:
+		# 彗星限定の武器のカプセルは吸い寄せない（自分で触って拾う）
+		if c.src == &"drop" and can:
 			var d := state.ship_pos - c.pos
 			var dist := d.length()
 			if dist < pull_r and dist > 1.0:
@@ -338,6 +349,7 @@ func _collect_capsules(dt: float) -> void:
 			_apply(c)
 		elif c.src == &"drop" and c.age > cfg.pickup_life:
 			c.taken = true
+			_record_capsule(c, &"lost", &"expired")
 	var kept: Array = []
 	for c: Pickup in capsules:
 		if not c.taken:
@@ -365,9 +377,11 @@ func _apply(c: Pickup) -> void:
 				if other.kind == Pickup.Kind.CACHE and not other.taken:
 					xp += other.value
 					other.taken = true
+					_record_capsule(other, &"collect", &"beacon")
 			build.add_xp(xp)
 			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -45), "text": "XP +%d" % roundi(xp), "color": Color("#b8a0ff"), "size": 22})
 		Pickup.Kind.CACHE:
+			_record_capsule(c, &"collect", &"normal")
 			build.add_xp(c.value)
 			state.emit(&"text", {"pos": c.pos, "text": "XP", "color": Color("#b8a0ff"), "size": 16})
 	state.emit(&"pickup", {"kind": Pickup.Kind.keys()[c.kind].to_lower()})

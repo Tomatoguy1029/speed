@@ -2,6 +2,7 @@
 ## ステージ選択で選ぶステージ。使う時間帯の並び、ボス、撃破でもらえる伝説のモジュールを決める。
 ## ---
 ## 値の正は res://data/stages/*.tres。
+@tool
 class_name StageDef
 extends Resource
 
@@ -24,6 +25,20 @@ const EDITOR_ORDER := 5
 ## このステージに出る敵の種類。出現のクリップは、この中から種類の組み合わせを選ぶ。
 ## 単位：type ID
 @export var enemies: Array[StringName] = []
+## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
+## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
+@export var enemy_attack_values: Dictionary = {}
+## クリップ以外から出る敵の、種類ごとの攻撃待ちの優先度（0〜5の整数）。大きいほど先。未設定は0（標準）。
+## クリップから出る敵は、クリップのattack_priority（0を含む）を使う。
+@export var enemy_attack_priorities: Dictionary = {}
+
+func enemy_attack_priority(type: StringName) -> float:
+	var value := float(enemy_attack_priorities.get(String(type), 0.0))
+	return value if is_finite(value) else 0.0
+
+func enemy_attack_value(type: StringName) -> float:
+	var value := float(enemy_attack_values.get(String(type), 1.0))
+	return value if is_finite(value) and value > 0.0 else 1.0
 ## 雑魚の目標の数
 ## 雑魚の種類ごとの、時刻ごとの目標の数の曲線。1つでもあれば、雑魚はこの曲線で補充し、時間帯の敵の数と重みは使わない。
 ## 単位：—
@@ -33,9 +48,31 @@ const EDITOR_ORDER := 5
 ## 単位：—
 @export var clips: Array[SpawnClip] = []
 ## トラックの名前
-## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
+## 出現タイムラインの通常トラックの名前と行数（番号順。空の名前なら番号を表示する）。空の行も保持する。
 ## 単位：文字
 @export var track_names: PackedStringArray
+## ボスの出現時刻
+## ラン開始からボスが出る時刻。負の値なら共通設定の時刻と幅を使う。
+## 単位：実秒
+@export var boss_time: float = -1.0
+## ボスの出現を使う
+## タイムラインのボスピンを配置するとオン、削除するとオフになる。
+## 単位：オン／オフ
+@export var boss_enabled: bool = true
+## 強化帯の開始
+## 敵の数・撃つ敵の割合・エリート確率を段階的に増やし始める時刻。負の値なら共通設定を使う。
+## 単位：実秒
+@export var surge_start: float = -1.0
+## 強化帯の終了
+## この時刻で強化の進行を止め、その時点の強さを保つ。負の値なら強化を続ける。
+## 単位：実秒
+@export var surge_end: float = -1.0
+## 時間帯ごとの強化のON/OFF。未指定の時間帯は既存の強化帯を使う。タイムラインから編集する。
+@export_storage var surge_phases: Dictionary = {}
+## ステージの制限時間
+## この時刻にランの time_limit_reached フラグを立てる。負の値なら制限時間を使わない。
+## 単位：実秒
+@export var time_limit: float = -1.0
 ## ボス
 ## このステージのボスの ID。
 ## 単位：文字
@@ -63,3 +100,68 @@ func enemy_sprite_path(type: StringName) -> String:
 ## enabled を指定したステージと時間帯で使う攻撃枠・配置規則。
 ## 単位：設定
 @export var encounter_profile: Dictionary = {}
+
+func boss_start(cfg: GameConfig) -> float:
+	return boss_time if boss_time >= 0.0 else cfg.boss_time
+
+func surge_begin(cfg: GameConfig) -> float:
+	return surge_start if surge_start >= 0.0 else cfg.surge_start
+
+## 時間帯のON/OFFを反映した強化区間。隣り合う区間はつなげる。
+func surge_windows(cfg: GameConfig) -> Array[Vector2]:
+	var start := surge_begin(cfg)
+	var end := maxf(start, surge_end) if surge_end >= 0.0 else INF
+	var windows: Array[Vector2] = []
+	if surge_phases.is_empty():
+		windows.append(Vector2(start, end))
+		return windows
+	for k in phases.size():
+		var phase: PhaseDef = phases[k]
+		var finish: float = phases[k + 1].start if k + 1 < phases.size() else INF
+		var key := String(phase.id)
+		var from := maxf(phase.start, start)
+		var to := minf(finish, end)
+		if surge_phases.has(key):
+			if not surge_phases[key]:
+				continue
+			from = phase.start
+			to = finish
+		var point_in_phase := start == end and start >= phase.start and start < finish
+		if to < from or (to == from and not point_in_phase):
+			continue
+		if not windows.is_empty() and from <= windows[-1].y:
+			windows[-1] = Vector2(windows[-1].x, maxf(windows[-1].y, to))
+		else:
+			windows.append(Vector2(from, to))
+	return windows
+
+## 各ON区間の強化内容で増分を積み上げ、OFF区間にも到達済みの強さを残す。
+func surge_effects(cfg: GameConfig, at: float) -> Dictionary:
+	var effects := {"steps": 0, "pop": 0.0, "ranged": 0.0, "elite": 0.0}
+	var progress := 0.0
+	var started := false
+	for window in surge_windows(cfg):
+		if at < window.x:
+			break
+		for k in phases.size():
+			var phase: PhaseDef = phases[k]
+			var finish: float = phases[k + 1].start if k + 1 < phases.size() else INF
+			var from := maxf(window.x, phase.start if k > 0 else 0.0)
+			var to := minf(at, minf(window.y, finish))
+			if from >= finish or to < from:
+				continue
+			if not started:
+				started = true
+				_add_surge_step(effects, phase, cfg, 1)
+			progress += maxf(0.0, to - from) / maxf(1.0, phase.surge_value("surge_interval", cfg))
+			var steps := int(floor(progress + 1e-9))
+			if steps > 0:
+				_add_surge_step(effects, phase, cfg, steps)
+				progress -= steps
+	return effects
+
+func _add_surge_step(effects: Dictionary, phase: PhaseDef, cfg: GameConfig, steps: int) -> void:
+	effects.steps += steps
+	effects.pop += float(steps) * phase.surge_value("surge_pop", cfg)
+	effects.ranged += float(steps) * phase.surge_value("surge_ranged", cfg)
+	effects.elite += float(steps) * phase.surge_value("surge_elite", cfg)

@@ -158,6 +158,9 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	_update_friendly(world_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	combat.enemies.corona.hit_thrown(combat.enemies, ship)
+	if state.phase != RunState.Phase.PLAY:
+		return
 	_update_hostile(world_dt)
 	_update_hazards(world_dt)
 
@@ -337,7 +340,7 @@ func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
 	var dir := (vel - normal * 2.0 * vel.dot(normal)).normalized()
 	var speed := float(p.reflect_speed)
 	_add_hostile(impact + normal * 2.0, dir * speed, speed, clampf(friend_r[shot], 5.0, 10.0),
-		float(p.reflect_life), float(p.reflect_dmg) * (1.0 + 0.25 * (t.level[enemy] - 1.0)),
+		float(p.reflect_life), float(p.reflect_dmg),
 		0.0, 0.0, HostileKind.REFLECTED)
 	t.fire_t[enemy] = maxf(0.01, float(p.reflect_interval))
 	t.flash[enemy] = 0.1
@@ -354,7 +357,7 @@ func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := 
 	var u := Vector2.from_angle(angle)
 	var pos := t.pos[i]
 	_add_hostile(pos + u * t.r[i], u * speed, speed, 9.0 if missile else 7.0, 4.5 if missile else 4.0,
-		float(p.get("bullet_dmg", 7.0)) * (1.0 + 0.25 * (t.level[i] - 1.0)), p.get("slow", 0.0),
+		float(p.get("bullet_dmg", 7.0)), p.get("slow", 0.0),
 		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": pos, "kind": kind})
 
@@ -561,6 +564,13 @@ func clear_hostile() -> void:
 	hostile_slots.clear()
 
 # ── 敵の攻撃の形（仕様書 11.7） ──────────────────────────────────
+
+## 範囲攻撃 i を出した敵の種類（敵に付いていて、その敵がまだいるときだけ。分からなければ空）。
+func _hazard_source(i: int) -> StringName:
+	var owner := hazard_owner[i]
+	if owner >= 0 and combat.enemies.is_same(owner, hazard_owner_id[i]):
+		return combat.enemies.table.type[owner]
+	return &""
 
 ## ビームを出す。from から angle の向きへ長さ length・幅 width。delay の予告のあと active の間当たる。
 func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
@@ -778,12 +788,12 @@ func _update_hazards(dt: float) -> void:
 				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
 				var reach := hazard_width[i] * 0.5 + R
 				if Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach:
-					ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+					ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind], _hazard_source(i))
 					if state.phase != RunState.Phase.PLAY:
 						return
 				continue
 		if hit:
 			hazard_hit[i] = 1
-			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind])
+			ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[kind], _hazard_source(i))
 			if state.phase != RunState.Phase.PLAY:
 				return

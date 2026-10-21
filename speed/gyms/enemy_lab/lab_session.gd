@@ -391,7 +391,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 					opts.meteor_index = run.field.rocks.size()
 					opts.size = rock.size
 					run.field.rocks.append(rock)
-				selected = run.enemies.spawn(def, float(args.get("level", 1)), origin + offset, opts)
+				selected = run.enemies.spawn(def, origin + offset, opts)
 				if opts.has("meteor_index"):
 					var rock = run.field.rocks[opts.meteor_index]
 					rock.row = selected
@@ -402,7 +402,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			var path := String(args.get("path", ""))
 			if ResourceLoader.exists(path):
 				var data := run.enemies.formation_data(load(path))
-				run.enemies.spawn_formation(data, float(args.get("level", 1)), int(args.get("layout", 0)), int(args.get("entry", 0)))
+				run.enemies.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
 				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
 		"edit_range":
 			var row := row_for_id(int(args.get("id", -1)))
@@ -440,7 +440,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if row >= 0 and run.enemies.table.def[row] != null:
 				var t := run.enemies.table
 				var ratio := t.hp[row] / maxf(0.001, t.max_hp[row])
-				run.enemies.apply_scaling(row, t.def[row], float(args.get("level", t.level[row])), {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
+				run.enemies.apply_scaling(row, t.def[row], {"elite": args.get("elite", t.elite[row] != 0), "size": maxf(0.1, float(args.get("size", t.def[row].radius)))})
 				t.hp[row] = t.max_hp[row] * ratio
 		"delete":
 			var row := row_for_id(int(args.get("id", -1)))
@@ -540,18 +540,21 @@ func _edit_definition(args: Dictionary) -> void:
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
-		if key not in ["hp", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
+		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
 			return
-		def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
+		if key == "toughness":
+			def.toughness = clampi(int(args.value), -1, 1)
+		else:
+			def.set(key, maxf(0.01 if key in ["hp", "radius"] else 0.0, float(args.value)))
 	run.enemies.definitions[type] = def
 	var t := run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.type[i] != type:
 			continue
 		var old: EnemyDef = t.def[i]
-		if key == "hp":
+		if key == "hp" or key == "toughness":
 			var ratio := t.hp[i] / maxf(0.001, t.max_hp[i])
-			t.max_hp[i] *= def.hp / maxf(old.hp, 0.001)
+			t.max_hp[i] *= def.base_hp(run.cfg) / maxf(old.base_hp(run.cfg), 0.001)
 			t.hp[i] = t.max_hp[i] * ratio
 		elif key == "armor":
 			t.armor[i] *= def.armor / maxf(old.armor, 0.001)
@@ -665,7 +668,7 @@ func digest() -> String:
 	for instance in run.bosses.lab_instances:
 		if is_instance_valid(instance.actor):
 			actors.append(_stable(instance.actor, 0))
-	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0),
+	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.corona, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
 

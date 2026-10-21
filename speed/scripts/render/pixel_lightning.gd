@@ -1,80 +1,100 @@
-## 描画だけに使う雷。乱数は攻撃判定・出現抽選と共有しない。
+## 雷撃の外観を共通の整数グリッドで描く。枝は装飾。ゲーム用の乱数・当たり判定は使わない。
 extends RefCounted
 
-const PALE := Color("#e1f7ff")
-
-static func draw(c: CanvasItem, from: Vector2, to: Vector2, pixel: float,
-		seed_value: int, alpha: float) -> void:
-	assert(pixel > 0.0)
-	var a := from / pixel
-	var b := to / pixel
-	var distance := a.distance_to(b)
-	if distance < 0.5:
-		return
-	var rng := RandomNumberGenerator.new()
-	rng.seed = seed_value
-	var depth := clampi(int(ceil(log(maxf(distance / 6.0, 1.0)) / log(2.0))), 1, 6)
-	var main := _path(a, b, minf(distance * 0.22, 24.0), depth, rng)
-	var core := _pixels(main, pixel)
-	var branches := PackedVector2Array()
-	var count := mini(3, int(distance / 28.0))
-	for i in count:
-		var index := clampi(int((i + 1.0) * (main.size() - 1) / (count + 1.0)), 1, main.size() - 2)
-		var start := main[index]
-		var direction := (b - a).normalized().rotated(rng.randf_range(0.6, 1.2) * (-1.0 if i % 2 else 1.0))
-		var end := start + direction * minf(distance * 0.22, 22.0)
-		branches.append_array(_pixels(_path(start, end, minf(distance * 0.05, 5.0), 3, rng), pixel))
-	if not branches.is_empty():
-		c.draw_multiline(branches, Color(PALE, alpha * 0.12), pixel * 3.0)
-		c.draw_multiline(branches, Color(PALE, alpha * 0.75), pixel)
-	c.draw_multiline(core, Color(PALE, alpha * 0.12), pixel * 5.0)
-	c.draw_multiline(core, Color(PALE, alpha * 0.35), pixel * 3.0)
-	c.draw_multiline(core, Color(1, 1, 1, alpha), pixel)
+const COLOR := Color("#e1f7ff")
+const SHAPE_INTERVAL := 0.07
+## 同じ放電の形を切り替えるまで、セル列を使い回す。寿命の短い演出用に保持数を制限する。
+const CACHE_LIMIT := 512
+static var _cache: Dictionary = {}
 
 static func intensity(age: float, lifetime: float) -> float:
-	var progress := clampf(age / maxf(lifetime, 0.001), 0.0, 1.0)
-	if progress < 0.18:
+	if age < 0.0 or lifetime <= 0.0 or age >= lifetime:
+		return 0.0
+	var t := age / lifetime
+	if t < 0.18:
 		return 0.4
-	if progress < 0.38:
+	if t < 0.38:
 		return 1.0
-	if progress < 0.5:
+	if t < 0.5:
 		return 0.12
-	return (1.0 - progress) * 2.0
+	return (1.0 - t) * 2.0
 
-static func _path(a: Vector2, b: Vector2, amplitude: float, depth: int,
-		rng: RandomNumberGenerator) -> PackedVector2Array:
-	if depth == 0:
-		return PackedVector2Array([a, b])
-	var middle := (a + b) * 0.5 + (b - a).normalized().orthogonal() * rng.randf_range(-amplitude, amplitude)
-	var points := _path(a, middle, amplitude * 0.52, depth - 1, rng)
-	points.resize(points.size() - 1)
-	points.append_array(_path(middle, b, amplitude * 0.52, depth - 1, rng))
-	return points
+## from・to・pixel は呼び出し元の座標系。pixel は画面またはプレビュー上のドット幅。
+static func draw(c: CanvasItem, from: Vector2, to: Vector2, pixel: float, seed_value: int, alpha: float) -> void:
+	if pixel <= 0.0 or alpha <= 0.0 or from.distance_squared_to(to) < pixel * pixel * 0.25:
+		return
+	var key := [from, to, pixel, seed_value]
+	if not _cache.has(key):
+		if _cache.size() >= CACHE_LIMIT:
+			_cache.erase(_cache.keys()[0])
+		var cells := _generate(from / pixel, to / pixel, seed_value)
+		_cache[key] = [_lines(cells[0], pixel), _lines(cells[1], pixel)]
+	var cells: Array = _cache[key]
+	# セルの中央に短い水平線を置き、アンチエイリアスなしでドットの階段を出す。
+	_draw_lines(c, cells[0], pixel, COLOR, alpha * 0.12, 5.0)
+	_draw_lines(c, cells[1], pixel, COLOR, alpha * 0.12, 3.0)
+	_draw_lines(c, cells[0], pixel, COLOR, alpha * 0.35, 3.0)
+	_draw_lines(c, cells[1], pixel, COLOR, alpha * 0.75, 1.0)
+	_draw_lines(c, cells[0], pixel, Color.WHITE, alpha, 1.0)
 
-static func _pixels(path: PackedVector2Array, pixel: float) -> PackedVector2Array:
-	var cells: Dictionary = {}
+static func _draw_lines(c: CanvasItem, lines: PackedVector2Array, pixel: float, color: Color, alpha: float, width: float) -> void:
+	if lines.is_empty():
+		return
+	c.draw_multiline(lines, Color(color, alpha), pixel * width, false)
+
+static func _lines(cells: PackedVector2Array, pixel: float) -> PackedVector2Array:
+	var lines := PackedVector2Array()
+	lines.resize(cells.size() * 2)
+	for i in cells.size():
+		lines[i * 2] = cells[i] * pixel
+		lines[i * 2 + 1] = (cells[i] + Vector2.RIGHT) * pixel
+	return lines
+
+static func _generate(from: Vector2, to: Vector2, seed_value: int) -> Array:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var distance := from.distance_to(to)
+	var depth := clampi(ceili(log(maxf(distance / 4.0, 1.0)) / log(2.0)), 1, 6)
+	var path := PackedVector2Array([from])
+	_split(path, from, to, depth, minf(distance * 0.22, 24.0), rng)
+	var main := {}
+	var branches := {}
+	_raster_path(main, path)
+	for i in mini(int(distance / 28.0), 3):
+		var at := path[rng.randi_range(1, path.size() - 2)]
+		var direction := (to - from).normalized().rotated(rng.randf_range(0.45, 1.15) * (-1.0 if i % 2 == 0 else 1.0))
+		var end := at + direction * minf(distance * 0.22, 22.0) * rng.randf_range(0.6, 1.0)
+		var branch := PackedVector2Array([at])
+		_split(branch, at, end, 3, at.distance_to(end) * 0.22, rng)
+		_raster_path(branches, branch)
+	return [PackedVector2Array(main.keys()), PackedVector2Array(branches.keys())]
+
+static func _split(out: PackedVector2Array, from: Vector2, to: Vector2, depth: int, offset: float, rng: RandomNumberGenerator) -> void:
+	if depth <= 0:
+		out.append(to)
+		return
+	var normal := (to - from).orthogonal().normalized()
+	var midpoint := (from + to) * 0.5 + normal * rng.randf_range(-offset, offset)
+	_split(out, from, midpoint, depth - 1, offset * 0.52, rng)
+	_split(out, midpoint, to, depth - 1, offset * 0.52, rng)
+
+static func _raster_path(cells: Dictionary, path: PackedVector2Array) -> void:
 	for i in range(1, path.size()):
 		var a := Vector2i(path[i - 1].round())
 		var b := Vector2i(path[i].round())
 		var dx := absi(b.x - a.x)
 		var dy := -absi(b.y - a.y)
-		var step_x := 1 if a.x < b.x else -1
-		var step_y := 1 if a.y < b.y else -1
+		var sx := 1 if a.x < b.x else -1
+		var sy := 1 if a.y < b.y else -1
 		var error := dx + dy
 		while true:
-			cells[a] = true
+			cells[Vector2(a)] = true
 			if a == b:
 				break
 			var twice := error * 2
 			if twice >= dy:
 				error += dy
-				a.x += step_x
+				a.x += sx
 			if twice <= dx:
 				error += dx
-				a.y += step_y
-	var lines := PackedVector2Array()
-	for cell: Vector2i in cells:
-		var center := Vector2(cell) * pixel
-		lines.append(center - Vector2(pixel * 0.5, 0))
-		lines.append(center + Vector2(pixel * 0.5, 0))
-	return lines
+				a.y += sy

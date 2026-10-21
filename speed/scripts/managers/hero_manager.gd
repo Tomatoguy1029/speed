@@ -21,6 +21,7 @@ var _landmark_row := -1
 var _landmark_id := 0
 ## 機体が近くまで来て、英雄の星座の場所を見たか（ミニマップに出す）
 var seen := false
+var _discovery_announced := false
 
 ## 今フィールドにある英雄の星座（無ければ null）
 var hero: HeroDef
@@ -59,13 +60,22 @@ func _random_hero(except: StringName) -> HeroDef:
 
 ## 星座をフィールドの端のほうの、機体から離れたランダムな位置に置く。
 func _place(def: HeroDef) -> void:
+	# 前の英雄の目印を持つ敵が残っていても、次の英雄の手掛かりに混ぜない。
+	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id):
+		enemies.table.landmark[_landmark_row] = 0
 	hero = def
 	if def == null:
 		return
 	var rng := state.rng
+	var min_distance := maxf(2500.0, cfg.hero_glow_range)
+	# 試行上限でも発見範囲へ置かない。候補がなければ機体の反対側に置く。
+	center = Vector2.from_angle(state.ship_pos.angle() + PI) * (cfg.field_radius - 600.0)
 	for attempt in 16:
-		center = Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(cfg.field_radius * 0.72, cfg.field_radius - 600.0)
-		if center.distance_to(state.ship_pos) > 2500.0 and field.body_gap(center, 0.0) > 600.0:
+		var candidate := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(cfg.field_radius * 0.72, cfg.field_radius - 600.0)
+		if candidate.distance_to(state.ship_pos) <= min_distance:
+			continue
+		center = candidate
+		if field.body_gap(center, 0.0) > 600.0:
 			break
 	var rot := rng.randf() * TAU
 	stars = PackedVector2Array()
@@ -75,6 +85,7 @@ func _place(def: HeroDef) -> void:
 	lit.resize(def.links.size() / 2)
 	guarded = false
 	seen = false
+	_discovery_announced = false
 	_last_star = -1
 	state.landmarks = PackedVector2Array()
 	_landmark_row = -1
@@ -101,6 +112,9 @@ func tick(real_dt: float, _world_dt: float) -> void:
 	if state.ship_pos.distance_squared_to(center) < cfg.hero_glow_range * cfg.hero_glow_range:
 		seen = true
 	_tick_landmark(real_dt)
+	if not _discovery_announced and revealed():
+		_discovery_announced = true
+		state.emit(&"hero_discovered", {"id": hero.id})
 	if not state.tracing:
 		return
 	if state.dash_id != _last_dash:
@@ -207,7 +221,7 @@ func _spawn_guards() -> void:
 	for n in cfg.hero_guards:
 		var def := enemies.def_of(types[state.rng.randi_range(0, types.size() - 1)])
 		var p := center + Vector2.from_angle(TAU * n / float(cfg.hero_guards)) * 420.0
-		enemies.spawn(def, enemies.spawn_level(), p, {"facing": (state.ship_pos - p).angle()})
+		enemies.spawn(def, p, {"facing": (state.ship_pos - p).angle()})
 
 ## 特別な枠の力を使う（Q）。使えなければ何もしない。
 func activate() -> void:

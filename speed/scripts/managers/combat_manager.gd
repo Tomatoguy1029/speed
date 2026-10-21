@@ -236,7 +236,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 
 # ── ダメージと撃破 ────────────────────────────────────────────────
 
-## 行 i の敵にダメージを与える。opts：crit（なければ確率で判定）、no_crit、cause、dir、knock、impact。
+## 行 i の敵にダメージを与える。opts：crit（体当たりで判定したクリティカル。武器などの当たりはクリティカルにならない）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	var t := enemies.table
 	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY or t.guard[i] > 0.0:
@@ -253,10 +253,6 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if cause == &"ram" and t.gate[i] == EnemyTable.Gate.IMMORTAL:
 		dmg = maxf(dmg, t.hp[i])
 	var crit: bool = opts.get("crit", false)
-	if not opts.has("crit") and not opts.get("no_crit", false):
-		crit = state.rng.randf() < state.stats.crit_chance
-		if crit:
-			dmg *= state.stats.crit_mult
 	var fresh := t.hp[i] >= t.max_hp[i] - 1e-6
 	# 一撃かどうかは、この突進で最初に触れた時点の HP で判定する
 	if state.tracing:
@@ -266,7 +262,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		fresh = t.dash_fresh[i] != 0
 	t.hp[i] -= dmg
 	t.flash[i] = 0.12
-	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause})
+	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
 	if t.hp[i] <= 0.0:
@@ -274,10 +270,13 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 			_kill_stop(i, crit)
 		kill_enemy(i, opts.merged({"crit": crit}))
 	elif opts.has("dir"):
-		var mass := maxf(1.0, t.r[i] / 20.0)
-		t.vel[i] += opts.dir * float(opts.get("knock", 160.0)) / mass
-		if FORCEFUL.has(cause) and t.is_boss[i] == 0:
-			t.knock_t[i] = 0.3
+		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
+		var push := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
+		if push > 0.0:
+			var mass := maxf(1.0, t.r[i] / 20.0)
+			t.vel[i] += opts.dir * float(opts.get("knock", 160.0)) * push / mass
+			if FORCEFUL.has(cause) and t.is_boss[i] == 0:
+				t.knock_t[i] = 0.3
 	if crit and not opts.get("no_crit", false):
 		build.on_critical(opts.get("impact", t.pos[i]))
 
@@ -336,12 +335,12 @@ func kill_enemy(i: int, opts := {}) -> void:
 		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
-	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i],
+	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
-	if build.capture_hull(i, cause):
+	if build.capture_hull(i):
 		t.hull_scattered[i] = 1
 	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
