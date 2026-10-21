@@ -66,9 +66,15 @@ func _place(def: HeroDef) -> void:
 	if def == null:
 		return
 	var rng := state.rng
+	var min_distance := maxf(2500.0, cfg.hero_glow_range)
+	# 試行上限でも発見範囲へ置かない。候補がなければ機体の反対側に置く。
+	center = Vector2.from_angle(state.ship_pos.angle() + PI) * (cfg.field_radius - 600.0)
 	for attempt in 16:
-		center = Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(cfg.field_radius * 0.72, cfg.field_radius - 600.0)
-		if center.distance_to(state.ship_pos) > 2500.0 and field.body_gap(center, 0.0) > 600.0:
+		var candidate := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(cfg.field_radius * 0.72, cfg.field_radius - 600.0)
+		if candidate.distance_to(state.ship_pos) <= min_distance:
+			continue
+		center = candidate
+		if field.body_gap(center, 0.0) > 600.0:
 			break
 	var rot := rng.randf() * TAU
 	stars = PackedVector2Array()
