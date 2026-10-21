@@ -70,6 +70,7 @@ var _banner := ""
 var _banner_color := Color.WHITE
 var _banner_t := 0.0
 var _warning_t := 0.0
+var _hero_notice_t := 0.0
 var _ring_usable := true
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
@@ -118,6 +119,8 @@ func _on_phase(phase: RunState.Phase) -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"hero_discovered":
+				_hero_notice_t = 1.8
 			&"boss_spawn":
 				_warning_t = 3.0
 			&"clear_banner":
@@ -227,6 +230,7 @@ func _notification(what: int) -> void:
 		run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
@@ -608,6 +612,11 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
+		if _hero_notice_t > 0.0:
+			var text := tr("hud.hero_discovered")
+			var font_size := mini(24, int((W - 24.0) / maxf(1.0, _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x) * 24.0))
+			draw_string(_font, Vector2(12.0, MINIMAP_R * 2.0 + 42.0 if W < 600.0 else 110.0), text, HORIZONTAL_ALIGNMENT_CENTER, W - 24.0,
+				font_size, Color(1.0, 0.91, 0.63, minf(1.0, _hero_notice_t / 0.4)))
 		if run.heroes.revealed() and run.heroes.is_captive():
 			_draw_edge_arrow(run.heroes.center, Color("#ffd24a"))
 		for p in run.field.rare_comet_positions():
@@ -618,7 +627,7 @@ func _draw() -> void:
 
 var _dense := PackedVector2Array()
 
-## ミニマップ（右上）。円形の星図のようなレーダーに、フィールド全体を縮めて出す（仕様書 17）。
+## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
 func _draw_minimap() -> void:
 	var s := run.state
@@ -627,39 +636,85 @@ func _draw_minimap() -> void:
 	var c := Vector2(584, 55)
 	var k := R / cfg.field_radius
 	draw_texture(RADAR, Vector2.ZERO)
-	draw_circle(c, cfg.planet_radius * k, Color(0.45, 0.5, 0.65, 0.6))
+	# 世界の外縁と惑星も自機からの相対位置へ移し、円内だけ描く。
+	var world_center := _minimap_offset(Vector2.ZERO)
+	for n in 96:
+		var a := world_center + Vector2.from_angle(n * TAU / 96.0) * R
+		var b := world_center + Vector2.from_angle((n + 1) * TAU / 96.0) * R
+		var segment := _minimap_segment(a, b)
+		if segment.size() == 2:
+			draw_line(c + segment[0], c + segment[1], Color(0.7, 0.8, 1.0, 0.35), 1.0)
+	var planet_shape := _minimap_disk(_minimap_offset(run.field.planet.pos), cfg.planet_radius * k)
+	for polygon: PackedVector2Array in planet_shape:
+		draw_colored_polygon(Transform2D(0.0, c) * polygon, Color(0.45, 0.5, 0.65, 0.6))
 	# 敵の多い所（数フレームに1回数え直す）
 	if Engine.get_process_frames() % 15 == 0:
 		_dense = _dense_cells()
 	for p in _dense:
-		draw_circle(c + p * k, 3.5, Color(1.0, 0.35, 0.35, 0.35))
+		var offset := _minimap_offset(p)
+		if offset.length() <= R - 3.5:
+			draw_circle(c + offset, 3.5, Color(1.0, 0.35, 0.35, 0.35))
 	for cap: Pickup in run.pickups.capsules:
-		draw_circle(c + cap.pos * k, 2.0, Color("#ffd24a"))
+		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, Color("#ffd24a"))
 	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
 	if h.hero != null and h.is_captive():
 		for q in s.landmarks:
-			var a := q * k
+			var a := _minimap_offset(q)
 			var u := (h.center - q).normalized()
 			var b := a.dot(u)
 			var disc := b * b - a.length_squared() + R * R
 			if disc > 0.0 and s.landmarks.size() < 2:
 				var r0 := sqrt(disc)
 				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
-			draw_circle(c + a, 3.0, gold)
+			draw_circle(c + _minimap_marker(q, 3.0), 3.0, gold)
 	if h.revealed():
-		var at := c + h.center * k
+		var at := c + _minimap_marker(h.center, 6.0)
 		var tw := 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
 		draw_circle(at, 6.0 * tw, Color(gold, 0.35))
 		draw_circle(at, 3.0, gold if h.is_captive() else Color(gold, 0.45))
 	if run.bosses.boss_alive():
-		draw_circle(c + run.bosses.boss_pos(Vector2.ZERO) * k, 4.0, Color("#ff526e"))
+		draw_circle(c + _minimap_marker(run.bosses.boss_pos(Vector2.ZERO), 4.0), 4.0, Color("#ff526e"))
 	var head := s.ship_heading if s.ship_heading != Vector2.ZERO else Vector2.UP
-	var sp := c + s.ship_pos * k
+	var sp := c
 	var side := Vector2(-head.y, head.x)
 	draw_colored_polygon(PackedVector2Array([sp + head * 6.0, sp - head * 4.0 + side * 4.0, sp - head * 4.0 - side * 4.0]),
 		Color.WHITE)
+
+## 地図は自機を原点にする。方角と距離の縮尺は世界と共通。
+func _minimap_offset(world_pos: Vector2) -> Vector2:
+	return (world_pos - run.state.ship_pos) * MINIMAP_R / run.cfg.field_radius
+
+## 円外の目標は方向を保って内縁へ寄せ、印全体を円内に収める。
+func _minimap_marker(world_pos: Vector2, radius: float) -> Vector2:
+	return _minimap_offset(world_pos).limit_length(MINIMAP_R - radius)
+
+## 円形マスクで線分を切る。世界外縁が円の外へ続く部分を描かない。
+static func _minimap_segment(a: Vector2, b: Vector2) -> PackedVector2Array:
+	var length := a.distance_to(b)
+	if length <= 0.0001:
+		return PackedVector2Array()
+	var u := (b - a) / length
+	var along := a.dot(u)
+	var disc := along * along - a.length_squared() + MINIMAP_R * MINIMAP_R
+	if disc <= 0.0:
+		return PackedVector2Array()
+	var root := sqrt(disc)
+	var first := maxf(0.0, -along - root)
+	var last := minf(length, -along + root)
+	return PackedVector2Array([a + u * first, a + u * last]) if last > first else PackedVector2Array()
+
+static func _minimap_disk(at: Vector2, radius: float) -> Array[PackedVector2Array]:
+	if at.length() >= MINIMAP_R + radius:
+		return []
+	var disk := PackedVector2Array()
+	var mask := PackedVector2Array()
+	for n in 64:
+		var u := Vector2.from_angle(n * TAU / 64.0)
+		disk.append(at + u * radius)
+		mask.append(u * MINIMAP_R)
+	return Geometry2D.intersect_polygons(disk, mask)
 
 ## 敵の多い所：フィールドを升目に分け、敵が一定より多い升目の中心（世界座標）。
 func _dense_cells() -> PackedVector2Array:

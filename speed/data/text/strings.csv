@@ -59,6 +59,7 @@ hud.draw,描く,Draw
 hud.kills,撃破 {n},Kills {n}
 hud.bonus,ボーナスステージ　残り {n} 秒,Bonus Stage  {n}s Left
 hud.warning,WARNING!!,WARNING!!
+hud.hero_discovered,英雄の星座を発見,Hero constellation discovered
 hud.clear,CLEAR!,CLEAR!
 hud.game_over,GAME OVER,GAME OVER
 hud.levelup_title,レベルアップ　1枚選ぶ（クリック／1〜3）,Level Up: Pick One (Click / 1–3)

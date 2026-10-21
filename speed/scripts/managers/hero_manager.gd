@@ -21,6 +21,7 @@ var _landmark_row := -1
 var _landmark_id := 0
 ## 機体が近くまで来て、英雄の星座の場所を見たか（ミニマップに出す）
 var seen := false
+var _discovery_announced := false
 
 ## 今フィールドにある英雄の星座（無ければ null）
 var hero: HeroDef
@@ -84,6 +85,7 @@ func _place(def: HeroDef) -> void:
 	lit.resize(def.links.size() / 2)
 	guarded = false
 	seen = false
+	_discovery_announced = false
 	_last_star = -1
 	state.landmarks = PackedVector2Array()
 	_landmark_row = -1
@@ -110,6 +112,9 @@ func tick(real_dt: float, _world_dt: float) -> void:
 	if state.ship_pos.distance_squared_to(center) < cfg.hero_glow_range * cfg.hero_glow_range:
 		seen = true
 	_tick_landmark(real_dt)
+	if not _discovery_announced and revealed():
+		_discovery_announced = true
+		state.emit(&"hero_discovered", {"id": hero.id})
 	if not state.tracing:
 		return
 	if state.dash_id != _last_dash:
