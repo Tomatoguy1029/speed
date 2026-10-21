@@ -48,6 +48,15 @@ func has_boss() -> bool:
 func boss_alive() -> bool:
 	return has_boss() and enemies.table.dead[boss_row] == 0
 
+## 描画する本体の役者を、本番・実験場で同じ行と ID の照合で探す。
+func actor_for_row(row: int) -> BossActor:
+	if row == boss_row and has_boss():
+		return actor
+	for instance in lab_instances:
+		if row == instance.boss_row and instance.has_boss():
+			return instance.actor
+	return null
+
 ## 敵の行を解放する前に、今のボスの撃破済みの部位を役者へ渡す。
 func part_defeated(row: int) -> void:
 	for instance in lab_instances:

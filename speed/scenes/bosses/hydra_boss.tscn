@@ -4,10 +4,13 @@
 [ext_resource type="BehaviorTree" uid="uid://fljn8lt4tihh" path="res://scenes/bosses/hydra_boss_bt.tres" id="2"]
 [ext_resource type="AnimationLibrary" uid="uid://0k5ofbflry1s" path="res://scenes/bosses/hydra_boss_timeline.tres" id="3"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra_presentation.tscn" id="presentation"]
+
 [sub_resource type="BlackboardPlan" id="BlackboardPlan_hydra"]
 
 [node name="HydraBoss" type="Node2D" unique_id=1207611038]
 script = ExtResource("1")
+presentation_scene = ExtResource("presentation")
 
 [node name="LimboHSM" type="LimboHSM" parent="." unique_id=867160680]
 update_mode = 2

@@ -251,6 +251,16 @@ Main (Node)
 
 `scenes/bosses/hydra_boss.tscn` と `scripts/bosses/hydra_boss.gd` が本体・首・頭を組み合わせる。本体と頭の当たり判定は敵の表に登録し、首の節は役者が描く。頭の位置・向きは攻撃の処理が決める。頭の行は親の本体の行と結び、行の再利用を ID でも確かめる。`EnemyManager.cleanup()` は行を解放する前に `BossManager.part_defeated()` から役者の `on_part_defeated()` へ通知し、頭へのダメージと火による再生停止を確定する。
 
+**Hydra の試遊と演出の差し替え**
+
+`gyms/hydra_trial.tscn` を F6 で起動すると、Hydra を配置した敵・ルート実験場が試遊モードで開く。既存の停止・巻き戻し・数値編集を使う。試遊シーンの Inspector で開始位置・無敵・試遊用の攻撃力倍率を変える。本番のステージデータとセーブは実験セッションから分ける。
+
+絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBoss の `presentation_scene` に指定する。`BodyAnchor` と `HeadAnchor` の位置、ルートの色・半径・線幅・フラッシュ時間を Inspector で変える。子の `VisualTimeline` の `warning`・`attack`・`recovery`・`hit` は装飾用で、Sprite2D・GPUParticles2D などへ置き換えられる。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取り、演出用 AnimationPlayer を世界秒で手動更新する。
+
+イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。`neck_index` は本体が -1、不死首が -2、通常首が配列の添字。動く取り付け位置は `presentation_anchor(index)`（ワールド座標）、現在の技・段階・露出・攻めどきは `presentation_state()` で読む。`warning_started`・`attack_started`・`finished`・`interrupted`・`recovery_started`・`head_destroyed`・`phase_changed`・`exposed`・`defeated` を扱う。`hit` は頭の HP 減少か不死首の撃破を確認したときだけ発火し、`target=hydra` と実ダメージを付ける。自機への命中演出は既存の戦闘側の被弾イベントが担う。発射・予告から命中を推測しない。
+
+判定の正は HydraBoss の `Timeline` と `hydra_boss_timeline.tres`。予告の長さは `tech_compass` から `north_burst`・`east_sweep`・`west_sweep` の実行キーまでとし、予告・攻撃・終了のキーとアニメーション全体の長さを AnimationPlayer でまとめて動かして調整する。`compass_spin_fraction` はこの区間に対する針の回転時間の割合。`VisualTimeline` の尺は装飾だけを変え、予告の輪は判定側の実行イベントまで保つ。イベントの `attack_started` は攻撃動作の開始を示し、実際の被弾は戦闘判定で確定する。段階遷移・露出・撃破は表示をリセットし、中断は残った予告・フラッシュ・ビーム表示を片付ける。
+
 `scripts/bosses/hydra_neck.gd` は通常の首と不死の首の骨組みを CPU で計算する。付け根から頭までの点列を持ち、世界秒で進む波を曲がりの目標へ加え、FABRIK の往復で節長を補正する。描画時は両端を本体と頭へ固定し、補正の残差を先端の節で吸収する。引いた首は余長を曲がりに使い、頭が全長より遠くへ出ると首全体を伸ばす。伸びきった首は直線で確定し、縮みきった首は更新と描画を止める。節数・補正回数・余長・波・追従の調整値は `data/bosses/hydra.tres` の `params.neck_*` に置き、骨組みの点列を描画素材から分けて扱う。 描画命令は世界の更新・部位の消失・本体の移動・半径の変更で更新し、停止中はキャッシュを使う。描画用の半径キャッシュは役者のメタデータに持ち、実験場の戦闘状態の比較から分ける。
 
 強めの技は `AnimationPlayer` のタイムラインを世界秒で進める。Behavior Tree が必要な首のそろった技を選び、役者が羅針盤の予告と各首の動きをまとめて扱う。必要な首が落ちたときはタイムラインを止める。首ごとの通常攻撃・生え直しは役者の状態で持ち、仕様は [仕様書](spec.md) の12.3。
