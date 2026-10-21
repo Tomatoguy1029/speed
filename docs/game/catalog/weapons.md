@@ -15,7 +15,7 @@
 | W05 | バリアシステム | 採用 | 周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ | 敵や弾に近づくときの状況を変える | 実装済み。`scripts/weapons/barrier.gd`、`data/weapons/W05_barrier.tres` | [demo W05](../../../demo/docs/weapons.md) `barrier` |
 | W06 | 追走ドローン | 採用 | 周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する。Lv で機数が増える | 自機が抜けたあとにも同じ線を掃く | 実装済み。`scripts/weapons/drone.gd`、`data/weapons/W06_drone.tres`。見た目は下の「機体とドローンの見た目」 | [demo W06](../../../demo/docs/weapons.md) `drone` |
 | W07 | 軌跡機雷 | 採用 | 高速で実際に通った線に一定の間隔で機雷を残す。少し遅れて有効になり、敵が近づくと爆発する | 敵が後から入る線を残す | 実装済み。`scripts/weapons/mines.gd`、`data/weapons/W07_mines.tres` | [demo W07](../../../demo/docs/weapons.md) `mines` |
-| W08 | ソニックブーム | 採用 | 駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波。同じ波動では各敵に1回 | 撃った地点だけでなく進路も一掃する。T05 とは別 | 実装済み。`scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres` | [demo W08](../../../demo/docs/weapons.md) `sonic` |
+| W08 | ソニックブーム | 採用 | 駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波。同じ波動では各敵に1回 | 撃った地点だけでなく進路も一掃する。T05 とは別 | 実装済み。`scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres`。威力は試遊用のLv別配列を使用（下記） | [demo W08](../../../demo/docs/weapons.md) `sonic` |
 | W17 | 接触電撃 | 採用 | 普段・高速を問わず敵に触れると、接触点の全周を角度帯に分け、敵がいる帯へ枝を出す。Lv に応じて枝数と全枝が共有する追加対象数が増える。空の帯の枠は各枝の続きへ交互に配る。同じ敵には1回の放電で1度だけ。隕石には流れない | 群れに踏み込み、最終段階では周囲にいる敵へ全方面から電撃を広げる | 実装済み。`scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。Lv別の枝数は試遊用の調整可能な初期値。外観は[雷撃](../art-style.md#37-雷撃) | [demo W17](../../../demo/docs/weapons.md) `contactArc`。本番は分岐方式 |
 | W23 | 後方ブラスター | 採用 | 自機の背後から進行方向の反対へ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力だけが上がる。描画中・なぞり中は休む | 敵から逃げる向きへ進みながら後ろの追跡敵を攻撃する | 実装済み。`scripts/weapons/rear.gd`、`data/weapons/W23_rear.tres`。通常の取得・強化候補 | 本番独自。demo未実装。具体的な数値は仮調整 |
 
@@ -46,6 +46,16 @@
 
 - 同じパーツを使う武器を両方持っても、パーツは1つだけ出す。W23 のタレットは、ほかのパーツの上に重ねる。
 - W06 のドローンは `drone.png` を原寸に `config.character_scale` を掛けて表示し、自機からドローンへの向きに向ける。射撃は近くの敵を狙い、見た目の向きには縛られない。経路の上での接触判定にも `config.character_scale` を掛ける。
+
+### W08のLv別威力
+
+威力は `data/weapons/W08_sonic.tres` の `damage_by_level` を攻撃力に掛ける。範囲と頻度には共通の段階別係数を使う。威力は試遊用の暫定値。
+
+| Lv | 威力の役割 |
+|---|---|
+| 1 | 標準雑魚を吹き飛ばし、HPを削る |
+| 2 | 基準攻撃力で標準サイズの標準雑魚を一撃で倒す |
+| 3〜5 | Lvごとに威力が上がる |
 
 ### W23のLv別強化
 
