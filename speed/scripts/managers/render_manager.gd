@@ -1086,6 +1086,8 @@ func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
 ## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。
 ## 機体が光の中にいる間は帯が明るくなる。撃ったあとの休みの間は暗い。
 func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
+	if not run.enemies.telescope_aiming(i):
+		return
 	var p := t.pos[i]
 	var r := t.r[i]
 	var dp: Dictionary = t.def[i].params

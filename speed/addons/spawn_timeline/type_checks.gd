@@ -22,16 +22,16 @@ func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_ty
 		# 敵の数が多いので、初めは折りたたむ
 		add_property_editor(name, Checks.new(_all_enemies(), true))
 		return true
-	if name == "enemy_attack_values" and object.get("clips") != null:
+	if name in ["enemy_attack_values", "enemy_attack_priorities"] and object.get("clips") != null:
 		add_property_editor(name, EnemyValues.new(func() -> Array:
 			var options := []
 			var ids: Array = object.get("enemies").duplicate()
-			for id in object.get("enemy_attack_values"):
+			for id in object.get(name):
 				if not ids.has(StringName(id)):
 					ids.append(StringName(id))
 			for id in ids:
 				options.append([StringName(id), _display_name(StringName(id))])
-			return options), false, "Enemy attack values")
+			return options, name == "enemy_attack_priorities"), false, "Enemy attack priorities" if name == "enemy_attack_priorities" else "Enemy attack values")
 		return true
 	if name == "formation_values" and object.get("formations") != null:
 		# 辞書はFormationsのoverride欄で編集する。保存名は互換性のため維持する。
@@ -309,14 +309,16 @@ class Checks extends EditorProperty:
 
 ## ステージの敵typeごとの個体value。辞書を複製して通知し、通常のUndo/Redoに載せる。
 class EnemyValues extends EditorProperty:
+	var _priority := false
 	var _source: Callable
 	var _options: Array = []
 	var _rows := VBoxContainer.new()
 	var _numbers: Array[SpinBox] = []
 	var _defaults: Array[Label] = []
 
-	func _init(source: Callable) -> void:
+	func _init(source: Callable, priority := false) -> void:
 		_source = source
+		_priority = priority
 		add_child(_rows)
 		set_bottom_editor(_rows)
 
@@ -338,14 +340,14 @@ class EnemyValues extends EditorProperty:
 				label.tooltip_text = label.text
 				row.add_child(label)
 				var fallback := Label.new()
-				fallback.text = "仮値"
-				fallback.tooltip_text = "未設定の互換用valueは1。種類別のバランスが確定したら入力する。"
+				fallback.text = "標準" if _priority else "仮値"
+				fallback.tooltip_text = "未設定は0。大きいほど先に攻撃枠を取り、必要な予算が空くまで後続を待たせる。" if _priority else "未設定の互換用valueは1。種類別のバランスが確定したら入力する。"
 				row.add_child(fallback)
 				_defaults.append(fallback)
 				var number := SpinBox.new()
-				number.min_value = 0.001
+				number.min_value = -1000000.0 if _priority else 0.001
 				number.max_value = 2147483647
-				number.step = 0.5
+				number.step = 1.0 if _priority else 0.5
 				number.value_changed.connect(_on_value_changed.bind(str(option[0])))
 				row.add_child(number)
 				_numbers.append(number)
@@ -353,7 +355,7 @@ class EnemyValues extends EditorProperty:
 		var values: Dictionary = get_edited_object().get(get_edited_property())
 		for k in _options.size():
 			var key := str(_options[k][0])
-			_numbers[k].set_value_no_signal(float(values.get(key, 1.0)))
+			_numbers[k].set_value_no_signal(float(values.get(key, 0.0 if _priority else 1.0)))
 			_defaults[k].visible = not values.has(key)
 
 	func _on_value_changed(value: float, key: String) -> void:

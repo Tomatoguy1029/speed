@@ -17,6 +17,8 @@ func _live(m: EnemyManager, row: int, id: int) -> bool:
 	return m.is_same(row, id) and m.table.dead[row] == 0
 
 func _cancel(m: EnemyManager, i: int, o: Dictionary) -> void:
+	if m.projectiles.director != null:
+		m.projectiles.director.cancel_wait(m._lab_owner(i), m.table.id[i])
 	o.selected = -1
 	o.selected_id = -1
 	o.wait = 0.0

@@ -28,6 +28,12 @@ const EDITOR_ORDER := 5
 ## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
 ## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
 @export var enemy_attack_values: Dictionary = {}
+## 種類ごとの攻撃待ちの優先度。大きいほど先。未設定は0（標準）。
+@export var enemy_attack_priorities: Dictionary = {}
+
+func enemy_attack_priority(type: StringName) -> float:
+	var value := float(enemy_attack_priorities.get(String(type), 0.0))
+	return value if is_finite(value) else 0.0
 
 func enemy_attack_value(type: StringName) -> float:
 	var value := float(enemy_attack_values.get(String(type), 1.0))

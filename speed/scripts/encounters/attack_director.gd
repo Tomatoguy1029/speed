@@ -33,28 +33,36 @@ func configure(value: Dictionary) -> void:
 
 func advance(time: float, enemies: EnemyManager) -> void:
 	now = time
-	var live := {}
-	for i in projectiles.hostile_alive.size():
-		if projectiles.hostile_alive[i]:
-			live[projectiles.lab_hostile_group.get(i, 0)] = true
-	for i in projectiles.hazard_alive.size():
-		if projectiles.hazard_alive[i]:
-			live[projectiles.lab_hazard_group.get(i, 0)] = true
-	for token in groups.keys():
+	# 期限前の枠は弾を調べず保持する。失効候補がある更新だけ全体を照合する。
+	var expired: Array = []
+	for token in groups:
 		var group: Dictionary = groups[token]
 		if formation_mode:
 			for member in group.get("members", {}).values():
 				var row := int(member.row)
 				if enemies.is_same(row, int(member.id)) and not enemies.table.dead[row] and enemies.table.mode[row] == EnemyTable.Mode.WINDUP:
 					group.until = maxf(float(group.until), now + maxf(0.05, enemies.table.timer[row]))
-		if group.until <= now and not live.has(token):
+		if group.until <= now:
+			expired.append(token)
+	if not expired.is_empty():
+		var live := {}
+		for i in projectiles.hostile_alive.size():
+			if projectiles.hostile_alive[i]:
+				live[projectiles.lab_hostile_group.get(i, 0)] = true
+		for i in projectiles.hazard_alive.size():
+			if projectiles.hazard_alive[i]:
+				live[projectiles.lab_hazard_group.get(i, 0)] = true
+		for token in expired:
+			if live.has(token):
+				continue
+			var group: Dictionary = groups[token]
 			if state != null: state.emit(&"attack_end", {"token": token, "owner": group.owner})
 			if owners.get(group.owner, 0) == token:
 				owners.erase(group.owner)
 			groups.erase(token)
 	for owner in waiting.keys():
 		var row: int = waiting[owner].row
-		if not enemies.is_same(row, int(waiting[owner].id)) or enemies.table.dead[row]:
+		if not enemies.is_same(row, int(waiting[owner].id)) or enemies.table.dead[row] or enemies.table.stone[row] > 0.0 				or enemies.table.knock_t[row] > 0.0 or enemies.table.shove_time[row] > 0.0:
 			waiting.erase(owner)
 			reasons.erase(owner)
 
@@ -72,6 +80,35 @@ func cancel_wait(owner: String, id := -1) -> void:
 		return
 	waiting.erase(owner)
 	reasons.erase(owner)
+
+## 未発射の照準を取り消す。同じoverride群れの別個体と、生きている弾の枠は保持する。
+func cancel_attack(owner: String, id: int) -> void:
+	cancel_wait(owner, id)
+	if not owners.has(owner):
+		return
+	var group: Dictionary = groups[owners[owner]]
+	if group.has("members"):
+		group.members.erase(str(id))
+		group.until = now
+		for member in group.members.values():
+			group.until = maxf(float(group.until), float(member.until))
+	elif int(group.id) == id:
+		group.until = now
+
+## 予算全体に収まる待機から先頭を選ぶ。必要量が空くまで後続を待たせる。
+## 待ち時間は全候補に同じ割合で加算するので、比較はpriority - since * 0.2で行える。
+func _next_owner() -> String:
+	var winner := ""
+	var best := -INF
+	for candidate: String in waiting:
+		var item: Dictionary = waiting[candidate]
+		if float(item.get("cost", 1.0)) > float(settings.budget):
+			continue
+		var score := float(item.priority) - float(item.since) * 0.2
+		if winner == "" or score > best or (is_equal_approx(score, best) and candidate < winner):
+			winner = candidate
+			best = score
+	return winner
 
 ## cost はownerのvalue（個体、または共有override群れ。省略時は1）。
 func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0, cost := -1.0) -> bool:
@@ -98,18 +135,11 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		cost = 1.0
 	queue(owner, cats, row, id, priority)
 	waiting[owner].cost = cost
-	var ordered := waiting.keys()
-	ordered.sort_custom(func(a, b):
-		var pa: float = float(waiting[a].priority) + (now - float(waiting[a].since)) * 0.2
-		var pb: float = float(waiting[b].priority) + (now - float(waiting[b].since)) * 0.2
-		return a < b if is_equal_approx(pa, pb) else pa > pb)
-	# 大きいvalueが待っている間も、残り予算で動ける群れを許可する。
-	for candidate in ordered if enabled else []:
-		if _capacity(float(waiting[candidate].get("cost", 1.0))).is_empty():
-			if candidate != owner:
-				reasons[owner] = TranslationServer.translate("lab.message_aa5d4e5983")
-				return false
-			break
+	if enabled:
+		var next := _next_owner()
+		if next != "" and next != owner:
+			reasons[owner] = TranslationServer.translate("lab.message_aa5d4e5983")
+			return false
 	var reason := _guard_reason(row)
 	if reason.is_empty():
 		reason = _capacity(cost) if enabled else ""

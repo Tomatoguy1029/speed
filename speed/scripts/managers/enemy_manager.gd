@@ -103,6 +103,8 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	t.meteor_index[i] = opts.get("meteor_index", -1)
 	if t.meteor_index[i] < 0:
 		_add_beh(i)
+	else:
+		_sight_step = -1
 	if t.beh[i] == EnemyTable.Beh.TRIANGLE:
 		_spawn_triangle_stars(i)
 	elif t.beh[i] == EnemyTable.Beh.CROW and not opts.get("flock_member", false):
@@ -362,6 +364,8 @@ func clear_all() -> void:
 	corona.clear()
 	slots.clear()
 	_tele_rays.clear()
+	_sight_rocks.clear()
+	_sight_step = -1
 	for b in EnemyTable.Beh.size():
 		beh_rows[b].clear()
 	_dead_rows.clear()
@@ -655,7 +659,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			if b not in [EnemyTable.Beh.CORONA, EnemyTable.Beh.RETICLE] and not _lab_admit(i, bdt):
+			if b not in [EnemyTable.Beh.CORONA, EnemyTable.Beh.RETICLE, EnemyTable.Beh.SNIPER] and not _lab_admit(i, bdt):
 				_chase(i, bdt)
 				pos[i] += vel[i] * dt
 				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
@@ -1125,7 +1129,19 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 		t.facing[j] += spin * (0.4 + 0.6 * near) * dt
 
 ## ぼうえんきょう座のサーチライトの光線の数と、光線ごとの届く長さ（敵の id → 長さの並び。帯の右端から左端の順）
+var _sight_rocks := PackedInt32Array()
+var _sight_step := -1
 const TELE_RAYS := 48
+
+## 岩を必要とする光線と支援判定で共用する。通常敵を各個体の近傍探索へ混ぜない。
+func _ensure_sight_rocks() -> void:
+	if _sight_step == _lod:
+		return
+	_sight_step = _lod
+	_sight_rocks.clear()
+	for row in table.alive.size():
+		if table.alive[row] != 0 and table.dead[row] == 0 and table.meteor_index[row] >= 0:
+			_sight_rocks.append(row)
 var _tele_rays: Dictionary = {}
 
 ## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。見失っている間は、機体のいる方へ
@@ -1146,18 +1162,29 @@ func _telescope(i: int, dt: float) -> void:
 	if t.mode[i] == EnemyTable.Mode.RECOVER:
 		t.timer[i] -= dt
 		_search_telescope(i, dt)
-		_cast_telescope(i)
+		_tele_rays.erase(t.id[i])
 		if t.timer[i] <= 0.0:
 			t.mode[i] = EnemyTable.Mode.MOVE
 		return
-	_cast_telescope(i)
+	if not telescope_in_range(i):
+		_cancel_telescope(i)
+		_search_telescope(i, dt)
+		return
+	_cast_telescope(i, true)
 	var seen := telescope_sight(i, state.ship_pos)
+	if seen != 1:
+		_cancel_telescope(i)
+		_search_telescope(i, dt)
+		return
+	# 照準が見え始める前に、射程・遮蔽物と予算を確認する。
+	if not _lab_admit(i, dt):
+		t.mode[i] = EnemyTable.Mode.MOVE
+		t.charge[i] = 0.0
+		_tele_rays.erase(t.id[i])
+		_search_telescope(i, dt)
+		return
+	_cast_telescope(i)
 	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		if seen == 2:
-			# 溜めの間に岩陰へ逃げられた：取り消して探し直す
-			t.mode[i] = EnemyTable.Mode.MOVE
-			t.charge[i] = 0.0
-			return
 		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
 		t.timer[i] -= dt
 		if t.timer[i] <= 0.0:
@@ -1170,20 +1197,31 @@ func _telescope(i: int, dt: float) -> void:
 			t.mode[i] = EnemyTable.Mode.RECOVER
 			t.timer[i] = float(p.cooldown)
 		return
-	if seen == 1:
-		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
-		t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
-	elif seen == 2:
-		# 岩陰に隠れた：狙いを外し、探し直す
-		t.charge[i] = 0.0
-		_search_telescope(i, dt)
-	else:
-		_search_telescope(i, dt)
-		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
+	_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
+	t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
 	if t.charge[i] >= 1.0:
 		t.mode[i] = EnemyTable.Mode.WINDUP
 		t.timer[i] = float(p.laser_charge)
 		state.emit(&"telescope_charge", {"pos": telescope_lens(i)})
+
+## 照準と未発射の予約を解除する。既に飛んでいる攻撃はdirector側が保持する。
+func _cancel_telescope(i: int) -> void:
+	if projectiles.director != null:
+		projectiles.director.cancel_attack(_lab_owner(i), table.id[i])
+	table.mode[i] = EnemyTable.Mode.MOVE
+	table.charge[i] = 0.0
+	_tele_rays.erase(table.id[i])
+
+func telescope_in_range(i: int) -> bool:
+	var distance := telescope_lens(i).distance_to(state.ship_pos)
+	return distance >= 1.0 and distance <= float(table.def[i].params.band_len)
+
+## 描画も攻撃可能な射程と、取得済みの枠に従う。
+func telescope_aiming(i: int) -> bool:
+	if not telescope_in_range(i) or (table.charge[i] <= 0.0 and table.mode[i] != EnemyTable.Mode.WINDUP):
+		return false
+	var d = projectiles.director
+	return d == null or not d.enabled or d.token(_lab_owner(i)) > 0
 
 ## ぼうえんきょう座が機体を探す：機体のいる方を中心に、左右へ振りながら向きを変える。
 func _search_telescope(i: int, dt: float) -> void:
@@ -1202,29 +1240,53 @@ func telescope_lens(i: int) -> Vector2:
 	return table.pos[i] + Vector2.from_angle(table.facing[i]) * table.r[i] * 0.9
 
 ## ぼうえんきょう座（行 i）の光線を投げ、光線ごとの届く長さを隕石・惑星・月で切って覚える。
-func _cast_telescope(i: int) -> void:
+func _cast_telescope(i: int, target_only := false) -> void:
 	var t := table
 	var length := float(t.def[i].params.band_len)
 	var lens := telescope_lens(i)
 	var half := telescope_half(i)
 	# 遮るもの：帯の届く範囲の隕石・鉄のがれきと、惑星・月
-	var blockers: Array = []
-	var rows := PackedInt32Array()
-	projectiles.combat.nearby(lens, length, rows)
-	for j in rows:
-		if t.meteor_index[j] >= 0 and t.dead[j] == 0:
-			blockers.append([t.pos[j], t.r[j]])
+	var blockers := PackedVector3Array()
+	_ensure_sight_rocks()
+	for j in _sight_rocks:
+		if t.alive[j] == 0 or t.dead[j] != 0 or t.meteor_index[j] < 0:
+			continue
+		var offset := t.pos[j] - lens
+		var radius := t.r[j]
+		if offset.length_squared() <= (length + radius) * (length + radius):
+			blockers.append(Vector3(offset.x, offset.y, radius))
 	for b in field.bodies:
 		if b.pos.distance_to(lens) < length + b.r:
-			blockers.append([b.pos, b.r])
+			var offset: Vector2 = b.pos - lens
+			blockers.append(Vector3(offset.x, offset.y, b.r))
+	# 円が光の扇と交わる可能性を先に調べる。光線数と円の交差判定は保つ。
+	var forward := Vector2.from_angle(t.facing[i])
+	var side_scale := cos(half)
+	var along_scale := sin(half)
+	var candidates := PackedVector3Array()
+	for blocker in blockers:
+		var offset := Vector2(blocker.x, blocker.y)
+		var along := offset.dot(forward)
+		if along < -blocker.z or absf(offset.cross(forward)) * side_scale - along * along_scale > blocker.z:
+			continue
+		candidates.append(blocker)
 	var rays := PackedFloat32Array()
 	rays.resize(TELE_RAYS)
-	for n in TELE_RAYS:
+	# 予約前は、機体への判定が補間する2本だけを計算する。許可後の見た目は48本を保つ。
+	var first := 0
+	var last := TELE_RAYS
+	if target_only:
+		rays.fill(length)
+		var offset := Geom.angle_diff((state.ship_pos - lens).angle(), t.facing[i])
+		var fraction := clampf((offset + half) / (2.0 * half), 0.0, 1.0) * (TELE_RAYS - 1)
+		first = mini(int(fraction), TELE_RAYS - 2)
+		last = first + 2
+	for n in range(first, last):
 		var v := Vector2.from_angle(t.facing[i] - half + 2.0 * half * n / float(TELE_RAYS - 1))
 		var reach := length
-		for blk in blockers:
-			var c: Vector2 = blk[0] - lens
-			var r: float = blk[1]
+		for blk in candidates:
+			var c := Vector2(blk.x, blk.y)
+			var r := blk.z
 			var along := c.dot(v)
 			if along < -r:
 				continue
@@ -1479,14 +1541,18 @@ func _blocking_rock(tel: int, small_r: float) -> int:
 	var length := lens.distance_to(ship)
 	if length > float(t.def[tel].params.band_len):
 		return -1
-	var rows := PackedInt32Array()
-	projectiles.combat.nearby((lens + ship) * 0.5, length * 0.5 + small_r, rows)
+	_ensure_sight_rocks()
+	var center := (lens + ship) * 0.5
+	var search_radius := length * 0.5 + small_r
 	var best := -1
 	var best_d := INF
-	for j in rows:
-		if t.meteor_index[j] < 0 or t.dead[j] != 0 or t.r[j] > small_r:
+	for j in _sight_rocks:
+		if t.alive[j] == 0 or t.meteor_index[j] < 0 or t.dead[j] != 0 or t.r[j] > small_r:
 			continue
 		var c := t.pos[j]
+		var radius := search_radius + t.r[j]
+		if c.distance_squared_to(center) > radius * radius:
+			continue
 		if Geometry2D.get_closest_point_to_segment(c, lens, ship).distance_to(c) > t.r[j] + cfg.ship_radius:
 			continue
 		var d := lens.distance_squared_to(c)
@@ -2505,8 +2571,8 @@ func _lab_admit(i: int, dt: float) -> bool:
 	elif def.behavior == &"pump":
 		due = table.buds[i] >= int(p.store_max)
 	elif def.behavior == &"sniper":
-		due = table.charge[i] >= 0.8
-		active = table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER
+		due = true
+		active = (table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER) and d.token(owner) > 0
 	elif def.behavior in [&"aquarius", &"cross", &"dolphin", &"corona"]:
 		# 間隔が過ぎた瞬間から予告を始める種類
 		due = table.fire_t[i] <= dt
@@ -2527,7 +2593,10 @@ func _lab_admit(i: int, dt: float) -> bool:
 		if p.has("laser_charge"):
 			duration = maxf(0.0, 1.0 - table.charge[i]) * float(p.lock_fill) + float(p.laser_charge) + float(p.laser_delay) + float(p.laser_time) + 0.1
 		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
-		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, cost):
+		var priority := 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0
+		if state.stage != null:
+			priority += state.stage.enemy_attack_priority(def.id)
+		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, priority, cost):
 			table.charge[i] = 0
 			return false
 	if not cats.is_empty():
