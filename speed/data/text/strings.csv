@@ -163,6 +163,8 @@ weapon.W22.name,双極ビーム,Bipolar Beam
 weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
+weapon.W24.name,光の槍,Light Lance
+weapon.W24.desc,突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる,Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage.
 ,■ 特性（trait.<ID>）,
 trait.T01.name,終端爆縮,End Implosion
 trait.T01.desc,線の終点で爆発,Explodes at the end of your line.
