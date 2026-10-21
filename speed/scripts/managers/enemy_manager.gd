@@ -474,6 +474,9 @@ func _tick_biters(dt: float) -> void:
 	var charge := t.charge
 	var now := state.world_time
 	var body_move := field.body_speed_max
+	var body_gap := t.body_gap
+	var body_gap_pos := t.body_gap_pos
+	var body_gap_time := t.body_gap_time
 	var cached: EnemyDef = null
 	var reach_add := 0.0
 	var half_reach := 0.0
@@ -554,7 +557,16 @@ func _tick_biters(dt: float) -> void:
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
-		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
+		var at := pos[i]
+		var margin := r[i] + vel[i].length() * dt
+		var gap := body_gap[i]
+		if gap >= 0.0 and gap - (at.distance_to(body_gap_pos[i]) + (now - body_gap_time[i]) * body_move) > margin:
+			continue
+		gap = field.body_gap(at, 4.0)
+		body_gap[i] = maxf(gap, 0.0)
+		body_gap_pos[i] = at
+		body_gap_time[i] = now
+		if gap < margin:
 			field.collide_enemy(i, from)
 
 ## 追跡（いちばん多い雑魚）は、関数を呼ばずにここで計算する（仕様書 11.5）。
@@ -577,6 +589,9 @@ func _tick_chase(dt: float) -> void:
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
+	var body_gap := t.body_gap
+	var body_gap_pos := t.body_gap_pos
+	var body_gap_time := t.body_gap_time
 	var stone := t.stone
 	var lod_lim := vh * 1.25 + Vector2(300, 300)
 	for i in beh_rows[EnemyTable.Beh.CHASE]:
@@ -614,11 +629,24 @@ func _tick_chase(dt: float) -> void:
 				facing[i] = u.angle()
 			vel[i] = v
 			pos[i] = from + v * dt
-		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
+		var at := pos[i]
+		var margin := r[i] + vel[i].length() * dt
+		var gap := body_gap[i]
+		if gap >= 0.0 and gap - (at.distance_to(body_gap_pos[i]) + (now - body_gap_time[i]) * body_move) > margin:
+			continue
+		gap = field.body_gap(at, 4.0)
+		body_gap[i] = maxf(gap, 0.0)
+		body_gap_pos[i] = at
+		body_gap_time[i] = now
+		if gap < margin:
 			field.collide_enemy(i, from)
 
 ## 追跡以外の行動の種類 b の雑魚を進める。
 func _tick_behavior(b: int, dt: float) -> void:
+	var rows: PackedInt32Array = beh_rows[b]
+	if rows.is_empty():
+		return
+	var managed := b not in [EnemyTable.Beh.CORONA, EnemyTable.Beh.RETICLE, EnemyTable.Beh.SNIPER]
 	var t := table
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -635,7 +663,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var stone := t.stone
 	var vc := state.view_center
 	var lim := state.view_half * 1.25 + Vector2(300, 300)
-	for i in beh_rows[b]:
+	for i in rows:
 		if dead[i] != 0 or corona.members.has(i):
 			continue
 		if stone[i] > 0.0:
@@ -662,7 +690,10 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			if b not in [EnemyTable.Beh.CORONA, EnemyTable.Beh.RETICLE, EnemyTable.Beh.SNIPER] and not _lab_admit(i, bdt):
+			var needs_admission := managed and t.def[i].rank >= 3
+			if managed and not needs_admission:
+				projectiles.lab_context = 0
+			if needs_admission and not _lab_admit(i, bdt):
 				_chase(i, bdt)
 				pos[i] += vel[i] * dt
 				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
