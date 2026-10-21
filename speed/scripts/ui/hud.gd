@@ -7,11 +7,25 @@ extends Control
 ## 描けるようになったときに広がる輪の時間（実秒）
 const RING_PULSE_TIME := 0.35
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
-## 装備一覧の枠の大きさ（画面px）
-const LOADOUT_WEAPON := 50.0
-const LOADOUT_TRAIT := 40.0
-## ミニマップの半径（画面px）
-const MINIMAP_R := 78.0
+## 装備一覧の枠の大きさ（素材のpx）
+const LOADOUT_WEAPON := 21.0
+const LOADOUT_TRAIT := 13.0
+## ミニマップの半径（素材のpx）
+const MINIMAP_R := 43.0
+const ART_SIZE := Vector2(640, 360)
+const CYAN := Color("#5bc8db")
+const ART := "res://assets/ui/combat/"
+const FRAME := preload(ART + "combat_ui_main.png")
+const RADAR := preload(ART + "combat_ui_radar.png")
+const HEALTH := preload(ART + "combat_ui_health_bar.png")
+const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
+const SLOTS := preload(ART + "combat_ui_upgrades_boxes.png")
+const CARDS := preload(ART + "combat_ui_boxes.png")
+const ICONS := preload(ART + "icons.png")
+const ICON_IDS := [
+	"W01", "W02", "W03", "W04", "W05", "W06", "W07", "W08", "W17", "W21", "W22", "W23",
+	"T01", "T03", "T04", "T05", "T06", "T07", "T08", "T09", "T10", "T11", "T12", "T13", "T14",
+]
 
 ## ミニマップと、ミニマップ以外の表示（経験値バー・時間・状態の文字・装備一覧・ボス・ゲージのリング）を描くか
 ## （実験場では初めは消す）
@@ -25,10 +39,15 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 
 var run: RunManager
 var _font: Font
-var _cards_box: VBoxContainer
+var _cards_box: Control
 var _reroll_button: Button
 var _cards_title: Label
-var _cards_row: HBoxContainer
+var _cards_row: Control
+var _frame: TextureRect
+var _loadout_icons: Control
+var _loadout_key := ""
+var _health_fill: AtlasTexture
+var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
 var _draw_button: Button
 var _banner := ""
@@ -45,6 +64,20 @@ func _ready() -> void:
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_health_fill = _make_bar_fill(HEALTH)
+	_experience_fill = _make_bar_fill(EXPERIENCE)
+	_frame = TextureRect.new()
+	_frame.texture = FRAME
+	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var frame_material := ShaderMaterial.new()
+	frame_material.shader = preload(ART + "main_frame.gdshader")
+	_frame.material = frame_material
+	add_child(_frame)
+	_loadout_icons = Control.new()
+	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_loadout_icons)
 	_build_cards()
 	_build_pause()
 	_draw_button = Button.new()
@@ -122,68 +155,169 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
+	_layout_art()
+	_refresh_loadout_icons()
 	queue_redraw()
+
+func _layout_art() -> void:
+	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
+	var origin := (size - ART_SIZE * factor) * 0.5
+	for item in [_frame, _loadout_icons, _cards_box]:
+		item.position = origin
+		item.scale = Vector2.ONE * factor
+	_frame.size = ART_SIZE
+	_frame.visible = show_status and run.state != null and run.state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING]
+	_loadout_icons.visible = _frame.visible
+
+func _make_bar_fill(frame: Texture2D) -> AtlasTexture:
+	var source := frame.get_image()
+	var image := Image.create(source.get_width(), source.get_height(), false, Image.FORMAT_RGBA8)
+	var bounds := source.get_used_rect()
+	# 素材の左右の縁の間だけ埋め、欠けた角もピクセル単位で合わせる。
+	for y in range(bounds.position.y, bounds.end.y):
+		var left := bounds.end.x
+		var right := bounds.position.x
+		for x in range(bounds.position.x, bounds.end.x):
+			if source.get_pixel(x, y).a > 0.0:
+				left = mini(left, x)
+				right = maxi(right, x)
+		for x in range(left + 1, right):
+			if source.get_pixel(x, y).a == 0.0:
+				image.set_pixel(x, y, Color.WHITE)
+	var fill := AtlasTexture.new()
+	fill.atlas = ImageTexture.create_from_image(image)
+	fill.region = image.get_used_rect()
+	return fill
+
+func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Color) -> void:
+	var area := fill.region
+	area.size.x = roundf(area.size.x * clampf(fraction, 0.0, 1.0))
+	if area.size.x > 0:
+		draw_texture_rect_region(fill.atlas, area, area, color)
+	draw_texture(frame, Vector2.ZERO)
+
+func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
+	if definition == null or definition is HeroDef:
+		return
+	var index := ICON_IDS.find(String(definition.id))
+	if index < 0:
+		return
+	var texture := AtlasTexture.new()
+	texture.atlas = ICONS
+	texture.region = Rect2(index * 47, 0, 47, 47)
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.position = area.position
+	icon.size = area.size
+	parent.add_child(icon)
+
+func _refresh_loadout_icons() -> void:
+	if run.state == null:
+		return
+	var key := str(run.state.weapons) + str(run.state.traits)
+	if key == _loadout_key:
+		return
+	_loadout_key = key
+	for child in _loadout_icons.get_children():
+		child.queue_free()
+	var row := 0
+	for owned in [run.state.weapons, run.state.traits]:
+		var index := 0
+		for id in owned:
+			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
+			_add_icon(_loadout_icons, (ConfigManager.weapons if row == 0 else ConfigManager.traits).get(id), area)
+			index += 1
+		row += 1
 
 # ── 3択 ──────────────────────────────────────────────────────────
 
 func _build_cards() -> void:
-	_cards_box = VBoxContainer.new()
-	_cards_box.set_anchors_preset(Control.PRESET_CENTER)
-	_cards_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_cards_box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_cards_box = Control.new()
+	_cards_box.size = ART_SIZE
+	_cards_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cards_box.visible = false
-	var title := Label.new()
-	_cards_title = title
-	title.text = tr("hud.levelup_title")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_cards_box.add_child(title)
-	_cards_row = HBoxContainer.new()
-	_cards_row.add_theme_constant_override("separation", 16)
+	_cards_title = Label.new()
+	_cards_title.position = Vector2(89, 61)
+	_cards_title.size = Vector2(464, 20)
+	_cards_title.add_theme_font_size_override("font_size", 10)
+	_cards_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cards_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cards_box.add_child(_cards_title)
+	_cards_row = Control.new()
+	_cards_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cards_box.add_child(_cards_row)
 	_reroll_button = Button.new()
-	_reroll_button.custom_minimum_size = Vector2(320, 52)
-	_reroll_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_reroll_button.position = Vector2(265, 288)
+	_reroll_button.size = Vector2(112, 29)
+	_reroll_button.add_theme_font_size_override("font_size", 9)
+	_card_art(_reroll_button, Rect2(265, 288, 112, 29))
 	_reroll_button.pressed.connect(func(): run.command(&"reroll"))
 	_cards_box.add_child(_reroll_button)
 	add_child(_cards_box)
 
+func _card_art(button: Button, region: Rect2) -> void:
+	var texture := AtlasTexture.new()
+	texture.atlas = CARDS
+	texture.region = region
+	var style := StyleBoxTexture.new()
+	style.texture = texture
+	button.add_theme_stylebox_override("normal", style)
+	for state in ["hover", "pressed", "focus", "disabled"]:
+		var variant := style.duplicate() as StyleBoxTexture
+		variant.modulate_color = Color(0.5, 0.5, 0.5) if state == "disabled" else Color(1.3, 1.3, 1.3)
+		button.add_theme_stylebox_override(state, variant)
+	button.add_theme_color_override("font_color", CYAN)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+
 func _show_cards() -> void:
-	# 古いカードはすぐ外す（消える前の札が並びの幅に残らないように）
 	for c in _cards_row.get_children():
 		_cards_row.remove_child(c)
 		c.queue_free()
 	var cards := run.state.cards
+	var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
 	for i in cards.size():
 		var info := card_info(cards[i])
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(280 if cards.size() <= 3 else 210, 220)
-		b.text = "%d. %s\n%s\n\n%s" % [i + 1, info.tag, info.name, info.desc]
-		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.06, 0.08, 0.14, 0.95)
-		style.border_color = info.color
-		style.set_border_width_all(3)
-		style.set_corner_radius_all(6)
-		b.add_theme_stylebox_override("normal", style)
-		var hover := style.duplicate() as StyleBoxFlat
-		hover.bg_color = Color(0.12, 0.15, 0.24, 0.95)
-		b.add_theme_stylebox_override("hover", hover)
-		b.add_theme_stylebox_override("focus", hover)
+		b.position = Vector2(89 + i * (width + 16), 83)
+		b.size = Vector2(width, 193)
+		b.tooltip_text = "%s: %s" % [info.name, info.desc]
+		_card_art(b, Rect2(89, 83, 145, 193))
 		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
+		var font_size := 10 if cards.size() <= 3 else 8
+		for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
+			[Vector2(7, 34), Vector2(width - 14, 28), info.name],
+			[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
+			var label := Label.new()
+			label.position = entry[0]
+			label.size = entry[1]
+			label.text = entry[2]
+			label.add_theme_font_size_override("font_size", font_size)
+			label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.clip_text = true
+			label.max_lines_visible = 4 if entry[0].y == 65 else 2
+			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			b.add_child(label)
+		var card: Dictionary = cards[i]
+		var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
+		_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var start: bool = run.state.start_pick
 	var swap: StringName = run.state.swap_pick
 	if swap != &"":
 		var got: WeaponDef = ConfigManager.weapons[swap]
-		_cards_title.text = tr("hud.swap_title").format({name = got.get_display_name()}) + "\n" + got.get_description()
+		_cards_title.text = tr("hud.swap_title").format({name = got.get_display_name()})
 	else:
 		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
 	_reroll_button.disabled = left <= 0
 	_reroll_button.visible = swap == &""
-	_cards_box.reset_size()
-	_cards_box.position = (size - _cards_box.size) / 2.0
+	_layout_art()
 	if _cards_row.get_child_count() > 0:
 		_cards_row.get_child(0).grab_focus.call_deferred()
 
@@ -261,60 +395,43 @@ func _draw() -> void:
 	var s := run.state
 	if s == null:
 		return
-	var cfg := run.cfg
 	var W := size.x
-	var H := size.y
 	_pause_box.position = (size - _pause_box.size) / 2.0
 	if s.phase == RunState.Phase.DYING or s.phase == RunState.Phase.FINISHING:
 		_draw_banner()
 		return
+	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
+	draw_set_transform((size - ART_SIZE * factor) * 0.5, 0.0, Vector2.ONE * factor)
 	if show_minimap:
-		_draw_minimap(W)
-	if not show_status:
-		return
-	# 経験値バー（画面の上端）
-	draw_rect(Rect2(0, 0, W, 5), Color(1, 1, 1, 0.08))
-	draw_rect(Rect2(0, 0, W * clampf(s.xp / run.build.xp_needed(), 0.0, 1.0), 5), Color("#b8a0ff"))
-	# 経過時間（上部中央）
-	draw_string(_font, Vector2(W / 2.0 - 40, 44), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 30, Color("#e8f0ff"))
-	if s.bonus_t > 0.0:
-		draw_string(_font, Vector2(W / 2.0 - 120, 76), tr("hud.bonus").format({n = ceili(s.bonus_t)}), HORIZONTAL_ALIGNMENT_CENTER, 240, 22, Color("#d9a8ff"))
-	# 状態の文字（左上）
-	var atk := run.combat.attack_power()
-	var x := 16.0
-	draw_string(_font, Vector2(x, 32), "HP %d / %d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-	if W < 600.0:
-		draw_string(_font, Vector2(x, 52), "ATK %.1f  Lv %d" % [atk, s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 72), tr("hud.kills").format({n = s.kills}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 92), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
-	else:
-		draw_string(_font, Vector2(x, 52), "ATK %.1f   %s   Lv %d" % [atk, tr("hud.kills").format({n = s.kills}), s.level], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#e8f0ff"))
-		draw_string(_font, Vector2(x, 72), tr("common.parts").format({n = s.coins}), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color("#ffd24a"))
-	_draw_loadout(H)
-	_draw_boss(W)
-	_draw_gauge_ring()
+		_draw_minimap()
+	if show_status:
+		# 素材の体力枠の内側に、現在のHPの割合を描く。
+		var hp := clampf(s.ship_hp / maxf(1.0, s.stats.max_hp), 0.0, 1.0)
+		var health_color := Color("#ff526e") if hp < 0.3 else CYAN
+		_draw_bar(HEALTH, _health_fill, hp, health_color)
+		draw_string(_font, Vector2(7, 40), "%d/%d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CYAN)
+		draw_string(_font, Vector2(7, 52), "ATK %.1f  %s  Lv %d  %s" % [run.combat.attack_power(), tr("hud.kills").format({n = s.kills}), s.level, tr("common.parts").format({n = s.coins})], HORIZONTAL_ALIGNMENT_LEFT, 260, 8, CYAN)
+		_draw_bar(EXPERIENCE, _experience_fill, s.xp / run.build.xp_needed(), Color("#b8a0ff"))
+		draw_string(_font, Vector2(280, 23), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 15, CYAN)
+		if s.bonus_t > 0.0:
+			draw_string(_font, Vector2(240, 37), tr("hud.bonus").format({n = ceili(s.bonus_t)}), HORIZONTAL_ALIGNMENT_CENTER, 160, 10, CYAN)
+		_draw_loadout()
+	draw_set_transform(Vector2.ZERO)
+	if show_status:
+		_draw_boss(W)
+		_draw_gauge_ring()
 
 var _dense := PackedVector2Array()
 
 ## ミニマップ（右上）。円形の星図のようなレーダーに、フィールド全体を縮めて出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
-func _draw_minimap(W: float) -> void:
+func _draw_minimap() -> void:
 	var s := run.state
 	var cfg := run.cfg
 	var R := MINIMAP_R
-	var c := Vector2(W - R - 14.0, R + 14.0)
+	var c := Vector2(584, 55)
 	var k := R / cfg.field_radius
-	var line := Color(0.65, 0.78, 1.0, 0.14)
-	draw_circle(c, R, Color(0.03, 0.05, 0.12, 0.82))
-	for f in [0.33, 0.66]:
-		draw_arc(c, R * f, 0, TAU, 48, line, 1.0)
-	for n in 4:
-		var u := Vector2.from_angle(n * PI / 4.0) * R
-		draw_line(c - u, c + u, line, 1.0)
-	draw_arc(c, R, 0, TAU, 64, Color(0.7, 0.8, 1.0, 0.55), 1.5)
-	for n in 36:
-		var u := Vector2.from_angle(n * TAU / 36.0)
-		draw_line(c + u * R, c + u * (R - (5.0 if n % 3 == 0 else 2.5)), Color(0.7, 0.8, 1.0, 0.45), 1.0)
+	draw_texture(RADAR, Vector2.ZERO)
 	draw_circle(c, cfg.planet_radius * k, Color(0.45, 0.5, 0.65, 0.6))
 	# 敵の多い所（数フレームに1回数え直す）
 	if Engine.get_process_frames() % 15 == 0:
@@ -370,104 +487,55 @@ func _dense_cells() -> PackedVector2Array:
 	return out
 
 ## 装備一覧（左下）。武器と特性を別の段の枠に並べ、空き枠も薄く描いて持てる数を見せる（仕様書 17）。
-## 武器は角の四角、特性は丸い四角。枠の色と下の目盛りは強化の段階（仕様書 8）。
-## 枠の中は名前（アイコンができたら差し替える）。
-func _draw_loadout(H: float) -> void:
-	var s := run.state
-	var cfg := run.cfg
-	var trait_y := H - 8.0 - LOADOUT_TRAIT
-	var weapon_y := trait_y - 5.0 - LOADOUT_WEAPON
-	_draw_slot_row(weapon_y, LOADOUT_WEAPON, 2, cfg.weapon_slots, cfg.weapon_max_level, s.weapons, ConfigManager.weapons)
-	_draw_slot_row(trait_y, LOADOUT_TRAIT, 12, cfg.trait_slots, cfg.trait_max_stacks, s.traits, ConfigManager.traits)
-	_draw_hero_slot(Vector2(8.0 + cfg.weapon_slots * (LOADOUT_WEAPON + 4.0) + 8.0, weapon_y))
+## 下の目盛りは強化の段階（仕様書 8）。
+## 枠の中は能力IDに対応する専用アイコンを表示する。
+func _draw_loadout() -> void:
+	draw_texture(SLOTS, Vector2.ZERO)
+	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ConfigManager.weapons)
+	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ConfigManager.traits)
+	_draw_hero_slot(Vector2(99, 315))
 
-## 特別な枠（英雄の星座の力）。武器の段の横に置く。使えるまでの時間は下から暗く覆う（仕様書 17）。
 func _draw_hero_slot(at: Vector2) -> void:
 	var s := run.state
-	var rect := Rect2(at, Vector2(LOADOUT_WEAPON, LOADOUT_WEAPON))
-	var box := StyleBoxFlat.new()
-	box.set_corner_radius_all(LOADOUT_WEAPON / 2.0)
-	box.set_border_width_all(2)
-	var gold := Color("#ffe8a0")
 	if s.hero_power == &"":
-		box.bg_color = Color(1, 1, 1, 0.03)
-		box.border_color = Color(gold, 0.25)
-		draw_style_box(box, rect)
 		return
-	var def: HeroDef = ConfigManager.heroes.get(s.hero_power)
-	box.bg_color = Color(0.1, 0.08, 0.03, 0.85)
-	box.border_color = gold
+	var rect := Rect2(at + Vector2(3, 3), Vector2(32, 31))
+	var definition: HeroDef = ConfigManager.heroes.get(s.hero_power)
+	var gold := Color("#ffe8a0")
+	if definition != null and not definition.stars.is_empty():
+		var bounds := Rect2(definition.stars[0], Vector2.ZERO)
+		for point in definition.stars:
+			bounds = bounds.expand(point)
+		var factor := 24.0 / maxf(1.0, maxf(bounds.size.x, bounds.size.y))
+		var center := rect.get_center()
+		for i in range(0, definition.links.size(), 2):
+			var a := center + (definition.stars[definition.links[i]] - bounds.get_center()) * factor
+			var b := center + (definition.stars[definition.links[i + 1]] - bounds.get_center()) * factor
+			draw_line(a, b, gold, 1)
+		for point in definition.stars:
+			draw_circle(center + (point - bounds.get_center()) * factor, 1, gold)
 	if s.hero_active_t > 0.0:
-		var glow := box.duplicate() as StyleBoxFlat
-		glow.bg_color = Color.TRANSPARENT
-		glow.border_color = Color(gold, 0.4 + 0.3 * sin(Time.get_ticks_msec() / 120.0))
-		glow.set_border_width_all(3)
-		glow.set_expand_margin_all(4)
-		draw_style_box(glow, rect)
-	draw_style_box(box, rect)
-	_draw_fit_text(def.display_name if def != null else String(s.hero_power), rect.grow(-6.0), gold)
-	if s.hero_cd > 0.0 and def != null and def.cooldown > 0.0:
-		var k := s.hero_cd / def.cooldown
-		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1.0 - k)), Vector2(rect.size.x, rect.size.y * k)),
-			Color(0, 0, 0, 0.55))
-	var key := OS.get_keycode_string(InputActions.key_of(&"hero"))
-	draw_string(_font, rect.position + Vector2(rect.size.x - 12.0, rect.size.y + 2.0), key, HORIZONTAL_ALIGNMENT_LEFT,
-		-1, 12, Color(gold, 0.8))
+		draw_rect(rect, Color(gold, 0.2 + 0.1 * sin(Time.get_ticks_msec() / 120.0)))
+	if s.hero_cd > 0.0 and definition != null and definition.cooldown > 0.0:
+		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
+		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
+	draw_string(_font, at + Vector2(26, 32), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
 
-func _draw_slot_row(y: float, size_px: float, corner: int, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
+func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
-	for k in slots:
-		var rect := Rect2(8.0 + k * (size_px + 4.0), y, size_px, size_px)
-		var box := StyleBoxFlat.new()
-		box.set_corner_radius_all(corner)
-		box.set_border_width_all(2)
-		if k >= ids.size():
-			box.bg_color = Color(1, 1, 1, 0.03)
-			box.border_color = Color(1, 1, 1, 0.18)
-			draw_style_box(box, rect)
-			continue
+	for k in mini(slots, ids.size()):
+		var weapon := size_px == LOADOUT_WEAPON
+		var step := 23.0 if weapon else 15.0
+		var rect := Rect2((7.0 if weapon else 9.0) + k * step, y, size_px, size_px)
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
-		var def = defs[ids[k]]
-		box.bg_color = Color(0.04, 0.06, 0.11, 0.8)
-		box.border_color = col
-		var text_col := col
-		# 彗星限定の武器は赤い枠で、ほかの武器と見分ける
-		if def is WeaponDef and def.comet_only:
-			var glow := box.duplicate() as StyleBoxFlat
-			glow.bg_color = Color.TRANSPARENT
-			glow.border_color = Color(COMET_ONLY_COLOR, 0.35 + 0.25 * sin(Time.get_ticks_msec() / 250.0))
-			glow.set_border_width_all(3)
-			glow.set_expand_margin_all(3)
-			draw_style_box(glow, rect)
-			box.bg_color = Color(0.25, 0.03, 0.06, 0.88)
-			box.border_color = COMET_ONLY_COLOR
-			text_col = Color("#ffd9d9")
-		draw_style_box(box, rect)
-		_draw_fit_text(def.get_display_name(), Rect2(rect.position + Vector2(3, 3), Vector2(size_px - 6.0, size_px - 12.0)), text_col)
-		# 段階の目盛り（強化のない彗星限定の武器には出さない）
-		if def is WeaponDef and def.comet_only:
+		var definition = defs[ids[k]]
+		if definition is WeaponDef and definition.comet_only:
+			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
-		var pip_w := (size_px - 10.0 - (max_level - 1) * 2.0) / max_level
+		var pip_w := (size_px - 4.0) / max_level
 		for j in max_level:
-			var pip := Rect2(rect.position.x + 5.0 + j * (pip_w + 2.0), rect.end.y - 7.0, pip_w, 3.0)
-			draw_rect(pip, col if j < lv else Color(1, 1, 1, 0.15))
-
-## 枠に収まる大きさまで文字を小さくして、上寄せ・中央揃えで描く。
-func _draw_fit_text(text: String, area: Rect2, col: Color) -> void:
-	# 単語の途中では折らない。どの大きさでも収まらなければ、いちばん小さい大きさで途中でも折る
-	var flags := TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND
-	var font_size := 12
-	while true:
-		var sz := _font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, area.size.x, font_size, -1, flags)
-		if sz.x <= area.size.x + 0.5 and sz.y <= area.size.y:
-			break
-		if font_size <= 8:
-			flags |= TextServer.BREAK_ADAPTIVE
-			break
-		font_size -= 1
-	draw_multiline_string(_font, area.position + Vector2(0, _font.get_ascent(font_size)), text, HORIZONTAL_ALIGNMENT_CENTER,
-		area.size.x, font_size, -1, col, flags)
+			draw_rect(Rect2(rect.position.x + 2 + j * pip_w, rect.end.y - 3, maxf(1, pip_w - 1), 1), col if j < lv else Color(1, 1, 1, 0.15))
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses

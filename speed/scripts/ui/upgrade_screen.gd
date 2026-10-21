@@ -170,6 +170,16 @@ func _build_part(part: Array, tooltips: Texture2D) -> void:
 	button.position = bounds.position
 	var mask := BitMap.new()
 	mask.create_from_image_alpha(texture.get_image().get_region(bounds))
+	# 各行の輪郭の間も判定に含め、線画の内部をクリックできるようにする。
+	for y in bounds.size.y:
+		var first := bounds.size.x
+		var last := -1
+		for x in bounds.size.x:
+			if mask.get_bit(x, y):
+				first = mini(first, x)
+				last = x
+		if last >= first:
+			mask.set_bit_rect(Rect2i(first, y, last - first + 1, 1), true)
 	mask.grow_mask(3, Rect2i(Vector2i.ZERO, bounds.size))
 	button.texture_click_mask = mask
 	_canvas.add_child(button)

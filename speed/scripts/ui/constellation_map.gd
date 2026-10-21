@@ -7,6 +7,7 @@ const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
 const CONSTELLATION_RADIUS := 84.0
 const SYMBOL_ANGLES := [90.0, 180.0, 270.0, 0.0]
+const DRAG_THRESHOLD := 4.0
 const TEXTURES := [
 	preload("res://assets/ui/map/constellations_unicorn.png"),
 	preload("res://assets/ui/map/constellations_centeur.png"),
@@ -20,7 +21,6 @@ var _preview: TextureRect
 var _heading: Label
 var _status: Label
 var _launch: Button
-var _slider: HSlider
 var _selected := 0
 var _angle := 0.0
 var _turn: Tween
@@ -31,6 +31,12 @@ var _details: Control
 var _detail_fade: Tween
 var _transition_progress := 0.0
 var _dragging := false
+var _pointer_down := false
+var _press_position := Vector2.ZERO
+var _last_pointer := Vector2.ZERO
+var _last_drag_angle := 0.0
+var _radial_drag := true
+var _pressed_star := -1
 
 func _ready() -> void:
 	size = Vector2(640, 360)
@@ -102,19 +108,11 @@ func _ready() -> void:
 			_select(4)
 			_reveal_details()
 		)
-	_slider = HSlider.new()
-	_slider.position = Vector2(34, 333)
-	_slider.size = Vector2(170, 14)
-	_slider.min_value = -180
-	_slider.max_value = 180
-	_slider.step = 0.1
-	_slider.value_changed.connect(_slide)
-	_slider.drag_started.connect(func(): _dragging = true)
-	_slider.drag_ended.connect(func(_changed: bool):
-		_dragging = false
-		select_constellation(posmod(roundi(-_angle / 90.0), 4))
+	get_window().focus_exited.connect(func():
+		if _dragging:
+			select_constellation(posmod(roundi(-_angle / 90.0), 4))
+		_cancel_drag()
 	)
-	add_child(_slider)
 	_select(0)
 	_apply_rotation(0.0)
 	_hide_details()
@@ -183,16 +181,66 @@ func select_constellation(index: int) -> void:
 	_turn.tween_method(_apply_rotation, _angle, target, 0.65)
 	_turn.tween_callback(_reveal_details)
 
-func _slide(value: float) -> void:
-	if _turn != null:
-		_turn.kill()
-	_hide_details()
-	_select(posmod(roundi(-value / 90.0), 4))
-	_apply_rotation(value)
-	if not _dragging:
-		_turn = create_tween()
-		_turn.tween_interval(0.15)
-		_turn.tween_callback(func(): select_constellation(_selected))
+func _input(event: InputEvent) -> void:
+	if not is_visible_in_tree() or _transition_progress < 1.0:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var point: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
+		if event.pressed:
+			var star := _star_at(point)
+			var offset := (point - _origin) / Vector2(1.0, _flatten)
+			if star < 0 and offset.length() > 175.5:
+				return
+			_pointer_down = true
+			_dragging = false
+			_pressed_star = star
+			_press_position = point
+			_last_pointer = point
+			_last_drag_angle = offset.angle()
+			_radial_drag = offset.length() >= 20.0
+			if star >= 0:
+				_stars[star].grab_focus()
+		elif _pointer_down:
+			if _dragging:
+				select_constellation(posmod(roundi(-_angle / 90.0), 4))
+			elif _pressed_star >= 0 and _star_at(point) == _pressed_star:
+				select_constellation(_pressed_star)
+			_cancel_drag()
+		else:
+			return
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion and _pointer_down:
+		var point: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
+		if not _dragging and point.distance_to(_press_position) >= DRAG_THRESHOLD:
+			_dragging = true
+			if _turn != null:
+				_turn.kill()
+			_hide_details()
+		if _dragging:
+			var offset := (point - _origin) / Vector2(1.0, _flatten)
+			var delta_angle := (point.x - _last_pointer.x) * 0.7
+			if _radial_drag:
+				delta_angle = rad_to_deg(wrapf(offset.angle() - _last_drag_angle, -PI, PI)) if offset.length() >= 20.0 else 0.0
+			var angle := _angle + delta_angle
+			_select(posmod(roundi(-angle / 90.0), 4))
+			_apply_rotation(angle)
+			_last_drag_angle = offset.angle()
+			_last_pointer = point
+		get_viewport().set_input_as_handled()
+
+func _star_at(point: Vector2) -> int:
+	var found := -1
+	for i in _stars.size():
+		var star := _stars[i]
+		if Rect2(star.position, star.size * star.scale).has_point(point):
+			if found < 0 or star.z_index > _stars[found].z_index:
+				found = i
+	return found
+
+func _cancel_drag() -> void:
+	_pointer_down = false
+	_dragging = false
+	_pressed_star = -1
 
 func _select(index: int) -> void:
 	_selected = index
@@ -221,12 +269,11 @@ func _apply_rotation(degrees: float) -> void:
 		star.position = _origin + Vector2(cos(angle), depth * _flatten) * CONSTELLATION_RADIUS - TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
-	if _slider != null:
-		_slider.set_value_no_signal(wrapf(degrees, -180.0, 180.0))
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress
 	if progress < 1.0:
+		_cancel_drag()
 		_hide_details()
 	_origin = Vector2(462, 176).lerp(ORIGIN, progress)
 	_flatten = lerpf(1.0, 0.5, progress)
