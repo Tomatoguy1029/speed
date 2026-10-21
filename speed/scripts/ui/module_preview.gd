@@ -182,7 +182,7 @@ func _draw_effect(code: String) -> void:
 			for i in 5:
 				var pos := ship + Vector2.from_angle(i * TAU / 5) * (65 - pulse * 20)
 				draw_colored_polygon(PackedVector2Array([pos + Vector2(0, -7), pos + Vector2(5, 0), pos + Vector2(0, 7), pos + Vector2(-5, 0)]), _ink(Color("#c7a2ff")))
-		"speed", "length":
+		"speed", "length", "glideDuration":
 			for i in 3:
 				_line(ship + Vector2(-65, -15 + i * 15), ship + Vector2(-27, -15 + i * 15), CYAN, 2.0)
 			if code == "length":

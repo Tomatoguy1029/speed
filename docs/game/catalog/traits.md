@@ -4,7 +4,7 @@
 
 表示用の名前・説明は [ゲーム内文言](../text.md) を正とする。採用判断が未決の [文言案](../../proposals/text.md) で、T01・T04 を検討する。
 
-数値の正は文書ではなく `.tres`。各特性の数値は `speed/data/traits/<ID>_<内部ID>.tres` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。能力値を変える特性（T07〜T12、T14）は、重ねるごとの効果を `per_stack`（T09 は上限 `max` も）に持つ。
+数値の正は文書ではなく `.tres`。各特性の数値は `speed/data/traits/<ID>_<内部ID>.tres` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。能力値を変える特性（T07〜T12、T14、T31）は、重ねるごとの効果を `per_stack`（T09 は上限 `max` も）に持つ。
 
 ## 採用
 
@@ -23,6 +23,11 @@
 | T12 | 広域回収 | 採用 | 回収範囲が広がる | アイテムに近づく必要が減る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T12_pickup.tres` | [demo T12](../../../demo/docs/traits.md) `pickup`。最大3重ね |
 | T13 | 反応波動 | 採用 | 実際にダメージを受けたとき、周りを押し返す波動 | 被弾のあとの周りを押し返す | 実装済み。`scripts/traits/reactive.gd`、`data/traits/T13_reactive.tres` | [demo T13](../../../demo/docs/traits.md) `reactive`。最大3重ね |
 | T14 | 軌跡延長 | 採用 | 描ける長さが伸びる。容量・最高速度とは別の倍率 | 複数の群れを1回で通る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T14_length.tres` | [demo T14](../../../demo/docs/traits.md) `length`。最大3重ね |
+| T31 | 高速持続（仮名） | 採用 | 突進後の保持時間と減速時間を同じ倍率で伸ばす | 突破後に高速で移動できる時間が伸びる | 実装済み。`BuildManager.refresh_stats()`、`ShipManager._step()`、`data/traits/T31_glideDuration.tres` | 最大3重ね。名称・数値の品質確認は未完了 |
+
+### T31 高速持続
+
+重ね数ごとの時間倍率は `data/traits/T31_glideDuration.tres` の `per_stack` から求める。最大3重ねまで、保持時間と巡航へ戻る減速時間を同じ割合で伸ばす。数値は試遊用の暫定値。カード・装備枠の仮アイコンは最高速度の共通素材を使う。[demo T23](../../../demo/docs/traits.md) は衝突後の加速持続と射出への持ち越しを扱う別項目。
 
 ## 保留・不採用
 

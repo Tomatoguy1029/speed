@@ -84,8 +84,10 @@ func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 		state.glide_t += dt
 		var cruise := state.stats.max_speed * cfg.steer_cruise
 		var sp := state.glide_speed
-		if state.glide_t > cfg.glide_hold:
-			var k := (state.glide_t - cfg.glide_hold) / maxf(0.001, cfg.glide_fade)
+		var hold := cfg.glide_hold * state.stats.glide_duration_mult
+		var fade := cfg.glide_fade * state.stats.glide_duration_mult
+		if state.glide_t > hold:
+			var k := (state.glide_t - hold) / maxf(0.001, fade)
 			if k >= 1.0:
 				state.glide = false
 				sp = cruise

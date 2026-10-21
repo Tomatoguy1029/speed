@@ -322,7 +322,7 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var texture: Texture2D = definition.icon_texture if definition is WeaponDef else null
+	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef else null
 	if texture == null:
 		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
 		var index := ICON_IDS.find(icon_id)
@@ -578,7 +578,7 @@ static func card_info(c: Dictionary) -> Dictionary:
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
 		tag = "card.first_weapon"
-	var suffix := "Lv%d" % lv if weapon else "%d/5" % lv
+	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ConfigManager.cfg.trait_max_stacks]
 	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 

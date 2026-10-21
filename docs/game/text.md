@@ -225,6 +225,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T13.desc | ダメージを受けたとき、周りを押し返す | Pushes nearby enemies away when you take damage. |
 | trait.T14.name | 軌跡延長 | Trail Extension |
 | trait.T14.desc | 描ける長さが伸びる（+25% ずつ） | Draw longer lines (+25% each). |
+| trait.T31.name | 高速持続 | Extended Glide |
+| trait.T31.desc | 突進後の高速状態が長く続く | Stay fast longer after a dash. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
 | legendary.legendary&#95;compass.name | 羅針盤のモジュール | Compass Module |
 | legendary.legendary&#95;compass.desc | らしんばん座を解放したときに残された、錆びついたモジュール。 | A rusted module left behind when Pyxis was freed. |

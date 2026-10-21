@@ -45,6 +45,7 @@ func refresh_stats() -> void:
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
 	s.length_mult = _meta_mult(&"length") * (1.0 + _per(&"T14") * _n(&"T14"))
+	s.glide_duration_mult = 1.0 + _per(&"T31") * _n(&"T31")
 	s.xp_mult = _meta_mult(&"xp")
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max

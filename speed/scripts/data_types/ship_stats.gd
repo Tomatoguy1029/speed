@@ -16,4 +16,6 @@ var charge_time := 0.0
 var capacity := 1.0
 ## 描ける長さの倍率（軌跡延長）
 var length_mult := 1.0
+## 突進後の保持・減速時間の倍率（高速持続）
+var glide_duration_mult := 1.0
 var xp_mult := 1.0
