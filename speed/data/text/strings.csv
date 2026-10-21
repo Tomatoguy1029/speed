@@ -142,7 +142,7 @@ weapon.W07.desc,高速で実際に通った線に機雷を残す。遅れて入�
 weapon.W08.name,ソニックブーム,Sonic Boom
 weapon.W08.desc,駆け抜け始めと一定間隔で、進路ごと大きな衝撃波,A huge shockwave along your path when a dash starts and at regular intervals.
 weapon.W17.name,接触電撃,Contact Arc
-weapon.W17.desc,敵に触れると、近くの敵へ電撃がつながる。Lv ごとにつながる数が増える,Touching an enemy arcs lightning to nearby enemies. Each level chains to more.
+weapon.W17.desc,敵に触れると、周りの敵へ電撃が枝分かれして広がる。Lv ごとにつながる数が増える,Touching an enemy branches lightning out to surrounding enemies. Each level reaches more.
 weapon.W21.name,質量牽引砲,Mass Tow Cannon
 weapon.W21.desc,なぞり中に機体の近くで倒れた敵の船体を牽引し、なぞり終えると進む向きへ次々と撃ち出す,"Tows the hulls of enemies defeated near your ship mid-dash, then fires them ahead one by one when the dash ends."
 weapon.W22.name,双極ビーム,Bipolar Beam

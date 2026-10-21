@@ -121,12 +121,15 @@ func _draw_effect(code: String) -> void:
 				draw_circle(pos, 7, _ink(Color("#ff7b54")))
 				_ring(pos, 11, Color(1, 0.6, 0.4, 0.5))
 		"contactArc":
-			var points := PackedVector2Array([ship + Vector2(20, 0), Vector2(-35, -20), Vector2(25, -45), Vector2(110, 30)])
+			var origin := Vector2(-35, -20)
+			var points := PackedVector2Array([ship + Vector2(20, 0), origin,
+				origin, Vector2(-90, -55), origin, Vector2(25, -65), origin, Vector2(40, 45),
+				Vector2(40, 45), Vector2(110, 30)])
 			var age := fmod(_clock, 0.8) if animated and known else 0.05
 			var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
-			for i in range(1, points.size()):
-				PIXEL_LIGHTNING.draw(self, points[i - 1], points[i], 2.0, i * 313 + shape * 101, PIXEL_LIGHTNING.intensity(age, 0.22))
-			for pos in [Vector2(-35, -20), Vector2(25, -45), Vector2(110, 30)]:
+			for i in range(0, points.size(), 2):
+				PIXEL_LIGHTNING.draw(self, points[i], points[i + 1], 2.0, i * 313 + shape * 101, PIXEL_LIGHTNING.intensity(age, 0.22))
+			for pos in [origin, Vector2(-90, -55), Vector2(25, -65), Vector2(40, 45), Vector2(110, 30)]:
 				_sprite(ENEMY, pos, 30.0)
 		"endBlast":
 			_burst(end, 42 + pulse * 12)

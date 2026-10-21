@@ -432,7 +432,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
 			&"bolt":
 				_bolt_seed += 1
-				bolts.append({"points": ev.points, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
+				bolts.append({"segments": ev.segments, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -1661,9 +1661,9 @@ func _draw_fx(c: CanvasItem) -> void:
 		var age: float = bo.max - bo.life
 		var alpha := PIXEL_LIGHTNING.intensity(age, bo.max)
 		var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
-		var pts := PackedVector2Array(bo.points)
-		for i in range(1, pts.size()):
-			PIXEL_LIGHTNING.draw(c, pts[i - 1], pts[i], _px(2.0), int(bo.seed) * 7919 + i * 313 + shape * 101, alpha)
+		var segments: PackedVector2Array = bo.segments
+		for i in range(0, segments.size(), 2):
+			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1], _px(2.0), int(bo.seed) * 7919 + i * 313 + shape * 101, alpha)
 	for r in rings:
 		var k: float = r.life / r.max
 		var col: Color = r.color
