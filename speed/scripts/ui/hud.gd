@@ -36,6 +36,15 @@ const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
 @export var run_path: NodePath
+## カードを表示してから選択を受け付けるまでの実秒。
+@export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
+
+var _cards_accept_at := 0
+var _card_blocked_pointer_frame := -1
+var _card_blocked_pointer_pos := Vector2.ZERO
+## 表示切替前からの押下と、離すまで破棄する押下（マウス・タッチ・選択キー）。
+var _card_held: Dictionary = {}
+var _card_discard: Dictionary = {}
 
 var run: RunManager
 var _font: Font
@@ -131,6 +140,60 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"boss_explode":
 				AudioManager.play(&"boom")
 
+## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
+func _input(event: InputEvent) -> void:
+	if run == null or run.state == null or run.state.lab_mode:
+		return
+	var id := _card_input_id(event)
+	if id == "":
+		return
+	var choosing := run.state.phase == RunState.Phase.LEVELUP
+	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
+	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
+		if event.device == -1 and blocked:
+			_card_blocked_pointer_frame = Engine.get_process_frames()
+			_card_blocked_pointer_pos = event.position
+		elif event.device != -1 and _card_blocked_pointer_frame == Engine.get_process_frames() and event.position == _card_blocked_pointer_pos:
+			blocked = true
+	if not event is InputEventScreenDrag:
+		if event.is_pressed():
+			_card_held[id] = true
+			if blocked:
+				_card_discard[id] = true
+		else:
+			_card_held.erase(id)
+			_card_discard.erase(id)
+	# タッチの選択は既存のマウス擬似イベントに任せ、元のタッチをゲームへ漏らさない。
+	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
+		get_viewport().set_input_as_handled()
+
+func _card_input_id(event: InputEvent) -> String:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		return "mouse:%d" % event.device
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		return "touch:%d:%d" % [event.device, event.index]
+	var id := ""
+	if event is InputEventKey:
+		id = "key:%d:%d" % [event.device, event.physical_keycode if event.physical_keycode != 0 else event.keycode]
+	elif event is InputEventJoypadButton:
+		id = "joy:%d:%d" % [event.device, event.button_index]
+	elif event is InputEventAction:
+		id = "action:%s" % event.action
+	if id != "":
+		if _card_held.has(id) or _card_discard.has(id):
+			return id
+		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept"]:
+			if event.is_action(action):
+				return id
+	return ""
+
+func _card_command(command: StringName, args := {}) -> void:
+	if run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+		return
+	_card_discard.merge(_card_held)
+	run.command(command, args)
+
 func _unhandled_input(event: InputEvent) -> void:
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
 	if _settings != null or run.state.lab_mode:
@@ -143,10 +206,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		for i in 3:
 			if event.is_action_pressed(StringName("card_%d" % (i + 1))):
 				get_viewport().set_input_as_handled()
-				run.command(&"choose_card", {"index": i})
+				_card_command(&"choose_card", {"index": i})
 		if event.is_action_pressed(&"reroll"):
 			get_viewport().set_input_as_handled()
-			run.command(&"reroll")
+			_card_command(&"reroll")
+		# カードの外を押しても、再開後の描画入力として残さない。
+		if _card_input_id(event) != "":
+			get_viewport().set_input_as_handled()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null and not run.state.lab_mode:
@@ -254,7 +320,7 @@ func _build_cards() -> void:
 	_reroll_button.size = Vector2(112, 29)
 	_reroll_button.add_theme_font_size_override("font_size", 9)
 	_card_art(_reroll_button, Rect2(265, 288, 112, 29))
-	_reroll_button.pressed.connect(func(): run.command(&"reroll"))
+	_reroll_button.pressed.connect(func(): _card_command(&"reroll"))
 	_cards_box.add_child(_reroll_button)
 	add_child(_cards_box)
 
@@ -273,6 +339,10 @@ func _card_art(button: Button, region: Rect2) -> void:
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 
 func _show_cards() -> void:
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_card_discard.merge(_card_held)
+	run.input.cancel_gesture()
+	# 古いカードはすぐ外す（消える前の札が並びの幅に残らないように）
 	for c in _cards_row.get_children():
 		_cards_row.remove_child(c)
 		c.queue_free()
@@ -285,7 +355,7 @@ func _show_cards() -> void:
 		b.size = Vector2(width, 193)
 		b.tooltip_text = "%s: %s" % [info.name, info.desc]
 		_card_art(b, Rect2(89, 83, 145, 193))
-		b.pressed.connect(func(): run.command(&"choose_card", {"index": i}))
+		b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
 		_cards_row.add_child(b)
 		var font_size := 10 if cards.size() <= 3 else 8
 		for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
