@@ -91,6 +91,13 @@ func _draw_effect(code: String) -> void:
 		ship = end
 	_sprite(SHIP, ship, 46.0, PI / 2.0)
 	match code:
+		"afterimage":
+			for i in 3:
+				var distance := fmod(_clock * 100.0 + i * 55.0, 180.0)
+				var pos := ship + Vector2(-45.0 - distance, 0)
+				_sprite(SHIP, pos, 46.0, PI / 2.0)
+				_line(pos + Vector2(-36, -8), pos + Vector2(-24, -8), CYAN, 2.0)
+				_line(pos + Vector2(-36, 8), pos + Vector2(-24, 8), CYAN, 2.0)
 		"forward", "scatter", "rear":
 			var shots := 5 if code == "scatter" else 2
 			var direction := -1.0 if code == "rear" else 1.0

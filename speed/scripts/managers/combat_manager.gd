@@ -340,14 +340,18 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
-	if build.capture_hull(i):
+	# 残像の追撃は直撃だけで完結させ、牽引・攻撃破片・撃破発動の武器/特性を複製しない。
+	if cause == &"afterimage":
+		t.hull_scattered[i] = 1
+	elif build.capture_hull(i):
 		t.hull_scattered[i] = 1
 	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
 		projectiles.scatter_hull(i, dir, speed, attack_power() * cfg.hull_debris_damage)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	build.on_kill(cause)
+	if cause != &"afterimage":
+		build.on_kill(cause)
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:

@@ -120,6 +120,11 @@ func tick(real_dt: float, world_dt: float) -> void:
 	_update_sonic(real_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	var afterimage = weapon_behaviors.get(&"W27")
+	if afterimage != null:
+		afterimage.replay(real_dt)
+		if state.phase != RunState.Phase.PLAY:
+			return
 	if world_dt > 0.0:
 		for b in weapon_behaviors.values():
 			b.tick(world_dt, busy)

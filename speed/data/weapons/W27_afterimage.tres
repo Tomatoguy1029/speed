@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/combat/afterimage_icon.svg" id="2"]
+
+[resource]
+script = ExtResource("1")
+level_steps = PackedInt32Array(1, 2, 3, 4, 5)
+params = {
+"echo_count_by_level": [1, 2, 3, 4, 5],
+"echo_total_by_level": [0.2, 0.275, 0.35, 0.425, 0.5],
+"echo_delay": 0.10
+}
+id = &"W27"
+code_id = &"afterimage"
+icon_texture = ExtResource("2")

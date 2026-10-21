@@ -289,6 +289,10 @@ func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
 		return
 	state.phase = phase
+	if phase in [RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		var afterimage = build.weapon_behaviors.get(&"W27")
+		if afterimage != null:
+			afterimage.clear()
 	phase_changed.emit(phase)
 
 # ── カメラ（仕様書 15） ──────────────────────────────────────────

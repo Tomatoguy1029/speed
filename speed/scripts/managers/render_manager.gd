@@ -116,6 +116,7 @@ var _exhaust: Array[Dictionary] = []
 var _glide_wake: Node2D
 var _light_lance: Node2D
 var _dash_range_drone: Node2D
+var _afterimage: Node2D
 
 func _ready() -> void:
 	run = get_node("../RunManager") as RunManager
@@ -171,6 +172,11 @@ func _ready() -> void:
 	_dash_range_drone.name = "DashRangeDrone"
 	_dash_range_drone.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.ship.add_child(_dash_range_drone)
+	_afterimage = preload("res://scripts/render/afterimage.gd").new()
+	_afterimage.name = "Afterimages"
+	_afterimage.z_index = -1
+	_afterimage.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+	_layers.ship.add_child(_afterimage)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -330,6 +336,7 @@ func _process(delta: float) -> void:
 	_glide_wake.step(dt, state, cfg, run.build.weapon_behaviors.has(&"W08"))
 	_light_lance.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W24"), cam_zoom)
 	_dash_range_drone.step(run.build.weapon_behaviors.get(&"W26"), cfg, cam_zoom)
+	_afterimage.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W27"))
 	_update_view()
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
