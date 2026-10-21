@@ -6,7 +6,8 @@ uniform vec4 light_color : source_color = vec4(0.89, 0.73, 0.42, 1.0);
 uniform float intensity : hint_range(0.0, 1.0) = 0.7;
 uniform float arrival : hint_range(0.0, 1.0) = 1.0;
 uniform float exposure : hint_range(0.0, 1.0) = 0.0;
-uniform float core_strength : hint_range(0.0, 4.0) = 0.65;
+uniform float core_strength : hint_range(0.0, 4.0) = 3.6;
+uniform float core_radius : hint_range(0.08, 0.35) = 0.22;
 uniform float broad_ray_strength : hint_range(0.0, 4.0) = 1.2;
 uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.75;
 uniform float ray_reach : hint_range(0.3, 2.0) = 1.0;
@@ -51,16 +52,18 @@ void fragment() {
 		float length_fade = exp(-radius / ray_reach * mix(2.0, 5.0, hash(seed + 40.0)));
 		fine += exp(-pow(d / width, 2.0)) * length_fade * mix(0.3, 1.0, hash(seed + 70.0));
 	}
-	float core = exp(-radius * radius * 52.0) * core_strength;
+	float core = exp(-pow(radius / core_radius, 2.0)) * core_strength;
 	float haze = exp(-radius * radius * 26.0) * 0.14;
 	float shroud = cloud(p * 14.0 + vec2(arrival * 0.1, 0.0));
 	float veil = mix(0.2 + shroud * 0.8, 1.0, exposure);
 	float ray_mask = smoothstep(0.025, 0.07, radius);
 	float rays = (broad * broad_ray_strength + fine * fine_ray_strength) * ray_mask * veil;
-	// 材質が読める低い明度を保つ。輪郭近傍のオーラは別パスが担う。
-	vec3 white = vec3(1.0, 0.96, 0.82);
+	// 白く飽和する光源を背面に置き、外側で金色へつなぐ。前面の材質は別パスで遮蔽する。
+	vec3 white = vec3(1.0);
 	vec3 gold = light_color.rgb;
-	vec3 emission = white * core * (0.55 + surge * 0.6);
+	float warmth = smoothstep(core_radius * 0.7, core_radius * 1.6, radius);
+	vec3 core_color = mix(white, mix(gold, white, 0.25), warmth);
+	vec3 emission = core_color * core * (0.55 + surge * 0.6);
 	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.85 + surge * 0.4);
 	emission += gold * haze;
 	float noise = fract(sin(dot(pixel, vec2(12.9898, 78.233))) * 43758.5453);

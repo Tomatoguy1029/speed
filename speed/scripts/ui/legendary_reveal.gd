@@ -8,7 +8,8 @@ const DESIGN := Vector2(640, 360)
 @export_range(0.0, 1.0) var light_strength := 0.8
 @export_range(0.0, 1.0) var background_dim := 0.97
 @export_group("補助の後光")
-@export_range(0.0, 4.0, 0.05) var white_core_strength := 0.65
+@export_range(0.0, 4.0, 0.05) var white_core_strength := 3.6
+@export_range(0.08, 0.35, 0.01) var white_core_radius := 0.22
 @export_range(0.0, 4.0, 0.05) var broad_ray_strength := 1.2
 @export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.75
 @export_range(0.3, 2.0, 0.05) var backlight_reach := 1.0
@@ -156,6 +157,7 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("arrival", arrival)
 	_light_material.set_shader_parameter("exposure", exposure)
 	_light_material.set_shader_parameter("core_strength", white_core_strength)
+	_light_material.set_shader_parameter("core_radius", white_core_radius)
 	_light_material.set_shader_parameter("broad_ray_strength", broad_ray_strength)
 	_light_material.set_shader_parameter("fine_ray_strength", fine_ray_strength)
 	_light_material.set_shader_parameter("ray_reach", backlight_reach)
