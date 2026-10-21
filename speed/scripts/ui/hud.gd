@@ -46,6 +46,7 @@ var _card_blocked_pointer_pos := Vector2.ZERO
 var _card_held: Dictionary = {}
 var _card_discard: Dictionary = {}
 
+var _rewards: Control
 var run: RunManager
 var _font: Font
 var _cards_box: Control
@@ -96,6 +97,9 @@ func _ready() -> void:
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_build_cards()
+	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
+	add_child(_rewards)
+	_rewards.active_changed.connect(_on_reward_active)
 	resized.connect(_layout_cards)
 	_build_pause()
 	_draw_button = Button.new()
@@ -110,8 +114,16 @@ func _ready() -> void:
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
 
+func _on_reward_active(active: bool) -> void:
+	run.ui_reward_active = active
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
+	if not active:
+		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+
 func _on_phase(phase: RunState.Phase) -> void:
-	_cards_box.visible = phase == RunState.Phase.LEVELUP
+	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
 	_pause_box.visible = phase == RunState.Phase.PAUSED
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
@@ -119,6 +131,8 @@ func _on_phase(phase: RunState.Phase) -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"level_bonus":
+				_rewards.enqueue_bonus(ev)
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
@@ -159,7 +173,7 @@ func _input(event: InputEvent) -> void:
 	if id == "":
 		return
 	var choosing := run.state.phase == RunState.Phase.LEVELUP
-	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -200,13 +214,16 @@ func _card_input_id(event: InputEvent) -> String:
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+	if _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
+	if _rewards.is_active():
+		get_viewport().set_input_as_handled()
+		return
 	if _settings != null or run.state.lab_mode:
 		return
 	var s := run.state

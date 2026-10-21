@@ -18,6 +18,8 @@ var state: RunState
 var cfg: GameConfig
 ## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
 var options: Dictionary = {}
+## 報酬演出中は世界と時計を保留し、HUD が実時間で演出を進める。
+var ui_reward_active := false
 var input_source: Callable
 var encounters
 const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
@@ -144,7 +146,7 @@ func _wire() -> void:
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	if state.lab_mode:
+	if state.lab_mode or ui_reward_active:
 		return
 	match state.phase:
 		RunState.Phase.PLAY:
@@ -419,6 +421,8 @@ func finish(cleared: bool) -> void:
 
 ## UI と入力からの命令（設計書 4.3）。
 func command(name: StringName, args := {}) -> void:
+	if ui_reward_active and name in [&"choose_card", &"reroll", &"pause", &"resume", &"draw_button"]:
+		return
 	match name:
 		&"choose_card":
 			choose_card(args.get("index", 0))
