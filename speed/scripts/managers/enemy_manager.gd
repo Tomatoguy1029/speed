@@ -32,6 +32,9 @@ const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &
 	&"guard": EnemyTable.Gate.GUARD, &"solid": EnemyTable.Gate.SOLID,
 	&"ghost": EnemyTable.Gate.GHOST, &"immortal": EnemyTable.Gate.IMMORTAL}
 
+const CORONA_VORTEX := preload("res://scripts/enemies/corona_vortex.gd")
+var corona := CORONA_VORTEX.new()
+
 var table := EnemyTable.new()
 var slots: RowSlots
 ## 行動の種類ごとの行番号の一覧（ボスと隕石は入らない）
@@ -99,10 +102,6 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 		_add_beh(i)
 	if t.beh[i] == EnemyTable.Beh.TRIANGLE:
 		_spawn_triangle_stars(i)
-	elif t.beh[i] == EnemyTable.Beh.CORONA:
-		var star := def_of(&"corona_star")
-		for k in int(def.params.stars):
-			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
 	elif t.beh[i] == EnemyTable.Beh.CROW and not opts.get("flock_member", false):
 		_spawn_flock(i, opts)
 	# 強敵と大物の出現は、プレイの記録が倒れるまでを追う
@@ -341,6 +340,7 @@ func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
 		return
 	table.dead[i] = 1
+	corona.release(self, i)
 	_dead_rows.append(i)
 
 ## 使用中の行の数（隕石・ボス・空きに戻る前の撃破済みを含む）。
@@ -356,6 +356,7 @@ func clear_regular() -> void:
 
 ## 全部の敵を消す（計測・確認用のツールが使う）。
 func clear_all() -> void:
+	corona.clear()
 	slots.clear()
 	_tele_rays.clear()
 	for b in EnemyTable.Beh.size():
@@ -370,6 +371,7 @@ func _add_beh(i: int) -> void:
 
 ## 行 i を空きに戻す。行動の種類ごとの一覧からは、最後の行と入れ替えて外す。
 func _release_row(i: int) -> void:
+	corona.release(self, i)
 	var s := table.beh_slot[i]
 	if s >= 0:
 		var rows := beh_rows[table.beh[i]]
@@ -430,6 +432,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA,
 			EnemyTable.Beh.SOLDIER, EnemyTable.Beh.DOLPHIN, EnemyTable.Beh.CROSS]:
 		_tick_behavior(b, world_dt)
+	corona.tick(self, world_dt)
 	_flush_new()
 
 ## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
@@ -470,7 +473,7 @@ func _tick_biters(dt: float) -> void:
 	var bite_dmg := 0.0
 	projectiles.lab_context = 0
 	for i in rows:
-		if dead[i] != 0:
+		if dead[i] != 0 or corona.members.has(i):
 			continue
 		if stone[i] > 0.0:
 			stone[i] -= dt
@@ -567,7 +570,7 @@ func _tick_chase(dt: float) -> void:
 	var stone := t.stone
 	var lod_lim := vh * 1.25 + Vector2(300, 300)
 	for i in beh_rows[EnemyTable.Beh.CHASE]:
-		if dead[i] != 0:
+		if dead[i] != 0 or corona.members.has(i):
 			continue
 		if stone[i] > 0.0:
 			stone[i] -= dt
@@ -623,7 +626,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var vc := state.view_center
 	var lim := state.view_half * 1.25 + Vector2(300, 300)
 	for i in beh_rows[b]:
-		if dead[i] != 0:
+		if dead[i] != 0 or corona.members.has(i):
 			continue
 		if stone[i] > 0.0:
 			# 石になっている間は動かない
@@ -649,7 +652,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			if not _lab_admit(i, bdt):
+			if b != EnemyTable.Beh.CORONA and not _lab_admit(i, bdt):
 				_chase(i, bdt)
 				pos[i] += vel[i] * dt
 				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
@@ -738,7 +741,6 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_auriga(i, bdt)
 				EnemyTable.Beh.CORONA:
 					_chase(i, bdt)
-					_corona(i, bdt)
 				EnemyTable.Beh.CEPHEUS:
 					_cepheus(i, bdt)
 				EnemyTable.Beh.SOLDIER:
@@ -1687,38 +1689,6 @@ func _auriga(i: int, dt: float) -> void:
 		projectiles.fire_wall(from, seg.angle(), seg.length(), float(p.trail_width), 0.0, float(p.trail_time),
 			float(p.bullet_dmg), Color("#ff8a3c"))
 
-## みなみのかんむり座：周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る。
-## 輪が広がっている間（mode が DASH）、輪の星に触れた機体は外へ押し出される。
-func _corona(i: int, dt: float) -> void:
-	var t := table
-	var p: Dictionary = t.def[i].params
-	t.facing[i] += float(p.spin) * dt
-	match t.mode[i]:
-		EnemyTable.Mode.MOVE:
-			t.fire_t[i] -= dt
-			t.timer[i] = maxf(0.0, t.timer[i] - dt / float(p.expand_time))
-			if t.fire_t[i] <= 0.0:
-				t.mode[i] = EnemyTable.Mode.DASH
-				t.fire_t[i] = float(p.fire_interval)
-		_:
-			t.timer[i] += dt / float(p.expand_time)
-			if t.timer[i] >= 1.0 + float(p.hold_time) / float(p.expand_time):
-				t.mode[i] = EnemyTable.Mode.MOVE
-	var ring := float(p.ring) * (1.0 + (float(p.expand) - 1.0) * smoothstep(0.0, 1.0, minf(t.timer[i], 1.0)))
-	var parts := t.parts[i]
-	var n := parts.size() / 2
-	for k in n:
-		var j := parts[k * 2]
-		if not self.is_same(j, parts[k * 2 + 1]) or t.dead[j] != 0:
-			continue
-		t.pos[j] = t.pos[i] + Vector2.from_angle(t.facing[i] + TAU * k / float(n)) * ring
-		if t.mode[i] == EnemyTable.Mode.DASH:
-			var d := state.ship_pos - t.pos[j]
-			var reach := t.r[j] + cfg.ship_radius
-			if d.length_squared() < reach * reach:
-				var out := (state.ship_pos - t.pos[i]).normalized()
-				state.ship_vel += out * float(p.push) * dt
-
 ## いるか座：距離を保ち、間隔ごとに構えて（WINDUP。機体の方へ向き直りながら、撃つ向きを予告する）、機体の方へ大きな扇の波動を撃つ。
 ## 波動は数層の弧でできたひとまとまりの一発で、当たるのは先頭の1枚だけ。機体にもほかの敵にも当たる（敵に敵を倒させる）。
 func _dolphin(i: int, dt: float) -> void:
@@ -2483,9 +2453,12 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 
 ## 遠くへ離れた敵を、画面外の出現位置へ移す。HP などは保ち、撃破・経験値・ドロップは発生しない。
 func _recycle(i: int) -> bool:
+	if corona.members.has(i):
+		return false
 	var p = spawn_point()
 	if p == null:
 		return false
+	corona.release(self, i)
 	var t := table
 	t.pos[i] = p
 	var to_ship: Vector2 = (state.ship_pos - p).normalized()
@@ -2521,16 +2494,18 @@ func _lab_admit(i: int, dt: float) -> bool:
 	elif def.behavior == &"sniper":
 		due = table.charge[i] >= 0.8
 		active = table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER
-	elif def.behavior in [&"aquarius", &"cross", &"dolphin"]:
+	elif def.behavior in [&"aquarius", &"cross", &"dolphin", &"corona"]:
 		# 間隔が過ぎた瞬間から予告を始める種類
 		due = table.fire_t[i] <= dt
 	elif def.behavior == &"ruler":
 		active = table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.RECOVER] or not table.links[i].is_empty()
 		due = table.buds[i] != 0 and table.mode[i] == EnemyTable.Mode.DASH and table.timer[i] <= dt
-	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
+	elif def.behavior in [&"clock", &"triangle", &"rocket"]:
 		due = true
 	if not active and due:
 		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
+		if def.behavior == &"corona":
+			duration = float(p.telegraph) + TAU / maxf(absf(float(p.spin)), 0.1) + float(p.throw_life)
 		if p.has("laser_charge"):
 			duration = maxf(0.0, 1.0 - table.charge[i]) * float(p.lock_fill) + float(p.laser_charge) + float(p.laser_delay) + float(p.laser_time) + 0.1
 		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight

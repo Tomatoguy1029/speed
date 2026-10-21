@@ -67,6 +67,8 @@ func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
 func texture_for(id: String) -> Texture2D:
+	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
+		return preload("res://assets/placeholders/corona_crown.svg")
 	if RenderManager.LAYERED_ENEMIES.has(StringName(id)):
 		return RenderManager.layered_texture(StringName(id))
 	if id.begins_with("field_planet"):

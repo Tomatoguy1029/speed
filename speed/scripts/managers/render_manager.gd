@@ -13,10 +13,6 @@ const LAYERED_ENEMIES := {
 		preload("res://assets/pixel/crab/cancer_armor.png"), preload("res://assets/pixel/crab/cancer_normal.png"), PI / 2.0],
 	&"dolphin": [preload("res://assets/pixel/dolphin/dolphin_base.png"),
 		preload("res://assets/pixel/dolphin/dolphin_armor.png"), preload("res://assets/pixel/dolphin/dolphin_normal.png"), PI / 2.0],
-	&"corona": [preload("res://assets/pixel/corona/crown_base.png"),
-		preload("res://assets/pixel/corona/crown_armor.png"), preload("res://assets/pixel/corona/crown_normal.png"), PI / 2.0],
-	&"corona_star": [preload("res://assets/pixel/corona/crown_pieces_base.png"),
-		preload("res://assets/pixel/corona/crown_pieces_armor.png"), preload("res://assets/pixel/corona/crown_pieces_normal.png"), PI / 2.0],
 	&"triangle": [preload("res://assets/pixel/triangle/triangle_center_base.png"),
 		preload("res://assets/pixel/triangle/triangle_center_armor.png"), preload("res://assets/pixel/triangle/triangle_center_normal.png"), PI / 2.0],
 	&"triangle_star": [preload("res://assets/pixel/triangle/triangle_nodes_base.png"),
@@ -791,6 +787,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		batch.end()
 	_draw_swallows(c)
 	_draw_summon_marks(c)
+	run.enemies.corona.draw(c, run.enemies, view)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
@@ -888,6 +885,8 @@ static func enemy_sprite_radius(type: StringName, collision_radius: float, chara
 	return collision_radius
 
 static func _enemy_sprite_angle(type: StringName, facing: float) -> float:
+	if type == &"corona":
+		return 0.0
 	if LAYERED_ENEMIES.has(type):
 		return facing + float(LAYERED_ENEMIES[type][3])
 	return facing + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0)
@@ -904,6 +903,9 @@ func _enemy_texture(type: StringName) -> Texture2D:
 
 ## 敵の種類の絵のファイル（ステージの敵の見た目に従う）。
 func _enemy_sprite_path(type: StringName) -> String:
+	# PNG を置けば既存の素材経路で差し替えられる仮の冠。
+	if type == &"corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
+		return "res://assets/placeholders/corona_crown.svg"
 	if state.stage != null:
 		return state.stage.enemy_sprite_path(type)
 	return "res://assets/pixel/%s.png" % type
@@ -967,7 +969,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_dolphin(c, t, i)
 	elif type == &"cross":
 		_draw_cross(c, t, i)
-	elif charge > 0.0:
+	elif charge > 0.0 and type != &"corona":
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
 		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))
@@ -1029,6 +1031,7 @@ func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var fuse := p - u * r * 0.95
 	var now := state.world_time
 	if t.mode[i] != EnemyTable.Mode.WINDUP:
+		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
 		return
 	var k := t.charge[i]
 	var throb := 0.5 + 0.5 * sin(state.world_time * (10.0 + 20.0 * k))

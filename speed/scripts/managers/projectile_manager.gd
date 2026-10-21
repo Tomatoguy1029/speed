@@ -158,6 +158,9 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	_update_friendly(world_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	combat.enemies.corona.hit_thrown(combat.enemies, ship)
+	if state.phase != RunState.Phase.PLAY:
+		return
 	_update_hostile(world_dt)
 	_update_hazards(world_dt)
 
