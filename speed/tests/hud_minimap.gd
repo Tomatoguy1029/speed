@@ -22,9 +22,9 @@ func _ready() -> void:
 		_check(is_equal_approx(rim.length(), hud.MINIMAP_R - 6.0) and rim.normalized().is_equal_approx(Vector2(1, -1).normalized()), "distant marker keeps direction and fits inside mask")
 		await _shot("map_%d_%d" % [ship.x, ship.y])
 	var segment: PackedVector2Array = hud._minimap_segment(Vector2(-100, 0), Vector2(100, 0))
-	_check(segment == PackedVector2Array([Vector2(-78, 0), Vector2(78, 0)]), "line clips to both sides of radar")
+	_check(segment == PackedVector2Array([Vector2(-hud.MINIMAP_R, 0), Vector2(hud.MINIMAP_R, 0)]), "line clips to both sides of radar")
 	_check(hud._minimap_segment(Vector2(-100, 100), Vector2(100, 100)).is_empty(), "outside line stays hidden")
-	var disks: Array = hud._minimap_disk(Vector2(75, 0), 12.0)
+	var disks: Array = hud._minimap_disk(Vector2(hud.MINIMAP_R - 3.0, 0), 12.0)
 	var in_mask := not disks.is_empty()
 	for polygon in disks:
 		for p in polygon:

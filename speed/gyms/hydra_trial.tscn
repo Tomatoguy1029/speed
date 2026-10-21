@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
-[ext_resource type="Script" path="res://gyms/hydra_trial.gd" id="1"]
-[node name="HydraTrial" type="Control"]
+[gd_scene format=3 uid="uid://cdgnhqc874qaf"]
+
+[ext_resource type="Script" uid="uid://h5kffnrq1gn2" path="res://gyms/hydra_trial.gd" id="1"]
+
+[node name="HydraTrial" type="Control" unique_id=1741791387]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

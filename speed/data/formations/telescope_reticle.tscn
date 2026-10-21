@@ -54,6 +54,22 @@ script = ExtResource("3")
 enemy = &"telescope"
 metadata/_edit_lock_ = true
 
+[node name="並びD" type="Node2D" parent="." unique_id=625269224]
+position = Vector2(-1632, -2)
+script = ExtResource("2")
+
+[node name="ぼうえんきょう座" type="Node2D" parent="並びD" unique_id=1442533600]
+position = Vector2(-36, 2.000001)
+rotation = -0.38072762
+script = ExtResource("3")
+enemy = &"telescope"
+
+[node name="ぼうえんきょう座2" type="Node2D" parent="並びD" unique_id=1512674676]
+position = Vector2(31, 1.000001)
+rotation = 0.5221322
+script = ExtResource("3")
+enemy = &"telescope"
+
 [node name="正面" type="Node2D" parent="." unique_id=948225832]
 position = Vector2(0, -1500)
 rotation = 3.1416

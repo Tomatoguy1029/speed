@@ -57,7 +57,7 @@ func _check_phases(run: RunManager) -> void:
 	run.state.time = 0.0
 	check(run.enemies.current_phase().id == &"p0", "時刻 0 は最初の時間帯")
 
-## 出した群れは、画面に入らない目安の円の外に出て、機体の方を向く。機体の向きに合わせて回る。
+## 出した群れは、画面に入らない目安の円の外に出て、機体の方へ配置の角度を保って向く。機体の向きに合わせて回る。
 func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
@@ -68,7 +68,8 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 	for heading in [Vector2.UP, Vector2.RIGHT, Vector2(-1, 1).normalized()]:
 		state.ship_heading = heading
 		for n in 12:
-			var rows := em.spawn_formation(data)
+			var layout: int = n % data.layouts.size()
+			var rows := em.spawn_formation(data, layout)
 			check(rows.size() >= 2, "群れの敵が出る")
 			for k in range(0, rows.size(), 2):
 				var i := rows[k]
@@ -76,7 +77,8 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 				check(rel.length() >= EnemyFormation.safe_radius() - 1.0, "目安の円の外に出る")
 				check(rel.normalized().dot(heading) > 0.0, "機体の向きの側に出る")
 				var to_ship := (-rel).normalized()
-				check(Vector2.from_angle(em.table.facing[i]).dot(to_ship) > 0.95, "機体の方を向く")
+				var marker_rotation: float = data.layouts[layout].markers[k / 2].rot
+				check(Vector2.from_angle(em.table.facing[i]).dot(to_ship.rotated(marker_rotation)) > 0.95, "機体の方へ配置の角度を保って向く")
 			for k in range(0, rows.size(), 2):
 				em.table.dead[rows[k]] = 1
 
