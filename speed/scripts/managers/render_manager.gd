@@ -698,6 +698,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
+		elif type == &"corona":
+			batch.add(p, 0.0, t.r[i], col)
 		elif type in EnemyDef.NATIVE_SPRITES:
 			batch.add(p, t.facing[i] + PI / 2.0, t.r[i], col)
 		else:
@@ -720,6 +722,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	_draw_meteor_shards(c)
 	_draw_swallows(c)
 	_draw_summon_marks(c)
+	run.enemies.corona.draw(c, run.enemies, view)
 
 ## ケフェウス座の召喚の予告：王から金の光が伸び、兵が現れる位置に紋章の輪が閉じていく。
 func _draw_summon_marks(c: CanvasItem) -> void:
@@ -802,6 +805,9 @@ func _enemy_texture(type: StringName) -> Texture2D:
 
 ## 敵の種類の絵のファイル（ステージの敵の見た目に従う）。
 func _enemy_sprite_path(type: StringName) -> String:
+	# PNG を置けば既存の素材経路で差し替えられる仮の冠。
+	if type == &"corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
+		return "res://assets/placeholders/corona_crown.svg"
 	if state.stage != null:
 		return state.stage.enemy_sprite_path(type)
 	return "res://assets/pixel/%s.png" % type
@@ -865,7 +871,7 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		_draw_dolphin(c, t, i)
 	elif type == &"cross":
 		_draw_cross(c, t, i)
-	elif charge > 0.0:
+	elif charge > 0.0 and type != &"corona":
 		# 撃つ前の予告：前の方に光が集まっていく
 		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
 		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))

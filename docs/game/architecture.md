@@ -251,9 +251,17 @@ Main (Node)
 
 強めの技は `AnimationPlayer` のタイムラインを世界秒で進める。Behavior Tree が必要な首のそろった技を選び、役者が羅針盤の予告と各首の動きをまとめて扱う。必要な首が落ちたときはタイムラインを止める。首ごとの通常攻撃・生え直しは役者の状態で持ち、仕様は [仕様書](spec.md) の12.3。
 
+**みなみのかんむり座の渦**
+
+`EnemyManager.corona`（`scripts/enemies/corona_vortex.gd`）は、冠ごとの種類別の保持配列と、個体の行番号・ID・所有する冠の行番号・ID・配列内位置を持つ。捕捉時は既存の戦闘格子で近傍を調べ、死亡・解放時は配列の末尾交換で除く。抽選は保持中の種類とその重みだけを走査し、選んだ種類の配列から1体を選ぶ。個体ごとの旋回更新は通常 AI の代わりに毎世界更新で行い、通常のダメージ・撃破処理は敵の表に対して続ける。実験場の比較値には渦の状態も含め、巻き戻しは同じシーン全体を保持する方式を使う。
+
+可視速度は「冠が前の世界更新から実際に動いた速度＋円の接線速度」と定義する。吸い込み中は半径を連続的に縮め、円に着いた個体だけを発射する。予告終了後、機体への方向と可視速度の角度誤差をフレームの両端で調べる。許容差 `align_angle` に入るか、±π の折り返しを除いた符号の変化で一致点をまたいだら発射できる。通過時は二分探索で更新内の時刻を求め、その位置から接線の向きを保って残り時間だけ直進する。渦から外すのはこの同じ個体で、複製や射出口への位置補正は行わない。
+
+短距離の吸い込みは、うみへび座も使う `FieldManager._well_pull` の距離減衰を使う。投擲の当たり判定は機体と個体の相対線分で調べ、通常の戦闘のあと `ProjectileManager.tick()` から既存の `ShipManager.damage()` へ渡す。死亡・行解放・冠の再配置で所有関係を解放し、保持中の個体自身の再配置を止める。ゲームの決まりと調整値は [仕様書 11.8](spec.md#118-みなみのかんむり座) に従う。
+
 ### 6.2 敵の表の列
 
-`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `volatile`・`splitling`、分裂（`split`）が `splitter`、誘導弾（`missile`）が `missile`、扇状の弾（`battleship`）が `spreader`、一直線（`rocket`）が `rocket`、自爆（`bomber`）が `bomber`、ビーム（`beamer`）が `beamer`・`cross`、波動（`pulser`）が `pulser`・`dolphin`。強敵は、`telescope` が狙撃（`sniper`）、ほかは type ID と同じ名前の行動（`pump`・`shield`・`ruler`・`clock`・`lynx`・`crow`・`reticle`・`triangle`・`phoenix`・`crab`・`marlin`・`aquarius`・`auriga`・`corona`・`cepheus`・`aquila`）を使う。部位（`part`）は、親の敵が位置を決める行動で、`triangle_star`・`corona_star` が使う。突進（`dash`）と射撃（`gunner`）は、出現から外した敵（[敵一覧](catalog/enemies.md)）の行動。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
+`scripts/data_types/enemy_table.gd` の列。「使う敵」は、その列の値を読み書きする敵。雑魚の行動の種類と type ID の対応は、追跡（`chase`）が `volatile`・`splitling`、分裂（`split`）が `splitter`、誘導弾（`missile`）が `missile`、扇状の弾（`battleship`）が `spreader`、一直線（`rocket`）が `rocket`、自爆（`bomber`）が `bomber`、ビーム（`beamer`）が `beamer`・`cross`、波動（`pulser`）が `pulser`・`dolphin`。強敵は、`telescope` が狙撃（`sniper`）、ほかは type ID と同じ名前の行動（`pump`・`shield`・`ruler`・`clock`・`lynx`・`crow`・`reticle`・`triangle`・`phoenix`・`crab`・`marlin`・`aquarius`・`auriga`・`corona`・`cepheus`・`aquila`）を使う。部位（`part`）は、親の敵が位置を決める行動で、`triangle_star` が使う。突進（`dash`）と射撃（`gunner`）は、出現から外した敵（[敵一覧](catalog/enemies.md)）の行動。漂流（`drift`）は回転だけをする行動で、割り当てる雑魚は未定。隕石の動きと回転は `FieldManager` が配置から決める。
 
 | 列 | 使う敵 | 中身 |
 |---|---|---|
@@ -291,8 +299,8 @@ Main (Node)
 | `body_gap` | 雑魚 | 前回確かめたときの、天体の表面までの距離（7章） |
 | `body_gap_pos` | 雑魚 | `body_gap` を確かめた位置 |
 | `body_gap_time` | 雑魚 | `body_gap` を確かめた世界時刻 |
-| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`DASH` が輪の広がった間） | 行動の段階（動く → 構える・飛ぶ など） |
-| `timer` | `mode` を使う敵 | 段階の残り時間。みなみのかんむり座は輪の広がり具合（0〜1） |
+| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
+| `timer` | `mode` を使う敵 | 段階の残り時間 |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
 | `charge` | `gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |
 | `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間、ポンプ座は次に吸い込めるまでの時間 |
@@ -305,7 +313,7 @@ Main (Node)
 | `links` | とけい座・みなみのさんかく座 | 付いて動く攻撃の形の行番号（`ProjectileManager` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |
 | `parent_id` | 部位 | 親の敵の id |
-| `parts` | 部位を持つ敵（みなみのさんかく座・みなみのかんむり座） | 部位の行番号と id を交互に並べた一覧 |
+| `parts` | 部位を持つ敵（みなみのさんかく座） | 部位の行番号と id を交互に並べた一覧 |
 | `landmark` | 強めの敵（星2〜5） | 1 なら目印の星を持つ（`HeroManager` が選ぶ） |
 | `fire_hit` | ヘルクレス座の火で焼かれた敵 | 最後に火でダメージを受けた世界時刻（うみへび座の頭が火で落ちたかの判定に使う） |
 | `stone` | ペルセウス座の力で石になった敵 | 石になっている残り時間（世界秒） |

@@ -52,7 +52,7 @@
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み・数値は試遊用の仮値 | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[仕様書 11.8](../spec.md#118-みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと次の投擲の弾薬が減る。通常の戦闘判定を使う | 5 | `data/enemies/corona.tres`、`scripts/enemies/corona_vortex.gd`。外観は[仮の冠](../art-style.md#46-みなみのかんむり座) |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |
@@ -63,7 +63,8 @@
 - 各敵は `speed/assets/pixel/<type ID>.png` のピクセルスプライトを Nearest で描く（`RenderManager`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
 - `splitter`・`splitling` は手描きの PNG を、透明な余白込みの原寸で表示する。エリートも同じ大きさ。基礎半径は各 `.tres` で画像に合わせる。
 - `missile` は試遊用のスプライト。最終の見た目は未確定。
-- 絵（`speed/assets/pixel/<type ID>.png`）がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。
+- `corona` は [仮の冠](../art-style.md#46-みなみのかんむり座) を使う。
+- それ以外で絵（`speed/assets/pixel/<type ID>.png`）がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。
 - 全敵とボスの表示と当たり判定に `config.character_scale` を掛ける。
 - 静止スプライトで、個別のアニメーションはない。
 

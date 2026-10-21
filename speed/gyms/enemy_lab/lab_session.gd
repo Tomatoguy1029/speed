@@ -668,7 +668,7 @@ func digest() -> String:
 	for instance in run.bosses.lab_instances:
 		if is_instance_valid(instance.actor):
 			actors.append(_stable(instance.actor, 0))
-	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0),
+	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.corona, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
 

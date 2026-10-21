@@ -651,10 +651,8 @@ lab.enemy.marlin.move,距離を保ち、光ってから高速で泳ぎ抜け、�
 lab.enemy.marlin.kill,HP を削る,Wear down its HP
 lab.enemy.auriga.move,大きく旋回しながら走り、車輪の跡が燃えて残る,Drives in wide turns leaving burning wheel tracks
 lab.enemy.auriga.kill,HP を削る,Wear down its HP
-lab.enemy.corona.move,周りを星の輪が回り、ときどき輪を広げて押し出す,A ring of stars circles it and periodically expands to push outward
-lab.enemy.corona.kill,回る星に体当たりすると弾かれる。隙間を通して本体を貫く。星は武器で壊せる,Ramming a ring star bounces you. Pierce the body through a gap. Weapons break the stars
-lab.enemy.corona_star.move,みなみのかんむり座の周りを回る星,A star circling the Southern Crown
-lab.enemy.corona_star.kill,体当たりは弾かれる。武器・波動で壊せる,Rams bounce off. Weapons and waves break it
+lab.enemy.corona.move,近くの雑魚を小さな渦で率いて近づき、予告した個体を旋回の進行方向へ投げる,Approaches with nearby enemies in a compact vortex and throws a marked enemy along its orbit
+lab.enemy.corona.kill,渦の群れを突き抜けて倒すと投擲の弾薬が減る。投げた個体の赤い頭だけが攻撃判定を持つ,Pierce the orbiting enemies to remove ammunition. Only a thrown enemy’s red head carries attack damage
 lab.enemy.phoenix.move,機体の周りを旋回し、飛んだ跡に炎を残す,Circles you and leaves a trail of fire
 lab.enemy.phoenix.kill,HP を削る。倒すと周りを焼き払い、近いと自分も焼かれる,Wear down its HP. Defeat scorches the area and burns you if close
 lab.enemy.cepheus.move,距離を保ち、専用の兵を召喚して隊列を組ませる。時間とともに3体の横一列→5体の扇形→7体の千鳥の二重隊列へ増援し、そのときだけ組み直す。兵は配置で止まって細長い光弾を撃つ,Keeps its distance and summons soldiers into formation. Reinforcements grow it from a line of three to a fan of five to a staggered double rank of seven and it only reforms then. Soldiers hold their posts and fire long light bolts

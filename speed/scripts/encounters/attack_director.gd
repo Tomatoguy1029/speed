@@ -9,7 +9,7 @@ const BEHAVIORS := {
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 	"lynx": ["aimed"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
-	"aquarius": ["beam"], "auriga": ["residue"], "corona": ["residue"],
+	"aquarius": ["beam"], "auriga": ["residue"], "corona": ["aimed"],
 	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
 var enabled := false

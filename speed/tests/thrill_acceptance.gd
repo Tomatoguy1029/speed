@@ -333,7 +333,7 @@ func _test_enemy_roster() -> void:
 		elif type == &"shield":
 			_check(absf(t.facing[i]) > 0.5, "タスク8：たて座は機体に向き直る")
 		elif type == &"corona":
-			_check(run.enemies.parts_alive(i) > 3 and t.pos[t.parts[i][0]].distance_to(from) > 50, "タスク12：かんむり座は小さな星の輪を回す")
+			_check(t.parts[i].is_empty() and t.pos[i].distance_to(from) > 50, "かんむり座は弾薬が空でも接近を続ける")
 		elif type == &"cepheus":
 			_check(run.state.events.any(func(e): return e.type == &"block_impact"), "タスク12：ケフェウス座は予告して号令する")
 		elif type == &"aquarius":
@@ -406,15 +406,14 @@ func _test_enemy_gates() -> void:
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "タスク11：かに座の挟んだ直後は正面から倒せる")
 	_clear()
 	var corona := _enemy(&"corona", at)
-	star = t.parts[corona][0]
-	_check(_ram(t.pos[star], Vector2.DOWN) and not t.dead[star], "タスク12：かんむり座の輪の星への突進は弾かれる")
+	star = _enemy(&"drifter", at + Vector2(0, 100))
+	run.combat.rebuild_grid()
+	run.enemies.corona.tick(run.enemies, 0.01)
+	_check(run.enemies.corona.members.has(star), "かんむり座は実在する雑魚を渦に捕捉する")
 	run.combat.damage_enemy(star, 1e6, {"cause": &"shot", "no_crit": true})
-	_check(t.dead[star] != 0, "タスク12：輪の星は武器で壊せる")
-	t.fire_t[corona] = 0.0
-	run.enemies._corona(corona, 0.01)
-	run.enemies._corona(corona, 1.0)
-	_ram(at, Vector2.from_angle(t.facing[corona] + PI / float(t.def[corona].params.stars)), 400.0)
-	_check(t.dead[corona] != 0, "タスク12：輪の隙間を通すと本体を貫ける")
+	_check(t.dead[star] != 0 and not run.enemies.corona.members.has(star), "武器で雑魚を倒すと投擲の弾薬が減る")
+	_ram(at, Vector2.RIGHT, 400.0)
+	_check(t.dead[corona] != 0, "かんむり座の本体を通常の体当たりで貫ける")
 	_clear()
 	var king := _enemy(&"cepheus", at)
 	var ruler := _enemy(&"ruler", at + Vector2(60, 0))

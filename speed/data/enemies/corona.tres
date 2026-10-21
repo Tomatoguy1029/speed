@@ -16,14 +16,32 @@ color = Color(1, 0.9, 0.55, 1)
 shape = &"orb"
 behavior = &"corona"
 params = {
-"expand": 2.4,
-"expand_time": 0.8,
-"fire_interval": 6.0,
-"hold_time": 1.5,
-"push": 2600.0,
-"ring": 120.0,
-"spin": 0.9,
-"stars": 10
+"capture_interval": 0.2,
+"capture_max": 18,
+"fire_interval": 3.0,
+"pull_radius": 185.0,
+"pull": 130.0,
+"ring": 100.0,
+"spin": 2.4,
+"telegraph": 0.75,
+"align_angle": 0.07,
+"throw_speed": 620.0,
+"throw_life": 1.6,
+"throw_effect_scale": 1.6,
+"throw_weight_drifter": 1.0,
+"throw_damage_drifter": 8.0,
+"throw_weight_swarm": 0.8,
+"throw_damage_swarm": 10.0,
+"throw_weight_splitling": 0.9,
+"throw_damage_splitling": 9.0,
+"throw_weight_biter": 0.9,
+"throw_damage_biter": 9.0,
+"throw_weight_darter": 0.65,
+"throw_damage_darter": 12.0,
+"throw_weight_splitter": 0.4,
+"throw_damage_splitter": 16.0,
+"throw_weight_armored": 0.2,
+"throw_damage_armored": 22.0
 }
 id = &"corona"
 display_name = "みなみのかんむり座"
