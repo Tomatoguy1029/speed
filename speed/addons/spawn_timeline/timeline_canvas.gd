@@ -21,7 +21,7 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"⌘（Ctrl）＋クリック：複数選択　クリップを上下にドラッグ：同じ種類のトラックへ移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製（元の右側、同じトラック）\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
-		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
+		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　←→で時刻を1秒ずつ　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -596,24 +596,7 @@ func _draw() -> void:
 	# ここから上に留める部分（目盛り・時間帯・雑魚の数）
 	draw_rect(Rect2(0, off, size.x, _tracks_top()), Color(0.1, 0.11, 0.14))
 	draw_rect(Rect2(0, off, size.x, RULER), Color(0.16, 0.17, 0.21))
-	# 目盛り：ラベルの間隔が十分空く、切りのいい間隔
-	var step := 10800.0
-	for st: float in [1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1200.0, 1800.0, 3600.0]:
-		if st * px_per_sec >= 80.0 * ui:
-			step = st
-			break
-	var minor := step / 5.0 if step / 5.0 * px_per_sec >= 10.0 * ui else step
-	var t := floorf(view_start / minor) * minor
-	while _x(t) < size.x and t <= end + 0.001:
-		var x := _x(t)
-		if x >= GUTTER:
-			var major := fmod(t + 0.0001, step) < 0.001
-			draw_line(Vector2(x, off + RULER - (12.0 if major else 5.0) * ui), Vector2(x, size.y), Color(1, 1, 1, 0.12 if major else 0.04))
-			if major:
-				var text := clock(t)
-				var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14)).x
-				draw_string(font, Vector2(minf(x + 4 * ui, size.x - width - 4 * ui), off + RULER * 0.66), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14))
-		t += minor
+	_draw_time_grid(font, end, off)
 	var ps: Array = timeline.phases()
 	var top := off + RULER
 	var max_pop := 1.0
@@ -673,10 +656,61 @@ func _draw() -> void:
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の合計（最大 %d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
 	clocks.draw()
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
+	# 見えている目盛りの階層を明示する（数字は常に秒）。
+	var units := PackedStringArray()
+	for tier: int in [1, 5, 10, 30]:
+		if tier >= _time_grid_step():
+			units.append("%ds" % tier)
+	draw_string(font, Vector2(8 * ui, off + RULER * 0.66), "目盛 " + " / ".join(units),
+		HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12), Color(1, 1, 1, 0.8))
 	# 再生位置
 	var px := _x(playhead)
 	draw_line(Vector2(px, off), Vector2(px, size.y), Color(1, 0.8, 0.2), 2.0 * ui)
 	draw_line(Vector2(GUTTER, 0), Vector2(GUTTER, size.y), Color(1, 1, 1, 0.2))
+
+## 目盛りは1・5・10・30秒の固定階層。拡大率では細かい階層だけを省く。
+func _time_grid_step() -> int:
+	for seconds: int in [1, 5, 10]:
+		if seconds * px_per_sec >= 8.0 * ui:
+			return seconds
+	return 30
+
+static func _time_tick_tier(second: int) -> int:
+	for tier: int in [30, 10, 5]:
+		if second % tier == 0:
+			return tier
+	return 1
+
+func _draw_time_grid(font: Font, end: float, off: float) -> void:
+	var step := _time_grid_step()
+	# ラベルも固定階層の位置から選び、実際の文字幅で衝突を避ける。
+	var label_step := 30
+	var visible_end := minf(end, _t(size.x))
+	var sample := clock(maxf(0.0, visible_end))
+	var label_width := font.get_string_size(sample, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14)).x
+	for seconds: int in [1, 5, 10, 30]:
+		if seconds >= step and seconds * px_per_sec >= label_width + 12.0 * ui:
+			label_step = seconds
+			break
+	var next_label_x := GUTTER + 4.0 * ui
+	var second := maxi(0, int(ceil(view_start / step)) * step)
+	while second <= visible_end + 0.001:
+		var x := _x(float(second))
+		var tier := _time_tick_tier(second)
+		var height: float = {1: 4.0, 5: 7.0, 10: 10.0, 30: 14.0}[tier] * ui
+		var alpha: float = {1: 0.035, 5: 0.065, 10: 0.1, 30: 0.18}[tier]
+		# 最大まで縮めたときも30秒を保ち、密な線が面状に見えるのを抑える。
+		var density := minf(1.0, step * px_per_sec / (8.0 * ui))
+		draw_line(Vector2(x, off + RULER), Vector2(x, size.y), Color(1, 1, 1, alpha * density))
+		draw_line(Vector2(x, off + RULER - height), Vector2(x, off + RULER), Color(1, 1, 1, (0.25 + height / (24.0 * ui)) * density))
+		if second % label_step == 0:
+			var text := clock(float(second))
+			var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14)).x
+			var left := x + 4.0 * ui
+			if left >= next_label_x and left + width <= size.x - 4.0 * ui:
+				draw_string(font, Vector2(left, off + RULER * 0.66), text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(14))
+				next_label_x = left + width + 8.0 * ui
+		second += step
 
 ## 位置 p にあるもの：{"kind", "index"}。
 func _hit(p: Vector2) -> Dictionary:
@@ -1028,6 +1062,11 @@ func _gui_input(event: InputEvent) -> void:
 			_hover_curve = hc
 			_hover_point = hp
 			queue_redraw()
+	elif event is InputEventKey and event.pressed and _rename == null and _drag.is_empty() and has_focus() \
+			and point_selected >= 0 and (event as InputEventKey).keycode in [KEY_LEFT, KEY_RIGHT] \
+			and not ((event as InputEventKey).ctrl_pressed or (event as InputEventKey).meta_pressed or (event as InputEventKey).alt_pressed):
+		_nudge_point_time(-1.0 if (event as InputEventKey).keycode == KEY_LEFT else 1.0)
+		accept_event()
 	elif event is InputEventKey and event.pressed and _rename == null and _drag.is_empty() \
 			and (event as InputEventKey).keycode in [KEY_LEFT, KEY_RIGHT] \
 			and not ((event as InputEventKey).ctrl_pressed or (event as InputEventKey).meta_pressed or (event as InputEventKey).alt_pressed) \
@@ -1140,6 +1179,26 @@ func _nudge_point(delta: float) -> void:
 	if after != before:
 		c.set("points", after)
 		timeline.commit("雑魚の曲線の点を変える", [[c, "points", before, after]])
+
+## 点の時刻を1秒ずつ動かす。端や隣の点を越える入力は止め、時刻の順序を保つ。
+func _nudge_point_time(delta: float) -> void:
+	var curves: Array = timeline.curves()
+	if curve_selected < 0 or curve_selected >= curves.size():
+		return
+	var c: Resource = curves[curve_selected]
+	var before: PackedVector2Array = c.get("points")
+	if point_selected < 0 or point_selected >= before.size():
+		return
+	var n := point_selected
+	var time := before[n].x + delta
+	var lo := before[n - 1].x + 0.1 if n > 0 else 0.0
+	var hi := before[n + 1].x - 0.1 if n + 1 < before.size() else 1e9
+	if time < lo or time > hi:
+		return
+	var after := before.duplicate()
+	after[n].x = time
+	c.set("points", after)
+	timeline.commit("雑魚の曲線の点を変える", [[c, "points", before, after]])
 
 func _remove_point() -> void:
 	var curves: Array = timeline.curves()
