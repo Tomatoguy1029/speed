@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://mw0dydcbhq02"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"shield"
+display_name = "たて座"
 rank = 4
 radius = 30.0
 hp = 90.0
@@ -15,15 +17,11 @@ xp = 12.0
 color = Color(0.62, 0.68, 0.8, 1)
 shape = &"hex"
 behavior = &"shield"
+max_alive = 3
+ranged = false
+size_var = false
 weak_arc = 1.0
 gate = &"back"
 params = {
-"front_arc": 1.2,
-"reflect_dmg": 7.0,
-"reflect_interval": 0.18,
-"reflect_life": 2.5,
-"reflect_speed": 700.0,
-"shield_time": 5.0
+"front_arc": 1.6
 }
-id = &"shield"
-display_name = "たて座"

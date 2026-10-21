@@ -1,31 +1,35 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://c7irgys8ijgjv"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s5_late"
+display_name = "ステージ5・終盤"
 start = 390.0
+end = 600.0
 pop_from = 75.0
 pop_to = 120.0
 level_from = 3.0
 level_to = 5.0
 rate = 10.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
 cores = true
 mix = {
-"aquila": 0.05,
-"auriga": 0.3,
-"beamer": 0.5,
-"bomber": 0.875,
-"cepheus": 0.06,
-"corona": 0.06,
-"cross": 0.35,
-"missile": 0.5,
-"pulser": 0.5,
 "rocket": 0.875,
-"shield": 0.35,
+"bomber": 0.875,
+"volatile": 0.875,
 "splitter": 0.875,
+"beamer": 0.5,
+"pulser": 0.5,
+"missile": 0.5,
 "spreader": 0.5,
-"volatile": 0.875
+"shield": 0.35,
+"cross": 0.35,
+"auriga": 0.3,
+"corona": 0.06,
+"cepheus": 0.06,
+"aquila": 0.05
 }
-id = &"s5_late"
-display_name = "ステージ5・終盤"

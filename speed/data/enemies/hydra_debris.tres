@@ -1,15 +1,25 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://p8d81nvobbt6"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"hydra_debris"
+display_name = "うみへび座の瓦礫の首"
+rank = 0
 radius = 30.0
 hp = 100.0
 armor = 8.0
+speed = 0.0
+accel = 0.0
+turn = 0.0
 xp = 6.0
 color = Color(0.65, 0.6, 0.55, 1)
 shape = &"hex"
 behavior = &"part"
-id = &"hydra_debris"
-display_name = "うみへび座の瓦礫の首"
+max_alive = 0
+ranged = false
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {}

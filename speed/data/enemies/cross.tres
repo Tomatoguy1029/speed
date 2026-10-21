@@ -1,31 +1,34 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://b4ele2yandf6d"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"cross"
+display_name = "みなみじゅうじ座"
 rank = 4
 radius = 26.0
 hp = 70.0
 armor = 7.0
-speed = 260.0
+speed = 80.0
 accel = 1.5
 turn = 2.0
 xp = 14.0
 color = Color(1, 0.95, 0.7, 1)
 shape = &"diamond"
-behavior = &"cross"
+behavior = &"beamer"
+max_alive = 2
 ranged = true
+size_var = false
+weak_arc = 0.0
+gate = &""
 params = {
-"align_tol": 28.0,
-"beam_len": 1600.0,
-"beam_time": 0.5,
+"keep": 420.0,
+"fire_interval": 4.5,
+"telegraph": 1.0,
+"beam_len": 1100.0,
 "beam_width": 26.0,
+"beam_time": 0.5,
 "bullet_dmg": 14.0,
-"fire_interval": 2.4,
-"rest": 0.5,
-"stand_off": 380.0,
-"telegraph": 0.8
+"cross": true
 }
-id = &"cross"
-display_name = "みなみじゅうじ座"

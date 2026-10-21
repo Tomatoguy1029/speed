@@ -1,27 +1,32 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://bpjjb6jsikp3m"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s2_pressure"
+display_name = "ステージ2・圧力期"
 start = 150.0
+end = 330.0
 pop_from = 45.0
 pop_to = 75.0
 level_from = 1.6
 level_to = 2.4
 rate = 8.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = false
 mix = {
-"beamer": 0.75,
+"rocket": 1.0,
 "bomber": 1.0,
-"crow": 0.2,
-"dolphin": 0.15,
-"lynx": 0.25,
+"volatile": 1.0,
+"splitter": 1.0,
+"beamer": 0.75,
 "missile": 0.75,
 "pump": 0.25,
+"crow": 0.2,
+"lynx": 0.25,
 "reticle": 0.2,
-"rocket": 1.0,
-"splitter": 1.0,
-"volatile": 1.0
+"dolphin": 0.15
 }
-id = &"s2_pressure"
-display_name = "ステージ2・圧力期"

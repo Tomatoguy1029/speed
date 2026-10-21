@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://bw7rocb4peq00"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"pulser"
+display_name = "波動の敵"
 rank = 2
 radius = 18.0
 hp = 18.0
@@ -15,16 +17,17 @@ xp = 4.0
 color = Color(0.45, 0.85, 1, 1)
 shape = &"hex"
 behavior = &"pulser"
+max_alive = 0
 ranged = true
+size_var = false
+weak_arc = 0.0
 params = {
-"bullet_dmg": 10.0,
-"fire_interval": 3.2,
 "keep": 260.0,
+"fire_interval": 3.2,
 "telegraph": 0.6,
-"wave_arc": 3.14159,
 "wave_radius": 320.0,
 "wave_speed": 520.0,
-"wave_width": 20.0
+"wave_width": 20.0,
+"wave_arc": 3.14159,
+"bullet_dmg": 10.0
 }
-id = &"pulser"
-display_name = "波動の敵"

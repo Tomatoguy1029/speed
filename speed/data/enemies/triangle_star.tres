@@ -1,16 +1,27 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dyalls5rm83lp"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"triangle_star"
+display_name = "みなみのさんかく座の星"
+rank = 0
 radius = 12.0
 hp = 6.0
+armor = 0.0
+speed = 0.0
 accel = 1.0
 turn = 1.0
 xp = 2.0
 color = Color(0.85, 1, 0.9, 1)
 shape = &"diamond"
 behavior = &"part"
-id = &"triangle_star"
-display_name = "みなみのさんかく座の星"
+max_alive = 0
+ranged = false
+size_var = false
+weak_arc = 0.0
+gate = &""
+params = {
+
+}

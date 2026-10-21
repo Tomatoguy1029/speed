@@ -17,16 +17,12 @@ const SETTING_DIR := "stage_launcher/stage_dir"
 ## ステージのシーンの名前（<STAGE_PREFIX><番号>.tscn）
 const STAGE_PREFIX := "stage_"
 
-## 最後に読んだ予約の開始時刻（秒）。consume が書く
-static var start_time := 0.0
-
-## 起動を予約する（エディタ側から呼ぶ）。start は、ランの時計をこの時刻から始める（出現タイムラインの「ここから試す」）。
-static func request(stage: int, start := 0.0) -> void:
+## 起動を予約する（エディタ側から呼ぶ）。
+static func request(stage: int) -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(PATH)  # 直前のステージの記録を残したいので、失敗しても続ける
 	cfg.set_value(SECTION, "pending", true)
 	cfg.set_value(SECTION, "stage", stage)
-	cfg.set_value(SECTION, "start", start)
 	cfg.set_value(SECTION, "last_stage", stage)
 	cfg.save(PATH)
 
@@ -38,9 +34,7 @@ static func consume() -> int:
 	if not bool(cfg.get_value(SECTION, "pending", false)):
 		return 0
 	var stage := int(cfg.get_value(SECTION, "stage", 0))
-	start_time = float(cfg.get_value(SECTION, "start", 0.0))
 	cfg.set_value(SECTION, "pending", false)
-	cfg.set_value(SECTION, "start", 0.0)
 	cfg.save(PATH)
 	return stage
 

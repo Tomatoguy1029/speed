@@ -41,23 +41,8 @@ var _buf := PackedInt32Array()
 var _hits: Array = []
 
 ## 敵の弾。項目ごとの列で持つ。1行が1発で、行は前へ詰めない（設計書 6）。
-## SHELL はポンプ座の圧縮弾。直進し、届く距離を飛ぶか何かに当たると、その場で大きく破裂する（破裂が当たる）
-## SLASH はやまねこ座の斬撃。片側1組の、潰れた弧の3本の爪痕。真ん中の少し先から外側へ横に伸び、外側で本体の方へ反り上がる。
-## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
-## BOLT はケフェウス座の兵の細長い光弾。直進し、追尾しない
-enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt"]
-## 斬撃の爪痕の形。横の大きさ（hostile_r）に対する割合：縦の大きさ、爪痕どうしの間隔、外側の爪痕ほど縦に伸びる量、
-## 真ん中を越えて伸びる量、太さ。爪痕は楕円の弧で、本体の方を上・伸びる側を右にしたとき SLASH_FROM の角度（−100°）から
-## 反り上がる。外側（機体側）の爪痕ほど反り上がりが長く（SLASH_RISE ずつ先まで回り込む）、外からの回り込みを防ぐ
-const SLASH_TALL := 0.48
-const SLASH_STEP := 0.15
-const SLASH_STRETCH := 0.22
-const SLASH_INNER := 0.12
-const SLASH_THICK := 0.07
-const SLASH_FROM := -100.0 * PI / 180.0
-const SLASH_RISE := 16.0 * PI / 180.0
-const SLASH_SAMPLES := 16
+enum HostileKind { BULLET, MISSILE }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -76,29 +61,19 @@ var hostile_gap := PackedFloat32Array()
 var hostile_stone := PackedFloat32Array()
 ## 浮かんで待つ残り時間（その間は動かないが、触れると被弾する）
 var hostile_wait := PackedFloat32Array()
-## 圧縮弾が破裂する範囲の半径（圧縮弾のほかは 0）
-var hostile_burst := PackedFloat32Array()
 var hostile_slots: RowSlots
-## 実験の攻撃グループ。行の再利用時に必ず上書きする。
-var lab_context := 0
-var lab_hostile_group: Dictionary = {}
-var lab_hazard_group: Dictionary = {}
-var director
 var _hostile_updating := false
 var _hostile_clear_pending := false
 
 ## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
-##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる。
-##         arc が 0 より大きければ、先へ行くほど左右に arc の角度で広がる（みずがめ座の極太ビーム）
+##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる
 ##   ZONE：pos を中心に半径 len の円。予告（delay）のあと一瞬弾ける
 ##   WAVE：pos から広がる輪・扇。angle の向きを中心に左右 arc の角度、速さ speed で半径 len まで広がる。
 ##         幅 width。gap_w が 0 より大きければ、gap の向きの左右 gap_w の角度に切れ目がある
 ##   WALL：pos から angle の向きへ長さ len・幅 width の残る線。予告のあと active の間、触れると被弾する
 enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
-## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
-## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD }
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
@@ -120,11 +95,9 @@ var hazard_color := PackedColorArray()
 ## 付いている敵の行と id（付いていなければ -1）。敵が倒れると、その攻撃の形も消える
 var hazard_owner := PackedInt32Array()
 var hazard_owner_id := PackedInt32Array()
-## 遅れて弾ける範囲・広がる波が、敵に与えるダメージ（0 なら敵には当たらない。誘爆・いるか座の波動に使う）
+## 遅れて弾ける範囲が、敵に与えるダメージ（0 なら敵には当たらない。誘爆に使う）
 var hazard_edmg := PackedFloat64Array()
-## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
-var hazard_block := PackedByteArray()
-## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
+## 広がる波の速さ、扇の左右の角度、切れ目の向きと左右の角度
 var hazard_speed := PackedFloat32Array()
 var hazard_arc := PackedFloat32Array()
 var hazard_gap := PackedFloat32Array()
@@ -290,15 +263,9 @@ func _update_friendly(dt: float) -> void:
 			var row: int = h[1]
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
-			var impact := from.lerp(to, h[0])
-			if kind == FriendKind.SHOT and _reflect_shot(i, row, impact):
-				pos = impact
-				life = 0.0
-				body_hit = null
-				break
 			hit[et.id[row]] = true
 			combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
-				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
+				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i]})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
 				friend_pos[i] = pos
@@ -320,29 +287,6 @@ func _update_friendly(dt: float) -> void:
 				state.emit(&"debris_trail", {"points": trail, "color": friend_color[i]})
 			friend_slots.release(i)
 		i += 1
-
-## たて座の正面に当たった弾を消し、一定間隔で危険な反射弾へ変える。貫通弾も盾で止まる。
-func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
-	var t := combat.enemies.table
-	var vel := friend_vel[shot]
-	if t.beh[enemy] != EnemyTable.Beh.SHIELD or t.stone[enemy] > 0.0 \
-			or not combat.enemies.shield_blocks(enemy, impact, vel):
-		return false
-	if t.fire_t[enemy] > 0.0:
-		return true
-	var p: Dictionary = t.def[enemy].params
-	var normal := (impact - t.pos[enemy]).normalized()
-	if normal.is_zero_approx():
-		normal = Vector2.from_angle(t.facing[enemy])
-	var dir := (vel - normal * 2.0 * vel.dot(normal)).normalized()
-	var speed := float(p.reflect_speed)
-	_add_hostile(impact + normal * 2.0, dir * speed, speed, clampf(friend_r[shot], 5.0, 10.0),
-		float(p.reflect_life), float(p.reflect_dmg) * (1.0 + 0.25 * (t.level[enemy] - 1.0)),
-		0.0, 0.0, HostileKind.REFLECTED)
-	t.fire_t[enemy] = maxf(0.01, float(p.reflect_interval))
-	t.flash[enemy] = 0.1
-	state.emit(&"shield_reflect", {"pos": impact, "normal": normal})
-	return true
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
@@ -366,73 +310,17 @@ func fire_ring_hold(i: int, n: int, radius: float, wait: float, speed: float, dm
 		var h := _add_hostile(c + u * radius, u * speed, speed, 8.0, 4.0 + wait, dmg, 0.0, 0.0, HostileKind.BULLET)
 		hostile_wait[h] = wait
 
-## 塊を投げる（うみへび座の瓦礫の首）。大きさ r、ダメージ dmg。
+## からす座の塊を投げる。大きさ r とダメージ dmg は集めた残骸の数で決まる。
 func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void:
 	var t := combat.enemies.table
 	var u := Vector2.from_angle(angle)
 	_add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, 4.0, dmg, 0.0, 0.0, HostileKind.BULLET)
 	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"lump"})
 
-## ポンプ座の圧縮弾を撃つ。距離 range を飛ぶか何かに当たると、半径 burst で破裂して dmg を与える。
-func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
-	var t := combat.enemies.table
-	var u := Vector2.from_angle(angle)
-	var h := _add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, range / maxf(speed, 1.0), dmg, 0.0, 0.0,
-		HostileKind.SHELL)
-	hostile_burst[h] = burst
-	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
-
-## ケフェウス座の兵の細長い光弾を、from から向き angle へ撃つ。直進し、追尾しない。
-func fire_bolt(from: Vector2, angle: float, speed: float, dmg: float) -> void:
-	_add_hostile(from, Vector2.from_angle(angle) * speed, speed, 7.0, 4.0, dmg, 0.0, 0.0, HostileKind.BOLT)
-	state.emit(&"shoot", {"pos": from, "kind": &"bolt"})
-
-## やまねこ座の斬撃を飛ばす。from（真ん中の先端）から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
-## size は爪痕の横の大きさ、side は伸びる側（進む向きに対して 1 なら左、-1 なら右）。
-func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: float, dmg: float, side: float) -> void:
-	var u := Vector2.from_angle(angle)
-	_add_hostile(from, u * speed, speed, size, range / maxf(speed, 1.0), dmg, 0.0, side, HostileKind.SLASH)
-	state.emit(&"shoot", {"pos": from, "kind": &"slash"})
-
-## 斬撃の k 本目（0〜2）の爪痕の点（斬撃の向きの座標。x が伸びる側、y が本体の方。横の大きさ 1）。k が大きいほど外側（機体側）。
-static func slash_local(k: int) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	var a := 1.0 + SLASH_STEP * float(k)
-	var b := SLASH_TALL + (SLASH_STEP + SLASH_STRETCH) * float(k)
-	var center := Vector2(SLASH_INNER, SLASH_TALL + SLASH_STRETCH * float(k))
-	for n in SLASH_SAMPLES + 1:
-		var phi := lerpf(SLASH_FROM, SLASH_RISE * float(k), float(n) / SLASH_SAMPLES)
-		pts.append(center + Vector2(a * cos(phi), b * sin(phi)))
-	return pts
-
-## 斬撃（真ん中の先端 pos、進む向き angle、横の大きさ size、伸びる側 side）の k 本目の爪痕の点（世界の座標）。
-static func slash_points(pos: Vector2, angle: float, size: float, side: float, k: int) -> PackedVector2Array:
-	var u := Vector2.from_angle(angle)
-	var across := Vector2(-u.y, u.x) * side
-	var pts := slash_local(k)
-	for n in pts.size():
-		pts[n] = pos + (across * pts[n].x - u * pts[n].y) * size
-	return pts
-
-## 位置 at（半径 reach の円）が斬撃の爪痕のどれかに触れているか。
-static func slash_touches(pos: Vector2, angle: float, size: float, side: float, at: Vector2, reach: float) -> bool:
-	var u := Vector2.from_angle(angle)
-	var d := at - pos
-	var local := Vector2(d.dot(Vector2(-u.y, u.x)) * side, -d.dot(u)) / size
-	var m := (SLASH_THICK * 0.5 * size + reach) / size
-	for k in 3:
-		var pts := slash_local(k)
-		for n in range(1, pts.size()):
-			if Geometry2D.get_closest_point_to_segment(local, pts[n - 1], pts[n]).distance_squared_to(local) <= m * m:
-				return true
-	return false
-
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
-	if director != null:
-		lab_hostile_group[i] = lab_context
 	hostile_pos[i] = pos
 	hostile_vel[i] = vel
 	hostile_speed[i] = speed
@@ -445,7 +333,6 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
-	hostile_burst[i] = 0.0
 	return i
 
 ## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
@@ -501,7 +388,7 @@ func _update_hostile(dt: float) -> void:
 		life -= dt
 		# 画面の外で、画面から離れていく弾（ホーミングしない弾）は、もう当たらないので消す
 		var rel := to - vc
-		if kind != HostileKind.MISSILE and (absf(rel.x) > keep.x or absf(rel.y) > keep.y) and rel.dot(vel) > 0.0:
+		if kind == HostileKind.BULLET and (absf(rel.x) > keep.x or absf(rel.y) > keep.y) and rel.dot(vel) > 0.0:
 			life = 0.0
 		var r := hostile_r[i]
 		# 敵の弾は等速。天体の表面までの余裕が、この更新の弾と天体の移動量より大きい間は判定を省く。
@@ -516,22 +403,12 @@ func _update_hostile(dt: float) -> void:
 		# 高速な弾も線分全体を確認する。
 		var rr := r + R
 		var reach := rr + step
-		if kind == HostileKind.SLASH:
-			if slash_touches(to, vel.angle(), r, hostile_turn[i], ship_pos, R):
-				ship.damage(hostile_dmg[i], 0.0, HOSTILE_CAUSE[kind])
-				life = 0.0
-		elif ship_pos.distance_squared_to(to) <= reach * reach:
+		if ship_pos.distance_squared_to(to) <= reach * reach:
 			var t := Geom.seg_circle_t(from, to, ship_pos, rr)
 			if t >= 0.0 and (body_hit == null or t < body_hit.t):
-				if kind != HostileKind.SHELL:
-					ship.damage(hostile_dmg[i], hostile_slow[i], HOSTILE_CAUSE[kind])
+				ship.damage(hostile_dmg[i], hostile_slow[i], HOSTILE_CAUSE[kind])
 				life = 0.0
-				to = from + (to - from) * t
 		if body_hit != null or life <= 0.0:
-			if kind == HostileKind.SHELL and hostile_life[i] > 0.0:
-				# 圧縮弾は、飛びきるか何かに当たった位置で破裂する
-				var at: Vector2 = to if body_hit == null else from + (to - from) * float(body_hit.t)
-				fire_zone(at, hostile_burst[i], 0.0, hostile_dmg[i], HazardStyle.BLAST, Color("#c9a6ff"))
 			hostile_slots.release(i)
 		else:
 			hostile_pos[i] = to
@@ -567,24 +444,11 @@ func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: 
 		color := Color("#ff5a6e")) -> int:
 	return _add_hazard(HazardKind.BEAM, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
 
-## 先へ行くほど広がるビームを出す。from で幅 width、そこから左右に spread の角度で広がる。
-## 予告（delay）の間は照射する範囲全体を見せ、そのあと active の間だけ当たる。
-func fire_flood(from: Vector2, angle: float, length: float, width: float, spread: float, delay: float, active: float,
-		dmg: float, color := Color("#8fd0ff")) -> int:
-	return _add_hazard(HazardKind.BEAM, HazardStyle.FLOOD, from, angle, length, width, delay, active, dmg, color,
-		0.0, spread)
-
-## 広がるビーム（行 h）の、根元から along の距離での幅の半分。
-func flood_half(h: int, along: float) -> float:
-	return hazard_width[h] * 0.5 + maxf(along, 0.0) * tan(hazard_arc[h])
-
-## 十字のビームを出す（4方向の fire_beam）。出した4本の行番号を返す。
+## 十字のビームを出す（4方向の fire_beam）。
 func fire_cross(center: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
-		color := Color("#ffe0a0")) -> PackedInt32Array:
-	var rows := PackedInt32Array()
+		color := Color("#ffe0a0")) -> void:
 	for k in 4:
-		rows.append(fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color))
-	return rows
+		fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color)
 
 ## 遅れて弾ける範囲を出す。center を中心に半径 radius。delay の予告のあと一瞬弾ける。style は見た目。
 ## edmg が 0 より大きければ、弾けたときに範囲の敵にもダメージを与える（誘爆）。
@@ -621,34 +485,6 @@ func attach_hazard(h: int, e: int) -> void:
 func owns_hazard(h: int, e: int, id: int) -> bool:
 	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
-## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
-## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
-func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
-	var best := {}
-	var best_t := INF
-	for h in hazard_alive.size():
-		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
-			continue
-		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
-			continue
-		var a := hazard_pos[h]
-		var u := Vector2.from_angle(hazard_angle[h])
-		var m := hazard_width[h] * 0.5 + radius
-		var d0 := u.cross(from - a)
-		var d1 := u.cross(to - a)
-		if absf(d1) >= m and signf(d0) == signf(d1):
-			continue
-		var t := 0.0
-		if absf(d0) > m and absf(d0 - d1) > 1e-6:
-			t = (d0 - signf(d0) * m) / (d0 - d1)
-		var along := u.dot(from.lerp(to, t) - a)
-		if along < -m or along > hazard_len[h] + m or t >= best_t:
-			continue
-		best_t = t
-		var n := Vector2(-u.y, u.x) * (1.0 if d0 >= 0.0 else -1.0)
-		best = {"t": t, "normal": n, "pos": from.lerp(to, t)}
-	return best
-
 ## 付いている攻撃の形（行 h）を動かす。length が 0 以上なら長さも変える。
 func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 	hazard_pos[h] = pos
@@ -665,8 +501,6 @@ func release_hazard(h: int) -> void:
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
 		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
 	var i := hazard_slots.take()
-	if director != null:
-		lab_hazard_group[i] = lab_context
 	hazard_kind[i] = kind
 	hazard_style[i] = style
 	hazard_pos[i] = pos
@@ -680,7 +514,6 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_hit[i] = 0
 	hazard_color[i] = color
 	hazard_edmg[i] = 0.0
-	hazard_block[i] = 0
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
 	hazard_speed[i] = speed
@@ -690,28 +523,6 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	return i
 
 ## 広がる波の、今の半径。
-## 広がる波（行 h）の先頭が、この更新で通り過ぎた敵に1回ずつ当たる（いるか座の波動）。
-func _wave_hits_enemies(h: int, dt: float) -> void:
-	var t := combat.enemies.table
-	var now := wave_radius(h)
-	var before := minf(hazard_len[h], maxf(0.0, hazard_t[h] - dt - hazard_delay[h]) * hazard_speed[h])
-	var half := hazard_width[h] * 0.5
-	var lo := maxf(before - half, 30.0)
-	var rows := PackedInt32Array()
-	combat.nearby(hazard_pos[h], now + half, rows)
-	for j in rows:
-		if t.dead[j] != 0 or t.meteor_index[j] >= 0:
-			continue
-		var d := t.pos[j] - hazard_pos[h]
-		var dist := d.length()
-		if dist + t.r[j] < lo or dist - t.r[j] > now + half:
-			continue
-		if absf(Geom.angle_diff(d.angle(), hazard_angle[h])) > hazard_arc[h] + t.r[j] / maxf(dist, 1.0):
-			continue
-		combat.damage_enemy(j, hazard_edmg[h], {"cause": &"wave", "dir": d / maxf(dist, 1.0), "knock": 300.0, "no_crit": true})
-		if state.phase != RunState.Phase.PLAY:
-			return
-
 func wave_radius(i: int) -> float:
 	return minf(hazard_len[i], maxf(0.0, hazard_t[i] - hazard_delay[i]) * hazard_speed[i])
 
@@ -733,10 +544,6 @@ func _update_hazards(dt: float) -> void:
 				or combat.enemies.table.dead[owner] != 0)):
 			hazard_slots.release(i)
 			continue
-		if t >= delay and hazard_kind[i] == HazardKind.WAVE and hazard_edmg[i] > 0.0:
-			_wave_hits_enemies(i, dt)
-			if state.phase != RunState.Phase.PLAY:
-				return
 		if t < delay or hazard_hit[i] != 0:
 			continue
 		var kind := hazard_kind[i]
@@ -744,15 +551,9 @@ func _update_hazards(dt: float) -> void:
 		match kind:
 			HazardKind.BEAM:
 				var a := hazard_pos[i]
-				var u := Vector2.from_angle(hazard_angle[i])
-				if hazard_arc[i] > 0.0:
-					var rel := ship_pos - a
-					var along := rel.dot(u)
-					hit = along > -R and along < hazard_len[i] + R and absf(rel.cross(u)) <= flood_half(i, along) + R
-				else:
-					var b := a + u * hazard_len[i]
-					var reach := hazard_width[i] * 0.5 + R
-					hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
+				var b := a + Vector2.from_angle(hazard_angle[i]) * hazard_len[i]
+				var reach := hazard_width[i] * 0.5 + R
+				hit = Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
 			HazardKind.ZONE:
 				# 弾けた瞬間だけ当たる（弾けたら hit を 1 にして、以後は見た目だけ）
 				hazard_hit[i] = 1

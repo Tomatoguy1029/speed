@@ -45,7 +45,7 @@ func refresh_stats() -> void:
 	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
-	s.length_mult = _meta_mult(&"length") * (1.0 + _per(&"T14") * _n(&"T14"))
+	s.length_mult = 1.0 + _per(&"T14") * _n(&"T14")
 	s.xp_mult = _meta_mult(&"xp")
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max
@@ -67,8 +67,7 @@ func _meta_level(stat: StringName) -> Array:
 	var out := []
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
 		if def.stat == stat:
-			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.meta_level(def.id)
-			out.append([def.per_level, level])
+			out.append([def.per_level, SaveManager.meta_level(def.id)])
 	return out
 
 func _meta_mult(stat: StringName) -> float:

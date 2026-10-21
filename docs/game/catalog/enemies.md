@@ -4,33 +4,16 @@
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
-## 通常出現する敵
+## 通常敵
 
-| type ID      | 名称       | 採用状態 | 本番の実装状況 | 行動・攻撃                                                                       | 出現条件                             | コード・demo参照／未決事項                                                                                 |
-| ------------ | ---------- | -------- | -------------- | -------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `drifter`    | ドリフター | 採用     | 実装済み       | 機体へまっすぐ追跡                                                               | 全時間帯                             | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../../../demo/docs/enemies.md)    |
-| `swarm`      | スウォーム | 採用     | 実装済み       | 小型の追跡敵                                                                     | 強化期・強化期II・無双期・脱出期     | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../../../demo/docs/enemies.md)      |
-| `darter`     | ダーター   | 採用     | 実装済み       | 近づくと予告してから突進し、しばらく止まる                                       | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../../../demo/docs/enemies.md)     |
-| `armored`    | 装甲型     | 採用     | 実装済み       | 装甲の硬い追跡敵。背面に当てると必ずクリティカル                                 | 圧力期・緊張期・脱出期、危険地帯     | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../../../demo/docs/enemies.md)    |
-| `splitter`   | 分裂型     | 採用     | 実装済み       | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも分かれる                   | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md)   |
-| `splitling`  | 分裂体     | 採用     | 実装済み       | 小型の追跡敵                                                                     | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../../../demo/docs/enemies.md)  |
-| `gunner`     | 射撃型     | 採用     | 実装済み       | 距離を保って回り込み、予告のあと弾を撃つ                                         | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md)     |
-| `missile`    | ミサイル艇 | 採用     | 実装済み       | さらに遠い距離を保ち、予告のあと誘導弾を撃つ                                     | 緊張期・脱出期、危険地帯             | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md)    |
-| `titan`      | タイタン   | 採用     | 実装済み       | 大型の追跡敵。生成時に大きさが変わる                                             | 無双期以外。同時に出る数に上限       | `scripts/managers/enemy_manager.gd`、`data/enemies/titan.tres`。[demo](../../../demo/docs/enemies.md)      |
-| `battleship` | 戦艦 | 採用 | 実装済み | 追跡し、予告のあと扇状に弾を撃つ。背面が弱点 | 緊張期・脱出期 | `data/enemies/battleship.tres`、`enemy_manager.gd` |
+区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。ステージごとの出現は `speed/data/phases/s<ステージ>_*.tres`。
 
-## 調整用に保持する敵
-
-追加版の敵は専用の[敵・ルート実験場](../spec.md#201-敵ルート実験場)から呼び出し、単体と混成を調整してから通常出現へ採用する。共有 ID の種類は上の通常構成でも使い、追加版の設定を実験用に保持する。ステージ1〜5の通常出現は共通の元の時間帯を使う。
-
-区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。通常ステージは共通の6時間帯を使う。追加版の `speed/data/phases/s<ステージ>_*.tres` は調整用に保持する。
-
-| type ID | 名称 | 星 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 倒し方 | 調整対象のステージ（通常出現は保留） | コード・データ参照 |
+| type ID | 名称 | 星 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 倒し方 | 出るステージ | コード・データ参照 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `rocket` | ミサイル | 1 | 採用 | 実装済み | 出た向きのまま一直線に飛ぶ。機体に近づくと爆発する。飛ぶ時間が過ぎると消える | — | 1〜5 | `data/enemies/rocket.tres`、`enemy_manager.gd` の `_rocket` |
 | `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | 1・2・3・5 | `data/enemies/bomber.tres`、`_bomber` |
 | `volatile` | 誘爆する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む。誘爆は連鎖する | — | 2〜5 | `data/enemies/volatile.tres`、`on_enemy_death` |
-| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 通常出現では追跡中にも分裂体を生み、撃破時に2体へ分かれる。追加版の生存中は分裂せず撃破時に2〜3体へ分かれる設定も保持する | 分かれた体もすべて倒す | 元の通常出現。追加版は `data/lab/enemy_variants.json` に保持 | `data/enemies/splitter.tres`・`splitling.tres` |
+| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと小さな2〜3体（`splitling`）に分かれる。分かれた体はそれ以上分かれない | 分かれた体もすべて倒す | 2・4・5 | `data/enemies/splitter.tres`・`splitling.tres` |
 | `splitling` | 分裂体 | 1 | 採用 | 実装済み | 分裂する雑魚から生まれ、機体を追う | — | 2・4・5の分裂時 | `data/enemies/splitling.tres`（行動は `chase`） |
 | `beamer` | ビームの敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって砲口に光を集めてからビームを撃つ | — | 1・2・3・5 | `data/enemies/beamer.tres`、`_beamer` |
 | `pulser` | 波動の敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって1枚だけの輪を出す。切れ目はなく、届く距離は短い | — | 1・4・5 | `data/enemies/pulser.tres`、`_pulser` |
@@ -39,10 +22,10 @@
 | `pump` | ポンプ座 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せてから、前方へ一気に吐き出す | 吸っている間だけ口が開き、倒せる | 1・2 | `data/enemies/pump.tres`、`enemy_manager.gd` の `_pump` |
 | `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper` |
 | `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle` |
-| `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
+| `shield` | たて座 | 4 | 採用 | 実装済み | 自分の方へゆっくり向き直る | 背面から貫くと倒れる。前面に当たると弾かれる（失敗） | 1・5 | `data/enemies/shield.tres`、`enemy_manager.gd` の行動 `shield` |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
-| `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
+| `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や波動なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
 | `reticle` | レチクル座 | 4 | 採用 | 実装済み | 自機のいた位置に照準の模様を刻み、そこに雷が落ちる | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle` |
 | `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
@@ -50,7 +33,7 @@
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab` |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み | 周りを小さな星が輪になって回る。周期的に輪を外へ広げて押し出し、少しすると戻る | 回る星に当たると弾かれる（失敗）。隙間を通せば本体を貫ける。回る星は武器や波動で壊せる | 5 | `data/enemies/corona.tres`・`corona_star.tres`、`enemy_manager.gd` の `_corona` |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み | 号令で、周りの強敵が一斉に攻撃する | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み | 太い水流を流し続け、敵と遅い自機を押し流す | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius` |
@@ -70,10 +53,10 @@
 | type ID       | 名称           | 採用状態     | 本番の実装状況 | 行動・攻撃                                                                                        | 出現条件                        | コード・demo参照／未決事項                                                                                                                                         |
 | ------------- | -------------- | ------------ | -------------- | ------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `provisional` | ボス戦艦（仮） | 採用（暫定） | 実装済み       | 機体を直接追う。予告のあと扇状に弾を撃つ。形態＝LimboHSM、判断＝Behavior Tree、攻撃＝タイムライン | 決まった時刻に1体。撃破でクリア | `scenes/bosses/provisional_boss.tscn`、`scripts/bosses/`、`data/bosses/provisional.tres`。demo の `boss`。見た目は `battleship.png` を共用。ギミック・弱点は未検討 |
-| `hydra` | うみへび座 | 採用 | 実装済み | 本体と、体力で増える首（3〜9本）。頭だけにダメージが通り、落とした頭は生え直す。火で落とした頭は世界の更新間隔に関係なく次の段階まで再生を止める。全部の頭を落とすと不死の首がむき出しになり、一度貫くと本体へ大きなダメージを与える。首の種類ごとの攻撃と、羅針盤で予告する4つの強めの技（仕様書 12.3）。形態＝LimboHSM、判断＝Behavior Tree、強めの技＝タイムライン | 通常出現を保留し、調整用に保持する | `scenes/bosses/hydra_boss.tscn`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、頭は `data/enemies/hydra_*.tres`。首の骨組みと描画キャッシュを実装（[設計書 6.1](../architecture.md#61-敵とボスの-ai)）。見た目は仮の図形で、最終の外観は未確定 |
+| `hydra` | うみへび座 | 採用 | 実装済み | 本体と、体力で増える首（3〜9本）。頭だけにダメージが通り、落とした頭は生え直す。火で落とした頭は世界の更新間隔に関係なく次の段階まで再生を止める。全部の頭を落とすと不死の首がむき出しになり、一度貫くと本体へ大きなダメージを与える。首の種類ごとの攻撃と、羅針盤で予告する4つの強めの技（仕様書 12.3）。形態＝LimboHSM、判断＝Behavior Tree、強めの技＝タイムライン | ステージ4、決まった時刻に1体。撃破でクリア | `scenes/bosses/hydra_boss.tscn`、`scripts/bosses/hydra_boss.gd`、`data/bosses/hydra.tres`、頭は `data/enemies/hydra_*.tres`。見た目は仮の図形 |
 | 仮ID `monoceros` | いっかくじゅう座 | 採用 | 未実装 | 地形に角が刺さる突進（仕様書12.3） | ステージ1 | 本番の実装は `provisional`。角の仕掛けと数値の調整が必要 |
 
-通常ステージ1〜5は `provisional` を使う。各星系の主の組み込みは調整後に行う。
+ケンタウルス座・おおいぬ座・りゅう座のボス戦は未実装。ステージ2・3・5は `provisional` を使う。
 
 ## 障害物
 
@@ -90,12 +73,15 @@
 - 被弾しても白く光らせない。
 - 月と惑星は `moon.png`・`planet.png` を障害物の半径に合わせて表示する。
 
-## 出現状態の参照
-
-`drifter`・`swarm`・`darter`・`armored`・`gunner`・`battleship`・`titan` は上の通常出現表を参照する。
-
 ## 廃止
 
 | type ID | 名称   | 採用状態       | 実装状況                       | 理由・参照                                                                                                                                                                                                                                                  |
 | ------- | ------ | -------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drifter` | ドリフター | 不採用（出現から外した） | 定義（`speed/data/enemies/drifter.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `swarm` | スウォーム | 不採用（出現から外した） | 定義（`speed/data/enemies/swarm.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `darter` | ダーター | 不採用（出現から外した） | 定義（`speed/data/enemies/darter.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `armored` | 装甲型 | 不採用（出現から外した） | 定義（`speed/data/enemies/armored.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `gunner` | 射撃型 | 不採用（出現から外した） | 定義（`speed/data/enemies/gunner.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `battleship` | 戦艦 | 不採用（出現から外した） | 定義（`speed/data/enemies/battleship.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
+| `titan` | タイタン | 不採用（出現から外した） | 定義（`speed/data/enemies/titan.tres`）と絵は残す。どの時間帯にも出ない | 新しい敵の区分（星の数）への置き換えのため。作りは新しい敵に再利用してよい |
 | `leech` | 減速型 | 不採用（廃止） | 定義・出現・減速処理を削除済み | 近くを通るだけで減速する仕組みは、速度を軸にしたゲームでストレスになるため。旧実装はコミット `7281ad9` の `speed/data/enemies/leech.tres`・`enemy_manager.gd`・`combat_manager.gd`。ID は再利用しない。[demo](../../../demo/docs/enemies.md) には残っている |

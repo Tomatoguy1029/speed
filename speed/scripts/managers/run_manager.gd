@@ -16,12 +16,6 @@ signal frame_events(events: Array[Dictionary])
 
 var state: RunState
 var cfg: GameConfig
-## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
-var options: Dictionary = {}
-var input_source: Callable
-var encounters
-const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
-const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
 @onready var field: FieldManager = $"../FieldManager"
 @onready var ship: ShipManager = $"../ShipManager"
@@ -51,48 +45,25 @@ var profile: Dictionary = {}
 var profiling := false
 
 func _ready() -> void:
-	if not OS.is_debug_build():
-		options = {}
-	cfg = options.get("config", ConfigManager.cfg)
+	cfg = ConfigManager.cfg
 	state = RunState.new()
-	state.lab_mode = bool(options.get("lab", false))
-	state.meta_override = options.get("meta", {})
-	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
-	state.endless = bool(options.get("endless", GameManager.run_endless))
-	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
-	if OS.is_debug_build() and not state.lab_mode:
-		state.time = GameManager.run_start_time
-	GameManager.run_start_time = 0.0
-	if options.has("seed"):
-		state.rng.seed = int(options.seed)
-	else:
-		state.rng.randomize()
+	state.stage_index = GameManager.run_stage
+	state.endless = GameManager.run_endless
+	state.stage = ConfigManager.stage(state.stage_index)
+	state.rng.randomize()
 	state.hitstop_budget = cfg.kill_hitstop_cap
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
 	_wire()
-	enemies.definitions = options.get("enemies", {})
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
 		m.setup(state, cfg)
-	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
-		encounters = ENCOUNTERS.new()
-		add_child(encounters)
-		encounters.setup(self, state.stage.encounter_profile)
-	if not state.lab_mode and projectiles.director == null:
-		# 強敵と大物の攻撃の管理（時間帯の攻撃の予算で動く。仕様書 11.7）
-		var director = DIRECTOR.new()
-		director.state = state
-		director.projectiles = projectiles
-		director.configure({"enabled": false})
-		projectiles.director = director
 	build.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
 	_update_camera(1.0)
 	# 最初の武器を選ぶ。HUD がつながってから開く
-	if not state.lab_mode:
-		build.open_start_cards.call_deferred()
+	build.open_start_cards.call_deferred()
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
@@ -141,8 +112,6 @@ func _wire() -> void:
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func _physics_process(delta: float) -> void:
-	if state.lab_mode:
-		return
 	match state.phase:
 		RunState.Phase.PLAY:
 			if profiling:
@@ -156,7 +125,7 @@ func _physics_process(delta: float) -> void:
 
 ## 設定のうちランに効くもの（ポーズ中に変えるとすぐ反映）。
 func _read_settings() -> void:
-	state.hitstop_enabled = bool(options.get("hitstop", true)) if state.lab_mode else bool(SaveManager.settings.hitstop)
+	state.hitstop_enabled = bool(SaveManager.settings.hitstop)
 
 ## 更新の順番（設計書 4.3）。
 ## ワープホールからボーナスステージに入る：周りの敵と敵の攻撃を消し、雑魚と硬めの敵を多く出す（仕様書 13.1）。
@@ -175,8 +144,7 @@ func _leave_bonus() -> void:
 	state.emit(&"bonus", {"enter": false, "pos": state.ship_pos})
 
 func _play_tick(real_dt: float) -> void:
-	state.sim_time += real_dt
-	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
+	var it := input.poll()
 	input.drawing = state.drawing
 	ship.intent = it
 	draw.intent = it
@@ -213,10 +181,6 @@ func _play_tick(real_dt: float) -> void:
 		_world_real_dt = 0.0
 		_world_dt = 0.0
 		_world_steps = 0
-		if encounters != null:
-			encounters.before_world()
-		elif not state.lab_mode and projectiles.director != null:
-			projectiles.director.advance(state.world_time, enemies)
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))
@@ -231,17 +195,14 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"projectiles", func(): projectiles.tick(wr, wd))
 	_run(&"cleanup", func(): enemies.cleanup())
 	if world_step:
-		if encounters != null:
-			encounters.advance()
-		if (not state.lab_mode or options.get("auto_spawn", false)) and (projectiles.director == null or not projectiles.director.guard_active()):
-			_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
+		_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
 		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()
 	if state.phase == RunState.Phase.PLAY and state.bonus_t <= 0.0 and field.take_warp():
 		_enter_bonus()
 	_update_camera(real_dt)
 	_check_end()
-	if state.phase == RunState.Phase.PLAY and not state.lab_mode:
+	if state.phase == RunState.Phase.PLAY:
 		build.try_open_cards()
 
 ## 処理を呼ぶ。計測中なら時間を測る。
@@ -266,8 +227,6 @@ func _process(_delta: float) -> void:
 	frame_events.emit(events)
 
 func _check_end() -> void:
-	if state.lab_mode:
-		return
 	if state.phase != RunState.Phase.PLAY:
 		return
 	if state.ship_hp <= 0.0:
@@ -284,15 +243,12 @@ func set_phase(phase: RunState.Phase) -> void:
 # ── カメラ（仕様書 15） ──────────────────────────────────────────
 
 func _base_zoom() -> float:
-	var size := _view_size()
+	var size := get_viewport().get_visible_rect().size
 	var f := pow(cfg.zoom_ref_speed / maxf(cfg.zoom_ref_speed, state.stats.max_speed), cfg.zoom_exp)
 	return minf(size.x, size.y) / cfg.base_view * clampf(f, cfg.zoom_min, 1.0)
 
-func _view_size() -> Vector2:
-	return options.get("view_size", get_viewport().get_visible_rect().size)
-
 func _update_camera(real_dt: float) -> void:
-	var size := _view_size()
+	var size := get_viewport().get_visible_rect().size
 	var zoom_t := _base_zoom()
 	if not _cam_ready:
 		state.view_center = state.ship_pos
@@ -388,9 +344,6 @@ func _finishing_tick(real_dt: float) -> void:
 
 ## ランを終えて結果画面へ。
 func finish(cleared: bool) -> void:
-	if state.lab_mode:
-		state.emit(&"lab_result", {"cleared": cleared})
-		return
 	if state.phase == RunState.Phase.ENDED:
 		return
 	state.cleared = cleared
@@ -483,15 +436,11 @@ func command(name: StringName, args := {}) -> void:
 			var keep := ship.invincible
 			ship.invincible = false
 			state.ship_invuln = 0.0
-			var shield_t := state.ship_shield_t
-			state.ship_shield_t = 0.0
 			ship.damage(1.0, 0.0, &"debug")
-			state.ship_shield_t = shield_t
 			ship.invincible = keep
 		&"debug_die":
 			ship.invincible = false
 			state.ship_invuln = 0.0
-			state.ship_shield_t = 0.0
 			ship.damage(state.ship_hp + 1.0, 0.0, &"debug")
 		&"debug_coins":
 			state.coins += int(args.get("amount", 100))
@@ -499,7 +448,3 @@ func command(name: StringName, args := {}) -> void:
 			finish(true)
 		&"debug_fail":
 			finish(false)
-
-## まだ世界側へ渡していない時間。保守的な予測の先頭に含める。
-func world_time_pending() -> float:
-	return maxf(0, _world_dt)

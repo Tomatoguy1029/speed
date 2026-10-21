@@ -1,7 +1,7 @@
-[gd_resource type="BehaviorTree" format=3 uid="uid://fljn8lt4tihh"]
+[gd_resource type="BehaviorTree" format=3]
 
-[ext_resource type="Script" uid="uid://dq2x4v3ncfq2l" path="res://scripts/bosses/tasks/attack_ready.gd" id="1_ready"]
-[ext_resource type="Script" uid="uid://cqeswtb7dofuv" path="res://scripts/bosses/tasks/play_attack.gd" id="2_play"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/attack_ready.gd" id="1_ready"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/play_attack.gd" id="2_play"]
 
 [sub_resource type="BTCondition" id="BTCondition_tech"]
 script = ExtResource("1_ready")

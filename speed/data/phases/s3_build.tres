@@ -1,23 +1,29 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://dkp4ksdvcm110"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s3_build"
+display_name = "ステージ3・序盤"
+start = 0.0
+end = 150.0
 pop_from = 14.0
 pop_to = 45.0
 level_from = 1.0
 level_to = 1.35
 rate = 6.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = false
 mix = {
-"beamer": 0.3,
-"bomber": 1.667,
-"lynx": 0.1,
-"reticle": 0.1,
 "rocket": 1.667,
+"bomber": 1.667,
+"volatile": 1.667,
+"beamer": 0.3,
 "spreader": 0.3,
 "triangle": 0.1,
-"volatile": 1.667
+"lynx": 0.1,
+"reticle": 0.1
 }
-id = &"s3_build"
-display_name = "ステージ3・序盤"

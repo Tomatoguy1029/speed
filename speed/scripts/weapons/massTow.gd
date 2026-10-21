@@ -4,7 +4,7 @@
 extends WeaponBehavior
 
 ## 牽引できる撃破の原因（なぞり中の攻撃）
-const CAUSES: Array[StringName] = [&"ram", &"bump", &"sonic", &"killSonic", &"contactWave", &"contactArc", &"critBeam"]
+const CAUSES: Array[StringName] = [&"ram", &"bump", &"wave", &"sonic", &"killSonic", &"contactWave", &"contactArc", &"critBeam"]
 
 ## 牽引中の船体。pos・r・type・color・angle・source_id・ready（撃ち出せるか）
 var cargo: Array[Dictionary] = []

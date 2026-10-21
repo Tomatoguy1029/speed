@@ -1,26 +1,30 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://di7wiskky3uib"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s1_late"
+display_name = "ステージ1・終盤"
 start = 390.0
+end = 600.0
 pop_from = 75.0
 pop_to = 120.0
 level_from = 3.0
 level_to = 5.0
 rate = 10.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
 cores = true
 mix = {
-"beamer": 1.0,
+"rocket": 1.75,
 "bomber": 1.75,
-"clock": 0.3,
+"beamer": 1.0,
 "pulser": 1.0,
 "pump": 0.4,
-"rocket": 1.75,
-"ruler": 0.3,
+"telescope": 0.4,
 "shield": 0.4,
-"telescope": 0.4
+"ruler": 0.3,
+"clock": 0.3
 }
-id = &"s1_late"
-display_name = "ステージ1・終盤"

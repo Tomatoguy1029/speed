@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cavqy4wcyo5l3"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"missile"
+display_name = "ホーミングミサイルの敵"
 rank = 2
 radius = 22.0
 hp = 20.0
@@ -12,18 +14,18 @@ speed = 85.0
 accel = 1.5
 turn = 4.0
 xp = 5.0
-color = Color(1, 0.702, 0.4196, 1)
+color = Color(1.0, 0.702, 0.4196, 1)
 shape = &"ship"
 behavior = &"missile"
 ranged = true
+size_var = false
+weak_arc = 0.0
 params = {
-"bullet_dmg": 11.0,
-"fire_interval": 4.5,
 "keep": 720.0,
+"fire_interval": 4.5,
+"telegraph": 0.6,
 "missile_speed": 500.0,
 "missile_turn": 1.7,
-"slow": 0.2,
-"telegraph": 0.6
+"bullet_dmg": 11.0,
+"slow": 0.2
 }
-id = &"missile"
-display_name = "ホーミングミサイルの敵"

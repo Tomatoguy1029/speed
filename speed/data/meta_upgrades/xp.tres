@@ -1,11 +1,11 @@
-[gd_resource type="Resource" script_class="MetaUpgradeDef" format=3 uid="uid://dum7ppfhbbg6n"]
+[gd_resource type="Resource" script_class="MetaUpgradeDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://m1tscetnyl0y" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/meta_upgrade_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"xp"
 stat = &"xp"
 per_level = 0.08
 costs = PackedInt32Array(25, 50, 90, 140, 210)
-id = &"xp"
 order = 6

@@ -11,7 +11,7 @@ enum Mode { MOVE, WINDUP, DASH, RECOVER }
 ## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
 enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBER, BEAMER, PULSER, PUMP, SNIPER,
 	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX,
-	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA, SOLDIER, BITER, DOLPHIN, CROSS }
+	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
 enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW, GUARD, SOLID, GHOST, IMMORTAL }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
@@ -50,8 +50,6 @@ var gate := PackedByteArray()
 var color := PackedColorArray()
 ## 同じ敵に続けて当たらない時間、被弾の光、年齢
 var hit_cd := PackedFloat64Array()
-## 生まれてから攻撃を受けない残り時間（分裂体が、親を倒した攻撃で一緒に倒れないように）
-var guard := PackedFloat64Array()
 var flash := PackedFloat64Array()
 var age := PackedFloat64Array()
 ## 大型の敵の撃破で、破片を飛ばし終えたか
@@ -67,6 +65,12 @@ var body_gap := PackedFloat64Array()
 var body_gap_pos := PackedVector2Array()
 var body_gap_time := PackedFloat64Array()
 
+# ── 追跡の広域移動：追跡する雑魚（仕様書 11.5）─────────────────────
+
+## 周期のずれ、移動先の向きと広がり（敵ごとに決まった値）
+var roam_phase := PackedFloat64Array()
+var roam_angle := PackedFloat64Array()
+var roam_radius := PackedFloat64Array()
 
 # ── 行動の状態：種類ごと ──────────────────────────────────────────
 
@@ -76,16 +80,9 @@ var timer := PackedFloat64Array()
 ## 射撃型・ミサイル艇・戦艦：次の射撃までの時間、予告の溜め（0〜1。ボスも使う）
 var fire_t := PackedFloat64Array()
 var charge := PackedFloat64Array()
-## 分裂型：次の分裂までの時間と、分裂した数。ポンプ座は buds に吸い込んだ敵の数を持つ
+## 分裂型：次の分裂までの時間と、分裂した数
 var bud_t := PackedFloat64Array()
 var buds := PackedInt32Array()
-## からす座：回収して運んでいる経験値の量
-var carry := PackedFloat64Array()
-## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）。ケフェウス座の兵：仕える王の行番号と id
-var target := PackedInt32Array()
-var target_id := PackedInt32Array()
-## ケフェウス座：隊列の基準の位置（増援で組み直すときに決める）
-var anchor := PackedVector2Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）

@@ -9,7 +9,7 @@ extends Resource
 const EDITOR_ORDER := 7
 
 ## 伸ばす能力
-## max_speed（最高速度）、max_hp（最大 HP）、attack（攻撃力）、charge_time（ゲージの充填時間）、pickup（回収範囲）、xp（経験値）、reroll（3択のリロールの回数）、length（線の長さ）。
+## max_speed（最高速度）、max_hp（最大 HP）、attack（攻撃力）、charge_time（ゲージの充填時間）、pickup（回収範囲）、xp（経験値）、reroll（3択のリロールの回数）。
 ## 単位：文字
 @export var stat: StringName
 ## 1段階ごとの効果

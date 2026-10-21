@@ -112,9 +112,9 @@ func tick(real_dt: float, _world_dt: float) -> void:
 func revealed() -> bool:
 	return hero != null and (seen or state.landmarks.size() >= 2 or not is_captive())
 
-## 目印の星：間隔ごとに、機体の近くの強めの敵から1体を選んで持たせる（仕様書 13.1）。実験場では持たせない。
+## 目印の星：間隔ごとに、機体の近くの強めの敵から1体を選んで持たせる（仕様書 13.1）。
 func _tick_landmark(dt: float) -> void:
-	if state.lab_mode or state.landmarks.size() >= 2:
+	if state.landmarks.size() >= 2:
 		return
 	var t := enemies.table
 	if _landmark_row >= 0 and enemies.is_same(_landmark_row, _landmark_id) and t.dead[_landmark_row] == 0:

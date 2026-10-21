@@ -1,9 +1,11 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://c1qwks0w606nd"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"spreader"
+display_name = "拡散弾の敵"
 rank = 2
 radius = 20.0
 hp = 22.0
@@ -15,15 +17,16 @@ xp = 5.0
 color = Color(0.85, 0.87, 0.95, 1)
 shape = &"square"
 behavior = &"battleship"
+max_alive = 0
 ranged = true
+size_var = false
+weak_arc = 0.0
 params = {
-"bullet_dmg": 9.0,
-"bullet_speed": 340.0,
 "fire_interval": 2.6,
-"slow": 0.1,
-"spread": 0.8,
 "telegraph": 0.5,
-"volley": 5
+"volley": 5,
+"spread": 0.8,
+"bullet_speed": 340.0,
+"bullet_dmg": 9.0,
+"slow": 0.1
 }
-id = &"spreader"
-display_name = "拡散弾の敵"

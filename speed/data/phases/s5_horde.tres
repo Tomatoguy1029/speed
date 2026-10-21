@@ -1,29 +1,32 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://dbufwrstgkm4c"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s5_horde"
+display_name = "ステージ5・無双期"
 start = 330.0
+end = 390.0
 pop_from = 140.0
 pop_to = 260.0
 level_from = 1.3
 level_to = 1.6
 rate = 60.0
+xp_bonus = 0.0
 wave_interval = 3.5
 wave_type = &"volatile"
+cores = false
 mix = {
-"auriga": 0.05,
-"beamer": 0.075,
-"bomber": 2.0,
-"cross": 0.05,
-"missile": 0.075,
-"pulser": 0.075,
 "rocket": 2.0,
-"shield": 0.1,
+"bomber": 2.0,
+"volatile": 2.0,
 "splitter": 2.0,
+"beamer": 0.075,
+"pulser": 0.075,
+"missile": 0.075,
 "spreader": 0.075,
-"volatile": 2.0
+"shield": 0.1,
+"cross": 0.05,
+"auriga": 0.05
 }
-id = &"s5_horde"
-display_name = "ステージ5・無双期"

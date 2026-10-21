@@ -1,18 +1,18 @@
-[gd_resource type="Resource" script_class="TraitDef" format=3 uid="uid://c438pac17btjl"]
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://chiv0uib8kxw0" path="res://scripts/data_types/trait_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"T05"
+code_id = &"killSonic"
 params = {
+"radius_base": 275.0,
+"radius_per": 45.0,
 "damage_base": 1.2,
 "damage_per": 0.6,
 "kills_base": 9.0,
 "kills_per": -1.0,
 "knock": 1000.0,
-"radius_base": 275.0,
-"radius_per": 45.0,
 "travel": 0.5
 }
-id = &"T05"
-code_id = &"killSonic"

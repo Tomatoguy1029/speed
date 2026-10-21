@@ -1,30 +1,35 @@
-[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://k2tu8keasl0v"]
+[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"s5_pressure"
+display_name = "ステージ5・圧力期"
 start = 150.0
+end = 330.0
 pop_from = 45.0
 pop_to = 75.0
 level_from = 1.6
 level_to = 2.4
 rate = 8.0
+xp_bonus = 0.0
+wave_interval = 0.0
+wave_type = &""
+cores = false
 mix = {
-"aquila": 0.01,
-"auriga": 0.2,
-"beamer": 0.375,
-"bomber": 1.0,
-"cepheus": 0.02,
-"corona": 0.02,
-"cross": 0.2,
-"missile": 0.375,
-"pulser": 0.375,
 "rocket": 1.0,
-"shield": 0.25,
+"bomber": 1.0,
+"volatile": 1.0,
 "splitter": 1.0,
+"beamer": 0.375,
+"pulser": 0.375,
+"missile": 0.375,
 "spreader": 0.375,
-"volatile": 1.0
+"shield": 0.25,
+"cross": 0.2,
+"auriga": 0.2,
+"corona": 0.02,
+"cepheus": 0.02,
+"aquila": 0.01
 }
-id = &"s5_pressure"
-display_name = "ステージ5・圧力期"

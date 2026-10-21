@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="WeaponDef" format=3 uid="uid://wfyt60g2ex2e"]
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
 
-[ext_resource type="Script" uid="uid://coq258ecgkhoh" path="res://scripts/data_types/weapon_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -9,8 +9,8 @@ params = {
 "color": "#ffb36b",
 "damage_by_level": [0.8, 0.8, 0.8, 1.2, 1.2],
 "interval_by_level": [0.45, 0.45, 0.3, 0.3, 0.3],
-"life": 0.9,
 "shots_by_level": [1, 2, 2, 2, 3],
+"life": 0.9,
 "spread_step": 0.12
 }
 id = &"W23"

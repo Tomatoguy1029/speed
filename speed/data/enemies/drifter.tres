@@ -1,9 +1,12 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dmcscc6j5qh54"]
+[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"drifter"
+display_name = "ドリフター"
+rank = 0
 radius = 11.5
 hp = 6.0
 armor = 2.0
@@ -11,8 +14,11 @@ speed = 130.0
 accel = 2.5
 turn = 4.0
 xp = 1.0
-color = Color(0.498, 0.8196, 1, 1)
+color = Color(0.498, 0.8196, 1.0, 1)
 shape = &"orb"
 behavior = &"chase"
-id = &"drifter"
-display_name = "ドリフター"
+size_var = false
+weak_arc = 0.0
+params = {
+
+}

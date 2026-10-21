@@ -1,16 +1,16 @@
-[gd_resource type="Resource" script_class="TraitDef" format=3 uid="uid://dy5t5itvea0g2"]
+[gd_resource type="Resource" script_class="TraitDef" load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://chiv0uib8kxw0" path="res://scripts/data_types/trait_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+id = &"T03"
+code_id = &"vortex"
 params = {
 "life_base": 1.5,
 "life_per": 0.4,
-"power_base": 200.0,
-"power_per": 70.0,
 "radius_base": 180.0,
-"radius_per": 35.0
+"radius_per": 35.0,
+"power_base": 200.0,
+"power_per": 70.0
 }
-id = &"T03"
-code_id = &"vortex"

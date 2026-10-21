@@ -77,7 +77,7 @@ func _start(it: Intent) -> void:
 	state.draw_points = PackedVector2Array()
 	if it.press:
 		state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
-		_first_point_msec = _clock_msec()
+		_first_point_msec = Time.get_ticks_msec()
 	state.emit(&"draw_start")
 
 func _update_drawing(it: Intent) -> void:
@@ -85,7 +85,7 @@ func _update_drawing(it: Intent) -> void:
 		if it.press:
 			state.draw_started = true
 			state.draw_points.append(field.push_out(it.pen, cfg.ship_radius + 4.0))
-			_first_point_msec = _clock_msec()
+			_first_point_msec = Time.get_ticks_msec()
 		elif it.touch and it.pen_release:
 			_cancel()
 		return
@@ -103,10 +103,7 @@ func _update_drawing(it: Intent) -> void:
 
 ## クリックで確定できるか：描き始めから config.draw_confirm_delay 秒たち、線ができていること（仕様書 6.3）。
 func _can_confirm() -> bool:
-	return _clock_msec() - _first_point_msec >= cfg.draw_confirm_delay * 1000.0 and state.draw_points.size() >= 2
-
-func _clock_msec() -> int:
-	return roundi(state.sim_time * 1000.0) if state.lab_mode else Time.get_ticks_msec()
+	return Time.get_ticks_msec() - _first_point_msec >= cfg.draw_confirm_delay * 1000.0 and state.draw_points.size() >= 2
 
 func _cancel() -> void:
 	state.drawing = false
@@ -186,9 +183,7 @@ func _commit(_it: Intent) -> void:
 		# ボーナスステージ：放つとすぐ満タンに戻る
 		state.gauge = 1.0
 	var pts := state.draw_points
-	# 今の位置から描き始めまでも、つながった移動として駆け抜ける（途中の敵にも壁にも当たる）
-	if state.ship_pos.distance_to(pts[0]) > 1.0:
-		pts.insert(0, state.ship_pos)
+	_warp(pts[0])
 	var dir := (pts[1] - pts[0]).normalized()
 	var speed := maxf(_launch_speed(dir, state.draw_gauge), 1.0)
 	state.ship_vel = dir * speed
@@ -230,13 +225,20 @@ func _launch_speed(dir: Vector2, gauge_amount: float) -> float:
 	var limit := state.stats.max_speed * maxf(1.0, gauge_amount)
 	return maxf(minf(carried + thrust, limit), sp * c)
 
+## 線の始点へ跳ぶ。跡を残す。
+func _warp(to: Vector2) -> void:
+	var from := state.ship_pos
+	if from.distance_to(to) < 1.0:
+		return
+	state.emit(&"warp", {"from": from, "to": to})
+	state.ship_pos = to
+
 # ── なぞり（仕様書 6.5・6.6） ────────────────────────────────────
 
 func _trace(real_dt: float) -> void:
 	var pts := state.trace_path
 	var dist := run.rate * real_dt
-	# なぞり中の当たり判定は、線の左右の帯の太さ
-	var R := combat.trace_radius()
+	var R := cfg.ship_radius
 	while dist > 1e-9 and run.seg < pts.size() - 1:
 		var a := pts[run.seg]
 		var b := pts[run.seg + 1]
@@ -259,8 +261,8 @@ func _trace(real_dt: float) -> void:
 		state.ship_pos = a + u * run.seg_pos
 		state.ship_vel = u * run.speed
 		state.ship_heading = u
-		if combat.wall_bounce(from):
-			_end_trace(false)
+		combat.wave_along(run, from, state.ship_pos)
+		if state.phase != RunState.Phase.PLAY:
 			return
 		if combat.collide_ship(from, R, run):
 			build.on_trail(run, from, state.ship_pos)
@@ -292,6 +294,7 @@ func _trace_twin(real_dt: float) -> void:
 		twin_run.seg_pos += move
 		dist -= move
 		state.twin_pos = a + (b - a) / maxf(seg_len, 1e-6) * twin_run.seg_pos
+		combat.wave_along(twin_run, from, state.twin_pos)
 		combat.twin_sweep(twin_run, from, state.twin_pos)
 		if state.phase != RunState.Phase.PLAY:
 			return

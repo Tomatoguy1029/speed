@@ -9,8 +9,6 @@ extends RunSystem
 ## iron（鉄のがれき、固定）、saw（回る丸鋸、固定）。鉄のがれきと丸鋸も、隕石と同じしくみで敵の表に入る
 class Rock:
 	var kind: StringName
-	## 実験場で手動配置した岩は、閲覧カメラから離れても表に残す。
-	var lab_manual := false
 	## 漂流は世界時刻0の位置、彗星は現れた時刻の位置
 	var pos := Vector2.ZERO
 	var vel := Vector2.ZERO
@@ -192,15 +190,15 @@ func _stream_rocks(dt: float) -> void:
 		table.facing[i] = rock.facing + rock.spin * t
 		if rock.kind == &"comet" and t >= rock.gone:
 			rock.destroyed = true
-		if rock.destroyed or (not rock.lab_manual and not _near(pv[0], 650.0)):
+		if rock.destroyed or not _near(pv[0], 650.0):
 			enemies.mark_dead(i)
 			rock.row = -1
 	_stream_t -= dt
 	if _stream_t > 0.0:
 		return
 	_stream_t = 0.2
-	var defs := {&"iron": enemies.def_of(&"iron"), &"saw": enemies.def_of(&"saw")}
-	var meteor: EnemyDef = enemies.def_of(&"meteor")
+	var defs := {&"iron": ConfigManager.enemies.get(&"iron"), &"saw": ConfigManager.enemies.get(&"saw")}
+	var meteor: EnemyDef = ConfigManager.enemies.get(&"meteor")
 	for k in rocks.size():
 		var rock := rocks[k]
 		if rock.destroyed or rock.row >= 0:
@@ -209,7 +207,7 @@ func _stream_rocks(dt: float) -> void:
 			rock.destroyed = true
 			continue
 		var pv := _rock_at(rock, t)
-		if not rock.lab_manual and not _near(pv[0], 300.0):
+		if not _near(pv[0], 300.0):
 			continue
 		var def: EnemyDef = defs.get(rock.kind, meteor)
 		var sprite_radius := rock.size if def != meteor or rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
