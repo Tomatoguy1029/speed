@@ -205,6 +205,7 @@ class Checks extends EditorProperty:
 			shared.add_child(override)
 			_overrides.append(override)
 			var number := SpinBox.new()
+			number.hide()
 			number.min_value = 0.001
 			number.max_value = 2147483647
 			number.step = 0.5
@@ -248,6 +249,7 @@ class Checks extends EditorProperty:
 				var overridden := values.has(key)
 				_overrides[k].set_pressed_no_signal(overridden)
 				_numbers[k].editable = overridden
+				_numbers[k].visible = overridden
 				_numbers[k].set_value_no_signal(float(values.get(key, maxf(0.5, float(_options[k][2])))))
 				_totals[k].modulate.a = 1.0 if _boxes[k].button_pressed else 0.45
 		_updating = false
