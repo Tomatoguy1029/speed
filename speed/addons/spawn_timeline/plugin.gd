@@ -59,6 +59,7 @@ func _on_inspected() -> void:
 	if Timeline.is_stage(object):
 		_panel.set_stage(object as Resource)
 		_main.set_stage(object as Resource)
+		_watch_phase_history(object)
 		make_bottom_panel_item_visible(_panel)
 	elif _panel != null and _panel.stage != null and (_panel.phases().has(object) or _panel.clips().has(object)):
 		_watch_phase_history(object)
@@ -80,7 +81,7 @@ func _queue_phase_save() -> void:
 	if _save_queued or _panel == null or _panel.stage == null:
 		return
 	var edited := EditorInterface.get_inspector().get_edited_object()
-	if not _panel.phases().has(edited) and not _panel.clips().has(edited):
+	if edited != _panel.stage and not _panel.phases().has(edited) and not _panel.clips().has(edited):
 		return
 	_save_queued = true
 	_save_phase_changes.call_deferred()
@@ -92,7 +93,7 @@ func _save_phase_changes() -> void:
 		_main.refresh()
 		# Formations はシーン参照と非表示のvalue辞書にも依存するため、一緒に更新する。
 		var edited := EditorInterface.get_inspector().get_edited_object()
-		if _panel.clips().has(edited):
+		if edited != _panel.stage and _panel.clips().has(edited):
 			var stack: Array[Node] = [EditorInterface.get_inspector()]
 			while not stack.is_empty():
 				var node := stack.pop_back()

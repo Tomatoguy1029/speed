@@ -2,6 +2,7 @@
 ## ステージ選択で選ぶステージ。使う時間帯の並び、ボス、撃破でもらえる伝説のモジュールを決める。
 ## ---
 ## 値の正は res://data/stages/*.tres。
+@tool
 class_name StageDef
 extends Resource
 
@@ -24,6 +25,13 @@ const EDITOR_ORDER := 5
 ## このステージに出る敵の種類。出現のクリップは、この中から種類の組み合わせを選ぶ。
 ## 単位：type ID
 @export var enemies: Array[StringName] = []
+## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
+## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
+@export var enemy_attack_values: Dictionary = {}
+
+func enemy_attack_value(type: StringName) -> float:
+	var value := float(enemy_attack_values.get(String(type), 1.0))
+	return value if is_finite(value) and value > 0.0 else 1.0
 ## 雑魚の目標の数
 ## 雑魚の種類ごとの、時刻ごとの目標の数の曲線。1つでもあれば、雑魚はこの曲線で補充し、時間帯の敵の数と重みは使わない。
 ## 単位：—

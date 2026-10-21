@@ -1,5 +1,5 @@
 ## 予告前に取得するラン単位の攻撃予算（仕様書 11.7）。
-## 本番では、同じ並びから出た群れ全体が1つのvalueを共有する。分類は記録用。
+## 本番では個体ごとにvalueを消費し、明示overrideの群れだけ1つのvalueを共有する。分類は記録用。
 ## 待っていた攻撃は、許可が出てもばらつき（jitter 秒までの乱数）だけ遅れて始める。
 extends RefCounted
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
@@ -9,11 +9,11 @@ const BEHAVIORS := {
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 	"lynx": ["aimed"], "triangle": ["residue"],
 	"phoenix": ["residue"], "crab": ["zone"], "marlin": ["dash", "aimed"],
-	"aquarius": ["beam"], "auriga": ["residue"], "corona": ["aimed"],
+	"aquarius": ["beam"], "reticle": ["beam"], "auriga": ["residue"], "corona": ["aimed"],
 	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
 var enabled := false
-## 本番タイムライン：整数の予算と群れの value のみで管理する。
+## 本番タイムライン：個体IDまたは共有override群れのIDで枠を管理する。
 var formation_mode := false
 var settings: Dictionary = {"budget": 4.0, "jitter": 0.3}
 var groups: Dictionary = {}
@@ -66,7 +66,14 @@ func queue(owner: String, cats: Array, row: int, id: int, priority := 0.0) -> vo
 	if not waiting.has(owner):
 		waiting[owner] = {"cats": cats, "row": row, "id": id, "since": now, "priority": priority}
 
-## cost は群れ全体が共有するvalue（省略時は1）。
+## 支援対象などを失った待機だけを取り消す。開始済みの枠・弾・範囲は保持する。
+func cancel_wait(owner: String, id := -1) -> void:
+	if id >= 0 and waiting.has(owner) and int(waiting[owner].id) != id:
+		return
+	waiting.erase(owner)
+	reasons.erase(owner)
+
+## cost はownerのvalue（個体、または共有override群れ。省略時は1）。
 func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0, cost := -1.0) -> bool:
 	if cats.is_empty():
 		return true

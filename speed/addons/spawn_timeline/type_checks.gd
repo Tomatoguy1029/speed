@@ -22,6 +22,20 @@ func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_ty
 		# 敵の数が多いので、初めは折りたたむ
 		add_property_editor(name, Checks.new(_all_enemies(), true))
 		return true
+	if name == "enemy_attack_values" and object.get("clips") != null:
+		add_property_editor(name, EnemyValues.new(func() -> Array:
+			var options := []
+			var ids: Array = object.get("enemies").duplicate()
+			for id in object.get("enemy_attack_values"):
+				if not ids.has(StringName(id)):
+					ids.append(StringName(id))
+			for id in ids:
+				options.append([StringName(id), _display_name(StringName(id))])
+			return options), false, "Enemy attack values")
+		return true
+	if name == "formation_values" and object.get("formations") != null:
+		# 辞書はFormationsのoverride欄で編集する。保存名は互換性のため維持する。
+		return true
 	if name == "layouts" and object.get("formations") != null:
 		# フォーメーションを足したり、シーンの配置を変えたりしたら、選べる並びも変わる
 		var clip := object
@@ -46,7 +60,7 @@ func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_ty
 		return true
 	return false
 
-## フォーメーションのシーンのパス → [変更の時刻, その配置の名前の並び]
+## フォーメーションのシーンのパス → [変更の時刻, to_dataの配置一覧]
 var _layout_cache: Dictionary = {}
 
 ## クリップのフォーメーションの配置：[[「ファイル名/配置の名前」, 表示名], …]。配置は、置き場所（markers）を持つ子のノード。
@@ -61,16 +75,18 @@ func _layout_options(clip: Object) -> Array:
 		var path: String = scene.resource_path
 		var stamp := FileAccess.get_modified_time(path)
 		if not _layout_cache.has(path) or _layout_cache[path][0] != stamp:
-			var names := []
+			var layouts := []
 			var root := (scene as PackedScene).instantiate()
-			for child in root.get_children():
-				if child.has_method("markers"):
-					names.append(String(child.name))
+			if root.has_method("to_data"):
+				layouts = root.to_data().get("layouts", [])
 			root.free()
-			_layout_cache[path] = [stamp, names]
+			_layout_cache[path] = [stamp, layouts]
 		var base := path.get_file().get_basename()
-		for n in _layout_cache[path][1]:
-			out.append([StringName(base + "/" + n), "%s：%s" % [base, n]])
+		for layout: Dictionary in _layout_cache[path][1]:
+			var n := str(layout.name)
+			var stage: Resource = timeline.stage if timeline != null else null
+			var total: float = clip.automatic_value(stage, layout) if stage != null else -1.0
+			out.append([StringName(base + "/" + n), "%s：%s" % [base, n], total])
 	return out
 
 ## すべての敵：[[type ID, 表示名], …]
@@ -102,6 +118,8 @@ class Checks extends EditorProperty:
 	var _options: Array
 	var _boxes: Array[CheckBox] = []
 	var _numbers: Array[SpinBox] = []
+	var _overrides: Array[CheckBox] = []
+	var _totals: Array[Label] = []
 	var _values_property := ""
 	var _updating := false
 	var _toggle: Button
@@ -111,6 +129,15 @@ class Checks extends EditorProperty:
 	## 何も選んでいないときの見出しと、選んだ数につける言葉
 	var _none_text := ""
 	var _unit := "種類を選択中"
+	var _refresh_left := 0.0
+
+	func _process(dt: float) -> void:
+		# 他のインスペクターで編集したstage値と保存した配置にも追従する。
+		_refresh_left -= dt
+		if _values_property != "" and _refresh_left <= 0.0 and get_edited_object() != null:
+			_refresh_left = 0.5
+			if _source.is_valid() and _source.call() != _options:
+				_update_property()
 
 	func _init(options: Array, folded: bool, source := Callable(), none_text := "", unit := "種類を選択中", values_property := "") -> void:
 		_folded_default = folded
@@ -137,14 +164,17 @@ class Checks extends EditorProperty:
 			child.queue_free()
 		_boxes.clear()
 		_numbers.clear()
+		_overrides.clear()
+		_totals.clear()
 		var table := _values_property != ""
-		_grid.columns = 3 if table else 2
+		_grid.columns = 4 if table else 2
 		if table:
 			_grid.add_theme_constant_override("h_separation", 0)
 			_grid.add_theme_constant_override("v_separation", 0)
-			for title in ["使用", "並び", "value"]:
+			for title in ["使用", "並び", "Auto", "Override"]:
 				var heading := Label.new()
 				heading.text = title
+				heading.tooltip_text = "Auto：個体valueの合計。Override：群れ全体が共有するvalue。"
 				_table_cell(heading, -1)
 		for k in options.size():
 			var opt: Array = options[k]
@@ -163,16 +193,27 @@ class Checks extends EditorProperty:
 			label.tooltip_text = label.text
 			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_table_cell(label, k, true)
+			var total := Label.new()
+			total.text = str(opt[2]) if float(opt[2]) >= 0.0 else "ステージを開く"
+			total.tooltip_text = "選んだ種類のvalue × この配置の体数。使用OFFの並びも比較用に表示する。"
+			_table_cell(total, k)
+			_totals.append(total)
+			var shared := HBoxContainer.new()
+			var override := CheckBox.new()
+			override.tooltip_text = "ON：群れが指定valueを1回分共有。OFF：各個体がstageのvalueを消費。保存済みのvalueはON。"
+			override.toggled.connect(_on_override_toggled.bind(str(opt[0]), float(opt[2])))
+			shared.add_child(override)
+			_overrides.append(override)
 			var number := SpinBox.new()
-			number.min_value = 1
+			number.min_value = 0.001
 			number.max_value = 2147483647
-			number.step = 1
-			number.rounded = true
+			number.step = 0.5
 			number.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			number.custom_minimum_size.x = 72 * EditorInterface.get_editor_scale()
-			number.tooltip_text = "群れ全体が共有するvalue（1以上の整数）"
+			number.tooltip_text = "群れ全体が共有する正のvalue（0.5刻みで調整）"
 			number.value_changed.connect(_on_value_changed.bind(str(opt[0])))
-			_table_cell(number, k)
+			shared.add_child(number)
+			_table_cell(shared, k)
 			_numbers.append(number)
 
 	func _table_cell(control: Control, row: int, expand := false) -> void:
@@ -203,7 +244,12 @@ class Checks extends EditorProperty:
 		for k in _options.size():
 			_boxes[k].set_pressed_no_signal(current.has(_options[k][0]) or (_values_property != "" and current.is_empty()))
 			if _values_property != "":
-				_numbers[k].set_value_no_signal(maxi(1, int(values.get(String(_options[k][0]), 1))))
+				var key := String(_options[k][0])
+				var overridden := values.has(key)
+				_overrides[k].set_pressed_no_signal(overridden)
+				_numbers[k].editable = overridden
+				_numbers[k].set_value_no_signal(float(values.get(key, maxf(0.5, float(_options[k][2])))))
+				_totals[k].modulate.a = 1.0 if _boxes[k].button_pressed else 0.45
 		_updating = false
 		_show_fold(current.size())
 
@@ -244,11 +290,74 @@ class Checks extends EditorProperty:
 		if _updating:
 			return
 		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
-		var integer := maxi(1, int(value))
-		if integer == int(values.get(key, 1)):
+		if not values.has(key) or is_equal_approx(value, float(values[key])):
 			return
-		values[key] = integer
+		values[key] = value
 		emit_changed(_values_property, values)
+
+	func _on_override_toggled(pressed: bool, key: String, automatic: float) -> void:
+		if _updating:
+			return
+		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
+		if pressed:
+			values[key] = maxf(0.5, automatic)
+		else:
+			values.erase(key)
+		emit_changed(_values_property, values)
+
+## ステージの敵typeごとの個体value。辞書を複製して通知し、通常のUndo/Redoに載せる。
+class EnemyValues extends EditorProperty:
+	var _source: Callable
+	var _options: Array = []
+	var _rows := VBoxContainer.new()
+	var _numbers: Array[SpinBox] = []
+	var _defaults: Array[Label] = []
+
+	func _init(source: Callable) -> void:
+		_source = source
+		add_child(_rows)
+		set_bottom_editor(_rows)
+
+	func _update_property() -> void:
+		var options: Array = _source.call()
+		if options != _options:
+			_options = options
+			for child in _rows.get_children():
+				_rows.remove_child(child)
+				child.queue_free()
+			_numbers.clear()
+			_defaults.clear()
+			for option: Array in options:
+				var row := HBoxContainer.new()
+				var label := Label.new()
+				label.text = str(option[1])
+				label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+				label.tooltip_text = label.text
+				row.add_child(label)
+				var fallback := Label.new()
+				fallback.text = "仮値"
+				fallback.tooltip_text = "未設定の互換用valueは1。種類別のバランスが確定したら入力する。"
+				row.add_child(fallback)
+				_defaults.append(fallback)
+				var number := SpinBox.new()
+				number.min_value = 0.001
+				number.max_value = 2147483647
+				number.step = 0.5
+				number.value_changed.connect(_on_value_changed.bind(str(option[0])))
+				row.add_child(number)
+				_numbers.append(number)
+				_rows.add_child(row)
+		var values: Dictionary = get_edited_object().get(get_edited_property())
+		for k in _options.size():
+			var key := str(_options[k][0])
+			_numbers[k].set_value_no_signal(float(values.get(key, 1.0)))
+			_defaults[k].visible = not values.has(key)
+
+	func _on_value_changed(value: float, key: String) -> void:
+		var values: Dictionary = get_edited_object().get(get_edited_property()).duplicate()
+		values[key] = value
+		emit_changed(get_edited_property(), values)
 
 ## シーンの参照は、群れの選択と別の欄で編集する。
 class Assets extends EditorProperty:
