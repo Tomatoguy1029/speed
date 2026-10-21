@@ -1,33 +1,29 @@
-[gd_resource type="Resource" script_class="PhaseDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://1dr0d2cx4jlo"]
 
-[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"s4_late"
-display_name = "ステージ4・終盤"
 start = 390.0
-end = 600.0
 pop_from = 75.0
 pop_to = 120.0
 level_from = 3.0
 level_to = 5.0
 rate = 10.0
-xp_bonus = 0.0
-wave_interval = 0.0
-wave_type = &""
 cores = true
 mix = {
-"rocket": 1.167,
-"volatile": 1.167,
-"splitter": 1.167,
-"pulser": 0.667,
-"missile": 0.667,
-"spreader": 0.667,
-"triangle": 0.3,
-"crow": 0.3,
+"aquarius": 0.08,
 "crab": 0.35,
+"crow": 0.3,
 "dolphin": 0.3,
 "marlin": 0.3,
-"aquarius": 0.08
+"missile": 0.667,
+"pulser": 0.667,
+"rocket": 1.167,
+"splitter": 1.167,
+"spreader": 0.667,
+"triangle": 0.3,
+"volatile": 1.167
 }
+id = &"s4_late"
+display_name = "ステージ4・終盤"

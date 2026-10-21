@@ -9,6 +9,8 @@ extends RunSystem
 var field: FieldManager
 var projectiles: ProjectileManager
 var bosses: BossManager
+## 実験場が複製した定義。未指定時は本番の定義を読む。
+var definitions: Dictionary = {}
 
 const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"split": EnemyTable.Beh.SPLIT,
 	&"gunner": EnemyTable.Beh.GUNNER, &"missile": EnemyTable.Beh.MISSILE,
@@ -19,7 +21,11 @@ const BEH := {&"chase": EnemyTable.Beh.CHASE, &"dash": EnemyTable.Beh.DASH, &"sp
 	&"crow": EnemyTable.Beh.CROW, &"reticle": EnemyTable.Beh.RETICLE, &"triangle": EnemyTable.Beh.TRIANGLE,
 	&"part": EnemyTable.Beh.PART, &"phoenix": EnemyTable.Beh.PHOENIX, &"crab": EnemyTable.Beh.CRAB,
 	&"marlin": EnemyTable.Beh.MARLIN, &"aquarius": EnemyTable.Beh.AQUARIUS, &"auriga": EnemyTable.Beh.AURIGA,
-	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA}
+	&"corona": EnemyTable.Beh.CORONA, &"cepheus": EnemyTable.Beh.CEPHEUS, &"aquila": EnemyTable.Beh.AQUILA,
+	&"soldier": EnemyTable.Beh.SOLDIER, &"biter": EnemyTable.Beh.BITER, &"dolphin": EnemyTable.Beh.DOLPHIN,
+	&"cross": EnemyTable.Beh.CROSS}
+## ポンプ座の吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
+const PUMP_MOUTH := 0.85
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"mouth": EnemyTable.Gate.MOUTH, &"back": EnemyTable.Gate.BACK, &"shell": EnemyTable.Gate.SHELL,
 	&"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
@@ -70,39 +76,20 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	var t := table
 	t.def[i] = def
 	t.type[i] = def.id
-	var L := maxf(1.0, level)
-	t.level[i] = L
-	var elite: bool = opts.get("elite", false)
-	t.elite[i] = 1 if elite else 0
-	var size: float = opts.get("size", def.radius)
-	var z := size / def.radius
-	var r := size * (1.25 if elite else 1.0)
-	# 手描き素材はエリートも同じ基準サイズで運用する。
-	if def.id in RenderManager.NATIVE_SPRITES:
-		r = def.radius
-	if opts.get("meteor_index", -1) < 0:
-		r *= cfg.character_scale
-	t.r[i] = r
-	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
-	t.hp[i] = t.max_hp[i]
-	t.armor[i] = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
-	t.xp[i] = def.xp * z * (1.0 + 0.5 * (L - 1.0)) * (4.0 if elite else 1.0)
-	t.speed[i] = def.speed * (1.0 + 0.04 * (L - 1.0))
+	apply_scaling(i, def, level, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
 	t.facing[i] = opts.get("facing", 0.0)
 	t.spin[i] = opts.get("spin", 0.0)
 	t.hit_cd[i] = opts.get("hit_cd", 0.0)
+	t.guard[i] = opts.get("guard", 0.0)
+	t.knock_t[i] = opts.get("knock", 0.0)
 	t.weak_arc[i] = def.weak_arc
 	t.gate[i] = GATE.get(def.gate, EnemyTable.Gate.NONE)
 	t.color[i] = def.color
 	var fire_interval: float = def.params.get("fire_interval", 0.0)
 	t.fire_t[i] = fire_interval * (0.5 + state.rng.randf() * 0.5)
 	t.beh[i] = BEH.get(def.behavior, EnemyTable.Beh.CHASE)
-	var n := t.id[i]
-	t.roam_phase[i] = n * 1.61803398875
-	t.roam_angle[i] = n * 2.39996322973
-	t.roam_radius[i] = (0.45 + 0.5 * sqrt(fmod(n * 0.61803398875, 1.0))) * minf(1.0, cfg.enemy_pursuit_spread / 480.0)
 	t.accel[i] = def.accel if def.accel > 0.0 else 2.0
 	t.turn[i] = def.turn if def.turn > 0.0 else 4.0
 	t.meteor_index[i] = opts.get("meteor_index", -1)
@@ -114,7 +101,55 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 		var star := def_of(&"corona_star")
 		for k in int(def.params.stars):
 			spawn_part(i, star, pos + Vector2.from_angle(TAU * k / float(def.params.stars)) * float(def.params.ring))
+	elif t.beh[i] == EnemyTable.Beh.CROW and not opts.get("flock_member", false):
+		_spawn_flock(i, level, opts)
 	return i
+
+## からす座の群れの隊列（先頭からの位置。前へ x、右へ y、flock_gap 単位）。からす座の4つの星の並びにそろえる
+const CROW_FORMATION := [Vector2(-1.0, -1.1), Vector2(-1.1, 1.0), Vector2(-2.1, 0.2)]
+
+## からす座：先頭の1羽（行 i）の向きを決め、残りを隊列に並べて同じ向き・同じ速さで出す。
+## 向きは、画面の中心から aim_spread だけずれた所を通る向き。画面の中心のすぐ近くに置かれた群れは、置いた向きのまま進む。
+func _spawn_flock(i: int, level: float, opts: Dictionary) -> void:
+	var t := table
+	var def := t.def[i]
+	var p: Dictionary = def.params
+	var vc := state.view_center
+	var vh := state.view_half
+	var spread := float(p.aim_spread)
+	var target := vc + Vector2(state.rng.randf_range(-spread, spread) * vh.x, state.rng.randf_range(-spread, spread) * vh.y)
+	if target.distance_to(t.pos[i]) > minf(vh.x, vh.y) * 0.25:
+		t.facing[i] = (target - t.pos[i]).angle()
+	t.mode[i] = EnemyTable.Mode.DASH
+	var u := Vector2.from_angle(t.facing[i])
+	var side := Vector2(-u.y, u.x)
+	var gap := float(p.flock_gap)
+	for k in mini(int(p.flock) - 1, CROW_FORMATION.size()):
+		var at: Vector2 = t.pos[i] + (u * CROW_FORMATION[k].x + side * CROW_FORMATION[k].y) * gap
+		var j := spawn(def, level, at, {"facing": t.facing[i], "elite": opts.get("elite", false), "flock_member": true})
+		t.mode[j] = EnemyTable.Mode.DASH
+
+## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
+func apply_scaling(i: int, def: EnemyDef, level: float, opts := {}) -> void:
+	var t := table
+	var L := maxf(1.0, level)
+	t.level[i] = L
+	var elite: bool = opts.get("elite", false)
+	t.elite[i] = 1 if elite else 0
+	var size: float = opts.get("size", def.radius)
+	var z := size / def.radius
+	var r := size * (1.25 if elite else 1.0)
+	# 手描き素材はエリートも同じ基準サイズで運用する。
+	if def.id in EnemyDef.NATIVE_SPRITES:
+		r = def.radius
+	if opts.get("meteor_index", -1) < 0:
+		r *= cfg.character_scale
+	t.r[i] = r
+	t.max_hp[i] = def.hp * z * z * (1.0 + 0.6 * (L - 1.0)) * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
+	t.hp[i] = t.max_hp[i]
+	t.armor[i] = def.armor * z * (1.0 + 0.35 * (L - 1.0)) * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
+	t.xp[i] = def.xp * z * (1.0 + 0.5 * (L - 1.0)) * (4.0 if elite else 1.0)
+	t.speed[i] = def.speed * (1.0 + 0.04 * (L - 1.0))
 
 ## 部位を1つ出し、親（行 i）に付ける。
 func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
@@ -182,6 +217,7 @@ func _reset_row(i: int) -> void:
 	t.weak_arc[i] = 0.0
 	t.color[i] = Color.WHITE
 	t.hit_cd[i] = 0.0
+	t.guard[i] = 0.0
 	t.flash[i] = 0.0
 	t.age[i] = 0.0
 	t.hull_scattered[i] = 0
@@ -191,15 +227,16 @@ func _reset_row(i: int) -> void:
 	t.body_gap[i] = -1.0
 	t.body_gap_pos[i] = Vector2.ZERO
 	t.body_gap_time[i] = 0.0
-	t.roam_phase[i] = 0.0
-	t.roam_angle[i] = 0.0
-	t.roam_radius[i] = 0.0
 	t.mode[i] = EnemyTable.Mode.MOVE
 	t.timer[i] = 0.0
 	t.fire_t[i] = 0.0
 	t.charge[i] = 0.0
 	t.bud_t[i] = 0.0
 	t.buds[i] = 0
+	t.carry[i] = 0.0
+	t.target[i] = -1
+	t.target_id[i] = -1
+	t.anchor[i] = Vector2.ZERO
 	t.spin[i] = 0.0
 	t.knock_t[i] = 0.0
 	t.shove_time[i] = 0.0
@@ -235,6 +272,10 @@ func is_same(i: int, id: int) -> bool:
 ## 弾かれるのは失敗のとき（BOUNCE）だけ。dmg は当たった攻撃のダメージで、殻（やまねこ座）にはこの判定で傷を付ける。
 func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0.0) -> int:
 	var t := table
+	if t.beh[i] == EnemyTable.Beh.SHIELD:
+		if shield_blocks(i, _hit, dir):
+			return EnemyTable.GateResult.BOUNCE if cause == &"ram" else EnemyTable.GateResult.PASS
+		return EnemyTable.GateResult.ALLOW
 	match t.gate[i]:
 		EnemyTable.Gate.MOUTH:
 			# 口が開いている（吸い込んでいる）間だけ倒せる
@@ -281,6 +322,17 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 			return EnemyTable.GateResult.PASS
 	return EnemyTable.GateResult.ALLOW
 
+## たて座の前面。命中した位置を使い、位置のない攻撃は飛んできた向きから判定する。
+func shield_blocks(i: int, hit: Vector2, dir: Vector2) -> bool:
+	var d := hit - table.pos[i]
+	if d.length_squared() < 0.01:
+		d = -dir
+	return d.length_squared() > 0.0 and absf(Geom.angle_diff(d.angle(), table.facing[i])) <= float(table.def[i].params.front_arc)
+
+## 盾を奪える背面。側面の通常攻撃と、背後からの高速体当たりを分ける。
+func shield_rear(i: int, hit: Vector2) -> bool:
+	return absf(Geom.angle_diff((hit - table.pos[i]).angle(), table.facing[i] + PI)) <= table.weak_arc[i]
+
 func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
 		return
@@ -301,6 +353,7 @@ func clear_regular() -> void:
 ## 全部の敵を消す（計測・確認用のツールが使う）。
 func clear_all() -> void:
 	slots.clear()
+	_tele_rays.clear()
 	for b in EnemyTable.Beh.size():
 		beh_rows[b].clear()
 	_dead_rows.clear()
@@ -324,7 +377,7 @@ func _release_row(i: int) -> void:
 	slots.release(i)
 
 func def_of(type: StringName) -> EnemyDef:
-	return ConfigManager.enemies.get(type) as EnemyDef
+	return definitions.get(type, ConfigManager.enemies.get(type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
 func debug_spawn_random(count_n: int) -> void:
@@ -370,36 +423,28 @@ func tick(_real_dt: float, world_dt: float) -> void:
 			EnemyTable.Beh.SHIELD, EnemyTable.Beh.RULER, EnemyTable.Beh.CLOCK, EnemyTable.Beh.LYNX,
 			EnemyTable.Beh.CROW, EnemyTable.Beh.RETICLE, EnemyTable.Beh.TRIANGLE, EnemyTable.Beh.PART,
 			EnemyTable.Beh.PHOENIX, EnemyTable.Beh.CRAB, EnemyTable.Beh.MARLIN, EnemyTable.Beh.AQUARIUS,
-			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA]:
+			EnemyTable.Beh.AURIGA, EnemyTable.Beh.CORONA, EnemyTable.Beh.CEPHEUS, EnemyTable.Beh.AQUILA,
+			EnemyTable.Beh.SOLDIER, EnemyTable.Beh.BITER, EnemyTable.Beh.DOLPHIN, EnemyTable.Beh.CROSS]:
 		_tick_behavior(b, world_dt)
 	_flush_new()
 
 ## 追跡（いちばん多い雑魚）は、関数を呼ばずにここで計算する（仕様書 11.5）。
 func _tick_chase(dt: float) -> void:
 	var t := table
-	var aim := state.enemy_aim
 	var vc := state.view_center
 	var vh := state.view_half
-	var cycle_len := cfg.enemy_approach_cycle
-	var appr := cfg.enemy_approach_time
-	var blend := cfg.enemy_approach_blend
-	var roam_turn := cfg.enemy_roam_turn
-	var face_move := cfg.enemy_face_move
+	var ship := state.ship_pos
 	var pos := t.pos
 	var vel := t.vel
 	var facing := t.facing
 	var age := t.age
 	var hit_cd := t.hit_cd
+	var guard := t.guard
 	var flash := t.flash
 	var dead := t.dead
 	var shove_time := t.shove_time
 	var knock_t := t.knock_t
-	var roam_phase := t.roam_phase
-	var roam_angle := t.roam_angle
-	var roam_radius := t.roam_radius
 	var speed := t.speed
-	var accel := t.accel
-	var turn := t.turn
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -416,43 +461,29 @@ func _tick_chase(dt: float) -> void:
 		age[i] = a
 		if hit_cd[i] > 0.0:
 			hit_cd[i] -= dt
+		if guard[i] > 0.0:
+			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
-		var cdt := dt
 		var rel := from - vc
+		# 画面から遠い敵は、LOD 回に1回だけ向きを決め直す。間の回は今の速度で進むだけ
 		if absf(rel.x) > lod_lim.x or absf(rel.y) > lod_lim.y:
 			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
 				pos[i] = from + vel[i] * dt
 				continue
-			cdt = dt * LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			var cycle := fmod(a + roam_phase[i], cycle_len)
-			var roam := clampf(minf((cycle - appr) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-			var target := aim
-			if roam > 0.0:
-				var ang := roam_angle[i] + a * roam_turn
-				var ux := cos(ang)
-				var uy := sin(ang)
-				var edge := roam_radius[i] / maxf(absf(ux), absf(uy))
-				target = aim + (Vector2(vc.x + ux * edge * vh.x, vc.y + uy * edge * vh.y) - aim) * roam
-			var d := target - from
+			# 機体へまっすぐ、決まった速さで向かう（旋回・慣性なし）
+			var d := ship - from
 			var dist := d.length()
-			if dist < 0.001:
-				dist = 1.0
-			var k := minf(1.0, accel[i] * cdt)
-			var v := vel[i]
-			v += (d * (speed[i] / dist) - v) * k
+			var v := Vector2.ZERO
+			if dist > 0.001:
+				var u := d / dist
+				v = u * speed[i]
+				facing[i] = u.angle()
 			vel[i] = v
-			# 向き：進む向きと機体への向きを混ぜ、毎秒 turn までしか回さない
-			var w := face_move * minf(1.0, v.length() / maxf(speed[i], 1.0))
-			var face := v.normalized() * w + (aim - from).normalized() * (1.0 - w)
-			if face.length_squared() > 0.0025:
-				var f := facing[i]
-				var turn_max := turn[i] * cdt
-				facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
@@ -466,6 +497,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var vel := t.vel
 	var age := t.age
 	var hit_cd := t.hit_cd
+	var guard := t.guard
 	var flash := t.flash
 	var dead := t.dead
 	var shove_time := t.shove_time
@@ -485,6 +517,8 @@ func _tick_behavior(b: int, dt: float) -> void:
 		age[i] += dt
 		if hit_cd[i] > 0.0:
 			hit_cd[i] -= dt
+		if guard[i] > 0.0:
+			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
@@ -499,6 +533,12 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
+			if not _lab_admit(i, bdt):
+				_chase(i, bdt)
+				pos[i] += vel[i] * dt
+				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
+					field.collide_enemy(i, from)
+				continue
 			match b:
 				EnemyTable.Beh.DASH:
 					_dash(i, bdt)
@@ -543,15 +583,12 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.PUMP:
 					_pump(i, bdt)
 				EnemyTable.Beh.SNIPER:
-					_keep_distance(i, bdt)
-					if _gun_timer(i, bdt):
-						var sp: Dictionary = t.def[i].params
-						projectiles.fire_enemy(i, (state.enemy_aim - pos[i]).angle(), sp.bullet_speed, &"bullet")
+					_telescope(i, bdt)
 				EnemyTable.Beh.SHIELD:
+					t.fire_t[i] = maxf(0.0, t.fire_t[i] - bdt)
 					_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], bdt)
 					_turn_toward(i, (state.ship_pos - pos[i]).angle(), t.turn[i], bdt)
 				EnemyTable.Beh.RULER:
-					_keep_distance(i, bdt)
 					_ruler(i, bdt)
 				EnemyTable.Beh.CLOCK:
 					_chase(i, bdt)
@@ -559,14 +596,14 @@ func _tick_behavior(b: int, dt: float) -> void:
 				EnemyTable.Beh.LYNX:
 					_lynx(i, bdt)
 				EnemyTable.Beh.CROW:
-					_keep_distance(i, bdt)
 					_crow(i, bdt)
 				EnemyTable.Beh.RETICLE:
-					_keep_distance(i, bdt)
 					_reticle(i, bdt)
 				EnemyTable.Beh.TRIANGLE:
-					_chase(i, bdt)
+					_keep_distance(i, bdt)
 					_triangle(i, bdt)
+					if t.mode[i] != EnemyTable.Mode.RECOVER and _gun_timer(i, bdt):
+						fire_volley(i)
 				EnemyTable.Beh.PART:
 					# 位置は親が決める。親が倒れたら一緒に消える
 					if not self.is_same(t.parent[i], t.parent_id[i]) or t.dead[t.parent[i]] != 0:
@@ -587,8 +624,15 @@ func _tick_behavior(b: int, dt: float) -> void:
 					_chase(i, bdt)
 					_corona(i, bdt)
 				EnemyTable.Beh.CEPHEUS:
-					_keep_distance(i, bdt)
 					_cepheus(i, bdt)
+				EnemyTable.Beh.SOLDIER:
+					_soldier(i, bdt)
+				EnemyTable.Beh.BITER:
+					_biter(i, bdt)
+				EnemyTable.Beh.DOLPHIN:
+					_dolphin(i, bdt)
+				EnemyTable.Beh.CROSS:
+					_cross(i, bdt)
 				EnemyTable.Beh.AQUILA:
 					_drive(i, bdt)
 					_aquila(i, bdt)
@@ -597,6 +641,8 @@ func _tick_behavior(b: int, dt: float) -> void:
 			pos[i] += vel[i] * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
+
+	projectiles.lab_context = 0
 
 ## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldManager.near_body と同じ条件）。
 ## 前回確かめたときの天体の表面までの距離から、その後に動いた距離と月が動けた距離を引き、
@@ -649,7 +695,7 @@ func fire_volley(i: int) -> void:
 	var n: int = p.volley
 	var spread: float = p.spread
 	for k in n:
-		projectiles.fire_enemy(i, base + (float(k) / (n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")
+		projectiles.fire_enemy(i, base + (float(k) / maxi(1, n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")
 
 func _steer_to(i: int, target: Vector2, speed: float, accel: float, dt: float) -> void:
 	var d := target - table.pos[i]
@@ -673,22 +719,16 @@ func _turn_moving(i: int, rate: float, dt: float) -> void:
 		_turn_toward(i, face.angle(), rate, dt)
 
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
-func _chase(i: int, dt: float) -> void:
+func _chase(i: int, _dt: float) -> void:
 	var t := table
-	var aim := _aim
-	var a := t.age[i]
-	var cycle_len := cfg.enemy_approach_cycle
-	var blend := cfg.enemy_approach_blend
-	var cycle := fmod(a + t.roam_phase[i], cycle_len)
-	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-	var target := aim
-	if roam > 0.0:
-		var ang := t.roam_angle[i] + a * cfg.enemy_roam_turn
-		var ux := cos(ang)
-		var uy := sin(ang)
-		var edge := t.roam_radius[i] / maxf(absf(ux), absf(uy))
-		target = aim + (Vector2(_vc.x + ux * edge * _vh.x, _vc.y + uy * edge * _vh.y) - aim) * roam
-	_move_to(i, target, t.speed[i], t.accel[i], t.turn[i], dt)
+	var d := state.ship_pos - t.pos[i]
+	var dist := d.length()
+	if dist < 0.001:
+		t.vel[i] = Vector2.ZERO
+		return
+	var u := d / dist
+	t.vel[i] = u * t.speed[i]
+	t.facing[i] = u.angle()
 
 ## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
 ## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。
@@ -745,9 +785,15 @@ func _split(i: int, dt: float) -> void:
 	t.bud_t[i] = 0.0
 	if t.buds[i] >= int(p.max_buds):
 		return
+	var a := bud_angle(i)
 	t.buds[i] += 1
-	var a := state.rng.randf() * TAU
-	spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i] * 1.5, {"facing": a})
+	spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i] * 1.2,
+		{"facing": a, "vel": Vector2.from_angle(a) * 160.0, "hit_cd": 0.2})
+	state.emit(&"bud", {"pos": t.pos[i] + Vector2.from_angle(a) * t.r[i], "color": t.color[i]})
+
+## 分裂する雑魚が次の分裂体を生む向き（育っていく芽の位置。描画も同じ向きを使う）。
+func bud_angle(i: int) -> float:
+	return float(table.id[i]) * 2.39996322973 + float(table.buds[i]) * 2.399963
 
 ## 射撃型・ミサイル艇：機体の周りの keep の距離を保ち、回り込む。
 func _keep_distance(i: int, dt: float) -> void:
@@ -816,7 +862,8 @@ func _rocket(i: int, dt: float) -> void:
 	elif t.timer[i] <= 0.0:
 		mark_dead(i)
 
-## 自爆する雑魚：追ってきて、近づくと2回明滅してから爆発する。明滅し終わる前に倒せば爆発しない。
+## 自爆する雑魚：追ってきて、機体が trigger に入るとカウントダウンに入る。カウントダウンの間も止まらず、
+## rush 倍の速さで機体へ詰め寄る。2回明滅し終わると爆発する。明滅し終わる前に倒せば爆発しない。
 func _bomber(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
@@ -826,11 +873,13 @@ func _bomber(i: int, dt: float) -> void:
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.blast_delay)
 		return
-	_hold(i, dt)
+	_steer_to(i, state.ship_pos, t.speed[i] * float(p.rush), t.accel[i] * 2.0, dt)
+	_turn_moving(i, t.turn[i] * 2.0, dt)
 	t.timer[i] -= dt
-	# 2回明滅する
+	# 2回明滅する。charge はカウントダウンの進み（0〜1）
 	var phase := 1.0 - t.timer[i] / maxf(float(p.blast_delay), 0.001)
-	t.flash[i] = 0.05 if fmod(phase * 2.0, 1.0) < 0.5 else 0.0
+	t.charge[i] = clampf(phase, 0.0, 1.0)
+	t.flash[i] = 0.05 if fmod(phase * 2.0, 1.0) > 0.75 else 0.0
 	if t.timer[i] <= 0.0:
 		_self_destruct(i)
 
@@ -854,9 +903,12 @@ func _beamer(i: int, dt: float) -> void:
 					float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3))
 		return
 	t.timer[i] -= dt
+	# charge は砲口に光が集まる進み（0〜1）。撃っている間は 1
+	t.charge[i] = clampf(1.0 - (t.timer[i] - float(p.beam_time)) / float(p.telegraph), 0.0, 1.0)
 	if t.timer[i] <= 0.0:
 		t.mode[i] = EnemyTable.Mode.MOVE
 		t.fire_t[i] = float(p.fire_interval)
+		t.charge[i] = 0.0
 
 ## 波動の敵：距離を保ち、間隔ごとに止まって、1枚の輪か扇を出す。
 func _pulser(i: int, dt: float) -> void:
@@ -886,63 +938,286 @@ func _pulser(i: int, dt: float) -> void:
 
 # ── 強敵（仕様書 11.7・敵一覧） ──────────────────────────────────
 
-## 機体が高速か（なぞり中・勢いの間・速い移動）。引き寄せる力は、高速の機体には効かない。
-func _ship_fast() -> bool:
-	return state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
-
-## ポンプ座：距離を保ち、周期的に止まって周りの敵と遅い機体を吸い寄せ（口が開いて倒せる）、
-## そのあと前方へ一気に吐き出す（扇形の波）。
+## ポンプ座：機体を追いながら周りの敵を吸い込んで圧縮する（buds が吸い込んだ数）。数に応じて胴体が膨らむ。
+## 満タンになると吸い込みを止めて構え（WINDUP）、向きを固定して圧縮弾を一発撃つ。撃ったあとはしぼむ（RECOVER）。
 func _pump(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if t.mode[i] == EnemyTable.Mode.MOVE:
-		_keep_distance(i, dt)
-		t.fire_t[i] -= dt
-		if t.fire_t[i] <= 0.0:
-			t.mode[i] = EnemyTable.Mode.WINDUP
-			t.timer[i] = float(p.suck_time)
-		return
-	_hold(i, dt)
+	var store_max := int(p.store_max)
+	var full := float(t.buds[i]) / float(store_max)
+	# 胴体は吸い込んだ数に応じて膨らみ、撃ったあとはしぼむ
+	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale
+	t.r[i] += (base_r * (1.0 + float(p.grow) * full) - t.r[i]) * minf(1.0, 6.0 * dt)
 	t.timer[i] -= dt
-	var a := (state.ship_pos - t.pos[i]).angle()
-	_turn_toward(i, a, 2.0, dt)
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		# 吸い寄せる
-		var reach := float(p.pull_radius)
-		var pull := float(p.pull) * dt
-		var d := t.pos[i] - state.ship_pos
-		if d.length_squared() < reach * reach and not _ship_fast():
-			state.ship_vel += d.normalized() * pull
-		var rows := PackedInt32Array()
-		projectiles.combat.nearby(t.pos[i], reach, rows)
-		for j in rows:
-			if j != i and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0:
-				var dj := t.pos[i] - t.pos[j]
-				t.vel[j] += dj.normalized() * pull
-		if t.timer[i] <= 0.0:
-			# 吐き出す
-			projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
-				float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
-			t.mode[i] = EnemyTable.Mode.RECOVER
-			t.timer[i] = 0.6
-	elif t.timer[i] <= 0.0:
-		t.mode[i] = EnemyTable.Mode.MOVE
-		t.fire_t[i] = float(p.fire_interval)
+	match t.mode[i]:
+		EnemyTable.Mode.MOVE:
+			_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
+			_pump_suck(i, p, dt)
+			if t.buds[i] >= store_max:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			# 撃つ直前の lock_time は向きを固定する
+			if t.timer[i] > float(p.lock_time):
+				_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
+			if t.timer[i] <= 0.0:
+				projectiles.fire_shell(i, t.facing[i], float(p.shell_speed), float(p.shell_r), float(p.shell_range),
+					float(p.burst_radius), _attack_dmg(i, float(p.bullet_dmg)))
+				t.buds[i] = 0
+				t.charge[i] = 0.0
+				t.vel[i] -= Vector2.from_angle(t.facing[i]) * float(p.shell_speed) * 0.3
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.recover)
+		_:
+			_hold(i, dt)
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
 
-## じょうぎ座：距離を保ち、間隔ごとに機体の近くへ長い直線の光の壁を置く。
+## ポンプ座が周りの敵を吸い寄せ、口に届いた敵を一定の間隔で吸い込む。吸い込める敵は、上限を持たない雑魚と硬めの敵。
+## 吸い寄せられている敵は自分の動きをやめ（knock_t）、自転しながら口へまっすぐ進む。口に近いほど速く、速く回る。
+## 吸い込んだ敵は撃破にせずに消し、自転しながら小さくなって口へ飛び込む見た目を描画へ知らせる。
+func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
+	var t := table
+	var reach := float(p.pull_radius)
+	var pull := float(p.pull)
+	var spin := float(p.pull_spin)
+	var mouth := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i] * PUMP_MOUTH
+	var bite := t.r[i] + float(p.swallow_reach)
+	t.bud_t[i] -= dt
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby(t.pos[i], reach, rows)
+	for j in rows:
+		if j == i or t.dead[j] != 0 or t.is_boss[j] != 0 or t.meteor_index[j] >= 0 or t.parent[j] >= 0 \
+				or t.landmark[j] != 0:
+			continue
+		if t.def[j] == null or t.def[j].max_alive > 0 or t.beh[j] == EnemyTable.Beh.PUMP:
+			continue
+		var d := mouth - t.pos[j]
+		var dist := d.length()
+		if dist < bite and t.bud_t[i] <= 0.0 and t.buds[i] < int(p.store_max):
+			t.buds[i] += 1
+			t.bud_t[i] = float(p.swallow_interval)
+			state.emit(&"swallow", {"enemy_type": t.type[j], "pos": t.pos[j], "r": t.r[j], "facing": t.facing[j],
+				"color": t.color[j], "row": i, "id": t.id[i], "spin": spin * 2.0})
+			mark_dead(j)
+			continue
+		var near := 1.0 - clampf(dist / reach, 0.0, 1.0)
+		t.knock_t[j] = maxf(t.knock_t[j], dt * 2.0)
+		t.vel[j] = d / maxf(dist, 1.0) * pull * (0.3 + 0.7 * near)
+		t.facing[j] += spin * (0.4 + 0.6 * near) * dt
+
+## ぼうえんきょう座のサーチライトの光線の数と、光線ごとの届く長さ（敵の id → 長さの並び。帯の右端から左端の順）
+const TELE_RAYS := 48
+var _tele_rays: Dictionary = {}
+
+## ぼうえんきょう座：距離を保ちながら、レンズの向き（facing）へサーチライトの帯を伸ばす。見失っている間は、機体のいる方へ
+## search_turn の速さで向き直りながら、その周りを左右へ search_sway の幅で振って探す。
+## 機体が光の中にいる間は機体の方へ track_turn の速さで追い、狙い（charge）が lock_fill で溜まる。帯の外では狙いが戻る。
+## 光は隕石・惑星・月で遮られ、その陰では見つからない。狙いの途中でも陰に入れば、狙いはすぐ外れる。
+## 帯は狙いが溜まるほど細くなる。溜まりきると laser_charge の間レーザーを溜め（WINDUP。機体を追い続け、岩陰に入られたら取り消す）、
+## 溜め終わりの向きへ太いレーザーを撃つ（laser_delay ののち laser_time の間当たる。光と同じく隕石などで止まる）。
+## 撃ったあと cooldown の間は休む（RECOVER）。
+func _telescope(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var d := t.pos[i] - _aim
+	var dist := maxf(d.length(), 1.0)
+	var u := d / dist
+	var side := 1.0 if t.id[i] % 2 == 1 else -1.0
+	_steer_to(i, _aim + u * float(p.keep) + Vector2(-u.y, u.x) * 150.0 * side, t.speed[i], t.accel[i], dt)
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		t.timer[i] -= dt
+		_search_telescope(i, dt)
+		_cast_telescope(i)
+		if t.timer[i] <= 0.0:
+			t.mode[i] = EnemyTable.Mode.MOVE
+		return
+	_cast_telescope(i)
+	var seen := telescope_sight(i, state.ship_pos)
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		if seen == 2:
+			# 溜めの間に岩陰へ逃げられた：取り消して探し直す
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.charge[i] = 0.0
+			return
+		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
+		t.timer[i] -= dt
+		if t.timer[i] <= 0.0:
+			var lens := telescope_lens(i)
+			var reach := telescope_reach(i, t.facing[i])
+			projectiles.fire_beam(lens, t.facing[i], reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
+				_attack_dmg(i, float(p.bullet_dmg)), Color(1.0, 0.3, 0.25))
+			state.emit(&"telescope_fire", {"pos": lens, "angle": t.facing[i], "length": reach, "width": float(p.laser_width)})
+			t.charge[i] = 0.0
+			t.mode[i] = EnemyTable.Mode.RECOVER
+			t.timer[i] = float(p.cooldown)
+		return
+	if seen == 1:
+		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.track_turn), dt)
+		t.charge[i] = minf(1.0, t.charge[i] + dt / float(p.lock_fill))
+	elif seen == 2:
+		# 岩陰に隠れた：狙いを外し、探し直す
+		t.charge[i] = 0.0
+		_search_telescope(i, dt)
+	else:
+		_search_telescope(i, dt)
+		t.charge[i] = maxf(0.0, t.charge[i] - dt * float(p.lock_decay))
+	if t.charge[i] >= 1.0:
+		t.mode[i] = EnemyTable.Mode.WINDUP
+		t.timer[i] = float(p.laser_charge)
+		state.emit(&"telescope_charge", {"pos": telescope_lens(i)})
+
+## ぼうえんきょう座が機体を探す：機体のいる方を中心に、左右へ振りながら向きを変える。
+func _search_telescope(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var sway := sin(t.age[i] * TAU / float(p.search_period) + float(t.id[i])) * float(p.search_sway)
+	_turn_toward(i, (state.ship_pos - t.pos[i]).angle() + sway, float(p.search_turn), dt)
+
+## ぼうえんきょう座の帯の左右の角度（狙いが溜まるほど細い）。
+func telescope_half(i: int) -> float:
+	var p: Dictionary = table.def[i].params
+	return lerpf(float(p.band_width), float(p.band_narrow), table.charge[i])
+
+## ぼうえんきょう座のサーチライトの光が出る位置（レンズ）。
+func telescope_lens(i: int) -> Vector2:
+	return table.pos[i] + Vector2.from_angle(table.facing[i]) * table.r[i] * 0.9
+
+## ぼうえんきょう座（行 i）の光線を投げ、光線ごとの届く長さを隕石・惑星・月で切って覚える。
+func _cast_telescope(i: int) -> void:
+	var t := table
+	var length := float(t.def[i].params.band_len)
+	var lens := telescope_lens(i)
+	var half := telescope_half(i)
+	# 遮るもの：帯の届く範囲の隕石・鉄のがれきと、惑星・月
+	var blockers: Array = []
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby(lens, length, rows)
+	for j in rows:
+		if t.meteor_index[j] >= 0 and t.dead[j] == 0:
+			blockers.append([t.pos[j], t.r[j]])
+	for b in field.bodies:
+		if b.pos.distance_to(lens) < length + b.r:
+			blockers.append([b.pos, b.r])
+	var rays := PackedFloat32Array()
+	rays.resize(TELE_RAYS)
+	for n in TELE_RAYS:
+		var v := Vector2.from_angle(t.facing[i] - half + 2.0 * half * n / float(TELE_RAYS - 1))
+		var reach := length
+		for blk in blockers:
+			var c: Vector2 = blk[0] - lens
+			var r: float = blk[1]
+			var along := c.dot(v)
+			if along < -r:
+				continue
+			var d2 := c.length_squared() - along * along
+			if d2 > r * r:
+				continue
+			reach = minf(reach, maxf(0.0, along - sqrt(r * r - d2)))
+		rays[n] = reach
+	_tele_rays[t.id[i]] = rays
+
+## ぼうえんきょう座（行 i）の光線ごとの届く長さ（まだ投げていなければ空）。
+func telescope_rays(i: int) -> PackedFloat32Array:
+	return _tele_rays.get(table.id[i], PackedFloat32Array())
+
+## 位置 at が、ぼうえんきょう座（行 i）の光の中か：0 は帯の外、1 は光の中、2 は帯の中だが隕石などの陰。
+## 描く光と同じ光線の長さで判定する。休んでいる間は見えない。
+func telescope_sight(i: int, at: Vector2) -> int:
+	var t := table
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		return 0
+	var lens := telescope_lens(i)
+	var d := at - lens
+	var dist := d.length()
+	if dist > float(t.def[i].params.band_len) or dist < 1.0:
+		return 0
+	var half := telescope_half(i)
+	var off := Geom.angle_diff(d.angle(), t.facing[i])
+	if absf(off) > half + atan(cfg.ship_radius / dist):
+		return 0
+	return 1 if dist <= telescope_reach(i, d.angle()) else 2
+
+## ぼうえんきょう座（行 i）の光が、向き angle にどこまで届くか（帯の中の光線の長さを補間する）。
+func telescope_reach(i: int, angle: float) -> float:
+	var rays := telescope_rays(i)
+	var length := float(table.def[i].params.band_len)
+	if rays.is_empty():
+		return length
+	var half := telescope_half(i)
+	var off := Geom.angle_diff(angle, table.facing[i])
+	var f := clampf((off + half) / (2.0 * half), 0.0, 1.0) * (TELE_RAYS - 1)
+	var n := mini(int(f), TELE_RAYS - 2)
+	return lerpf(rays[n], rays[n + 1], f - n)
+
+## じょうぎ座：1体の定規として現れ、split_delay たつと二つに分かれる（buds が左右の印 1・-1。0 は分かれる前）。
+## 2体は、機体の方へ向かう縦か横の軸（facing）をそろえ、機体を左右から挟む位置へ展開する（DASH）。
+## 照射の向きを予告し（WINDUP、charge が予告の進み）、それぞれ長いビームを出し続ける（RECOVER）。ビームは発射元に
+## つながり、機体の移動を止める壁になる。照射が終わると、また機体を挟む位置へ展開し直す。倒した個体のビームは消える。
 func _ruler(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	t.fire_t[i] -= dt
-	if t.fire_t[i] > 0.0:
+	if t.buds[i] == 0:
+		_keep_distance(i, dt)
+		if t.age[i] >= float(p.split_delay):
+			_split_ruler(i)
 		return
-	t.fire_t[i] = float(p.fire_interval)
-	var to_ship := (state.enemy_aim - t.pos[i]).normalized()
-	var across := Vector2(-to_ship.y, to_ship.x)
-	var length := float(p.wall_len)
-	var center := state.enemy_aim + to_ship * float(p.wall_offset)
-	projectiles.fire_wall(center - across * length * 0.5, across.angle(), length, float(p.wall_width),
-		float(p.telegraph), float(p.wall_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+	var d := Vector2.from_angle(t.facing[i])
+	t.timer[i] -= dt
+	match t.mode[i]:
+		EnemyTable.Mode.DASH:
+			var n := Vector2(-d.y, d.x)
+			var goal := state.ship_pos + n * float(t.buds[i]) * float(p.half_gap) - d * float(p.emit_back)
+			_steer_to(i, goal, float(p.deploy_speed), 6.0, dt)
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				var h := projectiles.fire_wall(t.pos[i] + d * t.r[i], t.facing[i], float(p.beam_len), float(p.beam_width), 0.0,
+					float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i])
+				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RAY
+				projectiles.hazard_block[h] = 1
+				projectiles.attach_hazard(h, i)
+				t.links[i] = PackedInt32Array([h])
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.beam_time)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			for h in t.links[i]:
+				if projectiles.owns_hazard(h, i, t.id[i]):
+					projectiles.move_hazard(h, t.pos[i] + d * t.r[i], t.facing[i])
+			if t.timer[i] <= 0.0:
+				for h in t.links[i]:
+					if projectiles.owns_hazard(h, i, t.id[i]):
+						projectiles.release_hazard(h)
+				t.links[i] = PackedInt32Array()
+				t.mode[i] = EnemyTable.Mode.DASH
+				t.timer[i] = float(p.deploy_time)
+
+## じょうぎ座（行 i）が二つに分かれる。機体への向きの縦横の大きい方を照射の軸にし、もう1体を同じ位置に出して展開を始める。
+func _split_ruler(i: int) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var rel := state.ship_pos - t.pos[i]
+	var d := Vector2(signf(rel.x), 0.0) if absf(rel.x) > absf(rel.y) else Vector2(0.0, signf(rel.y))
+	if d == Vector2.ZERO:
+		d = Vector2.DOWN
+	var halves := [i, spawn(t.def[i], t.level[i], t.pos[i], {"facing": d.angle(), "elite": t.elite[i] != 0})]
+	for k in 2:
+		var j: int = halves[k]
+		t.buds[j] = 1 if k == 0 else -1
+		t.facing[j] = d.angle()
+		t.mode[j] = EnemyTable.Mode.DASH
+		t.timer[j] = float(p.deploy_time)
+		t.vel[j] = Vector2(-d.y, d.x) * float(t.buds[j]) * float(p.deploy_speed) * 0.6
+	state.emit(&"ruler_split", {"pos": t.pos[i], "angle": d.angle(), "color": t.color[i]})
 
 ## とけい座：長針と短針が刃として回り続ける。針は付いて動く残る線で、速さが違う。
 func _clock(i: int, dt: float) -> void:
@@ -966,62 +1241,138 @@ func _clock(i: int, dt: float) -> void:
 	projectiles.move_hazard(links[0], t.pos[i], a0)
 	projectiles.move_hazard(links[1], t.pos[i], a1)
 
-## やまねこ座：近づいてきて、機体が届く距離に入ると前方を扇形に爪で薙ぐ。構えはない。
-## 殻が割れている間は、爪を振るう間隔が短くなる。攻撃が当たらない時間が続くと、殻の傷は戻る。
+## やまねこ座：距離を保ち、間隔ごとに前足を構えて（charge が構えの進み）、片側1組の斬撃を左右交互に飛ばし続ける
+## （buds が撃った数）。斬撃は真ん中の少し先から外側へ伸び、外側で本体の方へ反り上がる。撃ったときの機体の向きへ
+## 形を保って直進し、追尾しない。内側の端を左右交互によけて真ん中を抜けさせ、外側からの回り込みを難しくする。
 func _lynx(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	_steer_to(i, state.enemy_aim, t.speed[i], t.accel[i], dt)
+	# 遠くから撃つが、どこから撃っているか見えるように、本体は画面の中に収まる位置を保つ
+	var d := t.pos[i] - _aim
+	var u := d / maxf(d.length(), 1.0)
+	var room := _vh - Vector2.ONE * (t.r[i] + 40.0)
+	var goal := (_aim + u * float(p.keep)).clamp(_vc - room, _vc + room)
+	_steer_to(i, goal, t.speed[i], t.accel[i], dt)
 	_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
-	var open := t.shell_open[i] > 0.0
-	if open:
-		t.shell_open[i] -= dt
-	else:
-		t.shell_rest[i] += dt
-		if t.shell_rest[i] > float(p.shell_heal_delay):
-			t.shell_dmg[i] = maxf(0.0, t.shell_dmg[i] - float(p.shell_hp) * dt / float(p.shell_heal_time))
-	t.fire_t[i] -= dt * (float(p.fire_interval) / float(p.open_interval) if open else 1.0)
-	var reach := float(p.wave_radius) + t.r[i]
-	if t.fire_t[i] <= 0.0 and t.pos[i].distance_squared_to(state.ship_pos) < reach * reach:
-		t.fire_t[i] = float(p.fire_interval)
-		projectiles.fire_wave(t.pos[i], t.facing[i], float(p.wave_arc), float(p.wave_radius), float(p.wave_speed),
-			float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i].lightened(0.4))
+	if _gun_timer(i, dt):
+		var side := lynx_side(i)
+		t.buds[i] += 1
+		var a := (state.ship_pos - t.pos[i]).angle()
+		projectiles.fire_slash(t.pos[i] + Vector2.from_angle(a) * t.r[i], a, float(p.slash_speed), float(p.slash_size),
+			float(p.slash_range), _attack_dmg(i, float(p.bullet_dmg)), side)
 
-## からす座：周りで倒された敵の残骸を集めて塊にし（buds が集めた数）、集まると機体へ投げる。
+## やまねこ座が次に斬撃を伸ばす側（1 か -1。構えの見た目にも使う）。
+func lynx_side(i: int) -> float:
+	return 1.0 if table.buds[i] % 2 == 0 else -1.0
+
+## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
+## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。
+## 画面の外で exit_margin より離れ、さらに離れていくと、運んでいる経験値ごと退場する（撃破にはならない）。
 func _crow(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if t.buds[i] < int(p.throw_min):
-		t.charge[i] = 0.0
-		return
-	if _gun_timer(i, dt):
-		var n := t.buds[i]
-		t.buds[i] = 0
-		var size := float(p.lump_r) * sqrt(float(n) / float(p.throw_min))
-		projectiles.fire_lump(i, (state.enemy_aim - t.pos[i]).angle(), float(p.bullet_speed), size,
-			_attack_dmg(i, float(p.bullet_dmg)) * sqrt(float(n) / float(p.throw_min)))
+	var rel := t.pos[i] - _vc
+	t.vel[i] = Vector2.from_angle(t.facing[i]) * t.speed[i]
+	var margin := float(p.exit_margin)
+	if (absf(rel.x) > _vh.x + margin or absf(rel.y) > _vh.y + margin) and rel.dot(t.vel[i]) > 0.0:
+		mark_dead(i)
 
-## 倒された敵の残骸を、近くのからす座が集める。
-func _gather_debris(pos: Vector2) -> void:
-	var t := table
-	for j in beh_rows[EnemyTable.Beh.CROW]:
-		if t.dead[j] != 0:
-			continue
-		var p: Dictionary = t.def[j].params
-		if t.pos[j].distance_squared_to(pos) < float(p.gather_radius) * float(p.gather_radius):
-			t.buds[j] = mini(t.buds[j] + 1, int(p.lump_max))
-			return
-
-## レチクル座：距離を保ち、間隔ごとに機体のいた位置へ照準の模様を刻む。少し遅れてそこに雷が落ちる。
+## レチクル座：ぼうえんきょう座に付き従う支援機。いちばん近いぼうえんきょう座のそばへ動き、そばにいる間（follow_reach 以内）、
+## ぼうえんきょう座と機体の間で視線を遮っている小隕石（半径 small_r 以下）を探す。見つけたら照準を出して予告し（WINDUP、
+## 狙う岩は target）、aim_time ののち本体からビームを撃って壊す。機体への直接攻撃や、支援と関係のない岩は撃たない。
+## 支援先がいなくなると退却し（DASH）、画面の外で exit_margin より離れると消える（撃破にはならない）。
 func _reticle(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if not _gun_timer(i, dt):
+	var tel := _nearest_telescope(t.pos[i])
+	if tel < 0:
+		t.mode[i] = EnemyTable.Mode.DASH
+		t.target[i] = -1
+		var away := (t.pos[i] - state.ship_pos).normalized()
+		_steer_to(i, t.pos[i] + away * 400.0, float(p.retreat_speed), t.accel[i], dt)
+		_turn_toward(i, away.angle(), t.turn[i], dt)
+		var rel := t.pos[i] - _vc
+		var margin := float(p.exit_margin)
+		if (absf(rel.x) > _vh.x + margin or absf(rel.y) > _vh.y + margin) and rel.dot(t.vel[i]) > 0.0:
+			mark_dead(i)
 		return
-	for k in int(p.strikes):
-		var at := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * float(p.scatter) * float(k)
-		projectiles.fire_zone(at, float(p.blast_radius), float(p.blast_delay) + float(k) * 0.25,
-			_attack_dmg(i, float(p.bullet_dmg)), ProjectileManager.HazardStyle.LIGHTNING, t.color[i].lightened(0.3))
+	if t.mode[i] == EnemyTable.Mode.DASH:
+		t.mode[i] = EnemyTable.Mode.MOVE
+	# ぼうえんきょう座の横に付き従う
+	var tf := Vector2.from_angle(t.facing[tel])
+	var side := 1.0 if t.id[i] % 2 == 1 else -1.0
+	var goal := t.pos[tel] + Vector2(-tf.y, tf.x) * side * float(p.follow_gap) - tf * 30.0
+	_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+	var near := t.pos[i].distance_to(t.pos[tel]) <= float(p.follow_reach)
+	t.fire_t[i] -= dt
+	if t.mode[i] == EnemyTable.Mode.WINDUP:
+		var rock := t.target[i]
+		if not near or not self.is_same(rock, t.target_id[i]) or t.dead[rock] != 0:
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.target[i] = -1
+			t.charge[i] = 0.0
+			return
+		_turn_toward(i, (t.pos[rock] - t.pos[i]).angle(), t.turn[i] * 3.0, dt)
+		t.timer[i] -= dt
+		t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.aim_time)
+		if t.timer[i] <= 0.0:
+			var from := t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i]
+			state.emit(&"beam", {"from": from, "to": t.pos[rock], "width": 10.0, "life": 0.25, "color": t.color[i].lightened(0.3)})
+			state.emit(&"rock_break", {"pos": t.pos[rock], "r": t.r[rock], "meteor_index": t.meteor_index[rock],
+				"facing": t.facing[rock], "dir": (t.pos[rock] - from).normalized(), "color": Color("#a08a78")})
+			mark_dead(rock)
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.target[i] = -1
+			t.charge[i] = 0.0
+			t.fire_t[i] = float(p.break_interval)
+		return
+	_turn_toward(i, (t.pos[tel] - t.pos[i]).angle() if not near else t.facing[tel], t.turn[i], dt)
+	if near and t.fire_t[i] <= 0.0:
+		var rock := _blocking_rock(tel, float(p.small_r))
+		if rock >= 0:
+			t.target[i] = rock
+			t.target_id[i] = t.id[rock]
+			t.mode[i] = EnemyTable.Mode.WINDUP
+			t.timer[i] = float(p.aim_time)
+
+## 位置 at にいちばん近い、生きているぼうえんきょう座の行（いなければ -1）。
+func _nearest_telescope(at: Vector2) -> int:
+	var t := table
+	var best := -1
+	var best_d := INF
+	for j in beh_rows[EnemyTable.Beh.SNIPER]:
+		if t.dead[j] != 0:
+			continue
+		var d := at.distance_squared_to(t.pos[j])
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
+
+## ぼうえんきょう座（行 tel）のレンズと機体の間で、視線を遮っている小隕石（半径 small_r 以下）のうち、レンズにいちばん近いもの。
+## 機体がサーチライトの届く距離の外にいるときは探さない。
+func _blocking_rock(tel: int, small_r: float) -> int:
+	var t := table
+	var lens := telescope_lens(tel)
+	var ship := state.ship_pos
+	var length := lens.distance_to(ship)
+	if length > float(t.def[tel].params.band_len):
+		return -1
+	var rows := PackedInt32Array()
+	projectiles.combat.nearby((lens + ship) * 0.5, length * 0.5 + small_r, rows)
+	var best := -1
+	var best_d := INF
+	for j in rows:
+		if t.meteor_index[j] < 0 or t.dead[j] != 0 or t.r[j] > small_r:
+			continue
+		var c := t.pos[j]
+		if Geometry2D.get_closest_point_to_segment(c, lens, ship).distance_to(c) > t.r[j] + cfg.ship_radius:
+			continue
+		var d := lens.distance_squared_to(c)
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
 
 ## みなみのさんかく座：核の周りに3つの星を出す。
 func _spawn_triangle_stars(i: int) -> void:
@@ -1050,7 +1401,8 @@ func _triangle(i: int, dt: float) -> void:
 		for h in links:
 			projectiles.release_hazard(h)
 		t.links[i] = PackedInt32Array()
-		state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": t.r[i]})
+		t.charge[i] = 0.0
+		state.emit(&"membrane_break", {"points": verts, "color": t.color[i]})
 		return
 	if t.mode[i] == EnemyTable.Mode.RECOVER or verts.size() < 3:
 		return
@@ -1149,51 +1501,60 @@ func _marlin(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
-## みずがめ座：遠くに留まり、水瓶を傾けて（予告）から、機体の方へ太い水流を流し続ける。
-## 水流は、中の敵と遅い機体を流れの向きへ押し流す（ダメージはない）。mode が DASH の間が水流。
+## みずがめ座：瓶の口をいつも機体へ向けたまま機体へ近づき、approach の距離まで来たら、
+## 先へ行くほど広がる極太ビームを全方位へ beams 本、等間隔で一斉に照射する。
+## 1本は機体の方を向く。撃つ向きは予告の始めに決め、telegraph の間は溜めながら通り道に水の流れを流して予告し、
+## 撃つと beam_time の間だけ当てる。溜めの間はだんだん遅くなって止まり、瓶の口を機体の方へ向ける。
+## ビームの間には安全な隙間が残る。WINDUP が溜め・予告と照射、RECOVER が照射後の休み。
 func _aquarius(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	match t.mode[i]:
-		EnemyTable.Mode.MOVE:
-			_keep_distance(i, dt)
-			if _gun_timer(i, dt):
-				t.mode[i] = EnemyTable.Mode.DASH
-				t.timer[i] = float(p.pour_time)
-		_:
-			_hold(i, dt)
-			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.pour_turn), dt)
+		EnemyTable.Mode.WINDUP:
+			var beam_time := float(p.beam_time)
+			if t.timer[i] > beam_time:
+				# 溜め：だんだん遅くなって止まり、瓶の口を機体の方へ向ける
+				t.vel[i] *= maxf(0.0, 1.0 - 2.5 * dt)
+				_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), 2.0, dt)
+			else:
+				_hold(i, dt)
 			t.timer[i] -= dt
-			_pour(i, dt)
+			t.charge[i] = clampf(1.0 - (t.timer[i] - beam_time) / float(p.telegraph), 0.0, 1.0)
+			if t.timer[i] <= 0.0:
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.rest)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
-
-## みずがめ座の水流で、帯の中の敵と遅い機体を押し流す。
-func _pour(i: int, dt: float) -> void:
-	var t := table
-	var p: Dictionary = t.def[i].params
-	var u := Vector2.from_angle(t.facing[i])
-	var from := t.pos[i] + u * t.r[i]
-	var length := float(p.stream_len)
-	var half := float(p.stream_width) * 0.5
-	var push := u * float(p.push) * dt
-	var rel := state.ship_pos - from
-	var along := rel.dot(u)
-	if along > 0.0 and along < length and absf(rel.cross(u)) < half and not _ship_fast():
-		state.ship_vel += push
-	var rows := PackedInt32Array()
-	var seen := {}
-	var step := half * 1.6
-	var d := 0.0
-	while d < length:
-		rows.clear()
-		projectiles.combat.nearby(from + u * d, half, rows)
-		for j in rows:
-			if j != i and not seen.has(j) and t.is_boss[j] == 0 and t.meteor_index[j] < 0 and t.dead[j] == 0 \
-					and t.parent[j] < 0:
-				seen[j] = true
-				t.vel[j] += push
-		d += step
+		_:
+			# 機体の方へ、approach の距離の所まで寄る。瓶の口はいつも機体を向く
+			var to_ship := state.ship_pos - t.pos[i]
+			var dist := to_ship.length()
+			var approach := float(p.approach)
+			var goal := state.ship_pos - to_ship / maxf(dist, 1.0) * approach
+			var speed := t.speed[i] * clampf((dist - approach) / 200.0, 0.0, 1.0)
+			_steer_to(i, goal, speed, t.def[i].accel, dt)
+			_turn_toward(i, to_ship.angle(), t.turn[i], dt)
+			t.fire_t[i] -= dt
+			if t.fire_t[i] <= 0.0 and dist <= approach * 1.25:
+				t.fire_t[i] = float(p.fire_interval)
+				var a := to_ship.angle()
+				var n := int(p.beams)
+				# 照射の瞬間の衝撃と、照射後に崩れて残る水しぶきの演出（描画が本体の生存を確かめる）
+				state.emit(&"aquarius_aim", {"pos": t.pos[i], "angle": a, "count": n, "length": float(p.beam_len),
+					"width": float(p.beam_width), "spread": float(p.beam_spread), "delay": float(p.telegraph),
+					"active": float(p.beam_time), "color": t.color[i].lightened(0.25), "row": i, "id": t.id[i]})
+				for k in n:
+					var h := projectiles.fire_flood(t.pos[i], a + k * TAU / n, float(p.beam_len), float(p.beam_width),
+						float(p.beam_spread), float(p.telegraph), float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)),
+						t.color[i].lightened(0.25))
+					# 予告中・照射中に倒されたら消える
+					projectiles.attach_hazard(h, i)
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph) + float(p.beam_time)
 
 ## 大きく旋回しながら一定の速さで走る（ぎょしゃ座・わし座）。向きは turn の速さでしか変わらない。
 func _drive(i: int, dt: float) -> void:
@@ -1248,21 +1609,287 @@ func _corona(i: int, dt: float) -> void:
 				var out := (state.ship_pos - t.pos[i]).normalized()
 				state.ship_vel += out * float(p.push) * dt
 
-## ケフェウス座：間隔ごとに光って号令をかけ、周りの強敵に一斉に攻撃させる。
+## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
+## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
+func _biter(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var reach := t.r[i] + float(p.bite_reach) + cfg.ship_radius
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i] * 2.0, dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.bite_telegraph)
+			if t.timer[i] <= 0.0:
+				var at := t.pos[i] + Vector2.from_angle(t.facing[i]) * (t.r[i] + float(p.bite_reach) * 0.5)
+				projectiles.fire_zone(at, float(p.bite_radius), 0.0, _attack_dmg(i, float(p.bullet_dmg)),
+					ProjectileManager.HazardStyle.BITE, t.color[i].lightened(0.4))
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.bite_rest)
+		EnemyTable.Mode.RECOVER:
+			_chase(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+		_:
+			_chase(i, dt)
+			if t.pos[i].distance_squared_to(state.ship_pos) <= reach * reach:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.bite_telegraph)
+				t.flash[i] = 0.1
+
+## いるか座：距離を保ち、間隔ごとに構えて（WINDUP。機体の方へ向き直りながら、撃つ向きを予告する）、機体の方へ大きな扇の波動を撃つ。
+## 波動は数層の弧でできたひとまとまりの一発で、当たるのは先頭の1枚だけ。機体にもほかの敵にも当たる（敵に敵を倒させる）。
+func _dolphin(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), float(p.aim_turn), dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				var h := projectiles.fire_wave(t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], t.facing[i], float(p.wave_arc),
+					float(p.wave_radius), float(p.wave_speed), float(p.wave_width), 0.0, _attack_dmg(i, float(p.bullet_dmg)), 0.0, 0.0, t.color[i])
+				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RIPPLE
+				projectiles.hazard_edmg[h] = float(p.enemy_dmg)
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = 0.6
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+				t.fire_t[i] = float(p.fire_interval)
+		_:
+			_keep_distance(i, dt)
+			t.fire_t[i] -= dt
+			if t.fire_t[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+
+## みなみじゅうじ座：動き回り、機体と縦か横にそろう位置（十字の線が機体に当たる位置）へ回り込む。そろったら止まり、
+## 予告してから十字のレーザーを撃つ（線はいつも縦と横）。撃ったあとは少し休む。
+func _cross(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var d := state.ship_pos - t.pos[i]
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
+			if t.timer[i] <= 0.0:
+				t.charge[i] = 0.0
+				t.mode[i] = EnemyTable.Mode.RECOVER
+				t.timer[i] = float(p.beam_time) + float(p.rest)
+		EnemyTable.Mode.RECOVER:
+			_hold(i, dt)
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				t.mode[i] = EnemyTable.Mode.MOVE
+				t.fire_t[i] = float(p.fire_interval)
+		_:
+			# 縦か横の近い方の軸で、機体から stand_off だけ離れた所へ回り込む
+			var off := float(p.stand_off)
+			var goal := Vector2(state.ship_pos.x, state.ship_pos.y - signf(d.y if d.y != 0.0 else 1.0) * off) \
+				if absf(d.x) < absf(d.y) else Vector2(state.ship_pos.x - signf(d.x if d.x != 0.0 else 1.0) * off, state.ship_pos.y)
+			_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+			t.facing[i] += dt * 1.5
+			t.fire_t[i] -= dt
+			var aligned := minf(absf(d.x), absf(d.y)) <= float(p.align_tol)
+			if aligned and t.fire_t[i] <= 0.0 and d.length() <= float(p.beam_len) * 0.8:
+				# 本体に付け、予告中・照射中に倒されたらレーザーも消す
+				for h in projectiles.fire_cross(t.pos[i], 0.0, float(p.beam_len), float(p.beam_width), float(p.telegraph),
+						float(p.beam_time), _attack_dmg(i, float(p.bullet_dmg)), t.color[i].lightened(0.3)):
+					projectiles.attach_hazard(h, i)
+				t.mode[i] = EnemyTable.Mode.WINDUP
+				t.timer[i] = float(p.telegraph)
+				t.facing[i] = 0.0
+
+## ケフェウス座の隊列の兵の数（段階ごと）。3体は横一列、5体は扇形、7体は千鳥の二重隊列（前列4体・後列3体）
+const CEPHEUS_TIERS := [3, 5, 7]
+
+## ケフェウス座：距離を保ち、専用の兵を召喚して隊列を組ませる王（buds が今の段階 1〜3。0 は召喚前）。
+## reinforce_interval ごとに増援して段階を上げ（3→5→7体）、そのときだけ隊列を組み直す（WINDUP：射撃を休み、新しい兵の出現位置を
+## 予告してから召喚し、全員が配置に着くと射撃を再開する）。組み直したあとは、兵の位置と撃つ向きを固定する。
+## 倒された兵の穴は、次の増援まで残す。射撃は王が号令する（MOVE：fire_interval ごとに一斉射撃。7体は前列と後列が交互に撃つ）。
 func _cepheus(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
-	if not _gun_timer(i, dt):
+	# 機体から keep の距離を保つ。向き（facing）は隊列の向きなので、動いても変えない
+	var away := (t.pos[i] - _aim).normalized()
+	_steer_to(i, _aim + away * float(p.keep), t.speed[i], t.accel[i], dt)
+	if t.buds[i] == 0:
+		_cepheus_reform(i)
 		return
-	var rows := PackedInt32Array()
-	projectiles.combat.nearby(t.pos[i], float(p.command_radius), rows)
-	for j in rows:
-		if j == i or t.dead[j] != 0 or t.def[j] == null or t.def[j].max_alive <= 0 or t.parent[j] >= 0:
+	t.fire_t[i] -= dt
+	match t.mode[i]:
+		EnemyTable.Mode.WINDUP:
+			t.timer[i] -= dt
+			t.charge[i] = 1.0 - clampf(t.timer[i] / float(p.summon_time), 0.0, 1.0)
+			if t.timer[i] > 0.0:
+				return
+			var size: int = CEPHEUS_TIERS[t.buds[i] - 1]
+			if t.timer[i] > -dt * 1.5:
+				# 予告した位置に兵を召喚する
+				var taken := {}
+				for j in _soldiers_of(i):
+					taken[t.buds[j]] = true
+				for k in size:
+					if not taken.has(k):
+						var j := spawn(def_of(&"cepheus_soldier"), t.level[i], cepheus_slot(i, k)[0], {"facing": cepheus_slot(i, k)[1]})
+						t.target[j] = i
+						t.target_id[j] = t.id[i]
+						t.buds[j] = k
+						t.mode[j] = EnemyTable.Mode.MOVE
+				state.emit(&"cepheus_summon", {"pos": t.pos[i], "color": t.color[i]})
+			for j in _soldiers_of(i):
+				if t.mode[j] != EnemyTable.Mode.MOVE:
+					return
+			# 全員が配置に着いた：射撃を再開する
+			t.mode[i] = EnemyTable.Mode.MOVE
+			t.charge[i] = 0.0
+			t.timer[i] = float(p.fire_interval)
+			t.fire_t[i] = float(p.reinforce_interval)
+		_:
+			t.timer[i] -= dt
+			if t.timer[i] <= 0.0:
+				_cepheus_volley(i)
+				t.timer[i] = float(p.fire_interval) * (0.5 if t.buds[i] == 3 else 1.0)
+			if t.fire_t[i] <= 0.0:
+				_cepheus_reform(i)
+
+## ケフェウス座（行 i）の兵の行の一覧（倒れた兵は含めない）。
+func _soldiers_of(i: int) -> PackedInt32Array:
+	var t := table
+	var out := PackedInt32Array()
+	for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+		if t.dead[j] == 0 and t.target[j] == i and t.target_id[j] == t.id[i] and t.mode[j] != EnemyTable.Mode.RECOVER:
+			out.append(j)
+	return out
+
+## 増援：段階を1つ上げ（7体で止まる）、隊列の基準と向きを今の機体の方へ決め直す。残っている兵は新しい位置へ動き、
+## 足りない位置は出現位置を予告してから召喚する。
+func _cepheus_reform(i: int) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	t.buds[i] = mini(t.buds[i] + 1, CEPHEUS_TIERS.size())
+	t.anchor[i] = t.pos[i]
+	t.facing[i] = (state.ship_pos - t.pos[i]).angle()
+	var size: int = CEPHEUS_TIERS[t.buds[i] - 1]
+	var soldiers := _soldiers_of(i)
+	var k := 0
+	for j in soldiers:
+		if k >= size:
+			break
+		t.buds[j] = k
+		t.mode[j] = EnemyTable.Mode.DASH
+		k += 1
+	for n in range(k, size):
+		state.emit(&"summon_mark", {"pos": cepheus_slot(i, n)[0], "king": t.pos[i], "life": float(p.summon_time), "color": t.color[i]})
+	t.mode[i] = EnemyTable.Mode.WINDUP
+	t.timer[i] = float(p.summon_time)
+	t.bud_t[i] = 0.0
+
+## ケフェウス座（行 i）の隊列の k 番目の位置と、そこで撃つ向き。[位置, 向き]
+func cepheus_slot(i: int, k: int) -> Array:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var a := t.facing[i]
+	var u := Vector2.from_angle(a)
+	var n := Vector2(-u.y, u.x)
+	var base := t.anchor[i]
+	var spacing := float(p.spacing)
+	match CEPHEUS_TIERS[maxi(t.buds[i], 1) - 1]:
+		3:
+			return [base + u * float(p.row_near) + n * float(k - 1) * spacing, a]
+		5:
+			var ang := a + float(k - 2) * float(p.fan_step)
+			return [base + Vector2.from_angle(ang) * float(p.fan_radius), ang]
+		_:
+			if k < 4:
+				return [base + u * float(p.row_far) + n * (float(k) - 1.5) * spacing, a]
+			return [base + u * float(p.row_near) + n * float(k - 5) * spacing, a]
+
+## 王の号令で兵が撃つ。7体の隊列は前列（0〜3番）と後列（4〜6番）が交互に撃つ（bud_t が号令の回数）。
+func _cepheus_volley(i: int) -> void:
+	var t := table
+	var staggered := t.buds[i] == 3
+	var back := int(t.bud_t[i]) % 2 == 1
+	t.bud_t[i] += 1.0
+	for j in _soldiers_of(i):
+		if t.mode[j] != EnemyTable.Mode.MOVE:
 			continue
-		var jp: Dictionary = t.def[j].params
-		t.fire_t[j] = minf(t.fire_t[j], float(jp.get("telegraph", 0.0)) + 0.05)
-		t.flash[j] = 0.15
-	state.emit(&"block_impact", {"pos": t.pos[i], "normal": Vector2.UP, "enemy_pos": t.pos[i], "r": float(p.command_radius) * 0.2})
+		if staggered and (t.buds[j] >= 4) != back:
+			continue
+		var sp: Dictionary = t.def[j].params
+		projectiles.fire_bolt(t.pos[j] + Vector2.from_angle(t.facing[j]) * t.r[j], t.facing[j], float(sp.bolt_speed),
+			_attack_dmg(j, float(sp.bullet_dmg)))
+
+## ケフェウス座の兵：王が決めた隊列の位置へ動き（DASH）、着いたら止まって撃つ向きを向く（MOVE。撃つのは王の号令）。
+## 王が倒れると（RECOVER）、機体への攻撃をやめ、近くの兵へ向き直って撃ち合い、mutiny の時間が過ぎると崩れて倒れる。
+## 王がいないまま置かれた兵は、すぐに崩れる。
+func _soldier(i: int, dt: float) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	var king := t.target[i]
+	if t.mode[i] == EnemyTable.Mode.RECOVER:
+		_hold(i, dt)
+		t.timer[i] -= dt
+		t.fire_t[i] -= dt
+		var foe := _nearest_soldier(i)
+		if foe >= 0:
+			_turn_toward(i, (t.pos[foe] - t.pos[i]).angle(), t.turn[i], dt)
+			if t.fire_t[i] <= 0.0:
+				t.fire_t[i] = float(p.mutiny_shot)
+				state.emit(&"beam", {"from": t.pos[i], "to": t.pos[foe], "width": 4.0, "life": 0.12, "color": t.color[i].lightened(0.3)})
+				projectiles.combat.damage_enemy(foe, t.max_hp[foe] * 0.35, {"cause": &"collapse", "no_crit": true})
+		if t.timer[i] <= 0.0 and t.dead[i] == 0:
+			projectiles.combat.kill_enemy(i, {"cause": &"collapse"})
+		return
+	if not self.is_same(king, t.target_id[i]) or t.dead[king] != 0:
+		_start_mutiny(i, 0.4)
+		return
+	var slot := cepheus_slot(king, t.buds[i])
+	if t.mode[i] == EnemyTable.Mode.DASH:
+		var goal: Vector2 = slot[0]
+		_steer_to(i, goal, t.speed[i], t.accel[i], dt)
+		_turn_toward(i, (goal - t.pos[i]).angle(), t.turn[i], dt)
+		if t.pos[i].distance_to(goal) < 8.0:
+			t.pos[i] = goal
+			t.vel[i] = Vector2.ZERO
+			t.facing[i] = slot[1]
+			t.mode[i] = EnemyTable.Mode.MOVE
+		return
+	t.vel[i] = Vector2.ZERO
+	t.pos[i] = slot[0]
+	_turn_toward(i, slot[1], t.turn[i], dt)
+
+## 兵（行 i）の崩壊を始める。seconds ののちに崩れて倒れる。
+func _start_mutiny(i: int, seconds: float) -> void:
+	var t := table
+	t.mode[i] = EnemyTable.Mode.RECOVER
+	t.timer[i] = seconds
+	t.fire_t[i] = state.rng.randf() * float(t.def[i].params.mutiny_shot)
+
+## 兵（行 i）にいちばん近い、ほかの兵（いなければ -1）。
+func _nearest_soldier(i: int) -> int:
+	var t := table
+	var best := -1
+	var best_d := INF
+	for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+		if j == i or t.dead[j] != 0:
+			continue
+		var d := t.pos[i].distance_squared_to(t.pos[j])
+		if d < best_d:
+			best_d = d
+			best = j
+	return best
 
 ## わし座：雷を運ぶ鷲。大きく旋回しながら飛び、通り道に沿って雷を落とす。
 func _aquila(i: int, dt: float) -> void:
@@ -1276,27 +1903,42 @@ func _aquila(i: int, dt: float) -> void:
 		ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
-## 周りのからす座は残骸を集め、塊を持ったからす座が倒れると、塊が砕けて破片が飛ぶ。
+## ポンプ座は、圧縮していた敵を一気に解放する。飛び散る敵と破裂は機体の側の攻撃で、蓄積が多いほど強い。
 func on_enemy_death(i: int, atk: float) -> void:
 	var t := table
 	var dp: Dictionary = t.def[i].params if t.def[i] != null else {}
-	if t.beh[i] == EnemyTable.Beh.CROW:
-		for k in t.buds[i] * int(dp.shards):
-			projectiles.fire_enemy(i, state.rng.randf() * TAU, float(dp.bullet_speed) * state.rng.randf_range(0.6, 1.0), &"bullet")
-	elif t.is_boss[i] == 0 and t.meteor_index[i] < 0:
-		_gather_debris(t.pos[i])
+	var prior_context := projectiles.lab_context
+	if projectiles.director != null:
+		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
+	if t.beh[i] == EnemyTable.Beh.SNIPER:
+		_tele_rays.erase(t.id[i])
+	if t.beh[i] == EnemyTable.Beh.CEPHEUS:
+		# 王が倒れた：召喚と兵の攻撃が止まり、残った兵は撃ち合って崩れる
+		for j in beh_rows[EnemyTable.Beh.SOLDIER]:
+			if t.dead[j] == 0 and t.target[j] == i and t.target_id[j] == t.id[i] and t.mode[j] != EnemyTable.Mode.RECOVER:
+				_start_mutiny(j, float(dp.mutiny_time) + state.rng.randf() * 0.6)
+	if t.beh[i] == EnemyTable.Beh.PUMP:
+		var full := float(t.buds[i]) / float(dp.store_max)
+		projectiles.burst_debris(t.pos[i], int(dp.release_base) + int(float(dp.release_per) * float(t.buds[i])),
+			float(dp.release_speed), atk * float(dp.release_dmg), t.color[i].lightened(0.3), t.id[i])
+		projectiles.combat.explode(t.pos[i], float(dp.release_radius) * (1.0 + full), atk * float(dp.release_dmg),
+			{"cause": &"pump_burst", "no_crit": true, "color": t.color[i].lightened(0.4), "life": 0.35, "knock": 500.0 + 400.0 * full})
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), _attack_dmg(i, float(dp.blast_dmg)),
 			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
+	projectiles.lab_context = prior_context
 	if t.type[i] != &"splitter":
 		return
 	var p: Dictionary = t.def[i].params
+	if int(p.get("death_split", 0)) <= 0:
+		return
 	var n := maxi(1, int(p.get("death_split", 2)) + state.rng.randi_range(0, int(p.get("split_extra", 0))))
 	var facing := t.facing[i]
 	for k in n:
 		var a := facing + PI / 2.0 + TAU * float(k) / float(n) if n > 2 else facing + (1.0 if k == 1 else -1.0) * PI / 2.0
 		spawn_later(def_of(&"splitling"), t.level[i], t.pos[i] + Vector2.from_angle(a) * t.r[i],
-			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35})
+			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35,
+			"guard": float(p.get("split_guard", 0.0)), "knock": float(p.get("split_guard", 0.0))})
 
 ## 分裂などで増えた敵を、個体数の上限の範囲で出す（仕様書 11.3）。
 func _flush_new() -> void:
@@ -1326,22 +1968,48 @@ func cleanup() -> void:
 
 func current_phase() -> PhaseDef:
 	var phases: Array = state.stage.phases
-	for p: PhaseDef in phases:
-		if state.time < p.end:
-			return p
-	return phases[phases.size() - 1]
+	return phases[_phase_index()]
+
+## 今の時間帯の番号。時間帯は開始の時刻だけを持ち、次の時間帯の開始まで続く。
+func _phase_index() -> int:
+	var phases: Array = state.stage.phases
+	var n := 0
+	for k in range(1, phases.size()):
+		if (phases[k] as PhaseDef).start > state.time:
+			break
+		n = k
+	return n
+
+## 時間帯 n の終わりの時刻（次の時間帯の開始。最後の時間帯はボスの出現時刻）。
+func _phase_end(n: int) -> float:
+	var phases: Array = state.stage.phases
+	if n + 1 < phases.size():
+		return (phases[n + 1] as PhaseDef).start
+	return cfg.boss_time
 
 func _target() -> Dictionary:
-	var p := current_phase()
-	var k := clampf((state.time - p.start) / maxf(0.001, p.end - p.start), 0.0, 1.0)
+	var n := _phase_index()
+	var p: PhaseDef = state.stage.phases[n]
+	var k := clampf((state.time - p.start) / maxf(0.001, _phase_end(n) - p.start), 0.0, 1.0)
 	var steps := surge_steps()
 	if state.bonus_t > 0.0:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
 		return {"phase": p, "steps": steps, "pop": cfg.bonus_pop * cfg.density_mult,
 			"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
-	return {"phase": p, "steps": steps,
-		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
-		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
+	var scale := cfg.density_mult * (1.0 + cfg.surge_pop * steps)
+	var level := lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps
+	var curves: Array = state.stage.zako_curves
+	if not curves.is_empty():
+		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）。曲線の値がそのまま実際の数で、敵の密度倍率は掛けない
+		var surge := 1.0 + cfg.surge_pop * steps
+		var per := {}
+		var total := 0.0
+		for c: SpawnCurve in curves:
+			var v := maxf(0.0, c.value_at(state.time)) * surge
+			per[c.type] = float(per.get(c.type, 0.0)) + v
+			total += v
+		return {"phase": p, "steps": steps, "pop": total, "level": level, "per_type": per}
+	return {"phase": p, "steps": steps, "pop": lerpf(p.pop_from, p.pop_to, k) * scale, "level": level}
 
 ## 今の時間帯の敵のレベル（ほかの Manager が敵を出すときに使う）。
 func spawn_level() -> float:
@@ -1396,8 +2064,138 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 			_wave_t = 0.0
 			if alive_n < t.pop:
 				_spawn_wave(t, t.pop - alive_n)
+	_tick_clips(t.level)
+	_sync_attack_budget(phase)
+
+## 本番のランでは、攻撃の管理の予算を今の時間帯の「攻撃の予算」にする（0 なら管理しない）。
+## 実験場と採用した実験の設定では、それぞれの設定に任せる。
+func _sync_attack_budget(phase: PhaseDef) -> void:
+	var d = projectiles.director
+	if d == null or state.lab_mode or state.stage.encounter_profile.get("enabled", false):
+		return
+	d.enabled = phase.attack_budget > 0.0
+	d.settings.budget = phase.attack_budget
+	d.settings.jitter = cfg.attack_jitter
+
+# ── 強敵の群れ（敵の組み合わせのシーン） ────────────────────────────
+
+## 組み合わせのシーンのパス → ゲーム中に使う形（EnemyFormation.to_data）
+var _formation_cache: Dictionary = {}
+## クリップの番号 → そのクリップから出た群れ（各群れの行番号と id を交互に並べたもの）
+var _clip_groups: Dictionary = {}
+## クリップの番号 → 次に群れを出せる時刻（実秒）
+var _clip_next: Dictionary = {}
+
+## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
+func formation_data(scene: PackedScene) -> Dictionary:
+	if scene == null:
+		return {}
+	if not _formation_cache.has(scene.resource_path):
+		var node := scene.instantiate()
+		_formation_cache[scene.resource_path] = node.to_data() if node.has_method("to_data") else {}
+		node.free()
+	return _formation_cache[scene.resource_path]
+
+## 重み（weight）で1つ選んだ番号。空なら -1。
+func _pick_weighted(items: Array) -> int:
+	var total := 0.0
+	for it in items:
+		total += float(it.weight)
+	if items.is_empty() or total <= 0.0:
+		return -1
+	var roll := state.rng.randf() * total
+	for k in items.size():
+		roll -= float(items[k].weight)
+		if roll < 0.0:
+			return k
+	return items.size() - 1
+
+## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
+## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
+## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
+func spawn_formation(data: Dictionary, level: float, layout := -1, entry_index := -1, types: Array = []) -> PackedInt32Array:
+	var rows := PackedInt32Array()
+	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
+	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
+	if li < 0 or ei < 0:
+		return rows
+	var entry: Dictionary = data.entries[ei]
+	var heading := state.ship_vel.normalized() if state.ship_vel.length() > 40.0 else state.ship_heading
+	if heading == Vector2.ZERO:
+		heading = Vector2.UP
+	# 作るときの機体は上（y の負）向き。今の向きとの差だけ回す
+	var turn := heading.angle() + PI / 2.0
+	var stretch := maxf(1.0, minf(state.view_half.x, state.view_half.y) * 2.0 / maxf(cfg.base_view, 1.0))
+	var entry_xf := Transform2D(float(entry.rot), Vector2(entry.pos) * stretch)
+	for m: Dictionary in data.layouts[li].markers:
+		if not types.is_empty() and not types.has(StringName(m.type)):
+			continue
+		var def := def_of(StringName(m.type))
+		if def == null:
+			continue
+		var local := entry_xf * Transform2D(float(m.rot), Vector2(m.pos))
+		var pos := state.ship_pos + local.origin.rotated(turn)
+		# 置き場所の正面は y の負の向き
+		var facing := turn + local.get_rotation() - PI / 2.0
+		var i := spawn(def, level, pos, {"facing": facing})
+		rows.append(i)
+		rows.append(table.id[i])
+	return rows
+
+## 群れのうち、生きている敵がいるか。
+func _group_alive(rows: PackedInt32Array) -> bool:
+	for k in range(0, rows.size(), 2):
+		if self.is_same(rows[k], rows[k + 1]) and table.dead[rows[k]] == 0:
+			return true
+	return false
+
+## 組み合わせの敵のうち、同時に出る数の上限（max_alive）に達している種類があるか。
+func _formation_capped(data: Dictionary) -> bool:
+	for l: Dictionary in data.get("layouts", []):
+		for m: Dictionary in l.markers:
+			var def := def_of(StringName(m.type))
+			if def != null and def.max_alive > 0 and _type_counts.get(def.id, 0) >= def.max_alive:
+				return true
+	return false
+
+## ステージのクリップから強敵の群れを出す。クリップは開始から長さの間だけ働き、そのクリップから出た群れが同時の群れの数より
+## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選び、クリップの使う並びから配置を重みで1つ選んで、クリップの種類の敵だけを出す。
+## 種類ごとの上限（max_alive）に達するフォーメーションは選ばない。
+func _tick_clips(level: float) -> void:
+	var clips: Array = state.stage.clips if state.stage != null else []
+	for n in clips.size():
+		var clip: SpawnClip = clips[n]
+		var groups: Array = _clip_groups.get(n, []).filter(_group_alive)
+		_clip_groups[n] = groups
+		if state.time < clip.time or state.time >= clip.end_time():
+			continue
+		if groups.size() >= clip.groups or state.time < float(_clip_next.get(n, -1e9)):
+			continue
+		var items := []
+		for scene: PackedScene in clip.formations:
+			var data := formation_data(scene)
+			if data.is_empty() or _formation_capped(data):
+				continue
+			var allowed := clip.allowed_layouts(scene.resource_path, data)
+			if not allowed.is_empty():
+				items.append({"data": data, "layouts": allowed, "weight": 1.0})
+		var k := _pick_weighted(items)
+		if k < 0:
+			continue
+		var choices := []
+		for li: int in items[k].layouts:
+			choices.append({"index": li, "weight": items[k].data.layouts[li].weight})
+		var c := _pick_weighted(choices)
+		if c < 0:
+			continue
+		var rows := spawn_formation(items[k].data, level, choices[c].index, -1, clip.types)
+		if not rows.is_empty():
+			groups.append(rows)
+			_clip_next[n] = state.time + clip.interval
 
 var _type_counts: Dictionary = {}
+## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数
+var _zako_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
@@ -1405,6 +2203,7 @@ var _far_rows := PackedInt32Array()
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
+	_zako_counts.clear()
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -1416,6 +2215,12 @@ func _survey() -> int:
 	var type := table.type
 	var defs := table.def
 	_far_rows.clear()
+	# クリップから出た群れは、隊列のまま近づけるため、遠くにいても再配置しない
+	var grouped := {}
+	for groups: Array in _clip_groups.values():
+		for rows: PackedInt32Array in groups:
+			for k in range(0, rows.size(), 2):
+				grouped[rows[k]] = true
 	for rows in beh_rows:
 		for i in rows:
 			if dead[i] != 0:
@@ -1425,11 +2230,12 @@ func _survey() -> int:
 				_type_counts[type[i]] = _type_counts.get(type[i], 0) + 1
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
-				# 部位は親と一緒に動くので、離れても再配置しない
-				if table.parent[i] < 0:
+				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
+				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW and not grouped.has(i):
 					_far_rows.append(i)
 				continue
 			alive_n += 1
+			_zako_counts[type[i]] = int(_zako_counts.get(type[i], 0)) + 1
 			var ax := absf(rel.x)
 			var ay := absf(rel.y)
 			if ax < center_x and ay < center_y:
@@ -1477,7 +2283,9 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	var phase: PhaseDef = t.phase
 	var danger := field.danger_at(p.length())
-	var type := _pick_type(phase, t.steps)
+	var type := _pick_short_type(t.per_type) if t.has("per_type") else _pick_type(phase, t.steps)
+	if type == &"":
+		return false
 	var def := def_of(type)
 	if def == null:
 		return false
@@ -1491,7 +2299,18 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, level, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
+	_zako_counts[type] = int(_zako_counts.get(type, 0)) + 1
 	return true
+
+## 雑魚の目標の数の曲線から種類を選ぶ。目標の数に足りない分が大きい種類ほど選ばれやすい。足りない種類がなければ空。
+func _pick_short_type(per_type: Dictionary) -> StringName:
+	var items := []
+	for type in per_type:
+		var short := float(per_type[type]) - float(_zako_counts.get(type, 0))
+		if short > 0.0:
+			items.append({"type": type, "weight": short})
+	var k := _pick_weighted(items)
+	return StringName(items[k].type) if k >= 0 else &""
 
 ## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
 func _pick_type(phase: PhaseDef, steps: int) -> StringName:
@@ -1552,4 +2371,42 @@ func _recycle(i: int) -> bool:
 	t.timer[i] = 0.0
 	t.charge[i] = 0.0
 	t.fire_t[i] = t.def[i].params.get("fire_interval", 0.0)
+	return true
+
+## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
+func _lab_admit(i: int, dt: float) -> bool:
+	var d = projectiles.director
+	projectiles.lab_context = 0
+	var def := table.def[i]
+	if def == null:
+		return true
+	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
+	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
+	if cats.is_empty():
+		return true
+	var owner := str(table.id[i])
+	var p := def.params
+	var active := table.mode[i] != EnemyTable.Mode.MOVE or not table.links[i].is_empty()
+	var due := table.fire_t[i] <= float(p.get("telegraph", 0)) + dt
+	if def.behavior == &"dash":
+		due = table.pos[i].distance_to(state.enemy_aim) <= float(p.range)
+	elif def.behavior == &"bomber":
+		due = table.pos[i].distance_to(state.ship_pos) <= float(p.trigger)
+	elif def.behavior == &"pump":
+		due = table.buds[i] >= int(p.store_max)
+	elif def.behavior == &"sniper":
+		due = table.charge[i] >= 0.8
+		active = table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER
+	elif def.behavior in [&"aquarius", &"cross", &"dolphin"]:
+		# 間隔が過ぎた瞬間から予告を始める種類
+		due = table.fire_t[i] <= dt
+	elif def.behavior in [&"clock", &"triangle", &"rocket", &"corona"]:
+		due = true
+	if not active and due:
+		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
+		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, 1.0 if state.view_rect().has_point(table.pos[i]) else 0.0, def.attack_weight):
+			table.charge[i] = 0
+			return false
+	if not cats.is_empty():
+		projectiles.lab_context = d.token(owner)
 	return true

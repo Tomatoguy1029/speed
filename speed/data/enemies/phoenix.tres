@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://7sfskgy0ilat"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"phoenix"
-display_name = "ほうおう座"
 rank = 7
 radius = 56.0
 hp = 900.0
@@ -17,19 +15,16 @@ xp = 80.0
 color = Color(1, 0.5, 0.25, 1)
 shape = &"dart"
 behavior = &"phoenix"
-max_alive = 1
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"orbit": 520.0,
-"trail_step": 0.12,
-"trail_width": 22.0,
-"trail_time": 3.0,
+"blast_delay": 0.4,
+"blast_dmg": 25.0,
+"blast_radius": 380.0,
 "bullet_dmg": 10.0,
 "chain_power": 2.0,
-"blast_radius": 380.0,
-"blast_delay": 0.4,
-"blast_dmg": 25.0
+"orbit": 520.0,
+"trail_step": 0.12,
+"trail_time": 3.0,
+"trail_width": 22.0
 }
+id = &"phoenix"
+display_name = "ほうおう座"

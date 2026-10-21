@@ -10,6 +10,8 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 プロジェクト設定は Godot 4.6・Forward Plus です。タイトル・ステージ選択・ゲーム本体を実装済みで、メインシーンは `scenes/app/main.tscn` です。Godot 4.6 でインポートし、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用のビルドでは、全ステージを選べます。調整機能は [仕様書](docs/game/spec.md#20-調整機能) を参照してください。
 
+開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/game/spec.md#201-敵ルート実験場) を参照してください。
+
 敵・隕石・月・惑星・自機は、素材のある種類を透過ピクセルスプライトで、素材が未制作の敵を仮の図形で表示します。マウスへ機体が向き、左クリックで経路を描き始め、もう一度クリックするとその経路を突進します。Escでポーズ、Pで開発用調整パネルです。アート確認用の静止シーンは `tools/preview_pixel_assets.tscn`（F6で実行）。素材と再生成手順は [ピクセル素材](speed/assets/pixel/README.md) を参照してください。
 
 Godot の CLI が利用できる環境では、リポジトリのルートから次のコマンドでエディタを開けます。
@@ -21,6 +23,8 @@ godot --editor --path speed
 `.godot/` は生成キャッシュとして Git 管理から除外します。Godot 本番のビルド・配布方法は、今後の開発で決めます。
 
 接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
+
+敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
 
 短時間の性能計測は `godot --path speed --disable-vsync res://tools/profile_run.tscn -- --time=350`。セーブへ書き込まず、ゲームの進行を指定秒へ進めて6秒準備・6秒計測します。
 

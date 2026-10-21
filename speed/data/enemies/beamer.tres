@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cg88tx5qsykox"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"beamer"
-display_name = "ビームの敵"
 rank = 2
 radius = 18.0
 hp = 16.0
@@ -17,16 +15,15 @@ xp = 4.0
 color = Color(1, 0.5, 0.8, 1)
 shape = &"diamond"
 behavior = &"beamer"
-max_alive = 0
 ranged = true
-size_var = false
-weak_arc = 0.0
 params = {
-"keep": 520.0,
-"fire_interval": 4.0,
-"telegraph": 0.9,
 "beam_len": 2200.0,
-"beam_width": 22.0,
 "beam_time": 0.35,
-"bullet_dmg": 12.0
+"beam_width": 22.0,
+"bullet_dmg": 12.0,
+"fire_interval": 4.0,
+"keep": 520.0,
+"telegraph": 0.9
 }
+id = &"beamer"
+display_name = "ビームの敵"

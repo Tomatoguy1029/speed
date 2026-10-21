@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="GameConfig" format=3]
+[gd_resource type="Resource" script_class="GameConfig" format=3 uid="uid://cokmr01hunlnf"]
 
-[ext_resource type="Script" path="res://scripts/data_types/game_config.gd" id="1"]
+[ext_resource type="Script" uid="uid://b0iaw5utoqs3t" path="res://scripts/data_types/game_config.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -39,9 +39,9 @@ dust_drag = 0.55
 boundary_push = 600.0
 crash_restitution = 0.45
 touch_damage = 0.25
+character_scale = 1.3
 base_max_speed = 500.0
 base_hp = 120.0
-character_scale = 1.3
 ship_radius = 26.0
 invuln_time = 0.6
 pickup_radius = 140.0
@@ -73,8 +73,7 @@ draw_run_scale_min = 0.03
 draw_run_time = 0.5
 draw_step = 8.0
 draw_confirm_delay = 0.2
-wave_radius = 45.0
-wave_damage = 0.5
+trace_radius = 45.0
 base_attack = 10.0
 atk_scale = 1.0
 base_crit_chance = 0.05
@@ -91,14 +90,10 @@ hitstop_big_mult = 1.8
 hitstop_crit_mult = 1.3
 enemy_aim_lag = 0.5
 enemy_aim_speed = 450.0
+attack_jitter = 0.3
 enemy_hp_mult = 1.0
 enemy_armor_mult = 1.0
 density_mult = 5.0
-enemy_pursuit_spread = 480.0
-enemy_approach_cycle = 18.0
-enemy_approach_time = 4.5
-enemy_approach_blend = 2.0
-enemy_roam_turn = 0.12
 enemy_face_move = 0.7
 enemy_split_overflow = 0.1
 danger_level = 2.2
@@ -150,10 +145,10 @@ hero_star_radius = 45.0
 hero_guards = 4
 hero_guard_range = 1600.0
 hero_glow_range = 2600.0
-hero_next_time = 60.0
 landmark_interval = 10.0
 landmark_chance = 0.5
 landmark_spacing = 1800.0
+hero_next_time = 60.0
 comet_interval_min = 20.0
 comet_interval_max = 40.0
 comet_speed = 950.0

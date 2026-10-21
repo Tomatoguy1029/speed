@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://badcj85xp6s2b"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"aquila"
-display_name = "わし座"
 rank = 10
 radius = 64.0
 hp = 2400.0
@@ -17,14 +15,11 @@ xp = 170.0
 color = Color(0.95, 0.85, 0.6, 1)
 shape = &"dart"
 behavior = &"aquila"
-max_alive = 1
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"drop_step": 0.25,
-"blast_radius": 85.0,
 "blast_delay": 0.9,
-"bullet_dmg": 14.0
+"blast_radius": 85.0,
+"bullet_dmg": 14.0,
+"drop_step": 0.25
 }
+id = &"aquila"
+display_name = "わし座"

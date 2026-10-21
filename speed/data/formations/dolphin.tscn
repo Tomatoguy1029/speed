@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://bxl2barjiuk3s"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Dolphin" type="Node2D" unique_id=427327335]
+script = ExtResource("1")
+types = Array[StringName]([&"dolphin"])
+
+[node name="1体" type="Node2D" parent="." unique_id=1561623960]
+position = Vector2(-2400, 0)
+script = ExtResource("2")
+
+[node name="いるか座" type="Node2D" parent="1体" unique_id=60100185]
+script = ExtResource("3")
+enemy = &"dolphin"
+
+[node name="2体並び" type="Node2D" parent="." unique_id=409642023]
+position = Vector2(-2400, 400)
+script = ExtResource("2")
+
+[node name="いるか座左" type="Node2D" parent="2体並び" unique_id=1291272697]
+position = Vector2(-102, -1)
+script = ExtResource("3")
+enemy = &"dolphin"
+
+[node name="いるか座右" type="Node2D" parent="2体並び" unique_id=1928259087]
+position = Vector2(109, 0)
+script = ExtResource("3")
+enemy = &"dolphin"
+
+[node name="正面" type="Node2D" parent="." unique_id=862413329]
+position = Vector2(0, -1500)
+rotation = 3.1416
+script = ExtResource("4")
+
+[node name="左前" type="Node2D" parent="." unique_id=827096430]
+position = Vector2(-1100, -1050)
+rotation = 2.332943
+script = ExtResource("4")
+
+[node name="左前2" type="Node2D" parent="." unique_id=2029910598]
+position = Vector2(-612, -1368)
+rotation = 2.7209294
+script = ExtResource("4")
+
+[node name="左前3" type="Node2D" parent="." unique_id=1277012034]
+position = Vector2(-1418, -543)
+rotation = 1.9365044
+script = ExtResource("4")
+
+[node name="右前" type="Node2D" parent="." unique_id=373976220]
+position = Vector2(1100, -1050)
+rotation = 3.9502423
+script = ExtResource("4")
+
+[node name="右前2" type="Node2D" parent="." unique_id=1551408977]
+position = Vector2(643.0001, -1379)
+rotation = 3.577902
+script = ExtResource("4")
+
+[node name="右前3" type="Node2D" parent="." unique_id=1834929054]
+position = Vector2(1427.0001, -495)
+rotation = 4.378495
+script = ExtResource("4")

@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dc84xyw313ooj"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"corona"
-display_name = "みなみのかんむり座"
 rank = 6
 radius = 44.0
 hp = 700.0
@@ -17,18 +15,15 @@ xp = 90.0
 color = Color(1, 0.9, 0.55, 1)
 shape = &"orb"
 behavior = &"corona"
-max_alive = 1
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"stars": 10,
-"ring": 120.0,
 "expand": 2.4,
 "expand_time": 0.8,
-"hold_time": 1.5,
-"spin": 0.9,
 "fire_interval": 6.0,
-"push": 2600.0
+"hold_time": 1.5,
+"push": 2600.0,
+"ring": 120.0,
+"spin": 0.9,
+"stars": 10
 }
+id = &"corona"
+display_name = "みなみのかんむり座"

@@ -1,12 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://s6n8arc4nbja"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"darter"
-display_name = "ダーター"
-rank = 0
 radius = 18.0
 hp = 9.0
 armor = 3.5
@@ -14,15 +11,15 @@ speed = 110.0
 accel = 2.0
 turn = 4.0
 xp = 2.0
-color = Color(1.0, 0.6235, 0.4196, 1)
+color = Color(1, 0.6235, 0.4196, 1)
 shape = &"dart"
 behavior = &"dash"
-size_var = false
-weak_arc = 0.0
 params = {
-"range": 520.0,
-"windup": 0.7,
 "dash_speed": 760.0,
 "dash_time": 0.55,
-"recover": 0.9
+"range": 520.0,
+"recover": 0.9,
+"windup": 0.7
 }
+id = &"darter"
+display_name = "ダーター"

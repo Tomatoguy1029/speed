@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="HeroDef" format=3 uid="uid://baib3d7c7e5bo"]
 
-[ext_resource type="Script" path="res://scripts/data_types/hero_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://55mca4eirddc" path="res://scripts/data_types/hero_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -11,6 +11,3 @@ stars = PackedVector2Array(0, 0, -30, 120, -60, 240, -80, 340, 110, 20, 80, 140,
 links = PackedInt32Array(0, 1, 1, 2, 2, 3, 4, 5, 5, 6, 0, 4, 1, 5)
 cooldown = 45.0
 duration = 10.0
-params = {
-
-}

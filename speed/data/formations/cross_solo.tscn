@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://qsuhj8vo0blj"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="CrossSolo" type="Node2D"]
+script = ExtResource("1")
+types = Array[StringName]([&"cross"])
+
+[node name="1体" type="Node2D" parent="."]
+position = Vector2(-2400, 0)
+script = ExtResource("2")
+
+[node name="みなみじゅうじ座" type="Node2D" parent="1体"]
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="正面" type="Node2D" parent="."]
+position = Vector2(0, -1500)
+rotation = 3.1416
+script = ExtResource("4")
+
+[node name="左前" type="Node2D" parent="."]
+position = Vector2(-1100, -1050)
+rotation = 2.3329
+script = ExtResource("4")
+
+[node name="右前" type="Node2D" parent="."]
+position = Vector2(1100, -1050)
+rotation = -2.3329
+script = ExtResource("4")
+
+[node name="左" type="Node2D" parent="."]
+position = Vector2(-1500, 0)
+rotation = 1.5708
+script = ExtResource("4")
+
+[node name="右" type="Node2D" parent="."]
+position = Vector2(1500, 0)
+rotation = -1.5708
+script = ExtResource("4")

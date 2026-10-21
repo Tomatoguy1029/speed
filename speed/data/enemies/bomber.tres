@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dxa5n78vlsk8j"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"bomber"
-display_name = "自爆する雑魚"
 rank = 1
 radius = 12.0
 hp = 5.0
@@ -17,13 +15,12 @@ xp = 1.0
 color = Color(1, 0.36, 0.36, 1)
 shape = &"orb"
 behavior = &"bomber"
-max_alive = 0
-ranged = false
-size_var = false
-weak_arc = 0.0
 params = {
-"trigger": 150.0,
-"blast_delay": 0.7,
+"blast_delay": 1.0,
+"blast_dmg": 10.0,
 "blast_radius": 110.0,
-"blast_dmg": 10.0
+"rush": 1.3,
+"trigger": 170.0
 }
+id = &"bomber"
+display_name = "自爆する雑魚"

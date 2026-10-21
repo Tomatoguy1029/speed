@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PhaseDef" format=3 uid="uid://bwo0b0exhykxt"]
+
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+start = 300.0
+pop_from = 140.0
+pop_to = 260.0
+level_from = 1.3
+level_to = 1.6
+rate = 60.0
+wave_interval = 3.5
+wave_type = &"swarm"
+mix = {
+"drifter": 3.0,
+"splitling": 2.0,
+"swarm": 10.0
+}
+id = &"rampage"
+display_name = "無双期"

@@ -99,7 +99,7 @@ func _test_debug_stage_selection() -> void:
 			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage == 4 else &"provisional"), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == &"provisional", "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
 			GameManager.abort_run()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
 	app.queue_free()
@@ -115,6 +115,12 @@ func _start(stage: int) -> void:
 	scene = load("res://scenes/run/run.tscn").instantiate()
 	add_child(scene)
 	run = scene.get_node("Managers/RunManager")
+	run.state.stage = run.state.stage.duplicate()
+	run.state.stage.phases = []
+	for phase_name in ["build", "pressure", "horde", "late"]:
+		run.state.stage.phases.append(ConfigManager.phases[StringName("s%d_%s" % [stage, phase_name])])
+	if stage == 4:
+		run.state.stage.boss_id = &"hydra"
 	run.set_physics_process(false)
 	run.input.set_process_input(false)
 	run.input.set_process_unhandled_input(false)
@@ -209,7 +215,7 @@ func _test_foundation() -> void:
 	s.ship_vel = Vector2(-100, 0)
 	run.ship._collide_bodies()
 	_check(s.ship_vel.x > 0 and s.ship_hp == hp, "タスク1：惑星は被弾せず跳ね返る")
-	_check(ConfigManager.stage(1).phases[0].mix != ConfigManager.stage(2).phases[0].mix, "タスク2：出現の重みはステージごとに異なる")
+	_check(ConfigManager.stage(1).phases[0].mix == ConfigManager.stage(2).phases[0].mix, "復元：通常ステージは元の共通の出現構成を使う")
 	s.time = run.cfg.boss_time - 1.0
 	run.bosses.tick(0.0, 0.0)
 	_check(not s.boss_spawned and s.boss_at >= run.cfg.boss_time and s.boss_at <= run.cfg.boss_time + run.cfg.boss_time_spread, "タスク3：ボス時刻は指定範囲で決まる")
@@ -268,13 +274,16 @@ func _test_shapes() -> void:
 	p.fire_rings(at, 4, 0.3, 200, 100, 10, 0.2, 2, 0, 0.3, 0.5)
 	_check(p.hazard_count() == 4 and p.hazard_gap[0] != p.hazard_gap[1] and p.hazard_delay[0] != p.hazard_delay[1], "タスク6：多層の輪は切れ目と広がる時刻がずれる")
 
-const ROSTERS := {
+const IMPLEMENTED_ROSTERS := {
 	1: "rocket,bomber,beamer,pulser,pump,telescope,shield,ruler,clock",
 	2: "rocket,bomber,volatile,splitter,beamer,missile,pump,crow,lynx,reticle,dolphin",
 	3: "rocket,bomber,volatile,beamer,spreader,triangle,lynx,cross,reticle,ruler,phoenix",
 	4: "rocket,volatile,splitter,pulser,missile,spreader,triangle,crow,crab,dolphin,marlin,aquarius",
 	5: "rocket,bomber,volatile,splitter,beamer,pulser,missile,spreader,shield,cross,auriga,corona,cepheus,aquila"
 }
+
+const ORIGINAL_ROSTER := "drifter,swarm,darter,armored,gunner,missile,splitter,splitling,titan,battleship"
+const ROSTERS := {1: ORIGINAL_ROSTER, 2: ORIGINAL_ROSTER, 3: ORIGINAL_ROSTER, 4: ORIGINAL_ROSTER, 5: ORIGINAL_ROSTER}
 
 func _advance_enemies(seconds: float) -> Dictionary:
 	var peaks := {"hazards": 0, "hostile": 0, "wells": 0}
@@ -299,7 +308,7 @@ func _test_enemy_roster() -> void:
 			_check(phase.wave_type == &"" or expected.has(String(phase.wave_type)), "タスク7〜12：ステージ%dの波の種類" % stage)
 		_check(found.size() == expected.size() and found.all(func(id): return expected.has(id)), "タスク7〜12：ステージ%dの全出現種類" % stage)
 	var all_types: Array[StringName] = []
-	for roster in ROSTERS.values():
+	for roster in IMPLEMENTED_ROSTERS.values():
 		for id in roster.split(","):
 			if not all_types.has(StringName(id)):
 				all_types.append(StringName(id))
@@ -570,9 +579,10 @@ func _test_hero() -> void:
 			_check(run.combat.leo_width() > 1, "タスク17：しし座は帯を太くする")
 			var a := s.ship_pos - Vector2(100, 0)
 			var b := s.ship_pos + Vector2(300, 0)
-			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.wave_radius * 1.5)
+			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.trace_radius * 1.5)
 			run.combat.rebuild_grid()
-			run.combat.wave_along(TraceRun.new(), a, b)
+			s.ship_pos = b
+			run.combat.collide_ship(a, run.combat.trace_radius(), TraceRun.new())
 			_check(t.dead[victim] != 0, "タスク17：太い帯の敵は装甲に関係なく貫ける")
 			s.gauge = 1.0
 			_line(PackedVector2Array([a, b]))
@@ -846,7 +856,7 @@ func _test_app_flow() -> void:
 			await get_tree().process_frame
 		run.command(&"debug_time", {"seconds": run.state.boss_at + 0.1 - run.state.time})
 		_play_steps(2, 0.05)
-		_check(run.state.boss_spawned and run.bosses.actor.def.id == (&"hydra" if stage == 4 else &"provisional"), "通し確認：ステージ%dに対応するボスが出る" % stage)
+		_check(run.state.boss_spawned and run.bosses.actor.def.id == &"provisional", "通し確認：ステージ%dに対応するボスが出る" % stage)
 		await _shot("stage_%d_boss" % stage)
 		var enemies := run.enemies.table
 		for row in enemies.alive.size():
@@ -868,7 +878,7 @@ func _test_app_flow() -> void:
 			run.state.stats.attack_mult = 1000.0
 			var boss = run.bosses.actor
 			var target: Vector2 = run.enemies.table.pos[boss.body]
-			if stage == 4:
+			if boss.def.id == &"hydra":
 				if boss.immortal_row >= 0:
 					target = run.enemies.table.pos[boss.immortal_row]
 				else:
@@ -958,6 +968,7 @@ func _test_surge() -> void:
 		run.state.rng.seed = 208
 		run.enemies._survey()
 		var request: Dictionary = target.duplicate()
+		request.phase = ConfigManager.phases[&"s1_late"]
 		request.steps = steps
 		for attempt in 600:
 			run.enemies._spawn_one(request)

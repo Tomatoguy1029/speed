@@ -13,6 +13,7 @@ menu.settings,設定,Settings
 menu.quit,終了,Quit
 menu.main_menu,メインメニュー,Main Menu
 menu.stage_select,ステージ選択,Stage Select
+menu.enemy_lab,敵・ルート実験場（開発版）,Enemy & Route Lab (Dev Build)
 menu.upgrade,機体の強化,Ship Upgrades
 menu.encyclopedia,図鑑,Codex
 ,■ 設定,
@@ -51,6 +52,8 @@ stage_select.stage,ステージ {n}　{name},Stage {n}  {name}
 stage_select.debug,開発版：全ステージを選べます,Dev Build: All stages are available
 stage_select.locked,ステージ {n}　（前のステージをクリアすると選べる）,Stage {n}  (Clear the previous stage to unlock)
 stage_select.endless,エンドレス（準備中）,Endless (Coming Soon)
+stage_select.launch,出撃,Launch
+stage_select.available,出撃可能,Ready to launch
 ,■ ラン中（HUD・3択・ポーズ）,
 hud.draw,描く,Draw
 hud.kills,撃破 {n},Kills {n}
@@ -96,6 +99,18 @@ result.fastest,最速クリア　{time},Fastest Clear  {time}
 upgrade.row,{name}　{desc}　（{lv} / {max}）,{name}  {desc}  ({lv} / {max})
 upgrade.buy,強化（部品 {n}）,Upgrade ({n} Parts)
 upgrade.max,最大,Maxed
+upgrade.select_part,パーツを選択,Select a part
+upgrade.action,強化,Upgrade
+upgrade.price,必要部品：{n},Cost: {n} Parts
+upgrade.details,{desc}　（{lv} / {max}）,{desc}  ({lv} / {max})
+upgrade.part.atk,パワースパイク,Power Spike
+upgrade.part.hp,フレーム強度,Frame Strength
+upgrade.part.charge,充電効率,Charge Efficiency
+upgrade.part.xp,学習回路,Learning Circuit
+upgrade.part.length,エンジンタンク,Engine Tank
+upgrade.part.pickup,コレクター,Collector
+upgrade.part.speed,ブースター,Booster
+upgrade.part.reroll,演算予備,Spare Processor
 ,■ 図鑑,
 codex.title,図鑑　（{known} / {total}）,Codex  ({known} / {total})
 codex.weapons,武器,Weapons
@@ -183,9 +198,500 @@ meta.speed.name,主推進器,Main Thruster
 meta.speed.desc,最高速度 +5%,Top speed +5%
 meta.xp.name,学習回路,Learning Circuit
 meta.xp.desc,経験値 +8%,XP +8%
+meta.length.name,エンジンタンク,Engine Tank
+meta.length.desc,線の長さ +5%,Line length +5%
 ,■ ステージ（stage.<番号>）,
 stage.1.name,いっかくじゅう座の星系,Monoceros System
 stage.2.name,ケンタウルス座の星系,Centaurus System
 stage.3.name,おおいぬ座の星系,Canis Major System
 stage.4.name,うみへび座の星系,Hydra System
 stage.5.name,元凶の待つ星系,Where the Source Awaits
+lab.message_7474db4292,線には2点以上必要です,A route needs at least two points
+lab.message_26fa279ba2,出現,Spawns
+lab.message_63d8f43c5b,攻撃,Attacks
+lab.message_1c155a99a1,被弾,Damage
+lab.message_c3775f8a58,撃破,Kills
+lab.message_72f1cf759c,条件,Conditions
+lab.message_d7d7ce790b,配置,Layout
+lab.message_fadf24dbc5,保存,Files
+lab.message_fc23b9c287,変更はこの実験に適用されます。初期条件へ戻る操作は新しい実験です。,Changes apply to this experiment. New experiment resets the initial conditions.
+lab.message_9e4c412d75,試遊中の無敵,Invincible while playing
+lab.message_d79714f205,充填率,Charge
+lab.message_cdff100dfe,自機を表示中心へ移動・充填,Move ship to view center and charge
+lab.message_c66777f550,ステージ経過（実秒）,Stage time (real seconds)
+lab.message_54036730a6,ステージ時計へ適用,Set stage clock
+lab.message_568b393d89,復元した通常の出現,Original stage roster
+lab.message_df7c5eeb44,追加版の出現（実験のみ）,Added roster (lab only)
+lab.message_ace6599b1c,出現の時間帯を切替,Switch phase roster
+lab.message_0c0e2d79f0,基礎攻撃力,Base attack
+lab.message_0aee0183fd,最高速度,Maximum speed
+lab.message_017dfdb22a,線の長さ,Drawing length
+lab.message_ec7bdd3fb0,なぞりの当たり判定の太さ,Trace hit width
+lab.message_355273af8a,描画中の世界の速さ,World speed while drawing
+lab.message_ab276f5393,描画の確定待ち時間,Drawing confirmation delay
+lab.message_6384a9a6f0,ボスの基礎HP,Boss base HP
+lab.message_391c98f217,ボスの基礎装甲,Boss base armor
+lab.message_761cc8db45,機体の強化レベル,Ship upgrade level
+lab.message_c2080e1bd3,機体の強化を適用,Apply ship upgrade
+lab.message_6f0f16e0c0,武器,Weapon
+lab.message_b62ed716e3,特性,Trait
+lab.message_5c146b19a7,装備レベル,Equipment level
+lab.message_030e3f7f9b,装備に追加,Add equipment
+lab.message_c1f482ed04,装備を解除,Clear equipment
+lab.message_7a50a34743,英雄なし,No hero
+lab.message_3b8a4d49ef,英雄を発動,Activate hero
+lab.message_e52adaaa4c,追加版の分裂設定を適用,Apply added splitter variant
+lab.message_e2074e817f,攻撃の優先度管理を使う,Manage attack priorities
+lab.message_f4a90d8530,全体の重み付き上限,Total weighted budget
+lab.message_e25e93d055,狙い弾,Aimed shots
+lab.message_bbcc068b7e,誘導弾,Homing shots
+lab.message_437d9cf8d0,突進,Dashes
+lab.message_421607de84,ビーム,Beams
+lab.message_1133c374e7,遅延範囲,Delayed areas
+lab.message_f3482a22c0,広がる輪,Expanding waves
+lab.message_c04c40391d,残留範囲,Lingering areas
+lab.message_61bf2700ce,枠,Slots
+lab.message_d0fdf2aa39,重み,Weight
+lab.message_c7f2b1e003,間隔,Gap
+lab.message_1a59dadeb6,表示中の敵を優先し、待った時間で優先度を上げます。攻撃元から残った弾・範囲への線をフィールドに表示します。,Visible enemies get priority; waiting raises it. Lines connect attackers to their remaining shots and areas.
+lab.message_dc8d5ae40c,パレットで選んだ敵を、表示中心へ指定した時間から繰り返し出します。,Repeat the selected enemy at the view center during the chosen time range.
+lab.message_5fdbd8f764,開始（実秒）,Start (real seconds)
+lab.message_51b9d6157a,終了（実秒）,End (real seconds)
+lab.message_274c228534,間隔（実秒）,Interval (real seconds)
+lab.message_7c4fd18609,出現レーンに追加,Add spawn lane
+lab.message_25c440c98a,選択したレーンを削除,Delete selected lane
+lab.message_0113c8102f,すべてのレーンを止める,Stop all lanes
+lab.message_d144e6855f,線を描く時間（実秒）,Drawing duration (real seconds)
+lab.message_2fcfd99d3b,ルートに残す余裕幅,Route clearance
+lab.message_e10ded50d8,開始時間の幅（対応モデルのみ）,Start window (supported models)
+lab.message_f7df32cd04,静止配置の掃引を確認,Check static swept route
+lab.message_fb60080a99,描いた線を隔離して再生,Replay route in isolation
+lab.message_6cc4ba4282,認証した開始時間幅を保護,Protect certified start window
+lab.message_65f985536b,対応モデルで開始時間幅を確認してから有効にしてください,Certify a supported start window before enabling protection.
+lab.message_47a613a504,指定した時間幅の間、新しい攻撃と自動出現を見送ります,New attacks and automatic spawns are deferred during the specified window.
+lab.message_93025fc5b1,線を比較対象として複製,Duplicate route for comparison
+lab.message_0a50b49bd2,敵が動いてよい領域の半径,Placement region radius
+lab.message_4855e0d71e,現在の配置を生成規則にする,Capture layout as a generation rule
+lab.message_277d733b3c,領域の中心をドラッグ。Alt＋ドラッグで半径。ルートを変えると規則を再取得してください。,Drag a region center; Alt-drag changes its radius. Capture again after changing the route.
+lab.message_facbd979fc,貫く群れ,Fodder to pierce
+lab.message_098b17ccc2,避ける対象,Objects to avoid
+lab.message_1dafdf40bb,選んだ領域の最小数,Selected region minimum count
+lab.message_482249e12a,選んだ領域の最大数,Selected region maximum count
+lab.message_21716b1b31,選んだ領域の種類・役割・数を変更,"Apply selected enemy, role and counts"
+lab.message_6ffb4b865c,ランダムに回す角度（度）,Random rotation (degrees)
+lab.message_2abddd7072,長さの最小倍率,Minimum length scale
+lab.message_66086de6d6,ルート上で貫く弱い敵の最小数,Minimum fodder on route
+lab.message_d8cfb525ed,ランダム候補を3つ生成,Generate three random candidates
+lab.message_a19b200d4f,先に配置を生成規則にしてください,Capture a generation rule first.
+lab.message_f90284f87e,選んだ候補を配置に追加,Add selected candidate
+lab.message_4499d20c4e,実験名,Experiment name
+lab.message_3e46ee4fc1,配置・条件のプリセットを保存,Save layout and condition preset
+lab.message_0a6f61cf06,再生履歴と分岐を保存,Save replay and branches
+lab.message_c1df88bfc2,JSONを読み込む,Load JSON
+lab.message_e419196088,本番へ反映する対象（書き出しに明記）,Production targets (included in export)
+lab.message_b8d712fc9b,対象ステージ,Target stage
+lab.message_82b885c33d,時間帯を限定しない,All phases
+lab.message_e98240632d,AI用フォルダを書き出す,Export folder for AI
+lab.message_5da55226e3,書き出しは敵の差分、配置規則、攻撃枠、再現条件、画像をまとめます。通常ステージへの採用は対象を指定して反映します。,"Export includes definition changes, placement rules, attack limits, replay conditions and images. Specify targets when adopting changes in normal stages."
+lab.message_5931a7be25,指定した探索範囲で候補を発見できませんでした,No candidate found within the search limits.
+lab.message_7b47f8fa60,ルートを検証中 %d%%,Evaluating route %d%%
+lab.message_0db4675b27,候補を検査中 %d,Checking candidate %d
+lab.message_7591fff9f2,再構築中 %d%%,Reconstructing %d%%
+lab.message_60a1005be6,戻る,Back
+lab.message_922c39d8ac,敵・ルート実験場,Enemy & Route Lab
+lab.message_c83172920b,ステージ %d,Stage %d
+lab.message_528e1c7048,空のフィールド,Empty field
+lab.message_bb051fda3b,通常の自動出現,Normal automatic spawns
+lab.message_dfa32d64eb,新しい実験,New experiment
+lab.message_bf1c2f34ef,▶ 再生,▶ Play
+lab.message_2555a92b57,❚❚ 停止,❚❚ Pause
+lab.message_87b386148b,1コマ,Step
+lab.message_e2ff3a1576,最初の時刻へ戻す（配置は残す）,Back to the start (keep placements)
+lab.message_8e4350198b,選択・移動,Select / move
+lab.message_7b82dc2a06,敵を配置,Place enemies
+lab.message_096f45921a,線を編集,Edit route
+lab.message_605c5bd311,自機で試遊,Play as ship
+lab.message_685d3cd5a7,線を消す,Clear route
+lab.message_31c4ccdbbf,線の結果を確認,Evaluate route
+lab.message_67847e89ae,中止,Cancel
+lab.message_97c3c6246b,敵を消す,Clear enemies
+lab.message_fb93512f75,攻撃範囲,Attack ranges
+lab.message_19e1e846a4,敵の名前・IDで検索,Search enemy name or ID
+lab.message_da1f520c6f,数,Count
+lab.message_4db93d1888,選択情報,Selection
+lab.message_69a0de30fa,実験設定,Experiment
+lab.message_e2160dc29a,編集中：線の結果を確認してください,Editing: evaluate the route again.
+lab.message_c811c512d0,敵パレット,Palette
+lab.message_2041b03309,情報パネル,Inspector
+lab.message_25446d5b84,線編集：クリックで点を追加、点をドラッグ、右クリックで最後の点を削除,"Route: click to add, drag to move, right-click a point to delete."
+lab.message_787af9549a,中ボタン：移動　ホイール：拡大縮小　配置してから再生してください,"Middle-drag to pan; wheel to zoom. Place enemies, then play."
+lab.message_2e31753d0b,"%s　%s
+選択してフィールドをクリック","%s  %s
+Select, then click the field"
+lab.message_bd3455e23b,通常,Normal
+lab.message_cab5ef8006,ボス,Boss
+lab.message_0033dbf5f7,調整待ち,To tune
+lab.message_e6152035cf,"%s
+%s ・%s","%s
+%s / %s"
+lab.message_30308e98b5,：配置する位置をクリック,: click to place
+lab.message_992b3b0d94,敵を選択してドラッグ移動,Select an enemy and drag to move
+lab.message_d01d58488a,配置する位置をクリック,Click a placement position
+lab.message_6959dce1bf,線の点を追加・移動して結果を確認,"Add or move route points, then evaluate"
+lab.message_e032c78766,通常の描画操作で試遊。再生を押してください,Use normal drawing controls. Press Play to begin.
+lab.message_549e9c3c03,分岐 %d,Branch %d
+lab.message_9ec7700849,静止配置で成立,Valid in static layout
+lab.message_0df05349ff,指定時間幅で成立,Valid within the specified window
+lab.message_af33e7e17b,時間幅の評価モデルが未対応,Time-window model unsupported
+lab.message_3aee526f77,この条件で成立する候補は未確認,No valid candidate confirmed for these conditions
+lab.message_aa259c678f,線の条件を確認,Check route conditions
+lab.message_dd16bfc556,この再生条件で成立,Valid for this replay
+lab.message_b8f8f95d8c,この再生では終点到達・無被弾の条件を未達,Endpoint or no-damage condition not met in this replay
+lab.message_94deee7e2e,再確認が必要,Recheck required
+lab.message_68dc5e1c46,編集中,Editing
+lab.message_511972b218,　撃破 %d　被ダメージ %.1f　残り充填 %.2f,  Kills %d  Damage %.1f  Charge %.2f
+lab.message_198ce2dd32,　衝突・未確認 %d箇所　余裕幅 %.0f,  Collisions / unconfirmed %d  Clearance %.0f
+lab.message_c93b3203d0,線%d　%s　撃破%d,Route %d  %s  Kills %d
+lab.message_82b17798e4,候補%d　%s　Seed%d,Candidate %d  %s  Seed %d
+lab.message_e3178fc873,候補を選ぶと線と出現位置を重ねて表示します,Select a candidate to overlay its route and positions.
+lab.message_4949196244,候補が古いか未成立です。生成し直してください,Candidate is stale or invalid. Generate it again.
+lab.message_e104208879,保存できませんでした：%s,Could not save: %s
+lab.message_edf19cb8e9,*.json ; 実験のJSON,*.json ; Experiment JSON
+lab.message_10ccd95682,基準データが違います。結果の再確認が必要です,Baseline differs. Re-evaluate the results.
+lab.message_0d4f7fc305,読み込みました,Loaded
+lab.message_6d49e93edd,書き出しました：,"Exported: "
+lab.message_f6f81b6554,書き出しに失敗：,"Export failed: "
+lab.message_c2ddab60b8,❚❚ 再生中,❚❚ Playing
+lab.message_15d10dbb3a,%.2f 秒 / %.2f 秒　世界 %.2f 秒　敵 %d体　Seed %d,%.2f s / %.2f s  World %.2f s  Enemies %d  Seed %d
+lab.message_98f82d7b9f,現在の分岐,Current branch
+lab.message_91f8bdc328,再確認が必要：配置・装備・時間が変わっています,"Recheck required: layout, equipment or time changed."
+lab.message_87b29ea1a5,ファイルを読み込めません（上限16MB）,Cannot read file (16 MB limit).
+lab.message_d2cbd5f4c9,JSON の形式を確認してください,Check the JSON format.
+lab.message_5aa5077c96,対応していない記録の版・種類です,Unsupported record version or kind.
+lab.message_03af38d54f,初期条件・履歴の形式が違います,Invalid initial conditions or history format.
+lab.message_5411903cfb,記録の上限を超えています,Record exceeds limits.
+lab.message_516be31176,未知の初期条件：,"Unknown initial condition: "
+lab.message_da5e2e784c,未知のステージです,Unknown stage.
+lab.message_5023536a4b,初期条件の形式が違います：,"Invalid initial condition format: "
+lab.message_c6f64ef280,自機の位置が不正です,Invalid ship position.
+lab.message_dcb428f285,装備のID・レベルが不正です,Invalid equipment ID or level.
+lab.message_97502315d3,線の形式・上限を確認してください,Check route format and point limit.
+lab.message_275c3dbb23,線の座標が不正です,Invalid route coordinates.
+lab.message_1ea25ab8b0,配置規則の形式が違います,Invalid placement rule format.
+lab.message_3b1b000e8b,未知の調整値：,"Unknown tuning value: "
+lab.message_3fc0d7300b,未知の敵：,"Unknown enemy: "
+lab.message_8cfee97b22,変更できない敵の項目：,"Enemy property cannot be changed: "
+lab.message_8c395a3b3b,分岐の形式が違います,Invalid branch format.
+lab.message_2fa6cacf94,未知の命令・形式です,Unknown command or format.
+lab.message_884b1ef739,命令の時刻が範囲外です,Command time is out of range.
+lab.message_2a897624ac,命令の位置が不正です,Invalid command position.
+lab.message_c547a6d3c5,入力の座標が不正です,Invalid input coordinates.
+lab.message_6b1292dfc2,敵の値が不正です,Invalid enemy value.
+lab.message_6d6845a8d1,命令の数値が不正です,Invalid command number.
+lab.message_e4cadb1cab,許可していないラン命令です,Run command is not allowed.
+lab.message_3313855ba5,出現レーンの形式・上限を確認してください,Check spawn lane format and limits.
+lab.message_e33e75d642,出現レーンの形式が違います,Invalid spawn lane format.
+lab.message_f9993c711a,出現レーンに未知の敵があります,Unknown enemy in spawn lane.
+lab.message_bb508ec943,出現位置の形式が違います,Invalid spawn position format.
+lab.message_b58910d240,出現レーンの数値が不正です,Invalid spawn lane number.
+lab.message_94331992ec,出現間隔には正の値が必要です,Spawn interval must be positive.
+lab.message_1f862285cc,定義の形式が違います,Invalid definition format.
+lab.message_3c66a49d71,未知の敵・定義です,Unknown enemy or definition.
+lab.message_2dac0fe5e5,攻撃の値の形式が違います,Invalid attack parameter format.
+lab.message_7241f95e31,未知の攻撃の値です,Unknown attack parameter.
+lab.message_00769fb623,変更できない定義の値です,Definition value cannot be changed.
+lab.message_7d67422141,大きさと強さには有効な正の値が必要です,Size and strength require valid positive values.
+lab.message_f111d0afe0,敵を選択すると情報を表示,Select an enemy to inspect
+lab.message_479576c49c,"数値はこの実験の同じ種類に適用
+本番データは書き換えません","Values apply to this enemy type in the experiment.
+Production data stays unchanged."
+lab.message_a19e004551,姿・当たり判定・攻撃範囲を確認できます,"Inspect appearance, collision and attack ranges."
+lab.message_6170cb0f1e,"HP %.1f / %.1f
+装甲 %.1f　自機の攻撃 %.1f
+%s
+状態：%s
+位置 (%.0f, %.0f)　向き %.0f°","HP %.1f / %.1f
+Armor %.1f  Ship attack %.1f
+%s
+State: %s
+Position (%.0f, %.0f)  Angle %.0f°"
+lab.message_6fb30df6c1,貫通できる,Can pierce
+lab.message_2c343fabe5,装甲で弾かれる,Blocked by armor
+lab.message_09a8e159ad,予告中,Telegraphing
+lab.message_d44a3e6526,移動／待機,Moving / waiting
+lab.message_684f07d574,エリート,Elite
+lab.message_597e81eb3a,個体へ適用,Apply to individual
+lab.message_341a7b515f,基礎 HP,Base HP
+lab.message_7d629f79a9,基礎装甲,Base armor
+lab.message_80c64a0375,基礎速度,Base speed
+lab.message_b982dccaae,基礎半径,Base radius
+lab.message_4212b2ec66,攻撃・行動の設定,Attack and behavior settings
+lab.message_eb3d91decb,残留する攻撃の終了待ち,Waiting for lingering attacks to end
+lab.message_aa5d4e5983,優先順位の高い要求を先に処理,Waiting for a higher-priority request
+lab.message_377bd2f0f5,：分類の枠待ち,: category slots full
+lab.message_49b3b4a997,：共通の開始間隔待ち,: shared start gap
+lab.message_9ce7705ba3,全体の攻撃量の上限,Total attack budget reached
+lab.message_e98c560853,認証したルートの開始時間幅を保護中,Protecting a certified route start window
+lab.message_ace1dcf08b,描ける長さを超過,Drawing length exceeded
+lab.message_fdee8bc433,外縁,Outer boundary
+lab.message_409189caf0,地形の掃引,Swept terrain
+lab.message_416deae061,特殊な倒し方は再生で確認,Replay required for special defeat conditions
+lab.message_676b643ad5,通常攻撃での確実な撃破を未確認,Guaranteed kill with normal attack unconfirmed
+lab.message_eaf4530ecf,自機の自動攻撃・英雄・重力,"Automatic weapons, hero or gravity"
+lab.message_feb890132f,ランダムな地形の追加,Random terrain additions
+lab.message_8e84357015,敵弾,Enemy shot
+lab.message_c977ed9a15,攻撃範囲の保守的な包絡,Conservative attack envelope
+lab.message_d51f72362d,Encounter profile: 採用時の基準が異なるため無効,Encounter profile disabled: adoption baseline differs.
+lab.message_5e0ec7996a,現在の状態で適用できる候補が未発見,No applicable candidate found in the current state.
+lab.message_461a6d1eec,未知の敵です,Unknown enemy.
+lab.range_edit,範囲・向き,Range / direction
+lab.undo,取り消す,Undo
+lab.redo,やり直す,Redo
+lab.names,名前・ID,Names / IDs
+lab.terrain,天体,Terrain
+lab.rocks,隕石・がれき,Rocks / debris
+lab.gimmicks,フィールドの仕掛け,Field events
+lab.route_length,線 %.0f / %.0f　消費 %.0f%%,Route %.0f / %.0f  Cost %.0f%%
+lab.manual_exception,手動配置：地形や外縁と重なる例外を含みます,Manual layout includes terrain or boundary overlaps
+lab.info_categories,"攻撃 %s　優先度 %.1f　待機 %.2f秒
+%s","Attacks %s  Priority %.1f  Wait %.2fs
+%s"
+lab.spawn_probability,出現する確率（0〜1）,Spawn probability (0–1)
+lab.spawn_radius,出現領域の半径,Spawn region radius
+lab.lane_toggle,選択したレーンをON/OFF,Toggle selected lane
+lab.lane_apply,選択したレーンへ条件を適用,Apply conditions to selected lane
+lab.status_active,発動・予告,Active / telegraph
+lab.status_residue,残留,Lingering
+lab.status_wait,待機,Waiting
+lab.exit_clearance,抜けた先に残す余裕の半径,Exit clearance radius
+lab.min_spacing,敵中心どうしの最小距離,Minimum distance between enemy centers
+lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留 / 枠,■ Telegraph / active  / Lingering; active + lingering / slots
+lab.error_b03790ec83,時間帯一覧の形式が違います,Invalid phase list
+lab.error_1ba7e23ea5,未知の時間帯です,Unknown phase ID
+lab.error_ea2fd16cf8,攻撃量の上限が不正です,Invalid attack budget
+lab.error_76545bdd1e,攻撃管理の形式が違います,Invalid attack settings
+lab.error_141fdea6d8,攻撃分類の値が不正です,Invalid attack category value
+lab.error_b356dea242,配置規則の形式が違います,Invalid pattern
+lab.error_46cc43be42,候補一覧の形式が違います,Invalid candidates
+lab.error_f5899d482e,候補の形式が違います,Invalid candidate
+lab.error_51df4a5681,候補の線の座標が不正です,Invalid candidate route
+lab.error_34dfb05e18,候補の命令一覧が不正です,Invalid candidate commands
+lab.error_f2c0bc8a77,候補の命令が不正です,Invalid candidate command
+lab.error_d1d25618ab,配置規則の上限を超えています,Invalid pattern limits
+lab.error_59317e2e86,配置規則の線が不正です,Invalid pattern route
+lab.error_8a4eb2caa3,配置規則の数値が不正です,Invalid pattern number
+lab.error_956b200251,配置領域の形式が違います,Invalid placement region
+lab.error_1c4f35b1cc,配置領域に未知の敵があります,Unknown placement enemy
+lab.error_28ac733ef0,配置領域の数値が不正です,Invalid placement number
+lab.low_charge,線を描くための充填が不足しています,Insufficient charge to draw a route
+lab.trace_in_progress,実行中の線は開始前へ戻して評価してください,Rewind to before the active trace to evaluate another route
+lab.initial_branch,初期実験,Initial experiment
+lab.ship_level,機体のレベル,Ship level
+lab.reload_data,本番データを再読込して新しい実験,Reload production data and start a new experiment
+lab.data_reloaded,敵・ボス・時間帯・共通値を読み直しました,"Reloaded enemies, bosses, phases and shared values"
+lab.reload_failed,本番データの再読込に失敗しました。ファイルの形式を確認してください,Could not reload production data. Check the resource files.
+lab.ui.conditions,実験条件,Conditions
+lab.ui.random,ランダム配置,Random layouts
+lab.ui.files,保存,Save
+lab.ui.help,操作のヒント,Controls
+lab.ui.help_text,中ドラッグで移動・ホイールで拡大縮小。Spaceで再生／停止。選択した敵はDeleteで削除、Q／Eで回転。,Middle-drag to pan; wheel to zoom. Space to play/pause. Delete removes selected enemies; Q/E rotates them.
+lab.ui.enemies,敵,Enemies
+lab.ui.search,敵を検索,Find an enemy
+lab.ui.all,すべて,All enemies
+lab.ui.drag_hint,ドラッグして配置,Drag onto the field
+lab.ui.placement_options,配置オプション,Placement options
+lab.ui.select,選択,Select
+lab.ui.place,配置,Place
+lab.ui.route,ルート,Route
+lab.ui.try,試遊,Play as ship
+lab.ui.range,範囲,Range
+lab.ui.view,表示する情報,Display options
+lab.ui.center,自機を中心に表示,Center on ship
+lab.ui.edit_more,消去メニュー,Clear menu
+lab.ui.evaluate,ルートを試す,Try route
+lab.ui.tune,敵を調整,Tune enemy
+lab.ui.close,閉じる,Close
+lab.ui.field,フィールド,Field
+lab.ui.field_objects,地形・仕掛け,Terrain and events
+lab.ui.data,データの再読込,Reload data
+lab.ui.play,再生,Play
+lab.ui.pause,停止,Pause
+lab.ui.history,履歴,History
+lab.ui.transport_status,%.2f / %.2f 秒   敵 %d体,%.2f / %.2f s   %d enemies
+lab.ui.select_hint,敵をドラッグして移動,Drag an enemy to move it
+lab.ui.place_hint,フィールドをクリックして配置,Click the field to place enemies
+lab.ui.route_hint,クリックで点を追加・ドラッグで線を調整,Click to add points; drag points to edit
+lab.ui.try_hint,再生して自機を操作,Press Play to control the ship
+lab.ui.range_hint,選んだ敵からドラッグして範囲・向きを調整,Drag from the selected enemy to adjust range and direction
+lab.ui.enemy_tooltip,"%s（%s）
+ドラッグして配置／クリックして連続配置","%s (%s)
+Drag to place / click for repeated placement"
+lab.ui.basic,基本,Basics
+lab.ui.attack_details,攻撃・行動の詳細,Attack and behavior details
+lab.ui.individual,この個体,This instance
+lab.ui.live_details,詳しい状態,Live details
+lab.ui.type_values,同じ種類の敵に適用,Applies to this enemy type
+lab.ui.hp,HP %.0f / %.0f,HP %.0f / %.0f
+lab.ui.player,自機,Ship
+lab.ui.player_stats,自機・ボスの数値,Ship and boss values
+lab.ui.loadout,装備・英雄,Loadout and hero
+lab.ui.stage_time,時間帯,Stage phases
+lab.ui.formation,敵の組み合わせ,Enemy formations
+lab.attack.jitter,待ち方のばらつき（秒）,Wait jitter (s)
+lab.attack.danger,攻撃の重さ（強敵と大物）,Attack weight (strong and big enemies)
+lab.attack.used,重さ %.1f / %.1f,Weight %.1f / %.1f
+lab.formation.layout,配置,Layout
+lab.formation.entry,出現位置,Entry
+lab.formation.level,敵のレベル,Enemy level
+lab.formation.place,機体のまわりに並べる,Place around the ship
+lab.ui.attack_limits,分類ごとの制限,Limits by category
+lab.ui.route_settings,検証条件,Validation settings
+lab.ui.route_comparisons,比較したルート,Route comparisons
+lab.ui.pattern_settings,配置のランダム化,Randomize layout
+lab.ui.production_export,AI用の書き出し,Export for AI
+lab.ui.empty_field,左の敵をここへドラッグ,Drag an enemy here from the palette
+lab.ui.resize_panel,境界をドラッグしてパネルの大きさを変更,Drag the divider to resize the panels
+lab.ui.collapse_left,左の一覧を折りたたむ,Collapse the left list
+lab.ui.expand_left,左の一覧を開く,Expand the left list
+lab.ui.collapse_right,右のパネルを折りたたむ,Collapse the right panel
+lab.ui.expand_right,右のパネルを開く,Expand the right panel
+lab.ui.zoom_in,時間軸を拡大,Zoom in on the timeline
+lab.ui.zoom_out,時間軸を縮小,Zoom out on the timeline
+lab.ui.show_all,時間軸の全体を表示,Show the entire timeline
+lab.ui.track_help,ホイールで時間軸を拡大縮小・中ドラッグで横移動・クリックで時刻を移動,Wheel to zoom; middle-drag to pan; click to seek
+lab.ui.track_time,%s秒,%ss
+lab.ui.show_hud,HP・装備などの表示,HUD (HP and loadout)
+lab.ui.show_minimap,ミニマップ,Minimap
+lab.ui.show_background,背景の星,Background stars
+lab.ui.clear_route,線を消す,Clear route
+lab.ui.pin_ship,機体を固定,Pin ship
+lab.ui.pin_ship_help,機体を今の位置に止め、敵だけを動かす（もう一度押すと解除）,Hold the ship in place so only enemies move (press again to release)
+lab.ui.class_fodder,雑魚（星1）,Fodder (1 star)
+lab.ui.class_tough,硬めの敵（星2）,Tough (2 stars)
+lab.ui.class_strong,強敵（星3〜5）,Strong (3-5 stars)
+lab.ui.class_big,大物（星6〜10）,Big (6-10 stars)
+lab.ui.class_field,障害物・仕掛け,Obstacles and gimmicks
+lab.field.planet_small,惑星（小）,Planet (small)
+lab.field.planet,惑星（中）,Planet (medium)
+lab.field.planet_large,惑星（大）,Planet (large)
+lab.field.comet,彗星,Comet
+lab.field.gravity,重力,Gravity well
+lab.field.warp,ワープホール,Warp hole
+lab.field.gem,経験値の結晶,Experience crystals
+lab.ui.class_boss,ボス,Bosses
+lab.ui.class_other,出現から外した敵,Retired enemies
+lab.ui.stars_all,星：すべて,Stars: all
+lab.ui.stars_help,星の数で絞り込む,Filter by star count
+lab.ui.reset,リセット,Reset
+lab.ui.reset_help,再生を始めた時の状態に戻す（配置は残す。それ以降の記録は分岐として残す）,Back to when playback started (keeps placements; later records stay as a branch)
+lab.ui.how_moves,動き,Behavior
+lab.ui.how_to_kill,倒し方,How to defeat
+lab.enemy.drifter.move,追ってくる。ときどき画面の中を広く回る,Chases you and sometimes roams widely across the screen
+lab.enemy.drifter.kill,HP を削る（体当たり・武器）,Wear down its HP (ram or weapons)
+lab.enemy.swarm.move,小さな体で群れになって追ってくる,Small bodies that chase you in packs
+lab.enemy.swarm.kill,HP を削る,Wear down its HP
+lab.enemy.darter.move,近づくと構えてから突進し、突進のあとしばらく止まる,Winds up when close then dashes and stops for a while
+lab.enemy.darter.kill,HP を削る。止まっている間が狙いどき,Wear down its HP. Strike while it is stopped
+lab.enemy.armored.move,硬い装甲で追ってくる,Chases you behind heavy armor
+lab.enemy.armored.kill,攻撃力が装甲以上なら貫ける。背面に当てると必ずクリティカル,Pierce it when your attack meets its armor. Hits on its back always crit
+lab.enemy.splitter.move,経験値が詰まった体で機体を追う。生きている間は増えない,Chases the ship with a body full of experience. It does not multiply while alive
+lab.enemy.splitter.kill,倒すと経験値をその場に全部落とし、小さく速い分裂体2体に分かれる,Defeating it drops all its experience on the spot and splits it into two small fast splitlings
+lab.enemy.splitling.move,小さく速い体で追ってくる。それ以上は分かれない,A small fast body that chases you. It does not split further
+lab.enemy.splitling.kill,HP を削る,Wear down its HP
+lab.enemy.gunner.move,距離を保って回り込み、光ってから弾を撃つ,Keeps its distance and circles then fires after a flash
+lab.enemy.gunner.kill,HP を削る,Wear down its HP
+lab.enemy.missile.move,遠い距離を保ち、予告のあとホーミングミサイルを撃つ,Keeps far away and fires homing missiles after a warning
+lab.enemy.missile.kill,HP を削る,Wear down its HP
+lab.enemy.titan.move,大きな体で追ってくる。大きさは毎回変わる,A large chaser whose size varies each time
+lab.enemy.titan.kill,HP が多い。何度も貫く,High HP. Pierce it many times
+lab.enemy.battleship.move,追ってきて、予告のあと扇状に弾を撃つ,Chases you and fires a fan of bullets after a warning
+lab.enemy.battleship.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
+lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づくと爆発する。少しすると消える,Flies straight in its spawn direction and explodes near you then fades
+lab.enemy.rocket.kill,HP を削る,Wear down its HP
+lab.enemy.bomber.move,追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する,Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice
+lab.enemy.bomber.kill,明滅し終わる前に貫けば、爆発させずに倒せる,Pierce it before it finishes blinking to defeat it without an explosion
+lab.enemy.biter.move,全ステージ共通の雑魚（見た目はステージごと。うみへび座のステージではヘビ）。追ってきて、近づくと一瞬光ってから、その場で小さく噛みつく。弾は出さない,"A small fry shared by every stage (its look changes per stage; a snake in the Hydra stage). Chases you and when close flashes for an instant, then snaps right where it is. It never shoots"
+lab.enemy.biter.kill,普通に倒せる。群れの中で止まらずに駆け抜ける,Falls to ordinary attacks. Keep moving through the crowd instead of stopping
+lab.enemy.volatile.move,追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む（連鎖する）,Chases you. Explodes shortly after defeat and catches enemies and you (chains)
+lab.enemy.volatile.kill,HP を削る。倒したら爆発から離れる,Wear down its HP then get clear of the blast
+lab.enemy.beamer.move,距離を保ち、止まって砲口に光を集めてからビームを撃つ,Keeps its distance and stops to charge its muzzle before firing a beam
+lab.enemy.beamer.kill,HP を削る,Wear down its HP
+lab.enemy.pulser.move,距離を保ち、止まって届く距離の短い輪を1枚出す,Keeps its distance and stops to emit one short-range ring
+lab.enemy.pulser.kill,HP を削る,Wear down its HP
+lab.enemy.spreader.move,追ってきて、予告のあと扇状に弾をばらまく,Chases you and sprays a fan of bullets after a warning
+lab.enemy.spreader.kill,HP を削る,Wear down its HP
+lab.enemy.pump.move,機体を追いながら周りの敵を吸い込んで膨らむ。満タンになると構え、圧縮した敵を巨大な弾にして撃つ。弾は直進して一定の距離で破裂する,Chases the ship while swallowing nearby enemies and swelling. When full it braces and fires them as one huge shell that bursts after a set distance
+lab.enemy.pump.kill,HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる,Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst
+lab.enemy.telescope.move,距離を保ち、機体のいる方を左右に振って探すサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると一瞬溜めてから、レンズから機体の方へ太いレーザーを撃つ。光とレーザーは隕石で遮られる,Keeps its distance and swings a searchlight band back and forth around where the ship is. Inside the band it tracks you and locks on as the band narrows and turns red. Once the lock is full it charges for a moment then fires a thick laser at the ship. Rocks block both the light and the laser
+lab.enemy.telescope.kill,HP を削る。速く横切れば狙いは溜まらない,Wear down its HP. Crossing the band quickly barely builds the lock
+lab.enemy.triangle.move,3つの星の間に光の膜を張り、膜の中の砲台が距離を保って撃ってくる。膜に触れると被弾する,A turret inside a light membrane between three stars keeps its distance and shoots. Touching the membrane hurts
+lab.enemy.triangle.kill,先に頂点の星を1つ倒して膜を消し、次に中の砲台を倒す,First destroy a corner star to drop the membrane then destroy the turret inside
+lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と一緒に動く,A corner star of the Southern Triangle that moves with the core
+lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
+lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾で弾を反射する,Approaches while slowly turning toward you. Its front shield reflects shots
+lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
+lab.enemy.ruler.move,1体で現れ、二つに分かれて機体を左右（上下）から挟む位置へ展開する。照射の向きを予告してから、それぞれ長いビームを出し続ける。ビームは発射元につながり、壁になって移動を止める,Appears as one ruler then splits in two and spreads to flank the ship. After marking where it will fire each half keeps a long beam on. The beams stay tied to their emitters and act as walls that stop movement
+lab.enemy.ruler.kill,分かれた2体をそれぞれ普通に倒す。倒した側のビームが止まり、そちらへ動けるようになる,Defeat each half normally. Its beam stops and that side opens up
+lab.enemy.crow.move,4羽の群れで隊列を組み、機体を追わずに一直線に戦場を横断する。横を通り過ぎた経験値を1羽ずつ拾い、画面の外へ持ち去る。攻撃はしない,Four birds fly in formation straight across the field without chasing. Each picks up experience it passes on either side and carries it off screen. They never attack
+lab.enemy.crow.kill,1羽ずつもろく、普通に当てれば倒れる。退場する前に倒すと、その1羽が回収した経験値をその場にまとめて落とす,Each bird is fragile and falls to any hit. Defeat one before it leaves to drop the experience it collected in one spot
+lab.enemy.lynx.move,距離を保ち、潰れた弧の3本の爪痕の斬撃を左右交互に飛ばし続ける。斬撃は真ん中の少し先から外側へ伸び、外側で本体の方へ反り上がる。機体の方へ形を保って直進し、追尾しない,Keeps its distance and keeps hurling slashes of three flattened claw arcs on alternating sides. Each reaches just past the middle and sweeps outward curling back toward the lynx. They fly straight toward the ship keeping their shape without homing
+lab.enemy.lynx.kill,内側の端を左右交互によけながら真ん中を抜けて近づき、本体を普通に倒す。外側からは回り込みにくい,Weave past the inner tips through the middle to close in and defeat the body normally. Going around the outside is hard
+lab.enemy.reticle.move,近くのぼうえんきょう座に付き従う支援機。ぼうえんきょう座と機体の間で視線を遮る小隕石に照準を出し、ビームで壊す。機体は直接攻撃しない。支援先がいなければ退却する,A support craft that follows the nearest telescope. It marks small rocks that block the telescope’s line of sight to the ship and breaks them with a beam. It never attacks the ship directly and retreats when it has no telescope to support
+lab.enemy.reticle.kill,本体を普通に倒して岩陰を守るか、先にぼうえんきょう座を倒して連携を崩す,Defeat it normally to keep your cover or take down the telescope first to break up the pair
+lab.enemy.cross.move,動き回り、機体と縦か横にそろう位置で止まって、予告してから十字のレーザーを撃つ,Roams then stops where it lines up with the ship vertically or horizontally and fires a cross of lasers after a telegraph
+lab.enemy.cross.kill,HP を削る。止まって構えている間が狙い目,Wear down its HP. It is open while it stops to charge
+lab.enemy.clock.move,長針と短針が刃として回り続ける。2本の速さが違う,Its long and short hands spin as blades at different speeds
+lab.enemy.clock.kill,針の隙間から本体を狙う,Hit the body through the gap between the hands
+lab.enemy.dolphin.move,距離を保ち、構えて撃つ向きを予告してから、機体の方へ数層の弧の大きな扇の波動を撃つ。当たるのは先頭の1枚だけで、機体にもほかの敵にも当たる。追尾しない,Keeps its distance and after marking its aim fires a big fan of layered arcs toward the ship. Only the leading arc hits and it hits the ship and other enemies alike. It does not home
+lab.enemy.dolphin.kill,群れを射線に挟んで撃たせ、自分は離れる。本体は普通に倒す,Put a crowd in its line of fire then slip away. Defeat the body normally
+lab.enemy.crab.move,近づいてハサミを開き、前方を挟む,Approaches and opens its claws then pinches in front
+lab.enemy.crab.kill,背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる,Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front
+lab.enemy.marlin.move,距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く,Keeps its distance then flashes and darts past you spraying both sides
+lab.enemy.marlin.kill,HP を削る,Wear down its HP
+lab.enemy.auriga.move,大きく旋回しながら走り、車輪の跡が燃えて残る,Drives in wide turns leaving burning wheel tracks
+lab.enemy.auriga.kill,HP を削る,Wear down its HP
+lab.enemy.corona.move,周りを星の輪が回り、ときどき輪を広げて押し出す,A ring of stars circles it and periodically expands to push outward
+lab.enemy.corona.kill,回る星に体当たりすると弾かれる。隙間を通して本体を貫く。星は武器で壊せる,Ramming a ring star bounces you. Pierce the body through a gap. Weapons break the stars
+lab.enemy.corona_star.move,みなみのかんむり座の周りを回る星,A star circling the Southern Crown
+lab.enemy.corona_star.kill,体当たりは弾かれる。武器・波動で壊せる,Rams bounce off. Weapons and waves break it
+lab.enemy.phoenix.move,機体の周りを旋回し、飛んだ跡に炎を残す,Circles you and leaves a trail of fire
+lab.enemy.phoenix.kill,HP を削る。倒すと周りを焼き払い、近いと自分も焼かれる,Wear down its HP. Defeat scorches the area and burns you if close
+lab.enemy.cepheus.move,距離を保ち、専用の兵を召喚して隊列を組ませる。時間とともに3体の横一列→5体の扇形→7体の千鳥の二重隊列へ増援し、そのときだけ組み直す。兵は配置で止まって細長い光弾を撃つ,Keeps its distance and summons soldiers into formation. Reinforcements grow it from a line of three to a fan of five to a staggered double rank of seven and it only reforms then. Soldiers hold their posts and fire long light bolts
+lab.enemy.cepheus.kill,隊列を抜けて王を倒すと、召喚と兵の攻撃が止まり、残った兵は撃ち合って崩れる,Break through the ranks and defeat the king. Summoning and the soldiers’ attacks stop and the rest turn on each other and fall apart
+lab.enemy.cepheus_soldier.move,ケフェウス座が召喚する兵。王が決めた隊列の位置で止まり、王の号令で決まった向きへ細長い光弾を撃つ。追尾しない,A soldier summoned by Cepheus. It holds the post the king assigns and fires long light bolts in a fixed direction on the king’s command. They do not home
+lab.enemy.cepheus_soldier.kill,普通に倒せる。倒した穴は次の増援まで空く,Falls to ordinary attacks. The gap stays until the next reinforcement
+lab.enemy.aquarius.move,瓶の口を機体へ向けたまま近づき、止まって溜めながら通り道に水の流れを流して予告し、先へ行くほど広がる水のビームを全方位へ6本、一斉に照射する,"Closes in with its jar aimed at the ship, stops and charges while ripples flow along the beam paths, then fires six widening water beams in every direction at once"
+lab.enemy.aquarius.kill,HP を削る,Wear down its HP
+lab.enemy.aquila.move,大きく旋回して飛び、通り道に雷を落とす,Flies in wide turns dropping lightning along its path
+lab.enemy.aquila.kill,HP を削る,Wear down its HP
+lab.enemy.meteor.move,固い障害物。止まっているものと、ゆっくり漂うものがある,A solid obstacle. Some stay still and some drift slowly
+lab.enemy.meteor.kill,攻撃力が装甲以上の体当たりで砕く。普段の速さで触れると跳ね返る,Smash it with a ram that meets its armor. Touching it at normal speed bounces you
+lab.enemy.iron.move,動かない固い障害物（鉄のがれき）,An immovable solid obstacle (iron debris)
+lab.enemy.iron.kill,装甲がとても高い。十分な攻撃力の体当たりで割れる,Very high armor. A strong enough ram breaks it
+lab.enemy.saw.move,その場で回る丸鋸,A saw blade spinning in place
+lab.enemy.saw.kill,壊すのではなく、触れて飛ばす。進んでいた向きへ飛び、先の敵を巻き込む,Launch it by touching it rather than destroying it. It flies your way and cuts through enemies
+lab.enemy.hydra_bite.move,うみへび座の首。首を引いてから前へ伸びて噛みつく。3回続けて噛むこともある,A Hydra neck. Pulls back then lunges to bite. Sometimes bites three times in a row
+lab.enemy.hydra_bite.kill,頭を削って落とす（本体の体力も減る）。落ちた頭は生え直す,Wear the head down (also hurts the body). Lost heads regrow
+lab.enemy.hydra_vortex.move,うみへび座の首。渦を巻く息で、引き寄せる渦を置く,A Hydra neck. Breathes out a pulling vortex
+lab.enemy.hydra_vortex.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_debris.move,うみへび座の首。瓦礫を吐いて漂わせる。瓦礫を固めて投げることもある,A Hydra neck. Spits drifting debris or throws a packed lump
+lab.enemy.hydra_debris.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_beam.move,うみへび座の首。光を溜めて太いビームで薙ぐ。細いビームを3回撃つこともある,A Hydra neck. Charges then sweeps a thick beam or fires three thin beams
+lab.enemy.hydra_beam.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_homing.move,うみへび座の首。ホーミング弾を吐く。弾の輪を浮かべて放つこともある,A Hydra neck. Spits homing shots or floats a ring of bullets and releases it
+lab.enemy.hydra_homing.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
+lab.enemy.hydra_immortal.move,うみへび座の不死の首。むき出しの間、周りへ衝撃を出して暴れる,The immortal Hydra neck. Lashes out with shockwaves while exposed
+lab.enemy.hydra_immortal.kill,むき出しの数秒のうちに貫くと本体に大ダメージ。火は効かない,Pierce it within the exposed seconds for heavy body damage. Fire has no effect
+lab.enemy.hydra_rubble.move,うみへび座が吐いた瓦礫。漂って、少しすると消える,Debris spat by the Hydra. Drifts and vanishes after a while
+lab.enemy.hydra_rubble.kill,体当たりは弾かれる。武器で壊せる,Rams bounce off. Weapons break it
+lab.enemy.provisional.move,機体を直接追い、予告のあと扇状に弾を撃つ,Chases you directly and fires a fan of bullets after a warning
+lab.enemy.provisional.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
+lab.enemy.hydra.move,その場で構え、機体が離れると泳いで近づく。首（3〜9本）がそれぞれ攻撃し、羅針盤で予告して強めの技を出す,Holds its ground and swims closer when you are far. Each neck (3 to 9) attacks and its compass signals strong techniques
+lab.enemy.hydra.kill,本体と首はすり抜ける。頭だけにダメージが通る。全部の頭を落とすと出る不死の首を貫くと大ダメージ,The body and necks are intangible. Only heads take damage. Pierce the immortal neck exposed after all heads fall
+lab.ui.freehand,自由に描く,Freehand
+lab.ui.edit_points,点を編集,Edit points
+lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points
+lab.ui.freehand_hint,クリックで描き始め・もう一度クリックで確定（ドラッグ描画も可）,Click to start and click again to finish; dragging also works
+lab.ui.drawing_route,描画中：クリックで確定・右クリック／Escで取り消し,Drawing: click to finish; right-click or Esc to cancel
+lab.ui.collapse_bottom,下のバー全体を折りたたむ,Collapse the entire bottom bar
+lab.ui.expand_bottom,下のバーを開く,Expand the bottom bar

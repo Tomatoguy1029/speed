@@ -1,36 +1,41 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://cofap4b6byj5s"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"pump"
-display_name = "ポンプ座"
 rank = 3
 radius = 26.0
 hp = 60.0
 armor = 8.0
-speed = 80.0
+speed = 95.0
 accel = 1.5
 turn = 2.0
 xp = 12.0
 color = Color(0.72, 0.55, 1, 1)
 shape = &"orb"
 behavior = &"pump"
-max_alive = 2
-ranged = false
-size_var = false
-weak_arc = 0.0
-gate = &"mouth"
 params = {
-"keep": 380.0,
-"fire_interval": 4.0,
-"suck_time": 2.0,
-"pull_radius": 420.0,
-"pull": 900.0,
-"wave_arc": 0.55,
-"wave_radius": 520.0,
-"wave_speed": 900.0,
-"wave_width": 40.0,
-"bullet_dmg": 12.0
+"bullet_dmg": 22.0,
+"burst_radius": 150.0,
+"grow": 0.9,
+"lock_time": 0.5,
+"pull": 520.0,
+"pull_radius": 360.0,
+"pull_spin": 9.0,
+"recover": 1.2,
+"release_base": 8,
+"release_dmg": 1.2,
+"release_per": 1.0,
+"release_radius": 150.0,
+"release_speed": 900.0,
+"shell_r": 26.0,
+"shell_range": 640.0,
+"shell_speed": 520.0,
+"store_max": 20,
+"swallow_interval": 0.12,
+"swallow_reach": 30.0,
+"telegraph": 1.4
 }
+id = &"pump"
+display_name = "ポンプ座"

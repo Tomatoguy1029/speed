@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="HeroDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="HeroDef" format=3 uid="uid://bhod0qqug7hc7"]
 
-[ext_resource type="Script" path="res://scripts/data_types/hero_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://55mca4eirddc" path="res://scripts/data_types/hero_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -12,10 +12,10 @@ links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 0, 1, 4, 4, 5, 2, 6, 3, 7, 0, 8)
 cooldown = 50.0
 duration = 10.0
 params = {
-"interval": 0.35,
-"fall_time": 0.6,
-"radius": 110.0,
-"power": 3.0,
+"burn_power": 0.3,
 "burn_time": 3.0,
-"burn_power": 0.3
+"fall_time": 0.6,
+"interval": 0.35,
+"power": 3.0,
+"radius": 110.0
 }

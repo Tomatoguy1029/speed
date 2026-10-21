@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://d2eiulmloa5u7"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"cepheus"
-display_name = "ケフェウス座"
 rank = 7
 radius = 50.0
 hp = 1100.0
@@ -17,14 +15,17 @@ xp = 110.0
 color = Color(0.75, 0.6, 1, 1)
 shape = &"hex"
 behavior = &"cepheus"
-max_alive = 1
-ranged = true
-size_var = false
-weak_arc = 0.0
-gate = &""
 params = {
-"keep": 560.0,
-"fire_interval": 8.0,
-"telegraph": 1.5,
-"command_radius": 1200.0
+"fan_radius": 190.0,
+"fan_step": 0.42,
+"fire_interval": 0.8,
+"keep": 620.0,
+"mutiny_time": 2.2,
+"reinforce_interval": 9.0,
+"row_far": 230.0,
+"row_near": 120.0,
+"spacing": 120.0,
+"summon_time": 0.9
 }
+id = &"cepheus"
+display_name = "ケフェウス座"

@@ -1,11 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://b0vq1t4d740hj"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"triangle"
-display_name = "みなみのさんかく座"
 rank = 3
 radius = 22.0
 hp = 40.0
@@ -17,15 +15,18 @@ xp = 14.0
 color = Color(0.7, 0.95, 0.8, 1)
 shape = &"orb"
 behavior = &"triangle"
-max_alive = 2
-ranged = false
-size_var = false
-weak_arc = 0.0
 gate = &"membrane"
 params = {
+"bullet_dmg": 10.0,
+"bullet_speed": 460.0,
+"fire_interval": 2.6,
+"keep": 420.0,
 "span": 150.0,
 "spin": 0.5,
-"wall_width": 10.0,
+"spread": 0.3,
 "telegraph": 0.8,
-"bullet_dmg": 10.0
+"volley": 3,
+"wall_width": 10.0
 }
+id = &"triangle"
+display_name = "みなみのさんかく座"

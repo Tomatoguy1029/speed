@@ -1,27 +1,18 @@
-[gd_resource type="Resource" script_class="EnemyDef" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://bs5qxyts7hiyk"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
-id = &"hydra_rubble"
-display_name = "うみへび座の瓦礫"
-rank = 0
 radius = 22.0
 hp = 30.0
-armor = 0.0
-speed = 0.0
 accel = 1.0
-turn = 0.0
-xp = 0.0
 color = Color(0.55, 0.52, 0.5, 1)
 shape = &"hex"
 behavior = &"drift"
-max_alive = 0
-ranged = false
-size_var = false
-weak_arc = 0.0
 gate = &"guard"
 params = {
 "life": 6.0
 }
+id = &"hydra_rubble"
+display_name = "うみへび座の瓦礫"
