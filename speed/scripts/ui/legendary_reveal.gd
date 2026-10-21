@@ -7,6 +7,13 @@ const DESIGN := Vector2(640, 360)
 @export var light_color := Color("#e2b96b")
 @export_range(0.0, 1.0) var light_strength := 0.85
 @export_range(0.0, 1.0) var background_dim := 0.9
+@export_group("黒い影と後光")
+@export_range(0.0, 3.0, 0.05) var radiance_strength := 1.6
+@export_range(0.0, 1.0, 0.05) var shadow_strength := 1.0
+@export_range(0.0, 0.1, 0.005) var noise_strength := 0.025
+## 出現区間のどこから影を解き、どこで姿を見せ終わるか。
+@export_range(0.0, 1.0, 0.05) var shadow_release_start := 0.3
+@export_range(0.0, 1.0, 0.05) var shadow_release_end := 1.0
 
 var _definition: LegendaryModuleDef
 var _progress := 0.0
@@ -16,6 +23,8 @@ var _source := DESIGN / 2.0
 var _target := DESIGN / 2.0
 var _canvas := Control.new()
 var _image := TextureRect.new()
+var _aura := TextureRect.new()
+var _occlusion := TextureRect.new()
 var _name := Label.new()
 var _light := ColorRect.new()
 var _light_material := ShaderMaterial.new()
@@ -49,7 +58,25 @@ func _ready() -> void:
 		var rust := ShaderMaterial.new()
 		rust.shader = preload("res://shaders/legendary_placeholder_rust.gdshader")
 		_image.material = rust
+	_aura.texture = _image.texture
+	_aura.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_aura.size = _image.size
+	_aura.pivot_offset = _image.pivot_offset
+	_aura.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var aura_material := ShaderMaterial.new()
+	aura_material.shader = preload("res://shaders/legendary_radiance.gdshader")
+	_aura.material = aura_material
+	_canvas.add_child(_aura)
 	_canvas.add_child(_image)
+	_occlusion.texture = _image.texture
+	_occlusion.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_occlusion.size = _image.size
+	_occlusion.pivot_offset = _image.pivot_offset
+	_occlusion.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shadow_material := ShaderMaterial.new()
+	shadow_material.shader = preload("res://shaders/legendary_occlusion.gdshader")
+	_occlusion.material = shadow_material
+	_canvas.add_child(_occlusion)
 	_name.text = _definition.get_display_name()
 	_name.position = Vector2(55, 262)
 	_name.size = Vector2(530, 45)
@@ -89,6 +116,20 @@ func set_progress(value: float) -> void:
 	_image.position = center - _image.size / 2.0
 	_image.scale = Vector2.ONE * swell
 	_image.modulate.a = smoothstep(_appear * 0.3, _appear * 0.9, _progress) * (1.0 - taking)
+	var exposure := smoothstep(_appear * shadow_release_start,
+		_appear * maxf(shadow_release_start + 0.01, shadow_release_end), _progress)
+	for layer in [_aura, _occlusion]:
+		layer.position = _image.position
+		layer.scale = _image.scale
+		layer.modulate.a = smoothstep(_appear * 0.12, _appear * 0.55, _progress) * (1.0 - taking)
+	var aura_material := _aura.material as ShaderMaterial
+	aura_material.set_shader_parameter("intensity", radiance_strength)
+	aura_material.set_shader_parameter("exposure", exposure)
+	aura_material.set_shader_parameter("radiance_color", light_color.lightened(0.25))
+	var shadow_material := _occlusion.material as ShaderMaterial
+	shadow_material.set_shader_parameter("exposure", exposure)
+	shadow_material.set_shader_parameter("shadow_strength", shadow_strength)
+	shadow_material.set_shader_parameter("grain_strength", noise_strength)
 	if _image.material != null:
 		(_image.material as ShaderMaterial).set_shader_parameter("reveal", arrival)
 	_name.modulate.a = smoothstep(_appear * 0.85, _appear + 0.07, _progress) * (1.0 - taking)
@@ -96,12 +137,13 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("intensity", light_strength * arrival * (1.0 - taking))
 	_light_material.set_shader_parameter("light_color", light_color)
 	_light_material.set_shader_parameter("arrival", arrival)
+	_light_material.set_shader_parameter("exposure", exposure)
 	queue_redraw()
 
 func _draw() -> void:
 	var arrival := smoothstep(_appear * 0.18, _appear, _progress)
 	var taking := smoothstep(_collect, 1.0, _progress)
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.012, 0.018, 0.03, background_dim * arrival * (1.0 - taking)))
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.012, 0.018, 0.03, background_dim * smoothstep(0.0, _appear * 0.28, _progress) * (1.0 - taking)))
 	var factor := minf(size.x / DESIGN.x, size.y / DESIGN.y)
 	draw_set_transform((size - DESIGN * factor) / 2.0, 0, Vector2.ONE * factor)
 	# 仮部品を囲む少量の角形の光。乱数や世界の更新に依存しない。

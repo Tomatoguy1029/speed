@@ -13,8 +13,12 @@ float grain(vec2 p) {
 	return mix(mix(hash(cell), hash(cell + vec2(1.0, 0.0)), f.x),
 		mix(hash(cell + vec2(0.0, 1.0)), hash(cell + vec2(1.0)), f.x), f.y);
 }
+varying vec4 item_tint;
+void vertex() {
+	item_tint = COLOR;
+}
 void fragment() {
-	vec4 tint = COLOR;
+	vec4 tint = item_tint;
 	vec4 source = texture(TEXTURE, UV);
 	vec2 px = TEXTURE_PIXEL_SIZE;
 	vec2 pixel = floor(UV / px);
