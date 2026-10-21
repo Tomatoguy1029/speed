@@ -196,11 +196,11 @@ const PARAMS_DOCS := {
 ## 単位：単位（距離）
 @export var radius: float
 ## HP の属性
-## 星1〜5の敵の HP を、星の標準の体当たりの回数から、柔らかめは1回少なく（最低1回）、硬めは1回多くする（base_hp）。
+## config.rank_hits の対象の敵の HP を、星の標準の体当たりの回数から、柔らかめは1回少なく（最低1回）、硬めは1回多くする（base_hp）。星6〜10は試遊調整用の暫定対象。
 ## 単位：-1 柔らかめ・0 標準・1 硬め
 @export_enum("柔らかめ:-1", "標準:0", "硬め:1") var toughness: int = 0
 ## HP
-## 星のない敵と星6以上の敵の最大 HP（星1〜5の敵は、星と HP の属性から決める）。大きさの2乗に比例する。
+## config.rank_hits の対象外の敵の最大 HP。対象の敵は星と HP の属性から決める（星6〜10は暫定）。大きさの2乗に比例する。
 ## 単位：HP
 @export var hp: float
 ## 装甲
@@ -275,8 +275,9 @@ const PARAMS_DOCS := {
 ## 単位：文字
 @export var display_name: String
 
-## 標準の大きさのときの最大 HP。星1〜5の敵は、星の標準の体当たりの回数（config.rank_hits）に HP の属性を足した回数 n で、
-## 素の体当たり（config.base_attack）n 回でちょうど倒れる HP の真ん中（攻撃力 ×（n − 1）＋ 攻撃力 ÷ 2）。それ以外は hp。
+## 標準の大きさのときの最大 HP。config.rank_hits の対象の敵は、星の標準の体当たりの回数に HP の属性を足した回数 n で、
+## 素の体当たり（config.base_attack）が装甲を通る場合に n 回で倒れる HP の真ん中（攻撃力 ×（n − 1）＋ 攻撃力 ÷ 2）。それ以外は hp。
+## 星6〜10への適用は試遊調整用の暫定設定（仕様書11.1）。
 func base_hp(cfg: GameConfig) -> float:
 	if rank >= 1 and rank <= cfg.rank_hits.size():
 		var hits := maxi(1, cfg.rank_hits[rank - 1] + toughness)
