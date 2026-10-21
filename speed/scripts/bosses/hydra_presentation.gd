@@ -2,6 +2,7 @@
 extends Node2D
 
 @export var warning_color := Color("#ffd16c")
+@export var locked_color := Color("#fff2b0")
 @export var attack_color := Color("#ff765c")
 @export var recovery_color := Color("#8bf5c0")
 @export var hit_color := Color("#ffffff")
@@ -40,6 +41,8 @@ func on_hydra_event(event: Dictionary) -> void:
 			if animations.has_animation(clip):
 				animations.play(clip)
 				animations.advance(0.0)
+		&"target_locked":
+			if slots.has(-1): slots[-1].locked = true
 		&"hit":
 			flashes.append({"position": event.position, "life": flash_duration, "cue": cue})
 			if animations.has_animation(&"hit"):
@@ -87,10 +90,11 @@ func _draw() -> void:
 		if index < 0 and event.cue == &"warning_started":
 			var technique: StringName = event.technique
 			if technique == &"north":
-				for neck in hydra.necks:
-					if hydra._alive(neck):
-						var u := Vector2.from_angle(neck.base_angle + hydra.table.facing[hydra.body])
-						draw_line(anchor.origin + u * radius, anchor.origin + u * (hydra.table.r[hydra.body] + float(hydra.def.params.bite_reach)), Color(color, 0.5), line_width, true)
+				for target in hydra.presentation_targets():
+					var marker: Color = locked_color if target.locked else warning_color
+					draw_line(target.from, target.target, Color(marker, 0.55), line_width, true)
+					draw_arc(target.target, target.radius, 0.0, TAU, 40, marker, line_width, true)
+					draw_circle(target.target, line_width * 2.0, marker)
 			elif technique in [&"east", &"west"]:
 				for neck in hydra.necks:
 					if neck.kind == &"beam" and hydra._alive(neck):
