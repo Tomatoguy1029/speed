@@ -1,10 +1,10 @@
-## うみへび座（仕様書 12.3）。本体と、体力が減るほど増える首（3〜9本）と、真ん中の不死の首。
+## うみへび座（仕様書 12.3）。本体と、段階が進むほど増える首（3〜9本）と、真ん中の不死の首。
 ## 設計書 6.1 の3層で作る。
-##   形態：LimboHSM（形態1つ。首の本数は体力で増える）
+##   形態：LimboHSM。首全滅 → 不死首への突進で 3 → 5 → 7 → 9 本へ進む。
 ##   判断：形態の BTState が持つ Behavior Tree（強めの技を出せるなら、使える技のタイムラインを再生する）
 ##   攻撃：強めの技は AnimationPlayer のタイムライン（north・east・south・west）。普段の首の攻撃は首ごとの動き
 ##
-## 本体と首は、体当たりも武器もすり抜ける。ダメージが通るのは頭だけで、頭に与えたダメージの一部が本体の体力を削る。
+## 本体と首はすり抜け、頭だけを攻撃できる。本体の HP バーは残りの段階を示す。
 ## 頭は敵の表の1行（部位。種類ごとの敵の定義 hydra_<首の種類>）で、位置はこの役者が決める。
 ## 首の節は FABRIK で本体と頭をつなぎ、この役者が描く。
 extends BossActor
@@ -50,6 +50,7 @@ const TECH_DIR := {&"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
+@onready var decision: BTState = $LimboHSM/Form1
 
 var necks: Array[Neck] = []
 ## 今の段階の首の本数
@@ -75,6 +76,12 @@ var _needle := -PI / 2.0
 var _rubble: Array[Vector2i] = []
 var _vortex_at := Vector2.ZERO
 var _time := 0.0
+## 世界秒で進む攻めどきと、技別の再使用可能時刻。
+var recovery_t := 0.0
+var _tech_until: Dictionary = {}
+var _cooldown_scale := 1.0
+var last_tech: StringName = &""
+var last_tech_result: StringName = &""
 
 func _on_bound() -> void:
 	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
@@ -104,15 +111,13 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		return
 	_time += dt
 	_move(dt)
-	var frac := table.hp[body] / maxf(table.max_hp[body], 1.0)
-	var want := 3 if frac > 0.75 else (5 if frac > 0.5 else (7 if frac > 0.25 else 9))
-	if want > count:
-		_set_count(want)
+	recovery_t = maxf(0.0, recovery_t - dt)
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
 	_tick_immortal(dt)
 	_tech_cd -= dt
 	_spin_t -= dt
+	_update_blackboard()
 	hsm.update(dt)
 	if manager.projectiles.director != null:
 		manager.projectiles.lab_context = manager.projectiles.director.token("boss:" + str(table.id[body]))
@@ -120,8 +125,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		timeline.advance(dt)
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
-			timeline.stop()
-			tech_end()
+			interrupt_tech()
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and not run_state.boss_dead:
@@ -197,35 +201,30 @@ func on_part_defeated(row: int) -> void:
 	if immortal_row == row and immortal_id == table.id[row]:
 		_tick_immortal(0.0)
 
-## 首1本の更新：頭へのダメージを本体へ移し、頭が落ちたら生え直しを待つ。頭の位置を決め、首でつなぐ。
+## 首1本の更新。露出中は生え直しを止める。
 func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	var p: Dictionary = def.params
 	if neck.row >= 0 and not _alive(neck):
 		_on_head_lost(neck)
 	if neck.row < 0:
-		if not neck.burned:
+		if not neck.burned and exposed_t <= 0.0:
 			neck.regrow -= dt
 			if neck.regrow <= 0.0:
 				_grow(neck)
 		neck.length = maxf(0.0, neck.length - float(p.neck_rest) * dt)
 	else:
-		var hp := table.hp[neck.row]
-		if hp < neck.head_hp:
-			table.hp[body] -= (neck.head_hp - hp) * float(p.head_share)
-			table.flash[body] = 0.08
-		neck.head_hp = hp
+		neck.head_hp = table.hp[neck.row]
 		_attack(neck, k, dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
 	if neck.row >= 0 or neck.length > 0.0:
 		_follow_neck(neck, dt)
 
-## 頭が落ちた：残りの HP ぶんを本体へ移し、首の残骸を破片にして飛ばす。生え直しの時間を決める。
+## 頭が落ちた：首の残骸を破片にして飛ばし、生え直す時間を決める。
 ## 1本の線でまとめて落とした本数が多いほど、生え直しが少しだけ遅くなる。火で落ちた頭は次の段階まで生え直さない。
 func _on_head_lost(neck: Neck) -> void:
 	var p: Dictionary = def.params
 	var head := neck.row
-	table.hp[body] -= maxf(0.0, neck.head_hp) * float(p.head_share)
 	neck.burned = run_state.world_time - table.fire_hit[head] < 0.5
 	var n := 1
 	if run_state.tracing:
@@ -248,7 +247,7 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 
 # ── 不死の首 ──────────────────────────────────────────────────────
 
-## 普段の頭が全部落ちると、真ん中の不死の首がむき出しになる。むき出しの間に頭を貫くと本体に大きなダメージ。
+## 普段の頭を全部落とすと不死の首が露出し、貫くと次の段階へ進む。
 func _tick_immortal(dt: float) -> void:
 	var p: Dictionary = def.params
 	if exposed_t <= 0.0:
@@ -270,21 +269,31 @@ func _tick_immortal(dt: float) -> void:
 			1.2, _time, dt, p)
 		_immortal_attack(dt)
 	if lost or exposed_t <= 0.0:
-		if lost:
-			table.hp[body] -= table.max_hp[body] * float(p.immortal_dmg)
-			table.flash[body] = 0.3
-			run_state.emit(&"boss_hit", {"pos": table.pos[body]})
+		_finish_exposure(lost)
+
+func _finish_exposure(pierced: bool) -> void:
+	var row := immortal_row
+	immortal_row = -1
+	exposed_t = 0.0
+	_expose_cd = 3.0
+	if row >= 0 and manager.enemies.is_same(row, immortal_id) and table.dead[row] == 0:
+		manager.enemies.mark_dead(row)
+	if pierced:
+		interrupt_tech()
+		run_state.emit(&"boss_hit", {"pos": table.pos[body]})
+		if count == 9:
+			table.hp[body] = 0.0
 		else:
-			manager.enemies.mark_dead(immortal_row)
-		exposed_t = 0.0
-		_expose_cd = 3.0
-		immortal_row = -1
-		# 焼いた首は段階が変わるまで戻らない。焼いていない首だけ生え直す。
+			_set_count(count + 2)
+			table.hp[body] = table.max_hp[body] * (11.0 - count) / 8.0
+			table.flash[body] = 0.3
+	else:
 		for neck in necks:
 			if not neck.burned:
 				neck.regrow = minf(neck.regrow, 0.8)
 
 func _expose() -> void:
+	interrupt_tech()
 	var p: Dictionary = def.params
 	exposed_t = float(p.expose_time)
 	var j := manager.enemies.spawn_part(body, manager.enemies.def_of(&"hydra_immortal"), table.pos[body])
@@ -308,6 +317,9 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 		manager.projectiles.lab_context = manager.projectiles.director.token(owner)
 	var aim := (run_state.ship_pos - table.pos[body]).angle()
 	if neck.mode == &"idle":
+		# 旧追尾首は弱点として残す。追尾弾は発射しない。
+		if neck.kind == &"homing" or exposed_t > 0.0 or recovery_t > 0.0:
+			return
 		var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
 		var home := neck.base_angle + table.facing[body] + sway
 		neck.angle = lerp_angle(neck.angle, lerp_angle(home, aim, 0.35), minf(1.0, dt * 2.0))
@@ -355,8 +367,6 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 			_debris(neck, aim, dt)
 		&"beam_a", &"beam_b":
 			_beam(neck, aim, dt)
-		&"homing_a", &"homing_b":
-			_homing(neck, aim, dt)
 		_:
 			neck.mode = &"idle"
 
@@ -477,21 +487,6 @@ func _beam(neck: Neck, aim: float, dt: float) -> void:
 		_release_attack(neck)
 		_end(neck)
 
-## ホーミング弾の首。a：ホーミング弾を4発吐き出す。b：自分の周りに弾を輪のように浮かべ、少しして全部を外へ放つ。
-func _homing(neck: Neck, aim: float, dt: float) -> void:
-	var p: Dictionary = def.params
-	neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 3.0))
-	neck.glow = minf(1.0, neck.t / 0.5)
-	if neck.t < 0.5:
-		return
-	if neck.mode == &"homing_a":
-		for k in 4:
-			manager.projectiles.fire_enemy(neck.row, aim + (k - 1.5) * 0.35, float(p.missile_speed), &"missile",
-				{"bullet_dmg": float(p.missile_dmg), "missile_turn": 2.2})
-	else:
-		manager.projectiles.fire_ring_hold(neck.row, 12, 70.0, 0.9, float(p.ring_speed), float(p.missile_dmg))
-	_end(neck)
-
 ## 首の攻撃の後片付け（頭が落ちたとき）。
 func _release_attack(neck: Neck) -> void:
 	if neck.hazard >= 0:
@@ -510,32 +505,54 @@ func _immortal_attack(dt: float) -> void:
 
 # ── 強めの技（判断の層とタイムラインから呼ばれる） ────────────────────────
 
-## 強めの技を出せるか（判断の層の AttackReady）。
-func attack_ready(attack: StringName) -> bool:
-	return attack == &"technique" and _tech_cd <= 0.0 and not timeline.is_playing() and exposed_t <= 0.0 \
-		and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.engage) * 1.3 and not _available().is_empty() and manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0)
+func _update_blackboard() -> void:
+	var bb := decision.get_bt_instance().get_blackboard()
+	var offset := run_state.ship_pos - table.pos[body]
+	bb.set_var(&"player_distance", offset.length())
+	bb.set_var(&"player_angle", angle_difference(table.facing[body], offset.angle()))
+	var counts: Dictionary = {}
+	for neck in necks:
+		if _alive(neck): counts[neck.kind] = int(counts.get(neck.kind, 0)) + 1
+	bb.set_var(&"live_heads", counts)
+	bb.set_var(&"neck_count", count)
+	bb.set_var(&"exposed", exposed_t > 0.0)
+	bb.set_var(&"recovering", recovery_t > 0.0)
 
-## 使える技から1つ選んで、そのタイムラインを再生する（判断の層の PlayAttack）。
-func start_attack(_attack: StringName) -> void:
-	var list := _available()
-	tech = list[run_state.rng.randi() % list.size()]
+## 条件評価は読み取りだけ。攻撃枠は選択後に取得する。
+func attack_ready(attack: StringName) -> bool:
+	return tech == attack or (TECH_DIR.has(attack) and _tech_cd <= 0.0 and not busy and not timeline.is_playing() \
+		and exposed_t <= 0.0 and recovery_t <= 0.0 and _time >= float(_tech_until.get(attack, 0.0)) and _tech_ok(attack))
+
+func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
+	if busy or not attack_ready(attack):
+		return false
+	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
+		return false
+	tech = attack
+	_cooldown_scale = cooldown_scale
+	last_tech_result = &""
 	busy = true
 	for neck in necks:
 		_release_attack(neck)
 		_end(neck)
 	timeline.play(tech)
 	timeline.advance(0.0)
+	return true
 
 func attack_playing() -> bool:
-	return timeline.is_playing()
+	return busy
 
-## 技に必要な首がそろっている技の一覧。
-func _available() -> Array[StringName]:
-	var out: Array[StringName] = []
-	for name: StringName in TECH_DIR:
-		if _tech_ok(name):
-			out.append(name)
-	return out
+## BT の中断と部位喪失で共通の後片付けを行う。
+func interrupt_tech(attack: StringName = &"") -> void:
+	if attack != &"" and tech != &"" and tech != attack:
+		return
+	if manager.projectiles.director != null:
+		manager.projectiles.director.cancel_attack("boss:" + str(table.id[body]), table.id[body])
+	if not busy:
+		return
+	timeline.stop()
+	last_tech_result = &"interrupted"
+	tech_end()
 
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
@@ -545,7 +562,7 @@ func _tech_ok(name: StringName) -> bool:
 		&"east":
 			return _count(&"debris") >= 1 and _count(&"beam") >= 1
 		&"south":
-			return _count(&"vortex") >= 1 and _count(&"debris") >= 1
+			return false # 渦の壁と隙間の回避難度を決めてから接続する。
 		&"west":
 			return _count(&"beam") >= 2
 	return false
@@ -570,13 +587,23 @@ func tech_compass(name: StringName) -> void:
 
 ## 技の終わり（崩れたときも）。首を普段に戻す。
 func tech_end() -> void:
+	if not busy:
+		return
+	last_tech = tech
+	if last_tech_result == &"":
+		last_tech_result = &"finished"
+	_tech_until[tech] = _time + float(def.params.tech_cd) * _cooldown_scale
+	recovery_t = float(def.params.tech_recovery)
 	for neck in necks:
 		if String(neck.mode).begins_with("tech_"):
 			_release_attack(neck)
 			_end(neck)
 	busy = false
 	tech = &""
-	_tech_cd = float(def.params.tech_cd)
+	_tech_cd = 0.0
+	for r in _rubble:
+		if manager.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
+			manager.enemies.mark_dead(r.x)
 	_rubble.clear()
 
 ## 北：全方向の噛みつき。首を全部引っ込めて体を丸め、全部の首が一斉に外へ伸びて噛みつき、伸びきって止まる。
@@ -592,15 +619,8 @@ func north_burst() -> void:
 			neck.step = 0
 			neck.angle = neck.base_angle + table.facing[body]
 
-## 北の追い撃ち：ホーミング弾の首がいれば、伸びきったところからホーミング弾を吐く。
+## 北の伸びきった首を止め、攻めどきを見せる。
 func north_follow() -> void:
-	var p: Dictionary = def.params
-	for neck in necks:
-		if neck.kind == &"homing" and _alive(neck):
-			var aim := (run_state.ship_pos - _head_pos(neck)).angle()
-			for k in 3:
-				manager.projectiles.fire_enemy(neck.row, aim + (k - 1) * 0.4, float(p.missile_speed), &"missile",
-					{"bullet_dmg": float(p.missile_dmg), "missile_turn": 2.2})
 	for neck in necks:
 		if neck.mode == &"tech_burst":
 			neck.mode = &"tech_hold"

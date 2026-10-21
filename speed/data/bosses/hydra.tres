@@ -22,8 +22,6 @@ params = {
 "engage": 1100.0,
 "expose_time": 4.0,
 "head_hp": 120.0,
-"head_share": 0.8,
-"immortal_dmg": 0.12,
 "lump_dmg": 16.0,
 "lump_r": 26.0,
 "lump_speed": 520.0,
@@ -45,6 +43,7 @@ params = {
 "shard_speed": 420.0,
 "shock_radius": 240.0,
 "tech_cd": 14.0,
+"tech_recovery": 1.5,
 "vortex_life": 3.5,
 "vortex_pull": 1800.0,
 "vortex_radius": 300.0
