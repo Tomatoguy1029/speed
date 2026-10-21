@@ -5,15 +5,16 @@ extends Control
 
 const DESIGN := Vector2(640, 360)
 @export var light_color := Color("#e2b96b")
-@export_range(0.0, 1.0) var light_strength := 0.85
-@export_range(0.0, 1.0) var background_dim := 0.9
-@export_group("白金の核と光芒")
-@export_range(0.0, 4.0, 0.05) var white_core_strength := 1.8
-@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 1.25
-@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 1.1
-@export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 1.0
+@export_range(0.0, 1.0) var light_strength := 0.65
+@export_range(0.0, 1.0) var background_dim := 0.97
+@export_group("補助の後光")
+@export_range(0.0, 4.0, 0.05) var white_core_strength := 0.18
+@export_range(0.0, 4.0, 0.05) var broad_ray_strength := 0.22
+@export_range(0.0, 4.0, 0.05) var fine_ray_strength := 0.14
+@export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 0.12
 @export_group("黒い影と後光")
-@export_range(0.0, 3.0, 0.05) var radiance_strength := 1.6
+@export_range(0.0, 3.0, 0.05) var radiance_strength := 1.25
+@export_range(0.0, 1.0, 0.05) var aura_flow_strength := 0.4
 @export_range(0.0, 1.0, 0.05) var shadow_strength := 1.0
 @export_range(0.0, 0.1, 0.005) var noise_strength := 0.025
 ## 出現区間のどこから影を解き、どこで姿を見せ終わるか。
@@ -22,6 +23,7 @@ const DESIGN := Vector2(640, 360)
 
 var _definition: LegendaryModuleDef
 var _progress := 0.0
+var _duration := 4.35
 var _appear := 0.22
 var _collect := 0.78
 var _source := DESIGN / 2.0
@@ -98,6 +100,7 @@ func setup(definition: LegendaryModuleDef) -> void:
 
 func set_timing(appear: float, hold: float, collect: float) -> void:
 	var total := maxf(0.001, appear + hold + collect)
+	_duration = total
 	_appear = maxf(0.001, appear / total)
 	_collect = 1.0 - maxf(0.001, collect / total)
 
@@ -130,6 +133,8 @@ func set_progress(value: float) -> void:
 	var aura_material := _aura.material as ShaderMaterial
 	aura_material.set_shader_parameter("intensity", radiance_strength)
 	aura_material.set_shader_parameter("exposure", exposure)
+	aura_material.set_shader_parameter("motion_time", _progress * _duration)
+	aura_material.set_shader_parameter("flow_strength", aura_flow_strength)
 	aura_material.set_shader_parameter("radiance_color", light_color.lightened(0.25))
 	var shadow_material := _occlusion.material as ShaderMaterial
 	shadow_material.set_shader_parameter("exposure", exposure)
@@ -137,6 +142,8 @@ func set_progress(value: float) -> void:
 	shadow_material.set_shader_parameter("grain_strength", noise_strength)
 	if _image.material != null:
 		(_image.material as ShaderMaterial).set_shader_parameter("reveal", arrival)
+		(_image.material as ShaderMaterial).set_shader_parameter("motion_time", _progress * _duration)
+		(_image.material as ShaderMaterial).set_shader_parameter("flow_strength", aura_flow_strength)
 	_name.modulate.a = smoothstep(_appear * 0.85, _appear + 0.07, _progress) * (1.0 - taking)
 	_light_material.set_shader_parameter("center", center / DESIGN)
 	_light_material.set_shader_parameter("intensity", light_strength * arrival * (1.0 - taking))
@@ -159,7 +166,7 @@ func _draw() -> void:
 	for i in 32:
 		var angle := i * 2.39996323
 		var seed := fposmod(sin(i * 127.1 + 1.0) * 43758.5, 1.0)
-		var radius := 32.0 + sqrt(seed) * 135.0 + _progress * (5.0 + seed * 8.0)
+		var radius := 42.0 + sqrt(seed) * 65.0 + _progress * (3.0 + seed * 4.0)
 		var point := Vector2(320, 168) + Vector2.from_angle(angle) * Vector2(radius, radius * 0.72)
 		point = point.snapped(Vector2.ONE)
 		var ink := light_color.lightened(0.5 if i % 7 == 0 else 0.0)

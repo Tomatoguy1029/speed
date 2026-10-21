@@ -1,4 +1,4 @@
-// 白金の核・太さの異なる光芒・黒い遮蔽を局所的に重ねる。進行は UI の実時間で受け取る。
+// モジュール近傍に少量だけ差す補助の後光。進行は UI の実時間で受け取る。
 shader_type canvas_item;
 render_mode unshaded, blend_add;
 uniform vec2 center = vec2(0.5, 0.47);
@@ -6,10 +6,10 @@ uniform vec4 light_color : source_color = vec4(0.89, 0.73, 0.42, 1.0);
 uniform float intensity : hint_range(0.0, 1.0) = 0.7;
 uniform float arrival : hint_range(0.0, 1.0) = 1.0;
 uniform float exposure : hint_range(0.0, 1.0) = 0.0;
-uniform float core_strength : hint_range(0.0, 4.0) = 1.8;
-uniform float broad_ray_strength : hint_range(0.0, 4.0) = 1.25;
-uniform float fine_ray_strength : hint_range(0.0, 4.0) = 1.1;
-uniform float surge_strength : hint_range(0.0, 3.0) = 1.0;
+uniform float core_strength : hint_range(0.0, 4.0) = 0.18;
+uniform float broad_ray_strength : hint_range(0.0, 4.0) = 0.22;
+uniform float fine_ray_strength : hint_range(0.0, 4.0) = 0.14;
+uniform float surge_strength : hint_range(0.0, 3.0) = 0.12;
 float hash(float n) {
 	return fract(sin(n * 127.1) * 43758.5453);
 }
@@ -50,16 +50,16 @@ void fragment() {
 		fine += exp(-pow(d / width, 2.0)) * length_fade * mix(0.3, 1.0, hash(seed + 70.0));
 	}
 	float core = exp(-radius * radius * 52.0) * core_strength;
-	float haze = exp(-radius * radius * 10.0) * 0.2;
+	float haze = exp(-radius * radius * 26.0) * 0.14;
 	float shroud = cloud(p * 14.0 + vec2(arrival * 0.1, 0.0));
 	float veil = mix(0.2 + shroud * 0.8, 1.0, exposure);
 	float ray_mask = smoothstep(0.025, 0.07, radius);
-	float rays = (broad * broad_ray_strength + fine * fine_ray_strength) * ray_mask * veil;
-	// 白い核から先へ金色が伸びる。黒い部品の遮蔽は前景の別パスが担う。
+	float rays = (broad * broad_ray_strength + fine * fine_ray_strength) * ray_mask * veil * exp(-radius * radius * 16.0);
+	// 材質が読める低い明度を保つ。輪郭近傍のオーラは別パスが担う。
 	vec3 white = vec3(1.0, 0.96, 0.82);
 	vec3 gold = light_color.rgb;
-	vec3 emission = white * core * (0.55 + surge * 2.8);
-	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.28 + surge * 1.45);
+	vec3 emission = white * core * (0.55 + surge * 0.6);
+	emission += mix(gold, white, exp(-radius * 5.0) * 0.65) * rays * (0.28 + surge * 0.4);
 	emission += gold * haze;
 	float noise = fract(sin(dot(pixel, vec2(12.9898, 78.233))) * 43758.5453);
 	emission *= 0.97 + noise * 0.03;
