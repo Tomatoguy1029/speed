@@ -113,6 +113,13 @@ func _draw_effect(code: String) -> void:
 			for i in 2:
 				_ring(center, 32 + i * 20 + pulse * 14, color)
 			_sprite(ENEMY, center + Vector2(85, -35), 35.0)
+		"dashRangeDrone":
+			for side in [-1, 1]:
+				for rank in 3:
+					var pos := ship + Vector2(35, side * (24 + rank * 22))
+					_line(pos - Vector2(65 + rank * 8, 0), pos, CYAN, 6.0)
+					_line(pos - Vector2(65 + rank * 8, 0), pos, Color.WHITE, 2.0)
+					_sprite(FOLLOWER, pos, 25.0, PI / 2.0)
 		"drone":
 			for i in 3:
 				var pos := ship + Vector2.from_angle(_clock * 0.8 + i * TAU / 3.0) * 62
