@@ -101,7 +101,7 @@ func _get_configuration_warnings() -> PackedStringArray:
 					out.append("%s を %s に置くと、%s が目安の円の内側に入る" % [l.name, e.name, m.name])
 	return out
 
-## ゲーム中に使う形に直す。{"layouts": [{"weight", "markers": [{"type", "pos", "rot"}]}], "entries": [{"weight", "pos", "rot"}]}
+## ゲーム中に使う形に直す。{"layouts": [{"name", "weight", "markers": [{"type", "pos", "rot"}]}], "entries": [{"weight", "pos", "rot"}]}
 ## 位置と向きは、配置は群れの中心と正面からの相対、出現位置は機体（上向き）からの相対。
 func to_data() -> Dictionary:
 	var ls := []
@@ -111,7 +111,7 @@ func to_data() -> Dictionary:
 			if m.enemy != &"":
 				ms.append({"type": m.enemy, "pos": m.position, "rot": m.rotation})
 		if not ms.is_empty():
-			ls.append({"weight": l.weight, "markers": ms})
+			ls.append({"name": String(l.name), "weight": l.weight, "markers": ms})
 	var es := []
 	for e in entries():
 		# 向きは、エディターで開いていないシーンでも機体を向くように、位置から求める

@@ -90,10 +90,6 @@ func spawn(def: EnemyDef, level: float, pos: Vector2, opts := {}) -> int:
 	var fire_interval: float = def.params.get("fire_interval", 0.0)
 	t.fire_t[i] = fire_interval * (0.5 + state.rng.randf() * 0.5)
 	t.beh[i] = BEH.get(def.behavior, EnemyTable.Beh.CHASE)
-	var n := t.id[i]
-	t.roam_phase[i] = n * 1.61803398875
-	t.roam_angle[i] = n * 2.39996322973
-	t.roam_radius[i] = (0.45 + 0.5 * sqrt(fmod(n * 0.61803398875, 1.0))) * minf(1.0, cfg.enemy_pursuit_spread / 480.0)
 	t.accel[i] = def.accel if def.accel > 0.0 else 2.0
 	t.turn[i] = def.turn if def.turn > 0.0 else 4.0
 	t.meteor_index[i] = opts.get("meteor_index", -1)
@@ -231,9 +227,6 @@ func _reset_row(i: int) -> void:
 	t.body_gap[i] = -1.0
 	t.body_gap_pos[i] = Vector2.ZERO
 	t.body_gap_time[i] = 0.0
-	t.roam_phase[i] = 0.0
-	t.roam_angle[i] = 0.0
-	t.roam_radius[i] = 0.0
 	t.mode[i] = EnemyTable.Mode.MOVE
 	t.timer[i] = 0.0
 	t.fire_t[i] = 0.0
@@ -438,14 +431,9 @@ func tick(_real_dt: float, world_dt: float) -> void:
 ## 追跡（いちばん多い雑魚）は、関数を呼ばずにここで計算する（仕様書 11.5）。
 func _tick_chase(dt: float) -> void:
 	var t := table
-	var aim := state.enemy_aim
 	var vc := state.view_center
 	var vh := state.view_half
-	var cycle_len := cfg.enemy_approach_cycle
-	var appr := cfg.enemy_approach_time
-	var blend := cfg.enemy_approach_blend
-	var roam_turn := cfg.enemy_roam_turn
-	var face_move := cfg.enemy_face_move
+	var ship := state.ship_pos
 	var pos := t.pos
 	var vel := t.vel
 	var facing := t.facing
@@ -456,12 +444,7 @@ func _tick_chase(dt: float) -> void:
 	var dead := t.dead
 	var shove_time := t.shove_time
 	var knock_t := t.knock_t
-	var roam_phase := t.roam_phase
-	var roam_angle := t.roam_angle
-	var roam_radius := t.roam_radius
 	var speed := t.speed
-	var accel := t.accel
-	var turn := t.turn
 	var r := t.r
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -483,40 +466,24 @@ func _tick_chase(dt: float) -> void:
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
-		var cdt := dt
 		var rel := from - vc
+		# 画面から遠い敵は、LOD 回に1回だけ向きを決め直す。間の回は今の速度で進むだけ
 		if absf(rel.x) > lod_lim.x or absf(rel.y) > lod_lim.y:
 			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
 				pos[i] = from + vel[i] * dt
 				continue
-			cdt = dt * LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			var cycle := fmod(a + roam_phase[i], cycle_len)
-			var roam := clampf(minf((cycle - appr) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-			var target := aim
-			if roam > 0.0:
-				var ang := roam_angle[i] + a * roam_turn
-				var ux := cos(ang)
-				var uy := sin(ang)
-				var edge := roam_radius[i] / maxf(absf(ux), absf(uy))
-				target = aim + (Vector2(vc.x + ux * edge * vh.x, vc.y + uy * edge * vh.y) - aim) * roam
-			var d := target - from
+			# 機体へまっすぐ、決まった速さで向かう（旋回・慣性なし）
+			var d := ship - from
 			var dist := d.length()
-			if dist < 0.001:
-				dist = 1.0
-			var k := minf(1.0, accel[i] * cdt)
-			var v := vel[i]
-			v += (d * (speed[i] / dist) - v) * k
+			var v := Vector2.ZERO
+			if dist > 0.001:
+				var u := d / dist
+				v = u * speed[i]
+				facing[i] = u.angle()
 			vel[i] = v
-			# 向き：進む向きと機体への向きを混ぜ、毎秒 turn までしか回さない
-			var w := face_move * minf(1.0, v.length() / maxf(speed[i], 1.0))
-			var face := v.normalized() * w + (aim - from).normalized() * (1.0 - w)
-			if face.length_squared() > 0.0025:
-				var f := facing[i]
-				var turn_max := turn[i] * cdt
-				facing[i] = f + clampf(wrapf(face.angle() - f, -PI, PI), -turn_max, turn_max)
 			pos[i] = from + v * dt
 		if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 			field.collide_enemy(i, from)
@@ -752,22 +719,16 @@ func _turn_moving(i: int, rate: float, dt: float) -> void:
 		_turn_toward(i, face.angle(), rate, dt)
 
 ## 追跡：18秒の周期で「接近」と「広域移動」を切り替える（仕様書 11.5）。
-func _chase(i: int, dt: float) -> void:
+func _chase(i: int, _dt: float) -> void:
 	var t := table
-	var aim := _aim
-	var a := t.age[i]
-	var cycle_len := cfg.enemy_approach_cycle
-	var blend := cfg.enemy_approach_blend
-	var cycle := fmod(a + t.roam_phase[i], cycle_len)
-	var roam := clampf(minf((cycle - cfg.enemy_approach_time) / blend, (cycle_len - cycle) / blend), 0.0, 1.0)
-	var target := aim
-	if roam > 0.0:
-		var ang := t.roam_angle[i] + a * cfg.enemy_roam_turn
-		var ux := cos(ang)
-		var uy := sin(ang)
-		var edge := t.roam_radius[i] / maxf(absf(ux), absf(uy))
-		target = aim + (Vector2(_vc.x + ux * edge * _vh.x, _vc.y + uy * edge * _vh.y) - aim) * roam
-	_move_to(i, target, t.speed[i], t.accel[i], t.turn[i], dt)
+	var d := state.ship_pos - t.pos[i]
+	var dist := d.length()
+	if dist < 0.001:
+		t.vel[i] = Vector2.ZERO
+		return
+	var u := d / dist
+	t.vel[i] = u * t.speed[i]
+	t.facing[i] = u.angle()
 
 ## 狙った位置へ速さ speed で向かい（加速 accel）、進む向きと機体への向きを混ぜた向きへ毎秒 turn まで回る。
 ## 追跡と距離を保つ動きの共通部分（よく呼ぶので、関数をまとめて呼び出しを減らす）。
@@ -832,7 +793,7 @@ func _split(i: int, dt: float) -> void:
 
 ## 分裂する雑魚が次の分裂体を生む向き（育っていく芽の位置。描画も同じ向きを使う）。
 func bud_angle(i: int) -> float:
-	return table.roam_angle[i] + float(table.buds[i]) * 2.399963
+	return float(table.id[i]) * 2.39996322973 + float(table.buds[i]) * 2.399963
 
 ## 射撃型・ミサイル艇：機体の周りの keep の距離を保ち、回り込む。
 func _keep_distance(i: int, dt: float) -> void:
@@ -2035,9 +1996,20 @@ func _target() -> Dictionary:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
 		return {"phase": p, "steps": steps, "pop": cfg.bonus_pop * cfg.density_mult,
 			"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
-	return {"phase": p, "steps": steps,
-		"pop": lerpf(p.pop_from, p.pop_to, k) * cfg.density_mult * (1.0 + cfg.surge_pop * steps),
-		"level": lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps}
+	var scale := cfg.density_mult * (1.0 + cfg.surge_pop * steps)
+	var level := lerpf(p.level_from, p.level_to, k) + cfg.surge_level * steps
+	var curves: Array = state.stage.zako_curves
+	if not curves.is_empty():
+		# 雑魚の種類ごとの目標の数の曲線（合計が目標の数）。曲線の値がそのまま実際の数で、敵の密度倍率は掛けない
+		var surge := 1.0 + cfg.surge_pop * steps
+		var per := {}
+		var total := 0.0
+		for c: SpawnCurve in curves:
+			var v := maxf(0.0, c.value_at(state.time)) * surge
+			per[c.type] = float(per.get(c.type, 0.0)) + v
+			total += v
+		return {"phase": p, "steps": steps, "pop": total, "level": level, "per_type": per}
+	return {"phase": p, "steps": steps, "pop": lerpf(p.pop_from, p.pop_to, k) * scale, "level": level}
 
 ## 今の時間帯の敵のレベル（ほかの Manager が敵を出すときに使う）。
 func spawn_level() -> float:
@@ -2187,7 +2159,7 @@ func _formation_capped(data: Dictionary) -> bool:
 	return false
 
 ## ステージのクリップから強敵の群れを出す。クリップは開始から長さの間だけ働き、そのクリップから出た群れが同時の群れの数より
-## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選んで、クリップの種類の敵だけを出す。
+## 少なく、前の群れから出す間隔が経っていれば、フォーメーションを1つ選び、クリップの使う並びから配置を重みで1つ選んで、クリップの種類の敵だけを出す。
 ## 種類ごとの上限（max_alive）に達するフォーメーションは選ばない。
 func _tick_clips(level: float) -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
@@ -2202,17 +2174,28 @@ func _tick_clips(level: float) -> void:
 		var items := []
 		for scene: PackedScene in clip.formations:
 			var data := formation_data(scene)
-			if not data.is_empty() and not _formation_capped(data):
-				items.append({"data": data, "weight": 1.0})
+			if data.is_empty() or _formation_capped(data):
+				continue
+			var allowed := clip.allowed_layouts(scene.resource_path, data)
+			if not allowed.is_empty():
+				items.append({"data": data, "layouts": allowed, "weight": 1.0})
 		var k := _pick_weighted(items)
 		if k < 0:
 			continue
-		var rows := spawn_formation(items[k].data, level, -1, -1, clip.types)
+		var choices := []
+		for li: int in items[k].layouts:
+			choices.append({"index": li, "weight": items[k].data.layouts[li].weight})
+		var c := _pick_weighted(choices)
+		if c < 0:
+			continue
+		var rows := spawn_formation(items[k].data, level, choices[c].index, -1, clip.types)
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
 
 var _type_counts: Dictionary = {}
+## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数
+var _zako_counts: Dictionary = {}
 var _far_rows := PackedInt32Array()
 
 ## 1回の走査で、外周の辺ごとの数・同時に出る数の上限がある種類の数・再配置の範囲の中の数を数え、遠くの敵を再配置する。
@@ -2220,6 +2203,7 @@ var _far_rows := PackedInt32Array()
 func _survey() -> int:
 	_edge_counts.fill(0)
 	_type_counts.clear()
+	_zako_counts.clear()
 	var vc := state.view_center
 	var vh := state.view_half
 	var lim := vh * cfg.spawn_recycle_scale + Vector2(200, 200)
@@ -2231,6 +2215,12 @@ func _survey() -> int:
 	var type := table.type
 	var defs := table.def
 	_far_rows.clear()
+	# クリップから出た群れは、隊列のまま近づけるため、遠くにいても再配置しない
+	var grouped := {}
+	for groups: Array in _clip_groups.values():
+		for rows: PackedInt32Array in groups:
+			for k in range(0, rows.size(), 2):
+				grouped[rows[k]] = true
 	for rows in beh_rows:
 		for i in rows:
 			if dead[i] != 0:
@@ -2241,10 +2231,11 @@ func _survey() -> int:
 			var rel := pos[i] - vc
 			if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
 				# 部位は親と一緒に動き、からす座は横断して自分で退場するので、離れても再配置しない
-				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW:
+				if table.parent[i] < 0 and table.beh[i] != EnemyTable.Beh.CROW and not grouped.has(i):
 					_far_rows.append(i)
 				continue
 			alive_n += 1
+			_zako_counts[type[i]] = int(_zako_counts.get(type[i], 0)) + 1
 			var ax := absf(rel.x)
 			var ay := absf(rel.y)
 			if ax < center_x and ay < center_y:
@@ -2292,7 +2283,9 @@ func _spawn_one(t: Dictionary) -> bool:
 		return false
 	var phase: PhaseDef = t.phase
 	var danger := field.danger_at(p.length())
-	var type := _pick_type(phase, t.steps)
+	var type := _pick_short_type(t.per_type) if t.has("per_type") else _pick_type(phase, t.steps)
+	if type == &"":
+		return false
 	var def := def_of(type)
 	if def == null:
 		return false
@@ -2306,7 +2299,18 @@ func _spawn_one(t: Dictionary) -> bool:
 	spawn(def, level, p, opts)
 	if def.max_alive > 0:
 		_type_counts[type] = _type_counts.get(type, 0) + 1
+	_zako_counts[type] = int(_zako_counts.get(type, 0)) + 1
 	return true
+
+## 雑魚の目標の数の曲線から種類を選ぶ。目標の数に足りない分が大きい種類ほど選ばれやすい。足りない種類がなければ空。
+func _pick_short_type(per_type: Dictionary) -> StringName:
+	var items := []
+	for type in per_type:
+		var short := float(per_type[type]) - float(_zako_counts.get(type, 0))
+		if short > 0.0:
+			items.append({"type": type, "weight": short})
+	var k := _pick_weighted(items)
+	return StringName(items[k].type) if k >= 0 else &""
 
 ## 時間帯の出現の重みから種類を選ぶ。10:00 以降の強まりの段 steps に応じて、撃つ敵を出やすくする。
 func _pick_type(phase: PhaseDef, steps: int) -> StringName:

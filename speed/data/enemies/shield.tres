@@ -15,7 +15,6 @@ xp = 12.0
 color = Color(0.62, 0.68, 0.8, 1)
 shape = &"hex"
 behavior = &"shield"
-max_alive = 3
 weak_arc = 1.0
 gate = &"back"
 params = {

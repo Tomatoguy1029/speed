@@ -5,7 +5,17 @@ extends VBoxContainer
 
 const Canvas := preload("res://addons/spawn_timeline/timeline_canvas.gd")
 
+## 「大きく表示」を押したとき（エディターの上部の画面のタブ「出現タイムライン」へ切り替える）
+signal open_large
+
 var undo_redo: EditorUndoRedoManager
+## 上部の画面のタブに出すタイムラインなら true（「大きく表示」のボタンを出さない）
+var large := false:
+	set(value):
+		large = value
+		if _large_button != null:
+			_large_button.visible = not value
+var _large_button: Button = null
 var stage: Resource = null
 var canvas: Control
 var _title: Label
@@ -31,13 +41,16 @@ func _init() -> void:
 	_title = Label.new()
 	_title.text = "ステージを開くと表示します"
 	bar.add_child(_title)
-	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["▶ ここから試す", _launch_here],
+	for spec in [["＋クリップ", _add_clip], ["クリップを消す", _remove_clip], ["＋雑魚の曲線", _add_curve_menu], ["曲線を消す", _remove_curve],
+			["▶ ここから試す", _launch_here],
 			["縮小", func() -> void: canvas.zoom(0.8)], ["拡大", func() -> void: canvas.zoom(1.25)], ["全体", func() -> void: canvas.fit()],
-			["別ウィンドウ", _open_window]]:
+			["大きく表示", func() -> void: open_large.emit()], ["操作", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		bar.add_child(b)
+		if spec[0] == "大きく表示":
+			_large_button = b
 	_info = Label.new()
 	bar.add_child(_info)
 	# トラックは縦にスクロールする（目盛り・時間帯・雑魚の数はトラックの描画が上に留める）
@@ -51,6 +64,11 @@ func _init() -> void:
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(canvas)
 	scroll.get_v_scroll_bar().value_changed.connect(func(_v: float) -> void: canvas.queue_redraw())
+
+func _notification(what: int) -> void:
+	# 下のパネルと上部の画面のどちらで編集しても、表示し直したときに最新を描く
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_visible_in_tree() and stage != null:
+		refresh()
 
 func set_stage(value: Resource) -> void:
 	stage = value
@@ -71,6 +89,28 @@ func phases() -> Array:
 
 func clips() -> Array:
 	return stage.get("clips") if stage != null else []
+
+## 敵の種類の名前（敵の定義の display_name。読めなければ type ID）。
+func enemy_name(id: StringName) -> String:
+	if not _names.has(id):
+		var dir := str(ProjectSettings.get_setting("spawn_timeline/enemy_dir", ""))
+		var path := dir.path_join(String(id) + ".tres")
+		var res: Resource = load(path) if dir != "" and ResourceLoader.exists(path) else null
+		_names[id] = str(res.get("display_name")) if res != null and res.get("display_name") != null and str(res.get("display_name")) != "" else String(id)
+	return _names[id]
+
+var _names: Dictionary = {}
+
+## 敵の種類の区分（敵の定義の rank。雑魚は 1）。読めなければ 0。
+func enemy_rank(id: StringName) -> int:
+	var dir := str(ProjectSettings.get_setting("spawn_timeline/enemy_dir", ""))
+	var path := dir.path_join(String(id) + ".tres")
+	var res: Resource = load(path) if dir != "" and ResourceLoader.exists(path) else null
+	return int(res.get("rank")) if res != null and res.get("rank") != null else 0
+
+## 雑魚の目標の数の曲線（zako_curves）。
+func curves() -> Array:
+	return stage.get("zako_curves") if stage != null and stage.get("zako_curves") != null else []
 
 ## フォーメーション（組み合わせのシーン）に置いた敵の種類（置き場所のノードの enemy）。シーンごとに1回だけ調べる。
 func scene_types(scene: PackedScene) -> Array:
@@ -125,8 +165,12 @@ func _save() -> void:
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。
 func _new_clip() -> Resource:
+	return _new_element("clips")
+
+## 配列のプロパティ prop の要素の型のリソースを作る。
+func _new_element(prop: String) -> Resource:
 	for p in stage.get_property_list():
-		if p.name != "clips":
+		if p.name != prop:
 			continue
 		var cls := String(p.hint_string).get_slice(":", 1)
 		for g in ProjectSettings.get_global_class_list():
@@ -151,6 +195,52 @@ func _add_clip() -> void:
 	commit("クリップを足す", [[stage, "clips", before, after]])
 	EditorInterface.inspect_object(clip, "", true)
 
+## ステージの敵のうち、まだ曲線のない雑魚（区分 1）を選んで、雑魚の目標の数の曲線を足す。
+func _add_curve_menu() -> void:
+	if stage == null:
+		return
+	var have := {}
+	for c in curves():
+		have[c.get("type")] = true
+	var menu := PopupMenu.new()
+	for id in stage.get("enemies"):
+		if not have.has(id) and enemy_rank(id) == 1:
+			menu.add_item(enemy_name(id))
+			menu.set_item_metadata(menu.item_count - 1, String(id))
+	if menu.item_count == 0:
+		menu.add_item("（ステージの敵の一覧に、曲線のない雑魚がいない）")
+		menu.set_item_disabled(0, true)
+	menu.id_pressed.connect(func(index: int) -> void:
+		_add_curve(StringName(menu.get_item_metadata(menu.get_item_index(index))))
+		menu.queue_free())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(get_screen_position() + get_local_mouse_position(), Vector2i.ZERO))
+
+func _add_curve(type: StringName) -> void:
+	var curve := _new_element("zako_curves")
+	if curve == null:
+		return
+	curve.set("type", type)
+	curve.set("points", PackedVector2Array([Vector2(0.0, 10.0)]))
+	var before: Array = curves()
+	var after: Array = before.duplicate()
+	after.append(curve)
+	stage.set("zako_curves", after)
+	commit("雑魚の曲線を足す", [[stage, "zako_curves", before, after]])
+
+## 選んでいる雑魚の曲線を消す。
+func _remove_curve() -> void:
+	if stage == null or canvas.curve_selected < 0 or canvas.curve_selected >= curves().size():
+		return
+	var before: Array = curves()
+	var after: Array = before.duplicate()
+	after.remove_at(canvas.curve_selected)
+	stage.set("zako_curves", after)
+	canvas.curve_selected = -1
+	canvas.point_selected = -1
+	commit("雑魚の曲線を消す", [[stage, "zako_curves", before, after]])
+
 func _remove_clip() -> void:
 	if stage == null or canvas.selected < 0 or canvas.selected >= clips().size():
 		return
@@ -161,29 +251,15 @@ func _remove_clip() -> void:
 	canvas.selected = -1
 	commit("クリップを消す", [[stage, "clips", before, after]])
 
-var _window: Window = null
-
-## このパネルと同じステージを、別のウィンドウのタイムラインで開く（編集は同じステージに入る）。
-func _open_window() -> void:
-	if stage == null:
-		return
-	if is_instance_valid(_window):
-		_window.grab_focus()
-		return
-	_window = Window.new()
-	_window.title = "出現タイムライン - " + stage.resource_path.get_file()
-	_window.size = Vector2i(1500, 560)
-	_window.close_requested.connect(func() -> void:
-		_window.queue_free()
-		_window = null
-		refresh())
-	var other: Control = (get_script() as GDScript).new()
-	other.undo_redo = undo_redo
-	other.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_window.add_child(other)
-	EditorInterface.get_base_control().add_child(_window)
-	other.set_stage(stage)
-	_window.popup_centered()
+## 操作の説明を、ボタンの下に出す（外をクリックすると閉じる）。
+func _show_help() -> void:
+	var panel := PopupPanel.new()
+	var label := Label.new()
+	label.text = Canvas.HELP
+	panel.add_child(label)
+	panel.popup_hide.connect(panel.queue_free)
+	add_child(panel)
+	panel.popup(Rect2i(get_screen_position() + get_local_mouse_position() + Vector2(0, 24), Vector2i.ZERO))
 
 ## 再生位置の時刻から、このステージを起動する（ステージの起動の道具 stage_launcher の予約を使う）。
 func _launch_here() -> void:

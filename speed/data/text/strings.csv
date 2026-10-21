@@ -226,7 +226,7 @@ lab.message_ace6599b1c,出現の時間帯を切替,Switch phase roster
 lab.message_0c0e2d79f0,基礎攻撃力,Base attack
 lab.message_0aee0183fd,最高速度,Maximum speed
 lab.message_017dfdb22a,線の長さ,Drawing length
-lab.message_ec7bdd3fb0,波動の幅,Shockwave width
+lab.message_ec7bdd3fb0,なぞりの当たり判定の太さ,Trace hit width
 lab.message_355273af8a,描画中の世界の速さ,World speed while drawing
 lab.message_ab276f5393,描画の確定待ち時間,Drawing confirmation delay
 lab.message_6384a9a6f0,ボスの基礎HP,Boss base HP

@@ -297,14 +297,10 @@ extends Resource
 ## 描き始めてからこの時間の間は、クリックで線を確定しない。ダブルクリックで線ができる前に確定するのを防ぐ。
 ## 単位：実秒
 @export var draw_confirm_delay: float
-## なぞりの波動の幅
-## なぞった線の左右この距離の帯にいる敵に、装甲を無視する波動が当たる。
+## なぞりの当たり判定の太さ
+## なぞり中は、なぞった線の左右この距離に触れた敵に体当たりが当たる（機体の本体の半径の代わり）。
 ## 単位：単位（距離）
-@export var wave_radius: float
-## なぞりの波動の威力
-## 波動のダメージ ＝ 攻撃力 × この値。
-## 単位：倍
-@export var wave_damage: float
+@export var trace_radius: float
 
 ## 攻撃力・装甲・クリティカル・弾かれ・ヒットストップ、敵の狙い方
 @export_group("戦闘")
@@ -391,26 +387,6 @@ extends Resource
 ## 時間帯ごとの敵の数と補充の速さに掛ける。
 ## 単位：倍
 @export var density_mult: float
-## 追跡の広がり
-## 敵が機体から離れて動き回る範囲の広さ。480 で画面いっぱい、小さいほど機体の近くに集まる。
-## 単位：単位（距離）
-@export var enemy_pursuit_spread: float
-## 接近と移動の周期
-## 敵は、この周期で「機体へ接近」と「画面内を動き回る」を繰り返す。
-## 単位：世界秒
-@export var enemy_approach_cycle: float
-## 接近する時間
-## 周期のうち、機体へ向かって接近する時間。
-## 単位：世界秒
-@export var enemy_approach_time: float
-## 接近と移動の切り替えの時間
-## 接近と動き回るのを切り替えるとき、進路をなめらかに変える時間。
-## 単位：世界秒
-@export var enemy_approach_blend: float
-## 動き回る先の回る速さ
-## 動き回っている敵の移動先が、時間とともに回る速さ。
-## 単位：ラジアン/世界秒
-@export var enemy_roam_turn: float
 ## 進む向きを向く割合
 ## 移動中の敵の向き ＝ 進む向き × この値 ＋ 機体への向き × (1 − この値)。遅いときほど機体の方を向く。0 なら常に機体の方を向く。
 ## 単位：割合（0〜1）

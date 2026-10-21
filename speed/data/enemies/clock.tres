@@ -15,7 +15,6 @@ xp = 14.0
 color = Color(0.95, 0.9, 0.7, 1)
 shape = &"orb"
 behavior = &"clock"
-max_alive = 2
 params = {
 "bullet_dmg": 10.0,
 "hand_long": 170.0,

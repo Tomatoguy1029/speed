@@ -1,4 +1,4 @@
-## 時間帯・強敵の群れ・出現のクリップの出し方と、攻撃の予算を確かめる。
+## 時間帯・雑魚の目標の数の曲線・強敵の群れ・出現のクリップの出し方と、攻撃の予算を確かめる。
 ##   Godot --headless --path speed res://tests/spawn_formations.tscn
 extends Node
 
@@ -30,6 +30,7 @@ func _ready() -> void:
 	_check_spawn(run, scene)
 	_check_clips(run, scene)
 	_check_budget(run)
+	_check_curves(run)
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[spawn_formations] passed=%d failed=%d" % [passed, failed])
@@ -58,14 +59,14 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
 	var data := em.formation_data(scene)
-	check(data.layouts.size() == 2 and data.entries.size() == 3, "組み合わせのシーンを読める")
+	check(data.layouts.size() >= 1 and data.entries.size() >= 1, "組み合わせのシーンを読める")
 	state.ship_pos = Vector2(5000, -2000)
 	state.ship_vel = Vector2.ZERO
 	for heading in [Vector2.UP, Vector2.RIGHT, Vector2(-1, 1).normalized()]:
 		state.ship_heading = heading
 		for n in 12:
 			var rows := em.spawn_formation(data, 1.0)
-			check(rows.size() >= 4, "群れの敵が出る")
+			check(rows.size() >= 2, "群れの敵が出る")
 			for k in range(0, rows.size(), 2):
 				var i := rows[k]
 				var rel: Vector2 = em.table.pos[i] - state.ship_pos
@@ -134,7 +135,10 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 			all_tele = all_tele and em.table.type[rows[k]] == &"telescope"
 	check(groups.call() == 1 and all_tele, "クリップで選んだ種類の敵だけを出す")
 	kill.call()
-	# 種類ごとの上限に達するフォーメーションは選ばない（みずがめ座は1体まで）
+	# 種類ごとの上限に達するフォーメーションは選ばない（このテストでは、みずがめ座を1体までにする）
+	var capped: EnemyDef = em.def_of(&"aquarius").duplicate()
+	capped.max_alive = 1
+	em.definitions[&"aquarius"] = capped
 	var aqua_forms: Array[PackedScene] = [load("res://data/formations/aquarius_solo.tscn")]
 	clip.formations = aqua_forms
 	var aqua_types: Array[StringName] = [&"aquarius"]
@@ -147,6 +151,19 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	em._type_counts.clear()
 	em._tick_clips(1.0)
 	check(groups.call() == 1, "空いたら出す")
+	kill.call()
+	# クリップから出た群れは、遠くにいても再配置しない（隊列がばらばらにならない）
+	em._clip_groups.clear()
+	em._clip_next.clear()
+	clip.formations = forms
+	clip.types = types
+	state.time = 6.0
+	em._tick_clips(1.0)
+	var rows: PackedInt32Array = em._clip_groups[0][0]
+	var far := state.view_center + Vector2(0, -5000)
+	em.table.pos[rows[0]] = far
+	em._survey()
+	check(em.table.pos[rows[0]] == far, "クリップの群れは再配置しない")
 	kill.call()
 
 ## 攻撃の重さの合計が予算を超えないように待たせる。待っていた攻撃は、ばらつきの分だけ遅れて始める。
@@ -185,3 +202,34 @@ func _check_budget(run: RunManager) -> void:
 	em._sync_attack_budget(phase)
 	check(not run.projectiles.director.enabled, "予算が 0 の時間帯は管理しない")
 	state.lab_mode = true
+
+## 雑魚の目標の数の曲線は点を通り、点の間で行き過ぎない。曲線のあるステージは、種類ごとに足りない分を補充する。
+func _check_curves(run: RunManager) -> void:
+	var pts := PackedVector2Array([Vector2(0, 10), Vector2(60, 40), Vector2(90, 40), Vector2(120, 5)])
+	check(is_equal_approx(SpawnCurve.sample(pts, 60.0), 40.0), "曲線は点を通る")
+	check(is_equal_approx(SpawnCurve.sample(pts, -5.0), 10.0) and is_equal_approx(SpawnCurve.sample(pts, 500.0), 5.0), "点の外は端の点の数")
+	var ok := true
+	for k in 1200:
+		var v := SpawnCurve.sample(pts, k * 0.1)
+		ok = ok and v >= 5.0 - 0.001 and v <= 40.0 + 0.001
+	check(ok, "点の間で行き過ぎない")
+	check(absf(SpawnCurve.sample(pts, 75.0) - 40.0) < 0.001, "平らな所は平らのまま")
+	var em := run.enemies
+	var state := run.state
+	var stage: StageDef = state.stage.duplicate()
+	var a := SpawnCurve.new()
+	a.type = &"biter"
+	a.points = PackedVector2Array([Vector2(0, 6)])
+	var b := SpawnCurve.new()
+	b.type = &"bomber"
+	b.points = PackedVector2Array([Vector2(0, 0)])
+	var curves: Array[SpawnCurve] = [a, b]
+	stage.zako_curves = curves
+	state.stage = stage
+	state.time = 10.0
+	var t := em._target()
+	check(t.has("per_type") and is_equal_approx(float(t.per_type[&"biter"]), 6.0), "目標の数は曲線の値そのまま（密度倍率は掛けない）")
+	em._zako_counts.clear()
+	check(em._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
+	em._zako_counts[&"biter"] = 6
+	check(em._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")

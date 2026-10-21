@@ -15,7 +15,6 @@ xp = 16.0
 color = Color(0.5, 0.8, 1, 1)
 shape = &"orb"
 behavior = &"dolphin"
-max_alive = 2
 ranged = true
 params = {
 "aim_turn": 2.0,
@@ -24,10 +23,10 @@ params = {
 "fire_interval": 3.4,
 "keep": 520.0,
 "telegraph": 1.0,
-"wave_arc": 0.6,
-"wave_radius": 1300.0,
-"wave_speed": 460.0,
-"wave_width": 34.0
+"wave_arc": 0.7,
+"wave_radius": 430.0,
+"wave_speed": 300.0,
+"wave_width": 50.0
 }
 id = &"dolphin"
 display_name = "いるか座"

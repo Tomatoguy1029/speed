@@ -24,10 +24,18 @@ const EDITOR_ORDER := 5
 ## このステージに出る敵の種類。出現のクリップは、この中から種類の組み合わせを選ぶ。
 ## 単位：type ID
 @export var enemies: Array[StringName] = []
+## 雑魚の目標の数
+## 雑魚の種類ごとの、時刻ごとの目標の数の曲線。1つでもあれば、雑魚はこの曲線で補充し、時間帯の敵の数と重みは使わない。
+## 単位：—
+@export var zako_curves: Array[SpawnCurve] = []
 ## 出現のクリップ
 ## 強敵の出現。タイムラインに置き、開始から長さの間、選んだ種類の群れを出し続ける（ステージ全体の時刻で持つ）。
 ## 単位：—
 @export var clips: Array[SpawnClip] = []
+## トラックの名前
+## 出現タイムラインのトラックの名前（トラックの番号の順。空ならトラックの番号で表示する）。出し方には関係しない。
+## 単位：文字
+@export var track_names: PackedStringArray
 ## ボス
 ## このステージのボスの ID。
 ## 単位：文字

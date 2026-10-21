@@ -579,9 +579,10 @@ func _test_hero() -> void:
 			_check(run.combat.leo_width() > 1, "タスク17：しし座は帯を太くする")
 			var a := s.ship_pos - Vector2(100, 0)
 			var b := s.ship_pos + Vector2(300, 0)
-			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.wave_radius * 1.5)
+			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.trace_radius * 1.5)
 			run.combat.rebuild_grid()
-			run.combat.wave_along(TraceRun.new(), a, b)
+			s.ship_pos = b
+			run.combat.collide_ship(a, run.combat.trace_radius(), TraceRun.new())
 			_check(t.dead[victim] != 0, "タスク17：太い帯の敵は装甲に関係なく貫ける")
 			s.gauge = 1.0
 			_line(PackedVector2Array([a, b]))

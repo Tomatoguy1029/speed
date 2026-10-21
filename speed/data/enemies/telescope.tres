@@ -15,7 +15,6 @@ xp = 8.0
 color = Color(0.6, 0.85, 1, 1)
 shape = &"diamond"
 behavior = &"sniper"
-max_alive = 2
 ranged = true
 params = {
 "band_len": 1000.0,
