@@ -3,6 +3,7 @@
 ## 群れは、フォーメーション（敵の組み合わせのシーン）からランダムに1つ選び、その配置（使う並び）と出現位置をランダムに1つずつ選んで出す。
 ## ---
 ## 値の正は res://data/stages/*.tres の clips。
+@tool
 class_name SpawnClip
 extends Resource
 
@@ -27,8 +28,9 @@ extends Resource
 ## 選んだ並びが1つもないフォーメーションは使わない。空なら、すべての並びを使う。
 ## 単位：並びの名前
 @export var layouts: Array[StringName] = []
-## 並びごとの攻撃value。「シーンのファイル名/並びのノード名」→1以上の整数。未設定は1。
-@export_storage var formation_values: Dictionary = {}
+## 並びごとの共有override。「シーンのファイル名/並びのノード名」→正の小数。
+## 保存済みの整数も共有overrideとして読む。キーがなければ個体ごとの自動計算。
+@export var formation_values: Dictionary = {}
 
 ## 開始の時刻
 ## ラン開始からこの時刻に、このクリップが働き始める。
@@ -47,9 +49,23 @@ extends Resource
 ## 単位：実秒
 @export var interval: float = 10.0
 
-## 同じ並びから1回で出た群れ全体が共有する攻撃value。
-func formation_value(scene_path: String, layout_name: String) -> int:
-	return maxi(1, int(formation_values.get(String(layout_key(scene_path, layout_name)), 1)))
+## 同じ並びから1回で出た群れ全体の共有override。未設定は -1（個体ごと）。
+func formation_value(scene_path: String, layout_name: String) -> float:
+	var key := String(layout_key(scene_path, layout_name))
+	if not formation_values.has(key):
+		return -1.0
+	var value := float(formation_values[key])
+	return value if is_finite(value) and value > 0.0 else 1.0
+
+## 実際に出す種類だけを数えた、指定配置の個体valueの合計。選択の有無はUIで別表示する。
+func automatic_value(stage: StageDef, layout: Dictionary) -> float:
+	var total := 0.0
+	for marker: Dictionary in layout.get("markers", []):
+		var type := StringName(marker.type)
+		if not types.is_empty() and not types.has(type):
+			continue
+		total += stage.enemy_attack_value(type) if stage != null else 1.0
+	return total
 
 ## 終わりの時刻。
 func end_time() -> float:

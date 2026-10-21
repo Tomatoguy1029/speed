@@ -31,10 +31,10 @@ var beh_slot := PackedInt32Array()
 var is_boss := PackedByteArray()
 ## 隕石の配置の通し番号（隕石でなければ -1）
 var meteor_index := PackedInt32Array()
-## 出現した群れの通し番号。同じ群れの強敵が共有する攻撃枠（単体出現は0）。
+## overrideを使う群れの通し番号。0なら個体ごとの攻撃枠。
 var attack_group := PackedInt32Array()
-## 出現元の並びに設定した、群れ全体で共有する攻撃value。
-var attack_value := PackedInt32Array()
+## 個体の攻撃value、またはoverride群れが共有するvalue。
+var attack_value := PackedFloat64Array()
 ## 1 なら撃破済み（その回の終わりに空きへ戻る）
 var dead := PackedByteArray()
 var elite := PackedByteArray()

@@ -80,7 +80,10 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	t.def[i] = def
 	t.type[i] = def.id
 	t.attack_group[i] = int(opts.get("attack_group", 0))
-	t.attack_value[i] = maxi(1, int(opts.get("attack_value", 1)))
+	if t.attack_group[i] > 0:
+		t.attack_value[i] = float(opts.get("attack_value", 1.0))
+	else:
+		t.attack_value[i] = state.stage.enemy_attack_value(def.id) if state.stage != null else 1.0
 	apply_scaling(i, def, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
@@ -652,7 +655,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			_update_pushed(i, dt)
 		else:
-			if b != EnemyTable.Beh.CORONA and not _lab_admit(i, bdt):
+			if b not in [EnemyTable.Beh.CORONA, EnemyTable.Beh.RETICLE] and not _lab_admit(i, bdt):
 				_chase(i, bdt)
 				pos[i] += vel[i] * dt
 				if _near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
@@ -1398,6 +1401,8 @@ func _reticle(i: int, dt: float) -> void:
 	var p: Dictionary = t.def[i].params
 	var tel := _nearest_telescope(t.pos[i])
 	if tel < 0:
+		if projectiles.director != null:
+			projectiles.director.cancel_wait(_lab_owner(i), t.id[i])
 		t.mode[i] = EnemyTable.Mode.DASH
 		t.target[i] = -1
 		var away := (t.pos[i] - state.ship_pos).normalized()
@@ -1441,11 +1446,15 @@ func _reticle(i: int, dt: float) -> void:
 	_turn_toward(i, (t.pos[tel] - t.pos[i]).angle() if not near else t.facing[tel], t.turn[i], dt)
 	if near and t.fire_t[i] <= 0.0:
 		var rock := _blocking_rock(tel, float(p.small_r))
-		if rock >= 0:
+		if rock >= 0 and _lab_admit(i, dt):
 			t.target[i] = rock
 			t.target_id[i] = t.id[rock]
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.aim_time)
+		elif rock < 0 and projectiles.director != null:
+			projectiles.director.cancel_wait(_lab_owner(i), t.id[i])
+	elif projectiles.director != null:
+		projectiles.director.cancel_wait(_lab_owner(i), t.id[i])
 
 ## 位置 at にいちばん近い、生きているぼうえんきょう座の行（いなければ -1）。
 func _nearest_telescope(at: Vector2) -> int:
@@ -2113,7 +2122,7 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	_tick_clips()
 	_sync_attack_budget(phase)
 
-## 本番のランは、時間帯の整数予算と群れごとの value で攻撃を管理する。
+## 本番のランは、時間帯の予算と個体value（明示overrideだけ群れ共有）で攻撃を管理する。
 ## 実験場では、実験場の設定に任せる。
 func _sync_attack_budget(phase: PhaseDef) -> void:
 	var d = projectiles.director
@@ -2162,9 +2171,9 @@ func _pick_weighted(items: Array) -> int:
 ## 組み合わせ data から配置と出現位置を1つずつ選び（layout・entry に番号を渡せば、その配置・出現位置）、群れを出す。配置の中心と正面を出現位置の点と向きにそろえ、
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
-func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := 1) -> PackedInt32Array:
+func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0) -> PackedInt32Array:
 	var rows := PackedInt32Array()
-	var group := _next_id
+	var group := _next_id if value > 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:
@@ -2470,6 +2479,10 @@ func _recycle(i: int) -> bool:
 	t.fire_t[i] = t.def[i].params.get("fire_interval", 0.0)
 	return true
 
+func _lab_owner(i: int) -> String:
+	var d = projectiles.director
+	return "formation:%d" % table.attack_group[i] if d != null and d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
+
 ## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
@@ -2481,7 +2494,7 @@ func _lab_admit(i: int, dt: float) -> bool:
 	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
 	if cats.is_empty():
 		return true
-	var owner := "formation:%d" % table.attack_group[i] if d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
+	var owner := _lab_owner(i)
 	var p := def.params
 	var active := table.mode[i] != EnemyTable.Mode.MOVE or not table.links[i].is_empty()
 	var due := table.fire_t[i] <= float(p.get("telegraph", 0)) + dt
@@ -2502,10 +2515,15 @@ func _lab_admit(i: int, dt: float) -> bool:
 		due = table.buds[i] != 0 and table.mode[i] == EnemyTable.Mode.DASH and table.timer[i] <= dt
 	elif def.behavior in [&"clock", &"triangle", &"rocket"]:
 		due = true
+	elif def.behavior == &"reticle":
+		# 岩と支援先の選択は_reticleで行い、予告に入る瞬間だけ許可を取る。
+		due = true
 	if not active and due:
 		var duration := float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
 		if def.behavior == &"corona":
 			duration = float(p.telegraph) + TAU / maxf(absf(float(p.spin)), 0.1) + float(p.throw_life)
+		elif def.behavior == &"reticle":
+			duration = float(p.aim_time) + 0.25
 		if p.has("laser_charge"):
 			duration = maxf(0.0, 1.0 - table.charge[i]) * float(p.lock_fill) + float(p.laser_charge) + float(p.laser_delay) + float(p.laser_time) + 0.1
 		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
