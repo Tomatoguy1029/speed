@@ -65,6 +65,17 @@ hud.game_over,GAME OVER,GAME OVER
 hud.levelup_title,レベルアップ　1枚選ぶ（クリック／1〜3）,Level Up: Pick One (Click / 1–3)
 hud.level_bonus,おまけ,Bonus
 hud.level_bonus_more,継続！,More!
+hud.ult_granted,英雄の力を授かった,ULT ACQUIRED
+hud.ult_placeholder,仮カットイン · 正式素材へ差し替え予定,PLACEHOLDER CUT-IN · ART PENDING
+hud.ult_key,{key}：英雄の星座の力を発動,{key}: Activate constellation power
+hero.leo.power,線が太くなる,Wider Line
+hero.leo.desc,線が太くなり、帯に触れた敵を装甲に関係なく貫く。,Widen the line and pierce enemies in its path regardless of armor.
+hero.perseus.power,メドゥーサの首,Medusa's Head
+hero.perseus.desc,画面の中の敵（ボスと障害物のほか）と敵の弾を石にする。石は触れると砕ける。ボスは短時間止まる。,Petrify enemies (except bosses and obstacles) and hostile shots on screen. Touch stone to shatter it. Bosses stop briefly.
+hero.gemini.power,線を2本,Two Lines
+hero.gemini.desc,線を2本描き、機体と双子が同時に駆け抜ける。,Draw two lines. Your ship and its twin dash along them together.
+hero.hercules.power,火の隕石,Fiery Meteors
+hero.hercules.desc,機体の周りに火の隕石を落とし、落ちた跡を燃やす。,Drop fiery meteors around the ship and leave burning ground.
 hud.continuation,モジュール連続強化,CONSECUTIVE UPGRADE
 hud.continuation_count,{n} 連続！,{n} CHAIN!
 hud.start_title,最初の武器を1つ選ぶ（クリック／1〜3）,Choose Your First Weapon (Click / 1–3)
