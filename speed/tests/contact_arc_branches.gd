@@ -1,3 +1,4 @@
+## W17 の Lv ごとの全周分布・命中上限・片側配置・枝ごとの描画を短時間で確認する。
 extends Node
 
 func _ready() -> void:
@@ -23,10 +24,11 @@ func verify() -> void:
 	definition.radius = 10.0
 	definition.hp = 1000.0
 	var target := em.spawn(definition, Vector2.ZERO)
-	for pos in [Vector2(40,0),Vector2(80,0),Vector2(120,0),Vector2(160,0),
-		Vector2(-60,0),Vector2(-100,0),Vector2(-140,0),Vector2(-180,0),
-		Vector2(0,-50),Vector2(0,-90),Vector2(0,-130),Vector2(0,-170)]:
-		em.spawn(definition, pos)
+	# 全周の候補と、一方向だけに偏った近い候補を混ぜる。
+	for k in 40:
+		em.spawn(definition, Vector2.from_angle(k * TAU / 40.0 + 0.07) * 140.0)
+	for distance in [40.0, 60.0, 80.0]:
+		em.spawn(definition, Vector2(distance, 0))
 	var meteor := em.spawn(definition, Vector2(0,30))
 	em.table.meteor_index[meteor] = 0
 	var dead := em.spawn(definition, Vector2(0,20))
@@ -35,7 +37,7 @@ func verify() -> void:
 	var arc = load("res://scripts/weapons/contactArc.gd").new()
 	arc.setup(build, load("res://data/weapons/W17_contactArc.tres"))
 	var visual_segments := PackedVector2Array()
-	for lv in [1,5]:
+	for lv in range(1, 6):
 		arc.level = lv
 		s.events.clear()
 		arc.on_any_contact(target)
@@ -53,13 +55,37 @@ func verify() -> void:
 		var roots: Array[Vector2] = []
 		for k in range(2, segments.size(), 2):
 			if segments[k] == Vector2.ZERO: roots.append(segments[k+1])
-		assert(roots.size() == mini(3,lv*2), "Branches missing")
-		for i in roots.size():
-			for j in range(i+1,roots.size()):
-				assert(absf(roots[i].angle_to(roots[j])) >= deg_to_rad(60.0)-0.001, "Roots not separated")
-		print("W17 Lv",lv,": ",ids.size()," unique hits; ",roots.size()," separated roots; damage and segments OK")
+		assert(roots.size() == lv * 2, "Branches must grow with level")
+		var sectors := {}
+		var width := TAU / (lv * 2)
+		for pos in roots:
+			var sector := int(floor(fposmod(pos.angle() + width * 0.5, TAU) / width)) % (lv * 2)
+			assert(not sectors.has(sector), "One direction used multiple initial branches")
+			sectors[sector] = true
+		if lv == 5:
+			var angles: Array[float] = []
+			for pos in roots: angles.append(fposmod(pos.angle(), TAU))
+			angles.sort()
+			for k in angles.size():
+				var gap := fposmod(angles[(k + 1) % angles.size()] - angles[k], TAU)
+				assert(gap < TAU / 5.0, "Lv5 left a wide empty arc despite surrounding enemies")
+		print("W17 Lv", lv, ": ", ids.size(), " unique hits; ", roots.size(), " occupied angular sectors; damage OK")
 		visual_segments = segments
-	# One isolated contact must terminate without searching forever.
+	# 片側しか敵がいないときも全対象枠を使え、架空の命中先を作らない。
+	em.clear_all()
+	target = em.spawn(definition, Vector2.ZERO)
+	for k in 12: em.spawn(definition, Vector2(40.0 + k * 15.0, 0))
+	combat.rebuild_grid()
+	s.events.clear()
+	arc.on_any_contact(target)
+	var one_side_hits := 0
+	for e in s.events:
+		if e.type == &"hit": one_side_hits += 1
+	assert(one_side_hits == 11, "Unused sectors lost the shared target budget")
+	for pos in s.events.back().segments:
+		assert(pos.x >= 0.0 and pos.y == 0.0, "Invented a target on an empty side")
+	print("W17 one-sided crowd: 11 hits, all on the occupied side")
+	# 孤立した対象でも正常に終了する。
 	em.clear_all()
 	target = em.spawn(definition, Vector2.ZERO)
 	combat.rebuild_grid()

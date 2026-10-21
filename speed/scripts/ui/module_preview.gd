@@ -80,6 +80,8 @@ func _draw_effect(code: String) -> void:
 	var ship := Vector2(-92, 12)
 	if code == "rear":
 		ship.x = 92
+	elif code == "contactArc":
+		ship = Vector2(-140, 75)
 	var end := Vector2(65, 12)
 	var route := PackedVector2Array([Vector2(-145, 65), Vector2(-75, -45), end])
 	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length", "bipolar"]
@@ -121,16 +123,23 @@ func _draw_effect(code: String) -> void:
 				draw_circle(pos, 7, _ink(Color("#ff7b54")))
 				_ring(pos, 11, Color(1, 0.6, 0.4, 0.5))
 		"contactArc":
-			var origin := Vector2(-35, -20)
-			var points := PackedVector2Array([ship + Vector2(20, 0), origin,
-				origin, Vector2(-90, -55), origin, Vector2(25, -65), origin, Vector2(40, 45),
-				Vector2(40, 45), Vector2(110, 30)])
+			var origin := Vector2(10, -5)
+			var points := PackedVector2Array([ship + Vector2(20, 0), origin])
+			var targets: Array[Vector2] = []
+			var counts: Array = definition.params.branches_by_level
+			var count := int(counts.back())
+			for i in count:
+				var pos := origin + Vector2.from_angle(i * TAU / count) * Vector2(115, 75)
+				points.append(origin)
+				points.append(pos)
+				targets.append(pos)
 			var age := fmod(_clock, 0.8) if animated and known else 0.05
 			var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
 			for i in range(0, points.size(), 2):
 				PIXEL_LIGHTNING.draw(self, points[i], points[i + 1], 2.0, i * 313 + shape * 101, PIXEL_LIGHTNING.intensity(age, 0.22))
-			for pos in [origin, Vector2(-90, -55), Vector2(25, -65), Vector2(40, 45), Vector2(110, 30)]:
-				_sprite(ENEMY, pos, 30.0)
+			_sprite(ENEMY, origin, 30.0)
+			for pos in targets:
+				_sprite(ENEMY, pos, 24.0)
 		"endBlast":
 			_burst(end, 42 + pulse * 12)
 		"vortex":

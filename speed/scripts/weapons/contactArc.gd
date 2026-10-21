@@ -1,4 +1,4 @@
-## W17 接触電撃：接触した敵から離れた方向へ枝を出し、各枝を順に伸ばす（一覧 docs/game/catalog/weapons.md）。
+## W17 接触電撃：接触点の全周を角度帯に分け、敵がいる方向へ枝を配る（一覧 docs/game/catalog/weapons.md）。
 ## 全枝で Lv × chains_per_level 体の追加対象枠を共有。同じ敵には1回だけ。隕石には流れない。
 extends WeaponBehavior
 
@@ -17,17 +17,15 @@ func on_any_contact(target: int) -> void:
 	var reach: float = p("range")
 	var remaining := level * int(p("chains_per_level"))
 	var tips: Array[Vector2] = []
-	var directions: Array[Vector2] = []
-	var separation := deg_to_rad(clampf(float(p("branch_angle")), 0.0, 180.0))
-	# まず接触点の周りへ枝を配る。枝数・角度は .tres の試遊用初期値。
-	for k in mini(maxi(1, int(p("branches"))), remaining):
+	var counts: Array = p("branches_by_level")
+	var count := mini(maxi(1, int(counts[clampi(level - 1, 0, counts.size() - 1)])), remaining)
+	# Lv ごとの枝数で全周を分割。空の角度帯の枠は、実在する枝の続きへ回す。
+	for next in _roots(origin, reach, used, count):
 		if state.phase != RunState.Phase.PLAY:
 			break
-		var next := _nearest(origin, reach, used, directions, separation)
-		if next < 0:
-			break
+		if t.dead[next] != 0:
+			continue
 		var next_pos := _strike(origin, next, dmg, used, segments)
-		directions.append((next_pos - origin).normalized())
 		tips.append(next_pos)
 		remaining -= 1
 	# 各枝へ1体ずつ交互に配り、一方向が全対象枠を使うのを防ぐ。
@@ -45,8 +43,35 @@ func on_any_contact(target: int) -> void:
 			branch = 0
 	state.emit(&"bolt", {"segments": segments})
 
-func _nearest(from: Vector2, reach: float, used: Dictionary,
-		directions: Array[Vector2] = [], separation := 0.0) -> int:
+## 接触点の近傍を1回だけ探索し、全周の各角度帯で最も近い敵を選ぶ。
+func _roots(origin: Vector2, reach: float, used: Dictionary, count: int) -> PackedInt32Array:
+	if count <= 0:
+		return PackedInt32Array()
+	build.combat.nearby(origin, reach, _buf)
+	var t := build.enemies.table
+	var roots := PackedInt32Array()
+	roots.resize(count)
+	roots.fill(-1)
+	var distances := PackedFloat64Array()
+	distances.resize(count)
+	distances.fill(reach * reach)
+	var width := TAU / count
+	for i in _buf:
+		if t.meteor_index[i] >= 0 or used.has(t.id[i]):
+			continue
+		var offset := t.pos[i] - origin
+		var sector := int(floor(fposmod(offset.angle() + width * 0.5, TAU) / width)) % count
+		var d := offset.length_squared()
+		if d < distances[sector]:
+			distances[sector] = d
+			roots[sector] = i
+	var occupied := PackedInt32Array()
+	for i in roots:
+		if i >= 0:
+			occupied.append(i)
+	return occupied
+
+func _nearest(from: Vector2, reach: float, used: Dictionary) -> int:
 	build.combat.nearby(from, reach, _buf)
 	var t := build.enemies.table
 	var next := -1
@@ -58,14 +83,8 @@ func _nearest(from: Vector2, reach: float, used: Dictionary,
 		var d := offset.length_squared()
 		if d >= best:
 			continue
-		var separated := true
-		for direction in directions:
-			if absf(direction.angle_to(offset)) < separation:
-				separated = false
-				break
-		if separated:
-			best = d
-			next = i
+		best = d
+		next = i
 	return next
 
 func _strike(from: Vector2, next: int, dmg: float, used: Dictionary, segments: PackedVector2Array) -> Vector2:

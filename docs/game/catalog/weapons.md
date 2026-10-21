@@ -16,7 +16,7 @@
 | W06 | 追走ドローン | 採用 | 周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する。Lv で機数が増える | 自機が抜けたあとにも同じ線を掃く | 実装済み。`scripts/weapons/drone.gd`、`data/weapons/W06_drone.tres`。見た目は下の「機体とドローンの見た目」 | [demo W06](../../../demo/docs/weapons.md) `drone` |
 | W07 | 軌跡機雷 | 採用 | 高速で実際に通った線に一定の間隔で機雷を残す。少し遅れて有効になり、敵が近づくと爆発する | 敵が後から入る線を残す | 実装済み。`scripts/weapons/mines.gd`、`data/weapons/W07_mines.tres` | [demo W07](../../../demo/docs/weapons.md) `mines` |
 | W08 | ソニックブーム | 採用 | 駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波。同じ波動では各敵に1回 | 撃った地点だけでなく進路も一掃する。T05 とは別 | 実装済み。`scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres` | [demo W08](../../../demo/docs/weapons.md) `sonic` |
-| W17 | 接触電撃 | 採用 | 普段・高速を問わず敵に触れると、その敵から角度が離れた複数方向へ枝を出し、各枝を交互に伸ばす。全枝が共有する追加対象数は Lv で増える。同じ敵には1回の放電で1度だけ。隕石には流れない | 群れのつながった配置を線でまたぎ、接触点の周囲へ電撃を広げる | 実装済み。`scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。枝数・枝の最小角度は試遊用の調整可能な初期値。外観は[雷撃](../art-style.md#37-雷撃) | [demo W17](../../../demo/docs/weapons.md) `contactArc`。本番は分岐方式 |
+| W17 | 接触電撃 | 採用 | 普段・高速を問わず敵に触れると、接触点の全周を角度帯に分け、敵がいる帯へ枝を出す。Lv に応じて枝数と全枝が共有する追加対象数が増える。空の帯の枠は各枝の続きへ交互に配る。同じ敵には1回の放電で1度だけ。隕石には流れない | 群れに踏み込み、最終段階では周囲にいる敵へ全方面から電撃を広げる | 実装済み。`scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。Lv別の枝数は試遊用の調整可能な初期値。外観は[雷撃](../art-style.md#37-雷撃) | [demo W17](../../../demo/docs/weapons.md) `contactArc`。本番は分岐方式 |
 | W23 | 後方ブラスター | 採用 | 自機の背後から進行方向の反対へ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力だけが上がる。描画中・なぞり中は休む | 敵から逃げる向きへ進みながら後ろの追跡敵を攻撃する | 実装済み。`scripts/weapons/rear.gd`、`data/weapons/W23_rear.tres`。通常の取得・強化候補 | 本番独自。demo未実装。具体的な数値は仮調整 |
 
 味方の弾と攻撃する破片は惑星と月で止まる。波動・範囲攻撃・ビームは止まらない。
