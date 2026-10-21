@@ -57,7 +57,7 @@ const PARAMS_DOCS := {
 @export_group("図鑑")
 @export var preview_texture: Texture2D
 
-## 画面に出る名前と説明。編集元は docs/game/text.md。翻訳キーは strings.csv の trait.<ID>.name／.desc。
+## 画面に出る名前と説明。文章の正は res://data/text/strings.csv の trait.<ID>.name／.desc。
 func get_display_name() -> String:
 	return tr("trait.%s.name" % id)
 

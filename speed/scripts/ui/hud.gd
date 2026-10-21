@@ -39,13 +39,6 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 ## カードを表示してから選択を受け付けるまでの実秒。
 @export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
 
-@export_group("報酬演出")
-@export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
-@export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
-@export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
-## 800×450 の演出座標。任意で setup(HeroDef) / set_progress(0..1) を受け取る Control シーン。
-@export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
-
 var _cards_accept_at := 0
 var _card_blocked_pointer_frame := -1
 var _card_blocked_pointer_pos := Vector2.ZERO
@@ -53,7 +46,6 @@ var _card_blocked_pointer_pos := Vector2.ZERO
 var _card_held: Dictionary = {}
 var _card_discard: Dictionary = {}
 
-var _rewards: Control
 var run: RunManager
 var _font: Font
 var _cards_box: Control
@@ -83,7 +75,6 @@ var _ring_usable := true
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
-var _pause_after_reward := false
 
 func _ready() -> void:
 	run = get_node(run_path) as RunManager
@@ -105,13 +96,6 @@ func _ready() -> void:
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_build_cards()
-	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
-	_rewards.continuation_seconds = continuation_seconds
-	_rewards.ult_cutin_seconds = ult_cutin_seconds
-	_rewards.ult_details_seconds = ult_details_seconds
-	_rewards.ult_cutin_scene = ult_cutin_scene
-	add_child(_rewards)
-	_rewards.active_changed.connect(_on_reward_active)
 	resized.connect(_layout_cards)
 	_build_pause()
 	_draw_button = Button.new()
@@ -126,32 +110,15 @@ func _ready() -> void:
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
 
-func _on_reward_active(active: bool) -> void:
-	run.ui_reward_active = active
-	run.input.cancel_gesture()
-	_card_discard.merge(_card_held)
-	_draw_button.visible = not active and DisplayServer.is_touchscreen_available()
-	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
-	_pause_box.visible = not active and run.state.phase == RunState.Phase.PAUSED
-	if not active:
-		if _pause_after_reward:
-			_pause_after_reward = false
-			run.command(&"pause")
-		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
-
 func _on_phase(phase: RunState.Phase) -> void:
-	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
-	_pause_box.visible = phase == RunState.Phase.PAUSED and not _rewards.is_active()
+	_cards_box.visible = phase == RunState.Phase.LEVELUP
+	_pause_box.visible = phase == RunState.Phase.PAUSED
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
-			&"level_bonus":
-				_rewards.enqueue_bonus(ev)
-			&"hero_freed":
-				_rewards.enqueue_ult(ev)
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
@@ -192,7 +159,7 @@ func _input(event: InputEvent) -> void:
 	if id == "":
 		return
 	var choosing := run.state.phase == RunState.Phase.LEVELUP
-	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -213,8 +180,8 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _card_input_id(event: InputEvent) -> String:
-	if event is InputEventMouseButton:
-		return "mouse:%d:%d" % [event.device, event.button_index]
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		return "mouse:%d" % event.device
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
 		return "touch:%d:%d" % [event.device, event.index]
 	var id := ""
@@ -225,24 +192,21 @@ func _card_input_id(event: InputEvent) -> String:
 	elif event is InputEventAction:
 		id = "action:%s" % event.action
 	if id != "":
-		if _rewards.is_active() or _card_held.has(id) or _card_discard.has(id):
+		if _card_held.has(id) or _card_discard.has(id):
 			return id
-		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept", &"hero", &"draw_alt", &"pause"]:
+		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept"]:
 			if event.is_action(action):
 				return id
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+	if run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
-	if _rewards.is_active():
-		get_viewport().set_input_as_handled()
-		return
 	if _settings != null or run.state.lab_mode:
 		return
 	var s := run.state
@@ -263,10 +227,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null and not run.state.lab_mode:
-		if _rewards.is_active():
-			_pause_after_reward = true
-		else:
-			run.command(&"pause")
+		run.command(&"pause")
 
 func _process(delta: float) -> void:
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
@@ -322,15 +283,12 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var texture: Texture2D = definition.icon_texture if definition is WeaponDef else null
-	if texture == null:
-		var index := ICON_IDS.find(String(definition.id))
-		if index < 0:
-			return
-		var atlas := AtlasTexture.new()
-		atlas.atlas = ICONS
-		atlas.region = Rect2(index * 47, 0, 47, 47)
-		texture = atlas
+	var index := ICON_IDS.find(String(definition.id))
+	if index < 0:
+		return
+	var texture := AtlasTexture.new()
+	texture.atlas = ICONS
+	texture.region = Rect2(index * 47, 0, 47, 47)
 	var icon := TextureRect.new()
 	icon.texture = texture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -654,7 +612,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
-		if _hero_notice_t > 0.0 and not _rewards.is_active():
+		if _hero_notice_t > 0.0:
 			var text := tr("hud.hero_discovered")
 			var font_size := mini(24, int((W - 24.0) / maxf(1.0, _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x) * 24.0))
 			draw_string(_font, Vector2(12.0, MINIMAP_R * 2.0 + 42.0 if W < 600.0 else 110.0), text, HORIZONTAL_ALIGNMENT_CENTER, W - 24.0,

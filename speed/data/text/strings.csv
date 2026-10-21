@@ -1,5 +1,5 @@
 keys,ja,en
-,ゲーム中に表示する文章の生成データ。編集元は docs/game/text.md。ja 列が日本語、en 列が英語。設定の「言語」で切り替える。,
+,ゲーム中に表示する文章のマスタ。1行が1つの文章で、ja 列が日本語、en 列が英語。設定の「言語」で切り替える。,
 ,キーは「場所.項目」の形で、コードと画面がこのキーで文章を読む。武器・特性・伝説のモジュール・機体の強化は <種類>.<ID>.name と .desc（ID は .tres の id）、ステージは stage.<番号>.name。,
 ,{n} などの波かっこは、ゲームが数値や名前に置き換える場所。両方の言語で同じ名前を使う。,
 ,キーが空の行はこの説明と見出しで、ゲームは読まない。,
@@ -65,19 +65,6 @@ hud.game_over,GAME OVER,GAME OVER
 hud.levelup_title,レベルアップ　1枚選ぶ（クリック／1〜3）,Level Up: Pick One (Click / 1–3)
 hud.level_bonus,おまけ,Bonus
 hud.level_bonus_more,継続！,More!
-hud.ult_granted,英雄の力を授かった,ULT ACQUIRED
-hud.ult_placeholder,仮カットイン · 正式素材へ差し替え予定,PLACEHOLDER CUT-IN · ART PENDING
-hud.ult_key,{key}：英雄の星座の力を発動,{key}: Activate constellation power
-hero.leo.power,線が太くなる,Wider Line
-hero.leo.desc,線が太くなり、帯に触れた敵を装甲に関係なく貫く。,Widen the line and pierce enemies in its path regardless of armor.
-hero.perseus.power,メドゥーサの首,Medusa's Head
-hero.perseus.desc,画面の中の敵（ボスと障害物のほか）と敵の弾を石にする。石は触れると砕ける。ボスは短時間止まる。,Petrify enemies (except bosses and obstacles) and hostile shots on screen. Touch stone to shatter it. Bosses stop briefly.
-hero.gemini.power,線を2本,Two Lines
-hero.gemini.desc,線を2本描き、機体と双子が同時に駆け抜ける。,Draw two lines. Your ship and its twin dash along them together.
-hero.hercules.power,火の隕石,Fiery Meteors
-hero.hercules.desc,機体の周りに火の隕石を落とし、落ちた跡を燃やす。,Drop fiery meteors around the ship and leave burning ground.
-hud.continuation,モジュール連続強化,CONSECUTIVE UPGRADE
-hud.continuation_count,{n} 連続！,{n} CHAIN!
 hud.start_title,最初の武器を1つ選ぶ（クリック／1〜3）,Choose Your First Weapon (Click / 1–3)
 hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
@@ -163,8 +150,6 @@ weapon.W22.name,双極ビーム,Bipolar Beam
 weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
-weapon.W24.name,光の槍,Light Lance
-weapon.W24.desc,突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる,Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage.
 ,■ 特性（trait.<ID>）,
 trait.T01.name,終端爆縮,End Implosion
 trait.T01.desc,線の終点で爆発,Explodes at the end of your line.

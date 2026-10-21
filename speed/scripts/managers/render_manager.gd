@@ -112,8 +112,6 @@ var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
-var _glide_wake: Node2D
-var _light_lance: Node2D
 
 func _ready() -> void:
 	run = get_node("../RunManager") as RunManager
@@ -158,13 +156,6 @@ func _ready() -> void:
 	if not pipeline.rich:
 		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
-	_glide_wake = preload("res://scenes/fx/glide_wake.tscn").instantiate()
-	_layers.exhaust.add_child(_glide_wake)
-	_light_lance = preload("res://scripts/render/light_lance.gd").new()
-	_light_lance.name = "LightLance"
-	_light_lance.z_index = 1
-	_light_lance.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	_layers.ship.add_child(_light_lance)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -321,8 +312,6 @@ func _process(delta: float) -> void:
 		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
-	_glide_wake.step(dt, state, cfg, run.build.weapon_behaviors.has(&"W08"))
-	_light_lance.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W24"), cam_zoom)
 	_update_view()
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
@@ -348,8 +337,6 @@ func _process(delta: float) -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
-			&"lance_hit":
-				_light_lance.hit(ev)
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 			&"explode":

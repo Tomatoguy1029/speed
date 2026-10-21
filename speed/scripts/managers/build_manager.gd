@@ -248,7 +248,12 @@ func _level_bonus() -> void:
 		grant(pick.kind, pick.id)
 		count += 1
 		var owned: Dictionary = state.weapons if pick.kind == &"weapon" else state.traits
+		var def: Resource = (ConfigManager.weapons if pick.kind == &"weapon" else ConfigManager.traits)[pick.id]
 		state.emit(&"level_bonus", {"kind": pick.kind, "id": pick.id, "level": owned[pick.id], "count": count})
+		var head := TranslationServer.translate("hud.level_bonus") if count == 1 else TranslationServer.translate("hud.level_bonus_more")
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60 - 26 * count),
+			"text": "%s %s Lv%d" % [head, def.get_display_name(), owned[pick.id]],
+			"color": Color("#efcb70") if count == 1 else Color("#ffe46b"), "size": 20 + 3 * count})
 
 ## おまけで上げる候補：持っている武器・特性のうち、上限に達していないものからランダムに1つ。なければ空。
 func _bonus_target() -> Dictionary:
