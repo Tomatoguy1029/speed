@@ -18,7 +18,7 @@ func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
 			build.projectiles.fling_corpse(i, dir * v, _dmg())
 	else:
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
-		var push := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
+		var push := build.enemies.knockback_scale(i)
 		if push <= 0.0:
 			return
 		t.shove_time[i] = p("shove_time")

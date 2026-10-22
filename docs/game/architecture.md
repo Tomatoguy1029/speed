@@ -245,6 +245,8 @@ Main (Node)
 
 **うみへび座の編集と役割**
 
+`EnemyManager.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatManager.damage_enemy()` と吹き飛ばし衝角はこの判定を使い、役者が管理する移動速度と外力を分ける。
+
 ゲームの決まりは [ヒュドラ専用仕様](hydra.md)、採用・実装状況は [敵一覧](catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
 LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会のコンボ抽選と、形態・参加者・配置・待ち時間で選ぶ大技の枝を編集できる。`hydra_head_bt.tres` は各首が複製して持ち、種類・距離・方向・画面内・状態・予算の条件から通常技を選び、成立する技があれば実行する。各ProbabilitySelectorの子の重みと `hydra_play_tech.gd` の `cooldown_scale` をInspectorで編集する。技の位置条件・コスト・共通予算・時間・護衛位置は `data/bosses/hydra.tres` の `params` に置く。条件評価は読み取りだけを行い、選択後に攻撃枠を取得する。

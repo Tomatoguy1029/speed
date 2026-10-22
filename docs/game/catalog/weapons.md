@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|---|
 | W01 | ブラスター | 採用 | 進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる。描画中・なぞり中は休む | 通常の移動の向きが撃つ向きになる | 実装済み。`scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres` | [demo W01](../../../demo/docs/weapons.md) `forward` |
 | W02 | 散弾砲 | 採用 | 進む向きへ扇状に撃つ | 群れに向けて進み、近い距離で広がりを当てる | 実装済み。`scripts/weapons/scatter.gd`、`data/weapons/W02_scatter.tres` | [demo W02](../../../demo/docs/weapons.md) `scatter` |
-| W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ（クリティカルにはならない）。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
+| W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ（クリティカルにはならない）。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。外力は [ボス共通ルール](../spec.md#12-ボス) に従う。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
 | W04 | 接触波動 | 採用 | 高速で触れるたびに、触れた位置から周りへ波動。弾かれた接触でも出る。波動の撃破からは連鎖しない | 密集した群れを通る | 実装済み。`scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | [demo W04](../../../demo/docs/weapons.md) `contactWave` |
 | W05 | バリアシステム | 採用 | 周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ | 敵や弾に近づくときの状況を変える | 実装済み。`scripts/weapons/barrier.gd`、`data/weapons/W05_barrier.tres` | [demo W05](../../../demo/docs/weapons.md) `barrier` |
 | W06 | 追走ドローン | 採用 | 周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する。Lv で機数が増える | 自機が抜けたあとにも同じ線を掃く | 実装済み。`scripts/weapons/drone.gd`、`data/weapons/W06_drone.tres`。見た目は下の「機体とドローンの見た目」 | [demo W06](../../../demo/docs/weapons.md) `drone` |
