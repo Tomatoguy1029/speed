@@ -17,6 +17,9 @@ signal presentation_advanced(world_dt: float)
 var _presentation: Node
 var _defeat_announced := false
 
+const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
+const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
+var attack_field: Node2D
 const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 
 ## 首1本の状態
@@ -40,6 +43,8 @@ class Neck:
 	var mode: StringName = &"idle"
 	var t := 0.0
 	var cd := 0.0
+	var locked := false
+	var bt: BTTask
 	var step := 0
 	var glow := 0.0
 	## 付いて動く攻撃の形（ビーム）の行と、強めの技で首を振る速さ
@@ -155,6 +160,9 @@ func _on_bound() -> void:
 		add_child(_presentation)
 		if _presentation.has_method("bind_hydra"):
 			_presentation.bind_hydra(self)
+	attack_field = load("res://scripts/bosses/hydra_attack_field.gd").new()
+	add_child(attack_field)
+	attack_field.bind(self)
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	hsm.initialize(self)
@@ -221,6 +229,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_release_attack(neck)
 		_cue(&"defeated")
 		manager.on_boss_defeated(body, {"cause": &"ram"})
+	attack_field.tick(dt)
 	presentation_advanced.emit(dt)
 	queue_redraw()
 
@@ -285,6 +294,10 @@ func _grow(neck: Neck) -> void:
 	neck.row = j
 	neck.row_id = table.id[j]
 	neck.head_hp = hp
+	var bb := Blackboard.new()
+	bb.set_var(&"head_index",necks.find(neck))
+	neck.bt = HEAD_BT.root_task.clone()
+	neck.bt.initialize(self,bb,self)
 	neck.mode = &"idle"
 	neck.glow = 0.0
 	neck.segs.clear()
@@ -297,6 +310,7 @@ func _neck_base(neck: Neck) -> Vector2:
 func _head_pos(neck: Neck) -> Vector2:
 	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
+	if neck.locked and def.params.normal_rules.has(neck.mode): return neck.strike_pos
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
 
 func _alive(neck: Neck) -> bool:
@@ -329,7 +343,13 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		if table.hp[neck.row] < neck.head_hp:
 			_cue(&"hit", neck.mode, k, {"target": &"hydra", "damage": neck.head_hp - maxf(0.0, table.hp[neck.row])})
 		neck.head_hp = table.hp[neck.row]
-		_attack(neck, k, dt)
+		if def.params.normal_rules.has(neck.mode):
+			neck.t += dt
+			NORMALS.tick(self,neck,dt)
+		elif neck.mode == &"idle":
+			neck.cd = maxf(0.0,neck.cd-dt)
+			if not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
+		else: _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
 	if neck.row >= 0 or neck.length > 0.0:
@@ -440,6 +460,50 @@ func _expose() -> void:
 	immortal_segs.clear()
 	_cue(&"exposed", &"immortal", -2)
 	run_state.emit(&"text", {"pos": table.pos[body] + Vector2(0, -table.r[body] - 40.0), "text": "!", "color": Color("#ffe46b"), "size": 48})
+
+
+func normal_ready(index: int, attack: StringName) -> bool:
+	if index < 0 or index >= necks.size() or not def.params.normal_rules.has(attack): return false
+	var n := necks[index]
+	var rule: Dictionary = def.params.normal_rules[attack]
+	if not _alive(n) or n.kind != rule.kind or n.mode != &"idle" or n.cd > 0.0: return false
+	if busy or recovery_t > 0.0 or chance_t > 0.0 or growth_t > 0.0 or separation_pending: return false
+	var at := _head_pos(n)
+	if not run_state.view_rect().grow(-table.r[n.row]).has_point(at): return false
+	var offset := run_state.ship_pos-at
+	if offset.length() < rule.min or offset.length() > rule.max: return false
+	if not separated and absf(angle_difference(n.base_angle+table.facing[body],(run_state.ship_pos-_neck_base(n)).angle())) > 1.25: return false
+	var used := 0.0
+	for other in necks:
+		if def.params.normal_rules.has(other.mode): used += float(def.params.normal_rules[other.mode].cost)
+	return used + float(rule.cost) <= float(def.params.normal_budget)
+
+func start_normal(index: int, attack: StringName) -> bool:
+	if not normal_ready(index,attack): return false
+	var n := necks[index]
+	if not manager.admit("neck:"+str(n.row_id),["dash"],n.row,4.0): return false
+	n.mode = attack
+	n.t = 0.0
+	n.locked = false
+	n.step = 0
+	_cue(&"warning_started",attack,index)
+	return true
+
+func finish_normal(n: Neck) -> void:
+	var at := _head_pos(n)
+	_release_attack(n)
+	n.angle = (at-_neck_base(n)).angle()
+	n.length = at.distance_to(_neck_base(n))
+	n.locked = false
+	n.mode = &"idle"
+	n.cd = float(def.params.attack_cd)
+	_cue(&"finished",&"",necks.find(n))
+
+func position_head(index: int, dt: float) -> void:
+	var n := necks[index]
+	var facing := n.base_angle+table.facing[body]
+	n.angle = lerp_angle(n.angle,facing+sin(_time+n.base_angle)*0.15,minf(1.0,dt*2.0))
+	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
 
 # ── 首の攻撃（各首の種類ごと） ──────────────────────────────────────
 
@@ -633,6 +697,7 @@ func _beam(neck: Neck, aim: float, dt: float) -> void:
 
 ## 首の攻撃の後片付け（頭が落ちたとき）。
 func _release_attack(neck: Neck) -> void:
+	if attack_field != null: attack_field.remove_owner(neck.row)
 	if neck.hazard >= 0:
 		if manager.projectiles.owns_hazard(neck.hazard, neck.row, neck.row_id):
 			manager.projectiles.release_hazard(neck.hazard)

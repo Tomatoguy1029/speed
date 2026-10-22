@@ -12,6 +12,11 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"normal_rules": {&"bite_thrust": {"kind": &"bite", "min": 0.0, "max": 620.0, "cost": 1.0}},
+"normal_charge": 0.6,
+"normal_lunge": 0.16,
+"normal_hold": 0.9,
+"normal_budget": 3.0,
 "growth_thresholds": [0.75, 0.4],
 "growth_time": 1.0,
 "chance_time": 5.0,
