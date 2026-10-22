@@ -36,7 +36,7 @@ static func tick(a: Node, n, dt: float) -> void:
 		n.target = a.run_state.ship_pos
 		n.strike_from = from
 		n.strike_pos = from
-		a._cue(&"target_locked",n.mode,a.necks.find(n))
+		a._cue(&"target_locked",n.mode,a.head_index(n))
 	if n.locked and n.t < charge + flight:
 		n.strike_pos = n.strike_from.lerp(n.target,clampf((n.t-charge)/flight,0.0,1.0))
 		n.angle = (n.target-n.strike_from).angle()
@@ -46,7 +46,7 @@ static func tick(a: Node, n, dt: float) -> void:
 		if n.mode==&"thunder_headbutt" and n.step==0:
 			n.step=1
 			a.attack_field.add_shape(PackedVector2Array([n.target,n.target+Vector2(0.1,0)]),float(p.thunder_radius)*2.0,0.0,float(p.thunder_flash),float(p.beam_dmg),&"lightning",n.row)
-			a._cue(&"attack_started",n.mode,a.necks.find(n))
+			a._cue(&"attack_started",n.mode,a.head_index(n))
 		n.glow = 0.0
 	if n.t >= charge + flight + hold: a.finish_normal(n)
 
@@ -79,7 +79,7 @@ static func wind_band(a: Node,n,dt: float) -> void:
 		n.strike_pos=a._neck_base(n)+Vector2.from_angle(n.angle)*n.length
 		var points := PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.wind_length)])
 		a.attack_field.add_shape(points,float(p.wind_width),0.0,float(p.wind_time),0.0,&"wind",n.row)
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t >= charge+float(p.wind_time)+float(p.normal_hold): a.finish_normal(n)
 
 static func wind_blades(a: Node,n,dt: float) -> void:
@@ -100,7 +100,7 @@ static func wind_blades(a: Node,n,dt: float) -> void:
 			points.append(n.strike_pos+Vector2(cos(angle)*float(p.blade_size)*0.6,sin(angle)*float(p.blade_size)).rotated(n.angle))
 		a.attack_field.add_shape(points,float(p.blade_width),0.0,float(p.blade_life),float(p.bite_dmg),&"wind_blade",n.row,Vector2.from_angle(n.angle)*float(p.blade_speed),true)
 		n.step+=1
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t>=charge+2.0*float(p.blade_interval)+float(p.normal_hold): a.finish_normal(n)
 
 static func rubble(a: Node,n,dt: float) -> void:
@@ -119,7 +119,7 @@ static func rubble(a: Node,n,dt: float) -> void:
 			for i in int(p.rubble_count):
 				var angle: float = n.angle+float(p.rubble_spread)*(float(i)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)
 				launch_rubble(a,n,angle,float(p.rubble_small_radius))
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
 
 static func launch_rubble(a: Node,n,angle: float,radius: float) -> void:
@@ -145,7 +145,7 @@ static func beam_fixed(a: Node,n,dt: float) -> void:
 	elif not n.locked:
 		n.strike_pos=a._head_pos(n)
 		n.locked=true
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t>=charge+float(p.beam_time)+float(p.normal_hold): a.finish_normal(n)
 
 static func beam_bolt(a: Node,n,dt: float) -> void:
@@ -159,7 +159,7 @@ static func beam_bolt(a: Node,n,dt: float) -> void:
 		n.locked=true
 		var u := Vector2.from_angle(n.angle)
 		a.attack_field.add_shape(PackedVector2Array([n.strike_pos,n.strike_pos+u*float(p.bolt_length)]),float(p.bolt_width),0.0,float(p.bolt_life),float(p.beam_dmg),&"bolt",n.row,u*float(p.bolt_speed),true)
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
 
 static func thunder_drop(a: Node,n,dt: float) -> void:
@@ -174,8 +174,8 @@ static func thunder_drop(a: Node,n,dt: float) -> void:
 		if n.t>=charge*float(p.target_lock_fraction):
 			n.strike_pos=a._head_pos(n)
 			n.locked=true
-			a._cue(&"target_locked",n.mode,a.necks.find(n))
+			a._cue(&"target_locked",n.mode,a.head_index(n))
 	if n.t>=charge and n.step==0:
 		n.step=1
-		a._cue(&"attack_started",n.mode,a.necks.find(n))
+		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t>=charge+float(p.thunder_flash)+float(p.normal_hold): a.finish_normal(n)

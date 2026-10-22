@@ -255,6 +255,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		interrupt_tech()
 		for neck in necks:
 			_release_attack(neck)
+			if _alive(neck):manager.enemies.mark_dead(neck.row)
+		attack_field.clear_effects()
 		_cue(&"defeated")
 		manager.on_boss_defeated(body, {"cause": &"ram"})
 	attack_field.tick(dt)
@@ -539,7 +541,7 @@ func finish_normal(n: Neck) -> void:
 	n.locked = false
 	n.mode = &"idle"
 	n.cd = float(def.params.attack_cd)
-	_cue(&"finished",&"",necks.find(n))
+	_cue(&"finished",&"",head_index(n))
 
 func position_head(index: int, dt: float) -> void:
 	var n := necks[index]
@@ -1153,7 +1155,9 @@ func draw_on(c: CanvasItem) -> void:
 	if exposed_t > 0.0:
 		_draw_neck(c, immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
 	if separated:
-		if immortal_neck!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
+		if immortal_neck!=null:
+			_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
+			_draw_compass(c,52.0)
 		return
 	c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
 	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
@@ -1214,6 +1218,7 @@ func begin_separation()->void:
 	immortal_id=table.id[immortal_row]
 	immortal_neck.row=immortal_row
 	immortal_neck.row_id=immortal_id
+	immortal_neck.cd=float(def.params.attack_cd)
 	var hp: float=float(def.params.immortal_hp)*manager.cfg.enemy_hp_mult
 	table.max_hp[immortal_row]=hp
 	table.hp[immortal_row]=hp
@@ -1227,21 +1232,45 @@ func tick_bearer(dt: float)->void:
 	if immortal_row<0 or not manager.enemies.is_same(immortal_row,immortal_id) or table.dead[immortal_row]:
 		table.hp[body]=0.0
 		return
-	var away: Vector2=(immortal_neck.free_pos-run_state.ship_pos).normalized()
-	if away==Vector2.ZERO:away=Vector2.LEFT
-	var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
-	if busy and tech==&"grid" and special.state.has("plan"):
-		target=special.state.plan.bearer
-		if immortal_neck.free_pos.distance_to(target)<float(def.params.grid_tolerance):
-			table.hp[body]=table.hp[immortal_row]
-			return
-	if busy and tech==&"grid" and immortal_neck.free_pos.distance_to(target)<45.0:
-		immortal_neck.free_pos=immortal_neck.free_pos.lerp(target,1.0-exp(-4.0*dt))
-	else:SNAKE.steer(immortal_neck,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
-	table.pos[immortal_row]=immortal_neck.free_pos
-	table.pos[body]=immortal_neck.free_pos
+	var n:=immortal_neck
+	if n.head_hp>table.hp[immortal_row]:
+		n.motion.hit=0.35
+		_cue(&"hit",&"immortal",-2,{"target":&"hydra","damage":n.head_hp-table.hp[immortal_row]})
+	n.head_hp=table.hp[immortal_row]
+	var alone:=necks.all(func(head):return not _alive(head))
+	if alone and n.mode!=&"idle":
+		n.t+=dt
+		NORMALS.tick(self,n,dt)
+	elif alone and n.cd<=0.0:
+		n.mode=&"bite_thrust"
+		n.t=0.0
+		n.locked=false
+		n.step=0
+		_cue(&"warning_started",&"bite_thrust",-2)
+	else:
+		n.cd=maxf(0.0,n.cd-dt)
+		var away: Vector2=(n.free_pos-run_state.ship_pos).normalized()
+		if away==Vector2.ZERO:away=Vector2.LEFT
+		var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
+		var grid_hold: bool=busy and tech==&"grid" and special.state.has("plan")
+		if grid_hold:target=special.state.plan.bearer
+		target=target.limit_length(manager.cfg.field_radius-200.0)
+		if grid_hold and n.free_pos.distance_to(target)<45.0:
+			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
+			n.velocity=Vector2.ZERO
+		else:SNAKE.steer(n,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
+	var at:=_head_pos(n)
+	table.pos[immortal_row]=at
+	table.facing[immortal_row]=n.angle
+	table.pos[body]=at
 	table.hp[body]=table.hp[immortal_row]
-	_follow_neck(immortal_neck,dt)
+	_follow_neck(n,dt)
+
+func health_row()->int:
+	return immortal_row if separated and manager.enemies.is_same(immortal_row,immortal_id) else body
+
+func head_index(n: Neck)->int:
+	return -2 if n==immortal_neck else necks.find(n)
 
 func grid_plan()->Dictionary:
 	var maximum: float=manager.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/manager.cfg.base_max_speed
