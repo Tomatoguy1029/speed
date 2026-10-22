@@ -26,6 +26,8 @@ func _initialize() -> void:
 		_forbid(path, GAME_REFS, "道具（addons）がゲームを参照している")
 	for path in _files("res://scripts/ui"):
 		_forbid_regex(path, "\\bstate\\.[a-z_]+\\s*[+\\-*/]?=[^=]", "UI がランの状態を書き換えている")
+	for path in _files("res://scripts/encounters"):
+		_forbid(path, ["projectiles.director ="], "攻撃directorの所有はRunSimulationに集約する")
 	_forbid("res://scripts/runtime/run_simulation.gd", ["res://scripts/dev/", "&\"debug_"], "シミュレーションが開発用機能を参照している")
 	_forbid("res://scenes/run/run.tscn", ["res://scripts/dev/"], "本番の表示が開発用機能を参照している")
 	_forbid("res://scripts/ui/main.gd", ["res://gyms/", "res://addons/"], "画面の入口が開発用機能を参照している")

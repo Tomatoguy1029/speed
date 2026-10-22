@@ -1,7 +1,6 @@
 ## 採用したステージの配置規則だけを実行する。候補が成立しなければ出現を見送る。
 extends RefCounted
 const CHECK := preload("res://scripts/encounters/route_constraints.gd")
-const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 var run: RunSimulation
 var tick: int:
 	get: return roundi(run.state.sim_time * 60.0)
@@ -24,11 +23,6 @@ func setup(manager: RunSimulation, value: Dictionary) -> void:
 			profile.enabled = false
 			push_warning(TranslationServer.translate("lab.message_d51f72362d"))
 			return
-	var director = DIRECTOR.new()
-	director.state = run.state
-	director.projectiles = run.projectiles
-	director.configure(profile.get("director", {}))
-	run.projectiles.director = director
 
 func digest() -> String:
 	return str(run.state.rng.state)
