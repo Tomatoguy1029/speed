@@ -118,14 +118,16 @@ func setup() -> void:
 	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
 		encounters = ENCOUNTERS.new()
 		encounters.setup(self, state.stage.encounter_profile)
-	if not state.lab_mode and projectiles.director == null:
-		# 強敵の攻撃の管理（時間帯の予算と群れごとの value で動く。仕様書 11.7）
-		var director = DIRECTOR.new()
-		director.state = state
-		director.projectiles = projectiles
+	# 強敵の攻撃の管理（時間帯の予算と群れごとの value で動く。仕様書 11.7）。実験場は options.director の設定で動く
+	var director = DIRECTOR.new()
+	director.state = state
+	director.projectiles = projectiles
+	if state.lab_mode:
+		director.configure(options.get("director", {}))
+	else:
 		director.formation_mode = true
 		director.configure({"enabled": true, "budget": maxi(0, spawn.current_phase().attack_budget), "jitter": 0.0})
-		projectiles.director = director
+	projectiles.director = director
 	if not state.lab_mode:
 		spawn._sync_attack_budget(spawn.current_phase())
 	loadout.cards_opened.connect(func(_c):

@@ -6,7 +6,6 @@ signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
-const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 const DT := 1.0 / 60.0
 
 var scene: RunSession
@@ -121,7 +120,7 @@ func _rebuild() -> void:
 			defs[StringName(id)] = def
 	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
-		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
+		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {}), "director": spec.get("director", {})}
 	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
 	scene = RunManager.create_session(viewport if viewport != null else self, options, viewport != null)
 	scene.auto_step = false
@@ -136,11 +135,6 @@ func _rebuild() -> void:
 					for param in spec.boss_overrides[id][key]: boss.params[param] = safe_parameter(param, spec.boss_overrides[id][key][param])
 				else: boss.set(key, spec.boss_overrides[id][key])
 			run.bosses.definitions[StringName(id)] = boss
-	var director = DIRECTOR.new()
-	director.state = run.state
-	director.projectiles = run.projectiles
-	director.configure(spec.get("director", {}))
-	run.projectiles.director = director
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
 	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
