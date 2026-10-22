@@ -36,6 +36,13 @@ func _ready() -> void:
 		var wave: int = pr.emit_attack(&"wave", [Vector2.ZERO, 0.0, PI, 300.0, 100.0, 20.0, 0.5, 4.0])
 		check(pr.hazard_active[wave] == 3.0 and pr.hazard_speed[wave] == 100.0, "波の到達時間と速度を維持する")
 
+	var shell_shape = load("res://scripts/attacks/shell.gd").new()
+	check(shell_shape.has_method("spawn"), "圧縮弾の種類が生成処理を持つ")
+	if shell_shape.has_method("spawn"):
+		var row := session.sim.enemies.spawn(session.sim.enemies.def_of(&"drifter"), Vector2.ZERO)
+		pr.emit_attack(&"shell", [row, 0.0, 100.0, 20.0, 300.0, 90.0, 8.0])
+		check(pr.hostile_count() == 1 and pr.hostile_burst[0] == 90.0, "圧縮弾の破裂半径を維持する")
+
 	session.free()
 	await get_tree().process_frame
 	print("[attack_emission] %d failures" % failed)

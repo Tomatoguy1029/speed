@@ -379,51 +379,28 @@ func _update_friendly(dt: float) -> void:
 
 ## 敵（行 i）が弾を撃つ（射撃型・ミサイル艇・戦艦・ボス）。kind は &"bullet" か &"missile"。
 func fire_enemy(i: int, angle: float, speed: float, kind: StringName, params := {}) -> void:
-	var t := combat.enemies.table
-	var p: Dictionary = params if not params.is_empty() else t.def[i].params
-	var missile := kind == &"missile"
-	var u := Vector2.from_angle(angle)
-	var pos := t.pos[i]
-	_add_hostile(pos + u * t.r[i], u * speed, speed, 9.0 if missile else 7.0, 4.5 if missile else 4.0,
-		float(p.get("bullet_dmg", 7.0)), p.get("slow", 0.0),
-		p.get("missile_turn", 0.0), HostileKind.MISSILE if missile else HostileKind.BULLET)
-	state.emit(&"shoot", {"pos": pos, "kind": kind})
+	emit_attack(&"enemy", [i, angle, speed, kind, params])
 
 ## 敵（行 i）の周りに弾を輪のように n 発浮かべ、wait 世界秒のあと全部を外へ放つ（うみへび座のホーミング弾の首）。
 func fire_ring_hold(i: int, n: int, radius: float, wait: float, speed: float, dmg: float) -> void:
-	var c := combat.enemies.table.pos[i]
-	for k in n:
-		var u := Vector2.from_angle(TAU * k / float(n))
-		var h := _add_hostile(c + u * radius, u * speed, speed, 8.0, 4.0 + wait, dmg, 0.0, 0.0, HostileKind.BULLET)
-		hostile_wait[h] = wait
+	emit_attack(&"ring_hold", [i, n, radius, wait, speed, dmg])
 
 ## 塊を投げる（うみへび座の瓦礫の首）。大きさ r、ダメージ dmg。
 func fire_lump(i: int, angle: float, speed: float, r: float, dmg: float) -> void:
-	var t := combat.enemies.table
-	var u := Vector2.from_angle(angle)
-	_add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, 4.0, dmg, 0.0, 0.0, HostileKind.BULLET)
-	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"lump"})
+	emit_attack(&"lump", [i, angle, speed, r, dmg])
 
 ## ポンプ座の圧縮弾を撃つ。距離 range を飛ぶか何かに当たると、半径 burst で破裂して dmg を与える。
 func fire_shell(i: int, angle: float, speed: float, r: float, range: float, burst: float, dmg: float) -> void:
-	var t := combat.enemies.table
-	var u := Vector2.from_angle(angle)
-	var h := _add_hostile(t.pos[i] + u * (t.r[i] + r), u * speed, speed, r, range / maxf(speed, 1.0), dmg, 0.0, 0.0,
-		HostileKind.SHELL)
-	hostile_burst[h] = burst
-	state.emit(&"shoot", {"pos": t.pos[i], "kind": &"shell"})
+	emit_attack(&"shell", [i, angle, speed, r, range, burst, dmg])
 
 ## ケフェウス座の兵の細長い光弾を、from から向き angle へ撃つ。直進し、追尾しない。
 func fire_bolt(from: Vector2, angle: float, speed: float, dmg: float) -> void:
-	_add_hostile(from, Vector2.from_angle(angle) * speed, speed, 7.0, 4.0, dmg, 0.0, 0.0, HostileKind.BOLT)
-	state.emit(&"shoot", {"pos": from, "kind": &"bolt"})
+	emit_attack(&"bolt", [from, angle, speed, dmg])
 
 ## やまねこ座の斬撃を飛ばす。from（真ん中の先端）から向き angle へ形を保って直進し、距離 range を飛ぶと消える。
 ## size は爪痕の横の大きさ、side は伸びる側（進む向きに対して 1 なら左、-1 なら右）。
 func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: float, dmg: float, side: float) -> void:
-	var u := Vector2.from_angle(angle)
-	_add_hostile(from, u * speed, speed, size, range / maxf(speed, 1.0), dmg, 0.0, side, HostileKind.SLASH)
-	state.emit(&"shoot", {"pos": from, "kind": &"slash"})
+	emit_attack(&"slash", [from, angle, speed, size, range, dmg, side])
 
 ## 敵の弾を1行加え、その行番号を返す。空いた行を使い回すので、hostile_ の全部の列をここで書き直す。
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,

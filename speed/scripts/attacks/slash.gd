@@ -52,3 +52,8 @@ static func slash_touches(pos: Vector2, angle: float, size: float, side: float, 
 			if Geometry2D.get_closest_point_to_segment(local, pts[n - 1], pts[n]).distance_squared_to(local) <= m * m:
 				return true
 	return false
+
+func spawn(ps: ProjectileSystem, from: Vector2, angle: float, speed: float, size: float, range: float, dmg: float, side: float) -> void:
+	var u := Vector2.from_angle(angle)
+	ps._add_hostile(from, u * speed, speed, size, range / maxf(speed, 1.0), dmg, 0.0, side, ProjectileSystem.HostileKind.SLASH)
+	ps.state.emit(&"shoot", {"pos": from, "kind": &"slash"})
