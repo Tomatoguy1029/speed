@@ -291,15 +291,15 @@
 | もの | 出どころ | 効果 | 寿命 |
 |---|---|---|---|
 | 経験値の結晶 | 敵の撃破。量は 敵の経験値 × 経験値の倍率 × 時間帯の `xp_bonus`。数が `config.gem_max` を超えたら、古いものをまとめる | 経験値 | — |
-| 経験値カプセル | 撃破ごとに確率 min(`config.drop_max`, `config.drop_base` × 敵の経験値 ^ `config.drop_power_exp`) | 現在のレベルに必要な経験値 × `config.capsule_xp_frac` | `config.pickup_life` |
-| 漂流カプセル | フィールドに最大 `config.drift_capsule_count` 個。`config.drift_capsule_interval` ごとに機体の近くへ補充 | 現在のレベルに必要な経験値 × `config.drift_capsule_xp_frac` | — |
+| 大きい結晶 | 撃破ごとに確率 min(`config.drop_max`, `config.drop_base` × 敵の経験値 ^ `config.drop_power_exp`)。段の決まった敵（敵の `params.big_crystal`）は、その段を必ず落とす | 小・中・大の段ごとに決まった経験値（`config.big_crystal_xp`） | — |
 | 修理キット | 隕石の破壊で確率 `config.meteor_heal_chance` | 最大 HP × `config.meteor_heal_frac` を回復（上限を超えない） | `config.pickup_life` |
-| 回収ビーコン | 隕石の破壊で確率 `config.meteor_magnet_chance`（修理キットとは別に抽選） | フィールド上のすべての経験値の結晶と経験値カプセルを回収 | `config.pickup_life` |
+| 回収ビーコン | 隕石の破壊で確率 `config.meteor_magnet_chance`（修理キットとは別に抽選） | フィールド上のすべての経験値の結晶（大きい結晶を含む）を回収 | `config.pickup_life` |
 | 部品 | 隕石で確率 `config.meteor_coin_chance`（1〜3個）、エリートで3〜6個、ほかの敵は3%で1個 | 機体の強化に使う（14.1） | — |
 | 出力コア | `cores` が true の時間帯（4.2）に、フィールドの中心付近へ最大3個 | 最高速度 × (1 ＋ `config.core_boost`) | — |
 | 彗星限定の武器のカプセル | レアな彗星の破壊で必ず。中身の武器は彗星が現れたときに決まる | 彗星限定の武器を受け取る（8章） | — |
 
 - 回収範囲に入ったものは機体に吸い寄せられる。
+- 大きい結晶の段は、落ちたときに重みで抽選する。重みはラン開始の `config.big_crystal_weights_start` から `config.big_crystal_weights_end` へ、`config.big_crystal_shift_time` ラン秒かけてまっすぐ移り、以後は終わりの値のまま。後半ほど大きい段が出やすい。
 - HP が満タンのとき、修理キットは吸い寄せず、拾わない。
 - 彗星限定の武器のカプセルは吸い寄せない。機体が触れると拾う。
 
@@ -626,7 +626,7 @@ GAME OVER を出して結果画面へ（仮の演出） |
 
 | もの | 見た目 |
 |---|---|
-| 経験値の結晶 | 紫（#b8a0ff）、暗い紫の縁（#39265e）、明るい面付き。画面上で最低8px |
+| 経験値の結晶 | 紫（#b8a0ff）、暗い紫の縁（#39265e）、明るい面付き。画面上で最低8px。経験値が多いほど大きく、経験値1の結晶を等倍として、経験値の5乗根の倍率（最大3倍）で描く |
 | 敵の弾 | 中心が暗い赤いリング |
 | 味方の弾 | 水色の細長い弾 |
 | 攻撃する破片 | 金属色と橙の光の跡 |

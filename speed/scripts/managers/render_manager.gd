@@ -728,10 +728,13 @@ func _draw_pickups(c: CanvasItem) -> void:
 	gems.begin()
 	var gem_alive := p.gem_alive
 	var gem_pos := p.gem_pos
+	var gem_value := p.gem_value
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			gems.add_upright(pos, gs, XP_COLOR)
+			# 経験値の多い結晶ほど大きい（経験値1で等倍、最大3倍）
+			var v := gem_value[i]
+			gems.add_upright(pos, gs * (1.0 if v <= 1.0 else minf(pow(v, 0.2), 3.0)), XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -761,9 +764,6 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, XP_COLOR, 6.0)
 				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
-			_:
-				c.draw_circle(cap.pos, 14.0, XP_COLOR.darkened(0.2))
-				c.draw_arc(cap.pos, 16.0, 0, TAU, 24, XP_COLOR.lightened(0.3), _px(2.0))
 
 func _draw_enemies(c: CanvasItem) -> void:
 	var view := view_rect().grow(cfg.max_enemy_radius)
