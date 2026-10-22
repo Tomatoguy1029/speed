@@ -122,6 +122,17 @@ custom_name = "tornado"
 children = [SubResource("ready_tornado"), SubResource("play_tornado")]
 metadata/_weight_ = 1.0
 
+[sub_resource type="BTCondition" id="ready_debris_shatter"]
+script = ExtResource("ready")
+attack = &"debris_shatter"
+[sub_resource type="BTAction" id="play_debris_shatter"]
+script = ExtResource("play")
+technique = "debris_shatter"
+[sub_resource type="BTDynamicSequence" id="debris_shatter"]
+custom_name = "debris_shatter"
+children = [SubResource("ready_debris_shatter"), SubResource("play_debris_shatter")]
+metadata/_weight_ = 1.0
+
 [sub_resource type="BTProbabilitySelector" id="choose"]
 custom_name = "条件を満たす大技を重みで選ぶ"
 children = [SubResource("north"), SubResource("sequence"), SubResource("curve")]
@@ -129,10 +140,10 @@ script = ExtResource("selector")
 
 [sub_resource type="BTProbabilitySelector" id="combos"]
 custom_name = "共通発動機会に成立するコンボを抽選"
-children = [SubResource("tornado")]
+children = [SubResource("tornado"), SubResource("debris_shatter")]
 script = ExtResource("selector")
 [sub_resource type="BTSelector" id="root"]
-children = [SubResource("combos"), SubResource("choose")]
+children = [SubResource("combos"), SubResource("choose"), SubResource("debris_shatter")]
 
 [resource]
 description = "条件を組み替えて大技を選択。枝の重み、距離・角度、首の条件、実行タスクのクールダウン倍率を編集する"

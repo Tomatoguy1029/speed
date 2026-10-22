@@ -23,6 +23,7 @@ func tick(dt: float)->void:
 	if a.tech==&"sequence":sequence(dt)
 	elif a.tech==&"curve":curve(dt)
 	elif a.tech==&"tornado":tornado()
+	elif a.tech==&"debris_shatter":debris_shatter()
 	for n in a.participants:
 		if a._alive(n):
 			a.table.pos[n.row]=a._head_pos(n)
@@ -96,3 +97,34 @@ func tornado()->void:
 		var points:=PackedVector2Array([state.center-direction*45.0,state.center+direction*45.0])
 		a.attack_field.add_shape(points,float(p.tornado_width),0.0,float(p.tornado_life),float(p.lump_dmg),&"tornado",wind.row,direction*float(p.tornado_speed),true)
 		a._cue(&"attack_started",a.tech,a.necks.find(wind))
+
+func debris_shatter()->void:
+	var p: Dictionary=a.def.params
+	var debris=a.participants[0]
+	var beam=a.participants[1]
+	if not state.has("deployed"):
+		state.deployed=true
+		state.aim=(a.run_state.ship_pos-beam.strike_pos).angle()
+		for j in int(p.rubble_count):
+			var offset: float=(float(j)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)*1.4
+			var at: Vector2=beam.strike_pos+Vector2.from_angle(float(state.aim)+offset)*420.0
+			var row: int=a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
+			a._rubble.append(Vector2i(row,a.table.id[row]))
+			a.table.vel[row]=Vector2.ZERO
+			state[row]={"from":debris.strike_pos,"to":at}
+	if time<0.7:
+		for ref in a._rubble:
+			a.table.pos[ref.x]=Vector2(state[ref.x].from).lerp(state[ref.x].to,clampf(time/0.7,0.0,1.0))
+	if time>=0.7 and time<2.5:
+		beam.angle=float(state.aim)-0.9+1.8*clampf((time-0.7)/1.8,0.0,1.0)
+		var points:=PackedVector2Array([beam.strike_pos,beam.strike_pos+Vector2.from_angle(beam.angle)*float(p.beam_len)])
+		if beam.emission.is_empty():beam.emission=a.attack_field.add_shape(points,float(p.beam_width),0.0,1.8,float(p.beam_dmg),&"beam",beam.row)
+		else:beam.emission.points=points
+		for ref in a._rubble.duplicate():
+			if not a.manager.enemies.is_same(ref.x,ref.y) or a.table.dead[ref.x]:
+				a._rubble.erase(ref)
+				continue
+			if Geometry2D.get_closest_point_to_segment(a.table.pos[ref.x],points[0],points[1]).distance_to(a.table.pos[ref.x])<=a.table.r[ref.x]+float(p.beam_width)*0.5:
+				a._burst_rubble(ref.x,(a.table.pos[ref.x]-beam.strike_pos).normalized())
+				a._rubble.erase(ref)
+				a._cue(&"rubble_shattered",a.tech,a.necks.find(beam))

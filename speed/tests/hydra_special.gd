@@ -40,6 +40,7 @@ func _ready()->void:
 			var order: Array=events.filter(func(e):return e.cue in [&"gather_started",&"attack_started"] and e.neck_index>=0)
 			check(order.size()>=2 and order[0].cue==&"gather_started" and order[-1].world_time>order[0].world_time,"gather and rubble feed precede vortex launch")
 			check(a.combo_wait>0.0 and not a.attack_ready(&"tornado"),"combo opportunity consumes a common cooldown")
+		if name==&"debris_shatter":check(events.filter(func(e):return e.cue==&"rubble_shattered").size()==int(a.def.params.rubble_count),"beam intersection shatters each physical rubble once")
 		check(not a.busy and a.last_tech==name,"tech completes and releases global attack slot")
 		check(a._tech_until.has(name),"completed technique has an individual cooldown")
 	lab.queue_free()
