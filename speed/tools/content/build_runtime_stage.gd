@@ -48,14 +48,14 @@ static func names(source: StageDef) -> Dictionary:
 	for index in source.clips.size(): result.clips[index] = source.clips[index].label
 	return result
 
-static func build_all() -> Error:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://.content/dev"))
+static func build_all(output := "res://.content") -> Error:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
 	for file in DirAccess.get_files_at("res://data/stages"):
 		if not file.ends_with(".tres"): continue
-		var source := load("res://data/stages/" + file) as StageDef
-		var error := ResourceSaver.save(compile(source), "res://.content/stage_%d.tres" % source.index)
+		var source := ResourceLoader.load("res://data/stages/" + file, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+		var error := ResourceSaver.save(compile(source), output.path_join("stage_%d.tres" % source.index))
 		if error != OK: return error
-		var handle := FileAccess.open("res://.content/dev/stage_%d.json" % source.index, FileAccess.WRITE)
+		var handle := FileAccess.open(output.path_join("dev/stage_%d.json" % source.index), FileAccess.WRITE)
 		if handle == null: return FileAccess.get_open_error()
 		handle.store_string(JSON.stringify(names(source)))
 	return OK

@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/data_types/content_entry.gd" id="1_na87o"]
 [ext_resource type="Script" path="res://scripts/data_types/content_catalog.gd" id="2_pfhfx"]
 
-[sub_resource type="Resource" id="Resource_y3jmk"]
+[sub_resource type="Resource" id="Resource_na87o"]
 script = ExtResource("1_na87o")
 id = &"aquarius"
 category = &"enemies"
@@ -11,7 +11,7 @@ path = "res://data/enemies/aquarius.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_2urms"]
+[sub_resource type="Resource" id="Resource_pfhfx"]
 script = ExtResource("1_na87o")
 id = &"aquila"
 category = &"enemies"
@@ -19,7 +19,7 @@ path = "res://data/enemies/aquila.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_hb58i"]
+[sub_resource type="Resource" id="Resource_y3jmk"]
 script = ExtResource("1_na87o")
 id = &"armored"
 category = &"enemies"
@@ -27,7 +27,7 @@ path = "res://data/enemies/armored.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_y8rdo"]
+[sub_resource type="Resource" id="Resource_2urms"]
 script = ExtResource("1_na87o")
 id = &"auriga"
 category = &"enemies"
@@ -35,7 +35,7 @@ path = "res://data/enemies/auriga.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_vanno"]
+[sub_resource type="Resource" id="Resource_hb58i"]
 script = ExtResource("1_na87o")
 id = &"battleship"
 category = &"enemies"
@@ -43,7 +43,7 @@ path = "res://data/enemies/battleship.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ealk6"]
+[sub_resource type="Resource" id="Resource_y8rdo"]
 script = ExtResource("1_na87o")
 id = &"beamer"
 category = &"enemies"
@@ -51,7 +51,7 @@ path = "res://data/enemies/beamer.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_wv0aq"]
+[sub_resource type="Resource" id="Resource_vanno"]
 script = ExtResource("1_na87o")
 id = &"biter"
 category = &"enemies"
@@ -59,7 +59,7 @@ path = "res://data/enemies/biter.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_wufbb"]
+[sub_resource type="Resource" id="Resource_ealk6"]
 script = ExtResource("1_na87o")
 id = &"bomber"
 category = &"enemies"
@@ -67,7 +67,7 @@ path = "res://data/enemies/bomber.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_2khb0"]
+[sub_resource type="Resource" id="Resource_wv0aq"]
 script = ExtResource("1_na87o")
 id = &"cepheus"
 category = &"enemies"
@@ -75,7 +75,7 @@ path = "res://data/enemies/cepheus.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_2jpif"]
+[sub_resource type="Resource" id="Resource_wufbb"]
 script = ExtResource("1_na87o")
 id = &"cepheus_soldier"
 category = &"enemies"
@@ -83,7 +83,7 @@ path = "res://data/enemies/cepheus_soldier.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_nrc7o"]
+[sub_resource type="Resource" id="Resource_2khb0"]
 script = ExtResource("1_na87o")
 id = &"clock"
 category = &"enemies"
@@ -91,7 +91,7 @@ path = "res://data/enemies/clock.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_4sr7p"]
+[sub_resource type="Resource" id="Resource_2jpif"]
 script = ExtResource("1_na87o")
 id = &"corona"
 category = &"enemies"
@@ -99,7 +99,7 @@ path = "res://data/enemies/corona.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_elr1d"]
+[sub_resource type="Resource" id="Resource_nrc7o"]
 script = ExtResource("1_na87o")
 id = &"crab"
 category = &"enemies"
@@ -107,7 +107,7 @@ path = "res://data/enemies/crab.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_bi5lx"]
+[sub_resource type="Resource" id="Resource_4sr7p"]
 script = ExtResource("1_na87o")
 id = &"cross"
 category = &"enemies"
@@ -115,7 +115,7 @@ path = "res://data/enemies/cross.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_sj71a"]
+[sub_resource type="Resource" id="Resource_elr1d"]
 script = ExtResource("1_na87o")
 id = &"crow"
 category = &"enemies"
@@ -123,7 +123,7 @@ path = "res://data/enemies/crow.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_6sxnn"]
+[sub_resource type="Resource" id="Resource_bi5lx"]
 script = ExtResource("1_na87o")
 id = &"darter"
 category = &"enemies"
@@ -131,7 +131,7 @@ path = "res://data/enemies/darter.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_uhhva"]
+[sub_resource type="Resource" id="Resource_sj71a"]
 script = ExtResource("1_na87o")
 id = &"dolphin"
 category = &"enemies"
@@ -139,7 +139,7 @@ path = "res://data/enemies/dolphin.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_578rm"]
+[sub_resource type="Resource" id="Resource_6sxnn"]
 script = ExtResource("1_na87o")
 id = &"drifter"
 category = &"enemies"
@@ -147,7 +147,7 @@ path = "res://data/enemies/drifter.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_j5wdi"]
+[sub_resource type="Resource" id="Resource_uhhva"]
 script = ExtResource("1_na87o")
 id = &"gunner"
 category = &"enemies"
@@ -155,7 +155,7 @@ path = "res://data/enemies/gunner.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ufrwu"]
+[sub_resource type="Resource" id="Resource_578rm"]
 script = ExtResource("1_na87o")
 id = &"hydra_beam"
 category = &"enemies"
@@ -163,7 +163,7 @@ path = "res://data/enemies/hydra_beam.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_une5t"]
+[sub_resource type="Resource" id="Resource_j5wdi"]
 script = ExtResource("1_na87o")
 id = &"hydra_bite"
 category = &"enemies"
@@ -171,7 +171,7 @@ path = "res://data/enemies/hydra_bite.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_417se"]
+[sub_resource type="Resource" id="Resource_ufrwu"]
 script = ExtResource("1_na87o")
 id = &"hydra_debris"
 category = &"enemies"
@@ -179,7 +179,7 @@ path = "res://data/enemies/hydra_debris.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_wkcoo"]
+[sub_resource type="Resource" id="Resource_une5t"]
 script = ExtResource("1_na87o")
 id = &"hydra_immortal"
 category = &"enemies"
@@ -187,7 +187,7 @@ path = "res://data/enemies/hydra_immortal.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ibhkd"]
+[sub_resource type="Resource" id="Resource_417se"]
 script = ExtResource("1_na87o")
 id = &"hydra_rubble"
 category = &"enemies"
@@ -195,7 +195,7 @@ path = "res://data/enemies/hydra_rubble.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_2xjt5"]
+[sub_resource type="Resource" id="Resource_wkcoo"]
 script = ExtResource("1_na87o")
 id = &"hydra_thunder"
 category = &"enemies"
@@ -203,7 +203,7 @@ path = "res://data/enemies/hydra_thunder.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_q7c1o"]
+[sub_resource type="Resource" id="Resource_ibhkd"]
 script = ExtResource("1_na87o")
 id = &"hydra_vortex"
 category = &"enemies"
@@ -211,7 +211,7 @@ path = "res://data/enemies/hydra_vortex.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_4fole"]
+[sub_resource type="Resource" id="Resource_2xjt5"]
 script = ExtResource("1_na87o")
 id = &"iron"
 category = &"enemies"
@@ -219,7 +219,7 @@ path = "res://data/enemies/iron.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_73v70"]
+[sub_resource type="Resource" id="Resource_q7c1o"]
 script = ExtResource("1_na87o")
 id = &"lynx"
 category = &"enemies"
@@ -227,7 +227,7 @@ path = "res://data/enemies/lynx.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_d2k3k"]
+[sub_resource type="Resource" id="Resource_4fole"]
 script = ExtResource("1_na87o")
 id = &"marlin"
 category = &"enemies"
@@ -235,7 +235,7 @@ path = "res://data/enemies/marlin.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_cst6l"]
+[sub_resource type="Resource" id="Resource_73v70"]
 script = ExtResource("1_na87o")
 id = &"meteor"
 category = &"enemies"
@@ -243,7 +243,7 @@ path = "res://data/enemies/meteor.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_s252u"]
+[sub_resource type="Resource" id="Resource_d2k3k"]
 script = ExtResource("1_na87o")
 id = &"missile"
 category = &"enemies"
@@ -251,7 +251,7 @@ path = "res://data/enemies/missile.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_1oxts"]
+[sub_resource type="Resource" id="Resource_cst6l"]
 script = ExtResource("1_na87o")
 id = &"phoenix"
 category = &"enemies"
@@ -259,7 +259,7 @@ path = "res://data/enemies/phoenix.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_jq362"]
+[sub_resource type="Resource" id="Resource_s252u"]
 script = ExtResource("1_na87o")
 id = &"pulser"
 category = &"enemies"
@@ -267,7 +267,7 @@ path = "res://data/enemies/pulser.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_hj7jj"]
+[sub_resource type="Resource" id="Resource_1oxts"]
 script = ExtResource("1_na87o")
 id = &"pump"
 category = &"enemies"
@@ -275,7 +275,7 @@ path = "res://data/enemies/pump.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_sak13"]
+[sub_resource type="Resource" id="Resource_jq362"]
 script = ExtResource("1_na87o")
 id = &"reticle"
 category = &"enemies"
@@ -283,7 +283,7 @@ path = "res://data/enemies/reticle.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_h3ix0"]
+[sub_resource type="Resource" id="Resource_hj7jj"]
 script = ExtResource("1_na87o")
 id = &"rocket"
 category = &"enemies"
@@ -291,7 +291,7 @@ path = "res://data/enemies/rocket.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_sqvnm"]
+[sub_resource type="Resource" id="Resource_sak13"]
 script = ExtResource("1_na87o")
 id = &"ruler"
 category = &"enemies"
@@ -299,7 +299,7 @@ path = "res://data/enemies/ruler.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_klkf1"]
+[sub_resource type="Resource" id="Resource_h3ix0"]
 script = ExtResource("1_na87o")
 id = &"saw"
 category = &"enemies"
@@ -307,7 +307,7 @@ path = "res://data/enemies/saw.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_j8snm"]
+[sub_resource type="Resource" id="Resource_sqvnm"]
 script = ExtResource("1_na87o")
 id = &"shield"
 category = &"enemies"
@@ -315,7 +315,7 @@ path = "res://data/enemies/shield.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_0d3uc"]
+[sub_resource type="Resource" id="Resource_klkf1"]
 script = ExtResource("1_na87o")
 id = &"splitling"
 category = &"enemies"
@@ -323,7 +323,7 @@ path = "res://data/enemies/splitling.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_r43mc"]
+[sub_resource type="Resource" id="Resource_j8snm"]
 script = ExtResource("1_na87o")
 id = &"splitter"
 category = &"enemies"
@@ -331,7 +331,7 @@ path = "res://data/enemies/splitter.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_uygev"]
+[sub_resource type="Resource" id="Resource_0d3uc"]
 script = ExtResource("1_na87o")
 id = &"spreader"
 category = &"enemies"
@@ -339,7 +339,7 @@ path = "res://data/enemies/spreader.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_0mmfo"]
+[sub_resource type="Resource" id="Resource_r43mc"]
 script = ExtResource("1_na87o")
 id = &"swarm"
 category = &"enemies"
@@ -347,7 +347,7 @@ path = "res://data/enemies/swarm.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_h7k61"]
+[sub_resource type="Resource" id="Resource_uygev"]
 script = ExtResource("1_na87o")
 id = &"telescope"
 category = &"enemies"
@@ -355,7 +355,7 @@ path = "res://data/enemies/telescope.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_x3nv5"]
+[sub_resource type="Resource" id="Resource_0mmfo"]
 script = ExtResource("1_na87o")
 id = &"titan"
 category = &"enemies"
@@ -363,7 +363,7 @@ path = "res://data/enemies/titan.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ab5ft"]
+[sub_resource type="Resource" id="Resource_h7k61"]
 script = ExtResource("1_na87o")
 id = &"triangle"
 category = &"enemies"
@@ -371,7 +371,7 @@ path = "res://data/enemies/triangle.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_yex2t"]
+[sub_resource type="Resource" id="Resource_x3nv5"]
 script = ExtResource("1_na87o")
 id = &"triangle_star"
 category = &"enemies"
@@ -379,7 +379,7 @@ path = "res://data/enemies/triangle_star.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_6d86q"]
+[sub_resource type="Resource" id="Resource_ab5ft"]
 script = ExtResource("1_na87o")
 id = &"volatile"
 category = &"enemies"
@@ -387,7 +387,7 @@ path = "res://data/enemies/volatile.tres"
 text_prefix = "enemy"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_dqdyq"]
+[sub_resource type="Resource" id="Resource_yex2t"]
 script = ExtResource("1_na87o")
 id = &"build1"
 category = &"phases"
@@ -395,7 +395,7 @@ path = "res://data/phases/build1.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_bk7kp"]
+[sub_resource type="Resource" id="Resource_6d86q"]
 script = ExtResource("1_na87o")
 id = &"build2"
 category = &"phases"
@@ -403,7 +403,7 @@ path = "res://data/phases/build2.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_sj4iu"]
+[sub_resource type="Resource" id="Resource_dqdyq"]
 script = ExtResource("1_na87o")
 id = &"escape"
 category = &"phases"
@@ -411,7 +411,7 @@ path = "res://data/phases/escape.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_3a2hg"]
+[sub_resource type="Resource" id="Resource_bk7kp"]
 script = ExtResource("1_na87o")
 id = &"pressure"
 category = &"phases"
@@ -419,7 +419,7 @@ path = "res://data/phases/pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_dix5l"]
+[sub_resource type="Resource" id="Resource_sj4iu"]
 script = ExtResource("1_na87o")
 id = &"rampage"
 category = &"phases"
@@ -427,7 +427,7 @@ path = "res://data/phases/rampage.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_pvnv8"]
+[sub_resource type="Resource" id="Resource_3a2hg"]
 script = ExtResource("1_na87o")
 id = &"s1_build"
 category = &"phases"
@@ -435,7 +435,7 @@ path = "res://data/phases/s1_build.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_imoqa"]
+[sub_resource type="Resource" id="Resource_dix5l"]
 script = ExtResource("1_na87o")
 id = &"s1_horde"
 category = &"phases"
@@ -443,7 +443,7 @@ path = "res://data/phases/s1_horde.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_s1wr4"]
+[sub_resource type="Resource" id="Resource_pvnv8"]
 script = ExtResource("1_na87o")
 id = &"s1_late"
 category = &"phases"
@@ -451,7 +451,7 @@ path = "res://data/phases/s1_late.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_bfb3j"]
+[sub_resource type="Resource" id="Resource_imoqa"]
 script = ExtResource("1_na87o")
 id = &"s1_pressure"
 category = &"phases"
@@ -459,7 +459,7 @@ path = "res://data/phases/s1_pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_o3c6u"]
+[sub_resource type="Resource" id="Resource_s1wr4"]
 script = ExtResource("1_na87o")
 id = &"s2_build"
 category = &"phases"
@@ -467,7 +467,7 @@ path = "res://data/phases/s2_build.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_uet5m"]
+[sub_resource type="Resource" id="Resource_bfb3j"]
 script = ExtResource("1_na87o")
 id = &"s2_horde"
 category = &"phases"
@@ -475,7 +475,7 @@ path = "res://data/phases/s2_horde.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_abqs1"]
+[sub_resource type="Resource" id="Resource_o3c6u"]
 script = ExtResource("1_na87o")
 id = &"s2_late"
 category = &"phases"
@@ -483,7 +483,7 @@ path = "res://data/phases/s2_late.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_s8knn"]
+[sub_resource type="Resource" id="Resource_uet5m"]
 script = ExtResource("1_na87o")
 id = &"s2_pressure"
 category = &"phases"
@@ -491,7 +491,7 @@ path = "res://data/phases/s2_pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_jwoj3"]
+[sub_resource type="Resource" id="Resource_abqs1"]
 script = ExtResource("1_na87o")
 id = &"s3_build"
 category = &"phases"
@@ -499,7 +499,7 @@ path = "res://data/phases/s3_build.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_b8std"]
+[sub_resource type="Resource" id="Resource_s8knn"]
 script = ExtResource("1_na87o")
 id = &"s3_horde"
 category = &"phases"
@@ -507,7 +507,7 @@ path = "res://data/phases/s3_horde.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_axfos"]
+[sub_resource type="Resource" id="Resource_jwoj3"]
 script = ExtResource("1_na87o")
 id = &"s3_late"
 category = &"phases"
@@ -515,7 +515,7 @@ path = "res://data/phases/s3_late.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_sbq0g"]
+[sub_resource type="Resource" id="Resource_b8std"]
 script = ExtResource("1_na87o")
 id = &"s3_pressure"
 category = &"phases"
@@ -523,7 +523,7 @@ path = "res://data/phases/s3_pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_05cth"]
+[sub_resource type="Resource" id="Resource_axfos"]
 script = ExtResource("1_na87o")
 id = &"s4_build"
 category = &"phases"
@@ -531,7 +531,7 @@ path = "res://data/phases/s4_build.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_t42bu"]
+[sub_resource type="Resource" id="Resource_sbq0g"]
 script = ExtResource("1_na87o")
 id = &"s4_horde"
 category = &"phases"
@@ -539,7 +539,7 @@ path = "res://data/phases/s4_horde.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_6ohrv"]
+[sub_resource type="Resource" id="Resource_05cth"]
 script = ExtResource("1_na87o")
 id = &"s4_late"
 category = &"phases"
@@ -547,7 +547,7 @@ path = "res://data/phases/s4_late.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ommdm"]
+[sub_resource type="Resource" id="Resource_t42bu"]
 script = ExtResource("1_na87o")
 id = &"s4_pressure"
 category = &"phases"
@@ -555,7 +555,7 @@ path = "res://data/phases/s4_pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_luk4p"]
+[sub_resource type="Resource" id="Resource_6ohrv"]
 script = ExtResource("1_na87o")
 id = &"s5_build"
 category = &"phases"
@@ -563,7 +563,7 @@ path = "res://data/phases/s5_build.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_8l7sh"]
+[sub_resource type="Resource" id="Resource_ommdm"]
 script = ExtResource("1_na87o")
 id = &"s5_horde"
 category = &"phases"
@@ -571,7 +571,7 @@ path = "res://data/phases/s5_horde.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_k4ia1"]
+[sub_resource type="Resource" id="Resource_luk4p"]
 script = ExtResource("1_na87o")
 id = &"s5_late"
 category = &"phases"
@@ -579,7 +579,7 @@ path = "res://data/phases/s5_late.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_yn78u"]
+[sub_resource type="Resource" id="Resource_8l7sh"]
 script = ExtResource("1_na87o")
 id = &"s5_pressure"
 category = &"phases"
@@ -587,7 +587,7 @@ path = "res://data/phases/s5_pressure.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_83fj3"]
+[sub_resource type="Resource" id="Resource_k4ia1"]
 script = ExtResource("1_na87o")
 id = &"tension"
 category = &"phases"
@@ -595,7 +595,7 @@ path = "res://data/phases/tension.tres"
 text_prefix = "phase"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_18jcl"]
+[sub_resource type="Resource" id="Resource_yn78u"]
 script = ExtResource("1_na87o")
 index = 1
 category = &"stages"
@@ -603,7 +603,7 @@ path = "res://data/stages/stage_1.tres"
 text_prefix = "stage"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_7bxtu"]
+[sub_resource type="Resource" id="Resource_83fj3"]
 script = ExtResource("1_na87o")
 index = 2
 category = &"stages"
@@ -611,7 +611,7 @@ path = "res://data/stages/stage_2.tres"
 text_prefix = "stage"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_uy8hw"]
+[sub_resource type="Resource" id="Resource_18jcl"]
 script = ExtResource("1_na87o")
 index = 3
 category = &"stages"
@@ -619,7 +619,7 @@ path = "res://data/stages/stage_3.tres"
 text_prefix = "stage"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_0dhso"]
+[sub_resource type="Resource" id="Resource_7bxtu"]
 script = ExtResource("1_na87o")
 index = 4
 category = &"stages"
@@ -627,7 +627,7 @@ path = "res://data/stages/stage_4.tres"
 text_prefix = "stage"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_a37np"]
+[sub_resource type="Resource" id="Resource_uy8hw"]
 script = ExtResource("1_na87o")
 index = 5
 category = &"stages"
@@ -635,7 +635,7 @@ path = "res://data/stages/stage_5.tres"
 text_prefix = "stage"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_fuiaj"]
+[sub_resource type="Resource" id="Resource_0dhso"]
 script = ExtResource("1_na87o")
 id = &"hydra"
 category = &"bosses"
@@ -643,7 +643,7 @@ path = "res://data/bosses/hydra.tres"
 text_prefix = "boss"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_liox1"]
+[sub_resource type="Resource" id="Resource_a37np"]
 script = ExtResource("1_na87o")
 id = &"provisional"
 category = &"bosses"
@@ -651,7 +651,7 @@ path = "res://data/bosses/provisional.tres"
 text_prefix = "boss"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ixn0h"]
+[sub_resource type="Resource" id="Resource_fuiaj"]
 script = ExtResource("1_na87o")
 id = &"W01"
 category = &"weapons"
@@ -663,7 +663,7 @@ params = {
 }
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_op2ph"]
+[sub_resource type="Resource" id="Resource_liox1"]
 script = ExtResource("1_na87o")
 id = &"W02"
 category = &"weapons"
@@ -675,7 +675,7 @@ params = {
 }
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_7wmth"]
+[sub_resource type="Resource" id="Resource_ixn0h"]
 script = ExtResource("1_na87o")
 id = &"W03"
 category = &"weapons"
@@ -684,7 +684,7 @@ text_prefix = "weapon"
 code_id = &"knockback"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_millj"]
+[sub_resource type="Resource" id="Resource_op2ph"]
 script = ExtResource("1_na87o")
 id = &"W04"
 category = &"weapons"
@@ -693,7 +693,7 @@ text_prefix = "weapon"
 code_id = &"contactWave"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_o5c5j"]
+[sub_resource type="Resource" id="Resource_7wmth"]
 script = ExtResource("1_na87o")
 id = &"W05"
 category = &"weapons"
@@ -702,7 +702,7 @@ text_prefix = "weapon"
 code_id = &"barrier"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_fxdl0"]
+[sub_resource type="Resource" id="Resource_millj"]
 script = ExtResource("1_na87o")
 id = &"W06"
 category = &"weapons"
@@ -711,7 +711,7 @@ text_prefix = "weapon"
 code_id = &"drone"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_8c538"]
+[sub_resource type="Resource" id="Resource_o5c5j"]
 script = ExtResource("1_na87o")
 id = &"W07"
 category = &"weapons"
@@ -720,7 +720,7 @@ text_prefix = "weapon"
 code_id = &"mines"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_yqj1k"]
+[sub_resource type="Resource" id="Resource_fxdl0"]
 script = ExtResource("1_na87o")
 id = &"W08"
 category = &"weapons"
@@ -729,7 +729,7 @@ text_prefix = "weapon"
 code_id = &"sonic"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_27ji8"]
+[sub_resource type="Resource" id="Resource_8c538"]
 script = ExtResource("1_na87o")
 id = &"W17"
 category = &"weapons"
@@ -741,7 +741,7 @@ params = {
 }
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_vx0iy"]
+[sub_resource type="Resource" id="Resource_yqj1k"]
 script = ExtResource("1_na87o")
 id = &"W21"
 category = &"weapons"
@@ -751,7 +751,7 @@ code_id = &"massTow"
 costs = PackedInt32Array()
 comet_only = true
 
-[sub_resource type="Resource" id="Resource_jux2o"]
+[sub_resource type="Resource" id="Resource_27ji8"]
 script = ExtResource("1_na87o")
 id = &"W22"
 category = &"weapons"
@@ -764,7 +764,7 @@ params = {
 costs = PackedInt32Array()
 comet_only = true
 
-[sub_resource type="Resource" id="Resource_euv6d"]
+[sub_resource type="Resource" id="Resource_vx0iy"]
 script = ExtResource("1_na87o")
 id = &"W23"
 category = &"weapons"
@@ -776,7 +776,7 @@ params = {
 }
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_7ckk1"]
+[sub_resource type="Resource" id="Resource_jux2o"]
 script = ExtResource("1_na87o")
 id = &"W24"
 category = &"weapons"
@@ -786,7 +786,7 @@ code_id = &"lightLance"
 icon_path = "res://assets/ui/combat/light_lance_icon.tres"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_4fylu"]
+[sub_resource type="Resource" id="Resource_euv6d"]
 script = ExtResource("1_na87o")
 id = &"W25"
 category = &"weapons"
@@ -798,7 +798,7 @@ params = {
 }
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_gj280"]
+[sub_resource type="Resource" id="Resource_7ckk1"]
 script = ExtResource("1_na87o")
 id = &"W26"
 category = &"weapons"
@@ -808,7 +808,7 @@ code_id = &"dashRangeDrone"
 icon_path = "res://assets/ui/combat/dash_range_drone_icon.svg"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_f85gy"]
+[sub_resource type="Resource" id="Resource_4fylu"]
 script = ExtResource("1_na87o")
 id = &"W27"
 category = &"weapons"
@@ -818,7 +818,7 @@ code_id = &"afterimage"
 icon_path = "res://assets/ui/combat/afterimage_icon.svg"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_5a1q6"]
+[sub_resource type="Resource" id="Resource_gj280"]
 script = ExtResource("1_na87o")
 id = &"T01"
 category = &"traits"
@@ -827,7 +827,7 @@ text_prefix = "trait"
 code_id = &"endBlast"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_grrmq"]
+[sub_resource type="Resource" id="Resource_f85gy"]
 script = ExtResource("1_na87o")
 id = &"T03"
 category = &"traits"
@@ -836,7 +836,7 @@ text_prefix = "trait"
 code_id = &"vortex"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_gbngy"]
+[sub_resource type="Resource" id="Resource_5a1q6"]
 script = ExtResource("1_na87o")
 id = &"T04"
 category = &"traits"
@@ -845,7 +845,7 @@ text_prefix = "trait"
 code_id = &"fullCharge"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ntwis"]
+[sub_resource type="Resource" id="Resource_grrmq"]
 script = ExtResource("1_na87o")
 id = &"T05"
 category = &"traits"
@@ -854,7 +854,7 @@ text_prefix = "trait"
 code_id = &"killSonic"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_2uigc"]
+[sub_resource type="Resource" id="Resource_gbngy"]
 script = ExtResource("1_na87o")
 id = &"T06"
 category = &"traits"
@@ -863,7 +863,7 @@ text_prefix = "trait"
 code_id = &"critBeam"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_84jjj"]
+[sub_resource type="Resource" id="Resource_ntwis"]
 script = ExtResource("1_na87o")
 id = &"T07"
 category = &"traits"
@@ -872,7 +872,7 @@ text_prefix = "trait"
 code_id = &"quickCharge"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ck1kp"]
+[sub_resource type="Resource" id="Resource_2uigc"]
 script = ExtResource("1_na87o")
 id = &"T08"
 category = &"traits"
@@ -881,7 +881,7 @@ text_prefix = "trait"
 code_id = &"capacity"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_6lrnv"]
+[sub_resource type="Resource" id="Resource_84jjj"]
 script = ExtResource("1_na87o")
 id = &"T09"
 category = &"traits"
@@ -890,7 +890,7 @@ text_prefix = "trait"
 code_id = &"critRate"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_e8718"]
+[sub_resource type="Resource" id="Resource_ck1kp"]
 script = ExtResource("1_na87o")
 id = &"T10"
 category = &"traits"
@@ -899,7 +899,7 @@ text_prefix = "trait"
 code_id = &"speed"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ly6du"]
+[sub_resource type="Resource" id="Resource_6lrnv"]
 script = ExtResource("1_na87o")
 id = &"T11"
 category = &"traits"
@@ -908,7 +908,7 @@ text_prefix = "trait"
 code_id = &"attack"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_nikc3"]
+[sub_resource type="Resource" id="Resource_e8718"]
 script = ExtResource("1_na87o")
 id = &"T12"
 category = &"traits"
@@ -917,7 +917,7 @@ text_prefix = "trait"
 code_id = &"pickup"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ce0o5"]
+[sub_resource type="Resource" id="Resource_ly6du"]
 script = ExtResource("1_na87o")
 id = &"T13"
 category = &"traits"
@@ -926,7 +926,7 @@ text_prefix = "trait"
 code_id = &"reactive"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_hvqin"]
+[sub_resource type="Resource" id="Resource_nikc3"]
 script = ExtResource("1_na87o")
 id = &"T14"
 category = &"traits"
@@ -935,7 +935,7 @@ text_prefix = "trait"
 code_id = &"length"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_g3xy5"]
+[sub_resource type="Resource" id="Resource_ce0o5"]
 script = ExtResource("1_na87o")
 id = &"T31"
 category = &"traits"
@@ -945,7 +945,7 @@ code_id = &"glideDuration"
 icon_path = "res://assets/ui/combat/glide_duration_icon.tres"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_ugigi"]
+[sub_resource type="Resource" id="Resource_hvqin"]
 script = ExtResource("1_na87o")
 id = &"atk"
 category = &"meta_upgrades"
@@ -956,7 +956,7 @@ costs = PackedInt32Array(20, 40, 70, 110, 160)
 stat = &"attack"
 per_level = 0.06
 
-[sub_resource type="Resource" id="Resource_mopf4"]
+[sub_resource type="Resource" id="Resource_g3xy5"]
 script = ExtResource("1_na87o")
 id = &"charge"
 category = &"meta_upgrades"
@@ -967,7 +967,7 @@ costs = PackedInt32Array(20, 40, 70, 110, 160)
 stat = &"charge_time"
 per_level = 0.05
 
-[sub_resource type="Resource" id="Resource_b4wbt"]
+[sub_resource type="Resource" id="Resource_ugigi"]
 script = ExtResource("1_na87o")
 id = &"hp"
 category = &"meta_upgrades"
@@ -978,7 +978,7 @@ costs = PackedInt32Array(20, 40, 70, 110, 160)
 stat = &"max_hp"
 per_level = 20.0
 
-[sub_resource type="Resource" id="Resource_5itfc"]
+[sub_resource type="Resource" id="Resource_mopf4"]
 script = ExtResource("1_na87o")
 id = &"length"
 category = &"meta_upgrades"
@@ -989,7 +989,7 @@ costs = PackedInt32Array(25, 50, 90, 140, 210)
 stat = &"length"
 per_level = 0.05
 
-[sub_resource type="Resource" id="Resource_2vol7"]
+[sub_resource type="Resource" id="Resource_b4wbt"]
 script = ExtResource("1_na87o")
 id = &"pickup"
 category = &"meta_upgrades"
@@ -1000,7 +1000,7 @@ costs = PackedInt32Array(15, 30, 55, 85, 125)
 stat = &"pickup"
 per_level = 0.15
 
-[sub_resource type="Resource" id="Resource_d4nur"]
+[sub_resource type="Resource" id="Resource_5itfc"]
 script = ExtResource("1_na87o")
 id = &"reroll"
 category = &"meta_upgrades"
@@ -1011,7 +1011,7 @@ costs = PackedInt32Array(60, 140, 260)
 stat = &"reroll"
 per_level = 1.0
 
-[sub_resource type="Resource" id="Resource_0xnup"]
+[sub_resource type="Resource" id="Resource_2vol7"]
 script = ExtResource("1_na87o")
 id = &"speed"
 category = &"meta_upgrades"
@@ -1022,7 +1022,7 @@ costs = PackedInt32Array(25, 50, 90, 140, 210)
 stat = &"max_speed"
 per_level = 0.05
 
-[sub_resource type="Resource" id="Resource_mrx45"]
+[sub_resource type="Resource" id="Resource_d4nur"]
 script = ExtResource("1_na87o")
 id = &"xp"
 category = &"meta_upgrades"
@@ -1033,7 +1033,7 @@ costs = PackedInt32Array(25, 50, 90, 140, 210)
 stat = &"xp"
 per_level = 0.08
 
-[sub_resource type="Resource" id="Resource_jqtx4"]
+[sub_resource type="Resource" id="Resource_0xnup"]
 script = ExtResource("1_na87o")
 id = &"legendary_compass"
 category = &"legendary_modules"
@@ -1042,7 +1042,7 @@ text_prefix = "legendary"
 order = 4
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_7f1ap"]
+[sub_resource type="Resource" id="Resource_mrx45"]
 script = ExtResource("1_na87o")
 id = &"legendary_keel"
 category = &"legendary_modules"
@@ -1051,7 +1051,7 @@ text_prefix = "legendary"
 order = 3
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_q4tqk"]
+[sub_resource type="Resource" id="Resource_jqtx4"]
 script = ExtResource("1_na87o")
 id = &"legendary_sail"
 category = &"legendary_modules"
@@ -1060,7 +1060,7 @@ text_prefix = "legendary"
 order = 2
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_mhcn7"]
+[sub_resource type="Resource" id="Resource_7f1ap"]
 script = ExtResource("1_na87o")
 id = &"legendary_stern"
 category = &"legendary_modules"
@@ -1069,7 +1069,7 @@ text_prefix = "legendary"
 order = 1
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_jsn7w"]
+[sub_resource type="Resource" id="Resource_q4tqk"]
 script = ExtResource("1_na87o")
 id = &"gemini"
 category = &"heroes"
@@ -1077,7 +1077,7 @@ path = "res://data/heroes/gemini.tres"
 text_prefix = "hero"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_1dpcn"]
+[sub_resource type="Resource" id="Resource_mhcn7"]
 script = ExtResource("1_na87o")
 id = &"hercules"
 category = &"heroes"
@@ -1085,7 +1085,7 @@ path = "res://data/heroes/hercules.tres"
 text_prefix = "hero"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_d237i"]
+[sub_resource type="Resource" id="Resource_jsn7w"]
 script = ExtResource("1_na87o")
 id = &"leo"
 category = &"heroes"
@@ -1093,7 +1093,7 @@ path = "res://data/heroes/leo.tres"
 text_prefix = "hero"
 costs = PackedInt32Array()
 
-[sub_resource type="Resource" id="Resource_x2cpq"]
+[sub_resource type="Resource" id="Resource_1dpcn"]
 script = ExtResource("1_na87o")
 id = &"perseus"
 category = &"heroes"
@@ -1103,4 +1103,5 @@ costs = PackedInt32Array()
 
 [resource]
 script = ExtResource("2_pfhfx")
-entries = Array[ExtResource("1_na87o")]([SubResource("Resource_y3jmk"), SubResource("Resource_2urms"), SubResource("Resource_hb58i"), SubResource("Resource_y8rdo"), SubResource("Resource_vanno"), SubResource("Resource_ealk6"), SubResource("Resource_wv0aq"), SubResource("Resource_wufbb"), SubResource("Resource_2khb0"), SubResource("Resource_2jpif"), SubResource("Resource_nrc7o"), SubResource("Resource_4sr7p"), SubResource("Resource_elr1d"), SubResource("Resource_bi5lx"), SubResource("Resource_sj71a"), SubResource("Resource_6sxnn"), SubResource("Resource_uhhva"), SubResource("Resource_578rm"), SubResource("Resource_j5wdi"), SubResource("Resource_ufrwu"), SubResource("Resource_une5t"), SubResource("Resource_417se"), SubResource("Resource_wkcoo"), SubResource("Resource_ibhkd"), SubResource("Resource_2xjt5"), SubResource("Resource_q7c1o"), SubResource("Resource_4fole"), SubResource("Resource_73v70"), SubResource("Resource_d2k3k"), SubResource("Resource_cst6l"), SubResource("Resource_s252u"), SubResource("Resource_1oxts"), SubResource("Resource_jq362"), SubResource("Resource_hj7jj"), SubResource("Resource_sak13"), SubResource("Resource_h3ix0"), SubResource("Resource_sqvnm"), SubResource("Resource_klkf1"), SubResource("Resource_j8snm"), SubResource("Resource_0d3uc"), SubResource("Resource_r43mc"), SubResource("Resource_uygev"), SubResource("Resource_0mmfo"), SubResource("Resource_h7k61"), SubResource("Resource_x3nv5"), SubResource("Resource_ab5ft"), SubResource("Resource_yex2t"), SubResource("Resource_6d86q"), SubResource("Resource_dqdyq"), SubResource("Resource_bk7kp"), SubResource("Resource_sj4iu"), SubResource("Resource_3a2hg"), SubResource("Resource_dix5l"), SubResource("Resource_pvnv8"), SubResource("Resource_imoqa"), SubResource("Resource_s1wr4"), SubResource("Resource_bfb3j"), SubResource("Resource_o3c6u"), SubResource("Resource_uet5m"), SubResource("Resource_abqs1"), SubResource("Resource_s8knn"), SubResource("Resource_jwoj3"), SubResource("Resource_b8std"), SubResource("Resource_axfos"), SubResource("Resource_sbq0g"), SubResource("Resource_05cth"), SubResource("Resource_t42bu"), SubResource("Resource_6ohrv"), SubResource("Resource_ommdm"), SubResource("Resource_luk4p"), SubResource("Resource_8l7sh"), SubResource("Resource_k4ia1"), SubResource("Resource_yn78u"), SubResource("Resource_83fj3"), SubResource("Resource_18jcl"), SubResource("Resource_7bxtu"), SubResource("Resource_uy8hw"), SubResource("Resource_0dhso"), SubResource("Resource_a37np"), SubResource("Resource_fuiaj"), SubResource("Resource_liox1"), SubResource("Resource_ixn0h"), SubResource("Resource_op2ph"), SubResource("Resource_7wmth"), SubResource("Resource_millj"), SubResource("Resource_o5c5j"), SubResource("Resource_fxdl0"), SubResource("Resource_8c538"), SubResource("Resource_yqj1k"), SubResource("Resource_27ji8"), SubResource("Resource_vx0iy"), SubResource("Resource_jux2o"), SubResource("Resource_euv6d"), SubResource("Resource_7ckk1"), SubResource("Resource_4fylu"), SubResource("Resource_gj280"), SubResource("Resource_f85gy"), SubResource("Resource_5a1q6"), SubResource("Resource_grrmq"), SubResource("Resource_gbngy"), SubResource("Resource_ntwis"), SubResource("Resource_2uigc"), SubResource("Resource_84jjj"), SubResource("Resource_ck1kp"), SubResource("Resource_6lrnv"), SubResource("Resource_e8718"), SubResource("Resource_ly6du"), SubResource("Resource_nikc3"), SubResource("Resource_ce0o5"), SubResource("Resource_hvqin"), SubResource("Resource_g3xy5"), SubResource("Resource_ugigi"), SubResource("Resource_mopf4"), SubResource("Resource_b4wbt"), SubResource("Resource_5itfc"), SubResource("Resource_2vol7"), SubResource("Resource_d4nur"), SubResource("Resource_0xnup"), SubResource("Resource_mrx45"), SubResource("Resource_jqtx4"), SubResource("Resource_7f1ap"), SubResource("Resource_q4tqk"), SubResource("Resource_mhcn7"), SubResource("Resource_jsn7w"), SubResource("Resource_1dpcn"), SubResource("Resource_d237i"), SubResource("Resource_x2cpq")])
+source_signature = "0aed1f31c89c34297064f30c13d169a5abbc565e0ba763b9ff252352132e4c5b"
+entries = Array[ExtResource("1_na87o")]([SubResource("Resource_na87o"), SubResource("Resource_pfhfx"), SubResource("Resource_y3jmk"), SubResource("Resource_2urms"), SubResource("Resource_hb58i"), SubResource("Resource_y8rdo"), SubResource("Resource_vanno"), SubResource("Resource_ealk6"), SubResource("Resource_wv0aq"), SubResource("Resource_wufbb"), SubResource("Resource_2khb0"), SubResource("Resource_2jpif"), SubResource("Resource_nrc7o"), SubResource("Resource_4sr7p"), SubResource("Resource_elr1d"), SubResource("Resource_bi5lx"), SubResource("Resource_sj71a"), SubResource("Resource_6sxnn"), SubResource("Resource_uhhva"), SubResource("Resource_578rm"), SubResource("Resource_j5wdi"), SubResource("Resource_ufrwu"), SubResource("Resource_une5t"), SubResource("Resource_417se"), SubResource("Resource_wkcoo"), SubResource("Resource_ibhkd"), SubResource("Resource_2xjt5"), SubResource("Resource_q7c1o"), SubResource("Resource_4fole"), SubResource("Resource_73v70"), SubResource("Resource_d2k3k"), SubResource("Resource_cst6l"), SubResource("Resource_s252u"), SubResource("Resource_1oxts"), SubResource("Resource_jq362"), SubResource("Resource_hj7jj"), SubResource("Resource_sak13"), SubResource("Resource_h3ix0"), SubResource("Resource_sqvnm"), SubResource("Resource_klkf1"), SubResource("Resource_j8snm"), SubResource("Resource_0d3uc"), SubResource("Resource_r43mc"), SubResource("Resource_uygev"), SubResource("Resource_0mmfo"), SubResource("Resource_h7k61"), SubResource("Resource_x3nv5"), SubResource("Resource_ab5ft"), SubResource("Resource_yex2t"), SubResource("Resource_6d86q"), SubResource("Resource_dqdyq"), SubResource("Resource_bk7kp"), SubResource("Resource_sj4iu"), SubResource("Resource_3a2hg"), SubResource("Resource_dix5l"), SubResource("Resource_pvnv8"), SubResource("Resource_imoqa"), SubResource("Resource_s1wr4"), SubResource("Resource_bfb3j"), SubResource("Resource_o3c6u"), SubResource("Resource_uet5m"), SubResource("Resource_abqs1"), SubResource("Resource_s8knn"), SubResource("Resource_jwoj3"), SubResource("Resource_b8std"), SubResource("Resource_axfos"), SubResource("Resource_sbq0g"), SubResource("Resource_05cth"), SubResource("Resource_t42bu"), SubResource("Resource_6ohrv"), SubResource("Resource_ommdm"), SubResource("Resource_luk4p"), SubResource("Resource_8l7sh"), SubResource("Resource_k4ia1"), SubResource("Resource_yn78u"), SubResource("Resource_83fj3"), SubResource("Resource_18jcl"), SubResource("Resource_7bxtu"), SubResource("Resource_uy8hw"), SubResource("Resource_0dhso"), SubResource("Resource_a37np"), SubResource("Resource_fuiaj"), SubResource("Resource_liox1"), SubResource("Resource_ixn0h"), SubResource("Resource_op2ph"), SubResource("Resource_7wmth"), SubResource("Resource_millj"), SubResource("Resource_o5c5j"), SubResource("Resource_fxdl0"), SubResource("Resource_8c538"), SubResource("Resource_yqj1k"), SubResource("Resource_27ji8"), SubResource("Resource_vx0iy"), SubResource("Resource_jux2o"), SubResource("Resource_euv6d"), SubResource("Resource_7ckk1"), SubResource("Resource_4fylu"), SubResource("Resource_gj280"), SubResource("Resource_f85gy"), SubResource("Resource_5a1q6"), SubResource("Resource_grrmq"), SubResource("Resource_gbngy"), SubResource("Resource_ntwis"), SubResource("Resource_2uigc"), SubResource("Resource_84jjj"), SubResource("Resource_ck1kp"), SubResource("Resource_6lrnv"), SubResource("Resource_e8718"), SubResource("Resource_ly6du"), SubResource("Resource_nikc3"), SubResource("Resource_ce0o5"), SubResource("Resource_hvqin"), SubResource("Resource_g3xy5"), SubResource("Resource_ugigi"), SubResource("Resource_mopf4"), SubResource("Resource_b4wbt"), SubResource("Resource_5itfc"), SubResource("Resource_2vol7"), SubResource("Resource_d4nur"), SubResource("Resource_0xnup"), SubResource("Resource_mrx45"), SubResource("Resource_jqtx4"), SubResource("Resource_7f1ap"), SubResource("Resource_q4tqk"), SubResource("Resource_mhcn7"), SubResource("Resource_jsn7w"), SubResource("Resource_1dpcn")])

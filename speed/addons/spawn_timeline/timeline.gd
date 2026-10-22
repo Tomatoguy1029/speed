@@ -311,6 +311,8 @@ func _save_stage(target: Resource) -> void:
 		if p is Resource and p.resource_path != "" and not p.resource_path.contains("::"):
 			ResourceSaver.save(p)
 	ResourceSaver.save(target)
+	var error: Error = load("res://addons/content_build/builder.gd").build_all()
+	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
 	refresh()
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。

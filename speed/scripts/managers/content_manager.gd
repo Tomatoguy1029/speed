@@ -12,6 +12,7 @@ var base: GameConfig
 ## 実行時に使う調整値（調整パネルが書き換える）
 var cfg: GameConfig
 
+var _checked_build := false
 var catalog: ContentCatalog
 var _tables: Dictionary = {}
 var _definitions: Dictionary = {}
@@ -150,4 +151,10 @@ func _table(category: StringName) -> Dictionary:
 	return _tables[category]
 
 func runtime_stage(index: int) -> RuntimeStage:
+	if OS.has_feature("editor") and not _checked_build:
+		if not load("res://addons/content_build/builder.gd").is_current():
+			push_error("実行用データがないか古いため停止します。content/build_all.gdまたはエディター実行前の生成を行ってください。")
+			get_tree().quit(1)
+			return null
+		_checked_build = true
 	return load("res://.content/stage_%d.tres" % index) as RuntimeStage
