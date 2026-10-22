@@ -3,6 +3,9 @@ class_name PickupSystem
 extends RunSystem
 
 func dispose() -> void:
+	for item in _effects.values():
+		item.dispose()
+	_effects.clear()
 	for slots in [gem_slots, coin_slots]:
 		if slots != null:
 			slots.owner = null
@@ -234,8 +237,7 @@ func _collect_gems(dt: float) -> void:
 			gem_pulled[i] = 1
 			gem_pos[i] = p + d / maxf(dist, 1.0) * minf(step, dist)
 		if dist < reach:
-			build.add_xp(gem_value[i])
-			state.emit(&"pickup", {"kind": &"gem"})
+			collect(&"gem", gem_value[i])
 			gem_slots.release(i)
 
 ## はじけ飛んでいる結晶を動かす。勢いは落ちていき、拾えるようになるまでの時間を減らす。
@@ -267,8 +269,7 @@ func _collect_coins(dt: float) -> void:
 			coin_pulled[i] = 1
 			coin_pos[i] = p + d / maxf(dist, 1.0) * minf(step, dist)
 		if dist < reach:
-			state.coins += 1
-			state.emit(&"pickup", {"kind": &"coin"})
+			collect(&"coin")
 			coin_slots.release(i)
 
 func _collect_capsules(dt: float) -> void:
@@ -278,7 +279,7 @@ func _collect_capsules(dt: float) -> void:
 		if c.taken:
 			continue
 		c.age += dt
-		var can := c.kind != Pickup.Kind.HEAL or state.ship_hp < state.stats.max_hp
+		var can := effect(StringName(Pickup.Kind.keys()[c.kind].to_lower())).can_collect(c)
 		# 彗星限定の武器のカプセルは吸い寄せない（自分で触って拾う）
 		if c.src == &"drop" and can:
 			var d := state.ship_pos - c.pos
@@ -296,30 +297,21 @@ func _collect_capsules(dt: float) -> void:
 			kept.append(c)
 	capsules = kept
 
-func _apply(c: Pickup) -> void:
-	match c.kind:
-		Pickup.Kind.COMET_WEAPON:
-			state.pending_comet_weapons.append(c.weapon_id)
-		Pickup.Kind.HEAL:
-			var before := state.ship_hp
-			ship.heal(state.stats.max_hp * cfg.meteor_heal_frac)
-			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -40), "text": "HP +%d" % roundi(state.ship_hp - before), "color": Color("#67e8b1"), "size": 18})
-		Pickup.Kind.MAGNET:
-			var xp := 0.0
-			for i in gem_alive.size():
-				if gem_alive[i] != 0:
-					xp += gem_value[i]
-			_clear_gems()
-			build.add_xp(xp)
-			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -45), "text": "XP +%d" % roundi(xp), "color": Color("#b8a0ff"), "size": 22})
-	state.emit(&"pickup", {"kind": Pickup.Kind.keys()[c.kind].to_lower()})
-	state.emit(&"ring", {"pos": c.pos, "radius": 70.0 if c.kind == Pickup.Kind.HEAL else 120.0, "color": _ring_color(c.kind), "life": 0.5})
+var _effects: Dictionary = {}
 
-func _ring_color(kind: Pickup.Kind) -> Color:
-	match kind:
-		Pickup.Kind.COMET_WEAPON:
-			return Color("#ffd24a")
-		Pickup.Kind.HEAL:
-			return Color("#67e8b1")
-		_:
-			return Color("#b8a0ff")
+func effect(kind: StringName) -> PickupEffect:
+	if not _effects.has(kind):
+		var item: PickupEffect = load("res://scripts/pickups/%s.gd" % kind).new()
+		item.setup(ctx)
+		_effects[kind] = item
+	return _effects[kind]
+
+func collect(kind: StringName, value := 0.0, pickup: Pickup = null) -> void:
+	var item := effect(kind)
+	item.apply(value, pickup)
+	state.emit(&"pickup", {"kind": kind})
+	if pickup != null:
+		state.emit(&"ring", {"pos": pickup.pos, "radius": item.ring_radius, "color": item.ring_color, "life": 0.5})
+
+func _apply(c: Pickup) -> void:
+	collect(StringName(Pickup.Kind.keys()[c.kind].to_lower()), 0.0, c)
