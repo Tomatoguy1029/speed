@@ -43,6 +43,7 @@ class Neck:
 	var mode: StringName = &"idle"
 	var t := 0.0
 	var cd := 0.0
+	var emission: Dictionary = {}
 	var locked := false
 	var bt: BTTask
 	var step := 0
@@ -492,6 +493,7 @@ func start_normal(index: int, attack: StringName) -> bool:
 	n.t = 0.0
 	n.locked = false
 	n.step = 0
+	n.emission.clear()
 	_cue(&"warning_started",attack,index)
 	return true
 

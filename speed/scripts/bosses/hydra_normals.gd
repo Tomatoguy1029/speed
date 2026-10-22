@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"beam_fixed":
+		beam_fixed(a,n,dt)
+		return
 	if n.mode in [&"rubble_lump",&"rubble_fan"]:
 		rubble(a,n,dt)
 		return
@@ -117,3 +120,20 @@ static func launch_rubble(a: Node,n,angle: float,radius: float) -> void:
 	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.manager.enemies.def_of(&"hydra_rubble").params.life),float(a.def.params.lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
 	e.follow_row=row
 	e.follow_id=a.table.id[row]
+
+static func beam_fixed(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	if n.t < charge:
+		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*6.0))
+		n.glow=n.t/charge
+		var at: Vector2 = a._head_pos(n)
+		var points := PackedVector2Array([at,at+Vector2.from_angle(n.angle)*float(p.beam_len)])
+		if n.emission.is_empty():
+			n.emission=a.attack_field.add_shape(points,float(p.beam_width),charge-n.t,float(p.beam_time),float(p.beam_dmg),&"beam",n.row)
+		else: n.emission.points=points
+	elif not n.locked:
+		n.strike_pos=a._head_pos(n)
+		n.locked=true
+		a._cue(&"attack_started",n.mode,a.necks.find(n))
+	if n.t>=charge+float(p.beam_time)+float(p.normal_hold): a.finish_normal(n)
