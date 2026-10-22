@@ -17,6 +17,7 @@ signal presentation_advanced(world_dt: float)
 var _presentation: Node
 var _defeat_announced := false
 
+const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
 var special: RefCounted
@@ -372,6 +373,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		neck.length = maxf(0.0, neck.length - float(p.neck_rest) * dt)
 	else:
 		if table.hp[neck.row] < neck.head_hp:
+			neck.motion.hit=0.35
 			_cue(&"hit", neck.mode, k, {"target": &"hydra", "damage": neck.head_hp - maxf(0.0, table.hp[neck.row])})
 		neck.head_hp = table.hp[neck.row]
 		if def.params.normal_rules.has(neck.mode):
@@ -420,6 +422,9 @@ func _extend_regrow_grace(combo_scale: float) -> void:
 
 ## 頭の位置・向きは攻撃側が決め、描画用の点列だけを解く。頭を失った首は短く畳む。
 func _follow_neck(neck: Neck, dt: float) -> void:
+	if separated:
+		SNAKE.follow(neck,_head_pos(neck),dt,_time,def.params)
+		return
 	var rest := float(def.params.neck_rest)
 	if neck.row < 0:
 		rest = minf(rest, neck.length)
@@ -539,9 +544,7 @@ func position_head(index: int, dt: float) -> void:
 		var center: Vector2=table.pos[immortal_row] if immortal_row>=0 else run_state.ship_pos
 		var desired: Vector2=center+Vector2.from_angle(n.base_angle+_time*0.12)*float(def.params.guard_radius)
 		if not run_state.view_rect().grow(-60.0).has_point(n.free_pos):desired=run_state.view_rect().get_center()+Vector2.from_angle(n.base_angle)*minf(run_state.view_half.x,run_state.view_half.y)*0.65
-		n.velocity=(desired-n.free_pos).limit_length(float(def.params.snake_speed))
-		n.free_pos+=n.velocity*dt
-		if n.velocity.length()>1.0:n.angle=n.velocity.angle()
+		SNAKE.steer(n,desired,dt,def.params)
 		return
 	var facing := n.base_angle+table.facing[body]
 	n.angle = lerp_angle(n.angle,facing+sin(_time+n.base_angle)*0.15,minf(1.0,dt*2.0))
@@ -1217,8 +1220,8 @@ func tick_bearer(dt: float)->void:
 		return
 	var away: Vector2=(immortal_neck.free_pos-run_state.ship_pos).normalized()
 	if away==Vector2.ZERO:away=Vector2.LEFT
-	immortal_neck.free_pos+=away*float(def.params.bearer_speed)*dt
-	immortal_neck.angle=away.angle()
+	var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
+	SNAKE.steer(immortal_neck,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
 	table.pos[immortal_row]=immortal_neck.free_pos
 	table.pos[body]=immortal_neck.free_pos
 	table.hp[body]=table.hp[immortal_row]
