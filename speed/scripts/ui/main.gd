@@ -1,8 +1,6 @@
 ## 起動時のシーンのルート。GameManager の画面に合わせて、表示する画面のシーンを差し替える。
 ##
-## エディタのツールバー（addons/stage_launcher）からステージの直接起動が予約されていれば、
-## タイトルを飛ばしてそのステージを始める。予約はエディタから実行したときだけ読み、
-## 1回読んだら消す（F5 は通常どおりタイトルから始まる。設計書 14.1）。
+## 起動側の予約があれば、タイトルの表示より先に受け付ける（設計書 14.1）。
 extends Node
 
 const SCREENS := {
@@ -13,7 +11,6 @@ const SCREENS := {
 	GameManager.Screen.UPGRADE: "res://scenes/app/upgrade.tscn",
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
-	GameManager.Screen.ENEMY_LAB: "res://gyms/enemy_lab/enemy_lab.tscn",
 }
 
 var _current: Node = null
@@ -28,15 +25,7 @@ var _fade := preload("res://scripts/ui/screen_fade.gd").new()
 func _ready() -> void:
 	add_child(_fade)
 	GameManager.screen_changed.connect(_show)
-	if OS.has_feature("editor"):
-		var stage := StageLaunchRequest.consume()
-		if stage > 0:
-			print("[Main] ステージ %d を直接起動" % stage)
-			GameManager.reset_to_main_menu()
-			GameManager.run_start_time = StageLaunchRequest.start_time
-			GameManager.run_start_source = StageLaunchRequest.source
-			GameManager.start_run(stage)
-			return
+	if GameManager.boot_request.is_valid() and GameManager.boot_request.call(): return
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
@@ -83,7 +72,7 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	if screen == GameManager.Screen.RUN:
 		_current = RunManager.create_run()
 	else:
-		_current = (load(SCREENS[screen]) as PackedScene).instantiate()
+		_current = (load(SCREENS.get(screen, GameManager.extension_screens.get(screen, ""))) as PackedScene).instantiate()
 	if morph:
 		_current.set_meta("fade_from_menu", true)
 	if return_morph:

@@ -8,6 +8,7 @@ extends Control
 var close_fn: Callable
 
 func _ready() -> void:
+	GameManager.screen_ready.emit(self)
 	var back := get_node_or_null("%BackButton") as Button
 	if back != null:
 		back.pressed.connect(_on_back)

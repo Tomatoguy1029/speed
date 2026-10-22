@@ -10,6 +10,9 @@ const MAP_SCRIPT := preload("res://scripts/ui/constellation_map.gd")
 const ART_SIZE := Vector2(1280, 720)
 const MENU_CYAN := Color("5bc8db")
 
+## 起動側から加えるメニューの操作。
+var menu_accessory: Control
+
 var _art: Control
 var _radar_material: ShaderMaterial
 var _elapsed := 0.0
@@ -27,18 +30,6 @@ var _increments_alpha := 1.0
 
 func _ready() -> void:
 	_build_title_art()
-	if OS.is_debug_build():
-		var lab := Button.new()
-		lab.name = "EnemyLabButton"
-		lab.text = tr("menu.enemy_lab")
-		lab.add_theme_font_size_override("font_size", 18)
-		lab.pressed.connect(_go.bind(GameManager.Screen.ENEMY_LAB))
-		add_child(lab)
-		lab.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		lab.offset_left = -330.0
-		lab.offset_right = -24.0
-		lab.offset_top = 24.0
-		lab.offset_bottom = 68.0
 	%StartButton.pressed.connect(func(): _go(GameManager.Screen.MAIN_MENU))
 	%SettingsButton.pressed.connect(func(): _go(GameManager.Screen.SETTINGS))
 	%QuitButton.pressed.connect(GameManager.quit_game)
@@ -277,9 +268,9 @@ func transition_to_upgrade() -> void:
 	_morphing = true
 	_menu_options.hide()
 	_menu_back.hide()
-	var lab := get_node_or_null("EnemyLabButton")
-	if lab != null:
-		lab.hide()
+	var accessory := menu_accessory
+	if accessory != null:
+		accessory.hide()
 	var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(_menu_frame, "position", MORPH_PANEL.UPGRADE_RECT.position, 0.7)
 	tween.tween_property(_menu_frame, "size", MORPH_PANEL.UPGRADE_RECT.size, 0.7)
@@ -295,9 +286,9 @@ func _transition_from_upgrade() -> void:
 	_menu_frame.size = MORPH_PANEL.UPGRADE_RECT.size
 	_menu_frame.fill_color = Color.BLACK
 	_radar_material.set_shader_parameter("upgrade_progress", 1.0)
-	var lab := get_node_or_null("EnemyLabButton")
-	if lab != null:
-		lab.hide()
+	var accessory := menu_accessory
+	if accessory != null:
+		accessory.hide()
 	_transition = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_transition.tween_property(_menu_frame, "position", MORPH_PANEL.MENU_RECT.position, 0.7)
 	_transition.tween_property(_menu_frame, "size", MORPH_PANEL.MENU_RECT.size, 0.7)
@@ -307,7 +298,7 @@ func _transition_from_upgrade() -> void:
 		_menu_options.show()
 		_menu_back.show()
 		_morphing = false
-		if lab != null:
-			lab.show()
+		if accessory != null:
+			accessory.show()
 		_stage_button.grab_focus()
 	)
