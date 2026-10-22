@@ -136,7 +136,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 				run.inside[t.id[i]] = i
 			continue
 		# しし座の力が効いている間のなぞりは、装甲に関係なく貫く
-		var leo := run != null and leo_width() > 1.0
+		var leo := run != null and trace_width() > 1.0
 		if gate == EnemyTable.GateResult.ALLOW and (ignore_armor or leo or can_pierce(atk, i, crit)):
 			var dmg := atk * (state.stats.crit_mult if crit else 1.0)
 			if enemies.rear_open(i, hit_pos):
@@ -213,16 +213,13 @@ func _pierce_keep(i: int) -> float:
 	return 1.0 - minf(0.6, loss)
 
 ## しし座の力が効いているときの、なぞりの当たり判定の太さの倍率（効いていなければ 1）。
-func leo_width() -> float:
-	if state.hero_active_t <= 0.0 or state.hero_power != &"leo":
-		return 1.0
-	var def: HeroDef = ConfigManager.heroes.get(&"leo")
-	return float(def.params.get("width_mult", 1.0)) if def != null else 1.0
+func trace_width() -> float:
+	return ctx.heroes.trace_width() if ctx.heroes != null else 1.0
 
 ## なぞり中の機体の当たり判定の半径（仕様書 6.5）。線の左右この距離に触れた敵に、体当たりが当たる。
 ## しし座の力が効いている間は太くなる（仕様書 8.1）。
 func trace_radius() -> float:
-	return cfg.trace_radius * leo_width()
+	return cfg.trace_radius * trace_width()
 
 ## ふたご座の双子の機体が from から to へ動いた：通った敵に体当たりと同じように当てる（弾かれず、被弾もしない）。
 func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
@@ -242,7 +239,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 		if t.stone[i] > 0.0:
 			kill_enemy(i, {"cause": &"ram", "dir": dir})
 		elif enemies.gate_check(i, to, dir, &"ram", atk) == EnemyTable.GateResult.ALLOW \
-				and (ignore_armor or leo_width() > 1.0 or can_pierce(atk, i, false)):
+				and (ignore_armor or trace_width() > 1.0 or can_pierce(atk, i, false)):
 			damage_enemy(i, atk, {"cause": &"ram", "dir": dir, "impact": t.pos[i]})
 		if state.phase != RunState.Phase.PLAY:
 			return

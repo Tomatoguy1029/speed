@@ -574,7 +574,7 @@ func _test_hero() -> void:
 	_check(s.hero_cd == cd, "タスク16：クールダウン中は再発動しない")
 	match def.id:
 		&"leo":
-			_check(run.combat.leo_width() > 1, "タスク17：しし座は帯を太くする")
+			_check(run.combat.trace_width() > 1, "タスク17：しし座は帯を太くする")
 			var a := s.ship_pos - Vector2(100, 0)
 			var b := s.ship_pos + Vector2(300, 0)
 			t.pos[victim] = s.ship_pos + Vector2(0, run.cfg.trace_radius * 1.5)
@@ -613,9 +613,9 @@ func _test_hero() -> void:
 			_finish_trace()
 			_check(t.dead[victim] != 0 and t.dead[other] != 0, "タスク18：2本それぞれの線の敵を貫ける")
 		&"hercules":
-			_check(not h.falls.is_empty(), "タスク17：火の隕石が降り始める")
+			_check(not h.behavior(&"hercules").falls.is_empty(), "タスク17：火の隕石が降り始める")
 			h.tick(float(def.params.fall_time) + 0.01, 0.01)
-			_check(not h.burns.is_empty() and t.dead[victim] != 0, "タスク17：火の隕石は装甲を無視して焼き、燃える跡を残す")
+			_check(not h.behavior(&"hercules").burns.is_empty() and t.dead[victim] != 0, "タスク17：火の隕石は装甲を無視して焼き、燃える跡を残す")
 
 func _test_landmarks() -> void:
 	var h := run.heroes
@@ -901,14 +901,14 @@ func _test_hydra_fire() -> void:
 	run.combat.rebuild_grid()
 	var near_heads := 0
 	for sample in 300:
-		var target := run.heroes._fire_target()
+		var target: Vector2 = run.heroes.behavior(&"hercules")._fire_target()
 		for neck in boss.necks:
 			if boss._alive(neck) and target.distance_to(t.pos[neck.row]) < 65:
 				near_heads += 1
 				break
 	_check(near_heads > 60, "タスク23：火の隕石は雑魚が多くてもボスの頭に少し寄せる")
 	t.hp[head.row]=1.0
-	run.heroes.falls.append(Vector3(t.pos[head.row].x, t.pos[head.row].y, 0.01))
+	run.heroes.behavior(&"hercules").falls.append(Vector3(t.pos[head.row].x, t.pos[head.row].y, 0.01))
 	run.heroes.tick(0.02, 0.02)
 	boss.sim_tick(0.02, 0.02)
 	for tick in 20:

@@ -168,15 +168,7 @@ func _commit(_it: Intent) -> void:
 		# 線ができていない（描き始めの点がすぐ惑星・月に当たったとき）：描くのをやめ、ゲージは減らない
 		_cancel()
 		return
-	if state.twin_first.is_empty() and state.hero_active_t > 0.0 and state.hero_power == &"gemini":
-		# ふたご座の力：1本目を取っておき、2本目を好きな所から描く（長さの上限は同じ）
-		state.gauge = maxf(0.0, state.gauge - state.draw_start_charge * minf(1.0, state.draw_length / state.draw_limit))
-		state.twin_first = state.draw_points
-		state.draw_points = PackedVector2Array()
-		state.draw_length = 0.0
-		state.draw_started = false
-		state.draw_blocked = false
-		state.emit(&"twin_first")
+	if ctx.heroes != null and ctx.heroes.capture_first_trace():
 		return
 	var twin := state.twin_first
 	if twin.is_empty():

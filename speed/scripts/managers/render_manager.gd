@@ -604,12 +604,12 @@ func _draw_field(c: CanvasItem) -> void:
 		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	_draw_hero(c)
 	# ヘルクレス座の火の隕石：落ちてくる影と、燃える跡
-	for fall in run.heroes.falls:
+	for fall in run.heroes.behavior(&"hercules").falls:
 		var k := clampf(1.0 - fall.z / 0.6, 0.0, 1.0)
 		var at := Vector2(fall.x, fall.y)
 		c.draw_circle(at, 30.0 + 60.0 * k, Color(1.0, 0.4, 0.1, 0.12 + 0.25 * k))
 		c.draw_circle(at - Vector2(-0.6, 1.0) * 500.0 * (1.0 - k), 22.0, Color("#ffb060"))
-	for b in run.heroes.burns:
+	for b in run.heroes.behavior(&"hercules").burns:
 		var flick := 0.8 + 0.2 * sin(state.world_time * 18.0 + b.x)
 		c.draw_circle(Vector2(b.x, b.y), 80.0 * flick, Color(1.0, 0.45, 0.1, 0.22 * minf(1.0, b.z)))
 	# ワープホール：回る輪
@@ -1063,7 +1063,7 @@ func _draw_path_band(c: CanvasItem) -> void:
 	var pts := state.draw_points if state.drawing else state.trace_path
 	if pts.size() < 2:
 		return
-	var leo := run.combat.leo_width()
+	var leo := run.combat.trace_width()
 	var color := Color(1.0, 0.85, 0.45) if leo > 1.0 else Color(0.55, 0.9, 1.0)
 	var w := cfg.trace_radius * leo
 	for i in pts.size() - 1:

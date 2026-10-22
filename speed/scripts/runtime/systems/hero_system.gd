@@ -1,7 +1,7 @@
 ## 英雄の星座（仕様書 8.1・13.1）。フィールドの端に捕らわれた星座、解放、特別な枠の力。
 ##
 ## 星座の形と力の値は HeroDef（res://data/heroes/）。力が効いている間の中身は、
-## 力を使う所（DrawSystem・CombatSystem など）が state.hero_power と state.hero_active_t を見て決める。
+## 種類ごとの力はHeroBehaviorが受け持つ。
 class_name HeroSystem
 extends RunSystem
 
@@ -14,11 +14,6 @@ var combat: CombatSystem:
 var projectiles: ProjectileSystem:
 	get: return ctx.projectiles
 
-## ヘルクレス座の火の隕石：落ちてくる途中（位置と、落ちるまでの残り時間）と、燃えている跡（位置と残り時間）
-var falls: Array[Vector3] = []
-var burns: Array[Vector3] = []
-var _fire_t := 0.0
-var _burn_tick := 0.0
 ## 目印の星を選ぶまでの時間と、目印の星を持つ敵（行番号と id。いなければ -1）
 var _landmark_t := 0.0
 var _landmark_row := -1
@@ -46,8 +41,11 @@ func setup(context: RunContext) -> void:
 	super(context)
 	hero = null
 	_next_t = -1.0
-	falls.clear()
-	burns.clear()
+	for power in _powers.values():
+		power.dispose()
+	_powers.clear()
+	for definition in ConfigManager.heroes.values():
+		behavior(definition.id)
 	_prev_pos = state.ship_pos
 	if state.endless:
 		_place(_random_hero(&""))
@@ -106,7 +104,8 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		_next_t -= real_dt
 		if _next_t < 0.0:
 			_place(_random_hero(state.hero_power))
-	_tick_hercules(real_dt)
+	for power in _powers.values():
+		power.tick(real_dt, _world_dt)
 	var from := _prev_pos
 	_prev_pos = state.ship_pos
 	if hero == null or not is_captive():
@@ -241,98 +240,34 @@ func activate() -> void:
 	state.hero_cd = def.cooldown
 	state.hero_active_t = def.duration
 	state.emit(&"hero_power", {"id": def.id, "pos": state.ship_pos})
-	if def.id == &"perseus":
-		_medusa(def)
-
-## ペルセウス座（メドゥーサの首）：画面の中の敵と敵の弾を、効いている間、石にして止める。ボスは少しの間止まるだけ。
-func _medusa(def: HeroDef) -> void:
-	var view := state.view_rect()
-	var t := enemies.table
-	for i in t.alive.size():
-		if t.alive[i] == 0 or t.dead[i] != 0 or t.meteor_index[i] >= 0:
-			continue
-		if not view.has_point(t.pos[i]):
-			continue
-		if t.is_boss[i] != 0:
-			state.boss_stun = float(def.params.get("boss_stun", 1.5))
-		else:
-			t.stone[i] = def.duration
-	projectiles.stone_hostile(view, def.duration)
-
-# ── ヘルクレス座：火の隕石（仕様書 8.1） ─────────────────────────────
-
-## 効いている間、間隔ごとに機体の周りへ火の隕石を落とす。落ちた所で爆発し、跡はしばらく燃える。
-func _tick_hercules(dt: float) -> void:
-	var def: HeroDef = ConfigManager.heroes.get(&"hercules")
-	if def == null:
-		return
-	var p := def.params
-	if active_power() == &"hercules":
-		_fire_t -= dt
-		if _fire_t <= 0.0:
-			_fire_t = float(p.interval)
-			var at := _fire_target()
-			falls.append(Vector3(at.x, at.y, float(p.fall_time)))
-	var dmg := combat.attack_power() * float(p.power)
-	for k in range(falls.size() - 1, -1, -1):
-		var f := falls[k]
-		f.z -= dt
-		if f.z > 0.0:
-			falls[k] = f
-			continue
-		falls.remove_at(k)
-		var at := Vector2(f.x, f.y)
-		_burn_enemies(at, float(p.radius), dmg)
-		state.emit(&"explode", {"pos": at, "radius": float(p.radius), "cause": &"fire", "color": Color("#ff7a2e"), "life": 0.45})
-		burns.append(Vector3(at.x, at.y, float(p.burn_time)))
-	_burn_tick -= dt
-	var tick := _burn_tick <= 0.0
-	if tick:
-		_burn_tick = 0.25
-	for k in range(burns.size() - 1, -1, -1):
-		var b := burns[k]
-		b.z -= dt
-		if b.z <= 0.0:
-			burns.remove_at(k)
-			continue
-		burns[k] = b
-		if tick:
-			_burn_enemies(Vector2(b.x, b.y), float(p.radius) * 0.8, dmg * float(p.burn_power))
-
-## 火の隕石を落とす位置：機体の周り（画面の半分くらいの範囲）のランダムな位置。敵がいれば、その位置に寄せる。
-## ボス戦の間は、35% の確率でボスの部位（うみへび座の頭）に寄せる。
-func _fire_target() -> Vector2:
-	var half := state.view_half * 0.5
-	if combat.grid.table == null:
-		return state.ship_pos
-	var rows := PackedInt32Array()
-	combat.grid.query_radius(state.ship_pos, half.length(), combat.enemy_query_padding, rows)
-	var t := enemies.table
-	# ボス戦の間は、ボスの部位（うみへび座の頭）に少しだけ寄せる
-	if state.rng.randf() < 0.35:
-		for i in rows:
-			if t.dead[i] == 0 and t.parent[i] >= 0 and t.is_boss[t.parent[i]] != 0:
-				return t.pos[i] + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * 60.0
-	for attempt in 6:
-		if rows.is_empty():
-			break
-		var i := rows[state.rng.randi_range(0, rows.size() - 1)]
-		if t.dead[i] == 0 and t.meteor_index[i] < 0:
-			return t.pos[i] + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * 40.0
-	return state.ship_pos + Vector2(state.rng.randf_range(-half.x, half.x), state.rng.randf_range(-half.y, half.y))
-
-## 範囲の敵を、装甲に関係なく焼く。
-func _burn_enemies(center: Vector2, radius: float, dmg: float) -> void:
-	var rows := PackedInt32Array()
-	combat.grid.query_radius(center, radius, combat.enemy_query_padding, rows)
-	var t := enemies.table
-	for i in rows:
-		if t.dead[i] == 0 and t.meteor_index[i] < 0 and t.pos[i].distance_to(center) <= radius + t.r[i]:
-			combat.damage_enemy(i, dmg, {"cause": &"fire", "no_crit": true, "knock": 80.0,
-				"dir": (t.pos[i] - center).normalized(), "impact": center})
-			if state.phase != RunState.Phase.PLAY:
-				return
+	behavior(def.id).activate()
 
 ## 効いている力（無ければ空）。
 func active_power() -> StringName:
 	return state.hero_power if state.hero_active_t > 0.0 else &""
+
+var _powers: Dictionary = {}
+
+func behavior(id: StringName) -> HeroBehavior:
+	if not _powers.has(id):
+		var definition: HeroDef = ConfigManager.heroes.get(id)
+		if definition == null:
+			return null
+		var power: HeroBehavior = load("res://scripts/heroes/%s.gd" % id).new()
+		power.configure(ctx, definition)
+		_powers[id] = power
+	return _powers[id]
+
+func trace_width() -> float:
+	var power := behavior(state.hero_power)
+	return power.trace_width() if power != null else 1.0
+
+func capture_first_trace() -> bool:
+	var power := behavior(state.hero_power)
+	return power != null and power.capture_first_trace()
+
+func dispose() -> void:
+	for power in _powers.values():
+		power.dispose()
+	_powers.clear()
+	super()
