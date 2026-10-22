@@ -90,12 +90,7 @@ var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var _bolt_seed := 0
 var shield_transfers: Array = []
-## みずがめ座の照射の演出（照射の瞬間の衝撃と、照射後に崩れて残る水しぶき）。t は狙ってからの時間、end は照射の終わり
-var floods: Array = []
-## 照射が終わってから、水の流れが細くなって崩れ、霧と水滴が消えるまでの時間
-const FLOOD_TAIL := 1.4
-## みずがめ座の水を描く層（シェーダー water_flood）
-var _flood_layer: DrawLayer
+var _attack_visuals: Dictionary = {}
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -135,24 +130,11 @@ func _ready() -> void:
 	_path_band = DrawLayer.new()
 	_path_band.draw_fn = Callable(self, "_draw_path_band")
 	_path_band_group.add_child(_path_band)
-	# みずがめ座の水はシェーダーで描く。頂点の色で描き方を渡すので、色を変える modulate の掛からない層にする
-	_flood_layer = DrawLayer.new()
-	_flood_layer.name = "Flood"
-	_flood_layer.z_index = _layers.projectiles.z_index + 1
-	_flood_layer.draw_fn = Callable(self, "_draw_floods")
-	var flood_mat := ShaderMaterial.new()
-	flood_mat.shader = load("res://shaders/water_flood.gdshader")
-	# ノイズは作っておいた画像を使い回す
-	flood_mat.set_shader_parameter("noise_tex", load("res://assets/fx/water_noise.png"))
-	_flood_layer.material = flood_mat
-	world.add_child(_flood_layer)
 	_build_batches()
 	_build_directional_lights(world)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
-	if not pipeline.rich:
-		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
 	_glide_wake = preload("res://scenes/fx/glide_wake.tscn").instantiate()
 	_layers.exhaust.add_child(_glide_wake)
@@ -370,7 +352,6 @@ func _process(delta: float) -> void:
 		(_batches[type].material as ShaderMaterial).set_shader_parameter("brightness", brightness)
 		(_armor_batches[type].material as ShaderMaterial).set_shader_parameter("brightness", brightness)
 	_lit_enemy_marks.self_modulate = Color(brightness, brightness, brightness)
-	_flood_layer.queue_redraw()
 	_path_band_group.visible = state.drawing or state.tracing
 	_path_band_group.self_modulate = Color(1, 1, 1, 0.25 if state.drawing else 0.18)
 	_path_band.queue_redraw()
@@ -421,11 +402,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_ring(ev.pos, float(ev.r) * 2.4, Color("#ffe27a"), 0.3)
 				_burst(ev.pos, Color("#ffd23f"), 14, Vector2.ZERO, 360.0)
 			&"aquarius_aim":
-				var f := ev.duplicate()
-				f.t = 0.0
-				f.end = float(ev.delay) + float(ev.active)
-				f.fired = false
-				floods.append(f)
+				flood().aim(ev)
 			&"cepheus_summon":
 				_ring(ev.pos, 70.0, (ev.color as Color).lightened(0.4), 0.3)
 			&"rock_break":
@@ -572,32 +549,11 @@ func _update_fx(dt: float) -> void:
 	beams = beams.filter(func(f): return f.life > 0.0)
 	bolts = bolts.filter(func(f): return f.life > 0.0)
 	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
-	_update_floods(dt)
+	for visual in _attack_visuals.values():
+		visual.update(dt)
 
 ## みずがめ座の照射の演出を進める。照射の瞬間に揺れと衝撃波、照射中は細かい揺れ。
 ## 予告中に本体が倒れたら演出をやめ、照射中に倒れたらその場で崩れ始める。
-func _update_floods(dt: float) -> void:
-	var enemies := run.enemies
-	for f in floods:
-		f.t += dt
-		var alive: bool = enemies.is_same(int(f.row), int(f.id)) and enemies.table.dead[int(f.row)] == 0
-		if not f.fired:
-			if not alive:
-				f.t = 1e9
-				continue
-			if f.t >= float(f.delay):
-				f.fired = true
-				var col: Color = f.color
-				shake = maxf(shake, 16.0)
-				pipeline.add_wave(f.pos, 800.0, 0.7)
-				_burst(f.pos, col.lightened(0.3), 36, Vector2.ZERO, 760.0)
-		elif f.t < float(f.end):
-			if not alive:
-				f.end = f.t
-			else:
-				shake = maxf(shake, 3.5)
-	floods = floods.filter(func(f): return f.t < float(f.end) + FLOOD_TAIL and f.t < 1e8)
-
 # ── 層ごとの描画 ─────────────────────────────────────────────────
 
 func _px(px: float) -> float:
@@ -1039,14 +995,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
 
 ## やまねこ座の斬撃：潰れた弧の3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
-func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
-	var thick := ProjectileSystem.SLASH_THICK * size
-	for k in 3:
-		var pts := ProjectileSystem.slash_points(pos, travel, size, side, k)
-		c.draw_polyline(pts, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
-		c.draw_polyline(pts, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
-		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
-
 ## 圧縮した敵の塊（構えている口元と、撃った圧縮弾）。張り詰めた膜の中に、押し込められた敵がひしめいて回る。
 func _draw_shell_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(now * 14.0)
@@ -1105,208 +1053,22 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			var dir := pr.friend_vel[i].normalized()
 			c.draw_line(pos - dir * r * 2.2, pos + dir * r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), r * 0.9))
 	_hostile_batch.begin()
-	var hostile_alive := run.projectiles.hostile_alive
-	var hostile_pos := run.projectiles.hostile_pos
-	var hostile_r := run.projectiles.hostile_r
-	for i in hostile_alive.size():
-		var pos := hostile_pos[i]
-		if hostile_alive[i] != 0 and view.has_point(pos):
-			if pr.hostile_kind[i] == ProjectileSystem.HostileKind.BOLT:
-				# ケフェウス座の兵の細長い光弾
-				var u := pr.hostile_vel[i].normalized()
-				c.draw_line(pos - u * 34.0, pos + u * 6.0, Color(0.75, 0.6, 1.0, 0.35), 14.0)
-				c.draw_line(pos - u * 30.0, pos + u * 4.0, Color(0.85, 0.75, 1.0), 6.0)
-				c.draw_line(pos - u * 24.0, pos + u * 2.0, Color(1, 1, 1, 0.95), 2.5)
-			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.SLASH:
-				_draw_slash(c, pos, pr.hostile_vel[i].angle(), hostile_r[i], pr.hostile_turn[i], 1.0)
-			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.SHELL:
-				# ポンプ座の圧縮弾：後ろに尾を引く
-				var u := pr.hostile_vel[i].normalized()
-				var n := Vector2(-u.y, u.x) * hostile_r[i] * 0.8
-				c.draw_polygon(PackedVector2Array([pos + n, pos - u * hostile_r[i] * 2.2, pos - n]),
-					PackedColorArray([Color(0.85, 0.7, 1.0, 0.45), Color(0.85, 0.7, 1.0, 0.0), Color(0.85, 0.7, 1.0, 0.45)]))
-				_draw_shell_ball(c, pos, hostile_r[i], Color("#b78cff"), state.world_time)
-			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.REFLECTED:
-				var u := pr.hostile_vel[i].normalized()
-				c.draw_line(pos - u * hostile_r[i] * 3.0, pos, Color("#ff84df"), hostile_r[i] * 0.9)
-				c.draw_circle(pos, hostile_r[i], Color("#f45ec5"))
-				c.draw_circle(pos, hostile_r[i] * 0.5, Color("#fff0fc"))
-			else:
-				_hostile_batch.add(pos, 0.0, hostile_r[i], Color.WHITE)
-			if run.projectiles.hostile_stone[i] > 0.0:
-				c.draw_circle(pos, hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
+	for i in pr.hostile_alive.size():
+		var pos := pr.hostile_pos[i]
+		if pr.hostile_alive[i] != 0 and view.has_point(pos):
+			if not _attack_visual(ProjectileSystem.HostileKind.keys()[pr.hostile_kind[i]]).draw_shot(c, pr, i, pos):
+				_hostile_batch.add(pos, 0.0, pr.hostile_r[i], Color.WHITE)
+			if pr.hostile_stone[i] > 0.0:
+				c.draw_circle(pos, pr.hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
 	_hostile_batch.end()
 	_draw_hazards(c, view)
 
 ## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
-## 広がるビームの、根元から d の距離での幅の半分。
-func _flood_half(width: float, spread: float, d: float) -> float:
-	return width * 0.5 + maxf(d, 0.0) * tan(spread)
-
-## みずがめ座の水の層（シェーダー water_flood が描く）。予告のさざ波、照射の光、崩れていく光と霧。
-func _draw_floods(c: CanvasItem) -> void:
-	var pr := run.projectiles
-	var mat := _flood_layer.material as ShaderMaterial
-	# HDR の描画では頂点の色が線形に直されて届くので、シェーダーで元の値に戻す
-	mat.set_shader_parameter("linear_colors", _flood_layer.get_viewport().use_hdr_2d)
-	var shaped := false
-	for i in pr.hazard_alive.size():
-		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.FLOOD:
-			continue
-		if not shaped:
-			# ビームの形（みずがめ座はみな同じ形）
-			mat.set_shader_parameter("half0", pr.hazard_width[i] * 0.5)
-			mat.set_shader_parameter("slope", tan(pr.hazard_arc[i]))
-			mat.set_shader_parameter("beam_len", pr.hazard_len[i])
-			shaped = true
-		var t := pr.hazard_t[i]
-		var delay := pr.hazard_delay[i]
-		var charging := t < delay
-		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0) if charging else 1.0
-		_water_strip(c, pr.hazard_pos[i], pr.hazard_angle[i], pr.hazard_len[i], pr.hazard_width[i], pr.hazard_arc[i],
-			0.0 if charging else 1.0 / 3.0, k, float(i % 17) / 17.0)
-	for f in floods:
-		if f.t < float(f.end):
-			continue
-		var age: float = f.t - float(f.end)
-		var collapse := clampf(1.0 - age / 0.35, 0.0, 1.0)
-		var life := clampf(1.0 - age / FLOOD_TAIL, 0.0, 1.0)
-		var n := int(f.count)
-		for k in n:
-			var a := float(f.angle) + k * TAU / n
-			var seed := float((int(f.id) * 7 + k) % 17) / 17.0
-			if collapse > 0.0:
-				_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0 / 3.0, collapse, seed)
-			_water_strip(c, f.pos, a, float(f.length), float(f.width), float(f.spread), 1.0, life * (1.0 - collapse * 0.6), seed)
-
-## 広がるビーム1本ぶんを、本体の中心 p を頂点とする三角形1枚で描く（どのビームも本体の中心の一点に集まる）。
-## UV はビームの向きに沿った距離と横のずれ（世界の単位の 1/1000、shader water_flood の決まり）。両端の外に飛沫の余白を足す。
-func _water_strip(c: CanvasItem, p: Vector2, angle: float, length: float, width: float, spread: float,
-		mode: float, strength: float, seed: float) -> void:
-	const MARGIN := 1.12
-	var u := Vector2.from_angle(angle)
-	var v := Vector2(-u.y, u.x)
-	var h := _flood_half(width, spread, length) * MARGIN
-	var col := Color(mode, strength, seed, 1.0)
-	c.draw_polygon(PackedVector2Array([p, p + u * length + v * h, p + u * length - v * h]),
-		PackedColorArray([col, col, col]),
-		PackedVector2Array([Vector2.ZERO, Vector2(length, h) / 1000.0, Vector2(length, -h) / 1000.0]))
-
 func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
-	var alive := pr.hazard_alive
-	for i in alive.size():
-		if alive[i] == 0:
-			continue
-		var p := pr.hazard_pos[i]
-		var t := pr.hazard_t[i]
-		var delay := pr.hazard_delay[i]
-		var col := pr.hazard_color[i]
-		if pr.hazard_style[i] == ProjectileSystem.HazardStyle.LIGHTNING:
-			col = PIXEL_LIGHTNING.COLOR
-		var len := pr.hazard_len[i]
-		var charging := t < delay
-		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
-		match pr.hazard_kind[i]:
-			ProjectileSystem.HazardKind.BEAM:
-				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.FLOOD:
-					# みずがめ座の水は水の層（_draw_floods）が描く
-					continue
-				if charging:
-					# 砲口に光が集まっていく
-					c.draw_circle(p, _px(4.0) + 10.0 * k, Color(col, 0.25 + 0.5 * k))
-					continue
-				var b := p + Vector2.from_angle(pr.hazard_angle[i]) * len
-				if not view.grow(len).has_point(p):
-					continue
-				var w := pr.hazard_width[i]
-				var fade := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0) * 0.6
-				c.draw_line(p, b, Color(col, 0.35 * fade), w * 1.6)
-				c.draw_line(p, b, Color(col, 0.9 * fade), w)
-				c.draw_line(p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
-			ProjectileSystem.HazardKind.ZONE:
-				if not view.grow(len).has_point(p):
-					continue
-				var style := pr.hazard_style[i]
-				if charging:
-					if style == ProjectileSystem.HazardStyle.RETICLE or style == ProjectileSystem.HazardStyle.LIGHTNING:
-						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
-						var a := 0.25 + 0.55 * k
-						c.draw_arc(p, len, 0.0, TAU, 40, Color(col, a), _px(2.0))
-						c.draw_arc(p, len * (1.0 - 0.7 * k), 0.0, TAU, 32, Color(col, a), _px(1.5))
-						for q in 4:
-							var u := Vector2.from_angle(q * PI / 2.0 + PI / 4.0)
-							c.draw_line(p + u * len * 0.55, p + u * len * 1.15, Color(col, a), _px(2.0))
-					else:
-						# 弾ける前の点滅
-						if fmod(t, 0.16) < 0.08:
-							c.draw_circle(p, _px(6.0), Color(col, 0.9))
-					continue
-				var f := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0)
-				if style == ProjectileSystem.HazardStyle.BITE:
-					# 噛みつき：上下のあごが閉じる
-					var shut := 1.0 - f
-					for side: float in [-1.0, 1.0]:
-						var a0 := PI / 2.0 * side * (1.0 - shut * 0.8)
-						c.draw_arc(p, len * 0.75, a0 - 0.9, a0 + 0.9, 10, Color(1, 1, 1, f), _px(3.0))
-					c.draw_circle(p, len * 0.4, Color(col, 0.35 * f))
-					continue
-				c.draw_circle(p, len, Color(col, 0.45 * f))
-				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
-				if style == ProjectileSystem.HazardStyle.LIGHTNING:
-					var age := t - delay
-					var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
-					PIXEL_LIGHTNING.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0), i * 7919 + shape * 101,
-						PIXEL_LIGHTNING.intensity(age, pr.hazard_active[i]))
-			ProjectileSystem.HazardKind.WAVE:
-				if charging:
-					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
-					continue
-				var rad := pr.wave_radius(i)
-				if rad <= 0.0 or not view.grow(rad).has_point(p):
-					continue
-				var w := pr.hazard_width[i]
-				var arc := pr.hazard_arc[i]
-				var center := pr.hazard_angle[i]
-				var gap_w := pr.hazard_gap_w[i]
-				var fade := 1.0 - 0.5 * clampf(rad / maxf(len, 1.0), 0.0, 1.0)
-				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.RIPPLE:
-					# いるか座の波動：先頭の1枚（当たる）と、その後ろの薄い数枚（見た目だけ）
-					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.3 * fade), w * 2.0)
-					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col.lightened(0.3), 0.95 * fade), w)
-					for n in range(1, 4):
-						var back := rad - float(n) * w * 1.6
-						if back > 0.0:
-							c.draw_arc(p, back, center - arc, center + arc, 40, Color(col, 0.28 * fade / float(n)), w * 0.45)
-					continue
-				if gap_w > 0.0:
-					# 切れ目の反対側から一周、切れ目を空けて描く
-					var g := pr.hazard_gap[i]
-					c.draw_arc(p, rad, g + gap_w, g + TAU - gap_w, 48, Color(col, 0.85 * fade), w)
-				else:
-					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.85 * fade), w)
-			ProjectileSystem.HazardKind.WALL:
-				var b := p + Vector2.from_angle(pr.hazard_angle[i]) * len
-				if not view.grow(len).has_point(p):
-					continue
-				var w := pr.hazard_width[i]
-				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.RAY and not charging:
-					# じょうぎ座のビーム：発射元から伸びる、揺らめく光の柱
-					var left := delay + pr.hazard_active[i] - t
-					var f := clampf(left / 0.3, 0.0, 1.0) * clampf((t - delay) / 0.12, 0.0, 1.0)
-					var flick := 0.85 + 0.15 * sin(t * 50.0 + float(i))
-					c.draw_line(p, b, Color(col, 0.22 * f), w * 2.6 * flick)
-					c.draw_line(p, b, Color(col.lightened(0.2), 0.9 * f), w)
-					c.draw_line(p, b, Color(1, 1, 1, 0.9 * f), maxf(_px(2.0), w * 0.35))
-					c.draw_circle(p, w * (0.9 + 0.2 * flick), Color(1, 1, 1, 0.8 * f))
-					continue
-				if charging:
-					c.draw_line(p, b, Color(col, 0.15 + 0.35 * k), maxf(_px(2.0), w * 0.25 * k))
-					continue
-				var left := delay + pr.hazard_active[i] - t
-				var f := clampf(left / 0.4, 0.0, 1.0)
-				c.draw_line(p, b, Color(col, 0.35 * f), w * 1.5)
-				c.draw_line(p, b, Color(col, 0.9 * f), w)
+	for i in pr.hazard_alive.size():
+		if pr.hazard_alive[i] != 0:
+			_attack_visual(ProjectileSystem.HazardKind.keys()[pr.hazard_kind[i]]).draw_hazard(c, pr, i, view)
 
 func _draw_path_band(c: CanvasItem) -> void:
 	# ふたご座：取っておいた1本目と、双子の機体がなぞる線
@@ -1549,3 +1311,15 @@ func _draw_ship(c: CanvasItem) -> void:
 func _draw_top(c: CanvasItem) -> void:
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
+
+## 種類の表示は、その種類を初めて使ったときに作る。
+func _attack_visual(kind: String) -> AttackVisual:
+	var key := kind.to_lower()
+	if not _attack_visuals.has(key):
+		var visual: AttackVisual = load("res://scripts/render/attacks/%s.gd" % key).new()
+		visual.setup(self)
+		_attack_visuals[key] = visual
+	return _attack_visuals[key]
+
+func flood() -> AttackVisual:
+	return _attack_visual("flood")
