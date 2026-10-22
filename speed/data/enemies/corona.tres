@@ -1,9 +1,16 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dc84xyw313ooj"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"ambient": 0.0,
+"fill_energy": 0.4,
+"key_angle": -45.0,
+"key_energy": 2.0,
+"scale": 1.4
+}
 rank = 6
 radius = 44.0
 hp = 700.0
@@ -16,32 +23,32 @@ color = Color(1, 0.9, 0.55, 1)
 shape = &"orb"
 behavior = &"corona"
 params = {
+"align_angle": 0.07,
 "capture_interval": 0.2,
 "capture_max": 18,
 "fire_interval": 3.0,
-"pull_radius": 185.0,
 "pull": 130.0,
+"pull_radius": 185.0,
 "ring": 100.0,
 "spin": 2.4,
 "telegraph": 0.75,
-"align_angle": 0.07,
-"throw_speed": 620.0,
-"throw_life": 1.6,
-"throw_effect_scale": 1.6,
-"throw_weight_drifter": 1.0,
-"throw_damage_drifter": 8.0,
-"throw_weight_swarm": 0.8,
-"throw_damage_swarm": 10.0,
-"throw_weight_splitling": 0.9,
-"throw_damage_splitling": 9.0,
-"throw_weight_biter": 0.9,
+"throw_damage_armored": 22.0,
 "throw_damage_biter": 9.0,
-"throw_weight_darter": 0.65,
 "throw_damage_darter": 12.0,
-"throw_weight_splitter": 0.4,
+"throw_damage_drifter": 8.0,
+"throw_damage_splitling": 9.0,
 "throw_damage_splitter": 16.0,
+"throw_damage_swarm": 10.0,
+"throw_effect_scale": 1.6,
+"throw_life": 1.6,
+"throw_speed": 620.0,
 "throw_weight_armored": 0.2,
-"throw_damage_armored": 22.0
+"throw_weight_biter": 0.9,
+"throw_weight_darter": 0.65,
+"throw_weight_drifter": 1.0,
+"throw_weight_splitling": 0.9,
+"throw_weight_splitter": 0.4,
+"throw_weight_swarm": 0.8
 }
 id = &"corona"
 display_name = "みなみのかんむり座"

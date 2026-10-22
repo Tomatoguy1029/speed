@@ -46,24 +46,29 @@
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
 | `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | — | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
 | `reticle` | レチクル座 | 4 | 採用 | 実装済み。大きい経験値カプセルの報酬は採用・未実装（量は未決） | ぼうえんきょう座に付き従い、視線を遮る小隕石を予告後のビームで壊す。支援先がいなくなると退却する | — | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵)。設定は[星の力](../world.md#5-星の力と機体の強化) |
-| `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
+| `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer`。外観は[敵の描画](../art-style.md#42-敵) |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
 | `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | HP は硬め（星5の標準より体当たり1回多い） | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser`。外観は[敵の描画](../art-style.md#42-敵) |
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | — | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab`。外観は[敵の描画](../art-style.md#42-敵) |
-| `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
+| `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin`。外観は[敵の描画](../art-style.md#42-敵) |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
-| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み・数値は試遊用の仮値。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[仕様書 11.8](../spec.md#118-みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと次の投擲の弾薬が減る。通常の戦闘判定を使う | — | 4・5 | `data/enemies/corona.tres`、`data/formations/corona_solo.tscn`、`scripts/enemies/corona_vortex.gd`。外観は[仮の冠](../art-style.md#46-みなみのかんむり座) |
+| `corona` | みなみのかんむり座 | 6 | 採用 | 実装済み・数値は試遊用の仮値。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[仕様書 11.8](../spec.md#118-みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと次の投擲の弾薬が減る。通常の戦闘判定を使う | — | 4・5 | `data/enemies/corona.tres`、`data/formations/corona_solo.tscn`、`scripts/enemies/corona_vortex.gd`。外観は[冠の描画](../art-style.md#46-みなみのかんむり座) |
 | `phoenix` | ほうおう座 | 7 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 飛んだ跡に炎を残す。倒すと周りを焼き払い、近いと自分も焼かれる | — | — | 3 | `data/enemies/phoenix.tres`、`enemy_manager.gd` の `_phoenix` |
 | `cepheus` | ケフェウス座 | 7 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 号令で、周りの強敵が一斉に攻撃する | — | — | 5 | `data/enemies/cepheus.tres`、`enemy_manager.gd` の `_cepheus` |
 | `aquarius` | みずがめ座 | 10 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 太い水流を流し続け、敵と遅い自機を押し流す | — | — | 4 | `data/enemies/aquarius.tres`、`enemy_manager.gd` の `_aquarius`。外観は[敵の描画](../art-style.md#42-敵) |
-| `aquila` | わし座 | 10 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 通り道に沿って雷を落とす | — | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila`。雷撃の見た目は [デザインとアートスタイル](../art-style.md#37-雷撃) |
+| `aquila` | わし座 | 10 | 採用 | 実装済み。HPは[星ごとの暫定設定](../spec.md#111-見た目と強さ) | 通り道に沿って雷を落とす | — | — | 5 | `data/enemies/aquila.tres`、`enemy_manager.gd` の `_aquila`。本体の外観は[敵の描画](../art-style.md#42-敵)。雷撃の見た目は [デザインとアートスタイル](../art-style.md#37-雷撃) |
 
 ### 見た目の実装
+
+通常敵とパーツの種類ごとの外観調整・保存は、[実験場の仕様](../spec.md#201-敵ルート実験場)に従う。調整値の正は各敵データの `visual_settings` とする。
+
+- ステージ4の `biter`（ヘビ）は `assets/pixel/snake/` の本体・装甲・法線画像を重ねて描く。本体の星コアは照明に左右されず、装甲は法線付き照明を受ける。表示の基準寸法と接触半径は `biter` の設定に従う。
+- `pulser` は `assets/pixel/pulser/` の本体・装甲・法線画像を重ねて描く。星コアは照明に左右されず、装甲は法線付き照明を受ける。表示の基準寸法と接触半径は `pulser` の設定に従う。
 
 - 各敵は `speed/assets/pixel/<type ID>.png` のピクセルスプライトを Nearest で描く（`RenderManager`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
 - `splitter`・`splitling` の本体は手描きの PNG を、透明な余白込みの原寸で表示する。エリートも同じ大きさ。基礎半径は各 `.tres` で画像に合わせる。
 - `missile` は試遊用のスプライト。最終の見た目は未確定。
-- `corona` は [仮の冠](../art-style.md#46-みなみのかんむり座) を使う。
+- `corona` は [冠の描画](../art-style.md#46-みなみのかんむり座) を使う。
 - それ以外で絵（`speed/assets/pixel/<type ID>.png`）がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。
 - 全敵とボスの表示と当たり判定に `config.character_scale` を掛ける。
 - 静止スプライトで、個別のアニメーションはない。

@@ -14,6 +14,10 @@ var field: FieldManager
 var bosses: BossManager
 
 var grid := SpatialGrid.new()
+## 調整で大きくした敵も、中心が遠いだけで探索から漏らさない。
+var enemy_query_padding: float:
+	get:
+		return maxf(cfg.max_enemy_radius, grid.max_radius)
 ## 満タン突撃（特性 T04）による攻撃力の倍率と装甲無視。なぞりの間だけ有効
 var burst_power := 1.0
 var ignore_armor := false
@@ -33,11 +37,11 @@ func rebuild_grid() -> void:
 
 ## 近くの敵の行（out に入れる）。
 func nearby(p: Vector2, radius: float, out: PackedInt32Array) -> void:
-	grid.query_radius(p, radius, cfg.max_enemy_radius, out)
+	grid.query_radius(p, radius, enemy_query_padding, out)
 
 ## 範囲 lo〜hi の敵の行（out に入れる）。
 func in_rect(lo: Vector2, hi: Vector2, out: PackedInt32Array) -> void:
-	var pad := Vector2(cfg.max_enemy_radius, cfg.max_enemy_radius)
+	var pad := Vector2(enemy_query_padding, enemy_query_padding)
 	grid.query(lo - pad, hi + pad, out)
 
 # ── 攻撃力と装甲（仕様書 7.1・7.2・7.3） ──────────────────────────
@@ -63,7 +67,7 @@ func is_weak_hit(i: int, hit: Vector2) -> bool:
 func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 	var t := enemies.table
 	var to := state.ship_pos
-	var pad := Vector2(R + cfg.max_enemy_radius, R + cfg.max_enemy_radius)
+	var pad := Vector2(R + enemy_query_padding, R + enemy_query_padding)
 	grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 	_hits.clear()
 	for i in _buf:
@@ -215,7 +219,7 @@ func trace_radius() -> float:
 func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 	var t := enemies.table
 	var R := trace_radius()
-	var pad := Vector2(R + cfg.max_enemy_radius, R + cfg.max_enemy_radius)
+	var pad := Vector2(R + enemy_query_padding, R + enemy_query_padding)
 	var rows := PackedInt32Array()
 	grid.query(from.min(to) - pad, from.max(to) + pad, rows)
 	var dir := (to - from).normalized()
@@ -353,7 +357,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:
 	var t := enemies.table
 	var rows := PackedInt32Array()
-	grid.query_radius(center, radius, cfg.max_enemy_radius, rows)
+	grid.query_radius(center, radius, enemy_query_padding, rows)
 	var knock: float = opts.get("knock", 300.0)
 	for i in rows:
 		if t.dead[i] != 0:

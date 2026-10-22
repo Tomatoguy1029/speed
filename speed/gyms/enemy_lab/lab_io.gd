@@ -200,7 +200,7 @@ static func validate(data: Dictionary) -> String:
 		if not ConfigManager.enemies.has(StringName(id)):
 			return TranslationServer.translate("lab.message_3fc0d7300b") + String(id)
 		for key in spec.overrides[id]:
-			if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params"]:
+			if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params", "visual_settings"]:
 				return TranslationServer.translate("lab.message_8cfee97b22") + String(key)
 	for command in data.history:
 		var problem := _validate_command(command)
@@ -290,7 +290,13 @@ static func _definition_problem(values, boss := false) -> String:
 		var original: Resource = registry[StringName(id)]
 		for key in values[id]:
 			var value = values[id][key]
-			if key == "params":
+			if key == "visual_settings" and not boss:
+				if not value is Dictionary: return TranslationServer.translate("lab.message_2dac0fe5e5")
+				for field in value:
+					if not EnemyDef.VISUAL_LIMITS.has(field) or not _number_ok(value[field]): return TranslationServer.translate("lab.message_7241f95e31")
+					var limits: Vector2 = EnemyDef.VISUAL_LIMITS[field]
+					if float(value[field]) < limits.x or float(value[field]) > limits.y: return TranslationServer.translate("lab.message_7241f95e31")
+			elif key == "params":
 				if not value is Dictionary: return TranslationServer.translate("lab.message_2dac0fe5e5")
 				for param in value:
 					if not original.params.has(param) or (not _number_ok(value[param]) and not value[param] is bool): return TranslationServer.translate("lab.message_7241f95e31")

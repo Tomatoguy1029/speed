@@ -11,6 +11,17 @@ const EDITOR_ORDER := 3
 ## 絵の正面が上向きの種類（ほかの種類の絵は、正面が下向き）
 const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
 
+## 実験場と本番で共有する、種類ごとの外観上書き。
+const VISUAL_LIMITS := {
+	"scale": Vector2(0.1, 5.0), "key_energy": Vector2(0, 3), "fill_energy": Vector2(0, 3),
+	"key_angle": Vector2(-180, 180), "fill_angle": Vector2(-180, 180),
+	"height": Vector2(0, 1), "ambient": Vector2(0, 1), "normal_strength": Vector2(0, 3),
+}
+@export var visual_settings: Dictionary = {}
+
+func visual_value(key: String, fallback: float) -> float:
+	return clampf(float(visual_settings.get(key, fallback)), VISUAL_LIMITS[key].x, VISUAL_LIMITS[key].y)
+
 ## 行動の値（params）の名前・説明・単位
 const PARAMS_DOCS := {
 	"throw_weight_drifter": ["投擲の重み：ドリフター", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],

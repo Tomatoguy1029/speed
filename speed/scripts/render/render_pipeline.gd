@@ -10,6 +10,7 @@ extends Node
 ## 光る層の番号（visibility_layer のビット）
 const GLOW_LAYER := 2
 
+var _overlay_layer := 1
 var rich := false
 var sparks: GpuSparks
 var _world: Node2D
@@ -21,7 +22,8 @@ var _shock: ColorRect
 var _waves: Array = []
 
 ## world の下の層のうち、光らせる層を glow_layers で渡す。
-func setup(world: Node2D, camera: Camera2D, glow_layers: Array) -> void:
+func setup(world: Node2D, camera: Camera2D, glow_layers: Array, overlay_layer := 1) -> void:
+	_overlay_layer = overlay_layer
 	_world = world
 	_camera = camera
 	rich = RenderingServer.get_current_rendering_method() != "gl_compatibility"
@@ -62,7 +64,7 @@ func _setup_bloom_pass(glow_layers: Array) -> void:
 	_glow_viewport.add_child(_glow_camera)
 	add_child(_glow_viewport)
 	var layer := CanvasLayer.new()
-	layer.layer = 3
+	layer.layer = _overlay_layer + 2
 	var rect := TextureRect.new()
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -76,7 +78,7 @@ func _setup_bloom_pass(glow_layers: Array) -> void:
 
 func _setup_shockwave() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 1
+	layer.layer = _overlay_layer
 	_shock = ColorRect.new()
 	_shock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_shock.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -89,7 +91,7 @@ func _setup_shockwave() -> void:
 
 func _setup_sparks() -> void:
 	var layer := CanvasLayer.new()
-	layer.layer = 2
+	layer.layer = _overlay_layer + 1
 	sparks = GpuSparks.new()
 	layer.add_child(sparks)
 	add_child(layer)

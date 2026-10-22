@@ -7,6 +7,18 @@ extends Node
 
 const XP_COLOR := Color("#b8a0ff")
 const LAYERED_ENEMIES := {
+	&"pulser": [preload("res://assets/pixel/pulser/pulser_base.png"),
+		preload("res://assets/pixel/pulser/pulser_armor.png"), preload("res://assets/pixel/pulser/pulser_normal.png"), PI / 2.0],
+	&"snake": [preload("res://assets/pixel/snake/snake_base.png"),
+		preload("res://assets/pixel/snake/snake_armor.png"), preload("res://assets/pixel/snake/snake_normal.png"), PI / 2.0],
+	&"aquila": [preload("res://assets/pixel/aquila/eagle_base.png"),
+		preload("res://assets/pixel/aquila/eagle_armor.png"), preload("res://assets/pixel/aquila/eagle_normal.png"), PI / 2.0],
+	&"marlin": [preload("res://assets/pixel/marlin/swordfish_base.png"),
+		preload("res://assets/pixel/marlin/swordfish_armor.png"), preload("res://assets/pixel/marlin/swordfish_normal.png"), PI / 2.0],
+	&"corona": [preload("res://assets/pixel/corona/crown_base.png"),
+		preload("res://assets/pixel/corona/crown_armor.png"), preload("res://assets/pixel/corona/crown_normal.png"), 0.0],
+	&"cross": [preload("res://assets/pixel/cross/cross_base.png"),
+		preload("res://assets/pixel/cross/cross_armor.png"), preload("res://assets/pixel/cross/cross_normal.png"), PI / 2.0],
 	&"aquarius": [preload("res://assets/pixel/aquarius/aquarius_base.png"),
 		preload("res://assets/pixel/aquarius/aquarius_armor.png"), preload("res://assets/pixel/aquarius/aquarius_normal.png"), PI / 2.0],
 	&"crab": [preload("res://assets/pixel/crab/cancer_base.png"),
@@ -60,7 +72,7 @@ var pipeline: RenderPipeline
 var _batches: Dictionary = {}
 var _armor_batches: Dictionary = {}
 var _lit_enemy_marks: DrawLayer
-var _directional_lights: Array[DirectionalLight2D] = []
+var _directional_lights: Dictionary = {}
 var lighting_settings: Resource = preload("res://data/visuals/enemy_lighting.tres")
 ## 絵がまだない敵の種類（仮の図形で、敵の色で描く）
 var _shape_ids: Dictionary = {}
@@ -152,7 +164,7 @@ func _ready() -> void:
 	_build_directional_lights(world)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
-	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust])
+	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _armor_batches.size() + 2)
 	if not pipeline.rich:
 		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
@@ -165,43 +177,52 @@ func _ready() -> void:
 
 ## 法線付き装甲の敵と照明を、カメラに追従する専用キャンバスに置く。
 func _build_directional_lights(world: Node2D) -> void:
-	# DirectionalLight2Dはlight_maskを無視するので、敵専用のキャンバスへ分離する。
-	var lighting := CanvasLayer.new()
-	lighting.name = "EnemyLighting"
-	lighting.layer = 1
-	lighting.follow_viewport_enabled = true
-	world.add_child(lighting)
+	# DirectionalLight2Dはlight_maskを無視するため、種類ごとにキャンバスを分ける。
 	for type in _armor_batches:
+		var lighting := CanvasLayer.new()
+		lighting.name = String(type) + "Lighting"
+		lighting.layer = 1 + _directional_lights.size()
+		lighting.follow_viewport_enabled = true
+		world.add_child(lighting)
 		_batches[type].reparent(lighting)
 		_armor_batches[type].reparent(lighting)
+		var lights: Array[DirectionalLight2D] = []
+		for light_name in ["UpperLeftLight", "LowerRightLight"]:
+			var light := DirectionalLight2D.new()
+			light.name = light_name
+			light.range_layer_min = lighting.layer
+			light.range_layer_max = lighting.layer
+			lighting.add_child(light)
+			lights.append(light)
+		_directional_lights[type] = lights
+	var marks := CanvasLayer.new()
+	marks.name = "EnemyMarks"
+	marks.layer = 1 + _armor_batches.size()
+	marks.follow_viewport_enabled = true
+	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
 	_lit_enemy_marks.draw_fn = _draw_lit_enemy_marks
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	_lit_enemy_marks.material = unshaded
-	lighting.add_child(_lit_enemy_marks)
-	for settings in [["UpperLeftLight", Vector2(-1000, -1000)],
-		["LowerRightLight", Vector2(1000, 1000)]]:
-		var light := DirectionalLight2D.new()
-		light.name = settings[0]
-		light.position = settings[1]
-		light.range_layer_min = lighting.layer
-		light.range_layer_max = lighting.layer
-		lighting.add_child(light)
-		_directional_lights.append(light)
+	marks.add_child(_lit_enemy_marks)
+	var hud := world.get_parent().get_node_or_null("Hud") as CanvasLayer
+	if hud != null:
+		hud.layer = maxi(hud.layer, marks.layer + 4)
 	_apply_lighting()
 
 func _apply_lighting() -> void:
-	_directional_lights[0].energy = lighting_settings.key_energy
-	_directional_lights[0].rotation_degrees = lighting_settings.key_angle
-	_directional_lights[1].energy = lighting_settings.fill_energy
-	_directional_lights[1].rotation_degrees = lighting_settings.fill_angle
-	for light in _directional_lights:
-		light.height = lighting_settings.height
-	for batch: InstanceBatch in _armor_batches.values():
-		var armor := batch.material as ShaderMaterial
-		armor.set_shader_parameter("ambient", lighting_settings.ambient)
-		armor.set_shader_parameter("normal_strength", lighting_settings.normal_strength)
+	for type in _armor_batches:
+		var def := run.enemies.def_of(type)
+		var lights: Array = _directional_lights[type]
+		for i in 2:
+			var prefix := "key_" if i == 0 else "fill_"
+			lights[i].energy = def.visual_value(prefix + "energy", lighting_settings.get(prefix + "energy"))
+			lights[i].rotation_degrees = def.visual_value(prefix + "angle", lighting_settings.get(prefix + "angle"))
+			lights[i].height = def.visual_value("height", lighting_settings.height)
+		var armor := _armor_batches[type].material as ShaderMaterial
+		armor.set_shader_parameter("ambient", def.visual_value("ambient", lighting_settings.ambient))
+		armor.set_shader_parameter("normal_strength", def.visual_value("normal_strength", lighting_settings.normal_strength))
 
 ## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
 func _build_batches() -> void:
@@ -237,8 +258,9 @@ func _build_batches() -> void:
 			continue
 		var b := InstanceBatch.new()
 		var path := _enemy_sprite_path(def.id)
-		if LAYERED_ENEMIES.has(def.id):
-			b.setup_texture(LAYERED_ENEMIES[def.id][0])
+		var layers := layered_layers(def.id, state.stage)
+		if not layers.is_empty():
+			b.setup_texture(layers[0])
 			b.material = enemy_mat.duplicate()
 		elif ResourceLoader.exists(path):
 			b.setup_texture(load(path) as Texture2D)
@@ -251,15 +273,17 @@ func _build_batches() -> void:
 		_batches[def.id] = b
 	var armor_material := ShaderMaterial.new()
 	armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
-	for type in LAYERED_ENEMIES:
-		var layers: Array = LAYERED_ENEMIES[type]
+	for type in ConfigManager.enemies:
+		var layers := layered_layers(type, state.stage)
+		if layers.is_empty():
+			continue
 		var armor := CanvasTexture.new()
 		armor.diffuse_texture = layers[1]
 		armor.normal_texture = layers[2]
 		var batch := InstanceBatch.new()
 		batch.name = String(type) + "Armor"
 		batch.setup_texture(armor)
-		batch.material = armor_material
+		batch.material = armor_material.duplicate()
 		batch.z_index = -1
 		_layers.enemies.add_child(batch)
 		_armor_batches[type] = batch
@@ -726,7 +750,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_arc(cap.pos, 16.0, 0, TAU, 24, XP_COLOR.lightened(0.3), _px(2.0))
 
 func _draw_enemies(c: CanvasItem) -> void:
-	var view := view_rect().grow(cfg.max_enemy_radius)
+	var view := view_rect().grow(run.combat.enemy_query_padding)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.begin()
 	for key in _batches:
@@ -749,8 +773,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		var p := pos[i]
 		var type := t.type[i]
-		var sprite_radius := enemy_sprite_radius(type, t.r[i], cfg.character_scale)
-		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - cfg.max_enemy_radius)).has_point(p):
+		var sprite_radius := enemy_sprite_radius(type, t.r[i], cfg.character_scale, state.stage)
+		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - run.combat.enemy_query_padding)).has_point(p):
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 and type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
@@ -793,7 +817,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
-	var view := view_rect().grow(cfg.max_enemy_radius)
+	var view := view_rect().grow(run.combat.enemy_query_padding)
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.dead[i] == 0 and _armor_batches.has(t.type[i]) and view.has_point(t.pos[i]):
 			_draw_enemy_marks(c, t, i)
@@ -820,7 +844,7 @@ func _draw_swallows(c: CanvasItem) -> void:
 		if run.enemies.is_same(sw.row, sw.id):
 			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemyManager.PUMP_MOUTH
 		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
-		var r: float = enemy_sprite_radius(sw.type, sw.r, cfg.character_scale) * (1.0 - 0.85 * k)
+		var r: float = enemy_sprite_radius(sw.type, sw.r, cfg.character_scale, state.stage) * (1.0 - 0.85 * k)
 		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
 		var tex := _enemy_texture(sw.type)
 		if tex == null:
@@ -871,33 +895,45 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 	return PackedVector2Array([Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)])
 
 ## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
-static func layered_texture(type: StringName) -> Texture2D:
-	if not _layered_textures.has(type):
-		var layers: Array = LAYERED_ENEMIES[type]
+static func layered_layers(type: StringName, stage: StageDef = null) -> Array:
+	var skin := StringName(stage.enemy_sprite_path(type).get_file().get_basename()) if stage != null else type
+	return LAYERED_ENEMIES.get(skin, LAYERED_ENEMIES.get(type, []))
+
+static func layered_texture(type: StringName, stage: StageDef = null) -> Texture2D:
+	var layers := layered_layers(type, stage)
+	var key: String = layers[0].resource_path
+	if not _layered_textures.has(key):
 		var body: Image = layers[0].get_image()
 		body.blend_rect(layers[1].get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
-		_layered_textures[type] = ImageTexture.create_from_image(body)
-	return _layered_textures[type]
+		_layered_textures[key] = ImageTexture.create_from_image(body)
+	return _layered_textures[key]
 
 ## 専用のベース・装甲は元画像の寸法に自機と共通のキャラクター倍率を掛ける。
-static func enemy_sprite_radius(type: StringName, collision_radius: float, character_scale: float) -> float:
-	if LAYERED_ENEMIES.has(type):
-		var texture: Texture2D = LAYERED_ENEMIES[type][0]
-		return maxf(texture.get_width(), texture.get_height()) * 0.5 * character_scale
+static func enemy_sprite_radius(type: StringName, collision_radius: float, _character_scale: float, stage: StageDef = null) -> float:
+	var layers := layered_layers(type, stage)
+	if not layers.is_empty():
+		var texture: Texture2D = layers[0]
+		var def: EnemyDef = ConfigManager.enemies[type]
+		# 既存の表示寸法に合わせて差し替える素材。
+		if type in [&"biter", &"pulser"]:
+			return collision_radius
+		# 半径には実験場の倍率・個体の大きさが反映済み。
+		return maxf(texture.get_width(), texture.get_height()) * 0.5 * collision_radius / maxf(def.radius, 0.001)
 	return collision_radius
 
-static func _enemy_sprite_angle(type: StringName, facing: float) -> float:
+func _enemy_sprite_angle(type: StringName, facing: float) -> float:
 	if type == &"corona":
 		return 0.0
-	if LAYERED_ENEMIES.has(type):
-		return facing + float(LAYERED_ENEMIES[type][3])
+	var layers := layered_layers(type, state.stage)
+	if not layers.is_empty():
+		return facing + float(layers[3])
 	return facing + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0)
 
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
-		if LAYERED_ENEMIES.has(type):
-			_enemy_textures[type] = layered_texture(type)
+		if not layered_layers(type, state.stage).is_empty():
+			_enemy_textures[type] = layered_texture(type, state.stage)
 			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
@@ -920,7 +956,7 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	if tex == null:
 		c.draw_circle(p, r, Color("#aeb6c4"))
 		return
-	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r, cfg.character_scale) * 2.0
+	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r, cfg.character_scale, state.stage) * 2.0
 	c.draw_set_transform(p, _enemy_sprite_angle(type, angle))
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 	c.draw_set_transform(Vector2.ZERO)
