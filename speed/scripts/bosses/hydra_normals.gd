@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"bite_sweep":
+		sweep(a,n,dt)
+		return
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	var flight := float(p.normal_lunge)
@@ -24,3 +27,21 @@ static func tick(a: Node, n, dt: float) -> void:
 		n.strike_pos = n.target
 		n.glow = 0.0
 	if n.t >= charge + flight + hold: a.finish_normal(n)
+
+static func sweep(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	var duration := float(p.sweep_time)
+	var from: Vector2 = a._head_pos(n)
+	if n.t < charge:
+		n.glow = n.t/charge
+		n.angle = lerp_angle(n.angle,(a.run_state.ship_pos-a._neck_base(n)).angle()-float(p.sweep_arc)*0.5,minf(1.0,dt*7.0))
+	elif not n.locked:
+		n.locked=true
+		n.sweep=(a.run_state.ship_pos-a._neck_base(n)).angle()
+		n.strike_pos=from
+	if n.locked and n.t < charge+duration:
+		n.angle=n.sweep+float(p.sweep_arc)*(clampf((n.t-charge)/duration,0.0,1.0)-0.5)
+		n.strike_pos=a._neck_base(n)+Vector2.from_angle(n.angle)*float(p.sweep_reach)
+		a.attack_field.add_shape(PackedVector2Array([from,n.strike_pos]),float(p.bite_radius),0.0,0.12,float(p.bite_dmg),&"bite",n.row)
+	if n.t >= charge+duration+float(p.normal_hold): a.finish_normal(n)
