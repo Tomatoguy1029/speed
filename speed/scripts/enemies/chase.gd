@@ -54,7 +54,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				pos[i] = from + vel[i] * dt
 				continue
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
-			m._update_pushed(i, dt)
+			m.motion._update_pushed(i, dt)
 		else:
 			# 機体へまっすぐ、決まった速さで向かう（旋回・慣性なし）
 			var d := ship - from

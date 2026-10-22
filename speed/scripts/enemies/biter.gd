@@ -67,7 +67,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				continue
 			bdt = dt * m.LOD
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
-			m._update_pushed(i, dt)
+			m.motion._update_pushed(i, dt)
 		else:
 			var def: EnemyDef = t.def[i]
 			if def != cached:

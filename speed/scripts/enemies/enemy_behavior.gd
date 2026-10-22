@@ -2,7 +2,7 @@
 ##
 ## 1つのランで行動の種類（EnemyDef.behavior）ごとに1つだけ作り、その種類の全個体で共有する。
 ## 個体の状態は敵の表（EnemyTable）の列に持つ。EnemySystem は、その戦いに出た種類の Behavior だけを作って呼ぶ。
-## 移動の補助（追跡・距離を保つ・射撃の時間など）は EnemySystem の共通処理を、同じ名前の関数から呼ぶ。
+## 移動の補助（追跡・距離を保つ・射撃の時間など）はEnemyMotionを、同じ名前の関数から呼ぶ。
 class_name EnemyBehavior
 extends RefCounted
 
@@ -123,31 +123,31 @@ func clear() -> void:
 # ── EnemySystem の共通処理 ────────────────────────────────────────
 
 func _chase(i: int, dt: float) -> void:
-	m._chase(i, dt)
+	m.motion._chase(i, dt)
 
 func _steer_to(i: int, target: Vector2, speed: float, accel: float, dt: float) -> void:
-	m._steer_to(i, target, speed, accel, dt)
+	m.motion._steer_to(i, target, speed, accel, dt)
 
 func _turn_toward(i: int, target: float, rate: float, dt: float) -> void:
-	m._turn_toward(i, target, rate, dt)
+	m.motion._turn_toward(i, target, rate, dt)
 
 func _turn_moving(i: int, rate: float, dt: float) -> void:
-	m._turn_moving(i, rate, dt)
+	m.motion._turn_moving(i, rate, dt)
 
 func _move_to(i: int, target: Vector2, speed: float, accel: float, turn: float, dt: float) -> void:
-	m._move_to(i, target, speed, accel, turn, dt)
+	m.motion._move_to(i, target, speed, accel, turn, dt)
 
 func _keep_distance(i: int, dt: float) -> void:
-	m._keep_distance(i, dt)
+	m.motion._keep_distance(i, dt)
 
 func _gun_timer(i: int, dt: float) -> bool:
-	return m._gun_timer(i, dt)
+	return m.motion._gun_timer(i, dt)
 
 func _hold(i: int, dt: float) -> void:
-	m._hold(i, dt)
+	m.motion._hold(i, dt)
 
 func _drive(i: int, dt: float) -> void:
-	m._drive(i, dt)
+	m.motion._drive(i, dt)
 
 func _self_destruct(i: int) -> void:
 	m._self_destruct(i)
