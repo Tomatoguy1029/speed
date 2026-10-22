@@ -473,7 +473,6 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"debris_trail":
 				trails.append({"points": ev.points, "color": ev.color, "life": cfg.corpse_trail_life, "max": cfg.corpse_trail_life})
 			&"sonic":
-				flash = maxf(flash, 0.25)
 				shake = maxf(shake, 10.0)
 				pipeline.add_wave(ev.pos, ev.radius, 0.5)
 			&"boss_spawn":

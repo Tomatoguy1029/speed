@@ -594,7 +594,7 @@
 | 装甲に弾かれた | 接触面の左右へ `config.block_spark_count` 本の火花。止めた敵の接触側の装甲が `config.block_impact_life` 秒光る |
 | クリティカルで貫いた | 接触位置から `config.weak_flame_count` 個の炎。`config.weak_impact_life` 秒赤熱する |
 | 吹き飛ばした敵の破片 | 金属色・橙の縁の角張った破片が回転して飛ぶ。通った跡の光は実時間 `config.corpse_trail_life` 秒で消える（各破片の履歴は最大 `config.corpse_trail_points` 点） |
-| ソニックブーム | 機体と一緒に進路を進む。画面のフラッシュと揺れ、衝撃波の歪み |
+| ソニックブーム | 機体と一緒に進路を進む。画面の揺れ、衝撃波の歪み |
 | 普段の被弾 | 機体を `config.ship_hurt_time` 実秒赤くし、機体だけを横に最大 `config.ship_hurt_shake` px 震わせる。カメラは揺らさない |
 | 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_tim| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](hydra.md#25-制限時間の一撃)。仮のボスは本体から機体へ1本の光を溜め、太くして画面を埋める（`provisional.tres` の `final_*`） |
 GAME OVER を出して結果画面へ（仮の演出） |
