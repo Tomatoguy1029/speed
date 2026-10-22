@@ -395,8 +395,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			# 敵の組み合わせのシーンの配置と出現位置を選んで、機体のまわりに並べる
 			var path := String(args.get("path", ""))
 			if ResourceLoader.exists(path):
-				var data := run.enemies.formation_data(load(path))
-				run.enemies.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
+				var data := run.spawn.formation_data(load(path))
+				run.spawn.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
 				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
 		"edit_range":
 			var row := row_for_id(int(args.get("id", -1)))

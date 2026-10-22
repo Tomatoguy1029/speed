@@ -45,6 +45,8 @@ var combat: CombatSystem:
 	get: return ctx.combat
 var enemies: EnemySystem:
 	get: return ctx.enemies
+var spawn: SpawnSystem:
+	get: return ctx.spawn
 var bosses: BossSystem:
 	get: return ctx.bosses
 var projectiles: ProjectileSystem:
@@ -102,6 +104,7 @@ func setup() -> void:
 	ctx.draw = DrawSystem.new()
 	ctx.combat = CombatSystem.new()
 	ctx.enemies = EnemySystem.new()
+	ctx.spawn = SpawnSystem.new()
 	ctx.bosses = BossSystem.new()
 	ctx.projectiles = ProjectileSystem.new()
 	ctx.loadout = LoadoutSystem.new()
@@ -110,7 +113,7 @@ func setup() -> void:
 	bosses.actor_parent = actor_parent
 	enemies.definitions = options.get("enemies", {})
 	# 能力値を先に計算してから機体を置く
-	for m: RunSystem in [field, loadout, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
+	for m: RunSystem in [field, loadout, ship, draw, combat, enemies, spawn, bosses, projectiles, pickups, heroes]:
 		m.setup(ctx)
 	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
 		encounters = ENCOUNTERS.new()
@@ -121,10 +124,10 @@ func setup() -> void:
 		director.state = state
 		director.projectiles = projectiles
 		director.formation_mode = true
-		director.configure({"enabled": true, "budget": maxi(0, enemies.current_phase().attack_budget), "jitter": 0.0})
+		director.configure({"enabled": true, "budget": maxi(0, spawn.current_phase().attack_budget), "jitter": 0.0})
 		projectiles.director = director
 	if not state.lab_mode:
-		enemies._sync_attack_budget(enemies.current_phase())
+		spawn._sync_attack_budget(spawn.current_phase())
 	loadout.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
@@ -237,7 +240,7 @@ func _play_tick(real_dt: float) -> void:
 		_world_real_dt = 0.0
 		_world_dt = 0.0
 		_world_steps = 0
-		enemies._sync_attack_budget(enemies.current_phase())
+		spawn._sync_attack_budget(spawn.current_phase())
 		if encounters != null:
 			encounters.before_world()
 		elif not state.lab_mode and projectiles.director != null:
@@ -265,7 +268,7 @@ func _play_tick(real_dt: float) -> void:
 		if encounters != null:
 			encounters.advance()
 		if (not state.lab_mode or options.get("auto_spawn", false)) and (projectiles.director == null or not projectiles.director.guard_active()):
-			_run(&"spawner", func(): enemies.spawner_tick(wr, wd))
+			_run(&"spawner", func(): spawn.spawner_tick(wr, wd))
 		_run(&"pickups", func(): pickups.tick(wr, wd))
 	_record_approach()
 	if state.phase == RunState.Phase.PLAY and state.bonus_t <= 0.0 and field.take_warp():

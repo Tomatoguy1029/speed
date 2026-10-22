@@ -230,7 +230,7 @@ func _sample() -> void:
 	for g in pk.gem_alive.size():
 		if pk.gem_alive[g] != 0:
 			field_xp += pk.gem_value[g]
-	var phase: PhaseDef = _run.enemies.current_phase()
+	var phase: PhaseDef = _run.spawn.current_phase()
 	_write({"type": "sample", "t": _r(s.time), "band": String(phase.id),
 		"xp_picked": _r(s.xp_gained - _last_xp_gained), "xp_dropped": _r(s.xp_dropped - _last_xp_dropped), "xp_field": _r(field_xp),
 		"level": s.level, "hp": _r(s.ship_hp), "hp_max": _r(s.stats.max_hp),
@@ -299,7 +299,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"clip_group_end":
 				_write({"type": "clip_group_end", "t": time, "clip": e.clip, "key": e.key})
 			&"phase":
-				var p: PhaseDef = _run.enemies.current_phase()
+				var p: PhaseDef = _run.spawn.current_phase()
 				_write({"type": "band", "t": time, "id": String(p.id), "name": p.display_name})
 			&"levelup":
 				_write({"type": "levelup", "t": time, "level": e.level})

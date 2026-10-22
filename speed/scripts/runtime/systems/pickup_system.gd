@@ -62,7 +62,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 func on_enemy_killed(i: int) -> void:
 	var t := enemies.table
 	var pos := t.pos[i]
-	var phase := enemies.current_phase()
+	var phase := ctx.spawn.current_phase()
 	var bonus := phase.xp_bonus if phase.xp_bonus > 0.0 else 1.0
 	# 経験値をまとめて持つ敵（分裂する雑魚）は、gem_count 個の結晶に分けて、その場からはじけ飛ばす
 	var value := t.xp[i] * state.stats.xp_mult * bonus

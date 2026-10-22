@@ -43,7 +43,7 @@ func advance() -> void:
 		return
 	_next = run.state.world_time + maxf(0.5, float(profile.get("interval", 5)))
 	var phases: Array = profile.get("phases", [])
-	if not phases.is_empty() and not phases.has(String(run.enemies.current_phase().id)):
+	if not phases.is_empty() and not phases.has(String(run.spawn.current_phase().id)):
 		return
 	var patterns: Array = profile.get("patterns", [])
 	if patterns.is_empty():

@@ -15,6 +15,7 @@ var ship: ShipSystem
 var draw: DrawSystem
 var combat: CombatSystem
 var enemies: EnemySystem
+var spawn: SpawnSystem
 var bosses: BossSystem
 var projectiles: ProjectileSystem
 var loadout: LoadoutSystem
