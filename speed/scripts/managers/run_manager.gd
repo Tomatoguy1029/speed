@@ -39,6 +39,8 @@ const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
 ## 敗北・クリアの演出の経過時間（実秒）
 var sequence_t := 0.0
+## 敗北の流れが制限時間で始まったか（爆発を出さない）。
+var _time_up := false
 ## ボスへのトドメの直前の機体の位置の記録（スローの再生に使う。仕様書 16）
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
@@ -302,6 +304,8 @@ func _check_end() -> void:
 		_begin_death()
 	elif state.boss_dead:
 		_begin_finish()
+	elif state.time_limit_reached:
+		_begin_time_up()
 
 func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
@@ -356,12 +360,19 @@ func _begin_death() -> void:
 	state.emit(&"ship_death", {"pos": state.ship_pos})
 	set_phase(RunState.Phase.DYING)
 
+## 制限時間に達したら、敗北と同じ流れで終える。機体は爆発させず、暗闇が機体へ閉じていく。
+func _begin_time_up() -> void:
+	sequence_t = 0.0
+	_time_up = true
+	state.emit(&"time_up", {"pos": state.ship_pos})
+	set_phase(RunState.Phase.DYING)
+
 func _dying_tick(real_dt: float) -> void:
 	sequence_t += real_dt
 	var t1 := cfg.death_freeze_time
 	var t2 := t1 + cfg.death_explosion_time
 	var t3 := t2 + cfg.death_game_over_time
-	if sequence_t >= t1 and sequence_t - real_dt < t1:
+	if sequence_t >= t1 and sequence_t - real_dt < t1 and not _time_up:
 		state.emit(&"ship_explode", {"pos": state.ship_pos})
 	if sequence_t >= t2 and sequence_t - real_dt < t2:
 		state.emit(&"game_over")
