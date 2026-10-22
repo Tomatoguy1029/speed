@@ -158,6 +158,11 @@ var _tech_until: Dictionary = {}
 var _cooldown_scale := 1.0
 var last_tech: StringName = &""
 var last_tech_result: StringName = &""
+## 制限時間の一撃の経過時間（負なら使っていない。ランの時計で数える）、始めた時刻、溜めの長さ、首ごとの光の形
+var final_strike_t := -1.0
+var _final_start := 0.0
+var _final_charge := 1.0
+var _final_beams: Dictionary = {}
 
 func _on_bound() -> void:
 	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
@@ -185,7 +190,7 @@ func _on_bound() -> void:
 	hsm.set_active(true)
 	queue_redraw()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if manager == null or not manager.has_boss():
 		return
 	# 実験場で停止中に本体を移動・拡縮した場合も表示を更新する。
@@ -194,12 +199,20 @@ func _process(_delta: float) -> void:
 		queue_redraw()
 	if get_meta(&"draw_radius", -1.0) != table.r[body]:
 		queue_redraw()
+	# 制限時間の一撃が当たったら、敗北の停止の間に光を消し、爆発と GAME OVER を見せる。
+	if final_strike_t >= 0.0 and run_state.phase != RunState.Phase.PLAY:
+		attack_field.modulate.a = move_toward(attack_field.modulate.a, 0.0, delta / maxf(0.01, manager.cfg.death_freeze_time))
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
 		return
 	_time += dt
 	_sim_dt = dt
+	if final_strike_t >= 0.0:
+		_final_strike_tick(dt)
+		presentation_advanced.emit(dt)
+		queue_redraw()
+		return
 	if growth_t > 0.0:
 		growth_t = maxf(0.0, growth_t - dt)
 		table.guard[body] = growth_t
@@ -656,6 +669,63 @@ func interrupt_tech(attack: StringName = &"") -> void:
 	timeline.stop()
 	last_tech_result = &"interrupted"
 	tech_end()
+
+## 制限時間の一撃（仕様書 4.1）。全ての首・蛇が機体へ向いて光を溜め、溜め終わりに戦闘エリアを光で埋める。
+## 当たりの判定は RunManager が溜めの終わりに行う。溜めの間はボスを無敵にし、ほかの攻撃と判断を止める。
+func begin_final_strike(charge: float) -> void:
+	if final_strike_t >= 0.0:
+		return
+	final_strike_t = 0.0
+	_final_start = run_state.time
+	_final_charge = maxf(0.1, charge)
+	hsm.set_active(false)
+	interrupt_tech()
+	growth_t = 0.0
+	separation_t = 0.0
+	for n in _final_necks():
+		_end(n, true)
+		_release_attack(n)
+	attack_field.clear_effects()
+	_final_beams.clear()
+	_cue(&"final_strike_started")
+
+func _final_necks() -> Array[Neck]:
+	var result: Array[Neck] = []
+	for n in necks:
+		if _alive(n): result.append(n)
+	if separated and immortal_neck != null and immortal_row >= 0 and table.dead[immortal_row] == 0:
+		result.append(immortal_neck)
+	return result
+
+func _final_strike_tick(dt: float) -> void:
+	final_strike_t = run_state.time - _final_start
+	var k := clampf(final_strike_t / _final_charge, 0.0, 1.0)
+	var widen := clampf((final_strike_t - (_final_charge - float(def.params.final_widen_time))) / float(def.params.final_widen_time), 0.0, 1.0)
+	var width := lerpf(float(def.params.final_warn_width), float(def.params.final_beam_width), widen * widen)
+	var reach := Vector2(def.params.arena_size).length() * 1.5
+	var ship := run_state.ship_pos
+	table.guard[body] = 1.0
+	for n in _final_necks():
+		table.guard[n.row] = 1.0
+		if separated:
+			n.velocity = Vector2.ZERO
+			n.angle = lerp_angle(n.angle, (ship - n.free_pos).angle(), minf(1.0, dt * 6.0))
+		else:
+			aim_neck(n, (ship - _neck_base(n)).angle(), dt)
+			n.length = move_toward(n.length, float(def.params.neck_rest), float(def.params.neck_rest) * dt)
+		n.glow = k
+		table.pos[n.row] = _head_pos(n)
+		table.facing[n.row] = n.angle
+		_follow_neck(n, dt)
+		var head: Vector2 = table.pos[n.row]
+		var points := PackedVector2Array([head, head + (ship - head).normalized() * reach])
+		if not _final_beams.has(n.row_id):
+			_final_beams[n.row_id] = attack_field.add_shape(points, width, maxf(0.0, _final_charge - float(def.params.final_widen_time) - final_strike_t),
+				_final_charge + 10.0, 0.0, &"beam", n.row, Vector2.ZERO, true)
+		var beam: Dictionary = _final_beams[n.row_id]
+		beam.points = points
+		beam.width = width
+	attack_field.tick(dt)
 
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:

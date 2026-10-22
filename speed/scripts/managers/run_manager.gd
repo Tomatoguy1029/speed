@@ -39,8 +39,8 @@ const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
 ## 敗北・クリアの演出の経過時間（実秒）
 var sequence_t := 0.0
-## 敗北の流れが制限時間で始まったか（爆発を出さない）。
-var _time_up := false
+## 制限時間の一撃を始めたか。
+var _final_strike_started := false
 ## ボスへのトドメの直前の機体の位置の記録（スローの再生に使う。仕様書 16）
 var approach: Array[Vector2] = []
 var finish_replay: Array[Vector2] = []
@@ -305,7 +305,10 @@ func _check_end() -> void:
 	elif state.boss_dead:
 		_begin_finish()
 	elif state.time_limit_reached:
-		_begin_time_up()
+		if not _final_strike_started:
+			_begin_final_strike()
+		elif state.time >= state.stage.time_limit + cfg.time_up_charge_time:
+			_land_final_strike()
 
 func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
@@ -360,19 +363,30 @@ func _begin_death() -> void:
 	state.emit(&"ship_death", {"pos": state.ship_pos})
 	set_phase(RunState.Phase.DYING)
 
-## 制限時間に達したら、敗北と同じ流れで終える。機体は爆発させず、暗闇が機体へ閉じていく。
-func _begin_time_up() -> void:
-	sequence_t = 0.0
-	_time_up = true
-	state.emit(&"time_up", {"pos": state.ship_pos})
-	set_phase(RunState.Phase.DYING)
+## 制限時間に達したら、ボスが避けられない一撃を溜める（仕様書 4.1）。溜めの間も機体は動かせる。
+## ボスがいなければ、すぐに一撃が当たる。
+func _begin_final_strike() -> void:
+	_final_strike_started = true
+	state.emit(&"final_strike", {"t": state.time})
+	var actor := bosses.actor
+	if bosses.has_boss() and actor != null and actor.has_method("begin_final_strike"):
+		actor.begin_final_strike(cfg.time_up_charge_time)
+	else:
+		_land_final_strike()
+
+## 一撃は無敵・バリアを無視して機体の HP を0にする。その後は普段の敗北と同じ流れ。
+func _land_final_strike() -> void:
+	ship.invincible = false
+	state.ship_invuln = 0.0
+	state.ship_shield_t = 0.0
+	ship.damage(state.ship_hp + 1.0, 0.0, &"final_strike", &"boss")
 
 func _dying_tick(real_dt: float) -> void:
 	sequence_t += real_dt
 	var t1 := cfg.death_freeze_time
 	var t2 := t1 + cfg.death_explosion_time
 	var t3 := t2 + cfg.death_game_over_time
-	if sequence_t >= t1 and sequence_t - real_dt < t1 and not _time_up:
+	if sequence_t >= t1 and sequence_t - real_dt < t1:
 		state.emit(&"ship_explode", {"pos": state.ship_pos})
 	if sequence_t >= t2 and sequence_t - real_dt < t2:
 		state.emit(&"game_over")

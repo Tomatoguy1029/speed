@@ -79,7 +79,7 @@
 
 - 時計は、ラン開始からの経過時間を実秒で数え上げる。描画中・なぞり中も進み、ポーズ・3択・ヒットストップの間は止まる。
 - ステージの `boss_enabled` がオンなら、ボスは `boss_time` に1体現れる（12.2）。負の値なら、`config.boss_time` から `config.boss_time` ＋ `config.boss_time_spread` の間でランごとに時刻を決める。
-- ステージの `time_limit` 以上にランの時計が進むと、時間切れになる。負の値なら制限時間は無効。残り時間は画面に出さず、時計は経過時間のまま。
+- ステージの `time_limit` 以上にランの時計が進むと、時間切れになる。ボスが避けられない一撃を放ち、機体は敗北する（16章）。負の値なら制限時間は無効。残り時間は画面に出さず、時計は経過時間のまま。
 - **クリア**：ボスを撃破する。時計はトドメの時点で止まる。
 - **失敗**：機体の HP が0になるか、時間切れになる。部品と記録は、どちらも同じ扱い。
 - 結果で、獲得した部品をセーブに加え、記録を更新する（14.2）。クリアなら部品に `config.clear_bonus` を足す。
@@ -598,8 +598,8 @@
 | 吹き飛ばした敵の破片 | 金属色・橙の縁の角張った破片が回転して飛ぶ。通った跡の光は実時間 `config.corpse_trail_life` 秒で消える（各破片の履歴は最大 `config.corpse_trail_points` 点） |
 | ソニックブーム | 機体と一緒に進路を進む。画面のフラッシュと揺れ、衝撃波の歪み |
 | 普段の被弾 | 機体を `config.ship_hurt_time` 実秒赤くし、機体だけを横に最大 `config.ship_hurt_shake` px 震わせる。カメラは揺らさない |
-| 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_time` 秒表示して結果画面へ。暗さは結果画面まで保つ |
-| 時間切れ | 敗北と同じ流れで、機体は爆発させない。世界を止めて暗くし、`config.death_freeze_time` 実秒かけて画面の端から機体へ暗闇の円が閉じる。円の縁は暗い赤。そのあと GAME OVER を出して結果画面へ（仮の演出） |
+| 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_tim| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](hydra.md#25-制限時間の一撃) |
+GAME OVER を出して結果画面へ（仮の演出） |
 | ボス撃破 | 直前 `config.boss_finish_replay_window` 秒の機体の動きを記録し、`config.boss_finish_zoom` 倍に寄って `config.boss_finish_slow_time` 秒かけてスローで再生。最終勝利の通知で敵の攻撃を止め、通常の速さに戻ってボスが消滅し、残りの敵を消す。`config.boss_finish_blast_time` 秒のあと、ステージ1〜4は既存の伝説モジュールの姿と名前を見せ、機体へ回収する仮演出を行う。出現・静止・回収の時間は `config.boss_finish_relic_appear_time`・`config.boss_finish_relic_hold_time`・`config.boss_finish_relic_collect_time`。CLEAR! を `config.boss_finish_clear_time` 秒表示し、短い画面フェードで結果画面へ。スキップは CLEAR! の区間へ進む。演出中は操作・被弾・時間切れ・3択・新しい出現を止める。部品と記録の保存は演出の最後に1回だけ |
 
 - 演出は攻撃力・装甲・ヒットストップに影響しない。ポーズ中・3択の間は止まる。

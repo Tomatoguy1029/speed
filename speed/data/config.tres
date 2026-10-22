@@ -22,6 +22,7 @@ death_freeze_time = 1.0
 death_world_dim = 0.75
 death_explosion_time = 0.8
 death_game_over_time = 1.0
+time_up_charge_time = 2.0
 ship_hurt_time = 0.16
 ship_hurt_shake = 3.0
 block_spark_count = 28

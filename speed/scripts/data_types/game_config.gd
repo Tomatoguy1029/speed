@@ -86,6 +86,10 @@ extends Resource
 ## GAME OVER を出してから結果画面に移るまでの時間。
 ## 単位：実秒
 @export var death_game_over_time: float
+## 時間切れ：一撃の溜め
+## 制限時間に達してから、ボスの避けられない一撃が当たるまでの時間。溜めの間も機体は動かせる。
+## 単位：秒（ランの時計）
+@export var time_up_charge_time: float
 ## 被弾：赤くなる時間
 ## 普段の被弾で、機体を赤く光らせる長さ。
 ## 単位：実秒
