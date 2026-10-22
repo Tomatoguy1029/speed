@@ -719,8 +719,6 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.hydra&#95;debris.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
 | lab.enemy.hydra&#95;beam.move | 1本の射線を固定して照射する。有限長の光弾も撃つ | Holds one fixed beam or launches a finite light bolt |
 | lab.enemy.hydra&#95;beam.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
-| lab.enemy.hydra&#95;homing.move | うみへび座の首。ホーミング弾を吐く。弾の輪を浮かべて放つこともある | A Hydra neck. Spits homing shots or floats a ring of bullets and releases it |
-| lab.enemy.hydra&#95;homing.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
 | lab.enemy.hydra&#95;thunder.move | 帯電して頭突きし、到達時に放電する。遠くでは進行先へ落雷を予告する | Charges a headbutt with an arrival discharge, or marks lightning ahead at range |
 | lab.enemy.hydra&#95;thunder.kill | 頭を削って落とす。合体中は再生し、分離後は撃破できる | Wear the head down. Regrows while combined; stays defeated after separation |
 | lab.enemy.hydra&#95;immortal.move | 羅針盤を抱えて逃げる蛇。単独では振り返って噛みつく | The compass bearer flees, then turns to bite when alone |
@@ -790,7 +788,6 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/hydra&#95;beam.tres | うみへび座のビームの首 |
 | enemies/hydra&#95;bite.tres | うみへび座の噛みつく首 |
 | enemies/hydra&#95;debris.tres | うみへび座の瓦礫の首 |
-| enemies/hydra&#95;homing.tres | うみへび座のホーミング弾の首 |
 | enemies/hydra&#95;thunder.tres | うみへび座の雷の首 |
 | enemies/hydra&#95;immortal.tres | うみへび座の不死の首 |
 | enemies/hydra&#95;rubble.tres | うみへび座の瓦礫 |
