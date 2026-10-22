@@ -28,7 +28,7 @@ func _ready() -> void:
 	run.loadout.grant(&"weapon",&"W27",5)
 	run.combat.ignore_armor=true
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=run.bosses.lab_instances.back().actor
+	var a=run.bosses.actors.back()
 	a.hsm.set_active(false)
 	for n in a.necks:n.cd=1e6
 	check_target(run,a.body,"combined core")
@@ -66,7 +66,7 @@ func _ready() -> void:
 	run.loadout.weapon_behaviors[&"W03"].on_contact(grunt,a.table.pos[grunt],Vector2.RIGHT)
 	check(a.table.shove_time[grunt]>0.0 and a.table.vel[grunt].length()>0.0,"ordinary enemies still receive contact knockback")
 	run.bosses.spawn_lab(&"provisional",Vector2(600,0))
-	var provisional=run.bosses.lab_instances.back().actor
+	var provisional=run.bosses.actors.back()
 	check_target(run,provisional.body,"provisional boss")
 	lab.queue_free()
 	await get_tree().process_frame

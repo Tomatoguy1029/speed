@@ -923,17 +923,18 @@ func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned:
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses
-	if not bosses.boss_alive() and run.state.lab_mode:
-		for instance in bosses.lab_instances:
-			if instance.boss_alive():
-				bosses=instance
+	var owner := bosses.actor
+	if run.state.lab_mode:
+		for candidate in bosses.actors:
+			if candidate.body_alive():
+				owner = candidate
 				break
 	if _warning_t > 0.0 and fmod(_warning_t, 0.5) < 0.3:
 		draw_string(_font, Vector2(W / 2.0 - 160, 120), tr("hud.warning"), HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
-	if not bosses.boss_alive():
+	if owner == null or not owner.body_alive():
 		return
 	var t := run.enemies.table
-	var b: int=bosses.actor.health_row() if bosses.actor!=null else bosses.boss_row
+	var b: int = owner.health_row()
 	if b<0 or b>=t.hp.size() or t.dead[b]:return
 	var bw := minf(520.0, W * 0.6)
 	var bx := W / 2.0 - bw / 2.0

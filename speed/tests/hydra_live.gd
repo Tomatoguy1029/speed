@@ -17,7 +17,7 @@ func _ready()->void:
 	run.field.rocks.append(rock)
 	var gem:=run.pickups.drop_gem(Vector2(1850,0),17.0)
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=run.bosses.lab_instances.back().actor
+	var a=run.bosses.actors.back()
 	a.hsm.set_active(false)
 	check(a.table.pos[wall_enemy].x<1800.0 and a.table.pos[wall_enemy].x>0.0,"arena installation clears enemy from rubble footprint")
 	check(run.pickups.gem_pos[gem].x<1800.0 and run.pickups.gem_value[gem]==17.0,"arena installation preserves and clears buried XP")

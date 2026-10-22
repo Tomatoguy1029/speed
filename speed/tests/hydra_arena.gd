@@ -8,7 +8,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a = lab.run.bosses.lab_instances.back().actor
+	var a = lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	var arena = a.get("arena")
 	check(arena != null,"encounter creates fixed rubble arena immediately")
@@ -69,7 +69,7 @@ func _ready() -> void:
 				a.sim_tick(0.025,0.025)
 				if not a.busy or not a.special.positioning:break
 			check(a.tech==&"grid" and not a.special.positioning,"guards and bearer actually reach bounded grid formation")
-		a.manager.remove_boss()
+		a.ctx.bosses.remove_actor(a)
 		await get_tree().process_frame
 		check(field.first_body_hit(center,center+Vector2(10000,0),r)==null,"removing encounter releases boundary collision")
 	lab.queue_free()

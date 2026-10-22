@@ -9,7 +9,7 @@ func _ready()->void:
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
 	var run: RunSimulation=lab.run
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=run.bosses.lab_instances.back().actor
+	var a=run.bosses.actors.back()
 	a.hsm.set_active(false)
 	a._set_count(8)
 	a.begin_separation()

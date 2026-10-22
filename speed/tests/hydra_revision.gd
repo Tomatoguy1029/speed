@@ -10,7 +10,7 @@ func _ready() -> void:
 	var run: RunSimulation=lab.run
 	check(run.state.stage.boss_id==&"hydra","stage four selects playable hydra encounter")
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=run.bosses.lab_instances.back().actor
+	var a=run.bosses.actors.back()
 	a.hsm.set_active(false)
 	run.state.stats.attack_mult=0.01
 	var hp: float=a.table.hp[a.body]

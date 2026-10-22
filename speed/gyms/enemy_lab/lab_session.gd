@@ -664,9 +664,9 @@ func _run_schedule() -> void:
 
 func digest() -> String:
 	var actors := []
-	for instance in run.bosses.lab_instances:
-		if is_instance_valid(instance.actor):
-			actors.append(_stable(instance.actor, 0))
+	for owner in run.bosses.actors:
+		if is_instance_valid(owner):
+			actors.append(_stable(owner, 0))
 	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.behaviors, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
@@ -690,7 +690,7 @@ func _stable(value, depth: int):
 			var key: String = property.name
 			var item = value.get(key)
 			if item is Node or item is Callable or item is Signal or item is GDScript: continue
-			if key in ["_near", "ctx", "m", "director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
+			if key in ["_near", "_buf", "_hits", "ctx", "m", "director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
 			out[key] = _stable(item, depth + 1)
 		if value is BossActor and value.has_node("Timeline"):
 			var timeline: AnimationPlayer = value.get_node("Timeline")
@@ -733,10 +733,10 @@ func _edit_boss_definition(args: Dictionary) -> void:
 	else:
 		return
 	run.bosses.definitions[type] = def
-	for instance in run.bosses.lab_instances:
-		if instance.has_boss() and instance.actor.def.id == type:
-			instance.actor.def = def
-			var row: int = instance.boss_row
+	for owner in run.bosses.actors:
+		if owner.has_body() and owner.def.id == type:
+			owner.def = def
+			var row: int = owner.body
 			if key == "speed": run.enemies.table.speed[row] = def.speed
 			if key == "radius": run.enemies.table.r[row] = def.radius * run.cfg.character_scale
 
