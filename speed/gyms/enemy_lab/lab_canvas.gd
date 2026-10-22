@@ -296,7 +296,7 @@ func _pick(pos: Vector2, cycle := false) -> int:
 func _draw() -> void:
 	if session == null or not is_instance_valid(session.run):
 		return
-	var run: RunManager = session.run
+	var run: RunSimulation = session.run
 	if run.enemies.count() == 0 and route.is_empty() and mode != 3:
 		var message := tr("lab.ui.empty_field")
 		var font := get_theme_default_font()

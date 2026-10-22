@@ -727,7 +727,7 @@ func interrupt_tech(attack: StringName = &"") -> void:
 	tech_end()
 
 ## 制限時間の一撃（仕様書 4.1）。全ての首・蛇が機体へ向いて光を溜め、溜め終わりに戦闘エリアを光で埋める。
-## 当たりの判定は RunManager が溜めの終わりに行う。溜めの間はボスを無敵にし、ほかの攻撃と判断を止める。
+## 当たりの判定は RunSimulation が溜めの終わりに行う。溜めの間はボスを無敵にし、ほかの攻撃と判断を止める。
 func begin_final_strike(charge: float) -> void:
 	if final_strike_t >= 0.0:
 		return

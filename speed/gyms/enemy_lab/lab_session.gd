@@ -6,12 +6,11 @@ signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
-const RUN_SCENE := preload("res://scenes/run/run.tscn")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 const DT := 1.0 / 60.0
 
-var scene: Node
-var run: RunManager
+var scene: RunSession
+var run: RunSimulation
 var baseline: Dictionary = {}
 var spec: Dictionary = {}
 var history: Array[Dictionary] = []
@@ -120,25 +119,14 @@ func _rebuild() -> void:
 					for param in spec.overrides[id][key]: def.params[param] = safe_parameter(param, spec.overrides[id][key][param])
 				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
-	scene = RUN_SCENE.instantiate()
-	if viewport == null:
-		scene.get_node("Hud").free()
-		scene.get_node("Managers/RenderManager").free()
-		scene.get_node("World/Camera2D").enabled = false
-		scene.get_node("World").visible = false
-	else:
-		# 実験場の調整は実験場のパネルで行う。本番の調整パネル・性能表示は使わない
-		scene.get_node("Hud/DebugPanel").free()
-		scene.get_node("Hud/PerfOverlay").free()
-	run = scene.get_node("Managers/RunManager")
-	run.options = {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
+	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
-	if viewport != null:
-		viewport.add_child(scene)
-	else:
-		add_child(scene)
-	run.set_process(false)
+	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
+	scene = RunManager.create_session(viewport if viewport != null else self, options, viewport != null)
+	scene.auto_step = false
+	scene.set_process(false)
+	run = scene.sim
 	run.bosses.definitions = ConfigManager.bosses.duplicate()
 	for id in spec.get("boss_overrides", {}):
 		if ConfigManager.bosses.has(StringName(id)):
@@ -153,9 +141,6 @@ func _rebuild() -> void:
 	director.projectiles = run.projectiles
 	director.configure(spec.get("director", {}))
 	run.projectiles.director = director
-	if viewport == null:
-		run.input.set_process_input(false)
-		run.input.set_process_unhandled_input(false)
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
 	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos

@@ -46,6 +46,9 @@ func _physics_process(delta: float) -> void:
 func _process(_delta: float) -> void:
 	sim.flush_events()
 
-func _exit_tree() -> void:
-	sim.dispose()
-	RunManager.unregister(self)
+## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		sim.dispose()
+		if is_instance_valid(RunManager):
+			RunManager.unregister(self)

@@ -56,7 +56,7 @@ func _move(dt: float) -> void:
 # ── 制限時間の一撃（仕様書 4.1・16） ─────────────────────────────────
 
 ## 攻撃と移動を止めて機体へ向き、光を溜める。溜め終わりに光が太くなって画面を埋める。
-## 当たりの判定は RunManager が溜めの終わりに行う。溜めの間は無敵。
+## 当たりの判定は RunSimulation が溜めの終わりに行う。溜めの間は無敵。
 func begin_final_strike(charge: float) -> void:
 	if final_strike_t >= 0.0:
 		return

@@ -480,7 +480,7 @@ func _files(box: Node) -> void:
 func sync_from_session() -> void:
 	if not is_instance_valid(lab.session.run): return
 	_sync_appearance()
-	var run: RunManager = lab.session.run
+	var run: RunSimulation = lab.session.run
 	for key in _condition_fields:
 		var box: SpinBox = _condition_fields[key]
 		if not box.get_line_edit().has_focus() and not is_equal_approx(box.value, float(run.cfg.get(key))): box.set_value_no_signal(float(run.cfg.get(key)))
