@@ -14,6 +14,11 @@ const PARTS := [
 	[&"pickup", "collector", Rect2(246, 232, 156, 29), Rect2(323, 233, 77, 28)],
 	[&"speed", "booster", Rect2(246, 264, 145, 66), Rect2(312, 301, 78, 28)],
 ]
+@export_group("購入演出")
+@export_range(0.1, 2.0, 0.05) var upgrade_effect_duration := 0.75
+@export_range(0.0, 1.0, 0.05) var upgrade_effect_strength := 1.0
+@export_range(0.01, 0.2, 0.005) var upgrade_scan_width := 0.1
+
 var _art: SubViewportContainer
 var _canvas: Control
 var _heading: Label
@@ -24,6 +29,8 @@ var _buy_button: Button
 var _selected: StringName = &""
 var _hovered: StringName = &""
 var _materials: Dictionary = {}
+var _part_materials: Dictionary = {}
+var _upgrade_tween: Tween
 var _back_fill: TextureRect
 var _panel: Control
 var _content: Control
@@ -35,6 +42,10 @@ func _ready() -> void:
 	$Margin.hide()
 	_build_art()
 	SaveManager.save_changed.connect(_refresh_details)
+	visibility_changed.connect(func():
+		if not is_visible_in_tree():
+			_stop_upgrade_effect()
+	)
 	resized.connect(_layout_art)
 	_layout_art()
 	_refresh_details()
@@ -134,6 +145,7 @@ func _group_content() -> void:
 
 func transition_to_menu() -> void:
 	_leaving = true
+	_stop_upgrade_effect()
 	if _content_tween != null:
 		_content_tween.kill()
 	_group_content()
@@ -144,7 +156,11 @@ func transition_to_menu() -> void:
 
 func _on_back() -> void:
 	if not _leaving:
+		_stop_upgrade_effect()
 		super()
+
+func _exit_tree() -> void:
+	_stop_upgrade_effect()
 
 func _build_part(part: Array, tooltips: Texture2D) -> void:
 	var id: StringName = part[0]
@@ -166,10 +182,21 @@ func _build_part(part: Array, tooltips: Texture2D) -> void:
 	var button := TextureButton.new()
 	button.name = "Part_" + String(id)
 	button.texture_normal = cropped
-	button.material = material
+	var part_material := ShaderMaterial.new()
+	part_material.shader = preload("res://assets/ui/upgrade/part_upgrade.gdshader")
+	part_material.set_shader_parameter("effect_progress", 1.0)
+	# AtlasTexture の UV を部品の範囲へ戻し、絵の大きさに合わせて走査する。
+	var texture_size := Vector2(texture.get_size())
+	part_material.set_shader_parameter("part_uv_rect", Vector4(
+		bounds.position.x / texture_size.x, bounds.position.y / texture_size.y,
+		bounds.size.x / texture_size.x, bounds.size.y / texture_size.y))
+	_part_materials[id] = part_material
+	button.material = part_material
 	button.position = bounds.position
+	var part_image := texture.get_image().get_region(bounds)
 	var mask := BitMap.new()
-	mask.create_from_image_alpha(texture.get_image().get_region(bounds))
+	mask.create_from_image_alpha(part_image)
+	part_material.set_shader_parameter("surface_mask", _part_surface(mask))
 	# 各行の輪郭の間も判定に含め、線画の内部をクリックできるようにする。
 	for y in bounds.size.y:
 		var first := bounds.size.x
@@ -184,6 +211,37 @@ func _build_part(part: Array, tooltips: Texture2D) -> void:
 	button.texture_click_mask = mask
 	_canvas.add_child(button)
 	_connect_part(button, id)
+
+## 外側から透明画素をたどり、閉じた線画の内側だけを面として埋める。
+## クリック判定を広げる前の輪郭を使い、部品間の隙間は発光させない。
+func _part_surface(outline: BitMap) -> Texture2D:
+	var dimensions := outline.get_size()
+	var padded := dimensions + Vector2i(2, 2)
+	var outside := BitMap.new()
+	outside.create(padded)
+	outside.set_bitv(Vector2i.ZERO, true)
+	var pending: Array[Vector2i] = [Vector2i.ZERO]
+	var cursor := 0
+	while cursor < pending.size():
+		var point := pending[cursor]
+		cursor += 1
+		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next := point + step
+			if next.x < 0 or next.y < 0 or next.x >= padded.x or next.y >= padded.y:
+				continue
+			if outside.get_bitv(next):
+				continue
+			var pixel := next - Vector2i.ONE
+			if Rect2i(Vector2i.ZERO, dimensions).has_point(pixel) and outline.get_bitv(pixel):
+				continue
+			outside.set_bitv(next, true)
+			pending.append(next)
+	var image := Image.create(dimensions.x, dimensions.y, false, Image.FORMAT_L8)
+	for y in dimensions.y:
+		for x in dimensions.x:
+			if not outside.get_bit(x + 1, y + 1):
+				image.set_pixel(x, y, Color.WHITE)
+	return ImageTexture.create_from_image(image)
 
 func _connect_part(button: BaseButton, id: StringName) -> void:
 	button.pressed.connect(_select.bind(id))
@@ -218,7 +276,29 @@ func _hover(id: StringName) -> void:
 
 func _refresh_highlights() -> void:
 	for id: StringName in _materials:
-		_materials[id].set_shader_parameter("highlighted", id == _hovered or id == _selected)
+		var highlighted := id == _hovered or id == _selected
+		_materials[id].set_shader_parameter("highlighted", highlighted)
+		_part_materials[id].set_shader_parameter("highlighted", highlighted)
+
+func _stop_upgrade_effect() -> void:
+	if _upgrade_tween != null:
+		_upgrade_tween.kill()
+		_upgrade_tween = null
+	for material: ShaderMaterial in _part_materials.values():
+		material.set_shader_parameter("effect_progress", 1.0)
+
+func _play_upgrade_effect(id: StringName) -> void:
+	_stop_upgrade_effect()
+	var material := _part_materials.get(id) as ShaderMaterial
+	if material == null or not is_visible_in_tree():
+		return
+	material.set_shader_parameter("effect_strength", upgrade_effect_strength)
+	material.set_shader_parameter("scan_width", upgrade_scan_width)
+	material.set_shader_parameter("effect_progress", 0.0)
+	_upgrade_tween = create_tween()
+	_upgrade_tween.tween_method(func(progress: float):
+		material.set_shader_parameter("effect_progress", progress),
+		0.0, 1.0, upgrade_effect_duration)
 
 func _select(id: StringName) -> void:
 	if _leaving:
@@ -252,6 +332,7 @@ func _buy() -> void:
 	var def := ConfigManager.meta_upgrades.get(_selected) as MetaUpgradeDef
 	if def != null and SaveManager.buy_upgrade(def):
 		AudioManager.play(&"levelup")
+		_play_upgrade_effect(def.id)
 	_refresh_details()
 
 func _layout_art() -> void:
