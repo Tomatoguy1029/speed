@@ -212,60 +212,28 @@ func tick(_real_dt: float, world_dt: float) -> void:
 
 ## 味方の弾を撃つ。opts：speed、r、life、pierce_left、color、cause、on_hit（friend_on_hit）。
 func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
-	var speed: float = opts.get("speed", 1300.0)
-	var i := _add_friend(FriendKind.SHOT, StringName(opts.get("cause", &"shot")), from, Vector2.from_angle(angle) * speed,
-		opts.get("r", 5.0), dmg, opts.get("life", 0.9), false, opts.get("pierce_left", 0),
-		opts.get("color", Color("#ffe46b")), false, 250.0, 0.0, 0.0, -1)
-	friend_on_hit[i] = opts.get("on_hit", Callable())
+	emit_attack(&"friend_shot", [from, angle, dmg, opts])
 
 ## 位置 pos から、攻撃する破片を count 個、全方向へ飛ばす（うみへび座の首の残骸など）。source_id の敵には当たらない。
 func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Color, source_id: int) -> void:
-	for k in count:
-		var u := Vector2.from_angle(TAU * k / float(count) + state.rng.randf() * 0.4)
-		_add_friend(FriendKind.DEBRIS, &"hullDebris", pos + u * 10.0, u * speed * (0.8 + 0.3 * state.rng.randf()),
-			12.0, dmg, cfg.hull_debris_life, true, 0, color, true, cfg.hull_debris_knock, state.rng.randf() * TAU,
-			10.0 * (1.0 if k % 2 == 0 else -1.0), source_id)
-	state.emit(&"hull_scatter", {"pos": pos, "count": count})
+	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
 func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
-	var t := combat.enemies.table
-	var r := t.r[i]
-	if r < cfg.hull_debris_min_radius or t.meteor_index[i] >= 0 or t.is_boss[i] != 0 or t.hull_scattered[i] != 0:
-		return false
-	t.hull_scattered[i] = 1
-	var pos := t.pos[i]
-	var count := mini(cfg.hull_debris_max_pieces, maxi(6, ceili(r / 12.0)))
-	var directed := dir.length() > 0.01
-	var base := dir.angle() if directed else t.facing[i]
-	var spread := deg_to_rad(cfg.hull_debris_spread) if directed else TAU
-	for k in count:
-		var a := base + ((float(k) / (count - 1) - 0.5) if directed else float(k) / count) * spread
-		var u := Vector2.from_angle(a)
-		var v := speed * (0.85 + (k % 3) * 0.12)
-		_add_friend(FriendKind.DEBRIS, &"hullDebris", pos + u * r * 0.3, u * v,
-			clampf(r * 0.17, 10.0, 20.0), dmg, cfg.hull_debris_life, true, 0, t.color[i], true,
-			cfg.hull_debris_knock if knock < 0.0 else knock, state.rng.randf() * TAU,
-			10.0 * (1.0 if k % 2 == 0 else -1.0), t.id[i])
-	state.emit(&"hull_scatter", {"pos": pos, "count": count})
-	return true
+	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock])
 
 ## 牽引した船体を撃ち出す（質量牽引砲 W21）。敵を貫き、クリティカルにならない。source_id の敵には当たらない。
 func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, knock: float, type: StringName,
 		angle: float, source_id: int) -> void:
-	_add_friend(FriendKind.HULL, &"towShot", pos, vel, r, dmg, life, true, 0, Color("#ffbe65"), true, knock,
-		angle, 0.0, source_id, type)
+	emit_attack(&"friend_hull", [pos, vel, r, dmg, life, knock, type, angle, source_id])
 
 ## 体当たりされた回る丸鋸を飛ばす。敵を貫いて巻き込み、クリティカルにならない。
 func fire_saw(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float) -> void:
-	_add_friend(FriendKind.HULL, &"saw", pos, vel, r, dmg, life, true, 0, Color("#d9dde6"), true, 300.0,
-		vel.angle(), 14.0, -1, &"saw")
+	emit_attack(&"saw", [pos, vel, r, dmg, life])
 
 ## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
 func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
-	var t := combat.enemies.table
-	_add_friend(FriendKind.DEBRIS, &"corpse", t.pos[i], vel, maxf(10.0, t.r[i] * 0.6), dmg, 0.9, true, 0,
-		t.color[i], true, 250.0, state.rng.randf() * TAU, 10.0, t.id[i])
+	emit_attack(&"fling_corpse", [i, vel, dmg])
 
 ## 味方の弾・破片を1行加え、その行番号を返す。hit_id は最初から当てたことにする敵（-1 なら無し）。
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。

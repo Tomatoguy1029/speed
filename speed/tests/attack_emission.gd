@@ -43,6 +43,12 @@ func _ready() -> void:
 		pr.emit_attack(&"shell", [row, 0.0, 100.0, 20.0, 300.0, 90.0, 8.0])
 		check(pr.hostile_count() == 1 and pr.hostile_burst[0] == 90.0, "圧縮弾の破裂半径を維持する")
 
+	var friend_shape = load("res://scripts/attacks/friend_shot.gd").new()
+	check(friend_shape.has_method("spawn"), "味方弾の種類が生成処理を持つ")
+	if friend_shape.has_method("spawn"):
+		pr.emit_attack(&"friend_shot", [Vector2.ZERO, 0.0, 5.0, {"speed": 900.0}])
+		check(pr.friend_count() == 1 and pr.friend_vel[0] == Vector2(900, 0), "味方弾の指定速度を維持する")
+
 	session.free()
 	await get_tree().process_frame
 	print("[attack_emission] %d failures" % failed)
