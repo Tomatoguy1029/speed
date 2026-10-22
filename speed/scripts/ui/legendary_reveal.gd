@@ -4,6 +4,9 @@
 extends Control
 
 const DESIGN := Vector2(640, 360)
+const PREVIEW_SIZE := Vector2i(360, 220)
+## 差し替え画像の外側でにじみ・上向きの流れを描く余白。画像自体の表示サイズは維持する。
+const AURA_PADDING := Vector2i(48, 56)
 @export var light_color := Color("#e2b96b")
 @export_range(0.0, 1.0) var light_strength := 0.8
 @export_range(0.0, 1.0) var background_dim := 0.97
@@ -15,9 +18,16 @@ const DESIGN := Vector2(640, 360)
 @export_range(0.3, 2.0, 0.05) var backlight_reach := 1.0
 @export_range(0.5, 2.0, 0.05) var backlight_width := 1.1
 @export_range(0.0, 3.0, 0.05) var emergence_surge_strength := 0.12
+@export_group("発光の崩れ")
+@export_range(0.0, 1.0, 0.05) var core_distortion := 0.35
+@export_range(0.0, 1.0, 0.05) var ray_turbulence := 0.3
+@export_range(0.0, 1.0, 0.05) var ray_breakup := 0.25
 @export_group("黒い影と後光")
 @export_range(0.0, 3.0, 0.05) var radiance_strength := 1.25
 @export_range(0.0, 1.0, 0.05) var aura_flow_strength := 0.4
+@export_range(0.0, 2.0, 0.05) var aura_wisp_strength := 0.85
+@export_range(0.0, 2.0, 0.05) var aura_dust_strength := 0.9
+@export_range(0.0, 1.0, 0.05) var aura_surface_strength := 0.45
 @export_range(0.0, 1.0, 0.05) var shadow_strength := 1.0
 @export_range(0.0, 0.1, 0.005) var noise_strength := 0.025
 ## 出現区間のどこから影を解き、どこで姿を見せ終わるか。
@@ -34,6 +44,7 @@ var _target := DESIGN / 2.0
 var _canvas := Control.new()
 var _image := TextureRect.new()
 var _aura := TextureRect.new()
+var _mantle := TextureRect.new()
 var _occlusion := TextureRect.new()
 var _name := Label.new()
 var _light := ColorRect.new()
@@ -50,18 +61,20 @@ func _ready() -> void:
 	_light_material.shader = preload("res://shaders/legendary_reveal_light.gdshader")
 	_light.material = _light_material
 	_canvas.add_child(_light)
-	# 図鑑の既存部品図を低解像度で描画する。専用素材も同じ差替口を使う。
-	_viewport.size = Vector2i(360, 220)
+	# preview_texture の透過画像を優先し、未指定時だけ図鑑の仮部品図を使う。
+	# オーラ・金粉・遮蔽はこの共通のアルファを読むので、輪郭をコードへ固定しない。
+	_viewport.size = PREVIEW_SIZE + AURA_PADDING * 2
 	_viewport.transparent_bg = true
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(_viewport)
 	var preview := ModulePreview.new()
-	preview.size = Vector2(360, 220)
+	preview.size = Vector2(PREVIEW_SIZE)
+	preview.position = Vector2(AURA_PADDING)
 	_viewport.add_child(preview)
 	preview.setup(_definition, true)
 	_image.texture = _viewport.get_texture()
 	_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_image.size = Vector2(360, 220)
+	_image.size = Vector2(_viewport.size)
 	_image.pivot_offset = _image.size / 2.0
 	_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if _definition.preview_texture == null:
@@ -78,6 +91,15 @@ func _ready() -> void:
 	_aura.material = aura_material
 	_canvas.add_child(_aura)
 	_canvas.add_child(_image)
+	_mantle.texture = _image.texture
+	_mantle.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_mantle.size = _image.size
+	_mantle.pivot_offset = _image.pivot_offset
+	_mantle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mantle_material := ShaderMaterial.new()
+	mantle_material.shader = preload("res://shaders/legendary_mantle.gdshader")
+	_mantle.material = mantle_material
+	_canvas.add_child(_mantle)
 	_occlusion.texture = _image.texture
 	_occlusion.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_occlusion.size = _image.size
@@ -89,7 +111,8 @@ func _ready() -> void:
 	_canvas.add_child(_occlusion)
 	_name.text = _definition.get_display_name()
 	_name.position = Vector2(55, 262)
-	_name.size = Vector2(530, 45)
+	_name.size = Vector2(530, 75)
+	_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_name.add_theme_font_size_override("font_size", 22)
 	_name.add_theme_color_override("font_color", Color("#ecd6a5"))
@@ -131,17 +154,27 @@ func set_progress(value: float) -> void:
 	_image.modulate.a = smoothstep(0.0, _appear * 0.2, _progress) * (1.0 - taking)
 	var exposure := smoothstep(_appear * shadow_release_start,
 		_appear * maxf(shadow_release_start + 0.01, shadow_release_end), _progress)
-	for layer in [_aura, _occlusion]:
+	for layer in [_aura, _mantle, _occlusion]:
 		layer.position = _image.position
 		layer.scale = _image.scale
 		layer.modulate.a = smoothstep(_appear * 0.12, _appear * 0.55, _progress) * (1.0 - taking)
 	_occlusion.modulate.a = _image.modulate.a
+	_mantle.modulate.a = _image.modulate.a
 	var aura_material := _aura.material as ShaderMaterial
 	aura_material.set_shader_parameter("intensity", radiance_strength)
 	aura_material.set_shader_parameter("exposure", exposure)
 	aura_material.set_shader_parameter("motion_time", _progress * _duration)
 	aura_material.set_shader_parameter("flow_strength", aura_flow_strength)
 	aura_material.set_shader_parameter("radiance_color", light_color.lightened(0.25))
+	aura_material.set_shader_parameter("wisp_strength", aura_wisp_strength)
+	aura_material.set_shader_parameter("dust_strength", aura_dust_strength)
+	var mantle_material := _mantle.material as ShaderMaterial
+	mantle_material.set_shader_parameter("motion_time", _progress * _duration)
+	mantle_material.set_shader_parameter("flow_strength", aura_flow_strength)
+	mantle_material.set_shader_parameter("dust_strength", aura_dust_strength)
+	mantle_material.set_shader_parameter("wisp_strength", aura_wisp_strength)
+	mantle_material.set_shader_parameter("surface_strength", aura_surface_strength)
+	mantle_material.set_shader_parameter("radiance_color", light_color.lightened(0.25))
 	var shadow_material := _occlusion.material as ShaderMaterial
 	shadow_material.set_shader_parameter("exposure", exposure)
 	shadow_material.set_shader_parameter("shadow_strength", shadow_strength)
@@ -163,6 +196,10 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("ray_reach", backlight_reach)
 	_light_material.set_shader_parameter("ray_width", backlight_width)
 	_light_material.set_shader_parameter("surge_strength", emergence_surge_strength)
+	_light_material.set_shader_parameter("motion_time", _progress * _duration)
+	_light_material.set_shader_parameter("core_distortion", core_distortion)
+	_light_material.set_shader_parameter("ray_turbulence", ray_turbulence)
+	_light_material.set_shader_parameter("ray_breakup", ray_breakup)
 	queue_redraw()
 
 func _draw() -> void:
