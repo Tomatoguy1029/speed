@@ -8,7 +8,7 @@ func _ready() -> void:
 		hint.text = tr("stage_select.debug")
 		%Content.add_child(hint)
 	for i in range(1, ContentManager.stage_count() + 1):
-		var def := ContentManager.stage(i)
+		var def := ContentManager.catalog.find(&"stages", i)
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(420, 56)
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN

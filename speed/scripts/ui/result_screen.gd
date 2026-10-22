@@ -16,7 +16,7 @@ func _ready() -> void:
 		tr("result.parts").format({n = int(r.get("coins", 0))}),
 	]
 	if cleared and r.get("legendary", "") != "":
-		var def = ContentManager.legendary_modules.get(StringName(r.legendary))
+		var def = ContentManager.catalog.find(&"legendary_modules", StringName(r.legendary))
 		if def != null:
 			lines.append(tr("result.legendary").format({name = def.get_display_name()}))
 	var best: Dictionary = SaveManager.data.best

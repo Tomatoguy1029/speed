@@ -62,11 +62,11 @@ func run_meta_level(id: StringName) -> int:
 	return meta_level(id)
 
 ## 強化を1段階買う。部品が足りないか最大なら false。
-func buy_upgrade(def: MetaUpgradeDef) -> bool:
+func buy_upgrade(def: Resource) -> bool:
 	var lv := meta_level(def.id)
 	if lv >= def.costs.size():
 		return false
-	var cost := def.costs[lv]
+	var cost: int = def.costs[lv]
 	if coins() < cost:
 		return false
 	data.coins = coins() - cost
@@ -92,7 +92,7 @@ func add_coins(amount: int) -> void:
 
 ## 通常の進行でステージが解放されているか。前のステージをクリアしていれば選べる。
 func is_stage_unlocked(index: int) -> bool:
-	var stage := ContentManager.stage(index)
+	var stage := ContentManager.catalog.find(&"stages", index)
 	return stage != null and index <= int(data.cleared_stage) + 1
 
 func mark_stage_cleared(index: int) -> void:

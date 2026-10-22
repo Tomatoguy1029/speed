@@ -47,7 +47,7 @@ func _draw() -> void:
 		image_size *= minf(300.0 / image_size.x, 180.0 / image_size.y)
 		draw_texture_rect(texture, Rect2(-image_size / 2.0, image_size), false,
 			Color.WHITE if known else Color(0, 0, 0, 1))
-	elif definition is LegendaryModuleDef:
+	elif definition is LegendaryModuleDef or (definition is ContentEntry and definition.category == &"legendary_modules"):
 		_draw_legend(String(definition.id))
 	else:
 		_draw_effect(String(definition.code_id))
