@@ -19,6 +19,7 @@ var _defeat_announced := false
 
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
+var special: RefCounted
 var attack_field: Node2D
 const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 
@@ -107,7 +108,7 @@ func _check_growth() -> void:
 	_cue(&"growth_started", &"", -1, {"duration": growth_t})
 
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
-const TECH_DIR := {&"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const TECH_DIR := {&"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -165,6 +166,7 @@ func _on_bound() -> void:
 	attack_field = load("res://scripts/bosses/hydra_attack_field.gd").new()
 	add_child(attack_field)
 	attack_field.bind(self)
+	special=load("res://scripts/bosses/hydra_techniques.gd").new(self)
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	hsm.initialize(self)
@@ -221,6 +223,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
+		if busy and tech==&"sequence": special.tick(dt)
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
@@ -314,6 +317,7 @@ func _neck_base(neck: Neck) -> Vector2:
 	return table.pos[body] + Vector2.from_angle(neck.base_angle + table.facing[body]) * table.r[body]
 
 func _head_pos(neck: Neck) -> Vector2:
+	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
 	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
 	if neck.locked and def.params.normal_rules.has(neck.mode): return neck.strike_pos
@@ -355,7 +359,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
 			if not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
-		else: _attack(neck,k,dt)
+		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
 	if neck.row >= 0 or neck.length > 0.0:
@@ -582,6 +586,11 @@ func _end(neck: Neck, interrupted := false) -> void:
 		neck.length = offset.length()
 	if neck.mode != &"idle" and not String(neck.mode).begins_with("tech_"):
 		_cue(&"interrupted" if interrupted else &"finished", neck.mode, necks.find(neck))
+	if String(neck.mode).begins_with("special_"):
+		var delta := neck.strike_pos-_neck_base(neck)
+		neck.angle=delta.angle()
+		neck.length=delta.length()
+		neck.locked=false
 	neck.mode = &"idle"
 	neck.t = 0.0
 	neck.step = 0
@@ -746,7 +755,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 		return false
 	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
 		return false
-	if attack == &"north": participants = front_heads()
+	if attack in [&"north",&"sequence"]: participants = front_heads()
 	tech = attack
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
@@ -776,6 +785,8 @@ func interrupt_tech(attack: StringName = &"") -> void:
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
 	match name:
+		&"sequence":
+			return not separated and count>=5 and (participants.size()==3 and participants.all(func(n):return _alive(n)) if busy else front_heads().size()==3)
 		&"north":
 			return not separated and count >= 5 and (participants.all(func(n):return _alive(n)) and participants.size()==3 if busy else front_heads().size()==3)
 		&"east":
@@ -801,6 +812,7 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
+	if name==&"sequence": special.prepare()
 	if name == &"north":
 		north_aiming = true
 		_update_north_targets()
@@ -811,6 +823,10 @@ func tech_compass(name: StringName) -> void:
 	_needle = TECH_DIR.get(name, -PI / 2.0)
 
 ## 技の終わり（崩れたときも）。首を普段に戻す。
+func special_attack() -> void:
+	special.playing=true
+	_cue(&"attack_started")
+
 func tech_end() -> void:
 	if not busy:
 		return
@@ -823,12 +839,13 @@ func tech_end() -> void:
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})
 	for neck in necks:
-		if String(neck.mode).begins_with("tech_"):
+		if String(neck.mode).begins_with("tech_") or String(neck.mode).begins_with("special_"):
 			_release_attack(neck)
 			_end(neck)
 	busy = false
 	tech = &""
-	_tech_cd = 0.0
+	_tech_cd = float(def.params.tech_cd)
+	special.playing=false
 	for r in _rubble:
 		if manager.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
 			manager.enemies.mark_dead(r.x)

@@ -89,9 +89,20 @@ metadata/_weight_ = 0.8
 [sub_resource type="BTComment" id="south_pending"]
 custom_name = "南：渦壁と隙間の回避難度を調整後に接続（保留）"
 
+[sub_resource type="BTCondition" id="ready_sequence"]
+script = ExtResource("ready")
+attack = &"sequence"
+[sub_resource type="BTAction" id="play_sequence"]
+script = ExtResource("play")
+technique = "sequence"
+[sub_resource type="BTDynamicSequence" id="sequence"]
+custom_name = "sequence"
+children = [SubResource("ready_sequence"), SubResource("play_sequence")]
+metadata/_weight_ = 1.0
+
 [sub_resource type="BTProbabilitySelector" id="choose"]
 custom_name = "条件を満たす大技を重みで選ぶ"
-children = [SubResource("north"), SubResource("east"), SubResource("west"), SubResource("south_pending")]
+children = [SubResource("north"), SubResource("sequence")]
 script = ExtResource("selector")
 
 [resource]

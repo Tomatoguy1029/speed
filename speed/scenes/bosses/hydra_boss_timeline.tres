@@ -113,8 +113,19 @@ tracks/0/keys = {
 }]
 }
 
+[sub_resource type="Animation" id="Animation_sequence"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"sequence"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
 [resource]
 _data = {
+&"sequence": SubResource("Animation_sequence"),
 &"east": SubResource("Animation_east"),
 &"north": SubResource("Animation_north"),
 &"south": SubResource("Animation_south"),
