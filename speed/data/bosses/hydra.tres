@@ -12,6 +12,8 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"thunder_lead": 0.4,
+"target_lock_fraction": 0.55,
 "thunder_radius": 150.0,
 "thunder_flash": 0.22,
 "bolt_length": 150.0,
@@ -35,7 +37,7 @@ params = {
 "sweep_time": 0.7,
 "sweep_arc": 1.8,
 "sweep_reach": 350.0,
-"normal_rules": {&"bite_thrust": {"kind": &"bite", "min": 0.0, "max": 620.0, "cost": 1.0}, &"bite_sweep": {"kind": &"bite", "min": 0.0, "max": 400.0, "cost": 1.2}, &"wind_band": {"kind": &"vortex", "min": 0.0, "max": 420.0, "cost": 1.4}, &"wind_blades": {"kind": &"vortex", "min": 260.0, "max": 1400.0, "cost": 1.6}, &"rubble_lump": {"kind": &"debris", "min": 260.0, "max": 1400.0, "cost": 1.2}, &"rubble_fan": {"kind": &"debris", "min": 100.0, "max": 850.0, "cost": 1.5}, &"beam_fixed": {"kind": &"beam", "min": 300.0, "max": 1600.0, "cost": 1.6}, &"beam_bolt": {"kind": &"beam", "min": 120.0, "max": 1500.0, "cost": 1.0}, &"thunder_headbutt": {"kind": &"thunder", "min": 0.0, "max": 650.0, "cost": 1.5}},
+"normal_rules": {&"bite_thrust": {"kind": &"bite", "min": 0.0, "max": 620.0, "cost": 1.0}, &"bite_sweep": {"kind": &"bite", "min": 0.0, "max": 400.0, "cost": 1.2}, &"wind_band": {"kind": &"vortex", "min": 0.0, "max": 420.0, "cost": 1.4}, &"wind_blades": {"kind": &"vortex", "min": 260.0, "max": 1400.0, "cost": 1.6}, &"rubble_lump": {"kind": &"debris", "min": 260.0, "max": 1400.0, "cost": 1.2}, &"rubble_fan": {"kind": &"debris", "min": 100.0, "max": 850.0, "cost": 1.5}, &"beam_fixed": {"kind": &"beam", "min": 300.0, "max": 1600.0, "cost": 1.6}, &"beam_bolt": {"kind": &"beam", "min": 120.0, "max": 1500.0, "cost": 1.0}, &"thunder_headbutt": {"kind": &"thunder", "min": 0.0, "max": 650.0, "cost": 1.5}, &"thunder_drop": {"kind": &"thunder", "min": 260.0, "max": 1500.0, "cost": 1.4}},
 "normal_charge": 0.6,
 "normal_lunge": 0.16,
 "normal_hold": 0.9,
