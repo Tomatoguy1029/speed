@@ -23,6 +23,7 @@ func prepare()->void:
 		positioning=true
 		state.slots=[]
 		state.arrived={}
+		state.position_elapsed=0.0
 		var rect: Rect2=a.run_state.view_rect().grow(-float(a.def.params.formation_margin))
 		for i in a.participants.size():
 			var angle: float=TAU*float(i)/a.participants.size()
@@ -162,6 +163,10 @@ func beam_pincer()->void:
 
 ## 配置の途中も同じ操舵を使う。到着まで攻撃の時間軸を進めない。
 func position(dt: float)->bool:
+	state.position_elapsed+=dt
+	if state.position_elapsed>float(a.def.params.formation_timeout):
+		a.interrupt_tech()
+		return false
 	var ready:=true
 	for i in a.participants.size():
 		var n=a.participants[i]
@@ -177,6 +182,9 @@ func position(dt: float)->bool:
 		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.grid_tolerance if a.tech==&"grid" else a.def.params.formation_tolerance):state.arrived[i]=true
 		if not state.arrived.has(i):ready=false
 	if a.tech==&"grid" and a.immortal_neck.free_pos.distance_to(state.plan.bearer)>float(a.def.params.grid_tolerance):ready=false
+	if ready and not a.participants.filter(func(n):return a._alive(n)).all(func(n):return a.run_state.view_rect().grow(-a.table.r[n.row]).has_point(n.strike_pos)):
+		a.interrupt_tech()
+		return false
 	if ready:
 		positioning=false
 		for n in a.participants:

@@ -3,6 +3,7 @@ extends Node2D
 var actor: Node
 var effects: Array[Dictionary] = []
 var serial := 0
+var visuals: Dictionary={}
 var ship_previous := Vector2.ZERO
 var white: Texture2D
 const FX := preload("res://shaders/hydra_energy.gdshader")
@@ -29,7 +30,8 @@ func add_shape(points: PackedVector2Array, width: float, delay: float, life: flo
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,
 		"age": 0.0, "damage": damage, "kind": kind, "owner": owner,
 		"owner_id": actor.table.id[owner] if owner >= 0 else -1, "velocity": velocity,
-		"persistent": persistent, "hit": false, "line": line}
+		"persistent": persistent, "hit": false}
+	visuals[serial]=line
 	effects.append(effect)
 	return effect
 func remove_owner(row: int) -> void:
@@ -37,8 +39,9 @@ func remove_owner(row: int) -> void:
 		if e.owner == row and not e.persistent: e.life = 0.0
 func clear_effects() -> void:
 	for e in effects:
-		if is_instance_valid(e.line): e.line.queue_free()
+		if visuals.has(e.id):visuals[e.id].queue_free()
 	effects.clear()
+	visuals.clear()
 func intersects(points: PackedVector2Array, width: float, a: Vector2, b: Vector2) -> bool:
 	var radius: float = width * 0.5 + actor.manager.cfg.ship_radius
 	for i in range(points.size() - 1):
@@ -52,11 +55,12 @@ func tick(dt: float) -> void:
 	if dt <= 0.0: return
 	var ship: Vector2 = actor.run_state.ship_pos
 	for e in effects.duplicate():
-		var prior: PackedVector2Array = e.points.duplicate()
+		var prior: PackedVector2Array = e.get("previous_points",e.points).duplicate()
 		e.age += dt
 		var alive: bool = e.owner < 0 or e.persistent or (actor.manager.enemies.is_same(e.owner,e.owner_id) and actor.table.dead[e.owner] == 0)
 		if not alive or e.age >= e.delay + e.life:
-			e.line.queue_free()
+			visuals[e.id].queue_free()
+			visuals.erase(e.id)
 			effects.erase(e)
 			continue
 		if e.has("follow_row"):
@@ -69,7 +73,10 @@ func tick(dt: float) -> void:
 			for i in e.points.size(): e.points[i] += e.velocity * dt
 			var touching := intersects(e.points,e.width,ship_previous,ship) or intersects(prior,e.width,ship_previous,ship)
 			# Moving projectiles sweep their front and back edges too.
-			if not touching:
+			if not touching and prior.size()==e.points.size():
+				for i in range(e.points.size()-1):
+					var swept:=PackedVector2Array([prior[i],prior[i+1],e.points[i+1],e.points[i]])
+					if Geometry2D.is_point_in_polygon(ship,swept) or Geometry2D.is_point_in_polygon(ship_previous,swept):touching=true
 				for i in e.points.size():
 					if intersects(PackedVector2Array([prior[i],e.points[i]]),e.width,ship_previous,ship): touching = true
 			if touching and e.kind == &"wind":
@@ -78,12 +85,14 @@ func tick(dt: float) -> void:
 			elif touching and not e.hit and e.damage > 0.0:
 				actor.manager.projectiles.ship.damage(e.damage * actor.manager.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
-		e.line.points = e.points
-		e.line.width = e.width
+		e.previous_points=e.points.duplicate()
+		var line: Line2D=visuals[e.id]
+		line.points = e.points
+		line.width = e.width
 		var color: Color = {&"rubble": Color(0.55,0.44,0.3), &"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
-		e.line.material.set_shader_parameter("tint", color)
-		e.line.material.set_shader_parameter("clock", actor._time)
-		e.line.material.set_shader_parameter("warning", e.age < e.delay)
-		e.line.material.set_shader_parameter("span", maxf(1.0,e.points[0].distance_to(e.points[-1])))
-		e.line.material.set_shader_parameter("thickness", e.width)
+		line.material.set_shader_parameter("tint", color)
+		line.material.set_shader_parameter("clock", actor._time)
+		line.material.set_shader_parameter("warning", e.age < e.delay)
+		line.material.set_shader_parameter("span", maxf(1.0,e.points[0].distance_to(e.points[-1])))
+		line.material.set_shader_parameter("thickness", e.width)
 	ship_previous = ship

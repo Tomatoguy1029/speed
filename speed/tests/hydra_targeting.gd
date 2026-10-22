@@ -26,6 +26,7 @@ func _ready() -> void:
   var facing: float = boss.table.facing[boss.body]
   boss._move(0.5)
   check(is_equal_approx(boss.table.facing[boss.body], facing), "engaged body holds its orientation")
+  boss._set_count(8)
   boss._tech_cd = 0.0
   check(boss.try_start_tech(&"north", 1.0), "starts aimed bite")
   lab.run.state.ship_pos = Vector2(450, -40)
@@ -70,17 +71,15 @@ func _ready() -> void:
   boss._tick_neck(first, 0, 100.0)
   check(first.row == -1 and first.regrow == grace, "major attacks pause regrowth")
   boss.busy = false
-  lab.run.combat.damage_enemy(boss.necks[2].row, 1e6, {"cause": &"ram"})
+  for head in boss.necks:
+   if boss._alive(head):lab.run.combat.damage_enemy(head.row, 1e6, {"cause": &"ram"})
   lab.run.enemies.cleanup()
   for head in boss.necks: head.regrow = 0.0
   boss.sim_tick(0.01, 0.01)
-  check(boss.exposed_t > 0.0 and boss.necks.all(func(head): return head.row == -1), "all-head defeat exposes before any expired timer can regrow")
-  boss._tick_immortal(float(boss.def.params.expose_time) + 0.01)
-  check(boss.exposed_t <= 0.0 and boss._awaiting_regrowth, "failed exposure waits for normal regrowth")
-  boss.sim_tick(0.81, 0.81)
-  check(boss.necks.all(func(head): return head.row == -1), "failed exposure preserves defeated heads beyond the old 0.8-second reset")
-  boss.sim_tick(float(boss.def.params.regrow), float(boss.def.params.regrow))
-  check(boss.necks.all(func(head): return boss._alive(head)), "heads eventually return after failed-exposure grace")
+  check(boss.chance_t > 0.0 and boss.necks.all(func(head): return head.row == -1), "all-head defeat starts chance before expired timers can regrow")
+  boss.sim_tick(float(boss.def.params.chance_time)+0.1,float(boss.def.params.chance_time)+0.1)
+  check(boss.necks.all(func(head): return boss._alive(head)), "heads return after guaranteed central attack window")
+
  lab.queue_free()
  await get_tree().process_frame
  print("[hydra-target] passed=%d failed=%d" % [passed, failures])

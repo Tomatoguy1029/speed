@@ -1,12 +1,5 @@
-## うみへび座（仕様書 12.3）。本体と、段階が進むほど増える首（3〜9本）と、真ん中の不死の首。
-## 設計書 6.1 の3層で作る。
-##   形態：LimboHSM。首全滅 → 不死首への突進で 3 → 5 → 7 → 9 本へ進む。
-##   判断：形態の BTState が持つ Behavior Tree（強めの技を出せるなら、使える技のタイムラインを再生する）
-##   攻撃：強めの技は AnimationPlayer のタイムライン（north・east・south・west）。普段の首の攻撃は首ごとの動き
-##
-## 本体と首はすり抜け、頭だけを攻撃できる。本体の HP バーは残りの段階を示す。
-## 頭は敵の表の1行（部位。種類ごとの敵の定義 hydra_<首の種類>）で、位置はこの役者が決める。
-## 首の節は FABRIK で本体と頭をつなぎ、この役者が描く。
+## 中央の瓦礫を守る多頭ボス。HP閾値で3→5→8本へ増加し、瓦礫破壊で独立蛇へ分離する。
+## 行動選択はLimboAI、振り付けはAnimationPlayer、形状・判定は共有点列で扱う。
 extends BossActor
 
 ## Hydra 内の演出契約。判定を変えず、技 ID と取り付け位置を受け取る。
@@ -27,7 +20,7 @@ const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 
 ## 首1本の状態
 class Neck:
-	## 首の種類（bite・vortex・debris・beam・homing）
+	## 首の種類（bite・vortex・debris・beam・thunder）
 	var kind: StringName
 	## 本体から見た付け根の向きと、今の首の向き・長さ
 	var base_angle := 0.0
@@ -37,7 +30,7 @@ class Neck:
 	var row := -1
 	var row_id := 0
 	var head_hp := 0.0
-	## 生え直すまでの時間。burned なら次の段階まで生え直さない（火で落ちた頭）
+	## 生え直すまでの時間。火で落ちた頭は待ち時間を延長する。
 	var regrow := 0.0
 	var burned := false
 	## 首の骨組みの点列（付け根から頭まで）
@@ -117,7 +110,7 @@ func _check_growth() -> void:
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
 const COMBOS: Array[StringName] = [&"tornado",&"debris_shatter",&"beam_pincer"]
 var combo_wait := 0.0
-const TECH_DIR := {&"grid": 0.0, &"swarm": -PI/2.0, &"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const TECH_DIR := {&"grid":0.0,&"swarm":-PI/2.0,&"tornado":PI/2.0,&"debris_shatter":0.0,&"beam_pincer":PI,&"curve":PI/2.0,&"sequence":0.0,&"north":-PI/2.0}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -127,16 +120,11 @@ var necks: Array[Neck] = []
 ## 今の段階の首の本数
 var count := 0
 ## 不死の首：むき出しの残り時間と、頭の行と id
-var exposed_t := 0.0
 var immortal_row := -1
 var immortal_id := 0
-var immortal_segs := PackedVector2Array()
 ## むき出しが終わってから、次にむき出しになれるまでの時間
-var _expose_cd := 0.0
-var _awaiting_regrowth := false
 ## 1本の線（突進の番号）ごとに落とした頭の数
 var _dash_kills: Dictionary = {}
-var _shock_t := 0.0
 ## 強めの技の最中（普段の首の攻撃を止める）
 var busy := false
 ## 今の強めの技（空なら無し）、次に出せるまでの時間、羅針盤の針が回っている残り時間と止まる向き
@@ -146,7 +134,6 @@ var _spin_t := 0.0
 var _needle := -PI / 2.0
 ## 強めの技で吐いた瓦礫（行と id）と、南の技の渦の位置
 var _rubble: Array[Vector2i] = []
-var _vortex_at := Vector2.ZERO
 var _time := 0.0
 var _sim_dt := 0.0
 var north_target := Vector2.ZERO
@@ -225,7 +212,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if separated:tick_bearer(dt)
 	else:_move(dt)
 	recovery_t = maxf(0.0, recovery_t - dt)
-	_expose_cd = maxf(0.0, _expose_cd - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
 	_chance_step(dt)
 	if north_aiming:
@@ -247,8 +233,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
 		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
-		elif tech == &"east":
-			_shatter_on_beams()
+		
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
 		_defeat_announced = true
 		hsm.set_active(false)
@@ -270,14 +255,15 @@ func _move(dt: float) -> void:
 	var p: Dictionary = def.params
 	var d := run_state.ship_pos - t.pos[i]
 	var dist := maxf(d.length(), 1.0)
-	if busy and tech == &"north" and north_aiming:
-		var slot := TAU/float(count)
-		var wanted := d.angle()-roundf((d.angle()-t.facing[i])/slot)*slot
+	if busy and ((tech==&"north" and north_aiming) or tech==&"sequence"):
+		var middle:=Vector2.ZERO
+		for n in participants:middle+=Vector2.from_angle(n.base_angle)
+		var wanted: float=d.angle()-middle.angle()
 		t.facing[i] = rotate_toward(t.facing[i],wanted,def.turn*dt)
-	var swimming := dist > float(p.engage) and not busy and exposed_t <= 0.0 and recovery_t <= 0.0
+	var swimming := (dist > float(p.engage) or not run_state.view_rect().grow(-table.r[i]).has_point(t.pos[i])) and not busy and recovery_t <= 0.0
 	var want := d / dist * def.speed if swimming else Vector2.ZERO
 	t.vel[i] += (want - t.vel[i]) * minf(1.0, def.accel * dt)
-	if busy or exposed_t > 0.0 or recovery_t > 0.0:
+	if busy or recovery_t > 0.0:
 		t.vel[i] = Vector2.ZERO
 	# 構えている間は胴体の向きを保ち、狙いは首先で表す。
 	if swimming:
@@ -316,7 +302,6 @@ func _set_count(n: int) -> void:
 
 ## 首の頭を生やす。
 func _grow(neck: Neck) -> void:
-	_awaiting_regrowth = false
 	var p: Dictionary = def.params
 	neck.length = float(p.neck_rest) * 0.3
 	neck.angle = neck.base_angle + table.facing[body]
@@ -394,7 +379,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		_follow_neck(neck, dt)
 
 ## 頭が落ちた：首の残骸を破片にして飛ばし、生え直す時間を決める。
-## 1本の線でまとめて落とした本数が多いほど、生え直しが少しだけ遅くなる。火で落ちた頭は次の段階まで生え直さない。
+## 同じ線で倒した本数と、火の命中に応じて再生待ち時間を延長する。
 func _on_head_lost(neck: Neck) -> void:
 	var p: Dictionary = def.params
 	var head := neck.row
@@ -437,73 +422,6 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 		neck.base_angle * 2.4, _time, dt, def.params)
 	if not separated: NECK_CHAIN.keep_outside(neck.segs,table.pos[body],table.r[body])
 
-# ── 不死の首 ──────────────────────────────────────────────────────
-
-## 普段の頭を全部落とすと不死の首が露出し、貫くと次の段階へ進む。
-func _try_expose() -> void:
-	if exposed_t > 0.0 or _expose_cd > 0.0 or _awaiting_regrowth or necks.is_empty(): return
-	for neck in necks:
-		if _alive(neck): return
-	_expose()
-
-func _tick_immortal(dt: float) -> void:
-	var p: Dictionary = def.params
-	if exposed_t <= 0.0:
-		_try_expose()
-		return
-	exposed_t -= dt
-	var lost := not (manager.enemies.is_same(immortal_row, immortal_id) and table.dead[immortal_row] == 0)
-	if not lost:
-		var a := (run_state.ship_pos - table.pos[body]).angle()
-		var at := table.pos[body] + Vector2.from_angle(a) * (table.r[body] + float(p.neck_rest) * 0.8)
-		table.pos[immortal_row] = at
-		NECK_CHAIN.update(immortal_segs, table.pos[body], at, table.r[body] + float(p.neck_rest) * 0.8,
-			1.2, _time, dt, p)
-		_immortal_attack(dt)
-	if lost or exposed_t <= 0.0:
-		_finish_exposure(lost)
-
-func _finish_exposure(pierced: bool) -> void:
-	var row := immortal_row
-	immortal_row = -1
-	exposed_t = 0.0
-	_expose_cd = 0.0
-	_awaiting_regrowth = false
-	if row >= 0 and manager.enemies.is_same(row, immortal_id) and table.dead[row] == 0:
-		manager.enemies.mark_dead(row)
-	if pierced:
-		interrupt_tech()
-		run_state.emit(&"boss_hit", {"pos": table.pos[body]})
-		if count == 9:
-			table.hp[body] = 0.0
-		else:
-			_set_count(count + 2)
-			table.hp[body] = table.max_hp[body] * (11.0 - count) / 8.0
-			table.flash[body] = 0.3
-	else:
-		# 失敗直後にも通常の猶予を残す。再生が済むまで次の露出の判定を待つ。
-		_expose_cd = float(def.params.regrow)
-		for neck in necks:
-			if not neck.burned:
-				neck.regrow = float(def.params.regrow)
-				_awaiting_regrowth = true
-
-func _expose() -> void:
-	interrupt_tech()
-	var p: Dictionary = def.params
-	exposed_t = float(p.expose_time)
-	var j := manager.enemies.spawn_part(body, manager.enemies.def_of(&"hydra_immortal"), table.pos[body])
-	var hp := float(p.head_hp) * manager.cfg.enemy_hp_mult
-	table.max_hp[j] = hp
-	table.hp[j] = hp
-	table.gate[j] = EnemyTable.Gate.IMMORTAL
-	immortal_row = j
-	immortal_id = table.id[j]
-	immortal_segs.clear()
-	_cue(&"exposed", &"immortal", -2)
-	run_state.emit(&"text", {"pos": table.pos[body] + Vector2(0, -table.r[body] - 40.0), "text": "!", "color": Color("#ffe46b"), "size": 48})
-
-
 func normal_ready(index: int, attack: StringName) -> bool:
 	if index < 0 or index >= necks.size() or not def.params.normal_rules.has(attack): return false
 	var n := necks[index]
@@ -517,13 +435,17 @@ func normal_ready(index: int, attack: StringName) -> bool:
 	if not separated and absf(angle_difference(n.base_angle+table.facing[body],(run_state.ship_pos-_neck_base(n)).angle())) > 1.25: return false
 	var used := 0.0
 	for other in necks:
-		if def.params.normal_rules.has(other.mode): used += float(def.params.normal_rules[other.mode].cost)
-	return used + float(rule.cost) <= float(def.params.normal_budget)
+		if def.params.normal_rules.has(other.mode): used += float(def.params.normal_rules[other.mode].cost)*maxf(0.0,table.attack_value[other.row])
+	return used + float(rule.cost)*maxf(0.0,table.attack_value[n.row]) <= float(def.params.normal_budget)
 
 func start_normal(index: int, attack: StringName) -> bool:
 	if not normal_ready(index,attack): return false
 	var n := necks[index]
-	if not manager.admit("neck:"+str(n.row_id),["dash"],n.row,4.0): return false
+	var director=manager.projectiles.director
+	if director!=null:
+		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
+		var cost: float=float(def.params.normal_rules[attack].cost)*maxf(0.0,table.attack_value[n.row])
+		if not director.request("neck:"+str(n.row_id),cats,n.row,n.row_id,4.0,table.attack_priority[n.row],cost):return false
 	n.mode = attack
 	n.t = 0.0
 	n.locked = false
@@ -552,7 +474,9 @@ func position_head(index: int, dt: float) -> void:
 		SNAKE.steer(n,desired,dt,def.params)
 		return
 	var facing := n.base_angle+table.facing[body]
-	n.angle = lerp_angle(n.angle,facing+sin(_time+n.base_angle)*0.15,minf(1.0,dt*2.0))
+	var aim: float=(run_state.ship_pos-_neck_base(n)).angle()
+	var defend: float=facing+clampf(angle_difference(facing,aim),-0.8,0.8)
+	n.angle = lerp_angle(n.angle,defend+sin(_time+n.base_angle)*0.06,minf(1.0,dt*2.0))
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
 
 # ── 首の攻撃（各首の種類ごと） ──────────────────────────────────────
@@ -560,61 +484,14 @@ func position_head(index: int, dt: float) -> void:
 ## 首の攻撃の更新。普段は機体の方へゆらゆら向き、間隔ごとに種類ごとの2つの攻撃のどちらかを出す。
 ## 普段の首の攻撃は予告しない（噛みつきの引き・ビームの溜めなど、首の動きと光で見せる）。
 func _attack(neck: Neck, _k: int, dt: float) -> void:
-	var p: Dictionary = def.params
-	var owner := "neck:" + str(neck.row_id)
-	if manager.projectiles.director != null:
-		manager.projectiles.lab_context = manager.projectiles.director.token(owner)
-	var aim := (run_state.ship_pos - _neck_base(neck)).angle()
-	if neck.mode == &"idle":
-		# 旧追尾首は弱点として残す。追尾弾は発射しない。
-		if neck.kind == &"homing" or chance_t > 0.0 or growth_t > 0.0 or recovery_t > 0.0:
-			return
-		var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
-		var home := neck.base_angle + table.facing[body] + sway
-		neck.angle = lerp_angle(neck.angle, lerp_angle(home, aim, 0.35), minf(1.0, dt * 2.0))
-		neck.length = move_toward(neck.length, float(p.neck_rest), float(p.neck_rest) * dt * 2.0)
-		neck.glow = maxf(0.0, neck.glow - dt * 3.0)
-		neck.cd -= dt
-		if neck.cd <= 0.0 and not busy and table.pos[body].distance_to(run_state.ship_pos) < float(p.engage) * 1.3:
-			var cats: Array = {&"bite": ["dash"], &"vortex": ["wave"], &"debris": ["aimed"], &"beam": ["beam"], &"homing": ["homing"]}.get(neck.kind, ["aimed"])
-			if not manager.admit(owner, cats, neck.row, 5.0):
-				return
-			neck.cd = float(p.attack_cd) * (0.8 + 0.4 * run_state.rng.randf())
-			neck.step = 0
-			neck.mode = StringName(String(neck.kind) + ("_a" if run_state.rng.randf() < 0.5 else "_b"))
-			neck.t = 0.0
-			_cue(&"warning_started", neck.mode, necks.find(neck))
-		return
-	neck.t += dt
+	neck.t+=dt
 	match neck.mode:
 		&"tech_aim":
-			var direction := (neck.target - _neck_base(neck)).angle()
-			neck.angle = lerp_angle(neck.angle, direction, minf(1.0, dt * 6.0))
-			neck.length = move_toward(neck.length, float(p.neck_rest) * 0.35, float(p.neck_rest) * dt * 2.0)
-			neck.glow = minf(1.0, neck.glow + dt * 1.5)
-		&"tech_lunge":
-			_north_step(neck, minf(1.0, neck.t / _north_duration), dt)
-		&"tech_charge":
-			neck.length = move_toward(neck.length, float(p.neck_rest) * 1.25, float(p.neck_rest) * dt)
-			neck.angle = lerp_angle(neck.angle, neck.sweep, minf(1.0, dt * 4.0))
-			neck.glow = minf(1.0, neck.glow + dt)
-		&"tech_beam":
-			neck.angle += neck.sweep * dt
-			neck.glow = 1.0
-			if neck.hazard >= 0:
-				manager.projectiles.move_hazard(neck.hazard, _head_pos(neck), neck.angle)
-		&"tech_hold":
-			pass
-		&"bite_a", &"bite_b":
-			_bite(neck, aim, dt)
-		&"vortex_a", &"vortex_b":
-			_vortex(neck, aim, dt)
-		&"debris_a", &"debris_b":
-			_debris(neck, aim, dt)
-		&"beam_a", &"beam_b":
-			_beam(neck, aim, dt)
-		_:
-			neck.mode = &"idle"
+			var direction: float=(neck.target-_neck_base(neck)).angle()
+			neck.angle=lerp_angle(neck.angle,direction,minf(1.0,dt*6.0))
+			neck.length=move_toward(neck.length,float(def.params.neck_rest)*0.35,float(def.params.neck_rest)*dt*2.0)
+			neck.glow=minf(1.0,neck.glow+dt*1.5)
+		&"tech_lunge":_north_step(neck,minf(1.0,neck.t/_north_duration),dt)
 
 func _end(neck: Neck, interrupted := false) -> void:
 	# 伸びた頭をその場に残し、攻めどきが終わってから通常の長さへ戻す。
@@ -635,139 +512,15 @@ func _end(neck: Neck, interrupted := false) -> void:
 	neck.step = 0
 	neck.glow = 0.0
 
-## 噛みつく首。a：首を後ろに引いてから、前へ大きく伸びて噛みつく。噛みついた直後は伸びきって止まる。
-## b：短く3回、続けて噛みつきながら前へ出てくる。
-func _bite(neck: Neck, aim: float, dt: float) -> void:
-	var p: Dictionary = def.params
-	var rest := float(p.neck_rest)
-	var reach := float(p.bite_reach)
-	var multi := neck.mode == &"bite_b"
-	var pull_t := 0.3 if multi else 0.6
-	var lunge_t := 0.1 if multi else 0.14
-	var hold_t := 0.25 if multi else 0.9
-	var phase_t := pull_t + lunge_t + hold_t
-	var local := neck.t - neck.step * phase_t
-	if local < pull_t:
-		# 引く
-		neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 6.0))
-		neck.length = move_toward(neck.length, rest * 0.55, rest * dt * 2.5)
-		neck.glow = local / pull_t
-	elif local < pull_t + lunge_t:
-		var target := rest + (reach - rest) * ((neck.step + 1) / 3.0 if multi else 1.0)
-		neck.length = move_toward(neck.length, target, (target - rest * 0.5) * dt / lunge_t * 1.2)
-		neck.glow = 1.0
-		if local + dt >= pull_t + lunge_t:
-			manager.projectiles.fire_zone(_head_pos(neck), float(p.bite_radius), 0.0, float(p.bite_dmg),
-				ProjectileManager.HazardStyle.PLAIN, Color("#ff7a5a"))
-			_cue(&"attack_started", neck.mode, necks.find(neck))
-	elif local < phase_t:
-		neck.glow = 0.0
-	else:
-		neck.step += 1
-		if not multi or neck.step >= 3:
-			_end(neck)
-
-## 渦の首。a：渦を巻く息を吐き、ボスの周りに渦を1つ置く。b：息を長く吐きながら首を振り、渦を3つ並べて置く。
-func _vortex(neck: Neck, aim: float, dt: float) -> void:
-	var p: Dictionary = def.params
-	var multi := neck.mode == &"vortex_b"
-	neck.angle = lerp_angle(neck.angle, aim + (sin(neck.t * 2.0) * 0.9 if multi else 0.0), minf(1.0, dt * 3.0))
-	neck.glow = minf(1.0, neck.t / 0.5)
-	var times := [0.5, 1.0, 1.5] if multi else [0.5]
-	if neck.step < times.size() and neck.t >= times[neck.step]:
-		neck.step += 1
-		var at := _head_pos(neck) + Vector2.from_angle(neck.angle) * float(p.vortex_radius) * 0.8
-		manager.field.add_well(at, float(p.vortex_life), float(p.vortex_radius), float(p.vortex_pull))
-		_cue(&"attack_started", neck.mode, necks.find(neck))
-	if neck.t >= times[times.size() - 1] + 0.4:
-		_end(neck)
-
-## 瓦礫の首。a：鉄の瓦礫を吐き出し、ほかの首の周りに漂わせる（当たると弾かれる。少しすると消える）。
-## b：瓦礫を固めて塊にし、投げつける。
-func _debris(neck: Neck, aim: float, dt: float) -> void:
-	var p: Dictionary = def.params
-	neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 3.0))
-	neck.glow = minf(1.0, neck.t / 0.6)
-	if neck.t < 0.6:
-		return
-	_cue(&"attack_started", neck.mode, necks.find(neck))
-	if neck.mode == &"debris_a":
-		spit_rubble(neck, int(p.rubble_count))
-	else:
-		manager.projectiles.fire_lump(neck.row, aim, float(p.lump_speed), float(p.lump_r), float(p.lump_dmg))
-	_end(neck)
-
-## 瓦礫を n 個吐き出し、ほかの首の頭の周りに漂わせる。
-func spit_rubble(neck: Neck, n: int) -> void:
-	var rubble := manager.enemies.def_of(&"hydra_rubble")
-	var heads: Array[Vector2] = []
-	for other in necks:
-		if other != neck and _alive(other):
-			heads.append(_head_pos(other))
-	if heads.is_empty():
-		heads.append(table.pos[body])
-	for k in n:
-		var around: Vector2 = heads[k % heads.size()]
-		var at := around + Vector2.from_angle(run_state.rng.randf() * TAU) * run_state.rng.randf_range(70.0, 160.0)
-		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
-		table.vel[j] = (at - table.pos[j]) * 1.2
-
-## ビームの首。a：首を高く持ち上げて光を溜め、首を振りながら太いビームで本体の周りを薙ぐ。
-## b：細いビームを、機体の方へ3回続けて撃つ。
-func _beam(neck: Neck, aim: float, dt: float) -> void:
-	var p: Dictionary = def.params
-	if neck.mode == &"beam_b":
-		neck.angle = lerp_angle(neck.angle, aim, minf(1.0, dt * 4.0))
-		neck.glow = 0.6
-		var times := [0.2, 0.8, 1.4]
-		if neck.step < 3 and neck.t >= times[neck.step]:
-			neck.step += 1
-			var from := _head_pos(neck)
-			manager.projectiles.fire_beam(from, (run_state.ship_pos - from).angle(), float(p.beam_len), 14.0, 0.45, 0.25,
-				float(p.beam_dmg) * 0.7)
-			_cue(&"attack_started", neck.mode, necks.find(neck), {"damage_delay": 0.45})
-		if neck.t >= 2.2:
-			_end(neck)
-		return
-	var charge := 1.0
-	var sweep := 1.6
-	if neck.t < charge:
-		# 首を高く持ち上げて光を溜める
-		neck.length = move_toward(neck.length, float(p.neck_rest) * 1.25, float(p.neck_rest) * dt)
-		neck.angle = lerp_angle(neck.angle, aim - 1.1, minf(1.0, dt * 3.0))
-		neck.glow = neck.t / charge
-		return
-	if neck.hazard < 0:
-		neck.step = 0
-		neck.hazard = manager.projectiles.fire_beam(_head_pos(neck), neck.angle, float(p.beam_len), 40.0, 0.0, sweep,
-			float(p.beam_dmg))
-		manager.projectiles.attach_hazard(neck.hazard, neck.row)
-		_cue(&"attack_started", neck.mode, necks.find(neck))
-	neck.angle += 2.2 / sweep * dt
-	neck.glow = 1.0
-	if neck.hazard >= 0:
-		manager.projectiles.move_hazard(neck.hazard, _head_pos(neck), neck.angle)
-	if neck.t >= charge + sweep:
-		_release_attack(neck)
-		_end(neck)
-
 ## 首の攻撃の後片付け（頭が落ちたとき）。
 func _release_attack(neck: Neck) -> void:
+	if manager.projectiles.director!=null and not _alive(neck):manager.projectiles.director.cancel_attack("neck:"+str(neck.row_id),neck.row_id)
 	if attack_field != null: attack_field.remove_owner(neck.row)
 	if neck.hazard >= 0:
 		if manager.projectiles.owns_hazard(neck.hazard, neck.row, neck.row_id):
 			manager.projectiles.release_hazard(neck.hazard)
 		neck.hazard = -1
 	neck.glow = 0.0
-
-## むき出しの不死の首：周りへ短い衝撃を出して暴れる。
-func _immortal_attack(dt: float) -> void:
-	var p: Dictionary = def.params
-	_shock_t -= dt
-	if _shock_t <= 0.0:
-		_shock_t = 0.9
-		manager.projectiles.fire_wave(table.pos[immortal_row], 0.0, PI, float(p.shock_radius), 700.0, 24.0, 0.0,
-			float(p.bite_dmg) * 0.6, 0.0, 0.0, Color("#ffd27a"))
 
 # ── 強めの技（判断の層とタイムラインから呼ばれる） ────────────────────────
 
@@ -781,7 +534,7 @@ func _update_blackboard() -> void:
 		if _alive(neck): counts[neck.kind] = int(counts.get(neck.kind, 0)) + 1
 	bb.set_var(&"live_heads", counts)
 	bb.set_var(&"neck_count", count)
-	bb.set_var(&"exposed", exposed_t > 0.0)
+	bb.set_var(&"exposed", false)
 	bb.set_var(&"recovering", recovery_t > 0.0)
 
 ## 条件評価は読み取りだけ。攻撃枠は選択後に取得する。
@@ -808,7 +561,8 @@ func combo_heads(kinds: Array) -> Array[Neck]:
 func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if busy or not attack_ready(attack):
 		return false
-	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
+	if not timeline.has_animation(attack):return false
+	if manager.projectiles.director!=null and not manager.projectiles.director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(def.params.major_cost)):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
 	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
@@ -858,12 +612,6 @@ func _tech_ok(name: StringName) -> bool:
 			return not separated and count>=5 and (participants.size()==3 and participants.all(func(n):return _alive(n)) if busy else front_heads().size()==3)
 		&"north":
 			return not separated and count >= 5 and (participants.all(func(n):return _alive(n)) and participants.size()==3 if busy else front_heads().size()==3)
-		&"east":
-			return _count(&"debris") >= 1 and _count(&"beam") >= 1
-		&"south":
-			return false # 渦の壁と隙間の回避難度を決めてから接続する。
-		&"west":
-			return _count(&"beam") >= 2
 	return false
 
 func _count(kind: StringName) -> int:
@@ -929,7 +677,7 @@ func front_heads() -> Array[Neck]:
 	var ordered := necks.duplicate()
 	ordered.sort_custom(func(a,b):return absf(angle_difference(a.base_angle+table.facing[body],aim)) < absf(angle_difference(b.base_angle+table.facing[body],aim)))
 	for n in ordered:
-		if _alive(n) and absf(angle_difference(n.base_angle+table.facing[body],aim)) < float(def.params.north_half_angle):
+		if _alive(n) and absf(angle_difference(n.base_angle+table.facing[body],aim)) < float(def.params.north_half_angle)+PI/float(count):
 			result.append(n)
 		if result.size()==3: break
 	return result
@@ -981,49 +729,6 @@ func north_follow() -> void:
 		if neck.mode == &"tech_lunge":
 			_north_step(neck, 1.0, _sim_dt)
 
-## 東：砕ける瓦礫。瓦礫の首が本体の周りに瓦礫を漂わせたあと、ビームの首が薙ぎ払う。
-## ビームに当たった瓦礫は砕けて、破片（敵の弾）が四方へ飛び散る。
-func east_debris() -> void:
-	var neck := _first(&"debris")
-	if neck == null:
-		return
-	var rubble := manager.enemies.def_of(&"hydra_rubble")
-	for k in 10:
-		var at := table.pos[body] + Vector2.from_angle(TAU * k / 10.0 + run_state.rng.randf() * 0.3) * run_state.rng.randf_range(300.0, 480.0)
-		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-2.0, 2.0)})
-		table.vel[j] = (at - table.pos[j]) * 1.2
-		_rubble.append(Vector2i(j, table.id[j]))
-
-func east_charge() -> void:
-	var aim := (run_state.ship_pos - table.pos[body]).angle()
-	for neck in necks:
-		if neck.kind == &"beam" and _alive(neck):
-			neck.mode = &"tech_charge"
-			neck.sweep = aim - 1.1
-
-func east_sweep() -> void:
-	_cue(&"attack_started")
-	for neck in necks:
-		if neck.kind == &"beam" and _alive(neck):
-			_start_sweep(neck, 2.2 / 1.8, 1.9)
-
-## ビームに当たった瓦礫を砕く。
-func _shatter_on_beams() -> void:
-	var p: Dictionary = def.params
-	for neck in necks:
-		if neck.mode != &"tech_beam" or neck.hazard < 0:
-			continue
-		var a := _head_pos(neck)
-		var b := a + Vector2.from_angle(neck.angle) * float(p.beam_len)
-		for k in range(_rubble.size() - 1, -1, -1):
-			var j := _rubble[k].x
-			if not manager.enemies.is_same(j, _rubble[k].y) or table.dead[j] != 0:
-				_rubble.remove_at(k)
-				continue
-			if Geometry2D.get_closest_point_to_segment(table.pos[j], a, b).distance_to(table.pos[j]) < table.r[j] + 20.0:
-				_burst_rubble(j, (table.pos[j] - a).normalized())
-				_rubble.remove_at(k)
-
 ## 瓦礫を砕き、破片を飛ばす。from が 0 でなければ、その向きを中心に飛ばす。
 func _burst_rubble(j: int, from: Vector2) -> void:
 	var p: Dictionary = def.params
@@ -1032,63 +737,6 @@ func _burst_rubble(j: int, from: Vector2) -> void:
 		manager.projectiles.fire_enemy(j, base + (k - 2.5) * (0.45 if from != Vector2.ZERO else TAU / 6.0),
 			float(p.shard_speed), &"bullet", {"bullet_dmg": float(p.shard_dmg)})
 	manager.enemies.mark_dead(j)
-
-## 南：瓦礫の渦。渦の首が機体の方に大きな渦を置いたあと、瓦礫の首が瓦礫を吐く。
-## 瓦礫は渦に吸い込まれて回り、渦が消えるときに外へ飛び散る。
-func south_vortex() -> void:
-	var p: Dictionary = def.params
-	var neck := _first(&"vortex")
-	if neck == null:
-		return
-	var d := run_state.ship_pos - table.pos[body]
-	_vortex_at = table.pos[body] + d.normalized() * minf(d.length(), 520.0)
-	manager.field.add_well(_vortex_at, 3.4, float(p.vortex_radius) * 1.3, float(p.vortex_pull) * 1.3)
-	neck.glow = 1.0
-
-func south_debris() -> void:
-	var neck := _first(&"debris")
-	if neck == null:
-		return
-	var rubble := manager.enemies.def_of(&"hydra_rubble")
-	for k in 8:
-		var j := manager.enemies.spawn(rubble, _head_pos(neck), {"spin": run_state.rng.randf_range(-3.0, 3.0)})
-		var to := _vortex_at + Vector2.from_angle(run_state.rng.randf() * TAU) * 120.0
-		table.vel[j] = (to - table.pos[j]) * 0.9
-		_rubble.append(Vector2i(j, table.id[j]))
-
-func south_burst() -> void:
-	for r in _rubble:
-		if manager.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
-			_burst_rubble(r.x, (table.pos[r.x] - _vortex_at).normalized())
-	_rubble.clear()
-
-## 西：はさみ薙ぎ。2本のビームの首が、左右から同時に薙ぎ払い、間を閉じるように振る。
-func west_charge() -> void:
-	var aim := (run_state.ship_pos - table.pos[body]).angle()
-	var side := -1.0
-	for neck in necks:
-		if neck.kind == &"beam" and _alive(neck):
-			neck.mode = &"tech_charge"
-			neck.sweep = aim + side * 1.4
-			side = -side
-
-func west_sweep() -> void:
-	_cue(&"attack_started")
-	var aim := (run_state.ship_pos - table.pos[body]).angle()
-	for neck in necks:
-		if neck.mode == &"tech_charge":
-			var rate := -signf(Geom.angle_diff(neck.angle, aim)) * 1.3 / 1.6
-			_start_sweep(neck, rate, 1.7)
-
-## 首を振りながら太いビームを出す。
-func _start_sweep(neck: Neck, rate: float, time: float) -> void:
-	var p: Dictionary = def.params
-	neck.mode = &"tech_beam"
-	neck.sweep = rate
-	neck.hazard = manager.projectiles.fire_beam(_head_pos(neck), neck.angle, float(p.beam_len), 40.0, 0.0, time,
-		float(p.beam_dmg))
-	manager.projectiles.attach_hazard(neck.hazard, neck.row)
-	_cue(&"attack_started", tech, necks.find(neck))
 
 ## 判定タイムラインの実行キーから予告の長さを読む。演出専用のタイマーを正にしない。
 func _timeline_key_time(name: StringName, method: StringName) -> float:
@@ -1102,7 +750,7 @@ func _timeline_key_time(name: StringName, method: StringName) -> float:
 	return 0.0
 
 func _warning_duration(name: StringName) -> float:
-	var method: StringName = {&"sequence": &"special_attack", &"curve": &"special_attack", &"north": &"north_burst", &"east": &"east_sweep", &"west": &"west_sweep"}.get(name, &"")
+	var method: StringName=&"north_burst" if name==&"north" else &"special_attack"
 	return maxf(0.0, _timeline_key_time(name, method) - _timeline_key_time(name, &"tech_compass"))
 
 ## -1 は本体、-2 は不死首、0 以上は通常首の配列の添字。戻り値はワールド座標。
@@ -1124,7 +772,7 @@ func presentation_targets() -> Array[Dictionary]:
 	return targets
 
 func presentation_state() -> Dictionary:
-	return {"technique": tech, "busy": busy, "neck_count": count, "exposed": exposed_t > 0.0,
+	return {"technique": tech, "busy": busy, "neck_count": count, "exposed": false,
 		"north_aiming": north_aiming, "north_target": north_target, "recovery": recovery_t, "defeated": _defeat_announced, "world_time": _time}
 
 func _cue(cue: StringName, attack: StringName = &"", index := -1, details := {}) -> void:
@@ -1152,8 +800,6 @@ func draw_on(c: CanvasItem) -> void:
 	for neck in necks:
 		if neck.row >= 0 or neck.length > 0.0:
 			_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
-	if exposed_t > 0.0:
-		_draw_neck(c, immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
 	if separated:
 		if immortal_neck!=null:
 			_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)

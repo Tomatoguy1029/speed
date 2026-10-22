@@ -12,6 +12,8 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"formation_timeout": 12.0,
+"major_cost": 1.0,
 "grid_minimum": 3,
 "grid_clearance": 12.0,
 "grid_tolerance": 6.0,

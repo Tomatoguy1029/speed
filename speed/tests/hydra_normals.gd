@@ -15,6 +15,15 @@ func _ready() -> void:
 		var n = boss.necks[0]
 		n.cd = 0.0
 		check(boss.normal_ready(0, &"bite_thrust"), "front player can be bitten")
+		boss.table.attack_value[n.row]=4.0
+		check(not boss.normal_ready(0,&"bite_thrust"),"per-head attack value contributes to Hydra normal budget")
+		boss.table.attack_value[n.row]=1.0
+		var director=lab.run.projectiles.director
+		director.formation_mode=true
+		director.configure({"enabled":true,"budget":0.1,"jitter":0.0})
+		check(not boss.start_normal(0,&"bite_thrust"),"formation mode still obeys global attack budget")
+		director.configure({"enabled":false})
+		director.formation_mode=false
 		var waiting: int = lab.run.projectiles.director.waiting.size()
 		boss.normal_ready(0, &"bite_thrust")
 		check(lab.run.projectiles.director.waiting.size() == waiting, "eligibility has no reservation side effect")

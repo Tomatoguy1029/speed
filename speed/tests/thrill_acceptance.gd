@@ -167,20 +167,20 @@ func _check(ok: bool, label: String) -> void:
 
 func _test_fire_regrowth() -> void:
 	run.bosses.spawn()
-	var boss = run.bosses.actor
-	var t := run.enemies.table
-	run.state.world_time = 10.0
+	var boss=run.bosses.actor
+	boss.hsm.set_active(false)
+	run.state.world_time=10.0
 	for neck in boss.necks:
-		run.combat.damage_enemy(neck.row, t.hp[neck.row] + 1.0, {"cause": &"fire", "no_crit": true})
-	boss.sim_tick(0.01, 0.01)
-	_check(boss.exposed_t > 0.0, "全頭を落とすと不死の首が現れる")
-	_check(boss.necks.all(func(n): return n.burned), "火で落とした頭は再生が止まる")
-	boss._tick_immortal(float(boss.def.params.expose_time) + 0.1)
-	boss.sim_tick(1.0, 1.0)
-	_check(boss.necks.all(func(n): return n.row < 0 and n.burned), "不死の首の露出が終わっても焼いた頭は次段階まで戻らない")
-	t.hp[boss.body] = t.max_hp[boss.body] * 0.74
-	boss.sim_tick(0.01, 0.01)
-	_check(boss.count == 5 and boss.necks.all(func(n): return n.row >= 0 and not n.burned), "次段階で焼いた頭も戻り、新しい首が加わる")
+		run.combat.damage_enemy(neck.row,100000.0,{"cause":&"fire","no_crit":true})
+	run.enemies.cleanup()
+	boss.sim_tick(0.01,0.01)
+	_check(boss.chance_t>0.0,"全頭を倒すと中央のチャンスタイムになる")
+	_check(boss.necks.all(func(n):return n.burned and n.regrow>float(boss.def.params.regrow)),"火は倒れた頭の再生待ち時間を延ばす")
+	boss.sim_tick(float(boss.def.params.chance_time)+0.1,float(boss.def.params.chance_time)+0.1)
+	_check(boss.necks.all(func(n):return boss._alive(n)),"全頭ダウンのチャンスタイム後は頭が戻る")
+	run.enemies.table.hp[boss.body]=run.enemies.table.max_hp[boss.body]*0.74
+	boss.sim_tick(0.01,0.01)
+	_check(boss.count==5 and boss.necks.all(func(n):return boss._alive(n) and not n.burned),"HP段階の増加は全首を回復する")
 
 func _enemy(type: StringName, at: Vector2) -> int:
 	return run.enemies.spawn(run.enemies.def_of(type), at)
@@ -288,6 +288,7 @@ func _advance_enemies(seconds: float) -> Dictionary:
 	var peaks := {"hazards": 0, "hostile": 0, "wells": 0}
 	for k in ceili(seconds / 0.05):
 		run.state.world_time += 0.05
+		run.projectiles.director.advance(run.state.world_time,run.enemies)
 		run.enemies.tick(0.05, 0.05)
 		run.combat.rebuild_grid()
 		run.projectiles.tick(0.05, 0.05)
@@ -648,22 +649,16 @@ func _test_landmarks() -> void:
 
 func _test_immortal_hit() -> void:
 	run.bosses.spawn()
-	var boss = run.bosses.actor
-	var t := run.enemies.table
-	run.state.stats.crit_chance = 0.0
-	run.state.world_time = 10.0
-	for neck in boss.necks:
-		run.combat.damage_enemy(neck.row, 1000, {"cause": &"shot", "no_crit": true})
-	boss.sim_tick(0.01, 0.01)
-	boss.sim_tick(0.01, 0.01)
-	var immortal: int = boss.immortal_row
-	var head_hp: float = t.hp[immortal]
-	run.combat.damage_enemy(immortal, 1e6, {"cause": &"fire", "no_crit": true})
-	_check(t.hp[immortal] == head_hp, "タスク20・23：不死の首は火で焼けない")
-	var body_hp: float = t.hp[boss.body]
-	_ram(t.pos[immortal], Vector2.RIGHT)
-	boss.sim_tick(0.01, 0.01)
-	_check(t.hp[boss.body] <= body_hp - t.max_hp[boss.body] * float(boss.def.params.immortal_dmg) + 0.01, "タスク20：不死の首を一度貫くと本体へ大きなダメージ")
+	var boss=run.bosses.actor
+	boss.hsm.set_active(false)
+	var t:=run.enemies.table
+	run.combat.damage_enemy(boss.body,100000.0,{"cause":&"shot","no_crit":true})
+	for i in 100:boss.sim_tick(0.05,0.05)
+	_check(boss.separated and boss.immortal_row>=0 and not run.state.boss_dead,"中央破壊は勝利ではなく蛇の分離へ進む")
+	var row: int=boss.immortal_row
+	var before: float=t.hp[row]
+	run.combat.damage_enemy(row,10.0,{"cause":&"fire","no_crit":true})
+	_check(t.hp[row]<before,"護衛が残っていても不死の蛇へ通常ダメージが通る")
 
 func _living_type(type: StringName) -> int:
 	var count := 0
@@ -678,6 +673,14 @@ func _quiet_heads(boss) -> void:
 	boss.timeline.stop()
 	boss.tech_end()
 	boss._tech_cd = 1e6
+	boss.combo_wait=1e6
+	boss.hsm.set_active(false)
+	boss.attack_field.clear_effects()
+	var director=run.projectiles.director
+	director.groups.clear()
+	director.owners.clear()
+	director.waiting.clear()
+	director.configure({"enabled":true,"budget":4.0,"jitter":0.0})
 	for neck in boss.necks:
 		boss._release_attack(neck)
 		boss._end(neck)
@@ -698,6 +701,7 @@ func _advance_boss(seconds: float, place_rubble_on_beam := false) -> Dictionary:
 	for tick in ceili(seconds / 0.05):
 		_resume_for_check()
 		run.state.world_time += 0.05
+		run.projectiles.director.advance(run.state.world_time,run.enemies)
 		run.enemies.tick(0.05, 0.05)
 		if place_rubble_on_beam:
 			for neck in boss.necks:
@@ -709,7 +713,7 @@ func _advance_boss(seconds: float, place_rubble_on_beam := false) -> Dictionary:
 		boss.sim_tick(0.05, 0.05)
 		if boss.timeline.is_playing():
 			await get_tree().process_frame
-		peak.hazards = maxi(peak.hazards, run.projectiles.hazard_count())
+		peak.hazards = maxi(peak.hazards, run.projectiles.hazard_count()+boss.attack_field.effects.size())
 		peak.hostile = maxi(peak.hostile, run.projectiles.hostile_count())
 		peak.wells = maxi(peak.wells, run.field.wells.size())
 		peak.rubble = maxi(peak.rubble, _living_type(&"hydra_rubble"))
@@ -721,85 +725,55 @@ func _advance_boss(seconds: float, place_rubble_on_beam := false) -> Dictionary:
 
 func _test_hydra_attacks() -> void:
 	run.bosses.spawn()
-	var boss = run.bosses.actor
-	var t := run.enemies.table
-	var s := run.state
-	t.pos[boss.body] = Vector2(-2000, -2000)
-	s.ship_pos = t.pos[boss.body] + Vector2(400, 0)
-	s.view_center = s.ship_pos
-	s.enemy_aim = s.ship_pos
-	run.ship.invincible = true
+	var boss=run.bosses.actor
+	var t:=run.enemies.table
 	_quiet_heads(boss)
-	var hp: float = t.hp[boss.body]
-	_ram(t.pos[boss.body], Vector2.RIGHT)
-	run.combat.damage_enemy(boss.body, 1e6, {"cause": &"shot", "no_crit": true})
-	_check(t.hp[boss.body] == hp, "タスク20：本体には体当たりも武器も通らない")
-	s.ship_pos = t.pos[boss.body] + Vector2(400, 0)
-	var first = boss.necks[0]
-	run.combat.damage_enemy(first.row, 10.0, {"cause": &"shot", "no_crit": true})
-	boss.sim_tick(0.01, 0.01)
-	_check(is_equal_approx(t.hp[boss.body], hp - 10.0 * float(boss.def.params.head_share)), "タスク20：頭のダメージが本体の体力を削る")
-	run.combat.damage_enemy(first.row, 1e6, {"cause": &"shot", "no_crit": true})
-	boss.sim_tick(0.01, 0.01)
-	_check(first.row < 0 and run.projectiles.friend_count() > 0, "タスク20・21：落とした頭の首は破片になる")
-	await _advance_boss(float(boss.def.params.regrow) + 0.1)
-	_check(first.row >= 0, "タスク20：焼いていない頭は時間で生え直す")
-	for entry in [[0.74, 5], [0.49, 7], [0.24, 9]]:
-		t.hp[boss.body] = t.max_hp[boss.body] * entry[0]
-		boss.sim_tick(0.01, 0.01)
-		_check(boss.count == entry[1], "タスク20：体力段階で首が%d本になる" % entry[1])
-	for kind in [&"bite", &"vortex", &"debris", &"beam", &"homing"]:
-		for variant in ["a", "b"]:
-			_quiet_heads(boss)
-			var neck = boss._first(kind)
-			neck.mode = StringName(String(kind) + "_" + variant)
-			var peak: Dictionary = await _advance_boss(4.0)
-			var did_attack: bool = peak.hazards > 0 or peak.hostile > 0 or peak.wells > 0 or peak.rubble > 0
-			_check(did_attack, "タスク21：%sの首の攻撃%s" % [kind, variant])
+	var before: float=t.hp[boss.body]
+	run.combat.damage_enemy(boss.body,1.0,{"cause":&"shot","no_crit":true})
+	_check(t.hp[boss.body]<before,"中央は通常の武器で直接削れる")
+	before=t.hp[boss.body]
+	run.combat.damage_enemy(boss.necks[0].row,1.0,{"cause":&"shot","no_crit":true})
+	_check(t.hp[boss.body]==before,"頭と中央は別のHPを持つ")
+	for entry in [[0.74,5],[0.39,8]]:
+		t.hp[boss.body]=t.max_hp[boss.body]*entry[0]
+		boss.sim_tick(0.01,0.01)
+		_check(boss.count==entry[1],"HP閾値で首が%d本になる"%entry[1])
+		boss.sim_tick(1.1,1.1)
+	t.hp[boss.body]=t.max_hp[boss.body]
+	for attack in boss.def.params.normal_rules:
+		_quiet_heads(boss)
+		var rule: Dictionary=boss.def.params.normal_rules[attack]
+		var n=boss._first(rule.kind)
+		t.facing[boss.body]=-n.base_angle
+		n.angle=0.0
+		n.length=float(boss.def.params.neck_rest)
+		run.state.ship_pos=boss._head_pos(n)+Vector2(170.0 if float(rule.min)==0.0 else 450.0,0)
+		run.state.view_center=run.state.ship_pos
+		n.cd=0.0
+		var started: bool=boss.start_normal(boss.necks.find(n),attack)
+		_check(started,"位置条件から通常技%sを開始"%attack)
+		var peak: Dictionary=await _advance_boss(3.5)
+		_check(peak.hazards+peak.hostile+peak.rubble>0,"通常技%sが実判定を出す"%attack)
 
 func _test_hydra_techniques() -> void:
-	var boss = run.bosses.actor
-	var t := run.enemies.table
-	_quiet_heads(boss)
-	boss._tech_cd = 0.0
-	boss.sim_tick(0.01, 0.01)
-	_check(boss.timeline.is_playing() and boss.tech != &"", "タスク22：Behavior Treeが条件を満たす技を自動で選ぶ")
-	for name in [&"north", &"east", &"south", &"west"]:
+	var boss=run.bosses.actor
+	var t:=run.enemies.table
+	for name in [&"north",&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer"]:
 		_quiet_heads(boss)
-		_check(boss._tech_ok(name), "タスク22：%sは必要な首がそろうと使える" % name)
-		boss.tech = name
-		boss.busy = true
-		boss.timeline.play(name)
-		boss.timeline.advance(0.0)
-		await get_tree().process_frame
-		_check(boss._spin_t > 0, "タスク22：%sの前に羅針盤が回る" % name)
-		var early: Dictionary = await _advance_boss(1.25)
-		await _shot("hydra_compass_" + String(name))
-		_check(absf(Geom.angle_diff(boss.compass_angle(), boss.TECH_DIR[name])) < 0.01, "タスク22：羅針盤が%sの方位で止まる" % name)
-		var late: Dictionary = await _advance_boss(5.0, name == &"east")
-		_check(early.hazards + early.hostile + early.wells + early.rubble + late.hazards + late.hostile + late.wells + late.rubble > 0, "タスク22：%sのタイムラインが攻撃を出す" % name)
-		var pattern_ok: bool = late.hostile >= 3 if name == &"north" else (late.hostile >= 6 if name == &"east" else (late.hostile >= 48 if name == &"south" else late.hazards >= 2))
-		_check(pattern_ok, "タスク22：%sの組み合わせの攻撃" % name)
-		_check(not boss.busy and not boss.timeline.is_playing(), "タスク22：%sが完了して通常攻撃へ戻る" % name)
-		_quiet_heads(boss)
-		boss.tech = name
-		boss.busy = true
-		boss.timeline.play(name)
-		boss.timeline.advance(0.0)
-		await get_tree().process_frame
-		_resume_for_check()
-		var kind: StringName = &"bite" if name == &"north" else (&"vortex" if name == &"south" else &"beam")
-		# 技が必要とする種類を落とす。西は2本必要なので、片方を落とすだけでよい。
-		for neck in boss.necks:
-			if neck.kind == kind and boss._alive(neck):
-				run.combat.damage_enemy(neck.row, 1e6, {"cause": &"shot", "no_crit": true})
-				if name == &"west":
-					break
-		boss.sim_tick(0.01, 0.01)
-		_check(not boss.busy and not boss.timeline.is_playing(), "タスク22：%sは必要な首を先に落とすと崩せる" % name)
-		boss._set_count(9)
-		# 次の技は同じ体力段階で確認する。
-		t.hp[boss.body] = t.max_hp[boss.body] * 0.24
+		boss._set_count(8)
+		t.hp[boss.body]=t.max_hp[boss.body]
+		t.facing[boss.body]=0.0
+		run.state.ship_pos=t.pos[boss.body]+Vector2(400,0)
+		run.state.view_center=run.state.ship_pos
+		boss._tech_cd=0.0
+		boss.combo_wait=0.0
+		boss.recovery_t=0.0
+		boss._tech_until.clear()
+		_check(boss.try_start_tech(name,1.0),"成立する参加者で%sを開始"%name)
+		var peak: Dictionary=await _advance_boss(5.0)
+		_check(peak.hazards+peak.hostile+peak.rubble>0,"大技%sのタイムラインが実判定を出す"%name)
+		_check(not boss.busy,"大技%sの終了後に攻めどきへ進む"%name)
+		await _shot("hydra_"+String(name))
 
 func _play_steps(count: int, dt: float) -> void:
 	for tick in count:
@@ -931,6 +905,7 @@ func _test_hydra_fire() -> void:
 				near_heads += 1
 				break
 	_check(near_heads > 60, "タスク23：火の隕石は雑魚が多くてもボスの頭に少し寄せる")
+	t.hp[head.row]=1.0
 	run.heroes.falls.append(Vector3(t.pos[head.row].x, t.pos[head.row].y, 0.01))
 	run.heroes.tick(0.02, 0.02)
 	boss.sim_tick(0.02, 0.02)
@@ -939,7 +914,7 @@ func _test_hydra_fire() -> void:
 			break
 		run.heroes.tick(0.26, 0.26)
 		boss.sim_tick(0.26, 0.26)
-	_check(head.row < 0 and head.burned, "タスク23：英雄の火の隕石と燃える跡で頭の再生を止める")
+	_check(head.row < 0 and head.burned, "英雄の火の隕石と燃える跡で頭を倒し再生を遅らせる")
 
 func _shot(label: String, redraw: CanvasItem = null) -> void:
 	if shots == "" or DisplayServer.get_name() == "headless":
@@ -997,7 +972,6 @@ func _test_head_world_steps() -> void:
 	var neck = boss.necks[0]
 	var old_row: int = neck.row
 	var hp: float = run.enemies.table.hp[boss.body]
-	var head_hp: float = run.enemies.table.hp[old_row]
 	var at := run.enemies.table.pos[old_row]
 	run.state.world_time = 10.0
 	run.combat.damage_enemy(old_row, 1000, {"cause": &"fire", "no_crit": true})
@@ -1006,5 +980,5 @@ func _test_head_world_steps() -> void:
 	run._play_tick(1.0 / 120.0)
 	_enemy(&"splitling", at + Vector2(500, 0))
 	run._play_tick(1.0 / 120.0)
-	_check(neck.row < 0 and neck.burned, "タスク20・23：世界更新の間に倒れた頭も、火による再生停止を保つ")
-	_check(is_equal_approx(run.enemies.table.hp[boss.body], hp - head_hp * float(boss.def.params.head_share)), "タスク20：行の解放と世界更新で頭のダメージを二重に数えない")
+	_check(neck.row < 0 and neck.burned, "タスク20・23：世界更新の間に倒れた頭も、火による再生遅延を保つ")
+	_check(is_equal_approx(run.enemies.table.hp[boss.body], hp), "タスク20：行の解放と世界更新で頭のダメージを二重に数えない")
