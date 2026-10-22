@@ -104,7 +104,7 @@ static func rubble(a: Node,n,dt: float) -> void:
 			launch_rubble(a,n,n.angle,float(p.lump_r))
 		else:
 			for i in int(p.rubble_count):
-				var angle := n.angle+float(p.rubble_spread)*(float(i)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)
+				var angle: float = n.angle+float(p.rubble_spread)*(float(i)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)
 				launch_rubble(a,n,angle,float(p.rubble_small_radius))
 		a._cue(&"attack_started",n.mode,a.necks.find(n))
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
