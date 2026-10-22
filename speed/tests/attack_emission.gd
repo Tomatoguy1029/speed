@@ -30,6 +30,12 @@ func _ready() -> void:
 		var beam: int = pr.emit_attack(&"beam", [Vector2.ZERO, 0.0, 100.0, 10.0, 0.2, 0.3, 4.0])
 		check(pr.hazard_len[beam] == 100.0 and pr.hazard_dmg[beam] == 4.0, "公開入口と同じビームを生成する")
 
+	var wave_shape = load("res://scripts/attacks/wave.gd").new()
+	check(wave_shape.has_method("spawn"), "波の種類が生成処理を持つ")
+	if wave_shape.has_method("spawn"):
+		var wave: int = pr.emit_attack(&"wave", [Vector2.ZERO, 0.0, PI, 300.0, 100.0, 20.0, 0.5, 4.0])
+		check(pr.hazard_active[wave] == 3.0 and pr.hazard_speed[wave] == 100.0, "波の到達時間と速度を維持する")
+
 	session.free()
 	await get_tree().process_frame
 	print("[attack_emission] %d failures" % failed)

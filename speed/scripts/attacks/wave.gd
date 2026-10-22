@@ -35,3 +35,8 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 		if ps.state.phase != RunState.Phase.PLAY:
 			return false
 	return true
+
+func spawn(ps: ProjectileSystem, center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
+		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
+	return ps._add_hazard(ProjectileSystem.HazardKind.WAVE, ProjectileSystem.HazardStyle.PLAIN, center, angle, radius, width, delay, radius / maxf(speed, 1.0),
+		dmg, color, speed, arc, gap, gap_w)

@@ -573,8 +573,7 @@ func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: 
 ## 予告（delay）の間は照射する範囲全体を見せ、そのあと active の間だけ当たる。
 func fire_flood(from: Vector2, angle: float, length: float, width: float, spread: float, delay: float, active: float,
 		dmg: float, color := Color("#8fd0ff")) -> int:
-	return _add_hazard(HazardKind.BEAM, HazardStyle.FLOOD, from, angle, length, width, delay, active, dmg, color,
-		0.0, spread)
+	return emit_attack(&"flood", [from, angle, length, width, spread, delay, active, dmg, color])
 
 ## 広がるビーム（行 h）の、根元から along の距離での幅の半分。
 func flood_half(h: int, along: float) -> float:
@@ -595,19 +594,17 @@ func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style :
 ## delay の予告のあと、速さ speed で半径 radius まで広がる。
 func fire_wave(center: Vector2, angle: float, arc: float, radius: float, speed: float, width: float, delay: float,
 		dmg: float, gap := 0.0, gap_w := 0.0, color := Color("#9ad8ff")) -> int:
-	return _add_hazard(HazardKind.WAVE, HazardStyle.PLAIN, center, angle, radius, width, delay, radius / maxf(speed, 1.0),
-		dmg, color, speed, arc, gap, gap_w)
+	return emit_attack(&"wave", [center, angle, arc, radius, speed, width, delay, dmg, gap, gap_w, color])
 
 ## 何層もの輪を出す。層ごとに interval ずつ遅れて広がり、切れ目の向きが gap_step ずつずれる。
 func fire_rings(center: Vector2, layers: int, interval: float, radius: float, speed: float, width: float, delay: float,
 		dmg: float, gap: float, gap_w: float, gap_step: float, color := Color("#9ad8ff")) -> void:
-	for k in layers:
-		fire_wave(center, 0.0, PI, radius, speed, width, delay + k * interval, dmg, gap + k * gap_step, gap_w, color)
+	emit_attack(&"rings", [center, layers, interval, radius, speed, width, delay, dmg, gap, gap_w, gap_step, color])
 
 ## 残る線を出す。from から angle の向きへ長さ length・幅 width。delay のあと active の間、触れると被弾する。
 func fire_wall(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
 		color := Color("#ffd27a")) -> int:
-	return _add_hazard(HazardKind.WALL, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
+	return emit_attack(&"wall", [from, angle, length, width, delay, active, dmg, color])
 
 ## 攻撃の形（行 h）を敵（行 e）に付ける。敵が倒れると消え、位置と向きは敵が move_hazard で動かす。
 func attach_hazard(h: int, e: int) -> void:
