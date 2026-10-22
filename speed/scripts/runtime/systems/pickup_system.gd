@@ -205,7 +205,7 @@ func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2) -> void:
 
 func _collect_gems(dt: float) -> void:
 	_fly_gems(dt)
-	_crow_gather(dt)
+	enemies.gather_pickups(self, dt)
 	var reach := cfg.ship_radius + 14.0
 	var radius := state.stats.pickup_radius
 	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
@@ -240,43 +240,6 @@ func _fly_gems(dt: float) -> void:
 		gem_pos[i] += gem_vel[i] * dt
 		gem_vel[i] *= exp(-dt * 5.0)
 		gem_wait[i] -= dt
-
-## からす座が、横を通り過ぎる経験値の結晶を拾う（敵の表の carry に足す）。拾うのは、体の真横から少し後ろまでにあり、
-## 左右 gather_width の中にある結晶。前方の結晶は、横に来るまで拾わない。拾った結晶は足元の束へ飛び込む。
-## 機体が吸い寄せ始めた結晶は機体が先に取る。
-func _crow_gather(dt: float) -> void:
-	var t := enemies.table
-	var rows := enemies.beh_rows[EnemyTable.Beh.CROW]
-	if rows.is_empty():
-		return
-	for j in rows:
-		if t.dead[j] != 0:
-			continue
-		var p: Dictionary = t.def[j].params
-		var width := float(p.gather_width)
-		var behind := float(p.gather_behind)
-		var reach := maxf(width, behind) + t.r[j]
-		var reach_sq := reach * reach
-		var step := float(p.gather_speed) * dt
-		var u := Vector2.from_angle(t.facing[j])
-		var feet := t.pos[j] - u * t.r[j] * 0.62
-		for i in gem_alive.size():
-			if gem_alive[i] == 0 or gem_pulled[i] != 0 or gem_wait[i] > 0.0:
-				continue
-			var rel := gem_pos[i] - t.pos[j]
-			if rel.length_squared() >= reach_sq:
-				continue
-			var along := rel.dot(u)
-			if along > t.r[j] * 0.3 or along < -behind or absf(rel.cross(u)) > width:
-				continue
-			var d := feet - gem_pos[i]
-			var dist := d.length()
-			if dist <= step + 4.0:
-				t.carry[j] += gem_value[i]
-				t.buds[j] += 1
-				gem_slots.release(i)
-			else:
-				gem_pos[i] += d / dist * step
 
 func _collect_coins(dt: float) -> void:
 	var reach := cfg.ship_radius + 14.0

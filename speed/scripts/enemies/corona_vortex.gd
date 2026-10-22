@@ -1,4 +1,5 @@
-## 冠の短距離の渦。敵の表の同じ個体を保持し、通常 AI だけを旋回・投擲に置き換える。
+## 冠の短距離の渦（みなみのかんむり座の Behavior が持つ）。敵の表の同じ個体を保持し、通常 AI だけを旋回・投擲に置き換える。
+## 保持している個体は敵の表の held を 1 にし、EnemySystem はその行の行動を止める。
 ## owners[row].types[type] は個体の配列。members[row].slot と末尾交換で O(1) で除去する。
 ## 抽選は現在ある種類だけを回り、個体数を重みに加えない。
 extends RefCounted
@@ -39,6 +40,7 @@ func _detach(m: EnemySystem, j: int) -> void:
 	var a: Dictionary = members[j]
 	_unstock(j, a)
 	members.erase(j)
+	m.table.held[j] = 0
 	if _live(m, j, int(a.id)):
 		m.table.mode[j] = EnemyTable.Mode.MOVE
 		m.table.charge[j] = 0.0
@@ -87,6 +89,7 @@ func _capture(m: EnemySystem, i: int, o: Dictionary, p: Dictionary) -> void:
 			"life": 0.0, "release_fraction": 0.0, "from": t.pos[j], "ship_from": m.state.ship_pos, "damage": 0.0, "effect": float(p.throw_effect_scale)}
 		bucket.append(j)
 		o.count += 1
+		t.held[j] = 1
 		t.charge[j] = 0.0
 
 func choose_type(o: Dictionary, weights: Dictionary, rng: RandomNumberGenerator) -> String:
@@ -102,10 +105,11 @@ func choose_type(o: Dictionary, weights: Dictionary, rng: RandomNumberGenerator)
 			return kind
 	return ""
 
-func tick(m: EnemySystem, dt: float) -> void:
+## rows は冠の行。
+func tick(m: EnemySystem, dt: float, rows: PackedInt32Array) -> void:
 	var t := m.table
 	# 通常 AI の更新が終わり、冠の移動を確定してから渦を進める（LOD は適用しない）。
-	for i in m.beh_rows[EnemyTable.Beh.CORONA]:
+	for i in rows:
 		if t.dead[i] != 0:
 			continue
 		if not owners.has(i):

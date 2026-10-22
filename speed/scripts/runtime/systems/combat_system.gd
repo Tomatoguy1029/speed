@@ -81,7 +81,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		if run != null:
 			if run.inside.has(t.id[i]):
 				continue
-		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0 and t.beh[i] != EnemyTable.Beh.SHIELD:
+		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0 and not enemies.ignores_hit_cd(i):
 			continue
 		var hit_t := Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R)
 		if hit_t >= 0.0:
@@ -99,8 +99,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var dir := vel / sp if sp > 0.0 else Vector2.ZERO
 		var atk := attack_power()
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
-		var shield_front := t.beh[i] == EnemyTable.Beh.SHIELD and t.stone[i] <= 0.0 \
-			and enemies.shield_blocks(i, hit_pos, dir)
+		var shield_front := enemies.blocks_front(i, hit_pos, dir)
 		if shield_front and (not fast or (run == null and t.hit_cd[i] > 0.0)):
 			# 接触のクールダウン中も押し戻し、普通の移動で盾をすり抜けるのを防ぐ。
 			_bump_obstacle(i, hit_pos, R, dir, false)
@@ -140,7 +139,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var leo := run != null and leo_width() > 1.0
 		if gate == EnemyTable.GateResult.ALLOW and (ignore_armor or leo or can_pierce(atk, i, crit)):
 			var dmg := atk * (state.stats.crit_mult if crit else 1.0)
-			if t.beh[i] == EnemyTable.Beh.SHIELD and enemies.shield_rear(i, hit_pos):
+			if enemies.rear_open(i, hit_pos):
 				ship.steal_shield(i)
 				dmg = maxf(dmg, t.hp[i])
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
@@ -264,8 +263,8 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		t.fire_hit[i] = state.world_time
 	# 装甲を貫いた不死の首は、その1回で本体への攻撃になる。
 	# 通常の頭の HP を繰り返し削る必要はない。
-	if cause == &"ram" and t.gate[i] == EnemyTable.Gate.IMMORTAL:
-		dmg = maxf(dmg, t.hp[i])
+	if cause == &"ram":
+		dmg = enemies.gate_ram_damage(i, dmg)
 	var crit: bool = opts.get("crit", false)
 	var fresh := t.hp[i] >= t.max_hp[i] - 1e-6
 	# 一撃かどうかは、この突進で最初に触れた時点の HP で判定する

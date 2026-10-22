@@ -298,7 +298,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `id` | 全部 | 通し番号。使い回した行にも新しい番号が付く |
 | `def` | 雑魚・隕石 | 敵の定義（`data/enemies/<type ID>.tres`） |
 | `type` | 全部 | type ID（ボスはボスの ID） |
-| `beh` | 雑魚 | 行動の種類 |
+| `beh` | 雑魚 | 行動の種類の番号（`EnemySystem.behaviors` の位置。その戦いで出た順に振る） |
 | `beh_slot` | 雑魚 | 行動の種類ごとの行番号の一覧の中での位置 |
 | `is_boss` | ボス | ボスの当たり判定の行か |
 | `meteor_index` | 隕石・鉄のがれき・回る丸鋸 | `FieldManager` の配置の通し番号（それ以外は -1）。0 以上なら固い障害物として扱う |
@@ -347,9 +347,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `landmark` | 強めの敵（星2〜5） | 1 なら目印の星を持つ（`HeroManager` が選ぶ） |
 | `fire_hit` | ヘルクレス座の火で焼かれた敵 | 最後に火でダメージを受けた世界時刻（うみへび座の頭が火で落ちたかの判定に使う） |
 | `stone` | ペルセウス座の力で石になった敵 | 石になっている残り時間（世界秒） |
-| `shell_dmg` | やまねこ座 | 殻の傷 |
-| `shell_open` | やまねこ座 | 殻が割れている残り時間 |
-| `shell_rest` | やまねこ座 | 最後に攻撃が当たってからの時間 |
+| `held` | みなみのかんむり座の渦に捕まった敵 | 1 ならほかの敵に抱えられている。抱えている側が動かし、自分の行動は止まる |
 | `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
 | `shove_time` | 吹き飛ばし衝角（W03）で押し出された敵 | 押し出しの残り時間 |
 | `shove_vel` | 同上 | 押し出しの速度 |

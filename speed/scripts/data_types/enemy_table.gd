@@ -8,12 +8,8 @@ class_name EnemyTable
 extends RefCounted
 
 enum Mode { MOVE, WINDUP, DASH, RECOVER }
-## 行動の種類（EnemyDef.behavior を生成時に数値へ直したもの）
-enum Beh { CHASE, DASH, SPLIT, GUNNER, MISSILE, BATTLESHIP, DRIFT, ROCKET, BOMBER, BEAMER, PULSER, PUMP, SNIPER,
-	SHIELD, RULER, CLOCK, LYNX, CROW, RETICLE, TRIANGLE, PART, PHOENIX,
-	CRAB, MARLIN, AQUARIUS, AURIGA, CORONA, CEPHEUS, AQUILA, SOLDIER, BITER, DOLPHIN, CROSS }
 ## 特殊な倒し方の種類（EnemyDef.gate を生成時に数値へ直したもの）
-enum Gate { NONE, MOUTH, BACK, SHELL, MEMBRANE, CLAW, GUARD, SOLID, GHOST, IMMORTAL }
+enum Gate { NONE, BACK, MEMBRANE, CLAW, GUARD, SOLID, GHOST, IMMORTAL }
 ## 攻撃が当たったときの扱い：通常どおり／貫通するがダメージなし／弾かれる（失敗）
 enum GateResult { ALLOW, PASS, BOUNCE }
 
@@ -25,6 +21,7 @@ var alive := PackedByteArray()
 var id := PackedInt32Array()
 var def: Array[EnemyDef] = []
 var type: Array[StringName] = []
+## 行動の種類の番号（EnemySystem.behaviors の位置。その戦いで出た順に振る）
 var beh := PackedByteArray()
 ## 行動の種類ごとの行番号の一覧の中での位置（一覧に入っていなければ -1）
 var beh_slot := PackedInt32Array()
@@ -105,10 +102,8 @@ var landmark := PackedByteArray()
 var fire_hit := PackedFloat64Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は動かず、触れると砕ける）
 var stone := PackedFloat64Array()
-## 殻の傷、殻が割れている残り時間、最後に攻撃が当たってからの時間（やまねこ座）
-var shell_dmg := PackedFloat64Array()
-var shell_open := PackedFloat64Array()
-var shell_rest := PackedFloat64Array()
+## 1 ならほかの敵に抱えられている（みなみのかんむり座の渦など）。抱えている側が動かし、自分の行動は止まる
+var held := PackedByteArray()
 
 # ── 吹き飛ばされている間 ──────────────────────────────────────────
 

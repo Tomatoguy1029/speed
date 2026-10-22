@@ -162,7 +162,7 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	_update_friendly(world_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
-	combat.enemies.corona.hit_thrown(combat.enemies, ship)
+	combat.enemies.after_combat()
 	if state.phase != RunState.Phase.PLAY:
 		return
 	_update_hostile(world_dt)
@@ -339,8 +339,7 @@ func _update_friendly(dt: float) -> void:
 func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
 	var t := combat.enemies.table
 	var vel := friend_vel[shot]
-	if t.beh[enemy] != EnemyTable.Beh.SHIELD or t.stone[enemy] > 0.0 \
-			or not combat.enemies.shield_blocks(enemy, impact, vel):
+	if not combat.enemies.blocks_front(enemy, impact, vel):
 		return false
 	if t.fire_t[enemy] > 0.0:
 		return true
