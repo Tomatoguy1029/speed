@@ -24,7 +24,13 @@ godot --editor --path speed
 
 ゲーム中の名前・説明・UI 文言は [ゲーム内文言](docs/game/text.md) で編集し、記載の手順で CSV とリソース表示名へ反映します。
 
-`.godot/` は生成キャッシュとして Git 管理から除外します。Godot 本番のビルド・配布方法は、今後の開発で決めます。
+`.godot/` と `.content/` は生成物としてGit管理から除外します。エディター実行・タイムライン保存・exportで、編集元から実行用ステージと音源を生成します。CLIで生成するときは次を実行します。
+
+```bash
+godot --headless --path speed --script res://tools/content/build_all.gd -- --force
+```
+
+macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/dev/architecture.md#15-ビルドと配布)を参照してください。
 
 接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
 

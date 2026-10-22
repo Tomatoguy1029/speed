@@ -6,7 +6,7 @@
 
 リポジトリルートから辿る。
 
-- `speed/scripts/managers/play_recorder.gd`：JSONLへの出力・区間集計・F9・性能窓。
+- `speed/scripts/dev/play_recorder.gd`：JSONLへの出力・区間集計・F9・性能窓。
 - `speed/scripts/runtime/run_simulation.gd`：`recording_origin`・`recording_snapshot()`、ラン/世界時計とボーナス。
 - `speed/scripts/managers/run_manager.gd`、`speed/addons/stage_launcher/`、`speed/addons/spawn_timeline/`：開始経路。
 - `speed/scripts/runtime/systems/loadout_system.gd`：必要XP、装備の取得・交換・おまけ強化。
