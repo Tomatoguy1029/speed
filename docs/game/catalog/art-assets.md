@@ -130,4 +130,4 @@ Godot 本番の `speed/` で必要な絵と、制作範囲を相談する候補�
 
 各ステージの敵の採用・削除・作り直し、通常の攻撃と使用時 ULT・武器・特性の演出、UI と図鑑、導入・結果・画面切替の素材は全体を照合できていない。画像・コード描画の存在を手掛かりに、必要な箇所を追加する。
 
-割当確認では、ステージ4の `biter` は[ステージの指定](../../../speed/data/stages/stage_4.tres)で `snake.png` を使い、`bomber`・`telescope`・`reticle` などは `LAYERED_ENEMIES` の別フォルダ画像を使う。単純な同名 PNG の有無だけで未制作と判断せず、ステージ別の指定・重ねる画像・コード描画・アニメーションの接続を確認する。
+割当確認では、ステージ4の `biter` は[ステージの指定](../../../speed/data/stages/stage_4.tres)で `snake.png` を使い、`bomber`・`telescope`・`reticle` などは 外観（`speed/data/visuals/looks/` の `EnemyLook`）で指定した別フォルダ画像を使う。単純な同名 PNG の有無だけで未制作と判断せず、ステージ別の指定・重ねる画像・コード描画・アニメーションの接続を確認する。

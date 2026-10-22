@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EnemyLook" load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://dnagso08hefhy" path="res://scripts/render/enemy_look.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://cuf00vgq5n14c" path="res://assets/pixel/marlin/swordfish_base.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://binpax1rqdsni" path="res://assets/pixel/marlin/swordfish_armor.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://cr6d6rqyrx6r5" path="res://assets/pixel/marlin/swordfish_normal.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+angle = 1.5707964
+armor = ExtResource("3")
+base = ExtResource("2")
+normal = ExtResource("4")

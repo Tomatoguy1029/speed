@@ -62,9 +62,16 @@ func _set_visual(value: float, key: String) -> void:
 	if _appearance_type == &"":
 		return
 	lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key, "value": value})
-	if is_instance_valid(lab.session.run):
-		var render: RenderManager = lab.session.run.get_node("../RenderManager")
+	var render := _render()
+	if render != null:
 		render._apply_lighting()
+
+## 実験場の表示付きのランの描画（表示のない試行では null）。
+func _render() -> RenderManager:
+	var scene: RunSession = lab.session.scene
+	if not is_instance_valid(scene) or scene.view == null:
+		return null
+	return scene.view.get_node("RenderManager") as RenderManager
 
 func _sync_appearance() -> void:
 	var row: int = lab.session.selected
@@ -78,7 +85,7 @@ func _sync_appearance() -> void:
 	_appearance_save.disabled = not supported
 	_appearance_reset.disabled = not supported
 	for field: SpinBox in _lighting_fields.values():
-		field.editable = supported and not RenderManager.layered_layers(type, lab.session.run.state.stage).is_empty()
+		field.editable = supported and RenderManager.load_look(type, lab.session.run.state.stage) != null
 	if not supported:
 		_appearance_label.text = tr("lab.appearance.select_type")
 		return
@@ -159,7 +166,7 @@ func _focus_appearance() -> void:
 	lab.canvas.follow = false
 	lab.canvas.center = table.pos[i]
 	var available: float = maxf(40.0, minf(lab.canvas.size.x, lab.canvas.size.y) - 80.0)
-	lab.canvas.zoom = minf(8.0, available / maxf(1.0, RenderManager.enemy_sprite_radius(table.type[i], table.r[i], lab.session.run.cfg.character_scale, lab.session.run.state.stage) * 2.0 * sqrt(2.0)))
+	lab.canvas.zoom = minf(8.0, available / maxf(1.0, _render().enemy_sprite_radius(table.type[i], table.r[i]) * 2.0 * sqrt(2.0)))
 	lab.canvas.show_ranges = false
 	lab.canvas.show_ids = false
 	lab.canvas.selection.assign([table.id[i]])

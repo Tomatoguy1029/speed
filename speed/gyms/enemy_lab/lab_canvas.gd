@@ -66,12 +66,16 @@ func world(p: Vector2) -> Vector2:
 func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
+## 重ねた絵を合成した画像（外観のファイル → 画像）
+var _look_textures: Dictionary = {}
+
 func texture_for(id: String) -> Texture2D:
 	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
 		return preload("res://assets/placeholders/corona_crown.svg")
 	var stage: StageDef = session.run.state.stage if session != null and is_instance_valid(session.run) else null
-	if not RenderManager.layered_layers(StringName(id), stage).is_empty():
-		return RenderManager.layered_texture(StringName(id), stage)
+	var look := RenderManager.load_look(StringName(id), stage)
+	if look != null:
+		return RenderManager.look_texture(look, _look_textures)
 	if id.begins_with("field_planet"):
 		return RenderManager.PLANET
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える

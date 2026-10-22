@@ -6,43 +6,12 @@ class_name RenderManager
 extends Node
 
 const XP_COLOR := Color("#b8a0ff")
-const LAYERED_ENEMIES := {
-	&"pulser": [preload("res://assets/pixel/pulser/pulser_base.png"),
-		preload("res://assets/pixel/pulser/pulser_armor.png"), preload("res://assets/pixel/pulser/pulser_normal.png"), PI / 2.0],
-	&"snake": [preload("res://assets/pixel/snake/snake_base.png"),
-		preload("res://assets/pixel/snake/snake_armor.png"), preload("res://assets/pixel/snake/snake_normal.png"), PI / 2.0],
-	&"aquila": [preload("res://assets/pixel/aquila/eagle_base.png"),
-		preload("res://assets/pixel/aquila/eagle_armor.png"), preload("res://assets/pixel/aquila/eagle_normal.png"), PI / 2.0],
-	&"marlin": [preload("res://assets/pixel/marlin/swordfish_base.png"),
-		preload("res://assets/pixel/marlin/swordfish_armor.png"), preload("res://assets/pixel/marlin/swordfish_normal.png"), PI / 2.0],
-	&"corona": [preload("res://assets/pixel/corona/crown_base.png"),
-		preload("res://assets/pixel/corona/crown_armor.png"), preload("res://assets/pixel/corona/crown_normal.png"), 0.0],
-	&"cross": [preload("res://assets/pixel/cross/cross_base.png"),
-		preload("res://assets/pixel/cross/cross_armor.png"), preload("res://assets/pixel/cross/cross_normal.png"), PI / 2.0],
-	&"aquarius": [preload("res://assets/pixel/aquarius/aquarius_base.png"),
-		preload("res://assets/pixel/aquarius/aquarius_armor.png"), preload("res://assets/pixel/aquarius/aquarius_normal.png"), PI / 2.0],
-	&"crab": [preload("res://assets/pixel/crab/cancer_base.png"),
-		preload("res://assets/pixel/crab/cancer_armor.png"), preload("res://assets/pixel/crab/cancer_normal.png"), PI / 2.0],
-	&"dolphin": [preload("res://assets/pixel/dolphin/dolphin_base.png"),
-		preload("res://assets/pixel/dolphin/dolphin_armor.png"), preload("res://assets/pixel/dolphin/dolphin_normal.png"), PI / 2.0],
-	&"triangle": [preload("res://assets/pixel/triangle/triangle_center_base.png"),
-		preload("res://assets/pixel/triangle/triangle_center_armor.png"), preload("res://assets/pixel/triangle/triangle_center_normal.png"), PI / 2.0],
-	&"triangle_star": [preload("res://assets/pixel/triangle/triangle_nodes_base.png"),
-		preload("res://assets/pixel/triangle/triangle_nodes_armor.png"), preload("res://assets/pixel/triangle/triangle_nodes_normal.png"), PI / 2.0],
-	&"bomber": [preload("res://assets/pixel/bomber/drifter_base.png"),
-		preload("res://assets/pixel/bomber/drifter_armor.png"), preload("res://assets/pixel/bomber/drifter_normal.png"), -PI / 2.0],
-	&"telescope": [preload("res://assets/pixel/telescope/telescope_base.png"),
-		preload("res://assets/pixel/telescope/telescope_armor.png"), preload("res://assets/pixel/telescope/telescope_normal.png"), 0.0],
-	&"reticle": [preload("res://assets/pixel/reticle/reticle_base.png"),
-		preload("res://assets/pixel/reticle/reticle_armor.png"), preload("res://assets/pixel/reticle/reticle_normal.png"), 0.0],
-}
-static var _layered_textures: Dictionary = {}
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
-const SPRITE_IDS := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
-	"gunner", "missile", "battleship", "titan", "meteor_0", "meteor_1"]
+## 重ねた絵の外観の置き場（data/visuals/looks/<外観の名前>.tres）
+const LOOKS_DIR := "res://data/visuals/looks"
 const MOON := preload("res://assets/pixel/moon.png")
 const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
@@ -81,6 +50,16 @@ var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
 var _armor_batches: Dictionary = {}
+## 外観の名前の一覧（並び順が照明のキャンバスの層の番号になる。出ない外観の層は作らない）
+var _look_names: PackedStringArray = []
+## 種類ごとの外観（なければ null）と、種類ごとの絵を合成した画像
+var _looks: Dictionary = {}
+var _layered_textures: Dictionary = {}
+## 敵の見た目の処理（行動の種類の番号の順）と、出来事の種類から受け取る処理
+var _visuals: Array[EnemyVisual] = []
+var _event_visuals: Dictionary = {}
+var _enemy_mat: ShaderMaterial
+var _armor_material: ShaderMaterial
 var _lit_enemy_marks: DrawLayer
 var _directional_lights: Dictionary = {}
 var lighting_settings: Resource = preload("res://data/visuals/enemy_lighting.tres")
@@ -95,8 +74,6 @@ var cam_zoom := 1.0
 var view_override: Variant = null
 ## 背景の星を描くか（実験場では初めは消す）
 var show_background := true
-## いつも飾りを描く敵の種類（type ID → true）
-var _always_marked: Dictionary = {}
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
 
@@ -113,10 +90,6 @@ var _enemy_textures: Dictionary = {}
 var bolts: Array = []
 var _bolt_seed := 0
 var shield_transfers: Array = []
-## ポンプ座に吸い込まれていく敵（回りながら小さくなって口へ飛び込む）
-var swallows: Array = []
-## ケフェウス座が兵を召喚する位置の予告
-var summon_marks: Array = []
 ## みずがめ座の照射の演出（照射の瞬間の衝撃と、照射後に崩れて残る水しぶき）。t は狙ってからの時間、end は照射の終わり
 var floods: Array = []
 ## 照射が終わってから、水の流れが細くなって崩れ、霧と水滴が消えるまでの時間
@@ -177,7 +150,7 @@ func _ready() -> void:
 	_build_directional_lights(world)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
-	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _armor_batches.size() + 2)
+	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
 	if not pipeline.rich:
 		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
@@ -204,29 +177,16 @@ func _ready() -> void:
 	_build_star_batch()
 	run.frame_events.connect(_on_events)
 
-## 法線付き装甲の敵と照明を、カメラに追従する専用キャンバスに置く。
+## 法線付き装甲の敵の飾りを、照明の層の上の専用キャンバスに置く。照明の層は、その外観の敵が初めて出たときに作る。
 func _build_directional_lights(world: Node2D) -> void:
-	# DirectionalLight2Dはlight_maskを無視するため、種類ごとにキャンバスを分ける。
-	for type in _armor_batches:
-		var lighting := CanvasLayer.new()
-		lighting.name = String(type) + "Lighting"
-		lighting.layer = 1 + _directional_lights.size()
-		lighting.follow_viewport_enabled = true
-		world.add_child(lighting)
-		_batches[type].reparent(lighting)
-		_armor_batches[type].reparent(lighting)
-		var lights: Array[DirectionalLight2D] = []
-		for light_name in ["UpperLeftLight", "LowerRightLight"]:
-			var light := DirectionalLight2D.new()
-			light.name = light_name
-			light.range_layer_min = lighting.layer
-			light.range_layer_max = lighting.layer
-			lighting.add_child(light)
-			lights.append(light)
-		_directional_lights[type] = lights
+	for file in DirAccess.get_files_at(LOOKS_DIR):
+		var name := file.trim_suffix(".remap")
+		if name.ends_with(".tres"):
+			_look_names.append(name.get_basename())
+	_look_names.sort()
 	var marks := CanvasLayer.new()
 	marks.name = "EnemyMarks"
-	marks.layer = 1 + _armor_batches.size()
+	marks.layer = 1 + _look_names.size()
 	marks.follow_viewport_enabled = true
 	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
@@ -238,8 +198,29 @@ func _build_directional_lights(world: Node2D) -> void:
 	var hud := world.get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud != null:
 		hud.layer = maxi(hud.layer, marks.layer + 4)
+
+## 外観の種類 type の照明を、外観の名前の順の層に置く。DirectionalLight2D は light_mask を無視するため、種類ごとにキャンバスを分ける。
+func _build_lighting(type: StringName, look: EnemyLook) -> void:
+	var lighting := CanvasLayer.new()
+	lighting.name = String(type) + "Lighting"
+	lighting.layer = 1 + maxi(0, _look_names.find(look.resource_path.get_file().get_basename()))
+	lighting.follow_viewport_enabled = true
+	get_node(world_path).add_child(lighting)
+	_batches[type].reparent(lighting)
+	_armor_batches[type].reparent(lighting)
+	var lights: Array[DirectionalLight2D] = []
+	for light_name in ["UpperLeftLight", "LowerRightLight"]:
+		var light := DirectionalLight2D.new()
+		light.name = light_name
+		light.range_layer_min = lighting.layer
+		light.range_layer_max = lighting.layer
+		lighting.add_child(light)
+		lights.append(light)
+	_directional_lights[type] = lights
 	_apply_lighting()
 
+## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
+## 照明の値を敵データに合わせる。照明を作ったときと、実験場で外観を編集したときに呼ぶ。
 func _apply_lighting() -> void:
 	for type in _armor_batches:
 		var def := run.enemies.def_of(type)
@@ -253,69 +234,22 @@ func _apply_lighting() -> void:
 		armor.set_shader_parameter("ambient", def.visual_value("ambient", lighting_settings.ambient))
 		armor.set_shader_parameter("normal_strength", def.visual_value("normal_strength", lighting_settings.normal_strength))
 
-## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
+## 隕石・経験値の結晶・部品・敵の弾を MultiMesh でまとめる。敵の種類ごとのまとめは、その種類が初めて出たときに作る。
 func _build_batches() -> void:
-	var enemy_mat := ShaderMaterial.new()
-	enemy_mat.shader = load("res://shaders/pixel_sprite.gdshader")
-	for id in SPRITE_IDS:
-		if id.begins_with("meteor_"):
-			var sheet: Texture2D = METEOR_SHEETS[0 if id == "meteor_0" else 1]
-			var frame_size := float(sheet.get_height())
-			for stage in 3:
-				var rock_batch := InstanceBatch.new()
-				rock_batch.setup_texture(sheet, Rect2(stage * frame_size, 0, frame_size, frame_size))
-				rock_batch.material = enemy_mat
-				rock_batch.z_index = -1
-				_layers.enemies.add_child(rock_batch)
-				_batches[StringName(id + "_damage_" + str(stage))] = rock_batch
-			continue
-		var b := InstanceBatch.new()
-		b.setup_texture(load("res://assets/pixel/" + id + ".png") as Texture2D)
-		b.material = enemy_mat
-		# 弱点・予告・HPをスプライトの上に描く。
-		b.z_index = -1
-		_layers.enemies.add_child(b)
-		_batches[StringName(id)] = b
-	# ほかの種類は、assets/pixel/<type ID>.png があればその絵で、なければ敵の定義の形（EnemyDef.shape）の
-	# 図形で描く。png を置けば絵に替わる
-	for def: EnemyDef in ConfigManager.enemies.values():
-		# いつも飾り（口・殻・ハサミ・膜・水流・号令・塊）を描く種類
-		if def.gate in [&"mouth", &"shell", &"claw"] or def.behavior in [&"triangle", &"aquarius", &"cepheus", &"crow", &"shield", &"pump", &"soldier"] \
-				or def.id in [&"beamer", &"pulser", &"telescope", &"lynx", &"ruler", &"reticle", &"dolphin", &"cross"]:
-			_always_marked[def.id] = true
-		if def.id == &"meteor" or _batches.has(def.id):
-			continue
-		var b := InstanceBatch.new()
-		var path := _enemy_sprite_path(def.id)
-		var layers := layered_layers(def.id, state.stage)
-		if not layers.is_empty():
-			b.setup_texture(layers[0])
-			b.material = enemy_mat.duplicate()
-		elif ResourceLoader.exists(path):
-			b.setup_texture(load(path) as Texture2D)
-			b.material = enemy_mat
-		else:
-			b.setup_polygon(_placeholder_points(def.shape))
-			_shape_ids[def.id] = true
-		b.z_index = -1
-		_layers.enemies.add_child(b)
-		_batches[def.id] = b
-	var armor_material := ShaderMaterial.new()
-	armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
-	for type in ConfigManager.enemies:
-		var layers := layered_layers(type, state.stage)
-		if layers.is_empty():
-			continue
-		var armor := CanvasTexture.new()
-		armor.diffuse_texture = layers[1]
-		armor.normal_texture = layers[2]
-		var batch := InstanceBatch.new()
-		batch.name = String(type) + "Armor"
-		batch.setup_texture(armor)
-		batch.material = armor_material.duplicate()
-		batch.z_index = -1
-		_layers.enemies.add_child(batch)
-		_armor_batches[type] = batch
+	_enemy_mat = ShaderMaterial.new()
+	_enemy_mat.shader = load("res://shaders/pixel_sprite.gdshader")
+	_armor_material = ShaderMaterial.new()
+	_armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
+	for variant in METEOR_SHEETS.size():
+		var sheet: Texture2D = METEOR_SHEETS[variant]
+		var frame_size := float(sheet.get_height())
+		for stage in 3:
+			var rock_batch := InstanceBatch.new()
+			rock_batch.setup_texture(sheet, Rect2(stage * frame_size, 0, frame_size, frame_size))
+			rock_batch.material = _enemy_mat
+			rock_batch.z_index = -1
+			_layers.enemies.add_child(rock_batch)
+			_batches[StringName("meteor_" + str(variant) + "_damage_" + str(stage))] = rock_batch
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -351,11 +285,63 @@ func _build_batches() -> void:
 	_hostile_batch._setup_mesh(mesh)
 	_layers.projectiles.add_child(_hostile_batch)
 
+## 敵の種類 type のまとめた描画。外観があれば重ねた絵と照明、なければ assets/pixel/<type ID>.png の絵、
+## それもなければ敵の定義の形（EnemyDef.shape）の図形で描く。png を置けば絵に替わる。
+func _ensure_enemy_batch(type: StringName) -> InstanceBatch:
+	if _batches.has(type):
+		return _batches[type]
+	var b := InstanceBatch.new()
+	var look := look_of(type)
+	var path := _enemy_sprite_path(type)
+	if look != null:
+		b.setup_texture(look.base)
+		b.material = _enemy_mat.duplicate()
+	elif ResourceLoader.exists(path):
+		b.setup_texture(load(path) as Texture2D)
+		b.material = _enemy_mat
+	else:
+		var def := run.enemies.def_of(type)
+		b.setup_polygon(_placeholder_points(def.shape if def != null else &""))
+		_shape_ids[type] = true
+	b.z_index = -1
+	_layers.enemies.add_child(b)
+	_batches[type] = b
+	if look != null:
+		var armor := CanvasTexture.new()
+		armor.diffuse_texture = look.armor
+		armor.normal_texture = look.normal
+		var batch := InstanceBatch.new()
+		batch.name = String(type) + "Armor"
+		batch.setup_texture(armor)
+		batch.material = _armor_material.duplicate()
+		batch.z_index = -1
+		_layers.enemies.add_child(batch)
+		_armor_batches[type] = batch
+		_build_lighting(type, look)
+	return b
+
+## その戦いに出た行動の種類の見た目の処理を作る。ファイルがなければ共通の飾りだけを描く。
+func _sync_visuals() -> void:
+	var behaviors := run.enemies.behaviors
+	for k in range(_visuals.size(), behaviors.size()):
+		var name := behaviors[k].name
+		var path := "res://scripts/render/enemies/%s.gd" % name
+		var v: EnemyVisual = load(path).new() if ResourceLoader.exists(path) else EnemyVisual.new()
+		v.setup(self, name)
+		_visuals.append(v)
+		for e in v.events:
+			if not _event_visuals.has(e):
+				_event_visuals[e] = []
+			_event_visuals[e].append(v)
+
+## 行 i の敵の見た目の処理（行動の種類を持たない隕石・ボスは null）。
+func _visual_of(t: EnemyTable, i: int) -> EnemyVisual:
+	return _visuals[t.beh[i]] if t.beh_slot[i] >= 0 and t.beh[i] < _visuals.size() else null
+
 func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
 func _process(delta: float) -> void:
-	_apply_lighting()
 	var phase := state.phase
 	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -392,7 +378,10 @@ func _process(delta: float) -> void:
 # ── イベント → 演出 ───────────────────────────────────────────────
 
 func _on_events(events: Array[Dictionary]) -> void:
+	_sync_visuals()
 	for ev in events:
+		for v in _event_visuals.get(ev.type, []):
+			v.on_event(ev)
 		match ev.type:
 			&"lance_hit":
 				_light_lance.hit(ev)
@@ -428,15 +417,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 					"life": 0.3, "max": 0.3})
 				_ring(ev.pos, ev.r * 1.7, Color("#65e8ff"), 0.3)
 				shake = maxf(shake, 6.0)
-			&"swallow":
-				if swallows.size() < 120:
-					swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing, "color": ev.color,
-						"row": ev.row, "id": ev.id, "spin": ev.spin, "life": 0.3, "max": 0.3})
 			&"gem_burst":
 				_ring(ev.pos, float(ev.r) * 2.4, Color("#ffe27a"), 0.3)
 				_burst(ev.pos, Color("#ffd23f"), 14, Vector2.ZERO, 360.0)
-			&"summon_mark":
-				summon_marks.append({"pos": ev.pos, "king": ev.king, "color": ev.color, "life": ev.life, "max": ev.life})
 			&"aquarius_aim":
 				var f := ev.duplicate()
 				f.t = 0.0
@@ -574,7 +557,9 @@ func _update_fx(dt: float) -> void:
 		p.vel *= 1.0 - 2.5 * dt
 		p.life -= dt
 	particles = particles.filter(func(p): return p.life > 0.0)
-	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers, swallows, summon_marks]:
+	for v in _visuals:
+		v.update(dt)
+	for list in [rings, texts, ghosts, impacts, trails, beams, bolts, shield_transfers]:
 		for f in list:
 			f.life -= dt
 	for t in texts:
@@ -587,8 +572,6 @@ func _update_fx(dt: float) -> void:
 	beams = beams.filter(func(f): return f.life > 0.0)
 	bolts = bolts.filter(func(f): return f.life > 0.0)
 	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
-	swallows = swallows.filter(func(f): return f.life > 0.0)
-	summon_marks = summon_marks.filter(func(f): return f.life > 0.0)
 	_update_floods(dt)
 
 ## みずがめ座の照射の演出を進める。照射の瞬間に揺れと衝撃波、照射中は細かい揺れ。
@@ -839,6 +822,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	_sync_visuals()
 	var view := view_rect().grow(run.combat.enemy_query_padding)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.begin()
@@ -862,12 +846,14 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		var p := pos[i]
 		var type := t.type[i]
-		var sprite_radius := enemy_sprite_radius(type, t.r[i], cfg.character_scale, state.stage)
+		# 地形の隕石はシートの絵で描き、被弾で光らせない
+		var meteor := type == &"meteor"
+		var sprite_radius := t.r[i] if meteor else enemy_sprite_radius(type, t.r[i])
 		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - run.combat.enemy_query_padding)).has_point(p):
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
-		var col := Color(1.0 if t.flash[i] > 0.0 and type != &"meteor" else 0.0, 0.0, 0.0, 1.0)
-		if type == &"meteor":
+		var col := Color(1.0 if t.flash[i] > 0.0 and not meteor else 0.0, 0.0, 0.0, 1.0)
+		if meteor:
 			var comet := run.field.comet_at(t.meteor_index[i])
 			if comet != null:
 				_draw_comet(c, p, t.r[i], t.vel[i], comet.rare_weapon != &"")
@@ -883,16 +869,18 @@ func _draw_enemies(c: CanvasItem) -> void:
 			var boss_actor := run.bosses.actor_for_row(i)
 			if boss_actor != null and boss_actor.draws_self:
 				continue
-		var batch: InstanceBatch = _batches.get(type, _batches[&"battleship"])
+		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
 		else:
 			batch.add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
 		if _armor_batches.has(type):
 			_armor_batches[type].add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+			continue
 		# 飾りのある敵だけ、飾りを描く
-		if not _armor_batches.has(type) and (elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
-				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or _always_marked.has(type)):
+		var v := _visual_of(t, i)
+		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
+				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or (v != null and v.always_marked):
 			_draw_enemy_marks(c, t, i)
 	for key in _batches:
 		if key != &"gem":
@@ -900,9 +888,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 	_draw_meteor_shards(c)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.end()
-	_draw_swallows(c)
-	_draw_summon_marks(c)
-	run.enemies.corona.draw(c, run.enemies, view)
+	for v in _visuals:
+		v.draw_layer(c, view)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
@@ -910,39 +897,6 @@ func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.dead[i] == 0 and _armor_batches.has(t.type[i]) and view.has_point(t.pos[i]):
 			_draw_enemy_marks(c, t, i)
-
-## ケフェウス座の召喚の予告：王から金の光が伸び、兵が現れる位置に紋章の輪が閉じていく。
-func _draw_summon_marks(c: CanvasItem) -> void:
-	for m in summon_marks:
-		var k := 1.0 - float(m.life) / float(m.max)
-		var col: Color = (m.color as Color).lightened(0.35)
-		var at: Vector2 = m.pos
-		c.draw_line(m.king, at, Color(1.0, 0.85, 0.45, 0.25 + 0.35 * k), _px(2.0))
-		c.draw_arc(at, 30.0 * (1.6 - 0.6 * k), 0, TAU, 32, Color(col, 0.4 + 0.5 * k), _px(2.5))
-		for q in 5:
-			var a := state.world_time * 2.0 + q * TAU / 5.0
-			c.draw_line(at + Vector2.from_angle(a) * 18.0, at + Vector2.from_angle(a) * (26.0 + 10.0 * (1.0 - k)), Color(1.0, 0.85, 0.45, 0.6 * k), _px(2.0))
-		c.draw_circle(at, 6.0 + 8.0 * k, Color(1.0, 0.95, 0.75, 0.3 + 0.5 * k))
-
-## ポンプ座に吸い込まれていく敵。自転しながら小さくなり、ポンプ座の口へ飛び込む。
-func _draw_swallows(c: CanvasItem) -> void:
-	var t := run.enemies.table
-	for sw in swallows:
-		var k := 1.0 - float(sw.life) / float(sw.max)
-		var target: Vector2 = sw.pos
-		if run.enemies.is_same(sw.row, sw.id):
-			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemySystem.PUMP_MOUTH
-		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
-		var r: float = enemy_sprite_radius(sw.type, sw.r, cfg.character_scale, state.stage) * (1.0 - 0.85 * k)
-		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
-		var tex := _enemy_texture(sw.type)
-		if tex == null:
-			c.draw_circle(p, r, sw.color)
-			continue
-		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-		c.draw_set_transform(p, _enemy_sprite_angle(sw.type, angle))
-		c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
-		c.draw_set_transform(Vector2.ZERO)
 
 ## 彗星：光る核と、進む向きの反対へ伸びる尾。レアな彗星は金色で、周りを光の粒が回る（デザインとアートスタイル）。
 ## 専用の絵ができるまでの仮の描き方。
@@ -983,46 +937,50 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 			return pts
 	return PackedVector2Array([Vector2(0.8, -0.8), Vector2(0.8, 0.8), Vector2(-0.8, 0.8), Vector2(-0.8, -0.8)])
 
+## 敵の種類 type の外観（ステージの敵の見た目で差し替える。重ねた絵を持たない種類は null）。
+func look_of(type: StringName) -> EnemyLook:
+	if not _looks.has(type):
+		_looks[type] = load_look(type, state.stage)
+	return _looks[type]
+
+## 外観を読む。実験場の一覧も同じ規則で使う。
+static func load_look(type: StringName, stage: StageDef = null) -> EnemyLook:
+	var skin := String(stage.enemy_sprite_path(type).get_file().get_basename()) if stage != null else String(type)
+	for name in [skin, String(type)]:
+		var path := LOOKS_DIR.path_join(name + ".tres")
+		if ResourceLoader.exists(path):
+			return load(path) as EnemyLook
+	return null
+
 ## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
-static func layered_layers(type: StringName, stage: StageDef = null) -> Array:
-	var skin := StringName(stage.enemy_sprite_path(type).get_file().get_basename()) if stage != null else type
-	return LAYERED_ENEMIES.get(skin, LAYERED_ENEMIES.get(type, []))
+static func look_texture(look: EnemyLook, cache: Dictionary) -> Texture2D:
+	var key := look.resource_path
+	if not cache.has(key):
+		var body: Image = look.base.get_image()
+		body.blend_rect(look.armor.get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
+		cache[key] = ImageTexture.create_from_image(body)
+	return cache[key]
 
-static func layered_texture(type: StringName, stage: StageDef = null) -> Texture2D:
-	var layers := layered_layers(type, stage)
-	var key: String = layers[0].resource_path
-	if not _layered_textures.has(key):
-		var body: Image = layers[0].get_image()
-		body.blend_rect(layers[1].get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
-		_layered_textures[key] = ImageTexture.create_from_image(body)
-	return _layered_textures[key]
-
-## 専用のベース・装甲は元画像の寸法に自機と共通のキャラクター倍率を掛ける。
-static func enemy_sprite_radius(type: StringName, collision_radius: float, _character_scale: float, stage: StageDef = null) -> float:
-	var layers := layered_layers(type, stage)
-	if not layers.is_empty():
-		var texture: Texture2D = layers[0]
-		var def: EnemyDef = ConfigManager.enemies[type]
-		# 既存の表示寸法に合わせて差し替える素材。
-		if type in [&"biter", &"pulser"]:
-			return collision_radius
-		# 半径には実験場の倍率・個体の大きさが反映済み。
-		return maxf(texture.get_width(), texture.get_height()) * 0.5 * collision_radius / maxf(def.radius, 0.001)
-	return collision_radius
+## 外観の絵は元画像の寸法を、敵データの半径との比で拡大縮小する（半径には実験場の倍率・個体の大きさが反映済み）。
+func enemy_sprite_radius(type: StringName, collision_radius: float) -> float:
+	var look := look_of(type)
+	if look == null or look.size_from_collision:
+		return collision_radius
+	var def := run.enemies.def_of(type)
+	return maxf(look.base.get_width(), look.base.get_height()) * 0.5 * collision_radius / maxf(def.radius if def != null else collision_radius, 0.001)
 
 func _enemy_sprite_angle(type: StringName, facing: float) -> float:
-	if type == &"corona":
-		return 0.0
-	var layers := layered_layers(type, state.stage)
-	if not layers.is_empty():
-		return facing + float(layers[3])
+	var look := look_of(type)
+	if look != null:
+		return look.angle + (0.0 if look.fixed_angle else facing)
 	return facing + (PI / 2.0 if type in EnemyDef.NATIVE_SPRITES else -PI / 2.0)
 
 ## 敵の種類の絵（牽引した船体を描くのに使う。絵のない種類は null）。
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
-		if not layered_layers(type, state.stage).is_empty():
-			_enemy_textures[type] = layered_texture(type, state.stage)
+		var look := look_of(type)
+		if look != null:
+			_enemy_textures[type] = look_texture(look, _layered_textures)
 			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
@@ -1030,9 +988,6 @@ func _enemy_texture(type: StringName) -> Texture2D:
 
 ## 敵の種類の絵のファイル（ステージの敵の見た目に従う）。
 func _enemy_sprite_path(type: StringName) -> String:
-	# PNG を置けば既存の素材経路で差し替えられる仮の冠。
-	if type == &"corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
-		return "res://assets/placeholders/corona_crown.svg"
 	if state.stage != null:
 		return state.stage.enemy_sprite_path(type)
 	return "res://assets/pixel/%s.png" % type
@@ -1045,21 +1000,20 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	if tex == null:
 		c.draw_circle(p, r, Color("#aeb6c4"))
 		return
-	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r, cfg.character_scale, state.stage) * 2.0
+	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r) * 2.0
 	c.draw_set_transform(p, _enemy_sprite_angle(type, angle))
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 	c.draw_set_transform(Vector2.ZERO)
 
-## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。
+## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
-	if t.beh[i] == EnemyTable.Beh.SHIELD:
-		SHIELD_VISUAL.enemy(c, t, i)
+	var v := _visual_of(t, i)
 	if t.elite[i] != 0:
 		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	var weak := t.weak_arc[i]
-	if weak > 0.0 and t.type[i] != &"armored" and t.beh[i] != EnemyTable.Beh.SHIELD:
+	if weak > 0.0 and t.type[i] not in EnemyDef.NATIVE_SPRITES and (v == null or v.draws_weak_arc):
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
 	if t.landmark[i] != 0:
@@ -1074,74 +1028,8 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		# 石になっている
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
 		c.draw_arc(p, r * 1.05, 0, TAU, 20, Color(0.35, 0.33, 0.32), _px(2.0))
-	var charge := t.charge[i]
-	var type := t.type[i]
-	if t.beh[i] == EnemyTable.Beh.PUMP:
-		_draw_pump(c, t, i)
-	elif type == &"bomber":
-		_draw_bomber(c, t, i)
-	elif type == &"beamer":
-		_draw_beamer(c, t, i)
-	elif type == &"pulser":
-		_draw_pulser(c, t, i)
-	elif type == &"telescope":
-		_draw_telescope(c, t, i)
-	elif type == &"lynx":
-		_draw_lynx(c, t, i)
-	elif type == &"ruler":
-		_draw_ruler(c, t, i)
-	elif type == &"reticle":
-		_draw_reticle(c, t, i)
-	elif type == &"dolphin":
-		_draw_dolphin(c, t, i)
-	elif type == &"cross":
-		_draw_cross(c, t, i)
-	elif charge > 0.0 and type != &"corona":
-		# 撃つ前の予告：前の方に光が集まっていく
-		var muzzle := p + Vector2.from_angle(t.facing[i]) * r
-		c.draw_circle(muzzle, _px(3.0) + r * 0.45 * charge, Color(1.0, 0.9, 0.6, 0.35 + 0.55 * charge))
-	if t.gate[i] == EnemyTable.Gate.MOUTH and t.mode[i] == EnemyTable.Mode.WINDUP:
-		# 吸い込んでいる間は口が開いている
-		c.draw_circle(p + Vector2.from_angle(t.facing[i]) * r * 0.6, r * 0.45, Color(0.1, 0.05, 0.15, 0.9))
-		c.draw_arc(p, r * 2.4, 0, TAU, 32, Color(t.color[i], 0.25), _px(2.0))
-	if t.gate[i] == EnemyTable.Gate.SHELL:
-		if t.shell_open[i] > 0.0:
-			# 殻が割れて、星がむき出しになっている
-			c.draw_circle(p, r * 0.45, Color("#fff4b0"))
-		else:
-			# 殻：傷が増えるほど欠ける
-			var hurt := clampf(t.shell_dmg[i] / float(t.def[i].params.shell_hp), 0.0, 1.0)
-			c.draw_arc(p, r + _px(3.0), t.facing[i], t.facing[i] + TAU * (1.0 - hurt), 24, Color("#d9dde6"), _px(4.0))
-	if t.beh[i] == EnemyTable.Beh.TRIANGLE and t.mode[i] != EnemyTable.Mode.RECOVER and t.parts[i].size() == 6:
-		# 3つの星の間に張った光の膜。揺らめく内側の縁で厚みを見せる
-		var parts := t.parts[i]
-		var tri := PackedVector2Array([t.pos[parts[0]], t.pos[parts[2]], t.pos[parts[4]]])
-		var shimmer := 0.5 + 0.5 * sin(state.world_time * 3.0 + float(t.id[i]))
-		c.draw_colored_polygon(tri, Color(t.color[i], 0.1 + 0.06 * shimmer))
-		var mid := (tri[0] + tri[1] + tri[2]) / 3.0
-		for s: float in [0.82, 0.6]:
-			var inner := PackedVector2Array()
-			for v in tri:
-				inner.append(mid + (v - mid) * (s + 0.04 * shimmer))
-			inner.append(inner[0])
-			c.draw_polyline(inner, Color(t.color[i].lightened(0.4), 0.18 * s), _px(1.5))
-	if t.gate[i] == EnemyTable.Gate.CLAW and not LAYERED_ENEMIES.has(type):
-		# ハサミ：構えから挟んだ直後まで開いている
-		var open := t.mode[i] == EnemyTable.Mode.WINDUP or t.mode[i] == EnemyTable.Mode.RECOVER
-		for side: float in [-1.0, 1.0]:
-			var a := t.facing[i] + side * (0.75 if open else 0.35)
-			c.draw_circle(p + Vector2.from_angle(a) * r * 1.15, r * 0.38, Color("#ffb38a") if open else t.color[i])
-	if t.beh[i] == EnemyTable.Beh.CEPHEUS and t.mode[i] == EnemyTable.Mode.WINDUP:
-		# 召喚の間、王冠の光が強まる
-		var k := t.charge[i]
-		c.draw_arc(p, r * (1.15 + 0.3 * k), 0, TAU, 40, Color(1.0, 0.85, 0.4, 0.35 + 0.5 * k), _px(3.0))
-		c.draw_circle(p - Vector2.from_angle(t.facing[i]) * r * 0.55, r * (0.15 + 0.2 * k), Color(1.0, 0.92, 0.6, 0.5 + 0.4 * k))
-	if t.beh[i] == EnemyTable.Beh.SOLDIER and t.mode[i] == EnemyTable.Mode.RECOVER:
-		# 王を失って崩れていく兵
-		var flick := 0.5 + 0.5 * sin(state.world_time * 30.0 + float(t.id[i]))
-		c.draw_arc(p, r * 1.3, 0, TAU, 20, Color(1.0, 0.3, 0.3, 0.4 + 0.4 * flick), _px(2.0))
-	if t.beh[i] == EnemyTable.Beh.CROW and t.carry[i] > 0.0:
-		_draw_crow_bundle(c, t, i)
+	if v != null:
+		v.draw_marks(c, t, i)
 	var hp := t.hp[i]
 	var max_hp := t.max_hp[i]
 	if (r >= 25.0 or t.is_boss[i] != 0) and hp < max_hp:
@@ -1149,199 +1037,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		var top := p + Vector2(-w / 2.0, -r - _px(10.0))
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
-
-## 自爆する雑魚：カウントダウンに入ると赤く膨らむ光と、残り時間の輪、後ろの導火線の火花が強まる。
-func _draw_bomber(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var u := Vector2.from_angle(t.facing[i])
-	var fuse := p - u * r * 0.95
-	var now := state.world_time
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		c.draw_circle(fuse, maxf(_px(1.5), r * 0.12) * (0.7 + 0.3 * sin(now * 30.0 + float(t.id[i]))), Color("#ffd36b"))
-		return
-	var k := t.charge[i]
-	var throb := 0.5 + 0.5 * sin(state.world_time * (10.0 + 20.0 * k))
-	c.draw_arc(p, r * (1.05 + 0.25 * k * throb), 0, TAU, 32, Color(1.0, 0.3, 0.2, 0.35 + 0.45 * k), maxf(_px(2.0), r * (0.15 + 0.2 * k)))
-	c.draw_arc(p, r * 1.45, -PI / 2.0, -PI / 2.0 + TAU * (1.0 - k), 32, Color(1.0, 0.85, 0.5, 0.9), maxf(_px(2.0), r * 0.18))
-	for n in 4:
-		var q := fuse + Vector2.from_angle(now * 25.0 + n * 1.7) * r * (0.25 + 0.35 * k)
-		c.draw_circle(q, maxf(_px(1.5), r * (0.08 + 0.1 * k)), Color(1.0, 0.8 - 0.4 * float(n % 2), 0.3))
-
-## ビームの敵：構えると、周りの光の粒が砲口へ吸い込まれて集まり、撃つ瞬間に砲口が白く光る。
-func _draw_beamer(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var muzzle := p + Vector2.from_angle(t.facing[i]) * r * 0.9
-	var col := t.color[i].lightened(0.35)
-	var k := t.charge[i]
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		c.draw_circle(muzzle, maxf(_px(1.5), r * 0.1), Color(col, 0.6))
-		return
-	if k < 1.0:
-		for n in 8:
-			var f := fmod(k * 2.5 + n / 8.0, 1.0)
-			var q := muzzle + Vector2.from_angle(n * TAU / 8.0 + k * 3.0) * r * (1.8 - 1.6 * f)
-			c.draw_circle(q, maxf(_px(1.5), r * 0.08), Color(col, f))
-		c.draw_circle(muzzle, _px(2.0) + r * 0.45 * k, Color(col, 0.25 + 0.5 * k))
-		c.draw_circle(muzzle, _px(1.5) + r * 0.2 * k, Color(1, 1, 1, 0.5 + 0.5 * k))
-	else:
-		c.draw_circle(muzzle, r * 0.7, Color(1, 1, 1, 0.55))
-		c.draw_circle(muzzle, r * 0.45, Color(col, 0.9))
-
-## 波動の敵：次の輪までの溜まり具合で中心の光が強まり、構えると光の輪が中心へ縮んで集まる。
-func _draw_pulser(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var dp: Dictionary = t.def[i].params
-	var col := t.color[i].lightened(0.4)
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		var k := 1.0 - clampf(t.timer[i] / float(dp.telegraph), 0.0, 1.0)
-		for n in 3:
-			var f := fmod(k * 1.5 + n / 3.0, 1.0)
-			c.draw_arc(p, r * (2.4 - 2.0 * f), 0, TAU, 32, Color(col, f * 0.8), _px(2.0))
-		c.draw_circle(p, r * (0.25 + 0.2 * k), Color(1, 1, 1, 0.6 + 0.4 * k))
-		return
-	var ready := 1.0 - clampf(t.fire_t[i] / float(dp.fire_interval), 0.0, 1.0)
-	c.draw_circle(p, r * (0.12 + 0.14 * ready), Color(col, 0.3 + 0.6 * ready))
-	var spin := state.world_time * 2.0
-	for n in 3:
-		var a := spin + n * TAU / 3.0
-		c.draw_arc(p, r * 1.18, a, a + 0.8 * ready, 8, Color(col, 0.6 * ready), _px(2.0))
-
-## ぼうえんきょう座：レンズから伸びるサーチライトの帯。狙いが溜まるほど細く赤くなり、本体の周りの輪が狙いの溜まり具合を示す。
-## 光は隕石・惑星・月で遮られ、その裏には描かない（光線の束の届く長さで形を作る）。
-## 機体が光の中にいる間は帯が明るくなる。撃ったあとの休みの間は暗い。
-func _draw_telescope(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	if not run.enemies.telescope_aiming(i):
-		return
-	var p := t.pos[i]
-	var r := t.r[i]
-	var dp: Dictionary = t.def[i].params
-	var k := t.charge[i]
-	var f := t.facing[i]
-	var lens := run.enemies.telescope_lens(i)
-	var half := run.enemies.telescope_half(i)
-	var length := float(dp.band_len)
-	var rays := run.enemies.telescope_rays(i)
-	var col := Color(0.62, 0.9, 1.0).lerp(Color(1.0, 0.22, 0.2), k)
-	var resting := t.mode[i] == EnemyTable.Mode.RECOVER
-	var seen := run.enemies.telescope_sight(i, state.ship_pos) == 1
-	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 if seen else 0.0)
-	var count := rays.size()
-	if count < 2:
-		return
-	var pts := PackedVector2Array([lens])
-	var cols := PackedColorArray([Color(col, a0)])
-	for n in count:
-		var reach := rays[n]
-		pts.append(lens + Vector2.from_angle(f - half + 2.0 * half * n / float(count - 1)) * reach)
-		cols.append(Color(col, a0 * (1.0 - reach / length)))
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		# レーザーの溜め：帯がすぼまって赤い照準線になり脈打つ。光の粒がレンズへ吸い込まれ、レンズの光が膨らむ
-		var w := 1.0 - clampf(t.timer[i] / float(dp.laser_charge), 0.0, 1.0)
-		var reach := run.enemies.telescope_reach(i, f)
-		var pulse := 0.5 + 0.5 * sin(state.world_time * (30.0 + 40.0 * w))
-		var tip := lens + Vector2.from_angle(f) * reach
-		c.draw_line(lens, tip, Color(1.0, 0.25, 0.2, 0.25 + 0.35 * pulse), maxf(_px(2.0), 4.0 + 10.0 * w))
-		c.draw_line(lens, tip, Color(1.0, 0.85, 0.8, 0.5 + 0.4 * pulse), maxf(_px(1.0), 1.5 + 2.0 * w))
-		for n in 10:
-			var fr := fmod(w * 3.0 + n / 10.0, 1.0)
-			var q := lens + Vector2.from_angle(n * TAU / 10.0 + w * 4.0) * r * (2.4 - 2.2 * fr)
-			c.draw_circle(q, maxf(_px(1.5), r * 0.07), Color(1.0, 0.45, 0.3, fr))
-		c.draw_circle(lens, r * (0.35 + 0.6 * w), Color(1.0, 0.3, 0.22, 0.35 + 0.3 * pulse))
-		c.draw_circle(lens, r * (0.18 + 0.3 * w), Color(1.0, 0.92, 0.85, 0.9))
-		return
-	c.draw_polygon(pts, cols)
-	c.draw_line(lens, pts[1], Color(col, a0 * 1.6), _px(1.5))
-	c.draw_line(lens, pts[count], Color(col, a0 * 1.6), _px(1.5))
-	c.draw_circle(lens, _px(2.0) + r * (0.2 + 0.2 * k), Color(col, 0.5 + 0.4 * k))
-	if k > 0.0:
-		c.draw_arc(p, r * 1.35, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color(col, 0.9), maxf(_px(2.0), r * 0.12))
-
-## いるか座：構えている間、撃つ向きへ扇の輪郭と数層の弧が伸びていき、撃つ向きを予告する。
-func _draw_dolphin(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		return
-	var p := t.pos[i]
-	var r := t.r[i]
-	var k := t.charge[i]
-	var dp: Dictionary = t.def[i].params
-	var arc := float(dp.wave_arc)
-	var f := t.facing[i]
-	var col := t.color[i].lightened(0.3)
-	var reach := r * (2.0 + 4.0 * k)
-	for s: float in [-1.0, 1.0]:
-		c.draw_line(p, p + Vector2.from_angle(f + s * arc) * reach, Color(col, 0.25 + 0.4 * k), _px(2.0))
-	for n in 3:
-		var fr := fmod(k * 2.0 + n / 3.0, 1.0)
-		c.draw_arc(p, r * (1.2 + 3.5 * fr), f - arc, f + arc, 24, Color(col, (1.0 - fr) * (0.3 + 0.5 * k)), _px(3.0))
-	c.draw_circle(p + Vector2.from_angle(f) * r, r * (0.2 + 0.25 * k), Color(1, 1, 1, 0.5 + 0.4 * k))
-
-## みなみじゅうじ座：構えている間、縦と横に十字の予告線が伸び、中心の光が強まる。
-func _draw_cross(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		return
-	var p := t.pos[i]
-	var k := t.charge[i]
-	var col := t.color[i].lightened(0.2)
-	var length := float(t.def[i].params.beam_len) * (0.25 + 0.75 * k)
-	for q in 4:
-		var u := Vector2.from_angle(q * PI / 2.0)
-		var s := 0.0
-		while s < length:
-			c.draw_line(p + u * s, p + u * minf(s + 20.0, length), Color(col, 0.2 + 0.5 * k), maxf(_px(1.5), 2.0 + 3.0 * k))
-			s += 36.0
-	c.draw_circle(p, t.r[i] * (0.4 + 0.5 * k), Color(1, 1, 0.9, 0.35 + 0.5 * k))
-
-## レチクル座：狙っている岩の周りに照準の四隅が縮みながら回り込み、本体から岩へ細い照準線が伸びる。
-func _draw_reticle(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var col := t.color[i].lightened(0.2)
-	var p := t.pos[i]
-	var r := t.r[i]
-	var lens := p + Vector2.from_angle(t.facing[i]) * r
-	c.draw_circle(lens, maxf(_px(1.5), r * 0.12), Color(col, 0.7))
-	if t.mode[i] != EnemyTable.Mode.WINDUP:
-		return
-	var rock := t.target[i]
-	if not run.enemies.is_same(rock, t.target_id[i]):
-		return
-	var k := t.charge[i]
-	var at := t.pos[rock]
-	var size := t.r[rock] * (1.6 - 0.5 * k)
-	var spin := PI / 4.0 * (1.0 - k)
-	for q in 4:
-		var a := spin + q * PI / 2.0
-		var corner := at + Vector2.from_angle(a) * size * 1.41
-		var u := Vector2.from_angle(a + PI * 0.75)
-		var v := Vector2.from_angle(a - PI * 0.75)
-		c.draw_line(corner, corner + u * size * 0.5, Color(col, 0.5 + 0.5 * k), maxf(_px(2.0), 3.0))
-		c.draw_line(corner, corner + v * size * 0.5, Color(col, 0.5 + 0.5 * k), maxf(_px(2.0), 3.0))
-	c.draw_line(at - Vector2(size * 0.3, 0), at + Vector2(size * 0.3, 0), Color(col, 0.6 * k), _px(1.5))
-	c.draw_line(at - Vector2(0, size * 0.3), at + Vector2(0, size * 0.3), Color(col, 0.6 * k), _px(1.5))
-	var gap := at - lens
-	var steps := int(gap.length() / 18.0)
-	for n in range(0, steps, 2):
-		c.draw_line(lens + gap * (float(n) / steps), lens + gap * (float(n + 1) / steps), Color(col, 0.25 + 0.5 * k), _px(1.5))
-
-## じょうぎ座：照射の予告は、発射元から照射の向きへ伸びる点線。予告が進むほど濃く、先端の光が強まる。
-func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var u := Vector2.from_angle(t.facing[i])
-	var tip := p + u * r
-	var col := t.color[i].lightened(0.2)
-	if t.mode[i] == EnemyTable.Mode.WINDUP:
-		var k := t.charge[i]
-		var length := float(t.def[i].params.beam_len)
-		var dash := 36.0
-		var s := 0.0
-		while s < length:
-			c.draw_line(tip + u * s, tip + u * minf(s + dash * 0.55, length), Color(col, 0.25 + 0.6 * k), maxf(_px(2.0), 3.0 + 4.0 * k))
-			s += dash
-		c.draw_circle(tip, r * (0.2 + 0.4 * k), Color(1, 1, 1, 0.4 + 0.5 * k))
-	elif t.mode[i] == EnemyTable.Mode.DASH and t.buds[i] != 0:
-		c.draw_circle(tip, r * 0.18, Color(col, 0.6))
 
 ## やまねこ座の斬撃：潰れた弧の3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
 func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
@@ -1351,61 +1046,6 @@ func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, size: float, side: 
 		c.draw_polyline(pts, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
 		c.draw_polyline(pts, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
 		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
-
-## やまねこ座：構えると、次に斬撃を伸ばす側の前足に、爪痕の光が強まる。
-func _draw_lynx(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var k := t.charge[i]
-	if k <= 0.0:
-		return
-	var r := t.r[i]
-	var f := t.facing[i]
-	var u := Vector2.from_angle(f)
-	var side := run.enemies.lynx_side(i)
-	var paw := t.pos[i] + u * r * 0.55 + Vector2(-u.y, u.x) * side * r * 0.6
-	c.draw_circle(paw, r * (0.25 + 0.35 * k), Color(1.0, 0.55, 0.2, 0.25 * k))
-	_draw_slash(c, paw, f, r * (0.5 + 0.5 * k), side, 0.3 + 0.7 * k)
-
-## ポンプ座の絵（pump.png、48px）の継ぎ目の帯。前（画像の下）を + にした絵の中心からの位置と、半分の長さ（px）
-const PUMP_SEAMS := [[-10.5, 14.7], [-3.0, 16.4], [4.5, 14.7]]
-
-## ポンプ座：吸い込んだ数に応じて継ぎ目から光が漏れ、口へ流れ込む吸い込みの筋を描く。
-## 構えている間は胴体が張り詰めて脈打ち、継ぎ目が強く光り、口元に巨大な塊がせり出す。
-func _draw_pump(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var dp: Dictionary = t.def[i].params
-	var full := clampf(float(t.buds[i]) / float(dp.store_max), 0.0, 1.0)
-	var aiming := t.mode[i] == EnemyTable.Mode.WINDUP
-	var px := r / 24.0
-	var u := Vector2.from_angle(t.facing[i])
-	var side := Vector2(-u.y, u.x)
-	var mouth := p + u * r * EnemySystem.PUMP_MOUTH
-	var now := state.world_time
-	if t.mode[i] == EnemyTable.Mode.MOVE:
-		# 口へ流れ込む吸い込みの筋（外から口へ動く短い光）
-		for k in 9:
-			var phase := fmod(now * 1.4 + k * 0.381966, 1.0)
-			var ang := t.facing[i] + (float(k) - 4.0) * 0.26
-			var dist := r * (2.6 - 2.2 * phase)
-			var head := mouth + Vector2.from_angle(ang) * dist
-			var tail := mouth + Vector2.from_angle(ang) * (dist + r * 0.5)
-			c.draw_line(tail, head, Color(t.color[i].lightened(0.55), 0.55 * sin(phase * PI)), _px(2.0))
-	# 継ぎ目から漏れる光：吸い込むほど強く、構えると白熱して脈打つ
-	var pulse := 0.5 + 0.5 * sin(now * (22.0 if aiming else 5.0))
-	var glow := Color("#fff0c8") if aiming else t.color[i].lightened(0.55)
-	var a := (0.85 + 0.15 * pulse) if aiming else full * (0.55 + 0.25 * pulse)
-	if a > 0.02:
-		for seam in PUMP_SEAMS:
-			var center: Vector2 = p + u * float(seam[0]) * px
-			var half: Vector2 = side * float(seam[1]) * px * 0.92
-			c.draw_line(center - half, center + half, Color(glow, a * 0.35), maxf(_px(2.0), px * 4.5))
-			c.draw_line(center - half, center + half, Color(glow, a), maxf(_px(1.0), px * 1.6))
-	if aiming:
-		# 張り詰めた胴体の縁と、口元にせり出す塊
-		c.draw_arc(p + u * -3.0 * px, 16.5 * px * (1.03 + 0.03 * pulse), 0, TAU, 48, Color(glow, 0.55 + 0.35 * pulse), maxf(_px(2.0), px * 1.5))
-		var ball := float(dp.shell_r) * (0.35 + 0.65 * t.charge[i])
-		var at := mouth + u * ball * 0.55
-		_draw_shell_ball(c, at, ball, t.color[i], now)
 
 ## 圧縮した敵の塊（構えている口元と、撃った圧縮弾）。張り詰めた膜の中に、押し込められた敵がひしめいて回る。
 func _draw_shell_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: float) -> void:
@@ -1428,33 +1068,6 @@ func _draw_shell_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: fl
 		c.draw_set_transform(Vector2.ZERO)
 	c.draw_circle(at, r, Color(base.lightened(0.3), 0.18))
 	c.draw_arc(at, r, 0, TAU, 40, Color("#fff0c8", 0.75 + 0.25 * pulse), maxf(_px(1.5), r * 0.1))
-
-## からす座が足に抱えた経験値の結晶の束（尾の側の足元）。運んでいる量が多いほど大きく、明るく光る。
-func _draw_crow_bundle(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
-	var r := t.r[i]
-	var n := clampi(t.buds[i], 1, 12)
-	var amount := clampf(sqrt(t.carry[i]) / 8.0, 0.0, 1.0)
-	var u := Vector2.from_angle(t.facing[i])
-	var side := Vector2(-u.y, u.x)
-	var center := p - u * r * 0.62
-	var s := maxf(_px(2.0), r * (0.07 + 0.05 * amount))
-	var pulse := 0.5 + 0.5 * sin(state.world_time * 6.0)
-	c.draw_circle(center, s * (2.2 + 1.6 * amount), Color(XP_COLOR.lightened(0.3), 0.1 + 0.2 * amount * (0.6 + 0.4 * pulse)))
-	# 足の爪
-	for k: float in [-1.0, 1.0]:
-		c.draw_line(center + side * s * 1.2 * k + u * s * 2.2, center + side * s * 1.8 * k + u * s * 0.4, Color("#d8d2dc"), maxf(_px(1.0), s * 0.4))
-	var col := XP_COLOR.lightened(0.15 + 0.4 * amount)
-	var edge := XP_COLOR.darkened(0.55)
-	for k in n:
-		var ring := 0 if k == 0 else (1 if k < 7 else 2)
-		var a := float(k) * 2.399963
-		var q := center + (side * cos(a) - u * sin(a) * 0.8) * s * 1.4 * float(ring)
-		var pts := PackedVector2Array([q - u * s * 1.3, q + side * s * 0.8, q + u * s * 1.3, q - side * s * 0.8])
-		c.draw_colored_polygon(pts, col)
-		pts.append(pts[0])
-		c.draw_polyline(pts, edge, maxf(_px(1.0), s * 0.22))
-		c.draw_line(q - u * s * 0.8, q - side * s * 0.3, Color(1, 1, 1, 0.75), maxf(_px(1.0), s * 0.22))
 
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := view_rect().grow(40.0)
