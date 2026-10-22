@@ -53,10 +53,39 @@ class Neck:
 ## 首の本数ごとの首の種類（並びは付け根の向きの順）
 const NECKS := {
 	3: [&"bite", &"vortex", &"debris"],
-	5: [&"bite", &"vortex", &"debris", &"beam", &"bite"],
-	7: [&"bite", &"vortex", &"debris", &"beam", &"bite", &"homing", &"beam"],
-	9: [&"bite", &"vortex", &"debris", &"beam", &"bite", &"homing", &"beam", &"vortex", &"debris"],
+	5: [&"bite", &"vortex", &"debris", &"beam", &"thunder"],
+	8: [&"bite", &"vortex", &"debris", &"beam", &"thunder", &"bite", &"beam", &"vortex"],
 }
+var growth_t := 0.0
+var separation_pending := false
+var separated := false
+
+func on_body_damaged() -> void:
+	if not separated:
+		_check_growth()
+
+func handle_body_defeat(_opts: Dictionary) -> bool:
+	if separated:
+		return false
+	separation_pending = true
+	return true
+
+func _check_growth() -> void:
+	if growth_t > 0.0 or separated:
+		return
+	var ratio := table.hp[body] / table.max_hp[body]
+	var thresholds: Array = def.params.growth_thresholds
+	var next := 5 if count == 3 and ratio <= float(thresholds[0]) else (8 if count == 5 and ratio <= float(thresholds[1]) else 0)
+	if next == 0:
+		return
+	interrupt_tech()
+	_set_count(next)
+	growth_t = float(def.params.growth_time)
+	table.guard[body] = growth_t
+	for neck in necks:
+		if _alive(neck): table.guard[neck.row] = growth_t
+	_cue(&"growth_started", &"", -1, {"duration": growth_t})
+
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
 const TECH_DIR := {&"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
@@ -104,7 +133,7 @@ func _on_bound() -> void:
 	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
 	timeline.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
 	draws_self = true
-	table.gate[body] = EnemyTable.Gate.GHOST
+	table.gate[body] = EnemyTable.Gate.NONE
 	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）
 	z_index = 5
 	if presentation_scene != null:
@@ -133,16 +162,30 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		return
 	_time += dt
 	_sim_dt = dt
+	if growth_t > 0.0:
+		growth_t = maxf(0.0, growth_t - dt)
+		table.guard[body] = growth_t
+		for neck in necks:
+			if _alive(neck):
+				table.guard[neck.row] = growth_t
+				neck.length = move_toward(neck.length, float(def.params.neck_rest), float(def.params.neck_rest) * dt)
+				table.pos[neck.row] = _head_pos(neck)
+				_follow_neck(neck, dt)
+		if growth_t <= 0.0: _check_growth()
+		presentation_advanced.emit(dt)
+		queue_redraw()
+		return
+	_check_growth()
+	if growth_t > 0.0: return
 	_move(dt)
 	recovery_t = maxf(0.0, recovery_t - dt)
 	_expose_cd = maxf(0.0, _expose_cd - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
-	_try_expose()
+	# 全首ダウンはチャンスタイムへ接続する。
 	if north_aiming:
 		_update_north_targets()
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
-	_tick_immortal(dt)
 	_tech_cd -= dt
 	_spin_t -= dt
 	_update_blackboard()
@@ -156,7 +199,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			interrupt_tech()
 		elif tech == &"east":
 			_shatter_on_beams()
-	if table.hp[body] <= 0.0 and not _defeat_announced:
+	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
 		_defeat_announced = true
 		hsm.set_active(false)
 		interrupt_tech()
@@ -191,6 +234,7 @@ func _move(dt: float) -> void:
 ## 首の本数を n にする（段階が変わった）。火で落ちた頭も含めて、全部の首が生え直す。
 func _set_count(n: int) -> void:
 	_cue(&"phase_changed", &"", -1, {"next_count": n})
+	n = 8 if n >= 8 else (5 if n >= 5 else 3)
 	count = n
 	var kinds: Array = NECKS[n]
 	for k in kinds.size():
@@ -202,6 +246,11 @@ func _set_count(n: int) -> void:
 			neck.kind = kinds[k]
 			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * run_state.rng.randf())
 			necks.append(neck)
+		neck.kind = kinds[k]
+		if neck.row >= 0 and _alive(neck):
+			_release_attack(neck)
+			manager.enemies.mark_dead(neck.row)
+			neck.row = -1
 		neck.base_angle = TAU * k / float(n)
 		neck.burned = false
 		if neck.row < 0:
