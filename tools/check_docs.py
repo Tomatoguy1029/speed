@@ -96,6 +96,10 @@ def main():
 
     for dirpath, dirs, files in os.walk(os.path.join(ROOT, "docs")):
         rel = os.path.relpath(dirpath, ROOT)
+        # git が扱わない、ファイルの無いフォルダは見ない
+        if not any(f != ".DS_Store" for _, _, fs in os.walk(dirpath) for f in fs):
+            dirs[:] = []
+            continue
         if rel not in ALLOWED:
             errors.append(f"{rel}/: docs/ に無い置き場（置き場は docs/README.md の1章）")
             dirs[:] = []
