@@ -67,11 +67,11 @@ func _set_visual(value: float, key: String) -> void:
 		render._apply_lighting()
 
 ## 実験場の表示付きのランの描画（表示のない試行では null）。
-func _render() -> RenderManager:
+func _render() -> RunPresentation:
 	var scene: RunSession = lab.session.scene
 	if not is_instance_valid(scene) or scene.view == null:
 		return null
-	return scene.view.get_node("RenderManager") as RenderManager
+	return scene.view.get_node("RunPresentation") as RunPresentation
 
 func _sync_appearance() -> void:
 	var row: int = lab.session.selected
@@ -85,7 +85,7 @@ func _sync_appearance() -> void:
 	_appearance_save.disabled = not supported
 	_appearance_reset.disabled = not supported
 	for field: SpinBox in _lighting_fields.values():
-		field.editable = supported and RenderManager.load_look(type, lab.session.run.state.stage) != null
+		field.editable = supported and RunPresentation.load_look(type, lab.session.run.state.stage) != null
 	if not supported:
 		_appearance_label.text = tr("lab.appearance.select_type")
 		return

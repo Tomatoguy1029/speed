@@ -160,7 +160,7 @@ func field_items() -> Array:
 			FIELD_ITEM.make(&"field_comet", tr("lab.field.comet"), &"comet", 45.0, Color("#9fd6ff")),
 			FIELD_ITEM.make(&"field_gravity", tr("lab.field.gravity"), &"gravity", 0.0, Color("#a98cff")),
 			FIELD_ITEM.make(&"field_warp", tr("lab.field.warp"), &"warp", 0.0, Color("#d6a8ff")),
-			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RenderManager.XP_COLOR),
+			FIELD_ITEM.make(&"field_gem", tr("lab.field.gem"), &"gem", 140.0, RunPresentation.XP_COLOR),
 		]
 	return _field_items
 
@@ -225,7 +225,7 @@ func _reset() -> void:
 	canvas.selection.clear()
 	canvas.result.clear()
 	canvas.center = session.run.state.ship_pos
-	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
+	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	if render != null:
 		canvas.zoom = render.game_zoom()
 	_busy = false
@@ -474,7 +474,7 @@ func _process(_delta: float) -> void:
 ## 試遊中は本番のカメラが機体を追い、編集用の層もその視点に合わせる。
 ## 編集中は編集用の層の視点（ホイール・中ドラッグで動かす）を、本番の描画のカメラに渡す。ゲームの状態は変えない。
 func _sync_view() -> void:
-	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
+	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	var playing: bool = canvas.mode == 3
 	var following: bool = playing or canvas.follow
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
@@ -500,7 +500,7 @@ func _sync_view() -> void:
 
 ## 本番の画面と同じ大きさで映す倍率（描画がまだなければ 1）。
 func game_zoom() -> float:
-	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
+	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	return render.game_zoom() if render != null else 1.0
 
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。

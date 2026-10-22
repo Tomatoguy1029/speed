@@ -73,11 +73,11 @@ func texture_for(id: String) -> Texture2D:
 	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
 		return preload("res://assets/placeholders/corona_crown.svg")
 	var stage: StageDef = session.run.state.stage if session != null and is_instance_valid(session.run) else null
-	var look := RenderManager.load_look(StringName(id), stage)
+	var look := RunPresentation.load_look(StringName(id), stage)
 	if look != null:
-		return RenderManager.look_texture(look, _look_textures)
+		return RunPresentation.look_texture(look, _look_textures)
 	if id.begins_with("field_planet"):
-		return RenderManager.PLANET
+		return RunPresentation.PLANET
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
 	var path := "res://assets/pixel/%s.png" % id
 	if session != null and is_instance_valid(session.run) and session.run.state.stage != null:
