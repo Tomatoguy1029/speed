@@ -156,8 +156,8 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 		_meta_boxes[def.id] = spin
 	var row := HBoxContainer.new()
 	var preset := Button.new()
-	preset.text = "全部を8割にする"
-	preset.pressed.connect(_set_meta_ratio.bind(0.8))
+	preset.text = "全部を7割にする"
+	preset.pressed.connect(_set_meta_cost_ratio.bind(0.7))
 	row.add_child(preset)
 	var back := Button.new()
 	back.text = "セーブの段に戻す"
@@ -168,10 +168,23 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 	box.add_child(row)
 	_refresh_meta_levels()
 
-## 全項目を最大の段の ratio 倍（四捨五入）にする。
-func _set_meta_ratio(ratio: float) -> void:
+## 各項目を、そこまでに使う部品の合計が全段の合計の ratio 倍にいちばん近い段にする（同じ近さなら低い段）。
+func _set_meta_cost_ratio(ratio: float) -> void:
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
-		SaveManager.dev_meta_override[String(def.id)] = roundi(def.costs.size() * ratio)
+		var total := 0
+		for c in def.costs:
+			total += c
+		var target := total * ratio
+		var best := 0
+		var spent := 0
+		for k in def.costs.size():
+			spent += def.costs[k]
+			var best_spent := 0
+			for c in def.costs.slice(0, best):
+				best_spent += c
+			if absf(spent - target) < absf(best_spent - target):
+				best = k + 1
+		SaveManager.dev_meta_override[String(def.id)] = best
 	_refresh_meta_levels()
 
 func _refresh_meta_levels() -> void:
