@@ -32,6 +32,10 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[editor]
+
+export/convert_text_resources_to_binary=false
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/content_build/plugin.cfg", "res://addons/spawn_timeline/plugin.cfg", "res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg")
@@ -52,6 +56,7 @@ common/physics_ticks_per_second=120
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true
 
 [spawn_timeline]
 

@@ -46,12 +46,13 @@ var heroes: Dictionary:
 
 func _ready() -> void:
 	base = load(CONFIG_PATH) as GameConfig
-	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
+	if OS.has_feature("editor"): source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
 	catalog = load("res://data/content_catalog.tres") as ContentCatalog
 	# 記録の基準は読み込み順に依存させない。ファイルのハッシュだけを読む。
-	for entry in catalog.entries:
-		source_hashes[entry.path] = FileAccess.get_sha256(entry.path)
+	if OS.has_feature("editor"):
+		for entry in catalog.entries:
+			source_hashes[entry.path] = FileAccess.get_sha256(entry.path)
 
 ## 調整値を .tres の値に戻す。
 func reset_runtime() -> void:
@@ -125,7 +126,7 @@ func reload_experiment_data() -> bool:
 	for name in registries: set(name, loaded[name])
 	base = fresh
 	reset_runtime()
-	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
+	if OS.has_feature("editor"): source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	return true
 
 ## 定義は要求されたIDだけ読む。索引のパスは文字列なので依存資源を読み込まない。

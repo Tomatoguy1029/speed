@@ -41,7 +41,7 @@ static func compile(source: StageDef) -> RuntimeStage:
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
 	result.resources = load("res://tools/content/build_stage_resources.gd").build(result)
-	return result
+	return result if result.resources != null else null
 
 static func names(source: StageDef) -> Dictionary:
 	var result := {"phases": {}, "clips": {}}
@@ -54,7 +54,9 @@ static func build_all(output := "res://.content") -> Error:
 	for file in DirAccess.get_files_at("res://data/stages"):
 		if not file.ends_with(".tres"): continue
 		var source := ResourceLoader.load("res://data/stages/" + file, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
-		var error := ResourceSaver.save(compile(source), output.path_join("stage_%d.tres" % source.index))
+		var compiled := compile(source)
+		if compiled == null: return ERR_INVALID_DATA
+		var error := ResourceSaver.save(compiled, output.path_join("stage_%d.tres" % source.index))
 		if error != OK: return error
 		var handle := FileAccess.open(output.path_join("dev/stage_%d.json" % source.index), FileAccess.WRITE)
 		if handle == null: return FileAccess.get_open_error()

@@ -1,4 +1,5 @@
 ## 定義を読まずに、ID・並び順・画面用の値を引く。
+@tool
 class_name ContentCatalog
 extends Resource
 @export var source_signature := ""

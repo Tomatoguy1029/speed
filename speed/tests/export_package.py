@@ -1,0 +1,42 @@
+"""生成したPCKの配布境界と実行用データを確認する。引数はPCKのパス。"""
+import re
+import struct
+import sys
+from pathlib import Path
+
+
+def inspect(path: Path) -> None:
+    data = path.read_bytes()
+    assert data[:4] == b"GDPC", "PCKの先頭にヘッダーが必要"
+    version, _, _, _, flags, base = struct.unpack_from("<5IQ", data, 4)
+    assert version in (2, 3) and not flags & 1, "暗号化なしのPCK v2/v3を検査する"
+    position = struct.unpack_from("<Q", data, 32)[0] if version == 3 else 96
+    count = struct.unpack_from("<I", data, position)[0]
+    position += 4
+    files = {}
+    for _ in range(count):
+        length = struct.unpack_from("<I", data, position)[0]
+        position += 4
+        name = data[position:position + length].rstrip(b"\0").decode().replace("res://", "", 1)
+        position += length
+        offset, size = struct.unpack_from("<QQ", data, position)
+        position += 36
+        files[name] = data[base + offset:base + offset + size]
+    excluded = ("gyms/", "tests/", "tools/", "scripts/dev/", ".content/dev/",
+                "addons/content_build/", "addons/spawn_timeline/",
+                "addons/speed_data_editor/", "addons/stage_launcher/")
+    forbidden = [name for name in files if name.startswith(excluded)]
+    assert not forbidden, f"開発用ファイルが残っている: {forbidden}"
+    assert b"autoload/DevBootstrap" not in files["project.binary"], "開発用Autoloadを除外"
+    assert "addons/limboai/bin/limboai.gdextension" in files, "実行用の拡張を保持"
+    for index in range(1, 6):
+        stage = files[f".content/stage_{index}.tres"].decode()
+        assert 'path="res://scripts/data_types/stage_resources.gd"' in stage and 'resources = SubResource(' in stage, f"ステージ{index}に資源一覧が必要"
+        for dependency in re.findall(r'"(res://[^"\n]+)"', stage):
+            name = dependency.replace("res://", "", 1)
+            assert name in files or name + ".remap" in files or name + ".import" in files, f"配布から欠落: {dependency}"
+    print(f"[export_package] {count} files, 5 stages, OK")
+
+
+if __name__ == "__main__":
+    inspect(Path(sys.argv[1]))

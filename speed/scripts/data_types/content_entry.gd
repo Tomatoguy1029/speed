@@ -1,4 +1,5 @@
 ## 画面と資源の検索に使う、小さな定義の索引。画像はパスだけを保存する。
+@tool
 class_name ContentEntry
 extends Resource
 @export var id: StringName
