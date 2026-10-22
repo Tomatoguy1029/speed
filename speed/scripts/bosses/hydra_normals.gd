@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"rubble_lump":
+		rubble(a,n,dt)
+		return
 	if n.mode == &"wind_blades":
 		wind_blades(a,n,dt)
 		return
@@ -86,3 +89,26 @@ static func wind_blades(a: Node,n,dt: float) -> void:
 		n.step+=1
 		a._cue(&"attack_started",n.mode,a.necks.find(n))
 	if n.t>=charge+2.0*float(p.blade_interval)+float(p.normal_hold): a.finish_normal(n)
+
+static func rubble(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	if n.t < charge:
+		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*5.0))
+		n.glow=n.t/charge
+	elif not n.locked:
+		n.strike_pos=a._head_pos(n)
+		n.locked=true
+		n.target=a.run_state.ship_pos
+		launch_rubble(a,n,n.angle,float(p.lump_r))
+		a._cue(&"attack_started",n.mode,a.necks.find(n))
+	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
+
+static func launch_rubble(a: Node,n,angle: float,radius: float) -> void:
+	var row: int = a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),a._head_pos(n))
+	a.table.r[row]=radius
+	a.table.vel[row]=Vector2.from_angle(angle)*float(a.def.params.lump_speed)
+	var at: Vector2 = a.table.pos[row]
+	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.manager.enemies.def_of(&"hydra_rubble").params.life),float(a.def.params.lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
+	e.follow_row=row
+	e.follow_id=a.table.id[row]

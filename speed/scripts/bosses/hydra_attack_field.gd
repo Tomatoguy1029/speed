@@ -57,6 +57,12 @@ func tick(dt: float) -> void:
 			e.line.queue_free()
 			effects.erase(e)
 			continue
+		if e.has("follow_row"):
+			if not actor.manager.enemies.is_same(e.follow_row,e.follow_id) or actor.table.dead[e.follow_row]:
+				e.life=0.0
+				continue
+			var at: Vector2 = actor.table.pos[e.follow_row]
+			e.points=PackedVector2Array([at,at+Vector2(0.1,0)])
 		if e.age >= e.delay:
 			for i in e.points.size(): e.points[i] += e.velocity * dt
 			var touching := intersects(e.points,e.width,ship_previous,ship) or intersects(prior,e.width,ship_previous,ship)
@@ -72,7 +78,7 @@ func tick(dt: float) -> void:
 				e.hit = true
 		e.line.points = e.points
 		e.line.width = e.width
-		var color: Color = {&"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
+		var color: Color = {&"rubble": Color(0.55,0.44,0.3), &"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
 		e.line.material.set_shader_parameter("tint", color)
 		e.line.material.set_shader_parameter("clock", actor._time)
 		e.line.material.set_shader_parameter("warning", e.age < e.delay)
