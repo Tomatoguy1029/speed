@@ -47,6 +47,9 @@ class Neck:
 	var emission: Dictionary = {}
 	var locked := false
 	var bt: BTTask
+	var free_pos:=Vector2.ZERO
+	var velocity:=Vector2.ZERO
+	var motion: Dictionary={}
 	var step := 0
 	var glow := 0.0
 	## 付いて動く攻撃の形（ビーム）の行と、強めの技で首を振る速さ
@@ -66,6 +69,8 @@ const NECKS := {
 var growth_t := 0.0
 var separation_pending := false
 var separated := false
+var separation_t:=0.0
+var immortal_neck: Neck
 var chance_t := 0.0
 
 func _chance_step(dt: float) -> void:
@@ -87,7 +92,7 @@ func on_body_damaged() -> void:
 
 func handle_body_defeat(_opts: Dictionary) -> bool:
 	if separated:
-		return false
+		return immortal_row>=0 and manager.enemies.is_same(immortal_row,immortal_id) and table.dead[immortal_row]==0
 	separation_pending = true
 	return true
 
@@ -205,7 +210,18 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		return
 	_check_growth()
 	if growth_t > 0.0: return
-	_move(dt)
+	if separation_pending:begin_separation()
+	if separation_t>0.0:
+		separation_t=maxf(0.0,separation_t-dt)
+		table.guard[body]=separation_t
+		if immortal_row>=0:table.guard[immortal_row]=separation_t
+		for n in necks:
+			if _alive(n):table.guard[n.row]=separation_t
+		presentation_advanced.emit(dt)
+		queue_redraw()
+		return
+	if separated:tick_bearer(dt)
+	else:_move(dt)
 	recovery_t = maxf(0.0, recovery_t - dt)
 	_expose_cd = maxf(0.0, _expose_cd - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
@@ -317,6 +333,7 @@ func _grow(neck: Neck) -> void:
 
 ## 根元は胴体表面のローカル座標で固定し、首の狙い角から分離する。
 func _neck_base(neck: Neck) -> Vector2:
+	if separated:return neck.free_pos-Vector2.from_angle(neck.angle)*float(def.params.neck_rest)
 	return table.pos[body] + Vector2.from_angle(neck.base_angle + table.facing[body]) * table.r[body]
 
 func _head_pos(neck: Neck) -> Vector2:
@@ -324,6 +341,7 @@ func _head_pos(neck: Neck) -> Vector2:
 	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
 	if neck.locked and def.params.normal_rules.has(neck.mode): return neck.strike_pos
+	if separated:return neck.free_pos
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
 
 func _alive(neck: Neck) -> bool:
@@ -339,7 +357,7 @@ func on_part_defeated(row: int) -> void:
 	if immortal_row == row and immortal_id == table.id[row]:
 		if table.hp[row] <= 0.0:
 			_cue(&"hit", &"immortal", -2, {"target": &"hydra", "damage": table.max_hp[row]})
-		_tick_immortal(0.0)
+		if separated:table.hp[body]=0.0
 
 ## 首1本の更新。露出中は生え直しを止める。
 func _tick_neck(neck: Neck, k: int, dt: float) -> void:
@@ -509,6 +527,7 @@ func finish_normal(n: Neck) -> void:
 	_release_attack(n)
 	n.angle = (at-_neck_base(n)).angle()
 	n.length = at.distance_to(_neck_base(n))
+	n.free_pos=at
 	n.locked = false
 	n.mode = &"idle"
 	n.cd = float(def.params.attack_cd)
@@ -516,6 +535,14 @@ func finish_normal(n: Neck) -> void:
 
 func position_head(index: int, dt: float) -> void:
 	var n := necks[index]
+	if separated:
+		var center: Vector2=table.pos[immortal_row] if immortal_row>=0 else run_state.ship_pos
+		var desired: Vector2=center+Vector2.from_angle(n.base_angle+_time*0.12)*float(def.params.guard_radius)
+		if not run_state.view_rect().grow(-60.0).has_point(n.free_pos):desired=run_state.view_rect().get_center()+Vector2.from_angle(n.base_angle)*minf(run_state.view_half.x,run_state.view_half.y)*0.65
+		n.velocity=(desired-n.free_pos).limit_length(float(def.params.snake_speed))
+		n.free_pos+=n.velocity*dt
+		if n.velocity.length()>1.0:n.angle=n.velocity.angle()
+		return
 	var facing := n.base_angle+table.facing[body]
 	n.angle = lerp_angle(n.angle,facing+sin(_time+n.base_angle)*0.15,minf(1.0,dt*2.0))
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
@@ -593,6 +620,7 @@ func _end(neck: Neck, interrupted := false) -> void:
 		var delta := neck.strike_pos-_neck_base(neck)
 		neck.angle=delta.angle()
 		neck.length=delta.length()
+		neck.free_pos=neck.strike_pos
 		neck.locked=false
 	neck.mode = &"idle"
 	neck.t = 0.0
@@ -1112,6 +1140,9 @@ func draw_on(c: CanvasItem) -> void:
 			_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if exposed_t > 0.0:
 		_draw_neck(c, immortal_segs, r, Color("#c9a64a"), 0.6 + 0.4 * sin(_time * 10.0))
+	if separated:
+		if immortal_neck!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
+		return
 	c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
 	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
 	_draw_compass(c, r * 0.75)
@@ -1149,3 +1180,46 @@ func compass_angle() -> float:
 	if _spin_t > 0.0:
 		return _time * 14.0
 	return _needle if tech != &"" else -PI / 2.0
+
+
+## 瓦礫破壊を勝利と分け、全快した独立蛇へ所有権を引き継ぐ。
+func begin_separation()->void:
+	if separated:return
+	interrupt_tech()
+	attack_field.clear_effects()
+	_set_count(count)
+	for n in necks:n.free_pos=_head_pos(n)
+	separated=true
+	separation_pending=false
+	chance_t=0.0
+	separation_t=float(def.params.separation_time)
+	table.gate[body]=EnemyTable.Gate.GHOST
+	immortal_neck=Neck.new()
+	immortal_neck.kind=&"immortal"
+	immortal_neck.free_pos=table.pos[body]
+	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
+	immortal_row=manager.enemies.spawn_part(body,manager.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
+	immortal_id=table.id[immortal_row]
+	immortal_neck.row=immortal_row
+	immortal_neck.row_id=immortal_id
+	var hp: float=float(def.params.immortal_hp)*manager.cfg.enemy_hp_mult
+	table.max_hp[immortal_row]=hp
+	table.hp[immortal_row]=hp
+	table.gate[immortal_row]=EnemyTable.Gate.NONE
+	table.max_hp[body]=hp
+	table.hp[body]=hp
+	table.guard[immortal_row]=separation_t
+	_cue(&"separation_started",&"",-2,{"duration":separation_t})
+
+func tick_bearer(dt: float)->void:
+	if immortal_row<0 or not manager.enemies.is_same(immortal_row,immortal_id) or table.dead[immortal_row]:
+		table.hp[body]=0.0
+		return
+	var away: Vector2=(immortal_neck.free_pos-run_state.ship_pos).normalized()
+	if away==Vector2.ZERO:away=Vector2.LEFT
+	immortal_neck.free_pos+=away*float(def.params.bearer_speed)*dt
+	immortal_neck.angle=away.angle()
+	table.pos[immortal_row]=immortal_neck.free_pos
+	table.pos[body]=immortal_neck.free_pos
+	table.hp[body]=table.hp[immortal_row]
+	_follow_neck(immortal_neck,dt)

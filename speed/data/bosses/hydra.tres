@@ -12,6 +12,11 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"separation_time": 1.2,
+"immortal_hp": 900.0,
+"guard_radius": 320.0,
+"snake_speed": 260.0,
+"bearer_speed": 150.0,
 "combo_cooldown": 12.0,
 "tornado_width": 210.0,
 "tornado_speed": 680.0,
