@@ -6,6 +6,9 @@ class_name ProjectileSystem
 extends RunSystem
 
 func dispose() -> void:
+	for attack in _attached_attacks.values():
+		attack.dispose()
+	_attached_attacks.clear()
 	for slots in [friend_slots, hostile_slots, hazard_slots]:
 		if slots != null:
 			slots.owner = null
@@ -135,6 +138,28 @@ var hazard_slots: RowSlots
 ## 使った敵の弾の種類・攻撃の形の処理（種類の番号の位置。使っていない種類は null）
 var _hostile_shapes: Array[HostileShape] = []
 var _hazard_shapes: Array[HazardShape] = []
+
+## 機体の移動を使う攻撃。装備管理は発動だけを行い、攻撃自身が寿命と命中を持つ。
+var _attached_attacks: Dictionary = {}
+
+func attached_attack(kind: StringName) -> RunSystem:
+	if not _attached_attacks.has(kind):
+		var attack: RunSystem = load("res://scripts/attacks/%s.gd" % kind).new()
+		attack.setup(ctx)
+		_attached_attacks[kind] = attack
+	return _attached_attacks[kind]
+
+func tick_attached(real_dt: float) -> void:
+	for attack in _attached_attacks.values():
+		attack.tick(real_dt, real_dt)
+		if state.phase != RunState.Phase.PLAY:
+			return
+
+func trail_attached(p0: Vector2, p1: Vector2) -> void:
+	for attack in _attached_attacks.values():
+		attack.on_trail(p0, p1)
+		if state.phase != RunState.Phase.PLAY:
+			return
 
 func setup(context: RunContext) -> void:
 	super(context)

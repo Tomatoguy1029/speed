@@ -56,8 +56,8 @@ func _ready()->void:
 	run.state.ship_pos=a.table.pos[a.body]
 	run.combat.rebuild_grid()
 	var wave_hp: float=a.table.hp[a.body]
-	run.loadout.run_sonic(&"sonic",300.0,7.0,0.0,0.5)
-	for step in 6:run.loadout._update_sonic(0.1)
+	run.projectiles.attached_attack(&"sonic").fire(&"sonic",300.0,7.0,0.0,0.5)
+	for step in 6:run.projectiles.tick_attached(0.1)
 	check(is_equal_approx(wave_hp-a.table.hp[a.body],7.0),"one real sonic wave hits the core once across its lifetime")
 	a.begin_separation()
 	a.separation_t=0.0

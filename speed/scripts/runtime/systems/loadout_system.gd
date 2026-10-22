@@ -31,9 +31,6 @@ var field: FieldSystem:
 ## 管理 ID → 発動の処理
 var weapon_behaviors: Dictionary = {}
 var trait_behaviors: Dictionary = {}
-## 機体と一緒に進路を進む衝撃波（ソニックブームと連鎖ソニックで共通。一覧 W08・T05）
-var sonic_waves: Array = []
-var _buf := PackedInt32Array()
 
 func setup(context: RunContext) -> void:
 	super(context)
@@ -126,7 +123,7 @@ func add_xp(v: float) -> void:
 
 func tick(real_dt: float, world_dt: float) -> void:
 	var busy := state.drawing or state.tracing
-	_update_sonic(real_dt)
+	ctx.projectiles.tick_attached(real_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
 	var afterimage = weapon_behaviors.get(&"W27")
@@ -356,47 +353,6 @@ func reset_loadout() -> void:
 	trait_behaviors = {}
 	refresh_stats()
 
-# ── 衝撃波（W08・T05 で共通） ───────────────────────────────────
-
-## 機体の位置に衝撃波を出す。0.5実秒、機体と一緒に進路を進み、同じ波動では各敵に1回だけ当たる。
-func run_sonic(cause: StringName, radius: float, dmg: float, knock: float, travel: float) -> void:
-	var wave := {"pos": state.ship_pos, "radius": radius, "dmg": dmg, "cause": cause, "knock": knock,
-		"life": travel, "hits": {}}
-	sonic_waves.append(wave)
-	if sonic_waves.size() > 4:
-		sonic_waves.pop_front()
-	_sweep_sonic(wave, state.ship_pos, state.ship_pos)
-	state.emit(&"ring", {"pos": state.ship_pos, "radius": radius, "color": Color("#c8f7ff"), "life": 0.5})
-	state.emit(&"sonic", {"pos": state.ship_pos, "radius": radius})
-
-func _sweep_sonic(wave: Dictionary, p0: Vector2, p1: Vector2) -> void:
-	var steps := maxi(1, ceili(p0.distance_to(p1) / (wave.radius * 0.3)))
-	for k in range(1, steps + 1):
-		if state.phase != RunState.Phase.PLAY:
-			return
-		var p := p0.lerp(p1, float(k) / steps)
-		combat.nearby(p, wave.radius, _buf)
-		var t := enemies.table
-		for i in _buf:
-			if t.dead[i] != 0 or wave.hits.has(t.id[i]):
-				continue
-			wave.hits[t.id[i]] = true
-			var d := t.pos[i] - p
-			var dist := d.length()
-			combat.damage_enemy(i, wave.dmg, {"cause": wave.cause, "dir": d / dist if dist > 0.0 else Vector2.ZERO, "knock": wave.knock})
-			if state.phase != RunState.Phase.PLAY:
-				return
-	wave.pos = p1
-
-func _update_sonic(real_dt: float) -> void:
-	for wave in sonic_waves.duplicate():
-		if state.phase != RunState.Phase.PLAY:
-			return
-		if not state.tracing:
-			_sweep_sonic(wave, wave.pos, state.ship_pos)
-		wave.life -= real_dt
-	sonic_waves = sonic_waves.filter(func(w): return w.life > 0.0)
-
 # ── 発動のきっかけ（CombatSystem・DrawSystem・ShipSystem から呼ばれる） ─
 
 func on_launch(full: bool) -> void:
@@ -406,11 +362,9 @@ func on_launch(full: bool) -> void:
 		b.on_launch(full)
 
 func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
-	# なぞった区間ごとに、衝撃波も角を含めて進める
-	for wave in sonic_waves.duplicate():
-		_sweep_sonic(wave, p0, p1)
-		if state.phase != RunState.Phase.PLAY:
-			return
+	ctx.projectiles.trail_attached(p0, p1)
+	if state.phase != RunState.Phase.PLAY:
+		return
 	for b in weapon_behaviors.values():
 		b.on_trail(run, p0, p1)
 		if state.phase != RunState.Phase.PLAY:
