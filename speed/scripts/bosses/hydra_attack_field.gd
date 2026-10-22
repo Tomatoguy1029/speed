@@ -20,6 +20,8 @@ func add_shape(points: PackedVector2Array, width: float, delay: float, life: flo
 	var line := Line2D.new()
 	line.texture = white
 	line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	line.joint_mode = Line2D.LINE_JOINT_ROUND
 	line.material = ShaderMaterial.new()
 	line.material.shader = FX

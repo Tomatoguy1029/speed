@@ -30,6 +30,7 @@ func _ready() -> void:
 		var ids := {}
 		var has_motion := false
 		var has_curve := false
+		var lightning := false
 		var wind_slow := false
 		var wind_fast := true
 		var rubble := false
@@ -38,6 +39,7 @@ func _ready() -> void:
 			for e in a.attack_field.effects:
 				if e.owner == n.row:
 					ids[e.id]=true
+					lightning=lightning or e.kind==&"lightning"
 					if e.velocity.length()>0.0: has_motion=true
 					if e.points.size()>2: has_curve=true
 					if e.kind==&"wind" and e.age>=e.delay:
@@ -54,6 +56,7 @@ func _ready() -> void:
 			for j in a.table.alive.size():
 				if a.table.alive[j] and a.table.type[j]==&"hydra_rubble": rubble=true
 		check(ids.size()>0 or rubble,"move creates real attack geometry or solid rubble")
+		if attack==&"thunder_headbutt": check(lightning,"headbutt discharges at arrival then stops")
 		if attack==&"wind_band": check(wind_slow and wind_fast,"wind pushes slow ship and preserves tracing motion")
 		if attack==&"wind_blades": check(ids.size()==3 and has_motion and has_curve,"three distinct crescent blades move without changing shape")
 		if attack==&"beam_bolt": check(has_motion,"finite bolt travels instead of sustaining its whole ray")

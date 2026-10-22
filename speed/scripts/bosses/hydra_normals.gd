@@ -40,6 +40,10 @@ static func tick(a: Node, n, dt: float) -> void:
 		a.attack_field.add_shape(PackedVector2Array([from,n.strike_pos]),float(p.bite_radius),0.0,0.1,float(p.bite_dmg),&"bite",n.row)
 	elif n.locked:
 		n.strike_pos = n.target
+		if n.mode==&"thunder_headbutt" and n.step==0:
+			n.step=1
+			a.attack_field.add_shape(PackedVector2Array([n.target,n.target+Vector2(0.1,0)]),float(p.thunder_radius)*2.0,0.0,float(p.thunder_flash),float(p.beam_dmg),&"lightning",n.row)
+			a._cue(&"attack_started",n.mode,a.necks.find(n))
 		n.glow = 0.0
 	if n.t >= charge + flight + hold: a.finish_normal(n)
 
