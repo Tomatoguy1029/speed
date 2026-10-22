@@ -1,8 +1,8 @@
 ## 採用したステージの配置規則だけを実行する。候補が成立しなければ出現を見送る。
-extends Node
+extends RefCounted
 const CHECK := preload("res://scripts/encounters/route_constraints.gd")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
-var run: RunManager
+var run: RunSimulation
 var tick: int:
 	get: return roundi(run.state.sim_time * 60.0)
 var spec: Dictionary = {}
@@ -12,7 +12,7 @@ var profile: Dictionary = {}
 var _next := 0.0
 var opportunity: Dictionary = {}
 
-func setup(manager: RunManager, value: Dictionary) -> void:
+func setup(manager: RunSimulation, value: Dictionary) -> void:
 	run = manager
 	profile = value.duplicate(true)
 	if not profile.get("enabled", false):

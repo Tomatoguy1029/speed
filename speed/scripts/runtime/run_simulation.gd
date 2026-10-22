@@ -1,43 +1,60 @@
-## ランの進行。時計、各 Manager の更新の順番、カメラ、3択、勝敗（設計書 4.3、仕様書 4・15・16）。
+## ランの進行。時計、各 System の更新の順番、カメラ、3択、勝敗（設計書 4.3、仕様書 4・15・16）。
 ##
-## ランのシーン（scenes/run/run.tscn）の Managers ノードの子。ステージが終わるとシーンごと消える。
+## ノードを持たないので、表示のない試行でもそのまま動く。RunSession が固定更新ごとに physics_step() を呼ぶ。
 ## UI と入力からの働きかけは command() で受け取る。
-class_name RunManager
-extends Node
+class_name RunSimulation
+extends RefCounted
 
 signal phase_changed(phase: RunState.Phase)
 ## 3択のカードが新しくなった（開いた・次の3択・引き直し）
 signal cards_changed
 ## 1フレームぶんの出来事。表示・音・UI が受け取る
 signal frame_events(events: Array[Dictionary])
-
-@export var world_path: NodePath
-@export var input_path: NodePath
+## ランを最後まで終えた（結果画面へ）。実験場では出さない
+signal finished(result: Dictionary)
+## ランを途中でやめた
+signal aborted
 
 var state: RunState
 var cfg: GameConfig
-## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
+var ctx := RunContext.new()
+## ランの指定。RunManager がステージ・モード・開始時刻を入れて渡す。実験場は設定の上書きも入れる。
 var options: Dictionary = {}
 ## 録画の有無にかかわらず、ランを初期化した時点の出自と状態を保持する。
 var recording_origin: Dictionary = {}
 ## 報酬演出中は世界と時計を保留し、HUD が実時間で演出を進める。
 var ui_reward_active := false
 var input_source: Callable
+## 表示のあるランだけが持つ入力（表示のない試行では null）
+var input: InputRouter
+## ボスの役者を置くノード
+var actor_parent: Node
+## 画面の大きさ（options.view_size がなければここから読む）
+var view_size_source: Callable
 var encounters
 const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
-@onready var field: FieldSystem = $"../FieldSystem"
-@onready var ship: ShipSystem = $"../ShipSystem"
-@onready var draw: DrawSystem = $"../DrawSystem"
-@onready var combat: CombatSystem = $"../CombatSystem"
-@onready var enemies: EnemySystem = $"../EnemySystem"
-@onready var bosses: BossSystem = $"../BossSystem"
-@onready var projectiles: ProjectileSystem = $"../ProjectileSystem"
-@onready var build: LoadoutSystem = $"../LoadoutSystem"
-@onready var pickups: PickupSystem = $"../PickupSystem"
-@onready var heroes: HeroSystem = $"../HeroSystem"
-@onready var input: InputRouter = get_node(input_path)
+var field: FieldSystem:
+	get: return ctx.field
+var ship: ShipSystem:
+	get: return ctx.ship
+var draw: DrawSystem:
+	get: return ctx.draw
+var combat: CombatSystem:
+	get: return ctx.combat
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var bosses: BossSystem:
+	get: return ctx.bosses
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
+var loadout: LoadoutSystem:
+	get: return ctx.loadout
+var pickups: PickupSystem:
+	get: return ctx.pickups
+var heroes: HeroSystem:
+	get: return ctx.heroes
 
 ## 敗北・クリアの演出の経過時間（実秒）
 var sequence_t := 0.0
@@ -59,22 +76,17 @@ var _world_steps := 0
 var profile: Dictionary = {}
 var profiling := false
 
-func _ready() -> void:
-	if not OS.is_debug_build():
-		options = {}
+## ランを組み立てる。input・actor_parent・view_size_source は先に入れておく。
+func setup() -> void:
 	cfg = options.get("config", ConfigManager.cfg)
 	state = RunState.new()
 	state.lab_mode = bool(options.get("lab", false))
 	state.meta_override = options.get("meta", {})
-	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
-	state.endless = bool(options.get("endless", GameManager.run_endless))
+	state.stage_index = int(options.get("stage_index", 1))
+	state.endless = bool(options.get("endless", false))
 	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
-	var start_source := "stage_start"
-	if OS.is_debug_build() and not state.lab_mode:
-		state.time = GameManager.run_start_time
-		start_source = GameManager.run_start_source
-	GameManager.run_start_time = 0.0
-	GameManager.run_start_source = "stage_start"
+	state.time = float(options.get("start_time", 0.0))
+	var start_source: String = options.get("start_source", "stage_start")
 	if options.has("seed"):
 		state.rng.seed = int(options.seed)
 	else:
@@ -82,14 +94,26 @@ func _ready() -> void:
 	state.hitstop_budget = cfg.kill_hitstop_cap
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
-	_wire()
+	ctx.state = state
+	ctx.cfg = cfg
+	ctx.options = options
+	ctx.field = FieldSystem.new()
+	ctx.ship = ShipSystem.new()
+	ctx.draw = DrawSystem.new()
+	ctx.combat = CombatSystem.new()
+	ctx.enemies = EnemySystem.new()
+	ctx.bosses = BossSystem.new()
+	ctx.projectiles = ProjectileSystem.new()
+	ctx.loadout = LoadoutSystem.new()
+	ctx.pickups = PickupSystem.new()
+	ctx.heroes = HeroSystem.new()
+	bosses.actor_parent = actor_parent
 	enemies.definitions = options.get("enemies", {})
 	# 能力値を先に計算してから機体を置く
-	for m: RunSystem in [field, build, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
-		m.setup(state, cfg)
+	for m: RunSystem in [field, loadout, ship, draw, combat, enemies, bosses, projectiles, pickups, heroes]:
+		m.setup(ctx)
 	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
 		encounters = ENCOUNTERS.new()
-		add_child(encounters)
 		encounters.setup(self, state.stage.encounter_profile)
 	if not state.lab_mode and projectiles.director == null:
 		# 強敵の攻撃の管理（時間帯の予算と群れごとの value で動く。仕様書 11.7）
@@ -101,16 +125,22 @@ func _ready() -> void:
 		projectiles.director = director
 	if not state.lab_mode:
 		enemies._sync_attack_budget(enemies.current_phase())
-	build.cards_opened.connect(func(_c):
+	loadout.cards_opened.connect(func(_c):
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
 	_update_camera(1.0)
 	recording_origin = recording_snapshot()
 	recording_origin["source"] = "lab" if state.lab_mode else start_source
-	add_to_group("recordable_runs")
 	# 最初の武器を選ぶ。HUD がつながってから開く
 	if not state.lab_mode:
-		build.open_start_cards.call_deferred()
+		loadout.open_start_cards.call_deferred()
+
+## ランを片付ける。設定の通知を外し、ボスの役者を消す。
+func dispose() -> void:
+	if SaveManager.settings_changed.is_connected(_read_settings):
+		SaveManager.settings_changed.disconnect(_read_settings)
+	if bosses != null:
+		bosses.remove_boss()
 
 ## 成長と戦闘の初期値。装備は複製し、その後の取得で記録の初期状態が変わるのを防ぐ。
 func recording_snapshot() -> Dictionary:
@@ -120,53 +150,10 @@ func recording_snapshot() -> Dictionary:
 		"weapons": state.weapons.duplicate(), "traits": state.traits.duplicate(),
 		"hero_power": String(state.hero_power), "bonus_t": state.bonus_t, "endless": state.endless}
 
-## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
-func _wire() -> void:
-	field.enemies = enemies
-	heroes.enemies = enemies
-	heroes.field = field
-	heroes.combat = combat
-	heroes.projectiles = projectiles
-	field.projectiles = projectiles
-	ship.field = field
-	ship.combat = combat
-	ship.build = build
-	draw.field = field
-	draw.combat = combat
-	draw.build = build
-	draw.ship = ship
-	combat.enemies = enemies
-	combat.ship = ship
-	combat.build = build
-	combat.pickups = pickups
-	combat.projectiles = projectiles
-	combat.field = field
-	combat.bosses = bosses
-	enemies.field = field
-	enemies.projectiles = projectiles
-	enemies.bosses = bosses
-	bosses.enemies = enemies
-	bosses.projectiles = projectiles
-	bosses.field = field
-	bosses.actor_parent = get_node(world_path)
-	projectiles.field = field
-	projectiles.combat = combat
-	projectiles.ship = ship
-	projectiles.build = build
-	build.combat = combat
-	build.projectiles = projectiles
-	build.ship = ship
-	build.enemies = enemies
-	build.pickups = pickups
-	build.field = field
-	pickups.field = field
-	pickups.ship = ship
-	pickups.build = build
-	pickups.enemies = enemies
-
 # ── 更新 ──────────────────────────────────────────────────────────
 
-func _physics_process(delta: float) -> void:
+## 固定更新1回ぶん。実験場は自分で _play_tick を進めるので、ここは通らない。
+func physics_step(delta: float) -> void:
 	if state.lab_mode:
 		return
 	# 通常報酬の残りより最終勝利を優先する。首の撃破・再生は boss_dead を立てない。
@@ -208,7 +195,8 @@ func _leave_bonus() -> void:
 func _play_tick(real_dt: float) -> void:
 	state.sim_time += real_dt
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
-	input.drawing = state.drawing
+	if input != null:
+		input.drawing = state.drawing
 	ship.intent = it
 	draw.intent = it
 	draw.handle_input()
@@ -266,7 +254,7 @@ func _play_tick(real_dt: float) -> void:
 		heroes.activate()
 	_run(&"heroes", func(): heroes.tick(real_dt, world_dt))
 	if state.phase == RunState.Phase.PLAY:
-		_run(&"build", func(): build.tick(real_dt, world_dt))
+		_run(&"build", func(): loadout.tick(real_dt, world_dt))
 	if world_step and state.phase == RunState.Phase.PLAY:
 		_run(&"projectiles", func(): projectiles.tick(wr, wd))
 	_check_end()
@@ -285,7 +273,7 @@ func _play_tick(real_dt: float) -> void:
 	_update_camera(real_dt)
 	_check_end()
 	if state.phase == RunState.Phase.PLAY and not state.lab_mode:
-		build.try_open_cards()
+		loadout.try_open_cards()
 
 ## 処理を呼ぶ。計測中なら時間を測る。
 func _run(key: StringName, f: Callable) -> void:
@@ -301,10 +289,8 @@ func _run(key: StringName, f: Callable) -> void:
 	rec[2] = maxi(rec[2], elapsed)
 	profile[key] = rec
 
-func _process(_delta: float) -> void:
-	_flush_events()
-
-func _flush_events() -> void:
+## 積んだ出来事を表示・音・UI へ渡す。RunSession が毎フレーム呼ぶ。
+func flush_events() -> void:
 	if state.events.is_empty():
 		return
 	var events := state.events
@@ -331,7 +317,7 @@ func set_phase(phase: RunState.Phase) -> void:
 		return
 	state.phase = phase
 	if phase in [RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
-		var afterimage = build.weapon_behaviors.get(&"W27")
+		var afterimage = loadout.weapon_behaviors.get(&"W27")
 		if afterimage != null:
 			afterimage.clear()
 	phase_changed.emit(phase)
@@ -344,7 +330,9 @@ func _base_zoom() -> float:
 	return minf(size.x, size.y) / cfg.base_view * clampf(f, cfg.zoom_min, 1.0)
 
 func _view_size() -> Vector2:
-	return options.get("view_size", get_viewport().get_visible_rect().size)
+	if options.has("view_size"):
+		return options.view_size
+	return view_size_source.call() if view_size_source.is_valid() else Vector2(1280, 720)
 
 func _update_camera(real_dt: float) -> void:
 	var size := _view_size()
@@ -369,7 +357,7 @@ func _update_camera(real_dt: float) -> void:
 func choose_card(index: int) -> void:
 	if state.phase != RunState.Phase.LEVELUP:
 		return
-	if not build.choose_card(index):
+	if not loadout.choose_card(index):
 		set_phase(RunState.Phase.PLAY)
 
 # ── 敗北（仕様書 16） ─────────────────────────────────────────────
@@ -449,8 +437,9 @@ func finish_reveal_duration() -> float:
 	return maxf(0.0, cfg.boss_finish_relic_appear_time) + maxf(0.0, cfg.boss_finish_relic_hold_time) + maxf(0.0, cfg.boss_finish_relic_collect_time)
 
 func _reset_finish_input() -> void:
-	input.cancel_gesture()
-	input.drawing = false
+	if input != null:
+		input.cancel_gesture()
+		input.drawing = false
 	state.hitstop = 0.0
 	state.world_scale = 1.0
 	state.drawing = false
@@ -511,9 +500,9 @@ func finish(cleared: bool) -> void:
 	state.cleared = cleared
 	set_phase(RunState.Phase.ENDED)
 	# 時間をゼロに調整しても、結果フェードがランを停止する前に最後の出来事を届ける。
-	_flush_events()
+	flush_events()
 	var coins := state.coins + (cfg.clear_bonus if cleared else 0)
-	GameManager.finish_run({
+	finished.emit({
 		"stage": state.stage_index,
 		"endless": state.endless,
 		"cleared": cleared,
@@ -539,7 +528,7 @@ func command(name: StringName, args := {}) -> void:
 		elif name == &"abort":
 			_reset_finish_input()
 			set_phase(RunState.Phase.ENDED)
-			GameManager.abort_run()
+			aborted.emit()
 		return
 	if state.phase == RunState.Phase.ENDED:
 		return
@@ -548,7 +537,7 @@ func command(name: StringName, args := {}) -> void:
 			choose_card(args.get("index", 0))
 		&"reroll":
 			if state.phase == RunState.Phase.LEVELUP:
-				build.reroll_cards()
+				loadout.reroll_cards()
 		&"pause":
 			if state.phase == RunState.Phase.PLAY:
 				set_phase(RunState.Phase.PAUSED)
@@ -557,9 +546,10 @@ func command(name: StringName, args := {}) -> void:
 				set_phase(RunState.Phase.PLAY)
 		&"abort":
 			set_phase(RunState.Phase.ENDED)
-			GameManager.abort_run()
+			aborted.emit()
 		&"draw_button":
-			input.press_draw_button()
+			if input != null:
+				input.press_draw_button()
 		&"debug_time":
 			state.time += float(args.get("seconds", 30.0))
 		&"debug_hazards":
@@ -582,11 +572,11 @@ func command(name: StringName, args := {}) -> void:
 			if bosses.boss_alive():
 				bosses.on_boss_defeated(bosses.boss_row, {"cause": &"debug"})
 		&"debug_grant":
-			build.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
+			loadout.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
 		&"debug_reset_loadout":
-			build.reset_loadout()
+			loadout.reset_loadout()
 		&"debug_level_up":
-			build.add_xp(build.xp_needed() - state.xp + 0.01)
+			loadout.add_xp(loadout.xp_needed() - state.xp + 0.01)
 		&"debug_gauge_full":
 			state.gauge = 1.0
 		&"debug_heal":

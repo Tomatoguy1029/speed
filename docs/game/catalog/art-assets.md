@@ -92,7 +92,7 @@ Godot 本番の `speed/` で必要な絵と、制作範囲を相談する候補�
 | ART-026 | ワープホール／ボーナスへの入口 | `_draw_field()` が回る輪を描く。入口の見せ方と挙動を合わせて相談する |
 | ART-027 | ボーナスステージ／背景・入退場の見せ方 | `_draw_background()` が背景色を切り替える。入退場は `_enter_bonus()`・`_leave_bonus()`。追加素材の必要箇所から要相談 |
 
-参照：[フィールド描画](../../../speed/scripts/managers/render_manager.gd)、[`field_system.gd`](../../../speed/scripts/runtime/systems/field_system.gd)、[ボーナスの進行](../../../speed/scripts/managers/run_manager.gd)。実装されていることと、見た目・数値の調整完了を分けて確認する。
+参照：[フィールド描画](../../../speed/scripts/managers/render_manager.gd)、[`field_system.gd`](../../../speed/scripts/runtime/systems/field_system.gd)、[ボーナスの進行](../../../speed/scripts/runtime/run_simulation.gd)。実装されていることと、見た目・数値の調整完了を分けて確認する。
 
 ### 専用画像が未割当の敵
 
