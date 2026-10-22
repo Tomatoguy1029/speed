@@ -13,7 +13,7 @@
 | T01 | 終端爆縮 | 採用 | 線の終点（弾かれた地点を含む）で爆発 | 終点を密集地点にする | 実装済み。`scripts/traits/endBlast.gd`、`data/traits/T01_endBlast.tres` | [demo T01](../../../demo/docs/traits.md) `endBlast`。最大3重ね |
 | T03 | 余韻の渦 | 採用 | 線の終点に、敵を吸い寄せる渦を残す。ボスは引き寄せない | 次の群れ作りにも終点を使う | 実装済み。`scripts/traits/vortex.gd`、`data/traits/T03_vortex.tres` | [demo T03](../../../demo/docs/traits.md) `vortex`。最大3重ね |
 | T04 | 満タン突撃 | 採用 | 満タンから始めた線をなぞっている間は、装甲を無視して攻撃力が上がる。線が終わると戻る | 早く撃つか、満タンで硬い敵を抜くか | 実装済み。`scripts/traits/fullCharge.gd`、`data/traits/T04_fullCharge.tres` | [demo T04](../../../demo/docs/traits.md) `fullCharge`。最大3重ね |
-| T05 | 連鎖ソニック | 採用 | 1回の突進で一定数を倒すたびに衝撃波。衝撃波の撃破からは次を起こさない。W08 とは別 | 多く倒せる線を選ぶ | 実装済み。`scripts/traits/killSonic.gd`、`data/traits/T05_killSonic.tres` | [demo T05](../../../demo/docs/traits.md) `killSonic`。最大3重ね |
+| T05 | 連鎖ソニック | 採用 | 1回の突進で一定数を倒すたびに衝撃波。衝撃波の撃破からは次を起こさない。雑魚を払う役で、重ねると衝撃波が出る間隔が縮み、範囲が広がる。W08 とは別 | 多く倒せる線を選ぶ | 実装済み。`scripts/traits/killSonic.gd`、`data/traits/T05_killSonic.tres` | [demo T05](../../../demo/docs/traits.md) `killSonic`。最大3重ね |
 | T06 | クリティカルランス | 採用 | クリティカルのたびに進む向きへ貫くビーム。ビームからは再び発動しない | 命中した先に別の敵が並ぶ線 | 実装済み。`scripts/traits/critBeam.gd`、`data/traits/T06_critBeam.tres` | [demo T06](../../../demo/docs/traits.md) `critBeam`。最大3重ね |
 | T07 | 急速充填 | 採用 | ゲージの充填が速くなる | 次の高速攻撃が早く使える | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T07_quickCharge.tres` | [demo T07](../../../demo/docs/traits.md) `quickCharge`。最大3重ね |
 | T08 | 大容量チャージ | 採用 | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。回数のストックではない | 1回で長い線を通る | 実装済み。`BuildManager.refresh_stats()`、`data/traits/T08_capacity.tres` | [demo T08](../../../demo/docs/traits.md) `capacity`。最大3重ね |
