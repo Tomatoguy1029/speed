@@ -143,7 +143,7 @@ Manager は特定のステージ・ボス・仕掛けを知らない。コンテ
 | HeroManager | 英雄の星座の配置と解放、特別な枠の力の発動とクールダウン、目印の星の選定と位置のヒント（8.1・13.1） |
 | FieldManager | 地形、隕石、フィールドの仕掛け（13） |
 | FinaleManager | ラスボス戦の締め（12.4）。未作成 |
-| RenderManager | 描画の流れ（設計書10章） |
+| RunPresentation | 描画の流れ（設計書10章） |
 
 **更新の順番**：各 Manager は自分で `_physics_process` を回さず、RunManager が1回の固定更新ごとに次の順で呼ぶ。順番は demo の更新の順番に合わせる（`scripts/managers/run_manager.gd` の `_play_tick`）。
 
@@ -579,9 +579,9 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 | `run-build.js`、`run-weapons.js`、`modules.js`、`effects.js` | 6、7 | BuildManager、`scripts/weapons/`、`scripts/traits/`、`data/weapons/`、`data/traits/` |
 | `progression.js` | 7.1、12 | BuildManager、SaveManager、`data/meta_upgrades/` |
 | `field.js`、`meteor-field.js`、`gravity.js` | 11 | FieldManager |
-| `finale.js` | 14 | RunManager、RenderManager |
-| `debris.js`、`impact-fx.js` | 9.5、14 | ProjectileManager、RenderManager |
-| `render.js`、`ui.js` | 13、14、15 | RenderManager、`scenes/ui/`、`scripts/ui/` |
+| `finale.js` | 14 | RunManager、RunPresentation |
+| `debris.js`、`impact-fx.js` | 9.5、14 | ProjectileManager、RunPresentation |
+| `render.js`、`ui.js` | 13、14、15 | RunPresentation、`scenes/ui/`、`scripts/ui/` |
 | `debug.js` | 18 | `scenes/ui/`、`scripts/debug/`（調整パネル） |
 | `grid.js` | — | CombatManager（7章の空間分割） |
 | `portals.js`、`portal-loops.js`、`experimental-weapons.js`、`parts.js`、`stages.js` | — | 移さない（描画版の仕様に含まれない。demo の `stages.js` は速度の段階の演出で、本番のステージとは別物） |

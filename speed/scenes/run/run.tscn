@@ -1,6 +1,6 @@
 [gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://scripts/managers/render_manager.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/render/run_presentation.gd" id="11"]
 [ext_resource type="Script" path="res://scripts/input/input_router.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/ui/debug_panel.gd" id="14"]
@@ -8,7 +8,7 @@
 
 [node name="Run" type="Node"]
 
-[node name="RenderManager" type="Node" parent="."]
+[node name="RunPresentation" type="Node" parent="."]
 script = ExtResource("11")
 world_path = NodePath("../World")
 camera_path = NodePath("../World/Camera2D")

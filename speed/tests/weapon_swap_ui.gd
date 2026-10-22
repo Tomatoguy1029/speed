@@ -57,7 +57,7 @@ func _ready() -> void:
 	_check(run.state.phase == RunState.Phase.PLAY and run.state.weapons == before, "受け取らないときは現在の装備を保つ")
 	await _open_swap()
 	# サイズ確認はHUDを対象にし、世界側のエフェクトは静止したまま描く。
-	scene.view.get_node("RenderManager").set_process(false)
+	scene.view.get_node("RunPresentation").set_process(false)
 	for viewport_size in [Vector2i(640, 720), Vector2i(360, 640), Vector2i(640, 360)]:
 		get_window().size = viewport_size
 		await _settle()

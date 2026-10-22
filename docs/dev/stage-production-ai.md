@@ -14,7 +14,7 @@
 | 敵の基本値と行動 | `data/enemies/<type ID>.tres`、`scripts/managers/enemy_manager.gd`、種類別の `scripts/enemies/` | `scripts/data_types/enemy_def.gd`、[敵一覧](../game/catalog/enemies.md)と実装を照合する |
 | 成長とドロップ | `data/config.tres`、対象敵と時間帯のデータ | [成長](../game/spec.md#9-成長)・[ドロップ](../game/spec.md#10-ドロップと回収)、`scripts/managers/build_manager.gd`・`pickup_manager.gd` |
 | ボス | 対象の `data/bosses/`・`scenes/bosses/`・`scripts/bosses/` | ボスの個別仕様と[AI・技・演出の分担](architecture.md#61-敵とボスの-ai) |
-| 敵の絵・攻撃の描画 | `assets/pixel/`、`scripts/managers/render_manager.gd`、対象の描画処理 | [アートスタイル](../game/art-style.md)・[素材の入口](../../speed/assets/pixel/README.md)。ヒュドラは[個別素材と演出](../game/bosses/hydra.md#8-素材と演出) |
+| 敵の絵・攻撃の描画 | `assets/pixel/`、`scripts/render/run_presentation.gd`、対象の描画処理 | [アートスタイル](../game/art-style.md)・[素材の入口](../../speed/assets/pixel/README.md)。ヒュドラは[個別素材と演出](../game/bosses/hydra.md#8-素材と演出) |
 
 ステージの `phases` が参照するリソースを辿って編集する。専用時間帯はステージ内部にも保存でき、`data/phases/s4_*.tres` の存在だけでは通常ランへの適用を判断できない。雑魚の曲線を持つステージでは、時間帯の `mix`・`pop_from`・`pop_to` より曲線を確認する。
 

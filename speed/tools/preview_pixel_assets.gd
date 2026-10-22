@@ -52,7 +52,7 @@ func _preview() -> void:
 	if "--damage-preview" in OS.get_cmdline_user_args():
 		run.enemies.clear_all()
 		state.phase = RunState.Phase.PLAY
-		var renderer := game.get_node("RenderManager") as RenderManager
+		var renderer := game.get_node("RunPresentation") as RunPresentation
 		for variant in 2:
 			for stage in 4:
 				var rock := run.enemies.spawn(run.enemies.def_of(&"meteor"),
@@ -99,7 +99,7 @@ func _preview() -> void:
 		game.get_node("World").add_child(original)
 	if "--exhaust-preview" in OS.get_cmdline_user_args():
 		state.phase = RunState.Phase.PLAY
-		var renderer := game.get_node("RenderManager") as RenderManager
+		var renderer := game.get_node("RunPresentation") as RunPresentation
 		for i in 25:
 			state.ship_pos = Vector2(-180 + i * 7, sin(i * 0.07) * 35)
 			state.ship_heading = Vector2(7, cos(i * 0.07) * 2.45).normalized()

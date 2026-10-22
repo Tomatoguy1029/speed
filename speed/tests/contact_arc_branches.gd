@@ -109,7 +109,7 @@ func show_visual(build: LoadoutSystem, state: RunState, cfg: GameConfig, segment
 	add_child(viewport)
 	var run := RunSimulation.new()
 	run.ctx = build.ctx
-	var renderer := RenderManager.new()
+	var renderer := RunPresentation.new()
 	renderer.run = run
 	renderer.state = state
 	renderer.cfg = cfg

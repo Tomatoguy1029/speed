@@ -5,7 +5,7 @@ const FLOOD_TAIL := 1.4
 var floods: Array = []
 var _flood_layer: DrawLayer
 
-func setup(render: RenderManager) -> void:
+func setup(render: RunPresentation) -> void:
 	super(render)
 	# みずがめ座の水はシェーダーで描く。頂点の色で描き方を渡すので、色を変える modulate の掛からない層にする
 	_flood_layer = DrawLayer.new()

@@ -1,7 +1,7 @@
 ## たて座の見た目（盾と、奪える背面）。
 extends EnemyVisual
 
-func setup(render: RenderManager, behavior_name: StringName) -> void:
+func setup(render: RunPresentation, behavior_name: StringName) -> void:
 	super(render, behavior_name)
 	always_marked = true
 	draws_weak_arc = false

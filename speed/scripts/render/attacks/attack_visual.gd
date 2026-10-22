@@ -3,11 +3,11 @@ class_name AttackVisual
 extends RefCounted
 
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
-var rm: RenderManager
+var rm: RunPresentation
 var state: RunState:
 	get: return rm.state
 
-func setup(render: RenderManager) -> void:
+func setup(render: RunPresentation) -> void:
 	rm = render
 
 ## 専用の形を描いた場合はtrue。falseなら共通の弾のバッチで描く。

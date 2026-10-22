@@ -1,7 +1,7 @@
 ## からす座の見た目（足に抱えた経験値の束）。
 extends EnemyVisual
 
-func setup(render: RenderManager, behavior_name: StringName) -> void:
+func setup(render: RunPresentation, behavior_name: StringName) -> void:
 	super(render, behavior_name)
 	always_marked = true
 
@@ -21,12 +21,12 @@ func _draw_crow_bundle(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var center := p - u * r * 0.62
 	var s := maxf(_px(2.0), r * (0.07 + 0.05 * amount))
 	var pulse := 0.5 + 0.5 * sin(state.world_time * 6.0)
-	c.draw_circle(center, s * (2.2 + 1.6 * amount), Color(RenderManager.XP_COLOR.lightened(0.3), 0.1 + 0.2 * amount * (0.6 + 0.4 * pulse)))
+	c.draw_circle(center, s * (2.2 + 1.6 * amount), Color(RunPresentation.XP_COLOR.lightened(0.3), 0.1 + 0.2 * amount * (0.6 + 0.4 * pulse)))
 	# 足の爪
 	for k: float in [-1.0, 1.0]:
 		c.draw_line(center + side * s * 1.2 * k + u * s * 2.2, center + side * s * 1.8 * k + u * s * 0.4, Color("#d8d2dc"), maxf(_px(1.0), s * 0.4))
-	var col := RenderManager.XP_COLOR.lightened(0.15 + 0.4 * amount)
-	var edge := RenderManager.XP_COLOR.darkened(0.55)
+	var col := RunPresentation.XP_COLOR.lightened(0.15 + 0.4 * amount)
+	var edge := RunPresentation.XP_COLOR.darkened(0.55)
 	for k in n:
 		var ring := 0 if k == 0 else (1 if k < 7 else 2)
 		var a := float(k) * 2.399963

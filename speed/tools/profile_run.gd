@@ -3,7 +3,7 @@
 extends Node
 
 var run: RunSimulation
-var render: RenderManager
+var render: RunPresentation
 var drawing_times: Dictionary = {}
 var frames: Array[float] = []
 var gpu_times: Array[float] = []
@@ -39,7 +39,7 @@ func _ready() -> void:
 	var session := RunManager.create_run()
 	add_child(session)
 	run = session.sim
-	render = session.view.get_node("RenderManager")
+	render = session.view.get_node("RunPresentation")
 	await get_tree().process_frame
 	await get_tree().process_frame
 	run.command(&"choose_card", {"index": 0})

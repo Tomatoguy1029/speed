@@ -171,7 +171,7 @@ func _on_bound() -> void:
 	draws_self = true
 	table.gate[body] = EnemyTable.Gate.NONE
 	table.armor[body] = 0.0
-	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）
+	# 本体と首は、敵（頭）の下、地形の上に描く（RunPresentation の描画の層の enemies の下）
 	z_index = 5
 	arena = preload("res://scripts/bosses/hydra_arena.gd").new()
 	add_child(arena)

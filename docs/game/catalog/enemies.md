@@ -76,7 +76,7 @@
 
 - ステージ4の `biter`（ヘビ）は `assets/pixel/snake/`、`pulser` は `assets/pixel/pulser/` の本体・装甲・法線画像を重ねて描く。星コアは照明に左右されず、装甲は法線付き照明を受ける。表示の基準寸法と接触半径は各種類の設定に従う。
 
-- 各敵は `speed/assets/pixel/` のピクセルスプライトを Nearest で描く（`RenderManager`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
+- 各敵は `speed/assets/pixel/` のピクセルスプライトを Nearest で描く（`RunPresentation`・`InstanceBatch`）。素材の一覧は [素材README](../../../speed/assets/pixel/README.md)。
 - `splitter`・`splitling` の本体は手描きの PNG を、透明な余白込みの原寸で表示する。エリートも同じ大きさ。基礎半径は各 `.tres` で画像に合わせる。
 - `corona` は [冠の描画](../art-style.md#46-みなみのかんむり座) を使う。
 - 絵がまだない種類は、敵の定義の形（`shape`：丸・菱形・六角形・矢じり・四角）の図形を、敵の色で描く。png を置くと絵に替わる。

@@ -9,7 +9,7 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
-	var script = load("res://scripts/managers/render_manager.gd")
+	var script = load("res://scripts/render/run_presentation.gd")
 	check(script != null and script.can_instantiate(), "攻撃の表示を含む描画を生成できる")
 	if failed > 0:
 		get_tree().quit(1)

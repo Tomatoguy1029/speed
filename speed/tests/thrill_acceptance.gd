@@ -958,7 +958,7 @@ func _test_surge() -> void:
 		samples.append(sample)
 	_check(float(samples[1].elite) / samples[1].all > float(samples[0].elite) / samples[0].all + 0.05, "タスク4：後の波ではエリートの割合が増える")
 	_check(float(samples[1].ranged) / samples[1].all > float(samples[0].ranged) / samples[0].all + 0.1, "タスク4：後の波では弾とビームを撃つ敵の割合が増える")
-	var render: RenderManager = scene.view.get_node("RenderManager")
+	var render: RunPresentation = scene.view.get_node("RunPresentation")
 	var batch: InstanceBatch = render._ensure_enemy_batch(&"beamer")
 	_check(batch.texture != null or batch.multimesh.mesh != null, "初めて出る敵に画像または図形の描画を準備する")
 	_clear()

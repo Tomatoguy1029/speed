@@ -2,7 +2,7 @@
 ##
 ## World の下に層（DrawLayer）を作り、層ごとに描く。カメラは RunSimulation が求めた位置とズームに合わせる。
 ## 敵と天体は透過ピクセルスプライト。見分けのルール（仕様書 17）を保つ。
-class_name RenderManager
+class_name RunPresentation
 extends Node
 
 const XP_COLOR := Color("#b8a0ff")

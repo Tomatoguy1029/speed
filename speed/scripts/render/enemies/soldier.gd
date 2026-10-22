@@ -1,7 +1,7 @@
 ## ケフェウス座の兵の見た目（王を失って崩れていく兵）。
 extends EnemyVisual
 
-func setup(render: RenderManager, behavior_name: StringName) -> void:
+func setup(render: RunPresentation, behavior_name: StringName) -> void:
 	super(render, behavior_name)
 	always_marked = true
 

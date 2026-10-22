@@ -2,7 +2,7 @@
 ## コンピュートシェーダーで動かし、画面の大きさの絵に点として描いて重ねる。
 ##
 ## メインの RenderingDevice を使うので、Forward+ と Mobile だけで動く。Compatibility（ブラウザ）では
-## available() が false になり、RenderManager は CPU の粒で代える。
+## available() が false になり、RunPresentation は CPU の粒で代える。
 class_name GpuSparks
 extends TextureRect
 

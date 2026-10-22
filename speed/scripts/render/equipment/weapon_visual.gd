@@ -1,7 +1,7 @@
 ## 装備が使う表示。装備の種類は個別の表示だけが知り、描画側は共通の入口を呼ぶ。
 class_name WeaponVisual
 extends RefCounted
-var rm: RenderManager
+var rm: RunPresentation
 var behavior
 var active := true
 var node: Node2D
@@ -13,7 +13,7 @@ var state: RunState:
 	get: return rm.state
 var cfg: GameConfig:
 	get: return rm.cfg
-func setup(render: RenderManager, owner_behavior) -> void:
+func setup(render: RunPresentation, owner_behavior) -> void:
 	rm = render
 	behavior = owner_behavior
 func tick(_dt: float) -> void:
