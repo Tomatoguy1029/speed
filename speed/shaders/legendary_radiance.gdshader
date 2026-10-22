@@ -20,7 +20,7 @@ float cloud(vec2 p) {
 }
 float dust(vec2 pixel) {
 	// 種ごとに位置をずらした金粉をゆっくり上へ運ぶ。明滅で増減させない。
-	vec2 drifting = pixel + vec2(motion_time * 0.7, motion_time * 3.0);
+	vec2 drifting = pixel + vec2(motion_time * 2.8, motion_time * 14.0);
 	vec2 cell = floor(drifting / 4.0);
 	vec2 dot_pos = vec2(hash(cell + 11.0), hash(cell + 37.0)) * 2.8 + 0.6;
 	float distance = length(mod(drifting, 4.0) - dot_pos);
@@ -33,9 +33,9 @@ void fragment() {
 	vec2 pixel = floor(UV / TEXTURE_PIXEL_SIZE);
 	vec2 uv = (pixel + 0.5) * TEXTURE_PIXEL_SIZE;
 	float shape = texture(TEXTURE, uv).a;
-	vec2 drift = vec2(motion_time * 0.025, motion_time * 0.07);
+	vec2 drift = vec2(motion_time * 0.16, motion_time * 0.65);
 	float field = cloud(pixel / vec2(23.0, 36.0) + drift);
-	float folds = cloud(pixel / vec2(9.0, 27.0) + vec2(field * 2.0, motion_time * 0.1));
+	float folds = cloud(pixel / vec2(9.0, 27.0) + vec2(field * 2.0, motion_time * 0.55));
 	float thread = pow(max(0.0, 1.0 - abs(folds * 2.0 - 1.0)), 8.0);
 	float powder = dust(pixel) * dust_strength;
 	vec3 light = radiance_color.rgb;
@@ -71,6 +71,7 @@ void fragment() {
 	float current = 0.7 + field * 0.6;
 	density = (rim + proximity * 0.45 + smoke + motes) * current * intensity * mix(1.0, 0.8, exposure);
 	light = mix(light, vec3(1.0, 0.97, 0.85), clamp(rim * 0.4 + powder * 0.2, 0.0, 0.35));
-	density = floor(max(0.0, density) * 32.0 + hash(pixel) * 0.6) / 32.0;
+	// UV の画素格子で輪郭を保ち、細かなディザによる色粒は重ねない。
+	density = max(0.0, density);
 	COLOR = vec4(light, density) * item_tint;
 }

@@ -36,7 +36,7 @@ void fragment() {
 	vec2 p = (pixel / vec2(640.0, 360.0) - center) * vec2(1.77778, 1.0);
 	float radius = length(p);
 	// 低周波の偏りを形そのものへ使い、細かな場で縁と光の筋へほのかな揺らぎを加える。
-	vec2 drift = vec2(motion_time * 0.025, -motion_time * 0.018);
+	vec2 drift = vec2(motion_time * 0.10, -motion_time * 0.065);
 	vec2 low = vec2(cloud(p * 3.2 + drift + 4.0), cloud(p * 3.2 + drift + 19.0)) - 0.5;
 	vec2 detail = vec2(cloud(p * 15.0 + drift * 1.7 + 7.0), cloud(p * 15.0 + drift * 1.7 + 31.0)) - 0.5;
 	vec2 direction = p / max(radius, 0.001);
@@ -60,10 +60,10 @@ void fragment() {
 		float a = (sector + hash(seed) * 0.8) * 6.2831853 / 12.0;
 		float d = abs(mod(wrapped_angle - a + 3.14159265, 6.2831853) - 3.14159265);
 		float width = mix(0.025, 0.1, hash(seed + 20.0)) * ray_width;
-		float strand = grain1(radius * 8.0 + seed * 17.0 + motion_time * 0.04);
+		float strand = grain1(radius * 8.0 + seed * 17.0 + motion_time * 0.6);
 		width *= mix(1.0, 0.45 + strand * 1.15, ray_breakup);
 		float beam = exp(-pow(d / width, 2.0));
-		float gap = smoothstep(0.26, 0.66, grain1(radius * 20.0 + seed * 59.0 - motion_time * 0.035));
+		float gap = smoothstep(0.26, 0.66, grain1(radius * 20.0 + seed * 59.0 - motion_time * 0.45));
 		float density = mix(1.0, 0.3 + gap * 0.9, ray_breakup);
 		float reach = ray_reach * mix(0.38, 1.45, hash(seed + 89.0));
 		float end = 1.0 - smoothstep(reach * 0.7, reach, radius + detail.x * 0.035);
@@ -75,7 +75,7 @@ void fragment() {
 		width = mix(0.003, 0.012, hash(seed + 20.0)) * ray_width;
 		width *= mix(1.0, 0.3 + strand * 1.4, ray_breakup);
 		float length_fade = exp(-radius / ray_reach * mix(2.0, 5.0, hash(seed + 40.0)));
-		gap = smoothstep(0.34, 0.58, grain1(radius * 32.0 + seed * 31.0 + motion_time * 0.05));
+		gap = smoothstep(0.34, 0.58, grain1(radius * 32.0 + seed * 31.0 + motion_time * 0.65));
 		reach = ray_reach * mix(0.24, 1.15, hash(seed + 89.0));
 		end = 1.0 - smoothstep(reach * 0.65, reach, radius);
 		fine += exp(-pow(d / width, 2.0)) * length_fade * end * mix(1.0, gap, ray_breakup) * mix(0.3, 1.0, hash(seed + 70.0));
@@ -99,8 +99,7 @@ void fragment() {
 	// 光の合成後に階調を圧縮し、白い核の周辺にもなだらかな明暗を残す。
 	emission = vec3(0.98) * (vec3(1.0) - exp(-emission * 1.6));
 	emission += vec3(0.05) * exp(-pow(core_distance / (core_edge * 0.36), 2.0));
-	float noise = fract(sin(dot(pixel, vec2(12.9898, 78.233))) * 43758.5453);
-	// 固定ピクセル上の少数の階調に揃え、滑らかな写実光へ寄せすぎない。
-	emission = floor(max(emission, vec3(0.0)) * 32.0 + noise * 0.65) / 32.0;
+	// 画素格子は上の UV で保つ。RGB を個別に丸めると金色の縁に色段差が出るため、
+	// 光の色と階調はそのまま合成する。
 	COLOR = vec4(emission, 1.0);
 }

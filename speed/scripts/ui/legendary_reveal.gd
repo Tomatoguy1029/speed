@@ -24,6 +24,8 @@ const AURA_PADDING := Vector2i(48, 56)
 @export_range(0.0, 1.0, 0.05) var ray_breakup := 0.25
 @export_group("黒い影と後光")
 @export_range(0.0, 3.0, 0.05) var radiance_strength := 1.25
+## 演出時計に対する流れの速度。ヒットストップや Shader TIME に依存させない。
+@export_range(0.0, 3.0, 0.05) var aura_motion_speed := 1.0
 @export_range(0.0, 1.0, 0.05) var aura_flow_strength := 0.4
 @export_range(0.0, 2.0, 0.05) var aura_wisp_strength := 0.85
 @export_range(0.0, 2.0, 0.05) var aura_dust_strength := 0.9
@@ -163,13 +165,13 @@ func set_progress(value: float) -> void:
 	var aura_material := _aura.material as ShaderMaterial
 	aura_material.set_shader_parameter("intensity", radiance_strength)
 	aura_material.set_shader_parameter("exposure", exposure)
-	aura_material.set_shader_parameter("motion_time", _progress * _duration)
+	aura_material.set_shader_parameter("motion_time", _progress * _duration * aura_motion_speed)
 	aura_material.set_shader_parameter("flow_strength", aura_flow_strength)
 	aura_material.set_shader_parameter("radiance_color", light_color.lightened(0.25))
 	aura_material.set_shader_parameter("wisp_strength", aura_wisp_strength)
 	aura_material.set_shader_parameter("dust_strength", aura_dust_strength)
 	var mantle_material := _mantle.material as ShaderMaterial
-	mantle_material.set_shader_parameter("motion_time", _progress * _duration)
+	mantle_material.set_shader_parameter("motion_time", _progress * _duration * aura_motion_speed)
 	mantle_material.set_shader_parameter("flow_strength", aura_flow_strength)
 	mantle_material.set_shader_parameter("dust_strength", aura_dust_strength)
 	mantle_material.set_shader_parameter("wisp_strength", aura_wisp_strength)
@@ -181,7 +183,7 @@ func set_progress(value: float) -> void:
 	shadow_material.set_shader_parameter("grain_strength", noise_strength)
 	if _image.material != null:
 		(_image.material as ShaderMaterial).set_shader_parameter("reveal", arrival)
-		(_image.material as ShaderMaterial).set_shader_parameter("motion_time", _progress * _duration)
+		(_image.material as ShaderMaterial).set_shader_parameter("motion_time", _progress * _duration * aura_motion_speed)
 		(_image.material as ShaderMaterial).set_shader_parameter("flow_strength", aura_flow_strength)
 	_name.modulate.a = smoothstep(_appear * 0.85, _appear + 0.07, _progress) * (1.0 - taking)
 	_light_material.set_shader_parameter("center", center / DESIGN)
@@ -196,7 +198,7 @@ func set_progress(value: float) -> void:
 	_light_material.set_shader_parameter("ray_reach", backlight_reach)
 	_light_material.set_shader_parameter("ray_width", backlight_width)
 	_light_material.set_shader_parameter("surge_strength", emergence_surge_strength)
-	_light_material.set_shader_parameter("motion_time", _progress * _duration)
+	_light_material.set_shader_parameter("motion_time", _progress * _duration * aura_motion_speed)
 	_light_material.set_shader_parameter("core_distortion", core_distortion)
 	_light_material.set_shader_parameter("ray_turbulence", ray_turbulence)
 	_light_material.set_shader_parameter("ray_breakup", ray_breakup)
