@@ -48,6 +48,7 @@ var friend_trail: Array[PackedVector2Array] = []
 var friend_type: Array[StringName] = []
 ## 敵に当たったときに、ダメージの代わりに呼ぶ処理（敵の行・ダメージ・当たった位置。撃った武器が決める。なければ通常のダメージ）
 var friend_on_hit: Array[Callable] = []
+var _friend_shapes: Dictionary = {}
 var friend_slots: RowSlots
 var _buf := PackedInt32Array()
 var _hits: Array = []
@@ -259,8 +260,17 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 func friend_count() -> int:
 	return friend_slots.live
 
+## 行の解放時に、発射元を保持する命中処理も外す。
+func release_friend(i: int) -> void:
+	friend_on_hit[i] = Callable()
+	friend_slots.release(i)
+
+func _friend_shape(kind: int) -> FriendShape:
+	if not _friend_shapes.has(kind):
+		_friend_shapes[kind] = load("res://scripts/attacks/friend_%s.gd" % String(FriendKind.keys()[kind]).to_lower()).new()
+	return _friend_shapes[kind]
+
 func _update_friendly(dt: float) -> void:
-	var trail_points := cfg.corpse_trail_points
 	var et := combat.enemies.table
 	var i := 0
 	# 命中で増えた破片が後ろの行に入った場合は、この更新で一緒に進める
@@ -268,19 +278,13 @@ func _update_friendly(dt: float) -> void:
 		if friend_alive[i] == 0:
 			i += 1
 			continue
-		var kind := friend_kind[i]
+		var shape := _friend_shape(friend_kind[i])
 		var from := friend_pos[i]
 		var vel := friend_vel[i]
 		var r := friend_r[i]
 		var pos := from + vel * dt
 		var life := friend_life[i] - dt
-		friend_angle[i] += friend_spin[i] * dt
-		var trail := friend_trail[i]
-		if kind == FriendKind.DEBRIS:
-			trail.append(pos)
-			if trail.size() > trail_points:
-				trail.remove_at(0)
-			friend_trail[i] = trail
+		shape.advance(self, i, pos, dt)
 		var body_hit = field.first_body_hit(from, pos, r)
 		var to: Vector2 = pos if body_hit == null else body_hit.point
 		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
@@ -302,7 +306,7 @@ func _update_friendly(dt: float) -> void:
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
 			var impact := from.lerp(to, h[0])
-			if kind == FriendKind.SHOT and _reflect_shot(i, row, impact):
+			if shape.reflect(self, i, row, impact):
 				pos = impact
 				life = 0.0
 				body_hit = null
@@ -330,32 +334,9 @@ func _update_friendly(dt: float) -> void:
 		friend_pos[i] = pos
 		friend_life[i] = life
 		if life <= 0.0:
-			if kind == FriendKind.DEBRIS and trail.size() > 1:
-				state.emit(&"debris_trail", {"points": trail, "color": friend_color[i]})
-			friend_slots.release(i)
+			shape.on_end(self, i)
+			release_friend(i)
 		i += 1
-
-## たて座の正面に当たった弾を消し、一定間隔で危険な反射弾へ変える。貫通弾も盾で止まる。
-func _reflect_shot(shot: int, enemy: int, impact: Vector2) -> bool:
-	var t := combat.enemies.table
-	var vel := friend_vel[shot]
-	if not combat.enemies.blocks_front(enemy, impact, vel):
-		return false
-	if t.fire_t[enemy] > 0.0:
-		return true
-	var p: Dictionary = t.def[enemy].params
-	var normal := (impact - t.pos[enemy]).normalized()
-	if normal.is_zero_approx():
-		normal = Vector2.from_angle(t.facing[enemy])
-	var dir := (vel - normal * 2.0 * vel.dot(normal)).normalized()
-	var speed := float(p.reflect_speed)
-	_add_hostile(impact + normal * 2.0, dir * speed, speed, clampf(friend_r[shot], 5.0, 10.0),
-		float(p.reflect_life), float(p.reflect_dmg),
-		0.0, 0.0, HostileKind.REFLECTED)
-	t.fire_t[enemy] = maxf(0.01, float(p.reflect_interval))
-	t.flash[enemy] = 0.1
-	state.emit(&"shield_reflect", {"pos": impact, "normal": normal})
-	return true
 
 # ── 敵の弾 ────────────────────────────────────────────────────────
 
