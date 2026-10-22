@@ -54,38 +54,39 @@ speed/                    res://
     stage_launcher/       ステージの直接起動（14.1）
   scenes/                 シーン（.tscn）。人が一番よく触る
     app/                  Main、タイトル、設定、メインメニュー、ステージ選択、強化、図鑑、結果
-    run/                  ランの土台
-    stages/               ステージごとのフィールドの配置
+    run/                  ランの土台と、報酬演出の差し替えシーン（ULT・伝説モジュール）
     bosses/               中ボス・ラスボス（部位、タイムライン、AI）
-    gimmicks/             フィールドの仕掛け
-    ship/
-    render/               描画の流れ（10章）
-    ui/                   HUD、3択、ポーズ、調整パネル
-    fx/
+    fx/                   演出のシーン
+    stages/               ステージごとのフィールドの配置（未作成）
+    gimmicks/             フィールドの仕掛け（未作成）
+    ship/  render/  ui/   （未作成）
   scripts/                スクリプト（.gd）。主に AI が書く
     managers/             Manager（4.3）
     actors/               機体の見た目、ボスの役者の共通部分
     bosses/               ボスごとの行動、LimboAI のタスク
-    gimmicks/             フィールドの仕掛け
+    enemies/              個別の敵が持つ部品（みなみのかんむり座の渦）
+    encounters/           強敵の群れ・フォーメーション・攻撃の予算（11.3・11.7）
     weapons/              武器ごとの発動
     traits/               特性ごとの発動
     render/               描画の層と段
     input/                機器ごとの変換（9章）
     ui/
     data_types/           定義データのクラス（8.1の WeaponDef など）
-    debug/                計測表示、起動の予約
     common/               複数の場所で使う関数
-  shaders/
+    gimmicks/  debug/     （未作成）
+  shaders/                compute/ はコンピュートの演出
   data/                   定義データ（.tres）。数値の正（8.1）
     config.tres
-    phases/ weapons/ traits/ enemies/ stages/ bosses/ legendary_modules/ meta_upgrades/
+    phases/ weapons/ traits/ enemies/ stages/ bosses/ heroes/ legendary_modules/ meta_upgrades/
     formations/           敵の組み合わせのシーン（.tscn、8.1）
-  assets/                 画像、音、フォント
+    legendary_aura_bakes/ visuals/ text/ lab/
+  assets/                 画像、音、フォント（pixel/ ui/ fx/ placeholders/）
   gyms/                   実験用。規約なしで試せる。製品の書き出しから除外する
   tests/
+  tools/                  素材の切り出し・アート確認・性能計測
 ```
 
-ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。
+ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。配置のシーンは未作成で、`StageDef` の `scene_path` が指すファイルはまだない。
 
 ## 4. 全体の構成
 
