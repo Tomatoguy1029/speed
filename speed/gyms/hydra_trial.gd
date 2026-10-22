@@ -29,7 +29,7 @@ func _ready() -> void:
 		hydra.begin_separation()
 	if OS.get_cmdline_user_args().has("--hydra-inspect"):
 		session.pinned=trial_ship_position
-		session.run.build.reset_loadout()
+		session.run.loadout.reset_loadout()
 		inspect_actor=session.run.bosses.lab_instances.back().actor
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--hydra-capture="):capture_path=arg.trim_prefix("--hydra-capture=")

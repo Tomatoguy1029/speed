@@ -261,8 +261,8 @@ func _start_run() -> void:
 	await get_tree().process_frame
 	_run_manager().command(&"choose_card", {"index": 0})
 
-func _run_manager() -> RunManager:
-	return get_tree().root.find_child("RunManager", true, false) as RunManager
+func _run_manager() -> RunSimulation:
+	return RunManager.current().sim
 
 func _shot(name: String, wait := 0.4) -> void:
 	await _wait(wait)

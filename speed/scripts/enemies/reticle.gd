@@ -56,7 +56,7 @@ func _reticle(i: int, dt: float) -> void:
 	t.fire_t[i] -= dt
 	if t.mode[i] == EnemyTable.Mode.WINDUP:
 		var rock := t.target[i]
-		if not near or not is_same(rock, t.target_id[i]) or t.dead[rock] != 0:
+		if not near or not self.is_same(rock, t.target_id[i]) or t.dead[rock] != 0:
 			t.mode[i] = EnemyTable.Mode.MOVE
 			t.target[i] = -1
 			t.charge[i] = 0.0

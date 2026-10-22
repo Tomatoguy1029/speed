@@ -120,6 +120,8 @@ func _on_node_added(node: Node) -> void:
 		node.ready.connect(_begin.bind(node), CONNECT_ONE_SHOT)
 
 func _begin(session: RunSession, during_run := false) -> void:
+	if not is_instance_valid(session):
+		return
 	var run := session.sim
 	if not armed or run == _run or session.is_queued_for_deletion() or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
 		return
@@ -462,7 +464,7 @@ func _flush_performance(now_us: int) -> void:
 			"hazards": pr.hazard_count(), "hazard_capacity": pr.hazard_slots.capacity(),
 			"gems": pk.gem_slots.live, "gem_capacity": pk.gem_slots.capacity(),
 			"coins": pk.coin_slots.live, "coin_capacity": pk.coin_slots.capacity(), "capsules": pk.capsules.size(),
-			"corona_members": _run.enemies.corona.members.size()}})
+			"corona_members": (_run.enemies.behavior(&"corona").vortex.members.size() if _run.enemies.behavior(&"corona") != null else 0)}})
 	if _file != null:
 		_file.flush()
 	_clear_performance()

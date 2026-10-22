@@ -2,6 +2,12 @@
 class_name PickupSystem
 extends RunSystem
 
+func dispose() -> void:
+	for slots in [gem_slots, coin_slots]:
+		if slots != null:
+			slots.owner = null
+	super()
+
 ## 開発版の記録だけが購読する。大きい結晶が落ちたとき。tier は 1〜3（小・中・大）、enemy は落とした敵の種類。
 signal big_crystal_dropped(tier: int, xp: float, enemy: StringName)
 

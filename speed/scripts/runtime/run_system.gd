@@ -18,3 +18,9 @@ func setup(context: RunContext) -> void:
 ## 固定更新1回ぶん。real_dt は実秒、world_dt は世界秒。
 func tick(_real_dt: float, _world_dt: float) -> void:
 	pass
+
+## ランの終了時に、共有の参照を外す。
+func dispose() -> void:
+	ctx = null
+	state = null
+	cfg = null

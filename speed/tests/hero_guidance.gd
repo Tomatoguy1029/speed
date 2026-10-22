@@ -17,12 +17,17 @@ func _ready() -> void:
 	var blocked := BlockedField.new()
 	var enemies := EnemySystem.new()
 	var combat := CombatSystem.new()
-	combat.setup(s, cfg)
+	var context := RunContext.new()
+	context.state = s
+	context.cfg = cfg
+	context.field = field
+	context.enemies = enemies
+	context.combat = combat
+	context.heroes = h
+	combat.setup(context)
+	h.ctx = context
 	h.state = s
 	h.cfg = cfg
-	h.field = field
-	h.enemies = enemies
-	h.combat = combat
 	var def: HeroDef = load("res://data/heroes/perseus.tres")
 	var spawn := Vector2(-cfg.start_radius, 0.0)
 	s.ship_pos = spawn
@@ -60,17 +65,14 @@ func _ready() -> void:
 	h.tick(0.01, 0.01)
 	_check(_discoveries(s) == 2, "later proximity does not repeat landmark discovery")
 	# 障害物との間隔が成立しない場合も、最後の近すぎる候補を採用しない。
-	h.field = blocked
+	context.field = blocked
 	for seed_value in [0, 5, 19]:
 		s.rng.seed = seed_value
 		h._place(def)
 		h.tick(0.01, 0.01)
 		_check(s.ship_pos.distance_to(h.center) > cfg.hero_glow_range and not h.revealed(), "attempt limit stays undiscovered (seed %d)" % seed_value)
-	h.free()
-	field.free()
-	blocked.free()
-	enemies.free()
-	combat.free()
+	for system in [h, field, blocked, enemies, combat]:
+		system.dispose()
 	print("[hero-guidance] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 

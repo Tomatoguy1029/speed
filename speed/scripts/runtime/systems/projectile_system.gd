@@ -5,6 +5,12 @@
 class_name ProjectileSystem
 extends RunSystem
 
+func dispose() -> void:
+	for slots in [friend_slots, hostile_slots, hazard_slots]:
+		if slots != null:
+			slots.owner = null
+	super()
+
 var field: FieldSystem:
 	get: return ctx.field
 var combat: CombatSystem:

@@ -4,6 +4,15 @@
 class_name LoadoutSystem
 extends RunSystem
 
+func dispose() -> void:
+	for behavior in weapon_behaviors.values() + trait_behaviors.values():
+		behavior.build = null
+	weapon_behaviors.clear()
+	trait_behaviors.clear()
+	for connection in cards_opened.get_connections():
+		cards_opened.disconnect(connection.callable)
+	super()
+
 signal cards_opened(cards: Array)
 
 var combat: CombatSystem:

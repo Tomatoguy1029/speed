@@ -4,7 +4,7 @@ var failed:=0
 func check(ok: bool,label: String)->void:
 	print("[hydra-battle] ","PASS " if ok else "FAIL ",label)
 	if not ok:failed+=1
-func line(run: RunManager,points: PackedVector2Array)->void:
+func line(run: RunSimulation,points: PackedVector2Array)->void:
 	run.state.gauge=1.0
 	run.state.ship_pos=points[0]
 	run.state.ship_vel=Vector2.ZERO

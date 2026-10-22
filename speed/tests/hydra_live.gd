@@ -7,7 +7,7 @@ func _ready()->void:
 	var lab=load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
-	var run: RunManager=lab.run
+	var run: RunSimulation=lab.run
 	var wall_enemy:=run.enemies.spawn(run.enemies.def_of(&"biter"),Vector2(1900,0))
 	var rock:=FieldSystem.Rock.new()
 	rock.kind=&"iron"
@@ -56,8 +56,8 @@ func _ready()->void:
 	run.state.ship_pos=a.table.pos[a.body]
 	run.combat.rebuild_grid()
 	var wave_hp: float=a.table.hp[a.body]
-	run.build.run_sonic(&"sonic",300.0,7.0,0.0,0.5)
-	for step in 6:run.build._update_sonic(0.1)
+	run.loadout.run_sonic(&"sonic",300.0,7.0,0.0,0.5)
+	for step in 6:run.loadout._update_sonic(0.1)
 	check(is_equal_approx(wave_hp-a.table.hp[a.body],7.0),"one real sonic wave hits the core once across its lifetime")
 	a.begin_separation()
 	a.separation_t=0.0

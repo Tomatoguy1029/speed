@@ -591,8 +591,13 @@ func _show_cards() -> void:
 	_layout_cards()
 	var row: Control = _swap_grid if swap != &"" else _cards_row
 	if row.get_child_count() > 0:
-		row.get_child(0).grab_focus.call_deferred()
+		_focus_card.call_deferred(weakref(row.get_child(0)))
 	_swap_scroll.set_deferred("scroll_vertical", 0)
+
+func _focus_card(reference: WeakRef) -> void:
+	var button: Control = reference.get_ref()
+	if button != null and button.is_visible_in_tree():
+		button.grab_focus()
 
 func _layout_cards() -> void:
 	if _swap_box == null or not _swap_box.visible:

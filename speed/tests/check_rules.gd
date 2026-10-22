@@ -2,13 +2,13 @@
 ##   Godot --headless --path speed --script res://tests/check_rules.gd
 ##
 ## 確かめること：
-##   1. Autoload はアプリ全体の4つだけ（設計書 4.3）
+##   1. Autoload はアプリ全体の窓口と、開発用の記録だけ
 ##   2. Manager はコンテンツ（ステージ・ボス・フィールドの仕掛け）に依存しない（決まり4）
 ##   3. 道具（addons/）は Godot 本体だけに依存する（設計書 4.1）
 ##   4. UI はランの状態を書き換えない（state.xxx = の代入をしない）（設計書 4.1）
 extends SceneTree
 
-const ALLOWED_AUTOLOADS := ["ConfigManager", "SaveManager", "AudioManager", "GameManager"]
+const ALLOWED_AUTOLOADS := ["ConfigManager", "SaveManager", "AudioManager", "GameManager", "RunManager", "PlayRecorder"]
 const CONTENT_REFS := ["res://scenes/stages", "res://scenes/bosses", "res://scenes/gimmicks",
 	"res://scripts/bosses", "res://scripts/gimmicks"]
 const GAME_REFS := ["res://scripts", "res://scenes", "res://data", "ConfigManager", "SaveManager",

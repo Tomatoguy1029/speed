@@ -11,7 +11,7 @@ func _ready() -> void:
 	SaveManager.settings = settings_copy
 	await _start(1)
 	run.input.set_process_unhandled_input(true)
-	hud = scene.get_node("Hud/HudRoot")
+	hud = scene.view.get_node("Hud/HudRoot")
 	await _open()
 	_check(hud._cards_box.visible, "selection appears immediately")
 	_click_card()
@@ -115,8 +115,8 @@ func _ready() -> void:
 	_check(run.state.phase == RunState.Phase.LEVELUP, "emulation pair cannot cross the deadline as a new click")
 	# 初期武器選択も同じ保護を使う。
 	run.state.pending_levels = 0
-	run.build.reset_loadout()
-	run.build.open_start_cards()
+	run.loadout.reset_loadout()
+	run.loadout.open_start_cards()
 	await _position_card()
 	_click_card()
 	_check(run.state.start_pick, "initial weapon choice is guarded")
@@ -132,7 +132,7 @@ func _open(levels := 1) -> void:
 	run.state.swap_pick = &""
 	run.state.pending_levels = levels
 	run.set_phase(RunState.Phase.PLAY)
-	run.build.try_open_cards()
+	run.loadout.try_open_cards()
 	await _position_card()
 
 func _position_card() -> void:
@@ -182,4 +182,7 @@ func _touch(down: bool) -> void:
 	get_viewport().push_input(ev, true)
 
 func _wait_real() -> void:
+	# 入力のガードだけを検証する。乱数で選ばれた装備の報酬演出は別途確認する。
+	run.flush_events()
+	hud._rewards.cancel()
 	await get_tree().create_timer(0.35, true, false, true).timeout

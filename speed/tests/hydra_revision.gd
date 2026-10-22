@@ -7,7 +7,7 @@ func _ready() -> void:
 	var lab=load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[-220,0]})
-	var run: RunManager=lab.run
+	var run: RunSimulation=lab.run
 	check(run.state.stage.boss_id==&"hydra","stage four selects playable hydra encounter")
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
 	var a=run.bosses.lab_instances.back().actor

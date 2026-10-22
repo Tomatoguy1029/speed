@@ -115,6 +115,7 @@ func setup() -> void:
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, loadout, ship, draw, combat, enemies, spawn, bosses, projectiles, pickups, heroes]:
 		m.setup(ctx)
+	combat.rebuild_grid()
 	if not state.lab_mode and state.stage.encounter_profile.get("enabled", false):
 		encounters = ENCOUNTERS.new()
 		encounters.setup(self, state.stage.encounter_profile)
@@ -146,6 +147,18 @@ func dispose() -> void:
 		SaveManager.settings_changed.disconnect(_read_settings)
 	if bosses != null:
 		bosses.remove_boss()
+	if projectiles != null and projectiles.director != null:
+		projectiles.director.projectiles = null
+		projectiles.director.state = null
+		projectiles.director = null
+	for name in ["field", "ship", "draw", "combat", "enemies", "spawn", "bosses", "projectiles", "loadout", "pickups", "heroes"]:
+		var system: RunSystem = ctx.get(name)
+		if system != null:
+			system.dispose()
+		ctx.set(name, null)
+	encounters = null
+	input_source = Callable()
+	view_size_source = Callable()
 
 ## 成長と戦闘の初期値。装備は複製し、その後の取得で記録の初期状態が変わるのを防ぐ。
 func recording_snapshot() -> Dictionary:

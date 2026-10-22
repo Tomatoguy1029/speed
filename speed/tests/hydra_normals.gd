@@ -21,7 +21,7 @@ func _ready() -> void:
 		var director=lab.run.projectiles.director
 		director.formation_mode=true
 		director.configure({"enabled":true,"budget":0.1,"jitter":0.0})
-		check(not boss.start_normal(0,&"bite_thrust"),"formation mode still obeys global attack budget")
+		check(boss.start_normal(0,&"bite_thrust"),"normal run uses the Hydra budget independently of the small-fry budget")
 		director.configure({"enabled":false})
 		director.formation_mode=false
 		var waiting: int = lab.run.projectiles.director.waiting.size()

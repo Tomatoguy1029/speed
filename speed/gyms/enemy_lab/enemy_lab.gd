@@ -225,7 +225,7 @@ func _reset() -> void:
 	canvas.selection.clear()
 	canvas.result.clear()
 	canvas.center = session.run.state.ship_pos
-	var render: RenderManager = session.run.get_node_or_null("../RenderManager")
+	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
 	if render != null:
 		canvas.zoom = render.game_zoom()
 	_busy = false
@@ -474,7 +474,7 @@ func _process(_delta: float) -> void:
 ## 試遊中は本番のカメラが機体を追い、編集用の層もその視点に合わせる。
 ## 編集中は編集用の層の視点（ホイール・中ドラッグで動かす）を、本番の描画のカメラに渡す。ゲームの状態は変えない。
 func _sync_view() -> void:
-	var render: RenderManager = session.run.get_node_or_null("../RenderManager")
+	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
 	var playing: bool = canvas.mode == 3
 	var following: bool = playing or canvas.follow
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE if playing else Control.MOUSE_FILTER_STOP
@@ -484,7 +484,7 @@ func _sync_view() -> void:
 	(game_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", session.viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	# 本番の画面のうち HUD・ミニマップ・背景の星は、表示メニューで選んだときだけ出す
 	render.show_background = canvas.show_background
-	var hud: CanvasLayer = session.scene.get_node_or_null("Hud")
+	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null:
 		hud.visible = canvas.show_hud or canvas.show_minimap
 		var hud_root = hud.get_node_or_null("HudRoot")
@@ -500,7 +500,7 @@ func _sync_view() -> void:
 
 ## 本番の画面と同じ大きさで映す倍率（描画がまだなければ 1）。
 func game_zoom() -> float:
-	var render: RenderManager = session.run.get_node_or_null("../RenderManager") if is_instance_valid(session.run) else null
+	var render: RenderManager = session.scene.view.get_node_or_null("RenderManager") if session.scene.view != null else null
 	return render.game_zoom() if render != null else 1.0
 
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。

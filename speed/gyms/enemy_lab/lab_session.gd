@@ -156,13 +156,13 @@ func _rebuild() -> void:
 	var weapon_ids: Array = spec.get("weapons", {}).keys()
 	weapon_ids.sort()
 	for id in weapon_ids:
-		run.build.grant(&"weapon", StringName(id), int(spec.weapons[id]))
+		run.loadout.grant(&"weapon", StringName(id), int(spec.weapons[id]))
 	var trait_ids: Array = spec.get("traits", {}).keys()
 	trait_ids.sort()
 	for id in trait_ids:
-		run.build.grant(&"trait", StringName(id), int(spec.traits[id]))
+		run.loadout.grant(&"trait", StringName(id), int(spec.traits[id]))
 	run.state.level = int(spec.get("level", 1))
-	run.build.refresh_stats()
+	run.loadout.refresh_stats()
 	run.state.hero_power = StringName(spec.get("hero", ""))
 	tick = 0
 	selected = -1
@@ -479,7 +479,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			var key := String(args.get("key", ""))
 			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "trace_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
 				run.cfg.set(key, clampf(float(args.value), 0.001, 1.0) if key == "draw_time_scale" else maxf(0.01, float(args.value)))
-				run.build.refresh_stats()
+				run.loadout.refresh_stats()
 		"phase_set":
 			var phases := []
 			for id in args.get("ids", []):
@@ -487,20 +487,20 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if not phases.is_empty(): run.state.stage.phases = phases
 		"meta":
 			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
-			run.build.refresh_stats()
+			run.loadout.refresh_stats()
 		"time":
 			run.state.time = maxf(0, float(args.get("value", 0)))
 		"level":
 			run.state.level = clampi(int(args.get("value", 1)), 1, 1000)
-			run.build.refresh_stats()
+			run.loadout.refresh_stats()
 		"hero":
 			run.state.hero_power = StringName(args.get("id", ""))
 			run.state.hero_active_t = 0
 		"loadout":
 			if args.get("reset", false):
-				run.build.reset_loadout()
+				run.loadout.reset_loadout()
 			else:
-				run.build.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
+				run.loadout.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
 		"schedule":
 			schedule = args.get("entries", []).duplicate(true)
 		"guard":
@@ -667,7 +667,7 @@ func digest() -> String:
 	for instance in run.bosses.lab_instances:
 		if is_instance_valid(instance.actor):
 			actors.append(_stable(instance.actor, 0))
-	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.corona, 0),
+	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.behaviors, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
 
@@ -690,7 +690,7 @@ func _stable(value, depth: int):
 			var key: String = property.name
 			var item = value.get(key)
 			if item is Node or item is Callable or item is Signal or item is GDScript: continue
-			if key in ["director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
+			if key in ["_near", "ctx", "m", "director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
 			out[key] = _stable(item, depth + 1)
 		if value is BossActor and value.has_node("Timeline"):
 			var timeline: AnimationPlayer = value.get_node("Timeline")

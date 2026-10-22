@@ -29,7 +29,7 @@ func _soldier(i: int, dt: float) -> void:
 		if t.timer[i] <= 0.0 and t.dead[i] == 0:
 			projectiles.combat.kill_enemy(i, {"cause": &"collapse"})
 		return
-	if not is_same(king, t.target_id[i]) or t.dead[king] != 0:
+	if not self.is_same(king, t.target_id[i]) or t.dead[king] != 0:
 		_start_mutiny(i, 0.4)
 		return
 	var slot := cepheus_slot(king, t.buds[i])

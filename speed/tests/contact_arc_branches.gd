@@ -11,14 +11,17 @@ func verify() -> void:
 	var em := EnemySystem.new()
 	var combat := CombatSystem.new()
 	var build := LoadoutSystem.new()
-	em.setup(s, cfg)
-	combat.setup(s, cfg)
+	var context := RunContext.new()
+	context.state = s
+	context.cfg = cfg
+	context.enemies = em
+	context.combat = combat
+	context.loadout = build
+	em.setup(context)
+	combat.setup(context)
+	build.ctx = context
 	build.state = s
 	build.cfg = cfg
-	combat.enemies = em
-	combat.build = build
-	build.enemies = em
-	build.combat = combat
 	var definition := EnemyDef.new()
 	definition.id = &"arc_probe"
 	definition.radius = 10.0
@@ -95,9 +98,8 @@ func verify() -> void:
 	print("W17 isolated target: OK")
 	if "--visual" in OS.get_cmdline_user_args():
 		await show_visual(build, s, cfg, visual_segments)
-	em.free()
-	combat.free()
-	build.free()
+	for system in [em, combat, build]:
+		system.dispose()
 	get_tree().quit()
 
 func show_visual(build: LoadoutSystem, state: RunState, cfg: GameConfig, segments: PackedVector2Array) -> void:
@@ -105,8 +107,8 @@ func show_visual(build: LoadoutSystem, state: RunState, cfg: GameConfig, segment
 	viewport.size = Vector2i(1000, 500)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(viewport)
-	var run := RunManager.new()
-	run.build = build
+	var run := RunSimulation.new()
+	run.ctx = build.ctx
 	var renderer := RenderManager.new()
 	renderer.run = run
 	renderer.state = state
@@ -126,5 +128,4 @@ func show_visual(build: LoadoutSystem, state: RunState, cfg: GameConfig, segment
 	viewport.get_texture().get_image().save_png("/tmp/speed-contact-arc-branches.png")
 	print("Production bolt rendering and module preview: /tmp/speed-contact-arc-branches.png")
 	renderer.free()
-	run.free()
 	viewport.queue_free()

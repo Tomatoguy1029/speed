@@ -31,7 +31,7 @@ func _triangle(i: int, dt: float) -> void:
 		var j := parts[k]
 		var a := t.facing[i] + TAU * (k / 2) / 3.0
 		var at := t.pos[i] + Vector2.from_angle(a) * float(p.span)
-		if is_same(j, parts[k + 1]) and t.dead[j] == 0:
+		if self.is_same(j, parts[k + 1]) and t.dead[j] == 0:
 			t.pos[j] = at
 		verts.append(at)
 	var links := t.links[i]

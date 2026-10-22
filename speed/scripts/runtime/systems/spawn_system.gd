@@ -215,7 +215,7 @@ func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: A
 ## 群れのうち、生きている敵がいるか。
 func _group_alive(rows: PackedInt32Array) -> bool:
 	for k in range(0, rows.size(), 2):
-		if is_same(rows[k], rows[k + 1]) and table.dead[rows[k]] == 0:
+		if self.is_same(rows[k], rows[k + 1]) and table.dead[rows[k]] == 0:
 			return true
 	return false
 
@@ -313,7 +313,7 @@ func _survey(pop: float) -> float:
 				continue
 			var seen := false
 			for k in range(0, rows.size(), 2):
-				if is_same(rows[k], rows[k + 1]) and view.has_point(pos[rows[k]]):
+				if self.is_same(rows[k], rows[k + 1]) and view.has_point(pos[rows[k]]):
 					seen = true
 					break
 			if seen:

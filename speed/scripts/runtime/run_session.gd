@@ -49,6 +49,9 @@ func _process(_delta: float) -> void:
 ## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		# 記録の終了と役者の退出は、シミュレーションの参照が使える間に済ませる。
+		if is_inside_tree():
+			get_parent().remove_child(self)
 		sim.dispose()
 		if is_instance_valid(RunManager):
 			RunManager.unregister(self)

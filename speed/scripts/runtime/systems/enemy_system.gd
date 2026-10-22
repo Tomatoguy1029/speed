@@ -6,6 +6,13 @@
 class_name EnemySystem
 extends RunSystem
 
+func dispose() -> void:
+	for behavior in behaviors:
+		behavior.m = null
+	behaviors.clear()
+	_row_watchers.clear()
+	super()
+
 var field: FieldSystem:
 	get: return ctx.field
 var projectiles: ProjectileSystem:

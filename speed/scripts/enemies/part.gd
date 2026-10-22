@@ -2,6 +2,6 @@
 extends EnemyBehavior
 
 func step(i: int, dt: float) -> void:
-	if not is_same(table.parent[i], table.parent_id[i]) or table.dead[table.parent[i]] != 0:
+	if not self.is_same(table.parent[i], table.parent_id[i]) or table.dead[table.parent[i]] != 0:
 		mark_dead(i)
 	table.vel[i] = Vector2.ZERO

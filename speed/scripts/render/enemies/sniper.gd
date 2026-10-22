@@ -16,34 +16,34 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var dp: Dictionary = t.def[i].params
 	var k := t.charge[i]
 	var f := t.facing[i]
-	var lens := behavior.telescope_lens(i)
-	var half := behavior.telescope_half(i)
+	var lens: Vector2 = behavior.telescope_lens(i)
+	var half: float = behavior.telescope_half(i)
 	var length := float(dp.band_len)
-	var rays := behavior.telescope_rays(i)
+	var rays: PackedFloat32Array = behavior.telescope_rays(i)
 	var col := Color(0.62, 0.9, 1.0).lerp(Color(1.0, 0.22, 0.2), k)
 	var resting := t.mode[i] == EnemyTable.Mode.RECOVER
-	var seen := behavior.telescope_sight(i, state.ship_pos) == 1
+	var seen: bool = behavior.telescope_sight(i, state.ship_pos) == 1
 	var a0 := (0.06 if resting else 0.16 + 0.22 * k) + (0.08 if seen else 0.0)
-	var count := rays.size()
+	var count: int = rays.size()
 	if count < 2:
 		return
 	var pts := PackedVector2Array([lens])
 	var cols := PackedColorArray([Color(col, a0)])
 	for n in count:
-		var reach := rays[n]
+		var reach: float = rays[n]
 		pts.append(lens + Vector2.from_angle(f - half + 2.0 * half * n / float(count - 1)) * reach)
 		cols.append(Color(col, a0 * (1.0 - reach / length)))
 	if t.mode[i] == EnemyTable.Mode.WINDUP:
 		# レーザーの溜め：帯がすぼまって赤い照準線になり脈打つ。光の粒がレンズへ吸い込まれ、レンズの光が膨らむ
 		var w := 1.0 - clampf(t.timer[i] / float(dp.laser_charge), 0.0, 1.0)
-		var reach := behavior.telescope_reach(i, f)
+		var reach: float = behavior.telescope_reach(i, f)
 		var pulse := 0.5 + 0.5 * sin(state.world_time * (30.0 + 40.0 * w))
-		var tip := lens + Vector2.from_angle(f) * reach
+		var tip: Vector2 = lens + Vector2.from_angle(f) * reach
 		c.draw_line(lens, tip, Color(1.0, 0.25, 0.2, 0.25 + 0.35 * pulse), maxf(_px(2.0), 4.0 + 10.0 * w))
 		c.draw_line(lens, tip, Color(1.0, 0.85, 0.8, 0.5 + 0.4 * pulse), maxf(_px(1.0), 1.5 + 2.0 * w))
 		for n in 10:
 			var fr := fmod(w * 3.0 + n / 10.0, 1.0)
-			var q := lens + Vector2.from_angle(n * TAU / 10.0 + w * 4.0) * r * (2.4 - 2.2 * fr)
+			var q: Vector2 = lens + Vector2.from_angle(n * TAU / 10.0 + w * 4.0) * r * (2.4 - 2.2 * fr)
 			c.draw_circle(q, maxf(_px(1.5), r * 0.07), Color(1.0, 0.45, 0.3, fr))
 		c.draw_circle(lens, r * (0.35 + 0.6 * w), Color(1.0, 0.3, 0.22, 0.35 + 0.3 * pulse))
 		c.draw_circle(lens, r * (0.18 + 0.3 * w), Color(1.0, 0.92, 0.85, 0.9))

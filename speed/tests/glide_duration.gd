@@ -5,7 +5,7 @@ extends Node
 
 var failed := 0
 var checks := 0
-var run: RunManager
+var run: RunSimulation
 var scene: Node
 var shots := ""
 
@@ -19,11 +19,11 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			shots = arg.trim_prefix("--out=")
-	scene = load("res://scenes/run/run.tscn").instantiate()
-	run = scene.get_node("Managers/RunManager")
+	scene = RunManager.create_run()
+	run = scene.sim
 	run.options = {"lab": true, "seed": 31, "meta": {}}
 	add_child(scene)
-	run.set_physics_process(false)
+	scene.auto_step = false
 	run.state.phase = RunState.Phase.PLAY
 	var s := run.state
 	var cfg := run.cfg
@@ -34,7 +34,7 @@ func _ready() -> void:
 	check(icon != null and icon.get_width() == 47, "T31 has a card/loadout icon")
 	for level in range(4):
 		if level > 0:
-			check(run.build.grant(&"trait", &"T31"), "T31 stacks through grant")
+			check(run.loadout.grant(&"trait", &"T31"), "T31 stacks through grant")
 		var mult := 1.0 + 0.25 * level
 		check(s.stats.glide_duration_mult == mult, "T31 provisional additive multiplier")
 		s.ship_vel = baseline_vel
@@ -56,7 +56,7 @@ func _ready() -> void:
 		await _capture("level3_late_fade")
 		run.ship._step(1.75, Vector2.ZERO, 0.0)
 		await _capture("level3_cruise")
-	check(not run.build.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
+	check(not run.loadout.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
 	check(s.modules_obtained.has(&"T31"), "Standard result module list includes T31")
 	var saved := SaveManager.data.duplicate(true)
 	SaveManager.unlock_module(&"T31")
@@ -70,17 +70,18 @@ func _ready() -> void:
 	ConfigManager.traits = {&"T31": traits[&"T31"]}
 	for level in [0, 1, 3]:
 		s.traits = {} if level == 0 else {&"T31": level}
-		var cards := run.build.roll_cards()
+		var cards := run.loadout.roll_cards()
 		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 3), "Standard new/upgrade/maxed card pool")
 	ConfigManager.weapons = weapons
 	ConfigManager.traits = traits
 	s.traits = {&"T31": 3}
-	run.build.refresh_stats()
+	run.loadout.refresh_stats()
 	s.cards = [{"kind": &"trait", "id": &"T31", "level": 3}]
 	run.set_phase(RunState.Phase.LEVELUP)
 	run.cards_changed.emit()
-	check(scene.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("3/3"), "Trait card displays the configured stack cap")
+	check(scene.view.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("3/3"), "Trait card displays the configured stack cap")
 	await _capture("card_and_loadout")
+	await get_tree().process_frame
 	scene.queue_free()
 	await get_tree().process_frame
 	print("[glide_duration] %d checks, %d failures" % [checks, failed])

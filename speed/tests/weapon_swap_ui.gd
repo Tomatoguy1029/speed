@@ -17,7 +17,7 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await _start(1)
 	run.input.set_process_unhandled_input(true)
-	hud = scene.get_node("Hud/HudRoot")
+	hud = scene.view.get_node("Hud/HudRoot")
 	await _open_swap()
 	var grid: GridContainer = hud.get("_swap_grid")
 	var new_name: Label = hud.get("_swap_new_name")
@@ -46,7 +46,7 @@ func _ready() -> void:
 	for id in before:
 		if id != removed:
 			_check(run.state.weapons[id] == before[id], "交換しない所持武器のLvを保つ")
-	_check(not run.build._receive_comet_weapon(&"W22") and run.state.phase == RunState.Phase.PLAY, "同じ彗星武器を受け取ったときの既存ルールを保つ")
+	_check(not run.loadout._receive_comet_weapon(&"W22") and run.state.phase == RunState.Phase.PLAY, "同じ彗星武器を受け取ったときの既存ルールを保つ")
 	await _open_swap()
 	before = run.state.weapons.duplicate()
 	point = hud.get("_swap_keep").get_global_rect().get_center()
@@ -57,7 +57,7 @@ func _ready() -> void:
 	_check(run.state.phase == RunState.Phase.PLAY and run.state.weapons == before, "受け取らないときは現在の装備を保つ")
 	await _open_swap()
 	# サイズ確認はHUDを対象にし、世界側のエフェクトは静止したまま描く。
-	scene.get_node("Managers/RenderManager").set_process(false)
+	scene.view.get_node("RenderManager").set_process(false)
 	for viewport_size in [Vector2i(640, 720), Vector2i(360, 640), Vector2i(640, 360)]:
 		get_window().size = viewport_size
 		await _settle()
@@ -105,21 +105,21 @@ func _ready() -> void:
 	_check(hud._cards_row.visible and not hud.get("_swap_scroll").visible and hud._cards_row.get_child_count() == 3, "通常レベルアップは既存の3択を保つ")
 	await _shot("normal_levelup")
 	run.state.pending_levels = 0
-	run.build.open_start_cards()
+	run.loadout.open_start_cards()
 	await _settle()
 	_check(hud._cards_row.visible and not hud.get("_swap_keep").visible and run.state.start_pick, "初期武器選択も既存の表示を保つ")
 	await _shot("initial_weapon")
 	await _finish()
 
 func _open_swap() -> void:
-	run.build.reset_loadout()
+	run.loadout.reset_loadout()
 	for i in run.cfg.weapon_slots:
-		run.build.grant(&"weapon", StringName("W%02d" % (i + 1)), i + 1)
+		run.loadout.grant(&"weapon", StringName("W%02d" % (i + 1)), i + 1)
 	run.state.start_pick = false
 	run.state.pending_levels = 0
 	run.state.swap_pick = &""
 	run.set_phase(RunState.Phase.PLAY)
-	_check(run.build._receive_comet_weapon(&"W22"), "装備満杯で交換画面を開く")
+	_check(run.loadout._receive_comet_weapon(&"W22"), "装備満杯で交換画面を開く")
 	await _settle()
 
 func _settle() -> void:
