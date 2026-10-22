@@ -12,6 +12,9 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"curve_turn": 0.45,
+"curve_lag": 1.1,
+"curve_time": 2.6,
 "sequence_gap": 0.55,
 "sequence_charge": 0.45,
 "thunder_lead": 0.4,

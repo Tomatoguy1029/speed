@@ -108,7 +108,7 @@ func _check_growth() -> void:
 	_cue(&"growth_started", &"", -1, {"duration": growth_t})
 
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
-const TECH_DIR := {&"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const TECH_DIR := {&"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -223,7 +223,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
-		if busy and tech==&"sequence": special.tick(dt)
+		if busy and tech in [&"sequence",&"curve"]: special.tick(dt)
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
@@ -756,6 +756,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
+	elif attack==&"curve": participants.assign(necks.filter(func(n):return _alive(n)))
 	tech = attack
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
@@ -785,6 +786,8 @@ func interrupt_tech(attack: StringName = &"") -> void:
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
 	match name:
+		&"curve":
+			return not separated and count>=5 and (participants.any(func(n):return _alive(n)) if busy else necks.filter(func(n):return _alive(n)).size()>=3)
 		&"sequence":
 			return not separated and count>=5 and (participants.size()==3 and participants.all(func(n):return _alive(n)) if busy else front_heads().size()==3)
 		&"north":
@@ -812,7 +815,7 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
-	if name==&"sequence": special.prepare()
+	if name in [&"sequence",&"curve"]: special.prepare()
 	if name == &"north":
 		north_aiming = true
 		_update_north_targets()
@@ -1032,7 +1035,7 @@ func _timeline_key_time(name: StringName, method: StringName) -> float:
 	return 0.0
 
 func _warning_duration(name: StringName) -> float:
-	var method: StringName = {&"north": &"north_burst", &"east": &"east_sweep", &"west": &"west_sweep"}.get(name, &"")
+	var method: StringName = {&"sequence": &"special_attack", &"curve": &"special_attack", &"north": &"north_burst", &"east": &"east_sweep", &"west": &"west_sweep"}.get(name, &"")
 	return maxf(0.0, _timeline_key_time(name, method) - _timeline_key_time(name, &"tech_compass"))
 
 ## -1 は本体、-2 は不死首、0 以上は通常首の配列の添字。戻り値はワールド座標。
