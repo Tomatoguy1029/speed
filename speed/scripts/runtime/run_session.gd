@@ -87,6 +87,9 @@ func _process(_delta: float) -> void:
 			_pending_options.clear()
 			sim.aborted.emit()
 			return
+		if not resources.warmup_complete:
+			load("res://scripts/render/run_presentation.gd").warm_resources(self, resources)
+			return
 		_loading.queue_free()
 		_loading = null
 		var options := _pending_options

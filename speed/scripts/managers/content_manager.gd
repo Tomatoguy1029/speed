@@ -163,6 +163,7 @@ func runtime_stage(index: int) -> RuntimeStage:
 var _resource_jobs: Dictionary = {}
 func prepare_resources(paths: PackedStringArray, threaded := true) -> ContentResourceScope:
 	var scope := ContentResourceScope.new()
+	if paths.is_empty(): scope.warmup_complete = true
 	for path in paths:
 		if scope.resources.has(path) or path in scope.pending: continue
 		if not threaded:

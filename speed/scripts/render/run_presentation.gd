@@ -304,6 +304,8 @@ func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
 func _process(delta: float) -> void:
+	if run != null and run.loadout != null:
+		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	var phase := state.phase
 	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -1158,3 +1160,10 @@ func _friendly_visual(projectiles: ProjectileSystem, row: int) -> AttackVisual:
 		visual.setup(self)
 		_friendly_visuals[code] = visual
 	return _friendly_visuals[code]
+
+## 表示を組み立てる前のロード画面と、装備候補の表示中で共有する入口。
+static func warm_resources(parent: Node, scope: ContentResourceScope) -> void:
+	if scope == null or scope.cancelled or not scope.is_ready() or scope.warming or scope.warmup_complete: return
+	var viewport: Node = load("res://scripts/render/shader_warmup.gd").new()
+	parent.add_child(viewport)
+	viewport.prepare(scope)

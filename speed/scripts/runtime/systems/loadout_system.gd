@@ -20,6 +20,9 @@ var _candidate_resources: Dictionary = {}
 var _equipped_resources: Dictionary = {}
 var _pending_choice := -1
 
+func resource_scopes() -> Array:
+	return _candidate_resources.values() + _equipped_resources.values()
+
 func resources_for_card(id: StringName) -> ContentResourceScope:
 	return _candidate_resources.get(id)
 
@@ -44,7 +47,7 @@ func poll_choice() -> Variant:
 	var card: Dictionary = state.cards[index]
 	var id: StringName = state.swap_pick if state.swap_pick != &"" else card.id
 	var scope := resources_for_card(id)
-	if scope != null and not scope.is_ready(): return null
+	if scope != null and (not scope.is_ready() or not scope.warmup_complete): return null
 	_pending_choice = -1
 	return choose_card(index)
 
@@ -242,7 +245,7 @@ func choose_card(index: int) -> bool:
 		push_error("装備の資源を準備できないため、選択を保留します: %s" % selection)
 		_pending_choice = -1
 		return true
-	if c.kind != &"keep" and preparation != null and not preparation.is_ready():
+	if c.kind != &"keep" and preparation != null and (not preparation.is_ready() or not preparation.warmup_complete):
 		_pending_choice = index
 		return true
 	if state.swap_pick != &"":

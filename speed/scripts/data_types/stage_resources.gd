@@ -3,3 +3,6 @@ class_name StageResources
 extends Resource
 @export var paths := PackedStringArray()
 @export var enemy_ids := PackedStringArray()
+
+## ロード中にmaterialを作って描くshader。
+@export var shader_paths := PackedStringArray()

@@ -447,7 +447,7 @@ func _begin_finish() -> void:
 func finish_legendary() -> LegendaryModuleDef:
 	if state.endless or state.stage_index < 1 or state.stage_index > 4 or state.stage == null:
 		return null
-	return ContentManager.legendary_modules.get(state.stage.legendary_module_id) as LegendaryModuleDef
+	return ContentManager.definition(&"legendary_modules", state.stage.legendary_module_id) as LegendaryModuleDef
 
 func finish_reveal_start() -> float:
 	return maxf(0.0, cfg.boss_finish_slow_time) + maxf(0.0, cfg.boss_finish_blast_time)

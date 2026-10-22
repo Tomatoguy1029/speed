@@ -7,14 +7,13 @@ static func _add(paths: Dictionary, path: String) -> void:
 	for dependency in ResourceLoader.get_dependencies(path):
 		var parts := dependency.split("::")
 		_add(paths, parts[-1])
+	if path.ends_with(".gd") and FileAccess.file_exists(path):
+		var pattern := RegEx.new()
+		pattern.compile('res://[^"\\n]+')
+		for match in pattern.search_all(FileAccess.get_file_as_string(path)): _add(paths, match.get_string())
 static func _script(paths: Dictionary, path: String) -> String:
-	if not FileAccess.file_exists(path): return ""
 	_add(paths, path)
-	var text := FileAccess.get_file_as_string(path)
-	var pattern := RegEx.new()
-	pattern.compile('res://[^"\\n]+')
-	for match in pattern.search_all(text): _add(paths, match.get_string())
-	return text
+	return FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
 static func _attack(paths: Dictionary, kind: String) -> void:
 	_script(paths, "res://scripts/attacks/%s.gd" % kind)
 	_script(paths, "res://scripts/render/attacks/%s.gd" % kind)
@@ -77,14 +76,21 @@ static func build(stage: RuntimeStage) -> StageResources:
 		if not ResourceLoader.exists(look): look = "res://data/visuals/looks/%s.tres" % id
 		_add(paths, look)
 		_add(paths, stage.enemy_sprite_path(StringName(id)))
+	for entry: ContentEntry in catalog.table(&"weapons").values():
+		if entry.comet_only:
+			for path in entry.resources: _add(paths, path)
+	var legendary := catalog.find(&"legendary_modules", stage.legendary_module_id)
+	if legendary != null: _add(paths, legendary.path)
 	var boss := catalog.find(&"bosses", stage.boss_id)
 	if boss != null:
 		_add(paths, boss.path)
 		var definition := load(boss.path) as BossDef
 		_add(paths, definition.scene_path)
-	for common in ["res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
+	for common in ["res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
 	result.paths = PackedStringArray(paths.keys())
 	result.paths.sort()
+	for path in result.paths:
+		if path.ends_with(".gdshader"): result.shader_paths.append(path)
 	result.enemy_ids = PackedStringArray(ids.keys())
 	result.enemy_ids.sort()
 	return result
