@@ -154,11 +154,16 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 		spin.value_changed.connect(func(v: float): SaveManager.dev_meta_override[String(def.id)] = int(v))
 		grid.add_child(spin)
 		_meta_boxes[def.id] = spin
+	# ステージ1〜5で想定する育ち具合（仕様書 14.1）
+	var presets := HBoxContainer.new()
+	for tenths in [0, 2, 5, 7, 9]:
+		var preset := Button.new()
+		preset.text = "%d割" % tenths
+		preset.tooltip_text = "全部を、使う部品の合計が%d割に近い段にする" % tenths
+		preset.pressed.connect(_set_meta_cost_ratio.bind(tenths / 10.0))
+		presets.add_child(preset)
+	box.add_child(presets)
 	var row := HBoxContainer.new()
-	var preset := Button.new()
-	preset.text = "全部を7割にする"
-	preset.pressed.connect(_set_meta_cost_ratio.bind(0.7))
-	row.add_child(preset)
 	var back := Button.new()
 	back.text = "セーブの段に戻す"
 	back.pressed.connect(func():
