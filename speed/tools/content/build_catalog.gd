@@ -4,7 +4,7 @@ extends RefCounted
 const CATEGORIES := {"enemies": "enemy", "phases": "phase", "stages": "stage", "bosses": "boss", "weapons": "weapon", "traits": "trait", "meta_upgrades": "meta", "legendary_modules": "legendary", "heroes": "hero"}
 static func build(output := "res://data/content_catalog.tres") -> Error:
 	var catalog := ContentCatalog.new()
-	var hashes := PackedStringArray([FileAccess.get_sha256("res://tools/content/build_catalog.gd")])
+	var hashes := PackedStringArray([FileAccess.get_sha256("res://tools/content/build_catalog.gd"), FileAccess.get_sha256("res://scripts/data_types/content_entry.gd"), FileAccess.get_sha256("res://tools/content/build_stage_resources.gd")])
 	for category in CATEGORIES:
 		for file in DirAccess.get_files_at("res://data/" + category):
 			if not file.ends_with(".tres"): continue
@@ -26,6 +26,14 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 			if "params" in definition:
 				for key in ["color", "branches_by_level"]:
 					if definition.params.has(key): entry.params[key] = definition.params[key]
+			if category in ["weapons", "traits"]:
+				var paths := {}
+				var dependencies = load("res://tools/content/build_stage_resources.gd")
+				dependencies._add(paths, path)
+				dependencies._script(paths, "res://scripts/%s/%s.gd" % [category, entry.code_id])
+				dependencies._script(paths, "res://scripts/render/equipment/%s.gd" % entry.code_id)
+				entry.resources = PackedStringArray(paths.keys())
+				entry.resources.sort()
 			catalog.entries.append(entry)
 	catalog.source_signature = "\n".join(hashes).sha256_text()
 	if FileAccess.file_exists(output):

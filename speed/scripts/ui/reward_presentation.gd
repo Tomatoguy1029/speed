@@ -272,8 +272,7 @@ func _begin_next() -> void:
 	if int(_current.count) == 1:
 		_history.clear()
 	var step := int(_current.count) + 1
-	var defs: Dictionary = ContentManager.weapons if _current.kind == &"weapon" else ContentManager.traits
-	var definition: Resource = defs.get(_current.id)
+	var definition := ContentManager.catalog.find(&"weapons" if _current.kind == &"weapon" else &"traits", _current.id)
 	var title: String = definition.get_display_name() if definition != null else String(_current.id)
 	var reward := "%s Lv%d" % [title, _current.level]
 	_bonus_heading.text = tr("hud.continuation")

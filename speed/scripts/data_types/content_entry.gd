@@ -14,6 +14,7 @@ extends Resource
 @export var costs := PackedInt32Array()
 @export var stat: StringName
 @export var per_level := 0.0
+@export var resources := PackedStringArray()
 @export var comet_only := false
 var preview_texture: Texture2D:
 	get: return load(preview_path) if not preview_path.is_empty() else null

@@ -65,16 +65,15 @@ func _ready() -> void:
 	check(roundtrip.encyclopedia.has("T31"), "Standard save representation preserves discovery")
 	SaveManager.data = saved
 	# 通常の候補・強化候補への接続を、抽選対象だけ絞って確かめる。
-	var weapons := ContentManager.weapons
-	var traits := ContentManager.traits
-	ContentManager.weapons = {}
-	ContentManager.traits = {&"T31": traits[&"T31"]}
+	var catalog := ContentManager.catalog
+	var limited := ContentCatalog.new()
+	limited.entries = [catalog.find(&"traits", &"T31")]
+	ContentManager.catalog = limited
 	for level in [0, 1, 3]:
 		s.traits = {} if level == 0 else {&"T31": level}
 		var cards := run.loadout.roll_cards()
 		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 3), "Standard new/upgrade/maxed card pool")
-	ContentManager.weapons = weapons
-	ContentManager.traits = traits
+	ContentManager.catalog = catalog
 	s.traits = {&"T31": 3}
 	run.loadout.refresh_stats()
 	s.cards = [{"kind": &"trait", "id": &"T31", "level": 3}]

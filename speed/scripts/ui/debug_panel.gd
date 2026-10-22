@@ -89,7 +89,7 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	_module = OptionButton.new()
 	_module.add_theme_font_size_override("font_size", 15)
-	for table in [ContentManager.weapons, ContentManager.traits]:
+	for table in [ContentManager.catalog.table(&"weapons"), ContentManager.catalog.table(&"traits")]:
 		for def in ContentManager.sorted(table):
 			_module.add_item("%s %s" % [def.id, def.get_display_name()])
 			_module.set_item_metadata(_module.item_count - 1, def.id)
@@ -141,7 +141,7 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	box.add_child(grid)
-	for def: MetaUpgradeDef in ContentManager.sorted(ContentManager.meta_upgrades):
+	for def: ContentEntry in ContentManager.sorted(ContentManager.catalog.table(&"meta_upgrades")):
 		var l := Label.new()
 		l.text = "%s（最大 %d）" % [def.get_display_name(), def.costs.size()]
 		l.add_theme_font_size_override("font_size", 14)
@@ -175,9 +175,9 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 ## 全項目の段の合計を、最大の段の合計の ratio 倍（四捨五入）にする。各項目へ最大の段に比べて均等に振り分け、
 ## 端数の段は小数部の大きい項目から、同じなら強化画面の並び順で前の項目から1段ずつ足す。
 func _set_meta_ratio(ratio: float) -> void:
-	var defs: Array = ContentManager.sorted(ContentManager.meta_upgrades)
+	var defs: Array = ContentManager.sorted(ContentManager.catalog.table(&"meta_upgrades"))
 	var total := 0
-	for def: MetaUpgradeDef in defs:
+	for def: ContentEntry in defs:
 		total += def.costs.size()
 	var left := roundi(total * ratio)
 	var levels := {}

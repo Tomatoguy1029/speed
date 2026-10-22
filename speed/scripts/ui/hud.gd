@@ -395,7 +395,7 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef else null
+	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef or definition is ContentEntry else null
 	if texture == null:
 		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
 		var index := ICON_IDS.find(icon_id)
@@ -428,7 +428,7 @@ func _refresh_loadout_icons() -> void:
 		var index := 0
 		for id in owned:
 			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
-			_add_icon(_loadout_icons, (ContentManager.weapons if row == 0 else ContentManager.traits).get(id), area)
+			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
 			index += 1
 		row += 1
 
@@ -542,7 +542,7 @@ func _show_cards() -> void:
 	_swap_scroll.visible = swap != &""
 	_swap_keep.visible = swap != &""
 	if swap != &"":
-		var got: WeaponDef = ContentManager.weapons[swap]
+		var got: ContentEntry = ContentManager.catalog.find(&"weapons", swap)
 		_swap_new_name.text = got.get_display_name()
 		_swap_new_desc.text = got.get_description()
 		for i in cards.size():
@@ -583,7 +583,7 @@ func _show_cards() -> void:
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
 			var card: Dictionary = cards[i]
-			var definition: Resource = (ContentManager.traits if card.kind == &"trait" else ContentManager.weapons).get(card.id)
+			var definition: Resource = ContentManager.catalog.find(&"traits" if card.kind == &"trait" else &"weapons", card.id)
 			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
@@ -639,10 +639,10 @@ func _card_style(col: Color) -> StyleBoxFlat:
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
-			var new_def: WeaponDef = ContentManager.weapons[c.new]
+			var new_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.new)
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
-		var old_def: WeaponDef = ContentManager.weapons[c.id]
+		var old_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.id)
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
 			"desc": old_def.get_description(),
@@ -651,7 +651,7 @@ static func card_info(c: Dictionary) -> Dictionary:
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
 	var weapon: bool = c.kind == &"weapon"
-	var def = (ContentManager.weapons if weapon else ContentManager.traits).get(c.id)
+	var def = ContentManager.catalog.find(&"weapons" if weapon else &"traits", c.id)
 	var lv: int = c.level
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
@@ -877,8 +877,8 @@ func _dense_cells() -> PackedVector2Array:
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
 	draw_texture(SLOTS, Vector2.ZERO)
-	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.weapons)
-	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.traits)
+	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
+	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
 	_draw_hero_slot(Vector2(99, 315))
 
 func _draw_hero_slot(at: Vector2) -> void:
@@ -916,7 +916,7 @@ func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned:
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var definition = defs[ids[k]]
-		if definition is WeaponDef and definition.comet_only:
+		if weapon and definition.comet_only:
 			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
 		var pip_w := (size_px - 4.0) / max_level

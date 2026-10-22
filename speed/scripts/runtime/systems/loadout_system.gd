@@ -5,6 +5,9 @@ class_name LoadoutSystem
 extends RunSystem
 
 func dispose() -> void:
+	_release_candidates()
+	for scope: ContentResourceScope in _equipped_resources.values(): scope.cancel()
+	_equipped_resources.clear()
 	for behavior in weapon_behaviors.values() + trait_behaviors.values():
 		behavior.ctx = null
 	weapon_behaviors.clear()
@@ -12,6 +15,47 @@ func dispose() -> void:
 	for connection in cards_opened.get_connections():
 		cards_opened.disconnect(connection.callable)
 	super()
+
+var _candidate_resources: Dictionary = {}
+var _equipped_resources: Dictionary = {}
+var _pending_choice := -1
+
+func resources_for_card(id: StringName) -> ContentResourceScope:
+	return _candidate_resources.get(id)
+
+func _release_candidates() -> void:
+	for scope: ContentResourceScope in _candidate_resources.values(): scope.cancel()
+	_candidate_resources.clear()
+	_pending_choice = -1
+
+func _publish_cards() -> void:
+	_release_candidates()
+	for card in state.cards:
+		var id: StringName = state.swap_pick if state.swap_pick != &"" else card.id
+		var category: StringName = &"weapons" if state.swap_pick != &"" or card.kind == &"weapon" else &"traits"
+		var entry := ContentManager.catalog.find(category, id)
+		if entry != null and not _candidate_resources.has(id):
+			_candidate_resources[id] = ContentManager.prepare_resources(entry.resources, DisplayServer.get_name() != "headless")
+	cards_opened.emit(state.cards)
+
+func poll_choice() -> Variant:
+	if _pending_choice < 0: return null
+	var index := _pending_choice
+	var card: Dictionary = state.cards[index]
+	var id: StringName = state.swap_pick if state.swap_pick != &"" else card.id
+	var scope := resources_for_card(id)
+	if scope != null and not scope.is_ready(): return null
+	_pending_choice = -1
+	return choose_card(index)
+
+func _claim_resources(category: StringName, id: StringName) -> void:
+	if _equipped_resources.has(id): return
+	var scope := resources_for_card(id)
+	if scope != null:
+		_candidate_resources.erase(id)
+	else:
+		scope = ContentManager.prepare_resources(ContentManager.catalog.find(category, id).resources, false)
+	_equipped_resources[id] = scope
 
 signal cards_opened(cards: Array)
 signal equipment_changed
@@ -67,7 +111,7 @@ func _n(id: StringName) -> int:
 
 ## 能力値を変える特性の値（.tres の params）。
 func _trait_param(id: StringName, key: String, default := 0.0) -> float:
-	var def: TraitDef = ContentManager.traits.get(id)
+	var def := ContentManager.definition(&"traits", id) as TraitDef
 	return float(def.params.get(key, default)) if def != null else default
 
 func _per(id: StringName) -> float:
@@ -124,7 +168,7 @@ func try_open_cards() -> bool:
 	if state.pending_levels <= 0:
 		return false
 	state.cards = roll_cards()
-	cards_opened.emit(state.cards)
+	_publish_cards()
 	return true
 
 ## ラン開始時に、最初の武器の候補を出す（仕様書 9.2）。
@@ -134,11 +178,11 @@ func open_start_cards() -> void:
 		return
 	state.start_pick = true
 	state.cards = out
-	cards_opened.emit(state.cards)
+	_publish_cards()
 
 ## 最初の武器の候補：全武器からランダムに選ぶ。
 func roll_start_cards() -> Array[Dictionary]:
-	var ids: Array = ContentManager.weapons.keys().filter(func(id): return not ContentManager.weapons[id].comet_only)
+	var ids: Array = ContentManager.catalog.table(&"weapons").keys().filter(func(id): return not ContentManager.catalog.find(&"weapons", id).comet_only)
 	var out: Array[Dictionary] = []
 	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
 		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
@@ -148,7 +192,7 @@ func roll_start_cards() -> Array[Dictionary]:
 func roll_cards() -> Array[Dictionary]:
 	var pool: Array = []
 	for kind in [&"weapon", &"trait"]:
-		var defs: Dictionary = ContentManager.weapons if kind == &"weapon" else ContentManager.traits
+		var defs := ContentManager.catalog.table(&"weapons" if kind == &"weapon" else &"traits")
 		var owned: Dictionary = state.weapons if kind == &"weapon" else state.traits
 		var slots := cfg.weapon_slots if kind == &"weapon" else cfg.trait_slots
 		var max_lv := cfg.weapon_max_level if kind == &"weapon" else cfg.trait_max_stacks
@@ -184,7 +228,7 @@ func reroll_cards() -> bool:
 	state.rerolls_left -= 1
 	state.cards = roll_start_cards() if state.start_pick else roll_cards()
 	state.emit(&"reroll", {})
-	cards_opened.emit(state.cards)
+	_publish_cards()
 	return true
 
 ## 3択のカードを選ぶ。次の3択があれば作り直し、なければ false を返す。
@@ -192,17 +236,28 @@ func choose_card(index: int) -> bool:
 	if index < 0 or index >= state.cards.size():
 		return state.pending_levels > 0
 	var c: Dictionary = state.cards[index]
+	var selection: StringName = state.swap_pick if state.swap_pick != &"" else c.id
+	var preparation := resources_for_card(selection)
+	if c.kind != &"keep" and preparation != null and preparation.failed:
+		push_error("装備の資源を準備できないため、選択を保留します: %s" % selection)
+		_pending_choice = -1
+		return true
+	if c.kind != &"keep" and preparation != null and not preparation.is_ready():
+		_pending_choice = index
+		return true
 	if state.swap_pick != &"":
 		if c.kind == &"swap":
 			remove_weapon(c.id)
 			grant(&"weapon", state.swap_pick, cfg.weapon_max_level)
 			state.emit(&"upgrade", {"card": c})
 		state.swap_pick = &""
+		_release_candidates()
 		state.cards = []
 		return try_open_cards()
 	if state.start_pick:
 		state.start_pick = false
 		grant(c.kind, c.id)
+		_release_candidates()
 		state.cards = []
 		return false
 	if c.kind == &"heal":
@@ -215,8 +270,9 @@ func choose_card(index: int) -> bool:
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
 		state.cards = roll_cards()
-		cards_opened.emit(state.cards)
+		_publish_cards()
 		return true
+	_release_candidates()
 	state.cards = []
 	return false
 
@@ -253,8 +309,8 @@ func _bonus_target() -> Dictionary:
 ## 武器・特性を levels 段階手に入れる。枠が満員か上限なら false。
 func grant(kind: StringName, id: StringName, levels := 1) -> bool:
 	var weapon := kind == &"weapon"
-	var defs: Dictionary = ContentManager.weapons if weapon else ContentManager.traits
-	var def = defs.get(id)
+	var category: StringName = &"weapons" if weapon else &"traits"
+	var def := ContentManager.definition(category, id)
 	if def == null:
 		return false
 	var owned: Dictionary = state.weapons if weapon else state.traits
@@ -268,6 +324,7 @@ func grant(kind: StringName, id: StringName, levels := 1) -> bool:
 	owned[id] = mini(max_lv, lv + levels)
 	if not state.modules_obtained.has(id):
 		state.modules_obtained.append(id)
+	_claim_resources(category, id)
 	_sync_behavior(weapon, id, def, owned[id])
 	refresh_stats()
 	equipment_changed.emit()
@@ -291,6 +348,9 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 
 ## 武器を外す（彗星限定の武器と入れ替えるとき）。
 func remove_weapon(id: StringName) -> void:
+	if _equipped_resources.has(id):
+		_equipped_resources[id].cancel()
+		_equipped_resources.erase(id)
 	state.weapons.erase(id)
 	weapon_behaviors.erase(id)
 	refresh_stats()
@@ -303,7 +363,7 @@ func _receive_comet_weapon(id: StringName) -> bool:
 		return false
 	if state.weapons.size() < cfg.weapon_slots:
 		grant(&"weapon", id, cfg.weapon_max_level)
-		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ContentManager.weapons[id].get_display_name(),
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ContentManager.catalog.find(&"weapons", id).get_display_name(),
 			"color": Color("#efcb70"), "size": 24})
 		return false
 	state.swap_pick = id
@@ -312,7 +372,7 @@ func _receive_comet_weapon(id: StringName) -> bool:
 		out.append({"kind": &"swap", "id": owned, "level": state.weapons[owned], "new": id})
 	out.append({"kind": &"keep", "id": &"keep", "level": 1, "new": id})
 	state.cards = out
-	cards_opened.emit(state.cards)
+	_publish_cards()
 	return true
 
 ## 質量牽引砲（W21）が、行 i の敵の船体を牽引するか。牽引したら true。
@@ -322,6 +382,9 @@ func capture_hull(i: int) -> bool:
 
 ## 装備をすべて外す（調整パネル用）。
 func reset_loadout() -> void:
+	_release_candidates()
+	for scope: ContentResourceScope in _equipped_resources.values(): scope.cancel()
+	_equipped_resources.clear()
 	state.weapons = {}
 	state.traits = {}
 	weapon_behaviors = {}

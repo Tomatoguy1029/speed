@@ -188,6 +188,9 @@ func physics_step(delta: float) -> void:
 				_run(&"play_total", func(): _play_tick(delta))
 			else:
 				_play_tick(delta)
+		RunState.Phase.LEVELUP:
+			var choice: Variant = loadout.poll_choice()
+			if choice != null and not bool(choice): set_phase(RunState.Phase.PLAY)
 		RunState.Phase.DYING:
 			_dying_tick(delta)
 		RunState.Phase.FINISHING:
