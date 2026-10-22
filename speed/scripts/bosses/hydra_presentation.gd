@@ -88,7 +88,7 @@ func advance_effects(world_dt: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	if not is_instance_valid(hydra) or hydra.manager == null or not hydra.manager.has_boss(): return
+	if not is_instance_valid(hydra) or hydra.ctx == null or not hydra.has_body(): return
 	for index: int in slots:
 		var event: Dictionary = slots[index]
 		var anchor: Transform2D = hydra.presentation_anchor(index)

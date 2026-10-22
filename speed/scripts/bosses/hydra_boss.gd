@@ -99,7 +99,7 @@ func on_body_damaged() -> void:
 
 func handle_body_defeat(_opts: Dictionary) -> bool:
 	if separated:
-		return immortal_row>=0 and manager.enemies.is_same(immortal_row,immortal_id) and table.dead[immortal_row]==0
+		return immortal_row>=0 and ctx.enemies.is_same(immortal_row,immortal_id) and table.dead[immortal_row]==0
 	separation_pending = true
 	return true
 
@@ -192,7 +192,7 @@ func _on_bound() -> void:
 	queue_redraw()
 
 func _process(delta: float) -> void:
-	if manager == null or not manager.has_boss():
+	if ctx == null or not has_body():
 		return
 	# 実験場で停止中に本体を移動・拡縮した場合も表示を更新する。
 	if position != table.pos[body]:
@@ -202,7 +202,7 @@ func _process(delta: float) -> void:
 		queue_redraw()
 	# 制限時間の一撃が当たったら、敗北の停止の間に光を消し、爆発と GAME OVER を見せる。
 	if final_strike_t >= 0.0 and run_state.phase != RunState.Phase.PLAY:
-		attack_field.modulate.a = move_toward(attack_field.modulate.a, 0.0, delta / maxf(0.01, manager.cfg.death_freeze_time))
+		attack_field.modulate.a = move_toward(attack_field.modulate.a, 0.0, delta / maxf(0.01, ctx.cfg.death_freeze_time))
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
@@ -254,8 +254,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_spin_t -= dt
 	_update_blackboard()
 	hsm.update(dt)
-	if manager.projectiles.director != null:
-		manager.projectiles.lab_context = manager.projectiles.director.token("boss:" + str(table.id[body]))
+	if ctx.projectiles.director != null:
+		ctx.projectiles.lab_context = ctx.projectiles.director.token("boss:" + str(table.id[body]))
 	if busy and special.positioning:
 		if special.position(dt):timeline.play()
 	if timeline.is_playing():
@@ -278,11 +278,11 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		interrupt_tech()
 		for neck in necks:
 			_release_attack(neck)
-			if _alive(neck):manager.enemies.mark_dead(neck.row)
+			if _alive(neck):ctx.enemies.mark_dead(neck.row)
 		attack_field.clear_effects()
 		arena.release()
 		_cue(&"defeated")
-		manager.on_boss_defeated(body, {"cause": &"ram"})
+		ctx.bosses.on_boss_defeated(body, {"cause": &"ram"})
 	attack_field.tick(dt)
 	presentation_advanced.emit(dt)
 	queue_redraw()
@@ -309,7 +309,7 @@ func _move(dt: float) -> void:
 		t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
 	var from := t.pos[i]
 	t.pos[i] += t.vel[i] * dt
-	manager.field.collide_enemy(i, from)
+	ctx.field.collide_enemy(i, from)
 	t.pos[i] = arena.clamp_point(t.pos[i],t.r[i]+float(p.neck_rest)+80.0)
 	if t.flash[i] > 0.0:
 		t.flash[i] -= dt
@@ -332,7 +332,7 @@ func _set_count(n: int) -> void:
 		neck.kind = kinds[k]
 		if neck.row >= 0:
 			_release_attack(neck)
-			if _alive(neck):manager.enemies.mark_dead(neck.row)
+			if _alive(neck):ctx.enemies.mark_dead(neck.row)
 			neck.row = -1
 		neck.base_angle = TAU * k / float(n)
 		neck.burned = false
@@ -345,9 +345,9 @@ func _grow(neck: Neck) -> void:
 	var p: Dictionary = def.params
 	neck.length = float(p.neck_rest) * 0.3
 	neck.angle = neck.base_angle + table.facing[body]
-	var head_def := manager.enemies.def_of(StringName("hydra_" + String(neck.kind)))
-	var j := manager.enemies.spawn_part(body, head_def, _head_pos(neck))
-	var hp := float(p.head_hp) * manager.cfg.enemy_hp_mult
+	var head_def := ctx.enemies.def_of(StringName("hydra_" + String(neck.kind)))
+	var j := ctx.enemies.spawn_part(body, head_def, _head_pos(neck))
+	var hp := float(p.head_hp) * ctx.cfg.enemy_hp_mult
 	table.max_hp[j] = hp
 	table.hp[j] = hp
 	neck.row = j
@@ -373,7 +373,7 @@ func _head_pos(neck: Neck) -> Vector2:
 	if arena==null:return at
 	# 高速の伸長も天体の手前で止め、反対側へ抜けてから押し出すことを防ぐ。
 	if _alive(neck):
-		var hit=manager.field.first_body_hit(table.pos[neck.row],at,radius)
+		var hit=ctx.field.first_body_hit(table.pos[neck.row],at,radius)
 		if hit!=null and hit.body!=null:
 			var normal: Vector2=(hit.point-hit.body.pos).normalized()
 			at=hit.body.pos+normal*(hit.body.r+radius+0.1)
@@ -388,7 +388,7 @@ func _unbounded_head_pos(neck: Neck) -> Vector2:
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
 
 func _alive(neck: Neck) -> bool:
-	return neck.row >= 0 and manager.enemies.is_same(neck.row, neck.row_id) and table.dead[neck.row] == 0
+	return neck.row >= 0 and ctx.enemies.is_same(neck.row, neck.row_id) and table.dead[neck.row] == 0
 
 ## 頭の行が再利用される前に、火で落ちたかと本体へのダメージを確定する。
 func on_part_defeated(row: int) -> void:
@@ -441,7 +441,7 @@ func _on_head_lost(neck: Neck) -> void:
 	if run_state.tracing:
 		n = int(_dash_kills.get(run_state.dash_id, 0)) + 1
 		_dash_kills[run_state.dash_id] = n
-	manager.projectiles.burst_debris(table.pos[head], 8, 700.0, float(p.debris_dmg) * manager.cfg.atk_scale,
+	ctx.projectiles.burst_debris(table.pos[head], 8, 700.0, float(p.debris_dmg) * ctx.cfg.atk_scale,
 		Color("#a89a86"), table.id[head])
 	_release_attack(neck)
 	neck.row = -1
@@ -495,7 +495,7 @@ func normal_ready(index: int, attack: StringName) -> bool:
 func start_normal(index: int, attack: StringName) -> bool:
 	if not normal_ready(index,attack): return false
 	var n := necks[index]
-	var director=manager.projectiles.director
+	var director=ctx.projectiles.director
 	# 通常ランの雑魚枠と、首同士のnormal_budgetを独立させる。
 	if director!=null and not director.formation_mode:
 		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
@@ -643,11 +643,11 @@ func _end(neck: Neck, interrupted := false) -> void:
 
 ## 首の攻撃の後片付け（頭が落ちたとき）。
 func _release_attack(neck: Neck) -> void:
-	if manager.projectiles.director!=null and not _alive(neck):manager.projectiles.director.cancel_attack("neck:"+str(neck.row_id),neck.row_id)
+	if ctx.projectiles.director!=null and not _alive(neck):ctx.projectiles.director.cancel_attack("neck:"+str(neck.row_id),neck.row_id)
 	if attack_field != null: attack_field.remove_owner(neck.row)
 	if neck.hazard >= 0:
-		if manager.projectiles.owns_hazard(neck.hazard, neck.row, neck.row_id):
-			manager.projectiles.release_hazard(neck.hazard)
+		if ctx.projectiles.owns_hazard(neck.hazard, neck.row, neck.row_id):
+			ctx.projectiles.release_hazard(neck.hazard)
 		neck.hazard = -1
 	neck.glow = 0.0
 
@@ -691,7 +691,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if busy or not attack_ready(attack):
 		return false
 	if not timeline.has_animation(attack):return false
-	var director=manager.projectiles.director
+	var director=ctx.projectiles.director
 	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(def.params.major_cost)):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
@@ -718,8 +718,8 @@ func attack_playing() -> bool:
 func interrupt_tech(attack: StringName = &"") -> void:
 	if attack != &"" and tech != &"" and tech != attack:
 		return
-	if manager.projectiles.director != null:
-		manager.projectiles.director.cancel_attack("boss:" + str(table.id[body]), table.id[body])
+	if ctx.projectiles.director != null:
+		ctx.projectiles.director.cancel_attack("boss:" + str(table.id[body]), table.id[body])
 	if not busy:
 		return
 	timeline.stop()
@@ -852,8 +852,8 @@ func tech_end() -> void:
 	special.playing=false
 	special.positioning=false
 	for r in _rubble:
-		if manager.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
-			manager.enemies.mark_dead(r.x)
+		if ctx.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
+			ctx.enemies.mark_dead(r.x)
 	_rubble.clear()
 
 ## 北：予告中は自機周辺を捕捉し、north_curl のキーで狙いを固定する。
@@ -904,9 +904,9 @@ func _north_step(neck: Neck, fraction: float, dt: float) -> void:
 	_release_attack(neck)
 	neck.glow = 1.0
 	var delta := neck.strike_pos - previous
-	neck.hazard = manager.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(def.params.bite_radius) * 2.0,
+	neck.hazard = ctx.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(def.params.bite_radius) * 2.0,
 		0.0, maxf(dt, 0.001) + 0.001, float(def.params.bite_dmg), Color("#ff7a5a"))
-	manager.projectiles.attach_hazard(neck.hazard, neck.row)
+	ctx.projectiles.attach_hazard(neck.hazard, neck.row)
 	if fraction >= 1.0:
 		neck.mode = &"tech_hold"
 
@@ -921,9 +921,9 @@ func _burst_rubble(j: int, from: Vector2) -> void:
 	var p: Dictionary = def.params
 	var base := from.angle() if from != Vector2.ZERO else run_state.rng.randf() * TAU
 	for k in 6:
-		manager.projectiles.fire_enemy(j, base + (k - 2.5) * (0.45 if from != Vector2.ZERO else TAU / 6.0),
+		ctx.projectiles.fire_enemy(j, base + (k - 2.5) * (0.45 if from != Vector2.ZERO else TAU / 6.0),
 			float(p.shard_speed), &"bullet", {"bullet_dmg": float(p.shard_dmg)})
-	manager.enemies.mark_dead(j)
+	ctx.enemies.mark_dead(j)
 
 ## 判定タイムラインの実行キーから予告の長さを読む。演出専用のタイマーを正にしない。
 func _timeline_key_time(name: StringName, method: StringName) -> float:
@@ -944,7 +944,7 @@ func _warning_duration(name: StringName) -> float:
 func presentation_anchor(index := -1) -> Transform2D:
 	if index >= 0 and index < necks.size():
 		return Transform2D(necks[index].angle, _head_pos(necks[index]))
-	if index == -2 and immortal_row >= 0 and manager.enemies.is_same(immortal_row, immortal_id):
+	if index == -2 and immortal_row >= 0 and ctx.enemies.is_same(immortal_row, immortal_id):
 		return Transform2D(0.0, table.pos[immortal_row])
 	return Transform2D(table.facing[body], table.pos[body])
 
@@ -963,7 +963,7 @@ func presentation_state() -> Dictionary:
 		"north_aiming": north_aiming, "north_target": north_target, "recovery": recovery_t, "defeated": _defeat_announced, "world_time": _time}
 
 func _cue(cue: StringName, attack: StringName = &"", index := -1, details := {}) -> void:
-	if manager == null or not manager.has_boss(): return
+	if ctx == null or not has_body(): return
 	var anchor := presentation_anchor(index)
 	var head_id := necks[index].row_id if index >= 0 and index < necks.size() else (immortal_id if index == -2 else table.id[body])
 	presentation_event.emit({"cue": cue, "technique": attack if attack != &"" else tech,
@@ -974,13 +974,13 @@ func _cue(cue: StringName, attack: StringName = &"", index := -1, details := {})
 
 func _draw() -> void:
 	draw_on(self)
-	if manager != null and manager.has_boss():
+	if ctx != null and has_body():
 		# 描画キャッシュはメタデータに置き、実験場の戦闘状態の比較から分ける。
 		set_meta(&"draw_radius", table.r[body])
 
 ## 実験キャンバスも同じ本体・首・羅針盤を描く。
 func draw_on(c: CanvasItem) -> void:
-	if manager == null or not manager.has_boss():
+	if ctx == null or not has_body():
 		return
 	var t := table
 	var r := t.r[body]
@@ -1112,12 +1112,12 @@ func begin_separation()->void:
 	immortal_neck.kind=&"immortal"
 	immortal_neck.free_pos=table.pos[body]
 	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
-	immortal_row=manager.enemies.spawn_part(body,manager.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
+	immortal_row=ctx.enemies.spawn_part(body,ctx.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
 	immortal_id=table.id[immortal_row]
 	immortal_neck.row=immortal_row
 	immortal_neck.row_id=immortal_id
 	immortal_neck.cd=float(def.params.attack_cd)
-	var hp: float=float(def.params.immortal_hp)*manager.cfg.enemy_hp_mult
+	var hp: float=float(def.params.immortal_hp)*ctx.cfg.enemy_hp_mult
 	table.max_hp[immortal_row]=hp
 	table.hp[immortal_row]=hp
 	table.gate[immortal_row]=EnemyTable.Gate.NONE
@@ -1128,7 +1128,7 @@ func begin_separation()->void:
 	_cue(&"separation_started",&"",-2,{"duration":separation_t})
 
 func tick_bearer(dt: float)->void:
-	if immortal_row<0 or not manager.enemies.is_same(immortal_row,immortal_id) or table.dead[immortal_row]:
+	if immortal_row<0 or not ctx.enemies.is_same(immortal_row,immortal_id) or table.dead[immortal_row]:
 		table.hp[body]=0.0
 		return
 	var n:=immortal_neck
@@ -1166,26 +1166,26 @@ func tick_bearer(dt: float)->void:
 	table.hp[body]=table.hp[immortal_row]
 
 func health_row()->int:
-	return immortal_row if separated and manager.enemies.is_same(immortal_row,immortal_id) else body
+	return immortal_row if separated and ctx.enemies.is_same(immortal_row,immortal_id) else body
 
 func head_index(n: Neck)->int:
 	return -2 if n==immortal_neck else necks.find(n)
 
 func grid_plan()->Dictionary:
 	if not separated or immortal_row<0:return {}
-	var maximum: float=manager.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/manager.cfg.base_max_speed
-	var plan: Dictionary=GRID.build(run_state.view_rect().intersection(arena.bounds),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
+	var maximum: float=ctx.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/ctx.cfg.base_max_speed
+	var plan: Dictionary=GRID.build(run_state.view_rect().intersection(arena.bounds),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,ctx.cfg.ship_radius,maximum)
 	if plan.is_empty():return plan
 	var head_radius:=0.0
 	for n in necks:
 		if _alive(n):head_radius=maxf(head_radius,table.r[n.row])
 	# 天体の中の配置へ泳ぎ続ける大技を選ばず、通常戦闘と別の技を続ける。
-	for obstacle in manager.field.bodies:
+	for obstacle in ctx.field.bodies:
 		if Vector2(plan.bearer).distance_to(obstacle.pos)<obstacle.r+table.r[immortal_row]:return {}
 		for beam in plan.beams:
 			if Vector2(beam[0]).distance_to(obstacle.pos)<obstacle.r+head_radius:return {}
 		for i in range(1,plan.path.size()):
-			if Geom.seg_circle_t(plan.path[i-1],plan.path[i],obstacle.pos,obstacle.r+manager.cfg.ship_radius)>=0.0:return {}
+			if Geom.seg_circle_t(plan.path[i-1],plan.path[i],obstacle.pos,obstacle.r+ctx.cfg.ship_radius)>=0.0:return {}
 	return plan
 
 ## 通常移動は胴の長さぶん手前で回り込み、陣形への移動は指定された内側の配置へ進む。
@@ -1196,7 +1196,7 @@ func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formatio
 	n.free_pos=from
 	var destination: Vector2=arena.safe_point(target,margin)
 	# 障害物へ直進して停止する代わりに、その手前から表面に沿って回り込む。
-	for obstacle in manager.field.bodies:
+	for obstacle in ctx.field.bodies:
 		var clearance: float=obstacle.r+radius+60.0
 		if from.distance_to(obstacle.pos)<clearance+120.0 and Geom.seg_circle_t(from,destination,obstacle.pos,clearance)>=0.0:
 			var outward: Vector2=(from-obstacle.pos).normalized()
@@ -1208,7 +1208,7 @@ func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formatio
 	SNAKE.steer(n,destination,dt,def.params,speed_scale)
 	table.pos[n.row]=n.free_pos
 	table.vel[n.row]=n.velocity
-	manager.field.collide_enemy(n.row,from)
+	ctx.field.collide_enemy(n.row,from)
 	n.free_pos=arena.safe_point(table.pos[n.row],radius+1.0)
 	n.velocity=table.vel[n.row]
 	var inside: Vector2=arena.clamp_point(n.free_pos,radius)
