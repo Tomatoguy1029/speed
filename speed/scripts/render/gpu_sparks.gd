@@ -69,11 +69,12 @@ func _load_shader(path: String) -> RID:
 	return rd.shader_create_from_spirv(spirv)
 
 ## 画面の大きさが変わったら、描く絵を作り直す。
+## 古い絵は _tex を新しい絵へ差し替えてから解放する。先に解放すると、_tex が内部で持つ
+## 古い絵の共有ビューが一緒に消え、差し替えのときに二重に解放される。
 func _ensure_image(size_px: Vector2i) -> void:
 	if size_px == _image_size or size_px.x <= 0 or size_px.y <= 0:
 		return
-	if _image.is_valid():
-		rd.free_rid(_image)
+	var old_image := _image
 	_image_size = size_px
 	var fmt := RDTextureFormat.new()
 	fmt.format = RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT
@@ -92,6 +93,8 @@ func _ensure_image(size_px: Vector2i) -> void:
 	u1.add_id(_image)
 	_raster_set = rd.uniform_set_create([u0, u1], _raster_shader, 0)
 	_tex.texture_rd_rid = _image
+	if old_image.is_valid():
+		rd.free_rid(old_image)
 
 ## 火花を出す（次の step でまとめて GPU に送る）。
 func burst(pos: Vector2, color: Color, n: int, dir: Vector2, speed: float, life := 0.7, size := 4.0) -> void:
