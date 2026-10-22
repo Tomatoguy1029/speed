@@ -36,6 +36,7 @@ params = {
 "lump_speed": 520.0,
 "missile_dmg": 10.0,
 "missile_speed": 420.0,
+"north_half_angle": 1.65,
 "north_reach": 900.0,
 "north_spread": 120.0,
 "neck_iterations": 4,

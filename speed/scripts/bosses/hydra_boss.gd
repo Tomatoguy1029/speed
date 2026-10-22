@@ -139,6 +139,7 @@ var _vortex_at := Vector2.ZERO
 var _time := 0.0
 var _sim_dt := 0.0
 var north_target := Vector2.ZERO
+var participants: Array[Neck] = []
 var north_aiming := false
 var _north_duration := 0.001
 ## 世界秒で進む攻めどきと、技別の再使用可能時刻。
@@ -240,6 +241,10 @@ func _move(dt: float) -> void:
 	var p: Dictionary = def.params
 	var d := run_state.ship_pos - t.pos[i]
 	var dist := maxf(d.length(), 1.0)
+	if busy and tech == &"north" and north_aiming:
+		var slot := TAU/float(count)
+		var wanted := d.angle()-roundf((d.angle()-t.facing[i])/slot)*slot
+		t.facing[i] = rotate_toward(t.facing[i],wanted,def.turn*dt)
 	var swimming := dist > float(p.engage) and not busy and exposed_t <= 0.0 and recovery_t <= 0.0
 	var want := d / dist * def.speed if swimming else Vector2.ZERO
 	t.vel[i] += (want - t.vel[i]) * minf(1.0, def.accel * dt)
@@ -394,6 +399,7 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 		rest = minf(rest, neck.length)
 	NECK_CHAIN.update(neck.segs, _neck_base(neck), _head_pos(neck), rest,
 		neck.base_angle * 2.4, _time, dt, def.params)
+	if not separated: NECK_CHAIN.keep_outside(neck.segs,table.pos[body],table.r[body])
 
 # ── 不死の首 ──────────────────────────────────────────────────────
 
@@ -738,6 +744,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 		return false
 	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
 		return false
+	if attack == &"north": participants = front_heads()
 	tech = attack
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
@@ -768,7 +775,7 @@ func interrupt_tech(attack: StringName = &"") -> void:
 func _tech_ok(name: StringName) -> bool:
 	match name:
 		&"north":
-			return _count(&"bite") >= 1
+			return not separated and count >= 5 and (participants.all(func(n):return _alive(n)) and participants.size()==3 if busy else front_heads().size()==3)
 		&"east":
 			return _count(&"debris") >= 1 and _count(&"beam") >= 1
 		&"south":
@@ -796,7 +803,7 @@ func tech_compass(name: StringName) -> void:
 		north_aiming = true
 		_update_north_targets()
 		for neck in necks:
-			if _alive(neck): neck.mode = &"tech_aim"
+			if participants.has(neck): neck.mode = &"tech_aim"
 	_spin_t = _warning_duration(name) * compass_spin_fraction
 	_cue(&"warning_started", name, -1, {"duration": _warning_duration(name)})
 	_needle = TECH_DIR.get(name, -PI / 2.0)
@@ -826,20 +833,27 @@ func tech_end() -> void:
 	_rubble.clear()
 
 ## 北：予告中は自機周辺を捕捉し、north_curl のキーで狙いを固定する。
+func front_heads() -> Array[Neck]:
+	var result: Array[Neck] = []
+	if count < 5: return result
+	var aim := (run_state.ship_pos-table.pos[body]).angle()
+	var ordered := necks.duplicate()
+	ordered.sort_custom(func(a,b):return absf(angle_difference(a.base_angle+table.facing[body],aim)) < absf(angle_difference(b.base_angle+table.facing[body],aim)))
+	for n in ordered:
+		if _alive(n) and absf(angle_difference(n.base_angle+table.facing[body],aim)) < float(def.params.north_half_angle):
+			result.append(n)
+		if result.size()==3: break
+	return result
+
 func _update_north_targets() -> void:
 	north_target = run_state.ship_pos
-	var heads: Array[Neck] = []
-	for neck in necks:
-		if _alive(neck): heads.append(neck)
-	heads.sort_custom(func(a: Neck, b: Neck): return _neck_base(a).distance_squared_to(north_target) < _neck_base(b).distance_squared_to(north_target))
-	var side := (north_target - table.pos[body]).normalized().orthogonal()
-	var slots := maxi(1, ceili((heads.size() - 1) / 2.0))
-	for i in heads.size():
-		# 最初の首は標的位置そのもの、残りは左右へ広がる。
-		var lane := 0 if i == 0 else (ceili(i / 2.0) * (1 if i % 2 else -1))
-		var wanted := north_target + side * (float(def.params.north_spread) * lane / slots)
-		var base := _neck_base(heads[i])
-		heads[i].target = base + (wanted - base).limit_length(float(def.params.north_reach))
+	var direction := (north_target-table.pos[body]).normalized()
+	var side := direction.orthogonal()
+	var center := table.pos[body]+direction*maxf(north_target.distance_to(table.pos[body]),table.r[body]+float(def.params.neck_rest))
+	var ordered := participants.duplicate()
+	ordered.sort_custom(func(a,b):return _neck_base(a).dot(side) < _neck_base(b).dot(side))
+	for i in ordered.size():
+		ordered[i].target = center+side*float(def.params.north_spread)*(i-1)
 
 func north_curl() -> void:
 	_update_north_targets()
@@ -850,7 +864,7 @@ func north_burst() -> void:
 	north_aiming = false
 	_north_duration = maxf(0.001, _timeline_key_time(&"north", &"north_follow") - _timeline_key_time(&"north", &"north_burst"))
 	_cue(&"attack_started")
-	for neck in necks:
+	for neck in participants:
 		if _alive(neck):
 			neck.strike_from = _head_pos(neck)
 			neck.strike_pos = neck.strike_from
@@ -1015,7 +1029,7 @@ func presentation_targets() -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
 	if tech != &"north": return targets
 	for i in necks.size():
-		if _alive(necks[i]):
+		if participants.has(necks[i]) and _alive(necks[i]):
 			targets.append({"neck_index": i, "base": _neck_base(necks[i]), "from": _head_pos(necks[i]),
 				"target": necks[i].target, "radius": float(def.params.bite_radius), "locked": not north_aiming})
 	return targets
