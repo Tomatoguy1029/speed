@@ -127,7 +127,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | card.keep&#95;tag | 見送る | Skip |
 | card.keep&#95;name | 今の装備を残す | Keep Current Loadout |
 | card.keep&#95;desc | {name}は受け取らない | Leave {name} behind |
-| pickup.core | 出力 +{n}% | Power +{n}% |
 |  | ■ 結果 |  |
 | result.title | 結果 | Results |
 | result.cleared | クリア | Cleared |

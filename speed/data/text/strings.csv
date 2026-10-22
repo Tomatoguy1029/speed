@@ -98,7 +98,6 @@ card.swap_desc,この武器を外して、{name}を付ける,Remove this weapon 
 card.keep_tag,見送る,Skip
 card.keep_name,今の装備を残す,Keep Current Loadout
 card.keep_desc,{name}は受け取らない,Leave {name} behind
-pickup.core,出力 +{n}%,Power +{n}%
 ,■ 結果,
 result.title,結果,Results
 result.cleared,クリア,Cleared

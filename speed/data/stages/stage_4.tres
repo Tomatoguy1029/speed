@@ -374,7 +374,6 @@ start = 480.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
-cores = true
 mix = {
 "biter": 5.0,
 "bomber": 2.0,
@@ -389,7 +388,6 @@ start = 660.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
-cores = true
 mix = {
 "biter": 5.0,
 "bomber": 2.0,

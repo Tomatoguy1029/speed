@@ -1,4 +1,4 @@
-## ドロップと回収（仕様書 10）。経験値の結晶（大きい結晶を含む）・部品・修理キット・回収ビーコン・出力コア。
+## ドロップと回収（仕様書 10）。経験値の結晶（大きい結晶を含む）・部品・修理キット・回収ビーコン・彗星限定の武器のカプセル。
 class_name PickupManager
 extends RunSystem
 
@@ -34,8 +34,6 @@ var _gem_queue_row := PackedInt32Array()
 var _gem_queue_seq := PackedInt32Array()
 var _gem_queue_head := 0
 var _gem_next_seq := 0
-var _core_t := 0.0
-var _cores_started := false
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -50,7 +48,6 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
-	_spawn_cores(world_dt)
 	_collect_gems(world_dt)
 	_collect_coins(world_dt)
 	_collect_capsules(world_dt)
@@ -200,24 +197,6 @@ func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2) -> void:
 	c.pos = p
 	capsules.append(c)
 
-## 出力コア：脱出期に、中心付近へ最大3個（仕様書 10）。
-func _spawn_cores(dt: float) -> void:
-	if not enemies.current_phase().cores:
-		return
-	_core_t += dt
-	var cores := 0
-	for c: Pickup in capsules:
-		if c.kind == Pickup.Kind.CORE:
-			cores += 1
-	if cores >= 3 or (_cores_started and _core_t < 20.0):
-		return
-	_core_t = 0.0
-	var r := state.rng.randf_range(cfg.planet_radius + 250.0, cfg.zone_inner - 300.0)
-	_add_capsule(Pickup.Kind.CORE, &"core", Vector2.from_angle(state.rng.randf() * TAU) * r)
-	if not _cores_started or cores >= 2:
-		_cores_started = true
-	state.emit(&"core")
-
 # ── 拾う ──────────────────────────────────────────────────────────
 
 func _collect_gems(dt: float) -> void:
@@ -346,9 +325,6 @@ func _collect_capsules(dt: float) -> void:
 
 func _apply(c: Pickup) -> void:
 	match c.kind:
-		Pickup.Kind.CORE:
-			build.add_core()
-			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -50), "text": TranslationServer.translate("pickup.core").format({n = roundi(cfg.core_boost * 100.0)}), "color": Color("#ffd24a"), "size": 18})
 		Pickup.Kind.COMET_WEAPON:
 			state.pending_comet_weapons.append(c.weapon_id)
 		Pickup.Kind.HEAL:
@@ -368,7 +344,7 @@ func _apply(c: Pickup) -> void:
 
 func _ring_color(kind: Pickup.Kind) -> Color:
 	match kind:
-		Pickup.Kind.CORE, Pickup.Kind.COMET_WEAPON:
+		Pickup.Kind.COMET_WEAPON:
 			return Color("#ffd24a")
 		Pickup.Kind.HEAL:
 			return Color("#67e8b1")

@@ -8,7 +8,6 @@ start = 390.0
 pop_from = 75.0
 pop_to = 120.0
 rate = 10.0
-cores = true
 mix = {
 "beamer": 1.0,
 "bomber": 1.167,

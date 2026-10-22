@@ -12,6 +12,7 @@ const LOADOUT_WEAPON := 21.0
 const LOADOUT_TRAIT := 13.0
 ## ミニマップの半径（素材のpx）
 const MINIMAP_R := 43.0
+const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
 const ART := "res://assets/ui/combat/"
@@ -699,6 +700,9 @@ func _draw() -> void:
 		return
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	draw_set_transform((size - ART_SIZE * factor) * 0.5, 0.0, Vector2.ONE * factor)
+	# 画面の端の矢印をミニマップから避けるため、画面上の位置と枠を含む半径を覚える（0 ならミニマップなし）
+	_minimap_at = (size - ART_SIZE * factor) * 0.5 + MINIMAP_CENTER * factor
+	_minimap_r = (MINIMAP_R + 12.0) * factor if show_minimap else 0.0
 	if show_minimap:
 		_draw_minimap()
 	if show_status:
@@ -730,6 +734,8 @@ func _draw() -> void:
 		draw_rect(_cards_box.get_rect(), Color(0.06, 0.08, 0.14, 0.95))
 
 var _dense := PackedVector2Array()
+var _minimap_at := Vector2.ZERO
+var _minimap_r := 0.0
 
 ## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
@@ -737,7 +743,7 @@ func _draw_minimap() -> void:
 	var s := run.state
 	var cfg := run.cfg
 	var R := MINIMAP_R
-	var c := Vector2(584, 55)
+	var c := MINIMAP_CENTER
 	var k := R / cfg.field_radius
 	draw_texture(RADAR, Vector2.ZERO)
 	# 世界の外縁と惑星も自機からの相対位置へ移し、円内だけ描く。
@@ -759,7 +765,7 @@ func _draw_minimap() -> void:
 		if offset.length() <= R - 3.5:
 			draw_circle(c + offset, 3.5, Color(1.0, 0.35, 0.35, 0.35))
 	for cap: Pickup in run.pickups.capsules:
-		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, Color("#ffd24a"))
+		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, _minimap_pickup_color(cap.kind))
 	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
@@ -785,6 +791,16 @@ func _draw_minimap() -> void:
 	var side := Vector2(-head.y, head.x)
 	draw_colored_polygon(PackedVector2Array([sp + head * 6.0, sp - head * 4.0 + side * 4.0, sp - head * 4.0 - side * 4.0]),
 		Color.WHITE)
+
+## カプセル類の印の色。ゲーム内の見た目に合わせ、英雄の星座の金色と分ける。
+func _minimap_pickup_color(kind: Pickup.Kind) -> Color:
+	match kind:
+		Pickup.Kind.HEAL:
+			return Color("#67e8b1")
+		Pickup.Kind.MAGNET:
+			return Color("#b8a0ff")
+		_:
+			return Color("#5fd8ff")
 
 ## 地図は自機を原点にする。方角と距離の縮尺は世界と共通。
 func _minimap_offset(world_pos: Vector2) -> Vector2:
@@ -919,8 +935,15 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 		return
 	var center := size / 2.0
 	var dir := rel.normalized()
-	var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
-	var tip := center + dir * edge
+	var to_side := (size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001)
+	var to_top := (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001)
+	var tip := center + dir * minf(to_side, to_top)
+	# 右上のミニマップに重なるときは、画面の端に沿ってミニマップの外へずらす
+	if _minimap_r > 0.0 and tip.distance_to(_minimap_at) < _minimap_r + 24.0:
+		if to_side <= to_top:
+			tip.y = _minimap_at.y + _minimap_r + 24.0
+		else:
+			tip.x = _minimap_at.x - _minimap_r - 24.0
 	var side := Vector2(-dir.y, dir.x) * 12.0
 	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 

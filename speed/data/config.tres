@@ -162,7 +162,6 @@ meteor_coin_chance = 0.4
 meteor_heal_chance = 0.08
 meteor_heal_frac = 0.1
 meteor_magnet_chance = 0.04
-core_boost = 0.18
 pickup_life = 45.0
 gem_max = 600
 xp_base = 120.0

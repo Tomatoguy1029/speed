@@ -16,7 +16,6 @@ var field: FieldManager
 ## 管理 ID → 発動の処理
 var weapon_behaviors: Dictionary = {}
 var trait_behaviors: Dictionary = {}
-var cores := 0
 ## 機体と一緒に進路を進む衝撃波（ソニックブームと連鎖ソニックで共通。一覧 W08・T05）
 var sonic_waves: Array = []
 var _buf := PackedInt32Array()
@@ -31,12 +30,11 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
-## 基礎値・特性・強化画面での強化・出力コアから能力値を計算し直す（レベルでは変わらない）。
+## 基礎値・特性・強化画面での強化から能力値を計算し直す（レベルでは変わらない）。
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") \
-		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
+	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + _per(&"T10") * _n(&"T10"))
 	s.attack_mult = _meta_mult(&"attack") * (1.0 + _per(&"T11") * _n(&"T11"))
 	s.max_hp = cfg.base_hp + _meta_add(&"max_hp")
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
@@ -88,10 +86,6 @@ func _meta_reduce(stat: StringName) -> float:
 	for pl in _meta_level(stat):
 		m *= pow(1.0 - pl[0], pl[1])
 	return m
-
-func add_core() -> void:
-	cores += 1
-	refresh_stats()
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
