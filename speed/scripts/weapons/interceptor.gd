@@ -70,7 +70,7 @@ func _nearest(from: Vector2) -> int:
 			best = i
 	return best
 
-## 実際の着弾だけを扱う。弾の掃引・地形・盾反射は ProjectileManager が先に判定する。
+## 実際の着弾だけを扱う。弾の掃引・地形・盾反射は ProjectileSystem が先に判定する。
 func hit_enemy(i: int, damage: float, impact: Vector2) -> void:
 	var t := build.enemies.table
 	var id := t.id[i]

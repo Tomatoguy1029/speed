@@ -12,7 +12,7 @@ var capture_path:=""
 var capture_at:=1.0
 var capturing:=false
 var inspect_clock:=0.0
-var review_owner: BossManager
+var review_owner: BossSystem
 var review_next:=0.3
 var review_counts: Dictionary={}
 

@@ -1,11 +1,11 @@
 ## 武器の発動の共通の土台（設計書 8.1）。武器ごとに res://scripts/weapons/<内部 ID>.gd で上書きする。
 ##
-## 発動のきっかけごとに決まった入口（関数）を持つ。BuildManager が、持っている武器の入口を呼ぶ。
+## 発動のきっかけごとに決まった入口（関数）を持つ。LoadoutSystem が、持っている武器の入口を呼ぶ。
 ## 数値は WeaponDef（.tres）の params から読む。
 class_name WeaponBehavior
 extends RefCounted
 
-var build: BuildManager
+var build: LoadoutSystem
 var def: WeaponDef
 var level := 1
 
@@ -14,7 +14,7 @@ var state: RunState:
 var cfg: GameConfig:
 	get: return build.cfg
 
-func setup(b: BuildManager, d: WeaponDef) -> void:
+func setup(b: LoadoutSystem, d: WeaponDef) -> void:
 	build = b
 	def = d
 

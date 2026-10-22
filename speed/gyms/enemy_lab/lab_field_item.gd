@@ -1,5 +1,5 @@
 ## 実験場の敵一覧から置ける、フィールドの障害物と仕掛け（惑星・彗星・重力・ワープホール）。
-## 敵の表の敵ではないので、置くと FieldManager の要素として加える。
+## 敵の表の敵ではないので、置くと FieldSystem の要素として加える。
 extends Resource
 
 var id: StringName

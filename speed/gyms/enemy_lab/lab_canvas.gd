@@ -393,7 +393,7 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_po
 			var number := str(i + 1) if edit_points else ("1" if i == 0 else "2")
 			draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), number, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
 
-func _draw_projectiles(p: ProjectileManager) -> void:
+func _draw_projectiles(p: ProjectileSystem) -> void:
 	if show_ranges and p.director != null:
 		for i in p.hazard_alive.size():
 			if p.hazard_alive[i]: _source_line(p, int(p.lab_hazard_group.get(i, 0)), p.hazard_pos[i])
@@ -409,7 +409,7 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
 		var kind := p.hazard_kind[i]
-		if kind == ProjectileManager.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
+		if kind == ProjectileSystem.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
 			# 先へ行くほど広がるビーム（みずがめ座）は、範囲の輪郭を描く
 			var u := Vector2.from_angle(p.hazard_angle[i])
 			var v := Vector2(-u.y, u.x)
@@ -419,11 +419,11 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 			var outline := PackedVector2Array([pos + v * w0, tip + v * w1, tip - v * w1, pos - v * w0, pos + v * w0])
 			draw_colored_polygon(outline, Color(color, 0.06 if charging else 0.1))
 			draw_polyline(outline, color, 1.5, true)
-		elif kind == ProjectileManager.HazardKind.BEAM or kind == ProjectileManager.HazardKind.WALL:
+		elif kind == ProjectileSystem.HazardKind.BEAM or kind == ProjectileSystem.HazardKind.WALL:
 			var end := pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)
 			draw_line(pos, end, color, 1.5, true)
-		elif kind == ProjectileManager.HazardKind.ZONE:
+		elif kind == ProjectileSystem.HazardKind.ZONE:
 			draw_circle(pos, p.hazard_len[i] * zoom, Color(color, 0.13))
 			draw_arc(pos, p.hazard_len[i] * zoom, 0, TAU, 48, color, 2)
 		else:
@@ -441,7 +441,7 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 			if pts.size() > 1:
 				draw_polyline(pts, color, maxf(2, p.hazard_width[i] * zoom), true)
 
-func _source_line(p: ProjectileManager, token: int, at: Vector2) -> void:
+func _source_line(p: ProjectileSystem, token: int, at: Vector2) -> void:
 	if token == 0 or not p.director.groups.has(token): return
 	var group: Dictionary = p.director.groups[token]
 	var row: int = session.row_for_id(int(group.id))

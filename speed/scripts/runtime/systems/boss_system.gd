@@ -2,14 +2,17 @@
 ##
 ## ボスは役者（BossActor のシーン）としてノードで作り、当たり判定の円を敵の表（EnemyTable）の1行として登録する。
 ## ボスの行動（形態・判断・攻撃）は役者のシーンの側で持ち、この Manager は特定のボスを知らない。
-class_name BossManager
+class_name BossSystem
 extends RunSystem
 
 signal boss_spawned(actor: Node)
 
-var enemies: EnemyManager
-var projectiles: ProjectileManager
-var field: FieldManager
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
+var field: FieldSystem:
+	get: return ctx.field
 ## ボスの役者を置く場所（World の子）
 var actor_parent: Node
 
@@ -19,7 +22,7 @@ var actor: BossActor = null
 var boss_row := -1
 var boss_id := 0
 ## 実験場だけで使う、独立した本体・役者の所有者。
-var lab_instances: Array[BossManager] = []
+var lab_instances: Array[BossSystem] = []
 
 func tick(real_dt: float, world_dt: float) -> void:
 	for instance in lab_instances:
@@ -100,7 +103,7 @@ func body_damaged(row: int) -> void:
 	if owner != null:
 		owner.on_body_damaged()
 
-## ボスの HP が0になった（CombatManager から呼ばれる）。撃破の演出は RunManager が始める。
+## ボスの HP が0になった（CombatSystem から呼ばれる）。撃破の演出は RunManager が始める。
 func on_boss_defeated(i: int, opts: Dictionary) -> void:
 	var owner := actor_for_row(i)
 	if owner != null and opts.get("cause", &"") != &"debug" and owner.handle_body_defeat(opts):
@@ -124,7 +127,6 @@ func on_boss_defeated(i: int, opts: Dictionary) -> void:
 func remove_boss() -> void:
 	for instance in lab_instances:
 		instance.remove_boss()
-		instance.queue_free()
 	lab_instances.clear()
 	if has_boss():
 		enemies.mark_dead(boss_row)
@@ -141,13 +143,9 @@ func fire(angle: float, speed: float, params: Dictionary) -> void:
 func spawn_lab(type: StringName, pos: Vector2) -> int:
 	if not state.lab_mode or not ConfigManager.bosses.has(type):
 		return -1
-	var instance := BossManager.new()
-	add_child(instance)
-	instance.enemies = enemies
-	instance.projectiles = projectiles
-	instance.field = field
+	var instance := BossSystem.new()
 	instance.actor_parent = actor_parent
-	instance.setup(state, cfg)
+	instance.setup(ctx)
 	lab_instances.append(instance)
 	instance.definitions = definitions
 	instance.spawn(definitions.get(type, ConfigManager.bosses[type]), pos)

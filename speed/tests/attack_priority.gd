@@ -11,8 +11,8 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed":932,"empty":true,"stage":4})
-	var em: EnemyManager = lab.run.enemies
-	var pm: ProjectileManager = lab.run.projectiles
+	var em: EnemySystem = lab.run.enemies
+	var pm: ProjectileSystem = lab.run.projectiles
 	var stage := StageDef.new()
 	stage.enemy_attack_values = {"telescope":1.0}
 	stage.enemy_attack_priorities = {"aquarius":5.0}
@@ -75,7 +75,7 @@ func _ready() -> void:
 	check(not em.telescope_aiming(a) and em.table.charge[a] == 0.0, "Outside existing range hides and cancels aim")
 	d.advance(9.1,em)
 	check(d.token(str(em.table.id[a])) == 0, "Out-of-range reservation releases")
-	var body := FieldManager.Body.new()
+	var body := FieldSystem.Body.new()
 	body.pos = Vector2(200,0)
 	body.r = 80.0
 	lab.run.field.bodies.append(body)
@@ -88,7 +88,7 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 823
 	for k in 80:
-		var obstacle := FieldManager.Body.new()
+		var obstacle := FieldSystem.Body.new()
 		obstacle.pos = Vector2.from_angle(rng.randf_range(-PI,PI)) * rng.randf_range(30.0,1500.0)
 		obstacle.r = rng.randf_range(2.0,150.0)
 		lab.run.field.bodies.append(obstacle)

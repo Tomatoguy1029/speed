@@ -282,7 +282,7 @@ func _benchmark_bodies() -> Dictionary:
 func _old_body_hit(p0: Vector2, p1: Vector2, radius: float) -> Variant:
 	var found = null
 	var earliest := INF
-	for b: FieldManager.Body in run.field.bodies:
+	for b: FieldSystem.Body in run.field.bodies:
 		var rr := b.r + radius
 		if maxf(p0.x, p1.x) < b.pos.x - rr or minf(p0.x, p1.x) > b.pos.x + rr \
 				or maxf(p0.y, p1.y) < b.pos.y - rr or minf(p0.y, p1.y) > b.pos.y + rr:

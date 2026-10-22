@@ -2,13 +2,17 @@
 ##
 ## 描画となぞりは実秒で進む。世界の速さ（描画中 0.1 倍、なぞり中は突進の速さに反比例）は
 ## world_scale() で RunManager に伝える。
-class_name DrawManager
+class_name DrawSystem
 extends RunSystem
 
-var field: FieldManager
-var combat: CombatManager
-var build: BuildManager
-var ship: ShipManager
+var field: FieldSystem:
+	get: return ctx.field
+var combat: CombatSystem:
+	get: return ctx.combat
+var build: LoadoutSystem:
+	get: return ctx.loadout
+var ship: ShipSystem:
+	get: return ctx.ship
 
 var intent: Intent = Intent.new()
 var run: TraceRun = null
@@ -19,8 +23,8 @@ var _pre_dash_speed := 0.0
 ## 線の最初の点を置いた時刻（ミリ秒）。確定を受け付けるまでの時間を数える
 var _first_point_msec := 0
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	state.gauge = 1.0
 
 ## 今の世界の速さ（仕様書 6.2・6.5）。

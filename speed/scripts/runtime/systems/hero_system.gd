@@ -1,14 +1,18 @@
 ## 英雄の星座（仕様書 8.1・13.1）。フィールドの端に捕らわれた星座、解放、特別な枠の力。
 ##
 ## 星座の形と力の値は HeroDef（res://data/heroes/）。力が効いている間の中身は、
-## 力を使う所（DrawManager・CombatManager など）が state.hero_power と state.hero_active_t を見て決める。
-class_name HeroManager
+## 力を使う所（DrawSystem・CombatSystem など）が state.hero_power と state.hero_active_t を見て決める。
+class_name HeroSystem
 extends RunSystem
 
-var enemies: EnemyManager
-var field: FieldManager
-var combat: CombatManager
-var projectiles: ProjectileManager
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var field: FieldSystem:
+	get: return ctx.field
+var combat: CombatSystem:
+	get: return ctx.combat
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
 
 ## ヘルクレス座の火の隕石：落ちてくる途中（位置と、落ちるまでの残り時間）と、燃えている跡（位置と残り時間）
 var falls: Array[Vector3] = []
@@ -38,8 +42,8 @@ var _prev_pos := Vector2.ZERO
 ## エンドレスモード：次の星座が現れるまでの時間（負なら待っていない）
 var _next_t := -1.0
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	hero = null
 	_next_t = -1.0
 	falls.clear()

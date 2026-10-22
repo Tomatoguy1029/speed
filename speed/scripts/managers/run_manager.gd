@@ -27,16 +27,16 @@ var encounters
 const ENCOUNTERS := preload("res://scripts/encounters/encounter_coordinator.gd")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 
-@onready var field: FieldManager = $"../FieldManager"
-@onready var ship: ShipManager = $"../ShipManager"
-@onready var draw: DrawManager = $"../DrawManager"
-@onready var combat: CombatManager = $"../CombatManager"
-@onready var enemies: EnemyManager = $"../EnemyManager"
-@onready var bosses: BossManager = $"../BossManager"
-@onready var projectiles: ProjectileManager = $"../ProjectileManager"
-@onready var build: BuildManager = $"../BuildManager"
-@onready var pickups: PickupManager = $"../PickupManager"
-@onready var heroes: HeroManager = $"../HeroManager"
+@onready var field: FieldSystem = $"../FieldSystem"
+@onready var ship: ShipSystem = $"../ShipSystem"
+@onready var draw: DrawSystem = $"../DrawSystem"
+@onready var combat: CombatSystem = $"../CombatSystem"
+@onready var enemies: EnemySystem = $"../EnemySystem"
+@onready var bosses: BossSystem = $"../BossSystem"
+@onready var projectiles: ProjectileSystem = $"../ProjectileSystem"
+@onready var build: LoadoutSystem = $"../LoadoutSystem"
+@onready var pickups: PickupSystem = $"../PickupSystem"
+@onready var heroes: HeroSystem = $"../HeroSystem"
 @onready var input: InputRouter = get_node(input_path)
 
 ## 敗北・クリアの演出の経過時間（実秒）
@@ -569,8 +569,8 @@ func command(name: StringName, args := {}) -> void:
 			projectiles.fire_beam(p + Vector2.from_angle(a) * 420.0, a + PI, 900.0, 26.0, 0.8, 0.35, 10.0)
 			projectiles.fire_cross(p + Vector2.from_angle(a + 2.0) * 260.0, 0.0, 700.0, 18.0, 0.9, 0.3, 10.0)
 			projectiles.fire_zone(p + Vector2.from_angle(a + 4.0) * 160.0, 90.0, 1.0, 10.0,
-				ProjectileManager.HazardStyle.RETICLE)
-			projectiles.fire_zone(p, 70.0, 1.2, 10.0, ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
+				ProjectileSystem.HazardStyle.RETICLE)
+			projectiles.fire_zone(p, 70.0, 1.2, 10.0, ProjectileSystem.HazardStyle.LIGHTNING, Color("#ffe46b"))
 			projectiles.fire_zone(p + Vector2.from_angle(a + 1.0) * 220.0, 110.0, 0.6, 10.0)
 			projectiles.fire_wave(p + Vector2.from_angle(a + 3.0) * 300.0, a, 0.5, 500.0, 420.0, 18.0, 0.5, 10.0)
 			projectiles.fire_rings(p + Vector2.from_angle(a + 5.0) * 350.0, 4, 0.35, 700.0, 380.0, 16.0, 0.6, 10.0,

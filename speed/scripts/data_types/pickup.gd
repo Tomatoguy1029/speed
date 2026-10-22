@@ -1,4 +1,4 @@
-## カプセル類1つ（仕様書 10）。数の多い経験値の結晶と部品は PickupManager の列で持つ。
+## カプセル類1つ（仕様書 10）。数の多い経験値の結晶と部品は PickupSystem の列で持つ。
 class_name Pickup
 extends RefCounted
 

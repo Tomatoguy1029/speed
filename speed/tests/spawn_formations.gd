@@ -19,7 +19,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
 	var run: RunManager = lab.run
-	var em: EnemyManager = run.enemies
+	var em: EnemySystem = run.enemies
 	var state := run.state
 	var scene: PackedScene = load(FORMATION)
 	# 実験場で、選んだ配置と出現位置のとおりに並べる

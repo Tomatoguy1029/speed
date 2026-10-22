@@ -1,8 +1,8 @@
 ## 敵の表（設計書 6）。1行が1体で、項目ごとの列で持つ。隕石とボスも同じ表に入る。
 ##
 ## 生きている敵は、撃破されて空きに戻るまで同じ行にいる。空いた行は次に出る敵に使い回す。
-## 行を加える・空きに戻すのは EnemyManager だけ。値の書き換えは、敵を動かす処理（戦闘・武器・ボス）も行う。
-## 何フレームもまたいで敵を覚えるときは、行番号と id の組で覚え、EnemyManager.is_same で確かめる。
+## 行を加える・空きに戻すのは EnemySystem だけ。値の書き換えは、敵を動かす処理（戦闘・武器・ボス）も行う。
+## 何フレームもまたいで敵を覚えるときは、行番号と id の組で覚え、EnemySystem.is_same で確かめる。
 ## 列の一覧と、どの種類の敵が使う列かは設計書 6.2 の表。列を足したら同じ作業で表も直す。
 class_name EnemyTable
 extends RefCounted
@@ -93,7 +93,7 @@ var target_id := PackedInt32Array()
 var anchor := PackedVector2Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()
-## 敵に付いて動く攻撃の形の行番号（ProjectileManager の hazard_ の行。とけい座の針など）
+## 敵に付いて動く攻撃の形の行番号（ProjectileSystem の hazard_ の行。とけい座の針など）
 var links: Array[PackedInt32Array] = []
 ## 部位：親の敵の行番号と id（部位でなければ -1）。親は部位の行番号と id を交互に並べて持つ
 var parent := PackedInt32Array()

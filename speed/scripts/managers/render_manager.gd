@@ -931,7 +931,7 @@ func _draw_swallows(c: CanvasItem) -> void:
 		var k := 1.0 - float(sw.life) / float(sw.max)
 		var target: Vector2 = sw.pos
 		if run.enemies.is_same(sw.row, sw.id):
-			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemyManager.PUMP_MOUTH
+			target = t.pos[sw.row] + Vector2.from_angle(t.facing[sw.row]) * t.r[sw.row] * EnemySystem.PUMP_MOUTH
 		var p: Vector2 = (sw.pos as Vector2).lerp(target, k * k)
 		var r: float = enemy_sprite_radius(sw.type, sw.r, cfg.character_scale, state.stage) * (1.0 - 0.85 * k)
 		var angle: float = sw.facing + float(sw.spin) * (float(sw.max) - float(sw.life))
@@ -1345,9 +1345,9 @@ func _draw_ruler(c: CanvasItem, t: EnemyTable, i: int) -> void:
 
 ## やまねこ座の斬撃：潰れた弧の3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
 func _draw_slash(c: CanvasItem, pos: Vector2, travel: float, size: float, side: float, a: float) -> void:
-	var thick := ProjectileManager.SLASH_THICK * size
+	var thick := ProjectileSystem.SLASH_THICK * size
 	for k in 3:
-		var pts := ProjectileManager.slash_points(pos, travel, size, side, k)
+		var pts := ProjectileSystem.slash_points(pos, travel, size, side, k)
 		c.draw_polyline(pts, Color(1.0, 0.45, 0.15, 0.28 * a), thick * 2.2)
 		c.draw_polyline(pts, Color(1.0, 0.55, 0.22, 0.95 * a), thick)
 		c.draw_polyline(pts.slice(1, pts.size() - 1), Color(1.0, 0.95, 0.85, a), maxf(_px(1.5), thick * 0.3))
@@ -1379,7 +1379,7 @@ func _draw_pump(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var px := r / 24.0
 	var u := Vector2.from_angle(t.facing[i])
 	var side := Vector2(-u.y, u.x)
-	var mouth := p + u * r * EnemyManager.PUMP_MOUTH
+	var mouth := p + u * r * EnemySystem.PUMP_MOUTH
 	var now := state.world_time
 	if t.mode[i] == EnemyTable.Mode.MOVE:
 		# 口へ流れ込む吸い込みの筋（外から口へ動く短い光）
@@ -1478,9 +1478,9 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			c.draw_colored_polygon(pts, Color("#d9dde6"))
 		elif pr.friend_cause[i] == &"interceptor":
 			INTERCEPTOR_VISUAL.shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
-		elif pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
+		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.HULL:
 			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
-		elif pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
+		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.DEBRIS:
 			var trail := pr.friend_trail[i]
 			if trail.size() > 1:
 				c.draw_polyline(trail, Color(1.0, 0.6, 0.25, 0.7), _px(3.0))
@@ -1498,22 +1498,22 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in hostile_alive.size():
 		var pos := hostile_pos[i]
 		if hostile_alive[i] != 0 and view.has_point(pos):
-			if pr.hostile_kind[i] == ProjectileManager.HostileKind.BOLT:
+			if pr.hostile_kind[i] == ProjectileSystem.HostileKind.BOLT:
 				# ケフェウス座の兵の細長い光弾
 				var u := pr.hostile_vel[i].normalized()
 				c.draw_line(pos - u * 34.0, pos + u * 6.0, Color(0.75, 0.6, 1.0, 0.35), 14.0)
 				c.draw_line(pos - u * 30.0, pos + u * 4.0, Color(0.85, 0.75, 1.0), 6.0)
 				c.draw_line(pos - u * 24.0, pos + u * 2.0, Color(1, 1, 1, 0.95), 2.5)
-			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.SLASH:
+			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.SLASH:
 				_draw_slash(c, pos, pr.hostile_vel[i].angle(), hostile_r[i], pr.hostile_turn[i], 1.0)
-			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.SHELL:
+			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.SHELL:
 				# ポンプ座の圧縮弾：後ろに尾を引く
 				var u := pr.hostile_vel[i].normalized()
 				var n := Vector2(-u.y, u.x) * hostile_r[i] * 0.8
 				c.draw_polygon(PackedVector2Array([pos + n, pos - u * hostile_r[i] * 2.2, pos - n]),
 					PackedColorArray([Color(0.85, 0.7, 1.0, 0.45), Color(0.85, 0.7, 1.0, 0.0), Color(0.85, 0.7, 1.0, 0.45)]))
 				_draw_shell_ball(c, pos, hostile_r[i], Color("#b78cff"), state.world_time)
-			elif pr.hostile_kind[i] == ProjectileManager.HostileKind.REFLECTED:
+			elif pr.hostile_kind[i] == ProjectileSystem.HostileKind.REFLECTED:
 				var u := pr.hostile_vel[i].normalized()
 				c.draw_line(pos - u * hostile_r[i] * 3.0, pos, Color("#ff84df"), hostile_r[i] * 0.9)
 				c.draw_circle(pos, hostile_r[i], Color("#f45ec5"))
@@ -1538,7 +1538,7 @@ func _draw_floods(c: CanvasItem) -> void:
 	mat.set_shader_parameter("linear_colors", _flood_layer.get_viewport().use_hdr_2d)
 	var shaped := false
 	for i in pr.hazard_alive.size():
-		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileManager.HazardStyle.FLOOD:
+		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.FLOOD:
 			continue
 		if not shaped:
 			# ビームの形（みずがめ座はみな同じ形）
@@ -1589,14 +1589,14 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 		var t := pr.hazard_t[i]
 		var delay := pr.hazard_delay[i]
 		var col := pr.hazard_color[i]
-		if pr.hazard_style[i] == ProjectileManager.HazardStyle.LIGHTNING:
+		if pr.hazard_style[i] == ProjectileSystem.HazardStyle.LIGHTNING:
 			col = PIXEL_LIGHTNING.COLOR
 		var len := pr.hazard_len[i]
 		var charging := t < delay
 		var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
 		match pr.hazard_kind[i]:
-			ProjectileManager.HazardKind.BEAM:
-				if pr.hazard_style[i] == ProjectileManager.HazardStyle.FLOOD:
+			ProjectileSystem.HazardKind.BEAM:
+				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.FLOOD:
 					# みずがめ座の水は水の層（_draw_floods）が描く
 					continue
 				if charging:
@@ -1611,12 +1611,12 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				c.draw_line(p, b, Color(col, 0.35 * fade), w * 1.6)
 				c.draw_line(p, b, Color(col, 0.9 * fade), w)
 				c.draw_line(p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
-			ProjectileManager.HazardKind.ZONE:
+			ProjectileSystem.HazardKind.ZONE:
 				if not view.grow(len).has_point(p):
 					continue
 				var style := pr.hazard_style[i]
 				if charging:
-					if style == ProjectileManager.HazardStyle.RETICLE or style == ProjectileManager.HazardStyle.LIGHTNING:
+					if style == ProjectileSystem.HazardStyle.RETICLE or style == ProjectileSystem.HazardStyle.LIGHTNING:
 						# 照準の模様（敵が刻む印）。溜まるほど濃く、内側の輪が閉じていく
 						var a := 0.25 + 0.55 * k
 						c.draw_arc(p, len, 0.0, TAU, 40, Color(col, a), _px(2.0))
@@ -1630,7 +1630,7 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 							c.draw_circle(p, _px(6.0), Color(col, 0.9))
 					continue
 				var f := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0)
-				if style == ProjectileManager.HazardStyle.BITE:
+				if style == ProjectileSystem.HazardStyle.BITE:
 					# 噛みつき：上下のあごが閉じる
 					var shut := 1.0 - f
 					for side: float in [-1.0, 1.0]:
@@ -1640,12 +1640,12 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 					continue
 				c.draw_circle(p, len, Color(col, 0.45 * f))
 				c.draw_arc(p, len, 0.0, TAU, 40, Color(1, 1, 1, 0.8 * f), _px(3.0))
-				if style == ProjectileManager.HazardStyle.LIGHTNING:
+				if style == ProjectileSystem.HazardStyle.LIGHTNING:
 					var age := t - delay
 					var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
 					PIXEL_LIGHTNING.draw(c, p - Vector2(0, len * 3.0), p, _px(2.0), i * 7919 + shape * 101,
 						PIXEL_LIGHTNING.intensity(age, pr.hazard_active[i]))
-			ProjectileManager.HazardKind.WAVE:
+			ProjectileSystem.HazardKind.WAVE:
 				if charging:
 					c.draw_circle(p, _px(4.0) + 8.0 * k, Color(col, 0.2 + 0.5 * k))
 					continue
@@ -1657,7 +1657,7 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 				var center := pr.hazard_angle[i]
 				var gap_w := pr.hazard_gap_w[i]
 				var fade := 1.0 - 0.5 * clampf(rad / maxf(len, 1.0), 0.0, 1.0)
-				if pr.hazard_style[i] == ProjectileManager.HazardStyle.RIPPLE:
+				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.RIPPLE:
 					# いるか座の波動：先頭の1枚（当たる）と、その後ろの薄い数枚（見た目だけ）
 					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.3 * fade), w * 2.0)
 					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col.lightened(0.3), 0.95 * fade), w)
@@ -1672,12 +1672,12 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 					c.draw_arc(p, rad, g + gap_w, g + TAU - gap_w, 48, Color(col, 0.85 * fade), w)
 				else:
 					c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.85 * fade), w)
-			ProjectileManager.HazardKind.WALL:
+			ProjectileSystem.HazardKind.WALL:
 				var b := p + Vector2.from_angle(pr.hazard_angle[i]) * len
 				if not view.grow(len).has_point(p):
 					continue
 				var w := pr.hazard_width[i]
-				if pr.hazard_style[i] == ProjectileManager.HazardStyle.RAY and not charging:
+				if pr.hazard_style[i] == ProjectileSystem.HazardStyle.RAY and not charging:
 					# じょうぎ座のビーム：発射元から伸びる、揺らめく光の柱
 					var left := delay + pr.hazard_active[i] - t
 					var f := clampf(left / 0.3, 0.0, 1.0) * clampf((t - delay) / 0.12, 0.0, 1.0)

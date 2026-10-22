@@ -67,7 +67,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		if p.hostile_alive[i]:
 			var intersects := minf(distance_to_path(p.hostile_pos[i], path), p.hostile_pos[i].distance_to(path[path.size() - 1]) - exit_clearance) < p.hostile_r[i] + radius
 			if window > 0:
-				if p.hostile_turn[i] > 0 or p.hostile_kind[i] == ProjectileManager.HostileKind.MISSILE:
+				if p.hostile_turn[i] > 0 or p.hostile_kind[i] == ProjectileSystem.HostileKind.MISSILE:
 					unsupported.append("bullet:%d" % i)
 				else:
 					var end := p.hostile_pos[i] + p.hostile_vel[i] * horizon
@@ -82,7 +82,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		if window > 0 and p.hazard_owner[i] >= 0:
 			unsupported.append("hazard:%d" % i)
 		var hit := false
-		if p.hazard_kind[i] in [ProjectileManager.HazardKind.ZONE, ProjectileManager.HazardKind.WAVE]:
+		if p.hazard_kind[i] in [ProjectileSystem.HazardKind.ZONE, ProjectileSystem.HazardKind.WAVE]:
 			# 扇や切れ目を広い円に丸める。保守的な未成立を許す。
 			hit = minf(distance_to_path(p.hazard_pos[i], path), p.hazard_pos[i].distance_to(path[path.size() - 1]) - exit_clearance) <= p.hazard_len[i] + radius + p.hazard_width[i]
 		else:

@@ -15,7 +15,7 @@ func _ready() -> void:
 	if arena != null:
 		var bounds: Rect2 = arena.bounds
 		var center := bounds.get_center()
-		var field: FieldManager = lab.run.field
+		var field: FieldSystem = lab.run.field
 		var r: float = lab.run.cfg.ship_radius
 		check(field.boundary_accel(Vector2(lab.run.cfg.field_radius+100.0,0))==Vector2.ZERO,"encounter boundary replaces distant world-edge force")
 		for dir in [Vector2.RIGHT,Vector2.LEFT,Vector2.UP,Vector2.DOWN,Vector2(1,1).normalized()]:
@@ -24,7 +24,7 @@ func _ready() -> void:
 		lab.run.state.ship_pos=center+Vector2(bounds.size.x,0)
 		lab.run.state.ship_vel=Vector2(10000,0)
 		check(lab.run.combat.wall_bounce(center) and lab.run.state.ship_vel.x<0.0,"high speed travel bounces inside fixed wall")
-		var body := FieldManager.Body.new()
+		var body := FieldSystem.Body.new()
 		body.pos=Vector2(bounds.end.x-80.0,center.y)
 		body.r=120.0
 		field.bodies.append(body)

@@ -45,7 +45,7 @@ Godot 本番の `speed/` で必要な絵と、制作範囲を相談する候補�
 
 - **用途／表示場所**：フィールドの障害物。
 - **確定している必要性**：鉄のがれきの絵を用意する。
-- **素材状態・実装根拠**：[フィールド処理](../../../speed/scripts/managers/field_manager.gd)が `iron` を配置する。[描画処理](../../../speed/scripts/managers/render_manager.gd)の参照先 `assets/pixel/iron.png` は未配置で、[敵データ](../../../speed/data/enemies/iron.tres)の形を使う図形描画へ分岐する。
+- **素材状態・実装根拠**：[`field_system.gd`](../../../speed/scripts/runtime/systems/field_system.gd)が `iron` を配置する。[描画処理](../../../speed/scripts/managers/render_manager.gd)の参照先 `assets/pixel/iron.png` は未配置で、[敵データ](../../../speed/data/enemies/iron.tres)の形を使う図形描画へ分岐する。
 - **依頼／制作状態**：依頼予定。連絡済みか、制作・納品済みかは未確認。
 - **要照合／要相談**：絵の内容・寸法・向き・差分・枚数。見た目と挙動・数値の調整が必要であり、今の形や配置を完成仕様として依頼規格へ転記する扱いを避ける。
 
@@ -92,7 +92,7 @@ Godot 本番の `speed/` で必要な絵と、制作範囲を相談する候補�
 | ART-026 | ワープホール／ボーナスへの入口 | `_draw_field()` が回る輪を描く。入口の見せ方と挙動を合わせて相談する |
 | ART-027 | ボーナスステージ／背景・入退場の見せ方 | `_draw_background()` が背景色を切り替える。入退場は `_enter_bonus()`・`_leave_bonus()`。追加素材の必要箇所から要相談 |
 
-参照：[フィールド描画](../../../speed/scripts/managers/render_manager.gd)、[配置・重力・ワープ処理](../../../speed/scripts/managers/field_manager.gd)、[ボーナスの進行](../../../speed/scripts/managers/run_manager.gd)。実装されていることと、見た目・数値の調整完了を分けて確認する。
+参照：[フィールド描画](../../../speed/scripts/managers/render_manager.gd)、[`field_system.gd`](../../../speed/scripts/runtime/systems/field_system.gd)、[ボーナスの進行](../../../speed/scripts/managers/run_manager.gd)。実装されていることと、見た目・数値の調整完了を分けて確認する。
 
 ### 専用画像が未割当の敵
 

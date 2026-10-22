@@ -3,12 +3,15 @@
 ## 敵はノードではなく、敵の表（EnemyTable）の1行として持つ。雑魚の行動は種類ごとの単純なステートマシン
 ## （例：ダーターの予告 → 突進 → 回復）。隕石とボスも同じ表に入るが、数え方と行動は別に扱う。
 ## 行動する雑魚は、行動の種類ごとの行番号の一覧（beh_rows）に入り、更新は種類ごとにその一覧だけを回す。
-class_name EnemyManager
+class_name EnemySystem
 extends RunSystem
 
-var field: FieldManager
-var projectiles: ProjectileManager
-var bosses: BossManager
+var field: FieldSystem:
+	get: return ctx.field
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
+var bosses: BossSystem:
+	get: return ctx.bosses
 ## 実験場が複製した定義。未指定時は本番の定義を読む。
 var definitions: Dictionary = {}
 
@@ -57,8 +60,8 @@ var _vc := Vector2.ZERO
 var _vh := Vector2.ZERO
 var _face_move := 0.0
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	state.enemy_aim = state.ship_pos
 	slots = RowSlots.new(table, "")
 	beh_rows.resize(EnemyTable.Beh.size())
@@ -311,7 +314,7 @@ func gate_check(i: int, _hit: Vector2, dir: Vector2, cause: StringName, dmg := 0
 			# うみへび座の不死の首：貫いたときだけ。火では焼けない
 			return EnemyTable.GateResult.ALLOW if cause == &"ram" else EnemyTable.GateResult.PASS
 		EnemyTable.Gate.SOLID:
-			# 回る丸鋸：攻撃では壊れない（体当たりで飛ばす扱いは CombatManager）
+			# 回る丸鋸：攻撃では壊れない（体当たりで飛ばす扱いは CombatSystem）
 			return EnemyTable.GateResult.PASS
 		EnemyTable.Gate.GUARD:
 			# 体当たりは弾かれる（失敗）。武器や波動では壊せる
@@ -542,7 +545,7 @@ func _tick_biters(dt: float) -> void:
 				charge[i] = 1.0 - maxf(0.0, timer[i]) / telegraph
 				if timer[i] <= 0.0:
 					var at := from + Vector2.from_angle(facing[i]) * (r[i] + half_reach)
-					projectiles.fire_zone(at, bite_radius, 0.0, bite_dmg, ProjectileManager.HazardStyle.BITE, t.color[i].lightened(0.4))
+					projectiles.fire_zone(at, bite_radius, 0.0, bite_dmg, ProjectileSystem.HazardStyle.BITE, t.color[i].lightened(0.4))
 					charge[i] = 0.0
 					mode[i] = EnemyTable.Mode.RECOVER
 					timer[i] = rest
@@ -813,7 +816,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 
 	projectiles.lab_context = 0
 
-## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldManager.near_body と同じ条件）。
+## 行 i の敵が、位置 p から margin 以内に天体があるか（FieldSystem.near_body と同じ条件）。
 ## 前回確かめたときの天体の表面までの距離から、その後に動いた距離と月が動けた距離を引き、
 ## まだ margin より遠ければ確かめずに false を返す。瞬間移動も、前回の位置からの距離に入る。
 func _near_body(i: int, p: Vector2, margin: float, now: float, body_speed: float) -> bool:
@@ -1007,7 +1010,7 @@ func _self_destruct(i: int) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
 	projectiles.fire_zone(t.pos[i], float(p.blast_radius), 0.0, float(p.blast_dmg),
-		ProjectileManager.HazardStyle.BLAST, t.color[i])
+		ProjectileSystem.HazardStyle.BLAST, t.color[i])
 	mark_dead(i)
 
 ## ミサイル：出た向きのまま一直線に飛ぶ。機体に近づくと爆発し、飛ぶ時間が過ぎると消える。
@@ -1404,7 +1407,7 @@ func _ruler(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				var h := projectiles.fire_wall(t.pos[i] + d * t.r[i], t.facing[i], float(p.beam_len), float(p.beam_width), 0.0,
 					float(p.beam_time), float(p.bullet_dmg), t.color[i])
-				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RAY
+				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RAY
 				projectiles.hazard_block[h] = 1
 				projectiles.attach_hazard(h, i)
 				t.links[i] = PackedInt32Array([h])
@@ -1489,7 +1492,7 @@ func lynx_side(i: int) -> float:
 	return 1.0 if table.buds[i] % 2 == 0 else -1.0
 
 ## からす座：群れで隊列を組み、機体を追わずに一直線に戦場を横断する（向きは出たときに _spawn_flock が決める）。
-## 経験値の回収は PickupManager が1羽ずつ行う（carry が運んでいる量）。
+## 経験値の回収は PickupSystem が1羽ずつ行う（carry が運んでいる量）。
 ## 画面の外で exit_margin より離れ、さらに離れていくと、運んでいる経験値ごと退場する（撃破にはならない）。
 func _crow(i: int, dt: float) -> void:
 	var t := table
@@ -1691,7 +1694,7 @@ func _crab(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				var at := t.pos[i] + Vector2.from_angle(t.facing[i]) * (t.r[i] + float(p.reach) * 0.5)
 				projectiles.fire_zone(at, float(p.reach) * 0.6, 0.0, float(p.bullet_dmg),
-					ProjectileManager.HazardStyle.PLAIN, t.color[i].lightened(0.3))
+					ProjectileSystem.HazardStyle.PLAIN, t.color[i].lightened(0.3))
 				t.mode[i] = EnemyTable.Mode.RECOVER
 				t.timer[i] = float(p.open_time)
 		_:
@@ -1824,7 +1827,7 @@ func _dolphin(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				var h := projectiles.fire_wave(t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], t.facing[i], float(p.wave_arc),
 					float(p.wave_radius), float(p.wave_speed), float(p.wave_width), 0.0, float(p.bullet_dmg), 0.0, 0.0, t.color[i])
-				projectiles.hazard_style[h] = ProjectileManager.HazardStyle.RIPPLE
+				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RIPPLE
 				projectiles.hazard_edmg[h] = float(p.enemy_dmg)
 				t.charge[i] = 0.0
 				t.mode[i] = EnemyTable.Mode.RECOVER
@@ -2070,7 +2073,7 @@ func _aquila(i: int, dt: float) -> void:
 		return
 	t.fire_t[i] = float(p.drop_step)
 	projectiles.fire_zone(t.pos[i], float(p.blast_radius), float(p.blast_delay), float(p.bullet_dmg),
-		ProjectileManager.HazardStyle.LIGHTNING, Color("#ffe46b"))
+		ProjectileSystem.HazardStyle.LIGHTNING, Color("#ffe46b"))
 
 ## 撃破されたときの処理。分裂する雑魚は分かれ、誘爆する雑魚は少し遅れて爆発する。atk は機体の攻撃力。
 ## ポンプ座は、圧縮していた敵を一気に解放する。飛び散る敵と破裂は機体の側の攻撃で、蓄積が多いほど強い。
@@ -2095,7 +2098,7 @@ func on_enemy_death(i: int, atk: float) -> void:
 			{"cause": &"pump_burst", "no_crit": true, "color": t.color[i].lightened(0.4), "life": 0.35, "knock": 500.0 + 400.0 * full})
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), float(dp.blast_dmg),
-			ProjectileManager.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
+			ProjectileSystem.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
 	projectiles.lab_context = prior_context
 	if t.type[i] != &"splitter":
 		return

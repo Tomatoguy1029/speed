@@ -8,9 +8,9 @@ func verify() -> void:
 	var s := RunState.new()
 	s.lab_mode = true
 	var cfg: GameConfig = load("res://data/config.tres")
-	var em := EnemyManager.new()
-	var combat := CombatManager.new()
-	var build := BuildManager.new()
+	var em := EnemySystem.new()
+	var combat := CombatSystem.new()
+	var build := LoadoutSystem.new()
 	em.setup(s, cfg)
 	combat.setup(s, cfg)
 	build.state = s
@@ -100,7 +100,7 @@ func verify() -> void:
 	build.free()
 	get_tree().quit()
 
-func show_visual(build: BuildManager, state: RunState, cfg: GameConfig, segments: PackedVector2Array) -> void:
+func show_visual(build: LoadoutSystem, state: RunState, cfg: GameConfig, segments: PackedVector2Array) -> void:
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(1000, 500)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS

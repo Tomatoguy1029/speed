@@ -279,7 +279,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 	var cfg := run.cfg
 	match kind:
 		"planet":
-			var body := FieldManager.Body.new()
+			var body := FieldSystem.Body.new()
 			body.pos = at
 			body.r = maxf(10.0, radius)
 			body.is_planet = true
@@ -289,7 +289,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 			run.enemies.table.body_gap.fill(-1.0)
 			run.projectiles.hostile_gap.fill(0.0)
 		"comet":
-			var rock := FieldManager.Rock.new()
+			var rock := FieldSystem.Rock.new()
 			rock.lab_manual = true
 			rock.kind = &"comet"
 			var u := (run.state.ship_pos - at).normalized()
@@ -391,7 +391,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 				var offset := Vector2.from_angle(k * 2.399963) * sqrt(float(k)) * float(args.get("spacing", 60))
 				var opts := {"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)}
 				if def.id in [&"meteor", &"iron", &"saw"]:
-					var rock := FieldManager.Rock.new()
+					var rock := FieldSystem.Rock.new()
 					rock.lab_manual = true
 					rock.kind = &"belt" if def.id == &"meteor" else def.id
 					rock.pos = origin + offset

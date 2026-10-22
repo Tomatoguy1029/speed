@@ -13,7 +13,7 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"empty": true, "stage": 4, "seed": 932, "ship_pos": [650, 0]})
-	var m: EnemyManager = lab.run.enemies
+	var m: EnemySystem = lab.run.enemies
 	var t := m.table
 	var crown := m.spawn(m.def_of(&"corona"), Vector2.ZERO)
 	var ammo := m.spawn(m.def_of(&"biter"), Vector2(0, 100))

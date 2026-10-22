@@ -1,14 +1,18 @@
 ## ドロップと回収（仕様書 10）。経験値の結晶（大きい結晶を含む）・部品・修理キット・回収ビーコン・彗星限定の武器のカプセル。
-class_name PickupManager
+class_name PickupSystem
 extends RunSystem
 
 ## 開発版の記録だけが購読する。大きい結晶が落ちたとき。tier は 1〜3（小・中・大）、enemy は落とした敵の種類。
 signal big_crystal_dropped(tier: int, xp: float, enemy: StringName)
 
-var field: FieldManager
-var ship: ShipManager
-var build: BuildManager
-var enemies: EnemyManager
+var field: FieldSystem:
+	get: return ctx.field
+var ship: ShipSystem:
+	get: return ctx.ship
+var build: LoadoutSystem:
+	get: return ctx.loadout
+var enemies: EnemySystem:
+	get: return ctx.enemies
 
 ## 経験値の結晶と部品は、1つごとの箱を作らず項目ごとの列で持つ。1行が1つで、行は前へ詰めない（設計書 6）。
 ## 1 なら使用中の行
@@ -35,8 +39,8 @@ var _gem_queue_seq := PackedInt32Array()
 var _gem_queue_head := 0
 var _gem_next_seq := 0
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	gem_slots = RowSlots.new(self, "gem_")
 	coin_slots = RowSlots.new(self, "coin_")
 	# 追加の関数が、使い回す行の全部の列を書き直すか（デバッグ版だけ）

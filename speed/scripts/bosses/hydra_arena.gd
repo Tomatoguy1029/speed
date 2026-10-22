@@ -1,7 +1,7 @@
 ## 戦闘開始時から置く固定瓦礫。敵表に入れず、位置・回転・寿命を持つ飛翔瓦礫と分ける。
 extends Node2D
 var bounds := Rect2()
-var field: FieldManager
+var field: FieldSystem
 var owner_id := -1
 var thickness := 160.0
 var pieces: Array[PackedVector2Array] = []
@@ -99,7 +99,7 @@ func _clear_footprint(actor: BossActor)->void:
 		if at!=t.pos[i]:
 			t.pos[i]=at
 			t.vel[i]=Vector2.ZERO
-	var pickups: PickupManager=actor.manager.projectiles.combat.pickups
+	var pickups: PickupSystem=actor.manager.projectiles.combat.pickups
 	for i in pickups.gem_alive.size():
 		if pickups.gem_alive[i]:
 			var at:=_clear_point(pickups.gem_pos[i],12.0)

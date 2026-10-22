@@ -15,8 +15,8 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
-	var em: EnemyManager = lab.run.enemies
-	var pm: ProjectileManager = lab.run.projectiles
+	var em: EnemySystem = lab.run.enemies
+	var pm: ProjectileSystem = lab.run.projectiles
 	var stage := StageDef.new()
 	stage.enemy_attack_values = {"telescope": 1.0, "reticle": 0.5, "aquarius": 4.0}
 	lab.run.state.stage = stage

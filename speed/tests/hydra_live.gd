@@ -9,7 +9,7 @@ func _ready()->void:
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
 	var run: RunManager=lab.run
 	var wall_enemy:=run.enemies.spawn(run.enemies.def_of(&"biter"),Vector2(1900,0))
-	var rock:=FieldManager.Rock.new()
+	var rock:=FieldSystem.Rock.new()
 	rock.kind=&"iron"
 	rock.pos=Vector2(1900,200)
 	rock.size=40.0
@@ -64,7 +64,7 @@ func _ready()->void:
 	var plan: Dictionary=a.grid_plan()
 	check(not plan.is_empty(),"clear field permits grid formation")
 	if not plan.is_empty():
-		var obstruction:=FieldManager.Body.new()
+		var obstruction:=FieldSystem.Body.new()
 		obstruction.pos=plan.bearer
 		obstruction.r=100.0
 		run.field.bodies.append(obstruction)
@@ -84,7 +84,7 @@ func _ready()->void:
 	check(a.table.hp[a.immortal_row]>0.0 and is_equal_approx(bearer_hp-a.table.hp[a.immortal_row],run.combat.attack_power()*0.7),"ordinary weapon hit does not execute the compass bearer")
 	a.immortal_neck.mode=&"idle"
 	a.immortal_neck.cd=100.0
-	var planet:=FieldManager.Body.new()
+	var planet:=FieldSystem.Body.new()
 	planet.pos=a.immortal_neck.free_pos+Vector2(80,0)
 	planet.r=130.0
 	run.field.bodies.append(planet)

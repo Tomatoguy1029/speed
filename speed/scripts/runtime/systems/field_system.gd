@@ -2,7 +2,7 @@
 ##
 ## 惑星と月は障害物で、機体・敵・弾・線を止める。ここでは位置と当たり判定だけを持ち、
 ## 当たったときの扱い（跳ね返りやダメージ）は、それぞれの Manager が決める。
-class_name FieldManager
+class_name FieldSystem
 extends RunSystem
 
 ## 隕石1つの配置（仕様書 13.1）。kind は belt（地帯の岩、固定）、drift（漂流）、comet（彗星）、
@@ -45,8 +45,10 @@ class Body:
 	var a0 := 0.0
 	var dir := 1.0
 
-var enemies: EnemyManager
-var projectiles: ProjectileManager
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
 
 var planet: Body
 var moons: Array[Body] = []
@@ -75,8 +77,8 @@ var warp_pos := Vector2.ZERO
 var warp_gone := -1.0
 var _well_t := 0.0
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	var rng := state.rng
 	planet = Body.new()
 	planet.r = cfg.planet_radius

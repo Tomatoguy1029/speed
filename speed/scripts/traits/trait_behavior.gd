@@ -1,9 +1,9 @@
 ## 特性の発動の共通の土台（設計書 8.1）。発動のきっかけを持つ特性だけ、
-## res://scripts/traits/<内部 ID>.gd で上書きする。能力値を変えるだけの特性は BuildManager が計算する。
+## res://scripts/traits/<内部 ID>.gd で上書きする。能力値を変えるだけの特性は LoadoutSystem が計算する。
 class_name TraitBehavior
 extends RefCounted
 
-var build: BuildManager
+var build: LoadoutSystem
 var def: TraitDef
 ## 重ね数（1〜5）
 var n := 1
@@ -13,7 +13,7 @@ var state: RunState:
 var cfg: GameConfig:
 	get: return build.cfg
 
-func setup(b: BuildManager, d: TraitDef) -> void:
+func setup(b: LoadoutSystem, d: TraitDef) -> void:
 	build = b
 	def = d
 

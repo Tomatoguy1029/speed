@@ -3,7 +3,7 @@
 extends Node
 
 class BlockedField:
-	extends FieldManager
+	extends FieldSystem
 	func body_gap(_p: Vector2, _radius: float) -> float:
 		return 0.0
 
@@ -12,11 +12,11 @@ var failed := 0
 func _ready() -> void:
 	var cfg: GameConfig = load("res://data/config.tres")
 	var s := RunState.new()
-	var h := HeroManager.new()
-	var field := FieldManager.new()
+	var h := HeroSystem.new()
+	var field := FieldSystem.new()
 	var blocked := BlockedField.new()
-	var enemies := EnemyManager.new()
-	var combat := CombatManager.new()
+	var enemies := EnemySystem.new()
+	var combat := CombatSystem.new()
 	combat.setup(s, cfg)
 	h.state = s
 	h.cfg = cfg

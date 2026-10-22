@@ -1,17 +1,23 @@
 ## 成長と装備。経験値・レベル・3択・能力値・武器と特性の発動（仕様書 8・9）。
 ##
 ## 武器・特性の発動は、持っているものの WeaponBehavior / TraitBehavior の入口を呼んで行う。
-class_name BuildManager
+class_name LoadoutSystem
 extends RunSystem
 
 signal cards_opened(cards: Array)
 
-var combat: CombatManager
-var projectiles: ProjectileManager
-var ship: ShipManager
-var enemies: EnemyManager
-var pickups: PickupManager
-var field: FieldManager
+var combat: CombatSystem:
+	get: return ctx.combat
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
+var ship: ShipSystem:
+	get: return ctx.ship
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var pickups: PickupSystem:
+	get: return ctx.pickups
+var field: FieldSystem:
+	get: return ctx.field
 
 ## 管理 ID → 発動の処理
 var weapon_behaviors: Dictionary = {}
@@ -20,8 +26,8 @@ var trait_behaviors: Dictionary = {}
 var sonic_waves: Array = []
 var _buf := PackedInt32Array()
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	state.level = 0
 	state.weapons = {}
 	state.traits = {}
@@ -382,7 +388,7 @@ func _update_sonic(real_dt: float) -> void:
 		wave.life -= real_dt
 	sonic_waves = sonic_waves.filter(func(w): return w.life > 0.0)
 
-# ── 発動のきっかけ（CombatManager・DrawManager・ShipManager から呼ばれる） ─
+# ── 発動のきっかけ（CombatSystem・DrawSystem・ShipSystem から呼ばれる） ─
 
 func on_launch(full: bool) -> void:
 	for b in trait_behaviors.values():

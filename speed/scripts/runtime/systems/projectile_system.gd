@@ -2,13 +2,17 @@
 ##
 ## 物理的な弾と破片は、惑星と月で止まる。味方の波動・範囲攻撃・ビームはここでは扱わない。
 ## 敵の攻撃の形（ビーム・遅れて弾ける範囲など）は、予告のあとに当たり判定を持ち、地形では止まらない。
-class_name ProjectileManager
+class_name ProjectileSystem
 extends RunSystem
 
-var field: FieldManager
-var combat: CombatManager
-var ship: ShipManager
-var build: BuildManager
+var field: FieldSystem:
+	get: return ctx.field
+var combat: CombatSystem:
+	get: return ctx.combat
+var ship: ShipSystem:
+	get: return ctx.ship
+var build: LoadoutSystem:
+	get: return ctx.loadout
 
 ## 味方の弾と破片。項目ごとの列で持つ。1行が1つで、行は前へ詰めない（設計書 6）。
 ## HULL は質量牽引砲（W21）が撃ち出す船体
@@ -131,8 +135,8 @@ var hazard_gap := PackedFloat32Array()
 var hazard_gap_w := PackedFloat32Array()
 var hazard_slots: RowSlots
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	friend_slots = RowSlots.new(self, "friend_")
 	hostile_slots = RowSlots.new(self, "hostile_")
 	# 追加の関数が、使い回す行の全部の列を書き直すか（デバッグ版だけ）

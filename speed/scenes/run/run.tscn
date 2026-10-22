@@ -1,21 +1,21 @@
 [gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/managers/run_manager.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/managers/field_manager.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/managers/ship_manager.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/managers/draw_manager.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/managers/combat_manager.gd" id="5"]
-[ext_resource type="Script" path="res://scripts/managers/enemy_manager.gd" id="6"]
-[ext_resource type="Script" path="res://scripts/managers/boss_manager.gd" id="7"]
-[ext_resource type="Script" path="res://scripts/managers/projectile_manager.gd" id="8"]
-[ext_resource type="Script" path="res://scripts/managers/build_manager.gd" id="9"]
-[ext_resource type="Script" path="res://scripts/managers/pickup_manager.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/field_system.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/ship_system.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/draw_system.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/combat_system.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/enemy_system.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/boss_system.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/projectile_system.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/loadout_system.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/pickup_system.gd" id="10"]
 [ext_resource type="Script" path="res://scripts/managers/render_manager.gd" id="11"]
 [ext_resource type="Script" path="res://scripts/input/input_router.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/ui/debug_panel.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/ui/perf_overlay.gd" id="15"]
-[ext_resource type="Script" path="res://scripts/managers/hero_manager.gd" id="16"]
+[ext_resource type="Script" path="res://scripts/runtime/systems/hero_system.gd" id="16"]
 
 [node name="Run" type="Node"]
 
@@ -26,34 +26,34 @@ script = ExtResource("1")
 world_path = NodePath("../../World")
 input_path = NodePath("../../World/InputRouter")
 
-[node name="FieldManager" type="Node" parent="Managers"]
+[node name="FieldSystem" type="Node" parent="Managers"]
 script = ExtResource("2")
 
-[node name="ShipManager" type="Node" parent="Managers"]
+[node name="ShipSystem" type="Node" parent="Managers"]
 script = ExtResource("3")
 
-[node name="DrawManager" type="Node" parent="Managers"]
+[node name="DrawSystem" type="Node" parent="Managers"]
 script = ExtResource("4")
 
-[node name="CombatManager" type="Node" parent="Managers"]
+[node name="CombatSystem" type="Node" parent="Managers"]
 script = ExtResource("5")
 
-[node name="EnemyManager" type="Node" parent="Managers"]
+[node name="EnemySystem" type="Node" parent="Managers"]
 script = ExtResource("6")
 
-[node name="BossManager" type="Node" parent="Managers"]
+[node name="BossSystem" type="Node" parent="Managers"]
 script = ExtResource("7")
 
-[node name="ProjectileManager" type="Node" parent="Managers"]
+[node name="ProjectileSystem" type="Node" parent="Managers"]
 script = ExtResource("8")
 
-[node name="BuildManager" type="Node" parent="Managers"]
+[node name="LoadoutSystem" type="Node" parent="Managers"]
 script = ExtResource("9")
 
-[node name="PickupManager" type="Node" parent="Managers"]
+[node name="PickupSystem" type="Node" parent="Managers"]
 script = ExtResource("10")
 
-[node name="HeroManager" type="Node" parent="Managers"]
+[node name="HeroSystem" type="Node" parent="Managers"]
 script = ExtResource("16")
 
 [node name="RenderManager" type="Node" parent="Managers"]

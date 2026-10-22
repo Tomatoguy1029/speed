@@ -1,20 +1,23 @@
 ## 機体の移動・速さの減り方・地形との衝突・被弾（仕様書 5・7.2）。
 ##
-## なぞり中（state.tracing）は DrawManager が機体を動かすので、ここでは動かさない。
-class_name ShipManager
+## なぞり中（state.tracing）は DrawSystem が機体を動かすので、ここでは動かさない。
+class_name ShipSystem
 extends RunSystem
 
-var field: FieldManager
-var combat: CombatManager
-var build: BuildManager
+var field: FieldSystem:
+	get: return ctx.field
+var combat: CombatSystem:
+	get: return ctx.combat
+var build: LoadoutSystem:
+	get: return ctx.loadout
 
 ## RunManager が更新ごとに入れる入力の意図
 var intent: Intent = Intent.new()
 ## 調整パネルの「無敵」
 var invincible := false
 
-func setup(run_state: RunState, config: GameConfig) -> void:
-	super(run_state, config)
+func setup(context: RunContext) -> void:
+	super(context)
 	state.ship_pos = Vector2(-cfg.start_radius, 0.0)
 	state.ship_vel = Vector2(0.0, -cfg.base_max_speed * 0.3)
 	state.ship_hp = state.stats.max_hp

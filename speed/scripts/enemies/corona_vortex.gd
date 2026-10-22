@@ -13,10 +13,10 @@ func clear() -> void:
 	owners.clear()
 	members.clear()
 
-func _live(m: EnemyManager, row: int, id: int) -> bool:
+func _live(m: EnemySystem, row: int, id: int) -> bool:
 	return m.is_same(row, id) and m.table.dead[row] == 0
 
-func _cancel(m: EnemyManager, i: int, o: Dictionary) -> void:
+func _cancel(m: EnemySystem, i: int, o: Dictionary) -> void:
 	if m.projectiles.director != null:
 		m.projectiles.director.cancel_wait(m._lab_owner(i), m.table.id[i])
 	o.selected = -1
@@ -26,7 +26,7 @@ func _cancel(m: EnemyManager, i: int, o: Dictionary) -> void:
 	m.table.charge[i] = 0.0
 
 ## 死亡・行解放・冠の再配置はここを通す。投擲済みも冠の死で通常敵へ戻る。
-func release(m: EnemyManager, i: int) -> void:
+func release(m: EnemySystem, i: int) -> void:
 	if owners.has(i):
 		for j in members.keys():
 			if int(members[j].owner) == i:
@@ -35,7 +35,7 @@ func release(m: EnemyManager, i: int) -> void:
 	if members.has(i):
 		_detach(m, i)
 
-func _detach(m: EnemyManager, j: int) -> void:
+func _detach(m: EnemySystem, j: int) -> void:
 	var a: Dictionary = members[j]
 	_unstock(j, a)
 	members.erase(j)
@@ -62,7 +62,7 @@ func _unstock(j: int, a: Dictionary) -> void:
 		o.selected = -1
 		o.selected_id = -1
 
-func _capture(m: EnemyManager, i: int, o: Dictionary, p: Dictionary) -> void:
+func _capture(m: EnemySystem, i: int, o: Dictionary, p: Dictionary) -> void:
 	var t := m.table
 	# 既存の戦闘格子を使う。直前の世界更新の位置なので、実距離も必ず確かめる。
 	m.projectiles.combat.nearby(t.pos[i], float(p.pull_radius), _near)
@@ -102,7 +102,7 @@ func choose_type(o: Dictionary, weights: Dictionary, rng: RandomNumberGenerator)
 			return kind
 	return ""
 
-func tick(m: EnemyManager, dt: float) -> void:
+func tick(m: EnemySystem, dt: float) -> void:
 	var t := m.table
 	# 通常 AI の更新が終わり、冠の移動を確定してから渦を進める（LOD は適用しない）。
 	for i in m.beh_rows[EnemyTable.Beh.CORONA]:
@@ -180,7 +180,7 @@ func tick(m: EnemyManager, dt: float) -> void:
 		owners[i].center = t.pos[i]
 
 ## 可視の速度＝冠の並進＋円の接線。吸い込み中の半径も連続的に ring へ近づける。
-func _orbit(m: EnemyManager, j: int, a: Dictionary, o: Dictionary, p: Dictionary, dt: float) -> void:
+func _orbit(m: EnemySystem, j: int, a: Dictionary, o: Dictionary, p: Dictionary, dt: float) -> void:
 	var t := m.table
 	var i := int(a.owner)
 	var center0: Vector2 = o.center
@@ -244,7 +244,7 @@ static func _error(center: Vector2, center_v: Vector2, angle: float, radius: flo
 	return Geom.angle_diff((target - at).angle(), _velocity(center_v, angle, radius, spin).angle())
 
 ## 機体の移動・通常戦闘の後に判定。倒された弾薬は当たらず、1投につき1回で既存の無敵・盾を通す。
-func hit_thrown(m: EnemyManager, ship: ShipManager) -> void:
+func hit_thrown(m: EnemySystem, ship: ShipSystem) -> void:
 	for j in members.keys():
 		var a: Dictionary = members[j]
 		if not a.thrown or not _live(m, j, int(a.id)):
@@ -260,7 +260,7 @@ func hit_thrown(m: EnemyManager, ship: ShipManager) -> void:
 				return
 
 ## 差し替え用の図形。攻撃色は既存の敵弾の赤と爆発の橙。尾は飾りで、判定は頭の円。
-func draw(c: CanvasItem, m: EnemyManager, view: Rect2) -> void:
+func draw(c: CanvasItem, m: EnemySystem, view: Rect2) -> void:
 	var t := m.table
 	for i in owners:
 		if not _live(m, i, int(owners[i].id)) or not view.grow(200).has_point(t.pos[i]):

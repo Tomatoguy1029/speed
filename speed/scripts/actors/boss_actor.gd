@@ -1,11 +1,11 @@
 ## ボスの役者の共通の土台（設計書 4.2・6.1）。ボスのシーンのルートに付ける。
 ##
 ## 当たり判定の円は敵の表（EnemyTable）の1行（body）として入り、ボスの行動はこの役者が
-## BossManager から決まった順番で呼ばれて動かす（sim_tick）。見た目はこのノードの子に置く。
+## BossSystem から決まった順番で呼ばれて動かす（sim_tick）。見た目はこのノードの子に置く。
 class_name BossActor
 extends Node2D
 
-var manager: BossManager
+var manager: BossSystem
 ## 当たり判定の円の、敵の表での行番号
 var body := -1
 var def: BossDef
@@ -17,7 +17,7 @@ var run_state: RunState:
 var table: EnemyTable:
 	get: return manager.enemies.table
 
-func bind(m: BossManager, row: int, d: BossDef) -> void:
+func bind(m: BossSystem, row: int, d: BossDef) -> void:
 	manager = m
 	body = row
 	def = d

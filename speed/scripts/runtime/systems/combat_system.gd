@@ -1,17 +1,24 @@
 ## 戦闘の計算。当たり判定の格子・攻撃力・接触・クリティカル・ダメージ・撃破・範囲攻撃・ヒットストップ（仕様書 7）。
-class_name CombatManager
+class_name CombatSystem
 extends RunSystem
 
 ## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
 const FORCEFUL := [&"sonic", &"killSonic", &"critBeam", &"bipolar", &"towShot"]
 
-var enemies: EnemyManager
-var ship: ShipManager
-var build: BuildManager
-var pickups: PickupManager
-var projectiles: ProjectileManager
-var field: FieldManager
-var bosses: BossManager
+var enemies: EnemySystem:
+	get: return ctx.enemies
+var ship: ShipSystem:
+	get: return ctx.ship
+var build: LoadoutSystem:
+	get: return ctx.loadout
+var pickups: PickupSystem:
+	get: return ctx.pickups
+var projectiles: ProjectileSystem:
+	get: return ctx.projectiles
+var field: FieldSystem:
+	get: return ctx.field
+var bosses: BossSystem:
+	get: return ctx.bosses
 
 var grid := SpatialGrid.new()
 ## 調整で大きくした敵も、中心が遠いだけで探索から漏らさない。
