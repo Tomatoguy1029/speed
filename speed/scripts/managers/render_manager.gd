@@ -689,35 +689,87 @@ func _draw_field(c: CanvasItem) -> void:
 			c.draw_texture_rect(PLANET if b.is_planet else MOON,
 				Rect2(b.pos - Vector2.ONE * b.r, Vector2.ONE * b.r * 2.0), false)
 
-## 英雄の星座：うっすらと見える点線の星座線と、光った線。近くまで来ると星が恒星のように強く光る。
+## 英雄の星座：全体から淡金色の光がにじみ、つないだ星と光線がさらに強く輝く。
 func _draw_hero(c: CanvasItem) -> void:
 	var h := run.heroes
-	if h.hero == null:
+	if h.hero == null or h.stars.is_empty():
 		return
 	var view := view_rect().grow(900.0)
 	if not view.has_point(h.center):
 		return
-	var near := clampf(1.0 - h.center.distance_to(state.ship_pos) / cfg.hero_glow_range, 0.0, 1.0)
 	var gold := Color("#ffe8a0")
+	var brass := Color("#e2b96b")
+	var hot := Color(gold.r * 1.7, gold.g * 1.7, gold.b * 1.7)
 	var links := h.hero.links
+	var connected := PackedByteArray()
+	connected.resize(h.stars.size())
+	var bounds := Rect2(h.stars[0], Vector2.ZERO)
+	for star in h.stars:
+		bounds = bounds.expand(star)
+	# 星間の空間まで包む光の雲。線に沿った細い縁取りにせず、星座全体を一つの光源として見せる。
+	var center := bounds.get_center()
+	var radii := bounds.size * 0.65 + Vector2.ONE * _px(72.0)
+	var aura_pixel := _px(8.0)
+	var columns := ceili(radii.x * 2.0 / aura_pixel)
+	var rows := ceili(radii.y * 2.0 / aura_pixel)
+	var breath := 0.95 + 0.05 * sin(state.world_time * 0.8)
+	for row in rows:
+		for column in columns:
+			var at := center - radii + Vector2(column, row) * aura_pixel
+			var q := (at - center) / radii
+			var cloud := 0.78 + 0.22 * sin(q.x * 4.0 + q.y * 2.0) * cos(q.y * 5.0 - q.x)
+			var density := exp(-q.length_squared() * 2.8) * cloud
+			var alpha := floorf(density * 12.0) / 12.0 * 0.25 * breath
+			if alpha > 0.0:
+				c.draw_rect(Rect2(at.snapped(Vector2.ONE * aura_pixel), Vector2.ONE * aura_pixel),
+					Color(gold, alpha))
+	# 基本線は操作線と共通。光の広がりと芯を同じ経路に重ねて光線として見せる。
 	for n in h.lit.size():
 		var a := h.stars[links[n * 2]]
 		var b := h.stars[links[n * 2 + 1]]
-		if h.lit[n] != 0:
-			c.draw_line(a, b, Color(gold, 0.35), _px(9.0))
-			c.draw_line(a, b, gold, _px(3.0))
+		var points := PackedVector2Array([a, b])
+		var lit: bool = h.lit[n] != 0
+		if lit:
+			connected[links[n * 2]] = 1
+			connected[links[n * 2 + 1]] = 1
+		if lit:
+			_draw_route_line(c, points, Color(brass, 0.055), 22.0)
+			_draw_route_line(c, points, Color(gold, 0.13), 12.0)
+			_draw_route_line(c, points, Color(gold, 0.32), 6.0)
+			_draw_route_line(c, points, Color(gold, 0.95), 4.0)
+			_draw_route_line(c, points, Color(hot, 0.95), 2.0)
 		else:
-			c.draw_dashed_line(a, b, Color(0.8, 0.85, 1.0, 0.25 + 0.25 * near), _px(2.0), _px(10.0))
-	var pulse := 0.85 + 0.15 * sin(state.world_time * 3.0)
-	for p in h.stars:
-		if near > 0.0:
-			# 恒星のような光：中心の芯と、細い光の筋
-			c.draw_circle(p, cfg.hero_star_radius * (0.9 + 0.6 * near) * pulse, Color(1.0, 0.95, 0.75, 0.1 * near))
-			c.draw_circle(p, cfg.hero_star_radius * 0.6, Color(1.0, 0.97, 0.85, 0.3 * near))
-			for k in 4:
-				var u := Vector2.from_angle(k * PI / 4.0) * cfg.hero_star_radius * (1.2 + 2.0 * near) * pulse
-				c.draw_line(p - u, p + u, Color(1.0, 0.96, 0.8, (0.5 if k % 2 == 0 else 0.25) * near), _px(2.0))
-		c.draw_circle(p, maxf(_px(3.0), cfg.hero_star_radius * 0.3), Color(1.0, 0.98, 0.9, 0.6 + 0.4 * near))
+			# 光が戻る前の経路には、弱い金色の光だけを点線で残す。
+			_draw_route_line(c, points, Color(gold, 0.35), 2.0, true)
+	var pixel := _px(2.0)
+	var grid := Vector2.ONE * pixel
+	var glow_pixel := _px(4.0)
+	for index in h.stars.size():
+		var p := h.stars[index].snapped(grid)
+		var lit: bool = connected[index] != 0
+		# 同じ星光の強さと広がりを変え、残り火のような星が接続すると輝きを取り戻す。
+		var strength := 1.3 if lit else 0.6
+		var light_strength := 1.0 if lit else 0.32
+		for layer in 4:
+			var radius := _px([34.0, 25.0, 17.0, 10.0][layer]) * strength
+			var alpha: float = [0.035, 0.06, 0.12, 0.24][layer] * light_strength
+			var count := ceili(radius / glow_pixel)
+			for y in range(-count, count + 1):
+				var dy := y * glow_pixel
+				var half_width := floorf(sqrt(maxf(0.0, radius * radius - dy * dy)) / glow_pixel) * glow_pixel
+				if half_width > 0.0:
+					c.draw_rect(Rect2(p + Vector2(-half_width, dy - glow_pixel * 0.5),
+						Vector2(half_width * 2.0, glow_pixel)), Color(gold, alpha))
+		var arm := _px(26.0 if lit else 9.0)
+		c.draw_rect(Rect2(p - Vector2(arm, pixel), Vector2(arm * 2.0, pixel * 2.0)), Color(gold, 0.45 * light_strength))
+		c.draw_rect(Rect2(p - Vector2(pixel * 0.5, arm * 1.15), Vector2(pixel, arm * 2.3)), Color(gold, 0.85 * light_strength))
+		var light_rows := [1, 3, 5, 7, 9, 7, 5, 3, 1] if lit else [1, 3, 5, 7, 5, 3, 1]
+		for row in light_rows.size():
+			var width: int = light_rows[row]
+			c.draw_rect(Rect2(p + Vector2(-width * 0.5, row - light_rows.size() * 0.5) * pixel,
+				Vector2(width, 1) * pixel), Color(gold, 1.0 if lit else 0.4))
+		var core := grid * (3.0 if lit else 2.0)
+		c.draw_rect(Rect2(p - core * 0.5, core), hot if lit else Color(gold, 0.55))
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
@@ -1627,19 +1679,29 @@ func _draw_path_band(c: CanvasItem) -> void:
 	for point in pts:
 		c.draw_circle(point, w, color)
 
+## 操作線と英雄の星間線で共有する実線・点線。太さと点線間隔は画面pxで扱う。
+func _draw_route_line(c: CanvasItem, points: PackedVector2Array, color: Color, width_px: float, dashed := false) -> void:
+	if points.size() < 2:
+		return
+	if not dashed:
+		c.draw_polyline(points, color, _px(width_px))
+		return
+	for i in points.size() - 1:
+		var gap := points[i + 1] - points[i]
+		var steps := int(gap.length() / _px(14.0))
+		for k in range(0, steps, 2):
+			c.draw_line(points[i] + gap * (float(k) / steps), points[i] + gap * (float(k + 1) / steps), color, _px(width_px))
+
 func _draw_path(c: CanvasItem) -> void:
 	if state.drawing and state.draw_points.size() > 0:
 		var pts := state.draw_points
 		# 今の位置から描き始めまでの移動（なぞりで一緒に駆け抜ける）を点線で示す
-		var gap := pts[0] - state.ship_pos
-		var steps := int(gap.length() / _px(14.0))
-		for k in range(0, steps, 2):
-			c.draw_line(state.ship_pos + gap * (float(k) / steps), state.ship_pos + gap * (float(k + 1) / steps), Color(0.8, 0.97, 1.0, 0.55), _px(2.0))
+		_draw_route_line(c, PackedVector2Array([state.ship_pos, pts[0]]), Color(0.8, 0.97, 1.0, 0.55), 2.0, true)
 		if pts.size() > 1:
-			c.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.95), _px(3.0))
+			_draw_route_line(c, pts, Color(0.8, 0.97, 1.0, 0.95), 3.0)
 		c.draw_circle(pts[0], _px(6.0), Color("#c8f7ff"))
 	if state.tracing and state.trace_path.size() > 1:
-		c.draw_polyline(state.trace_path, Color(0.8, 0.97, 1.0, 0.6), _px(2.0))
+		_draw_route_line(c, state.trace_path, Color(0.8, 0.97, 1.0, 0.6), 2.0)
 	for g in ghosts:
 		var a: float = g.life / g.max
 		c.draw_line(g.from, g.to, Color(0.75, 0.95, 1.0, 0.6 * a), _px(4.0))
