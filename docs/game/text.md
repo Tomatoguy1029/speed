@@ -108,6 +108,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.skip&#95;finish | 演出をスキップ | Skip sequence |
 | hud.continuation | モジュール連続強化 | CONSECUTIVE UPGRADE |
 | hud.continuation&#95;count | {n} 連続！ | {n} CHAIN! |
+| hud.continuation&#95;next | クリックで進む | Click to proceed |
 | hud.start&#95;title | 最初の武器を1つ選ぶ（クリック／1〜3） | Choose Your First Weapon (Click / 1–3) |
 | hud.reroll | リロール（残り {n} 回）　{key} | Reroll ({n} Left)  {key} |
 | hud.pause | ポーズ | Paused |

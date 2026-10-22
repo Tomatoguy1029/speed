@@ -48,6 +48,7 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
 
 var _cards_accept_at := 0
+var _reward_advanced_frame := -1
 var _card_blocked_pointer_frame := -1
 var _card_blocked_pointer_pos := Vector2.ZERO
 ## 表示切替前からの押下と、離すまで破棄する押下（マウス・タッチ・選択キー）。
@@ -116,6 +117,7 @@ func _ready() -> void:
 	_rewards.ult_cutin_seconds = ult_cutin_seconds
 	_rewards.ult_details_seconds = ult_details_seconds
 	_rewards.ult_cutin_scene = ult_cutin_scene
+	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
 	_rewards.active_changed.connect(_on_reward_active)
 	resized.connect(_layout_cards)
@@ -232,6 +234,11 @@ func _input(event: InputEvent) -> void:
 	var id := _card_input_id(event)
 	if id == "":
 		return
+	# 表示を発生させた押下や、タッチ由来の擬似マウスを次送りに使わない。
+	var reward_press: bool = _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+		(event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.device != -1 and event.pressed)
+		or (event is InputEventScreenTouch and event.pressed)
+		or event.is_action_pressed(&"ui_accept"))
 	var choosing := run.state.phase == RunState.Phase.LEVELUP
 	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
@@ -252,6 +259,9 @@ func _input(event: InputEvent) -> void:
 	# タッチの選択は既存のマウス擬似イベントに任せ、元のタッチをゲームへ漏らさない。
 	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
 		get_viewport().set_input_as_handled()
+	if reward_press and _reward_advanced_frame != Engine.get_process_frames():
+		_reward_advanced_frame = Engine.get_process_frames()
+		_rewards.advance_bonus()
 
 func _card_input_id(event: InputEvent) -> String:
 	if event is InputEventMouseButton:
