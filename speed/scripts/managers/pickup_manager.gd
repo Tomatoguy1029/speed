@@ -1,9 +1,9 @@
-## ドロップと回収（仕様書 10）。経験値の結晶・部品・経験値カプセル・漂流カプセル・修理キット・回収ビーコン・出力コア。
+## ドロップと回収（仕様書 10）。経験値の結晶（大きい結晶を含む）・部品・修理キット・回収ビーコン・彗星限定の武器のカプセル。
 class_name PickupManager
 extends RunSystem
 
-## 開発版の記録だけが購読する。XP 加算の前に通知し、ビーコンの合算でも取得前のレベルを保つ。
-signal xp_capsule_event(capsule: Pickup, action: StringName, cause: StringName)
+## 開発版の記録だけが購読する。大きい結晶が落ちたとき。tier は 1〜3（小・中・大）、enemy は落とした敵の種類。
+signal big_crystal_dropped(tier: int, xp: float, enemy: StringName)
 
 var field: FieldManager
 var ship: ShipManager
@@ -34,9 +34,6 @@ var _gem_queue_row := PackedInt32Array()
 var _gem_queue_seq := PackedInt32Array()
 var _gem_queue_head := 0
 var _gem_next_seq := 0
-var _capsule_t := 0.0
-var _core_t := 0.0
-var _cores_started := false
 
 func setup(run_state: RunState, config: GameConfig) -> void:
 	super(run_state, config)
@@ -51,8 +48,6 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
-	_spawn_field_capsules(world_dt)
-	_spawn_cores(world_dt)
 	_collect_gems(world_dt)
 	_collect_coins(world_dt)
 	_collect_capsules(world_dt)
@@ -84,17 +79,40 @@ func on_enemy_killed(i: int) -> void:
 	_drop_coins(i)
 	if t.type[i] == &"meteor":
 		if state.rng.randf() < cfg.meteor_heal_chance:
-			_add_capsule(Pickup.Kind.HEAL, &"drop", pos, 0.0)
+			_add_capsule(Pickup.Kind.HEAL, &"drop", pos)
 		if state.rng.randf() < cfg.meteor_magnet_chance:
-			_add_capsule(Pickup.Kind.MAGNET, &"drop", pos, 0.0)
+			_add_capsule(Pickup.Kind.MAGNET, &"drop", pos)
 		# レアな彗星は、決まった彗星限定の武器のカプセルを必ず落とす
 		var weapon := field.comet_weapon(t.meteor_index[i])
 		if weapon != &"":
-			_add_capsule(Pickup.Kind.COMET_WEAPON, &"comet", pos, 0.0)
+			_add_capsule(Pickup.Kind.COMET_WEAPON, &"comet", pos)
 			capsules[capsules.size() - 1].weapon_id = weapon
-	var chance := minf(cfg.drop_max, cfg.drop_base * pow(t.xp[i], cfg.drop_power_exp))
-	if state.rng.randf() < chance:
-		_add_capsule(Pickup.Kind.CACHE, &"drop", pos, build.xp_needed() * cfg.capsule_xp_frac)
+	# 大きい結晶：レチクル座のように段の決まった敵は必ず、ほかは経験値の多い敵ほど高い確率で落とす
+	var tier := int(t.def[i].params.get("big_crystal", 0)) if t.def[i] != null else 0
+	if tier == 0 and state.rng.randf() < minf(cfg.drop_max, cfg.drop_base * pow(t.xp[i], cfg.drop_power_exp)):
+		tier = _roll_big_crystal_tier()
+	if tier > 0:
+		var xp := cfg.big_crystal_xp[tier - 1]
+		state.xp_dropped += xp
+		drop_gem(pos, xp)
+		if OS.is_debug_build() and big_crystal_dropped.has_connections():
+			big_crystal_dropped.emit(tier, xp, t.type[i])
+
+## 大きい結晶の段（1〜3）。重みはラン開始の値から終わりの値へ、ラン秒でまっすぐ移る。
+func _roll_big_crystal_tier() -> int:
+	var f := clampf(state.time / cfg.big_crystal_shift_time, 0.0, 1.0)
+	var weights := PackedFloat32Array()
+	var total := 0.0
+	for k in cfg.big_crystal_xp.size():
+		var w := lerpf(cfg.big_crystal_weights_start[k], cfg.big_crystal_weights_end[k], f)
+		weights.append(w)
+		total += w
+	var roll := state.rng.randf() * total
+	for k in weights.size():
+		roll -= weights[k]
+		if roll < 0.0:
+			return k + 1
+	return weights.size()
 
 func drop_gem(p: Vector2, v: float) -> int:
 	if gem_slots.live > cfg.gem_max:
@@ -172,62 +190,12 @@ func _drop_coins(i: int) -> void:
 	for k in n:
 		_add_coin(pos + Vector2.from_angle(state.rng.randf() * TAU) * state.rng.randf() * r)
 
-func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2, xp: float) -> void:
+func _add_capsule(kind: Pickup.Kind, src: StringName, p: Vector2) -> void:
 	var c := Pickup.new()
 	c.kind = kind
 	c.src = src
 	c.pos = p
-	c.value = xp
 	capsules.append(c)
-	_record_capsule(c, &"spawn")
-
-func _record_capsule(c: Pickup, action: StringName, cause: StringName = &"unknown") -> void:
-	if OS.is_debug_build() and c.kind == Pickup.Kind.CACHE and xp_capsule_event.has_connections():
-		xp_capsule_event.emit(c, action, cause)
-
-## 漂流カプセル：フィールドに最大 n 個。16秒ごとに補充（仕様書 10）。
-func _spawn_field_capsules(dt: float) -> void:
-	var view_r := state.view_half.length()
-	var kept: Array = []
-	for c: Pickup in capsules:
-		if c.src != &"field" or c.pos.distance_to(state.ship_pos) < view_r * 2.0:
-			kept.append(c)
-		else:
-			_record_capsule(c, &"lost", &"distance_cull")
-	capsules = kept
-	_capsule_t += dt
-	var count := 0
-	for c: Pickup in capsules:
-		if c.src == &"field":
-			count += 1
-	if count >= cfg.drift_capsule_count or not (state.time < 2.0 or _capsule_t >= cfg.drift_capsule_interval):
-		return
-	_capsule_t = 0.0
-	var distance := maxf(200.0, view_r * (0.25 + state.rng.randf() * 0.3))
-	for i in 16:
-		var p := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * distance
-		var r := p.length()
-		if r > cfg.planet_radius + 100.0 and r < cfg.field_radius - 100.0:
-			_add_capsule(Pickup.Kind.CACHE, &"field", p, build.xp_needed() * cfg.drift_capsule_xp_frac)
-			return
-
-## 出力コア：脱出期に、中心付近へ最大3個（仕様書 10）。
-func _spawn_cores(dt: float) -> void:
-	if not enemies.current_phase().cores:
-		return
-	_core_t += dt
-	var cores := 0
-	for c: Pickup in capsules:
-		if c.kind == Pickup.Kind.CORE:
-			cores += 1
-	if cores >= 3 or (_cores_started and _core_t < 20.0):
-		return
-	_core_t = 0.0
-	var r := state.rng.randf_range(cfg.planet_radius + 250.0, cfg.zone_inner - 300.0)
-	_add_capsule(Pickup.Kind.CORE, &"core", Vector2.from_angle(state.rng.randf() * TAU) * r, 0.0)
-	if not _cores_started or cores >= 2:
-		_cores_started = true
-	state.emit(&"core")
 
 # ── 拾う ──────────────────────────────────────────────────────────
 
@@ -349,7 +317,6 @@ func _collect_capsules(dt: float) -> void:
 			_apply(c)
 		elif c.src == &"drop" and c.age > cfg.pickup_life:
 			c.taken = true
-			_record_capsule(c, &"lost", &"expired")
 	var kept: Array = []
 	for c: Pickup in capsules:
 		if not c.taken:
@@ -358,9 +325,6 @@ func _collect_capsules(dt: float) -> void:
 
 func _apply(c: Pickup) -> void:
 	match c.kind:
-		Pickup.Kind.CORE:
-			build.add_core()
-			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -50), "text": TranslationServer.translate("pickup.core").format({n = roundi(cfg.core_boost * 100.0)}), "color": Color("#ffd24a"), "size": 18})
 		Pickup.Kind.COMET_WEAPON:
 			state.pending_comet_weapons.append(c.weapon_id)
 		Pickup.Kind.HEAL:
@@ -373,23 +337,14 @@ func _apply(c: Pickup) -> void:
 				if gem_alive[i] != 0:
 					xp += gem_value[i]
 			_clear_gems()
-			for other: Pickup in capsules:
-				if other.kind == Pickup.Kind.CACHE and not other.taken:
-					xp += other.value
-					other.taken = true
-					_record_capsule(other, &"collect", &"beacon")
 			build.add_xp(xp)
 			state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -45), "text": "XP +%d" % roundi(xp), "color": Color("#b8a0ff"), "size": 22})
-		Pickup.Kind.CACHE:
-			_record_capsule(c, &"collect", &"normal")
-			build.add_xp(c.value)
-			state.emit(&"text", {"pos": c.pos, "text": "XP", "color": Color("#b8a0ff"), "size": 16})
 	state.emit(&"pickup", {"kind": Pickup.Kind.keys()[c.kind].to_lower()})
 	state.emit(&"ring", {"pos": c.pos, "radius": 70.0 if c.kind == Pickup.Kind.HEAL else 120.0, "color": _ring_color(c.kind), "life": 0.5})
 
 func _ring_color(kind: Pickup.Kind) -> Color:
 	match kind:
-		Pickup.Kind.CORE, Pickup.Kind.COMET_WEAPON:
+		Pickup.Kind.COMET_WEAPON:
 			return Color("#ffd24a")
 		Pickup.Kind.HEAL:
 			return Color("#67e8b1")

@@ -1,7 +1,7 @@
 ## 選択後だけ攻撃枠を要求し、指定した技を実行する。中断は待機と実行の両方を片付ける。
 @tool
 extends BTAction
-@export_enum("north", "east", "west") var technique := "north"
+@export var technique := "north"
 ## 基準時間は BossDef.params.tech_cd。技ごとにこの倍率を調整する。
 @export_range(0.0, 10.0) var cooldown_scale := 1.0
 var _started := false

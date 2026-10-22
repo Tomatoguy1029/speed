@@ -84,8 +84,10 @@ func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 		state.glide_t += dt
 		var cruise := state.stats.max_speed * cfg.steer_cruise
 		var sp := state.glide_speed
-		if state.glide_t > cfg.glide_hold:
-			var k := (state.glide_t - cfg.glide_hold) / maxf(0.001, cfg.glide_fade)
+		var hold := cfg.glide_hold * state.stats.glide_duration_mult
+		var fade := cfg.glide_fade * state.stats.glide_duration_mult
+		if state.glide_t > hold:
+			var k := (state.glide_t - hold) / maxf(0.001, fade)
 			if k >= 1.0:
 				state.glide = false
 				sp = cruise
@@ -140,9 +142,19 @@ func _collide_bodies() -> void:
 			state.glide = false
 			state.ship_vel -= n * vn * (1.0 + cfg.crash_restitution)
 			state.emit(&"crash", {"pos": state.ship_pos, "power": -vn})
+	# 天体からの押し出しが固定外周を越えた場合も、機体を内側に保つ。
+	for bounds: Rect2 in field.battle_arenas.values():
+		var safe := bounds.grow(-R)
+		var inside := state.ship_pos.clamp(safe.position,safe.end)
+		if inside != state.ship_pos:
+			var inward := (inside-state.ship_pos).normalized()
+			state.ship_pos = inside
+			var vn := state.ship_vel.dot(inward)
+			if vn < 0.0: state.ship_vel -= inward*vn*(1.0+cfg.crash_restitution)
+			state.glide = false
 	var r := state.ship_pos.length()
 	var wall := cfg.field_radius + 500.0
-	if r > wall:
+	if r > wall and field.battle_arenas.is_empty():
 		state.glide = false
 		var n := state.ship_pos / r
 		state.ship_pos = n * wall
@@ -165,7 +177,8 @@ func steal_shield(i: int) -> void:
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
 func damage(amount: float, slow: float, cause: StringName, source := &"") -> bool:
-	if state.phase != RunState.Phase.PLAY:
+	# 最終勝利が通知されたフレームの残りの接触・弾でも HP を減らさない。
+	if state.phase != RunState.Phase.PLAY or state.boss_dead:
 		return false
 	if state.ship_shield_t > 0.0:
 		if state.ship_shield_flash <= 0.0:

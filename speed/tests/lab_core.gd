@@ -21,7 +21,7 @@ func _ready() -> void:
 	var data_before := JSON.stringify(SaveManager.data)
 	var config_before := ConfigManager.cfg.enemy_hp_mult
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
-	check(lab.run.state.stage.boss_id == &"provisional", "実験の基準は復元したボス")
+	check(lab.run.state.stage.boss_id == &"hydra", "実験の基準はステージ4のヒュドラ")
 	check(lab.run.state.phase == RunState.Phase.PLAY, "カード選択なしで実験できる")
 	check(lab.run.cfg != ConfigManager.cfg, "設定を実験ごとに複製する")
 	lab.perform("spawn", {"type": "gunner", "pos": [200, 0], "count": 3})

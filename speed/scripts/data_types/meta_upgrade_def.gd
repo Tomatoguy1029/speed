@@ -32,7 +32,7 @@ const EDITOR_ORDER := 7
 ## 単位：番号
 @export var order: int
 
-## 画面に出る名前と説明。文章の正は res://data/text/strings.csv の meta.<ID>.name／.desc。
+## 画面に出る名前と説明。編集元は docs/game/text.md。翻訳キーは strings.csv の meta.<ID>.name／.desc。
 func get_display_name() -> String:
 	return tr("meta.%s.name" % id)
 

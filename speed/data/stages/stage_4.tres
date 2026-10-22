@@ -374,7 +374,6 @@ start = 480.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
-cores = true
 mix = {
 "biter": 5.0,
 "bomber": 2.0,
@@ -389,7 +388,6 @@ start = 660.0
 pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
-cores = true
 mix = {
 "biter": 5.0,
 "bomber": 2.0,
@@ -439,7 +437,7 @@ surge_phases = {
 "s4_eve": false
 }
 time_limit = 900.0
-boss_id = &"provisional"
+boss_id = &"hydra"
 legendary_module_id = &"legendary_compass"
 enemy_looks = {
 "biter": "snake"

@@ -10,7 +10,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # docs/game/ に置ける文書（catalog/ の中は自由）
-GAME_DOCS = {"treatment.md", "world.md", "art-style.md", "spec.md", "architecture.md", "backlog.md"}
+GAME_DOCS = {"treatment.md", "world.md", "art-style.md", "spec.md", "hydra.md", "architecture.md", "backlog.md", "text.md", "stage-production.md", "stage-production-ai.md", "stage-1.md", "stage-2.md", "stage-3.md", "stage-4.md", "stage-5.md"}
 # 今の状態だけを書く置き場
 STATE_DIRS = ["docs/game", "docs/proposals"]
 # 廃止した個人の作業ログ

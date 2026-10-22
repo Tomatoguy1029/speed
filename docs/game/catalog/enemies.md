@@ -8,13 +8,15 @@
 
 ## 通常出現する敵
 
+以下の通常出現表はステージ1〜3・5の共通構成を示す。ステージ4は[個別仕様](../stage-4.md#3-登場する敵と編成)と、そこで参照するステージリソースの構成を使う。
+
 | type ID      | 名称       | 採用状態 | 本番の実装状況 | 行動・攻撃                                                                       | 出現条件                             | コード・demo参照／未決事項                                                                                 |
 | ------------ | ---------- | -------- | -------------- | -------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | `drifter`    | ドリフター | 採用     | 実装済み       | 機体へまっすぐ追跡                                                               | 全時間帯                             | `scripts/managers/enemy_manager.gd`、`data/enemies/drifter.tres`。[demo](../../../demo/docs/enemies.md)    |
 | `swarm`      | スウォーム | 採用     | 実装済み       | 小型の追跡敵                                                                     | 強化期・強化期II・無双期・脱出期     | `scripts/managers/enemy_manager.gd`、`data/enemies/swarm.tres`。[demo](../../../demo/docs/enemies.md)      |
 | `darter`     | ダーター   | 採用     | 実装済み       | 近づくと予告してから突進し、しばらく止まる                                       | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/darter.tres`。[demo](../../../demo/docs/enemies.md)     |
 | `armored`    | 装甲型     | 採用     | 実装済み       | 装甲の硬い追跡敵。背面に当てると必ずクリティカル                                 | 圧力期・緊張期・脱出期、危険地帯     | `scripts/managers/enemy_manager.gd`、`data/enemies/armored.tres`。[demo](../../../demo/docs/enemies.md)    |
-| `splitter`   | 分裂型     | 採用     | 実装済み       | 追跡し、一定間隔で分裂体を生む（上限あり）。撃破時にも分かれる                   | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md)   |
+| `splitter`   | 分裂型     | 採用     | 実装済み       | 追跡し、撃破時に経験値を落として分裂体へ分かれる                   | 無双期以外                           | `scripts/managers/enemy_manager.gd`、`data/enemies/splitter.tres`。[demo](../../../demo/docs/enemies.md)   |
 | `splitling`  | 分裂体     | 採用     | 実装済み       | 小型の追跡敵                                                                     | 分裂型から生まれる、無双期の通常出現 | `scripts/managers/enemy_manager.gd`、`data/enemies/splitling.tres`。[demo](../../../demo/docs/enemies.md)  |
 | `gunner`     | 射撃型     | 採用     | 実装済み       | 距離を保って回り込み、予告のあと弾を撃つ                                         | 圧力期以降（無双期を除く）、危険地帯 | `scripts/managers/enemy_manager.gd`、`data/enemies/gunner.tres`。[demo](../../../demo/docs/enemies.md)     |
 | `missile`    | ミサイル艇 | 採用     | 実装済み       | さらに遠い距離を保ち、予告のあと誘導弾を撃つ                                     | 緊張期・脱出期、危険地帯             | `scripts/managers/enemy_manager.gd`、`data/enemies/missile.tres`。[demo](../../../demo/docs/enemies.md)    |
@@ -23,32 +25,33 @@
 
 ## 調整用に保持する敵
 
-追加版の敵は専用の[敵・ルート実験場](../spec.md#201-敵ルート実験場)から呼び出し、単体と混成を調整してから通常出現へ採用する。共有 ID の種類は上の通常構成でも使い、追加版の設定を実験用に保持する。ステージ1〜5の通常出現は共通の元の時間帯を使う。
+追加構成の敵は専用の[敵・ルート実験場](../spec.md#201-敵ルート実験場)で単体と混成を調整する。ステージ4で通常出現へ採用した種類は[個別仕様](../stage-4.md#3-登場する敵と編成)を参照する。共有IDの種類は上の共通構成でも使い、追加版の設定を実験用に保持する。
 
-区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。通常ステージは共通の6時間帯を使う。追加版の `speed/data/phases/s<ステージ>_*.tres` は調整用に保持する。
+区分と星の数の決まりは [仕様書](../spec.md) の11.1。星2〜5の敵は、目印の星を持つことがある（仕様書 13.1）。エリートの扱いは仕様書 11.2。強敵と大物は、種類ごとに同時に出る数の上限を持つ（仕様書 11.3）。通常ランの時間帯は各ステージの `phases` が参照するリソースを使う。追加版の `speed/data/phases/s<ステージ>_*.tres` は調整用に保持する。
 
-| type ID | 名称 | 星 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 倒し方 | 特徴・備考 | 調整対象のステージ（通常出現は保留） | コード・データ参照 |
+| type ID | 名称 | 星 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 倒し方 | 特徴・備考 | 調整対象のステージ | コード・データ参照 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `biter` | 噛みつく雑魚 | 1 | 採用 | 実装済み | 追跡し、接近すると予告後に短い噛みつきを出す | 群れの中を駆け抜けながら倒す | ステージ別の外観は `enemy_looks`。ステージ4はヘビ | 4で通常出現 | `data/enemies/biter.tres`、`enemy_manager.gd` の `_biter` |
 | `rocket` | ミサイル | 1 | 採用 | 実装済み | 出た向きのまま一直線に飛ぶ。機体に近づくと爆発する。飛ぶ時間が過ぎると消える | — | — | 1〜5 | `data/enemies/rocket.tres`、`enemy_manager.gd` の `_rocket` |
-| `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | — | 1・2・3・5 | `data/enemies/bomber.tres`、`_bomber`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
+| `bomber` | 自爆する雑魚 | 1 | 採用 | 実装済み | 追ってきて、近づくと2回明滅して爆発する | 明滅し終わる前に貫けば、爆発させずに倒せる | — | 1・2・3・4・5 | `data/enemies/bomber.tres`、`_bomber`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
 | `volatile` | 誘爆する雑魚 | 1 | 採用 | 実装済み | 追ってくる。倒すと少し遅れて爆発し、周りの敵も機体も巻き込む。誘爆は連鎖する | — | — | 2〜5 | `data/enemies/volatile.tres`、`on_enemy_death` |
-| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 通常出現では追跡中にも分裂体を生み、撃破時に2体へ分かれる。追加版の生存中は分裂せず撃破時に2〜3体へ分かれる設定も保持する | 分かれた体もすべて倒す | — | 元の通常出現。追加版は `data/lab/enemy_variants.json` に保持 | `data/enemies/splitter.tres`・`splitling.tres` |
+| `splitter` | 分裂する雑魚 | 1 | 採用 | 実装済み | 経験値を多く持つ体で追跡し、撃破時に経験値を落として小さい分裂体へ分かれる。生存中の増殖は `params.max_buds`、撃破時の分裂は `params.death_split` で調整する | 分かれた体もすべて倒す | 生存中の増殖は現データで無効 | 共通構成と4の通常出現。実験用設定は `data/lab/enemy_variants.json` に保持 | `data/enemies/splitter.tres`・`splitling.tres` |
 | `splitling` | 分裂体 | 1 | 採用 | 実装済み | 分裂する雑魚から生まれ、機体を追う | — | — | 2・4・5の分裂時 | `data/enemies/splitling.tres`（行動は `chase`） |
 | `beamer` | ビームの敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって砲口に光を集めてからビームを撃つ | — | — | 1・2・3・5 | `data/enemies/beamer.tres`、`_beamer` |
 | `pulser` | 波動の敵 | 2 | 採用 | 実装済み | 距離を保ち、止まって1枚だけの輪を出す。切れ目はなく、届く距離は短い | — | — | 1・4・5 | `data/enemies/pulser.tres`、`_pulser` |
 | `missile` | ホーミングミサイルの敵 | 2 | 採用 | 実装済み | 遠い距離を保ち、予告のあとホーミングミサイルを撃つ | — | — | 2・4・5 | `data/enemies/missile.tres` |
 | `spreader` | 拡散弾の敵 | 2 | 採用 | 実装済み | 追ってきて、予告のあと扇状に弾をばらまく | — | — | 3・4・5 | `data/enemies/spreader.tres`（行動は `battleship`） |
 | `pump` | ポンプ座 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せてから、前方へ一気に吐き出す | 吸っている間だけ口が開き、倒せる | — | 1・2 | `data/enemies/pump.tres`、`enemy_manager.gd` の `_pump` |
-| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | レンズが光って予告してから、細く速い弾を撃つ | — | HP は柔らかめ（星3の標準より体当たり1回少ない） | 1 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
+| `telescope` | ぼうえんきょう座 | 3 | 採用 | 実装済み | 探索する光の帯で照準を溜め、予告後に太いレーザーを撃つ。小隕石で光と射線が遮られる | 帯を素早く横切る、岩陰を使う、本体を倒す | HP は柔らかめ（星3の標準より体当たり1回少ない） | 1・4 | `data/enemies/telescope.tres`、`enemy_manager.gd` の行動 `sniper`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
 | `triangle` | みなみのさんかく座 | 3 | 採用 | 実装済み | 3つの星の間に光の膜を張る。膜に触れると被弾する | 頂点の星を1つ貫くと膜が消え、中の核を狙える | — | 3・4 | `data/enemies/triangle.tres`・`triangle_star.tres`、`enemy_manager.gd` の `_triangle`。外観は[敵の描画](../art-style.md#42-敵) |
 | `shield` | たて座 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ。背面から貫くルートの先では弾幕へ踏み込める | — | 1・5 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`enemy_manager.gd`・`combat_manager.gd`・`ship_manager.gd`。実験場で各値を調整できる |
 | `ruler` | じょうぎ座 | 4 | 採用 | 実装済み | 長い直線の光の壁を置く | — | — | 1・3 | `data/enemies/ruler.tres`、`enemy_manager.gd` の `_ruler` |
 | `crow` | からす座 | 4 | 採用 | 実装済み | 周りで倒された敵の残骸を集めて塊にし、1個投げてくる。本体を倒すと塊が砕けて破片が飛ぶ | — | — | 2・4 | `data/enemies/crow.tres`、`enemy_manager.gd` の `_crow` |
 | `lynx` | やまねこ座 | 4 | 採用 | 実装済み | 前方の短い距離を扇形に爪で薙ぐ。殻が割れている間は、爪を振るう間隔が短くなる | 殻に耐久がある。体当たりなら1回、弾や武器なら集中して当て続けると割れる。割れている数秒のうちにもう1回当てると倒れる。攻撃が当たらない時間が続くと殻の傷は戻る | — | 2・3 | `data/enemies/lynx.tres`、`enemy_manager.gd` の `_lynx` |
-| `reticle` | レチクル座 | 4 | 採用 | 実装済み。大きい経験値カプセルの報酬は採用・未実装（量は未決） | ぼうえんきょう座に付き従い、視線を遮る小隕石を予告後のビームで壊す。支援先がいなくなると退却する | — | — | 2・3 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵)。設定は[星の力](../world.md#5-星の力と機体の強化) |
-| `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 構えて光を集め、十字にレーザーを撃つ | — | — | 3・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_beamer` |
+| `reticle` | レチクル座 | 4 | 採用 | 実装済み。倒すと大きい結晶（中の段）を必ず落とす | ぼうえんきょう座に付き従い、視線を遮る小隕石を予告後のビームで壊す。支援先がいなくなると退却する | — | — | 2・3・4 | `data/enemies/reticle.tres`、`enemy_manager.gd` の `_reticle`。外観は [デザインとアートスタイル](../art-style.md#42-敵)。設定は[星の力](../world.md#5-星の力と機体の強化) |
+| `cross` | みなみじゅうじ座 | 4 | 採用 | 実装済み | 機体と縦か横にそろう位置で停止し、予告後に十字のレーザーを撃つ | 停止して構える間に攻める | — | 3・4・5 | `data/enemies/cross.tres`、`enemy_manager.gd` の `_cross` |
 | `clock` | とけい座 | 5 | 採用 | 実装済み | 長針と短針が刃として回り続ける。2本の速さが違う | — | — | 1 | `data/enemies/clock.tres`、`enemy_manager.gd` の `_clock` |
-| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 何層もの輪を出し、層ごとに切れ目がずれている。届く距離が長い | — | HP は硬め（星5の標準より体当たり1回多い） | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_pulser`。外観は[敵の描画](../art-style.md#42-敵) |
+| `dolphin` | いるか座 | 5 | 採用 | 実装済み | 距離を保ち、方向を予告してから層状の扇の波動を撃つ。先頭の弧が機体とほかの敵に当たる | 群れを射線に挟んで撃たせ、自分は離れる。本体を普通に倒す | HP は硬め（星5の標準より体当たり1回多い） | 2・4 | `data/enemies/dolphin.tres`、`enemy_manager.gd` の `_dolphin`。外観は[敵の描画](../art-style.md#42-敵) |
 | `crab` | かに座 | 5 | 採用 | 実装済み | ハサミを開いてから前方を挟む | 挟んだ直後は正面からでも割れる | — | 4 | `data/enemies/crab.tres`、`enemy_manager.gd` の `_crab`。外観は[敵の描画](../art-style.md#42-敵) |
 | `marlin` | かじき座 | 5 | 採用 | 実装済み | 高速で泳ぎ抜けながら、横へ扇状にしぶきを撒く | — | — | 4 | `data/enemies/marlin.tres`、`enemy_manager.gd` の `_marlin` |
 | `auriga` | ぎょしゃ座 | 5 | 採用 | 実装済み | 車輪の跡が燃えて残る | — | — | 5 | `data/enemies/auriga.tres`、`enemy_manager.gd` の `_auriga` |
@@ -70,13 +73,15 @@
 
 ## ボス
 
+命中時の外力は [ボスの共通ルール](../spec.md#12-ボス) に従う。本体とボス所属部位の判定を実装し、各役者の移動・攻撃・被弾モーションへ接続する。
+
 | type ID       | 名称           | 採用状態     | 本番の実装状況 | 行動・攻撃                                                                                        | 出現条件                        | コード・demo参照／未決事項                                                                                                                                         |
 | ------------- | -------------- | ------------ | -------------- | ------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `provisional` | ボス戦艦（仮） | 採用（暫定） | 実装済み       | 機体を直接追う。予告のあと扇状に弾を撃つ。形態＝LimboHSM、判断＝Behavior Tree、攻撃＝タイムライン | 決まった時刻に1体。撃破でクリア | `scenes/bosses/provisional_boss.tscn`、`scripts/bosses/`、`data/bosses/provisional.tres`。demo の `boss`。見た目は `battleship.png` を共用。ギミック・弱点は未検討 |
-| `hydra` | うみへび座 | 採用 | 実装済み。南の渦壁は条件付き採用・未実装 | 首全滅で不死の首を露出し、体当たりで貫くと3・5・7・9本の順に進み、最後の段階で撃破する。次の頭の撃破で倒れた全首の再生猶予を延ばし、火で再生を抑える。胴体表面に根元を固定し、北は自機周辺を予告・狙い固定して複数首で集中攻撃する。BT で距離・方向・生存首・重み・技別クールダウンを調整し、羅針盤で北・東・西の大技を予告する。技の後に攻めどきを設ける（[仕様書 12.3](../spec.md#123-中ボス)） | 通常出現を保留し、調整用に保持する | `scenes/bosses/hydra_boss.tscn`、`scenes/bosses/hydra_boss_bt.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`。追尾首は弱点として保持し専用攻撃を休止する。`scenes/bosses/hydra_presentation.tscn` に差し替え用の仮演出を接続。`gyms/hydra_trial.tscn` で試遊する。南の回避難度と最終外観は未決。BT と演出の編集方法は[設計書 6.1](../architecture.md#61-敵とボスの-ai) |
+| `hydra` | うみへび座 | 採用 | 中央HP・首増加・通常10技・大技5種・コンボ3種・分離から決着・固定瓦礫の戦闘エリアを実装。専用の攻撃予算、天体回避、壁設置時の退避、分離後の分散護衛を接続。格子は仮1配置、試遊調整は別作業（[専用仕様](../hydra.md)） | 戦闘・行動判断・素材と演出は [専用仕様](../hydra.md) | ステージ4の通常ボスとして出現する | `scenes/bosses/hydra_boss.tscn`、`scenes/bosses/hydra_boss_bt.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、`scenes/bosses/hydra_presentation.tscn`。`gyms/hydra_trial.tscn` で試遊する。編集方法は [設計書 6.1](../architecture.md#61-敵とボスの-ai) |
 | 仮ID `monoceros` | いっかくじゅう座 | 採用 | 未実装 | 地形に角が刺さる突進（仕様書12.3） | ステージ1 | 本番の実装は `provisional`。角の仕掛けと数値の調整が必要 |
 
-通常ステージ1〜5は `provisional` を使う。各星系の主の組み込みは調整後に行う。
+通常ステージ4は `hydra`、ステージ1〜3・5は `provisional` を使う。各ステージの出現時刻は `speed/data/stages/` の定義に従う。
 
 ## 障害物
 

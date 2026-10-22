@@ -300,8 +300,15 @@ func _update_friendly(dt: float) -> void:
 				body_hit = null
 				break
 			hit[et.id[row]] = true
-			combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
-				"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
+			if friend_cause[i] == &"interceptor":
+				var interceptor = build.weapon_behaviors.get(&"W25")
+				if interceptor != null:
+					interceptor.hit_enemy(row, friend_dmg[i], impact)
+				else:
+					combat.damage_enemy(row, friend_dmg[i], {"cause": &"interceptor", "impact": impact, "no_crit": true})
+			else:
+				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
+					"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
 				friend_pos[i] = pos

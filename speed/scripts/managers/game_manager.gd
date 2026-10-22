@@ -10,6 +10,8 @@ signal screen_changed(screen: Screen)
 signal run_requested(stage: int, endless: bool)
 
 var screen: Screen = Screen.TITLE
+## Main の短いフェード中は、重複する遷移要求を受け付けない。
+var screen_transition_active := false
 var _history: Array[Screen] = []
 
 ## 遊ぶステージとモード（ステージ選択で決まる）
@@ -17,11 +19,14 @@ var run_stage := 1
 var run_endless := false
 ## 次のランの時計を始める時刻（開発用。出現タイムラインの「ここから試す」）。ランが始まると 0 に戻る
 var run_start_time := 0.0
+var run_start_source := "stage_start"
 ## 直前のランの結果（結果画面が表示する）
 var last_result: Dictionary = {}
 
 ## 画面を移る。push が true なら、戻る操作で今の画面へ戻れるように覚えておく。
 func goto(next: Screen, push := true) -> void:
+	if screen_transition_active:
+		return
 	if push and screen != next and screen != Screen.RUN and screen != Screen.RESULT:
 		_history.append(screen)
 	screen = next
@@ -38,6 +43,8 @@ func reset_to_main_menu() -> void:
 	goto(Screen.MAIN_MENU, false)
 
 func start_run(stage: int, endless := false) -> void:
+	if screen_transition_active:
+		return
 	run_stage = stage
 	run_endless = endless
 	goto(Screen.RUN, false)

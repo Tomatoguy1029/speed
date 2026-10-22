@@ -1,33 +1,5 @@
 [gd_resource type="AnimationLibrary" format=3 uid="uid://0k5ofbflry1s"]
 
-[sub_resource type="Animation" id="Animation_east"]
-length = 5.2
-tracks/0/type = "method"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath(".")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 1.4, 2.2, 3, 5),
-"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
-"values": [{
-"args": [&"east"],
-"method": &"tech_compass"
-}, {
-"args": [],
-"method": &"east_debris"
-}, {
-"args": [],
-"method": &"east_charge"
-}, {
-"args": [],
-"method": &"east_sweep"
-}, {
-"args": [],
-"method": &"tech_end"
-}]
-}
 
 [sub_resource type="Animation" id="Animation_north"]
 length = 3.8
@@ -58,65 +30,85 @@ tracks/0/keys = {
 }]
 }
 
-[sub_resource type="Animation" id="Animation_south"]
-length = 5.8
-tracks/0/type = "method"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath(".")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 1.4, 2, 5, 5.6),
-"transitions": PackedFloat32Array(1, 1, 1, 1, 1),
-"values": [{
-"args": [&"south"],
-"method": &"tech_compass"
-}, {
-"args": [],
-"method": &"south_vortex"
-}, {
-"args": [],
-"method": &"south_debris"
-}, {
-"args": [],
-"method": &"south_burst"
-}, {
-"args": [],
-"method": &"tech_end"
-}]
-}
 
-[sub_resource type="Animation" id="Animation_west"]
+[sub_resource type="Animation" id="Animation_sequence"]
 length = 4.4
 tracks/0/type = "method"
-tracks/0/imported = false
-tracks/0/enabled = true
 tracks/0/path = NodePath(".")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 1.4, 2.4, 4.2),
-"transitions": PackedFloat32Array(1, 1, 1, 1),
-"values": [{
-"args": [&"west"],
-"method": &"tech_compass"
-}, {
-"args": [],
-"method": &"west_charge"
-}, {
-"args": [],
-"method": &"west_sweep"
-}, {
-"args": [],
-"method": &"tech_end"
-}]
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"sequence"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_curve"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"curve"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_tornado"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"tornado"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_debris_shatter"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"debris_shatter"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_beam_pincer"]
+length = 4.4
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 4.2),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"beam_pincer"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_swarm"]
+length = 6.2
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 6.0),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"swarm"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
+[sub_resource type="Animation" id="Animation_grid"]
+length = 6.2
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 6.0),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"grid"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
 }
 
 [resource]
 _data = {
-&"east": SubResource("Animation_east"),
+&"grid": SubResource("Animation_grid"),
+&"swarm": SubResource("Animation_swarm"),
+&"beam_pincer": SubResource("Animation_beam_pincer"),
+&"debris_shatter": SubResource("Animation_debris_shatter"),
+&"tornado": SubResource("Animation_tornado"),
+&"curve": SubResource("Animation_curve"),
+&"sequence": SubResource("Animation_sequence"),
 &"north": SubResource("Animation_north"),
-&"south": SubResource("Animation_south"),
-&"west": SubResource("Animation_west")
 }

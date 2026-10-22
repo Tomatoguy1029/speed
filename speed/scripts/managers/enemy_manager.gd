@@ -344,6 +344,15 @@ func shield_blocks(i: int, hit: Vector2, dir: Vector2) -> bool:
 func shield_rear(i: int, hit: Vector2) -> bool:
 	return absf(Geom.angle_diff((hit - table.pos[i]).angle(), table.facing[i] + PI)) <= table.weak_arc[i]
 
+## ボスとその部位の位置は役者が決める。外力だけを除き、自力移動や被弾表現を保つ。
+func knockback_scale(i: int) -> float:
+	if table.is_boss[i] != 0:
+		return 0.0
+	var parent := table.parent[i]
+	if self.is_same(parent,table.parent_id[i]) and table.is_boss[parent] != 0:
+		return 0.0
+	return table.def[i].knockback_scale(cfg) if table.def[i] != null else 1.0
+
 func mark_dead(i: int) -> void:
 	if table.dead[i] != 0:
 		return
@@ -360,6 +369,9 @@ func clear_regular() -> void:
 	var t := table
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.is_boss[i] == 0 and t.meteor_index[i] < 0:
+			var parent:=t.parent[i]
+			if self.is_same(parent,t.parent_id[i]) and t.is_boss[parent]!=0 and t.dead[parent]==0:
+				continue
 			mark_dead(i)
 
 ## 全部の敵を消す（計測・確認用のツールが使う）。

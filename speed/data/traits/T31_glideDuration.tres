@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TraitDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/combat/glide_duration_icon.tres" id="2"]
+
+[resource]
+script = ExtResource("1")
+; 試遊用の暫定値。保持・減速時間の倍率 = 1 + per_stack * 重ね数（最大3）。
+params = {
+"per_stack": 0.25
+}
+id = &"T31"
+code_id = &"glideDuration"
+icon_texture = ExtResource("2")

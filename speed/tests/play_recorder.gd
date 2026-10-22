@@ -1,11 +1,19 @@
-## カプセルの計測を短い操作で確認する。JSONL は /tmp の専用フォルダだけへ書く。
+## 録画の開始経路・成長の保全と既存の計測を確認する。JSONL は /tmp の専用フォルダだけへ書く。
 ## Godot --headless --path speed res://tests/play_recorder.tscn
 extends Node
 
 const RECORDER := preload("res://scripts/managers/play_recorder.gd")
+
+class TempRecorder:
+	extends "res://scripts/managers/play_recorder.gd"
+	var directory := "/tmp/speed-recording-start-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
+	func _recording_directory() -> String:
+		return directory
+
 var passed := 0
 var failed := 0
 var recording_path := ""
+var shots := ""
 
 func check(ok: bool, label: String) -> void:
 	if ok:
@@ -15,9 +23,12 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--out="):
+			shots = arg.trim_prefix("--out=")
 	var on: Dictionary = await scenario(true)
 	var off: Dictionary = await scenario(false)
-	check(on == off, "記録 ON/OFF で XP・レベル・乱数状態・残存カプセルが同じ")
+	check(on == off, "記録 ON/OFF で XP・レベル・乱数状態・残存結晶が同じ")
 	var records: Array[Dictionary] = []
 	var file := FileAccess.open(recording_path, FileAccess.READ)
 	while file.get_position() < file.get_length():
@@ -27,142 +38,204 @@ func _ready() -> void:
 	file.close()
 	verify(records)
 	await verify_performance()
+	await verify_mid_run_start()
+	await verify_start_routes()
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
+
+func verify_mid_run_start() -> void:
+	var scene := load("res://scenes/run/run.tscn").instantiate() as Node
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(scene)
+	var run := scene.get_node("Managers/RunManager") as RunManager
+	await get_tree().process_frame
+	run.state.time = 42.0
+	run.state.level = 3
+	run.state.xp = 0.125
+	run.state.xp_gained = 1000.0
+	run.state.xp_dropped = 1200.0
+	run.state.weapons[&"W01"] = 2
+	run.state.kills = 10
+	var before := [run.state.time, run.state.level, run.state.xp, run.state.rng.state]
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	var key := InputEventKey.new()
+	key.keycode = KEY_F9
+	key.pressed = true
+	rec._input(key)
+	check(rec._file != null, "プレイ中の F9 で既存ランの記録を開始する")
+	check(before == [run.state.time, run.state.level, run.state.xp, run.state.rng.state], "録画開始は時計・成長・乱数を変えない")
+	if rec._file != null:
+		var path := rec._file.get_path()
+		var start: Dictionary = read_rows(path)[0]
+		check(start.run_start.source == "stage_start" and start.run_start.t == 0.0, "通常ランの出自を途中録画でも保つ")
+		check(start.run_start.level == 0 and start.run_start.weapons.is_empty(), "初期武器の選択前の状態を保持する")
+		check(start.recording_start.t == 42.0 and start.recording_start.level == 3 and start.recording_start.xp == 0.125, "録画開始時の時計・レベル・XP を保存する")
+		check(start.recording_start.weapons.W01 == 2 and start.recording_start.xp_gained == 1000.0, "録画開始時の装備と累計を保存する")
+		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
+		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
+		rec._set_armed(true)
+		rec._begin(run)
+		check(rec._file.get_path() == path and read_rows(path).size() == 1, "重複開始でファイルを作り直さない")
+		rec._process(0.0)
+		await capture("mid-run")
+		run.state.time += 3.0
+		run.state.xp_gained += 2.0
+		run.state.xp_dropped += 4.0
+		rec._process(0.0)
+		var sample: Dictionary = read_rows(path)[1]
+		check(sample.xp_picked == 2.0 and sample.xp_dropped == 4.0, "最初の sample は録画開始後の XP だけを集計する")
+		rec._input(key)
+		var closed := FileAccess.get_file_as_bytes(path)
+		check(read_rows(path).back().result == "stopped", "F9 停止を記録する")
+		rec._set_armed(false)
+		rec._end("stopped")
+		check(FileAccess.get_file_as_bytes(path) == closed, "重複停止で記録を書き足さない")
+		rec._input(key)
+		check(rec._file != null and rec._file.get_path() != path, "すぐ再開しても別のファイルへ記録する")
+		check(FileAccess.get_file_as_bytes(path) == closed, "再開で既存ファイルを上書きしない")
+		run.set_phase(RunState.Phase.ENDED)
+		check(rec._file == null and rec.armed, "ラン終了後も次のランの待機は続く")
+		rec._set_armed(false)
+		rec._set_armed(true)
+		check(rec._file == null, "終了済みランでは新しく記録しない")
+	rec._set_armed(false)
+	rec.queue_free()
+	scene.queue_free()
+	await get_tree().process_frame
+
+func verify_start_routes() -> void:
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	for route in [{"source": "stage_start", "t": 0.0}, {"source": "timeline", "t": 240.0},
+		{"source": "timeline", "t": 0.0}, {"source": "stage_launcher", "t": 0.0}, {"source": "unknown", "t": 0.0}]:
+		for delayed in [false, true]:
+			GameManager.run_start_source = route.source
+			GameManager.run_start_time = route.t
+			if not delayed:
+				rec._set_armed(true)
+			var scene := load("res://scenes/run/run.tscn").instantiate() as Node
+			scene.process_mode = Node.PROCESS_MODE_DISABLED
+			var run := scene.get_node("Managers/RunManager") as RunManager
+			run.options = {"seed": 932}
+			add_child(scene)
+			await get_tree().process_frame
+			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
+			if delayed:
+				# 初期武器を選び、実際のラン更新を短く進めてから F9。
+				run.choose_card(0)
+				run.combat.rebuild_grid()
+				for tick in 12:
+					run._physics_process(1.0 / 120.0)
+				var snapshot := run.recording_snapshot()
+				var rng := run.state.rng.state
+				var key := InputEventKey.new()
+				key.keycode = KEY_F9
+				key.pressed = true
+				rec._input(key)
+				check(run.recording_snapshot() == snapshot and run.state.rng.state == rng, "途中開始も実更新後の状態を保全する")
+			check(rec._file != null, "各開始経路で記録を開始する")
+			if rec._file != null:
+				var path := rec._file.get_path()
+				var start: Dictionary = read_rows(path)[0]
+				check(start.schema_version == 4 and start.run_start.source == route.source and start.run_start.t == route.t, "開始経路とラン開始時刻を正確に保存する")
+				check(start.run_start.level == 0 and start.run_start.xp == 0.0, "途中時刻のランでも初期レベル・XP を推測しない")
+				check(start.missing_prefix == delayed, "ランの開始経路と前半欠落は別々に保存する")
+				check(is_equal_approx(start.recording_start.t, run.state.time if delayed else route.t), "録画開始時刻をランの開始時刻と区別する")
+				if route.source == "timeline" and delayed and route.t > 0.0:
+					check(run.state.time > route.t and run.state.xp_gained == 0.0, "タイムライン途中開始は成長のない時計から進む")
+					rec._process(0.0)
+					await capture("timeline-mid-run")
+				scene.queue_free()
+				await get_tree().process_frame
+				check(rec._file == null and read_rows(path).back().result == "quit", "シーンを離れると記録を閉じる")
+			else:
+				scene.queue_free()
+				await get_tree().process_frame
+			rec._set_armed(false)
+	# ready の前に待機を解除した通知は、後から記録を始めない。
+	rec._begin(null)
+	check(rec._file == null, "解除後に届いた開始通知を無視する")
+	print("START_ROUTE_CHECK directory=", rec.directory)
+	rec.queue_free()
+	await get_tree().process_frame
+
+func read_rows(path: String) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	var file := FileAccess.open(path, FileAccess.READ)
+	while file.get_position() < file.get_length():
+		rows.append(JSON.parse_string(file.get_line()))
+	return rows
+
+func capture(label: String) -> void:
+	if shots == "" or DisplayServer.get_name() == "headless":
+		return
+	DirAccess.make_dir_recursive_absolute(shots)
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(shots.path_join(label + ".png"))
 
 func scenario(recording: bool) -> Dictionary:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
-	await lab.reset({"seed": 932, "empty": true, "stage": 1,
-		"config": {"drop_base": 1.0, "drop_max": 1.0, "capsule_xp_frac": 2.0}})
+	await lab.reset({"seed": 932, "empty": true, "stage": 1, "config": {"drop_base": 1.0, "drop_max": 1.0}})
 	var run: RunManager = lab.run
 	var pk := run.pickups
 	var s := run.state
 	s.ship_pos = Vector2(3000, 0)
 	s.time = 5.0
-	var existing := Pickup.new()
-	existing.src = &"unrecognized"
-	existing.pos = s.ship_pos + Vector2(800, 0)
-	existing.value = 0.125
-	pk.capsules.append(existing)
-	var rec = RECORDER.new()
+	var rec = TempRecorder.new()
 	add_child(rec)
 	rec.set_process(false)
+	rec._set_armed(true)
 	rec._begin(run)
 	check(rec._file == null, "実験場は通常の記録先へ書かない")
+	rec._set_armed(false)
 	if recording:
 		var directory := "/tmp/speed-xp-recorder-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
 		DirAccess.make_dir_recursive_absolute(directory)
-		recording_path = directory.path_join("capsules.jsonl")
+		recording_path = directory.path_join("big_crystals.jsonl")
 		# 本番のファイル作成だけを分離し、通知・sample・end の処理はそのまま使う。
 		rec._file = FileAccess.open(recording_path, FileAccess.WRITE)
 		rec._run = run
-		rec._start_capsules()
-		check(rec._capsule_config().capsule_xp_frac == run.cfg.capsule_xp_frac, "開始時のカプセル設定を取得できる")
+		rec._big_crystals = {}
+		pk.big_crystal_dropped.connect(rec._on_big_crystal)
+		check(rec._xp_config().big_crystal_xp == Array(run.cfg.big_crystal_xp), "開始時の大きい結晶の設定を取得できる")
 		run.phase_changed.connect(rec._on_phase_changed)
 		run.tree_exiting.connect(rec._end.bind("quit"))
-	# 実際の敵ドロップ経路と通常回収。XP でレベルが上がる前の値を記録する。
-	var row := run.enemies.spawn(ConfigManager.enemies[&"biter"], s.ship_pos)
-	pk.on_enemy_killed(row)
-	pk._collect_capsules(0.01)
-	check(s.level > 1, "通常回収の XP がレベルを上げる")
-	# 実際の漂流生成経路。
+	# 実際の敵ドロップ経路。ドロップ率1なので雑魚も大きい結晶を落とし、レチクル座は中の段を必ず落とす。
+	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"biter"], s.ship_pos))
 	s.time = 6.0
-	pk._spawn_field_capsules(run.cfg.drift_capsule_interval)
-	var drift: Pickup = null
-	for c: Pickup in pk.capsules:
-		if c.src == &"field": drift = c
-	check(drift != null, "漂流カプセルを生成する")
-	# 通常カプセルがビーコンより先に回収され、残り2個はビーコンが回収する。
-	# 3個とも回収圏内に置き、同じループ内の二重回収を確認する。
-	pk._add_capsule(Pickup.Kind.CACHE, &"drop", s.ship_pos, 0.25)
-	pk._add_capsule(Pickup.Kind.MAGNET, &"drop", s.ship_pos, 0.0)
-	pk._add_capsule(Pickup.Kind.CACHE, &"drop", s.ship_pos, run.build.xp_needed() * 3.0 + 0.5)
-	if drift != null:
-		drift.pos = s.ship_pos
-		pk.capsules.erase(drift)
-		pk.capsules.append(drift)
-	existing.pos = s.ship_pos + Vector2(800, 0)
-	# 生成不明の既存カプセルもビーコンの対象になる。
-	pk._collect_capsules(0.01)
-	# 期限切れ、距離による除去、通知のない除去、終了時の未回収。
-	s.time = 7.0
-	pk._add_capsule(Pickup.Kind.CACHE, &"drop", s.ship_pos + Vector2(2000, 0), 0.75)
-	pk.capsules.back().age = run.cfg.pickup_life + 1.0
-	pk._collect_capsules(0.01)
-	pk._add_capsule(Pickup.Kind.CACHE, &"field", s.ship_pos + Vector2(100000, 0), 1.25)
-	run.cfg.drift_capsule_count = 0
-	pk._spawn_field_capsules(0.01)
-	pk._add_capsule(Pickup.Kind.CACHE, &"unrecognized", s.ship_pos + Vector2(800, 0), 1.5)
-	pk.capsules.pop_back()
-	pk._add_capsule(Pickup.Kind.CACHE, &"drop", s.ship_pos + Vector2(800, 0), 2.0)
-	# 配列へ直接追加されたものは、生成済みと偽らず observed として記録する。
-	var unknown := Pickup.new()
-	unknown.src = &"unrecognized"
-	unknown.pos = s.ship_pos + Vector2(800, 0)
-	unknown.value = 0.0625
-	pk.capsules.append(unknown)
-	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "remaining": pk.capsules.size()}
+	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"reticle"], s.ship_pos))
+	pk._collect_gems(0.01)
+	check(s.xp_gained >= 75.0 + 12.0, "大きい結晶の XP を回収する")
+	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "gems": pk.gem_slots.live}
 	if recording:
 		s.time = 8.0
 		rec._on_phase_changed(RunState.Phase.ENDED)
 		check(rec._file == null and rec._run == null, "ラン終了でファイルを閉じる")
-	check(not pk.xp_capsule_event.has_connections(), "記録 OFF/終了後は購読・計測が残らない")
-	pk._add_capsule(Pickup.Kind.CACHE, &"drop", s.ship_pos, 0.03125)
-	pk._collect_capsules(0.01)
-	check(rec._xp_capsules.is_empty(), "記録 OFF/終了後にカプセルを追跡しない")
+	check(not pk.big_crystal_dropped.has_connections(), "記録 OFF/終了後は購読が残らない")
 	rec.queue_free()
 	lab.queue_free()
 	await get_tree().process_frame
 	return outcome
 
 func verify(records: Array[Dictionary]) -> void:
-	var spawned := {}
-	var collected := {}
-	var lost := {}
-	var observed := 0
-	var beacon := 0
-	var normal := 0
-	var reasons := {}
-	var beacon_levels := {}
+	var drops: Array[Dictionary] = []
 	for e in records:
-		match e.type:
-			"xp_capsule_spawn":
-				check(not spawned.has(e.id), "生成 ID はラン内で一意")
-				spawned[e.id] = e
-				check(e.spawned == e.t, "生成時刻を保持する")
-			"xp_capsule_observed":
-				observed += 1
-				check(e.spawned == null and e.source == "unknown", "生成や出所が不明なら偽らない")
-			"xp_capsule_collect":
-				check(not collected.has(e.id), "カプセルを二重計上しない")
-				collected[e.id] = e
-				if e.cause == "beacon":
-					beacon += 1
-					beacon_levels[e.level] = true
-				if e.cause == "normal": normal += 1
-				if e.t == 5.0:
-					check(e.level == 1 and e.source == "enemy_drop", "通常回収は加算前レベルと敵ドロップを記録")
-				if e.source == "drift":
-					check(e.cause == "beacon" and e.t == 6.0, "漂流のビーコン回収に時刻と出所がある")
-				if spawned.has(e.id): check(e.xp == spawned[e.id].xp, "1個の XP を丸めず保持する")
-			"xp_capsule_lost":
-				lost[e.id] = e
-				reasons[e.cause] = true
-	check(normal == 2 and beacon == 3, "通常2個・ビーコン3個を分けて記録する")
-	check(beacon_levels.size() == 1 and beacon_levels.has(2.0), "ビーコンは合算 XP 加算前のレベルを全個に記録する")
-	check(observed == 2, "生成未確認は別の観測数にする")
-	check(reasons.has("expired") and reasons.has("distance_cull") and reasons.has("unknown"), "消失原因を区別する")
+		if e.type == "big_crystal":
+			drops.append(e)
+	check(drops.size() == 2, "大きい結晶を1個ずつ記録する")
+	if drops.size() == 2:
+		check(drops[0].t == 5.0 and drops[0].enemy == "biter" and drops[0].level == 1.0, "時刻・落とした敵・落ちたときのレベルを記録する")
+		check(drops[1].enemy == "reticle" and drops[1].tier == 2.0 and drops[1].xp == 75.0, "レチクル座は中の段を落とす")
 	var end: Dictionary = records.back()
 	check(end.type == "end" and end.result == "quit", "終了行は既存形式を維持する")
-	check(end.xp_capsules_remaining.size() == 2, "終了時の未回収2個を利用できる")
-	check(end.xp_capsules.enemy_drop.remaining == 1 and end.xp_capsules.unknown.remaining == 1, "未回収を出所別に集計する")
-	check(end.xp_capsules.enemy_drop.remaining_xp == 2.0, "未回収 XP を保持する")
-	var generated := 0
-	for source in end.xp_capsules:
-		var counts: Dictionary = end.xp_capsules[source]
-		generated += int(counts.get("spawn", 0))
-	check(generated + observed == collected.size() + lost.size() + end.xp_capsules_remaining.size(), "生成・観測＝取得＋消失＋残存")
+	var count := 0
+	for tier in end.big_crystals:
+		count += int(end.big_crystals[tier].count)
+	check(count == drops.size(), "終了時に段ごとの数を集計する")
 
 func verify_performance() -> void:
 	var lab = load('res://gyms/enemy_lab/lab_session.gd').new()

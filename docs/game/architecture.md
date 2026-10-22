@@ -4,6 +4,8 @@
 - 「決定」は決まったもの、「案」はまだ決まっていないもの。
 - Godot プロジェクトは `speed/`（`res://`）。`.godot/` などの生成キャッシュはコミットしない。
 
+ステージ制作の入口は[制作ガイド](stage-production.md)、編集先と記録分析の進め方は[AI向け参照](stage-production-ai.md)、ステージ4の制作要件は[個別仕様](stage-4.md)を参照する。本書はツールの詳細な編集契約と記録形式を定義する。
+
 ---
 
 ## 1. 前提
@@ -23,7 +25,7 @@
 | ストーリー（5ステージ）とエンドレスの2つのモードがある | 仕様書 2 |
 | ステージごとに、星系の広いフィールド・中ボス・フィールドの仕掛けが変わる | 仕様書 2〜22 |
 | 中ボスは複数の部位（うみへび座の首など）を持ちうる。画面より大きくなりうる | 仕様書 12.3 |
-| フィールドの仕掛けが、自機の移動と描いた線の両方に作用する | 仕様書 13.2 |
+| ステージ固有の仕掛けは、ステージごとの個別仕様で定める | 仕様書 13.2 |
 | ラスボス戦の締めで、描画のルール（長さの上限・世界の速さ）を一時的に変え、自動の演出を流す | 仕様書 12.4 |
 | ストーリーの進み具合・伝説のモジュール・ハイスコアを保存する。伝説のモジュールは能力値に効かない | 仕様書 14・2.3 |
 
@@ -122,7 +124,7 @@ Manager は特定のステージ・ボス・仕掛けを知らない。コンテ
 | SaveManager | セーブ、図鑑、伝説のモジュール、ハイスコア、強化画面での強化（11章） |
 | ConfigManager | 調整値（`.tres` の実行時の複製。8.3） |
 | AudioManager | 音 |
-| PlayRecorder | 開発版だけ：プレイの記録（14.3）。F9 で待機を入・切、F10 で記録のフォルダを開く |
+| PlayRecorder | 開発版だけ：プレイの記録（14.3）。F9 で記録・待機を入・切、F10 で記録のフォルダを開く |
 
 **ラン中（ランのシーンの子）**
 
@@ -243,27 +245,37 @@ Main (Node)
 - 道具は LimboAI（MIT ライセンス。Behavior Tree と階層型ステートマシン、編集画面とデバッガを持つ）の GDExtension 版を使う。Windows・macOS・Linux・Android・iOS・Web に対応している。GDExtension 版で使えない機能は導入前に確認する。
 - ボスの判断の層から、自機の状態（線を描いているか、描かれた線、ゲージの溜まり具合、位置）・フィールドの仕掛けとの位置関係・ボス自身と部位の HP を読めるようにする。何を判断に使うかは、ボスごとの仕様で決める。
 
-**うみへび座の役者**
+**うみへび座の編集と役割**
 
-`scenes/bosses/hydra_boss_bt.tres` を LimboAI の BT エディタで開く。北・東・西の枝を選び、距離（`engage` に対する倍率）、本体正面からの方向、生きている首の種類と必要数を Inspector で編集する。条件ノードは追加・並べ替えできる。枝の重みは ProbabilitySelector の子の重み、技別クールダウンは `HydraTechnique` 実行タスクの `cooldown_scale` を変える。基準時間・攻めどき・攻撃の強さは `data/bosses/hydra.tres` の `params` に置く。初期設定は、近距離で北、中距離から遠距離で前方を捉えたときに東・西を選ぶ試遊用の草案とする。条件と重み・倍率の数値の正は BT リソースに置く。
+`EnemyManager.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatManager.damage_enemy()` と吹き飛ばし衝角はこの判定を使い、役者が管理する移動速度と外力を分ける。
 
-役者は世界の固定更新ごとに Blackboard の `player_distance`・`player_angle`（本体正面との差、ラジアン）・`live_heads`・`neck_count`・`exposed`・`recovering` を更新する。重み付き選択は LimboAI の編集機能とランの RNG を使う。条件評価は読み取りだけで行い、選んだ実行タスクが攻撃枠を取得する。枠待ち中は条件を再評価し、実行中は距離と方向を固定して予告した技を完遂する。必要な首の喪失・BT の中断は共通の後始末へ渡す。必須の段階進行と露出・復帰は役者のスクリプトで確定する。南の枝は保留を示すコメントとして保持する。
+ゲームの決まりは [ヒュドラ専用仕様](hydra.md)、採用・実装状況は [敵一覧](catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
-`scenes/bosses/hydra_boss.tscn` と `scripts/bosses/hydra_boss.gd` が本体・首・頭を組み合わせる。本体と頭の当たり判定は敵の表に登録し、首の節は役者が描く。頭の位置・向きは攻撃の処理が決める。頭の行は親の本体の行と結び、行の再利用を ID でも確かめる。`EnemyManager.cleanup()` は行を解放する前に `BossManager.part_defeated()` から役者の `on_part_defeated()` へ通知し、頭へのダメージと火による再生停止を確定する。
+LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会のコンボ抽選と、形態・参加者・配置・待ち時間で選ぶ大技の枝を編集できる。`hydra_head_bt.tres` は各首が複製して持ち、種類・距離・方向・画面内・状態・予算の条件から通常技を選び、成立する技があれば実行する。各ProbabilitySelectorの子の重みと `hydra_play_tech.gd` の `cooldown_scale` をInspectorで編集する。技の位置条件・コスト・共通予算・時間・護衛位置は `data/bosses/hydra.tres` の `params` に置く。条件評価は読み取りだけを行い、選択後に攻撃枠を取得する。
 
-**Hydra の試遊と演出の差し替え**
+`hydra_normals.gd` は通常技、`hydra_techniques.gd` は大技・コンボと配置待ち、`hydra_grid.gd` は領域判定・優先枠・一筆経路の検証を担当する。`Timeline` と `hydra_boss_timeline.tres` のメソッドキーを世界秒で手動更新する。同時噛みつきは捕捉→固定→伸長→到達、ほかの大技は配置→予告→実行→全体硬直を進める。配置の移動中はタイムラインを待たせる。参加者の喪失は個別仕様に従って中断か欠員として扱う。
 
-`gyms/hydra_trial.tscn` を F6 で起動すると、Hydra を配置した敵・ルート実験場が試遊モードで開く。既存の停止・巻き戻し・数値編集を使う。試遊シーンの Inspector で開始位置・無敵・試遊用の攻撃力倍率を変える。本番のステージデータとセーブは実験セッションから分ける。
+合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は `hydra_snake_motion.gd` が操舵し、頭の通過点列を胴体がたどる。速度・旋回・被弾・構え・攻撃・停止の重みを世界秒で連続的に混ぜる。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
 
-絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBoss の `presentation_scene` に指定する。`BodyAnchor` と `HeadAnchor` の位置、ルートの色・半径・線幅・フラッシュ時間を Inspector で変える。子の `VisualTimeline` の `warning`・`attack`・`recovery`・`hit` は装飾用で、Sprite2D・GPUParticles2D などへ置き換えられる。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取り、演出用 AnimationPlayer を世界秒で手動更新する。
+通常技の捕捉位置は `start_normal()` で保持し、待機中の狙いは更新間隔を持たせる。`aim_neck()` が角速度と加速度を制御する。全ての攻撃位置が確定した後に頭の向きと胴の骨組みを一度だけ更新する。中央本体と分離後の不死の蛇は、役者の生成時に装甲を通過可能な値へ設定する。
 
-イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。`neck_index` は本体が -1、不死首が -2、通常首が配列の添字。動く取り付け位置は `presentation_anchor(index)`（ワールド座標）、現在の技・段階・露出・攻めどきは `presentation_state()` で読む。北の予告の線・到達点・判定半径・固定状態は `presentation_targets()` を読む。`warning_started`・`target_locked`・`attack_started`・`finished`・`interrupted`・`recovery_started`・`head_destroyed`・`phase_changed`・`exposed`・`defeated` を扱う。`hit` は頭の HP 減少か不死首の撃破を確認したときだけ発火し、`target=hydra` と実ダメージを付ける。自機への命中演出は既存の戦闘側の被弾イベントが担う。発射・予告から命中を推測しない。
+`hydra_attack_field.gd` は表示と判定で同じ点列・幅・開始時刻・寿命を使う。機体と形状の移動区間を掃引し、世界時間停止時は形を保つ。描画ノードはID別に持ち、戦闘状態の辞書に解放済みノードを残さず、実験場の巻き戻し比較を保つ。
 
-判定の正は HydraBoss の `Timeline` と `hydra_boss_timeline.tres`。予告の長さは `tech_compass` から `north_burst`・`east_sweep`・`west_sweep` の実行キーまでとし、予告・攻撃・終了のキーとアニメーション全体の長さを AnimationPlayer でまとめて動かして調整する。北は `tech_compass` から捕捉し、`north_curl` で狙いを固定、`north_burst` で伸長、`north_follow` で到達して停止する。これらのキーをまとめて編集し、固定後の回避時間を確保する。先端は根元を動かさずワールド座標の到達点へ補間し、更新区間ごとの掃引判定を出す。`north_reach` は BT の距離条件と根元から自機までの距離に合わせて調整し、予告も同じ射程で制限する。`compass_spin_fraction` は予告区間に対する針の回転時間の割合。`VisualTimeline` の尺は装飾だけを変え、予告の輪は判定側の実行イベントまで保つ。イベントの `attack_started` は攻撃動作の開始を示し、実際の被弾は戦闘判定で確定する。段階遷移・露出・撃破は表示をリセットし、中断は残った予告・フラッシュ・ビーム表示を片付ける。
+`hydra_arena.gd` は固定瓦礫の描画と戦闘エリアを所有し、ボスの行IDで `FieldManager.battle_arenas` へ矩形を登録する。地形の掃引判定・機体の跳ね返り・線描画・弾の地形判定で同じ外周を使う。通常の蛇の操舵は胴の長さを考慮して内側を狙い、大技は画面とエリアの共通部分へ配置する。最終撃破と役者の解放で登録を解除する。
 
-`scripts/bosses/hydra_neck.gd` は通常の首と不死の首の骨組みを CPU で計算する。本体表面の固定根元から頭までの点列を持ち、世界秒で進む波を曲がりの目標へ加え、FABRIK の往復で節長を補正する。描画時は両端を胴体ローカルの根元と頭へ固定し、補正の残差を先端の節で吸収する。引いた首は余長を曲がりに使い、頭が全長より遠くへ出ると首全体を伸ばす。伸びきった首は直線で確定し、縮みきった首は更新と描画を止める。節数・補正回数・余長・波・追従の調整値は `data/bosses/hydra.tres` の `params.neck_*` に置き、骨組みの点列を描画素材から分けて扱う。 描画命令は世界の更新・部位の消失・本体の移動・半径の変更で更新し、停止中はキャッシュを使う。描画用の半径キャッシュは役者のメタデータに持ち、実験場の戦闘状態の比較から分ける。
+**Hydraの試遊と素材差し替え**
 
-強めの技は `AnimationPlayer` のタイムラインを世界秒で進める。Behavior Tree が必要な首のそろった技を選び、役者が羅針盤の予告と各首の動きをまとめて扱う。必要な首が落ちたときはタイムラインを止める。首ごとの通常攻撃・生え直しは役者の状態で持ち、仕様は [仕様書](spec.md) の12.3。
+`gyms/hydra_trial.tscn` をF6で起動すると、敵・ルート実験場が試遊モードで開く。停止・巻き戻し・機体固定・数値編集を使える。シーンのInspectorで開始位置・無敵・試遊用の攻撃倍率を変える。通常出現とセーブは実験セッションから分ける。
+
+HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首の節・羅針盤の差し替え口。頭は既存の敵素材経路 `assets/pixel/hydra_<種類>.png` とステージの素材指定を使う。`energy_shader` は実判定に沿う光線・風・雷・瓦礫のマテリアルを差し替える。判定は点列・幅・時間のまま保持する。
+
+瓦礫竜巻は `tornado_scene` の `hydra_tornado.tscn` で差し替える。`hydra_tornado.gd` は `update_effect(effect, world_time)` で攻撃点列・幅・投入位置を受け取り、`hydra_tornado.gdshader` の渦と既存の岩素材を重ねる。演出ノードは攻撃辞書の外に保管し、判定と寿命は `hydra_attack_field.gd` が所有する。
+
+絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBossの `presentation_scene` に指定する。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取る。`VisualTimeline` は装飾用、`burst_shader` は衝撃・破壊・増加・分離のピクセル表現用。イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。添字は本体-1、不死の蛇-2、通常首0以上。取り付け位置は `presentation_anchor()`、状態は `presentation_state()`、同時噛みつきの実際の到達点は `presentation_targets()` で読む。`hit` は実HP減少に伴い実ダメージを渡す。
+
+描画確認用の起動引数は `--hydra-inspect --hydra-attack=<通常技ID>` または `--hydra-inspect --hydra-tech=<大技・コンボID>`。指定した技を1回再現する。`--hydra-split` で分離状態から試遊できる。撮影は `--hydra-capture=/tmp/任意名.png --hydra-capture-at=<秒>` を併用する。`--hydra-inspect --hydra-review` は確認用の攻撃力で線入力から一戦を自動再現する。確認モードの機体固定と自動進行は起動引数のある実行だけに適用する。
+
+`--hydra-arena-edge` は固定バリケードの角付近へ機体を固定し、外周を描画確認する。
 
 **みなみのかんむり座の渦**
 
@@ -510,11 +522,11 @@ Main (Node)
 
 **決定**：ステージの調整に使うため、遊んだランのデータをファイルに書き出す。戦闘・経験値は出来事と区間の数を記録し、性能は実時間の窓で集約する。記録を読む側（AI など）が対応づけて分析する。
 
-- 開発版だけで動く Autoload（`scripts/managers/play_recorder.gd`）。F9 で記録の待機を入・切し、待機中に F10 で記録のフォルダを開く。待機中は画面の右下に小さく「● REC 待機」、記録中は「● REC」とランの時計を出し、記録を閉じたら保存したファイル名を数秒出す。
-- 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は F9 で切るまで続き、次のランは別のファイルになる。実験場のランは記録しない。
-- 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
+- 開発版だけで動く Autoload（`scripts/managers/play_recorder.gd`）。F9 で記録・待機を入・切し、有効な間は F10 で記録のフォルダを開く。プレイ中の F9 は、その場の時計・成長・装備を保って記録を始める。タイムラインの再生、ポーズ、カード選択中も同じ操作を使う。待機中は画面の右下に小さく「● REC 待機」、記録中は「● REC」とランの時計を出し、記録を閉じたら保存したファイル名を数秒出す。
+- 待機中に始めたランは初期化直後から、プレイ中に有効にしたランはその時点から、終わる（クリア・やられた・やめた）か F9 で停止するまで1つのファイルに書く。待機は F9 で切るまで続き、次のランと停止後の再開は別のファイルになる。記録対象は本番のランとし、実験場は専用の記録を使う。
+- 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
 - 記録の種類（`type`）：
-  - `start`：ステージ、始めた時刻、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=3`）、Godot の版、開始時のステージファイルの SHA256、性能の実時間間隔
+  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`）、Godot の版、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
   - `sample`：3秒（ランの時計）ごとのまとめ。拾った・落ちた・フィールドに残る経験値、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大
   - `performance`：PLAY 中の実時間3秒ごとの描画フレーム間隔。`real_t` は書き込み時の記録開始からの実秒、`window_start_real`・`window_end_real` は計測区間の実秒、`duration_real` は観測した間隔の合計とする。`t`・`world_t` でラン秒・世界秒に対応づけ、ボーナス中も実時間で書く。平均FPS、平均・最大フレーム時間、33ms・50ms超の回数、ヒットストップを観測したフレーム数と割合（`hitstop_frame_ratio`）、描線中・駆け抜け中のフレーム数を保持する。停止・カード選択・ボーナス切替で窓を分け、遊んでいる最中のボーナス切替フレームの待ちは残す。割合はフレーム観測値であり、停止時間の厳密な割合とは区別する。`objects_at_write` に書き込み時点の敵・味方弾・敵弾・攻撃範囲・経験値粒・部品の使用数と確保行数、カプセル数、冠の保持数を置く。`bonus` は計測区間、`bonus_at_write` は書き込み時点の状態を表す。毎フレームは定数個のカウンタだけを更新し、フレーム別の行は保存しない。
   - `bonus`・`run_phase`：ボーナスの出入りと、ポーズ・カード選択を含むラン状態の切り替わり。全ての行に `real_t` を追加し、既存のXP・戦闘の `t` と結び付ける。
@@ -522,8 +534,32 @@ Main (Node)
   - `levelup`・`pick`：レベルアップと、出たカード・選んだカード・おまけで上がった数
   - `strong`：強敵と大物（星3以上）が倒れた（ランの終わりにまだいた）ときの、出た時刻・生きていた時間・受けた体当たりの回数・武器のダメージの合計と原因ごとの内訳（`by_cause`）・とどめの原因（`killed_by`）
   - `clip_group`・`clip_group_end`：出現のクリップの群れが出た・全滅した
-  - `end`：終わり方、レベル、撃破数、武器と特性、やられたときは最後に受けた攻撃
+  - `big_crystal`：大きい結晶が落ちた時刻、落ちたときのレベル、段（`tier`。1〜3が小・中・大）、経験値、落とした敵の種類
+  - `end`：終わり方、レベル、撃破数、武器と特性、やられたときは最後に受けた攻撃、段ごとの大きい結晶の数と経験値の合計（`big_crystals`）
 - ゲーム側は、記録のために出来事（`strong_spawn`・`clip_group`・`clip_group_end`、撃破と命中の個体の `id`、被弾の `source`）と、経験値の合計（`RunState.xp_gained`・`xp_dropped`）を出す。
+
+#### 開始条件と分析の読み方
+
+ランの開始と録画の開始を、`start` 行の別々の項目で表す。RunManager は録画が無効な間も初期化時の状態を保持する。
+
+| 項目 | 意味 |
+|---|---|
+| `run_start.source` | `stage_start` はステージ選択・再挑戦・ランシーンの直接実行、`stage_launcher` はエディタのステージ起動、`timeline` は出現タイムラインの再生、`unknown` は出自不明の起動予約 |
+| `run_start.t` | ランの時計を始めた時刻。タイムラインは再生位置の時刻を使い、成長はランの初期状態から始める |
+| `recording_start.t` | 録画を始めた時点のラン秒 |
+| `recording_start.trigger` | `armed_before_run` はラン開始前から待機、`during_run` は既に存在するランで開始 |
+| `missing_prefix` | `true` はラン初期化から録画開始までの観測が欠ける。時計0でカード選択中に開始した場合もこの区分を使う |
+
+`run_start` と `recording_start` は、それぞれの時点のラン秒・世界秒（`t`・`world_t`）、状態（`phase`）、レベル、現在のレベル内の XP、取得・ドロップ XP 累計、HP・最大HP、撃破累計、武器・特性、英雄の力、ボーナス残り秒、エンドレスの有無を保持する。初期武器の選択前はレベル0・装備なしを記録し、選択後の値と区別する。
+
+分析は記録を読む側（AI など）が次の順で区分し、除外したファイル名と理由を表示する。
+
+1. 通常のバランス分析に使う候補は、`run_start.source` が `stage_start` または `stage_launcher`、`run_start.t=0`、`recording_start.trigger=armed_before_run`、`recording_start.t=0`、`missing_prefix=false` をすべて満たす記録とする。
+2. `timeline` の記録はタイムライン検証ランとして扱う。途中時刻では XP0 など通常の成長と異なる初期条件になるため、通常のバランス分析から既定で除外する。時刻0からのタイムライン再生も開始経路で区分する。
+3. `missing_prefix=true` は前半欠落として既定で除外する。通常開始ランでも完全なランの観測と区別する。`end.result=stopped`・`quit`、または `end` 行の欠落も、それぞれ記録停止・途中終了・終了未確認として示し、完走記録と区別する。
+4. 出自・開始条件の欠落や `unknown`、旧形式の記録は出自不明として既定で除外する。時刻やレベルだけから通常開始と推定する扱いは避ける。過去の JSONL は原本のまま保持する。
+
+除外した記録も、明示した区間と初期条件のもとで開発・挙動・性能の確認に使える。途中録画の `sample` の XP・撃破・ダメージは録画開始以降の区間値、`recording_start.xp_gained`・`xp_dropped`・`kills` と `end.kills` はラン全体の累計として読む。強敵の生存時間・被弾原因・カード取得などの出来事も観測した範囲で解釈し、欠けた前半を0や未発生で補わない。
 
 ## 15. ビルドと配布
 

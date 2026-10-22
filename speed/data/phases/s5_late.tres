@@ -8,7 +8,6 @@ start = 390.0
 pop_from = 75.0
 pop_to = 120.0
 rate = 10.0
-cores = true
 mix = {
 "aquila": 0.05,
 "auriga": 0.3,

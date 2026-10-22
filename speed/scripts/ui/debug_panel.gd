@@ -33,6 +33,8 @@ var _module: OptionButton
 var _levels: SpinBox
 var _enemy_count: SpinBox
 var _sliders: Dictionary = {}
+## 機体の強化の ID → 段の入力欄
+var _meta_boxes: Dictionary = {}
 var _status: Label
 
 func _ready() -> void:
@@ -131,7 +133,76 @@ func _ready() -> void:
 	meta_reset.text = "機体の強化をリセット（部品を返す。次のランから反映）"
 	meta_reset.pressed.connect(func(): SaveManager.reset_upgrades())
 	box.add_child(meta_reset)
+	_add_meta_levels(box)
 	_refresh_sliders()
+
+## 機体の強化の段を項目ごとに決める（セーブは変えない。次のランから反映）。
+func _add_meta_levels(box: VBoxContainer) -> void:
+	box.add_child(_heading("機体の強化の段（セーブは変えない。次のランから反映）"))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	box.add_child(grid)
+	for def: MetaUpgradeDef in ConfigManager.sorted(ConfigManager.meta_upgrades):
+		var l := Label.new()
+		l.text = "%s（最大 %d）" % [def.get_display_name(), def.costs.size()]
+		l.add_theme_font_size_override("font_size", 14)
+		grid.add_child(l)
+		var spin := SpinBox.new()
+		spin.min_value = 0
+		spin.max_value = def.costs.size()
+		spin.step = 1
+		spin.value_changed.connect(func(v: float): SaveManager.dev_meta_override[String(def.id)] = int(v))
+		grid.add_child(spin)
+		_meta_boxes[def.id] = spin
+	# ステージ1〜5で想定する育ち具合（仕様書 14.1）
+	var presets := HBoxContainer.new()
+	for tenths in [0, 2, 5, 7, 9]:
+		var preset := Button.new()
+		preset.text = "%d割" % tenths
+		preset.tooltip_text = "段の合計を、最大の段の合計の%d割にする" % tenths
+		preset.pressed.connect(_set_meta_ratio.bind(tenths / 10.0))
+		presets.add_child(preset)
+	box.add_child(presets)
+	var row := HBoxContainer.new()
+	var back := Button.new()
+	back.text = "セーブの段に戻す"
+	back.pressed.connect(func():
+		SaveManager.dev_meta_override.clear()
+		_refresh_meta_levels())
+	row.add_child(back)
+	box.add_child(row)
+	_refresh_meta_levels()
+
+## 全項目の段の合計を、最大の段の合計の ratio 倍（四捨五入）にする。各項目へ最大の段に比べて均等に振り分け、
+## 端数の段は小数部の大きい項目から、同じなら強化画面の並び順で前の項目から1段ずつ足す。
+func _set_meta_ratio(ratio: float) -> void:
+	var defs: Array = ConfigManager.sorted(ConfigManager.meta_upgrades)
+	var total := 0
+	for def: MetaUpgradeDef in defs:
+		total += def.costs.size()
+	var left := roundi(total * ratio)
+	var levels := {}
+	var order := []
+	for k in defs.size():
+		var share: float = defs[k].costs.size() * ratio
+		levels[defs[k].id] = floori(share)
+		left -= floori(share)
+		order.append([share - floori(share), k])
+	order.sort_custom(func(a, b): return a[0] > b[0] or (a[0] == b[0] and a[1] < b[1]))
+	for o in order:
+		if left <= 0:
+			break
+		var def: MetaUpgradeDef = defs[o[1]]
+		if levels[def.id] < def.costs.size():
+			levels[def.id] += 1
+			left -= 1
+	for id in levels:
+		SaveManager.dev_meta_override[String(id)] = levels[id]
+	_refresh_meta_levels()
+
+func _refresh_meta_levels() -> void:
+	for id in _meta_boxes:
+		_meta_boxes[id].set_value_no_signal(SaveManager.run_meta_level(id))
 
 func _heading(text: String) -> Label:
 	var l := Label.new()
@@ -145,6 +216,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		visible = not visible
 		if visible:
 			_refresh_sliders()
+			_refresh_meta_levels()
 
 func _process(_delta: float) -> void:
 	if visible and run.state != null:

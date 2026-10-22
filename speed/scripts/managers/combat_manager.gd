@@ -174,10 +174,13 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		return true
 	return false
 
-## 機体が from から今の位置へ動く途中で、移動を止める壁（じょうぎ座のビーム）にぶつかったら、壁の手前で止めて弾く。
+## 機体の移動区間が、じょうぎ座の壁ビームか固定の戦闘外周に触れたら、手前で止めて弾く。
 ## 弾いたら true。弾かれるのは失敗で、被弾はしない。
 func wall_bounce(from: Vector2) -> bool:
 	var hit := projectiles.block_hit(from, state.ship_pos, cfg.ship_radius)
+	var arena := field.arena_hit(from, state.ship_pos, cfg.ship_radius)
+	if not arena.is_empty() and (hit.is_empty() or from.distance_squared_to(arena.pos)<from.distance_squared_to(hit.pos)):
+		hit = arena
 	if hit.is_empty():
 		return false
 	var n: Vector2 = hit.normal
@@ -261,6 +264,8 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 			t.dash_fresh[i] = 1 if fresh else 0
 		fresh = t.dash_fresh[i] != 0
 	t.hp[i] -= dmg
+	if t.is_boss[i] != 0:
+		bosses.body_damaged(i)
 	t.flash[i] = 0.12
 	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:
@@ -271,7 +276,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		kill_enemy(i, opts.merged({"crit": crit}))
 	elif opts.has("dir"):
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
-		var push := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
+		var push := enemies.knockback_scale(i)
 		if push > 0.0:
 			var mass := maxf(1.0, t.r[i] / 20.0)
 			t.vel[i] += opts.dir * float(opts.get("knock", 160.0)) * push / mass
@@ -340,14 +345,18 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
 	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
-	if build.capture_hull(i):
+	# 残像の追撃は直撃だけで完結させ、牽引・攻撃破片・撃破発動の武器/特性を複製しない。
+	if cause == &"afterimage":
+		t.hull_scattered[i] = 1
+	elif build.capture_hull(i):
 		t.hull_scattered[i] = 1
 	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
 		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
 		projectiles.scatter_hull(i, dir, speed, attack_power() * cfg.hull_debris_damage)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	build.on_kill(cause)
+	if cause != &"afterimage":
+		build.on_kill(cause)
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:
