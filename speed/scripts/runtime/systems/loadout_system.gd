@@ -459,7 +459,3 @@ func on_end() -> void:
 func on_phase_changed(phase: RunState.Phase) -> void:
 	for behavior in weapon_behaviors.values():
 		behavior.on_phase_changed(phase)
-
-## 開発用の装備付与も、既定の装備は装備管理が決める。
-func grant_command(args: Dictionary) -> void:
-	grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))

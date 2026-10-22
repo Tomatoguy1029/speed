@@ -55,12 +55,8 @@ func start(options: Dictionary, with_view: bool) -> void:
 	sim.view_size_source = func(): return get_viewport().get_visible_rect().size
 	if with_view:
 		view = load(VIEW_PATH).instantiate()
-		for path in ["RunPresentation", "Hud/HudRoot", "Hud/DebugPanel", "Hud/PerfOverlay"]:
+		for path in ["RunPresentation", "Hud/HudRoot"]:
 			view.get_node(path).run = sim
-		if options.get("lab", false):
-			# 実験場の調整は実験場のパネルで行う。本番の調整パネル・性能表示は使わない
-			view.get_node("Hud/DebugPanel").free()
-			view.get_node("Hud/PerfOverlay").free()
 		sim.input = view.get_node("World/InputRouter")
 		sim.actor_parent = view.get_node("World")
 	else:

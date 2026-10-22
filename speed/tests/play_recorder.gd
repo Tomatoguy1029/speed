@@ -2,10 +2,10 @@
 ## Godot --headless --path speed res://tests/play_recorder.tscn
 extends Node
 
-const RECORDER := preload("res://scripts/managers/play_recorder.gd")
+const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 
 class TempRecorder:
-	extends "res://scripts/managers/play_recorder.gd"
+	extends "res://scripts/dev/play_recorder.gd"
 	var directory := "/tmp/speed-recording-start-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
 	func _recording_directory() -> String:
 		return directory

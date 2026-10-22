@@ -386,30 +386,6 @@ func def_of(type: StringName) -> EnemyDef:
 	return (definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
-func debug_spawn_random(count_n: int) -> void:
-	if not OS.is_debug_build():
-		return
-	var choices: Array[EnemyDef] = []
-	for def: EnemyDef in ContentManager.sorted(ContentManager.enemies):
-		if def.behavior != &"part" and behaviors[_behavior_index(def.behavior)].debug_spawnable:
-			choices.append(def)
-	if choices.is_empty():
-		return
-	var view := state.view_rect()
-	for k in clampi(count_n, 1, 10000):
-		var def := choices[state.rng.randi_range(0, choices.size() - 1)]
-		var pos := Vector2(state.rng.randf_range(view.position.x, view.end.x),
-			state.rng.randf_range(view.position.y, view.end.y))
-		var opts := {"facing": (state.ship_pos - pos).angle()}
-		if def.size_var:
-			opts.size = def.radius * state.rng.randf_range(0.85, 1.45)
-		var i := spawn(def, pos, opts)
-		var r := table.r[i]
-		var p := field.push_out(pos, r + 4.0)
-		if p.length() > cfg.field_radius - r:
-			p = p.normalized() * (cfg.field_radius - r)
-		table.pos[i] = p
-
 # ── 更新 ──────────────────────────────────────────────────────────
 
 func tick(_real_dt: float, world_dt: float) -> void:

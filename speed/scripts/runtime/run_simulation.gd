@@ -77,6 +77,8 @@ var _world_steps := 0
 ## play_total は全体の包含時間なので、個別の項目と合算しない。
 var profile: Dictionary = {}
 var profiling := false
+## 追加の命令。シミュレーションの利用側が必要に応じて渡す。
+var command_extension: Callable
 
 ## ランを組み立てる。input・actor_parent・view_size_source は先に入れておく。
 func setup() -> void:
@@ -144,6 +146,7 @@ func setup() -> void:
 
 ## ランを片付ける。設定の通知を外し、ボスの役者を消す。
 func dispose() -> void:
+	command_extension = Callable()
 	if SaveManager.settings_changed.is_connected(_read_settings):
 		SaveManager.settings_changed.disconnect(_read_settings)
 	if bosses != null:
@@ -538,6 +541,7 @@ func finish(cleared: bool) -> void:
 
 ## UI と入力からの命令（設計書 4.3）。
 func command(name: StringName, args := {}) -> void:
+	if state == null: return
 	if ui_reward_active and name in [&"choose_card", &"reroll", &"pause", &"resume", &"draw_button"]:
 		return
 	if state.phase == RunState.Phase.FINISHING:
@@ -553,6 +557,7 @@ func command(name: StringName, args := {}) -> void:
 		return
 	if state.phase == RunState.Phase.ENDED:
 		return
+	if command_extension.is_valid() and command_extension.call(name, args): return
 	match name:
 		&"choose_card":
 			choose_card(args.get("index", 0))
@@ -571,77 +576,6 @@ func command(name: StringName, args := {}) -> void:
 		&"draw_button":
 			if input != null:
 				input.press_draw_button()
-		&"debug_time":
-			state.time += float(args.get("seconds", 30.0))
-		&"debug_hazards":
-			# 敵の攻撃の形を機体の周りに出して見る
-			var p := state.ship_pos
-			var a := state.rng.randf() * TAU
-			projectiles.fire_beam(p + Vector2.from_angle(a) * 420.0, a + PI, 900.0, 26.0, 0.8, 0.35, 10.0)
-			projectiles.fire_cross(p + Vector2.from_angle(a + 2.0) * 260.0, 0.0, 700.0, 18.0, 0.9, 0.3, 10.0)
-			projectiles.fire_zone(p + Vector2.from_angle(a + 4.0) * 160.0, 90.0, 1.0, 10.0,
-				ProjectileSystem.HazardStyle.RETICLE)
-			projectiles.fire_zone(p, 70.0, 1.2, 10.0, ProjectileSystem.HazardStyle.LIGHTNING, Color("#ffe46b"))
-			projectiles.fire_zone(p + Vector2.from_angle(a + 1.0) * 220.0, 110.0, 0.6, 10.0)
-			projectiles.fire_wave(p + Vector2.from_angle(a + 3.0) * 300.0, a, 0.5, 500.0, 420.0, 18.0, 0.5, 10.0)
-			projectiles.fire_rings(p + Vector2.from_angle(a + 5.0) * 350.0, 4, 0.35, 700.0, 380.0, 16.0, 0.6, 10.0,
-				a, 0.35, 0.6)
-			projectiles.fire_wall(p + Vector2.from_angle(a + 0.5) * 200.0, a + PI / 2.0, 500.0, 16.0, 0.5, 3.0, 10.0)
-		&"debug_boss_time":
-			state.time = maxf(state.time, state.boss_at - 1.0)
-		&"debug_kill_boss":
-			if bosses.boss_alive():
-				bosses.on_boss_defeated(bosses.boss_row, {"cause": &"debug"})
-		&"debug_grant":
-			loadout.grant_command(args)
-		&"debug_reset_loadout":
-			loadout.reset_loadout()
-		&"debug_level_up":
-			loadout.add_xp(loadout.xp_needed() - state.xp + 0.01)
-		&"debug_gauge_full":
-			state.gauge = 1.0
-		&"debug_heal":
-			ship.heal(state.stats.max_hp)
-		&"debug_invincible":
-			ship.invincible = not ship.invincible
-		&"debug_clear_enemies":
-			var t := enemies.table
-			for i in t.alive.size():
-				if t.alive[i] != 0 and t.is_boss[i] == 0:
-					enemies.mark_dead(i)
-		&"debug_gravity":
-			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
-				field.spawn_well()
-		&"debug_warp":
-			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
-				field.spawn_warp()
-		&"debug_comet":
-			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
-				field.spawn_comet(bool(args.get("rare", false)))
-		&"debug_spawn_enemies":
-			if OS.is_debug_build() and state.phase in [RunState.Phase.PLAY, RunState.Phase.PAUSED, RunState.Phase.LEVELUP]:
-				enemies.debug_spawn_random(int(args.get("count", 100)))
-				combat.rebuild_grid()
-		&"debug_hurt":
-			var keep := ship.invincible
-			ship.invincible = false
-			state.ship_invuln = 0.0
-			var shield_t := state.ship_shield_t
-			state.ship_shield_t = 0.0
-			ship.damage(1.0, 0.0, &"debug")
-			state.ship_shield_t = shield_t
-			ship.invincible = keep
-		&"debug_die":
-			ship.invincible = false
-			state.ship_invuln = 0.0
-			state.ship_shield_t = 0.0
-			ship.damage(state.ship_hp + 1.0, 0.0, &"debug")
-		&"debug_coins":
-			state.coins += int(args.get("amount", 100))
-		&"debug_clear":
-			finish(true)
-		&"debug_fail":
-			finish(false)
 
 ## まだ世界側へ渡していない時間。保守的な予測の先頭に含める。
 func world_time_pending() -> float:

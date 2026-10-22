@@ -4,6 +4,8 @@
 ## 通常のゲームのランは「今のラン」として1つ持つ。実験場は独立したランを複数作る。
 extends Node
 
+signal session_created(session: RunSession)
+
 var _sessions: Dictionary = {}
 var _next_id := 1
 ## 通常のゲームの今のラン（なければ -1）
@@ -19,9 +21,8 @@ func create_run() -> RunSession:
 		options.start_source = GameManager.run_start_source
 	GameManager.run_start_time = 0.0
 	GameManager.run_start_source = "stage_start"
-	var session := _register(RunSession.new())
+	var session := _register(RunSession.new(), options)
 	current_id = session.id
-	session.add_to_group("recordable_runs")
 	session.sim.finished.connect(GameManager.finish_run)
 	session.sim.aborted.connect(GameManager.abort_run)
 	session.ready.connect(func(): session.start_loading(options), CONNECT_ONE_SHOT)
@@ -29,7 +30,7 @@ func create_run() -> RunSession:
 
 ## 実験場・道具のランを作り、parent の下で始める。
 func create_session(parent: Node, options: Dictionary, with_view: bool) -> RunSession:
-	var session := _register(RunSession.new())
+	var session := _register(RunSession.new(), options)
 	parent.add_child(session)
 	session.start(options, with_view)
 	return session
@@ -54,8 +55,10 @@ func unregister(s: RunSession) -> void:
 	if current_id == s.id:
 		current_id = -1
 
-func _register(s: RunSession) -> RunSession:
+func _register(s: RunSession, options: Dictionary) -> RunSession:
+	s.sim.options = options
 	s.id = _next_id
 	_next_id += 1
 	_sessions[s.id] = s
+	session_created.emit(s)
 	return s

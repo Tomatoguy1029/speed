@@ -11,9 +11,9 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 		if not name.begins_with("."): _files(directory.path_join(name), result)
 static func signature() -> String:
 	var files := PackedStringArray()
-	for directory in ["res://data", "res://scripts", "res://addons", "res://tools/content", "res://shaders"]: _files(directory, files)
+	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders"]: _files(directory, files)
 	files.sort()
-	var hashes := PackedStringArray()
+	var hashes := PackedStringArray(["res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))
 	return "\n".join(hashes).sha256_text()
 static func is_current(output := ROOT) -> bool:
