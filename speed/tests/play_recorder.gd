@@ -1,11 +1,19 @@
-## 大きい結晶の計測を短い操作で確認する。JSONL は /tmp の専用フォルダだけへ書く。
+## 録画の開始経路・成長の保全と既存の計測を確認する。JSONL は /tmp の専用フォルダだけへ書く。
 ## Godot --headless --path speed res://tests/play_recorder.tscn
 extends Node
 
 const RECORDER := preload("res://scripts/managers/play_recorder.gd")
+
+class TempRecorder:
+	extends "res://scripts/managers/play_recorder.gd"
+	var directory := "/tmp/speed-recording-start-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
+	func _recording_directory() -> String:
+		return directory
+
 var passed := 0
 var failed := 0
 var recording_path := ""
+var shots := ""
 
 func check(ok: bool, label: String) -> void:
 	if ok:
@@ -15,6 +23,9 @@ func check(ok: bool, label: String) -> void:
 		push_error("[play_recorder] " + label)
 
 func _ready() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--out="):
+			shots = arg.trim_prefix("--out=")
 	var on: Dictionary = await scenario(true)
 	var off: Dictionary = await scenario(false)
 	check(on == off, "記録 ON/OFF で XP・レベル・乱数状態・残存結晶が同じ")
@@ -27,8 +38,143 @@ func _ready() -> void:
 	file.close()
 	verify(records)
 	await verify_performance()
+	await verify_mid_run_start()
+	await verify_start_routes()
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
+
+func verify_mid_run_start() -> void:
+	var scene := load("res://scenes/run/run.tscn").instantiate() as Node
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(scene)
+	var run := scene.get_node("Managers/RunManager") as RunManager
+	await get_tree().process_frame
+	run.state.time = 42.0
+	run.state.level = 3
+	run.state.xp = 0.125
+	run.state.xp_gained = 1000.0
+	run.state.xp_dropped = 1200.0
+	run.state.weapons[&"W01"] = 2
+	run.state.kills = 10
+	var before := [run.state.time, run.state.level, run.state.xp, run.state.rng.state]
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	var key := InputEventKey.new()
+	key.keycode = KEY_F9
+	key.pressed = true
+	rec._input(key)
+	check(rec._file != null, "プレイ中の F9 で既存ランの記録を開始する")
+	check(before == [run.state.time, run.state.level, run.state.xp, run.state.rng.state], "録画開始は時計・成長・乱数を変えない")
+	if rec._file != null:
+		var path := rec._file.get_path()
+		var start: Dictionary = read_rows(path)[0]
+		check(start.run_start.source == "stage_start" and start.run_start.t == 0.0, "通常ランの出自を途中録画でも保つ")
+		check(start.run_start.level == 0 and start.run_start.weapons.is_empty(), "初期武器の選択前の状態を保持する")
+		check(start.recording_start.t == 42.0 and start.recording_start.level == 3 and start.recording_start.xp == 0.125, "録画開始時の時計・レベル・XP を保存する")
+		check(start.recording_start.weapons.W01 == 2 and start.recording_start.xp_gained == 1000.0, "録画開始時の装備と累計を保存する")
+		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
+		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
+		rec._set_armed(true)
+		rec._begin(run)
+		check(rec._file.get_path() == path and read_rows(path).size() == 1, "重複開始でファイルを作り直さない")
+		rec._process(0.0)
+		await capture("mid-run")
+		run.state.time += 3.0
+		run.state.xp_gained += 2.0
+		run.state.xp_dropped += 4.0
+		rec._process(0.0)
+		var sample: Dictionary = read_rows(path)[1]
+		check(sample.xp_picked == 2.0 and sample.xp_dropped == 4.0, "最初の sample は録画開始後の XP だけを集計する")
+		rec._input(key)
+		var closed := FileAccess.get_file_as_bytes(path)
+		check(read_rows(path).back().result == "stopped", "F9 停止を記録する")
+		rec._set_armed(false)
+		rec._end("stopped")
+		check(FileAccess.get_file_as_bytes(path) == closed, "重複停止で記録を書き足さない")
+		rec._input(key)
+		check(rec._file != null and rec._file.get_path() != path, "すぐ再開しても別のファイルへ記録する")
+		check(FileAccess.get_file_as_bytes(path) == closed, "再開で既存ファイルを上書きしない")
+		run.set_phase(RunState.Phase.ENDED)
+		check(rec._file == null and rec.armed, "ラン終了後も次のランの待機は続く")
+		rec._set_armed(false)
+		rec._set_armed(true)
+		check(rec._file == null, "終了済みランでは新しく記録しない")
+	rec._set_armed(false)
+	rec.queue_free()
+	scene.queue_free()
+	await get_tree().process_frame
+
+func verify_start_routes() -> void:
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	for route in [{"source": "stage_start", "t": 0.0}, {"source": "timeline", "t": 240.0},
+		{"source": "timeline", "t": 0.0}, {"source": "stage_launcher", "t": 0.0}, {"source": "unknown", "t": 0.0}]:
+		for delayed in [false, true]:
+			GameManager.run_start_source = route.source
+			GameManager.run_start_time = route.t
+			if not delayed:
+				rec._set_armed(true)
+			var scene := load("res://scenes/run/run.tscn").instantiate() as Node
+			scene.process_mode = Node.PROCESS_MODE_DISABLED
+			var run := scene.get_node("Managers/RunManager") as RunManager
+			run.options = {"seed": 932}
+			add_child(scene)
+			await get_tree().process_frame
+			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
+			if delayed:
+				# 初期武器を選び、実際のラン更新を短く進めてから F9。
+				run.choose_card(0)
+				run.combat.rebuild_grid()
+				for tick in 12:
+					run._physics_process(1.0 / 120.0)
+				var snapshot := run.recording_snapshot()
+				var rng := run.state.rng.state
+				var key := InputEventKey.new()
+				key.keycode = KEY_F9
+				key.pressed = true
+				rec._input(key)
+				check(run.recording_snapshot() == snapshot and run.state.rng.state == rng, "途中開始も実更新後の状態を保全する")
+			check(rec._file != null, "各開始経路で記録を開始する")
+			if rec._file != null:
+				var path := rec._file.get_path()
+				var start: Dictionary = read_rows(path)[0]
+				check(start.schema_version == 4 and start.run_start.source == route.source and start.run_start.t == route.t, "開始経路とラン開始時刻を正確に保存する")
+				check(start.run_start.level == 0 and start.run_start.xp == 0.0, "途中時刻のランでも初期レベル・XP を推測しない")
+				check(start.missing_prefix == delayed, "ランの開始経路と前半欠落は別々に保存する")
+				check(is_equal_approx(start.recording_start.t, run.state.time if delayed else route.t), "録画開始時刻をランの開始時刻と区別する")
+				if route.source == "timeline" and delayed and route.t > 0.0:
+					check(run.state.time > route.t and run.state.xp_gained == 0.0, "タイムライン途中開始は成長のない時計から進む")
+					rec._process(0.0)
+					await capture("timeline-mid-run")
+				scene.queue_free()
+				await get_tree().process_frame
+				check(rec._file == null and read_rows(path).back().result == "quit", "シーンを離れると記録を閉じる")
+			else:
+				scene.queue_free()
+				await get_tree().process_frame
+			rec._set_armed(false)
+	# ready の前に待機を解除した通知は、後から記録を始めない。
+	rec._begin(null)
+	check(rec._file == null, "解除後に届いた開始通知を無視する")
+	print("START_ROUTE_CHECK directory=", rec.directory)
+	rec.queue_free()
+	await get_tree().process_frame
+
+func read_rows(path: String) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	var file := FileAccess.open(path, FileAccess.READ)
+	while file.get_position() < file.get_length():
+		rows.append(JSON.parse_string(file.get_line()))
+	return rows
+
+func capture(label: String) -> void:
+	if shots == "" or DisplayServer.get_name() == "headless":
+		return
+	DirAccess.make_dir_recursive_absolute(shots)
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(shots.path_join(label + ".png"))
 
 func scenario(recording: bool) -> Dictionary:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()

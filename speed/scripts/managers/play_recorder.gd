@@ -1,4 +1,4 @@
-## プレイの記録（開発版だけ。設計書 14.3）。F9 で記録の待機を入・切し、待機中に F10 で記録のフォルダを開く。
+## プレイの記録（開発版だけ。設計書 14.3）。F9 で記録を入・切し、プレイ中ならその場で開始する。
 ## 待機中に始めたランを、終わる（クリア・やられた・やめた）まで1つのファイルに書く。待機は F9 で切るまで続き、
 ## 次のランは別のファイルにする。実験場のランは記録しない。
 ## ファイルは書類フォルダの SPEED/recordings/stage<番号>_<日時>.jsonl。1行に1つの記録（JSON）で、メモリにためずに書き出す。
@@ -58,6 +58,9 @@ static func folder() -> String:
 		return ProjectSettings.globalize_path("user://recordings")
 	return docs.path_join("SPEED").path_join("recordings")
 
+func _recording_directory() -> String:
+	return folder()
+
 func _ready() -> void:
 	if not OS.is_debug_build():
 		set_process(false)
@@ -93,9 +96,16 @@ func _input(event: InputEvent) -> void:
 		OS.shell_open(folder())
 
 func _set_armed(on: bool) -> void:
+	if on == armed:
+		return
 	armed = on
 	if on:
 		get_tree().node_added.connect(_on_node_added)
+		for run in get_tree().get_nodes_in_group("recordable_runs"):
+			if run.is_node_ready() and not run.is_queued_for_deletion():
+				_begin(run, true)
+				if _run != null:
+					break
 	else:
 		if get_tree().node_added.is_connected(_on_node_added):
 			get_tree().node_added.disconnect(_on_node_added)
@@ -107,14 +117,20 @@ func _on_node_added(node: Node) -> void:
 	if node is RunManager:
 		node.ready.connect(_begin.bind(node), CONNECT_ONE_SHOT)
 
-func _begin(run: Node) -> void:
-	if run.state.lab_mode:
+func _begin(run: Node, during_run := false) -> void:
+	if not armed or run == _run or run.is_queued_for_deletion() or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
 		return
 	_end("quit")
 	_run = run
-	DirAccess.make_dir_recursive_absolute(folder())
+	var directory := _recording_directory()
+	DirAccess.make_dir_recursive_absolute(directory)
 	var stamp := Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "_")
-	var path := folder().path_join("stage%d_%s.jsonl" % [run.state.stage_index, stamp])
+	var base := directory.path_join("stage%d_%s" % [run.state.stage_index, stamp])
+	var path := base + ".jsonl"
+	var suffix := 1
+	while FileAccess.file_exists(path):
+		path = "%s_%d.jsonl" % [base, suffix]
+		suffix += 1
 	_file = FileAccess.open(path, FileAccess.WRITE)
 	if _file == null:
 		_run = null
@@ -124,6 +140,7 @@ func _begin(run: Node) -> void:
 	run.build.cards_opened.connect(_on_cards)
 	run.tree_exiting.connect(_end.bind("quit"))
 	_reset_counts()
+	_on_cards(run.state.cards)
 	_last_xp_gained = run.state.xp_gained
 	_last_xp_dropped = run.state.xp_dropped
 	_next_sample = run.state.time + INTERVAL
@@ -133,13 +150,17 @@ func _begin(run: Node) -> void:
 	for k in phases.size():
 		var p: PhaseDef = phases[k]
 		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start})
+	var recording_start: Dictionary = run.recording_snapshot()
+	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 3, "xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
+		"schema_version": 4, "run_start": run.recording_origin, "recording_start": recording_start, "missing_prefix": during_run,
+		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
 	_big_crystals = {}
 	_run.pickups.big_crystal_dropped.connect(_on_big_crystal)
+	_file.flush()
 	_update_label()
 
 ## ランで使う機体の強化の段（ID → 段）。開発版の上書きを含む。

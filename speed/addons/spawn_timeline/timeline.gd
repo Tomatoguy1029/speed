@@ -478,5 +478,5 @@ func _launch_here() -> void:
 	if stage == null:
 		return
 	var request: GDScript = load("res://addons/stage_launcher/launch_request.gd")
-	request.request(int(stage.get("index")), canvas.playhead)
+	request.request(int(stage.get("index")), canvas.playhead, "timeline")
 	EditorInterface.play_main_scene()

@@ -35,6 +35,7 @@ func _ready() -> void:
 			print("[Main] ステージ %d を直接起動" % stage)
 			GameManager.reset_to_main_menu()
 			GameManager.run_start_time = StageLaunchRequest.start_time
+			GameManager.run_start_source = StageLaunchRequest.source
 			GameManager.start_run(stage)
 			return
 	_show(GameManager.screen)

@@ -18,6 +18,8 @@ var state: RunState
 var cfg: GameConfig
 ## シーンをツリーへ追加する前に渡す。共有の本番設定を書き換えず実験を起動する。
 var options: Dictionary = {}
+## 録画の有無にかかわらず、ランを初期化した時点の出自と状態を保持する。
+var recording_origin: Dictionary = {}
 ## 報酬演出中は世界と時計を保留し、HUD が実時間で演出を進める。
 var ui_reward_active := false
 var input_source: Callable
@@ -67,9 +69,12 @@ func _ready() -> void:
 	state.stage_index = int(options.get("stage_index", GameManager.run_stage))
 	state.endless = bool(options.get("endless", GameManager.run_endless))
 	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
+	var start_source := "stage_start"
 	if OS.is_debug_build() and not state.lab_mode:
 		state.time = GameManager.run_start_time
+		start_source = GameManager.run_start_source
 	GameManager.run_start_time = 0.0
+	GameManager.run_start_source = "stage_start"
 	if options.has("seed"):
 		state.rng.seed = int(options.seed)
 	else:
@@ -100,9 +105,20 @@ func _ready() -> void:
 		set_phase(RunState.Phase.LEVELUP)
 		cards_changed.emit())
 	_update_camera(1.0)
+	recording_origin = recording_snapshot()
+	recording_origin["source"] = "lab" if state.lab_mode else start_source
+	add_to_group("recordable_runs")
 	# 最初の武器を選ぶ。HUD がつながってから開く
 	if not state.lab_mode:
 		build.open_start_cards.call_deferred()
+
+## 成長と戦闘の初期値。装備は複製し、その後の取得で記録の初期状態が変わるのを防ぐ。
+func recording_snapshot() -> Dictionary:
+	return {"t": state.time, "world_t": state.world_time, "phase": RunState.Phase.keys()[state.phase],
+		"level": state.level, "xp": state.xp, "xp_gained": state.xp_gained, "xp_dropped": state.xp_dropped,
+		"hp": state.ship_hp, "hp_max": state.stats.max_hp, "kills": state.kills,
+		"weapons": state.weapons.duplicate(), "traits": state.traits.duplicate(),
+		"hero_power": String(state.hero_power), "bonus_t": state.bonus_t, "endless": state.endless}
 
 ## ほかの Manager への参照を渡す。依存の向きはここで一覧できる（設計書 4.4 の決まり2）。
 func _wire() -> void:
