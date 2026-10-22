@@ -14,13 +14,13 @@ func on_critical(from: Vector2) -> void:
 	var width := val("width")
 	var to := from + u * length
 	var pad := Vector2(width / 2.0, width / 2.0)
-	build.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
+	ctx.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
 	var dmg := atk() * val("damage")
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	for i in _buf:
 		if t.dead[i] != 0 or Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + width / 2.0) < 0.0:
 			continue
-		build.combat.damage_enemy(i, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
+		ctx.combat.damage_enemy(i, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
 		if state.phase != RunState.Phase.PLAY:
 			return
 	state.emit(&"beam", {"from": from, "to": to, "width": width})

@@ -3,5 +3,5 @@
 extends TraitBehavior
 
 func on_launch(full: bool) -> void:
-	build.combat.ignore_armor = full
-	build.combat.burst_power = val("mult") if full else 1.0
+	ctx.combat.ignore_armor = full
+	ctx.combat.burst_power = val("mult") if full else 1.0

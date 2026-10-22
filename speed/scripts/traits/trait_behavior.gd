@@ -3,18 +3,18 @@
 class_name TraitBehavior
 extends RefCounted
 
-var build: LoadoutSystem
+var ctx: RunContext
 var def: TraitDef
 ## 重ね数（1〜5）
 var n := 1
 
 var state: RunState:
-	get: return build.state
+	get: return ctx.state
 var cfg: GameConfig:
-	get: return build.cfg
+	get: return ctx.cfg
 
-func setup(b: LoadoutSystem, d: TraitDef) -> void:
-	build = b
+func setup(context: RunContext, d: TraitDef) -> void:
+	ctx = context
 	def = d
 
 ## params の base ＋ per × n。
@@ -22,7 +22,7 @@ func val(key: String) -> float:
 	return float(def.params.get(key + "_base", 0.0)) + float(def.params.get(key + "_per", 0.0)) * n
 
 func atk() -> float:
-	return build.combat.attack_power()
+	return ctx.combat.attack_power()
 
 func tick(_dt: float, _busy: bool) -> void:
 	pass

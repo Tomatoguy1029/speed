@@ -5,8 +5,10 @@ class_name LoadoutSystem
 extends RunSystem
 
 func dispose() -> void:
-	for behavior in weapon_behaviors.values() + trait_behaviors.values():
+	for behavior in weapon_behaviors.values():
 		behavior.build = null
+	for behavior in trait_behaviors.values():
+		behavior.ctx = null
 	weapon_behaviors.clear()
 	trait_behaviors.clear()
 	for connection in cards_opened.get_connections():
@@ -311,7 +313,7 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 			b = load(path).new()
 		else:
 			b = WeaponBehavior.new() if weapon else TraitBehavior.new()
-		b.setup(self, def)
+		b.setup(self if weapon else ctx, def)
 		table[id] = b
 	if weapon:
 		table[id].level = lv
