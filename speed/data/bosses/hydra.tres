@@ -12,6 +12,10 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"combo_cooldown": 12.0,
+"tornado_width": 210.0,
+"tornado_speed": 680.0,
+"tornado_life": 1.8,
 "curve_turn": 0.45,
 "curve_lag": 1.1,
 "curve_time": 2.6,

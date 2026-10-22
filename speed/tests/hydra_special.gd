@@ -22,16 +22,24 @@ func _ready()->void:
 		check(a.try_start_tech(name,1.0),"special starts through admission")
 		var peak:=0
 		var curve:=false
+		var tornado_owned:=false
 		for i in 200:
 			a.sim_tick(0.025,0.025)
 			peak=maxi(peak,a.attack_field.effects.size())
 			for e in a.attack_field.effects:
 				if e.points.size()>3:curve=true
+				if e.kind==&"tornado" and e.velocity.length()>0.0:
+					tornado_owned=e.owner==a.participants[0].row and a.participants[0].kind==&"vortex" and e.width>150.0
 		check(peak>0,"timeline produces gameplay geometry")
 		if name==&"sequence":
 			var times: Array=events.filter(func(e):return e.cue==&"attack_started" and e.neck_index>=0).map(func(e):return e.world_time)
 			check(times.size()==3 and times[2]-times[0]>0.5,"three heads attack in distinct ordered beats")
 		if name==&"curve":check(curve,"rotating beam uses a curved shared polyline")
+		if name==&"tornado":
+			check(tornado_owned,"vortex head launches a broad moving rubble tornado")
+			var order: Array=events.filter(func(e):return e.cue in [&"gather_started",&"attack_started"] and e.neck_index>=0)
+			check(order.size()>=2 and order[0].cue==&"gather_started" and order[-1].world_time>order[0].world_time,"gather and rubble feed precede vortex launch")
+			check(a.combo_wait>0.0 and not a.attack_ready(&"tornado"),"combo opportunity consumes a common cooldown")
 		check(not a.busy and a.last_tech==name,"tech completes and releases global attack slot")
 		check(a._tech_until.has(name),"completed technique has an individual cooldown")
 	lab.queue_free()

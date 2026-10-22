@@ -111,11 +111,29 @@ custom_name = "curve"
 children = [SubResource("ready_curve"), SubResource("play_curve")]
 metadata/_weight_ = 1.0
 
+[sub_resource type="BTCondition" id="ready_tornado"]
+script = ExtResource("ready")
+attack = &"tornado"
+[sub_resource type="BTAction" id="play_tornado"]
+script = ExtResource("play")
+technique = "tornado"
+[sub_resource type="BTDynamicSequence" id="tornado"]
+custom_name = "tornado"
+children = [SubResource("ready_tornado"), SubResource("play_tornado")]
+metadata/_weight_ = 1.0
+
 [sub_resource type="BTProbabilitySelector" id="choose"]
 custom_name = "条件を満たす大技を重みで選ぶ"
 children = [SubResource("north"), SubResource("sequence"), SubResource("curve")]
 script = ExtResource("selector")
 
+[sub_resource type="BTProbabilitySelector" id="combos"]
+custom_name = "共通発動機会に成立するコンボを抽選"
+children = [SubResource("tornado")]
+script = ExtResource("selector")
+[sub_resource type="BTSelector" id="root"]
+children = [SubResource("combos"), SubResource("choose")]
+
 [resource]
 description = "条件を組み替えて大技を選択。枝の重み、距離・角度、首の条件、実行タスクのクールダウン倍率を編集する"
-root_task = SubResource("choose")
+root_task = SubResource("root")

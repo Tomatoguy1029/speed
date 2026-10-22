@@ -108,7 +108,9 @@ func _check_growth() -> void:
 	_cue(&"growth_started", &"", -1, {"duration": growth_t})
 
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
-const TECH_DIR := {&"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const COMBOS: Array[StringName] = [&"tornado",&"debris_shatter",&"beam_pincer"]
+var combo_wait := 0.0
+const TECH_DIR := {&"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -213,6 +215,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
 	_tech_cd -= dt
+	combo_wait=maxf(0.0,combo_wait-dt)
 	_spin_t -= dt
 	_update_blackboard()
 	hsm.update(dt)
@@ -223,7 +226,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
-		if busy and tech in [&"sequence",&"curve"]: special.tick(dt)
+		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer"]: special.tick(dt)
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
@@ -747,8 +750,24 @@ func _update_blackboard() -> void:
 
 ## 条件評価は読み取りだけ。攻撃枠は選択後に取得する。
 func attack_ready(attack: StringName) -> bool:
-	return tech == attack or (TECH_DIR.has(attack) and _tech_cd <= 0.0 and not busy and not timeline.is_playing() \
-		and chance_t <= 0.0 and growth_t <= 0.0 and not separation_pending and recovery_t <= 0.0 and _time >= float(_tech_until.get(attack, 0.0)) and _tech_ok(attack))
+	if tech==attack:return true
+	if not TECH_DIR.has(attack) or busy or timeline.is_playing() or chance_t>0.0 or growth_t>0.0 or separation_pending or recovery_t>0.0:return false
+	if COMBOS.has(attack):
+		if combo_wait>0.0:return false
+	elif _tech_cd>0.0:return false
+	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack)
+
+func combo_heads(kinds: Array) -> Array[Neck]:
+	var result: Array[Neck]=[]
+	for kind in kinds:
+		var found: Neck
+		for n in necks:
+			if _alive(n) and n.kind==kind and n.mode==&"idle" and not result.has(n):
+				found=n
+				break
+		if found==null:return []
+		result.append(found)
+	return result
 
 func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if busy or not attack_ready(attack):
@@ -757,6 +776,9 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
 	elif attack==&"curve": participants.assign(necks.filter(func(n):return _alive(n)))
+	elif COMBOS.has(attack):
+		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[attack])
+		combo_wait=float(def.params.combo_cooldown)
 	tech = attack
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
@@ -786,6 +808,9 @@ func interrupt_tech(attack: StringName = &"") -> void:
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
 	match name:
+		&"tornado",&"debris_shatter",&"beam_pincer":
+			if busy:return participants.size()==2 and participants.all(func(n):return _alive(n))
+			return combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[name]).size()==2
 		&"curve":
 			return not separated and count>=5 and (participants.any(func(n):return _alive(n)) if busy else necks.filter(func(n):return _alive(n)).size()>=3)
 		&"sequence":
@@ -815,7 +840,7 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
-	if name in [&"sequence",&"curve"]: special.prepare()
+	if name in [&"sequence",&"curve"] or COMBOS.has(name): special.prepare()
 	if name == &"north":
 		north_aiming = true
 		_update_north_targets()
@@ -837,7 +862,7 @@ func tech_end() -> void:
 	last_tech = tech
 	if last_tech_result == &"":
 		last_tech_result = &"finished"
-	_tech_until[tech] = _time + float(def.params.tech_cd) * _cooldown_scale
+	_tech_until[tech] = _time + float(def.params.combo_cooldown if COMBOS.has(tech) else def.params.tech_cd) * _cooldown_scale
 	recovery_t = float(def.params.tech_recovery)
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})

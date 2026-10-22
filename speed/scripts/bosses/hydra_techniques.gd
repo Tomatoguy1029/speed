@@ -3,9 +3,11 @@ extends RefCounted
 var a: Node
 var time:=0.0
 var playing:=false
+var state: Dictionary={}
 func _init(actor: Node)->void:a=actor
 func prepare()->void:
 	time=0.0
+	state.clear()
 	playing=false
 	for n in a.participants:
 		n.strike_pos=a._head_pos(n)
@@ -20,6 +22,7 @@ func tick(dt: float)->void:
 	time+=dt
 	if a.tech==&"sequence":sequence(dt)
 	elif a.tech==&"curve":curve(dt)
+	elif a.tech==&"tornado":tornado()
 	for n in a.participants:
 		if a._alive(n):
 			a.table.pos[n.row]=a._head_pos(n)
@@ -64,3 +67,32 @@ func curve(dt: float)->void:
 		if time>=float(p.curve_time):
 			n.emission.life=0.0
 			n.mode=&"special_hold"
+
+func tornado()->void:
+	var p: Dictionary=a.def.params
+	var wind=a.participants[0]
+	var debris=a.participants[1]
+	var center: Vector2=wind.strike_pos+Vector2.from_angle((a.run_state.ship_pos-wind.strike_pos).angle())*120.0
+	if not state.has("vortex"):
+		var points:=PackedVector2Array()
+		for j in 25:points.append(center+Vector2.from_angle(float(j)*TAU/24.0)*70.0)
+		state.vortex=a.attack_field.add_shape(points,30.0,0.0,1.2,0.0,&"tornado",wind.row)
+		state.center=center
+		state.rows=[]
+		state.from=debris.strike_pos
+		for j in 3:
+			var row: int=a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
+			a._rubble.append(Vector2i(row,a.table.id[row]))
+			state.rows.append(row)
+		a._cue(&"gather_started",a.tech,a.necks.find(wind))
+	if time>=0.5 and time<1.2:
+		for j in state.rows.size():
+			a.table.pos[state.rows[j]]=Vector2(state.from).lerp(state.center,clampf((time-0.5)/0.7,0.0,1.0))+Vector2.from_angle(float(j)*TAU/3.0)*20.0
+	if time>=1.2 and not state.has("launched"):
+		state.launched=true
+		state.vortex.life=0.0
+		for row in state.rows:a.manager.enemies.mark_dead(row)
+		var direction: Vector2=(a.run_state.ship_pos-state.center).normalized()
+		var points:=PackedVector2Array([state.center-direction*45.0,state.center+direction*45.0])
+		a.attack_field.add_shape(points,float(p.tornado_width),0.0,float(p.tornado_life),float(p.lump_dmg),&"tornado",wind.row,direction*float(p.tornado_speed),true)
+		a._cue(&"attack_started",a.tech,a.necks.find(wind))
