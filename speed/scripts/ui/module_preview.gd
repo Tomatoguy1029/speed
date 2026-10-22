@@ -3,6 +3,7 @@
 class_name ModulePreview
 extends Control
 
+const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
 const SILHOUETTE := preload("res://shaders/module_silhouette.gdshader")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 const SHIP := preload("res://assets/pixel/airship.png")
@@ -90,6 +91,13 @@ func _draw_effect(code: String) -> void:
 		ship = end
 	_sprite(SHIP, ship, 46.0, PI / 2.0)
 	match code:
+		"afterimage":
+			for i in 3:
+				var distance := fmod(_clock * 100.0 + i * 55.0, 180.0)
+				var pos := ship + Vector2(-45.0 - distance, 0)
+				_sprite(SHIP, pos, 46.0, PI / 2.0)
+				_line(pos + Vector2(-36, -8), pos + Vector2(-24, -8), CYAN, 2.0)
+				_line(pos + Vector2(-36, 8), pos + Vector2(-24, 8), CYAN, 2.0)
 		"forward", "scatter", "rear":
 			var shots := 5 if code == "scatter" else 2
 			var direction := -1.0 if code == "rear" else 1.0
@@ -112,11 +120,32 @@ func _draw_effect(code: String) -> void:
 			for i in 2:
 				_ring(center, 32 + i * 20 + pulse * 14, color)
 			_sprite(ENEMY, center + Vector2(85, -35), 35.0)
+		"dashRangeDrone":
+			for side in [-1, 1]:
+				for rank in 3:
+					var pos := ship + Vector2(35, side * (24 + rank * 22))
+					_line(pos - Vector2(65 + rank * 8, 0), pos, CYAN, 6.0)
+					_line(pos - Vector2(65 + rank * 8, 0), pos, Color.WHITE, 2.0)
+					_sprite(FOLLOWER, pos, 25.0, PI / 2.0)
 		"drone":
 			for i in 3:
 				var pos := ship + Vector2.from_angle(_clock * 0.8 + i * TAU / 3.0) * 62
 				_sprite(FOLLOWER, pos, 32.0, PI / 2.0)
 				_line(pos + Vector2(15, 0), pos + Vector2(45, 0), CYAN, 2.0)
+		"interceptor":
+			var preview_scale := minf(size.x / 360.0, size.y / 220.0)
+			for i in 6:
+				var a := _clock * 0.75 + i * TAU / 6.0
+				var pos := ship + Vector2.from_angle(a) * 64.0
+				var aim := Vector2(140, pos.y * 1.4)
+				var angle := (aim - pos).angle()
+				INTERCEPTOR_VISUAL.drone(self, size / 2.0 + pos * preview_scale, angle,
+					1.4 * preview_scale, 0.06 if pulse > 0.7 else 0.0)
+				for j in 2:
+					var progress := fmod(_clock * 1.8 + j * 0.3 + i * 0.16, 1.0)
+					INTERCEPTOR_VISUAL.shot(self, size / 2.0 + pos.lerp(aim, progress) * preview_scale,
+						angle, preview_scale)
+			draw_set_transform(size / 2.0, 0.0, Vector2.ONE * preview_scale)
 		"mines":
 			for i in 5:
 				var pos := route[0].lerp(route[1], i / 4.0)
@@ -160,7 +189,7 @@ func _draw_effect(code: String) -> void:
 			for i in 5:
 				var pos := ship + Vector2.from_angle(i * TAU / 5) * (65 - pulse * 20)
 				draw_colored_polygon(PackedVector2Array([pos + Vector2(0, -7), pos + Vector2(5, 0), pos + Vector2(0, 7), pos + Vector2(-5, 0)]), _ink(Color("#c7a2ff")))
-		"speed", "length":
+		"speed", "length", "glideDuration":
 			for i in 3:
 				_line(ship + Vector2(-65, -15 + i * 15), ship + Vector2(-27, -15 + i * 15), CYAN, 2.0)
 			if code == "length":

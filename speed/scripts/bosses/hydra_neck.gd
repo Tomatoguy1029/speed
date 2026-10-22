@@ -58,3 +58,13 @@ static func update(points: PackedVector2Array, base: Vector2, head: Vector2,
 			break
 	# 有限回の補正で残る誤差は首の先へ引き受け、頭の攻撃位置を厳密に保つ。
 	points[count] = head
+
+## 固定根元からの最初の節を外向きに保ち、胴体内部への曲がりを除く。
+static func keep_outside(points: PackedVector2Array, center: Vector2, radius: float) -> void:
+	if points.size() < 3: return
+	var root := points[0]-center
+	if (points[1]-points[0]).dot(root) < 0.0:
+		points[1] = points[0]+root.normalized()*maxf(4.0,points[1].distance_to(points[0]))
+	for i in range(1,points.size()-1):
+		var offset := points[i]-center
+		if offset.length() < radius+12.0: points[i] = center+offset.normalized()*(radius+12.0)

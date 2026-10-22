@@ -55,12 +55,21 @@ const AIRSHIP_CANON := preload("res://assets/pixel/airship_canon.png")
 const AIRSHIP_PROBE := preload("res://assets/pixel/airship_electronic_probe.png")
 const AIRSHIP_MINE := preload("res://assets/pixel/airship_mine.png")
 const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
+const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
 const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
+@export_group("ボス消滅の仮演出")
+## 任意の自動再生 Node2D。World 座標に置き、寿命と素材は差替シーンが持つ。空なら共通の仮破片。
+@export var finish_effect_scene: PackedScene
+@export var finish_color := Color("#e2b96b")
+@export_range(0.0, 1.0) var finish_flash := 0.2
+@export_range(0.0, 40.0) var finish_shake := 6.0
+@export_range(0, 200) var finish_particles := 80
+@export_range(0.1, 3.0) var finish_wave_seconds := 0.8
 
 var run: RunManager
 var state: RunState
@@ -124,6 +133,10 @@ var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
+var _glide_wake: Node2D
+var _light_lance: Node2D
+var _dash_range_drone: Node2D
+var _afterimage: Node2D
 
 func _ready() -> void:
 	run = get_node("../RunManager") as RunManager
@@ -168,6 +181,22 @@ func _ready() -> void:
 	if not pipeline.rich:
 		_flood_layer.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
+	_glide_wake = preload("res://scenes/fx/glide_wake.tscn").instantiate()
+	_layers.exhaust.add_child(_glide_wake)
+	_light_lance = preload("res://scripts/render/light_lance.gd").new()
+	_light_lance.name = "LightLance"
+	_light_lance.z_index = 1
+	_light_lance.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+	_layers.ship.add_child(_light_lance)
+	_dash_range_drone = preload("res://scripts/render/dash_range_drone.gd").new()
+	_dash_range_drone.name = "DashRangeDrone"
+	_dash_range_drone.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+	_layers.ship.add_child(_dash_range_drone)
+	_afterimage = preload("res://scripts/render/afterimage.gd").new()
+	_afterimage.name = "Afterimages"
+	_afterimage.z_index = -1
+	_afterimage.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+	_layers.ship.add_child(_afterimage)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -336,6 +365,10 @@ func _process(delta: float) -> void:
 		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
+	_glide_wake.step(dt, state, cfg, run.build.weapon_behaviors.has(&"W08"))
+	_light_lance.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W24"), cam_zoom)
+	_dash_range_drone.step(run.build.weapon_behaviors.get(&"W26"), cfg, cam_zoom)
+	_afterimage.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W27"))
 	_update_view()
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
@@ -361,6 +394,8 @@ func _process(delta: float) -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"lance_hit":
+				_light_lance.hit(ev)
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 			&"explode":
@@ -462,16 +497,20 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"debris_trail":
 				trails.append({"points": ev.points, "color": ev.color, "life": cfg.corpse_trail_life, "max": cfg.corpse_trail_life})
 			&"sonic":
-				flash = maxf(flash, 0.25)
 				shake = maxf(shake, 10.0)
 				pipeline.add_wave(ev.pos, ev.radius, 0.5)
 			&"boss_spawn":
 				shake = maxf(shake, 8.0)
 			&"boss_explode":
-				flash = 1.0
-				shake = 30.0
-				_burst(ev.pos, Color("#ff526e"), 120, Vector2.ZERO, 900.0)
-				pipeline.add_wave(ev.pos, 1600.0, 1.2)
+				flash = finish_flash
+				shake = finish_shake
+				if finish_effect_scene != null:
+					var effect := finish_effect_scene.instantiate() as Node2D
+					effect.position = ev.pos
+					get_node(world_path).add_child(effect)
+				else:
+					_burst(ev.pos, finish_color, finish_particles, Vector2.ZERO, 700.0)
+				pipeline.add_wave(ev.pos, 1600.0, finish_wave_seconds)
 			&"ship_explode":
 				_burst(ev.pos, Color("#9fe8ff"), 60, Vector2.ZERO, 500.0)
 
@@ -641,7 +680,8 @@ func _draw_field(c: CanvasItem) -> void:
 		var center := Vector2(d.x, d.y)
 		if view.has_point(center) or view.grow(d.z).has_point(center):
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
-	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+	if f.battle_arenas.is_empty():
+		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	_draw_hero(c)
 	# ヘルクレス座の火の隕石：落ちてくる影と、燃える跡
 	for fall in run.heroes.falls:
@@ -673,35 +713,87 @@ func _draw_field(c: CanvasItem) -> void:
 			c.draw_texture_rect(PLANET if b.is_planet else MOON,
 				Rect2(b.pos - Vector2.ONE * b.r, Vector2.ONE * b.r * 2.0), false)
 
-## 英雄の星座：うっすらと見える点線の星座線と、光った線。近くまで来ると星が恒星のように強く光る。
+## 英雄の星座：全体から淡金色の光がにじみ、つないだ星と光線がさらに強く輝く。
 func _draw_hero(c: CanvasItem) -> void:
 	var h := run.heroes
-	if h.hero == null:
+	if h.hero == null or h.stars.is_empty():
 		return
 	var view := view_rect().grow(900.0)
 	if not view.has_point(h.center):
 		return
-	var near := clampf(1.0 - h.center.distance_to(state.ship_pos) / cfg.hero_glow_range, 0.0, 1.0)
 	var gold := Color("#ffe8a0")
+	var brass := Color("#e2b96b")
+	var hot := Color(gold.r * 1.7, gold.g * 1.7, gold.b * 1.7)
 	var links := h.hero.links
+	var connected := PackedByteArray()
+	connected.resize(h.stars.size())
+	var bounds := Rect2(h.stars[0], Vector2.ZERO)
+	for star in h.stars:
+		bounds = bounds.expand(star)
+	# 星間の空間まで包む光の雲。線に沿った細い縁取りにせず、星座全体を一つの光源として見せる。
+	var center := bounds.get_center()
+	var radii := bounds.size * 0.65 + Vector2.ONE * _px(72.0)
+	var aura_pixel := _px(8.0)
+	var columns := ceili(radii.x * 2.0 / aura_pixel)
+	var rows := ceili(radii.y * 2.0 / aura_pixel)
+	var breath := 0.95 + 0.05 * sin(state.world_time * 0.8)
+	for row in rows:
+		for column in columns:
+			var at := center - radii + Vector2(column, row) * aura_pixel
+			var q := (at - center) / radii
+			var cloud := 0.78 + 0.22 * sin(q.x * 4.0 + q.y * 2.0) * cos(q.y * 5.0 - q.x)
+			var density := exp(-q.length_squared() * 2.8) * cloud
+			var alpha := floorf(density * 12.0) / 12.0 * 0.25 * breath
+			if alpha > 0.0:
+				c.draw_rect(Rect2(at.snapped(Vector2.ONE * aura_pixel), Vector2.ONE * aura_pixel),
+					Color(gold, alpha))
+	# 基本線は操作線と共通。光の広がりと芯を同じ経路に重ねて光線として見せる。
 	for n in h.lit.size():
 		var a := h.stars[links[n * 2]]
 		var b := h.stars[links[n * 2 + 1]]
-		if h.lit[n] != 0:
-			c.draw_line(a, b, Color(gold, 0.35), _px(9.0))
-			c.draw_line(a, b, gold, _px(3.0))
+		var points := PackedVector2Array([a, b])
+		var lit: bool = h.lit[n] != 0
+		if lit:
+			connected[links[n * 2]] = 1
+			connected[links[n * 2 + 1]] = 1
+		if lit:
+			_draw_route_line(c, points, Color(brass, 0.055), 22.0)
+			_draw_route_line(c, points, Color(gold, 0.13), 12.0)
+			_draw_route_line(c, points, Color(gold, 0.32), 6.0)
+			_draw_route_line(c, points, Color(gold, 0.95), 4.0)
+			_draw_route_line(c, points, Color(hot, 0.95), 2.0)
 		else:
-			c.draw_dashed_line(a, b, Color(0.8, 0.85, 1.0, 0.25 + 0.25 * near), _px(2.0), _px(10.0))
-	var pulse := 0.85 + 0.15 * sin(state.world_time * 3.0)
-	for p in h.stars:
-		if near > 0.0:
-			# 恒星のような光：中心の芯と、細い光の筋
-			c.draw_circle(p, cfg.hero_star_radius * (0.9 + 0.6 * near) * pulse, Color(1.0, 0.95, 0.75, 0.1 * near))
-			c.draw_circle(p, cfg.hero_star_radius * 0.6, Color(1.0, 0.97, 0.85, 0.3 * near))
-			for k in 4:
-				var u := Vector2.from_angle(k * PI / 4.0) * cfg.hero_star_radius * (1.2 + 2.0 * near) * pulse
-				c.draw_line(p - u, p + u, Color(1.0, 0.96, 0.8, (0.5 if k % 2 == 0 else 0.25) * near), _px(2.0))
-		c.draw_circle(p, maxf(_px(3.0), cfg.hero_star_radius * 0.3), Color(1.0, 0.98, 0.9, 0.6 + 0.4 * near))
+			# 光が戻る前の経路には、弱い金色の光だけを点線で残す。
+			_draw_route_line(c, points, Color(gold, 0.35), 2.0, true)
+	var pixel := _px(2.0)
+	var grid := Vector2.ONE * pixel
+	var glow_pixel := _px(4.0)
+	for index in h.stars.size():
+		var p := h.stars[index].snapped(grid)
+		var lit: bool = connected[index] != 0
+		# 同じ星光の強さと広がりを変え、残り火のような星が接続すると輝きを取り戻す。
+		var strength := 1.3 if lit else 0.6
+		var light_strength := 1.0 if lit else 0.32
+		for layer in 4:
+			var radius := _px([34.0, 25.0, 17.0, 10.0][layer]) * strength
+			var alpha: float = [0.035, 0.06, 0.12, 0.24][layer] * light_strength
+			var count := ceili(radius / glow_pixel)
+			for y in range(-count, count + 1):
+				var dy := y * glow_pixel
+				var half_width := floorf(sqrt(maxf(0.0, radius * radius - dy * dy)) / glow_pixel) * glow_pixel
+				if half_width > 0.0:
+					c.draw_rect(Rect2(p + Vector2(-half_width, dy - glow_pixel * 0.5),
+						Vector2(half_width * 2.0, glow_pixel)), Color(gold, alpha))
+		var arm := _px(26.0 if lit else 9.0)
+		c.draw_rect(Rect2(p - Vector2(arm, pixel), Vector2(arm * 2.0, pixel * 2.0)), Color(gold, 0.45 * light_strength))
+		c.draw_rect(Rect2(p - Vector2(pixel * 0.5, arm * 1.15), Vector2(pixel, arm * 2.3)), Color(gold, 0.85 * light_strength))
+		var light_rows := [1, 3, 5, 7, 9, 7, 5, 3, 1] if lit else [1, 3, 5, 7, 5, 3, 1]
+		for row in light_rows.size():
+			var width: int = light_rows[row]
+			c.draw_rect(Rect2(p + Vector2(-width * 0.5, row - light_rows.size() * 0.5) * pixel,
+				Vector2(width, 1) * pixel), Color(gold, 1.0 if lit else 0.4))
+		var core := grid * (3.0 if lit else 2.0)
+		c.draw_rect(Rect2(p - core * 0.5, core), hot if lit else Color(gold, 0.55))
 
 func _draw_pickups(c: CanvasItem) -> void:
 	var p := run.pickups
@@ -712,10 +804,13 @@ func _draw_pickups(c: CanvasItem) -> void:
 	gems.begin()
 	var gem_alive := p.gem_alive
 	var gem_pos := p.gem_pos
+	var gem_value := p.gem_value
 	for i in gem_alive.size():
 		var pos := gem_pos[i]
 		if gem_alive[i] != 0 and view.has_point(pos):
-			gems.add_upright(pos, gs, XP_COLOR)
+			# 経験値の多い結晶ほど大きい（経験値1で等倍、最大3倍）
+			var v := gem_value[i]
+			gems.add_upright(pos, gs * (1.0 if v <= 1.0 else minf(pow(v, 0.2), 3.0)), XP_COLOR)
 	gems.end()
 	var cs := maxf(6.0, _px(3.5))
 	_coin_batch.begin()
@@ -732,9 +827,6 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos - Vector2(14, 11), Vector2(28, 22)), Color.WHITE)
 				c.draw_rect(Rect2(cap.pos - Vector2(3, 8), Vector2(6, 16)), Color("#e8434f"))
 				c.draw_rect(Rect2(cap.pos - Vector2(8, 3), Vector2(16, 6)), Color("#e8434f"))
-			Pickup.Kind.CORE:
-				c.draw_circle(cap.pos, 18.0, Color("#ffd24a"))
-				c.draw_arc(cap.pos, 26.0, 0, TAU, 32, Color("#fff2b0"), _px(2.0))
 			Pickup.Kind.COMET_WEAPON:
 				var pulse := 0.5 + 0.5 * sin(state.time * 5.0)
 				c.draw_circle(cap.pos, 30.0 + pulse * 6.0, Color(1.0, 0.75, 0.25, 0.25))
@@ -745,9 +837,6 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_arc(cap.pos, 14.0, PI, TAU, 16, XP_COLOR, 6.0)
 				c.draw_rect(Rect2(cap.pos + Vector2(-17, 0), Vector2(6, 10)), Color.WHITE)
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
-			_:
-				c.draw_circle(cap.pos, 14.0, XP_COLOR.darkened(0.2))
-				c.draw_arc(cap.pos, 16.0, 0, TAU, 24, XP_COLOR.lightened(0.3), _px(2.0))
 
 func _draw_enemies(c: CanvasItem) -> void:
 	var view := view_rect().grow(run.combat.enemy_query_padding)
@@ -1387,6 +1476,8 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			for k in 24:
 				pts.append(pos + Vector2.from_angle(pr.friend_angle[i] + TAU * k / 24.0) * r * (1.0 if k % 2 == 0 else 0.78))
 			c.draw_colored_polygon(pts, Color("#d9dde6"))
+		elif pr.friend_cause[i] == &"interceptor":
+			INTERCEPTOR_VISUAL.shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
 		elif pr.friend_kind[i] == ProjectileManager.FriendKind.HULL:
 			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
 		elif pr.friend_kind[i] == ProjectileManager.FriendKind.DEBRIS:
@@ -1624,19 +1715,29 @@ func _draw_path_band(c: CanvasItem) -> void:
 	for point in pts:
 		c.draw_circle(point, w, color)
 
+## 操作線と英雄の星間線で共有する実線・点線。太さと点線間隔は画面pxで扱う。
+func _draw_route_line(c: CanvasItem, points: PackedVector2Array, color: Color, width_px: float, dashed := false) -> void:
+	if points.size() < 2:
+		return
+	if not dashed:
+		c.draw_polyline(points, color, _px(width_px))
+		return
+	for i in points.size() - 1:
+		var gap := points[i + 1] - points[i]
+		var steps := int(gap.length() / _px(14.0))
+		for k in range(0, steps, 2):
+			c.draw_line(points[i] + gap * (float(k) / steps), points[i] + gap * (float(k + 1) / steps), color, _px(width_px))
+
 func _draw_path(c: CanvasItem) -> void:
 	if state.drawing and state.draw_points.size() > 0:
 		var pts := state.draw_points
 		# 今の位置から描き始めまでの移動（なぞりで一緒に駆け抜ける）を点線で示す
-		var gap := pts[0] - state.ship_pos
-		var steps := int(gap.length() / _px(14.0))
-		for k in range(0, steps, 2):
-			c.draw_line(state.ship_pos + gap * (float(k) / steps), state.ship_pos + gap * (float(k + 1) / steps), Color(0.8, 0.97, 1.0, 0.55), _px(2.0))
+		_draw_route_line(c, PackedVector2Array([state.ship_pos, pts[0]]), Color(0.8, 0.97, 1.0, 0.55), 2.0, true)
 		if pts.size() > 1:
-			c.draw_polyline(pts, Color(0.8, 0.97, 1.0, 0.95), _px(3.0))
+			_draw_route_line(c, pts, Color(0.8, 0.97, 1.0, 0.95), 3.0)
 		c.draw_circle(pts[0], _px(6.0), Color("#c8f7ff"))
 	if state.tracing and state.trace_path.size() > 1:
-		c.draw_polyline(state.trace_path, Color(0.8, 0.97, 1.0, 0.6), _px(2.0))
+		_draw_route_line(c, state.trace_path, Color(0.8, 0.97, 1.0, 0.6), 2.0)
 	for g in ghosts:
 		var a: float = g.life / g.max
 		c.draw_line(g.from, g.to, Color(0.75, 0.95, 1.0, 0.6 * a), _px(4.0))
@@ -1659,6 +1760,10 @@ func _draw_build_objects(c: CanvasItem) -> void:
 			c.draw_set_transform(d.pos, angle)
 			c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false)
 			c.draw_set_transform(Vector2.ZERO)
+	var interceptors = b.weapon_behaviors.get(&"W25")
+	if interceptors != null:
+		for d in interceptors.drones:
+			INTERCEPTOR_VISUAL.drone(c, d.pos, d.angle, cfg.character_scale, d.flash)
 	var tow = b.weapon_behaviors.get(&"W21")
 	if tow != null:
 		for j in mini(int(tow.p("visible")), tow.cargo.size()):

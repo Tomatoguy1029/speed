@@ -1,0 +1,137 @@
+[gd_resource type="BehaviorTree" format=3 uid="uid://chk5yk8st2hsa"]
+
+[ext_resource type="Script" uid="uid://dhpxtf3p4dsbn" path="res://scripts/bosses/tasks/hydra_normal_play.gd" id="play"]
+[ext_resource type="Script" uid="uid://d0wgglwceqdko" path="res://scripts/bosses/tasks/hydra_position.gd" id="position"]
+[ext_resource type="Script" uid="uid://bh5kvklhdavcy" path="res://scripts/bosses/tasks/hydra_normal_ready.gd" id="ready"]
+[ext_resource type="Script" uid="uid://bcp4h5hcnlqt6" path="res://scripts/bosses/tasks/hydra_weighted_selector.gd" id="weighted"]
+
+[sub_resource type="BTCondition" id="ready_bite_thrust"]
+script = ExtResource("ready")
+
+[sub_resource type="BTAction" id="play_bite_thrust"]
+script = ExtResource("play")
+
+[sub_resource type="BTSequence" id="bite_thrust"]
+children = [SubResource("ready_bite_thrust"), SubResource("play_bite_thrust")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_bite_sweep"]
+script = ExtResource("ready")
+attack = &"bite_sweep"
+
+[sub_resource type="BTAction" id="play_bite_sweep"]
+script = ExtResource("play")
+attack = &"bite_sweep"
+
+[sub_resource type="BTSequence" id="bite_sweep"]
+children = [SubResource("ready_bite_sweep"), SubResource("play_bite_sweep")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_wind_band"]
+script = ExtResource("ready")
+attack = &"wind_band"
+
+[sub_resource type="BTAction" id="play_wind_band"]
+script = ExtResource("play")
+attack = &"wind_band"
+
+[sub_resource type="BTSequence" id="wind_band"]
+children = [SubResource("ready_wind_band"), SubResource("play_wind_band")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_wind_blades"]
+script = ExtResource("ready")
+attack = &"wind_blades"
+
+[sub_resource type="BTAction" id="play_wind_blades"]
+script = ExtResource("play")
+attack = &"wind_blades"
+
+[sub_resource type="BTSequence" id="wind_blades"]
+children = [SubResource("ready_wind_blades"), SubResource("play_wind_blades")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_rubble_lump"]
+script = ExtResource("ready")
+attack = &"rubble_lump"
+
+[sub_resource type="BTAction" id="play_rubble_lump"]
+script = ExtResource("play")
+attack = &"rubble_lump"
+
+[sub_resource type="BTSequence" id="rubble_lump"]
+children = [SubResource("ready_rubble_lump"), SubResource("play_rubble_lump")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_rubble_fan"]
+script = ExtResource("ready")
+attack = &"rubble_fan"
+
+[sub_resource type="BTAction" id="play_rubble_fan"]
+script = ExtResource("play")
+attack = &"rubble_fan"
+
+[sub_resource type="BTSequence" id="rubble_fan"]
+children = [SubResource("ready_rubble_fan"), SubResource("play_rubble_fan")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_beam_fixed"]
+script = ExtResource("ready")
+attack = &"beam_fixed"
+
+[sub_resource type="BTAction" id="play_beam_fixed"]
+script = ExtResource("play")
+attack = &"beam_fixed"
+
+[sub_resource type="BTSequence" id="beam_fixed"]
+children = [SubResource("ready_beam_fixed"), SubResource("play_beam_fixed")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_beam_bolt"]
+script = ExtResource("ready")
+attack = &"beam_bolt"
+
+[sub_resource type="BTAction" id="play_beam_bolt"]
+script = ExtResource("play")
+attack = &"beam_bolt"
+
+[sub_resource type="BTSequence" id="beam_bolt"]
+children = [SubResource("ready_beam_bolt"), SubResource("play_beam_bolt")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_thunder_headbutt"]
+script = ExtResource("ready")
+attack = &"thunder_headbutt"
+
+[sub_resource type="BTAction" id="play_thunder_headbutt"]
+script = ExtResource("play")
+attack = &"thunder_headbutt"
+
+[sub_resource type="BTSequence" id="thunder_headbutt"]
+children = [SubResource("ready_thunder_headbutt"), SubResource("play_thunder_headbutt")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_thunder_drop"]
+script = ExtResource("ready")
+attack = &"thunder_drop"
+
+[sub_resource type="BTAction" id="play_thunder_drop"]
+script = ExtResource("play")
+attack = &"thunder_drop"
+
+[sub_resource type="BTSequence" id="thunder_drop"]
+children = [SubResource("ready_thunder_drop"), SubResource("play_thunder_drop")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTProbabilitySelector" id="choose"]
+children = [SubResource("bite_thrust"), SubResource("bite_sweep"), SubResource("wind_band"), SubResource("wind_blades"), SubResource("rubble_lump"), SubResource("rubble_fan"), SubResource("beam_fixed"), SubResource("beam_bolt"), SubResource("thunder_headbutt"), SubResource("thunder_drop")]
+script = ExtResource("weighted")
+
+[sub_resource type="BTAction" id="position"]
+script = ExtResource("position")
+
+[sub_resource type="BTSelector" id="root"]
+children = [SubResource("choose"), SubResource("position")]
+
+[resource]
+root_task = SubResource("root")

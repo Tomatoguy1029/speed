@@ -12,6 +12,7 @@ const LOADOUT_WEAPON := 21.0
 const LOADOUT_TRAIT := 13.0
 ## ミニマップの半径（素材のpx）
 const MINIMAP_R := 43.0
+const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
 const ART := "res://assets/ui/combat/"
@@ -39,13 +40,27 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 ## カードを表示してから選択を受け付けるまでの実秒。
 @export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
 
+@export_group("報酬演出")
+@export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
+@export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
+@export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
+## 800×450 の演出座標。任意で setup(HeroDef) / set_progress(0..1) を受け取る Control シーン。
+@export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
+
 var _cards_accept_at := 0
+var _reward_advanced_frame := -1
 var _card_blocked_pointer_frame := -1
 var _card_blocked_pointer_pos := Vector2.ZERO
 ## 表示切替前からの押下と、離すまで破棄する押下（マウス・タッチ・選択キー）。
 var _card_held: Dictionary = {}
 var _card_discard: Dictionary = {}
 
+## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
+@export_group("伝説獲得の仮演出")
+@export var legendary_reveal_scene: PackedScene = preload("res://scenes/run/legendary_reveal.tscn")
+var _legendary_reveal: Control
+var _finish_skip: Button
+var _rewards: Control
 var run: RunManager
 var _font: Font
 var _cards_box: Control
@@ -75,6 +90,7 @@ var _ring_usable := true
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
+var _pause_after_reward := false
 
 func _ready() -> void:
 	run = get_node(run_path) as RunManager
@@ -96,6 +112,14 @@ func _ready() -> void:
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
 	_build_cards()
+	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
+	_rewards.continuation_seconds = continuation_seconds
+	_rewards.ult_cutin_seconds = ult_cutin_seconds
+	_rewards.ult_details_seconds = ult_details_seconds
+	_rewards.ult_cutin_scene = ult_cutin_scene
+	_rewards.add_module_icon = _add_icon
+	add_child(_rewards)
+	_rewards.active_changed.connect(_on_reward_active)
 	resized.connect(_layout_cards)
 	_build_pause()
 	_draw_button = Button.new()
@@ -106,19 +130,66 @@ func _ready() -> void:
 	_draw_button.visible = DisplayServer.is_touchscreen_available()
 	_draw_button.pressed.connect(func(): run.command(&"draw_button"))
 	add_child(_draw_button)
+	_finish_skip = Button.new()
+	_finish_skip.text = tr("hud.skip_finish")
+	_finish_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_finish_skip.position = Vector2(-210, -58)
+	_finish_skip.size = Vector2(190, 38)
+	_finish_skip.hide()
+	_finish_skip.pressed.connect(func(): run.command(&"skip_finish"))
+	add_child(_finish_skip)
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
 
+func _on_reward_active(active: bool) -> void:
+	run.ui_reward_active = active
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_draw_button.visible = not active and DisplayServer.is_touchscreen_available() and run.state.phase == RunState.Phase.PLAY
+	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
+	_pause_box.visible = not active and run.state.phase == RunState.Phase.PAUSED
+	if not active:
+		if _pause_after_reward:
+			_pause_after_reward = false
+			run.command(&"pause")
+		_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+
 func _on_phase(phase: RunState.Phase) -> void:
-	_cards_box.visible = phase == RunState.Phase.LEVELUP
-	_pause_box.visible = phase == RunState.Phase.PAUSED
+	if phase == RunState.Phase.FINISHING:
+		_pause_after_reward = false
+		_rewards.cancel()
+		_warning_t = 0.0
+		_hero_notice_t = 0.0
+		_draw_button.hide()
+		var definition := run.finish_legendary()
+		if definition != null and legendary_reveal_scene != null:
+			_legendary_reveal = legendary_reveal_scene.instantiate() as Control
+			_legendary_reveal.setup(definition)
+			add_child(_legendary_reveal)
+			_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			if _legendary_reveal.has_method("set_timing"):
+				_legendary_reveal.set_timing(run.cfg.boss_finish_relic_appear_time, run.cfg.boss_finish_relic_hold_time, run.cfg.boss_finish_relic_collect_time)
+			_legendary_reveal.hide()
+			move_child(_finish_skip, -1)
+	elif phase == RunState.Phase.ENDED:
+		_finish_skip.hide()
+		if _legendary_reveal != null:
+			_legendary_reveal.hide()
+	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
+	_pause_box.visible = phase == RunState.Phase.PAUSED and not _rewards.is_active()
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"level_bonus":
+				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+					_rewards.enqueue_bonus(ev)
+			&"hero_freed":
+				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+					_rewards.enqueue_ult(ev)
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
@@ -155,11 +226,21 @@ func _on_events(events: Array[Dictionary]) -> void:
 func _input(event: InputEvent) -> void:
 	if run == null or run.state == null or run.state.lab_mode:
 		return
+	if run.state.phase == RunState.Phase.FINISHING:
+		if run.sequence_t >= 0.35 and not event.is_echo() and (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_accept")):
+			run.command(&"skip_finish")
+			get_viewport().set_input_as_handled()
+		return
 	var id := _card_input_id(event)
 	if id == "":
 		return
+	# 表示を発生させた押下や、タッチ由来の擬似マウスを次送りに使わない。
+	var reward_press: bool = _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+		(event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.device != -1 and event.pressed)
+		or (event is InputEventScreenTouch and event.pressed)
+		or event.is_action_pressed(&"ui_accept"))
 	var choosing := run.state.phase == RunState.Phase.LEVELUP
-	var blocked := _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -178,10 +259,13 @@ func _input(event: InputEvent) -> void:
 	# タッチの選択は既存のマウス擬似イベントに任せ、元のタッチをゲームへ漏らさない。
 	if blocked or (choosing and (event is InputEventScreenTouch or event is InputEventScreenDrag)):
 		get_viewport().set_input_as_handled()
+	if reward_press and _reward_advanced_frame != Engine.get_process_frames():
+		_reward_advanced_frame = Engine.get_process_frames()
+		_rewards.advance_bonus()
 
 func _card_input_id(event: InputEvent) -> String:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		return "mouse:%d" % event.device
+	if event is InputEventMouseButton:
+		return "mouse:%d:%d" % [event.device, event.button_index]
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
 		return "touch:%d:%d" % [event.device, event.index]
 	var id := ""
@@ -192,21 +276,27 @@ func _card_input_id(event: InputEvent) -> String:
 	elif event is InputEventAction:
 		id = "action:%s" % event.action
 	if id != "":
-		if _card_held.has(id) or _card_discard.has(id):
+		if _rewards.is_active() or _card_held.has(id) or _card_discard.has(id):
 			return id
-		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept"]:
+		for action in [&"card_1", &"card_2", &"card_3", &"reroll", &"ui_accept", &"hero", &"draw_alt", &"pause"]:
 			if event.is_action(action):
 				return id
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+	if _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		get_viewport().set_input_as_handled()
+		return
 	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
+	if _rewards.is_active():
+		get_viewport().set_input_as_handled()
+		return
 	if _settings != null or run.state.lab_mode:
 		return
 	var s := run.state
@@ -227,15 +317,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and run != null and run.state != null and not run.state.lab_mode:
-		run.command(&"pause")
+		if _rewards.is_active():
+			_pause_after_reward = true
+		else:
+			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_update_finish_presentation()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
 	_refresh_loadout_icons()
 	queue_redraw()
+
+func _update_finish_presentation() -> void:
+	if run.state.phase != RunState.Phase.FINISHING:
+		return
+	var start := run.finish_reveal_start()
+	var duration := run.finish_reveal_duration()
+	_finish_skip.visible = run.sequence_t >= 0.35 and run.sequence_t < start + duration
+	if _legendary_reveal == null:
+		return
+	_legendary_reveal.visible = duration > 0.0 and run.sequence_t >= start and run.sequence_t < start + duration
+	if not _legendary_reveal.visible:
+		return
+	if _legendary_reveal.has_method("set_endpoints"):
+		var s := run.state
+		_legendary_reveal.set_endpoints((run.finish_origin - s.view_center) * s.camera_zoom + size / 2.0,
+			(s.ship_pos - s.view_center) * s.camera_zoom + size / 2.0)
+	_legendary_reveal.set_progress(clampf((run.sequence_t - start) / maxf(0.001, duration), 0.0, 1.0))
 
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
@@ -283,12 +394,16 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var index := ICON_IDS.find(String(definition.id))
-	if index < 0:
-		return
-	var texture := AtlasTexture.new()
-	texture.atlas = ICONS
-	texture.region = Rect2(index * 47, 0, 47, 47)
+	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef else null
+	if texture == null:
+		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
+		var index := ICON_IDS.find(icon_id)
+		if index < 0:
+			return
+		var atlas := AtlasTexture.new()
+		atlas.atlas = ICONS
+		atlas.region = Rect2(index * 47, 0, 47, 47)
+		texture = atlas
 	var icon := TextureRect.new()
 	icon.texture = texture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -535,7 +650,7 @@ static func card_info(c: Dictionary) -> Dictionary:
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
 		tag = "card.first_weapon"
-	var suffix := "Lv%d" % lv if weapon else "%d/5" % lv
+	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ConfigManager.cfg.trait_max_stacks]
 	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 
@@ -595,6 +710,9 @@ func _draw() -> void:
 		return
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	draw_set_transform((size - ART_SIZE * factor) * 0.5, 0.0, Vector2.ONE * factor)
+	# 画面の端の矢印をミニマップから避けるため、画面上の位置と枠を含む半径を覚える（0 ならミニマップなし）
+	_minimap_at = (size - ART_SIZE * factor) * 0.5 + MINIMAP_CENTER * factor
+	_minimap_r = (MINIMAP_R + 12.0) * factor if show_minimap else 0.0
 	if show_minimap:
 		_draw_minimap()
 	if show_status:
@@ -612,12 +730,12 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
-		if _hero_notice_t > 0.0:
+		if _hero_notice_t > 0.0 and run.heroes.guidance_visible() and not _rewards.is_active():
 			var text := tr("hud.hero_discovered")
 			var font_size := mini(24, int((W - 24.0) / maxf(1.0, _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x) * 24.0))
 			draw_string(_font, Vector2(12.0, MINIMAP_R * 2.0 + 42.0 if W < 600.0 else 110.0), text, HORIZONTAL_ALIGNMENT_CENTER, W - 24.0,
 				font_size, Color(1.0, 0.91, 0.63, minf(1.0, _hero_notice_t / 0.4)))
-		if run.heroes.revealed() and run.heroes.is_captive():
+		if run.heroes.guidance_visible() and run.heroes.revealed() and run.heroes.is_captive():
 			_draw_edge_arrow(run.heroes.center, Color("#ffd24a"))
 		for p in run.field.rare_comet_positions():
 			_draw_edge_arrow(p, Color("#ffd24a"))
@@ -626,6 +744,8 @@ func _draw() -> void:
 		draw_rect(_cards_box.get_rect(), Color(0.06, 0.08, 0.14, 0.95))
 
 var _dense := PackedVector2Array()
+var _minimap_at := Vector2.ZERO
+var _minimap_r := 0.0
 
 ## ミニマップ（右上）。自機を中心に、世界の方角と縮尺を保って出す（仕様書 17）。
 ## 自機・ボス・カプセル・敵の多い所・目印の星の線・英雄の星座。
@@ -633,7 +753,7 @@ func _draw_minimap() -> void:
 	var s := run.state
 	var cfg := run.cfg
 	var R := MINIMAP_R
-	var c := Vector2(584, 55)
+	var c := MINIMAP_CENTER
 	var k := R / cfg.field_radius
 	draw_texture(RADAR, Vector2.ZERO)
 	# 世界の外縁と惑星も自機からの相対位置へ移し、円内だけ描く。
@@ -655,11 +775,11 @@ func _draw_minimap() -> void:
 		if offset.length() <= R - 3.5:
 			draw_circle(c + offset, 3.5, Color(1.0, 0.35, 0.35, 0.35))
 	for cap: Pickup in run.pickups.capsules:
-		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, Color("#ffd24a"))
+		draw_circle(c + _minimap_marker(cap.pos, 2.0), 2.0, _minimap_pickup_color(cap.kind))
 	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
-	if h.hero != null and h.is_captive():
+	if h.guidance_visible() and h.hero != null and h.is_captive():
 		for q in s.landmarks:
 			var a := _minimap_offset(q)
 			var u := (h.center - q).normalized()
@@ -669,7 +789,7 @@ func _draw_minimap() -> void:
 				var r0 := sqrt(disc)
 				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
 			draw_circle(c + _minimap_marker(q, 3.0), 3.0, gold)
-	if h.revealed():
+	if h.guidance_visible() and h.revealed():
 		var at := c + _minimap_marker(h.center, 6.0)
 		var tw := 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
 		draw_circle(at, 6.0 * tw, Color(gold, 0.35))
@@ -681,6 +801,16 @@ func _draw_minimap() -> void:
 	var side := Vector2(-head.y, head.x)
 	draw_colored_polygon(PackedVector2Array([sp + head * 6.0, sp - head * 4.0 + side * 4.0, sp - head * 4.0 - side * 4.0]),
 		Color.WHITE)
+
+## カプセル類の印の色。ゲーム内の見た目に合わせ、英雄の星座の金色と分ける。
+func _minimap_pickup_color(kind: Pickup.Kind) -> Color:
+	match kind:
+		Pickup.Kind.HEAL:
+			return Color("#67e8b1")
+		Pickup.Kind.MAGNET:
+			return Color("#b8a0ff")
+		_:
+			return Color("#5fd8ff")
 
 ## 地図は自機を原点にする。方角と距離の縮尺は世界と共通。
 func _minimap_offset(world_pos: Vector2) -> Vector2:
@@ -789,12 +919,18 @@ func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned:
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses
+	if not bosses.boss_alive() and run.state.lab_mode:
+		for instance in bosses.lab_instances:
+			if instance.boss_alive():
+				bosses=instance
+				break
 	if _warning_t > 0.0 and fmod(_warning_t, 0.5) < 0.3:
 		draw_string(_font, Vector2(W / 2.0 - 160, 120), tr("hud.warning"), HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
 	if not bosses.boss_alive():
 		return
 	var t := run.enemies.table
-	var b := bosses.boss_row
+	var b: int=bosses.actor.health_row() if bosses.actor!=null else bosses.boss_row
+	if b<0 or b>=t.hp.size() or t.dead[b]:return
 	var bw := minf(520.0, W * 0.6)
 	var bx := W / 2.0 - bw / 2.0
 	draw_rect(Rect2(bx, 60, bw, 10), Color(0, 0, 0, 0.6))
@@ -809,8 +945,15 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 		return
 	var center := size / 2.0
 	var dir := rel.normalized()
-	var edge := minf((size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001), (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001))
-	var tip := center + dir * edge
+	var to_side := (size.x / 2.0 - 40.0) / maxf(absf(dir.x), 0.001)
+	var to_top := (size.y / 2.0 - 40.0) / maxf(absf(dir.y), 0.001)
+	var tip := center + dir * minf(to_side, to_top)
+	# 右上のミニマップに重なるときは、画面の端に沿ってミニマップの外へずらす
+	if _minimap_r > 0.0 and tip.distance_to(_minimap_at) < _minimap_r + 24.0:
+		if to_side <= to_top:
+			tip.y = _minimap_at.y + _minimap_r + 24.0
+		else:
+			tip.x = _minimap_at.x - _minimap_r - 24.0
 	var side := Vector2(-dir.y, dir.x) * 12.0
 	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 

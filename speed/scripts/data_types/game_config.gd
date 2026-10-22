@@ -50,10 +50,22 @@ extends Resource
 ## スロー再生中、カメラを機体にこの倍率で寄せる。
 ## 単位：倍
 @export var boss_finish_zoom: float
-## 撃破：爆発から CLEAR! までの時間
-## ボスが爆発して残りの敵が消えたあと、CLEAR! を出すまでの時間。
+## 撃破：爆発から獲得演出までの時間
+## ボスが爆発して残りの敵が消えたあと、モジュールの出現（報酬なしなら CLEAR!）まで待つ時間。
 ## 単位：実秒
 @export var boss_finish_blast_time: float
+## 伝説獲得：出現の時間
+## 既存の伝説モジュールが光の中から現れ、中央へ移る仮演出。
+## 単位：実秒
+@export var boss_finish_relic_appear_time: float
+## 伝説獲得：見せる時間
+## 部品の姿と既存名称を静止して見せる時間。
+## 単位：実秒
+@export var boss_finish_relic_hold_time: float
+## 伝説獲得：回収の時間
+## 部品の光が機体へ収束する時間。報酬の保存は結果へ移るときに行う。
+## 単位：実秒
+@export var boss_finish_relic_collect_time: float
 ## 撃破：CLEAR! の表示時間
 ## CLEAR! を出してから結果画面に移るまでの時間。
 ## 単位：実秒
@@ -74,6 +86,10 @@ extends Resource
 ## GAME OVER を出してから結果画面に移るまでの時間。
 ## 単位：実秒
 @export var death_game_over_time: float
+## 時間切れ：一撃の溜め
+## 制限時間に達してから、ボスの避けられない一撃が当たるまでの時間。溜めの間も機体は動かせる。
+## 単位：秒（ランの時計）
+@export var time_up_charge_time: float
 ## 被弾：赤くなる時間
 ## 普段の被弾で、機体を赤く光らせる長さ。
 ## 単位：実秒
@@ -482,36 +498,36 @@ extends Resource
 ## 単位：度
 @export var hull_debris_spread: float
 
-## 経験値・カプセル・修理キット・部品・出力コアの出方
+## 経験値・大きい結晶・カプセル・修理キット・部品の出方
 @export_group("ドロップ")
-## カプセルのドロップ率の係数
-## 敵がカプセルを落とす確率 ＝ この値 × 敵の経験値 ^ ドロップ率の指数（上限あり）。
+## 大きい結晶のドロップ率の係数
+## 敵が大きい結晶を落とす確率 ＝ この値 × 敵の経験値 ^ ドロップ率の指数（上限あり）。
 ## 単位：割合
 @export var drop_base: float
 ## ドロップ率の指数
-## 強い敵ほどカプセルを落としやすくする度合い。
+## 強い敵ほど大きい結晶を落としやすくする度合い。
 ## 単位：指数
 @export var drop_power_exp: float
-## カプセルのドロップ率の上限
-## 敵がカプセルを落とす確率は、これを超えない。
+## 大きい結晶のドロップ率の上限
+## 敵が大きい結晶を落とす確率は、これを超えない。
 ## 単位：割合（0〜1）
 @export var drop_max: float
-## カプセルの経験値
-## 敵が落とすカプセルで得る経験値 ＝ 今のレベルに必要な経験値 × この値。
-## 単位：割合
-@export var capsule_xp_frac: float
-## 漂流カプセルの経験値
-## フィールドに漂うカプセルで得る経験値 ＝ 今のレベルに必要な経験値 × この値。
-## 単位：割合
-@export var drift_capsule_xp_frac: float
-## 漂流カプセルの数
-## フィールドに同時に漂っている漂流カプセルの最大数。
-## 単位：個
-@export var drift_capsule_count: int
-## 漂流カプセルの補充の間隔
-## この間隔ごとに、機体の近くへ漂流カプセルを1つ補充する。
-## 単位：世界秒
-@export var drift_capsule_interval: float
+## 大きい結晶の経験値
+## 左から小・中・大の段の経験値。
+## 単位：経験値
+@export var big_crystal_xp: PackedFloat32Array
+## 大きい結晶の段の出やすさ：開始
+## ラン開始のときに、落ちた大きい結晶が小・中・大のどの段になるかの重み。左から小・中・大。
+## 単位：重み
+@export var big_crystal_weights_start: PackedFloat32Array
+## 大きい結晶の段の出やすさ：終わり
+## 段の重みは、ラン開始の値からこの値へ、段の移り変わりの時間をかけてまっすぐ移る。以後はこの値のまま。
+## 単位：重み
+@export var big_crystal_weights_end: PackedFloat32Array
+## 大きい結晶の段の移り変わりの時間
+## 段の重みが開始の値から終わりの値へ移りきるまでの時間。
+## 単位：ラン秒
+@export var big_crystal_shift_time: float
 ## 隕石の密度
 ## 隕石の配置の基準の数。隕石地帯・漂う岩の数がこれに合わせて決まる。
 ## 単位：個
@@ -652,10 +668,6 @@ extends Resource
 ## 隕石を壊したとき、回収ビーコン（フィールドの経験値をすべて回収）を落とす確率。
 ## 単位：割合（0〜1）
 @export var meteor_magnet_chance: float
-## 出力コアの効果
-## 出力コアを1つ拾うごとに、最高速度をこの割合だけ伸ばす。
-## 単位：割合
-@export var core_boost: float
 ## ドロップの寿命
 ## 敵・隕石が落としたカプセル・修理キット・回収ビーコンが消えるまでの時間。
 ## 単位：世界秒

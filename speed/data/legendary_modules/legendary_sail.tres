@@ -1,9 +1,16 @@
 [gd_resource type="Resource" script_class="LegendaryModuleDef" format=3 uid="uid://drbqaft88yhjk"]
 
 [ext_resource type="Script" uid="uid://cm6gg1gnis3vl" path="res://scripts/data_types/legendary_module_def.gd" id="1"]
+[ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_sail_back.res" id="1_qt3tq"]
+[ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_sail_front.res" id="2_4nmg7"]
+[ext_resource type="Texture2D" path="res://assets/ui/legendary_aura_masks/legendary_sail_mask.res" id="3_s5xpf"]
 
 [resource]
 script = ExtResource("1")
 id = &"legendary_sail"
 boss_id = &"centaurus"
 order = 2
+reveal_aura_mask = ExtResource("3_s5xpf")
+reveal_aura_baked_back = ExtResource("1_qt3tq")
+reveal_aura_baked_front = ExtResource("2_4nmg7")
+reveal_aura_bake_signature = "2c1f5c2dae4c0b752be371e30ffc1c36be183a7de3fe7a8fc17a535de82e0fdb"

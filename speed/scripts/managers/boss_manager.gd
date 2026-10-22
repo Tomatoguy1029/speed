@@ -94,8 +94,17 @@ func spawn(def_override: BossDef = null, position_override := Vector2.INF) -> vo
 	state.emit(&"boss_spawn", {"pos": p})
 	boss_spawned.emit(actor)
 
+## 本体行への被弾を、対応する役者へ通知する。
+func body_damaged(row: int) -> void:
+	var owner := actor_for_row(row)
+	if owner != null:
+		owner.on_body_damaged()
+
 ## ボスの HP が0になった（CombatManager から呼ばれる）。撃破の演出は RunManager が始める。
 func on_boss_defeated(i: int, opts: Dictionary) -> void:
+	var owner := actor_for_row(i)
+	if owner != null and opts.get("cause", &"") != &"debug" and owner.handle_body_defeat(opts):
+		return
 	if state.lab_mode:
 		for instance in lab_instances:
 			if instance.has_boss() and instance.boss_row == i:

@@ -9,12 +9,21 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# docs/game/ に置ける文書（catalog/ の中は自由）
-GAME_DOCS = {"treatment.md", "world.md", "art-style.md", "spec.md", "architecture.md", "backlog.md"}
+# docs/ の置き場ごとに置ける文書（None はその置き場の .md なら自由）
+ALLOWED = {
+    "docs": {"README.md"},
+    "docs/game": {"treatment.md", "world.md", "art-style.md", "spec.md", "text.md", "backlog.md"},
+    "docs/game/catalog": None,
+    "docs/game/stages": {f"stage-{n}.md" for n in range(1, 6)},
+    "docs/game/bosses": None,
+    "docs/dev": {"architecture.md", "stage-production.md", "stage-production-ai.md"},
+}
 # 今の状態だけを書く置き場
-STATE_DIRS = ["docs/game", "docs/proposals"]
+STATE_DIRS = ["docs/game", "docs/dev"]
 # 廃止した個人の作業ログ
-PERSONAL_LOGS = [f"{d}/{n}.md" for d in ("docs/logs", "demo/docs") for n in ("wakida", "shumak", "keporusu")]
+PERSONAL_LOGS = [f"demo/docs/{n}.md" for n in ("wakida", "shumak", "keporusu")]
+# リポジトリに置かない、作業用の置き場
+WORK_DIRS = ["tasks", "docs/proposals", "docs/logs"]
 # リンク切れを調べる文書
 LINK_TARGETS = ["docs", "AGENTS.md", "README.md"]
 
@@ -22,7 +31,7 @@ DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 # 列で持つデータのコードと、その列の一覧を載せた設計書の節（表の1列目に列名をコードの書き方で書く）
-COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/game/architecture.md", "### 6.2 敵の表の列")]
+COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/dev/architecture.md", "### 6.2 敵の表の列")]
 VAR = re.compile(r"^var (\w+)")
 TABLE_ROW = re.compile(r"^\|\s*`(\w+)`\s*\|")
 CODE_SPAN = re.compile(r"`[^`]*`")
@@ -85,12 +94,26 @@ def main():
                         if m:
                             errors.append(f"{path}:{n}: {rule}を書かない（「{m.group(0)}」）")
 
-    game = os.path.join(ROOT, "docs/game")
-    for name in sorted(os.listdir(game)):
-        if name == "catalog":
+    for dirpath, dirs, files in os.walk(os.path.join(ROOT, "docs")):
+        rel = os.path.relpath(dirpath, ROOT).replace(os.sep, "/")
+        # git が扱わない、ファイルの無いフォルダは見ない
+        if not any(f != ".DS_Store" for _, _, fs in os.walk(dirpath) for f in fs):
+            dirs[:] = []
             continue
-        if name not in GAME_DOCS:
-            errors.append(f"docs/game/{name}: docs/game/ に置けない文書（案は docs/proposals/、報告は docs/logs/ へ）")
+        if rel not in ALLOWED:
+            errors.append(f"{rel}/: docs/ に無い置き場（置き場は docs/README.md の1章）")
+            dirs[:] = []
+            continue
+        allowed = ALLOWED[rel]
+        for name in sorted(files):
+            if name == ".DS_Store":
+                continue
+            if not name.endswith(".md") or (allowed is not None and name not in allowed):
+                errors.append(f"{rel}/{name}: {rel}/ に置けない文書（案・報告・作業の計画はリポジトリの外へ）")
+
+    for d in WORK_DIRS:
+        if os.path.exists(os.path.join(ROOT, d)):
+            errors.append(f"{d}/: 作業用の計画・案・報告はリポジトリに置かない")
 
     for path in PERSONAL_LOGS:
         if os.path.exists(os.path.join(ROOT, path)):

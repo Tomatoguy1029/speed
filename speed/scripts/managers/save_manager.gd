@@ -16,6 +16,8 @@ const SAVE_VERSION := 1
 
 var data: Dictionary = {}
 var settings: Dictionary = {}
+## 開発版だけ：ランで使う強化の段の上書き（ID → 段）。調整パネルで決め、セーブには書かない。
+var dev_meta_override: Dictionary = {}
 ## 起動してからウィンドウの大きさを画面に合わせたか
 var _window_sized := false
 
@@ -52,6 +54,12 @@ func coins() -> int:
 
 func meta_level(id: StringName) -> int:
 	return int(data.meta.get(String(id), 0))
+
+## ランで使う強化の段。開発版の上書きがあればそれを、なければセーブの段を使う。
+func run_meta_level(id: StringName) -> int:
+	if OS.is_debug_build() and dev_meta_override.has(String(id)):
+		return int(dev_meta_override[String(id)])
+	return meta_level(id)
 
 ## 強化を1段階買う。部品が足りないか最大なら false。
 func buy_upgrade(def: MetaUpgradeDef) -> bool:

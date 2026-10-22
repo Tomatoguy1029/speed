@@ -14,11 +14,11 @@ SPEED の本番ゲームは Godot で開発する。Godot プロジェクトは 
 
 - 文書を作る・直す前に、必ず [文書の運用規定](docs/README.md) を読んで従う。置き場、書き方（日付・経緯・作業者の名前を書かない、定義は能動的に書く、同じ内容は1か所だけ）、案の扱いはそこにある。
 - 個人の作業ログ（作業・判断の履歴）は作らない。経緯は git のコミットに残す。
-- 頼まれていない文書をリポジトリに作らない。調査結果などの資料は会話で渡すか、リポジトリの外に置く。新しい文書が要りそうなときは、作る前にユーザーに聞く。
+- 頼まれていない文書をリポジトリに作らない。調査結果・案・計測や実装の報告・特定の作業のための計画やタスク一覧・引継ぎは、会話で渡すか、リポジトリの外に置く。新しい文書が要りそうなときは、作る前にユーザーに聞く。
 - コミットの前に `python3 tools/check_docs.py` が通ることを確かめる。クローンごとに1回 `git config core.hooksPath .githooks` を実行すると、コミット前に自動で走る。GitHub Actions でも同じチェックが走る。
 
 ## コミットと公開
 
-自分の変更だけを `git add` してコミットする。`git add -A`・`git commit -a`・force push は使わない。他の人の未コミット変更には触れない。pushする前に必ずユーザーへ確認し、承認を得る。承認後、最新の `origin/main` が `HEAD` の祖先であることを確認して `git push origin HEAD:main` する。
+自分の変更だけを `git add` してコミットする。`git add -A`・`git commit -a`・force push は使わない。他の人の未コミット変更には触れない。pushする前に必ずユーザーへ確認し、承認を得る。push は今いる作業ブランチへ行う。`git branch --show-current` でブランチを確かめ、最新の `origin/<そのブランチ>` が `HEAD` の祖先であることを確認して `git push origin HEAD` する。`main` へ入れるのは、ユーザーが main への統合を決めたときだけ。開発ブランチの `HEAD` を `main` へ push しない（`git push origin HEAD:main` を使わない）。
 
 Vercel で公開するのは demo。GitHub Actions とルートの `vercel.json` で `demo/dist/` を配信する。Godot 本番の配布方法は未設定。demo の公開を変更したときは、公開 HTML とビルド済み `demo/dist/index.html` の一致まで確認する。

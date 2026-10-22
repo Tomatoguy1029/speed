@@ -1,4 +1,4 @@
-## 画面の確認用：決まった手順で画面を移り、それぞれの画面を PNG に保存する（tasks/plan.md の確認のコマンド）。
+## 画面の確認用：決まった手順で画面を移り、それぞれの画面を PNG に保存する。
 ## 実行中はセーブを退避し、終わったら元に戻す。
 ##
 ##   Godot --path speed res://tests/screen_capture.tscn -- --out=<フォルダ> [--steps=flow|run]

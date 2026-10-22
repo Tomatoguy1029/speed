@@ -37,7 +37,19 @@ func sim_tick(_real_dt: float, _world_dt: float) -> void:
 func on_part_defeated(_row: int) -> void:
 	pass
 
+## 共通の被弾通知。役者がHP閾値と形態移行を確定する。
+func on_body_damaged() -> void:
+	pass
+
+## trueならこの破壊は形態移行として役者が引き受ける。
+func handle_body_defeat(_opts: Dictionary) -> bool:
+	return false
+
 func _process(_delta: float) -> void:
 	if manager != null and manager.has_boss():
 		position = table.pos[body]
 		rotation = table.facing[body]
+
+## 上部HP表示の対象行。形態によって本命の部位へ切り替えられる。
+func health_row()->int:
+	return body

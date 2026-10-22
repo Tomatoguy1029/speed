@@ -1,5 +1,5 @@
 keys,ja,en
-,ゲーム中に表示する文章のマスタ。1行が1つの文章で、ja 列が日本語、en 列が英語。設定の「言語」で切り替える。,
+,ゲーム中に表示する文章の生成データ。編集元は docs/game/text.md。ja 列が日本語、en 列が英語。設定の「言語」で切り替える。,
 ,キーは「場所.項目」の形で、コードと画面がこのキーで文章を読む。武器・特性・伝説のモジュール・機体の強化は <種類>.<ID>.name と .desc（ID は .tres の id）、ステージは stage.<番号>.name。,
 ,{n} などの波かっこは、ゲームが数値や名前に置き換える場所。両方の言語で同じ名前を使う。,
 ,キーが空の行はこの説明と見出しで、ゲームは読まない。,
@@ -65,6 +65,21 @@ hud.game_over,GAME OVER,GAME OVER
 hud.levelup_title,レベルアップ　1枚選ぶ（クリック／1〜3）,Level Up: Pick One (Click / 1–3)
 hud.level_bonus,おまけ,Bonus
 hud.level_bonus_more,継続！,More!
+hud.ult_granted,英雄の力を授かった,ULT ACQUIRED
+hud.ult_placeholder,仮カットイン · 正式素材へ差し替え予定,PLACEHOLDER CUT-IN · ART PENDING
+hud.ult_key,{key}：英雄の星座の力を発動,{key}: Activate constellation power
+hero.leo.power,線が太くなる,Wider Line
+hero.leo.desc,線が太くなり、帯に触れた敵を装甲に関係なく貫く。,Widen the line and pierce enemies in its path regardless of armor.
+hero.perseus.power,メドゥーサの首,Medusa's Head
+hero.perseus.desc,画面の中の敵（ボスと障害物のほか）と敵の弾を石にする。石は触れると砕ける。ボスは短時間止まる。,Petrify enemies (except bosses and obstacles) and hostile shots on screen. Touch stone to shatter it. Bosses stop briefly.
+hero.gemini.power,線を2本,Two Lines
+hero.gemini.desc,線を2本描き、機体と双子が同時に駆け抜ける。,Draw two lines. Your ship and its twin dash along them together.
+hero.hercules.power,火の隕石,Fiery Meteors
+hero.hercules.desc,機体の周りに火の隕石を落とし、落ちた跡を燃やす。,Drop fiery meteors around the ship and leave burning ground.
+hud.skip_finish,演出をスキップ,Skip sequence
+hud.continuation,モジュール連続強化,CONSECUTIVE UPGRADE
+hud.continuation_count,{n} 連続！,{n} CHAIN!
+hud.continuation_next,クリックで進む,Click to proceed
 hud.start_title,最初の武器を1つ選ぶ（クリック／1〜3）,Choose Your First Weapon (Click / 1–3)
 hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
@@ -84,7 +99,6 @@ card.swap_desc,この武器を外して、{name}を付ける,Remove this weapon 
 card.keep_tag,見送る,Skip
 card.keep_name,今の装備を残す,Keep Current Loadout
 card.keep_desc,{name}は受け取らない,Leave {name} behind
-pickup.core,出力 +{n}%,Power +{n}%
 ,■ 結果,
 result.title,結果,Results
 result.cleared,クリア,Cleared
@@ -150,6 +164,14 @@ weapon.W22.name,双極ビーム,Bipolar Beam
 weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
+weapon.W24.name,光の槍,Light Lance
+weapon.W24.desc,突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる,Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage.
+weapon.W25.name,迎撃ドローン,Interceptor Drones
+weapon.W25.desc,周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える,"Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts."
+weapon.W26.name,突進範囲ドローン,Dash Range Drones
+weapon.W26.desc,突進時に左右へ編隊を展開し、横の敵まで貫く。Lvで機数と編隊幅、光跡が成長,"Deploy a formation beside the ship during a dash to pierce enemies across a wider path. Levels add drones, width, and longer light trails."
+weapon.W27.name,残像機,Afterimage
+weapon.W27.desc,光の分身が突進軌道を追撃。Lvで機数と合計追撃威力が増える,"Light echoes retrace your dash with a delay, sharing a portion of normal ram damage. Levels increase echo count and total follow-up damage."
 ,■ 特性（trait.<ID>）,
 trait.T01.name,終端爆縮,End Implosion
 trait.T01.desc,線の終点で爆発,Explodes at the end of your line.
@@ -177,6 +199,8 @@ trait.T13.name,反応波動,Reactive Wave
 trait.T13.desc,ダメージを受けたとき、周りを押し返す,Pushes nearby enemies away when you take damage.
 trait.T14.name,軌跡延長,Trail Extension
 trait.T14.desc,描ける長さが伸びる（+25% ずつ）,Draw longer lines (+25% each).
+trait.T31.name,高速持続,Extended Glide
+trait.T31.desc,突進後の高速状態が長く続く,Stay fast longer after a dash.
 ,■ 伝説のモジュール（legendary.<ID>）,
 legendary.legendary_compass.name,羅針盤のモジュール,Compass Module
 legendary.legendary_compass.desc,らしんばん座を解放したときに残された、錆びついたモジュール。,A rusted module left behind when Pyxis was freed.
@@ -670,24 +694,24 @@ lab.enemy.iron.move,動かない固い障害物（鉄のがれき）,An immovabl
 lab.enemy.iron.kill,装甲がとても高い。十分な攻撃力の体当たりで割れる,Very high armor. A strong enough ram breaks it
 lab.enemy.saw.move,その場で回る丸鋸,A saw blade spinning in place
 lab.enemy.saw.kill,壊すのではなく、触れて飛ばす。進んでいた向きへ飛び、先の敵を巻き込む,Launch it by touching it rather than destroying it. It flies your way and cuts through enemies
-lab.enemy.hydra_bite.move,うみへび座の首。首を引いてから前へ伸びて噛みつく。3回続けて噛むこともある,A Hydra neck. Pulls back then lunges to bite. Sometimes bites three times in a row
+lab.enemy.hydra_bite.move,うみへび座の噛みつく首。狙いを固定して突き噛みし、近くでは横に薙ぐ,A Hydra bite head. Locks its lunge or sweeps nearby space
 lab.enemy.hydra_bite.kill,頭を削って落とす（本体の体力も減る）。落ちた頭は生え直す,Wear the head down (also hurts the body). Lost heads regrow
-lab.enemy.hydra_vortex.move,うみへび座の首。渦を巻く息で、引き寄せる渦を置く,A Hydra neck. Breathes out a pulling vortex
+lab.enemy.hydra_vortex.move,風の帯で遅い機体を押し返し、首を振って三日月の風刃を3枚撃つ,Pushes slow ships away with a wind band and swings to launch three crescent blades
 lab.enemy.hydra_vortex.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
-lab.enemy.hydra_debris.move,うみへび座の首。瓦礫を吐いて漂わせる。瓦礫を固めて投げることもある,A Hydra neck. Spits drifting debris or throws a packed lump
+lab.enemy.hydra_debris.move,硬い瓦礫の塊を投げる。近めの距離では扇状に散らす,Throws hard rubble chunks or scatters them in a fan at closer range
 lab.enemy.hydra_debris.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
-lab.enemy.hydra_beam.move,うみへび座の首。光を溜めて太いビームで薙ぐ。細いビームを3回撃つこともある,A Hydra neck. Charges then sweeps a thick beam or fires three thin beams
+lab.enemy.hydra_beam.move,1本の射線を固定して照射する。有限長の光弾も撃つ,Holds one fixed beam or launches a finite light bolt
 lab.enemy.hydra_beam.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
-lab.enemy.hydra_homing.move,うみへび座の首。ホーミング弾を吐く。弾の輪を浮かべて放つこともある,A Hydra neck. Spits homing shots or floats a ring of bullets and releases it
-lab.enemy.hydra_homing.kill,頭を削って落とす。落ちた頭は生え直す,Wear the head down. Lost heads regrow
-lab.enemy.hydra_immortal.move,うみへび座の不死の首。むき出しの間、周りへ衝撃を出して暴れる,The immortal Hydra neck. Lashes out with shockwaves while exposed
-lab.enemy.hydra_immortal.kill,むき出しの数秒のうちに貫くと本体に大ダメージ。火は効かない,Pierce it within the exposed seconds for heavy body damage. Fire has no effect
+lab.enemy.hydra_thunder.move,帯電して頭突きし、到達時に放電する。遠くでは進行先へ落雷を予告する,"Charges a headbutt with an arrival discharge, or marks lightning ahead at range"
+lab.enemy.hydra_thunder.kill,頭を削って落とす。合体中は再生し、分離後は撃破できる,Wear the head down. Regrows while combined; stays defeated after separation
+lab.enemy.hydra_immortal.move,羅針盤を抱えて逃げる蛇。単独では振り返って噛みつく,"The compass bearer flees, then turns to bite when alone"
+lab.enemy.hydra_immortal.kill,護衛が残っていても直接攻撃できる。倒すと羅針盤を解放する,Can be damaged directly while guards remain. Defeat it to free the compass
 lab.enemy.hydra_rubble.move,うみへび座が吐いた瓦礫。漂って、少しすると消える,Debris spat by the Hydra. Drifts and vanishes after a while
 lab.enemy.hydra_rubble.kill,体当たりは弾かれる。武器で壊せる,Rams bounce off. Weapons break it
 lab.enemy.provisional.move,機体を直接追い、予告のあと扇状に弾を撃つ,Chases you directly and fires a fan of bullets after a warning
 lab.enemy.provisional.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
-lab.enemy.hydra.move,その場で構え、機体が離れると泳いで近づく。首（3〜9本）がそれぞれ攻撃し、羅針盤で予告して強めの技を出す,Holds its ground and swims closer when you are far. Each neck (3 to 9) attacks and its compass signals strong techniques
-lab.enemy.hydra.kill,本体と首はすり抜ける。頭だけにダメージが通る。全部の頭を落とすと出る不死の首を貫くと大ダメージ,The body and necks are intangible. Only heads take damage. Pierce the immortal neck exposed after all heads fall
+lab.enemy.hydra.move,中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する,Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes
+lab.enemy.hydra.kill,中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す,"Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer"
 lab.ui.freehand,自由に描く,Freehand
 lab.ui.edit_points,点を編集,Edit points
 lab.ui.route_tool_help,自由描画と点ごとの編集を切り替え,Switch between freehand drawing and editing points
@@ -712,7 +736,6 @@ lab.appearance.reset,初期の照明へ戻す,Reset lighting
 lab.appearance.save,照明をプロジェクトへ保存,Save lighting to project
 lab.appearance.saved,照明を enemy_lighting.tres に保存しました,Lighting saved to enemy_lighting.tres
 lab.appearance.select_enemy,確認する敵を選択してください,Select an enemy to inspect
-
 lab.appearance.scale,サイズ倍率（見た目・当たり判定）,Size multiplier (visual and collision)
 lab.appearance.type_help,選択した種類の全個体へ即時反映します。サイズは見た目と当たり判定の両方に適用します。保存すると全ステージの同じ種類に使います。照明は法線画像を持つ敵だけ調整できます。,Edits apply to all instances of the selected type. Size changes visuals and collision. Save to use settings in every stage. Lighting requires a normal map.
 lab.appearance.restore_saved,この種類を保存済みの外観へ戻す,Restore saved appearance for this type

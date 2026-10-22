@@ -16,7 +16,6 @@ var field: FieldManager
 ## 管理 ID → 発動の処理
 var weapon_behaviors: Dictionary = {}
 var trait_behaviors: Dictionary = {}
-var cores := 0
 ## 機体と一緒に進路を進む衝撃波（ソニックブームと連鎖ソニックで共通。一覧 W08・T05）
 var sonic_waves: Array = []
 var _buf := PackedInt32Array()
@@ -31,12 +30,11 @@ func setup(run_state: RunState, config: GameConfig) -> void:
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
-## 基礎値・特性・強化画面での強化・出力コアから能力値を計算し直す（レベルでは変わらない）。
+## 基礎値・特性・強化画面での強化から能力値を計算し直す（レベルでは変わらない）。
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") \
-		* (1.0 + cfg.core_boost * cores) * (1.0 + _per(&"T10") * _n(&"T10"))
+	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + _per(&"T10") * _n(&"T10"))
 	s.attack_mult = _meta_mult(&"attack") * (1.0 + _per(&"T11") * _n(&"T11"))
 	s.max_hp = cfg.base_hp + _meta_add(&"max_hp")
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
@@ -45,6 +43,7 @@ func refresh_stats() -> void:
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
 	s.length_mult = _meta_mult(&"length") * (1.0 + _per(&"T14") * _n(&"T14"))
+	s.glide_duration_mult = 1.0 + _per(&"T31") * _n(&"T31")
 	s.xp_mult = _meta_mult(&"xp")
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max
@@ -66,7 +65,7 @@ func _meta_level(stat: StringName) -> Array:
 	var out := []
 	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
 		if def.stat == stat:
-			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.meta_level(def.id)
+			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.run_meta_level(def.id)
 			out.append([def.per_level, level])
 	return out
 
@@ -87,10 +86,6 @@ func _meta_reduce(stat: StringName) -> float:
 	for pl in _meta_level(stat):
 		m *= pow(1.0 - pl[0], pl[1])
 	return m
-
-func add_core() -> void:
-	cores += 1
-	refresh_stats()
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
@@ -119,6 +114,11 @@ func tick(real_dt: float, world_dt: float) -> void:
 	_update_sonic(real_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	var afterimage = weapon_behaviors.get(&"W27")
+	if afterimage != null:
+		afterimage.replay(real_dt)
+		if state.phase != RunState.Phase.PLAY:
+			return
 	if world_dt > 0.0:
 		for b in weapon_behaviors.values():
 			b.tick(world_dt, busy)
@@ -248,12 +248,7 @@ func _level_bonus() -> void:
 		grant(pick.kind, pick.id)
 		count += 1
 		var owned: Dictionary = state.weapons if pick.kind == &"weapon" else state.traits
-		var def: Resource = (ConfigManager.weapons if pick.kind == &"weapon" else ConfigManager.traits)[pick.id]
 		state.emit(&"level_bonus", {"kind": pick.kind, "id": pick.id, "level": owned[pick.id], "count": count})
-		var head := TranslationServer.translate("hud.level_bonus") if count == 1 else TranslationServer.translate("hud.level_bonus_more")
-		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60 - 26 * count),
-			"text": "%s %s Lv%d" % [head, def.get_display_name(), owned[pick.id]],
-			"color": Color("#efcb70") if count == 1 else Color("#ffe46b"), "size": 20 + 3 * count})
 
 ## おまけで上げる候補：持っている武器・特性のうち、上限に達していないものからランダムに1つ。なければ空。
 func _bonus_target() -> Dictionary:

@@ -68,6 +68,8 @@ var _stream_t := 0.0
 ## 次の彗星までの世界秒
 var _comet_t := 0.0
 var wells: Array[Well] = []
+## ボス所有の固定外周。所有者の解放時に、その外周だけを取り除く。
+var battle_arenas: Dictionary = {}
 ## ワープホールの位置と消える世界時刻（無ければ warp_gone が負）
 var warp_pos := Vector2.ZERO
 var warp_gone := -1.0
@@ -400,13 +402,14 @@ func dust_drag_at(p: Vector2) -> float:
 
 ## 外縁の外へ出ようとするときの押し戻しの加速度。
 func boundary_accel(p: Vector2) -> Vector2:
+	if not battle_arenas.is_empty(): return Vector2.ZERO
 	var r := p.length()
 	if r <= cfg.field_radius:
 		return Vector2.ZERO
 	return -p / r * (cfg.boundary_push + (r - cfg.field_radius) * 4.0)
 
 ## 線分 p0→p1（太さ radius）が最初に当たる障害物。当たらなければ null。
-## 戻り値は { body, t, point }。
+## 戻り値は { body, t, point }。固定外周は body が null で、normal と pos を持つ。
 func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
 	var found: Body = null
 	var earliest := INF
@@ -428,11 +431,38 @@ func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
 					if t >= 0.0 and t < earliest:
 						earliest = t
 						found = b
+	var arena := arena_hit(p0, p1, radius)
+	if not arena.is_empty() and arena.t < earliest:
+		return arena
 	return null if found == null else {"body": found, "t": earliest, "point": p0.lerp(p1, earliest)}
+
+## 固定外周を内側から横切る最初の点。高速移動でも終点だけの判定にしない。
+func arena_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
+	var result: Dictionary = {}
+	for bounds: Rect2 in battle_arenas.values():
+		var safe := bounds.grow(-radius)
+		var start := from.clamp(safe.position, safe.end)
+		if start != from:
+			# 外側に残った敵・弾を、囲いの内側へ転送しない。
+			return {"body":null,"t":0.0,"point":from,"pos":from,"normal":(from-start).normalized()}
+		var delta := to-from
+		for axis in 2:
+			if is_zero_approx(delta[axis]): continue
+			var edge: float = safe.end[axis] if delta[axis]>0.0 else safe.position[axis]
+			var fraction: float = (edge-from[axis])/delta[axis]
+			if fraction < 0.0 or fraction > 1.0: continue
+			if not result.is_empty() and fraction >= float(result.t): continue
+			var normal := Vector2.ZERO
+			normal[axis] = -signf(delta[axis])
+			var point := from.lerp(to,fraction)
+			result = {"body":null,"t":fraction,"point":point,"pos":point+normal*0.01,"normal":normal}
+	return result
 
 ## 半径 radius の円が、いちばん近い障害物の表面に触れるまでの距離（重なっていれば 0 以下）。
 func body_gap(p: Vector2, radius: float) -> float:
 	var gap := INF
+	for bounds: Rect2 in battle_arenas.values():
+		gap = minf(gap,minf(minf(p.x-bounds.position.x,bounds.end.x-p.x),minf(p.y-bounds.position.y,bounds.end.y-p.y))-radius)
 	for b in bodies:
 		gap = minf(gap, p.distance_to(b.pos) - b.r - radius)
 	return gap
@@ -440,6 +470,9 @@ func body_gap(p: Vector2, radius: float) -> float:
 ## 点 p を障害物の外へ押し出した位置（線の描き始めなどに使う）。
 func push_out(p: Vector2, margin: float) -> Vector2:
 	var q := p
+	for bounds: Rect2 in battle_arenas.values():
+		var safe := bounds.grow(-margin)
+		q = q.clamp(safe.position,safe.end)
 	for b in bodies:
 		var d := q - b.pos
 		var dist := d.length()
@@ -484,12 +517,17 @@ func collide_enemy(i: int, from: Vector2) -> void:
 	var hit = first_body_hit(from, table.pos[i], r)
 	if hit == null:
 		return
-	var b: Body = hit.body
-	var n: Vector2 = hit.point - b.pos
-	if n.length_squared() < 1e-6:
-		n = from - b.pos
-	n = n.normalized() if n.length_squared() > 0.0 else Vector2.RIGHT
-	table.pos[i] = b.pos + n * (b.r + r + 0.01)
+	var n: Vector2
+	if hit.has("normal"):
+		n = hit.normal
+		table.pos[i] = hit.pos
+	else:
+		var b: Body = hit.body
+		n = hit.point - b.pos
+		if n.length_squared() < 1e-6:
+			n = from - b.pos
+		n = n.normalized() if n.length_squared() > 0.0 else Vector2.RIGHT
+		table.pos[i] = b.pos + n * (b.r + r + 0.01)
 	var v := table.vel[i]
 	var vn := v.dot(n)
 	if vn < 0.0:

@@ -1,0 +1,14 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/render/glide_wake.gd" id="1"]
+[ext_resource type="Shader" path="res://shaders/glide_wake.gdshader" id="2"]
+[ext_resource type="Texture2D" path="res://assets/fx/water_noise.png" id="3"]
+
+[sub_resource type="ShaderMaterial" id="WakeMaterial"]
+resource_local_to_scene = true
+shader = ExtResource("2")
+shader_parameter/noise_tex = ExtResource("3")
+
+[node name="GlideWake" type="Node2D"]
+material = SubResource("WakeMaterial")
+script = ExtResource("1")

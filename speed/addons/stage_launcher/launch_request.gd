@@ -19,19 +19,24 @@ const STAGE_PREFIX := "stage_"
 
 ## 最後に読んだ予約の開始時刻（秒）。consume が書く
 static var start_time := 0.0
+## 起動の入口。旧形式の予約は unknown として受け取る。
+static var source := "unknown"
 
 ## 起動を予約する（エディタ側から呼ぶ）。start は、ランの時計をこの時刻から始める（出現タイムラインの「ここから試す」）。
-static func request(stage: int, start := 0.0) -> void:
+static func request(stage: int, start := 0.0, entry := "stage_launcher") -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(PATH)  # 直前のステージの記録を残したいので、失敗しても続ける
 	cfg.set_value(SECTION, "pending", true)
 	cfg.set_value(SECTION, "stage", stage)
 	cfg.set_value(SECTION, "start", start)
+	cfg.set_value(SECTION, "source", entry)
 	cfg.set_value(SECTION, "last_stage", stage)
 	cfg.save(PATH)
 
 ## 予約を読み、同時に消す。予約がなければ 0。ゲームの起動時に1回だけ呼ぶ。
 static func consume() -> int:
+	start_time = 0.0
+	source = "unknown"
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:
 		return 0
@@ -39,6 +44,7 @@ static func consume() -> int:
 		return 0
 	var stage := int(cfg.get_value(SECTION, "stage", 0))
 	start_time = float(cfg.get_value(SECTION, "start", 0.0))
+	source = str(cfg.get_value(SECTION, "source", "unknown"))
 	cfg.set_value(SECTION, "pending", false)
 	cfg.set_value(SECTION, "start", 0.0)
 	cfg.save(PATH)
