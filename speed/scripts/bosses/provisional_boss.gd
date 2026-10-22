@@ -9,6 +9,11 @@ extends BossActor
 @onready var timeline: AnimationPlayer = $Timeline
 
 var _cooldown := 0.0
+## 制限時間の一撃の経過時間（負なら使っていない。ランの時計で数える）、始めた時刻、溜めの長さ、光
+var final_strike_t := -1.0
+var _final_start := 0.0
+var _final_charge := 1.0
+var _final_beam: Line2D
 
 func _on_bound() -> void:
 	# 手動の固定更新中に技の処理を確定し、描画フレームへ持ち越さない。
@@ -19,6 +24,9 @@ func _on_bound() -> void:
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
+		return
+	if final_strike_t >= 0.0:
+		_final_strike_tick(dt)
 		return
 	_move(dt)
 	_cooldown -= dt
@@ -44,6 +52,59 @@ func _move(dt: float) -> void:
 		t.hit_cd[i] -= dt
 	if t.flash[i] > 0.0:
 		t.flash[i] -= dt
+
+# ── 制限時間の一撃（仕様書 4.1・16） ─────────────────────────────────
+
+## 攻撃と移動を止めて機体へ向き、光を溜める。溜め終わりに光が太くなって画面を埋める。
+## 当たりの判定は RunManager が溜めの終わりに行う。溜めの間は無敵。
+func begin_final_strike(charge: float) -> void:
+	if final_strike_t >= 0.0:
+		return
+	final_strike_t = 0.0
+	_final_start = run_state.time
+	_final_charge = maxf(0.1, charge)
+	hsm.set_active(false)
+	timeline.stop()
+	_final_beam = Line2D.new()
+	_final_beam.top_level = true
+	_final_beam.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+	_final_beam.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_final_beam.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	_final_beam.end_cap_mode = Line2D.LINE_CAP_ROUND
+	var pixels := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	pixels.fill(Color.WHITE)
+	_final_beam.texture = ImageTexture.create_from_image(pixels)
+	_final_beam.material = ShaderMaterial.new()
+	_final_beam.material.shader = preload("res://shaders/hydra_energy.gdshader")
+	add_child(_final_beam)
+
+func _final_strike_tick(dt: float) -> void:
+	final_strike_t = run_state.time - _final_start
+	var widen_time := float(def.params.final_widen_time)
+	var widen := clampf((final_strike_t - (_final_charge - widen_time)) / widen_time, 0.0, 1.0)
+	var t := table
+	var i := body
+	var d := run_state.ship_pos - t.pos[i]
+	t.vel[i] = Vector2.ZERO
+	t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
+	t.guard[i] = 1.0
+	t.charge[i] = clampf(final_strike_t / _final_charge, 0.0, 1.0)
+	var points := PackedVector2Array([t.pos[i], t.pos[i] + d.normalized() * float(def.params.final_reach)])
+	var width := lerpf(float(def.params.final_warn_width), float(def.params.final_beam_width), widen * widen)
+	_final_beam.points = points
+	_final_beam.width = width
+	var mat := _final_beam.material as ShaderMaterial
+	mat.set_shader_parameter("tint", Color(1, 0.25, 0.4))
+	mat.set_shader_parameter("clock", run_state.time)
+	mat.set_shader_parameter("warning", final_strike_t < _final_charge - widen_time)
+	mat.set_shader_parameter("span", points[0].distance_to(points[1]))
+	mat.set_shader_parameter("thickness", width)
+
+func _process(delta: float) -> void:
+	super(delta)
+	# 一撃が当たったら、敗北の停止の間に光を消し、爆発と GAME OVER を見せる。
+	if _final_beam != null and run_state.phase != RunState.Phase.PLAY:
+		_final_beam.modulate.a = move_toward(_final_beam.modulate.a, 0.0, delta / maxf(0.01, manager.cfg.death_freeze_time))
 
 # ── 判断の層から呼ばれる ──────────────────────────────────────────
 

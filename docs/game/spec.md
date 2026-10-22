@@ -598,7 +598,7 @@
 | 吹き飛ばした敵の破片 | 金属色・橙の縁の角張った破片が回転して飛ぶ。通った跡の光は実時間 `config.corpse_trail_life` 秒で消える（各破片の履歴は最大 `config.corpse_trail_points` 点） |
 | ソニックブーム | 機体と一緒に進路を進む。画面のフラッシュと揺れ、衝撃波の歪み |
 | 普段の被弾 | 機体を `config.ship_hurt_time` 実秒赤くし、機体だけを横に最大 `config.ship_hurt_shake` px 震わせる。カメラは揺らさない |
-| 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_tim| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](hydra.md#25-制限時間の一撃) |
+| 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_tim| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](hydra.md#25-制限時間の一撃)。仮のボスは本体から機体へ1本の光を溜め、太くして画面を埋める（`provisional.tres` の `final_*`） |
 GAME OVER を出して結果画面へ（仮の演出） |
 | ボス撃破 | 直前 `config.boss_finish_replay_window` 秒の機体の動きを記録し、`config.boss_finish_zoom` 倍に寄って `config.boss_finish_slow_time` 秒かけてスローで再生。最終勝利の通知で敵の攻撃を止め、通常の速さに戻ってボスが消滅し、残りの敵を消す。`config.boss_finish_blast_time` 秒のあと、ステージ1〜4は既存の伝説モジュールの姿と名前を見せ、機体へ回収する仮演出を行う。出現・静止・回収の時間は `config.boss_finish_relic_appear_time`・`config.boss_finish_relic_hold_time`・`config.boss_finish_relic_collect_time`。CLEAR! を `config.boss_finish_clear_time` 秒表示し、短い画面フェードで結果画面へ。スキップは CLEAR! の区間へ進む。演出中は操作・被弾・時間切れ・3択・新しい出現を止める。部品と記録の保存は演出の最後に1回だけ |
 

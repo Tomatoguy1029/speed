@@ -70,7 +70,7 @@ func enemy_attack_value(type: StringName) -> float:
 ## 時間帯ごとの強化のON/OFF。未指定の時間帯は既存の強化帯を使う。タイムラインから編集する。
 @export_storage var surge_phases: Dictionary = {}
 ## ステージの制限時間
-## この時刻にランの time_limit_reached フラグを立てる。負の値なら制限時間を使わない。
+## この時刻に時間切れになり、ボスの避けられない一撃で負ける（仕様書 4.1）。負の値なら制限時間を使わない。
 ## 単位：実秒
 @export var time_limit: float = -1.0
 ## ボス

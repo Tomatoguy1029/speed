@@ -15,6 +15,10 @@ weak_arc = 0.7
 params = {
 "bullet_dmg": 15.0,
 "bullet_speed": 420.0,
+"final_beam_width": 5000.0,
+"final_reach": 6000.0,
+"final_warn_width": 18.0,
+"final_widen_time": 0.35,
 "fire_interval": 2.6,
 "slow": 0.15,
 "spread": 1.3,
