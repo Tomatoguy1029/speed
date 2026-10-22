@@ -18,14 +18,21 @@ func bind(owner_actor: Node) -> void:
 func add_shape(points: PackedVector2Array, width: float, delay: float, life: float, damage: float,
 		kind: StringName, owner := -1, velocity := Vector2.ZERO, persistent := false) -> Dictionary:
 	serial += 1
-	var line := Line2D.new()
+	var line: Node2D
+	var area: bool=kind==&"lightning" and points[0].distance_to(points[-1])<1.0
+	if area:
+		line=Sprite2D.new()
+		line.texture=white
+	else:
+		line=Line2D.new()
 	line.texture = white
-	line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
+	if not area:line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+	if not area:line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	if not area:line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	if not area:line.joint_mode = Line2D.LINE_JOINT_ROUND
 	line.material = ShaderMaterial.new()
-	line.material.shader = FX
+	line.material.shader = preload("res://shaders/hydra_area.gdshader") if area else (actor.energy_shader if actor.energy_shader!=null else FX)
 	add_child(line)
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,
 		"age": 0.0, "damage": damage, "kind": kind, "owner": owner,
@@ -86,13 +93,23 @@ func tick(dt: float) -> void:
 				actor.manager.projectiles.ship.damage(e.damage * actor.manager.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
 		e.previous_points=e.points.duplicate()
-		var line: Line2D=visuals[e.id]
-		line.points = e.points
-		line.width = e.width
-		var color: Color = {&"rubble": Color(0.55,0.44,0.3), &"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
+		var line: Node2D=visuals[e.id]
+		if line is Line2D:
+			line.points=e.points
+			line.width=e.width
+		else:
+			line.position=e.points[0]
+			line.scale=Vector2.ONE*float(e.width)*0.5
+		var color: Color = {&"tornado":Color(0.3,0.85,0.72), &"rubble": Color(0.55,0.44,0.3), &"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
+		line.material.set_shader_parameter("style",{&"wind":1,&"wind_blade":1,&"lightning":2,&"rubble":3,&"tornado":4,&"bolt":5}.get(e.kind,0))
 		line.material.set_shader_parameter("tint", color)
 		line.material.set_shader_parameter("clock", actor._time)
 		line.material.set_shader_parameter("warning", e.age < e.delay)
-		line.material.set_shader_parameter("span", maxf(1.0,e.points[0].distance_to(e.points[-1])))
+		line.material.set_shader_parameter("span", maxf(1.0,_length(e.points)))
 		line.material.set_shader_parameter("thickness", e.width)
 	ship_previous = ship
+
+func _length(points: PackedVector2Array)->float:
+	var result:=0.0
+	for i in range(1,points.size()):result+=points[i-1].distance_to(points[i])
+	return result

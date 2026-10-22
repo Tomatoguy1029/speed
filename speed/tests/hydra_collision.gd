@@ -45,6 +45,18 @@ func _ready()->void:
 	moving.points=PackedVector2Array([Vector2(100,-100),Vector2(100,100)])
 	field.tick(0.01)
 	check(lab.run.state.ship_hp<hp,"moving beam sweeps its interior between old and new polylines")
+	field.clear_effects()
+	var radius: float=a.table.r[a.body]
+	var replacement:=Shader.new()
+	replacement.code="shader_type canvas_item; void fragment(){ COLOR=vec4(0.2,1.0,0.3,1.0); }"
+	a.energy_shader=replacement
+	a.body_texture=field.white
+	a.neck_texture=field.white
+	a.compass_texture=field.white
+	var expected:=PackedVector2Array([Vector2(500,500),Vector2(800,500)])
+	var swapped: Dictionary=field.add_shape(expected,40.0,0.5,1.0,10.0,&"beam")
+	check(field.visuals[swapped.id].material.shader==replacement and swapped.points==expected and is_equal_approx(swapped.width,40.0),"artist shader swap preserves shared collision geometry")
+	check(a.table.r[a.body]==radius,"artwork textures preserve body collision radius")
 	lab.queue_free()
 	await get_tree().process_frame
 	get_tree().quit(1 if failed else 0)

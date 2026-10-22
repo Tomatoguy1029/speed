@@ -6,6 +6,12 @@ extends BossActor
 signal presentation_event(event: Dictionary)
 signal presentation_advanced(world_dt: float)
 @export var presentation_scene: PackedScene
+@export_group("Artwork")
+@export var body_texture: Texture2D
+@export var neck_texture: Texture2D
+@export var compass_texture: Texture2D
+@export_group("Presentation")
+@export var energy_shader: Shader=preload("res://shaders/hydra_energy.gdshader")
 @export_range(0.0, 1.0) var compass_spin_fraction := 0.5
 var _presentation: Node
 var _defeat_announced := false
@@ -233,7 +239,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
 		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
-		
+
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
 		_defeat_announced = true
 		hsm.set_active(false)
@@ -290,9 +296,9 @@ func _set_count(n: int) -> void:
 			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * run_state.rng.randf())
 			necks.append(neck)
 		neck.kind = kinds[k]
-		if neck.row >= 0 and _alive(neck):
+		if neck.row >= 0:
 			_release_attack(neck)
-			manager.enemies.mark_dead(neck.row)
+			if _alive(neck):manager.enemies.mark_dead(neck.row)
 			neck.row = -1
 		neck.base_angle = TAU * k / float(n)
 		neck.burned = false
@@ -805,7 +811,8 @@ func draw_on(c: CanvasItem) -> void:
 			_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
 		return
-	c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
+	if body_texture!=null:c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
+	else:c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
 	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
 	_draw_compass(c, r * 0.75)
 
@@ -819,13 +826,25 @@ func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Col
 		var size := body_r * (0.32 - 0.14 * float(s) / point_count)
 		if s > 0:
 			c.draw_line(previous, at, col, size * 2.0)
-		c.draw_circle(at, size, col if s % 2 == 0 else dark)
+		if neck_texture!=null:
+			var facing: float=(at-previous).angle() if s>0 else 0.0
+			c.draw_set_transform(at,facing)
+			c.draw_texture_rect(neck_texture,Rect2(Vector2.ONE*-size,Vector2.ONE*size*2.0),false)
+			c.draw_set_transform(Vector2.ZERO)
+		else:
+			var polygon:=PackedVector2Array()
+			for corner in 8:polygon.append((at+Vector2.from_angle(float(corner)*TAU/8.0)*size).snapped(Vector2(3,3)))
+			c.draw_colored_polygon(polygon,col if s%2==0 else dark)
+			c.draw_line(at+Vector2(-size*0.5,-size*0.4),at+Vector2(size*0.4,-size*0.4),col.lightened(0.2),3.0)
 		previous = at
 	if glow > 0.0 and not segs.is_empty():
 		c.draw_circle(previous, body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
 
 ## 本体に埋め込まれた羅針盤。強めの技の前だけ針が回る（強めの技で使う）。
 func _draw_compass(c: CanvasItem, R: float) -> void:
+	if compass_texture!=null:
+		c.draw_texture_rect(compass_texture,Rect2(Vector2.ONE*-R,Vector2.ONE*R*2.0),false)
+		return
 	c.draw_circle(Vector2.ZERO, R, Color("#e8dcc0"))
 	c.draw_arc(Vector2.ZERO, R, 0, TAU, 48, Color("#3a2f25"), 3.0)
 	var font := ThemeDB.fallback_font

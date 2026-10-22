@@ -243,29 +243,27 @@ Main (Node)
 - 道具は LimboAI（MIT ライセンス。Behavior Tree と階層型ステートマシン、編集画面とデバッガを持つ）の GDExtension 版を使う。Windows・macOS・Linux・Android・iOS・Web に対応している。GDExtension 版で使えない機能は導入前に確認する。
 - ボスの判断の層から、自機の状態（線を描いているか、描かれた線、ゲージの溜まり具合、位置）・フィールドの仕掛けとの位置関係・ボス自身と部位の HP を読めるようにする。何を判断に使うかは、ボスごとの仕様で決める。
 
-**うみへび座の草案実装**
+**うみへび座の編集と役割**
 
-採用仕様は [ヒュドラ専用仕様](hydra.md)、実装状況は [敵一覧](catalog/enemies.md) に置く。以下は現存する草案の役者・BT・演出の編集方法を示す。
+ゲームの決まりは [ヒュドラ専用仕様](hydra.md)、採用・実装状況は [敵一覧](catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
-`scenes/bosses/hydra_boss_bt.tres` を LimboAI の BT エディタで開く。北・東・西の枝を選び、距離（`engage` に対する倍率）、本体正面からの方向、生きている首の種類と必要数を Inspector で編集する。条件ノードは追加・並べ替えできる。枝の重みは ProbabilitySelector の子の重み、技別クールダウンは `HydraTechnique` 実行タスクの `cooldown_scale` を変える。基準時間・攻めどき・攻撃の強さは `data/bosses/hydra.tres` の `params` に置く。初期設定は、近距離で北、中距離から遠距離で前方を捉えたときに東・西を選ぶ試遊用の草案とする。条件と重み・倍率の数値の正は BT リソースに置く。
+LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会のコンボ抽選と、形態・参加者・配置・待ち時間で選ぶ大技の枝を編集できる。`hydra_head_bt.tres` は各首が複製して持ち、種類・距離・方向・画面内・状態・予算の条件から通常技を選び、成立する技があれば実行する。各ProbabilitySelectorの子の重みと `hydra_play_tech.gd` の `cooldown_scale` をInspectorで編集する。技の位置条件・コスト・共通予算・時間・護衛位置は `data/bosses/hydra.tres` の `params` に置く。条件評価は読み取りだけを行い、選択後に攻撃枠を取得する。
 
-役者は世界の固定更新ごとに Blackboard の `player_distance`・`player_angle`（本体正面との差、ラジアン）・`live_heads`・`neck_count`・`exposed`・`recovering` を更新する。重み付き選択は LimboAI の編集機能とランの RNG を使う。条件評価は読み取りだけで行い、選んだ実行タスクが攻撃枠を取得する。枠待ち中は条件を再評価し、実行中は距離と方向を固定して予告した技を完遂する。必要な首の喪失・BT の中断は共通の後始末へ渡す。必須の段階進行と露出・復帰は役者のスクリプトで確定する。南の枝は保留を示すコメントとして保持する。
+`hydra_normals.gd` は通常技、`hydra_techniques.gd` は大技・コンボと配置待ち、`hydra_grid.gd` は領域判定・優先枠・一筆経路の検証を担当する。`Timeline` と `hydra_boss_timeline.tres` のメソッドキーを世界秒で手動更新する。同時噛みつきは捕捉→固定→伸長→到達、ほかの大技は配置→予告→実行→全体硬直を進める。配置の移動中はタイムラインを待たせる。参加者の喪失は個別仕様に従って中断か欠員として扱う。
 
-`scenes/bosses/hydra_boss.tscn` と `scripts/bosses/hydra_boss.gd` が本体・首・頭を組み合わせる。本体と頭の当たり判定は敵の表に登録し、首の節は役者が描く。頭の位置・向きは攻撃の処理が決める。頭の行は親の本体の行と結び、行の再利用を ID でも確かめる。`EnemyManager.cleanup()` は行を解放する前に `BossManager.part_defeated()` から役者の `on_part_defeated()` へ通知し、頭へのダメージと火による再生停止を確定する。
+合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は `hydra_snake_motion.gd` が操舵し、頭の通過点列を胴体がたどる。速度・旋回・被弾・構え・攻撃・停止の重みを世界秒で連続的に混ぜる。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
 
-**Hydra の試遊と演出の差し替え**
+`hydra_attack_field.gd` は表示と判定で同じ点列・幅・開始時刻・寿命を使う。機体と形状の移動区間を掃引し、世界時間停止時は形を保つ。描画ノードはID別に持ち、戦闘状態の辞書に解放済みノードを残さず、実験場の巻き戻し比較を保つ。
 
-`gyms/hydra_trial.tscn` を F6 で起動すると、Hydra を配置した敵・ルート実験場が試遊モードで開く。既存の停止・巻き戻し・数値編集を使う。試遊シーンの Inspector で開始位置・無敵・試遊用の攻撃力倍率を変える。本番のステージデータとセーブは実験セッションから分ける。
+**Hydraの試遊と素材差し替え**
 
-絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBoss の `presentation_scene` に指定する。`BodyAnchor` と `HeadAnchor` の位置、ルートの色・半径・線幅・フラッシュ時間を Inspector で変える。子の `VisualTimeline` の `warning`・`attack`・`recovery`・`hit` は装飾用で、Sprite2D・GPUParticles2D などへ置き換えられる。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取り、演出用 AnimationPlayer を世界秒で手動更新する。
+`gyms/hydra_trial.tscn` をF6で起動すると、敵・ルート実験場が試遊モードで開く。停止・巻き戻し・機体固定・数値編集を使える。シーンのInspectorで開始位置・無敵・試遊用の攻撃倍率を変える。通常出現とセーブは実験セッションから分ける。
 
-イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。`neck_index` は本体が -1、不死首が -2、通常首が配列の添字。動く取り付け位置は `presentation_anchor(index)`（ワールド座標）、現在の技・段階・露出・攻めどきは `presentation_state()` で読む。北の予告の線・到達点・判定半径・固定状態は `presentation_targets()` を読む。`warning_started`・`target_locked`・`attack_started`・`finished`・`interrupted`・`recovery_started`・`head_destroyed`・`phase_changed`・`exposed`・`defeated` を扱う。`hit` は頭の HP 減少か不死首の撃破を確認したときだけ発火し、`target=hydra` と実ダメージを付ける。自機への命中演出は既存の戦闘側の被弾イベントが担う。発射・予告から命中を推測しない。
+HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首の節・羅針盤の差し替え口。頭は既存の敵素材経路 `assets/pixel/hydra_<種類>.png` とステージの素材指定を使う。`energy_shader` は実判定に沿う光線・風・雷・瓦礫のマテリアルを差し替える。判定は点列・幅・時間のまま保持する。
 
-判定の正は HydraBoss の `Timeline` と `hydra_boss_timeline.tres`。予告の長さは `tech_compass` から `north_burst`・`east_sweep`・`west_sweep` の実行キーまでとし、予告・攻撃・終了のキーとアニメーション全体の長さを AnimationPlayer でまとめて動かして調整する。北は `tech_compass` から捕捉し、`north_curl` で狙いを固定、`north_burst` で伸長、`north_follow` で到達して停止する。これらのキーをまとめて編集し、固定後の回避時間を確保する。先端は根元を動かさずワールド座標の到達点へ補間し、更新区間ごとの掃引判定を出す。`north_reach` は BT の距離条件と根元から自機までの距離に合わせて調整し、予告も同じ射程で制限する。`compass_spin_fraction` は予告区間に対する針の回転時間の割合。`VisualTimeline` の尺は装飾だけを変え、予告の輪は判定側の実行イベントまで保つ。イベントの `attack_started` は攻撃動作の開始を示し、実際の被弾は戦闘判定で確定する。段階遷移・露出・撃破は表示をリセットし、中断は残った予告・フラッシュ・ビーム表示を片付ける。
+絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBossの `presentation_scene` に指定する。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取る。`VisualTimeline` は装飾用、`burst_shader` は衝撃・破壊・増加・分離のピクセル表現用。イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。添字は本体-1、不死の蛇-2、通常首0以上。取り付け位置は `presentation_anchor()`、状態は `presentation_state()`、同時噛みつきの実際の到達点は `presentation_targets()` で読む。`hit` は実HP減少に伴い実ダメージを渡す。
 
-`scripts/bosses/hydra_neck.gd` は通常の首と不死の首の骨組みを CPU で計算する。本体表面の固定根元から頭までの点列を持ち、世界秒で進む波を曲がりの目標へ加え、FABRIK の往復で節長を補正する。描画時は両端を胴体ローカルの根元と頭へ固定し、補正の残差を先端の節で吸収する。引いた首は余長を曲がりに使い、頭が全長より遠くへ出ると首全体を伸ばす。伸びきった首は直線で確定し、縮みきった首は更新と描画を止める。節数・補正回数・余長・波・追従の調整値は `data/bosses/hydra.tres` の `params.neck_*` に置き、骨組みの点列を描画素材から分けて扱う。 描画命令は世界の更新・部位の消失・本体の移動・半径の変更で更新し、停止中はキャッシュを使う。描画用の半径キャッシュは役者のメタデータに持ち、実験場の戦闘状態の比較から分ける。
-
-強めの技は `AnimationPlayer` のタイムラインを世界秒で進める。Behavior Tree が必要な首のそろった技を選び、役者が羅針盤の予告と各首の動きをまとめて扱う。必要な首が落ちたときはタイムラインを止める。草案では首ごとの通常攻撃・生え直しを役者の状態で持つ。採用仕様への対応は [ヒュドラ専用仕様](hydra.md) に従う。
+描画確認用の起動引数は `--hydra-inspect --hydra-attack=<通常技ID>` または `--hydra-inspect --hydra-tech=<大技・コンボID>`。指定した技を1回再現する。`--hydra-split` で分離状態から試遊できる。撮影は `--hydra-capture=/tmp/任意名.png --hydra-capture-at=<秒>` を併用する。`--hydra-inspect --hydra-review` は確認用の攻撃力で線入力から一戦を自動再現する。確認モードの機体固定と自動進行は起動引数のある実行だけに適用する。
 
 **みなみのかんむり座の渦**
 

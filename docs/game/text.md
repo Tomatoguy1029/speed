@@ -711,24 +711,26 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.iron.kill | 装甲がとても高い。十分な攻撃力の体当たりで割れる | Very high armor. A strong enough ram breaks it |
 | lab.enemy.saw.move | その場で回る丸鋸 | A saw blade spinning in place |
 | lab.enemy.saw.kill | 壊すのではなく、触れて飛ばす。進んでいた向きへ飛び、先の敵を巻き込む | Launch it by touching it rather than destroying it. It flies your way and cuts through enemies |
-| lab.enemy.hydra&#95;bite.move | うみへび座の首。首を引いてから前へ伸びて噛みつく。3回続けて噛むこともある | A Hydra neck. Pulls back then lunges to bite. Sometimes bites three times in a row |
+| lab.enemy.hydra&#95;bite.move | うみへび座の噛みつく首。狙いを固定して突き噛みし、近くでは横に薙ぐ | A Hydra bite head. Locks its lunge or sweeps nearby space |
 | lab.enemy.hydra&#95;bite.kill | 頭を削って落とす（本体の体力も減る）。落ちた頭は生え直す | Wear the head down (also hurts the body). Lost heads regrow |
-| lab.enemy.hydra&#95;vortex.move | うみへび座の首。渦を巻く息で、引き寄せる渦を置く | A Hydra neck. Breathes out a pulling vortex |
+| lab.enemy.hydra&#95;vortex.move | 風の帯で遅い機体を押し返し、首を振って三日月の風刃を3枚撃つ | Pushes slow ships away with a wind band and swings to launch three crescent blades |
 | lab.enemy.hydra&#95;vortex.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
-| lab.enemy.hydra&#95;debris.move | うみへび座の首。瓦礫を吐いて漂わせる。瓦礫を固めて投げることもある | A Hydra neck. Spits drifting debris or throws a packed lump |
+| lab.enemy.hydra&#95;debris.move | 硬い瓦礫の塊を投げる。近めの距離では扇状に散らす | Throws hard rubble chunks or scatters them in a fan at closer range |
 | lab.enemy.hydra&#95;debris.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
-| lab.enemy.hydra&#95;beam.move | うみへび座の首。光を溜めて太いビームで薙ぐ。細いビームを3回撃つこともある | A Hydra neck. Charges then sweeps a thick beam or fires three thin beams |
+| lab.enemy.hydra&#95;beam.move | 1本の射線を固定して照射する。有限長の光弾も撃つ | Holds one fixed beam or launches a finite light bolt |
 | lab.enemy.hydra&#95;beam.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
 | lab.enemy.hydra&#95;homing.move | うみへび座の首。ホーミング弾を吐く。弾の輪を浮かべて放つこともある | A Hydra neck. Spits homing shots or floats a ring of bullets and releases it |
 | lab.enemy.hydra&#95;homing.kill | 頭を削って落とす。落ちた頭は生え直す | Wear the head down. Lost heads regrow |
-| lab.enemy.hydra&#95;immortal.move | うみへび座の不死の首。むき出しの間、周りへ衝撃を出して暴れる | The immortal Hydra neck. Lashes out with shockwaves while exposed |
-| lab.enemy.hydra&#95;immortal.kill | むき出しの数秒のうちに貫くと本体に大ダメージ。火は効かない | Pierce it within the exposed seconds for heavy body damage. Fire has no effect |
+| lab.enemy.hydra&#95;thunder.move | 帯電して頭突きし、到達時に放電する。遠くでは進行先へ落雷を予告する | Charges a headbutt with an arrival discharge, or marks lightning ahead at range |
+| lab.enemy.hydra&#95;thunder.kill | 頭を削って落とす。合体中は再生し、分離後は撃破できる | Wear the head down. Regrows while combined; stays defeated after separation |
+| lab.enemy.hydra&#95;immortal.move | 羅針盤を抱えて逃げる蛇。単独では振り返って噛みつく | The compass bearer flees, then turns to bite when alone |
+| lab.enemy.hydra&#95;immortal.kill | 護衛が残っていても直接攻撃できる。倒すと羅針盤を解放する | Can be damaged directly while guards remain. Defeat it to free the compass |
 | lab.enemy.hydra&#95;rubble.move | うみへび座が吐いた瓦礫。漂って、少しすると消える | Debris spat by the Hydra. Drifts and vanishes after a while |
 | lab.enemy.hydra&#95;rubble.kill | 体当たりは弾かれる。武器で壊せる | Rams bounce off. Weapons break it |
 | lab.enemy.provisional.move | 機体を直接追い、予告のあと扇状に弾を撃つ | Chases you directly and fires a fan of bullets after a warning |
 | lab.enemy.provisional.kill | HP を削る。背面が弱点 | Wear down its HP. Its back is the weak point |
-| lab.enemy.hydra.move | その場で構え、機体が離れると泳いで近づく。首（3〜9本）がそれぞれ攻撃し、羅針盤で予告して強めの技を出す | Holds its ground and swims closer when you are far. Each neck (3 to 9) attacks and its compass signals strong techniques |
-| lab.enemy.hydra.kill | 本体と首はすり抜ける。頭だけにダメージが通る。全部の頭を落とすと出る不死の首を貫くと大ダメージ | The body and necks are intangible. Only heads take damage. Pierce the immortal neck exposed after all heads fall |
+| lab.enemy.hydra.move | 中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する | Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes |
+| lab.enemy.hydra.kill | 中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す | Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer |
 | lab.ui.freehand | 自由に描く | Freehand |
 | lab.ui.edit&#95;points | 点を編集 | Edit points |
 | lab.ui.route&#95;tool&#95;help | 自由描画と点ごとの編集を切り替え | Switch between freehand drawing and editing points |
@@ -789,6 +791,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/hydra&#95;bite.tres | うみへび座の噛みつく首 |
 | enemies/hydra&#95;debris.tres | うみへび座の瓦礫の首 |
 | enemies/hydra&#95;homing.tres | うみへび座のホーミング弾の首 |
+| enemies/hydra&#95;thunder.tres | うみへび座の雷の首 |
 | enemies/hydra&#95;immortal.tres | うみへび座の不死の首 |
 | enemies/hydra&#95;rubble.tres | うみへび座の瓦礫 |
 | enemies/hydra&#95;vortex.tres | うみへび座の渦の首 |

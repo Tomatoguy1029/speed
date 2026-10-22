@@ -12,10 +12,12 @@ func _ready() -> void:
 	var boss = lab.run.bosses.lab_instances.back().actor
 	boss.hsm.set_active(false)
 	var maximum: float = boss.table.max_hp[boss.body]
+	lab.run.combat.damage_enemy(boss.necks[0].row,100000.0,{"cause":&"weapon"})
 	lab.run.combat.damage_enemy(boss.body, maximum * 0.4, {"cause": &"weapon"})
 	check(is_equal_approx(boss.table.hp[boss.body], maximum * 0.6), "central rubble takes ordinary weapon damage and carries excess")
 	boss.sim_tick(0.01, 0.01)
 	check(boss.count == 5, "HP threshold grows five heads")
+	check(boss.necks.all(func(n):return boss._alive(n)),"growth restores heads killed earlier in the same world step")
 	check(boss.necks.any(func(n): return n.kind == &"thunder"), "five heads contain all five kinds")
 	var after: float = boss.table.hp[boss.body]
 	lab.run.combat.damage_enemy(boss.body, 100.0, {"cause": &"weapon"})
