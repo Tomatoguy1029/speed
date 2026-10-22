@@ -86,7 +86,7 @@ func setup() -> void:
 	state.meta_override = options.get("meta", {})
 	state.stage_index = int(options.get("stage_index", 1))
 	state.endless = bool(options.get("endless", false))
-	state.stage = options.get("stage", ContentManager.stage(state.stage_index))
+	state.stage = options.get("stage", ContentManager.runtime_stage(state.stage_index))
 	state.time = float(options.get("start_time", 0.0))
 	var start_source: String = options.get("start_source", "stage_start")
 	if options.has("seed"):

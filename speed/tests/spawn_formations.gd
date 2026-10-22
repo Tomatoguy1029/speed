@@ -61,7 +61,7 @@ func _check_phases(run: RunSimulation) -> void:
 func _check_spawn(run: RunSimulation, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
-	var data := em.ctx.spawn.formation_data(scene)
+	var data: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(scene)
 	check(data.layouts.size() >= 1 and data.entries.size() >= 1, "組み合わせのシーンを読める")
 	state.ship_pos = Vector2(5000, -2000)
 	state.ship_vel = Vector2.ZERO
@@ -108,24 +108,24 @@ func _check_clips(run: RunSimulation, scene: PackedScene) -> void:
 			for k in range(0, rows.size(), 2):
 				em.table.dead[rows[k]] = 1
 	state.time = 4.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "開始の前は出さない")
 	state.time = 5.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "開始で群れを出す")
 	state.time = 6.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "同時の群れの数を超えて出さない")
 	kill.call()
 	state.time = 7.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "出す間隔が経つまで次を出さない")
 	state.time = 8.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "間隔が経てば次を出す")
 	kill.call()
 	state.time = 20.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "長さが過ぎたら出さない")
 	# 選んだ種類の敵だけを出す
 	var only: Array[StringName] = [&"telescope"]
@@ -133,7 +133,7 @@ func _check_clips(run: RunSimulation, scene: PackedScene) -> void:
 	em.ctx.spawn._clip_groups.clear()
 	em.ctx.spawn._clip_next.clear()
 	state.time = 6.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	var all_tele := true
 	for rows: PackedInt32Array in em.ctx.spawn._clip_groups.get(0, []):
 		for k in range(0, rows.size(), 2):
@@ -151,10 +151,10 @@ func _check_clips(run: RunSimulation, scene: PackedScene) -> void:
 	em.ctx.spawn._clip_groups.clear()
 	em.ctx.spawn._clip_next.clear()
 	em.ctx.spawn._type_counts[&"aquarius"] = 1
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "上限に達している間は出さない")
 	em.ctx.spawn._type_counts.clear()
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "空いたら出す")
 	kill.call()
 	# クリップから出た群れは、遠くにいても再配置しない（隊列がばらばらにならない）
@@ -163,7 +163,7 @@ func _check_clips(run: RunSimulation, scene: PackedScene) -> void:
 	clip.formations = forms
 	clip.types = types
 	state.time = 6.0
-	em.ctx.spawn._tick_clips()
+	_tick_clip(run, clip)
 	var rows: PackedInt32Array = em.ctx.spawn._clip_groups[0][0]
 	var far := state.view_center + Vector2(0, -5000)
 	em.table.pos[rows[0]] = far
@@ -238,3 +238,8 @@ func _check_curves(run: RunSimulation) -> void:
 	check(em.ctx.spawn._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
 	em.ctx.spawn._zako_counts[&"biter"] = 6
 	check(em.ctx.spawn._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")
+
+## 編集元の変更は制作工程を通してからランへ渡す。
+func _tick_clip(run: RunSimulation, source: SpawnClip) -> void:
+	run.state.stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(source)]
+	run.spawn._tick_clips()

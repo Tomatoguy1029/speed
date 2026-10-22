@@ -993,7 +993,7 @@ func _stage_types(stage: StageDef) -> PackedStringArray:
 		if phase.wave_type != &"" and not types.has(String(phase.wave_type)): types.append(String(phase.wave_type))
 	for clip: SpawnClip in stage.clips:
 		for formation: PackedScene in clip.formations:
-			for layout in run.spawn.formation_data(formation).get("layouts", []):
+			for layout in load("res://tools/content/build_runtime_stage.gd").formation(formation).get("layouts", []):
 				for marker in layout.markers:
 					if (clip.types.is_empty() or StringName(marker.type) in clip.types) and not types.has(String(marker.type)):
 						types.append(String(marker.type))

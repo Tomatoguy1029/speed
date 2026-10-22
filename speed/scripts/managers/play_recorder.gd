@@ -14,6 +14,7 @@ const SAVED_NOTICE := 5.0
 var _real_start_us := 0
 var _perf_last_us := 0
 var _perf_window_us := 0
+var _record_names: Dictionary = {}
 var _perf_phase := -1
 var _perf_bonus := false
 var _perf_frames := 0
@@ -152,11 +153,13 @@ func _begin(session: RunSession, during_run := false) -> void:
 	_last_xp_dropped = run.state.xp_dropped
 	_next_sample = run.state.time + INTERVAL
 	_perf_start(Time.get_ticks_usec())
+	var names_path := "res://.content/dev/stage_%d.json" % run.state.stage_index
+	_record_names = JSON.parse_string(FileAccess.get_file_as_string(names_path)) if FileAccess.file_exists(names_path) else {}
 	var bands := []
 	var phases: Array = run.state.stage.phases
 	for k in phases.size():
 		var p: PhaseDef = phases[k]
-		bands.append({"id": String(p.id), "name": p.display_name, "start": p.start})
+		bands.append({"id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name), "start": p.start})
 	var recording_start: Dictionary = run.recording_snapshot()
 	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
@@ -297,12 +300,12 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"strong_spawn":
 				_strong[e.id] = [String(e.enemy_type), time, 0, 0.0, {}]
 			&"clip_group":
-				_write({"type": "clip_group", "t": time, "clip": e.clip, "key": e.key, "n": e.n})
+				_write({"type": "clip_group", "t": time, "clip": _record_names.get("clips", {}).get(str(e.clip), str(e.clip)), "key": e.key, "n": e.n})
 			&"clip_group_end":
-				_write({"type": "clip_group_end", "t": time, "clip": e.clip, "key": e.key})
+				_write({"type": "clip_group_end", "t": time, "clip": _record_names.get("clips", {}).get(str(e.clip), str(e.clip)), "key": e.key})
 			&"phase":
 				var p: PhaseDef = _run.spawn.current_phase()
-				_write({"type": "band", "t": time, "id": String(p.id), "name": p.display_name})
+				_write({"type": "band", "t": time, "id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name)})
 			&"levelup":
 				_write({"type": "levelup", "t": time, "level": e.level})
 			&"upgrade":

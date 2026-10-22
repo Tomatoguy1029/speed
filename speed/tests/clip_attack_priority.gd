@@ -69,7 +69,7 @@ func _runtime_checks() -> void:
 	clip.formations = [load("res://data/formations/aquarius_solo.tscn")]
 	clip.types = [&"aquarius"]
 	clip.length = 10.0
-	stage.clips = [clip]
+	stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(clip)]
 	lab.run.state.time = 0.0
 	em.ctx.spawn._tick_clips()
 	var groups: Array = em.ctx.spawn._clip_groups[0]

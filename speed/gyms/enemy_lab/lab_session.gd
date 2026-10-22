@@ -118,7 +118,7 @@ func _rebuild() -> void:
 					for param in spec.overrides[id][key]: def.params[param] = safe_parameter(param, spec.overrides[id][key][param])
 				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
-	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
+	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": load("res://tools/content/build_runtime_stage.gd").compile(stage),
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {}), "director": spec.get("director", {})}
 	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
@@ -389,7 +389,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			# 敵の組み合わせのシーンの配置と出現位置を選んで、機体のまわりに並べる
 			var path := String(args.get("path", ""))
 			if ResourceLoader.exists(path):
-				var data := run.spawn.formation_data(load(path))
+				var data: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(load(path))
 				run.spawn.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
 				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
 		"edit_range":

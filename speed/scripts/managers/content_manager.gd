@@ -148,3 +148,6 @@ func _table(category: StringName) -> Dictionary:
 			table[id] = definition(category, id)
 		_tables[category] = table
 	return _tables[category]
+
+func runtime_stage(index: int) -> RuntimeStage:
+	return load("res://.content/stage_%d.tres" % index) as RuntimeStage

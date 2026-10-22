@@ -142,24 +142,12 @@ func _sync_attack_budget(phase: PhaseDef) -> void:
 
 # ── 強敵の群れ（敵の組み合わせのシーン） ────────────────────────────
 
-## 組み合わせのシーンのパス → ゲーム中に使う形（EnemyFormation.to_data）
-var _formation_cache: Dictionary = {}
 ## クリップの番号 → そのクリップから出た群れ（各群れの行番号と id を交互に並べたもの）
 var _clip_groups: Dictionary = {}
 ## クリップの番号 → 次に群れを出せる時刻（実秒）
 var _clip_next: Dictionary = {}
 ## 一度画面に入ったクリップの群れ（群れの最初の敵の id → true）。入ったあとは遠くなったら再配置する
 var _clip_arrived: Dictionary = {}
-
-## 組み合わせのシーンを、ゲーム中に使う形にする（シーンごとに1回だけ）。
-func formation_data(scene: PackedScene) -> Dictionary:
-	if scene == null:
-		return {}
-	if not _formation_cache.has(scene.resource_path):
-		var node := scene.instantiate()
-		_formation_cache[scene.resource_path] = node.to_data() if node.has_method("to_data") else {}
-		node.free()
-	return _formation_cache[scene.resource_path]
 
 ## 重み（weight）で1つ選んだ番号。空なら -1。
 func _pick_weighted(items: Array) -> int:
@@ -234,7 +222,7 @@ func _formation_capped(data: Dictionary) -> bool:
 func _tick_clips() -> void:
 	var clips: Array = state.stage.clips if state.stage != null else []
 	for n in clips.size():
-		var clip: SpawnClip = clips[n]
+		var clip: RuntimeClip = clips[n]
 		var prev: Array = _clip_groups.get(n, [])
 		var groups: Array = prev.filter(_group_alive)
 		if groups.size() < prev.size():
@@ -242,36 +230,31 @@ func _tick_clips() -> void:
 			for g: PackedInt32Array in prev:
 				if not groups.has(g):
 					_clip_arrived.erase(g[1])
-					state.emit(&"clip_group_end", {"clip": clip.label, "key": g[1]})
+					state.emit(&"clip_group_end", {"clip": n, "key": g[1]})
 		_clip_groups[n] = groups
 		if state.time < clip.time or state.time >= clip.end_time():
 			continue
 		if groups.size() >= clip.groups or state.time < float(_clip_next.get(n, -1e9)):
 			continue
 		var items := []
-		for scene: PackedScene in clip.formations:
-			var data := formation_data(scene)
-			if data.is_empty() or _formation_capped(data):
-				continue
-			var allowed := clip.allowed_layouts(scene.resource_path, data)
-			if not allowed.is_empty():
-				items.append({"data": data, "layouts": allowed, "scene_path": scene.resource_path, "weight": 1.0})
+		for data: Dictionary in clip.prepared:
+			if not _formation_capped(data): items.append({"data": data, "weight": 1.0})
 		var k := _pick_weighted(items)
 		if k < 0:
 			continue
 		var choices := []
-		for li: int in items[k].layouts:
+		for li in items[k].data.layouts.size():
 			choices.append({"index": li, "weight": items[k].data.layouts[li].weight})
 		var c := _pick_weighted(choices)
 		if c < 0:
 			continue
 		var layout_index: int = choices[c].index
-		var value := clip.formation_value(items[k].scene_path, str(items[k].data.layouts[layout_index].get("name", "")))
+		var value: float = items[k].data.layouts[layout_index].value
 		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority)
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
-			state.emit(&"clip_group", {"clip": clip.label, "key": rows[1], "n": rows.size() / 2})
+			state.emit(&"clip_group", {"clip": n, "key": rows[1], "n": rows.size() / 2})
 
 var _type_counts: Dictionary = {}
 ## 曲線のある雑魚の種類ごとの、再配置の範囲の中の数

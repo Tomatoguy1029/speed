@@ -185,4 +185,6 @@ func _wait_real() -> void:
 	# 入力のガードだけを検証する。乱数で選ばれた装備の報酬演出は別途確認する。
 	run.flush_events()
 	hud._rewards.cancel()
-	await get_tree().create_timer(0.35, true, false, true).timeout
+	var deadline := Time.get_ticks_usec() + 350_000
+	while Time.get_ticks_usec() < deadline:
+		await get_tree().process_frame
