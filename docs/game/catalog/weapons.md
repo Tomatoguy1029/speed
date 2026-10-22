@@ -15,7 +15,6 @@
 | W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ（クリティカルにはならない）。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。外力は [ボス共通ルール](../spec.md#12-ボス) に従う。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
 | W04 | 接触波動 | 採用 | 高速で触れるたびに、触れた位置から周りへ波動。弾かれた接触でも出る。波動の撃破からは連鎖しない | 密集した群れを通る | 実装済み。`scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | [demo W04](../../../demo/docs/weapons.md) `contactWave` |
 | W05 | バリアシステム | 採用 | 周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ | 敵や弾に近づくときの状況を変える | 実装済み。`scripts/weapons/barrier.gd`、`data/weapons/W05_barrier.tres` | [demo W05](../../../demo/docs/weapons.md) `barrier` |
-| W06 | 追走ドローン | 採用 | 周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する。Lv で機数が増える | 自機が抜けたあとにも同じ線を掃く | 実装済み。`scripts/weapons/drone.gd`、`data/weapons/W06_drone.tres`。見た目は下の「機体とドローンの見た目」 | [demo W06](../../../demo/docs/weapons.md) `drone` |
 | W07 | 軌跡機雷 | 採用 | 高速で実際に通った線に一定の間隔で機雷を残す。少し遅れて有効になり、敵が近づくと爆発する | 敵が後から入る線を残す | 実装済み。`scripts/weapons/mines.gd`、`data/weapons/W07_mines.tres` | [demo W07](../../../demo/docs/weapons.md) `mines` |
 | W08 | ソニックブーム | 採用 | 駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波。同じ波動では各敵に1回 | 撃った地点だけでなく進路も一掃する。T05 とは別 | 実装済み。`scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres`。威力は試遊用のLv別配列を使用（下記） | [demo W08](../../../demo/docs/weapons.md) `sonic` |
 | W17 | 接触電撃 | 採用 | 普段・高速を問わず敵に触れると、接触点の全周を角度帯に分け、敵がいる帯へ枝を出す。Lv に応じて枝数と全枝が共有する追加対象数が増える。空の帯の枠は各枝の続きへ交互に配る。同じ敵には1回の放電で1度だけ。隕石には流れない | 群れに踏み込み、最終段階では周囲にいる敵へ全方面から電撃を広げる | 実装済み。`scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。Lv別の枝数は試遊用の調整可能な初期値。外観は[雷撃](../art-style.md#37-雷撃) | [demo W17](../../../demo/docs/weapons.md) `contactArc`。本番は分岐方式 |
@@ -129,4 +128,6 @@
 
 ## 保留・不採用
 
-なし。
+| ID | 名称 | 採用状態 | 発動・効果 | 本番の実装状況・コード参照 | 理由・未決事項 |
+|---|---|---|---|---|---|
+| W06 | 追走ドローン | 保留（コンセプト撤回） | 周りを回って近くの敵を撃つ。駆け抜けた線を1機ごとに遅れて追い、触れた敵も攻撃する。Lv で機数が増える | 実装済みのまま。`scripts/weapons/drone.gd`、`data/weapons/W06_drone.tres`。削除は未実施。見た目は下の「機体とドローンの見た目」 | 線を遅れて追う役割が W27 残像機と重なる。代わりのドローンは未定 |
