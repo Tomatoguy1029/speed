@@ -16,6 +16,10 @@ signal presentation_advanced(world_dt: float)
 @export_range(0.0, 1.0) var compass_spin_fraction := 0.5
 var _presentation: Node
 var _defeat_announced := false
+var _neck_mesh: ArrayMesh
+var _neck_mesh_dirty:=true
+var _neck_mesh_origin:=Vector2.INF
+var _neck_mesh_radius:=-1.0
 
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
@@ -443,9 +447,12 @@ func _extend_regrow_grace(combo_scale: float) -> void:
 
 ## 頭の位置・向きは攻撃側が決め、描画用の点列だけを解く。頭を失った首は短く畳む。
 func _follow_neck(neck: Neck, dt: float) -> void:
+	_neck_mesh_dirty=true
 	if separated:
 		SNAKE.follow(neck,_head_pos(neck),dt,_time,def.params)
-		for i in neck.segs.size():neck.segs[i]=arena.safe_point(neck.segs[i],24.0)
+		var points:=neck.segs
+		for i in points.size():points[i]=arena.safe_point(points[i],24.0)
+		neck.segs=points
 		return
 	var rest := float(def.params.neck_rest)
 	if neck.row < 0:
@@ -851,18 +858,70 @@ func draw_on(c: CanvasItem) -> void:
 		return
 	var t := table
 	var r := t.r[body]
-	for neck in necks:
-		if neck.row >= 0 or neck.length > 0.0:
-			_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
+	if neck_texture==null:
+		_draw_neck_mesh(c,r)
+	else:
+		for neck in necks:
+			if neck.row >= 0 or neck.length > 0.0:
+				_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if separated:
 		if immortal_neck!=null:
-			_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
+			if neck_texture!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
 		return
 	if body_texture!=null:c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
 	else:c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
 	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
 	_draw_compass(c, r * 0.75)
+
+## 仮の首の節・継ぎ目・ハイライトを一枚へまとめ、色と重なり順を保つ。
+func _draw_neck_mesh(c: CanvasItem,radius: float)->void:
+	if _neck_mesh_dirty or _neck_mesh_origin!=table.pos[body] or _neck_mesh_radius!=radius:
+		var vertices:=PackedVector2Array()
+		var colors:=PackedColorArray()
+		var indices:=PackedInt32Array()
+		for neck in necks:
+			if neck.row>=0 or neck.length>0.0:_append_neck_mesh(neck.segs,radius,Color("#8f8170"),vertices,colors,indices)
+		if separated and immortal_neck!=null:_append_neck_mesh(immortal_neck.segs,110.0,Color("#c9a64a"),vertices,colors,indices)
+		_neck_mesh=null
+		if not vertices.is_empty():
+			var arrays:=[]
+			arrays.resize(Mesh.ARRAY_MAX)
+			arrays[Mesh.ARRAY_VERTEX]=vertices
+			arrays[Mesh.ARRAY_COLOR]=colors
+			arrays[Mesh.ARRAY_INDEX]=indices
+			_neck_mesh=ArrayMesh.new()
+			_neck_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+		_neck_mesh_dirty=false
+		_neck_mesh_origin=table.pos[body]
+		_neck_mesh_radius=radius
+	if _neck_mesh!=null:c.draw_mesh(_neck_mesh,null)
+	for neck in necks:
+		if neck.row>=0 and neck.glow>0.0 and not neck.segs.is_empty():
+			c.draw_circle(neck.segs[-1]-table.pos[body],radius*0.5,Color(1.0,0.85,0.5,0.45*neck.glow))
+
+func _append_neck_mesh(segs: PackedVector2Array,radius: float,col: Color,vertices: PackedVector2Array,colors: PackedColorArray,indices: PackedInt32Array)->void:
+	var previous:=Vector2.ZERO
+	var dark:=col.darkened(0.15)
+	for i in segs.size():
+		var at:=segs[i]-table.pos[body]
+		var size:=radius*(0.32-0.14*float(i)/segs.size())
+		if i>0:_append_neck_line(previous,at,size*2.0,col,vertices,colors,indices)
+		var polygon:=PackedVector2Array()
+		for corner in 8:polygon.append((at+Vector2.from_angle(float(corner)*TAU/8.0)*size).snapped(Vector2(3,3)))
+		_append_neck_polygon(polygon,col if i%2==0 else dark,vertices,colors,indices)
+		_append_neck_line(at+Vector2(-size*0.5,-size*0.4),at+Vector2(size*0.4,-size*0.4),3.0,col.lightened(0.2),vertices,colors,indices)
+		previous=at
+
+func _append_neck_line(a: Vector2,b: Vector2,width: float,col: Color,vertices: PackedVector2Array,colors: PackedColorArray,indices: PackedInt32Array)->void:
+	var side:=(b-a).normalized().orthogonal()*width*0.5
+	_append_neck_polygon(PackedVector2Array([a+side,b+side,b-side,a-side]),col,vertices,colors,indices)
+
+func _append_neck_polygon(points: PackedVector2Array,col: Color,vertices: PackedVector2Array,colors: PackedColorArray,indices: PackedInt32Array)->void:
+	var start:=vertices.size()
+	vertices.append_array(points)
+	for i in points.size():colors.append(col)
+	for i in range(1,points.size()-1):indices.append_array(PackedInt32Array([start,start+i,start+i+1]))
 
 func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Color, glow: float) -> void:
 	var origin := table.pos[body]
