@@ -63,7 +63,7 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_arc(p + u * -3.0 * px, 16.5 * px * (1.03 + 0.03 * pulse), 0, TAU, 48, Color(glow, 0.55 + 0.35 * pulse), maxf(_px(2.0), px * 1.5))
 		var ball := float(dp.shell_r) * (0.35 + 0.65 * t.charge[i])
 		var at := mouth + u * ball * 0.55
-		rm._draw_shell_ball(c, at, ball, t.color[i], now)
+		rm._attack_visual("shell").draw_ball(c, at, ball, t.color[i], now)
 
 ## ポンプ座に吸い込まれていく敵。自転しながら小さくなり、ポンプ座の口へ飛び込む。
 func _draw_swallows(c: CanvasItem) -> void:

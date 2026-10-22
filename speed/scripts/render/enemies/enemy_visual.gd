@@ -48,3 +48,13 @@ func update(_dt: float) -> void:
 
 func _px(px: float) -> float:
 	return rm._px(px)
+
+## 本体の特別な表示を描いたらtrue。falseなら共通のスプライトへ渡す。
+func draw_body(_c: CanvasItem, _table: EnemyTable, _row: int, _pos: Vector2) -> bool:
+	return false
+
+func sprite_radius(table: EnemyTable, row: int) -> float:
+	return rm.enemy_sprite_radius(table.type[row], table.r[row])
+
+func on_kill(_event: Dictionary) -> void:
+	pass

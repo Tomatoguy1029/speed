@@ -22,3 +22,6 @@ func update(_dt: float) -> void:
 
 func _px(px: float) -> float:
 	return rm._px(px)
+
+func draw_friend(_c: CanvasItem, _projectiles: ProjectileSystem, _row: int, _pos: Vector2) -> void:
+	pass

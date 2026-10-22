@@ -90,16 +90,7 @@ func on_enemy_killed(i: int) -> void:
 		for k in n:
 			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n))
 	_drop_coins(i)
-	if t.type[i] == &"meteor":
-		if state.rng.randf() < cfg.meteor_heal_chance:
-			_add_capsule(Pickup.Kind.HEAL, &"drop", pos)
-		if state.rng.randf() < cfg.meteor_magnet_chance:
-			_add_capsule(Pickup.Kind.MAGNET, &"drop", pos)
-		# レアな彗星は、決まった彗星限定の武器のカプセルを必ず落とす
-		var weapon := field.comet_weapon(t.meteor_index[i])
-		if weapon != &"":
-			_add_capsule(Pickup.Kind.COMET_WEAPON, &"comet", pos)
-			capsules[capsules.size() - 1].weapon_id = weapon
+	enemies.extra_drops(self, i)
 	# 大きい結晶：レチクル座のように段の決まった敵は必ず、ほかは経験値の多い敵ほど高い確率で落とす
 	var tier := int(t.def[i].params.get("big_crystal", 0)) if t.def[i] != null else 0
 	if tier == 0 and state.rng.randf() < minf(cfg.drop_max, cfg.drop_base * pow(t.xp[i], cfg.drop_power_exp)):
@@ -194,10 +185,9 @@ func _drop_coins(i: int) -> void:
 	var n := 0
 	if t.elite[i] != 0:
 		n = 3 + state.rng.randi_range(0, 3)
-	elif t.type[i] == &"meteor":
-		n = (1 + state.rng.randi_range(0, 2)) if state.rng.randf() < cfg.meteor_coin_chance else 0
-	elif state.rng.randf() < 0.03:
-		n = 1
+	else:
+		var behavior := enemies.row_behavior(i)
+		n = behavior.coin_count(i) if behavior != null else (1 if state.rng.randf() < 0.03 else 0)
 	var pos := t.pos[i]
 	var r := t.r[i]
 	for k in n:

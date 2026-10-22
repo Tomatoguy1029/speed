@@ -41,6 +41,9 @@ var _looks: Dictionary = {}
 var _layered_textures: Dictionary = {}
 ## 敵の見た目の処理（行動の種類の番号の順）と、出来事の種類から受け取る処理
 var _visuals: Array[EnemyVisual] = []
+var _visual_codes: Dictionary = {}
+var _type_visuals: Dictionary = {}
+var _friendly_visuals: Dictionary = {}
 var _event_visuals: Dictionary = {}
 var _enemy_mat: ShaderMaterial
 var _armor_material: ShaderMaterial
@@ -268,21 +271,34 @@ func _ensure_enemy_batch(type: StringName) -> InstanceBatch:
 
 ## その戦いに出た行動の種類の見た目の処理を作る。ファイルがなければ共通の飾りだけを描く。
 func _sync_visuals() -> void:
-	var behaviors := run.enemies.behaviors
-	for k in range(_visuals.size(), behaviors.size()):
-		var name := behaviors[k].name
-		var path := "res://scripts/render/enemies/%s.gd" % name
-		var v: EnemyVisual = load(path).new() if ResourceLoader.exists(path) else EnemyVisual.new()
-		v.setup(self, name)
-		_visuals.append(v)
-		for e in v.events:
-			if not _event_visuals.has(e):
-				_event_visuals[e] = []
-			_event_visuals[e].append(v)
+	for behavior in run.enemies.behaviors:
+		_visual_for_code(behavior.name, behavior.name)
 
-## 行 i の敵の見た目の処理（行動の種類を持たない隕石・ボスは null）。
-func _visual_of(t: EnemyTable, i: int) -> EnemyVisual:
-	return _visuals[t.beh[i]] if t.beh_slot[i] >= 0 and t.beh[i] < _visuals.size() else null
+func _visual_for_code(code: StringName, behavior_name: StringName) -> EnemyVisual:
+	if not _visual_codes.has(code):
+		var path := "res://scripts/render/enemies/%s.gd" % code
+		var visual: EnemyVisual = load(path).new() if ResourceLoader.exists(path) else EnemyVisual.new()
+		visual.setup(self, behavior_name)
+		_visual_codes[code] = visual
+		_visuals.append(visual)
+		for event in visual.events:
+			if not _event_visuals.has(event):
+				_event_visuals[event] = []
+			_event_visuals[event].append(visual)
+	return _visual_codes[code]
+
+func _visual_for_type(type: StringName) -> EnemyVisual:
+	if not _type_visuals.has(type):
+		var def := run.enemies.def_of(type)
+		if def == null:
+			return null
+		var path := "res://scripts/render/enemies/%s.gd" % type
+		var code := type if ResourceLoader.exists(path) else def.behavior
+		_type_visuals[type] = _visual_for_code(code, def.behavior)
+	return _type_visuals[type]
+
+func _visual_of(table: EnemyTable, row: int) -> EnemyVisual:
+	return _visual_for_type(table.type[row]) if table.def[row] != null else null
 
 func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
@@ -342,8 +358,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"text":
 				_text(ev.pos, ev.text, ev.color, ev.get("size", 16))
 			&"kill":
-				if ev.get("enemy_type", &"") == &"meteor":
-					_shatter_meteor(ev)
+				var killed_visual := _visual_for_type(StringName(ev.get("enemy_type", &"")))
+				if killed_visual != null:
+					killed_visual.on_kill(ev)
 				var n := 6 + roundi(ev.r / 3.0)
 				_burst(ev.pos, ev.color, n, ev.get("dir", Vector2.ZERO), 260.0 + ev.r * 4.0)
 				if ev.r > 25.0:
@@ -759,25 +776,13 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		var p := pos[i]
 		var type := t.type[i]
-		# 地形の隕石はシートの絵で描き、被弾で光らせない
-		var meteor := type == &"meteor"
-		var sprite_radius := t.r[i] if meteor else enemy_sprite_radius(type, t.r[i])
+		var visual := _visual_of(t, i)
+		var sprite_radius := visual.sprite_radius(t, i) if visual != null else enemy_sprite_radius(type, t.r[i])
 		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - run.combat.enemy_query_padding)).has_point(p):
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
-		var col := Color(1.0 if t.flash[i] > 0.0 and not meteor else 0.0, 0.0, 0.0, 1.0)
-		if meteor:
-			var comet := run.field.comet_at(t.meteor_index[i])
-			if comet != null:
-				_draw_comet(c, p, t.r[i], t.vel[i], comet.rare_weapon != &"")
-				continue
-			# ストリームで再生成されても同じ岩の模様を使う。
-			var meteors := _meteors()
-			var variant := posmod(t.meteor_index[i], 2)
-			var stage := clampi(int((1.0 - t.hp[i] / t.max_hp[i]) * 3.0), 0, 2)
-			var rock_key := StringName("meteor_" + str(variant) + "_damage_" + str(stage))
-			var rock_batch: InstanceBatch = _batches[rock_key]
-			rock_batch.add(p, t.facing[i], meteors.METEOR_SHEETS[variant].get_height() / 2.0, col)
+		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
+		if visual != null and visual.draw_body(c, t, i, p):
 			continue
 		if t.is_boss[i] != 0:
 			var boss_actor := run.bosses.actor_for_row(i)
@@ -952,29 +957,6 @@ func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_rect(Rect2(top, Vector2(w, _px(4.0))), Color(0, 0, 0, 0.6))
 		c.draw_rect(Rect2(top, Vector2(w * maxf(0.0, hp / max_hp), _px(4.0))), Color("#ff6b5a"))
 
-## やまねこ座の斬撃：潰れた弧の3本の爪痕。外側の光、橙の芯、白い刃の3重で描く。a は濃さ。
-## 圧縮した敵の塊（構えている口元と、撃った圧縮弾）。張り詰めた膜の中に、押し込められた敵がひしめいて回る。
-func _draw_shell_ball(c: CanvasItem, at: Vector2, r: float, base: Color, now: float) -> void:
-	var pulse := 0.5 + 0.5 * sin(now * 14.0)
-	c.draw_circle(at, r * (1.25 + 0.08 * pulse), Color(base.lightened(0.5), 0.22))
-	c.draw_circle(at, r, base.darkened(0.45))
-	var kinds: Array[StringName] = [&"drifter", &"swarm", &"drifter", &"splitling", &"swarm", &"drifter", &"swarm"]
-	for k in kinds.size():
-		var ring := 0.0 if k == 0 else 0.55
-		var a := now * (1.5 if k % 2 == 0 else -1.1) + k * TAU / 6.0
-		var q := at + Vector2.from_angle(a) * r * ring
-		var tex := _enemy_texture(kinds[k])
-		var size := r * (0.62 if k == 0 else 0.5)
-		if tex == null:
-			c.draw_circle(q, size * 0.5, base)
-			continue
-		var ext := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * size
-		c.draw_set_transform(q, a * 2.0)
-		c.draw_texture_rect(tex, Rect2(-ext / 2.0, ext), false, Color(1, 1, 1, 0.9))
-		c.draw_set_transform(Vector2.ZERO)
-	c.draw_circle(at, r, Color(base.lightened(0.3), 0.18))
-	c.draw_arc(at, r, 0, TAU, 40, Color("#fff0c8", 0.75 + 0.25 * pulse), maxf(_px(1.5), r * 0.1))
-
 func _draw_projectiles(c: CanvasItem) -> void:
 	var view := view_rect().grow(40.0)
 	for t in trails:
@@ -989,27 +971,7 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		var pos := friend_pos[i]
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
-		var r := pr.friend_r[i]
-		if pr.friend_type[i] == &"saw":
-			var pts := PackedVector2Array()
-			for k in 24:
-				pts.append(pos + Vector2.from_angle(pr.friend_angle[i] + TAU * k / 24.0) * r * (1.0 if k % 2 == 0 else 0.78))
-			c.draw_colored_polygon(pts, Color("#d9dde6"))
-		elif pr.friend_cause[i] == &"interceptor":
-			load("res://scripts/render/interceptor_visual.gd").shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
-		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.HULL:
-			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
-		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.DEBRIS:
-			var trail := pr.friend_trail[i]
-			if trail.size() > 1:
-				c.draw_polyline(trail, Color(1.0, 0.6, 0.25, 0.7), _px(3.0))
-			var u := Vector2.from_angle(pr.friend_angle[i]) * r
-			var v := Vector2(-u.y, u.x) * 0.6
-			c.draw_colored_polygon(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v]), Color("#aeb6c4"))
-			c.draw_polyline(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v, pos + u]), Color("#ff9a3c"), _px(1.5))
-		else:
-			var dir := pr.friend_vel[i].normalized()
-			c.draw_line(pos - dir * r * 2.2, pos + dir * r * 1.2, Color("#9fe8ff"), maxf(_px(3.0), r * 0.9))
+		_friendly_visual(pr, i).draw_friend(c, pr, i, pos)
 	_hostile_batch.begin()
 	for i in pr.hostile_alive.size():
 		var pos := pr.hostile_pos[i]
@@ -1186,3 +1148,13 @@ func _meteors() -> RefCounted:
 		_meteor_visual = load("res://scripts/render/meteor_visual.gd").new()
 		_meteor_visual.setup(self)
 	return _meteor_visual
+
+func _friendly_visual(projectiles: ProjectileSystem, row: int) -> AttackVisual:
+	var code := String(projectiles.friend_type[row])
+	if code.is_empty() or not ResourceLoader.exists("res://scripts/render/friendly/%s.gd" % code):
+		code = String(ProjectileSystem.FriendKind.keys()[projectiles.friend_kind[row]]).to_lower()
+	if not _friendly_visuals.has(code):
+		var visual: AttackVisual = load("res://scripts/render/friendly/%s.gd" % code).new()
+		visual.setup(self)
+		_friendly_visuals[code] = visual
+	return _friendly_visuals[code]

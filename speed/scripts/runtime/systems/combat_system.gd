@@ -115,8 +115,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
 			kill_enemy(i, {"cause": &"ram" if fast else &"touch", "dir": dir})
 			continue
-		if t.type[i] == &"saw":
-			_launch_saw(i, dir if dir != Vector2.ZERO else (t.pos[i] - from).normalized(), sp)
+		if enemies.contact_override(i, dir, from, sp):
 			continue
 		if not fast and t.meteor_index[i] >= 0:
 			_bump_obstacle(i, hit_pos, R, dir)
@@ -309,14 +308,6 @@ func _bump_obstacle(i: int, hit_pos: Vector2, R: float, dir: Vector2, damage := 
 	state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
 	if damage:
 		damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
-
-## 回る丸鋸（行 i）に触れた：丸鋸が機体の進んでいた向き u へ飛んでいき、その先の敵を巻き込む。1回で壊れる。
-func _launch_saw(i: int, u: Vector2, ship_speed: float) -> void:
-	var t := enemies.table
-	var speed := maxf(cfg.saw_speed, ship_speed)
-	projectiles.fire_saw(t.pos[i], u * speed, t.r[i], attack_power() * cfg.saw_power, cfg.saw_life)
-	state.emit(&"block_impact", {"pos": t.pos[i], "normal": -u, "enemy_pos": t.pos[i], "r": t.r[i]})
-	enemies.mark_dead(i)
 
 ## 一撃で倒したときのヒットストップ（仕様書 7.4）。
 func _kill_stop(i: int, crit: bool) -> void:

@@ -21,6 +21,7 @@ var watches_rows := false
 var ignores_hit_cd := false
 ## 画面から遠く離れたら、画面外の出現位置へ移すか。自分で退場する種類（横断する群れなど）は false
 var recycles_far := true
+var debug_spawnable := true
 
 var table: EnemyTable:
 	get: return m.table
@@ -149,12 +150,6 @@ func _hold(i: int, dt: float) -> void:
 func _drive(i: int, dt: float) -> void:
 	m.motion._drive(i, dt)
 
-func _self_destruct(i: int) -> void:
-	m._self_destruct(i)
-
-func fire_volley(i: int) -> void:
-	m.fire_volley(i)
-
 func mark_dead(i: int) -> void:
 	m.mark_dead(i)
 
@@ -181,3 +176,30 @@ func _lab_admit(i: int, dt: float) -> bool:
 
 func _lab_owner(i: int) -> String:
 	return m._lab_owner(i)
+
+## 接触を固有の動きで引き受けたらtrue。
+func on_contact(_row: int, _dir: Vector2, _from: Vector2, _ship_speed: float) -> bool:
+	return false
+
+func extra_drops(_pickups: PickupSystem, _row: int) -> void:
+	pass
+
+func coin_count(_row: int) -> int:
+	return 1 if state.rng.randf() < 0.03 else 0
+
+
+func _self_destruct(i: int) -> void:
+	var t := table
+	var p: Dictionary = t.def[i].params
+	projectiles.fire_zone(t.pos[i], float(p.blast_radius), 0.0, float(p.blast_dmg),
+		ProjectileSystem.HazardStyle.BLAST, t.color[i])
+	mark_dead(i)
+
+
+func fire_volley(i: int) -> void:
+	var p: Dictionary = table.def[i].params
+	var base := (state.enemy_aim - table.pos[i]).angle()
+	var n: int = p.volley
+	var spread: float = p.spread
+	for k in n:
+		projectiles.fire_enemy(i, base + (float(k) / maxi(1, n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")

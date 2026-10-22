@@ -278,8 +278,6 @@ func ignores_hit_cd(i: int) -> bool:
 	return table.beh_slot[i] >= 0 and behaviors[table.beh[i]].ignores_hit_cd
 
 func _gate(kind: int) -> EnemyGate:
-	if kind == EnemyTable.Gate.NONE:
-		return null
 	if not _gate_rules.has(kind):
 		var name := String(EnemyTable.Gate.keys()[kind]).to_lower()
 		_gate_rules[kind] = load("res://scripts/enemies/gates/%s.gd" % name).new()
@@ -393,7 +391,7 @@ func debug_spawn_random(count_n: int) -> void:
 		return
 	var choices: Array[EnemyDef] = []
 	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
-		if def.id != &"meteor" and def.behavior != &"part" and def.behavior != &"obstacle":
+		if def.behavior != &"part" and behaviors[_behavior_index(def.behavior)].debug_spawnable:
 			choices.append(def)
 	if choices.is_empty():
 		return
@@ -501,21 +499,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 			field.collide_enemy(i, from)
 
 	projectiles.lab_context = 0
-## 扇状に弾をばらまく（戦艦）。
-func fire_volley(i: int) -> void:
-	var p: Dictionary = table.def[i].params
-	var base := (state.enemy_aim - table.pos[i]).angle()
-	var n: int = p.volley
-	var spread: float = p.spread
-	for k in n:
-		projectiles.fire_enemy(i, base + (float(k) / maxi(1, n - 1) - 0.5) * spread, p.bullet_speed, &"bullet")
-## 自分の周りで爆発して消える（倒されたことにはならない）。
-func _self_destruct(i: int) -> void:
-	var t := table
-	var p: Dictionary = t.def[i].params
-	projectiles.fire_zone(t.pos[i], float(p.blast_radius), 0.0, float(p.blast_dmg),
-		ProjectileSystem.HazardStyle.BLAST, t.color[i])
-	mark_dead(i)
+
 ## 撃破されたときの処理。誘爆する雑魚は少し遅れて爆発し、種類ごとの撃破の処理（分裂・解放など）を呼ぶ。atk は機体の攻撃力。
 func on_enemy_death(i: int, atk: float) -> void:
 	var t := table
@@ -581,3 +565,15 @@ func _lab_admit(i: int, dt: float) -> bool:
 	if not cats.is_empty():
 		projectiles.lab_context = d.token(owner)
 	return true
+
+func row_behavior(row: int) -> EnemyBehavior:
+	return behaviors[table.beh[row]] if table.def[row] != null else null
+
+func contact_override(row: int, dir: Vector2, from: Vector2, ship_speed: float) -> bool:
+	var behavior := row_behavior(row)
+	return behavior != null and behavior.on_contact(row, dir, from, ship_speed)
+
+func extra_drops(pickups: PickupSystem, row: int) -> void:
+	var behavior := row_behavior(row)
+	if behavior != null:
+		behavior.extra_drops(pickups, row)
