@@ -38,6 +38,7 @@ func _ready() -> void:
 		PerfOverlay.saved_mode = PerfOverlay.Mode.DETAIL if options.overlay == "detail" else PerfOverlay.Mode.COMPACT
 	var session := RunManager.create_run()
 	add_child(session)
+	if session.sim.state == null: await session.started
 	run = session.sim
 	render = session.view.get_node("RunPresentation")
 	await get_tree().process_frame

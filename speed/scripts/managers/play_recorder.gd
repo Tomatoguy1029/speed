@@ -105,6 +105,9 @@ func _set_armed(on: bool) -> void:
 	if on:
 		get_tree().node_added.connect(_on_node_added)
 		for run in get_tree().get_nodes_in_group("recordable_runs"):
+			if run.sim.state == null:
+				_on_node_added(run)
+				continue
 			if run.is_node_ready() and not run.is_queued_for_deletion() and run.sim.state != null:
 				_begin(run, true)
 				if _run != null:
@@ -118,13 +121,14 @@ func _set_armed(on: bool) -> void:
 ## ランのセッションが来たら、準備ができてから記録を始める。
 func _on_node_added(node: Node) -> void:
 	if node is RunSession:
-		node.ready.connect(_begin.bind(node), CONNECT_ONE_SHOT)
+		var callback := _begin.bind(node)
+		if not node.started.is_connected(callback): node.started.connect(callback, CONNECT_ONE_SHOT)
 
 func _begin(session: RunSession, during_run := false) -> void:
 	if not is_instance_valid(session):
 		return
 	var run := session.sim
-	if not armed or run == _run or session.is_queued_for_deletion() or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
+	if not armed or run == _run or session.is_queued_for_deletion() or run.state == null or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
 		return
 	_end("quit")
 	_run = run

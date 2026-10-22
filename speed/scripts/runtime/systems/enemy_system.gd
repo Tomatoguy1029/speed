@@ -383,7 +383,7 @@ func _behavior_index(name: StringName) -> int:
 	return k
 
 func def_of(type: StringName) -> EnemyDef:
-	return definitions.get(type, ContentManager.enemies.get(type)) as EnemyDef
+	return (definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
 func debug_spawn_random(count_n: int) -> void:

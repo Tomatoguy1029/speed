@@ -40,6 +40,7 @@ static func compile(source: StageDef) -> RuntimeStage:
 		copy.display_name = ""
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
+	result.resources = load("res://tools/content/build_stage_resources.gd").build(result)
 	return result
 
 static func names(source: StageDef) -> Dictionary:

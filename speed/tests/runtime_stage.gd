@@ -22,5 +22,13 @@ func _ready() -> void:
 		check(runtime.clips[0].label.is_empty() and runtime.clips[0].formations.is_empty(), "クリップにラベルとシーンを持たない")
 		check(not runtime.clips[0].prepared.is_empty(), "展開済みの配置を持つ")
 		check(builder.names(source).clips[0] == "recording_label", "記録用の名前を別の表に保存する")
+		var minimal := StageDef.new()
+		minimal.enemies = [&"drifter"]
+		var prepared: Resource = builder.compile(minimal)
+		var manifest: Resource = prepared.get("resources")
+		check(manifest != null, "ステージが使う資源の一覧を生成する")
+		if manifest != null:
+			check(not "res://shaders/water_flood.gdshader" in manifest.paths, "水流を使わないステージの一覧に水流shaderを入れない")
+
 	print("[runtime_stage] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)

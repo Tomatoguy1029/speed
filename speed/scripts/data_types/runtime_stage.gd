@@ -2,3 +2,4 @@
 ## StageDefの数値と計算を共有し、編集用のシーン・名前・トラックは空にする。
 class_name RuntimeStage
 extends StageDef
+@export var resources: StageResources

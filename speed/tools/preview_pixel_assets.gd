@@ -10,6 +10,7 @@ func _preview() -> void:
 	var root := get_tree().root
 	var session := RunManager.create_run()
 	root.add_child(session)
+	if session.sim.state == null: await session.started
 	session.auto_step = false
 	var game := session.view
 	var run := session.sim

@@ -23,6 +23,7 @@ func _ready() -> void:
 	run = scene.sim
 	run.options = {"lab": true, "seed": 31, "meta": {}}
 	add_child(scene)
+	if scene.sim.state == null: await scene.started
 	scene.auto_step = false
 	run.state.phase = RunState.Phase.PLAY
 	var s := run.state

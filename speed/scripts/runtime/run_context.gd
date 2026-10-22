@@ -21,3 +21,5 @@ var projectiles: ProjectileSystem
 var loadout: LoadoutSystem
 var pickups: PickupSystem
 var heroes: HeroSystem
+
+var resources: ContentResourceScope

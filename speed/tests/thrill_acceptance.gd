@@ -112,6 +112,7 @@ func _start(stage: int) -> void:
 	GameManager.run_endless = false
 	scene = RunManager.create_run()
 	add_child(scene)
+	if scene.sim.state == null: await scene.started
 	run = scene.sim
 	run.state.stage = run.state.stage.duplicate()
 	run.state.stage.phases = []

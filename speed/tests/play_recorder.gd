@@ -45,8 +45,9 @@ func _ready() -> void:
 
 func verify_mid_run_start() -> void:
 	var scene := RunManager.create_run() as Node
-	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	add_child(scene)
+	if scene.sim.state == null: await scene.started
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	var run := scene.sim as RunSimulation
 	await get_tree().process_frame
 	run.state.time = 42.0
@@ -117,10 +118,11 @@ func verify_start_routes() -> void:
 			if not delayed:
 				rec._set_armed(true)
 			var scene := RunManager.create_run() as Node
-			scene.process_mode = Node.PROCESS_MODE_DISABLED
 			var run := scene.sim as RunSimulation
 			run.options = {"seed": 932}
 			add_child(scene)
+			if scene.sim.state == null: await scene.started
+			scene.process_mode = Node.PROCESS_MODE_DISABLED
 			await get_tree().process_frame
 			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
 			if delayed:

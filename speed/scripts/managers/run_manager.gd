@@ -24,7 +24,7 @@ func create_run() -> RunSession:
 	session.add_to_group("recordable_runs")
 	session.sim.finished.connect(GameManager.finish_run)
 	session.sim.aborted.connect(GameManager.abort_run)
-	session.ready.connect(func(): session.start(options, true), CONNECT_ONE_SHOT)
+	session.ready.connect(func(): session.start_loading(options), CONNECT_ONE_SHOT)
 	return session
 
 ## 実験場・道具のランを作り、parent の下で始める。
@@ -50,6 +50,7 @@ func command(id: int, name: StringName, args := {}) -> void:
 ## RunSession が木から出るときに呼ぶ。
 func unregister(s: RunSession) -> void:
 	_sessions.erase(s.id)
+	if _sessions.is_empty(): ContentManager.release_runtime_definitions()
 	if current_id == s.id:
 		current_id = -1
 

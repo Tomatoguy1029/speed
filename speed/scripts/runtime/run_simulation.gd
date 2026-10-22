@@ -156,6 +156,8 @@ func dispose() -> void:
 		if system != null:
 			system.dispose()
 		ctx.set(name, null)
+	if ctx.resources != null: ctx.resources.cancel()
+	ctx.resources = null
 	encounters = null
 	input_source = Callable()
 	view_size_source = Callable()

@@ -158,3 +158,39 @@ func runtime_stage(index: int) -> RuntimeStage:
 			return null
 		_checked_build = true
 	return load("res://.content/stage_%d.tres" % index) as RuntimeStage
+
+## 読込ジョブはセッションを保持せず、取り消した要求の結果も最後まで受け取って解放する。
+var _resource_jobs: Dictionary = {}
+func prepare_resources(paths: PackedStringArray, threaded := true) -> ContentResourceScope:
+	var scope := ContentResourceScope.new()
+	for path in paths:
+		if scope.resources.has(path) or path in scope.pending: continue
+		if not threaded:
+			scope.provide(path, load(path))
+		elif ResourceLoader.has_cached(path):
+			scope.provide(path, ResourceLoader.get_cached_ref(path))
+		else:
+			scope.pending.append(path)
+			if not _resource_jobs.has(path):
+				var error := ResourceLoader.load_threaded_request(path)
+				if error != OK:
+					scope.provide(path, null)
+					continue
+				_resource_jobs[path] = []
+			_resource_jobs[path].append(weakref(scope))
+	return scope
+func pending_resources() -> int:
+	return _resource_jobs.size()
+func _process(_delta: float) -> void:
+	for path: String in _resource_jobs.keys():
+		var status := ResourceLoader.load_threaded_get_status(path)
+		if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS: continue
+		var resource: Resource = ResourceLoader.load_threaded_get(path) if status == ResourceLoader.THREAD_LOAD_LOADED else null
+		for reference: WeakRef in _resource_jobs[path]:
+			var scope := reference.get_ref() as ContentResourceScope
+			if scope != null: scope.provide(path, resource)
+		_resource_jobs.erase(path)
+
+func release_runtime_definitions() -> void:
+	_tables.clear()
+	_definitions.clear()
