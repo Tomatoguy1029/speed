@@ -24,6 +24,9 @@ var options: Dictionary = {}
 var recording_origin: Dictionary = {}
 ## 報酬演出中は世界と時計を保留し、HUD が実時間で演出を進める。
 var ui_reward_active := false
+## HUD に重ねたメニュー中は、選択確定の資源待ちも含めて更新を保留する。
+var ui_overlay_active := false
+var _phase_before_pause := RunState.Phase.PLAY
 var input_source: Callable
 ## 表示のあるランだけが持つ入力（表示のない試行では null）
 var input: InputRouter
@@ -178,7 +181,7 @@ func recording_snapshot() -> Dictionary:
 
 ## 固定更新1回ぶん。実験場は自分で _play_tick を進めるので、ここは通らない。
 func physics_step(delta: float) -> void:
-	if state.lab_mode:
+	if state.lab_mode or ui_overlay_active:
 		return
 	# 通常報酬の残りより最終勝利を優先する。首の撃破・再生は boss_dead を立てない。
 	if state.phase == RunState.Phase.PLAY and state.boss_dead:
@@ -542,7 +545,7 @@ func finish(cleared: bool) -> void:
 ## UI と入力からの命令（設計書 4.3）。
 func command(name: StringName, args := {}) -> void:
 	if state == null: return
-	if ui_reward_active and name in [&"choose_card", &"reroll", &"pause", &"resume", &"draw_button"]:
+	if (ui_reward_active or ui_overlay_active) and name in [&"choose_card", &"reroll", &"draw_button"]:
 		return
 	if state.phase == RunState.Phase.FINISHING:
 		if name == &"skip_finish":
@@ -565,11 +568,14 @@ func command(name: StringName, args := {}) -> void:
 			if state.phase == RunState.Phase.LEVELUP:
 				loadout.reroll_cards()
 		&"pause":
-			if state.phase == RunState.Phase.PLAY:
+			if state.phase in [RunState.Phase.PLAY, RunState.Phase.LEVELUP]:
+				_phase_before_pause = state.phase
+				if input != null: input.cancel_gesture()
 				set_phase(RunState.Phase.PAUSED)
 		&"resume":
 			if state.phase == RunState.Phase.PAUSED:
-				set_phase(RunState.Phase.PLAY)
+				if input != null: input.cancel_gesture()
+				set_phase(_phase_before_pause)
 		&"abort":
 			set_phase(RunState.Phase.ENDED)
 			aborted.emit()

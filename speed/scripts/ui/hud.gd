@@ -92,6 +92,8 @@ var _ring_usable := true
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
 var _pause_after_reward := false
+var _menu_overlay: Control
+var _overlay_focus: WeakRef
 
 func _ready() -> void:
 	_font = ThemeDB.fallback_font
@@ -146,9 +148,7 @@ func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
 	run.input.cancel_gesture()
 	_card_discard.merge(_card_held)
-	_draw_button.visible = not active and DisplayServer.is_touchscreen_available() and run.state.phase == RunState.Phase.PLAY
-	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
-	_pause_box.visible = not active and run.state.phase == RunState.Phase.PAUSED
+	_sync_menu_visibility()
 	if not active:
 		if _pause_after_reward:
 			_pause_after_reward = false
@@ -177,10 +177,51 @@ func _on_phase(phase: RunState.Phase) -> void:
 		_finish_skip.hide()
 		if _legendary_reveal != null:
 			_legendary_reveal.hide()
-	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
-	_pause_box.visible = phase == RunState.Phase.PAUSED and not _rewards.is_active()
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_sync_menu_visibility()
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
+
+## 開発用パネルなどを重ねる入口。選択・報酬・ポーズの状態は裏に保持する。
+func can_show_menu_overlay() -> bool:
+	return _settings == null and _menu_overlay == null and run.state.phase in [RunState.Phase.PLAY, RunState.Phase.LEVELUP, RunState.Phase.PAUSED]
+
+func show_menu_overlay(overlay: Control) -> bool:
+	if not can_show_menu_overlay():
+		return false
+	var focus := get_viewport().gui_get_focus_owner()
+	_overlay_focus = weakref(focus) if focus != null else null
+	_menu_overlay = overlay
+	run.ui_overlay_active = true
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_sync_menu_visibility()
+	return true
+
+func close_menu_overlay(overlay: Control) -> void:
+	if _menu_overlay != overlay:
+		return
+	_menu_overlay = null
+	run.ui_overlay_active = false
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_sync_menu_visibility()
+	var focus := _overlay_focus.get_ref() as Control if _overlay_focus != null else null
+	if focus != null and focus.is_visible_in_tree():
+		focus.grab_focus()
+	_overlay_focus = null
+
+func _sync_menu_visibility() -> void:
+	var covered := _menu_overlay != null
+	var paused := run.state.phase == RunState.Phase.PAUSED
+	_cards_box.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.LEVELUP
+	_pause_box.visible = not covered and paused and _settings == null
+	_rewards.visible = not covered and not paused and _rewards.is_active()
+	_rewards.set_process(not covered and not paused)
+	_draw_button.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY and DisplayServer.is_touchscreen_available()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
@@ -232,16 +273,23 @@ func _input(event: InputEvent) -> void:
 			run.command(&"skip_finish")
 			get_viewport().set_input_as_handled()
 		return
+	# カードの入力ガードや GUI より先にメニューキーを扱う。
+	if _settings == null and _menu_overlay == null and event.is_action(&"pause") and run.state.phase in [RunState.Phase.PLAY, RunState.Phase.LEVELUP, RunState.Phase.PAUSED]:
+		get_viewport().set_input_as_handled()
+		if event.is_action_pressed(&"pause"):
+			run.command(&"resume" if run.state.phase == RunState.Phase.PAUSED else &"pause")
+		return
 	var id := _card_input_id(event)
 	if id == "":
 		return
 	# 表示を発生させた押下や、タッチ由来の擬似マウスを次送りに使わない。
-	var reward_press: bool = _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+	var in_menu := _menu_overlay != null or run.state.phase == RunState.Phase.PAUSED
+	var reward_press: bool = not in_menu and _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
 		(event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.device != -1 and event.pressed)
 		or (event is InputEventScreenTouch and event.pressed)
 		or event.is_action_pressed(&"ui_accept"))
-	var choosing := run.state.phase == RunState.Phase.LEVELUP
-	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	var choosing := not in_menu and run.state.phase == RunState.Phase.LEVELUP
+	var blocked: bool = not in_menu and (_rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at))
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -285,26 +333,25 @@ func _card_input_id(event: InputEvent) -> String:
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+	if _menu_overlay != null or _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# 実験場では HUD は表示だけ。操作は実験場が扱う。
+	if run.state.lab_mode:
+		return
 	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 		get_viewport().set_input_as_handled()
 		return
-	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
-	if _rewards.is_active():
+	if _menu_overlay != null or run.state.phase == RunState.Phase.PAUSED or _rewards.is_active():
 		get_viewport().set_input_as_handled()
 		return
-	if _settings != null or run.state.lab_mode:
+	if _settings != null:
 		return
 	var s := run.state
-	if event.is_action_pressed(&"pause"):
-		get_viewport().set_input_as_handled()
-		run.command(&"pause" if s.phase == RunState.Phase.PLAY else &"resume")
-	elif s.phase == RunState.Phase.LEVELUP:
+	if s.phase == RunState.Phase.LEVELUP:
 		for i in 3:
 			if event.is_action_pressed(StringName("card_%d" % (i + 1))):
 				get_viewport().set_input_as_handled()
@@ -696,6 +743,7 @@ func _open_settings(from: Button) -> void:
 	AudioManager.play(&"ui")
 	_settings = SETTINGS_SCENE.instantiate() as UiScreen
 	_settings.close_fn = func():
+		_settings.set_process_unhandled_input(false)
 		_settings.queue_free()
 		_settings = null
 		_pause_box.visible = true

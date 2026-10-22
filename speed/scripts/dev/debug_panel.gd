@@ -29,6 +29,7 @@ const SLIDERS := [
 
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var _hud: Control
 var _module: OptionButton
 var _levels: SpinBox
 var _enemy_count: SpinBox
@@ -42,6 +43,7 @@ func _ready() -> void:
 	if not OS.is_debug_build():
 		queue_free()
 		return
+	_hud = get_parent().get_node("HudRoot")
 	custom_minimum_size = Vector2(420, 0)
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(420, 560)
@@ -209,13 +211,28 @@ func _heading(text: String) -> Label:
 	l.add_theme_font_size_override("font_size", 16)
 	return l
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"debug_panel"):
+func _input(event: InputEvent) -> void:
+	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		if visible: _close()
+		return
+	if not visible and not _hud.can_show_menu_overlay(): return
+	if event.is_action(&"debug_panel") or (visible and (event.is_action(&"pause") or event.is_action(&"ui_cancel"))):
 		get_viewport().set_input_as_handled()
-		visible = not visible
+		if not event.is_pressed() or event.is_echo(): return
 		if visible:
+			_close()
+		elif _hud.show_menu_overlay(self):
+			show()
 			_refresh_sliders()
 			_refresh_meta_levels()
+			for button in find_children("*", "Button", true, false):
+				if button.is_visible_in_tree():
+					button.grab_focus()
+					break
+
+func _close() -> void:
+	hide()
+	_hud.close_menu_overlay(self)
 
 func _process(_delta: float) -> void:
 	if visible and run.state != null:

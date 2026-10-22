@@ -307,11 +307,11 @@ func _process(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	var phase := state.phase
-	var frozen := phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
+	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
 	var dt := 0.0 if frozen else delta
 	# 停止中は減衰も止まるため、残った画面揺れを持ち越さない。
-	if phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
+	if run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
 		shake = 0.0
 	_update_fx(dt)
 	_ship_visual.update(dt)
