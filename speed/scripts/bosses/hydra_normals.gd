@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"beam_bolt":
+		beam_bolt(a,n,dt)
+		return
 	if n.mode == &"beam_fixed":
 		beam_fixed(a,n,dt)
 		return
@@ -137,3 +140,17 @@ static func beam_fixed(a: Node,n,dt: float) -> void:
 		n.locked=true
 		a._cue(&"attack_started",n.mode,a.necks.find(n))
 	if n.t>=charge+float(p.beam_time)+float(p.normal_hold): a.finish_normal(n)
+
+static func beam_bolt(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	if n.t < charge:
+		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*6.0))
+		n.glow=n.t/charge
+	elif not n.locked:
+		n.strike_pos=a._head_pos(n)
+		n.locked=true
+		var u := Vector2.from_angle(n.angle)
+		a.attack_field.add_shape(PackedVector2Array([n.strike_pos,n.strike_pos+u*float(p.bolt_length)]),float(p.bolt_width),0.0,float(p.bolt_life),float(p.beam_dmg),&"bolt",n.row,u*float(p.bolt_speed),true)
+		a._cue(&"attack_started",n.mode,a.necks.find(n))
+	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
