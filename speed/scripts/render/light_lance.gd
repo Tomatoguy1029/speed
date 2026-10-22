@@ -50,10 +50,6 @@ func step(dt: float, state: RunState, cfg: GameConfig, weapon, zoom: float) -> v
 		_points.clear()
 		_ages.clear()
 		_hits.clear()
-	if weapon == null:
-		_points.clear()
-		_ages.clear()
-		_hits.clear()
 	if _active:
 		_level = weapon.level
 		_tip = weapon.reach() / _scale

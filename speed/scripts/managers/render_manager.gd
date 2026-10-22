@@ -17,15 +17,7 @@ const PLANET := preload("res://assets/pixel/planet.png")
 const AIRSHIP := preload("res://assets/pixel/airship.png")
 const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
 const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
-const AIRSHIP_TURRET_BASE := preload("res://assets/pixel/airship_turret_base.png")
-const AIRSHIP_TURRET := preload("res://assets/pixel/airship_turret.png")
-const AIRSHIP_ARMOR := preload("res://assets/pixel/airship_armor.png")
-const AIRSHIP_CANON := preload("res://assets/pixel/airship_canon.png")
-const AIRSHIP_PROBE := preload("res://assets/pixel/airship_electronic_probe.png")
-const AIRSHIP_MINE := preload("res://assets/pixel/airship_mine.png")
-const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
 const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
-const DRONE := preload("res://assets/pixel/drone.png")
 const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 	preload("res://assets/pixel/meteor2_spritesheet.png")]
 
@@ -103,9 +95,7 @@ var _coin_batch: InstanceBatch
 var _jet_time := 0.0
 var _exhaust: Array[Dictionary] = []
 var _glide_wake: Node2D
-var _light_lance: Node2D
-var _dash_range_drone: Node2D
-var _afterimage: Node2D
+var _equipment_visuals: Dictionary = {}
 
 func _ready() -> void:
 	state = run.state
@@ -138,20 +128,8 @@ func _ready() -> void:
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
 	_glide_wake = preload("res://scenes/fx/glide_wake.tscn").instantiate()
 	_layers.exhaust.add_child(_glide_wake)
-	_light_lance = preload("res://scripts/render/light_lance.gd").new()
-	_light_lance.name = "LightLance"
-	_light_lance.z_index = 1
-	_light_lance.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	_layers.ship.add_child(_light_lance)
-	_dash_range_drone = preload("res://scripts/render/dash_range_drone.gd").new()
-	_dash_range_drone.name = "DashRangeDrone"
-	_dash_range_drone.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	_layers.ship.add_child(_dash_range_drone)
-	_afterimage = preload("res://scripts/render/afterimage.gd").new()
-	_afterimage.name = "Afterimages"
-	_afterimage.z_index = -1
-	_afterimage.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	_layers.ship.add_child(_afterimage)
+	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
+	_sync_equipment_visuals()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -333,10 +311,13 @@ func _process(delta: float) -> void:
 		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
-	_glide_wake.step(dt, state, cfg, run.loadout.weapon_behaviors.has(&"W08"))
-	_light_lance.step(dt, state, cfg, run.loadout.weapon_behaviors.get(&"W24"), cam_zoom)
-	_dash_range_drone.step(run.loadout.weapon_behaviors.get(&"W26"), cfg, cam_zoom)
-	_afterimage.step(dt, state, cfg, run.loadout.weapon_behaviors.get(&"W27"))
+	_glide_wake.step(dt, state, cfg, _blue_exhaust())
+	for key in _equipment_visuals.keys():
+		var visual: WeaponVisual = _equipment_visuals[key]
+		visual.tick(dt)
+		if visual.finished():
+			visual.dispose()
+			_equipment_visuals.erase(key)
 	_update_view()
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
@@ -363,9 +344,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		for v in _event_visuals.get(ev.type, []):
 			v.on_event(ev)
+		for visual in _equipment_visuals.values():
+			visual.on_event(ev)
 		match ev.type:
-			&"lance_hit":
-				_light_lance.hit(ev)
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 			&"explode":
@@ -1119,45 +1100,9 @@ func _draw_path(c: CanvasItem) -> void:
 
 ## 武器・特性が残すもの（機雷・ドローン・渦）。
 func _draw_build_objects(c: CanvasItem) -> void:
-	var b := run.loadout
-	var mines = b.weapon_behaviors.get(&"W07")
-	if mines != null:
-		for m in mines.mines:
-			var col := Color("#ff7b54") if m.armed <= 0.0 else Color(1, 0.5, 0.3, 0.4)
-			c.draw_circle(m.pos, 7.0, col)
-			c.draw_arc(m.pos, 11.0, 0, TAU, 12, Color(1, 0.6, 0.4, 0.5), _px(1.5))
-	var drones = b.weapon_behaviors.get(&"W06")
-	if drones != null:
-		for d in drones.drones:
-			var size := DRONE.get_size() * cfg.character_scale
-			var outward: Vector2 = d.pos - state.ship_pos
-			var angle := outward.angle() + PI / 2.0 if not outward.is_zero_approx() else state.ship_heading.angle() + PI / 2.0
-			c.draw_set_transform(d.pos, angle)
-			c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false)
-			c.draw_set_transform(Vector2.ZERO)
-	var interceptors = b.weapon_behaviors.get(&"W25")
-	if interceptors != null:
-		for d in interceptors.drones:
-			INTERCEPTOR_VISUAL.drone(c, d.pos, d.angle, cfg.character_scale, d.flash)
-	var tow = b.weapon_behaviors.get(&"W21")
-	if tow != null:
-		for j in mini(int(tow.p("visible")), tow.cargo.size()):
-			var h: Dictionary = tow.cargo[j]
-			_draw_hull(c, h.type, h.pos, h.angle, h.r, Color.TRANSPARENT)
-	var bipolar = b.weapon_behaviors.get(&"W22")
-	if bipolar != null and bipolar.origin != null:
-		var o: Vector2 = bipolar.origin
-		var col := Color(bipolar.p("color", "#69fff0"))
-		c.draw_arc(o, 26.0, 0, TAU, 24, col, _px(3.0))
-		c.draw_circle(o, 9.0, col)
-		c.draw_line(o, state.ship_pos, Color(col, 0.25), _px(2.0))
-	var vortex = b.trait_behaviors.get(&"T03")
-	if vortex != null:
-		for v in vortex.vortexes:
-			var k: float = v.life / v.max
-			for i in 3:
-				var a: float = state.time * 4.0 + i * TAU / 3.0
-				c.draw_arc(v.pos, v.radius * (0.3 + 0.2 * i), a, a + 2.0, 16, Color(0.75, 0.45, 1.0, 0.6 * k), _px(3.0))
+	for visual in _equipment_visuals.values():
+		if visual.active:
+			visual.draw_objects(c)
 
 func _draw_meteor_shards(c: CanvasItem) -> void:
 	for shard in meteor_shards:
@@ -1234,7 +1179,7 @@ func _update_exhaust(dt: float) -> void:
 		_exhaust.pop_front()
 
 func _draw_exhaust(c: CanvasItem) -> void:
-	var sonic := run.loadout.weapon_behaviors.has(&"W08")
+	var sonic := _blue_exhaust()
 	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
 	for i in range(1, _exhaust.size()):
 		var fade: float = _exhaust[i - 1].life / 0.24
@@ -1249,7 +1194,7 @@ func _draw_exhaust(c: CanvasItem) -> void:
 	var frame := int(_jet_time * 12.0) % 3
 	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
 	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	var flame := AIRSHIP_BLUE_FLAME if sonic else AIRSHIP_FLAME
+	var flame := load("res://assets/pixel/airship_blue_flame.png") if sonic else AIRSHIP_FLAME
 	c.draw_texture_rect_region(flame, rect, region)
 	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
 	c.draw_set_transform(Vector2.ZERO)
@@ -1271,33 +1216,13 @@ func _draw_ship(c: CanvasItem) -> void:
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
-	var weapons := run.loadout.weapon_behaviors
-	if weapons.has(&"W01") or weapons.has(&"W02"):
-		c.draw_texture_rect(AIRSHIP_CANON, rect, false, col)
+	_draw_equipment_parts(c, rect, col, true)
 	c.draw_texture_rect(AIRSHIP, rect, false, col)
-	var attachments: Array[Texture2D] = []
-	if weapons.has(&"W03") or weapons.has(&"W05"):
-		attachments.append(AIRSHIP_ARMOR)
-	if weapons.has(&"W17"):
-		attachments.append(AIRSHIP_PROBE)
-	if weapons.has(&"W07"):
-		attachments.append(AIRSHIP_MINE)
-	for attachment in attachments:
-		c.draw_texture_rect(attachment, rect, false, col)
-	var rear = run.loadout.weapon_behaviors.get(&"W23")
-	if rear != null:
-		c.draw_texture_rect(AIRSHIP_TURRET_BASE,
-			Rect2(Vector2(-AIRSHIP_TURRET_BASE.get_width() / 2.0, -20.0) * cfg.character_scale,
-				AIRSHIP_TURRET_BASE.get_size() * cfg.character_scale), false, col)
+	_draw_equipment_parts(c, rect, col, false)
 	c.draw_set_transform(Vector2.ZERO)
-	if rear != null:
-		# 元絵の砲身は下向き。キャンバスの中心ではなく取り付け軸で回す。
-		var mount: Vector2 = rear.mount_position() + (p - state.ship_pos)
-		var aim: Vector2 = rear.aim_direction()
-		c.draw_set_transform(mount, aim.angle() - PI / 2.0)
-		c.draw_texture_rect(AIRSHIP_TURRET,
-			Rect2(-rear.MOUNT_PIXEL * cfg.character_scale, size), false, col)
-		c.draw_set_transform(Vector2.ZERO)
+	for visual in _equipment_visuals.values():
+		if visual.active:
+			visual.draw_extra(c, p, col)
 	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale)
 	for effect in shield_transfers:
 		SHIELD_VISUAL.transfer(c, effect, state.ship_pos)
@@ -1323,3 +1248,34 @@ func _attack_visual(kind: String) -> AttackVisual:
 
 func flood() -> AttackVisual:
 	return _attack_visual("flood")
+
+func _sync_equipment_visuals() -> void:
+	var current := {}
+	for behavior in run.loadout.weapon_behaviors.values() + run.loadout.trait_behaviors.values():
+		var key: int = behavior.get_instance_id()
+		current[key] = true
+		if _equipment_visuals.has(key):
+			continue
+		var path := "res://scripts/render/equipment/%s.gd" % behavior.def.code_id
+		if ResourceLoader.exists(path):
+			var visual: WeaponVisual = load(path).new()
+			visual.setup(self, behavior)
+			_equipment_visuals[key] = visual
+	for key in _equipment_visuals:
+		_equipment_visuals[key].active = current.has(key)
+
+func _blue_exhaust() -> bool:
+	for visual in _equipment_visuals.values():
+		if visual.active and visual.blue_exhaust:
+			return true
+	return false
+
+func _draw_equipment_parts(c: CanvasItem, rect: Rect2, color: Color, under: bool) -> void:
+	var drawn := {}
+	var visuals := _equipment_visuals.values()
+	visuals.sort_custom(func(a, b): return a.overlay_order < b.overlay_order)
+	for visual in visuals:
+		var texture: Texture2D = visual.underlay if under else visual.overlay
+		if visual.active and texture != null and not drawn.has(texture):
+			c.draw_texture_rect(texture, rect, false, color)
+			drawn[texture] = true

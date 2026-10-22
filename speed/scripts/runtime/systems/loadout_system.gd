@@ -14,6 +14,7 @@ func dispose() -> void:
 	super()
 
 signal cards_opened(cards: Array)
+signal equipment_changed
 
 var combat: CombatSystem:
 	get: return ctx.combat
@@ -297,6 +298,7 @@ func grant(kind: StringName, id: StringName, levels := 1) -> bool:
 		state.modules_obtained.append(id)
 	_sync_behavior(weapon, id, def, owned[id])
 	refresh_stats()
+	equipment_changed.emit()
 	return true
 
 func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> void:
@@ -320,6 +322,7 @@ func remove_weapon(id: StringName) -> void:
 	state.weapons.erase(id)
 	weapon_behaviors.erase(id)
 	refresh_stats()
+	equipment_changed.emit()
 
 ## 彗星限定の武器を受け取る（仕様書 8）。強化はなく、Lv の上限で装備する。持っていれば何もしない。
 ## 枠が満員なら、入れ替える武器を選ぶカードを開いて true を返す。
@@ -352,6 +355,7 @@ func reset_loadout() -> void:
 	weapon_behaviors = {}
 	trait_behaviors = {}
 	refresh_stats()
+	equipment_changed.emit()
 
 # ── 発動のきっかけ（CombatSystem・DrawSystem・ShipSystem から呼ばれる） ─
 
