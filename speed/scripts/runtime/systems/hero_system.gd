@@ -44,18 +44,18 @@ func setup(context: RunContext) -> void:
 	for power in _powers.values():
 		power.dispose()
 	_powers.clear()
-	for definition in ConfigManager.heroes.values():
+	for definition in ContentManager.heroes.values():
 		behavior(definition.id)
 	_prev_pos = state.ship_pos
 	if state.endless:
 		_place(_random_hero(&""))
 		return
-	for def: HeroDef in ConfigManager.heroes.values():
+	for def: HeroDef in ContentManager.heroes.values():
 		if def.stage == state.stage_index:
 			_place(def)
 
 func _random_hero(except: StringName) -> HeroDef:
-	var list: Array = ConfigManager.heroes.values().filter(func(d): return d.id != except)
+	var list: Array = ContentManager.heroes.values().filter(func(d): return d.id != except)
 	if list.is_empty():
 		return null
 	return list[state.rng.randi_range(0, list.size() - 1)]
@@ -234,7 +234,7 @@ func _spawn_guards() -> void:
 func activate() -> void:
 	if state.hero_power == &"" or state.hero_cd > 0.0:
 		return
-	var def: HeroDef = ConfigManager.heroes.get(state.hero_power)
+	var def: HeroDef = ContentManager.heroes.get(state.hero_power)
 	if def == null:
 		return
 	state.hero_cd = def.cooldown
@@ -250,7 +250,7 @@ var _powers: Dictionary = {}
 
 func behavior(id: StringName) -> HeroBehavior:
 	if not _powers.has(id):
-		var definition: HeroDef = ConfigManager.heroes.get(id)
+		var definition: HeroDef = ContentManager.heroes.get(id)
 		if definition == null:
 			return null
 		var power: HeroBehavior = load("res://scripts/heroes/%s.gd" % id).new()

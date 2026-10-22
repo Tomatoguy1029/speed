@@ -206,9 +206,9 @@ func scenario(recording: bool) -> Dictionary:
 		run.phase_changed.connect(rec._on_phase_changed)
 		lab.scene.tree_exiting.connect(rec._end.bind("quit"))
 	# 実際の敵ドロップ経路。ドロップ率1なので雑魚も大きい結晶を落とし、レチクル座は中の段を必ず落とす。
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"biter"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"biter"], s.ship_pos))
 	s.time = 6.0
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"reticle"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"reticle"], s.ship_pos))
 	pk._collect_gems(0.01)
 	check(s.xp_gained >= 75.0 + 12.0, "大きい結晶の XP を回収する")
 	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "gems": pk.gem_slots.live}

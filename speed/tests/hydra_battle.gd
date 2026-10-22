@@ -47,7 +47,7 @@ func _ready()->void:
 	check(JSON.stringify(SaveManager.data)==saved,"full lab battle leaves save data untouched")
 	await lab.reset({"empty":true,"stage":4})
 	lab.run.state.lab_mode=false
-	lab.run.bosses.spawn(ConfigManager.bosses[&"hydra"],Vector2.ZERO)
+	lab.run.bosses.spawn(ContentManager.bosses[&"hydra"],Vector2.ZERO)
 	a=lab.run.bosses.actor
 	a.hsm.set_active(false)
 	a._set_count(8)

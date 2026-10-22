@@ -51,10 +51,10 @@ func _ready() -> void:
 	runtime.setup(lab.run, {"enabled": true, "patterns": [pattern], "director": {"enabled": true}})
 	runtime.advance()
 	check(not runtime.opportunity.is_empty() and lab.run.enemies.count() > 0, "採用した規則だけを本番と同じ入口で追加できる")
-	check(ConfigManager.stage(1).encounter_profile.is_empty(), "通常ステージでは採用前の機能を有効にしない")
+	check(ContentManager.stage(1).encounter_profile.is_empty(), "通常ステージでは採用前の機能を有効にしない")
 	var old_lab_def: EnemyDef = lab.run.enemies.def_of(&"drifter")
-	var old_def: EnemyDef = ConfigManager.enemies[&"drifter"]
-	check(ConfigManager.reload_experiment_data(), "本番の敵・時間帯・共通値を読み直せる")
-	check(ConfigManager.enemies[&"drifter"] != old_def and lab.run.enemies.def_of(&"drifter") == old_lab_def, "再読込は新しい参照を作り、既存の実験の定義を変えない")
+	var old_def: EnemyDef = ContentManager.enemies[&"drifter"]
+	check(ContentManager.reload_experiment_data(), "本番の敵・時間帯・共通値を読み直せる")
+	check(ContentManager.enemies[&"drifter"] != old_def and lab.run.enemies.def_of(&"drifter") == old_lab_def, "再読込は新しい参照を作り、既存の実験の定義を変えない")
 	print("[lab_constraints] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)

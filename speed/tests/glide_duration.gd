@@ -29,8 +29,8 @@ func _ready() -> void:
 	var cfg := run.cfg
 	var baseline_vel := s.ship_vel
 	var baseline := [s.stats.max_speed, s.stats.capacity, s.stats.charge_time, run.draw.budget(1.0), run.draw._launch_speed(Vector2.RIGHT, 1.0)]
-	check(ConfigManager.traits.has(&"T31"), "T31 is loaded through the standard registry")
-	var icon: Texture2D = ConfigManager.traits[&"T31"].icon_texture
+	check(ContentManager.traits.has(&"T31"), "T31 is loaded through the standard registry")
+	var icon: Texture2D = ContentManager.traits[&"T31"].icon_texture
 	check(icon != null and icon.get_width() == 47, "T31 has a card/loadout icon")
 	for level in range(4):
 		if level > 0:
@@ -64,16 +64,16 @@ func _ready() -> void:
 	check(roundtrip.encyclopedia.has("T31"), "Standard save representation preserves discovery")
 	SaveManager.data = saved
 	# 通常の候補・強化候補への接続を、抽選対象だけ絞って確かめる。
-	var weapons := ConfigManager.weapons
-	var traits := ConfigManager.traits
-	ConfigManager.weapons = {}
-	ConfigManager.traits = {&"T31": traits[&"T31"]}
+	var weapons := ContentManager.weapons
+	var traits := ContentManager.traits
+	ContentManager.weapons = {}
+	ContentManager.traits = {&"T31": traits[&"T31"]}
 	for level in [0, 1, 3]:
 		s.traits = {} if level == 0 else {&"T31": level}
 		var cards := run.loadout.roll_cards()
 		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 3), "Standard new/upgrade/maxed card pool")
-	ConfigManager.weapons = weapons
-	ConfigManager.traits = traits
+	ContentManager.weapons = weapons
+	ContentManager.traits = traits
 	s.traits = {&"T31": 3}
 	run.loadout.refresh_stats()
 	s.cards = [{"kind": &"trait", "id": &"T31", "level": 3}]

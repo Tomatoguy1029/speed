@@ -38,8 +38,8 @@ func _ready() -> void:
 		grid.add_theme_constant_override("v_separation", 12)
 		list.add_child(grid)
 		_grids.append(grid)
-		var table: Dictionary = ConfigManager.get(section[1])
-		for def in ConfigManager.sorted(table):
+		var table: Dictionary = ContentManager.get(section[1])
+		for def in ContentManager.sorted(table):
 			total += 1
 			var has := SaveManager.is_module_known(def.id)
 			known += 1 if has else 0

@@ -8,10 +8,10 @@
 ##   4. UI はランの状態を書き換えない（state.xxx = の代入をしない）（設計書 4.1）
 extends SceneTree
 
-const ALLOWED_AUTOLOADS := ["ConfigManager", "SaveManager", "AudioManager", "GameManager", "RunManager", "PlayRecorder"]
+const ALLOWED_AUTOLOADS := ["ContentManager", "SaveManager", "AudioManager", "GameManager", "RunManager", "PlayRecorder"]
 const CONTENT_REFS := ["res://scenes/stages", "res://scenes/bosses", "res://scenes/gimmicks",
 	"res://scripts/bosses", "res://scripts/gimmicks"]
-const GAME_REFS := ["res://scripts", "res://scenes", "res://data", "ConfigManager", "SaveManager",
+const GAME_REFS := ["res://scripts", "res://scenes", "res://data", "ContentManager", "SaveManager",
 	"AudioManager", "GameManager"]
 
 var errors: Array[String] = []

@@ -42,7 +42,7 @@ func _ready() -> void:
 	_appearance(_page(tr("lab.appearance.title")))
 
 func _appearance(page: Node) -> void:
-	_appearance_hashes = ConfigManager.source_hashes.duplicate()
+	_appearance_hashes = ContentManager.source_hashes.duplicate()
 	_text(page, tr("lab.appearance.help"))
 	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
 	_button(page, tr("lab.appearance.focus"), _focus_appearance)
@@ -90,7 +90,7 @@ func _sync_appearance() -> void:
 		_appearance_label.text = tr("lab.appearance.select_type")
 		return
 	var def: EnemyDef = lab.session.run.enemies.def_of(type)
-	var original: EnemyDef = ConfigManager.enemies[type]
+	var original: EnemyDef = ContentManager.enemies[type]
 	var pending: bool = def.visual_settings != original.visual_settings
 	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
 	if switched or not _appearance_scale.get_line_edit().has_focus():
@@ -105,7 +105,7 @@ func _sync_appearance() -> void:
 func _restore_appearance() -> void:
 	if _appearance_type == &"":
 		return
-	var original: EnemyDef = ConfigManager.enemies[_appearance_type]
+	var original: EnemyDef = ContentManager.enemies[_appearance_type]
 	var saved := ResourceLoader.load(original.resource_path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyDef
 	if saved == null:
 		lab._messages.text = tr("lab.appearance.save_failed")
@@ -124,7 +124,7 @@ func _save_appearance() -> void:
 		if field.editable:
 			field.apply()
 	var type := _appearance_type
-	var original: EnemyDef = ConfigManager.enemies[type]
+	var original: EnemyDef = ContentManager.enemies[type]
 	var path := original.resource_path
 	if FileAccess.get_sha256(path) != String(_appearance_hashes.get(path, "")):
 		lab._messages.text = tr("lab.appearance.file_changed")
@@ -141,7 +141,7 @@ func _save_appearance() -> void:
 		return
 	original.visual_settings = saved.visual_settings.duplicate(true)
 	_appearance_hashes[path] = FileAccess.get_sha256(path)
-	ConfigManager.source_hashes[path] = _appearance_hashes[path]
+	ContentManager.source_hashes[path] = _appearance_hashes[path]
 	lab._messages.text = tr("lab.appearance.saved_type").format({"name": def.display_name})
 	_sync_appearance()
 
@@ -247,15 +247,15 @@ func _conditions(page: Node) -> void:
 		else:
 			for suffix in ["early", "mid", "late"]:
 				var id := "s%d_%s" % [int(lab.session.spec.stage), suffix]
-				if ConfigManager.phases.has(StringName(id)): ids.append(id)
+				if ContentManager.phases.has(StringName(id)): ids.append(id)
 		lab.session.perform("phase_set", {"ids": ids}))
 	box = UI.fold(page, tr("lab.ui.player_stats"))
 	for entry in [["base_attack", TranslationServer.translate("lab.message_0c0e2d79f0"), 10.2], ["base_max_speed", TranslationServer.translate("lab.message_0aee0183fd"), 400.0], ["draw_length", TranslationServer.translate("lab.message_017dfdb22a"), 1020.0], ["trace_radius", TranslationServer.translate("lab.message_ec7bdd3fb0"), 28.0], ["draw_time_scale", TranslationServer.translate("lab.message_355273af8a"), 0.03], ["draw_confirm_delay", TranslationServer.translate("lab.message_ab276f5393"), 0.1], ["boss_hp", TranslationServer.translate("lab.message_6384a9a6f0"), 1000], ["boss_armor", TranslationServer.translate("lab.message_391c98f217"), 30]]:
-		_condition_fields[entry[0]] = _number(box, entry[1], float(ConfigManager.base.get(entry[0])), 0.01, 100000, 1, func(value): lab.session.perform("config", {"key": entry[0], "value": value}))
+		_condition_fields[entry[0]] = _number(box, entry[1], float(ContentManager.base.get(entry[0])), 0.01, 100000, 1, func(value): lab.session.perform("config", {"key": entry[0], "value": value}))
 	box = UI.fold(page, tr("lab.ui.loadout"))
 	var meta := OptionButton.new()
 	box.add_child(meta)
-	for id in ConfigManager.meta_upgrades:
+	for id in ContentManager.meta_upgrades:
 		meta.add_item(String(id))
 		meta.set_item_metadata(meta.item_count - 1, String(id))
 	var meta_level := _number(box, TranslationServer.translate("lab.message_761cc8db45"), 0, 0, 100)
@@ -268,7 +268,7 @@ func _conditions(page: Node) -> void:
 	box.add_child(definitions)
 	var fill := func(_i):
 		definitions.clear()
-		for def in ConfigManager.sorted(ConfigManager.weapons if kind.selected == 0 else ConfigManager.traits):
+		for def in ContentManager.sorted(ContentManager.weapons if kind.selected == 0 else ContentManager.traits):
 			definitions.add_item("%s %s" % [def.id, def.get_display_name()])
 			definitions.set_item_metadata(definitions.item_count - 1, String(def.id))
 	kind.item_selected.connect(fill)
@@ -280,7 +280,7 @@ func _conditions(page: Node) -> void:
 	box.add_child(heroes)
 	heroes.add_item(TranslationServer.translate("lab.message_7a50a34743"))
 	heroes.set_item_metadata(0, "")
-	for id in ConfigManager.heroes:
+	for id in ContentManager.heroes:
 		heroes.add_item(String(id))
 		heroes.set_item_metadata(heroes.item_count - 1, String(id))
 	heroes.item_selected.connect(func(i): lab.session.perform("hero", {"id": heroes.get_item_metadata(i)}))
@@ -337,7 +337,7 @@ func _attacks(box: Node) -> void:
 	_number(box, tr("lab.attack.jitter"), 0.3, 0, 3, 0.05, func(value): _settings.jitter = value; _apply_director())
 	# 強敵と大物の攻撃の重さ（種類ごと。予算の合計に数える）
 	var heavy := UI.fold(box, tr("lab.attack.danger"))
-	for def in ConfigManager.sorted(ConfigManager.enemies):
+	for def in ContentManager.sorted(ContentManager.enemies):
 		if def.rank >= 3 and preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
 			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
@@ -466,18 +466,18 @@ func _files(box: Node) -> void:
 	_button(box, TranslationServer.translate("lab.message_c1df88bfc2"), lab._choose_file)
 	box = UI.fold(box, tr("lab.ui.production_export"))
 	box.tooltip_text = tr("lab.message_e419196088")
-	export_stage = _number(box, TranslationServer.translate("lab.message_b8d712fc9b"), 1, 1, ConfigManager.stage_count())
+	export_stage = _number(box, TranslationServer.translate("lab.message_b8d712fc9b"), 1, 1, ContentManager.stage_count())
 	export_phase = OptionButton.new()
 	export_phase.add_item(TranslationServer.translate("lab.message_82b885c33d"))
 	export_phase.set_item_metadata(0, "")
-	for def in ConfigManager.sorted(ConfigManager.phases):
+	for def in ContentManager.sorted(ContentManager.phases):
 		export_phase.add_item(String(def.id))
 		export_phase.set_item_metadata(export_phase.item_count - 1, String(def.id))
 	box.add_child(export_phase)
 	export_targets = ItemList.new()
 	export_targets.select_mode = ItemList.SELECT_MULTI
 	export_targets.custom_minimum_size.y = 150
-	for def in ConfigManager.sorted(ConfigManager.enemies):
+	for def in ContentManager.sorted(ContentManager.enemies):
 		export_targets.add_item("%s %s" % [def.id, def.display_name])
 		export_targets.set_item_metadata(export_targets.item_count - 1, String(def.id))
 	box.add_child(export_targets)

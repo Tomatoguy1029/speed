@@ -12,11 +12,11 @@ func _ready() -> void:
 		tr("result.time").format({time = "%d:%02d" % [int(t) / 60, int(t) % 60]}),
 		tr("result.kills").format({n = int(r.get("kills", 0))}),
 		tr("result.level").format({n = int(r.get("level", 1))}),
-		tr("result.peak_speed").format({speed = "%.2f" % (float(r.get("peak_speed", 0.0)) * ConfigManager.cfg.speed_to_kms)}),
+		tr("result.peak_speed").format({speed = "%.2f" % (float(r.get("peak_speed", 0.0)) * ContentManager.cfg.speed_to_kms)}),
 		tr("result.parts").format({n = int(r.get("coins", 0))}),
 	]
 	if cleared and r.get("legendary", "") != "":
-		var def = ConfigManager.legendary_modules.get(StringName(r.legendary))
+		var def = ContentManager.legendary_modules.get(StringName(r.legendary))
 		if def != null:
 			lines.append(tr("result.legendary").format({name = def.get_display_name()}))
 	var best: Dictionary = SaveManager.data.best

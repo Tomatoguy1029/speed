@@ -77,7 +77,7 @@ func buy_upgrade(def: MetaUpgradeDef) -> bool:
 ## 強化をすべて 0 に戻し、使った部品を返す（調整パネル用）。
 func reset_upgrades() -> int:
 	var refund := 0
-	for def in ConfigManager.meta_upgrades.values():
+	for def in ContentManager.meta_upgrades.values():
 		var lv := meta_level(def.id)
 		for i in lv:
 			refund += def.costs[i]
@@ -92,7 +92,7 @@ func add_coins(amount: int) -> void:
 
 ## 通常の進行でステージが解放されているか。前のステージをクリアしていれば選べる。
 func is_stage_unlocked(index: int) -> bool:
-	var stage := ConfigManager.stage(index)
+	var stage := ContentManager.stage(index)
 	return stage != null and index <= int(data.cleared_stage) + 1
 
 func mark_stage_cleared(index: int) -> void:

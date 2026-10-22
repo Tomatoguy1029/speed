@@ -1,6 +1,6 @@
 ## 調整パネル（仕様書 20）。開発版だけで P キーで開く。
 ##
-## ランの状態は RunSimulation への命令で変え、調整値は ConfigManager の実行時の複製（cfg）だけを書き換える。
+## ランの状態は RunSimulation への命令で変え、調整値は ContentManager の実行時の複製（cfg）だけを書き換える。
 ## 「既定値に戻す」で .tres の値に戻る。.tres そのものは書き換えない（設計書 8.3）。
 extends PanelContainer
 
@@ -89,8 +89,8 @@ func _ready() -> void:
 	var row := HBoxContainer.new()
 	_module = OptionButton.new()
 	_module.add_theme_font_size_override("font_size", 15)
-	for table in [ConfigManager.weapons, ConfigManager.traits]:
-		for def in ConfigManager.sorted(table):
+	for table in [ContentManager.weapons, ContentManager.traits]:
+		for def in ContentManager.sorted(table):
 			_module.add_item("%s %s" % [def.id, def.get_display_name()])
 			_module.set_item_metadata(_module.item_count - 1, def.id)
 	row.add_child(_module)
@@ -141,7 +141,7 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	box.add_child(grid)
-	for def: MetaUpgradeDef in ConfigManager.sorted(ConfigManager.meta_upgrades):
+	for def: MetaUpgradeDef in ContentManager.sorted(ContentManager.meta_upgrades):
 		var l := Label.new()
 		l.text = "%s（最大 %d）" % [def.get_display_name(), def.costs.size()]
 		l.add_theme_font_size_override("font_size", 14)
@@ -175,7 +175,7 @@ func _add_meta_levels(box: VBoxContainer) -> void:
 ## 全項目の段の合計を、最大の段の合計の ratio 倍（四捨五入）にする。各項目へ最大の段に比べて均等に振り分け、
 ## 端数の段は小数部の大きい項目から、同じなら強化画面の並び順で前の項目から1段ずつ足す。
 func _set_meta_ratio(ratio: float) -> void:
-	var defs: Array = ConfigManager.sorted(ConfigManager.meta_upgrades)
+	var defs: Array = ContentManager.sorted(ContentManager.meta_upgrades)
 	var total := 0
 	for def: MetaUpgradeDef in defs:
 		total += def.costs.size()
@@ -231,7 +231,7 @@ func _spawn_enemies() -> void:
 	run.command(&"debug_spawn_enemies", {"count": int(_enemy_count.value)})
 
 func _on_slider(value: float, key: String) -> void:
-	var cfg := ConfigManager.cfg
+	var cfg := ContentManager.cfg
 	if typeof(cfg.get(key)) == TYPE_INT:
 		cfg.set(key, int(value))
 	else:
@@ -240,14 +240,14 @@ func _on_slider(value: float, key: String) -> void:
 
 func _refresh_sliders() -> void:
 	for key in _sliders:
-		var v = ConfigManager.cfg.get(key)
+		var v = ContentManager.cfg.get(key)
 		_sliders[key][0].set_value_no_signal(float(v))
 		_sliders[key][1].text = "%s %s" % [_sliders[key][2], str(snappedf(float(v), 0.01))]
 
 func _reset_defaults() -> void:
 	# 実行時の複製の中身を .tres の値に戻す（RunSimulation などが同じ複製を持っているため、中身を書き戻す）
-	var base := ConfigManager.base
+	var base := ContentManager.base
 	for prop in base.get_property_list():
 		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:
-			ConfigManager.cfg.set(prop.name, base.get(prop.name))
+			ContentManager.cfg.set(prop.name, base.get(prop.name))
 	_refresh_sliders()

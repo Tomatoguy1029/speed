@@ -76,7 +76,7 @@ func spawn(def_override: BossDef = null, position_override := Vector2.INF) -> vo
 	_spawn_actor(def_override, position_override)
 
 func _spawn_actor(def_override: BossDef, position_override: Vector2) -> BossActor:
-	var def: BossDef = def_override if def_override != null else definitions.get(state.stage.boss_id, ConfigManager.bosses.get(state.stage.boss_id))
+	var def: BossDef = def_override if def_override != null else definitions.get(state.stage.boss_id, ContentManager.bosses.get(state.stage.boss_id))
 	if def == null:
 		return null
 	state.boss_spawned = true
@@ -138,9 +138,9 @@ func remove_actor(owner: BossActor) -> void:
 
 ## 実験場も同じ役者一覧へ追加する。通常ランでは呼び出せない。
 func spawn_lab(type: StringName, pos: Vector2) -> int:
-	if not state.lab_mode or not ConfigManager.bosses.has(type):
+	if not state.lab_mode or not ContentManager.bosses.has(type):
 		return -1
-	var owner := _spawn_actor(definitions.get(type, ConfigManager.bosses[type]), pos)
+	var owner := _spawn_actor(definitions.get(type, ContentManager.bosses[type]), pos)
 	return owner.body if owner != null else -1
 
 ## 技を構える前に、必要な分類を同時取得する。

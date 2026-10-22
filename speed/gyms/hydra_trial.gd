@@ -21,7 +21,7 @@ func _ready() -> void:
 	await super._ready()
 	if not OS.is_debug_build(): return
 	await session.reset({"empty": true, "stage": 4, "ship_pos": [trial_ship_position.x, trial_ship_position.y],
-		"invincible": trial_invincible, "hero": "hercules", "config": {"base_attack": ConfigManager.base.base_attack * trial_attack_multiplier}})
+		"invincible": trial_invincible, "hero": "hercules", "config": {"base_attack": ContentManager.base.base_attack * trial_attack_multiplier}})
 	session.perform("boss", {"type": "hydra", "pos": [0, 0]})
 	# 読み込み・描画確認用。通常起動の試遊条件を共有設定へ保存しない。
 	if OS.get_cmdline_user_args().has("--hydra-split"):

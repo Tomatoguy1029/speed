@@ -12,29 +12,45 @@ var base: GameConfig
 ## 実行時に使う調整値（調整パネルが書き換える）
 var cfg: GameConfig
 
-var enemies: Dictionary = {}
-var phases: Dictionary = {}
-var stages: Dictionary = {}
-var bosses: Dictionary = {}
-var weapons: Dictionary = {}
-var traits: Dictionary = {}
-var meta_upgrades: Dictionary = {}
-var legendary_modules: Dictionary = {}
-var heroes: Dictionary = {}
+var catalog: ContentCatalog
+var _tables: Dictionary = {}
+var _definitions: Dictionary = {}
+var enemies: Dictionary:
+	get: return _table(&"enemies")
+	set(value): _tables[&"enemies"] = value
+var phases: Dictionary:
+	get: return _table(&"phases")
+	set(value): _tables[&"phases"] = value
+var stages: Dictionary:
+	get: return _table(&"stages")
+	set(value): _tables[&"stages"] = value
+var bosses: Dictionary:
+	get: return _table(&"bosses")
+	set(value): _tables[&"bosses"] = value
+var weapons: Dictionary:
+	get: return _table(&"weapons")
+	set(value): _tables[&"weapons"] = value
+var traits: Dictionary:
+	get: return _table(&"traits")
+	set(value): _tables[&"traits"] = value
+var meta_upgrades: Dictionary:
+	get: return _table(&"meta_upgrades")
+	set(value): _tables[&"meta_upgrades"] = value
+var legendary_modules: Dictionary:
+	get: return _table(&"legendary_modules")
+	set(value): _tables[&"legendary_modules"] = value
+var heroes: Dictionary:
+	get: return _table(&"heroes")
+	set(value): _tables[&"heroes"] = value
 
 func _ready() -> void:
 	base = load(CONFIG_PATH) as GameConfig
 	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
-	_load_dir("res://data/enemies", enemies, "id")
-	_load_dir("res://data/phases", phases, "id")
-	_load_dir("res://data/stages", stages, "index")
-	_load_dir("res://data/bosses", bosses, "id")
-	_load_dir("res://data/weapons", weapons, "id")
-	_load_dir("res://data/traits", traits, "id")
-	_load_dir("res://data/meta_upgrades", meta_upgrades, "id")
-	_load_dir("res://data/legendary_modules", legendary_modules, "id")
-	_load_dir("res://data/heroes", heroes, "id")
+	catalog = load("res://data/content_catalog.tres") as ContentCatalog
+	# 記録の基準は読み込み順に依存させない。ファイルのハッシュだけを読む。
+	for entry in catalog.entries:
+		source_hashes[entry.path] = FileAccess.get_sha256(entry.path)
 
 ## 調整値を .tres の値に戻す。
 func reset_runtime() -> void:
@@ -42,11 +58,11 @@ func reset_runtime() -> void:
 
 ## ステージの数。
 func stage_count() -> int:
-	return stages.size()
+	return catalog.table(&"stages").size()
 
 ## ステージの定義。なければ null。
 func stage(index: int) -> StageDef:
-	return stages.get(index) as StageDef
+	return definition(&"stages", index) as StageDef
 
 ## order（または id）の順に並べた定義の一覧。
 func sorted(table: Dictionary) -> Array:
@@ -73,7 +89,7 @@ func _load_dir(dir_path: String, into: Dictionary, key: String, mode := Resource
 		var res := ResourceLoader.load(dir_path.path_join(name), "", mode)
 		if res == null or res.get(key) == null:
 			healthy = false
-			push_warning("ConfigManager: %s を読めない" % name)
+			push_warning("ContentManager: %s を読めない" % name)
 			continue
 		into[res.get(key)] = res
 		source_hashes[dir_path.path_join(name)] = FileAccess.get_sha256(dir_path.path_join(name))
@@ -110,3 +126,25 @@ func reload_experiment_data() -> bool:
 	reset_runtime()
 	source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	return true
+
+## 定義は要求されたIDだけ読む。索引のパスは文字列なので依存資源を読み込まない。
+func definition(category: StringName, id: Variant) -> Resource:
+	if _tables.has(category) and _tables[category].has(id):
+		return _tables[category][id]
+	var entry := catalog.find(category, id)
+	if entry == null: return null
+	var existing: WeakRef = _definitions.get(entry.path)
+	var result: Resource = existing.get_ref() if existing != null else null
+	if result == null:
+		result = load(entry.path)
+		_definitions[entry.path] = weakref(result)
+		source_hashes[entry.path] = FileAccess.get_sha256(entry.path)
+	return result
+
+func _table(category: StringName) -> Dictionary:
+	if not _tables.has(category):
+		var table := {}
+		for id in catalog.table(category):
+			table[id] = definition(category, id)
+		_tables[category] = table
+	return _tables[category]

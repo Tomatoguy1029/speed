@@ -13,7 +13,7 @@ func _ready() -> void:
 		check(not ResourceLoader.has_cached(path), "表示なしのランが専用資源を読まない: " + path)
 	session.free()
 	await get_tree().process_frame
-	var config := ConfigManager.cfg.duplicate() as GameConfig
+	var config := ContentManager.cfg.duplicate() as GameConfig
 	config.meteor_count = 0
 	config.iron_count = 0
 	config.saw_count = 0

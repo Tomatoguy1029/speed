@@ -67,7 +67,7 @@ func _preview() -> void:
 		# 破片が分離した瞬間を静止確認する。
 		renderer._update_fx(0.2)
 		var drone = load("res://scripts/weapons/drone.gd").new()
-		drone.setup(run.loadout, ConfigManager.weapons[&"W06"])
+		drone.setup(run.loadout, ContentManager.weapons[&"W06"])
 		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
 		run.loadout.weapon_behaviors[&"W06"] = drone
 	if "--path-preview" in OS.get_cmdline_user_args() or "--trace-preview" in OS.get_cmdline_user_args():
@@ -109,7 +109,7 @@ func _preview() -> void:
 		state.phase = RunState.Phase.LEVELUP
 		state.ship_heading = Vector2.RIGHT
 		var weapon = load("res://scripts/weapons/rear.gd").new()
-		weapon.setup(run.loadout, ConfigManager.weapons[&"W23"])
+		weapon.setup(run.loadout, ContentManager.weapons[&"W23"])
 		run.loadout.weapon_behaviors[&"W23"] = weapon
 		for lv in range(1, 6):
 			weapon.level = lv
@@ -121,13 +121,13 @@ func _preview() -> void:
 				pr.friend_pos[i] += pr.friend_vel[i] * 0.08
 		state.ship_pos = Vector2.ZERO
 		var drone = load("res://scripts/weapons/drone.gd").new()
-		drone.setup(run.loadout, ConfigManager.weapons[&"W06"])
+		drone.setup(run.loadout, ContentManager.weapons[&"W06"])
 		drone.drones = [{"pos": Vector2(-70, 0)}, {"pos": Vector2(70, 0)},
 			{"pos": Vector2(0, -70)}, {"pos": Vector2(0, 70)}]
 		run.loadout.weapon_behaviors[&"W06"] = drone
 	if "--attachments-preview" in OS.get_cmdline_user_args():
 		for id in [&"W01", &"W02", &"W03", &"W05", &"W07", &"W08", &"W17", &"W23"]:
-			run.loadout._sync_behavior(true, id, ConfigManager.weapons[id], 1)
+			run.loadout._sync_behavior(true, id, ContentManager.weapons[id], 1)
 	print("PIXEL_PREVIEW_READY: ", run.enemies.count(), " enemies/rocks")
 	if "--capture" in OS.get_cmdline_user_args():
 		for i in 4:

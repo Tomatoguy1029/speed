@@ -272,7 +272,7 @@ func _begin_next() -> void:
 	if int(_current.count) == 1:
 		_history.clear()
 	var step := int(_current.count) + 1
-	var defs: Dictionary = ConfigManager.weapons if _current.kind == &"weapon" else ConfigManager.traits
+	var defs: Dictionary = ContentManager.weapons if _current.kind == &"weapon" else ContentManager.traits
 	var definition: Resource = defs.get(_current.id)
 	var title: String = definition.get_display_name() if definition != null else String(_current.id)
 	var reward := "%s Lv%d" % [title, _current.level]
@@ -307,7 +307,7 @@ func _update_continuation_stamp() -> void:
 	_bonus_stamp.scale = Vector2.ONE * scale_factor
 
 func _begin_ult() -> void:
-	var definition: HeroDef = ConfigManager.heroes.get(_current.id)
+	var definition: HeroDef = ContentManager.heroes.get(_current.id)
 	_heading.text = tr("hud.ult_granted")
 	_heading.add_theme_color_override("font_color", Color("#efcb70"))
 	_ult_name.text = "%s — %s" % [definition.display_name, tr("hero.%s.power" % definition.id)]

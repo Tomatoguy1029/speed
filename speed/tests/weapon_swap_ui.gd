@@ -26,7 +26,7 @@ func _ready() -> void:
 		await _finish()
 		return
 	_check(not hud._cards_row.visible and grid.get_child_count() == run.cfg.weapon_slots, "交換候補には所持武器だけを並べる")
-	_check(new_name.text == ConfigManager.weapons[&"W22"].get_display_name(), "上の情報欄に拾った武器を1つ表示する")
+	_check(new_name.text == ContentManager.weapons[&"W22"].get_display_name(), "上の情報欄に拾った武器を1つ表示する")
 	var before: Dictionary = run.state.weapons.duplicate()
 	await _wait_real()
 	point = new_name.get_global_rect().get_center()
@@ -35,7 +35,7 @@ func _ready() -> void:
 	for i in grid.get_child_count():
 		var b: Button = grid.get_child(i)
 		var card: Dictionary = run.state.cards[i]
-		var def: WeaponDef = ConfigManager.weapons[card.id]
+		var def: WeaponDef = ContentManager.weapons[card.id]
 		_check(b.text.contains(def.get_description()) and b.text.contains("Lv%d" % card.level), "交換候補%dには固有の説明と所持Lvを表示する" % i)
 		_check(b.get_theme_stylebox("normal").border_color == hud.RANK_COLORS[card.level - 1], "交換候補%dは所持Lvの枠色を使う" % i)
 	await _shot("swap_wide")
@@ -97,7 +97,7 @@ func _ready() -> void:
 	TranslationServer.set_locale("en")
 	await _open_swap()
 	await _shot("swap_en_small")
-	_check(hud.get("_swap_new_desc").text == ConfigManager.weapons[&"W22"].get_description(), "英語も既存の武器説明を使う")
+	_check(hud.get("_swap_new_desc").text == ContentManager.weapons[&"W22"].get_description(), "英語も既存の武器説明を使う")
 	TranslationServer.set_locale("ja")
 	get_window().size = Vector2i(1280, 720)
 	run.state.swap_pick = &""

@@ -72,12 +72,12 @@ func reset(settings := {}) -> void:
 	# 保存で本番の外観が変わっても、この実験の巻き戻しは開始時の値から再生する。
 	if not spec.has("overrides"):
 		spec["overrides"] = {}
-	for type in ConfigManager.enemies:
+	for type in ContentManager.enemies:
 		var id := String(type)
 		if not spec.overrides.has(id):
 			spec.overrides[id] = {}
 		if not spec.overrides[id].has("visual_settings"):
-			spec.overrides[id]["visual_settings"] = ConfigManager.enemies[type].visual_settings.duplicate(true)
+			spec.overrides[id]["visual_settings"] = ContentManager.enemies[type].visual_settings.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
@@ -90,7 +90,7 @@ func _rebuild() -> void:
 		if scene.get_parent() != null:
 			scene.get_parent().remove_child(scene)
 		scene.queue_free()
-	var cfg: GameConfig = ConfigManager.base.duplicate(true)
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
 	for key in spec.get("config", {}):
 		cfg.set(key, spec.config[key])
 	var field_flags: Dictionary = spec.get("field", {})
@@ -108,8 +108,8 @@ func _rebuild() -> void:
 		cfg.comet_interval_max = 1e8
 		cfg.gravity_interval_min = 1e8
 		cfg.gravity_interval_max = 1e8
-	var stage: StageDef = ConfigManager.stage(int(spec.get("stage", 1))).duplicate(true)
-	var defs: Dictionary = ConfigManager.enemies.duplicate()
+	var stage: StageDef = ContentManager.stage(int(spec.get("stage", 1))).duplicate(true)
+	var defs: Dictionary = ContentManager.enemies.duplicate()
 	for id in spec.get("overrides", {}):
 		if defs.has(StringName(id)):
 			var def: EnemyDef = defs[StringName(id)].duplicate(true)
@@ -126,10 +126,10 @@ func _rebuild() -> void:
 	scene.auto_step = false
 	scene.set_process(false)
 	run = scene.sim
-	run.bosses.definitions = ConfigManager.bosses.duplicate()
+	run.bosses.definitions = ContentManager.bosses.duplicate()
 	for id in spec.get("boss_overrides", {}):
-		if ConfigManager.bosses.has(StringName(id)):
-			var boss: BossDef = ConfigManager.bosses[StringName(id)].duplicate(true)
+		if ContentManager.bosses.has(StringName(id)):
+			var boss: BossDef = ContentManager.bosses[StringName(id)].duplicate(true)
 			for key in spec.boss_overrides[id]:
 				if key == "params":
 					for param in spec.boss_overrides[id][key]: boss.params[param] = safe_parameter(param, spec.boss_overrides[id][key][param])
@@ -483,7 +483,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 		"phase_set":
 			var phases := []
 			for id in args.get("ids", []):
-				if ConfigManager.phases.has(StringName(id)): phases.append(ConfigManager.phases[StringName(id)])
+				if ContentManager.phases.has(StringName(id)): phases.append(ContentManager.phases[StringName(id)])
 			if not phases.is_empty(): run.state.stage.phases = phases
 		"meta":
 			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
@@ -660,7 +660,7 @@ func _run_schedule() -> void:
 			var at := vector(entry.get("pos", [0, 0])) + Vector2.from_angle(run.state.rng.randf() * TAU) * sqrt(run.state.rng.randf()) * float(entry.get("radius", 0))
 			entry = entry.duplicate(true)
 			entry.pos = [at.x, at.y]
-			_apply("boss" if ConfigManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
+			_apply("boss" if ContentManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
 
 func digest() -> String:
 	var actors := []

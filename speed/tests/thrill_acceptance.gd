@@ -75,14 +75,14 @@ func _ready() -> void:
 func _test_debug_stage_selection() -> void:
 	_check(OS.is_debug_build(), "ステージ選択：開発版で確認する")
 	_check(SaveManager.is_stage_unlocked(1), "ステージ選択：通常の進行では最初にステージ1が開く")
-	for stage in range(2, ConfigManager.stage_count() + 1):
+	for stage in range(2, ContentManager.stage_count() + 1):
 		_check(not SaveManager.is_stage_unlocked(stage), "ステージ選択：ステージ%dのクリア記録は未解放のまま" % stage)
 	_check(not SaveManager.is_stage_unlocked(0) and not SaveManager.is_stage_unlocked(6), "ステージ選択：存在しないステージは選べない")
 	SaveManager.data = SaveManager._migrate({"version": 1, "cleared_stage": 0, "coins": 123}, SaveManager.default_data())
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
 	add_child(app)
 	await get_tree().process_frame
-	for stage in range(1, ConfigManager.stage_count() + 1):
+	for stage in range(1, ContentManager.stage_count() + 1):
 		GameManager.goto(GameManager.Screen.STAGE_SELECT)
 		await get_tree().process_frame
 		var map = app._current._map
@@ -106,7 +106,7 @@ func _test_debug_stage_selection() -> void:
 	SaveManager.data = SaveManager.default_data()
 
 func _start(stage: int) -> void:
-	ConfigManager.reset_runtime()
+	ContentManager.reset_runtime()
 	SaveManager.data = SaveManager.default_data()
 	GameManager.run_stage = stage
 	GameManager.run_endless = false
@@ -116,7 +116,7 @@ func _start(stage: int) -> void:
 	run.state.stage = run.state.stage.duplicate()
 	run.state.stage.phases = []
 	for phase_name in ["build", "pressure", "horde", "late"]:
-		run.state.stage.phases.append(ConfigManager.phases[StringName("s%d_%s" % [stage, phase_name])])
+		run.state.stage.phases.append(ContentManager.phases[StringName("s%d_%s" % [stage, phase_name])])
 	if stage == 4:
 		run.state.stage.boss_id = &"hydra"
 	scene.auto_step = false
@@ -214,7 +214,7 @@ func _test_foundation() -> void:
 	s.ship_vel = Vector2(-100, 0)
 	run.ship._collide_bodies()
 	_check(s.ship_vel.x > 0 and s.ship_hp == hp, "タスク1：惑星は被弾せず跳ね返る")
-	_check(ConfigManager.stage(1).phases[0].mix == ConfigManager.stage(2).phases[0].mix, "復元：通常ステージは元の共通の出現構成を使う")
+	_check(ContentManager.stage(1).phases[0].mix == ContentManager.stage(2).phases[0].mix, "復元：通常ステージは元の共通の出現構成を使う")
 	s.time = run.cfg.boss_time - 1.0
 	run.bosses.tick(0.0, 0.0)
 	_check(not s.boss_spawned and s.boss_at >= run.cfg.boss_time and s.boss_at <= run.cfg.boss_time + run.cfg.boss_time_spread, "タスク3：ボス時刻は指定範囲で決まる")
@@ -299,9 +299,9 @@ func _advance_enemies(seconds: float) -> Dictionary:
 	return peaks
 
 func _test_enemy_roster() -> void:
-	for stage in range(1, ConfigManager.stage_count() + 1):
-		for id in _stage_types(ConfigManager.stage(stage)):
-			_check(ConfigManager.enemies.has(StringName(id)), "ステージ%dの出現種類%sに定義がある" % [stage, id])
+	for stage in range(1, ContentManager.stage_count() + 1):
+		for id in _stage_types(ContentManager.stage(stage)):
+			_check(ContentManager.enemies.has(StringName(id)), "ステージ%dの出現種類%sに定義がある" % [stage, id])
 	var all_types: Array[StringName] = []
 	for roster in IMPLEMENTED_ROSTERS.values():
 		for id in roster.split(","):
@@ -531,7 +531,7 @@ func _test_hero() -> void:
 	# 護衛の条件を満たす出現定義を持つステージを、独立したfixtureとして用意する。
 	var guard_phase: PhaseDef = s.stage.phases[0].duplicate(true)
 	guard_phase.mix[&"telescope"] = 1.0
-	var guard_def: EnemyDef = ConfigManager.enemies[&"telescope"].duplicate(true)
+	var guard_def: EnemyDef = ContentManager.enemies[&"telescope"].duplicate(true)
 	guard_def.max_alive = 4
 	run.enemies.definitions[&"telescope"] = guard_def
 	s.stage.phases[0] = guard_phase
@@ -787,7 +787,7 @@ func _play_steps(count: int, dt: float) -> void:
 			run.physics_step(dt)
 
 func _test_app_flow() -> void:
-	ConfigManager.reset_runtime()
+	ContentManager.reset_runtime()
 	SaveManager.data = SaveManager.default_data()
 	GameManager.goto(GameManager.Screen.TITLE, false)
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
@@ -817,7 +817,7 @@ func _test_app_flow() -> void:
 			var at := run.state.ship_pos
 			_line(PackedVector2Array([at, at + Vector2(300, 150)]))
 			_play_steps(20, 0.05)
-			var expected := _stage_types(ConfigManager.stage(stage))
+			var expected := _stage_types(ContentManager.stage(stage))
 			var valid := true
 			var regular := 0
 			var t := run.enemies.table
@@ -829,7 +829,7 @@ func _test_app_flow() -> void:
 			await get_tree().process_frame
 		run.command(&"debug_time", {"seconds": run.state.boss_at + 0.1 - run.state.time})
 		_play_steps(2, 0.05)
-		_check(run.state.boss_spawned and run.bosses.actor.def.id == ConfigManager.stage(stage).boss_id, "通し確認：ステージ%dに対応するボスが出る" % stage)
+		_check(run.state.boss_spawned and run.bosses.actor.def.id == ContentManager.stage(stage).boss_id, "通し確認：ステージ%dに対応するボスが出る" % stage)
 		await _shot("stage_%d_boss" % stage)
 		var enemies := run.enemies.table
 		for row in enemies.alive.size():
@@ -943,7 +943,7 @@ func _test_surge() -> void:
 		run.state.rng.seed = 208
 		run.spawn._survey(0.0)
 		var request: Dictionary = target.duplicate()
-		request.phase = ConfigManager.phases[&"s1_late"]
+		request.phase = ContentManager.phases[&"s1_late"]
 		request.steps = steps
 		request.surge = {"ranged": run.cfg.surge_ranged * steps, "elite": run.cfg.surge_elite * steps}
 		for attempt in 600:

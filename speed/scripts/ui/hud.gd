@@ -428,7 +428,7 @@ func _refresh_loadout_icons() -> void:
 		var index := 0
 		for id in owned:
 			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
-			_add_icon(_loadout_icons, (ConfigManager.weapons if row == 0 else ConfigManager.traits).get(id), area)
+			_add_icon(_loadout_icons, (ContentManager.weapons if row == 0 else ContentManager.traits).get(id), area)
 			index += 1
 		row += 1
 
@@ -542,7 +542,7 @@ func _show_cards() -> void:
 	_swap_scroll.visible = swap != &""
 	_swap_keep.visible = swap != &""
 	if swap != &"":
-		var got: WeaponDef = ConfigManager.weapons[swap]
+		var got: WeaponDef = ContentManager.weapons[swap]
 		_swap_new_name.text = got.get_display_name()
 		_swap_new_desc.text = got.get_description()
 		for i in cards.size():
@@ -583,7 +583,7 @@ func _show_cards() -> void:
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
 			var card: Dictionary = cards[i]
-			var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
+			var definition: Resource = (ContentManager.traits if card.kind == &"trait" else ContentManager.weapons).get(card.id)
 			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
@@ -639,10 +639,10 @@ func _card_style(col: Color) -> StyleBoxFlat:
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
-			var new_def: WeaponDef = ConfigManager.weapons[c.new]
+			var new_def: WeaponDef = ContentManager.weapons[c.new]
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
-		var old_def: WeaponDef = ConfigManager.weapons[c.id]
+		var old_def: WeaponDef = ContentManager.weapons[c.id]
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
 			"desc": old_def.get_description(),
@@ -651,12 +651,12 @@ static func card_info(c: Dictionary) -> Dictionary:
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
 	var weapon: bool = c.kind == &"weapon"
-	var def = (ConfigManager.weapons if weapon else ConfigManager.traits).get(c.id)
+	var def = (ContentManager.weapons if weapon else ContentManager.traits).get(c.id)
 	var lv: int = c.level
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
 		tag = "card.first_weapon"
-	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ConfigManager.cfg.trait_max_stacks]
+	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ContentManager.cfg.trait_max_stacks]
 	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 
@@ -877,8 +877,8 @@ func _dense_cells() -> PackedVector2Array:
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
 	draw_texture(SLOTS, Vector2.ZERO)
-	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ConfigManager.weapons)
-	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ConfigManager.traits)
+	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.weapons)
+	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.traits)
 	_draw_hero_slot(Vector2(99, 315))
 
 func _draw_hero_slot(at: Vector2) -> void:
@@ -886,7 +886,7 @@ func _draw_hero_slot(at: Vector2) -> void:
 	if s.hero_power == &"":
 		return
 	var rect := Rect2(at + Vector2(3, 3), Vector2(32, 31))
-	var definition: HeroDef = ConfigManager.heroes.get(s.hero_power)
+	var definition: HeroDef = ContentManager.heroes.get(s.hero_power)
 	var gold := Color("#ffe8a0")
 	if definition != null and not definition.stars.is_empty():
 		var bounds := Rect2(definition.stars[0], Vector2.ZERO)

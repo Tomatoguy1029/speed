@@ -67,7 +67,7 @@ func _n(id: StringName) -> int:
 
 ## 能力値を変える特性の値（.tres の params）。
 func _trait_param(id: StringName, key: String, default := 0.0) -> float:
-	var def: TraitDef = ConfigManager.traits.get(id)
+	var def: TraitDef = ContentManager.traits.get(id)
 	return float(def.params.get(key, default)) if def != null else default
 
 func _per(id: StringName) -> float:
@@ -76,7 +76,7 @@ func _per(id: StringName) -> float:
 ## 強化画面での強化（仕様書 14）。
 func _meta_level(stat: StringName) -> Array:
 	var out := []
-	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
+	for def: MetaUpgradeDef in ContentManager.meta_upgrades.values():
 		if def.stat == stat:
 			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.run_meta_level(def.id)
 			out.append([def.per_level, level])
@@ -165,7 +165,7 @@ func open_start_cards() -> void:
 
 ## 最初の武器の候補：全武器からランダムに選ぶ。
 func roll_start_cards() -> Array[Dictionary]:
-	var ids: Array = ConfigManager.weapons.keys().filter(func(id): return not ConfigManager.weapons[id].comet_only)
+	var ids: Array = ContentManager.weapons.keys().filter(func(id): return not ContentManager.weapons[id].comet_only)
 	var out: Array[Dictionary] = []
 	while out.size() < cfg.start_weapon_choices and not ids.is_empty():
 		var id = ids.pop_at(state.rng.randi_range(0, ids.size() - 1))
@@ -175,7 +175,7 @@ func roll_start_cards() -> Array[Dictionary]:
 func roll_cards() -> Array[Dictionary]:
 	var pool: Array = []
 	for kind in [&"weapon", &"trait"]:
-		var defs: Dictionary = ConfigManager.weapons if kind == &"weapon" else ConfigManager.traits
+		var defs: Dictionary = ContentManager.weapons if kind == &"weapon" else ContentManager.traits
 		var owned: Dictionary = state.weapons if kind == &"weapon" else state.traits
 		var slots := cfg.weapon_slots if kind == &"weapon" else cfg.trait_slots
 		var max_lv := cfg.weapon_max_level if kind == &"weapon" else cfg.trait_max_stacks
@@ -280,7 +280,7 @@ func _bonus_target() -> Dictionary:
 ## 武器・特性を levels 段階手に入れる。枠が満員か上限なら false。
 func grant(kind: StringName, id: StringName, levels := 1) -> bool:
 	var weapon := kind == &"weapon"
-	var defs: Dictionary = ConfigManager.weapons if weapon else ConfigManager.traits
+	var defs: Dictionary = ContentManager.weapons if weapon else ContentManager.traits
 	var def = defs.get(id)
 	if def == null:
 		return false
@@ -330,7 +330,7 @@ func _receive_comet_weapon(id: StringName) -> bool:
 		return false
 	if state.weapons.size() < cfg.weapon_slots:
 		grant(&"weapon", id, cfg.weapon_max_level)
-		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ConfigManager.weapons[id].get_display_name(),
+		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ContentManager.weapons[id].get_display_name(),
 			"color": Color("#efcb70"), "size": 24})
 		return false
 	state.swap_pick = id

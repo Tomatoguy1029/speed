@@ -145,7 +145,7 @@ func _weapons_steps() -> void:
 	await _wait(0.5)
 	var run := _run_manager()
 	run.ship.invincible = true
-	for id in ConfigManager.weapons:
+	for id in ContentManager.weapons:
 		run.command(&"debug_grant", {"kind": &"weapon", "id": id, "levels": 5})
 	for id in [&"T01", &"T02", &"T03", &"T05", &"T06"]:
 		run.command(&"debug_grant", {"kind": &"trait", "id": id, "levels": 5})

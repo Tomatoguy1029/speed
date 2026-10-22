@@ -89,7 +89,7 @@ func texture_for(id: String) -> Texture2D:
 	return _textures[path]
 
 func _can_drop_data(_position: Vector2, data: Variant) -> bool:
-	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
+	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ContentManager.enemies.has(StringName(data.lab_enemy)) or ContentManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
 
 func _drop_data(position: Vector2, data: Variant) -> void:
 	spawn_type = String(data.lab_enemy)
@@ -105,7 +105,7 @@ func _place(point: Vector2) -> void:
 		if field != null:
 			session.perform("field", {"kind": String(field.kind), "pos": [point.x, point.y], "radius": field.radius})
 		return
-	var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
+	var kind := "boss" if ContentManager.bosses.has(StringName(spawn_type)) else "spawn"
 	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count})
 	selection.clear()
 	if session.selected >= 0: selection.append(session.run.enemies.table.id[session.selected])

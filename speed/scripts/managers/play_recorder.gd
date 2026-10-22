@@ -173,7 +173,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 ## ランで使う機体の強化の段（ID → 段）。開発版の上書きを含む。
 func _meta_levels() -> Dictionary:
 	var out := {}
-	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
+	for def: MetaUpgradeDef in ContentManager.meta_upgrades.values():
 		out[String(def.id)] = SaveManager.run_meta_level(def.id)
 	return out
 

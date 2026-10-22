@@ -109,8 +109,8 @@ func _fill_palette() -> void:
 		child.queue_free()
 	workspace.palette_buttons.clear()
 	var filter := _filter.text.to_lower()
-	var definitions := ConfigManager.sorted(ConfigManager.enemies)
-	definitions.append_array(ConfigManager.sorted(ConfigManager.bosses))
+	var definitions := ContentManager.sorted(ContentManager.enemies)
+	definitions.append_array(ContentManager.sorted(ContentManager.bosses))
 	definitions.append_array(field_items())
 	# 並びは「スリルと寄り道」の敵ごとの情報の表の順。そのあとにボス、出現から外した敵・障害物
 	definitions.sort_custom(func(a, b):
@@ -550,7 +550,7 @@ func _reload_data() -> void:
 	generator.cancelled = true
 	session.cancel_seek()
 	while _busy: await get_tree().process_frame
-	if ConfigManager.reload_experiment_data():
+	if ContentManager.reload_experiment_data():
 		await _reset()
 		_fill_palette()
 		_messages.text = tr("lab.data_reloaded")

@@ -77,7 +77,7 @@ static func construct(pattern: Dictionary, rng: RandomNumberGenerator, anchor: V
 	var commands := []
 	for region in pattern.get("regions", []):
 		var type := StringName(region.get("type", ""))
-		if not ConfigManager.enemies.has(type) and not ConfigManager.bosses.has(type):
+		if not ContentManager.enemies.has(type) and not ContentManager.bosses.has(type):
 			return {"valid": false, "reason": TranslationServer.translate("lab.message_461a6d1eec")}
 		var minimum := clampi(int(region.get("min_count", 1)), 0, 100)
 		var maximum := clampi(int(region.get("max_count", 1)), minimum, 100)
@@ -85,7 +85,7 @@ static func construct(pattern: Dictionary, rng: RandomNumberGenerator, anchor: V
 			var point := Vector2(float(region.pos[0]), float(region.pos[1]))
 			point += Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * float(region.get("jitter", 0))
 			point = anchor + point.rotated(angle) * scale_value
-			commands.append({"kind": "boss" if ConfigManager.bosses.has(type) else "spawn", "args": {"type": region.type, "pos": [point.x, point.y], "angle": float(region.get("angle", 0)) + angle, "role": region.get("role", "avoid"), "elite": region.get("elite", false)}})
+			commands.append({"kind": "boss" if ContentManager.bosses.has(type) else "spawn", "args": {"type": region.type, "pos": [point.x, point.y], "angle": float(region.get("angle", 0)) + angle, "role": region.get("role", "avoid"), "elite": region.get("elite", false)}})
 	return {"valid": path.size() >= 2, "route": path, "commands": commands}
 
 func _admit_candidates(commands: Array, path: PackedVector2Array, margin: float, window: float, pattern: Dictionary) -> bool:

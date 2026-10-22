@@ -383,14 +383,14 @@ func _behavior_index(name: StringName) -> int:
 	return k
 
 func def_of(type: StringName) -> EnemyDef:
-	return definitions.get(type, ConfigManager.enemies.get(type)) as EnemyDef
+	return definitions.get(type, ContentManager.enemies.get(type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。
 func debug_spawn_random(count_n: int) -> void:
 	if not OS.is_debug_build():
 		return
 	var choices: Array[EnemyDef] = []
-	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
+	for def: EnemyDef in ContentManager.sorted(ContentManager.enemies):
 		if def.behavior != &"part" and behaviors[_behavior_index(def.behavior)].debug_spawnable:
 			choices.append(def)
 	if choices.is_empty():

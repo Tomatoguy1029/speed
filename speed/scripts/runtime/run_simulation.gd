@@ -80,13 +80,13 @@ var profiling := false
 
 ## ランを組み立てる。input・actor_parent・view_size_source は先に入れておく。
 func setup() -> void:
-	cfg = options.get("config", ConfigManager.cfg)
+	cfg = options.get("config", ContentManager.cfg)
 	state = RunState.new()
 	state.lab_mode = bool(options.get("lab", false))
 	state.meta_override = options.get("meta", {})
 	state.stage_index = int(options.get("stage_index", 1))
 	state.endless = bool(options.get("endless", false))
-	state.stage = options.get("stage", ConfigManager.stage(state.stage_index))
+	state.stage = options.get("stage", ContentManager.stage(state.stage_index))
 	state.time = float(options.get("start_time", 0.0))
 	var start_source: String = options.get("start_source", "stage_start")
 	if options.has("seed"):
@@ -441,7 +441,7 @@ func _begin_finish() -> void:
 func finish_legendary() -> LegendaryModuleDef:
 	if state.endless or state.stage_index < 1 or state.stage_index > 4 or state.stage == null:
 		return null
-	return ConfigManager.legendary_modules.get(state.stage.legendary_module_id) as LegendaryModuleDef
+	return ContentManager.legendary_modules.get(state.stage.legendary_module_id) as LegendaryModuleDef
 
 func finish_reveal_start() -> float:
 	return maxf(0.0, cfg.boss_finish_slow_time) + maxf(0.0, cfg.boss_finish_blast_time)
