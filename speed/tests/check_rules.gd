@@ -2,13 +2,13 @@
 ##   Godot --headless --path speed --script res://tests/check_rules.gd
 ##
 ## 確かめること：
-##   1. Autoload はアプリ全体の窓口と、開発用の記録だけ
+##   1. Autoload はアプリ全体の窓口と、開発用の起動だけ
 ##   2. Manager はコンテンツ（ステージ・ボス・フィールドの仕掛け）に依存しない（決まり4）
-##   3. 道具（addons/）は Godot 本体だけに依存する（設計書 4.1）
+##   3. 再利用する道具は Godot 本体だけに依存し、content_build はゲーム専用の生成を受け持つ
 ##   4. UI はランの状態を書き換えない（state.xxx = の代入をしない）（設計書 4.1）
 extends SceneTree
 
-const ALLOWED_AUTOLOADS := ["ContentManager", "SaveManager", "AudioManager", "GameManager", "RunManager", "PlayRecorder"]
+const ALLOWED_AUTOLOADS := ["ContentManager", "SaveManager", "AudioManager", "GameManager", "RunManager", "ProfileManager", "DevBootstrap"]
 const CONTENT_REFS := ["res://scenes/stages", "res://scenes/bosses", "res://scenes/gimmicks",
 	"res://scripts/bosses", "res://scripts/gimmicks"]
 const GAME_REFS := ["res://scripts", "res://scenes", "res://data", "ContentManager", "SaveManager",
@@ -21,11 +21,14 @@ func _initialize() -> void:
 	for path in _files("res://scripts/managers"):
 		_forbid(path, CONTENT_REFS, "Manager がコンテンツを参照している")
 	for path in _files("res://addons"):
-		if path.begins_with("res://addons/limboai"):
+		if path.begins_with("res://addons/limboai/") or path.begins_with("res://addons/content_build/"):
 			continue
 		_forbid(path, GAME_REFS, "道具（addons）がゲームを参照している")
 	for path in _files("res://scripts/ui"):
 		_forbid_regex(path, "\\bstate\\.[a-z_]+\\s*[+\\-*/]?=[^=]", "UI がランの状態を書き換えている")
+	_forbid("res://scripts/runtime/run_simulation.gd", ["res://scripts/dev/", "&\"debug_"], "シミュレーションが開発用機能を参照している")
+	_forbid("res://scenes/run/run.tscn", ["res://scripts/dev/"], "本番の表示が開発用機能を参照している")
+	_forbid("res://scripts/ui/main.gd", ["res://gyms/", "res://addons/"], "画面の入口が開発用機能を参照している")
 	if errors.is_empty():
 		print("[check_rules] OK")
 		quit(0)
