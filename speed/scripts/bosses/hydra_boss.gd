@@ -129,6 +129,7 @@ const TECH_DIR := {&"grid":0.0,&"swarm":-PI/2.0,&"tornado":PI/2.0,&"debris_shatt
 @onready var decision: BTState = $LimboHSM/Form1
 
 var necks: Array[Neck] = []
+var _guard_approach: Array[Neck] = []
 ## 今の段階の首の本数
 var count := 0
 ## 不死の首：むき出しの残り時間と、頭の行と id
@@ -245,6 +246,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_chance_step(dt)
 	if north_aiming:
 		_update_north_targets()
+	_update_guard_approach()
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
 	_tech_cd -= dt
@@ -523,10 +525,25 @@ func finish_normal(n: Neck) -> void:
 func position_head(index: int, dt: float) -> void:
 	var n := necks[index]
 	if separated:
-		var center: Vector2=table.pos[immortal_row] if immortal_row>=0 else run_state.ship_pos
-		var desired: Vector2=center+Vector2.from_angle(n.base_angle+_time*0.12)*float(def.params.guard_radius)
-		if not run_state.view_rect().grow(-60.0).has_point(n.free_pos):desired=run_state.view_rect().get_center()+Vector2.from_angle(n.base_angle)*minf(run_state.view_half.x,run_state.view_half.y)*0.65
-		steer_snake(n,desired,dt)
+		var desired:=_guard_patrol(n,index)
+		var entering:=false
+		# 次の攻撃予算に入る蛇だけ画面内へ向かい、残りは護衛位置へ散る。
+		if _guard_approach.has(n):
+			var view: Rect2=run_state.view_rect().grow(-table.r[n.row]-24.0).intersection(arena.bounds.grow(-float(def.params.neck_rest)-table.r[n.row]-24.0))
+			if not view.has_area():
+				view=run_state.view_rect().grow(-table.r[n.row]-24.0).intersection(arena.bounds.grow(-table.r[n.row]-24.0))
+				entering=true
+			var heading:=Vector2.from_angle(n.base_angle)
+			desired=view.get_center()+heading*view.size*0.4
+		var spacing: float=float(def.params.neck_rest)*0.6+table.r[n.row]*2.0
+		for other in necks:
+			if other==n or not _alive(other):continue
+			var offset:=n.free_pos-table.pos[other.row]
+			var distance:=offset.length()
+			if distance>=spacing:continue
+			var direction:=offset/distance if distance>1.0 else Vector2.from_angle(n.base_angle)
+			desired+=direction*(spacing-distance)*1.5
+		steer_snake(n,desired,dt,1.0,entering)
 		return
 	var facing := n.base_angle+table.facing[body]
 	n.motion.aim_wait=maxf(0.0,float(n.motion.get("aim_wait",0.0))-dt)
@@ -540,6 +557,45 @@ func position_head(index: int, dt: float) -> void:
 	var defend: float=facing+clampf(local,-0.8,0.8)
 	aim_neck(n,defend+sin(_time+n.base_angle)*0.06,dt)
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
+
+## 護衛範囲を壁の内側へ収め、内外の持ち場をそれぞれ異なる周期で泳ぐ。
+func _guard_patrol(n: Neck,index: int)->Vector2:
+	var center: Vector2=table.pos[immortal_row]
+	var away:=(center-run_state.ship_pos).normalized()
+	var reach:=float(def.params.guard_radius)*3.0
+	center-=away*float(def.params.guard_radius)*0.4
+	var margin: float=float(def.params.neck_rest)+table.r[n.row]+24.0
+	var region:=Rect2(center-Vector2.ONE*reach,Vector2.ONE*reach*2.0).intersection(arena.bounds.grow(-margin))
+	if not region.has_area():region=arena.bounds.grow(-margin)
+	var phase:=_time*(0.23+index*0.017)+n.base_angle*2.0
+	var angle:=n.base_angle+sin(phase)*0.35
+	var ring:=0.55+0.35*(index%2)+sin(phase*0.7+index)*0.06
+	return region.get_center()+Vector2.from_angle(angle)*region.size*0.5*ring
+
+## 通常攻撃の予算と待ち順から、画面内へ入る護衛だけを先に選ぶ。
+func _update_guard_approach()->void:
+	_guard_approach.clear()
+	if not separated or busy or recovery_t>0.0:return
+	var budget:=float(def.params.normal_budget)
+	var pending: Array[Neck]=[]
+	for n in necks:
+		if not _alive(n):continue
+		if def.params.normal_rules.has(n.mode):
+			budget-=float(def.params.normal_rules[n.mode].cost)*maxf(0.0,table.attack_value[n.row])
+		elif n.mode==&"idle" and n.cd<=0.0:
+			if not n.motion.has("guard_ready_since"):n.motion.guard_ready_since=_time
+			pending.append(n)
+		else:n.motion.erase("guard_ready_since")
+	pending.sort_custom(func(a,b):
+		if a.motion.guard_ready_since!=b.motion.guard_ready_since:return a.motion.guard_ready_since<b.motion.guard_ready_since
+		return a.free_pos.distance_squared_to(run_state.ship_pos)<b.free_pos.distance_squared_to(run_state.ship_pos))
+	for n in pending:
+		var cost:=INF
+		for rule: Dictionary in def.params.normal_rules.values():
+			if rule.kind==n.kind:cost=minf(cost,float(rule.cost)*maxf(0.0,table.attack_value[n.row]))
+		if cost>budget:continue
+		budget-=cost
+		_guard_approach.append(n)
 
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
 	if dt<=0.0:return

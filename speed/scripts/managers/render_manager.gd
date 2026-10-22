@@ -656,7 +656,8 @@ func _draw_field(c: CanvasItem) -> void:
 		var center := Vector2(d.x, d.y)
 		if view.has_point(center) or view.grow(d.z).has_point(center):
 			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
-	c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+	if f.battle_arenas.is_empty():
+		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	_draw_hero(c)
 	# ヘルクレス座の火の隕石：落ちてくる影と、燃える跡
 	for fall in run.heroes.falls:
