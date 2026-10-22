@@ -145,7 +145,7 @@ func _tick_landmark(dt: float) -> void:
 	if state.rng.randf() >= cfg.landmark_chance or combat.grid.table == null:
 		return
 	var rows := PackedInt32Array()
-	combat.grid.query_radius(state.ship_pos, state.view_half.length() * 1.3, cfg.max_enemy_radius, rows)
+	combat.grid.query_radius(state.ship_pos, state.view_half.length() * 1.3, combat.enemy_query_padding, rows)
 	var picks := PackedInt32Array()
 	for i in rows:
 		if t.dead[i] != 0 or t.def[i] == null or t.def[i].rank < 2 or t.def[i].rank > 5 or t.parent[i] >= 0:
@@ -302,7 +302,7 @@ func _fire_target() -> Vector2:
 	if combat.grid.table == null:
 		return state.ship_pos
 	var rows := PackedInt32Array()
-	combat.grid.query_radius(state.ship_pos, half.length(), cfg.max_enemy_radius, rows)
+	combat.grid.query_radius(state.ship_pos, half.length(), combat.enemy_query_padding, rows)
 	var t := enemies.table
 	# ボス戦の間は、ボスの部位（うみへび座の頭）に少しだけ寄せる
 	if state.rng.randf() < 0.35:
@@ -320,7 +320,7 @@ func _fire_target() -> Vector2:
 ## 範囲の敵を、装甲に関係なく焼く。
 func _burn_enemies(center: Vector2, radius: float, dmg: float) -> void:
 	var rows := PackedInt32Array()
-	combat.grid.query_radius(center, radius, cfg.max_enemy_radius, rows)
+	combat.grid.query_radius(center, radius, combat.enemy_query_padding, rows)
 	var t := enemies.table
 	for i in rows:
 		if t.dead[i] == 0 and t.meteor_index[i] < 0 and t.pos[i].distance_to(center) <= radius + t.r[i]:

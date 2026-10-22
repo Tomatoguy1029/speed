@@ -95,7 +95,7 @@ def main():
                             errors.append(f"{path}:{n}: {rule}を書かない（「{m.group(0)}」）")
 
     for dirpath, dirs, files in os.walk(os.path.join(ROOT, "docs")):
-        rel = os.path.relpath(dirpath, ROOT)
+        rel = os.path.relpath(dirpath, ROOT).replace(os.sep, "/")
         # git が扱わない、ファイルの無いフォルダは見ない
         if not any(f != ".DS_Store" for _, _, fs in os.walk(dirpath) for f in fs):
             dirs[:] = []

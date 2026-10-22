@@ -153,7 +153,7 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 		r = def.radius
 	if opts.get("meteor_index", -1) < 0:
 		r *= cfg.character_scale
-	t.r[i] = r
+	t.r[i] = r * def.visual_value("scale", 1.0)
 	t.max_hp[i] = def.base_hp(cfg) * z * z * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
 	t.hp[i] = t.max_hp[i]
 	t.armor[i] = def.armor * z * cfg.enemy_armor_mult * (1.3 if elite else 1.0)
@@ -1111,7 +1111,7 @@ func _pump(i: int, dt: float) -> void:
 	var store_max := int(p.store_max)
 	var full := float(t.buds[i]) / float(store_max)
 	# 胴体は吸い込んだ数に応じて膨らみ、撃ったあとはしぼむ
-	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale
+	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale * t.def[i].visual_value("scale", 1.0)
 	t.r[i] += (base_r * (1.0 + float(p.grow) * full) - t.r[i]) * minf(1.0, 6.0 * dt)
 	t.timer[i] -= dt
 	match t.mode[i]:

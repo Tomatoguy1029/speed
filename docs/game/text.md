@@ -753,6 +753,17 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.save | 照明をプロジェクトへ保存 | Save lighting to project |
 | lab.appearance.saved | 照明を enemy&#95;lighting.tres に保存しました | Lighting saved to enemy&#95;lighting.tres |
 | lab.appearance.select&#95;enemy | 確認する敵を選択してください | Select an enemy to inspect |
+| lab.appearance.scale | サイズ倍率（見た目・当たり判定） | Size multiplier (visual and collision) |
+| lab.appearance.type&#95;help | 選択した種類の全個体へ即時反映します。サイズは見た目と当たり判定の両方に適用します。保存すると全ステージの同じ種類に使います。照明は法線画像を持つ敵だけ調整できます。 | Edits apply to all instances of the selected type. Size changes visuals and collision. Save to use settings in every stage. Lighting requires a normal map. |
+| lab.appearance.restore&#95;saved | この種類を保存済みの外観へ戻す | Restore saved appearance for this type |
+| lab.appearance.save&#95;type | この種類の設定をステージへ保存 | Save this type for all stages |
+| lab.appearance.select&#95;type | 配置した通常敵またはパーツを選択してください（ボス・地形は対象外） | Select a placed enemy or part (bosses and terrain are excluded). |
+| lab.appearance.target | {name} [{id}] — {state} | {name} [{id}] — {state} |
+| lab.appearance.unsaved | 未保存 | Unsaved |
+| lab.appearance.saved&#95;state | 保存済み | Saved |
+| lab.appearance.save&#95;failed | 外観を保存できませんでした | Could not save appearance |
+| lab.appearance.file&#95;changed | 敵データが外部で変更されています。実験場を開き直してから保存してください。 | Enemy data changed externally. Reopen the lab before saving. |
+| lab.appearance.saved&#95;type | {name} の外観を保存しました。次のステージ開始から使います。 | Saved appearance for {name}. New runs will use these settings. |
 <!-- csv:end -->
 
 ### 互換行

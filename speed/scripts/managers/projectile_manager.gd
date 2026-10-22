@@ -275,7 +275,7 @@ func _update_friendly(dt: float) -> void:
 			friend_trail[i] = trail
 		var body_hit = field.first_body_hit(from, pos, r)
 		var to: Vector2 = pos if body_hit == null else body_hit.point
-		var pad := Vector2(r + cfg.max_enemy_radius, r + cfg.max_enemy_radius)
+		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
 		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()

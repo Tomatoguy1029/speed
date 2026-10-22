@@ -1,9 +1,13 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://b33ay4rvkn8n0"]
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"ambient": 0.1,
+"key_energy": 2.0
+}
 rank = 4
 radius = 22.0
 hp = 45.0

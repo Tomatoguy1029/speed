@@ -2,7 +2,6 @@
 extends TabContainer
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 const LIGHTING := preload("res://data/visuals/enemy_lighting.tres")
-const LIGHTING_DEFAULTS := preload("res://scripts/render/enemy_lighting_settings.gd")
 var lab
 var result_list: ItemList
 var candidates: ItemList
@@ -25,6 +24,12 @@ var _spawn_entries: ItemList
 var _schedule_hash := 0
 var _lighting_fields: Dictionary = {}
 var _appearance_angle: SpinBox
+var _appearance_type: StringName = &""
+var _appearance_label: Label
+var _appearance_scale: SpinBox
+var _appearance_save: Button
+var _appearance_reset: Button
+var _appearance_hashes: Dictionary = {}
 
 func _ready() -> void:
 	custom_minimum_size.x = 368
@@ -37,32 +42,101 @@ func _ready() -> void:
 	_appearance(_page(tr("lab.appearance.title")))
 
 func _appearance(page: Node) -> void:
+	_appearance_hashes = ConfigManager.source_hashes.duplicate()
 	_text(page, tr("lab.appearance.help"))
 	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
 	_button(page, tr("lab.appearance.focus"), _focus_appearance)
+	_appearance_label = _text(page, "")
+	_appearance_scale = _number(page, tr("lab.appearance.scale"), 1, 0.1, 5, 0.05, _set_visual.bind("scale"))
 	_appearance_angle = _number(page, tr("lab.appearance.rotation"), 0, -180, 180, 5, _rotate_appearance)
+	_appearance_reset = _button(page, tr("lab.appearance.restore_saved"), _restore_appearance)
+	_appearance_save = _button(page, tr("lab.appearance.save_type"), _save_appearance)
 	for entry in [["key_energy", 0.0, 3.0, 0.01], ["fill_energy", 0.0, 3.0, 0.01],
 		["key_angle", -180.0, 180.0, 1.0], ["fill_angle", -180.0, 180.0, 1.0],
 		["height", 0.0, 1.0, 0.01], ["ambient", 0.0, 1.0, 0.01], ["normal_strength", 0.0, 3.0, 0.05]]:
 		var key: String = entry[0]
-		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_lighting.bind(key))
-	_text(page, tr("lab.appearance.light_help"))
-	_button(page, tr("lab.appearance.reset"), func():
-		var defaults := LIGHTING_DEFAULTS.new()
-		for key in _lighting_fields:
-			LIGHTING.set(key, defaults.get(key))
-			_lighting_fields[key].set_value_no_signal(LIGHTING.get(key)))
-	_button(page, tr("lab.appearance.save"), func():
-		for field in _lighting_fields.values():
-			field.apply()
-		var error := ResourceSaver.save(LIGHTING, "res://data/visuals/enemy_lighting.tres")
-		lab._messages.text = tr("lab.appearance.saved") if error == OK else error_string(error))
+		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_visual.bind(key))
+	_text(page, tr("lab.appearance.type_help"))
 
-func _set_lighting(value: float, key: String) -> void:
-	LIGHTING.set(key, value)
+func _set_visual(value: float, key: String) -> void:
+	if _appearance_type == &"":
+		return
+	lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key, "value": value})
 	if is_instance_valid(lab.session.run):
 		var render: RenderManager = lab.session.run.get_node("../RenderManager")
 		render._apply_lighting()
+
+func _sync_appearance() -> void:
+	var row: int = lab.session.selected
+	var table: EnemyTable = lab.session.run.enemies.table
+	var supported := row >= 0 and table.is_boss[row] == 0 and table.meteor_index[row] < 0 and table.type[row] not in [&"iron", &"saw"]
+	var type: StringName = table.type[row] if supported else &""
+	var switched := _appearance_type != type
+	_appearance_type = type
+	_appearance_scale.editable = supported
+	_appearance_angle.editable = row >= 0
+	_appearance_save.disabled = not supported
+	_appearance_reset.disabled = not supported
+	for field: SpinBox in _lighting_fields.values():
+		field.editable = supported and not RenderManager.layered_layers(type, lab.session.run.state.stage).is_empty()
+	if not supported:
+		_appearance_label.text = tr("lab.appearance.select_type")
+		return
+	var def: EnemyDef = lab.session.run.enemies.def_of(type)
+	var original: EnemyDef = ConfigManager.enemies[type]
+	var pending: bool = def.visual_settings != original.visual_settings
+	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
+	if switched or not _appearance_scale.get_line_edit().has_focus():
+		_appearance_scale.set_value_no_signal(def.visual_value("scale", 1.0))
+	if switched or not _appearance_angle.get_line_edit().has_focus():
+		_appearance_angle.set_value_no_signal(wrapf(rad_to_deg(table.facing[row]), -180, 180))
+	for key in _lighting_fields:
+		var field: SpinBox = _lighting_fields[key]
+		if switched or not field.get_line_edit().has_focus():
+			field.set_value_no_signal(def.visual_value(key, LIGHTING.get(key)))
+
+func _restore_appearance() -> void:
+	if _appearance_type == &"":
+		return
+	var original: EnemyDef = ConfigManager.enemies[_appearance_type]
+	var saved := ResourceLoader.load(original.resource_path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyDef
+	if saved == null:
+		lab._messages.text = tr("lab.appearance.save_failed")
+		return
+	for key in EnemyDef.VISUAL_LIMITS:
+		lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key,
+			"value": saved.visual_value(key, 1.0 if key == "scale" else float(LIGHTING.get(key))),
+			"inherit": not saved.visual_settings.has(key)})
+	_sync_appearance()
+
+func _save_appearance() -> void:
+	if _appearance_type == &"":
+		return
+	_appearance_scale.apply()
+	for field: SpinBox in _lighting_fields.values():
+		if field.editable:
+			field.apply()
+	var type := _appearance_type
+	var original: EnemyDef = ConfigManager.enemies[type]
+	var path := original.resource_path
+	if FileAccess.get_sha256(path) != String(_appearance_hashes.get(path, "")):
+		lab._messages.text = tr("lab.appearance.file_changed")
+		return
+	var saved := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyDef
+	if saved == null:
+		lab._messages.text = tr("lab.appearance.save_failed")
+		return
+	var def: EnemyDef = lab.session.run.enemies.def_of(type)
+	saved.visual_settings = def.visual_settings.duplicate(true)
+	var error := ResourceSaver.save(saved, path)
+	if error != OK:
+		lab._messages.text = tr("lab.appearance.save_failed") + " " + error_string(error)
+		return
+	original.visual_settings = saved.visual_settings.duplicate(true)
+	_appearance_hashes[path] = FileAccess.get_sha256(path)
+	ConfigManager.source_hashes[path] = _appearance_hashes[path]
+	lab._messages.text = tr("lab.appearance.saved_type").format({"name": def.display_name})
+	_sync_appearance()
 
 func _inspect_bomber() -> void:
 	if not is_instance_valid(lab.session.run):
@@ -85,7 +159,7 @@ func _focus_appearance() -> void:
 	lab.canvas.follow = false
 	lab.canvas.center = table.pos[i]
 	var available: float = maxf(40.0, minf(lab.canvas.size.x, lab.canvas.size.y) - 80.0)
-	lab.canvas.zoom = minf(8.0, available / maxf(1.0, RenderManager.enemy_sprite_radius(table.type[i], table.r[i], lab.session.run.cfg.character_scale) * 2.0 * sqrt(2.0)))
+	lab.canvas.zoom = minf(8.0, available / maxf(1.0, RenderManager.enemy_sprite_radius(table.type[i], table.r[i], lab.session.run.cfg.character_scale, lab.session.run.state.stage) * 2.0 * sqrt(2.0)))
 	lab.canvas.show_ranges = false
 	lab.canvas.show_ids = false
 	lab.canvas.selection.assign([table.id[i]])
@@ -405,6 +479,7 @@ func _files(box: Node) -> void:
 
 func sync_from_session() -> void:
 	if not is_instance_valid(lab.session.run): return
+	_sync_appearance()
 	var run: RunManager = lab.session.run
 	for key in _condition_fields:
 		var box: SpinBox = _condition_fields[key]

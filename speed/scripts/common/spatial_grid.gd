@@ -8,6 +8,7 @@
 class_name SpatialGrid
 extends RefCounted
 
+var max_radius := 0.0
 var cell := 160.0
 var origin := Vector2.ZERO
 var cols := 0
@@ -20,6 +21,7 @@ var _used_cells := PackedInt32Array()
 ## 使用中で撃破されていない行を登録する。
 func build(enemy_table: EnemyTable, cell_size: float) -> void:
 	table = enemy_table
+	max_radius = 0.0
 	var alive := table.alive
 	var dead := table.dead
 	var pos := table.pos
@@ -38,6 +40,7 @@ func build(enemy_table: EnemyTable, cell_size: float) -> void:
 		if alive[i] == 0 or dead[i] != 0:
 			next[i] = -1
 			continue
+		max_radius = maxf(max_radius, table.r[i])
 		var p := pos[i]
 		var cx := floori((p.x - origin.x) / cell)
 		var cy := floori((p.y - origin.y) / cell)

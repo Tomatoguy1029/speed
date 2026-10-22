@@ -99,7 +99,7 @@ def generate(document):
                          body, flags=re.MULTILINE)
         outputs[path] = (prefix + marker + updated).encode("utf-8")
     # A new resource also needs a row in the source; direct editor additions must be visible.
-    expected = {str(path.relative_to(ROOT / "speed/data"))
+    expected = {path.relative_to(ROOT / "speed/data").as_posix()
                 for folder in ("enemies", "heroes", "bosses")
                 for path in (ROOT / "speed/data" / folder).glob("*.tres")
                 if re.search(r"^display_name = ", path.read_text(encoding="utf-8"), re.MULTILINE)}

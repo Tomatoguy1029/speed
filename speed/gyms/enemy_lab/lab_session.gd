@@ -71,6 +71,15 @@ func reset(settings := {}) -> void:
 	current_branch = tr("lab.initial_branch")
 	spec = {"seed": 932, "empty": true, "stage": 1, "auto_spawn": false, "invincible": true}
 	spec.merge(settings.duplicate(true), true)
+	# 保存で本番の外観が変わっても、この実験の巻き戻しは開始時の値から再生する。
+	if not spec.has("overrides"):
+		spec["overrides"] = {}
+	for type in ConfigManager.enemies:
+		var id := String(type)
+		if not spec.overrides.has(id):
+			spec.overrides[id] = {}
+		if not spec.overrides[id].has("visual_settings"):
+			spec.overrides[id]["visual_settings"] = ConfigManager.enemies[type].visual_settings.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
@@ -535,7 +544,16 @@ func _edit_definition(args: Dictionary) -> void:
 		return
 	if typeof(args.value) == TYPE_FLOAT and not is_finite(args.value):
 		return
-	if key.begins_with("params."):
+	if key.begins_with("visual."):
+		var field := key.trim_prefix("visual.")
+		if not EnemyDef.VISUAL_LIMITS.has(field):
+			return
+		var limits: Vector2 = EnemyDef.VISUAL_LIMITS[field]
+		if args.get("inherit", false) == true:
+			def.visual_settings.erase(field)
+		else:
+			def.visual_settings[field] = clampf(float(args.value), limits.x, limits.y)
+	elif key.begins_with("params."):
 		if not def.params.has(key.trim_prefix("params.")):
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
@@ -562,6 +580,8 @@ func _edit_definition(args: Dictionary) -> void:
 			t.speed[i] *= def.speed / maxf(old.speed, 0.001)
 		elif key == "radius":
 			t.r[i] *= def.radius / maxf(old.radius, 0.001)
+		elif key == "visual.scale":
+			t.r[i] *= def.visual_value("scale", 1.0) / old.visual_value("scale", 1.0)
 		t.def[i] = def
 
 func row_for_id(id: int) -> int:
