@@ -66,40 +66,20 @@ var body_speed_max := 0.0
 ## 宇宙塵の雲（中心と半径）
 var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
-var _stream_t := 0.0
 ## 次の彗星までの世界秒
-var _comet_t := 0.0
 var wells: Array[Well] = []
 ## ボス所有の固定外周。所有者の解放時に、その外周だけを取り除く。
 var battle_arenas: Dictionary = {}
 ## ワープホールの位置と消える世界時刻（無ければ warp_gone が負）
 var warp_pos := Vector2.ZERO
 var warp_gone := -1.0
-var _well_t := 0.0
 
 func setup(context: RunContext) -> void:
 	super(context)
-	var rng := state.rng
 	planet = Body.new()
 	planet.r = cfg.planet_radius
 	planet.is_planet = true
 	bodies.append(planet)
-	for i in cfg.moon_count:
-		var m := Body.new()
-		m.orbit = rng.randf_range(1500.0, cfg.field_radius - 600.0)
-		m.a0 = float(i) / cfg.moon_count * TAU + rng.randf_range(-0.3, 0.3)
-		m.dir = -1.0 if rng.randf() < 0.5 else 1.0
-		m.r = rng.randf_range(110.0, 180.0)
-		moons.append(m)
-		bodies.append(m)
-	for i in cfg.dust_count:
-		var a := rng.randf() * TAU
-		var d := rng.randf_range(cfg.planet_radius + 600.0, cfg.field_radius - 200.0)
-		dust.append(Vector3(cos(a) * d, sin(a) * d, rng.randf_range(250.0, 620.0)))
-	_build_moon_bands()
-	body_speed_max = 0.0
-	for m in moons:
-		body_speed_max = maxf(body_speed_max, absf(cfg.moon_orbit_speed) * m.orbit)
 	_body_origin = Vector2.ONE * (-cfg.field_radius - BODY_CELL_SIZE)
 	_body_width = ceili((cfg.field_radius * 2.0 + BODY_CELL_SIZE * 2.0) / BODY_CELL_SIZE)
 	_body_cells.clear()
@@ -107,281 +87,66 @@ func setup(context: RunContext) -> void:
 	for i in _body_cells.size():
 		_body_cells[i] = []
 	_body_used.clear()
-	_place_rocks(rng)
-	_update_moons()
-	wells.clear()
-	warp_gone = -1.0
-	_well_t = rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
+	for old in _gimmicks.values():
+		old.dispose()
+	_gimmicks.clear()
+	for id in [&"moons", &"dust", &"comets", &"meteors", &"warp", &"gravity"]:
+		var part: FieldGimmick = load("res://scripts/gimmicks/%s.gd" % id).new()
+		part.setup(ctx)
+		_gimmicks[id] = part
+	for id in [&"moons", &"dust", &"meteors", &"comets", &"warp", &"gravity"]:
+		_gimmicks[id].initialize()
+	refresh_bodies()
 
-func tick(_real_dt: float, world_dt: float) -> void:
-	_update_moons()
-	if world_dt > 0.0:
-		_tick_comets(world_dt)
-		_stream_rocks(world_dt)
-		_tick_wells(world_dt)
+var _gimmicks: Dictionary = {}
 
-# ── 隕石（仕様書 13.1） ─────────────────────────────────────────────
+func gimmick(id: StringName) -> FieldGimmick:
+	return _gimmicks.get(id)
 
-## ラン開始時に、世界の決まった位置へ隕石を置く：地帯・漂流。彗星はラン中に現れる（_tick_comets）。
-func _place_rocks(rng: RandomNumberGenerator) -> void:
-	var n := cfg.meteor_count
-	for i in roundi(n * 0.45):
-		var center := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1100.0, cfg.field_radius - 650.0)
-		for j in 8:
-			_add_rock(rng, center + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * 380.0, &"belt", Vector2.ZERO)
-	for i in roundi(n * 2.5):
-		var d := sqrt(rng.randf_range(800.0 * 800.0, pow(cfg.field_radius - 300.0, 2.0)))
-		var heading := rng.randf() * TAU
-		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"drift", Vector2.from_angle(heading) * rng.randf_range(15.0, 35.0))
-	# 鉄のがれきと回る丸鋸（置き方は仮：フィールドの全体に散らす）
-	for i in cfg.iron_count:
-		var center := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1100.0, cfg.field_radius - 650.0)
-		for j in rng.randi_range(3, 5):
-			_add_rock(rng, center + Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * 240.0, &"iron", Vector2.ZERO)
-	for i in cfg.saw_count:
-		var d := sqrt(rng.randf_range(900.0 * 900.0, pow(cfg.field_radius - 400.0, 2.0)))
-		_add_rock(rng, Vector2.from_angle(rng.randf() * TAU) * d, &"saw", Vector2.ZERO)
-	_comet_t = rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
+func tick(real_dt: float, world_dt: float) -> void:
+	for part in _gimmicks.values():
+		part.tick(real_dt, world_dt)
 
-func _add_rock(rng: RandomNumberGenerator, p: Vector2, kind: StringName, vel: Vector2) -> void:
-	var r := p.length()
-	if r < cfg.planet_radius + 200.0 or r > cfg.field_radius - 100.0:
-		return
-	var rock := Rock.new()
-	rock.kind = kind
-	rock.pos = p
-	rock.vel = vel
-	rock.size = rng.randf_range(24.0, 65.0)
-	rock.facing = rng.randf() * TAU
-	rock.spin = rng.randf_range(-0.5, 0.5)
-	if kind == &"iron":
-		rock.size = rng.randf_range(30.0, 50.0)
-	elif kind == &"saw":
-		rock.size = 30.0
-		rock.spin = 8.0
-	rocks.append(rock)
+func dispose() -> void:
+	for part in _gimmicks.values():
+		part.dispose()
+	_gimmicks.clear()
+	super()
 
-## 世界時刻 t の隕石の位置と速度。
-func _rock_at(rock: Rock, t: float) -> Array:
-	if rock.kind == &"comet":
-		return [rock.pos + rock.vel * (t - rock.born), rock.vel]
-	var diameter := cfg.field_radius * 2.0
-	var p := rock.pos + rock.vel * t
-	p = Vector2(fposmod(p.x + cfg.field_radius, diameter) - cfg.field_radius, fposmod(p.y + cfg.field_radius, diameter) - cfg.field_radius)
-	return [p, rock.vel]
+func refresh_bodies() -> void:
+	gimmick(&"moons").update()
 
-func _near(p: Vector2, extra: float) -> bool:
-	var d := (p - state.view_center).abs()
-	var r := p.length()
-	return d.x < state.view_half.x + extra and d.y < state.view_half.y + extra \
-		and r > cfg.planet_radius + 100.0 and r < cfg.field_radius + 100.0
+func rock_at(rock: Rock, time: float) -> Array:
+	return gimmick(&"meteors")._rock_at(rock, time)
 
-## 画面の近くの隕石だけを敵の表に入れる。壊した隕石はそのランの間は戻らない。
-func _stream_rocks(dt: float) -> void:
-	var t := state.world_time
-	var table := enemies.table
-	for rock in rocks:
-		var i := rock.row
-		if i < 0:
-			continue
-		# 撃破されて空きに戻った行は、別の敵に使い回されていることがある
-		if not enemies.is_same(i, rock.row_id) or table.dead[i] != 0:
-			if not enemies.is_same(i, rock.row_id) or table.hull_scattered[i] == 0:
-				rock.destroyed = true
-			rock.row = -1
-			continue
-		var pv := _rock_at(rock, t)
-		table.pos[i] = pv[0]
-		table.vel[i] = pv[1]
-		table.facing[i] = rock.facing + rock.spin * t
-		if rock.kind == &"comet" and t >= rock.gone:
-			rock.destroyed = true
-		if rock.destroyed or (not rock.lab_manual and not _near(pv[0], 650.0)):
-			enemies.mark_dead(i)
-			rock.row = -1
-	_stream_t -= dt
-	if _stream_t > 0.0:
-		return
-	_stream_t = 0.2
-	var defs := {&"iron": enemies.def_of(&"iron"), &"saw": enemies.def_of(&"saw")}
-	var meteor: EnemyDef = enemies.def_of(&"meteor")
-	for k in rocks.size():
-		var rock := rocks[k]
-		if rock.destroyed or rock.row >= 0:
-			continue
-		if rock.kind == &"comet" and t >= rock.gone:
-			rock.destroyed = true
-			continue
-		var pv := _rock_at(rock, t)
-		if not rock.lab_manual and not _near(pv[0], 300.0):
-			continue
-		var def: EnemyDef = defs.get(rock.kind, meteor)
-		var sprite_radius := rock.size if def != meteor or rock.kind == &"comet" else (60.0 if k % 2 == 0 else 40.0)
-		var i := enemies.spawn(def, pv[0], {"size": sprite_radius, "facing": rock.facing, "spin": rock.spin,
-			"meteor_index": k, "vel": pv[1]})
-		rock.row = i
-		rock.row_id = table.id[i]
-		if rock.rare_weapon != &"":
-			table.max_hp[i] *= cfg.rare_comet_hp_mult
-			table.hp[i] = table.max_hp[i]
-
-# ── 重力（仕様書 13.1） ─────────────────────────────────────────────
-
-## 重力を出し、敵・敵の弾・遅い機体を引き寄せる。高速の機体には効かない。
-func _tick_wells(dt: float) -> void:
-	_well_t -= dt
-	if _well_t <= 0.0:
-		_well_t = state.rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
-		spawn_well()
-	var now := state.world_time
-	for k in range(wells.size() - 1, -1, -1):
-		if now - wells[k].born >= wells[k].life:
-			wells.remove_at(k)
-	if wells.is_empty():
-		return
-	var fast := state.tracing or state.glide or state.ship_vel.length() >= state.stats.max_speed * cfg.ram_speed_ratio
-	var t := enemies.table
-	for w in wells:
-		var k := 1.0 - (now - w.born) / w.life
-		var reach := w.radius * k
-		var pull := w.pull * k * dt
-		if not fast:
-			state.ship_vel += _well_pull(w.pos, state.ship_pos, reach, pull)
-		for i in t.alive.size():
-			if t.alive[i] != 0 and t.dead[i] == 0 and t.is_boss[i] == 0 and t.meteor_index[i] < 0 and t.parent[i] < 0:
-				t.vel[i] += _well_pull(w.pos, t.pos[i], reach, pull)
-		var hostile_alive := projectiles.hostile_alive
-		for i in hostile_alive.size():
-			if hostile_alive[i] != 0:
-				projectiles.hostile_vel[i] += _well_pull(w.pos, projectiles.hostile_pos[i], reach, pull)
-
-## 重力の中心 center が、位置 p のものに与える速度の変化（届かなければ 0）。
-func _well_pull(center: Vector2, p: Vector2, reach: float, pull: float) -> Vector2:
-	var d := center - p
-	var dist := d.length()
-	if dist >= reach or dist < 1.0:
-		return Vector2.ZERO
-	return d / dist * pull * (1.0 - dist / reach)
-
-## 画面の中の、機体から少し離れた位置に重力を1つ出す。
 func spawn_well() -> void:
-	var w := Well.new()
-	for attempt in 8:
-		var p := state.view_center + Vector2(state.rng.randf_range(-0.7, 0.7) * state.view_half.x,
-			state.rng.randf_range(-0.7, 0.7) * state.view_half.y)
-		w.pos = p
-		if p.distance_to(state.ship_pos) > 300.0 and body_gap(p, 0.0) > 100.0:
-			break
-	w.born = state.world_time
-	w.life = cfg.gravity_life
-	w.radius = cfg.gravity_radius
-	w.pull = cfg.gravity_pull
-	wells.append(w)
+	gimmick(&"gravity").spawn_well()
 
-## 位置 pos に、引き寄せる領域を1つ置く（うみへび座の渦の首の渦など）。重力と同じく、縮んで消える。
 func add_well(pos: Vector2, life: float, radius: float, pull: float) -> void:
-	var w := Well.new()
-	w.pos = pos
-	w.born = state.world_time
-	w.life = life
-	w.radius = radius
-	w.pull = pull
-	wells.append(w)
+	gimmick(&"gravity").add_well(pos, life, radius, pull)
 
-# ── 彗星（仕様書 13.1） ─────────────────────────────────────────────
-
-func _tick_comets(dt: float) -> void:
-	_comet_t -= dt
-	if _comet_t > 0.0:
-		return
-	_comet_t = state.rng.randf_range(cfg.comet_interval_min, cfg.comet_interval_max)
-	if state.bonus_t <= 0.0 and not state.boss_spawned and warp_gone < 0.0 and state.time >= cfg.rare_comet_after \
-			and state.rng.randf() < cfg.warp_chance:
-		spawn_warp()
-		return
-	spawn_comet(state.time >= cfg.rare_comet_after and state.rng.randf() < cfg.rare_comet_chance)
-
-# ── ワープホール（仕様書 13.1） ───────────────────────────────────────
-
-## 画面の端の近くにワープホールを出す。
-func spawn_warp() -> void:
-	for attempt in 8:
-		var u := Vector2.from_angle(state.rng.randf() * TAU)
-		var edge := minf(state.view_half.x / maxf(absf(u.x), 0.001), state.view_half.y / maxf(absf(u.y), 0.001))
-		warp_pos = state.view_center + u * edge * 0.8
-		if body_gap(warp_pos, cfg.warp_radius) > 50.0 and warp_pos.length() < cfg.field_radius - 200.0:
-			break
-	warp_gone = state.world_time + cfg.warp_life
-
-## 機体がワープホールに触れたか。触れたらワープホールは消える。
-func take_warp() -> bool:
-	if warp_gone < 0.0:
-		return false
-	if state.world_time >= warp_gone:
-		warp_gone = -1.0
-		return false
-	var reach := cfg.warp_radius + cfg.ship_radius
-	if state.ship_pos.distance_squared_to(warp_pos) > reach * reach:
-		return false
-	warp_gone = -1.0
-	return true
-
-## 画面の端の近くを横切る彗星を1つ出す。惑星を通らない向きを選ぶ。
 func spawn_comet(rare: bool) -> void:
-	var rng := state.rng
-	var vc := state.view_center
-	var vh := state.view_half
-	var lead := vh.length() + 700.0
-	for attempt in 12:
-		var u := Vector2.from_angle(rng.randf() * TAU)
-		var side := Vector2(-u.y, u.x) * (1.0 if rng.randf() < 0.5 else -1.0)
-		var edge := absf(side.x) * vh.x + absf(side.y) * vh.y
-		var start := vc - u * lead + side * edge * rng.randf_range(0.55, 0.9)
-		var end := start + u * lead * 2.0
-		if Geom.seg_circle_t(start, end, Vector2.ZERO, cfg.planet_radius + 150.0) >= 0.0 and attempt < 11:
-			continue
-		var r := Rock.new()
-		r.kind = &"comet"
-		r.pos = start
-		r.vel = u * cfg.comet_speed
-		r.born = state.world_time
-		r.gone = state.world_time + lead * 2.0 / cfg.comet_speed
-		r.size = rng.randf_range(35.0, 55.0)
-		r.facing = u.angle()
-		if rare:
-			# まだ持っていない彗星限定の武器から選ぶ。すべて持っていれば普通の彗星にする
-			var ids: Array = ConfigManager.weapons.keys().filter(func(id):
-				return ConfigManager.weapons[id].comet_only and not state.weapons.has(id))
-			if not ids.is_empty():
-				r.rare_weapon = ids[rng.randi_range(0, ids.size() - 1)]
-		rocks.append(r)
-		_stream_t = 0.0
-		return
+	gimmick(&"comets").spawn_comet(rare)
 
-## 隕石の配置の番号 index が彗星なら、その彗星の情報を返す（彗星でなければ null）。
 func comet_at(index: int) -> Rock:
-	if index < 0 or index >= rocks.size() or rocks[index].kind != &"comet":
-		return null
-	return rocks[index]
+	return gimmick(&"comets").comet_at(index)
 
-## 今いるレアな彗星の位置（画面の外の向きの矢印に使う）。
 func rare_comet_positions() -> PackedVector2Array:
-	var out := PackedVector2Array()
-	var t := state.world_time
-	for rock in rocks:
-		if rock.kind == &"comet" and rock.rare_weapon != &"" and not rock.destroyed and t < rock.gone:
-			out.append(_rock_at(rock, t)[0])
-	return out
+	return gimmick(&"comets").rare_comet_positions()
 
-## 隕石の配置の番号 index がレアな彗星なら、落とす彗星限定の武器の管理 ID（そうでなければ空）。
 func comet_weapon(index: int) -> StringName:
-	var c := comet_at(index)
-	return c.rare_weapon if c != null else &""
+	return gimmick(&"comets").comet_weapon(index)
 
-func _update_moons() -> void:
-	for m in moons:
-		var a := m.a0 + m.dir * cfg.moon_orbit_speed * state.world_time
-		m.pos = Vector2(cos(a), sin(a)) * m.orbit
+func spawn_warp() -> void:
+	gimmick(&"warp").spawn_warp()
+
+func take_warp() -> bool:
+	return gimmick(&"warp").take_warp()
+
+func dust_drag_at(pos: Vector2) -> float:
+	return gimmick(&"dust").dust_drag_at(pos)
+
+func _update_body_grid() -> void:
 	# 少数の天体を格子へ登録し、各弾が全天体を調べることを避ける。
 	for cell in _body_used:
 		_body_cells[cell].clear()
@@ -396,13 +161,6 @@ func _update_moons() -> void:
 					_body_used.append(cell)
 				_body_cells[cell].append(b)
 
-func dust_drag_at(p: Vector2) -> float:
-	for d in dust:
-		if p.distance_squared_to(Vector2(d.x, d.y)) < d.z * d.z:
-			return cfg.dust_drag
-	return 0.0
-
-## 外縁の外へ出ようとするときの押し戻しの加速度。
 func boundary_accel(p: Vector2) -> Vector2:
 	if not battle_arenas.is_empty(): return Vector2.ZERO
 	var r := p.length()
@@ -410,8 +168,6 @@ func boundary_accel(p: Vector2) -> Vector2:
 		return Vector2.ZERO
 	return -p / r * (cfg.boundary_push + (r - cfg.field_radius) * 4.0)
 
-## 線分 p0→p1（太さ radius）が最初に当たる障害物。当たらなければ null。
-## 戻り値は { body, t, point }。固定外周は body が null で、normal と pos を持つ。
 func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
 	var found: Body = null
 	var earliest := INF
@@ -438,7 +194,6 @@ func first_body_hit(p0: Vector2, p1: Vector2, radius := 0.0) -> Variant:
 		return arena
 	return null if found == null else {"body": found, "t": earliest, "point": p0.lerp(p1, earliest)}
 
-## 固定外周を内側から横切る最初の点。高速移動でも終点だけの判定にしない。
 func arena_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 	var result: Dictionary = {}
 	for bounds: Rect2 in battle_arenas.values():
@@ -460,7 +215,6 @@ func arena_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 			result = {"body":null,"t":fraction,"point":point,"pos":point+normal*0.01,"normal":normal}
 	return result
 
-## 半径 radius の円が、いちばん近い障害物の表面に触れるまでの距離（重なっていれば 0 以下）。
 func body_gap(p: Vector2, radius: float) -> float:
 	var gap := INF
 	for bounds: Rect2 in battle_arenas.values():
@@ -469,7 +223,6 @@ func body_gap(p: Vector2, radius: float) -> float:
 		gap = minf(gap, p.distance_to(b.pos) - b.r - radius)
 	return gap
 
-## 点 p を障害物の外へ押し出した位置（線の描き始めなどに使う）。
 func push_out(p: Vector2, margin: float) -> Vector2:
 	var q := p
 	for bounds: Rect2 in battle_arenas.values():
@@ -483,7 +236,6 @@ func push_out(p: Vector2, margin: float) -> Vector2:
 			q = b.pos + (d / dist if dist > 0.001 else Vector2.RIGHT) * min_d
 	return q
 
-## 軌道の半径帯に月を登録。月が周回しても所属帯は変わらない。
 func _build_moon_bands() -> void:
 	_moon_bands.clear()
 	var outer := 0.0
@@ -498,7 +250,6 @@ func _build_moon_bands() -> void:
 		for i in range(first, last + 1):
 			_moon_bands[i].append(moon)
 
-## 元の近傍条件を維持し、該当する半径帯の月だけを確認する。
 func near_body(p: Vector2, margin: float) -> bool:
 	var r := p.length()
 	if r < planet.r + margin + 4.0:
@@ -512,7 +263,6 @@ func near_body(p: Vector2, margin: float) -> bool:
 				return true
 	return false
 
-## 敵（行 i）が障害物をすり抜けないよう、表面で止めて横方向の速度だけ残す。
 func collide_enemy(i: int, from: Vector2) -> void:
 	var table := enemies.table
 	var r := table.r[i]

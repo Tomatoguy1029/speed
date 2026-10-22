@@ -21,7 +21,7 @@ func _ready()->void:
 	a.hsm.set_active(false)
 	check(a.table.pos[wall_enemy].x<1800.0 and a.table.pos[wall_enemy].x>0.0,"arena installation clears enemy from rubble footprint")
 	check(run.pickups.gem_pos[gem].x<1800.0 and run.pickups.gem_value[gem]==17.0,"arena installation preserves and clears buried XP")
-	run.field._stream_rocks(0.02)
+	run.field.gimmick(&"meteors")._stream_rocks(0.02)
 	check(rock.pos.x<1800.0 and rock.row>=0 and a.table.pos[rock.row].x<1800.0,"streamed rock source stays clear after arena installation")
 	var d=load("res://scripts/encounters/attack_director.gd").new()
 	d.state=run.state

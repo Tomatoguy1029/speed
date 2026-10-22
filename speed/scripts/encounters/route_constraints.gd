@@ -61,7 +61,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		for command in session.history:
 			if int(command.tick) > session.tick and int(command.tick) <= session.tick + ceili(horizon * 60): unsupported.append("recorded future commands")
 		if not run.state.weapons.is_empty() or not run.state.traits.is_empty() or run.state.hero_active_t > 0 or not run.field.wells.is_empty(): unsupported.append(TranslationServer.translate("lab.message_eaf4530ecf"))
-		if run.field._comet_t <= horizon or run.field._well_t <= horizon: unsupported.append(TranslationServer.translate("lab.message_feb890132f"))
+		if run.field.gimmick(&"comets")._comet_t <= horizon or run.field.gimmick(&"gravity")._well_t <= horizon: unsupported.append(TranslationServer.translate("lab.message_feb890132f"))
 	var p := run.projectiles
 	for i in p.hostile_alive.size():
 		if p.hostile_alive[i]:

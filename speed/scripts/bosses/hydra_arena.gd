@@ -88,7 +88,7 @@ func _clear_footprint(actor: BossActor)->void:
 	# 岩の配置元も更新し、次のstream更新で壁の中へ戻ることを防ぐ。
 	for rock in field.rocks:
 		if rock.destroyed:continue
-		var current: Vector2=field._rock_at(rock,actor.run_state.world_time)[0]
+		var current: Vector2=field.rock_at(rock,actor.run_state.world_time)[0]
 		var cleared:=_clear_point(current,rock.size)
 		if cleared==current:continue
 		rock.pos=cleared

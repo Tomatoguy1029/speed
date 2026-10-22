@@ -448,12 +448,12 @@ func _test_field() -> void:
 	s.view_center = at
 	f.rocks.clear()
 	run.enemies.clear_all()
-	f._add_rock(s.rng, at + Vector2(100, 0), &"iron", Vector2.ZERO)
+	f.gimmick(&"meteors")._add_rock(s.rng, at + Vector2(100, 0), &"iron", Vector2.ZERO)
 	var iron = f.rocks[-1]
-	f._add_rock(s.rng, at + Vector2(100, 200), &"saw", Vector2.ZERO)
+	f.gimmick(&"meteors")._add_rock(s.rng, at + Vector2(100, 200), &"saw", Vector2.ZERO)
 	var saw = f.rocks[-1]
-	f._stream_t = 0.0
-	f._stream_rocks(0.01)
+	f.gimmick(&"meteors")._stream_t = 0.0
+	f.gimmick(&"meteors")._stream_rocks(0.01)
 	var hp := s.ship_hp
 	_check(_ram(t.pos[iron.row], Vector2.RIGHT) and s.ship_hp == hp and not t.dead[iron.row], "タスク13：鉄のがれきは弾いて火花を出す")
 	var target := _enemy(&"splitling", t.pos[saw.row] + Vector2(200, 0))
@@ -464,24 +464,24 @@ func _test_field() -> void:
 	_resume_for_check()
 	p._update_friendly(0.5)
 	_check(t.dead[target] != 0, "タスク13：飛んだ丸鋸はその先の敵を巻き込む")
-	f._stream_rocks(0.01)
+	f.gimmick(&"meteors")._stream_rocks(0.01)
 	_check(saw.destroyed, "タスク13：使った丸鋸は再出現しない")
 	_clear()
 	s.ship_pos = at + Vector2(200, 0)
 	s.world_time = 10.0
-	f._well_t = 1e6
+	f.gimmick(&"gravity")._well_t = 1e6
 	f.add_well(at, 3.0, 600.0, 1000.0)
 	var enemy := _enemy(&"splitling", at + Vector2(180, 0))
 	p.fire_enemy(enemy, 0, 100, &"bullet")
 	var bullet := 0
 	var old_velocity := p.hostile_vel[bullet]
-	f._tick_wells(0.1)
+	f.gimmick(&"gravity")._tick_wells(0.1)
 	_check(s.ship_vel.x < 0 and t.vel[enemy].x < 0 and p.hostile_vel[bullet].x < old_velocity.x, "タスク14：重力は遅い機体・敵・敵弾の進路を曲げる")
 	s.ship_vel = Vector2(10000, 0)
-	f._tick_wells(0.1)
+	f.gimmick(&"gravity")._tick_wells(0.1)
 	_check(s.ship_vel == Vector2(10000, 0), "タスク14：高速の機体には重力が効かない")
 	s.world_time = 13.1
-	f._tick_wells(0.1)
+	f.gimmick(&"gravity")._tick_wells(0.1)
 	_check(f.wells.is_empty(), "タスク14：重力は寿命で消える")
 	_clear()
 	s.time = 240.0
@@ -687,7 +687,7 @@ func _quiet_heads(boss) -> void:
 	run.projectiles.clear_hostile()
 	run.projectiles.friend_slots.clear()
 	run.field.wells.clear()
-	run.field._well_t = 1e6
+	run.field.gimmick(&"gravity")._well_t = 1e6
 	var t := run.enemies.table
 	for i in t.alive.size():
 		if t.alive[i] and t.type[i] == &"hydra_rubble":
@@ -717,7 +717,7 @@ func _advance_boss(seconds: float, place_rubble_on_beam := false) -> Dictionary:
 		peak.wells = maxi(peak.wells, run.field.wells.size())
 		peak.rubble = maxi(peak.rubble, _living_type(&"hydra_rubble"))
 		run.combat.rebuild_grid()
-		run.field._tick_wells(0.05)
+		run.field.gimmick(&"gravity")._tick_wells(0.05)
 		run.projectiles.tick(0.05, 0.05)
 		run.enemies.cleanup()
 	return peak

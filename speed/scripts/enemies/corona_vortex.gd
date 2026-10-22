@@ -124,7 +124,7 @@ func tick(m: EnemySystem, dt: float, rows: PackedInt32Array) -> void:
 		# Hydra と同じ短距離の重力減衰。高速突進・滑走中は吸い込みを振り切る。
 		var fast := m.state.tracing or m.state.glide or m.state.ship_vel.length() >= m.state.stats.max_speed * m.cfg.ram_speed_ratio
 		if not fast:
-			m.state.ship_vel += m.field._well_pull(t.pos[i], m.state.ship_pos, float(p.pull_radius), float(p.pull) * dt)
+			m.state.ship_vel += m.field.gimmick(&"gravity")._well_pull(t.pos[i], m.state.ship_pos, float(p.pull_radius), float(p.pull) * dt)
 		o.capture_t -= dt
 		if float(o.capture_t) <= 0.0:
 			o.capture_t = maxf(float(p.capture_interval), dt)

@@ -150,7 +150,7 @@ func _rebuild() -> void:
 		run.field.moons.clear()
 		run.field.planet.pos = Vector2(1e7, 1e7)
 		run.field.planet.r = 0
-		run.field._update_moons()
+		run.field.refresh_bodies()
 	if not spec.get("auto_boss", false):
 		run.state.boss_spawned = true
 	var weapon_ids: Array = spec.get("weapons", {}).keys()
@@ -263,7 +263,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 			body.r = maxf(10.0, radius)
 			body.is_planet = true
 			field.bodies.append(body)
-			field._update_moons()
+			field.refresh_bodies()
 			# 天体までの距離の覚えを捨てて、新しい惑星を確かめ直させる
 			run.enemies.table.body_gap.fill(-1.0)
 			run.projectiles.hostile_gap.fill(0.0)
@@ -280,7 +280,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 			rock.size = maxf(20.0, radius)
 			rock.facing = u.angle()
 			field.rocks.append(rock)
-			field._stream_t = 0.0
+			field.gimmick(&"meteors")._stream_t = 0.0
 		"gravity":
 			field.add_well(at, cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
 		"warp":
