@@ -1,7 +1,7 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
-	if n.mode == &"rubble_lump":
+	if n.mode in [&"rubble_lump",&"rubble_fan"]:
 		rubble(a,n,dt)
 		return
 	if n.mode == &"wind_blades":
@@ -100,7 +100,12 @@ static func rubble(a: Node,n,dt: float) -> void:
 		n.strike_pos=a._head_pos(n)
 		n.locked=true
 		n.target=a.run_state.ship_pos
-		launch_rubble(a,n,n.angle,float(p.lump_r))
+		if n.mode==&"rubble_lump":
+			launch_rubble(a,n,n.angle,float(p.lump_r))
+		else:
+			for i in int(p.rubble_count):
+				var angle := n.angle+float(p.rubble_spread)*(float(i)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)
+				launch_rubble(a,n,angle,float(p.rubble_small_radius))
 		a._cue(&"attack_started",n.mode,a.necks.find(n))
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
 
