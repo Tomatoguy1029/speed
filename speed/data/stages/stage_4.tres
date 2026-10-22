@@ -439,7 +439,7 @@ surge_phases = {
 "s4_eve": false
 }
 time_limit = 900.0
-boss_id = &"provisional"
+boss_id = &"hydra"
 legendary_module_id = &"legendary_compass"
 enemy_looks = {
 "biter": "snake"

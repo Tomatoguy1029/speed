@@ -99,7 +99,7 @@ func _test_debug_stage_selection() -> void:
 			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == &"provisional", "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"provisional"), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
 			GameManager.abort_run()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
 	app.queue_free()

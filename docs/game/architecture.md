@@ -255,6 +255,8 @@ LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会�
 
 合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は `hydra_snake_motion.gd` が操舵し、頭の通過点列を胴体がたどる。速度・旋回・被弾・構え・攻撃・停止の重みを世界秒で連続的に混ぜる。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
 
+通常技の捕捉位置は `start_normal()` で保持し、待機中の狙いは更新間隔を持たせる。`aim_neck()` が角速度と加速度を制御する。全ての攻撃位置が確定した後に頭の向きと胴の骨組みを一度だけ更新する。中央本体と分離後の不死の蛇は、役者の生成時に装甲を通過可能な値へ設定する。
+
 `hydra_attack_field.gd` は表示と判定で同じ点列・幅・開始時刻・寿命を使う。機体と形状の移動区間を掃引し、世界時間停止時は形を保つ。描画ノードはID別に持ち、戦闘状態の辞書に解放済みノードを残さず、実験場の巻き戻し比較を保つ。
 
 `hydra_arena.gd` は固定瓦礫の描画と戦闘エリアを所有し、ボスの行IDで `FieldManager.battle_arenas` へ矩形を登録する。地形の掃引判定・機体の跳ね返り・線描画・弾の地形判定で同じ外周を使う。通常の蛇の操舵は胴の長さを考慮して内側を狙い、大技は画面とエリアの共通部分へ配置する。最終撃破と役者の解放で登録を解除する。
@@ -264,6 +266,8 @@ LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会�
 `gyms/hydra_trial.tscn` をF6で起動すると、敵・ルート実験場が試遊モードで開く。停止・巻き戻し・機体固定・数値編集を使える。シーンのInspectorで開始位置・無敵・試遊用の攻撃倍率を変える。通常出現とセーブは実験セッションから分ける。
 
 HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首の節・羅針盤の差し替え口。頭は既存の敵素材経路 `assets/pixel/hydra_<種類>.png` とステージの素材指定を使う。`energy_shader` は実判定に沿う光線・風・雷・瓦礫のマテリアルを差し替える。判定は点列・幅・時間のまま保持する。
+
+瓦礫竜巻は `tornado_scene` の `hydra_tornado.tscn` で差し替える。`hydra_tornado.gd` は `update_effect(effect, world_time)` で攻撃点列・幅・投入位置を受け取り、`hydra_tornado.gdshader` の渦と既存の岩素材を重ねる。演出ノードは攻撃辞書の外に保管し、判定と寿命は `hydra_attack_field.gd` が所有する。
 
 絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBossの `presentation_scene` に指定する。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取る。`VisualTimeline` は装飾用、`burst_shader` は衝撃・破壊・増加・分離のピクセル表現用。イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。添字は本体-1、不死の蛇-2、通常首0以上。取り付け位置は `presentation_anchor()`、状態は `presentation_state()`、同時噛みつきの実際の到達点は `presentation_targets()` で読む。`hit` は実HP減少に伴い実ダメージを渡す。
 

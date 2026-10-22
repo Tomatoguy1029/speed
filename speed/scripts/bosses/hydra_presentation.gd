@@ -95,9 +95,13 @@ func _draw() -> void:
 		var point := anchor * (body_anchor.position if index < 0 else head_anchor.position)
 		var radius: float = hydra.table.r[hydra.body] * body_radius_scale if index < 0 else head_radius
 		var color := warning_color if event.cue == &"warning_started" else (recovery_color if event.cue == &"recovery_started" else attack_color)
-		# 常に見える輪を残し、装飾アニメーションの尺で予告を消さない。
-		draw_arc(point, radius, 0.0, TAU, 48, Color(color, 0.8), line_width, true)
-		draw_arc(point, radius * maxf(0.5, pulse_scale), 0.0, TAU, 48, Color(color, 0.35), line_width, true)
+		# 合図は開いた角で示し、本体を囲むシールド状の輪を作らない。
+		var reach:=radius*0.55 if index<0 else radius
+		for corner in 4:
+			var direction:=Vector2(-1 if corner%2==0 else 1,-1 if corner<2 else 1)
+			var at: Vector2=(point+direction*reach).snapped(Vector2(3,3))
+			var points:=PackedVector2Array([at-Vector2(direction.x,0)*12.0,at,at-Vector2(0,direction.y)*12.0])
+			draw_polyline(points,Color(color,0.8),line_width)
 		if index < 0 and event.cue == &"warning_started":
 			var technique: StringName = event.technique
 			if technique == &"north":

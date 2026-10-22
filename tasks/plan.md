@@ -685,6 +685,21 @@ git diff --check
 
 **検証：** `hydra_arena`、`hydra_motion`、`hydra_grid`、`hydra_collision`、`hydra_battle`、`lab_core`、`lab_replay`、`load_all`。`hydra_trial` の `--hydra-inspect --hydra-arena-edge` で外周を描画確認する。
 
+<a id="h27"></a>
+
+### H27：竜巻・頭の追尾・本体の貫通を整え、通常ステージへ接続する
+
+**依存：** H26。
+
+**受け入れ条件**
+
+- [x] 瓦礫竜巻の投入・巻き上がり・放出を、岩素材とピクセルシェーダーでつなぐ。
+- [x] 首の狙い更新と旋回を安定させ、攻撃位置の確定後に胴の姿勢を一度だけ更新する。
+- [x] 中央の瓦礫と不死の蛇を弱い突進でも貫け、本体を囲むシールド状の合図を除く。
+- [x] 通常ステージ4の時間出現がヒュドラを選び、合体から決着まで進む。
+
+**検証：** `hydra_revision`、通常10技の `hydra_move`、大技・コンボの `hydra_special`、`hydra_motion`、`hydra_targeting`、`hydra_battle`、`hydra_arena`、`hydra_ai`、`hydra_collision`、`boss_knockback`、`lab_core`、`lab_replay`、読み込みと文書チェック。描画付きの `hydra_trial` で竜巻の投入・放出と一戦を確認する。
+
 ## リスクと対処
 
 | リスク | 対処 |

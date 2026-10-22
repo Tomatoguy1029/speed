@@ -12,6 +12,7 @@ signal presentation_advanced(world_dt: float)
 @export var compass_texture: Texture2D
 @export_group("Presentation")
 @export var energy_shader: Shader=preload("res://shaders/hydra_energy.gdshader")
+@export var tornado_scene: PackedScene=preload("res://scenes/bosses/hydra_tornado.tscn")
 @export_range(0.0, 1.0) var compass_spin_fraction := 0.5
 var _presentation: Node
 var _defeat_announced := false
@@ -159,6 +160,7 @@ func _on_bound() -> void:
 	timeline.callback_mode_method = AnimationMixer.ANIMATION_CALLBACK_MODE_METHOD_IMMEDIATE
 	draws_self = true
 	table.gate[body] = EnemyTable.Gate.NONE
+	table.armor[body] = 0.0
 	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）
 	z_index = 5
 	arena = preload("res://scripts/bosses/hydra_arena.gd").new()
@@ -243,6 +245,13 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
 		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
+	# 攻撃の位置が確定してから、頭と胴の姿勢を固定更新につき一度だけ進める。
+	for n in necks:
+		if _alive(n):
+			table.pos[n.row]=_head_pos(n)
+			table.facing[n.row]=n.angle
+		if n.row>=0 or n.length>0.0:_follow_neck(n,dt)
+	if separated and immortal_neck!=null:_follow_neck(immortal_neck,dt)
 
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
 		_defeat_announced = true
@@ -391,8 +400,6 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
-	if neck.row >= 0 or neck.length > 0.0:
-		_follow_neck(neck, dt)
 
 ## 頭が落ちた：首の残骸を破片にして飛ばし、生え直す時間を決める。
 ## 同じ線で倒した本数と、火の命中に応じて再生待ち時間を延長する。
@@ -468,6 +475,8 @@ func start_normal(index: int, attack: StringName) -> bool:
 	n.locked = false
 	n.step = 0
 	n.emission.clear()
+	n.target = run_state.ship_pos
+	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(def.params.thunder_lead)
 	_cue(&"warning_started",attack,index)
 	return true
 
@@ -491,10 +500,28 @@ func position_head(index: int, dt: float) -> void:
 		steer_snake(n,desired,dt)
 		return
 	var facing := n.base_angle+table.facing[body]
-	var aim: float=(run_state.ship_pos-_neck_base(n)).angle()
-	var defend: float=facing+clampf(angle_difference(facing,aim),-0.8,0.8)
-	n.angle = lerp_angle(n.angle,defend+sin(_time+n.base_angle)*0.06,minf(1.0,dt*2.0))
+	n.motion.aim_wait=maxf(0.0,float(n.motion.get("aim_wait",0.0))-dt)
+	if not n.motion.has("aim_target") or n.motion.aim_wait<=0.0:
+		n.motion.aim_target=run_state.ship_pos
+		n.motion.aim_wait=float(def.params.aim_refresh)
+	var offset: Vector2=n.motion.aim_target-_neck_base(n)
+	var forward:=Vector2.from_angle(facing)
+	# 根元の背後を横切った自機を追って、左右の限界へ交互に首を振らない。
+	var local:=atan2(offset.dot(forward.orthogonal()),maxf(float(def.params.aim_deadzone),offset.dot(forward)))
+	var defend: float=facing+clampf(local,-0.8,0.8)
+	aim_neck(n,defend+sin(_time+n.base_angle)*0.06,dt)
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
+
+func aim_neck(n: Neck, desired: float, dt: float) -> void:
+	if dt<=0.0:return
+	var offset:=angle_difference(n.angle,desired)
+	var accel:=float(def.params.aim_accel)
+	var speed:=minf(float(def.params.aim_turn),sqrt(2.0*accel*absf(offset)))
+	var velocity:=move_toward(float(n.motion.get("aim_velocity",0.0)),signf(offset)*speed,accel*dt)
+	var step:=velocity*dt
+	if signf(step)==signf(offset) and absf(step)>absf(offset):step=offset
+	n.angle+=step
+	n.motion.aim_velocity=step/dt
 
 # ── 首の攻撃（各首の種類ごと） ──────────────────────────────────────
 
@@ -899,6 +926,7 @@ func begin_separation()->void:
 	table.max_hp[immortal_row]=hp
 	table.hp[immortal_row]=hp
 	table.gate[immortal_row]=EnemyTable.Gate.NONE
+	table.armor[immortal_row]=0.0
 	table.max_hp[body]=hp
 	table.hp[body]=hp
 	table.guard[immortal_row]=separation_t
@@ -940,7 +968,6 @@ func tick_bearer(dt: float)->void:
 	table.facing[immortal_row]=n.angle
 	table.pos[body]=at
 	table.hp[body]=table.hp[immortal_row]
-	_follow_neck(n,dt)
 
 func health_row()->int:
 	return immortal_row if separated and manager.enemies.is_same(immortal_row,immortal_id) else body

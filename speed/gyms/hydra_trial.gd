@@ -59,6 +59,7 @@ func _ready() -> void:
 		session.run.state.ship_pos=session.pinned
 		session.run.state.view_center=session.pinned
 	_set_mode(3)
+	if review_owner!=null:session.live_input=Callable()
 	_refresh()
 
 func _notification(what: int)->void:
@@ -78,10 +79,14 @@ func _process(delta: float)->void:
 			get_tree().quit()
 			return
 		var a=review_owner.actor
+		if inspect_clock>40.0:
+			print("[hydra-review] FAIL timeout; hp=",a.table.hp[a.body]," count=",a.count," split=",a.separated," phase=",session.run.state.phase," drawing=",session.run.state.drawing," tracing=",session.run.state.tracing," worlds=",session.run.state.world_time)
+			get_tree().quit(1)
+			return
 		review_counts[a.count]=true
 		if a.separated:review_counts["separated"]=true
 		if inspect_clock>=review_next and a.growth_t<=0.0 and a.separation_t<=0.0 and not session.run.state.tracing and not session.run.state.drawing:
-			var at: Vector2=a.table.pos[a.immortal_row]+a.immortal_neck.velocity*0.3 if a.separated else a.table.pos[a.body]
+			var at: Vector2=a._head_pos(a.immortal_neck) if a.separated else a.table.pos[a.body]
 			var start: Vector2=at-Vector2(180,0)
 			session.run.state.ship_pos=start
 			session.run.state.ship_vel=Vector2.ZERO

@@ -75,10 +75,10 @@
 | type ID       | 名称           | 採用状態     | 本番の実装状況 | 行動・攻撃                                                                                        | 出現条件                        | コード・demo参照／未決事項                                                                                                                                         |
 | ------------- | -------------- | ------------ | -------------- | ------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `provisional` | ボス戦艦（仮） | 採用（暫定） | 実装済み       | 機体を直接追う。予告のあと扇状に弾を撃つ。形態＝LimboHSM、判断＝Behavior Tree、攻撃＝タイムライン | 決まった時刻に1体。撃破でクリア | `scenes/bosses/provisional_boss.tscn`、`scripts/bosses/`、`data/bosses/provisional.tres`。demo の `boss`。見た目は `battleship.png` を共用。ギミック・弱点は未検討 |
-| `hydra` | うみへび座 | 採用 | 中央HP・首増加・通常10技・大技5種・コンボ3種・分離から決着・固定瓦礫の戦闘エリアを実装。格子は仮1配置、試遊調整は別作業（[専用仕様](../hydra.md)） | 戦闘・行動判断・素材と演出は [専用仕様](../hydra.md) | 通常出現を保留し、調整用に保持する | `scenes/bosses/hydra_boss.tscn`、`scenes/bosses/hydra_boss_bt.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、`scenes/bosses/hydra_presentation.tscn`。`gyms/hydra_trial.tscn` で試遊する。編集方法は [設計書 6.1](../architecture.md#61-敵とボスの-ai) |
+| `hydra` | うみへび座 | 採用 | 中央HP・首増加・通常10技・大技5種・コンボ3種・分離から決着・固定瓦礫の戦闘エリアを実装。格子は仮1配置、試遊調整は別作業（[専用仕様](../hydra.md)） | 戦闘・行動判断・素材と演出は [専用仕様](../hydra.md) | ステージ4の通常ボスとして出現する | `scenes/bosses/hydra_boss.tscn`、`scenes/bosses/hydra_boss_bt.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、`scenes/bosses/hydra_presentation.tscn`。`gyms/hydra_trial.tscn` で試遊する。編集方法は [設計書 6.1](../architecture.md#61-敵とボスの-ai) |
 | 仮ID `monoceros` | いっかくじゅう座 | 採用 | 未実装 | 地形に角が刺さる突進（仕様書12.3） | ステージ1 | 本番の実装は `provisional`。角の仕掛けと数値の調整が必要 |
 
-通常ステージ1〜5は `provisional` を使う。各星系の主の組み込みは調整後に行う。
+通常ステージ4は `hydra`、ステージ1〜3・5は `provisional` を使う。各ステージの出現時刻は `speed/data/stages/` の定義に従う。
 
 ## 障害物
 

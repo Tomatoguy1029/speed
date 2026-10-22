@@ -12,6 +12,10 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"aim_refresh": 0.3,
+"aim_turn": 1.8,
+"aim_accel": 6.0,
+"aim_deadzone": 60.0,
 "arena_size": Vector2(3200,2600),
 "arena_wall_thickness": 160.0,
 "formation_timeout": 12.0,

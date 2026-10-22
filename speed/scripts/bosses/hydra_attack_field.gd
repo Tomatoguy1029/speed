@@ -20,19 +20,24 @@ func add_shape(points: PackedVector2Array, width: float, delay: float, life: flo
 	serial += 1
 	var line: Node2D
 	var area: bool=kind==&"lightning" and points[0].distance_to(points[-1])<1.0
-	if area:
+	var tornado: bool=kind in [&"tornado",&"tornado_charge"]
+	if tornado:
+		line=actor.tornado_scene.instantiate()
+	elif area:
 		line=Sprite2D.new()
 		line.texture=white
 	else:
 		line=Line2D.new()
-	line.texture = white
+	if not tornado:line.texture = white
 	line.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
-	if not area:line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
-	if not area:line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	if not area:line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	if not area:line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.material = ShaderMaterial.new()
-	line.material.shader = preload("res://shaders/hydra_area.gdshader") if area else (actor.energy_shader if actor.energy_shader!=null else FX)
+	if line is Line2D:
+		line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.joint_mode = Line2D.LINE_JOINT_ROUND
+	if not tornado:
+		line.material = ShaderMaterial.new()
+		line.material.shader = preload("res://shaders/hydra_area.gdshader") if area else (actor.energy_shader if actor.energy_shader!=null else FX)
 	add_child(line)
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,
 		"age": 0.0, "damage": damage, "kind": kind, "owner": owner,
@@ -94,6 +99,9 @@ func tick(dt: float) -> void:
 				e.hit = true
 		e.previous_points=e.points.duplicate()
 		var line: Node2D=visuals[e.id]
+		if line.has_method("update_effect"):
+			line.update_effect(e,actor._time)
+			continue
 		if line is Line2D:
 			line.points=e.points
 			line.width=e.width

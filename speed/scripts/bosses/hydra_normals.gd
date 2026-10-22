@@ -28,12 +28,11 @@ static func tick(a: Node, n, dt: float) -> void:
 	var hold := float(p.normal_hold)
 	var from: Vector2 = a._head_pos(n)
 	if n.t < charge:
-		n.angle = lerp_angle(n.angle,(a.run_state.ship_pos-a._neck_base(n)).angle(),minf(1.0,dt*6.0))
+		a.aim_neck(n,(n.target-a._neck_base(n)).angle(),dt)
 		n.length = move_toward(n.length,float(p.neck_rest)*0.4,float(p.neck_rest)*dt*2.0)
 		n.glow = n.t / charge
 	elif not n.locked:
 		n.locked = true
-		n.target = a.run_state.ship_pos
 		n.strike_from = from
 		n.strike_pos = from
 		a._cue(&"target_locked",n.mode,a.head_index(n))
@@ -57,10 +56,10 @@ static func sweep(a: Node,n,dt: float) -> void:
 	var from: Vector2 = a._head_pos(n)
 	if n.t < charge:
 		n.glow = n.t/charge
-		n.angle = lerp_angle(n.angle,(a.run_state.ship_pos-a._neck_base(n)).angle()-float(p.sweep_arc)*0.5,minf(1.0,dt*7.0))
+		a.aim_neck(n,(n.target-a._neck_base(n)).angle()-float(p.sweep_arc)*0.5,dt)
 	elif not n.locked:
 		n.locked=true
-		n.sweep=(a.run_state.ship_pos-a._neck_base(n)).angle()
+		n.sweep=(n.target-a._neck_base(n)).angle()
 		n.strike_pos=from
 	if n.locked and n.t < charge+duration:
 		n.angle=n.sweep+float(p.sweep_arc)*(clampf((n.t-charge)/duration,0.0,1.0)-0.5)
@@ -72,7 +71,7 @@ static func wind_band(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if n.t < charge:
-		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*5.0))
+		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
 		n.glow=n.t/charge
 	elif not n.locked:
 		n.locked=true
@@ -86,12 +85,12 @@ static func wind_blades(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if n.t < charge:
-		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle()-float(p.blade_spread)*0.5,minf(1.0,dt*5.0))
+		a.aim_neck(n,(n.target-a._head_pos(n)).angle()-float(p.blade_spread)*0.5,dt)
 		n.glow=n.t/charge
 	elif not n.locked:
 		n.strike_pos=a._head_pos(n)
 		n.locked=true
-		n.sweep=(a.run_state.ship_pos-n.strike_pos).angle()
+		n.sweep=(n.target-n.strike_pos).angle()
 	if n.locked and n.step<3 and n.t>=charge+n.step*float(p.blade_interval):
 		n.angle=n.sweep+(float(n.step)*0.5-0.5)*float(p.blade_spread)
 		var points := PackedVector2Array()
@@ -107,12 +106,11 @@ static func rubble(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if n.t < charge:
-		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*5.0))
+		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
 		n.glow=n.t/charge
 	elif not n.locked:
 		n.strike_pos=a._head_pos(n)
 		n.locked=true
-		n.target=a.run_state.ship_pos
 		if n.mode==&"rubble_lump":
 			launch_rubble(a,n,n.angle,float(p.lump_r))
 		else:
@@ -135,7 +133,7 @@ static func beam_fixed(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if n.t < charge:
-		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*6.0))
+		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
 		n.glow=n.t/charge
 		var at: Vector2 = a._head_pos(n)
 		var points := PackedVector2Array([at,at+Vector2.from_angle(n.angle)*float(p.beam_len)])
@@ -152,7 +150,7 @@ static func beam_bolt(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if n.t < charge:
-		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*6.0))
+		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
 		n.glow=n.t/charge
 	elif not n.locked:
 		n.strike_pos=a._head_pos(n)
@@ -166,7 +164,6 @@ static func thunder_drop(a: Node,n,dt: float) -> void:
 	var p: Dictionary = a.def.params
 	var charge := float(p.normal_charge)
 	if not n.locked:
-		n.target=a.run_state.ship_pos+a.run_state.ship_vel*float(p.thunder_lead)
 		var points := PackedVector2Array([n.target,n.target+Vector2(0.1,0)])
 		if n.emission.is_empty(): n.emission=a.attack_field.add_shape(points,float(p.thunder_radius)*2.0,charge-n.t,float(p.thunder_flash),float(p.beam_dmg),&"lightning",n.row)
 		else: n.emission.points=points
