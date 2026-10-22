@@ -127,9 +127,8 @@ func tick(real_dt: float, world_dt: float) -> void:
 	ctx.projectiles.tick_attached(real_dt)
 	if state.phase != RunState.Phase.PLAY:
 		return
-	var afterimage = weapon_behaviors.get(&"W27")
-	if afterimage != null:
-		afterimage.replay(real_dt)
+	for behavior in weapon_behaviors.values():
+		behavior.tick_real(real_dt)
 		if state.phase != RunState.Phase.PLAY:
 			return
 	if world_dt > 0.0:
@@ -417,3 +416,11 @@ func on_end() -> void:
 		b.on_end()
 	combat.burst_power = 1.0
 	combat.ignore_armor = false
+
+func on_phase_changed(phase: RunState.Phase) -> void:
+	for behavior in weapon_behaviors.values():
+		behavior.on_phase_changed(phase)
+
+## 開発用の装備付与も、既定の装備は装備管理が決める。
+func grant_command(args: Dictionary) -> void:
+	grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))

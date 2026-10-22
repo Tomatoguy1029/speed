@@ -334,10 +334,7 @@ func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
 		return
 	state.phase = phase
-	if phase in [RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
-		var afterimage = loadout.weapon_behaviors.get(&"W27")
-		if afterimage != null:
-			afterimage.clear()
+	loadout.on_phase_changed(phase)
 	phase_changed.emit(phase)
 
 # ── カメラ（仕様書 15） ──────────────────────────────────────────
@@ -590,7 +587,7 @@ func command(name: StringName, args := {}) -> void:
 			if bosses.boss_alive():
 				bosses.on_boss_defeated(bosses.boss_row, {"cause": &"debug"})
 		&"debug_grant":
-			loadout.grant(args.get("kind", &"weapon"), args.get("id", &"W01"), int(args.get("levels", 1)))
+			loadout.grant_command(args)
 		&"debug_reset_loadout":
 			loadout.reset_loadout()
 		&"debug_level_up":

@@ -58,3 +58,10 @@ func on_kill(_cause: StringName) -> void:
 	pass
 func on_end() -> void:
 	pass
+
+## 世界時間に依存しない装備の更新。
+func tick_real(_dt: float) -> void:
+	pass
+
+func on_phase_changed(_phase: RunState.Phase) -> void:
+	pass

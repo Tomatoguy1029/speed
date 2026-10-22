@@ -48,7 +48,7 @@ func on_end() -> void:
 		_current.end = true
 	_current = {}
 
-## BuildManagerから実秒で更新する。描画の世界スロー・ボーナスの時計に依存しない。
+## 装備管理から実秒で更新する。描画の世界スロー・ボーナスの時計に依存しない。
 ## ポーズ・カード選択・ヒットストップ中は呼び出し元が更新を止める。
 func replay(dt: float) -> void:
 	if state.phase != RunState.Phase.PLAY:
@@ -111,3 +111,10 @@ func _hit_along(copy: Dictionary, a: Vector2, b: Vector2, power: float, radius: 
 			"impact": a.lerp(b, hit_t), "knock": 0.0, "no_crit": true})
 		if state.phase != RunState.Phase.PLAY:
 			return
+
+func tick_real(dt: float) -> void:
+	replay(dt)
+
+func on_phase_changed(phase: RunState.Phase) -> void:
+	if phase in [RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		clear()
