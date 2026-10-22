@@ -567,7 +567,7 @@ func _hazard_source(i: int) -> StringName:
 ## ビームを出す。from から angle の向きへ長さ length・幅 width。delay の予告のあと active の間当たる。
 func fire_beam(from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
 		color := Color("#ff5a6e")) -> int:
-	return _add_hazard(HazardKind.BEAM, HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)
+	return emit_attack(&"beam", [from, angle, length, width, delay, active, dmg, color])
 
 ## 先へ行くほど広がるビームを出す。from で幅 width、そこから左右に spread の角度で広がる。
 ## 予告（delay）の間は照射する範囲全体を見せ、そのあと active の間だけ当たる。
@@ -583,18 +583,13 @@ func flood_half(h: int, along: float) -> float:
 ## 十字のビームを出す（4方向の fire_beam）。出した4本の行番号を返す。
 func fire_cross(center: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
 		color := Color("#ffe0a0")) -> PackedInt32Array:
-	var rows := PackedInt32Array()
-	for k in 4:
-		rows.append(fire_beam(center, angle + k * PI / 2.0, length, width, delay, active, dmg, color))
-	return rows
+	return emit_attack(&"cross", [center, angle, length, width, delay, active, dmg, color])
 
 ## 遅れて弾ける範囲を出す。center を中心に半径 radius。delay の予告のあと一瞬弾ける。style は見た目。
 ## edmg が 0 より大きければ、弾けたときに範囲の敵にもダメージを与える（誘爆）。
 func fire_zone(center: Vector2, radius: float, delay: float, dmg: float, style := HazardStyle.BLAST,
 		color := Color("#ffb36b"), edmg := 0.0) -> int:
-	var i := _add_hazard(HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ZONE_FLASH, dmg, color)
-	hazard_edmg[i] = edmg
-	return i
+	return emit_attack(&"zone", [center, radius, delay, dmg, style, color, edmg])
 
 ## 広がる輪・扇を出す。arc は扇の左右の角度（PI で全周）。gap_w が 0 より大きければ、gap の向きに切れ目を空ける。
 ## delay の予告のあと、速さ speed で半径 radius まで広がる。

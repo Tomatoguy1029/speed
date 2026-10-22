@@ -11,3 +11,7 @@ func touches(ps: ProjectileSystem, i: int, ship_pos: Vector2, R: float) -> bool:
 	var b := a + u * ps.hazard_len[i]
 	var reach := ps.hazard_width[i] * 0.5 + R
 	return Geometry2D.get_closest_point_to_segment(ship_pos, a, b).distance_squared_to(ship_pos) <= reach * reach
+
+func spawn(ps: ProjectileSystem, from: Vector2, angle: float, length: float, width: float, delay: float, active: float, dmg: float,
+		color := Color("#ff5a6e")) -> int:
+	return ps._add_hazard(ProjectileSystem.HazardKind.BEAM, ProjectileSystem.HazardStyle.PLAIN, from, angle, length, width, delay, active, dmg, color)

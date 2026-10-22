@@ -24,6 +24,12 @@ func _ready() -> void:
 		check(rows.size() == 2 and pr.hazard_count() == 2, "新しい種類から2本のビームを出せる")
 		check(pr.hazard_pos[rows[0]] == Vector2(10, 20), "出現位置を保つ")
 		check(pr.hazard_dmg[rows[1]] == 7.0, "形の共通管理でダメージを保つ")
+	var shape = load("res://scripts/attacks/beam.gd").new()
+	check(shape.has_method("spawn"), "ビームの種類が生成処理を持つ")
+	if shape.has_method("spawn"):
+		var beam: int = pr.emit_attack(&"beam", [Vector2.ZERO, 0.0, 100.0, 10.0, 0.2, 0.3, 4.0])
+		check(pr.hazard_len[beam] == 100.0 and pr.hazard_dmg[beam] == 4.0, "公開入口と同じビームを生成する")
+
 	session.free()
 	await get_tree().process_frame
 	print("[attack_emission] %d failures" % failed)

@@ -14,3 +14,9 @@ func before_touch(ps: ProjectileSystem, i: int) -> bool:
 		if ps.state.phase != RunState.Phase.PLAY:
 			return false
 	return true
+
+func spawn(ps: ProjectileSystem, center: Vector2, radius: float, delay: float, dmg: float, style := ProjectileSystem.HazardStyle.BLAST,
+		color := Color("#ffb36b"), edmg := 0.0) -> int:
+	var i := ps._add_hazard(ProjectileSystem.HazardKind.ZONE, style, center, 0.0, radius, 0.0, delay, ProjectileSystem.ZONE_FLASH, dmg, color)
+	ps.hazard_edmg[i] = edmg
+	return i
