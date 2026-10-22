@@ -6,6 +6,7 @@ static func steer(n, target: Vector2, dt: float, p: Dictionary, speed_scale:=1.0
 	if offset.length()>1.0:
 		n.angle=rotate_toward(n.angle,offset.angle(),float(p.snake_turn)*dt)
 	var speed: float=float(p.snake_speed)*speed_scale*clampf(offset.length()/100.0,0.3,1.0)
+	speed*=0.3+0.7*maxf(0.0,cos(angle_difference(n.angle,offset.angle())))
 	var desired:=Vector2.from_angle(n.angle)*speed
 	n.velocity=n.velocity.lerp(desired,1.0-exp(-float(p.snake_accel)*dt))
 	n.free_pos+=n.velocity*dt

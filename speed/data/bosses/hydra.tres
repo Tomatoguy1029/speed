@@ -12,6 +12,12 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"formation_margin": 70.0,
+"formation_tolerance": 45.0,
+"swarm_reach": 1000.0,
+"swarm_gap": 0.3,
+"swarm_flight": 1.0,
+"swarm_cooldown": 15.0,
 "snake_turn": 3.2,
 "snake_accel": 4.0,
 "bearer_distance": 650.0,

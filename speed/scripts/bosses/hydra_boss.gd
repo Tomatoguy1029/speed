@@ -116,7 +116,7 @@ func _check_growth() -> void:
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
 const COMBOS: Array[StringName] = [&"tornado",&"debris_shatter",&"beam_pincer"]
 var combo_wait := 0.0
-const TECH_DIR := {&"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const TECH_DIR := {&"swarm": -PI/2.0, &"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -238,12 +238,14 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	hsm.update(dt)
 	if manager.projectiles.director != null:
 		manager.projectiles.lab_context = manager.projectiles.director.token("boss:" + str(table.id[body]))
+	if busy and special.positioning:
+		if special.position(dt):timeline.play()
 	if timeline.is_playing():
 		timeline.advance(dt)
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
-		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer"]: special.tick(dt)
+		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm"]: special.tick(dt)
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
@@ -806,7 +808,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
-	elif attack==&"curve": participants.assign(necks.filter(func(n):return _alive(n)))
+	elif attack in [&"curve",&"swarm"]: participants.assign(necks.filter(func(n):return _alive(n)))
 	elif COMBOS.has(attack):
 		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[attack])
 		combo_wait=float(def.params.combo_cooldown)
@@ -819,6 +821,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 		_end(neck, true)
 	timeline.play(tech)
 	timeline.advance(0.0)
+	if special.positioning:timeline.pause()
 	return true
 
 func attack_playing() -> bool:
@@ -839,6 +842,8 @@ func interrupt_tech(attack: StringName = &"") -> void:
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
 	match name:
+		&"swarm":
+			return separated and (participants.any(func(n):return _alive(n)) if busy else necks.filter(func(n):return _alive(n)).size()>=2)
 		&"tornado",&"debris_shatter",&"beam_pincer":
 			if busy:return participants.size()==2 and participants.all(func(n):return _alive(n))
 			return combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[name]).size()==2
@@ -871,7 +876,7 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
-	if name in [&"sequence",&"curve"] or COMBOS.has(name): special.prepare()
+	if name in [&"sequence",&"curve",&"swarm"] or COMBOS.has(name): special.prepare()
 	if name == &"north":
 		north_aiming = true
 		_update_north_targets()
@@ -893,7 +898,7 @@ func tech_end() -> void:
 	last_tech = tech
 	if last_tech_result == &"":
 		last_tech_result = &"finished"
-	_tech_until[tech] = _time + float(def.params.combo_cooldown if COMBOS.has(tech) else def.params.tech_cd) * _cooldown_scale
+	_tech_until[tech] = _time + float(def.params.get(String(tech)+"_cooldown",def.params.combo_cooldown if COMBOS.has(tech) else def.params.tech_cd)) * _cooldown_scale
 	recovery_t = float(def.params.tech_recovery)
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})
@@ -905,6 +910,7 @@ func tech_end() -> void:
 	tech = &""
 	_tech_cd = float(def.params.tech_cd)
 	special.playing=false
+	special.positioning=false
 	for r in _rubble:
 		if manager.enemies.is_same(r.x, r.y) and table.dead[r.x] == 0:
 			manager.enemies.mark_dead(r.x)

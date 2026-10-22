@@ -1,94 +1,17 @@
 [gd_resource type="BehaviorTree" format=3 uid="uid://fljn8lt4tihh"]
-
-[ext_resource type="Script" uid="uid://n1jxjctk0di8" path="res://scripts/bosses/tasks/hydra_direction.gd" id="direction"]
-[ext_resource type="Script" uid="uid://d11bkngfbv1yj" path="res://scripts/bosses/tasks/hydra_heads.gd" id="heads"]
-[ext_resource type="Script" uid="uid://vtc6wauclble" path="res://scripts/bosses/tasks/hydra_play_tech.gd" id="play"]
-[ext_resource type="Script" uid="uid://dt0ucyqa6d2og" path="res://scripts/bosses/tasks/hydra_range.gd" id="range"]
-[ext_resource type="Script" uid="uid://dq2x4v3ncfq2l" path="res://scripts/bosses/tasks/attack_ready.gd" id="ready"]
-[ext_resource type="Script" uid="uid://bcp4h5hcnlqt6" path="res://scripts/bosses/tasks/hydra_weighted_selector.gd" id="selector"]
-
-[sub_resource type="BTCondition" id="north_range"]
-script = ExtResource("range")
-maximum_ratio = 0.6
-
-[sub_resource type="BTCondition" id="north_direction"]
-script = ExtResource("direction")
-
-[sub_resource type="BTCondition" id="north_ready"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/attack_ready.gd" id="ready"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/hydra_play_tech.gd" id="play"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/hydra_weighted_selector.gd" id="selector"]
+[sub_resource type="BTCondition" id="ready_north"]
 script = ExtResource("ready")
 attack = &"north"
-
-[sub_resource type="BTCondition" id="north_head0"]
-script = ExtResource("heads")
-
-[sub_resource type="BTAction" id="north_play"]
+[sub_resource type="BTAction" id="play_north"]
 script = ExtResource("play")
-cooldown_scale = 0.8
-
+technique = "north"
 [sub_resource type="BTDynamicSequence" id="north"]
 custom_name = "north"
-children = [SubResource("north_range"), SubResource("north_direction"), SubResource("north_ready"), SubResource("north_head0"), SubResource("north_play")]
-metadata/_weight_ = 1.3
-
-[sub_resource type="BTCondition" id="east_range"]
-script = ExtResource("range")
-minimum_ratio = 0.35
-
-[sub_resource type="BTCondition" id="east_direction"]
-script = ExtResource("direction")
-half_angle_degrees = 110.0
-
-[sub_resource type="BTCondition" id="east_ready"]
-script = ExtResource("ready")
-attack = &"east"
-
-[sub_resource type="BTCondition" id="east_head0"]
-script = ExtResource("heads")
-kind = "debris"
-
-[sub_resource type="BTCondition" id="east_head1"]
-script = ExtResource("heads")
-kind = "beam"
-
-[sub_resource type="BTAction" id="east_play"]
-script = ExtResource("play")
-technique = "east"
-
-[sub_resource type="BTDynamicSequence" id="east"]
-custom_name = "east"
-children = [SubResource("east_range"), SubResource("east_direction"), SubResource("east_ready"), SubResource("east_head0"), SubResource("east_head1"), SubResource("east_play")]
+children = [SubResource("ready_north"), SubResource("play_north")]
 metadata/_weight_ = 1.0
-
-[sub_resource type="BTCondition" id="west_range"]
-script = ExtResource("range")
-minimum_ratio = 0.55
-
-[sub_resource type="BTCondition" id="west_direction"]
-script = ExtResource("direction")
-half_angle_degrees = 100.0
-
-[sub_resource type="BTCondition" id="west_ready"]
-script = ExtResource("ready")
-attack = &"west"
-
-[sub_resource type="BTCondition" id="west_head0"]
-script = ExtResource("heads")
-kind = "beam"
-minimum_count = 2
-
-[sub_resource type="BTAction" id="west_play"]
-script = ExtResource("play")
-technique = "west"
-cooldown_scale = 1.2
-
-[sub_resource type="BTDynamicSequence" id="west"]
-custom_name = "west"
-children = [SubResource("west_range"), SubResource("west_direction"), SubResource("west_ready"), SubResource("west_head0"), SubResource("west_play")]
-metadata/_weight_ = 0.8
-
-[sub_resource type="BTComment" id="south_pending"]
-custom_name = "南：渦壁と隙間の回避難度を調整後に接続（保留）"
-
 [sub_resource type="BTCondition" id="ready_sequence"]
 script = ExtResource("ready")
 attack = &"sequence"
@@ -99,7 +22,6 @@ technique = "sequence"
 custom_name = "sequence"
 children = [SubResource("ready_sequence"), SubResource("play_sequence")]
 metadata/_weight_ = 1.0
-
 [sub_resource type="BTCondition" id="ready_curve"]
 script = ExtResource("ready")
 attack = &"curve"
@@ -110,7 +32,16 @@ technique = "curve"
 custom_name = "curve"
 children = [SubResource("ready_curve"), SubResource("play_curve")]
 metadata/_weight_ = 1.0
-
+[sub_resource type="BTCondition" id="ready_swarm"]
+script = ExtResource("ready")
+attack = &"swarm"
+[sub_resource type="BTAction" id="play_swarm"]
+script = ExtResource("play")
+technique = "swarm"
+[sub_resource type="BTDynamicSequence" id="swarm"]
+custom_name = "swarm"
+children = [SubResource("ready_swarm"), SubResource("play_swarm")]
+metadata/_weight_ = 1.0
 [sub_resource type="BTCondition" id="ready_tornado"]
 script = ExtResource("ready")
 attack = &"tornado"
@@ -121,7 +52,6 @@ technique = "tornado"
 custom_name = "tornado"
 children = [SubResource("ready_tornado"), SubResource("play_tornado")]
 metadata/_weight_ = 1.0
-
 [sub_resource type="BTCondition" id="ready_debris_shatter"]
 script = ExtResource("ready")
 attack = &"debris_shatter"
@@ -132,7 +62,6 @@ technique = "debris_shatter"
 custom_name = "debris_shatter"
 children = [SubResource("ready_debris_shatter"), SubResource("play_debris_shatter")]
 metadata/_weight_ = 1.0
-
 [sub_resource type="BTCondition" id="ready_beam_pincer"]
 script = ExtResource("ready")
 attack = &"beam_pincer"
@@ -143,19 +72,16 @@ technique = "beam_pincer"
 custom_name = "beam_pincer"
 children = [SubResource("ready_beam_pincer"), SubResource("play_beam_pincer")]
 metadata/_weight_ = 1.0
-
 [sub_resource type="BTProbabilitySelector" id="choose"]
-custom_name = "条件を満たす大技を重みで選ぶ"
-children = [SubResource("north"), SubResource("sequence"), SubResource("curve")]
+custom_name = "形態・参加者・配置・再使用待ちで大技を選択"
 script = ExtResource("selector")
-
+children = [SubResource("north"), SubResource("sequence"), SubResource("curve"), SubResource("swarm")]
 [sub_resource type="BTProbabilitySelector" id="combos"]
-custom_name = "共通発動機会に成立するコンボを抽選"
-children = [SubResource("tornado"), SubResource("debris_shatter"), SubResource("beam_pincer")]
+custom_name = "共通発動機会のコンボ抽選"
 script = ExtResource("selector")
+children = [SubResource("tornado"), SubResource("debris_shatter"), SubResource("beam_pincer")]
 [sub_resource type="BTSelector" id="root"]
-children = [SubResource("combos"), SubResource("choose"), SubResource("debris_shatter"), SubResource("beam_pincer")]
-
+children = [SubResource("combos"), SubResource("choose")]
 [resource]
-description = "条件を組み替えて大技を選択。枝の重み、距離・角度、首の条件、実行タスクのクールダウン倍率を編集する"
+description = "通常攻撃は首別BT。全体の攻めどき・配置中は通常攻撃を待たせる。重みと条件・動作の枝を編集する"
 root_task = SubResource("root")

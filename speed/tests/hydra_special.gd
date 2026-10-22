@@ -14,6 +14,10 @@ func _ready()->void:
 	var a=lab.run.bosses.lab_instances.back().actor
 	a.hsm.set_active(false)
 	a._set_count(8)
+	if name in [&"swarm",&"grid"]:
+		a.begin_separation()
+		a.separation_t=0.0
+		a.table.guard[a.immortal_row]=0.0
 	a._tech_cd=0.0
 	var events: Array=[]
 	a.presentation_event.connect(func(e):events.append(e))
@@ -24,15 +28,19 @@ func _ready()->void:
 		var curve:=false
 		var tornado_owned:=false
 		var owners: Dictionary={}
-		for i in 200:
+		for i in (400 if name in [&"swarm",&"grid"] else 200):
 			a.sim_tick(0.025,0.025)
-			peak=maxi(peak,a.attack_field.effects.size())
+			if a.busy:peak=maxi(peak,a.attack_field.effects.size())
 			for e in a.attack_field.effects:
 				if e.kind==&"beam":owners[e.owner]=true
 				if e.points.size()>3:curve=true
 				if e.kind==&"tornado" and e.velocity.length()>0.0:
 					tornado_owned=e.owner==a.participants[0].row and a.participants[0].kind==&"vortex" and e.width>150.0
 		check(peak>0,"timeline produces gameplay geometry")
+		if name==&"swarm":
+			var times: Array=events.filter(func(e):return e.cue==&"attack_started" and e.neck_index>=0 and e.technique==&"swarm").map(func(e):return e.world_time)
+			check(times.size()==8 and times[-1]-times[0]>1.5,"eight independent snakes launch in separate beats")
+			check(a.special.state.slots[0].distance_to(a.special.state.slots[4])>300.0,"launch positions occupy different sides of the view")
 		if name==&"sequence":
 			var times: Array=events.filter(func(e):return e.cue==&"attack_started" and e.neck_index>=0).map(func(e):return e.world_time)
 			check(times.size()==3 and times[2]-times[0]>0.5,"three heads attack in distinct ordered beats")

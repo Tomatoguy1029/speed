@@ -163,8 +163,19 @@ tracks/0/keys = {
 "values": [{"args": [&"beam_pincer"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
 }
 
+[sub_resource type="Animation" id="Animation_swarm"]
+length = 6.2
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 6.0),
+"transitions": PackedFloat32Array(1,1,1),
+"values": [{"args": [&"swarm"], "method": &"tech_compass"}, {"args": [], "method": &"special_attack"}, {"args": [], "method": &"tech_end"}]
+}
+
 [resource]
 _data = {
+&"swarm": SubResource("Animation_swarm"),
 &"beam_pincer": SubResource("Animation_beam_pincer"),
 &"debris_shatter": SubResource("Animation_debris_shatter"),
 &"tornado": SubResource("Animation_tornado"),

@@ -3,12 +3,14 @@ extends RefCounted
 var a: Node
 var time:=0.0
 var playing:=false
+var positioning:=false
 var state: Dictionary={}
 func _init(actor: Node)->void:a=actor
 func prepare()->void:
 	time=0.0
 	state.clear()
 	playing=false
+	positioning=false
 	for n in a.participants:
 		n.strike_pos=a._head_pos(n)
 		n.strike_from=n.strike_pos
@@ -17,6 +19,14 @@ func prepare()->void:
 		n.step=0
 		n.emission.clear()
 	if a.tech==&"curve":curve(0.0)
+	if a.tech==&"swarm":
+		positioning=true
+		state.slots=[]
+		state.arrived={}
+		var rect: Rect2=a.run_state.view_rect().grow(-float(a.def.params.formation_margin))
+		for i in a.participants.size():
+			var angle: float=TAU*float(i)/a.participants.size()
+			state.slots.append(rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45))
 func tick(dt: float)->void:
 	if not playing:return
 	time+=dt
@@ -25,6 +35,7 @@ func tick(dt: float)->void:
 	elif a.tech==&"tornado":tornado()
 	elif a.tech==&"debris_shatter":debris_shatter()
 	elif a.tech==&"beam_pincer":beam_pincer()
+	elif a.tech==&"swarm":swarm(dt)
 	for n in a.participants:
 		if a._alive(n):
 			a.table.pos[n.row]=a._head_pos(n)
@@ -142,3 +153,47 @@ func beam_pincer()->void:
 		var points:=PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.beam_len)])
 		if n.emission.is_empty():n.emission=a.attack_field.add_shape(points,float(p.beam_width),0.5,1.8,float(p.beam_dmg),&"beam",n.row)
 		else:n.emission.points=points
+
+
+## 配置の途中も同じ操舵を使う。到着まで攻撃の時間軸を進めない。
+func position(dt: float)->bool:
+	var ready:=true
+	for i in a.participants.size():
+		var n=a.participants[i]
+		if not a._alive(n):continue
+		if not state.arrived.has(i):
+			a.SNAKE.steer(n,state.slots[i],dt,a.def.params,1.8)
+		n.strike_pos=n.free_pos
+		a.table.pos[n.row]=n.free_pos
+		a._follow_neck(n,dt)
+		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.formation_tolerance):state.arrived[i]=true
+		if not state.arrived.has(i):ready=false
+	if ready:
+		positioning=false
+		for n in a.participants:
+			n.strike_from=n.strike_pos
+			var direction: Vector2=(a.run_state.ship_pos-n.strike_pos).normalized()
+			n.target=n.strike_pos+direction*float(a.def.params.swarm_reach)
+	return ready
+
+func swarm(dt: float)->void:
+	var p: Dictionary=a.def.params
+	for i in a.participants.size():
+		var n=a.participants[i]
+		if not a._alive(n):continue
+		var local: float=time-i*float(p.swarm_gap)
+		if local<0.0:continue
+		if n.emission.is_empty():n.emission=a.attack_field.add_shape(PackedVector2Array([n.strike_from,n.target]),float(p.bite_radius),float(p.sequence_charge),0.001,0.0,&"bite",n.row)
+		if local<float(p.sequence_charge):continue
+		if not n.locked:
+			n.locked=true
+			n.angle=(n.target-n.strike_from).angle()
+			a._cue(&"target_locked",a.tech,a.necks.find(n))
+			a._cue(&"attack_started",a.tech,a.necks.find(n))
+		var f:=clampf((local-float(p.sequence_charge))/float(p.swarm_flight),0.0,1.0)
+		if n.mode!=&"special_hold":
+			var before: Vector2=n.strike_pos
+			n.strike_pos=n.strike_from.lerp(n.target,f)
+			n.free_pos=n.strike_pos
+			a.attack_field.add_shape(PackedVector2Array([before,n.strike_pos]),float(p.bite_radius),0.0,dt+0.001,float(p.bite_dmg),&"bite",n.row)
+			if f>=1.0:n.mode=&"special_hold"
