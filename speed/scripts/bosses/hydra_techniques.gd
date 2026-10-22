@@ -24,6 +24,7 @@ func tick(dt: float)->void:
 	elif a.tech==&"curve":curve(dt)
 	elif a.tech==&"tornado":tornado()
 	elif a.tech==&"debris_shatter":debris_shatter()
+	elif a.tech==&"beam_pincer":beam_pincer()
 	for n in a.participants:
 		if a._alive(n):
 			a.table.pos[n.row]=a._head_pos(n)
@@ -128,3 +129,16 @@ func debris_shatter()->void:
 				a._burst_rubble(ref.x,(a.table.pos[ref.x]-beam.strike_pos).normalized())
 				a._rubble.erase(ref)
 				a._cue(&"rubble_shattered",a.tech,a.necks.find(beam))
+
+func beam_pincer()->void:
+	var p: Dictionary=a.def.params
+	if not state.has("aims"):
+		state.aims=[]
+		for n in a.participants:state.aims.append((a.run_state.ship_pos-n.strike_pos).angle())
+	for j in a.participants.size():
+		var n=a.participants[j]
+		var side:=1.0 if j==0 else -1.0
+		n.angle=float(state.aims[j])+side*lerpf(0.8,0.12,clampf((time-0.5)/1.8,0.0,1.0))
+		var points:=PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.beam_len)])
+		if n.emission.is_empty():n.emission=a.attack_field.add_shape(points,float(p.beam_width),0.5,1.8,float(p.beam_dmg),&"beam",n.row)
+		else:n.emission.points=points
