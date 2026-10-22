@@ -59,6 +59,20 @@ const NECKS := {
 var growth_t := 0.0
 var separation_pending := false
 var separated := false
+var chance_t := 0.0
+
+func _chance_step(dt: float) -> void:
+	if separated or separation_pending: return
+	if chance_t > 0.0:
+		chance_t = maxf(0.0, chance_t - dt)
+		if chance_t <= 0.0:
+			for neck in necks:
+				if not _alive(neck): _grow(neck)
+	elif not necks.is_empty() and necks.all(func(n): return not _alive(n)):
+		interrupt_tech()
+		chance_t = float(def.params.chance_time)
+		_cue(&"recovery_started", &"chance", -1, {"duration": chance_t})
+
 
 func on_body_damaged() -> void:
 	if not separated:
@@ -181,7 +195,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	recovery_t = maxf(0.0, recovery_t - dt)
 	_expose_cd = maxf(0.0, _expose_cd - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
-	# 全首ダウンはチャンスタイムへ接続する。
+	_chance_step(dt)
 	if north_aiming:
 		_update_north_targets()
 	for k in necks.size():
@@ -306,7 +320,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	if neck.row >= 0 and not _alive(neck):
 		_on_head_lost(neck)
 	if neck.row < 0:
-		if not neck.burned and exposed_t <= 0.0 and not busy and recovery_t <= 0.0:
+		if not separated and chance_t <= 0.0 and growth_t <= 0.0 and not busy and recovery_t <= 0.0:
 			neck.regrow -= dt
 			if neck.regrow <= 0.0:
 				_grow(neck)
@@ -340,6 +354,8 @@ func _on_head_lost(neck: Neck) -> void:
 	neck.row = -1
 	neck.mode = &"idle"
 	_extend_regrow_grace(1.0 + float(p.regrow_combo) * (n - 1))
+	if neck.burned:
+		neck.regrow = maxf(neck.regrow, float(p.regrow) * float(p.fire_regrow_scale))
 
 ## 次の首へ向かう時間を残り首数で確保し、倒すたびに全ての倒れた首へ猶予を与える。
 func _extend_regrow_grace(combo_scale: float) -> void:
@@ -348,7 +364,7 @@ func _extend_regrow_grace(combo_scale: float) -> void:
 		if _alive(neck): remaining += 1
 	var grace := (float(def.params.regrow) + float(def.params.regrow_per_head) * remaining) * combo_scale
 	for neck in necks:
-		if neck.row < 0 and not neck.burned:
+		if neck.row < 0:
 			neck.regrow = maxf(neck.regrow, grace)
 
 ## 頭の位置・向きは攻撃側が決め、描画用の点列だけを解く。頭を失った首は短く畳む。
@@ -437,7 +453,7 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 	var aim := (run_state.ship_pos - _neck_base(neck)).angle()
 	if neck.mode == &"idle":
 		# 旧追尾首は弱点として残す。追尾弾は発射しない。
-		if neck.kind == &"homing" or exposed_t > 0.0 or recovery_t > 0.0:
+		if neck.kind == &"homing" or chance_t > 0.0 or growth_t > 0.0 or recovery_t > 0.0:
 			return
 		var sway := sin(_time * 0.9 + neck.base_angle * 3.0) * 0.35
 		var home := neck.base_angle + table.facing[body] + sway
@@ -650,7 +666,7 @@ func _update_blackboard() -> void:
 ## 条件評価は読み取りだけ。攻撃枠は選択後に取得する。
 func attack_ready(attack: StringName) -> bool:
 	return tech == attack or (TECH_DIR.has(attack) and _tech_cd <= 0.0 and not busy and not timeline.is_playing() \
-		and exposed_t <= 0.0 and recovery_t <= 0.0 and _time >= float(_tech_until.get(attack, 0.0)) and _tech_ok(attack))
+		and chance_t <= 0.0 and growth_t <= 0.0 and not separation_pending and recovery_t <= 0.0 and _time >= float(_tech_until.get(attack, 0.0)) and _tech_ok(attack))
 
 func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if busy or not attack_ready(attack):
