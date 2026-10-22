@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"wind_blades":
+		wind_blades(a,n,dt)
+		return
 	if n.mode == &"wind_band":
 		wind_band(a,n,dt)
 		return
@@ -62,3 +65,24 @@ static func wind_band(a: Node,n,dt: float) -> void:
 		a.attack_field.add_shape(points,float(p.wind_width),0.0,float(p.wind_time),0.0,&"wind",n.row)
 		a._cue(&"attack_started",n.mode,a.necks.find(n))
 	if n.t >= charge+float(p.wind_time)+float(p.normal_hold): a.finish_normal(n)
+
+static func wind_blades(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	if n.t < charge:
+		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle()-float(p.blade_spread)*0.5,minf(1.0,dt*5.0))
+		n.glow=n.t/charge
+	elif not n.locked:
+		n.strike_pos=a._head_pos(n)
+		n.locked=true
+		n.sweep=(a.run_state.ship_pos-n.strike_pos).angle()
+	if n.locked and n.step<3 and n.t>=charge+n.step*float(p.blade_interval):
+		n.angle=n.sweep+(float(n.step)*0.5-0.5)*float(p.blade_spread)
+		var points := PackedVector2Array()
+		for i in 13:
+			var angle := -PI*0.5+PI*float(i)/12.0
+			points.append(n.strike_pos+Vector2(cos(angle)*float(p.blade_size)*0.6,sin(angle)*float(p.blade_size)).rotated(n.angle))
+		a.attack_field.add_shape(points,float(p.blade_width),0.0,float(p.blade_life),float(p.bite_dmg),&"wind_blade",n.row,Vector2.from_angle(n.angle)*float(p.blade_speed),true)
+		n.step+=1
+		a._cue(&"attack_started",n.mode,a.necks.find(n))
+	if n.t>=charge+2.0*float(p.blade_interval)+float(p.normal_hold): a.finish_normal(n)

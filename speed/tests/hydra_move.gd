@@ -36,7 +36,7 @@ func _ready() -> void:
 		for i in 130:
 			a.sim_tick(0.02,0.02)
 			for e in a.attack_field.effects:
-				if e.owner == n.row or e.persistent:
+				if e.owner == n.row:
 					ids[e.id]=true
 					if e.velocity.length()>0.0: has_motion=true
 					if e.points.size()>2: has_curve=true
