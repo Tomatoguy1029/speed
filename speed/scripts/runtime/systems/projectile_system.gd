@@ -9,6 +9,7 @@ func dispose() -> void:
 	for attack in _attached_attacks.values():
 		attack.dispose()
 	_attached_attacks.clear()
+	_attack_kinds.clear()
 	for slots in [friend_slots, hostile_slots, hazard_slots]:
 		if slots != null:
 			slots.owner = null
@@ -141,6 +142,17 @@ var _hazard_shapes: Array[HazardShape] = []
 
 ## 機体の移動を使う攻撃。装備管理は発動だけを行い、攻撃自身が寿命と命中を持つ。
 var _attached_attacks: Dictionary = {}
+
+## 使った攻撃の生成器だけを保持する。外から登録した種類も同じ入口で使える。
+var _attack_kinds: Dictionary = {}
+
+func register_attack(kind: StringName, attack: AttackKind) -> void:
+	_attack_kinds[kind] = attack
+
+func emit_attack(kind: StringName, args: Array) -> Variant:
+	if not _attack_kinds.has(kind):
+		register_attack(kind, load("res://scripts/attacks/%s.gd" % kind).new())
+	return _attack_kinds[kind].emit(self, args)
 
 func attached_attack(kind: StringName) -> RunSystem:
 	if not _attached_attacks.has(kind):

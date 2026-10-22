@@ -2,7 +2,7 @@
 ##
 ## 同じ形を複数の敵・ボスが使う。ProjectileSystem は、その戦いで使った形だけを作る。
 class_name HazardShape
-extends RefCounted
+extends AttackKind
 
 ## 機体に1回だけ当たる（false なら残る線のように、触れている間ずっと危ない）
 var hits_once := true

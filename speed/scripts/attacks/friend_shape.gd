@@ -1,6 +1,6 @@
 ## 味方の弾の種類ごとの動き。行と当たり判定の共通管理はProjectileSystemが受け持つ。
 class_name FriendShape
-extends RefCounted
+extends AttackKind
 
 func advance(ps: ProjectileSystem, i: int, _pos: Vector2, dt: float) -> void:
 	ps.friend_angle[i] += ps.friend_spin[i] * dt

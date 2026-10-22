@@ -2,7 +2,7 @@
 ##
 ## 同じ種類を複数の敵・ボスが使う。ProjectileSystem は、その戦いで使った種類だけを作る。
 class_name HostileShape
-extends RefCounted
+extends AttackKind
 
 ## 画面の外で、画面から離れていく弾を消すか（追いかける弾は false）
 var leaves_view := true
