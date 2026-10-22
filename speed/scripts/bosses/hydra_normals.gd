@@ -1,6 +1,9 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	if n.mode == &"wind_band":
+		wind_band(a,n,dt)
+		return
 	if n.mode == &"bite_sweep":
 		sweep(a,n,dt)
 		return
@@ -45,3 +48,17 @@ static func sweep(a: Node,n,dt: float) -> void:
 		n.strike_pos=a._neck_base(n)+Vector2.from_angle(n.angle)*float(p.sweep_reach)
 		a.attack_field.add_shape(PackedVector2Array([from,n.strike_pos]),float(p.bite_radius),0.0,0.12,float(p.bite_dmg),&"bite",n.row)
 	if n.t >= charge+duration+float(p.normal_hold): a.finish_normal(n)
+
+static func wind_band(a: Node,n,dt: float) -> void:
+	var p: Dictionary = a.def.params
+	var charge := float(p.normal_charge)
+	if n.t < charge:
+		n.angle=lerp_angle(n.angle,(a.run_state.ship_pos-a._head_pos(n)).angle(),minf(1.0,dt*5.0))
+		n.glow=n.t/charge
+	elif not n.locked:
+		n.locked=true
+		n.strike_pos=a._neck_base(n)+Vector2.from_angle(n.angle)*n.length
+		var points := PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.wind_length)])
+		a.attack_field.add_shape(points,float(p.wind_width),0.0,float(p.wind_time),0.0,&"wind",n.row)
+		a._cue(&"attack_started",n.mode,a.necks.find(n))
+	if n.t >= charge+float(p.wind_time)+float(p.normal_hold): a.finish_normal(n)

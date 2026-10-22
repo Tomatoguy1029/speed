@@ -12,10 +12,14 @@ accel = 0.8
 turn = 0.6
 xp = 150.0
 params = {
+"wind_force": 2600.0,
+"wind_length": 340.0,
+"wind_width": 180.0,
+"wind_time": 1.0,
 "sweep_time": 0.7,
 "sweep_arc": 1.8,
 "sweep_reach": 350.0,
-"normal_rules": {&"bite_thrust": {"kind": &"bite", "min": 0.0, "max": 620.0, "cost": 1.0}, &"bite_sweep": {"kind": &"bite", "min": 0.0, "max": 400.0, "cost": 1.2}},
+"normal_rules": {&"bite_thrust": {"kind": &"bite", "min": 0.0, "max": 620.0, "cost": 1.0}, &"bite_sweep": {"kind": &"bite", "min": 0.0, "max": 400.0, "cost": 1.2}, &"wind_band": {"kind": &"vortex", "min": 0.0, "max": 420.0, "cost": 1.4}},
 "normal_charge": 0.6,
 "normal_lunge": 0.16,
 "normal_hold": 0.9,
