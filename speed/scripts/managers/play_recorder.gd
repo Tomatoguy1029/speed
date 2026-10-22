@@ -26,7 +26,9 @@ var _perf_drawing := 0
 var _perf_tracing := 0
 
 var armed := false
-var _run: Node = null
+var _run: RunSimulation = null
+## 記録中のランのセッション（木から出たら記録を閉じる）
+var _session: RunSession = null
 var _file: FileAccess = null
 var _next_sample := 0.0
 var _last_xp_gained := 0.0
@@ -102,7 +104,7 @@ func _set_armed(on: bool) -> void:
 	if on:
 		get_tree().node_added.connect(_on_node_added)
 		for run in get_tree().get_nodes_in_group("recordable_runs"):
-			if run.is_node_ready() and not run.is_queued_for_deletion():
+			if run.is_node_ready() and not run.is_queued_for_deletion() and run.sim.state != null:
 				_begin(run, true)
 				if _run != null:
 					break
@@ -112,16 +114,18 @@ func _set_armed(on: bool) -> void:
 		_end("stopped")
 	_update_label()
 
-## ランの管理役（RunManager）が来たら、準備ができてから記録を始める。
+## ランのセッションが来たら、準備ができてから記録を始める。
 func _on_node_added(node: Node) -> void:
-	if node is RunManager:
+	if node is RunSession:
 		node.ready.connect(_begin.bind(node), CONNECT_ONE_SHOT)
 
-func _begin(run: Node, during_run := false) -> void:
-	if not armed or run == _run or run.is_queued_for_deletion() or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
+func _begin(session: RunSession, during_run := false) -> void:
+	var run := session.sim
+	if not armed or run == _run or session.is_queued_for_deletion() or run.state.lab_mode or run.state.phase == RunState.Phase.ENDED:
 		return
 	_end("quit")
 	_run = run
+	_session = session
 	var directory := _recording_directory()
 	DirAccess.make_dir_recursive_absolute(directory)
 	var stamp := Time.get_datetime_string_from_system().replace(":", "").replace("-", "").replace("T", "_")
@@ -134,11 +138,12 @@ func _begin(run: Node, during_run := false) -> void:
 	_file = FileAccess.open(path, FileAccess.WRITE)
 	if _file == null:
 		_run = null
+		_session = null
 		return
 	run.frame_events.connect(_on_events)
 	run.phase_changed.connect(_on_phase_changed)
-	run.build.cards_opened.connect(_on_cards)
-	run.tree_exiting.connect(_end.bind("quit"))
+	run.loadout.cards_opened.connect(_on_cards)
+	session.tree_exiting.connect(_end.bind("quit"))
 	_reset_counts()
 	_on_cards(run.state.cards)
 	_last_xp_gained = run.state.xp_gained
@@ -335,14 +340,15 @@ func _end(result: String) -> void:
 	_saved_t = SAVED_NOTICE
 	_file.close()
 	_file = null
-	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.build.cards_opened, _on_cards],
+	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.loadout.cards_opened, _on_cards],
 		[_run.pickups.big_crystal_dropped, _on_big_crystal]]:
 		if sig[0].is_connected(sig[1]):
 			sig[0].disconnect(sig[1])
-	for c in _run.tree_exiting.get_connections():
+	for c in _session.tree_exiting.get_connections():
 		if c.callable.get_object() == self:
-			_run.tree_exiting.disconnect(c.callable)
+			_session.tree_exiting.disconnect(c.callable)
 	_run = null
+	_session = null
 	_big_crystals = {}
 	_strong = {}
 	_offered = []
