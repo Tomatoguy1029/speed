@@ -174,10 +174,13 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		return true
 	return false
 
-## 機体が from から今の位置へ動く途中で、移動を止める壁（じょうぎ座のビーム）にぶつかったら、壁の手前で止めて弾く。
+## 機体の移動区間が、じょうぎ座の壁ビームか固定の戦闘外周に触れたら、手前で止めて弾く。
 ## 弾いたら true。弾かれるのは失敗で、被弾はしない。
 func wall_bounce(from: Vector2) -> bool:
 	var hit := projectiles.block_hit(from, state.ship_pos, cfg.ship_radius)
+	var arena := field.arena_hit(from, state.ship_pos, cfg.ship_radius)
+	if not arena.is_empty() and (hit.is_empty() or from.distance_squared_to(arena.pos)<from.distance_squared_to(hit.pos)):
+		hit = arena
 	if hit.is_empty():
 		return false
 	var n: Vector2 = hit.normal

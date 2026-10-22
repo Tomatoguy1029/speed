@@ -142,9 +142,19 @@ func _collide_bodies() -> void:
 			state.glide = false
 			state.ship_vel -= n * vn * (1.0 + cfg.crash_restitution)
 			state.emit(&"crash", {"pos": state.ship_pos, "power": -vn})
+	# 天体からの押し出しが固定外周を越えた場合も、機体を内側に保つ。
+	for bounds: Rect2 in field.battle_arenas.values():
+		var safe := bounds.grow(-R)
+		var inside := state.ship_pos.clamp(safe.position,safe.end)
+		if inside != state.ship_pos:
+			var inward := (inside-state.ship_pos).normalized()
+			state.ship_pos = inside
+			var vn := state.ship_vel.dot(inward)
+			if vn < 0.0: state.ship_vel -= inward*vn*(1.0+cfg.crash_restitution)
+			state.glide = false
 	var r := state.ship_pos.length()
 	var wall := cfg.field_radius + 500.0
-	if r > wall:
+	if r > wall and field.battle_arenas.is_empty():
 		state.glide = false
 		var n := state.ship_pos / r
 		state.ship_pos = n * wall

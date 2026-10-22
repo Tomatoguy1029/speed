@@ -255,6 +255,8 @@ LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会�
 
 `hydra_attack_field.gd` は表示と判定で同じ点列・幅・開始時刻・寿命を使う。機体と形状の移動区間を掃引し、世界時間停止時は形を保つ。描画ノードはID別に持ち、戦闘状態の辞書に解放済みノードを残さず、実験場の巻き戻し比較を保つ。
 
+`hydra_arena.gd` は固定瓦礫の描画と戦闘エリアを所有し、ボスの行IDで `FieldManager.battle_arenas` へ矩形を登録する。地形の掃引判定・機体の跳ね返り・線描画・弾の地形判定で同じ外周を使う。通常の蛇の操舵は胴の長さを考慮して内側を狙い、大技は画面とエリアの共通部分へ配置する。最終撃破と役者の解放で登録を解除する。
+
 **Hydraの試遊と素材差し替え**
 
 `gyms/hydra_trial.tscn` をF6で起動すると、敵・ルート実験場が試遊モードで開く。停止・巻き戻し・機体固定・数値編集を使える。シーンのInspectorで開始位置・無敵・試遊用の攻撃倍率を変える。通常出現とセーブは実験セッションから分ける。
@@ -264,6 +266,8 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 絵担当は `scenes/bosses/hydra_presentation.tscn` を複製し、HydraBossの `presentation_scene` に指定する。差し替えシーンは `bind_hydra(actor)` で `presentation_event` と `presentation_advanced` を受け取る。`VisualTimeline` は装飾用、`burst_shader` は衝撃・破壊・増加・分離のピクセル表現用。イベントは `cue`・`technique`・`neck_index`・`part_id`・`kind`・`position`・`angle`・`world_time` を渡す。添字は本体-1、不死の蛇-2、通常首0以上。取り付け位置は `presentation_anchor()`、状態は `presentation_state()`、同時噛みつきの実際の到達点は `presentation_targets()` で読む。`hit` は実HP減少に伴い実ダメージを渡す。
 
 描画確認用の起動引数は `--hydra-inspect --hydra-attack=<通常技ID>` または `--hydra-inspect --hydra-tech=<大技・コンボID>`。指定した技を1回再現する。`--hydra-split` で分離状態から試遊できる。撮影は `--hydra-capture=/tmp/任意名.png --hydra-capture-at=<秒>` を併用する。`--hydra-inspect --hydra-review` は確認用の攻撃力で線入力から一戦を自動再現する。確認モードの機体固定と自動進行は起動引数のある実行だけに適用する。
+
+`--hydra-arena-edge` は固定バリケードの角付近へ機体を固定し、外周を描画確認する。
 
 **みなみのかんむり座の渦**
 

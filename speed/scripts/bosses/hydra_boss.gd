@@ -22,6 +22,7 @@ const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
 var special: RefCounted
 var attack_field: Node2D
+var arena: Node2D
 const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 
 ## 首1本の状態
@@ -160,6 +161,9 @@ func _on_bound() -> void:
 	table.gate[body] = EnemyTable.Gate.NONE
 	# 本体と首は、敵（頭）の下、地形の上に描く（RenderManager の描画の層の enemies の下）
 	z_index = 5
+	arena = preload("res://scripts/bosses/hydra_arena.gd").new()
+	add_child(arena)
+	arena.bind(self)
 	if presentation_scene != null:
 		_presentation = presentation_scene.instantiate()
 		add_child(_presentation)
@@ -248,6 +252,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_release_attack(neck)
 			if _alive(neck):manager.enemies.mark_dead(neck.row)
 		attack_field.clear_effects()
+		arena.release()
 		_cue(&"defeated")
 		manager.on_boss_defeated(body, {"cause": &"ram"})
 	attack_field.tick(dt)
@@ -277,6 +282,7 @@ func _move(dt: float) -> void:
 	var from := t.pos[i]
 	t.pos[i] += t.vel[i] * dt
 	manager.field.collide_enemy(i, from)
+	t.pos[i] = arena.clamp_point(t.pos[i],t.r[i]+float(p.neck_rest)+80.0)
 	if t.flash[i] > 0.0:
 		t.flash[i] -= dt
 
@@ -334,6 +340,10 @@ func _neck_base(neck: Neck) -> Vector2:
 	return table.pos[body] + Vector2.from_angle(neck.base_angle + table.facing[body]) * table.r[body]
 
 func _head_pos(neck: Neck) -> Vector2:
+	var at := _unbounded_head_pos(neck)
+	return arena.clamp_point(at,table.r[neck.row] if _alive(neck) else 40.0) if arena != null else at
+
+func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
 	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
@@ -420,6 +430,7 @@ func _extend_regrow_grace(combo_scale: float) -> void:
 func _follow_neck(neck: Neck, dt: float) -> void:
 	if separated:
 		SNAKE.follow(neck,_head_pos(neck),dt,_time,def.params)
+		for i in neck.segs.size():neck.segs[i]=arena.clamp_point(neck.segs[i],24.0)
 		return
 	var rest := float(def.params.neck_rest)
 	if neck.row < 0:
@@ -477,7 +488,7 @@ func position_head(index: int, dt: float) -> void:
 		var center: Vector2=table.pos[immortal_row] if immortal_row>=0 else run_state.ship_pos
 		var desired: Vector2=center+Vector2.from_angle(n.base_angle+_time*0.12)*float(def.params.guard_radius)
 		if not run_state.view_rect().grow(-60.0).has_point(n.free_pos):desired=run_state.view_rect().get_center()+Vector2.from_angle(n.base_angle)*minf(run_state.view_half.x,run_state.view_half.y)*0.65
-		SNAKE.steer(n,desired,dt,def.params)
+		steer_snake(n,desired,dt)
 		return
 	var facing := n.base_angle+table.facing[body]
 	var aim: float=(run_state.ship_pos-_neck_base(n)).angle()
@@ -919,11 +930,11 @@ func tick_bearer(dt: float)->void:
 		var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
 		var grid_hold: bool=busy and tech==&"grid" and special.state.has("plan")
 		if grid_hold:target=special.state.plan.bearer
-		target=target.limit_length(manager.cfg.field_radius-200.0)
+		target=arena.clamp_point(target,table.r[n.row]+12.0 if grid_hold else float(def.params.neck_rest)+60.0)
 		if grid_hold and n.free_pos.distance_to(target)<45.0:
 			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
 			n.velocity=Vector2.ZERO
-		else:SNAKE.steer(n,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
+		else:steer_snake(n,target,dt,float(def.params.bearer_speed)/float(def.params.snake_speed),grid_hold)
 	var at:=_head_pos(n)
 	table.pos[immortal_row]=at
 	table.facing[immortal_row]=n.angle
@@ -939,4 +950,15 @@ func head_index(n: Neck)->int:
 
 func grid_plan()->Dictionary:
 	var maximum: float=manager.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/manager.cfg.base_max_speed
-	return GRID.build(run_state.view_rect(),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
+	return GRID.build(run_state.view_rect().intersection(arena.bounds),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
+
+## 通常移動は胴の長さぶん手前で回り込み、陣形への移動は指定された内側の配置へ進む。
+func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formation:=false) -> void:
+	var radius: float=table.r[n.row]
+	var margin:=radius+12.0 if formation else float(def.params.neck_rest)+radius+24.0
+	SNAKE.steer(n,arena.clamp_point(target,margin),dt,def.params,speed_scale)
+	var inside: Vector2=arena.clamp_point(n.free_pos,radius)
+	if inside!=n.free_pos:
+		var inward: Vector2=(inside-n.free_pos).normalized()
+		n.velocity-=inward*minf(0.0,n.velocity.dot(inward))
+		n.free_pos=inside

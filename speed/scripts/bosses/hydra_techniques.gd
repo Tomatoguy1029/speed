@@ -24,7 +24,7 @@ func prepare()->void:
 		state.slots=[]
 		state.arrived={}
 		state.position_elapsed=0.0
-		var rect: Rect2=a.run_state.view_rect().grow(-float(a.def.params.formation_margin))
+		var rect: Rect2=a.run_state.view_rect().intersection(a.arena.bounds).grow(-float(a.def.params.formation_margin))
 		for i in a.participants.size():
 			var angle: float=TAU*float(i)/a.participants.size()
 			state.slots.append(rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45))
@@ -175,7 +175,7 @@ func position(dt: float)->bool:
 			if a.tech==&"grid" and n.free_pos.distance_to(state.slots[i])<45.0:
 				n.velocity=(state.slots[i]-n.free_pos).limit_length(100.0)
 				n.free_pos+=n.velocity*dt*4.0
-			else:a.SNAKE.steer(n,state.slots[i],dt,a.def.params,1.8)
+			else:a.steer_snake(n,state.slots[i],dt,1.8,true)
 		n.strike_pos=n.free_pos
 		a.table.pos[n.row]=n.free_pos
 		a._follow_neck(n,dt)
@@ -191,6 +191,8 @@ func position(dt: float)->bool:
 			n.strike_from=n.strike_pos
 			var direction: Vector2=(a.run_state.ship_pos-n.strike_pos).normalized()
 			n.target=n.strike_pos+direction*float(a.def.params.swarm_reach)
+			var hit: Dictionary=a.manager.field.arena_hit(n.strike_pos,n.target,a.table.r[n.row])
+			if not hit.is_empty():n.target=hit.pos
 	return ready
 
 func swarm(dt: float)->void:

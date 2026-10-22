@@ -53,6 +53,11 @@ func _ready() -> void:
 		review_owner=session.run.bosses.lab_instances.back()
 		session.pinned=null
 		session.run.state.stats.attack_mult=1000.0
+	if OS.get_cmdline_user_args().has("--hydra-arena-edge"):
+		var bounds: Rect2=session.run.bosses.lab_instances.back().actor.arena.bounds
+		session.pinned=bounds.end-Vector2(220,220)
+		session.run.state.ship_pos=session.pinned
+		session.run.state.view_center=session.pinned
 	_set_mode(3)
 	_refresh()
 
