@@ -39,7 +39,7 @@ func setup(context: RunContext) -> void:
 	state.weapons = {}
 	state.traits = {}
 	refresh_stats()
-	state.rerolls_left = cfg.reroll_count + roundi(_meta_add(&"reroll"))
+	state.rerolls_left = cfg.reroll_count + roundi(float(ctx.profile.add.get(&"reroll", 0.0)))
 
 # ── 能力値（設計書 8.2） ─────────────────────────────────────────
 
@@ -47,17 +47,17 @@ func setup(context: RunContext) -> void:
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	s.max_speed = cfg.base_max_speed * _meta_mult(&"max_speed") * (1.0 + _per(&"T10") * _n(&"T10"))
-	s.attack_mult = _meta_mult(&"attack") * (1.0 + _per(&"T11") * _n(&"T11"))
-	s.max_hp = cfg.base_hp + _meta_add(&"max_hp")
+	s.max_speed = cfg.base_max_speed * float(ctx.profile.mult.get(&"max_speed", 1.0)) * (1.0 + _per(&"T10") * _n(&"T10"))
+	s.attack_mult = float(ctx.profile.mult.get(&"attack", 1.0)) * (1.0 + _per(&"T11") * _n(&"T11"))
+	s.max_hp = cfg.base_hp + float(ctx.profile.add.get(&"max_hp", 0.0))
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
-	s.charge_time = cfg.dash_charge_time * _meta_reduce(&"charge_time") / (1.0 + _per(&"T07") * _n(&"T07"))
+	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _per(&"T07") * _n(&"T07"))
 	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
 	s.crit_mult = cfg.crit_mult
-	s.pickup_radius = cfg.pickup_radius * _meta_mult(&"pickup") * (1.0 + _per(&"T12") * _n(&"T12"))
-	s.length_mult = _meta_mult(&"length") * (1.0 + _per(&"T14") * _n(&"T14"))
+	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _per(&"T12") * _n(&"T12"))
+	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _per(&"T14") * _n(&"T14"))
 	s.glide_duration_mult = 1.0 + _per(&"T31") * _n(&"T31")
-	s.xp_mult = _meta_mult(&"xp")
+	s.xp_mult = float(ctx.profile.mult.get(&"xp", 1.0))
 	if old_max > 0.0 and s.max_hp > old_max:
 		state.ship_hp += s.max_hp - old_max
 	state.ship_hp = minf(state.ship_hp, s.max_hp)
@@ -72,33 +72,6 @@ func _trait_param(id: StringName, key: String, default := 0.0) -> float:
 
 func _per(id: StringName) -> float:
 	return _trait_param(id, "per_stack")
-
-## 強化画面での強化（仕様書 14）。
-func _meta_level(stat: StringName) -> Array:
-	var out := []
-	for def: MetaUpgradeDef in ContentManager.meta_upgrades.values():
-		if def.stat == stat:
-			var level := int(state.meta_override.get(String(def.id), 0)) if state.lab_mode else SaveManager.run_meta_level(def.id)
-			out.append([def.per_level, level])
-	return out
-
-func _meta_mult(stat: StringName) -> float:
-	var m := 1.0
-	for pl in _meta_level(stat):
-		m *= 1.0 + pl[0] * pl[1]
-	return m
-
-func _meta_add(stat: StringName) -> float:
-	var a := 0.0
-	for pl in _meta_level(stat):
-		a += pl[0] * pl[1]
-	return a
-
-func _meta_reduce(stat: StringName) -> float:
-	var m := 1.0
-	for pl in _meta_level(stat):
-		m *= pow(1.0 - pl[0], pl[1])
-	return m
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 

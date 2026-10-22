@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 ContentManager="*res://scripts/managers/content_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"
+ProfileManager="*res://scripts/managers/profile_manager.gd"
 AudioManager="*res://scripts/managers/audio_manager.gd"
 GameManager="*res://scripts/managers/game_manager.gd"
 RunManager="*res://scripts/managers/run_manager.gd"

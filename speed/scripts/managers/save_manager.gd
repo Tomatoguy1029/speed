@@ -77,7 +77,7 @@ func buy_upgrade(def: Resource) -> bool:
 ## 強化をすべて 0 に戻し、使った部品を返す（調整パネル用）。
 func reset_upgrades() -> int:
 	var refund := 0
-	for def in ContentManager.meta_upgrades.values():
+	for def in ContentManager.catalog.table(&"meta_upgrades").values():
 		var lv := meta_level(def.id)
 		for i in lv:
 			refund += def.costs[i]

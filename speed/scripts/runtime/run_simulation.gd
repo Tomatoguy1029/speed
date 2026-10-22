@@ -99,6 +99,7 @@ func setup() -> void:
 	ctx.state = state
 	ctx.cfg = cfg
 	ctx.options = options
+	ctx.profile = options.get("profile", ProfileManager.for_run(state.lab_mode, state.meta_override)).duplicate(true)
 	ctx.field = FieldSystem.new()
 	ctx.ship = ShipSystem.new()
 	ctx.draw = DrawSystem.new()

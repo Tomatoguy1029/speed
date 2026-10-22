@@ -13,7 +13,7 @@ var current_id := -1
 ## 返したセッションを、呼び出し側が画面として木に入れたあと start する。
 func create_run() -> RunSession:
 	var options := {"stage_index": GameManager.run_stage, "endless": GameManager.run_endless,
-		"stage": ContentManager.runtime_stage(GameManager.run_stage)}
+		"stage": ContentManager.runtime_stage(GameManager.run_stage), "profile": ProfileManager.for_run(false)}
 	if OS.is_debug_build():
 		options.start_time = GameManager.run_start_time
 		options.start_source = GameManager.run_start_source

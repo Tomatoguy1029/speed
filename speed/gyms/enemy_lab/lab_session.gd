@@ -487,6 +487,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 			if not phases.is_empty(): run.state.stage.phases = phases
 		"meta":
 			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
+			run.ctx.profile = ProfileManager.compute(run.state.meta_override)
 			run.loadout.refresh_stats()
 		"time":
 			run.state.time = maxf(0, float(args.get("value", 0)))

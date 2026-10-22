@@ -23,3 +23,6 @@ var pickups: PickupSystem
 var heroes: HeroSystem
 
 var resources: ContentResourceScope
+
+## 永続強化を反映した係数のスナップショット。
+var profile: Dictionary = {}
