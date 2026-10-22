@@ -136,11 +136,18 @@ func _begin(run: Node) -> void:
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
 		"schema_version": 3, "xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
-		"engine_version": Engine.get_version_info().string,
+		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
 	_big_crystals = {}
 	_run.pickups.big_crystal_dropped.connect(_on_big_crystal)
 	_update_label()
+
+## ランで使う機体の強化の段（ID → 段）。開発版の上書きを含む。
+func _meta_levels() -> Dictionary:
+	var out := {}
+	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
+		out[String(def.id)] = SaveManager.run_meta_level(def.id)
+	return out
 
 func _xp_config() -> Dictionary:
 	var out := {}

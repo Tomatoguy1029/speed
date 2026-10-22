@@ -33,6 +33,8 @@ var _module: OptionButton
 var _levels: SpinBox
 var _enemy_count: SpinBox
 var _sliders: Dictionary = {}
+## 機体の強化の ID → 段の入力欄
+var _meta_boxes: Dictionary = {}
 var _status: Label
 
 func _ready() -> void:
@@ -131,7 +133,50 @@ func _ready() -> void:
 	meta_reset.text = "機体の強化をリセット（部品を返す。次のランから反映）"
 	meta_reset.pressed.connect(func(): SaveManager.reset_upgrades())
 	box.add_child(meta_reset)
+	_add_meta_levels(box)
 	_refresh_sliders()
+
+## 機体の強化の段を項目ごとに決める（セーブは変えない。次のランから反映）。
+func _add_meta_levels(box: VBoxContainer) -> void:
+	box.add_child(_heading("機体の強化の段（セーブは変えない。次のランから反映）"))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	box.add_child(grid)
+	for def: MetaUpgradeDef in ConfigManager.sorted(ConfigManager.meta_upgrades):
+		var l := Label.new()
+		l.text = "%s（最大 %d）" % [def.get_display_name(), def.costs.size()]
+		l.add_theme_font_size_override("font_size", 14)
+		grid.add_child(l)
+		var spin := SpinBox.new()
+		spin.min_value = 0
+		spin.max_value = def.costs.size()
+		spin.step = 1
+		spin.value_changed.connect(func(v: float): SaveManager.dev_meta_override[String(def.id)] = int(v))
+		grid.add_child(spin)
+		_meta_boxes[def.id] = spin
+	var row := HBoxContainer.new()
+	var preset := Button.new()
+	preset.text = "全部を8割にする"
+	preset.pressed.connect(_set_meta_ratio.bind(0.8))
+	row.add_child(preset)
+	var back := Button.new()
+	back.text = "セーブの段に戻す"
+	back.pressed.connect(func():
+		SaveManager.dev_meta_override.clear()
+		_refresh_meta_levels())
+	row.add_child(back)
+	box.add_child(row)
+	_refresh_meta_levels()
+
+## 全項目を最大の段の ratio 倍（四捨五入）にする。
+func _set_meta_ratio(ratio: float) -> void:
+	for def: MetaUpgradeDef in ConfigManager.meta_upgrades.values():
+		SaveManager.dev_meta_override[String(def.id)] = roundi(def.costs.size() * ratio)
+	_refresh_meta_levels()
+
+func _refresh_meta_levels() -> void:
+	for id in _meta_boxes:
+		_meta_boxes[id].set_value_no_signal(SaveManager.run_meta_level(id))
 
 func _heading(text: String) -> Label:
 	var l := Label.new()
@@ -145,6 +190,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		visible = not visible
 		if visible:
 			_refresh_sliders()
+			_refresh_meta_levels()
 
 func _process(_delta: float) -> void:
 	if visible and run.state != null:
