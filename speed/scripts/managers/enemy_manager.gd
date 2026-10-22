@@ -369,6 +369,9 @@ func clear_regular() -> void:
 	var t := table
 	for i in t.alive.size():
 		if t.alive[i] != 0 and t.is_boss[i] == 0 and t.meteor_index[i] < 0:
+			var parent:=t.parent[i]
+			if self.is_same(parent,t.parent_id[i]) and t.is_boss[parent]!=0 and t.dead[parent]==0:
+				continue
 			mark_dead(i)
 
 ## 全部の敵を消す（計測・確認用のツールが使う）。

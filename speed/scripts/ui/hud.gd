@@ -716,12 +716,12 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if show_status:
 		_draw_boss(W)
-		if _hero_notice_t > 0.0 and not _rewards.is_active():
+		if _hero_notice_t > 0.0 and run.heroes.guidance_visible() and not _rewards.is_active():
 			var text := tr("hud.hero_discovered")
 			var font_size := mini(24, int((W - 24.0) / maxf(1.0, _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x) * 24.0))
 			draw_string(_font, Vector2(12.0, MINIMAP_R * 2.0 + 42.0 if W < 600.0 else 110.0), text, HORIZONTAL_ALIGNMENT_CENTER, W - 24.0,
 				font_size, Color(1.0, 0.91, 0.63, minf(1.0, _hero_notice_t / 0.4)))
-		if run.heroes.revealed() and run.heroes.is_captive():
+		if run.heroes.guidance_visible() and run.heroes.revealed() and run.heroes.is_captive():
 			_draw_edge_arrow(run.heroes.center, Color("#ffd24a"))
 		for p in run.field.rare_comet_positions():
 			_draw_edge_arrow(p, Color("#ffd24a"))
@@ -763,7 +763,7 @@ func _draw_minimap() -> void:
 	# 目印の星の線：取り戻した位置から英雄の星座を通る直線。2体そろうと線を消す。
 	var h := run.heroes
 	var gold := Color("#ffe8a0")
-	if h.hero != null and h.is_captive():
+	if h.guidance_visible() and h.hero != null and h.is_captive():
 		for q in s.landmarks:
 			var a := _minimap_offset(q)
 			var u := (h.center - q).normalized()
@@ -773,7 +773,7 @@ func _draw_minimap() -> void:
 				var r0 := sqrt(disc)
 				draw_line(c + a + u * (-b - r0), c + a + u * (-b + r0), Color(gold, 0.7), 1.5)
 			draw_circle(c + _minimap_marker(q, 3.0), 3.0, gold)
-	if h.revealed():
+	if h.guidance_visible() and h.revealed():
 		var at := c + _minimap_marker(h.center, 6.0)
 		var tw := 0.7 + 0.3 * sin(Time.get_ticks_msec() / 200.0)
 		draw_circle(at, 6.0 * tw, Color(gold, 0.35))

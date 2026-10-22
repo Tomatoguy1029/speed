@@ -122,6 +122,10 @@ func tick(real_dt: float, _world_dt: float) -> void:
 		_last_star = -1
 	_pass_stars(from, state.ship_pos)
 
+## ボス戦の開始から、英雄の探索案内を隠す。獲得済みの力は保持する。
+func guidance_visible() -> bool:
+	return state.endless or not state.boss_spawned
+
 ## ミニマップに英雄の星座を出すか：近くまで来たか、目印の星の線が2本そろったか、解放したとき。
 func revealed() -> bool:
 	return hero != null and (seen or state.landmarks.size() >= 2 or not is_captive())

@@ -27,11 +27,72 @@ func bind(actor: BossActor) -> void:
 	actor.table.body_gap.fill(-1.0)
 	actor.manager.projectiles.hostile_gap.fill(0.0)
 	_build_rubble()
+	_clear_footprint(actor)
 	queue_redraw()
 
 func clamp_point(at: Vector2, margin: float) -> Vector2:
 	var safe := bounds.grow(-margin)
 	return at.clamp(safe.position,safe.end)
+
+## 外周と天体を同時に満たす最寄りの候補へ退避する。
+func safe_point(at: Vector2, margin: float) -> Vector2:
+	var point:=clamp_point(at,margin)
+	for pass_index in 4:
+		var changed:=false
+		for obstacle in field.bodies:
+			var radius: float=obstacle.r+margin+1.0
+			if point.distance_squared_to(obstacle.pos)>=radius*radius:continue
+			var angle: float=(point-obstacle.pos).angle()
+			var best:=point
+			var distance:=INF
+			for i in 64:
+				var candidate: Vector2=obstacle.pos+Vector2.from_angle(angle+TAU*i/64.0)*radius
+				if not bounds.grow(-margin).has_point(candidate):continue
+				if candidate.distance_squared_to(at)<distance:
+					best=candidate
+					distance=candidate.distance_squared_to(at)
+			if best!=point:
+				point=best
+				changed=true
+		if not changed:break
+	return point
+
+## 壁の厚みと重なる物を、回収・戦闘可能な内側へずらす。
+func _clear_footprint(actor: BossActor)->void:
+	var t:=actor.table
+	# 岩の配置元も更新し、次のstream更新で壁の中へ戻ることを防ぐ。
+	for rock in field.rocks:
+		if rock.destroyed:continue
+		var current: Vector2=field._rock_at(rock,actor.run_state.world_time)[0]
+		var cleared:=_clear_point(current,rock.size)
+		if cleared==current:continue
+		rock.pos=cleared
+		rock.vel=Vector2.ZERO
+	for i in t.alive.size():
+		if not t.alive[i] or t.dead[i] or i==actor.body:continue
+		var at:=_clear_point(t.pos[i],t.r[i])
+		if at!=t.pos[i]:
+			t.pos[i]=at
+			t.vel[i]=Vector2.ZERO
+	var pickups: PickupManager=actor.manager.projectiles.combat.pickups
+	for i in pickups.gem_alive.size():
+		if pickups.gem_alive[i]:
+			var at:=_clear_point(pickups.gem_pos[i],12.0)
+			if at!=pickups.gem_pos[i]:
+				pickups.gem_pos[i]=at
+				pickups.gem_vel[i]=Vector2.ZERO
+	for i in pickups.coin_alive.size():
+		if pickups.coin_alive[i]:pickups.coin_pos[i]=_clear_point(pickups.coin_pos[i],12.0)
+	for capsule: Pickup in pickups.capsules:capsule.pos=_clear_point(capsule.pos,24.0)
+
+func _clear_point(at: Vector2, radius: float)->Vector2:
+	var outer:=bounds.grow(thickness+80.0+radius)
+	if not outer.has_point(at):return at
+	if bounds.has_point(at):return safe_point(at,radius+12.0)
+	var inner:=bounds.grow(-radius-12.0)
+	var inward:=at.clamp(inner.position,inner.end)
+	# 壁のすぐ外の物も回収・戦闘可能な内側へ退避する。遠方の物には触れない。
+	return safe_point(inward,radius+12.0)
 
 func release() -> void:
 	if field != null: field.battle_arenas.erase(owner_id)

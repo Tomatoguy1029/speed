@@ -27,7 +27,8 @@ func prepare()->void:
 		var rect: Rect2=a.run_state.view_rect().intersection(a.arena.bounds).grow(-float(a.def.params.formation_margin))
 		for i in a.participants.size():
 			var angle: float=TAU*float(i)/a.participants.size()
-			state.slots.append(rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45))
+			var slot: Vector2=rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45)
+			state.slots.append(a.arena.safe_point(slot,a.table.r[a.participants[i].row]+12.0))
 		if a.tech==&"grid":
 			state.plan=a.grid_plan()
 			state.slots.clear()

@@ -350,7 +350,15 @@ func _neck_base(neck: Neck) -> Vector2:
 
 func _head_pos(neck: Neck) -> Vector2:
 	var at := _unbounded_head_pos(neck)
-	return arena.clamp_point(at,table.r[neck.row] if _alive(neck) else 40.0) if arena != null else at
+	var radius: float=table.r[neck.row] if _alive(neck) else 40.0
+	if arena==null:return at
+	# 高速の伸長も天体の手前で止め、反対側へ抜けてから押し出すことを防ぐ。
+	if _alive(neck):
+		var hit=manager.field.first_body_hit(table.pos[neck.row],at,radius)
+		if hit!=null and hit.body!=null:
+			var normal: Vector2=(hit.point-hit.body.pos).normalized()
+			at=hit.body.pos+normal*(hit.body.r+radius+0.1)
+	return arena.safe_point(at,radius)
 
 func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
@@ -437,7 +445,7 @@ func _extend_regrow_grace(combo_scale: float) -> void:
 func _follow_neck(neck: Neck, dt: float) -> void:
 	if separated:
 		SNAKE.follow(neck,_head_pos(neck),dt,_time,def.params)
-		for i in neck.segs.size():neck.segs[i]=arena.clamp_point(neck.segs[i],24.0)
+		for i in neck.segs.size():neck.segs[i]=arena.safe_point(neck.segs[i],24.0)
 		return
 	var rest := float(def.params.neck_rest)
 	if neck.row < 0:
@@ -466,7 +474,8 @@ func start_normal(index: int, attack: StringName) -> bool:
 	if not normal_ready(index,attack): return false
 	var n := necks[index]
 	var director=manager.projectiles.director
-	if director!=null:
+	# 通常ランの雑魚枠と、首同士のnormal_budgetを独立させる。
+	if director!=null and not director.formation_mode:
 		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
 		var cost: float=float(def.params.normal_rules[attack].cost)*maxf(0.0,table.attack_value[n.row])
 		if not director.request("neck:"+str(n.row_id),cats,n.row,n.row_id,4.0,table.attack_priority[n.row],cost):return false
@@ -606,7 +615,8 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if busy or not attack_ready(attack):
 		return false
 	if not timeline.has_animation(attack):return false
-	if manager.projectiles.director!=null and not manager.projectiles.director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(def.params.major_cost)):
+	var director=manager.projectiles.director
+	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(def.params.major_cost)):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
 	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
@@ -950,6 +960,7 @@ func tick_bearer(dt: float)->void:
 		n.t=0.0
 		n.locked=false
 		n.step=0
+		n.target=run_state.ship_pos
 		_cue(&"warning_started",&"bite_thrust",-2)
 	else:
 		n.cd=maxf(0.0,n.cd-dt)
@@ -976,14 +987,45 @@ func head_index(n: Neck)->int:
 	return -2 if n==immortal_neck else necks.find(n)
 
 func grid_plan()->Dictionary:
+	if not separated or immortal_row<0:return {}
 	var maximum: float=manager.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/manager.cfg.base_max_speed
-	return GRID.build(run_state.view_rect().intersection(arena.bounds),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
+	var plan: Dictionary=GRID.build(run_state.view_rect().intersection(arena.bounds),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
+	if plan.is_empty():return plan
+	var head_radius:=0.0
+	for n in necks:
+		if _alive(n):head_radius=maxf(head_radius,table.r[n.row])
+	# 天体の中の配置へ泳ぎ続ける大技を選ばず、通常戦闘と別の技を続ける。
+	for obstacle in manager.field.bodies:
+		if Vector2(plan.bearer).distance_to(obstacle.pos)<obstacle.r+table.r[immortal_row]:return {}
+		for beam in plan.beams:
+			if Vector2(beam[0]).distance_to(obstacle.pos)<obstacle.r+head_radius:return {}
+		for i in range(1,plan.path.size()):
+			if Geom.seg_circle_t(plan.path[i-1],plan.path[i],obstacle.pos,obstacle.r+manager.cfg.ship_radius)>=0.0:return {}
+	return plan
 
 ## 通常移動は胴の長さぶん手前で回り込み、陣形への移動は指定された内側の配置へ進む。
 func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formation:=false) -> void:
 	var radius: float=table.r[n.row]
 	var margin:=radius+12.0 if formation else float(def.params.neck_rest)+radius+24.0
-	SNAKE.steer(n,arena.clamp_point(target,margin),dt,def.params,speed_scale)
+	var from: Vector2=arena.safe_point(n.free_pos,radius+1.0)
+	n.free_pos=from
+	var destination: Vector2=arena.safe_point(target,margin)
+	# 障害物へ直進して停止する代わりに、その手前から表面に沿って回り込む。
+	for obstacle in manager.field.bodies:
+		var clearance: float=obstacle.r+radius+60.0
+		if from.distance_to(obstacle.pos)<clearance+120.0 and Geom.seg_circle_t(from,destination,obstacle.pos,clearance)>=0.0:
+			var outward: Vector2=(from-obstacle.pos).normalized()
+			if outward.is_zero_approx():outward=Vector2.RIGHT
+			var turn:=signf(outward.cross(destination-obstacle.pos))
+			if turn==0.0:turn=1.0
+			destination=arena.safe_point(obstacle.pos+outward.rotated(turn*0.6)*clearance,radius+1.0)
+			break
+	SNAKE.steer(n,destination,dt,def.params,speed_scale)
+	table.pos[n.row]=n.free_pos
+	table.vel[n.row]=n.velocity
+	manager.field.collide_enemy(n.row,from)
+	n.free_pos=arena.safe_point(table.pos[n.row],radius+1.0)
+	n.velocity=table.vel[n.row]
 	var inside: Vector2=arena.clamp_point(n.free_pos,radius)
 	if inside!=n.free_pos:
 		var inward: Vector2=(inside-n.free_pos).normalized()
