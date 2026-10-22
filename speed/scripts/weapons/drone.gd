@@ -50,26 +50,26 @@ func tick(dt: float, busy: bool) -> void:
 	for d in drones:
 		var target := _nearest(d.pos, float(p("range")))
 		if target >= 0:
-			build.projectiles.fire_shot(d.pos, (build.enemies.table.pos[target] - d.pos).angle(), atk() * float(p("damage")) * dmg_k(),
+			ctx.projectiles.fire_shot(d.pos, (ctx.enemies.table.pos[target] - d.pos).angle(), atk() * float(p("damage")) * dmg_k(),
 				{"color": Color("#a8ffdb"), "r": 4.0})
 
 func _hit_along(d: Dictionary, a: Vector2, b: Vector2, now: float) -> void:
 	var radius := 14.0 * cfg.character_scale
 	var pad := Vector2.ONE * radius
-	build.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _buf)
-	var t := build.enemies.table
+	ctx.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _buf)
+	var t := ctx.enemies.table
 	for i in _buf:
 		if t.dead[i] != 0 or float(d.hits.get(t.id[i], -1.0)) > now:
 			continue
 		if Geom.seg_circle_t(a, b, t.pos[i], t.r[i] + radius) < 0.0:
 			continue
 		d.hits[t.id[i]] = now + float(p("contact_cd"))
-		build.combat.damage_enemy(i, atk() * dmg_k() * float(p("contact_damage")), {"cause": &"drone"})
+		ctx.combat.damage_enemy(i, atk() * dmg_k() * float(p("contact_damage")), {"cause": &"drone"})
 
 ## 近くの敵の行番号（いなければ -1）。隕石は狙わない。
 func _nearest(from: Vector2, range_r: float) -> int:
-	build.combat.nearby(from, range_r, _buf)
-	var t := build.enemies.table
+	ctx.combat.nearby(from, range_r, _buf)
+	var t := ctx.enemies.table
 	var best := -1
 	var bd := range_r * range_r
 	for i in _buf:

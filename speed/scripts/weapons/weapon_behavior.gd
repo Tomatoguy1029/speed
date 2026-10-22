@@ -5,17 +5,17 @@
 class_name WeaponBehavior
 extends RefCounted
 
-var build: LoadoutSystem
+var ctx: RunContext
 var def: WeaponDef
 var level := 1
 
 var state: RunState:
-	get: return build.state
+	get: return ctx.state
 var cfg: GameConfig:
-	get: return build.cfg
+	get: return ctx.cfg
 
-func setup(b: LoadoutSystem, d: WeaponDef) -> void:
-	build = b
+func setup(context: RunContext, d: WeaponDef) -> void:
+	ctx = context
 	def = d
 
 ## 表示 Lv に対応する性能段階（仕様書 8）。
@@ -36,7 +36,7 @@ func p(key: String, default = 0.0):
 	return def.params.get(key, default)
 
 func atk() -> float:
-	return build.combat.attack_power()
+	return ctx.combat.attack_power()
 
 # ── 発動のきっかけ ─────────────────────────────────────────────────
 ## 固定更新ごと。busy は描画中・なぞり中（このときは周期の攻撃を休む）

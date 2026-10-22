@@ -11,14 +11,14 @@ func _dmg() -> float:
 	return atk() * float(p("damage")) * dmg_k()
 
 func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	var v := _speed()
 	if t.dead[i] != 0:
-		if t.hull_scattered[i] == 0 and not build.projectiles.scatter_hull(i, dir, v, _dmg()):
-			build.projectiles.fling_corpse(i, dir * v, _dmg())
+		if t.hull_scattered[i] == 0 and not ctx.projectiles.scatter_hull(i, dir, v, _dmg()):
+			ctx.projectiles.fling_corpse(i, dir * v, _dmg())
 	else:
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
-		var push := build.enemies.knockback_scale(i)
+		var push := ctx.enemies.knockback_scale(i)
 		if push <= 0.0:
 			return
 		t.shove_time[i] = p("shove_time")
@@ -29,7 +29,7 @@ func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
 
 ## 押し出されている敵が、ほかの敵にぶつかったらダメージを与える。
 func tick(_dt: float, _busy: bool) -> void:
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	var shoved := t.shoved
 	for i in shoved.size():
 		if shoved[i] == 0 or t.alive[i] == 0:
@@ -42,7 +42,7 @@ func tick(_dt: float, _busy: bool) -> void:
 		var r := t.r[i]
 		var pad := Vector2(r, r)
 		var hits: Dictionary = t.shove_hits[i]
-		build.combat.in_rect(from.min(pos) - pad, from.max(pos) + pad, _buf)
+		ctx.combat.in_rect(from.min(pos) - pad, from.max(pos) + pad, _buf)
 		for other in _buf:
 			if other == i or hits.has(t.id[other]):
 				continue
@@ -51,7 +51,7 @@ func tick(_dt: float, _busy: bool) -> void:
 			hits[t.id[other]] = true
 			var sv := t.shove_vel[i]
 			var sp := sv.length()
-			build.combat.damage_enemy(other, t.shove_dmg[i], {"cause": &"knockbackChain", "no_crit": true, "dir": sv / sp if sp > 0.0 else Vector2.ZERO, "knock": p("chain_knock")})
+			ctx.combat.damage_enemy(other, t.shove_dmg[i], {"cause": &"knockbackChain", "no_crit": true, "dir": sv / sp if sp > 0.0 else Vector2.ZERO, "knock": p("chain_knock")})
 			state.emit(&"ring", {"pos": t.pos[other], "radius": t.r[other] + 30.0, "color": Color("#ff986b"), "life": 0.25})
 			if state.phase != RunState.Phase.PLAY:
 				return

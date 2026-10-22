@@ -22,13 +22,13 @@ func on_end() -> void:
 	var u := d / length
 	var width := float(p("width")) * radius_k()
 	var pad := Vector2(width / 2.0, width / 2.0)
-	build.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
+	ctx.combat.in_rect(from.min(to) - pad, from.max(to) + pad, _buf)
 	var dmg := atk() * float(p("damage")) * dmg_k()
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	for i in _buf:
 		if t.dead[i] != 0 or Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + width / 2.0) < 0.0:
 			continue
-		build.combat.damage_enemy(i, dmg, {"cause": &"bipolar", "dir": u, "knock": p("knock")})
+		ctx.combat.damage_enemy(i, dmg, {"cause": &"bipolar", "dir": u, "knock": p("knock")})
 		if state.phase != RunState.Phase.PLAY:
 			return
 	var color := Color(p("color", "#69fff0"))

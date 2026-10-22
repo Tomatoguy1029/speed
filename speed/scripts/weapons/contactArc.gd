@@ -5,7 +5,7 @@ extends WeaponBehavior
 var _buf := PackedInt32Array()
 
 func on_any_contact(target: int) -> void:
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	if t.meteor_index[target] >= 0:
 		return
 	var dmg := atk() * float(p("damage")) * dmg_k()
@@ -13,7 +13,7 @@ func on_any_contact(target: int) -> void:
 	var origin := t.pos[target]
 	var segments := PackedVector2Array([state.ship_pos, origin])
 	if t.dead[target] == 0:
-		build.combat.damage_enemy(target, dmg, {"cause": &"contactArc"})
+		ctx.combat.damage_enemy(target, dmg, {"cause": &"contactArc"})
 	var reach: float = p("range")
 	var remaining := level * int(p("chains_per_level"))
 	var tips: Array[Vector2] = []
@@ -47,8 +47,8 @@ func on_any_contact(target: int) -> void:
 func _roots(origin: Vector2, reach: float, used: Dictionary, count: int) -> PackedInt32Array:
 	if count <= 0:
 		return PackedInt32Array()
-	build.combat.nearby(origin, reach, _buf)
-	var t := build.enemies.table
+	ctx.combat.nearby(origin, reach, _buf)
+	var t := ctx.enemies.table
 	var roots := PackedInt32Array()
 	roots.resize(count)
 	roots.fill(-1)
@@ -72,8 +72,8 @@ func _roots(origin: Vector2, reach: float, used: Dictionary, count: int) -> Pack
 	return occupied
 
 func _nearest(from: Vector2, reach: float, used: Dictionary) -> int:
-	build.combat.nearby(from, reach, _buf)
-	var t := build.enemies.table
+	ctx.combat.nearby(from, reach, _buf)
+	var t := ctx.enemies.table
 	var next := -1
 	var best := reach * reach
 	for i in _buf:
@@ -88,10 +88,10 @@ func _nearest(from: Vector2, reach: float, used: Dictionary) -> int:
 	return next
 
 func _strike(from: Vector2, next: int, dmg: float, used: Dictionary, segments: PackedVector2Array) -> Vector2:
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	used[t.id[next]] = true
 	var pos := t.pos[next]
 	segments.append(from)
 	segments.append(pos)
-	build.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized()})
+	ctx.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized()})
 	return pos

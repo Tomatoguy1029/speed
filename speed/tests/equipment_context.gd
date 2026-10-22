@@ -21,6 +21,19 @@ func _ready() -> void:
 				behavior.setup(session.sim.ctx, TraitDef.new())
 				check(behavior.state == session.sim.state and behavior.cfg == session.sim.cfg, "特性は自分のランだけを参照する")
 				behavior.ctx = null
+	for session in [a, b]:
+		for path in DirAccess.get_files_at("res://scripts/weapons"):
+			if not path.ends_with(".gd"):
+				continue
+			var behavior = load("res://scripts/weapons/" + path).new()
+			var props := {}
+			for prop in behavior.get_property_list():
+				props[prop.name] = true
+			check(props.has("ctx") and not props.has("build"), "%sはRunContextを受け取る" % path)
+			if props.has("ctx"):
+				behavior.setup(session.sim.ctx, WeaponDef.new())
+				check(behavior.state == session.sim.state, "武器は自分のランだけを参照する")
+				behavior.ctx = null
 	a.free()
 	b.free()
 	await get_tree().process_frame

@@ -6,7 +6,7 @@ var _t := 0.0
 func _fire() -> void:
 	var damage_by_level: Array = p("damage_by_level")
 	var index := clampi(level, 1, damage_by_level.size()) - 1
-	build.run_sonic(&"sonic", float(p("radius")) * radius_k(), atk() * float(damage_by_level[index]), p("knock"), p("travel"))
+	ctx.loadout.run_sonic(&"sonic", float(p("radius")) * radius_k(), atk() * float(damage_by_level[index]), p("knock"), p("travel"))
 
 func on_launch(_full: bool) -> void:
 	_fire()

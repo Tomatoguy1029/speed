@@ -38,7 +38,7 @@ func verify() -> void:
 	em.table.dead[dead] = 1
 	combat.rebuild_grid()
 	var arc = load("res://scripts/weapons/contactArc.gd").new()
-	arc.setup(build, load("res://data/weapons/W17_contactArc.tres"))
+	arc.setup(context, load("res://data/weapons/W17_contactArc.tres"))
 	var visual_segments := PackedVector2Array()
 	for lv in range(1, 6):
 		arc.level = lv

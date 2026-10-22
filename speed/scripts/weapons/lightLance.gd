@@ -30,8 +30,8 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 	var start := p0 + dir * nose
 	var end := p1 + dir * reach()
 	var pad := Vector2.ONE * width
-	build.combat.in_rect(start.min(end) - pad, start.max(end) + pad, _rows)
-	var t := build.enemies.table
+	ctx.combat.in_rect(start.min(end) - pad, start.max(end) + pad, _rows)
+	var t := ctx.enemies.table
 	var damage := atk() * level_value("damage_by_level")
 	for i in _rows:
 		if t.dead[i] != 0 or _hit_ids.has(t.id[i]):
@@ -42,7 +42,7 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 		_hit_ids[t.id[i]] = true
 		# damage_enemy が盾・特殊撃破条件・無敵を扱う。武器直撃はクリティカルを再抽選しない。
 		var before := t.hp[i]
-		build.combat.damage_enemy(i, damage, {"cause": &"lightLance", "dir": dir,
+		ctx.combat.damage_enemy(i, damage, {"cause": &"lightLance", "dir": dir,
 			"impact": start.lerp(end, hit_t), "knock": 0.0, "no_crit": true})
 		if t.hp[i] < before:
 			state.emit(&"lance_hit", {"pos": start.lerp(end, hit_t), "dir": dir, "level": level})
