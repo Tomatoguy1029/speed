@@ -37,6 +37,8 @@ static func build_all(force := false, output := ROOT) -> Error:
 	var outputs := [catalog_path]
 	for file in DirAccess.get_files_at(output):
 		if file.get_extension() in ["tres", "res"]: outputs.append(output.path_join(file))
+	for file in DirAccess.get_files_at(output.path_join("dev")):
+		if file.ends_with(".json"): outputs.append(output.path_join("dev").path_join(file))
 	var stamp := FileAccess.open(output.path_join("stamp.json"), FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))

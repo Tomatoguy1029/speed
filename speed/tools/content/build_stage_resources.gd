@@ -17,6 +17,10 @@ static func _script(paths: Dictionary, path: String) -> String:
 static func _attack(paths: Dictionary, kind: String) -> void:
 	_script(paths, "res://scripts/attacks/%s.gd" % kind)
 	_script(paths, "res://scripts/render/attacks/%s.gd" % kind)
+	if kind in ["zone", "beam"]:
+		for file in DirAccess.get_files_at("res://scripts/render/attacks"):
+			if file.begins_with(kind + "_") and file.ends_with(".gd") and file != "beam_flood.gd":
+				_script(paths, "res://scripts/render/attacks/" + file)
 	if kind in ["enemy", "ring_hold", "lump"]:
 		_script(paths, "res://scripts/attacks/bullet.gd")
 		_script(paths, "res://scripts/render/attacks/bullet.gd")
@@ -25,6 +29,7 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 		_script(paths, "res://scripts/render/attacks/missile.gd")
 	if kind in ["cross", "flood"]: _script(paths, "res://scripts/render/attacks/beam.gd")
 	if kind == "flood":
+		_script(paths, "res://scripts/render/attacks/beam_flood.gd")
 		_script(paths, "res://scripts/render/attacks/flood.gd")
 		_add(paths, "res://shaders/water_flood.gdshader")
 	if kind == "rings": _script(paths, "res://scripts/render/attacks/wave.gd")

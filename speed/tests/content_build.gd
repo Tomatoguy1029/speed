@@ -16,5 +16,8 @@ func _ready() -> void:
 		DirAccess.remove_absolute(output + "/stage_1.tres")
 		check(not builder.is_current(output), "生成物の欠落を検出する")
 		check(builder.build_all(false, output) == OK and builder.is_current(output), "欠落した生成物を作り直せる")
+		DirAccess.remove_absolute(output + "/dev/stage_1.json")
+		check(not builder.is_current(output), "開発用の名前の対応表の欠落も検出する")
+		check(builder.build_all(false, output) == OK and builder.is_current(output), "欠落した対応表を作り直せる")
 	print("[content_build] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)

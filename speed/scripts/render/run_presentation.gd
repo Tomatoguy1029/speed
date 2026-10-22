@@ -990,7 +990,7 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
 	for i in pr.hazard_alive.size():
 		if pr.hazard_alive[i] != 0:
-			_attack_visual(ProjectileSystem.HazardKind.keys()[pr.hazard_kind[i]]).draw_hazard(c, pr, i, view)
+			_hazard_visual(pr, i).draw_hazard(c, pr, i, view)
 
 func _draw_path_band(c: CanvasItem) -> void:
 	# ふたご座：取っておいた1本目と、双子の機体がなぞる線
@@ -1110,6 +1110,12 @@ func _attack_visual(kind: String) -> AttackVisual:
 		visual.setup(self)
 		_attack_visuals[key] = visual
 	return _attack_visuals[key]
+
+func _hazard_visual(pr: ProjectileSystem, i: int) -> AttackVisual:
+	var kind: String = ProjectileSystem.HazardKind.keys()[pr.hazard_kind[i]].to_lower()
+	var style: String = ProjectileSystem.HazardStyle.keys()[pr.hazard_style[i]].to_lower()
+	var name := kind + "_" + style
+	return _attack_visual(name if ResourceLoader.exists("res://scripts/render/attacks/%s.gd" % name) else kind)
 
 func flood() -> AttackVisual:
 	return _attack_visual("flood")

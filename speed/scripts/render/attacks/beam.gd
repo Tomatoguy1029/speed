@@ -5,16 +5,10 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 	var p := pr.hazard_pos[i]
 	var t := pr.hazard_t[i]
 	var delay := pr.hazard_delay[i]
-	var col := pr.hazard_color[i]
-	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.LIGHTNING:
-		col = PIXEL_LIGHTNING.COLOR
+	var col := _color(pr, i)
 	var len := pr.hazard_len[i]
 	var charging := t < delay
 	var k := clampf(t / maxf(delay, 0.001), 0.0, 1.0)
-	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.FLOOD:
-		# 広がるビームは水流の見た目が水の層に描く
-		rm.flood()
-		return
 	if charging:
 		# 砲口に光が集まっていく
 		c.draw_circle(p, _px(4.0) + 10.0 * k, Color(col, 0.25 + 0.5 * k))
@@ -27,3 +21,6 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 	c.draw_line(p, b, Color(col, 0.35 * fade), w * 1.6)
 	c.draw_line(p, b, Color(col, 0.9 * fade), w)
 	c.draw_line(p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
+
+func _color(pr: ProjectileSystem, i: int) -> Color:
+	return pr.hazard_color[i]
