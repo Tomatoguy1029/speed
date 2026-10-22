@@ -14,7 +14,7 @@ static func length(path: PackedVector2Array) -> float:
 	return value
 
 static func validate(session, path: PackedVector2Array, margin := 20.0, window := 0.0, draw_seconds := 0.5, exit_clearance := 0.0) -> Dictionary:
-	var run: RunManager = session.run
+	var run: RunSimulation = session.run
 	exit_clearance = maxf(0, exit_clearance)
 	var blockers := []
 	var fodder := []
@@ -103,5 +103,5 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		"digest": session.digest(), "critical_dependent": false, "horizon": horizon, "draw_seconds": draw_seconds, "exit_clearance": exit_clearance}
 
 ## 入力点の省略と角の補正で線が寄る範囲も、通過する円に加える。
-static func sweep_radius(run: RunManager, margin: float) -> float:
+static func sweep_radius(run: RunSimulation, margin: float) -> float:
 	return run.cfg.ship_radius + maxf(0, margin) + run.cfg.draw_step + 2.5 / maxf(run.state.camera_zoom, 0.01)

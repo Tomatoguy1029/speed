@@ -12,7 +12,6 @@ const SCREENS := {
 	GameManager.Screen.STAGE_SELECT: "res://scenes/app/title.tscn",
 	GameManager.Screen.UPGRADE: "res://scenes/app/upgrade.tscn",
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
-	GameManager.Screen.RUN: "res://scenes/run/run.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
 	GameManager.Screen.ENEMY_LAB: "res://gyms/enemy_lab/enemy_lab.tscn",
 }
@@ -81,8 +80,10 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	if _current != null:
 		_current.queue_free()
 		_current = null
-	var scene := load(SCREENS[screen]) as PackedScene
-	_current = scene.instantiate()
+	if screen == GameManager.Screen.RUN:
+		_current = RunManager.create_run()
+	else:
+		_current = (load(SCREENS[screen]) as PackedScene).instantiate()
 	if morph:
 		_current.set_meta("fade_from_menu", true)
 	if return_morph:

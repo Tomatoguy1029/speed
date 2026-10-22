@@ -1,6 +1,6 @@
 ## 描画の流れ（設計書 10）。ゲームの状態とイベントを読むだけで、状態は書き換えない。
 ##
-## World の下に層（DrawLayer）を作り、層ごとに描く。カメラは RunManager が求めた位置とズームに合わせる。
+## World の下に層（DrawLayer）を作り、層ごとに描く。カメラは RunSimulation が求めた位置とズームに合わせる。
 ## 敵と天体は透過ピクセルスプライト。見分けのルール（仕様書 17）を保つ。
 class_name RenderManager
 extends Node
@@ -71,7 +71,8 @@ const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
 @export_range(0, 200) var finish_particles := 80
 @export_range(0.1, 3.0) var finish_wave_seconds := 0.8
 
-var run: RunManager
+## RunSession が木に入れる前に入れる
+var run: RunSimulation
 var state: RunState
 var cfg: GameConfig
 
@@ -139,7 +140,6 @@ var _dash_range_drone: Node2D
 var _afterimage: Node2D
 
 func _ready() -> void:
-	run = get_node("../RunManager") as RunManager
 	state = run.state
 	cfg = run.cfg
 	_font = ThemeDB.fallback_font
@@ -365,10 +365,10 @@ func _process(delta: float) -> void:
 		shake = 0.0
 	_update_fx(dt)
 	_update_exhaust(dt)
-	_glide_wake.step(dt, state, cfg, run.build.weapon_behaviors.has(&"W08"))
-	_light_lance.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W24"), cam_zoom)
-	_dash_range_drone.step(run.build.weapon_behaviors.get(&"W26"), cfg, cam_zoom)
-	_afterimage.step(dt, state, cfg, run.build.weapon_behaviors.get(&"W27"))
+	_glide_wake.step(dt, state, cfg, run.loadout.weapon_behaviors.has(&"W08"))
+	_light_lance.step(dt, state, cfg, run.loadout.weapon_behaviors.get(&"W24"), cam_zoom)
+	_dash_range_drone.step(run.loadout.weapon_behaviors.get(&"W26"), cfg, cam_zoom)
+	_afterimage.step(dt, state, cfg, run.loadout.weapon_behaviors.get(&"W27"))
 	_update_view()
 	var offset := Vector2.ZERO
 	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
@@ -1744,7 +1744,7 @@ func _draw_path(c: CanvasItem) -> void:
 
 ## 武器・特性が残すもの（機雷・ドローン・渦）。
 func _draw_build_objects(c: CanvasItem) -> void:
-	var b := run.build
+	var b := run.loadout
 	var mines = b.weapon_behaviors.get(&"W07")
 	if mines != null:
 		for m in mines.mines:
@@ -1859,7 +1859,7 @@ func _update_exhaust(dt: float) -> void:
 		_exhaust.pop_front()
 
 func _draw_exhaust(c: CanvasItem) -> void:
-	var sonic := run.build.weapon_behaviors.has(&"W08")
+	var sonic := run.loadout.weapon_behaviors.has(&"W08")
 	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
 	for i in range(1, _exhaust.size()):
 		var fade: float = _exhaust[i - 1].life / 0.24
@@ -1896,7 +1896,7 @@ func _draw_ship(c: CanvasItem) -> void:
 	var size := AIRSHIP.get_size() * cfg.character_scale
 	c.draw_set_transform(p, dir.angle() + PI / 2.0)
 	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
-	var weapons := run.build.weapon_behaviors
+	var weapons := run.loadout.weapon_behaviors
 	if weapons.has(&"W01") or weapons.has(&"W02"):
 		c.draw_texture_rect(AIRSHIP_CANON, rect, false, col)
 	c.draw_texture_rect(AIRSHIP, rect, false, col)
@@ -1909,7 +1909,7 @@ func _draw_ship(c: CanvasItem) -> void:
 		attachments.append(AIRSHIP_MINE)
 	for attachment in attachments:
 		c.draw_texture_rect(attachment, rect, false, col)
-	var rear = run.build.weapon_behaviors.get(&"W23")
+	var rear = run.loadout.weapon_behaviors.get(&"W23")
 	if rear != null:
 		c.draw_texture_rect(AIRSHIP_TURRET_BASE,
 			Rect2(Vector2(-AIRSHIP_TURRET_BASE.get_width() / 2.0, -20.0) * cfg.character_scale,

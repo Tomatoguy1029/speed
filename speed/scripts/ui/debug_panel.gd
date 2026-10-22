@@ -1,10 +1,9 @@
 ## 調整パネル（仕様書 20）。開発版だけで P キーで開く。
 ##
-## ランの状態は RunManager への命令で変え、調整値は ConfigManager の実行時の複製（cfg）だけを書き換える。
+## ランの状態は RunSimulation への命令で変え、調整値は ConfigManager の実行時の複製（cfg）だけを書き換える。
 ## 「既定値に戻す」で .tres の値に戻る。.tres そのものは書き換えない（設計書 8.3）。
 extends PanelContainer
 
-@export var run_path: NodePath
 
 ## 調整できる値：項目名、表示名、最小、最大、刻み
 const SLIDERS := [
@@ -28,7 +27,8 @@ const SLIDERS := [
 	["trait_slots", "特性の枠", 1.0, 12.0, 1.0],
 ]
 
-var run: RunManager
+## RunSession が木に入れる前に入れる
+var run: RunSimulation
 var _module: OptionButton
 var _levels: SpinBox
 var _enemy_count: SpinBox
@@ -38,7 +38,6 @@ var _meta_boxes: Dictionary = {}
 var _status: Label
 
 func _ready() -> void:
-	run = get_node(run_path) as RunManager
 	visible = false
 	if not OS.is_debug_build():
 		queue_free()
@@ -246,7 +245,7 @@ func _refresh_sliders() -> void:
 		_sliders[key][1].text = "%s %s" % [_sliders[key][2], str(snappedf(float(v), 0.01))]
 
 func _reset_defaults() -> void:
-	# 実行時の複製の中身を .tres の値に戻す（RunManager などが同じ複製を持っているため、中身を書き戻す）
+	# 実行時の複製の中身を .tres の値に戻す（RunSimulation などが同じ複製を持っているため、中身を書き戻す）
 	var base := ConfigManager.base
 	for prop in base.get_property_list():
 		if prop.usage & PROPERTY_USAGE_SCRIPT_VARIABLE:

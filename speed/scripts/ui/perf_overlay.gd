@@ -5,7 +5,6 @@
 class_name PerfOverlay
 extends PanelContainer
 
-@export var run_path: NodePath
 
 enum Mode { HIDDEN, COMPACT, DETAIL }
 
@@ -22,7 +21,8 @@ const HEAD := "[color=#9fe8ff]%s[/color]"
 static var saved_mode := Mode.HIDDEN
 static var _saved_pos := Vector2(-1, -1)
 
-var run: RunManager
+## RunSession が木に入れる前に入れる
+var run: RunSimulation
 var mode := Mode.HIDDEN
 var _label: RichTextLabel
 var _graph: Control
@@ -39,7 +39,7 @@ var _frame_sum := 0.0
 var _frame_max := 0.0
 var _frame_n := 0
 var _compiles_prev := -1
-## RunManager の計測をこの表示が有効にしたか
+## RunSimulation の計測をこの表示が有効にしたか
 var _owns_profiling := false
 var _dragging := false
 var _drag_offset := Vector2.ZERO
@@ -49,7 +49,6 @@ func _ready() -> void:
 	if not OS.is_debug_build():
 		queue_free()
 		return
-	run = get_node(run_path) as RunManager
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.02, 0.03, 0.06, 0.88)

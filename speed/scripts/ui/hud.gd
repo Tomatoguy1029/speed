@@ -1,4 +1,4 @@
-## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunManager に命令として渡す。
+## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunSimulation に命令として渡す。
 ##
 ## 時間・経験値バー・状態の文字・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
@@ -36,7 +36,6 @@ var show_status := true
 const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
-@export var run_path: NodePath
 ## カードを表示してから選択を受け付けるまでの実秒。
 @export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
 
@@ -61,7 +60,8 @@ var _card_discard: Dictionary = {}
 var _legendary_reveal: Control
 var _finish_skip: Button
 var _rewards: Control
-var run: RunManager
+## RunSession が木に入れる前に入れる
+var run: RunSimulation
 var _font: Font
 var _cards_box: Control
 var _reroll_button: Button
@@ -93,7 +93,6 @@ var _ring_pulse_t := 0.0
 var _pause_after_reward := false
 
 func _ready() -> void:
-	run = get_node(run_path) as RunManager
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -722,7 +721,7 @@ func _draw() -> void:
 		_draw_bar(HEALTH, _health_fill, hp, health_color)
 		draw_string(_font, Vector2(7, 40), "%d/%d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CYAN)
 		draw_string(_font, Vector2(7, 52), "ATK %.1f  %s  Lv %d  %s" % [run.combat.attack_power(), tr("hud.kills").format({n = s.kills}), s.level, tr("common.parts").format({n = s.coins})], HORIZONTAL_ALIGNMENT_LEFT, 260, 8, CYAN)
-		_draw_bar(EXPERIENCE, _experience_fill, s.xp / run.build.xp_needed(), Color("#b8a0ff"))
+		_draw_bar(EXPERIENCE, _experience_fill, s.xp / run.loadout.xp_needed(), Color("#b8a0ff"))
 		draw_string(_font, Vector2(280, 23), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 15, CYAN)
 		if s.bonus_t > 0.0:
 			draw_string(_font, Vector2(240, 37), tr("hud.bonus").format({n = ceili(s.bonus_t)}), HORIZONTAL_ALIGNMENT_CENTER, 160, 10, CYAN)
