@@ -19,7 +19,7 @@ func prepare()->void:
 		n.step=0
 		n.emission.clear()
 	if a.tech==&"curve":curve(0.0)
-	if a.tech==&"swarm":
+	if a.tech in [&"swarm",&"grid"]:
 		positioning=true
 		state.slots=[]
 		state.arrived={}
@@ -27,6 +27,10 @@ func prepare()->void:
 		for i in a.participants.size():
 			var angle: float=TAU*float(i)/a.participants.size()
 			state.slots.append(rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45))
+		if a.tech==&"grid":
+			state.plan=a.grid_plan()
+			state.slots.clear()
+			for beam in state.plan.beams:state.slots.append(beam[0])
 func tick(dt: float)->void:
 	if not playing:return
 	time+=dt
@@ -36,6 +40,7 @@ func tick(dt: float)->void:
 	elif a.tech==&"debris_shatter":debris_shatter()
 	elif a.tech==&"beam_pincer":beam_pincer()
 	elif a.tech==&"swarm":swarm(dt)
+	elif a.tech==&"grid":grid()
 	for n in a.participants:
 		if a._alive(n):
 			a.table.pos[n.row]=a._head_pos(n)
@@ -162,12 +167,16 @@ func position(dt: float)->bool:
 		var n=a.participants[i]
 		if not a._alive(n):continue
 		if not state.arrived.has(i):
-			a.SNAKE.steer(n,state.slots[i],dt,a.def.params,1.8)
+			if a.tech==&"grid" and n.free_pos.distance_to(state.slots[i])<45.0:
+				n.velocity=(state.slots[i]-n.free_pos).limit_length(100.0)
+				n.free_pos+=n.velocity*dt*4.0
+			else:a.SNAKE.steer(n,state.slots[i],dt,a.def.params,1.8)
 		n.strike_pos=n.free_pos
 		a.table.pos[n.row]=n.free_pos
 		a._follow_neck(n,dt)
-		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.formation_tolerance):state.arrived[i]=true
+		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.grid_tolerance if a.tech==&"grid" else a.def.params.formation_tolerance):state.arrived[i]=true
 		if not state.arrived.has(i):ready=false
+	if a.tech==&"grid" and a.immortal_neck.free_pos.distance_to(state.plan.bearer)>float(a.def.params.grid_tolerance):ready=false
 	if ready:
 		positioning=false
 		for n in a.participants:
@@ -197,3 +206,15 @@ func swarm(dt: float)->void:
 			n.free_pos=n.strike_pos
 			a.attack_field.add_shape(PackedVector2Array([before,n.strike_pos]),float(p.bite_radius),0.0,dt+0.001,float(p.bite_dmg),&"bite",n.row)
 			if f>=1.0:n.mode=&"special_hold"
+
+
+func grid()->void:
+	var p: Dictionary=a.def.params
+	for i in a.participants.size():
+		var n=a.participants[i]
+		if not a._alive(n) or not n.emission.is_empty():continue
+		var points:=PackedVector2Array([n.strike_pos,state.plan.beams[i][1]])
+		n.angle=(points[1]-points[0]).angle()
+		n.emission=a.attack_field.add_shape(points,float(p.beam_width),float(p.normal_charge),float(p.grid_time),float(p.beam_dmg),&"beam",n.row)
+		n.mode=&"special_hold"
+		a._cue(&"attack_started",a.tech,a.necks.find(n))

@@ -42,6 +42,16 @@ technique = "swarm"
 custom_name = "swarm"
 children = [SubResource("ready_swarm"), SubResource("play_swarm")]
 metadata/_weight_ = 1.0
+[sub_resource type="BTCondition" id="ready_grid"]
+script = ExtResource("ready")
+attack = &"grid"
+[sub_resource type="BTAction" id="play_grid"]
+script = ExtResource("play")
+technique = "grid"
+[sub_resource type="BTDynamicSequence" id="grid"]
+custom_name = "grid"
+children = [SubResource("ready_grid"), SubResource("play_grid")]
+metadata/_weight_ = 1.0
 [sub_resource type="BTCondition" id="ready_tornado"]
 script = ExtResource("ready")
 attack = &"tornado"
@@ -75,7 +85,7 @@ metadata/_weight_ = 1.0
 [sub_resource type="BTProbabilitySelector" id="choose"]
 custom_name = "形態・参加者・配置・再使用待ちで大技を選択"
 script = ExtResource("selector")
-children = [SubResource("north"), SubResource("sequence"), SubResource("curve"), SubResource("swarm")]
+children = [SubResource("north"), SubResource("sequence"), SubResource("curve"), SubResource("swarm"), SubResource("grid")]
 [sub_resource type="BTProbabilitySelector" id="combos"]
 custom_name = "共通発動機会のコンボ抽選"
 script = ExtResource("selector")

@@ -28,7 +28,7 @@ func _ready()->void:
 		var curve:=false
 		var tornado_owned:=false
 		var owners: Dictionary={}
-		for i in (400 if name in [&"swarm",&"grid"] else 200):
+		for i in (720 if name==&"grid" else (400 if name==&"swarm" else 200)):
 			a.sim_tick(0.025,0.025)
 			if a.busy:peak=maxi(peak,a.attack_field.effects.size())
 			for e in a.attack_field.effects:
@@ -52,6 +52,9 @@ func _ready()->void:
 			check(a.combo_wait>0.0 and not a.attack_ready(&"tornado"),"combo opportunity consumes a common cooldown")
 		if name==&"debris_shatter":check(events.filter(func(e):return e.cue==&"rubble_shattered").size()==int(a.def.params.rubble_count),"beam intersection shatters each physical rubble once")
 		if name==&"beam_pincer":check(owners.size()==2 and a.participants[0]!=a.participants[1],"two distinct beam heads each own one ray")
+		if name==&"grid":
+			check(owners.size()==8,"all regular kinds participate in finite grid beams")
+			check(not a.special.state.plan.is_empty(),"grid keeps its prevalidated route during performance")
 		check(not a.busy and a.last_tech==name,"tech completes and releases global attack slot")
 		check(a._tech_until.has(name),"completed technique has an individual cooldown")
 	lab.queue_free()

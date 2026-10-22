@@ -17,6 +17,7 @@ signal presentation_advanced(world_dt: float)
 var _presentation: Node
 var _defeat_announced := false
 
+const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
@@ -116,7 +117,7 @@ func _check_growth() -> void:
 ## 強めの技の方位（羅針盤の針が止まる向き。画面の上が北）
 const COMBOS: Array[StringName] = [&"tornado",&"debris_shatter",&"beam_pincer"]
 var combo_wait := 0.0
-const TECH_DIR := {&"swarm": -PI/2.0, &"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
+const TECH_DIR := {&"grid": 0.0, &"swarm": -PI/2.0, &"tornado": PI/2.0, &"debris_shatter": 0.0, &"beam_pincer": PI, &"curve": PI/2.0, &"sequence": 0.0, &"north": -PI / 2.0, &"east": 0.0, &"south": PI / 2.0, &"west": PI}
 
 @onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
@@ -245,7 +246,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
-		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm"]: special.tick(dt)
+		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
 		elif tech == &"east":
 			_shatter_on_beams()
 	if table.hp[body] <= 0.0 and separated and not _defeat_announced:
@@ -808,7 +809,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	if not manager.admit("boss:" + str(table.id[body]), ["dash", "beam", "zone", "aimed"], body, 12.0):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
-	elif attack in [&"curve",&"swarm"]: participants.assign(necks.filter(func(n):return _alive(n)))
+	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
 	elif COMBOS.has(attack):
 		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[attack])
 		combo_wait=float(def.params.combo_cooldown)
@@ -842,6 +843,8 @@ func interrupt_tech(attack: StringName = &"") -> void:
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
 	match name:
+		&"grid":
+			return separated and (participants.any(func(n):return _alive(n)) if busy else not grid_plan().is_empty())
 		&"swarm":
 			return separated and (participants.any(func(n):return _alive(n)) if busy else necks.filter(func(n):return _alive(n)).size()>=2)
 		&"tornado",&"debris_shatter",&"beam_pincer":
@@ -876,7 +879,7 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
-	if name in [&"sequence",&"curve",&"swarm"] or COMBOS.has(name): special.prepare()
+	if name in [&"sequence",&"curve",&"swarm",&"grid"] or COMBOS.has(name): special.prepare()
 	if name == &"north":
 		north_aiming = true
 		_update_north_targets()
@@ -1227,8 +1230,19 @@ func tick_bearer(dt: float)->void:
 	var away: Vector2=(immortal_neck.free_pos-run_state.ship_pos).normalized()
 	if away==Vector2.ZERO:away=Vector2.LEFT
 	var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
-	SNAKE.steer(immortal_neck,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
+	if busy and tech==&"grid" and special.state.has("plan"):
+		target=special.state.plan.bearer
+		if immortal_neck.free_pos.distance_to(target)<float(def.params.grid_tolerance):
+			table.hp[body]=table.hp[immortal_row]
+			return
+	if busy and tech==&"grid" and immortal_neck.free_pos.distance_to(target)<45.0:
+		immortal_neck.free_pos=immortal_neck.free_pos.lerp(target,1.0-exp(-4.0*dt))
+	else:SNAKE.steer(immortal_neck,target,dt,def.params,float(def.params.bearer_speed)/float(def.params.snake_speed))
 	table.pos[immortal_row]=immortal_neck.free_pos
 	table.pos[body]=immortal_neck.free_pos
 	table.hp[body]=table.hp[immortal_row]
 	_follow_neck(immortal_neck,dt)
+
+func grid_plan()->Dictionary:
+	var maximum: float=manager.cfg.draw_length*run_state.stats.capacity*run_state.stats.length_mult*run_state.stats.max_speed/manager.cfg.base_max_speed
+	return GRID.build(run_state.view_rect(),run_state.ship_pos,necks.filter(func(n):return _alive(n)).size(),def.params,manager.cfg.ship_radius,maximum)
