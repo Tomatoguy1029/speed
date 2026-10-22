@@ -12,7 +12,7 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/game/spec.md#201-敵ルート実験場) を参照してください。
 
-ステージ制作は [制作ガイド](docs/game/stage-production.md) から始めます。AIへ実装・記録分析を頼むときは [AI向け資料](docs/game/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stage-4.md) を参照してください。
+ステージ制作は [制作ガイド](docs/dev/stage-production.md) から始めます。AIへ実装・記録分析を頼むときは [AI向け資料](docs/dev/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stages/stage-4.md) を参照してください。
 
 敵・隕石・月・惑星・自機は、素材のある種類を透過ピクセルスプライトで、素材が未制作の敵を仮の図形で表示します。マウスへ機体が向き、左クリックで経路を描き始め、もう一度クリックするとその経路を突進します。Escでポーズ、Pで開発用調整パネルです。アート確認用の静止シーンは `tools/preview_pixel_assets.tscn`（F6で実行）。素材と再生成手順は [ピクセル素材](speed/assets/pixel/README.md) を参照してください。
 
@@ -39,10 +39,11 @@ godot --editor --path speed
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
 | `docs/README.md` | [文書の運用規定](docs/README.md)。文書を触る前に必ず読む |
-| `docs/game/` | 本番の資料：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[設計書](docs/game/architecture.md)・課題 |
-| `docs/game/catalog/` | 武器・特性・敵など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
-| `docs/logs/` | 本番の計測・実装の報告 |
-| `docs/proposals/` | まだ採用していない案 |
+| `docs/game/` | ゲームの決まり：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[ゲーム内文言](docs/game/text.md)・[課題](docs/game/backlog.md) |
+| `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
+| `docs/game/stages/` | ステージ1〜5の個別仕様（例：[ステージ4](docs/game/stages/stage-4.md)） |
+| `docs/game/bosses/` | ボスの個別仕様（[うみへび座](docs/game/bosses/hydra.md)） |
+| `docs/dev/` | 作り方：[設計書](docs/dev/architecture.md)・[ステージ制作ガイド](docs/dev/stage-production.md)・[AI向けの制作参照](docs/dev/stage-production-ai.md) |
 | `demo/docs/` | demo の仕様・課題 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
