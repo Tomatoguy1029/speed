@@ -142,7 +142,7 @@ Manager は特定のステージ・ボス・仕掛けを知らない。コンテ
 | PickupManager | ドロップと回収（10） |
 | HeroManager | 英雄の星座の配置と解放、特別な枠の力の発動とクールダウン、目印の星の選定と位置のヒント（8.1・13.1） |
 | FieldManager | 地形、隕石、フィールドの仕掛け（13） |
-| FinaleManager | ラスボス戦の締め（12.4） |
+| FinaleManager | ラスボス戦の締め（12.4）。未作成 |
 | RenderManager | 描画の流れ（設計書10章） |
 
 **更新の順番**：各 Manager は自分で `_physics_process` を回さず、RunManager が1回の固定更新ごとに次の順で呼ぶ。順番は demo の更新の順番に合わせる（`scripts/managers/run_manager.gd` の `_play_tick`）。
