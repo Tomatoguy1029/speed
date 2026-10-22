@@ -44,7 +44,7 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 ## 800×450 の演出座標。任意で setup(HeroDef) / set_progress(0..1) を受け取る Control シーン。
-@export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
+@export var ult_cutin_scene: PackedScene
 
 var _cards_accept_at := 0
 var _reward_advanced_frame := -1
@@ -56,7 +56,8 @@ var _card_discard: Dictionary = {}
 
 ## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
 @export_group("伝説獲得の仮演出")
-@export var legendary_reveal_scene: PackedScene = preload("res://scenes/run/legendary_reveal.tscn")
+@export var legendary_reveal_scene: PackedScene
+@export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
 var _legendary_reveal: Control
 var _finish_skip: Button
 var _rewards: Control
@@ -162,8 +163,9 @@ func _on_phase(phase: RunState.Phase) -> void:
 		_hero_notice_t = 0.0
 		_draw_button.hide()
 		var definition := run.finish_legendary()
-		if definition != null and legendary_reveal_scene != null:
-			_legendary_reveal = legendary_reveal_scene.instantiate() as Control
+		if definition != null and (legendary_reveal_scene != null or not legendary_reveal_path.is_empty()):
+			var scene: PackedScene = legendary_reveal_scene if legendary_reveal_scene != null else load(legendary_reveal_path)
+			_legendary_reveal = scene.instantiate() as Control
 			_legendary_reveal.setup(definition)
 			add_child(_legendary_reveal)
 			_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

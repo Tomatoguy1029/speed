@@ -5,7 +5,7 @@
 class_name RunSession
 extends Node
 
-const VIEW_SCENE := preload("res://scenes/run/run.tscn")
+const VIEW_PATH := "res://scenes/run/run.tscn"
 
 ## RunManager が振る番号。破棄したあとの命令を見分ける
 var id := 0
@@ -20,7 +20,7 @@ func start(options: Dictionary, with_view: bool) -> void:
 	sim.options = options
 	sim.view_size_source = func(): return get_viewport().get_visible_rect().size
 	if with_view:
-		view = VIEW_SCENE.instantiate()
+		view = load(VIEW_PATH).instantiate()
 		for path in ["RunPresentation", "Hud/HudRoot", "Hud/DebugPanel", "Hud/PerfOverlay"]:
 			view.get_node(path).run = sim
 		if options.get("lab", false):

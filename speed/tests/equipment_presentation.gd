@@ -9,6 +9,8 @@ func _ready() -> void:
 	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, true)
 	session.auto_step = false
 	var world := session.view.get_node("World")
+	var presentation: Node = session.view.get_node("RunPresentation")
+	presentation.set_process(false)
 	check(world.find_child("LightLance", true, false) == null, "光の槍を装備する前に専用表示を作らない")
 	check(world.find_child("Afterimages", true, false) == null, "残像を装備する前に専用表示を作らない")
 	session.sim.loadout.grant(&"weapon", &"W24")
@@ -19,10 +21,12 @@ func _ready() -> void:
 	world.find_child("LightLance", true, false).hit({"pos": Vector2.ZERO, "dir": Vector2.RIGHT, "level": 1})
 	session.sim.loadout.remove_weapon(&"W24")
 	session.sim.loadout.remove_weapon(&"W27")
+	presentation._process(0.02)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check(world.find_child("LightLance", true, false) != null, "取り外したあとも命中の閃光が終わるまで表示を保つ")
-	await get_tree().create_timer(0.2).timeout
+	presentation._process(0.2)
+	await get_tree().process_frame
 	check(world.find_child("LightLance", true, false) == null, "演出が終わった光の槍の表示を解放する")
 	check(world.find_child("Afterimages", true, false) == null, "演出が終わった残像の表示を解放する")
 	session.free()

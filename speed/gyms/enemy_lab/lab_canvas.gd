@@ -77,7 +77,9 @@ func texture_for(id: String) -> Texture2D:
 	if look != null:
 		return RunPresentation.look_texture(look, _look_textures)
 	if id.begins_with("field_planet"):
-		return RunPresentation.PLANET
+		if not _textures.has("planet"):
+			_textures["planet"] = load("res://assets/pixel/planet.png")
+		return _textures["planet"]
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
 	var path := "res://assets/pixel/%s.png" % id
 	if session != null and is_instance_valid(session.run) and session.run.state.stage != null:

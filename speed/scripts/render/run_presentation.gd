@@ -12,14 +12,6 @@ const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 ## 重ねた絵の外観の置き場（data/visuals/looks/<外観の名前>.tres）
 const LOOKS_DIR := "res://data/visuals/looks"
-const MOON := preload("res://assets/pixel/moon.png")
-const PLANET := preload("res://assets/pixel/planet.png")
-const AIRSHIP := preload("res://assets/pixel/airship.png")
-const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
-const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
-const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
-const METEOR_SHEETS := [preload("res://assets/pixel/meteor_spritesheet.png"),
-	preload("res://assets/pixel/meteor2_spritesheet.png")]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -92,8 +84,9 @@ var _star_batch: InstanceBatch
 var _star_material: ShaderMaterial
 var _hostile_batch: InstanceBatch
 var _coin_batch: InstanceBatch
-var _jet_time := 0.0
-var _exhaust: Array[Dictionary] = []
+var _ship_visual: RefCounted
+var _meteor_visual: RefCounted
+var _body_visual: RefCounted
 var _glide_wake: Node2D
 var _equipment_visuals: Dictionary = {}
 
@@ -101,6 +94,9 @@ func _ready() -> void:
 	state = run.state
 	cfg = run.cfg
 	_font = ThemeDB.fallback_font
+	_ship_visual = load("res://scripts/render/ship_visual.gd").new()
+	_ship_visual.setup(self)
+	_body_visual = load("res://scripts/render/body_visual.gd").new()
 	_read_settings()
 	SaveManager.settings_changed.connect(_read_settings)
 	_camera = get_node(camera_path) as Camera2D
@@ -126,7 +122,7 @@ func _ready() -> void:
 	add_child(pipeline)
 	pipeline.setup(world as Node2D, _camera, [_layers.projectiles, _layers.fx, _layers.path, _layers.exhaust], _look_names.size() + 2)
 	_layers.exhaust.modulate = Color(1.15, 1.15, 1.15)
-	_glide_wake = preload("res://scenes/fx/glide_wake.tscn").instantiate()
+	_glide_wake = load("res://scenes/fx/glide_wake.tscn").instantiate()
 	_layers.exhaust.add_child(_glide_wake)
 	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
 	_sync_equipment_visuals()
@@ -200,16 +196,6 @@ func _build_batches() -> void:
 	_enemy_mat.shader = load("res://shaders/pixel_sprite.gdshader")
 	_armor_material = ShaderMaterial.new()
 	_armor_material.shader = preload("res://shaders/pixel_armor.gdshader")
-	for variant in METEOR_SHEETS.size():
-		var sheet: Texture2D = METEOR_SHEETS[variant]
-		var frame_size := float(sheet.get_height())
-		for stage in 3:
-			var rock_batch := InstanceBatch.new()
-			rock_batch.setup_texture(sheet, Rect2(stage * frame_size, 0, frame_size, frame_size))
-			rock_batch.material = _enemy_mat
-			rock_batch.z_index = -1
-			_layers.enemies.add_child(rock_batch)
-			_batches[StringName("meteor_" + str(variant) + "_damage_" + str(stage))] = rock_batch
 	var gem := InstanceBatch.new()
 	gem.setup_polygon(PackedVector2Array([Vector2(0, -1.4), Vector2(1, 0), Vector2(0, 1.4), Vector2(-1, 0)]))
 	var gem_mat := ShaderMaterial.new()
@@ -310,7 +296,7 @@ func _process(delta: float) -> void:
 	if phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
 		shake = 0.0
 	_update_fx(dt)
-	_update_exhaust(dt)
+	_ship_visual.update(dt)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
@@ -424,7 +410,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"crash":
 				shake = maxf(shake, 16.0)
 			&"warp":
-				_exhaust.clear()
+				_ship_visual.clear()
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
 			&"beam":
 				var life: float = ev.get("life", 0.4)
@@ -491,16 +477,7 @@ func _sparks(p: Vector2, normal: Vector2, n: int, color: Color) -> void:
 		particles.append({"pos": p, "vel": dir * s, "life": 0.25 + randf() * 0.2, "max": 0.45, "color": color, "size": 2.0 + randf() * 2.0})
 
 func _shatter_meteor(ev: Dictionary) -> void:
-	var sheet: Texture2D = METEOR_SHEETS[posmod(int(ev.meteor_index), 2)]
-	var size := float(sheet.get_height())
-	var half := size / 2.0
-	for y in 2:
-		for x in 2:
-			var offset := Vector2((x - 0.5) * half, (y - 0.5) * half).rotated(ev.facing)
-			meteor_shards.append({"texture": sheet,
-				"region": Rect2(size * 2.0 + x * half, y * half, half, half),
-				"pos": ev.pos + offset, "vel": offset.normalized() * 100.0 + ev.dir * 60.0,
-				"angle": ev.facing, "spin": -1.5 if x == y else 1.5, "life": 0.65})
+	_meteors().shatter(ev)
 
 func _update_fx(dt: float) -> void:
 	for shard in meteor_shards:
@@ -630,8 +607,7 @@ func _draw_field(c: CanvasItem) -> void:
 		c.draw_circle(w.pos, maxf(6.0, reach * 0.08), Color(0.08, 0.02, 0.15, 0.9))
 	for b in f.bodies:
 		if view.grow(b.r).has_point(b.pos):
-			c.draw_texture_rect(PLANET if b.is_planet else MOON,
-				Rect2(b.pos - Vector2.ONE * b.r, Vector2.ONE * b.r * 2.0), false)
+			_body_visual.draw(c, b)
 
 ## 英雄の星座：全体から淡金色の光がにじみ、つないだ星と光線がさらに強く輝く。
 func _draw_hero(c: CanvasItem) -> void:
@@ -796,11 +772,12 @@ func _draw_enemies(c: CanvasItem) -> void:
 				_draw_comet(c, p, t.r[i], t.vel[i], comet.rare_weapon != &"")
 				continue
 			# ストリームで再生成されても同じ岩の模様を使う。
+			var meteors := _meteors()
 			var variant := posmod(t.meteor_index[i], 2)
 			var stage := clampi(int((1.0 - t.hp[i] / t.max_hp[i]) * 3.0), 0, 2)
 			var rock_key := StringName("meteor_" + str(variant) + "_damage_" + str(stage))
 			var rock_batch: InstanceBatch = _batches[rock_key]
-			rock_batch.add(p, t.facing[i], METEOR_SHEETS[variant].get_height() / 2.0, col)
+			rock_batch.add(p, t.facing[i], meteors.METEOR_SHEETS[variant].get_height() / 2.0, col)
 			continue
 		if t.is_boss[i] != 0:
 			var boss_actor := run.bosses.actor_for_row(i)
@@ -1019,7 +996,7 @@ func _draw_projectiles(c: CanvasItem) -> void:
 				pts.append(pos + Vector2.from_angle(pr.friend_angle[i] + TAU * k / 24.0) * r * (1.0 if k % 2 == 0 else 0.78))
 			c.draw_colored_polygon(pts, Color("#d9dde6"))
 		elif pr.friend_cause[i] == &"interceptor":
-			INTERCEPTOR_VISUAL.shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
+			load("res://scripts/render/interceptor_visual.gd").shot(c, pos, pr.friend_vel[i].angle(), _px(1.0))
 		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.HULL:
 			_draw_hull(c, pr.friend_type[i], pos, pr.friend_vel[i].angle(), r, Color("#ffbe65"))
 		elif pr.friend_kind[i] == ProjectileSystem.FriendKind.DEBRIS:
@@ -1151,87 +1128,11 @@ func _draw_dim(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING:
 		c.draw_rect(view_rect().grow(400.0), Color(0, 0, 0, cfg.death_world_dim))
 
-func _update_exhaust(dt: float) -> void:
-	if dt <= 0.0:
-		return
-	for sample in _exhaust:
-		sample.life -= dt
-	_exhaust = _exhaust.filter(func(sample): return sample.life > 0.0)
-	if state.phase != RunState.Phase.PLAY and state.phase != RunState.Phase.FINISHING:
-		return
-	if state.drawing or state.hitstop > 0.0:
-		return
-	var animation_speed := state.ship_vel.length()
-	if state.tracing and run.draw.run != null:
-		animation_speed = run.draw.run.rate
-	_jet_time += dt * clampf(animation_speed / cfg.base_max_speed, 0.0, 3.0)
-	if state.ship_vel.length() < 5.0:
-		return
-	var tail := state.ship_pos - state.ship_heading * 22.0 * cfg.character_scale
-	if not _exhaust.is_empty():
-		var distance: float = tail.distance_to(_exhaust.back().pos)
-		if distance > maxf(120.0, state.ship_vel.length() * dt * 3.0):
-			_exhaust.clear()
-		elif distance < 2.0 * cfg.character_scale:
-			return
-	_exhaust.append({"pos": tail, "life": 0.24})
-	if _exhaust.size() > 48:
-		_exhaust.pop_front()
-
 func _draw_exhaust(c: CanvasItem) -> void:
-	var sonic := _blue_exhaust()
-	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
-	for i in range(1, _exhaust.size()):
-		var fade: float = _exhaust[i - 1].life / 0.24
-		trail_color.a = fade * 0.18
-		c.draw_line(_exhaust[i - 1].pos, _exhaust[i].pos,
-			trail_color, 3.0 * cfg.character_scale)
-	if state.phase == RunState.Phase.DYING or state.phase == RunState.Phase.ENDED:
-		return
-	var size := AIRSHIP.get_size() * cfg.character_scale
-	# 上側10px・下側20pxの余白を除いた機体本体の中心へ合わせる。
-	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
-	var frame := int(_jet_time * 12.0) % 3
-	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
-	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	var flame := load("res://assets/pixel/airship_blue_flame.png") if sonic else AIRSHIP_FLAME
-	c.draw_texture_rect_region(flame, rect, region)
-	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
-	c.draw_set_transform(Vector2.ZERO)
+	_ship_visual.draw_exhaust(c)
 
 func _draw_ship(c: CanvasItem) -> void:
-	if state.phase == RunState.Phase.DYING and run.sequence_t >= cfg.death_freeze_time:
-		return
-	var p := state.ship_pos
-	var R := cfg.ship_radius
-	var col := Color.WHITE
-	var hurt := state.ship_hurt > 0.0
-	if hurt:
-		col = Color("#ff6b5a")
-		if state.phase != RunState.Phase.PAUSED and state.phase != RunState.Phase.LEVELUP:
-			p.x += randf_range(-1.0, 1.0) * _px(cfg.ship_hurt_shake)
-	if state.ship_invuln > 0.0 and fmod(state.time * 20.0, 2.0) < 1.0:
-		col.a = 0.5
-	var dir := state.ship_heading
-	var size := AIRSHIP.get_size() * cfg.character_scale
-	c.draw_set_transform(p, dir.angle() + PI / 2.0)
-	var rect := Rect2(Vector2(-AIRSHIP.get_width() / 2.0, -30.0) * cfg.character_scale, size)
-	_draw_equipment_parts(c, rect, col, true)
-	c.draw_texture_rect(AIRSHIP, rect, false, col)
-	_draw_equipment_parts(c, rect, col, false)
-	c.draw_set_transform(Vector2.ZERO)
-	for visual in _equipment_visuals.values():
-		if visual.active:
-			visual.draw_extra(c, p, col)
-	SHIELD_VISUAL.equipped(c, state, R, cfg.character_scale)
-	for effect in shield_transfers:
-		SHIELD_VISUAL.transfer(c, effect, state.ship_pos)
-	# HP バー（機体の真下、仕様書 17）
-	var frac := clampf(state.ship_hp / state.stats.max_hp, 0.0, 1.0)
-	var w := _px(44.0)
-	var top := p + Vector2(-w / 2.0, R + _px(10.0))
-	c.draw_rect(Rect2(top - Vector2(_px(1), _px(1)), Vector2(w + _px(2), _px(7))), Color(0, 0, 0, 0.55))
-	c.draw_rect(Rect2(top, Vector2(w * frac, _px(5.0))), Color("#ff5a4a") if frac < 0.3 else Color("#5dffa0"))
+	_ship_visual.draw_ship(c)
 
 func _draw_top(c: CanvasItem) -> void:
 	if flash > 0.0:
@@ -1279,3 +1180,9 @@ func _draw_equipment_parts(c: CanvasItem, rect: Rect2, color: Color, under: bool
 		if visual.active and texture != null and not drawn.has(texture):
 			c.draw_texture_rect(texture, rect, false, color)
 			drawn[texture] = true
+
+func _meteors() -> RefCounted:
+	if _meteor_visual == null:
+		_meteor_visual = load("res://scripts/render/meteor_visual.gd").new()
+		_meteor_visual.setup(self)
+	return _meteor_visual
