@@ -30,11 +30,13 @@ static func build_all(force := false, output := ROOT) -> Error:
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 	var error: Error = load("res://tools/content/build_catalog.gd").build(catalog_path)
 	if error != OK: return error
+	error = load("res://tools/content/build_audio.gd").build(output.path_join("audio.res"))
+	if error != OK: return error
 	error = load("res://tools/content/build_runtime_stage.gd").build_all(output)
 	if error != OK: return error
 	var outputs := [catalog_path]
 	for file in DirAccess.get_files_at(output):
-		if file.ends_with(".tres"): outputs.append(output.path_join(file))
+		if file.get_extension() in ["tres", "res"]: outputs.append(output.path_join(file))
 	var stamp := FileAccess.open(output.path_join("stamp.json"), FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))

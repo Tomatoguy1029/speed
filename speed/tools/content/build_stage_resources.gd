@@ -82,7 +82,7 @@ static func build(stage: RuntimeStage) -> StageResources:
 		_add(paths, boss.path)
 		var definition := load(boss.path) as BossDef
 		_add(paths, definition.scene_path)
-	for common in ["res://scenes/run/run.tscn", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
+	for common in ["res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/ship_visual.gd", "res://scripts/render/body_visual.gd", "res://scripts/render/meteor_visual.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
 	result.paths = PackedStringArray(paths.keys())
 	result.paths.sort()
 	result.enemy_ids = PackedStringArray(ids.keys())
