@@ -64,7 +64,15 @@ func _ready() -> void:
 	var live := edited.duplicate(true)
 	live.telescope.hp = hp * 3.0
 	live.telescope["params.bullet_dmg"] = damage + 12.0
+	session.sim.state.time = 13.5
+	session.sim.state.world_time = 7.25
 	enemies.update_stage_tuning(live)
+	var changes := session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
+	check(changes.size() == 1 and changes[0].t == 13.5 and changes[0].world_t == 7.25 and changes[0].values == live, "変更イベントに適用時刻と上書き全体を含める")
+	enemies.update_stage_tuning(live)
+	check(session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed").size() == 1, "同じ設定の再通知を省く")
+	live.telescope.hp = hp * 4.0
+	check(changes[0].values.telescope.hp == hp * 3.0, "変更イベントの辞書を後続の試行から独立させる")
 	check(is_equal_approx(t.hp[row] / t.max_hp[row], 0.25) and t.max_hp[row] > old_hp, "ライブHP変更で残HP割合を保つ")
 	check(t.id[row] == id and t.pos[row] == Vector2(300, 200) and t.timer[row] == 1.25, "位置・個体ID・行動状態を維持する")
 	check(t.def[row].params.bullet_dmg == damage + 12.0, "既存個体が次の攻撃に新しい値を使う")

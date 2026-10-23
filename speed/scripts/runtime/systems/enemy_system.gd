@@ -43,6 +43,7 @@ func _stage_definition(type: StringName) -> EnemyDef:
 
 ## 開発用UIからのライブ変更。個体の残HP割合、行動、位置、IDを保つ。
 func update_stage_tuning(values: Dictionary) -> void:
+	if values == stage_tuning: return
 	var affected := stage_tuning.keys()
 	for id in values:
 		if id not in affected: affected.append(id)
@@ -72,7 +73,7 @@ func update_stage_tuning(values: Dictionary) -> void:
 			var previous := float(old.params.get("fire_interval", 0.0))
 			if previous > 0.0 and interval != previous: t.fire_t[i] *= interval / previous
 			t.def[i] = definition
-	state.emit(&"enemy_tuning_changed", {"values": stage_tuning.duplicate(true)})
+	state.emit(&"enemy_tuning_changed", {"t": state.time, "world_t": state.world_time, "values": stage_tuning.duplicate(true)})
 
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"back": EnemyTable.Gate.BACK, &"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
