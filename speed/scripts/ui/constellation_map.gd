@@ -176,10 +176,9 @@ func _reveal_details() -> void:
 	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration)
 
 func _apply_reveal_settings() -> void:
-	for parameter: String in ["spectrum_speed", "spectrum_motion", "spectrum_correlation"]:
+	for parameter: String in ["spectrum_speed", "spectrum_base_height", "spectrum_motion", "spectrum_correlation", "spectrum_peak_frequency", "spectrum_peak_strength", "orbit_speed"]:
 		_detail_material.set_shader_parameter(parameter, reveal_settings.get(parameter))
-	for parameter: String in ["crt_strength", "noise_strength"]:
-		_monitor_material.set_shader_parameter(parameter, reveal_settings.get(parameter))
+	_monitor_material.set_shader_parameter("crt_strength", reveal_settings.crt_strength)
 
 func _set_detail_line(progress: float) -> void:
 	_line_progress = 1.0 - pow(1.0 - progress, reveal_settings.line_ease)
