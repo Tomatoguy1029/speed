@@ -15,6 +15,6 @@ func tick(dt: float, busy: bool) -> void:
 	var a := state.ship_heading.angle()
 	var step: float = p("spread_step")
 	for i in shots:
-		build.projectiles.fire_shot(state.ship_pos, a + (i - (shots - 1) / 2.0) * step,
+		ctx.projectiles.fire_shot(state.ship_pos, a + (i - (shots - 1) / 2.0) * step,
 			atk() * dmg_k() * float(p("damage")),
 			{"pierce_left": n / 3, "life": p("life"), "color": Color(p("color", "#ffb36b"))})

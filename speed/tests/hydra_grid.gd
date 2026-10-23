@@ -7,7 +7,7 @@ func _ready()->void:
 	var script=load("res://scripts/bosses/hydra_grid.gd")
 	check(script!=null,"grid planner exists")
 	if script!=null:
-		var p: Dictionary=ConfigManager.bosses[&"hydra"].params
+		var p: Dictionary=ContentManager.bosses[&"hydra"].params
 		var rect:=Rect2(-640,-360,1280,720)
 		check(script.region(Vector2.ZERO,rect)==&"center" and script.region(Vector2(550,0),rect)==&"right" and script.region(Vector2(-550,0),rect)==&"left" and script.region(Vector2(0,-300),rect)==&"up" and script.region(Vector2(0,300),rect)==&"down","five view regions are distinct")
 		for size in [Vector2(1280,720),Vector2(720,1280),Vector2(1024,768)]:

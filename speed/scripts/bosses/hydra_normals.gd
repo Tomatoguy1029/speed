@@ -121,11 +121,11 @@ static func rubble(a: Node,n,dt: float) -> void:
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
 
 static func launch_rubble(a: Node,n,angle: float,radius: float) -> void:
-	var row: int = a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),a._head_pos(n))
+	var row: int = a.ctx.enemies.spawn(a.ctx.enemies.def_of(&"hydra_rubble"),a._head_pos(n))
 	a.table.r[row]=radius
 	a.table.vel[row]=Vector2.from_angle(angle)*float(a.def.params.lump_speed)
 	var at: Vector2 = a.table.pos[row]
-	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.manager.enemies.def_of(&"hydra_rubble").params.life),float(a.def.params.lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
+	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.ctx.enemies.def_of(&"hydra_rubble").params.life),float(a.def.params.lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
 	e.follow_row=row
 	e.follow_id=a.table.id[row]
 

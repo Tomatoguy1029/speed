@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyLook" load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://dnagso08hefhy" path="res://scripts/render/enemy_look.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://b2ks7rmcrh40i" path="res://assets/pixel/snake/snake_base.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://co1bbhwi5n3qf" path="res://assets/pixel/snake/snake_armor.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://c8i2qhab3vpwu" path="res://assets/pixel/snake/snake_normal.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+angle = 1.5707964
+armor = ExtResource("3")
+base = ExtResource("2")
+normal = ExtResource("4")
+size_from_collision = true

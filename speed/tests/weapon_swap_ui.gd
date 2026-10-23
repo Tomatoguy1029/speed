@@ -17,7 +17,7 @@ func _ready() -> void:
 	get_window().size = Vector2i(1280, 720)
 	await _start(1)
 	run.input.set_process_unhandled_input(true)
-	hud = scene.get_node("Hud/HudRoot")
+	hud = scene.view.get_node("Hud/HudRoot")
 	await _open_swap()
 	var grid: GridContainer = hud.get("_swap_grid")
 	var new_name: Label = hud.get("_swap_new_name")
@@ -26,7 +26,7 @@ func _ready() -> void:
 		await _finish()
 		return
 	_check(not hud._cards_row.visible and grid.get_child_count() == run.cfg.weapon_slots, "交換候補には所持武器だけを並べる")
-	_check(new_name.text == ConfigManager.weapons[&"W22"].get_display_name(), "上の情報欄に拾った武器を1つ表示する")
+	_check(new_name.text == ContentManager.weapons[&"W22"].get_display_name(), "上の情報欄に拾った武器を1つ表示する")
 	var before: Dictionary = run.state.weapons.duplicate()
 	await _wait_real()
 	point = new_name.get_global_rect().get_center()
@@ -35,7 +35,7 @@ func _ready() -> void:
 	for i in grid.get_child_count():
 		var b: Button = grid.get_child(i)
 		var card: Dictionary = run.state.cards[i]
-		var def: WeaponDef = ConfigManager.weapons[card.id]
+		var def: WeaponDef = ContentManager.weapons[card.id]
 		_check(b.text.contains(def.get_description()) and b.text.contains("Lv%d" % card.level), "交換候補%dには固有の説明と所持Lvを表示する" % i)
 		_check(b.get_theme_stylebox("normal").border_color == hud.RANK_COLORS[card.level - 1], "交換候補%dは所持Lvの枠色を使う" % i)
 	await _shot("swap_wide")
@@ -46,7 +46,7 @@ func _ready() -> void:
 	for id in before:
 		if id != removed:
 			_check(run.state.weapons[id] == before[id], "交換しない所持武器のLvを保つ")
-	_check(not run.build._receive_comet_weapon(&"W22") and run.state.phase == RunState.Phase.PLAY, "同じ彗星武器を受け取ったときの既存ルールを保つ")
+	_check(not run.loadout._receive_comet_weapon(&"W22") and run.state.phase == RunState.Phase.PLAY, "同じ彗星武器を受け取ったときの既存ルールを保つ")
 	await _open_swap()
 	before = run.state.weapons.duplicate()
 	point = hud.get("_swap_keep").get_global_rect().get_center()
@@ -57,7 +57,7 @@ func _ready() -> void:
 	_check(run.state.phase == RunState.Phase.PLAY and run.state.weapons == before, "受け取らないときは現在の装備を保つ")
 	await _open_swap()
 	# サイズ確認はHUDを対象にし、世界側のエフェクトは静止したまま描く。
-	scene.get_node("Managers/RenderManager").set_process(false)
+	scene.view.get_node("RunPresentation").set_process(false)
 	for viewport_size in [Vector2i(640, 720), Vector2i(360, 640), Vector2i(640, 360)]:
 		get_window().size = viewport_size
 		await _settle()
@@ -97,7 +97,7 @@ func _ready() -> void:
 	TranslationServer.set_locale("en")
 	await _open_swap()
 	await _shot("swap_en_small")
-	_check(hud.get("_swap_new_desc").text == ConfigManager.weapons[&"W22"].get_description(), "英語も既存の武器説明を使う")
+	_check(hud.get("_swap_new_desc").text == ContentManager.weapons[&"W22"].get_description(), "英語も既存の武器説明を使う")
 	TranslationServer.set_locale("ja")
 	get_window().size = Vector2i(1280, 720)
 	run.state.swap_pick = &""
@@ -105,21 +105,21 @@ func _ready() -> void:
 	_check(hud._cards_row.visible and not hud.get("_swap_scroll").visible and hud._cards_row.get_child_count() == 3, "通常レベルアップは既存の3択を保つ")
 	await _shot("normal_levelup")
 	run.state.pending_levels = 0
-	run.build.open_start_cards()
+	run.loadout.open_start_cards()
 	await _settle()
 	_check(hud._cards_row.visible and not hud.get("_swap_keep").visible and run.state.start_pick, "初期武器選択も既存の表示を保つ")
 	await _shot("initial_weapon")
 	await _finish()
 
 func _open_swap() -> void:
-	run.build.reset_loadout()
+	run.loadout.reset_loadout()
 	for i in run.cfg.weapon_slots:
-		run.build.grant(&"weapon", StringName("W%02d" % (i + 1)), i + 1)
+		run.loadout.grant(&"weapon", StringName("W%02d" % (i + 1)), i + 1)
 	run.state.start_pick = false
 	run.state.pending_levels = 0
 	run.state.swap_pick = &""
 	run.set_phase(RunState.Phase.PLAY)
-	_check(run.build._receive_comet_weapon(&"W22"), "装備満杯で交換画面を開く")
+	_check(run.loadout._receive_comet_weapon(&"W22"), "装備満杯で交換画面を開く")
 	await _settle()
 
 func _settle() -> void:

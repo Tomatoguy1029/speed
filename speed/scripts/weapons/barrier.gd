@@ -9,7 +9,7 @@ func radius() -> float:
 
 func tick(dt: float, busy: bool) -> void:
 	_block_t = maxf(0.0, _block_t - dt)
-	if _block_t <= 0.0 and build.projectiles.block_one(state.ship_pos, radius()):
+	if _block_t <= 0.0 and ctx.projectiles.block_one(state.ship_pos, radius()):
 		_block_t = float(p("block_interval")) / rate_k()
 	if busy:
 		return
@@ -17,5 +17,5 @@ func tick(dt: float, busy: bool) -> void:
 	if _t < float(p("interval")) / rate_k():
 		return
 	_t = 0.0
-	build.combat.explode(state.ship_pos, radius(), atk() * float(p("damage")) * dmg_k(),
+	ctx.combat.explode(state.ship_pos, radius(), atk() * float(p("damage")) * dmg_k(),
 		{"cause": &"barrier", "color": Color("#76aaff"), "knock": p("knock"), "life": 0.2})

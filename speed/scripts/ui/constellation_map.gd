@@ -97,7 +97,7 @@ func _ready() -> void:
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
 	_launch.pressed.connect(_start)
-	if ConfigManager.stage_count() > 4:
+	if ContentManager.stage_count() > 4:
 		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
 		final_stage.add_theme_font_size_override("font_size", 11)
 		_transparent_button(final_stage)

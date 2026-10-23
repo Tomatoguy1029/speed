@@ -2,5 +2,5 @@
 extends WeaponBehavior
 
 func on_contact(_i: int, hit: Vector2, _dir: Vector2) -> void:
-	build.combat.explode(hit, float(p("radius")) * radius_k(), atk() * float(p("damage")) * dmg_k(),
+	ctx.combat.explode(hit, float(p("radius")) * radius_k(), atk() * float(p("damage")) * dmg_k(),
 		{"cause": &"contactWave", "color": Color("#9fe8ff"), "knock": p("knock"), "life": 0.3})

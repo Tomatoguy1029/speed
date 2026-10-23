@@ -55,7 +55,7 @@ func clear_effects() -> void:
 	effects.clear()
 	visuals.clear()
 func intersects(points: PackedVector2Array, width: float, a: Vector2, b: Vector2) -> bool:
-	var radius: float = width * 0.5 + actor.manager.cfg.ship_radius
+	var radius: float = width * 0.5 + actor.ctx.cfg.ship_radius
 	for i in range(points.size() - 1):
 		var p := points[i]
 		var q := points[i + 1]
@@ -69,14 +69,14 @@ func tick(dt: float) -> void:
 	for e in effects.duplicate():
 		var prior: PackedVector2Array = e.get("previous_points",e.points).duplicate()
 		e.age += dt
-		var alive: bool = e.owner < 0 or e.persistent or (actor.manager.enemies.is_same(e.owner,e.owner_id) and actor.table.dead[e.owner] == 0)
+		var alive: bool = e.owner < 0 or e.persistent or (actor.ctx.enemies.is_same(e.owner,e.owner_id) and actor.table.dead[e.owner] == 0)
 		if not alive or e.age >= e.delay + e.life:
 			visuals[e.id].queue_free()
 			visuals.erase(e.id)
 			effects.erase(e)
 			continue
 		if e.has("follow_row"):
-			if not actor.manager.enemies.is_same(e.follow_row,e.follow_id) or actor.table.dead[e.follow_row]:
+			if not actor.ctx.enemies.is_same(e.follow_row,e.follow_id) or actor.table.dead[e.follow_row]:
 				e.life=0.0
 				continue
 			var at: Vector2 = actor.table.pos[e.follow_row]
@@ -95,7 +95,7 @@ func tick(dt: float) -> void:
 				if not actor.run_state.tracing and not actor.run_state.glide and actor.run_state.ship_vel.length() < actor.run_state.stats.max_speed:
 					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(actor.def.params.wind_force) * dt
 			elif touching and not e.hit and e.damage > 0.0:
-				actor.manager.projectiles.ship.damage(e.damage * actor.manager.cfg.atk_scale,0.0,e.kind,&"hydra")
+				actor.ctx.projectiles.ship.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
 		e.previous_points=e.points.duplicate()
 		var line: Node2D=visuals[e.id]

@@ -110,8 +110,8 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 func _hit_along(a: Vector2, b: Vector2, dir: Vector2) -> void:
 	var radius := float(p("drone_hit_radius")) * cfg.character_scale
 	var pad := Vector2.ONE * radius
-	build.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _rows)
-	var t := build.enemies.table
+	ctx.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _rows)
+	var t := ctx.enemies.table
 	for i in _rows:
 		if t.dead[i] != 0 or _hit_ids.has(t.id[i]):
 			continue
@@ -119,7 +119,7 @@ func _hit_along(a: Vector2, b: Vector2, dir: Vector2) -> void:
 		if hit_t < 0.0:
 			continue
 		_hit_ids[t.id[i]] = true
-		build.combat.damage_enemy(i, atk() * level_value("damage_by_level"), \
+		ctx.combat.damage_enemy(i, atk() * level_value("damage_by_level"), \
 			{"cause": &"dashRangeDrone", "dir": dir, "impact": a.lerp(b, hit_t), "knock": 0.0, "no_crit": true})
 		if state.phase != RunState.Phase.PLAY:
 			return

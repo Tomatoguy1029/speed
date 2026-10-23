@@ -11,6 +11,6 @@ speed = 40.0
 xp = 1.0
 color = Color(0.5451, 0.4784, 0.4157, 1)
 shape = &"rock"
-behavior = &"drift"
+behavior = &"meteor"
 id = &"meteor"
 display_name = "隕石"

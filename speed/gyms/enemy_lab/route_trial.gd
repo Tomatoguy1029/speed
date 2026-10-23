@@ -32,7 +32,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 		return await _finish({"status": "cancelled"})
 	for n in clampi(start_offset, 0, 3600):
 		worker.step()
-	var run: RunManager = worker.run
+	var run: RunSimulation = worker.run
 	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
 		return await _finish({"status": "invalid", "reason": tr("lab.trace_in_progress")})
 	if run.state.gauge < run.cfg.draw_min_charge:

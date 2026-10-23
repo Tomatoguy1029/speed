@@ -2,5 +2,5 @@
 extends TraitBehavior
 
 func on_end() -> void:
-	build.combat.explode(state.ship_pos, val("radius"), atk() * val("damage"),
+	ctx.combat.explode(state.ship_pos, val("radius"), atk() * val("damage"),
 		{"cause": &"endBlast", "color": Color("#c46bff"), "knock": def.params.knock})

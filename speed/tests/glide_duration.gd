@@ -5,7 +5,7 @@ extends Node
 
 var failed := 0
 var checks := 0
-var run: RunManager
+var run: RunSimulation
 var scene: Node
 var shots := ""
 
@@ -19,22 +19,23 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			shots = arg.trim_prefix("--out=")
-	scene = load("res://scenes/run/run.tscn").instantiate()
-	run = scene.get_node("Managers/RunManager")
+	scene = RunManager.create_run()
+	run = scene.sim
 	run.options = {"lab": true, "seed": 31, "meta": {}}
 	add_child(scene)
-	run.set_physics_process(false)
+	if scene.sim.state == null: await scene.started
+	scene.auto_step = false
 	run.state.phase = RunState.Phase.PLAY
 	var s := run.state
 	var cfg := run.cfg
 	var baseline_vel := s.ship_vel
 	var baseline := [s.stats.max_speed, s.stats.capacity, s.stats.charge_time, run.draw.budget(1.0), run.draw._launch_speed(Vector2.RIGHT, 1.0)]
-	check(ConfigManager.traits.has(&"T31"), "T31 is loaded through the standard registry")
-	var icon: Texture2D = ConfigManager.traits[&"T31"].icon_texture
+	check(ContentManager.traits.has(&"T31"), "T31 is loaded through the standard registry")
+	var icon: Texture2D = ContentManager.traits[&"T31"].icon_texture
 	check(icon != null and icon.get_width() == 47, "T31 has a card/loadout icon")
 	for level in range(4):
 		if level > 0:
-			check(run.build.grant(&"trait", &"T31"), "T31 stacks through grant")
+			check(run.loadout.grant(&"trait", &"T31"), "T31 stacks through grant")
 		var mult := 1.0 + 0.25 * level
 		check(s.stats.glide_duration_mult == mult, "T31 provisional additive multiplier")
 		s.ship_vel = baseline_vel
@@ -56,7 +57,7 @@ func _ready() -> void:
 		await _capture("level3_late_fade")
 		run.ship._step(1.75, Vector2.ZERO, 0.0)
 		await _capture("level3_cruise")
-	check(not run.build.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
+	check(not run.loadout.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
 	check(s.modules_obtained.has(&"T31"), "Standard result module list includes T31")
 	var saved := SaveManager.data.duplicate(true)
 	SaveManager.unlock_module(&"T31")
@@ -64,23 +65,23 @@ func _ready() -> void:
 	check(roundtrip.encyclopedia.has("T31"), "Standard save representation preserves discovery")
 	SaveManager.data = saved
 	# 通常の候補・強化候補への接続を、抽選対象だけ絞って確かめる。
-	var weapons := ConfigManager.weapons
-	var traits := ConfigManager.traits
-	ConfigManager.weapons = {}
-	ConfigManager.traits = {&"T31": traits[&"T31"]}
+	var catalog := ContentManager.catalog
+	var limited := ContentCatalog.new()
+	limited.entries = [catalog.find(&"traits", &"T31")]
+	ContentManager.catalog = limited
 	for level in [0, 1, 3]:
 		s.traits = {} if level == 0 else {&"T31": level}
-		var cards := run.build.roll_cards()
+		var cards := run.loadout.roll_cards()
 		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 3), "Standard new/upgrade/maxed card pool")
-	ConfigManager.weapons = weapons
-	ConfigManager.traits = traits
+	ContentManager.catalog = catalog
 	s.traits = {&"T31": 3}
-	run.build.refresh_stats()
+	run.loadout.refresh_stats()
 	s.cards = [{"kind": &"trait", "id": &"T31", "level": 3}]
 	run.set_phase(RunState.Phase.LEVELUP)
 	run.cards_changed.emit()
-	check(scene.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("3/3"), "Trait card displays the configured stack cap")
+	check(scene.view.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("3/3"), "Trait card displays the configured stack cap")
 	await _capture("card_and_loadout")
+	await get_tree().process_frame
 	scene.queue_free()
 	await get_tree().process_frame
 	print("[glide_duration] %d checks, %d failures" % [checks, failed])

@@ -14,7 +14,7 @@ static func length(path: PackedVector2Array) -> float:
 	return value
 
 static func validate(session, path: PackedVector2Array, margin := 20.0, window := 0.0, draw_seconds := 0.5, exit_clearance := 0.0) -> Dictionary:
-	var run: RunManager = session.run
+	var run: RunSimulation = session.run
 	exit_clearance = maxf(0, exit_clearance)
 	var blockers := []
 	var fodder := []
@@ -61,13 +61,13 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		for command in session.history:
 			if int(command.tick) > session.tick and int(command.tick) <= session.tick + ceili(horizon * 60): unsupported.append("recorded future commands")
 		if not run.state.weapons.is_empty() or not run.state.traits.is_empty() or run.state.hero_active_t > 0 or not run.field.wells.is_empty(): unsupported.append(TranslationServer.translate("lab.message_eaf4530ecf"))
-		if run.field._comet_t <= horizon or run.field._well_t <= horizon: unsupported.append(TranslationServer.translate("lab.message_feb890132f"))
+		if run.field.gimmick(&"comets")._comet_t <= horizon or run.field.gimmick(&"gravity")._well_t <= horizon: unsupported.append(TranslationServer.translate("lab.message_feb890132f"))
 	var p := run.projectiles
 	for i in p.hostile_alive.size():
 		if p.hostile_alive[i]:
 			var intersects := minf(distance_to_path(p.hostile_pos[i], path), p.hostile_pos[i].distance_to(path[path.size() - 1]) - exit_clearance) < p.hostile_r[i] + radius
 			if window > 0:
-				if p.hostile_turn[i] > 0 or p.hostile_kind[i] == ProjectileManager.HostileKind.MISSILE:
+				if p.hostile_turn[i] > 0 or p.hostile_kind[i] == ProjectileSystem.HostileKind.MISSILE:
 					unsupported.append("bullet:%d" % i)
 				else:
 					var end := p.hostile_pos[i] + p.hostile_vel[i] * horizon
@@ -82,7 +82,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		if window > 0 and p.hazard_owner[i] >= 0:
 			unsupported.append("hazard:%d" % i)
 		var hit := false
-		if p.hazard_kind[i] in [ProjectileManager.HazardKind.ZONE, ProjectileManager.HazardKind.WAVE]:
+		if p.hazard_kind[i] in [ProjectileSystem.HazardKind.ZONE, ProjectileSystem.HazardKind.WAVE]:
 			# 扇や切れ目を広い円に丸める。保守的な未成立を許す。
 			hit = minf(distance_to_path(p.hazard_pos[i], path), p.hazard_pos[i].distance_to(path[path.size() - 1]) - exit_clearance) <= p.hazard_len[i] + radius + p.hazard_width[i]
 		else:
@@ -103,5 +103,5 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 		"digest": session.digest(), "critical_dependent": false, "horizon": horizon, "draw_seconds": draw_seconds, "exit_clearance": exit_clearance}
 
 ## 入力点の省略と角の補正で線が寄る範囲も、通過する円に加える。
-static func sweep_radius(run: RunManager, margin: float) -> float:
+static func sweep_radius(run: RunSimulation, margin: float) -> float:
 	return run.cfg.ship_radius + maxf(0, margin) + run.cfg.draw_step + 2.5 / maxf(run.state.camera_zoom, 0.01)

@@ -23,7 +23,7 @@ var reasons: Dictionary = {}
 var serial := 0
 var now := 0.0
 var state: RunState
-var projectiles: ProjectileManager
+var projectiles: ProjectileSystem
 
 func configure(value: Dictionary) -> void:
 	enabled = value.get("enabled", false)
@@ -31,7 +31,7 @@ func configure(value: Dictionary) -> void:
 		if value.has(key):
 			settings[key] = value[key].duplicate(true) if value[key] is Dictionary else float(value[key])
 
-func advance(time: float, enemies: EnemyManager) -> void:
+func advance(time: float, enemies: EnemySystem) -> void:
 	now = time
 	# 期限前の枠は弾を調べず保持する。失効候補がある更新だけ全体を照合する。
 	var expired: Array = []

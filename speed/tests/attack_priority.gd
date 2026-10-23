@@ -11,8 +11,8 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed":932,"empty":true,"stage":4})
-	var em: EnemyManager = lab.run.enemies
-	var pm: ProjectileManager = lab.run.projectiles
+	var em: EnemySystem = lab.run.enemies
+	var pm: ProjectileSystem = lab.run.projectiles
 	var stage := StageDef.new()
 	stage.enemy_attack_values = {"telescope":1.0}
 	stage.enemy_attack_priorities = {"aquarius":5.0}
@@ -67,20 +67,20 @@ func _ready() -> void:
 		em.table.mode[row] = EnemyTable.Mode.MOVE
 		em.table.charge[row] = 0.0
 	lab.run.combat.rebuild_grid()
-	for row in [a,b,c]: em._telescope(row,0.01)
+	for row in [a,b,c]: em.behavior(&"sniper").step(row,0.01)
 	check(em.table.charge[a] > 0.0 and d.token(str(em.table.id[a])) > 0, "Budget reserved before first lock-on progress")
-	check(em.telescope_aiming(a) and em.telescope_aiming(b) and not em.telescope_aiming(c), "Only two telegraphs with budget two")
+	check(em.behavior(&"sniper").telescope_aiming(a) and em.behavior(&"sniper").telescope_aiming(b) and not em.behavior(&"sniper").telescope_aiming(c), "Only two telegraphs with budget two")
 	em.table.pos[a] = Vector2(2000,0)
-	em._telescope(a,0.01)
-	check(not em.telescope_aiming(a) and em.table.charge[a] == 0.0, "Outside existing range hides and cancels aim")
+	em.behavior(&"sniper").step(a,0.01)
+	check(not em.behavior(&"sniper").telescope_aiming(a) and em.table.charge[a] == 0.0, "Outside existing range hides and cancels aim")
 	d.advance(9.1,em)
 	check(d.token(str(em.table.id[a])) == 0, "Out-of-range reservation releases")
-	var body := FieldManager.Body.new()
+	var body := FieldSystem.Body.new()
 	body.pos = Vector2(200,0)
 	body.r = 80.0
 	lab.run.field.bodies.append(body)
-	em._telescope(b,0.01)
-	check(not em.telescope_aiming(b), "Occlusion cancels telegraph")
+	em.behavior(&"sniper").step(b,0.01)
+	check(not em.behavior(&"sniper").telescope_aiming(b), "Occlusion cancels telegraph")
 	d.advance(9.2,em)
 	check(d.token(str(em.table.id[b])) == 0, "Occlusion reservation releases")
 	# 扇の候補絞り込みが48本の従来の円交差結果を保つ。
@@ -88,7 +88,7 @@ func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 823
 	for k in 80:
-		var obstacle := FieldManager.Body.new()
+		var obstacle := FieldSystem.Body.new()
 		obstacle.pos = Vector2.from_angle(rng.randf_range(-PI,PI)) * rng.randf_range(30.0,1500.0)
 		obstacle.r = rng.randf_range(2.0,150.0)
 		lab.run.field.bodies.append(obstacle)
@@ -97,10 +97,10 @@ func _ready() -> void:
 		for charge in [0.0,0.7,1.0]:
 			em.table.facing[a] = angle
 			em.table.charge[a] = charge
-			em._cast_telescope(a)
-			var rays := em.telescope_rays(a)
-			var lens := em.telescope_lens(a)
-			var half := em.telescope_half(a)
+			em.behavior(&"sniper")._cast_telescope(a)
+			var rays: PackedFloat32Array = em.behavior(&"sniper").telescope_rays(a)
+			var lens: Vector2 = em.behavior(&"sniper").telescope_lens(a)
+			var half: float = em.behavior(&"sniper").telescope_half(a)
 			var same := true
 			for n in 48:
 				var direction := Vector2.from_angle(angle-half+2.0*half*n/47.0)
@@ -116,20 +116,21 @@ func _ready() -> void:
 			check(same,"48 ray blocker equivalence")
 			lab.run.state.ship_pos = Vector2.from_angle(angle+half*0.7)*600.0
 			var target_angle: float = (lab.run.state.ship_pos-lens).angle()
-			var full_reach := em.telescope_reach(a,target_angle)
-			em._cast_telescope(a,true)
-			check(absf(em.telescope_reach(a,target_angle)-full_reach)<0.001,"Two-ray admission equals full 48-ray interpolation")
+			var full_reach: float = em.behavior(&"sniper").telescope_reach(a,target_angle)
+			em.behavior(&"sniper")._cast_telescope(a,true)
+			check(absf(em.behavior(&"sniper").telescope_reach(a,target_angle)-full_reach)<0.001,"Two-ray admission equals full 48-ray interpolation")
 	lab.run.field.bodies.clear()
 	lab.run.state.ship_pos = Vector2.ZERO
 	em.table.pos[a] = Vector2(400,0)
 	em.table.facing[a] = PI
 	var rock := em.spawn(em.def_of(&"meteor"),Vector2(200,0),{"meteor_index":0,"size":20.0})
-	check(em._blocking_rock(a,30.0)==rock,"New rock invalidates shared sight cache")
+	em._behavior_index(&"reticle")
+	check(em.behavior(&"reticle")._blocking_rock(a,30.0)==rock,"New rock invalidates shared sight cache")
 	em.table.pos[rock] = Vector2(200,250)
-	check(em._blocking_rock(a,30.0)==-1,"Shared sight cache reads moving rock position")
+	check(em.behavior(&"reticle")._blocking_rock(a,30.0)==-1,"Shared sight cache reads moving rock position")
 	em.table.pos[rock] = Vector2(200,0)
 	em.table.dead[rock] = 1
-	check(em._blocking_rock(a,30.0)==-1,"Destroyed rock immediately excluded")
+	check(em.behavior(&"reticle")._blocking_rock(a,30.0)==-1,"Destroyed rock immediately excluded")
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[attack_priority] %d checks, %d failures" % [checks,failed])

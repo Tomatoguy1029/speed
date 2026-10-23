@@ -25,6 +25,6 @@ func tick(dt: float, busy: bool) -> void:
 	var origin := mount_position() + backwards * 12.5 * cfg.character_scale
 	for i in shots:
 		var angle := backwards.angle() + (i - (shots - 1) / 2.0) * float(p("spread_step"))
-		build.projectiles.fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
+		ctx.projectiles.fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
 			{"life": p("life"), "color": Color(p("color"))})
 	state.emit(&"weapon_fire", {"id": def.id})

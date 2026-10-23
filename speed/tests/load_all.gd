@@ -2,7 +2,7 @@
 ##   Godot --headless --path speed res://tests/load_all.tscn
 extends Node
 
-const DIRS := ["res://scripts", "res://scenes", "res://addons", "res://data", "res://tests", "res://gyms"]
+const DIRS := ["res://scripts", "res://scenes", "res://addons", "res://data", "res://tests", "res://gyms", "res://tools"]
 
 func _ready() -> void:
 	var failed: Array[String] = []

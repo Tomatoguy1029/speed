@@ -145,7 +145,7 @@ func _weapons_steps() -> void:
 	await _wait(0.5)
 	var run := _run_manager()
 	run.ship.invincible = true
-	for id in ConfigManager.weapons:
+	for id in ContentManager.weapons:
 		run.command(&"debug_grant", {"kind": &"weapon", "id": id, "levels": 5})
 	for id in [&"T01", &"T02", &"T03", &"T05", &"T06"]:
 		run.command(&"debug_grant", {"kind": &"trait", "id": id, "levels": 5})
@@ -261,8 +261,8 @@ func _start_run() -> void:
 	await get_tree().process_frame
 	_run_manager().command(&"choose_card", {"index": 0})
 
-func _run_manager() -> RunManager:
-	return get_tree().root.find_child("RunManager", true, false) as RunManager
+func _run_manager() -> RunSimulation:
+	return RunManager.current().sim
 
 func _shot(name: String, wait := 0.4) -> void:
 	await _wait(wait)

@@ -310,7 +310,7 @@ func _select(id: StringName) -> void:
 
 func _refresh_details() -> void:
 	_coins.text = tr("common.parts").format({n = SaveManager.coins()})
-	var def := ConfigManager.meta_upgrades.get(_selected) as MetaUpgradeDef
+	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	_buy_button.disabled = true
 	if def == null:
 		_heading.text = tr("upgrade.select_part")
@@ -329,7 +329,7 @@ func _refresh_details() -> void:
 func _buy() -> void:
 	if _leaving:
 		return
-	var def := ConfigManager.meta_upgrades.get(_selected) as MetaUpgradeDef
+	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	if def != null and SaveManager.buy_upgrade(def):
 		AudioManager.play(&"levelup")
 		_play_upgrade_effect(def.id)

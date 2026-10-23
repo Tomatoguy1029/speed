@@ -38,8 +38,8 @@ func _ready() -> void:
 		grid.add_theme_constant_override("v_separation", 12)
 		list.add_child(grid)
 		_grids.append(grid)
-		var table: Dictionary = ConfigManager.get(section[1])
-		for def in ConfigManager.sorted(table):
+		var table: Dictionary = ContentManager.catalog.table(StringName(section[1]))
+		for def in ContentManager.sorted(table):
 			total += 1
 			var has := SaveManager.is_module_known(def.id)
 			known += 1 if has else 0
@@ -135,5 +135,5 @@ func _show(def: Resource, has: bool) -> void:
 		_caption.text = tr("codex.unknown")
 		_detail.text = tr("codex.unknown_name") + "\n\n" + tr("codex.unknown_detail")
 		return
-	_caption.text = tr("codex.art_custom") if def.preview_texture != null else tr("codex.art_placeholder") if def is LegendaryModuleDef else tr("codex.art_effect")
+	_caption.text = tr("codex.art_custom") if def.preview_texture != null else tr("codex.art_placeholder") if def is ContentEntry and def.category == &"legendary_modules" else tr("codex.art_effect")
 	_detail.text = def.get_display_name() + "\n" + String(def.id) + "\n\n" + def.get_description()

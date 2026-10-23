@@ -8,7 +8,7 @@ func _ready()->void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[-200,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=lab.run.bosses.lab_instances.back().actor
+	var a=lab.run.bosses.actors.back()
 	var field=a.attack_field
 	lab.run.ship.invincible=false
 	var hp: float=lab.run.state.ship_hp

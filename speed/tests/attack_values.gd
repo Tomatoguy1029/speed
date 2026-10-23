@@ -15,8 +15,8 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
-	var em: EnemyManager = lab.run.enemies
-	var pm: ProjectileManager = lab.run.projectiles
+	var em: EnemySystem = lab.run.enemies
+	var pm: ProjectileSystem = lab.run.projectiles
 	var stage := StageDef.new()
 	stage.enemy_attack_values = {"telescope": 1.0, "reticle": 0.5, "aquarius": 4.0}
 	lab.run.state.stage = stage
@@ -33,7 +33,7 @@ func _ready() -> void:
 	stage.enemy_attack_values.reticle = 0.5
 	clip.types.clear()
 	clip.formation_values = {"fixture/pair": 3}
-	const SAVE := "user://attack_values_fixture.tres"
+	const SAVE := "/tmp/speed-attack-values-fixture.tres"
 	check(ResourceSaver.save(clip, SAVE) == OK, "Legacy integer fixture saves")
 	var loaded: SpawnClip = ResourceLoader.load(SAVE, "", ResourceLoader.CACHE_MODE_IGNORE)
 	check(loaded.formation_value("fixture.tscn", "pair") == 3.0 and loaded.formation_values["fixture/pair"] is int, "Legacy integer is preserved as explicit shared override")
@@ -45,7 +45,7 @@ func _ready() -> void:
 	d.formation_mode = true
 	d.configure({"enabled": true, "budget": 1.5, "jitter": 0.0})
 	pm.director = d
-	var rows := em.spawn_formation(data, 0, 0)
+	var rows := em.ctx.spawn.spawn_formation(data, 0, 0)
 	var a := rows[0]
 	var b := rows[2]
 	check(rows.size() == 4 and em.table.attack_group[a] == 0 and em.table.attack_group[b] == 0, "Auto keeps both spawns and uses individual owners")
@@ -68,7 +68,7 @@ func _ready() -> void:
 	check(d.used_cost() == 0.0, "Budget returns after hazard disappears")
 	d.waiting.clear()
 	d.reasons.clear()
-	rows = em.spawn_formation(data, 0, 0, [], 0.5)
+	rows = em.ctx.spawn.spawn_formation(data, 0, 0, [], 0.5)
 	a = rows[0]
 	b = rows[2]
 	em.table.charge[a] = 0.9

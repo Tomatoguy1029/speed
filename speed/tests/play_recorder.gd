@@ -2,10 +2,10 @@
 ## Godot --headless --path speed res://tests/play_recorder.tscn
 extends Node
 
-const RECORDER := preload("res://scripts/managers/play_recorder.gd")
+const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 
 class TempRecorder:
-	extends "res://scripts/managers/play_recorder.gd"
+	extends "res://scripts/dev/play_recorder.gd"
 	var directory := "/tmp/speed-recording-start-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
 	func _recording_directory() -> String:
 		return directory
@@ -44,10 +44,11 @@ func _ready() -> void:
 	get_tree().quit(1 if failed else 0)
 
 func verify_mid_run_start() -> void:
-	var scene := load("res://scenes/run/run.tscn").instantiate() as Node
-	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var scene := RunManager.create_run() as Node
 	add_child(scene)
-	var run := scene.get_node("Managers/RunManager") as RunManager
+	if scene.sim.state == null: await scene.started
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var run := scene.sim as RunSimulation
 	await get_tree().process_frame
 	run.state.time = 42.0
 	run.state.level = 3
@@ -76,7 +77,7 @@ func verify_mid_run_start() -> void:
 		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
 		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
 		rec._set_armed(true)
-		rec._begin(run)
+		rec._begin(scene)
 		check(rec._file.get_path() == path and read_rows(path).size() == 1, "重複開始でファイルを作り直さない")
 		rec._process(0.0)
 		await capture("mid-run")
@@ -116,11 +117,12 @@ func verify_start_routes() -> void:
 			GameManager.run_start_time = route.t
 			if not delayed:
 				rec._set_armed(true)
-			var scene := load("res://scenes/run/run.tscn").instantiate() as Node
-			scene.process_mode = Node.PROCESS_MODE_DISABLED
-			var run := scene.get_node("Managers/RunManager") as RunManager
+			var scene := RunManager.create_run() as Node
+			var run := scene.sim as RunSimulation
 			run.options = {"seed": 932}
 			add_child(scene)
+			if scene.sim.state == null: await scene.started
+			scene.process_mode = Node.PROCESS_MODE_DISABLED
 			await get_tree().process_frame
 			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
 			if delayed:
@@ -128,7 +130,7 @@ func verify_start_routes() -> void:
 				run.choose_card(0)
 				run.combat.rebuild_grid()
 				for tick in 12:
-					run._physics_process(1.0 / 120.0)
+					run.physics_step(1.0 / 120.0)
 				var snapshot := run.recording_snapshot()
 				var rng := run.state.rng.state
 				var key := InputEventKey.new()
@@ -180,7 +182,7 @@ func scenario(recording: bool) -> Dictionary:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 1, "config": {"drop_base": 1.0, "drop_max": 1.0}})
-	var run: RunManager = lab.run
+	var run: RunSimulation = lab.run
 	var pk := run.pickups
 	var s := run.state
 	s.ship_pos = Vector2(3000, 0)
@@ -189,7 +191,7 @@ func scenario(recording: bool) -> Dictionary:
 	add_child(rec)
 	rec.set_process(false)
 	rec._set_armed(true)
-	rec._begin(run)
+	rec._begin(lab.scene)
 	check(rec._file == null, "実験場は通常の記録先へ書かない")
 	rec._set_armed(false)
 	if recording:
@@ -199,15 +201,16 @@ func scenario(recording: bool) -> Dictionary:
 		# 本番のファイル作成だけを分離し、通知・sample・end の処理はそのまま使う。
 		rec._file = FileAccess.open(recording_path, FileAccess.WRITE)
 		rec._run = run
+		rec._session = lab.scene
 		rec._big_crystals = {}
 		pk.big_crystal_dropped.connect(rec._on_big_crystal)
 		check(rec._xp_config().big_crystal_xp == Array(run.cfg.big_crystal_xp), "開始時の大きい結晶の設定を取得できる")
 		run.phase_changed.connect(rec._on_phase_changed)
-		run.tree_exiting.connect(rec._end.bind("quit"))
+		lab.scene.tree_exiting.connect(rec._end.bind("quit"))
 	# 実際の敵ドロップ経路。ドロップ率1なので雑魚も大きい結晶を落とし、レチクル座は中の段を必ず落とす。
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"biter"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"biter"], s.ship_pos))
 	s.time = 6.0
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"reticle"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"reticle"], s.ship_pos))
 	pk._collect_gems(0.01)
 	check(s.xp_gained >= 75.0 + 12.0, "大きい結晶の XP を回収する")
 	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "gems": pk.gem_slots.live}
@@ -241,8 +244,8 @@ func verify_performance() -> void:
 	var lab = load('res://gyms/enemy_lab/lab_session.gd').new()
 	add_child(lab)
 	await lab.reset({'seed':932,'empty':true,'stage':4})
-	var run: RunManager = lab.run
-	run.set_physics_process(false)
+	var run: RunSimulation = lab.run
+	lab.scene.auto_step = false
 	run.state.phase = RunState.Phase.PLAY
 	run.state.time = 300.0
 	var rec = RECORDER.new()
@@ -253,6 +256,7 @@ func verify_performance() -> void:
 	var path := directory.path_join('performance.jsonl')
 	rec._file = FileAccess.open(path,FileAccess.WRITE)
 	rec._run = run
+	rec._session = lab.scene
 	var stamp := Time.get_ticks_usec()
 	rec._perf_start(stamp)
 	var rng_before := run.state.rng.state

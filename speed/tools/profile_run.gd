@@ -2,8 +2,8 @@
 ## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on --types=pump,lynx
 extends Node
 
-var run: RunManager
-var render: RenderManager
+var run: RunSimulation
+var render: RunPresentation
 var drawing_times: Dictionary = {}
 var frames: Array[float] = []
 var gpu_times: Array[float] = []
@@ -36,37 +36,38 @@ func _ready() -> void:
 	if options.has("overlay"):
 		# --overlay=compact|detail で性能の表示を出した状態で始める
 		PerfOverlay.saved_mode = PerfOverlay.Mode.DETAIL if options.overlay == "detail" else PerfOverlay.Mode.COMPACT
-	var scene := preload("res://scenes/run/run.tscn").instantiate()
-	add_child(scene)
-	run = scene.get_node("Managers/RunManager")
-	render = scene.get_node("Managers/RenderManager")
+	var session := RunManager.create_run()
+	add_child(session)
+	if session.sim.state == null: await session.started
+	run = session.sim
+	render = session.view.get_node("RunPresentation")
 	await get_tree().process_frame
 	await get_tree().process_frame
 	run.command(&"choose_card", {"index": 0})
-	run.build.reset_loadout()
-	run.build.grant(&"weapon", &"W01", 1)
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W01", 1)
 	if options.get("attack", "off") == "on":
-		run.build.reset_loadout()
+		run.loadout.reset_loadout()
 		for id in [&"W03", &"W04", &"W08", &"W17"]:
-			run.build.grant(&"weapon", id, 5)
-		run.build.grant(&"trait", &"T04", 5)
+			run.loadout.grant(&"weapon", id, 5)
+		run.loadout.grant(&"trait", &"T04", 5)
 	if options.has("weapons"):
 		# --weapons=W01:5,W02:3,T03:2 で装備を置き換える（T で始まるものは特性）
-		run.build.reset_loadout()
+		run.loadout.reset_loadout()
 		for item in String(options.weapons).split(",", false):
 			var parts := item.split(":")
 			var kind := &"trait" if parts[0].begins_with("T") else &"weapon"
-			run.build.grant(kind, StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
+			run.loadout.grant(kind, StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
 	run.state.rng.seed = 1029
-	# RunManager の初期化は乱数配置なので、天体も同じシードで作り直す。
+	# ランの初期化は乱数配置なので、天体も同じシードで作り直す。
 	# 天体との接触量の違いを、描画の比較条件へ混ぜない。
 	run.field.bodies.clear()
 	run.field.moons.clear()
 	run.field.dust.clear()
 	run.field.rocks.clear()
 	run.enemies.clear_all()
-	run.field.setup(run.state, run.cfg)
-	run.ship.setup(run.state, run.cfg)
+	run.field.setup(run.ctx)
+	run.ship.setup(run.ctx)
 	run.state.world_time = 0.0
 	run.ship.invincible = true
 	run.input._touch = true
@@ -91,7 +92,7 @@ func _ready() -> void:
 		render.pipeline.sparks.rd = null
 		render.pipeline.sparks.hide()
 	if options.get("glow", "on") == "off":
-		for child in scene.get_node("World").get_children():
+		for child in session.view.get_node("World").get_children():
 			if child is WorldEnvironment:
 				child.environment.glow_enabled = false
 	if options.get("background", "on") == "off":
@@ -282,7 +283,7 @@ func _benchmark_bodies() -> Dictionary:
 func _old_body_hit(p0: Vector2, p1: Vector2, radius: float) -> Variant:
 	var found = null
 	var earliest := INF
-	for b: FieldManager.Body in run.field.bodies:
+	for b: FieldSystem.Body in run.field.bodies:
 		var rr := b.r + radius
 		if maxf(p0.x, p1.x) < b.pos.x - rr or minf(p0.x, p1.x) > b.pos.x + rr \
 				or maxf(p0.y, p1.y) < b.pos.y - rr or minf(p0.y, p1.y) > b.pos.y + rr:

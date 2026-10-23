@@ -1,65 +1,15 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scripts/managers/run_manager.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/managers/field_manager.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/managers/ship_manager.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/managers/draw_manager.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/managers/combat_manager.gd" id="5"]
-[ext_resource type="Script" path="res://scripts/managers/enemy_manager.gd" id="6"]
-[ext_resource type="Script" path="res://scripts/managers/boss_manager.gd" id="7"]
-[ext_resource type="Script" path="res://scripts/managers/projectile_manager.gd" id="8"]
-[ext_resource type="Script" path="res://scripts/managers/build_manager.gd" id="9"]
-[ext_resource type="Script" path="res://scripts/managers/pickup_manager.gd" id="10"]
-[ext_resource type="Script" path="res://scripts/managers/render_manager.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/render/run_presentation.gd" id="11"]
 [ext_resource type="Script" path="res://scripts/input/input_router.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="13"]
-[ext_resource type="Script" path="res://scripts/ui/debug_panel.gd" id="14"]
-[ext_resource type="Script" path="res://scripts/ui/perf_overlay.gd" id="15"]
-[ext_resource type="Script" path="res://scripts/managers/hero_manager.gd" id="16"]
 
 [node name="Run" type="Node"]
 
-[node name="Managers" type="Node" parent="."]
-
-[node name="RunManager" type="Node" parent="Managers"]
-script = ExtResource("1")
-world_path = NodePath("../../World")
-input_path = NodePath("../../World/InputRouter")
-
-[node name="FieldManager" type="Node" parent="Managers"]
-script = ExtResource("2")
-
-[node name="ShipManager" type="Node" parent="Managers"]
-script = ExtResource("3")
-
-[node name="DrawManager" type="Node" parent="Managers"]
-script = ExtResource("4")
-
-[node name="CombatManager" type="Node" parent="Managers"]
-script = ExtResource("5")
-
-[node name="EnemyManager" type="Node" parent="Managers"]
-script = ExtResource("6")
-
-[node name="BossManager" type="Node" parent="Managers"]
-script = ExtResource("7")
-
-[node name="ProjectileManager" type="Node" parent="Managers"]
-script = ExtResource("8")
-
-[node name="BuildManager" type="Node" parent="Managers"]
-script = ExtResource("9")
-
-[node name="PickupManager" type="Node" parent="Managers"]
-script = ExtResource("10")
-
-[node name="HeroManager" type="Node" parent="Managers"]
-script = ExtResource("16")
-
-[node name="RenderManager" type="Node" parent="Managers"]
+[node name="RunPresentation" type="Node" parent="."]
 script = ExtResource("11")
-world_path = NodePath("../../World")
-camera_path = NodePath("../../World/Camera2D")
+world_path = NodePath("../World")
+camera_path = NodePath("../World/Camera2D")
 
 [node name="World" type="Node2D" parent="."]
 
@@ -80,16 +30,3 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("13")
-run_path = NodePath("../../Managers/RunManager")
-
-[node name="DebugPanel" type="PanelContainer" parent="Hud"]
-offset_left = 16.0
-offset_top = 110.0
-offset_right = 436.0
-offset_bottom = 690.0
-script = ExtResource("14")
-run_path = NodePath("../../Managers/RunManager")
-
-[node name="PerfOverlay" type="PanelContainer" parent="Hud"]
-script = ExtResource("15")
-run_path = NodePath("../../Managers/RunManager")

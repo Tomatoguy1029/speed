@@ -12,7 +12,8 @@ var capture_path:=""
 var capture_at:=1.0
 var capturing:=false
 var inspect_clock:=0.0
-var review_owner: BossManager
+var review_owner: BossActor
+var reviewing := false
 var review_next:=0.3
 var review_counts: Dictionary={}
 
@@ -20,17 +21,17 @@ func _ready() -> void:
 	await super._ready()
 	if not OS.is_debug_build(): return
 	await session.reset({"empty": true, "stage": 4, "ship_pos": [trial_ship_position.x, trial_ship_position.y],
-		"invincible": trial_invincible, "hero": "hercules", "config": {"base_attack": ConfigManager.base.base_attack * trial_attack_multiplier}})
+		"invincible": trial_invincible, "hero": "hercules", "config": {"base_attack": ContentManager.base.base_attack * trial_attack_multiplier}})
 	session.perform("boss", {"type": "hydra", "pos": [0, 0]})
 	# 読み込み・描画確認用。通常起動の試遊条件を共有設定へ保存しない。
 	if OS.get_cmdline_user_args().has("--hydra-split"):
-		var hydra=session.run.bosses.lab_instances.back().actor
+		var hydra=session.run.bosses.actors.back()
 		hydra._set_count(8)
 		hydra.begin_separation()
 	if OS.get_cmdline_user_args().has("--hydra-inspect"):
 		session.pinned=trial_ship_position
-		session.run.build.reset_loadout()
-		inspect_actor=session.run.bosses.lab_instances.back().actor
+		session.run.loadout.reset_loadout()
+		inspect_actor=session.run.bosses.actors.back()
 		for arg in OS.get_cmdline_user_args():
 			if arg.begins_with("--hydra-capture="):capture_path=arg.trim_prefix("--hydra-capture=")
 			if arg.begins_with("--hydra-capture-at="):capture_at=float(arg.trim_prefix("--hydra-capture-at="))
@@ -50,16 +51,17 @@ func _ready() -> void:
 				session.pinned=inspect_actor._head_pos(n)+Vector2(450.0 if float(rule.min)>0.0 else 150.0,0.0)
 			inspect_pending=true
 	if OS.get_cmdline_user_args().has("--hydra-review"):
-		review_owner=session.run.bosses.lab_instances.back()
+		review_owner=session.run.bosses.actors.back()
+		reviewing = true
 		session.pinned=null
 		session.run.state.stats.attack_mult=1000.0
 	if OS.get_cmdline_user_args().has("--hydra-arena-edge"):
-		var bounds: Rect2=session.run.bosses.lab_instances.back().actor.arena.bounds
+		var bounds: Rect2=session.run.bosses.actors.back().arena.bounds
 		session.pinned=bounds.end-Vector2(220,220)
 		session.run.state.ship_pos=session.pinned
 		session.run.state.view_center=session.pinned
 	_set_mode(3)
-	if review_owner!=null:session.live_input=Callable()
+	if reviewing:session.live_input=Callable()
 	_refresh()
 
 func _notification(what: int)->void:
@@ -69,16 +71,16 @@ func _notification(what: int)->void:
 
 func _process(delta: float)->void:
 	super._process(delta)
-	if capture_path!="" or review_owner!=null:
+	if capture_path!="" or reviewing:
 		session.playing=true
 		if session.run.state.phase==RunState.Phase.PAUSED:session.run.command(&"resume")
 		inspect_clock+=delta
-	if review_owner!=null:
-		if not review_owner.has_boss():
+	if reviewing:
+		if not is_instance_valid(review_owner) or not review_owner.has_body():
 			print("[hydra-review] PASS drawn routes completed combined growth, separation and bearer defeat; phases=",review_counts)
 			get_tree().quit()
 			return
-		var a=review_owner.actor
+		var a=review_owner
 		if inspect_clock>40.0:
 			print("[hydra-review] FAIL timeout; hp=",a.table.hp[a.body]," count=",a.count," split=",a.separated," phase=",session.run.state.phase," drawing=",session.run.state.drawing," tracing=",session.run.state.tracing," worlds=",session.run.state.world_time)
 			get_tree().quit(1)

@@ -52,27 +52,27 @@ func _runtime_checks() -> void:
 		{"type": &"aquarius", "pos": Vector2.ZERO, "rot": 0.0},
 		{"type": &"telescope", "pos": Vector2(100, 0), "rot": 0.0}]}],
 		"entries": [{"weight": 1.0, "pos": Vector2.ZERO, "rot": 0.0}]}
-	var rows: PackedInt32Array = em.spawn_formation(data, 0, 0, [], -1.0, 0.0)
+	var rows: PackedInt32Array = em.ctx.spawn.spawn_formation(data, 0, 0, [], -1.0, 0.0)
 	check(em.table.attack_priority[rows[0]] == 0.0 and em.table.attack_priority[rows[2]] == 0.0,
 		"Explicit clip zero overrides both StageDef types")
-	rows = em.spawn_formation(data, 0, 0, [], 2.0, 1.0)
+	rows = em.ctx.spawn.spawn_formation(data, 0, 0, [], 2.0, 1.0)
 	check(em.table.attack_priority[rows[0]] == 1.0 and em.table.attack_priority[rows[2]] == 1.0,
 		"Clip priority reaches every type with shared override")
 	check(em.table.attack_value[rows[0]] == 2.0, "Priority preserves shared attack cost")
 	var part: int = em.spawn_part(rows[0], em.def_of(&"telescope"), Vector2.ZERO)
 	check(em.table.attack_priority[part] == 1.0, "Derived part keeps source priority over its type default")
 	var ruler: int = em.spawn(em.def_of(&"ruler"), Vector2.ZERO, {"attack_priority": 1.0})
-	em._split_ruler(ruler)
-	var halves: PackedInt32Array = em.beh_rows[EnemyTable.Beh.RULER]
+	em.behavior(&"ruler")._split_ruler(ruler)
+	var halves: PackedInt32Array = em.behavior(&"ruler").rows()
 	check(halves.size() == 2 and em.table.attack_priority[halves[1]] == 1.0, "Ruler split keeps priority")
 	# 実際のクリップ出現経路。時刻・配置・数はfixtureのまま使う。
 	clip.formations = [load("res://data/formations/aquarius_solo.tscn")]
 	clip.types = [&"aquarius"]
 	clip.length = 10.0
-	stage.clips = [clip]
+	stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(clip)]
 	lab.run.state.time = 0.0
-	em._tick_clips()
-	var groups: Array = em._clip_groups[0]
+	em.ctx.spawn._tick_clips()
+	var groups: Array = em.ctx.spawn._clip_groups[0]
 	var spawned: PackedInt32Array = groups[0]
 	check(em.table.attack_priority[spawned[0]] == 1.0, "Ticked clip propagates Inspector value")
 	var d = load("res://scripts/encounters/attack_director.gd").new()

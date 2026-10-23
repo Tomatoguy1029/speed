@@ -6,6 +6,11 @@ extends Node
 
 enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB }
 
+signal screen_ready(view: Control)
+## 起動側から加える画面。
+var extension_screens: Dictionary = {}
+var boot_request: Callable
+
 signal screen_changed(screen: Screen)
 signal run_requested(stage: int, endless: bool)
 

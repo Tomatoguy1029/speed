@@ -8,7 +8,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"empty": true, "stage": 4})
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
-	var boss = lab.run.bosses.lab_instances.back().actor
+	var boss = lab.run.bosses.actors.back()
 	boss.hsm.set_active(false)
 	for neck in boss.necks: neck.cd = 1e6
 	var first = boss.necks[0]

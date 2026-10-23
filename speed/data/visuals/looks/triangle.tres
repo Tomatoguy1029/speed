@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EnemyLook" load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://dnagso08hefhy" path="res://scripts/render/enemy_look.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://dmnywvqlu6dsh" path="res://assets/pixel/triangle/triangle_center_base.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://cmvmotawxqqb3" path="res://assets/pixel/triangle/triangle_center_armor.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://cuo5y7dh5xvhf" path="res://assets/pixel/triangle/triangle_center_normal.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+angle = 1.5707964
+armor = ExtResource("3")
+base = ExtResource("2")
+normal = ExtResource("4")

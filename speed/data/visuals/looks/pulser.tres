@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyLook" load_steps=5 format=3]
+
+[ext_resource type="Script" uid="uid://dnagso08hefhy" path="res://scripts/render/enemy_look.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://crfc3hhc2neai" path="res://assets/pixel/pulser/pulser_base.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://nh45wipivsxv" path="res://assets/pixel/pulser/pulser_armor.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://cpkikjh5hnwwd" path="res://assets/pixel/pulser/pulser_normal.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+angle = 1.5707964
+armor = ExtResource("3")
+base = ExtResource("2")
+normal = ExtResource("4")
+size_from_collision = true

@@ -1,25 +1,29 @@
 ## ボスの役者の共通の土台（設計書 4.2・6.1）。ボスのシーンのルートに付ける。
 ##
 ## 当たり判定の円は敵の表（EnemyTable）の1行（body）として入り、ボスの行動はこの役者が
-## BossManager から決まった順番で呼ばれて動かす（sim_tick）。見た目はこのノードの子に置く。
+## BossSystem から決まった順番で呼ばれて動かす（sim_tick）。見た目はこのノードの子に置く。
 class_name BossActor
 extends Node2D
 
-var manager: BossManager
+var ctx: RunContext
+var body_id := 0
+var registered := false
 ## 当たり判定の円の、敵の表での行番号
 var body := -1
 var def: BossDef
-## true なら、役者が本体を自分で描く（RenderManager はボスの行を描かない）
+## true なら、役者が本体を自分で描く（RunPresentation はボスの行を描かない）
 var draws_self := false
 
 var run_state: RunState:
-	get: return manager.state
+	get: return ctx.state
 var table: EnemyTable:
-	get: return manager.enemies.table
+	get: return ctx.enemies.table
 
-func bind(m: BossManager, row: int, d: BossDef) -> void:
-	manager = m
+func bind(context: RunContext, row: int, d: BossDef) -> void:
+	ctx = context
 	body = row
+	body_id = table.id[row]
+	registered = true
 	def = d
 	position = table.pos[row]
 	_on_bound()
@@ -46,10 +50,17 @@ func handle_body_defeat(_opts: Dictionary) -> bool:
 	return false
 
 func _process(_delta: float) -> void:
-	if manager != null and manager.has_boss():
+	if has_body():
 		position = table.pos[body]
 		rotation = table.facing[body]
 
 ## 上部HP表示の対象行。形態によって本命の部位へ切り替えられる。
 func health_row()->int:
 	return body
+
+## 行を再利用した別の敵を、この役者の本体として扱わない。
+func has_body() -> bool:
+	return registered and ctx != null and ctx.enemies != null and ctx.enemies.is_same(body, body_id)
+
+func body_alive() -> bool:
+	return has_body() and table.dead[body] == 0

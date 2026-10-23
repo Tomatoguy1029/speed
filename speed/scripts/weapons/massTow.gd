@@ -12,7 +12,7 @@ var _fire_t := 0.0
 func capture(i: int) -> bool:
 	if not state.tracing:
 		return false
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	if t.meteor_index[i] >= 0 or t.is_boss[i] != 0:
 		return false
 	var reach := float(p("capture_radius")) + t.r[i]
@@ -49,7 +49,7 @@ func tick(dt: float, _busy: bool) -> void:
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:
 		var c: Dictionary = cargo.pop_front()
 		var dmg := atk() * float(p("damage")) * dmg_k() * maxf(1.0, float(c.r) / float(p("size_ref")))
-		build.projectiles.fire_hull(c.pos, u * (float(p("shot_speed")) + sp), c.r, dmg, p("life"), p("knock"),
+		ctx.projectiles.fire_hull(c.pos, u * (float(p("shot_speed")) + sp), c.r, dmg, p("life"), p("knock"),
 			c.type, u.angle(), c.source_id)
 		state.emit(&"ring", {"pos": c.pos, "radius": maxf(34.0, float(c.r)), "color": Color("#ffbe65"), "life": 0.15})
 		_fire_t += interval

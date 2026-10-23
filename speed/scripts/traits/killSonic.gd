@@ -24,4 +24,4 @@ func on_kill(cause: StringName) -> void:
 	if cause == &"killSonic" or _kills < _next or state.phase != RunState.Phase.PLAY:
 		return
 	_next = _kills + _every()
-	build.run_sonic(&"killSonic", val("radius"), atk() * val("damage"), def.params.knock, def.params.travel)
+	ctx.projectiles.attached_attack(&"sonic").fire(&"killSonic", val("radius"), atk() * val("damage"), def.params.knock, def.params.travel)

@@ -1,4 +1,4 @@
-## 短い出現タイムラインの編集テスト。保存先は user:// の fixture だけ。
+## 短い出現タイムラインの編集テスト。保存先は /tmp の fixture だけ。
 ## godot --headless --editor --path speed --script res://tests/spawn_timeline.gd
 @tool
 extends SceneTree
@@ -8,7 +8,7 @@ const SpawnCurveResource := preload("res://scripts/data_types/spawn_curve.gd")
 const Clip := preload("res://scripts/data_types/spawn_clip.gd")
 const Marker := preload("res://tests/fixtures/timeline_enemy.gd")
 const Stage := preload("res://tests/fixtures/timeline_stage.gd")
-const SAVE := "user://spawn_timeline_fixture.tres"
+const SAVE := "/tmp/spawn_timeline_fixture.tres"
 var panel
 var canvas
 var manager: EditorUndoRedoManager
@@ -332,7 +332,7 @@ func _formation(label: String, types: Array) -> PackedScene:
 	var scene := PackedScene.new()
 	scene.pack(root_node)
 	root_node.free()
-	var path := "user://spawn_timeline_%s.tscn" % label
+	var path := "/tmp/spawn_timeline_%s.tscn" % label
 	ResourceSaver.save(scene, path)
 	scene.take_over_path(path)
 	temporary_scenes.append(path)

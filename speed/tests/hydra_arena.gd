@@ -8,14 +8,14 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a = lab.run.bosses.lab_instances.back().actor
+	var a = lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	var arena = a.get("arena")
 	check(arena != null,"encounter creates fixed rubble arena immediately")
 	if arena != null:
 		var bounds: Rect2 = arena.bounds
 		var center := bounds.get_center()
-		var field: FieldManager = lab.run.field
+		var field: FieldSystem = lab.run.field
 		var r: float = lab.run.cfg.ship_radius
 		check(field.boundary_accel(Vector2(lab.run.cfg.field_radius+100.0,0))==Vector2.ZERO,"encounter boundary replaces distant world-edge force")
 		for dir in [Vector2.RIGHT,Vector2.LEFT,Vector2.UP,Vector2.DOWN,Vector2(1,1).normalized()]:
@@ -24,7 +24,7 @@ func _ready() -> void:
 		lab.run.state.ship_pos=center+Vector2(bounds.size.x,0)
 		lab.run.state.ship_vel=Vector2(10000,0)
 		check(lab.run.combat.wall_bounce(center) and lab.run.state.ship_vel.x<0.0,"high speed travel bounces inside fixed wall")
-		var body := FieldManager.Body.new()
+		var body := FieldSystem.Body.new()
 		body.pos=Vector2(bounds.end.x-80.0,center.y)
 		body.r=120.0
 		field.bodies.append(body)
@@ -69,7 +69,7 @@ func _ready() -> void:
 				a.sim_tick(0.025,0.025)
 				if not a.busy or not a.special.positioning:break
 			check(a.tech==&"grid" and not a.special.positioning,"guards and bearer actually reach bounded grid formation")
-		a.manager.remove_boss()
+		a.ctx.bosses.remove_actor(a)
 		await get_tree().process_frame
 		check(field.first_body_hit(center,center+Vector2(10000,0),r)==null,"removing encounter releases boundary collision")
 	lab.queue_free()
