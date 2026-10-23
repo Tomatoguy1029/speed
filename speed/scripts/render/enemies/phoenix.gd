@@ -62,7 +62,7 @@ func _draw_flames(c: CanvasItem) -> void:
 	for i in behavior.rows():
 		if t.dead[i] == 0 and t.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH]:
 			var radius: float = behavior.impact_radius(i)
-			if view.grow(radius * 1.2).has_point(t.anchor[i]):
+			if view.grow(radius * (1.2 + float(flame_settings.lift))).has_point(t.anchor[i]):
 				_flame_quad(c, t.anchor[i], radius, t.charge[i] if t.mode[i] == EnemyTable.Mode.WINDUP else 1.0,
 					float(t.id[i] % 31) / 31.0, false)
 	var pr := run.projectiles
@@ -70,12 +70,14 @@ func _draw_flames(c: CanvasItem) -> void:
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.PHOENIX:
 			continue
 		var radius := pr.hazard_len[i]
-		if view.grow(radius * 1.2).has_point(pr.hazard_pos[i]):
+		if view.grow(radius * (1.2 + float(flame_settings.lift))).has_point(pr.hazard_pos[i]):
 			var age := clampf((pr.hazard_t[i] - pr.hazard_delay[i]) / maxf(0.001, pr.hazard_active[i]), 0.0, 1.0)
 			_flame_quad(c, pr.hazard_pos[i], radius, age, float(i % 31) / 31.0, true)
 
 func _flame_quad(c: CanvasItem, center: Vector2, radius: float, age: float, seed: float, attack: bool) -> void:
-	var uv := PackedVector2Array([Vector2(-1.2, -1.2), Vector2(1.2, -1.2), Vector2(1.2, 1.2), Vector2(-1.2, 1.2)])
+	# 上へ立ち上がる先端だけ余白を増やし、消失時も四角形の端で切らない。
+	var top := -1.2 - float(flame_settings.lift)
+	var uv := PackedVector2Array([Vector2(-1.2, top), Vector2(1.2, top), Vector2(1.2, 1.2), Vector2(-1.2, 1.2)])
 	var points := PackedVector2Array()
 	for p in uv:
 		points.append(center + p * radius)

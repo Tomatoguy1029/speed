@@ -163,16 +163,20 @@ func _capture(stage: RuntimeStage) -> void:
 	b.step(row, 0.01)
 	b.step(row, float(p.retreat_time))
 	b.step(row, float(p.telegraph) * 0.6)
-	for phase in ["telegraph", "dive", "impact", "recover"]:
+	for phase in ["telegraph", "dive", "impact-rise", "impact", "impact-fade", "recover"]:
 		if phase == "dive":
 			b.step(row, float(p.telegraph))
 			b.step(row, float(p.dive_time) * 0.7)
-		elif phase == "impact":
+		elif phase == "impact-rise":
 			b.step(row, float(p.dive_time))
+			sim.projectiles.tick(0.03, 0.03)
+		elif phase == "impact":
 			sim.projectiles.tick(0.12, 0.12)
+		elif phase == "impact-fade":
+			sim.projectiles.tick(0.27, 0.27)
 		elif phase == "recover":
-			sim.projectiles.tick(0.7, 0.7)
-			b.step(row, 0.7)
+			sim.projectiles.tick(0.3, 0.3)
+			b.step(row, 0.3)
 		sim.state.world_time += 0.1
 		await get_tree().process_frame
 		await get_tree().process_frame
