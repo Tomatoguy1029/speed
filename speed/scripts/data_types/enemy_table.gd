@@ -78,17 +78,17 @@ var timer := PackedFloat64Array()
 ## 射撃型・ミサイル艇・戦艦：次の射撃までの時間、予告の溜め（0〜1。ボスも使う）
 var fire_t := PackedFloat64Array()
 var charge := PackedFloat64Array()
-## 分裂型：次の分裂までの時間と、分裂した数。ポンプ座は buds に吸い込んだ敵の数を持つ
+## 分裂型の間隔と数。ポンプ座の buds は吸い込んだ数、かに座は小走り/停止の時間と左右の進行方向。
 var bud_t := PackedFloat64Array()
 var buds := PackedInt32Array()
-## からす座：回収して運んでいる経験値の量
+## からす座の回収XP。かに座は横歩きで届かない経過時間。
 var carry := PackedFloat64Array()
-## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）。ケフェウス座の兵：仕える王の行番号と id
+## レチクル座の岩、ケフェウス座の兵の王の行番号とID。かに座は薙ぎ/向き直しの区分と向き直す回数。
 var target := PackedInt32Array()
 var target_id := PackedInt32Array()
-## ケフェウス座：隊列の基準の位置。ほうおう座：離脱先・予告した着地点。
+## ケフェウス座の隊列位置。ほうおう座の離脱先・着地点。かに座の向き直す先・突進直前の位置。
 var anchor := PackedVector2Array()
-## 漂流する敵・隕石の回転の速さ
+## 漂流する敵・隕石の回転速度。かに座は向き直す前の角度。
 var spin := PackedFloat64Array()
 ## 敵に付いて動く攻撃の形の行番号（ProjectileSystem の hazard_ の行。とけい座の針など）
 var links: Array[PackedInt32Array] = []
