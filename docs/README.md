@@ -26,6 +26,9 @@
 | [game/backlog.md](game/backlog.md) | 課題 |
 | `game/catalog/*.md` | 量産する項目の一覧と、その運用ルール。[共有アート素材リスト](game/catalog/art-assets.md)は必要な絵・要照合の候補を洗い出し、依頼・納品・組込・確認の状態を管理する |
 | `game/stages/stage-1.md`〜`stage-5.md` | ステージの個別仕様。狙う体験・フェーズ・敵の役割・ボス戦 |
+| [game/bosses/monoceros.md](game/bosses/monoceros.md) | いっかくじゅう座の個別仕様。核と、戦闘・行動判断の要件・素材と演出の雛形 |
+| [game/bosses/centaurus.md](game/bosses/centaurus.md) | ケンタウルス座の個別仕様。核と、戦闘・行動判断の要件・素材と演出の雛形 |
+| [game/bosses/canis-major.md](game/bosses/canis-major.md) | おおいぬ座の個別仕様。核と、戦闘・行動判断の要件・素材と演出の雛形 |
 | [game/bosses/hydra.md](game/bosses/hydra.md) | うみへび座の個別仕様。戦闘、行動判断の要件、素材と演出 |
 | [dev/architecture.md](dev/architecture.md) | 設計書。Godot での作り方 |
 | [dev/stage-production.md](dev/stage-production.md) | ステージ制作ガイド。制作者が使う制作・操作・試遊調整の入口 |
