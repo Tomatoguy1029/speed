@@ -3,8 +3,12 @@
 ## HP・装甲には、調整値の「敵の HP 倍率」「敵の装甲倍率」も掛かる。
 ## ---
 ## 値の正は res://data/enemies/*.tres（一覧 docs/game/catalog/enemies.md）。既定値は 0（GameConfig と同じ理由）。
+@tool
 class_name EnemyDef
 extends Resource
+
+## ラン専用の複製へ適用する標準HP。保存元はStageDef.enemy_tuning。
+var stage_hp := -1.0
 
 ## データ編集の画面での並び順
 const EDITOR_ORDER := 3
@@ -290,6 +294,7 @@ const PARAMS_DOCS := {
 ## 素の体当たり（config.base_attack）が装甲を通る場合に n 回で倒れる HP の真ん中（攻撃力 ×（n − 1）＋ 攻撃力 ÷ 2）。それ以外は hp。
 ## 星6〜10への適用は試遊調整用の暫定設定（仕様書11.1）。
 func base_hp(cfg: GameConfig) -> float:
+	if stage_hp > 0.0: return stage_hp
 	if rank >= 1 and rank <= cfg.rank_hits.size():
 		var hits := maxi(1, cfg.rank_hits[rank - 1] + toughness)
 		return cfg.base_attack * (hits - 1) + cfg.base_attack * 0.5

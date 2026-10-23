@@ -1,4 +1,4 @@
-## T06 クリティカルランス：クリティカルのたびに、進む向きへ貫くビーム。ビームからは再び発動しない（一覧 docs/game/catalog/traits.md）。
+## T06 クリティカルランス：クリティカルのたびに、進む向きへ貫く光の槍。槍からは再び発動しない（一覧 docs/game/catalog/traits.md）。
 extends TraitBehavior
 
 var _next_time := 0.0
@@ -23,4 +23,4 @@ func on_critical(from: Vector2) -> void:
 		ctx.combat.damage_enemy(i, dmg, {"cause": &"critBeam", "no_crit": true, "dir": u, "knock": def.params.knock})
 		if state.phase != RunState.Phase.PLAY:
 			return
-	state.emit(&"beam", {"from": from, "to": to, "width": width})
+	state.emit(&"critical_lance", {"from": from, "to": to, "width": width})

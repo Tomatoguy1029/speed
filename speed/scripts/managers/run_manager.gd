@@ -12,8 +12,9 @@ var _next_id := 1
 var current_id := -1
 
 ## 通常のゲームのランを作る。ステージとモードは GameManager の選択から読む。
-## 返したセッションを、呼び出し側が画面として木に入れたあと start する。
+## 資源の読み込みを開始して返す。呼び出し側が木へ入れると描画の準備を進める。
 func create_run() -> RunSession:
+	var before := Time.get_ticks_usec()
 	var options := {"stage_index": GameManager.run_stage, "endless": GameManager.run_endless,
 		"stage": ContentManager.runtime_stage(GameManager.run_stage), "profile": ProfileManager.for_run(false)}
 	if OS.is_debug_build():
@@ -22,10 +23,12 @@ func create_run() -> RunSession:
 	GameManager.run_start_time = 0.0
 	GameManager.run_start_source = "stage_start"
 	var session := _register(RunSession.new(), options)
+	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec() - before) / 1000.0
 	current_id = session.id
 	session.sim.finished.connect(GameManager.finish_run)
 	session.sim.aborted.connect(GameManager.abort_run)
-	session.ready.connect(func(): session.start_loading(options), CONNECT_ONE_SHOT)
+	# 暗転中にもI/Oを進める。描画準備は木に入ってから行う。
+	session.start_loading(options)
 	return session
 
 ## 実験場・道具のランを作り、parent の下で始める。

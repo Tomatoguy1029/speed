@@ -38,7 +38,7 @@ export/convert_text_resources_to_binary=false
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/content_build/plugin.cfg", "res://addons/spawn_timeline/plugin.cfg", "res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg")
+enabled=PackedStringArray("res://addons/content_build/plugin.cfg", "res://addons/spawn_timeline/plugin.cfg", "res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg", "res://addons/stage_enemy_tuning/plugin.cfg")
 
 [gui]
 

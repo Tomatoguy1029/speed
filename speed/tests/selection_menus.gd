@@ -128,6 +128,8 @@ func _ready() -> void:
 	# ゲーム中のデバッグ表示も閉じるまで時計を停止し、背後の入力を残さない。
 	run.state.pending_levels = 0
 	run.cfg.weapon_slots = 1
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W01")
 	run.loadout._receive_comet_weapon(&"W17")
 	var swap := run.state.swap_pick
 	cards = run.state.cards.duplicate(true)

@@ -5,12 +5,12 @@
 [resource]
 script = ExtResource("1")
 radius = 12.0
-hp = 6.0
+hp = 8.0
 accel = 1.0
 turn = 1.0
-xp = 2.0
+xp = 3.0
 color = Color(0.85, 1, 0.9, 1)
 shape = &"diamond"
-behavior = &"part"
+behavior = &"triangle_star"
 id = &"triangle_star"
 display_name = "みなみのさんかく座の星"

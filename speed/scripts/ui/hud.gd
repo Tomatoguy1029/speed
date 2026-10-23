@@ -266,6 +266,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
 	if run == null or run.state == null or run.state.lab_mode:
 		return
 	if run.state.phase == RunState.Phase.FINISHING:
@@ -289,7 +291,7 @@ func _input(event: InputEvent) -> void:
 		or (event is InputEventScreenTouch and event.pressed)
 		or event.is_action_pressed(&"ui_accept"))
 	var choosing := not in_menu and run.state.phase == RunState.Phase.LEVELUP
-	var blocked: bool = not in_menu and (_rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at))
+	var blocked: bool = _card_discard.has(id) or (not in_menu and (_rewards.is_active() or (choosing and Time.get_ticks_usec() < _cards_accept_at)))
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -734,9 +736,26 @@ func _build_pause() -> void:
 	var quit := Button.new()
 	quit.text = "hud.quit_run"
 	quit.custom_minimum_size = Vector2(320, 52)
-	quit.pressed.connect(func(): run.command(&"abort"))
+	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+
+func _confirm_abort() -> void:
+	if run.state.phase != RunState.Phase.PAUSED or not can_show_menu_overlay(): return
+	var dialog := preload("res://scripts/ui/run_exit_confirmation.gd").new()
+	dialog.input_id = _card_input_id
+	dialog.held_inputs = _card_held
+	dialog.discarded_inputs = _card_discard
+	dialog.input_delay = card_input_delay
+	add_child(dialog)
+	show_menu_overlay(dialog)
+	dialog.finished.connect(func(confirmed: bool):
+		if confirmed:
+			# 遷移が完了するまで確認画面が入力を受け止める。
+			run.command(&"abort")
+		else:
+			close_menu_overlay(dialog)
+			dialog.queue_free())
 
 ## ポーズ中に設定を重ねて開く。戻ると閉じてポーズに戻る。
 func _open_settings(from: Button) -> void:

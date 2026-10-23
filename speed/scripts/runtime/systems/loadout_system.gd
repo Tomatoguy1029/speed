@@ -62,6 +62,8 @@ func _claim_resources(category: StringName, id: StringName) -> void:
 
 signal cards_opened(cards: Array)
 signal equipment_changed
+## 記録中だけ購読する装備の差分。選択画面で時計が止まっていても即座に通知する。
+signal loadout_recorded(change: Dictionary)
 
 var combat: CombatSystem:
 	get: return ctx.combat
@@ -250,8 +252,8 @@ func choose_card(index: int) -> bool:
 		return true
 	if state.swap_pick != &"":
 		if c.kind == &"swap":
-			remove_weapon(c.id)
-			grant(&"weapon", state.swap_pick, cfg.weapon_max_level)
+			remove_weapon(c.id, &"comet_swap")
+			grant(&"weapon", state.swap_pick, cfg.weapon_max_level, &"comet_swap")
 			state.emit(&"upgrade", {"card": c})
 		state.swap_pick = &""
 		_release_candidates()
@@ -259,14 +261,14 @@ func choose_card(index: int) -> bool:
 		return try_open_cards()
 	if state.start_pick:
 		state.start_pick = false
-		grant(c.kind, c.id)
+		grant(c.kind, c.id, 1, &"initial_choice")
 		_release_candidates()
 		state.cards = []
 		return false
 	if c.kind == &"heal":
 		ship.heal(state.stats.max_hp * cfg.fallback_heal)
 	else:
-		grant(c.kind, c.id)
+		grant(c.kind, c.id, 1, &"card")
 	state.emit(&"upgrade", {"card": c})
 	if c.kind != &"heal":
 		_level_bonus()
@@ -289,7 +291,7 @@ func _level_bonus() -> void:
 		var pick := _bonus_target()
 		if pick.is_empty():
 			return
-		grant(pick.kind, pick.id)
+		grant(pick.kind, pick.id, 1, &"level_bonus")
 		count += 1
 		var owned: Dictionary = state.weapons if pick.kind == &"weapon" else state.traits
 		state.emit(&"level_bonus", {"kind": pick.kind, "id": pick.id, "level": owned[pick.id], "count": count})
@@ -310,7 +312,7 @@ func _bonus_target() -> Dictionary:
 # ── 装備（仕様書 8） ─────────────────────────────────────────────
 
 ## 武器・特性を levels 段階手に入れる。枠が満員か上限なら false。
-func grant(kind: StringName, id: StringName, levels := 1) -> bool:
+func grant(kind: StringName, id: StringName, levels := 1, source := &"direct") -> bool:
 	var weapon := kind == &"weapon"
 	var category: StringName = &"weapons" if weapon else &"traits"
 	var def := ContentManager.definition(category, id)
@@ -330,8 +332,15 @@ func grant(kind: StringName, id: StringName, levels := 1) -> bool:
 	_claim_resources(category, id)
 	_sync_behavior(weapon, id, def, owned[id])
 	refresh_stats()
+	_record_change(kind, id, lv, int(owned[id]), source)
 	equipment_changed.emit()
 	return true
+
+func _record_change(kind: StringName, id: StringName, previous: int, current: int, source: StringName) -> void:
+	if OS.is_debug_build() and loadout_recorded.has_connections():
+		loadout_recorded.emit({"type": "loadout", "t": state.time, "world_t": state.world_time,
+			"kind": String(kind), "id": String(id), "previous": previous, "current": current,
+			"source": String(source), "level": state.level})
 
 func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> void:
 	var table := weapon_behaviors if weapon else trait_behaviors
@@ -350,11 +359,13 @@ func _sync_behavior(weapon: bool, id: StringName, def: Resource, lv: int) -> voi
 		table[id].n = lv
 
 ## 武器を外す（彗星限定の武器と入れ替えるとき）。
-func remove_weapon(id: StringName) -> void:
+func remove_weapon(id: StringName, source := &"direct") -> void:
+	var previous := int(state.weapons.get(id, 0))
 	if _equipped_resources.has(id):
 		_equipped_resources[id].cancel()
 		_equipped_resources.erase(id)
 	state.weapons.erase(id)
+	if previous > 0: _record_change(&"weapon", id, previous, 0, source)
 	weapon_behaviors.erase(id)
 	refresh_stats()
 	equipment_changed.emit()
@@ -365,7 +376,7 @@ func _receive_comet_weapon(id: StringName) -> bool:
 	if state.weapons.has(id):
 		return false
 	if state.weapons.size() < cfg.weapon_slots:
-		grant(&"weapon", id, cfg.weapon_max_level)
+		grant(&"weapon", id, cfg.weapon_max_level, &"comet")
 		state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -60), "text": ContentManager.catalog.find(&"weapons", id).get_display_name(),
 			"color": Color("#efcb70"), "size": 24})
 		return false
@@ -385,6 +396,9 @@ func capture_hull(i: int) -> bool:
 
 ## 装備をすべて外す（調整パネル用）。
 func reset_loadout() -> void:
+	for kind in [&"weapon", &"trait"]:
+		var owned: Dictionary = state.weapons if kind == &"weapon" else state.traits
+		for id in owned: _record_change(kind, id, int(owned[id]), 0, &"reset")
 	_release_candidates()
 	for scope: ContentResourceScope in _equipped_resources.values(): scope.cancel()
 	_equipped_resources.clear()

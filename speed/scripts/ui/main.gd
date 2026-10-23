@@ -14,6 +14,7 @@ const SCREENS := {
 }
 
 var _current: Node = null
+var _prepared_run: RunSession
 var _screen_request := 0
 var _displayed_screen := -1
 var _fade := preload("res://scripts/ui/screen_fade.gd").new()
@@ -29,6 +30,9 @@ func _ready() -> void:
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
+	if _prepared_run != null:
+		_prepared_run.free()
+		_prepared_run = null
 	_screen_request += 1
 	var request := _screen_request
 	var fade: bool = (
@@ -39,7 +43,11 @@ func _show(screen: GameManager.Screen) -> void:
 	if fade:
 		GameManager.screen_transition_active = true
 		_current.process_mode = Node.PROCESS_MODE_DISABLED
+		if screen == GameManager.Screen.RUN:
+			_prepared_run = RunManager.create_run()
 		await _fade.cover(fade_out_time)
+		if request != _screen_request:
+			return
 	await _replace_screen(screen, request)
 	if request != _screen_request:
 		return
@@ -47,9 +55,13 @@ func _show(screen: GameManager.Screen) -> void:
 	# 最後の子で先に入力を受け、GUI やランへ演出中の操作を渡さない。
 	move_child(_fade, -1)
 	if fade:
-		_current.process_mode = Node.PROCESS_MODE_DISABLED
+		# 資源準備はフェード中も進め、戦闘の時計だけを保留する。
+		if not _current is RunSession:
+			_current.process_mode = Node.PROCESS_MODE_DISABLED
 		await _fade.reveal(fade_in_time)
+		if request != _screen_request: return
 		_current.process_mode = Node.PROCESS_MODE_INHERIT
+		if _current is RunSession: _current.auto_step = true
 		GameManager.screen_transition_active = false
 
 func _replace_screen(screen: GameManager.Screen, request: int) -> void:
@@ -70,7 +82,9 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 		_current.queue_free()
 		_current = null
 	if screen == GameManager.Screen.RUN:
-		_current = RunManager.create_run()
+		_current = _prepared_run if _prepared_run != null else RunManager.create_run()
+		_prepared_run = null
+		_current.auto_step = false
 	else:
 		_current = (load(SCREENS.get(screen, GameManager.extension_screens.get(screen, ""))) as PackedScene).instantiate()
 	if morph:
@@ -78,3 +92,9 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	if return_morph:
 		_current.set_meta("morph_from_upgrade", true)
 	add_child(_current)
+	if screen == GameManager.Screen.RUN and not GameManager.screen_transition_active:
+		_current.auto_step = true
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(_prepared_run):
+		_prepared_run.free()

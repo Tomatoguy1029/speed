@@ -212,6 +212,8 @@ func _heading(text: String) -> Label:
 	return l
 
 func _input(event: InputEvent) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
 	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 		if visible: _close()
 		return

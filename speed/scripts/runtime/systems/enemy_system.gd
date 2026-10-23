@@ -14,6 +14,9 @@ func dispose() -> void:
 		behavior.m = null
 	behaviors.clear()
 	_row_watchers.clear()
+	definitions.clear()
+	_stage_bases.clear()
+	stage_tuning.clear()
 	super()
 
 var field: FieldSystem:
@@ -24,6 +27,53 @@ var bosses: BossSystem:
 	get: return ctx.bosses
 ## 実験場が複製した定義。未指定時は本番の定義を読む。
 var definitions: Dictionary = {}
+## このランだけのステージ差分。共通定義や別のランと辞書を共有しない。
+var stage_tuning: Dictionary = {}
+var _stage_bases: Dictionary = {}
+
+func set_stage_tuning(values: Dictionary) -> void:
+	stage_tuning = values.duplicate(true)
+
+func _stage_definition(type: StringName) -> EnemyDef:
+	if not _stage_bases.has(type):
+		_stage_bases[type] = definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)
+	var base: EnemyDef = _stage_bases[type]
+	var values: Dictionary = stage_tuning.get(String(type), {})
+	return StageEnemyTuning.resolve(base, values) if not values.is_empty() else base
+
+## 開発用UIからのライブ変更。個体の残HP割合、行動、位置、IDを保つ。
+func update_stage_tuning(values: Dictionary) -> void:
+	if values == stage_tuning: return
+	var affected := stage_tuning.keys()
+	for id in values:
+		if id not in affected: affected.append(id)
+	stage_tuning = values.duplicate(true)
+	var t := table
+	for id in affected:
+		var type := StringName(id)
+		var definition := _stage_definition(type)
+		definitions[type] = definition
+		for i in t.alive.size():
+			if not t.alive[i] or t.dead[i] or t.is_boss[i] or t.type[i] != type: continue
+			var old: EnemyDef = t.def[i]
+			var old_hp := old.base_hp(cfg)
+			var scale := sqrt(t.max_hp[i] / maxf(old_hp * cfg.enemy_hp_mult * (3.0 if t.elite[i] else 1.0), 0.001))
+			if definition.base_hp(cfg) != old_hp:
+				var health := t.hp[i] / maxf(t.max_hp[i], 0.001)
+				t.max_hp[i] *= definition.base_hp(cfg) / maxf(old_hp, 0.001)
+				t.hp[i] = t.max_hp[i] * health
+			if definition.armor != old.armor:
+				t.armor[i] = t.armor[i] * definition.armor / old.armor if old.armor > 0.0 else definition.armor * scale * cfg.enemy_armor_mult * (1.3 if t.elite[i] else 1.0)
+			if definition.speed != old.speed:
+				t.speed[i] = t.speed[i] * definition.speed / old.speed if old.speed > 0.0 else definition.speed
+			if definition.accel != old.accel: t.accel[i] = definition.accel if definition.accel > 0.0 else 2.0
+			if definition.turn != old.turn: t.turn[i] = definition.turn if definition.turn > 0.0 else 4.0
+			if definition.weak_arc != old.weak_arc: t.weak_arc[i] = definition.weak_arc
+			var interval := float(definition.params.get("fire_interval", 0.0))
+			var previous := float(old.params.get("fire_interval", 0.0))
+			if previous > 0.0 and interval != previous: t.fire_t[i] *= interval / previous
+			t.def[i] = definition
+	state.emit(&"enemy_tuning_changed", {"t": state.time, "world_t": state.world_time, "values": stage_tuning.duplicate(true)})
 
 ## 特殊な倒し方（EnemyDef.gate）の名前と種類
 const GATE := {&"back": EnemyTable.Gate.BACK, &"membrane": EnemyTable.Gate.MEMBRANE, &"claw": EnemyTable.Gate.CLAW,
@@ -71,6 +121,7 @@ func setup(context: RunContext) -> void:
 ## 敵を1体出し、その行番号を返す。opts：elite、size、facing、spin、meteor_index、vel、hit_cd。
 ## 仕様書 11.2 の補正をかける。
 func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
+	if stage_tuning.has(String(def.id)): def = def_of(def.id)
 	var i := slots.take()
 	_reset_row(i)
 	var t := table
@@ -383,6 +434,10 @@ func _behavior_index(name: StringName) -> int:
 	return k
 
 func def_of(type: StringName) -> EnemyDef:
+	if stage_tuning.has(String(type)):
+		if not definitions.has(type) or definitions[type] == _stage_bases.get(type):
+			definitions[type] = _stage_definition(type)
+		return definitions[type]
 	return (definitions[type] if definitions.has(type) else ContentManager.definition(&"enemies", type)) as EnemyDef
 
 ## 負荷計測用。通常の出現上限を超え、画面内にランダムな通常敵を追加する。

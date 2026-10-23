@@ -14,17 +14,24 @@ var sim := RunSimulation.new()
 var view: Node
 ## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
 var auto_step := true
+## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
+var recording_initial: Dictionary = {}
 
 signal started
 var resources: ContentResourceScope
 var _pending_options: Dictionary = {}
 var _loading: CanvasLayer
+## resource_wait_msは要求の投入と暗転中の経過を含む。ほかの区間と単純合算しない。
+var loading_timings: Dictionary = {}
+var _load_started_us := 0
+var _warm_started_us := 0
 var _progress: ProgressBar
 
 ## 通常の出撃は資源を別スレッドで準備し、準備が終わるまで戦闘の時計を始めない。
 func start_loading(options: Dictionary) -> void:
 	var stage: RuntimeStage = options.get("stage")
 	if stage == null: return
+	_load_started_us = Time.get_ticks_usec()
 	_pending_options = options
 	_loading = CanvasLayer.new()
 	add_child(_loading)
@@ -42,6 +49,7 @@ func start_loading(options: Dictionary) -> void:
 	column.add_child(back)
 	# 描画を持たないDummy rendererはテクスチャ生成を主スレッドで行う。
 	resources = ContentManager.prepare_resources(stage.resources.paths, DisplayServer.get_name() != "headless")
+	loading_timings["resource_request_ms"] = (Time.get_ticks_usec() - _load_started_us) / 1000.0
 
 ## 木に入ったあとに呼ぶ。表示を作る場合は、シミュレーションを組み立ててから表示を木に入れる。
 func start(options: Dictionary, with_view: bool) -> void:
@@ -53,8 +61,10 @@ func start(options: Dictionary, with_view: bool) -> void:
 	sim.ctx.resources = resources
 	sim.options = options
 	sim.view_size_source = func(): return get_viewport().get_visible_rect().size
+	var before := Time.get_ticks_usec()
 	if with_view:
 		view = load(VIEW_PATH).instantiate()
+		loading_timings["view_instantiate_ms"] = (Time.get_ticks_usec() - before) / 1000.0
 		for path in ["RunPresentation", "Hud/HudRoot"]:
 			view.get_node(path).run = sim
 		sim.input = view.get_node("World/InputRouter")
@@ -65,10 +75,21 @@ func start(options: Dictionary, with_view: bool) -> void:
 		actors.visible = false
 		add_child(actors)
 		sim.actor_parent = actors
+	before = Time.get_ticks_usec()
 	sim.setup()
+	loading_timings["simulation_setup_ms"] = (Time.get_ticks_usec() - before) / 1000.0
+	before = Time.get_ticks_usec()
+	var identity_path := "res://scripts/dev/recording_identity.gd"
+	if OS.is_debug_build() and not sim.state.lab_mode and ResourceLoader.exists(identity_path):
+		recording_initial = load(identity_path).capture(sim)
+	loading_timings["recording_identity_ms"] = (Time.get_ticks_usec() - before) / 1000.0
+	before = Time.get_ticks_usec()
 	if view != null:
 		add_child(view)
+	loading_timings["view_ready_ms"] = (Time.get_ticks_usec() - before) / 1000.0
+	before = Time.get_ticks_usec()
 	started.emit()
+	loading_timings["started_callbacks_ms"] = (Time.get_ticks_usec() - before) / 1000.0
 
 func _physics_process(delta: float) -> void:
 	if auto_step and sim.state != null:
@@ -83,9 +104,13 @@ func _process(_delta: float) -> void:
 			_pending_options.clear()
 			sim.aborted.emit()
 			return
+		if _warm_started_us == 0:
+			_warm_started_us = Time.get_ticks_usec()
+			loading_timings["resource_wait_ms"] = (_warm_started_us - _load_started_us) / 1000.0
 		if not resources.warmup_complete:
 			load("res://scripts/render/run_presentation.gd").warm_resources(self, resources)
 			return
+		loading_timings["shader_warmup_ms"] = (Time.get_ticks_usec() - _warm_started_us) / 1000.0
 		_loading.queue_free()
 		_loading = null
 		var options := _pending_options

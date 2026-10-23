@@ -4,6 +4,7 @@ const COMMANDS := preload("res://scripts/dev/run_commands.gd")
 const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 const DEBUG_PANEL := preload("res://scripts/dev/debug_panel.gd")
 const PERF_OVERLAY := preload("res://scripts/dev/perf_overlay.gd")
+const ENEMY_TUNING := preload("res://scripts/dev/stage_enemy_overlay.gd")
 func _ready() -> void:
 	if not OS.is_debug_build(): return
 	GameManager.extension_screens[GameManager.Screen.ENEMY_LAB] = "res://gyms/enemy_lab/enemy_lab.tscn"
@@ -32,6 +33,10 @@ func _decorate(reference: WeakRef) -> void:
 	overlay.name = "PerfOverlay"
 	overlay.run = session.sim
 	session.view.get_node("Hud").add_child(overlay)
+	var tuning := ENEMY_TUNING.new()
+	tuning.name = "StageEnemyTuning"
+	tuning.run = session.sim
+	session.view.get_node("Hud").add_child(tuning)
 
 func _on_screen_ready(view: Control) -> void:
 	var path: String = view.get_script().resource_path

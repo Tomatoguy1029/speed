@@ -13,6 +13,8 @@ func dispose() -> void:
 
 ## 開発版の記録だけが購読する。大きい結晶が落ちたとき。tier は 1〜3（小・中・大）、enemy は落とした敵の種類。
 signal big_crystal_dropped(tier: int, xp: float, enemy: StringName)
+## 結晶の生成・合流・回収・敵への移動。記録中だけ辞書を作る。
+signal xp_recorded(record: Dictionary)
 
 var field: FieldSystem:
 	get: return ctx.field
@@ -80,15 +82,15 @@ func on_enemy_killed(i: int) -> void:
 	if gems > 1:
 		for k in gems:
 			var u := Vector2.from_angle(TAU * k / float(gems) + state.rng.randf() * 0.5)
-			fling_gem(pos + u * t.r[i] * 0.3, value / float(gems), u * state.rng.randf_range(240.0, 380.0), 0.35)
+			fling_gem(pos + u * t.r[i] * 0.3, value / float(gems), u * state.rng.randf_range(240.0, 380.0), 0.35, &"enemy", t.type[i], t.id[i])
 		state.emit(&"gem_burst", {"pos": pos, "r": t.r[i]})
 	else:
-		drop_gem(pos, value)
+		drop_gem(pos, value, &"enemy", t.type[i], t.id[i])
 	if t.carry[i] > 0.0:
 		# からす座が運んでいた経験値を、倒した場所へまとめて落とす
 		var n := clampi(t.buds[i], 1, 16)
 		for k in n:
-			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n))
+			drop_gem(pos + Vector2.from_angle(TAU * k / float(n)) * (10.0 + 4.0 * float(k % 3)), t.carry[i] / float(n), &"crow_carry", t.type[i], t.id[i])
 	_drop_coins(i)
 	enemies.extra_drops(self, i)
 	# 大きい結晶：レチクル座のように段の決まった敵は必ず、ほかは経験値の多い敵ほど高い確率で落とす
@@ -98,7 +100,7 @@ func on_enemy_killed(i: int) -> void:
 	if tier > 0:
 		var xp := cfg.big_crystal_xp[tier - 1]
 		state.xp_dropped += xp
-		drop_gem(pos, xp)
+		drop_gem(pos, xp, &"big_crystal", t.type[i], t.id[i], tier)
 		if OS.is_debug_build() and big_crystal_dropped.has_connections():
 			big_crystal_dropped.emit(tier, xp, t.type[i])
 
@@ -118,18 +120,25 @@ func _roll_big_crystal_tier() -> int:
 			return k + 1
 	return weights.size()
 
-func drop_gem(p: Vector2, v: float) -> int:
+func drop_gem(p: Vector2, v: float, source := &"direct", enemy := &"", enemy_id := -1, tier := 0) -> int:
+	var added_xp := v
+	var merged_from := -1
 	if gem_slots.live > cfg.gem_max:
 		# いちばん古い結晶を、新しい結晶にまとめる
 		var oldest := _pop_oldest_gem()
 		if oldest >= 0:
+			merged_from = gem_seq[oldest]
 			v += gem_value[oldest]
 			gem_slots.release(oldest)
-	return _add_gem(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0, v)
+	var i := _add_gem(p + Vector2.from_angle(state.rng.randf() * TAU) * 8.0, v)
+	if records_xp():
+		record_xp({"type": "xp_drop", "id": gem_seq[i], "xp": v, "added_xp": added_xp,
+			"source": String(source), "enemy": String(enemy), "enemy_id": enemy_id, "tier": tier, "merged_from": merged_from})
+	return i
 
 ## 結晶を p から速さ vel ではじけ飛ばす。wait 世界秒たつまでは拾えず、勢いが落ちながら散らばる。
-func fling_gem(p: Vector2, v: float, vel: Vector2, wait: float) -> void:
-	var i := drop_gem(p, v)
+func fling_gem(p: Vector2, v: float, vel: Vector2, wait: float, source := &"direct", enemy := &"", enemy_id := -1) -> void:
+	var i := drop_gem(p, v, source, enemy, enemy_id)
 	gem_vel[i] = vel
 	gem_wait[i] = wait
 
@@ -227,8 +236,17 @@ func _collect_gems(dt: float) -> void:
 			gem_pulled[i] = 1
 			gem_pos[i] = p + d / maxf(dist, 1.0) * minf(step, dist)
 		if dist < reach:
+			if records_xp(): record_xp({"type": "xp_collect", "id": gem_seq[i], "xp": gem_value[i], "method": "ship"})
 			collect(&"gem", gem_value[i])
 			gem_slots.release(i)
+
+func records_xp() -> bool:
+	return OS.is_debug_build() and xp_recorded.has_connections()
+
+func record_xp(record: Dictionary) -> void:
+	record["t"] = state.time
+	record["world_t"] = state.world_time
+	xp_recorded.emit(record)
 
 ## はじけ飛んでいる結晶を動かす。勢いは落ちていき、拾えるようになるまでの時間を減らす。
 func _fly_gems(dt: float) -> void:

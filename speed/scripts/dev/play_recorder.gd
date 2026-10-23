@@ -10,6 +10,7 @@ const INTERVAL := 3.0
 const PERF_INTERVAL_US := 3000000
 ## 保存したファイル名を出しておく時間（実秒）
 const SAVED_NOTICE := 5.0
+const IDENTITY := preload("res://scripts/dev/recording_identity.gd")
 
 var _real_start_us := 0
 var _perf_last_us := 0
@@ -53,6 +54,8 @@ var _label: Label
 ## 保存したファイル名の表示の残り時間と、その文字
 var _saved_t := 0.0
 var _saved_text := ""
+## F9 の直前から表示待ちだった出来事は、観測区間へ混ぜない。
+var _skip_events := 0
 
 ## 記録を置くフォルダ（書類フォルダの SPEED/recordings。書類フォルダが分からなければユーザーデータの中）。
 static func folder() -> String:
@@ -150,6 +153,10 @@ func _begin(session: RunSession, during_run := false) -> void:
 	run.frame_events.connect(_on_events)
 	run.phase_changed.connect(_on_phase_changed)
 	run.loadout.cards_opened.connect(_on_cards)
+	run.loadout.loadout_recorded.connect(_on_loadout)
+	run.pickups.xp_recorded.connect(_write)
+	run.ship.hurt_recorded.connect(_on_hurt)
+	_skip_events = run.state.events.size() if during_run else 0
 	session.tree_exiting.connect(_end.bind("quit"))
 	_reset_counts()
 	_on_cards(run.state.cards)
@@ -166,12 +173,32 @@ func _begin(session: RunSession, during_run := false) -> void:
 		bands.append({"id": String(p.id), "name": _record_names.get("phases", {}).get(String(p.id), p.display_name), "start": p.start})
 	var recording_start: Dictionary = run.recording_snapshot()
 	recording_start["trigger"] = "during_run" if during_run else "armed_before_run"
+	var run_start := run.recording_origin.duplicate(true)
+	if not session.recording_initial.is_empty():
+		run_start["conditions"] = session.recording_initial
+	recording_start["conditions"] = {"config": IDENTITY.plain(run.cfg), "profile": IDENTITY.plain(run.ctx.profile),
+		"stats": IDENTITY.stats(run.state.stats), "hitstop_enabled": run.state.hitstop_enabled, "invincible": run.ship.invincible,
+		"rng_seed": str(run.state.rng.seed), "rng_state": str(run.state.rng.state)}
+	if "stage_tuning" in run.enemies:
+		recording_start.conditions["enemy_tuning"] = IDENTITY.plain(run.enemies.get("stage_tuning"))
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 4, "run_start": run.recording_origin, "recording_start": recording_start, "missing_prefix": during_run,
+		"schema_version": 4, "measurement_version": 1, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
 		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
+	# 途中録画に存在する結晶は、生成時刻・出所を推定せず、ID と現値だけ引き継ぐ。
+	if during_run:
+		var gems := []
+		var pk := run.pickups
+		for i in pk.gem_alive.size():
+			if pk.gem_alive[i] != 0: gems.append([pk.gem_seq[i], pk.gem_value[i]])
+		var carried := []
+		var table := run.enemies.table
+		for i in table.alive.size():
+			if table.alive[i] != 0 and table.dead[i] == 0 and table.carry[i] > 0.0:
+				carried.append([table.id[i], table.carry[i]])
+		_write({"type": "xp_existing", "t": run.state.time, "world_t": run.state.world_time, "gems": gems, "carried": carried, "origin": "unobserved"})
 	_big_crystals = {}
 	_run.pickups.big_crystal_dropped.connect(_on_big_crystal)
 	_file.flush()
@@ -261,13 +288,37 @@ func _on_cards(cards: Array) -> void:
 	for c in cards:
 		_offered.append("%s:%s:%d" % [c.kind, c.id, int(c.get("level", 0))])
 
+func _on_loadout(change: Dictionary) -> void:
+	if int(change.current) > 0:
+		var category := &"weapons" if change.kind == "weapon" else &"traits"
+		var def := ContentManager.definition(category, StringName(change.id))
+		change["definition_sha256"] = IDENTITY.digest(IDENTITY.plain(def))
+	_write(change)
+
+func _on_hurt(hit: Dictionary) -> void:
+	_write({"type": "hurt", "t": hit.t, "world_t": hit.world_t, "amount": hit.amount,
+		"cause": String(hit.cause), "source": String(hit.source), "hp_after": hit.hp_after})
+	var key := String(hit.cause)
+	if String(hit.source) != "": key += "/" + String(hit.source)
+	_damage[key] = _r(float(_damage.get(key, 0.0)) + float(hit.amount))
+	_last_hurt = {"cause": String(hit.cause), "source": String(hit.source)}
+
 func _on_events(events: Array[Dictionary]) -> void:
 	if _run == null:
 		return
 	var time: float = _r(_run.state.time)
 	var pick: Dictionary = {}
 	for e in events:
+		if _skip_events > 0:
+			_skip_events -= 1
+			continue
 		match e.type:
+			&"enemy_tuning_changed", &"enemy_tuning_saved":
+				# t は通知を処理した時計。適用・保存そのものの時計は別に保ち、通知待ちを区別する。
+				var record := {"type": String(e.type), "t": time, "world_t": _run.state.world_time,
+					"event_t": e.get("t", null), "event_world_t": e.get("world_t", null), "values": e.get("values", null)}
+				if e.type == &"enemy_tuning_saved": record["path"] = e.get("path", null)
+				_write(record)
 			&"bonus":
 				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
 			&"kill":
@@ -295,12 +346,6 @@ func _on_events(events: Array[Dictionary]) -> void:
 					elif cause != &"bump" and cause != &"touch":
 						rec[3] += dmg
 						rec[4][String(cause)] = _r(float(rec[4].get(String(cause), 0.0)) + dmg)
-			&"hurt":
-				var key := String(e.get("cause", &""))
-				if String(e.get("source", &"")) != "":
-					key += "/" + String(e.source)
-				_damage[key] = _r(float(_damage.get(key, 0.0)) + float(e.get("amount", 0.0)))
-				_last_hurt = {"cause": String(e.get("cause", &"")), "source": String(e.get("source", &""))}
 			&"strong_spawn":
 				_strong[e.id] = [String(e.enemy_type), time, 0, 0.0, {}]
 			&"clip_group":
@@ -335,6 +380,8 @@ func _on_phase_changed(phase: int) -> void:
 func _end(result: String) -> void:
 	if _run == null:
 		return
+	# 表示用の待ち行列は消費せず、終了直前の未通知分だけ記録する。
+	_on_events(_run.state.events)
 	var s = _run.state
 	_flush_performance(_perf_last_us)
 	_sample()
@@ -350,7 +397,8 @@ func _end(result: String) -> void:
 	_file.close()
 	_file = null
 	for sig in [[_run.frame_events, _on_events], [_run.phase_changed, _on_phase_changed], [_run.loadout.cards_opened, _on_cards],
-		[_run.pickups.big_crystal_dropped, _on_big_crystal]]:
+		[_run.pickups.big_crystal_dropped, _on_big_crystal], [_run.pickups.xp_recorded, _write], [_run.loadout.loadout_recorded, _on_loadout],
+		[_run.ship.hurt_recorded, _on_hurt]]:
 		if sig[0].is_connected(sig[1]):
 			sig[0].disconnect(sig[1])
 	for c in _session.tree_exiting.get_connections():
@@ -362,10 +410,13 @@ func _end(result: String) -> void:
 	_strong = {}
 	_offered = []
 	_last_hurt = {}
+	_skip_events = 0
 	_update_label()
 
 func _write(record: Dictionary) -> void:
 	if _file != null:
+		# 既存の区間行と出来事を同じ時計精度で並べる。
+		if record.has("t"): record.t = _r(float(record.t))
 		if _real_start_us > 0:
 			if not record.has("real_t"):
 				record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0

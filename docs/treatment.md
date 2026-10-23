@@ -101,8 +101,8 @@ flowchart LR
 
 | 内容 | 文書 |
 |---|---|
-| ストーリーと設定 | [世界観とストーリー](world.md) |
-| 見た目 | [デザインとアートスタイル](art-style.md) |
+| ストーリーと設定 | [世界観とストーリー](game/world.md) |
+| 見た目 | [デザインとアートスタイル](game/art-style.md) |
 | ゲームの決まり | [仕様書](spec.md) |
-| 武器・特性・敵 | [武器一覧](catalog/weapons.md)・[特性一覧](catalog/traits.md)・[敵一覧](catalog/enemies.md) |
-| 作り方 | [設計書](../dev/architecture.md) |
+| 武器・特性・敵 | [武器一覧](game/catalog/weapons.md)・[特性一覧](game/catalog/traits.md)・[敵一覧](game/catalog/enemies.md) |
+| 作り方 | [設計書](architecture.md) |

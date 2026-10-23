@@ -9,6 +9,7 @@ const MORPH_PANEL := preload("res://scripts/ui/morph_panel.gd")
 const MAP_SCRIPT := preload("res://scripts/ui/constellation_map.gd")
 const ART_SIZE := Vector2(1280, 720)
 const MENU_CYAN := Color("5bc8db")
+const MENU_DIRECTIONS := {KEY_W: KEY_UP, KEY_A: KEY_LEFT, KEY_S: KEY_DOWN, KEY_D: KEY_RIGHT}
 
 ## 起動側から加えるメニューの操作。
 var menu_accessory: Control
@@ -117,6 +118,8 @@ func _style_menu_button(button: Button) -> void:
 	button.draw.connect(_draw_menu_corners.bind(button))
 	button.mouse_entered.connect(button.queue_redraw)
 	button.mouse_exited.connect(button.queue_redraw)
+	button.focus_entered.connect(button.queue_redraw)
+	button.focus_exited.connect(button.queue_redraw)
 
 func _build_start_panel(canvas: Control) -> void:
 	_start_panel = Control.new()
@@ -230,6 +233,28 @@ func _close_start_panel() -> void:
 	AudioManager.play(&"ui")
 	GameManager.back()
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and not (event.ctrl_pressed or event.alt_pressed or event.meta_pressed):
+		var code: Key = event.keycode if event.keycode != 0 else event.physical_keycode
+		if MENU_DIRECTIONS.has(code):
+			var window_focus := get_viewport().gui_get_focus_owner()
+			var menu_focus := _stage_button.get_viewport().gui_get_focus_owner()
+			if window_focus is LineEdit or window_focus is TextEdit or menu_focus is LineEdit or menu_focus is TextEdit:
+				return
+			var navigation := event.duplicate() as InputEventKey
+			navigation.keycode = MENU_DIRECTIONS[code] as Key
+			navigation.physical_keycode = event.physical_keycode if event.physical_keycode != 0 else code
+			navigation.unicode = 0
+			# 物理キーを残し、遷移の押下保護には元の WASD と同じ入力として記録する。
+			get_viewport().push_input(navigation, true)
+			get_viewport().set_input_as_handled()
+			return
+	if _morphing or (_transition != null and _transition.is_running()):
+		for action in [&"ui_accept", &"ui_cancel", &"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
+			if event.is_action(action):
+				get_viewport().set_input_as_handled()
+				return
+
 func _unhandled_input(event: InputEvent) -> void:
 	if (_start_panel.visible or GameManager.screen == GameManager.Screen.STAGE_SELECT) and event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -238,7 +263,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		super(event)
 
 func _draw_menu_corners(button: Button) -> void:
-	if not button.is_hovered():
+	if not button.is_hovered() and not button.has_focus():
 		return
 	var bounds := Rect2(Vector2.ONE, button.size - Vector2.ONE * 2.0)
 	for corner: Vector2 in [bounds.position, Vector2(bounds.end.x, bounds.position.y), bounds.end, Vector2(bounds.position.x, bounds.end.y)]:
