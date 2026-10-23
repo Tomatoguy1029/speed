@@ -110,7 +110,7 @@ Godot 本番の `speed/` で、shaderとは別に必要な絵・画像素材と�
 | 素材 ID | 対象・用途 | 素材状態・確認点 |
 |---|---|---|
 | ART-010 | みなみのかんむり座（`corona`）の本体 | [外観マスタ](../../../speed/data/visuals/looks/corona.tres)が本体・装甲・法線画像を指定。仮 SVG の差し替え依頼として扱う前に、組込済みの冠を確認する。渦・予告・投擲の[図形描画](../../../speed/scripts/enemies/corona_vortex.gd)は追加素材の必要性から要相談 |
-| ART-016 | かじき座（`marlin`）の本体 | [外観マスタ](../../../speed/data/visuals/looks/marlin.tres)が `swordfish_base`・`armor`・`normal` の3枚を指定。[現仕様](enemies.md)には未実装の攻撃動作が残る。絵の割当と動作の完成を分けて確認する |
+| ART-016 | かじき座（`marlin`）の本体 | [外観マスタ](../../../speed/data/visuals/looks/marlin.tres)が `swordfish_base`・`armor`・`normal` の3枚を指定。攻撃動作は[敵一覧](enemies.md#かじき座の突進)を参照。絵の割当と外観の品質確認を分けて管理する |
 | ART-019 | わし座（`aquila`）の本体 | [外観マスタ](../../../speed/data/visuals/looks/aquila.tres)が `eagle_base`・`armor`・`normal` の3枚を指定。本体の新規制作が必要かは未決 |
 
 ## 要相談：素材の制作範囲を決める
