@@ -56,40 +56,59 @@ static func text(parent: Node, value: String, stretch := false) -> Label:
 	parent.add_child(label)
 	return label
 
-static func row(parent: Node, key: String, base: float, value: float, integer: bool, wide: bool, changed: Callable, reset: Callable, hint: Callable) -> Array:
+static func row(parent: Node, key: String, base: float, value: float, integer: bool, wide: bool, changed: Callable, reset: Callable, override: Callable, hint: Callable) -> Array:
 	var info := docs(key)
 	var name: Label
-	var controls: Node = parent
+	var cells: Node = parent
 	if not wide:
-		var box := VBoxContainer.new()
-		parent.add_child(box)
-		name = text(box, info[0], true)
-		controls = HBoxContainer.new()
-		box.add_child(controls)
-	else: name = text(parent, info[0], true)
+		cells = VBoxContainer.new()
+		parent.add_child(cells)
+	name = text(cells, info[0], true)
 	name.mouse_filter = Control.MOUSE_FILTER_PASS
 	name.tooltip_text = "%s\n%s\n単位: %s" % [key, info[1], info[2]]
 	name.mouse_entered.connect(hint.bind("%s · %s\n%s" % [info[0], info[2], info[1]]))
-	var common := text(controls, ("" if wide else "共通 ") + String.num(base, 3))
-	common.custom_minimum_size.x = 54 if wide else 72
-	var spin := SpinBox.new()
-	spin.min_value = minf(base, StageEnemyTuning.minimum(key))
-	spin.max_value = maxf(base, 100000.0)
-	spin.step = 1.0 if integer else 0.01
-	spin.value = value
-	spin.custom_minimum_size.x = 100 if wide else 82
-	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spin.tooltip_text = "%sの現在値 / %s" % [info[0], info[2]]
-	focus_control(spin.get_line_edit())
-	controls.add_child(spin)
-	spin.value_changed.connect(changed)
-	var state := text(controls, "")
-	state.custom_minimum_size.x = 70 if wide else 54
+	var common := text(cells, ("" if wide else "共通値（参照） ") + String.num(base, 3))
+	common.tooltip_text = "全ステージの基準値。参照のみ。"
+	common.modulate = Color("#b9c5d4")
+	common.custom_minimum_size.x = 64 if wide else 0
+	var settings := VBoxContainer.new()
+	cells.add_child(settings)
+	var enabled := CheckBox.new()
+	enabled.text = "このステージで上書き"
+	enabled.tooltip_text = "ONでこのステージだけの値を編集。OFFで共通値へ戻す。"
+	focus_control(enabled)
+	settings.add_child(enabled)
+	enabled.toggled.connect(override)
+	var tail: Node = cells
+	if not wide:
+		tail = HBoxContainer.new()
+		cells.add_child(tail)
+	var state := text(tail, "", not wide)
+	state.custom_minimum_size.x = 108 if wide else 0
 	state.add_theme_font_size_override("font_size", 13)
 	var revert := Button.new()
 	revert.text = "↶"
-	revert.tooltip_text = "%sの上書きを解除" % info[0]
+	revert.tooltip_text = "上書きを解除して共通値を使用（チェックOFFと同じ）"
 	focus_control(revert)
-	controls.add_child(revert)
-	revert.pressed.connect(reset.bind(key, spin, base))
-	return [state, revert, spin]
+	tail.add_child(revert)
+	revert.pressed.connect(func(): reset.call(key, settings.get_node_or_null("Value"), base))
+	# 編集欄は上書きONのときだけ作る。非表示のSpinBoxも先に生成しない。
+	return [state, revert, null, enabled, settings, {"key": key, "base": base, "value": value, "integer": integer, "changed": changed}]
+
+static func editor(controls: Array) -> SpinBox:
+	if controls[2] != null: return controls[2]
+	var data: Dictionary = controls[5]
+	var spin := SpinBox.new()
+	spin.name = "Value"
+	spin.min_value = minf(data.base, StageEnemyTuning.minimum(data.key))
+	spin.max_value = maxf(data.base, 100000.0)
+	spin.step = 1.0 if data.integer else 0.01
+	spin.value = data.value
+	spin.custom_minimum_size.x = 100
+	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spin.tooltip_text = "このステージの上書き値 / %s" % docs(data.key)[2]
+	focus_control(spin.get_line_edit())
+	controls[4].add_child(spin)
+	spin.value_changed.connect(data.changed)
+	controls[2] = spin
+	return spin

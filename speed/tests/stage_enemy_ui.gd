@@ -80,7 +80,7 @@ func _ready() -> void:
 	await frames()
 	if "--manual" in OS.get_cmdline_user_args(): return
 	check(panel._tree_items.has("予告・頻度") and panel._tree_items.has("範囲・形状"), "敵固有の項目を意味のある階層に分類する")
-	check(panel._wide, "大きいウィンドウで共通値・現在値・状態を横に比較する")
+	check(panel._wide, "大きいウィンドウで共通値・ステージ設定・実効値を横に比較する")
 	await capture("large")
 	var initial_size := overlay.size
 	var grip: Vector2 = overlay._grip.global_position + Vector2(12, 12)
@@ -130,11 +130,23 @@ func _ready() -> void:
 	panel._category = "威力・効果"
 	panel._refresh_rows()
 	await frames()
+	var enabled: CheckBox = panel._row_controls["params.bullet_dmg"][3]
+	check(not enabled.button_pressed and panel._row_controls["params.bullet_dmg"][2] == null, "継承中は共通値を使用し編集欄を作らない")
+	check(panel._row_controls["params.bullet_dmg"][0].text.contains("共通値を使用"), "継承状態と実効値を表示する")
+	enabled.button_pressed = true
 	var spin: SpinBox = panel._row_controls["params.bullet_dmg"][2]
+	check(spin.visible and panel.values.telescope["params.bullet_dmg"] == 20.0, "チェックONでこのステージの上書き欄を表示する")
 	spin.value = 27.0
 	check(panel.is_dirty() and session.sim.enemies.stage_tuning.telescope["params.bullet_dmg"] == 27.0, "数値編集とライブ適用を維持する")
+	check(IO.definition("telescope").params.bullet_dmg == 20.0, "共通値を変更しない")
+	enabled.button_pressed = false
+	check(not spin.visible and not panel.values.get("telescope", {}).has("params.bullet_dmg"), "チェックOFFで上書きを解除して共通値へ戻る")
+	enabled.button_pressed = true
+	spin.value = 27.0
 	var events := session.sim.state.events.filter(func(event): return event.type == &"enemy_tuning_changed")
-	check(not events.is_empty(), "録画用の変更イベントを維持する")
+	check(not events.is_empty() and events[-1].values.telescope["params.bullet_dmg"] == 27.0 and events[-1].has("t"), "録画用の時刻・上書き辞書の変更イベントを維持する")
+	await frames()
+	await capture("override-enabled")
 	spin.get_line_edit().grab_focus()
 	await frames()
 	for key in [KEY_P, KEY_1, KEY_Q, KEY_SPACE]:
@@ -152,6 +164,7 @@ func _ready() -> void:
 	spin.get_line_edit().release_focus()
 	panel._save()
 	check(not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.telescope["params.bullet_dmg"] == 27.0, "Saveボタンの経路で保存し未保存状態を解除する")
+	check(panel._row_controls["params.bullet_dmg"][3].button_pressed, "保存済みの上書きを有効表示する")
 	get_window().size = Vector2i(400, 560)
 	await frames()
 	check(overlay.get_global_rect().end.x <= 400 and overlay.get_global_rect().end.y <= 560, "小さい画面にパネル全体を収める")
@@ -192,6 +205,17 @@ func _ready() -> void:
 	check(overlay.size.x >= 390, "画面内に広げられる")
 	overlay._maximize()
 	check(overlay.get_rect() == rect, "元の位置とサイズに戻れる")
+	panel.reload_stage()
+	panel._category = "威力・効果"
+	panel._refresh_rows()
+	await frames()
+	check(panel._row_controls["params.bullet_dmg"][3].button_pressed and panel._row_controls["params.bullet_dmg"][2].value == 27.0, "再読込でも保存済み上書きのチェックと値を復元する")
+	panel._row_controls["params.bullet_dmg"][3].button_pressed = false
+	panel._save()
+	check(not IO.read_stage(fixture).enemy_tuning.get("telescope", {}).has("params.bullet_dmg"), "解除してSaveするとステージの上書きも削除する")
+	panel.reload_stage()
+	await frames()
+	check(not panel._row_controls["params.bullet_dmg"][3].button_pressed and panel._row_controls["params.bullet_dmg"][2] == null, "解除後の再読込は共通値の参照に戻る")
 	overlay.free()
 	debug.free()
 	hud.free()

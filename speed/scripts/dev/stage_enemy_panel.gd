@@ -75,7 +75,7 @@ func _ready() -> void:
 		else: values.clear()
 		_changed()
 		_refresh_rows())
-	_button(toolbar, "?", func(): _hint.text = "共通値は基準、現在値はこのステージの設定。↶で継承へ戻し、Saveで保存。XP・成長・武器は共通設定。")
+	_button(toolbar, "?", func(): _hint.text = "共通値は参照のみ。項目のチェックONでこのステージだけ上書き。OFFで共通値を使用。Saveで保存。")
 	_split = HSplitContainer.new()
 	_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_split.add_theme_constant_override("autohide", 0)
@@ -122,6 +122,8 @@ func _ready() -> void:
 	_heading = FIELDS.text(_editor, "", true)
 	_heading.add_theme_font_size_override("font_size", 18)
 	_heading.max_lines_visible = 2
+	var relation := FIELDS.text(_editor, "共通値（参照） → ステージ設定 → 実効値", true)
+	relation.add_theme_font_size_override("font_size", 13)
 	_search = LineEdit.new()
 	_search.placeholder_text = "項目を検索（威力・間隔・射程…）"
 	FIELDS.focus_control(_search)
@@ -135,7 +137,7 @@ func _ready() -> void:
 	_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rows.add_theme_constant_override("separation", 8)
 	_scroll.add_child(_rows)
-	_hint = FIELDS.text(self, "項目名にカーソルを重ねると説明を表示。区切りをドラッグして領域を調整。", true)
+	_hint = FIELDS.text(self, "共通値は参照のみ。チェックONでこのステージだけ上書き。OFFで共通値へ戻る。", true)
 	_hint.add_theme_font_size_override("font_size", 13)
 	_hint.max_lines_visible = 2
 	_status = FIELDS.text(self, "", true)
@@ -164,7 +166,7 @@ func _layout() -> void:
 	_nav.visible = not _compact or _nav_open
 	_editor.visible = not _compact or not _nav_open
 	_nav_button.text = "編集へ戻る" if _nav_open else "敵・分類"
-	var wide := _editor.size.x >= 510
+	var wide := _editor.size.x >= 620
 	if wide != _wide:
 		_wide = wide
 		_queue_rows()
@@ -325,7 +327,7 @@ func _refresh_rows() -> void:
 			var content: Container = GridContainer.new() if _wide else VBoxContainer.new()
 			if _wide:
 				content.columns = 5
-				for title in ["項目", "共通値", "現在値", "状態 / 差分", ""]: FIELDS.text(content, title)
+				for title in ["項目", "共通値（参照）", "ステージ設定", "実効値・状態", ""]: FIELDS.text(content, title)
 			section.add_child(content)
 			content.visible = toggle.button_pressed
 			toggle.toggled.connect(func(open):
@@ -336,33 +338,43 @@ func _refresh_rows() -> void:
 				var base := StageEnemyTuning.base_value(_enemy, key, _cfg)
 				var value := float(values.get(_id, {}).get(key, base))
 				var integer: bool = key.begins_with("params.") and _enemy.params[key.trim_prefix("params.")] is int
-				_row_controls[key] = FIELDS.row(content, key, base, value, integer, _wide, _edit_value.bind(key, base), _reset_key, func(text): _hint.text = text)
+				_row_controls[key] = FIELDS.row(content, key, base, value, integer, _wide, _edit_value.bind(key, base), _reset_key, _toggle_override.bind(key, base), func(text): _hint.text = text)
 				_refresh_difference(key, value, base)
 
 func _refresh_difference(key: String, value: float, base: float) -> void:
 	if not _row_controls.has(key): return
 	var overridden: bool = values.get(_id, {}).has(key)
 	var unsaved: bool = values.get(_id, {}).get(key, null) != baseline.get(_id, {}).get(key, null)
+	var controls: Array = _row_controls[key]
+	controls[3].set_pressed_no_signal(overridden)
+	if overridden:
+		var spin: SpinBox = FIELDS.editor(controls)
+		if not is_equal_approx(spin.value, value): spin.set_value_no_signal(value)
+	if controls[2] != null: controls[2].visible = overridden
 	var state: Label = _row_controls[key][0]
-	state.text = ("* " if unsaved else "") + ("%+.2f" % (value - base) if overridden else "共通")
+	state.text = "%s実効 %s\n%s" % ["* " if unsaved else "", String.num(value, 3), "上書き %+.2f" % (value - base) if overridden else "共通値を使用"]
 	state.tooltip_text = ("未保存 / " if unsaved else "保存済み / ") + ("ステージ上書き" if overridden else "共通値を使用")
+	state.tooltip_text += "\nサイズ・エリートなどの個体補正前の標準値。"
 	state.modulate = Color("#ffda87") if unsaved else Color.WHITE
 	_row_controls[key][1].disabled = not overridden
 
 func _edit_value(value: float, key: String, base: float) -> void:
 	if not values.has(_id): values[_id] = {}
-	# 共通値と同じ数値を入力したら継承に戻す。
-	if is_equal_approx(value, base): values[_id].erase(key)
-	else: values[_id][key] = value
-	if values[_id].is_empty(): values.erase(_id)
+	values[_id][key] = value
 	_refresh_difference(key, value, base)
 	_changed()
+
+func _toggle_override(enabled: bool, key: String, base: float) -> void:
+	if enabled:
+		_edit_value(base, key, base)
+	else:
+		_reset_key(key, _row_controls[key][2], base)
 
 func _reset_key(key: String, spin: SpinBox, base: float) -> void:
 	if values.has(_id):
 		values[_id].erase(key)
 		if values[_id].is_empty(): values.erase(_id)
-	spin.set_value_no_signal(base)
+	if spin != null: spin.set_value_no_signal(base)
 	_refresh_difference(key, base, base)
 	_changed()
 
