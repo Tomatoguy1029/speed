@@ -70,12 +70,11 @@ func screen(p: Vector2) -> Vector2:
 var _look_textures: Dictionary = {}
 
 func texture_for(id: String) -> Texture2D:
-	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
-		return preload("res://assets/placeholders/corona_crown.svg")
 	var stage: StageDef = session.run.state.stage if session != null and is_instance_valid(session.run) else null
 	var look := RunPresentation.load_look(StringName(id), stage)
 	if look != null:
-		return RunPresentation.look_texture(look, _look_textures)
+		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ContentManager.enemies.get(StringName(id))
+		return RunPresentation.look_texture(look, _look_textures, def.armor_colors if def != null else {})
 	if id.begins_with("field_planet"):
 		if not _textures.has("planet"):
 			_textures["planet"] = load("res://assets/pixel/planet.png")

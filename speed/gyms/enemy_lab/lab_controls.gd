@@ -1,5 +1,6 @@
 ## 実験条件・攻撃・出現・配置規則・保存の編集ドック。
 extends TabContainer
+const ARMOR_VIEW := preload("res://gyms/enemy_lab/lab_armor_paint.gd")
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 const LIGHTING := preload("res://data/visuals/enemy_lighting.tres")
 var lab
@@ -30,6 +31,8 @@ var _appearance_scale: SpinBox
 var _appearance_save: Button
 var _appearance_reset: Button
 var _appearance_hashes: Dictionary = {}
+var _armor_view: ARMOR_VIEW
+var _armor_color: ColorPickerButton
 
 func _ready() -> void:
 	custom_minimum_size.x = 368
@@ -51,12 +54,48 @@ func _appearance(page: Node) -> void:
 	_appearance_angle = _number(page, tr("lab.appearance.rotation"), 0, -180, 180, 5, _rotate_appearance)
 	_appearance_reset = _button(page, tr("lab.appearance.restore_saved"), _restore_appearance)
 	_appearance_save = _button(page, tr("lab.appearance.save_type"), _save_appearance)
+	var paint_box := UI.fold(page, tr("lab.armor.title"), true)
+	_text(paint_box, tr("lab.armor.help"))
+	var paint_row := HBoxContainer.new()
+	paint_box.add_child(paint_row)
+	var paint_label := _text(paint_row, tr("lab.armor.color"))
+	paint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_armor_color = ColorPickerButton.new()
+	_armor_color.color = Color("#cba36e")
+	_armor_color.edit_alpha = false
+	_armor_color.custom_minimum_size = Vector2(100, 32)
+	paint_row.add_child(_armor_color)
+	_armor_view = ARMOR_VIEW.new()
+	_armor_view.piece_pressed.connect(_paint_armor_piece)
+	paint_box.add_child(_armor_view)
 	for entry in [["key_energy", 0.0, 3.0, 0.01], ["fill_energy", 0.0, 3.0, 0.01],
 		["key_angle", -180.0, 180.0, 1.0], ["fill_angle", -180.0, 180.0, 1.0],
 		["height", 0.0, 1.0, 0.01], ["ambient", 0.0, 1.0, 0.01], ["normal_strength", 0.0, 3.0, 0.05]]:
 		var key: String = entry[0]
 		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_visual.bind(key))
 	_text(page, tr("lab.appearance.type_help"))
+
+func _paint_armor_piece(region: int, restore: bool) -> void:
+	if _appearance_type == &"" or _armor_view.source == null:
+		return
+	var def: EnemyDef = lab.session.run.enemies.def_of(_appearance_type)
+	var colors := def.armor_colors.duplicate(true)
+	var source: String = _armor_view.data.key
+	var palette: Dictionary = colors.get(source, {}).duplicate()
+	if restore:
+		palette.erase(str(region))
+	else:
+		palette[str(region)] = _armor_color.color.to_html(false)
+	if palette.is_empty():
+		colors.erase(source)
+	else:
+		colors[source] = palette
+	if colors == def.armor_colors:
+		return
+	lab.session.perform("armor_paint", {"type": String(_appearance_type), "colors": colors})
+	var render := _render()
+	if render != null:
+		render._apply_lighting()
 
 func _set_visual(value: float, key: String) -> void:
 	if _appearance_type == &"":
@@ -87,11 +126,16 @@ func _sync_appearance() -> void:
 	for field: SpinBox in _lighting_fields.values():
 		field.editable = supported and RunPresentation.load_look(type, lab.session.run.state.stage) != null
 	if not supported:
+		_armor_view.show_armor(null, {})
+		_armor_color.disabled = true
 		_appearance_label.text = tr("lab.appearance.select_type")
 		return
 	var def: EnemyDef = lab.session.run.enemies.def_of(type)
 	var original: EnemyDef = ContentManager.enemies[type]
-	var pending: bool = def.visual_settings != original.visual_settings
+	var look := RunPresentation.load_look(type, lab.session.run.state.stage)
+	_armor_view.show_armor(look.armor if look != null else null, def.armor_colors)
+	_armor_color.disabled = look == null
+	var pending: bool = def.visual_settings != original.visual_settings or def.armor_colors != original.armor_colors
 	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
 	if switched or not _appearance_scale.get_line_edit().has_focus():
 		_appearance_scale.set_value_no_signal(def.visual_value("scale", 1.0))
@@ -114,6 +158,7 @@ func _restore_appearance() -> void:
 		lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key,
 			"value": saved.visual_value(key, 1.0 if key == "scale" else float(LIGHTING.get(key))),
 			"inherit": not saved.visual_settings.has(key)})
+	lab.session.perform("armor_paint", {"type": String(_appearance_type), "colors": saved.armor_colors.duplicate(true)})
 	_sync_appearance()
 
 func _save_appearance() -> void:
@@ -135,11 +180,13 @@ func _save_appearance() -> void:
 		return
 	var def: EnemyDef = lab.session.run.enemies.def_of(type)
 	saved.visual_settings = def.visual_settings.duplicate(true)
+	saved.armor_colors = def.armor_colors.duplicate(true)
 	var error := ResourceSaver.save(saved, path)
 	if error != OK:
 		lab._messages.text = tr("lab.appearance.save_failed") + " " + error_string(error)
 		return
 	original.visual_settings = saved.visual_settings.duplicate(true)
+	original.armor_colors = saved.armor_colors.duplicate(true)
 	_appearance_hashes[path] = FileAccess.get_sha256(path)
 	ContentManager.source_hashes[path] = _appearance_hashes[path]
 	lab._messages.text = tr("lab.appearance.saved_type").format({"name": def.display_name})

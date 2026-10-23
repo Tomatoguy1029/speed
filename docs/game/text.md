@@ -764,6 +764,9 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.save&#95;failed | 外観を保存できませんでした | Could not save appearance |
 | lab.appearance.file&#95;changed | 敵データが外部で変更されています。実験場を開き直してから保存してください。 | Enemy data changed externally. Reopen the lab before saving. |
 | lab.appearance.saved&#95;type | {name} の外観を保存しました。次のステージ開始から使います。 | Saved appearance for {name}. New runs will use these settings. |
+| lab.armor.title | 装甲の塗装 | Armor paint |
+| lab.armor.color | 塗る色 | Paint color |
+| lab.armor.help | 左クリックで装甲片を塗り、右クリックで元の色に戻します。上下左右につながるピクセルだけを同じ片として扱い、斜めの接触は分けます。画像は元の向きで表示します。外観の保存ボタンでステージにも反映できます。 | Left-click to paint a piece; right-click to restore its original color. Only horizontal and vertical neighbors connect. Diagonal contacts stay separate. The image uses its original orientation. Save appearance to use the paint in stages. |
 <!-- csv:end -->
 
 ### 互換行

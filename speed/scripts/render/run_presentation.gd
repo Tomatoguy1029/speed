@@ -5,6 +5,8 @@
 class_name RunPresentation
 extends Node
 
+const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
+
 const XP_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
@@ -34,6 +36,8 @@ var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
 var _armor_batches: Dictionary = {}
+var _armor_sources: Dictionary = {}
+var _armor_palette_hashes: Dictionary = {}
 ## 外観の名前の一覧（並び順が照明のキャンバスの層の番号になる。出ない外観の層は作らない）
 var _look_names: PackedStringArray = []
 ## 種類ごとの外観（なければ null）と、種類ごとの絵を合成した画像
@@ -192,6 +196,23 @@ func _apply_lighting() -> void:
 		var armor := _armor_batches[type].material as ShaderMaterial
 		armor.set_shader_parameter("ambient", def.visual_value("ambient", lighting_settings.ambient))
 		armor.set_shader_parameter("normal_strength", def.visual_value("normal_strength", lighting_settings.normal_strength))
+		var source: Texture2D = _armor_sources[type]
+		var data := ARMOR_PAINT.layout(source)
+		var palette: Dictionary = def.armor_colors.get(data.key, {})
+		var signature := hash(palette)
+		if _armor_palette_hashes.get(type, -1) != signature:
+			_armor_palette_hashes[type] = signature
+			var canvas := _armor_batches[type].texture as CanvasTexture
+			if palette.is_empty():
+				canvas.diffuse_texture = source
+			else:
+				var painted := ARMOR_PAINT.painted_image(source, def.armor_colors)
+				if canvas.diffuse_texture is ImageTexture:
+					(canvas.diffuse_texture as ImageTexture).update(painted)
+				else:
+					canvas.diffuse_texture = ImageTexture.create_from_image(painted)
+			_enemy_textures.erase(type)
+
 
 ## 隕石・経験値の結晶・部品・敵の弾を MultiMesh でまとめる。敵の種類ごとのまとめは、その種類が初めて出たときに作る。
 func _build_batches() -> void:
@@ -258,6 +279,7 @@ func _ensure_enemy_batch(type: StringName) -> InstanceBatch:
 	if look != null:
 		var armor := CanvasTexture.new()
 		armor.diffuse_texture = look.armor
+		_armor_sources[type] = look.armor
 		armor.normal_texture = look.normal
 		var batch := InstanceBatch.new()
 		batch.name = String(type) + "Armor"
@@ -874,11 +896,14 @@ static func load_look(type: StringName, stage: StageDef = null) -> EnemyLook:
 	return null
 
 ## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
-static func look_texture(look: EnemyLook, cache: Dictionary) -> Texture2D:
-	var key := look.resource_path
+static func look_texture(look: EnemyLook, cache: Dictionary, palettes: Dictionary = {}) -> Texture2D:
+	var data := ARMOR_PAINT.layout(look.armor)
+	var key := look.resource_path + ":" + str(hash(palettes.get(data.key, {})))
 	if not cache.has(key):
+		if cache.size() >= 64:
+			cache.erase(cache.keys()[0])
 		var body: Image = look.base.get_image()
-		body.blend_rect(look.armor.get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
+		body.blend_rect(ARMOR_PAINT.painted_image(look.armor, palettes), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
 		cache[key] = ImageTexture.create_from_image(body)
 	return cache[key]
 
@@ -901,7 +926,7 @@ func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
 		var look := look_of(type)
 		if look != null:
-			_enemy_textures[type] = look_texture(look, _layered_textures)
+			_enemy_textures[type] = look_texture(look, _layered_textures, run.enemies.def_of(type).armor_colors)
 			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null

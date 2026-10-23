@@ -22,6 +22,8 @@ const VISUAL_LIMITS := {
 	"height": Vector2(0, 1), "ambient": Vector2(0, 1), "normal_strength": Vector2(0, 3),
 }
 @export var visual_settings: Dictionary = {}
+## 装甲画像の透過マスク別に保存する、装甲片の塗装色（RGB）。
+@export var armor_colors: Dictionary = {}
 
 func visual_value(key: String, fallback: float) -> float:
 	return clampf(float(visual_settings.get(key, fallback)), VISUAL_LIMITS[key].x, VISUAL_LIMITS[key].y)
