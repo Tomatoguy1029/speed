@@ -1,0 +1,17 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/render/enemies/phoenix_flame_settings.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+ember_color = Color(0.72, 0.184, 0.098, 1)
+flame_color = Color(0.969, 0.475, 0.141, 1)
+hot_color = Color(1, 0.855, 0.439, 1)
+smoke_color = Color(0.259, 0.173, 0.208, 1)
+amount = 0.85
+speed = 1.0
+pixel_size = 3.0
+turbulence = 1.0
+sparks = 0.45
+opacity = 0.85
+emission = 0.65
