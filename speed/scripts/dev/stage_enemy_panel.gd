@@ -35,6 +35,8 @@ var _compact := false
 var _wide := false
 var _nav_open := false
 var _definitions: Dictionary = {}
+var _names: Dictionary = {}
+var _rows_queued := false
 var _enemy_search: LineEdit
 var _search: LineEdit
 var _rows: VBoxContainer
@@ -146,7 +148,12 @@ func _ready() -> void:
 	_nav_split.split_offset = _saved_nav_split
 	for split in [_split, _nav_split]:
 		split.get_drag_area_controls()[0].tooltip_text = "ドラッグして領域の大きさを変える"
-	if not stage_path.is_empty(): open_stage(stage_path)
+	if _live:
+		_stage_picker.disabled = true
+		_stage_picker.select(_stages.find(stage_path))
+		_refresh_enemies()
+		_changed()
+	elif not stage_path.is_empty(): open_stage(stage_path)
 	elif not _stages.is_empty(): open_stage(_stages[0])
 	_layout.call_deferred()
 
@@ -160,7 +167,14 @@ func _layout() -> void:
 	var wide := _editor.size.x >= 510
 	if wide != _wide:
 		_wide = wide
-		_refresh_rows.call_deferred()
+		_queue_rows()
+
+func _queue_rows() -> void:
+	if _rows_queued: return
+	_rows_queued = true
+	(func():
+		_rows_queued = false
+		_refresh_rows()).call_deferred()
 
 func _button(parent: Node, text: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -201,26 +215,26 @@ func reload_stage() -> void:
 func bind_run(stage: StageDef, cfg: GameConfig, tuning: Dictionary) -> void:
 	_live = true
 	_cfg = cfg
-	open_stage("res://data/stages/stage_%d.tres" % stage.index)
+	_source = stage
+	stage_path = "res://data/stages/stage_%d.tres" % stage.index
+	baseline = stage.enemy_tuning.duplicate(true)
 	values = tuning.duplicate(true)
+	if _id.is_empty() and not stage.enemies.is_empty(): _id = String(stage.enemies[0])
+	if not is_node_ready(): return
 	_stage_picker.disabled = true
-	_refresh_rows()
+	_stage_picker.select(_stages.find(stage_path))
+	_refresh_enemies()
 	_changed()
 
 func _refresh_enemies() -> void:
-	if _definitions.is_empty():
-		for file in DirAccess.get_files_at("res://data/enemies"):
-			if file.ends_with(".tres"):
-				var id := file.trim_suffix(".tres")
-				_definitions[id] = IO.definition(id)
+	_names = IO.enemy_names()
 	_ids.clear()
 	_enemy_list.clear()
-	for id: String in _definitions:
-		var base: EnemyDef = _definitions[id]
-		var name := "%s / %s" % [base.display_name, id]
+	for id: String in _names:
+		var name := "%s / %s" % [_names[id], id]
 		if not _enemy_search.text.is_empty() and not name.to_lower().contains(_enemy_search.text.to_lower()): continue
 		_ids.append(id)
-		var index := _enemy_list.add_item(base.display_name)
+		var index := _enemy_list.add_item(_names[id])
 		_enemy_list.set_item_tooltip(index, name)
 	if _ids.is_empty():
 		_enemy = null
@@ -234,11 +248,13 @@ func _select_enemy(id: String) -> void:
 	if index >= 0:
 		_enemy_list.select(index)
 		_enemy_list.ensure_current_is_visible()
-	_enemy = _definitions[id] if _definitions.has(id) else IO.definition(id)
+	if not _definitions.has(id): _definitions[id] = IO.definition(id)
+	_enemy = _definitions[id]
 	_refresh_tree()
-	_refresh_rows()
+	_queue_rows()
 
 func _refresh_tree() -> void:
+	_tree.set_block_signals(true)
 	_tree.clear()
 	_tree_items.clear()
 	var root := _tree.create_item()
@@ -261,6 +277,7 @@ func _refresh_tree() -> void:
 	if not _tree_items.has(_category): _category = "すべて"
 	_update_tree_counts()
 	_tree_items[_category].select(0)
+	_tree.set_block_signals(false)
 
 func _update_tree_counts() -> void:
 	for category in _tree_items:
@@ -358,7 +375,7 @@ func _changed() -> void:
 		var id := _ids[index]
 		var count: int = values.get(id, {}).size()
 		var pending: bool = values.get(id, {}) != baseline.get(id, {})
-		_enemy_list.set_item_text(index, ("* " if pending else "") + _definitions[id].display_name + (" · %d" % count if count else ""))
+		_enemy_list.set_item_text(index, ("* " if pending else "") + _names[id] + (" · %d" % count if count else ""))
 	var count := 0
 	for id in values: count += values[id].size()
 	_status.text = "%s · 上書き %d種 / %d項目" % ["● 未保存の試行" if is_dirty() else "保存済み", values.size(), count]

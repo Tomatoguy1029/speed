@@ -68,9 +68,12 @@ func _ready() -> void:
 	overlay = load("res://scripts/dev/stage_enemy_overlay.gd").new()
 	overlay.run = session.sim
 	layer.add_child(overlay)
+	check(overlay.panel == null and overlay.get_child_count() == 0, "閉じている敵調整はUIを構築しない")
 	overlay.show()
 	await frames()
 	var panel: Control = overlay.panel
+	check(panel._definitions.size() == 1, "初回表示は選択した敵の定義だけを読む")
+	check(panel._names["telescope"] == IO.definition("telescope").display_name, "一覧はソースの敵名を表示する")
 	panel.stage_path = fixture
 	panel.reload_stage()
 	panel._select_enemy("telescope")
@@ -176,6 +179,7 @@ func _ready() -> void:
 	overlay.show()
 	overlay._fit()
 	check(overlay.get_rect() == rect, "閉じて開いても位置とサイズを保持する")
+	check(overlay.panel == panel, "再表示では構築済みのUIを使う")
 	var next = load("res://scripts/dev/stage_enemy_overlay.gd").new()
 	next.run = session.sim
 	layer.add_child(next)

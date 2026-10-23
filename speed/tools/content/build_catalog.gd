@@ -15,6 +15,7 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 			entry.category = category
 			entry.path = path
 			entry.text_prefix = CATEGORIES[category]
+			if category == "enemies": entry.params["display_name"] = definition.display_name
 			if category == "stages": entry.index = definition.index
 			else: entry.id = definition.id
 			for key in ["code_id", "order", "costs", "stat", "per_level", "comet_only"]:

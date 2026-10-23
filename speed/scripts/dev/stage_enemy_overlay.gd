@@ -13,6 +13,17 @@ var _placed := false
 var _restored := Rect2()
 
 func _ready() -> void:
+	hide()
+	visibility_changed.connect(func():
+		if visible: _ensure_contents())
+	get_viewport().size_changed.connect(_constrain)
+	resized.connect(_place_grip)
+	item_rect_changed.connect(_place_grip)
+	minimum_size_changed.connect(func(): _constrain.call_deferred())
+
+## 出撃時にはノードも定義も作らず、最初に開くときだけ組み立てる。
+func _ensure_contents() -> void:
+	if panel != null: return
 	theme = Theme.new()
 	theme.default_font_size = 15
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -46,8 +57,8 @@ func _ready() -> void:
 	header.add_child(close)
 	panel = PANEL.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(panel)
 	panel.bind_run(run.state.stage, run.cfg, run.enemies.stage_tuning)
+	box.add_child(panel)
 	panel.tuning_changed.connect(func(values): run.enemies.update_stage_tuning(values))
 	panel.saved.connect(func(stage):
 		run.state.emit(&"enemy_tuning_saved", {"path": panel.stage_path, "values": stage.enemy_tuning.duplicate(true)}))
@@ -60,12 +71,7 @@ func _ready() -> void:
 	_grip.draw.connect(func():
 		for n in [6, 11, 16]: _grip.draw_line(Vector2(n, 20), Vector2(20, n), Color("#a7b8cc"), 1.0))
 	add_child(_grip)
-	get_viewport().size_changed.connect(_constrain)
-	resized.connect(_place_grip)
-	item_rect_changed.connect(_place_grip)
-	minimum_size_changed.connect(func(): _constrain.call_deferred())
 	_fit.call_deferred()
-	hide()
 
 func _exit_tree() -> void:
 	if _placed: _remember()

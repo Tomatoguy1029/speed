@@ -2,12 +2,34 @@
 @tool
 extends RefCounted
 
+static var _names: Dictionary = {}
+static var _names_key := ""
+
+## 一覧はビルド済みの名前だけを使い、敵定義の読込は選択された種類だけにする。
+static func enemy_names() -> Dictionary:
+	var files := DirAccess.get_files_at("res://data/enemies")
+	var path := "res://data/content_catalog.tres"
+	var key := "%s:%s" % [FileAccess.get_modified_time(path), str(files)]
+	if key != _names_key:
+		var mode := ResourceLoader.CACHE_MODE_REUSE if _names_key.is_empty() else ResourceLoader.CACHE_MODE_IGNORE
+		var catalog := ResourceLoader.load(path, "", mode) as ContentCatalog
+		var entries := catalog.table(&"enemies")
+		_names = {}
+		for file in files:
+			if not file.ends_with(".tres"): continue
+			var id := file.trim_suffix(".tres")
+			var entry: ContentEntry = entries.get(StringName(id))
+			# エディターで追加した直後の種類も、索引の生成前から選択できる。
+			_names[id] = entry.params.display_name if entry != null and entry.params.has("display_name") else definition(id).display_name
+		_names_key = key
+	return _names
+
 static func read_stage(path: String) -> StageDef:
 	return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 
 static func definition(id: String) -> EnemyDef:
 	var path := "res://data/enemies/%s.tres" % id
-	return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as EnemyDef if ResourceLoader.exists(path) else null
+	return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyDef if ResourceLoader.exists(path) else null
 
 static func validate(values: Dictionary) -> String:
 	for id in values:

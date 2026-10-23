@@ -9,6 +9,9 @@ id = &"aquarius"
 category = &"enemies"
 path = "res://data/enemies/aquarius.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "みずがめ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -18,6 +21,9 @@ id = &"aquila"
 category = &"enemies"
 path = "res://data/enemies/aquila.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "わし座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -27,6 +33,9 @@ id = &"armored"
 category = &"enemies"
 path = "res://data/enemies/armored.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "装甲型"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -36,6 +45,9 @@ id = &"auriga"
 category = &"enemies"
 path = "res://data/enemies/auriga.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ぎょしゃ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -45,6 +57,9 @@ id = &"battleship"
 category = &"enemies"
 path = "res://data/enemies/battleship.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "戦艦"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -54,6 +69,9 @@ id = &"beamer"
 category = &"enemies"
 path = "res://data/enemies/beamer.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ビームの敵"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -63,6 +81,9 @@ id = &"biter"
 category = &"enemies"
 path = "res://data/enemies/biter.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "噛みつく雑魚"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -72,6 +93,9 @@ id = &"bomber"
 category = &"enemies"
 path = "res://data/enemies/bomber.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "自爆する雑魚"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -81,6 +105,9 @@ id = &"cepheus"
 category = &"enemies"
 path = "res://data/enemies/cepheus.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ケフェウス座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -90,6 +117,9 @@ id = &"cepheus_soldier"
 category = &"enemies"
 path = "res://data/enemies/cepheus_soldier.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ケフェウス座の兵"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -99,6 +129,9 @@ id = &"clock"
 category = &"enemies"
 path = "res://data/enemies/clock.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "とけい座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -108,6 +141,9 @@ id = &"corona"
 category = &"enemies"
 path = "res://data/enemies/corona.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "みなみのかんむり座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -117,6 +153,9 @@ id = &"crab"
 category = &"enemies"
 path = "res://data/enemies/crab.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "かに座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -126,6 +165,9 @@ id = &"cross"
 category = &"enemies"
 path = "res://data/enemies/cross.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "みなみじゅうじ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -135,6 +177,9 @@ id = &"crow"
 category = &"enemies"
 path = "res://data/enemies/crow.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "からす座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -144,6 +189,9 @@ id = &"darter"
 category = &"enemies"
 path = "res://data/enemies/darter.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ダーター"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -153,6 +201,9 @@ id = &"dolphin"
 category = &"enemies"
 path = "res://data/enemies/dolphin.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "いるか座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -162,6 +213,9 @@ id = &"drifter"
 category = &"enemies"
 path = "res://data/enemies/drifter.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ドリフター"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -171,6 +225,9 @@ id = &"gunner"
 category = &"enemies"
 path = "res://data/enemies/gunner.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "射撃型"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -180,6 +237,9 @@ id = &"hydra_beam"
 category = &"enemies"
 path = "res://data/enemies/hydra_beam.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座のビームの首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -189,6 +249,9 @@ id = &"hydra_bite"
 category = &"enemies"
 path = "res://data/enemies/hydra_bite.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の噛みつく首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -198,6 +261,9 @@ id = &"hydra_debris"
 category = &"enemies"
 path = "res://data/enemies/hydra_debris.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の瓦礫の首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -207,6 +273,9 @@ id = &"hydra_immortal"
 category = &"enemies"
 path = "res://data/enemies/hydra_immortal.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の不死の首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -216,6 +285,9 @@ id = &"hydra_rubble"
 category = &"enemies"
 path = "res://data/enemies/hydra_rubble.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の瓦礫"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -225,6 +297,9 @@ id = &"hydra_thunder"
 category = &"enemies"
 path = "res://data/enemies/hydra_thunder.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の雷の首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -234,6 +309,9 @@ id = &"hydra_vortex"
 category = &"enemies"
 path = "res://data/enemies/hydra_vortex.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "うみへび座の渦の首"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -243,6 +321,9 @@ id = &"iron"
 category = &"enemies"
 path = "res://data/enemies/iron.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "鉄のがれき"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -252,6 +333,9 @@ id = &"lynx"
 category = &"enemies"
 path = "res://data/enemies/lynx.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "やまねこ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -261,6 +345,9 @@ id = &"marlin"
 category = &"enemies"
 path = "res://data/enemies/marlin.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "かじき座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -270,6 +357,9 @@ id = &"meteor"
 category = &"enemies"
 path = "res://data/enemies/meteor.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "隕石"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -279,6 +369,9 @@ id = &"missile"
 category = &"enemies"
 path = "res://data/enemies/missile.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ホーミングミサイルの敵"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -288,6 +381,9 @@ id = &"phoenix"
 category = &"enemies"
 path = "res://data/enemies/phoenix.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ほうおう座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -297,6 +393,9 @@ id = &"pulser"
 category = &"enemies"
 path = "res://data/enemies/pulser.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "波動の敵"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -306,6 +405,9 @@ id = &"pump"
 category = &"enemies"
 path = "res://data/enemies/pump.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ポンプ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -315,6 +417,9 @@ id = &"reticle"
 category = &"enemies"
 path = "res://data/enemies/reticle.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "レチクル座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -324,6 +429,9 @@ id = &"rocket"
 category = &"enemies"
 path = "res://data/enemies/rocket.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ミサイル"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -333,6 +441,9 @@ id = &"ruler"
 category = &"enemies"
 path = "res://data/enemies/ruler.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "じょうぎ座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -342,6 +453,9 @@ id = &"saw"
 category = &"enemies"
 path = "res://data/enemies/saw.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "回る丸鋸"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -351,6 +465,9 @@ id = &"shield"
 category = &"enemies"
 path = "res://data/enemies/shield.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "たて座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -360,6 +477,9 @@ id = &"splitling"
 category = &"enemies"
 path = "res://data/enemies/splitling.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "分裂体"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -369,6 +489,9 @@ id = &"splitter"
 category = &"enemies"
 path = "res://data/enemies/splitter.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "分裂する雑魚"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -378,6 +501,9 @@ id = &"spreader"
 category = &"enemies"
 path = "res://data/enemies/spreader.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "拡散弾の敵"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -387,6 +513,9 @@ id = &"swarm"
 category = &"enemies"
 path = "res://data/enemies/swarm.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "スウォーム"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -396,6 +525,9 @@ id = &"telescope"
 category = &"enemies"
 path = "res://data/enemies/telescope.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "ぼうえんきょう座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -405,6 +537,9 @@ id = &"titan"
 category = &"enemies"
 path = "res://data/enemies/titan.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "タイタン"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -414,6 +549,9 @@ id = &"triangle"
 category = &"enemies"
 path = "res://data/enemies/triangle.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "みなみのさんかく座"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -423,6 +561,9 @@ id = &"triangle_star"
 category = &"enemies"
 path = "res://data/enemies/triangle_star.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "みなみのさんかく座の星"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -432,6 +573,9 @@ id = &"volatile"
 category = &"enemies"
 path = "res://data/enemies/volatile.tres"
 text_prefix = "enemy"
+params = {
+"display_name": "誘爆する雑魚"
+}
 costs = PackedInt32Array()
 resources = PackedStringArray()
 
@@ -1219,5 +1363,5 @@ resources = PackedStringArray()
 
 [resource]
 script = ExtResource("2_pfhfx")
-source_signature = "a8199df5b2ababa68deb1b4b13238ffc6c6527fa3863134062d7cf79c0f90eab"
+source_signature = "072ca46c18eb6ac37a64259547abf59efa568297f13402de05aef0fb612d0f72"
 entries = Array[ExtResource("1_na87o")]([SubResource("Resource_na87o"), SubResource("Resource_pfhfx"), SubResource("Resource_y3jmk"), SubResource("Resource_2urms"), SubResource("Resource_hb58i"), SubResource("Resource_y8rdo"), SubResource("Resource_vanno"), SubResource("Resource_ealk6"), SubResource("Resource_wv0aq"), SubResource("Resource_wufbb"), SubResource("Resource_2khb0"), SubResource("Resource_2jpif"), SubResource("Resource_nrc7o"), SubResource("Resource_4sr7p"), SubResource("Resource_elr1d"), SubResource("Resource_bi5lx"), SubResource("Resource_sj71a"), SubResource("Resource_6sxnn"), SubResource("Resource_uhhva"), SubResource("Resource_578rm"), SubResource("Resource_j5wdi"), SubResource("Resource_ufrwu"), SubResource("Resource_une5t"), SubResource("Resource_417se"), SubResource("Resource_wkcoo"), SubResource("Resource_ibhkd"), SubResource("Resource_2xjt5"), SubResource("Resource_q7c1o"), SubResource("Resource_4fole"), SubResource("Resource_73v70"), SubResource("Resource_d2k3k"), SubResource("Resource_cst6l"), SubResource("Resource_s252u"), SubResource("Resource_1oxts"), SubResource("Resource_jq362"), SubResource("Resource_hj7jj"), SubResource("Resource_sak13"), SubResource("Resource_h3ix0"), SubResource("Resource_sqvnm"), SubResource("Resource_klkf1"), SubResource("Resource_j8snm"), SubResource("Resource_0d3uc"), SubResource("Resource_r43mc"), SubResource("Resource_uygev"), SubResource("Resource_0mmfo"), SubResource("Resource_h7k61"), SubResource("Resource_x3nv5"), SubResource("Resource_ab5ft"), SubResource("Resource_yex2t"), SubResource("Resource_6d86q"), SubResource("Resource_dqdyq"), SubResource("Resource_bk7kp"), SubResource("Resource_sj4iu"), SubResource("Resource_3a2hg"), SubResource("Resource_dix5l"), SubResource("Resource_pvnv8"), SubResource("Resource_imoqa"), SubResource("Resource_s1wr4"), SubResource("Resource_bfb3j"), SubResource("Resource_o3c6u"), SubResource("Resource_uet5m"), SubResource("Resource_abqs1"), SubResource("Resource_s8knn"), SubResource("Resource_jwoj3"), SubResource("Resource_b8std"), SubResource("Resource_axfos"), SubResource("Resource_sbq0g"), SubResource("Resource_05cth"), SubResource("Resource_t42bu"), SubResource("Resource_6ohrv"), SubResource("Resource_ommdm"), SubResource("Resource_luk4p"), SubResource("Resource_8l7sh"), SubResource("Resource_k4ia1"), SubResource("Resource_yn78u"), SubResource("Resource_83fj3"), SubResource("Resource_18jcl"), SubResource("Resource_7bxtu"), SubResource("Resource_uy8hw"), SubResource("Resource_0dhso"), SubResource("Resource_a37np"), SubResource("Resource_fuiaj"), SubResource("Resource_liox1"), SubResource("Resource_ixn0h"), SubResource("Resource_op2ph"), SubResource("Resource_7wmth"), SubResource("Resource_millj"), SubResource("Resource_o5c5j"), SubResource("Resource_fxdl0"), SubResource("Resource_8c538"), SubResource("Resource_yqj1k"), SubResource("Resource_27ji8"), SubResource("Resource_vx0iy"), SubResource("Resource_jux2o"), SubResource("Resource_euv6d"), SubResource("Resource_7ckk1"), SubResource("Resource_4fylu"), SubResource("Resource_gj280"), SubResource("Resource_f85gy"), SubResource("Resource_5a1q6"), SubResource("Resource_grrmq"), SubResource("Resource_gbngy"), SubResource("Resource_ntwis"), SubResource("Resource_2uigc"), SubResource("Resource_84jjj"), SubResource("Resource_ck1kp"), SubResource("Resource_6lrnv"), SubResource("Resource_e8718"), SubResource("Resource_ly6du"), SubResource("Resource_nikc3"), SubResource("Resource_ce0o5"), SubResource("Resource_hvqin"), SubResource("Resource_g3xy5"), SubResource("Resource_ugigi"), SubResource("Resource_mopf4"), SubResource("Resource_b4wbt"), SubResource("Resource_5itfc"), SubResource("Resource_2vol7"), SubResource("Resource_d4nur"), SubResource("Resource_0xnup"), SubResource("Resource_mrx45"), SubResource("Resource_jqtx4"), SubResource("Resource_7f1ap"), SubResource("Resource_q4tqk"), SubResource("Resource_mhcn7"), SubResource("Resource_jsn7w")])
