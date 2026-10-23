@@ -8,6 +8,7 @@ const ORIGIN := Vector2(198, 195)
 const CONSTELLATION_RADIUS := 84.0
 const SYMBOL_ANGLES := [90.0, 180.0, 270.0, 0.0]
 const DRAG_THRESHOLD := 4.0
+const REVEAL_SETTINGS := preload("res://data/map_reveal_settings.tres")
 const TEXTURES := [
 	preload("res://assets/ui/map/constellations_unicorn.png"),
 	preload("res://assets/ui/map/constellations_centeur.png"),
@@ -32,6 +33,11 @@ var _origin := ORIGIN
 var _flatten := 0.5
 var _details: Control
 var _detail_fade: Tween
+var _detail_material: ShaderMaterial
+var _monitor_material: ShaderMaterial
+var _line_progress := 0.0
+# プレビューでは複製した Resource を渡し、本番の調整値を保存せず比較できる。
+var reveal_settings: Resource = REVEAL_SETTINGS
 var _transition_progress := 0.0
 var _dragging := false
 var _pointer_down := false
@@ -90,7 +96,10 @@ func _ready() -> void:
 	_details.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_details.size = size
 	add_child(_details)
-	_artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), _details)
+	var detail_art := _artwork(preload("res://assets/ui/map/selection_screen_decorations.png"), self)
+	_detail_material = ShaderMaterial.new()
+	_detail_material.shader = preload("res://assets/ui/map/information_reveal.gdshader")
+	detail_art.material = _detail_material
 	_preview = TextureRect.new()
 	_preview.position = Vector2(451, 88)
 	_preview.size = Vector2(135, 82)
@@ -118,9 +127,22 @@ func _ready() -> void:
 			select_constellation(posmod(roundi(-_angle / 90.0), 4))
 		_cancel_drag()
 	)
+	var monitor := ColorRect.new()
+	monitor.size = size
+	monitor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	monitor.z_index = 100
+	_monitor_material = ShaderMaterial.new()
+	_monitor_material.shader = preload("res://assets/ui/map/monitor.gdshader")
+	monitor.material = _monitor_material
+	add_child(monitor)
 	_select(0)
 	_apply_rotation(0.0)
 	_hide_details()
+	visibility_changed.connect(func():
+		if not is_visible_in_tree():
+			_cancel_drag()
+			_hide_details()
+	)
 
 func _artwork(texture: Texture2D, parent: Control) -> TextureRect:
 	var art := TextureRect.new()
@@ -140,16 +162,56 @@ func _transparent_button(button: Button) -> void:
 func _hide_details() -> void:
 	if _detail_fade != null:
 		_detail_fade.kill()
-	_details.modulate.a = 0.0
-	_details.hide()
+	_set_detail_line(0.0)
+	_set_detail_light(0.0)
 
 func _reveal_details() -> void:
-	if _transition_progress < 1.0:
+	if _transition_progress < 1.0 or not is_visible_in_tree():
 		return
 	_hide_details()
-	_details.show()
+	_apply_reveal_settings()
 	_detail_fade = create_tween()
-	_detail_fade.tween_property(_details, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE)
+	_detail_fade.tween_method(_set_detail_line, 0.0, 1.0, reveal_settings.line_duration)
+	_detail_fade.tween_interval(reveal_settings.information_delay)
+	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration)
+
+func _apply_reveal_settings() -> void:
+	for parameter: String in ["spectrum_speed", "spectrum_motion", "spectrum_correlation"]:
+		_detail_material.set_shader_parameter(parameter, reveal_settings.get(parameter))
+	for parameter: String in ["crt_strength", "noise_strength"]:
+		_monitor_material.set_shader_parameter(parameter, reveal_settings.get(parameter))
+
+func _set_detail_line(progress: float) -> void:
+	_line_progress = 1.0 - pow(1.0 - progress, reveal_settings.line_ease)
+	_detail_material.set_shader_parameter("line_progress", _line_progress)
+	queue_redraw()
+
+func _set_detail_light(progress: float) -> void:
+	var alpha := smoothstep(0.0, 1.0, progress)
+	var glow: float = sin(progress * PI) * reveal_settings.glow_strength
+	_details.modulate = Color(1.0 + glow, 1.0 + glow, 1.0 + glow, alpha)
+	_detail_material.set_shader_parameter("information_alpha", alpha)
+	_detail_material.set_shader_parameter("glow", glow)
+
+func _draw() -> void:
+	if _line_progress <= 0.0:
+		return
+	var selected: Control = _stars[_selected] if _selected < _stars.size() else _final_stage
+	if selected == null:
+		return
+	var source := selected.position + selected.size * selected.scale * Vector2(1.0, 0.5)
+	var points := PackedVector2Array([source.round(), Vector2(396, source.y).round(), Vector2(423, 210), Vector2(430, 210)])
+	var total := 0.0
+	for i in range(1, points.size()):
+		total += points[i - 1].distance_to(points[i])
+	var remaining := total * _line_progress
+	for i in range(1, points.size()):
+		var length := points[i - 1].distance_to(points[i])
+		if length > 0.0:
+			draw_line(points[i - 1], points[i - 1].lerp(points[i], minf(remaining / length, 1.0)).round(), Color("859b9f"), 1.0)
+		remaining -= length
+		if remaining <= 0.0:
+			break
 
 func _ring(parent: Node2D, texture: Texture2D) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -239,7 +301,7 @@ func _input(event: InputEvent) -> void:
 	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
 	if event.is_action(&"ui_accept") and focus != _back:
 		get_viewport().set_input_as_handled()
-		if event.is_pressed() and not event.is_echo() and _details.visible and (_turn == null or not _turn.is_running()):
+		if event.is_pressed() and not event.is_echo():
 			_start()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
