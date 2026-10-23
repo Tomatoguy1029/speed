@@ -66,11 +66,8 @@ func _ready() -> void:
 	var victims: Array[int] = []
 	for x in [100, 400, 900]: victims.append(victim(Vector2(x, 0)))
 	var outside := victim(Vector2(400, 150))
-	var planet := sim.field.planet
-	planet.pos = Vector2(600, 0)
-	planet.r = 40.0
-	sim.field.bodies.append(planet)
-	sim.field._update_body_grid()
+	var rock := meteor(Vector2(600, 0))
+	victims.append(rock.row)
 	var kills := sim.state.kills
 	var xp := sim.state.xp_dropped
 	var expected_xp := 0.0
@@ -80,14 +77,33 @@ func _ready() -> void:
 	check(t.dead[outside] == 0, "進路の外の敵を壊さない")
 	check(sim.state.kills == kills + victims.size(), "途中の敵をそれぞれ一度だけ撃破として数える")
 	check(is_equal_approx(sim.state.xp_dropped - xp, expected_xp), "共通撃破の経験値を一度ずつ落とす")
-	check(not sim.field.bodies.has(planet), "途中の惑星を地形から除く")
-	check(sim.field.first_body_hit(Vector2.ZERO, Vector2(1000, 0), 1.0) == null, "破壊後は地形格子と衝突へ残さない")
-	check(sim.field.body_gap(planet.pos, 0.0) == INF and sim.field.push_out(planet.pos, 10.0) == planet.pos, "破壊した惑星で押し出されない")
-	sim.field.refresh_bodies()
-	check(not sim.field.bodies.has(planet) and not sim.field.near_body(planet.pos, 1.0), "次の地形更新でも惑星を復活させない")
+	sim.field.gimmick(&"meteors").tick(0.1, 0.1)
+	check(rock.destroyed and rock.row == -1, "破壊した隕石を配置元でも破壊済みとして扱う")
+	sim.enemies.cleanup()
+	sim.field.gimmick(&"meteors").tick(0.2, 0.2)
+	check(rock.destroyed and rock.row == -1, "隕石は行の解放後も再出現しない")
 	var xp_after := sim.state.xp_dropped
 	b.before_move(row, 0.1)
 	check(sim.state.kills == kills + victims.size() and sim.state.xp_dropped == xp_after, "重なった移動区間で撃破と報酬を重ねない")
+
+	# 惑星はBody、隕石はRockとして区別し、通常の地形と破壊対象を保つ。
+	reset()
+	row = dash(Vector2.ZERO, 10000.0, 0.2)
+	rock = meteor(Vector2(100, 0))
+	var planet := sim.field.planet
+	planet.pos = Vector2(600, 0)
+	planet.r = 40.0
+	sim.field.bodies.append(planet)
+	sim.field._update_body_grid()
+	sim.enemies.tick(0.1, 0.1)
+	check(t.dead[rock.row] != 0, "惑星と同じ進路にある隕石を壊す")
+	check(sim.field.bodies.has(planet) and planet.pos == Vector2(600, 0) and planet.r == 40.0, "惑星の実体・位置・半径を保持する")
+	var terrain_hit = sim.field.first_body_hit(Vector2.ZERO, Vector2(1000, 0), 1.0)
+	check(terrain_hit != null and terrain_hit.body == planet, "惑星を共通の地形衝突格子に保持する")
+	sim.field.refresh_bodies()
+	check(sim.field.bodies.has(planet) and sim.field.near_body(planet.pos, 1.0), "次の地形更新後も惑星を保持する")
+	check(sim.state.events.filter(func(event): return event.type == &"explode" and event.get("cause") == &"marlin").is_empty(), "惑星の破壊演出を発生させない")
+	check(t.mode[row] == EnemyTable.Mode.DASH, "地形接触で専用の行動遷移を追加しない")
 
 	# 同じフレームに二体が通っても、同じ敵を二重に倒さない。
 	reset()
@@ -125,12 +141,12 @@ func _ready() -> void:
 	b.before_move(row, 0.05)
 	check(t.dead[regular_part] != 0, "通常敵の部位はボスの例外へ含めない")
 
-	# 月・固定外周で止まり、その先の敵や惑星まで破壊しない。
-	for arena in [false, true]:
+	# 共通の地形衝突より先まで破壊しない。惑星・月・固定外周で同じAPIを使う。
+	for terrain in ["planet", "moon", "arena"]:
 		reset()
 		row = dash(Vector2.ZERO, 10000.0, 0.2)
-		if arena: sim.field.battle_arenas["test"] = Rect2(-200, -200, 500, 400)
-		else: body(Vector2(300, 0), 40.0, false)
+		if terrain == "arena": sim.field.battle_arenas["test"] = Rect2(-200, -200, 500, 400)
+		else: body(Vector2(300, 0), 40.0, terrain == "planet")
 		target = victim(Vector2(500, 0))
 		planet = body(Vector2(700, 0), 50.0, true)
 		sim.enemies.tick(0.1, 0.1)
@@ -175,6 +191,7 @@ func reset() -> void:
 	sim.projectiles.clear_hostile()
 	sim.projectiles.director.configure({"enabled": false})
 	sim.field.bodies.clear()
+	sim.field.rocks.clear()
 	sim.field.moons.clear()
 	sim.field.battle_arenas.clear()
 	sim.field._build_moon_bands()
@@ -196,6 +213,18 @@ func dash(pos: Vector2, speed: float, duration: float) -> int:
 
 func victim(pos: Vector2) -> int:
 	return sim.enemies.spawn(sim.enemies.def_of(&"drifter"), pos)
+
+func meteor(pos: Vector2) -> FieldSystem.Rock:
+	var rock := FieldSystem.Rock.new()
+	rock.kind = &"belt"
+	rock.pos = pos
+	rock.size = 20.0
+	rock.lab_manual = true
+	var rock_index := sim.field.rocks.size()
+	sim.field.rocks.append(rock)
+	rock.row = sim.enemies.spawn(sim.enemies.def_of(&"meteor"), pos, {"meteor_index": rock_index, "size": rock.size})
+	rock.row_id = t.id[rock.row]
+	return rock
 
 func body(pos: Vector2, radius: float, planet: bool) -> FieldSystem.Body:
 	var result := FieldSystem.Body.new()
@@ -234,10 +263,11 @@ func _capture(stage: RuntimeStage) -> void:
 		if t.mode[row] == EnemyTable.Mode.WINDUP and not placed:
 			placed = true
 			for fraction in [0.25, 0.7]: victim(t.pos[row].lerp(t.anchor[row], fraction))
-			body(t.pos[row].lerp(t.anchor[row], 0.48), 65.0, true)
+			meteor(t.pos[row].lerp(t.anchor[row], 0.48))
+			body(Vector2(0, -240), 65.0, true)
 			sim.field.planet.pos = Vector2(1e7, 1e7)
-		label.text = {EnemyTable.Mode.MOVE: "高速回遊", EnemyTable.Mode.WINDUP: "急停止 → キランと予告",
-			EnemyTable.Mode.DASH: "狙いを固定して直線突進・進路破壊", EnemyTable.Mode.RECOVER: "突進終了"}.get(t.mode[row], "")
+		label.text = {EnemyTable.Mode.MOVE: "高速回遊", EnemyTable.Mode.WINDUP: "急停止 → キランと予告（惑星は保持）",
+			EnemyTable.Mode.DASH: "直線突進・敵と隕石を破壊", EnemyTable.Mode.RECOVER: "突進終了"}.get(t.mode[row], "")
 		sim.combat.rebuild_grid()
 		sim.projectiles.tick(dt, dt)
 		sim.enemies.cleanup()
