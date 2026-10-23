@@ -12,6 +12,8 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
 
+共通ピクセル炎の外観は `speed/gyms/pixel_flame_preview.tscn` をF6で開くか、`godot --path speed res://gyms/pixel_flame_preview.tscn` で単体調整できます。連続燃焼・短い噴出、外炎・内炎・芯と密度の比較、停止・コマ送り、任意の時間離散化、色と弱い発光を調整し、明示保存で `speed/data/visuals/pixel_flame.tres` へ保存します。外観は本人確認待ちです。
+
 ステージ制作は [制作ガイド](docs/dev/stage-production.md) から始めます。録画JSONLと感想を使うバランス調整は [試遊・分析・再比較の手順](docs/dev/stage-production.md#6-記録と感想で調整する) に沿って [分析スキル](.agents/skills/speed-balance-analysis/SKILL.md) を呼び出します。AIへの実装依頼は [AI向け資料](docs/dev/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stages/stage-4.md) を参照してください。
 
 敵・隕石・月・惑星・自機は、素材のある種類を透過ピクセルスプライトで、素材が未制作の敵を仮の図形で表示します。マウスへ機体が向き、左クリックで経路を描き始め、もう一度クリックするとその経路を突進します。Escでポーズ、Pで開発用調整パネルです。アート確認用の静止シーンは `tools/preview_pixel_assets.tscn`（F6で実行）。素材と再生成手順は [ピクセル素材](speed/assets/pixel/README.md) を参照してください。
