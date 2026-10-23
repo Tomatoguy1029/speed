@@ -837,9 +837,10 @@ func _draw_minimap() -> void:
 		var segment := _minimap_segment(a, b)
 		if segment.size() == 2:
 			draw_line(c + segment[0], c + segment[1], Color(0.7, 0.8, 1.0, 0.35), 1.0)
-	var planet_shape := _minimap_disk(_minimap_offset(run.field.planet.pos), cfg.planet_radius * k)
-	for polygon: PackedVector2Array in planet_shape:
-		draw_colored_polygon(Transform2D(0.0, c) * polygon, Color(0.45, 0.5, 0.65, 0.6))
+	if run.field.bodies.has(run.field.planet):
+		var planet_shape := _minimap_disk(_minimap_offset(run.field.planet.pos), run.field.planet.r * k)
+		for polygon: PackedVector2Array in planet_shape:
+			draw_colored_polygon(Transform2D(0.0, c) * polygon, Color(0.45, 0.5, 0.65, 0.6))
 	# 敵の多い所（数フレームに1回数え直す）
 	if Engine.get_process_frames() % 15 == 0:
 		_dense = _dense_cells()

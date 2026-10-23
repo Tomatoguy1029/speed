@@ -82,7 +82,7 @@ func _spawn_actor(def_override: BossDef, position_override: Vector2) -> BossActo
 	state.boss_spawned = true
 	var distance := minf(1000.0, state.view_half.length() * 0.65)
 	var p := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * distance
-	if p.distance_to(field.planet.pos) < field.planet.r + 180.0:
+	if field.bodies.has(field.planet) and p.distance_to(field.planet.pos) < field.planet.r + 180.0:
 		p = field.planet.pos + (state.ship_pos - field.planet.pos).normalized() * (field.planet.r + 220.0)
 	if p.length() > cfg.field_radius - 160.0:
 		p = p.normalized() * (cfg.field_radius - 160.0)

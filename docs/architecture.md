@@ -288,6 +288,8 @@ classDiagram
 
 EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
 
+EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時間を受け取り、高速突進の移動区間を判定する。`full_rate` が有効な種類は、画面外でも行動と区間判定を毎回進める。石化・外力による移動は共通の前処理で扱う。
+
 | 対象 | 層 | 方式 |
 |---|---|---|
 | 雑魚 | 行動 | 種類ごとの単純なステートマシン（例：ダーターの予告 → 突進 → 回復） |

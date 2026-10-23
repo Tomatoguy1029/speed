@@ -8,7 +8,7 @@ rank = 5
 radius = 26.0
 hp = 70.0
 armor = 7.0
-speed = 140.0
+speed = 560.0
 accel = 1.5
 turn = 3.0
 xp = 16.0
@@ -23,6 +23,7 @@ params = {
 "dash_time": 0.9,
 "fire_interval": 4.0,
 "keep": 520.0,
+"recover": 0.8,
 "spray": 3,
 "spray_step": 0.15,
 "spread": 0.6,
