@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+rank = 1
+radius = 13.0
+hp = 6.0
+armor = 2.0
+speed = 140.0
+accel = 2.5
+turn = 4.0
+xp = 1.0
+color = Color(0.9, 0.65, 0.35, 1)
+shape = &"box"
+behavior = &"defender"
+params = {
+"bite_radius": 26.0,
+"bite_reach": 22.0,
+"bite_rest": 0.8,
+"bite_telegraph": 0.3,
+"bullet_dmg": 8.0,
+"guard_arrive": 60.0,
+"guard_distance": 90.0,
+"guard_radius": 600.0,
+"guard_spacing": 42.0
+}
+id = &"defender"
+display_name = "守る雑魚"

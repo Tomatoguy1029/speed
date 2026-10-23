@@ -72,7 +72,7 @@ var body_gap_time := PackedFloat64Array()
 
 # ── 行動の状態：種類ごと ──────────────────────────────────────────
 
-## 突進型：予告 → 突進 → 回復の段階と、その残り時間
+## 攻撃の段階と残り時間。ほうおう座は MOVE が離脱、WINDUP が着地点予告、DASH が飛び込み、RECOVER が着地後の停止。
 var mode := PackedByteArray()
 var timer := PackedFloat64Array()
 ## 射撃型・ミサイル艇・戦艦：次の射撃までの時間、予告の溜め（0〜1。ボスも使う）
@@ -86,7 +86,7 @@ var carry := PackedFloat64Array()
 ## レチクル座：狙っている岩の行番号と id（狙っていなければ -1）。ケフェウス座の兵：仕える王の行番号と id
 var target := PackedInt32Array()
 var target_id := PackedInt32Array()
-## ケフェウス座：隊列の基準の位置（増援で組み直すときに決める）
+## ケフェウス座：隊列の基準の位置。ほうおう座：離脱先・予告した着地点。
 var anchor := PackedVector2Array()
 ## 漂流する敵・隕石の回転の速さ
 var spin := PackedFloat64Array()

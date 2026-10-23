@@ -79,7 +79,9 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				bite_radius = float(p.bite_radius)
 				bite_dmg = float(p.bullet_dmg)
 			var m := mode[i]
-			if m == EnemyTable.Mode.WINDUP:
+			if _move_without_bite(i, bdt):
+				pass
+			elif m == EnemyTable.Mode.WINDUP:
 				# 止まって機体の方へ向き直り、予告が終わったら噛みつく
 				vel[i] *= maxf(0.0, 1.0 - 8.0 * bdt)
 				_turn_toward(i, (ship - from).angle(), t.turn[i] * 2.0, bdt)
@@ -127,3 +129,8 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 func _pursuit_velocity(i: int, ship: Vector2, _dt: float) -> Vector2:
 	var d := ship - table.pos[i]
 	return d.normalized() * table.speed[i] if d.length_squared() >= 0.000001 else Vector2.ZERO
+
+## 守る雑魚など、噛みつきを休んで別の移動をする種類の入口。
+## true のときも、共通の石化・外力・移動・天体衝突は同じ更新で処理する。
+func _move_without_bite(_i: int, _dt: float) -> bool:
+	return false
