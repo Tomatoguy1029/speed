@@ -23,6 +23,18 @@ func _ready() -> void:
 	title = app._current
 	map = title._map
 	_check(_focus() == title.get_node("%StartButton"), "title starts with visible keyboard focus")
+	_tap(KEY_S)
+	_check(_focus() == title.get_node("%SettingsButton"), "S navigates title like down")
+	_tap(KEY_W)
+	_check(_focus() == title.get_node("%StartButton"), "W navigates title like up")
+	for code in [KEY_W, KEY_A, KEY_S, KEY_D]:
+		var key := InputEventKey.new()
+		key.keycode = code
+		key.physical_keycode = code
+		var global_navigation := false
+		for action in [&"ui_up", &"ui_left", &"ui_down", &"ui_right"]:
+			global_navigation = global_navigation or key.is_action(action)
+		_check(not global_navigation, "WASD does not alter global UI or gameplay bindings (%d)" % code)
 	await _shot("keyboard_title")
 	_tap(KEY_DOWN)
 	_check(_focus() == title.get_node("%SettingsButton"), "down selects settings")
@@ -30,6 +42,10 @@ func _ready() -> void:
 	_tap(KEY_SPACE)
 	await _frames()
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU and _focus() == title._stage_button, "Space opens mode menu with initial focus")
+	_tap(KEY_S)
+	_check(_focus().text == "機体強化", "S navigates mode menu like down")
+	_tap(KEY_W)
+	_check(_focus() == title._stage_button, "W navigates mode menu like up")
 	_key(KEY_SPACE, true, true)
 	_key(KEY_SPACE, false)
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU, "accept echo and release do not advance another menu")
@@ -41,11 +57,17 @@ func _ready() -> void:
 	_key(KEY_SPACE, true)
 	_key(KEY_ESCAPE, true)
 	_key(KEY_RIGHT, true)
+	_key(KEY_D, true, false, false)
+	_tap(KEY_W)
+	_tap(KEY_A)
+	_tap(KEY_S)
 	await _wait(1.4)
 	_key(KEY_SPACE, true, true)
 	_key(KEY_SPACE, false)
 	_key(KEY_ESCAPE, false)
 	_key(KEY_RIGHT, false)
+	_key(KEY_D, true, true)
+	_key(KEY_D, false)
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and requests == 0 and map._selected == 0, "transition discards accept, cancel and navigation begun during animation")
 	_check(_focus() == map._stars[0], "stage map focuses current selection")
 	await _test_horizontal_navigation()
@@ -54,6 +76,9 @@ func _ready() -> void:
 	_key(KEY_RIGHT, true, true)
 	_key(KEY_RIGHT, false)
 	_check(map._selected == 3, "navigation echo cannot skip stages")
+	_key(KEY_D, true, true)
+	_key(KEY_D, false)
+	_check(map._selected == 3, "WASD navigation echo cannot skip stages")
 	_tap(KEY_SPACE)
 	_check(requests == 0, "accept during selection animation cannot launch")
 	await _wait(0.75)
@@ -62,8 +87,12 @@ func _ready() -> void:
 	_check(map._selected == 4, "down selects stage 5 in stage order")
 	_tap(KEY_UP)
 	_check(map._selected == 3, "up returns to stage 4 in stage order")
-	_tap(KEY_DOWN)
-	_check(map._selected == 4 and _focus() == map._final_stage, "down reaches final stage with matching focus")
+	_tap(KEY_S)
+	_check(map._selected == 4, "S selects stage 5 like down")
+	_tap(KEY_W)
+	_check(map._selected == 3, "W selects stage 4 like up")
+	_tap(KEY_S)
+	_check(map._selected == 4 and _focus() == map._final_stage, "S reaches final stage with matching focus")
 	await _wait(0.75)
 	await _shot("keyboard_stage_5")
 	# Space はテキスト・SpinBox の数値欄を編集する入力として残す。
@@ -73,13 +102,26 @@ func _ready() -> void:
 	edit.grab_focus()
 	_tap(KEY_SPACE)
 	_check(edit.text == " " and requests == 0, "Space edits text without launching")
+	for code in [KEY_W, KEY_A, KEY_S, KEY_D]: _tap(code)
+	_key(KEY_W, true, true)
+	_key(KEY_W, false)
+	_check(edit.text == " wasdw" and map._selected == 4 and _focus() == edit, "WASD and text repeat edit text without navigating")
 	edit.queue_free()
 	var spin := SpinBox.new()
 	map.add_child(spin)
 	spin.get_line_edit().grab_focus()
 	_tap(KEY_SPACE)
+	for code in [KEY_W, KEY_A, KEY_S, KEY_D]: _tap(code)
 	_check(requests == 0, "numeric input does not launch")
+	_check(map._selected == 4 and _focus() == spin.get_line_edit(), "WASD leaves numeric input focus and stage selection alone")
 	spin.queue_free()
+	var multiline := TextEdit.new()
+	multiline.size = Vector2(180, 80)
+	title.add_child(multiline)
+	multiline.grab_focus()
+	for code in [KEY_W, KEY_A, KEY_S, KEY_D]: _tap(code)
+	_check(multiline.text == "wasd" and map._selected == 4, "WASD edits multiline text in the window viewport without navigating")
+	multiline.queue_free()
 	# マウスで星座を選んだ後も、矢印による選択を続けられる。
 	await _frames()
 	_click_map(map._stars[0].get_rect().get_center())
@@ -114,6 +156,8 @@ func _ready() -> void:
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT, "mouse opens stage map")
 	_tap(KEY_LEFT)
 	await _wait(0.75)
+	_key(KEY_D, true, false, false)
+	await _wait(0.75)
 	var stage: int = map._selected + 1
 	_key(KEY_SPACE, true)
 	_key(KEY_SPACE, true, true)
@@ -133,6 +177,9 @@ func _ready() -> void:
 		_key(KEY_SPACE, true, true)
 		_key(KEY_SPACE, false)
 		_key(KEY_ENTER, false)
+		_key(KEY_D, true, true, false)
+		_key(KEY_D, false, false, false)
+		_check(not app._fade._discard.has("key:0:%d" % KEY_D) and not app._fade._discard.has("key:0:%d" % KEY_RIGHT), "held WASD clears without a synthetic arrow remaining after transition")
 		_check(run.state.start_pick and run.state.weapons.is_empty(), "held launch keys cannot choose starting weapon")
 		await _shot("keyboard_launch")
 	app.queue_free()
@@ -178,11 +225,13 @@ func _stage_centers() -> Array[float]:
 func _check_horizontal(direction: int, label: String) -> void:
 	var points := _stage_centers()
 	var from: int = map._selected
+	var angle: float = map._angle
 	var has_neighbor := false
 	for x in points:
 		if (x - points[from]) * direction > 0.5: has_neighbor = true
 	_tap(KEY_LEFT if direction < 0 else KEY_RIGHT)
 	var selected: int = map._selected
+	var arrow_focus := _focus()
 	var correct := selected != from
 	if has_neighbor:
 		correct = correct and (points[selected] - points[from]) * direction > 0.5
@@ -190,6 +239,13 @@ func _check_horizontal(direction: int, label: String) -> void:
 		for x in points:
 			correct = correct and points[selected] * direction <= x * direction + 0.5
 	_check(correct, "%s: %s selects screen-side neighbor or opposite edge" % [label, "left" if direction < 0 else "right"])
+	# 同じ描画状態から WASD を送り、矢印と同じ対象・フォーカスになることを確認する。
+	map._turn.kill()
+	map._select(from)
+	map._apply_rotation(angle)
+	map._focus_selected()
+	_tap(KEY_A if direction < 0 else KEY_D)
+	_check(map._selected == selected and _focus() == arrow_focus, "%s: A/D chooses the same visible target as arrows" % label)
 	print("[menu-direction] %s key=%d from=%d to=%d centers=%s" % [label, direction, from + 1, selected + 1, points])
 
 func _focus() -> Control:
@@ -202,11 +258,12 @@ func _frames() -> void:
 func _wait(seconds: float) -> void:
 	await get_tree().create_timer(seconds).timeout
 
-func _key(code: Key, down: bool, echo := false) -> void:
+func _key(code: Key, down: bool, echo := false, physical := true) -> void:
 	var ev := InputEventKey.new()
 	ev.keycode = code
-	ev.physical_keycode = code
+	ev.physical_keycode = code if physical else 0
 	if code == KEY_SPACE: ev.unicode = 32
+	elif code >= KEY_A and code <= KEY_Z: ev.unicode = code + 32
 	ev.pressed = down
 	ev.echo = echo
 	get_viewport().push_input(ev, true)
