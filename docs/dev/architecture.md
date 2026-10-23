@@ -152,6 +152,52 @@ RunSession（Node）が RunSimulation（RefCounted）と任意の表示を所有
 
 表示のあるランは RunPresentation・HUD・InputRouter を接続する。表示のない実験は、同じシミュレーションと非表示の役者用Nodeを作る。シグナルはレベルアップや勝敗などに使い、命中・撃破などは更新ごとの出来事の列へ積む。UI と入力はセッションの命令の入口を使う。
 
+#### ランの所有と参照
+
+黒いひし形はランの寿命に合わせて保持・解放する関係、通常の矢印は参照、破線は呼び出しを表す。RunManagerはIDでセッションを登録し、シーンの親がRunSessionを木に保持する。RunViewは `scenes/run/run.tscn` の根を表し、表示を使うランに接続する。
+
+```mermaid
+classDiagram
+  class RunManager {
+    create_run()
+    create_session(parent, options, with_view)
+    command(id, name, args)
+  }
+  class RunSession {
+    start_loading(options)
+    start(options, with_view)
+  }
+  class RunSimulation {
+    setup()
+    physics_step(delta)
+    command(name, args)
+    dispose()
+  }
+  class RunSystem {
+    setup(context)
+    tick(real_dt, world_dt)
+    dispose()
+  }
+  class RunView {
+    <<Scene>>
+  }
+  RunManager --> "0..*" RunSession : IDで登録
+  RunSession *-- "1" RunSimulation : sim
+  RunSession *-- "0..1" RunView : view
+  RunSession *-- "0..1" ContentResourceScope : resources
+  RunView *-- RunPresentation : 子ノード
+  RunSimulation *-- RunContext : ctx
+  RunSimulation *-- RunState : state
+  RunSimulation ..> RunSystem : setup / tick / dispose
+  RunContext *-- "11" RunSystem : 各System
+  RunContext --> RunState : state
+  RunContext --> ContentResourceScope : resources
+  RunSystem --> RunContext : ctx
+  RunPresentation --> RunSimulation : run
+```
+
+実装の入口は [RunSession](../../speed/scripts/runtime/run_session.gd)、[RunSimulation](../../speed/scripts/runtime/run_simulation.gd)、[RunContext](../../speed/scripts/runtime/run_context.gd)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
+
 ### 4.4 守る決まり
 
 1. 各Systemの責任を仕様のまとまりに対応させる。
@@ -219,6 +265,31 @@ Main (Node)
 `EnemyBehavior`が出現・更新・被弾・死亡・解放の入口を持ち、`EnemyMotion`が操舵と移動の補助、`enemies/gates/`が被弾条件を持つ。敵の表は共通の列を保持し、その種類だけが使う状態はBehaviorに置く。行番号をまたいで個体を覚えるときはIDも照合する。
 
 弾と攻撃は `scripts/attacks/` のAttackKindが生成し、形状・移動・接触の入口を種類ごとに実装する。ProjectileSystemは列の割り当て・更新・解放と共通の命中を扱う。味方弾の特殊な命中は武器側のコールバックへ渡し、行の解放時に参照を消す。
+
+**System・Behavior・Visualの接続**
+
+敵と装備を例に、種類別の処理と表示の境界を示す。EnemyBehaviorはEnemySystemを経由して表とContext内のSystemを参照し、WeaponBehavior・TraitBehaviorはContextを直接参照する。白いひし形は保持する複数のインスタンス、三角の矢印は継承を表す。
+
+```mermaid
+classDiagram
+  RunSystem <|-- EnemySystem
+  RunSystem <|-- LoadoutSystem
+  RunSystem --> RunContext : ctx
+  EnemySystem *-- EnemyTable : table
+  EnemySystem o-- "0..*" EnemyBehavior : behaviors
+  EnemyBehavior --> EnemySystem : m
+  LoadoutSystem o-- "0..*" WeaponBehavior : weapon_behaviors
+  LoadoutSystem o-- "0..*" TraitBehavior : trait_behaviors
+  WeaponBehavior --> RunContext : ctx
+  TraitBehavior --> RunContext : ctx
+  RunPresentation o-- "0..*" EnemyVisual : 行動・外観の種類別
+  RunPresentation o-- "0..*" WeaponVisual : 装備のインスタンス別
+  EnemyVisual --> EnemyBehavior : behaviorで問い合わせ
+  WeaponVisual --> WeaponBehavior : behavior
+  WeaponVisual --> TraitBehavior : behavior
+```
+
+EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../../speed/scripts/render/equipment/weapon_visual.gd) にある。
 
 **決定**
 
@@ -391,11 +462,82 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 
 StageDef・SpawnClip・フォーメーションのシーンを編集元とする。`tools/content/build_all.gd` が `.content/stage_<番号>.tres` のRuntimeStage・RuntimeClipとStageResourcesを生成する。実行用のクリップは配置・種類フィルター・攻撃valueを解決した辞書を持つ。トラック名・表示ラベルは `.content/dev/` の名前対応表へ保存し、記録の表示名に使う。実験場も同じコンパイラーで編集元を組み立て、`options.enemies` の個別定義の差し替えを維持する。
 
+**編集元から実行用データへの生成**
+
+RuntimeStageとRuntimeClipは編集元の型を継承し、戦闘で使う値と展開済みの配置を保持する。図中のStageCompilerは [build_runtime_stage.gd](../../speed/tools/content/build_runtime_stage.gd) を表す。破線は生成処理への入力・出力、通常の矢印は保持する参照を示す。
+
+```mermaid
+classDiagram
+  class StageCompiler {
+    <<Script>>
+    compile(source)
+    clip(source)
+    formation(scene)
+    build_all(output)
+  }
+  class RuntimeClip {
+    Array~Dictionary~ prepared
+  }
+  class StageResources {
+    PackedStringArray paths
+    PackedStringArray enemy_ids
+    PackedStringArray shader_paths
+  }
+  StageDef <|-- RuntimeStage
+  SpawnClip <|-- RuntimeClip
+  StageDef --> "0..*" SpawnClip : clips
+  SpawnClip --> "0..*" EnemyFormation : formationsのPackedScene
+  StageCompiler ..> StageDef : compileの入力
+  StageCompiler ..> EnemyFormation : 一時生成してto_data
+  StageCompiler ..> RuntimeStage : compileの出力
+  StageCompiler ..> RuntimeClip : clipの出力
+  RuntimeStage --> "0..*" RuntimeClip : clipsの実体
+  RuntimeStage *-- StageResources : resources
+```
+
+[共通の生成入口](../../speed/addons/content_build/builder.gd) がStageCompilerの `build_all()` を呼び、生成結果を `.content/stage_<番号>.tres` へ保存する。StageResourcesは [build_stage_resources.gd](../../speed/tools/content/build_stage_resources.gd) が定義・行動・見た目・音・shaderなどのパスを集めて作る。
+
 **資源の寿命**
 
 出撃後、RunSessionはロード表示と戻る操作を出してStageResourcesを準備する。ContentResourceScopeが参照を所有し、ContentManagerが重複する要求をまとめて読み込む。セッション終了・出撃取り消しで参照を解放する。タイトルへ戻ったあとも残るものは索引とアプリ共通の資源とする。
 
 カードの候補を出すときは、候補ごとの定義・振る舞い・見た目・画像を別のScopeで準備する。選択した候補の準備とshaderの描画準備が終わると装備へ参照を渡し、ほかの候補を解放して戦闘へ戻る。装備解除・ラン終了でも対応する参照を解放する。
+
+**通常出撃のロードと開始**
+
+生成済みのステージを取得してから、資源の読み込みとshaderの描画準備を完了させ、シミュレーションと表示を接続する。図は表示のある通常出撃の成功経路を示す。ContentManagerは読み込み要求をまとめ、完了した資源を各Scopeへ渡す。
+
+```mermaid
+sequenceDiagram
+  participant RM as RunManager
+  participant CM as ContentManager
+  participant S as RunSession
+  participant R as ContentResourceScope
+  participant P as RunPresentation
+  participant Sim as RunSimulation
+  RM->>CM: runtime_stage(index)
+  CM-->>RM: .contentのRuntimeStage
+  RM->>S: new() / ID登録
+  Note over RM,S: 呼び出し側がシーンの木へ追加<br/>readyが発火
+  S->>S: start_loading(options)
+  S->>CM: prepare_resources<br/>(stage.resources.paths)
+  CM->>R: new()
+  CM-->>S: Scope
+  loop 資源の読み込みが完了するまで
+    CM->>R: provide(path, resource)
+    S->>R: is_ready()
+  end
+  S->>P: warm_resources(self, resources)
+  Note over R,P: shader_warmup.gdが描画を準備<br/>warmup_completeを立てる
+  S->>S: start(options, true)
+  Note over S,Sim: ctx.resources・options<br/>入力・役者の親を渡す
+  S->>Sim: setup()
+  Note over S,P: viewを木へ追加<br/>RunPresentationの_ready()を実行
+  P->>Sim: frame_events.connect<br/>(_on_events)
+  S->>S: started.emit()
+```
+
+セッション終了時は [RunSessionの破棄処理](../../speed/scripts/runtime/run_session.gd) がScopeを `cancel()` し、RunSimulationの `dispose()` がSystem・役者・通知の参照を外す。[ContentResourceScope](../../speed/scripts/data_types/content_resource_scope.gd) は取り消し後に届いた資源を解放する。
 
 ### 8.2 ラン中の状態
 
@@ -449,6 +591,45 @@ StageDef・SpawnClip・フォーメーションのシーンを編集元とする
 ## 10. 描画と演出
 
 RunPresentationがランの状態と出来事を受け取り、2Dの層とシェーダーの段を組み立てる。敵はEnemyVisual、攻撃はAttackVisual、装備は種類ごとのVisualへ表示を渡す。ShipVisual・BodyVisual・MeteorVisualが機体・天体・隕石を描く。
+
+### 10.1 出来事と状態から描画まで
+
+固定更新で積んだ出来事は、RunSessionのフレーム更新から表示へ渡す。RunPresentationは出来事から演出を作り、継続する位置・HP・攻撃形状はRunStateと各Systemの列から読む。図中のSystem・Behaviorと種類別Visualは、該当する処理をまとめた参加者を表す。
+
+```mermaid
+sequenceDiagram
+  participant S as RunSession
+  participant Sim as RunSimulation
+  participant Logic as System / Behavior
+  participant State as RunState
+  participant P as RunPresentation
+  participant V as 種類別Visual
+  participant Pipe as RenderPipeline
+  participant L as DrawLayer
+  S->>Sim: physics_step(delta)
+  Sim->>Logic: _play_tick内の<br/>決まった順番で更新
+  Logic->>State: emit(type, data)
+  State->>State: eventsへ追加
+  Note over S,State: 固定更新の出来事をフレーム単位でまとめる
+  S->>Sim: _processからflush_events()
+  Sim->>State: eventsを取り出し空の列へ差し替え
+  Sim-->>P: frame_events(events) / _on_events
+  P->>V: on_event(ev)
+  Note over P,V: 購読したEnemyVisualと<br/>装備のWeaponVisualへ通知
+  P->>P: 共通の演出を追加
+  Note over P,L: RunPresentationの_process(delta)と描画
+  P->>V: update(dt) / tick(dt)
+  P->>Pipe: step(dt, camera_pos, zoom)
+  P->>L: queue_redraw()
+  L->>P: _draw()からdraw_fn.call(self)
+  P->>State: 位置・線・位相などを読む
+  P->>Logic: 敵・弾・ドロップの列を読む
+  P->>V: draw_marks / draw_objects<br/>draw_shotなど
+```
+
+AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../../speed/scripts/data_types/run_state.gd)、[RunSimulation.flush_events](../../speed/scripts/runtime/run_simulation.gd)、[RunPresentation](../../speed/scripts/render/run_presentation.gd)、[DrawLayer](../../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
+
+### 10.2 層・資源・画面効果
 
 重ねた絵は `data/visuals/looks/<外観名>.tres` のEnemyLookに本体・装甲・法線を指定する。種類の外観を足す入口はこのResourceとし、ステージの `enemy_looks` から外観名を選ぶ。バッチ・照明・種類固有の表示は、そのランで使う種類を初めて表示するときに作り、照明の値は編集時に反映する。水流の専用層とshaderも初回使用時に作る。
 
