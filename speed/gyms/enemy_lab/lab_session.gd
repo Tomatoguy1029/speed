@@ -7,12 +7,10 @@ signal seek_progress(value: float)
 
 const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
-const RUN_SCENE := preload("res://scenes/run/run.tscn")
-const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
 const DT := 1.0 / 60.0
 
-var scene: Node
-var run: RunManager
+var scene: RunSession
+var run: RunSimulation
 var baseline: Dictionary = {}
 var spec: Dictionary = {}
 var history: Array[Dictionary] = []
@@ -75,14 +73,14 @@ func reset(settings := {}) -> void:
 	# 保存で本番の外観が変わっても、この実験の巻き戻しは開始時の値から再生する。
 	if not spec.has("overrides"):
 		spec["overrides"] = {}
-	for type in ConfigManager.enemies:
+	for type in ContentManager.enemies:
 		var id := String(type)
 		if not spec.overrides.has(id):
 			spec.overrides[id] = {}
 		if not spec.overrides[id].has("visual_settings"):
-			spec.overrides[id]["visual_settings"] = ConfigManager.enemies[type].visual_settings.duplicate(true)
+			spec.overrides[id]["visual_settings"] = ContentManager.enemies[type].visual_settings.duplicate(true)
 		if not spec.overrides[id].has("armor_colors"):
-			spec.overrides[id]["armor_colors"] = ConfigManager.enemies[type].armor_colors.duplicate(true)
+			spec.overrides[id]["armor_colors"] = ContentManager.enemies[type].armor_colors.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
@@ -95,7 +93,7 @@ func _rebuild() -> void:
 		if scene.get_parent() != null:
 			scene.get_parent().remove_child(scene)
 		scene.queue_free()
-	var cfg: GameConfig = ConfigManager.base.duplicate(true)
+	var cfg: GameConfig = ContentManager.base.duplicate(true)
 	for key in spec.get("config", {}):
 		cfg.set(key, spec.config[key])
 	var field_flags: Dictionary = spec.get("field", {})
@@ -113,8 +111,8 @@ func _rebuild() -> void:
 		cfg.comet_interval_max = 1e8
 		cfg.gravity_interval_min = 1e8
 		cfg.gravity_interval_max = 1e8
-	var stage: StageDef = ConfigManager.stage(int(spec.get("stage", 1))).duplicate(true)
-	var defs: Dictionary = ConfigManager.enemies.duplicate()
+	var stage: StageDef = ContentManager.stage(int(spec.get("stage", 1))).duplicate(true)
+	var defs: Dictionary = ContentManager.enemies.duplicate()
 	for id in spec.get("overrides", {}):
 		if defs.has(StringName(id)):
 			var def: EnemyDef = defs[StringName(id)].duplicate(true)
@@ -123,42 +121,23 @@ func _rebuild() -> void:
 					for param in spec.overrides[id][key]: def.params[param] = safe_parameter(param, spec.overrides[id][key][param])
 				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
-	scene = RUN_SCENE.instantiate()
-	if viewport == null:
-		scene.get_node("Hud").free()
-		scene.get_node("Managers/RenderManager").free()
-		scene.get_node("World/Camera2D").enabled = false
-		scene.get_node("World").visible = false
-	else:
-		# 実験場の調整は実験場のパネルで行う。本番の調整パネル・性能表示は使わない
-		scene.get_node("Hud/DebugPanel").free()
-		scene.get_node("Hud/PerfOverlay").free()
-	run = scene.get_node("Managers/RunManager")
-	run.options = {"lab": true, "config": cfg, "stage_index": stage.index, "stage": stage,
+	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": load("res://tools/content/build_runtime_stage.gd").compile(stage),
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
-		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {})}
-	if viewport != null:
-		viewport.add_child(scene)
-	else:
-		add_child(scene)
-	run.set_process(false)
-	run.bosses.definitions = ConfigManager.bosses.duplicate()
+		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {}), "director": spec.get("director", {})}
+	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
+	scene = RunManager.create_session(viewport if viewport != null else self, options, viewport != null)
+	scene.auto_step = false
+	scene.set_process(false)
+	run = scene.sim
+	run.bosses.definitions = ContentManager.bosses.duplicate()
 	for id in spec.get("boss_overrides", {}):
-		if ConfigManager.bosses.has(StringName(id)):
-			var boss: BossDef = ConfigManager.bosses[StringName(id)].duplicate(true)
+		if ContentManager.bosses.has(StringName(id)):
+			var boss: BossDef = ContentManager.bosses[StringName(id)].duplicate(true)
 			for key in spec.boss_overrides[id]:
 				if key == "params":
 					for param in spec.boss_overrides[id][key]: boss.params[param] = safe_parameter(param, spec.boss_overrides[id][key][param])
 				else: boss.set(key, spec.boss_overrides[id][key])
 			run.bosses.definitions[StringName(id)] = boss
-	var director = DIRECTOR.new()
-	director.state = run.state
-	director.projectiles = run.projectiles
-	director.configure(spec.get("director", {}))
-	run.projectiles.director = director
-	if viewport == null:
-		run.input.set_process_input(false)
-		run.input.set_process_unhandled_input(false)
 	run.input_source = func(): return _intent
 	run.ship.invincible = spec.get("invincible", true)
 	run.state.ship_pos = vector(spec.get("ship_pos", [0, 0])) if not terrain or spec.has("ship_pos") else run.state.ship_pos
@@ -174,19 +153,19 @@ func _rebuild() -> void:
 		run.field.moons.clear()
 		run.field.planet.pos = Vector2(1e7, 1e7)
 		run.field.planet.r = 0
-		run.field._update_moons()
+		run.field.refresh_bodies()
 	if not spec.get("auto_boss", false):
 		run.state.boss_spawned = true
 	var weapon_ids: Array = spec.get("weapons", {}).keys()
 	weapon_ids.sort()
 	for id in weapon_ids:
-		run.build.grant(&"weapon", StringName(id), int(spec.weapons[id]))
+		run.loadout.grant(&"weapon", StringName(id), int(spec.weapons[id]))
 	var trait_ids: Array = spec.get("traits", {}).keys()
 	trait_ids.sort()
 	for id in trait_ids:
-		run.build.grant(&"trait", StringName(id), int(spec.traits[id]))
+		run.loadout.grant(&"trait", StringName(id), int(spec.traits[id]))
 	run.state.level = int(spec.get("level", 1))
-	run.build.refresh_stats()
+	run.loadout.refresh_stats()
 	run.state.hero_power = StringName(spec.get("hero", ""))
 	tick = 0
 	selected = -1
@@ -282,17 +261,17 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 	var cfg := run.cfg
 	match kind:
 		"planet":
-			var body := FieldManager.Body.new()
+			var body := FieldSystem.Body.new()
 			body.pos = at
 			body.r = maxf(10.0, radius)
 			body.is_planet = true
 			field.bodies.append(body)
-			field._update_moons()
+			field.refresh_bodies()
 			# 天体までの距離の覚えを捨てて、新しい惑星を確かめ直させる
 			run.enemies.table.body_gap.fill(-1.0)
 			run.projectiles.hostile_gap.fill(0.0)
 		"comet":
-			var rock := FieldManager.Rock.new()
+			var rock := FieldSystem.Rock.new()
 			rock.lab_manual = true
 			rock.kind = &"comet"
 			var u := (run.state.ship_pos - at).normalized()
@@ -304,7 +283,7 @@ func _add_field(kind: String, at: Vector2, radius: float) -> void:
 			rock.size = maxf(20.0, radius)
 			rock.facing = u.angle()
 			field.rocks.append(rock)
-			field._stream_t = 0.0
+			field.gimmick(&"meteors")._stream_t = 0.0
 		"gravity":
 			field.add_well(at, cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
 		"warp":
@@ -394,7 +373,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 				var offset := Vector2.from_angle(k * 2.399963) * sqrt(float(k)) * float(args.get("spacing", 60))
 				var opts := {"facing": float(args.get("angle", 0)), "elite": args.get("elite", false)}
 				if def.id in [&"meteor", &"iron", &"saw"]:
-					var rock := FieldManager.Rock.new()
+					var rock := FieldSystem.Rock.new()
 					rock.lab_manual = true
 					rock.kind = &"belt" if def.id == &"meteor" else def.id
 					rock.pos = origin + offset
@@ -413,8 +392,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			# 敵の組み合わせのシーンの配置と出現位置を選んで、機体のまわりに並べる
 			var path := String(args.get("path", ""))
 			if ResourceLoader.exists(path):
-				var data := run.enemies.formation_data(load(path))
-				run.enemies.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
+				var data: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(load(path))
+				run.spawn.spawn_formation(data, int(args.get("layout", 0)), int(args.get("entry", 0)))
 				run.state.emit(&"lab_spawn", {"pos": run.state.ship_pos, "enemy_type": &"formation"})
 		"edit_range":
 			var row := row_for_id(int(args.get("id", -1)))
@@ -503,28 +482,29 @@ func _apply(kind: String, args: Dictionary) -> void:
 			var key := String(args.get("key", ""))
 			if key in ["base_attack", "base_max_speed", "draw_length", "draw_confirm_delay", "draw_time_scale", "trace_radius", "boss_hp", "boss_armor"] and typeof(args.get("value")) in [TYPE_INT, TYPE_FLOAT]:
 				run.cfg.set(key, clampf(float(args.value), 0.001, 1.0) if key == "draw_time_scale" else maxf(0.01, float(args.value)))
-				run.build.refresh_stats()
+				run.loadout.refresh_stats()
 		"phase_set":
 			var phases := []
 			for id in args.get("ids", []):
-				if ConfigManager.phases.has(StringName(id)): phases.append(ConfigManager.phases[StringName(id)])
+				if ContentManager.phases.has(StringName(id)): phases.append(ContentManager.phases[StringName(id)])
 			if not phases.is_empty(): run.state.stage.phases = phases
 		"meta":
 			run.state.meta_override[String(args.get("id", ""))] = clampi(int(args.get("level", 0)), 0, 100)
-			run.build.refresh_stats()
+			run.ctx.profile = ProfileManager.compute(run.state.meta_override)
+			run.loadout.refresh_stats()
 		"time":
 			run.state.time = maxf(0, float(args.get("value", 0)))
 		"level":
 			run.state.level = clampi(int(args.get("value", 1)), 1, 1000)
-			run.build.refresh_stats()
+			run.loadout.refresh_stats()
 		"hero":
 			run.state.hero_power = StringName(args.get("id", ""))
 			run.state.hero_active_t = 0
 		"loadout":
 			if args.get("reset", false):
-				run.build.reset_loadout()
+				run.loadout.reset_loadout()
 			else:
-				run.build.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
+				run.loadout.grant(StringName(args.get("kind", "weapon")), StringName(args.get("id", "")), clampi(int(args.get("level", 1)), 1, 100))
 		"schedule":
 			schedule = args.get("entries", []).duplicate(true)
 		"guard":
@@ -699,14 +679,14 @@ func _run_schedule() -> void:
 			var at := vector(entry.get("pos", [0, 0])) + Vector2.from_angle(run.state.rng.randf() * TAU) * sqrt(run.state.rng.randf()) * float(entry.get("radius", 0))
 			entry = entry.duplicate(true)
 			entry.pos = [at.x, at.y]
-			_apply("boss" if ConfigManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
+			_apply("boss" if ContentManager.bosses.has(StringName(entry.get("type", ""))) else "spawn", entry)
 
 func digest() -> String:
 	var actors := []
-	for instance in run.bosses.lab_instances:
-		if is_instance_valid(instance.actor):
-			actors.append(_stable(instance.actor, 0))
-	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.corona, 0),
+	for owner in run.bosses.actors:
+		if is_instance_valid(owner):
+			actors.append(_stable(owner, 0))
+	return str(hash(var_to_bytes([tick, baseline, _stable(run.enemies.definitions, 0), _stable(run.bosses.definitions, 0), _stable(run.state, 0), _stable(run.enemies.table, 0), _stable(run.enemies.behaviors, 0),
 		_stable(run.projectiles, 0), _stable(run.draw, 0), _stable(run.field, 0), actors,
 		run.projectiles.director.groups, run.projectiles.director.waiting, schedule])))
 
@@ -729,7 +709,7 @@ func _stable(value, depth: int):
 			var key: String = property.name
 			var item = value.get(key)
 			if item is Node or item is Callable or item is Signal or item is GDScript: continue
-			if key in ["director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
+			if key in ["_near", "_buf", "_hits", "ctx", "m", "director", "manager", "combat", "field", "ship", "build", "enemies", "bosses", "projectiles", "definitions", "actor_parent", "slots", "friend_slots", "hostile_slots", "hazard_slots"]: continue
 			out[key] = _stable(item, depth + 1)
 		if value is BossActor and value.has_node("Timeline"):
 			var timeline: AnimationPlayer = value.get_node("Timeline")
@@ -772,10 +752,10 @@ func _edit_boss_definition(args: Dictionary) -> void:
 	else:
 		return
 	run.bosses.definitions[type] = def
-	for instance in run.bosses.lab_instances:
-		if instance.has_boss() and instance.actor.def.id == type:
-			instance.actor.def = def
-			var row: int = instance.boss_row
+	for owner in run.bosses.actors:
+		if owner.has_body() and owner.def.id == type:
+			owner.def = def
+			var row: int = owner.body
 			if key == "speed": run.enemies.table.speed[row] = def.speed
 			if key == "radius": run.enemies.table.r[row] = def.radius * run.cfg.character_scale
 

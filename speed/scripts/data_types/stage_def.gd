@@ -25,6 +25,9 @@ const EDITOR_ORDER := 5
 ## このステージに出る敵の種類。出現のクリップは、この中から種類の組み合わせを選ぶ。
 ## 単位：type ID
 @export var enemies: Array[StringName] = []
+## 敵調整dock／プレイ中パネルが編集する、敵ID → 数値項目 → 上書き値。
+## HPは星から計算した標準HP、params.*は敵固有の行動値。未指定は共通値を使う。
+@export_storage var enemy_tuning: Dictionary = {}
 ## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
 ## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
 @export var enemy_attack_values: Dictionary = {}

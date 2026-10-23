@@ -18,8 +18,8 @@ func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 4})
-	var run: RunManager = lab.run
-	var em: EnemyManager = run.enemies
+	var run: RunSimulation = lab.run
+	var em: EnemySystem = run.enemies
 	var state := run.state
 	var scene: PackedScene = load(FORMATION)
 	# 実験場で、選んだ配置と出現位置のとおりに並べる
@@ -37,7 +37,7 @@ func _ready() -> void:
 	get_tree().quit(1 if failed else 0)
 
 ## 時間帯は開始の時刻だけを持ち、次の時間帯の開始まで続く。最後はボスの出現時刻まで。
-func _check_phases(run: RunManager) -> void:
+func _check_phases(run: RunSimulation) -> void:
 	var stage: StageDef = run.state.stage.duplicate()
 	var phases := []
 	for s in [0.0, 100.0, 200.0]:
@@ -49,19 +49,19 @@ func _check_phases(run: RunManager) -> void:
 	stage.boss_time = 350.0
 	run.state.stage = stage
 	run.state.time = 150.0
-	check(run.enemies.current_phase().id == &"p100", "時刻 150 は2つ目の時間帯")
-	check(is_equal_approx(run.enemies._phase_end(1), 200.0), "2つ目は3つ目の開始で終わる")
-	check(is_equal_approx(run.enemies._phase_end(2), 350.0), "最後はステージのボスピンの時刻で終わる")
+	check(run.spawn.current_phase().id == &"p100", "時刻 150 は2つ目の時間帯")
+	check(is_equal_approx(run.spawn._phase_end(1), 200.0), "2つ目は3つ目の開始で終わる")
+	check(is_equal_approx(run.spawn._phase_end(2), 350.0), "最後はステージのボスピンの時刻で終わる")
 	stage.boss_time = -1.0
-	check(is_equal_approx(run.enemies._phase_end(2), run.cfg.boss_time), "ボス時刻の指定がなければ共通設定を使う")
+	check(is_equal_approx(run.spawn._phase_end(2), run.cfg.boss_time), "ボス時刻の指定がなければ共通設定を使う")
 	run.state.time = 0.0
-	check(run.enemies.current_phase().id == &"p0", "時刻 0 は最初の時間帯")
+	check(run.spawn.current_phase().id == &"p0", "時刻 0 は最初の時間帯")
 
 ## 出した群れは、画面に入らない目安の円の外に出て、機体の方へ配置の角度を保って向く。機体の向きに合わせて回る。
-func _check_spawn(run: RunManager, scene: PackedScene) -> void:
+func _check_spawn(run: RunSimulation, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
-	var data := em.formation_data(scene)
+	var data: Dictionary = load("res://tools/content/build_runtime_stage.gd").formation(scene)
 	check(data.layouts.size() >= 1 and data.entries.size() >= 1, "組み合わせのシーンを読める")
 	state.ship_pos = Vector2(5000, -2000)
 	state.ship_vel = Vector2.ZERO
@@ -69,7 +69,7 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 		state.ship_heading = heading
 		for n in 12:
 			var layout: int = n % data.layouts.size()
-			var rows := em.spawn_formation(data, layout)
+			var rows := em.ctx.spawn.spawn_formation(data, layout)
 			check(rows.size() >= 2, "群れの敵が出る")
 			for k in range(0, rows.size(), 2):
 				var i := rows[k]
@@ -83,7 +83,7 @@ func _check_spawn(run: RunManager, scene: PackedScene) -> void:
 				em.table.dead[rows[k]] = 1
 
 ## クリップは開始から長さの間だけ働き、同時の群れの数まで、出す間隔を空けて群れを出す。選んだ種類の敵だけを出す。
-func _check_clips(run: RunManager, scene: PackedScene) -> void:
+func _check_clips(run: RunSimulation, scene: PackedScene) -> void:
 	var em := run.enemies
 	var state := run.state
 	var stage: StageDef = state.stage.duplicate()
@@ -99,43 +99,43 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	var clips: Array[SpawnClip] = [clip]
 	stage.clips = clips
 	state.stage = stage
-	em._clip_groups.clear()
-	em._clip_next.clear()
-	em._type_counts.clear()
-	var groups := func() -> int: return (em._clip_groups.get(0, []) as Array).size()
+	em.ctx.spawn._clip_groups.clear()
+	em.ctx.spawn._clip_next.clear()
+	em.ctx.spawn._type_counts.clear()
+	var groups := func() -> int: return (em.ctx.spawn._clip_groups.get(0, []) as Array).size()
 	var kill := func() -> void:
-		for rows: PackedInt32Array in em._clip_groups.get(0, []):
+		for rows: PackedInt32Array in em.ctx.spawn._clip_groups.get(0, []):
 			for k in range(0, rows.size(), 2):
 				em.table.dead[rows[k]] = 1
 	state.time = 4.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "開始の前は出さない")
 	state.time = 5.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "開始で群れを出す")
 	state.time = 6.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "同時の群れの数を超えて出さない")
 	kill.call()
 	state.time = 7.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "出す間隔が経つまで次を出さない")
 	state.time = 8.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "間隔が経てば次を出す")
 	kill.call()
 	state.time = 20.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "長さが過ぎたら出さない")
 	# 選んだ種類の敵だけを出す
 	var only: Array[StringName] = [&"telescope"]
 	clip.types = only
-	em._clip_groups.clear()
-	em._clip_next.clear()
+	em.ctx.spawn._clip_groups.clear()
+	em.ctx.spawn._clip_next.clear()
 	state.time = 6.0
-	em._tick_clips()
+	_tick_clip(run, clip)
 	var all_tele := true
-	for rows: PackedInt32Array in em._clip_groups.get(0, []):
+	for rows: PackedInt32Array in em.ctx.spawn._clip_groups.get(0, []):
 		for k in range(0, rows.size(), 2):
 			all_tele = all_tele and em.table.type[rows[k]] == &"telescope"
 	check(groups.call() == 1 and all_tele, "クリップで選んだ種類の敵だけを出す")
@@ -148,32 +148,32 @@ func _check_clips(run: RunManager, scene: PackedScene) -> void:
 	clip.formations = aqua_forms
 	var aqua_types: Array[StringName] = [&"aquarius"]
 	clip.types = aqua_types
-	em._clip_groups.clear()
-	em._clip_next.clear()
-	em._type_counts[&"aquarius"] = 1
-	em._tick_clips()
+	em.ctx.spawn._clip_groups.clear()
+	em.ctx.spawn._clip_next.clear()
+	em.ctx.spawn._type_counts[&"aquarius"] = 1
+	_tick_clip(run, clip)
 	check(groups.call() == 0, "上限に達している間は出さない")
-	em._type_counts.clear()
-	em._tick_clips()
+	em.ctx.spawn._type_counts.clear()
+	_tick_clip(run, clip)
 	check(groups.call() == 1, "空いたら出す")
 	kill.call()
 	# クリップから出た群れは、遠くにいても再配置しない（隊列がばらばらにならない）
-	em._clip_groups.clear()
-	em._clip_next.clear()
+	em.ctx.spawn._clip_groups.clear()
+	em.ctx.spawn._clip_next.clear()
 	clip.formations = forms
 	clip.types = types
 	state.time = 6.0
-	em._tick_clips()
-	var rows: PackedInt32Array = em._clip_groups[0][0]
+	_tick_clip(run, clip)
+	var rows: PackedInt32Array = em.ctx.spawn._clip_groups[0][0]
 	var far := state.view_center + Vector2(0, -5000)
 	em.table.pos[rows[0]] = far
-	em._survey(0.0)
+	em.ctx.spawn._survey(0.0)
 	check(em.table.pos[rows[0]] == far, "クリップの群れは再配置しない")
 	kill.call()
 
 ## 攻撃の重さの合計が予算を超えないように待たせる。待っていた攻撃は、ばらつきの分だけ遅れて始める。
 ## 雑魚は管理しない。本番のランでは、時間帯の整数予算を使う。
-func _check_budget(run: RunManager) -> void:
+func _check_budget(run: RunSimulation) -> void:
 	var em := run.enemies
 	var state := run.state
 	var d = load("res://scripts/encounters/attack_director.gd").new()
@@ -201,15 +201,15 @@ func _check_budget(run: RunManager) -> void:
 	var phase := PhaseDef.new()
 	phase.attack_budget = 5
 	state.lab_mode = false
-	em._sync_attack_budget(phase)
+	em.ctx.spawn._sync_attack_budget(phase)
 	check(run.projectiles.director.enabled and is_equal_approx(float(run.projectiles.director.settings.budget), 5.0), "時間帯の予算で管理する")
 	phase.attack_budget = 0
-	em._sync_attack_budget(phase)
+	em.ctx.spawn._sync_attack_budget(phase)
 	check(run.projectiles.director.enabled and run.projectiles.director.settings.budget == 0, "予算が0の時間帯も管理し、新しい強敵の攻撃を待たせる")
 	state.lab_mode = true
 
 ## 雑魚の目標の数の曲線は点を通り、点の間で行き過ぎない。曲線のあるステージは、種類ごとに足りない分を補充する。
-func _check_curves(run: RunManager) -> void:
+func _check_curves(run: RunSimulation) -> void:
 	var pts := PackedVector2Array([Vector2(0, 10), Vector2(60, 40), Vector2(90, 40), Vector2(120, 5)])
 	check(is_equal_approx(SpawnCurve.sample(pts, 60.0), 40.0), "曲線は点を通る")
 	check(is_equal_approx(SpawnCurve.sample(pts, -5.0), 10.0) and is_equal_approx(SpawnCurve.sample(pts, 500.0), 5.0), "点の外は端の点の数")
@@ -232,9 +232,14 @@ func _check_curves(run: RunManager) -> void:
 	stage.zako_curves = curves
 	state.stage = stage
 	state.time = 10.0
-	var t := em._target()
+	var t := em.ctx.spawn.target()
 	check(t.has("per_type") and is_equal_approx(float(t.per_type[&"biter"]), 6.0), "目標の数は曲線の値そのまま（密度倍率は掛けない）")
-	em._zako_counts.clear()
-	check(em._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
-	em._zako_counts[&"biter"] = 6
-	check(em._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")
+	em.ctx.spawn._zako_counts.clear()
+	check(em.ctx.spawn._pick_short_type(t.per_type) == &"biter", "足りない種類を補充する")
+	em.ctx.spawn._zako_counts[&"biter"] = 6
+	check(em.ctx.spawn._pick_short_type(t.per_type) == &"", "目標の数に届いていれば補充しない")
+
+## 編集元の変更は制作工程を通してからランへ渡す。
+func _tick_clip(run: RunSimulation, source: SpawnClip) -> void:
+	run.state.stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(source)]
+	run.spawn._tick_clips()

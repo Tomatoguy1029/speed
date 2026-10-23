@@ -21,6 +21,9 @@ var _preview: TextureRect
 var _heading: Label
 var _status: Label
 var _launch: Button
+var _back: Button
+var _final_stage: Button
+var _launch_requested := false
 var _selected := 0
 var _angle := 0.0
 var _turn: Tween
@@ -62,6 +65,10 @@ func _ready() -> void:
 		star.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		star.tooltip_text = tr("stage.%d.name" % (i + 1))
 		star.pressed.connect(select_constellation.bind(i))
+		star.draw.connect(_draw_star_focus.bind(star))
+		star.focus_entered.connect(star.queue_redraw)
+		star.focus_exited.connect(star.queue_redraw)
+		star.focus_entered.connect(_on_stage_focus.bind(i))
 		add_child(star)
 		_stars.append(star)
 	var back_fill := Polygon2D.new()
@@ -71,6 +78,7 @@ func _ready() -> void:
 	back_fill.hide()
 	_artwork(preload("res://assets/ui/map/selection_screen_back_button.png"), self)
 	var back := _button("", Vector2(7, 7), Vector2(74, 30))
+	_back = back
 	back.tooltip_text = tr("common.back")
 	_transparent_button(back)
 	back.mouse_entered.connect(back_fill.show)
@@ -97,17 +105,14 @@ func _ready() -> void:
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
 	_launch.pressed.connect(_start)
-	if ConfigManager.stage_count() > 4:
+	if ContentManager.stage_count() > 4:
 		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
+		_final_stage = final_stage
 		final_stage.add_theme_font_size_override("font_size", 11)
 		_transparent_button(final_stage)
 		final_stage.size = Vector2(150, 16)
-		final_stage.pressed.connect(func():
-			if _turn != null:
-				_turn.kill()
-			_select(4)
-			_reveal_details()
-		)
+		final_stage.pressed.connect(select_constellation.bind(4))
+		final_stage.focus_entered.connect(_on_stage_focus.bind(4))
 	get_window().focus_exited.connect(func():
 		if _dragging:
 			select_constellation(posmod(roundi(-_angle / 90.0), 4))
@@ -176,13 +181,66 @@ func select_constellation(index: int) -> void:
 		_turn.kill()
 	_hide_details()
 	_select(index)
+	_focus_selected()
+	if index >= TEXTURES.size():
+		_reveal_details()
+		return
 	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
 	_turn = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_turn.tween_method(_apply_rotation, _angle, target, 0.65)
 	_turn.tween_callback(_reveal_details)
 
+func _on_stage_focus(index: int) -> void:
+	if not _pointer_down and index != _selected:
+		select_constellation(index)
+
+## 回転中の星座と、円の外の最終ステージを実際の左右位置でたどる。
+func _horizontal_neighbor(direction: int) -> int:
+	var buttons: Array[Control] = []
+	buttons.assign(_stars)
+	if _final_stage != null:
+		buttons.append(_final_stage)
+	var from_x := buttons[_selected].get_global_rect().get_center().x
+	var nearest := _selected
+	var nearest_distance := INF
+	var wrapped := _selected
+	var wrap_edge := INF
+	for i in buttons.size():
+		if i == _selected:
+			continue
+		var x := buttons[i].get_global_rect().get_center().x
+		var distance := (x - from_x) * direction
+		# 同じ縦軸の星座を、浮動小数の誤差で左右の隣と見なさない。
+		if distance > 0.5 and distance < nearest_distance:
+			nearest = i
+			nearest_distance = distance
+		if x * direction < wrap_edge:
+			wrapped = i
+			wrap_edge = x * direction
+	return nearest if nearest != _selected else wrapped
+
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _transition_progress < 1.0:
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return
+	# 左右は表示位置、上下は従来どおりのステージ順に選ぶ。
+	if event.is_action(&"ui_left") or event.is_action(&"ui_up") or event.is_action(&"ui_right") or event.is_action(&"ui_down"):
+		get_viewport().set_input_as_handled()
+		if event.is_pressed() and not event.is_echo():
+			_cancel_drag()
+			if event.is_action(&"ui_left") or event.is_action(&"ui_right"):
+				select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
+			else:
+				var step := -1 if event.is_action(&"ui_up") else 1
+				select_constellation(posmod(_selected + step, mini(ContentManager.stage_count(), 5)))
+		return
+	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
+	if event.is_action(&"ui_accept") and focus != _back:
+		get_viewport().set_input_as_handled()
+		if event.is_pressed() and not event.is_echo() and _details.visible and (_turn == null or not _turn.is_running()):
+			_start()
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var point: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
@@ -269,6 +327,12 @@ func _apply_rotation(degrees: float) -> void:
 		star.position = _origin + Vector2(cos(angle), depth * _flatten) * CONSTELLATION_RADIUS - TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
+	if _final_stage != null:
+		_final_stage.add_theme_color_override("font_color", CYAN if _selected == 4 else Color.WHITE)
+
+func _draw_star_focus(star: TextureButton) -> void:
+	if star.has_focus():
+		star.draw_rect(Rect2(Vector2.ZERO, star.size), CYAN, false, 1.0)
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress
@@ -282,10 +346,20 @@ func set_transition(progress: float) -> void:
 	_apply_rotation(_angle)
 
 func focus_selection() -> void:
-	_stars[mini(_selected, 3)].grab_focus()
+	_launch_requested = false
+	_focus_selected()
 	_reveal_details()
 
+func _focus_selected() -> void:
+	if _selected < _stars.size():
+		_stars[_selected].grab_focus()
+	elif _final_stage != null:
+		_final_stage.grab_focus()
+
 func _start() -> void:
+	if _launch_requested or GameManager.screen_transition_active:
+		return
 	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):
+		_launch_requested = true
 		AudioManager.play(&"ui")
 		GameManager.start_run(_selected + 1)

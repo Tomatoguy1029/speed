@@ -1,7 +1,7 @@
 ## 戦闘開始時から置く固定瓦礫。敵表に入れず、位置・回転・寿命を持つ飛翔瓦礫と分ける。
 extends Node2D
 var bounds := Rect2()
-var field: FieldManager
+var field: FieldSystem
 var owner_id := -1
 var thickness := 160.0
 var pieces: Array[PackedVector2Array] = []
@@ -18,7 +18,7 @@ func bind(actor: BossActor) -> void:
 	position = Vector2.ZERO
 	z_index = 3
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	field = actor.manager.field
+	field = actor.ctx.field
 	var size: Vector2 = actor.def.params.arena_size
 	var center := (actor.table.pos[actor.body]+actor.run_state.ship_pos)*0.5
 	# 出現地点と自機を囲み、戦闘開始中の機体を壁の外へ取り残さない。
@@ -29,7 +29,7 @@ func bind(actor: BossActor) -> void:
 	field.battle_arenas[owner_id] = bounds
 	# 出現前に測った天体までの余裕を、新しい外周にも流用しない。
 	actor.table.body_gap.fill(-1.0)
-	actor.manager.projectiles.hostile_gap.fill(0.0)
+	actor.ctx.projectiles.hostile_gap.fill(0.0)
 	_build_rubble()
 	_build_mesh()
 	_clear_footprint(actor)
@@ -88,7 +88,7 @@ func _clear_footprint(actor: BossActor)->void:
 	# 岩の配置元も更新し、次のstream更新で壁の中へ戻ることを防ぐ。
 	for rock in field.rocks:
 		if rock.destroyed:continue
-		var current: Vector2=field._rock_at(rock,actor.run_state.world_time)[0]
+		var current: Vector2=field.rock_at(rock,actor.run_state.world_time)[0]
 		var cleared:=_clear_point(current,rock.size)
 		if cleared==current:continue
 		rock.pos=cleared
@@ -99,7 +99,7 @@ func _clear_footprint(actor: BossActor)->void:
 		if at!=t.pos[i]:
 			t.pos[i]=at
 			t.vel[i]=Vector2.ZERO
-	var pickups: PickupManager=actor.manager.projectiles.combat.pickups
+	var pickups: PickupSystem=actor.ctx.projectiles.combat.pickups
 	for i in pickups.gem_alive.size():
 		if pickups.gem_alive[i]:
 			var at:=_clear_point(pickups.gem_pos[i],12.0)

@@ -18,7 +18,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"seed": 901, "empty": true, "director": {"enabled": true, "budget": 8}})
 	var index := 0
-	for def: EnemyDef in ConfigManager.sorted(ConfigManager.enemies):
+	for def: EnemyDef in ContentManager.sorted(ContentManager.enemies):
 		if def.behavior == &"part": continue
 		var point := Vector2.from_angle(float(index) * 0.45) * (450 + 25 * index)
 		lab.perform("spawn", {"type": String(def.id), "pos": [point.x, point.y]})
@@ -28,7 +28,7 @@ func _ready() -> void:
 	lab.perform("hero", {"id": "perseus"})
 	lab.perform("input", {"has_cursor": false, "hero": true})
 	lab.perform("boss_parameter", {"type": "hydra", "key": "params.attack_cd", "value": 1.5})
-	check(ConfigManager.bosses[&"hydra"].params.attack_cd != 1.5, "ボスの数値を本番定義から隔離する")
+	check(ContentManager.bosses[&"hydra"].params.attack_cd != 1.5, "ボスの数値を本番定義から隔離する")
 	for n in 420: lab.step()
 	var expected: String = lab.digest()
 	await cold_seek(lab, 420)

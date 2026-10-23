@@ -2,5 +2,5 @@
 extends TraitBehavior
 
 func on_hurt() -> void:
-	build.combat.explode(state.ship_pos, val("radius"), atk() * val("damage"),
+	ctx.combat.explode(state.ship_pos, val("radius"), atk() * val("damage"),
 		{"cause": &"reactive", "color": Color("#ff6b5a"), "knock": def.params.knock})

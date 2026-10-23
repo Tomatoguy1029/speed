@@ -7,6 +7,7 @@ uniform float tip = 178.0;
 uniform float level = 5.0;
 uniform float clock = 0.0;
 uniform float pixel = 1.5;
+uniform bool silhouette = false;
 uniform float mode = 0.0; // 0: 槍本体、1: 実経路上の光跡、2: 命中閃光
 
 float hash(vec2 p) {
@@ -79,5 +80,5 @@ void fragment() {
 	vec3 platinum = vec3(1.0, 0.92, 0.67);
 	vec3 color = mix(gold, platinum, rim * 0.30 + edge * 0.55);
 	color = mix(color, vec3(1.0, 0.99, 0.94), max(core, edge * 0.65));
-	COLOR = vec4(color * (1.0 + core * 0.80 + edge * 1.20), alpha);
+	COLOR = vec4(silhouette ? vec3(0.22, 0.25, 0.32) : color * (1.0 + core * 0.80 + edge * 1.20), alpha);
 }

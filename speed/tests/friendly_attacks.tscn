@@ -1,0 +1,4 @@
+[gd_scene load_steps=2 format=3]
+[ext_resource type="Script" path="res://tests/friendly_attacks.gd" id="1"]
+[node name="FriendlyAttacks" type="Node"]
+script = ExtResource("1")

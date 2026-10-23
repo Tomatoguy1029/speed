@@ -9,7 +9,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"empty": true, "stage": 4, "ship_pos": [400, 0]})
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
-	var boss = lab.run.bosses.lab_instances.back().actor
+	var boss = lab.run.bosses.actors.back()
 	boss.hsm.set_active(false)
 	var maximum: float = boss.table.max_hp[boss.body]
 	lab.run.combat.damage_enemy(boss.necks[0].row,100000.0,{"cause":&"weapon"})
@@ -29,7 +29,7 @@ func _ready() -> void:
 	check(boss.necks.all(func(n): return boss._alive(n) and is_equal_approx(boss.table.hp[n.row], boss.table.max_hp[n.row])), "growth restores every head")
 	boss.sim_tick(2.0, 2.0)
 	lab.run.combat.damage_enemy(boss.body, maximum * 2.0, {"cause": &"weapon"})
-	check(not lab.run.state.boss_dead and boss.manager.has_boss(), "central destruction keeps the encounter alive")
+	check(not lab.run.state.boss_dead and boss.has_body(), "central destruction keeps the encounter alive")
 	lab.queue_free()
 	await get_tree().process_frame
 	get_tree().quit(1 if failures else 0)

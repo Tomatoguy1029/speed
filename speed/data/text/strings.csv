@@ -5,6 +5,7 @@ keys,ja,en
 ,キーが空の行はこの説明と見出しで、ゲームは読まない。,
 ,■ 共通,
 common.back,戻る,Back
+common.cancel,キャンセル,Cancel
 common.to_main_menu,メインメニューに戻る,Back to Main Menu
 common.parts,部品 {n},Parts {n}
 ,■ タイトル・メインメニュー,
@@ -85,6 +86,9 @@ hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
 hud.resume,続ける,Resume
 hud.quit_run,メインメニューに戻る（このランは残らない）,Back to Main Menu (This Run Is Lost)
+hud.confirm_quit_run,"メインメニューに戻りますか？
+このランの記録は残りません。","Return to the main menu?
+This run will not be saved."
 hud.swap_title,入れ替えて手放す武器を選ぶ,Choose a Weapon to Replace
 card.new_weapon,新しい武器,New Weapon
 card.new_trait,新しい特性,New Trait
@@ -164,8 +168,6 @@ weapon.W22.name,双極ビーム,Bipolar Beam
 weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く,"Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends."
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
-weapon.W24.name,光の槍,Light Lance
-weapon.W24.desc,突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる,Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage.
 weapon.W25.name,迎撃ドローン,Interceptor Drones
 weapon.W25.desc,周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える,"Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts."
 weapon.W26.name,突進範囲ドローン,Dash Range Drones
@@ -182,7 +184,7 @@ trait.T04.desc,満タンから使うと、装甲を無視して威力も上が�
 trait.T05.name,連鎖ソニック,Chain Sonic
 trait.T05.desc,1回で何体も倒すと衝撃波,Defeating many enemies in one line releases a shockwave.
 trait.T06.name,クリティカルランス,Critical Lance
-trait.T06.desc,クリティカルのたびに前方へ貫くビーム,Every critical hit fires a piercing beam forward.
+trait.T06.desc,クリティカルのたびに前方へ貫く光の槍を飛ばす,Every critical hit fires a piercing lance of light forward.
 trait.T07.name,急速充填,Quick Charge
 trait.T07.desc,ゲージが早く溜まる（充填速度 +25% ずつ）,The gauge fills faster (+25% charge speed each).
 trait.T08.name,大容量チャージ,High-Capacity Charge
@@ -650,10 +652,10 @@ lab.enemy.pump.move,機体を追いながら周りの敵を吸い込んで膨ら
 lab.enemy.pump.kill,HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる,Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst
 lab.enemy.telescope.move,距離を保ち、機体のいる方を左右に振って探すサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると一瞬溜めてから、レンズから機体の方へ太いレーザーを撃つ。光とレーザーは隕石で遮られる,Keeps its distance and swings a searchlight band back and forth around where the ship is. Inside the band it tracks you and locks on as the band narrows and turns red. Once the lock is full it charges for a moment then fires a thick laser at the ship. Rocks block both the light and the laser
 lab.enemy.telescope.kill,HP を削る。速く横切れば狙いは溜まらない,Wear down its HP. Crossing the band quickly barely builds the lock
-lab.enemy.triangle.move,3つの星の間に光の膜を張り、膜の中の砲台が距離を保って撃ってくる。膜に触れると被弾する,A turret inside a light membrane between three stars keeps its distance and shoots. Touching the membrane hurts
-lab.enemy.triangle.kill,先に頂点の星を1つ倒して膜を消し、次に中の砲台を倒す,First destroy a corner star to drop the membrane then destroy the turret inside
-lab.enemy.triangle_star.move,みなみのさんかく座の頂点の星。核と一緒に動く,A corner star of the Southern Triangle that moves with the core
-lab.enemy.triangle_star.kill,倒すと膜が消える,Destroy it to drop the membrane
+lab.enemy.triangle.move,3つの星が三角の辺に沿って回りながら寄ってくる。辺を動く星の後ろに伸びる赤いレーザーに触れると被弾する,Three stars circle along the sides of a triangle as it closes in. Touching the red laser trailing a moving star hurts
+lab.enemy.triangle.kill,星が頂点で止まっている間だけ攻撃が通る。止まった3つの星を、三角をなぞる一筆でまとめて貫く,Stars can be hit only while they rest on the corners. Trace the triangle in one stroke to pierce all three
+lab.enemy.triangle_star.move,みなみのさんかく座の星。三角の辺に沿って回る,A star of the Southern Triangle that circles along its sides
+lab.enemy.triangle_star.kill,頂点で止まっている間に倒す。全部倒すとみなみのさんかく座が倒れる,Destroy it while it rests on a corner. Destroying all three defeats the Southern Triangle
 lab.enemy.shield.move,機体を追ってゆっくり向き直り、前面の盾で弾を反射する,Approaches while slowly turning toward you. Its front shield reflects shots
 lab.enemy.shield.kill,正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える,Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks
 lab.enemy.ruler.move,1体で現れ、二つに分かれて機体を左右（上下）から挟む位置へ展開する。照射の向きを予告してから、それぞれ長いビームを出し続ける。ビームは発射元につながり、壁になって移動を止める,Appears as one ruler then splits in two and spreads to flank the ship. After marking where it will fire each half keeps a long beam on. The beams stay tied to their emitters and act as walls that stop movement

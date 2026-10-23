@@ -8,7 +8,7 @@ func _ready()->void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[500,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=lab.run.bosses.lab_instances.back().actor
+	var a=lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	a._set_count(8)
 	lab.run.combat.damage_enemy(a.necks[0].row,100000.0,{"cause":&"weapon"})
@@ -17,7 +17,7 @@ func _ready()->void:
 	for i in 140:a.sim_tick(0.025,0.025)
 	check(a.separated and not a.separation_pending,"central destruction starts separated phase once")
 	check(a.necks.size()==8 and a.necks.all(func(n):return a._alive(n) and is_equal_approx(a.table.hp[n.row],a.table.max_hp[n.row])),"all eight snakes recover on separation")
-	check(a.immortal_row>=0 and a.manager.has_boss(),"compass bearer exists while encounter stays alive")
+	check(a.immortal_row>=0 and a.has_body(),"compass bearer exists while encounter stays alive")
 	if a.immortal_row>=0:
 		var before: float=a.table.hp[a.immortal_row]
 		lab.run.combat.damage_enemy(a.immortal_row,10.0,{"cause":&"weapon"})

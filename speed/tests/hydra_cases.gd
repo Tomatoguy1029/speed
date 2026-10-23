@@ -8,7 +8,7 @@ func _ready()->void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[500,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=lab.run.bosses.lab_instances.back().actor
+	var a=lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	for degrees in [0.0,36.0,90.0,180.0,270.0]:
 		a.interrupt_tech()

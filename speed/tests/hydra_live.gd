@@ -7,9 +7,9 @@ func _ready()->void:
 	var lab=load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
-	var run: RunManager=lab.run
+	var run: RunSimulation=lab.run
 	var wall_enemy:=run.enemies.spawn(run.enemies.def_of(&"biter"),Vector2(1900,0))
-	var rock:=FieldManager.Rock.new()
+	var rock:=FieldSystem.Rock.new()
 	rock.kind=&"iron"
 	rock.pos=Vector2(1900,200)
 	rock.size=40.0
@@ -17,11 +17,11 @@ func _ready()->void:
 	run.field.rocks.append(rock)
 	var gem:=run.pickups.drop_gem(Vector2(1850,0),17.0)
 	run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=run.bosses.lab_instances.back().actor
+	var a=run.bosses.actors.back()
 	a.hsm.set_active(false)
 	check(a.table.pos[wall_enemy].x<1800.0 and a.table.pos[wall_enemy].x>0.0,"arena installation clears enemy from rubble footprint")
 	check(run.pickups.gem_pos[gem].x<1800.0 and run.pickups.gem_value[gem]==17.0,"arena installation preserves and clears buried XP")
-	run.field._stream_rocks(0.02)
+	run.field.gimmick(&"meteors")._stream_rocks(0.02)
 	check(rock.pos.x<1800.0 and rock.row>=0 and a.table.pos[rock.row].x<1800.0,"streamed rock source stays clear after arena installation")
 	var d=load("res://scripts/encounters/attack_director.gd").new()
 	d.state=run.state
@@ -56,15 +56,15 @@ func _ready()->void:
 	run.state.ship_pos=a.table.pos[a.body]
 	run.combat.rebuild_grid()
 	var wave_hp: float=a.table.hp[a.body]
-	run.build.run_sonic(&"sonic",300.0,7.0,0.0,0.5)
-	for step in 6:run.build._update_sonic(0.1)
+	run.projectiles.attached_attack(&"sonic").fire(&"sonic",300.0,7.0,0.0,0.5)
+	for step in 6:run.projectiles.tick_attached(0.1)
 	check(is_equal_approx(wave_hp-a.table.hp[a.body],7.0),"one real sonic wave hits the core once across its lifetime")
 	a.begin_separation()
 	a.separation_t=0.0
 	var plan: Dictionary=a.grid_plan()
 	check(not plan.is_empty(),"clear field permits grid formation")
 	if not plan.is_empty():
-		var obstruction:=FieldManager.Body.new()
+		var obstruction:=FieldSystem.Body.new()
 		obstruction.pos=plan.bearer
 		obstruction.r=100.0
 		run.field.bodies.append(obstruction)
@@ -84,7 +84,7 @@ func _ready()->void:
 	check(a.table.hp[a.immortal_row]>0.0 and is_equal_approx(bearer_hp-a.table.hp[a.immortal_row],run.combat.attack_power()*0.7),"ordinary weapon hit does not execute the compass bearer")
 	a.immortal_neck.mode=&"idle"
 	a.immortal_neck.cd=100.0
-	var planet:=FieldManager.Body.new()
+	var planet:=FieldSystem.Body.new()
 	planet.pos=a.immortal_neck.free_pos+Vector2(80,0)
 	planet.r=130.0
 	run.field.bodies.append(planet)

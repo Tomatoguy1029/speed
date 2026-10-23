@@ -12,7 +12,7 @@ func _ready() -> void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a = lab.run.bosses.lab_instances.back().actor
+	var a = lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	a._set_count(5)
 	check(a.def.params.normal_rules.has(attack),String(attack)+" has configurable eligibility")

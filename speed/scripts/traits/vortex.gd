@@ -14,8 +14,8 @@ func on_end() -> void:
 func tick(dt: float, _busy: bool) -> void:
 	for v in vortexes:
 		v.life -= dt
-		build.combat.nearby(v.pos, v.radius, _buf)
-		var t := build.enemies.table
+		ctx.combat.nearby(v.pos, v.radius, _buf)
+		var t := ctx.enemies.table
 		for i in _buf:
 			if t.is_boss[i] != 0:
 				continue
@@ -26,5 +26,5 @@ func tick(dt: float, _busy: bool) -> void:
 				continue
 			var move := minf(dist - 10.0, v.power * dt / maxf(1.0, t.r[i] / 30.0))
 			t.pos[i] = from + d / dist * move
-			build.field.collide_enemy(i, from)
+			ctx.field.collide_enemy(i, from)
 	vortexes = vortexes.filter(func(v): return v.life > 0.0)

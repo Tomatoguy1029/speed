@@ -11,7 +11,7 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.settings = settings_copy
 	await _start(1)
-	var hud = scene.get_node("Hud/HudRoot")
+	var hud = scene.view.get_node("Hud/HudRoot")
 	var s := run.state
 	for ship in [Vector2.ZERO, Vector2(4000, -3000), Vector2(-5500, 0)]:
 		s.ship_pos = ship

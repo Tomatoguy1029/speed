@@ -1,28 +1,21 @@
-## 光の槍の描画。通常の機体・滑走残光へ独立した層として重ねる。
-## ゲーム用の乱数・攻撃判定を持たず、命中イベントも表示だけに使う。
+## T06の発動時だけ、白金色のピクセル調の槍を攻撃線に沿って飛ばす。
+## 攻撃判定と乱数を持たず、既存の即時命中を視覚化する。
 extends Node2D
 
 const SHADER := preload("res://shaders/light_lance.gdshader")
+const FLIGHT_TIME := 0.18
+const FADE_TIME := 0.10
+const TIP := 168.0
+const BODY_LENGTH := TIP + 42.0
+var shots: Array[Dictionary] = []
 var _body: DrawLayer
 var _tail: DrawLayer
-var _flash: DrawLayer
-var _points: Array[Vector2] = []
-var _ages: Array[float] = []
-var _hits: Array[Dictionary] = []
-var _active := false
-var _level := 1
-var _head := Vector2.ZERO
-var _dir := Vector2.RIGHT
 var _scale := 1.0
-var _tip := 50.0
-var _reach := 24.0
-var _clock := 0.0
-var _dash := -1
+var silhouette := false
 
 func _ready() -> void:
 	_tail = _layer(_draw_tail, 1.0)
 	_body = _layer(_draw_body, 0.0)
-	_flash = _layer(_draw_hits, 2.0)
 
 func _layer(draw_fn: Callable, mode: float) -> DrawLayer:
 	var layer := DrawLayer.new()
@@ -30,73 +23,34 @@ func _layer(draw_fn: Callable, mode: float) -> DrawLayer:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
 	mat.set_shader_parameter("mode", mode)
+	mat.set_shader_parameter("level", 5.0)
+	mat.set_shader_parameter("extent", Vector2(BODY_LENGTH, 64.0) if mode == 0.0 else Vector2(128, 32))
+	mat.set_shader_parameter("left_edge", -42.0 if mode == 0.0 else 0.0)
+	mat.set_shader_parameter("tip", TIP if mode == 0.0 else 128.0)
 	layer.material = mat
 	add_child(layer)
 	return layer
 
-func hit(event: Dictionary) -> void:
-	_hits.append({"pos": event.pos, "dir": event.dir, "life": 0.13, "max": 0.13, "level": event.level})
-	if _hits.size() > 24:
-		_hits.pop_front()
+func fire(event: Dictionary) -> void:
+	shots.append({"from": event.from, "to": event.to, "width": event.width, "age": 0.0})
 
-func step(dt: float, state: RunState, cfg: GameConfig, weapon, zoom: float) -> void:
-	if dt <= 0.0 or state.hitstop > 0.0:
-		return
-	_scale = cfg.character_scale
-	_head = state.ship_pos
-	_dir = state.ship_heading
-	_active = weapon != null and state.tracing and state.phase == RunState.Phase.PLAY
-	if state.phase not in [RunState.Phase.PLAY, RunState.Phase.FINISHING]:
-		_points.clear()
-		_ages.clear()
-		_hits.clear()
-	if weapon == null:
-		_points.clear()
-		_ages.clear()
-		_hits.clear()
-	if _active:
-		_level = weapon.level
-		_tip = weapon.reach() / _scale
-		_reach = weapon.level_value("tail_by_level") * _scale
-		if _dash != state.dash_id:
-			_points.clear()
-			_ages.clear()
-			_dash = state.dash_id
-	_clock += dt
-	for i in _ages.size():
-		_ages[i] += dt
-	while not _ages.is_empty() and _ages[0] > 0.24:
-		_ages.pop_front()
-		_points.pop_front()
-	if _active:
-		var back := _head - _dir * 30.0 * _scale
-		if not _points.is_empty() and back.distance_to(_points.back()) > maxf(_reach * 2.0, state.ship_vel.length() * dt * 3.0):
-			_points.clear()
-			_ages.clear()
-		if _points.is_empty() or back.distance_to(_points.back()) >= _scale:
-			_points.append(back)
-			_ages.append(0.0)
-			if _points.size() > 64:
-				_points.pop_front()
-				_ages.pop_front()
-	for effect in _hits:
-		effect.life -= dt
-	_hits = _hits.filter(func(effect): return effect.life > 0.0)
-	for layer in [_body, _tail, _flash]:
+func step(dt: float, character_scale: float, zoom: float) -> void:
+	_scale = character_scale
+	for shot in shots:
+		shot.age += dt
+	shots = shots.filter(func(shot): return shot.age < FLIGHT_TIME + FADE_TIME)
+	for layer in [_body, _tail]:
 		var mat := layer.material as ShaderMaterial
-		mat.set_shader_parameter("clock", _clock)
+		mat.set_shader_parameter("clock", shots.back().age if not shots.is_empty() else 0.0)
 		mat.set_shader_parameter("pixel", maxf(1.0, 2.0 / maxf(zoom * _scale, 0.01)))
-		mat.set_shader_parameter("level", float(_level))
+		mat.set_shader_parameter("silhouette", silhouette)
 		layer.queue_redraw()
-	var body_mat := _body.material as ShaderMaterial
-	body_mat.set_shader_parameter("extent", Vector2(_tip + 42.0, 64.0))
-	body_mat.set_shader_parameter("left_edge", -42.0)
-	body_mat.set_shader_parameter("tip", _tip)
-	for layer in [_tail, _flash]:
-		var mat := layer.material as ShaderMaterial
-		mat.set_shader_parameter("extent", Vector2(128.0, 32.0))
-		mat.set_shader_parameter("left_edge", 0.0)
-		mat.set_shader_parameter("tip", 128.0)
+
+## 図鑑も同じshaderと飛行を使い、未入手なら静止したシルエットにする。
+func preview(from: Vector2, to: Vector2, age: float, known: bool) -> void:
+	silhouette = not known
+	shots = [{"from": from, "to": to, "width": 24.0, "age": age}]
+	step(0.0, 0.65, 1.0)
 
 func _quad(c: CanvasItem, rect: Rect2, alpha: float) -> void:
 	c.draw_primitive(PackedVector2Array([rect.position, rect.position + Vector2(rect.size.x, 0), rect.end,
@@ -104,32 +58,29 @@ func _quad(c: CanvasItem, rect: Rect2, alpha: float) -> void:
 		PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]))
 
 func _draw_body(c: CanvasItem) -> void:
-	if not _active:
-		return
-	c.draw_set_transform(_head, _dir.angle(), Vector2.ONE * _scale)
-	_quad(c, Rect2(-42, -32, _tip + 42, 64), 1.0)
+	for shot in shots:
+		var delta: Vector2 = shot.to - shot.from
+		var progress := minf(1.0, shot.age / FLIGHT_TIME)
+		var length := minf(BODY_LENGTH * _scale, delta.length() * progress)
+		if length <= 0.0:
+			continue
+		var scale := Vector2(length / BODY_LENGTH, float(shot.width) / 39.0)
+		var head: Vector2 = shot.from + delta * progress
+		var alpha := 1.0 - clampf((shot.age - FLIGHT_TIME) / FADE_TIME, 0.0, 1.0)
+		c.draw_set_transform(head - delta.normalized() * TIP * scale.x, delta.angle(), scale)
+		_quad(c, Rect2(-42, -32, BODY_LENGTH, 64), alpha)
 	c.draw_set_transform(Vector2.ZERO)
 
 func _draw_tail(c: CanvasItem) -> void:
-	var distance := 0.0
-	for i in range(_points.size() - 1, 0, -1):
-		var front := _points[i]
-		var back := _points[i - 1]
-		var length := front.distance_to(back)
-		if length < 0.01 or distance >= _reach:
+	for shot in shots:
+		var delta: Vector2 = shot.to - shot.from
+		var traveled := delta.length() * minf(1.0, shot.age / FLIGHT_TIME)
+		var body := minf(BODY_LENGTH * _scale, traveled)
+		var length := minf(140.0 * _scale, traveled - body)
+		if length <= 0.0:
 			continue
-		back = front.lerp(back, minf(1.0, (_reach - distance) / length))
-		length = front.distance_to(back)
-		var alpha := (1.0 - distance / maxf(_reach, 1.0)) * (1.0 - _ages[i] / 0.24)
-		c.draw_set_transform(front, (back - front).angle(), Vector2.ONE * _scale)
-		_quad(c, Rect2(0, -16, length / _scale, 32), alpha * (0.5 if _level < 3 else 0.85))
-		distance += length
-	c.draw_set_transform(Vector2.ZERO)
-
-func _draw_hits(c: CanvasItem) -> void:
-	for effect in _hits:
-		var alpha: float = effect.life / effect.max
-		var length := 28.0 if effect.level < 5 else 104.0
-		c.draw_set_transform(effect.pos, effect.dir.angle(), Vector2.ONE * _scale)
-		_quad(c, Rect2(0, -16, length, 32), alpha)
+		var head: Vector2 = shot.from + delta.normalized() * (traveled - body)
+		var alpha := 1.0 - clampf((shot.age - FLIGHT_TIME) / FADE_TIME, 0.0, 1.0)
+		c.draw_set_transform(head, (-delta).angle(), Vector2(length / 128.0, _scale))
+		_quad(c, Rect2(0, -16, 128, 32), alpha * 0.85)
 	c.draw_set_transform(Vector2.ZERO)

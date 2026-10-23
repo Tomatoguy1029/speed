@@ -8,7 +8,7 @@ func _ready()->void:
 	add_child(lab)
 	await lab.reset({"empty":true,"stage":4,"ship_pos":[400,0]})
 	lab.run.bosses.spawn_lab(&"hydra",Vector2.ZERO)
-	var a=lab.run.bosses.lab_instances.back().actor
+	var a=lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
 	a._set_count(8)
 	a.begin_separation()
@@ -32,7 +32,7 @@ func _ready()->void:
 	var wins: int=lab.run.state.events.filter(func(e):return e.type==&"boss_defeated").size()
 	check(wins==1,"only bearer death emits one final victory")
 	check(a.attack_field.effects.is_empty(),"final victory clears owned attack geometry")
-	check(not lab.run.bosses.lab_instances.back().has_boss(),"lab final cleanup releases encounter owner")
+	check(not a.has_body(),"lab final cleanup releases encounter owner")
 	check(not lab.run.state.boss_dead and lab.run.state.modules_obtained.is_empty(),"lab victory leaves campaign progression untouched")
 	lab.queue_free()
 	await get_tree().process_frame

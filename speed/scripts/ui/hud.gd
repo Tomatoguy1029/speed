@@ -1,4 +1,4 @@
-## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunManager に命令として渡す。
+## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果は RunSimulation に命令として渡す。
 ##
 ## 時間・経験値バー・状態の文字・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
@@ -36,7 +36,6 @@ var show_status := true
 const COMET_ONLY_COLOR := Color("#ff3b4e")
 const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Color("#bf91ef"), Color("#efcb70")]
 
-@export var run_path: NodePath
 ## カードを表示してから選択を受け付けるまでの実秒。
 @export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
 
@@ -45,7 +44,7 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 ## 800×450 の演出座標。任意で setup(HeroDef) / set_progress(0..1) を受け取る Control シーン。
-@export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
+@export var ult_cutin_scene: PackedScene
 
 var _cards_accept_at := 0
 var _reward_advanced_frame := -1
@@ -57,11 +56,13 @@ var _card_discard: Dictionary = {}
 
 ## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
 @export_group("伝説獲得の仮演出")
-@export var legendary_reveal_scene: PackedScene = preload("res://scenes/run/legendary_reveal.tscn")
+@export var legendary_reveal_scene: PackedScene
+@export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
 var _legendary_reveal: Control
 var _finish_skip: Button
 var _rewards: Control
-var run: RunManager
+## RunSession が木に入れる前に入れる
+var run: RunSimulation
 var _font: Font
 var _cards_box: Control
 var _reroll_button: Button
@@ -91,9 +92,10 @@ var _ring_usable := true
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
 var _pause_after_reward := false
+var _menu_overlay: Control
+var _overlay_focus: WeakRef
 
 func _ready() -> void:
-	run = get_node(run_path) as RunManager
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -146,9 +148,7 @@ func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
 	run.input.cancel_gesture()
 	_card_discard.merge(_card_held)
-	_draw_button.visible = not active and DisplayServer.is_touchscreen_available() and run.state.phase == RunState.Phase.PLAY
-	_cards_box.visible = not active and run.state.phase == RunState.Phase.LEVELUP
-	_pause_box.visible = not active and run.state.phase == RunState.Phase.PAUSED
+	_sync_menu_visibility()
 	if not active:
 		if _pause_after_reward:
 			_pause_after_reward = false
@@ -163,8 +163,9 @@ func _on_phase(phase: RunState.Phase) -> void:
 		_hero_notice_t = 0.0
 		_draw_button.hide()
 		var definition := run.finish_legendary()
-		if definition != null and legendary_reveal_scene != null:
-			_legendary_reveal = legendary_reveal_scene.instantiate() as Control
+		if definition != null and (legendary_reveal_scene != null or not legendary_reveal_path.is_empty()):
+			var scene: PackedScene = legendary_reveal_scene if legendary_reveal_scene != null else load(legendary_reveal_path)
+			_legendary_reveal = scene.instantiate() as Control
 			_legendary_reveal.setup(definition)
 			add_child(_legendary_reveal)
 			_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -176,10 +177,51 @@ func _on_phase(phase: RunState.Phase) -> void:
 		_finish_skip.hide()
 		if _legendary_reveal != null:
 			_legendary_reveal.hide()
-	_cards_box.visible = phase == RunState.Phase.LEVELUP and not _rewards.is_active()
-	_pause_box.visible = phase == RunState.Phase.PAUSED and not _rewards.is_active()
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_sync_menu_visibility()
 	if _pause_box.visible:
 		_pause_box.get_child(1).grab_focus()
+
+## 開発用パネルなどを重ねる入口。選択・報酬・ポーズの状態は裏に保持する。
+func can_show_menu_overlay() -> bool:
+	return _settings == null and _menu_overlay == null and run.state.phase in [RunState.Phase.PLAY, RunState.Phase.LEVELUP, RunState.Phase.PAUSED]
+
+func show_menu_overlay(overlay: Control) -> bool:
+	if not can_show_menu_overlay():
+		return false
+	var focus := get_viewport().gui_get_focus_owner()
+	_overlay_focus = weakref(focus) if focus != null else null
+	_menu_overlay = overlay
+	run.ui_overlay_active = true
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_sync_menu_visibility()
+	return true
+
+func close_menu_overlay(overlay: Control) -> void:
+	if _menu_overlay != overlay:
+		return
+	_menu_overlay = null
+	run.ui_overlay_active = false
+	run.input.cancel_gesture()
+	_card_discard.merge(_card_held)
+	_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
+	_sync_menu_visibility()
+	var focus := _overlay_focus.get_ref() as Control if _overlay_focus != null else null
+	if focus != null and focus.is_visible_in_tree():
+		focus.grab_focus()
+	_overlay_focus = null
+
+func _sync_menu_visibility() -> void:
+	var covered := _menu_overlay != null
+	var paused := run.state.phase == RunState.Phase.PAUSED
+	_cards_box.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.LEVELUP
+	_pause_box.visible = not covered and paused and _settings == null
+	_rewards.visible = not covered and not paused and _rewards.is_active()
+	_rewards.set_process(not covered and not paused)
+	_draw_button.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY and DisplayServer.is_touchscreen_available()
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
@@ -224,6 +266,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
 	if run == null or run.state == null or run.state.lab_mode:
 		return
 	if run.state.phase == RunState.Phase.FINISHING:
@@ -231,16 +275,23 @@ func _input(event: InputEvent) -> void:
 			run.command(&"skip_finish")
 			get_viewport().set_input_as_handled()
 		return
+	# カードの入力ガードや GUI より先にメニューキーを扱う。
+	if _settings == null and _menu_overlay == null and event.is_action(&"pause") and run.state.phase in [RunState.Phase.PLAY, RunState.Phase.LEVELUP, RunState.Phase.PAUSED]:
+		get_viewport().set_input_as_handled()
+		if event.is_action_pressed(&"pause"):
+			run.command(&"resume" if run.state.phase == RunState.Phase.PAUSED else &"pause")
+		return
 	var id := _card_input_id(event)
 	if id == "":
 		return
 	# 表示を発生させた押下や、タッチ由来の擬似マウスを次送りに使わない。
-	var reward_press: bool = _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
+	var in_menu := _menu_overlay != null or run.state.phase == RunState.Phase.PAUSED
+	var reward_press: bool = not in_menu and _rewards.is_bonus_active() and not _card_held.has(id) and not _card_discard.has(id) and not event.is_echo() and (
 		(event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.device != -1 and event.pressed)
 		or (event is InputEventScreenTouch and event.pressed)
 		or event.is_action_pressed(&"ui_accept"))
-	var choosing := run.state.phase == RunState.Phase.LEVELUP
-	var blocked: bool = _rewards.is_active() or _card_discard.has(id) or (choosing and Time.get_ticks_usec() < _cards_accept_at)
+	var choosing := not in_menu and run.state.phase == RunState.Phase.LEVELUP
+	var blocked: bool = _card_discard.has(id) or (not in_menu and (_rewards.is_active() or (choosing and Time.get_ticks_usec() < _cards_accept_at)))
 	# 擬似イベントと元の入力の間で期限を越えても、同じ押下として破棄する。
 	if (event is InputEventMouseButton or event is InputEventScreenTouch) and event.is_pressed():
 		if event.device == -1 and blocked:
@@ -284,26 +335,25 @@ func _card_input_id(event: InputEvent) -> String:
 	return ""
 
 func _card_command(command: StringName, args := {}) -> void:
-	if _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
+	if _menu_overlay != null or _rewards.is_active() or run.state.phase != RunState.Phase.LEVELUP or Time.get_ticks_usec() < _cards_accept_at:
 		return
 	_card_discard.merge(_card_held)
 	run.command(command, args)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# 実験場では HUD は表示だけ。操作は実験場が扱う。
+	if run.state.lab_mode:
+		return
 	if run.state.phase in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 		get_viewport().set_input_as_handled()
 		return
-	# 実験場では HUD は表示だけ（ポーズ・3択は実験場が扱い、操作の記録に入らない入力を受けない）
-	if _rewards.is_active():
+	if _menu_overlay != null or run.state.phase == RunState.Phase.PAUSED or _rewards.is_active():
 		get_viewport().set_input_as_handled()
 		return
-	if _settings != null or run.state.lab_mode:
+	if _settings != null:
 		return
 	var s := run.state
-	if event.is_action_pressed(&"pause"):
-		get_viewport().set_input_as_handled()
-		run.command(&"pause" if s.phase == RunState.Phase.PLAY else &"resume")
-	elif s.phase == RunState.Phase.LEVELUP:
+	if s.phase == RunState.Phase.LEVELUP:
 		for i in 3:
 			if event.is_action_pressed(StringName("card_%d" % (i + 1))):
 				get_viewport().set_input_as_handled()
@@ -394,7 +444,7 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef else null
+	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef or definition is ContentEntry else null
 	if texture == null:
 		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
 		var index := ICON_IDS.find(icon_id)
@@ -427,7 +477,7 @@ func _refresh_loadout_icons() -> void:
 		var index := 0
 		for id in owned:
 			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
-			_add_icon(_loadout_icons, (ConfigManager.weapons if row == 0 else ConfigManager.traits).get(id), area)
+			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
 			index += 1
 		row += 1
 
@@ -541,7 +591,7 @@ func _show_cards() -> void:
 	_swap_scroll.visible = swap != &""
 	_swap_keep.visible = swap != &""
 	if swap != &"":
-		var got: WeaponDef = ConfigManager.weapons[swap]
+		var got: ContentEntry = ContentManager.catalog.find(&"weapons", swap)
 		_swap_new_name.text = got.get_display_name()
 		_swap_new_desc.text = got.get_description()
 		for i in cards.size():
@@ -582,7 +632,7 @@ func _show_cards() -> void:
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
 			var card: Dictionary = cards[i]
-			var definition: Resource = (ConfigManager.traits if card.kind == &"trait" else ConfigManager.weapons).get(card.id)
+			var definition: Resource = ContentManager.catalog.find(&"traits" if card.kind == &"trait" else &"weapons", card.id)
 			_add_icon(b, definition, Rect2(48 * width / 145.0, 129, 48 * width / 145.0, 48))
 	var left := run.state.rerolls_left
 	_reroll_button.text = tr("hud.reroll").format({n = left, key = OS.get_keycode_string(InputActions.key_of(&"reroll"))})
@@ -592,8 +642,13 @@ func _show_cards() -> void:
 	_layout_cards()
 	var row: Control = _swap_grid if swap != &"" else _cards_row
 	if row.get_child_count() > 0:
-		row.get_child(0).grab_focus.call_deferred()
+		_focus_card.call_deferred(weakref(row.get_child(0)))
 	_swap_scroll.set_deferred("scroll_vertical", 0)
+
+func _focus_card(reference: WeakRef) -> void:
+	var button: Control = reference.get_ref()
+	if button != null and button.is_visible_in_tree():
+		button.grab_focus()
 
 func _layout_cards() -> void:
 	if _swap_box == null or not _swap_box.visible:
@@ -633,10 +688,10 @@ func _card_style(col: Color) -> StyleBoxFlat:
 static func card_info(c: Dictionary) -> Dictionary:
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
-			var new_def: WeaponDef = ConfigManager.weapons[c.new]
+			var new_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.new)
 			return {"tag": TranslationServer.translate("card.keep_tag"), "name": TranslationServer.translate("card.keep_name"),
 				"desc": TranslationServer.translate("card.keep_desc").format({name = new_def.get_display_name()}), "color": Color("#6b7690")}
-		var old_def: WeaponDef = ConfigManager.weapons[c.id]
+		var old_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.id)
 		var old_name := old_def.get_display_name() if old_def.comet_only else "%s Lv%d" % [old_def.get_display_name(), c.level]
 		return {"tag": TranslationServer.translate("card.swap_tag"), "name": old_name,
 			"desc": old_def.get_description(),
@@ -645,12 +700,12 @@ static func card_info(c: Dictionary) -> Dictionary:
 		return {"tag": TranslationServer.translate("card.heal_tag"), "name": TranslationServer.translate("card.heal_name"),
 			"desc": TranslationServer.translate("card.heal_desc"), "color": Color("#6dffb0")}
 	var weapon: bool = c.kind == &"weapon"
-	var def = (ConfigManager.weapons if weapon else ConfigManager.traits).get(c.id)
+	var def = ContentManager.catalog.find(&"weapons" if weapon else &"traits", c.id)
 	var lv: int = c.level
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
 		tag = "card.first_weapon"
-	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ConfigManager.cfg.trait_max_stacks]
+	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ContentManager.cfg.trait_max_stacks]
 	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 
@@ -681,15 +736,33 @@ func _build_pause() -> void:
 	var quit := Button.new()
 	quit.text = "hud.quit_run"
 	quit.custom_minimum_size = Vector2(320, 52)
-	quit.pressed.connect(func(): run.command(&"abort"))
+	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+
+func _confirm_abort() -> void:
+	if run.state.phase != RunState.Phase.PAUSED or not can_show_menu_overlay(): return
+	var dialog := preload("res://scripts/ui/run_exit_confirmation.gd").new()
+	dialog.input_id = _card_input_id
+	dialog.held_inputs = _card_held
+	dialog.discarded_inputs = _card_discard
+	dialog.input_delay = card_input_delay
+	add_child(dialog)
+	show_menu_overlay(dialog)
+	dialog.finished.connect(func(confirmed: bool):
+		if confirmed:
+			# 遷移が完了するまで確認画面が入力を受け止める。
+			run.command(&"abort")
+		else:
+			close_menu_overlay(dialog)
+			dialog.queue_free())
 
 ## ポーズ中に設定を重ねて開く。戻ると閉じてポーズに戻る。
 func _open_settings(from: Button) -> void:
 	AudioManager.play(&"ui")
 	_settings = SETTINGS_SCENE.instantiate() as UiScreen
 	_settings.close_fn = func():
+		_settings.set_process_unhandled_input(false)
 		_settings.queue_free()
 		_settings = null
 		_pause_box.visible = true
@@ -722,7 +795,7 @@ func _draw() -> void:
 		_draw_bar(HEALTH, _health_fill, hp, health_color)
 		draw_string(_font, Vector2(7, 40), "%d/%d" % [ceili(maxf(0.0, s.ship_hp)), roundi(s.stats.max_hp)], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, CYAN)
 		draw_string(_font, Vector2(7, 52), "ATK %.1f  %s  Lv %d  %s" % [run.combat.attack_power(), tr("hud.kills").format({n = s.kills}), s.level, tr("common.parts").format({n = s.coins})], HORIZONTAL_ALIGNMENT_LEFT, 260, 8, CYAN)
-		_draw_bar(EXPERIENCE, _experience_fill, s.xp / run.build.xp_needed(), Color("#b8a0ff"))
+		_draw_bar(EXPERIENCE, _experience_fill, s.xp / run.loadout.xp_needed(), Color("#b8a0ff"))
 		draw_string(_font, Vector2(280, 23), "%d:%02d" % [int(s.time) / 60, int(s.time) % 60], HORIZONTAL_ALIGNMENT_CENTER, 80, 15, CYAN)
 		if s.bonus_t > 0.0:
 			draw_string(_font, Vector2(240, 37), tr("hud.bonus").format({n = ceili(s.bonus_t)}), HORIZONTAL_ALIGNMENT_CENTER, 160, 10, CYAN)
@@ -871,8 +944,8 @@ func _dense_cells() -> PackedVector2Array:
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
 	draw_texture(SLOTS, Vector2.ZERO)
-	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ConfigManager.weapons)
-	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ConfigManager.traits)
+	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
+	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
 	_draw_hero_slot(Vector2(99, 315))
 
 func _draw_hero_slot(at: Vector2) -> void:
@@ -880,7 +953,7 @@ func _draw_hero_slot(at: Vector2) -> void:
 	if s.hero_power == &"":
 		return
 	var rect := Rect2(at + Vector2(3, 3), Vector2(32, 31))
-	var definition: HeroDef = ConfigManager.heroes.get(s.hero_power)
+	var definition: HeroDef = ContentManager.heroes.get(s.hero_power)
 	var gold := Color("#ffe8a0")
 	if definition != null and not definition.stars.is_empty():
 		var bounds := Rect2(definition.stars[0], Vector2.ZERO)
@@ -910,7 +983,7 @@ func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned:
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var definition = defs[ids[k]]
-		if definition is WeaponDef and definition.comet_only:
+		if weapon and definition.comet_only:
 			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
 		var pip_w := (size_px - 4.0) / max_level
@@ -919,17 +992,18 @@ func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned:
 
 func _draw_boss(W: float) -> void:
 	var bosses := run.bosses
-	if not bosses.boss_alive() and run.state.lab_mode:
-		for instance in bosses.lab_instances:
-			if instance.boss_alive():
-				bosses=instance
+	var owner := bosses.actor
+	if run.state.lab_mode:
+		for candidate in bosses.actors:
+			if candidate.body_alive():
+				owner = candidate
 				break
 	if _warning_t > 0.0 and fmod(_warning_t, 0.5) < 0.3:
 		draw_string(_font, Vector2(W / 2.0 - 160, 120), tr("hud.warning"), HORIZONTAL_ALIGNMENT_CENTER, 320, 48, Color("#ff526e"))
-	if not bosses.boss_alive():
+	if owner == null or not owner.body_alive():
 		return
 	var t := run.enemies.table
-	var b: int=bosses.actor.health_row() if bosses.actor!=null else bosses.boss_row
+	var b: int = owner.health_row()
 	if b<0 or b>=t.hp.size() or t.dead[b]:return
 	var bw := minf(520.0, W * 0.6)
 	var bx := W / 2.0 - bw / 2.0

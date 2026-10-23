@@ -1,21 +1,21 @@
 ## 武器の発動の共通の土台（設計書 8.1）。武器ごとに res://scripts/weapons/<内部 ID>.gd で上書きする。
 ##
-## 発動のきっかけごとに決まった入口（関数）を持つ。BuildManager が、持っている武器の入口を呼ぶ。
+## 発動のきっかけごとに決まった入口（関数）を持つ。LoadoutSystem が、持っている武器の入口を呼ぶ。
 ## 数値は WeaponDef（.tres）の params から読む。
 class_name WeaponBehavior
 extends RefCounted
 
-var build: BuildManager
+var ctx: RunContext
 var def: WeaponDef
 var level := 1
 
 var state: RunState:
-	get: return build.state
+	get: return ctx.state
 var cfg: GameConfig:
-	get: return build.cfg
+	get: return ctx.cfg
 
-func setup(b: BuildManager, d: WeaponDef) -> void:
-	build = b
+func setup(context: RunContext, d: WeaponDef) -> void:
+	ctx = context
 	def = d
 
 ## 表示 Lv に対応する性能段階（仕様書 8）。
@@ -36,7 +36,7 @@ func p(key: String, default = 0.0):
 	return def.params.get(key, default)
 
 func atk() -> float:
-	return build.combat.attack_power()
+	return ctx.combat.attack_power()
 
 # ── 発動のきっかけ ─────────────────────────────────────────────────
 ## 固定更新ごと。busy は描画中・なぞり中（このときは周期の攻撃を休む）
@@ -57,4 +57,11 @@ func on_any_contact(_i: int) -> void:
 func on_kill(_cause: StringName) -> void:
 	pass
 func on_end() -> void:
+	pass
+
+## 世界時間に依存しない装備の更新。
+func tick_real(_dt: float) -> void:
+	pass
+
+func on_phase_changed(_phase: RunState.Phase) -> void:
 	pass

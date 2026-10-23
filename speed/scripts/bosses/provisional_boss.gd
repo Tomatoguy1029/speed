@@ -47,7 +47,7 @@ func _move(dt: float) -> void:
 	t.vel[i] += (d / dist * t.speed[i] - t.vel[i]) * minf(1.0, def.accel * dt)
 	t.facing[i] += clampf(Geom.angle_diff(d.angle(), t.facing[i]), -def.turn * dt, def.turn * dt)
 	t.pos[i] += t.vel[i] * dt
-	manager.field.collide_enemy(i, from)
+	ctx.field.collide_enemy(i, from)
 	if t.hit_cd[i] > 0.0:
 		t.hit_cd[i] -= dt
 	if t.flash[i] > 0.0:
@@ -56,7 +56,7 @@ func _move(dt: float) -> void:
 # ── 制限時間の一撃（仕様書 4.1・16） ─────────────────────────────────
 
 ## 攻撃と移動を止めて機体へ向き、光を溜める。溜め終わりに光が太くなって画面を埋める。
-## 当たりの判定は RunManager が溜めの終わりに行う。溜めの間は無敵。
+## 当たりの判定は RunSimulation が溜めの終わりに行う。溜めの間は無敵。
 func begin_final_strike(charge: float) -> void:
 	if final_strike_t >= 0.0:
 		return
@@ -104,12 +104,12 @@ func _process(delta: float) -> void:
 	super(delta)
 	# 一撃が当たったら、敗北の停止の間に光を消し、爆発と GAME OVER を見せる。
 	if _final_beam != null and run_state.phase != RunState.Phase.PLAY:
-		_final_beam.modulate.a = move_toward(_final_beam.modulate.a, 0.0, delta / maxf(0.01, manager.cfg.death_freeze_time))
+		_final_beam.modulate.a = move_toward(_final_beam.modulate.a, 0.0, delta / maxf(0.01, ctx.cfg.death_freeze_time))
 
 # ── 判断の層から呼ばれる ──────────────────────────────────────────
 
 func attack_ready(_attack: StringName) -> bool:
-	return _cooldown <= 0.0 and not timeline.is_playing() and manager.admit("boss:" + str(table.id[body]), ["aimed"], body, 2.0)
+	return _cooldown <= 0.0 and not timeline.is_playing() and ctx.bosses.admit("boss:" + str(table.id[body]), ["aimed"], body, 2.0)
 
 func start_attack(attack: StringName) -> void:
 	timeline.play(attack)
@@ -127,4 +127,4 @@ func fire_volley() -> void:
 	var spread: float = def.params.spread
 	var base := (run_state.enemy_aim - table.pos[body]).angle()
 	for i in n:
-		manager.fire(base + (float(i) / maxi(1, n - 1) - 0.5) * spread, def.params.bullet_speed, def.params)
+		ctx.projectiles.fire_enemy(body, base + (float(i) / maxi(1, n - 1) - 0.5) * spread, def.params.bullet_speed, &"bullet", def.params)

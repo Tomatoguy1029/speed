@@ -9,6 +9,10 @@ const MORPH_PANEL := preload("res://scripts/ui/morph_panel.gd")
 const MAP_SCRIPT := preload("res://scripts/ui/constellation_map.gd")
 const ART_SIZE := Vector2(1280, 720)
 const MENU_CYAN := Color("5bc8db")
+const MENU_DIRECTIONS := {KEY_W: KEY_UP, KEY_A: KEY_LEFT, KEY_S: KEY_DOWN, KEY_D: KEY_RIGHT}
+
+## 起動側から加えるメニューの操作。
+var menu_accessory: Control
 
 var _art: Control
 var _radar_material: ShaderMaterial
@@ -27,18 +31,6 @@ var _increments_alpha := 1.0
 
 func _ready() -> void:
 	_build_title_art()
-	if OS.is_debug_build():
-		var lab := Button.new()
-		lab.name = "EnemyLabButton"
-		lab.text = tr("menu.enemy_lab")
-		lab.add_theme_font_size_override("font_size", 18)
-		lab.pressed.connect(_go.bind(GameManager.Screen.ENEMY_LAB))
-		add_child(lab)
-		lab.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		lab.offset_left = -330.0
-		lab.offset_right = -24.0
-		lab.offset_top = 24.0
-		lab.offset_bottom = 68.0
 	%StartButton.pressed.connect(func(): _go(GameManager.Screen.MAIN_MENU))
 	%SettingsButton.pressed.connect(func(): _go(GameManager.Screen.SETTINGS))
 	%QuitButton.pressed.connect(GameManager.quit_game)
@@ -126,6 +118,8 @@ func _style_menu_button(button: Button) -> void:
 	button.draw.connect(_draw_menu_corners.bind(button))
 	button.mouse_entered.connect(button.queue_redraw)
 	button.mouse_exited.connect(button.queue_redraw)
+	button.focus_entered.connect(button.queue_redraw)
+	button.focus_exited.connect(button.queue_redraw)
 
 func _build_start_panel(canvas: Control) -> void:
 	_start_panel = Control.new()
@@ -239,6 +233,28 @@ func _close_start_panel() -> void:
 	AudioManager.play(&"ui")
 	GameManager.back()
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and not (event.ctrl_pressed or event.alt_pressed or event.meta_pressed):
+		var code: Key = event.keycode if event.keycode != 0 else event.physical_keycode
+		if MENU_DIRECTIONS.has(code):
+			var window_focus := get_viewport().gui_get_focus_owner()
+			var menu_focus := _stage_button.get_viewport().gui_get_focus_owner()
+			if window_focus is LineEdit or window_focus is TextEdit or menu_focus is LineEdit or menu_focus is TextEdit:
+				return
+			var navigation := event.duplicate() as InputEventKey
+			navigation.keycode = MENU_DIRECTIONS[code] as Key
+			navigation.physical_keycode = event.physical_keycode if event.physical_keycode != 0 else code
+			navigation.unicode = 0
+			# 物理キーを残し、遷移の押下保護には元の WASD と同じ入力として記録する。
+			get_viewport().push_input(navigation, true)
+			get_viewport().set_input_as_handled()
+			return
+	if _morphing or (_transition != null and _transition.is_running()):
+		for action in [&"ui_accept", &"ui_cancel", &"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
+			if event.is_action(action):
+				get_viewport().set_input_as_handled()
+				return
+
 func _unhandled_input(event: InputEvent) -> void:
 	if (_start_panel.visible or GameManager.screen == GameManager.Screen.STAGE_SELECT) and event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -247,7 +263,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		super(event)
 
 func _draw_menu_corners(button: Button) -> void:
-	if not button.is_hovered():
+	if not button.is_hovered() and not button.has_focus():
 		return
 	var bounds := Rect2(Vector2.ONE, button.size - Vector2.ONE * 2.0)
 	for corner: Vector2 in [bounds.position, Vector2(bounds.end.x, bounds.position.y), bounds.end, Vector2(bounds.position.x, bounds.end.y)]:
@@ -277,9 +293,9 @@ func transition_to_upgrade() -> void:
 	_morphing = true
 	_menu_options.hide()
 	_menu_back.hide()
-	var lab := get_node_or_null("EnemyLabButton")
-	if lab != null:
-		lab.hide()
+	var accessory := menu_accessory
+	if accessory != null:
+		accessory.hide()
 	var tween := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(_menu_frame, "position", MORPH_PANEL.UPGRADE_RECT.position, 0.7)
 	tween.tween_property(_menu_frame, "size", MORPH_PANEL.UPGRADE_RECT.size, 0.7)
@@ -295,9 +311,9 @@ func _transition_from_upgrade() -> void:
 	_menu_frame.size = MORPH_PANEL.UPGRADE_RECT.size
 	_menu_frame.fill_color = Color.BLACK
 	_radar_material.set_shader_parameter("upgrade_progress", 1.0)
-	var lab := get_node_or_null("EnemyLabButton")
-	if lab != null:
-		lab.hide()
+	var accessory := menu_accessory
+	if accessory != null:
+		accessory.hide()
 	_transition = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_transition.tween_property(_menu_frame, "position", MORPH_PANEL.MENU_RECT.position, 0.7)
 	_transition.tween_property(_menu_frame, "size", MORPH_PANEL.MENU_RECT.size, 0.7)
@@ -307,7 +323,7 @@ func _transition_from_upgrade() -> void:
 		_menu_options.show()
 		_menu_back.show()
 		_morphing = false
-		if lab != null:
-			lab.show()
+		if accessory != null:
+			accessory.show()
 		_stage_button.grab_focus()
 	)

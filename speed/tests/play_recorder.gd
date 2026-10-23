@@ -2,10 +2,10 @@
 ## Godot --headless --path speed res://tests/play_recorder.tscn
 extends Node
 
-const RECORDER := preload("res://scripts/managers/play_recorder.gd")
+const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 
 class TempRecorder:
-	extends "res://scripts/managers/play_recorder.gd"
+	extends "res://scripts/dev/play_recorder.gd"
 	var directory := "/tmp/speed-recording-start-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
 	func _recording_directory() -> String:
 		return directory
@@ -40,14 +40,20 @@ func _ready() -> void:
 	await verify_performance()
 	await verify_mid_run_start()
 	await verify_start_routes()
+	var measured_on := await measurement_scenario(true)
+	var measured_off := await measurement_scenario(false)
+	check(measured_on == measured_off, "追加イベントの ON/OFF で装備・HP・XP・乱数・結晶が同じ")
+	await verify_live_tuning(false)
+	await verify_live_tuning(true)
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
 
 func verify_mid_run_start() -> void:
-	var scene := load("res://scenes/run/run.tscn").instantiate() as Node
-	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var scene := RunManager.create_run() as Node
 	add_child(scene)
-	var run := scene.get_node("Managers/RunManager") as RunManager
+	if scene.sim.state == null: await scene.started
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var run := scene.sim as RunSimulation
 	await get_tree().process_frame
 	run.state.time = 42.0
 	run.state.level = 3
@@ -56,6 +62,11 @@ func verify_mid_run_start() -> void:
 	run.state.xp_dropped = 1200.0
 	run.state.weapons[&"W01"] = 2
 	run.state.kills = 10
+	var existing_row := run.pickups.drop_gem(Vector2.ZERO, 8.0)
+	var existing_id := run.pickups.gem_seq[existing_row]
+	run.state.emit(&"hurt", {"amount": 99.0, "cause": &"before_recording"})
+	var initial_profile: Dictionary = scene.recording_initial.profile.duplicate(true)
+	run.ctx.profile.mult[&"xp"] = 9.0
 	var before := [run.state.time, run.state.level, run.state.xp, run.state.rng.state]
 	var rec := TempRecorder.new()
 	add_child(rec)
@@ -74,17 +85,22 @@ func verify_mid_run_start() -> void:
 		check(start.recording_start.t == 42.0 and start.recording_start.level == 3 and start.recording_start.xp == 0.125, "録画開始時の時計・レベル・XP を保存する")
 		check(start.recording_start.weapons.W01 == 2 and start.recording_start.xp_gained == 1000.0, "録画開始時の装備と累計を保存する")
 		check(start.missing_prefix and start.recording_start.trigger == "during_run", "同じ通常ランでも前半欠落を明示する")
+		var existing: Dictionary = read_rows(path)[1]
+		check(existing.type == "xp_existing" and existing.origin == "unobserved" and int(existing.gems[0][0]) == existing_id and existing.gems[0][1] == 8.0, "途中開始の残存結晶IDと値を生成不明として記録する")
+		check(start.run_start.conditions.profile == RECORDER.IDENTITY.plain(initial_profile) and start.recording_start.conditions.profile.mult.xp == 9.0, "開始時の強化と途中録画時の強化を区別する")
 		check(rec._offered.size() == run.state.cards.size(), "既に表示中のカード候補を引き継ぐ")
 		rec._set_armed(true)
-		rec._begin(run)
-		check(rec._file.get_path() == path and read_rows(path).size() == 1, "重複開始でファイルを作り直さない")
+		rec._begin(scene)
+		check(rec._file.get_path() == path and read_rows(path).size() == 2, "重複開始でファイルを作り直さない")
+		run.flush_events()
+		check(read_rows(path).filter(func(row): return row.type == "hurt").is_empty(), "F9前から通知待ちの被弾を観測区間へ混ぜない")
 		rec._process(0.0)
 		await capture("mid-run")
 		run.state.time += 3.0
 		run.state.xp_gained += 2.0
 		run.state.xp_dropped += 4.0
 		rec._process(0.0)
-		var sample: Dictionary = read_rows(path)[1]
+		var sample: Dictionary = read_rows(path).filter(func(row): return row.type == "sample")[0]
 		check(sample.xp_picked == 2.0 and sample.xp_dropped == 4.0, "最初の sample は録画開始後の XP だけを集計する")
 		rec._input(key)
 		var closed := FileAccess.get_file_as_bytes(path)
@@ -116,11 +132,12 @@ func verify_start_routes() -> void:
 			GameManager.run_start_time = route.t
 			if not delayed:
 				rec._set_armed(true)
-			var scene := load("res://scenes/run/run.tscn").instantiate() as Node
-			scene.process_mode = Node.PROCESS_MODE_DISABLED
-			var run := scene.get_node("Managers/RunManager") as RunManager
+			var scene := RunManager.create_run() as Node
+			var run := scene.sim as RunSimulation
 			run.options = {"seed": 932}
 			add_child(scene)
+			if scene.sim.state == null: await scene.started
+			scene.process_mode = Node.PROCESS_MODE_DISABLED
 			await get_tree().process_frame
 			check(GameManager.run_start_time == 0.0 and GameManager.run_start_source == "stage_start", "開始条件を次のランへ持ち越さない")
 			if delayed:
@@ -128,7 +145,7 @@ func verify_start_routes() -> void:
 				run.choose_card(0)
 				run.combat.rebuild_grid()
 				for tick in 12:
-					run._physics_process(1.0 / 120.0)
+					run.physics_step(1.0 / 120.0)
 				var snapshot := run.recording_snapshot()
 				var rng := run.state.rng.state
 				var key := InputEventKey.new()
@@ -180,7 +197,7 @@ func scenario(recording: bool) -> Dictionary:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true, "stage": 1, "config": {"drop_base": 1.0, "drop_max": 1.0}})
-	var run: RunManager = lab.run
+	var run: RunSimulation = lab.run
 	var pk := run.pickups
 	var s := run.state
 	s.ship_pos = Vector2(3000, 0)
@@ -189,7 +206,7 @@ func scenario(recording: bool) -> Dictionary:
 	add_child(rec)
 	rec.set_process(false)
 	rec._set_armed(true)
-	rec._begin(run)
+	rec._begin(lab.scene)
 	check(rec._file == null, "実験場は通常の記録先へ書かない")
 	rec._set_armed(false)
 	if recording:
@@ -199,15 +216,16 @@ func scenario(recording: bool) -> Dictionary:
 		# 本番のファイル作成だけを分離し、通知・sample・end の処理はそのまま使う。
 		rec._file = FileAccess.open(recording_path, FileAccess.WRITE)
 		rec._run = run
+		rec._session = lab.scene
 		rec._big_crystals = {}
 		pk.big_crystal_dropped.connect(rec._on_big_crystal)
 		check(rec._xp_config().big_crystal_xp == Array(run.cfg.big_crystal_xp), "開始時の大きい結晶の設定を取得できる")
 		run.phase_changed.connect(rec._on_phase_changed)
-		run.tree_exiting.connect(rec._end.bind("quit"))
+		lab.scene.tree_exiting.connect(rec._end.bind("quit"))
 	# 実際の敵ドロップ経路。ドロップ率1なので雑魚も大きい結晶を落とし、レチクル座は中の段を必ず落とす。
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"biter"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"biter"], s.ship_pos))
 	s.time = 6.0
-	pk.on_enemy_killed(run.enemies.spawn(ConfigManager.enemies[&"reticle"], s.ship_pos))
+	pk.on_enemy_killed(run.enemies.spawn(ContentManager.enemies[&"reticle"], s.ship_pos))
 	pk._collect_gems(0.01)
 	check(s.xp_gained >= 75.0 + 12.0, "大きい結晶の XP を回収する")
 	var outcome := {"xp": s.xp_gained, "level": s.level, "rng": s.rng.state, "gems": pk.gem_slots.live}
@@ -241,8 +259,8 @@ func verify_performance() -> void:
 	var lab = load('res://gyms/enemy_lab/lab_session.gd').new()
 	add_child(lab)
 	await lab.reset({'seed':932,'empty':true,'stage':4})
-	var run: RunManager = lab.run
-	run.set_physics_process(false)
+	var run: RunSimulation = lab.run
+	lab.scene.auto_step = false
 	run.state.phase = RunState.Phase.PLAY
 	run.state.time = 300.0
 	var rec = RECORDER.new()
@@ -253,6 +271,7 @@ func verify_performance() -> void:
 	var path := directory.path_join('performance.jsonl')
 	rec._file = FileAccess.open(path,FileAccess.WRITE)
 	rec._run = run
+	rec._session = lab.scene
 	var stamp := Time.get_ticks_usec()
 	rec._perf_start(stamp)
 	var rng_before := run.state.rng.state
@@ -310,4 +329,199 @@ func verify_performance() -> void:
 	print('PERF_RECORDER_CHECK passed=',passed,' rows=',rows.size(),' bytes=',FileAccess.get_file_as_bytes(path).size())
 	rec.queue_free()
 	lab.queue_free()
+	await get_tree().process_frame
+
+## 実際の入口を使い、履歴の対応と観測による状態変化を検証する。
+func measurement_scenario(recording: bool) -> Dictionary:
+	var config := ContentManager.cfg.duplicate() as GameConfig
+	config.levelup_bonus_chance = 1.0
+	config.levelup_bonus_more = 1.0
+	config.levelup_bonus_last = 1.0
+	config.gem_max = 1
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	if recording: rec._set_armed(true)
+	var scene := RunManager.create_session(self, {"seed": 704, "config": config, "profile": ProfileManager.compute({})}, false)
+	scene.auto_step = false
+	var run := scene.sim
+	var s := run.state
+	var pk := run.pickups
+	await get_tree().process_frame
+	var path := rec._file.get_path() if recording else ""
+	run.choose_card(0)
+	s.time = 12.25
+	s.world_time = 7.5
+	s.cards = [{"kind": &"trait", "id": &"T10", "level": 1}]
+	s.pending_levels = 1
+	run.loadout.choose_card(0)
+	# 彗星の空き枠取得と、満員時の入れ替え。
+	run.loadout._receive_comet_weapon(&"W21")
+	for id in ContentManager.catalog.table(&"weapons"):
+		if not ContentManager.catalog.find(&"weapons", id).comet_only and s.weapons.size() < config.weapon_slots:
+			run.loadout.grant(&"weapon", id)
+	run.loadout._receive_comet_weapon(&"W22")
+	await get_tree().process_frame
+	var replaced: StringName = s.cards[0].id
+	run.loadout.choose_card(0)
+	# 各被弾を、無敵で拒否した攻撃と区別する。書込時には時計を進めておく。
+	s.phase = RunState.Phase.PLAY
+	s.ship_hp = 100.0
+	s.ship_shield_t = 0.0
+	s.ship_invuln = 0.0
+	run.ship.damage(7.0, 0.0, &"bullet", &"reticle")
+	run.ship.damage(99.0, 0.0, &"bullet", &"reticle")
+	s.time = 12.5
+	s.world_time = 7.75
+	s.ship_invuln = 0.0
+	run.ship.damage(3.0, 0.0, &"touch", &"biter")
+	s.time = 13.0
+	run.flush_events()
+	# 結晶の生成・通常回収・上限合流・ビーコン回収。
+	s.ship_pos = Vector2(1000, 0)
+	var row := pk.drop_gem(s.ship_pos, 2.5, &"enemy", &"biter", 101)
+	var ship_id := pk.gem_seq[row]
+	pk._collect_gems(0.01)
+	row = pk.drop_gem(Vector2.ZERO, 5.0, &"big_crystal", &"reticle", 102, 2)
+	var first := pk.gem_seq[row]
+	pk.drop_gem(Vector2.ZERO, 3.0, &"enemy", &"biter", 103)
+	row = pk.drop_gem(Vector2.ZERO, 4.0, &"enemy", &"biter", 104)
+	var merged := pk.gem_seq[row]
+	s.time = 14.0
+	pk.collect(&"magnet")
+	# からす座の実際の回収経路と、運搬XPの再ドロップ。
+	var crow_def := run.enemies.def_of(&"crow").duplicate(true) as EnemyDef
+	crow_def.params.flock = 1
+	var crow := run.enemies.spawn(crow_def, Vector2.ZERO)
+	run.enemies.table.facing[crow] = 0.0
+	row = pk.drop_gem(Vector2(-run.enemies.table.r[crow] * 0.62, 0), 6.0, &"enemy", &"biter", 105)
+	var carried := pk.gem_seq[row]
+	run.enemies.behavior(&"crow").gather_pickups(pk, 1.0)
+	check(run.enemies.table.carry[crow] == 6.0, "からす座が実際に結晶を回収する")
+	pk.on_enemy_killed(crow)
+	var outcome := {"weapons": s.weapons.duplicate(), "traits": s.traits.duplicate(), "hp": s.ship_hp,
+		"xp": s.xp_gained, "rng": s.rng.state, "gems": Array(pk.gem_value), "alive": Array(pk.gem_alive)}
+	if recording:
+		rec._end("stopped")
+		var rows := read_rows(path)
+		var start: Dictionary = rows[0]
+		check(start.schema_version == 4 and start.measurement_version == 1, "schema4 に識別可能な追加計測を保存する")
+		check(start.run_start.conditions.config.gem_max == 1 and start.run_start.conditions.profile.mult.xp == 1.0, "開始時の実効設定と強化係数を保存する")
+		check(start.run_start.conditions.identity.code_sha256.length() == 64 and start.run_start.conditions.identity.runtime_stage_sha256.length() == 64, "コード・実行ステージを識別するハッシュ")
+		var changes := rows.filter(func(e): return e.type == "loadout")
+		check(changes[0].source == "initial_choice" and changes[0].previous == 0 and changes[0].current == 1, "初期武器選択を記録する")
+		check(changes.filter(func(e): return e.source == "level_bonus").size() == 3, "おまけ対象を3件すべて記録する")
+		var equipment := {"weapon": {}, "trait": {}}
+		for e in changes:
+			check(equipment[e.kind].get(e.id, 0) == int(e.previous), "装備変更の前値が履歴につながる")
+			if e.current == 0: equipment[e.kind].erase(e.id)
+			else: equipment[e.kind][e.id] = int(e.current)
+		check(equipment.weapon == RECORDER._plain(s.weapons) and equipment.trait == RECORDER._plain(s.traits), "時刻付き履歴から最終装備を復元できる")
+		check(changes.any(func(e): return e.source == "comet" and e.id == "W21"), "空き枠への彗星武器取得")
+		check(changes.any(func(e): return e.source == "comet_swap" and e.id == String(replaced) and e.current == 0) and s.weapons.has(&"W22"), "彗星交換の取り外しと取得を記録する")
+		var hurts := rows.filter(func(e): return e.type == "hurt")
+		check(hurts.size() == 2 and hurts[0].amount == 7.0 and hurts[1].amount == 3.0, "無敵による拒否を含めず実被弾を1発ずつ記録する")
+		var samples := rows.filter(func(e): return e.type == "sample")
+		check(samples.back().damage.get("bullet/reticle", 0) == 7.0 and samples.back().damage.get("touch/biter", 0) == 3.0, "既存の被弾集計へ二重計上しない")
+		check(hurts[0].t == 12.25 and hurts[0].world_t == 7.5 and hurts[0].hp_after == 93.0 and hurts[1].source == "biter", "被弾の発生時刻・原因・残HPを保持する")
+		check(rows.any(func(e): return e.type == "xp_collect" and e.get("id", -1) == ship_id and e.method == "ship" and e.xp == 2.5), "通常結晶の生成IDと回収を対応づける")
+		check(rows.any(func(e): return e.type == "xp_drop" and e.id == merged and e.merged_from == first and e.added_xp == 4.0 and e.xp == 9.0), "合流の親IDと新規供給量を区別する")
+		var beacon: Array = rows.filter(func(e): return e.type == "xp_collect" and e.method == "beacon")
+		check(beacon.size() == 1 and beacon[0].gems.size() == 2 and beacon[0].xp == 12.0 and beacon[0].t == 14.0, "ビーコン回収を1行で各結晶ID・値・時刻につなぐ")
+		check(rows.any(func(e): return e.type == "xp_transfer" and e.id == carried), "からす座による回収を機体取得と区別する")
+		check(rows.any(func(e): return e.type == "xp_drop" and e.source == "crow_carry" and e.added_xp == 6.0), "からす座の運搬XPを再供給と識別する")
+		check(rows.filter(func(e): return e.type == "pick").size() > 0 and rows.back().type == "end", "既存 pick・end の行形式を保持する")
+		var previous_time := 0.0
+		for e in rows:
+			if e.has("t"):
+				check(e.t >= previous_time, "出来事と区間行のラン時計が順序を保つ")
+				previous_time = e.t
+		print("MEASUREMENT_CHECK rows=%d bytes=%d" % [rows.size(), FileAccess.get_file_as_bytes(path).size()])
+	rec._set_armed(false)
+	check(not pk.xp_recorded.has_connections() and not run.loadout.loadout_recorded.has_connections(), "録画終了で追加計測の購読を解除する")
+	rec.queue_free()
+	scene.queue_free()
+	await get_tree().process_frame
+	return outcome
+
+
+## EnemySystem の実イベントを録画へ接続し、通常開始と前半欠落の双方で変更境界を保持する。
+func verify_live_tuning(during_run: bool) -> void:
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	if not during_run: rec._set_armed(true)
+	var stage := ContentManager.runtime_stage(4).duplicate(true) as RuntimeStage
+	stage.enemy_tuning = {}
+	var scene := RunManager.create_session(self, {"stage": stage, "seed": 819, "stage_index": 4}, false)
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var run := scene.sim
+	var state := run.state
+	var hp := run.enemies.def_of(&"telescope").base_hp(run.cfg)
+	var initial := {"telescope": {"hp": hp * 1.5}}
+	if during_run:
+		state.time = 7.0
+		state.world_time = 3.0
+		run.enemies.update_stage_tuning(initial)
+		rec._set_armed(true)
+		rec._begin(scene, true)
+	check(rec._file != null, "ライブ調整の統合検証で録画を開始する")
+	if rec._file == null:
+		scene.queue_free()
+		rec.queue_free()
+		await get_tree().process_frame
+		return
+	var path := rec._file.get_path()
+	var start: Dictionary = read_rows(path)[0]
+	check(start.run_start.conditions.enemy_tuning.is_empty(), "ラン初期化時の上書きは後のライブ変更から独立する")
+	check(start.recording_start.conditions.enemy_tuning == (initial if during_run else {}), "録画開始時のライブ上書きを保存する")
+	check(start.missing_prefix == during_run, "ライブ調整でも前半欠落の区分を保つ")
+	state.time = 10.25
+	state.world_time = 4.5
+	var values := {"telescope": {"hp": hp * 2.0}}
+	var expected := values.duplicate(true)
+	run.enemies.update_stage_tuning(values)
+	values.telescope.hp = 1.0
+	state.time = 11.0
+	state.world_time = 5.0
+	var rng_before := state.rng.state
+	run.flush_events()
+	check(state.rng.state == rng_before and run.enemies.stage_tuning == expected, "受信は乱数と適用済みの上書きを変更しない")
+	rec._file.flush()
+	var changes := read_rows(path).filter(func(e): return e.type == "enemy_tuning_changed")
+	check(changes.size() == 1, "途中録画より前の通知待ち変更を履歴へ混ぜない")
+	if changes.size() == 1:
+		check(changes[0].event_t == 10.25 and changes[0].event_world_t == 4.5, "実イベントの適用ラン秒・世界秒を保存する")
+		check(changes[0].t == 11.0 and changes[0].world_t == 5.0, "通知処理の時計を適用時刻から区別する")
+		check(changes[0].values == expected, "適用後の辞書は通知待ち中の別編集から独立する")
+	# ボーナス中はラン時計が止まっても世界秒と行順で変更を区別できる。
+	state.bonus_t = 30.0
+	state.world_time = 5.25
+	run.enemies.update_stage_tuning({"telescope": {"hp": hp * 3.0}})
+	state.world_time = 5.5
+	run.enemies.update_stage_tuning({})
+	run.enemies.update_stage_tuning({})
+	state.world_time = 6.0
+	run.flush_events()
+	# 保存の通知は適用履歴と区別する。ソースファイルへの保存は行わず契約だけを検証する。
+	state.emit(&"enemy_tuning_saved", {"t": state.time, "world_t": state.world_time,
+		"path": "res://data/stages/stage_4.tres", "values": expected.duplicate(true)})
+	run.flush_events()
+	# 時刻を持たない通知も欠測のまま読めることを確認する。
+	state.emit(&"enemy_tuning_changed", {"values": {}})
+	run.flush_events()
+	rec._end("stopped")
+	var rows := read_rows(path)
+	changes = rows.filter(func(e): return e.type == "enemy_tuning_changed")
+	check(changes.size() == 4, "3回の実適用と時刻欠測の1通知だけを保存する")
+	if changes.size() == 4:
+		check(changes[1].event_t == 11.0 and changes[1].event_world_t == 5.25 and changes[2].event_world_t == 5.5, "停止したラン時計でも世界秒が適用順を保つ")
+		check(changes[2].values.is_empty(), "空の辞書は上書き全解除として保存する")
+		check(changes[3].event_t == null and changes[3].event_world_t == null, "欠けた適用時刻を処理時計で補完しない")
+	var saved := rows.filter(func(e): return e.type == "enemy_tuning_saved")
+	check(saved.size() == 1 and saved[0].path == "res://data/stages/stage_4.tres" and saved[0].values == expected, "保存通知を実適用と別の種類で保存する")
+	check(rows.back().type == "end" and rows.back().result == "stopped", "ライブ履歴を含む録画も既存の終端を保つ")
+	rec._set_armed(false)
+	rec.queue_free()
+	scene.queue_free()
 	await get_tree().process_frame

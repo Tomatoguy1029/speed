@@ -100,7 +100,7 @@ func tornado()->void:
 		state.rows=[]
 		state.from=debris.strike_pos
 		for j in 3:
-			var row: int=a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
+			var row: int=a.ctx.enemies.spawn(a.ctx.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
 			a._rubble.append(Vector2i(row,a.table.id[row]))
 			state.rows.append(row)
 			a.table.color[row].a=0.0
@@ -122,7 +122,7 @@ func tornado()->void:
 	if time>=1.2 and not state.has("launched"):
 		state.launched=true
 		state.vortex.life=0.0
-		for row in state.rows:a.manager.enemies.mark_dead(row)
+		for row in state.rows:a.ctx.enemies.mark_dead(row)
 		var direction: Vector2=state.direction
 		var points:=PackedVector2Array([state.center-direction*45.0,state.center+direction*45.0])
 		a.attack_field.add_shape(points,float(p.tornado_width),0.0,float(p.tornado_life),float(p.lump_dmg),&"tornado",wind.row,direction*float(p.tornado_speed),true)
@@ -138,7 +138,7 @@ func debris_shatter()->void:
 		for j in int(p.rubble_count):
 			var offset: float=(float(j)/maxf(1.0,float(p.rubble_count)-1.0)-0.5)*1.4
 			var at: Vector2=beam.strike_pos+Vector2.from_angle(float(state.aim)+offset)*420.0
-			var row: int=a.manager.enemies.spawn(a.manager.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
+			var row: int=a.ctx.enemies.spawn(a.ctx.enemies.def_of(&"hydra_rubble"),debris.strike_pos)
 			a._rubble.append(Vector2i(row,a.table.id[row]))
 			a.table.vel[row]=Vector2.ZERO
 			state[row]={"from":debris.strike_pos,"to":at}
@@ -151,7 +151,7 @@ func debris_shatter()->void:
 		if beam.emission.is_empty():beam.emission=a.attack_field.add_shape(points,float(p.beam_width),0.0,1.8,float(p.beam_dmg),&"beam",beam.row)
 		else:beam.emission.points=points
 		for ref in a._rubble.duplicate():
-			if not a.manager.enemies.is_same(ref.x,ref.y) or a.table.dead[ref.x]:
+			if not a.ctx.enemies.is_same(ref.x,ref.y) or a.table.dead[ref.x]:
 				a._rubble.erase(ref)
 				continue
 			if Geometry2D.get_closest_point_to_segment(a.table.pos[ref.x],points[0],points[1]).distance_to(a.table.pos[ref.x])<=a.table.r[ref.x]+float(p.beam_width)*0.5:
@@ -202,7 +202,7 @@ func position(dt: float)->bool:
 			n.strike_from=n.strike_pos
 			var direction: Vector2=(a.run_state.ship_pos-n.strike_pos).normalized()
 			n.target=n.strike_pos+direction*float(a.def.params.swarm_reach)
-			var hit: Dictionary=a.manager.field.arena_hit(n.strike_pos,n.target,a.table.r[n.row])
+			var hit: Dictionary=a.ctx.field.arena_hit(n.strike_pos,n.target,a.table.r[n.row])
 			if not hit.is_empty():n.target=hit.pos
 	return ready
 

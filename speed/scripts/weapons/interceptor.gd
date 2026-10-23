@@ -39,21 +39,21 @@ func tick(dt: float, busy: bool) -> void:
 			d.left = int(value("burst_by_level"))
 		var target := _nearest(d.pos)
 		if target >= 0:
-			var t := build.enemies.table
+			var t := ctx.enemies.table
 			_target_after[t.id[target]] = _clock + float(p("target_interval"))
 			d.angle = (t.pos[target] - d.pos).angle()
 			d.flash = 0.09
 			var direction := Vector2.from_angle(float(d.angle))
-			build.projectiles.fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
+			ctx.projectiles.fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
 				atk() * float(value("damage_by_level")), {"cause": &"interceptor", "r": p("shot_radius"),
-				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color"))})
+				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy})
 		d.left = int(d.left) - 1
 		d.next = _clock + (float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
 
 func _nearest(from: Vector2) -> int:
 	var range_r := float(p("range"))
-	build.combat.nearby(state.ship_pos, range_r, _buf)
-	var t := build.enemies.table
+	ctx.combat.nearby(state.ship_pos, range_r, _buf)
+	var t := ctx.enemies.table
 	var best := -1
 	var distance := INF
 	for i in _buf:
@@ -70,9 +70,9 @@ func _nearest(from: Vector2) -> int:
 			best = i
 	return best
 
-## 実際の着弾だけを扱う。弾の掃引・地形・盾反射は ProjectileManager が先に判定する。
+## 実際の着弾だけを扱う。弾の掃引・地形・盾反射は ProjectileSystem が先に判定する。
 func hit_enemy(i: int, damage: float, impact: Vector2) -> void:
-	var t := build.enemies.table
+	var t := ctx.enemies.table
 	var id := t.id[i]
 	if _hit_after.has(id):
 		return
@@ -84,7 +84,7 @@ func hit_enemy(i: int, damage: float, impact: Vector2) -> void:
 		opts.dir = (t.pos[i] - state.ship_pos).normalized()
 		opts.knock = float(p("knock"))
 	var hp := t.hp[i]
-	build.combat.damage_enemy(i, damage, opts)
+	ctx.combat.damage_enemy(i, damage, opts)
 	if control and t.hp[i] < hp and t.dead[i] == 0:
 		# 既存の押し返し時間を使う。耐性・質量補正は damage_enemy が適用する。
 		t.knock_t[i] = maxf(t.knock_t[i], float(p("control_time")))

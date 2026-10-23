@@ -17,11 +17,13 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-ConfigManager="*res://scripts/managers/config_manager.gd"
+ContentManager="*res://scripts/managers/content_manager.gd"
 SaveManager="*res://scripts/managers/save_manager.gd"
+ProfileManager="*res://scripts/managers/profile_manager.gd"
 AudioManager="*res://scripts/managers/audio_manager.gd"
 GameManager="*res://scripts/managers/game_manager.gd"
-PlayRecorder="*res://scripts/managers/play_recorder.gd"
+RunManager="*res://scripts/managers/run_manager.gd"
+DevBootstrap="*res://scripts/dev/bootstrap.gd"
 
 [display]
 
@@ -30,9 +32,13 @@ window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
+[editor]
+
+export/convert_text_resources_to_binary=false
+
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/spawn_timeline/plugin.cfg", "res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg")
+enabled=PackedStringArray("res://addons/content_build/plugin.cfg", "res://addons/spawn_timeline/plugin.cfg", "res://addons/speed_data_editor/plugin.cfg", "res://addons/stage_launcher/plugin.cfg", "res://addons/stage_enemy_tuning/plugin.cfg")
 
 [gui]
 
@@ -50,6 +56,7 @@ common/physics_ticks_per_second=120
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true
 
 [spawn_timeline]
 

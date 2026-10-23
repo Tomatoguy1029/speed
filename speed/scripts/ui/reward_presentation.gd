@@ -9,7 +9,8 @@ signal active_changed(active: bool)
 @export_range(0.12, 0.4, 0.01) var continuation_stamp_seconds := 0.22
 
 ## 正式なカットインは Control シーンとして差し替える。任意で setup(hero) / set_progress(0..1) を実装する。
-@export var ult_cutin_scene: PackedScene = preload("res://scenes/run/ult_cutin.tscn")
+@export var ult_cutin_scene: PackedScene
+@export_file("*.tscn") var ult_cutin_path := "res://scenes/run/ult_cutin.tscn"
 @export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
@@ -107,7 +108,7 @@ func _build_bonus() -> void:
 	_light.size = BONUS_SIZE
 	_light.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_material = ShaderMaterial.new()
-	_material.shader = preload("res://assets/ui/rewards/continuation.gdshader")
+	_material.shader = load("res://assets/ui/rewards/continuation.gdshader")
 	_light.material = _material
 	_bonus_canvas.add_child(_light)
 	_bonus_heading = _label(Rect2(80, 26, 480, 18), 10, Color("#a6b4cb"), _bonus_canvas)
@@ -271,8 +272,7 @@ func _begin_next() -> void:
 	if int(_current.count) == 1:
 		_history.clear()
 	var step := int(_current.count) + 1
-	var defs: Dictionary = ConfigManager.weapons if _current.kind == &"weapon" else ConfigManager.traits
-	var definition: Resource = defs.get(_current.id)
+	var definition := ContentManager.catalog.find(&"weapons" if _current.kind == &"weapon" else &"traits", _current.id)
 	var title: String = definition.get_display_name() if definition != null else String(_current.id)
 	var reward := "%s Lv%d" % [title, _current.level]
 	_bonus_heading.text = tr("hud.continuation")
@@ -306,13 +306,14 @@ func _update_continuation_stamp() -> void:
 	_bonus_stamp.scale = Vector2.ONE * scale_factor
 
 func _begin_ult() -> void:
-	var definition: HeroDef = ConfigManager.heroes.get(_current.id)
+	var definition: HeroDef = ContentManager.heroes.get(_current.id)
 	_heading.text = tr("hud.ult_granted")
 	_heading.add_theme_color_override("font_color", Color("#efcb70"))
 	_ult_name.text = "%s — %s" % [definition.display_name, tr("hero.%s.power" % definition.id)]
 	_ult_desc.text = tr("hero.%s.desc" % definition.id)
 	_ult_key.text = tr("hud.ult_key").format({key = OS.get_keycode_string(InputActions.key_of(&"hero"))})
-	_cutin = ult_cutin_scene.instantiate() as Control
+	var scene: PackedScene = ult_cutin_scene if ult_cutin_scene != null else load(ult_cutin_path)
+	_cutin = scene.instantiate() as Control
 	_canvas.add_child(_cutin)
 	if _cutin.has_method("setup"):
 		_cutin.setup(definition)

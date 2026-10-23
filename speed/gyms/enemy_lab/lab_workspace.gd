@@ -332,7 +332,7 @@ func _settings(parent: Node) -> void:
 func environment(parent: Node) -> void:
 	var box := UI.fold(parent, tr("lab.ui.field"), true)
 	lab._stage = OptionButton.new()
-	for n in range(1, ConfigManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
+	for n in range(1, ContentManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
 	box.add_child(lab._stage)
 	var seed_row := HBoxContainer.new()
 	box.add_child(seed_row)

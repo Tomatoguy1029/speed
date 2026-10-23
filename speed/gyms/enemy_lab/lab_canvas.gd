@@ -66,15 +66,19 @@ func world(p: Vector2) -> Vector2:
 func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
+## 重ねた絵を合成した画像（外観のファイル → 画像）
+var _look_textures: Dictionary = {}
+
 func texture_for(id: String) -> Texture2D:
 	var stage: StageDef = session.run.state.stage if session != null and is_instance_valid(session.run) else null
-	if not RenderManager.layered_layers(StringName(id), stage).is_empty():
-		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ConfigManager.enemies.get(StringName(id))
-		return RenderManager.layered_texture(StringName(id), stage, def.armor_colors if def != null else {})
-	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
-		return preload("res://assets/placeholders/corona_crown.svg")
+	var look := RunPresentation.load_look(StringName(id), stage)
+	if look != null:
+		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ContentManager.enemies.get(StringName(id))
+		return RunPresentation.look_texture(look, _look_textures, def.armor_colors if def != null else {})
 	if id.begins_with("field_planet"):
-		return RenderManager.PLANET
+		if not _textures.has("planet"):
+			_textures["planet"] = load("res://assets/pixel/planet.png")
+		return _textures["planet"]
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
 	var path := "res://assets/pixel/%s.png" % id
 	if session != null and is_instance_valid(session.run) and session.run.state.stage != null:
@@ -84,7 +88,7 @@ func texture_for(id: String) -> Texture2D:
 	return _textures[path]
 
 func _can_drop_data(_position: Vector2, data: Variant) -> bool:
-	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ConfigManager.enemies.has(StringName(data.lab_enemy)) or ConfigManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
+	return data is Dictionary and data.has("lab_enemy") and session != null and is_instance_valid(session.run) and not session.seeking and (ContentManager.enemies.has(StringName(data.lab_enemy)) or ContentManager.bosses.has(StringName(data.lab_enemy)) or String(data.lab_enemy).begins_with("field_"))
 
 func _drop_data(position: Vector2, data: Variant) -> void:
 	spawn_type = String(data.lab_enemy)
@@ -100,7 +104,7 @@ func _place(point: Vector2) -> void:
 		if field != null:
 			session.perform("field", {"kind": String(field.kind), "pos": [point.x, point.y], "radius": field.radius})
 		return
-	var kind := "boss" if ConfigManager.bosses.has(StringName(spawn_type)) else "spawn"
+	var kind := "boss" if ContentManager.bosses.has(StringName(spawn_type)) else "spawn"
 	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count})
 	selection.clear()
 	if session.selected >= 0: selection.append(session.run.enemies.table.id[session.selected])
@@ -297,7 +301,7 @@ func _pick(pos: Vector2, cycle := false) -> int:
 func _draw() -> void:
 	if session == null or not is_instance_valid(session.run):
 		return
-	var run: RunManager = session.run
+	var run: RunSimulation = session.run
 	if run.enemies.count() == 0 and route.is_empty() and mode != 3:
 		var message := tr("lab.ui.empty_field")
 		var font := get_theme_default_font()
@@ -394,7 +398,7 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_po
 			var number := str(i + 1) if edit_points else ("1" if i == 0 else "2")
 			draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), number, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
 
-func _draw_projectiles(p: ProjectileManager) -> void:
+func _draw_projectiles(p: ProjectileSystem) -> void:
 	if show_ranges and p.director != null:
 		for i in p.hazard_alive.size():
 			if p.hazard_alive[i]: _source_line(p, int(p.lab_hazard_group.get(i, 0)), p.hazard_pos[i])
@@ -410,7 +414,7 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
 		var kind := p.hazard_kind[i]
-		if kind == ProjectileManager.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
+		if kind == ProjectileSystem.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
 			# 先へ行くほど広がるビーム（みずがめ座）は、範囲の輪郭を描く
 			var u := Vector2.from_angle(p.hazard_angle[i])
 			var v := Vector2(-u.y, u.x)
@@ -420,11 +424,11 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 			var outline := PackedVector2Array([pos + v * w0, tip + v * w1, tip - v * w1, pos - v * w0, pos + v * w0])
 			draw_colored_polygon(outline, Color(color, 0.06 if charging else 0.1))
 			draw_polyline(outline, color, 1.5, true)
-		elif kind == ProjectileManager.HazardKind.BEAM or kind == ProjectileManager.HazardKind.WALL:
+		elif kind == ProjectileSystem.HazardKind.BEAM or kind == ProjectileSystem.HazardKind.WALL:
 			var end := pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)
 			draw_line(pos, end, color, 1.5, true)
-		elif kind == ProjectileManager.HazardKind.ZONE:
+		elif kind == ProjectileSystem.HazardKind.ZONE:
 			draw_circle(pos, p.hazard_len[i] * zoom, Color(color, 0.13))
 			draw_arc(pos, p.hazard_len[i] * zoom, 0, TAU, 48, color, 2)
 		else:
@@ -442,7 +446,7 @@ func _draw_projectiles(p: ProjectileManager) -> void:
 			if pts.size() > 1:
 				draw_polyline(pts, color, maxf(2, p.hazard_width[i] * zoom), true)
 
-func _source_line(p: ProjectileManager, token: int, at: Vector2) -> void:
+func _source_line(p: ProjectileSystem, token: int, at: Vector2) -> void:
 	if token == 0 or not p.director.groups.has(token): return
 	var group: Dictionary = p.director.groups[token]
 	var row: int = session.row_for_id(int(group.id))

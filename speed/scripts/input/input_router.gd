@@ -20,7 +20,7 @@ var _pen_index := -1
 var _pen_screen := Vector2.ZERO
 var _mouse_screen := Vector2.ZERO
 var _mouse_seen := false
-## RunManager が描画中かどうかを伝える（タッチの指を、スティックにするかペンにするかの判断に使う）
+## RunSimulation が描画中かどうかを伝える（タッチの指を、スティックにするかペンにするかの判断に使う）
 var drawing := false
 
 ## カーソルの位置は、UI の上でも追い続ける（動きのイベントから得る）。

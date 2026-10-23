@@ -1,8 +1,6 @@
 ## 起動時のシーンのルート。GameManager の画面に合わせて、表示する画面のシーンを差し替える。
 ##
-## エディタのツールバー（addons/stage_launcher）からステージの直接起動が予約されていれば、
-## タイトルを飛ばしてそのステージを始める。予約はエディタから実行したときだけ読み、
-## 1回読んだら消す（F5 は通常どおりタイトルから始まる。設計書 14.1）。
+## 起動側の予約があれば、タイトルの表示より先に受け付ける（設計書 14.1）。
 extends Node
 
 const SCREENS := {
@@ -12,12 +10,11 @@ const SCREENS := {
 	GameManager.Screen.STAGE_SELECT: "res://scenes/app/title.tscn",
 	GameManager.Screen.UPGRADE: "res://scenes/app/upgrade.tscn",
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
-	GameManager.Screen.RUN: "res://scenes/run/run.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
-	GameManager.Screen.ENEMY_LAB: "res://gyms/enemy_lab/enemy_lab.tscn",
 }
 
 var _current: Node = null
+var _prepared_run: RunSession
 var _screen_request := 0
 var _displayed_screen := -1
 var _fade := preload("res://scripts/ui/screen_fade.gd").new()
@@ -29,18 +26,13 @@ var _fade := preload("res://scripts/ui/screen_fade.gd").new()
 func _ready() -> void:
 	add_child(_fade)
 	GameManager.screen_changed.connect(_show)
-	if OS.has_feature("editor"):
-		var stage := StageLaunchRequest.consume()
-		if stage > 0:
-			print("[Main] ステージ %d を直接起動" % stage)
-			GameManager.reset_to_main_menu()
-			GameManager.run_start_time = StageLaunchRequest.start_time
-			GameManager.run_start_source = StageLaunchRequest.source
-			GameManager.start_run(stage)
-			return
+	if GameManager.boot_request.is_valid() and GameManager.boot_request.call(): return
 	_show(GameManager.screen)
 
 func _show(screen: GameManager.Screen) -> void:
+	if _prepared_run != null:
+		_prepared_run.free()
+		_prepared_run = null
 	_screen_request += 1
 	var request := _screen_request
 	var fade: bool = (
@@ -51,7 +43,11 @@ func _show(screen: GameManager.Screen) -> void:
 	if fade:
 		GameManager.screen_transition_active = true
 		_current.process_mode = Node.PROCESS_MODE_DISABLED
+		if screen == GameManager.Screen.RUN:
+			_prepared_run = RunManager.create_run()
 		await _fade.cover(fade_out_time)
+		if request != _screen_request:
+			return
 	await _replace_screen(screen, request)
 	if request != _screen_request:
 		return
@@ -59,9 +55,13 @@ func _show(screen: GameManager.Screen) -> void:
 	# 最後の子で先に入力を受け、GUI やランへ演出中の操作を渡さない。
 	move_child(_fade, -1)
 	if fade:
-		_current.process_mode = Node.PROCESS_MODE_DISABLED
+		# 資源準備はフェード中も進め、戦闘の時計だけを保留する。
+		if not _current is RunSession:
+			_current.process_mode = Node.PROCESS_MODE_DISABLED
 		await _fade.reveal(fade_in_time)
+		if request != _screen_request: return
 		_current.process_mode = Node.PROCESS_MODE_INHERIT
+		if _current is RunSession: _current.auto_step = true
 		GameManager.screen_transition_active = false
 
 func _replace_screen(screen: GameManager.Screen, request: int) -> void:
@@ -81,10 +81,20 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	if _current != null:
 		_current.queue_free()
 		_current = null
-	var scene := load(SCREENS[screen]) as PackedScene
-	_current = scene.instantiate()
+	if screen == GameManager.Screen.RUN:
+		_current = _prepared_run if _prepared_run != null else RunManager.create_run()
+		_prepared_run = null
+		_current.auto_step = false
+	else:
+		_current = (load(SCREENS.get(screen, GameManager.extension_screens.get(screen, ""))) as PackedScene).instantiate()
 	if morph:
 		_current.set_meta("fade_from_menu", true)
 	if return_morph:
 		_current.set_meta("morph_from_upgrade", true)
 	add_child(_current)
+	if screen == GameManager.Screen.RUN and not GameManager.screen_transition_active:
+		_current.auto_step = true
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(_prepared_run):
+		_prepared_run.free()

@@ -11,7 +11,7 @@ func _ready() -> void:
  add_child(lab)
  await lab.reset({"empty": true, "stage": 4, "ship_pos": [400, 0]})
  lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
- var boss = lab.run.bosses.lab_instances.back().actor
+ var boss = lab.run.bosses.actors.back()
  boss.hsm.set_active(false)
  check(boss.has_method("_neck_base"), "each neck has a body-fixed surface socket")
  if boss.has_method("_neck_base"):

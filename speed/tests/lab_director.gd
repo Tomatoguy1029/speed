@@ -21,7 +21,7 @@ func _ready() -> void:
 		check(lab.run.projectiles.director.groups.size() <= 1, "本番ビームも同時枠を守る")
 	lab.perform("boss", {"type": "hydra", "pos": [600, 0]})
 	lab.perform("boss", {"type": "provisional", "pos": [-600, 0]})
-	check(lab.run.bosses.lab_instances.size() == 2, "複数ボスを置いても所有者を分ける")
+	check(lab.run.bosses.actors.size() == 2, "複数ボスを置いても所有者を分ける")
 	lab.perform("spawn", {"type": "meteor", "pos": [-100, 50]})
 	check(lab.run.enemies.table.meteor_index[lab.selected] >= 0, "実験の隕石も地形の行に登録する")
 	var digest: String = lab.digest()

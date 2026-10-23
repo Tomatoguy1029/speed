@@ -48,7 +48,7 @@ func on_end() -> void:
 		_current.end = true
 	_current = {}
 
-## BuildManagerから実秒で更新する。描画の世界スロー・ボーナスの時計に依存しない。
+## 装備管理から実秒で更新する。描画の世界スロー・ボーナスの時計に依存しない。
 ## ポーズ・カード選択・ヒットストップ中は呼び出し元が更新を止める。
 func replay(dt: float) -> void:
 	if state.phase != RunState.Phase.PLAY:
@@ -95,8 +95,8 @@ func _advance(echo: Dictionary, copy: Dictionary) -> void:
 
 func _hit_along(copy: Dictionary, a: Vector2, b: Vector2, power: float, radius: float, share: float) -> void:
 	var pad := Vector2.ONE * radius
-	build.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _rows)
-	var t := build.enemies.table
+	ctx.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _rows)
+	var t := ctx.enemies.table
 	for i in _rows:
 		if t.dead[i] != 0 or copy.hits.has(t.id[i]):
 			continue
@@ -105,9 +105,16 @@ func _hit_along(copy: Dictionary, a: Vector2, b: Vector2, power: float, radius: 
 			continue
 		copy.hits[t.id[i]] = true
 		# 貫通可否は記録時の通常ram威力、実ダメージはその分配分だけ。クリティカルは複製しない。
-		if not build.combat.can_pierce(power, i, false):
+		if not ctx.combat.can_pierce(power, i, false):
 			continue
-		build.combat.damage_enemy(i, power * share, {"cause": &"afterimage", "dir": copy.dir,
+		ctx.combat.damage_enemy(i, power * share, {"cause": &"afterimage", "dir": copy.dir,
 			"impact": a.lerp(b, hit_t), "knock": 0.0, "no_crit": true})
 		if state.phase != RunState.Phase.PLAY:
 			return
+
+func tick_real(dt: float) -> void:
+	replay(dt)
+
+func on_phase_changed(phase: RunState.Phase) -> void:
+	if phase in [RunState.Phase.DYING, RunState.Phase.FINISHING, RunState.Phase.ENDED]:
+		clear()

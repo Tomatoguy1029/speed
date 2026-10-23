@@ -1,4 +1,4 @@
-## 描画の層1つ。描く処理は持ち主（RenderManager）の関数を呼ぶ。
+## 描画の層1つ。描く処理は持ち主（RunPresentation）の関数を呼ぶ。
 class_name DrawLayer
 extends Node2D
 

@@ -11,7 +11,7 @@ func _draw() -> void:
 		extent *= 42.0 / maxf(extent.x, extent.y)
 		draw_texture_rect(texture, Rect2(center - extent / 2, extent), false)
 	elif definition is EnemyDef:
-		var points := RenderManager._placeholder_points(definition.shape)
+		var points := RunPresentation._placeholder_points(definition.shape)
 		for i in points.size():
 			points[i] = points[i] * 20 + center
 		draw_colored_polygon(points, definition.color)

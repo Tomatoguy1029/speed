@@ -16,8 +16,13 @@ var definition: Resource
 var known := false
 var animated := false
 var _clock := 0.0
+var _lance_preview: Node2D
 
 func setup(def: Resource, acquired: bool, animate := false) -> void:
+	if is_instance_valid(_lance_preview):
+		remove_child(_lance_preview)
+		_lance_preview.queue_free()
+	_lance_preview = null
 	definition = def
 	known = acquired
 	animated = animate
@@ -29,6 +34,9 @@ func setup(def: Resource, acquired: bool, animate := false) -> void:
 		var silhouette := ShaderMaterial.new()
 		silhouette.shader = SILHOUETTE
 		material = silhouette
+	if "code_id" in definition and definition.code_id == &"critBeam" and definition.preview_texture == null:
+		_lance_preview = load("res://scripts/render/light_lance.gd").new()
+		add_child(_lance_preview)
 	set_process(animated and known)
 	queue_redraw()
 
@@ -47,7 +55,7 @@ func _draw() -> void:
 		image_size *= minf(300.0 / image_size.x, 180.0 / image_size.y)
 		draw_texture_rect(texture, Rect2(-image_size / 2.0, image_size), false,
 			Color.WHITE if known else Color(0, 0, 0, 1))
-	elif definition is LegendaryModuleDef:
+	elif definition is LegendaryModuleDef or (definition is ContentEntry and definition.category == &"legendary_modules"):
 		_draw_legend(String(definition.id))
 	else:
 		_draw_effect(String(definition.code_id))
@@ -176,8 +184,11 @@ func _draw_effect(code: String) -> void:
 				var angle := _clock + i * TAU / 3
 				draw_arc(end, 25 + i * 14, angle, angle + 2.0, 24, _ink(Color(0.75, 0.45, 1, 0.8)), 3.0, true)
 		"critBeam":
-			_line(end, Vector2(165, 12), GOLD, 12.0)
-			_line(end, Vector2(165, 12), Color.WHITE, 3.0)
+			var fit := minf(size.x / 360.0, size.y / 220.0)
+			_lance_preview.position = size / 2.0
+			_lance_preview.scale = Vector2.ONE * fit
+			var age := fmod(_clock, 0.7) if animated and known else 0.12
+			_lance_preview.preview(end, Vector2(165, 12), age, known)
 		"fullCharge", "quickCharge", "capacity":
 			_ring(ship, 48, Color(0.3, 0.5, 0.6, 0.4))
 			var fill := 1.0 if code == "fullCharge" else 0.4 + pulse * 0.6
