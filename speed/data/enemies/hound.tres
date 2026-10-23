@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+rank = 1
+radius = 13.0
+hp = 6.0
+armor = 2.0
+speed = 160.0
+accel = 4.0
+turn = 4.0
+xp = 1.0
+color = Color(0.75, 0.65, 0.95, 1)
+shape = &"dart"
+behavior = &"hound"
+params = {
+"bite_radius": 26.0,
+"bite_reach": 22.0,
+"bite_rest": 0.8,
+"bite_telegraph": 0.3,
+"bullet_dmg": 8.0,
+"pack_alignment": 0.45,
+"pack_cohesion": 0.9,
+"pack_count": 5,
+"pack_gap": 38.0,
+"pack_neighbor_radius": 180.0,
+"pack_separation": 0.6
+}
+id = &"hound"
+display_name = "猟犬"

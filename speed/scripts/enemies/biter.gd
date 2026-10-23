@@ -25,7 +25,6 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	var knock_t := t.knock_t
 	var stone := t.stone
 	var held := t.held
-	var speed := t.speed
 	var r := t.r
 	var mode := t.mode
 	var timer := t.timer
@@ -93,15 +92,12 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 					mode[i] = EnemyTable.Mode.RECOVER
 					timer[i] = rest
 			else:
-				# 機体へまっすぐ、決まった速さで向かう（_chase と同じ）
+				# 噛みつきは共通に保ち、派生する種類は追跡の速度だけを変える。
 				var d := ship - from
 				var dist := d.length()
-				if dist < 0.001:
-					vel[i] = Vector2.ZERO
-				else:
-					var u := d / dist
-					vel[i] = u * speed[i]
-					facing[i] = u.angle()
+				vel[i] = _pursuit_velocity(i, ship, bdt)
+				if vel[i].length_squared() > 0.000001:
+					facing[i] = vel[i].angle()
 				if m == EnemyTable.Mode.RECOVER:
 					timer[i] -= bdt
 					if timer[i] <= 0.0:
@@ -126,3 +122,8 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 		body_gap_time[i] = now
 		if gap < margin:
 			field.collide_enemy(i, from)
+
+## 機体へまっすぐ、決まった速さで向かう（_chase と同じ）。
+func _pursuit_velocity(i: int, ship: Vector2, _dt: float) -> Vector2:
+	var d := ship - table.pos[i]
+	return d.normalized() * table.speed[i] if d.length_squared() >= 0.000001 else Vector2.ZERO
