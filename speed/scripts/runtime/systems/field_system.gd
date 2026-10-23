@@ -114,6 +114,16 @@ func dispose() -> void:
 func refresh_bodies() -> void:
 	gimmick(&"moons").update()
 
+## かじき座の突進で惑星を壊す。月とボスの固定外周は通常の障害物として残す。
+func destroy_planet(body: Body) -> bool:
+	if not body.is_planet or not bodies.has(body):
+		return false
+	bodies.erase(body)
+	_update_body_grid()
+	state.emit(&"explode", {"pos": body.pos, "radius": body.r, "cause": &"marlin", "life": 0.4,
+		"color": Color("#9cb8ff")})
+	return true
+
 func rock_at(rock: Rock, time: float) -> Array:
 	return gimmick(&"meteors")._rock_at(rock, time)
 
@@ -247,8 +257,9 @@ func _build_moon_bands() -> void:
 
 func near_body(p: Vector2, margin: float) -> bool:
 	var r := p.length()
-	if r < planet.r + margin + 4.0:
-		return true
+	for body in bodies:
+		if body.is_planet and p.distance_squared_to(body.pos) < pow(body.r + margin + 4.0, 2):
+			return true
 	var first := maxi(0, int((r - margin) / MOON_BAND_SIZE))
 	var last := mini(_moon_bands.size() - 1, int((r + margin) / MOON_BAND_SIZE))
 	for i in range(first, last + 1):
