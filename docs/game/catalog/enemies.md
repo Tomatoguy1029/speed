@@ -4,6 +4,8 @@
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
+同じ敵をステージ別に調整する値は `speed/data/stages/stage_*.tres` の `enemy_tuning` に持つ。[ステージ敵調整](../spec.md#20-調整機能)で編集する。
+
 強敵の攻撃の重なりは、出現タイムラインの時間帯の予算と、ステージの種類ごとの個体value（`enemy_attack_values`）と、クリップの攻撃優先度（`attack_priority`）と任意の共有overrideで調整する。[攻撃の管理](../spec.md#117-敵の攻撃の形)を参照。
 
 ## 敵

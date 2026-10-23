@@ -91,7 +91,7 @@ func setup() -> void:
 	state.meta_override = options.get("meta", {})
 	state.stage_index = int(options.get("stage_index", 1))
 	state.endless = bool(options.get("endless", false))
-	state.stage = options.get("stage", ContentManager.runtime_stage(state.stage_index))
+	state.stage = options.stage if options.has("stage") else ContentManager.runtime_stage(state.stage_index)
 	state.time = float(options.get("start_time", 0.0))
 	var start_source: String = options.get("start_source", "stage_start")
 	if options.has("seed"):
@@ -117,7 +117,9 @@ func setup() -> void:
 	ctx.pickups = PickupSystem.new()
 	ctx.heroes = HeroSystem.new()
 	bosses.actor_parent = actor_parent
-	enemies.definitions = options.get("enemies", {})
+	enemies.definitions = options.get("enemies", {}).duplicate()
+	if not state.lab_mode:
+		enemies.set_stage_tuning(state.stage.enemy_tuning)
 	# 能力値を先に計算してから機体を置く
 	for m: RunSystem in [field, loadout, ship, draw, combat, enemies, spawn, bosses, projectiles, pickups, heroes]:
 		m.setup(ctx)

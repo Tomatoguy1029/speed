@@ -41,6 +41,17 @@ static func compile(source: StageDef) -> RuntimeStage:
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
 	result.resources = load("res://tools/content/build_stage_resources.gd").build(result)
+	# 実行用にも局所上書きを保持し、未知の敵・項目・不正な数値を生成時に止める。
+	for id in result.enemy_tuning:
+		var path := "res://data/enemies/%s.tres" % String(id)
+		var definition := load(path) as EnemyDef if ResourceLoader.exists(path) else null
+		if definition == null or not result.enemy_tuning[id] is Dictionary:
+			push_error("敵調整の定義が不正: %s" % id)
+			return null
+		var problem := StageEnemyTuning.error_for(definition, result.enemy_tuning[id])
+		if not problem.is_empty():
+			push_error("敵調整 %s: %s" % [id, problem])
+			return null
 	return result if result.resources != null else null
 
 static func names(source: StageDef) -> Dictionary:
