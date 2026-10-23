@@ -57,19 +57,10 @@ func before_move(i: int, dt: float) -> void:
 	var from := t.pos[i]
 	var dir := Vector2.from_angle(t.facing[i])
 	var to := from + dir * float(p.dash_speed) * travel
-	# 月・ボスの固定外周より向こうまで破壊しない。
-	var stop := 1.0
-	var arena := field.arena_hit(from, to, t.r[i])
-	if not arena.is_empty(): stop = float(arena.t)
-	for body in field.bodies:
-		if body.is_planet: continue
-		var hit := Geom.seg_circle_t(from, to, body.pos, body.r + t.r[i])
-		if hit >= 0.0: stop = minf(stop, hit)
-	to = from.lerp(to, stop)
-	# 惑星を先に除き、共通の地形衝突・格子・描画へ即座に反映する。
-	for body in field.bodies.duplicate():
-		if body.is_planet and Geom.seg_circle_t(from, to, body.pos, body.r + t.r[i]) >= 0.0:
-			field.destroy_planet(body)
+	# 惑星・月・固定外周は共通の地形判定を使い、衝突より先まで破壊しない。
+	var terrain_hit = field.first_body_hit(from, to, t.r[i])
+	if terrain_hit != null:
+		to = from.lerp(to, float(terrain_hit.t))
 	# 敵更新の後に再構築される戦闘格子は使わず、現在の表の位置を調べる。
 	# 撃破は共通入口に集め、同じ対象の再命中や複数のカジキでも報酬を重ねない。
 	for j in t.alive.size():

@@ -114,16 +114,6 @@ func dispose() -> void:
 func refresh_bodies() -> void:
 	gimmick(&"moons").update()
 
-## かじき座の突進で惑星を壊す。月とボスの固定外周は通常の障害物として残す。
-func destroy_planet(body: Body) -> bool:
-	if not body.is_planet or not bodies.has(body):
-		return false
-	bodies.erase(body)
-	_update_body_grid()
-	state.emit(&"explode", {"pos": body.pos, "radius": body.r, "cause": &"marlin", "life": 0.4,
-		"color": Color("#9cb8ff")})
-	return true
-
 func rock_at(rock: Rock, time: float) -> Array:
 	return gimmick(&"meteors")._rock_at(rock, time)
 
