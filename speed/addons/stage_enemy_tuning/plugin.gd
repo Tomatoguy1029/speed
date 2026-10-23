@@ -1,22 +1,31 @@
 @tool
 extends EditorPlugin
 
-const PANEL := preload("res://scripts/dev/stage_enemy_panel.gd")
+const PANEL := preload("res://addons/stage_enemy_tuning/dock_panel.gd")
+var _dock: ScrollContainer
 var _panel: Control
 var _inspected: StageDef
 
 func _enter_tree() -> void:
+	# 折り返す説明文や一覧の最小サイズを、エディター全体へ伝えない。
+	_dock = ScrollContainer.new()
+	_dock.name = "ステージ敵調整"
+	_dock.custom_minimum_size = Vector2(280, 320)
+	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_dock.follow_focus = true
 	_panel = PANEL.new()
-	_panel.name = "ステージ敵調整"
-	_panel.custom_minimum_size = Vector2(280, 320)
+	_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_panel.saved.connect(_on_saved)
-	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _panel)
+	_dock.add_child(_panel)
+	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
+	_on_inspected.call_deferred()
 
 func _exit_tree() -> void:
 	EditorInterface.get_inspector().edited_object_changed.disconnect(_on_inspected)
-	remove_control_from_docks(_panel)
-	_panel.queue_free()
+	remove_control_from_docks(_dock)
+	_dock.queue_free()
 
 func _on_inspected() -> void:
 	var object := EditorInterface.get_inspector().get_edited_object()
