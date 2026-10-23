@@ -46,6 +46,9 @@ func gather_pickups(pk: PickupSystem, dt: float) -> void:
 			if dist <= step + 4.0:
 				t.carry[j] += pk.gem_value[i]
 				t.buds[j] += 1
+				if pk.records_xp():
+					pk.record_xp({"type": "xp_transfer", "id": pk.gem_seq[i], "xp": pk.gem_value[i],
+						"method": "crow", "enemy_id": t.id[j]})
 				pk.gem_slots.release(i)
 			else:
 				pk.gem_pos[i] += d / dist * step

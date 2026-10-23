@@ -14,6 +14,8 @@ var sim := RunSimulation.new()
 var view: Node
 ## 固定更新を自分で進めるか。実験場は自分の時計で sim を進める
 var auto_step := true
+## 開発用の録画条件。途中録画でもラン初期化時の実効値を保持する。
+var recording_initial: Dictionary = {}
 
 signal started
 var resources: ContentResourceScope
@@ -66,6 +68,9 @@ func start(options: Dictionary, with_view: bool) -> void:
 		add_child(actors)
 		sim.actor_parent = actors
 	sim.setup()
+	var identity_path := "res://scripts/dev/recording_identity.gd"
+	if OS.is_debug_build() and not sim.state.lab_mode and ResourceLoader.exists(identity_path):
+		recording_initial = load(identity_path).capture(sim)
 	if view != null:
 		add_child(view)
 	started.emit()

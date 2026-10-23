@@ -4,6 +4,9 @@
 class_name ShipSystem
 extends RunSystem
 
+## 記録中だけ購読する実被弾。表示待ちのフレームをまたぐ前に通知する。
+signal hurt_recorded(hit: Dictionary)
+
 var field: FieldSystem:
 	get: return ctx.field
 var combat: CombatSystem:
@@ -196,7 +199,10 @@ func damage(amount: float, slow: float, cause: StringName, source := &"") -> boo
 	state.ship_vel *= 1.0 - minf(0.9, slow)
 	state.ship_invuln = cfg.invuln_time
 	state.ship_hurt = cfg.ship_hurt_time
-	state.emit(&"hurt", {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source})
+	var hit := {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source,
+		"t": state.time, "world_t": state.world_time, "hp_after": state.ship_hp}
+	state.emit(&"hurt", hit)
+	if OS.is_debug_build() and hurt_recorded.has_connections(): hurt_recorded.emit(hit)
 	if state.ship_hp > 0.0:
 		build.on_hurt()
 	return true

@@ -710,17 +710,31 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - 待機中に始めたランは初期化直後から、プレイ中に有効にしたランはその時点から、終わる（クリア・やられた・やめた）か F9 で停止するまで1つのファイルに書く。待機は F9 で切るまで続き、次のランと停止後の再開は別のファイルになる。記録対象は本番のランとし、実験場は専用の記録を使う。
 - 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
 - 記録の種類（`type`）：
-  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`）、Godot の版、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
+  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=1`）、Godot の版、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
   - `sample`：3秒（ランの時計）ごとのまとめ。拾った・落ちた・フィールドに残る経験値、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大
   - `performance`：PLAY 中の実時間3秒ごとの描画フレーム間隔。`real_t` は書き込み時の記録開始からの実秒、`window_start_real`・`window_end_real` は計測区間の実秒、`duration_real` は観測した間隔の合計とする。`t`・`world_t` でラン秒・世界秒に対応づけ、ボーナス中も実時間で書く。平均FPS、平均・最大フレーム時間、33ms・50ms超の回数、ヒットストップを観測したフレーム数と割合（`hitstop_frame_ratio`）、描線中・駆け抜け中のフレーム数を保持する。停止・カード選択・ボーナス切替で窓を分け、遊んでいる最中のボーナス切替フレームの待ちは残す。割合はフレーム観測値であり、停止時間の厳密な割合とは区別する。`objects_at_write` に書き込み時点の敵・味方弾・敵弾・攻撃範囲・経験値粒・部品の使用数と確保行数、カプセル数、冠の保持数を置く。`bonus` は計測区間、`bonus_at_write` は書き込み時点の状態を表す。毎フレームは定数個のカウンタだけを更新し、フレーム別の行は保存しない。
   - `bonus`・`run_phase`：ボーナスの出入りと、ポーズ・カード選択を含むラン状態の切り替わり。全ての行に `real_t` を追加し、既存のXP・戦闘の `t` と結び付ける。
   - `band`：時間帯の切り替わり（名前）
   - `levelup`・`pick`：レベルアップと、出たカード・選んだカード・おまけで上がった数
+  - `loadout`：武器・特性が実際に変わったラン秒・世界秒、種類・管理ID・変更前後の段（`previous`・`current`）、取得経路（`source`）。初期武器選択は `initial_choice`、通常カードは `card`、おまけは `level_bonus`、彗星の空き枠取得は `comet`、交換の取り外しと取得は `comet_swap`、直接付与・取り外しは `direct`、全解除は `reset`。段0は取り外しを表す。取得時に実際に参照した定義のハッシュ（`definition_sha256`）も持つ。装備の復元は開始装備とこの差分を使い、`pick` の回数やおまけ数を重ねて加算しない。
+  - `hurt`：HPが減った被弾ごとの発生ラン秒・世界秒、1発のダメージ（`amount`。致死時の超過分を含む）、原因・発生元・被弾直後のHP（`hp_after`）。無敵・盾で拒否した攻撃は実被弾の件数から区別する。`sample.damage` は同じ被弾の区間集計として読む。
+  - `xp_drop`：結晶の通し番号（`id`）、生成ラン秒・世界秒、結晶の総XP（`xp`）、今回加えたXP（`added_xp`）、出所（`source`：`enemy`・`big_crystal`・`crow_carry`・`direct`）、敵種・敵個体ID・大結晶の段。上限による合流は親結晶のIDを `merged_from` に置く（通常は -1）。合流前のXPを新規供給量へ重ねない。からす座が運んだXPの再ドロップも `crow_carry` として区別する。
+  - `xp_collect`：機体が取得したラン秒・世界秒・XP・方法。通常回収（`method=ship`）は結晶の `id`、ビーコン（`method=beacon`）は `[id, XP]` の配列 `gems` と合計XPを1行で保存する。
+  - `xp_transfer`：からす座が結晶を持ち去ったラン秒・世界秒、結晶ID・XP・運搬する敵の個体ID。機体の取得XPと分け、同じ敵IDの `crow_carry` へつなぐ。
+  - `xp_existing`：途中録画の開始時に地面にある結晶の `[id, XP]` と、運搬中の `[敵個体ID, XP]` を一度だけ保存する。`origin=unobserved` として、生成前半の欠測を保つ。
   - `strong`：強敵と大物（星3以上）が倒れた（ランの終わりにまだいた）ときの、出た時刻・生きていた時間・受けた体当たりの回数・武器のダメージの合計と原因ごとの内訳（`by_cause`）・とどめの原因（`killed_by`）
   - `clip_group`・`clip_group_end`：出現のクリップの群れが出た・全滅した
   - `big_crystal`：大きい結晶が落ちた時刻、落ちたときのレベル、段（`tier`。1〜3が小・中・大）、経験値、落とした敵の種類
   - `end`：終わり方、レベル、撃破数、武器と特性、やられたときは最後に受けた攻撃、段ごとの大きい結晶の数と経験値の合計（`big_crystals`）
 - ゲーム側は、記録のために出来事（`strong_spawn`・`clip_group`・`clip_group_end`、撃破と命中の個体の `id`、被弾の `source`）と、経験値の合計（`RunState.xp_gained`・`xp_dropped`）を出す。
+
+#### 実行条件の識別
+
+`RunSession` は開発版のラン初期化直後に条件を複製し、録画の有無によらず保持する。`run_start.conditions` に実効GameConfig、永続強化係数（`profile`）、機体能力値、機体強化段、強化上書きの有無、無敵・ヒットストップ設定と物理更新頻度を保存する。`recording_start.conditions` は録画開始時の実効GameConfig・永続強化係数・機体能力値・無敵・ヒットストップ設定を保存し、途中開始時の変更と区別する。ステージ別の敵調整があるランは `enemy_tuning` に各時点の実効上書きを保存する。両時点の乱数seed・状態は、JSONの数値精度を保つ文字列 `rng_seed`・`rng_state` として保存する。
+
+`run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。
+
+ファイルのハッシュは初期化時点のディスク内容、読み込み済みScriptのハッシュはその時点の実行本文として区別する。資源の後読み込み・実行中のコードや設定の変更・入力の再生まで含む再現性は、対応する観測範囲を明示する。ソースを同梱しないビルドは `source_files_available` と一覧の欠落を確認し、空のリビジョンや未観測の条件を不明として扱う。
 
 #### 開始条件と分析の読み方
 
