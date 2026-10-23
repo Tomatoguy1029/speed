@@ -266,6 +266,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and focus.is_in_group("stage_enemy_tuning_input"): return
 	if run == null or run.state == null or run.state.lab_mode:
 		return
 	if run.state.phase == RunState.Phase.FINISHING:
