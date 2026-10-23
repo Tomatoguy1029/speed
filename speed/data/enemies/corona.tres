@@ -36,6 +36,7 @@ params = {
 "throw_damage_biter": 9.0,
 "throw_damage_darter": 12.0,
 "throw_damage_drifter": 8.0,
+"throw_damage_hound": 9.0,
 "throw_damage_splitling": 9.0,
 "throw_damage_splitter": 16.0,
 "throw_damage_swarm": 10.0,
@@ -46,6 +47,7 @@ params = {
 "throw_weight_biter": 0.9,
 "throw_weight_darter": 0.65,
 "throw_weight_drifter": 1.0,
+"throw_weight_hound": 0.9,
 "throw_weight_splitling": 0.9,
 "throw_weight_splitter": 0.4,
 "throw_weight_swarm": 0.8
