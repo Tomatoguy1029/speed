@@ -793,9 +793,11 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/cross.tres | みなみじゅうじ座 |
 | enemies/crow.tres | からす座 |
 | enemies/darter.tres | ダーター |
+| enemies/defender.tres | 守る雑魚 |
 | enemies/dolphin.tres | いるか座 |
 | enemies/drifter.tres | ドリフター |
 | enemies/gunner.tres | 射撃型 |
+| enemies/hound.tres | 猟犬 |
 | enemies/hydra&#95;beam.tres | うみへび座のビームの首 |
 | enemies/hydra&#95;bite.tres | うみへび座の噛みつく首 |
 | enemies/hydra&#95;debris.tres | うみへび座の瓦礫の首 |

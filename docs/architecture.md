@@ -381,16 +381,16 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `body_gap` | 雑魚 | 前回確かめたときの、天体の表面までの距離（7章） |
 | `body_gap_pos` | 雑魚 | `body_gap` を確かめた位置 |
 | `body_gap_time` | 雑魚 | `body_gap` を確かめた世界時刻 |
-| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
+| `mode` | `darter`・`rocket`・`biter`・`defender`・`hound`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`phoenix`（`MOVE` が離脱、`WINDUP` が着地点予告、`DASH` が飛び込み、`RECOVER` が着地後の停止）・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間 |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
-| `charge` | `gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |
+| `charge` | `biter`・`defender`・`hound`・`gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`phoenix`・`aquarius`・`cepheus`・ボス | 攻撃の予告の溜め（0〜1） |
 | `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間、ポンプ座は次に吸い込めるまでの時間 |
 | `buds` | `splitter`・`pump`・`crow` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数 |
 | `carry` | `crow` | 回収して運んでいる経験値の量 |
 | `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
 | `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
-| `anchor` | `cepheus` | 隊列の基準の位置（増援で組み直すときに決める） |
+| `anchor` | `cepheus`・`phoenix` | ケフェウス座の隊列の基準の位置。ほうおう座の離脱先・予告した着地点 |
 | `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針が回り始めてからの時間 |
 | `links` | とけい座・みなみのさんかく座 | 付いて動く攻撃の形の行番号（`ProjectileSystem` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |
