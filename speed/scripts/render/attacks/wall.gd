@@ -2,6 +2,9 @@
 extends AttackVisual
 
 func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> void:
+	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.TRAIL:
+		# 付いている敵の見た目が描く（みなみのさんかく座の軌跡）
+		return
 	var p := pr.hazard_pos[i]
 	var t := pr.hazard_t[i]
 	var delay := pr.hazard_delay[i]

@@ -667,10 +667,10 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.pump.kill | HP を削る。倒すと溜めていた敵が飛び散り、周りの敵を薙ぎ倒す。溜めているほど派手になる | Wear down its HP. Defeating it releases the compressed enemies and mows down those nearby. The fuller it is the bigger the burst |
 | lab.enemy.telescope.move | 距離を保ち、機体のいる方を左右に振って探すサーチライトの帯を伸ばす。帯の中にいると追われて狙いが溜まり、帯が細く赤くなる。溜まりきると一瞬溜めてから、レンズから機体の方へ太いレーザーを撃つ。光とレーザーは隕石で遮られる | Keeps its distance and swings a searchlight band back and forth around where the ship is. Inside the band it tracks you and locks on as the band narrows and turns red. Once the lock is full it charges for a moment then fires a thick laser at the ship. Rocks block both the light and the laser |
 | lab.enemy.telescope.kill | HP を削る。速く横切れば狙いは溜まらない | Wear down its HP. Crossing the band quickly barely builds the lock |
-| lab.enemy.triangle.move | 3つの星の間に光の膜を張り、膜の中の砲台が距離を保って撃ってくる。膜に触れると被弾する | A turret inside a light membrane between three stars keeps its distance and shoots. Touching the membrane hurts |
-| lab.enemy.triangle.kill | 先に頂点の星を1つ倒して膜を消し、次に中の砲台を倒す | First destroy a corner star to drop the membrane then destroy the turret inside |
-| lab.enemy.triangle&#95;star.move | みなみのさんかく座の頂点の星。核と一緒に動く | A corner star of the Southern Triangle that moves with the core |
-| lab.enemy.triangle&#95;star.kill | 倒すと膜が消える | Destroy it to drop the membrane |
+| lab.enemy.triangle.move | 3つの星が三角の辺に沿って回りながら寄ってくる。辺を動く星の後ろに伸びる赤いレーザーに触れると被弾する | Three stars circle along the sides of a triangle as it closes in. Touching the red laser trailing a moving star hurts |
+| lab.enemy.triangle.kill | 星が頂点で止まっている間だけ攻撃が通る。止まった3つの星を、三角をなぞる一筆でまとめて貫く | Stars can be hit only while they rest on the corners. Trace the triangle in one stroke to pierce all three |
+| lab.enemy.triangle&#95;star.move | みなみのさんかく座の星。三角の辺に沿って回る | A star of the Southern Triangle that circles along its sides |
+| lab.enemy.triangle&#95;star.kill | 頂点で止まっている間に倒す。全部倒すとみなみのさんかく座が倒れる | Destroy it while it rests on a corner. Destroying all three defeats the Southern Triangle |
 | lab.enemy.shield.move | 機体を追ってゆっくり向き直り、前面の盾で弾を反射する | Approaches while slowly turning toward you. Its front shield reflects shots |
 | lab.enemy.shield.kill | 正面に触れると隕石のように押し戻される。側面・背面は通常攻撃が通る。装甲を破って背面を高速で貫くと一撃で倒れ、一定時間攻撃を防ぐ盾を奪える | Touching its front pushes you back like a meteor. Attack the exposed sides or rear. Pierce the rear through its armor at high speed to defeat it and steal temporary protection against enemy attacks |
 | lab.enemy.ruler.move | 1体で現れ、二つに分かれて機体を左右（上下）から挟む位置へ展開する。照射の向きを予告してから、それぞれ長いビームを出し続ける。ビームは発射元につながり、壁になって移動を止める | Appears as one ruler then splits in two and spreads to flank the ship. After marking where it will fire each half keeps a long beam on. The beams stay tied to their emitters and act as walls that stop movement |
