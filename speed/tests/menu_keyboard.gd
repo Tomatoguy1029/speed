@@ -48,22 +48,22 @@ func _ready() -> void:
 	_key(KEY_RIGHT, false)
 	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and requests == 0 and map._selected == 0, "transition discards accept, cancel and navigation begun during animation")
 	_check(_focus() == map._stars[0], "stage map focuses current selection")
+	await _test_horizontal_navigation()
 	_tap(KEY_RIGHT)
-	_check(map._selected == 1 and _focus() == map._stars[1], "right selects and focuses stage 2")
+	_check(map._selected == 3 and _focus() == map._stars[3], "right selects and focuses stage 4 on the right")
 	_key(KEY_RIGHT, true, true)
 	_key(KEY_RIGHT, false)
-	_check(map._selected == 1, "navigation echo cannot skip stages")
+	_check(map._selected == 3, "navigation echo cannot skip stages")
 	_tap(KEY_SPACE)
 	_check(requests == 0, "accept during selection animation cannot launch")
 	await _wait(0.75)
-	await _shot("keyboard_stage_2")
+	await _shot("keyboard_stage_4")
 	_tap(KEY_DOWN)
-	_check(map._selected == 2, "down selects stage 3")
+	_check(map._selected == 4, "down selects stage 5 in stage order")
 	_tap(KEY_UP)
-	_check(map._selected == 1, "up returns to stage 2")
-	_tap(KEY_LEFT)
-	_tap(KEY_LEFT)
-	_check(map._selected == 4 and _focus() == map._final_stage, "left reaches final stage with matching focus")
+	_check(map._selected == 3, "up returns to stage 4 in stage order")
+	_tap(KEY_DOWN)
+	_check(map._selected == 4 and _focus() == map._final_stage, "down reaches final stage with matching focus")
 	await _wait(0.75)
 	await _shot("keyboard_stage_5")
 	# Space はテキスト・SpinBox の数値欄を編集する入力として残す。
@@ -139,6 +139,58 @@ func _ready() -> void:
 	await _frames()
 	print("[menu-keyboard] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
+
+func _test_horizontal_navigation() -> void:
+	# 各ステージの回転後と、次の回転途中に、実際に描かれた中心座標で方向を確認する。
+	for stage in 5:
+		for direction in [-1, 1]:
+			map.select_constellation(stage)
+			await _wait(0.7)
+			_check_horizontal(direction, "stage %d settled" % (stage + 1))
+			await _wait(0.2)
+			_check_horizontal(-direction, "stage %d during rotation" % (stage + 1))
+			await _wait(0.7)
+	# 左端・右端からのラップも、円周の各向きで確認する。
+	for rotation_stage in 4:
+		map.select_constellation(rotation_stage)
+		await _wait(0.7)
+		for direction in [-1, 1]:
+			if map._turn != null: map._turn.kill()
+			map._apply_rotation(-90.0 * rotation_stage)
+			var points := _stage_centers()
+			var edge := 0
+			for i in points.size():
+				if points[i] * direction > points[edge] * direction: edge = i
+			map._select(edge)
+			map._focus_selected()
+			_check_horizontal(direction, "rotation %d wrap" % rotation_stage)
+	map.select_constellation(0)
+	await _wait(0.7)
+	await _shot("keyboard_direction_initial")
+
+func _stage_centers() -> Array[float]:
+	var points: Array[float] = []
+	for button in map._stars:
+		points.append(button.get_global_rect().get_center().x)
+	points.append(map._final_stage.get_global_rect().get_center().x)
+	return points
+
+func _check_horizontal(direction: int, label: String) -> void:
+	var points := _stage_centers()
+	var from: int = map._selected
+	var has_neighbor := false
+	for x in points:
+		if (x - points[from]) * direction > 0.5: has_neighbor = true
+	_tap(KEY_LEFT if direction < 0 else KEY_RIGHT)
+	var selected: int = map._selected
+	var correct := selected != from
+	if has_neighbor:
+		correct = correct and (points[selected] - points[from]) * direction > 0.5
+	else:
+		for x in points:
+			correct = correct and points[selected] * direction <= x * direction + 0.5
+	_check(correct, "%s: %s selects screen-side neighbor or opposite edge" % [label, "left" if direction < 0 else "right"])
+	print("[menu-direction] %s key=%d from=%d to=%d centers=%s" % [label, direction, from + 1, selected + 1, points])
 
 func _focus() -> Control:
 	return title._stage_button.get_viewport().gui_get_focus_owner()

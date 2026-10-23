@@ -194,19 +194,47 @@ func _on_stage_focus(index: int) -> void:
 	if not _pointer_down and index != _selected:
 		select_constellation(index)
 
+## 回転中の星座と、円の外の最終ステージを実際の左右位置でたどる。
+func _horizontal_neighbor(direction: int) -> int:
+	var buttons: Array[Control] = []
+	buttons.assign(_stars)
+	if _final_stage != null:
+		buttons.append(_final_stage)
+	var from_x := buttons[_selected].get_global_rect().get_center().x
+	var nearest := _selected
+	var nearest_distance := INF
+	var wrapped := _selected
+	var wrap_edge := INF
+	for i in buttons.size():
+		if i == _selected:
+			continue
+		var x := buttons[i].get_global_rect().get_center().x
+		var distance := (x - from_x) * direction
+		# 同じ縦軸の星座を、浮動小数の誤差で左右の隣と見なさない。
+		if distance > 0.5 and distance < nearest_distance:
+			nearest = i
+			nearest_distance = distance
+		if x * direction < wrap_edge:
+			wrapped = i
+			wrap_edge = x * direction
+	return nearest if nearest != _selected else wrapped
+
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _transition_progress < 1.0:
 		return
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
 		return
-	# 星座の配置は回転するため、GUI の位置推測ではなくステージ順に選ぶ。
+	# 左右は表示位置、上下は従来どおりのステージ順に選ぶ。
 	if event.is_action(&"ui_left") or event.is_action(&"ui_up") or event.is_action(&"ui_right") or event.is_action(&"ui_down"):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
 			_cancel_drag()
-			var step := -1 if event.is_action(&"ui_left") or event.is_action(&"ui_up") else 1
-			select_constellation(posmod(_selected + step, mini(ContentManager.stage_count(), 5)))
+			if event.is_action(&"ui_left") or event.is_action(&"ui_right"):
+				select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
+			else:
+				var step := -1 if event.is_action(&"ui_up") else 1
+				select_constellation(posmod(_selected + step, mini(ContentManager.stage_count(), 5)))
 		return
 	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
 	if event.is_action(&"ui_accept") and focus != _back:
