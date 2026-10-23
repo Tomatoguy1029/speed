@@ -193,8 +193,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W22.desc | なぞり始めに発射器を残し、なぞり終えると機体との間を太いビームで貫く | Leaves an emitter where your dash starts, then cuts a thick beam between it and your ship when the dash ends. |
 | weapon.W23.name | 後方ブラスター | Rear Blaster |
 | weapon.W23.desc | 機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇 | Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage. |
-| weapon.W24.name | 光の槍 | Light Lance |
-| weapon.W24.desc | 突進中に機体が光の槍へ変わり、正面の敵に追加直撃。Lvで前方の長さと威力が伸びる | Become a lance of light during a dash and deal an extra direct hit ahead. Levels extend its reach and damage. |
 | weapon.W25.name | 迎撃ドローン | Interceptor Drones |
 | weapon.W25.desc | 周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える | Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts. |
 | weapon.W26.name | 突進範囲ドローン | Dash Range Drones |
@@ -211,7 +209,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T05.name | 連鎖ソニック | Chain Sonic |
 | trait.T05.desc | 1回で何体も倒すと衝撃波 | Defeating many enemies in one line releases a shockwave. |
 | trait.T06.name | クリティカルランス | Critical Lance |
-| trait.T06.desc | クリティカルのたびに前方へ貫くビーム | Every critical hit fires a piercing beam forward. |
+| trait.T06.desc | クリティカルのたびに前方へ貫く光の槍を飛ばす | Every critical hit fires a piercing lance of light forward. |
 | trait.T07.name | 急速充填 | Quick Charge |
 | trait.T07.desc | ゲージが早く溜まる（充填速度 +25% ずつ） | The gauge fills faster (+25% charge speed each). |
 | trait.T08.name | 大容量チャージ | High-Capacity Charge |
