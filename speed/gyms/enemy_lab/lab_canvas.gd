@@ -67,11 +67,12 @@ func screen(p: Vector2) -> Vector2:
 	return (p - center) * zoom + size / 2.0
 
 func texture_for(id: String) -> Texture2D:
-	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
-		return preload("res://assets/placeholders/corona_crown.svg")
 	var stage: StageDef = session.run.state.stage if session != null and is_instance_valid(session.run) else null
 	if not RenderManager.layered_layers(StringName(id), stage).is_empty():
-		return RenderManager.layered_texture(StringName(id), stage)
+		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ConfigManager.enemies.get(StringName(id))
+		return RenderManager.layered_texture(StringName(id), stage, def.armor_colors if def != null else {})
+	if id == "corona" and not ResourceLoader.exists("res://assets/pixel/corona.png"):
+		return preload("res://assets/placeholders/corona_crown.svg")
 	if id.begins_with("field_planet"):
 		return RenderManager.PLANET
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える

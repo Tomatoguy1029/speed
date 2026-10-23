@@ -5,6 +5,7 @@ signal changed
 signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
+const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
 const RUN_SCENE := preload("res://scenes/run/run.tscn")
 const DIRECTOR := preload("res://scripts/encounters/attack_director.gd")
@@ -80,6 +81,8 @@ func reset(settings := {}) -> void:
 			spec.overrides[id] = {}
 		if not spec.overrides[id].has("visual_settings"):
 			spec.overrides[id]["visual_settings"] = ConfigManager.enemies[type].visual_settings.duplicate(true)
+		if not spec.overrides[id].has("armor_colors"):
+			spec.overrides[id]["armor_colors"] = ConfigManager.enemies[type].armor_colors.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
 	await _rebuild()
@@ -532,6 +535,21 @@ func _apply(kind: String, args: Dictionary) -> void:
 			_edit_boss_definition(args)
 		"parameter":
 			_edit_definition(args)
+		"armor_paint":
+			_edit_armor(args)
+
+func _edit_armor(args: Dictionary) -> void:
+	var type := StringName(args.get("type", ""))
+	var original := run.enemies.def_of(type)
+	if original == null or not ARMOR_PAINT.valid_palettes(args.get("colors")):
+		return
+	var def: EnemyDef = original.duplicate(true)
+	def.armor_colors = args.colors.duplicate(true)
+	run.enemies.definitions[type] = def
+	var table := run.enemies.table
+	for i in table.alive.size():
+		if table.alive[i] and table.type[i] == type:
+			table.def[i] = def
 
 func _edit_definition(args: Dictionary) -> void:
 	var type := StringName(args.get("type", ""))

@@ -5,6 +5,7 @@
 class_name RenderManager
 extends Node
 
+const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
 const XP_COLOR := Color("#b8a0ff")
 const LAYERED_ENEMIES := {
 	&"pulser": [preload("res://assets/pixel/pulser/pulser_base.png"),
@@ -80,6 +81,8 @@ var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
 var _armor_batches: Dictionary = {}
+var _armor_sources: Dictionary = {}
+var _armor_palette_hashes: Dictionary = {}
 var _lit_enemy_marks: DrawLayer
 var _directional_lights: Dictionary = {}
 var lighting_settings: Resource = preload("res://data/visuals/enemy_lighting.tres")
@@ -252,6 +255,22 @@ func _apply_lighting() -> void:
 		var armor := _armor_batches[type].material as ShaderMaterial
 		armor.set_shader_parameter("ambient", def.visual_value("ambient", lighting_settings.ambient))
 		armor.set_shader_parameter("normal_strength", def.visual_value("normal_strength", lighting_settings.normal_strength))
+		var source: Texture2D = _armor_sources[type]
+		var data := ARMOR_PAINT.layout(source)
+		var palette: Dictionary = def.armor_colors.get(data.key, {})
+		var signature := hash(palette)
+		if _armor_palette_hashes.get(type, -1) != signature:
+			_armor_palette_hashes[type] = signature
+			var canvas := _armor_batches[type].texture as CanvasTexture
+			if palette.is_empty():
+				canvas.diffuse_texture = source
+			else:
+				var painted := ARMOR_PAINT.painted_image(source, def.armor_colors)
+				if canvas.diffuse_texture is ImageTexture:
+					(canvas.diffuse_texture as ImageTexture).update(painted)
+				else:
+					canvas.diffuse_texture = ImageTexture.create_from_image(painted)
+			_enemy_textures.erase(type)
 
 ## 種類ごとのスプライトと経験値の結晶を MultiMesh でまとめる。
 func _build_batches() -> void:
@@ -308,6 +327,7 @@ func _build_batches() -> void:
 			continue
 		var armor := CanvasTexture.new()
 		armor.diffuse_texture = layers[1]
+		_armor_sources[type] = layers[1]
 		armor.normal_texture = layers[2]
 		var batch := InstanceBatch.new()
 		batch.name = String(type) + "Armor"
@@ -988,12 +1008,15 @@ static func layered_layers(type: StringName, stage: StageDef = null) -> Array:
 	var skin := StringName(stage.enemy_sprite_path(type).get_file().get_basename()) if stage != null else type
 	return LAYERED_ENEMIES.get(skin, LAYERED_ENEMIES.get(type, []))
 
-static func layered_texture(type: StringName, stage: StageDef = null) -> Texture2D:
+static func layered_texture(type: StringName, stage: StageDef = null, palettes: Dictionary = {}) -> Texture2D:
 	var layers := layered_layers(type, stage)
-	var key: String = layers[0].resource_path
+	var data := ARMOR_PAINT.layout(layers[1])
+	var key: String = layers[0].resource_path + ":" + str(hash(palettes.get(data.key, {})))
 	if not _layered_textures.has(key):
+		if _layered_textures.size() >= 64:
+			_layered_textures.erase(_layered_textures.keys()[0])
 		var body: Image = layers[0].get_image()
-		body.blend_rect(layers[1].get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
+		body.blend_rect(ARMOR_PAINT.painted_image(layers[1], palettes), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
 		_layered_textures[key] = ImageTexture.create_from_image(body)
 	return _layered_textures[key]
 
@@ -1022,7 +1045,7 @@ func _enemy_sprite_angle(type: StringName, facing: float) -> float:
 func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
 		if not layered_layers(type, state.stage).is_empty():
-			_enemy_textures[type] = layered_texture(type, state.stage)
+			_enemy_textures[type] = layered_texture(type, state.stage, run.enemies.def_of(type).armor_colors)
 			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null

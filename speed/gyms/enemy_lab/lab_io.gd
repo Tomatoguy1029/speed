@@ -1,8 +1,9 @@
 ## 実験用 JSON の保存・差分・再現基準。読み込みからコードやシーンを実行しない。
 extends RefCounted
+const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]
+const COMMANDS := ["armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]
 
 static func plain(value):
 	if value is Vector2:
@@ -200,7 +201,7 @@ static func validate(data: Dictionary) -> String:
 		if not ConfigManager.enemies.has(StringName(id)):
 			return TranslationServer.translate("lab.message_3fc0d7300b") + String(id)
 		for key in spec.overrides[id]:
-			if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params", "visual_settings"]:
+			if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "params", "visual_settings", "armor_colors"]:
 				return TranslationServer.translate("lab.message_8cfee97b22") + String(key)
 	for command in data.history:
 		var problem := _validate_command(command)
@@ -238,6 +239,9 @@ static func _validate_command(command) -> String:
 		if not args.get("id", "") is String or args.get("kind", "weapon") not in ["weapon", "trait"]: return TranslationServer.translate("lab.message_dcb428f285")
 		var registry: Dictionary = ConfigManager.weapons if args.get("kind", "weapon") == "weapon" else ConfigManager.traits
 		if not registry.has(StringName(args.get("id", ""))): return TranslationServer.translate("lab.message_dcb428f285")
+	if command.kind == "armor_paint":
+		if not ConfigManager.enemies.has(StringName(args.get("type", ""))) or not ARMOR_PAINT.valid_palettes(args.get("colors")):
+			return TranslationServer.translate("lab.message_7241f95e31")
 	if command.kind == "hero":
 		if not args.get("id", "") is String or (not String(args.get("id", "")).is_empty() and not ConfigManager.heroes.has(StringName(args.id))): return TranslationServer.translate("lab.message_dcb428f285")
 	if command.kind == "director":
@@ -290,7 +294,9 @@ static func _definition_problem(values, boss := false) -> String:
 		var original: Resource = registry[StringName(id)]
 		for key in values[id]:
 			var value = values[id][key]
-			if key == "visual_settings" and not boss:
+			if key == "armor_colors" and not boss:
+				if not ARMOR_PAINT.valid_palettes(value): return TranslationServer.translate("lab.message_7241f95e31")
+			elif key == "visual_settings" and not boss:
 				if not value is Dictionary: return TranslationServer.translate("lab.message_2dac0fe5e5")
 				for field in value:
 					if not EnemyDef.VISUAL_LIMITS.has(field) or not _number_ok(value[field]): return TranslationServer.translate("lab.message_7241f95e31")
