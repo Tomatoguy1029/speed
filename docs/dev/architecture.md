@@ -710,6 +710,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
   - `band`：時間帯の切り替わり（名前）
   - `levelup`・`pick`：レベルアップと、出たカード・選んだカード・おまけで上がった数
   - `loadout`：武器・特性が実際に変わったラン秒・世界秒、種類・管理ID・変更前後の段（`previous`・`current`）、取得経路（`source`）。初期武器選択は `initial_choice`、通常カードは `card`、おまけは `level_bonus`、彗星の空き枠取得は `comet`、交換の取り外しと取得は `comet_swap`、直接付与・取り外しは `direct`、全解除は `reset`。段0は取り外しを表す。取得時に実際に参照した定義のハッシュ（`definition_sha256`）も持つ。装備の復元は開始装備とこの差分を使い、`pick` の回数やおまけ数を重ねて加算しない。
+  - `enemy_tuning_changed`・`enemy_tuning_saved`：ライブ適用とステージ保存の通知。`values` に通知時点の上書き辞書全体を保持し、空の辞書は全解除を表す。ライブ適用は既存個体と以後の出現へ反映する変更、保存は対象ファイルへの書き込みとして区別する。`t`・`world_t` は通知処理時点、`event_t`・`event_world_t` は発行元が添えた実際の適用・保存時点を表す。発行元に時刻がない場合は後者を `null` として保持する。保存通知は `path` も持つ。
   - `hurt`：HPが減った被弾ごとの発生ラン秒・世界秒、1発のダメージ（`amount`。致死時の超過分を含む）、原因・発生元・被弾直後のHP（`hp_after`）。無敵・盾で拒否した攻撃は実被弾の件数から区別する。`sample.damage` は同じ被弾の区間集計として読む。
   - `xp_drop`：結晶の通し番号（`id`）、生成ラン秒・世界秒、結晶の総XP（`xp`）、今回加えたXP（`added_xp`）、出所（`source`：`enemy`・`big_crystal`・`crow_carry`・`direct`）、敵種・敵個体ID・大結晶の段。上限による合流は親結晶のIDを `merged_from` に置く（通常は -1）。合流前のXPを新規供給量へ重ねない。からす座が運んだXPの再ドロップも `crow_carry` として区別する。
   - `xp_collect`：機体が取得したラン秒・世界秒・XP・方法。通常回収（`method=ship`）は結晶の `id`、ビーコン（`method=beacon`）は `[id, XP]` の配列 `gems` と合計XPを1行で保存する。
@@ -726,6 +727,8 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 `RunSession` は開発版のラン初期化直後に条件を複製し、録画の有無によらず保持する。`run_start.conditions` に実効GameConfig、永続強化係数（`profile`）、機体能力値、機体強化段、強化上書きの有無、無敵・ヒットストップ設定と物理更新頻度を保存する。`recording_start.conditions` は録画開始時の実効GameConfig・永続強化係数・機体能力値・無敵・ヒットストップ設定を保存し、途中開始時の変更と区別する。ステージ別の敵調整があるランは `enemy_tuning` に各時点の実効上書きを保存する。両時点の乱数seed・状態は、JSONの数値精度を保つ文字列 `rng_seed`・`rng_state` として保存する。
 
 `run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。
+
+ライブ調整の区間は `recording_start.conditions.enemy_tuning` から始め、`enemy_tuning_changed.values` で全体を置き換えて追う。適用境界には `event_t`・`event_world_t` を使い、同じラン秒では行順と世界秒を併用する。`sample` が境界をまたぐ場合は設定が混在する区間として扱う。保存通知は適用履歴から分ける。録画前の変更は前半欠測のまま保持する。
 
 ファイルのハッシュは初期化時点のディスク内容、読み込み済みScriptのハッシュはその時点の実行本文として区別する。資源の後読み込み・実行中のコードや設定の変更・入力の再生まで含む再現性は、対応する観測範囲を明示する。ソースを同梱しないビルドは `source_files_available` と一覧の欠落を確認し、空のリビジョンや未観測の条件を不明として扱う。
 

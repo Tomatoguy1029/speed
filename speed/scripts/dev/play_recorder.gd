@@ -313,6 +313,12 @@ func _on_events(events: Array[Dictionary]) -> void:
 			_skip_events -= 1
 			continue
 		match e.type:
+			&"enemy_tuning_changed", &"enemy_tuning_saved":
+				# t は通知を処理した時計。適用・保存そのものの時計は別に保ち、通知待ちを区別する。
+				var record := {"type": String(e.type), "t": time, "world_t": _run.state.world_time,
+					"event_t": e.get("t", null), "event_world_t": e.get("world_t", null), "values": e.get("values", null)}
+				if e.type == &"enemy_tuning_saved": record["path"] = e.get("path", null)
+				_write(record)
 			&"bonus":
 				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
 			&"kill":

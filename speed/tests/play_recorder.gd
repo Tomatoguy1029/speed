@@ -43,6 +43,8 @@ func _ready() -> void:
 	var measured_on := await measurement_scenario(true)
 	var measured_off := await measurement_scenario(false)
 	check(measured_on == measured_off, "追加イベントの ON/OFF で装備・HP・XP・乱数・結晶が同じ")
+	await verify_live_tuning(false)
+	await verify_live_tuning(true)
 	print("[play_recorder] passed=%d failed=%d output=%s" % [passed, failed, recording_path])
 	get_tree().quit(1 if failed else 0)
 
@@ -441,3 +443,85 @@ func measurement_scenario(recording: bool) -> Dictionary:
 	scene.queue_free()
 	await get_tree().process_frame
 	return outcome
+
+
+## EnemySystem の実イベントを録画へ接続し、通常開始と前半欠落の双方で変更境界を保持する。
+func verify_live_tuning(during_run: bool) -> void:
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	if not during_run: rec._set_armed(true)
+	var stage := ContentManager.runtime_stage(4).duplicate(true) as RuntimeStage
+	stage.enemy_tuning = {}
+	var scene := RunManager.create_session(self, {"stage": stage, "seed": 819, "stage_index": 4}, false)
+	scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var run := scene.sim
+	var state := run.state
+	var hp := run.enemies.def_of(&"telescope").base_hp(run.cfg)
+	var initial := {"telescope": {"hp": hp * 1.5}}
+	if during_run:
+		state.time = 7.0
+		state.world_time = 3.0
+		run.enemies.update_stage_tuning(initial)
+		rec._set_armed(true)
+		rec._begin(scene, true)
+	check(rec._file != null, "ライブ調整の統合検証で録画を開始する")
+	if rec._file == null:
+		scene.queue_free()
+		rec.queue_free()
+		await get_tree().process_frame
+		return
+	var path := rec._file.get_path()
+	var start: Dictionary = read_rows(path)[0]
+	check(start.run_start.conditions.enemy_tuning.is_empty(), "ラン初期化時の上書きは後のライブ変更から独立する")
+	check(start.recording_start.conditions.enemy_tuning == (initial if during_run else {}), "録画開始時のライブ上書きを保存する")
+	check(start.missing_prefix == during_run, "ライブ調整でも前半欠落の区分を保つ")
+	state.time = 10.25
+	state.world_time = 4.5
+	var values := {"telescope": {"hp": hp * 2.0}}
+	var expected := values.duplicate(true)
+	run.enemies.update_stage_tuning(values)
+	values.telescope.hp = 1.0
+	state.time = 11.0
+	state.world_time = 5.0
+	var rng_before := state.rng.state
+	run.flush_events()
+	check(state.rng.state == rng_before and run.enemies.stage_tuning == expected, "受信は乱数と適用済みの上書きを変更しない")
+	rec._file.flush()
+	var changes := read_rows(path).filter(func(e): return e.type == "enemy_tuning_changed")
+	check(changes.size() == 1, "途中録画より前の通知待ち変更を履歴へ混ぜない")
+	if changes.size() == 1:
+		check(changes[0].event_t == 10.25 and changes[0].event_world_t == 4.5, "実イベントの適用ラン秒・世界秒を保存する")
+		check(changes[0].t == 11.0 and changes[0].world_t == 5.0, "通知処理の時計を適用時刻から区別する")
+		check(changes[0].values == expected, "適用後の辞書は通知待ち中の別編集から独立する")
+	# ボーナス中はラン時計が止まっても世界秒と行順で変更を区別できる。
+	state.bonus_t = 30.0
+	state.world_time = 5.25
+	run.enemies.update_stage_tuning({"telescope": {"hp": hp * 3.0}})
+	state.world_time = 5.5
+	run.enemies.update_stage_tuning({})
+	run.enemies.update_stage_tuning({})
+	state.world_time = 6.0
+	run.flush_events()
+	# 保存の通知は適用履歴と区別する。ソースファイルへの保存は行わず契約だけを検証する。
+	state.emit(&"enemy_tuning_saved", {"t": state.time, "world_t": state.world_time,
+		"path": "res://data/stages/stage_4.tres", "values": expected.duplicate(true)})
+	run.flush_events()
+	# 時刻を持たない通知も欠測のまま読めることを確認する。
+	state.emit(&"enemy_tuning_changed", {"values": {}})
+	run.flush_events()
+	rec._end("stopped")
+	var rows := read_rows(path)
+	changes = rows.filter(func(e): return e.type == "enemy_tuning_changed")
+	check(changes.size() == 4, "3回の実適用と時刻欠測の1通知だけを保存する")
+	if changes.size() == 4:
+		check(changes[1].event_t == 11.0 and changes[1].event_world_t == 5.25 and changes[2].event_world_t == 5.5, "停止したラン時計でも世界秒が適用順を保つ")
+		check(changes[2].values.is_empty(), "空の辞書は上書き全解除として保存する")
+		check(changes[3].event_t == null and changes[3].event_world_t == null, "欠けた適用時刻を処理時計で補完しない")
+	var saved := rows.filter(func(e): return e.type == "enemy_tuning_saved")
+	check(saved.size() == 1 and saved[0].path == "res://data/stages/stage_4.tres" and saved[0].values == expected, "保存通知を実適用と別の種類で保存する")
+	check(rows.back().type == "end" and rows.back().result == "stopped", "ライブ履歴を含む録画も既存の終端を保つ")
+	rec._set_armed(false)
+	rec.queue_free()
+	scene.queue_free()
+	await get_tree().process_frame
