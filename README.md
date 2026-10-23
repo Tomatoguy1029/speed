@@ -8,9 +8,9 @@
 
 Godot のプロジェクトは [speed/project.godot](speed/project.godot) です。このリポジトリを `speed/` にクローンした場合、`speed/speed/project.godot` を Godot のプロジェクトマネージャーからインポートしてください。
 
-プロジェクト設定は Godot 4.6・Forward Plus です。タイトル・ステージ選択・ゲーム本体を実装済みで、メインシーンは `scenes/app/main.tscn` です。Godot 4.6 でインポートし、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用のビルドでは、全ステージを選べます。調整機能は [仕様書](docs/game/spec.md#20-調整機能) を参照してください。
+プロジェクト設定は Godot 4.6・Forward Plus です。タイトル・ステージ選択・ゲーム本体を実装済みで、メインシーンは `scenes/app/main.tscn` です。Godot 4.6 でインポートし、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用のビルドでは、全ステージを選べます。調整機能は [仕様書](docs/spec.md#20-調整機能) を参照してください。
 
-開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/game/spec.md#201-敵ルート実験場) を参照してください。
+開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
 
 ステージ制作は [制作ガイド](docs/dev/stage-production.md) から始めます。AIへ実装・記録分析を頼むときは [AI向け資料](docs/dev/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stages/stage-4.md) を参照してください。
 
@@ -30,7 +30,7 @@ godot --editor --path speed
 godot --headless --path speed --script res://tools/content/build_all.gd -- --force
 ```
 
-macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/dev/architecture.md#15-ビルドと配布)を参照してください。
+macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
 接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
 
@@ -45,11 +45,12 @@ macOSのローカル確認用アプリは `godot --headless --path speed --expor
 | `speed/` | Godot 本番プロジェクト |
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
 | `docs/README.md` | [文書の運用規定](docs/README.md)。文書を触る前に必ず読む |
-| `docs/game/` | ゲームの決まり：[企画書](docs/game/treatment.md)・[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[仕様書](docs/game/spec.md)・[ゲーム内文言](docs/game/text.md)・[課題](docs/game/backlog.md) |
+| `docs/` | ゲーム全体を定義する同じ階層の文書：[企画書](docs/treatment.md)・[仕様書](docs/spec.md)・[設計書](docs/architecture.md) |
+| `docs/game/` | 個別資料：[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[ゲーム内文言](docs/game/text.md)・[課題](docs/game/backlog.md) |
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/game/stages/` | ステージ1〜5の個別仕様（例：[ステージ4](docs/game/stages/stage-4.md)） |
 | `docs/game/bosses/` | ボスの個別仕様（[うみへび座](docs/game/bosses/hydra.md)） |
-| `docs/dev/` | 作り方：[設計書](docs/dev/architecture.md)・[ステージ制作ガイド](docs/dev/stage-production.md)・[AI向けの制作参照](docs/dev/stage-production-ai.md) |
+| `docs/dev/` | 制作手順：[ステージ制作ガイド](docs/dev/stage-production.md)・[AI向けの制作参照](docs/dev/stage-production-ai.md) |
 | `demo/docs/` | demo の仕様・課題 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |

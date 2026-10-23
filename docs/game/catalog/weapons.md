@@ -1,6 +1,6 @@
 # 本番の武器一覧
 
-[一覧の運用ルール](rules.md) に従う。管理 ID は demo から引き継ぐ。共通のルール（枠・Lv・係数・段階の色）は [仕様書](../spec.md) の8章。demo の保留・候補（W09〜W16、W18）は本番に登録していない。
+[一覧の運用ルール](rules.md) に従う。管理 ID は demo から引き継ぐ。共通のルール（枠・Lv・係数・段階の色）は [仕様書](../../spec.md) の8章。demo の保留・候補（W09〜W16、W18）は本番に登録していない。
 
 表示用の名前・説明は [ゲーム内文言](../text.md) を正とする。
 
@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|---|
 | W01 | ブラスター | 採用 | 進む向きへ自動で撃つ。Lv で威力・連射・弾数・貫通が伸びる。描画中・なぞり中は休む | 通常の移動の向きが撃つ向きになる | 実装済み。`scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres` | [demo W01](../../../demo/docs/weapons.md) `forward` |
 | W02 | 散弾砲 | 採用 | 進む向きへ扇状に撃つ | 群れに向けて進み、近い距離で広がりを当てる | 実装済み。`scripts/weapons/scatter.gd`、`data/weapons/W02_scatter.tres` | [demo W02](../../../demo/docs/weapons.md) `scatter` |
-| W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ（クリティカルにはならない）。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。外力は [ボス共通ルール](../spec.md#12-ボス) に従う。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
+| W03 | 吹き飛ばし衝角 | 採用 | 高速で触れた生きた敵を進む向きへ吹き飛ばし、ほかの敵にぶつけてダメージ（クリティカルにはならない）。倒した大型の敵は破片を扇状に、小型の敵は死体を1つ飛ばす | ほかの敵に船体をぶつけられる向きから入る | 実装済み。外力は [ボス共通ルール](../../spec.md#12-ボス) に従う。`scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | [demo W03](../../../demo/docs/weapons.md) `knockback` |
 | W04 | 接触波動 | 採用 | 高速で触れるたびに、触れた位置から周りへ波動。弾かれた接触でも出る。波動の撃破からは連鎖しない | 密集した群れを通る | 実装済み。`scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | [demo W04](../../../demo/docs/weapons.md) `contactWave` |
 | W05 | バリアシステム | 採用 | 周りに定期的な波動を出し、一定間隔で敵の弾を1発防ぐ | 敵や弾に近づくときの状況を変える | 実装済み。`scripts/weapons/barrier.gd`、`data/weapons/W05_barrier.tres` | [demo W05](../../../demo/docs/weapons.md) `barrier` |
 | W07 | 軌跡機雷 | 採用 | 高速で実際に通った線に一定の間隔で機雷を残す。少し遅れて有効になり、敵が近づくと爆発する | 敵が後から入る線を残す | 実装済み。`scripts/weapons/mines.gd`、`data/weapons/W07_mines.tres` | [demo W07](../../../demo/docs/weapons.md) `mines` |
@@ -27,7 +27,7 @@
 
 ## 彗星限定
 
-レアな彗星を壊したときだけ手に入る（[仕様書](../spec.md) の8章・13.1）。3択には出ず、強化もない。手に入れたときから Lv の上限の強さ。
+レアな彗星を壊したときだけ手に入る（[仕様書](../../spec.md) の8章・13.1）。3択には出ず、強化もない。手に入れたときから Lv の上限の強さ。
 
 | ID | 名称 | 採用状態 | 発動・効果 | ルートへの影響 | 本番の実装状況・コード参照 | demo参照・未決事項 |
 |---|---|---|---|---|---|---|

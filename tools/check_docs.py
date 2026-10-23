@@ -11,15 +11,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # docs/ の置き場ごとに置ける文書（None はその置き場の .md なら自由）
 ALLOWED = {
-    "docs": {"README.md"},
-    "docs/game": {"treatment.md", "world.md", "art-style.md", "spec.md", "text.md", "backlog.md"},
+    "docs": {"README.md", "treatment.md", "spec.md", "architecture.md"},
+    "docs/game": {"world.md", "art-style.md", "text.md", "backlog.md"},
     "docs/game/catalog": None,
     "docs/game/stages": {f"stage-{n}.md" for n in range(1, 6)},
     "docs/game/bosses": None,
-    "docs/dev": {"architecture.md", "stage-production.md", "stage-production-ai.md"},
+    "docs/dev": {"stage-production.md", "stage-production-ai.md"},
 }
 # 今の状態だけを書く置き場
-STATE_DIRS = ["docs/game", "docs/dev"]
+STATE_DIRS = ["docs/treatment.md", "docs/spec.md", "docs/architecture.md", "docs/game", "docs/dev"]
 # 廃止した個人の作業ログ
 PERSONAL_LOGS = [f"demo/docs/{n}.md" for n in ("wakida", "shumak", "keporusu")]
 # リポジトリに置かない、作業用の置き場
@@ -31,7 +31,7 @@ DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 # 列で持つデータのコードと、その列の一覧を載せた設計書の節（表の1列目に列名をコードの書き方で書く）
-COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/dev/architecture.md", "### 6.2 敵の表の列")]
+COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/architecture.md", "### 6.2 敵の表の列")]
 VAR = re.compile(r"^var (\w+)")
 TABLE_ROW = re.compile(r"^\|\s*`(\w+)`\s*\|")
 CODE_SPAN = re.compile(r"`[^`]*`")

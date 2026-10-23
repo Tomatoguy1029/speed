@@ -3,7 +3,7 @@
 - demo のコードは引き継がない。ゲームの挙動は仕様書を正とし、ここでは Godot での正式な開発に向けて設計し直す。
 - Godot プロジェクトは `speed/`（`res://`）。`.godot/` などの生成キャッシュはコミットしない。
 
-ステージ制作の入口は[制作ガイド](stage-production.md)、編集先と記録分析の進め方は[AI向け参照](stage-production-ai.md)、ステージ4の制作要件は[個別仕様](../game/stages/stage-4.md)を参照する。本書はツールの詳細な編集契約と記録形式を定義する。
+ステージ制作の入口は[制作ガイド](dev/stage-production.md)、編集先と記録分析の進め方は[AI向け参照](dev/stage-production-ai.md)、ステージ4の制作要件は[個別仕様](game/stages/stage-4.md)を参照する。本書はツールの詳細な編集契約と記録形式を定義する。
 
 ---
 
@@ -20,7 +20,7 @@
 | 世界の時間と実時間を分けて扱う。描画中0.1倍、なぞり中は可変、ヒットストップで停止 | 仕様書 1・6 |
 | なぞり中、機体は0.5実秒で最大数千単位を移動する（1回の更新で大きく動く） | 仕様書 6.5 |
 | ほとんどの数値をプレイ中に調整パネルから変えられる | 仕様書 20 |
-| 武器・特性・敵は一覧の管理 ID（W01、T01、`drifter` など）で管理する | [catalog.md](../game/catalog/rules.md) |
+| 武器・特性・敵は一覧の管理 ID（W01、T01、`drifter` など）で管理する | [catalog.md](game/catalog/rules.md) |
 | ストーリー（5ステージ）とエンドレスの2つのモードがある | 仕様書 2 |
 | ステージごとに、星系の広いフィールド・中ボス・フィールドの仕掛けが変わる | 仕様書 2〜22 |
 | 中ボスは複数の部位（うみへび座の首など）を持ちうる。画面より大きくなりうる | 仕様書 12.3 |
@@ -195,7 +195,7 @@ classDiagram
   RunPresentation --> RunSimulation : run
 ```
 
-実装の入口は [RunSession](../../speed/scripts/runtime/run_session.gd)、[RunSimulation](../../speed/scripts/runtime/run_simulation.gd)、[RunContext](../../speed/scripts/runtime/run_context.gd)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
+実装の入口は [RunSession](../speed/scripts/runtime/run_session.gd)、[RunSimulation](../speed/scripts/runtime/run_simulation.gd)、[RunContext](../speed/scripts/runtime/run_context.gd)。種類別の処理との接続は [6.1](#61-敵とボスの-ai)、資源の準備と解放は [8.1](#81-定義データresource) に示す。
 
 ### 4.4 守る決まり
 
@@ -286,7 +286,7 @@ classDiagram
   WeaponVisual --> TraitBehavior : behavior
 ```
 
-EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../../speed/scripts/render/equipment/weapon_visual.gd) にある。
+EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
 
 | 対象 | 層 | 方式 |
 |---|---|---|
@@ -302,7 +302,7 @@ EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、Loado
 
 `EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と吹き飛ばし衝角はこの判定を使い、役者が管理する移動速度と外力を分ける。
 
-ゲームの決まりは [ヒュドラ専用仕様](../game/bosses/hydra.md)、採用・実装状況は [敵一覧](../game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
+ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
 LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会のコンボ抽選と、形態・参加者・配置・待ち時間で選ぶ大技の枝を編集できる。`hydra_head_bt.tres` は各首が複製して持ち、種類・距離・方向・画面内・状態・予算の条件から通常技を選び、成立する技があれば実行する。各ProbabilitySelectorの子の重みと `hydra_play_tech.gd` の `cooldown_scale` をInspectorで編集する。技の位置条件・コスト・共通予算・時間・護衛位置は `data/bosses/hydra.tres` の `params` に置く。条件評価は読み取りだけを行い、選択後に攻撃枠を取得する。
 
@@ -338,7 +338,7 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 
 可視速度は「冠が前の世界更新から実際に動いた速度＋円の接線速度」と定義する。吸い込み中は半径を連続的に縮め、円に着いた個体だけを発射する。予告終了後、機体への方向と可視速度の角度誤差をフレームの両端で調べる。許容差 `align_angle` に入るか、±π の折り返しを除いた符号の変化で一致点をまたいだら発射できる。通過時は二分探索で更新内の時刻を求め、その位置から接線の向きを保って残り時間だけ直進する。渦から外すのはこの同じ個体で、複製や射出口への位置補正は行わない。
 
-短距離の吸い込みは、うみへび座も使う `FieldSystem._well_pull` の距離減衰を使う。投擲の当たり判定は機体と個体の相対線分で調べ、通常の戦闘のあと `ProjectileSystem.tick()` から既存の `ShipSystem.damage()` へ渡す。死亡・行解放・冠の再配置で所有関係を解放し、保持中の個体自身の再配置を止める。ゲームの決まりと調整値は [敵一覧](../game/catalog/enemies.md#みなみのかんむり座) に従う。
+短距離の吸い込みは、うみへび座も使う `FieldSystem._well_pull` の距離減衰を使う。投擲の当たり判定は機体と個体の相対線分で調べ、通常の戦闘のあと `ProjectileSystem.tick()` から既存の `ShipSystem.damage()` へ渡す。死亡・行解放・冠の再配置で所有関係を解放し、保持中の個体自身の再配置を止める。ゲームの決まりと調整値は [敵一覧](game/catalog/enemies.md#みなみのかんむり座) に従う。
 
 ### 6.2 敵の表の列
 
@@ -422,19 +422,19 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 - 地形の詳細判定は線分と円で調べる。天体の範囲を512単位の格子へ毎更新登録し、短い移動区間では線分の太さを含む矩形に重なるセルから候補を取る。長い区間や格子外では全天体を調べる。敵の近傍確認では、月を軌道の半径帯に登録して候補を絞る。雑魚は、前回確かめたときの天体の表面までの距離・位置・世界時刻を持ち、その距離からその後に動いた距離と月が動けた距離を引いても余裕が残る間は、近傍確認を省く。敵の弾は等速なので、いちばん近い天体の表面までの距離を弾ごとに持ち、弾の移動量と月の公転の速さの上限で毎回減らす。この余裕が残る間は天体の判定を省く。月の軌道半径・大きさがラン中固定であることを利用し、周回位置は毎更新の実位置で判定する。惑星の判定と近傍の条件は維持する。
 - フィールドの仕掛けの作りは、それぞれの仕掛けを実装するときに考える。
 
-隕石・彗星・鉄のがれき・丸鋸は配置情報を保持し、カメラ近傍で敵の表へ登録する。範囲を離れると表の行を解放し、破壊済み状態はラン中維持する。惑星と月は `FieldSystem` の障害物データと空間索引で管理し、月の位置は世界時間から更新する。重力とワープホールは世界時間と寿命で管理する。各仕掛けの挙動は[仕様書13.1](../game/spec.md#131-フィールドの要素)に従う。
+隕石・彗星・鉄のがれき・丸鋸は配置情報を保持し、カメラ近傍で敵の表へ登録する。範囲を離れると表の行を解放し、破壊済み状態はラン中維持する。惑星と月は `FieldSystem` の障害物データと空間索引で管理し、月の位置は世界時間から更新する。重力とワープホールは世界時間と寿命で管理する。各仕掛けの挙動は[仕様書13.1](spec.md#131-フィールドの要素)に従う。
 
 ## 8. データ構造
 
 ### 8.1 定義データ（Resource）
 
-数値のデータのうち、今後調整する必要があるものはすべて `.tres` で管理する。数値のパラメータの正は `.tres` で、ドキュメントでは管理しない（[catalog.md](../game/catalog/rules.md)）。
+数値のデータのうち、今後調整する必要があるものはすべて `.tres` で管理する。数値のパラメータの正は `.tres` で、ドキュメントでは管理しない（[catalog.md](game/catalog/rules.md)）。
 
 | クラス | 中身 | 対応する一覧 |
 |---|---|---|
-| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](../game/catalog/weapons.md) |
-| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](../game/catalog/traits.md) |
-| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](../game/catalog/enemies.md) |
+| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
+| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
+| `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](game/catalog/enemies.md) |
 | `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、攻撃の予算、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
 | `StageDef` | 星系、フィールドの配置、仕掛けの領域、時間帯の表、ステージの敵、雑魚の目標の数の曲線、出現のクリップ、出現タイムラインのトラックの名前、敵の見た目、中ボス、伝説のモジュール | 仕様書 2〜22 |
@@ -458,7 +458,7 @@ StageDef・SpawnClip・フォーメーションのシーンを編集元とする
 
 **編集元から実行用データへの生成**
 
-RuntimeStageとRuntimeClipは編集元の型を継承し、戦闘で使う値と展開済みの配置を保持する。図中のStageCompilerは [build_runtime_stage.gd](../../speed/tools/content/build_runtime_stage.gd) を表す。破線は生成処理への入力・出力、通常の矢印は保持する参照を示す。
+RuntimeStageとRuntimeClipは編集元の型を継承し、戦闘で使う値と展開済みの配置を保持する。図中のStageCompilerは [build_runtime_stage.gd](../speed/tools/content/build_runtime_stage.gd) を表す。破線は生成処理への入力・出力、通常の矢印は保持する参照を示す。
 
 ```mermaid
 classDiagram
@@ -489,7 +489,7 @@ classDiagram
   RuntimeStage *-- StageResources : resources
 ```
 
-[共通の生成入口](../../speed/addons/content_build/builder.gd) がStageCompilerの `build_all()` を呼び、生成結果を `.content/stage_<番号>.tres` へ保存する。StageResourcesは [build_stage_resources.gd](../../speed/tools/content/build_stage_resources.gd) が定義・行動・見た目・音・shaderなどのパスを集めて作る。
+[共通の生成入口](../speed/addons/content_build/builder.gd) がStageCompilerの `build_all()` を呼び、生成結果を `.content/stage_<番号>.tres` へ保存する。StageResourcesは [build_stage_resources.gd](../speed/tools/content/build_stage_resources.gd) が定義・行動・見た目・音・shaderなどのパスを集めて作る。
 
 **資源の寿命**
 
@@ -531,7 +531,7 @@ sequenceDiagram
   S->>S: started.emit()
 ```
 
-セッション終了時は [RunSessionの破棄処理](../../speed/scripts/runtime/run_session.gd) がScopeを `cancel()` し、RunSimulationの `dispose()` がSystem・役者・通知の参照を外す。[ContentResourceScope](../../speed/scripts/data_types/content_resource_scope.gd) は取り消し後に届いた資源を解放する。
+セッション終了時は [RunSessionの破棄処理](../speed/scripts/runtime/run_session.gd) がScopeを `cancel()` し、RunSimulationの `dispose()` がSystem・役者・通知の参照を外す。[ContentResourceScope](../speed/scripts/data_types/content_resource_scope.gd) は取り消し後に届いた資源を解放する。
 
 ### 8.2 ラン中の状態
 
@@ -621,7 +621,7 @@ sequenceDiagram
   P->>V: draw_marks / draw_objects<br/>draw_shotなど
 ```
 
-AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../../speed/scripts/data_types/run_state.gd)、[RunSimulation.flush_events](../../speed/scripts/runtime/run_simulation.gd)、[RunPresentation](../../speed/scripts/render/run_presentation.gd)、[DrawLayer](../../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
+AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../speed/scripts/data_types/run_state.gd)、[RunSimulation.flush_events](../speed/scripts/runtime/run_simulation.gd)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[DrawLayer](../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
 
 ### 10.2 層・資源・画面効果
 
@@ -692,7 +692,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - 時間帯と同じトラックに、ボス出現・ステージの制限時間をピンとして重ねる（`stage_clocks.gd`）。上段の「ボス」「終了」は、共通のピンのアイコンを付け、同じ幅で横に並べる。ONは灰色のボタン、OFFは背景・文字・アイコン全体を暗く表示する。押すと再生位置へ配置し、もう一度押すと削除する。再生位置が先頭なら既存の配置の末尾へ置く。ボスピンの配置・削除はステージの `boss_enabled` を切り替える。ピンは左右のドラッグで時刻を変え、画面の端でつかみ続けると横へスクロールする。クリックして選んだピン・クリップは左右キーで1秒ずつ動かす。クリップは長さ・トラックを保ち、同じトラックのほかのクリップと重なる移動は止める。ピンはダブルクリックで時刻を入力する。時間帯の右クリックから、指定位置への時間帯の追加・対象時間帯の削除・名称変更・強化区間のON/OFFを選ぶ。追加した時間帯はその位置の時間帯の設定を引き継ぎ、ステージ内に保存する。削除はステージから参照を外し、元の時間帯リソースと残る時間帯の名称・開始時刻を保つ。最後の1つは残す。強化区間の時間帯名は赤字で末尾に「(強化区間)」を表示し、元の名称には付け加えない。時間帯をクリックするとそのリソースをインスペクターに開き、強化間隔・1段ごとの敵数増加・撃つ敵の出やすさ・エリート確率を編集できる。インスペクターの編集・取り消しも保存へ反映する。各時間帯の強化ON/OFFはステージの `surge_phases` に保存し、未指定の時間帯は既存の強化開始・終了時刻を引き継ぐ。共通設定のリソースはプロジェクト設定 `spawn_timeline/defaults_resource` から読み、ステージの上書きがあれば優先する。表示範囲はこれらの進行時刻も含める。
 - 編集はエディタの取り消し・やり直しに載せ、確定するたびにステージと、別ファイルの時間帯を保存する。
 - インスペクタでは、ステージの敵の一覧（`enemies`）と、クリップの種類の組み合わせ・フォーメーションの置ける種類（`types`）を、チェックボックスで選ぶ。クリップの使う並び（`layouts`）も、クリップのフォーメーションの配置（置き場所を持つ子のノード）をチェックボックスで選ぶ。チェックボックスの並びは見出しで折りたためる（ステージの敵の一覧は初めは折りたたむ）。クリップの種類は、タイムラインで開いているステージの敵の中から選ぶ。敵の定義の場所はプロジェクト設定 `spawn_timeline/enemy_dir` から読む。
-- 時間帯に整数の「予算」を表示し、クリックで直接入力する。ステージのインスペクターの「Enemy attack values」で種類ごとの個体valueを0.5刻みで調整する。「Enemy attack priorities」で種類ごとの優先度を編集し、未設定は標準0を使う。未設定の種類には「仮値」を表示する。クリップのインスペクターは「Spawn assets」で配置シーンを登録し、「Formations」でそのシーン内の並びを選択する。各行の「Auto」（個体合計）はステージの値・クリップの種類フィルター・実際の配置を読み、ステージの値が変わると再計算する。「Override」（群れ共有）をONにすると共有valueを入力でき、OFFにすると自動の個体消費へ戻る。保存名 `formation_values` は整数の項目も共有overrideとして維持する。開始時刻と長さはタイムラインで編集し、インスペクターは同時の群れの数を「Group counts」、間隔を「Interval」と表示する。種類のチェック一覧は折り畳むと下部エディターの背景も取り除く。時間帯とクリップの編集は保存と取り消し・やり直しに載せる。攻撃の制御は[仕様書 11.7](../game/spec.md#117-敵の攻撃の形)に従う。
+- 時間帯に整数の「予算」を表示し、クリックで直接入力する。ステージのインスペクターの「Enemy attack values」で種類ごとの個体valueを0.5刻みで調整する。「Enemy attack priorities」で種類ごとの優先度を編集し、未設定は標準0を使う。未設定の種類には「仮値」を表示する。クリップのインスペクターは「Spawn assets」で配置シーンを登録し、「Formations」でそのシーン内の並びを選択する。各行の「Auto」（個体合計）はステージの値・クリップの種類フィルター・実際の配置を読み、ステージの値が変わると再計算する。「Override」（群れ共有）をONにすると共有valueを入力でき、OFFにすると自動の個体消費へ戻る。保存名 `formation_values` は整数の項目も共有overrideとして維持する。開始時刻と長さはタイムラインで編集し、インスペクターは同時の群れの数を「Group counts」、間隔を「Interval」と表示する。種類のチェック一覧は折り畳むと下部エディターの背景も取り除く。時間帯とクリップの編集は保存と取り消し・やり直しに載せる。攻撃の制御は[仕様書 11.7](spec.md#117-敵の攻撃の形)に従う。
 - 目盛りをクリックして再生位置を決め、「再生」でその時刻からステージを起動する（14.1）。
 
 ### 14.3 プレイの記録
@@ -793,12 +793,12 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 
 | 項目 | 管理方法と参照先 |
 |---|---|
-| 敵 | 通常出現はステージの目標数と `config.spawn_total_cap`、分裂は目標数 ×（1 ＋ `config.enemy_split_overflow`）で管理する。[仕様書11章](../game/spec.md#11-敵) |
-| 経験値の結晶 | 個数が `config.gem_max` を超えた状態で追加すると、最古の結晶を新しい結晶へまとめる。[仕様書10章](../game/spec.md#10-ドロップと回収) |
-| 機雷 | [W07_mines.tres](../../speed/data/weapons/W07_mines.tres) の `params.max` まで追加する |
-| 破片の光の跡 | 1つの破片につき `config.corpse_trail_points` 点まで保持し、超えた最古点を除く。[仕様書16章](../game/spec.md#16-演出) |
+| 敵 | 通常出現はステージの目標数と `config.spawn_total_cap`、分裂は目標数 ×（1 ＋ `config.enemy_split_overflow`）で管理する。[仕様書11章](spec.md#11-敵) |
+| 経験値の結晶 | 個数が `config.gem_max` を超えた状態で追加すると、最古の結晶を新しい結晶へまとめる。[仕様書10章](spec.md#10-ドロップと回収) |
+| 機雷 | [W07_mines.tres](../speed/data/weapons/W07_mines.tres) の `params.max` まで追加する |
+| 破片の光の跡 | 1つの破片につき `config.corpse_trail_points` 点まで保持し、超えた最古点を除く。[仕様書16章](spec.md#16-演出) |
 
-数値は参照先の `.tres` で管理する。敵が1300体前後いる場面での60fpsは、[仕様書21章](../game/spec.md#21-性能)の性能目標とする。
+数値は参照先の `.tres` で管理する。敵が1300体前後いる場面での60fpsは、[仕様書21章](spec.md#21-性能)の性能目標とする。
 
 ## 18. 未決事項
 
@@ -814,7 +814,7 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 
 再現の基準は初期条件と tick 付き命令履歴の再実行。ContentManager は読み込んだ定義のハッシュを持ち、セッションがその基準を保持する。明示的なデータ再読込は敵・ボス・時間帯・ステージ・共通値を新しい参照として公開し、既存の実験が持つ参照を保つ。実験用の描画時計は `RunState.sim_time`、ボスの戦闘乱数は `RunState.rng` を使う。手動更新するボスのタイムラインはメソッドをその更新内で実行する。巻き戻しの高速化は、停止したランシーンを上限付きで保持する方式で、HSM・BT の内部状態も同じ実体で復元する。チェックポイントの鍵は適用済みの初期条件・命令列。履歴を差し替えた場合は実行済みの鍵との一致を検査する。
 
-`route_trial.gd` は独立したセッションで DrawSystem の描画・なぞりと各Systemの本番判定を実行する。`scripts/encounters/route_constraints.gd` は戦闘の別実装を持たず、静止形状と保守的な時間包絡の検査を担当する。成立区分と操作の正は [仕様書20.1](../game/spec.md#201-敵ルート実験場)。
+`route_trial.gd` は独立したセッションで DrawSystem の描画・なぞりと各Systemの本番判定を実行する。`scripts/encounters/route_constraints.gd` は戦闘の別実装を持たず、静止形状と保守的な時間包絡の検査を担当する。成立区分と操作の正は [仕様書20.1](spec.md#201-敵ルート実験場)。
 
 `scripts/encounters/attack_director.gd` は要求・分類の同時取得・待機・開始・残留・終了を管理する。ProjectileSystem の行番号から攻撃グループを引き、行の再利用時に対応を上書きする。付着範囲の所有者と、発生元・攻撃グループを区別する。EnemySystem の発動境界とボスの判断から予告前に許可を取り、攻撃のない追跡は既存の処理で進める。同じランの複数ボスは1つのBossSystemのactorsへ登録し、部位通知と撃破を対応する行・IDへ送る。役者と各部位はRunContextを受け取る。
 

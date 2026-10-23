@@ -6,22 +6,26 @@
 
 `docs/` には、現行仕様と今後実装する仕様、現在の実装状況を置く。開発に関わる全員が、文書だけでゲームの仕様と実装状況を正しく知れる状態を保つ。
 
+文書は抽象度で配置する。ゲーム全体を定義する企画書・仕様書・設計書は `docs/` 直下の同じ階層に置く。設定・見た目・文言・個別仕様は `game/`、制作手順は `dev/` の下位資料として管理する。
+
 | 置き場 | 置くもの |
 |---|---|
-| `docs/game/` | ゲームの決まり。現行仕様と今後実装する仕様を書く |
+| `docs/` | ゲーム全体の企画書・仕様書・設計書と、この文書運用規定 |
+| `docs/game/` | 世界観・アート・文言の個別資料と課題 |
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](game/catalog/rules.md) |
 | `docs/game/stages/` | ステージごとの個別仕様（`stage-1.md`〜`stage-5.md`） |
 | `docs/game/bosses/` | ボスごとの詳しい仕様。ステージの個別仕様からリンクする |
-| `docs/dev/` | 作り方。設計書と、ステージ制作の進め方 |
+| `docs/dev/` | 制作手順。ステージ制作の進め方とAI向けの参照 |
 
 置ける文書は次のものだけ。増やすときは、この表と `tools/check_docs.py` を同じ作業で直す。
 
 | 文書 | 中身 |
 |---|---|
-| [game/treatment.md](game/treatment.md) | 企画書。ゲームを知らない人に全体像をイメージさせる数ページの要約 |
+| [treatment.md](treatment.md) | 企画書。ゲームを知らない人に全体像をイメージさせる数ページの要約 |
+| [spec.md](spec.md) | 仕様書。全ステージに共通するゲームの決まり |
+| [architecture.md](architecture.md) | 設計書。Godot での作り方 |
 | [game/world.md](game/world.md) | 世界観とストーリー。設定と元ネタ |
 | [game/art-style.md](game/art-style.md) | デザインとアートスタイル。見た目 |
-| [game/spec.md](game/spec.md) | 仕様書。全ステージに共通するゲームの決まり |
 | [game/text.md](game/text.md) | ゲーム内文言の編集元と反映手順 |
 | [game/backlog.md](game/backlog.md) | 課題 |
 | `game/catalog/*.md` | 量産する項目の一覧と、その運用ルール。[共有アート素材リスト](game/catalog/art-assets.md)は必要な絵・要照合の候補を洗い出し、依頼・納品・組込・確認の状態を管理する |
@@ -30,7 +34,6 @@
 | [game/bosses/centaurus.md](game/bosses/centaurus.md) | ケンタウルス座の個別仕様。核と、戦闘・行動判断の要件・素材と演出の雛形 |
 | [game/bosses/canis-major.md](game/bosses/canis-major.md) | おおいぬ座の個別仕様。核と、戦闘・行動判断の要件・素材と演出の雛形 |
 | [game/bosses/hydra.md](game/bosses/hydra.md) | うみへび座の個別仕様。戦闘、行動判断の要件、素材と演出 |
-| [dev/architecture.md](dev/architecture.md) | 設計書。Godot での作り方 |
 | [dev/stage-production.md](dev/stage-production.md) | ステージ制作ガイド。制作者が使う制作・操作・試遊調整の入口 |
 | [dev/stage-production-ai.md](dev/stage-production-ai.md) | AI向けの制作参照。編集先・記録分析・変更確認の進め方 |
 
@@ -73,7 +76,7 @@ python3 tools/check_docs.py
 - 個人の作業ログのファイル
 - リポジトリの `tasks/`・`docs/proposals/`・`docs/logs/`
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
-- [設計書](dev/architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
+- [設計書](architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
 
 コミット前のフックを使うには、クローンごとに1回だけ次を実行する。
 
