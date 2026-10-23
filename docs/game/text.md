@@ -34,6 +34,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 |  | キーが空の行はこの説明と見出しで、ゲームは読まない。 |  |
 |  | ■ 共通 |  |
 | common.back | 戻る | Back |
+| common.cancel | キャンセル | Cancel |
 | common.to&#95;main&#95;menu | メインメニューに戻る | Back to Main Menu |
 | common.parts | 部品 {n} | Parts {n} |
 |  | ■ タイトル・メインメニュー |  |
@@ -114,6 +115,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.pause | ポーズ | Paused |
 | hud.resume | 続ける | Resume |
 | hud.quit&#95;run | メインメニューに戻る（このランは残らない） | Back to Main Menu (This Run Is Lost) |
+| hud.confirm&#95;quit&#95;run | メインメニューに戻りますか？<br>このランの記録は残りません。 | Return to the main menu?<br>This run will not be saved. |
 | hud.swap&#95;title | 入れ替えて手放す武器を選ぶ | Choose a Weapon to Replace |
 | card.new&#95;weapon | 新しい武器 | New Weapon |
 | card.new&#95;trait | 新しい特性 | New Trait |

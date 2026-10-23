@@ -5,6 +5,7 @@ keys,ja,en
 ,キーが空の行はこの説明と見出しで、ゲームは読まない。,
 ,■ 共通,
 common.back,戻る,Back
+common.cancel,キャンセル,Cancel
 common.to_main_menu,メインメニューに戻る,Back to Main Menu
 common.parts,部品 {n},Parts {n}
 ,■ タイトル・メインメニュー,
@@ -85,6 +86,9 @@ hud.reroll,リロール（残り {n} 回）　{key},Reroll ({n} Left)  {key}
 hud.pause,ポーズ,Paused
 hud.resume,続ける,Resume
 hud.quit_run,メインメニューに戻る（このランは残らない）,Back to Main Menu (This Run Is Lost)
+hud.confirm_quit_run,"メインメニューに戻りますか？
+このランの記録は残りません。","Return to the main menu?
+This run will not be saved."
 hud.swap_title,入れ替えて手放す武器を選ぶ,Choose a Weapon to Replace
 card.new_weapon,新しい武器,New Weapon
 card.new_trait,新しい特性,New Trait
