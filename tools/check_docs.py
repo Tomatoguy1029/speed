@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # docs/ の置き場ごとに置ける文書（None はその置き場の .md なら自由）
 ALLOWED = {
     "docs": {"README.md", "treatment.md", "spec.md", "architecture.md"},
-    "docs/game": {"world.md", "art-style.md", "text.md", "backlog.md"},
+    "docs/game": {"world.md", "art-style.md", "graphics-improvements.md", "text.md", "backlog.md"},
     "docs/game/catalog": None,
     "docs/game/stages": {f"stage-{n}.md" for n in range(1, 6)},
     "docs/game/bosses": None,

@@ -26,6 +26,7 @@
 | [architecture.md](architecture.md) | 設計書。Godot での作り方 |
 | [game/world.md](game/world.md) | 世界観とストーリー。設定と元ネタ |
 | [game/art-style.md](game/art-style.md) | デザインとアートスタイル。見た目 |
+| [game/graphics-improvements.md](game/graphics-improvements.md) | グラフィック改善ポイント。UIのレイアウト・色・アニメーション・エフェクトの改善要件 |
 | [game/text.md](game/text.md) | ゲーム内文言の編集元と反映手順 |
 | [game/backlog.md](game/backlog.md) | 課題 |
 | `game/catalog/*.md` | 量産する項目の一覧と、その運用ルール。[共有アート素材リスト](game/catalog/art-assets.md)は必要な絵・要照合の候補を洗い出し、依頼・納品・組込・確認の状態を管理する |
@@ -47,7 +48,7 @@
 2. **定義は能動的に書く。** 物事は「何であるか」「どこにあるか」「何をするか」で書き、「〜ではない」「〜しない」の形で定義しない。冒頭に概要を書くのはよい。似た文書を区別するときは、もう一方の文書に触れてよい。
 3. **同じ内容は1か所だけに書く。** 正の置き場は次のとおりで、ほかの文書からはリンクする。
    - 設定と元ネタ：世界観とストーリー
-   - 見た目：デザインとアートスタイル。ボスの個別素材と演出は `game/bosses/` の各ボスの仕様
+   - 見た目：デザインとアートスタイル。ボスの個別素材と演出は `game/bosses/` の各ボスの仕様。UIのグラフィック改善要件は[グラフィック改善ポイント](game/graphics-improvements.md)、必要な画像・素材は[共有アート素材リスト](game/catalog/art-assets.md)
    - ゲームの決まり：仕様書。ボスの個別仕様は `game/bosses/`、個別の武器・特性・敵の詳しい仕様は `game/catalog/` の各一覧
    - ステージ固有のゲーム仕様：各ステージの個別仕様。`game/stages/` の `stage-1.md`〜`stage-5.md`（例：[stage-4.md](game/stages/stage-4.md)）。共通の決まりとボスの詳細仕様はそれぞれの正本を参照する
    - 現在使う制作の進め方：[制作ガイド](dev/stage-production.md)。AIへの実装・分析依頼は [AI向け参照](dev/stage-production-ai.md)、ツールの詳細な編集契約と記録形式は設計書
