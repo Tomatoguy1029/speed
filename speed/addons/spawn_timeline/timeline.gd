@@ -15,6 +15,7 @@ var _details: RichTextLabel
 var _edit_feedback := ""
 ## 組み合わせのシーンのパス → 中に置いた敵の種類の一覧
 var _types_cache: Dictionary = {}
+var cached_mismatches: Array = []
 
 ## 時間帯の配列 phases と出現のクリップの配列 clips を持つリソースか。
 static func is_stage(object: Object) -> bool:
@@ -135,6 +136,11 @@ func set_stage(value: Resource) -> void:
 	refresh()
 
 func refresh() -> void:
+	refresh_view()
+	refresh_diagnostics()
+
+## ドラッグ中は表示だけ追従し、全検証と詳細表示は確定時に更新する。
+func refresh_view() -> void:
 	for prop in _pin_buttons:
 		var button: Button = _pin_buttons[prop]
 		var exists: bool = stage != null and canvas.clocks.value(prop) >= 0.0
@@ -145,7 +151,6 @@ func refresh() -> void:
 		button.self_modulate = Color.WHITE if exists else Color(0.45, 0.45, 0.45)
 		button.tooltip_text = "ON：クリックでOFFに切り替え" if exists else "OFF：クリックで再生位置にピンを配置（0:00なら既存の配置の末尾）"
 	_playhead_label.text = "再生位置 %s　" % Canvas.clock(canvas.playhead)
-	refresh_diagnostics()
 	if stage != null:
 		canvas.custom_minimum_size.y = canvas.content_height()
 	canvas.queue_redraw()
@@ -153,6 +158,7 @@ func refresh() -> void:
 ## 件数・赤枠と同じ検証結果を、選択の詳細と全件の詳細で説明する。
 func refresh_diagnostics() -> void:
 	var bad: Array = canvas.mismatches() if stage != null else []
+	cached_mismatches = bad
 	_info.text = "ルール違反のクリップ %d%s" % [bad.size(), "（詳細）" if not bad.is_empty() else ""]
 	_info.disabled = bad.is_empty()
 	_info.tooltip_text = all_rule_details()
@@ -168,6 +174,10 @@ func refresh_diagnostics() -> void:
 
 func report_edit_rejection(reason: String) -> void:
 	_edit_feedback = "操作できません：" + reason
+	if not canvas._drag.is_empty():
+		_details.text = _edit_feedback
+		_details.show()
+		return
 	refresh_diagnostics()
 
 func all_rule_details() -> String:
@@ -311,8 +321,6 @@ func _save_stage(target: Resource) -> void:
 		if p is Resource and p.resource_path != "" and not p.resource_path.contains("::"):
 			ResourceSaver.save(p)
 	ResourceSaver.save(target)
-	var error: Error = load("res://addons/content_build/builder.gd").build_all()
-	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
 	refresh()
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。

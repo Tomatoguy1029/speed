@@ -76,6 +76,12 @@ func _contains_resource(resources: Array, object: Object) -> bool:
 func _has_main_screen() -> bool:
 	return true
 
+## F5・F6・ツールバー・途中再生を、エディター共通の実行前フックで生成する。
+func _build() -> bool:
+	var error: Error = load("res://addons/content_build/builder.gd").build_all()
+	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
+	return error == OK
+
 func _on_property_edited(_property: String) -> void:
 	_queue_phase_save()
 
