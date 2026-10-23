@@ -117,6 +117,8 @@ func _style_menu_button(button: Button) -> void:
 	button.draw.connect(_draw_menu_corners.bind(button))
 	button.mouse_entered.connect(button.queue_redraw)
 	button.mouse_exited.connect(button.queue_redraw)
+	button.focus_entered.connect(button.queue_redraw)
+	button.focus_exited.connect(button.queue_redraw)
 
 func _build_start_panel(canvas: Control) -> void:
 	_start_panel = Control.new()
@@ -230,6 +232,13 @@ func _close_start_panel() -> void:
 	AudioManager.play(&"ui")
 	GameManager.back()
 
+func _input(event: InputEvent) -> void:
+	if _morphing or (_transition != null and _transition.is_running()):
+		for action in [&"ui_accept", &"ui_cancel", &"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
+			if event.is_action(action):
+				get_viewport().set_input_as_handled()
+				return
+
 func _unhandled_input(event: InputEvent) -> void:
 	if (_start_panel.visible or GameManager.screen == GameManager.Screen.STAGE_SELECT) and event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -238,7 +247,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		super(event)
 
 func _draw_menu_corners(button: Button) -> void:
-	if not button.is_hovered():
+	if not button.is_hovered() and not button.has_focus():
 		return
 	var bounds := Rect2(Vector2.ONE, button.size - Vector2.ONE * 2.0)
 	for corner: Vector2 in [bounds.position, Vector2(bounds.end.x, bounds.position.y), bounds.end, Vector2(bounds.position.x, bounds.end.y)]:
