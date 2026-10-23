@@ -29,7 +29,7 @@ static func capture(run: RunSimulation) -> Dictionary:
 			"config_sha256": digest(config), "runtime_stage_sha256": digest(plain(run.state.stage)),
 			"catalog_signature": ContentManager.catalog.source_signature,
 			"build_revision": OS.get_environment("SPEED_BUILD_REVISION"),
-			"scope": "run_initialization", "source_files_available": source_files_available}}
+			"scope": "run_initialization", "resource_digest_version": 2, "source_files_available": source_files_available}}
 
 static func _scan(path: String, extensions: Array, files: Dictionary, loaded: Dictionary) -> void:
 	for name in DirAccess.get_files_at(path):
@@ -54,6 +54,12 @@ static func stats(value: ShipStats) -> Dictionary:
 	return out
 
 static func plain(value: Variant) -> Variant:
+	# 画像の生バイトをJSONの数列へ展開しない。内容のSHA-256で識別する。
+	if value is PackedByteArray:
+		var hash := HashingContext.new()
+		hash.start(HashingContext.HASH_SHA256)
+		hash.update(value)
+		return {"bytes": value.size(), "sha256": hash.finish().hex_encode()}
 	if value is Resource:
 		var out := {}
 		for prop in value.get_property_list():

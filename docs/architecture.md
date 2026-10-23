@@ -499,7 +499,7 @@ classDiagram
 
 **通常出撃のロードと開始**
 
-生成済みのステージを取得してから、資源の読み込みとshaderの描画準備を完了させ、シミュレーションと表示を接続する。図は表示のある通常出撃の成功経路を示す。ContentManagerは読み込み要求をまとめ、完了した資源を各Scopeへ渡す。
+生成済みのステージを取得して暗転中から資源を読み込み、明転中も読み込みとshaderの描画準備を進める。資源と描画の準備を完了させてシミュレーションと表示を接続し、画面遷移の入力抑止が終わると戦闘の時計を進める。図は表示のある通常出撃の成功経路を示す。ContentManagerは読み込み要求をまとめ、完了した資源を各Scopeへ渡す。
 
 ```mermaid
 sequenceDiagram
@@ -512,8 +512,8 @@ sequenceDiagram
   RM->>CM: runtime_stage(index)
   CM-->>RM: .contentのRuntimeStage
   RM->>S: new() / ID登録
-  Note over RM,S: 呼び出し側がシーンの木へ追加<br/>readyが発火
-  S->>S: start_loading(options)
+  RM->>S: start_loading(options)
+  Note over RM,S: 画面の暗転と資源読み込みを並行し<br/>呼び出し側がシーンの木へ追加
   S->>CM: prepare_resources<br/>(stage.resources.paths)
   CM->>R: new()
   CM-->>S: Scope
@@ -726,7 +726,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 `RunSession` は開発版のラン初期化直後に条件を複製し、録画の有無によらず保持する。`run_start.conditions` に実効GameConfig、永続強化係数（`profile`）、機体能力値、機体強化段、強化上書きの有無、無敵・ヒットストップ設定と物理更新頻度を保存する。`recording_start.conditions` は録画開始時の実効GameConfig・永続強化係数・機体能力値・無敵・ヒットストップ設定を保存し、途中開始時の変更と区別する。ステージ別の敵調整があるランは `enemy_tuning` に各時点の実効上書きを保存する。両時点の乱数seed・状態は、JSONの数値精度を保つ文字列 `rng_seed`・`rng_state` として保存する。
 
-`run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。
+`run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。バイト列を含む資源の実効値は、バイト数と内容のSHA-256へ変換してから照合する。この形式を `resource_digest_version: 2` で示し、異なる形式の実効値ハッシュは形式を揃えて比較する。
 
 ライブ調整の区間は `recording_start.conditions.enemy_tuning` から始め、`enemy_tuning_changed.values` で全体を置き換えて追う。適用境界には `event_t`・`event_world_t` を使い、同じラン秒では行順と世界秒を併用する。`sample` が境界をまたぐ場合は設定が混在する区間として扱う。保存通知は適用履歴から分ける。録画前の変更は前半欠測のまま保持する。
 
