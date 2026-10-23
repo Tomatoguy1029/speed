@@ -1,4 +1,4 @@
-## 実行前・タイムライン保存・CLI・exportで共有する生成処理。
+## 実行前・CLI・exportで共有する生成処理。
 @tool
 extends RefCounted
 const ROOT := "res://.content"
