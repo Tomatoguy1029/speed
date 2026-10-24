@@ -8,6 +8,7 @@ const ENEMY_TUNING := preload("res://scripts/dev/stage_enemy_overlay.gd")
 func _ready() -> void:
 	if not OS.is_debug_build(): return
 	GameManager.extension_screens[GameManager.Screen.ENEMY_LAB] = "res://gyms/enemy_lab/enemy_lab.tscn"
+	GameManager.extension_screens[GameManager.Screen.BACKGROUND_LAB] = "res://gyms/background_lab/background_lab.tscn"
 	GameManager.screen_ready.connect(_on_screen_ready)
 	GameManager.boot_request = _consume_launch_request
 	RunManager.session_created.connect(_on_session_created)
@@ -45,18 +46,28 @@ func _on_screen_ready(view: Control) -> void:
 	button.name = "EnemyLabButton"
 	button.text = tr("menu.enemy_lab")
 	button.pressed.connect(view._go.bind(GameManager.Screen.ENEMY_LAB))
+	var background_button := Button.new()
+	background_button.name = "BackgroundLabButton"
+	background_button.text = tr("bg.title")
+	background_button.pressed.connect(view._go.bind(GameManager.Screen.BACKGROUND_LAB))
 	if path.ends_with("/title_screen.gd"):
-		view.menu_accessory = button
-		button.add_theme_font_size_override("font_size", 18)
-		view.add_child(button)
-		button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-		button.offset_left = -330.0
-		button.offset_right = -24.0
-		button.offset_top = 24.0
-		button.offset_bottom = 68.0
+		var tools := VBoxContainer.new()
+		tools.name = "DevelopmentTools"
+		view.menu_accessory = tools
+		view.add_child(tools)
+		tools.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		tools.offset_left = -330.0
+		tools.offset_right = -24.0
+		tools.offset_top = 24.0
+		tools.add_child(button)
+		tools.add_child(background_button)
+		for control: Button in [button, background_button]:
+			control.add_theme_font_size_override("font_size", 18)
+			control.custom_minimum_size.y = 44
 	else:
-		button.custom_minimum_size = Vector2(320, 52)
-		view.get_node("%Content").add_child(button)
+		for control: Button in [button, background_button]:
+			control.custom_minimum_size = Vector2(320, 52)
+			view.get_node("%Content").add_child(control)
 
 func _consume_launch_request() -> bool:
 	if not OS.has_feature("editor"): return false

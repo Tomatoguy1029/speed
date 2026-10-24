@@ -767,6 +767,48 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.save&#95;failed | 外観を保存できませんでした | Could not save appearance |
 | lab.appearance.file&#95;changed | 敵データが外部で変更されています。実験場を開き直してから保存してください。 | Enemy data changed externally. Reopen the lab before saving. |
 | lab.appearance.saved&#95;type | {name} の外観を保存しました。次のステージ開始から使います。 | Saved appearance for {name}. New runs will use these settings. |
+| bg.title | 背景エディター | Background editor |
+| bg.back | 戻る | Back |
+| bg.stage | ステージ {n} | Stage {n} |
+| bg.undo | 取り消す | Undo |
+| bg.redo | やり直す | Redo |
+| bg.save | ステージへ保存 | Save to stage |
+| bg.assets | 背景素材 | Background assets |
+| bg.add | 選択した素材を追加 | Add selected asset |
+| bg.placed | 配置済み（下ほど手前） | Placed (last is in front) |
+| bg.send_back | 奥へ | Backward |
+| bg.bring_front | 手前へ | Forward |
+| bg.start | 開始地点へ | Go to start |
+| bg.focus | 選択を拡大 | Frame selection |
+| bg.guides | ガイド表示 | Show guides |
+| bg.help | 左ドラッグで配置を移動 · ホイールでズーム · 中央ドラッグで視点移動。座標はステージ開始地点を原点にします。 | Left-drag to move · Wheel to zoom · Middle-drag to pan. Coordinates are relative to the stage start. |
+| bg.origin | 開始地点 (0, 0) | Start (0, 0) |
+| bg.properties | 選択した背景 | Selected background |
+| bg.x | 位置 X | Position X |
+| bg.y | 位置 Y | Position Y |
+| bg.scale | サイズ倍率 | Scale |
+| bg.rotation | 回転（度） | Rotation (degrees) |
+| bg.opacity | 透明度（0＝非表示、1＝不透明） | Opacity (0 = hidden, 1 = opaque) |
+| bg.color | 重ねる色 | Color tint |
+| bg.duplicate | 複製 | Duplicate |
+| bg.delete | 削除 | Delete |
+| bg.unsaved_title | 未保存の変更 | Unsaved changes |
+| bg.discard_button | 破棄して移動 | Discard and continue |
+| bg.cancel | 編集を続ける | Continue editing |
+| bg.discard | 未保存の背景変更を破棄して移動しますか？ | Discard unsaved background changes and continue? |
+| bg.dimensions | 表示寸法：{w} × {h}（透明な余白を除く） | Visible size: {w} × {h} (excluding transparent padding) |
+| bg.select | 背景素材を追加するか、配置済みの背景を選んでください。 | Add an asset or select a placed background. |
+| bg.status | 背景 {n} 件 · {state} | {n} backgrounds · {state} |
+| bg.dirty | 未保存 | Unsaved |
+| bg.saved | 保存済み | Saved |
+| bg.external_change | ステージが外部で変更されています。変更を控え、ステージを読み直してから保存してください。 | The stage changed externally. Keep a copy of your edits and reload the stage before saving. |
+| bg.failed | 背景を保存できませんでした。 | Could not save backgrounds. |
+| bg.saved_stage | 背景を保存しました。次のステージ開始から反映します。 | Backgrounds saved. Changes apply the next time the stage starts. |
+| bg.asset.colony | コロニーの残骸 | Colony wreck |
+| bg.asset.space_debris | 宇宙の瓦礫 | Space debris |
+| bg.asset.asteroid_a | 小惑星 A | Asteroid A |
+| bg.asset.asteroid_b | 小惑星 B | Asteroid B |
+| bg.asset.solar | ソーラーパネルの残骸 | Solar panel wreck |
 | lab.armor.title | 装甲の塗装 | Armor paint |
 | lab.armor.upper | 上半分 | Upper half |
 | lab.armor.lower | 下半分 | Lower half |
