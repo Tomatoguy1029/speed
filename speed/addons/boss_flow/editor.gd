@@ -16,6 +16,8 @@ var flow: Resource
 var flow_path := "res://data/bosses/hydra_flow.tres"
 var flow_bar := HBoxContainer.new()
 var editing_flow := false
+var combo_editor := preload("res://addons/boss_flow/combo_graph.gd").new()
+var combo_id := ""
 
 func _ready() -> void:
 	var toolbar := HBoxContainer.new()
@@ -52,6 +54,13 @@ func _ready() -> void:
 	scroll.add_child(_fields)
 	_status.text = "技を開いて編集します。保存では実行データを生成しません。"
 	_load_rules()
+	add_child(combo_editor)
+	combo_editor.hide()
+	combo_editor.changed.connect(func(value):
+		history.create_action("コンボ内部を変更")
+		history.add_do_method(_set_combo.bind(combo_id, value))
+		history.add_undo_method(_set_combo.bind(combo_id, rules.combos.get(combo_id, {"type": "sequence", "children": []}).duplicate(true)))
+		history.commit_action())
 
 func _load_rules() -> void:
 	if ResourceLoader.exists(rules_path):
@@ -65,9 +74,20 @@ func _load_rules() -> void:
 
 func _picked(kind: String, id: String) -> void:
 	editing_flow = false
+	combo_editor.hide()
 	if kind == "technique":
 		for move in rules.techniques:
-			if String(move.technique) == id: open_technique(move.resource_path)
+			if String(move.technique) == id:
+				open_technique(move.resource_path)
+				var button := Button.new()
+				button.text = "コンボ内部を開く"
+				button.pressed.connect(func():
+					combo_id = id
+					editing_rules = true
+					combo_editor.show()
+					combo_editor.open(rules.combos.get(id, {"type": "sequence", "children": []}), rules.techniques))
+				_fields.add_child(button)
+				_fields.add_child(Control.new())
 	elif kind == "condition":
 		editing_rules = true
 		for child in _fields.get_children():
@@ -96,6 +116,10 @@ func _picked(kind: String, id: String) -> void:
 func _set_gate(id: String, key: String, value: float) -> void:
 	rules.conditions[id][key] = value
 	preview.queue_redraw()
+
+func _set_combo(id: String, value: Dictionary) -> void:
+	rules.combos[id] = value.duplicate(true)
+	combo_editor.open(rules.combos[id], rules.techniques)
 
 func _open_path() -> void:
 	open_technique(_path.text)
