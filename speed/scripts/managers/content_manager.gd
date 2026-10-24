@@ -12,7 +12,6 @@ var base: GameConfig
 ## 実行時に使う調整値（調整パネルが書き換える）
 var cfg: GameConfig
 
-var _checked_build := false
 var catalog: ContentCatalog
 var _tables: Dictionary = {}
 var _definitions: Dictionary = {}
@@ -45,6 +44,10 @@ var heroes: Dictionary:
 	set(value): _tables[&"heroes"] = value
 
 func _ready() -> void:
+	# エディターの実行前プラグインを通らない起動でも、音源より先に生成する。
+	if not _ensure_runtime_content():
+		get_tree().quit(1)
+		return
 	base = load(CONFIG_PATH) as GameConfig
 	if OS.has_feature("editor"): source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
@@ -151,14 +154,29 @@ func _table(category: StringName) -> Dictionary:
 		_tables[category] = table
 	return _tables[category]
 
+## 開発中は実験場の保存で生成物が古くなるため、ステージ開始ごとに確認する。
+func _ensure_runtime_content() -> bool:
+	if not OS.has_feature("editor"):
+		return true
+	var builder = load("res://addons/content_build/builder.gd")
+	if builder.is_current():
+		return true
+	var error: Error = builder.build_all()
+	if error != OK:
+		push_error("実行用データの自動生成に失敗: %s" % error_string(error))
+		return false
+	if catalog != null:
+		catalog = ResourceLoader.load("res://data/content_catalog.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as ContentCatalog
+		release_runtime_definitions()
+	return true
+
 func runtime_stage(index: int) -> RuntimeStage:
-	if OS.has_feature("editor") and not _checked_build:
-		if not load("res://addons/content_build/builder.gd").is_current():
-			push_error("実行用データがないか古いため停止します。content/build_all.gdまたはエディター実行前の生成を行ってください。")
-			get_tree().quit(1)
-			return null
-		_checked_build = true
-	return load("res://.content/stage_%d.tres" % index) as RuntimeStage
+	if not _ensure_runtime_content():
+		get_tree().quit(1)
+		return null
+	# 同じ実行中に再生成したステージも、古い読み込み済みリソースを使わず読む。
+	var mode := ResourceLoader.CACHE_MODE_IGNORE_DEEP if OS.has_feature("editor") else ResourceLoader.CACHE_MODE_REUSE
+	return ResourceLoader.load("res://.content/stage_%d.tres" % index, "", mode) as RuntimeStage
 
 ## 読込ジョブはセッションを保持せず、取り消した要求の結果も最後まで受け取って解放する。
 var _resource_jobs: Dictionary = {}
