@@ -14,7 +14,7 @@ func _ready() -> void:
 	_path.placeholder_text = "技Resourceのパス（res://…）"
 	_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(_path)
-	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo]]:
+	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["試遊", play_current]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -66,6 +66,14 @@ func save_current() -> Error:
 	var error := ResourceSaver.save(current, source_path)
 	_status.text = "保存済み（実行データは試遊前に生成）" if error == OK else error_string(error)
 	return error
+
+func play_current() -> void:
+	if save_current() != OK: return
+	var result = preload("res://tools/content/build_boss_program.gd").compile({"techniques": [current]}, "res://.content/boss_preview.tres")
+	if result.error != OK:
+		_status.text = "生成失敗: " + error_string(result.error)
+		return
+	if Engine.is_editor_hint(): EditorInterface.play_custom_scene("res://gyms/boss_flow_trial.tscn")
 
 func _refresh() -> void:
 	for child in _fields.get_children():

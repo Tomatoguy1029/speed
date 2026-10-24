@@ -28,7 +28,8 @@ func exercise(a, lab) -> void:
 	var n = a.necks[0]
 	n.cd = 0.0
 	check(a.start_normal(0, &"bite_thrust"), "normal start uses conditions and settings")
-	a.sim_tick(0.15, 0.15)
+	# 判定の寿命0.1秒より細かく更新し、実際の固定更新と同じ条件で観測する。
+	for frame in 15: a.sim_tick(0.01, 0.01)
 	check(a.attack_field.effects.any(func(e): return is_equal_approx(e.width, 117.0) and is_equal_approx(e.damage, 31.0)), "normal width and damage reach actual geometry")
 	lab.run.state.ship_pos = Vector2(-5000, 0)
 	a.sim_tick(0.05, 0.05)

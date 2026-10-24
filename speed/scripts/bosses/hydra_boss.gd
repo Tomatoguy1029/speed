@@ -485,7 +485,8 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 func _collect_moves(task: BTTask, gates: Array = []) -> void:
 	var branch := gates.duplicate()
 	if task is BTSequence:
-		for child in task.get_children():
+		for child_index in task.get_child_count():
+			var child := task.get_child(child_index)
 			if child.has_method("allows"): branch.append(child)
 	if task.has_method("get_hydra_settings"):
 		var settings: HydraTechnique = task.get_hydra_settings()
@@ -493,7 +494,7 @@ func _collect_moves(task: BTTask, gates: Array = []) -> void:
 			_moves[settings.technique] = settings.duplicate(true)
 			_move_gates[settings.technique] = branch
 			if settings.head_kind != &"": _normal_moves[settings.technique] = true
-	for child in task.get_children(): _collect_moves(child, branch)
+	for child_index in task.get_child_count(): _collect_moves(task.get_child(child_index), branch)
 
 func move_settings(attack: StringName) -> HydraTechnique:
 	return _moves.get(attack)
