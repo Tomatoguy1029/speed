@@ -716,6 +716,12 @@ func _edit_coverage(group := "") -> void:
 	var selection: Dictionary = rules.condition_groups.get(group, {})
 	_context(selection.get("title", "全技") + " · 条件のカバー", 5, true)
 	_clear_fields()
+	var purpose := Label.new()
+	purpose.text = "このノードにつなぐ技をまとめます。距離・方向の発動条件は、各技を選んで編集します。"
+	purpose.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	purpose.custom_minimum_size.x = 160 * _scale
+	_fields.add_child(purpose)
+	_fields.add_child(Control.new())
 	if not selection.is_empty():
 		var label := Label.new()
 		label.text = "条件選択の名前"
@@ -727,7 +733,7 @@ func _edit_coverage(group := "") -> void:
 		name_field.focus_exited.connect(func(): _rename_group(group, name_field.text, original_name))
 		_fields.add_child(name_field)
 		var members_label := Label.new()
-		members_label.text = "配下の技"
+		members_label.text = "候補にする技\nチェックで有効／無効"
 		_fields.add_child(members_label)
 		var members := VBoxContainer.new()
 		_fields.add_child(members)
@@ -743,7 +749,7 @@ func _edit_coverage(group := "") -> void:
 		_fields.add_child(move_label)
 		var choices := OptionButton.new()
 		choices.fit_to_longest_item = false
-		choices.add_item("移す技を選択…")
+		choices.add_item("移す技を選ぶ…")
 		for id in rules.node_ids():
 			if graph.hub_for(id) == group: continue
 			choices.add_item(GRAPH.node_title(rules, id))
@@ -751,22 +757,35 @@ func _edit_coverage(group := "") -> void:
 		choices.item_selected.connect(func(index):
 			if index > 0: graph.assign_group(choices.get_item_metadata(index), group))
 		_fields.add_child(choices)
+	var simulation := CheckBox.new()
+	simulation.text = "範囲図の確認条件"
+	_fields.add_child(simulation)
+	_fields.add_child(Control.new())
+	var preview_start := _fields.get_child_count()
+	var explanation := Label.new()
+	explanation.text = "以下は範囲図だけに使う仮の状況です。戦闘のスタミナ・首の数・発動条件は変更しません。"
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	explanation.custom_minimum_size.x = 160 * _scale
+	_fields.add_child(explanation)
+	_fields.add_child(Control.new())
 	var separated := CheckButton.new()
-	separated.text = "分離後の状況"
+	separated.text = "分離した状態で確認"
 	separated.button_pressed = preview_separated
-	separated.toggled.connect(func(value): preview_separated = value)
+	separated.toggled.connect(func(value): preview_separated = value; _analyze_coverage())
 	if _is_hydra():
 		_fields.add_child(separated)
 		_fields.add_child(Control.new())
 	else: separated.free()
-	_number_field("確認する残量", preview_stamina, func(value): preview_stamina = value)
-	_number_field("確認領域の半径", preview_radius, func(value): preview_radius = value, 1.0)
+	_number_field("仮の残りスタミナ", preview_stamina, func(value): preview_stamina = value; _analyze_coverage())
+	_number_field("範囲図に表示する距離", preview_radius, func(value): preview_radius = value; _analyze_coverage(), 1.0)
 	for kind in preview_heads:
-		if _is_hydra(): _number_field({"bite": "噛みつき", "vortex": "渦", "debris": "瓦礫", "beam": "ビーム", "thunder": "雷"}[kind] + "の生存数", preview_heads[kind], func(value): preview_heads[kind] = int(value), 0.0, 2.0)
-	var refresh := Button.new()
-	refresh.text = "この状況の攻撃範囲を表示"
-	refresh.pressed.connect(_analyze_coverage)
-	_fields.add_child(refresh)
+		if _is_hydra():
+			var field := _number_field("仮の" + {"bite": "噛みつき", "vortex": "渦", "debris": "瓦礫", "beam": "ビーム", "thunder": "雷"}[kind] + "首（本）", preview_heads[kind], func(value): preview_heads[kind] = int(value); _analyze_coverage(), 0.0, 2.0)
+			field.step = 1.0
+	var preview_fields := _fields.get_children().slice(preview_start)
+	for field in preview_fields: field.hide()
+	simulation.toggled.connect(func(expanded):
+		for field in preview_fields: field.visible = expanded)
 	_analyze_coverage()
 
 func _rename_group(group: String, text: String, original_name: String) -> void:
