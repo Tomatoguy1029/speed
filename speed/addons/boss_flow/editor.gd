@@ -23,7 +23,7 @@ func _ready() -> void:
 	_path.placeholder_text = "技Resourceのパス（res://…）"
 	_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(_path)
-	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["共通設定", _edit_common], ["試遊", play_current]]:
+	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["共通設定", _edit_common], ["併用禁止", _edit_forbidden], ["試遊", play_current]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -256,6 +256,48 @@ func _edit_common() -> void:
 			history.add_do_property(flow, key, value)
 			history.add_undo_property(flow, key, flow.get(key))
 			history.commit_action())
+
+func _edit_forbidden() -> void:
+	editing_flow = false
+	editing_rules = true
+	_clear_fields()
+	_status.text = "同時に使わない技の組（逆順も同じ設定）"
+	for pair in rules.forbidden:
+		var label := Label.new()
+		label.text = "%s × %s" % [pair[0], pair[1]]
+		_fields.add_child(label)
+		var remove := Button.new()
+		remove.text = "削除"
+		remove.pressed.connect(func():
+			var copy: Array = rules.forbidden.duplicate(true)
+			copy.erase(pair)
+			_set_forbidden_undo(copy))
+		_fields.add_child(remove)
+	var choices: Array[OptionButton] = []
+	for side in 2:
+		var choice := OptionButton.new()
+		for move in rules.techniques: choice.add_item(String(move.technique))
+		choices.append(choice)
+		_fields.add_child(choice)
+	var add := Button.new()
+	add.text = "禁止ペアを追加"
+	add.pressed.connect(func():
+		var pair := [choices[0].get_item_text(choices[0].selected), choices[1].get_item_text(choices[1].selected)]
+		pair.sort()
+		var copy: Array = rules.forbidden.duplicate(true)
+		if not copy.has(pair): copy.append(pair)
+		_set_forbidden_undo(copy))
+	_fields.add_child(add)
+
+func _set_forbidden_undo(value: Array) -> void:
+	history.create_action("併用禁止を変更")
+	history.add_do_method(_set_forbidden.bind(value))
+	history.add_undo_method(_set_forbidden.bind(rules.forbidden.duplicate(true)))
+	history.commit_action()
+
+func _set_forbidden(value: Array) -> void:
+	rules.forbidden = value.duplicate(true)
+	_edit_forbidden()
 
 func play_current() -> void:
 	if save_current() != OK: return

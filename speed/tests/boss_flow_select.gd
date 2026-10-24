@@ -11,5 +11,14 @@ func _initialize() -> void:
 	assert(selector.choose([a, c], section, []).front().id == "a")
 	assert(selector.choose([a, c], section, [a]).front().id == "c")
 	assert(selector.choose([a], {"weights": {"single": 1.0, "combo": 99.0}}, []).front().id == "a")
+	var b := {"id": "b", "category": "single", "cost": 1.0, "parts": [2]}
+	var together := {"weights": {"parallel": 100.0}, "cap": 2.0}
+	if selector.choose([a, b], together, []).size() != 2:
+		print("[boss-select] FAIL parallel choice missing")
+		quit(1)
+		return
+	assert(selector.choose([a, b], together, [], [["a", "b"]]).is_empty())
+	b.parts = [1]
+	assert(selector.choose([a, b], together, []).is_empty())
 	print("[boss-select] PASS weighted category, history row, unavailable redistribution")
 	quit()

@@ -61,7 +61,9 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 		else: status = "区間上限または最大スタミナで実行できる技がありません"
 		return
 	candidates = affordable
-	var actions: Array = selector.choose(candidates, section, last)
+	var selection := section.duplicate()
+	selection.available = minf(stamina, cap)
+	var actions: Array = selector.choose(candidates, selection, last, context.get("forbidden", []))
 	if actions.is_empty():
 		status = "成立する攻撃種別の確率が0です"
 		return

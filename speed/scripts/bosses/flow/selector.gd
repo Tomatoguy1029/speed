@@ -18,7 +18,43 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 		var id: String = candidate.id
 		if not groups[kind].has(id): groups[kind][id] = []
 		groups[kind][id].append([candidate])
-	return sample(groups, weights_for(section, last))
+	var cap := float(section.get("available", section.get("cap", INF)))
+	var parallel := {}
+	for i in candidates.size():
+		if candidates[i].get("category", "single") != "single": continue
+		for j in range(i + 1, candidates.size()):
+			if candidates[j].get("category", "single") != "single": continue
+			var pair := [candidates[i], candidates[j]]
+			if not compatible([pair[0]], pair[1], cap, _forbidden): continue
+			var key := identity(pair)
+			if not parallel.has(key): parallel[key] = []
+			parallel[key].append(pair)
+	if not parallel.is_empty(): groups.parallel = parallel
+	var actions: Array = sample(groups, weights_for(section, last))
+	# 3個以上は選択済みペアから必要時だけ拡張し、全ての部分集合を作らない。
+	if actions.size() > 1:
+		var remaining := candidates.duplicate()
+		while not remaining.is_empty() and random.randf() < 0.5:
+			var next: Dictionary = remaining.pop_at(random.randi_range(0, remaining.size() - 1))
+			if next.get("category", "single") == "single" and compatible(actions, next, cap, _forbidden): actions = actions + [next]
+	return actions
+
+static func identity(actions: Array) -> String:
+	var ids := PackedStringArray()
+	for action in actions: ids.append(String(action.id))
+	ids.sort()
+	return "|".join(ids)
+
+static func compatible(actions: Array, next: Dictionary, cap: float, forbidden: Array) -> bool:
+	var cost := float(next.cost)
+	for action in actions:
+		cost += float(action.cost)
+		if action.get("exclusive", false) or next.get("exclusive", false): return false
+		for part in action.get("parts", []):
+			if part in next.get("parts", []): return false
+		for pair in forbidden:
+			if pair.size() == 2 and ((pair[0] == action.id and pair[1] == next.id) or (pair[1] == action.id and pair[0] == next.id)): return false
+	return cost <= cap + 0.00001
 
 func sample(groups: Dictionary, weights: Dictionary) -> Array:
 	var total := 0.0
