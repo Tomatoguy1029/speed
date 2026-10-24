@@ -747,6 +747,8 @@ func _test_hydra_attacks() -> void:
 		n.angle=0.0
 		n.length=float(boss.def.params.neck_rest)
 		run.state.ship_pos=boss._head_pos(n)+Vector2(170.0 if float(rule.min)==0.0 else 450.0,0)
+		if attack == &"bite_sweep":
+			run.state.ship_pos = boss._neck_base(n) + Vector2(float(boss.move_params(attack).sweep_reach) * 0.7, 0)
 		run.state.view_center=run.state.ship_pos
 		n.cd=0.0
 		var started: bool=boss.start_normal(boss.necks.find(n),attack)

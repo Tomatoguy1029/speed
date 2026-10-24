@@ -145,6 +145,7 @@ func _check_growth() -> void:
 	interrupt_tech()
 	_set_count(next)
 	growth_t = float(def.params.growth_time)
+	if flow_adapter != null: flow_adapter.cancel_all()
 	table.guard[body] = growth_t
 	for neck in necks:
 		if _alive(neck): table.guard[neck.row] = growth_t
@@ -519,28 +520,20 @@ func move_params(attack: StringName) -> Dictionary:
 func _position_ready(attack: StringName, index := -1) -> bool:
 	if flow_controlled and action_rules != null:
 		var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-		var distance_origin: Vector2 = table.pos[body]
-		var angle_origin: Vector2 = table.pos[body]
-		var facing: float = table.facing[body]
+		var snapshot := {"gate": gate, "body": table.pos[body], "facing": table.facing[body], "separated": separated}
 		if index >= 0:
 			var n := necks[index]
-			if int(gate.get("distance_origin", 0)) == 1: distance_origin = _head_pos(n)
-			elif int(gate.get("distance_origin", 0)) == 2: distance_origin = _neck_base(n)
-			if int(gate.get("angle_origin", 0)) == 1:
-				angle_origin = _neck_base(n)
-				facing += n.base_angle
-		var delta: Vector2 = run_state.ship_pos - distance_origin
-		var angular: Vector2 = (run_state.ship_pos - angle_origin).rotated(-facing)
-		var angular_gate := gate.duplicate()
-		angular_gate.min = 0.0
-		angular_gate.max = INF
-		if separated and gate.get("ignore_when_separated", false): angular_gate.half_angle = 180.0
-		return delta.length() >= float(gate.get("min", 0.0)) and delta.length() <= float(gate.get("max", INF)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(angular_gate, angular)
+			snapshot.head = _head_pos(n)
+			snapshot.base = _neck_base(n)
+			snapshot.base_angle = n.base_angle
+			snapshot.reach = NORMALS.reach(attack, move_params(attack))
+		return preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos)
 	for condition in _move_gates.get(attack, []):
 		if not condition.allows(self, index): return false
 	return true
 
 func _normal_cost(attack: StringName) -> float:
+	if action_rules != null: return float(action_rules.costs.get(String(attack), INF))
 	var settings := move_settings(attack)
 	return float(settings.parameters.cost) if settings != null else INF
 
@@ -648,6 +641,8 @@ func _update_guard_approach()->void:
 	_guard_approach.clear()
 	if not separated or busy or recovery_t>0.0:return
 	var budget:=float(def.params.normal_budget)
+	if flow_controlled and flow_runner.flow != null:
+		budget = minf(flow_runner.stamina, float(flow_runner.flow.sections[flow_runner.index].get("cap", flow_runner.flow.maximum_stamina)))
 	var pending: Array[Neck]=[]
 	for n in necks:
 		if not _alive(n):continue
@@ -663,7 +658,7 @@ func _update_guard_approach()->void:
 	for n in pending:
 		var cost:=INF
 		for settings: HydraTechnique in _moves.values():
-			if settings.head_kind==n.kind:cost=minf(cost,float(settings.parameters.cost)*maxf(0.0,table.attack_value[n.row]))
+			if settings.head_kind==n.kind:cost=minf(cost,_normal_cost(settings.technique))
 		if cost>budget:continue
 		budget-=cost
 		_guard_approach.append(n)
@@ -749,7 +744,8 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 		return false
 	if not timeline.has_animation(attack):return false
 	var director=ctx.projectiles.director
-	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(move_params(attack).major_cost)):
+	var major_cost: float = action_rules.costs.get(String(attack), 1.0) if action_rules != null else float(move_params(attack).major_cost)
+	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,major_cost):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
 	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
@@ -791,6 +787,7 @@ func begin_final_strike(charge: float) -> void:
 	if final_strike_t >= 0.0:
 		return
 	final_strike_t = 0.0
+	if flow_adapter != null: flow_adapter.cancel_all()
 	_final_start = run_state.time
 	_final_charge = maxf(0.1, charge)
 	hsm.set_active(false)
@@ -1182,6 +1179,7 @@ func compass_angle() -> float:
 ## 瓦礫破壊を勝利と分け、全快した独立蛇へ所有権を引き継ぐ。
 func begin_separation()->void:
 	if separated:return
+	if flow_adapter != null: flow_adapter.cancel_all()
 	interrupt_tech()
 	attack_field.clear_effects()
 	_set_count(count)

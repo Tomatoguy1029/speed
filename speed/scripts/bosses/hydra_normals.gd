@@ -1,5 +1,15 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
+
+## 同じ技の数値から求める到達上限。標的位置へ直接出す技は発動条件で領域を決める。
+static func reach(id: StringName, p: Dictionary) -> Dictionary:
+	match id:
+		&"bite_sweep": return {"origin": "base", "max": float(p.sweep_reach) + float(p.bite_radius) * 0.5}
+		&"wind_band": return {"origin": "head", "max": float(p.wind_length) + float(p.wind_width) * 0.5}
+		&"wind_blades": return {"origin": "head", "max": float(p.blade_speed) * float(p.blade_life) + float(p.blade_size)}
+		&"beam_fixed": return {"origin": "head", "max": float(p.beam_len) + float(p.beam_width) * 0.5}
+		&"beam_bolt": return {"origin": "head", "max": float(p.bolt_speed) * float(p.bolt_life) + float(p.bolt_length) + float(p.bolt_width) * 0.5}
+	return {"origin": "head", "max": INF}
 static func tick(a: Node, n, dt: float) -> void:
 	var aim: Dictionary = a.move_params(n.mode)
 	if n.t <= minf(float(aim.get("aim_tracking", 0.0)), float(aim.get("normal_charge", 0.0))): n.target = a.run_state.ship_pos

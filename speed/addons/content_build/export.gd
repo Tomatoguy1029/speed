@@ -16,6 +16,7 @@ func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String,
 			ProjectSettings.set_setting(key, null)
 	# 隠しフォルダの生成物を明示的に含める。開発用の名前の対応表は含めない。
 	for file in DirAccess.get_files_at(BUILD.ROOT):
+		if file == "boss_preview.tres": continue
 		if file.get_extension() in ["tres", "res"]:
 			var path := BUILD.ROOT.path_join(file)
 			add_file(path, FileAccess.get_file_as_bytes(path), false)

@@ -1,6 +1,6 @@
 extends RefCounted
 var program: Dictionary
-var adapter: Object
+var adapter: WeakRef
 var cursor := 0
 var elapsed := 0.0
 var state: StringName = &"running"
@@ -10,25 +10,30 @@ var branches: Array = []
 
 func _init(value: Dictionary, owner_adapter: Object) -> void:
 	program = value
-	adapter = owner_adapter
+	adapter = weakref(owner_adapter)
 
 func tick(dt: float) -> StringName:
 	if state != &"running" or dt <= 0.0: return state
+	var owner_adapter: Object = adapter.get_ref()
+	if owner_adapter == null:
+		cancel()
+		return state
 	match program.get("type", "action"):
 		"wait":
 			elapsed += dt
 			if elapsed >= float(program.get("seconds", 0.0)): state = &"finished"
 		"action":
 			if ticket == null:
-				ticket = adapter.start_step(String(program.get("id", "")))
+				ticket = owner_adapter.start_step(String(program.get("id", "")))
 				if ticket == null: state = &"failed"
+			elif ticket.has_method("failed") and ticket.failed(): state = &"failed"
 			elif not ticket.running(): state = &"finished"
 		"sequence":
 			var children: Array = program.get("children", [])
 			if cursor >= children.size():
 				state = &"finished"
 			else:
-				if child == null: child = get_script().new(children[cursor], adapter)
+				if child == null: child = get_script().new(children[cursor], owner_adapter)
 				var result: StringName = child.tick(dt)
 				if result == &"failed": state = result
 				elif result == &"finished":
@@ -37,7 +42,7 @@ func tick(dt: float) -> StringName:
 					if cursor >= children.size(): state = &"finished"
 		"parallel":
 			if branches.is_empty():
-				for node in program.get("children", []): branches.append(get_script().new(node, adapter))
+				for node in program.get("children", []): branches.append(get_script().new(node, owner_adapter))
 			var completed := 0
 			for branch in branches:
 				var result: StringName = branch.tick(dt)
@@ -48,11 +53,11 @@ func tick(dt: float) -> StringName:
 			if completed == branches.size(): state = &"finished"
 		"branch":
 			if child == null:
-				var pick := 0 if adapter.step_condition(program.get("condition", {})) else 1
+				var pick := 0 if owner_adapter.step_condition(program.get("condition", {})) else 1
 				if program.get("children", []).size() != 2:
 					state = &"failed"
 					return state
-				child = get_script().new(program.children[pick], adapter)
+				child = get_script().new(program.children[pick], owner_adapter)
 			state = child.tick(dt)
 		_:
 			state = &"failed"

@@ -31,6 +31,19 @@ func exercise() -> void:
 	check(panel.save_current() == OK, "explicit save succeeds")
 	check(panel.open_technique(path) == OK and panel.current.parameters.bite_dmg == before + 7.0, "reload preserves saved value")
 	check(original.parameters.bite_dmg == before, "source stays untouched")
+	panel.graph.node_selected.emit(panel.graph.get_node("bite_thrust"))
+	check(panel.source_path == "res://data/bosses/hydra_moves/bite_thrust.tres", "native graph node selection opens the technique")
+	await process_frame
+	var from = panel.graph.get_node("choose")
+	var to = panel.graph.get_node("bite_thrust")
+	var origin: Vector2 = (from.position_offset + from.get_output_port_position(0)) * panel.graph.zoom - panel.graph.scroll_offset
+	var target: Vector2 = (to.position_offset + to.get_input_port_position(0)) * panel.graph.zoom - panel.graph.scroll_offset
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = origin.lerp(target, 0.5)
+	panel.graph._input_graph(click)
+	check(panel.editing_rules and panel.preview.gate == panel.rules.conditions.bite_thrust, "connection hit test selects its conditions")
 	DirAccess.remove_absolute(path)
 	panel.queue_free()
 	await process_frame

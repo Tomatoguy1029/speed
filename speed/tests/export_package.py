@@ -24,11 +24,13 @@ def inspect(path: Path) -> None:
         files[name] = data[base + offset:base + offset + size]
     excluded = ("gyms/", "tests/", "tools/", "scripts/dev/", ".content/dev/",
                 "addons/content_build/", "addons/spawn_timeline/",
-                "addons/speed_data_editor/", "addons/stage_launcher/")
+                "addons/speed_data_editor/", "addons/stage_launcher/", "addons/boss_flow/")
     forbidden = [name for name in files if name.startswith(excluded)]
     assert not forbidden, f"開発用ファイルが残っている: {forbidden}"
     assert b"autoload/DevBootstrap" not in files["project.binary"], "開発用Autoloadを除外"
     assert "addons/limboai/bin/limboai.gdextension" in files, "実行用の拡張を保持"
+    assert ".content/boss_hydra.tres" in files, "生成したボスAIを含める"
+    assert ".content/boss_preview.tres" not in files, "試遊用の編集結果を配布へ含めない"
     for index in range(1, 6):
         stage = files[f".content/stage_{index}.tres"].decode()
         assert 'path="res://scripts/data_types/stage_resources.gd"' in stage and 'resources = SubResource(' in stage, f"ステージ{index}に資源一覧が必要"

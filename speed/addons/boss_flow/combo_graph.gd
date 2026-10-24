@@ -65,7 +65,7 @@ func _ready() -> void:
 	graph.custom_minimum_size = Vector2(400, 220)
 	graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	graph.node_selected.connect(func(id):
-		_selected = String(id).trim_prefix("step_").to_int()
+		_selected = String(id.name).trim_prefix("step_").to_int()
 		inspected.emit(path + [_selected]))
 	add_child(graph)
 

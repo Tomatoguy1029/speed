@@ -21,6 +21,7 @@ func configure(value: Resource) -> void:
 	retry = 0.0
 
 func tick(dt: float, context: Dictionary, adapter: Object) -> void:
+	if dt > 0.0 and adapter.has_method("tick"): adapter.tick(dt)
 	if dt <= 0.0 or flow == null or flow.sections.is_empty() or adapter.blocked(): return
 	if rest_remaining > 0.0:
 		rest_remaining = maxf(0.0, rest_remaining - dt)
