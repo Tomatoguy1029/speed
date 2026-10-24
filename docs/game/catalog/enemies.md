@@ -143,7 +143,7 @@
 
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | データ・コード |
 | --- | --- | --- | --- | --- | --- | --- |
-| `drifter` | ドリフター | 採用 | 実装済み | 機体へまっすぐ追跡 | 全時間帯 | `data/enemies/drifter.tres`。[demo](../../../demo/docs/enemies.md) |
+| `drifter` | ドリフター | 採用 | 実装済み | 機体へまっすぐ追跡 | 全時間帯 | `data/enemies/drifter.tres`。導入でも複数体を仮の練習相手に流用する（[仕様書](../../spec.md#3-画面の流れ)）。[demo](../../../demo/docs/enemies.md) |
 | `swarm` | スウォーム | 採用 | 実装済み | 小型の追跡敵 | 強化期・強化期II・無双期・脱出期 | `data/enemies/swarm.tres` |
 | `darter` | ダーター | 採用 | 実装済み | 近づくと予告してから突進し、しばらく止まる | 無双期以外 | `data/enemies/darter.tres` |
 | `armored` | 装甲型 | 採用 | 実装済み | 装甲の硬い追跡敵。背面に当てると必ずクリティカル | 圧力期・緊張期・脱出期、危険地帯 | `data/enemies/armored.tres` |

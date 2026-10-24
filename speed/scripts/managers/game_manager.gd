@@ -4,7 +4,7 @@
 ## screen_changed を受けて、対応する画面のシーンに差し替える。
 extends Node
 
-enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB, BACKGROUND_LAB }
+enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB, BACKGROUND_LAB, INTRO }
 
 signal screen_ready(view: Control)
 ## 起動側から加える画面。
@@ -32,6 +32,10 @@ var last_result: Dictionary = {}
 func goto(next: Screen, push := true) -> void:
 	if screen_transition_active:
 		return
+	if next == Screen.STAGE_SELECT and not SaveManager.has_seen_intro() and screen != Screen.INTRO:
+		next = Screen.INTRO
+	if screen == Screen.INTRO and next == Screen.INTRO:
+		return
 	if push and screen != next and screen != Screen.RUN and screen != Screen.RESULT:
 		_history.append(screen)
 	screen = next
@@ -46,6 +50,18 @@ func back() -> void:
 func reset_to_main_menu() -> void:
 	_history = [Screen.TITLE]
 	goto(Screen.MAIN_MENU, false)
+
+## メニュー端から、初回と同じカットシーン・操作体験を再生する。
+func replay_intro() -> void:
+	goto(Screen.INTRO)
+
+## 完了と明示スキップは同じ出口を使う。戻る履歴へ導入を積まない。
+func finish_intro() -> void:
+	if screen != Screen.INTRO or screen_transition_active:
+		return
+	SaveManager.mark_intro_seen()
+	_history = [Screen.TITLE, Screen.MAIN_MENU]
+	goto(Screen.STAGE_SELECT, false)
 
 func start_run(stage: int, endless := false) -> void:
 	if screen_transition_active:

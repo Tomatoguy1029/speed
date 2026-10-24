@@ -652,12 +652,15 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - `user://` に保存する。中身は仕様書 14 のとおり（ストーリーの進み具合、伝説のモジュール、ハイスコア、図鑑の獲得状況を含む）。
 - データに版の番号を持たせ、版が変わったら古いデータを新しい形に変換する。読めないデータは壊さずに初期値で始める。
 - 設定（音量、画面モード、言語、キー設定）は、セーブとは別のファイルに保存する。
+- 導入の視聴済み状態を `intro_seen` として保存する。不足するセーブ項目は `SaveManager._migrate()` が初期値で補う。
 
 ## 12. UI
 
 - すべての UI は `Control` で作り、アンカーとコンテナで画面の大きさに合わせる。座標を決め打ちしない。
 - 色と文字の大きさは1つのテーマにまとめる。強化段階の色（仕様書 8）もテーマで管理する。
 - 3択・ポーズ・結果は、ラン中の状態を表示するだけにする。選んだ結果は RunManager に命令として渡す（4.2）。
+- 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/runtime/intro_sequence.gd` が場面進行と操作待ち、`intro_practice.gd` が星・練習相手・見本線を管理する。`scripts/ui/intro_screen.gd` は状態を表示してセッションへ命令を渡し、`scripts/render/intro_visual.gd` が差し替え用の仮演出を描く。
+- 導入は独立した `RunSession` の `RunSimulation` と、本番の `run.tscn` の World・Camera・入力・描画を使う。複製した共通設定と専用の `RuntimeStage` を渡し、`lab_mode` の状態を導入シーケンスから既存の更新処理で進める。`hud` オプションで専用の最小 UI に替え、リリース版でも同じ操作を使う。
 
 ## 13. 音
 

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="IntroPresentation" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/intro_presentation.gd" id="1"]
+[ext_resource type="Resource" path="res://data/enemies/drifter.tres" id="2"]
+[ext_resource type="Texture2D" path="res://assets/pixel/drifter.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/ui/map/constellations_unicorn.png" id="4"]
+
+[resource]
+script = ExtResource("1")
+practice_enemy = ExtResource("2")
+transform_texture = ExtResource("3")
+unicorn_texture = ExtResource("4")

@@ -37,7 +37,11 @@ func _ready() -> void:
 	# ブラウザ版ではアプリを終了できないので、終了ボタンを出さない
 	%QuitButton.visible = not OS.has_feature("web")
 	super()
-	show_screen(GameManager.screen, false)
+	if get_meta("map_from_intro", false):
+		show_screen(GameManager.Screen.MAIN_MENU, false)
+		show_screen(GameManager.Screen.STAGE_SELECT)
+	else:
+		show_screen(GameManager.screen, false)
 	if get_meta("morph_from_upgrade", false):
 		_transition_from_upgrade()
 
@@ -157,6 +161,14 @@ func _build_start_panel(canvas: Control) -> void:
 	back.focus_exited.connect(fill.hide)
 	back.pressed.connect(_close_start_panel)
 	_menu_back.add_child(back)
+	var replay := Button.new()
+	replay.name = "ReplayIntroButton"
+	replay.text = tr("intro.replay")
+	_style_menu_button(replay)
+	replay.add_theme_font_size_override("font_size", 12)
+	replay.position = Vector2(450, 322)
+	replay.pressed.connect(GameManager.replay_intro)
+	_menu_options.add_child(replay)
 	var labels := ["ステージセレクト", "機体強化", "コーデックス"]
 	var destinations := [GameManager.Screen.STAGE_SELECT, GameManager.Screen.UPGRADE, GameManager.Screen.ENCYCLOPEDIA]
 	for i in labels.size():
