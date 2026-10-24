@@ -18,6 +18,9 @@ var flow_bar := HBoxContainer.new()
 var editing_flow := false
 var combo_editor := preload("res://addons/boss_flow/combo_graph.gd").new()
 var combo_id := ""
+var preview_stamina := 8.0
+var preview_radius := 1800.0
+var preview_heads := {"bite": 2, "vortex": 2, "debris": 1, "beam": 2, "thunder": 1}
 
 func _ready() -> void:
 	var toolbar := HBoxContainer.new()
@@ -25,7 +28,7 @@ func _ready() -> void:
 	_path.placeholder_text = "技Resourceのパス（res://…）"
 	_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(_path)
-	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["共通設定", _edit_common], ["併用禁止", _edit_forbidden], ["試遊", play_current]]:
+	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["共通設定", _edit_common], ["範囲確認", _edit_coverage], ["併用禁止", _edit_forbidden], ["試遊", play_current]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -91,6 +94,7 @@ func _picked(kind: String, id: String) -> void:
 				_fields.add_child(Control.new())
 	elif kind == "condition":
 		editing_rules = true
+		preview.layers = []
 		for child in _fields.get_children():
 			_fields.remove_child(child)
 			child.queue_free()
@@ -368,6 +372,34 @@ func _set_forbidden_undo(value: Array) -> void:
 func _set_forbidden(value: Array) -> void:
 	rules.forbidden = value.duplicate(true)
 	_edit_forbidden()
+
+func _edit_coverage() -> void:
+	_clear_fields()
+	_number_field("確認する残量", preview_stamina, func(value): preview_stamina = value)
+	_number_field("確認領域の半径", preview_radius, func(value): preview_radius = value, 1.0)
+	for kind in preview_heads:
+		_number_field(kind + "の生存数", preview_heads[kind], func(value): preview_heads[kind] = int(value), 0.0, 2.0)
+	var refresh := Button.new()
+	refresh.text = "指定状況の範囲を重ねる"
+	refresh.pressed.connect(_analyze_coverage)
+	_fields.add_child(refresh)
+	_analyze_coverage()
+
+func _analyze_coverage() -> void:
+	var layers: Array = []
+	for move in rules.techniques:
+		if float(rules.costs.get(String(move.technique), 1.0)) > preview_stamina: continue
+		if move.head_kind != &"" and int(preview_heads.get(String(move.head_kind), 0)) == 0: continue
+		var gate: Dictionary = rules.conditions.get(String(move.technique), {}).duplicate()
+		gate.max = minf(float(gate.get("max", preview_radius)), preview_radius)
+		# 本体を基準とした条件領域。個別の配置成立・照準の時間変化は実行側で再判定する。
+		layers.append(gate)
+	preview.radius = preview_radius
+	preview.layers = layers
+	var result: Dictionary = preview.analyze(layers, preview_radius)
+	preview.gaps = result.points
+	preview.queue_redraw()
+	_status.text = "条件領域: %d技 / 未カバー %dサンプル（橙）。部位の配置・実到達の確認は試遊で行います。" % [layers.size(), result.holes]
 
 func play_current() -> void:
 	if save_current() != OK: return
