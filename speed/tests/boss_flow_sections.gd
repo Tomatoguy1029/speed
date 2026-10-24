@@ -35,6 +35,14 @@ func exercise() -> void:
 	assert(panel.flow.sections.size() == 3)
 	panel.redo_edit()
 	assert(panel.flow.sections.size() == 5)
+	panel.flow_graph.begin_node_move.emit()
+	panel.flow_graph.get_node("section_1").position_offset.y += 70
+	panel.flow_graph.end_node_move.emit()
+	var moved_y: float = panel.flow_graph.get_node("section_1").position_offset.y
+	panel.flow_graph.command("align")
+	assert(is_equal_approx(panel.flow_graph.get_node("section_0").position_offset.y, panel.flow_graph.get_node("section_1").position_offset.y), "section alignment keeps the flow horizontal")
+	panel.undo_edit()
+	assert(panel.flow_graph.get_node("section_1").position_offset.y == moved_y)
 	assert(panel.save_current() == OK)
 	var saved = ResourceLoader.load(flow_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	assert(saved.sections[2].next == 0 and saved.sections[3].next == 4)

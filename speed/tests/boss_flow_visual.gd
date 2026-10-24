@@ -6,6 +6,10 @@ func exercise() -> void:
 	root.size = Vector2i(1100, 800)
 	var panel = load("res://addons/boss_flow/editor.gd").new()
 	panel.theme = ThemeDB.get_default_theme()
+	if "--large-editor" in OS.get_cmdline_user_args():
+		root.size = Vector2i(2030, 1540)
+		panel.theme = Theme.new()
+		panel.theme.default_font_size = 28
 	var host := VBoxContainer.new()
 	root.add_child(host)
 	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

@@ -126,23 +126,35 @@ func command(action: String) -> void:
 			after.sections.append(entry.section.duplicate(true))
 		for entry in clipboard:
 			var index: int = mapping[entry.index]
-			after.sections[index].next = mapping.get(int(entry.section.get("next", 0)), int(entry.section.get("next", 0)))
+			for field in ["next", "fallback"]:
+				if entry.section.has(field): after.sections[index][field] = mapping.get(int(entry.section[field]), int(entry.section[field]))
 			after.layout["section_" + str(index)] = entry.position + shift
 	elif action in ["delete", "cut"]:
 		if selected.is_empty() or selected.size() == flow.sections.size(): return
 		var mapping := {}
 		after.sections = []
 		after.layout = {}
+		if flow.layout.has("shared_rest"): after.layout.shared_rest = flow.layout.shared_rest
 		for i in flow.sections.size():
 			if i in selected: continue
 			mapping[i] = after.sections.size()
 			after.sections.append(flow.sections[i].duplicate(true))
 			if flow.layout.has("section_" + str(i)): after.layout["section_" + str(mapping[i])] = flow.layout["section_" + str(i)]
 		for section in after.sections:
-			var next := int(section.get("next", 0))
-			for attempt in flow.sections.size():
-				if mapping.has(next): break
-				next = int(flow.sections[next].get("next", 0))
-			section.next = mapping.get(next, 0)
+			for field in ["next", "fallback"]:
+				if not section.has(field): continue
+				var next := int(section[field])
+				for attempt in flow.sections.size():
+					if mapping.has(next): break
+					next = int(flow.sections[next].get("next", 0))
+				section[field] = mapping.get(next, 0)
+	elif action == "align":
+		if selected.is_empty(): selected.assign(range(flow.sections.size()))
+		var first: GraphNode = get_node("section_" + str(selected[0]))
+		var x := first.position_offset.x
+		for index in selected:
+			var node: GraphNode = get_node("section_" + str(index))
+			after.layout[String(node.name)] = Vector2(x, first.position_offset.y)
+			x += node.size.x + 48 * maxf(1.0, get_theme_default_font_size() / 14.0)
 	else: return
 	edit_requested.emit(before, after, "区間ノードを編集")

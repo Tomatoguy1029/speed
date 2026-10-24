@@ -99,6 +99,10 @@ func _ready() -> void:
 	add_section.text = "区間を追加"
 	add_section.pressed.connect(_add_section)
 	flow_tools.add_child(add_section)
+	var align_sections := Button.new()
+	align_sections.text = "区間を整列"
+	align_sections.pressed.connect(func(): flow_graph.command("align"))
+	flow_tools.add_child(align_sections)
 	flow_area.add_child(flow_graph)
 	flow_graph.picked.connect(_edit_section)
 	flow_graph.shared_settings_requested.connect(_edit_common)
@@ -180,6 +184,7 @@ func _set_flow_state(value: Dictionary) -> void:
 	flow.layout = value.layout.duplicate(true)
 	dirty_flow = true
 	_refresh_flow()
+	if _inspector_mode == 2: _edit_section(_selected_section, _probability_previous)
 
 func _select_settings(index: int) -> void:
 	combo_editor.hide()
@@ -435,9 +440,9 @@ func _assign(target: Resource, key: String, value: Variant) -> void:
 	target.emit_changed()
 	if target == current:
 		preview.set_attack(current, "hydra" if _is_hydra() else String(rules.adapter))
-		for node in graph.get_children():
-			if node is GraphNode and not String(node.name).begins_with("choose_") and rules.source_for(String(node.name)) == String(current.technique):
-				node.get_child(0).set_attack(current, "hydra" if _is_hydra() else String(rules.adapter))
+	for node in graph.get_children():
+		if node is GraphNode and not String(node.name).begins_with("choose_") and rules.source_for(String(node.name)) == String(target.technique):
+			node.get_child(0).set_attack(target, "hydra" if _is_hydra() else String(rules.adapter))
 	_status.text = "変更があります。「変更を保存」で確定できます。"
 	for node in _fields.get_children():
 		if target == current and node is SpinBox and node.get_meta("key", "") == key:

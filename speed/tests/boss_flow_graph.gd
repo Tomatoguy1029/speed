@@ -77,6 +77,12 @@ func exercise() -> void:
  assert(panel.current.parameters.bite_dmg == original_damage + 1.0)
  panel.history.undo()
  assert(panel.current.parameters.bite_dmg == original_damage, "a UI rebuild must preserve user edits and undo history")
+ panel._picked("technique", "beam_fixed")
+ var beam_width: float = panel.current.parameters.beam_width
+ panel.set_value("beam_width", beam_width + 10.0)
+ panel._picked("technique", "bite_thrust")
+ panel.undo_edit()
+ assert(panel.graph.get_node("beam_fixed").get_child(0).attack.width == beam_width, "undo refreshes the thumbnail of a technique that is no longer selected")
  panel.rules.combos.combo_clipboard = {"type": "sequence", "children": [{"type": "wait", "seconds": 1.0}]}
  panel.rules.costs.combo_clipboard = 2.0
  graph.show_rules(panel.rules)

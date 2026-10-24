@@ -40,6 +40,7 @@ static func validate(source: Dictionary) -> PackedStringArray:
 				for pair in section.get("forbidden", []):
 					if pair.size() != 2 or not known.has(String(pair[0])) or not known.has(String(pair[1])): errors.append("区間の禁止ペアが不正: " + str(i))
 			if int(section.get("next", 0)) < 0 or int(section.get("next", 0)) >= flow.sections.size(): errors.append("次区間が存在しません: " + str(i))
+			if section.has("fallback") and (int(section.fallback) < 0 or int(section.fallback) >= flow.sections.size()): errors.append("不成立時の区間が存在しません: " + str(i))
 			if section.get("request", "normal") not in ["normal", "major", "rest", "any"]: errors.append("要求種別が不正: " + str(i))
 			if float(section.get("cap", flow.maximum_stamina)) <= 0.0: errors.append("消費上限が不正: " + str(i))
 	return errors
