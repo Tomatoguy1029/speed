@@ -639,10 +639,6 @@ func _draw_background(c: CanvasItem) -> void:
 func _draw_field(c: CanvasItem) -> void:
 	var f := run.field
 	var view := view_rect().grow(700.0)
-	for d in f.dust:
-		var center := Vector2(d.x, d.y)
-		if view.has_point(center) or view.grow(d.z).has_point(center):
-			c.draw_circle(center, d.z, Color(0.4, 0.35, 0.55, 0.08))
 	if f.battle_arenas.is_empty():
 		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	_draw_hero(c)

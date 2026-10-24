@@ -22,7 +22,6 @@ func _preview() -> void:
 	state.camera_zoom = 0.8
 	state.view_half = root.get_visible_rect().size / (2.0 * state.camera_zoom)
 	state.ship_invuln = 0.0
-	run.field.dust.clear()
 	run.field.planet.pos = Vector2(-650, 330)
 	run.field.planet.r = 140.0
 	for i in run.field.moons.size():

@@ -42,8 +42,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 		return
 	_steer(world_dt)
 	var from := state.ship_pos
-	var drag := field.dust_drag_at(from)
-	_step(world_dt, field.boundary_accel(from), drag)
+	_step(world_dt, field.boundary_accel(from))
 	combat.wall_bounce(from)
 	combat.collide_ship(from, cfg.ship_radius, null)
 	if state.phase != RunState.Phase.PLAY:
@@ -84,7 +83,7 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 
 # ── 速さの減り方（仕様書 5.2・6.6） ───────────────────────────────
 
-func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
+func _step(dt: float, accel: Vector2) -> void:
 	if state.glide:
 		# 勢い：glide_hold の間は速さを保ち、そのあと glide_fade かけて巡航の速さまで落として終える（仕様書 6.6）
 		state.glide_t += dt
@@ -124,8 +123,6 @@ func _step(dt: float, accel: Vector2, extra_drag: float) -> void:
 				target = floor_speed + (target - floor_speed) * exp(-cfg.cruise_drag * dt)
 		if target > max_speed:
 			target = max_speed + (target - max_speed) * exp(-cfg.overcap_decay * dt)
-		if extra_drag > 0.0:
-			target *= exp(-extra_drag * dt)
 		state.ship_vel *= target / sp
 	state.ship_pos += state.ship_vel * dt
 	if not state.ship_vel.is_zero_approx():

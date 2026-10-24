@@ -117,7 +117,6 @@
 
 - 発射（なぞりの開始）から `config.boost_duration` の間は減速しない。その後、残す速さを `config.energy_cut` まで落とす。
 - 普段は弱い抵抗（`config.cruise_drag`）で減速するが、最高速度 × `config.cruise_floor` より下には落ちない。最高速度を超えた分は毎秒 `config.overcap_decay` の割合で減る。
-- 宇宙塵の雲（13.1）の中では抵抗 `config.dust_drag` がかかる。
 - なぞり終えたあとの勢い（6.6）がある間は、勢いの決まりで速さが決まり、ほかの減速はかからない。
 
 ## 6. ゲージと描画
@@ -452,7 +451,6 @@
 | 開始位置 | 中心から `config.start_radius` |
 | 惑星 | 中心に半径 `config.planet_radius`。障害物 |
 | 月 | `config.moon_count` 個。中心の周りの軌道を毎秒 `config.moon_orbit_speed` ラジアンで回る。障害物 |
-| 宇宙塵の雲 | `config.dust_count` 個。中では抵抗 `config.dust_drag`（6.6の勢いの間は無効） |
 | 重力 | 下記 |
 | 隕石 | 下記 |
 | 鉄のがれき | 下記 |

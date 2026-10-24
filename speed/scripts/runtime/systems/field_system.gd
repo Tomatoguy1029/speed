@@ -1,4 +1,4 @@
-## フィールド。惑星・周回する月・宇宙塵・外縁・危険度（仕様書 13.1）。
+## フィールド。惑星・周回する月・外縁・危険度（仕様書 13.1）。
 ##
 ## 惑星と月は障害物で、機体・敵・弾・線を止める。ここでは位置と当たり判定だけを持ち、
 ## 当たったときの扱い（跳ね返りやダメージ）は、それぞれの Manager が決める。
@@ -63,8 +63,6 @@ var _body_origin := Vector2.ZERO
 var _body_width := 0
 ## 天体が動く速さの上限（月の公転）。弾の天体判定を省ける時間の見積もりに使う
 var body_speed_max := 0.0
-## 宇宙塵の雲（中心と半径）
-var dust: Array[Vector3] = []
 var rocks: Array[Rock] = []
 ## 次の彗星までの世界秒
 var wells: Array[Well] = []
@@ -90,11 +88,11 @@ func setup(context: RunContext) -> void:
 	for old in _gimmicks.values():
 		old.dispose()
 	_gimmicks.clear()
-	for id in [&"moons", &"dust", &"comets", &"meteors", &"warp", &"gravity"]:
+	for id in [&"moons", &"comets", &"meteors", &"warp", &"gravity"]:
 		var part: FieldGimmick = load("res://scripts/gimmicks/%s.gd" % id).new()
 		part.setup(ctx)
 		_gimmicks[id] = part
-	for id in [&"moons", &"dust", &"meteors", &"comets", &"warp", &"gravity"]:
+	for id in [&"moons", &"meteors", &"comets", &"warp", &"gravity"]:
 		_gimmicks[id].initialize()
 	refresh_bodies()
 
@@ -142,9 +140,6 @@ func spawn_warp() -> void:
 
 func take_warp() -> bool:
 	return gimmick(&"warp").take_warp()
-
-func dust_drag_at(pos: Vector2) -> float:
-	return gimmick(&"dust").dust_drag_at(pos)
 
 func _update_body_grid() -> void:
 	# 少数の天体を格子へ登録し、各弾が全天体を調べることを避ける。

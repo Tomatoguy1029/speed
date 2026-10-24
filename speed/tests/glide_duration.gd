@@ -42,20 +42,20 @@ func _ready() -> void:
 		check(baseline == [s.stats.max_speed, s.stats.capacity, s.stats.charge_time, run.draw.budget(1.0), run.draw._launch_speed(Vector2.RIGHT, 1.0)], "Top speed, capacity, charge, line budget and launch speed stay unchanged")
 		for time in [0.0, cfg.glide_hold, cfg.glide_hold + cfg.glide_fade * 0.25, cfg.glide_hold + cfg.glide_fade * 0.5, cfg.glide_hold + cfg.glide_fade]:
 			_begin_glide()
-			run.ship._step(time * mult, Vector2.ZERO, 0.0)
+			run.ship._step(time * mult, Vector2.ZERO)
 			var cruise := s.stats.max_speed * cfg.steer_cruise
 			var k := clampf((time - cfg.glide_hold) / cfg.glide_fade, 0.0, 1.0)
 			check(is_equal_approx(s.ship_vel.length(), lerpf(s.stats.max_speed * cfg.glide_speed_ratio, cruise, k)), "Hold and linear fade have the same normalized curve")
 			check(s.glide == (time < cfg.glide_hold + cfg.glide_fade), "Glide ends at the scaled total duration")
 		_begin_glide()
-		run.ship._step(7.5, Vector2.ZERO, 0.0)
+		run.ship._step(7.5, Vector2.ZERO)
 		print("[glide_duration] level=%d multiplier=%.2f at7.5s speed=%.1f glide=%s" % [level, mult, s.ship_vel.length(), s.glide])
 		if level == 0 or level == 3:
 			await _capture("level%d_at7_5s" % level)
 	if shots != "":
-		run.ship._step(3.0, Vector2.ZERO, 0.0)
+		run.ship._step(3.0, Vector2.ZERO)
 		await _capture("level3_late_fade")
-		run.ship._step(1.75, Vector2.ZERO, 0.0)
+		run.ship._step(1.75, Vector2.ZERO)
 		await _capture("level3_cruise")
 	check(not run.loadout.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
 	check(s.modules_obtained.has(&"T31"), "Standard result module list includes T31")
