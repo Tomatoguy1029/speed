@@ -441,7 +441,8 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 			NORMALS.tick(self,neck,dt)
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
-			if not flow_controlled and not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
+			if flow_controlled: position_head(k, dt)
+			elif not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
@@ -589,6 +590,7 @@ func finish_normal(n: Neck) -> void:
 	n.locked = false
 	n.mode = &"idle"
 	n.cd = cooldown
+	if separated and immortal_row >= 0: n.motion.guard_angle = (at - table.pos[immortal_row]).angle()
 	_cue(&"finished",&"",head_index(n))
 
 func position_head(index: int, dt: float) -> void:
@@ -637,7 +639,9 @@ func _guard_patrol(n: Neck,index: int)->Vector2:
 	var region:=Rect2(center-Vector2.ONE*reach,Vector2.ONE*reach*2.0).intersection(arena.bounds.grow(-margin))
 	if not region.has_area():region=arena.bounds.grow(-margin)
 	var phase:=_time*(0.23+index*0.017)+n.base_angle*2.0
-	var angle:=n.base_angle+sin(phase)*0.35
+	if not n.motion.has("guard_angle"): n.motion.guard_angle = (n.free_pos - center).angle()
+	n.motion.guard_angle = float(n.motion.guard_angle) + _sim_dt * (0.11 + index * 0.009) * (1.0 if index % 2 == 0 else -1.0)
+	var angle: float = n.motion.guard_angle + sin(phase) * 0.18
 	var ring:=0.55+0.35*(index%2)+sin(phase*0.7+index)*0.06
 	return region.get_center()+Vector2.from_angle(angle)*region.size*0.5*ring
 

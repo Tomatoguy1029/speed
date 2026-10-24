@@ -37,6 +37,17 @@ func exercise() -> void:
 	check(tornadoes.size() == 2, "all distinct vortex and debris combinations are offered")
 	result = adapter.candidates({"request": "major"})
 	check(result.candidates.any(func(c): return c.id == "curve"), "combined major is offered")
+	actor.begin_separation()
+	actor.separation_t = 0.0
+	actor.recovery_t = 0.0
+	actor._tech_cd = 0.0
+	result = adapter.candidates({"request": "major"})
+	check(result.candidates.any(func(c): return c.id == "swarm"), "separated swarm is offered")
+	var guard = actor.necks[0]
+	guard.free_pos = actor.table.pos[actor.immortal_row] + Vector2(500, 100)
+	actor._sim_dt = 0.1
+	actor._guard_patrol(guard, 0)
+	check(guard.motion.has("guard_angle"), "guard uses a changing orbit from current position")
 	lab.queue_free()
 	await process_frame
 	quit(1 if failures else 0)
