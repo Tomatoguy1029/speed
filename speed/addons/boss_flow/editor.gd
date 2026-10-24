@@ -23,7 +23,7 @@ func _ready() -> void:
 	_path.placeholder_text = "技Resourceのパス（res://…）"
 	_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(_path)
-	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["試遊", play_current]]:
+	for entry in [["開く", _open_path], ["保存", save_current], ["戻す", history.undo], ["やり直す", history.redo], ["共通設定", _edit_common], ["試遊", play_current]]:
 		var button := Button.new()
 		button.text = entry[0]
 		button.pressed.connect(entry[1])
@@ -190,6 +190,13 @@ func _edit_section(i: int) -> void:
 			history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
 			history.commit_action())
 		_fields.add_child(field)
+	_number_field("今回の消費上限", float(flow.sections[i].get("cap", 2.0)), func(value):
+		var copy: Array = flow.sections.duplicate(true)
+		copy[i].cap = value
+		history.create_action("消費上限を変更")
+		history.add_do_method(_set_sections.bind(copy))
+		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+		history.commit_action())
 	for key in ["single", "parallel", "combo", "major"]:
 		_number_field({"single": "単独の割合", "parallel": "同時の割合", "combo": "コンボの割合", "major": "大技の割合"}[key], float(flow.sections[i].get("weights", {}).get(key, 0.0)), func(value): _section_weight(i, key, value))
 	for previous in ["single", "parallel", "combo", "major"]:
@@ -238,6 +245,17 @@ func _edit_probability(index: int, previous: String) -> void:
 		if rule.previous == previous: weights = rule.weights
 	for key in ["single", "parallel", "combo", "major"]:
 		_number_field(key, float(weights.get(key, 0.0)), func(value): _section_weight(index, key, value, previous))
+
+func _edit_common() -> void:
+	editing_flow = true
+	_clear_fields()
+	_status.text = "全区間から不足時に休息へ入ります"
+	for key in ["maximum_stamina", "partial_rest", "empty_rest"]:
+		_number_field({"maximum_stamina": "最大スタミナ", "partial_rest": "残量ありの休息（秒）", "empty_rest": "枯渇時の休息（秒）"}[key], flow.get(key), func(value):
+			history.create_action("休息・スタミナを変更")
+			history.add_do_property(flow, key, value)
+			history.add_undo_property(flow, key, flow.get(key))
+			history.commit_action())
 
 func play_current() -> void:
 	if save_current() != OK: return
