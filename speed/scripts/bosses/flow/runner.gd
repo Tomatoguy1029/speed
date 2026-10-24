@@ -52,6 +52,7 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	var candidates: Array = result.get("candidates", [])
 	if candidates.is_empty():
 		status = result.get("reason", "候補なし")
+		if section.has("fallback"): index = clampi(int(section.fallback), 0, flow.sections.size() - 1)
 		return
 	var cap := minf(float(section.get("cap", flow.maximum_stamina)), flow.maximum_stamina)
 	var within_cap: Array = candidates.filter(func(c): return float(c.cost) >= 0.0 and float(c.cost) <= cap)

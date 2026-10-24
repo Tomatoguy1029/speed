@@ -1,22 +1,12 @@
 [gd_scene format=3 uid="uid://dng7xfnb18j0e"]
 
 [ext_resource type="Script" uid="uid://s0dvntycuf7w" path="res://scripts/bosses/hydra_boss.gd" id="1"]
-[ext_resource type="BehaviorTree" uid="uid://fljn8lt4tihh" path="res://scenes/bosses/hydra_boss_bt.tres" id="2"]
 [ext_resource type="AnimationLibrary" uid="uid://0k5ofbflry1s" path="res://scenes/bosses/hydra_boss_timeline.tres" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/bosses/hydra_presentation.tscn" id="presentation"]
-
-[sub_resource type="BlackboardPlan" id="BlackboardPlan_hydra"]
 
 [node name="HydraBoss" type="Node2D" unique_id=1207611038]
 script = ExtResource("1")
 presentation_scene = ExtResource("presentation")
-
-[node name="LimboHSM" type="LimboHSM" parent="." unique_id=867160680]
-update_mode = 2
-
-[node name="Form1" type="BTState" parent="LimboHSM" unique_id=1816088641]
-behavior_tree = ExtResource("2")
-blackboard_plan = SubResource("BlackboardPlan_hydra")
 
 [node name="Timeline" type="AnimationPlayer" parent="." unique_id=277545997]
 callback_mode_process = 2

@@ -10,13 +10,13 @@ func _ready() -> void:
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
 	var boss = lab.run.bosses.actors.back()
 	boss.hsm.set_active(false)
-	check(boss.has_method("normal_ready"), "normal attacks have an editable BT selection path")
+	check(boss.has_method("normal_ready"), "normal attacks have an independent eligibility path")
 	if boss.has_method("normal_ready"):
 		var n = boss.necks[0]
 		n.cd = 0.0
 		check(boss.normal_ready(0, &"bite_thrust"), "front player can be bitten")
 		boss.table.attack_value[n.row]=4.0
-		check(not boss.normal_ready(0,&"bite_thrust"),"per-head attack value contributes to Hydra normal budget")
+		check(boss.normal_ready(0,&"bite_thrust"),"eligibility is independent of the removed concurrency budget")
 		boss.table.attack_value[n.row]=1.0
 		var director=lab.run.projectiles.director
 		director.formation_mode=true
@@ -28,7 +28,7 @@ func _ready() -> void:
 		boss.normal_ready(0, &"bite_thrust")
 		check(lab.run.projectiles.director.waiting.size() == waiting, "eligibility has no reservation side effect")
 		boss.sim_tick(0.01, 0.01)
-		check(n.mode == &"bite_thrust", "head tree selects the eligible attack")
+		check(n.mode == &"bite_thrust", "selected head executes the eligible attack")
 		for i in 70: boss.sim_tick(0.01, 0.01)
 		var locked: Vector2 = n.target
 		lab.run.state.ship_pos += Vector2(0, 200)

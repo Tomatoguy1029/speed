@@ -1,5 +1,5 @@
 ## 中央の瓦礫を守る多頭ボス。HP閾値で3→5→8本へ増加し、瓦礫破壊で独立蛇へ分離する。
-## 行動選択はLimboAI、振り付けはAnimationPlayer、形状・判定は共有点列で扱う。
+## 行動選択は共通フロー、振り付けはAnimationPlayer、形状・判定は共有点列で扱う。
 extends BossActor
 
 ## Hydra 内の演出契約。判定を変えず、技 ID と取り付け位置を受け取る。
@@ -24,11 +24,27 @@ var _neck_mesh_radius:=-1.0
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
-const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
 var _moves: Dictionary = {}
 var _move_gates: Dictionary = {}
 var flow_controlled := false
 var action_rules: Resource
+var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
+var flow_adapter: RefCounted
+
+class SelectionControl:
+	extends RefCounted
+	var active := true
+	func set_active(value: bool) -> void: active = value
+	func is_active() -> bool: return active
+
+var hsm := SelectionControl.new()
+
+func configure_flow(program: Resource) -> void:
+	use_action_rules(program.data.rules)
+	flow_runner.configure(program.data.flow)
+	flow_runner.selector.random = run_state.rng
+	flow_adapter = preload("res://scripts/bosses/hydra_flow_adapter.gd").new(self)
+	hsm.set_active(true)
 
 func use_action_rules(value: Resource) -> void:
 	action_rules = value
@@ -69,7 +85,6 @@ class Neck:
 	var cd := 0.0
 	var emission: Dictionary = {}
 	var locked := false
-	var bt: BTTask
 	var free_pos:=Vector2.ZERO
 	var velocity:=Vector2.ZERO
 	var motion: Dictionary={}
@@ -140,9 +155,7 @@ const COMBOS: Array[StringName] = [&"tornado",&"debris_shatter",&"beam_pincer"]
 var combo_wait := 0.0
 const TECH_DIR := {&"grid":0.0,&"swarm":-PI/2.0,&"tornado":PI/2.0,&"debris_shatter":0.0,&"beam_pincer":PI,&"curve":PI/2.0,&"sequence":0.0,&"north":-PI/2.0}
 
-@onready var hsm: LimboHSM = $LimboHSM
 @onready var timeline: AnimationPlayer = $Timeline
-@onready var decision: BTState = $LimboHSM/Form1
 
 var necks: Array[Neck] = []
 var _guard_approach: Array[Neck] = []
@@ -201,12 +214,12 @@ func _on_bound() -> void:
 	add_child(attack_field)
 	attack_field.bind(self)
 	special=load("res://scripts/bosses/hydra_techniques.gd").new(self)
-	_collect_moves(HEAD_BT.root_task)
-	_collect_moves(decision.behavior_tree.root_task)
+	if not ResourceLoader.exists("res://.content/boss_hydra.tres"):
+		push_error("ヒュドラAIの実行データがありません。試遊前のコンテンツ生成を実行してください。")
+		return
+	configure_flow(load("res://.content/boss_hydra.tres"))
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
-	hsm.initialize(self)
-	hsm.set_active(true)
 	queue_redraw()
 
 func _process(delta: float) -> void:
@@ -257,8 +270,12 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
-	if separated:tick_bearer(dt)
-	else:_move(dt)
+	if flow_runner.rest_remaining <= 0.0:
+		if separated: tick_bearer(dt)
+		else: _move(dt)
+	else:
+		table.vel[body] = Vector2.ZERO
+		if separated and immortal_row >= 0: table.vel[immortal_row] = Vector2.ZERO
 	recovery_t = maxf(0.0, recovery_t - dt)
 	# 全滅を先に確定する。同じ更新で期限が来た頭を先に生やさない。
 	_chance_step(dt)
@@ -270,8 +287,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_tech_cd -= dt
 	combo_wait=maxf(0.0,combo_wait-dt)
 	_spin_t -= dt
-	_update_blackboard()
-	hsm.update(dt)
+	if hsm.active and flow_adapter != null:
+		flow_runner.tick(dt, {"player": run_state.ship_pos, "forbidden": action_rules.forbidden}, flow_adapter)
 	if ctx.projectiles.director != null:
 		ctx.projectiles.lab_context = ctx.projectiles.director.token("boss:" + str(table.id[body]))
 	if busy and special.positioning:
@@ -371,10 +388,6 @@ func _grow(neck: Neck) -> void:
 	neck.row = j
 	neck.row_id = table.id[j]
 	neck.head_hp = hp
-	var bb := Blackboard.new()
-	bb.set_var(&"head_index",necks.find(neck))
-	neck.bt = HEAD_BT.root_task.clone()
-	neck.bt.initialize(self,bb,self)
 	neck.mode = &"idle"
 	neck.glow = 0.0
 	neck.segs.clear()
@@ -442,7 +455,6 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
 			if flow_controlled: position_head(k, dt)
-			elif not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
@@ -496,20 +508,6 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 	if not separated: NECK_CHAIN.keep_outside(neck.segs,table.pos[body],table.r[body])
 
 ## BT の技ノードが参照する Resource を役者ごとに読み込む。BossDef の既存編集は保持する。
-func _collect_moves(task: BTTask, gates: Array = []) -> void:
-	var branch := gates.duplicate()
-	if task is BTSequence:
-		for child_index in task.get_child_count():
-			var child := task.get_child(child_index)
-			if child.has_method("allows"): branch.append(child)
-	if task.has_method("get_hydra_settings"):
-		var settings: HydraTechnique = task.get_hydra_settings()
-		if settings != null:
-			_moves[settings.technique] = settings.duplicate(true)
-			_move_gates[settings.technique] = branch
-			if settings.head_kind != &"": _normal_moves[settings.technique] = true
-	for child_index in task.get_child_count(): _collect_moves(task.get_child(child_index), branch)
-
 func move_settings(attack: StringName) -> HydraTechnique:
 	return _moves.get(attack)
 
@@ -726,20 +724,6 @@ func _release_attack(neck: Neck) -> void:
 
 # ── 強めの技（判断の層とタイムラインから呼ばれる） ────────────────────────
 
-func _update_blackboard() -> void:
-	var bb := decision.get_bt_instance().get_blackboard()
-	var offset := run_state.ship_pos - table.pos[body]
-	bb.set_var(&"player_distance", offset.length())
-	bb.set_var(&"player_angle", angle_difference(table.facing[body], offset.angle()))
-	var counts: Dictionary = {}
-	for neck in necks:
-		if _alive(neck): counts[neck.kind] = int(counts.get(neck.kind, 0)) + 1
-	bb.set_var(&"live_heads", counts)
-	bb.set_var(&"neck_count", count)
-	bb.set_var(&"exposed", false)
-	bb.set_var(&"recovering", recovery_t > 0.0)
-
-## 条件評価は読み取りだけ。攻撃枠は選択後に取得する。
 func attack_ready(attack: StringName) -> bool:
 	if tech==attack:return true
 	if not TECH_DIR.has(attack) or busy or timeline.is_playing() or chance_t>0.0 or growth_t>0.0 or separation_pending or recovery_t>0.0:return false

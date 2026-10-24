@@ -14,6 +14,7 @@ func exercise() -> void:
 	await lab.reset({"empty": true, "stage": 4, "ship_pos": [400, 0], "invincible": true})
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
 	var actor = lab.run.bosses.actors.back()
+	check(actor.get_node_or_null("LimboHSM") == null and actor.get("flow_runner") != null, "production Hydra uses the new flow without a Limbo state machine")
 	actor.hsm.set_active(false)
 	actor.use_action_rules(load("res://data/bosses/ai/hydra_action_rules.tres"))
 	var adapter = script.new(actor)
