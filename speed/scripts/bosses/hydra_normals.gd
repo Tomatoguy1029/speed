@@ -1,6 +1,8 @@
 ## 単独技の振り付け。BTは選択し、この動作は世界時間で進む。
 extends RefCounted
 static func tick(a: Node, n, dt: float) -> void:
+	var aim: Dictionary = a.move_params(n.mode)
+	if n.t <= minf(float(aim.get("aim_tracking", 0.0)), float(aim.get("normal_charge", 0.0))): n.target = a.run_state.ship_pos
 	if n.mode == &"thunder_drop":
 		thunder_drop(a,n,dt)
 		return

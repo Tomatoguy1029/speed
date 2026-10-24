@@ -56,6 +56,7 @@ func _ready() -> void:
 	_load_rules()
 	add_child(combo_editor)
 	combo_editor.hide()
+	combo_editor.inspected.connect(_edit_combo_step)
 	combo_editor.changed.connect(func(value):
 		history.create_action("コンボ内部を変更")
 		history.add_do_method(_set_combo.bind(combo_id, value))
@@ -120,6 +121,39 @@ func _set_gate(id: String, key: String, value: float) -> void:
 func _set_combo(id: String, value: Dictionary) -> void:
 	rules.combos[id] = value.duplicate(true)
 	combo_editor.open(rules.combos[id], rules.techniques)
+
+func _edit_combo_step(path: Array) -> void:
+	_clear_fields()
+	var step: Dictionary = rules.combos[combo_id]
+	for index in path: step = step.children[index]
+	_status.text = "コンボ内部: " + String(step.get("type", "action"))
+	if step.type == "wait":
+		_number_field("待機（秒）", step.seconds, func(value): _combo_field(path, "seconds", value))
+	elif step.type == "branch":
+		_status.text += "（子の左が成立、右が不成立）"
+		for key in ["min", "max", "angle", "half_angle"]:
+			_number_field(key, step.condition.get(key, 0.0), func(value): _combo_field(path, key, value, true), -180.0 if key == "angle" else 0.0)
+	elif step.type == "action":
+		var label := Label.new()
+		label.text = "技（技間で再判定）"
+		_fields.add_child(label)
+		var choices := OptionButton.new()
+		for move in rules.techniques:
+			choices.add_item(String(move.technique))
+			if String(move.technique) == step.id: choices.selected = choices.item_count - 1
+		choices.item_selected.connect(func(index): _combo_field(path, "id", choices.get_item_text(index)))
+		_fields.add_child(choices)
+
+func _combo_field(path: Array, key: String, value: Variant, condition := false) -> void:
+	var copy: Dictionary = rules.combos[combo_id].duplicate(true)
+	var step := copy
+	for index in path: step = step.children[index]
+	if condition: step.condition[key] = value
+	else: step[key] = value
+	history.create_action("コンボの技間条件・待機を変更")
+	history.add_do_method(_set_combo.bind(combo_id, copy))
+	history.add_undo_method(_set_combo.bind(combo_id, rules.combos[combo_id].duplicate(true)))
+	history.commit_action()
 
 func _open_path() -> void:
 	open_technique(_path.text)

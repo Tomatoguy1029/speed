@@ -1,6 +1,7 @@
 @tool
 extends VBoxContainer
 signal changed(program: Dictionary)
+signal inspected(step_path: Array)
 var program: Dictionary = {}
 var graph := GraphEdit.new()
 var _selected := -1
@@ -22,7 +23,7 @@ func _at(value: Dictionary) -> Dictionary:
 func _ready() -> void:
 	var tools := HBoxContainer.new()
 	add_child(tools)
-	for title_text in ["技", "待機", "順次グループ", "並列グループ"]: _type.add_item(title_text)
+	for title_text in ["技", "待機", "順次グループ", "並列グループ", "条件分岐"]: _type.add_item(title_text)
 	tools.add_child(_type)
 	tools.add_child(_technique)
 	_seconds.step = 0.1
@@ -63,7 +64,9 @@ func _ready() -> void:
 		tools.add_child(shift)
 	graph.custom_minimum_size = Vector2(400, 220)
 	graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	graph.node_selected.connect(func(id): _selected = String(id).trim_prefix("step_").to_int())
+	graph.node_selected.connect(func(id):
+		_selected = String(id).trim_prefix("step_").to_int()
+		inspected.emit(path + [_selected]))
 	add_child(graph)
 
 func open(value: Dictionary, moves: Array) -> void:
@@ -88,7 +91,7 @@ func open(value: Dictionary, moves: Array) -> void:
 		node.add_child(label)
 		node.set_slot(0, true, 0, Color.GRAY, true, 0, Color.GRAY)
 		graph.add_child(node)
-		if step.get("type", "") in ["sequence", "parallel"]:
+		if step.get("type", "") in ["sequence", "parallel", "branch"]:
 			node.gui_input.connect(func(event):
 				if event is InputEventMouseButton and event.double_click:
 					path.append(i)
@@ -104,6 +107,7 @@ func _append() -> void:
 		0: node = {"type": "action", "id": _technique.get_item_text(_technique.selected)}
 		1: node = {"type": "wait", "seconds": _seconds.value}
 		2: node = {"type": "sequence", "children": []}
-		_: node = {"type": "parallel", "children": []}
+		3: node = {"type": "parallel", "children": []}
+		_: node = {"type": "branch", "condition": {"min": 0.0, "max": 600.0, "angle": 0.0, "half_angle": 180.0}, "children": [{"type": "sequence", "children": []}, {"type": "sequence", "children": []}]}
 	target.children.append(node)
 	changed.emit(copy)

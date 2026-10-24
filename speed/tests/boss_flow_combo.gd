@@ -13,6 +13,7 @@ class Adapter:
 		var ticket := Ticket.new()
 		tickets.append(ticket)
 		return ticket
+	func step_condition(gate: Dictionary) -> bool: return gate.get("test", false)
 func _initialize() -> void:
 	var script = load("res://scripts/bosses/flow/combo_runner.gd")
 	if script == null:
@@ -45,5 +46,12 @@ func _initialize() -> void:
 	assert(parallel.tick(0.1) == &"running")
 	parallel_adapter.tickets[1].busy = false
 	assert(parallel.tick(0.1) == &"finished")
+	var branch_adapter := Adapter.new()
+	var branch = script.new({"type": "branch", "condition": {"test": false}, "children": [{"type": "action", "id": "near"}, {"type": "action", "id": "far"}]}, branch_adapter)
+	branch.tick(0.1)
+	if branch_adapter.started != ["far"]:
+		print("[boss-combo] FAIL branch decision missing")
+		quit(1)
+		return
 	print("[boss-combo] PASS ordered actions, delay and cancel")
 	quit()

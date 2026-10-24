@@ -46,6 +46,14 @@ func tick(dt: float) -> StringName:
 					return state
 				if result == &"finished": completed += 1
 			if completed == branches.size(): state = &"finished"
+		"branch":
+			if child == null:
+				var pick := 0 if adapter.step_condition(program.get("condition", {})) else 1
+				if program.get("children", []).size() != 2:
+					state = &"failed"
+					return state
+				child = get_script().new(program.children[pick], adapter)
+			state = child.tick(dt)
 		_:
 			state = &"failed"
 	return state

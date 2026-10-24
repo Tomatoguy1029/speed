@@ -3,6 +3,10 @@ var actor: Node
 var active: Array = []
 func _init(value: Node) -> void: actor = value
 
+func step_condition(gate: Dictionary) -> bool:
+	var relative: Vector2 = (actor.run_state.ship_pos - actor.table.pos[actor.body]).rotated(-actor.table.facing[actor.body])
+	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, relative)
+
 func blocked() -> bool:
 	return not actor.has_body() or actor.growth_t > 0.0 or actor.separation_pending or actor.separation_t > 0.0 or actor.chance_t > 0.0 or actor.final_strike_t >= 0.0
 
