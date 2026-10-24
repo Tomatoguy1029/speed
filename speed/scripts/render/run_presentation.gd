@@ -621,7 +621,7 @@ func _build_stage_background() -> void:
 		sprite.position = state.ship_pos + placement.offset
 		sprite.scale = Vector2.ONE * placement.scale
 		sprite.rotation_degrees = placement.rotation_degrees
-		sprite.modulate = placement.tint
+		sprite.modulate = placement.display_tint()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_layers.background.add_child(sprite)
 		_background_sprites.append(sprite)

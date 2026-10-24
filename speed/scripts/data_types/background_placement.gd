@@ -6,8 +6,12 @@ extends Resource
 @export var offset := Vector2.ZERO
 @export_range(0.05, 10.0, 0.05) var scale := 1.0
 @export_range(-180.0, 180.0, 1.0) var rotation_degrees := 0.0
+## RGBは色、Aは明るさ。元画像のアルファは保ち、背後の星を遮る。
 @export var tint := Color(0.55, 0.65, 0.75, 0.7)
 var _bounds := Rect2()
+
+func display_tint() -> Color:
+	return Color(tint.r * tint.a, tint.g * tint.a, tint.b * tint.a, 1.0)
 
 func bounds() -> Rect2:
 	if _bounds.size == Vector2.ZERO and texture != null:

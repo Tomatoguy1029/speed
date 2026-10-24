@@ -788,7 +788,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.y | 位置 Y | Position Y |
 | bg.scale | サイズ倍率 | Scale |
 | bg.rotation | 回転（度） | Rotation (degrees) |
-| bg.opacity | 透明度（0＝非表示、1＝不透明） | Opacity (0 = hidden, 1 = opaque) |
+| bg.opacity | 明るさ（0＝黒、1＝元の明るさ） | Brightness (0 = black, 1 = original) |
 | bg.color | 重ねる色 | Color tint |
 | bg.duplicate | 複製 | Duplicate |
 | bg.delete | 削除 | Delete |
@@ -808,6 +808,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.asset.space_debris | 宇宙の瓦礫 | Space debris |
 | bg.asset.asteroid_a | 小惑星 A | Asteroid A |
 | bg.asset.asteroid_b | 小惑星 B | Asteroid B |
+| bg.asset.planet_a | 惑星 A | Planet A |
+| bg.asset.station_a | 宇宙船 A | Spacecraft A |
 | bg.asset.solar | ソーラーパネルの残骸 | Solar panel wreck |
 | lab.armor.title | 装甲の塗装 | Armor paint |
 | lab.armor.upper | 上半分 | Upper half |
