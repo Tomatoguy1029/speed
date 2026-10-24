@@ -1,7 +1,7 @@
 extends Node
 var failed := 0
 func check(ok: bool, label: String) -> void:
-	print("[hydra-bt-settings] ", "PASS " if ok else "FAIL ", label)
+	print("[hydra-technique-settings] ", "PASS " if ok else "FAIL ", label)
 	if not ok: failed += 1
 func _ready() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
@@ -10,7 +10,7 @@ func _ready() -> void:
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
 	var a = lab.run.bosses.actors.back()
 	a.hsm.set_active(false)
-	check(a.has_method("move_settings"), "BT technique resource is the execution source")
+	check(a.has_method("move_settings"), "technique resource is the execution source")
 	if a.has_method("move_settings"):
 		await exercise(a, lab)
 	lab.queue_free()

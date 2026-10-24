@@ -717,8 +717,8 @@ lab.enemy.hydra_immortal.move,羅針盤を抱えて逃げる蛇。単独では�
 lab.enemy.hydra_immortal.kill,護衛が残っていても直接攻撃できる。倒すと羅針盤を解放する,Can be damaged directly while guards remain. Defeat it to free the compass
 lab.enemy.hydra_rubble.move,うみへび座が吐いた瓦礫。漂って、少しすると消える,Debris spat by the Hydra. Drifts and vanishes after a while
 lab.enemy.hydra_rubble.kill,体当たりは弾かれる。武器で壊せる,Rams bounce off. Weapons break it
-lab.enemy.provisional.move,機体を直接追い、予告のあと扇状に弾を撃つ,Chases you directly and fires a fan of bullets after a warning
-lab.enemy.provisional.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
+lab.enemy.monoceros.move,予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う,"Locks its direction after a warning, then charges, sweeps its horn, or kicks backward"
+lab.enemy.monoceros.kill,技後の隙や惑星に角が刺さった時に攻める,Strike during its recovery or while its horn is stuck in a planet
 lab.enemy.hydra.move,中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する,Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes
 lab.enemy.hydra.kill,中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す,"Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer"
 lab.ui.freehand,自由に描く,Freehand

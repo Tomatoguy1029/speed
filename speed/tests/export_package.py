@@ -28,7 +28,8 @@ def inspect(path: Path) -> None:
     forbidden = [name for name in files if name.startswith(excluded)]
     assert not forbidden, f"開発用ファイルが残っている: {forbidden}"
     assert b"autoload/DevBootstrap" not in files["project.binary"], "開発用Autoloadを除外"
-    assert "addons/limboai/bin/limboai.gdextension" in files, "実行用の拡張を保持"
+    assert not any(name.startswith("addons/limboai/") for name in files), "廃止した拡張を含めない"
+    assert ".content/boss_monoceros.tres" in files, "一角獣の生成AIを含める"
     assert ".content/boss_hydra.tres" in files, "生成したボスAIを含める"
     assert ".content/boss_preview.tres" not in files, "試遊用の編集結果を配布へ含めない"
     for index in range(1, 6):

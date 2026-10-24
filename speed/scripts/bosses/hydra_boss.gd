@@ -25,7 +25,6 @@ const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 var _moves: Dictionary = {}
-var _move_gates: Dictionary = {}
 var flow_controlled := false
 var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
@@ -50,7 +49,6 @@ func use_action_rules(value: Resource) -> void:
 	action_rules = value
 	_moves.clear()
 	_normal_moves.clear()
-	_move_gates.clear()
 	for move in value.techniques:
 		_moves[move.technique] = move.duplicate(true)
 		if move.head_kind != &"": _normal_moves[move.technique] = true
@@ -529,8 +527,6 @@ func _position_ready(attack: StringName, index := -1, internal_step := false) ->
 				snapshot.reach = NORMALS.reach(attack, move_params(attack))
 			if preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos): return true
 		return false
-	for condition in _move_gates.get(attack, []):
-		if not condition.allows(self, index): return false
 	return true
 
 func _normal_cost(attack: StringName) -> float:

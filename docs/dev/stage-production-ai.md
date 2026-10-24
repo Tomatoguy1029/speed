@@ -302,9 +302,9 @@ Dolphin                         EnemyFormation：編成の根
 
 操作一覧は右上の「？」と[設計書14.2](../architecture.md#142-出現タイムラインのエディタ拡張)、候補・保存欄の実装は[インスペクター拡張](../../speed/addons/spawn_timeline/type_checks.gd)、抽選の実装は[SpawnSystem](../../speed/scripts/runtime/systems/spawn_system.gd)を参照する。
 
-### ボスのBT・攻撃値・タイムライン
+### ボスの区間フロー・攻撃値・タイムライン
 
-ヒュドラは共通フローと独立した技定義を使う。操作は[制作ガイド5.6](stage-production.md#56-ボス行動を調整する)、責務と生成契約は[設計書6.1](../architecture.md#61-敵とボスの-ai)を参照する。他のボスの既存BTは各ボスの実装を確認して扱う。
+うみへび座・いっかくじゅう座は共通フローと独立した技定義を使う。操作は[制作ガイド5.6](stage-production.md#56-ボス行動を調整する)、責務と生成契約は[設計書6.1](../architecture.md#61-敵とボスの-ai)を参照する。個別の形態・技実行は各ボスの役者を確認して扱う。
 
 | 調整対象 | 編集・確認先 |
 |---|---|

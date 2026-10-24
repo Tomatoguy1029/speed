@@ -21,7 +21,7 @@ func _initialize() -> void:
 	for path in _files("res://scripts/managers"):
 		_forbid(path, CONTENT_REFS, "Manager がコンテンツを参照している")
 	for path in _files("res://addons"):
-		if path.begins_with("res://addons/limboai/") or path.begins_with("res://addons/content_build/"):
+		if path.begins_with("res://addons/content_build/"):
 			continue
 		_forbid(path, GAME_REFS, "道具（addons）がゲームを参照している")
 	for path in _files("res://scripts/ui"):

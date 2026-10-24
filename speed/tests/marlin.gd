@@ -126,7 +126,7 @@ func _ready() -> void:
 	row = dash(Vector2.ZERO, 10000.0, 0.2)
 	var invuln := victim(Vector2(100, 0))
 	t.guard[invuln] = 10.0
-	var boss := sim.enemies.spawn_boss(&"provisional", Vector2(250, 0), 30.0, 100.0, 10.0, 0.0, 0.0, 0.0, 0.0, Color.WHITE)
+	var boss := sim.enemies.spawn_boss(&"monoceros", Vector2(250, 0), 30.0, 100.0, 10.0, 0.0, 0.0, 0.0, 0.0, Color.WHITE)
 	var part := sim.enemies.spawn_part(boss, sim.enemies.def_of(&"drifter"), Vector2(300, 0))
 	var saw := sim.enemies.spawn(sim.enemies.def_of(&"saw"), Vector2(400, 0))
 	var rubble := sim.enemies.spawn(sim.enemies.def_of(&"hydra_rubble"), Vector2(500, 0))

@@ -410,14 +410,13 @@
 
 [デザインとアートスタイル](game/art-style.md) の4.3。
 
-### 12.2 仮のボス
+### 12.2 ボスの出現
 
-今のステージ1〜3・5には、このボスが出る（ステージ4はうみへび座、12.3）。値は `speed/data/bosses/provisional.tres`（HP・装甲は `config.boss_hp`・`config.boss_armor`、出現時刻は4.1）。
+ステージの`boss_enabled`・`boss_id`と4.1の時刻で専用ボスを出す。ボスの値と採用・実装状況は[敵一覧](game/catalog/enemies.md#ボス)から参照する。
 
-- 4.1の時刻に1体出る。機体から少し離れた位置に出し、惑星の中とフィールドの外は避ける。倒すまで消えず、ずっと追ってくる。
-- 機体を直接追い、予告のあと扇状に弾を撃つ。予告の長さはボスのシーンの攻撃の動き（volley）で決まる。
-- 表示：画面上部の HP バー、出現時の「WARNING!!」、画面外にいるときの方向の矢印。
-- ボスが出ても通常の敵は湧き続ける。ボスは画面外へ離れても消えず、再配置もしない。
+- ボスを機体から少し離れた位置に出し、惑星の中とフィールドの外を避ける。撃破まで保持する。
+- 画面上部にHPバー、出現時に「WARNING!!」、画面外では方向の矢印を表示する。
+- ボス戦中も通常の敵を出す。画面外のボスは各役者の移動で管理する。
 
 ### 12.3 中ボス
 
@@ -581,7 +580,7 @@
 | ソニックブーム | 機体と一緒に進路を進む。画面の揺れ、衝撃波の歪み |
 | 普段の被弾 | 機体を `config.ship_hurt_time` 実秒赤くし、機体だけを横に最大 `config.ship_hurt_shake` px 震わせる。カメラは揺らさない |
 | 敗北 | 最後の被弾の瞬間、カメラを固定し、HUD を消す。世界を `config.death_freeze_time` 実秒止め、機体以外を `config.death_world_dim` の割合で暗くする。機体を消して爆発・破片を `config.death_explosion_time` 秒、GAME OVER を `config.death_game_over_time` 秒表示して結果画面へ。暗さは結果画面まで保つ |
-| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](game/bosses/hydra.md#25-制限時間の一撃)。仮のボスは本体から機体へ1本の光を溜め、太くして画面を埋める（`provisional.tres` の `final_*`） |
+| 時間切れ | ボスが攻撃と行動を止め、避けられない一撃を `config.time_up_charge_time` 秒溜める。溜めの間も機体は動かせ、ボスは無敵。溜め終わりに一撃が無敵とバリアを無視して当たり、敗北と同じ流れへ移る。ボスがいなければ、すぐに当たる。うみへび座の一撃は[専用仕様](game/bosses/hydra.md#25-制限時間の一撃)。いっかくじゅう座は本体から機体へ1本の光を溜め、太くして画面を埋める（`monoceros.tres` の `final_*`） |
 | ボス撃破 | 直前 `config.boss_finish_replay_window` 秒の機体の動きを記録し、`config.boss_finish_zoom` 倍に寄って `config.boss_finish_slow_time` 秒かけてスローで再生。最終勝利の通知で敵の攻撃を止め、通常の速さに戻ってボスが消滅し、残りの敵を消す。`config.boss_finish_blast_time` 秒のあと、ステージ1〜4は既存の伝説モジュールの姿と名前を見せ、機体へ回収する仮演出を行う。出現・静止・回収の時間は `config.boss_finish_relic_appear_time`・`config.boss_finish_relic_hold_time`・`config.boss_finish_relic_collect_time`。CLEAR! を `config.boss_finish_clear_time` 秒表示し、短い画面フェードで結果画面へ。スキップは CLEAR! の区間へ進む。演出中は操作・被弾・時間切れ・3択・新しい出現を止める。部品と記録の保存は演出の最後に1回だけ |
 
 - 演出は攻撃力・装甲・ヒットストップに影響しない。ポーズ中・3択の間は止まる。

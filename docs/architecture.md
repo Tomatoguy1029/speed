@@ -48,7 +48,6 @@ speed/                    res://
   project.godot
   addons/                 編集用の道具、実行用拡張、ゲーム専用の生成（4.1）
     content_build/        実行用データの生成とexport
-    limboai/              敵 AI（6.1）
     spawn_timeline/       出現タイムライン（14.2）
     speed_data_editor/    データ編集ツール（8.4）
     stage_launcher/       ステージの直接起動（14.1）
@@ -65,7 +64,7 @@ speed/                    res://
     runtime/              RunSimulation・RunSession・RunContext・systems/
     dev/                  開発用の起動・命令・調整・性能表示・録画
     actors/               機体の見た目、ボスの役者の共通部分
-    bosses/               ボスごとの行動、LimboAI のタスク
+    bosses/               ボスごとの行動と共通フロー
     enemies/              EnemyBehavior・EnemyMotion・種類別の行動・被弾条件
     attacks/              攻撃の生成・移動・接触の種類別処理
     heroes/  gimmicks/    英雄の力とフィールドの仕掛け
@@ -294,12 +293,11 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 |---|---|---|
 | 雑魚 | 行動 | 種類ごとの単純なステートマシン（例：ダーターの予告 → 突進 → 回復） |
 | ヒュドラ | 形態（首増加・合体・分離） | 役者が専用状態を管理する |
-| 他の中ボス・ラスボス | 形態 | 既存の階層型ステートマシン |
-| ヒュドラ | 判断 | 共通の区間フローと、個別処理が返す実行可能候補 |
-| 他の中ボス・ラスボス | 判断 | 既存のBehavior Tree |
+| いっかくじゅう座 | 形態 | 役者がHP閾値と移行予約を管理する |
+| 実装済みのボス | 判断 | 共通の区間フローと、個別処理が返す実行可能候補 |
 | 中ボス・ラスボス | 攻撃（1つ1つの動き・弾・予告の振り付け） | タイムライン（エディタで人が調整する） |
 
-- 既存BTを持つボスはLimboAIのGDExtension版を使う。共通フローの編集画面はGodotのEditorPluginとして実装する。
+- 共通フローの編集画面はGodotのEditorPluginで実装する。`single_actor_adapter.gd`が一体のボス、`hydra_flow_adapter.gd`が複数の首の実行を共通選択器へ接続する。
 - ボスの判断の層から、自機の状態（線を描いているか、描かれた線、ゲージの溜まり具合、位置）・フィールドの仕掛けとの位置関係・ボス自身と部位の HP を読めるようにする。何を判断に使うかは、ボスごとの仕様で決める。
 
 **うみへび座の編集と役割**
@@ -781,7 +779,7 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 godot --headless --path speed --export-release macOS /tmp/SPEED.app
 ```
 
-`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、LimboAIの実行用拡張と生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
+`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
 
 ## 16. demo との対応
 
