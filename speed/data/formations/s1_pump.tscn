@@ -1,0 +1,55 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Stage1Pump" type="Node2D"]
+script = ExtResource("1")
+types = Array[StringName]([&"pump"])
+
+[node name="単体" type="Node2D" parent="."]
+position = Vector2(-2400, 0)
+script = ExtResource("2")
+weight = 1.0
+
+[node name="Pump1" type="Node2D" parent="単体"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"pump"
+
+[node name="二体並び" type="Node2D" parent="."]
+position = Vector2(-2400, 450)
+script = ExtResource("2")
+weight = 1.5
+
+[node name="Pump1" type="Node2D" parent="二体並び"]
+position = Vector2(-150, 0)
+script = ExtResource("3")
+enemy = &"pump"
+
+[node name="Pump2" type="Node2D" parent="二体並び"]
+position = Vector2(150, 0)
+script = ExtResource("3")
+enemy = &"pump"
+
+[node name="正面" type="Node2D" parent="."]
+position = Vector2(0, -1900)
+script = ExtResource("4")
+weight = 2.0
+
+[node name="左前" type="Node2D" parent="."]
+position = Vector2(-1520, -1140)
+script = ExtResource("4")
+weight = 1.0
+
+[node name="右前" type="Node2D" parent="."]
+position = Vector2(1520, -1140)
+script = ExtResource("4")
+weight = 1.0
+
+[node name="後ろ" type="Node2D" parent="."]
+position = Vector2(0, 1900)
+script = ExtResource("4")
+weight = 0.5
