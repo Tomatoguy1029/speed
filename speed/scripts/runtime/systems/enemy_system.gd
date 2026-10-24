@@ -175,7 +175,7 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 		r = def.radius
 	if opts.get("meteor_index", -1) < 0:
 		r *= cfg.character_scale
-	t.r[i] = r * def.visual_value("scale", 1.0)
+	t.r[i] = r * def.visual_value("scale", 1.0) * def.visual_value("collision_scale", 1.0)
 	t.max_hp[i] = def.base_hp(cfg) * z * z * cfg.enemy_hp_mult * (3.0 if elite else 1.0)
 	t.hp[i] = t.max_hp[i]
 	t.armor[i] = def.armor * z * cfg.enemy_armor_mult * (1.3 if elite else 1.0)

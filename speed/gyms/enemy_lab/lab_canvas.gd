@@ -338,6 +338,9 @@ func _draw() -> void:
 			draw_arc(pos, radius + 6, -PI / 2, PI, 12, Color("#7d8b9d"), 2)
 			if selected: draw_string(ThemeDB.fallback_font, pos + Vector2(-radius, radius + 22), reason, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#a5b4cb"))
 		if selected:
+			# 選択枠と別に、実際の接触判定の半径を示す。
+			draw_circle(pos, t.r[i] * zoom, Color(0.98, 0.65, 0.3, 0.08))
+			draw_arc(pos, t.r[i] * zoom, 0, TAU, 96, Color("#f9ae58"), 1.5)
 			draw_arc(pos, radius + 9, 0, TAU, 32, Color("#71e4e0"), 2)
 			var width := radius * 2
 			draw_rect(Rect2(pos + Vector2(-radius, -radius - 18), Vector2(width, 4)), Color("#354052"))

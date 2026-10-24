@@ -578,8 +578,9 @@ func _edit_definition(args: Dictionary) -> void:
 			t.speed[i] *= def.speed / maxf(old.speed, 0.001)
 		elif key == "radius":
 			t.r[i] *= def.radius / maxf(old.radius, 0.001)
-		elif key == "visual.scale":
-			t.r[i] *= def.visual_value("scale", 1.0) / old.visual_value("scale", 1.0)
+		elif key in ["visual.scale", "visual.collision_scale"]:
+			var field := key.trim_prefix("visual.")
+			t.r[i] *= def.visual_value(field, 1.0) / old.visual_value(field, 1.0)
 		t.def[i] = def
 
 func row_for_id(id: int) -> int:

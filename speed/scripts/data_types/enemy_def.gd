@@ -17,7 +17,7 @@ const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter
 
 ## 実験場と本番で共有する、種類ごとの外観上書き。
 const VISUAL_LIMITS := {
-	"scale": Vector2(0.1, 5.0), "key_energy": Vector2(0, 3), "fill_energy": Vector2(0, 3),
+	"scale": Vector2(0.1, 5.0), "collision_scale": Vector2(0.1, 5.0), "key_energy": Vector2(0, 3), "fill_energy": Vector2(0, 3),
 	"key_angle": Vector2(-180, 180), "fill_angle": Vector2(-180, 180),
 	"height": Vector2(0, 1), "ambient": Vector2(0, 1), "normal_strength": Vector2(0, 3),
 }

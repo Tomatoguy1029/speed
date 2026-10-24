@@ -28,11 +28,14 @@ var _appearance_angle: SpinBox
 var _appearance_type: StringName = &""
 var _appearance_label: Label
 var _appearance_scale: SpinBox
+var _collision_scale: SpinBox
+var _collision_radius: Label
 var _appearance_save: Button
 var _appearance_reset: Button
 var _appearance_hashes: Dictionary = {}
 var _armor_view: ARMOR_VIEW
 var _armor_color: ColorPickerButton
+var _armor_part: OptionButton
 
 func _ready() -> void:
 	custom_minimum_size.x = 368
@@ -51,11 +54,19 @@ func _appearance(page: Node) -> void:
 	_button(page, tr("lab.appearance.focus"), _focus_appearance)
 	_appearance_label = _text(page, "")
 	_appearance_scale = _number(page, tr("lab.appearance.scale"), 1, 0.1, 5, 0.05, _set_visual.bind("scale"))
+	_collision_scale = _number(page, tr("lab.appearance.collision_scale"), 1, 0.1, 5, 0.05, _set_visual.bind("collision_scale"))
+	_collision_radius = _text(page, "")
+	_text(page, tr("lab.appearance.collision_help"))
 	_appearance_angle = _number(page, tr("lab.appearance.rotation"), 0, -180, 180, 5, _rotate_appearance)
 	_appearance_reset = _button(page, tr("lab.appearance.restore_saved"), _restore_appearance)
 	_appearance_save = _button(page, tr("lab.appearance.save_type"), _save_appearance)
 	var paint_box := UI.fold(page, tr("lab.armor.title"), true)
 	_text(paint_box, tr("lab.armor.help"))
+	_armor_part = OptionButton.new()
+	_armor_part.add_item(tr("lab.armor.upper"))
+	_armor_part.add_item(tr("lab.armor.lower"))
+	_armor_part.item_selected.connect(func(_index: int): _sync_appearance())
+	paint_box.add_child(_armor_part)
 	var paint_row := HBoxContainer.new()
 	paint_box.add_child(paint_row)
 	var paint_label := _text(paint_row, tr("lab.armor.color"))
@@ -120,12 +131,15 @@ func _sync_appearance() -> void:
 	var switched := _appearance_type != type
 	_appearance_type = type
 	_appearance_scale.editable = supported
+	_collision_scale.editable = supported
+	_collision_radius.visible = supported
 	_appearance_angle.editable = row >= 0
 	_appearance_save.disabled = not supported
 	_appearance_reset.disabled = not supported
 	for field: SpinBox in _lighting_fields.values():
 		field.editable = supported and RunPresentation.load_look(type, lab.session.run.state.stage) != null
 	if not supported:
+		_armor_part.hide()
 		_armor_view.show_armor(null, {})
 		_armor_color.disabled = true
 		_appearance_label.text = tr("lab.appearance.select_type")
@@ -133,12 +147,20 @@ func _sync_appearance() -> void:
 	var def: EnemyDef = lab.session.run.enemies.def_of(type)
 	var original: EnemyDef = ContentManager.enemies[type]
 	var look := RunPresentation.load_look(type, lab.session.run.state.stage)
+	_armor_part.visible = look != null and look.split_other != null
+	if switched:
+		_armor_part.select(0)
+	if look != null and look.split_other != null and _armor_part.selected == 1:
+		look = look.split_other
 	_armor_view.show_armor(look.armor if look != null else null, def.armor_colors)
 	_armor_color.disabled = look == null
 	var pending: bool = def.visual_settings != original.visual_settings or def.armor_colors != original.armor_colors
 	_appearance_label.text = tr("lab.appearance.target").format({"name": def.display_name, "id": type, "state": tr("lab.appearance.unsaved") if pending else tr("lab.appearance.saved_state")})
 	if switched or not _appearance_scale.get_line_edit().has_focus():
 		_appearance_scale.set_value_no_signal(def.visual_value("scale", 1.0))
+	if switched or not _collision_scale.get_line_edit().has_focus():
+		_collision_scale.set_value_no_signal(def.visual_value("collision_scale", 1.0))
+	_collision_radius.text = tr("lab.appearance.collision_radius").format({"radius": "%.1f" % table.r[row]})
 	if switched or not _appearance_angle.get_line_edit().has_focus():
 		_appearance_angle.set_value_no_signal(wrapf(rad_to_deg(table.facing[row]), -180, 180))
 	for key in _lighting_fields:
@@ -156,7 +178,7 @@ func _restore_appearance() -> void:
 		return
 	for key in EnemyDef.VISUAL_LIMITS:
 		lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key,
-			"value": saved.visual_value(key, 1.0 if key == "scale" else float(LIGHTING.get(key))),
+			"value": saved.visual_value(key, 1.0 if key in ["scale", "collision_scale"] else float(LIGHTING.get(key))),
 			"inherit": not saved.visual_settings.has(key)})
 	lab.session.perform("armor_paint", {"type": String(_appearance_type), "colors": saved.armor_colors.duplicate(true)})
 	_sync_appearance()
@@ -165,6 +187,7 @@ func _save_appearance() -> void:
 	if _appearance_type == &"":
 		return
 	_appearance_scale.apply()
+	_collision_scale.apply()
 	for field: SpinBox in _lighting_fields.values():
 		if field.editable:
 			field.apply()

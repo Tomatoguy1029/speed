@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyLook" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/render/enemy_look.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/pixel/ruler/ruler_top_base.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/pixel/ruler/ruler_top_armor.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/pixel/ruler/ruler_top_normal.png" id="4"]
+[ext_resource type="Resource" path="res://data/visuals/looks/ruler_bottom.tres" id="5"]
+
+[resource]
+script = ExtResource("1")
+base = ExtResource("2")
+armor = ExtResource("3")
+normal = ExtResource("4")
+split_other = ExtResource("5")

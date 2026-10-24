@@ -37,6 +37,8 @@ var pipeline: RenderPipeline
 var _batches: Dictionary = {}
 var _armor_batches: Dictionary = {}
 var _armor_sources: Dictionary = {}
+## 描画用パーツが参照する敵の種類。
+var _batch_owners: Dictionary = {}
 var _armor_palette_hashes: Dictionary = {}
 ## 外観の名前の一覧（並び順が照明のキャンバスの層の番号になる。出ない外観の層は作らない）
 var _look_names: PackedStringArray = []
@@ -186,7 +188,8 @@ func _build_lighting(type: StringName, look: EnemyLook) -> void:
 ## 照明の値を敵データに合わせる。照明を作ったときと、実験場で外観を編集したときに呼ぶ。
 func _apply_lighting() -> void:
 	for type in _armor_batches:
-		var def := run.enemies.def_of(type)
+		var owner: StringName = _batch_owners.get(type, type)
+		var def := run.enemies.def_of(owner)
 		var lights: Array = _directional_lights[type]
 		for i in 2:
 			var prefix := "key_" if i == 0 else "fill_"
@@ -211,7 +214,7 @@ func _apply_lighting() -> void:
 					(canvas.diffuse_texture as ImageTexture).update(painted)
 				else:
 					canvas.diffuse_texture = ImageTexture.create_from_image(painted)
-			_enemy_textures.erase(type)
+			_enemy_textures.erase(owner)
 
 
 ## 隕石・経験値の結晶・部品・敵の弾を MultiMesh でまとめる。敵の種類ごとのまとめは、その種類が初めて出たときに作る。
@@ -257,14 +260,15 @@ func _build_batches() -> void:
 
 ## 敵の種類 type のまとめた描画。外観があれば重ねた絵と照明、なければ assets/pixel/<type ID>.png の絵、
 ## それもなければ敵の定義の形（EnemyDef.shape）の図形で描く。png を置けば絵に替わる。
-func _ensure_enemy_batch(type: StringName) -> InstanceBatch:
+func _ensure_enemy_batch(type: StringName, part: EnemyLook = null, owner: StringName = &"") -> InstanceBatch:
 	if _batches.has(type):
 		return _batches[type]
 	var b := InstanceBatch.new()
-	var look := look_of(type)
+	_batch_owners[type] = owner if owner != &"" else type
+	var look := part if part != null else look_of(type)
 	var path := _enemy_sprite_path(type)
 	if look != null:
-		b.setup_texture(look.base)
+		b.setup_texture(look.base_texture())
 		b.material = _enemy_mat.duplicate()
 	elif ResourceLoader.exists(path):
 		b.setup_texture(load(path) as Texture2D)
@@ -814,7 +818,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 				continue
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
-			batch.add(p, t.facing[i], t.r[i], Color.WHITE if t.flash[i] > 0.0 else t.color[i])
+			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
 		else:
 			batch.add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
 		if _armor_batches.has(type):
@@ -898,21 +902,27 @@ static func load_look(type: StringName, stage: StageDef = null) -> EnemyLook:
 ## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
 static func look_texture(look: EnemyLook, cache: Dictionary, palettes: Dictionary = {}) -> Texture2D:
 	var data := ARMOR_PAINT.layout(look.armor)
-	var key := look.resource_path + ":" + str(hash(palettes.get(data.key, {})))
+	var other_palette: Dictionary = palettes.get(ARMOR_PAINT.layout(look.split_other.armor).key, {}) if look.split_other != null else {}
+	var key := look.resource_path + ":" + str(hash([palettes.get(data.key, {}), other_palette]))
 	if not cache.has(key):
 		if cache.size() >= 64:
 			cache.erase(cache.keys()[0])
-		var body: Image = look.base.get_image()
+		var body: Image = look.base_texture().get_image()
 		body.blend_rect(ARMOR_PAINT.painted_image(look.armor, palettes), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
+		if look.split_other != null:
+			var other := look_texture(look.split_other, cache, palettes)
+			body.blend_rect(other.get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
 		cache[key] = ImageTexture.create_from_image(body)
 	return cache[key]
 
 ## 外観の絵は元画像の寸法を、敵データの半径との比で拡大縮小する（半径には実験場の倍率・個体の大きさが反映済み）。
 func enemy_sprite_radius(type: StringName, collision_radius: float) -> float:
+	var def := run.enemies.def_of(type)
+	if def != null:
+		collision_radius /= def.visual_value("collision_scale", 1.0)
 	var look := look_of(type)
 	if look == null or look.size_from_collision:
 		return collision_radius
-	var def := run.enemies.def_of(type)
 	return maxf(look.base.get_width(), look.base.get_height()) * 0.5 * collision_radius / maxf(def.radius if def != null else collision_radius, 0.001)
 
 func _enemy_sprite_angle(type: StringName, facing: float) -> float:
