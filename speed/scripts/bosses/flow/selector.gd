@@ -30,13 +30,24 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 			if not parallel.has(key): parallel[key] = []
 			parallel[key].append(pair)
 	if not parallel.is_empty(): groups.parallel = parallel
-	var actions: Array = sample(groups, weights_for(section, last))
+	var weights := weights_for(section, last)
+	var previous := identity(last)
+	if section.get("avoid_repeat", true) and not previous.is_empty():
+		var alternatives := groups.duplicate(true)
+		var positive := false
+		for kind in alternatives.keys():
+			alternatives[kind].erase(previous)
+			if alternatives[kind].is_empty(): alternatives.erase(kind)
+			elif float(weights.get(kind, 0.0)) > 0.0: positive = true
+		if positive: groups = alternatives
+	var actions: Array = sample(groups, weights)
 	# 3個以上は選択済みペアから必要時だけ拡張し、全ての部分集合を作らない。
 	if actions.size() > 1:
 		var remaining := candidates.duplicate()
 		while not remaining.is_empty() and random.randf() < 0.5:
 			var next: Dictionary = remaining.pop_at(random.randi_range(0, remaining.size() - 1))
-			if next.get("category", "single") == "single" and compatible(actions, next, cap, _forbidden): actions = actions + [next]
+			if next.get("category", "single") == "single" and compatible(actions, next, cap, _forbidden):
+				if not section.get("avoid_repeat", true) or identity(actions + [next]) != previous: actions = actions + [next]
 	return actions
 
 static func identity(actions: Array) -> String:

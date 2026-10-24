@@ -176,6 +176,18 @@ func _edit_section(i: int) -> void:
 	editing_flow = true
 	_clear_fields()
 	_status.text = "共通フローの区間（技定義は全区間で共通）"
+	var avoid := CheckButton.new()
+	avoid.text = "可能なら直前と同じ組み合わせを避ける"
+	avoid.button_pressed = flow.sections[i].get("avoid_repeat", true)
+	avoid.toggled.connect(func(value):
+		var copy: Array = flow.sections.duplicate(true)
+		copy[i].avoid_repeat = value
+		history.create_action("連発回避を変更")
+		history.add_do_method(_set_sections.bind(copy))
+		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+		history.commit_action())
+	_fields.add_child(avoid)
+	_fields.add_child(Control.new())
 	for key in ["name", "request", "next"]:
 		var label := Label.new()
 		label.text = {"name": "区間名", "request": "要求 normal / major / rest", "next": "次の区間番号（0から）"}[key]

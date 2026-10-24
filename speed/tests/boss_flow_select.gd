@@ -20,5 +20,14 @@ func _initialize() -> void:
 	assert(selector.choose([a, b], together, [], [["a", "b"]]).is_empty())
 	b.parts = [1]
 	assert(selector.choose([a, b], together, []).is_empty())
+	b.parts = [2]
+	var avoid := {"weights": {"single": 100.0}, "avoid_repeat": true}
+	selector.random.seed = 0
+	if selector.choose([a, b], avoid, [a]).front().id != "b":
+		print("[boss-select] FAIL repeat avoidance missing")
+		quit(1)
+		return
+	assert(selector.choose([a], avoid, [a]).front().id == "a")
+	assert(not selector.choose([a, b], avoid, [a, b]).is_empty())
 	print("[boss-select] PASS weighted category, history row, unavailable redistribution")
 	quit()
