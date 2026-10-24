@@ -75,6 +75,7 @@ func handle_body_defeat(_opts: Dictionary) -> bool:
 func _stop_combat() -> void:
 	if _defeated: return
 	_defeated = true
+	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	timeline.stop()
 	mode = &"defeated"
@@ -148,6 +149,15 @@ func rule() -> Dictionary:
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 	if not can_select(attack, int(gate.get("min_phase", 1)), float(gate.get("min", 0.0)), float(gate.get("max", INF)), false): return false
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim - table.pos[body]).rotated(-table.facing[body]))
+
+func selection_blocked() -> bool:
+	return not body_alive() or not selection_enabled or mode in [&"phase", &"final", &"defeated"]
+
+func can_begin_sequence() -> bool:
+	return mode == &"idle" and _cooldown <= 0.0 and reposition <= 0.0
+
+func attack_failed() -> bool:
+	return not body_alive() or reposition > 0.0
 
 ## 条件評価では攻撃枠を消費しない。
 func can_select(attack: StringName, min_phase: int, min_range: float, max_range: float, rear_only: bool) -> bool:
@@ -360,9 +370,21 @@ func _cue(cue: StringName) -> void:
 		"position": table.pos[body], "angle": table.facing[body], "world_time": clock})
 
 func begin_final_strike(charge: float) -> void:
+	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	combo_pending = false
 	previous_horn.clear()
 	mode = &"final"
 	super(charge)
 	_cue(&"final_strike")
+
+func cancel_attack() -> void:
+	timeline.stop()
+	combo_pending = false
+	passes_left = 0
+	previous_horn.clear()
+	recovery = 0.0
+	mode = &"idle"
+
+func _exit_tree() -> void:
+	if flow_adapter != null: flow_adapter.cancel()

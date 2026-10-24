@@ -41,7 +41,7 @@ var _probability_previous := ""
 var _scale := 1.0
 var _file_dialog := FileDialog.new()
 const GRAPH := preload("res://addons/boss_flow/technique_graph.gd")
-const PARAM_LABELS := {"normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
+const PARAM_LABELS := {"warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
