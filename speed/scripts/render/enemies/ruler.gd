@@ -23,3 +23,24 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 		c.draw_circle(tip, r * (0.2 + 0.4 * k), Color(1, 1, 1, 0.4 + 0.5 * k))
 	elif t.mode[i] == EnemyTable.Mode.DASH and t.buds[i] != 0:
 		c.draw_circle(tip, r * 0.18, Color(col, 0.6))
+
+## 元画像の共通キャンバスを重ね、分離後は buds の側だけを描く。
+func draw_body(_c: CanvasItem, t: EnemyTable, i: int, pos: Vector2) -> bool:
+	var type := t.type[i]
+	var look := rm.look_of(type)
+	if look == null or look.split_other == null:
+		return false
+	rm._ensure_enemy_batch(type)
+	var lower_key := StringName(String(type) + "/lower")
+	rm._ensure_enemy_batch(lower_key, look.split_other, type)
+	var radius := sprite_radius(t, i)
+	var color := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0, 0, 1)
+	for side in [-1, 1]:
+		if t.buds[i] != 0 and t.buds[i] != side:
+			continue
+		var key: StringName = type if side == -1 else lower_key
+		var part: EnemyLook = look if side == -1 else look.split_other
+		var angle := t.facing[i] + part.angle
+		rm._batches[key].add(pos, angle, radius, color)
+		rm._armor_batches[key].add(pos, angle, radius, color)
+	return true

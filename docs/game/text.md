@@ -753,6 +753,9 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.save | 照明をプロジェクトへ保存 | Save lighting to project |
 | lab.appearance.saved | 照明を enemy&#95;lighting.tres に保存しました | Lighting saved to enemy&#95;lighting.tres |
 | lab.appearance.select&#95;enemy | 確認する敵を選択してください | Select an enemy to inspect |
+| lab.appearance.collision_scale | 当たり判定のみの倍率 | Collision-only multiplier |
+| lab.appearance.collision_radius | この個体の当たり判定の半径：{radius} | This enemy’s collision radius: {radius} |
+| lab.appearance.collision_help | オレンジの円が実際の当たり判定です。この倍率は見た目の大きさを保ち、同じ種類の敵の判定だけを変えます。保存ボタンでステージにも反映できます。 | The orange circle shows the actual collision area. This multiplier changes collision for this enemy type while keeping its visual size. Save to apply it in stages. |
 | lab.appearance.scale | サイズ倍率（見た目・当たり判定） | Size multiplier (visual and collision) |
 | lab.appearance.type&#95;help | 選択した種類の全個体へ即時反映します。サイズは見た目と当たり判定の両方に適用します。保存すると全ステージの同じ種類に使います。照明は法線画像を持つ敵だけ調整できます。 | Edits apply to all instances of the selected type. Size changes visuals and collision. Save to use settings in every stage. Lighting requires a normal map. |
 | lab.appearance.restore&#95;saved | この種類を保存済みの外観へ戻す | Restore saved appearance for this type |
@@ -765,6 +768,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.appearance.file&#95;changed | 敵データが外部で変更されています。実験場を開き直してから保存してください。 | Enemy data changed externally. Reopen the lab before saving. |
 | lab.appearance.saved&#95;type | {name} の外観を保存しました。次のステージ開始から使います。 | Saved appearance for {name}. New runs will use these settings. |
 | lab.armor.title | 装甲の塗装 | Armor paint |
+| lab.armor.upper | 上半分 | Upper half |
+| lab.armor.lower | 下半分 | Lower half |
 | lab.armor.color | 塗る色 | Paint color |
 | lab.armor.help | 左クリックで装甲片を塗り、右クリックで元の色に戻します。上下左右につながるピクセルだけを同じ片として扱い、斜めの接触は分けます。画像は元の向きで表示します。外観の保存ボタンでステージにも反映できます。 | Left-click to paint a piece; right-click to restore its original color. Only horizontal and vertical neighbors connect. Diagonal contacts stay separate. The image uses its original orientation. Save appearance to use the paint in stages. |
 <!-- csv:end -->

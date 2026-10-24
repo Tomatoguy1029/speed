@@ -28,7 +28,7 @@ func _pump(i: int, dt: float) -> void:
 	var store_max := int(p.store_max)
 	var full := float(t.buds[i]) / float(store_max)
 	# 胴体は吸い込んだ数に応じて膨らみ、撃ったあとはしぼむ
-	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale * t.def[i].visual_value("scale", 1.0)
+	var base_r := t.def[i].radius * (1.25 if t.elite[i] != 0 else 1.0) * cfg.character_scale * t.def[i].visual_value("scale", 1.0) * t.def[i].visual_value("collision_scale", 1.0)
 	t.r[i] += (base_r * (1.0 + float(p.grow) * full) - t.r[i]) * minf(1.0, 6.0 * dt)
 	t.timer[i] -= dt
 	match t.mode[i]:
