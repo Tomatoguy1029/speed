@@ -1,4 +1,5 @@
 ## 透過で区切られた装甲片を上下左右の4近傍で分け、種類ごとの塗装を作る。
+@tool
 extends RefCounted
 
 static var _layouts: Dictionary = {}
@@ -81,3 +82,35 @@ static func valid_palettes(value: Variant) -> bool:
 			if not color is String or color.length() != 6 or not Color.html_is_valid(color):
 				return false
 	return true
+
+static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> EnemyLook:
+	var result := source.duplicate() as EnemyLook
+	result.prepared = true
+	result.source_path = source.resource_path
+	result.painted_armors = {}
+	result.previews = {}
+	var data := layout(source.armor)
+	result.armor_key = data.key
+	if source.decorations != null:
+		var image := source.base.get_image().duplicate()
+		image.blend_rect(source.decorations.get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+		result.base = ImageTexture.create_from_image(image)
+	result.decorations = null
+	if source.split_other != null: result.split_other = prepare_look(source.split_other, palettes)
+	for palette in palettes:
+		var armor_id := result.colors_key(palette)
+		if not result.painted_armors.has(armor_id):
+			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, palette))
+		var preview_id := result.preview_key(palette)
+		if result.previews.has(preview_id): continue
+		var image := result.base.get_image().duplicate()
+		image.blend_rect(result.painted_armors[armor_id].get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+		if result.split_other != null:
+			image.blend_rect(result.split_other.previews[result.split_other.preview_key(palette)].get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+		result.previews[preview_id] = ImageTexture.create_from_image(image)
+	return result
+
+## 実験場が明示的に接続するライブ編集用経路。配布版のフォールバックには使わない。
+static func live_look(look: EnemyLook, palettes: Dictionary) -> EnemyLook:
+	var source := load(look.source_path) as EnemyLook
+	return prepare_look(source, [{}, palettes])

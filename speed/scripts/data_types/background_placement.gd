@@ -1,4 +1,5 @@
 ## 接触判定を持たない、ステージ開始地点を基準とする背景の配置。
+@tool
 class_name BackgroundPlacement
 extends Resource
 

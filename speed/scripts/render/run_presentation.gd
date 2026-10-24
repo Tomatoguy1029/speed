@@ -5,15 +5,11 @@
 class_name RunPresentation
 extends Node
 
-const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
-
 const XP_COLOR := Color("#b8a0ff")
 const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
-## 重ねた絵の外観の置き場（data/visuals/looks/<外観の名前>.tres）
-const LOOKS_DIR := "res://data/visuals/looks"
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -146,11 +142,7 @@ func _ready() -> void:
 
 ## 法線付き装甲の敵の飾りを、照明の層の上の専用キャンバスに置く。照明の層は、その外観の敵が初めて出たときに作る。
 func _build_directional_lights(world: Node2D) -> void:
-	for file in DirAccess.get_files_at(LOOKS_DIR):
-		var name := file.trim_suffix(".remap")
-		if name.ends_with(".tres"):
-			_look_names.append(name.get_basename())
-	_look_names.sort()
+	_look_names = state.stage.resources.look_names
 	var marks := CanvasLayer.new()
 	marks.name = "EnemyMarks"
 	marks.layer = 1 + _look_names.size()
@@ -170,7 +162,7 @@ func _build_directional_lights(world: Node2D) -> void:
 func _build_lighting(type: StringName, look: EnemyLook) -> void:
 	var lighting := CanvasLayer.new()
 	lighting.name = String(type) + "Lighting"
-	lighting.layer = 1 + maxi(0, _look_names.find(look.resource_path.get_file().get_basename()))
+	lighting.layer = 1 + maxi(0, _look_names.find(look.source_path.get_file().get_basename()))
 	lighting.follow_viewport_enabled = true
 	get_node(world_path).add_child(lighting)
 	_batches[type].reparent(lighting)
@@ -201,21 +193,18 @@ func _apply_lighting() -> void:
 		var armor := _armor_batches[type].material as ShaderMaterial
 		armor.set_shader_parameter("ambient", def.visual_value("ambient", lighting_settings.ambient))
 		armor.set_shader_parameter("normal_strength", def.visual_value("normal_strength", lighting_settings.normal_strength))
-		var source: Texture2D = _armor_sources[type]
-		var data := ARMOR_PAINT.layout(source)
-		var palette: Dictionary = def.armor_colors.get(data.key, {})
-		var signature := hash(palette)
+		var look: EnemyLook = _armor_sources[type]
+		var key := look.colors_key(def.armor_colors)
+		var signature := hash(key)
 		if _armor_palette_hashes.get(type, -1) != signature:
 			_armor_palette_hashes[type] = signature
 			var canvas := _armor_batches[type].texture as CanvasTexture
-			if palette.is_empty():
-				canvas.diffuse_texture = source
-			else:
-				var painted := ARMOR_PAINT.painted_image(source, def.armor_colors)
-				if canvas.diffuse_texture is ImageTexture:
-					(canvas.diffuse_texture as ImageTexture).update(painted)
-				else:
-					canvas.diffuse_texture = ImageTexture.create_from_image(painted)
+			if not look.painted_armors.has(key):
+				var live: Callable = run.options.get("live_visuals", Callable())
+				assert(state.lab_mode and live.is_valid(), "固定塗装の生成物が必要: " + look.source_path)
+				look = live.call(look, def.armor_colors)
+				_armor_sources[type] = look
+			canvas.diffuse_texture = look.painted_armors[key]
 			_enemy_textures.erase(owner)
 
 
@@ -285,7 +274,7 @@ func _ensure_enemy_batch(type: StringName, part: EnemyLook = null, owner: String
 	if look != null:
 		var armor := CanvasTexture.new()
 		armor.diffuse_texture = look.armor
-		_armor_sources[type] = look.armor
+		_armor_sources[type] = look
 		armor.normal_texture = look.normal
 		var batch := InstanceBatch.new()
 		batch.name = String(type) + "Armor"
@@ -908,32 +897,33 @@ static func _placeholder_points(shape: StringName) -> PackedVector2Array:
 ## 敵の種類 type の外観（ステージの敵の見た目で差し替える。重ねた絵を持たない種類は null）。
 func look_of(type: StringName) -> EnemyLook:
 	if not _looks.has(type):
-		_looks[type] = load_look(type, state.stage)
+		_looks[type] = load_look(type, state.stage, null if state.lab_mode else run.ctx.resources)
+		if state.lab_mode and _looks[type] != null:
+			# 任意の敵を追加する実験場も、取得後の参照はそのSessionへ渡す。
+			run.ctx.resources.provide(_looks[type].resource_path, _looks[type])
 	return _looks[type]
 
 ## 外観を読む。実験場の一覧も同じ規則で使う。
-static func load_look(type: StringName, stage: StageDef = null) -> EnemyLook:
+static func load_look(type: StringName, stage: StageDef = null, scope: ContentResourceScope = null) -> EnemyLook:
 	var skin := String(stage.enemy_sprite_path(type).get_file().get_basename()) if stage != null else String(type)
+	var index: StageResources = stage.resources if stage is RuntimeStage else ContentManager.visual_index
 	for name in [skin, String(type)]:
-		var path := LOOKS_DIR.path_join(name + ".tres")
-		if ResourceLoader.exists(path):
-			return load(path) as EnemyLook
+		if index.look_paths.has(name):
+			var path: String = index.look_paths[name]
+			if scope == null: return load(path) as EnemyLook
+			assert(scope.resources.has(path), "外観の準備が必要: " + path)
+			return scope.resources.get(path) as EnemyLook
 	return null
 
 ## 本番の船体と実験場の一覧に、同じベース・装甲の合成画像を使う。
-static func look_texture(look: EnemyLook, cache: Dictionary, palettes: Dictionary = {}) -> Texture2D:
-	var data := ARMOR_PAINT.layout(look.armor)
-	var other_palette: Dictionary = palettes.get(ARMOR_PAINT.layout(look.split_other.armor).key, {}) if look.split_other != null else {}
-	var key := look.resource_path + ":" + str(hash([palettes.get(data.key, {}), other_palette]))
+static func look_texture(look: EnemyLook, cache: Dictionary, palettes: Dictionary = {}, live: Callable = Callable()) -> Texture2D:
+	var key := look.source_path + ":" + look.preview_key(palettes)
 	if not cache.has(key):
 		if cache.size() >= 64:
 			cache.erase(cache.keys()[0])
-		var body: Image = look.base_texture().get_image()
-		body.blend_rect(ARMOR_PAINT.painted_image(look.armor, palettes), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
-		if look.split_other != null:
-			var other := look_texture(look.split_other, cache, palettes)
-			body.blend_rect(other.get_image(), Rect2i(Vector2i.ZERO, body.get_size()), Vector2i.ZERO)
-		cache[key] = ImageTexture.create_from_image(body)
+		if not look.previews.has(look.preview_key(palettes)) and live.is_valid(): look = live.call(look, palettes)
+		assert(look.prepared and look.previews.has(look.preview_key(palettes)), "生成済みの合成画像が必要: " + look.source_path)
+		cache[key] = look.previews[look.preview_key(palettes)]
 	return cache[key]
 
 ## 外観の絵は元画像の寸法を、敵データの半径との比で拡大縮小する（半径には実験場の倍率・個体の大きさが反映済み）。
@@ -957,7 +947,7 @@ func _enemy_texture(type: StringName) -> Texture2D:
 	if not _enemy_textures.has(type):
 		var look := look_of(type)
 		if look != null:
-			_enemy_textures[type] = look_texture(look, _layered_textures, run.enemies.def_of(type).armor_colors)
+			_enemy_textures[type] = look_texture(look, _layered_textures, run.enemies.def_of(type).armor_colors, run.options.get("live_visuals", Callable()))
 			return _enemy_textures[type]
 		var path := _enemy_sprite_path(type)
 		_enemy_textures[type] = load(path) if ResourceLoader.exists(path) else null
