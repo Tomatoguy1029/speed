@@ -14,5 +14,5 @@ index = 1
 scene_path = "res://scenes/stages/stage_1.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
 time_limit = 900.0
-boss_id = &"provisional"
+boss_id = &"monoceros"
 legendary_module_id = &"legendary_stern"

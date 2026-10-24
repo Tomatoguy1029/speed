@@ -1,0 +1,108 @@
+[gd_resource type="BehaviorTree" format=3]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/monoceros_ready.gd" id="ready"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/play_attack.gd" id="play"]
+[ext_resource type="Script" path="res://scripts/bosses/tasks/hydra_weighted_selector.gd" id="selector"]
+
+[sub_resource type="BTCondition" id="ready_kick"]
+script = ExtResource("ready")
+attack = &"kick"
+min_phase = 1
+min_range = 0.0
+max_range = 260.0
+rear_only = true
+
+[sub_resource type="BTAction" id="play_kick"]
+script = ExtResource("play")
+attack = &"kick"
+
+[sub_resource type="BTSequence" id="kick"]
+children = [SubResource("ready_kick"), SubResource("play_kick")]
+metadata/_weight_ = 0.55
+
+[sub_resource type="BTCondition" id="ready_lance"]
+script = ExtResource("ready")
+attack = &"lance"
+min_phase = 2
+min_range = 450.0
+max_range = 1500.0
+rear_only = false
+
+[sub_resource type="BTAction" id="play_lance"]
+script = ExtResource("play")
+attack = &"lance"
+
+[sub_resource type="BTSequence" id="lance"]
+children = [SubResource("ready_lance"), SubResource("play_lance")]
+metadata/_weight_ = 2.0
+
+[sub_resource type="BTCondition" id="ready_combo"]
+script = ExtResource("ready")
+attack = &"combo"
+min_phase = 2
+min_range = 300.0
+max_range = 1300.0
+rear_only = false
+
+[sub_resource type="BTAction" id="play_combo"]
+script = ExtResource("play")
+attack = &"combo"
+
+[sub_resource type="BTSequence" id="combo"]
+children = [SubResource("ready_combo"), SubResource("play_combo")]
+metadata/_weight_ = 1.0
+
+[sub_resource type="BTCondition" id="ready_sweep"]
+script = ExtResource("ready")
+attack = &"sweep"
+min_phase = 1
+min_range = 0.0
+max_range = 290.0
+rear_only = false
+
+[sub_resource type="BTAction" id="play_sweep"]
+script = ExtResource("play")
+attack = &"sweep"
+
+[sub_resource type="BTSequence" id="sweep"]
+children = [SubResource("ready_sweep"), SubResource("play_sweep")]
+metadata/_weight_ = 1.5
+
+[sub_resource type="BTCondition" id="ready_return_charge"]
+script = ExtResource("ready")
+attack = &"return_charge"
+min_phase = 1
+min_range = 280.0
+max_range = 2000.0
+rear_only = false
+
+[sub_resource type="BTAction" id="play_return_charge"]
+script = ExtResource("play")
+attack = &"return_charge"
+
+[sub_resource type="BTSequence" id="return_charge"]
+children = [SubResource("ready_return_charge"), SubResource("play_return_charge")]
+metadata/_weight_ = 0.8
+
+[sub_resource type="BTCondition" id="ready_charge"]
+script = ExtResource("ready")
+attack = &"charge"
+min_phase = 1
+min_range = 0.0
+max_range = 100000.0
+rear_only = false
+
+[sub_resource type="BTAction" id="play_charge"]
+script = ExtResource("play")
+attack = &"charge"
+
+[sub_resource type="BTSequence" id="charge"]
+children = [SubResource("ready_charge"), SubResource("play_charge")]
+metadata/_weight_ = 1.5
+
+[sub_resource type="BTProbabilitySelector" id="root"]
+script = ExtResource("selector")
+children = [SubResource("kick"), SubResource("lance"), SubResource("combo"), SubResource("sweep"), SubResource("return_charge"), SubResource("charge")]
+
+[resource]
+description = "距離・背面・形態・技別CDでいっかくじゅう座の技を選ぶ"
+root_task = SubResource("root")
