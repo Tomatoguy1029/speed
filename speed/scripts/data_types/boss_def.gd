@@ -60,12 +60,14 @@ const PARAMS_DOCS := {
 ## 当たり判定と見た目の大きさ。
 ## 単位：単位（距離）
 @export var radius: float
-## HP（今は使っていない）
-## 今は調整値の「ボスの HP」を使う。
+## 専用ステータスを使う場合のHP。
+## use_def_stats がfalseなら共通調整値の「ボスの HP」を使う。
 ## 単位：HP
 @export var hp: float
-## 装甲（今は使っていない）
-## 今は調整値の「ボスの装甲」を使う。
+## HPと装甲をこの定義から読み、共通の敵倍率を掛ける。
+@export var use_def_stats := false
+## 専用ステータスを使う場合の装甲。
+## use_def_stats がfalseなら共通調整値の「ボスの装甲」を使う。
 ## 単位：攻撃力
 @export var armor: float
 ## 速さ

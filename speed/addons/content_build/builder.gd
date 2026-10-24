@@ -1,4 +1,4 @@
-## 実行前・タイムライン保存・CLI・exportで共有する生成処理。
+## 実行前・CLI・exportで共有する生成処理。
 @tool
 extends RefCounted
 const ROOT := "res://.content"
@@ -6,6 +6,7 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 	for name in DirAccess.get_files_at(directory):
 		var path := directory.path_join(name)
 		if path == "res://data/content_catalog.tres": continue
+		if path.begins_with("res://data/bosses/ai/") or "_moves/" in path: continue
 		if path.get_extension() in ["gd", "tres", "tscn", "gdshader"]: result.append(path)
 	for name in DirAccess.get_directories_at(directory):
 		if not name.begins_with("."): _files(directory.path_join(name), result)
@@ -25,6 +26,9 @@ static func is_current(output := ROOT) -> bool:
 		if not FileAccess.file_exists(path): return false
 	return true
 static func build_all(force := false, output := ROOT) -> Error:
+	for id in ["hydra", "monoceros"]:
+		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id, output.path_join("boss_" + id + ".tres"))
+		if boss.error != OK: return boss.error
 	if not force and is_current(output): return OK
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output))
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")

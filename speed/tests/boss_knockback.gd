@@ -65,9 +65,9 @@ func _ready() -> void:
 	var grunt: int=run.enemies.spawn(run.enemies.def_of(&"drifter"),Vector2(800,800))
 	run.loadout.weapon_behaviors[&"W03"].on_contact(grunt,a.table.pos[grunt],Vector2.RIGHT)
 	check(a.table.shove_time[grunt]>0.0 and a.table.vel[grunt].length()>0.0,"ordinary enemies still receive contact knockback")
-	run.bosses.spawn_lab(&"provisional",Vector2(600,0))
-	var provisional=run.bosses.actors.back()
-	check_target(run,provisional.body,"provisional boss")
+	run.bosses.spawn_lab(&"monoceros",Vector2(600,0))
+	var monoceros=run.bosses.actors.back()
+	check_target(run,monoceros.body,"monoceros boss")
 	lab.queue_free()
 	await get_tree().process_frame
 	get_tree().quit(1 if failed else 0)

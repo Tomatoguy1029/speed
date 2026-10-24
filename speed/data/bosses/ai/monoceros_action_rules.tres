@@ -1,0 +1,67 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_fdbe4"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/kick.tres" id="2_glkwt"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/lance.tres" id="3_ia7vf"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/combo.tres" id="4_gnbgk"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/sweep.tres" id="5_rmxme"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/return_charge.tres" id="6_r5v4j"]
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/charge.tres" id="7_qrfmn"]
+
+[resource]
+script = ExtResource("1_fdbe4")
+adapter = &"monoceros"
+trial_scene = "res://gyms/boss_flow_trial.tscn"
+techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("4_gnbgk"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn")])
+conditions = {
+"charge": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 100000.0,
+"min": 0.0,
+"min_phase": 1
+},
+"combo": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1300.0,
+"min": 300.0,
+"min_phase": 2
+},
+"kick": {
+"angle": 180.0,
+"half_angle": 37.24225668350351,
+"max": 260.0,
+"min": 0.0,
+"min_phase": 1
+},
+"lance": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1500.0,
+"min": 450.0,
+"min_phase": 2
+},
+"return_charge": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 2000.0,
+"min": 280.0,
+"min_phase": 1
+},
+"sweep": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 290.0,
+"min": 0.0,
+"min_phase": 1
+}
+}
+costs = {
+"charge": 1.0,
+"combo": 3.0,
+"kick": 1.0,
+"lance": 3.0,
+"return_charge": 3.0,
+"sweep": 1.0
+}

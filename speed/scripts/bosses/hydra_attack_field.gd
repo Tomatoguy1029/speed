@@ -93,7 +93,7 @@ func tick(dt: float) -> void:
 					if intersects(PackedVector2Array([prior[i],e.points[i]]),e.width,ship_previous,ship): touching = true
 			if touching and e.kind == &"wind":
 				if not actor.run_state.tracing and not actor.run_state.glide and actor.run_state.ship_vel.length() < actor.run_state.stats.max_speed:
-					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(actor.def.params.wind_force) * dt
+					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(e.get("wind_force", actor.def.params.wind_force)) * dt
 			elif touching and not e.hit and e.damage > 0.0:
 				actor.ctx.projectiles.ship.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true

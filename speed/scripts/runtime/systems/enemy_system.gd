@@ -505,7 +505,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 		# 画面から遠い敵は、LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
 		var bdt := dt
 		var rel := from - vc
-		if absf(rel.x) > lim.x or absf(rel.y) > lim.y:
+		if not behavior.full_rate and (absf(rel.x) > lim.x or absf(rel.y) > lim.y):
 			if (t.id[i] + _lod) % LOD != 0 and shove_time[i] <= 0.0 and knock_t[i] <= 0.0:
 				pos[i] = from + vel[i] * dt
 				continue
@@ -523,6 +523,9 @@ func _tick_behavior(b: int, dt: float) -> void:
 					field.collide_enemy(i, from)
 				continue
 			behavior.step(i, bdt)
+			if dead[i] != 0:
+				continue
+			behavior.before_move(i, dt)
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt

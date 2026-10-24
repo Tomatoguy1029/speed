@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://v8a6e5uhhmej"]
+
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"swarm"
+category = &"major"
+parameters = {
+"bite_dmg": 16.0,
+"bite_radius": 75.0,
+"cooldown": 15.0,
+"major_cost": 1.0,
+"performance_time": 5.2,
+"sequence_charge": 0.45,
+"swarm_flight": 1.0,
+"swarm_gap": 0.3,
+"swarm_reach": 1000.0,
+"tech_recovery": 1.5,
+"warning_time": 0.8
+}

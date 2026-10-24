@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"thunder_headbutt"
+head_kind = &"thunder"
+parameters = {
+"normal_charge": 0.6,
+"normal_hold": 0.9,
+"attack_cd": 3.0,
+"normal_lunge": 0.16,
+"bite_radius": 75.0,
+"bite_dmg": 16.0,
+"thunder_radius": 150.0,
+"thunder_flash": 0.22,
+"beam_dmg": 18.0,
+"cost": 1.5
+}

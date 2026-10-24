@@ -11,8 +11,6 @@ func _ready() -> void:
 		for path in _files(d):
 			if not (path.ends_with(".gd") or path.ends_with(".tscn") or path.ends_with(".tres")):
 				continue
-			if path.begins_with("res://addons/") and path.ends_with("plugin.gd"):
-				continue  # エディタ専用（EditorPlugin）はゲームの中では読めない
 			count += 1
 			var res := load(path)
 			if res == null or (res is GDScript and not res.can_instantiate() and not res.is_abstract()):

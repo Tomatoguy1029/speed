@@ -48,7 +48,6 @@ speed/                    res://
   project.godot
   addons/                 編集用の道具、実行用拡張、ゲーム専用の生成（4.1）
     content_build/        実行用データの生成とexport
-    limboai/              敵 AI（6.1）
     spawn_timeline/       出現タイムライン（14.2）
     speed_data_editor/    データ編集ツール（8.4）
     stage_launcher/       ステージの直接起動（14.1）
@@ -65,7 +64,7 @@ speed/                    res://
     runtime/              RunSimulation・RunSession・RunContext・systems/
     dev/                  開発用の起動・命令・調整・性能表示・録画
     actors/               機体の見た目、ボスの役者の共通部分
-    bosses/               ボスごとの行動、LimboAI のタスク
+    bosses/               ボスごとの行動と共通フロー
     enemies/              EnemyBehavior・EnemyMotion・種類別の行動・被弾条件
     attacks/              攻撃の生成・移動・接触の種類別処理
     heroes/  gimmicks/    英雄の力とフィールドの仕掛け
@@ -89,6 +88,7 @@ speed/                    res://
   .content/               実行用ステージ・音・開発用の名前対応表（生成物）
   tests/
   tools/                  素材の切り出し・アート確認・性能計測
+    editor/               SPEED専用のボス行動・ステージ敵調整の編集機能
 ```
 
 ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。配置のシーンは今は空の仮シーンで、ステージの直接起動（14.1）の対象として使う。
@@ -288,14 +288,17 @@ classDiagram
 
 EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、LoadoutSystemは装備の `tick()` や接触・撃破の入口を呼ぶ。WeaponVisualの `behavior` は武器か特性のどちらかを指す。表示側は状態を読み、イベントから演出を作る（[10章](#10-描画と演出)）。入口の定義は [EnemyBehavior](../speed/scripts/enemies/enemy_behavior.gd)、[WeaponBehavior](../speed/scripts/weapons/weapon_behavior.gd)、[TraitBehavior](../speed/scripts/traits/trait_behavior.gd)、[EnemyVisual](../speed/scripts/render/enemies/enemy_visual.gd)、[WeaponVisual](../speed/scripts/render/equipment/weapon_visual.gd) にある。
 
+EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時間を受け取り、高速突進の移動区間を判定する。`full_rate` が有効な種類は、画面外でも行動と区間判定を毎回進める。石化・外力による移動は共通の前処理で扱う。
+
 | 対象 | 層 | 方式 |
 |---|---|---|
 | 雑魚 | 行動 | 種類ごとの単純なステートマシン（例：ダーターの予告 → 突進 → 回復） |
-| 中ボス・ラスボス | 形態（第1形態 → 第2形態 → 最後の抵抗 など） | 階層型ステートマシン |
-| 中ボス・ラスボス | 判断（各形態の中で、状況を見て次の行動を選ぶ） | Behavior Tree |
+| ヒュドラ | 形態（首増加・合体・分離） | 役者が専用状態を管理する |
+| いっかくじゅう座 | 形態 | 役者がHP閾値と移行予約を管理する |
+| 実装済みのボス | 判断 | 共通の区間フローと、個別処理が返す実行可能候補 |
 | 中ボス・ラスボス | 攻撃（1つ1つの動き・弾・予告の振り付け） | タイムライン（エディタで人が調整する） |
 
-- 道具は LimboAI（MIT ライセンス。Behavior Tree と階層型ステートマシン、編集画面とデバッガを持つ）の GDExtension 版を使う。Windows・macOS・Linux・Android・iOS・Web に対応している。GDExtension 版で使えない機能は導入前に確認する。
+- 共通フローの編集画面はGodotのEditorPluginで実装する。`single_actor_adapter.gd`が一体のボス、`hydra_flow_adapter.gd`が複数の首の実行を共通選択器へ接続する。
 - ボスの判断の層から、自機の状態（線を描いているか、描かれた線、ゲージの溜まり具合、位置）・フィールドの仕掛けとの位置関係・ボス自身と部位の HP を読めるようにする。何を判断に使うかは、ボスごとの仕様で決める。
 
 **うみへび座の編集と役割**
@@ -304,7 +307,15 @@ EnemySystemは `step()` または `tick_rows()` で敵の行動を進め、Loado
 
 ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
-LimboAIで `scenes/bosses/hydra_boss_bt.tres` を開くと、共通発動機会のコンボ抽選と、形態・参加者・配置・待ち時間で選ぶ大技の枝を編集できる。`hydra_head_bt.tres` は各首が複製して持ち、種類・距離・方向・画面内・状態・予算の条件から通常技を選び、成立する技があれば実行する。各ProbabilitySelectorの子の重みと `hydra_play_tech.gd` の `cooldown_scale` をInspectorで編集する。技の位置条件・コスト・共通予算・時間・護衛位置は `data/bosses/hydra.tres` の `params` に置く。条件評価は読み取りだけを行い、選択後に攻撃枠を取得する。
+`tools/editor/boss_flow/`が「ボス行動」画面を提供する。SPEED専用の編集機能は`tools/editor/`に置き、`addons/boss_flow/`と`addons/stage_enemy_tuning/`にはGodotへ登録する`plugin.cfg`だけを置く。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#56-ボス行動を調整する)を参照する。
+
+`data/bosses/ai/hydra_flow.tres`が区間の要求種別・確率・消費上限・使用可能な技参照・同時攻撃の禁止・共有スタミナ・二種類の休息を持つ。`hydra_action_rules.tres`が技参照・距離方向条件・消費量・コンボ内部を持ち、技の性能は参照先の`hydra_moves/*.tres`が持つ。`BossTechnique`は共通の技データ、`HydraTechnique`は必要な首の種類を追加する型である。`graph_nodes`は図のノードから技への参照と接続・非表示状態を持つ。通常技の複製は同じ性能を参照し、個別の条件を持つ。実行側は接続された同じ技の条件をORで評価し、ノード数によって抽選頻度を増やさない。
+
+`flow/runner.gd`は区間・履歴・消費・休息を管理し、`selector.gd`は実行可能候補から一つまたは複数を選ぶ。`hydra_flow_adapter.gd`は現在の位置・形態・生存部位から具体的参加者付きの候補を返し、開始時に参加者を再検証する。個別側の入力は現在状況と要求種別で、区間の構造と区間ごとの候補絞り込み・禁止ペアは共通側に保持する。区間の有向接続は右から左へのループも保存し、1更新で1回だけ遷移を処理する。条件評価は読み取りとし、開始に成功した選択分だけ消費する。技のID集合で直前の組み合わせを識別し、別候補があれば連発を避ける。
+
+`build_boss_program.gd`が編集元から`.content/boss_hydra.tres`を作る。技の数値と条件を独立したスナップショットにし、画面配置を除いた署名と形式の版を検査する。数値入力・ノード移動・保存は編集元と表示だけを更新する。生成は試遊・export・明示操作時に行い、意味のある変更がない場合は生成済みデータを再利用する。通常の起動前生成とexportは同じ変換を呼び、exportは試遊専用の`boss_preview.tres`を除外する。
+
+コンボ内部は`combo_runner.gd`が順次・並列・待機・技間分岐を進める。並列は全枝の完了を待ち、枝の失敗時は実行中の枝を取り消す。照準と技固有の欠員処理は既存の実行部が担当する。範囲確認は指定した残量・生存部位・基準姿勢に対して条件と到達上限を重ね、サンプル上の未カバーを示す。実行時も同じ距離方向の計算と通常技の到達上限を判定する。配置成立と、予告中・実行中に動く機体への命中は個別の実行条件で扱う。
 
 `hydra_normals.gd` は通常技、`hydra_techniques.gd` は大技・コンボと配置待ち、`hydra_grid.gd` は領域判定・優先枠・一筆経路の検証を担当する。`Timeline` と `hydra_boss_timeline.tres` のメソッドキーを世界秒で手動更新する。同時噛みつきは捕捉→固定→伸長→到達、ほかの大技は配置→予告→実行→全体硬直を進める。配置の移動中はタイムラインを待たせる。参加者の喪失は個別仕様に従って中断か欠員として扱う。
 
@@ -381,18 +392,18 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `body_gap` | 雑魚 | 前回確かめたときの、天体の表面までの距離（7章） |
 | `body_gap_pos` | 雑魚 | `body_gap` を確かめた位置 |
 | `body_gap_time` | 雑魚 | `body_gap` を確かめた世界時刻 |
-| `mode` | `darter`・`rocket`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`RECOVER` がハサミの開いた間）・`marlin`・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
+| `mode` | `darter`・`rocket`・`biter`・`defender`・`hound`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`MOVE` が横歩き、`WINDUP` が薙ぎ・向き直し、`DASH` が突進、`RECOVER` が停止）・`marlin`・`phoenix`（`MOVE` が離脱、`WINDUP` が着地点予告、`DASH` が飛び込み、`RECOVER` が着地後の停止）・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間 |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
-| `charge` | `gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`aquarius`・`cepheus`・ボス | 射撃の予告の溜め（0〜1） |
-| `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次にしぶきを撒くまでの時間、ポンプ座は次に吸い込めるまでの時間 |
-| `buds` | `splitter`・`pump`・`crow` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数 |
-| `carry` | `crow` | 回収して運んでいる経験値の量 |
-| `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
-| `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
-| `anchor` | `cepheus` | 隊列の基準の位置（増援で組み直すときに決める） |
-| `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針が回り始めてからの時間 |
-| `links` | とけい座・みなみのさんかく座 | 付いて動く攻撃の形の行番号（`ProjectileSystem` の `hazard_` の行） |
+| `charge` | `biter`・`defender`・`hound`・`gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`crab`・`phoenix`・`aquarius`・`cepheus`・ボス | 攻撃の予告の溜め（0〜1） |
+| `bud_t` | `splitter`・`marlin`・`pump`・`crab` | 次の分裂までの時間。かじき座は次のしぶき、ポンプ座は次の吸い込み、かに座は小走り・停止の残り時間 |
+| `buds` | `splitter`・`pump`・`crow`・`crab` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数、かに座は左右の進行方向（停止は0） |
+| `carry` | `crow`・`crab` | からす座が運ぶ経験値の量。かに座は横歩きで届かない経過時間 |
+| `target` | `reticle`・`soldier`・`crab` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号、かに座は薙ぎ・向き直しの区分 |
+| `target_id` | `reticle`・`soldier`・`crab` | 狙っている岩の id。ケフェウス座の兵は仕える王の id、かに座は向き直す回数 |
+| `anchor` | `cepheus`・`phoenix`・`crab` | ケフェウス座の隊列の基準位置。ほうおう座の離脱先・着地点。かに座の向き直す先・突進直前の位置 |
+| `spin` | 漂流（`drift`）の雑魚、`clock`・`crab` | 回転の速さ。とけい座は針の経過時間、かに座は向き直す前の角度 |
+| `links` | とけい座・みなみのさんかく座・かに座 | 付いて動く攻撃の形の行番号（`ProjectileSystem` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |
 | `parent_id` | 部位 | 親の敵の id |
 | `parts` | 部位を持つ敵（みなみのさんかく座） | 部位の行番号と id を交互に並べた一覧 |
@@ -650,12 +661,15 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 - `user://` に保存する。中身は仕様書 14 のとおり（ストーリーの進み具合、伝説のモジュール、ハイスコア、図鑑の獲得状況を含む）。
 - データに版の番号を持たせ、版が変わったら古いデータを新しい形に変換する。読めないデータは壊さずに初期値で始める。
 - 設定（音量、画面モード、言語、キー設定）は、セーブとは別のファイルに保存する。
+- 導入の視聴済み状態を `intro_seen` として保存する。不足するセーブ項目は `SaveManager._migrate()` が初期値で補う。
 
 ## 12. UI
 
 - すべての UI は `Control` で作り、アンカーとコンテナで画面の大きさに合わせる。座標を決め打ちしない。
 - 色と文字の大きさは1つのテーマにまとめる。強化段階の色（仕様書 8）もテーマで管理する。
 - 3択・ポーズ・結果は、ラン中の状態を表示するだけにする。選んだ結果は RunManager に命令として渡す（4.2）。
+- 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/runtime/intro_sequence.gd` が場面進行と操作待ち、`intro_practice.gd` が星・練習相手・見本線を管理する。`scripts/ui/intro_screen.gd` は状態を表示してセッションへ命令を渡し、`scripts/render/intro_visual.gd` が差し替え用の仮演出を描く。
+- 導入は独立した `RunSession` の `RunSimulation` と、本番の `run.tscn` の World・Camera・入力・描画を使う。複製した共通設定と専用の `RuntimeStage` を渡し、`lab_mode` の状態を導入シーケンスから既存の更新処理で進める。`hud` オプションで専用の最小 UI に替え、リリース版でも同じ操作を使う。
 
 ## 13. 音
 
@@ -766,7 +780,7 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 godot --headless --path speed --export-release macOS /tmp/SPEED.app
 ```
 
-`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、LimboAIの実行用拡張と生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
+`speed/export_presets.cfg` のmacOS設定はローカル確認用の署名・公証なしのアプリを生成する。`gyms/`・`tests/`・`tools/`・`scripts/dev/`・編集用addon・開発用の名前対応表とAutoloadを除外し、生成済みの実行用データを含める。PCKの検査は `python3 speed/tests/export_package.py <PCKのパス>` を使う。製品の署名・公証・ストア公開の設定は未決。
 
 ## 16. demo との対応
 

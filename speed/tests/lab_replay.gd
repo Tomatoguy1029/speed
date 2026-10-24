@@ -24,7 +24,7 @@ func _ready() -> void:
 		lab.perform("spawn", {"type": String(def.id), "pos": [point.x, point.y]})
 		index += 1
 	lab.perform("boss", {"type": "hydra", "pos": [700, 300]})
-	lab.perform("boss", {"type": "provisional", "pos": [-700, 300]})
+	lab.perform("boss", {"type": "monoceros", "pos": [-700, 300]})
 	lab.perform("hero", {"id": "perseus"})
 	lab.perform("input", {"has_cursor": false, "hero": true})
 	lab.perform("boss_parameter", {"type": "hydra", "key": "params.attack_cd", "value": 1.5})

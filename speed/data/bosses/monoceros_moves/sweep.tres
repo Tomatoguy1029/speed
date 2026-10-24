@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_hh10e"]
+
+[resource]
+script = ExtResource("1_hh10e")
+technique = &"sweep"
+parameters = {
+"active": 0.5,
+"arc": 1.15,
+"cd": 4.0,
+"damage": 20.0,
+"recover": 1.3,
+"warn": 0.85
+}

@@ -492,7 +492,7 @@ func _draw() -> void:
 	var off := _scroll_y()
 	# トラック：1行に複数のクリップ。クリップは開始から長さの間の棒で、中に名前・種類・同時の群れの数・出す間隔を書く
 	var cs: Array = timeline.clips()
-	var bad := mismatches()
+	var bad: Array = timeline.cached_mismatches
 	var chosen := selection()
 	for row in track_count():
 		var y := _clips_top() + row * TRACK
@@ -1263,9 +1263,10 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 				_drag.moved = true
 			# 差し込む所：トラックの間（0 なら一番上、トラックの数なら一番下）
 			_drag.gap = clampi(int(round((p.y - _clips_top()) / TRACK)), 0, track_count() - 1)
-	timeline.refresh()
+	timeline.refresh_view()
 
 func _end_drag() -> void:
+	timeline.refresh_diagnostics()
 	if _drag.get("kind", "") == "track_move":
 		var from: int = _drag.row
 		var gap: int = _drag.gap

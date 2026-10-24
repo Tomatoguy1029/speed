@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="BossDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+radius = 96.0
+use_def_stats = true
+hp = 2600.0
+armor = 10.0
+speed = 210.0
+accel = 3.0
+turn = 2.7
+xp = 100.0
+weak_arc = 0.0
+params = {
+"initial_wait": 1.2,
+"phase_threshold": 0.5,
+"phase_time": 1.0,
+"lock_lead": 0.22,
+"horn_width": 30.0,
+"horn_length_ratio": 1.85,
+"near_clearance": 220.0,
+"reposition_time": 1.2,
+"approach_range": 1000.0,
+"return_passes": 3,
+"turnaround_time": 0.35,
+"stuck_time": 3.0,
+"extract_time": 0.65,
+"extract_speed": 90.0,
+"combo_gap": 0.45,
+"kick_trigger_arc": 0.65,
+"final_beam_width": 5000.0,
+"final_reach": 6000.0,
+"final_warn_width": 18.0,
+"final_widen_time": 0.35
+}
+id = &"monoceros"
+display_name = "いっかくじゅう座"
+scene_path = "res://scenes/bosses/monoceros_boss.tscn"

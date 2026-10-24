@@ -32,6 +32,7 @@ func _ready() -> void:
 func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
+		"intro_seen": false,
 		"coins": 0,
 		"meta": {},
 		"cleared_stage": 0,
@@ -48,6 +49,15 @@ func save() -> void:
 		return
 	f.store_string(JSON.stringify(data, "\t"))
 	save_changed.emit()
+
+## 導入の再生状態は、ステージの解放やランの回数と独立して保存する。
+func has_seen_intro() -> bool:
+	return bool(data.get("intro_seen", false))
+
+func mark_intro_seen() -> void:
+	if not has_seen_intro():
+		data.intro_seen = true
+		save()
 
 func coins() -> int:
 	return int(data.coins)
@@ -150,6 +160,12 @@ func _load_save() -> Dictionary:
 ## 古い版のセーブを今の形にそろえる。足りない項目は初期値で埋める。
 func _migrate(loaded: Dictionary, d: Dictionary) -> Dictionary:
 	for k in d:
+		# JSON の数値は float。有限な整数だけを、int の表現範囲内で復元する。
+		var value: Variant = loaded.get(k)
+		if typeof(d[k]) == TYPE_INT and value is float and is_finite(value) \
+				and value == floor(value) and value >= -9223372036854775808.0 and value < 9223372036854775808.0:
+			d[k] = int(value)
+			continue
 		if loaded.has(k) and typeof(loaded[k]) == typeof(d[k]):
 			if d[k] is Dictionary:
 				for kk in d[k]:

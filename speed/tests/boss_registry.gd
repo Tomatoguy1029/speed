@@ -9,8 +9,8 @@ func _ready() -> void:
 	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, false)
 	session.auto_step = false
 	var bosses := session.sim.bosses
-	var one := bosses.spawn_lab(&"provisional", Vector2(3000, 0))
-	var two := bosses.spawn_lab(&"provisional", Vector2(-3000, 0))
+	var one := bosses.spawn_lab(&"monoceros", Vector2(3000, 0))
+	var two := bosses.spawn_lab(&"monoceros", Vector2(-3000, 0))
 	check(bosses.get("actors") != null, "ボス管理は役者の一覧を持つ")
 	if bosses.get("actors") != null:
 		check(bosses.actors.size() == 2, "同じSystemに2体を登録する")

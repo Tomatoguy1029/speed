@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://c5ww0653reysj"]
+
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"curve"
+category = &"major"
+parameters = {
+"beam_dmg": 18.0,
+"beam_len": 1400.0,
+"beam_width": 40.0,
+"cooldown": 14.0,
+"curve_delay": 0.8,
+"curve_lag": 1.1,
+"curve_time": 2.6,
+"curve_turn": 0.45,
+"major_cost": 1.0,
+"performance_time": 3.4,
+"tech_recovery": 1.5,
+"warning_time": 0.8
+}

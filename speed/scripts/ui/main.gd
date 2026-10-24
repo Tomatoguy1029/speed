@@ -11,6 +11,7 @@ const SCREENS := {
 	GameManager.Screen.UPGRADE: "res://scenes/app/upgrade.tscn",
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
+	GameManager.Screen.INTRO: "res://scenes/app/intro.tscn",
 }
 
 var _current: Node = null
@@ -91,6 +92,8 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 		_current.set_meta("fade_from_menu", true)
 	if return_morph:
 		_current.set_meta("morph_from_upgrade", true)
+	if screen == GameManager.Screen.STAGE_SELECT and _displayed_screen == GameManager.Screen.INTRO:
+		_current.set_meta("map_from_intro", true)
 	add_child(_current)
 	if screen == GameManager.Screen.RUN and not GameManager.screen_transition_active:
 		_current.auto_step = true

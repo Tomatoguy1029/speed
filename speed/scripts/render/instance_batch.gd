@@ -1,3 +1,4 @@
+@tool
 ## 同じ形の多数の物を、1つの MultiMeshInstance2D でまとめて描く（設計書 6・10）。
 ##
 ## 毎フレーム begin() → add() を繰り返す → end()。インスタンスの値は配列（buffer）へ直接書く。

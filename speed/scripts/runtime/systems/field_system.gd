@@ -247,8 +247,9 @@ func _build_moon_bands() -> void:
 
 func near_body(p: Vector2, margin: float) -> bool:
 	var r := p.length()
-	if r < planet.r + margin + 4.0:
-		return true
+	for body in bodies:
+		if body.is_planet and p.distance_squared_to(body.pos) < pow(body.r + margin + 4.0, 2):
+			return true
 	var first := maxi(0, int((r - margin) / MOON_BAND_SIZE))
 	var last := mini(_moon_bands.size() - 1, int((r + margin) / MOON_BAND_SIZE))
 	for i in range(first, last + 1):

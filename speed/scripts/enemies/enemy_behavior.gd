@@ -13,6 +13,8 @@ var name: StringName
 var index := 0
 ## 数の多い雑魚は、共通の前処理を自分のループに含めて tick_rows() で全行を進める
 var custom_loop := false
+## 高速移動など、画面外でも行動と移動区間の判定を毎回進める種類。
+var full_rate := false
 ## 強敵（rank 3 以上）は、攻撃の枠を取ってから動く。自分で枠を取る種類は false
 var admission := true
 ## ほかの種類の行が倒れた・空きに戻ったことも on_row_gone() で知りたいか（ほかの敵を抱える種類）
@@ -58,6 +60,10 @@ func on_spawn(_i: int, _opts: Dictionary) -> void:
 
 ## 1行ぶんの行動。押し出し・石化・遠い敵の間引きは EnemySystem が済ませてある。
 func step(_i: int, _dt: float) -> void:
+	pass
+
+## 通常移動の直前。dt は実際に移動する世界秒（LODでまとめた判断時間とは別）。
+func before_move(_i: int, _dt: float) -> void:
 	pass
 
 ## custom_loop の種類だけ：この種類の全行を進める。

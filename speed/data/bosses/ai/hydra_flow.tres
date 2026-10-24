@@ -1,0 +1,48 @@
+[gd_resource type="Resource" format=3 uid="uid://cp0h3nw1gjb8y"]
+
+[ext_resource type="Script" uid="uid://eeodn8akgqcw" path="res://scripts/data_types/boss_flow_def.gd" id="1_rn1s6"]
+
+[resource]
+script = ExtResource("1_rn1s6")
+maximum_stamina = 8.0
+layout = null
+sections = [{
+"cap": 2.0,
+"name": "牽制",
+"next": 1,
+"request": "normal",
+"weights": {
+"combo": 15.0,
+"parallel": 25.0,
+"single": 60.0
+}
+}, {
+"cap": 3.0,
+"name": "圧力",
+"next": 2,
+"request": "normal",
+"weights": {
+"combo": 20.0,
+"parallel": 45.0,
+"single": 35.0
+}
+}, {
+"cap": 3.0,
+"fallback": 0,
+"name": "大技候補",
+"next": 3,
+"request": "major",
+"weights": {
+"major": 100.0
+}
+}, {
+"cap": 2.0,
+"name": "区間4",
+"next": 0,
+"request": "normal",
+"weights": {
+"combo": 15.0,
+"parallel": 25.0,
+"single": 60.0
+}
+}]

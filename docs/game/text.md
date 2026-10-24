@@ -38,6 +38,13 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | common.to&#95;main&#95;menu | メインメニューに戻る | Back to Main Menu |
 | common.parts | 部品 {n} | Parts {n} |
 |  | ■ タイトル・メインメニュー |  |
+| intro.replay | はじまりを見直す | Replay opening |
+| intro.skip | スキップ | Skip |
+| intro.draw | お手本の線に沿って描く（クリックで開始） | Follow the example path; click to begin |
+| intro.confirm | お手本をなぞり、もう一度クリックで突進 | Follow the example, then click again to dash |
+| intro.touch | 「描く」を押し、お手本の線をなぞる | Tap Draw, then follow the example path |
+| intro.touch&#95;draw | 描く | Draw |
+| intro.motive | 何か異変が起きている。あの星々も救わねば。 | Something is happening. I must save those stars too. |
 | menu.start | ゲームスタート | Start Game |
 | menu.settings | 設定 | Settings |
 | menu.quit | 終了 | Quit |
@@ -725,8 +732,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.hydra&#95;immortal.kill | 護衛が残っていても直接攻撃できる。倒すと羅針盤を解放する | Can be damaged directly while guards remain. Defeat it to free the compass |
 | lab.enemy.hydra&#95;rubble.move | うみへび座が吐いた瓦礫。漂って、少しすると消える | Debris spat by the Hydra. Drifts and vanishes after a while |
 | lab.enemy.hydra&#95;rubble.kill | 体当たりは弾かれる。武器で壊せる | Rams bounce off. Weapons break it |
-| lab.enemy.provisional.move | 機体を直接追い、予告のあと扇状に弾を撃つ | Chases you directly and fires a fan of bullets after a warning |
-| lab.enemy.provisional.kill | HP を削る。背面が弱点 | Wear down its HP. Its back is the weak point |
+| lab.enemy.monoceros.move | 予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う | Locks its direction after a warning, then charges, sweeps its horn, or kicks backward |
+| lab.enemy.monoceros.kill | 技後の隙や惑星に角が刺さった時に攻める | Strike during its recovery or while its horn is stuck in a planet |
 | lab.enemy.hydra.move | 中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する | Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes |
 | lab.enemy.hydra.kill | 中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す | Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer |
 | lab.ui.freehand | 自由に描く | Freehand |
@@ -845,9 +852,11 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/cross.tres | みなみじゅうじ座 |
 | enemies/crow.tres | からす座 |
 | enemies/darter.tres | ダーター |
+| enemies/defender.tres | 守る雑魚 |
 | enemies/dolphin.tres | いるか座 |
 | enemies/drifter.tres | ドリフター |
 | enemies/gunner.tres | 射撃型 |
+| enemies/hound.tres | 猟犬 |
 | enemies/hydra&#95;beam.tres | うみへび座のビームの首 |
 | enemies/hydra&#95;bite.tres | うみへび座の噛みつく首 |
 | enemies/hydra&#95;debris.tres | うみへび座の瓦礫の首 |
@@ -881,6 +890,6 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | heroes/hercules.tres | ヘルクレス座 |
 | heroes/leo.tres | しし座 |
 | heroes/perseus.tres | ペルセウス座 |
+| bosses/monoceros.tres | いっかくじゅう座 |
 | bosses/hydra.tres | うみへび座 |
-| bosses/provisional.tres | ボス戦艦（仮） |
 <!-- resources:end -->

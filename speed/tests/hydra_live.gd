@@ -40,10 +40,11 @@ func _ready()->void:
 	var warnings:=0
 	a.presentation_event.connect(func(e):
 		if e.cue==&"warning_started":a.set_meta("live_warnings",int(a.get_meta("live_warnings",0))+1))
+	a.hsm.set_active(true)
 	for step in 350:
 		a.sim_tick(0.02,0.02)
 	warnings=int(a.get_meta("live_warnings",0))
-	check(warnings>0,"actual head BehaviorTree starts attacks under zero stage budget")
+	check(warnings>0,"common flow starts attacks under zero stage budget")
 	a._set_count(5)
 	a.recovery_t=0.0
 	a._tech_cd=0.0

@@ -14,4 +14,5 @@ index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
 time_limit = 900.0
-boss_id = &"provisional"
+boss_id = &""
+boss_enabled = false

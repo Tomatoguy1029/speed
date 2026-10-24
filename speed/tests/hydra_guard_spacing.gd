@@ -44,15 +44,20 @@ func _ready()->void:
 	a.presentation_event.connect(func(e):
 		if e.cue==&"warning_started" and e.neck_index>=0:warned[e.neck_index]=true)
 	for n in a.necks:n.cd=0.0
+	# 護衛の交代を、全体大技の演出時間と切り離して検証する。
+	a.flow_runner.flow = a.flow_runner.flow.duplicate(true)
+	a.flow_runner.flow.sections = [{"request": "normal", "cap": 2.0, "weights": {"single": 100.0}, "next": 0}]
+	a.flow_runner.index = 0
+	a.hsm.set_active(true)
 	var within_budget:=true
-	for step in 600:
+	for step in 1200:
 		a.sim_tick(0.025,0.025)
 		var used:=0.0
 		for n in a.necks:
-			if a.def.params.normal_rules.has(n.mode):used+=float(a.def.params.normal_rules[n.mode].cost)*a.table.attack_value[n.row]
-		within_budget=within_budget and used<=float(a.def.params.normal_budget)+0.001
+			if a.def.params.normal_rules.has(n.mode):used+=float(a.action_rules.costs.get(String(n.mode),1.0))
+		within_budget=within_budget and used<=float(a.flow_runner.flow.sections[a.flow_runner.index].get("cap",8.0))+0.001
 	check(warned.size()>=3,"different spread guards enter the viewport and take turns attacking")
-	check(within_budget,"guard approach preserves the existing attack budget")
+	check(within_budget,"guard attacks preserve the section stamina ceiling")
 	lab.queue_free()
 	await get_tree().process_frame
 	get_tree().quit(1 if failed else 0)

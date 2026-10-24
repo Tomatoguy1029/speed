@@ -82,14 +82,16 @@ func _spawn_actor(def_override: BossDef, position_override: Vector2) -> BossActo
 	state.boss_spawned = true
 	var distance := minf(1000.0, state.view_half.length() * 0.65)
 	var p := state.ship_pos + Vector2.from_angle(state.rng.randf() * TAU) * distance
-	if p.distance_to(field.planet.pos) < field.planet.r + 180.0:
+	if field.bodies.has(field.planet) and p.distance_to(field.planet.pos) < field.planet.r + 180.0:
 		p = field.planet.pos + (state.ship_pos - field.planet.pos).normalized() * (field.planet.r + 220.0)
 	if p.length() > cfg.field_radius - 160.0:
 		p = p.normalized() * (cfg.field_radius - 160.0)
 	if position_override != Vector2.INF:
 		p = position_override
-	var row := enemies.spawn_boss(def.id, p, def.radius * cfg.character_scale, cfg.boss_hp * cfg.enemy_hp_mult,
-		cfg.boss_armor * cfg.enemy_armor_mult, def.xp, def.speed, def.weak_arc,
+	var hp := def.hp if def.use_def_stats else cfg.boss_hp
+	var armor := def.armor if def.use_def_stats else cfg.boss_armor
+	var row := enemies.spawn_boss(def.id, p, def.radius * cfg.character_scale, hp * cfg.enemy_hp_mult,
+		armor * cfg.enemy_armor_mult, def.xp, def.speed, def.weak_arc,
 		(state.ship_pos - p).angle(), Color("#ff526e"))
 	var scene := load(def.scene_path) as PackedScene
 	var owner := scene.instantiate() as BossActor

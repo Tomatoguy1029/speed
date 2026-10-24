@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://7656cvrjbhpy"]
+
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"north"
+category = &"major"
+parameters = {
+"bite_dmg": 16.0,
+"bite_radius": 75.0,
+"cooldown": 14.0,
+"major_cost": 1.0,
+"north_flight": 0.3,
+"north_lock_time": 1.4,
+"north_spread": 120.0,
+"performance_time": 1.2,
+"tech_recovery": 1.5,
+"warning_time": 2.4
+}
