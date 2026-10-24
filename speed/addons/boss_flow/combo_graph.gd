@@ -7,11 +7,22 @@ var _selected := -1
 var _type := OptionButton.new()
 var _technique := OptionButton.new()
 var _seconds := SpinBox.new()
+var path: Array = []
+var _moves: Array = []
+
+func _at(value: Dictionary) -> Dictionary:
+	var node := value
+	for index in path:
+		if index >= node.get("children", []).size():
+			path.clear()
+			return value
+		node = node.children[index]
+	return node
 
 func _ready() -> void:
 	var tools := HBoxContainer.new()
 	add_child(tools)
-	for title_text in ["技", "待機"]: _type.add_item(title_text)
+	for title_text in ["技", "待機", "順次グループ", "並列グループ"]: _type.add_item(title_text)
 	tools.add_child(_type)
 	tools.add_child(_technique)
 	_seconds.step = 0.1
@@ -25,11 +36,31 @@ func _ready() -> void:
 	var remove := Button.new()
 	remove.text = "選択を削除"
 	remove.pressed.connect(func():
-		if _selected >= 0 and _selected < program.get("children", []).size():
+		if _selected >= 0 and _selected < _at(program).get("children", []).size():
 			var copy := program.duplicate(true)
-			copy.children.remove_at(_selected)
+			_at(copy).children.remove_at(_selected)
 			changed.emit(copy))
 	tools.add_child(remove)
+	var back := Button.new()
+	back.text = "上の階層"
+	back.pressed.connect(func():
+		if not path.is_empty(): path.pop_back()
+		open(program, _moves))
+	tools.add_child(back)
+	for direction in [-1, 1]:
+		var shift := Button.new()
+		shift.text = "←" if direction < 0 else "→"
+		shift.pressed.connect(func():
+			var copy := program.duplicate(true)
+			var nodes: Array = _at(copy).get("children", [])
+			var other: int = _selected + direction
+			if _selected >= 0 and other >= 0 and other < nodes.size():
+				var temp = nodes[_selected]
+				nodes[_selected] = nodes[other]
+				nodes[other] = temp
+				_selected = other
+				changed.emit(copy))
+		tools.add_child(shift)
 	graph.custom_minimum_size = Vector2(400, 220)
 	graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	graph.node_selected.connect(func(id): _selected = String(id).trim_prefix("step_").to_int())
@@ -37,6 +68,7 @@ func _ready() -> void:
 
 func open(value: Dictionary, moves: Array) -> void:
 	program = value
+	_moves = moves
 	_technique.clear()
 	for move in moves: _technique.add_item(String(move.technique))
 	graph.clear_connections()
@@ -44,8 +76,9 @@ func open(value: Dictionary, moves: Array) -> void:
 		if node is GraphNode:
 			graph.remove_child(node)
 			node.queue_free()
-	for i in program.get("children", []).size():
-		var step: Dictionary = program.children[i]
+	var nodes: Array = _at(program).get("children", [])
+	for i in nodes.size():
+		var step: Dictionary = nodes[i]
 		var node := GraphNode.new()
 		node.name = "step_" + str(i)
 		node.title = String(step.get("id", step.get("type", "技")))
@@ -55,11 +88,22 @@ func open(value: Dictionary, moves: Array) -> void:
 		node.add_child(label)
 		node.set_slot(0, true, 0, Color.GRAY, true, 0, Color.GRAY)
 		graph.add_child(node)
-		if i > 0: graph.connect_node("step_" + str(i - 1), 0, node.name, 0)
+		if step.get("type", "") in ["sequence", "parallel"]:
+			node.gui_input.connect(func(event):
+				if event is InputEventMouseButton and event.double_click:
+					path.append(i)
+					open(program, _moves))
+		if i > 0 and _at(program).get("type", "") != "parallel": graph.connect_node("step_" + str(i - 1), 0, node.name, 0)
 
 func _append() -> void:
 	var copy := program.duplicate(true)
-	if not copy.has("children"): copy.children = []
-	copy.type = "sequence"
-	copy.children.append({"type": "action", "id": _technique.get_item_text(_technique.selected)} if _type.selected == 0 else {"type": "wait", "seconds": _seconds.value})
+	var target := _at(copy)
+	if not target.has("children"): target.children = []
+	var node: Dictionary
+	match _type.selected:
+		0: node = {"type": "action", "id": _technique.get_item_text(_technique.selected)}
+		1: node = {"type": "wait", "seconds": _seconds.value}
+		2: node = {"type": "sequence", "children": []}
+		_: node = {"type": "parallel", "children": []}
+	target.children.append(node)
 	changed.emit(copy)

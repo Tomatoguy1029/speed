@@ -31,5 +31,19 @@ func _initialize() -> void:
 	assert(adapter.started == ["a", "b"])
 	combo.cancel()
 	assert(not adapter.tickets[1].busy)
+	var parallel_adapter := Adapter.new()
+	var parallel = script.new({"type": "parallel", "children": [{"type": "action", "id": "a"}, {"type": "sequence", "children": [{"type": "wait", "seconds": 0.5}, {"type": "action", "id": "b"}]}]}, parallel_adapter)
+	parallel.tick(0.1)
+	if parallel_adapter.started != ["a"]:
+		print("[boss-combo] FAIL parallel execution missing")
+		quit(1)
+		return
+	parallel.tick(0.5)
+	parallel.tick(0.1)
+	assert(parallel_adapter.started == ["a", "b"])
+	parallel_adapter.tickets[0].busy = false
+	assert(parallel.tick(0.1) == &"running")
+	parallel_adapter.tickets[1].busy = false
+	assert(parallel.tick(0.1) == &"finished")
 	print("[boss-combo] PASS ordered actions, delay and cancel")
 	quit()
