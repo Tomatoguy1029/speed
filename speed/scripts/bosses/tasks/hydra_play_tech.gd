@@ -1,21 +1,22 @@
-## 選択後だけ攻撃枠を要求し、指定した技を実行する。中断は待機と実行の両方を片付ける。
+## Settings が技別数値の正本。条件とCDは開始時だけ評価する。
 @tool
 extends BTAction
-@export var technique := "north"
-## 基準時間は BossDef.params.tech_cd。技ごとにこの倍率を調整する。
-@export_range(0.0, 10.0) var cooldown_scale := 1.0
+@export var settings: HydraTechnique
 var _started := false
 func _generate_name() -> String:
-	return "HydraTechnique %s" % technique
+	return "HydraTechnique %s" % (settings.technique if settings != null else &"unset")
 func _enter() -> void:
 	_started = false
 func _tick(_delta: float) -> Status:
-	var id := StringName(technique)
+	if settings == null: return FAILURE
+	var id := settings.technique
 	if not _started:
-		if not agent.attack_ready(id): return FAILURE
-		_started = agent.try_start_tech(id, cooldown_scale)
-		return RUNNING
+		_started = agent.try_start_tech(id, 1.0)
+		return RUNNING if _started else FAILURE
 	if agent.tech == id: return RUNNING
 	return SUCCESS if agent.last_tech == id and agent.last_tech_result == &"finished" else FAILURE
 func _exit() -> void:
-	agent.interrupt_tech(StringName(technique))
+	if _started and settings != null: agent.interrupt_tech(settings.technique)
+
+func get_hydra_settings() -> HydraTechnique:
+	return settings

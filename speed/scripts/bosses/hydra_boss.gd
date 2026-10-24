@@ -25,6 +25,9 @@ const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
+var _moves: Dictionary = {}
+var _move_gates: Dictionary = {}
+var _normal_moves: Dictionary = {}
 var special: RefCounted
 var attack_field: Node2D
 var arena: Node2D
@@ -185,6 +188,8 @@ func _on_bound() -> void:
 	add_child(attack_field)
 	attack_field.bind(self)
 	special=load("res://scripts/bosses/hydra_techniques.gd").new(self)
+	_collect_moves(HEAD_BT.root_task)
+	_collect_moves(decision.behavior_tree.root_task)
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	hsm.initialize(self)
@@ -383,7 +388,7 @@ func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
 	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
-	if neck.locked and def.params.normal_rules.has(neck.mode): return neck.strike_pos
+	if neck.locked and _normal_moves.has(neck.mode): return neck.strike_pos
 	if separated:return neck.free_pos
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
 
@@ -418,7 +423,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 			neck.motion.hit=0.35
 			_cue(&"hit", neck.mode, k, {"target": &"hydra", "damage": neck.head_hp - maxf(0.0, table.hp[neck.row])})
 		neck.head_hp = table.hp[neck.row]
-		if def.params.normal_rules.has(neck.mode):
+		if _normal_moves.has(neck.mode):
 			neck.t += dt
 			NORMALS.tick(self,neck,dt)
 		elif neck.mode == &"idle":
@@ -476,21 +481,50 @@ func _follow_neck(neck: Neck, dt: float) -> void:
 		neck.base_angle * 2.4, _time, dt, def.params)
 	if not separated: NECK_CHAIN.keep_outside(neck.segs,table.pos[body],table.r[body])
 
+## BT の技ノードが参照する Resource を役者ごとに読み込む。BossDef の既存編集は保持する。
+func _collect_moves(task: BTTask, gates: Array = []) -> void:
+	var branch := gates.duplicate()
+	if task is BTSequence:
+		for child in task.get_children():
+			if child.has_method("allows"): branch.append(child)
+	if task.has_method("get_hydra_settings"):
+		var settings: HydraTechnique = task.get_hydra_settings()
+		if settings != null:
+			_moves[settings.technique] = settings.duplicate(true)
+			_move_gates[settings.technique] = branch
+			if settings.head_kind != &"": _normal_moves[settings.technique] = true
+	for child in task.get_children(): _collect_moves(child, branch)
+
+func move_settings(attack: StringName) -> HydraTechnique:
+	return _moves.get(attack)
+
+## 移行済みの技別値は Settings が正。Params は本体・移動・共通予算の値を供給する。
+func move_params(attack: StringName) -> Dictionary:
+	var settings := move_settings(attack)
+	return def.params.merged(settings.parameters, true) if settings != null else def.params
+
+func _position_ready(attack: StringName, index := -1) -> bool:
+	for condition in _move_gates.get(attack, []):
+		if not condition.allows(self, index): return false
+	return true
+
+func _normal_cost(attack: StringName) -> float:
+	var settings := move_settings(attack)
+	return float(settings.parameters.cost) if settings != null else INF
+
 func normal_ready(index: int, attack: StringName) -> bool:
-	if index < 0 or index >= necks.size() or not def.params.normal_rules.has(attack): return false
+	if index < 0 or index >= necks.size() or not _normal_moves.has(attack): return false
 	var n := necks[index]
-	var rule: Dictionary = def.params.normal_rules[attack]
-	if not _alive(n) or n.kind != rule.kind or n.mode != &"idle" or n.cd > 0.0: return false
+	var settings := move_settings(attack)
+	if not _alive(n) or n.kind != settings.head_kind or n.mode != &"idle" or n.cd > 0.0: return false
 	if busy or recovery_t > 0.0 or chance_t > 0.0 or growth_t > 0.0 or separation_pending: return false
 	var at := _head_pos(n)
 	if not run_state.view_rect().grow(-table.r[n.row]).has_point(at): return false
-	var offset := run_state.ship_pos-at
-	if offset.length() < rule.min or offset.length() > rule.max: return false
-	if not separated and absf(angle_difference(n.base_angle+table.facing[body],(run_state.ship_pos-_neck_base(n)).angle())) > 1.25: return false
+	if not _position_ready(attack, index): return false
 	var used := 0.0
 	for other in necks:
-		if def.params.normal_rules.has(other.mode): used += float(def.params.normal_rules[other.mode].cost)*maxf(0.0,table.attack_value[other.row])
-	return used + float(rule.cost)*maxf(0.0,table.attack_value[n.row]) <= float(def.params.normal_budget)
+		if _normal_moves.has(other.mode): used += _normal_cost(other.mode)*maxf(0.0,table.attack_value[other.row])
+	return used + _normal_cost(attack)*maxf(0.0,table.attack_value[n.row]) <= float(def.params.normal_budget)
 
 func start_normal(index: int, attack: StringName) -> bool:
 	if not normal_ready(index,attack): return false
@@ -499,7 +533,7 @@ func start_normal(index: int, attack: StringName) -> bool:
 	# 通常ランの雑魚枠と、首同士のnormal_budgetを独立させる。
 	if director!=null and not director.formation_mode:
 		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
-		var cost: float=float(def.params.normal_rules[attack].cost)*maxf(0.0,table.attack_value[n.row])
+		var cost: float=_normal_cost(attack)*maxf(0.0,table.attack_value[n.row])
 		if not director.request("neck:"+str(n.row_id),cats,n.row,n.row_id,4.0,table.attack_priority[n.row],cost):return false
 	n.mode = attack
 	n.t = 0.0
@@ -507,11 +541,12 @@ func start_normal(index: int, attack: StringName) -> bool:
 	n.step = 0
 	n.emission.clear()
 	n.target = run_state.ship_pos
-	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(def.params.thunder_lead)
+	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(move_params(attack).thunder_lead)
 	_cue(&"warning_started",attack,index)
 	return true
 
 func finish_normal(n: Neck) -> void:
+	var cooldown := float(move_params(n.mode).attack_cd)
 	var at := _head_pos(n)
 	_release_attack(n)
 	n.angle = (at-_neck_base(n)).angle()
@@ -519,7 +554,7 @@ func finish_normal(n: Neck) -> void:
 	n.free_pos=at
 	n.locked = false
 	n.mode = &"idle"
-	n.cd = float(def.params.attack_cd)
+	n.cd = cooldown
 	_cue(&"finished",&"",head_index(n))
 
 func position_head(index: int, dt: float) -> void:
@@ -580,8 +615,8 @@ func _update_guard_approach()->void:
 	var pending: Array[Neck]=[]
 	for n in necks:
 		if not _alive(n):continue
-		if def.params.normal_rules.has(n.mode):
-			budget-=float(def.params.normal_rules[n.mode].cost)*maxf(0.0,table.attack_value[n.row])
+		if _normal_moves.has(n.mode):
+			budget-=_normal_cost(n.mode)*maxf(0.0,table.attack_value[n.row])
 		elif n.mode==&"idle" and n.cd<=0.0:
 			if not n.motion.has("guard_ready_since"):n.motion.guard_ready_since=_time
 			pending.append(n)
@@ -591,8 +626,8 @@ func _update_guard_approach()->void:
 		return a.free_pos.distance_squared_to(run_state.ship_pos)<b.free_pos.distance_squared_to(run_state.ship_pos))
 	for n in pending:
 		var cost:=INF
-		for rule: Dictionary in def.params.normal_rules.values():
-			if rule.kind==n.kind:cost=minf(cost,float(rule.cost)*maxf(0.0,table.attack_value[n.row]))
+		for settings: HydraTechnique in _moves.values():
+			if settings.head_kind==n.kind:cost=minf(cost,float(settings.parameters.cost)*maxf(0.0,table.attack_value[n.row]))
 		if cost>budget:continue
 		budget-=cost
 		_guard_approach.append(n)
@@ -673,7 +708,7 @@ func attack_ready(attack: StringName) -> bool:
 	if COMBOS.has(attack):
 		if combo_wait>0.0:return false
 	elif _tech_cd>0.0:return false
-	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack)
+	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack) and _position_ready(attack)
 
 func combo_heads(kinds: Array) -> Array[Neck]:
 	var result: Array[Neck]=[]
@@ -692,7 +727,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 		return false
 	if not timeline.has_animation(attack):return false
 	var director=ctx.projectiles.director
-	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(def.params.major_cost)):
+	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,float(move_params(attack).major_cost)):
 		return false
 	if attack in [&"north",&"sequence"]: participants = front_heads()
 	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
@@ -706,7 +741,8 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	for neck in necks:
 		_release_attack(neck)
 		_end(neck, true)
-	timeline.play(tech)
+	_configure_tech_timeline(attack)
+	timeline.play("configured/"+String(tech))
 	timeline.advance(0.0)
 	if special.positioning:timeline.pause()
 	return true
@@ -838,8 +874,8 @@ func tech_end() -> void:
 	last_tech = tech
 	if last_tech_result == &"":
 		last_tech_result = &"finished"
-	_tech_until[tech] = _time + float(def.params.get(String(tech)+"_cooldown",def.params.combo_cooldown if COMBOS.has(tech) else def.params.tech_cd)) * _cooldown_scale
-	recovery_t = float(def.params.tech_recovery)
+	_tech_until[tech] = _time + float(move_params(tech).cooldown) * _cooldown_scale
+	recovery_t = float(move_params(tech).tech_recovery)
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})
 	for neck in necks:
@@ -877,7 +913,7 @@ func _update_north_targets() -> void:
 	var ordered := participants.duplicate()
 	ordered.sort_custom(func(a,b):return _neck_base(a).dot(side) < _neck_base(b).dot(side))
 	for i in ordered.size():
-		ordered[i].target = center+side*float(def.params.north_spread)*(i-1)
+		ordered[i].target = center+side*float(move_params(&"north").north_spread)*(i-1)
 
 func north_curl() -> void:
 	_update_north_targets()
@@ -904,8 +940,8 @@ func _north_step(neck: Neck, fraction: float, dt: float) -> void:
 	_release_attack(neck)
 	neck.glow = 1.0
 	var delta := neck.strike_pos - previous
-	neck.hazard = ctx.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(def.params.bite_radius) * 2.0,
-		0.0, maxf(dt, 0.001) + 0.001, float(def.params.bite_dmg), Color("#ff7a5a"))
+	neck.hazard = ctx.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(move_params(&"north").bite_radius) * 2.0,
+		0.0, maxf(dt, 0.001) + 0.001, float(move_params(&"north").bite_dmg), Color("#ff7a5a"))
 	ctx.projectiles.attach_hazard(neck.hazard, neck.row)
 	if fraction >= 1.0:
 		neck.mode = &"tech_hold"
@@ -918,22 +954,46 @@ func north_follow() -> void:
 
 ## 瓦礫を砕き、破片を飛ばす。from が 0 でなければ、その向きを中心に飛ばす。
 func _burst_rubble(j: int, from: Vector2) -> void:
-	var p: Dictionary = def.params
+	var p: Dictionary = move_params(tech)
 	var base := from.angle() if from != Vector2.ZERO else run_state.rng.randf() * TAU
 	for k in 6:
 		ctx.projectiles.fire_enemy(j, base + (k - 2.5) * (0.45 if from != Vector2.ZERO else TAU / 6.0),
 			float(p.shard_speed), &"bullet", {"bullet_dmg": float(p.shard_dmg)})
 	ctx.enemies.mark_dead(j)
 
+## 技別 Settings から内部イベントを構成する。共有外部ライブラリを変更しない。
+func _configure_tech_timeline(attack: StringName) -> void:
+	var p := move_params(attack)
+	var animation := Animation.new()
+	var track := animation.add_track(Animation.TYPE_METHOD)
+	animation.track_set_path(track, NodePath("."))
+	animation.track_insert_key(track, 0.0, {"method": &"tech_compass", "args": [attack]})
+	var warning := maxf(0.001, float(p.warning_time))
+	if attack == &"north":
+		animation.track_insert_key(track, clampf(float(p.north_lock_time), 0.0, warning), {"method": &"north_curl", "args": []})
+		animation.track_insert_key(track, warning, {"method": &"north_burst", "args": []})
+		animation.track_insert_key(track, warning+float(p.north_flight), {"method": &"north_follow", "args": []})
+	else:
+		animation.track_insert_key(track, warning, {"method": &"special_attack", "args": []})
+	var end := warning+maxf(float(p.performance_time), float(p.get("north_flight", 0.0)))
+	animation.track_insert_key(track, end, {"method": &"tech_end", "args": []})
+	animation.length = end+0.2
+	var library := AnimationLibrary.new()
+	library.add_animation(attack, animation)
+	# The actor owns this library; replacement leaves the template resource untouched.
+	if timeline.has_animation_library(&"configured"): timeline.remove_animation_library(&"configured")
+	timeline.add_animation_library(&"configured", library)
+
 ## 判定タイムラインの実行キーから予告の長さを読む。演出専用のタイマーを正にしない。
 func _timeline_key_time(name: StringName, method: StringName) -> float:
-	var animation := timeline.get_animation(name)
+	var key := StringName("configured/"+String(name))
+	var animation := timeline.get_animation(key if timeline.has_animation(key) else name)
 	if animation == null: return 0.0
 	for track in animation.get_track_count():
 		if animation.track_get_type(track) != Animation.TYPE_METHOD: continue
-		for key in animation.track_get_key_count(track):
-			if animation.method_track_get_name(track, key) == method:
-				return animation.track_get_key_time(track, key)
+		for method_key in animation.track_get_key_count(track):
+			if animation.method_track_get_name(track, method_key) == method:
+				return animation.track_get_key_time(track, method_key)
 	return 0.0
 
 func _warning_duration(name: StringName) -> float:
@@ -955,7 +1015,7 @@ func presentation_targets() -> Array[Dictionary]:
 	for i in necks.size():
 		if participants.has(necks[i]) and _alive(necks[i]):
 			targets.append({"neck_index": i, "base": _neck_base(necks[i]), "from": _head_pos(necks[i]),
-				"target": necks[i].target, "radius": float(def.params.bite_radius), "locked": not north_aiming})
+				"target": necks[i].target, "radius": float(move_params(&"north").bite_radius), "locked": not north_aiming})
 	return targets
 
 func presentation_state() -> Dictionary:

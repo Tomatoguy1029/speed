@@ -1,11 +1,15 @@
-## 距離は BossDef.params の基準に対する倍率。選んだ技の予告中・実行中は固定する。
+## 発動時の距離条件。実際の攻撃範囲は技の Settings が持つ。
 @tool
 extends BTCondition
-@export var distance_parameter: StringName = &"engage"
-@export_range(0.0, 10.0) var minimum_ratio := 0.0
-@export_range(0.0, 10.0) var maximum_ratio := 1.3
+@export_enum("Body", "Head", "Neck Base") var origin: int = 0
+@export_range(0.0, 100000.0, 1.0, "or_greater") var minimum_distance := 0.0
+@export_range(0.0, 100000.0, 1.0, "or_greater") var maximum_distance := 100000.0
+func allows(actor: Node, head_index := -1) -> bool:
+	var at: Vector2 = actor.table.pos[actor.body]
+	if origin != 0:
+		if head_index < 0 or head_index >= actor.necks.size(): return false
+		at = actor._head_pos(actor.necks[head_index]) if origin == 1 else actor._neck_base(actor.necks[head_index])
+	var distance: float = actor.run_state.ship_pos.distance_to(at)
+	return distance >= minimum_distance and distance <= maximum_distance
 func _tick(_delta: float) -> Status:
-	if agent.busy: return SUCCESS
-	var distance: float = blackboard.get_var(&"player_distance", INF)
-	var basis: float = agent.def.params.get(distance_parameter, 0.0)
-	return SUCCESS if distance >= basis * minimum_ratio and distance <= basis * maximum_ratio else FAILURE
+	return SUCCESS if allows(agent, int(blackboard.get_var(&"head_index", -1))) else FAILURE

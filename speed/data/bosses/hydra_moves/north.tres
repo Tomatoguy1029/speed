@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"north"
+head_kind = &""
+parameters = {
+"warning_time": 2.4,
+"performance_time": 1.2,
+"tech_recovery": 1.5,
+"cooldown": 14.0,
+"major_cost": 1.0,
+"north_spread": 120.0,
+"bite_radius": 75.0,
+"bite_dmg": 16.0,
+"north_lock_time": 1.4,
+"north_flight": 0.3
+}

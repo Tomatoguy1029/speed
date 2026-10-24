@@ -22,7 +22,7 @@ static func tick(a: Node, n, dt: float) -> void:
 	if n.mode == &"bite_sweep":
 		sweep(a,n,dt)
 		return
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	var flight := float(p.normal_lunge)
 	var hold := float(p.normal_hold)
@@ -50,7 +50,7 @@ static func tick(a: Node, n, dt: float) -> void:
 	if n.t >= charge + flight + hold: a.finish_normal(n)
 
 static func sweep(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	var duration := float(p.sweep_time)
 	var from: Vector2 = a._head_pos(n)
@@ -68,7 +68,7 @@ static func sweep(a: Node,n,dt: float) -> void:
 	if n.t >= charge+duration+float(p.normal_hold): a.finish_normal(n)
 
 static func wind_band(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if n.t < charge:
 		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
@@ -77,12 +77,13 @@ static func wind_band(a: Node,n,dt: float) -> void:
 		n.locked=true
 		n.strike_pos=a._neck_base(n)+Vector2.from_angle(n.angle)*n.length
 		var points := PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.wind_length)])
-		a.attack_field.add_shape(points,float(p.wind_width),0.0,float(p.wind_time),0.0,&"wind",n.row)
+		var effect: Dictionary = a.attack_field.add_shape(points,float(p.wind_width),0.0,float(p.wind_time),0.0,&"wind",n.row)
+		effect.wind_force = float(p.wind_force)
 		a._cue(&"attack_started",n.mode,a.head_index(n))
 	if n.t >= charge+float(p.wind_time)+float(p.normal_hold): a.finish_normal(n)
 
 static func wind_blades(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if n.t < charge:
 		a.aim_neck(n,(n.target-a._head_pos(n)).angle()-float(p.blade_spread)*0.5,dt)
@@ -103,7 +104,7 @@ static func wind_blades(a: Node,n,dt: float) -> void:
 	if n.t>=charge+2.0*float(p.blade_interval)+float(p.normal_hold): a.finish_normal(n)
 
 static func rubble(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if n.t < charge:
 		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
@@ -123,14 +124,14 @@ static func rubble(a: Node,n,dt: float) -> void:
 static func launch_rubble(a: Node,n,angle: float,radius: float) -> void:
 	var row: int = a.ctx.enemies.spawn(a.ctx.enemies.def_of(&"hydra_rubble"),a._head_pos(n))
 	a.table.r[row]=radius
-	a.table.vel[row]=Vector2.from_angle(angle)*float(a.def.params.lump_speed)
+	a.table.vel[row]=Vector2.from_angle(angle)*float(a.move_params(n.mode).lump_speed)
 	var at: Vector2 = a.table.pos[row]
-	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.ctx.enemies.def_of(&"hydra_rubble").params.life),float(a.def.params.lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
+	var e: Dictionary = a.attack_field.add_shape(PackedVector2Array([at,at+Vector2(0.1,0)]),radius*2.0,0.0,float(a.ctx.enemies.def_of(&"hydra_rubble").params.life),float(a.move_params(n.mode).lump_dmg),&"rubble",n.row,Vector2.ZERO,true)
 	e.follow_row=row
 	e.follow_id=a.table.id[row]
 
 static func beam_fixed(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if n.t < charge:
 		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
@@ -147,7 +148,7 @@ static func beam_fixed(a: Node,n,dt: float) -> void:
 	if n.t>=charge+float(p.beam_time)+float(p.normal_hold): a.finish_normal(n)
 
 static func beam_bolt(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if n.t < charge:
 		a.aim_neck(n,(n.target-a._head_pos(n)).angle(),dt)
@@ -161,7 +162,7 @@ static func beam_bolt(a: Node,n,dt: float) -> void:
 	if n.t>=charge+float(p.normal_hold): a.finish_normal(n)
 
 static func thunder_drop(a: Node,n,dt: float) -> void:
-	var p: Dictionary = a.def.params
+	var p: Dictionary = a.move_params(n.mode)
 	var charge := float(p.normal_charge)
 	if not n.locked:
 		var points := PackedVector2Array([n.target,n.target+Vector2(0.1,0)])

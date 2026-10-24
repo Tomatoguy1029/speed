@@ -44,7 +44,7 @@ func tick(dt: float)->void:
 	elif a.tech==&"swarm":swarm(dt)
 	elif a.tech==&"grid":grid()
 func sequence(dt: float)->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	for i in a.participants.size():
 		var n=a.participants[i]
 		var local: float=time-i*float(p.sequence_gap)
@@ -65,7 +65,7 @@ func sequence(dt: float)->void:
 			if fraction>=1.0:n.mode=&"special_hold"
 
 func curve(dt: float)->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	a.table.facing[a.body]+=float(p.curve_turn)*dt
 	for n in a.participants:
 		if not a._alive(n):continue
@@ -78,14 +78,14 @@ func curve(dt: float)->void:
 			at+=Vector2.from_angle(n.angle-f*float(p.curve_lag))*float(p.beam_len)/24.0
 			points.append(at)
 		if n.emission.is_empty():
-			n.emission=a.attack_field.add_shape(points,float(p.beam_width),0.8,float(p.curve_time),float(p.beam_dmg),&"beam",n.row)
+			n.emission=a.attack_field.add_shape(points,float(p.beam_width),float(p.curve_delay),float(p.curve_time),float(p.beam_dmg),&"beam",n.row)
 		else:n.emission.points=points
 		if time>=float(p.curve_time):
 			n.emission.life=0.0
 			n.mode=&"special_hold"
 
 func tornado()->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	var wind=a.participants[0]
 	var debris=a.participants[1]
 	if not state.has("vortex"):
@@ -96,7 +96,7 @@ func tornado()->void:
 		wind.angle=direction.angle()
 		debris.angle=(Vector2(state.center)-debris.strike_pos).angle()
 		var points:=PackedVector2Array([state.center,state.center+Vector2(0.1,0)])
-		state.vortex=a.attack_field.add_shape(points,float(p.tornado_width)*0.8,0.0,1.2,0.0,&"tornado_charge",wind.row)
+		state.vortex=a.attack_field.add_shape(points,float(p.tornado_width)*0.8,0.0,float(p.tornado_charge),0.0,&"tornado_charge",wind.row)
 		state.rows=[]
 		state.from=debris.strike_pos
 		for j in 3:
@@ -107,19 +107,19 @@ func tornado()->void:
 			a.table.r[row]=26.0+float(j)*6.0
 		a._cue(&"gather_started",a.tech,a.necks.find(wind))
 	if not state.has("launched"):
-		state.vortex.fill=clampf((time-0.5)/0.7,0.0,1.0)
+		state.vortex.fill=clampf((time-float(p.tornado_charge)*5.0/12.0)/(float(p.tornado_charge)*7.0/12.0),0.0,1.0)
 		state.vortex.feed=[]
 		var from: Vector2=state.from
 		var center: Vector2=state.center
 		var side: Vector2=(center-from).normalized().orthogonal()
 		for j in state.rows.size():
 			var row: int=state.rows[j]
-			var progress:=clampf((time-0.25-float(j)*0.12)/0.65,0.0,1.0)
+			var progress:=clampf((time-float(p.tornado_charge)*(0.25+float(j)*0.12)/1.2)/(float(p.tornado_charge)*0.65/1.2),0.0,1.0)
 			var at:=from.lerp(center,progress)+side*sin(progress*PI)*(60.0+float(j)*35.0)
 			a.table.pos[row]=at
 			a.table.r[row]=(26.0+float(j)*6.0)*(1.0-progress*0.7)
 			state.vortex.feed.append(Vector3(at.x,at.y,a.table.r[row]))
-	if time>=1.2 and not state.has("launched"):
+	if time>=float(p.tornado_charge) and not state.has("launched"):
 		state.launched=true
 		state.vortex.life=0.0
 		for row in state.rows:a.ctx.enemies.mark_dead(row)
@@ -129,7 +129,7 @@ func tornado()->void:
 		a._cue(&"attack_started",a.tech,a.necks.find(wind))
 
 func debris_shatter()->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	var debris=a.participants[0]
 	var beam=a.participants[1]
 	if not state.has("deployed"):
@@ -142,13 +142,13 @@ func debris_shatter()->void:
 			a._rubble.append(Vector2i(row,a.table.id[row]))
 			a.table.vel[row]=Vector2.ZERO
 			state[row]={"from":debris.strike_pos,"to":at}
-	if time<0.7:
+	if time<float(p.shatter_deploy):
 		for ref in a._rubble:
-			a.table.pos[ref.x]=Vector2(state[ref.x].from).lerp(state[ref.x].to,clampf(time/0.7,0.0,1.0))
-	if time>=0.7 and time<2.5:
-		beam.angle=float(state.aim)-0.9+1.8*clampf((time-0.7)/1.8,0.0,1.0)
+			a.table.pos[ref.x]=Vector2(state[ref.x].from).lerp(state[ref.x].to,clampf(time/float(p.shatter_deploy),0.0,1.0))
+	if time>=float(p.shatter_deploy) and time<float(p.shatter_deploy)+float(p.shatter_time):
+		beam.angle=float(state.aim)-float(p.shatter_arc)*0.5+float(p.shatter_arc)*clampf((time-float(p.shatter_deploy))/float(p.shatter_time),0.0,1.0)
 		var points:=PackedVector2Array([beam.strike_pos,beam.strike_pos+Vector2.from_angle(beam.angle)*float(p.beam_len)])
-		if beam.emission.is_empty():beam.emission=a.attack_field.add_shape(points,float(p.beam_width),0.0,1.8,float(p.beam_dmg),&"beam",beam.row)
+		if beam.emission.is_empty():beam.emission=a.attack_field.add_shape(points,float(p.beam_width),0.0,float(p.shatter_time),float(p.beam_dmg),&"beam",beam.row)
 		else:beam.emission.points=points
 		for ref in a._rubble.duplicate():
 			if not a.ctx.enemies.is_same(ref.x,ref.y) or a.table.dead[ref.x]:
@@ -160,16 +160,16 @@ func debris_shatter()->void:
 				a._cue(&"rubble_shattered",a.tech,a.necks.find(beam))
 
 func beam_pincer()->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	if not state.has("aims"):
 		state.aims=[]
 		for n in a.participants:state.aims.append((a.run_state.ship_pos-n.strike_pos).angle())
 	for j in a.participants.size():
 		var n=a.participants[j]
 		var side:=1.0 if j==0 else -1.0
-		n.angle=float(state.aims[j])+side*lerpf(0.8,0.12,clampf((time-0.5)/1.8,0.0,1.0))
+		n.angle=float(state.aims[j])+side*lerpf(float(p.pincer_open_angle),float(p.pincer_close_angle),clampf((time-float(p.pincer_delay))/float(p.pincer_time),0.0,1.0))
 		var points:=PackedVector2Array([n.strike_pos,n.strike_pos+Vector2.from_angle(n.angle)*float(p.beam_len)])
-		if n.emission.is_empty():n.emission=a.attack_field.add_shape(points,float(p.beam_width),0.5,1.8,float(p.beam_dmg),&"beam",n.row)
+		if n.emission.is_empty():n.emission=a.attack_field.add_shape(points,float(p.beam_width),float(p.pincer_delay),float(p.pincer_time),float(p.beam_dmg),&"beam",n.row)
 		else:n.emission.points=points
 
 
@@ -201,13 +201,13 @@ func position(dt: float)->bool:
 		for n in a.participants:
 			n.strike_from=n.strike_pos
 			var direction: Vector2=(a.run_state.ship_pos-n.strike_pos).normalized()
-			n.target=n.strike_pos+direction*float(a.def.params.swarm_reach)
+			n.target=n.strike_pos+direction*float(a.move_params(a.tech).swarm_reach)
 			var hit: Dictionary=a.ctx.field.arena_hit(n.strike_pos,n.target,a.table.r[n.row])
 			if not hit.is_empty():n.target=hit.pos
 	return ready
 
 func swarm(dt: float)->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	for i in a.participants.size():
 		var n=a.participants[i]
 		if not a._alive(n):continue
@@ -230,7 +230,7 @@ func swarm(dt: float)->void:
 
 
 func grid()->void:
-	var p: Dictionary=a.def.params
+	var p: Dictionary=a.move_params(a.tech)
 	for i in a.participants.size():
 		var n=a.participants[i]
 		if not a._alive(n) or not n.emission.is_empty():continue
