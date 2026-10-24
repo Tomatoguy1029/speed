@@ -67,6 +67,7 @@ var cam_zoom := 1.0
 var view_override: Variant = null
 ## 背景の星を描くか（実験場では初めは消す）
 var show_background := true
+var _background_sprites: Array[Sprite2D] = []
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
 
@@ -140,6 +141,7 @@ func _ready() -> void:
 	for i in 400:
 		_stars.append(Vector3(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0), rng.randf_range(0.2, 1.0)))
 	_build_star_batch()
+	_build_stage_background()
 	run.frame_events.connect(_on_events)
 
 ## 法線付き装甲の敵の飾りを、照明の層の上の専用キャンバスに置く。照明の層は、その外観の敵が初めて出たときに作る。
@@ -607,10 +609,29 @@ func _build_star_batch() -> void:
 	_star_batch.material = _star_material
 	_layers.background.add_child(_star_batch)
 
+## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
+func _build_stage_background() -> void:
+	for placement: BackgroundPlacement in state.stage.backgrounds:
+		if placement.texture == null:
+			continue
+		var sprite := Sprite2D.new()
+		sprite.texture = placement.texture
+		sprite.region_enabled = true
+		sprite.region_rect = placement.bounds()
+		sprite.position = state.ship_pos + placement.offset
+		sprite.scale = Vector2.ONE * placement.scale
+		sprite.rotation_degrees = placement.rotation_degrees
+		sprite.modulate = placement.tint
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_layers.background.add_child(sprite)
+		_background_sprites.append(sprite)
+
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
 	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
 	_star_batch.visible = show_background
+	for sprite in _background_sprites:
+		sprite.visible = show_background
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)

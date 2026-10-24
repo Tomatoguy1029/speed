@@ -13,6 +13,9 @@ const EDITOR_ORDER := 5
 ## ステージの番号。
 ## 単位：番号
 @export var index: int
+## 開始地点を基準に置く背景。配列の後ろほど手前に重ねる。
+@export var backgrounds: Array[BackgroundPlacement] = []
+
 ## 配置のシーン
 ## ステージの配置を置いたシーンのファイル。
 ## 単位：ファイル

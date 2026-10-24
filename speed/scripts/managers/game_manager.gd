@@ -4,7 +4,7 @@
 ## screen_changed を受けて、対応する画面のシーンに差し替える。
 extends Node
 
-enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB }
+enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB, BACKGROUND_LAB }
 
 signal screen_ready(view: Control)
 ## 起動側から加える画面。

@@ -36,6 +36,8 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 static func build(stage: RuntimeStage) -> StageResources:
 	var result := StageResources.new()
 	var paths := {}
+	for placement: BackgroundPlacement in stage.backgrounds:
+		if placement.texture != null: _add(paths, placement.texture.resource_path)
 	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
 	var ids := {}
 	for id in stage.enemies: ids[String(id)] = true

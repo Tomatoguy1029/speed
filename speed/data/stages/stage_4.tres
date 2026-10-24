@@ -1,14 +1,51 @@
-[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://d30gdh43u6kli"]
+[gd_resource type="Resource" script_class="StageDef" format=3]
 
-[ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
-[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="1_3ghul"]
-[ext_resource type="PackedScene" uid="uid://b0sce1j2r44rr" path="res://data/formations/telescope_reticle.tscn" id="2_xsgcl"]
-[ext_resource type="PackedScene" uid="uid://bxl2barjiuk3s" path="res://data/formations/dolphin.tscn" id="3_pea44"]
-[ext_resource type="PackedScene" uid="uid://c7he0y13h5761" path="res://data/formations/aquarius_solo.tscn" id="4_blxf3"]
-[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
-[ext_resource type="PackedScene" uid="uid://qsuhj8vo0blj" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
-[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="8_xsgcl"]
+[ext_resource type="Script" path="res://scripts/data_types/stage_def.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/spawn_clip.gd" id="1_3ghul"]
+[ext_resource type="PackedScene" path="res://data/formations/telescope_reticle.tscn" id="2_xsgcl"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/solar.png" id="3_3vyts"]
+[ext_resource type="PackedScene" path="res://data/formations/dolphin.tscn" id="3_pea44"]
+[ext_resource type="PackedScene" path="res://data/formations/aquarius_solo.tscn" id="4_blxf3"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/asteroid_b.png" id="4_pmvkf"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/asteroid_a.png" id="5_fkgl6"]
+[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
+[ext_resource type="PackedScene" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/space_debris.png" id="6_bab1x"]
+[ext_resource type="Script" path="res://scripts/data_types/spawn_curve.gd" id="8_xsgcl"]
 [ext_resource type="PackedScene" path="res://data/formations/corona_solo.tscn" id="9_corona"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/colony.png" id="bg_colony"]
+[ext_resource type="Script" path="res://scripts/data_types/background_placement.gd" id="bg_script"]
+
+[sub_resource type="Resource" id="Resource_psaqe"]
+script = ExtResource("bg_script")
+texture = ExtResource("bg_colony")
+offset = Vector2(-677.3871, 10.675674)
+scale = 2.0
+tint = Color(0.55, 0.65, 0.75, 0.3)
+
+[sub_resource type="Resource" id="Resource_rjgwb"]
+script = ExtResource("bg_script")
+texture = ExtResource("3_3vyts")
+offset = Vector2(918.67145, -1124.1201)
+scale = 1.2
+rotation_degrees = 40.0
+tint = Color(0.55, 0.65, 0.75, 0.5)
+
+[sub_resource type="Resource" id="Resource_6ur6i"]
+script = ExtResource("bg_script")
+texture = ExtResource("4_pmvkf")
+offset = Vector2(-191.7809, -129.1954)
+
+[sub_resource type="Resource" id="Resource_vt7nj"]
+script = ExtResource("bg_script")
+texture = ExtResource("5_fkgl6")
+offset = Vector2(-425.6096, 419.38715)
+
+[sub_resource type="Resource" id="Resource_g1k3m"]
+script = ExtResource("bg_script")
+texture = ExtResource("6_bab1x")
+offset = Vector2(-335.9769, -288.14322)
+scale = 1.4
 
 [sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
@@ -414,6 +451,7 @@ points = PackedVector2Array(0, 0, 27, 0, 33, 17, 60, 29, 80, 29, 90, 9, 122, 9, 
 [resource]
 script = ExtResource("1")
 index = 4
+backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m")])
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_s6gwe"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
