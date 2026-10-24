@@ -2,7 +2,7 @@ extends SceneTree
 func _initialize() -> void: call_deferred("exercise")
 func exercise() -> void:
 	var compiler = load("res://tools/content/build_boss_program.gd")
-	var panel = load("res://addons/boss_flow/editor.gd").new()
+	var panel = load("res://tools/editor/boss_flow/editor.gd").new()
 	root.add_child(panel)
 	DirAccess.make_dir_recursive_absolute("res://.content/tests")
 	var path := "res://.content/tests/perf_move.tres"

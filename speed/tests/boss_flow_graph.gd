@@ -3,7 +3,7 @@ extends SceneTree
 func _initialize() -> void: call_deferred("exercise")
 func exercise() -> void:
  root.size = Vector2i(1200, 800)
- var panel = load("res://addons/boss_flow/editor.gd").new()
+ var panel = load("res://tools/editor/boss_flow/editor.gd").new()
  panel.theme = ThemeDB.get_default_theme()
  root.add_child(panel)
  panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

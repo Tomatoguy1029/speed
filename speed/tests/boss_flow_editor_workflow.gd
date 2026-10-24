@@ -48,7 +48,7 @@ func exercise() -> void:
 	var host := VBoxContainer.new()
 	root.add_child(host)
 	host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var panel = load("res://addons/boss_flow/editor.gd").new()
+	var panel = load("res://tools/editor/boss_flow/editor.gd").new()
 	panel.theme = ThemeDB.get_default_theme()
 	host.add_child(panel)
 	await _settle()

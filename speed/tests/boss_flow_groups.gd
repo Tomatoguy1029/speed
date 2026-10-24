@@ -41,7 +41,7 @@ func exercise() -> void:
 	root.size = Vector2i(1280, 900)
 	rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
 	rules.layout = {}
-	graph = load("res://addons/boss_flow/technique_graph.gd").new()
+	graph = load("res://tools/editor/boss_flow/technique_graph.gd").new()
 	graph.theme = ThemeDB.get_default_theme()
 	root.add_child(graph)
 	graph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

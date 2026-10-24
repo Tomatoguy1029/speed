@@ -6,7 +6,7 @@ func exercise() -> void:
  var host := VBoxContainer.new()
  root.add_child(host)
  host.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- var panel = load("res://addons/boss_flow/editor.gd").new()
+ var panel = load("res://tools/editor/boss_flow/editor.gd").new()
  panel.theme = ThemeDB.get_default_theme()
  host.add_child(panel)
  for dimension in [Vector2i(1200, 800), Vector2i(860, 620)]:
@@ -30,7 +30,7 @@ func exercise() -> void:
  assert(panel.current.parameters.bite_dmg == original)
  panel.queue_free()
  await process_frame
- var large = load("res://addons/boss_flow/editor.gd").new()
+ var large = load("res://tools/editor/boss_flow/editor.gd").new()
  large.theme = Theme.new()
  large.theme.default_font_size = 28
  root.size = Vector2i(1778, 1000)

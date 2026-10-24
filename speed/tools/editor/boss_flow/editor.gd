@@ -9,16 +9,16 @@ var _status := Label.new()
 var _path := LineEdit.new()
 var rules: Resource
 var rules_path := "res://data/bosses/ai/hydra_action_rules.tres"
-var graph := preload("res://addons/boss_flow/technique_graph.gd").new()
-var preview := preload("res://addons/boss_flow/range_preview.gd").new()
+var graph := preload("res://tools/editor/boss_flow/technique_graph.gd").new()
+var preview := preload("res://tools/editor/boss_flow/range_preview.gd").new()
 var editing_rules := false
 var flow: Resource
 var flow_path := "res://data/bosses/ai/hydra_flow.tres"
-var flow_graph := preload("res://addons/boss_flow/flow_graph.gd").new()
+var flow_graph := preload("res://tools/editor/boss_flow/flow_graph.gd").new()
 var _selected_section := 0
 var _coverage_group := ""
 var editing_flow := false
-var combo_editor := preload("res://addons/boss_flow/combo_graph.gd").new()
+var combo_editor := preload("res://tools/editor/boss_flow/combo_graph.gd").new()
 var combo_id := ""
 var preview_stamina := 8.0
 var preview_radius := 1800.0
@@ -40,7 +40,7 @@ var _last_combo_path: Array = []
 var _probability_previous := ""
 var _scale := 1.0
 var _file_dialog := FileDialog.new()
-const GRAPH := preload("res://addons/boss_flow/technique_graph.gd")
+const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
 const PARAM_LABELS := {"warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
 
 func _ready() -> void:
@@ -1003,9 +1003,9 @@ func rebuild_ui() -> void:
 	_status = Label.new()
 	_path = LineEdit.new()
 	graph = GRAPH.new()
-	preview = preload("res://addons/boss_flow/range_preview.gd").new()
-	flow_graph = preload("res://addons/boss_flow/flow_graph.gd").new()
-	combo_editor = preload("res://addons/boss_flow/combo_graph.gd").new()
+	preview = preload("res://tools/editor/boss_flow/range_preview.gd").new()
+	flow_graph = preload("res://tools/editor/boss_flow/flow_graph.gd").new()
+	combo_editor = preload("res://tools/editor/boss_flow/combo_graph.gd").new()
 	_heading = Label.new()
 	_preview_frame = CenterContainer.new()
 	_split = HSplitContainer.new()

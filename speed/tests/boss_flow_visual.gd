@@ -4,7 +4,7 @@ func _initialize() -> void: call_deferred("exercise")
 func exercise() -> void:
 	root.content_scale_size = Vector2i.ZERO
 	root.size = Vector2i(1100, 800)
-	var panel = load("res://addons/boss_flow/editor.gd").new()
+	var panel = load("res://tools/editor/boss_flow/editor.gd").new()
 	panel.theme = ThemeDB.get_default_theme()
 	if "--large-editor" in OS.get_cmdline_user_args():
 		root.size = Vector2i(2030, 1540)

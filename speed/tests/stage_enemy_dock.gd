@@ -3,7 +3,7 @@
 @tool
 extends SceneTree
 
-const PANEL := preload("res://addons/stage_enemy_tuning/dock_panel.gd")
+const PANEL := preload("res://tools/editor/stage_enemy_tuning/dock_panel.gd")
 var failed := 0
 
 func _initialize() -> void:

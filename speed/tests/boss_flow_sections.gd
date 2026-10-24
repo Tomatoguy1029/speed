@@ -12,7 +12,7 @@ func exercise() -> void:
 	var flow_path := "res://.content/tests/sections_flow.tres"
 	ResourceSaver.save(rules, rules_path)
 	ResourceSaver.save(flow, flow_path)
-	var panel = load("res://addons/boss_flow/editor.gd").new()
+	var panel = load("res://tools/editor/boss_flow/editor.gd").new()
 	root.add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	assert(panel.open_boss(rules_path, flow_path) == OK)

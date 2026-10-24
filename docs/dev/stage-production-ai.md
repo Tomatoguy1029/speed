@@ -132,7 +132,7 @@ HPは `EnemyDef.base_hp()` の計算結果で確認する。星の基準対象�
 
 ### F4・ステージ敵上書き
 
-1. `scripts/dev/stage_enemy_overlay.gd`・`stage_enemy_panel.gd`・`stage_enemy_fields.gd` でF4の入口、実際の表示名、選択ステージ、上書きの有無、未保存状態を確認する。エディターdockの接続は `addons/stage_enemy_tuning/plugin.gd`、敵→分類→項目の縦配置と表示名は `dock_panel.gd` を読む。F4の「Save」とdockの「保存」、項目の上書き・解除表示を区別する。プレイ中のF4と実行前のdockでは、適用先と保存後の確認方法が異なる。
+1. `scripts/dev/stage_enemy_overlay.gd`・`stage_enemy_panel.gd`・`stage_enemy_fields.gd` でF4の入口、実際の表示名、選択ステージ、上書きの有無、未保存状態を確認する。エディターdockの接続は `tools/editor/stage_enemy_tuning/plugin.gd`、敵→分類→項目の縦配置と表示名は `dock_panel.gd` を読む。F4の「Save」とdockの「保存」、項目の上書き・解除表示を区別する。プレイ中のF4と実行前のdockでは、適用先と保存後の確認方法が異なる。
 2. `scripts/data_types/stage_enemy_tuning.gd` の `keys_for()`・`base_value()`・`error_for()`・`resolve()` と対象敵の定義を読む。対象項目が許可されるか、整数か、最小値などの制約、標準HPの計算、報酬項目の除外を確認する。辞書には明示的に上書きする項目だけを持たせ、共通値へ戻す項目はキーを外す。同じ値を保存した上書きと、未指定で共通値へ追従する状態を区別する。
 3. `scripts/runtime/systems/enemy_system.gd` の `update_stage_tuning()` と、対象の行動が値を読む箇所を追う。既存個体・次の出現・次回の行動参照のどこへ反映するか、残HP割合の保持や発射済み攻撃への適用範囲を確認する。ステージ単位で同じ敵IDへ適用するため、同種を使う他クリップにも影響する。クリップ別・個体別の任意戦闘値上書きを作り足さない。
 4. 保存は `scripts/dev/stage_enemy_edit.gd` を読み、対象ステージの `enemy_tuning` だけを変更する。保存基準との競合判定、未保存試行の破棄、上書き解除と「Save」の違いを[操作手順](stage-production.md#53-保存戻すエディターで編集する)と照合する。競合時は自分の変更内容を保持して相手と確認し、古い辞書の全量で保存し直さない。
@@ -313,7 +313,7 @@ Dolphin                         EnemyFormation：編成の根
 | データ | 保存する内容 | 実装の確認先 |
 |---|---|---|
 | `data/bosses/ai/<boss>_flow.tres` | 区間の要求・候補技・割合・直前種別別の割合・消費上限・禁止ペア・次区間・共有スタミナ・休息・区間の図配置 | `scripts/data_types/boss_flow_def.gd`、`flow/runner.gd`・`selector.gd` |
-| `data/bosses/ai/<boss>_action_rules.tres` | 技参照・技ノードごとの発動条件・技IDごとの消費・コンボ内部・条件選択の所属・接続・非表示・図配置 | `scripts/data_types/boss_action_rules.gd`、`addons/boss_flow/technique_graph.gd` |
+| `data/bosses/ai/<boss>_action_rules.tres` | 技参照・技ノードごとの発動条件・技IDごとの消費・コンボ内部・条件選択の所属・接続・非表示・図配置 | `scripts/data_types/boss_action_rules.gd`、`tools/editor/boss_flow/technique_graph.gd` |
 | `data/bosses/<boss>_moves/*.tres` | 各技の性能・判定範囲・動作時間・技後待ち・再使用待ち等 | `boss_technique.gd`、対象の技実行処理。Hydraは `HydraTechnique` が首の種類を追加する |
 | `data/bosses/<boss>.tres`・シーン | 本体設定・移動・形態・個別の部位管理・演出参照 | 各 `BossDef` と役者、`scripts/runtime/systems/boss_system.gd` |
 | `.content/boss_<boss>.tres` | 検証済みの実行用スナップショット | `tools/content/build_boss_program.gd`。編集元から正規生成し、直接編集しない |
@@ -324,7 +324,7 @@ Hydraの `move_params()` は本体の `params` に技別 `parameters` を重ね�
 
 #### 開く・区間を作る
 
-`addons/boss_flow/plugin.gd` が上部「ボス行動」、ツールメニュー、Cmd/Ctrl＋Alt＋Bを登録する。プラグイン名も「ボス行動」。左上のボス選択は2つの `_action_rules.tres`・`_flow.tres` を開く。未保存変更があれば切り替えを止める。ファイルメニュー「技の設定ファイルを開く…」は性能リソースを開く操作であり、選択中ボスのフロー・ルール全体を自動で切り替える操作ではない。
+`tools/editor/boss_flow/plugin.gd` が上部「ボス行動」、ツールメニュー、Cmd/Ctrl＋Alt＋Bを登録する。プラグイン名も「ボス行動」。左上のボス選択は2つの `_action_rules.tres`・`_flow.tres` を開く。未保存変更があれば切り替えを止める。ファイルメニュー「技の設定ファイルを開く…」は性能リソースを開く操作であり、選択中ボスのフロー・ルール全体を自動で切り替える操作ではない。
 
 1. 上段の青い区間を選ぶ。「区間名」を入力し、「要求する攻撃」で「通常・同時・コンボ」「大技」「休息」「全候補」を選ぶ。
 2. 「全技を候補にする」をOFFにすると「この区間で使える技」を個別に選べる。保存するのは技IDの参照。未指定は全候補、明示した空配列は候補なしになる。

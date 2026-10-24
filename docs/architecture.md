@@ -88,6 +88,7 @@ speed/                    res://
   .content/               実行用ステージ・音・開発用の名前対応表（生成物）
   tests/
   tools/                  素材の切り出し・アート確認・性能計測
+    editor/               SPEED専用のボス行動・ステージ敵調整の編集機能
 ```
 
 ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。配置のシーンは今は空の仮シーンで、ステージの直接起動（14.1）の対象として使う。
@@ -306,7 +307,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
-`addons/boss_flow/`が「ボス行動」画面を提供する。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#56-ボス行動を調整する)を参照する。
+`tools/editor/boss_flow/`が「ボス行動」画面を提供する。SPEED専用の編集機能は`tools/editor/`に置き、`addons/boss_flow/`と`addons/stage_enemy_tuning/`にはGodotへ登録する`plugin.cfg`だけを置く。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#56-ボス行動を調整する)を参照する。
 
 `data/bosses/ai/hydra_flow.tres`が区間の要求種別・確率・消費上限・使用可能な技参照・同時攻撃の禁止・共有スタミナ・二種類の休息を持つ。`hydra_action_rules.tres`が技参照・距離方向条件・消費量・コンボ内部を持ち、技の性能は参照先の`hydra_moves/*.tres`が持つ。`BossTechnique`は共通の技データ、`HydraTechnique`は必要な首の種類を追加する型である。`graph_nodes`は図のノードから技への参照と接続・非表示状態を持つ。通常技の複製は同じ性能を参照し、個別の条件を持つ。実行側は接続された同じ技の条件をORで評価し、ノード数によって抽選頻度を増やさない。
 

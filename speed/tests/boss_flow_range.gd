@@ -10,7 +10,7 @@ func _initialize() -> void:
 	assert(not condition.allows(gate, Vector2(200, 250)))
 	gate.angle = 180.0
 	assert(condition.allows(gate, Vector2(-200, 0)))
-	var preview = load("res://addons/boss_flow/range_preview.gd")
+	var preview = load("res://tools/editor/boss_flow/range_preview.gd")
 	if not preview.has_method("analyze"):
 		print("[boss-range] FAIL coverage analysis missing")
 		quit(1)

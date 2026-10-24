@@ -4,7 +4,7 @@ extends EditorPlugin
 var panel: Control
 
 func _enter_tree() -> void:
-	panel = preload("res://addons/boss_flow/editor.gd").new()
+	panel = preload("res://tools/editor/boss_flow/editor.gd").new()
 	panel.theme = EditorInterface.get_editor_theme()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -35,9 +35,9 @@ func _shortcut_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _save_external_data() -> void:
-	if is_instance_valid(panel):
-		var focus := get_viewport().gui_get_focus_owner()
-		if focus != null and panel.is_ancestor_of(focus): focus.release_focus()
+	# 終了時の遅い通知では、既に木から外れた編集画面を保存しない。
+	# 入力中の値の確定は、画面自身のsave_currentが担当する。
+	if is_instance_valid(panel) and panel.is_inside_tree():
 		panel.save_current()
 func _exit_tree() -> void:
 	remove_tool_menu_item("ボス行動")

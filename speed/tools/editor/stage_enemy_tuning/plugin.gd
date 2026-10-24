@@ -1,7 +1,7 @@
 @tool
 extends EditorPlugin
 
-const PANEL := preload("res://addons/stage_enemy_tuning/dock_panel.gd")
+const PANEL := preload("res://tools/editor/stage_enemy_tuning/dock_panel.gd")
 var _dock: ScrollContainer
 var _panel: Control
 var _inspected: StageDef

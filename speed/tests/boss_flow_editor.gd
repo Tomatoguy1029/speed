@@ -10,7 +10,7 @@ func _initialize() -> void:
 	call_deferred("exercise")
 
 func exercise() -> void:
-	var script = load("res://addons/boss_flow/editor.gd")
+	var script = load("res://tools/editor/boss_flow/editor.gd")
 	check(script != null, "editor is available")
 	if script == null:
 		quit(1)

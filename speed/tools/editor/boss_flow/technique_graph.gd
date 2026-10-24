@@ -173,7 +173,7 @@ func add_group() -> void:
 	picked.emit("coverage", id)
 
 func _get_connection_line(from_position: Vector2, to_position: Vector2) -> PackedVector2Array:
-	return preload("res://addons/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
+	return preload("res://tools/editor/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
 
 func show_rules(value: Resource) -> void:
 	rules = value
@@ -238,7 +238,7 @@ func _add_node(id: String, title_text: String, at: Vector2, input: bool) -> Grap
 	node.title = title_text
 	node.self_modulate = Color(0.65, 0.95, 0.8) if not input else Color.WHITE
 	if input:
-		var diagram := preload("res://addons/boss_flow/range_preview.gd").new()
+		var diagram := preload("res://tools/editor/boss_flow/range_preview.gd").new()
 		diagram.custom_minimum_size = Vector2(120, 58) * maxf(1.0, get_theme_default_font_size() / 14.0)
 		diagram.gate = rules.conditions.get(id, {})
 		diagram.tooltip_text = "青：発動条件　橙：基準の攻撃範囲"
@@ -269,7 +269,7 @@ func _request_reroute() -> void:
 
 func _reroute() -> void:
 	_reroute_pending = false
-	preload("res://addons/boss_flow/wire_router.gd").refresh(self)
+	preload("res://tools/editor/boss_flow/wire_router.gd").refresh(self)
 
 func fit_all() -> void:
 	if size.x <= 0 or size.y <= 0: return
@@ -365,7 +365,7 @@ func _settle(node: GraphNode) -> void:
 			return
 
 func _draw() -> void:
-	preload("res://addons/boss_flow/wire_router.gd").draw_directions(self, Color(0.65, 0.9, 0.75))
+	preload("res://tools/editor/boss_flow/wire_router.gd").draw_directions(self, Color(0.65, 0.9, 0.75))
 	for i in range(0, _guides.size(), 2): draw_line(_guides[i] * zoom - scroll_offset, _guides[i + 1] * zoom - scroll_offset, Color(1.0, 0.75, 0.2, 0.8), 1.0)
 
 func _connect(id: String, connected: bool) -> void:

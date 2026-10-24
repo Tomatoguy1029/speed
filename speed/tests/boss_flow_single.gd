@@ -25,7 +25,7 @@ func exercise() -> void:
 	DirAccess.make_dir_recursive_absolute("res://.content/tests")
 	ResourceSaver.save(rules, "res://.content/tests/single_action_rules.tres")
 	ResourceSaver.save(flow, "res://.content/tests/single_flow.tres")
-	var editor = load("res://addons/boss_flow/editor.gd").new()
+	var editor = load("res://tools/editor/boss_flow/editor.gd").new()
 	root.add_child(editor)
 	assert(editor.open_boss("res://.content/tests/single_action_rules.tres", "res://.content/tests/single_flow.tres") == OK)
 	assert(not editor._is_hydra())

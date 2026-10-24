@@ -1,7 +1,7 @@
 ## 配線は右側から出て左側へ入り、途中のノードから余白を空けて迂回する。
 extends SceneTree
 
-const ROUTER_PATH := "res://addons/boss_flow/wire_router.gd"
+const ROUTER_PATH := "res://tools/editor/boss_flow/wire_router.gd"
 const EPSILON := 0.001
 var failures := 0
 var finished := false

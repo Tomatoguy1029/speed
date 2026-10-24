@@ -15,13 +15,13 @@ func _request_reroute() -> void:
 
 func _reroute() -> void:
 	_reroute_pending = false
-	preload("res://addons/boss_flow/wire_router.gd").refresh(self)
+	preload("res://tools/editor/boss_flow/wire_router.gd").refresh(self)
 
 func _get_connection_line(from_position: Vector2, to_position: Vector2) -> PackedVector2Array:
-	return preload("res://addons/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
+	return preload("res://tools/editor/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
 
 func _draw() -> void:
-	preload("res://addons/boss_flow/wire_router.gd").draw_directions(self, Color.SKY_BLUE)
+	preload("res://tools/editor/boss_flow/wire_router.gd").draw_directions(self, Color.SKY_BLUE)
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(280, 150) * maxf(1.0, get_theme_default_font_size() / 14.0)
