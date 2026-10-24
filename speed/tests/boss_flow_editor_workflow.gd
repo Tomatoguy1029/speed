@@ -149,7 +149,7 @@ func exercise() -> void:
 		text = _texts(panel, true)
 		check(_has(text, "範囲") or _has(text, "カバー"), "a condition-selection hub exposes its coverage")
 		check(not _has(text, "噛みつきのダメージ") and not _has(text, "単独攻撃の割合"), "the condition-selection hub keeps technique and section settings separate")
-		check(_has(text, "条件選択の名前") and _has(text, "技をここへ移す"), "the selected condition hub exposes its own name and technique membership")
+		check(_has(text, "ノード名") and _has(text, "技の接続先を変更"), "the selected condition hub exposes its own name and technique membership")
 		check(panel._coverage_gates("wind_band").is_empty(), "the bite hub coverage does not include unrelated wind techniques")
 		var name_field: LineEdit
 		for field in panel._fields.get_children():
