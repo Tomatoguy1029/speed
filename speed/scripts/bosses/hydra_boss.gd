@@ -27,6 +27,7 @@ const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
 var _moves: Dictionary = {}
 var _move_gates: Dictionary = {}
+var flow_controlled := false
 var _normal_moves: Dictionary = {}
 var special: RefCounted
 var attack_field: Node2D
@@ -428,7 +429,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 			NORMALS.tick(self,neck,dt)
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
-			if not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
+			if not flow_controlled and not busy and recovery_t <= 0.0 and chance_t <= 0.0: neck.bt.execute(dt)
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
 		table.facing[neck.row] = neck.angle
@@ -522,6 +523,7 @@ func normal_ready(index: int, attack: StringName) -> bool:
 	var at := _head_pos(n)
 	if not run_state.view_rect().grow(-table.r[n.row]).has_point(at): return false
 	if not _position_ready(attack, index): return false
+	if flow_controlled: return true
 	var used := 0.0
 	for other in necks:
 		if _normal_moves.has(other.mode): used += _normal_cost(other.mode)*maxf(0.0,table.attack_value[other.row])
@@ -723,7 +725,7 @@ func combo_heads(kinds: Array) -> Array[Neck]:
 		result.append(found)
 	return result
 
-func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
+func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = []) -> bool:
 	if busy or not attack_ready(attack):
 		return false
 	if not timeline.has_animation(attack):return false
@@ -735,6 +737,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float) -> bool:
 	elif COMBOS.has(attack):
 		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[attack])
 		combo_wait=float(def.params.combo_cooldown)
+	if not chosen.is_empty(): participants.assign(chosen)
 	tech = attack
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
