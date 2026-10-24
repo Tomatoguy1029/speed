@@ -1,21 +1,20 @@
-[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://dqpi0mnutu7re"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 technique = &"sequence"
 category = &"major"
-head_kind = &""
 parameters = {
-"warning_time": 0.8,
-"performance_time": 3.4,
-"tech_recovery": 1.5,
+"bite_dmg": 16.0,
+"bite_radius": 75.0,
 "cooldown": 14.0,
 "major_cost": 1.0,
-"sequence_gap": 0.55,
-"sequence_charge": 0.45,
 "normal_lunge": 0.16,
-"bite_radius": 75.0,
-"bite_dmg": 16.0
+"performance_time": 3.4,
+"sequence_charge": 0.45,
+"sequence_gap": 0.55,
+"tech_recovery": 1.5,
+"warning_time": 0.8
 }

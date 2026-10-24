@@ -1,25 +1,24 @@
-[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://c4ex4dw2hghn6"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 technique = &"debris_shatter"
 category = &"combo"
-head_kind = &""
 parameters = {
-"warning_time": 0.8,
-"performance_time": 3.4,
-"tech_recovery": 1.5,
-"cooldown": 12.0,
-"major_cost": 1.0,
-"rubble_count": 6,
+"beam_dmg": 18.0,
 "beam_len": 1400.0,
 "beam_width": 40.0,
-"beam_dmg": 18.0,
-"shard_speed": 420.0,
+"cooldown": 12.0,
+"major_cost": 1.0,
+"performance_time": 3.4,
+"rubble_count": 6,
 "shard_dmg": 10.0,
+"shard_speed": 420.0,
+"shatter_arc": 1.8,
 "shatter_deploy": 0.7,
 "shatter_time": 1.8,
-"shatter_arc": 1.8
+"tech_recovery": 1.5,
+"warning_time": 0.8
 }

@@ -1,21 +1,20 @@
-[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+[gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://dqduf0fhhub6t"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
 technique = &"tornado"
 category = &"combo"
-head_kind = &""
 parameters = {
-"warning_time": 0.8,
+"cooldown": 12.0,
+"lump_dmg": 16.0,
+"major_cost": 1.0,
 "performance_time": 3.4,
 "tech_recovery": 1.5,
-"cooldown": 12.0,
-"major_cost": 1.0,
-"tornado_width": 210.0,
-"tornado_speed": 680.0,
+"tornado_charge": 1.2,
 "tornado_life": 1.8,
-"lump_dmg": 16.0,
-"tornado_charge": 1.2
+"tornado_speed": 680.0,
+"tornado_width": 210.0,
+"warning_time": 0.8
 }
