@@ -12,6 +12,10 @@ var rules_path := "res://data/bosses/hydra_action_rules.tres"
 var graph := preload("res://addons/boss_flow/technique_graph.gd").new()
 var preview := preload("res://addons/boss_flow/range_preview.gd").new()
 var editing_rules := false
+var flow: Resource
+var flow_path := "res://data/bosses/hydra_flow.tres"
+var flow_bar := HBoxContainer.new()
+var editing_flow := false
 
 func _ready() -> void:
 	var toolbar := HBoxContainer.new()
@@ -25,6 +29,12 @@ func _ready() -> void:
 		button.pressed.connect(entry[1])
 		toolbar.add_child(button)
 	add_child(_status)
+	var flow_scroll := ScrollContainer.new()
+	flow_scroll.custom_minimum_size.y = 64
+	flow_scroll.add_child(flow_bar)
+	add_child(flow_scroll)
+	flow = load(flow_path).duplicate(true) if ResourceLoader.exists(flow_path) else preload("res://scripts/data_types/boss_flow_def.gd").new()
+	_refresh_flow()
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var split := HSplitContainer.new()
@@ -54,6 +64,7 @@ func _load_rules() -> void:
 	graph.show_rules(rules)
 
 func _picked(kind: String, id: String) -> void:
+	editing_flow = false
 	if kind == "technique":
 		for move in rules.techniques:
 			if String(move.technique) == id: open_technique(move.resource_path)
@@ -96,6 +107,7 @@ func open_technique(path: String) -> Error:
 		return ERR_INVALID_DATA
 	current = loaded.duplicate(true)
 	editing_rules = false
+	editing_flow = false
 	source_path = path
 	_path.text = path
 	history.clear_history()
@@ -121,6 +133,7 @@ func _assign(key: String, value: Variant) -> void:
 			node.set_value_no_signal(float(value))
 
 func save_current() -> Error:
+	if editing_flow: return ResourceSaver.save(flow, flow_path)
 	if editing_rules:
 		var result := ResourceSaver.save(rules, rules_path)
 		_status.text = "発動条件を保存しました" if result == OK else error_string(result)
@@ -129,6 +142,54 @@ func save_current() -> Error:
 	var error := ResourceSaver.save(current, source_path)
 	_status.text = "保存済み（実行データは試遊前に生成）" if error == OK else error_string(error)
 	return error
+
+func _clear_fields() -> void:
+	for child in _fields.get_children():
+		_fields.remove_child(child)
+		child.queue_free()
+
+func _refresh_flow() -> void:
+	for child in flow_bar.get_children():
+		flow_bar.remove_child(child)
+		child.queue_free()
+	for i in flow.sections.size():
+		var button := Button.new()
+		button.text = "%s →" % flow.sections[i].get("name", "区間" + str(i + 1))
+		button.pressed.connect(_edit_section.bind(i))
+		flow_bar.add_child(button)
+	var add := Button.new()
+	add.text = "＋ 区間"
+	add.pressed.connect(func():
+		var copy: Array = flow.sections.duplicate(true)
+		copy.append({"name": "区間" + str(copy.size() + 1), "request": "normal", "cap": 2.0, "weights": {"single": 60.0, "parallel": 25.0, "combo": 15.0}, "next": 0})
+		history.create_action("区間を追加")
+		history.add_do_method(_set_sections.bind(copy))
+		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+		history.commit_action())
+	flow_bar.add_child(add)
+
+func _set_sections(value: Array) -> void:
+	flow.sections = value.duplicate(true)
+	_refresh_flow()
+
+func _edit_section(i: int) -> void:
+	editing_flow = true
+	_clear_fields()
+	_status.text = "共通フローの区間（技定義は全区間で共通）"
+	for key in ["name", "request", "next"]:
+		var label := Label.new()
+		label.text = {"name": "区間名", "request": "要求 normal / major / rest", "next": "次の区間番号（0から）"}[key]
+		_fields.add_child(label)
+		var field := LineEdit.new()
+		field.text = str(flow.sections[i].get(key, 0 if key == "next" else "normal"))
+		field.text_submitted.connect(func(value):
+			var copy: Array = flow.sections.duplicate(true)
+			copy[i][key] = int(value) if key == "next" else value
+			history.create_action("区間を変更")
+			history.add_do_method(_set_sections.bind(copy))
+			history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+			history.commit_action())
+		_fields.add_child(field)
 
 func play_current() -> void:
 	if save_current() != OK: return
