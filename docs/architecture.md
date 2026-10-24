@@ -757,7 +757,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 ## 15. ビルドと配布
 
-`addons/content_build/builder.gd` の共通生成処理を、エディターの実行前、タイムライン保存、CLI、exportから呼ぶ。編集元のハッシュと出力一覧をstampに持ち、実行用ステージ・音源・名前対応表の欠落を検出する。エディターでの実行は、生成物が編集元と一致することを開始時に確認する。生成物は `.content/` に置き、Gitの対象外とする。
+`addons/content_build/builder.gd` の共通生成処理を、エディターの実行前、タイムライン保存、CLI、exportから呼ぶ。編集元のハッシュと出力一覧をstampに持ち、実行用ステージ・音源・名前対応表の欠落を検出する。エディターでの実行は、Autoloadの初期化で音源を読む前と、各ステージを開始する前にも生成物を確認し、不足・更新があれば共通生成処理で作り直す。実験場で保存してから同じ実行中にステージへ進む場合も、新しい生成物を読み直す。配布版は生成済みデータを使う。生成物は `.content/` に置き、Gitの対象外とする。
 
 ```bash
 godot --headless --path speed --script res://tools/content/build_all.gd -- --force
