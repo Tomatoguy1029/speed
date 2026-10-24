@@ -28,6 +28,18 @@ const HEAD_BT := preload("res://scenes/bosses/hydra_head_bt.tres")
 var _moves: Dictionary = {}
 var _move_gates: Dictionary = {}
 var flow_controlled := false
+var action_rules: Resource
+
+func use_action_rules(value: Resource) -> void:
+	action_rules = value
+	_moves.clear()
+	_normal_moves.clear()
+	_move_gates.clear()
+	for move in value.techniques:
+		_moves[move.technique] = move.duplicate(true)
+		if move.head_kind != &"": _normal_moves[move.technique] = true
+	flow_controlled = true
+	hsm.set_active(false)
 var _normal_moves: Dictionary = {}
 var special: RefCounted
 var attack_field: Node2D
@@ -506,6 +518,25 @@ func move_params(attack: StringName) -> Dictionary:
 	return def.params.merged(settings.parameters, true) if settings != null else def.params
 
 func _position_ready(attack: StringName, index := -1) -> bool:
+	if flow_controlled and action_rules != null:
+		var gate: Dictionary = action_rules.conditions.get(String(attack), {})
+		var distance_origin: Vector2 = table.pos[body]
+		var angle_origin: Vector2 = table.pos[body]
+		var facing: float = table.facing[body]
+		if index >= 0:
+			var n := necks[index]
+			if int(gate.get("distance_origin", 0)) == 1: distance_origin = _head_pos(n)
+			elif int(gate.get("distance_origin", 0)) == 2: distance_origin = _neck_base(n)
+			if int(gate.get("angle_origin", 0)) == 1:
+				angle_origin = _neck_base(n)
+				facing += n.base_angle
+		var delta: Vector2 = run_state.ship_pos - distance_origin
+		var angular: Vector2 = (run_state.ship_pos - angle_origin).rotated(-facing)
+		var angular_gate := gate.duplicate()
+		angular_gate.min = 0.0
+		angular_gate.max = INF
+		if separated and gate.get("ignore_when_separated", false): angular_gate.half_angle = 180.0
+		return delta.length() >= float(gate.get("min", 0.0)) and delta.length() <= float(gate.get("max", INF)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(angular_gate, angular)
 	for condition in _move_gates.get(attack, []):
 		if not condition.allows(self, index): return false
 	return true

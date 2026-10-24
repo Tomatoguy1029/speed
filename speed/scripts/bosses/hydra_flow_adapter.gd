@@ -35,7 +35,9 @@ func _candidate(id: StringName, heads: Array, kind: String) -> Dictionary:
 	var parts: Array = []
 	for head in heads: parts.append(head.row_id)
 	var params: Dictionary = actor.move_params(id)
-	return {"id": String(id), "heads": heads, "parts": parts, "category": kind, "exclusive": kind != "single", "cost": float(params.get("stamina", params.get("cost", params.get("major_cost", 2.0))))}
+	var cost := float(params.get("stamina", params.get("cost", params.get("major_cost", 2.0))))
+	if actor.action_rules != null: cost = float(actor.action_rules.costs.get(String(id), cost))
+	return {"id": String(id), "heads": heads, "parts": parts, "category": kind, "exclusive": kind != "single", "cost": cost}
 
 func start(actions: Array) -> bool:
 	# 同一更新内で全体を検証し、候補の具体的個体を固定する。

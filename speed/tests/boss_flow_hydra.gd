@@ -15,7 +15,7 @@ func exercise() -> void:
 	lab.run.bosses.spawn_lab(&"hydra", Vector2.ZERO)
 	var actor = lab.run.bosses.actors.back()
 	actor.hsm.set_active(false)
-	actor.flow_controlled = true
+	actor.use_action_rules(load("res://data/bosses/hydra_action_rules.tres"))
 	var adapter = script.new(actor)
 	var result: Dictionary = adapter.candidates({"request": "normal"})
 	check(not result.candidates.is_empty(), "returns concrete normal candidates")
