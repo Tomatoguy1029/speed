@@ -15,11 +15,11 @@ func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var dp: Dictionary = t.def[i].params
 	var arc := float(dp.wave_arc)
 	var f := t.facing[i]
-	var col := t.color[i].lightened(0.3)
+	var col := Color(1.0, 0.3, 0.25)
 	var reach := r * (2.0 + 4.0 * k)
 	for s: float in [-1.0, 1.0]:
 		c.draw_line(p, p + Vector2.from_angle(f + s * arc) * reach, Color(col, 0.25 + 0.4 * k), _px(2.0))
 	for n in 3:
 		var fr := fmod(k * 2.0 + n / 3.0, 1.0)
-		c.draw_arc(p, r * (1.2 + 3.5 * fr), f - arc, f + arc, 24, Color(col, (1.0 - fr) * (0.3 + 0.5 * k)), _px(3.0))
+		rm._draw_round_arc(c, p, r * (1.2 + 3.5 * fr), f - arc, f + arc, 24, Color(col, (1.0 - fr) * (0.3 + 0.5 * k)), _px(3.0))
 	c.draw_circle(p + Vector2.from_angle(f) * r, r * (0.2 + 0.25 * k), Color(1, 1, 1, 0.5 + 0.4 * k))

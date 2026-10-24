@@ -18,6 +18,7 @@ behavior = &"ruler"
 ranged = true
 params = {
 "beam_len": 2600.0,
+"beam_start_gap": 80.0,
 "beam_time": 5.0,
 "beam_width": 26.0,
 "bullet_dmg": 12.0,

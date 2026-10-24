@@ -131,7 +131,6 @@ func _start(stage: int) -> void:
 	run.enemies.clear_all()
 	run.field.bodies.clear()
 	run.field.moons.clear()
-	run.field.dust.clear()
 	run.field.rocks.clear()
 	run.field.setup(run.ctx)
 	run.heroes.setup(run.ctx)

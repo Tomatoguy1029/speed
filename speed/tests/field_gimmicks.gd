@@ -12,7 +12,7 @@ func _ready() -> void:
 	var field := sim.field
 	check(field.has_method("gimmick"), "仕掛けの種類ごとの処理を取得できる")
 	if field.has_method("gimmick"):
-		for id in [&"moons", &"dust", &"meteors", &"comets", &"warp", &"gravity"]:
+		for id in [&"moons", &"meteors", &"comets", &"warp", &"gravity"]:
 			check(field.gimmick(id) != null, "%sの仕掛けを登録する" % id)
 	sim.state.ship_pos = Vector2(3000, 0)
 	sim.state.ship_vel = Vector2.ZERO
@@ -27,9 +27,6 @@ func _ready() -> void:
 	field.warp_pos = sim.state.ship_pos
 	field.warp_gone = sim.state.world_time + 1.0
 	check(field.take_warp() and not field.take_warp(), "接触したワープを一度だけ取得する")
-	field.dust = [Vector3(3000, 0, 100)]
-	check(field.dust_drag_at(sim.state.ship_pos) == sim.cfg.dust_drag, "宇宙塵の内側で減速する")
-	check(field.dust_drag_at(Vector2(5000, 0)) == 0.0, "宇宙塵の外側では減速しない")
 	session.free()
 	await get_tree().process_frame
 	print("[field_gimmicks] %d failures" % failed)

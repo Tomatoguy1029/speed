@@ -37,7 +37,7 @@ func focus_item() -> void:
 func _hit(point: Vector2) -> int:
 	for i in range(editor.items.size() - 1, -1, -1):
 		var item: BackgroundPlacement = editor.items[i]
-		if item.texture == null or item.tint.a <= 0.0:
+		if item.texture == null:
 			continue
 		var bounds := item.bounds()
 		var local := (point - item.offset).rotated(-deg_to_rad(item.rotation_degrees)) / item.scale + bounds.size * 0.5
@@ -110,7 +110,7 @@ func _draw() -> void:
 		if item.texture == null: continue
 		var bounds := item.bounds()
 		draw_set_transform(screen(item.offset), deg_to_rad(item.rotation_degrees), Vector2.ONE * zoom * item.scale)
-		draw_texture_rect_region(item.texture, Rect2(-bounds.size * 0.5, bounds.size), bounds, item.tint)
+		draw_texture_rect_region(item.texture, Rect2(-bounds.size * 0.5, bounds.size), bounds, item.display_tint())
 	draw_set_transform(Vector2.ZERO)
 	if guides:
 		var origin := screen(Vector2.ZERO)

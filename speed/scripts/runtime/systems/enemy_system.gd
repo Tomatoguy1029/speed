@@ -545,15 +545,16 @@ func on_enemy_death(i: int, atk: float) -> void:
 			ProjectileSystem.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
 	projectiles.lab_context = prior_context
 
-## 分裂などで増えた敵を、個体数の上限の範囲で出す（仕様書 11.3）。
+## 分裂体は個体数の上限を超えて出し、ほかの増殖は上限の範囲で出す（仕様書 11.3）。
 func _flush_new() -> void:
 	if _new.is_empty():
 		return
 	var limit := ceili(ctx.spawn.target().pop * (1.0 + cfg.enemy_split_overflow))
 	var population := ctx.spawn.count_population(false)
 	for n in _new:
-		if population >= limit:
-			break
+		var def: EnemyDef = n[0]
+		if population >= limit and def.id != &"splitling":
+			continue
 		spawn(n[0], n[1], n[2])
 		population += 1
 	_new.clear()

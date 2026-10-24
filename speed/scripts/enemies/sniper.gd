@@ -95,8 +95,10 @@ func _telescope(i: int, dt: float) -> void:
 		if t.timer[i] <= 0.0:
 			var lens := telescope_lens(i)
 			var reach := telescope_reach(i, t.facing[i])
-			projectiles.fire_beam(lens, t.facing[i], reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
+			var beam := projectiles.fire_beam(lens, t.facing[i], reach, float(p.laser_width), float(p.laser_delay), float(p.laser_time),
 				float(p.bullet_dmg), Color(1.0, 0.3, 0.25))
+			if beam >= 0:
+				projectiles.hazard_style[beam] = ProjectileSystem.HazardStyle.TELESCOPE
 			state.emit(&"telescope_fire", {"pos": lens, "angle": t.facing[i], "length": reach, "width": float(p.laser_width)})
 			t.charge[i] = 0.0
 			t.mode[i] = EnemyTable.Mode.RECOVER

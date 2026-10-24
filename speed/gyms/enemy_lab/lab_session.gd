@@ -106,7 +106,6 @@ func _rebuild() -> void:
 		cfg.iron_count = 0
 		cfg.saw_count = 0
 	if not gimmicks:
-		cfg.dust_count = 0
 		cfg.comet_interval_min = 1e8
 		cfg.comet_interval_max = 1e8
 		cfg.gravity_interval_min = 1e8
@@ -147,7 +146,6 @@ func _rebuild() -> void:
 	run.state.time = float(spec.get("time", 0.0))
 	run.state.gauge = float(spec.get("gauge", 1.0))
 	if not rocks: run.field.rocks.clear()
-	if not gimmicks: run.field.dust.clear()
 	if not terrain:
 		run.field.bodies.clear()
 		run.field.moons.clear()

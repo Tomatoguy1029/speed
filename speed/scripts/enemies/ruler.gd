@@ -36,7 +36,7 @@ func _ruler(i: int, dt: float) -> void:
 			_hold(i, dt)
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
 			if t.timer[i] <= 0.0:
-				var h := projectiles.fire_wall(t.pos[i] + d * t.r[i], t.facing[i], float(p.beam_len), float(p.beam_width), 0.0,
+				var h := projectiles.fire_wall(beam_origin(i), t.facing[i], float(p.beam_len), float(p.beam_width), 0.0,
 					float(p.beam_time), float(p.bullet_dmg), t.color[i])
 				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RAY
 				projectiles.hazard_block[h] = 1
@@ -49,7 +49,7 @@ func _ruler(i: int, dt: float) -> void:
 			_hold(i, dt)
 			for h in t.links[i]:
 				if projectiles.owns_hazard(h, i, t.id[i]):
-					projectiles.move_hazard(h, t.pos[i] + d * t.r[i], t.facing[i])
+					projectiles.move_hazard(h, beam_origin(i), t.facing[i])
 			if t.timer[i] <= 0.0:
 				for h in t.links[i]:
 					if projectiles.owns_hazard(h, i, t.id[i]):
@@ -57,6 +57,13 @@ func _ruler(i: int, dt: float) -> void:
 				t.links[i] = PackedInt32Array()
 				t.mode[i] = EnemyTable.Mode.DASH
 				t.timer[i] = float(p.deploy_time)
+
+## 本体とビーム端の間に隙間を設ける。予告・発射・追従で共有する。
+func beam_origin(i: int) -> Vector2:
+	var params: Dictionary = table.def[i].params
+	var gap := maxf(0.0, float(params.get("beam_start_gap", 0.0)))
+	var distance := table.r[i] + float(params.beam_width) * 0.5 + gap
+	return table.pos[i] + Vector2.from_angle(table.facing[i]) * distance
 
 ## じょうぎ座（行 i）が二つに分かれる。機体への向きの縦横の大きい方を照射の軸にし、もう1体を同じ位置に出して展開を始める。
 func _split_ruler(i: int) -> void:

@@ -24,12 +24,12 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 	var fade := 1.0 - 0.5 * clampf(rad / maxf(len, 1.0), 0.0, 1.0)
 	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.RIPPLE:
 		# いるか座の波動：先頭の1枚（当たる）と、その後ろの薄い数枚（見た目だけ）
-		c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col, 0.3 * fade), w * 2.0)
-		c.draw_arc(p, rad, center - arc, center + arc, 48, Color(col.lightened(0.3), 0.95 * fade), w)
+		rm._draw_round_arc(c, p, rad, center - arc, center + arc, 48, Color(col, 0.3 * fade), w * 2.0)
+		rm._draw_round_arc(c, p, rad, center - arc, center + arc, 48, Color(col.lightened(0.3), 0.95 * fade), w)
 		for n in range(1, 4):
 			var back := rad - float(n) * w * 1.6
 			if back > 0.0:
-				c.draw_arc(p, back, center - arc, center + arc, 40, Color(col, 0.28 * fade / float(n)), w * 0.45)
+				rm._draw_round_arc(c, p, back, center - arc, center + arc, 40, Color(col, 0.28 * fade / float(n)), w * 0.45)
 		return
 	if gap_w > 0.0:
 		# 切れ目の反対側から一周、切れ目を空けて描く

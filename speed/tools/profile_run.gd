@@ -63,7 +63,6 @@ func _ready() -> void:
 	# 天体との接触量の違いを、描画の比較条件へ混ぜない。
 	run.field.bodies.clear()
 	run.field.moons.clear()
-	run.field.dust.clear()
 	run.field.rocks.clear()
 	run.enemies.clear_all()
 	run.field.setup(run.ctx)

@@ -18,6 +18,13 @@ func draw_hazard(c: CanvasItem, pr: ProjectileSystem, i: int, view: Rect2) -> vo
 		return
 	var w := pr.hazard_width[i]
 	var fade := 1.0 - clampf((t - delay) / maxf(pr.hazard_active[i], 0.001), 0.0, 1.0) * 0.6
+	if pr.hazard_style[i] == ProjectileSystem.HazardStyle.TELESCOPE:
+		var remaining := delay + pr.hazard_active[i] - t
+		fade *= smoothstep(0.0, minf(0.08, pr.hazard_active[i]), remaining)
+		rm._draw_round_beam(c, p, b, Color(col, 0.35 * fade), w * 1.6)
+		rm._draw_round_beam(c, p, b, Color(col, 0.9 * fade), w)
+		rm._draw_round_beam(c, p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
+		return
 	c.draw_line(p, b, Color(col, 0.35 * fade), w * 1.6)
 	c.draw_line(p, b, Color(col, 0.9 * fade), w)
 	c.draw_line(p, b, Color(1, 1, 1, 0.85 * fade), maxf(_px(2.0), w * 0.3))
