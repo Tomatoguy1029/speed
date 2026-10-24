@@ -1,10 +1,11 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" format=3 uid="uid://cp0h3nw1gjb8y"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_flow_def.gd" id="1_rn1s6"]
+[ext_resource type="Script" uid="uid://eeodn8akgqcw" path="res://scripts/data_types/boss_flow_def.gd" id="1_rn1s6"]
 
 [resource]
 script = ExtResource("1_rn1s6")
 maximum_stamina = 8.0
+layout = null
 sections = [{
 "cap": 2.0,
 "name": "牽制",
@@ -29,9 +30,19 @@ sections = [{
 "cap": 3.0,
 "fallback": 0,
 "name": "大技候補",
-"next": 0,
+"next": 3,
 "request": "major",
 "weights": {
 "major": 100.0
+}
+}, {
+"cap": 2.0,
+"name": "区間4",
+"next": 0,
+"request": "normal",
+"weights": {
+"combo": 15.0,
+"parallel": 25.0,
+"single": 60.0
 }
 }]

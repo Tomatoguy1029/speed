@@ -1,6 +1,6 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" format=3 uid="uid://83fwp546x24l"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_hy4gv"]
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_hy4gv"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/bite_thrust.tres" id="2_uae8c"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/bite_sweep.tres" id="3_xrdwf"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/wind_band.tres" id="4_x5nyk"]
@@ -11,14 +11,14 @@
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/beam_bolt.tres" id="9_d4juc"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/thunder_headbutt.tres" id="10_h1jcp"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/thunder_drop.tres" id="11_62bfn"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/tornado.tres" id="12_6a8j0"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/debris_shatter.tres" id="13_baoas"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/beam_pincer.tres" id="14_orjre"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/north.tres" id="15_7b8q5"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/sequence.tres" id="16_ano7g"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/curve.tres" id="17_dfhe2"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/swarm.tres" id="18_f7ol8"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/grid.tres" id="19_t6ymw"]
+[ext_resource type="Resource" uid="uid://dqduf0fhhub6t" path="res://data/bosses/hydra_moves/tornado.tres" id="12_6a8j0"]
+[ext_resource type="Resource" uid="uid://c4ex4dw2hghn6" path="res://data/bosses/hydra_moves/debris_shatter.tres" id="13_baoas"]
+[ext_resource type="Resource" uid="uid://ba2ex12u0acdl" path="res://data/bosses/hydra_moves/beam_pincer.tres" id="14_orjre"]
+[ext_resource type="Resource" uid="uid://7656cvrjbhpy" path="res://data/bosses/hydra_moves/north.tres" id="15_7b8q5"]
+[ext_resource type="Resource" uid="uid://dqpi0mnutu7re" path="res://data/bosses/hydra_moves/sequence.tres" id="16_ano7g"]
+[ext_resource type="Resource" uid="uid://c5ww0653reysj" path="res://data/bosses/hydra_moves/curve.tres" id="17_dfhe2"]
+[ext_resource type="Resource" uid="uid://v8a6e5uhhmej" path="res://data/bosses/hydra_moves/swarm.tres" id="18_f7ol8"]
+[ext_resource type="Resource" uid="uid://ceqdi55m261mo" path="res://data/bosses/hydra_moves/grid.tres" id="19_t6ymw"]
 
 [resource]
 script = ExtResource("1_hy4gv")
@@ -206,4 +206,25 @@ costs = {
 "tornado": 2.0,
 "wind_band": 1.0,
 "wind_blades": 1.0
+}
+layout = {
+"beam_bolt": Vector2(474, 1398),
+"beam_fixed": Vector2(474, 1204),
+"beam_pincer": Vector2(474, 2368),
+"bite_sweep": Vector2(474, 234),
+"bite_thrust": Vector2(474, 40),
+"choose": Vector2(60, 200),
+"curve": Vector2(474, 2950),
+"debris_shatter": Vector2(474, 2174),
+"grid": Vector2(474, 3338),
+"north": Vector2(474, 2562),
+"rubble_fan": Vector2(474, 1009.9999),
+"rubble_lump": Vector2(474, 816),
+"sequence": Vector2(474, 2756),
+"swarm": Vector2(474, 3144),
+"thunder_drop": Vector2(474, 1786),
+"thunder_headbutt": Vector2(474, 1592),
+"tornado": Vector2(474, 1980),
+"wind_band": Vector2(474, 428),
+"wind_blades": Vector2(474, 622)
 }
