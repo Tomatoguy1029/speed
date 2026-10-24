@@ -304,43 +304,23 @@ Dolphin                         EnemyFormation：編成の根
 
 ### ボスのBT・攻撃値・タイムライン
 
-ボスの行動編集機能は整備中。新しい仕組みの操作説明は完成確認後に実装と照合する。ボス調整の依頼では、対象の個別仕様、保存済みのBT・シーン・公開リソースを読む。別のボスの公開項目を転用しない。
+ヒュドラは共通フローと独立した技定義を使う。操作は[制作ガイド5.6](stage-production.md#56-ボス行動を調整する)、責務と生成契約は[設計書6.1](../architecture.md#61-敵とボスの-ai)を参照する。他のボスの既存BTは各ボスの実装を確認して扱う。
 
-#### 既存の編集入口
-
-ボスは、技を選ぶBT、戦闘数値の `BossDef`、技の実行時刻を持つ `AnimationPlayer`、実際の動作を行うスクリプトに分かれる。ヒュドラを調整するときは、次の入口を使う。担当範囲は[1章](stage-production.md#1-仕様を確認して開く)、ボスの戦闘要件は[ヒュドラの個別仕様](../game/bosses/hydra.md)で確認する。
-
-1. Godotのファイルシステムから `res://scenes/bosses/hydra_boss.tscn` を開く。
-2. シーンツリーで `LimboHSM` を展開し、子の `Form1`（`BTState`）を選ぶ。
-3. インスペクターの `Behavior Tree` に入っている `hydra_boss_bt.tres` をクリックし、LimboAIのBT編集画面を開く。既存ファイル `res://scenes/bosses/hydra_boss_bt.tres` を直接開く方法も使える。
-4. BTの枝を展開し、変更する条件・動作のノードを選ぶ。選択したタスクの公開プロパティをインスペクターで編集する。
-
-本体のBTは「共通発動機会のコンボ抽選」と「形態・参加者・配置・再使用待ちで大技を選択」の枝を持つ。首1本ごとの通常技を変えるときは、別の `res://scenes/bosses/hydra_head_bt.tres` を開く。通常技の各枝は条件と実行の組で、噛みつき・風・瓦礫・ビーム・雷の技を持つ。このBTは各首が実行時に複製して使う。
-
-#### 値の正本と実行を追う
-
-| 層 | 確認するもの |
+| 調整対象 | 編集・確認先 |
 |---|---|
-| BT | `hydra_boss_bt.tres`・`hydra_head_bt.tres` の接続された枝、各タスクの `@export`、参照する設定リソース。宣言だけの条件を配置済みと扱わない |
-| Blackboard | 役者の `_update_blackboard()` と首生成時の初期化。供給する観測値、タスクが読むキー、更新時点。初期値を変えて戦闘数値を設定する用途と分ける |
-| 定義・技設定 | `data/bosses/` と、BT・役者が現に参照するリソース。キーの存在だけで効果を認めず、同名値の優先関係・実行時の上書きを追う |
-| Timeline | シーン直下の `Timeline`（`AnimationPlayer`）と外部ライブラリ。実行時に構成するキーも確認し、ステージの出現タイムラインと区別する |
-| 実行 | `normal_ready()`・`attack_ready()`・`_tech_ok()`・`tech_end()`、`hydra_normals.gd`・`hydra_techniques.gd`。技開始と継続、参加者の欠損、後片付けを追う |
+| 区間・選択割合・スタミナ・休息 | `data/bosses/ai/hydra_flow.tres`、共通の`flow/runner.gd`と`selector.gd` |
+| 技の距離方向条件・消費・禁止ペア・コンボ内部 | `data/bosses/ai/hydra_action_rules.tres`と`hydra_flow_adapter.gd` |
+| 技の性能・時間 | `data/bosses/hydra_moves/*.tres`、`hydra_normals.gd`、`hydra_techniques.gd` |
+| 本体・再生・分離・護衛 | `hydra.tres`の本体設定と`hydra_boss.gd` |
+| 実行向け変換 | `tools/content/build_boss_program.gd`と生成済み`.content/boss_hydra.tres` |
 
-技内の時刻は、BTの動作 → 開始処理 → 実際に再生するTimelineとキー → 呼び出された処理と内部タイマーの順で読む。`beam_pincer` は `tech_compass`・`special_attack`・`tech_end` のイベントと、動作側の追加予告・持続を分けて確認する。`special_attack` とダメージ判定開始を同一視しない。全長だけでは持続は変わらず、`tech_end` を再生範囲外に出すと終了処理が欠ける可能性がある。`north` の捕捉・固定・伸長、`grid`・`swarm` の配置待ち、通常技の内部タイマーも確認する。すべての時間をTimelineだけで調整できると案内しない。
+編集元から実行向け変換までの数値の優先関係を追い、区間情報を個別側へ持ち込まない。技のIDや部位数の存在だけで成立とせず、画面内・到達・形態・配置・再使用待ちを確認する。通常技の消費は共通のスタミナ値を読み、残っている互換データの`cost`を別の消費資源として足さない。
 
-既存の `BTProbabilitySelector` 直下の枝は、右クリックの `Edit Probability` → `Weight` / `Percent` で相対的な選択比率を編集する。Hydraの `hydra_weighted_selector.gd` はランの乱数で選び、失敗した枝を外して再抽選する。継承元の `Abort On Failure` でこの再抽選は切り替わらない。重み、再使用待ち、同時攻撃予算を分ける。
+開始前の不成立、開始後の中断、技固有の欠員継続を区別する。[個別仕様7.4](../game/bosses/hydra.md#74-実行中の参加者と中断)に従い、曲線ビームの欠けた射線、順番噛みつきの中断、飛びかかりの欠番を確認する。保存後は必要な位置・部位・形態を作って、選択・予告・判定・終了・通常行動への復帰を確かめる。
 
-Hydraの首は噛みつき・渦・瓦礫・ビーム・雷の種類と技ごとの参加条件で扱う。[個別仕様7.4](../game/bosses/hydra.md#74-実行中の参加者と中断)と現実装を比較し、異なる箇所は明示する。`hydra_heads.gd` の列挙と実際の種類ID、本体・首別のBlackboard差も確認する。`normal_budget` と技のcostは同時攻撃枠であり、回復するスタミナとは分ける。
+編集イベントや保存通知から全体生成を起こさない。生成回数を確認し、ノード移動・数値変更・保存では増えず、意味的な変更後の試遊時だけ生成することを維持する。範囲の重ね表示は明示操作で解析し、基準姿勢でのサンプル警告と、動く機体への命中を区別する。
 
-#### 保存と検証
-
-- BTはLimboAIの `Save`（⌘ / Ctrl＋Alt＋S）で対象ファイルを保存する。外部の設定リソース・シーン・ライブラリも実際に編集したファイルごとに保存する。
-- 本体HPや装甲は `BossDef.use_def_stats` と共通設定、役者の初期化を追い、保存値と実効値を分ける。未参照の数値や、新しい技IDの入力だけで動作が増えると案内しない。
-- 保存後は起動し直し、必要な形態・参加者・位置・待ち時間が成立した条件で、選択・予告・判定・終了・通常行動への復帰を確認する。未完の編集機能の保存・実行反映を確認済みと扱わない。
-- ボスBTの全選択・失敗理由・各首の履歴が録画にあるとは仮定しない。[分析の観測限界](../../.agents/skills/speed-balance-analysis/references/measurement.md#編成とボスの調整で観測できる範囲)を使う。
-
-入口の役割は[設計書6.1](../architecture.md#61-敵とボスの-ai)、LimboAIの操作は[公式のBT作成手順](https://limboai.readthedocs.io/en/stable/behavior-trees/create-tree.html)と[同梱版に対応するエディター実装](https://github.com/limbonaut/limboai/blob/v1.8.1/editor/limbo_ai_editor_plugin.cpp)を参照する。
+録画が持つ観測範囲は[分析の観測限界](../../.agents/skills/speed-balance-analysis/references/measurement.md#編成とボスの調整で観測できる範囲)を参照する。全ての選択理由や部位の履歴を記録済みとは扱わない。
 
 ## プレイ記録を読む
 
