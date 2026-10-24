@@ -105,7 +105,7 @@ enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
 ## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）。TRAIL は付いている敵の見た目が描く
 ## 残る線（みなみのさんかく座の赤いレーザーの軌跡）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL }
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25

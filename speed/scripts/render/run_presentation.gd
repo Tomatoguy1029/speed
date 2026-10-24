@@ -444,7 +444,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				# 太いレーザーの残光と、レンズの閃光
 				var dir := Vector2.from_angle(ev.angle)
 				beams.append({"from": ev.pos, "to": ev.pos + dir * float(ev.length), "width": float(ev.width) * 1.6, "life": 0.28,
-					"max": 0.28, "color": Color(1.0, 0.3, 0.22)})
+					"max": 0.28, "rounded": true, "color": Color(1.0, 0.3, 0.22)})
 				_ring(ev.pos, 40.0, Color(1.0, 0.75, 0.6), 0.22)
 				_burst(ev.pos, Color(1.0, 0.5, 0.35), 10, dir, 500.0)
 				shake = maxf(shake, 9.0)
@@ -691,7 +691,7 @@ func _draw_hero(c: CanvasItem) -> void:
 	# 星間の空間まで包む光の雲。線に沿った細い縁取りにせず、星座全体を一つの光源として見せる。
 	var center := bounds.get_center()
 	var radii := bounds.size * 0.65 + Vector2.ONE * _px(72.0)
-	var aura_pixel := _px(8.0)
+	var aura_pixel := _px(4.0)
 	var columns := ceili(radii.x * 2.0 / aura_pixel)
 	var rows := ceili(radii.y * 2.0 / aura_pixel)
 	var breath := 0.95 + 0.05 * sin(state.world_time * 0.8)
@@ -701,7 +701,7 @@ func _draw_hero(c: CanvasItem) -> void:
 			var q := (at - center) / radii
 			var cloud := 0.78 + 0.22 * sin(q.x * 4.0 + q.y * 2.0) * cos(q.y * 5.0 - q.x)
 			var density := exp(-q.length_squared() * 2.8) * cloud
-			var alpha := floorf(density * 12.0) / 12.0 * 0.25 * breath
+			var alpha := floorf(density * 24.0) / 24.0 * 0.25 * breath
 			if alpha > 0.0:
 				c.draw_rect(Rect2(at.snapped(Vector2.ONE * aura_pixel), Vector2.ONE * aura_pixel),
 					Color(gold, alpha))
@@ -827,6 +827,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
+		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
+		if t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
+			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
 		if visual != null and visual.draw_body(c, t, i, p):
 			continue
 		if t.is_boss[i] != 0:
@@ -1104,11 +1107,74 @@ func _draw_meteor_shards(c: CanvasItem) -> void:
 			shard.region, Color(1, 1, 1, shard.life / 0.65))
 	c.draw_set_transform(Vector2.ZERO)
 
+## 丸い先端の内側で色を薄め、射程の境界へなじませる。
+func _draw_round_beam(c: CanvasItem, a: Vector2, b: Vector2, color: Color, width: float) -> void:
+	var length := a.distance_to(b)
+	var radius := minf(width * 0.5, length * 0.5)
+	if radius <= 0.0:
+		return
+	var direction := (b - a).normalized()
+	var side := direction.orthogonal()
+	var angle := direction.angle()
+	var fade_length := minf(maxf(width, 40.0), length * 0.5)
+	var points := PackedVector2Array()
+	points.append(b - direction * fade_length + side * radius)
+	for n in 13:
+		points.append(b - direction * radius + Vector2.from_angle(angle - PI * 0.5 + PI * n / 12.0) * radius)
+	points.append(b - direction * fade_length - side * radius)
+	var colors := PackedColorArray()
+	for point in points:
+		colors.append(Color(color, color.a * clampf((b - point).dot(direction) / fade_length, 0.0, 1.0)))
+	c.draw_polygon(points, colors)
+	points = PackedVector2Array([
+		b - direction * fade_length + side * radius,
+		b - direction * fade_length - side * radius])
+	for n in 13:
+		points.append(a + direction * radius + Vector2.from_angle(angle + PI * 0.5 + PI * n / 12.0) * radius)
+	c.draw_colored_polygon(points, color)
+
+## 帯を短い四角形に区切り、凹んだ輪郭の自動分割による塗りの欠けを避ける。
+func _draw_round_arc(c: CanvasItem, center: Vector2, radius: float, start: float, end: float,
+		segments: int, color: Color, width: float) -> void:
+	var half := minf(width * 0.5, radius * 0.9)
+	if half <= 0.0:
+		return
+	var fillet := half * 0.5
+	var points := PackedVector2Array()
+	var indices := PackedInt32Array()
+	for n in segments:
+		var direction := Vector2.from_angle(lerpf(start, end, float(n) / (segments - 1)))
+		points.append(center + direction * (radius + half))
+		points.append(center + direction * (radius - half))
+		if n > 0:
+			var i := n * 2
+			indices.append_array(PackedInt32Array([i - 2, i - 1, i, i, i - 1, i + 1]))
+	for cap_index in 2:
+		var direction := Vector2.from_angle(end if cap_index == 0 else start)
+		var tangent := Vector2(-direction.y, direction.x) * (1.0 if cap_index == 0 else -1.0)
+		var cap := center + direction * radius
+		var pivot := points.size()
+		points.append(cap)
+		# 外角と内角を1/4円でつなぎ、端の中央には短い平面を残す。
+		for corner in 2:
+			var offset := (half - fillet) * (1.0 if corner == 0 else -1.0)
+			for n in 7:
+				var angle := (corner + float(n) / 6.0) * PI * 0.5
+				points.append(cap + direction * (offset + cos(angle) * fillet) + tangent * sin(angle) * fillet)
+				var i := points.size() - 1
+				if i > pivot + 1:
+					indices.append_array(PackedInt32Array([pivot, i - 1, i]))
+	RenderingServer.canvas_item_add_triangle_array(c.get_canvas_item(), indices, points, PackedColorArray([color]))
+
 func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
 		var bc: Color = bm.color
+		if bm.get("rounded", false):
+			_draw_round_beam(c, bm.from, bm.to, Color(bc, 0.7 * k), bm.width)
+			_draw_round_beam(c, bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+			continue
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
 		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
 	for bo in bolts:

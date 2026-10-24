@@ -20,7 +20,7 @@ func _dolphin(i: int, dt: float) -> void:
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
 			if t.timer[i] <= 0.0:
 				var h := projectiles.fire_wave(t.pos[i] + Vector2.from_angle(t.facing[i]) * t.r[i], t.facing[i], float(p.wave_arc),
-					float(p.wave_radius), float(p.wave_speed), float(p.wave_width), 0.0, float(p.bullet_dmg), 0.0, 0.0, t.color[i])
+					float(p.wave_radius), float(p.wave_speed), float(p.wave_width), 0.0, float(p.bullet_dmg), 0.0, 0.0, Color(1.0, 0.3, 0.25))
 				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RIPPLE
 				projectiles.hazard_edmg[h] = float(p.enemy_dmg)
 				t.charge[i] = 0.0
