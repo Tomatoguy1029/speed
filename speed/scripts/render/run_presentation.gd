@@ -612,10 +612,11 @@ func _build_star_batch() -> void:
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
 func _build_stage_background() -> void:
 	for placement: BackgroundPlacement in state.stage.backgrounds:
-		if placement.texture == null:
+		if placement.texture_path.is_empty():
 			continue
 		var sprite := Sprite2D.new()
-		sprite.texture = placement.texture
+		sprite.texture = run.ctx.resources.resources.get(placement.texture_path)
+		assert(sprite.texture != null, "背景画像の準備が必要: " + placement.texture_path)
 		sprite.region_enabled = true
 		sprite.region_rect = placement.bounds()
 		sprite.position = state.ship_pos + placement.offset

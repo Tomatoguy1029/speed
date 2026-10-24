@@ -29,9 +29,11 @@ static func compile(source: StageDef) -> RuntimeStage:
 	var result := RuntimeStage.new()
 	for property in source.get_property_list():
 		if property.usage & PROPERTY_USAGE_STORAGE == 0: continue
-		if property.name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "clips", "phases", "track_names", "scene_path"]: continue
+		if property.name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "clips", "phases", "track_names", "scene_path", "backgrounds"]: continue
 		var value: Variant = source.get(property.name)
 		result.set(property.name, value.duplicate(true) if value is Dictionary or value is Array else value)
+	for placement in source.backgrounds:
+		result.backgrounds.append(preload("res://tools/content/prepare_background.gd").compile(placement))
 	result.zako_curves = []
 	for curve in source.zako_curves: result.zako_curves.append(curve.duplicate(true))
 	result.phases = []

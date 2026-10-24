@@ -58,7 +58,12 @@ func start(options: Dictionary, with_view: bool) -> void:
 	if not options.has("stage"):
 		options.stage = ContentManager.runtime_stage(int(options.get("stage_index", 1)))
 	if options.stage == null: return
-	if resources == null: resources = ContentManager.prepare_resources(PackedStringArray(), false)
+	if resources == null:
+		var paths := PackedStringArray()
+		if with_view:
+			for placement: BackgroundPlacement in options.stage.backgrounds:
+				if not placement.texture_path.is_empty(): paths.append(placement.texture_path)
+		resources = ContentManager.prepare_resources(paths, false)
 	sim.ctx.resources = resources
 	sim.options = options
 	sim.view_size_source = func(): return get_viewport().get_visible_rect().size

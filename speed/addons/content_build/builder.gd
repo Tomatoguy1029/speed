@@ -7,12 +7,12 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 		var path := directory.path_join(name)
 		if path == "res://data/content_catalog.tres": continue
 		if path.begins_with("res://data/bosses/ai/") or "_moves/" in path: continue
-		if path.get_extension() in ["gd", "tres", "tscn", "gdshader"]: result.append(path)
+		if path.get_extension() in ["gd", "tres", "tscn", "gdshader", "png", "svg", "jpg", "jpeg", "webp", "import"]: result.append(path)
 	for name in DirAccess.get_directories_at(directory):
 		if not name.begins_with("."): _files(directory.path_join(name), result)
 static func signature() -> String:
 	var files := PackedStringArray()
-	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders"]: _files(directory, files)
+	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders", "res://assets"]: _files(directory, files)
 	files.sort()
 	var hashes := PackedStringArray(["res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))

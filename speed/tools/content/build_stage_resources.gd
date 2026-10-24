@@ -37,7 +37,7 @@ static func build(stage: RuntimeStage) -> StageResources:
 	var result := StageResources.new()
 	var paths := {}
 	for placement: BackgroundPlacement in stage.backgrounds:
-		if placement.texture != null: _add(paths, placement.texture.resource_path)
+		if not placement.texture_path.is_empty(): _add(paths, placement.texture_path)
 	_add(paths, "res://.content/boss_hydra.tres")
 	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
 	var ids := {}

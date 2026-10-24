@@ -191,7 +191,10 @@ func _load_stage(index: int) -> void:
 	_source = ResourceLoader.load(source.resource_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 	_source_hash = FileAccess.get_sha256(_source.resource_path)
 	items.clear()
-	for item in _source.backgrounds: items.append(item.copy())
+	for item in _source.backgrounds:
+		var copy := item.copy()
+		preload("res://tools/content/prepare_background.gd").measure(copy)
+		items.append(copy)
 	selected = -1
 	_undo.clear()
 	_redo.clear()
@@ -242,6 +245,7 @@ func _add_asset() -> void:
 	var before := snapshot()
 	var item := BackgroundPlacement.new()
 	item.texture = load(_assets.get_item_metadata(chosen[0]))
+	preload("res://tools/content/prepare_background.gd").measure(item)
 	item.offset = canvas.center
 	items.append(item)
 	selected = items.size() - 1
