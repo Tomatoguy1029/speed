@@ -65,11 +65,11 @@
 
 数値の正は [`speed/data/bosses/monoceros.tres`](../../../speed/data/bosses/monoceros.tres)。HP・装甲・移動速度・旋回速度、距離・角度、技別の予告・実行・硬直・ダメージ・再使用待ち時間、突進回数、角刺さり・角抜き時間、形態移行のHP閾値は試遊調整用の仮値とする。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。
 
-形態は `monoceros_boss.tscn` の `LimboHSM` が管理する。両形態の `BTState` は `monoceros_boss_bt.tres` を使い、技ごとの形態・距離・背面条件・重みを編集できる。条件タスクは技別の再使用待ち時間も調べ、選ばれた枝で攻撃枠を取得する。
+技の選択は共通フローで行い、`ai/monoceros_flow.tres`が区間の割合・消費上限・共有スタミナ・休息を持つ。`ai/monoceros_action_rules.tres`が距離・方向・必要形態を持ち、個別の再使用待ちを満たす候補から選ぶ。形態の予約と確定は役者が管理する。
 
 現仮実装の `combo` は、通常突進→短い切り返し→予告付きの薙ぎ払い→硬直を再生する実装例で、技の並びは仮置きとする。
 
-`monoceros_boss_timeline.tres` の `attack` は方向固定・発進・終了のメソッドトラックを持つ。役者ごとに複製し、技の開始時に専用データの時間へ合わせて手動更新する。表示は戦闘イベントへ接続する。制限時間の一撃は共通の仮ボス基盤を継承する。
+`monoceros_boss_timeline.tres` の `attack` は方向固定・発進・終了のメソッドトラックを持つ。役者ごとに複製し、技の開始時に専用データの時間へ合わせて手動更新する。表示は戦闘イベントへ接続する。技の性能・時間・再使用待ちは`monoceros_moves/*.tres`を使う。制限時間の一撃は`boss_final_strike.gd`の共通演出を使う。
 
 短い受け入れ確認は `tests/monoceros.tscn`、描画付きの技の見本は同じシーンへ `-- --capture` を付けて実行する。実験場では `monoceros` を配置して試遊できる。
 

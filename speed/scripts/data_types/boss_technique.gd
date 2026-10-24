@@ -3,6 +3,7 @@
 extends Resource
 class_name BossTechnique
 @export var technique: StringName
+@export var category: StringName = &"single"
 @export_storage var parameters: Dictionary = {}:
 	set(value):
 		parameters = value

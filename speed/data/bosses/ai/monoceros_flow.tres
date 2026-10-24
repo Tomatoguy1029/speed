@@ -1,0 +1,29 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_flow_def.gd" id="1_attlg"]
+
+[resource]
+script = ExtResource("1_attlg")
+partial_rest = 0.8
+empty_rest = 2.0
+sections = [{
+"cap": 3.0,
+"name": "接近・牽制",
+"next": 1,
+"request": "any",
+"weights": {
+"combo": 20.0,
+"major": 10.0,
+"single": 70.0
+}
+}, {
+"cap": 3.0,
+"name": "連撃・強襲",
+"next": 0,
+"request": "any",
+"weights": {
+"combo": 40.0,
+"major": 20.0,
+"single": 40.0
+}
+}]

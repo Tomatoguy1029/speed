@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_g8oib"]
+
+[resource]
+script = ExtResource("1_g8oib")
+technique = &"lance"
+category = &"major"
+parameters = {
+"active": 0.38,
+"cd": 10.0,
+"damage": 30.0,
+"distance": 340.0,
+"reach": 650.0,
+"recover": 2.2,
+"warn": 1.35
+}

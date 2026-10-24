@@ -19,6 +19,7 @@ func _ready() -> void:
 		await capture()
 		return
 	fresh()
+	check(actor.get_node_or_null("LimboHSM") == null and actor.get("flow_runner") != null, "一角獣は共通フローを使いLimboAIへ依存しない")
 	check(ContentManager.stage(1).boss_id == &"monoceros", "ステージ1は専用ボスを参照する")
 	check(actor.table.max_hp[actor.body] == actor.def.hp * sim.cfg.enemy_hp_mult, "専用HPを共通倍率付きで使う")
 	check(actor.table.armor[actor.body] == actor.def.armor * sim.cfg.enemy_armor_mult, "専用装甲を使う")
@@ -140,7 +141,7 @@ func _ready() -> void:
 	step(1.5)
 	check(actor.phase == 2 and actor.mode == &"phase", "通常の隙を消費してから移行する")
 	step(1.1)
-	check(actor.hsm.get_active_state() == actor.get_node("LimboHSM/Form2"), "HSMが第2形態のBTへ遷移する")
+	check(actor.phase == 2 and actor.get("flow_runner") != null, "第2形態も共通フローで行動を選ぶ")
 
 	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。
@@ -151,6 +152,11 @@ func _ready() -> void:
 	check(sim.state.stage.legendary_module_id == &"legendary_stern", "とも座の伝説モジュールへ接続する")
 	fresh()
 	check(actor.phase == 1 and not actor.phase_pending and actor.mode == &"idle", "再生成で攻撃・形態・角刺さりをリセットする")
+	actor._cooldown = 0.0
+	var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
+	check(not candidates.is_empty() and candidates.all(func(c): return c.id not in ["lance", "combo"]), "第1形態の候補に第2形態専用技を混ぜない")
+	step(0.1)
+	check(actor.flow_runner.active and actor.flow_runner.stamina < actor.flow_runner.flow.maximum_stamina, "共通フローの抽選で技を開始しスタミナを消費する")
 	actor.begin_final_strike(1.0)
 	step(0.1)
 	check(actor.final_strike_t >= 0.0 and actor.mode == &"final", "制限時間の共通演出に対応する")

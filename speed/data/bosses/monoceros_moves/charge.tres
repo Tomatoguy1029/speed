@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_m6gi3"]
+
+[resource]
+script = ExtResource("1_m6gi3")
+technique = &"charge"
+parameters = {
+"active": 0.85,
+"cd": 3.0,
+"damage": 25.0,
+"distance": 1250.0,
+"recover": 1.5,
+"warn": 1.05
+}

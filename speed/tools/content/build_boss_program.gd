@@ -73,8 +73,11 @@ static func snapshot(value: Variant) -> Variant:
 	return value
 
 static func build_hydra(output := "res://.content/boss_hydra.tres") -> Dictionary:
-	var rules = ResourceLoader.load("res://data/bosses/ai/hydra_action_rules.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	var flow = ResourceLoader.load("res://data/bosses/ai/hydra_flow.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	return build_boss("hydra", output)
+
+static func build_boss(id: String, output: String) -> Dictionary:
+	var rules = ResourceLoader.load("res://data/bosses/ai/" + id + "_action_rules.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	var flow = ResourceLoader.load("res://data/bosses/ai/" + id + "_flow.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	if rules == null or flow == null: return {"error": ERR_FILE_NOT_FOUND, "generated": false}
 	return compile({"rules": rules, "flow": flow}, output)
 

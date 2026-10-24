@@ -1,7 +1,7 @@
-## 形態はHSM、選択はBT、予告・固定・発進・終了はAnimationPlayerで進める。
-## 共通の制限時間演出は仮ボスの実装を継承する。本体は全方向から攻撃できる。
+## 選択は共通フロー、形態と技の実行は個別ロジックで進める。
+## 予告・固定・発進・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
 class_name MonocerosBoss
-extends "res://scripts/bosses/provisional_boss.gd"
+extends "res://scripts/bosses/boss_final_strike.gd"
 
 signal presentation_event(event: Dictionary)
 signal presentation_advanced(world_dt: float)
@@ -31,6 +31,21 @@ var previous_ship := Vector2.ZERO
 var previous_horn := PackedVector2Array()
 var _defeated := false
 var _presentation: Node
+var _cooldown := 0.0
+var selection_enabled := true
+var action_rules: Resource
+var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
+var flow_adapter: RefCounted
+var _moves := {}
+
+func configure_flow(program: Resource) -> void:
+	action_rules = program.data.rules
+	_moves.clear()
+	for move in action_rules.techniques: _moves[move.technique] = move
+	flow_runner.configure(program.data.flow)
+	flow_runner.selector.random = run_state.rng
+	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
+	selection_enabled = true
 
 func _on_bound() -> void:
 	draws_self = true
@@ -39,9 +54,7 @@ func _on_bound() -> void:
 	var library := timeline.get_animation_library("").duplicate(true) as AnimationLibrary
 	timeline.remove_animation_library("")
 	timeline.add_animation_library("", library)
-	hsm.add_transition($LimboHSM/Form1, $LimboHSM/Form2, &"empower")
-	hsm.initialize(self)
-	hsm.set_active(true)
+	configure_flow(load("res://.content/boss_monoceros.tres"))
 	previous_ship = run_state.ship_pos
 	_cooldown = float(def.params.initial_wait)
 	if presentation_scene != null:
@@ -62,7 +75,7 @@ func handle_body_defeat(_opts: Dictionary) -> bool:
 func _stop_combat() -> void:
 	if _defeated: return
 	_defeated = true
-	hsm.set_active(false)
+	selection_enabled = false
 	timeline.stop()
 	mode = &"defeated"
 	table.vel[body] = Vector2.ZERO
@@ -115,14 +128,13 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if phase_pending:
 			phase_pending = false
 			phase = 2
-			hsm.dispatch(&"empower")
 			mode = &"phase"
 			phase_time = float(def.params.phase_time)
 			_cue(&"phase_changed")
 		else:
 			_cooldown = maxf(0.0, _cooldown - dt)
 			_reposition_tick(dt)
-			hsm.update(dt)
+			if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
 	previous_ship = run_state.ship_pos
 	presentation_advanced.emit(dt)
@@ -131,9 +143,13 @@ func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
 
 func rule() -> Dictionary:
-	return def.params.attacks.get(technique, {})
+	return _moves[technique].parameters if _moves.has(technique) else {}
 
-## 条件はBTの枝から与える。評価は攻撃枠を消費しない。
+func technique_ready(attack: StringName, gate: Dictionary) -> bool:
+	if not can_select(attack, int(gate.get("min_phase", 1)), float(gate.get("min", 0.0)), float(gate.get("max", INF)), false): return false
+	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim - table.pos[body]).rotated(-table.facing[body]))
+
+## 条件評価では攻撃枠を消費しない。
 func can_select(attack: StringName, min_phase: int, min_range: float, max_range: float, rear_only: bool) -> bool:
 	if mode != &"idle" or _cooldown > 0.0 or reposition > 0.0 or phase < min_phase: return false
 	if clock < float(cooldowns.get(attack, 0.0)): return false
@@ -141,15 +157,16 @@ func can_select(attack: StringName, min_phase: int, min_range: float, max_range:
 	if d.length() < min_range or d.length() > max_range: return false
 	return not rear_only or absf(Geom.angle_diff(d.angle(), table.facing[body] + PI)) < float(def.params.kick_trigger_arc)
 
-func start_attack(attack: StringName) -> void:
-	if mode != &"idle": return
-	var r: Dictionary = def.params.attacks[attack]
-	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)): return
+func start_attack(attack: StringName) -> bool:
+	if mode != &"idle" or not _moves.has(attack): return false
+	var r: Dictionary = _moves[attack].parameters
+	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)): return false
 	technique = &"charge" if attack == &"combo" else attack
 	cooldowns[attack] = clock + float(r.cd)
 	combo_pending = attack == &"combo"
 	passes_left = int(def.params.return_passes) if attack == &"return_charge" else 1
 	_begin_pass()
+	return true
 
 func attack_playing() -> bool:
 	return mode != &"idle"
@@ -343,6 +360,7 @@ func _cue(cue: StringName) -> void:
 		"position": table.pos[body], "angle": table.facing[body], "world_time": clock})
 
 func begin_final_strike(charge: float) -> void:
+	selection_enabled = false
 	combo_pending = false
 	previous_horn.clear()
 	mode = &"final"
