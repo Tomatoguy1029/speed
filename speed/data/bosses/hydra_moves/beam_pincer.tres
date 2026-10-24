@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 technique = &"beam_pincer"
+category = &"combo"
 head_kind = &""
 parameters = {
 "warning_time": 0.8,

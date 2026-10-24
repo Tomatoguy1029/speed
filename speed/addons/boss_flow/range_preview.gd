@@ -5,6 +5,20 @@ var layers: Array = []
 var coverage_mode := false
 var gaps := PackedVector2Array()
 var radius := 1800.0
+var attack := {}
+
+func set_attack(move: Resource, adapter: String) -> void:
+	var p: Dictionary = move.parameters
+	if adapter == "hydra" or move.get("head_kind") != null:
+		p = load("res://data/bosses/hydra.tres").params.merged(p, true)
+		var reach: Dictionary = preload("res://scripts/bosses/hydra_normals.gd").reach(move.technique, p)
+		attack = {"length": reach.get("max", INF), "width": p.get("beam_width", p.get("bite_radius", 60.0)), "angle": 0.0}
+		if not is_finite(float(attack.length)): attack = {"dynamic": true, "length": 0.0}
+		if move.technique in [&"bite_thrust", &"thunder_headbutt"]: attack = {"targeted": true, "length": 0.0, "width": float(p.bite_radius)}
+		if move.technique == &"thunder_drop": attack = {"targeted": true, "length": 0.0, "width": float(p.thunder_radius) * 2.0, "circle": true}
+	else:
+		attack = {"length": p.get("reach", p.get("distance", 180.0)), "width": 30.0, "angle": 180.0 if move.technique == &"kick" else 0.0}
+	queue_redraw()
 
 static func analyze(conditions: Array, limit: float) -> Dictionary:
 	var missing := PackedVector2Array()
@@ -23,7 +37,7 @@ static func covers(condition: Dictionary, point: Vector2) -> bool:
 	var range_test := preload("res://scripts/bosses/flow/range_condition.gd")
 	return range_test.allows_snapshot(condition, point) if condition.has("gate") else range_test.allows(condition, point - condition.get("offset", Vector2.ZERO))
 func _ready() -> void:
-	custom_minimum_size = Vector2(180, 180)
+	if custom_minimum_size == Vector2.ZERO: custom_minimum_size = Vector2(180, 180)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 func _draw() -> void:
 	var center := size * 0.5
@@ -43,9 +57,17 @@ func _draw() -> void:
 		for point in gaps: draw_circle(center + point * scaling, 1.5, Color(0.95, 0.55, 0.2, 0.7))
 		draw_circle(center, 5, Color(0.9, 0.5, 0.25))
 		return
-	var maximum := maxf(1.0, float(gate.get("max", 600.0)))
+	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), float(attack.get("length", 0.0)))))
 	var scale_factor := minf(size.x, size.y) * 0.43 / maximum
 	_sector(gate, center, scale_factor)
+	if not attack.is_empty() and not attack.get("dynamic", false):
+		var length := float(attack.get("length", 0.0))
+		if attack.get("targeted", false): length = (float(gate.get("min", 0.0)) + maximum) * 0.5
+		var end := center + Vector2.from_angle(deg_to_rad(float(attack.get("angle", gate.get("angle", 0.0))))) * length * scale_factor
+		if attack.get("circle", false): draw_circle(end, maxf(2.0, float(attack.width) * 0.5 * scale_factor), Color(1.0, 0.65, 0.15, 0.8), false, 2.0)
+		else: draw_line(center, end, Color(1.0, 0.65, 0.15, 0.9), maxf(2.0, float(attack.get("width", 30.0)) * scale_factor))
+	elif attack.get("dynamic", false):
+		draw_string(get_theme_default_font(), Vector2(4, size.y - 3), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), Color(1.0, 0.65, 0.15))
 	draw_circle(center, 5, Color(0.9, 0.5, 0.25))
 	draw_line(center, center + Vector2(18, 0), Color(0.9, 0.5, 0.25), 2)
 

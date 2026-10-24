@@ -34,14 +34,15 @@ func exercise() -> void:
 	panel.graph.node_selected.emit(panel.graph.get_node("bite_thrust"))
 	check(panel.source_path == "res://data/bosses/hydra_moves/bite_thrust.tres", "native graph node selection opens the technique")
 	await process_frame
-	var from = panel.graph.get_node("choose")
+	var from = panel.graph.get_node("choose_normal")
 	var to = panel.graph.get_node("bite_thrust")
-	var origin: Vector2 = (from.position_offset + from.get_output_port_position(0)) * panel.graph.zoom - panel.graph.scroll_offset
-	var target: Vector2 = (to.position_offset + to.get_input_port_position(0)) * panel.graph.zoom - panel.graph.scroll_offset
+	var origin: Vector2 = (from.position_offset + from.get_output_port_position(0)) * panel.graph.zoom
+	var target: Vector2 = (to.position_offset + to.get_input_port_position(0)) * panel.graph.zoom
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
-	click.position = origin.lerp(target, 0.5)
+	var line: PackedVector2Array = panel.graph.get_connection_line(origin, target)
+	click.position = line[-2].lerp(line[-1], 0.5) - panel.graph.scroll_offset
 	panel.graph._input_graph(click)
 	check(panel.editing_rules and panel.preview.gate == panel.rules.conditions.bite_thrust, "connection hit test selects its conditions")
 	DirAccess.remove_absolute(path)

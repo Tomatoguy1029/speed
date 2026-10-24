@@ -12,7 +12,7 @@ func exercise() -> void:
 	host.add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	await process_frame
-	panel._picked("condition", "bite_thrust")
+	panel._picked("technique", "bite_thrust")
 	await process_frame
 	await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute("res://.content/tests")

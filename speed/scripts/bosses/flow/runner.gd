@@ -51,6 +51,8 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	query["stamina"] = stamina
 	var result: Dictionary = adapter.candidates(query)
 	var candidates: Array = result.get("candidates", [])
+	if section.has("allowed_techniques"):
+		candidates = candidates.filter(func(candidate): return String(candidate.id) in section.allowed_techniques)
 	if candidates.is_empty():
 		status = result.get("reason", "候補なし")
 		if section.has("fallback"): index = clampi(int(section.fallback), 0, flow.sections.size() - 1)
@@ -65,7 +67,7 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	candidates = affordable
 	var selection := section.duplicate()
 	selection.available = minf(stamina, cap)
-	var actions: Array = selector.choose(candidates, selection, last, context.get("forbidden", []))
+	var actions: Array = selector.choose(candidates, selection, last, section.get("forbidden", []))
 	if actions.is_empty():
 		status = "成立する攻撃種別の確率が0です"
 		return

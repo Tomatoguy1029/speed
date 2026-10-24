@@ -289,7 +289,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	combo_wait=maxf(0.0,combo_wait-dt)
 	_spin_t -= dt
 	if hsm.active and flow_adapter != null:
-		flow_runner.tick(dt, {"player": run_state.ship_pos, "forbidden": action_rules.forbidden}, flow_adapter)
+		flow_runner.tick(dt, {"player": run_state.ship_pos}, flow_adapter)
 	if ctx.projectiles.director != null:
 		ctx.projectiles.lab_context = ctx.projectiles.director.token("boss:" + str(table.id[body]))
 	if busy and special.positioning:

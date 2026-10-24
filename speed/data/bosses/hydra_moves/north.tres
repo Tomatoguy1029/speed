@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1")
 technique = &"north"
+category = &"major"
 head_kind = &""
 parameters = {
 "warning_time": 2.4,

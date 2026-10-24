@@ -16,7 +16,7 @@ func exercise() -> void:
  await process_frame
  assert(panel.rules.node_ids().size() == initial + 2)
  assert(panel.rules.source_for("bite_thrust_copy_1") == "bite_thrust")
- assert(graph.is_node_connected("choose", 0, "bite_thrust_copy_1", 0))
+ assert(graph.is_node_connected("choose_normal", 0, "bite_thrust_copy_1", 0))
  assert(panel.rules.conditions.bite_thrust_copy_1 == panel.rules.conditions.bite_thrust)
  panel.history.undo()
  assert(panel.rules.node_ids().size() == initial)
@@ -24,9 +24,9 @@ func exercise() -> void:
  await process_frame
  graph._connect("bite_thrust", false)
  assert(panel.rules.active_gates_for("bite_thrust").size() == 1)
- assert(not graph.is_node_connected("choose", 0, "bite_thrust", 0))
+ assert(not graph.is_node_connected("choose_normal", 0, "bite_thrust", 0))
  panel.history.undo()
- assert(graph.is_node_connected("choose", 0, "bite_thrust", 0))
+ assert(graph.is_node_connected("choose_normal", 0, "bite_thrust", 0))
  graph._select_nodes(["bite_thrust_copy_1", "wind_band_copy_1"])
  graph.command("delete")
  assert(panel.rules.node_ids().size() == initial)

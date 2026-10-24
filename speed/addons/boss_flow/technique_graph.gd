@@ -1,6 +1,7 @@
 @tool
 extends GraphEdit
 signal picked(kind: String, id: String)
+signal play_requested(id: String)
 signal layout_changed
 signal edit_requested(before: Dictionary, after: Dictionary, title: String)
 var rules: Resource
@@ -10,7 +11,8 @@ var _drag_before := {}
 var _updating := false
 var _guides := PackedVector2Array()
 var _popup := PopupMenu.new()
-const TITLES := {"bite_thrust": "噛みつき", "bite_sweep": "薙ぎ払い", "wind_band": "風の帯", "wind_blades": "風刃", "rubble_lump": "瓦礫の塊", "rubble_fan": "瓦礫の散弾", "beam_fixed": "固定ビーム", "beam_bolt": "ビーム弾", "thunder_headbutt": "雷の頭突き", "thunder_drop": "落雷", "tornado": "瓦礫竜巻", "debris_shatter": "瓦礫砕き", "beam_pincer": "挟撃ビーム", "north": "同時噛みつき", "sequence": "順番噛みつき", "curve": "曲線ビーム", "swarm": "連続飛びかかり", "grid": "格子ビーム"}
+var _reroute_pending := false
+const TITLES := {"charge": "突進", "return_charge": "往復突進", "sweep": "角の薙ぎ払い", "kick": "後ろ蹴り", "lance": "光の槍", "combo": "突進から薙ぎ払い", "bite_thrust": "噛みつき", "bite_sweep": "薙ぎ払い", "wind_band": "風の帯", "wind_blades": "風刃", "rubble_lump": "瓦礫の塊", "rubble_fan": "瓦礫の散弾", "beam_fixed": "固定ビーム", "beam_bolt": "ビーム弾", "thunder_headbutt": "雷の頭突き", "thunder_drop": "落雷", "tornado": "瓦礫竜巻", "debris_shatter": "瓦礫砕き", "beam_pincer": "挟撃ビーム", "north": "同時噛みつき", "sequence": "順番噛みつき", "curve": "曲線ビーム", "swarm": "連続飛びかかり", "grid": "格子ビーム"}
 
 static func title_for(id: String) -> String:
 	if id.begins_with("combo_"):
@@ -28,9 +30,11 @@ func _ready() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	focus_mode = Control.FOCUS_ALL
 	right_disconnects = true
+	zoom_min = 0.2
+	minimap_enabled = false
 	connection_lines_thickness = 1.5
 	node_selected.connect(func(node):
-		if node.name == &"choose": picked.emit("coverage", "")
+		if String(node.name).begins_with("choose_"): picked.emit("coverage", String(node.name).trim_prefix("choose_"))
 		else: picked.emit("technique", String(node.name)))
 	gui_input.connect(_input_graph)
 	begin_node_move.connect(_move_begin)
@@ -41,9 +45,11 @@ func _ready() -> void:
 	duplicate_nodes_request.connect(func(): command("duplicate"))
 	delete_nodes_request.connect(func(ids): _delete(ids))
 	connection_request.connect(func(from, _port, to, _input):
-		if String(from) == "choose": _connect(String(to), true))
+		if String(from) == hub_for(String(to)): _connect(String(to), true))
 	disconnection_request.connect(func(_from, _port, to, _input): _connect(String(to), false))
 	get_menu_hbox().hide()
+	resized.connect(func():
+		if rules != null and rules.layout.is_empty(): fit_all.call_deferred())
 	add_child(_popup)
 	for text in ["コピー", "貼り付け", "複製", "選択ノードを削除", "選択ノードを縦に等間隔にする"]: _popup.add_item(text)
 	_popup.id_pressed.connect(func(i): command(["copy", "paste", "duplicate", "delete", "align"][i]))
@@ -93,6 +99,18 @@ func focus_technique(id: String) -> void:
 func snapshot() -> Dictionary:
 	return {"conditions": rules.conditions.duplicate(true), "layout": rules.layout.duplicate(true), "graph_nodes": rules.graph_nodes.duplicate(true), "combos": rules.combos.duplicate(true), "costs": rules.costs.duplicate(true)}
 
+func category_for(id: String) -> String:
+	var source: String = rules.source_for(id)
+	if rules.combos.has(source): return "combo"
+	for move in rules.techniques:
+		if String(move.technique) == source: return "normal" if move.category == &"single" else String(move.category)
+	return "normal"
+
+func hub_for(id: String) -> String: return "choose_" + category_for(id)
+
+func _get_connection_line(from_position: Vector2, to_position: Vector2) -> PackedVector2Array:
+	return preload("res://addons/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
+
 func show_rules(value: Resource) -> void:
 	rules = value
 	_updating = true
@@ -101,35 +119,91 @@ func show_rules(value: Resource) -> void:
 		if child is GraphNode:
 			remove_child(child)
 			child.queue_free()
-	var scale_factor := maxf(1.0, get_theme_default_font_size() / 14.0)
-	var source := _add_node("choose", "行動選択", rules.layout.get("choose", Vector2(30, 100) * scale_factor), false)
-	var x := source.position_offset.x + source.get_combined_minimum_size().x + 100 * scale_factor
-	var y := 20.0 * scale_factor
-	for id in rules.node_ids():
-		var settings: Dictionary = rules.graph_nodes.get(id, {})
-		var node := _add_node(id, node_title(rules, id), rules.layout.get(id, Vector2(x, y)), true)
-		y += node.get_combined_minimum_size().y + 28 * scale_factor
-		if settings.get("connected", true): connect_node("choose", 0, id, 0)
+	var factor := maxf(1.0, get_theme_default_font_size() / 14.0)
+	var x := 20.0 * factor
+	for category in ["normal", "combo", "major"]:
+		var ids: Array[String] = []
+		for id in rules.node_ids():
+			if category_for(id) == category: ids.append(id)
+		var hub := _add_node("choose_" + category, {"normal": "通常技", "combo": "コンボ", "major": "大技"}[category] + " · 条件選択", Vector2(x, 15 * factor), false)
+		var columns := 3 if category == "normal" and ids.size() > 6 else 2 if category != "combo" and ids.size() > 3 else 1
+		var nodes: Array[GraphNode] = []
+		var cell := Vector2.ZERO
+		for id in ids:
+			var node := _add_node(id, node_title(rules, id), Vector2.ZERO, true)
+			nodes.append(node)
+			cell.x = maxf(cell.x, node.get_combined_minimum_size().x + 18 * factor)
+			cell.y = maxf(cell.y, node.get_combined_minimum_size().y + 18 * factor)
+		for i in nodes.size():
+			var id: String = ids[i]
+			var at := Vector2(x + (i % columns) * cell.x, hub.get_combined_minimum_size().y + 44 * factor + floori(i / float(columns)) * cell.y)
+			nodes[i].position_offset = rules.layout.get(id, at)
+			if rules.graph_nodes.get(id, {}).get("connected", true): connect_node(String(hub.name), 0, id, 0)
+		x += maxf(hub.get_combined_minimum_size().x, columns * cell.x) + 30 * factor
 	_updating = false
+	if rules.layout.is_empty(): fit_all.call_deferred()
 
 func _add_node(id: String, title_text: String, at: Vector2, input: bool) -> GraphNode:
 	var node := GraphNode.new()
 	node.name = id
 	node.title = title_text
-	var label := Label.new()
-	label.text = "技の性能" if input else "条件 → 技"
-	node.add_child(label)
-	node.set_slot(0, input, 0, Color(0.6, 0.7, 0.8), not input, 0, Color(0.6, 0.7, 0.8))
+	node.self_modulate = Color(0.65, 0.95, 0.8) if not input else Color.WHITE
+	if input:
+		var diagram := preload("res://addons/boss_flow/range_preview.gd").new()
+		diagram.custom_minimum_size = Vector2(120, 58) * maxf(1.0, get_theme_default_font_size() / 14.0)
+		diagram.gate = rules.conditions.get(id, {})
+		diagram.tooltip_text = "青：発動条件　橙：基準の攻撃範囲"
+		for move in rules.techniques:
+			if String(move.technique) == rules.source_for(id): diagram.set_attack(move, String(rules.adapter))
+		node.add_child(diagram)
+		var play := Button.new()
+		play.text = "保存して再生"
+		play.pressed.connect(func(): play_requested.emit(id))
+		node.add_child(play)
+	else:
+		var label := Label.new()
+		label.text = "条件のカバーを確認"
+		node.add_child(label)
+	node.set_slot(0, input, 0, Color(0.6, 0.8, 0.7), not input, 0, Color(0.6, 0.8, 0.7))
 	add_child(node)
-	node.position_offset = at
+	node.resized.connect(_request_reroute)
+	node.position_offset = rules.layout.get(id, at)
 	node.position_offset_changed.connect(func():
+		_request_reroute()
 		if not _updating and not _drag_before.is_empty(): _assist(node))
 	return node
+
+func _request_reroute() -> void:
+	if _reroute_pending: return
+	_reroute_pending = true
+	_reroute.call_deferred()
+
+func _reroute() -> void:
+	_reroute_pending = false
+	preload("res://addons/boss_flow/wire_router.gd").refresh(self)
+
+func fit_all() -> void:
+	if size.x <= 0 or size.y <= 0: return
+	var bounds := Rect2()
+	for node in get_children():
+		if node is GraphNode: bounds = bounds.merge(Rect2(node.position_offset, node.get_combined_minimum_size()))
+	zoom = clampf(minf((size.x - 25) / maxf(1, bounds.size.x), (size.y - 25) / maxf(1, bounds.size.y)), zoom_min, 1.0)
+	scroll_offset = bounds.position * zoom - Vector2(12, 12)
+
+func arrange_categories() -> void:
+	var before := snapshot()
+	var after := snapshot()
+	rules.layout = {}
+	show_rules(rules)
+	after.layout = positions()
+	rules.layout = before.layout
+	edit_requested.emit(before, after, "技を分類して整列")
+	fit_all.call_deferred()
 
 func selected_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for node in get_children():
-		if node is GraphNode and node.selected and node.name != &"choose": ids.append(String(node.name))
+		if node is GraphNode and node.selected and not String(node.name).begins_with("choose_"): ids.append(String(node.name))
 	return ids
 
 func positions() -> Dictionary:
@@ -197,6 +271,7 @@ func _settle(node: GraphNode) -> void:
 			return
 
 func _draw() -> void:
+	preload("res://addons/boss_flow/wire_router.gd").draw_directions(self, Color(0.65, 0.9, 0.75))
 	for i in range(0, _guides.size(), 2): draw_line(_guides[i] * zoom - scroll_offset, _guides[i + 1] * zoom - scroll_offset, Color(1.0, 0.75, 0.2, 0.8), 1.0)
 
 func _connect(id: String, connected: bool) -> void:
@@ -213,7 +288,7 @@ func _delete(ids: Array) -> void:
 	var after := snapshot()
 	for raw in ids:
 		var id := String(raw)
-		if id == "choose": continue
+		if id.begins_with("choose_"): continue
 		if not after.graph_nodes.has(id): after.graph_nodes[id] = {"source": rules.source_for(id)}
 		after.graph_nodes[id].hidden = true
 		after.graph_nodes[id].connected = false

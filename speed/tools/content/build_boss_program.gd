@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
-const VERSION := 2
+const VERSION := 3
 static var generation_count := 0
 
 static func validate(source: Dictionary) -> PackedStringArray:
@@ -33,6 +33,12 @@ static func validate(source: Dictionary) -> PackedStringArray:
 		if flow.sections.is_empty(): errors.append("区間がありません")
 		for i in flow.sections.size():
 			var section: Dictionary = flow.sections[i]
+			if rules != null:
+				var known: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
+				for id in section.get("allowed_techniques", []):
+					if not known.has(String(id)): errors.append("区間の候補技が存在しません: " + String(id))
+				for pair in section.get("forbidden", []):
+					if pair.size() != 2 or not known.has(String(pair[0])) or not known.has(String(pair[1])): errors.append("区間の禁止ペアが不正: " + str(i))
 			if int(section.get("next", 0)) < 0 or int(section.get("next", 0)) >= flow.sections.size(): errors.append("次区間が存在しません: " + str(i))
 			if section.get("request", "normal") not in ["normal", "major", "rest", "any"]: errors.append("要求種別が不正: " + str(i))
 			if float(section.get("cap", flow.maximum_stamina)) <= 0.0: errors.append("消費上限が不正: " + str(i))

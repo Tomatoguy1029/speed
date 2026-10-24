@@ -14,13 +14,13 @@ func exercise() -> void:
   await process_frame
   await process_frame
   assert(panel.size.y >= host.size.y - 1.0, "main editor must expand vertically inside its Container")
-  assert(panel.graph.size.y > host.size.y * 0.45, "the graph must use the available editor height")
+  assert(panel.graph.size.y + panel.flow_graph.size.y > host.size.y * 0.65, "the graph must use the available editor height")
   assert(panel.get_combined_minimum_size().x <= host.size.x, "controls must not force the editor outside its available width")
   panel._picked("condition", "bite_thrust")
   await process_frame
   assert(panel.preview.size.y <= 200.0 * panel._scale, "the condition preview must remain compact")
- assert(panel._settings is OptionButton and panel._techniques is OptionButton, "settings and techniques are selections, not rows of buttons")
- assert(panel.flow_bar is TabBar, "flow sections use a selection control")
+ assert(panel.get("_settings") == null, "a universal settings selector must not mix node responsibilities")
+ assert(panel.flow_graph is GraphEdit, "flow sections use a separate node editor")
  var original: float = panel.working["res://data/bosses/hydra_moves/bite_thrust.tres"].parameters.bite_dmg
  panel._picked("technique", "bite_thrust")
  panel.set_value("bite_dmg", original + 1.0)

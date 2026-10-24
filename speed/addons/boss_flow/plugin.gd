@@ -39,7 +39,7 @@ func _make_visible(visible: bool) -> void:
 	if is_instance_valid(panel):
 		panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if visible and panel.get_meta("boss_layout_revision", 0) != 2: panel.rebuild_ui()
+		if visible and panel.get_meta("boss_layout_revision", 0) != 3: panel.rebuild_ui()
 		panel.visible = visible
 
 func _shortcut_input(event: InputEvent) -> void:

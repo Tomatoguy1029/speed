@@ -308,8 +308,8 @@ Dolphin                         EnemyFormation：編成の根
 
 | 調整対象 | 編集・確認先 |
 |---|---|
-| 区間・選択割合・スタミナ・休息 | `data/bosses/ai/hydra_flow.tres`、共通の`flow/runner.gd`と`selector.gd` |
-| 技の距離方向条件・消費・禁止ペア・コンボ内部 | `data/bosses/ai/hydra_action_rules.tres`と`hydra_flow_adapter.gd` |
+| 区間・候補技・選択割合・禁止ペア・スタミナ・休息 | `data/bosses/ai/hydra_flow.tres`、共通の`flow/runner.gd`と`selector.gd` |
+| 技の距離方向条件・消費・コンボ内部 | `data/bosses/ai/hydra_action_rules.tres`と`hydra_flow_adapter.gd` |
 | 技の性能・時間 | `data/bosses/hydra_moves/*.tres`、`hydra_normals.gd`、`hydra_techniques.gd` |
 | 本体・再生・分離・護衛 | `hydra.tres`の本体設定と`hydra_boss.gd` |
 | 実行向け変換 | `tools/content/build_boss_program.gd`と生成済み`.content/boss_hydra.tres` |
