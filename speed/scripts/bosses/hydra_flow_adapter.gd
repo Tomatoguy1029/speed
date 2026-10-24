@@ -26,7 +26,14 @@ func candidates(query: Dictionary) -> Dictionary:
 			var heads: Array = []
 			if id in [&"north", &"sequence"]: heads = actor.front_heads()
 			elif id in actor.COMBOS:
-				heads = actor.combo_heads({&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[id])
+				var kinds: Array = {&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[id]
+				for first in actor.necks:
+					if not actor._alive(first) or first.mode != &"idle" or first.kind != kinds[0]: continue
+					for second in actor.necks:
+						if second == first or not actor._alive(second) or second.mode != &"idle" or second.kind != kinds[1]: continue
+						if kinds[0] == kinds[1] and first.row_id > second.row_id: continue
+						result.append(_candidate(id, [first, second], "combo"))
+				continue
 			else: heads = actor.necks.filter(func(n): return actor._alive(n))
 			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if id in actor.COMBOS else "major"))
 	return {"candidates": result, "reason": "距離・部位・再使用待ち"}

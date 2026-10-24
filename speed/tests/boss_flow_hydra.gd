@@ -27,6 +27,16 @@ func exercise() -> void:
 		check(adapter.start([action]), "concrete participants start")
 		check(adapter.running(), "running includes technique recovery")
 	actor.interrupt_tech()
+	actor._set_count(8)
+	actor.recovery_t = 0.0
+	actor._tech_until.clear()
+	actor._tech_cd = 0.0
+	actor.combo_wait = 0.0
+	result = adapter.candidates({"request": "normal"})
+	var tornadoes: Array = result.candidates.filter(func(c): return c.id == "tornado")
+	check(tornadoes.size() == 2, "all distinct vortex and debris combinations are offered")
+	result = adapter.candidates({"request": "major"})
+	check(result.candidates.any(func(c): return c.id == "curve"), "combined major is offered")
 	lab.queue_free()
 	await process_frame
 	quit(1 if failures else 0)
