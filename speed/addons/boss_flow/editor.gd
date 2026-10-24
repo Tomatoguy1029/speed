@@ -7,6 +7,11 @@ var history := UndoRedo.new()
 var _fields := GridContainer.new()
 var _status := Label.new()
 var _path := LineEdit.new()
+var rules: Resource
+var rules_path := "res://data/bosses/hydra_action_rules.tres"
+var graph := preload("res://addons/boss_flow/technique_graph.gd").new()
+var preview := preload("res://addons/boss_flow/range_preview.gd").new()
+var editing_rules := false
 
 func _ready() -> void:
 	var toolbar := HBoxContainer.new()
@@ -22,11 +27,64 @@ func _ready() -> void:
 	add_child(_status)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(scroll)
+	var split := HSplitContainer.new()
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(split)
+	split.add_child(graph)
+	graph.picked.connect(_picked)
+	var details := VBoxContainer.new()
+	split.add_child(details)
+	details.custom_minimum_size.x = 260
+	details.add_child(preview)
+	details.add_child(scroll)
 	_fields.columns = 2
 	_fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_fields)
 	_status.text = "技を開いて編集します。保存では実行データを生成しません。"
+	_load_rules()
+
+func _load_rules() -> void:
+	if ResourceLoader.exists(rules_path):
+		rules = load(rules_path).duplicate(false)
+		rules.conditions = rules.conditions.duplicate(true)
+	else:
+		rules = preload("res://scripts/data_types/boss_action_rules.gd").new()
+		for filename in DirAccess.get_files_at("res://data/bosses/hydra_moves"):
+			if filename.ends_with(".tres"): rules.techniques.append(load("res://data/bosses/hydra_moves/" + filename))
+	graph.show_rules(rules)
+
+func _picked(kind: String, id: String) -> void:
+	if kind == "technique":
+		for move in rules.techniques:
+			if String(move.technique) == id: open_technique(move.resource_path)
+	elif kind == "condition":
+		editing_rules = true
+		for child in _fields.get_children():
+			_fields.remove_child(child)
+			child.queue_free()
+		var gate: Dictionary = rules.conditions.get(id, {"min": 0.0, "max": 600.0, "angle": 0.0, "half_angle": 180.0})
+		rules.conditions[id] = gate
+		preview.gate = gate
+		preview.queue_redraw()
+		for key in ["min", "max", "angle", "half_angle"]:
+			var label := Label.new()
+			label.text = {"min": "最小距離", "max": "最大距離", "angle": "中心角度（度）", "half_angle": "半角（度）"}[key]
+			_fields.add_child(label)
+			var field := SpinBox.new()
+			field.min_value = -180 if key == "angle" else 0
+			field.max_value = 180 if "angle" in key else 100000
+			field.value = gate[key]
+			field.value_changed.connect(func(value):
+				history.create_action("発動条件を変更")
+				history.add_do_method(_set_gate.bind(id, key, value))
+				history.add_undo_method(_set_gate.bind(id, key, gate[key]))
+				history.commit_action())
+			_fields.add_child(field)
+		_status.text = id + " の発動条件（区間と独立）"
+
+func _set_gate(id: String, key: String, value: float) -> void:
+	rules.conditions[id][key] = value
+	preview.queue_redraw()
 
 func _open_path() -> void:
 	open_technique(_path.text)
@@ -37,6 +95,7 @@ func open_technique(path: String) -> Error:
 		_status.text = "技の設定を開けません: " + path
 		return ERR_INVALID_DATA
 	current = loaded.duplicate(true)
+	editing_rules = false
 	source_path = path
 	_path.text = path
 	history.clear_history()
@@ -62,6 +121,10 @@ func _assign(key: String, value: Variant) -> void:
 			node.set_value_no_signal(float(value))
 
 func save_current() -> Error:
+	if editing_rules:
+		var result := ResourceSaver.save(rules, rules_path)
+		_status.text = "発動条件を保存しました" if result == OK else error_string(result)
+		return result
 	if current == null or source_path.is_empty(): return ERR_UNCONFIGURED
 	var error := ResourceSaver.save(current, source_path)
 	_status.text = "保存済み（実行データは試遊前に生成）" if error == OK else error_string(error)
