@@ -52,6 +52,7 @@ func start_loading(options: Dictionary) -> void:
 	loading_timings["resource_request_ms"] = (Time.get_ticks_usec() - _load_started_us) / 1000.0
 
 ## 木に入ったあとに呼ぶ。表示を作る場合は、シミュレーションを組み立ててから表示を木に入れる。
+## options.hud が false なら通常 HUD を省き、利用側が専用 UI を接続する。
 func start(options: Dictionary, with_view: bool) -> void:
 	options = options.duplicate()
 	if not options.has("stage"):
@@ -65,8 +66,11 @@ func start(options: Dictionary, with_view: bool) -> void:
 	if with_view:
 		view = load(VIEW_PATH).instantiate()
 		loading_timings["view_instantiate_ms"] = (Time.get_ticks_usec() - before) / 1000.0
-		for path in ["RunPresentation", "Hud/HudRoot"]:
-			view.get_node(path).run = sim
+		view.get_node("RunPresentation").run = sim
+		if options.get("hud", true):
+			view.get_node("Hud/HudRoot").run = sim
+		else:
+			view.get_node("Hud").free()
 		sim.input = view.get_node("World/InputRouter")
 		sim.actor_parent = view.get_node("World")
 	else:

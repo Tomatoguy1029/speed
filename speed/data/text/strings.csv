@@ -9,6 +9,13 @@ common.cancel,キャンセル,Cancel
 common.to_main_menu,メインメニューに戻る,Back to Main Menu
 common.parts,部品 {n},Parts {n}
 ,■ タイトル・メインメニュー,
+intro.replay,はじまりを見直す,Replay opening
+intro.skip,スキップ,Skip
+intro.draw,お手本の線に沿って描く（クリックで開始）,Follow the example path; click to begin
+intro.confirm,お手本をなぞり、もう一度クリックで突進,"Follow the example, then click again to dash"
+intro.touch,「描く」を押し、お手本の線をなぞる,"Tap Draw, then follow the example path"
+intro.touch_draw,描く,Draw
+intro.motive,何か異変が起きている。あの星々も救わねば。,Something is happening. I must save those stars too.
 menu.start,ゲームスタート,Start Game
 menu.settings,設定,Settings
 menu.quit,終了,Quit
