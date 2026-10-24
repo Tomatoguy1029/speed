@@ -193,7 +193,7 @@ func _set_meta_ratio(ratio: float) -> void:
 	for o in order:
 		if left <= 0:
 			break
-		var def: MetaUpgradeDef = defs[o[1]]
+		var def: ContentEntry = defs[o[1]]
 		if levels[def.id] < def.costs.size():
 			levels[def.id] += 1
 			left -= 1
