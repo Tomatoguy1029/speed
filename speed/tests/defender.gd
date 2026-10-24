@@ -46,7 +46,7 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="): capture = arg.trim_prefix("--capture=")
 	var cfg := ContentManager.base.duplicate(true) as GameConfig
-	for key in ["moon_count", "meteor_count", "iron_count", "saw_count", "dust_count"]: cfg.set(key, 0)
+	for key in ["moon_count", "meteor_count", "iron_count", "saw_count"]: cfg.set(key, 0)
 	var session := RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": 2, "seed": 42, "config": cfg}, not capture.is_empty())
 	session.auto_step = false
 	run = session.sim

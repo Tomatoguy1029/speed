@@ -35,7 +35,6 @@ func _practice_config() -> GameConfig:
 	# 障害物と自動出現を外す。移動・描画・突進の本番値は保持する。
 	config.planet_radius = 0.0
 	config.moon_count = 0
-	config.dust_count = 0
 	config.meteor_count = 0
 	config.iron_count = 0
 	config.saw_count = 0

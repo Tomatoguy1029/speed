@@ -18,7 +18,7 @@ func _ready() -> void:
 	# 空の実験場と同じ生成口を使い、他担当の生成キャッシュ更新と独立して確かめる。
 	var stage = load("res://tools/content/build_runtime_stage.gd").compile(ContentManager.stage(3))
 	var cfg := ContentManager.base.duplicate(true) as GameConfig
-	for key in ["moon_count", "meteor_count", "iron_count", "saw_count", "dust_count"]: cfg.set(key, 0)
+	for key in ["moon_count", "meteor_count", "iron_count", "saw_count"]: cfg.set(key, 0)
 	var capture := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="): capture = arg.trim_prefix("--capture=")
