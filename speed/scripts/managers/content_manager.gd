@@ -178,38 +178,61 @@ func runtime_stage(index: int) -> RuntimeStage:
 	var mode := ResourceLoader.CACHE_MODE_IGNORE_DEEP if OS.has_feature("editor") else ResourceLoader.CACHE_MODE_REUSE
 	return ResourceLoader.load("res://.content/stage_%d.tres" % index, "", mode) as RuntimeStage
 
-## 読込ジョブはセッションを保持せず、取り消した要求の結果も最後まで受け取って解放する。
+## 読込タスクは結果の資源と終了まで所有し、取り消した要求も回収する。
+# Godot 4.6.3 の load_threaded_* は、依存読込との競合で内部トークンが残る。
+# load() と結果をこのタスクが所有し、終了を待ってから主スレッドへ渡す。
+class ResourceJob:
+	extends RefCounted
+	var task_id: int
+	var resource: Resource
+	var waiters: Array[WeakRef] = []
+	func start(path: String) -> void:
+		task_id = WorkerThreadPool.add_task(_load.bind(path), false, "Load " + path)
+	func _load(path: String) -> void:
+		resource = ResourceLoader.load(path)
+	func finish() -> void:
+		# 終了時はフレームが進まないので、描画資源の作成要求も主スレッドで処理する。
+		while not WorkerThreadPool.is_task_completed(task_id):
+			RenderingServer.force_sync()
+			OS.delay_usec(1000)
+		WorkerThreadPool.wait_for_task_completion(task_id)
+
 var _resource_jobs: Dictionary = {}
 func prepare_resources(paths: PackedStringArray, threaded := true) -> ContentResourceScope:
 	var scope := ContentResourceScope.new()
 	if paths.is_empty(): scope.warmup_complete = true
 	for path in paths:
 		if scope.resources.has(path) or path in scope.pending: continue
-		if not threaded:
+		# スクリプト・シーン・複合資源の依存解決は主スレッドに集約する。
+		# 独立した画像・音源・シェーダーの読込だけを非同期にする。
+		if not threaded or path.get_extension() not in ["png", "svg", "jpg", "jpeg", "webp",
+			"wav", "ogg", "mp3", "gdshader", "glsl"]:
 			scope.provide(path, load(path))
 		elif ResourceLoader.has_cached(path):
 			scope.provide(path, ResourceLoader.get_cached_ref(path))
 		else:
 			scope.pending.append(path)
 			if not _resource_jobs.has(path):
-				var error := ResourceLoader.load_threaded_request(path)
-				if error != OK:
-					scope.provide(path, null)
-					continue
-				_resource_jobs[path] = []
-			_resource_jobs[path].append(weakref(scope))
+				var job := ResourceJob.new()
+				_resource_jobs[path] = job
+				job.start(path)
+			_resource_jobs[path].waiters.append(weakref(scope))
 	return scope
 func pending_resources() -> int:
 	return _resource_jobs.size()
 func _process(_delta: float) -> void:
 	for path: String in _resource_jobs.keys():
-		var status := ResourceLoader.load_threaded_get_status(path)
-		if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS: continue
-		var resource: Resource = ResourceLoader.load_threaded_get(path) if status == ResourceLoader.THREAD_LOAD_LOADED else null
-		for reference: WeakRef in _resource_jobs[path]:
+		var job: ResourceJob = _resource_jobs[path]
+		if not WorkerThreadPool.is_task_completed(job.task_id): continue
+		job.finish()
+		for reference: WeakRef in job.waiters:
 			var scope := reference.get_ref() as ContentResourceScope
-			if scope != null: scope.provide(path, resource)
+			if scope != null: scope.provide(path, job.resource)
 		_resource_jobs.erase(path)
+
+func _exit_tree() -> void:
+	for job: ResourceJob in _resource_jobs.values(): job.finish()
+	_resource_jobs.clear()
 
 func release_runtime_definitions() -> void:
 	_tables.clear()

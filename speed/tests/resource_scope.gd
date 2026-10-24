@@ -24,5 +24,43 @@ func _ready() -> void:
 		check(not ResourceLoader.has_cached(path), "未使用の演出・隕石は表示付きでも専用資源を読まない: " + path)
 	session.free()
 	await get_tree().process_frame
+	await _test_async_resources()
+	_test_pending_shutdown()
 	print("[resource_scope] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _test_async_resources() -> void:
+	var path := "res://shaders/intro_sky_mist.gdshader"
+	var paths := PackedStringArray([path, path])
+	var kept := ContentManager.prepare_resources(paths)
+	check(ContentManager.pending_resources() > 0, "非同期の読込要求を開始する")
+	var cancelled := ContentManager.prepare_resources(paths)
+	var dropped: ContentResourceScope = ContentManager.prepare_resources(paths)
+	var reference: WeakRef = weakref(dropped)
+	dropped = null
+	check(reference.get_ref() == null, "読込中の要求は利用側を保持しない")
+	cancelled.cancel()
+	var limit := Time.get_ticks_msec() + 10000
+	while ContentManager.pending_resources() > 0 and Time.get_ticks_msec() < limit:
+		await get_tree().process_frame
+	check(ContentManager.pending_resources() == 0, "読込と取り消しのタスクを最後まで回収する")
+	check(kept.is_ready() and not kept.failed and kept.resources.get(path) is Shader,
+		"重複する要求をまとめ、継続した利用側へ資源を渡す")
+	check(cancelled.resources.is_empty() and cancelled.pending.is_empty(),
+		"共有読込の完了後も取り消した利用側へ資源を戻さない")
+	kept.cancel()
+	await get_tree().process_frame
+
+func _test_pending_shutdown() -> void:
+	var loader: Node = load("res://scripts/managers/content_manager.gd").new()
+	add_child(loader)
+	var paths := PackedStringArray(["res://data/weapons/W03_knockback.tres", "res://data/meta_upgrades/charge.tres",
+		"res://shaders/hydra_tornado.gdshader"])
+	if DisplayServer.get_name() != "headless":
+		paths.append_array(PackedStringArray(["res://scenes/bosses/hydra_tornado.tscn",
+			"res://scenes/bosses/hydra_presentation.tscn", "res://assets/pixel/meteor_spritesheet.png"]))
+	var scope: ContentResourceScope = loader.prepare_resources(paths)
+	check(loader.pending_resources() > 0, "未回収の読込がある状態で終了を確認する")
+	scope.cancel()
+	loader.free()
+	check(scope.resources.is_empty() and scope.pending.is_empty(), "読込中の所有者を破棄しても取り消し状態を保つ")
