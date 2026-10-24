@@ -45,6 +45,8 @@ func exercise() -> void:
 	if not normals.is_empty():
 		var id: String = normals[0].id
 		actor.action_rules.combos["test_native"] = {"type": "sequence", "children": [{"type": "action", "id": id}, {"type": "wait", "seconds": 0.05}]}
+		actor.action_rules.graph_nodes[id] = {"source": id, "connected": false}
+		check(not adapter.candidates({"request": "normal"}).candidates.any(func(c): return c.id == id), "disconnecting the outer node removes its direct candidate")
 		var authored: Array = adapter.candidates({"request": "normal"}).candidates.filter(func(c): return c.id == "test_native")
 		check(not authored.is_empty() and adapter.start(authored), "native action starts through authored combo")
 		adapter.tick(0.01)
@@ -55,6 +57,7 @@ func exercise() -> void:
 			if not adapter.running(): break
 		check(not adapter.running(), "native combo finishes after attack recovery and wait")
 		actor.action_rules.combos.erase("test_native")
+		actor.action_rules.graph_nodes.erase(id)
 		actor.action_rules.combos["test_parallel"] = {"type": "parallel", "children": [{"type": "action", "id": "bite_thrust"}, {"type": "action", "id": "bite_thrust"}]}
 		var saved_gate: Dictionary = actor.action_rules.conditions.bite_thrust
 		actor.action_rules.conditions.bite_thrust = {"min": 0.0, "max": 2000.0, "half_angle": 180.0}

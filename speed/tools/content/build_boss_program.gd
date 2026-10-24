@@ -25,6 +25,9 @@ static func validate(source: Dictionary) -> PackedStringArray:
 			var cost := float(rules.costs[id])
 			if not is_finite(cost) or cost < 0.0: errors.append("消費が不正: " + id)
 		for id in rules.combos: _validate_combo(rules.combos[id], ids, errors, String(id), 0)
+		for id in rules.graph_nodes:
+			var source_id: String = rules.source_for(String(id))
+			if not ids.has(source_id) and not rules.combos.has(source_id): errors.append("ノードの技参照が不正: " + String(id))
 	if flow != null:
 		if flow.maximum_stamina <= 0.0 or flow.partial_rest < 0.0 or flow.empty_rest < 0.0: errors.append("最大スタミナ・休息時間が不正")
 		if flow.sections.is_empty(): errors.append("区間がありません")

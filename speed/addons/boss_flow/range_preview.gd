@@ -54,6 +54,11 @@ func _sector(value: Dictionary, center: Vector2, scale_factor: float) -> void:
 	var points := PackedVector2Array()
 	var half := deg_to_rad(float(value.get("half_angle", 180.0)))
 	var angle := deg_to_rad(float(value.get("angle", 0.0)))
+	var minimum := float(value.get("min", 0.0))
+	if maximum < minimum: return
+	if maximum == minimum or half <= 0.0:
+		draw_line(center + Vector2.from_angle(angle) * minimum * scale_factor, center + Vector2.from_angle(angle) * maximum * scale_factor, Color(0.2, 0.65, 0.9), 1.0)
+		return
 	for distance in [maximum, float(value.get("min", 0.0))]:
 		for i in 49:
 			var k := i if distance == maximum else 48 - i

@@ -517,17 +517,18 @@ func move_params(attack: StringName) -> Dictionary:
 	var settings := move_settings(attack)
 	return def.params.merged(settings.parameters, true) if settings != null else def.params
 
-func _position_ready(attack: StringName, index := -1) -> bool:
+func _position_ready(attack: StringName, index := -1, internal_step := false) -> bool:
 	if flow_controlled and action_rules != null:
-		var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-		var snapshot := {"gate": gate, "body": table.pos[body], "facing": table.facing[body], "separated": separated}
-		if index >= 0:
-			var n := necks[index]
-			snapshot.head = _head_pos(n)
-			snapshot.base = _neck_base(n)
-			snapshot.base_angle = n.base_angle
-			snapshot.reach = NORMALS.reach(attack, move_params(attack))
-		return preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos)
+		for gate in ([action_rules.conditions.get(String(attack), {})] if internal_step else action_rules.active_gates_for(String(attack))):
+			var snapshot := {"gate": gate, "body": table.pos[body], "facing": table.facing[body], "separated": separated}
+			if index >= 0:
+				var n := necks[index]
+				snapshot.head = _head_pos(n)
+				snapshot.base = _neck_base(n)
+				snapshot.base_angle = n.base_angle
+				snapshot.reach = NORMALS.reach(attack, move_params(attack))
+			if preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos): return true
+		return false
 	for condition in _move_gates.get(attack, []):
 		if not condition.allows(self, index): return false
 	return true
@@ -537,7 +538,7 @@ func _normal_cost(attack: StringName) -> float:
 	var settings := move_settings(attack)
 	return float(settings.parameters.cost) if settings != null else INF
 
-func normal_ready(index: int, attack: StringName) -> bool:
+func normal_ready(index: int, attack: StringName, internal_step := false) -> bool:
 	if index < 0 or index >= necks.size() or not _normal_moves.has(attack): return false
 	var n := necks[index]
 	var settings := move_settings(attack)
@@ -545,15 +546,15 @@ func normal_ready(index: int, attack: StringName) -> bool:
 	if busy or recovery_t > 0.0 or chance_t > 0.0 or growth_t > 0.0 or separation_pending: return false
 	var at := _head_pos(n)
 	if not run_state.view_rect().grow(-table.r[n.row]).has_point(at): return false
-	if not _position_ready(attack, index): return false
+	if not _position_ready(attack, index, internal_step): return false
 	if flow_controlled: return true
 	var used := 0.0
 	for other in necks:
 		if _normal_moves.has(other.mode): used += _normal_cost(other.mode)*maxf(0.0,table.attack_value[other.row])
 	return used + _normal_cost(attack)*maxf(0.0,table.attack_value[n.row]) <= float(def.params.normal_budget)
 
-func start_normal(index: int, attack: StringName) -> bool:
-	if not normal_ready(index,attack): return false
+func start_normal(index: int, attack: StringName, internal_step := false) -> bool:
+	if not normal_ready(index,attack,internal_step): return false
 	var n := necks[index]
 	var director=ctx.projectiles.director
 	# 通常ランの雑魚枠と、首同士のnormal_budgetを独立させる。
@@ -719,13 +720,13 @@ func _release_attack(neck: Neck) -> void:
 
 # ── 強めの技（判断の層とタイムラインから呼ばれる） ────────────────────────
 
-func attack_ready(attack: StringName) -> bool:
+func attack_ready(attack: StringName, internal_step := false) -> bool:
 	if tech==attack:return true
 	if not TECH_DIR.has(attack) or busy or timeline.is_playing() or chance_t>0.0 or growth_t>0.0 or separation_pending or recovery_t>0.0:return false
 	if COMBOS.has(attack):
 		if combo_wait>0.0:return false
 	elif _tech_cd>0.0:return false
-	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack) and _position_ready(attack)
+	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack) and _position_ready(attack, -1, internal_step)
 
 func combo_heads(kinds: Array) -> Array[Neck]:
 	var result: Array[Neck]=[]
@@ -739,8 +740,8 @@ func combo_heads(kinds: Array) -> Array[Neck]:
 		result.append(found)
 	return result
 
-func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = []) -> bool:
-	if busy or not attack_ready(attack):
+func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [], internal_step := false) -> bool:
+	if busy or not attack_ready(attack, internal_step):
 		return false
 	if not timeline.has_animation(attack):return false
 	var director=ctx.projectiles.director

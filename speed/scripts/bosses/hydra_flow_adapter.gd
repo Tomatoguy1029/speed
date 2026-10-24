@@ -41,7 +41,7 @@ func start_step(id: String) -> Object:
 	if options.is_empty(): return null
 	var previous := active
 	var chosen := [options[0]]
-	var ok := start(chosen)
+	var ok := start(chosen, true)
 	active = previous
 	if not ok: return null
 	var ticket := StepTicket.new()
@@ -65,11 +65,11 @@ func candidates(query: Dictionary) -> Dictionary:
 		if move.head_kind != &"":
 			if query.get("request", "normal") == "major": continue
 			for i in actor.necks.size():
-				if actor.normal_ready(i, id): result.append(_candidate(id, [actor.necks[i]], "single"))
+				if actor.normal_ready(i, id, query.get("children_only", false)): result.append(_candidate(id, [actor.necks[i]], "single"))
 		else:
 			if query.get("request", "normal") == "normal" and id not in actor.COMBOS: continue
 			if query.get("request", "normal") == "major" and id in actor.COMBOS: continue
-			if not actor.attack_ready(id): continue
+			if not actor.attack_ready(id, query.get("children_only", false)): continue
 			var heads: Array = []
 			if id in [&"north", &"sequence"]: heads = actor.front_heads()
 			elif id in actor.COMBOS:
@@ -85,7 +85,7 @@ func candidates(query: Dictionary) -> Dictionary:
 			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if id in actor.COMBOS else "major"))
 	if not query.get("children_only", false) and query.get("request", "normal") != "major" and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
 		for id in actor.action_rules.combos:
-			if not step_condition(actor.action_rules.conditions.get(id, {})): continue
+			if not actor.action_rules.active_gates_for(String(id)).any(func(gate): return step_condition(gate)): continue
 			var needs: Dictionary = _requirements(actor.action_rules.combos[id])
 			var heads: Array = []
 			var possible := true
@@ -126,7 +126,7 @@ func _candidate(id: StringName, heads: Array, kind: String) -> Dictionary:
 	if actor.action_rules != null: cost = float(actor.action_rules.costs.get(String(id), cost))
 	return {"id": String(id), "heads": heads, "parts": parts, "category": kind, "exclusive": kind != "single", "cost": cost}
 
-func start(actions: Array) -> bool:
+func start(actions: Array, internal_step := false) -> bool:
 	# 同一更新内で全体を検証し、候補の具体的個体を固定する。
 	if blocked() or actions.is_empty(): return false
 	for action in actions:
@@ -136,16 +136,16 @@ func start(actions: Array) -> bool:
 			if not actor._alive(head) or head.row_id != action.parts[i]: return false
 		if action.has("program"): continue
 		if action.category == "single":
-			if not actor.normal_ready(actor.necks.find(action.heads[0]), StringName(action.id)): return false
-		elif not actor.attack_ready(StringName(action.id)): return false
+			if not actor.normal_ready(actor.necks.find(action.heads[0]), StringName(action.id), internal_step): return false
+		elif not actor.attack_ready(StringName(action.id), internal_step): return false
 	var started: Array = []
 	for action in actions:
 		var ok: bool
 		if action.has("program"):
 			custom_run = preload("res://scripts/bosses/flow/combo_runner.gd").new(action.program, self)
 			ok = true
-		elif action.category == "single": ok = actor.start_normal(actor.necks.find(action.heads[0]), StringName(action.id))
-		else: ok = actor.try_start_tech(StringName(action.id), 1.0, action.heads)
+		elif action.category == "single": ok = actor.start_normal(actor.necks.find(action.heads[0]), StringName(action.id), internal_step)
+		else: ok = actor.try_start_tech(StringName(action.id), 1.0, action.heads, internal_step)
 		if not ok:
 			_cancel_actions(started + [action])
 			return false
