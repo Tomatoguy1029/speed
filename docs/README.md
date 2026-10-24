@@ -1,6 +1,6 @@
 # 文書の運用規定
 
-`docs/` を触る人とエージェントは、作業の前にこの規定を読み、必ず従う。違反は `python3 tools/check_docs.py` で検出し、コミット前のフックと GitHub Actions で止める。
+`docs/` を触る人とエージェントは、作業の前にこの規定を読み、必ず従う。配置・表記・リンク等の機械的な違反は `python3 tools/check_docs.py` で検出し、コミット前のフックと GitHub Actions で止める。設計の意味的な適合はレビューで確認する。
 
 ## 1. 置き場
 
@@ -79,6 +79,8 @@ python3 tools/check_docs.py
 - リポジトリの `tasks/`・`docs/proposals/`・`docs/logs/`
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
 - [設計書](architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
+
+処理の実行時期と生成・利用・解放の関係は、[設計書15.1](architecture.md#151-ビルドと実行時の境界)を正とし、[AI向けの確認手順](dev/stage-production-ai.md#処理の実行時期を設計レビューする)でレビューする。上記の自動チェックは、この意味的な適合判定を代行しない。
 
 コミット前のフックを使うには、クローンごとに1回だけ次を実行する。
 
