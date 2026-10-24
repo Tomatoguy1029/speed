@@ -7,10 +7,9 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 
 ## じょうぎ座：照射の予告は、発射元から照射の向きへ伸びる点線。予告が進むほど濃く、先端の光が強まる。
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	var p := t.pos[i]
 	var r := t.r[i]
 	var u := Vector2.from_angle(t.facing[i])
-	var tip := p + u * r
+	var tip: Vector2 = behavior.call(&"beam_origin", i)
 	var col := t.color[i].lightened(0.2)
 	if t.mode[i] == EnemyTable.Mode.WINDUP:
 		var k := t.charge[i]
