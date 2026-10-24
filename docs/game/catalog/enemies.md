@@ -110,7 +110,7 @@
 | `monoceros` | いっかくじゅう座 | 採用 | 通常／往復突進・薙ぎ・蹴り・後半の光槍と連携・惑星の角刺さり・形態予約を実装。表示と数値は仮 | [専用仕様](../bosses/monoceros.md) | ステージ1のボス | `scenes/bosses/monoceros_boss.tscn`、`scenes/bosses/monoceros_boss_bt.tres`、`scripts/bosses/monoceros_boss.gd`、`data/bosses/monoceros.tres`、`scenes/bosses/monoceros_presentation.tscn`。実験場で配置できる |
 | 未定 | ケンタウルス座 | 採用 | 未実装（`provisional` で代用） | [ステージ2](../stages/stage-2.md#4-ボス戦) | ステージ2のボス | — |
 | 未定 | おおいぬ座 | 採用 | 未実装（`provisional` で代用） | [ステージ3](../stages/stage-3.md#4-ボス戦) | ステージ3のボス | — |
-| 未定 | りゅう座 | 採用 | 未実装（`provisional` で代用） | ピカロの処理と本体への攻撃を選び、両立できる。機体とピカロを吸い込み、ブレスと星弾を放つ大技を持つ。口に到達した自機へ噛みつき系の専用攻撃を行う。[ステージ5](../stages/stage-5.md#4-ラスボス戦) | ステージ5のラスボス | — |
+| 未定 | りゅう座 | 採用 | 未実装（`provisional` で代用） | ピカロの処理と本体への攻撃を選び、両立できる。星を組み替え、過去の4体のボスを想起させる技を使う。機体とピカロを吸い込み、ブレスと星弾を放つ大技を持つ。口に到達した自機へ噛みつき系の専用攻撃を行う。[ステージ5](../stages/stage-5.md#4-ラスボス戦) | ステージ5のラスボス | — |
 
 各ステージのボスの出現時刻は `speed/data/stages/` の定義に従う。
 
