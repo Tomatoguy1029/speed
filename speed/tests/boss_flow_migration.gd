@@ -1,10 +1,10 @@
 extends SceneTree
 func _initialize() -> void:
-	if not ResourceLoader.exists("res://data/bosses/hydra_action_rules.tres"):
+	if not ResourceLoader.exists("res://data/bosses/ai/hydra_action_rules.tres"):
 		print("[boss-migration] FAIL migrated rules missing")
 		quit(1)
 		return
-	var rules = load("res://data/bosses/hydra_action_rules.tres")
+	var rules = load("res://data/bosses/ai/hydra_action_rules.tres")
 	assert(rules.techniques.size() == 18)
 	assert(rules.conditions.size() == 18)
 	assert(rules.conditions.bite_thrust.max == 620.0)

@@ -17,4 +17,8 @@ func _initialize() -> void:
 	result = compiler.compile(source, "res://.content/tests/compiled_boss.tres")
 	check(result.error == OK and not result.generated, "layout change reuses runtime data")
 	check(result.program.data.techniques[0].parameters.bite_dmg == 16.0, "compiled values preserved")
+	source.techniques[0] = source.techniques[0].duplicate(true)
+	var compiled = compiler.compile(source, "res://.content/tests/embedded_boss.tres")
+	source.techniques[0].parameters.bite_dmg = 999.0
+	check(compiled.program.data.techniques[0].parameters.bite_dmg == 16.0, "runtime values are independent of editor resources")
 	quit(1 if failed else 0)

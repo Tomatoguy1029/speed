@@ -27,13 +27,13 @@ func collect(task: BTTask, gates: Array = []) -> void:
 	for i in task.get_child_count(): collect(task.get_child(i), branch)
 
 func _initialize() -> void:
-	if ResourceLoader.exists("res://data/bosses/hydra_action_rules.tres"):
+	if ResourceLoader.exists("res://data/bosses/ai/hydra_action_rules.tres"):
 		print("既存の編集元を保護するため移行を省略しました")
 		quit()
 		return
 	collect(load("res://scenes/bosses/hydra_head_bt.tres").root_task)
 	collect(load("res://scenes/bosses/hydra_boss_bt.tres").root_task)
-	var error := ResourceSaver.save(rules, "res://data/bosses/hydra_action_rules.tres")
+	var error := ResourceSaver.save(rules, "res://data/bosses/ai/hydra_action_rules.tres")
 	if error != OK:
 		quit(1)
 		return
@@ -43,6 +43,6 @@ func _initialize() -> void:
 		{"name": "牽制", "request": "normal", "cap": 2.0, "weights": {"single": 60.0, "parallel": 25.0, "combo": 15.0}, "next": 1},
 		{"name": "圧力", "request": "normal", "cap": 3.0, "weights": {"single": 35.0, "parallel": 45.0, "combo": 20.0}, "next": 2},
 		{"name": "大技候補", "request": "major", "cap": 3.0, "weights": {"major": 100.0}, "next": 0, "fallback": 0}]
-	error = ResourceSaver.save(flow, "res://data/bosses/hydra_flow.tres")
+	error = ResourceSaver.save(flow, "res://data/bosses/ai/hydra_flow.tres")
 	print("ヒュドラ移行: ", rules.techniques.size(), "技 / ", error_string(error))
 	quit(0 if error == OK else 1)

@@ -8,12 +8,12 @@ var _fields := GridContainer.new()
 var _status := Label.new()
 var _path := LineEdit.new()
 var rules: Resource
-var rules_path := "res://data/bosses/hydra_action_rules.tres"
+var rules_path := "res://data/bosses/ai/hydra_action_rules.tres"
 var graph := preload("res://addons/boss_flow/technique_graph.gd").new()
 var preview := preload("res://addons/boss_flow/range_preview.gd").new()
 var editing_rules := false
 var flow: Resource
-var flow_path := "res://data/bosses/hydra_flow.tres"
+var flow_path := "res://data/bosses/ai/hydra_flow.tres"
 var flow_bar := HBoxContainer.new()
 var editing_flow := false
 var combo_editor := preload("res://addons/boss_flow/combo_graph.gd").new()
@@ -21,6 +21,9 @@ var combo_id := ""
 var preview_stamina := 8.0
 var preview_radius := 1800.0
 var preview_heads := {"bite": 2, "vortex": 2, "debris": 1, "beam": 2, "thunder": 1}
+var dirty_flow := false
+var dirty_rules := false
+var working: Dictionary = {}
 
 func _ready() -> void:
 	var toolbar := HBoxContainer.new()
@@ -119,10 +122,12 @@ func _picked(kind: String, id: String) -> void:
 		_status.text = id + " の発動条件（区間と独立）"
 
 func _set_gate(id: String, key: String, value: float) -> void:
+	dirty_rules = true
 	rules.conditions[id][key] = value
 	preview.queue_redraw()
 
 func _set_combo(id: String, value: Dictionary) -> void:
+	dirty_rules = true
 	rules.combos[id] = value.duplicate(true)
 	combo_editor.open(rules.combos[id], rules.techniques)
 
@@ -167,12 +172,12 @@ func open_technique(path: String) -> Error:
 	if loaded == null or not loaded.get("parameters") is Dictionary:
 		_status.text = "技の設定を開けません: " + path
 		return ERR_INVALID_DATA
-	current = loaded.duplicate(true)
+	current = working.get(path, loaded.duplicate(true))
+	working[path] = current
 	editing_rules = false
 	editing_flow = false
 	source_path = path
 	_path.text = path
-	history.clear_history()
 	_refresh()
 	return OK
 
@@ -195,15 +200,22 @@ func _assign(key: String, value: Variant) -> void:
 			node.set_value_no_signal(float(value))
 
 func save_current() -> Error:
-	if editing_flow: return ResourceSaver.save(flow, flow_path)
-	if editing_rules:
-		var result := ResourceSaver.save(rules, rules_path)
-		_status.text = "発動条件を保存しました" if result == OK else error_string(result)
-		return result
-	if current == null or source_path.is_empty(): return ERR_UNCONFIGURED
-	var error := ResourceSaver.save(current, source_path)
-	_status.text = "保存済み（実行データは試遊前に生成）" if error == OK else error_string(error)
-	return error
+	for path in working:
+		var move: Resource = working[path]
+		var error := ResourceSaver.save(move, path, ResourceSaver.FLAG_CHANGE_PATH)
+		if error != OK: return error
+		for i in rules.techniques.size():
+			if rules.techniques[i].technique == move.technique: rules.techniques[i] = move
+	if dirty_rules:
+		var error := ResourceSaver.save(rules, rules_path)
+		if error != OK: return error
+	if dirty_flow:
+		var error := ResourceSaver.save(flow, flow_path)
+		if error != OK: return error
+	dirty_rules = false
+	dirty_flow = false
+	_status.text = "保存済み（実行データは生成していません）"
+	return OK
 
 func _clear_fields() -> void:
 	for child in _fields.get_children():
@@ -231,6 +243,7 @@ func _refresh_flow() -> void:
 	flow_bar.add_child(add)
 
 func _set_sections(value: Array) -> void:
+	dirty_flow = true
 	flow.sections = value.duplicate(true)
 	_refresh_flow()
 
@@ -329,7 +342,11 @@ func _edit_common() -> void:
 			history.create_action("休息・スタミナを変更")
 			history.add_do_property(flow, key, value)
 			history.add_undo_property(flow, key, flow.get(key))
+			history.add_do_method(_dirty_flow)
+			history.add_undo_method(_dirty_flow)
 			history.commit_action())
+
+func _dirty_flow() -> void: dirty_flow = true
 
 func _edit_forbidden() -> void:
 	editing_flow = false
@@ -370,6 +387,7 @@ func _set_forbidden_undo(value: Array) -> void:
 	history.commit_action()
 
 func _set_forbidden(value: Array) -> void:
+	dirty_rules = true
 	rules.forbidden = value.duplicate(true)
 	_edit_forbidden()
 
@@ -403,7 +421,7 @@ func _analyze_coverage() -> void:
 
 func play_current() -> void:
 	if save_current() != OK: return
-	var result = preload("res://tools/content/build_boss_program.gd").compile({"techniques": [current]}, "res://.content/boss_preview.tres")
+	var result = preload("res://tools/content/build_boss_program.gd").compile({"rules": rules, "flow": flow}, "res://.content/boss_preview.tres")
 	if result.error != OK:
 		_status.text = "生成失敗: " + error_string(result.error)
 		return
@@ -414,6 +432,7 @@ func _refresh() -> void:
 		_fields.remove_child(child)
 		child.queue_free()
 	for key in current.parameters:
+		if key in ["cost", "major_cost"]: continue
 		var label := Label.new()
 		label.text = String(key)
 		_fields.add_child(label)
@@ -425,4 +444,14 @@ func _refresh() -> void:
 		field.set_meta("key", key)
 		field.value_changed.connect(func(value): set_value(key, value))
 		_fields.add_child(field)
+	var id := String(current.technique)
+	_number_field("消費スタミナ", float(rules.costs.get(id, 1.0)), func(value):
+		history.create_action("技の消費を変更")
+		history.add_do_method(_set_cost.bind(id, value))
+		history.add_undo_method(_set_cost.bind(id, float(rules.costs.get(id, 1.0))))
+		history.commit_action())
 	_status.text = "編集中: " + source_path
+
+func _set_cost(id: String, value: float) -> void:
+	rules.costs[id] = value
+	dirty_rules = true
