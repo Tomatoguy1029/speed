@@ -6,6 +6,7 @@ var retry := 0.0
 var stamina := 0.0
 var last: Array = []
 var status := ""
+var selector := preload("res://scripts/bosses/flow/selector.gd").new()
 
 func configure(value: Resource) -> void:
 	flow = value
@@ -33,7 +34,10 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	if candidates.is_empty():
 		status = result.get("reason", "候補なし")
 		return
-	var actions := [candidates[0]]
+	var actions: Array = selector.choose(candidates, section, last)
+	if actions.is_empty():
+		status = "成立する攻撃種別の確率が0です"
+		return
 	if adapter.start(actions):
 		active = true
 		last = actions

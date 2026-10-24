@@ -190,6 +190,54 @@ func _edit_section(i: int) -> void:
 			history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
 			history.commit_action())
 		_fields.add_child(field)
+	for key in ["single", "parallel", "combo", "major"]:
+		_number_field({"single": "単独の割合", "parallel": "同時の割合", "combo": "コンボの割合", "major": "大技の割合"}[key], float(flow.sections[i].get("weights", {}).get(key, 0.0)), func(value): _section_weight(i, key, value))
+	for previous in ["single", "parallel", "combo", "major"]:
+		var button := Button.new()
+		button.text = "直前が「%s」の確率を編集" % previous
+		button.pressed.connect(_edit_probability.bind(i, previous))
+		_fields.add_child(button)
+		_fields.add_child(Control.new())
+
+func _number_field(title_text: String, value: float, changed: Callable, minimum := 0.0, maximum := 100000.0) -> SpinBox:
+	var label := Label.new()
+	label.text = title_text
+	_fields.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = maximum
+	field.step = 0.1
+	field.value = value
+	field.value_changed.connect(changed)
+	_fields.add_child(field)
+	return field
+
+func _section_weight(index: int, key: String, value: float, previous := "") -> void:
+	var copy: Array = flow.sections.duplicate(true)
+	if previous.is_empty():
+		if not copy[index].has("weights"): copy[index].weights = {}
+		copy[index].weights[key] = value
+	else:
+		if not copy[index].has("probability_rules"): copy[index].probability_rules = []
+		var found := false
+		for rule in copy[index].probability_rules:
+			if rule.previous == previous:
+				rule.weights[key] = value
+				found = true
+		if not found: copy[index].probability_rules.append({"previous": previous, "weights": copy[index].weights.duplicate().merged({key: value}, true)})
+	history.create_action("選択確率を変更")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
+
+func _edit_probability(index: int, previous: String) -> void:
+	_clear_fields()
+	_status.text = "直前が「%s」の場合の区間確率" % previous
+	var weights: Dictionary = flow.sections[index].get("weights", {})
+	for rule in flow.sections[index].get("probability_rules", []):
+		if rule.previous == previous: weights = rule.weights
+	for key in ["single", "parallel", "combo", "major"]:
+		_number_field(key, float(weights.get(key, 0.0)), func(value): _section_weight(index, key, value, previous))
 
 func play_current() -> void:
 	if save_current() != OK: return
