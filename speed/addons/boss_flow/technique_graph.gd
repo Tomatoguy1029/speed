@@ -34,7 +34,7 @@ func _ready() -> void:
 	minimap_enabled = false
 	connection_lines_thickness = 1.5
 	node_selected.connect(func(node):
-		if String(node.name).begins_with("choose_"): picked.emit("coverage", String(node.name).trim_prefix("choose_"))
+		if rules.condition_groups.has(String(node.name)): picked.emit("coverage", String(node.name))
 		else: picked.emit("technique", String(node.name)))
 	gui_input.connect(_input_graph)
 	begin_node_move.connect(_move_begin)
@@ -45,7 +45,7 @@ func _ready() -> void:
 	duplicate_nodes_request.connect(func(): command("duplicate"))
 	delete_nodes_request.connect(func(ids): _delete(ids))
 	connection_request.connect(func(from, _port, to, _input):
-		if String(from) == hub_for(String(to)): _connect(String(to), true))
+		if rules.condition_groups.has(String(from)) and rules.node_ids().has(String(to)): assign_group(String(to), String(from)))
 	disconnection_request.connect(func(_from, _port, to, _input): _connect(String(to), false))
 	get_menu_hbox().hide()
 	resized.connect(func():
@@ -57,31 +57,43 @@ func _ready() -> void:
 		_popup.position = Vector2i(get_screen_position() + at)
 		_popup.popup())
 
-func make_display_bar() -> HBoxContainer:
+func make_toolbar(add_combo: Callable) -> void:
+	var overlay := PanelContainer.new()
+	overlay.name = "TechniqueTools"
+	overlay.position = Vector2(8, 8)
+	add_child(overlay)
 	var bar := HBoxContainer.new()
+	overlay.add_child(bar)
+	var label := Label.new()
+	label.text = "技・条件"
+	bar.add_child(label)
+	var add := MenuButton.new()
+	add.flat = false
+	add.text = "＋ 追加"
+	add.get_popup().add_item("条件選択を追加", 0)
+	add.get_popup().add_item("コンボ技を作成", 1)
+	add.get_popup().id_pressed.connect(func(id):
+		if id == 0: add_group()
+		else: add_combo.call())
+	bar.add_child(add)
 	var display := MenuButton.new()
-	display.text = "配置と表示"
+	display.flat = false
+	display.text = "表示・整列"
 	bar.add_child(display)
-	var spacing_label := Label.new()
-	spacing_label.text = "グリッド間隔"
-	bar.add_child(spacing_label)
-	var spacing := SpinBox.new()
-	spacing.min_value = 1
-	spacing.max_value = 256
-	spacing.value = snapping_distance
-	spacing.value_changed.connect(func(value): snapping_distance = int(value))
-	bar.add_child(spacing)
 	var menu := display.get_popup()
+	menu.add_item("全体を表示", 5)
+	menu.add_item("条件選択ごとに整列", 6)
+	menu.add_item("拡大率 100%", 7)
+	menu.add_item("拡大率 50%", 8)
+	menu.add_separator()
 	menu.add_check_item("グリッドを表示", 0)
 	menu.add_check_item("ノードをグリッドに合わせる", 1)
 	menu.add_check_item("全体図を表示", 2)
 	menu.add_check_item("近くのノードに位置を合わせる", 3)
 	menu.add_item("選択ノードを縦に等間隔にする", 4)
-	menu.add_item("全ノードを縦に整列する", 5)
 	menu.about_to_popup.connect(func():
-		for i in 4: menu.set_item_checked(i, [show_grid, snapping_enabled, minimap_enabled, align_enabled][i]))
+		for i in 4: menu.set_item_checked(menu.get_item_index(i), [show_grid, snapping_enabled, minimap_enabled, align_enabled][i]))
 	menu.id_pressed.connect(_display_action)
-	return bar
 
 func _display_action(id: int) -> void:
 	match id:
@@ -90,14 +102,17 @@ func _display_action(id: int) -> void:
 		2: minimap_enabled = not minimap_enabled
 		3: align_enabled = not align_enabled
 		4: command("align")
-		5: command("align_all")
+		5: fit_all()
+		6: arrange_categories()
+		7: zoom = 1.0
+		8: zoom = 0.5
 
 func focus_technique(id: String) -> void:
 	var node := get_node_or_null(NodePath(id)) as GraphNode
 	if node != null: scroll_offset = (node.position_offset - Vector2(180, 70)) * zoom
 
 func snapshot() -> Dictionary:
-	return {"conditions": rules.conditions.duplicate(true), "layout": rules.layout.duplicate(true), "graph_nodes": rules.graph_nodes.duplicate(true), "combos": rules.combos.duplicate(true), "costs": rules.costs.duplicate(true)}
+	return {"conditions": rules.conditions.duplicate(true), "layout": rules.layout.duplicate(true), "graph_nodes": rules.graph_nodes.duplicate(true), "combos": rules.combos.duplicate(true), "costs": rules.costs.duplicate(true), "condition_groups": rules.condition_groups.duplicate(true)}
 
 func category_for(id: String) -> String:
 	var source: String = rules.source_for(id)
@@ -106,13 +121,72 @@ func category_for(id: String) -> String:
 		if String(move.technique) == source: return "normal" if move.category == &"single" else String(move.category)
 	return "normal"
 
-func hub_for(id: String) -> String: return "choose_" + category_for(id)
+func hub_for(id: String) -> String:
+	for group in rules.condition_groups:
+		if id in rules.condition_groups[group].get("nodes", []): return group
+	return ""
+
+func _default_groups() -> Dictionary:
+	var result := {}
+	for category in ["normal", "combo", "major"]:
+		var buckets := {}
+		for id in rules.node_ids():
+			if category_for(id) != category: continue
+			var kind := ""
+			for move in rules.techniques:
+				if String(move.technique) == rules.source_for(id): kind = String(move.get("head_kind") if move.get("head_kind") != null else "")
+			if not buckets.has(kind): buckets[kind] = []
+			buckets[kind].append(id)
+		if buckets.is_empty(): buckets[""] = []
+		var number := 0
+		for kind in buckets:
+			var ids: Array = buckets[kind]
+			var count := maxi(1, ceili(ids.size() / 4.0))
+			var chunk := maxi(1, ceili(ids.size() / float(count)))
+			for i in count:
+				number += 1
+				var group: String = "choose_" + category + ("_" + str(number) if number > 1 else "")
+				var title_text: String = {"normal": "通常技", "combo": "コンボ", "major": "大技"}[category]
+				title_text += " · " + {"bite": "噛みつき", "vortex": "渦", "debris": "瓦礫", "beam": "ビーム", "thunder": "雷"}.get(kind, kind) if not kind.is_empty() else (" " + str(number) if number > 1 else "")
+				result[group] = {"title": title_text, "nodes": ids.slice(i * chunk, (i + 1) * chunk)}
+	return result
+
+func assign_group(id: String, group: String) -> void:
+	if not rules.condition_groups.has(group) or not rules.node_ids().has(id): return
+	var before := snapshot()
+	var after := snapshot()
+	for value in after.condition_groups.values(): value.nodes.erase(id)
+	after.condition_groups[group].nodes.append(id)
+	if not after.graph_nodes.has(id): after.graph_nodes[id] = {"source": rules.source_for(id)}
+	after.graph_nodes[id].connected = true
+	edit_requested.emit(before, after, "技の条件選択を変更")
+
+func add_group() -> void:
+	var before := snapshot()
+	var after := snapshot()
+	var n := 1
+	while after.condition_groups.has("choose_custom_" + str(n)): n += 1
+	var id := "choose_custom_" + str(n)
+	after.condition_groups[id] = {"title": "条件選択 " + str(n), "nodes": []}
+	after.layout[id] = (scroll_offset + size * 0.5) / zoom
+	edit_requested.emit(before, after, "条件選択を追加")
+	picked.emit("coverage", id)
 
 func _get_connection_line(from_position: Vector2, to_position: Vector2) -> PackedVector2Array:
 	return preload("res://addons/boss_flow/wire_router.gd").for_graph(self, from_position, to_position)
 
 func show_rules(value: Resource) -> void:
 	rules = value
+	if rules.condition_groups.is_empty():
+		rules.condition_groups = _default_groups()
+		# 旧エディターの単一ハブが生成した縦一列配置を移行する。
+		if rules.layout.has("choose"): rules.layout = {}
+	# 新しく作成した技は既存グループへ加える。
+	for id in rules.node_ids():
+		if not hub_for(id).is_empty(): continue
+		var group := "choose_" + category_for(id)
+		if not rules.condition_groups.has(group): rules.condition_groups[group] = {"title": "条件選択", "nodes": []}
+		rules.condition_groups[group].nodes.append(id)
 	_updating = true
 	clear_connections()
 	for child in get_children():
@@ -120,13 +194,14 @@ func show_rules(value: Resource) -> void:
 			remove_child(child)
 			child.queue_free()
 	var factor := maxf(1.0, get_theme_default_font_size() / 14.0)
-	var x := 20.0 * factor
-	for category in ["normal", "combo", "major"]:
+	var blocks: Array = []
+	var block_size := Vector2.ZERO
+	for group in rules.condition_groups:
 		var ids: Array[String] = []
 		for id in rules.node_ids():
-			if category_for(id) == category: ids.append(id)
-		var hub := _add_node("choose_" + category, {"normal": "通常技", "combo": "コンボ", "major": "大技"}[category] + " · 条件選択", Vector2(x, 15 * factor), false)
-		var columns := 3 if category == "normal" and ids.size() > 6 else 2 if category != "combo" and ids.size() > 3 else 1
+			if hub_for(id) == group: ids.append(id)
+		var hub := _add_node(group, rules.condition_groups[group].title + " · 条件選択", Vector2.ZERO, false)
+		var columns := mini(2, maxi(1, ids.size()))
 		var nodes: Array[GraphNode] = []
 		var cell := Vector2.ZERO
 		for id in ids:
@@ -134,12 +209,26 @@ func show_rules(value: Resource) -> void:
 			nodes.append(node)
 			cell.x = maxf(cell.x, node.get_combined_minimum_size().x + 18 * factor)
 			cell.y = maxf(cell.y, node.get_combined_minimum_size().y + 18 * factor)
-		for i in nodes.size():
-			var id: String = ids[i]
-			var at := Vector2(x + (i % columns) * cell.x, hub.get_combined_minimum_size().y + 44 * factor + floori(i / float(columns)) * cell.y)
-			nodes[i].position_offset = rules.layout.get(id, at)
-			if rules.graph_nodes.get(id, {}).get("connected", true): connect_node(String(hub.name), 0, id, 0)
-		x += maxf(hub.get_combined_minimum_size().x, columns * cell.x) + 30 * factor
+		var height := hub.get_combined_minimum_size().y + 30 * factor
+		block_size.x = maxf(block_size.x, maxf(hub.get_combined_minimum_size().x, columns * cell.x) + 24 * factor)
+		block_size.y = maxf(block_size.y, height + ceili(ids.size() / float(columns)) * cell.y + 24 * factor)
+		blocks.append({"hub": hub, "ids": ids, "nodes": nodes, "columns": columns, "cell": cell, "height": height, "total_height": height + ceili(ids.size() / float(columns)) * cell.y + 24 * factor})
+	var lanes := mini(4, blocks.size())
+	var heights := []
+	heights.resize(lanes)
+	heights.fill(0.0)
+	for b in blocks.size():
+		var block: Dictionary = blocks[b]
+		var lane := 0
+		for i in lanes:
+			if heights[i] < heights[lane]: lane = i
+		var at := Vector2(20, 58) * factor + Vector2(lane * block_size.x, heights[lane])
+		heights[lane] += block.total_height
+		block.hub.position_offset = rules.layout.get(String(block.hub.name), at)
+		for i in block.nodes.size():
+			var id: String = block.ids[i]
+			block.nodes[i].position_offset = rules.layout.get(id, at + Vector2((i % block.columns) * block.cell.x, block.height + floori(i / float(block.columns)) * block.cell.y))
+			if rules.graph_nodes.get(id, {}).get("connected", true): connect_node(String(block.hub.name), 0, id, 0)
 	_updating = false
 	if rules.layout.is_empty(): fit_all.call_deferred()
 
@@ -185,10 +274,15 @@ func _reroute() -> void:
 func fit_all() -> void:
 	if size.x <= 0 or size.y <= 0: return
 	var bounds := Rect2()
+	var first := true
 	for node in get_children():
-		if node is GraphNode: bounds = bounds.merge(Rect2(node.position_offset, node.get_combined_minimum_size()))
-	zoom = clampf(minf((size.x - 25) / maxf(1, bounds.size.x), (size.y - 25) / maxf(1, bounds.size.y)), zoom_min, 1.0)
-	scroll_offset = bounds.position * zoom - Vector2(12, 12)
+		if node is GraphNode:
+			var rect := Rect2(node.position_offset, node.get_combined_minimum_size())
+			bounds = rect if first else bounds.merge(rect)
+			first = false
+	var top := 48.0 * maxf(1.0, get_theme_default_font_size() / 14.0)
+	zoom = clampf(minf((size.x - 25) / maxf(1, bounds.size.x), (size.y - top - 12) / maxf(1, bounds.size.y)), zoom_min, 1.0)
+	scroll_offset = bounds.position * zoom - Vector2(12, top)
 
 func arrange_categories() -> void:
 	var before := snapshot()
@@ -203,7 +297,7 @@ func arrange_categories() -> void:
 func selected_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for node in get_children():
-		if node is GraphNode and node.selected and not String(node.name).begins_with("choose_"): ids.append(String(node.name))
+		if node is GraphNode and node.selected: ids.append(String(node.name))
 	return ids
 
 func positions() -> Dictionary:
@@ -286,9 +380,17 @@ func _delete(ids: Array) -> void:
 	if ids.is_empty(): return
 	var before := snapshot()
 	var after := snapshot()
+	var targets: Array = ids.duplicate()
 	for raw in ids:
+		if after.condition_groups.has(String(raw)):
+			for member in after.condition_groups[String(raw)].nodes:
+				if not targets.has(member): targets.append(member)
+			after.condition_groups.erase(String(raw))
+			after.layout.erase(String(raw))
+	for raw in targets:
 		var id := String(raw)
 		if id.begins_with("choose_"): continue
+		for group in after.condition_groups.values(): group.nodes.erase(id)
 		if not after.graph_nodes.has(id): after.graph_nodes[id] = {"source": rules.source_for(id)}
 		after.graph_nodes[id].hidden = true
 		after.graph_nodes[id].connected = false
@@ -298,8 +400,15 @@ func command(action: String) -> void:
 	var ids := selected_ids()
 	if action in ["copy", "cut", "duplicate"]:
 		clipboard.clear()
+		var expanded: Array[String] = ids.duplicate()
 		for id in ids:
-			clipboard.append({"id": id, "source": rules.source_for(id), "gate": rules.conditions.get(id, {}).duplicate(true), "position": get_node(NodePath(id)).position_offset, "size": get_node(NodePath(id)).size, "connected": rules.graph_nodes.get(id, {}).get("connected", true)})
+			if not rules.condition_groups.has(id): continue
+			clipboard.append({"id": id, "group": rules.condition_groups[id].duplicate(true), "position": get_node(NodePath(id)).position_offset, "size": get_node(NodePath(id)).size})
+			for member in rules.condition_groups[id].nodes:
+				if rules.node_ids().has(member) and not expanded.has(member): expanded.append(member)
+		for id in expanded:
+			if rules.condition_groups.has(id): continue
+			clipboard.append({"id": id, "source": rules.source_for(id), "owner": hub_for(id), "gate": rules.conditions.get(id, {}).duplicate(true), "position": get_node(NodePath(id)).position_offset, "size": get_node(NodePath(id)).size, "connected": rules.graph_nodes.get(id, {}).get("connected", true)})
 			if rules.combos.has(rules.source_for(id)):
 				clipboard[-1].program = rules.combos[rules.source_for(id)].duplicate(true)
 				clipboard[-1].cost = rules.costs.get(rules.source_for(id), 2.0)
@@ -311,7 +420,18 @@ func command(action: String) -> void:
 		var after := snapshot()
 		var pasted: Array[String] = []
 		var offset := _paste_offset()
+		var groups := {}
 		for entry in clipboard:
+			if not entry.has("group"): continue
+			var n := 1
+			while after.condition_groups.has(entry.id + "_copy_" + str(n)): n += 1
+			var id: String = entry.id + "_copy_" + str(n)
+			groups[entry.id] = id
+			after.condition_groups[id] = {"title": entry.group.title + "（複製）", "nodes": []}
+			after.layout[id] = entry.position + offset
+			pasted.append(id)
+		for entry in clipboard:
+			if entry.has("group"): continue
 			var n := 1
 			var id: String = entry.source + "_copy_" + str(n)
 			while after.graph_nodes.has(id) or rules.node_ids().has(id) or after.combos.has(id):
@@ -325,6 +445,8 @@ func command(action: String) -> void:
 			after.graph_nodes[id] = {"source": source, "connected": entry.connected}
 			after.conditions[id] = entry.gate.duplicate(true)
 			after.layout[id] = entry.position + offset
+			var owner: String = groups.get(entry.owner, entry.owner)
+			if after.condition_groups.has(owner): after.condition_groups[owner].nodes.append(id)
 			pasted.append(id)
 		edit_requested.emit(before, after, "ノードを貼り付け")
 		_select_nodes.call_deferred(pasted)

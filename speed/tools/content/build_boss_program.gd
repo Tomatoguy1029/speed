@@ -66,7 +66,7 @@ static func snapshot(value: Variant) -> Variant:
 		var copy: Resource = value.duplicate(true)
 		for property in value.get_property_list():
 			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["script", "resource_name", "resource_local_to_scene"]:
-				copy.set(property.name, {} if property.name == "layout" else snapshot(value.get(property.name)))
+				copy.set(property.name, {} if property.name in ["layout", "condition_groups"] else snapshot(value.get(property.name)))
 		return copy
 	if value is Dictionary:
 		var copy := {}
@@ -92,7 +92,7 @@ static func canonical(value: Variant) -> Variant:
 	if value is Resource:
 		var fields := {}
 		for property in value.get_property_list():
-			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["resource_name", "resource_local_to_scene", "script", "layout"]:
+			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["resource_name", "resource_local_to_scene", "script", "layout", "condition_groups"]:
 				fields[property.name] = canonical(value.get(property.name))
 		return fields
 	if value is Dictionary:

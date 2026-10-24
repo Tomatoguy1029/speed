@@ -25,7 +25,7 @@ func exercise() -> void:
 	await process_frame
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("res://.content/tests/boss_section.png")
-	panel._edit_coverage()
+	panel._edit_coverage("choose_normal")
 	await process_frame
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("res://.content/tests/boss_coverage.png")

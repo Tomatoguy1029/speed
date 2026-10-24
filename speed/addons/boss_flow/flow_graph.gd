@@ -26,6 +26,7 @@ func _draw() -> void:
 func _ready() -> void:
 	custom_minimum_size = Vector2(280, 150) * maxf(1.0, get_theme_default_font_size() / 14.0)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	focus_mode = Control.FOCUS_ALL
 	get_menu_hbox().hide()
 	copy_nodes_request.connect(func(): command("copy"))

@@ -70,6 +70,31 @@ func exercise() -> void:
 	check(not universal_selector, "there is no universal selector mixing technique and section settings")
 
 	var graph: GraphEdit = panel.graph
+	check(graph.get_global_rect().position.y - flow_graph.get_global_rect().end.y <= 24.0, "only the resize divider separates the section and technique canvases")
+	var add_menu: MenuButton
+	for node in graph.find_children("*", "MenuButton", true, false):
+		if "追加" in node.text: add_menu = node
+	check(add_menu != null and not add_menu.flat, "technique creation is an explicit menu inside its own canvas")
+	if add_menu != null:
+		var groups: int = panel.rules.condition_groups.size()
+		add_menu.get_popup().id_pressed.emit(0)
+		await _settle()
+		check(panel.rules.condition_groups.size() == groups + 1 and panel._inspector_mode == 5, "the canvas add menu creates and selects a condition-selection hub")
+		panel.undo_edit()
+		await _settle()
+		check(panel.rules.condition_groups.size() == groups, "the canvas creation menu participates in undo")
+	check(not _has(_texts(panel), "グリッド間隔"), "the workspace does not expose an unnecessary grid interval field")
+	var splitter := graph.get_parent() as VSplitContainer
+	check(splitter != null, "the technique canvas directly shares the resize divider with the section area")
+	if splitter != null:
+		var before_height: float = flow_graph.size.y
+		var before_bottom: float = graph.size.y
+		var before_offset := splitter.split_offset
+		splitter.split_offset += 60
+		await _settle()
+		check(flow_graph.size.y > before_height and graph.size.y < before_bottom, "moving the divider grows the section canvas and shrinks the technique canvas")
+		splitter.split_offset = before_offset
+		await _settle()
 	var hubs := ["choose_normal", "choose_combo", "choose_major"]
 	for id in hubs: check(graph.get_node_or_null(NodePath(id)) is GraphNode, "the technique overview has a separate " + id + " hub")
 	var columns := {}
@@ -124,6 +149,18 @@ func exercise() -> void:
 		text = _texts(panel, true)
 		check(_has(text, "範囲") or _has(text, "カバー"), "a condition-selection hub exposes its coverage")
 		check(not _has(text, "噛みつきのダメージ") and not _has(text, "単独攻撃の割合"), "the condition-selection hub keeps technique and section settings separate")
+		check(_has(text, "条件選択の名前") and _has(text, "技をここへ移す"), "the selected condition hub exposes its own name and technique membership")
+		check(panel._coverage_gates("wind_band").is_empty(), "the bite hub coverage does not include unrelated wind techniques")
+		var name_field: LineEdit
+		for field in panel._fields.get_children():
+			if field is LineEdit: name_field = field
+		if name_field != null:
+			var old_name: String = panel.rules.condition_groups.choose_normal.title
+			name_field.grab_focus()
+			name_field.text = "近距離の選択"
+			name_field.text_submitted.emit(name_field.text)
+			panel.undo_edit()
+			check(panel.rules.condition_groups.choose_normal.title == old_name, "undoing a hub name while editing its field does not reapply the changed name")
 
 	panel.queue_free()
 	await process_frame

@@ -16,7 +16,7 @@ var flow: Resource
 var flow_path := "res://data/bosses/ai/hydra_flow.tres"
 var flow_graph := preload("res://addons/boss_flow/flow_graph.gd").new()
 var _selected_section := 0
-var _coverage_category := ""
+var _coverage_group := ""
 var editing_flow := false
 var combo_editor := preload("res://addons/boss_flow/combo_graph.gd").new()
 var combo_id := ""
@@ -85,10 +85,14 @@ func _ready() -> void:
 	_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(_split)
 	var workspace := VSplitContainer.new()
+	workspace.name = "BattleAndTechniqueSplit"
+	workspace.dragger_visibility = SplitContainer.DRAGGER_VISIBLE
 	workspace.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_split.add_child(workspace)
 	var flow_area := VBoxContainer.new()
+	flow_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	flow_area.size_flags_stretch_ratio = 0.35
 	workspace.add_child(flow_area)
 	var flow_tools := HFlowContainer.new()
 	flow_area.add_child(flow_tools)
@@ -96,7 +100,7 @@ func _ready() -> void:
 	flow_label.text = "戦闘の区間"
 	flow_tools.add_child(flow_label)
 	var add_section := Button.new()
-	add_section.text = "区間を追加"
+	add_section.text = "＋ 区間を追加"
 	add_section.pressed.connect(_add_section)
 	flow_tools.add_child(add_section)
 	var align_sections := Button.new()
@@ -112,31 +116,8 @@ func _ready() -> void:
 		history.add_undo_method(_set_flow_state.bind(before))
 		history.commit_action())
 	_refresh_flow()
-	var graph_column := VBoxContainer.new()
-	graph_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace.add_child(graph_column)
-	var graph_tools := HFlowContainer.new()
-	graph_column.add_child(graph_tools)
-	var graph_label := Label.new()
-	graph_label.text = "技と条件選択"
-	graph_tools.add_child(graph_label)
-	for entry in [["コンボを追加", _new_combo], ["全体を表示", func(): graph.fit_all()], ["分類して整列", func(): graph.arrange_categories()]]:
-		var button := Button.new()
-		button.text = entry[0]
-		button.pressed.connect(entry[1])
-		graph_tools.add_child(button)
-	var zoom := HSlider.new()
-	zoom.min_value = 0.2
-	zoom.max_value = 1.5
-	zoom.step = 0.05
-	zoom.value = 1.0
-	zoom.custom_minimum_size.x = 70 * _scale
-	zoom.tooltip_text = "技の図を拡大・縮小"
-	zoom.value_changed.connect(func(value): graph.zoom = value)
-	graph.gui_input.connect(func(_event): zoom.set_value_no_signal(graph.zoom))
-	graph_tools.add_child(zoom)
-	graph_column.add_child(graph)
-	graph_tools.add_child(graph.make_display_bar())
+	workspace.add_child(graph)
+	graph.make_toolbar(_new_combo)
 	graph.picked.connect(_picked)
 	graph.play_requested.connect(play_technique)
 	graph.edit_requested.connect(func(before, after, title_text):
@@ -177,7 +158,7 @@ func _ready() -> void:
 		history.add_undo_method(_set_combo.bind(combo_id, rules.combos.get(combo_id, {"type": "sequence", "children": []}).duplicate(true)))
 		history.commit_action())
 	_picked("technique", _selected_technique)
-	set_meta("boss_layout_revision", 3)
+	set_meta("boss_layout_revision", 4)
 
 func _set_flow_state(value: Dictionary) -> void:
 	flow.sections = value.sections.duplicate(true)
@@ -194,7 +175,7 @@ func _select_settings(index: int) -> void:
 		2: _edit_section(_selected_section)
 		3: _edit_common()
 		4: _edit_forbidden()
-		5: _edit_coverage()
+		5: _edit_coverage(_coverage_group)
 
 func _context(title_text: String, mode: int, show_preview := false) -> void:
 	_heading.text = title_text
@@ -206,11 +187,13 @@ func _refresh_techniques() -> void:
 	if not ids.has(_selected_technique) and not ids.is_empty(): _selected_technique = ids[0]
 
 func _set_graph_state(value: Dictionary) -> void:
+	var coverage := _inspector_mode == 5
 	for key in value: rules.set(key, value[key].duplicate(true))
 	dirty_rules = true
 	graph.show_rules(rules)
 	_refresh_techniques()
-	if rules.node_ids().has(_selected_technique): _picked("condition" if _inspector_mode == 1 else "technique", _selected_technique)
+	if coverage: _edit_coverage(_coverage_group if rules.condition_groups.has(_coverage_group) else "")
+	elif rules.node_ids().has(_selected_technique): _picked("condition" if _inspector_mode == 1 else "technique", _selected_technique)
 	else:
 		_clear_fields()
 		_context("技がありません。元に戻すで復元できます。", 0)
@@ -268,6 +251,7 @@ func _load_rules() -> void:
 		rules.combos = rules.combos.duplicate(true)
 		rules.costs = rules.costs.duplicate(true)
 		rules.layout = rules.layout.duplicate(true)
+		rules.condition_groups = rules.condition_groups.duplicate(true)
 		rules.graph_nodes = rules.graph_nodes.duplicate(true)
 	else:
 		rules = preload("res://scripts/data_types/boss_action_rules.gd").new()
@@ -300,7 +284,7 @@ func open_boss(action_path: String, section_path: String) -> Error:
 func _is_hydra() -> bool: return rules.adapter == &"hydra" or "hydra_action_rules" in rules_path
 
 func _picked(kind: String, id: String) -> void:
-	if not id.is_empty():
+	if not id.is_empty() and kind != "coverage":
 		_selected_technique = id
 	editing_flow = false
 	combo_editor.hide()
@@ -727,10 +711,46 @@ func _set_section_techniques(index: int, all: bool, ids: Array) -> void:
 	history.commit_action()
 	_edit_section(index)
 
-func _edit_coverage(category := "") -> void:
-	_coverage_category = category
-	_context("指定した状況の範囲を重ねて確認", 5, true)
+func _edit_coverage(group := "") -> void:
+	_coverage_group = group
+	var selection: Dictionary = rules.condition_groups.get(group, {})
+	_context(selection.get("title", "全技") + " · 条件のカバー", 5, true)
 	_clear_fields()
+	if not selection.is_empty():
+		var label := Label.new()
+		label.text = "条件選択の名前"
+		_fields.add_child(label)
+		var name_field := LineEdit.new()
+		name_field.text = selection.title
+		var original_name: String = selection.title
+		name_field.text_submitted.connect(func(value): _rename_group(group, value, original_name))
+		name_field.focus_exited.connect(func(): _rename_group(group, name_field.text, original_name))
+		_fields.add_child(name_field)
+		var members_label := Label.new()
+		members_label.text = "配下の技"
+		_fields.add_child(members_label)
+		var members := VBoxContainer.new()
+		_fields.add_child(members)
+		for id in rules.node_ids():
+			if graph.hub_for(id) != group: continue
+			var enabled := CheckBox.new()
+			enabled.text = GRAPH.node_title(rules, id)
+			enabled.button_pressed = rules.graph_nodes.get(id, {}).get("connected", true)
+			enabled.toggled.connect(func(value): graph._connect(id, value))
+			members.add_child(enabled)
+		var move_label := Label.new()
+		move_label.text = "技をここへ移す"
+		_fields.add_child(move_label)
+		var choices := OptionButton.new()
+		choices.fit_to_longest_item = false
+		choices.add_item("移す技を選択…")
+		for id in rules.node_ids():
+			if graph.hub_for(id) == group: continue
+			choices.add_item(GRAPH.node_title(rules, id))
+			choices.set_item_metadata(choices.item_count - 1, id)
+		choices.item_selected.connect(func(index):
+			if index > 0: graph.assign_group(choices.get_item_metadata(index), group))
+		_fields.add_child(choices)
 	var separated := CheckButton.new()
 	separated.text = "分離後の状況"
 	separated.button_pressed = preview_separated
@@ -749,14 +769,30 @@ func _edit_coverage(category := "") -> void:
 	_fields.add_child(refresh)
 	_analyze_coverage()
 
+func _rename_group(group: String, text: String, original_name: String) -> void:
+	if not rules.condition_groups.has(group) or rules.condition_groups[group].title != original_name or text.strip_edges().is_empty() or original_name == text.strip_edges(): return
+	var before: Dictionary = graph.snapshot()
+	var after: Dictionary = graph.snapshot()
+	after.condition_groups[group].title = text.strip_edges()
+	history.create_action("条件選択の名前を変更")
+	history.add_do_method(_set_graph_state.bind(after))
+	history.add_undo_method(_set_graph_state.bind(before))
+	history.commit_action()
+
+func _coverage_gates(id: String) -> Array:
+	if _coverage_group.is_empty(): return rules.active_gates_for(id)
+	var gates: Array = []
+	for node in rules.node_ids():
+		if rules.source_for(node) == id and graph.hub_for(node) == _coverage_group and rules.graph_nodes.get(node, {}).get("connected", true): gates.append(rules.conditions.get(node, {}))
+	return gates
+
 func _analyze_coverage() -> void:
 	preview.coverage_mode = true
 	if not _is_hydra():
 		var layers: Array = []
 		for move in rules.techniques:
-			if not _coverage_category.is_empty() and graph.category_for(String(move.technique)) != _coverage_category: continue
 			if float(rules.costs.get(String(move.technique), 1.0)) <= preview_stamina:
-				for condition in rules.active_gates_for(String(move.technique)):
+				for condition in _coverage_gates(String(move.technique)):
 					var gate: Dictionary = condition.duplicate()
 					gate.max = minf(float(gate.get("max", preview_radius)), preview_radius)
 					layers.append(gate)
@@ -784,7 +820,6 @@ func _analyze_coverage() -> void:
 		var base: Vector2 = Vector2.from_angle(angle) * float(definition.radius)
 		heads.append({"kind": kind, "base": base, "head": base + Vector2.from_angle(angle) * float(definition.params.neck_rest), "base_angle": angle})
 	for move in rules.techniques:
-		if not _coverage_category.is_empty() and graph.category_for(String(move.technique)) != _coverage_category: continue
 		if float(rules.costs.get(String(move.technique), 1.0)) > preview_stamina: continue
 		if move.head_kind == &"":
 			if String(move.technique) in ["north", "sequence", "curve"] and (preview_separated or total < 5): continue
@@ -796,7 +831,7 @@ func _analyze_coverage() -> void:
 				available[kind] -= 1
 				if available[kind] < 0: possible = false
 			if not possible: continue
-		for condition in rules.active_gates_for(String(move.technique)):
+		for condition in _coverage_gates(String(move.technique)):
 			var gate: Dictionary = condition.duplicate()
 			gate.max = minf(float(gate.get("max", preview_radius)), preview_radius)
 			if move.head_kind == &"": layers.append({"gate": gate})
