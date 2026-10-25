@@ -7,6 +7,7 @@ script = ExtResource("1")
 pop_from = 14.0
 pop_to = 45.0
 rate = 6.0
+attack_budget = 1
 mix = {
 "darter": 1.5,
 "drifter": 6.0,
@@ -15,4 +16,4 @@ mix = {
 "titan": 0.05
 }
 id = &"build1"
-display_name = "強化期"
+display_name = "1回目の育成"

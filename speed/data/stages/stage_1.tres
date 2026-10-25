@@ -1,17 +1,171 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://7ga23cplbwst"]
 
-[ext_resource type="Script" path="res://scripts/data_types/stage_def.gd" id="stage"]
-[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="phase"]
-[ext_resource type="Script" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
-[ext_resource type="Script" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_shield.tscn" id="shield"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_pump.tscn" id="pump"]
+[ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_2gqev"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_marlin.tscn" id="marlin"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
+[ext_resource type="PackedScene" path="res://data/formations/s1_pump.tscn" id="pump"]
+[ext_resource type="PackedScene" path="res://data/formations/s1_shield.tscn" id="shield"]
+[ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_triangle.tscn" id="triangle"]
+
+[sub_resource type="Resource" id="Clip_0"]
+script = ExtResource("clip")
+label = "たて座"
+track = 0
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("shield")])
+attack_priority = 1
+time = 45.0
+length = 37.0
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_1"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 1
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+attack_priority = 1
+time = 120.0
+length = 37.0
+groups = 2
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_2"]
+script = ExtResource("clip")
+label = "たて座"
+track = 0
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("shield")])
+attack_priority = 1
+time = 143.0
+length = 14.0
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_3"]
+script = ExtResource("clip")
+label = "かじき座"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("marlin")])
+attack_priority = 1
+time = 195.0
+length = 37.0
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_4"]
+script = ExtResource("clip")
+label = "みなみのさんかく座"
+track = 3
+types = Array[StringName]([&"triangle"])
+formations = Array[PackedScene]([ExtResource("triangle")])
+attack_priority = 1
+time = 270.0
+length = 37.0
+groups = 2
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_5"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 1
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+attack_priority = 1
+time = 278.0
+length = 29.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_6"]
+script = ExtResource("clip")
+label = "たて座"
+track = 0
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("shield")])
+attack_priority = 1
+time = 286.0
+length = 21.0
+groups = 2
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_7"]
+script = ExtResource("clip")
+label = "かじき座"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("marlin")])
+attack_priority = 1
+time = 345.0
+length = 37.0
+groups = 3
+interval = 9.0
+
+[sub_resource type="Resource" id="Clip_8"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 1
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"s1_pump/単体"])
+attack_priority = 1
+time = 354.0
+length = 28.0
+interval = 22.0
+
+[sub_resource type="Resource" id="Clip_9"]
+script = ExtResource("clip")
+label = "たて座"
+track = 0
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("shield")])
+attack_priority = 1
+time = 420.0
+length = 52.0
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_10"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 1
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+attack_priority = 1
+time = 424.0
+length = 48.0
+groups = 2
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_11"]
+script = ExtResource("clip")
+label = "かじき座"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("marlin")])
+attack_priority = 1
+time = 428.0
+length = 44.0
+groups = 3
+
+[sub_resource type="Resource" id="Clip_12"]
+script = ExtResource("clip")
+label = "みなみのさんかく座"
+track = 3
+types = Array[StringName]([&"triangle"])
+formations = Array[PackedScene]([ExtResource("triangle")])
+attack_priority = 1
+time = 432.0
+length = 40.0
+groups = 2
+interval = 18.0
 
 [sub_resource type="Resource" id="Phase_grow_1"]
 script = ExtResource("phase")
-start = 0.0
 rate = 6.0
 xp_bonus = 1.0
 attack_budget = 1
@@ -151,163 +305,6 @@ script = ExtResource("curve")
 type = &"pulser"
 points = PackedVector2Array(0, 0, 14, 0, 29, 0, 45, 0, 58, 0, 68, 0, 80, 0, 90, 0, 105, 0, 120, 0, 133, 0, 143, 0, 155, 0, 165, 1, 180, 3, 195, 1, 208, 3, 218, 1, 230, 3, 240, 1, 255, 4, 270, 2, 283, 4, 293, 2, 305, 4, 315, 2, 330, 5, 345, 2, 358, 5, 368, 2, 380, 5, 390, 2, 405, 5, 420, 3, 437, 6, 451, 3, 467, 6, 480, 1)
 
-[sub_resource type="Resource" id="Clip_0"]
-script = ExtResource("clip")
-label = "たて座"
-track = 0
-types = Array[StringName]([&"shield"])
-formations = Array[PackedScene]([ExtResource("shield")])
-attack_priority = 1
-time = 45.0
-length = 37.0
-groups = 2
-interval = 12.0
-
-[sub_resource type="Resource" id="Clip_1"]
-script = ExtResource("clip")
-label = "ポンプ座"
-track = 1
-types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-attack_priority = 1
-time = 120.0
-length = 37.0
-groups = 2
-interval = 14.0
-
-[sub_resource type="Resource" id="Clip_2"]
-script = ExtResource("clip")
-label = "たて座"
-track = 0
-types = Array[StringName]([&"shield"])
-formations = Array[PackedScene]([ExtResource("shield")])
-attack_priority = 1
-time = 143.0
-length = 14.0
-groups = 2
-interval = 12.0
-
-[sub_resource type="Resource" id="Clip_3"]
-script = ExtResource("clip")
-label = "かじき座"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("marlin")])
-attack_priority = 1
-time = 195.0
-length = 37.0
-groups = 2
-interval = 12.0
-
-[sub_resource type="Resource" id="Clip_4"]
-script = ExtResource("clip")
-label = "みなみのさんかく座"
-track = 3
-types = Array[StringName]([&"triangle"])
-formations = Array[PackedScene]([ExtResource("triangle")])
-attack_priority = 1
-time = 270.0
-length = 37.0
-groups = 2
-interval = 16.0
-
-[sub_resource type="Resource" id="Clip_5"]
-script = ExtResource("clip")
-label = "ポンプ座"
-track = 1
-types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-attack_priority = 1
-time = 278.0
-length = 29.0
-groups = 1
-interval = 18.0
-
-[sub_resource type="Resource" id="Clip_6"]
-script = ExtResource("clip")
-label = "たて座"
-track = 0
-types = Array[StringName]([&"shield"])
-formations = Array[PackedScene]([ExtResource("shield")])
-attack_priority = 1
-time = 286.0
-length = 21.0
-groups = 2
-interval = 14.0
-
-[sub_resource type="Resource" id="Clip_7"]
-script = ExtResource("clip")
-label = "かじき座"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("marlin")])
-attack_priority = 1
-time = 345.0
-length = 37.0
-groups = 3
-interval = 9.0
-
-[sub_resource type="Resource" id="Clip_8"]
-script = ExtResource("clip")
-label = "ポンプ座"
-track = 1
-types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s1_pump/単体"])
-attack_priority = 1
-time = 354.0
-length = 28.0
-groups = 1
-interval = 22.0
-
-[sub_resource type="Resource" id="Clip_9"]
-script = ExtResource("clip")
-label = "たて座"
-track = 0
-types = Array[StringName]([&"shield"])
-formations = Array[PackedScene]([ExtResource("shield")])
-attack_priority = 1
-time = 420.0
-length = 52.0
-groups = 2
-interval = 12.0
-
-[sub_resource type="Resource" id="Clip_10"]
-script = ExtResource("clip")
-label = "ポンプ座"
-track = 1
-types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-attack_priority = 1
-time = 424.0
-length = 48.0
-groups = 2
-interval = 14.0
-
-[sub_resource type="Resource" id="Clip_11"]
-script = ExtResource("clip")
-label = "かじき座"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("marlin")])
-attack_priority = 1
-time = 428.0
-length = 44.0
-groups = 3
-interval = 10.0
-
-[sub_resource type="Resource" id="Clip_12"]
-script = ExtResource("clip")
-label = "みなみのさんかく座"
-track = 3
-types = Array[StringName]([&"triangle"])
-formations = Array[PackedScene]([ExtResource("triangle")])
-attack_priority = 1
-time = 432.0
-length = 40.0
-groups = 2
-interval = 18.0
-
 [resource]
 script = ExtResource("stage")
 index = 1
@@ -315,16 +312,16 @@ scene_path = "res://scenes/stages/stage_1.tscn"
 phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss")]
 enemies = Array[StringName]([&"biter", &"darter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
 enemy_attack_values = {
-"darter": 0.2,
 "bomber": 0.3,
-"pulser": 0.5,
-"shield": 1.0,
-"pump": 1.0,
+"darter": 0.2,
 "marlin": 1.0,
+"pulser": 0.5,
+"pump": 1.0,
+"shield": 1.0,
 "triangle": 1.0
 }
-zako_curves = Array[SpawnCurve]([SubResource("Curve_biter"), SubResource("Curve_darter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
-clips = Array[SpawnClip]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12")])
+zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_darter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
+clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12")])
 track_names = PackedStringArray("たて座", "ポンプ座", "かじき座", "みなみのさんかく座")
 boss_time = 480.0
 time_limit = 900.0

@@ -30,4 +30,45 @@ static func build(output: String) -> Error:
 	index.look_names.sort()
 	var error := ResourceSaver.save(index, output.path_join("visual_index.tres"))
 	TRANSFORM._layouts.clear()
-	return error
+	return _build_meteor_pieces(output) if error == OK else error
+
+## 隣の破片が切り出し矩形へ入り込む部分を、制作時に除く。
+static func _build_meteor_pieces(output: String) -> Error:
+	var frames := load("res://data/visuals/meteor_pieces.tres").duplicate(true) as SpriteFrames
+	for animation in frames.get_animation_names():
+		for i in frames.get_frame_count(animation):
+			var source := frames.get_frame_texture(animation, i) as AtlasTexture
+			var image := source.get_image()
+			var seen := {}
+			var groups: Array = []
+			for y in image.get_height():
+				for x in image.get_width():
+					var point := Vector2i(x, y)
+					if seen.has(point) or image.get_pixelv(point).a == 0.0: continue
+					var group: Array[Vector2i] = [point]
+					seen[point] = true
+					var next := 0
+					while next < group.size():
+						var current := group[next]
+						next += 1
+						for dy in range(-1, 2):
+							for dx in range(-1, 2):
+								var neighbor := current + Vector2i(dx, dy)
+								if neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= image.get_width() or neighbor.y >= image.get_height(): continue
+								if seen.has(neighbor) or image.get_pixelv(neighbor).a == 0.0: continue
+								seen[neighbor] = true
+								group.append(neighbor)
+					groups.append(group)
+			if groups.is_empty(): return ERR_INVALID_DATA
+			groups.sort_custom(func(a, b): return a.size() > b.size())
+			var isolated := Image.create(image.get_width(), image.get_height(), false, Image.FORMAT_RGBA8)
+			for k in groups.size():
+				# 原画の微小な離れドットも残す。
+				if k != 0 and groups[k].size() > 2: continue
+				for point in groups[k]: isolated.set_pixelv(point, image.get_pixelv(point))
+			var piece := AtlasTexture.new()
+			piece.atlas = ImageTexture.create_from_image(isolated)
+			piece.region = Rect2(Vector2.ZERO, source.region.size)
+			piece.set_meta("offset", source.region.get_center() - source.atlas.get_size() * 0.5)
+			frames.set_frame(animation, i, piece)
+	return ResourceSaver.save(frames, output.path_join("meteor_pieces.res"))

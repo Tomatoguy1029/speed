@@ -4,10 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-start = 360.0
+start = 260.0
 pop_from = 70.0
 pop_to = 110.0
 rate = 10.0
+attack_budget = 1
 mix = {
 "armored": 3.0,
 "battleship": 0.3,
@@ -19,4 +20,4 @@ mix = {
 "titan": 1.2
 }
 id = &"tension"
-display_name = "緊張期"
+display_name = "3回目の育成"

@@ -4,16 +4,17 @@
 
 [resource]
 script = ExtResource("1")
-start = 300.0
+start = 170.0
 pop_from = 140.0
 pop_to = 260.0
 rate = 60.0
 wave_interval = 3.5
 wave_type = &"swarm"
+attack_budget = 2
 mix = {
 "drifter": 3.0,
 "splitling": 2.0,
 "swarm": 10.0
 }
 id = &"rampage"
-display_name = "無双期"
+display_name = "2回目の山"
