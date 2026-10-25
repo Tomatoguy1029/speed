@@ -12,4 +12,4 @@ armor = 10.0
 speed = 240.0
 turn = 2.4
 xp = 500.0
-params = {"warn": 0.8, "active": 0.22, "recover": 0.8, "damage": 30.0, "reach": 360.0, "width": 45.0}
+params = {"thresholds": [0.7,0.4], "phase_time":1.0,"warn": 0.8, "active": 0.22, "recover": 0.8, "damage": 30.0, "reach": 360.0, "width": 45.0}

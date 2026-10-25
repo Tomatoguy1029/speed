@@ -89,6 +89,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
 		elapsed = 0.0
+	elif mode == &"transition":
+		if elapsed >= float(def.params.get("phase_time",1.0)):
+			mode = &"idle"
+			table.guard[body] = 0.0
 	elif mode == &"active":
 		if not attack_hit:
 			var tip := table.pos[body] + direction * float(rule().reach)
@@ -123,3 +127,17 @@ func attack_failed() -> bool:
 	return not body_alive()
 func technique_ready(id: StringName, gate: Dictionary) -> bool:
 	return mode == &"idle" and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
+
+func on_body_damaged() -> void:
+	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
+	if phase > thresholds.size(): return
+	var floor_hp := table.max_hp[body] * float(thresholds[phase - 1])
+	if table.hp[body] > floor_hp: return
+	table.hp[body] = floor_hp
+	cancel_attack()
+	phase += 1
+	mode = &"transition"
+	elapsed = 0.0
+	table.guard[body] = 1.0
+	_update_body()
+	presentation_event.emit({"cue": &"phase_changed", "phase": phase})

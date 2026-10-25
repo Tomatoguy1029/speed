@@ -40,6 +40,14 @@ func _ready() -> void:
 	check(actor.start_attack(&"bite"), "噛みつきを開始する")
 	for frame in 600: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(not actor.attack_playing(), "噛みつきの予告・実行・隙が終わる")
+	for expected_phase in [2,3]:
+		var threshold := 0.7 if expected_phase == 2 else 0.4
+		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})
+		check(actor.phase == expected_phase, "大きな一撃でもHP段階を一つずつ進める")
+		check(is_equal_approx(sim.enemies.table.hp[actor.body],sim.enemies.table.max_hp[actor.body] * threshold), "超過分を切り捨てて閾値でHPを止める")
+		check(not sim.state.boss_dead, "段階移行は最終勝利を通知しない")
+		for frame in 180: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor.mode == &"idle" and sim.enemies.table.guard[actor.body] <= 0.0, "移行後に攻撃と被弾を再開できる")
 	session.free()
 	print("[draco] failures=",failed)
 	get_tree().quit(1 if failed else 0)
