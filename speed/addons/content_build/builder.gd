@@ -7,14 +7,14 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 		var path := directory.path_join(name)
 		if path == "res://data/content_catalog.tres": continue
 		if path.begins_with("res://data/bosses/ai/") or "_moves/" in path: continue
-		if path.get_extension() in ["gd", "tres", "tscn", "gdshader"]: result.append(path)
+		if path.get_extension() in ["gd", "tres", "tscn", "gdshader", "png", "svg", "jpg", "jpeg", "webp", "import"]: result.append(path)
 	for name in DirAccess.get_directories_at(directory):
 		if not name.begins_with("."): _files(directory.path_join(name), result)
 static func signature() -> String:
 	var files := PackedStringArray()
-	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders"]: _files(directory, files)
+	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders", "res://assets"]: _files(directory, files)
 	files.sort()
-	var hashes := PackedStringArray(["res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
+	var hashes := PackedStringArray(["engine:" + str(Engine.get_version_info().string), "res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))
 	return "\n".join(hashes).sha256_text()
 static func is_current(output := ROOT) -> bool:
@@ -31,6 +31,9 @@ static func build_all(force := false, output := ROOT) -> Error:
 		if boss.error != OK: return boss.error
 	if not force and is_current(output): return OK
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
+	var visual_error: Error = load("res://tools/content/build_visuals.gd").build(output)
+	if visual_error != OK: return visual_error
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 	var error: Error = load("res://tools/content/build_catalog.gd").build(catalog_path)
 	if error != OK: return error
@@ -39,10 +42,12 @@ static func build_all(force := false, output := ROOT) -> Error:
 	error = load("res://tools/content/build_runtime_stage.gd").build_all(output)
 	if error != OK: return error
 	var outputs := [catalog_path]
+	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):
+		if file.begins_with("look_") and not output.path_join(file) in visual_index.look_paths.values(): continue
 		if file.get_extension() in ["tres", "res"]: outputs.append(output.path_join(file))
 	for file in DirAccess.get_files_at(output.path_join("dev")):
-		if file.ends_with(".json"): outputs.append(output.path_join("dev").path_join(file))
+		if file.get_extension() in ["json", "res"]: outputs.append(output.path_join("dev").path_join(file))
 	var stamp := FileAccess.open(output.path_join("stamp.json"), FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))

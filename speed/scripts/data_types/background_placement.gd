@@ -1,4 +1,5 @@
 ## 接触判定を持たない、ステージ開始地点を基準とする背景の配置。
+@tool
 class_name BackgroundPlacement
 extends Resource
 
@@ -10,7 +11,8 @@ extends Resource
 @export_range(-180.0, 180.0, 1.0) var rotation_degrees := 0.0
 ## RGBは色、Aは明るさ。元画像のアルファは保ち、背後の星を遮る。
 @export var tint := Color(0.55, 0.65, 0.75, 0.7)
-var _bounds := Rect2()
+@export_storage var texture_path := ""
+@export_storage var used_rect := Rect2()
 
 func position_at(view_offset: Vector2) -> Vector2:
 	return offset + view_offset * (1.0 - parallax)
@@ -19,9 +21,7 @@ func display_tint() -> Color:
 	return Color(tint.r * tint.a, tint.g * tint.a, tint.b * tint.a, 1.0)
 
 func bounds() -> Rect2:
-	if _bounds.size == Vector2.ZERO and texture != null:
-		_bounds = Rect2(texture.get_image().get_used_rect())
-	return _bounds
+	return used_rect
 
 func copy() -> BackgroundPlacement:
 	var result := BackgroundPlacement.new()
@@ -31,4 +31,6 @@ func copy() -> BackgroundPlacement:
 	result.scale = scale
 	result.rotation_degrees = rotation_degrees
 	result.tint = tint
+	result.texture_path = texture_path
+	result.used_rect = used_rect
 	return result

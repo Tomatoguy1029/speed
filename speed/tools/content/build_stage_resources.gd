@@ -33,11 +33,15 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 		_script(paths, "res://scripts/render/attacks/flood.gd")
 		_add(paths, "res://shaders/water_flood.gdshader")
 	if kind == "rings": _script(paths, "res://scripts/render/attacks/wave.gd")
-static func build(stage: RuntimeStage) -> StageResources:
+static func build(stage: RuntimeStage, output := "res://.content") -> StageResources:
 	var result := StageResources.new()
 	var paths := {}
+	var index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
+	if index == null: return null
+	result.look_names = index.look_names
+	result.look_paths = index.look_paths.duplicate()
 	for placement: BackgroundPlacement in stage.backgrounds:
-		if placement.texture != null: _add(paths, placement.texture.resource_path)
+		if not placement.texture_path.is_empty(): _add(paths, placement.texture_path)
 	_add(paths, "res://.content/boss_hydra.tres")
 	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
 	var ids := {}
@@ -80,9 +84,8 @@ static func build(stage: RuntimeStage) -> StageResources:
 				ids[String(candidate)] = true
 				pending.append(String(candidate))
 		var skin := stage.enemy_sprite_path(StringName(id)).get_file().get_basename()
-		var look := "res://data/visuals/looks/%s.tres" % skin
-		if not ResourceLoader.exists(look): look = "res://data/visuals/looks/%s.tres" % id
-		_add(paths, look)
+		var look: String = index.look_paths.get(skin, index.look_paths.get(id, ""))
+		if not look.is_empty(): _add(paths, look)
 		_add(paths, stage.enemy_sprite_path(StringName(id)))
 	for entry: ContentEntry in catalog.table(&"weapons").values():
 		if entry.comet_only:

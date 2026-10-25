@@ -13,6 +13,7 @@ var base: GameConfig
 var cfg: GameConfig
 
 var catalog: ContentCatalog
+var visual_index: StageResources
 var _tables: Dictionary = {}
 var _definitions: Dictionary = {}
 var enemies: Dictionary:
@@ -52,6 +53,7 @@ func _ready() -> void:
 	if OS.has_feature("editor"): source_hashes[CONFIG_PATH] = FileAccess.get_sha256(CONFIG_PATH)
 	reset_runtime()
 	catalog = load("res://data/content_catalog.tres") as ContentCatalog
+	visual_index = load("res://.content/visual_index.tres") as StageResources
 	# 記録の基準は読み込み順に依存させない。ファイルのハッシュだけを読む。
 	if OS.has_feature("editor"):
 		for entry in catalog.entries:
@@ -167,6 +169,7 @@ func _ensure_runtime_content() -> bool:
 		return false
 	if catalog != null:
 		catalog = ResourceLoader.load("res://data/content_catalog.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as ContentCatalog
+		visual_index = ResourceLoader.load("res://.content/visual_index.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 		release_runtime_definitions()
 	return true
 
