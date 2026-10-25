@@ -328,6 +328,8 @@ func _process(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	_sync_picaro()
+	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
+	if hud != null: hud.visible = state.cinematic_bars<=0.0
 	var phase := state.phase
 	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -1218,6 +1220,11 @@ func _draw_ship(c: CanvasItem) -> void:
 	_ship_visual.draw_ship(c)
 
 func _draw_top(c: CanvasItem) -> void:
+	if state.cinematic_bars>0.0:
+		var rect := view_rect()
+		var height := rect.size.y*0.1*state.cinematic_bars
+		c.draw_rect(Rect2(rect.position,Vector2(rect.size.x,height)),Color.BLACK)
+		c.draw_rect(Rect2(Vector2(rect.position.x,rect.end.y-height),Vector2(rect.size.x,height)),Color.BLACK)
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 

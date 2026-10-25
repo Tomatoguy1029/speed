@@ -1,6 +1,7 @@
 ## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
 extends BossActor
 signal presentation_event(event: Dictionary)
+var cycle: RefCounted
 var picaro: RefCounted
 var phase := 1
 var mode: StringName = &"idle"
@@ -27,6 +28,7 @@ var _presentation: Node2D
 
 func _on_bound() -> void:
 	draws_self = true
+	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
 	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
 	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
 	add_child(_presentation)
@@ -70,6 +72,8 @@ func damage_target(row: int) -> int:
 	return body if row == body or row in body_rows else row
 
 func _exit_tree() -> void:
+	if cycle != null: cycle.cancel()
+	if picaro != null: picaro.clear()
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
 
@@ -96,6 +100,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
 	picaro.tick()
+	if cycle.tick(dt):
+		_update_body()
+		_presentation.queue_redraw()
+		return
 	_update_closing_walls(dt)
 	elapsed += dt
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
@@ -156,11 +164,14 @@ func on_body_damaged() -> void:
 		rock.destroyed = true
 		if ctx.enemies.is_same(rock.row,rock.row_id): ctx.enemies.mark_dead(rock.row)
 	placed_meteors.clear()
+	cycle.cancel()
+	picaro.pause(true)
 	phase += 1
 	mode = &"transition"
 	elapsed = 0.0
 	table.guard[body] = 1.0
 	_update_body()
+	if phase == 2: cycle.begin_initial()
 	presentation_event.emit({"cue": &"phase_changed", "phase": phase})
 
 func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector2Array()) -> void:

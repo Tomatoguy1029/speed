@@ -14,6 +14,9 @@ var phase: Phase = Phase.PLAY
 var rng := RandomNumberGenerator.new()
 ## 実験用の時計と設定。通常ランは既定のまま使う。
 var lab_mode := false
+## 演出の入力・被弾保護。世界と発射済みの弾は進み続ける。
+var controls_locked := false
+var cinematic_bars := 0.0
 var sim_time := 0.0
 var meta_override: Dictionary = {}
 
