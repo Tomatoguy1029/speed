@@ -16,6 +16,7 @@ var practice := preload("res://scripts/runtime/intro_practice.gd").new()
 func setup(parent: Node, visuals: IntroPresentation) -> void:
 	presentation = visuals
 	var stage := RuntimeStage.new()
+	stage.resources = ContentManager.visual_index
 	stage.phases = [PhaseDef.new()]
 	stage.boss_enabled = false
 	session = RunManager.create_session(parent, {"lab": true, "config": _practice_config(),
