@@ -294,6 +294,8 @@ func _reset_row(i: int) -> void:
 	t.links[i] = PackedInt32Array()
 	t.stone[i] = 0.0
 	t.held[i] = 0
+	t.pump_owner[i] = -1
+	t.pump_owner_id[i] = -1
 	t.landmark[i] = 0
 	t.fire_hit[i] = -1e9
 	t.parent[i] = -1
