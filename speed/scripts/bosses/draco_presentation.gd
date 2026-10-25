@@ -72,3 +72,11 @@ func _draw() -> void:
 			draw_polyline(line,Color("#443d83"),70.0,false)
 			draw_polyline(line,Color(0.4,0.65,1.0,0.5),45.0,false)
 			draw_circle(at,55.0,Color("#8d87c9"))
+
+	if actor.technique == &"inhale" and actor._driver != null and not actor._driver.spent:
+		var mouth := actor.to_local(actor.table.pos[actor.body]+actor.direction*100.0)
+		for j in 24:
+			var k := fmod(actor.elapsed*0.7+j/24.0,1.0)
+			var angle := j*2.399963
+			var at := mouth+Vector2.from_angle(angle)*float(actor.rule().pull_range)*(1.0-k)
+			draw_line(at,at+(mouth-at).normalized()*25.0,Color(0.6,0.5,1.0,k*0.6),3.0)

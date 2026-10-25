@@ -229,6 +229,7 @@ func _play_tick(real_dt: float) -> void:
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
 	if input != null:
 		input.drawing = state.drawing
+	if state.steering_locked: it = Intent.new()
 	if state.controls_locked:
 		it = Intent.new()
 		state.ship_vel = Vector2.ZERO

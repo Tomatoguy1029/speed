@@ -136,6 +136,15 @@ func _ready() -> void:
 		for frame in 1400: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(actor.mode==&"idle", "複製の共同攻撃から回収を終える")
 		check(sim.enemies.table.dead[row]!=0, "残った複製は吸収だけで回収する")
+	actor.cancel_attack()
+	check(actor.start_attack(&"inhale"), "吸引と吐き出しを開始する")
+	if actor.technique == &"inhale":
+		var inhale = actor._driver
+		var member: int = actor.picaro.spawn_picaro(&"pump",sim.enemies.table.pos[actor.body]+Vector2(70,0))
+		for frame in 600: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(sim.enemies.table.dead[member]!=0, "口元に来たピカロを吸収する")
+		check(inhale.spent and inhale.stars==0, "吸収星数は直後の吐き出し一回で使い切る")
+		actor.cancel_attack()
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

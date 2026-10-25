@@ -566,7 +566,7 @@ func attach_hazard(h: int, e: int) -> void:
 
 ## 行 h の攻撃の形が、敵（行 e、id）に付いたまま残っているか。
 func owns_hazard(h: int, e: int, id: int) -> bool:
-	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
+	return h >= 0 and h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
 ## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
