@@ -16,6 +16,10 @@ func setup(simulation: RunSimulation, visuals: IntroPresentation, origin: Vector
 	for offset: Vector2 in presentation.practice_offsets:
 		stars.append(arrival + offset + Vector2(80, 0))
 
+func relocate(origin: Vector2) -> void:
+	stars.clear()
+	for offset: Vector2 in presentation.practice_offsets: stars.append(origin+offset+Vector2(80,0))
+
 func spawn() -> void:
 	for star in stars:
 		var row: int = run.enemies.spawn(presentation.practice_enemy, star,

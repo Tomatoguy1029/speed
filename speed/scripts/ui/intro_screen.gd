@@ -62,10 +62,11 @@ func _on_beat_changed(next: int) -> void:
 	_hint.hide()
 	_draw_button.visible = next == Beat.PRACTICE and _touch
 	_motive.visible = next == Beat.MOTIVE
-	if next == Beat.PRACTICE:
+	if next in [Beat.FLIGHT,Beat.PRACTICE]:
 		run.input.cancel_gesture()
 		run.input.process_mode = Node.PROCESS_MODE_INHERIT
-		_update_hint()
+		if next == Beat.PRACTICE: _update_hint()
+	if next == Beat.TRANSFORM: run.input.process_mode=Node.PROCESS_MODE_DISABLED
 	if next == Beat.RESTORE:
 		run.input.process_mode = Node.PROCESS_MODE_DISABLED
 		var renderer: RunPresentation = session.view.get_node("RunPresentation")
@@ -105,7 +106,7 @@ func _pause() -> void:
 func _resume() -> void:
 	_hud.get_node("Pause").hide()
 	RunManager.command(session.id, &"resume")
-	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat == Beat.PRACTICE else Node.PROCESS_MODE_DISABLED
+	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat in [Beat.FLIGHT,Beat.PRACTICE] else Node.PROCESS_MODE_DISABLED
 
 func _exit_tree() -> void:
 	sequence.dispose()

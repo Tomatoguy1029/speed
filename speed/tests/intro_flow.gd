@@ -118,6 +118,21 @@ func _test_practice(intro: Node) -> void:
 	intro._resume()
 	var run: RunSimulation = intro.run
 	_check(not intro.session.view.has_node("Hud") and run.state.lab_mode and run.loadout.weapon_behaviors.is_empty(), "練習は通常ランの記録・装備から独立")
+	_check(intro.sequence.get("opening_complete") != null, "北極星喪失の導入を持つ")
+	if intro.sequence.get("opening_complete") != null:
+		_check(not intro.sequence.opening_complete and intro.run.state.cinematic_bars>0.0, "チュートリアル前にシネマスコープで星空を映す")
+		_elapse(intro, 3.01)
+		_check(intro.beat==intro.Beat.DEVOUR, "約3秒の星空から捕食へ進む")
+		await _shot("devour")
+		_elapse(intro, intro.presentation.devour_time)
+		_elapse(intro, intro.presentation.depart_time)
+		_check(intro.beat==intro.Beat.FLIGHT and intro.sequence.opening_complete, "竜が去ったら操舵を渡す")
+		var old_pos: Vector2=run.state.ship_pos
+		run.input_source=func():
+			var it:=Intent.new();it.has_cursor=true;it.cursor=old_pos+Vector2(200,0);return it
+		_elapse(intro, 0.5)
+		_check(run.state.ship_pos.distance_to(old_pos)>1.0,"航行はカーソル方向へ通常操舵できる")
+		run.input_source=Callable()
 	await _shot("flight")
 	_elapse(intro, intro.presentation.flight_time)
 	_check(intro.practice.enemies.is_empty(), "星だけの間は敵を生成しない")

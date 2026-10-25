@@ -19,10 +19,11 @@ func _draw() -> void:
 	var time: float = intro.beat_time
 	var p: IntroPresentation = intro.presentation
 	if distant_sky:
+		if beat < intro.Beat.FLIGHT: _opening(beat,time)
 		if beat >= intro.Beat.OMEN:
 			_omen(time if beat == intro.Beat.OMEN else p.omen_time + time)
 		return
-	if beat <= intro.Beat.TRANSFORM:
+	if beat == intro.Beat.TRANSFORM:
 		var progress := clampf(time / p.transform_time, 0.0, 1.0) if beat == intro.Beat.TRANSFORM else 0.0
 		for i in intro.practice.stars.size():
 			var delay := float(i) * 0.04
@@ -180,3 +181,26 @@ func _sky_mist(center: Vector2, extent: float, time: float, reveal: float, _puls
 	mist_material.set_shader_parameter("elapsed", time)
 	mist_material.set_shader_parameter("reveal", reveal)
 	mist_material.set_shader_parameter("ember_color", intro.presentation.sky_glow_color)
+
+## 冒頭の影は仮素材。画面に対する比で構成し、正式な竜の絵へ差し替える。
+func _opening(beat: int, time: float) -> void:
+	var state: RunState=intro.run.state
+	var focus := state.view_center+Vector2(-state.view_half.x*0.1,-state.view_half.y*0.48)
+	var extent := minf(state.view_half.x,state.view_half.y)
+	var progress := clampf(time/intro.presentation.devour_time,0.0,1.0) if beat==intro.Beat.DEVOUR else (1.0 if beat==intro.Beat.DEPART else 0.0)
+	if beat==intro.Beat.FOCUS or (beat==intro.Beat.DEVOUR and progress<0.7): _star(focus,1.0,Color("#f3f7ff"))
+	if beat==intro.Beat.FOCUS: return
+	var depart := clampf(time/intro.presentation.depart_time,0.0,1.0) if beat==intro.Beat.DEPART else 0.0
+	var grow := smoothstep(0.0,0.7,progress)*(1.0-depart*0.9)
+	var head := focus+Vector2(extent*(1.0-progress)*2.0,-depart*extent)
+	var body := PackedVector2Array()
+	for j in 25:
+		var t := j/24.0
+		body.append(head+Vector2(t*extent*3.5,sin(t*TAU*1.5+time)*extent*0.4)*grow)
+	if grow>0.01:
+		draw_polyline(body,Color(0.025,0.015,0.065,1.0-depart),extent*0.24*grow,false)
+		var jaw := extent*0.14*grow
+		var mouth := PackedVector2Array([head+Vector2(jaw,-jaw),head-Vector2(jaw,0),head+Vector2(jaw,jaw)])
+		draw_polyline(mouth,Color(0.035,0.02,0.08,1.0-depart),jaw*0.5,false)
+		if progress>0.65:
+			for side in [-1,1]: draw_circle(head+Vector2(jaw*0.1,side*jaw*0.38),maxf(2.0,jaw*0.08),Color(1,0.05,0.15,1.0-depart))
