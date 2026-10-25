@@ -32,8 +32,9 @@ func on_death(i: int, _atk: float) -> void:
 		return
 	var n := maxi(1, int(p.get("death_split", 2)) + state.rng.randi_range(0, int(p.get("split_extra", 0))))
 	var facing := t.facing[i]
+	var child := def_of(&"splitling")
 	for k in n:
 		var a := facing + PI / 2.0 + TAU * float(k) / float(n) if n > 2 else facing + (1.0 if k == 1 else -1.0) * PI / 2.0
-		spawn_later(def_of(&"splitling"), t.pos[i] + Vector2.from_angle(a) * t.r[i],
+		spawn_later(child, t.pos[i] + Vector2.from_angle(a) * t.r[i],
 			{"facing": a, "vel": Vector2.from_angle(a) * float(p.get("split_speed", 200.0)), "hit_cd": 0.35,
 			"guard": float(p.get("split_guard", 0.0)), "knock": float(p.get("split_guard", 0.0)), "attack_priority": t.attack_priority[i]})

@@ -64,3 +64,14 @@ func has_body() -> bool:
 
 func body_alive() -> bool:
 	return has_body() and table.dead[body] == 0
+
+## 複数の命中形状を一体として受けるボスで上書きする。
+func damage_target(row: int) -> int:
+	return row
+
+func contains_hit(point: Vector2, radius: float) -> bool:
+	return point.distance_to(table.pos[body]) <= table.r[body]+radius
+
+## 独立HPを持つ複製など、追加の命中先の全身を追う。
+func contains_additional_target(_row: int, _point: Vector2, _radius: float) -> bool:
+	return false

@@ -60,7 +60,7 @@ func target() -> Dictionary:
 	var steps: int = effects.steps
 	if state.bonus_t > 0.0:
 		# ボーナスステージ：雑魚と硬めの敵だけを多く保つ
-		return {"phase": p, "steps": steps, "surge": effects, "pop": cfg.bonus_pop * cfg.density_mult}
+		return _bonus_target(p, effects)
 	var scale := cfg.density_mult * (1.0 + float(effects.pop))
 	var curves: Array = state.stage.zako_curves
 	if not curves.is_empty():
@@ -74,6 +74,29 @@ func target() -> Dictionary:
 			total += v
 		return {"phase": p, "steps": steps, "surge": effects, "pop": total, "per_type": per}
 	return {"phase": p, "steps": steps, "surge": effects, "pop": lerpf(p.pop_from, p.pop_to, k) * scale}
+
+## 通常と同じ出現元の相対配分を、ボーナスの目標人数へ伸ばす。候補がなければ補充を休止する。
+func _bonus_target(phase: PhaseDef, effects: Dictionary) -> Dictionary:
+	var curves: Array = state.stage.zako_curves
+	var weights := {}
+	if not curves.is_empty():
+		for curve: SpawnCurve in curves:
+			weights[curve.type] = float(weights.get(curve.type, 0.0)) + maxf(0.0, curve.value_at(state.time))
+	else:
+		weights = phase.mix.duplicate()
+	var per := {}
+	var total := 0.0
+	for type in weights:
+		var def := def_of(StringName(type))
+		if def == null or def.max_alive > 0 or def.rank > 2: continue
+		var weight := maxf(0.0, float(weights[type]))
+		if curves.is_empty() and def.ranged: weight *= 1.0 + float(effects.ranged)
+		if weight <= 0.0: continue
+		per[StringName(type)] = weight
+		total += weight
+	var pop := cfg.bonus_pop * cfg.density_mult if total > 0.0 else 0.0
+	for type in per: per[type] = float(per[type]) * pop / total
+	return {"phase": phase, "steps": effects.steps, "surge": effects, "pop": pop, "per_type": per}
 
 ## 強化帯の強まりの段（仕様書 4.2）。右端に達したあとは、その段を保つ。
 func surge_steps() -> int:
@@ -117,16 +140,22 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	while _spawn_acc >= 1.0 and alive_n < t.pop and raw_n < raw_limit and attempts < cap:
 		attempts += 1
 		_spawn_acc -= 1.0
+		var before := enemies.count()
 		if _spawn_one(t):
-			alive_n += 1
-			raw_n += 1
-	if phase.wave_interval > 0.0:
+			if enemies.count() - before > 1:
+				# 群れ・部位を成立させてから、増えた全員を次の補充判断へ含める。
+				alive_n = _survey(t.pop)
+				raw_n = _survey_raw
+			else:
+				alive_n += 1
+				raw_n += 1
+	if state.bonus_t <= 0.0 and phase.wave_interval > 0.0:
 		_wave_t += world_dt
 		if _wave_t >= phase.wave_interval:
 			_wave_t = 0.0
 			if alive_n < t.pop and raw_n < raw_limit:
 				_spawn_wave(t, minf(t.pop - alive_n, raw_limit - raw_n))
-	_tick_clips()
+	if state.bonus_t <= 0.0: _tick_clips()
 	_sync_attack_budget(phase)
 
 ## 本番のランは、時間帯の予算と個体value（明示overrideだけ群れ共有）で攻撃を管理する。
@@ -422,9 +451,10 @@ func _pick_type(phase: PhaseDef, ranged_bonus: float) -> StringName:
 			w *= 1.0 + ranged_bonus
 		items.append([StringName(k), w])
 	if items.is_empty():
-		return phase.mix.keys()[0]
+		return &""
 	for it in items:
 		total += it[1]
+	if total <= 0.0: return &""
 	var roll := state.rng.randf() * total
 	for it in items:
 		if roll < it[1]:
@@ -438,9 +468,11 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 	var def := def_of(t.phase.wave_type)
 	if def == null:
 		return
+	var before := enemies.count()
 	var half := state.view_half
 	if state.rng.randf() < 0.5:
 		for k in n:
+			if enemies.count() - before >= remaining: break
 			var a := (k + state.rng.randf()) / n * TAU
 			var u := Vector2(cos(a), sin(a))
 			var d := minf((half.x + cfg.spawn_margin) / maxf(0.0001, absf(u.x)), (half.y + cfg.spawn_margin) / maxf(0.0001, absf(u.y))) + state.rng.randf() * 90.0
@@ -449,6 +481,7 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 		var a := state.rng.randf() * TAU
 		var u := Vector2(cos(a), sin(a))
 		for k in n:
+			if enemies.count() - before >= remaining: break
 			var d := minf(half.x / maxf(0.0001, absf(u.x)), half.y / maxf(0.0001, absf(u.y))) + cfg.spawn_margin + k * 12.0
 			var off := (state.rng.randf() - 0.5) * 120.0
 			spawn(def, state.ship_pos + u * d + Vector2(-u.y, u.x) * off, {"facing": a + PI})

@@ -2,18 +2,120 @@
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_2vgpk"]
-[ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_mgob6"]
-[ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
 [ext_resource type="PackedScene" uid="uid://b5ynln1hy5dmj" path="res://data/formations/s3_lynx.tscn" id="3_gibww"]
-[ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
 [ext_resource type="PackedScene" uid="uid://psh27x4c22fn" path="res://data/formations/s3_marlin.tscn" id="4_p4nfj"]
-[ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
 [ext_resource type="PackedScene" uid="uid://2jtm8qsrcrj1" path="res://data/formations/s3_corona.tscn" id="5_d6uyw"]
-[ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
-[ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
+
+[sub_resource type="Resource" id="Phase_stage3_build1"]
+script = ExtResource("9_mgob6")
+pop_from = 14.0
+pop_to = 45.0
+rate = 6.0
+mix = {
+"darter": 1.5,
+"drifter": 6.0,
+"splitter": 0.8,
+"swarm": 1.0,
+"titan": 0.05
+}
+id = &"build1"
+display_name = "1回目の育成"
+
+[sub_resource type="Resource" id="Phase_stage3_pressure"]
+script = ExtResource("9_mgob6")
+start = 61.0
+pop_from = 45.0
+pop_to = 70.0
+rate = 8.0
+attack_budget = 2
+mix = {
+"armored": 2.2,
+"darter": 3.0,
+"drifter": 3.5,
+"gunner": 1.1,
+"splitter": 1.5,
+"titan": 0.3
+}
+id = &"pressure"
+display_name = "1回目の山"
+
+[sub_resource type="Resource" id="Phase_stage3_build2"]
+script = ExtResource("9_mgob6")
+start = 130.0
+pop_from = 38.0
+pop_to = 45.0
+rate = 6.0
+xp_bonus = 1.4
+attack_budget = 1
+mix = {
+"darter": 2.0,
+"drifter": 4.0,
+"gunner": 1.0,
+"splitter": 2.0,
+"swarm": 2.0,
+"titan": 0.4
+}
+id = &"build2"
+display_name = "休憩"
+
+[sub_resource type="Resource" id="Phase_stage3_rampage"]
+script = ExtResource("9_mgob6")
+start = 140.0
+pop_from = 140.0
+pop_to = 260.0
+rate = 60.0
+wave_interval = 3.5
+wave_type = &"swarm"
+attack_budget = 3
+mix = {
+"drifter": 3.0,
+"splitling": 2.0,
+"swarm": 10.0
+}
+id = &"rampage"
+display_name = "2回目の山"
+
+[sub_resource type="Resource" id="Phase_stage3_tension"]
+script = ExtResource("9_mgob6")
+start = 210.0
+pop_from = 70.0
+pop_to = 110.0
+rate = 10.0
+mix = {
+"armored": 3.0,
+"battleship": 0.3,
+"darter": 3.0,
+"drifter": 2.5,
+"gunner": 2.0,
+"missile": 1.3,
+"splitter": 2.0,
+"titan": 1.2
+}
+id = &"tension"
+display_name = "休憩"
+
+[sub_resource type="Resource" id="Phase_stage3_escape"]
+script = ExtResource("9_mgob6")
+start = 230.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 4
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"escape"
+display_name = "3回目の山"
 
 [sub_resource type="Resource" id="Resource_ruix5"]
 script = ExtResource("2_mgob6")
@@ -200,7 +302,7 @@ points = PackedVector2Array(0, 0, 37, 94, 64, 93, 82, 39, 130, 40, 132, 80, 140,
 script = ExtResource("1")
 index = 3
 scene_path = "res://scenes/stages/stage_3.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
+phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
 clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela")])

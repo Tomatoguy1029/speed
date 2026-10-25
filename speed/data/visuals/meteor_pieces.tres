@@ -1,0 +1,62 @@
+[gd_resource type="SpriteFrames" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/pixel/meteor_1_pieces.png" id="1"]
+[ext_resource type="Texture2D" path="res://assets/pixel/meteor_2_pieces.png" id="2"]
+
+[sub_resource type="AtlasTexture" id="Atlas_0_0"]
+atlas = ExtResource("1")
+region = Rect2(18, 40, 43, 46)
+
+[sub_resource type="AtlasTexture" id="Atlas_0_1"]
+atlas = ExtResource("1")
+region = Rect2(98, 24, 78, 64)
+
+[sub_resource type="AtlasTexture" id="Atlas_0_2"]
+atlas = ExtResource("1")
+region = Rect2(6, 106, 59, 68)
+
+[sub_resource type="AtlasTexture" id="Atlas_0_3"]
+atlas = ExtResource("1")
+region = Rect2(84, 110, 46, 54)
+
+[sub_resource type="AtlasTexture" id="Atlas_0_4"]
+atlas = ExtResource("1")
+region = Rect2(125, 92, 49, 50)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_0"]
+atlas = ExtResource("2")
+region = Rect2(10, 9, 36, 35)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_1"]
+atlas = ExtResource("2")
+region = Rect2(70, 11, 21, 30)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_2"]
+atlas = ExtResource("2")
+region = Rect2(108, 18, 33, 26)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_3"]
+atlas = ExtResource("2")
+region = Rect2(119, 38, 35, 28)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_4"]
+atlas = ExtResource("2")
+region = Rect2(11, 62, 31, 31)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_5"]
+atlas = ExtResource("2")
+region = Rect2(30, 89, 25, 23)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_6"]
+atlas = ExtResource("2")
+region = Rect2(78, 88, 23, 24)
+
+[sub_resource type="AtlasTexture" id="Atlas_1_7"]
+atlas = ExtResource("2")
+region = Rect2(126, 77, 23, 22)
+
+[resource]
+animations = [
+{"frames": [{"duration": 1.0, "texture": SubResource("Atlas_0_0")}, {"duration": 1.0, "texture": SubResource("Atlas_0_1")}, {"duration": 1.0, "texture": SubResource("Atlas_0_2")}, {"duration": 1.0, "texture": SubResource("Atlas_0_3")}, {"duration": 1.0, "texture": SubResource("Atlas_0_4")}], "loop": false, "name": &"meteor_1", "speed": 1.0},
+{"frames": [{"duration": 1.0, "texture": SubResource("Atlas_1_0")}, {"duration": 1.0, "texture": SubResource("Atlas_1_1")}, {"duration": 1.0, "texture": SubResource("Atlas_1_2")}, {"duration": 1.0, "texture": SubResource("Atlas_1_3")}, {"duration": 1.0, "texture": SubResource("Atlas_1_4")}, {"duration": 1.0, "texture": SubResource("Atlas_1_5")}, {"duration": 1.0, "texture": SubResource("Atlas_1_6")}, {"duration": 1.0, "texture": SubResource("Atlas_1_7")}], "loop": false, "name": &"meteor_2", "speed": 1.0}
+]

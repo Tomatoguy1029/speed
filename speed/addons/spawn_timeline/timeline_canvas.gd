@@ -21,7 +21,8 @@ const HELP := "クリップをドラッグ：開始の時刻　右端をドラ�
 		"⌘（Ctrl）＋クリック：複数選択　クリップを上下にドラッグ：同じ種類のトラックへ移す　クリップ・トラック名をダブルクリック：名前　右クリック・⌘C/⌘V/⌘D：コピー・貼り付け・複製（元の右側、同じトラック）\n" + \
 		"トラック名をクリック：トラックを選ぶ（Delete で消す、⌘D で複製）　トラック名をつかんで上下へ：差し込む所へ並べ替える　トラック名を右クリック：複製・消す\n" + \
 		"時間帯の境目をドラッグ：開始の時刻　時間帯をダブルクリック：名前　目盛りをクリック：再生位置\n" + \
-		"雑魚の曲線：何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　←→で時刻を1秒ずつ　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
+		"名前欄と編集領域の境界を左右にドラッグ：名前欄の幅を変更\n" + \
+		"雑魚の曲線：名前か曲線を右クリックでトラックを削除　何もない所をダブルクリックで点を足す　点をドラッグで動かす　点をダブルクリックで時刻と数を入力（例 2:00 30）　←→で時刻を1秒ずつ　↑↓で数を1ずつ（Shift で10ずつ）　Delete で点を消す\n" + \
 		"ホイール・2本指の縦スクロール：上下に動かす　Shift＋ホイール・2本指の横スクロール：左右に動かす\n" + \
 		"Ctrl（⌘）＋ホイール・ピンチ：拡大縮小\n" + \
 		"Delete：選んだクリップを消す　Shift を押しながらドラッグすると 0.1 秒刻み"
@@ -31,7 +32,12 @@ const BASE := {"gutter": 230.0, "ruler": 30.0, "phase": 50.0, "pop": 48.0, "trac
 
 ## 表示倍率と、それを掛けた大きさ
 var ui := 1.0
+const MIN_GUTTER := 96.0
+const MIN_EDIT_WIDTH := 160.0
 var GUTTER := 230.0
+## 希望する名前欄の幅。ウィンドウを一時的に狭めても元の幅へ戻せるよう保持する。
+var _gutter_width := BASE.gutter
+var _gutter_hover := false
 var RULER := 30.0
 var PHASE_ROW := 50.0
 var POP_ROW := 48.0
@@ -71,7 +77,8 @@ func _init() -> void:
 	clip_contents = true
 	if Engine.is_editor_hint():
 		ui = EditorInterface.get_editor_scale()
-	GUTTER = BASE.gutter * ui
+	GUTTER = _gutter_width * ui
+	custom_minimum_size.x = (MIN_GUTTER + MIN_EDIT_WIDTH) * ui
 	RULER = BASE.ruler * ui
 	PHASE_ROW = BASE.phase * ui
 	POP_ROW = BASE.pop * ui
@@ -261,6 +268,20 @@ func _track_menu(row: int, at: Vector2) -> void:
 	add_child(menu)
 	menu.popup(Rect2i(Vector2i(get_screen_position() + at), Vector2i.ZERO))
 
+## 右クリックした曲線だけを削除する。点の削除とは対象を分けて表示する。
+func _curve_menu(index: int, at: Vector2) -> void:
+	var curve: Resource = timeline.curves()[index]
+	var stage: Resource = timeline.stage
+	var menu := PopupMenu.new()
+	menu.add_item("曲線トラック「%s」（%s）を削除" % [timeline.enemy_name(curve.get("type")), curve.get("type")], 0)
+	menu.id_pressed.connect(func(_id: int) -> void:
+		if timeline.stage == stage:
+			timeline._remove_curve(curve)
+		menu.queue_free())
+	menu.popup_hide.connect(menu.queue_free)
+	add_child(menu)
+	menu.popup(Rect2i(Vector2i(get_screen_position() + at), Vector2i.ZERO))
+
 ## 通常トラックの数（明示した空の行も含め、末尾に配置用の仮の行を1本足す）。
 func track_count() -> int:
 	var names = timeline.stage.get("track_names")
@@ -381,8 +402,25 @@ static func clock(t: float) -> String:
 	return "%d:%02d" % [int(t) / 60, int(t) % 60]
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED and not _user_view:
+	if what == NOTIFICATION_RESIZED:
+		_update_gutter()
+	elif what == NOTIFICATION_MOUSE_EXIT:
+		_gutter_hover = false
+		mouse_default_cursor_shape = Control.CURSOR_ARROW
+		queue_redraw()
+
+## 幅の変更は表示状態だけに保持し、ステージの編集履歴へ混ぜない。
+func _update_gutter() -> void:
+	GUTTER = clampf(_gutter_width * ui, MIN_GUTTER * ui, maxf(MIN_GUTTER * ui, size.x - MIN_EDIT_WIDTH * ui))
+	if not _user_view:
 		fit()
+	else:
+		px_per_sec = maxf(px_per_sec, _min_px())
+		_clamp_view()
+
+func _resize_gutter(width: float) -> void:
+	_gutter_width = clampf(width, MIN_GUTTER * ui, maxf(MIN_GUTTER * ui, size.x - MIN_EDIT_WIDTH * ui)) / ui
+	_update_gutter()
 
 ## ピンを画面の端でつかみ続けると、横へ送って先の時刻まで動かせる。
 func _process(dt: float) -> void:
@@ -652,7 +690,7 @@ func _draw() -> void:
 			draw_polyline(line, Color(0.5, 0.9, 0.6), 2.0 * ui, true)
 	draw_rect(Rect2(0, off, GUTTER, _tracks_top()), Color(0.1, 0.11, 0.14))
 	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
-	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯 / 予算", HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(15))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯 / 予算", HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の合計（最大 %d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % int(max_pop), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
 	clocks.draw()
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
@@ -666,7 +704,8 @@ func _draw() -> void:
 	# 再生位置
 	var px := _x(playhead)
 	draw_line(Vector2(px, off), Vector2(px, size.y), Color(1, 0.8, 0.2), 2.0 * ui)
-	draw_line(Vector2(GUTTER, 0), Vector2(GUTTER, size.y), Color(1, 1, 1, 0.2))
+	var resizing: bool = _gutter_hover or _drag.get("kind", "") == "gutter"
+	draw_line(Vector2(GUTTER, 0), Vector2(GUTTER, size.y), Color(1, 1, 1, 0.6 if resizing else 0.2), (2.0 if resizing else 1.0) * ui)
 
 ## 目盛りは1・5・10・30秒の固定階層。拡大率では細かい階層だけを省く。
 func _time_grid_step() -> int:
@@ -715,6 +754,16 @@ func _draw_time_grid(font: Font, end: float, off: float) -> void:
 ## 位置 p にあるもの：{"kind", "index"}。
 func _hit(p: Vector2) -> Dictionary:
 	var hy := p.y - _scroll_y()
+	if absf(p.x - GUTTER) <= 4.0 * ui:
+		# 時刻0の点・ピンも境界上にあるので、編集側のハンドルを優先する。
+		if hy >= RULER and hy < RULER + PHASE_ROW:
+			var pin: Dictionary = clocks.hit(p)
+			if not pin.is_empty(): return pin
+		if p.x >= GUTTER and hy >= _tracks_top() and p.y < _clips_top():
+			var ck := int(floor((p.y - _curves_top()) / CURVE_ROW))
+			var point := _hit_curve_point(ck, p)
+			if not point.is_empty(): return point
+		return {"kind": "gutter"}
 	if hy < RULER:
 		return {"kind": "playhead"}
 	var ps: Array = timeline.phases()
@@ -742,13 +791,8 @@ func _hit(p: Vector2) -> Dictionary:
 			return {}
 		if p.x < GUTTER:
 			return {"kind": "curve_label", "curve": ck}
-		var c: Resource = curves[ck]
-		var vmax := _curve_max(c)
-		var pts: PackedVector2Array = c.get("points")
-		for n in pts.size():
-			if Vector2(_x(pts[n].x), _curve_y(ck, pts[n].y, vmax)).distance_to(p) <= 9.0 * ui:
-				return {"kind": "point", "curve": ck, "point": n}
-		return {"kind": "curve_body", "curve": ck}
+		var point := _hit_curve_point(ck, p)
+		return point if not point.is_empty() else {"kind": "curve_body", "curve": ck}
 	var row := int(floor((p.y - _clips_top()) / TRACK))
 	if row < 0 or row >= track_count():
 		return {}
@@ -769,6 +813,17 @@ func _hit(p: Vector2) -> Dictionary:
 		if p.x >= _x(float(c.get("time"))) - HANDLE and p.x <= _x(_clip_end(c)):
 			return {"kind": "time", "index": k}
 	return {"kind": "track", "row": row}
+	return {}
+
+func _hit_curve_point(index: int, p: Vector2) -> Dictionary:
+	var curves: Array = timeline.curves()
+	if index < 0 or index >= curves.size(): return {}
+	var c: Resource = curves[index]
+	var vmax := _curve_max(c)
+	var points: PackedVector2Array = c.get("points")
+	for n in points.size():
+		if Vector2(_x(points[n].x), _curve_y(index, points[n].y, vmax)).distance_to(p) <= 9.0 * ui:
+			return {"kind": "point", "curve": index, "point": n}
 	return {}
 
 ## 選択対象を切り替え、キー操作が以前の対象へ残るのを防ぐ。
@@ -923,6 +978,7 @@ func _get_tooltip(at: Vector2) -> String:
 		return ""
 	var hit := _hit(at)
 	match hit.get("kind", ""):
+		"gutter": return "左右にドラッグして名前欄の幅を変更"
 		"time", "length": return timeline.clip_rule_report(timeline.clips()[hit.index])
 		"phase_budget": return "予算 %d：クリックして整数を入力。0は強敵の新しい攻撃を停止。" % int(timeline.phases()[hit.index].get("attack_budget"))
 	return ""
@@ -970,9 +1026,16 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			var h := _hit(mb.position)
 			_select_hit(h, false, true)
+			if h.get("kind", "") == "gutter":
+				accept_event()
+				return
 			var phase_y := mb.position.y - _scroll_y() - RULER
 			if phase_y >= 0.0 and phase_y < PHASE_ROW:
 				clocks.menu(mb.position)
+				accept_event()
+				return
+			if h.get("kind", "") in ["curve_label", "curve_body", "point"]:
+				_curve_menu(h.curve, mb.position)
 				accept_event()
 				return
 			if h.get("kind", "") == "track_label":
@@ -992,6 +1055,12 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			grab_focus()
 			var h := _hit(mb.position)
+			if h.get("kind", "") == "gutter":
+				_drag = {"kind": "gutter", "offset": mb.position.x - GUTTER}
+				_gutter_hover = true
+				mouse_default_cursor_shape = Control.CURSOR_HSIZE
+				accept_event()
+				return
 			var toggle: bool = (mb.ctrl_pressed or mb.meta_pressed) and h.get("kind", "") in ["time", "length"]
 			_select_hit(h, toggle, true)
 			if toggle:
@@ -1056,6 +1125,11 @@ func _gui_input(event: InputEvent) -> void:
 		_move_drag((event as InputEventMouseMotion).position, (event as InputEventMouseMotion).shift_pressed)
 	elif event is InputEventMouseMotion:
 		var h := _hit((event as InputEventMouseMotion).position)
+		var over_gutter: bool = h.get("kind", "") == "gutter"
+		if over_gutter != _gutter_hover:
+			_gutter_hover = over_gutter
+			mouse_default_cursor_shape = Control.CURSOR_HSIZE if over_gutter else Control.CURSOR_ARROW
+			queue_redraw()
 		var hc: int = h.get("curve", -1) if h.get("kind", "") == "point" else -1
 		var hp: int = h.get("point", -1) if h.get("kind", "") == "point" else -1
 		if hc != _hover_curve or hp != _hover_point:
@@ -1220,6 +1294,9 @@ func _begin_point_drag(k: int, n: int) -> void:
 		"before": {"points": (c.get("points") as PackedVector2Array).duplicate()}}
 
 func _move_drag(p: Vector2, fine: bool) -> void:
+	if _drag.kind == "gutter":
+		_resize_gutter(p.x - float(_drag.offset))
+		return
 	var t := _t(p.x)
 	var snap := 0.1 if fine else 1.0
 	match _drag.kind:
@@ -1266,6 +1343,12 @@ func _move_drag(p: Vector2, fine: bool) -> void:
 	timeline.refresh_view()
 
 func _end_drag() -> void:
+	if _drag.get("kind", "") == "gutter":
+		_drag = {}
+		_gutter_hover = false
+		mouse_default_cursor_shape = Control.CURSOR_ARROW
+		queue_redraw()
+		return
 	timeline.refresh_diagnostics()
 	if _drag.get("kind", "") == "track_move":
 		var from: int = _drag.row

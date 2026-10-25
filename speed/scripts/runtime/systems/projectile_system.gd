@@ -62,8 +62,8 @@ var _hits: Array = []
 ## SLASH はやまねこ座の斬撃。片側1組の、潰れた弧の3本の爪痕。真ん中の少し先から外側へ横に伸び、外側で本体の方へ反り上がる。
 ## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
 ## BOLT はケフェウス座の兵の細長い光弾。直進し、追尾しない
-enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt"]
+enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT, LIGHT_ARROW, COSMIC_ARROW, STAR_BOLT }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt", &"arrow", &"arrow", &"star_bolt"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -292,13 +292,16 @@ func _update_friendly(dt: float) -> void:
 		var life := friend_life[i] - dt
 		shape.advance(self, i, pos, dt)
 		var body_hit = field.first_body_hit(from, pos, r)
+		var wall_hit := block_hit(from,pos,r)
+		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
+			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		var to: Vector2 = pos if body_hit == null else body_hit.point
 		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
 		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
 		for row in _buf:
-			if hit.has(et.id[row]):
+			if hit.has(et.id[combat.damage_target(row)]):
 				continue
 			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
 			if t >= 0.0:
@@ -309,6 +312,7 @@ func _update_friendly(dt: float) -> void:
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
 			var row: int = h[1]
+			if hit.has(et.id[combat.damage_target(row)]): continue
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
 			var impact := from.lerp(to, h[0])
@@ -317,7 +321,7 @@ func _update_friendly(dt: float) -> void:
 				life = 0.0
 				body_hit = null
 				break
-			hit[et.id[row]] = true
+			hit[et.id[combat.damage_target(row)]] = true
 			if friend_on_hit[i].is_valid():
 				friend_on_hit[i].call(row, friend_dmg[i], impact)
 			else:
@@ -454,6 +458,9 @@ func _update_hostile(dt: float) -> void:
 			gap = field.body_gap(from, r)
 			if gap <= step:
 				body_hit = field.first_body_hit(from, to, r)
+		var wall_hit := block_hit(from,to,r)
+		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
+			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
 		var stop = shape.contact(self, i, from, to, body_hit, ship_pos, R, step)
@@ -559,7 +566,7 @@ func attach_hazard(h: int, e: int) -> void:
 
 ## 行 h の攻撃の形が、敵（行 e、id）に付いたまま残っているか。
 func owns_hazard(h: int, e: int, id: int) -> bool:
-	return h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
+	return h >= 0 and h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
 ## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。

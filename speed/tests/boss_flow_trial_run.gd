@@ -8,7 +8,10 @@ func exercise() -> void:
 	custom.data.rules.costs.test_combo = 3.0
 	DirAccess.make_dir_recursive_absolute("res://.content/tests")
 	ResourceSaver.save(custom, "res://.content/tests/monoceros_combo_preview.tres")
-	for entry in [["hydra", "bite_thrust"], ["monoceros", "kick"], ["monoceros", "test_combo"]]:
+	var entries := [["hydra", "bite_thrust"], ["monoceros", "kick"], ["monoceros", "test_combo"]]
+	var draco: Resource=load("res://.content/boss_draco.tres")
+	for move in draco.data.rules.techniques: entries.append(["draco",String(move.technique)])
+	for entry in entries:
 		var trial = load("res://gyms/boss_flow_trial.tscn").instantiate()
 		trial.set_meta("preview_request", {"boss": entry[0], "technique": entry[1]})
 		trial.set_meta("preview_program", "res://.content/tests/monoceros_combo_preview.tres" if entry[1] == "test_combo" else "res://.content/boss_" + entry[0] + ".tres")

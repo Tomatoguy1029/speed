@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-start = 130.0
+start = 135.0
 pop_from = 38.0
 pop_to = 45.0
 rate = 6.0
@@ -19,4 +19,4 @@ mix = {
 "titan": 0.4
 }
 id = &"build2"
-display_name = "休憩"
+display_name = "2回目の育成"

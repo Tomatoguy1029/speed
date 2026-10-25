@@ -466,7 +466,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
 		return
-	var key := str(run.state.weapons) + str(run.state.traits)
+	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules)
 	if key == _loadout_key:
 		return
 	_loadout_key = key
@@ -474,12 +474,21 @@ func _refresh_loadout_icons() -> void:
 		child.queue_free()
 	var row := 0
 	for owned in [run.state.weapons, run.state.traits]:
+		if row==0 and not run.state.final_modules.is_empty():
+			row+=1
+			continue
 		var index := 0
 		for id in owned:
 			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
 			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
 			index += 1
 		row += 1
+	for j in run.state.final_modules.size():
+		var preview=preload("res://scripts/ui/legendary_module_icon.gd").new()
+		preview.position=Vector2(9+j*23,317)
+		preview.size=Vector2(17,17)
+		preview.module_id=run.state.final_modules[j]
+		_loadout_icons.add_child(preview)
 
 # ── 3択 ──────────────────────────────────────────────────────────
 

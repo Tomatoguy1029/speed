@@ -145,9 +145,10 @@ func add_xp(v: float) -> void:
 # ── 3択（仕様書 9.2・9.4） ─────────────────────────────────────────
 
 func tick(real_dt: float, world_dt: float) -> void:
+	if state.controls_locked: return
 	var busy := state.drawing or state.tracing
 	ctx.projectiles.tick_attached(real_dt)
-	if state.phase != RunState.Phase.PLAY:
+	if state.phase != RunState.Phase.PLAY or state.controls_locked:
 		return
 	for behavior in weapon_behaviors.values():
 		behavior.tick_real(real_dt)

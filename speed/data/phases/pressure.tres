@@ -4,11 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-start = 61.0
+start = 55.0
 pop_from = 45.0
 pop_to = 70.0
 rate = 8.0
-attack_budget = 2
+attack_budget = 3
 mix = {
 "armored": 2.2,
 "darter": 3.0,

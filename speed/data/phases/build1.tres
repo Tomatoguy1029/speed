@@ -7,6 +7,7 @@ script = ExtResource("1")
 pop_from = 14.0
 pop_to = 45.0
 rate = 6.0
+attack_budget = 1
 mix = {
 "darter": 1.5,
 "drifter": 6.0,

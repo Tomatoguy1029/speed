@@ -223,19 +223,4 @@ func _draw_effect(code: String) -> void:
 			_burst(Vector2(30, 12), 22 + pulse * 10)
 
 func _draw_legend(id: String) -> void:
-	# 専用素材がない間は部品を示す仮の図。完成アートとは区別する。
-	var color := _ink(GOLD)
-	match id:
-		"legendary_compass":
-			_ring(Vector2.ZERO, 66, GOLD)
-			_ring(Vector2.ZERO, 53, GOLD)
-			draw_colored_polygon(PackedVector2Array([Vector2(0, -48), Vector2(14, 0), Vector2(0, 48), Vector2(-14, 0)]), color)
-		"legendary_sail":
-			_line(Vector2(-35, 60), Vector2(-35, -65), GOLD, 5.0)
-			draw_colored_polygon(PackedVector2Array([Vector2(-26, -62), Vector2(65, 38), Vector2(-26, 38)]), color)
-		"legendary_keel":
-			draw_polyline(PackedVector2Array([Vector2(-85, -28), Vector2(-60, 25), Vector2(0, 50), Vector2(60, 25), Vector2(85, -28)]), color, 8.0, true)
-			_line(Vector2.ZERO, Vector2(0, 50), GOLD, 6.0)
-		"legendary_stern":
-			draw_colored_polygon(PackedVector2Array([Vector2(-50, -50), Vector2(50, -50), Vector2(68, 45), Vector2(-68, 45)]), color)
-			_line(Vector2(-35, 65), Vector2(35, 65), GOLD, 8.0)
+	preload("res://scripts/ui/legendary_module_geometry.gd").draw(self,id,_ink(GOLD))

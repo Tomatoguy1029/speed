@@ -16,6 +16,10 @@ func setup(simulation: RunSimulation, visuals: IntroPresentation, origin: Vector
 	for offset: Vector2 in presentation.practice_offsets:
 		stars.append(arrival + offset + Vector2(80, 0))
 
+func relocate(origin: Vector2) -> void:
+	stars.clear()
+	for offset: Vector2 in presentation.practice_offsets: stars.append(origin+offset+Vector2(80,0))
+
 func spawn() -> void:
 	for star in stars:
 		var row: int = run.enemies.spawn(presentation.practice_enemy, star,
@@ -35,7 +39,9 @@ func update() -> void:
 	for record: Dictionary in enemies.values():
 		var row: int = record.row
 		if run.enemies.table.pos[row].distance_to(state.ship_pos) > 950.0:
-			run.enemies.table.pos[row] = state.ship_pos + state.ship_heading * 700.0
+			run.enemies.table.speed[row] = maxf(presentation.practice_enemy.speed,state.stats.max_speed*0.9)
+		else:
+			run.enemies.table.speed[row] = presentation.practice_enemy.speed
 	if not state.drawing and not state.tracing:
 		build_guide()
 
