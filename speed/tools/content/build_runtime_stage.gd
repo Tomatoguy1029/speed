@@ -25,13 +25,15 @@ static func clip(source: SpawnClip) -> RuntimeClip:
 			result.prepared.append({"layouts": layouts, "entries": data.entries})
 	return result
 
-static func compile(source: StageDef) -> RuntimeStage:
+static func compile(source: StageDef, output := "res://.content") -> RuntimeStage:
 	var result := RuntimeStage.new()
 	for property in source.get_property_list():
 		if property.usage & PROPERTY_USAGE_STORAGE == 0: continue
-		if property.name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "clips", "phases", "track_names", "scene_path"]: continue
+		if property.name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "clips", "phases", "track_names", "scene_path", "backgrounds"]: continue
 		var value: Variant = source.get(property.name)
 		result.set(property.name, value.duplicate(true) if value is Dictionary or value is Array else value)
+	for placement in source.backgrounds:
+		result.backgrounds.append(preload("res://tools/content/prepare_background.gd").compile(placement))
 	result.zako_curves = []
 	for curve in source.zako_curves: result.zako_curves.append(curve.duplicate(true))
 	result.phases = []
@@ -40,7 +42,7 @@ static func compile(source: StageDef) -> RuntimeStage:
 		copy.display_name = ""
 		result.phases.append(copy)
 	for item in source.clips: result.clips.append(clip(item))
-	result.resources = load("res://tools/content/build_stage_resources.gd").build(result)
+	result.resources = load("res://tools/content/build_stage_resources.gd").build(result, output)
 	# 実行用にも局所上書きを保持し、未知の敵・項目・不正な数値を生成時に止める。
 	for id in result.enemy_tuning:
 		var path := "res://data/enemies/%s.tres" % String(id)
@@ -65,7 +67,7 @@ static func build_all(output := "res://.content") -> Error:
 	for file in DirAccess.get_files_at("res://data/stages"):
 		if not file.ends_with(".tres"): continue
 		var source := ResourceLoader.load("res://data/stages/" + file, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
-		var compiled := compile(source)
+		var compiled := compile(source, output)
 		if compiled == null: return ERR_INVALID_DATA
 		var error := ResourceSaver.save(compiled, output.path_join("stage_%d.tres" % source.index))
 		if error != OK: return error

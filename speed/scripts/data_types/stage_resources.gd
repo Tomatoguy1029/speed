@@ -6,3 +6,5 @@ extends Resource
 
 ## ロード中にmaterialを作って描くshader。
 @export var shader_paths := PackedStringArray()
+@export var look_names := PackedStringArray()
+@export var look_paths: Dictionary = {}

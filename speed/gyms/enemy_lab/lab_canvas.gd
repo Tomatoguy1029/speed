@@ -74,7 +74,7 @@ func texture_for(id: String) -> Texture2D:
 	var look := RunPresentation.load_look(StringName(id), stage)
 	if look != null:
 		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ContentManager.enemies.get(StringName(id))
-		return RunPresentation.look_texture(look, _look_textures, def.armor_colors if def != null else {})
+		return RunPresentation.look_texture(look, _look_textures, def.armor_colors if def != null else {}, preload("res://tools/content/visual_transforms.gd").live_look)
 	if id.begins_with("field_planet"):
 		if not _textures.has("planet"):
 			_textures["planet"] = load("res://assets/pixel/planet.png")
