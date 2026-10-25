@@ -38,11 +38,16 @@ func tick(a: BossActor, _dt: float) -> void:
 		var radius := (base_radius+pitch*coil_turns*t)*radius_scale
 		points.append(center+Vector2.from_angle(head_angle+t*TAU*coil_turns)*radius)
 	if a.elapsed>=shrink_at:
-		if not trapped_hit and a.run_state.ship_pos.distance_to(center)<base_radius*radius_scale+body_width:
+		points[0]+=Vector2.DOWN*shrink*extent*2.5
+		var touching := false
+		for j in range(points.size()-1):
+			if Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos,points[j],points[j+1]).distance_to(a.run_state.ship_pos)<=body_width*0.5+a.ctx.cfg.ship_radius:
+				touching=true
+				break
+		if not trapped_hit and touching:
 			trapped=true;trapped_hit=true
 			a.ctx.ship.damage(float(p.damage)*a.ctx.cfg.atk_scale,0.0,&"spiral",&"draco")
 			a.run_state.ship_invuln=maxf(a.run_state.ship_invuln,float(p.shrink_time)+1.0)
-		points[0]+=Vector2.DOWN*shrink*extent*2.5
 	a.table.facing[a.body]=(center-points[0]).angle() if a.elapsed<shrink_at else PI*0.5
 	a.table.pos[a.body]=points[0]
 	a.body_override=points

@@ -26,6 +26,17 @@ func _ready() -> void:
 			for frame in 540: actor.sim_tick(1.0/120.0,1.0/120.0)
 			for h in spiral.walls: check(is_equal_approx(sim.projectiles.hazard_width[h],actor.body_width),"青紫の壁と胴体の太さが一致する")
 		actor.cancel_attack()
+	actor.cancel_attack();actor.cycle.cancel()
+	sim.state.view_half=Vector2(980,550)
+	sim.state.ship_pos=Vector2.ZERO;sim.state.enemy_aim=Vector2.ZERO
+	sim.state.ship_invuln=0.0;sim.ship.invincible=false
+	var hp:=sim.state.ship_hp
+	actor.start_attack(&"spiral")
+	for frame in 558: actor.sim_tick(1.0/120.0,1.0/120.0)
+	check(sim.state.ship_hp==hp,"収縮開始だけで、安全な空間の自機に即ダメージを出さない")
+	for frame in 280: actor.sim_tick(1.0/120.0,1.0/120.0)
+	check(sim.state.ship_hp<hp,"胴体が実際に閉じたところで挟まれた被弾を出す")
+	actor.cancel_attack()
 	check(is_equal_approx(actor.table.r[actor.body],baseline_radius),"技の終了時に頭の判定を元へ戻す")
 	session.free()
 	print("[draco_spiral_scale] failures=",failures)
