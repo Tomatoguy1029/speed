@@ -173,6 +173,16 @@ func _ready() -> void:
 		for frame in 720: actor.advance_finale(1.0/120.0,Intent.new())
 		check(actor.finale.stage==&"input", "解放と合体から自由描画へ進む")
 		check(sim.state.final_modules.size()==4, "四つの伝説モジュールを武器欄へ渡す")
+		var intent := Intent.new()
+		intent.press=true;intent.has_cursor=true;intent.pen=Vector2.ZERO
+		actor.advance_finale(0.01,intent)
+		intent.press=false;intent.pen=Vector2(10000,10000)
+		actor.advance_finale(0.01,intent)
+		check(actor.finale.strokes.size()>=2 and actor.finale.stage==&"input", "無制限の自由描画中も自動確定しない")
+		check(sim.state.world_scale==0.0, "最終描画中の世界速度はゼロ")
+		intent.pen_release=true
+		actor.advance_finale(0.01,intent)
+		check(actor.finale.stage==&"strikes", "離すと入力経路に関係なく固定フィニッシュを始める")
 	session.free()
 	print("[draco] failures=",failed)
 	get_tree().quit(1 if failed else 0)

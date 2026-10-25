@@ -28,7 +28,7 @@ func begin() -> void:
 	a.run_state.drawing=false;a.run_state.tracing=false;a.run_state.ship_vel=Vector2.ZERO
 	a.run_state.world_scale=0.0
 	a.presentation_event.emit({"cue":&"core_released","pos":core,"radius":100.0})
-func advance(dt: float, _intent: Intent) -> void:
+func advance(dt: float, intent: Intent) -> void:
 	if stage==&"" or completed: return
 	var a = actor
 	time+=dt
@@ -56,6 +56,17 @@ func advance(dt: float, _intent: Intent) -> void:
 				stage=&"input";time=0.0
 				a.run_state.controls_locked=false;a.run_state.cinematic_bars=0.0
 				for j in 49: guide.append(center+Vector2.from_angle(j*TAU/48.0)*430.0)
+		&"input":
+			if intent.press or intent.alt_press:
+				if not began:
+					began=true
+					strokes.append(intent.pen)
+			if began and intent.has_cursor and (strokes.is_empty() or strokes[-1].distance_to(intent.pen)>3.0): strokes.append(intent.pen)
+			if began and intent.pen_release:
+				stage=&"strikes";time=0.0
+				a.run_state.controls_locked=true
+				a.run_state.drawing=false
+			else: a.run_state.drawing=began
 	a._update_body();a._presentation.queue_redraw()
 func dispose() -> void:
 	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0;actor.run_state.cinematic_camera=false

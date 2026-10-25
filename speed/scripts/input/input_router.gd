@@ -30,8 +30,9 @@ func _input(event: InputEvent) -> void:
 		_mouse_seen = true
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_press = true
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed: _press = true
+		else: _pen_release = true
 		_touch = false
 	elif event.is_action_pressed(&"draw_alt"):
 		_alt_press = true

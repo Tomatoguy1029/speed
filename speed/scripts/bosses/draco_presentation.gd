@@ -93,3 +93,11 @@ func _draw() -> void:
 				var from := at+Vector2.from_angle(j*TAU/4.0)*250.0
 				var position: Vector2=from.lerp(actor.to_local(actor.run_state.ship_pos),clampf(actor.finale.time/2.0,0.0,1.0))
 				draw_rect(Rect2(position-Vector2(12,8),Vector2(24,16)),Color("#d3c2ff"))
+
+	if actor.finale.stage == &"input":
+		var guide := PackedVector2Array()
+		for point in actor.finale.guide: guide.append(actor.to_local(point))
+		if guide.size()>1: draw_polyline(guide,Color(0.65,0.75,1.0,0.18),3.0,false)
+		var strokes := PackedVector2Array()
+		for point in actor.finale.strokes: strokes.append(actor.to_local(point))
+		if strokes.size()>1: draw_polyline(strokes,Color("#effaff"),4.0,false)
