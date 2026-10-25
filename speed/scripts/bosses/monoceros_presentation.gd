@@ -48,6 +48,24 @@ func _limb(root: Vector2, knee: Vector2, hoof: Vector2, width: float, color: Col
 	else:
 		_poly([hoof+Vector2(-9,-8),hoof+Vector2(12,-8),hoof+Vector2(12,8),hoof+Vector2(-9,8)], LIGHT)
 
+func booster_strength() -> float:
+	if actor == null or actor.mode == &"defeated": return 0.0
+	if actor.mode == &"entrance": return 2.0
+	return 2.5 if actor.mode == &"active" and actor.technique in [&"charge", &"return_charge"] else 0.55
+
+func _booster() -> void:
+	_poly([Vector2(-68,-18),Vector2(-88,-15),Vector2(-88,15),Vector2(-68,18)], HULL)
+	var strength := booster_strength()
+	if strength <= 0.0: return
+	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength
+	for layer in 3:
+		var factor := 1.0 - float(layer) * 0.24
+		for j in 12:
+			var t := float(j) / 12.0
+			var height := maxf(pixel_size, (24.0 - t * 22.0) * factor)
+			var at := Vector2(-86.0 - length * t * factor, sin(actor.clock * 20.0 - t * 8.0) * 7.0 * t * factor - height * 0.5).snapped(Vector2.ONE * pixel_size)
+			draw_rect(Rect2(at, Vector2(maxf(pixel_size, length * factor / 12.0), height)), [Color("#245c96"), Color("#61c9ff"), Color("#e0fbff")][layer])
+
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	var r := actor.table.r[actor.body]
@@ -79,8 +97,8 @@ func _draw() -> void:
 		_poly([Vector2(-58,-28),Vector2(-44,-28),Vector2(-44,28),Vector2(-58,28)], HULL)
 		_poly([Vector2(-20,-23),Vector2(23,-23),Vector2(35,0),Vector2(23,23),Vector2(-20,23)], SHADE)
 		_poly([Vector2(-8,-15),Vector2(20,-15),Vector2(27,0),Vector2(20,15),Vector2(-8,15)], HULL)
-	# たてがみと尻尾。燃焼は形態表現に使わない。
-	_poly([Vector2(-76,-10),Vector2(-109,-18),Vector2(-125,-5),Vector2(-103,7),Vector2(-77,10)], SHADE)
+	# 船尾ブースターの青白い炎が尻尾になる。
+	_booster()
 	var neck_angle := 0.0
 	if actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]:
 		neck_angle = (actor.horn_points()[1]-actor.table.pos[actor.body]).angle()-actor.table.facing[actor.body]

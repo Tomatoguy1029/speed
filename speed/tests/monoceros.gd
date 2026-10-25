@@ -159,6 +159,22 @@ func _ready() -> void:
 	check(actor.phase == 2 and actor.get("flow_runner") != null, "第2形態も共通フローで行動を選ぶ")
 
 	fresh()
+	check(actor.has_method("begin_entrance"), "ブースターで画面外から飛び込む登場を持つ")
+	if actor.has_method("begin_entrance"):
+		var target := actor.table.pos[actor.body]
+		actor.call("begin_entrance")
+		check(actor.mode == &"entrance" and not actor.can_begin_sequence(), "登場中は攻撃を選ばない")
+		check(actor.table.pos[actor.body].distance_to(target) > 100.0, "登場は目標の外側から始まる")
+		step(2.0)
+		check(actor.mode == &"idle" and actor.table.pos[actor.body].is_equal_approx(target), "飛来後に目標で停止する")
+	check(actor._presentation.has_method("booster_strength"), "表示側はブースターの噴射強度を持つ")
+	if actor._presentation.has_method("booster_strength"):
+		var idle_strength: float = actor._presentation.call("booster_strength")
+		actor.start_attack(&"charge")
+		while actor.mode == &"windup": step(DT)
+		check(float(actor._presentation.call("booster_strength")) > idle_strength, "突進で炎の尻尾が大きく噴き出す")
+
+	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。
 	sim.state.lab_mode = false
 	actor.start_attack(&"return_charge")
