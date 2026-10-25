@@ -104,6 +104,8 @@
 
 やまねこ座（`lynx`）は、元画像の寸法を保ち、Base → Decorations → Armorの順に重ねる。Normalは装甲の法線マップに使う。ディテールは装甲片の塗装時にも元の色を保つ。
 
+たて座（`shield`）は、`assets/pixel/shield/` の `scutum_base.png`・`scutum_armor.png`・`scutum_normal.png` を使う。BaseにArmorを重ね、Normalで装甲の陰影を付ける。原画の上側の盾を敵の正面へ向け、盾の見た目は原画の装甲で表す。奪って機体へ装備した盾と転送中の盾は共通の盾の演出を使う。
+
 じょうぎ座（`ruler`）は上下各58×46ピクセルの共通キャンバスを同じ位置に重ねる。分離後もキャンバスの中心と寸法を保ち、それぞれの装甲へ対応する法線画像を使う。
 
 ケフェウス座（`cepheus`）は、中央の赤い星から左右へ湾曲した厚い装甲を広げ、下方へ細い装甲の軸を伸ばす。青灰色の大小の装甲片と暗い内部構造を重ね、左右の装甲の隙間に赤い発光部を置く。本体は `assets/pixel/cepheus/`、兵は `assets/pixel/cepheus_soldier/` のBase・Armor・Normalを使う。兵は左右へ小さな装甲を張り出した細い輪郭を持つ。
