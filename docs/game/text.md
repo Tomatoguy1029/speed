@@ -817,6 +817,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.asset.asteroid_b | 小惑星 B | Asteroid B |
 | bg.asset.planet_a | 惑星 A | Planet A |
 | bg.asset.station_a | 宇宙船 A | Spacecraft A |
+| bg.asset.planet_b | 惑星 B | Planet B |
+| bg.asset.station_b | 宇宙船 B | Spacecraft B |
 | bg.asset.solar | ソーラーパネルの残骸 | Solar panel wreck |
 | lab.armor.title | 装甲の塗装 | Armor paint |
 | lab.armor.upper | 上半分 | Upper half |
