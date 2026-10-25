@@ -3,6 +3,9 @@ extends Node2D
 var actor: BossActor
 var effects: Array = []
 func on_event(event: Dictionary) -> void:
+	if event.cue in [&"phase_changed",&"bear_roar"]:
+		var at: Vector2=event.get("pos",actor.table.pos[actor.body])
+		actor.run_state.emit(&"draco_roar",{"pos":at,"radius":700.0})
 	if event.cue in [&"rock_break",&"arrow_impact",&"cosmic_collapse"]:
 		effects.append({"pos":event.pos,"time":actor.clock,"radius":event.radius})
 		if effects.size() > 32: effects.pop_front()
@@ -111,3 +114,19 @@ func _draw() -> void:
 		if opening>0.0: draw_polyline(line,Color("#070411"),90.0*opening,false)
 		if opening>0.4:
 			for side in [-1,1]: draw_circle(Vector2(0,side*25.0),8.0,Color("#ff2345"))
+
+	if actor.mode==&"windup" and actor.technique==&"tail_sweep":
+		var reach: float=actor.rule().reach
+		draw_arc(Vector2.ZERO,reach,PI-1.3,PI+1.3,48,Color(1.0,0.65,0.25,0.7),5.0,false)
+		for angle in [PI-1.3,PI+1.3]:draw_line(Vector2.ZERO,Vector2.from_angle(angle)*reach,Color(1.0,0.65,0.25,0.35),3.0)
+	if actor.mode==&"windup" and actor.technique==&"rifts" and actor._driver!=null:
+		for side in [-1,1]:
+			for j in 3:
+				var from: Vector2=actor._driver.center+Vector2(side*620.0,(j-1)*140.0)
+				var to: Vector2=actor._driver.center+Vector2(side*130.0,(j-1)*140.0+side*75.0)
+				draw_line(actor.to_local(from),actor.to_local(to),Color(0.75,0.5,1.0,0.35),4.0)
+	if actor.cycle.stage==&"collect":
+		for j in 16:
+			var k:=fmod(actor.cycle.time*0.5+j/16.0,1.0)
+			var at:=Vector2.from_angle(j*2.399963)*450.0*(1.0-k)
+			draw_circle(at,4.0,Color(0.8,0.9,1.0,k))

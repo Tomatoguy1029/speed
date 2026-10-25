@@ -7,6 +7,7 @@ var stage: StringName = &""
 var home := Vector2.ZERO
 var generated := 0
 var next_cycle := 12.0
+var base_zoom := 1.0
 func _init(a: BossActor) -> void: actor = a
 func begin_initial() -> void:
 	first = true
@@ -14,6 +15,8 @@ func begin_initial() -> void:
 	time = 0.0
 	generated = 0
 	home = actor.table.pos[actor.body]
+	base_zoom=maxf(0.1,actor.run_state.camera_zoom)
+	actor.run_state.cinematic_camera=true
 	actor.run_state.controls_locked = true
 	actor.run_state.cinematic_bars = 1.0
 	actor.run_state.drawing = false
@@ -34,10 +37,14 @@ func tick(dt: float) -> bool:
 			if next_cycle<=0.0: begin_deep()
 		return false
 	time += dt
+	if first:
+		a.run_state.view_center=a.run_state.ship_pos.lerp(a.table.pos[a.body],0.65)
+		a.run_state.camera_zoom=base_zoom*0.8
 	match stage:
 		&"roar":
 			if time>=1.0: stage=&"collect"; time=0.0
 		&"collect":
+			a.table.pos[a.body]=home+Vector2(sin(time*0.8)*350.0,-250.0-cos(time*0.6)*120.0)
 			a._presentation.scale = Vector2.ONE*lerpf(1.0,0.25,clampf(time,0.0,1.0))
 			a._presentation.modulate.a = 0.35
 			a.table.guard[a.body] = 1.0
@@ -55,7 +62,7 @@ func tick(dt: float) -> bool:
 			a._presentation.scale = Vector2.ONE*lerpf(0.25,1.0,clampf(time,0.0,1.0))
 			a._presentation.modulate.a = lerpf(0.35,1.0,clampf(time,0.0,1.0))
 			if time>=1.0:
-				a.table.guard[a.body]=0.0
+				a.table.guard[a.body]=1.0 if first else 0.0
 				stage=&"generate";time=0.0;generated=0
 		&"generate":
 			var count := int(a.def.params.get("picaro_count",3))
@@ -71,11 +78,11 @@ func tick(dt: float) -> bool:
 				generated+=1
 			if time>0.6+count*0.8+1.0:
 				first=false;stage=&"";next_cycle=10.0
-				a.run_state.controls_locked=false;a.run_state.cinematic_bars=0.0;a.run_state.encounter_protected=false
+				a.run_state.controls_locked=false;a.run_state.cinematic_bars=0.0;a.run_state.encounter_protected=false;a.run_state.cinematic_camera=false
 				a.mode=&"idle";a.elapsed=0.0;a.table.guard[a.body]=0.0
 				a.picaro.attacking=false
 	return stage != &""
 func cancel() -> void:
 	stage=&"";first=false;time=0.0;next_cycle=10.0
-	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0;actor.run_state.encounter_protected=false
+	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0;actor.run_state.encounter_protected=false;actor.run_state.cinematic_camera=false
 	actor._presentation.scale=Vector2.ONE;actor._presentation.modulate=Color.WHITE

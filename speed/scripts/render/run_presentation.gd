@@ -469,6 +469,11 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"sonic":
 				shake = maxf(shake, 10.0)
 				pipeline.add_wave(ev.pos, ev.radius, 0.5)
+			&"draco_roar":
+				shake=maxf(shake,12.0)
+				pipeline.add_wave(ev.pos,ev.radius,0.8)
+				_ring(ev.pos,ev.radius,Color("#c2b8ff"),0.8)
+				AudioManager.play(&"roar",-8.0)
 			&"boss_spawn":
 				shake = maxf(shake, 8.0)
 			&"boss_explode":

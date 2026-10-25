@@ -34,6 +34,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.pressed: _press = true
 		else: _pen_release = true
 		_touch = false
+	elif event.is_action_released(&"draw_alt"):
+		_pen_release=true
 	elif event.is_action_pressed(&"draw_alt"):
 		_alt_press = true
 	elif event.is_action_pressed(&"hero"):

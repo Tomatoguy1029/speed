@@ -60,6 +60,7 @@ func _physics_process(delta: float) -> void:
 
 func _on_beat_changed(next: int) -> void:
 	_hint.hide()
+	if next==Beat.DEPART: AudioManager.play(&"roar",-12.0,0.7)
 	_draw_button.visible = next == Beat.PRACTICE and _touch
 	_motive.visible = next == Beat.MOTIVE
 	if next in [Beat.FLIGHT,Beat.PRACTICE]:
