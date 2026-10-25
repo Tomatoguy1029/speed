@@ -1,6 +1,7 @@
 ## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
 extends BossActor
 signal presentation_event(event: Dictionary)
+var entrance: RefCounted
 var finale: RefCounted
 var cycle: RefCounted
 var picaro: RefCounted
@@ -32,6 +33,7 @@ var _presentation: Node2D
 
 func _on_bound() -> void:
 	draws_self = true
+	entrance = preload("res://scripts/bosses/draco_entrance.gd").new(self)
 	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
 	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
 	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
@@ -49,6 +51,7 @@ func _on_bound() -> void:
 	if ResourceLoader.exists("res://.content/boss_draco.tres"):
 		configure_flow(load("res://.content/boss_draco.tres"))
 	selection_enabled = not run_state.lab_mode
+	if not run_state.lab_mode: entrance.begin()
 
 func configure_flow(program: Resource) -> void:
 	selection_enabled = true
@@ -78,6 +81,7 @@ func damage_target(row: int) -> int:
 	return int(clone_damage_rows[row]) if clone_damage_rows.has(row) else (body if row == body or row in body_rows else row)
 
 func _exit_tree() -> void:
+	if entrance != null: entrance.cancel()
 	if finale != null: finale.dispose()
 	if cycle != null: cycle.cancel()
 	if picaro != null: picaro.clear()
@@ -114,6 +118,9 @@ func attack_playing() -> bool:
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
+	if entrance.tick(dt):
+		_update_body();_presentation.queue_redraw()
+		return
 	picaro.tick()
 	_update_closing_walls(dt)
 	if cycle.tick(dt):

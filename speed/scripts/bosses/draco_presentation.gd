@@ -108,3 +108,11 @@ func _draw() -> void:
 		var strokes := PackedVector2Array()
 		for point in actor.finale.strokes: strokes.append(actor.to_local(point))
 		if strokes.size()>1: draw_polyline(strokes,Color("#effaff"),4.0,false)
+
+	if actor.entrance.active:
+		var opening: float=actor.entrance.rift
+		var line := PackedVector2Array()
+		for j in 17: line.append(Vector2(sin(j*2.3)*60.0*opening,(j-8)*55.0*opening))
+		if opening>0.0: draw_polyline(line,Color("#070411"),90.0*opening,false)
+		if opening>0.4:
+			for side in [-1,1]: draw_circle(Vector2(0,side*25.0),8.0,Color("#ff2345"))

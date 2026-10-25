@@ -526,6 +526,6 @@ boss_time=480.0
 
 time_limit=900.0
 
-boss_id=&""
+boss_id=&"draco"
 
-boss_enabled=false
+boss_enabled=true

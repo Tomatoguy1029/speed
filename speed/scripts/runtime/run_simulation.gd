@@ -372,7 +372,9 @@ func _view_size() -> Vector2:
 	return view_size_source.call() if view_size_source.is_valid() else Vector2(1280, 720)
 
 func _update_camera(real_dt: float) -> void:
-	if state.cinematic_camera: return
+	if state.cinematic_camera:
+		state.view_half=_view_size()/2.0/maxf(0.001,state.camera_zoom)
+		return
 	var size := _view_size()
 	var zoom_t := _base_zoom()
 	if not _cam_ready:

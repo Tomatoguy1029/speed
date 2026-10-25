@@ -21,6 +21,12 @@ func _ready() -> void:
 	sim.bosses.spawn(load("res://data/bosses/draco.tres"), Vector2.ZERO)
 	var actor = sim.bosses.actor
 	check(actor != null and actor.def.id == &"draco", "実験場に本番用の竜を生成できる")
+	check(actor.get("entrance") != null, "静かな星空から対面までを所有する")
+	if actor.get("entrance") != null:
+		actor.entrance.begin()
+		check(not actor.start_attack(&"bite") and sim.state.controls_locked, "登場中は攻撃と操作を止める")
+		for frame in 1100: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor.mode==&"idle" and not sim.state.controls_locked and sim.state.cinematic_bars==0.0, "対面後に戦闘へ引き渡す")
 	check(actor.get("body_rows") != null, "全身の命中形状を持つ")
 	if actor.get("body_rows") != null:
 		var rows: Array = actor.body_rows

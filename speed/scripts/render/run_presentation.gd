@@ -820,6 +820,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		if state.cinematic_hide_enemies and t.is_boss[i]==0: continue
 		if t.def[i] != null and t.def[i].params.get("picaro",false): continue
 		var p := pos[i]
 		var type := t.type[i]

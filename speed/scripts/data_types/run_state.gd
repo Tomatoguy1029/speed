@@ -20,6 +20,7 @@ var encounter_protected := false
 var steering_locked := false
 var cinematic_bars := 0.0
 var cinematic_camera := false
+var cinematic_hide_enemies := false
 var final_modules: Array[StringName] = []
 var draco_finish_done := false
 var sim_time := 0.0
