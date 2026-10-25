@@ -26,6 +26,9 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.settings = settings
 	TranslationServer.set_locale("ja")
+	if OS.get_cmdline_user_args().has("--replay-only"):
+		await _test_replay_only()
+		return
 	var old := {"version": 1, "coins": 321, "cleared_stage": 3, "meta": {"attack": 2}, "legendary": ["legendary_stern"], "encyclopedia": ["W01"], "best": {"runs": 7, "clears": 3, "fastest_clear": 120.0, "top_speed": 2400.0}, "endless_high_score": 42}
 	SaveManager.data = SaveManager._migrate(JSON.parse_string(JSON.stringify(old)), SaveManager.default_data())
 	_check(not SaveManager.has_seen_intro(), "既存セーブの不足フラグを初期化")
@@ -106,6 +109,58 @@ func _ready() -> void:
 	print("[intro] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
+## 再視聴の開始・スキップ・完了・再実行だけを確認し、通常ステージは起動しない。
+func _test_replay_only() -> void:
+	var state := RunState.new()
+	_check(state.get("cinematic_bars") is float, "読み込んだ RunState は共通の演出状態を持つ")
+	if failed:
+		get_tree().quit(1)
+		return
+	state.cinematic_bars = 1.0
+	_check(state.cinematic_bars == 1.0, "読み込んだ RunState へ演出状態を代入できる")
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
+	var saved: Dictionary = SaveManager.data.duplicate(true)
+	GameManager.boot_request = Callable()
+	var app: Node = load("res://scenes/app/main.tscn").instantiate()
+	app.set_meta("skip_stage_launch", true)
+	add_child(app)
+	GameManager.reset_to_main_menu()
+	await get_tree().process_frame
+	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
+	await get_tree().process_frame
+	var intro: Node = app._current
+	_check(GameManager.screen == GameManager.Screen.INTRO and intro.visual != null and intro._hud != null, "見直すボタンで映像と操作 UI を初期化")
+	_check(intro.run.state.cinematic_bars == 1.0, "再視聴の開始時に共通描画へ黒帯を渡す")
+	var skipped_id: int = intro.session.id
+	intro.find_child("SkipIntro", true, false).pressed.emit()
+	await get_tree().process_frame
+	_check(GameManager.screen == GameManager.Screen.STAGE_SELECT and RunManager.session(skipped_id) == null, "スキップで選択へ戻り専用セッションを解放")
+	GameManager.reset_to_main_menu()
+	await get_tree().process_frame
+	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
+	await get_tree().process_frame
+	var completed_id: int = app._current.session.id
+	await _test_practice(app._current)
+	_check(RunManager.session(completed_id) == null, "練習完了で専用セッションを解放")
+	GameManager.reset_to_main_menu()
+	await get_tree().process_frame
+	app._current.find_child("ReplayIntroButton", true, false).pressed.emit()
+	await get_tree().process_frame
+	intro = app._current
+	_check(intro.beat == intro.Beat.FOCUS and not intro.sequence.opening_complete and intro.run.state.cinematic_bars == 1.0, "完了後の再視聴は最初の映像と黒帯から開始")
+	_check(not intro.run.state.drawing and not intro.run.state.tracing and not intro.run.input._press, "再視聴は前回の入力を引き継がない")
+	intro.find_child("SkipIntro", true, false).pressed.emit()
+	await get_tree().process_frame
+	_check(SaveManager.data == saved and SaveManager.writes == 0, "再視聴で既存セーブを書き換えない")
+	app.queue_free()
+	await get_tree().process_frame
+	_check(RunManager._sessions.is_empty(), "再視聴のセッションが残らない")
+	for player: AudioStreamPlayer in AudioManager._players:
+		player.stop()
+	print("[intro replay] failed=%d" % failed)
+	get_tree().quit(1 if failed else 0)
+
 func _check(ok: bool, label: String) -> void:
 	print("[intro] %s %s" % ["PASS" if ok else "FAIL", label])
 	if not ok:
@@ -127,6 +182,7 @@ func _test_practice(intro: Node) -> void:
 		_elapse(intro, intro.presentation.devour_time)
 		_elapse(intro, intro.presentation.depart_time)
 		_check(intro.beat==intro.Beat.FLIGHT and intro.sequence.opening_complete, "竜が去ったら操舵を渡す")
+		_check(run.state.cinematic_bars == 0.0, "操舵へ渡すときに共通描画の黒帯を解除")
 		var old_pos: Vector2=run.state.ship_pos
 		run.input_source=func():
 			var it:=Intent.new();it.has_cursor=true;it.cursor=old_pos+Vector2(200,0);return it
