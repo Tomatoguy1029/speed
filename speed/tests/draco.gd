@@ -34,6 +34,9 @@ func _ready() -> void:
 			var at: Vector2 = sim.enemies.table.pos[row]
 			sim.combat.twin_sweep(trace,at-Vector2(20,0),at+Vector2(20,0))
 		check(is_equal_approx(before-sim.enemies.table.hp[actor.body],sim.combat.attack_power()), "同じ突進で複数の部位に触れても一体分だけ命中する")
+	check(actor.get("flow_adapter") != null, "竜は共通フローのadapterを持つ")
+	if actor.get("flow_adapter") != null:
+		check(not actor.flow_adapter.candidates({"request":"any"}).candidates.is_empty(), "距離条件から噛みつきを候補にできる")
 	check(actor.start_attack(&"bite"), "噛みつきを開始する")
 	for frame in 600: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(not actor.attack_playing(), "噛みつきの予告・実行・隙が終わる")

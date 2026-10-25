@@ -10,6 +10,10 @@ var aim := Vector2.ZERO
 var direction := Vector2.RIGHT
 var attack_hit := false
 var selection_enabled := false
+var action_rules: Resource
+var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
+var flow_adapter: RefCounted
+var _moves: Dictionary = {}
 var body_rows: Array[int] = []
 var body_ids: Array[int] = []
 var _presentation: Node2D
@@ -26,6 +30,17 @@ func _on_bound() -> void:
 		body_rows.append(row)
 		body_ids.append(table.id[row])
 	_update_body()
+	if ResourceLoader.exists("res://.content/boss_draco.tres"):
+		configure_flow(load("res://.content/boss_draco.tres"))
+	selection_enabled = not run_state.lab_mode
+
+func configure_flow(program: Resource) -> void:
+	action_rules = program.data.rules
+	_moves.clear()
+	for move in action_rules.techniques: _moves[move.technique] = move
+	flow_runner.configure(program.data.flow)
+	flow_runner.selector.random = run_state.rng
+	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
 
 func body_points() -> PackedVector2Array:
 	var points := PackedVector2Array([table.pos[body]])
@@ -49,10 +64,10 @@ func _exit_tree() -> void:
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
 
 func rule() -> Dictionary:
-	return def.params
+	return _moves[technique].parameters if _moves.has(technique) else def.params
 
 func start_attack(id: StringName) -> bool:
-	if mode != &"idle" or id != &"bite": return false
+	if mode != &"idle" or not _moves.has(id): return false
 	technique = id
 	mode = &"windup"
 	elapsed = 0.0
@@ -86,6 +101,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		technique = &""
 	_update_body()
 	_presentation.queue_redraw()
+	if selection_enabled and mode == &"idle" and flow_adapter != null:
+		flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 
 func cancel_attack() -> void:
 	mode = &"idle"
@@ -95,3 +112,12 @@ func cancel_attack() -> void:
 func handle_body_defeat(_opts: Dictionary) -> bool:
 	cancel_attack()
 	return false
+
+func selection_blocked() -> bool:
+	return not body_alive() or mode in [&"transition", &"finale", &"deep"]
+func can_begin_sequence() -> bool:
+	return mode == &"idle"
+func attack_failed() -> bool:
+	return not body_alive()
+func technique_ready(id: StringName, gate: Dictionary) -> bool:
+	return mode == &"idle" and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))

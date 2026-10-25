@@ -26,7 +26,7 @@ static func is_current(output := ROOT) -> bool:
 		if not FileAccess.file_exists(path): return false
 	return true
 static func build_all(force := false, output := ROOT) -> Error:
-	for id in ["hydra", "monoceros"]:
+	for id in ["hydra", "monoceros", "draco"]:
 		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id, output.path_join("boss_" + id + ".tres"))
 		if boss.error != OK: return boss.error
 	if not force and is_current(output): return OK
