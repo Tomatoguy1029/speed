@@ -111,6 +111,19 @@ func _ready() -> void:
 			check(not sim.enemies.def_of(id).params.get("picaro",false), "元の敵定義を変更しない")
 		for frame in 150: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(actor.picaro.alive().size() == 2, "異なる既存敵のピカロを保持する")
+	actor.cancel_attack()
+	check(actor.start_attack(&"picaro_wall"), "隊列と口からの光の矢を開始する")
+	if actor.technique == &"picaro_wall":
+		var driver = actor._driver
+		for frame in 240: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(driver.shots>1, "口から上向きに複数発を連射する")
+		check(not driver.impacts.is_empty(), "画面外へ消えた後に固定地点を予告する")
+		if not driver.impacts.is_empty():
+			var target: Vector2 = driver.impacts[0].pos
+			sim.state.enemy_aim += Vector2(200,0)
+			actor.sim_tick(0.01,0.01)
+			check(driver.impacts[0].pos == target, "予告後は自機を追わない")
+		actor.cancel_attack()
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

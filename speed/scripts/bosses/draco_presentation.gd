@@ -3,7 +3,7 @@ extends Node2D
 var actor: BossActor
 var effects: Array = []
 func on_event(event: Dictionary) -> void:
-	if event.cue == &"rock_break":
+	if event.cue in [&"rock_break",&"arrow_impact"]:
 		effects.append({"pos":event.pos,"time":actor.clock,"radius":event.radius})
 		if effects.size() > 32: effects.pop_front()
 func _draw() -> void:
@@ -54,3 +54,11 @@ func _draw() -> void:
 			var angle := j*TAU/12.0+age*6.0
 			var at := center+Vector2.from_angle(angle)*radius*maxf(0.1,1.5-age)
 			draw_line(at,at+Vector2.from_angle(angle+1.0)*12.0,Color(0.6,0.85,1.0,alpha),3.0)
+
+	if actor.technique == &"picaro_wall" and actor._driver != null:
+		for impact: Dictionary in actor._driver.impacts:
+			if impact.pos == Vector2.INF: continue
+			var progress := clampf((float(impact.age)-float(impact.wait))/float(impact.warn),0.0,1.0)
+			var point := actor.to_local(impact.pos)
+			draw_arc(point,float(actor.rule().radius)*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
+			draw_line(point+Vector2(0,-1200*(1.0-progress)),point,Color(0.6,0.75,1.0,progress*0.6),4.0)
