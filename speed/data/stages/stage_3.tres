@@ -9,6 +9,95 @@
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
 
+[sub_resource type="Resource" id="Resource_ruix5"]
+script = ExtResource("2_mgob6")
+label = "やまねこさん"
+track = 0
+types = Array[StringName]([&"lynx"])
+formations = Array[PackedScene]([ExtResource("3_gibww")])
+time = 140.0
+length = 34.0
+groups = 2
+interval = 3.0
+
+[sub_resource type="Resource" id="Resource_tcq7l"]
+script = ExtResource("2_mgob6")
+label = "やまねこさん"
+track = 0
+types = Array[StringName]([&"lynx"])
+formations = Array[PackedScene]([ExtResource("3_gibww")])
+time = 174.0
+length = 36.0
+groups = 4
+interval = 2.0
+
+[sub_resource type="Resource" id="Resource_beaf5"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("4_p4nfj")])
+time = 230.0
+length = 70.0
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_yo0rm"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 3
+types = Array[StringName]([&"corona"])
+formations = Array[PackedScene]([ExtResource("5_d6uyw")])
+time = 230.0
+length = 70.0
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_f46h8"]
+script = ExtResource("2_mgob6")
+label = "やまねこさん"
+track = 0
+types = Array[StringName]([&"lynx"])
+formations = Array[PackedScene]([ExtResource("3_gibww")])
+time = 230.0
+length = 70.0
+interval = 3.0
+
+[sub_resource type="Resource" id="Resource_l47yt"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 4
+time = 320.0
+length = 105.0
+groups = 2
+interval = 3.0
+
+[sub_resource type="Resource" id="Resource_q0ddx"]
+script = ExtResource("2_mgob6")
+label = "やまねこさん"
+track = 0
+types = Array[StringName]([&"lynx"])
+formations = Array[PackedScene]([ExtResource("3_gibww")])
+time = 320.0
+length = 105.0
+interval = 3.0
+
+[sub_resource type="Resource" id="Resource_iwkbi"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("4_p4nfj")])
+time = 320.0
+length = 105.0
+
+[sub_resource type="Resource" id="Resource_7wela"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 3
+types = Array[StringName]([&"corona"])
+formations = Array[PackedScene]([ExtResource("5_d6uyw")])
+time = 320.0
+length = 105.0
+
 [sub_resource type="Resource" id="Phase_stage3_build1"]
 script = ExtResource("9_mgob6")
 pop_from = 14.0
@@ -116,95 +205,6 @@ mix = {
 }
 id = &"escape"
 display_name = "3回目の山"
-
-[sub_resource type="Resource" id="Resource_ruix5"]
-script = ExtResource("2_mgob6")
-label = "やまねこさん"
-track = 0
-types = Array[StringName]([&"lynx"])
-formations = Array[PackedScene]([ExtResource("3_gibww")])
-time = 140.0
-length = 34.0
-groups = 2
-interval = 3.0
-
-[sub_resource type="Resource" id="Resource_tcq7l"]
-script = ExtResource("2_mgob6")
-label = "やまねこさん"
-track = 0
-types = Array[StringName]([&"lynx"])
-formations = Array[PackedScene]([ExtResource("3_gibww")])
-time = 174.0
-length = 36.0
-groups = 4
-interval = 2.0
-
-[sub_resource type="Resource" id="Resource_beaf5"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("4_p4nfj")])
-time = 230.0
-length = 70.0
-interval = 5.0
-
-[sub_resource type="Resource" id="Resource_yo0rm"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 3
-types = Array[StringName]([&"corona"])
-formations = Array[PackedScene]([ExtResource("5_d6uyw")])
-time = 230.0
-length = 70.0
-interval = 5.0
-
-[sub_resource type="Resource" id="Resource_f46h8"]
-script = ExtResource("2_mgob6")
-label = "やまねこさん"
-track = 0
-types = Array[StringName]([&"lynx"])
-formations = Array[PackedScene]([ExtResource("3_gibww")])
-time = 230.0
-length = 70.0
-interval = 3.0
-
-[sub_resource type="Resource" id="Resource_l47yt"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 4
-time = 320.0
-length = 105.0
-groups = 2
-interval = 3.0
-
-[sub_resource type="Resource" id="Resource_q0ddx"]
-script = ExtResource("2_mgob6")
-label = "やまねこさん"
-track = 0
-types = Array[StringName]([&"lynx"])
-formations = Array[PackedScene]([ExtResource("3_gibww")])
-time = 320.0
-length = 105.0
-interval = 3.0
-
-[sub_resource type="Resource" id="Resource_iwkbi"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 2
-types = Array[StringName]([&"marlin"])
-formations = Array[PackedScene]([ExtResource("4_p4nfj")])
-time = 320.0
-length = 105.0
-
-[sub_resource type="Resource" id="Resource_7wela"]
-script = ExtResource("2_mgob6")
-label = "新しいクリップ"
-track = 3
-types = Array[StringName]([&"corona"])
-formations = Array[PackedScene]([ExtResource("5_d6uyw")])
-time = 320.0
-length = 105.0
 
 [sub_resource type="Resource" id="Resource_gibww"]
 script = ExtResource("9_mgob6")
