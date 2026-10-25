@@ -10,6 +10,7 @@ var elapsed := 0.0
 var aim := Vector2.ZERO
 var direction := Vector2.RIGHT
 var attack_hit := false
+var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
 var _driver: RefCounted
@@ -27,6 +28,7 @@ func _on_bound() -> void:
 	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
 	add_child(_presentation)
 	_presentation.actor = self
+	presentation_event.connect(_presentation.on_event)
 	for j in 12:
 		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], 46.0, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
 		table.parent[row] = body
@@ -91,6 +93,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
 	elapsed += dt
+	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
 		elapsed = 0.0
@@ -144,6 +147,10 @@ func on_body_damaged() -> void:
 	if table.hp[body] > floor_hp: return
 	table.hp[body] = floor_hp
 	cancel_attack()
+	for rock: FieldSystem.Rock in placed_meteors:
+		rock.destroyed = true
+		if ctx.enemies.is_same(rock.row,rock.row_id): ctx.enemies.mark_dead(rock.row)
+	placed_meteors.clear()
 	phase += 1
 	mode = &"transition"
 	elapsed = 0.0

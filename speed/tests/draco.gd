@@ -14,6 +14,7 @@ func _ready() -> void:
 	var session := RunManager.create_session(self, {"lab": true, "stage": stage, "stage_index": 5, "seed": 105}, false)
 	session.auto_step = false
 	var sim: RunSimulation = session.sim
+	sim.field.bodies.clear()
 	sim.state.phase = RunState.Phase.PLAY
 	sim.state.ship_pos = Vector2(300,0)
 	sim.state.enemy_aim = sim.state.ship_pos
@@ -54,6 +55,25 @@ func _ready() -> void:
 	check(actor.start_attack(&"tail_slam"), "尾を叩きつける攻撃を開始する")
 	for frame in 300: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(sim.projectiles.hazard_count() > hazards_before, "尾の着地点に小さな衝撃波を出す")
+	actor.cancel_attack()
+	check(actor.start_attack(&"breath"), "隕石投射からブレスを開始する")
+	if actor.technique == &"breath":
+		var breath = actor._driver
+		check(breath.rocks.size() == 3, "口から遮蔽用の隕石を出す")
+		for frame in 150: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(breath.rays.size() > 12, "炎の表示と命中に使う遮蔽光線を計算する")
+		actor.elapsed = float(actor.rule().active) * 0.5
+		sim.state.ship_pos = Vector2(700,0)
+		sim.ship.invincible = false
+		sim.state.ship_invuln = 0.0
+		var before_hp := sim.state.ship_hp
+		breath.tick(actor,1.0/120.0)
+		check(sim.state.ship_hp == before_hp, "隕石の裏にはブレスが当たらない")
+		sim.enemies.mark_dead(breath.rocks[1].row)
+		breath.tick(actor,1.0/120.0)
+		check(sim.state.ship_hp < before_hp, "遮蔽が破壊されたら見える炎と同時に被弾する")
+		actor.cancel_attack()
+		check(breath.rocks.all(func(r): return sim.enemies.table.dead[r.row] != 0), "中断時に配置済みの隕石を崩す")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})
