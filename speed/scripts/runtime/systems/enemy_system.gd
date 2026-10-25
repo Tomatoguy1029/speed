@@ -27,6 +27,7 @@ var bosses: BossSystem:
 	get: return ctx.bosses
 ## 実験場が複製した定義。未指定時は本番の定義を読む。
 var definitions: Dictionary = {}
+var _source_row := -1
 ## このランだけのステージ差分。共通定義や別のランと辞書を共有しない。
 var stage_tuning: Dictionary = {}
 var _stage_bases: Dictionary = {}
@@ -121,6 +122,7 @@ func setup(context: RunContext) -> void:
 ## 敵を1体出し、その行番号を返す。opts：elite、size、facing、spin、meteor_index、vel、hit_cd。
 ## 仕様書 11.2 の補正をかける。
 func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
+	def=_inherit_picaro(def)
 	if stage_tuning.has(String(def.id)) and not def.params.get("picaro",false): def = def_of(def.id)
 	var i := slots.take()
 	_reset_row(i)
@@ -153,7 +155,10 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	t.meteor_index[i] = opts.get("meteor_index", -1)
 	if t.meteor_index[i] < 0:
 		_add_beh(i)
+		var previous_source:=_source_row
+		_source_row=i
 		behaviors[t.beh[i]].on_spawn(i, opts)
+		_source_row=previous_source
 	else:
 		for b in behaviors:
 			b.rocks_changed()
@@ -296,7 +301,7 @@ func _reset_row(i: int) -> void:
 
 ## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で出す（仕様書 11.3）。
 func spawn_later(def: EnemyDef, pos: Vector2, opts := {}) -> void:
-	_new.append([def, pos, opts])
+	_new.append([_inherit_picaro(def), pos, opts])
 
 ## 行 i が、id の敵のまま使用中か（撃破済みでも、空きに戻るまでは true）。
 func is_same(i: int, id: int) -> bool:
@@ -527,7 +532,10 @@ func _tick_behavior(b: int, dt: float) -> void:
 				if motion._near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 					field.collide_enemy(i, from)
 				continue
+			var previous_source:=_source_row
+			_source_row=i
 			behavior.step(i, bdt)
+			_source_row=previous_source
 			if dead[i] != 0:
 				continue
 			behavior.before_move(i, dt)
@@ -547,7 +555,10 @@ func on_enemy_death(i: int, atk: float) -> void:
 	if projectiles.director != null:
 		projectiles.lab_context = projectiles.director.passive(str(t.id[i]), i, t.id[i])
 	if t.beh_slot[i] >= 0:
+		var previous_source:=_source_row
+		_source_row=i
 		behaviors[t.beh[i]].on_death(i, atk)
+		_source_row=previous_source
 	if dp.has("chain_power"):
 		projectiles.fire_zone(t.pos[i], float(dp.blast_radius), float(dp.blast_delay), float(dp.blast_dmg),
 			ProjectileSystem.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
@@ -617,3 +628,16 @@ func extra_drops(pickups: PickupSystem, row: int) -> void:
 	var behavior := row_behavior(row)
 	if behavior != null:
 		behavior.extra_drops(pickups, row)
+
+## 元の行動が出す部位・兵・分裂体も、同じボスが所有するコズミック版へ引き継ぐ。
+func _inherit_picaro(definition: EnemyDef) -> EnemyDef:
+	if _source_row<0 or _source_row>=table.def.size() or table.def[_source_row]==null: return definition
+	var source: EnemyDef=table.def[_source_row]
+	if not source.params.get("picaro",false): return definition
+	var owner: int=int(source.params.get("picaro_owner",0))
+	if definition.params.get("picaro",false) and int(definition.params.get("picaro_owner",0))==owner: return definition
+	var copy:=definition.duplicate(true) as EnemyDef
+	copy.params.picaro=true
+	copy.params.source_type=definition.id
+	copy.params.picaro_owner=owner
+	return copy

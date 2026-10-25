@@ -71,3 +71,7 @@ func damage_target(row: int) -> int:
 
 func contains_hit(point: Vector2, radius: float) -> bool:
 	return point.distance_to(table.pos[body]) <= table.r[body]+radius
+
+## 独立HPを持つ複製など、追加の命中先の全身を追う。
+func contains_additional_target(_row: int, _point: Vector2, _radius: float) -> bool:
+	return false

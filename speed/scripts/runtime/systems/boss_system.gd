@@ -161,4 +161,7 @@ func admit(key: String, cats: Array, row: int, duration: float) -> bool:
 
 func contains_target(row: int, point: Vector2, radius: float) -> bool:
 	var owner := actor_for_row(row)
-	return owner.contains_hit(point,radius) if owner != null else point.distance_to(enemies.table.pos[row]) <= enemies.table.r[row]+radius
+	if owner!=null:return owner.contains_hit(point,radius)
+	for candidate in actors:
+		if candidate.contains_additional_target(row,point,radius):return true
+	return point.distance_to(enemies.table.pos[row])<=enemies.table.r[row]+radius

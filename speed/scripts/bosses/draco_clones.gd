@@ -54,13 +54,14 @@ func begin(a: BossActor) -> void:
 			var visual=preload("res://scripts/bosses/draco_clone_visual.gd").new()
 			visual.actor=a;visual.unit=units[-1]
 			host.add_child(visual)
+			units[-1].visual=visual
 			for k in 12:
 				var part := EnemyDef.new()
 				part.params.clone_visual=true
 				part.id=&"draco_copy_part";part.behavior=&"drift";part.radius=35;part.hp=999999;part.speed=0
 				var segment := a.ctx.enemies.spawn(part,a.table.pos[row])
 				a.table.held[segment]=1;a.table.parent[segment]=a.body;a.table.parent_id[segment]=a.body_id
-				a.clone_damage_rows[segment]=row
+				a.clone_damage_rows[segment]={"row":row,"id":a.table.id[row],"part_id":a.table.id[segment]}
 				units[-1].parts.append({"row":segment,"id":a.table.id[segment]})
 func tick(a: BossActor, dt: float) -> void:
 	host.attack_field.tick(dt)
@@ -87,11 +88,20 @@ func tick(a: BossActor, dt: float) -> void:
 			a.table.pos[unit.row]=a.table.pos[unit.row].lerp(a.table.pos[a.body],minf(1.0,dt*5.0))
 func end(a: BossActor, cancelled: bool) -> void:
 	if host != null:
-		host.attack_field.clear_effects()
-		host.queue_free()
+		for effect: Dictionary in host.attack_field.effects:
+			if not effect.persistent: effect.life=0.0
+		if not host.attack_field.effects.any(func(e):return e.persistent):
+			host.attack_field.clear_effects()
+			host.queue_free()
+		else: a.retained_fields.append(host)
 	for unit: Dictionary in units:
-		if unit.index>0 and a.ctx.enemies.is_same(unit.row,unit.id): a.ctx.enemies.mark_dead(unit.row)
+		if unit.index==0: continue
+		if cancelled and a.ctx.enemies.is_same(unit.row,unit.id) and a.table.dead[unit.row]==0:
+			unit.visual.reparent(a._presentation)
+			a.picaro.members.append({"row":unit.row,"id":unit.id,"born":a.clock-2.0,"stars":int(a.rule().get("clone_stars",13)),"clone_parts":unit.parts,"visual":unit.visual,"angle":unit.angle})
+			continue
+		if a.ctx.enemies.is_same(unit.row,unit.id): a.ctx.enemies.mark_dead(unit.row)
 		for part: Dictionary in unit.parts:
 			if a.ctx.enemies.is_same(part.row,part.id): a.ctx.enemies.mark_dead(part.row)
-			a.clone_damage_rows.erase(part.row)
+			if int(a.clone_damage_rows.get(part.row,{}).get("part_id",-1))==int(part.id): a.clone_damage_rows.erase(part.row)
 	a.attack_points.clear()

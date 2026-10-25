@@ -10,6 +10,7 @@ var mode: StringName = &"idle"
 var technique: StringName = &""
 var _cooldown := 0.0
 var attack_serial := 0
+var attack_token := 0
 var clock := 0.0
 var elapsed := 0.0
 var aim := Vector2.ZERO
@@ -28,6 +29,7 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves: Dictionary = {}
+var retained_fields: Array = []
 var clone_damage_rows: Dictionary = {}
 var body_rows: Array[int] = []
 var body_ids: Array[int] = []
@@ -83,7 +85,10 @@ func _update_body() -> void:
 			table.r[body_rows[j]] = body_width*0.5
 
 func damage_target(row: int) -> int:
-	return int(clone_damage_rows[row]) if clone_damage_rows.has(row) else (body if row == body or row in body_rows else row)
+	if clone_damage_rows.has(row):
+		var target: Dictionary=clone_damage_rows[row]
+		if table.id[row]==int(target.part_id) and ctx.enemies.is_same(target.row,target.id): return int(target.row)
+	return body if row==body or row in body_rows else row
 
 func _exit_tree() -> void:
 	if entrance != null: entrance.cancel()
@@ -103,7 +108,8 @@ func start_attack(id: StringName) -> bool:
 		var key := "draco:%d:%d" % [body_id,attack_serial]
 		var p: Dictionary=_moves[id].parameters
 		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0): return false
-		ctx.projectiles.lab_context=director.token(key)
+		attack_token=director.token(key)
+		ctx.projectiles.lab_context=attack_token
 		attack_serial+=1
 	if id != &"picaro_wall": picaro.pause(false)
 	technique = id
@@ -122,10 +128,15 @@ func attack_playing() -> bool:
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
+	if attack_token>0: ctx.projectiles.lab_context=attack_token
 	clock += dt
 	if entrance.tick(dt):
 		_update_body();_presentation.queue_redraw()
 		return
+	for host: Node in retained_fields.duplicate():
+		host.attack_field.tick(dt)
+		if host.attack_field.effects.is_empty():
+			host.queue_free();retained_fields.erase(host)
 	picaro.tick()
 	_update_closing_walls(dt)
 	if cycle.tick(dt):
@@ -244,3 +255,10 @@ func _update_closing_walls(dt: float) -> void:
 		ps.hazard_len[h] = float(wall.length)*f
 		ps.hazard_width[h] = float(wall.width)*f
 		ps.hazard_pos[h] = wall.from+Vector2.from_angle(float(wall.angle))*float(wall.length)*(1.0-f)*0.5
+
+func contains_additional_target(row: int, point: Vector2, radius: float) -> bool:
+	for part: int in clone_damage_rows:
+		var target: Dictionary=clone_damage_rows[part]
+		if int(target.row)!=row or not ctx.enemies.is_same(row,target.id) or not ctx.enemies.is_same(part,target.part_id): continue
+		if point.distance_to(table.pos[part])<=table.r[part]+radius:return true
+	return false
