@@ -11,8 +11,12 @@
 [ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="5_ha4ve"]
 [ext_resource type="PackedScene" path="res://data/formations/cross_solo.tscn" id="6_3vyts"]
 [ext_resource type="Texture2D" path="res://assets/pixel/background/space_debris.png" id="6_bab1x"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/planet_a.png" id="7_fkgl6"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/station_a.png" id="8_bab1x"]
 [ext_resource type="Script" path="res://scripts/data_types/spawn_curve.gd" id="8_xsgcl"]
 [ext_resource type="PackedScene" path="res://data/formations/corona_solo.tscn" id="9_corona"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/station_b.png" id="9_mwefo"]
+[ext_resource type="Texture2D" path="res://assets/pixel/background/planet_b.png" id="10_05gyn"]
 [ext_resource type="Texture2D" path="res://assets/pixel/background/colony.png" id="bg_colony"]
 [ext_resource type="Script" path="res://scripts/data_types/background_placement.gd" id="bg_script"]
 
@@ -20,16 +24,17 @@
 script = ExtResource("bg_script")
 texture = ExtResource("bg_colony")
 offset = Vector2(-677.3871, 10.675674)
+parallax = 0.5
 scale = 2.0
-tint = Color(0.55, 0.65, 0.75, 0.3)
+tint = Color(0.55, 0.65, 0.75, 0.6)
 
 [sub_resource type="Resource" id="Resource_rjgwb"]
 script = ExtResource("bg_script")
 texture = ExtResource("3_3vyts")
-offset = Vector2(918.67145, -1124.1201)
+offset = Vector2(993.7828, -1361.9727)
+parallax = 0.4
 scale = 1.2
 rotation_degrees = 40.0
-tint = Color(0.55, 0.65, 0.75, 0.5)
 
 [sub_resource type="Resource" id="Resource_6ur6i"]
 script = ExtResource("bg_script")
@@ -44,8 +49,40 @@ offset = Vector2(-425.6096, 419.38715)
 [sub_resource type="Resource" id="Resource_g1k3m"]
 script = ExtResource("bg_script")
 texture = ExtResource("6_bab1x")
-offset = Vector2(-335.9769, -288.14322)
+offset = Vector2(-141.14066, -390.97345)
+parallax = 0.7
 scale = 1.4
+
+[sub_resource type="Resource" id="Resource_vv5jg"]
+script = ExtResource("bg_script")
+texture = ExtResource("7_fkgl6")
+offset = Vector2(4007.9856, -784.17163)
+parallax = 0.5
+scale = 1.4
+tint = Color(0.55, 0.65, 0.75, 0.9)
+
+[sub_resource type="Resource" id="Resource_qrqj0"]
+script = ExtResource("bg_script")
+texture = ExtResource("8_bab1x")
+offset = Vector2(2710.7993, 856.8749)
+parallax = 0.4
+scale = 1.3
+
+[sub_resource type="Resource" id="Resource_8jnq7"]
+script = ExtResource("bg_script")
+texture = ExtResource("9_mwefo")
+offset = Vector2(2788.6362, -1720.3271)
+parallax = 0.6
+scale = 1.4
+rotation_degrees = -20.0
+
+[sub_resource type="Resource" id="Resource_dyeu7"]
+script = ExtResource("bg_script")
+texture = ExtResource("10_05gyn")
+offset = Vector2(439.6783, 1507.744)
+parallax = 0.3
+scale = 4.0
+rotation_degrees = 20.0
 
 [sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
@@ -451,7 +488,7 @@ points = PackedVector2Array(0, 0, 27, 0, 33, 17, 60, 29, 80, 29, 90, 9, 122, 9, 
 [resource]
 script = ExtResource("1")
 index = 4
-backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m")])
+backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m"), SubResource("Resource_vv5jg"), SubResource("Resource_qrqj0"), SubResource("Resource_8jnq7"), SubResource("Resource_dyeu7")])
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_s6gwe"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
