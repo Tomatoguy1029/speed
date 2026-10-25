@@ -1157,8 +1157,7 @@ func _draw_build_objects(c: CanvasItem) -> void:
 func _draw_meteor_shards(c: CanvasItem) -> void:
 	for shard in meteor_shards:
 		c.draw_set_transform(shard.pos, shard.angle)
-		c.draw_texture_rect_region(shard.texture, Rect2(-shard.region.size / 2.0, shard.region.size),
-			shard.region, Color(1, 1, 1, shard.life / 0.65))
+		c.draw_texture(shard.texture, -shard.texture.get_size() / 2.0, Color(1, 1, 1, shard.life / 0.65))
 	c.draw_set_transform(Vector2.ZERO)
 
 ## 丸い先端の内側で色を薄め、射程の境界へなじませる。
