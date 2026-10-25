@@ -64,3 +64,7 @@ func has_body() -> bool:
 
 func body_alive() -> bool:
 	return has_body() and table.dead[body] == 0
+
+## 複数の命中形状を一体として受けるボスで上書きする。
+func damage_target(row: int) -> int:
+	return row

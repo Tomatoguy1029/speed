@@ -60,6 +60,14 @@ func actor_for_row(row: int) -> BossActor:
 			return owner
 	return null
 
+## 当たり判定の行を、ダメージと一撃内の重複管理に使う本体へ解決する。
+func damage_target(row: int) -> int:
+	var owner := actor_for_row(row)
+	if owner == null:
+		var parent := enemies.table.parent[row]
+		if enemies.is_same(parent, enemies.table.parent_id[row]): owner = actor_for_row(parent)
+	return owner.damage_target(row) if owner != null else row
+
 ## 敵の行を解放する前に、今のボスの撃破済みの部位を役者へ渡す。
 func part_defeated(row: int) -> void:
 	var t := enemies.table

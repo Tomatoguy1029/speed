@@ -79,9 +79,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 	_hits.clear()
 	for i in _buf:
 		if run != null:
-			if run.inside.has(t.id[i]):
+			if run.inside.has(t.id[bosses.damage_target(i)]):
 				continue
-		elif t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0 and not enemies.ignores_hit_cd(i):
+		elif t.hit_cd[bosses.damage_target(i)] > 0.0 and t.meteor_index[i] < 0 and not enemies.ignores_hit_cd(i):
 			continue
 		var hit_t := Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R)
 		if hit_t >= 0.0:
@@ -100,18 +100,18 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var atk := attack_power()
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
 		var shield_front := enemies.blocks_front(i, hit_pos, dir)
-		if shield_front and (not fast or (run == null and t.hit_cd[i] > 0.0)):
+		if shield_front and (not fast or (run == null and t.hit_cd[bosses.damage_target(i)] > 0.0)):
 			# 接触のクールダウン中も押し戻し、普通の移動で盾をすり抜けるのを防ぐ。
 			_bump_obstacle(i, hit_pos, R, dir, false)
 			return true
-		if run == null and t.hit_cd[i] > 0.0 and t.meteor_index[i] < 0:
+		if run == null and t.hit_cd[bosses.damage_target(i)] > 0.0 and t.meteor_index[i] < 0:
 			continue
 		var crit := is_weak_hit(i, hit_pos) or state.rng.randf() < state.stats.crit_chance
 		if t.stone[i] > 0.0:
 			# 石になった敵は、触れると装甲や倒し方に関係なく一撃で砕ける
-			t.hit_cd[i] = cfg.contact_cooldown
+			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
-				run.inside[t.id[i]] = i
+				run.inside[t.id[bosses.damage_target(i)]] = i
 			state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
 			kill_enemy(i, {"cause": &"ram" if fast else &"touch", "dir": dir})
 			continue
@@ -122,7 +122,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			continue
 		if not fast:
 			# 普段の接触：弱い攻撃になる。機体は被弾しない
-			t.hit_cd[i] = cfg.contact_cooldown
+			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			damage_enemy(i, atk * cfg.touch_damage, {"cause": &"touch", "dir": dir, "no_crit": true, "impact": hit_pos})
 			if state.phase == RunState.Phase.PLAY:
 				build.on_electric_contact(i)
@@ -130,9 +130,9 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var gate := enemies.gate_check(i, hit_pos, dir, &"ram")
 		if gate == EnemyTable.GateResult.PASS:
 			# 特殊な倒し方の条件を満たさない：貫通するが倒れない
-			t.hit_cd[i] = cfg.contact_cooldown
+			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
-				run.inside[t.id[i]] = i
+				run.inside[t.id[bosses.damage_target(i)]] = i
 			continue
 		# しし座の力が効いている間のなぞりは、装甲に関係なく貫く
 		var leo := run != null and trace_width() > 1.0
@@ -144,7 +144,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
 			if crit:
 				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
-			t.hit_cd[i] = cfg.contact_cooldown
+			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
 				var id := t.id[i]
 				run.inside[id] = i
@@ -176,7 +176,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		state.ship_boost_t = 0.0
 		if gate == EnemyTable.GateResult.ALLOW:
 			damage_enemy(i, atk * 0.25, {"crit": crit, "cause": &"bump", "dir": -n})
-		t.hit_cd[i] = 0.25
+		t.hit_cd[bosses.damage_target(i)] = 0.25
 		# 弾かれるのは失敗で、被弾はしない
 		build.on_contact(i, hit_pos, dir)
 		state.emit(&"bounce", {"pos": state.ship_pos})
@@ -230,11 +230,11 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 	var dir := (to - from).normalized()
 	var atk := attack_power()
 	for i in rows:
-		if t.dead[i] != 0 or t.meteor_index[i] >= 0 or run.inside.has(t.id[i]):
+		if t.dead[i] != 0 or t.meteor_index[i] >= 0 or run.inside.has(t.id[bosses.damage_target(i)]):
 			continue
 		if Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R) < 0.0:
 			continue
-		run.inside[t.id[i]] = i
+		run.inside[t.id[bosses.damage_target(i)]] = i
 		if t.stone[i] > 0.0:
 			kill_enemy(i, {"cause": &"ram", "dir": dir})
 		elif enemies.gate_check(i, to, dir, &"ram", atk) == EnemyTable.GateResult.ALLOW \
@@ -247,6 +247,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 
 ## 行 i の敵にダメージを与える。opts：crit（体当たりで判定したクリティカル。武器などの当たりはクリティカルにならない）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
+	i = bosses.damage_target(i)
 	var t := enemies.table
 	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY or t.guard[i] > 0.0:
 		return
@@ -302,9 +303,9 @@ func _bump_obstacle(i: int, hit_pos: Vector2, R: float, dir: Vector2, damage := 
 	if vn < 0.0:
 		state.ship_vel -= n * 2.0 * vn
 		state.ship_vel *= cfg.bounce_keep
-	if t.hit_cd[i] > 0.0:
+	if t.hit_cd[bosses.damage_target(i)] > 0.0:
 		return
-	t.hit_cd[i] = 0.25
+	t.hit_cd[bosses.damage_target(i)] = 0.25
 	state.emit(&"block_impact", {"pos": hit_pos, "normal": n, "enemy_pos": t.pos[i], "r": t.r[i]})
 	if damage:
 		damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})

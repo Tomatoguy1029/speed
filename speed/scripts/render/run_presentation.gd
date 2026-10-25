@@ -829,7 +829,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if visual != null and visual.draw_body(c, t, i, p):
 			continue
 		if t.is_boss[i] != 0:
-			var boss_actor := run.bosses.actor_for_row(i)
+			var boss_actor := run.bosses.actor_for_row(run.bosses.damage_target(i))
 			if boss_actor != null and boss_actor.draws_self:
 				continue
 		var batch := _ensure_enemy_batch(type)

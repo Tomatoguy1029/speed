@@ -1,0 +1,97 @@
+## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
+extends BossActor
+signal presentation_event(event: Dictionary)
+var phase := 1
+var mode: StringName = &"idle"
+var technique: StringName = &""
+var clock := 0.0
+var elapsed := 0.0
+var aim := Vector2.ZERO
+var direction := Vector2.RIGHT
+var attack_hit := false
+var selection_enabled := false
+var body_rows: Array[int] = []
+var body_ids: Array[int] = []
+var _presentation: Node2D
+
+func _on_bound() -> void:
+	draws_self = true
+	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
+	add_child(_presentation)
+	_presentation.actor = self
+	for j in 12:
+		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], 46.0, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
+		table.parent[row] = body
+		table.parent_id[row] = body_id
+		body_rows.append(row)
+		body_ids.append(table.id[row])
+	_update_body()
+
+func body_points() -> PackedVector2Array:
+	var points := PackedVector2Array([table.pos[body]])
+	for j in 12:
+		var t := float(j + 1) / 12.0
+		points.append(table.pos[body] + Vector2(-t * 680.0, sin(t * TAU * 1.4 - clock) * 120.0 * t).rotated(table.facing[body]))
+	return points
+
+func _update_body() -> void:
+	var points := body_points()
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j], body_ids[j]):
+			table.pos[body_rows[j]] = points[j + 1]
+			table.guard[body_rows[j]] = table.guard[body]
+
+func damage_target(row: int) -> int:
+	return body if row == body or row in body_rows else row
+
+func _exit_tree() -> void:
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
+
+func rule() -> Dictionary:
+	return def.params
+
+func start_attack(id: StringName) -> bool:
+	if mode != &"idle" or id != &"bite": return false
+	technique = id
+	mode = &"windup"
+	elapsed = 0.0
+	attack_hit = false
+	aim = run_state.enemy_aim
+	direction = (aim - table.pos[body]).normalized()
+	table.facing[body] = direction.angle()
+	return true
+
+func attack_playing() -> bool:
+	return mode != &"idle"
+
+func sim_tick(_real_dt: float, dt: float) -> void:
+	if dt <= 0.0 or not body_alive(): return
+	clock += dt
+	elapsed += dt
+	if mode == &"windup" and elapsed >= float(rule().warn):
+		mode = &"active"
+		elapsed = 0.0
+	elif mode == &"active":
+		if not attack_hit:
+			var tip := table.pos[body] + direction * float(rule().reach)
+			if Geometry2D.get_closest_point_to_segment(run_state.ship_pos, table.pos[body], tip).distance_to(run_state.ship_pos) < float(rule().width) + ctx.cfg.ship_radius:
+				ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale, 0.0, &"bite", &"draco")
+				attack_hit = true
+		if elapsed >= float(rule().active):
+			mode = &"recovery"
+			elapsed = 0.0
+	elif mode == &"recovery" and elapsed >= float(rule().recover):
+		mode = &"idle"
+		technique = &""
+	_update_body()
+	_presentation.queue_redraw()
+
+func cancel_attack() -> void:
+	mode = &"idle"
+	technique = &""
+	elapsed = 0.0
+
+func handle_body_defeat(_opts: Dictionary) -> bool:
+	cancel_attack()
+	return false
