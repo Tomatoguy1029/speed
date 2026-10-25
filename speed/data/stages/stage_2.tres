@@ -281,20 +281,15 @@ mix = {
 id = &"phase_6315931189886180248"
 display_name = "ボス戦"
 
-[sub_resource type="Resource" id="Resource_3y6x8"]
-script = ExtResource("10_hhbsv")
-type = &"splitling"
-points = PackedVector2Array(0, 10, 55, 66, 56, 29, 136, 35, 170, 100, 171, 37, 260, 42, 269, 61, 280, 81, 290, 26, 386, 23, 393, 73, 414, 116, 417, 64)
-
 [sub_resource type="Resource" id="Resource_fv8bx"]
 script = ExtResource("10_hhbsv")
 type = &"splitter"
-points = PackedVector2Array(0, 10, 55, 47, 56, 0, 136, 12, 151, 49, 170, 71, 171, 27, 260, 30, 271, 49, 282, 79, 290, 30, 386, 40, 392, 88, 414, 126, 416, 57)
+points = PackedVector2Array(0, 10, 55, 47, 56, 0, 136, 12, 151, 90, 170, 121, 170.1, 59, 260, 53, 271, 183, 290.9, 277, 291, 100, 386, 113, 394, 318, 412, 408, 415, 162)
 
 [sub_resource type="Resource" id="Resource_0kvk0"]
 script = ExtResource("10_hhbsv")
 type = &"defender"
-points = PackedVector2Array(0, 0, 50, 0, 56, 22, 135, 23, 136, 0, 163, 0, 170, 66, 260, 66, 261, 0, 290, 0, 292, 58, 386, 53, 386.1, 0, 415, 0, 416, 135)
+points = PackedVector2Array(0, 0, 55, 53, 62, 148, 135, 151, 136, 45, 169, 51, 171, 189, 260, 187, 261, 57, 290, 65, 293, 295, 386, 301, 386.1, 0, 415, 0, 416, 345)
 
 [resource]
 script = ExtResource("1")
@@ -302,7 +297,7 @@ index = 2
 scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
-zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_3y6x8"), SubResource("Resource_fv8bx"), SubResource("Resource_0kvk0")])
+zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_fv8bx"), SubResource("Resource_0kvk0")])
 clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7"), SubResource("Resource_k0r5q"), SubResource("Resource_cnhb3"), SubResource("Resource_7hkhu"), SubResource("Resource_axpqg"), SubResource("Resource_20pjy"), SubResource("Resource_hqnda"), SubResource("Resource_q0aev"), SubResource("Resource_70vkp"), SubResource("Resource_j3iar"), SubResource("Resource_lg16d"), SubResource("Resource_hb46m"), SubResource("Resource_olek3"), SubResource("Resource_3d53o"), SubResource("Resource_yrkec"), SubResource("Resource_ksojn"), SubResource("Resource_6qln1"), SubResource("Resource_nhqsb"), SubResource("Resource_yy5kg"), SubResource("Resource_2v223")])
 track_names = PackedStringArray("ビームの敵", "じょうぎ座", "たて座", "ぼうえんきょう座", "かに座")
 boss_time = 475.0
