@@ -63,7 +63,7 @@ var _hits: Array = []
 ## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
 ## BOLT はケフェウス座の兵の細長い光弾。直進し、追尾しない
 enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT, LIGHT_ARROW, COSMIC_ARROW, STAR_BOLT }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt", &"arrow", &"arrow"]
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt", &"arrow", &"arrow", &"star_bolt"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()
@@ -298,7 +298,7 @@ func _update_friendly(dt: float) -> void:
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
 		for row in _buf:
-			if hit.has(et.id[row]):
+			if hit.has(et.id[ctx.bosses.damage_target(row)]):
 				continue
 			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
 			if t >= 0.0:
@@ -309,6 +309,7 @@ func _update_friendly(dt: float) -> void:
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
 			var row: int = h[1]
+			if hit.has(et.id[ctx.bosses.damage_target(row)]): continue
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
 			var impact := from.lerp(to, h[0])
@@ -317,7 +318,7 @@ func _update_friendly(dt: float) -> void:
 				life = 0.0
 				body_hit = null
 				break
-			hit[et.id[row]] = true
+			hit[et.id[ctx.bosses.damage_target(row)]] = true
 			if friend_on_hit[i].is_valid():
 				friend_on_hit[i].call(row, friend_dmg[i], impact)
 			else:

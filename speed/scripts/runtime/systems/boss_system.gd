@@ -158,3 +158,7 @@ func admit(key: String, cats: Array, row: int, duration: float) -> bool:
 	if projectiles.director == null or projectiles.director.formation_mode:
 		return true
 	return projectiles.director.request(key, cats, row, enemies.table.id[row], duration, 1.5)
+
+func contains_target(row: int, point: Vector2, radius: float) -> bool:
+	var owner := actor_for_row(row)
+	return owner.contains_hit(point,radius) if owner != null else point.distance_to(enemies.table.pos[row]) <= enemies.table.r[row]+radius

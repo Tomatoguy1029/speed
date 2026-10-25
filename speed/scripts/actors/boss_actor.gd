@@ -68,3 +68,6 @@ func body_alive() -> bool:
 ## 複数の命中形状を一体として受けるボスで上書きする。
 func damage_target(row: int) -> int:
 	return row
+
+func contains_hit(point: Vector2, radius: float) -> bool:
+	return point.distance_to(table.pos[body]) <= table.r[body]+radius

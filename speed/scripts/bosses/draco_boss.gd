@@ -167,3 +167,9 @@ func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector
 	if hit:
 		ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
 		attack_hit = true
+
+func contains_hit(point: Vector2, radius: float) -> bool:
+	if super(point,radius): return true
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j],body_ids[j]) and point.distance_to(table.pos[body_rows[j]]) <= table.r[body_rows[j]]+radius: return true
+	return false

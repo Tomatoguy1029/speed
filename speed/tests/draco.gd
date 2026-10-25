@@ -35,6 +35,12 @@ func _ready() -> void:
 			var at: Vector2 = sim.enemies.table.pos[row]
 			sim.combat.twin_sweep(trace,at-Vector2(20,0),at+Vector2(20,0))
 		check(is_equal_approx(before-sim.enemies.table.hp[actor.body],sim.combat.attack_power()), "同じ突進で複数の部位に触れても一体分だけ命中する")
+	var trace_hp: float = sim.enemies.table.hp[actor.body]
+	sim.state.ship_pos = Vector2(140,0)
+	sim.state.ship_vel = Vector2.RIGHT * sim.state.stats.max_speed * 2.0
+	sim.state.stats.crit_chance = 0.0
+	sim.combat.collide_ship(Vector2(-750,0),sim.cfg.trace_radius,TraceRun.new())
+	check(is_equal_approx(trace_hp-sim.enemies.table.hp[actor.body],sim.combat.attack_power()), "実際の一筆でも胴体の重複命中を防ぐ")
 	check(actor.get("flow_adapter") != null, "竜は共通フローのadapterを持つ")
 	if actor.get("flow_adapter") != null:
 		check(not actor.flow_adapter.candidates({"request":"any"}).candidates.is_empty(), "距離条件から噛みつきを候補にできる")
@@ -74,6 +80,13 @@ func _ready() -> void:
 		check(sim.state.ship_hp < before_hp, "遮蔽が破壊されたら見える炎と同時に被弾する")
 		actor.cancel_attack()
 		check(breath.rocks.all(func(r): return sim.enemies.table.dead[r.row] != 0), "中断時に配置済みの隕石を崩す")
+	for id in [&"charge",&"leap"]:
+		actor.cancel_attack()
+		check(actor.start_attack(id), "移動攻撃を開始する: "+id)
+		var origin: Vector2 = sim.enemies.table.pos[actor.body]
+		for frame in 300: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(sim.enemies.table.pos[actor.body].distance_to(origin)>100.0, "移動攻撃で本体が移動する: "+id)
+		check(actor.mode == &"idle", "移動攻撃後に隙を終える: "+id)
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

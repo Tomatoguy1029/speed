@@ -91,6 +91,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 	_hits.sort_custom(func(a, b): return a[0] < b[0])
 	for h in _hits:
 		var i: int = h[1]
+		if run != null and run.inside.has(t.id[bosses.damage_target(i)]): continue
 		if t.dead[i] != 0:
 			continue
 		var hit_pos := from.lerp(to, h[0])
@@ -111,7 +112,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			# 石になった敵は、触れると装甲や倒し方に関係なく一撃で砕ける
 			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
-				run.inside[t.id[bosses.damage_target(i)]] = i
+				run.inside[t.id[bosses.damage_target(i)]] = bosses.damage_target(i)
 			state.emit(&"block_impact", {"pos": t.pos[i], "normal": -dir, "enemy_pos": t.pos[i], "r": t.r[i]})
 			kill_enemy(i, {"cause": &"ram" if fast else &"touch", "dir": dir})
 			continue
@@ -132,7 +133,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			# 特殊な倒し方の条件を満たさない：貫通するが倒れない
 			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
-				run.inside[t.id[bosses.damage_target(i)]] = i
+				run.inside[t.id[bosses.damage_target(i)]] = bosses.damage_target(i)
 			continue
 		# しし座の力が効いている間のなぞりは、装甲に関係なく貫く
 		var leo := run != null and trace_width() > 1.0
@@ -146,8 +147,8 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
 			t.hit_cd[bosses.damage_target(i)] = cfg.contact_cooldown
 			if run != null:
-				var id := t.id[i]
-				run.inside[id] = i
+				var id := t.id[bosses.damage_target(i)]
+				run.inside[id] = bosses.damage_target(i)
 				var n: int = run.passes.get(id, 0) + 1
 				run.passes[id] = n
 				if n > 1:
@@ -234,7 +235,7 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 			continue
 		if Geom.seg_circle_t(from, to, t.pos[i], t.r[i] + R) < 0.0:
 			continue
-		run.inside[t.id[bosses.damage_target(i)]] = i
+		run.inside[t.id[bosses.damage_target(i)]] = bosses.damage_target(i)
 		if t.stone[i] > 0.0:
 			kill_enemy(i, {"cause": &"ram", "dir": dir})
 		elif enemies.gate_check(i, to, dir, &"ram", atk) == EnemyTable.GateResult.ALLOW \
