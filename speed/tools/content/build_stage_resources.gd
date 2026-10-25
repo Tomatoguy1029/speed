@@ -58,6 +58,8 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 	var cfg := load("res://data/config.tres") as GameConfig
 	for kind in ["meteor", "iron", "saw"]:
 		if cfg.get(kind + "_count") > 0: ids[kind] = true
+	if stage.boss_id == &"draco":
+		for id in catalog.table(&"enemies"): ids[String(id)] = true
 	var pending := ids.keys()
 	var known := catalog.table(&"enemies")
 	var attack_pattern := RegEx.new()

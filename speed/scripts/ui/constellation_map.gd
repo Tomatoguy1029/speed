@@ -418,7 +418,7 @@ func _focus_selected() -> void:
 		_final_stage.grab_focus()
 
 func _start() -> void:
-	if _launch_requested or GameManager.screen_transition_active:
+	if _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
 		return
 	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):
 		_launch_requested = true

@@ -47,6 +47,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_check(GameManager.screen == GameManager.Screen.INTRO, "初回の選択前に導入")
 	_check(app._current.get("visual") != null and app._current.get("_hud") != null, "映像と操作 UI の初期化")
+	_check(app._current.run.state.stage.resources != null, "導入の戦場は生成済みの外観索引を持つ")
+	_check(app._current.session.view.get_node("RunPresentation")._glide_wake != null, "導入の戦闘表示は描画パイプラインまで初期化する")
 	if failed:
 		get_tree().quit(1)
 		return
@@ -116,6 +118,21 @@ func _test_practice(intro: Node) -> void:
 	intro._resume()
 	var run: RunSimulation = intro.run
 	_check(not intro.session.view.has_node("Hud") and run.state.lab_mode and run.loadout.weapon_behaviors.is_empty(), "練習は通常ランの記録・装備から独立")
+	_check(intro.sequence.get("opening_complete") != null, "北極星喪失の導入を持つ")
+	if intro.sequence.get("opening_complete") != null:
+		_check(not intro.sequence.opening_complete and intro.run.state.cinematic_bars>0.0, "チュートリアル前にシネマスコープで星空を映す")
+		_elapse(intro, 3.01)
+		_check(intro.beat==intro.Beat.DEVOUR, "約3秒の星空から捕食へ進む")
+		await _shot("devour")
+		_elapse(intro, intro.presentation.devour_time)
+		_elapse(intro, intro.presentation.depart_time)
+		_check(intro.beat==intro.Beat.FLIGHT and intro.sequence.opening_complete, "竜が去ったら操舵を渡す")
+		var old_pos: Vector2=run.state.ship_pos
+		run.input_source=func():
+			var it:=Intent.new();it.has_cursor=true;it.cursor=old_pos+Vector2(200,0);return it
+		_elapse(intro, 0.5)
+		_check(run.state.ship_pos.distance_to(old_pos)>1.0,"航行はカーソル方向へ通常操舵できる")
+		run.input_source=Callable()
 	await _shot("flight")
 	_elapse(intro, intro.presentation.flight_time)
 	_check(intro.practice.enemies.is_empty(), "星だけの間は敵を生成しない")
@@ -143,6 +160,14 @@ func _test_practice(intro: Node) -> void:
 	_check(intro.beat_time == time and run.state.phase == RunState.Phase.PAUSED, "ポーズ中は映像と練習を停止")
 	intro._resume()
 	_check(intro.practice.enemies.size() == 4, "練習相手を複数体配置")
+	var first: Dictionary=intro.practice.enemies.values()[0]
+	var far: Vector2=run.state.ship_pos+Vector2(1500,0)
+	var saved: Vector2=run.enemies.table.pos[first.row]
+	run.enemies.table.pos[first.row]=far
+	intro.practice.update()
+	_check(run.enemies.table.pos[first.row]==far,"練習の敵は追い越しても瞬間移動で戻さない")
+	run.enemies.table.pos[first.row]=saved
+	intro.practice.build_guide()
 	var guide: PackedVector2Array = intro.practice.guide_points.duplicate()
 	_check(guide.size() > 4 and guide[8].y != guide[16].y, "敵の中心を曲がって通る見本線")
 	_check(not intro.session.is_in_group("recordable_runs") and RunManager.current_id == -1 and not run.state.stage.boss_enabled, "導入は録画・通常ラン・ボス進行から独立")

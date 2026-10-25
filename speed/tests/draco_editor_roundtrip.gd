@@ -1,0 +1,26 @@
+extends Node
+var failures := 0
+func check(ok: bool,label: String) -> void:
+	if not ok: failures+=1;push_error(label)
+func _ready() -> void:
+	var editor=load("res://tools/editor/boss_flow/editor.gd").new()
+	add_child(editor)
+	editor.open_boss("res://data/bosses/ai/draco_action_rules.tres","res://data/bosses/ai/draco_flow.tres")
+	for move in editor.rules.techniques:
+		check(editor.open_technique(move.resource_path)==OK,"全技の設定を編集できる: "+String(move.technique))
+	check(editor.has_method("set_arc_value"),"複数の弧をボス行動から編集できる")
+	if editor.has_method("set_arc_value"):
+		DirAccess.make_dir_recursive_absolute("res://.content/dev")
+		var source: Resource=load("res://data/bosses/draco_moves/inhale.tres").duplicate(true)
+		var path := "res://.content/dev/draco_arc_test.tres"
+		check(ResourceSaver.save(source,path)==OK,"試遊用コピーを保存する")
+		editor.open_technique(path)
+		editor.set_arc_value(0,"radius",321.0)
+		editor.set_arc_value(1,"offset_x",77.0)
+		check(editor.save_current()==OK,"弧の編集を保存する")
+		var reloaded: Resource=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+		check(reloaded.parameters.arcs[0].radius==321.0 and reloaded.parameters.arcs[1].offset.x==77.0,"半径と弧の位置が再読込後も残る")
+		DirAccess.remove_absolute(path)
+	editor.free()
+	print("[draco_editor_roundtrip] failures=",failures)
+	get_tree().quit(1 if failures else 0)

@@ -248,7 +248,7 @@ func _trace(real_dt: float) -> void:
 		var et := combat.enemies.table
 		for id in run.inside.keys():
 			var i: int = run.inside[id]
-			if not combat.enemies.is_same(i, id) or et.dead[i] != 0 or from.distance_to(et.pos[i]) > et.r[i] + R + 2.0:
+			if not combat.enemies.is_same(i, id) or et.dead[i] != 0 or not combat.contains_target(i,from,R+2.0):
 				run.inside.erase(id)
 		run.seg_pos += move
 		dist -= move

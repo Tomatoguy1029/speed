@@ -14,6 +14,7 @@ func _ready() -> void:
 	SaveManager.set_script(MemorySave)
 	SaveManager.settings = settings_copy
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	GameManager.boot_request = Callable()
 	GameManager.screen = GameManager.Screen.TITLE
 	GameManager.run_requested.connect(func(_stage, _endless): requests += 1)

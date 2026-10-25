@@ -6,9 +6,11 @@ var coverage_mode := false
 var gaps := PackedVector2Array()
 var radius := 1800.0
 var attack := {}
+var arcs: Array = []
 
 func set_attack(move: Resource, adapter: String) -> void:
 	var p: Dictionary = move.parameters
+	arcs=p.get("arcs",[])
 	if adapter == "hydra" or move.get("head_kind") != null:
 		p = load("res://data/bosses/hydra.tres").params.merged(p, true)
 		var reach: Dictionary = preload("res://scripts/bosses/hydra_normals.gd").reach(move.technique, p)
@@ -60,6 +62,14 @@ func _draw() -> void:
 	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), float(attack.get("length", 0.0)))))
 	var scale_factor := minf(size.x, size.y) * 0.43 / maximum
 	_sector(gate, center, scale_factor)
+	for arc: DracoExhaleArc in arcs:
+		var origin: Vector2=center+arc.offset*scale_factor
+		var angle := deg_to_rad(arc.angle_degrees)
+		var spread := deg_to_rad(arc.spread_degrees)
+		draw_arc(origin,arc.radius*scale_factor,angle-spread,angle+spread,32,Color(0.75,0.65,1.0,0.8),2.0)
+		for j in arc.count:
+			var direction := Vector2.from_angle(angle+lerpf(-spread,spread,j/maxf(1.0,arc.count-1.0)))
+			draw_circle(origin+direction*arc.radius*scale_factor,2.0,Color("#c6bdff"))
 	if not attack.is_empty() and not attack.get("dynamic", false):
 		var length := float(attack.get("length", 0.0))
 		if attack.get("targeted", false): length = (float(gate.get("min", 0.0)) + maximum) * 0.5

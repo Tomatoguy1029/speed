@@ -12,7 +12,7 @@ var _updating := false
 var _guides := PackedVector2Array()
 var _popup := PopupMenu.new()
 var _reroute_pending := false
-const TITLES := {"charge": "突進", "return_charge": "往復突進", "sweep": "角の薙ぎ払い", "kick": "後ろ蹴り", "lance": "光の槍", "combo": "突進から薙ぎ払い", "bite_thrust": "噛みつき", "bite_sweep": "薙ぎ払い", "wind_band": "風の帯", "wind_blades": "風刃", "rubble_lump": "瓦礫の塊", "rubble_fan": "瓦礫の散弾", "beam_fixed": "固定ビーム", "beam_bolt": "ビーム弾", "thunder_headbutt": "雷の頭突き", "thunder_drop": "落雷", "tornado": "瓦礫竜巻", "debris_shatter": "瓦礫砕き", "beam_pincer": "挟撃ビーム", "north": "同時噛みつき", "sequence": "順番噛みつき", "curve": "曲線ビーム", "swarm": "連続飛びかかり", "grid": "格子ビーム"}
+const TITLES := {"bite":"噛みつき","tail_sweep":"尻尾の薙ぎ払い","star_fan":"星弾の扇","tail_slam":"尻尾の叩きつけ","breath":"薙ぎ払いブレス","meteor":"隕石投射","leap":"飛びかかり噛みつき","rifts":"三本爪の亀裂","picaro_wall":"ピカロ隊列と光の矢","clones":"全身複製","inhale":"吸引と吐き出し","spiral":"螺旋収縮","charge": "突進", "return_charge": "往復突進", "sweep": "角の薙ぎ払い", "kick": "後ろ蹴り", "lance": "光の槍", "combo": "突進から薙ぎ払い", "bite_thrust": "噛みつき", "bite_sweep": "薙ぎ払い", "wind_band": "風の帯", "wind_blades": "風刃", "rubble_lump": "瓦礫の塊", "rubble_fan": "瓦礫の散弾", "beam_fixed": "固定ビーム", "beam_bolt": "ビーム弾", "thunder_headbutt": "雷の頭突き", "thunder_drop": "落雷", "tornado": "瓦礫竜巻", "debris_shatter": "瓦礫砕き", "beam_pincer": "挟撃ビーム", "north": "同時噛みつき", "sequence": "順番噛みつき", "curve": "曲線ビーム", "swarm": "連続飛びかかり", "grid": "格子ビーム"}
 
 static func title_for(id: String) -> String:
 	if id.begins_with("combo_"):

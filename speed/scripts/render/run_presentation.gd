@@ -28,6 +28,8 @@ var state: RunState
 var cfg: GameConfig
 
 var _layers: Dictionary = {}
+var _picaro_sprites: Dictionary = {}
+var _picaro_material: ShaderMaterial
 var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
@@ -347,6 +349,9 @@ func _read_settings() -> void:
 func _process(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
+	_sync_picaro()
+	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
+	if hud != null: hud.visible = state.cinematic_bars<=0.0
 	var phase := state.phase
 	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -491,6 +496,11 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"sonic":
 				shake = maxf(shake, 10.0)
 				pipeline.add_wave(ev.pos, ev.radius, 0.5)
+			&"draco_roar":
+				shake=maxf(shake,12.0)
+				pipeline.add_wave(ev.pos,ev.radius,0.8)
+				_ring(ev.pos,ev.radius,Color("#c2b8ff"),0.8)
+				AudioManager.play(&"roar",-8.0)
 			&"boss_spawn":
 				shake = maxf(shake, 8.0)
 			&"boss_explode":
@@ -854,9 +864,12 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		if state.cinematic_hide_enemies and t.is_boss[i] == 0: continue
+		if t.def[i] != null and t.def[i].params.get("clone_visual", false): continue
+		if t.def[i] != null and t.def[i].params.get("picaro", false): continue
 		# 本体行はEnemyDefを持たない。自分で描く役者へ渡し、通常敵の参照へ進めない。
 		if t.is_boss[i] != 0:
-			var boss_actor := run.bosses.actor_for_row(i)
+			var boss_actor := run.bosses.actor_for_row(run.bosses.damage_target(i))
 			if boss_actor != null and boss_actor.draws_self:
 				continue
 		var p := pos[i]
@@ -1270,6 +1283,20 @@ func _draw_ship(c: CanvasItem) -> void:
 	_ship_visual.draw_ship(c)
 
 func _draw_top(c: CanvasItem) -> void:
+	var boss := run.bosses.actor
+	if boss != null and boss.get("mode")==&"finale":
+		var finale: RefCounted=boss.finale
+		if finale.dim>0.0: c.draw_rect(view_rect().grow(400),Color(0.0,0.0,0.02,finale.dim))
+		if finale.line.size()==2:
+			var width := 18.0 if finale.stage==&"strikes" else 48.0
+			var alpha := 1.0 if finale.stage in [&"strikes",&"last"] else maxf(0.0,finale.dim)
+			c.draw_line(finale.line[0],finale.line[1],Color(0.65,0.65,1.0,alpha*0.45),width*3.0,false)
+			c.draw_line(finale.line[0],finale.line[1],Color(1,1,1,alpha),width,false)
+	if state.cinematic_bars>0.0:
+		var rect := view_rect()
+		var height := rect.size.y*0.1*state.cinematic_bars
+		c.draw_rect(Rect2(rect.position,Vector2(rect.size.x,height)),Color.BLACK)
+		c.draw_rect(Rect2(Vector2(rect.position.x,rect.end.y-height),Vector2(rect.size.x,height)),Color.BLACK)
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 
@@ -1344,3 +1371,41 @@ static func warm_resources(parent: Node, scope: ContentResourceScope) -> void:
 	var viewport: Node = load("res://scripts/render/shader_warmup.gd").new()
 	parent.add_child(viewport)
 	viewport.prepare(scope)
+
+func _sync_picaro() -> void:
+	if _picaro_material == null:
+		_picaro_material = ShaderMaterial.new()
+		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
+	var t := run.enemies.table
+	var used := {}
+	for i in t.alive.size():
+		if t.alive[i]==0 or t.dead[i]!=0 or t.def[i]==null or not t.def[i].params.get("picaro",false): continue
+		var id := t.id[i]
+		used[id] = true
+		var source := StringName(t.def[i].params.source_type)
+		if not _picaro_sprites.has(id):
+			var texture := _enemy_texture(source)
+			var node: Node2D
+			if texture != null:
+				var bitmap := Sprite2D.new()
+				bitmap.texture=texture
+				node=bitmap
+			else:
+				var shape := Polygon2D.new()
+				shape.polygon=_placeholder_points(t.def[i].shape)
+				shape.color=t.color[i]
+				node=shape
+			node.material = _picaro_material
+			_layers.enemies.add_child(node)
+			_picaro_sprites[id] = node
+		var sprite: Node2D = _picaro_sprites[id]
+		sprite.position = t.pos[i]
+		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
+		var radius := enemy_sprite_radius(source,t.r[i])
+		if sprite is Sprite2D: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		else: sprite.scale=Vector2.ONE*radius
+		sprite.modulate = Color(1,1,1,0.45 if t.guard[i]>0.0 else 1.0)
+	for id in _picaro_sprites.keys():
+		if not used.has(id):
+			_picaro_sprites[id].queue_free()
+			_picaro_sprites.erase(id)

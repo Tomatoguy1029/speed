@@ -11,10 +11,11 @@ func exercise() -> void:
 	check(not FileAccess.file_exists("res://addons/limboai/bin/limboai.gdextension"), "LimboAI拡張をプロジェクトから削除する")
 	check(not ClassDB.class_exists("BTTask"), "起動時にLimboAIの型を登録しない")
 	check(not content.bosses.has(&"provisional"), "仮ボスをコンテンツ一覧から除く")
-	for index in [2, 3, 5]:
+	for index in [2, 3]:
 		var stage = content.stage(index)
 		check(stage.boss_id == &"" and not stage.boss_enabled, "未実装ステージに仮ボス参照を残さない: " + str(index))
-	for id in [&"hydra", &"monoceros"]:
+	check(content.stage(5).boss_id==&"draco" and content.stage(5).boss_enabled,"ステージ5には専用の竜を接続する")
+	for id in [&"hydra", &"monoceros", &"draco"]:
 		var definition: BossDef = content.bosses[id]
 		var scene := load(definition.scene_path) as PackedScene
 		check(scene != null, "専用ボスを読み込める: " + String(id))

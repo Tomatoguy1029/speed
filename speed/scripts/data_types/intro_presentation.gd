@@ -3,13 +3,16 @@ class_name IntroPresentation
 extends Resource
 
 @export_group("映像の尺（実秒）")
-@export_range(0.1, 20.0) var flight_time := 5.0
+@export_range(0.1,20.0) var focus_time := 3.0
+@export_range(0.1,20.0) var devour_time := 3.0
+@export_range(0.1,20.0) var depart_time := 2.0
+@export_range(0.1, 20.0) var flight_time := 7.5
 @export_range(0.1, 20.0) var transform_time := 4.0
 @export_range(0.1, 20.0) var handoff_time := 2.0
 @export_range(0.1, 20.0) var restore_time := 3.0
 @export_range(0.1, 20.0) var omen_time := 6.0
 @export_range(0.1, 20.0) var motive_time := 3.0
-@export_range(0.0, 20.0) var hint_delay := 0.0
+@export_range(0.0, 20.0) var hint_delay := 3.0
 
 @export_group("差し替え用の仮素材")
 ## 既存のドリフターを練習に流用する。敵の本番データは変更しない。

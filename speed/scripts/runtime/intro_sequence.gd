@@ -1,12 +1,13 @@
 ## 導入の場面進行。独立した本番セッションを使い、操作の処理は RunSimulation に任せる。
 extends RefCounted
 
-enum Beat { FLIGHT, TRANSFORM, HANDOFF, PRACTICE, RESTORE, OMEN, MOTIVE }
+enum Beat { FOCUS, DEVOUR, DEPART, FLIGHT, TRANSFORM, HANDOFF, PRACTICE, RESTORE, OMEN, MOTIVE }
 
 signal beat_changed(beat: Beat)
 signal completed
 
-var beat := Beat.FLIGHT
+var beat := Beat.FOCUS
+var opening_complete := false
 var beat_time := 0.0
 var presentation: IntroPresentation
 var session: RunSession
@@ -16,6 +17,7 @@ var practice := preload("res://scripts/runtime/intro_practice.gd").new()
 func setup(parent: Node, visuals: IntroPresentation) -> void:
 	presentation = visuals
 	var stage := RuntimeStage.new()
+	stage.resources = ContentManager.visual_index
 	stage.phases = [PhaseDef.new()]
 	stage.boss_enabled = false
 	session = RunManager.create_session(parent, {"lab": true, "config": _practice_config(),
@@ -25,6 +27,7 @@ func setup(parent: Node, visuals: IntroPresentation) -> void:
 	run = session.sim
 	run.heroes.hero = null
 	run.ship.invincible = true
+	run.state.cinematic_bars=1.0
 	run.state.ship_vel = Vector2(32, 0)
 	run.state.ship_heading = Vector2.RIGHT
 	practice.setup(run, presentation, run.state.ship_pos)
@@ -49,10 +52,24 @@ func advance(delta: float) -> void:
 		return
 	beat_time += delta
 	match beat:
+		Beat.FOCUS:
+			_film_camera(1.15)
+			if beat_time>=presentation.focus_time: _next(Beat.DEVOUR)
+		Beat.DEVOUR:
+			_film_camera(1.15)
+			if beat_time>=presentation.devour_time: _next(Beat.DEPART)
+		Beat.DEPART:
+			_film_camera(1.15)
+			if beat_time>=presentation.depart_time:
+				opening_complete=true
+				run.state.cinematic_bars=0.0
+				run.input.cancel_gesture()
+				_next(Beat.FLIGHT)
 		Beat.FLIGHT:
-			run.state.ship_pos += Vector2(32, 0) * delta
+			run._play_tick(delta)
 			_film_camera(1.35)
 			if beat_time >= presentation.flight_time:
+				practice.relocate(run.state.ship_pos)
 				_next(Beat.TRANSFORM)
 		Beat.TRANSFORM:
 			run.state.ship_vel = Vector2.ZERO

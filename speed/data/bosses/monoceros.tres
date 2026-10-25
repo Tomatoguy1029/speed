@@ -15,6 +15,9 @@ xp = 100.0
 weak_arc = 0.0
 params = {
 "initial_wait": 1.2,
+"entrance_time": 1.4,
+"lance_hold": 0.12,
+"lance_fade": 0.45,
 "phase_threshold": 0.5,
 "phase_time": 1.0,
 "lock_lead": 0.22,

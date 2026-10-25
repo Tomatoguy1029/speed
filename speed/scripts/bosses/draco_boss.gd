@@ -1,0 +1,264 @@
+## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
+extends BossActor
+signal presentation_event(event: Dictionary)
+var entrance: RefCounted
+var finale: RefCounted
+var cycle: RefCounted
+var picaro: RefCounted
+var phase := 1
+var mode: StringName = &"idle"
+var technique: StringName = &""
+var _cooldown := 0.0
+var attack_serial := 0
+var attack_token := 0
+var clock := 0.0
+var elapsed := 0.0
+var aim := Vector2.ZERO
+var direction := Vector2.RIGHT
+var attack_hit := false
+var closing_walls: Array = []
+var placed_meteors: Array = []
+var telegraph_points := PackedVector2Array()
+var attack_points := PackedVector2Array()
+var body_override := PackedVector2Array()
+var body_width := 92.0
+var head_scale := 1.0
+var _driver: RefCounted
+var selection_enabled := false
+var action_rules: Resource
+var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
+var flow_adapter: RefCounted
+var _moves: Dictionary = {}
+var retained_fields: Array = []
+var clone_damage_rows: Dictionary = {}
+var body_rows: Array[int] = []
+var body_ids: Array[int] = []
+var _presentation: Node2D
+
+func _on_bound() -> void:
+	draws_self = true
+	entrance = preload("res://scripts/bosses/draco_entrance.gd").new(self)
+	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
+	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
+	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
+	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
+	add_child(_presentation)
+	_presentation.actor = self
+	presentation_event.connect(_presentation.on_event)
+	for j in 12:
+		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], 46.0, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
+		table.parent[row] = body
+		table.parent_id[row] = body_id
+		body_rows.append(row)
+		body_ids.append(table.id[row])
+	_update_body()
+	if ResourceLoader.exists("res://.content/boss_draco.tres"):
+		configure_flow(load("res://.content/boss_draco.tres"))
+	selection_enabled = not run_state.lab_mode
+	if not run_state.lab_mode: entrance.begin()
+
+func configure_flow(program: Resource) -> void:
+	selection_enabled = true
+	action_rules = program.data.rules
+	_moves.clear()
+	for move in action_rules.techniques: _moves[move.technique] = move
+	flow_runner.configure(program.data.flow)
+	flow_runner.selector.random = run_state.rng
+	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
+
+func body_points() -> PackedVector2Array:
+	if not body_override.is_empty(): return body_override
+	var points := PackedVector2Array([table.pos[body]])
+	for j in 12:
+		var t := float(j + 1) / 12.0
+		points.append(table.pos[body] + Vector2(-t * 680.0, sin(t * TAU * 1.4 - clock) * 120.0 * t).rotated(table.facing[body]))
+	return points
+
+func _update_body() -> void:
+	position=table.pos[body]
+	rotation=table.facing[body]
+	var points := body_points()
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j], body_ids[j]):
+			table.pos[body_rows[j]] = points[roundi(float(j+1)*float(points.size()-1)/float(body_rows.size()))]
+			table.guard[body_rows[j]] = table.guard[body]
+			table.r[body_rows[j]] = body_width*0.5
+
+func damage_target(row: int) -> int:
+	if clone_damage_rows.has(row):
+		var target: Dictionary=clone_damage_rows[row]
+		if table.id[row]==int(target.part_id) and ctx.enemies.is_same(target.row,target.id): return int(target.row)
+	return body if row==body or row in body_rows else row
+
+func _exit_tree() -> void:
+	if entrance != null: entrance.cancel()
+	if finale != null: finale.dispose()
+	if cycle != null: cycle.cancel()
+	if picaro != null: picaro.clear()
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
+
+func rule() -> Dictionary:
+	return _moves[technique].parameters if _moves.has(technique) else def.params
+
+func start_attack(id: StringName) -> bool:
+	if mode != &"idle" or not _moves.has(id): return false
+	if selection_enabled and ctx.projectiles.director != null:
+		var director: RefCounted=ctx.projectiles.director
+		var key := "draco:%d:%d" % [body_id,attack_serial]
+		var p: Dictionary=_moves[id].parameters
+		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0): return false
+		attack_token=director.token(key)
+		ctx.projectiles.lab_context=attack_token
+		attack_serial+=1
+	if id != &"picaro_wall": picaro.pause(false)
+	technique = id
+	mode = &"windup"
+	elapsed = 0.0
+	attack_hit = false
+	aim = run_state.enemy_aim
+	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
+	table.facing[body] = direction.angle()
+	_driver = rule().driver.new() if rule().has("driver") else null
+	if _driver != null: _driver.begin(self)
+	return true
+
+func attack_playing() -> bool:
+	return mode != &"idle"
+
+func sim_tick(_real_dt: float, dt: float) -> void:
+	if dt <= 0.0 or not body_alive(): return
+	if attack_token>0: ctx.projectiles.lab_context=attack_token
+	clock += dt
+	if entrance.tick(dt):
+		_update_body();_presentation.queue_redraw()
+		return
+	for host: Node in retained_fields.duplicate():
+		host.attack_field.tick(dt)
+		if host.attack_field.effects.is_empty():
+			host.queue_free();retained_fields.erase(host)
+	picaro.tick()
+	_update_closing_walls(dt)
+	if cycle.tick(dt):
+		_update_body()
+		_presentation.queue_redraw()
+		return
+	elapsed += dt
+	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
+	if mode == &"windup" and elapsed >= float(rule().warn):
+		mode = &"active"
+		elapsed = 0.0
+	elif mode == &"transition":
+		if elapsed >= float(def.params.get("phase_time",1.0)):
+			mode = &"idle"
+			table.guard[body] = 0.0
+			run_state.encounter_protected=false
+	elif mode == &"active":
+		if _driver != null: _driver.tick(self,dt)
+		else:
+			var tip := table.pos[body] + direction * float(rule().reach)
+			hit_segment(PackedVector2Array([table.pos[body],tip]),float(rule().width))
+		if elapsed >= float(rule().active):
+			if _driver != null: _driver.end(self,false)
+			_driver = null
+			mode = &"recovery"
+			elapsed = 0.0
+	elif mode == &"recovery" and elapsed >= float(rule().recover):
+		mode = &"idle"
+		technique = &""
+	_update_body()
+	_presentation.queue_redraw()
+	if selection_enabled and mode == &"idle" and flow_adapter != null:
+		var delta := run_state.enemy_aim-table.pos[body]
+		if delta.length()>1400.0:
+			table.pos[body]+=delta.normalized()*def.speed*dt
+			table.facing[body]=delta.angle()
+		flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
+
+func cancel_attack() -> void:
+	if _driver != null: _driver.end(self,true)
+	_driver = null
+	attack_points.clear()
+	mode = &"idle"
+	technique = &""
+	elapsed = 0.0
+
+func handle_body_defeat(_opts: Dictionary) -> bool:
+	if mode != &"finale": finale.begin()
+	return true
+func advance_finale(real_dt: float, intent: Intent) -> void:
+	finale.advance(real_dt,intent)
+
+func selection_blocked() -> bool:
+	return not body_alive() or mode in [&"transition", &"finale", &"deep"]
+func can_begin_sequence() -> bool:
+	return mode == &"idle" and closing_walls.is_empty()
+func attack_failed() -> bool:
+	return not body_alive()
+func technique_ready(id: StringName, gate: Dictionary) -> bool:
+	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and phase <= int(gate.get("max_phase",3)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
+
+func on_body_damaged() -> void:
+	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
+	if phase > thresholds.size(): return
+	var floor_hp := table.max_hp[body] * float(thresholds[phase - 1])
+	if table.hp[body] > floor_hp: return
+	table.hp[body] = floor_hp
+	cancel_attack()
+	for rock: FieldSystem.Rock in placed_meteors:
+		rock.destroyed = true
+		if ctx.enemies.is_same(rock.row,rock.row_id): ctx.enemies.mark_dead(rock.row)
+	placed_meteors.clear()
+	cycle.cancel()
+	picaro.pause(true)
+	run_state.encounter_protected=true
+	phase += 1
+	mode = &"transition"
+	elapsed = 0.0
+	table.guard[body] = 1.0
+	_update_body()
+	if phase == 2: cycle.begin_initial()
+	presentation_event.emit({"cue": &"phase_changed", "phase": phase})
+
+func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector2Array()) -> void:
+	if attack_hit: return
+	var radius := width + ctx.cfg.ship_radius
+	var hit := Geometry2D.get_closest_point_to_segment(run_state.ship_pos,points[0],points[1]).distance_to(run_state.ship_pos) <= radius
+	if prior.size() == 2:
+		hit = hit or Geometry2D.is_point_in_polygon(run_state.ship_pos,PackedVector2Array([prior[0],prior[1],points[1],points[0]]))
+	if hit:
+		ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
+		attack_hit = true
+
+func contains_hit(point: Vector2, radius: float) -> bool:
+	if super(point,radius): return true
+	for j in body_rows.size():
+		if ctx.enemies.is_same(body_rows[j],body_ids[j]) and point.distance_to(table.pos[body_rows[j]]) <= table.r[body_rows[j]]+radius: return true
+	return false
+
+func close_wall(h: int, duration: float) -> void:
+	var ps := ctx.projectiles
+	if not ps.owns_hazard(h,body,body_id): return
+	ps.hazard_dmg[h] = 0.0
+	closing_walls.append({"h":h,"time":duration,"duration":duration,"from":ps.hazard_pos[h],"length":ps.hazard_len[h],"width":ps.hazard_width[h],"angle":ps.hazard_angle[h]})
+
+func _update_closing_walls(dt: float) -> void:
+	var ps := ctx.projectiles
+	for wall: Dictionary in closing_walls.duplicate():
+		var h := int(wall.h)
+		wall.time = float(wall.time)-dt
+		if not ps.owns_hazard(h,body,body_id) or float(wall.time)<=0.0:
+			if ps.owns_hazard(h,body,body_id): ps.release_hazard(h)
+			closing_walls.erase(wall)
+			continue
+		var f := float(wall.time)/float(wall.duration)
+		ps.hazard_len[h] = float(wall.length)*f
+		ps.hazard_width[h] = float(wall.width)*f
+		ps.hazard_pos[h] = wall.from+Vector2.from_angle(float(wall.angle))*float(wall.length)*(1.0-f)*0.5
+
+func contains_additional_target(row: int, point: Vector2, radius: float) -> bool:
+	for part: int in clone_damage_rows:
+		var target: Dictionary=clone_damage_rows[part]
+		if int(target.row)!=row or not ctx.enemies.is_same(row,target.id) or not ctx.enemies.is_same(part,target.part_id): continue
+		if point.distance_to(table.pos[part])<=table.r[part]+radius:return true
+	return false
