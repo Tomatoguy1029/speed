@@ -97,6 +97,9 @@ var _meteor_visual: RefCounted
 var _body_visual: RefCounted
 var _glide_wake: Node2D
 var _equipment_visuals: Dictionary = {}
+## 1回の敵描画で共有する数値だけ。Resource参照を持たず、パスの前後で破棄する。
+var _enemy_sprite_metrics: Dictionary = {}
+var _drawing_enemies := false
 
 func _ready() -> void:
 	state = run.state
@@ -364,6 +367,10 @@ func _process(delta: float) -> void:
 
 func _on_events(events: Array[Dictionary]) -> void:
 	_sync_visuals()
+	if pipeline.sparks.available():
+		var minimum := 0
+		for event in events: minimum += _common_burst_count(event)*2
+		pipeline.sparks.reserve_bursts(minimum)
 	for ev in events:
 		for v in _event_visuals.get(ev.type, []):
 			v.on_event(ev)
@@ -382,7 +389,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				var killed_visual := _visual_for_type(StringName(ev.get("enemy_type", &"")))
 				if killed_visual != null:
 					killed_visual.on_kill(ev)
-				var n := 6 + roundi(ev.r / 3.0)
+				var n := _common_burst_count(ev)
 				_burst(ev.pos, ev.color, n, ev.get("dir", Vector2.ZERO), 260.0 + ev.r * 4.0)
 				if ev.r > 25.0:
 					shake = maxf(shake, 8.0)
@@ -405,7 +412,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				shake = maxf(shake, 6.0)
 			&"gem_burst":
 				_ring(ev.pos, float(ev.r) * 2.4, Color("#ffe27a"), 0.3)
-				_burst(ev.pos, Color("#ffd23f"), 14, Vector2.ZERO, 360.0)
+				_burst(ev.pos, Color("#ffd23f"), _common_burst_count(ev), Vector2.ZERO, 360.0)
 			&"aquarius_aim":
 				flood().aim(ev)
 			&"cepheus_summon":
@@ -478,6 +485,13 @@ func _on_events(events: Array[Dictionary]) -> void:
 				pipeline.add_wave(ev.pos, 1600.0, finish_wave_seconds)
 			&"ship_explode":
 				_burst(ev.pos, Color("#9fe8ff"), 60, Vector2.ZERO, 500.0)
+
+## 予告と実際の撃破・結晶演出で同じ値を使う。他の演出は下限に含めない。
+func _common_burst_count(event: Dictionary) -> int:
+	match event.type:
+		&"kill": return 6+roundi(float(event.r)/3.0)
+		&"gem_burst": return 14
+	return 0
 
 func _ring(p: Vector2, radius: float, color: Color, life: float) -> void:
 	if rings.size() > 80:
@@ -793,8 +807,11 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	_enemy_sprite_metrics.clear()
+	_drawing_enemies = true
 	_sync_visuals()
-	var view := view_rect().grow(run.combat.enemy_query_padding)
+	var query_padding := run.combat.enemy_query_padding
+	var view := view_rect().grow(query_padding)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.begin()
 	for key in _batches:
@@ -824,7 +841,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var type := t.type[i]
 		var visual := _visual_of(t, i)
 		var sprite_radius := visual.sprite_radius(t, i) if visual != null else enemy_sprite_radius(type, t.r[i])
-		if not view.grow(maxf(0.0, sprite_radius * sqrt(2.0) - run.combat.enemy_query_padding)).has_point(p):
+		var extra := maxf(0.0, sprite_radius * sqrt(2.0) - query_padding)
+		# 共通の境界内に収まる外観は同じ矩形を使う。大きい外観だけ元の拡張判定を行う。
+		if not (view.has_point(p) if extra == 0.0 else view.grow(extra).has_point(p)):
 			continue
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
@@ -854,6 +873,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 		batch.end()
 	for v in _visuals:
 		v.draw_layer(c, view)
+	_drawing_enemies = false
+	_enemy_sprite_metrics.clear()
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
@@ -935,13 +956,26 @@ static func look_texture(look: EnemyLook, cache: Dictionary, palettes: Dictionar
 
 ## 外観の絵は元画像の寸法を、敵データの半径との比で拡大縮小する（半径には実験場の倍率・個体の大きさが反映済み）。
 func enemy_sprite_radius(type: StringName, collision_radius: float) -> float:
-	var def := run.enemies.def_of(type)
-	if def != null:
-		collision_radius /= def.visual_value("collision_scale", 1.0)
-	var look := look_of(type)
-	if look == null or look.size_from_collision:
+	var metrics: PackedFloat64Array
+	if _drawing_enemies and _enemy_sprite_metrics.has(type):
+		metrics = _enemy_sprite_metrics[type]
+	else:
+		metrics = _read_enemy_sprite_metrics(type)
+		if _drawing_enemies: _enemy_sprite_metrics[type] = metrics
+	# 元と同じ演算順を保つ。個体ごとの半径はここで反映する。
+	collision_radius /= metrics[0]
+	if metrics[1] != 0.0:
 		return collision_radius
-	return maxf(look.base.get_width(), look.base.get_height()) * 0.5 * collision_radius / maxf(def.radius if def != null else collision_radius, 0.001)
+	return metrics[2] * collision_radius / maxf(metrics[3] if metrics[4] != 0.0 else collision_radius, 0.001)
+
+## 衝突倍率・衝突径を使うフラグ・画像の半寸法・定義半径・定義ありの順。
+func _read_enemy_sprite_metrics(type: StringName) -> PackedFloat64Array:
+	var def := run.enemies.def_of(type)
+	var look := look_of(type)
+	return PackedFloat64Array([def.visual_value("collision_scale", 1.0) if def != null else 1.0,
+		1.0 if look == null or look.size_from_collision else 0.0,
+		maxf(look.base.get_width(), look.base.get_height()) * 0.5 if look != null and not look.size_from_collision else 0.0,
+		def.radius if def != null else 0.0, 1.0 if def != null else 0.0])
 
 func _enemy_sprite_angle(type: StringName, facing: float) -> float:
 	var look := look_of(type)
