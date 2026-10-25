@@ -915,7 +915,10 @@ func _refresh() -> void:
 		_fields.remove_child(child)
 		child.queue_free()
 	for key in current.parameters:
-		if key in ["cost", "major_cost"]: continue
+		if key=="arcs":
+			_append_arcs()
+			continue
+		if key in ["cost", "major_cost"] or not (current.parameters[key] is float or current.parameters[key] is int): continue
 		var label := Label.new()
 		var description: Array = BossDef.PARAMS_DOCS.get(key, [])
 		label.text = PARAM_LABELS.get(key, description[0] if not description.is_empty() else String(key))
@@ -1030,3 +1033,43 @@ func _exit_tree() -> void:
 	history.clear_history()
 	history.free()
 	working.clear()
+
+func set_arc_value(index: int, property: String, value: float) -> void:
+	if current==null or not current.parameters.has("arcs"): return
+	var old: Array=current.parameters.arcs
+	if index<0 or index>=old.size(): return
+	var next: Array=[]
+	for arc: Resource in old: next.append(arc.duplicate(true))
+	if property in ["offset_x","offset_y"]:
+		var offset: Vector2=next[index].offset
+		if property=="offset_x": offset.x=value
+		else: offset.y=value
+		next[index].offset=offset
+	else: next[index].set(property,int(value) if property=="count" else value)
+	history.create_action("吐き出しの弧を変更")
+	history.add_do_method(_assign.bind(current,"arcs",next))
+	history.add_undo_method(_assign.bind(current,"arcs",old))
+	history.commit_action()
+
+func _append_arcs() -> void:
+	var arcs: Array=current.parameters.arcs
+	for index in arcs.size():
+		var arc: Resource=arcs[index]
+		var label := Label.new()
+		label.text="彗星弾の弧 %d" % (index+1)
+		_fields.add_child(label)
+		for property in ["offset_x","offset_y","radius","angle_degrees","spread_degrees","count"]:
+			var value: float=arc.offset.x if property=="offset_x" else arc.offset.y if property=="offset_y" else float(arc.get(property))
+			_number_field({"offset_x":"位置 X","offset_y":"位置 Y","radius":"半径","angle_degrees":"中心角度","spread_degrees":"広がり","count":"弾数"}[property],value,func(next): set_arc_value(index,property,next),-10000.0 if property in ["offset_x","offset_y","angle_degrees"] else 1.0)
+	var button := Button.new()
+	button.text="弧を追加"
+	button.pressed.connect(func():
+		var old: Array=current.parameters.arcs
+		var next := old.duplicate()
+		next.append(preload("res://scripts/bosses/draco_exhale_arc.gd").new())
+		history.create_action("吐き出しの弧を追加")
+		history.add_do_method(_assign.bind(current,"arcs",next))
+		history.add_undo_method(_assign.bind(current,"arcs",old))
+		history.commit_action()
+		_refresh())
+	_fields.add_child(button)
