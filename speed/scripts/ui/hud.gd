@@ -24,7 +24,7 @@ const SLOTS := preload(ART + "combat_ui_upgrades_boxes.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := [
-	"W01", "W02", "W03", "W04", "W05", "W06", "W07", "W08", "W17", "W21", "W22", "W23",
+	"W01", "W02", "W03", "W04", "W05", "W25", "W07", "W08", "W17", "W21", "W22", "W23",
 	"T01", "T03", "T04", "T05", "T06", "T07", "T08", "T09", "T10", "T11", "T12", "T13", "T14",
 ]
 
@@ -446,7 +446,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 		return
 	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef or definition is ContentEntry else null
 	if texture == null:
-		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
+		var icon_id := String(definition.id)
 		var index := ICON_IDS.find(icon_id)
 		if index < 0:
 			return

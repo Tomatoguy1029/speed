@@ -197,8 +197,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W04.desc | 高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る | Every high-speed contact sends out a wave. Works even when you bounce off. |
 | weapon.W05.name | バリアシステム | Barrier System |
 | weapon.W05.desc | 周りに定期的な波動を出し、敵の弾を防ぐ | Emits waves around you at intervals and blocks enemy shots. |
-| weapon.W06.name | 追走ドローン | Chaser Drones |
-| weapon.W06.desc | 周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する | Orbit and shoot, then trail your dash line and strike enemies they touch. |
 | weapon.W07.name | 軌跡機雷 | Trail Mines |
 | weapon.W07.desc | 高速で実際に通った線に機雷を残す。遅れて入った敵を爆破 | Leaves mines along the line you flew at high speed. Blasts enemies that wander in. |
 | weapon.W08.name | ソニックブーム | Sonic Boom |
