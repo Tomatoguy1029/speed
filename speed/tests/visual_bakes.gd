@@ -54,6 +54,8 @@ func _backgrounds() -> void:
 		check("texture_path" in prepared and "used_rect" in prepared, "実行用背景は画像パスと生成済み範囲を持つ")
 		check(prepared.bounds() == Rect2(original.texture.get_image().get_used_rect()), "背景の切り取り範囲を保持する")
 		check(prepared.offset == original.offset and prepared.scale == original.scale and prepared.tint == original.tint, "背景の配置と明るさを保持する")
+		check(prepared.parallax == original.parallax and prepared.copy().parallax == original.parallax, "背景の移動倍率を生成・複製で保持する")
+		check(prepared.position_at(Vector2(900, -600)) == original.position_at(Vector2(900, -600)), "生成後も同じカメラ移動で同じ背景位置になる")
 
 func _same_image(actual: Image, path: String) -> void:
 	var expected := Image.new()
