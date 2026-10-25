@@ -8,7 +8,7 @@ func _ready() -> void:
 	hud._refresh_loadout_icons()
 	var count:=0
 	for node in hud._loadout_icons.get_children():
-		if node is ModulePreview:count+=1
+		if node.get("module_id")!=null:count+=1
 	var passed: bool=count==4
 	if not passed:push_error("合体後の武器欄に四つの伝説の部品図を表示する")
 	session.free()

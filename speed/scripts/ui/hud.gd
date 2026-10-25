@@ -484,10 +484,10 @@ func _refresh_loadout_icons() -> void:
 			index += 1
 		row += 1
 	for j in run.state.final_modules.size():
-		var preview:=ModulePreview.new()
+		var preview=preload("res://scripts/ui/legendary_module_icon.gd").new()
 		preview.position=Vector2(9+j*23,317)
 		preview.size=Vector2(17,17)
-		preview.setup(ContentManager.catalog.find(&"legendary_modules",run.state.final_modules[j]),true)
+		preview.module_id=run.state.final_modules[j]
 		_loadout_icons.add_child(preview)
 
 # ── 3択 ──────────────────────────────────────────────────────────
