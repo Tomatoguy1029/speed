@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-start = 135.0
+start = 169.0
 pop_from = 38.0
 pop_to = 45.0
 rate = 6.0

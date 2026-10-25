@@ -10,6 +10,7 @@ pop_to = 260.0
 rate = 60.0
 wave_interval = 3.5
 wave_type = &"swarm"
+attack_budget = 2
 mix = {
 "drifter": 3.0,
 "splitling": 2.0,

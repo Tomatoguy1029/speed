@@ -7,8 +7,11 @@
 [ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
 [ext_resource type="PackedScene" uid="uid://c7lv3gs5b6ybn" path="res://data/formations/s2_beamer.tscn" id="3_hhbsv"]
 [ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
+[ext_resource type="PackedScene" uid="uid://c2bfyhrynkq2f" path="res://data/formations/s2_ruler.tscn" id="4_ttetq"]
 [ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
+[ext_resource type="PackedScene" uid="uid://cur5vh0jpoy0c" path="res://data/formations/s2_shield.tscn" id="5_3y6x8"]
 [ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
+[ext_resource type="PackedScene" uid="uid://cagn3eqtiqrgr" path="res://data/formations/s2_telescope.tscn" id="6_fv8bx"]
 [ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_5plhc"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_hhbsv"]
@@ -19,10 +22,61 @@ label = "ビームの敵たくさん"
 track = 0
 types = Array[StringName]([&"beamer"])
 formations = Array[PackedScene]([ExtResource("3_hhbsv")])
-time = 55.0
-length = 80.0
+time = 84.0
+length = 51.0
 groups = 4
 interval = 2.0
+
+[sub_resource type="Resource" id="Resource_k0r5q"]
+script = ExtResource("2_5plhc")
+label = "じょうぎ座"
+track = 1
+types = Array[StringName]([&"ruler"])
+formations = Array[PackedScene]([ExtResource("4_ttetq")])
+time = 56.0
+length = 79.0
+
+[sub_resource type="Resource" id="Resource_cnhb3"]
+script = ExtResource("2_5plhc")
+label = "たて座"
+track = 2
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("5_3y6x8")])
+time = 56.0
+length = 79.0
+
+[sub_resource type="Resource" id="Resource_7hkhu"]
+script = ExtResource("2_5plhc")
+label = "ぼうえんきょう"
+track = 3
+types = Array[StringName]([&"telescope"])
+formations = Array[PackedScene]([ExtResource("6_fv8bx")])
+time = 170.0
+length = 90.0
+groups = 3
+interval = 4.0
+
+[sub_resource type="Resource" id="Resource_axpqg"]
+script = ExtResource("2_5plhc")
+label = "たて座"
+track = 2
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("5_3y6x8")])
+time = 170.0
+length = 46.0
+groups = 5
+interval = 1.0
+
+[sub_resource type="Resource" id="Resource_20pjy"]
+script = ExtResource("2_5plhc")
+label = "たて座"
+track = 2
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("5_3y6x8")])
+time = 216.0
+length = 44.0
+groups = 20
+interval = 0.5
 
 [sub_resource type="Resource" id="Resource_hhbsv"]
 script = ExtResource("9_5plhc")
@@ -84,21 +138,26 @@ display_name = "ボス戦"
 [sub_resource type="Resource" id="Resource_3y6x8"]
 script = ExtResource("10_hhbsv")
 type = &"splitling"
-points = PackedVector2Array(0, 10, 55, 66, 56, 28)
+points = PackedVector2Array(0, 10, 55, 66, 56, 35, 136, 35, 170, 97, 171, 37)
 
 [sub_resource type="Resource" id="Resource_fv8bx"]
 script = ExtResource("10_hhbsv")
 type = &"splitter"
-points = PackedVector2Array(0, 10, 55, 47, 56, 15)
+points = PackedVector2Array(0, 10, 55, 47, 56, 12, 136, 12, 139, 60, 170, 59, 171, 27)
+
+[sub_resource type="Resource" id="Resource_0kvk0"]
+script = ExtResource("10_hhbsv")
+type = &"defender"
+points = PackedVector2Array(0, 0, 50, 0, 56, 22, 135, 23, 136, 0, 163, 0, 170, 66)
 
 [resource]
 script = ExtResource("1")
 index = 2
 scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq")]
-enemies = Array[StringName]([&"beamer", &"crab", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
-zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_3y6x8"), SubResource("Resource_fv8bx")])
-clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7")])
+enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
+zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_3y6x8"), SubResource("Resource_fv8bx"), SubResource("Resource_0kvk0")])
+clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7"), SubResource("Resource_k0r5q"), SubResource("Resource_cnhb3"), SubResource("Resource_7hkhu"), SubResource("Resource_axpqg"), SubResource("Resource_20pjy")])
 track_names = PackedStringArray("ビームの敵", "じょうぎ座", "たて座", "ぼうえんきょう座", "かに座")
 boss_enabled = false
 surge_phases = {
