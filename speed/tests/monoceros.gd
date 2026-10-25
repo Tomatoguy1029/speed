@@ -175,6 +175,18 @@ func _ready() -> void:
 		check(float(actor._presentation.call("booster_strength")) > idle_strength, "突進で炎の尻尾が大きく噴き出す")
 
 	fresh()
+	actor.phase = 2
+	actor.start_attack(&"lance")
+	while actor.mode in [&"windup", &"active"]: step(DT)
+	check(actor._presentation.get("lance_afterglow") != null, "光の槍は突き終わりに全体を残す")
+	if actor._presentation.get("lance_afterglow") != null:
+		check(float(actor._presentation.get("lance_afterglow")) > 0.0, "突き終わりの残光を開始する")
+		var hp_after := sim.state.ship_hp
+		step(0.7)
+		check(float(actor._presentation.get("lance_afterglow")) <= 0.0, "飛散後の粒子はフェードして消える")
+		check(sim.state.ship_hp == hp_after, "槍の残光に攻撃判定を残さない")
+
+	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。
 	sim.state.lab_mode = false
 	actor.start_attack(&"return_charge")
