@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://psh27x4c22fn"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_axfmi"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_76x3i"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_5inek"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_ulqpa"]
+
+[node name="Stage3Marlin" type="Node2D" unique_id=1462650156]
+script = ExtResource("1_axfmi")
+types = Array[StringName]([&"marlin"])
+
+[node name="単体" type="Node2D" parent="." unique_id=1380940436]
+position = Vector2(-2400, 0)
+script = ExtResource("2_76x3i")
+
+[node name="Marlin" type="Node2D" parent="単体" unique_id=1063353023]
+script = ExtResource("3_5inek")
+enemy = &"marlin"
+
+[node name="正面" type="Node2D" parent="." unique_id=1183137142]
+position = Vector2(0, -1900)
+rotation = 3.1415927
+script = ExtResource("4_ulqpa")
+weight = 2.0
+
+[node name="左前" type="Node2D" parent="." unique_id=414890150]
+position = Vector2(-1545.9999, -1148)
+rotation = 2.2095199
+script = ExtResource("4_ulqpa")
+
+[node name="右前" type="Node2D" parent="." unique_id=870306583]
+position = Vector2(1520, -1140)
+rotation = 4.0688877
+script = ExtResource("4_ulqpa")
+
+[node name="後ろ" type="Node2D" parent="." unique_id=313650186]
+position = Vector2(0, 1900)
+script = ExtResource("4_ulqpa")
+weight = 0.5
+
+[node name="左後" type="Node2D" parent="." unique_id=1069733570]
+position = Vector2(-1586, 1354.0001)
+rotation = 0.8641465
+script = ExtResource("4_ulqpa")
+weight = 0.5
+
+[node name="右後" type="Node2D" parent="." unique_id=804323251]
+position = Vector2(1598.0001, 1182.0001)
+rotation = -0.9339363
+script = ExtResource("4_ulqpa")
+weight = 0.5
