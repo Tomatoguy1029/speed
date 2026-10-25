@@ -815,6 +815,11 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		# 本体行はEnemyDefを持たない。自分で描く役者へ渡し、通常敵の参照へ進めない。
+		if t.is_boss[i] != 0:
+			var boss_actor := run.bosses.actor_for_row(i)
+			if boss_actor != null and boss_actor.draws_self:
+				continue
 		var p := pos[i]
 		var type := t.type[i]
 		var visual := _visual_of(t, i)
@@ -824,14 +829,10 @@ func _draw_enemies(c: CanvasItem) -> void:
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
-		if t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
+		if t.is_boss[i] == 0 and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
 		if visual != null and visual.draw_body(c, t, i, p):
 			continue
-		if t.is_boss[i] != 0:
-			var boss_actor := run.bosses.actor_for_row(i)
-			if boss_actor != null and boss_actor.draws_self:
-				continue
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
