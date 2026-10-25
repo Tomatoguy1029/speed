@@ -3,9 +3,9 @@
 [ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
-[node name="Stage5Growth" type="Node2D"]
+[node name="Stage5Grow1" type="Node2D"]
 script=ExtResource("1")
-types=Array[StringName]([&"auriga",&"crab",&"cross",&"dolphin",&"pump"])
+types=Array[StringName]([&"crab",&"pump"])
 [node name="pump" type="Node2D" parent="."]
 position=Vector2(-2600,0)
 script=ExtResource("2")
@@ -20,27 +20,6 @@ script=ExtResource("2")
 position=Vector2(0.0,0)
 script=ExtResource("3")
 enemy=&"crab"
-[node name="cross" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="cross"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="auriga" type="Node2D" parent="."]
-position=Vector2(-2600,1650)
-script=ExtResource("2")
-[node name="auriga" type="Node2D" parent="auriga"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"auriga"
-[node name="dolphin" type="Node2D" parent="."]
-position=Vector2(-2600,2200)
-script=ExtResource("2")
-[node name="dolphin" type="Node2D" parent="dolphin"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"dolphin"
 [node name="Entry0" type="Node2D" parent="."]
 position=Vector2(0,-1600)
 script=ExtResource("4")
