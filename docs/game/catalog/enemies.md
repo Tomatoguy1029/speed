@@ -6,6 +6,8 @@
 
 同じ敵をステージ別に調整する値は `speed/data/stages/stage_*.tres` の `enemy_tuning` に持つ。[ステージ敵調整](../../spec.md#20-調整機能)で編集する。
 
+ステージ1の強敵と三角の星のHP上書きは、[Stage1の調整箇所](../stages/stage-1.md#調整する場所)を参照する。
+
 強敵の攻撃の重なりは、出現タイムラインの時間帯の予算と、ステージの種類ごとの個体value（`enemy_attack_values`）と、クリップの攻撃優先度（`attack_priority`）と任意の共有overrideで調整する。[攻撃の管理](../../spec.md#117-敵の攻撃の形)を参照。
 
 ## 敵設計の6分類
