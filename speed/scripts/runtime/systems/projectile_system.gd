@@ -301,7 +301,7 @@ func _update_friendly(dt: float) -> void:
 		var hit: Dictionary = friend_hit[i]
 		_hits.clear()
 		for row in _buf:
-			if hit.has(et.id[ctx.bosses.damage_target(row)]):
+			if hit.has(et.id[combat.damage_target(row)]):
 				continue
 			var t := Geom.seg_circle_t(from, to, et.pos[row], r + et.r[row])
 			if t >= 0.0:
@@ -312,7 +312,7 @@ func _update_friendly(dt: float) -> void:
 		var pierce := friend_pierce[i] != 0
 		for h in _hits:
 			var row: int = h[1]
-			if hit.has(et.id[ctx.bosses.damage_target(row)]): continue
+			if hit.has(et.id[combat.damage_target(row)]): continue
 			if life <= 0.0 or et.dead[row] != 0:
 				continue
 			var impact := from.lerp(to, h[0])
@@ -321,7 +321,7 @@ func _update_friendly(dt: float) -> void:
 				life = 0.0
 				body_hit = null
 				break
-			hit[et.id[ctx.bosses.damage_target(row)]] = true
+			hit[et.id[combat.damage_target(row)]] = true
 			if friend_on_hit[i].is_valid():
 				friend_on_hit[i].call(row, friend_dmg[i], impact)
 			else:
