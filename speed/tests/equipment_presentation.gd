@@ -6,6 +6,7 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	_check_lance_lifetime()
 	var legendary_preview := ModulePreview.new()
 	legendary_preview.setup(LegendaryModuleDef.new(), true)
 	legendary_preview.free()
@@ -64,6 +65,27 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[equipment_presentation] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _check_lance_lifetime() -> void:
+	var lance := load("res://scripts/render/light_lance.gd").new() as Node2D
+	add_child(lance)
+	var event := {"from": Vector2.ZERO, "to": Vector2(840, 0), "width": 40.0}
+	lance.fire(event)
+	lance.step(0.28, 1.0, 1.0)
+	check(lance.shots.size() == 1, "以前の消滅時刻でも槍の消え際を見せる")
+	lance.fire(event)
+	check(lance.shots.size() == 2 and is_equal_approx(lance.shots[0].age, 0.28), "次の槍で既存の表示を消去・巻き戻ししない")
+	lance.step(0.13, 1.0, 1.0)
+	check(lance.shots.size() == 1 and is_equal_approx(lance.shots[0].age, 0.13), "古い槍だけを寿命で回収する")
+	lance.step(0.41, 1.0, 1.0)
+	var interval: float = ContentManager.definition(&"traits", &"T06").params.cooldown
+	for shot in 20:
+		lance.step(interval, 1.0, 1.0)
+		lance.fire(event)
+		check(lance.shots.size() <= 3, "最短間隔の連続発動でも表示が蓄積し続けない")
+	lance.step(0.41, 1.0, 1.0)
+	check(lance.shots.is_empty(), "連続発動が終わったあと全表示を回収する")
+	lance.free()
 
 func _check_lance_combat(session: RunSession) -> void:
 	var sim := session.sim

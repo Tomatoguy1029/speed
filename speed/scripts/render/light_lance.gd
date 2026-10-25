@@ -4,7 +4,10 @@ extends Node2D
 
 const SHADER := preload("res://shaders/light_lance.gdshader")
 const FLIGHT_TIME := 0.18
-const FADE_TIME := 0.10
+## 到達した槍を少し保ってから消す。攻撃は発動時に即時判定済み。
+const HOLD_TIME := 0.08
+const FADE_TIME := 0.14
+const FADE_START := FLIGHT_TIME + HOLD_TIME
 const TIP := 168.0
 const BODY_LENGTH := TIP + 42.0
 var shots: Array[Dictionary] = []
@@ -38,7 +41,7 @@ func step(dt: float, character_scale: float, zoom: float) -> void:
 	_scale = character_scale
 	for shot in shots:
 		shot.age += dt
-	shots = shots.filter(func(shot): return shot.age < FLIGHT_TIME + FADE_TIME)
+	shots = shots.filter(func(shot): return shot.age < FADE_START + FADE_TIME)
 	for layer in [_body, _tail]:
 		var mat := layer.material as ShaderMaterial
 		mat.set_shader_parameter("clock", shots.back().age if not shots.is_empty() else 0.0)
@@ -66,7 +69,7 @@ func _draw_body(c: CanvasItem) -> void:
 			continue
 		var scale := Vector2(length / BODY_LENGTH, float(shot.width) / 39.0)
 		var head: Vector2 = shot.from + delta * progress
-		var alpha := 1.0 - clampf((shot.age - FLIGHT_TIME) / FADE_TIME, 0.0, 1.0)
+		var alpha := 1.0 - clampf((shot.age - FADE_START) / FADE_TIME, 0.0, 1.0)
 		c.draw_set_transform(head - delta.normalized() * TIP * scale.x, delta.angle(), scale)
 		_quad(c, Rect2(-42, -32, BODY_LENGTH, 64), alpha)
 	c.draw_set_transform(Vector2.ZERO)
@@ -80,7 +83,7 @@ func _draw_tail(c: CanvasItem) -> void:
 		if length <= 0.0:
 			continue
 		var head: Vector2 = shot.from + delta.normalized() * (traveled - body)
-		var alpha := 1.0 - clampf((shot.age - FLIGHT_TIME) / FADE_TIME, 0.0, 1.0)
+		var alpha := 1.0 - clampf((shot.age - FADE_START) / FADE_TIME, 0.0, 1.0)
 		c.draw_set_transform(head, (-delta).angle(), Vector2(length / 128.0, _scale))
 		_quad(c, Rect2(0, -16, 128, 32), alpha * 0.85)
 	c.draw_set_transform(Vector2.ZERO)
