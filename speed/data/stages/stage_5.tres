@@ -10,6 +10,8 @@
 
 [ext_resource type="PackedScene" path="res://data/formations/s5_growth.tscn" id="growth"]
 
+[ext_resource type="PackedScene" path="res://data/formations/s5_early.tscn" id="early"]
+
 [sub_resource type="Resource" id="Phase0"]
 
 script=ExtResource("phase")
@@ -330,6 +332,78 @@ interval=14.0
 
 attack_priority=1
 
+[sub_resource type="Resource" id="Clip5"]
+
+script=ExtResource("clip")
+
+label="山1"
+
+track=1
+
+types=Array[StringName]([&"pump",&"crab",&"cross"])
+
+formations=Array[PackedScene]([ExtResource("early")])
+
+layouts=Array[StringName]([&"s5_early/peak1"])
+
+time=45.0
+
+length=45.0
+
+groups=1
+
+interval=18.0
+
+attack_priority=1
+
+[sub_resource type="Resource" id="Clip6"]
+
+script=ExtResource("clip")
+
+label="山2"
+
+track=1
+
+types=Array[StringName]([&"auriga",&"crab",&"cross"])
+
+formations=Array[PackedScene]([ExtResource("early")])
+
+layouts=Array[StringName]([&"s5_early/peak2"])
+
+time=115.0
+
+length=55.0
+
+groups=1
+
+interval=16.0
+
+attack_priority=1
+
+[sub_resource type="Resource" id="Clip7"]
+
+script=ExtResource("clip")
+
+label="からす継続"
+
+track=2
+
+types=Array[StringName]([&"crow"])
+
+formations=Array[PackedScene]([ExtResource("early")])
+
+layouts=Array[StringName]([&"s5_early/crow"])
+
+time=115.0
+
+length=365.0
+
+groups=1
+
+interval=24.0
+
+attack_priority=1
+
 [resource]
 
 script=ExtResource("stage")
@@ -346,7 +420,7 @@ enemy_attack_values={"biter":0.1,"splitter":0.1,"bomber":0.3,"pump":1.0,"crab":1
 
 zako_curves=Array[SpawnCurve]([SubResource("Curve_biter"),SubResource("Curve_splitter"),SubResource("Curve_bomber")])
 
-clips=Array[SpawnClip]([SubResource("Clip0"),SubResource("Clip1"),SubResource("Clip2"),SubResource("Clip3"),SubResource("Clip4")])
+clips=Array[SpawnClip]([SubResource("Clip0"),SubResource("Clip1"),SubResource("Clip2"),SubResource("Clip3"),SubResource("Clip4"),SubResource("Clip5"),SubResource("Clip6"),SubResource("Clip7")])
 
 track_names=PackedStringArray("育成の強敵","山1・2","からす","大物の山")
 
