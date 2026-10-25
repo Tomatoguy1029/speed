@@ -10,6 +10,8 @@ var elapsed := 0.0
 var aim := Vector2.ZERO
 var direction := Vector2.RIGHT
 var attack_hit := false
+var attack_points := PackedVector2Array()
+var _driver: RefCounted
 var selection_enabled := false
 var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
@@ -77,6 +79,8 @@ func start_attack(id: StringName) -> bool:
 	aim = run_state.enemy_aim
 	direction = (aim - table.pos[body]).normalized()
 	table.facing[body] = direction.angle()
+	_driver = rule().driver.new() if rule().has("driver") else null
+	if _driver != null: _driver.begin(self)
 	return true
 
 func attack_playing() -> bool:
@@ -94,12 +98,13 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			mode = &"idle"
 			table.guard[body] = 0.0
 	elif mode == &"active":
-		if not attack_hit:
+		if _driver != null: _driver.tick(self,dt)
+		else:
 			var tip := table.pos[body] + direction * float(rule().reach)
-			if Geometry2D.get_closest_point_to_segment(run_state.ship_pos, table.pos[body], tip).distance_to(run_state.ship_pos) < float(rule().width) + ctx.cfg.ship_radius:
-				ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale, 0.0, &"bite", &"draco")
-				attack_hit = true
+			hit_segment(PackedVector2Array([table.pos[body],tip]),float(rule().width))
 		if elapsed >= float(rule().active):
+			if _driver != null: _driver.end(self,false)
+			_driver = null
 			mode = &"recovery"
 			elapsed = 0.0
 	elif mode == &"recovery" and elapsed >= float(rule().recover):
@@ -111,6 +116,9 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 
 func cancel_attack() -> void:
+	if _driver != null: _driver.end(self,true)
+	_driver = null
+	attack_points.clear()
 	mode = &"idle"
 	technique = &""
 	elapsed = 0.0
@@ -141,3 +149,13 @@ func on_body_damaged() -> void:
 	table.guard[body] = 1.0
 	_update_body()
 	presentation_event.emit({"cue": &"phase_changed", "phase": phase})
+
+func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector2Array()) -> void:
+	if attack_hit: return
+	var radius := width + ctx.cfg.ship_radius
+	var hit := Geometry2D.get_closest_point_to_segment(run_state.ship_pos,points[0],points[1]).distance_to(run_state.ship_pos) <= radius
+	if prior.size() == 2:
+		hit = hit or Geometry2D.is_point_in_polygon(run_state.ship_pos,PackedVector2Array([prior[0],prior[1],points[1],points[0]]))
+	if hit:
+		ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
+		attack_hit = true

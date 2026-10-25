@@ -13,3 +13,8 @@ func _draw() -> void:
 	if actor.mode in [&"windup", &"active"]:
 		var end: Vector2 = actor.direction * float(actor.rule().reach)
 		draw_line(Vector2.ZERO,end,Color("#ffc17c") if actor.mode == &"windup" else Color("#ff568c"),8.0 if actor.mode == &"windup" else float(actor.rule().width) * 2.0,false)
+
+	if actor.attack_points.size() > 1:
+		var line := PackedVector2Array()
+		for point in actor.attack_points: line.append(actor.to_local(point))
+		draw_polyline(line,Color("#c8a5ff"),20.0,false)

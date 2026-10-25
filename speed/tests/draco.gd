@@ -40,6 +40,10 @@ func _ready() -> void:
 	check(actor.start_attack(&"bite"), "噛みつきを開始する")
 	for frame in 600: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(not actor.attack_playing(), "噛みつきの予告・実行・隙が終わる")
+	actor.cancel_attack()
+	check(actor.start_attack(&"tail_sweep"), "尾の薙ぎ払いをフロー登録から開始できる")
+	for frame in 480: actor.sim_tick(1.0/120.0,1.0/120.0)
+	check(actor.mode == &"idle", "尾の攻撃は隙を終えて戻る")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})
