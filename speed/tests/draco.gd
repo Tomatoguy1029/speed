@@ -145,6 +145,17 @@ func _ready() -> void:
 		check(sim.enemies.table.dead[member]!=0, "口元に来たピカロを吸収する")
 		check(inhale.spent and inhale.stars==0, "吸収星数は直後の吐き出し一回で使い切る")
 		actor.cancel_attack()
+	actor.cancel_attack()
+	check(actor.start_attack(&"spiral"), "螺旋収縮を開始する")
+	if actor.technique == &"spiral":
+		var spiral = actor._driver
+		var center: Vector2 = spiral.center
+		sim.state.enemy_aim += Vector2(500,0)
+		for frame in 540: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(spiral.center==center, "螺旋の中心は開始時の位置に固定する")
+		check(not spiral.walls.is_empty(), "青紫の胴体オーラは弾と機体を遮る")
+		actor.cancel_attack()
+		check(spiral.walls.all(func(h): return sim.projectiles.hazard_alive[h]==0), "中断した螺旋壁を残さない")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

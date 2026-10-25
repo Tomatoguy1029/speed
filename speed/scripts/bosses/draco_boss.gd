@@ -16,6 +16,7 @@ var closing_walls: Array = []
 var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
+var body_override := PackedVector2Array()
 var _driver: RefCounted
 var selection_enabled := false
 var action_rules: Resource
@@ -56,6 +57,7 @@ func configure_flow(program: Resource) -> void:
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
 
 func body_points() -> PackedVector2Array:
+	if not body_override.is_empty(): return body_override
 	var points := PackedVector2Array([table.pos[body]])
 	for j in 12:
 		var t := float(j + 1) / 12.0
@@ -66,7 +68,7 @@ func _update_body() -> void:
 	var points := body_points()
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]):
-			table.pos[body_rows[j]] = points[j + 1]
+			table.pos[body_rows[j]] = points[roundi(float(j+1)*float(points.size()-1)/float(body_rows.size()))]
 			table.guard[body_rows[j]] = table.guard[body]
 
 func damage_target(row: int) -> int:
