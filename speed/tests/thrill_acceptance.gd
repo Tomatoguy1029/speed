@@ -28,6 +28,7 @@ func _ready() -> void:
 	var save_script: Script = SaveManager.get_script()
 	SaveManager.set_script(MemorySave)
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	SaveManager.settings = settings
 	await _test_debug_stage_selection()
 	await _start(4)
@@ -66,10 +67,17 @@ func _ready() -> void:
 	_test_hydra_fire()
 	await _close()
 	await _test_app_flow()
+	for player: AudioStreamPlayer in AudioManager._players:
+		player.stop()
+		player.stream=null
+	await get_tree().process_frame
+	await get_tree().process_frame
 	SaveManager.set_script(save_script)
 	SaveManager.data = saved_data
 	SaveManager.settings = settings
 	print("[acceptance] passed=%d failed=%d" % [passed, failed])
+	# 音声スレッドが停止要求を消費してから、実行体を終了する。
+	await get_tree().create_timer(maxf(0.05,AudioServer.get_output_latency()*2.0)).timeout
 	get_tree().quit(1 if failed else 0)
 
 func _test_debug_stage_selection() -> void:
@@ -79,6 +87,7 @@ func _test_debug_stage_selection() -> void:
 		_check(not SaveManager.is_stage_unlocked(stage), "ステージ選択：ステージ%dのクリア記録は未解放のまま" % stage)
 	_check(not SaveManager.is_stage_unlocked(0) and not SaveManager.is_stage_unlocked(6), "ステージ選択：存在しないステージは選べない")
 	SaveManager.data = SaveManager._migrate({"version": 1, "cleared_stage": 0, "coins": 123}, SaveManager.default_data())
+	SaveManager.data.intro_seen = true
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
 	add_child(app)
 	await get_tree().process_frame
@@ -96,7 +105,7 @@ func _test_debug_stage_selection() -> void:
 			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &"draco" if stage==5 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
 			GameManager.abort_run()
 			await _settle_screen()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
@@ -104,18 +113,24 @@ func _test_debug_stage_selection() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 
 func _start(stage: int) -> void:
 	ContentManager.reset_runtime()
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	GameManager.run_stage = stage
 	GameManager.run_endless = false
 	scene = RunManager.create_run()
 	add_child(scene)
 	if scene.sim.state == null: await scene.started
 	run = scene.sim
+	for path: String in ContentManager.visual_index.look_paths.values():
+		run.ctx.resources.provide(path, load(path))
 	run.state.stage = run.state.stage.duplicate()
 	run.state.stage.phases = []
+	run.state.stage.zako_curves=[]
+	run.state.stage.clips=[]
 	for phase_name in ["build", "pressure", "horde", "late"]:
 		run.state.stage.phases.append(ContentManager.phases[StringName("s%d_%s" % [stage, phase_name])])
 	if stage == 4:
@@ -214,10 +229,10 @@ func _test_foundation() -> void:
 	s.ship_vel = Vector2(-100, 0)
 	run.ship._collide_bodies()
 	_check(s.ship_vel.x > 0 and s.ship_hp == hp, "タスク1：惑星は被弾せず跳ね返る")
-	_check(ContentManager.stage(1).phases[0].mix == ContentManager.stage(2).phases[0].mix, "復元：通常ステージは元の共通の出現構成を使う")
-	s.time = run.cfg.boss_time - 1.0
+	_check(ContentManager.stage(1).phases.size()==13 and ContentManager.stage(1).boss_time==480.0, "本番のステージ1は六山と8分の固有タイムラインを使う")
+	s.time = s.stage.boss_start(run.cfg) - 1.0
 	run.bosses.tick(0.0, 0.0)
-	_check(not s.boss_spawned and s.boss_at >= run.cfg.boss_time and s.boss_at <= run.cfg.boss_time + run.cfg.boss_time_spread, "タスク3：ボス時刻は指定範囲で決まる")
+	_check(not s.boss_spawned and s.boss_at == s.stage.boss_start(run.cfg) if s.stage.boss_time>=0.0 else s.boss_at >= run.cfg.boss_time and s.boss_at <= run.cfg.boss_time + run.cfg.boss_time_spread, "タスク3：ボス時刻は指定範囲で決まる")
 	s.time = s.boss_at
 	run.bosses.tick(0.0, 0.0)
 	_check(s.boss_spawned, "タスク3：出現時刻にボスが現れる")
@@ -374,7 +389,7 @@ func _test_enemy_gates() -> void:
 	var t := run.enemies.table
 	var at := Vector2(-2000, -2000)
 	run.state.stats.attack_mult = 1000.0
-	for type in [&"shield", &"crab"]:
+	for type in [&"shield"]:
 		_clear()
 		var i := _enemy(type, at)
 		_check(_ram(at, Vector2.LEFT) and not t.dead[i], "タスク8・11：%sの正面は弾かれる" % type)
@@ -387,14 +402,20 @@ func _test_enemy_gates() -> void:
 	_check(not _ram(at, Vector2.RIGHT) and t.dead[lynx] != 0, "やまねこ座は通常の突進で倒せる")
 	_clear()
 	var triangle := _enemy(&"triangle", at)
-	run.enemies.behavior(&"triangle").step(triangle, 0.01)
-	_check(run.projectiles.hazard_count() == 3 and not _ram(at, Vector2.RIGHT) and not t.dead[triangle], "タスク10：三角の膜は中の核を守る")
+	var behavior := run.enemies.behavior(&"triangle")
+	_check(t.parts[triangle].size()==6 and run.projectiles.hazard_count()==0,"三角は停止中の三つの星からなる")
 	var star := t.parts[triangle][0]
-	run.combat.damage_enemy(star, 1e6, {"cause": &"shot", "no_crit": true})
-	run.enemies.behavior(&"triangle").step(triangle, 0.01)
-	_check(run.projectiles.hazard_count() == 0 and not _ram(at, Vector2.RIGHT) and t.dead[triangle] != 0, "タスク10：頂点を壊すと膜が消えて核を倒せる")
+	run.combat.damage_enemy(star,1e6,{"cause":&"shot","no_crit":true})
+	behavior.after_tick(0.01)
+	_check(not t.dead[triangle],"星を一つ倒しても残る二つの星で動く")
+	for k in [2,4]: run.combat.damage_enemy(t.parts[triangle][k],1e6,{"cause":&"shot","no_crit":true})
+	behavior.after_tick(0.01)
+	_check(t.dead[triangle]!=0,"三つの星を倒すと見えない中心も終了する")
 	_clear()
 	var crab := _enemy(&"crab", at)
+	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "かに座は通常時も正面から攻撃できる")
+	_clear()
+	crab=_enemy(&"crab",at)
 	t.mode[crab] = EnemyTable.Mode.RECOVER
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "タスク11：かに座の挟んだ直後は正面から倒せる")
 	_clear()
@@ -791,11 +812,13 @@ func _play_steps(count: int, dt: float) -> void:
 func _test_app_flow() -> void:
 	ContentManager.reset_runtime()
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	GameManager.goto(GameManager.Screen.TITLE, false)
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()
 	add_child(app)
 	app._current.get_node("%StartButton").pressed.emit()
 	_check(GameManager.screen == GameManager.Screen.MAIN_MENU, "通し確認：タイトルからゲームスタート")
+	var expected_clears := 0
 	for stage in range(1, 6):
 		app._current._stage_button.pressed.emit()
 		var map = app._current._map
@@ -829,6 +852,12 @@ func _test_app_flow() -> void:
 					valid = valid and (expected.has(String(t.type[i])) or t.type[i] == &"splitling")
 			_check(valid and regular > 0, "通し確認：ステージ%dの%.0f秒で決めた敵が出る" % [stage, clock])
 			await get_tree().process_frame
+		if not run.state.stage.boss_enabled:
+			_check(not run.state.boss_spawned and run.bosses.actor==null,"未接続ステージ%dは仮ボスを出さない" % stage)
+			GameManager.abort_run()
+			await _settle_screen()
+			continue
+		expected_clears+=1
 		run.command(&"debug_time", {"seconds": run.state.boss_at + 0.1 - run.state.time})
 		_play_steps(2, 0.05)
 		_check(run.state.boss_spawned and run.bosses.actor.def.id == ContentManager.stage(stage).boss_id, "通し確認：ステージ%dに対応するボスが出る" % stage)
@@ -840,8 +869,10 @@ func _test_app_flow() -> void:
 		run.enemies.cleanup()
 		_play_steps(20, 0.05)
 		var replenished := false
+		var spawn_target: Dictionary=run.spawn.target()
+		var automatic_types: Array=spawn_target.per_type.keys() if spawn_target.has("per_type") else spawn_target.phase.mix.keys()
 		for row in enemies.alive.size():
-			if enemies.alive[row] and not enemies.dead[row] and not enemies.is_boss[row] and enemies.parent[row] < 0 and enemies.meteor_index[row] < 0:
+			if enemies.alive[row] and not enemies.dead[row] and not enemies.is_boss[row] and enemies.parent[row] < 0 and enemies.meteor_index[row] < 0 and (enemies.type[row] in automatic_types or String(enemies.type[row]) in automatic_types):
 				replenished = true
 		_check(replenished == (float(run.spawn.target().pop) > 0.0), "通し確認：ステージ%dのボス戦は設定した出現目標に従う" % stage)
 		for attempt in 100:
@@ -852,6 +883,14 @@ func _test_app_flow() -> void:
 			# 攻めどきと当たりの確認用に、調整機能と同じ実行時の強さを使う。
 			run.state.stats.attack_mult = 1000.0
 			var boss = run.bosses.actor
+			if boss.def.id==&"draco" and boss.mode==&"finale":
+				var it:=Intent.new()
+				if boss.finale.stage==&"input":
+					it.press=not boss.finale.began;it.has_cursor=true;it.pen=run.state.ship_pos;it.pen_release=boss.finale.began
+				run.input_source=func(): return it
+				_play_steps(40,0.05)
+				run.input_source=Callable()
+				continue
 			var target: Vector2 = run.enemies.table.pos[boss.body]
 			if boss.def.id == &"hydra":
 				if boss.immortal_row >= 0:
@@ -887,7 +926,7 @@ func _test_app_flow() -> void:
 			_check(SaveManager.is_stage_unlocked(stage + 1), "通し確認：クリアしたステージ%dの次が選べる" % stage)
 		app._current.get_node("%MenuButton").pressed.emit()
 		await _settle_screen()
-	_check(int(SaveManager.data.best.clears) == 5, "通し確認：5ステージ分のクリアを記録する")
+	_check(int(SaveManager.data.best.clears) == expected_clears, "通し確認：接続済みの各ステージのクリアを一度ずつ記録する")
 	app.queue_free()
 	await get_tree().process_frame
 
@@ -988,7 +1027,9 @@ func _test_head_world_steps() -> void:
 	_check(is_equal_approx(run.enemies.table.hp[boss.body], hp), "タスク20：行の解放と世界更新で頭のダメージを二重に数えない")
 
 func _stage_types(stage: StageDef) -> PackedStringArray:
-	var types := PackedStringArray()
+	var types := PackedStringArray(stage.enemies)
+	for curve: SpawnCurve in stage.zako_curves:
+		if not types.has(String(curve.type)): types.append(String(curve.type))
 	for phase: PhaseDef in stage.phases:
 		for id in phase.mix:
 			if not types.has(String(id)): types.append(String(id))
