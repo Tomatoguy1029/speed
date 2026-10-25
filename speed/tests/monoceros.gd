@@ -24,6 +24,21 @@ func _ready() -> void:
 	check(actor.table.max_hp[actor.body] == actor.def.hp * sim.cfg.enemy_hp_mult, "専用HPを共通倍率付きで使う")
 	check(actor.table.armor[actor.body] == actor.def.armor * sim.cfg.enemy_armor_mult, "専用装甲を使う")
 	check(actor.table.gate[actor.body] == EnemyTable.Gate.NONE and actor.table.weak_arc[actor.body] == 0.0, "全方向から本体を攻撃できる")
+	fresh()
+	sim.state.ship_pos = Vector2(2400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor._cooldown = 0.0
+	step(0.1)
+	check(actor.mode == &"idle", "遠方では届かない突進を始めず接近する")
+	check(actor.table.pos[actor.body].x > 0.0, "遠方からプレイヤーへ戻る")
+	var approached := false
+	for frame in 1200:
+		step(DT)
+		if actor.mode == &"windup":
+			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= float(actor.def.params.approach_range)
+			break
+	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
+	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
 	step(0.4)

@@ -17,7 +17,7 @@ conditions = {
 "charge": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 100000.0,
+"max": 1000.0,
 "min": 0.0,
 "min_phase": 1
 },
@@ -45,7 +45,7 @@ conditions = {
 "return_charge": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 2000.0,
+"max": 1000.0,
 "min": 280.0,
 "min_phase": 1
 },
