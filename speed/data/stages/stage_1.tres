@@ -285,11 +285,6 @@ script = ExtResource("curve")
 type = &"biter"
 points = PackedVector2Array(0, 18, 14, 100, 29, 175, 45, 110, 58, 230, 68, 110, 80, 230, 90, 120, 105, 240, 120, 140, 133, 280, 143, 140, 155, 280, 165, 150, 180, 290, 195, 160, 208, 330, 218, 160, 230, 330, 240, 165, 255, 340, 270, 180, 283, 365, 293, 180, 305, 365, 315, 180, 330, 380, 345, 200, 358, 400, 368, 200, 380, 400, 390, 200, 405, 420, 420, 220, 437, 450, 451, 220, 467, 450, 480, 90)
 
-[sub_resource type="Resource" id="Curve_darter"]
-script = ExtResource("curve")
-type = &"darter"
-points = PackedVector2Array(0, 0, 14, 0, 29, 6, 45, 8, 58, 16, 68, 8, 80, 16, 90, 8, 105, 14, 120, 10, 133, 22, 143, 10, 155, 22, 165, 10, 180, 18, 195, 12, 208, 26, 218, 12, 230, 26, 240, 10, 255, 20, 270, 14, 283, 28, 293, 14, 305, 28, 315, 12, 330, 22, 345, 16, 358, 32, 368, 16, 380, 32, 390, 14, 405, 24, 420, 18, 437, 36, 451, 18, 467, 36, 480, 6)
-
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
 type = &"bomber"
@@ -310,17 +305,16 @@ script = ExtResource("stage")
 index = 1
 scene_path = "res://scenes/stages/stage_1.tscn"
 phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss")]
-enemies = Array[StringName]([&"biter", &"darter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
+enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
 enemy_attack_values = {
 "bomber": 0.3,
-"darter": 0.2,
 "marlin": 1.0,
 "pulser": 0.5,
 "pump": 1.0,
 "shield": 1.0,
 "triangle": 1.0
 }
-zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_darter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
+zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
 clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12")])
 track_names = PackedStringArray("たて座", "ポンプ座", "かじき座", "みなみのさんかく座")
 boss_time = 480.0
