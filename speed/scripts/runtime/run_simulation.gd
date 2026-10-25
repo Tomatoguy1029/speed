@@ -459,6 +459,10 @@ func _begin_finish() -> void:
 	projectiles.clear_hostile()
 	state.emit(&"boss_finish", {"pos": finish_origin})
 	set_phase(RunState.Phase.FINISHING)
+	if state.draco_finish_done:
+		finish_replay.clear()
+		sequence_t=finish_reveal_start()+finish_reveal_duration()
+		_finish_blast()
 
 ## 表示するだけ。既存の報酬付与は finish → GameManager → SaveManager が1回行う。
 func finish_legendary() -> LegendaryModuleDef:

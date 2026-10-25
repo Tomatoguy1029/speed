@@ -183,6 +183,13 @@ func _ready() -> void:
 		intent.pen_release=true
 		actor.advance_finale(0.01,intent)
 		check(actor.finale.stage==&"strikes", "離すと入力経路に関係なく固定フィニッシュを始める")
+		sim.state.lab_mode=false
+		for frame in 1500: actor.advance_finale(1.0/120.0,Intent.new())
+		check(sim.state.boss_dead and actor.finale.completed, "固定連撃と切断・爆発を終えて勝利を通知する")
+		var wins := sim.state.events.filter(func(e): return e.type==&"boss_defeated").size()
+		actor.advance_finale(1.0,Intent.new())
+		check(sim.state.events.filter(func(e): return e.type==&"boss_defeated").size()==wins and wins==1, "最終勝利を一度だけ通知する")
+		sim.state.lab_mode=true
 	session.free()
 	print("[draco] failures=",failed)
 	get_tree().quit(1 if failed else 0)

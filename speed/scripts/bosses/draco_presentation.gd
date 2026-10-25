@@ -3,18 +3,25 @@ extends Node2D
 var actor: BossActor
 var effects: Array = []
 func on_event(event: Dictionary) -> void:
-	if event.cue in [&"rock_break",&"arrow_impact"]:
+	if event.cue in [&"rock_break",&"arrow_impact",&"cosmic_collapse"]:
 		effects.append({"pos":event.pos,"time":actor.clock,"radius":event.radius})
 		if effects.size() > 32: effects.pop_front()
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	var points := PackedVector2Array()
 	for point in actor.body_points(): points.append(actor.to_local(point))
-	draw_polyline(points, Color("#19122e"), 105.0, false)
-	draw_polyline(points, Color("#544475"), 78.0, false)
-	draw_circle(Vector2(-110,0), 30.0, Color("#e9faff"))
-	draw_colored_polygon(PackedVector2Array([Vector2(-30,-48),Vector2(80,-35),Vector2(105,0),Vector2(80,35),Vector2(-30,48)]),Color("#70618c"))
-	for side in [-1,1]: draw_circle(Vector2(58,side * 24),7,Color("#ff3155"))
+	if actor.finale.stage != &"explode":
+		if actor.finale.split>0.0:
+			for side in 2:
+				var piece := PackedVector2Array()
+				for j in range(0 if side==0 else 6,6 if side==0 else points.size()): piece.append(points[j]+Vector2((-1 if side==0 else 1)*actor.finale.split*90.0,0))
+				if piece.size()>1: draw_polyline(piece,Color("#544475"),78.0,false)
+		else:
+			draw_polyline(points, Color("#19122e"), 105.0, false)
+			draw_polyline(points, Color("#544475"), 78.0, false)
+	if actor.finale.stage != &"explode": draw_circle(Vector2(-110,0), 30.0, Color("#e9faff"))
+	if actor.finale.stage != &"explode": draw_colored_polygon(PackedVector2Array([Vector2(-30,-48),Vector2(80,-35),Vector2(105,0),Vector2(80,35),Vector2(-30,48)]),Color("#70618c"))
+	for side in ([] if actor.finale.stage == &"explode" else [-1,1]): draw_circle(Vector2(58,side * 24),7,Color("#ff3155"))
 	if actor.mode in [&"windup", &"active"] and actor.technique == &"bite":
 		var end: Vector2 = actor.direction * float(actor.rule().reach)
 		draw_line(Vector2.ZERO,end,Color("#ffc17c") if actor.mode == &"windup" else Color("#ff568c"),8.0 if actor.mode == &"windup" else float(actor.rule().width) * 2.0,false)

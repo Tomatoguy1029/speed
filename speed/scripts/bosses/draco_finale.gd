@@ -67,6 +67,40 @@ func advance(dt: float, intent: Intent) -> void:
 				a.run_state.controls_locked=true
 				a.run_state.drawing=false
 			else: a.run_state.drawing=began
+		&"strikes":
+			var count := int(a.def.params.get("finish_passes",8))
+			var duration := float(a.def.params.get("finish_pass_time",0.32))
+			var index := mini(count-1,int(time/duration))
+			var progress := fmod(time,duration)/duration
+			var direction := Vector2.from_angle(index*2.399963)
+			line=PackedVector2Array([center-direction*650.0,center+direction*650.0])
+			a.run_state.ship_pos=line[0].lerp(line[1],clampf(progress*1.4,0.0,1.0))
+			a.run_state.ship_heading=direction
+			a.run_state.camera_zoom=base_zoom*lerpf(0.75,1.3,clampf(time/(count*duration),0.0,1.0))
+			if time>=count*duration: stage=&"last";time=0.0
+		&"last":
+			a.run_state.camera_zoom=base_zoom*0.45
+			line=PackedVector2Array([center+Vector2(0,1300),center-Vector2(0,1300)])
+			a.run_state.ship_pos=line[0].lerp(line[1],clampf(time/0.3,0.0,1.0))
+			a.run_state.ship_heading=Vector2.UP
+			dim=0.95
+			if time>=0.4: stage=&"sight";time=0.0
+		&"sight":
+			a.run_state.camera_zoom=base_zoom*0.45
+			dim=lerpf(0.95,0.0,clampf(time/1.6,0.0,1.0))
+			if time>=1.6: stage=&"split";time=0.0
+		&"split":
+			a.run_state.camera_zoom=base_zoom*0.45
+			split=clampf(time/0.5,0.0,1.0)
+			if time>=0.6:
+				stage=&"explode";time=0.0
+				a.presentation_event.emit({"cue":&"cosmic_collapse","pos":center,"radius":430.0})
+		&"explode":
+			if time>=0.8:
+				completed=true
+				a.run_state.draco_finish_done=true
+				dispose()
+				a.ctx.bosses.on_boss_defeated(a.body,{"cause":&"draco_finale","finale_complete":true})
 	a._update_body();a._presentation.queue_redraw()
 func dispose() -> void:
 	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0;actor.run_state.cinematic_camera=false

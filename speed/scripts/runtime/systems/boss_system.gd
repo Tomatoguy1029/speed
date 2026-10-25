@@ -119,7 +119,7 @@ func body_damaged(row: int) -> void:
 ## ボスの HP が0になった（CombatSystem から呼ばれる）。撃破の演出は RunManager が始める。
 func on_boss_defeated(i: int, opts: Dictionary) -> void:
 	var owner := actor_for_row(i)
-	if owner != null and opts.get("cause", &"") != &"debug" and owner.handle_body_defeat(opts):
+	if owner != null and opts.get("cause", &"") != &"debug" and not opts.get("finale_complete",false) and owner.handle_body_defeat(opts):
 		return
 	if state.lab_mode:
 		if owner != null:

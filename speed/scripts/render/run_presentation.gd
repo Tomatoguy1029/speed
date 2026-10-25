@@ -1220,6 +1220,15 @@ func _draw_ship(c: CanvasItem) -> void:
 	_ship_visual.draw_ship(c)
 
 func _draw_top(c: CanvasItem) -> void:
+	var boss := run.bosses.actor
+	if boss != null and boss.get("mode")==&"finale":
+		var finale: RefCounted=boss.finale
+		if finale.dim>0.0: c.draw_rect(view_rect().grow(400),Color(0.0,0.0,0.02,finale.dim))
+		if finale.line.size()==2:
+			var width := 18.0 if finale.stage==&"strikes" else 48.0
+			var alpha := 1.0 if finale.stage in [&"strikes",&"last"] else maxf(0.0,finale.dim)
+			c.draw_line(finale.line[0],finale.line[1],Color(0.65,0.65,1.0,alpha*0.45),width*3.0,false)
+			c.draw_line(finale.line[0],finale.line[1],Color(1,1,1,alpha),width,false)
 	if state.cinematic_bars>0.0:
 		var rect := view_rect()
 		var height := rect.size.y*0.1*state.cinematic_bars
