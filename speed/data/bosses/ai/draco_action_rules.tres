@@ -3,10 +3,11 @@
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/bite.tres" id="2"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_sweep.tres" id="move_tail_sweep"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/star_fan.tres" id="move_star_fan"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_slam.tres" id="move_tail_slam"]
 [resource]
 script = ExtResource("1")
 adapter = &"draco"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("move_star_fan"), ExtResource("move_tail_sweep"), ExtResource("2")])
-conditions = {"star_fan": {"min":0.0,"max":1600.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "tail_sweep": {"min":0.0,"max":1600.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "bite": {"min":0.0,"max":360.0,"angle":0.0,"half_angle":100.0,"min_phase":1}}
-costs = {"star_fan": 1.0, "tail_sweep": 1.0, "bite":1.0}
+techniques = Array[Resource]([ExtResource("move_tail_slam"), ExtResource("move_star_fan"), ExtResource("move_tail_sweep"), ExtResource("2")])
+conditions = {"tail_slam": {"min":0.0,"max":1600.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "star_fan": {"min":0.0,"max":1600.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "tail_sweep": {"min":0.0,"max":1600.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "bite": {"min":0.0,"max":360.0,"angle":0.0,"half_angle":100.0,"min_phase":1}}
+costs = {"tail_slam": 1.0, "star_fan": 1.0, "tail_sweep": 1.0, "bite":1.0}
