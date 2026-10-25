@@ -21,5 +21,6 @@ func _ready() -> void:
 	check(s5.clips.any(func(c): return c.time==115.0 and &"auriga" in c.types),"山2に移動する残留攻撃を配置する")
 	check(s5.clips.any(func(c): return c.time==195.0 and &"cepheus" in c.types),"山3に王と軍勢を置く")
 	check(s5.clips.any(func(c): return c.time==290.0 and &"aquila" in c.types),"山4に雷の大物を置く")
+	check(s5.clips.any(func(c): return c.time==437.5 and &"aquila" in c.types and &"pump" in c.types),"山5後半に軍勢から雷と炎へ入れ替える")
 	print("[stage15_timeline] failures=",failures)
 	get_tree().quit(1 if failures else 0)
