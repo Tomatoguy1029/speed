@@ -10,6 +10,7 @@ var elapsed := 0.0
 var aim := Vector2.ZERO
 var direction := Vector2.RIGHT
 var attack_hit := false
+var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
 var _driver: RefCounted
 var selection_enabled := false

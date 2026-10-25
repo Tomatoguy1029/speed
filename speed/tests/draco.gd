@@ -44,6 +44,11 @@ func _ready() -> void:
 	check(actor.start_attack(&"tail_sweep"), "尾の薙ぎ払いをフロー登録から開始できる")
 	for frame in 480: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(actor.mode == &"idle", "尾の攻撃は隙を終えて戻る")
+	actor.cancel_attack()
+	var bullets_before := sim.projectiles.hostile_count()
+	check(actor.start_attack(&"star_fan"), "頭部の星弾を開始できる")
+	for frame in 240: actor.sim_tick(1.0/120.0,1.0/120.0)
+	check(sim.projectiles.hostile_count() - bullets_before == 9, "扇に並んだ星弾を一斉発射する")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

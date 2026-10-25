@@ -62,8 +62,8 @@ var _hits: Array = []
 ## SLASH はやまねこ座の斬撃。片側1組の、潰れた弧の3本の爪痕。真ん中の少し先から外側へ横に伸び、外側で本体の方へ反り上がる。
 ## 形を保ったまま直進する。hostile_r が爪痕の横の大きさ、hostile_turn が伸びる側（進む向きに対して 1 なら左、-1 なら右）
 ## BOLT はケフェウス座の兵の細長い光弾。直進し、追尾しない
-enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT }
-const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt"]
+enum HostileKind { BULLET, MISSILE, REFLECTED, SHELL, SLASH, BOLT, LIGHT_ARROW, COSMIC_ARROW, STAR_BOLT }
+const HOSTILE_CAUSE: Array[StringName] = [&"bullet", &"missile", &"reflected", &"blast", &"slash", &"bolt", &"arrow", &"arrow"]
 ## 1 なら使用中の行
 var hostile_alive := PackedByteArray()
 var hostile_pos := PackedVector2Array()

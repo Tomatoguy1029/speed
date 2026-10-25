@@ -18,3 +18,6 @@ func _draw() -> void:
 		var line := PackedVector2Array()
 		for point in actor.attack_points: line.append(actor.to_local(point))
 		draw_polyline(line,Color("#c8a5ff"),20.0,false)
+
+	for point in actor.telegraph_points:
+		draw_circle(actor.to_local(point),10.0,Color("#c4b0ff"))
