@@ -4,6 +4,7 @@ signal presentation_event(event: Dictionary)
 var phase := 1
 var mode: StringName = &"idle"
 var technique: StringName = &""
+var _cooldown := 0.0
 var clock := 0.0
 var elapsed := 0.0
 var aim := Vector2.ZERO
@@ -35,6 +36,7 @@ func _on_bound() -> void:
 	selection_enabled = not run_state.lab_mode
 
 func configure_flow(program: Resource) -> void:
+	selection_enabled = true
 	action_rules = program.data.rules
 	_moves.clear()
 	for move in action_rules.techniques: _moves[move.technique] = move

@@ -60,12 +60,12 @@ func _ready() -> void:
 	files.get_popup().id_pressed.connect(func(_id): _file_dialog.popup_centered_ratio(0.65))
 	toolbar.add_child(files)
 	var bosses := OptionButton.new()
-	for title_text in ["うみへび座", "いっかくじゅう座"]: bosses.add_item(title_text)
-	bosses.selected = 0 if "hydra" in rules_path else 1
+	for title_text in ["うみへび座", "いっかくじゅう座", "りゅう座"]: bosses.add_item(title_text)
+	bosses.selected = 2 if "draco" in rules_path else 0 if "hydra" in rules_path else 1
 	bosses.item_selected.connect(func(index):
-		var id: String = ["hydra", "monoceros"][index]
+		var id: String = ["hydra", "monoceros", "draco"][index]
 		if open_boss("res://data/bosses/ai/" + id + "_action_rules.tres", "res://data/bosses/ai/" + id + "_flow.tres") != OK:
-			bosses.selected = 0 if "hydra" in rules_path else 1)
+			bosses.selected = 2 if "draco" in rules_path else 0 if "hydra" in rules_path else 1)
 	toolbar.add_child(bosses)
 	for entry in [["変更を保存", save_current], ["保存して戦闘を試す", play_current], ["元に戻す", undo_edit], ["やり直す", redo_edit]]:
 		var button := Button.new()
