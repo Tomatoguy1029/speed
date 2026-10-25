@@ -474,6 +474,9 @@ func _refresh_loadout_icons() -> void:
 		child.queue_free()
 	var row := 0
 	for owned in [run.state.weapons, run.state.traits]:
+		if row==0 and not run.state.final_modules.is_empty():
+			row+=1
+			continue
 		var index := 0
 		for id in owned:
 			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
@@ -481,7 +484,11 @@ func _refresh_loadout_icons() -> void:
 			index += 1
 		row += 1
 	for j in run.state.final_modules.size():
-		_add_icon(_loadout_icons,ContentManager.catalog.find(&"legendary_modules",run.state.final_modules[j]),Rect2(9+j*23,294,17,17))
+		var preview:=ModulePreview.new()
+		preview.position=Vector2(9+j*23,317)
+		preview.size=Vector2(17,17)
+		preview.setup(ContentManager.catalog.find(&"legendary_modules",run.state.final_modules[j]),true)
+		_loadout_icons.add_child(preview)
 
 # ── 3択 ──────────────────────────────────────────────────────────
 
