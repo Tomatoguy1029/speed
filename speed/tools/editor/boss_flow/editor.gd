@@ -41,7 +41,7 @@ var _probability_previous := ""
 var _scale := 1.0
 var _file_dialog := FileDialog.new()
 const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
-const PARAM_LABELS := {"warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
+const PARAM_LABELS := {"radius_factor":"螺旋の半径倍率","body_ratio":"螺旋の胴体幅（画面短辺比）","head_scale":"頭の拡大倍率","coil_turns":"胴体の巻き数","first_lap":"1周目の時間（秒）","second_lap":"2周目の時間（秒）","pause":"巻き終わりの停止（秒）","shrink_time":"収縮と離脱（秒）","clone_stars":"複製1体の星数（仮）","warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1061,6 +1061,18 @@ func _append_arcs() -> void:
 		for property in ["offset_x","offset_y","radius","angle_degrees","spread_degrees","count"]:
 			var value: float=arc.offset.x if property=="offset_x" else arc.offset.y if property=="offset_y" else float(arc.get(property))
 			_number_field({"offset_x":"位置 X","offset_y":"位置 Y","radius":"半径","angle_degrees":"中心角度","spread_degrees":"広がり","count":"弾数"}[property],value,func(next): set_arc_value(index,property,next),-10000.0 if property in ["offset_x","offset_y","angle_degrees"] else 1.0)
+		var remove := Button.new()
+		remove.text="この弧を削除"
+		remove.pressed.connect(func():
+			var old: Array=current.parameters.arcs
+			var next:=old.duplicate()
+			next.remove_at(index)
+			history.create_action("吐き出しの弧を削除")
+			history.add_do_method(_assign.bind(current,"arcs",next))
+			history.add_undo_method(_assign.bind(current,"arcs",old))
+			history.commit_action()
+			_refresh())
+		_fields.add_child(remove)
 	var button := Button.new()
 	button.text="弧を追加"
 	button.pressed.connect(func():
