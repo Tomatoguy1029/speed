@@ -125,6 +125,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_cue(&"extracting")
 	elif mode in [&"recovery", &"turnaround", &"extract"]:
 		recovery = maxf(0.0, recovery - dt)
+		if mode == &"turnaround": _aim(dt)
 		if mode == &"extract":
 			_move_body(-direction * float(def.params.extract_speed) * dt)
 		if recovery <= 0.0:
@@ -235,6 +236,10 @@ func _aim(dt: float) -> void:
 
 func lock_aim() -> void:
 	if mode != &"windup": return
+	# 旋回途中の姿勢を狙いと取り違えず、この時点の遅延照準を固定する。
+	# 蹴りは背後への攻撃なので本体の向きを保つ。
+	if technique != &"kick" and not aim_point.is_equal_approx(table.pos[body]):
+		table.facing[body] = (aim_point - table.pos[body]).angle()
 	locked = true
 	direction = Vector2.from_angle(table.facing[body])
 	_cue(&"aim_locked")

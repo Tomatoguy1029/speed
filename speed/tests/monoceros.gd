@@ -38,6 +38,18 @@ func _ready() -> void:
 			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= float(actor.def.params.approach_range)
 			break
 	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
+	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"combo"]:
+		fresh()
+		actor._cooldown = 0.0
+		actor.phase = 2 if tech in [&"lance", &"combo"] else 1
+		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(180, 0) if tech == &"sweep" else Vector2(600, 0)
+		var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
+		check(candidates.any(func(c): return c.id == String(tech)), "仕様の距離・形態で候補へ入る: " + tech)
+		var flow := actor.flow_runner.flow.duplicate(true)
+		for section in flow.sections: section["allowed_techniques"] = [String(tech)]
+		actor.flow_runner.configure(flow)
+		step(DT)
+		check(actor.mode == &"windup" and actor.technique == (&"charge" if tech == &"combo" else tech), "共通フローから技を開始できる: " + tech)
 	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
@@ -54,6 +66,15 @@ func _ready() -> void:
 	check(absf((actor.table.pos[actor.body] - launch).normalized().cross(Vector2.from_angle(locked_angle))) < 0.001, "発進後は直線で曲がらない")
 	step(2.2)
 	check(actor.mode == &"idle", "通常突進の後に回復する")
+	for tech in [&"charge", &"return_charge", &"lance"]:
+		fresh()
+		actor.phase = 2
+		sim.state.enemy_aim = Vector2(-600, 0)
+		actor.start_attack(tech)
+		until(&"windup", true)
+		var target_direction := (sim.state.enemy_aim - actor.table.pos[actor.body]).normalized()
+		check(actor.direction.dot(target_direction) > 0.9999, "背後へ切り返しても固定時点の遅延照準を狙う: " + tech)
+		check(Vector2.from_angle(actor.table.facing[actor.body]).dot(actor.direction) > 0.9999, "予告と発進方向を一致させる: " + tech)
 
 	fresh()
 	actor.start_attack(&"return_charge")
