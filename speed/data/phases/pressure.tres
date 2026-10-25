@@ -4,10 +4,11 @@
 
 [resource]
 script = ExtResource("1")
-start = 150.0
+start = 55.0
 pop_from = 45.0
 pop_to = 70.0
 rate = 8.0
+attack_budget = 3
 mix = {
 "armored": 2.2,
 "darter": 3.0,
@@ -17,4 +18,4 @@ mix = {
 "titan": 0.3
 }
 id = &"pressure"
-display_name = "圧力期"
+display_name = "1回目の山"

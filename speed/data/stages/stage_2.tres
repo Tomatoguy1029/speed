@@ -1,19 +1,111 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://dby43ig7kpa54"]
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_aepvt"]
 [ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_5plhc"]
 [ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
+[ext_resource type="PackedScene" uid="uid://c7lv3gs5b6ybn" path="res://data/formations/s2_beamer.tscn" id="3_hhbsv"]
 [ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
 [ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
 [ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
 [ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_5plhc"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_hhbsv"]
+
+[sub_resource type="Resource" id="Resource_esfk7"]
+script = ExtResource("2_5plhc")
+label = "ビームの敵たくさん"
+track = 0
+types = Array[StringName]([&"beamer"])
+formations = Array[PackedScene]([ExtResource("3_hhbsv")])
+time = 55.0
+length = 80.0
+groups = 4
+interval = 2.0
+
+[sub_resource type="Resource" id="Resource_hhbsv"]
+script = ExtResource("9_5plhc")
+start = 386.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_347783990498013494"
+display_name = "4回目の育成"
+
+[sub_resource type="Resource" id="Resource_5plhc"]
+script = ExtResource("9_5plhc")
+start = 415.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_6374603078355179547"
+display_name = "ボス前ラッシュ"
+
+[sub_resource type="Resource" id="Resource_ttetq"]
+script = ExtResource("9_5plhc")
+start = 475.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_6315931189886180248"
+display_name = "ボス戦"
+
+[sub_resource type="Resource" id="Resource_3y6x8"]
+script = ExtResource("10_hhbsv")
+type = &"splitling"
+points = PackedVector2Array(0, 10, 55, 66, 56, 28)
+
+[sub_resource type="Resource" id="Resource_fv8bx"]
+script = ExtResource("10_hhbsv")
+type = &"splitter"
+points = PackedVector2Array(0, 10, 55, 47, 56, 15)
 
 [resource]
 script = ExtResource("1")
 index = 2
 scene_path = "res://scenes/stages/stage_2.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
-time_limit = 900.0
-boss_id = &""
+phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq")]
+enemies = Array[StringName]([&"beamer", &"crab", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
+zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_3y6x8"), SubResource("Resource_fv8bx")])
+clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7")])
+track_names = PackedStringArray("ビームの敵", "じょうぎ座", "たて座", "ぼうえんきょう座", "かに座")
 boss_enabled = false
+surge_phases = {
+"escape": false,
+"phase_347783990498013494": false,
+"phase_6315931189886180248": false,
+"phase_6374603078355179547": false
+}
+time_limit = 900.0
 legendary_module_id = &"legendary_sail"
