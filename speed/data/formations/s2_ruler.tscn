@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://d387m33usipqe"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_xn0y3"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_st02e"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_67jg3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_nyt1f"]
+
+[node name="Stage2Ruler" type="Node2D" unique_id=1462650156]
+script = ExtResource("1_xn0y3")
+types = Array[StringName]([&"ruler"])
+
+[node name="単体" type="Node2D" parent="." unique_id=1380940436]
+position = Vector2(-2400, 0)
+script = ExtResource("2_st02e")
+
+[node name="Ruler" type="Node2D" parent="単体" unique_id=1063353023]
+script = ExtResource("3_67jg3")
+enemy = &"ruler"
+
+[node name="左" type="Node2D" parent="." unique_id=1183137142]
+position = Vector2(-1820.9999, 19)
+rotation = 1.5603629
+script = ExtResource("4_nyt1f")
+weight = 2.0
+
+[node name="右" type="Node2D" parent="." unique_id=1900481339]
+position = Vector2(1683, 10.000015)
+rotation = -1.5648545
+script = ExtResource("4_nyt1f")
+weight = 2.0

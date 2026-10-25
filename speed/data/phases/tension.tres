@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-start = 360.0
+start = 210.0
 pop_from = 70.0
 pop_to = 110.0
 rate = 10.0
@@ -19,4 +19,4 @@ mix = {
 "titan": 1.2
 }
 id = &"tension"
-display_name = "緊張期"
+display_name = "休憩"

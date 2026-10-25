@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://d15drw3y56hut"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_kt2au"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_sqax3"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_knqu4"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_7prei"]
+
+[node name="Stage2Telescope" type="Node2D" unique_id=1462650156]
+script = ExtResource("1_kt2au")
+types = Array[StringName]([&"telescope"])
+
+[node name="単体" type="Node2D" parent="." unique_id=1380940436]
+position = Vector2(-2400, 0)
+script = ExtResource("2_sqax3")
+
+[node name="Telescope" type="Node2D" parent="単体" unique_id=1063353023]
+script = ExtResource("3_knqu4")
+enemy = &"telescope"
+
+[node name="正面" type="Node2D" parent="." unique_id=1183137142]
+position = Vector2(0, -1900)
+rotation = 3.1415927
+script = ExtResource("4_7prei")
+weight = 2.0
+
+[node name="左前" type="Node2D" parent="." unique_id=414890150]
+position = Vector2(-1545.9999, -1148)
+rotation = 2.2095199
+script = ExtResource("4_7prei")
+
+[node name="右前" type="Node2D" parent="." unique_id=870306583]
+position = Vector2(1520, -1140)
+rotation = 4.0688877
+script = ExtResource("4_7prei")
+
+[node name="後ろ" type="Node2D" parent="." unique_id=313650186]
+position = Vector2(0, 1900)
+script = ExtResource("4_7prei")
+weight = 0.5
+
+[node name="左後" type="Node2D" parent="." unique_id=1069733570]
+position = Vector2(-1586, 1354.0001)
+rotation = 0.8641465
+script = ExtResource("4_7prei")
+weight = 0.5
+
+[node name="右後" type="Node2D" parent="." unique_id=804323251]
+position = Vector2(1598.0001, 1182.0001)
+rotation = -0.9339363
+script = ExtResource("4_7prei")
+weight = 0.5

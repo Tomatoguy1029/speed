@@ -1,19 +1,122 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://fcgonnnnpvv6"]
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_2vgpk"]
 [ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_mgob6"]
 [ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
 [ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
 [ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
 [ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
 [ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
+
+[sub_resource type="Resource" id="Resource_gibww"]
+script = ExtResource("9_mgob6")
+start = 300.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_2525774894323272944"
+display_name = "休憩"
+
+[sub_resource type="Resource" id="Resource_p4nfj"]
+script = ExtResource("9_mgob6")
+start = 320.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_6369425975374370843"
+display_name = "4回目の山"
+
+[sub_resource type="Resource" id="Resource_d6uyw"]
+script = ExtResource("9_mgob6")
+start = 425.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_5747225833786728851"
+display_name = "休憩"
+
+[sub_resource type="Resource" id="Resource_eal8u"]
+script = ExtResource("9_mgob6")
+start = 455.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"armored": 3.0,
+"battleship": 0.6,
+"darter": 3.0,
+"gunner": 2.0,
+"missile": 1.6,
+"splitter": 1.5,
+"swarm": 3.0,
+"titan": 2.0
+}
+id = &"phase_1030509691842008278"
+display_name = "ボス戦中"
+
+[sub_resource type="Resource" id="Resource_2vgpk"]
+script = ExtResource("10_gibww")
+type = &"bomber"
+points = PackedVector2Array(0, 0, 62, 35, 73, 12, 130, 12, 133, 17, 140, 18)
+
+[sub_resource type="Resource" id="Resource_mgob6"]
+script = ExtResource("10_gibww")
+type = &"hound"
+points = PackedVector2Array(0, 0, 11, 27, 61, 89, 62, 428, 63, 25, 75, 23, 77, 641, 77.5, 21.4, 89, 45, 91, 686, 93, 68, 104, 53, 106, 693, 108, 83, 120, 98, 121, 799, 123, 60, 130, 79)
+
+[sub_resource type="Resource" id="Resource_uudoi"]
+script = ExtResource("10_gibww")
+type = &"splitter"
+points = PackedVector2Array(0, 0, 37, 94, 64, 93, 82, 39, 130, 40, 131, 93, 140, 103, 141, 55)
 
 [resource]
 script = ExtResource("1")
 index = 3
 scene_path = "res://scenes/stages/stage_3.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
-time_limit = 900.0
-boss_id = &""
+phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
+enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
+zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
+track_names = PackedStringArray("やまねこ座", "ぎょしゃ座", "かじき座", "みなみのかんむり座", "ほうおう座")
 boss_enabled = false
+surge_phases = {
+"escape": false,
+"phase_1030509691842008278": false,
+"phase_2525774894323272944": false,
+"phase_5747225833786728851": false,
+"phase_6369425975374370843": false
+}
 legendary_module_id = &"legendary_keel"
