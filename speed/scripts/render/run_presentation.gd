@@ -100,6 +100,9 @@ var _equipment_visuals: Dictionary = {}
 ## 1回の敵描画で共有する数値だけ。Resource参照を持たず、パスの前後で破棄する。
 var _enemy_sprite_metrics: Dictionary = {}
 var _drawing_enemies := false
+var _hero_aura: MeshInstance2D
+var _hero_aura_material: ShaderMaterial
+var _field_boundary: DrawLayer
 
 func _ready() -> void:
 	state = run.state
@@ -120,6 +123,22 @@ func _ready() -> void:
 		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		world.add_child(layer)
 		_layers[name] = layer
+	_field_boundary = DrawLayer.new()
+	_field_boundary.show_behind_parent = true
+	_field_boundary.draw_fn = _draw_field_boundary
+	_layers.field.add_child(_field_boundary)
+	_hero_aura = MeshInstance2D.new()
+	_hero_aura.show_behind_parent = true
+	var aura: HeroAuraAssets = run.ctx.resources.resources.get("res://.content/hero_aura.res")
+	if aura == null and state.lab_mode:
+		aura = load("res://.content/hero_aura.res") as HeroAuraAssets
+		run.ctx.resources.provide("res://.content/hero_aura.res",aura)
+	assert(aura != null,"英雄の光雲の生成物が必要")
+	if aura != null:
+		_hero_aura.mesh = aura.mesh
+		_hero_aura_material = aura.material.duplicate() as ShaderMaterial
+		_hero_aura.material = _hero_aura_material
+	_layers.field.add_child(_hero_aura)
 	# 不透明な帯を合成してから一度だけ透過し、交差部分も同じ濃さにする。
 	_path_band_group = CanvasGroup.new()
 	_path_band_group.z_index = -1
@@ -351,6 +370,7 @@ func _process(delta: float) -> void:
 	_camera.position = cam_center + offset
 	_camera.zoom = Vector2(cam_zoom, cam_zoom)
 	pipeline.step(dt, _camera.position, cam_zoom)
+	_field_boundary.queue_redraw()
 	for layer in _layers.values():
 		layer.queue_redraw()
 	_lit_enemy_marks.queue_redraw()
@@ -646,11 +666,13 @@ func _draw_background(c: CanvasItem) -> void:
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
 
+func _draw_field_boundary(c: CanvasItem) -> void:
+	if run.field.battle_arenas.is_empty():
+		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
+
 func _draw_field(c: CanvasItem) -> void:
 	var f := run.field
 	var view := view_rect().grow(700.0)
-	if f.battle_arenas.is_empty():
-		c.draw_arc(Vector2.ZERO, cfg.field_radius, 0, TAU, 256, Color(1.0, 0.4, 0.4, 0.35), _px(2.0))
 	_draw_hero(c)
 	# ヘルクレス座の火の隕石：落ちてくる影と、燃える跡
 	for fall in run.heroes.behavior(&"hercules").falls:
@@ -683,6 +705,7 @@ func _draw_field(c: CanvasItem) -> void:
 
 ## 英雄の星座：全体から淡金色の光がにじみ、つないだ星と光線がさらに強く輝く。
 func _draw_hero(c: CanvasItem) -> void:
+	_hero_aura.hide()
 	var h := run.heroes
 	if h.hero == null or h.stars.is_empty():
 		return
@@ -705,16 +728,15 @@ func _draw_hero(c: CanvasItem) -> void:
 	var columns := ceili(radii.x * 2.0 / aura_pixel)
 	var rows := ceili(radii.y * 2.0 / aura_pixel)
 	var breath := 0.95 + 0.05 * sin(state.world_time * 0.8)
-	for row in rows:
-		for column in columns:
-			var at := center - radii + Vector2(column, row) * aura_pixel
-			var q := (at - center) / radii
-			var cloud := 0.78 + 0.22 * sin(q.x * 4.0 + q.y * 2.0) * cos(q.y * 5.0 - q.x)
-			var density := exp(-q.length_squared() * 2.8) * cloud
-			var alpha := floorf(density * 24.0) / 24.0 * 0.25 * breath
-			if alpha > 0.0:
-				c.draw_rect(Rect2(at.snapped(Vector2.ONE * aura_pixel), Vector2.ONE * aura_pixel),
-					Color(gold, alpha))
+	if _hero_aura_material != null:
+		_hero_aura.position = (center-radii).snapped(Vector2.ONE*aura_pixel)
+		_hero_aura.scale = Vector2(columns,rows)*aura_pixel
+		_hero_aura_material.set_shader_parameter("cell_count",Vector2(columns,rows))
+		_hero_aura_material.set_shader_parameter("radii",radii)
+		_hero_aura_material.set_shader_parameter("aura_center",center)
+		_hero_aura_material.set_shader_parameter("cell_size",aura_pixel)
+		_hero_aura_material.set_shader_parameter("breath",breath)
+		_hero_aura.show()
 	# 基本線は操作線と共通。光の広がりと芯を同じ経路に重ねて光線として見せる。
 	for n in h.lit.size():
 		var a := h.stars[links[n * 2]]

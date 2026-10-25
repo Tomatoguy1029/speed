@@ -27,14 +27,28 @@ func append(pos: Vector2, color: Color, n: int, dir: Vector2, speed: float, life
 	cursor = (cursor+skipped)%capacity
 	if n <= skipped: return
 	if _pending.is_empty(): _first = cursor
+	var at := _pending.size()
+	_pending.resize(at+(n-skipped)*FLOATS)
 	for _i in n-skipped:
 		var a := randf()*TAU
 		var s := speed*(0.3+randf())
 		var v := Vector2.from_angle(a)*s*0.6+dir*s*0.8
 		var l := life*(0.6+randf()*0.6)
-		_pending.append_array(PackedFloat32Array([pos.x,pos.y,v.x,v.y,l,l,size*(0.6+randf()*0.8),0.0,
-			color.r*1.6,color.g*1.6,color.b*1.6,1.0]))
+		_pending[at] = pos.x
+		_pending[at+1] = pos.y
+		_pending[at+2] = v.x
+		_pending[at+3] = v.y
+		_pending[at+4] = l
+		_pending[at+5] = l
+		_pending[at+6] = size*(0.6+randf()*0.8)
+		_pending[at+7] = 0.0
+		_pending[at+8] = color.r*1.6
+		_pending[at+9] = color.g*1.6
+		_pending[at+10] = color.b*1.6
+		_pending[at+11] = 1.0
+		at += FLOATS
 		cursor = (cursor+1)%capacity
+
 func take_frame() -> Dictionary:
 	var count := _pending.size()/FLOATS
 	if count > capacity:
