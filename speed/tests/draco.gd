@@ -102,6 +102,15 @@ func _ready() -> void:
 	sim.projectiles._update_hostile(1.0)
 	check(sim.projectiles.hostile_count() == 0, "通行を止める壁は敵弾も遮る")
 	sim.projectiles.release_hazard(wall)
+	check(actor.get("picaro") != null, "ピカロの生成と所有者を持つ")
+	if actor.get("picaro") != null:
+		for id in [&"biter",&"pump"]:
+			var row: int = actor.picaro.spawn_picaro(id,Vector2(500,300))
+			check(sim.enemies.table.def[row].behavior == sim.enemies.def_of(id).behavior, "ピカロは元の敵の行動を使う")
+			check(sim.enemies.table.def[row].params.get("picaro",false), "共通コズミック描画を指定する")
+			check(not sim.enemies.def_of(id).params.get("picaro",false), "元の敵定義を変更しない")
+		for frame in 150: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor.picaro.alive().size() == 2, "異なる既存敵のピカロを保持する")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

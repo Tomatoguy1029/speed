@@ -28,6 +28,8 @@ var state: RunState
 var cfg: GameConfig
 
 var _layers: Dictionary = {}
+var _picaro_sprites: Dictionary = {}
+var _picaro_material: ShaderMaterial
 var pipeline: RenderPipeline
 ## 形ごとのまとめた描画（敵・経験値の結晶）
 var _batches: Dictionary = {}
@@ -325,6 +327,7 @@ func _read_settings() -> void:
 func _process(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
+	_sync_picaro()
 	var phase := state.phase
 	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -815,6 +818,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		if t.def[i] != null and t.def[i].params.get("picaro",false): continue
 		var p := pos[i]
 		var type := t.type[i]
 		var visual := _visual_of(t, i)
@@ -1288,3 +1292,31 @@ static func warm_resources(parent: Node, scope: ContentResourceScope) -> void:
 	var viewport: Node = load("res://scripts/render/shader_warmup.gd").new()
 	parent.add_child(viewport)
 	viewport.prepare(scope)
+
+func _sync_picaro() -> void:
+	if _picaro_material == null:
+		_picaro_material = ShaderMaterial.new()
+		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
+	var t := run.enemies.table
+	var used := {}
+	for i in t.alive.size():
+		if t.alive[i]==0 or t.dead[i]!=0 or t.def[i]==null or not t.def[i].params.get("picaro",false): continue
+		var id := t.id[i]
+		used[id] = true
+		var source := StringName(t.def[i].params.source_type)
+		if not _picaro_sprites.has(id):
+			var sprite := Sprite2D.new()
+			sprite.texture = _enemy_texture(source)
+			sprite.material = _picaro_material
+			_layers.enemies.add_child(sprite)
+			_picaro_sprites[id] = sprite
+		var sprite: Sprite2D = _picaro_sprites[id]
+		sprite.position = t.pos[i]
+		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
+		var radius := enemy_sprite_radius(source,t.r[i])
+		if sprite.texture != null: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		sprite.modulate = Color(1,1,1,0.45 if t.guard[i]>0.0 else 1.0)
+	for id in _picaro_sprites.keys():
+		if not used.has(id):
+			_picaro_sprites[id].queue_free()
+			_picaro_sprites.erase(id)

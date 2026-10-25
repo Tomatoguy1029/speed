@@ -184,6 +184,11 @@ func apply_scaling(i: int, def: EnemyDef, opts := {}) -> void:
 
 ## 部位を1つ出し、親（行 i）に付ける。
 func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
+	if table.def[i] != null and table.def[i].params.get("picaro",false):
+		def = def.duplicate(true)
+		def.params.picaro = true
+		def.params.source_type = def.id
+		def.id = StringName("picaro_"+String(def.id))
 	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i], "attack_priority": table.attack_priority[i]})
 	table.parent[j] = i
 	table.parent_id[j] = table.id[i]

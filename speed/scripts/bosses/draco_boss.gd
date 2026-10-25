@@ -1,6 +1,7 @@
 ## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
 extends BossActor
 signal presentation_event(event: Dictionary)
+var picaro: RefCounted
 var phase := 1
 var mode: StringName = &"idle"
 var technique: StringName = &""
@@ -26,6 +27,7 @@ var _presentation: Node2D
 
 func _on_bound() -> void:
 	draws_self = true
+	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
 	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
 	add_child(_presentation)
 	_presentation.actor = self
@@ -93,6 +95,7 @@ func attack_playing() -> bool:
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
+	picaro.tick()
 	_update_closing_walls(dt)
 	elapsed += dt
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)

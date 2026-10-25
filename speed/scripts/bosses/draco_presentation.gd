@@ -38,3 +38,19 @@ func _draw() -> void:
 		for j in 12:
 			var at: Vector2 = actor.to_local(effect.pos) + Vector2.from_angle(j*TAU/12.0)*(float(effect.radius)+age*160.0)
 			draw_rect(Rect2(at.snapped(Vector2(3,3)),Vector2(6,6)),Color(0.75,0.65,0.55,1.0-age/0.6))
+
+	for member: Dictionary in actor.picaro.alive():
+		var age: float = actor.clock-float(member.born)
+		if age>1.4: continue
+		var center := actor.to_local(actor.table.pos[member.row])
+		var radius: float = actor.table.r[member.row]*1.5
+		var alpha := clampf((1.4-age)*2.0,0.0,1.0)
+		var membrane := PackedVector2Array()
+		for j in 49:
+			var angle := j*TAU/48.0
+			membrane.append(center+Vector2.from_angle(angle)*radius*(1.0+sin(angle*5.0+age*12.0)*0.1)*(1.0+maxf(0.0,age-0.8)))
+		draw_polyline(membrane,Color(0.5,0.3,1.0,alpha*0.6),4.0,false)
+		for j in 12:
+			var angle := j*TAU/12.0+age*6.0
+			var at := center+Vector2.from_angle(angle)*radius*maxf(0.1,1.5-age)
+			draw_line(at,at+Vector2.from_angle(angle+1.0)*12.0,Color(0.6,0.85,1.0,alpha),3.0)
