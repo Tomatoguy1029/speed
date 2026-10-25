@@ -120,7 +120,7 @@ python3 tools/generate_text.py --check
 "/Applications/Godot.app/Contents/MacOS/Godot" --headless --log-file /tmp/speed-stage15-acceptance.log --path speed res://tests/thrill_acceptance.tscn
 ```
 
-上記は既存のテスト入口。竜専用の自動テストは未接続であり、存在するものとして扱わない。全体テストは必要性と実行依頼を確認して使う。
+竜の戦闘は `tests/draco.tscn`、全技の中断は `tests/draco_interruptions.tscn`、螺旋のサイズと被弾は `tests/draco_spiral_scale.tscn`、弧の保存再読込は `tests/draco_editor_roundtrip.tscn`、両ステージの時間配分は `tests/stage15_timeline.tscn` を使う。`tests/draco_visual.tscn` は実GPUで各技と決着を確認する。全体テストは自動実装の承認に従って実行する。
 
 ## 6. プロジェクト構成
 
