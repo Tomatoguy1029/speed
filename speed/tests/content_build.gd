@@ -25,6 +25,11 @@ func _ready() -> void:
 		DirAccess.remove_absolute(output + "/dev/armor_phoenix.res")
 		check(not builder.is_current(output), "開発用の装甲領域の欠落を検出する")
 		check(builder.build_all(false, output) == OK and builder.is_current(output), "装甲領域を再生成する")
+		DirAccess.remove_absolute(output + "/hero_aura.res")
+		check(not builder.is_current(output), "英雄の光雲の生成物欠落を検出する")
+		check(builder.build_all(false, output) == OK and builder.is_current(output), "英雄の光雲を共通工程で再生成する")
+		var aura := load(output + "/hero_aura.res") as HeroAuraAssets
+		check(aura != null and aura.mesh != null and aura.material != null, "共通の光雲の形状とmaterialを保持する")
 		var before: String = builder.signature()
 		var probe := "res://assets/pixel/visual_signature_probe.png"
 		var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)

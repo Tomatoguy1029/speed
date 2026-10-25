@@ -8,6 +8,7 @@ extends TextureRect
 
 const MAX_SPARKS := 16384
 const FLOATS := 12  # pos2 vel2 life max size pad color4
+const EMISSION_BUFFER := preload("res://scripts/render/spark_emission_buffer.gd")
 
 var rd: RenderingDevice
 var _sim_shader: RID
@@ -19,9 +20,7 @@ var _image: RID
 var _sim_set: RID
 var _raster_set: RID
 var _image_size := Vector2i.ZERO
-var _cursor := 0
-var _pending := PackedFloat32Array()
-var _pending_start := 0
+var _emissions := EMISSION_BUFFER.new(MAX_SPARKS)
 var _tex := Texture2DRD.new()
 
 func available() -> bool:
@@ -96,30 +95,23 @@ func _ensure_image(size_px: Vector2i) -> void:
 	if old_image.is_valid():
 		rd.free_rid(old_image)
 
+## 同期的なイベント列で最低限出る粒数を先に渡す。
+func reserve_bursts(minimum: int) -> void:
+	if rd != null: _emissions.reserve(minimum)
+
 ## 火花を出す（次の step でまとめて GPU に送る）。
 func burst(pos: Vector2, color: Color, n: int, dir: Vector2, speed: float, life := 0.7, size := 4.0) -> void:
 	if rd == null:
 		return
-	if _pending.is_empty():
-		_pending_start = _cursor
-	for i in n:
-		var a := randf() * TAU
-		var s := speed * (0.3 + randf())
-		var v := Vector2.from_angle(a) * s * 0.6 + dir * s * 0.8
-		var l := life * (0.6 + randf() * 0.6)
-		_pending.append_array(PackedFloat32Array([pos.x, pos.y, v.x, v.y, l, l, size * (0.6 + randf() * 0.8), 0.0,
-			color.r * 1.6, color.g * 1.6, color.b * 1.6, 1.0]))
-		_cursor = (_cursor + 1) % MAX_SPARKS
+	_emissions.append(pos,color,n,dir,speed,life,size)
 
 ## 1フレームぶん進めて描く。dt は演出の時間（ポーズ中は 0）。
 func step(dt: float, view_center: Vector2, zoom: float) -> void:
 	if rd == null:
 		return
 	var size_px := Vector2i(get_viewport_rect().size)
-	var pending := _pending
-	var first := _pending_start
-	_pending = PackedFloat32Array()
-	RenderingServer.call_on_render_thread(_dispatch.bind(dt, view_center, zoom, size_px, pending, first))
+	var frame := _emissions.take_frame()
+	RenderingServer.call_on_render_thread(_dispatch.bind(dt, view_center, zoom, size_px, frame.data, frame.first))
 
 func _dispatch(dt: float, view_center: Vector2, zoom: float, size_px: Vector2i, pending: PackedFloat32Array, first: int) -> void:
 	_ensure_image(size_px)
@@ -173,6 +165,7 @@ func _dispatch(dt: float, view_center: Vector2, zoom: float, size_px: Vector2i, 
 	rd.compute_list_end()
 
 func _exit_tree() -> void:
+	_emissions.clear()
 	if rd == null:
 		return
 	var rids := [_raster_set, _sim_set, _image, _buffer, _raster_pipeline, _sim_pipeline, _raster_shader, _sim_shader]

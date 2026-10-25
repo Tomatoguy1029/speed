@@ -450,13 +450,16 @@ func _add_curve(type: StringName) -> void:
 	stage.set("zako_curves", after)
 	commit("雑魚の曲線を足す", [[stage, "zako_curves", before, after]])
 
-## 選んでいる雑魚の曲線を消す。
-func _remove_curve() -> void:
-	if stage == null or canvas.curve_selected < 0 or canvas.curve_selected >= curves().size():
+## 指定された曲線だけを配列から外す。敵一覧・他の曲線・クリップは保持する。
+func _remove_curve(curve: Resource) -> void:
+	if stage == null:
 		return
 	var before: Array = curves()
+	var index := before.find(curve)
+	if index < 0:
+		return
 	var after: Array = before.duplicate()
-	after.remove_at(canvas.curve_selected)
+	after.remove_at(index)
 	stage.set("zako_curves", after)
 	canvas.curve_selected = -1
 	canvas.point_selected = -1
