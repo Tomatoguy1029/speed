@@ -12,6 +12,8 @@
 
 [ext_resource type="PackedScene" path="res://data/formations/s5_early.tscn" id="early"]
 
+[ext_resource type="PackedScene" path="res://data/formations/s5_late.tscn" id="late"]
+
 [sub_resource type="Resource" id="Phase0"]
 
 script=ExtResource("phase")
@@ -404,6 +406,30 @@ interval=24.0
 
 attack_priority=1
 
+[sub_resource type="Resource" id="Clip8"]
+
+script=ExtResource("clip")
+
+label="山3"
+
+track=3
+
+types=Array[StringName]([&"cepheus",&"dolphin",&"crab"])
+
+formations=Array[PackedScene]([ExtResource("late")])
+
+layouts=Array[StringName]([&"s5_late/peak3"])
+
+time=195.0
+
+length=70.0
+
+groups=1
+
+interval=18.0
+
+attack_priority=1
+
 [resource]
 
 script=ExtResource("stage")
@@ -420,7 +446,7 @@ enemy_attack_values={"biter":0.1,"splitter":0.1,"bomber":0.3,"pump":1.0,"crab":1
 
 zako_curves=Array[SpawnCurve]([SubResource("Curve_biter"),SubResource("Curve_splitter"),SubResource("Curve_bomber")])
 
-clips=Array[SpawnClip]([SubResource("Clip0"),SubResource("Clip1"),SubResource("Clip2"),SubResource("Clip3"),SubResource("Clip4"),SubResource("Clip5"),SubResource("Clip6"),SubResource("Clip7")])
+clips=Array[SpawnClip]([SubResource("Clip0"),SubResource("Clip1"),SubResource("Clip2"),SubResource("Clip3"),SubResource("Clip4"),SubResource("Clip5"),SubResource("Clip6"),SubResource("Clip7"),SubResource("Clip8")])
 
 track_names=PackedStringArray("育成の強敵","山1・2","からす","大物の山")
 

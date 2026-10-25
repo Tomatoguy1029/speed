@@ -19,5 +19,6 @@ func _ready() -> void:
 	check(crow.size()==1 and crow[0].time==115.0 and crow[0].end_time()==480.0,"カラスは山2から育成を含め最後まで継続する")
 	check(s5.clips.any(func(c): return c.time==45.0 and &"cross" in c.types),"山1に線の攻撃を配置する")
 	check(s5.clips.any(func(c): return c.time==115.0 and &"auriga" in c.types),"山2に移動する残留攻撃を配置する")
+	check(s5.clips.any(func(c): return c.time==195.0 and &"cepheus" in c.types),"山3に王と軍勢を置く")
 	print("[stage15_timeline] failures=",failures)
 	get_tree().quit(1 if failures else 0)
