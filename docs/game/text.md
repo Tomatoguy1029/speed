@@ -788,7 +788,9 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bg.start | 開始地点へ | Go to start |
 | bg.focus | 選択を拡大 | Frame selection |
 | bg.guides | ガイド表示 | Show guides |
-| bg.help | 左ドラッグで配置を移動 · ホイールでズーム · 中央ドラッグで視点移動。座標はステージ開始地点を原点にします。 | Left-drag to move · Wheel to zoom · Middle-drag to pan. Coordinates are relative to the stage start. |
+| bg.parallax_preview | 視差プレビュー | Preview parallax |
+| bg.parallax | 移動倍率（0＝固定、1＝通常） | Movement ratio (0 = fixed, 1 = normal) |
+| bg.help | 左ドラッグで配置を移動 · ホイールでズーム · 中央ドラッグで視点移動。視差プレビュー中は中央ドラッグで背景の流れを確認できます。配置のドラッグはプレビューをOFFにしてください。座標はステージ開始地点を原点にします。 | Left-drag to move · Wheel to zoom · Middle-drag to pan. Preview parallax by panning; turn preview off to drag placements. Coordinates are relative to the stage start. |
 | bg.origin | 開始地点 (0, 0) | Start (0, 0) |
 | bg.properties | 選択した背景 | Selected background |
 | bg.x | 位置 X | Position X |

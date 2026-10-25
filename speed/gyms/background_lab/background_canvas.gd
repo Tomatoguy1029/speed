@@ -5,6 +5,7 @@ var editor
 var center := Vector2.ZERO
 var zoom := 0.65
 var guides := true
+var parallax_preview := false
 var _panning := false
 var _dragging := false
 var _grab := Vector2.ZERO
@@ -23,6 +24,9 @@ func screen(world: Vector2) -> Vector2:
 
 func world(point: Vector2) -> Vector2:
 	return (point - size * 0.5) / zoom + center
+
+func item_position(item: BackgroundPlacement) -> Vector2:
+	return item.position_at(center) if parallax_preview else item.offset
 
 func focus_item() -> void:
 	if editor.selected < 0:
@@ -57,7 +61,7 @@ func _gui_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_MIDDLE:
 			_panning = event.pressed
 			accept_event()
-		elif event.button_index == MOUSE_BUTTON_LEFT:
+		elif event.button_index == MOUSE_BUTTON_LEFT and not parallax_preview:
 			grab_focus()
 			if event.pressed:
 				var index := _hit(world(event.position))
@@ -109,7 +113,7 @@ func _draw() -> void:
 	for item: BackgroundPlacement in editor.items:
 		if item.texture == null: continue
 		var bounds := item.bounds()
-		draw_set_transform(screen(item.offset), deg_to_rad(item.rotation_degrees), Vector2.ONE * zoom * item.scale)
+		draw_set_transform(screen(item_position(item)), deg_to_rad(item.rotation_degrees), Vector2.ONE * zoom * item.scale)
 		draw_texture_rect_region(item.texture, Rect2(-bounds.size * 0.5, bounds.size), bounds, item.display_tint())
 	draw_set_transform(Vector2.ZERO)
 	if guides:
@@ -122,5 +126,5 @@ func _draw() -> void:
 		var half := item.bounds().size * item.scale * 0.5
 		var corners := PackedVector2Array()
 		for corner in [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y), Vector2(-half.x, -half.y)]:
-			corners.append(screen(item.offset + corner.rotated(deg_to_rad(item.rotation_degrees))))
+			corners.append(screen(item_position(item) + corner.rotated(deg_to_rad(item.rotation_degrees))))
 		draw_polyline(corners, Color("#71e4e0"), 2.0)
