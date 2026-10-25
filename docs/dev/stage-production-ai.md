@@ -305,7 +305,7 @@ Dolphin                         EnemyFormation：編成の根
 
 ### ボスの区間フロー・攻撃値・タイムライン
 
-共通の「ボス行動」画面は、うみへび座・いっかくじゅう座の区間フローと技を編集する。概要は[制作ガイド5.5](stage-production.md#55-ボス行動を調整する)。データの役割・生成契約のSSOTは[設計書6.1](../architecture.md#61-敵とボスの-ai)、個別の技・形態・欠員・演出は[ヒュドラ](../game/bosses/hydra.md)・[いっかくじゅう座](../game/bosses/monoceros.md)の仕様を読む。[りゅう座](../game/bosses/draco.md)など、画面の選択肢にないボスへ同じ編集経路を適用済みと案内しない。
+共通の「ボス行動」画面は、うみへび座・いっかくじゅう座・りゅう座の区間フローと技を編集する。概要は[制作ガイド5.5](stage-production.md#55-ボス行動を調整する)。データの役割・生成契約のSSOTは[設計書6.1](../architecture.md#61-敵とボスの-ai)、個別の技・形態・欠員・演出は[ヒュドラ](../game/bosses/hydra.md)・[いっかくじゅう座](../game/bosses/monoceros.md)・[りゅう座](../game/bosses/draco.md)の仕様を読む。
 
 #### スクリプトの入口と追加実装の判断
 
@@ -322,7 +322,8 @@ Dolphin                         EnemyFormation：編成の根
 | `scripts/bosses/hydra_techniques.gd` | 海蛇の連携技・大技の動作。曲線ビーム、渦と瓦礫の連携など |
 | `scripts/bosses/hydra_boss.gd` | 海蛇の技開始・終了・成立判定、Timelineとの接続、首の状態、成長・分離・護衛。上記の技処理を呼ぶ本体 |
 | `scripts/bosses/hydra_grid.gd`・`hydra_snake_motion.gd` | 海蛇の格子配置・蛇の移動。大技や分離後の具体的な位置制御から呼び出しを追う |
-| `scripts/bosses/flow/single_actor_adapter.gd` | 1体ボス用の候補・開始・完了窓口。役者のメソッド群を呼ぶ。一角獣が利用する |
+| `scripts/bosses/flow/single_actor_adapter.gd` | 1体ボス用の候補・開始・完了窓口。役者のメソッド群を呼ぶ。一角獣と竜が利用する |
+| `scripts/bosses/draco_boss.gd`・`draco_*.gd` | 竜の全身命中先、HP段階、技のdriver、ピカロの生成・担当、登場・最終入力・決着。吸引の弧は技内の `DracoExhaleArc` を編集し、正規生成した新しい試遊で確認する |
 | `scripts/bosses/monoceros_boss.gd` | 一角獣の技ごとの制御と全体制御。成立判定、照準、突進、攻撃判定、終了、形態変更 |
 | `scripts/data_types/boss_technique.gd` | 技ID・種別・公開性能値。海蛇は `scripts/bosses/hydra_technique.gd` の派生型も使う |
 | `tools/editor/boss_flow/editor.gd`・`range_preview.gd` | 調整項目の表示・保存・試遊と範囲図。公開値を増やす際の表示名・単位・図の対応 |
@@ -445,7 +446,7 @@ sequenceDiagram
 
 #### 編集元と適用範囲
 
-以下は `speed/` 内のパス。`<boss>` は `hydra` または `monoceros`。
+以下は `speed/` 内のパス。`<boss>` は `hydra`・`monoceros`・`draco`。
 
 | データ | 保存する内容 | 実装の確認先 |
 |---|---|---|

@@ -1,0 +1,8 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/draco_spiral.gd" id="2"]
+[resource]
+script = ExtResource("1")
+technique = &"spiral"
+category = &"major"
+parameters = {"driver": ExtResource("2"), "warn": 1.0, "active": 6.0, "recover": 1.5, "damage": 35.0, "reach": 2000.0, "width": 154.0, "radius_factor": 0.78, "body_ratio": 0.14, "head_scale": 2.0, "coil_turns": 0.75, "first_lap": 1.0, "second_lap": 1.6, "pause": 1.0, "shrink_time": 2.0}

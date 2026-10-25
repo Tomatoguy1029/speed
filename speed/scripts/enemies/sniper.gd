@@ -190,17 +190,7 @@ func _cast_telescope(i: int, target_only := false) -> void:
 		last = first + 2
 	for n in range(first, last):
 		var v := Vector2.from_angle(t.facing[i] - half + 2.0 * half * n / float(TELE_RAYS - 1))
-		var reach := length
-		for blk in candidates:
-			var c := Vector2(blk.x, blk.y)
-			var r := blk.z
-			var along := c.dot(v)
-			if along < -r:
-				continue
-			var d2 := c.length_squared() - along * along
-			if d2 > r * r:
-				continue
-			reach = minf(reach, maxf(0.0, along - sqrt(r * r - d2)))
+		var reach := preload("res://scripts/common/beam_occlusion.gd").reach(v,length,candidates)
 		rays[n] = reach
 	_tele_rays[t.id[i]] = rays
 

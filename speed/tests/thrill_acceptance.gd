@@ -28,6 +28,7 @@ func _ready() -> void:
 	var save_script: Script = SaveManager.get_script()
 	SaveManager.set_script(MemorySave)
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	SaveManager.settings = settings
 	await _test_debug_stage_selection()
 	await _start(4)
@@ -66,10 +67,17 @@ func _ready() -> void:
 	_test_hydra_fire()
 	await _close()
 	await _test_app_flow()
+	for player: AudioStreamPlayer in AudioManager._players:
+		player.stop()
+		player.stream=null
+	await get_tree().process_frame
+	await get_tree().process_frame
 	SaveManager.set_script(save_script)
 	SaveManager.data = saved_data
 	SaveManager.settings = settings
 	print("[acceptance] passed=%d failed=%d" % [passed, failed])
+	# 音声スレッドが停止要求を消費してから、実行体を終了する。
+	await get_tree().create_timer(maxf(0.05,AudioServer.get_output_latency()*2.0)).timeout
 	get_tree().quit(1 if failed else 0)
 
 func _test_debug_stage_selection() -> void:
@@ -97,7 +105,7 @@ func _test_debug_stage_selection() -> void:
 			_check(initial_run.state.stage.index == stage and initial_run.state.time == 0.0 and initial_run.state.phase == RunState.Phase.LEVELUP, "ステージ選択：ステージ%dを0秒の武器選択から開始する" % stage)
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
-			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &"draco" if stage==5 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
 			GameManager.abort_run()
 			await _settle_screen()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
@@ -105,10 +113,12 @@ func _test_debug_stage_selection() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 
 func _start(stage: int) -> void:
 	ContentManager.reset_runtime()
 	SaveManager.data = SaveManager.default_data()
+	SaveManager.data.intro_seen = true
 	GameManager.run_stage = stage
 	GameManager.run_endless = false
 	scene = RunManager.create_run()
@@ -122,6 +132,8 @@ func _start(stage: int) -> void:
 	add_child(scene)
 	if scene.sim.state == null: await scene.started
 	run = scene.sim
+	for path: String in ContentManager.visual_index.look_paths.values():
+		run.ctx.resources.provide(path, load(path))
 	run.state.stage = run.state.stage.duplicate()
 	scene.auto_step = false
 	run.input.set_process_input(false)
@@ -457,6 +469,9 @@ func _test_enemy_gates() -> void:
 		"三角：崩壊後は中心と全頂点の行を回収する")
 	_clear()
 	var crab := _enemy(&"crab", at)
+	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "かに座は通常時も正面から攻撃できる")
+	_clear()
+	crab=_enemy(&"crab",at)
 	t.mode[crab] = EnemyTable.Mode.RECOVER
 	_check(not _ram(at, Vector2.LEFT) and t.dead[crab] != 0, "タスク11：かに座の挟んだ直後は正面から倒せる")
 	_clear()
@@ -932,8 +947,10 @@ func _test_app_flow() -> void:
 		run.enemies.cleanup()
 		await _play_steps(20, 0.05)
 		var replenished := false
+		var spawn_target: Dictionary=run.spawn.target()
+		var automatic_types: Array=spawn_target.per_type.keys() if spawn_target.has("per_type") else spawn_target.phase.mix.keys()
 		for row in enemies.alive.size():
-			if enemies.alive[row] and not enemies.dead[row] and not enemies.is_boss[row] and enemies.parent[row] < 0 and enemies.meteor_index[row] < 0:
+			if enemies.alive[row] and not enemies.dead[row] and not enemies.is_boss[row] and enemies.parent[row] < 0 and enemies.meteor_index[row] < 0 and (enemies.type[row] in automatic_types or String(enemies.type[row]) in automatic_types):
 				replenished = true
 		_check(replenished == (float(run.spawn.target().pop) > 0.0), "通し確認：ステージ%dのボス戦は設定した出現目標に従う" % stage)
 		for attempt in 100:
@@ -944,6 +961,14 @@ func _test_app_flow() -> void:
 			# 攻めどきと当たりの確認用に、調整機能と同じ実行時の強さを使う。
 			run.state.stats.attack_mult = 1000.0
 			var boss = run.bosses.actor
+			if boss.def.id==&"draco" and boss.mode==&"finale":
+				var it:=Intent.new()
+				if boss.finale.stage==&"input":
+					it.press=not boss.finale.began;it.has_cursor=true;it.pen=run.state.ship_pos;it.pen_release=boss.finale.began
+				run.input_source=func(): return it
+				_play_steps(40,0.05)
+				run.input_source=Callable()
+				continue
 			var target: Vector2 = run.enemies.table.pos[boss.body]
 			if boss.def.id == &"hydra":
 				if boss.immortal_row >= 0:

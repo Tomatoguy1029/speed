@@ -151,6 +151,8 @@ func _run() -> void:
 	await settle()
 	check(canvas.GUTTER >= 90 * canvas.ui and canvas.size.x - canvas.GUTTER >= 159 * canvas.ui, "Window resize preserves both minimum widths")
 	await drag_width(110 * canvas.ui)
+	# 幅変更中のパンで画面外へ出た点を対象にせず、座標の照合範囲をそろえる。
+	canvas.fit()
 	var c: Resource = stage.zako_curves[0]
 	canvas.get_parent().scroll_vertical = 0
 	await settle()

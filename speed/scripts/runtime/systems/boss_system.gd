@@ -60,6 +60,14 @@ func actor_for_row(row: int) -> BossActor:
 			return owner
 	return null
 
+## 当たり判定の行を、ダメージと一撃内の重複管理に使う本体へ解決する。
+func damage_target(row: int) -> int:
+	var owner := actor_for_row(row)
+	if owner == null:
+		var parent := enemies.table.parent[row]
+		if enemies.is_same(parent, enemies.table.parent_id[row]): owner = actor_for_row(parent)
+	return owner.damage_target(row) if owner != null else row
+
 ## 敵の行を解放する前に、今のボスの撃破済みの部位を役者へ渡す。
 func part_defeated(row: int) -> void:
 	var t := enemies.table
@@ -111,7 +119,7 @@ func body_damaged(row: int) -> void:
 ## ボスの HP が0になった（CombatSystem から呼ばれる）。撃破の演出は RunManager が始める。
 func on_boss_defeated(i: int, opts: Dictionary) -> void:
 	var owner := actor_for_row(i)
-	if owner != null and opts.get("cause", &"") != &"debug" and owner.handle_body_defeat(opts):
+	if owner != null and opts.get("cause", &"") != &"debug" and not opts.get("finale_complete",false) and owner.handle_body_defeat(opts):
 		return
 	if state.lab_mode:
 		if owner != null:
@@ -150,3 +158,10 @@ func admit(key: String, cats: Array, row: int, duration: float) -> bool:
 	if projectiles.director == null or projectiles.director.formation_mode:
 		return true
 	return projectiles.director.request(key, cats, row, enemies.table.id[row], duration, 1.5)
+
+func contains_target(row: int, point: Vector2, radius: float) -> bool:
+	var owner := actor_for_row(row)
+	if owner!=null:return owner.contains_hit(point,radius)
+	for candidate in actors:
+		if candidate.contains_additional_target(row,point,radius):return true
+	return point.distance_to(enemies.table.pos[row])<=enemies.table.r[row]+radius
