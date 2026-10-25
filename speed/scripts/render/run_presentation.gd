@@ -824,7 +824,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
-		if t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
+		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
 		if visual != null and visual.draw_body(c, t, i, p):
 			continue
