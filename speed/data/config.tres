@@ -96,7 +96,6 @@ enemy_hp_mult = 1.0
 enemy_armor_mult = 1.0
 density_mult = 5.0
 enemy_face_move = 0.7
-enemy_split_overflow = 0.1
 spawn_margin = 70.0
 spawn_refill_time = 1.0
 spawn_recycle_scale = 1.6

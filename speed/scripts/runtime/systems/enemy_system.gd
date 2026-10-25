@@ -94,7 +94,7 @@ var slots: RowSlots
 var beh_rows: Array[PackedInt32Array] = []
 ## 撃破済みで、その回の終わりに空きへ戻す行
 var _dead_rows := PackedInt32Array()
-## 分裂などで、更新の終わりに個体数の上限の範囲で出す敵：[def, pos, opts]
+## 行動が予約した生成。更新の終わりにすべて出す：[def, pos, opts]
 var _new: Array = []
 var _next_id := 1
 ## 画面から遠い敵の判断を間引く回数（LOD 回に1回、まとめた時間で判断する。移動は毎回）と、更新の通し番号
@@ -119,7 +119,8 @@ func setup(context: RunContext) -> void:
 # ── 行の出し入れ ──────────────────────────────────────────────────
 
 ## 敵を1体出し、その行番号を返す。opts：elite、size、facing、spin、meteor_index、vel、hit_cd。
-## 仕様書 11.2 の補正をかける。
+## 仕様書 11.2 の補正をかける。行を作る境界であり、出現可否と固有数は呼び出し元が決める。
+## 通常補充の上限は SpawnSystem、召喚・分裂・構成員の数は各行動が管理する。
 func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	if stage_tuning.has(String(def.id)): def = def_of(def.id)
 	var i := slots.take()
@@ -289,7 +290,8 @@ func _reset_row(i: int) -> void:
 	t.parent_id[i] = -1
 	t.parts[i] = PackedInt32Array()
 
-## 分裂などで増える敵。更新の終わりに、個体数の上限の範囲で出す（仕様書 11.3）。
+## 行動に必要な分裂などを予約する。即時生成と同じく通常補充の上限を適用せず、更新の終わりに出す。
+## 数・間隔は予約する行動が制限する。撃破時の生成は親の行の寿命から独立し、clear_all() で破棄する。
 func spawn_later(def: EnemyDef, pos: Vector2, opts := {}) -> void:
 	_new.append([def, pos, opts])
 
@@ -548,18 +550,10 @@ func on_enemy_death(i: int, atk: float) -> void:
 			ProjectileSystem.HazardStyle.BLAST, t.color[i], atk * float(dp.chain_power))
 	projectiles.lab_context = prior_context
 
-## 分裂体は個体数の上限を超えて出し、ほかの増殖は上限の範囲で出す（仕様書 11.3）。
+## 行動が確定した生成を実行する（仕様書 11.3）。敵IDによらず即時生成と同じ方針を使う。
 func _flush_new() -> void:
-	if _new.is_empty():
-		return
-	var limit := ceili(ctx.spawn.target().pop * (1.0 + cfg.enemy_split_overflow))
-	var population := ctx.spawn.count_population(false)
 	for n in _new:
-		var def: EnemyDef = n[0]
-		if population >= limit and def.id != &"splitling":
-			continue
 		spawn(n[0], n[1], n[2])
-		population += 1
 	_new.clear()
 
 ## 撃破済みの行を空きに戻す。

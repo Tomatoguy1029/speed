@@ -117,9 +117,15 @@ func spawner_tick(_real_dt: float, world_dt: float) -> void:
 	while _spawn_acc >= 1.0 and alive_n < t.pop and raw_n < raw_limit and attempts < cap:
 		attempts += 1
 		_spawn_acc -= 1.0
+		var before := enemies.count()
 		if _spawn_one(t):
-			alive_n += 1
-			raw_n += 1
+			if enemies.count() - before > 1:
+				# 群れ・部位を成立させてから、増えた全員を次の補充判断へ含める。
+				alive_n = _survey(t.pop)
+				raw_n = _survey_raw
+			else:
+				alive_n += 1
+				raw_n += 1
 	if phase.wave_interval > 0.0:
 		_wave_t += world_dt
 		if _wave_t >= phase.wave_interval:
@@ -438,9 +444,11 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 	var def := def_of(t.phase.wave_type)
 	if def == null:
 		return
+	var before := enemies.count()
 	var half := state.view_half
 	if state.rng.randf() < 0.5:
 		for k in n:
+			if enemies.count() - before >= remaining: break
 			var a := (k + state.rng.randf()) / n * TAU
 			var u := Vector2(cos(a), sin(a))
 			var d := minf((half.x + cfg.spawn_margin) / maxf(0.0001, absf(u.x)), (half.y + cfg.spawn_margin) / maxf(0.0001, absf(u.y))) + state.rng.randf() * 90.0
@@ -449,6 +457,7 @@ func _spawn_wave(t: Dictionary, remaining: float) -> void:
 		var a := state.rng.randf() * TAU
 		var u := Vector2(cos(a), sin(a))
 		for k in n:
+			if enemies.count() - before >= remaining: break
 			var d := minf(half.x / maxf(0.0001, absf(u.x)), half.y / maxf(0.0001, absf(u.y))) + cfg.spawn_margin + k * 12.0
 			var off := (state.rng.randf() - 0.5) * 120.0
 			spawn(def, state.ship_pos + u * d + Vector2(-u.y, u.x) * off, {"facing": a + PI})

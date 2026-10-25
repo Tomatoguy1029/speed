@@ -843,7 +843,7 @@ demo のどのファイルが、仕様書のどこにあたり、本番のどこ
 
 | 項目 | 管理方法と参照先 |
 |---|---|
-| 敵 | 通常出現はステージの目標数と `config.spawn_total_cap`、分裂は目標数 ×（1 ＋ `config.enemy_split_overflow`）で管理する。[仕様書11章](spec.md#11-敵) |
+| 敵 | `SpawnSystem` が通常補充・波状出現の数とクリップの制限を管理する。`EnemySystem.spawn()`・`spawn_part()` は行を生成し、`spawn_later()` は行動が確定した生成を更新末尾に実行する。各行動が固有数・間隔を制限し、`RowSlots` が空き行を再利用・拡張する。予約は確定時の定義・位置・指定をラン内で保持し、実行後または全消去時に解放する。[生成の共通規則](spec.md#113-出現と補充) |
 | 経験値の結晶 | 個数が `config.gem_max` を超えた状態で追加すると、最古の結晶を新しい結晶へまとめる。[仕様書10章](spec.md#10-ドロップと回収) |
 | 機雷 | [W07_mines.tres](../speed/data/weapons/W07_mines.tres) の `params.max` まで追加する |
 | 破片の光の跡 | 1つの破片につき `config.corpse_trail_points` 点まで保持し、超えた最古点を除く。[仕様書16章](spec.md#16-演出) |
