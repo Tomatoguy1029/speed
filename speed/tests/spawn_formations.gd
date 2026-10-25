@@ -31,6 +31,7 @@ func _ready() -> void:
 	_check_clips(run, scene)
 	_check_budget(run)
 	_check_curves(run)
+	_check_bonus(run)
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[spawn_formations] passed=%d failed=%d" % [passed, failed])
@@ -243,3 +244,57 @@ func _check_curves(run: RunSimulation) -> void:
 func _tick_clip(run: RunSimulation, source: SpawnClip) -> void:
 	run.state.stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(source)]
 	run.spawn._tick_clips()
+
+func _check_bonus(run: RunSimulation) -> void:
+	var stage := run.state.stage.duplicate() as RuntimeStage
+	var phase := PhaseDef.new()
+	phase.pop_from = 6.0
+	phase.pop_to = 6.0
+	phase.rate = 10.0
+	phase.wave_interval = 0.1
+	phase.wave_type = &"ruler"
+	stage.phases = [phase]
+	stage.clips.clear()
+	var curves: Array[SpawnCurve] = []
+	for entry in [[&"biter", 3.0], [&"pulser", 1.0], [&"ruler", 20.0]]:
+		var curve := SpawnCurve.new()
+		curve.type = entry[0]
+		curve.points = PackedVector2Array([Vector2(0.0, entry[1])])
+		curves.append(curve)
+	stage.zako_curves = curves.duplicate()
+	var clip := SpawnClip.new()
+	clip.types = [&"aquarius"]
+	clip.formations = [load("res://data/formations/aquarius_solo.tscn")]
+	clip.length = 30.0
+	stage.clips = [load("res://tools/content/build_runtime_stage.gd").clip(clip)]
+	run.state.stage = stage
+	run.state.time = 0.0
+	run.state.bonus_t = run.cfg.bonus_time
+	run.enemies.clear_all()
+	run.spawn._clip_groups.clear()
+	run.spawn._clip_next.clear()
+	var t := run.spawn.target()
+	check(t.has("per_type") and not t.per_type.has(&"ruler"), "ボーナスは曲線の雑魚・硬めだけを候補にする")
+	if t.has("per_type"):
+		check(is_equal_approx(float(t.per_type.get(&"biter", 0.0)), t.pop * 0.75) \
+			and is_equal_approx(float(t.per_type.get(&"pulser", 0.0)), t.pop * 0.25), "ボーナス人数へ曲線の相対配分を引き継ぐ")
+	for step in 10: run.spawn.spawner_tick(0.1, 0.1)
+	var counts := {}
+	for rows in run.enemies.beh_rows:
+		for row in rows:
+			if not run.enemies.table.dead[row]: counts[run.enemies.table.type[row]] = true
+	check(counts.has(&"biter") and counts.has(&"pulser") and counts.size() == 2, "空mixでも対象の敵が出て、強敵の波・クリップは出ない")
+	check(run.spawn._clip_groups.is_empty(), "ボーナス中は強敵クリップを補充しない")
+	stage.zako_curves.clear()
+	phase.mix = {&"biter": 3.0, &"pulser": 1.0, &"ruler": 100.0}
+	t = run.spawn.target()
+	check(t.has("per_type") and t.per_type.has(&"biter") and t.per_type.has(&"pulser") and not t.per_type.has(&"ruler"),
+		"従来mix方式も同じボーナス規則を使う")
+	phase.mix.clear()
+	run.enemies.clear_all()
+	for step in 3: run.spawn.spawner_tick(0.1, 0.1)
+	check(run.enemies.count() == 0 and run.spawn._pick_type(phase, 0.0) == &"", "候補ゼロは安全に補充を止め、別の敵へ置換しない")
+	run.state.bonus_t = 0.0
+	stage.zako_curves = curves
+	t = run.spawn.target()
+	check(t.has("per_type") and is_equal_approx(float(t.per_type.get(&"ruler", 0.0)), 20.0), "ボーナス終了後は通常の曲線目標へ戻る")
