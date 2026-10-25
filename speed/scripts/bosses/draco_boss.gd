@@ -1,6 +1,7 @@
 ## 竜の本体。候補選択は共通フロー、各技は開始・更新・取消の契約で接続する。
 extends BossActor
 signal presentation_event(event: Dictionary)
+var finale: RefCounted
 var cycle: RefCounted
 var picaro: RefCounted
 var phase := 1
@@ -30,6 +31,7 @@ var _presentation: Node2D
 
 func _on_bound() -> void:
 	draws_self = true
+	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
 	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
 	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
 	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
@@ -75,6 +77,7 @@ func damage_target(row: int) -> int:
 	return int(clone_damage_rows[row]) if clone_damage_rows.has(row) else (body if row == body or row in body_rows else row)
 
 func _exit_tree() -> void:
+	if finale != null: finale.dispose()
 	if cycle != null: cycle.cancel()
 	if picaro != null: picaro.clear()
 	for j in body_rows.size():
@@ -144,8 +147,10 @@ func cancel_attack() -> void:
 	elapsed = 0.0
 
 func handle_body_defeat(_opts: Dictionary) -> bool:
-	cancel_attack()
-	return false
+	if mode != &"finale": finale.begin()
+	return true
+func advance_finale(real_dt: float, intent: Intent) -> void:
+	finale.advance(real_dt,intent)
 
 func selection_blocked() -> bool:
 	return not body_alive() or mode in [&"transition", &"finale", &"deep"]

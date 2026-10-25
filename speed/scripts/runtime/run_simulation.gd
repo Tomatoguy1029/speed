@@ -227,6 +227,10 @@ func _leave_bonus() -> void:
 func _play_tick(real_dt: float) -> void:
 	state.sim_time += real_dt
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
+	if bosses.actor != null and bosses.actor.get("mode")==&"finale":
+		bosses.actor.advance_finale(real_dt,it)
+		_check_end()
+		return
 	if input != null:
 		input.drawing = state.drawing
 	if state.steering_locked: it = Intent.new()
@@ -368,6 +372,7 @@ func _view_size() -> Vector2:
 	return view_size_source.call() if view_size_source.is_valid() else Vector2(1280, 720)
 
 func _update_camera(real_dt: float) -> void:
+	if state.cinematic_camera: return
 	var size := _view_size()
 	var zoom_t := _base_zoom()
 	if not _cam_ready:

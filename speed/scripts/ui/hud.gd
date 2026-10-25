@@ -466,7 +466,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
 		return
-	var key := str(run.state.weapons) + str(run.state.traits)
+	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules)
 	if key == _loadout_key:
 		return
 	_loadout_key = key
@@ -480,6 +480,8 @@ func _refresh_loadout_icons() -> void:
 			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
 			index += 1
 		row += 1
+	for j in run.state.final_modules.size():
+		_add_icon(_loadout_icons,ContentManager.catalog.find(&"legendary_modules",run.state.final_modules[j]),Rect2(9+j*23,294,17,17))
 
 # ── 3択 ──────────────────────────────────────────────────────────
 

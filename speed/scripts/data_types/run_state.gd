@@ -18,6 +18,9 @@ var lab_mode := false
 var controls_locked := false
 var steering_locked := false
 var cinematic_bars := 0.0
+var cinematic_camera := false
+var final_modules: Array[StringName] = []
+var draco_finish_done := false
 var sim_time := 0.0
 var meta_override: Dictionary = {}
 

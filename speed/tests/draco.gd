@@ -166,6 +166,13 @@ func _ready() -> void:
 		check(not sim.state.boss_dead, "段階移行は最終勝利を通知しない")
 		for frame in 1200: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(actor.mode == &"idle" and sim.enemies.table.guard[actor.body] <= 0.0, "移行後に攻撃と被弾を再開できる")
+	check(actor.get("finale") != null, "HP0を専用の最終決着へ接続する")
+	if actor.get("finale") != null:
+		sim.combat.damage_enemy(actor.body,1.0e6,{"cause":&"shot"})
+		check(actor.mode==&"finale" and not sim.state.boss_dead, "核解放前に勝利を通知しない")
+		for frame in 720: actor.advance_finale(1.0/120.0,Intent.new())
+		check(actor.finale.stage==&"input", "解放と合体から自由描画へ進む")
+		check(sim.state.final_modules.size()==4, "四つの伝説モジュールを武器欄へ渡す")
 	session.free()
 	print("[draco] failures=",failed)
 	get_tree().quit(1 if failed else 0)

@@ -80,3 +80,16 @@ func _draw() -> void:
 			var angle := j*2.399963
 			var at := mouth+Vector2.from_angle(angle)*float(actor.rule().pull_range)*(1.0-k)
 			draw_line(at,at+(mouth-at).normalized()*25.0,Color(0.6,0.5,1.0,k*0.6),3.0)
+
+	if actor.finale.stage in [&"release",&"combine",&"pose",&"input"]:
+		var at := actor.to_local(actor.finale.core)
+		var bear := PackedVector2Array()
+		for point in actor.finale.BEAR: bear.append(at+point)
+		draw_polyline(bear,Color("#e6eeff"),3.0,false)
+		for point in bear: draw_circle(point,7.0,Color("#eefaff"))
+		draw_circle(bear[0],12.0,Color.WHITE)
+		if actor.finale.stage == &"combine":
+			for j in 4:
+				var from := at+Vector2.from_angle(j*TAU/4.0)*250.0
+				var position: Vector2=from.lerp(actor.to_local(actor.run_state.ship_pos),clampf(actor.finale.time/2.0,0.0,1.0))
+				draw_rect(Rect2(position-Vector2(12,8),Vector2(24,16)),Color("#d3c2ff"))
