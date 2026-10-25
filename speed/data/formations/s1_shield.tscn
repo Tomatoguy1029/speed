@@ -1,55 +1,54 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://7f0mms4dx4xw"]
 
-[ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="Stage1Shield" type="Node2D"]
+[node name="Stage1Shield" type="Node2D" unique_id=815324822]
 script = ExtResource("1")
 types = Array[StringName]([&"shield"])
 
-[node name="単体" type="Node2D" parent="."]
+[node name="単体" type="Node2D" parent="." unique_id=1249761569]
 position = Vector2(-2400, 0)
 script = ExtResource("2")
-weight = 1.0
 
-[node name="Shield1" type="Node2D" parent="単体"]
-position = Vector2(0, 0)
+[node name="Shield1" type="Node2D" parent="単体" unique_id=525278094]
 script = ExtResource("3")
 enemy = &"shield"
 
-[node name="二体並び" type="Node2D" parent="."]
+[node name="二体並び" type="Node2D" parent="." unique_id=1226864274]
 position = Vector2(-2400, 450)
 script = ExtResource("2")
 weight = 1.5
 
-[node name="Shield1" type="Node2D" parent="二体並び"]
+[node name="Shield1" type="Node2D" parent="二体並び" unique_id=2109567657]
 position = Vector2(-150, 0)
 script = ExtResource("3")
 enemy = &"shield"
 
-[node name="Shield2" type="Node2D" parent="二体並び"]
+[node name="Shield2" type="Node2D" parent="二体並び" unique_id=21047680]
 position = Vector2(150, 0)
 script = ExtResource("3")
 enemy = &"shield"
 
-[node name="正面" type="Node2D" parent="."]
+[node name="正面" type="Node2D" parent="." unique_id=1162836898]
 position = Vector2(0, -1900)
+rotation = 3.1415927
 script = ExtResource("4")
 weight = 2.0
 
-[node name="左前" type="Node2D" parent="."]
+[node name="左前" type="Node2D" parent="." unique_id=1145984439]
 position = Vector2(-1520, -1140)
+rotation = 2.2142975
 script = ExtResource("4")
-weight = 1.0
 
-[node name="右前" type="Node2D" parent="."]
+[node name="右前" type="Node2D" parent="." unique_id=1178141439]
 position = Vector2(1520, -1140)
+rotation = 4.0688877
 script = ExtResource("4")
-weight = 1.0
 
-[node name="後ろ" type="Node2D" parent="."]
+[node name="後ろ" type="Node2D" parent="." unique_id=323508321]
 position = Vector2(0, 1900)
 script = ExtResource("4")
 weight = 0.5

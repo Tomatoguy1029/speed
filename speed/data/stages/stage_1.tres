@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://data/formations/s1_marlin.tscn" id="marlin"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_pump.tscn" id="pump"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_shield.tscn" id="shield"]
+[ext_resource type="PackedScene" uid="uid://7f0mms4dx4xw" path="res://data/formations/s1_shield.tscn" id="shield"]
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_triangle.tscn" id="triangle"]
 
