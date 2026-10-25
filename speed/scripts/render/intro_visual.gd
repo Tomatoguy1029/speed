@@ -51,12 +51,16 @@ func _formation(at: Vector2, progress: float) -> void:
 		var angle: float = float(i) * 2.399963 + intro.beat_time * 0.18 * (1.0 - gather)
 		var initial := Vector2.from_angle(angle) * (95.0 + float(i % 5) * 13.0)
 		var settled := Vector2.from_angle(float(i) * 2.399963) * (3.0 + float(i % 4) * 3.0)
-		var center := at + initial.lerp(settled, gather)
+		var center := (at + initial.lerp(settled, gather)).snapped(Vector2(2,2))
 		var scale := 0.65 + float(i % 3) * 0.16
+		if progress>0.5 and progress<0.85: draw_line(center,at,Color(0.65,0.75,1.0,(1.0-enemy_alpha)*0.12),2.0)
 		var piece := PackedVector2Array([Vector2(-6, -4), Vector2(5, -5), Vector2(7, 5), Vector2(-3, 7)])
 		for j in piece.size():
 			piece[j] = center + piece[j].rotated(angle) * scale
 		draw_colored_polygon(piece, Color(0.35 + float(i % 3) * 0.045, 0.42, 0.47, rubble_alpha))
+	if progress>0.55 and progress<0.95:
+		var pulse := sin((progress-0.55)/0.4*PI)
+		draw_arc(at,18.0+pulse*25.0,0,TAU,24,Color(0.8,0.9,1.0,pulse*0.8),3.0)
 	# 破片が核の周囲に固まってから、同じ位置の完成スプライトへ溶かして替える。
 	if enemy_alpha > 0.0 and p.transform_texture != null:
 		var dimensions: Vector2 = p.transform_texture.get_size() * intro.run.cfg.character_scale

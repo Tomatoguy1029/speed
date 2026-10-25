@@ -39,7 +39,9 @@ func update() -> void:
 	for record: Dictionary in enemies.values():
 		var row: int = record.row
 		if run.enemies.table.pos[row].distance_to(state.ship_pos) > 950.0:
-			run.enemies.table.pos[row] = state.ship_pos + state.ship_heading * 700.0
+			run.enemies.table.speed[row] = maxf(presentation.practice_enemy.speed,state.stats.max_speed*0.9)
+		else:
+			run.enemies.table.speed[row] = presentation.practice_enemy.speed
 	if not state.drawing and not state.tracing:
 		build_guide()
 

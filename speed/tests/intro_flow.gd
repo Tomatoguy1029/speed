@@ -160,6 +160,14 @@ func _test_practice(intro: Node) -> void:
 	_check(intro.beat_time == time and run.state.phase == RunState.Phase.PAUSED, "ポーズ中は映像と練習を停止")
 	intro._resume()
 	_check(intro.practice.enemies.size() == 4, "練習相手を複数体配置")
+	var first: Dictionary=intro.practice.enemies.values()[0]
+	var far: Vector2=run.state.ship_pos+Vector2(1500,0)
+	var saved: Vector2=run.enemies.table.pos[first.row]
+	run.enemies.table.pos[first.row]=far
+	intro.practice.update()
+	_check(run.enemies.table.pos[first.row]==far,"練習の敵は追い越しても瞬間移動で戻さない")
+	run.enemies.table.pos[first.row]=saved
+	intro.practice.build_guide()
 	var guide: PackedVector2Array = intro.practice.guide_points.duplicate()
 	_check(guide.size() > 4 and guide[8].y != guide[16].y, "敵の中心を曲がって通る見本線")
 	_check(not intro.session.is_in_group("recordable_runs") and RunManager.current_id == -1 and not run.state.stage.boss_enabled, "導入は録画・通常ラン・ボス進行から独立")

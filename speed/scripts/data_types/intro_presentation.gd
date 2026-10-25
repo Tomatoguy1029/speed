@@ -12,7 +12,7 @@ extends Resource
 @export_range(0.1, 20.0) var restore_time := 3.0
 @export_range(0.1, 20.0) var omen_time := 6.0
 @export_range(0.1, 20.0) var motive_time := 3.0
-@export_range(0.0, 20.0) var hint_delay := 0.0
+@export_range(0.0, 20.0) var hint_delay := 3.0
 
 @export_group("差し替え用の仮素材")
 ## 既存のドリフターを練習に流用する。敵の本番データは変更しない。
