@@ -20,6 +20,8 @@ var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
 var body_override := PackedVector2Array()
+var body_width := 92.0
+var head_scale := 1.0
 var _driver: RefCounted
 var selection_enabled := false
 var action_rules: Resource
@@ -71,11 +73,14 @@ func body_points() -> PackedVector2Array:
 	return points
 
 func _update_body() -> void:
+	position=table.pos[body]
+	rotation=table.facing[body]
 	var points := body_points()
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]):
 			table.pos[body_rows[j]] = points[roundi(float(j+1)*float(points.size()-1)/float(body_rows.size()))]
 			table.guard[body_rows[j]] = table.guard[body]
+			table.r[body_rows[j]] = body_width*0.5
 
 func damage_target(row: int) -> int:
 	return int(clone_damage_rows[row]) if clone_damage_rows.has(row) else (body if row == body or row in body_rows else row)

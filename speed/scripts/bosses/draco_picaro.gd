@@ -8,7 +8,6 @@ func spawn_picaro(type: StringName, at: Vector2) -> int:
 	var source := actor.ctx.enemies.def_of(type)
 	if source == null: return -1
 	var copy := source.duplicate(true) as EnemyDef
-	copy.id = StringName("picaro_"+String(type))
 	copy.params.picaro = true
 	copy.params.source_type = type
 	var row := actor.ctx.enemies.spawn(copy,at)

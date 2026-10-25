@@ -44,14 +44,19 @@ func begin(a: BossActor) -> void:
 		var row: int = a.body
 		if j>0:
 			var copy := EnemyDef.new()
+			copy.params.clone_visual=true
 			copy.id=&"draco_copy";copy.behavior=&"drift";copy.radius=90.0;copy.hp=float(a.rule().clone_hp);copy.speed=0;copy.rank=1
 			row=a.ctx.enemies.spawn(copy,center+Vector2.from_angle(j*TAU/3.0)*650.0)
 			a.table.held[row]=1
 		var move: Resource = MOVES[order[j]]
 		units.append({"row":row,"id":a.table.id[row],"mode":move.technique,"t":0.0,"target":a.aim,"angle":(a.aim-a.table.pos[row]).angle(),"length":100.0,"glow":0.0,"locked":false,"strike_from":Vector2.ZERO,"strike_pos":Vector2.ZERO,"step":0,"sweep":0.0,"emission":{},"done":false,"origin":a.table.pos[row],"index":j,"parts":[]})
 		if j>0:
+			var visual=preload("res://scripts/bosses/draco_clone_visual.gd").new()
+			visual.actor=a;visual.unit=units[-1]
+			host.add_child(visual)
 			for k in 12:
 				var part := EnemyDef.new()
+				part.params.clone_visual=true
 				part.id=&"draco_copy_part";part.behavior=&"drift";part.radius=35;part.hp=999999;part.speed=0
 				var segment := a.ctx.enemies.spawn(part,a.table.pos[row])
 				a.table.held[segment]=1;a.table.parent[segment]=a.body;a.table.parent_id[segment]=a.body_id

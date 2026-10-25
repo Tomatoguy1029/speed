@@ -10,6 +10,9 @@ func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	var points := PackedVector2Array()
 	for point in actor.body_points(): points.append(actor.to_local(point))
+	if actor.technique==&"spiral" and points.size()>2:
+		draw_polyline(points,Color(0.3,0.2,1.0,0.2),actor.body_width*1.35,false)
+		draw_polyline(points,Color(0.5,0.35,1.0,0.75),actor.body_width*1.08,false)
 	if actor.finale.stage != &"explode":
 		if actor.finale.split>0.0:
 			for side in 2:
@@ -17,11 +20,13 @@ func _draw() -> void:
 				for j in range(0 if side==0 else 6,6 if side==0 else points.size()): piece.append(points[j]+Vector2((-1 if side==0 else 1)*actor.finale.split*90.0,0))
 				if piece.size()>1: draw_polyline(piece,Color("#544475"),78.0,false)
 		else:
-			draw_polyline(points, Color("#19122e"), 105.0, false)
-			draw_polyline(points, Color("#544475"), 78.0, false)
+			draw_polyline(points, Color("#19122e"), actor.body_width+20.0, false)
+			draw_polyline(points, Color("#544475"), actor.body_width, false)
+	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*actor.head_scale)
 	if actor.finale.stage != &"explode": draw_circle(Vector2(-110,0), 30.0, Color("#e9faff"))
 	if actor.finale.stage != &"explode": draw_colored_polygon(PackedVector2Array([Vector2(-30,-48),Vector2(80,-35),Vector2(105,0),Vector2(80,35),Vector2(-30,48)]),Color("#70618c"))
 	for side in ([] if actor.finale.stage == &"explode" else [-1,1]): draw_circle(Vector2(58,side * 24),7,Color("#ff3155"))
+	draw_set_transform(Vector2.ZERO)
 	if actor.mode in [&"windup", &"active"] and actor.technique == &"bite":
 		var end: Vector2 = actor.direction * float(actor.rule().reach)
 		draw_line(Vector2.ZERO,end,Color("#ffc17c") if actor.mode == &"windup" else Color("#ff568c"),8.0 if actor.mode == &"windup" else float(actor.rule().width) * 2.0,false)
@@ -69,16 +74,6 @@ func _draw() -> void:
 			var point := actor.to_local(impact.pos)
 			draw_arc(point,float(actor.rule().radius)*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
 			draw_line(point+Vector2(0,-1200*(1.0-progress)),point,Color(0.6,0.75,1.0,progress*0.6),4.0)
-
-	if actor.technique == &"clones" and actor._driver != null:
-		for unit: Dictionary in actor._driver.units:
-			if unit.index==0 or not actor.ctx.enemies.is_same(unit.row,unit.id) or actor.table.dead[unit.row]!=0: continue
-			var at := actor.to_local(actor.table.pos[unit.row])
-			var line := PackedVector2Array()
-			for j in 13: line.append(at+Vector2(-j*45.0,sin(j*0.7-actor.clock)*55.0).rotated(unit.angle-actor.rotation))
-			draw_polyline(line,Color("#443d83"),70.0,false)
-			draw_polyline(line,Color(0.4,0.65,1.0,0.5),45.0,false)
-			draw_circle(at,55.0,Color("#8d87c9"))
 
 	if actor.technique == &"inhale" and actor._driver != null and not actor._driver.spent:
 		var mouth := actor.to_local(actor.table.pos[actor.body]+actor.direction*100.0)

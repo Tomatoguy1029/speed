@@ -821,6 +821,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if alive[i] == 0 or dead[i] != 0:
 			continue
 		if state.cinematic_hide_enemies and t.is_boss[i]==0: continue
+		if t.def[i] != null and t.def[i].params.get("clone_visual",false): continue
 		if t.def[i] != null and t.def[i].params.get("picaro",false): continue
 		var p := pos[i]
 		var type := t.type[i]
@@ -1322,16 +1323,26 @@ func _sync_picaro() -> void:
 		used[id] = true
 		var source := StringName(t.def[i].params.source_type)
 		if not _picaro_sprites.has(id):
-			var sprite := Sprite2D.new()
-			sprite.texture = _enemy_texture(source)
-			sprite.material = _picaro_material
-			_layers.enemies.add_child(sprite)
-			_picaro_sprites[id] = sprite
-		var sprite: Sprite2D = _picaro_sprites[id]
+			var texture := _enemy_texture(source)
+			var node: Node2D
+			if texture != null:
+				var bitmap := Sprite2D.new()
+				bitmap.texture=texture
+				node=bitmap
+			else:
+				var shape := Polygon2D.new()
+				shape.polygon=_placeholder_points(t.def[i].shape)
+				shape.color=t.color[i]
+				node=shape
+			node.material = _picaro_material
+			_layers.enemies.add_child(node)
+			_picaro_sprites[id] = node
+		var sprite: Node2D = _picaro_sprites[id]
 		sprite.position = t.pos[i]
 		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
 		var radius := enemy_sprite_radius(source,t.r[i])
-		if sprite.texture != null: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		if sprite is Sprite2D: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		else: sprite.scale=Vector2.ONE*radius
 		sprite.modulate = Color(1,1,1,0.45 if t.guard[i]>0.0 else 1.0)
 	for id in _picaro_sprites.keys():
 		if not used.has(id):

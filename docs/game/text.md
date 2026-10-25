@@ -905,4 +905,5 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | heroes/perseus.tres | ペルセウス座 |
 | bosses/monoceros.tres | いっかくじゅう座 |
 | bosses/hydra.tres | うみへび座 |
+| bosses/draco.tres | りゅう座 |
 <!-- resources:end -->

@@ -121,7 +121,7 @@ func setup(context: RunContext) -> void:
 ## 敵を1体出し、その行番号を返す。opts：elite、size、facing、spin、meteor_index、vel、hit_cd。
 ## 仕様書 11.2 の補正をかける。
 func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
-	if stage_tuning.has(String(def.id)): def = def_of(def.id)
+	if stage_tuning.has(String(def.id)) and not def.params.get("picaro",false): def = def_of(def.id)
 	var i := slots.take()
 	_reset_row(i)
 	var t := table
@@ -188,7 +188,6 @@ func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
 		def = def.duplicate(true)
 		def.params.picaro = true
 		def.params.source_type = def.id
-		def.id = StringName("picaro_"+String(def.id))
 	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i], "attack_priority": table.attack_priority[i]})
 	table.held[j] = table.held[i]
 	table.parent[j] = i
