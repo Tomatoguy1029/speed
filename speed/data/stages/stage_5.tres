@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="StageDef" format=3]
+[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://c1oc0arox6d64"]
 
 [ext_resource type="Script" path="res://scripts/data_types/background_placement.gd" id="1_tpwl5"]
 [ext_resource type="Script" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
