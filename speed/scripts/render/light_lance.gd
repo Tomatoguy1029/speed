@@ -5,7 +5,7 @@ extends Node2D
 const SHADER := preload("res://shaders/light_lance.gdshader")
 const FLIGHT_TIME := 0.18
 ## 到達した槍を少し保ってから消す。攻撃は発動時に即時判定済み。
-const HOLD_TIME := 0.08
+const HOLD_TIME := 0.18
 const FADE_TIME := 0.14
 const FADE_START := FLIGHT_TIME + HOLD_TIME
 const TIP := 168.0
