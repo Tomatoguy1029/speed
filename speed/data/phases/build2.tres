@@ -4,11 +4,12 @@
 
 [resource]
 script = ExtResource("1")
-start = 169.0
+start = 135.0
 pop_from = 38.0
 pop_to = 45.0
 rate = 6.0
 xp_bonus = 1.4
+attack_budget = 1
 mix = {
 "darter": 2.0,
 "drifter": 4.0,
