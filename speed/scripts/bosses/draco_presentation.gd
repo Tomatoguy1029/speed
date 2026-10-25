@@ -62,3 +62,13 @@ func _draw() -> void:
 			var point := actor.to_local(impact.pos)
 			draw_arc(point,float(actor.rule().radius)*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
 			draw_line(point+Vector2(0,-1200*(1.0-progress)),point,Color(0.6,0.75,1.0,progress*0.6),4.0)
+
+	if actor.technique == &"clones" and actor._driver != null:
+		for unit: Dictionary in actor._driver.units:
+			if unit.index==0 or not actor.ctx.enemies.is_same(unit.row,unit.id) or actor.table.dead[unit.row]!=0: continue
+			var at := actor.to_local(actor.table.pos[unit.row])
+			var line := PackedVector2Array()
+			for j in 13: line.append(at+Vector2(-j*45.0,sin(j*0.7-actor.clock)*55.0).rotated(unit.angle-actor.rotation))
+			draw_polyline(line,Color("#443d83"),70.0,false)
+			draw_polyline(line,Color(0.4,0.65,1.0,0.5),45.0,false)
+			draw_circle(at,55.0,Color("#8d87c9"))

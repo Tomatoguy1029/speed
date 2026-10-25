@@ -124,6 +124,18 @@ func _ready() -> void:
 			actor.sim_tick(0.01,0.01)
 			check(driver.impacts[0].pos == target, "予告後は自機を追わない")
 		actor.cancel_attack()
+	actor.cancel_attack()
+	check(actor.start_attack(&"clones"), "全身複製を開始できる")
+	if actor.technique == &"clones":
+		var clones = actor._driver
+		check(clones.units.size()==3, "本体を含め合計三体を編成する")
+		var hp: float = sim.enemies.table.hp[actor.body]
+		var row: int = clones.units[1].row
+		sim.combat.damage_enemy(row,10.0,{"cause":&"shot"})
+		check(sim.enemies.table.hp[actor.body]==hp, "複製のHPは本体と独立する")
+		for frame in 1400: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor.mode==&"idle", "複製の共同攻撃から回収を終える")
+		check(sim.enemies.table.dead[row]!=0, "残った複製は吸収だけで回収する")
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

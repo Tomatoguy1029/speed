@@ -22,6 +22,7 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves: Dictionary = {}
+var clone_damage_rows: Dictionary = {}
 var body_rows: Array[int] = []
 var body_ids: Array[int] = []
 var _presentation: Node2D
@@ -69,7 +70,7 @@ func _update_body() -> void:
 			table.guard[body_rows[j]] = table.guard[body]
 
 func damage_target(row: int) -> int:
-	return body if row == body or row in body_rows else row
+	return int(clone_damage_rows[row]) if clone_damage_rows.has(row) else (body if row == body or row in body_rows else row)
 
 func _exit_tree() -> void:
 	if cycle != null: cycle.cancel()
