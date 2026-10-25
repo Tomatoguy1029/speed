@@ -15,8 +15,10 @@ func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String,
 			_development_settings[key] = ProjectSettings.get_setting(key)
 			ProjectSettings.set_setting(key, null)
 	# 隠しフォルダの生成物を明示的に含める。開発用の名前の対応表は含めない。
+	var index := ResourceLoader.load(BUILD.ROOT.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(BUILD.ROOT):
 		if file == "boss_preview.tres": continue
+		if file.begins_with("look_") and not BUILD.ROOT.path_join(file) in index.look_paths.values(): continue
 		if file.get_extension() in ["tres", "res"]:
 			var path := BUILD.ROOT.path_join(file)
 			add_file(path, FileAccess.get_file_as_bytes(path), false)

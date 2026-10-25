@@ -1,6 +1,6 @@
 ## 実験用 JSON の保存・差分・再現基準。読み込みからコードやシーンを実行しない。
 extends RefCounted
-const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
+const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const VERSION := 1
 const ROOT := "user://enemy_lab"
 const COMMANDS := ["armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]

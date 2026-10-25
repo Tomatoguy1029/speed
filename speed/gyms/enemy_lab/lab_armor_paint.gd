@@ -2,7 +2,7 @@
 extends Control
 
 signal piece_pressed(region: int, restore: bool)
-const PAINT := preload("res://scripts/render/armor_paint.gd")
+const PAINT := preload("res://tools/content/visual_transforms.gd")
 var source: Texture2D
 var data: Dictionary = {}
 var _texture: Texture2D

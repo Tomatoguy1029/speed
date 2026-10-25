@@ -8,6 +8,7 @@ var items: Array[BackgroundPlacement] = []
 var selected := -1
 var canvas: CANVAS
 var _stage: OptionButton
+var _parallax_preview: CheckButton
 var _assets: ItemList
 var _placed: ItemList
 var _fields: Dictionary = {}
@@ -92,12 +93,16 @@ func _ready() -> void:
 	var tools := HBoxContainer.new()
 	workspace.add_child(tools)
 	UI.button(tools, tr("bg.start"), func(): canvas.center = Vector2.ZERO; canvas.zoom = 0.65; canvas.queue_redraw())
-	UI.button(tools, tr("bg.focus"), func(): canvas.focus_item(), "focus")
+	UI.button(tools, tr("bg.focus"), func(): _parallax_preview.button_pressed = false; canvas.focus_item(), "focus")
 	var guides := CheckButton.new()
 	guides.text = tr("bg.guides")
 	guides.button_pressed = true
 	guides.toggled.connect(func(on: bool): canvas.guides = on; canvas.queue_redraw())
 	tools.add_child(guides)
+	_parallax_preview = CheckButton.new()
+	_parallax_preview.text = tr("bg.parallax_preview")
+	_parallax_preview.toggled.connect(func(on: bool): canvas.finish_drag(); canvas.parallax_preview = on; canvas.queue_redraw())
+	tools.add_child(_parallax_preview)
 	canvas = CANVAS.new()
 	canvas.editor = self
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -115,7 +120,7 @@ func _ready() -> void:
 	_label(inspector, tr("bg.properties")).add_theme_font_size_override("font_size", 18)
 	_details = _label(inspector, "")
 	_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	for field in [["x", -100000, 100000, 1], ["y", -100000, 100000, 1], ["scale", 0.05, 10, 0.05], ["rotation", -180, 180, 1], ["opacity", 0, 1, 0.01]]:
+	for field in [["x", -100000, 100000, 1], ["y", -100000, 100000, 1], ["scale", 0.05, 10, 0.05], ["rotation", -180, 180, 1], ["opacity", 0, 1, 0.01], ["parallax", 0, 1, 0.05]]:
 		_label(inspector, tr("bg." + field[0]))
 		var number := SpinBox.new()
 		number.min_value = field[1]
@@ -164,7 +169,7 @@ func snapshot() -> Array:
 func _key() -> String:
 	var values := []
 	for item in items:
-		values.append([item.texture.resource_path if item.texture != null else "", item.offset, item.scale, item.rotation_degrees, item.tint])
+		values.append([item.texture.resource_path if item.texture != null else "", item.offset, item.scale, item.rotation_degrees, item.tint, item.parallax])
 	return var_to_str(values)
 
 func remember(before: Array) -> void:
@@ -191,11 +196,15 @@ func _load_stage(index: int) -> void:
 	_source = ResourceLoader.load(source.resource_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 	_source_hash = FileAccess.get_sha256(_source.resource_path)
 	items.clear()
-	for item in _source.backgrounds: items.append(item.copy())
+	for item in _source.backgrounds:
+		var copy := item.copy()
+		preload("res://tools/content/prepare_background.gd").measure(copy)
+		items.append(copy)
 	selected = -1
 	_undo.clear()
 	_redo.clear()
 	_stage.select(_stage.get_item_index(index))
+	_parallax_preview.button_pressed = false
 	canvas.center = Vector2.ZERO
 	canvas.zoom = 0.65
 	_saved_key = _key()
@@ -219,6 +228,7 @@ func refresh(rebuild := true) -> void:
 		_fields.scale.set_value_no_signal(item.scale)
 		_fields.rotation.set_value_no_signal(item.rotation_degrees)
 		_fields.opacity.set_value_no_signal(item.tint.a)
+		_fields.parallax.set_value_no_signal(item.parallax)
 		_color.color = Color(item.tint, 1.0)
 		_details.text = tr("bg.dimensions").format({"w": int(item.bounds().size.x * item.scale), "h": int(item.bounds().size.y * item.scale)})
 	else:
@@ -242,6 +252,7 @@ func _add_asset() -> void:
 	var before := snapshot()
 	var item := BackgroundPlacement.new()
 	item.texture = load(_assets.get_item_metadata(chosen[0]))
+	preload("res://tools/content/prepare_background.gd").measure(item)
 	item.offset = canvas.center
 	items.append(item)
 	selected = items.size() - 1
@@ -257,6 +268,7 @@ func _edit(value: float, field: String) -> void:
 		"scale": item.scale = value
 		"rotation": item.rotation_degrees = value
 		"opacity": item.tint.a = value
+		"parallax": item.parallax = value
 	remember(before)
 
 func _set_color(value: Color) -> void:

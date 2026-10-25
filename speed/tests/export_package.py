@@ -32,8 +32,13 @@ def inspect(path: Path) -> None:
     assert ".content/boss_monoceros.tres" in files, "一角獣の生成AIを含める"
     assert ".content/boss_hydra.tres" in files, "生成したボスAIを含める"
     assert ".content/boss_preview.tres" not in files, "試遊用の編集結果を配布へ含めない"
+    assert ".content/visual_index.tres" in files, "生成済みの外観索引を含める"
+    assert not any(name.startswith("scripts/render/armor_paint.gd") for name in files), "実行時の装甲解析を残さない"
+    for look in re.findall(r'"(res://\.content/look_[^"\n]+\.res)"', files[".content/visual_index.tres"].decode()):
+        assert look.replace("res://", "", 1) in files, f"生成済み外観の欠落: {look}"
     for index in range(1, 6):
         stage = files[f".content/stage_{index}.tres"].decode()
+        assert not re.search(r'\[ext_resource type="Texture2D"[^\n]+background/', stage), "背景画像をステージへ直接結合しない"
         assert 'path="res://scripts/data_types/stage_resources.gd"' in stage and 'resources = SubResource(' in stage, f"ステージ{index}に資源一覧が必要"
         for dependency in re.findall(r'"(res://[^"\n]+)"', stage):
             name = dependency.replace("res://", "", 1)

@@ -5,7 +5,7 @@ signal changed
 signal event_recorded(event: Dictionary)
 signal seek_progress(value: float)
 
-const ARMOR_PAINT := preload("res://scripts/render/armor_paint.gd")
+const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
 const DT := 1.0 / 60.0
 
@@ -121,6 +121,7 @@ func _rebuild() -> void:
 				else: def.set(key, spec.overrides[id][key])
 			defs[StringName(id)] = def
 	var options := {"lab": true, "config": cfg, "stage_index": stage.index, "stage": load("res://tools/content/build_runtime_stage.gd").compile(stage),
+		"live_visuals": ARMOR_PAINT.live_look,
 		"endless": false, "seed": int(spec.get("seed", 932)), "enemies": defs, "auto_spawn": spec.get("auto_spawn", false),
 		"view_size": Vector2(1280, 720), "meta": spec.get("meta", {}), "director": spec.get("director", {})}
 	# 表示のない試行は表示を作らない。実験場が自分の時計で進め、出来事も自分で読む
