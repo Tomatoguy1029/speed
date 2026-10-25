@@ -71,11 +71,11 @@ func tick(dt: float) -> bool:
 				generated+=1
 			if time>0.6+count*0.8+1.0:
 				first=false;stage=&"";next_cycle=10.0
-				a.run_state.controls_locked=false;a.run_state.cinematic_bars=0.0
+				a.run_state.controls_locked=false;a.run_state.cinematic_bars=0.0;a.run_state.encounter_protected=false
 				a.mode=&"idle";a.elapsed=0.0;a.table.guard[a.body]=0.0
 				a.picaro.attacking=false
 	return stage != &""
 func cancel() -> void:
 	stage=&"";first=false;time=0.0;next_cycle=10.0
-	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0
+	actor.run_state.controls_locked=false;actor.run_state.cinematic_bars=0.0;actor.run_state.encounter_protected=false
 	actor._presentation.scale=Vector2.ONE;actor._presentation.modulate=Color.WHITE

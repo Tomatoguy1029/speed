@@ -190,6 +190,7 @@ func spawn_part(i: int, def: EnemyDef, pos: Vector2) -> int:
 		def.params.source_type = def.id
 		def.id = StringName("picaro_"+String(def.id))
 	var j := spawn(def, pos, {"attack_group": table.attack_group[i], "attack_value": table.attack_value[i], "attack_priority": table.attack_priority[i]})
+	table.held[j] = table.held[i]
 	table.parent[j] = i
 	table.parent_id[j] = table.id[i]
 	var parts := table.parts[i]

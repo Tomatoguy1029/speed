@@ -8,6 +8,7 @@ var phase := 1
 var mode: StringName = &"idle"
 var technique: StringName = &""
 var _cooldown := 0.0
+var attack_serial := 0
 var clock := 0.0
 var elapsed := 0.0
 var aim := Vector2.ZERO
@@ -88,12 +89,20 @@ func rule() -> Dictionary:
 
 func start_attack(id: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(id): return false
+	if selection_enabled and ctx.projectiles.director != null:
+		var director: RefCounted=ctx.projectiles.director
+		var key := "draco:%d:%d" % [body_id,attack_serial]
+		var p: Dictionary=_moves[id].parameters
+		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0): return false
+		ctx.projectiles.lab_context=director.token(key)
+		attack_serial+=1
+	if id != &"picaro_wall": picaro.pause(false)
 	technique = id
 	mode = &"windup"
 	elapsed = 0.0
 	attack_hit = false
 	aim = run_state.enemy_aim
-	direction = (aim - table.pos[body]).normalized()
+	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
 	table.facing[body] = direction.angle()
 	_driver = rule().driver.new() if rule().has("driver") else null
 	if _driver != null: _driver.begin(self)
@@ -106,11 +115,11 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
 	picaro.tick()
+	_update_closing_walls(dt)
 	if cycle.tick(dt):
 		_update_body()
 		_presentation.queue_redraw()
 		return
-	_update_closing_walls(dt)
 	elapsed += dt
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
 	if mode == &"windup" and elapsed >= float(rule().warn):
@@ -120,6 +129,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if elapsed >= float(def.params.get("phase_time",1.0)):
 			mode = &"idle"
 			table.guard[body] = 0.0
+			run_state.encounter_protected=false
 	elif mode == &"active":
 		if _driver != null: _driver.tick(self,dt)
 		else:
@@ -136,6 +146,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_update_body()
 	_presentation.queue_redraw()
 	if selection_enabled and mode == &"idle" and flow_adapter != null:
+		var delta := run_state.enemy_aim-table.pos[body]
+		if delta.length()>1400.0:
+			table.pos[body]+=delta.normalized()*def.speed*dt
+			table.facing[body]=delta.angle()
 		flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 
 func cancel_attack() -> void:
@@ -159,7 +173,7 @@ func can_begin_sequence() -> bool:
 func attack_failed() -> bool:
 	return not body_alive()
 func technique_ready(id: StringName, gate: Dictionary) -> bool:
-	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
+	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and phase <= int(gate.get("max_phase",3)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
 
 func on_body_damaged() -> void:
 	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
@@ -174,6 +188,7 @@ func on_body_damaged() -> void:
 	placed_meteors.clear()
 	cycle.cancel()
 	picaro.pause(true)
+	run_state.encounter_protected=true
 	phase += 1
 	mode = &"transition"
 	elapsed = 0.0

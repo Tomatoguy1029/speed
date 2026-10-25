@@ -16,6 +16,7 @@ var rng := RandomNumberGenerator.new()
 var lab_mode := false
 ## 演出の入力・被弾保護。世界と発射済みの弾は進み続ける。
 var controls_locked := false
+var encounter_protected := false
 var steering_locked := false
 var cinematic_bars := 0.0
 var cinematic_camera := false
