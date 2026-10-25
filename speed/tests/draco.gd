@@ -87,6 +87,21 @@ func _ready() -> void:
 		for frame in 300: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(sim.enemies.table.pos[actor.body].distance_to(origin)>100.0, "移動攻撃で本体が移動する: "+id)
 		check(actor.mode == &"idle", "移動攻撃後に隙を終える: "+id)
+	actor.cancel_attack()
+	check(actor.start_attack(&"rifts"), "三本爪の亀裂を開始する")
+	if actor.technique == &"rifts":
+		for frame in 240: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor._driver.walls.size() == 6, "左右それぞれ三本の亀裂を残す")
+		actor.cancel_attack()
+		for frame in 60: actor.sim_tick(1.0/120.0,1.0/120.0)
+		check(actor.closing_walls.is_empty(), "亀裂を修復してから次へ進む")
+	sim.projectiles.clear_hostile()
+	var wall := sim.projectiles.fire_wall(Vector2(0,900),-PI*0.5,200.0,20.0,0.0,5.0,0.0)
+	sim.projectiles.hazard_block[wall] = 1
+	sim.projectiles.fire_bolt(Vector2(-200,800),0.0,400.0,10.0)
+	sim.projectiles._update_hostile(1.0)
+	check(sim.projectiles.hostile_count() == 0, "通行を止める壁は敵弾も遮る")
+	sim.projectiles.release_hazard(wall)
 	for expected_phase in [2,3]:
 		var threshold := 0.7 if expected_phase == 2 else 0.4
 		sim.combat.damage_enemy(actor.body,1.0e6,{"cause": &"shot"})

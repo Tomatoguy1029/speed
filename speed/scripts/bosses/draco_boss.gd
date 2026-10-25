@@ -10,6 +10,7 @@ var elapsed := 0.0
 var aim := Vector2.ZERO
 var direction := Vector2.RIGHT
 var attack_hit := false
+var closing_walls: Array = []
 var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
@@ -92,6 +93,7 @@ func attack_playing() -> bool:
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
+	_update_closing_walls(dt)
 	elapsed += dt
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
 	if mode == &"windup" and elapsed >= float(rule().warn):
@@ -134,11 +136,11 @@ func handle_body_defeat(_opts: Dictionary) -> bool:
 func selection_blocked() -> bool:
 	return not body_alive() or mode in [&"transition", &"finale", &"deep"]
 func can_begin_sequence() -> bool:
-	return mode == &"idle"
+	return mode == &"idle" and closing_walls.is_empty()
 func attack_failed() -> bool:
 	return not body_alive()
 func technique_ready(id: StringName, gate: Dictionary) -> bool:
-	return mode == &"idle" and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
+	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
 
 func on_body_damaged() -> void:
 	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
@@ -173,3 +175,23 @@ func contains_hit(point: Vector2, radius: float) -> bool:
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j],body_ids[j]) and point.distance_to(table.pos[body_rows[j]]) <= table.r[body_rows[j]]+radius: return true
 	return false
+
+func close_wall(h: int, duration: float) -> void:
+	var ps := ctx.projectiles
+	if not ps.owns_hazard(h,body,body_id): return
+	ps.hazard_dmg[h] = 0.0
+	closing_walls.append({"h":h,"time":duration,"duration":duration,"from":ps.hazard_pos[h],"length":ps.hazard_len[h],"width":ps.hazard_width[h],"angle":ps.hazard_angle[h]})
+
+func _update_closing_walls(dt: float) -> void:
+	var ps := ctx.projectiles
+	for wall: Dictionary in closing_walls.duplicate():
+		var h := int(wall.h)
+		wall.time = float(wall.time)-dt
+		if not ps.owns_hazard(h,body,body_id) or float(wall.time)<=0.0:
+			if ps.owns_hazard(h,body,body_id): ps.release_hazard(h)
+			closing_walls.erase(wall)
+			continue
+		var f := float(wall.time)/float(wall.duration)
+		ps.hazard_len[h] = float(wall.length)*f
+		ps.hazard_width[h] = float(wall.width)*f
+		ps.hazard_pos[h] = wall.from+Vector2.from_angle(float(wall.angle))*float(wall.length)*(1.0-f)*0.5

@@ -292,6 +292,9 @@ func _update_friendly(dt: float) -> void:
 		var life := friend_life[i] - dt
 		shape.advance(self, i, pos, dt)
 		var body_hit = field.first_body_hit(from, pos, r)
+		var wall_hit := block_hit(from,pos,r)
+		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
+			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		var to: Vector2 = pos if body_hit == null else body_hit.point
 		var pad := Vector2(r + combat.enemy_query_padding, r + combat.enemy_query_padding)
 		combat.grid.query(from.min(to) - pad, from.max(to) + pad, _buf)
@@ -455,6 +458,9 @@ func _update_hostile(dt: float) -> void:
 			gap = field.body_gap(from, r)
 			if gap <= step:
 				body_hit = field.first_body_hit(from, to, r)
+		var wall_hit := block_hit(from,to,r)
+		if not wall_hit.is_empty() and (body_hit == null or wall_hit.t < body_hit.t):
+			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
 		var stop = shape.contact(self, i, from, to, body_hit, ship_pos, R, step)
