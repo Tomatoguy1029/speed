@@ -803,7 +803,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 ### 15.2 背景の配置
 
-ステージの背景は `StageDef.backgrounds` の `BackgroundPlacement` 配列へ保存する。画像・開始地点からの位置・倍率・回転・色と明るさを持ち、配列の後ろほど手前へ描く。`tint` のRGBを色、Aを明るさとして保存し、`display_tint()` がRGBへ明るさを掛けて描画用のAを1に保つ。元画像のアルファは画像の穴・輪郭に使う。実行用の `texture_path` と `used_rect` は生成時に解決し、`bounds()` は生成済み範囲を返す。`RunPresentation` と開発用の `gyms/background_lab/` が同じ原点と寸法で描く。背景エディターは保存時にステージを読み直して背景配列だけを書き換え、外部変更はファイルのハッシュで検出する。実行用の依存資源にも背景画像を含める。
+ステージの背景は `StageDef.backgrounds` の `BackgroundPlacement` 配列へ保存する。画像・開始地点からの位置・倍率・回転・色と明るさ・移動倍率 `parallax` を持ち、配列の後ろほど手前へ描く。`tint` のRGBを色、Aを明るさとして保存し、`display_tint()` がRGBへ明るさを掛けて描画用のAを1に保つ。元画像のアルファは画像の穴・輪郭に使う。`position_at()` が開始地点からのカメラ移動量に応じた表示位置を計算し、本番と背景エディターの視差プレビューで共有する。実行用の `texture_path` と `used_rect` は生成時に解決し、`bounds()` は生成済み範囲を返す。`RunPresentation` と開発用の `gyms/background_lab/` が同じ原点と寸法で描く。背景エディターは保存時にステージを読み直して背景配列だけを書き換え、外部変更はファイルのハッシュで検出する。実行用の依存資源にも背景画像を含める。
 
 ### 15.3 生成と配布の入口
 

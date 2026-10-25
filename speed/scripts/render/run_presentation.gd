@@ -64,6 +64,8 @@ var view_override: Variant = null
 ## 背景の星を描くか（実験場では初めは消す）
 var show_background := true
 var _background_sprites: Array[Sprite2D] = []
+var _background_placements: Array[BackgroundPlacement] = []
+var _background_origin := Vector2.ZERO
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
 
@@ -600,6 +602,7 @@ func _build_star_batch() -> void:
 
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
 func _build_stage_background() -> void:
+	_background_origin = state.ship_pos
 	for placement: BackgroundPlacement in state.stage.backgrounds:
 		if placement.texture_path.is_empty():
 			continue
@@ -615,13 +618,16 @@ func _build_stage_background() -> void:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_layers.background.add_child(sprite)
 		_background_sprites.append(sprite)
+		_background_placements.append(placement)
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
 	c.draw_rect(view, Color(0.08, 0.03, 0.12) if state.bonus_t > 0.0 else Color(0.02, 0.03, 0.07))
 	_star_batch.visible = show_background
-	for sprite in _background_sprites:
+	for i in _background_sprites.size():
+		var sprite := _background_sprites[i]
 		sprite.visible = show_background
+		sprite.position = _background_origin + _background_placements[i].position_at(cam_center - _background_origin)
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
