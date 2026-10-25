@@ -22,7 +22,20 @@ func _ready() -> void:
 	sim = session.sim
 	t = sim.enemies.table
 	reset()
+	var visual := preload("res://scripts/render/enemies/marlin.gd")
+	var view := Rect2(-100, -60, 200, 120)
+	for from in [Vector2(-200, 0), Vector2(200, 0), Vector2(0, -200), Vector2(0, 200), Vector2(-200, -120)]:
+		var line: PackedVector2Array = visual.clip_warning(from, Vector2.ZERO, view)
+		check(line.size() == 2 and view.grow(0.01).has_point(line[0]) and line[1] == Vector2.ZERO,
+			"画面外からの進入点と進路を画面内に示す")
+		check((line[1] - line[0]).normalized().is_equal_approx((-from).normalized()), "予告の方向を実際の固定方向に保つ")
+	check(visual.clip_warning(Vector2(-200, 80), Vector2(200, 80), view).is_empty(), "画面を通らない進路を画面端へ寄せない")
+	check(visual.clip_warning(Vector2(-200, 0), Vector2(-150, 0), view).is_empty(), "画面へ届かない突進を描かない")
+	var onscreen: PackedVector2Array = visual.clip_warning(Vector2.ZERO, Vector2(50, 0), view)
+	check(onscreen == PackedVector2Array([Vector2.ZERO, Vector2(50, 0)]), "画面内の吻先と終点を保持する")
 	var def := sim.enemies.def_of(&"marlin")
+	for key in ["spray", "spray_step", "spread", "bullet_speed", "bullet_dmg"]:
+		check(not def.params.has(key), "不要な弾設定%sを持たない" % key)
 	check(StageEnemyTuning.keys_for(def).has("params.recover"), "休みをステージ別に調整できる")
 	check(StageEnemyTuning.keys_for(def).has("speed"), "回遊速度を既存の調整画面で変更できる")
 	var tuned := StageEnemyTuning.resolve(def, {"speed": 700.0, "params.recover": 1.2, "params.dash_speed": 2400.0})
@@ -57,6 +70,7 @@ func _ready() -> void:
 	for frame in 20:
 		sim.enemies.tick(0.1, 0.1)
 		if t.mode[row] == EnemyTable.Mode.RECOVER: break
+	check(sim.projectiles.hostile_alive.count(1) == 0, "突進で左右弾を発射しない")
 	check(t.mode[row] == EnemyTable.Mode.RECOVER and t.charge[row] == 0.0, "突進後に予告を残さず休む")
 	check(t.fire_t[row] == float(def.params.fire_interval), "既存の攻撃間隔を保つ")
 
@@ -244,6 +258,9 @@ func _capture(stage: RuntimeStage) -> void:
 	reset()
 	var render := session.view.get_node("RunPresentation") as RunPresentation
 	render.view_override = {"center": Vector2.ZERO, "zoom": 0.65}
+	if "--warnings" in OS.get_cmdline_user_args():
+		await _capture_warnings(session, render)
+		return
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var label := Label.new()
@@ -276,5 +293,24 @@ func _capture(stage: RuntimeStage) -> void:
 		if frame == 110:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("/tmp/speed-marlin-warning.png")
+	session.free()
+	get_tree().quit()
+
+## 同じ描画経路で停止直後・発進直前・画面外の予告を比較する。
+func _capture_warnings(session: Node, render: RunPresentation) -> void:
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.ship_invuln = 100.0
+	var row := sim.enemies.spawn(sim.enemies.def_of(&"marlin"), Vector2(-500, -160))
+	for sample in ["on-early", "on-late", "off-left", "off-top"]:
+		t.pos[row] = Vector2(-500, -160)
+		if sample == "off-left": t.pos[row] = Vector2(render.view_rect().position.x - 150.0, -100)
+		if sample == "off-top": t.pos[row] = Vector2(-100, render.view_rect().position.y - 150.0)
+		t.facing[row] = (sim.state.ship_pos - t.pos[row]).angle()
+		t.anchor[row] = sim.state.ship_pos
+		t.mode[row] = EnemyTable.Mode.WINDUP
+		t.charge[row] = 0.01 if sample == "on-early" else 0.9
+		for frame in 30: await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/tmp/speed-marlin-warning-%s.png" % sample)
 	session.free()
 	get_tree().quit()

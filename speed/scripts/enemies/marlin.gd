@@ -32,7 +32,6 @@ func step(i: int, dt: float) -> void:
 				t.timer[i] = float(p.dash_time)
 				t.fire_t[i] = float(p.fire_interval)
 				t.charge[i] = 0.0
-				t.bud_t[i] = 0.0
 		EnemyTable.Mode.DASH:
 			if t.timer[i] <= 0.0:
 				t.vel[i] = Vector2.ZERO
@@ -77,11 +76,3 @@ func before_move(i: int, dt: float) -> void:
 		if t.dead[i] or state.phase != RunState.Phase.PLAY: return
 	t.vel[i] = (to - from) / dt
 	t.timer[i] = maxf(0.0, t.timer[i] - dt)
-	t.bud_t[i] -= dt
-	if travel > 0.0 and t.bud_t[i] <= 0.0:
-		t.bud_t[i] = float(p.spray_step)
-		var n := int(p.spray)
-		for side: float in [-1.0, 1.0]:
-			for k in n:
-				var a := t.facing[i] + side * PI / 2.0 + (float(k) / maxf(n - 1, 1) - 0.5) * float(p.spread)
-				projectiles.fire_enemy(i, a, float(p.bullet_speed), &"bullet")
