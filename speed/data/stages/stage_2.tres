@@ -289,7 +289,7 @@ points = PackedVector2Array(0, 10, 55, 47, 56, 0, 136, 12, 151, 90, 170, 121, 17
 [sub_resource type="Resource" id="Resource_0kvk0"]
 script = ExtResource("10_hhbsv")
 type = &"defender"
-points = PackedVector2Array(0, 0, 55, 53, 62, 148, 135, 151, 136, 45, 169, 51, 171, 189, 260, 187, 261, 57, 290, 65, 293, 295, 386, 301, 386.1, 0, 415, 0, 416, 345)
+points = PackedVector2Array(0, 0, 55, 53, 57, 304, 134, 288, 136, 45, 169, 51, 171, 336, 259, 329, 261, 57, 290, 65, 291, 367, 386, 378, 386.1, 0, 415, 0, 416, 436)
 
 [resource]
 script = ExtResource("1")
