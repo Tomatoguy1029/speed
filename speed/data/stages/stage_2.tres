@@ -284,12 +284,12 @@ display_name = "ボス戦"
 [sub_resource type="Resource" id="Resource_3y6x8"]
 script = ExtResource("10_hhbsv")
 type = &"splitling"
-points = PackedVector2Array(0, 10, 55, 66, 56, 35, 136, 35, 170, 119, 171, 37, 260, 42, 269, 101, 281, 105, 290, 39, 386, 36, 392, 151, 415, 145, 418, 92)
+points = PackedVector2Array(0, 10, 55, 66, 56, 29, 136, 35, 170, 100, 171, 37, 260, 42, 269, 61, 280, 81, 290, 26, 386, 23, 393, 73, 414, 116, 417, 64)
 
 [sub_resource type="Resource" id="Resource_fv8bx"]
 script = ExtResource("10_hhbsv")
 type = &"splitter"
-points = PackedVector2Array(0, 10, 55, 47, 56, 12, 136, 12, 139, 90, 170, 87, 171, 27, 260, 30, 271, 108, 288, 113, 290, 76, 386, 71, 391, 185, 415, 188, 418, 134)
+points = PackedVector2Array(0, 10, 55, 47, 56, 0, 136, 12, 151, 49, 170, 71, 171, 27, 260, 30, 271, 49, 282, 79, 290, 30, 386, 40, 392, 88, 414, 126, 416, 57)
 
 [sub_resource type="Resource" id="Resource_0kvk0"]
 script = ExtResource("10_hhbsv")
