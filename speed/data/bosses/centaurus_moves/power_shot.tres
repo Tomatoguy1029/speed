@@ -8,7 +8,7 @@ technique = &"power_shot"
 parameters = {
 "cd": 7.0,
 "damage": 28.0,
-"lock": 0.4,
+"alert": 0.4,
 "radius": 30.0,
 "recover": 1.5,
 "speed": 1800.0,

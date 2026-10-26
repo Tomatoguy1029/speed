@@ -23,7 +23,7 @@ func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"aim_locked", &"released"]: pulse = 0.3
+	if event.cue in [&"alert", &"released"]: pulse = 0.3
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -61,9 +61,9 @@ func _draw() -> void:
 		var reach := float(actor.rule().get("travel", 1600.0))
 		var width := float(actor.rule().get("radius", 30.0)) * 2.0
 		var from := Vector2(r * float(actor.def.params.bow_reach), 0.0)
-		var color := DANGER if actor.locked else WARNING
-		color.a = 0.85 if actor.locked else 0.35 + draw_fraction() * 0.35
-		draw_line(from, from + Vector2(reach, 0.0), color, width if actor.locked else pixel_size * 2.0)
+		var color := DANGER if actor.alerting else WARNING
+		color.a = 0.85 if actor.alerting else 0.35 + draw_fraction() * 0.35
+		draw_line(from, from + Vector2(reach, 0.0), color, width if actor.alerting else pixel_size * 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	modulate = tint
@@ -91,7 +91,7 @@ func _draw() -> void:
 	var pull := Vector2(62.0 + cos(1.1) * 26.0 - draw_fraction() * 34.0, 0.0)
 	draw_polyline(PackedVector2Array([packed[0], pull, packed[packed.size() - 1]]), STRING, pixel_size, false)
 	if actor.mode == &"windup":
-		var glow := DANGER if actor.locked else WARNING
+		var glow := DANGER if actor.alerting else WARNING
 		var length := 40.0 if actor.technique == &"power_shot" else 26.0
 		draw_line(pull, pull + Vector2(length + 30.0, 0.0), glow, pixel_size * (3.0 if actor.technique == &"power_shot" else 1.5))
 	# 攻めどき（射終わりの硬直）は縁を光らせる。

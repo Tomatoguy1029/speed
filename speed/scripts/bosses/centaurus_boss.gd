@@ -1,5 +1,5 @@
 ## ケンタウルス座。選択は共通フロー、距離取り・離脱・射撃は個別ロジックで進める。
-## 予告・狙い固定・発射・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
+## 予告・発射前の警告・発射・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
 class_name CentaurusBoss
 extends "res://scripts/bosses/boss_final_strike.gd"
 
@@ -12,7 +12,8 @@ var mode: StringName = &"idle"
 var technique: StringName = &""
 var clock := 0.0
 var recovery := 0.0
-var locked := false
+## 強弓の発射直前の警告中か
+var alerting := false
 var cooldowns: Dictionary = {}
 var retreat_time := 0.0
 var retreat_ready_at := 0.0
@@ -119,7 +120,9 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			technique = &""
 	elif mode in [&"windup", &"shooting"]:
 		table.vel[body] = Vector2.ZERO
-		if not locked: _face(run_state.enemy_aim, def.turn, dt)
+		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。
+		if technique == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+		else: _face(run_state.enemy_aim, def.turn, dt)
 		if timeline.is_playing(): timeline.advance(dt)
 	else:
 		_cooldown = maxf(0.0, _cooldown - dt)
@@ -171,7 +174,7 @@ func attack_playing() -> bool:
 
 func cancel_attack() -> void:
 	timeline.stop()
-	locked = false
+	alerting = false
 	recovery = 0.0
 	technique = &""
 	if mode in [&"windup", &"shooting", &"recovery"]: mode = &"idle"
@@ -184,13 +187,13 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 
 func _begin_windup(r: Dictionary, length: float) -> void:
 	mode = &"windup"
-	locked = false
+	alerting = false
 	table.vel[body] = Vector2.ZERO
 	var anim := timeline.get_animation(&"attack")
 	anim.length = length
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
 	if technique == &"power_shot":
-		anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.lock)), {"method": &"lock_aim", "args": []})
+		anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.alert)), {"method": &"alert", "args": []})
 		anim.track_insert_key(0, float(r.warn), {"method": &"release", "args": []})
 	else:
 		for k in int(r.count): anim.track_insert_key(0, float(r.warn) + float(r.interval) * k, {"method": &"release", "args": []})
@@ -199,23 +202,23 @@ func _begin_windup(r: Dictionary, length: float) -> void:
 	timeline.advance(0.0)
 	_cue(&"telegraph")
 
-func lock_aim() -> void:
+## 強弓の発射直前の警告。向きは発射まで機体を追い続ける。
+func alert() -> void:
 	if mode != &"windup": return
-	locked = true
-	_cue(&"aim_locked")
+	alerting = true
+	_cue(&"alert")
 
 ## 弓の先。矢はここから出る。
 func bow_mouth() -> Vector2:
 	return table.pos[body] + Vector2.from_angle(table.facing[body]) * table.r[body] * float(def.params.bow_reach)
 
-## 速射は1本ごとに共通の遅延照準を狙う。強弓は固定した向きへ射る。矢は敵をすり抜ける。
+## 速射は1本ごとに共通の遅延照準を狙う。強弓は発射の瞬間の機体の位置へ射る。矢は敵をすり抜ける。
 func release() -> void:
 	if mode not in [&"windup", &"shooting"]: return
 	var r := rule()
 	var mouth := bow_mouth()
 	var power := technique == &"power_shot"
-	if power: lock_aim()
-	var angle := table.facing[body] if power else (run_state.enemy_aim - mouth).angle()
+	var angle := ((run_state.ship_pos if power else run_state.enemy_aim) - mouth).angle()
 	ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle, float(r.speed), float(r.radius), float(r.travel),
 		float(r.damage) * ctx.cfg.atk_scale, power])
 	mode = &"shooting"
@@ -224,7 +227,7 @@ func release() -> void:
 func end_attack() -> void:
 	if mode not in [&"windup", &"shooting"]: return
 	timeline.stop()
-	locked = false
+	alerting = false
 	mode = &"recovery"
 	recovery = float(rule().recover)
 	_cue(&"recovery_started")
