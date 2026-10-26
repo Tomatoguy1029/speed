@@ -1,5 +1,10 @@
 [gd_scene format=3]
 [ext_resource type="Script" path="res://scripts/bosses/monoceros_presentation.gd" id="visual"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros_parts.tscn" id="parts"]
 [node name="MonocerosPresentation" type="Node2D"]
 texture_filter = 1
 script = ExtResource("visual")
+
+[node name="Parts" parent="." instance=ExtResource("parts")]
+position = Vector2(37, 0)
+rotation = -1.5707963267949
