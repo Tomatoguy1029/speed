@@ -31,6 +31,21 @@ func refresh() -> void:
 		fields.remove_child(child)
 		child.queue_free()
 	_label("ピクセル炎の調整")
+	var presets := OptionButton.new()
+	presets.tooltip_text = "保存済みの炎設定を選択して読み込みます"
+	var paths: Array[String] = preview.preset_paths()
+	for i in paths.size():
+		presets.add_item(paths[i].get_file().get_basename())
+		presets.set_item_metadata(i, paths[i])
+		if paths[i] == preview.preset_path:
+			presets.selected = i
+	presets.item_selected.connect(func(index):
+		preview.preset_path = presets.get_item_metadata(index)
+		if preview.request_reload.is_valid():
+			preview.request_reload.call(preview.reload_preset)
+		else:
+			preview.reload_preset())
+	fields.add_child(presets)
 	var path := LineEdit.new()
 	path.text = preview.preset_path
 	path.text_changed.connect(func(text): preview.preset_path = text)
@@ -47,15 +62,54 @@ func refresh() -> void:
 	copy.text_changed.connect(func(text): preview.copy_path = text)
 	fields.add_child(copy)
 	_button("別名で複製保存して切り替える", preview.save_copy)
-	var play := CheckButton.new()
-	play.text = "再生"
-	play.button_pressed = preview.playing
-	play.toggled.connect(func(value): preview.playing = value)
-	fields.add_child(play)
-	_button("停止して1コマ進む", func(): preview.step(); play.button_pressed = false)
-	_button("同じ設定で先頭から再実行", preview.restart)
+	var transport := HBoxContainer.new()
+	fields.add_child(transport)
+	_transport_button(transport, "⏮", "同じ設定で先頭から再実行", preview.restart)
+	_transport_button(transport, "▶", "再生。停止後や燃焼終了後は先頭から再開", preview.play)
+	_transport_button(transport, "⏸", "一時停止。続きから再生できます", preview.pause)
+	_transport_button(transport, "⏹", "停止して先頭へ戻す", preview.stop)
+	_transport_button(transport, "⏭", "停止して1コマ進む", preview.step)
+	var speed := Button.new()
+	speed.text = "⏩ " + str(preview.playback_speed) + "x"
+	speed.tooltip_text = "再生速度を1倍・2倍・4倍で切り替え"
+	speed.pressed.connect(func():
+		preview.set_speed(2.0 if preview.playback_speed == 1.0 else (4.0 if preview.playback_speed == 2.0 else 1.0))
+		speed.text = "⏩ " + str(preview.playback_speed) + "x")
+	transport.add_child(speed)
 	_number("発生時間 / 0=連続・変更後は再実行", preview.emission_seconds, "0,3,0.05", func(value): preview.emission_seconds = value)
 	_number("乱数seed / 変更後は再実行", preview.seed_value, "0,99999,1", func(value): preview.seed_value = int(value))
+	_label("実背景と使用箇所")
+	var stages := OptionButton.new()
+	for name in DirAccess.get_files_at("res://data/stages"):
+		if name.ends_with(".tres"):
+			var stage_path := "res://data/stages/" + name
+			var stage_data := ResourceLoader.load(stage_path, "", ResourceLoader.CACHE_MODE_IGNORE) as StageDef
+			if stage_data == null or stage_data.backgrounds.is_empty():
+				continue
+			stages.add_item(name.get_basename())
+			stages.set_item_metadata(stages.item_count - 1, stage_path)
+			if stage_path == preview.context_stage_path:
+				stages.selected = stages.item_count - 1
+	stages.item_selected.connect(func(index):
+		preview.select_context(stages.get_item_metadata(index), 0)
+		refresh())
+	fields.add_child(stages)
+	var targets := OptionButton.new()
+	for i in preview._context_items.size():
+		var item: BackgroundPlacement = preview._context_items[i]
+		targets.add_item("%d: %s" % [i + 1, item.texture.resource_path.get_file() if item.texture != null else "画像なし"])
+	if targets.item_count > 0:
+		targets.selected = preview.context_target
+	targets.item_selected.connect(func(index):
+		preview.select_context(preview.context_stage_path, index)
+		refresh())
+	fields.add_child(targets)
+	_number("表示倍率 / 1=実寸", preview.preview_zoom, "0.1,4,0.1", func(value): preview.preview_zoom = value; preview._view_dirty = true)
+	_number("炎の横位置 / ワールド単位", preview.usage_offset.x, "-1024,1024,1", func(value): preview.usage_offset.x = value; preview._view_dirty = true)
+	_number("炎の縦位置 / ワールド単位", preview.usage_offset.y, "-1024,1024,1", func(value): preview.usage_offset.y = value; preview._view_dirty = true)
+	_number("炎の表示倍率", preview.usage_scale, "0.1,8,0.05", func(value): preview.usage_scale = value; preview._view_dirty = true)
+	_button("選択背景の使用箇所へ保存", preview.save_usage)
+	_label("以下は炎自体の形・動き・色。保存先 .tres を用途ごとに分けられます。")
 	for property in preview.settings.get_property_list():
 		var key: String = property.name
 		if property.usage & PROPERTY_USAGE_GROUP and key != "Resource":
@@ -101,6 +155,14 @@ func _button(text: String, action: Callable) -> void:
 	button.text = text
 	button.pressed.connect(action)
 	fields.add_child(button)
+
+func _transport_button(row: HBoxContainer, icon: String, tip: String, action: Callable) -> void:
+	var button := Button.new()
+	button.text = icon
+	button.tooltip_text = tip
+	button.custom_minimum_size.x = 42
+	button.pressed.connect(action)
+	row.add_child(button)
 
 func _number(text: String, value: float, hint: String, action: Callable) -> void:
 	_label(text)

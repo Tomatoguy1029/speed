@@ -63,6 +63,7 @@ func start(options: Dictionary, with_view: bool) -> void:
 		if with_view:
 			for placement: BackgroundPlacement in options.stage.backgrounds:
 				if not placement.texture_path.is_empty(): paths.append(placement.texture_path)
+				if not placement.fire_preset_path.is_empty(): paths.append(placement.fire_preset_path)
 		resources = ContentManager.prepare_resources(paths, false)
 	sim.ctx.resources = resources
 	sim.options = options

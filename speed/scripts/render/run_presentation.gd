@@ -67,6 +67,8 @@ var view_override: Variant = null
 var show_background := true
 var _background_sprites: Array[Sprite2D] = []
 var _background_placements: Array[BackgroundPlacement] = []
+var _background_fires: Array[PixelFire] = []
+var _fire_placements: Array[BackgroundPlacement] = []
 var _background_origin := Vector2.ZERO
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
@@ -649,6 +651,7 @@ func _build_star_batch() -> void:
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
 func _build_stage_background() -> void:
 	_background_origin = state.ship_pos
+	var pending_fires: Array[PixelFire] = []
 	for placement: BackgroundPlacement in state.stage.backgrounds:
 		if placement.texture_path.is_empty():
 			continue
@@ -665,6 +668,20 @@ func _build_stage_background() -> void:
 		_layers.background.add_child(sprite)
 		_background_sprites.append(sprite)
 		_background_placements.append(placement)
+		if not placement.fire_preset_path.is_empty():
+			var preset := run.ctx.resources.resources.get(placement.fire_preset_path) as PixelFireSettings
+			if preset == null:
+				push_warning("背景の炎設定を読み込めません: " + placement.fire_preset_path)
+				continue
+			var fire := PixelFire.new()
+			fire.settings = preset
+			fire.position = state.ship_pos + placement.offset + placement.fire_offset
+			fire.scale = Vector2.ONE * placement.fire_scale
+			pending_fires.append(fire)
+			_background_fires.append(fire)
+			_fire_placements.append(placement)
+	for fire in pending_fires:
+		_layers.background.add_child(fire)
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
@@ -674,6 +691,10 @@ func _draw_background(c: CanvasItem) -> void:
 		var sprite := _background_sprites[i]
 		sprite.visible = show_background
 		sprite.position = _background_origin + _background_placements[i].position_at(cam_center - _background_origin)
+	for i in _background_fires.size():
+		var fire := _background_fires[i]
+		fire.visible = show_background
+		fire.position = _background_origin + _fire_placements[i].position_at(cam_center - _background_origin) + _fire_placements[i].fire_offset
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
