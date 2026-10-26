@@ -14,6 +14,8 @@ const STRING := Color("#f4ecd8")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
+## 背後攻撃の予告で本体に掛ける色
+const REAR_GLOW := Color(1.9, 0.35, 0.35)
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 ## 矢の雨の矢の向き（画面の下向きから少し傾ける）
 const RAIN_ANGLE := PI * 0.5 - 0.35
@@ -121,6 +123,10 @@ func _draw() -> void:
 		draw_line(from, from + Vector2(reach, 0.0), color, width if actor.alerting else pixel_size * 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
+	# 背後攻撃は、構えの間ボスを赤く明滅させ、当たりが有効な間は赤く光らせ続ける。
+	if actor.technique == &"rear_attack" and actor.mode in [&"windup", &"strike"]:
+		var blink := 1.0 if actor.mode == &"strike" else 0.5 + 0.5 * sin(actor.clock * TAU * 6.0)
+		tint = Color.WHITE.lerp(REAR_GLOW, blink)
 	modulate = tint
 	# 脚：走っている間は前後に振る。
 	for j in 4:

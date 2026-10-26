@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスと機体の間に置く守る雑魚の数
 @export_range(0, 40) var trial_defenders := 8
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "volley", "power_shot", "rain") var trial_technique := "normal"
+@export_enum("normal", "volley", "power_shot", "rain", "rear_attack") var trial_technique := "normal"
 
 func _ready() -> void:
 	await super._ready()
@@ -27,6 +27,7 @@ func _ready() -> void:
 		if arg.begins_with("--centaurus-capture-at="): capture_at = float(arg.trim_prefix("--centaurus-capture-at="))
 		if arg.begins_with("--centaurus-tech="): _only(StringName(arg.trim_prefix("--centaurus-tech=")))
 		if arg == "--centaurus-pin": session.pinned = trial_ship_position
+		if arg == "--centaurus-rear": _place_behind()
 	_set_mode(3)
 	_refresh()
 
@@ -49,6 +50,17 @@ func _process(delta: float) -> void:
 	var distance: float = actor.table.pos[actor.body].distance_to(session.run.state.ship_pos) if actor != null and actor.has_body() else -1.0
 	print("[centaurus-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if actor != null else &"", " tech=", actor.technique if actor != null else &"", " distance=", roundi(distance), " ship_hp=", session.run.state.ship_hp)
 	get_tree().quit(0 if error == OK else 1)
+
+## 背後攻撃の確認用。ボスを機体と反対へ向け、背中の後ろに機体を固定して、最初の待ちをなくす。
+func _place_behind() -> void:
+	var actor: BossActor = session.run.bosses.actor
+	if actor == null: return
+	var at: Vector2 = actor.table.pos[actor.body]
+	actor.table.facing[actor.body] = 0.0
+	actor._cooldown = 0.0
+	session.pinned = at - Vector2(220, 0)
+	session.run.state.ship_pos = session.pinned
+	session.run.state.enemy_aim = session.pinned
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。
 func _only(id: StringName) -> void:
