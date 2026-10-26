@@ -1,0 +1,148 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/unicorn.png" id="1_sheet"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros_parts.gd" id="2_parts"]
+[ext_resource type="SpriteFrames" path="res://data/visuals/monoceros_gait.tres" id="3_gait"]
+
+[sub_resource type="AtlasTexture" id="Atlas_body"]
+atlas = ExtResource("1_sheet")
+region = Rect2(9, 1, 89, 130)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_head_upper"]
+atlas = ExtResource("1_sheet")
+region = Rect2(196, 35, 71, 86)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_head_lower"]
+atlas = ExtResource("1_sheet")
+region = Rect2(197, 133, 69, 99)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_booster"]
+atlas = ExtResource("1_sheet")
+region = Rect2(115, 72, 74, 53)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_leg_root"]
+atlas = ExtResource("1_sheet")
+region = Rect2(132, 144, 45, 59)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_leg_raised"]
+atlas = ExtResource("1_sheet")
+region = Rect2(4, 144, 24, 89)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_leg_low"]
+atlas = ExtResource("1_sheet")
+region = Rect2(67, 145, 26, 57)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="Atlas_leg_down"]
+atlas = ExtResource("1_sheet")
+region = Rect2(99, 145, 26, 36)
+filter_clip = true
+
+[node name="MonocerosParts" type="Node2D"]
+texture_filter = 1
+script = ExtResource("2_parts")
+gait = ExtResource("3_gait")
+
+[node name="TailBooster" type="Node2D" parent="."]
+position = Vector2(0, -107)
+
+[node name="Sprite" type="Sprite2D" parent="TailBooster"]
+position = Vector2(-37, -27)
+texture = SubResource("Atlas_booster")
+centered = false
+
+[node name="RearLeftLeg" type="Node2D" parent="."]
+position = Vector2(-27, -87)
+
+[node name="Foot" type="Node2D" parent="RearLeftLeg"]
+position = Vector2(-3, 33)
+
+[node name="Sprite" type="Sprite2D" parent="RearLeftLeg/Foot"]
+position = Vector2(-13, -6)
+texture = SubResource("Atlas_leg_raised")
+centered = false
+
+[node name="Root" type="Sprite2D" parent="RearLeftLeg"]
+position = Vector2(-30, -12)
+texture = SubResource("Atlas_leg_root")
+centered = false
+
+[node name="RearRightLeg" type="Node2D" parent="."]
+position = Vector2(28, -86)
+
+[node name="Foot" type="Node2D" parent="RearRightLeg"]
+position = Vector2(4, 47)
+
+[node name="Sprite" type="Sprite2D" parent="RearRightLeg/Foot"]
+position = Vector2(-13, -6)
+texture = SubResource("Atlas_leg_low")
+centered = false
+
+[node name="Root" type="Sprite2D" parent="RearRightLeg"]
+position = Vector2(-15, -12)
+texture = SubResource("Atlas_leg_root")
+centered = false
+flip_h = true
+
+[node name="FrontLeftLeg" type="Node2D" parent="."]
+position = Vector2(-31, -2)
+
+[node name="Foot" type="Node2D" parent="FrontLeftLeg"]
+position = Vector2(-5, 40)
+
+[node name="Sprite" type="Sprite2D" parent="FrontLeftLeg/Foot"]
+position = Vector2(-13, -6)
+texture = SubResource("Atlas_leg_down")
+centered = false
+
+[node name="Root" type="Sprite2D" parent="FrontLeftLeg"]
+position = Vector2(-30, -12)
+texture = SubResource("Atlas_leg_root")
+centered = false
+
+[node name="FrontRightLeg" type="Node2D" parent="."]
+position = Vector2(30, -3)
+
+[node name="Foot" type="Node2D" parent="FrontRightLeg"]
+position = Vector2(4, 40)
+
+[node name="Sprite" type="Sprite2D" parent="FrontRightLeg/Foot"]
+position = Vector2(-13, -6)
+texture = SubResource("Atlas_leg_low")
+centered = false
+
+[node name="Root" type="Sprite2D" parent="FrontRightLeg"]
+position = Vector2(-15, -12)
+texture = SubResource("Atlas_leg_root")
+centered = false
+flip_h = true
+
+[node name="Body" type="Node2D" parent="."]
+position = Vector2(0, -37)
+
+[node name="Sprite" type="Sprite2D" parent="Body"]
+position = Vector2(-44, -65)
+texture = SubResource("Atlas_body")
+centered = false
+
+[node name="Head" type="Node2D" parent="."]
+position = Vector2(0, 9)
+
+[node name="Upper" type="Sprite2D" parent="Head"]
+position = Vector2(-36, -25)
+texture = SubResource("Atlas_head_upper")
+centered = false
+
+[node name="Lower" type="Node2D" parent="Head"]
+position = Vector2(0, 50)
+
+[node name="Sprite" type="Sprite2D" parent="Head/Lower"]
+position = Vector2(-35, -23)
+texture = SubResource("Atlas_head_lower")
+centered = false
