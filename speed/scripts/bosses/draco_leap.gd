@@ -28,6 +28,7 @@ func windup(a: BossActor,_dt: float) -> void:
 	if not locked:
 		_lock(a)
 		locked=a.elapsed>=setup_time
+		if locked: a.combat_trace.stage("lock")
 	if a.elapsed<setup_time:
 		a.table.pos[a.body]=entry.lerp(origin,MOTION.smooth(a.elapsed/setup_time))
 	else:

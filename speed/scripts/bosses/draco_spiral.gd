@@ -64,6 +64,7 @@ func tick(a: BossActor, _dt: float) -> void:
 		# 収縮中は共通hazardの反復ヒットを止め、接触を一度だけ受付する。
 		for h in walls:
 			if a.ctx.projectiles.owns_hazard(h, a.body, a.body_id): a.ctx.projectiles.hazard_dmg[h] = 0.0
+		if not trapped_hit: a.combat_trace.evaluate()
 		var touching := false
 		for j in range(points.size() - 1):
 			if Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos, points[j], points[j + 1]).distance_to(a.run_state.ship_pos) <= a.body_width * 0.5 * FORM.taper((fractions[j] + fractions[j + 1]) * 0.5) + a.ctx.cfg.ship_radius:
@@ -72,7 +73,7 @@ func tick(a: BossActor, _dt: float) -> void:
 		if not trapped_hit and touching:
 			trapped = true
 			trapped_hit = true
-			a.ctx.ship.damage(float(p.damage) * a.ctx.cfg.atk_scale, 0.0, &"spiral", &"draco")
+			a.combat_trace.damage(float(p.damage) * a.ctx.cfg.atk_scale, 0.0, &"spiral", &"draco")
 			a.run_state.ship_invuln = maxf(a.run_state.ship_invuln, float(p.shrink_time) * (1.0 - shrink) + 1.0)
 	a.table.facing[a.body] = (points[0] - points[1]).angle() if shrink < 0.65 else PI * 0.5
 	a.table.pos[a.body] = points[0]

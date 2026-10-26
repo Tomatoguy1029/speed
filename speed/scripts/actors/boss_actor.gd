@@ -5,6 +5,9 @@
 class_name BossActor
 extends Node2D
 
+var combat_trace := preload("res://scripts/bosses/combat_trace.gd").new()
+## Adapter scopes natural AI; direct/debug callers keep the explicit external origin.
+var combat_origin := "external_forced"
 var ctx: RunContext
 var body_id := 0
 var registered := false
@@ -28,6 +31,7 @@ func bind(context: RunContext, row: int, d: BossDef) -> void:
 	registered = true
 	def = d
 	position = table.pos[row]
+	combat_trace.bind(self)
 	_on_bound()
 
 ## 結び付いたあとの準備（各ボスで上書きする）。

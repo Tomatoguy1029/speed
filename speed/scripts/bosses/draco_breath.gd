@@ -79,10 +79,11 @@ func tick(a: BossActor,_dt: float) -> void:
 		rays.append(reach)
 		polygon.append(mouth+direction*reach)
 	a.attack_points=polygon
+	a.combat_trace.evaluate()
 	# 点列の隣接扇形そのものを使う。遮蔽の見えている境界を判定も越えない。
 	for j in range(1,polygon.size()-1):
 		if Geometry2D.is_point_in_polygon(a.run_state.ship_pos,PackedVector2Array([mouth,polygon[j],polygon[j+1]])):
-			a.ctx.ship.damage(float(a.rule().damage)*a.ctx.cfg.atk_scale,0.0,&"breath",&"draco")
+			a.combat_trace.damage(float(a.rule().damage)*a.ctx.cfg.atk_scale,0.0,&"breath",&"draco")
 			break
 func end(a: BossActor,cancelled: bool) -> void:
 	for rock: FieldSystem.Rock in rocks:

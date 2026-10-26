@@ -22,12 +22,13 @@ func tick(a: BossActor, dt: float) -> void:
 	var mouth: Vector2 = a.mouth_pos()
 	var inhale_time := float(a.rule().inhale_time)
 	if a.elapsed < inhale_time:
+		if not caught: a.combat_trace.evaluate()
 		var toward: Vector2 = mouth - a.run_state.ship_pos
 		if toward.length() < float(a.rule().pull_range) and not caught:
 			a.run_state.ship_pos += toward.normalized() * minf(toward.length(), float(a.rule().pull_speed) * dt)
 			if toward.length() < float(a.rule().mouth_radius) + a.ctx.cfg.ship_radius:
 				caught = true
-				a.ctx.ship.damage(float(a.rule().bite_damage) * a.ctx.cfg.atk_scale, 0.0, &"bite", &"draco")
+				a.combat_trace.damage(float(a.rule().bite_damage) * a.ctx.cfg.atk_scale, 0.0, &"bite", &"draco")
 				a.run_state.ship_pos = mouth + a.direction * (a.head_scale * 100.0)
 				a.run_state.ship_vel = a.direction * 1000.0
 				a.run_state.ship_invuln = maxf(a.run_state.ship_invuln, 1.2)
@@ -54,6 +55,7 @@ func tick(a: BossActor, dt: float) -> void:
 	a.direction = beam_direction
 	a.table.facing[a.body] = a.direction.angle()
 	mouth = a.mouth_pos()
+	a.combat_trace.stage("lock", {"scope": "exhale", "aim": [a.aim_target().x, a.aim_target().y]})
 	beam = a.ctx.projectiles.fire_beam(mouth, a.direction.angle(), float(a.rule().reach), float(a.rule().width), float(a.rule().get("beam_warn", 0.5)), float(a.rule().beam_time), float(a.rule().damage) * a.ctx.cfg.atk_scale, Color("#d4bbff"))
 	a.ctx.projectiles.attach_hazard(beam, a.body)
 	if stars > 0:

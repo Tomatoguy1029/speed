@@ -35,6 +35,7 @@ func windup(a: BossActor,_dt: float) -> void:
 	if not locked:
 		_lock(a)
 		locked=a.elapsed>=setup_time
+		if locked: a.combat_trace.stage("lock")
 func tick(a: BossActor,_dt: float) -> void:
 	MOTION.clear_tell(a)
 	var before := MOTION.mouth(a)

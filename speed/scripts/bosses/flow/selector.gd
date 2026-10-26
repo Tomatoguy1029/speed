@@ -1,6 +1,7 @@
 extends RefCounted
 var random := RandomNumberGenerator.new()
 var diagnostics: Dictionary = {}
+var record_details := false
 
 static func category(actions: Array) -> String:
 	return "parallel" if actions.size() > 1 else String(actions[0].get("category", "single")) if not actions.is_empty() else ""
@@ -41,6 +42,11 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 			elif float(weights.get(kind, 0.0)) > 0.0: positive = true
 		if positive: groups = alternatives
 	var actions: Array = sample(groups, weights)
+	if record_details:
+		diagnostics["previous_identity"] = previous
+		diagnostics["avoid_repeat"] = section.get("avoid_repeat", true)
+		diagnostics["eligible_identities"] = {}
+		for kind in groups: diagnostics.eligible_identities[kind] = groups[kind].keys()
 	# 3個以上は選択済みペアから必要時だけ拡張し、全ての部分集合を作らない。
 	if actions.size() > 1:
 		var remaining := candidates.duplicate()
@@ -73,6 +79,7 @@ func sample(groups: Dictionary, weights: Dictionary) -> Array:
 	diagnostics = {"available": groups.keys(), "weights": weights, "total": total}
 	if total <= 0.0: return []
 	var cursor := random.randf() * total
+	if record_details: diagnostics["draw"] = cursor
 	for kind in groups:
 		cursor -= maxf(0.0, float(weights.get(kind, 0.0)))
 		if cursor < 0.0:

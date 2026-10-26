@@ -158,8 +158,6 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			if not (state.glide or state.tracing):
 				state.ship_vel *= _pierce_keep(i)
 			build.on_contact(i, hit_pos, dir)
-			if crit:
-				_stop(0.05 if t.dead[i] != 0 else 0.035)
 			continue
 		# 弾かれた（仕様書 6.5・7.2）
 		state.glide = false
@@ -248,14 +246,18 @@ func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
 
 ## 行 i の敵にダメージを与える。opts：crit（体当たりで判定したクリティカル。武器などの当たりはクリティカルにならない）、no_crit、cause、dir、knock、impact。
 func damage_enemy(i: int, dmg: float, opts := {}) -> void:
+	var struck_row := i
+	var requested := dmg
 	i = damage_target(i)
 	var t := enemies.table
 	if t.dead[i] != 0 or dmg <= 0.0 or state.phase != RunState.Phase.PLAY or t.guard[i] > 0.0 or state.controls_locked or state.encounter_protected:
+		_record_boss_damage(struck_row, i, requested, 0.0, t.hp[i], opts, "dead" if t.dead[i] != 0 else "nonpositive" if dmg <= 0.0 else "run_phase" if state.phase != RunState.Phase.PLAY else "guard" if t.guard[i] > 0.0 else "controls_locked" if state.controls_locked else "encounter_protected")
 		return
 	var cause: StringName = opts.get("cause", &"")
 	# 体当たりの通り抜けは collide_ship で扱う。ここでは、条件を満たさない攻撃のダメージを止める
 	if cause != &"ram" and cause != &"bump" and enemies.gate_check(i, opts.get("impact", t.pos[i]),
 			opts.get("dir", Vector2.ZERO), cause, dmg) != EnemyTable.GateResult.ALLOW:
+		_record_boss_damage(struck_row, i, requested, 0.0, t.hp[i], opts, "damage_gate")
 		return
 	if cause == &"fire":
 		t.fire_hit[i] = state.world_time
@@ -275,14 +277,15 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	t.hp[i] -= dmg
 	if t.is_boss[i] != 0:
 		bosses.body_damaged(i)
+	_record_boss_damage(struck_row, i, requested, dmg, hp_before, opts, "phase_floor" if t.hp[i] > hp_before - dmg else "applied")
 	if bosses != null: bosses.damage_applied(i, maxf(0.0, hp_before - maxf(0.0, t.hp[i])))
+	if cause == &"ram" and hp_before > maxf(0.0, t.hp[i]):
+		_hit_stop(i, fresh, crit)
 	t.flash[i] = 0.12
 	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
 	if t.hp[i] <= 0.0:
-		if fresh and cause == &"ram":
-			_kill_stop(i, crit)
 		kill_enemy(i, opts.merged({"crit": crit}))
 	elif opts.has("dir"):
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
@@ -313,19 +316,33 @@ func _bump_obstacle(i: int, hit_pos: Vector2, R: float, dir: Vector2, damage := 
 	if damage:
 		damage_enemy(i, attack_power() * 0.25, {"cause": &"bump", "dir": -n})
 
-## 一撃で倒したときのヒットストップ（仕様書 7.4）。
-func _kill_stop(i: int, crit: bool) -> void:
-	if dash_stop >= cfg.kill_hitstop_cap:
-		return
-	var big := enemies.table.r[i] > 25.0
-	var stop := cfg.kill_hitstop * (cfg.hitstop_big_mult if big else 1.0) * (cfg.hitstop_crit_mult if crit else 1.0)
-	_stop(stop)
-	dash_stop += stop
+## 実際にHPを減らした体当たりの停止時間。撃破とクリティカルは長い方を1回だけ使う。
+func _hit_stop(i: int, fresh: bool, crit: bool) -> void:
+	var t := enemies.table
+	var killed := t.hp[i] <= 0.0
+	var seconds := 0.0
+	if fresh and killed:
+		seconds = cfg.kill_hitstop * (cfg.hitstop_big_mult if t.r[i] > 25.0 else 1.0) * (cfg.hitstop_crit_mult if crit else 1.0)
+	if crit:
+		seconds = maxf(seconds, 0.05 if killed else 0.035)
+	var multiplier := 1.0
+	if t.def[i] != null:
+		multiplier = t.def[i].hitstop_multiplier
+	elif bosses != null:
+		var owner := bosses.actor_for_row(i)
+		if owner != null: multiplier = owner.def.hitstop_multiplier
+	if is_finite(multiplier) and multiplier > 0.0:
+		_stop(seconds * multiplier)
 
-## ヒットストップを seconds 実秒以上にする。設定で切っていれば止めない。
+## 同時命中は最長の残時間を使い、要求時間の合計を共通上限内に収める。
 func _stop(seconds: float) -> void:
-	if state.hitstop_enabled:
-		state.hitstop = maxf(state.hitstop, seconds)
+	if not state.hitstop_enabled or state.phase != RunState.Phase.PLAY or state.controls_locked or state.encounter_protected:
+		return
+	if not is_finite(seconds) or seconds <= 0.0 or not is_finite(cfg.kill_hitstop_cap):
+		return
+	var stop := minf(seconds, maxf(0.0, cfg.kill_hitstop_cap - dash_stop))
+	state.hitstop = maxf(state.hitstop, stop)
+	dash_stop += stop
 
 func kill_enemy(i: int, opts := {}) -> void:
 	var t := enemies.table
@@ -386,3 +403,15 @@ func damage_target(row: int) -> int:
 func contains_target(row: int, point: Vector2, radius: float) -> bool:
 	if bosses!=null: return bosses.contains_target(row,point,radius)
 	return point.distance_to(enemies.table.pos[row])<=enemies.table.r[row]+radius
+
+func _record_boss_damage(struck: int, target: int, requested: float, resolved: float, before: float, opts: Dictionary, reason: String) -> void:
+	if bosses == null or not bosses.diagnostics.enabled(): return
+	for actor in bosses.actors:
+		if not actor.owns_damage_target(target): continue
+		var t := enemies.table
+		actor.combat_trace.event("combat_damage", {"target": "boss", "struck_id": t.id[struck], "target_id": t.id[target],
+			"cause": String(opts.get("cause", &"")), "requested": requested, "resolved": resolved,
+			"applied": maxf(0.0, before - maxf(0.0, t.hp[target])), "discarded": maxf(0.0, resolved - maxf(0.0, before - maxf(0.0, t.hp[target]))),
+			"hp_before": before, "hp_after": t.hp[target], "reason": reason,
+			"impact": [opts.get("impact", t.pos[struck]).x, opts.get("impact", t.pos[struck]).y]})
+		return

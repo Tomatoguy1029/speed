@@ -6,6 +6,7 @@ class_name ProjectileSystem
 extends RunSystem
 
 func dispose() -> void:
+	clear_combat_observations()
 	for attack in _attached_attacks.values():
 		attack.dispose()
 	_attached_attacks.clear()
@@ -92,6 +93,10 @@ var lab_hazard_group: Dictionary = {}
 var director
 var _hostile_updating := false
 var _hostile_clear_pending := false
+## Only boss-created effects are tracked, with a fixed cap independent of mob count.
+var _combat_hostiles: Dictionary = {}
+var _combat_hazards: Dictionary = {}
+const COMBAT_EFFECT_LIMIT := 512
 
 ## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
 ##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる。
@@ -394,6 +399,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
 	hostile_burst[i] = 0.0
+	_combat_spawn(_combat_hostiles, i, "hostile", pos)
 	return i
 
 ## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
@@ -422,6 +428,7 @@ func _update_hostile(dt: float) -> void:
 		var life := hostile_life[i]
 		if life <= 0.0:
 			# バリアで消された弾
+			_combat_end(_combat_hostiles, i, "removed_before_contact", hostile_pos[i])
 			hostile_slots.release(i)
 			i += 1
 			continue
@@ -430,6 +437,7 @@ func _update_hostile(dt: float) -> void:
 			hostile_stone[i] -= dt
 			var reach_s := hostile_r[i] + R
 			if ship_pos.distance_squared_to(from) <= reach_s * reach_s:
+				_combat_end(_combat_hostiles, i, "petrified", from)
 				hostile_slots.release(i)
 			i += 1
 			continue
@@ -463,6 +471,7 @@ func _update_hostile(dt: float) -> void:
 			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
+		_combat_evaluate(_combat_hostiles, i)
 		var stop = shape.contact(self, i, from, to, body_hit, ship_pos, R, step)
 		if stop != null:
 			life = 0.0
@@ -470,6 +479,7 @@ func _update_hostile(dt: float) -> void:
 		if body_hit != null or life <= 0.0:
 			# 飛びきるか何かに当たった位置で消える（圧縮弾はそこで破裂する）
 			shape.on_end(self, i, to if body_hit == null else from + (to - from) * float(body_hit.t), life <= 0.0)
+			_combat_end(_combat_hostiles, i, "contact" if stop != null else "obstacle" if body_hit != null else "lifetime_or_view_exit", to)
 			hostile_slots.release(i)
 		else:
 			hostile_pos[i] = to
@@ -502,6 +512,7 @@ func block_one(center: Vector2, radius: float) -> bool:
 
 ## ボスの撃破などで、敵の弾と攻撃の形をすべて消す。
 func clear_hostile() -> void:
+	clear_combat_observations("cleared")
 	hazard_slots.clear()
 	if _hostile_updating:
 		_hostile_clear_pending = true
@@ -606,6 +617,7 @@ func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 ## 攻撃の形（行 h）を消す。
 func release_hazard(h: int) -> void:
 	if h < hazard_alive.size() and hazard_alive[h] != 0:
+		_combat_end(_combat_hazards, h, "released", hazard_pos[h])
 		hazard_slots.release(h)
 
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
@@ -634,6 +646,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
 	hazard_gap_w[i] = gap_w
+	_combat_spawn(_combat_hazards, i, "hazard", pos)
 	return i
 
 ## 広がる波（行 i）の、今の半径。
@@ -656,6 +669,7 @@ func _update_hazards(dt: float) -> void:
 		var owner := hazard_owner[i]
 		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
 				or combat.enemies.table.dead[owner] != 0)):
+			_combat_end(_combat_hazards, i, "lifetime_or_owner_end", hazard_pos[i])
 			hazard_slots.release(i)
 			continue
 		var shape := _hazard_shape(hazard_kind[i])
@@ -665,10 +679,55 @@ func _update_hazards(dt: float) -> void:
 			continue
 		if not shape.before_touch(self, i):
 			return
+		_combat_evaluate(_combat_hazards, i)
 		if not shape.touches(self, i, ship_pos, R):
 			continue
 		if shape.hits_once:
 			hazard_hit[i] = 1
-		ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[hazard_kind[i]], _hazard_source(i))
+		_combat_damage(_combat_hazards, i, hazard_dmg[i], 0.0, HAZARD_CAUSE[hazard_kind[i]], _hazard_source(i))
 		if state.phase != RunState.Phase.PLAY:
 			return
+
+func _combat_spawn(records: Dictionary, row: int, kind: String, pos: Vector2) -> void:
+	# Always remove stale slot metadata, including when recording was stopped mid-effect.
+	records.erase(row)
+	if ctx.bosses == null or not ctx.bosses.diagnostics.enabled(): return
+	var actor := ctx.bosses.recording_actor
+	if actor == null: return
+	if _combat_hostiles.size() + _combat_hazards.size() >= COMBAT_EFFECT_LIMIT:
+		ctx.bosses.diagnostics.dropped += 1
+		return
+	var meta: Dictionary = actor.combat_trace.context()
+	meta.merge({"effect_id": ctx.bosses.diagnostics.next_id(), "effect_kind": kind, "effect_row": row,
+		"spawn_pos": [pos.x, pos.y], "checks": 0, "contacts": 0, "applied": 0.0})
+	records[row] = meta
+	ctx.bosses.diagnostics.record("boss_effect", meta.merged({"step": "spawn"}))
+
+func _combat_evaluate(records: Dictionary, row: int) -> void:
+	if not records.is_empty() and records.has(row): records[row].checks += 1
+
+func damage_hostile(row: int) -> void:
+	_combat_damage(_combat_hostiles, row, hostile_dmg[row], hostile_slow[row], HOSTILE_CAUSE[hostile_kind[row]], &"")
+
+func _combat_damage(records: Dictionary, row: int, amount: float, slow: float, cause: StringName, source: StringName) -> void:
+	if records.is_empty() or not records.has(row):
+		ship.damage(amount, slow, cause, source)
+		return
+	var meta: Dictionary = records[row]
+	meta.contacts += 1
+	var before := state.ship_hp
+	ship.damage(amount, slow, cause, source, meta)
+	meta.applied += maxf(0.0, before - maxf(0.0, state.ship_hp))
+
+func _combat_end(records: Dictionary, row: int, reason: String, pos: Vector2) -> void:
+	if records.is_empty() or not records.has(row): return
+	var meta: Dictionary = records[row]
+	records.erase(row)
+	if ctx.bosses == null or not ctx.bosses.diagnostics.enabled(): return
+	meta.merge({"step": "end", "reason": reason, "end_pos": [pos.x, pos.y], "player_pos": [state.ship_pos.x, state.ship_pos.y],
+		"observation_scope": "effect_observed_lifetime", "outcome": "hit" if float(meta.applied) > 0.0 else "contact_blocked" if int(meta.contacts) > 0 else "evaluated_miss" if int(meta.checks) > 0 else "no_hit_observed"})
+	ctx.bosses.diagnostics.record("boss_effect", meta)
+
+func clear_combat_observations(reason := "recording_end") -> void:
+	for row: int in _combat_hostiles.keys(): _combat_end(_combat_hostiles, row, reason, hostile_pos[row])
+	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])

@@ -87,6 +87,7 @@ func handle_body_defeat(_opts: Dictionary) -> bool:
 
 func _stop_combat() -> void:
 	if _defeated: return
+	combat_trace.finish("interrupted", "defeated")
 	_defeated = true
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
@@ -142,6 +143,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 					mode = &"recovery"
 					recovery = float(rule().recover)
 			else:
+				combat_trace.finish()
 				mode = &"idle"
 				technique = &""
 	elif mode == &"phase":
@@ -178,17 +180,28 @@ func rule() -> Dictionary:
 	return _moves[technique].parameters if _moves.has(technique) else {}
 
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
-	if not _moves.has(attack) or not can_select(attack, int(gate.get("min_phase", 1)), float(gate.get("min", 0.0)), minf(float(gate.get("max", INF)), _reach(attack)), false): return false
-	if not _gate_allows(gate): return false
-	# 接近された時は、その状況に対応する蹄・薙ぎを使う。CD中は突進へ戻れる。
-	if attack != &"kick" and _close_ready(&"kick"): return false
-	if attack not in [&"kick", &"sweep"] and _close_ready(&"sweep"): return false
+	return technique_rejection(attack, gate).is_empty()
+
+func technique_rejection(attack: StringName, gate: Dictionary) -> String:
+	if not _moves.has(attack): return "unknown_technique"
+	if mode != &"idle": return "busy"
+	if _cooldown > 0.0: return "initial_wait"
+	if reposition > 0.0: return "repositioning"
+	if phase < int(gate.get("min_phase", 1)): return "phase"
+	if clock < float(cooldowns.get(attack, 0.0)): return "cooldown"
+	var distance := table.pos[body].distance_to(run_state.ship_pos)
+	if distance < float(gate.get("min", 0.0)): return "distance_below_min"
+	if distance > float(gate.get("max", INF)): return "distance_above_max"
+	if distance > _reach(attack): return "out_of_reach"
+	if not _gate_allows(gate): return "direction_or_range_gate"
+	if attack != &"kick" and _close_ready(&"kick"): return "close_kick_priority"
+	if attack not in [&"kick", &"sweep"] and _close_ready(&"sweep"): return "close_sweep_priority"
 	if attack != &"kick":
 		var r: Dictionary = _moves[attack].parameters
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
-		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return false
-	# 予告中も走り続ける相手へ、発進時には届かない技を選ばない。
-	return table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) <= _reach(attack)
+		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
+	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) > _reach(attack): return "predicted_target_out_of_reach"
+	return ""
 
 func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
@@ -220,9 +233,14 @@ func can_select(attack: StringName, min_phase: int, min_range: float, max_range:
 	return not rear_only or absf(Geom.angle_diff(d.angle(), table.facing[body] + PI)) < float(def.params.kick_trigger_arc)
 
 func start_attack(attack: StringName) -> bool:
-	if mode != &"idle" or not _moves.has(attack): return false
+	if mode != &"idle" or not _moves.has(attack):
+		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
+		return false
 	var r: Dictionary = _moves[attack].parameters
-	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)): return false
+	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)):
+		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
+		return false
+	combat_trace.begin(attack, combat_origin)
 	technique = &"charge" if attack == &"combo" else attack
 	cooldowns[attack] = clock + float(r.cd)
 	combo_pending = attack == &"combo"
@@ -302,6 +320,7 @@ func launch_strike() -> void:
 	if mode != &"windup": return
 	lock_aim()
 	if table.pos[body].distance_to(aim_point) > _reach(technique) or (technique == &"kick" and absf(Geom.angle_diff(direction.angle(), table.facing[body] + PI)) > float(def.params.kick_trigger_arc)):
+		combat_trace.finish("interrupted", "target_left_launch_range")
 		# 予告中に届かない位置へ離れた自機へ、空の近接攻撃を出し続けない。
 		timeline.stop()
 		combo_pending = false
@@ -311,6 +330,7 @@ func launch_strike() -> void:
 		_cue(&"recovery_started")
 		return
 	if technique in [&"charge", &"return_charge", &"lance"] and _path_blocked():
+		combat_trace.finish("interrupted", "path_obstructed")
 		combo_pending = false
 		passes_left = 0
 		timeline.stop()
@@ -348,6 +368,7 @@ func _tick_strike(dt: float, prior: PackedVector2Array) -> void:
 			stuck_body = hit.body
 			stuck_offset = table.pos[body] - stuck_body.pos
 			stuck_time = float(def.params.stuck_time)
+			combat_trace.finish("interrupted", "horn_stuck_in_planet")
 			mode = &"stuck"
 			combo_pending = false
 			passes_left = 0
@@ -356,6 +377,7 @@ func _tick_strike(dt: float, prior: PackedVector2Array) -> void:
 			_cue(&"horn_stuck")
 			return
 		if body_hit != null:
+			combat_trace.stage("interruption", {"reason": "body_obstacle"})
 			table.pos[body] = from.lerp(to, body_hit.t)
 			_damage_shape(prior, horn_points())
 			combo_pending = false
@@ -452,6 +474,7 @@ func warning_points() -> PackedVector2Array:
 
 func _damage_shape(prior: PackedVector2Array, points: PackedVector2Array) -> void:
 	if attack_hit or mode != &"active": return
+	combat_trace.evaluate()
 	var radius := float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 	var paths: Array[PackedVector2Array] = [points, prior]
 	if prior.size() == 2:
@@ -468,14 +491,22 @@ func _damage_shape(prior: PackedVector2Array, points: PackedVector2Array) -> voi
 
 func _hit_ship() -> void:
 	if attack_hit: return
-	ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale, 0.0, &"horn", &"monoceros")
+	combat_trace.damage(float(rule().damage) * ctx.cfg.atk_scale, 0.0, &"horn", &"monoceros")
 	attack_hit = true
 
 func _cue(cue: StringName) -> void:
+	match cue:
+		&"telegraph": combat_trace.stage("telegraph")
+		&"aim_locked": combat_trace.stage("lock")
+		&"attack_started": combat_trace.stage("execute")
+		&"recovery_started": combat_trace.stage("recovery")
+		&"phase_changed": combat_trace.event("boss_phase", {"reason": "hp_threshold"})
 	presentation_event.emit({"cue": cue, "technique": technique, "phase": phase, "mode": mode,
 		"position": table.pos[body], "angle": table.facing[body], "world_time": clock})
 
 func begin_final_strike(charge: float) -> void:
+	combat_trace.finish("interrupted", "final_strike_replay")
+	combat_trace.stage("replay", {"origin": "final_strike_replay"})
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	combo_pending = false
@@ -485,6 +516,7 @@ func begin_final_strike(charge: float) -> void:
 	_cue(&"final_strike")
 
 func cancel_attack() -> void:
+	combat_trace.finish("interrupted", "cancelled")
 	timeline.stop()
 	combo_pending = false
 	passes_left = 0

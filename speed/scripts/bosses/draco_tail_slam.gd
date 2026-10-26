@@ -37,6 +37,7 @@ func windup(a: BossActor,_dt: float) -> void:
 	if not locked:
 		_target(a)
 		locked=a.elapsed>=minf(0.25,float(a.rule().warn)*0.35)
+		if locked: a.combat_trace.stage("lock", {"aim": [target.x, target.y], "scope": "tail_target"})
 	MOTION.blend(a,base,lifted,a.elapsed/float(a.rule().warn))
 func tick(a: BossActor,_dt: float) -> void:
 	MOTION.clear_tell(a)

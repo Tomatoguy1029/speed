@@ -162,12 +162,16 @@ func rule() -> Dictionary:
 	return _moves[technique].parameters if _moves.has(technique) else def.params
 
 func start_attack(id: StringName) -> bool:
-	if mode != &"idle" or not _moves.has(id): return false
+	if mode != &"idle" or not _moves.has(id):
+		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(id), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
+		return false
 	if selection_enabled and ctx.projectiles.director != null:
 		var director: RefCounted=ctx.projectiles.director
 		var key := "draco:%d:%d" % [body_id,attack_serial]
 		var p: Dictionary=_moves[id].parameters
-		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0): return false
+		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0):
+			combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(id), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
+			return false
 		attack_token=director.token(key)
 		ctx.projectiles.lab_context=attack_token
 		attack_serial+=1
@@ -176,6 +180,7 @@ func start_attack(id: StringName) -> bool:
 	telegraph_points.clear()
 	telegraph_paths.clear()
 	telegraph_widths.clear()
+	combat_trace.begin(id, combat_origin)
 	technique = id
 	attack_width = float(rule().get("width",45.0))
 	mode = &"windup"
@@ -185,7 +190,12 @@ func start_attack(id: StringName) -> bool:
 	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
 	table.facing[body] = direction.angle()
 	_driver = rule().driver.new() if rule().has("driver") else null
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	if _driver != null: _driver.begin(self)
+	ctx.bosses.recording_actor = prior_observer
+	combat_trace.stage("telegraph")
+	if _driver == null or not ("locked" in _driver): combat_trace.stage("lock", {"scope": "initial_aim"})
 	_update_body()
 	_presentation.queue_redraw()
 	return true
@@ -210,11 +220,14 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_update_body()
 		_presentation.queue_redraw()
 		return
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	elapsed += dt
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
 		elapsed = 0.0
+		combat_trace.stage("execute")
 	elif mode == &"transition":
 		if elapsed >= float(def.params.get("phase_time",1.0)):
 			mode = &"idle"
@@ -229,15 +242,18 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			if _driver != null: _driver.end(self,false)
 			mode = &"recovery"
 			elapsed = 0.0
+			combat_trace.stage("recovery")
 	elif mode == &"recovery":
 		if _driver != null and _driver.has_method("recover"): _driver.recover(self,dt)
 		if elapsed >= float(rule().recover):
+			combat_trace.finish()
 			_driver = null
 			mode = &"idle"
 			technique = &""
 			telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear()
 			attack_points.clear()
 			reset_pose()
+	ctx.bosses.recording_actor = prior_observer
 	_update_body()
 	_presentation.queue_redraw()
 	if selection_enabled and mode == &"idle" and flow_adapter != null:
@@ -248,6 +264,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		flow_runner.tick(dt, {"player": run_state.ship_pos}, flow_adapter)
 
 func cancel_attack() -> void:
+	combat_trace.finish("interrupted", "cancelled")
 	if _driver != null: _driver.end(self,true)
 	_driver = null
 	attack_points.clear()
@@ -258,7 +275,10 @@ func cancel_attack() -> void:
 	elapsed = 0.0
 
 func handle_body_defeat(_opts: Dictionary) -> bool:
-	if mode != &"finale": finale.begin()
+	if mode != &"finale":
+		combat_trace.finish("interrupted", "finale")
+		combat_trace.stage("finale", {"origin": "scripted_finale"})
+		finale.begin()
 	return true
 func advance_finale(real_dt: float, intent: Intent) -> void:
 	finale.advance(real_dt,intent)
@@ -270,7 +290,18 @@ func can_begin_sequence() -> bool:
 func attack_failed() -> bool:
 	return not body_alive()
 func technique_ready(id: StringName, gate: Dictionary) -> bool:
-	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and phase <= int(gate.get("max_phase",3)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos-table.pos[body]).rotated(-table.facing[body]))
+	return technique_rejection(id, gate).is_empty()
+
+func technique_rejection(id: StringName, gate: Dictionary) -> String:
+	if mode != &"idle": return "busy"
+	if not closing_walls.is_empty(): return "closing_walls"
+	if not _moves.has(id): return "unknown_technique"
+	if phase < int(gate.get("min_phase", 1)) or phase > int(gate.get("max_phase", 3)): return "phase"
+	var relative := (run_state.ship_pos-table.pos[body]).rotated(-table.facing[body])
+	if relative.length() < float(gate.get("min", 0.0)): return "distance_below_min"
+	if relative.length() > float(gate.get("max", 100000.0)): return "distance_above_max"
+	if not preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, relative): return "direction_gate"
+	return ""
 
 func on_body_damaged() -> void:
 	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
@@ -278,6 +309,7 @@ func on_body_damaged() -> void:
 	var floor_hp := table.max_hp[body] * float(thresholds[phase - 1])
 	if table.hp[body] > floor_hp: return
 	table.hp[body] = floor_hp
+	combat_trace.finish("interrupted", "phase_transition")
 	cancel_attack()
 	for rock: FieldSystem.Rock in placed_meteors:
 		rock.destroyed = true
@@ -287,6 +319,7 @@ func on_body_damaged() -> void:
 	picaro.pause(true)
 	run_state.encounter_protected=true
 	phase += 1
+	combat_trace.event("boss_phase", {"reason": "hp_threshold"})
 	mode = &"transition"
 	elapsed = 0.0
 	table.guard[body] = 1.0
@@ -296,6 +329,7 @@ func on_body_damaged() -> void:
 
 func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector2Array()) -> void:
 	if attack_hit or points.size()<2: return
+	combat_trace.evaluate()
 	attack_width = width
 	var radius := width + ctx.cfg.ship_radius
 	var hit := Geometry2D.get_closest_point_to_segment(run_state.ship_pos,points[0],points[1]).distance_to(run_state.ship_pos) <= radius
@@ -305,7 +339,7 @@ func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector
 		for j in sweep.size():
 			if Geometry2D.get_closest_point_to_segment(run_state.ship_pos,sweep[j],sweep[(j+1)%sweep.size()]).distance_to(run_state.ship_pos)<=radius: hit=true
 	if hit:
-		attack_hit = ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
+		attack_hit = combat_trace.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
 
 func contains_hit(point: Vector2, radius: float) -> bool:
 	if table.guard[body]>=1.0: return false

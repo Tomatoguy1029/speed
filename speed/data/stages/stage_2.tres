@@ -306,6 +306,7 @@ zako_curves = Array[ExtResource("10_hhbsv")]([SubResource("Resource_3y6x8"), Sub
 clips = Array[ExtResource("2_5plhc")]([SubResource("Resource_esfk7"), SubResource("Resource_k0r5q"), SubResource("Resource_cnhb3"), SubResource("Resource_7hkhu"), SubResource("Resource_axpqg"), SubResource("Resource_20pjy"), SubResource("Resource_hqnda"), SubResource("Resource_q0aev"), SubResource("Resource_70vkp"), SubResource("Resource_j3iar"), SubResource("Resource_lg16d"), SubResource("Resource_hb46m"), SubResource("Resource_olek3"), SubResource("Resource_3d53o"), SubResource("Resource_yrkec"), SubResource("Resource_ksojn"), SubResource("Resource_6qln1"), SubResource("Resource_nhqsb"), SubResource("Resource_yy5kg"), SubResource("Resource_2v223")])
 track_names = PackedStringArray("ビームの敵", "じょうぎ座", "たて座", "ぼうえんきょう座", "かに座")
 boss_time = 475.0
+boss_enabled = false
 surge_phases = {
 "escape": false,
 "phase_347783990498013494": false,

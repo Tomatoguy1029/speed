@@ -6,6 +6,20 @@ class_name BossSystem
 extends RunSystem
 
 signal boss_spawned(actor: Node)
+var diagnostics := preload("res://scripts/runtime/combat_diagnostics.gd").new()
+## Scoped to the current attack driver; retained summons keep their provenance unknown.
+var recording_actor: BossActor
+
+func setup(context: RunContext) -> void:
+	super(context)
+	diagnostics.state = state
+
+func dispose() -> void:
+	diagnostics.level = 0
+	diagnostics.state = null
+	recording_actor = null
+	super()
+
 
 var enemies: EnemySystem:
 	get: return ctx.enemies
@@ -154,6 +168,7 @@ func remove_actor(owner: BossActor) -> void:
 		return
 	if owner.has_body():
 		enemies.mark_dead(owner.body)
+	owner.combat_trace.finish("interrupted", "actor_removed")
 	owner.registered = false
 	owner.hit_feedback.clear()
 	actors.erase(owner)

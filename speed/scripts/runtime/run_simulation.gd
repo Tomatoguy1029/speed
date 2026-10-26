@@ -151,6 +151,7 @@ func setup() -> void:
 
 ## ランを片付ける。設定の通知を外し、ボスの役者を消す。
 func dispose() -> void:
+	if state != null: state.hitstop = 0.0
 	command_extension = Callable()
 	if SaveManager.settings_changed.is_connected(_read_settings):
 		SaveManager.settings_changed.disconnect(_read_settings)
@@ -207,6 +208,7 @@ func physics_step(delta: float) -> void:
 ## 設定のうちランに効くもの（ポーズ中に変えるとすぐ反映）。
 func _read_settings() -> void:
 	state.hitstop_enabled = bool(options.get("hitstop", true)) if state.lab_mode else bool(SaveManager.settings.hitstop)
+	if not state.hitstop_enabled: state.hitstop = 0.0
 
 ## 更新の順番（設計書 4.3）。
 ## ワープホールからボーナスステージに入る：周りの敵と敵の攻撃を消し、雑魚と硬めの敵を多く出す（仕様書 13.1）。
@@ -225,6 +227,7 @@ func _leave_bonus() -> void:
 	state.emit(&"bonus", {"enter": false, "pos": state.ship_pos})
 
 func _play_tick(real_dt: float) -> void:
+	if state.controls_locked or state.encounter_protected: state.hitstop = 0.0
 	state.sim_time += real_dt
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
 	if bosses.actor != null and bosses.actor.get("mode")==&"finale":
@@ -241,7 +244,7 @@ func _play_tick(real_dt: float) -> void:
 	draw.intent = it
 	draw.handle_input()
 	if state.hitstop > 0.0:
-		state.hitstop -= real_dt
+		state.hitstop = maxf(0.0, state.hitstop - real_dt)
 		return
 	if profiling:
 		_run(&"combat", func(): combat.tick(real_dt, 0.0))
@@ -356,6 +359,7 @@ func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
 		return
 	state.phase = phase
+	if phase != RunState.Phase.PLAY: state.hitstop = 0.0
 	loadout.on_phase_changed(phase)
 	phase_changed.emit(phase)
 

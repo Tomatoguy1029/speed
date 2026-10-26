@@ -4,6 +4,8 @@
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
+敵とボスの種類ごとの停止時間は `hitstop_multiplier` で調整する。[ヒットストップの適用条件・継承・上限](../../spec.md#74-ヒットストップ)に従い、[敵設定の編集手順](../../dev/stage-production.md#53-保存戻すエディターで編集する)から保存する。
+
 同じ敵をステージ別に調整する値は `speed/data/stages/stage_*.tres` の `enemy_tuning` に持つ。[ステージ敵調整](../../spec.md#20-調整機能)で編集する。
 
 ステージ1の強敵と三角の星のHP上書きは、[Stage1の調整箇所](../stages/stage-1.md#調整する場所)を参照する。
@@ -137,7 +139,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `hydra` | うみへび座 | 採用 | 中央HP・首増加・通常10技・大技5種・コンボ3種・分離から決着・固定瓦礫の戦闘エリアを実装。共通フロー・条件線・技ノードによる編集と消費型スタミナを実装。格子は仮1配置、試遊調整は未完 | [専用仕様](../bosses/hydra.md) | ステージ4のボス | `scenes/bosses/hydra_boss.tscn`、`data/bosses/ai/hydra_flow.tres`、`data/bosses/ai/hydra_action_rules.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、`scenes/bosses/hydra_presentation.tscn`。`gyms/hydra_trial.tscn` で試遊する。編集方法は [設計書 6.1](../../architecture.md#61-敵とボスの-ai) |
 | `monoceros` | いっかくじゅう座 | 採用 | 通常／往復突進・薙ぎ・蹴り・後半の光槍・惑星の角刺さり・形態予約、共通フローによる選択と消費型スタミナを実装。現在位置と実射程で候補を判定し、近距離は薙ぎ、背後は蹴りを優先する。予告中に速度から接触位置を見積もり、固定した直線へ発進する。実被弾を薄い白色と描画だけの揺れで示す。`combo` は届く場合に薙ぎへつなぐ仮実装例。表示と数値は仮。登場飛行・青白い炎の尾・突進噴射を実装。[剣状の角・光槍の固定から飛散・減衰](../bosses/monoceros.md#8-素材と演出)を実装。[演出の未完項目](../bosses/monoceros.md#10-調整素材の未完項目)が残る | [専用仕様](../bosses/monoceros.md)・[一戦の完成ラインと調整要件](../bosses/monoceros.md#9-実装調整接続) | ステージ1のボス | `scenes/bosses/monoceros_boss.tscn`、`data/bosses/ai/monoceros_action_rules.tres`、`data/bosses/ai/monoceros_flow.tres`、`data/bosses/monoceros_moves/`、`scripts/bosses/monoceros_boss.gd`、`data/bosses/monoceros.tres`、`scenes/bosses/monoceros_presentation.tscn`。実験場で配置できる |
-| 未定 | ケンタウルス座 | 採用 | 未実装（専用ボスの出現を無効化） | [ステージ2](../stages/stage-2.md#4-ボス戦) | ステージ2のボス | — |
+| 未定 | ケンタウルス座 | 採用 | 未実装（専用ボスの出現を無効化） | [ステージ2](../stages/stage-2.md#4-ボス戦) | ステージ2のボス | `data/stages/stage_2.tres` の `boss_enabled` で出現を管理する |
 | 未定 | おおいぬ座 | 採用 | 未実装（専用ボスの出現を無効化） | [ステージ3](../stages/stage-3.md#4-ボス戦) | ステージ3のボス | — |
 | `draco` | りゅう座 | 採用 | 共通寸法・姿勢に沿った全身の単一命中先、通常6技・主な7技、既存敵のコズミック版と全身複製、HP3段階、登場・小熊座解放・最終入力・固定フィニッシュを接続。現在位置に基づく狙いと確定予告、噛みつきの首・尾の動作、装甲と星の核の手続き描画、有効被弾の白色化・微振動を使う。共通フロー・ボス行動画面・全技の単独試遊とステージ5の本番出現を有効化。正式構図と最終バランスを調整する | [裂け目からの登場・自機越しの対面構図](../bosses/draco.md#83-ラスボス戦の登場)・[HP段階移行と隕石の消去](../bosses/draco.md#2-戦闘の進行)・[通常攻撃とブレスの遮蔽](../bosses/draco.md#4-通常攻撃)・[光の矢の固定着弾予告と光の爆発](../bosses/draco.md#52-隊列越しの遠距離攻撃ケンタウルス座)・[本体を含む3体編成と5系統からの選出](../bosses/draco.md#54-全身複製うみへび座)・[吸引と編集可能な複数の弧状弾配置](../bosses/draco.md#57-吸引大技)・[主な技・壁と被弾後の挙動](../bosses/draco.md#5-主な技)・[こぐま座の咆哮から合体・連撃・光の貫通と切断・爆発](../bosses/draco.md#23-hp0から最終決着)・[一戦の完成ライン](../bosses/draco.md#91-一戦を試遊できる完成ライン)・[発動条件と行動編集](../bosses/draco.md#71-攻撃区間と技の選択) | ステージ5のラスボス | `scripts/bosses/draco_boss.gd`・`draco_*.gd`、`data/bosses/draco_moves/`、`data/bosses/ai/draco_action_rules.tres`・`draco_flow.tres`、`scenes/bosses/draco_boss.tscn`。矢は共通の `scripts/attacks/light_arrow.gd` とコズミック版を使う |
 

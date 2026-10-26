@@ -27,6 +27,7 @@ func tick(a: BossActor, dt: float) -> void:
 		impact.age = float(impact.age) + dt
 		if impact.pos == Vector2.INF and float(impact.age) >= float(impact.wait):
 			impact.pos = a.aim_target()
+			a.combat_trace.stage("lock", {"scope": "arrow_impact", "aim": [impact.pos.x, impact.pos.y]})
 			a.presentation_event.emit({"cue":&"target_locked", "pos":impact.pos, "radius":a.rule().radius})
 		if impact.pos != Vector2.INF and float(impact.age) >= float(impact.wait) + float(impact.warn):
 			a.ctx.projectiles.fire_zone(impact.pos, float(a.rule().radius), 0.0, float(a.rule().damage) * a.ctx.cfg.atk_scale, ProjectileSystem.HazardStyle.BLAST, Color("#b7a3ff"))

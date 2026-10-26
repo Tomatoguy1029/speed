@@ -90,9 +90,10 @@ func tick(a: BossActor, dt: float) -> void:
 			var before: Vector2 = a.table.pos[unit.row] + forward * mouth_offset
 			a.table.pos[unit.row]=unit.origin.lerp(landing,clampf((a.elapsed-entry)/0.5,0.0,1.0))
 			var after: Vector2 = a.table.pos[unit.row] + forward * mouth_offset
+			if not unit.entry_hit: a.combat_trace.evaluate()
 			var nearest := Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos,before,after)
 			if not unit.entry_hit and nearest.distance_to(a.run_state.ship_pos) <= float(a.rule().width) + a.ctx.cfg.ship_radius:
-				unit.entry_hit = a.ctx.ship.damage(float(a.rule().damage) * a.ctx.cfg.atk_scale,0.0,&"clone_leap",&"draco")
+				unit.entry_hit = a.combat_trace.damage(float(a.rule().damage) * a.ctx.cfg.atk_scale,0.0,&"clone_leap",&"draco")
 		elif a.elapsed<entry+0.9:
 			a.table.pos[unit.row]=landing.lerp(unit.origin,(a.elapsed-entry-0.5)/0.4)
 		elif not unit.done:
