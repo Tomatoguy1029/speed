@@ -83,9 +83,6 @@ func refresh() -> void:
 	for name in DirAccess.get_files_at("res://data/stages"):
 		if name.ends_with(".tres"):
 			var stage_path := "res://data/stages/" + name
-			var stage_data := ResourceLoader.load(stage_path, "", ResourceLoader.CACHE_MODE_IGNORE) as StageDef
-			if stage_data == null or stage_data.backgrounds.is_empty():
-				continue
 			stages.add_item(name.get_basename())
 			stages.set_item_metadata(stages.item_count - 1, stage_path)
 			if stage_path == preview.context_stage_path:
@@ -100,15 +97,53 @@ func refresh() -> void:
 		targets.add_item("%d: %s" % [i + 1, item.texture.resource_path.get_file() if item.texture != null else "画像なし"])
 	if targets.item_count > 0:
 		targets.selected = preview.context_target
+	else:
+		targets.add_item("このステージに背景配置なし")
+		targets.disabled = true
 	targets.item_selected.connect(func(index):
 		preview.select_context(preview.context_stage_path, index)
 		refresh())
 	fields.add_child(targets)
+	_label("重ねて見る対象画像（確認用・ステージには保存しません）")
+	var subject_row := HBoxContainer.new()
+	var subject_path := LineEdit.new()
+	subject_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	subject_path.placeholder_text = "res://assets/pixel/airship.png"
+	subject_path.text = preview.subject_path
+	subject_path.text_submitted.connect(preview.select_subject)
+	subject_row.add_child(subject_path)
+	var browse := Button.new()
+	browse.text = "選択…"
+	browse.tooltip_text = "プロジェクト内の PNG を選択"
+	browse.pressed.connect(preview.choose_subject)
+	subject_row.add_child(browse)
+	fields.add_child(subject_row)
+	_number("対象画像の表示倍率", preview.subject_scale, "0.1,8,0.05", func(value): preview.subject_scale = value; preview._view_dirty = true)
 	_number("表示倍率 / 1=実寸", preview.preview_zoom, "0.1,4,0.1", func(value): preview.preview_zoom = value; preview._view_dirty = true)
 	_number("炎の横位置 / ワールド単位", preview.usage_offset.x, "-1024,1024,1", func(value): preview.usage_offset.x = value; preview._view_dirty = true)
 	_number("炎の縦位置 / ワールド単位", preview.usage_offset.y, "-1024,1024,1", func(value): preview.usage_offset.y = value; preview._view_dirty = true)
 	_number("炎の表示倍率", preview.usage_scale, "0.1,8,0.05", func(value): preview.usage_scale = value; preview._view_dirty = true)
 	_button("選択背景の使用箇所へ保存", preview.save_usage)
+	_label("ステージ内の固定位置へ使う")
+	var uses := OptionButton.new()
+	uses.add_item("新しい用途")
+	var use_names: Array[String] = preview.world_usage_names()
+	for name in use_names:
+		uses.add_item(name)
+		if name == preview.usage_name:
+			uses.selected = uses.item_count - 1
+	uses.item_selected.connect(func(index):
+		if index > 0:
+			preview.load_world_usage(use_names[index - 1])
+		else:
+			preview.usage_name = "")
+	fields.add_child(uses)
+	var use_name := LineEdit.new()
+	use_name.placeholder_text = "使用箇所の名前"
+	use_name.text = preview.usage_name
+	use_name.text_changed.connect(func(value): preview.usage_name = value)
+	fields.add_child(use_name)
+	_button("固定位置に設定を保存", preview.save_world_usage)
 	_label("以下は炎自体の形・動き・色。保存先 .tres を用途ごとに分けられます。")
 	for property in preview.settings.get_property_list():
 		var key: String = property.name

@@ -69,6 +69,7 @@ var _background_sprites: Array[Sprite2D] = []
 var _background_placements: Array[BackgroundPlacement] = []
 var _background_fires: Array[PixelFire] = []
 var _fire_placements: Array[BackgroundPlacement] = []
+var _static_fires: Array[PixelFire] = []
 var _background_origin := Vector2.ZERO
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
@@ -682,6 +683,21 @@ func _build_stage_background() -> void:
 			_fire_placements.append(placement)
 	for fire in pending_fires:
 		_layers.background.add_child(fire)
+	for use_name in state.stage.fire_uses:
+		var fire_use: Dictionary = state.stage.fire_uses[use_name]
+		var preset_path := str(fire_use.get("preset", ""))
+		var preset := run.ctx.resources.resources.get(preset_path) as PixelFireSettings
+		if preset == null:
+			push_warning("固定炎の設定を読み込めません: " + preset_path)
+			continue
+		var fire := PixelFire.new()
+		fire.name = str(use_name)
+		fire.settings = preset
+		var offset: Vector2 = fire_use.get("offset", Vector2.ZERO)
+		fire.position = _background_origin + offset
+		fire.scale = Vector2.ONE * float(fire_use.get("scale", 1.0))
+		_layers.background.add_child(fire)
+		_static_fires.append(fire)
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
@@ -695,6 +711,8 @@ func _draw_background(c: CanvasItem) -> void:
 		var fire := _background_fires[i]
 		fire.visible = show_background
 		fire.position = _background_origin + _fire_placements[i].position_at(cam_center - _background_origin) + _fire_placements[i].fire_offset
+	for fire in _static_fires:
+		fire.visible = show_background
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)

@@ -41,9 +41,14 @@ var context_target := 0
 var preview_zoom := 1.0
 var usage_offset := Vector2.ZERO
 var usage_scale := 1.0
+var usage_name := ""
 var _context_stage: StageDef
 var _context_hash := ""
 var _context_items: Array[BackgroundPlacement] = []
+var subject_path := ""
+var subject_scale := 1.0
+var subject_sprite: Sprite2D
+var _subject_dialog: FileDialog
 var _loaded_path := ""
 var _source_hash := ""
 var _panel: Control
@@ -93,6 +98,12 @@ func _ready() -> void:
 	stage.add_child(background)
 	context_root = Node2D.new()
 	stage.add_child(context_root)
+	_subject_dialog = FileDialog.new()
+	_subject_dialog.access = FileDialog.ACCESS_RESOURCES
+	_subject_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_subject_dialog.filters = PackedStringArray(["*.png ; PNG"])
+	_subject_dialog.file_selected.connect(select_subject)
+	add_child(_subject_dialog)
 	fire = PixelFire.new()
 	fire.manual = true
 	stage.add_child(fire)
@@ -182,6 +193,8 @@ func select_context(path: String, target: int) -> void:
 	if loaded == null:
 		_set_status("背景を読み込めません: " + path)
 		return
+	if path != context_stage_path:
+		usage_name = ""
 	context_stage_path = path
 	_context_stage = loaded
 	_context_hash = FileAccess.get_md5(path)
@@ -193,6 +206,9 @@ func select_context(path: String, target: int) -> void:
 		if not dirty and not _context_items[context_target].fire_preset_path.is_empty():
 			preset_path = _context_items[context_target].fire_preset_path
 			reload_preset()
+	else:
+		usage_offset = Vector2.ZERO
+		usage_scale = 1.0
 	for child in context_root.get_children():
 		child.queue_free()
 	for item in _context_items:
@@ -210,8 +226,37 @@ func select_context(path: String, target: int) -> void:
 		sprite.modulate = item.display_tint()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		context_root.add_child(sprite)
+	_refresh_subject()
 	_view_dirty = true
 	_set_status("背景: " + path + " / 対象 %d" % (context_target + 1))
+
+func choose_subject() -> void:
+	_subject_dialog.popup_centered_ratio(0.75)
+
+func select_subject(path: String) -> void:
+	if not path.is_empty() and (not path.begins_with("res://") or not path.ends_with(".png")):
+		_set_status("対象画像にはプロジェクト内の PNG を選択してください。")
+		return
+	subject_path = path
+	_refresh_subject()
+	_view_dirty = true
+	if is_instance_valid(_panel):
+		_panel.refresh()
+
+func _refresh_subject() -> void:
+	if is_instance_valid(subject_sprite):
+		subject_sprite.queue_free()
+	subject_sprite = null
+	if subject_path.is_empty():
+		return
+	var texture := ResourceLoader.load(subject_path) as Texture2D
+	if texture == null:
+		_set_status("対象画像を読み込めません: " + subject_path)
+		return
+	subject_sprite = Sprite2D.new()
+	subject_sprite.texture = texture
+	subject_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	context_root.add_child(subject_sprite)
 
 func _layout_context() -> void:
 	var center := Vector2.ZERO
@@ -219,8 +264,94 @@ func _layout_context() -> void:
 		center = _context_items[context_target].offset
 	context_root.position = Vector2(stage.size) * 0.5 - center * preview_zoom
 	context_root.scale = Vector2.ONE * preview_zoom
+	if is_instance_valid(subject_sprite):
+		subject_sprite.position = center
+		subject_sprite.scale = Vector2.ONE * subject_scale
 	fire.position = context_root.position + (center + usage_offset) * preview_zoom
 	fire.scale = Vector2.ONE * usage_scale * preview_zoom
+
+func world_usage_names() -> Array[String]:
+	var names: Array[String] = []
+	if _context_stage != null:
+		for name in _context_stage.fire_uses:
+			names.append(str(name))
+	names.sort()
+	return names
+
+func load_world_usage(name: String) -> void:
+	if _context_stage == null or not _context_stage.fire_uses.has(name):
+		return
+	usage_name = name
+	var use: Dictionary = _context_stage.fire_uses[name]
+	var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	var offset: Vector2 = use.get("offset", Vector2.ZERO)
+	usage_offset = offset - center
+	usage_scale = float(use.get("scale", 1.0))
+	if not dirty:
+		preset_path = str(use.get("preset", ""))
+		reload_preset()
+	_view_dirty = true
+	if is_instance_valid(_panel):
+		_panel.refresh()
+
+func save_world_usage() -> void:
+	var name := usage_name.strip_edges()
+	if name.is_empty() or _context_stage == null or dirty or _loaded_path.is_empty():
+		_set_status("用途名を付け、炎設定を保存してから固定位置へ割り当ててください。")
+		return
+	if FileAccess.get_md5(context_stage_path) != _context_hash or FileAccess.get_md5(_loaded_path) != _source_hash:
+		_set_status("設定またはステージが外部で変更されています。再読込してください。")
+		return
+	var uses: Dictionary = _context_stage.fire_uses.duplicate(true)
+	var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	uses[name] = {"preset": _loaded_path, "offset": center + usage_offset, "scale": usage_scale}
+	var source := FileAccess.get_file_as_string(context_stage_path)
+	var line := "fire_uses = " + var_to_str(uses).replace("\n", " ")
+	var key_at := source.find("\nfire_uses = ")
+	var updated := ""
+	if key_at >= 0:
+		var end := source.find("\n", key_at + 1)
+		if end < 0 or not source.substr(key_at + 1, end - key_at - 1).strip_edges().ends_with("}"):
+			_set_status("ステージの用途一覧が複数行のため、保存形式を確認してください。")
+			return
+		updated = source.substr(0, key_at + 1) + line + source.substr(end)
+	else:
+		var resource_at := source.find("\n[resource]\n")
+		if resource_at < 0:
+			_set_status("ステージの Resource 節を特定できません。")
+			return
+		var script_end := source.find("\n", resource_at + "\n[resource]\n".length())
+		if script_end < 0:
+			_set_status("ステージのスクリプト行を特定できません。")
+			return
+		updated = source.substr(0, script_end + 1) + line + "\n" + source.substr(script_end + 1)
+	if not _write_stage_text(updated):
+		return
+	_context_stage.fire_uses = uses
+	usage_name = name
+	_set_status("固定位置の使用箇所へ保存しました: " + name)
+	if is_instance_valid(_panel):
+		_panel.refresh()
+
+func _write_stage_text(updated: String) -> bool:
+	var absolute := ProjectSettings.globalize_path(context_stage_path)
+	var temp := absolute + ".fire-tmp"
+	var file := FileAccess.open(temp, FileAccess.WRITE)
+	if file == null:
+		_set_status("使用箇所の一時保存に失敗しました。")
+		return false
+	file.store_string(updated)
+	file.flush()
+	file.close()
+	var error := DirAccess.rename_absolute(temp, absolute)
+	if error != OK:
+		DirAccess.remove_absolute(temp)
+		_set_status("使用箇所の保存に失敗しました: " + error_string(error))
+		return false
+	_context_hash = FileAccess.get_md5(context_stage_path)
+	if Engine.is_editor_hint():
+		EditorInterface.get_resource_filesystem().scan()
+	return true
 
 func save_usage() -> void:
 	if _context_stage == null or context_target >= _context_items.size() or dirty or _loaded_path.is_empty():

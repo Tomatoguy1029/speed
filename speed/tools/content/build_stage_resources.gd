@@ -45,6 +45,12 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 		if not placement.fire_preset_path.is_empty():
 			_add(paths, placement.fire_preset_path)
 			_script(paths, "res://scripts/render/fx/pixel_fire.gd")
+	for use_name in stage.fire_uses:
+		var fire_use: Dictionary = stage.fire_uses[use_name]
+		var preset_path := str(fire_use.get("preset", ""))
+		if not preset_path.is_empty():
+			_add(paths, preset_path)
+			_script(paths, "res://scripts/render/fx/pixel_fire.gd")
 	_add(paths, "res://.content/boss_hydra.tres")
 	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
 	var ids := {}

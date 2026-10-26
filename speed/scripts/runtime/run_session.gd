@@ -64,6 +64,9 @@ func start(options: Dictionary, with_view: bool) -> void:
 			for placement: BackgroundPlacement in options.stage.backgrounds:
 				if not placement.texture_path.is_empty(): paths.append(placement.texture_path)
 				if not placement.fire_preset_path.is_empty(): paths.append(placement.fire_preset_path)
+			for fire_use: Dictionary in options.stage.fire_uses.values():
+				var preset_path := str(fire_use.get("preset", ""))
+				if not preset_path.is_empty(): paths.append(preset_path)
 		resources = ContentManager.prepare_resources(paths, false)
 	sim.ctx.resources = resources
 	sim.options = options
