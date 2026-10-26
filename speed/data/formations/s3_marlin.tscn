@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://b5jsa50t7qlnx"]
+[gd_scene format=3 uid="uid://psh27x4c22fn"]
 
 [ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_axfmi"]
 [ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_76x3i"]
