@@ -1,6 +1,6 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" format=3 uid="uid://bay7nt1g67f70"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_c7rul"]
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_c7rul"]
 [ext_resource type="Resource" path="res://data/bosses/centaurus_moves/volley.tres" id="2_c7vly"]
 [ext_resource type="Resource" path="res://data/bosses/centaurus_moves/power_shot.tres" id="3_c7pws"]
 
@@ -28,4 +28,25 @@ conditions = {
 costs = {
 "power_shot": 2.0,
 "volley": 1.0
+}
+layout = {
+"choose_combo": Vector2(752, 116),
+"choose_major": Vector2(1464, 116),
+"choose_normal": Vector2(40, 116),
+"power_shot": Vector2(380, 340),
+"volley": Vector2(40, 340)
+}
+condition_groups = {
+"choose_combo": {
+"nodes": [],
+"title": "コンボ"
+},
+"choose_major": {
+"nodes": [],
+"title": "大技"
+},
+"choose_normal": {
+"nodes": ["volley", "power_shot"],
+"title": "通常技"
+}
 }
