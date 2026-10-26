@@ -127,6 +127,4 @@ func _fit_length(source: PackedVector2Array, length: float, count: int) -> Packe
 		var tangent := (source[-1] - source[-2]).normalized()
 		if tangent.is_zero_approx(): tangent = Vector2.LEFT
 		trimmed.append(trimmed[-1] + tangent * remaining)
-	var result := PackedVector2Array()
-	for j in count: result.append(FORM.sample(trimmed, float(j) / float(count - 1)))
-	return result
+	return FORM.samples_even(trimmed, count)

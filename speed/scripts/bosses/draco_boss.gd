@@ -130,11 +130,12 @@ func _update_body() -> void:
 	position = table.pos[body]
 	rotation = table.facing[body]
 	var points := body_points()
+	var row_points := FORM.samples_even(points, body_rows.size(), false)
 	table.r[body] = def.radius*head_scale*perspective_scale
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j],body_ids[j]):
 			var fraction := float(j+1)/float(body_rows.size())
-			table.pos[body_rows[j]] = FORM.sample(points,fraction)
+			table.pos[body_rows[j]] = row_points[j]
 			table.guard[body_rows[j]] = table.guard[body]
 			table.r[body_rows[j]] = body_width*0.5*FORM.taper(fraction)*perspective_scale
 
@@ -154,7 +155,7 @@ func _exit_tree() -> void:
 	if entrance != null: entrance.cancel()
 	if finale != null: finale.dispose()
 	if cycle != null: cycle.cancel()
-	if picaro != null: picaro.clear()
+	if picaro != null: picaro.dispose()
 	for j in body_rows.size():
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
 

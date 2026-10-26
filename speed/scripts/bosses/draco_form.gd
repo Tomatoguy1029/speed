@@ -31,6 +31,28 @@ static func sample(points: PackedVector2Array, fraction: float) -> Vector2:
 		remaining-=segment
 	return points[-1]
 
+## Sample a whole spine in one pass. The target distances match repeated sample() calls.
+static func samples_even(points: PackedVector2Array, count: int, include_head := true) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	if points.is_empty() or count <= 0: return result
+	var lengths := PackedFloat32Array()
+	var total := 0.0
+	for j in range(points.size() - 1):
+		var segment := points[j].distance_to(points[j + 1])
+		lengths.append(segment)
+		total += segment
+	var cursor := 0
+	var traversed := 0.0
+	for j in count:
+		var fraction := float(j) / float(maxi(1, count - 1)) if include_head else float(j + 1) / float(count)
+		var target := total * fraction
+		while cursor < lengths.size() - 1 and target > traversed + lengths[cursor]:
+			traversed += lengths[cursor]
+			cursor += 1
+		if cursor >= lengths.size(): result.append(points[-1])
+		else: result.append(points[cursor].lerp(points[cursor + 1], (target - traversed) / maxf(0.001, lengths[cursor])))
+	return result
+
 static func draw_body(canvas: CanvasItem, points: PackedVector2Array, width: float, time: float, cosmic := false, alpha := 1.0, fractions_override := PackedFloat32Array()) -> void:
 	if points.size()<2 or alpha<=0.001: return
 	var progress := fractions_override if fractions_override.size()==points.size() else fractions(points)
