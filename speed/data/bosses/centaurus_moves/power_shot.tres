@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_c7pws"]
+
+[resource]
+script = ExtResource("1_c7pws")
+technique = &"power_shot"
+parameters = {
+"cd": 7.0,
+"damage": 28.0,
+"alert": 0.4,
+"radius": 30.0,
+"recover": 1.5,
+"speed": 1800.0,
+"travel": 1600.0,
+"warn": 1.4
+}

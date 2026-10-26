@@ -1,4 +1,4 @@
-## 守る雑魚。近くの強敵と機体の間へ横一列に並び、強敵がいない間は噛みつく。
+## 守る雑魚。近くの強敵・ボスと機体の間へ横一列に並び、守る相手がいない間は噛みつく。
 extends "res://scripts/enemies/biter.gd"
 
 ## 1世界更新の間だけ共有する整列先。死亡・行解放・再出現で破棄する。
@@ -36,17 +36,17 @@ func _move_without_bite(i: int, dt: float) -> bool:
 		return true
 	return false
 
-## 強敵を一度だけ列挙し、同じ強敵を守る個体をID順の列へ割り当てる。
-## 並ぶ数は、その強敵の近くに出現させた守る雑魚の数で決まる。
+## 強敵とボスの本体を一度だけ列挙し、同じ相手を守る個体をID順の列へ割り当てる。
+## 並ぶ数は、その相手の近くに出現させた守る雑魚の数で決まる。
 func _assign_posts() -> void:
 	_posts.clear()
 	_posts_tick = m._lod
 	var t := table
 	var strong: Array[int] = []
 	for j in t.alive.size():
-		if t.alive[j] == 0 or t.dead[j] != 0 or t.is_boss[j] != 0 or t.parent[j] >= 0 or t.held[j] != 0 or t.meteor_index[j] >= 0:
+		if t.alive[j] == 0 or t.dead[j] != 0 or t.parent[j] >= 0 or t.held[j] != 0 or t.meteor_index[j] >= 0:
 			continue
-		if t.def[j] != null and t.def[j].rank >= 3 and t.def[j].rank <= 5:
+		if t.is_boss[j] != 0 or (t.def[j] != null and t.def[j].rank >= 3 and t.def[j].rank <= 5):
 			strong.append(j)
 	var ordered: Array[int] = []
 	ordered.assign(rows())
