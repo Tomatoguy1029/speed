@@ -13,8 +13,6 @@ const SCENES := {
 	"visual": "res://gyms/visual_editor.tscn",
 	"fire_scene": "res://gyms/pixel_fire_preview.tscn",
 	"background": "res://gyms/background_lab/background_lab.tscn",
-	"boss_trial": "res://gyms/boss_flow_trial.tscn",
-	"hydra_trial": "res://gyms/hydra_trial.tscn",
 	"art": "res://tools/preview_pixel_assets.tscn",
 	"performance": "res://gyms/perf_enemies/perf_enemies.tscn",
 	"profile": "res://tools/profile_run.tscn",
@@ -41,7 +39,7 @@ func _enter_tree() -> void:
 	add_control_to_container(CONTAINER_TOOLBAR, _button)
 	_lab_button = Button.new()
 	_lab_button.text = "▶ 実験場"
-	_lab_button.tooltip_text = "敵・ルート実験場を直接起動する（編集中のシーンに関係なく起動）"
+	_lab_button.tooltip_text = "敵・ボスの試遊とヒットストップ調整を共通の実験場で行う"
 	_lab_button.pressed.connect(_on_lab_pressed)
 	add_control_to_container(CONTAINER_TOOLBAR, _lab_button)
 	_visual_button = Button.new()
@@ -66,15 +64,15 @@ func _rebuild_menu() -> void:
 			_add_action(entry[0], ["plugin", entry[1], entry[2], entry[3]])
 	_menu.add_separator("起動・試遊")
 	_add_action("編集中のステージを起動", ["stage"])
-	for entry in [["敵・ルート実験場", "lab"], ["ボス技試遊", "boss_trial"], ["Hydra 試遊", "hydra_trial"]]:
+	for entry in [["実験場", "lab"]]:
 		_add_scene(entry[0], entry[1])
 	_menu.add_separator("見た目")
 	for entry in [["ビジュアル編集（炎・オーラ・後光・マップ）", "visual"], ["背景編集", "background"], ["ピクセル素材確認", "art"]]:
 		_add_scene(entry[0], entry[1])
 	if ResourceLoader.exists(SCENES.fire_scene):
 		_add_action("ピクセル炎（2D編集）", ["edit_scene", "fire_scene"])
-	_menu.add_separator("計測")
-	for entry in [["敵描画性能実験", "performance"], ["ラン性能計測", "profile"]]:
+	_menu.add_separator("内部診断")
+	for entry in [["敵描画ベンチ", "performance"], ["ラン処理・描画ベンチ", "profile"]]:
 		_add_scene(entry[0], entry[1])
 
 func _add_scene(label: String, key: String) -> void:
@@ -164,7 +162,7 @@ func _on_pressed() -> void:
 	EditorInterface.play_main_scene()
 
 func _on_lab_pressed() -> void:
-	print("[Stage Launcher] 敵・ルート実験場を起動します")
+	print("[Stage Launcher] 実験場を起動します")
 	EditorInterface.play_custom_scene(LAB_SCENE)
 
 ## 編集中のシーンのパス。起動するのは保存済みの内容なので、先に保存する。
