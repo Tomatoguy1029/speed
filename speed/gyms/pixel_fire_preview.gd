@@ -69,6 +69,100 @@ var dirty := false
 var preview_host: Control
 var controls_host: Control
 var request_reload: Callable
+var _history := UndoRedo.new()
+var _history_generation := 0
+var _history_serial := 0
+var _last_history_key := ""
+var _last_history_msec := 0
+var _drag_before: Dictionary = {}
+var _restoring_history := false
+
+func _snapshot() -> Dictionary:
+	var values := {}
+	if settings != null:
+		for property in settings.get_property_list():
+			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_EDITOR:
+				values[property.name] = settings.get(property.name)
+	var references: Array[Dictionary] = []
+	var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	for sprite in reference_sprites:
+		if is_instance_valid(sprite):
+			references.append({"path": sprite.texture.resource_path, "offset": sprite.position - center,
+				"rotation": sprite.rotation_degrees, "scale": sprite.scale})
+	return {"generation": _history_generation, "values": values, "references": references,
+		"selected": selected_reference, "offset": usage_offset, "scale": usage_scale,
+		"rotation": fire_rotation}
+
+func _restore_snapshot(snapshot: Dictionary) -> void:
+	if not is_inside_tree() or snapshot.generation != _history_generation: return
+	_restoring_history = true
+	for key in snapshot.values:
+		settings.set(key, snapshot.values[key])
+	usage_offset = snapshot.offset
+	usage_scale = snapshot.scale
+	fire_rotation = snapshot.rotation
+	for sprite in reference_sprites:
+		if is_instance_valid(sprite): sprite.queue_free()
+	reference_sprites.clear()
+	var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	for reference in snapshot.references:
+		if _add_reference_sprite(reference.path, false):
+			var sprite: Sprite2D = reference_sprites.back()
+			sprite.position = center + reference.offset
+			sprite.rotation_degrees = reference.rotation
+			sprite.scale = reference.scale
+	selected_reference = mini(int(snapshot.selected), reference_sprites.size() - 1)
+	subject_sprite = reference_sprites.back() if not reference_sprites.is_empty() else null
+	subject_path = subject_sprite.texture.resource_path if is_instance_valid(subject_sprite) else ""
+	_view_dirty = true
+	dirty = true
+	_set_status("未保存の調整値 / 保存先: " + _loaded_path)
+	_restoring_history = false
+	if is_instance_valid(_panel): _panel.refresh()
+
+func _record_change(key: String, before: Dictionary, merge := false) -> void:
+	if _restoring_history or before.is_empty(): return
+	var after := _snapshot()
+	if before == after: return
+	var now := Time.get_ticks_msec()
+	if not merge or key != _last_history_key or now - _last_history_msec > 500:
+		_history_serial += 1
+	_last_history_key = key
+	_last_history_msec = now
+	var label := "炎: %s %d" % [key, _history_serial]
+	var mode := UndoRedo.MERGE_ENDS if merge else UndoRedo.MERGE_DISABLE
+	if Engine.is_editor_hint():
+		var editor_history := EditorInterface.get_editor_undo_redo()
+		editor_history.create_action(label, mode, self, false, false)
+		editor_history.add_do_method(self, &"_restore_snapshot", after)
+		editor_history.add_undo_method(self, &"_restore_snapshot", before)
+		editor_history.commit_action(false)
+	else:
+		_history.create_action(label, mode)
+		_history.add_do_method(_restore_snapshot.bind(after))
+		_history.add_undo_method(_restore_snapshot.bind(before))
+		_history.commit_action(false)
+
+func change_setting(key: String, value: Variant) -> void:
+	var before := _snapshot()
+	settings.set(key, value)
+	_record_change(key, before, true)
+
+func change_setting_component(key: String, axis: int, value: float) -> void:
+	var before := _snapshot()
+	var vector: Variant = settings.get(key)
+	vector[axis] = value
+	settings.set(key, vector)
+	_record_change(key, before, true)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if Engine.is_editor_hint() or not is_visible_in_tree() or not event is InputEventKey: return
+	if not event.pressed or event.echo or event.keycode != KEY_Z or not event.is_command_or_control_pressed(): return
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit or focus is SpinBox: return
+	if event.shift_pressed: _history.redo()
+	else: _history.undo()
+	get_viewport().set_input_as_handled()
 
 func open_editor() -> void:
 	EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn")
@@ -83,9 +177,12 @@ func _ready() -> void:
 	var split := HSplitContainer.new()
 	margin.add_child(split)
 	if not Engine.is_editor_hint():
+		var scroller := ScrollContainer.new()
+		scroller.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroller.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		(controls_host if controls_host != null else split).add_child(scroller)
 		_panel = PANEL.new()
-		_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		(controls_host if controls_host != null else split).add_child(_panel)
+		scroller.add_child(_panel)
 	var right := VBoxContainer.new()
 	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -231,6 +328,8 @@ func select_context(path: String, target: int) -> void:
 	if loaded == null:
 		_set_status("背景を読み込めません: " + path)
 		return
+	if path != context_stage_path or target != context_target:
+		_history_generation += 1
 	var old_center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
 	var references: Array[Dictionary] = []
 	for sprite in reference_sprites:
@@ -292,7 +391,9 @@ func select_subject(path: String) -> void:
 	if not path.begins_with("res://") or not path.to_lower().ends_with(".png"):
 		_set_status("対象画像にはプロジェクト内の PNG を選択してください。")
 		return
-	_add_reference_sprite(path, true)
+	var before := _snapshot()
+	if not _add_reference_sprite(path, true): return
+	_record_change("参照画像の追加", before)
 	_view_dirty = true
 	if is_instance_valid(_panel):
 		_panel.refresh()
@@ -324,11 +425,13 @@ func select_edit_item(index: int) -> void:
 func remove_selected_reference() -> void:
 	if selected_reference < 0 or selected_reference >= reference_sprites.size():
 		return
+	var before := _snapshot()
 	reference_sprites[selected_reference].queue_free()
 	reference_sprites.remove_at(selected_reference)
 	selected_reference = -1
 	subject_sprite = reference_sprites.back() if not reference_sprites.is_empty() else null
 	subject_path = subject_sprite.texture.resource_path if is_instance_valid(subject_sprite) else ""
+	_record_change("参照画像の削除", before)
 	if is_instance_valid(_panel):
 		_panel.refresh()
 
@@ -345,31 +448,41 @@ func edit_scale() -> float:
 	return usage_scale if selected_reference < 0 else reference_sprites[selected_reference].scale.x
 
 func set_edit_position(offset: Vector2) -> void:
+	var before := _snapshot() if not _dragging else {}
 	if selected_reference < 0:
 		usage_offset = offset
 	else:
 		var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
 		reference_sprites[selected_reference].position = center + offset
 	_view_dirty = true
+	_record_change("配置", before, true)
 
 func set_edit_rotation(degrees: float) -> void:
+	var before := _snapshot()
 	if selected_reference < 0:
 		fire_rotation = degrees
 	else:
 		reference_sprites[selected_reference].rotation_degrees = degrees
 	_view_dirty = true
+	_record_change("回転", before, true)
 
 func set_edit_scale(value: float) -> void:
+	var before := _snapshot()
 	if selected_reference < 0:
 		usage_scale = value
 	else:
 		reference_sprites[selected_reference].scale = Vector2.ONE * value
 	_view_dirty = true
+	_record_change("倍率", before, true)
 
 func reset_edit_transform() -> void:
+	var before := _snapshot()
+	_restoring_history = true
 	set_edit_position(Vector2.ZERO)
 	set_edit_rotation(0.0)
 	set_edit_scale(1.0)
+	_restoring_history = false
+	_record_change("配置を戻す", before)
 	if is_instance_valid(_panel):
 		_panel.refresh()
 
@@ -408,6 +521,10 @@ func _canvas_input(event: InputEvent) -> void:
 						selected_reference = index
 						break
 				if is_instance_valid(_panel): _panel.refresh()
+				_drag_before = _snapshot()
+			else:
+				_record_change("ドラッグ配置", _drag_before)
+				_drag_before = {}
 			accept_event()
 	elif event is InputEventMouseMotion:
 		if _panning:
@@ -624,6 +741,7 @@ func reload_preset() -> void:
 	if loaded == null:
 		_set_status("ピクセル炎の設定Resourceを読み込めません。")
 		return
+	_history_generation += 1
 	_loaded_path = path
 	_source_hash = FileAccess.get_md5(path)
 	settings = loaded
@@ -649,6 +767,7 @@ func save_copy() -> void:
 		_set_status("複製先には data/visuals 内の新しい .tres パスを指定してください。既存ファイルは保護します。")
 		return
 	if _write_preset(path):
+		_history_generation += 1
 		preset_path = path
 		notify_property_list_changed()
 		if is_instance_valid(_panel):

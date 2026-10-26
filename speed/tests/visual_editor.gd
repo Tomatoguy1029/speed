@@ -34,12 +34,22 @@ func _run() -> void:
 	check(not ResourceLoader.has_cached("res://scenes/run/legendary_reveal.tscn"), "未選択のオーラ素材を読み込まない")
 	var fire = editor._current()
 	check(fire.stage.size.y > 200 and fire._panel.size.y > 200, "炎の描画と操作部に編集できる高さを確保")
+	check(fire._panel is VBoxContainer and fire._panel.get_parent() is ScrollContainer,
+		"独立画面だけで操作部を外側スクロールに収める")
 	check(not fire.dirty and fire.settings != load(fire.DEFAULT_PRESET), "炎は保存値と独立した複製から始める")
 	var source_birth: float = load(fire.DEFAULT_PRESET).birth_rate
+	fire.change_setting("birth_rate", source_birth + 8.0)
+	check(fire.settings.birth_rate == source_birth + 8.0 and fire._history.has_undo(), "炎パラメータの変更を履歴に記録")
+	fire._history.undo()
+	check(fire.settings.birth_rate == source_birth, "炎パラメータを元に戻す")
+	fire._history.redo()
+	check(fire.settings.birth_rate == source_birth + 8.0, "炎パラメータをやり直す")
+	fire._history.undo()
 	fire.settings.birth_rate = source_birth + 1.0
 	check(fire.dirty and load(fire.DEFAULT_PRESET).birth_rate == source_birth, "炎の変更で共有Resourceを変更しない")
 	editor._refresh()
-	check(editor._dirty.text.begins_with("● 未保存") and editor._path.text == fire.DEFAULT_PRESET, "共通ヘッダーに未保存と完全な保存先を表示")
+	check(editor._dirty.text.begins_with("● 未保存") and editor._path.text == fire.DEFAULT_PRESET.get_file()
+		and editor._path.tooltip_text == fire.DEFAULT_PRESET, "共通ヘッダーに未保存と保存先を表示")
 	editor.request_reload(fire.reload_current)
 	check(editor._confirm.visible, "再読込は未保存値の破棄を確認する")
 	editor._confirm.canceled.emit()

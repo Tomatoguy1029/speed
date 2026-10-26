@@ -11,7 +11,6 @@ func _can_handle(object: Object) -> bool:
 
 func _parse_begin(object: Object) -> void:
 	var panel := Controls.new()
-	panel.custom_minimum_size = Vector2(0, 560)
 	add_custom_control(panel)
 	panel.bind_preview.call_deferred(object)
 

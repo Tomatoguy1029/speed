@@ -1,6 +1,6 @@
 ## 実行画面と2D編集Inspectorで共用する炎の操作部。
 @tool
-extends ScrollContainer
+extends VBoxContainer
 
 const LABELS := {
 	"emission_shape": "形", "source_size": "発生源", "birth_rate": "発生/秒",
@@ -23,7 +23,6 @@ var _expanded := {"scene": false, "particle": false, "layers": false, "shape": f
 var _grids: Array[GridContainer] = []
 
 func _ready() -> void:
-	horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fields.add_theme_constant_override("separation", 4)
@@ -238,17 +237,17 @@ func _property_grid(parent: Control, keys: Array, properties: Dictionary) -> voi
 			for name in ["点", "線", "箱"]:
 				choice.add_item(name)
 			choice.selected = int(current)
-			choice.item_selected.connect(func(index): preview.settings.set(key, index))
+			choice.item_selected.connect(func(index): preview.change_setting(key, index))
 			row.add_child(choice)
 		elif current is float or current is int:
-			_number(grid, label, key, current, property.hint_string, func(v): preview.settings.set(key, int(v) if current is int else v))
+			_number(grid, label, key, current, property.hint_string, func(v): preview.change_setting(key, int(v) if current is int else v))
 		elif current is Color:
 			var color_row := _row(grid)
 			_label(color_row, label)
 			var picker := ColorPickerButton.new()
 			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			picker.color = current
-			picker.color_changed.connect(func(v): preview.settings.set(key, v))
+			picker.color_changed.connect(func(v): preview.change_setting(key, v))
 			color_row.add_child(picker)
 		elif current is Vector2 or current is Vector3:
 			for axis in (2 if current is Vector2 else 3):
@@ -256,10 +255,8 @@ func _property_grid(parent: Control, keys: Array, properties: Dictionary) -> voi
 				var hint := "0,4,0.05" if current is Vector3 else "0,1024,1"
 				if key == "field_size":
 					hint = "32,1024,1" if axis == 0 else "64,1024,1"
-				_number(grid, label + component, key, current[axis], hint, func(v):
-					var vector: Variant = preview.settings.get(key)
-					vector[axis] = v
-					preview.settings.set(key, vector))
+				_number(grid, label + component, key, current[axis], hint,
+					func(v): preview.change_setting_component(key, axis, v))
 
 func _section(title: String, key: String) -> VBoxContainer:
 	var head := Button.new()

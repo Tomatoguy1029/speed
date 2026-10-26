@@ -23,8 +23,26 @@ var _confirm := ConfirmationDialog.new()
 var _pending_action: Callable
 var _previous_auto_quit := true
 
+func _present_window() -> void:
+	var initial_screen := DisplayServer.window_get_current_screen()
+	var screen := initial_screen
+	var preferred := OS.get_environment("SPEED_VISUAL_EDITOR_SCREEN")
+	if preferred.is_valid_int() and int(preferred) >= 0 and int(preferred) < DisplayServer.get_screen_count():
+		screen = int(preferred)
+		DisplayServer.window_set_current_screen(screen)
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var window_rect := Rect2i(DisplayServer.window_get_position(), DisplayServer.window_get_size())
+	print("[Visual Editor] window=%s usable=%s screen=%d" % [window_rect, usable, screen])
+	if usable.size.x > 0 and usable.size.y > 0 and (screen != initial_screen or not usable.encloses(window_rect)):
+		var size := window_rect.size.min(usable.size)
+		DisplayServer.window_set_size(size)
+		DisplayServer.window_set_position(usable.position + (usable.size - size) / 2)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
+	DisplayServer.window_move_to_foreground()
+
 func _ready() -> void:
 	get_window().title = "SPEED — ビジュアル編集"
+	_present_window.call_deferred()
 	theme = Theme.new()
 	theme.default_font_size = 18
 	var background := ColorRect.new()

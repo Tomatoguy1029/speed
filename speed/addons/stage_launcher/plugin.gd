@@ -22,11 +22,15 @@ var _lab_button: Button = null
 var _visual_button: Button = null
 var _menu_items: Array[String] = []
 var _fire_inspector: EditorInspectorPlugin
+var _launch_error: AcceptDialog
 
 func _enter_tree() -> void:
 	add_to_group("speed_stage_launcher")
 	_fire_inspector = FireInspector.new()
 	add_inspector_plugin(_fire_inspector)
+	_launch_error = AcceptDialog.new()
+	_launch_error.title = "ビジュアル編集を開けません"
+	add_child(_launch_error)
 	_button = Button.new()
 	_button.text = "▶ ステージ"
 	_button.tooltip_text = "編集中のステージを直接起動する（F5 は通常どおりタイトルから）"
@@ -40,7 +44,7 @@ func _enter_tree() -> void:
 	_visual_button = Button.new()
 	_visual_button.text = "▶ ビジュアル編集"
 	_visual_button.tooltip_text = "炎・オーラ・後光・マップを共通画面で調整する"
-	_visual_button.pressed.connect(func(): EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn"))
+	_visual_button.pressed.connect(_on_visual_pressed)
 	add_control_to_container(CONTAINER_TOOLBAR, _visual_button)
 	_register_menu_items()
 	_move_next_to_main_screen_buttons()
@@ -50,7 +54,7 @@ func _enter_tree() -> void:
 func _register_menu_items() -> void:
 	_add_menu_item("編集中のステージを起動", _on_pressed)
 	_add_scene("実験場", "lab")
-	_add_scene("ビジュアル編集（炎・オーラ・後光・マップ）", "visual")
+	_add_menu_item("ビジュアル編集（炎・オーラ・後光・マップ）", _on_visual_pressed)
 	_add_scene("背景編集", "background")
 	_add_scene("ピクセル素材確認", "art")
 	if ResourceLoader.exists(SCENES.fire_scene):
@@ -81,6 +85,9 @@ func _move_next_to_main_screen_buttons() -> void:
 	bar.move_child(_visual_button, _lab_button.get_index() + 1)
 
 func _exit_tree() -> void:
+	if _launch_error != null:
+		_launch_error.queue_free()
+		_launch_error = null
 	if _fire_inspector != null:
 		remove_inspector_plugin(_fire_inspector)
 		_fire_inspector = null
@@ -109,6 +116,28 @@ func _on_pressed() -> void:
 func _on_lab_pressed() -> void:
 	print("[Stage Launcher] 実験場を起動します")
 	EditorInterface.play_custom_scene(LAB_SCENE)
+
+func _on_visual_pressed() -> void:
+	var path: String = SCENES.visual
+	if not ResourceLoader.exists(path) or ResourceLoader.load(path) == null:
+		_visual_error("ビジュアル編集のシーンを読み込めません: " + path)
+		return
+	print("[Stage Launcher] ビジュアル編集を起動します")
+	OS.set_environment("SPEED_VISUAL_EDITOR_SCREEN", str(DisplayServer.window_get_current_screen()))
+	EditorInterface.play_custom_scene(path)
+	await get_tree().process_frame
+	if not is_inside_tree(): return
+	if EditorInterface.get_playing_scene() != path:
+		_visual_error("ビジュアル編集を起動できませんでした。エディターの出力を確認してください。")
+		return
+	# Godot の「ゲーム」タブは、別窓で実行中ならその窓へフォーカスする。
+	EditorInterface.set_main_screen_editor("Game")
+
+func _visual_error(message: String) -> void:
+	push_error(message)
+	if is_instance_valid(_launch_error):
+		_launch_error.dialog_text = message
+		_launch_error.popup_centered()
 
 ## 編集中のシーンのパス。起動するのは保存済みの内容なので、先に保存する。
 func _current_scene_path() -> String:

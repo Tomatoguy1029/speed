@@ -13,8 +13,9 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	for id in [&"W03", &"W04", &"W08", &"W17"]:
 		run.loadout.grant(&"weapon", id, run.cfg.weapon_max_level)
+	for id in [&"T01", &"T03", &"T04", &"T05", &"T09"]:
+		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
 	for i in 10: _check(run.loadout.post_max.select(&"crit_chance"), "追加クリティカルを取得")
-	for i in 3: run.loadout.grant(&"trait", &"T09")
 	run.loadout.refresh_stats()
 	run.state.ship_hp = 40.0
 	run.state.pending_levels = 2
