@@ -4,107 +4,211 @@
 [ext_resource type="Script" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
 [ext_resource type="PackedScene" path="res://data/formations/s5_crow.tscn" id="crow"]
 [ext_resource type="Script" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_grow_1.tscn" id="grow_1"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_grow_2.tscn" id="grow_2"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_grow_3.tscn" id="grow_3"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_grow_4.tscn" id="grow_4"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_grow_5.tscn" id="grow_5"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_1.tscn" id="peak_1"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_2.tscn" id="peak_2"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_3.tscn" id="peak_3"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_4.tscn" id="peak_4"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_5a.tscn" id="peak_5a"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_peak_5b.tscn" id="peak_5b"]
 [ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="phase"]
 [ext_resource type="Script" path="res://scripts/data_types/stage_def.gd" id="stage"]
 
-[sub_resource type="Resource" id="Clip0"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_pump.tscn" id="pump"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_crab.tscn" id="crab"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_cross.tscn" id="cross"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_auriga.tscn" id="auriga"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_dolphin.tscn" id="dolphin"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_cepheus.tscn" id="cepheus"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_aquila.tscn" id="aquila"]
+
+[sub_resource type="Resource" id="Clip_0"]
 script = ExtResource("clip")
-label = "育成1"
+label = "ポンプ座"
 track = 0
-types = Array[StringName]([&"pump", &"crab"])
-formations = Array[PackedScene]([ExtResource("grow_1")])
-layouts = Array[StringName]([&"s5_grow_1/pump", &"s5_grow_1/crab"])
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"s5_pump/s5_grow_1_pump"])
 attack_priority = 1
 length = 45.0
 interval = 22.0
 
-[sub_resource type="Resource" id="Clip1"]
+[sub_resource type="Resource" id="Clip_1"]
 script = ExtResource("clip")
-label = "育成2"
-track = 0
-types = Array[StringName]([&"crab", &"cross"])
-formations = Array[PackedScene]([ExtResource("grow_2")])
-layouts = Array[StringName]([&"s5_grow_2/crab", &"s5_grow_2/cross"])
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_grow_1_crab"])
+attack_priority = 1
+length = 45.0
+interval = 22.0
+
+[sub_resource type="Resource" id="Clip_2"]
+script = ExtResource("clip")
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_grow_2_crab"])
 attack_priority = 1
 time = 90.0
 length = 25.0
 interval = 20.0
 
-[sub_resource type="Resource" id="Clip2"]
+[sub_resource type="Resource" id="Clip_3"]
 script = ExtResource("clip")
-label = "育成3"
-track = 0
-types = Array[StringName]([&"auriga", &"dolphin"])
-formations = Array[PackedScene]([ExtResource("grow_3")])
-layouts = Array[StringName]([&"s5_grow_3/auriga", &"s5_grow_3/dolphin"])
+label = "みなみじゅうじ座"
+track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_grow_2_cross"])
+attack_priority = 1
+time = 90.0
+length = 25.0
+interval = 20.0
+
+[sub_resource type="Resource" id="Clip_4"]
+script = ExtResource("clip")
+label = "ぎょしゃ座"
+track = 3
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("auriga")])
+layouts = Array[StringName]([&"s5_auriga/s5_grow_3_auriga"])
 attack_priority = 1
 time = 170.0
 length = 25.0
 interval = 18.0
 
-[sub_resource type="Resource" id="Clip3"]
+[sub_resource type="Resource" id="Clip_5"]
 script = ExtResource("clip")
-label = "育成4"
+label = "いるか座"
+track = 4
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("dolphin")])
+layouts = Array[StringName]([&"s5_dolphin/s5_grow_3_dolphin"])
+attack_priority = 1
+time = 170.0
+length = 25.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_6"]
+script = ExtResource("clip")
+label = "ポンプ座"
 track = 0
-types = Array[StringName]([&"pump", &"cross"])
-formations = Array[PackedScene]([ExtResource("grow_4")])
-layouts = Array[StringName]([&"s5_grow_4/pump", &"s5_grow_4/cross"])
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"s5_pump/s5_grow_4_pump"])
 attack_priority = 1
 time = 265.0
 length = 25.0
 interval = 16.0
 
-[sub_resource type="Resource" id="Clip4"]
+[sub_resource type="Resource" id="Clip_7"]
 script = ExtResource("clip")
-label = "育成5"
-track = 0
-types = Array[StringName]([&"crab", &"dolphin"])
-formations = Array[PackedScene]([ExtResource("grow_5")])
-layouts = Array[StringName]([&"s5_grow_5/crab", &"s5_grow_5/dolphin"])
+label = "みなみじゅうじ座"
+track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_grow_4_cross"])
+attack_priority = 1
+time = 265.0
+length = 25.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_8"]
+script = ExtResource("clip")
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_grow_5_crab"])
 attack_priority = 1
 time = 370.0
 length = 25.0
 interval = 14.0
 
-[sub_resource type="Resource" id="Clip5"]
+[sub_resource type="Resource" id="Clip_9"]
 script = ExtResource("clip")
-label = "山1"
-track = 1
-types = Array[StringName]([&"pump", &"crab", &"cross"])
-formations = Array[PackedScene]([ExtResource("peak_1")])
-layouts = Array[StringName]([&"s5_peak_1/peak1"])
+label = "いるか座"
+track = 4
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("dolphin")])
+layouts = Array[StringName]([&"s5_dolphin/s5_grow_5_dolphin"])
+attack_priority = 1
+time = 370.0
+length = 25.0
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_10"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 0
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"s5_pump/s5_peak_1_peak1"])
 attack_priority = 1
 time = 45.0
 length = 45.0
 interval = 18.0
 
-[sub_resource type="Resource" id="Clip6"]
+[sub_resource type="Resource" id="Clip_11"]
 script = ExtResource("clip")
-label = "山2"
+label = "かに座"
 track = 1
-types = Array[StringName]([&"auriga", &"crab", &"cross"])
-formations = Array[PackedScene]([ExtResource("peak_2")])
-layouts = Array[StringName]([&"s5_peak_2/peak2"])
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_peak_1_peak1"])
+attack_priority = 1
+time = 45.0
+length = 45.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_12"]
+script = ExtResource("clip")
+label = "みなみじゅうじ座"
+track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_peak_1_peak1"])
+attack_priority = 1
+time = 45.0
+length = 45.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_13"]
+script = ExtResource("clip")
+label = "ぎょしゃ座"
+track = 3
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("auriga")])
+layouts = Array[StringName]([&"s5_auriga/s5_peak_2_peak2"])
 attack_priority = 1
 time = 115.0
 length = 55.0
 interval = 16.0
 
-[sub_resource type="Resource" id="Clip7"]
+[sub_resource type="Resource" id="Clip_14"]
 script = ExtResource("clip")
-label = "からす継続"
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_peak_2_peak2"])
+attack_priority = 1
+time = 115.0
+length = 55.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_15"]
+script = ExtResource("clip")
+label = "みなみじゅうじ座"
 track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_peak_2_peak2"])
+attack_priority = 1
+time = 115.0
+length = 55.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_16"]
+script = ExtResource("clip")
+label = "からす座"
+track = 5
 types = Array[StringName]([&"crow"])
 formations = Array[PackedScene]([ExtResource("crow")])
 layouts = Array[StringName]([&"s5_crow/crow"])
@@ -113,54 +217,178 @@ time = 115.0
 length = 365.0
 interval = 24.0
 
-[sub_resource type="Resource" id="Clip8"]
+[sub_resource type="Resource" id="Clip_17"]
 script = ExtResource("clip")
-label = "山3"
-track = 3
-types = Array[StringName]([&"cepheus", &"dolphin", &"crab"])
-formations = Array[PackedScene]([ExtResource("peak_3")])
-layouts = Array[StringName]([&"s5_peak_3/peak3"])
+label = "ケフェウス座"
+track = 6
+types = Array[StringName]([&"cepheus"])
+formations = Array[PackedScene]([ExtResource("cepheus")])
+layouts = Array[StringName]([&"s5_cepheus/s5_peak_3_peak3"])
 attack_priority = 1
 time = 195.0
 length = 70.0
 interval = 18.0
 
-[sub_resource type="Resource" id="Clip9"]
+[sub_resource type="Resource" id="Clip_18"]
 script = ExtResource("clip")
-label = "山4"
-track = 3
-types = Array[StringName]([&"aquila", &"auriga", &"cross"])
-formations = Array[PackedScene]([ExtResource("peak_4")])
-layouts = Array[StringName]([&"s5_peak_4/peak4"])
+label = "いるか座"
+track = 4
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("dolphin")])
+layouts = Array[StringName]([&"s5_dolphin/s5_peak_3_peak3"])
+attack_priority = 1
+time = 195.0
+length = 70.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_19"]
+script = ExtResource("clip")
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_peak_3_peak3"])
+attack_priority = 1
+time = 195.0
+length = 70.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip_20"]
+script = ExtResource("clip")
+label = "わし座"
+track = 7
+types = Array[StringName]([&"aquila"])
+formations = Array[PackedScene]([ExtResource("aquila")])
+layouts = Array[StringName]([&"s5_aquila/s5_peak_4_peak4"])
 attack_priority = 1
 time = 290.0
 length = 80.0
 interval = 16.0
 
-[sub_resource type="Resource" id="Clip10"]
+[sub_resource type="Resource" id="Clip_21"]
 script = ExtResource("clip")
-label = "山5前半"
+label = "ぎょしゃ座"
 track = 3
-types = Array[StringName]([&"cepheus", &"dolphin", &"crab", &"cross"])
-formations = Array[PackedScene]([ExtResource("peak_5a")])
-layouts = Array[StringName]([&"s5_peak_5a/peak5a"])
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("auriga")])
+layouts = Array[StringName]([&"s5_auriga/s5_peak_4_peak4"])
+attack_priority = 1
+time = 290.0
+length = 80.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_22"]
+script = ExtResource("clip")
+label = "みなみじゅうじ座"
+track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_peak_4_peak4"])
+attack_priority = 1
+time = 290.0
+length = 80.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip_23"]
+script = ExtResource("clip")
+label = "ケフェウス座"
+track = 6
+types = Array[StringName]([&"cepheus"])
+formations = Array[PackedScene]([ExtResource("cepheus")])
+layouts = Array[StringName]([&"s5_cepheus/s5_peak_5a_peak5a"])
 attack_priority = 1
 time = 395.0
 length = 42.5
 interval = 14.0
 
-[sub_resource type="Resource" id="Clip11"]
+[sub_resource type="Resource" id="Clip_24"]
 script = ExtResource("clip")
-label = "山5後半"
-track = 3
-types = Array[StringName]([&"cepheus", &"aquila", &"auriga", &"pump"])
-formations = Array[PackedScene]([ExtResource("peak_5b")])
-layouts = Array[StringName]([&"s5_peak_5b/peak5b"])
+label = "いるか座"
+track = 4
+types = Array[StringName]([&"dolphin"])
+formations = Array[PackedScene]([ExtResource("dolphin")])
+layouts = Array[StringName]([&"s5_dolphin/s5_peak_5a_peak5a"])
+attack_priority = 1
+time = 395.0
+length = 42.5
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_25"]
+script = ExtResource("clip")
+label = "かに座"
+track = 1
+types = Array[StringName]([&"crab"])
+formations = Array[PackedScene]([ExtResource("crab")])
+layouts = Array[StringName]([&"s5_crab/s5_peak_5a_peak5a"])
+attack_priority = 1
+time = 395.0
+length = 42.5
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_26"]
+script = ExtResource("clip")
+label = "みなみじゅうじ座"
+track = 2
+types = Array[StringName]([&"cross"])
+formations = Array[PackedScene]([ExtResource("cross")])
+layouts = Array[StringName]([&"s5_cross/s5_peak_5a_peak5a"])
+attack_priority = 1
+time = 395.0
+length = 42.5
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip_27"]
+script = ExtResource("clip")
+label = "ケフェウス座"
+track = 6
+types = Array[StringName]([&"cepheus"])
+formations = Array[PackedScene]([ExtResource("cepheus")])
+layouts = Array[StringName]([&"s5_cepheus/s5_peak_5b_peak5b"])
 attack_priority = 1
 time = 437.5
 length = 42.5
 groups = 2
 interval = 12.0
+
+[sub_resource type="Resource" id="Clip_28"]
+script = ExtResource("clip")
+label = "わし座"
+track = 7
+types = Array[StringName]([&"aquila"])
+formations = Array[PackedScene]([ExtResource("aquila")])
+layouts = Array[StringName]([&"s5_aquila/s5_peak_5b_peak5b"])
+attack_priority = 1
+time = 437.5
+length = 42.5
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_29"]
+script = ExtResource("clip")
+label = "ぎょしゃ座"
+track = 3
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("auriga")])
+layouts = Array[StringName]([&"s5_auriga/s5_peak_5b_peak5b"])
+attack_priority = 1
+time = 437.5
+length = 42.5
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Clip_30"]
+script = ExtResource("clip")
+label = "ポンプ座"
+track = 0
+types = Array[StringName]([&"pump"])
+formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"s5_pump/s5_peak_5b_peak5b"])
+attack_priority = 1
+time = 437.5
+length = 42.5
+groups = 2
+interval = 12.0
+
 
 [sub_resource type="Resource" id="Phase0"]
 script = ExtResource("phase")
@@ -296,8 +524,8 @@ enemy_attack_values = {
 "splitter": 0.1
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
-clips = Array[ExtResource("clip")]([SubResource("Clip0"), SubResource("Clip1"), SubResource("Clip2"), SubResource("Clip3"), SubResource("Clip4"), SubResource("Clip5"), SubResource("Clip6"), SubResource("Clip7"), SubResource("Clip8"), SubResource("Clip9"), SubResource("Clip10"), SubResource("Clip11")])
-track_names = PackedStringArray("育成の強敵", "山1・2", "からす", "大物の山")
+clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_27"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
+track_names = PackedStringArray("ポンプ座", "かに座", "みなみじゅうじ座", "ぎょしゃ座", "いるか座", "からす座", "ケフェウス座", "わし座")
 boss_time = 480.0
 time_limit = 900.0
 boss_id = &"draco"
