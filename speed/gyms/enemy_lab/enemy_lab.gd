@@ -134,7 +134,8 @@ func build_hitstop_controls(parent: Node) -> void:
 	row.add_child(_hitstop_scope)
 	_hitstop_save_button = _button(row, "設定を保存", _save_hitstop)
 	_hitstop_inherit_button = _button(row, "ステージ設定を継承へ戻す", _inherit_hitstop)
-	_hitstop_status = _label(row, "")
+	_hitstop_status = _label(parent, "")
+	_hitstop_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hitstop_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hitstop_status.tooltip_text = "0: 停止なし / 1: 従来の時間。保存は明示操作のみ。"
 	_hitstop_save_button.disabled = true

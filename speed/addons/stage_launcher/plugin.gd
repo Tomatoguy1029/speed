@@ -7,7 +7,6 @@ extends EditorPlugin
 
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
-const MENU_NAME := "SPEED"
 const SCENES := {
 	"lab": LAB_SCENE,
 	"visual": "res://gyms/visual_editor.tscn",
@@ -17,18 +16,10 @@ const SCENES := {
 	"performance": "res://gyms/perf_enemies/perf_enemies.tscn",
 	"profile": "res://tools/profile_run.tscn",
 }
-const EDITOR_TOOLS := [
-	["データ編集", "speed_data_editor", "open_window", "res://addons/speed_data_editor/plugin.gd"],
-	["ボス行動", "speed_boss_flow", "open_editor", "res://tools/editor/boss_flow/plugin.gd"],
-	["出現タイムライン・編成", "speed_spawn_timeline", "open_timeline", "res://addons/spawn_timeline/plugin.gd"],
-	["ステージ敵調整", "speed_stage_enemy_tuning", "open_dock", "res://tools/editor/stage_enemy_tuning/plugin.gd"],
-]
-
 var _button: Button = null
 var _lab_button: Button = null
 var _visual_button: Button = null
-var _menu: PopupMenu
-var _actions: Array[Array] = []
+var _menu_items: Array[String] = []
 
 func _enter_tree() -> void:
 	add_to_group("speed_stage_launcher")
@@ -47,83 +38,29 @@ func _enter_tree() -> void:
 	_visual_button.tooltip_text = "炎・オーラ・後光・マップを共通画面で調整する"
 	_visual_button.pressed.connect(func(): EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn"))
 	add_control_to_container(CONTAINER_TOOLBAR, _visual_button)
-	_menu = PopupMenu.new()
-	_menu.about_to_popup.connect(_rebuild_menu)
-	_menu.id_pressed.connect(_dispatch_menu)
-	add_tool_submenu_item(MENU_NAME, _menu)
+	_register_menu_items()
 	_move_next_to_main_screen_buttons()
 
-## Godot の既存「プロジェクト → ツール」内に、登録済みの入口だけを並べる。
-## 他の plugin が無効なら項目を出さない。実行画面は保存・終了を既存の実装に任せる。
-func _rebuild_menu() -> void:
-	_menu.clear()
-	_actions.clear()
-	_menu.add_separator("編集")
-	for entry in EDITOR_TOOLS:
-		if _find_editor_plugin(entry[1], entry[3]) != null:
-			_add_action(entry[0], ["plugin", entry[1], entry[2], entry[3]])
-	_menu.add_separator("起動・試遊")
-	_add_action("編集中のステージを起動", ["stage"])
-	for entry in [["実験場", "lab"]]:
-		_add_scene(entry[0], entry[1])
-	_menu.add_separator("見た目")
-	for entry in [["ビジュアル編集（炎・オーラ・後光・マップ）", "visual"], ["背景編集", "background"], ["ピクセル素材確認", "art"]]:
-		_add_scene(entry[0], entry[1])
+## Godot 標準の「プロジェクト → ツール」直下へ登録する。
+## エディター拡張の入口は各 plugin 自身が登録し、無効時に項目を残さない。
+func _register_menu_items() -> void:
+	_add_menu_item("編集中のステージを起動", _on_pressed)
+	_add_scene("実験場", "lab")
+	_add_scene("ビジュアル編集（炎・オーラ・後光・マップ）", "visual")
+	_add_scene("背景編集", "background")
+	_add_scene("ピクセル素材確認", "art")
 	if ResourceLoader.exists(SCENES.fire_scene):
-		_add_action("ピクセル炎（2D編集）", ["edit_scene", "fire_scene"])
-	_menu.add_separator("内部診断")
-	for entry in [["敵描画ベンチ", "performance"], ["ラン処理・描画ベンチ", "profile"]]:
-		_add_scene(entry[0], entry[1])
+		_add_menu_item("ピクセル炎（2D編集）", EditorInterface.open_scene_from_path.bind(SCENES.fire_scene))
+	_add_scene("敵描画ベンチ", "performance")
+	_add_scene("ラン処理・描画ベンチ", "profile")
 
 func _add_scene(label: String, key: String) -> void:
 	if ResourceLoader.exists(SCENES[key]):
-		_add_action(label, ["scene", key])
+		_add_menu_item(label, EditorInterface.play_custom_scene.bind(SCENES[key]))
 
-func _add_action(label: String, action: Array) -> void:
-	var id := _actions.size()
-	_actions.append(action)
-	_menu.add_item(label, id)
-
-func _dispatch_menu(id: int) -> void:
-	if id < 0 or id >= _actions.size(): return
-	var action: Array = _actions[id]
-	match action[0]:
-		"stage": _on_pressed()
-		"scene": EditorInterface.play_custom_scene(SCENES[action[1]])
-		"edit_scene": EditorInterface.open_scene_from_path(SCENES[action[1]])
-		"plugin":
-			var owner := _find_editor_plugin(action[1], action[3])
-			if owner == null:
-				push_warning("SPEED ツールは現在無効です: %s" % action[1])
-				return
-			if owner.has_method(action[2]):
-				owner.call(action[2])
-			else:
-				_open_loaded_legacy_plugin(owner, action[1])
-
-## 外部で更新されたスクリプトは、開いたままのエディター内では旧インスタンスが残る。
-## グループ登録前の実体も識別し、編集中のパネルを破棄せずに使えるようにする。
-func _find_editor_plugin(group: String, script_path: String) -> EditorPlugin:
-	for node in get_tree().get_nodes_in_group(group):
-		if node is EditorPlugin:
-			return node
-	for node in get_tree().root.find_children("*", "EditorPlugin", true, false):
-		var script: Script = node.get_script()
-		if script != null and script.resource_path == script_path:
-			return node
-	return null
-
-func _open_loaded_legacy_plugin(owner: EditorPlugin, group: String) -> void:
-	match group:
-		"speed_data_editor": owner.call("_open")
-		"speed_boss_flow": EditorInterface.set_main_screen_editor("ボス行動")
-		"speed_spawn_timeline": EditorInterface.set_main_screen_editor("出現タイムライン")
-		"speed_stage_enemy_tuning":
-			var dock: Control = owner.get("_dock")
-			if dock != null:
-				dock.custom_minimum_size.x = 160
-				if dock.get_parent() is TabContainer:
-					(dock.get_parent() as TabContainer).current_tab = dock.get_index()
+func _add_menu_item(label: String, action: Callable) -> void:
+	add_tool_menu_item(label, action)
+	_menu_items.append(label)
 
 ## 既定では右端に置かれて見つけにくいので、「2D／3D／スクリプト」の並びの直後へ移す。
 ## エディタ内部のノードが見つからなければ、既定の位置のままにする。
@@ -140,8 +77,9 @@ func _move_next_to_main_screen_buttons() -> void:
 	bar.move_child(_visual_button, _lab_button.get_index() + 1)
 
 func _exit_tree() -> void:
-	remove_tool_menu_item(MENU_NAME)
-	_menu = null
+	for label in _menu_items:
+		remove_tool_menu_item(label)
+	_menu_items.clear()
 	if _visual_button != null:
 		remove_control_from_container(CONTAINER_TOOLBAR, _visual_button)
 		_visual_button.queue_free()

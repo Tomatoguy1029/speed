@@ -88,7 +88,7 @@ speed/                    res://
   .content/               実行用ステージ・音・開発用の名前対応表（生成物）
   tests/
   tools/                  素材の切り出し・アート確認・性能計測
-    editor/               SPEED専用のボス行動・ステージ敵調整の編集機能
+    editor/               SPEED専用のボスAI・ステージ敵調整の編集機能
 ```
 
 ステージは、人が配置を触るシーン（`scenes/stages/`）と、数値の `StageDef`（`data/stages/`）に分ける。配置のシーンは今は空の仮シーンで、ステージの直接起動（14.1）の対象として使う。
@@ -314,7 +314,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
-`tools/editor/boss_flow/`が「ボス行動」画面を提供する。SPEED専用の編集機能は`tools/editor/`に置き、`addons/boss_flow/`と`addons/stage_enemy_tuning/`にはGodotへ登録する`plugin.cfg`だけを置く。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#55-ボス行動を調整する)を参照する。
+`tools/editor/boss_flow/`が「ボスAI」画面を提供する。SPEED専用の編集機能は`tools/editor/`に置き、`addons/boss_flow/`と`addons/stage_enemy_tuning/`にはGodotへ登録する`plugin.cfg`だけを置く。上段に区間ノードのグラフ、下段に通常技・コンボ・大技の分類ごとの技グラフ、右側に選択したノードの編集欄を置く。操作は[制作ガイド](dev/stage-production.md#55-ボスaiを調整する)を参照する。
 
 `data/bosses/ai/hydra_flow.tres`が区間の要求種別・確率・消費上限・使用可能な技参照・同時攻撃の禁止・共有スタミナ・二種類の休息を持つ。`hydra_action_rules.tres`が技参照・距離方向条件・消費量・コンボ内部を持ち、技の性能は参照先の`hydra_moves/*.tres`が持つ。`BossTechnique`は共通の技データ、`HydraTechnique`は必要な首の種類を追加する型である。`graph_nodes`は図のノードから技への参照と接続・非表示状態を持つ。通常技の複製は同じ性能を参照し、個別の条件を持つ。実行側は接続された同じ技の条件をORで評価し、ノード数によって抽選頻度を増やさない。
 
@@ -338,7 +338,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 **Hydraの試遊と素材差し替え**
 
-Godotの「プロジェクト → ツール → SPEED → 実験場」でHydraを選ぶと、通常敵や他のボスと共通の実験場で試遊できる。停止・巻き戻し・機体固定・技の即実行を使える。ヒットストップの試遊値は実験内に留まり、明示した保存操作だけがボス定義へ書き込む。従来の `gyms/hydra_trial.tscn` は開発中の直接起動用シーンとして残るが、独立したメニュー項目は設けない。
+Godotの「プロジェクト → ツール → 実験場」でHydraを選ぶと、通常敵や他のボスと共通の実験場で試遊できる。停止・巻き戻し・機体固定・技の即実行を使える。ヒットストップの試遊値は実験内に留まり、明示した保存操作だけがボス定義へ書き込む。従来の `gyms/hydra_trial.tscn` は開発中の直接起動用シーンとして残るが、独立したメニュー項目は設けない。
 
 HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首の節・羅針盤の差し替え口。頭は既存の敵素材経路 `assets/pixel/hydra_<種類>.png` とステージの素材指定を使う。`energy_shader` は実判定に沿う光線・風・雷・瓦礫のマテリアルを差し替える。判定は点列・幅・時間のまま保持する。
 
@@ -709,7 +709,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 エディタ拡張 `addons/stage_launcher/` から、特定のステージと実験場を直接起動する。
 
-Godot の「プロジェクト → ツール → SPEED」は登録済みの編集プラグインと既存の試遊シーンへの共通入口を提供する。編集プラグインの操作は元のプラグインへ委譲し、試遊・計測は既存シーンを起動する。編集プラグインが無効なら該当項目を表示しない。ツールバー・Inspector・各画面の保存動作は維持する。
+Godot の「プロジェクト → ツール」直下に各ツールを登録する。データ編集・ボスAI・出現タイムライン・ステージ敵調整は各編集プラグインが自身の項目を登録し、無効化時に除去する。試遊・計測はステージ起動プラグインが既存シーンを登録する。ツールバー・Inspector・各画面の保存動作は維持する。
 
 - エディタのツールバー（「2D／3D／スクリプト」の並びの直後）に「▶ ステージ」「▶ 実験場」の順でボタンを置く。
 - 「▶ 実験場」は `EditorInterface.play_custom_scene()` で `gyms/enemy_lab/enemy_lab.tscn` を直接起動する。編集対象のシーンはそのまま保つ。

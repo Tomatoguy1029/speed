@@ -20,6 +20,7 @@ func _enter_tree() -> void:
 	_panel.saved.connect(_on_saved)
 	_dock.add_child(_panel)
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)
+	add_tool_menu_item("ステージ敵調整", open_dock)
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	_on_inspected.call_deferred()
 
@@ -32,6 +33,7 @@ func open_dock() -> void:
 		tabs.current_tab = _dock.get_index()
 
 func _exit_tree() -> void:
+	remove_tool_menu_item("ステージ敵調整")
 	EditorInterface.get_inspector().edited_object_changed.disconnect(_on_inspected)
 	remove_control_from_docks(_dock)
 	_dock.queue_free()

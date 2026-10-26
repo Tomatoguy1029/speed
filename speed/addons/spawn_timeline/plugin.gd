@@ -10,6 +10,7 @@ extends EditorPlugin
 const Timeline := preload("res://addons/spawn_timeline/timeline.gd")
 const TypeChecks := preload("res://addons/spawn_timeline/type_checks.gd")
 const TITLE := "出現タイムライン"
+const MENU_LABEL := "出現タイムライン・編成"
 
 var _panel: Control = null
 var _main: Control = null
@@ -30,6 +31,7 @@ func _enter_tree() -> void:
 	_checks = TypeChecks.new()
 	_checks.timeline = _panel
 	add_inspector_plugin(_checks)
+	add_tool_menu_item(MENU_LABEL, open_timeline)
 	# 開いたステージは、インスペクターの対象が変わったときに拾う（上部の画面へ勝手に切り替えないように _handles は使わない）
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	EditorInterface.get_inspector().property_edited.connect(_on_property_edited)
@@ -45,6 +47,7 @@ func open_timeline() -> void:
 	make_bottom_panel_item_visible(_panel)
 
 func _exit_tree() -> void:
+	remove_tool_menu_item(MENU_LABEL)
 	if EditorInterface.get_inspector().property_edited.is_connected(_on_property_edited):
 		EditorInterface.get_inspector().property_edited.disconnect(_on_property_edited)
 	for history in _phase_histories:
