@@ -60,6 +60,7 @@ var _card_discard: Dictionary = {}
 @export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
 var _legendary_reveal: Control
 var _finish_skip: Button
+var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
@@ -140,6 +141,15 @@ func _ready() -> void:
 	_finish_skip.hide()
 	_finish_skip.pressed.connect(func(): run.command(&"skip_finish"))
 	add_child(_finish_skip)
+	_entrance_skip = Button.new()
+	_entrance_skip.name = "BossEntranceSkip"
+	_entrance_skip.text = tr("hud.skip_finish")
+	_entrance_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_entrance_skip.position = Vector2(-210, -58)
+	_entrance_skip.size = Vector2(190, 38)
+	_entrance_skip.hide()
+	_entrance_skip.pressed.connect(func(): run.command(&"skip_boss_entrance"))
+	add_child(_entrance_skip)
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
@@ -221,7 +231,7 @@ func _sync_menu_visibility() -> void:
 	_pause_box.visible = not covered and paused and _settings == null
 	_rewards.visible = not covered and not paused and _rewards.is_active()
 	_rewards.set_process(not covered and not paused)
-	_draw_button.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY and DisplayServer.is_touchscreen_available()
+	_draw_button.visible = _can_show_draw_button(DisplayServer.is_touchscreen_available())
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
@@ -374,12 +384,29 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	_update_finish_presentation()
+	_update_cinematic_visibility()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
 	_refresh_loadout_icons()
 	queue_redraw()
+
+func _update_cinematic_visibility() -> void:
+	_sync_combat_art_visibility()
+	var boss := run.bosses.actor
+	var entrance: RefCounted = boss.get("entrance") if boss != null else null
+	_entrance_skip.visible = run.state.phase == RunState.Phase.PLAY and entrance != null and entrance.active and entrance.time >= 0.4
+	_draw_button.visible = _can_show_draw_button(DisplayServer.is_touchscreen_available())
+
+func _can_show_draw_button(touchscreen: bool) -> bool:
+	return touchscreen and run.state.cinematic_bars <= 0.0 and _menu_overlay == null and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY
+
+func _sync_combat_art_visibility() -> void:
+	var state := run.state
+	var cinematic := state != null and state.cinematic_bars > 0.0
+	_frame.visible = show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
+	_loadout_icons.visible = _frame.visible or (cinematic and not state.final_modules.is_empty())
 
 func _update_finish_presentation() -> void:
 	if run.state.phase != RunState.Phase.FINISHING:
@@ -411,8 +438,7 @@ func _layout_art() -> void:
 		_cards_box.scale = Vector2.ONE * factor
 		_cards_box.size = ART_SIZE
 	_frame.size = ART_SIZE
-	_frame.visible = show_status and run.state != null and run.state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING]
-	_loadout_icons.visible = _frame.visible
+	_sync_combat_art_visibility()
 
 func _make_bar_fill(frame: Texture2D) -> AtlasTexture:
 	var source := frame.get_image()
@@ -466,7 +492,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
 		return
-	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules)
+	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules) + str(run.state.cinematic_bars > 0.0)
 	if key == _loadout_key:
 		return
 	_loadout_key = key
@@ -474,6 +500,9 @@ func _refresh_loadout_icons() -> void:
 		child.queue_free()
 	var row := 0
 	for owned in [run.state.weapons, run.state.traits]:
+		if run.state.cinematic_bars > 0.0:
+			row += 1
+			continue
 		if row==0 and not run.state.final_modules.is_empty():
 			row+=1
 			continue
@@ -784,6 +813,8 @@ func _open_settings(from: Button) -> void:
 func _draw() -> void:
 	var s := run.state
 	if s == null:
+		return
+	if s.cinematic_bars > 0.0:
 		return
 	var W := size.x
 	_pause_box.position = (size - _pause_box.size) / 2.0

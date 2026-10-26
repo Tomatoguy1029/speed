@@ -579,6 +579,12 @@ func command(name: StringName, args := {}) -> void:
 		return
 	if command_extension.is_valid() and command_extension.call(name, args): return
 	match name:
+		&"skip_boss_entrance":
+			var owner := bosses.actor
+			var entrance: RefCounted = owner.get("entrance") if owner != null else null
+			if state.phase == RunState.Phase.PLAY and entrance != null and entrance.active:
+				entrance.skip()
+				if input != null: input.cancel_gesture()
 		&"choose_card":
 			choose_card(args.get("index", 0))
 		&"reroll":

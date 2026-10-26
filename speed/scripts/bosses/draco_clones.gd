@@ -1,11 +1,13 @@
 ## 専用の頭担当を全身の竜へ載せ、Hydraの技と攻撃形状を共用する。
 extends RefCounted
+const FORM = preload("res://scripts/bosses/draco_form.gd")
 const NORMALS = preload("res://scripts/bosses/hydra_normals.gd")
 const HYDRA = preload("res://data/bosses/hydra.tres")
 const MOVES = [preload("res://data/bosses/hydra_moves/bite_thrust.tres"),preload("res://data/bosses/hydra_moves/wind_band.tres"),preload("res://data/bosses/hydra_moves/rubble_fan.tres"),preload("res://data/bosses/hydra_moves/beam_fixed.tres"),preload("res://data/bosses/hydra_moves/thunder_drop.tres")]
 var units: Array = []
 var host: Node
 var center := Vector2.ZERO
+var ended := false
 class Host:
 	extends Node
 	var _time: float:
@@ -29,7 +31,7 @@ class Host:
 	func head_index(_n: Dictionary) -> int: return 0
 	func finish_normal(n: Dictionary) -> void: n.done=true
 func begin(a: BossActor) -> void:
-	center = a.aim
+	center = a.aim_target()
 	host = Host.new()
 	host.actor=a;host.ctx=a.ctx;host.run_state=a.run_state;host.table=a.table;host.def=HYDRA
 	a.add_child(host)
@@ -45,48 +47,63 @@ func begin(a: BossActor) -> void:
 		if j>0:
 			var copy := EnemyDef.new()
 			copy.params.clone_visual=true
-			copy.id=&"draco_copy";copy.behavior=&"drift";copy.radius=90.0;copy.hp=float(a.rule().clone_hp);copy.speed=0;copy.rank=1
+			copy.id=&"draco_copy";copy.behavior=&"drift";copy.radius=a.table.r[a.body];copy.hp=float(a.rule().clone_hp);copy.speed=0;copy.rank=1
 			row=a.ctx.enemies.spawn(copy,center+Vector2.from_angle(j*TAU/3.0)*650.0)
 			a.table.held[row]=1
 		var move: Resource = MOVES[order[j]]
-		units.append({"row":row,"id":a.table.id[row],"mode":move.technique,"t":0.0,"target":a.aim,"angle":(a.aim-a.table.pos[row]).angle(),"length":100.0,"glow":0.0,"locked":false,"strike_from":Vector2.ZERO,"strike_pos":Vector2.ZERO,"step":0,"sweep":0.0,"emission":{},"done":false,"origin":a.table.pos[row],"index":j,"parts":[]})
+		units.append({"row":row,"id":a.table.id[row],"mode":move.technique,"t":0.0,"target":center,"angle":(center-a.table.pos[row]).angle(),"length":100.0,"glow":0.0,"locked":false,"strike_from":Vector2.ZERO,"strike_pos":Vector2.ZERO,"step":0,"sweep":0.0,"emission":{},"done":false,"entry_hit":false,"origin":a.table.pos[row],"index":j,"parts":[],"points":a.neutral_body_points(a.table.pos[row],(center-a.table.pos[row]).angle())})
 		if j>0:
 			var visual=preload("res://scripts/bosses/draco_clone_visual.gd").new()
 			visual.actor=a;visual.unit=units[-1]
 			host.add_child(visual)
 			units[-1].visual=visual
-			for k in 12:
+			for k in a.body_rows.size():
 				var part := EnemyDef.new()
 				part.params.clone_visual=true
-				part.id=&"draco_copy_part";part.behavior=&"drift";part.radius=35;part.hp=999999;part.speed=0
+				part.id=&"draco_copy_part";part.behavior=&"drift";part.radius=a.body_width*0.5;part.hp=999999;part.speed=0
 				var segment := a.ctx.enemies.spawn(part,a.table.pos[row])
 				a.table.held[segment]=1;a.table.parent[segment]=a.body;a.table.parent_id[segment]=a.body_id
 				a.clone_damage_rows[segment]={"row":row,"id":a.table.id[row],"part_id":a.table.id[segment]}
 				units[-1].parts.append({"row":segment,"id":a.table.id[segment]})
+		_sync_shape(a,units[-1])
+		a.telegraph_paths.append(PackedVector2Array([a.table.pos[row]+Vector2.from_angle(float(units[-1].angle))*105.0*a.head_scale,center]))
+		a.telegraph_widths.append(float(a.rule().width))
 func tick(a: BossActor, dt: float) -> void:
 	host.attack_field.tick(dt)
+	a.telegraph_paths.clear()
+	a.telegraph_widths.clear()
 	for unit: Dictionary in units:
 		if not a.ctx.enemies.is_same(unit.row,unit.id) or a.table.dead[unit.row]!=0:
 			for part: Dictionary in unit.parts:
 				if a.ctx.enemies.is_same(part.row,part.id): a.ctx.enemies.mark_dead(part.row)
 			continue
 		var entry: float = float(unit.index)*0.7
-		if a.elapsed<entry: continue
+		if a.elapsed<entry:
+			a.telegraph_paths.append(PackedVector2Array([a.table.pos[unit.row]+Vector2.from_angle(float(unit.angle))*105.0*a.head_scale,center]))
+			a.telegraph_widths.append(float(a.rule().width))
+			continue
+		var forward := Vector2.from_angle(float(unit.angle))
+		var mouth_offset: float = 105.0 * a.head_scale
+		var landing := center - forward * mouth_offset
 		if a.elapsed<entry+0.5:
-			a.table.pos[unit.row]=unit.origin.lerp(center,clampf((a.elapsed-entry)/0.5,0.0,1.0))
-			var point: Vector2 = a.table.pos[unit.row]
-			a.hit_segment(PackedVector2Array([point,point+Vector2.from_angle(unit.angle)*120.0]),60.0)
+			var before: Vector2 = a.table.pos[unit.row] + forward * mouth_offset
+			a.table.pos[unit.row]=unit.origin.lerp(landing,clampf((a.elapsed-entry)/0.5,0.0,1.0))
+			var after: Vector2 = a.table.pos[unit.row] + forward * mouth_offset
+			var nearest := Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos,before,after)
+			if not unit.entry_hit and nearest.distance_to(a.run_state.ship_pos) <= float(a.rule().width) + a.ctx.cfg.ship_radius:
+				unit.entry_hit = a.ctx.ship.damage(float(a.rule().damage) * a.ctx.cfg.atk_scale,0.0,&"clone_leap",&"draco")
 		elif a.elapsed<entry+0.9:
-			a.table.pos[unit.row]=center.lerp(unit.origin,(a.elapsed-entry-0.5)/0.4)
+			a.table.pos[unit.row]=landing.lerp(unit.origin,(a.elapsed-entry-0.5)/0.4)
 		elif not unit.done:
 			unit.t=float(unit.t)+dt
 			NORMALS.tick(host,unit,dt)
-		for k in unit.parts.size():
-			var part: Dictionary=unit.parts[k]
-			if a.ctx.enemies.is_same(part.row,part.id): a.table.pos[part.row]=a.table.pos[unit.row]+Vector2(-(k+1)*45.0,sin((k+1)*0.7-a.clock)*55.0).rotated(unit.angle)
+			if unit.mode==&"bite_thrust" and unit.locked: a.table.pos[unit.row]=unit.strike_pos
 		if a.elapsed>float(a.rule().active)-1.0 and unit.index>0:
 			a.table.pos[unit.row]=a.table.pos[unit.row].lerp(a.table.pos[a.body],minf(1.0,dt*5.0))
+		_sync_shape(a,unit)
 func end(a: BossActor, cancelled: bool) -> void:
+	if ended: return
+	ended = true
 	if host != null:
 		for effect: Dictionary in host.attack_field.effects:
 			if not effect.persistent: effect.life=0.0
@@ -98,10 +115,23 @@ func end(a: BossActor, cancelled: bool) -> void:
 		if unit.index==0: continue
 		if cancelled and a.ctx.enemies.is_same(unit.row,unit.id) and a.table.dead[unit.row]==0:
 			unit.visual.reparent(a._presentation)
-			a.picaro.members.append({"row":unit.row,"id":unit.id,"born":a.clock-2.0,"stars":int(a.rule().get("clone_stars",13)),"clone_parts":unit.parts,"visual":unit.visual,"angle":unit.angle})
+			a.picaro.members.append({"row":unit.row,"id":unit.id,"born":a.clock-2.0,"stars":int(a.rule().get("clone_stars",13)),"clone_parts":unit.parts,"visual":unit.visual,"angle":unit.angle,"unit":unit})
 			continue
 		if a.ctx.enemies.is_same(unit.row,unit.id): a.ctx.enemies.mark_dead(unit.row)
 		for part: Dictionary in unit.parts:
 			if a.ctx.enemies.is_same(part.row,part.id): a.ctx.enemies.mark_dead(part.row)
 			if int(a.clone_damage_rows.get(part.row,{}).get("part_id",-1))==int(part.id): a.clone_damage_rows.erase(part.row)
 	a.attack_points.clear()
+	a.telegraph_paths.clear()
+	a.telegraph_widths.clear()
+
+func _sync_shape(a: BossActor, unit: Dictionary) -> void:
+	var points: PackedVector2Array = a.neutral_body_points(a.table.pos[unit.row], float(unit.angle))
+	unit.points = points
+	if unit.index == 0:
+		a.table.facing[a.body] = float(unit.angle)
+	for k in unit.parts.size():
+		var part: Dictionary = unit.parts[k]
+		if a.ctx.enemies.is_same(part.row, part.id):
+			a.table.pos[part.row] = FORM.sample(points,float(k+1)/float(unit.parts.size()))
+			a.table.r[part.row] = a.body_width * 0.5 * FORM.taper(float(k+1)/float(unit.parts.size()))

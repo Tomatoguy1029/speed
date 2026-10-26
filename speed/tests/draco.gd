@@ -27,6 +27,11 @@ func _ready() -> void:
 		check(not actor.start_attack(&"bite") and sim.state.controls_locked, "登場中は攻撃と操作を止める")
 		for frame in 1100: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(actor.mode==&"idle" and not sim.state.controls_locked and sim.state.cinematic_bars==0.0, "対面後に戦闘へ引き渡す")
+	# The entrance now stages an authored world-space confrontation. The
+	# independent collision/attack fixtures below explicitly use their own origin.
+	sim.enemies.table.pos[actor.body] = Vector2.ZERO
+	sim.enemies.table.facing[actor.body] = 0.0
+	actor.reset_pose()
 	check(actor.get("body_rows") != null, "全身の命中形状を持つ")
 	if actor.get("body_rows") != null:
 		var rows: Array = actor.body_rows
@@ -90,7 +95,7 @@ func _ready() -> void:
 		actor.cancel_attack()
 		check(actor.start_attack(id), "移動攻撃を開始する: "+id)
 		var origin: Vector2 = sim.enemies.table.pos[actor.body]
-		for frame in 300: actor.sim_tick(1.0/120.0,1.0/120.0)
+		for frame in ceili((float(actor.rule().warn)+float(actor.rule().active)+float(actor.rule().recover)+0.1)*120.0): actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(sim.enemies.table.pos[actor.body].distance_to(origin)>100.0, "移動攻撃で本体が移動する: "+id)
 		check(actor.mode == &"idle", "移動攻撃後に隙を終える: "+id)
 	actor.cancel_attack()

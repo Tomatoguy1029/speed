@@ -1,5 +1,6 @@
 ## 元の敵定義を複製し、個体と生成・攻撃担当の寿命を所有する。
 extends RefCounted
+const FORM = preload("res://scripts/bosses/draco_form.gd")
 var actor: BossActor
 var members: Array = []
 var attacking := true
@@ -35,9 +36,13 @@ func tick() -> void:
 		actor.table.held[m.row] = 1 if forming or not attacking else 0
 		actor.table.guard[m.row] = 1.0 if forming else 0.0
 		if m.has("clone_parts"):
+			var points: PackedVector2Array = actor.neutral_body_points(actor.table.pos[m.row],float(m.angle))
+			if m.has("unit"): m.unit.points=points
 			for j in m.clone_parts.size():
 				var part: Dictionary=m.clone_parts[j]
-				if actor.ctx.enemies.is_same(part.row,part.id): actor.table.pos[part.row]=actor.table.pos[m.row]+Vector2(-(j+1)*45.0,sin((j+1)*0.7-actor.clock)*55.0).rotated(float(m.angle))
+				if actor.ctx.enemies.is_same(part.row,part.id):
+					actor.table.pos[part.row]=FORM.sample(points,float(j+1)/float(m.clone_parts.size()))
+					actor.table.r[part.row]=actor.body_width*0.5*FORM.taper(float(j+1)/float(m.clone_parts.size()))
 		var parts: PackedInt32Array = actor.table.parts[m.row]
 		for j in range(0,parts.size(),2):
 			if actor.ctx.enemies.is_same(parts[j],parts[j+1]): actor.table.held[parts[j]] = actor.table.held[m.row]

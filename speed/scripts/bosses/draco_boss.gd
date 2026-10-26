@@ -21,8 +21,16 @@ var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
 var body_override := PackedVector2Array()
-var body_width := 92.0
-var head_scale := 1.0
+## Combat dimensions are authored once. Poses change the spine, not the size of the animal.
+var body_length := 1500.0
+var body_width := 154.0
+var head_scale := 2.0
+var body_segments := 32
+var perspective_scale := 1.0
+var telegraph_paths: Array[PackedVector2Array] = []
+var telegraph_widths: Array[float] = []
+var attack_width := 45.0
+const FORM = preload("res://scripts/bosses/draco_form.gd")
 var _driver: RefCounted
 var selection_enabled := false
 var action_rules: Resource
@@ -37,6 +45,10 @@ var _presentation: Node2D
 
 func _on_bound() -> void:
 	draws_self = true
+	body_length = float(def.params.get("body_length",1500.0))
+	body_width = float(def.params.get("body_width",154.0))
+	head_scale = float(def.params.get("head_scale",2.0))
+	body_segments = int(def.params.get("body_segments",32))
 	entrance = preload("res://scripts/bosses/draco_entrance.gd").new(self)
 	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
 	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
@@ -45,8 +57,8 @@ func _on_bound() -> void:
 	add_child(_presentation)
 	_presentation.actor = self
 	presentation_event.connect(_presentation.on_event)
-	for j in 12:
-		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], 46.0, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
+	for j in body_segments:
+		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], body_width*0.5, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
 		table.parent[row] = body
 		table.parent_id[row] = body_id
 		body_rows.append(row)
@@ -66,23 +78,65 @@ func configure_flow(program: Resource) -> void:
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
 
-func body_points() -> PackedVector2Array:
-	if not body_override.is_empty(): return body_override
-	var points := PackedVector2Array([table.pos[body]])
-	for j in 12:
-		var t := float(j + 1) / 12.0
-		points.append(table.pos[body] + Vector2(-t * 680.0, sin(t * TAU * 1.4 - clock) * 120.0 * t).rotated(table.facing[body]))
+func neutral_body_points(head: Vector2, angle: float) -> PackedVector2Array:
+	var points := PackedVector2Array([head])
+	for j in body_segments:
+		var t := float(j+1)/float(body_segments)
+		var wave := sin(t*TAU*1.25-clock*0.75)*float(def.params.get("body_wave",180.0))*sin(t*PI*0.8)
+		points.append(head+Vector2(-t*body_length,wave).rotated(angle))
+	var length := FORM.length(points)
+	if length>0.001:
+		for j in points.size(): points[j]=head+(points[j]-head)*(body_length/length)
 	return points
 
+func body_points() -> PackedVector2Array:
+	var points := body_override.duplicate() if not body_override.is_empty() else neutral_body_points(table.pos[body],table.facing[body])
+	if not is_equal_approx(perspective_scale,1.0):
+		var head: Vector2 = table.pos[body]
+		for j in points.size(): points[j] = head+(points[j]-head)*perspective_scale
+	return points
+
+func aim_target(lead_seconds := 0.0) -> Vector2:
+	var lead: Vector2 = run_state.ship_vel*maxf(0.0,lead_seconds)
+	return run_state.ship_pos+lead.limit_length(float(def.params.get("aim_lead_cap",280.0)))
+
+func mouth_pos() -> Vector2:
+	return table.pos[body]+Vector2.from_angle(table.facing[body])*105.0*head_scale*perspective_scale
+
+func mouth_position() -> Vector2:
+	return mouth_pos()
+
+func chest_pos() -> Vector2:
+	return table.pos[body]-Vector2.from_angle(table.facing[body])*110.0*head_scale*perspective_scale
+
+func apply_depth(depth: float, alpha := 1.0) -> void:
+	perspective_scale = clampf(depth,0.1,1.0)
+	_presentation.scale = Vector2.ONE
+	_presentation.modulate.a = clampf(alpha,0.0,1.0)
+	_update_body()
+
+func reset_pose() -> void:
+	body_override.clear()
+	body_width = float(def.params.get("body_width",154.0))
+	head_scale = float(def.params.get("head_scale",2.0))
+	perspective_scale = 1.0
+	if _presentation != null:
+		_presentation.scale = Vector2.ONE
+		_presentation.modulate = Color.WHITE
+		_presentation.visible = true
+	if has_body(): _update_body()
+
 func _update_body() -> void:
-	position=table.pos[body]
-	rotation=table.facing[body]
+	position = table.pos[body]
+	rotation = table.facing[body]
 	var points := body_points()
+	table.r[body] = def.radius*head_scale*perspective_scale
 	for j in body_rows.size():
-		if ctx.enemies.is_same(body_rows[j], body_ids[j]):
-			table.pos[body_rows[j]] = points[roundi(float(j+1)*float(points.size()-1)/float(body_rows.size()))]
+		if ctx.enemies.is_same(body_rows[j],body_ids[j]):
+			var fraction := float(j+1)/float(body_rows.size())
+			table.pos[body_rows[j]] = FORM.sample(points,fraction)
 			table.guard[body_rows[j]] = table.guard[body]
-			table.r[body_rows[j]] = body_width*0.5
+			table.r[body_rows[j]] = body_width*0.5*FORM.taper(fraction)*perspective_scale
 
 func damage_target(row: int) -> int:
 	if clone_damage_rows.has(row):
@@ -112,15 +166,22 @@ func start_attack(id: StringName) -> bool:
 		ctx.projectiles.lab_context=attack_token
 		attack_serial+=1
 	if id != &"picaro_wall": picaro.pause(false)
+	reset_pose()
+	telegraph_points.clear()
+	telegraph_paths.clear()
+	telegraph_widths.clear()
 	technique = id
+	attack_width = float(rule().get("width",45.0))
 	mode = &"windup"
 	elapsed = 0.0
 	attack_hit = false
-	aim = run_state.enemy_aim
+	aim = aim_target()
 	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
 	table.facing[body] = direction.angle()
 	_driver = rule().driver.new() if rule().has("driver") else null
 	if _driver != null: _driver.begin(self)
+	_update_body()
+	_presentation.queue_redraw()
 	return true
 
 func attack_playing() -> bool:
@@ -160,25 +221,32 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			hit_segment(PackedVector2Array([table.pos[body],tip]),float(rule().width))
 		if elapsed >= float(rule().active):
 			if _driver != null: _driver.end(self,false)
-			_driver = null
 			mode = &"recovery"
 			elapsed = 0.0
-	elif mode == &"recovery" and elapsed >= float(rule().recover):
-		mode = &"idle"
-		technique = &""
+	elif mode == &"recovery":
+		if _driver != null and _driver.has_method("recover"): _driver.recover(self,dt)
+		if elapsed >= float(rule().recover):
+			_driver = null
+			mode = &"idle"
+			technique = &""
+			telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear()
+			attack_points.clear()
+			reset_pose()
 	_update_body()
 	_presentation.queue_redraw()
 	if selection_enabled and mode == &"idle" and flow_adapter != null:
-		var delta := run_state.enemy_aim-table.pos[body]
-		if delta.length()>1400.0:
+		var delta := run_state.ship_pos-table.pos[body]
+		if delta.length()>float(def.params.get("approach_distance",900.0)):
 			table.pos[body]+=delta.normalized()*def.speed*dt
 			table.facing[body]=delta.angle()
-		flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
+		flow_runner.tick(dt, {"player": run_state.ship_pos}, flow_adapter)
 
 func cancel_attack() -> void:
 	if _driver != null: _driver.end(self,true)
 	_driver = null
 	attack_points.clear()
+	telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear()
+	reset_pose()
 	mode = &"idle"
 	technique = &""
 	elapsed = 0.0
@@ -196,7 +264,7 @@ func can_begin_sequence() -> bool:
 func attack_failed() -> bool:
 	return not body_alive()
 func technique_ready(id: StringName, gate: Dictionary) -> bool:
-	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and phase <= int(gate.get("max_phase",3)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim-table.pos[body]).rotated(-table.facing[body]))
+	return mode == &"idle" and closing_walls.is_empty() and _moves.has(id) and phase >= int(gate.get("min_phase", 1)) and phase <= int(gate.get("max_phase",3)) and preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos-table.pos[body]).rotated(-table.facing[body]))
 
 func on_body_damaged() -> void:
 	var thresholds: Array = def.params.get("thresholds", [0.7, 0.4])
@@ -221,31 +289,45 @@ func on_body_damaged() -> void:
 	presentation_event.emit({"cue": &"phase_changed", "phase": phase})
 
 func hit_segment(points: PackedVector2Array, width: float, prior := PackedVector2Array()) -> void:
-	if attack_hit: return
+	if attack_hit or points.size()<2: return
+	attack_width = width
 	var radius := width + ctx.cfg.ship_radius
 	var hit := Geometry2D.get_closest_point_to_segment(run_state.ship_pos,points[0],points[1]).distance_to(run_state.ship_pos) <= radius
 	if prior.size() == 2:
-		hit = hit or Geometry2D.is_point_in_polygon(run_state.ship_pos,PackedVector2Array([prior[0],prior[1],points[1],points[0]]))
+		var sweep := PackedVector2Array([prior[0],prior[1],points[1],points[0]])
+		hit = hit or Geometry2D.is_point_in_polygon(run_state.ship_pos,sweep)
+		for j in sweep.size():
+			if Geometry2D.get_closest_point_to_segment(run_state.ship_pos,sweep[j],sweep[(j+1)%sweep.size()]).distance_to(run_state.ship_pos)<=radius: hit=true
 	if hit:
-		ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
-		attack_hit = true
+		attack_hit = ctx.ship.damage(float(rule().damage) * ctx.cfg.atk_scale,0.0,technique,&"draco")
 
 func contains_hit(point: Vector2, radius: float) -> bool:
+	if table.guard[body]>=1.0: return false
 	if super(point,radius): return true
-	for j in body_rows.size():
-		if ctx.enemies.is_same(body_rows[j],body_ids[j]) and point.distance_to(table.pos[body_rows[j]]) <= table.r[body_rows[j]]+radius: return true
+	var points := body_points()
+	var fractions := FORM.fractions(points)
+	for j in range(points.size()-1):
+		var nearest := Geometry2D.get_closest_point_to_segment(point,points[j],points[j+1])
+		var segment := points[j].distance_to(points[j+1])
+		var along := nearest.distance_to(points[j])/maxf(0.001,segment)
+		var fraction := lerpf(fractions[j],fractions[j+1],along)
+		var width := body_width*0.5*FORM.taper(fraction)*perspective_scale
+		if nearest.distance_to(point)<=width+radius: return true
 	return false
 
-func close_wall(h: int, duration: float) -> void:
+func close_wall(h: int, duration: float, delay := 0.0) -> void:
 	var ps := ctx.projectiles
 	if not ps.owns_hazard(h,body,body_id): return
 	ps.hazard_dmg[h] = 0.0
-	closing_walls.append({"h":h,"time":duration,"duration":duration,"from":ps.hazard_pos[h],"length":ps.hazard_len[h],"width":ps.hazard_width[h],"angle":ps.hazard_angle[h]})
+	closing_walls.append({"h":h,"time":duration,"duration":duration,"delay":delay,"from":ps.hazard_pos[h],"length":ps.hazard_len[h],"width":ps.hazard_width[h],"angle":ps.hazard_angle[h]})
 
 func _update_closing_walls(dt: float) -> void:
 	var ps := ctx.projectiles
 	for wall: Dictionary in closing_walls.duplicate():
 		var h := int(wall.h)
+		if float(wall.get("delay",0.0))>0.0:
+			wall.delay = maxf(0.0,float(wall.delay)-dt)
+			continue
 		wall.time = float(wall.time)-dt
 		if not ps.owns_hazard(h,body,body_id) or float(wall.time)<=0.0:
 			if ps.owns_hazard(h,body,body_id): ps.release_hazard(h)

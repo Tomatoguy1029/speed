@@ -351,7 +351,9 @@ func _process(delta: float) -> void:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	_sync_picaro()
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
-	if hud != null: hud.visible = state.cinematic_bars<=0.0
+	# HUD owns cinematic visibility so the explicit entrance skip and the
+	# completed legendary module strip remain usable while the combat UI hides.
+	if hud != null: hud.visible = true
 	var phase := state.phase
 	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -1399,6 +1401,7 @@ func _sync_picaro() -> void:
 			_layers.enemies.add_child(node)
 			_picaro_sprites[id] = node
 		var sprite: Node2D = _picaro_sprites[id]
+		sprite.visible = not run.state.cinematic_hide_enemies or t.is_boss[i] != 0
 		sprite.position = t.pos[i]
 		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
 		var radius := enemy_sprite_radius(source,t.r[i])
