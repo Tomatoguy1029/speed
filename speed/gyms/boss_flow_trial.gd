@@ -16,7 +16,7 @@ func _ready() -> void:
 	if program == null:
 		push_error("試遊データがありません。ボス行動画面から再生してください。")
 		return
-	await session.reset({"empty": true, "stage": {"hydra": 4, "draco": 5, "centaurus": 2}.get(boss_id, 1), "ship_pos": [500, 0], "invincible": true, "director": {"enabled": false}})
+	await session.reset({"empty": true, "stage": {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(boss_id, 1), "ship_pos": [500, 0], "invincible": true, "director": {"enabled": false}})
 	session.perform("boss", {"type": boss_id, "pos": [0, 0]})
 	preview_actor = session.run.bosses.actor
 	if preview_actor == null: return

@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="BossDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+radius = 100.0
+use_def_stats = true
+hp = 3400.0
+armor = 13.0
+speed = 165.0
+accel = 3.0
+turn = 2.6
+xp = 140.0
+weak_arc = 0.0
+params = {
+"initial_wait": 1.2,
+"entrance_time": 1.4,
+"pack_size": 8,
+"lead_radius": 520.0,
+"lead_max": 50,
+"lead_scan": 0.2,
+"lead_catch_up": 1.4,
+"led_hits": 2,
+"led_color": Color(1, 0, 1, 1),
+"slot_back": 50.0,
+"slot_side": 55.0,
+"final_beam_width": 5000.0,
+"final_reach": 6000.0,
+"final_warn_width": 18.0,
+"final_widen_time": 0.35
+}
+id = &"canis_major"
+display_name = "おおいぬ座"
+scene_path = "res://scenes/bosses/canis_major_boss.tscn"

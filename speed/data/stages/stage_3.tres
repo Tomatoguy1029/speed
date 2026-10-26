@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://b5ynln1hy5dmj" path="res://data/formations/s3_lynx.tscn" id="3_gibww"]
 [ext_resource type="PackedScene" uid="uid://psh27x4c22fn" path="res://data/formations/s3_marlin.tscn" id="4_p4nfj"]
 [ext_resource type="PackedScene" uid="uid://2jtm8qsrcrj1" path="res://data/formations/s3_corona.tscn" id="5_d6uyw"]
+[ext_resource type="PackedScene" uid="uid://dck8igaktitco" path="res://data/formations/s3_phoenix.tscn" id="6_fori7"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
 
@@ -65,6 +66,8 @@ interval = 3.0
 script = ExtResource("2_mgob6")
 label = "新しいクリップ"
 track = 4
+types = Array[StringName]([&"phoenix"])
+formations = Array[PackedScene]([ExtResource("6_fori7")])
 time = 320.0
 length = 105.0
 groups = 2
@@ -97,6 +100,42 @@ types = Array[StringName]([&"corona"])
 formations = Array[PackedScene]([ExtResource("5_d6uyw")])
 time = 320.0
 length = 105.0
+
+[sub_resource type="Resource" id="Resource_fori7"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 4
+types = Array[StringName]([&"phoenix"])
+formations = Array[PackedScene]([ExtResource("6_fori7")])
+time = 455.0
+length = 445.0
+
+[sub_resource type="Resource" id="Resource_5d1dk"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 3
+types = Array[StringName]([&"corona"])
+formations = Array[PackedScene]([ExtResource("5_d6uyw")])
+time = 455.0
+length = 445.0
+
+[sub_resource type="Resource" id="Resource_luhxi"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 2
+types = Array[StringName]([&"marlin"])
+formations = Array[PackedScene]([ExtResource("4_p4nfj")])
+time = 455.0
+length = 445.0
+
+[sub_resource type="Resource" id="Resource_kpaf0"]
+script = ExtResource("2_mgob6")
+label = "やまねこさん"
+track = 0
+types = Array[StringName]([&"lynx"])
+formations = Array[PackedScene]([ExtResource("3_gibww")])
+time = 455.0
+length = 445.0
 
 [sub_resource type="Resource" id="Phase_stage3_build1"]
 script = ExtResource("9_mgob6")
@@ -291,12 +330,12 @@ points = PackedVector2Array(0, 0, 62, 35, 73, 12, 130, 12, 133, 14, 140, 16, 144
 [sub_resource type="Resource" id="Resource_mgob6"]
 script = ExtResource("10_gibww")
 type = &"hound"
-points = PackedVector2Array(0, 0, 11, 27, 61, 89, 62, 428, 63, 25, 75, 23, 77, 641, 77.5, 21.4, 89, 45, 91, 686, 93, 68, 104, 53, 106, 693, 108, 83, 120, 98, 121, 799, 123, 60, 130, 79, 131, 21.4, 139, 21.4, 140, 89, 141, 207, 142.03, 25, 154.2, 23, 156, 257, 156.74, 21.4, 168.41, 45, 171, 300, 172.46, 68, 183.62, 53, 186, 386, 187.68, 83, 199.86, 98, 201, 371, 202.9, 60, 210, 79, 211, 21.4, 229, 21.4, 230, 89, 231.01, 428, 232.03, 25, 244.2, 23, 246.23, 641, 246.74, 21.4, 258.41, 45, 260.43, 686, 262.46, 68, 273.62, 53, 276, 686, 277.68, 83, 289.86, 98, 290.87, 799, 292.9, 60, 300, 79, 301, 21.4, 319, 21.4, 320, 89, 321.52, 428, 323.04, 25, 341.3, 23, 344.35, 641, 345.11, 21.4, 362.61, 45, 365.65, 686, 368.7, 68, 385.43, 53, 388.48, 693, 391.52, 83, 409.78, 98, 411.3, 799, 414.35, 60, 425, 79, 426, 21.4, 454, 21.4)
+points = PackedVector2Array(0, 0, 11, 27, 61, 89, 62, 428, 63, 25, 75, 23, 77, 641, 77.5, 21.4, 89, 45, 91, 686, 93, 68, 104, 53, 106, 693, 108, 83, 120, 98, 121, 799, 123, 60, 130, 79, 131, 21.4, 139, 21.4, 140, 89, 141, 207, 142.03, 25, 154.2, 23, 156, 257, 156.74, 21.4, 168.41, 45, 171, 300, 172.46, 68, 183.62, 53, 186, 386, 187.68, 83, 199.86, 98, 201, 371, 202.9, 60, 210, 79, 211, 21.4, 229, 21.4, 230, 89, 231.01, 428, 232.03, 25, 244.2, 23, 246.23, 641, 246.74, 21.4, 258.41, 45, 260.43, 686, 262.46, 68, 273.62, 53, 276, 686, 277.68, 83, 289.86, 98, 290.87, 799, 292.9, 60, 300, 79, 301, 21.4, 319, 21.4, 320, 89, 321.52, 428, 323.04, 25, 341.3, 23, 344.35, 641, 345.11, 21.4, 362.61, 45, 365.65, 686, 368.7, 68, 385.43, 53, 388.48, 693, 391.52, 83, 409.78, 98, 411.3, 799, 414.35, 60, 425, 79, 426, 21.4, 454, 21.4, 459, 186)
 
 [sub_resource type="Resource" id="Resource_uudoi"]
 script = ExtResource("10_gibww")
 type = &"splitter"
-points = PackedVector2Array(0, 0, 37, 94, 64, 93, 82, 39, 130, 40, 132, 80, 140, 78, 141, 55)
+points = PackedVector2Array(0, 0, 37, 94, 64, 93, 82, 39, 130, 40, 132, 80, 140, 78, 141, 55, 455, 53, 458, 63)
 
 [resource]
 script = ExtResource("1")
@@ -305,9 +344,9 @@ scene_path = "res://scenes/stages/stage_3.tscn"
 phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
-clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela")])
+clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_fori7"), SubResource("Resource_5d1dk"), SubResource("Resource_luhxi"), SubResource("Resource_kpaf0")])
 track_names = PackedStringArray("やまねこ座", "ぎょしゃ座", "かじき座", "みなみのかんむり座", "ほうおう座")
-boss_enabled = false
+boss_time = 455.0
 surge_phases = {
 "escape": false,
 "phase_1030509691842008278": false,
@@ -315,4 +354,6 @@ surge_phases = {
 "phase_5747225833786728851": false,
 "phase_6369425975374370843": false
 }
+time_limit = 900.0
+boss_id = &"canis_major"
 legendary_module_id = &"legendary_keel"

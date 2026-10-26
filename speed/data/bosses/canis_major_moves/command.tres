@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmcmd"]
+
+[resource]
+script = ExtResource("1_cmcmd")
+technique = &"command"
+parameters = {
+"cd": 7.0,
+"damage": 12.0,
+"lunge_speed": 1260.0,
+"lunge_time": 0.55,
+"min_hounds": 3,
+"recover": 0.6,
+"warn": 0.6
+}

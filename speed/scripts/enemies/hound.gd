@@ -5,6 +5,12 @@ extends "res://scripts/enemies/biter.gd"
 var packs: Dictionary = {}
 var members: Dictionary = {}
 var _pursuit: Dictionary = {}
+## ボスが率いる個体の走る先（行 → [目標, 期限の世界時刻, 速さの倍率]）。期限が過ぎると群れの追跡へ戻る。
+var follows: Dictionary = {}
+
+## 行 i を、世界時刻 until まで goal へ走らせる。遠いほど速く、最大で自分の速さの speed_scale 倍。
+func follow(i: int, goal: Vector2, until: float, speed_scale: float) -> void:
+	follows[i] = [goal, until, speed_scale]
 
 func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 	super(system, behavior_name, idx)
@@ -51,6 +57,9 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 func _pack_velocity(i: int) -> Vector2:
 	var t := table
 	var p := t.def[i].params
+	var order: Array = follows.get(i, [])
+	if not order.is_empty() and float(order[1]) >= state.world_time:
+		return _follow_velocity(i, order)
 	var chase := (state.ship_pos - t.pos[i]).normalized() * t.speed[i]
 	var center := Vector2.ZERO
 	var velocity := Vector2.ZERO
@@ -74,6 +83,24 @@ func _pack_velocity(i: int) -> Vector2:
 	desired += separation * t.speed[i] * float(p.pack_separation)
 	return desired.limit_length(t.speed[i])
 
+## 率いられている間は群れの向きをそろえず、目標へ寄りながら仲間との間隔だけ保つ。
+func _follow_velocity(i: int, order: Array) -> Vector2:
+	var t := table
+	var p := t.def[i].params
+	var to: Vector2 = order[0] - t.pos[i]
+	var top := t.speed[i] * float(order[2])
+	var desired := to.normalized() * minf(top, to.length() / 0.25) if to.length_squared() > 1.0 else Vector2.ZERO
+	var gap := maxf(1.0, float(p.pack_gap))
+	var separation := Vector2.ZERO
+	for j: int in packs[members[i]]:
+		if j == i or not _running(j): continue
+		var offset := t.pos[i] - t.pos[j]
+		var distance := offset.length()
+		if distance > 0.001 and distance < gap:
+			separation += offset / distance * (1.0 - distance / gap)
+	desired += separation * t.speed[i] * float(p.pack_separation)
+	return desired.limit_length(top)
+
 func _pursuit_velocity(i: int, ship: Vector2, dt: float) -> Vector2:
 	var target: Vector2 = _pursuit.get(i, (ship - table.pos[i]).normalized() * table.speed[i])
 	return table.vel[i].lerp(target, clampf(table.accel[i] * dt, 0.0, 1.0))
@@ -92,8 +119,10 @@ func _remove(i: int) -> void:
 	if packs[pack].is_empty(): packs.erase(pack)
 	members.erase(i)
 	_pursuit.erase(i)
+	follows.erase(i)
 
 func clear() -> void:
 	packs.clear()
 	members.clear()
 	_pursuit.clear()
+	follows.clear()
