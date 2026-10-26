@@ -7,18 +7,37 @@ var _settings: Resource = preload("res://data/map_reveal_settings.tres").duplica
 var _viewport: SubViewport
 var _source_hash := FileAccess.get_md5(SETTINGS_PATH)
 var _status := Label.new()
+var preview_host: Control
+var controls_host: Control
+var settings_path := SETTINGS_PATH
+var dirty := false
+var _fields: Dictionary = {}
+var _title: Control
 
 func _ready() -> void:
-	get_window().title = "SPEED — 周辺情報の出現演出・試作"
+	if controls_host == null:
+		get_window().title = "SPEED — 周辺情報の出現演出・試作"
 	var layout := VBoxContainer.new()
 	layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(layout)
+	layout.visible = controls_host == null
 	var caption := Label.new()
 	caption.text = "マップ演出・視覚調整用の試作 / 各項目にマウスを置くと説明 / 保存先: data/map_reveal_settings.tres"
 	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	layout.add_child(caption)
+	var panel_host: Control = layout
+	if controls_host != null:
+		var scroll := ScrollContainer.new()
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		controls_host.add_child(scroll)
+		var groups := VBoxContainer.new()
+		groups.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.add_child(groups)
+		panel_host = groups
 	var tabs := TabContainer.new()
-	layout.add_child(tabs)
+	if controls_host == null:
+		layout.add_child(tabs)
 	for section: Array in [
 		["接続線と点灯", "星座から線を伸ばし、その後に情報を点灯します。", [
 		["線の秒数", "line_duration", 0.0, 2.0, 0.01, "線が伸び切るまでの秒数。0 で即時表示。"],
@@ -44,17 +63,23 @@ func _ready() -> void:
 	]:
 		var panel := VBoxContainer.new()
 		panel.name = section[0]
-		tabs.add_child(panel)
+		if controls_host == null:
+			tabs.add_child(panel)
+		else:
+			panel_host.add_child(panel)
+			var heading := Label.new()
+			heading.text = section[0]
+			panel.add_child(heading)
 		var description := Label.new()
 		description.text = section[1]
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		panel.add_child(description)
-		var fields := HFlowContainer.new()
+		var fields: Container = HFlowContainer.new() if controls_host == null else VBoxContainer.new()
 		panel.add_child(fields)
 		for field: Array in section[2]:
 			_add_field(fields, field)
 	var tools := HFlowContainer.new()
-	layout.add_child(tools)
+	panel_host.add_child(tools)
 	var replay := Button.new()
 	replay.text = "再生 / マップを開く"
 	replay.pressed.connect(_replay)
@@ -64,18 +89,38 @@ func _ready() -> void:
 	save.tooltip_text = "現在の値を data/map_reveal_settings.tres に保存します。次の本番起動から使います。"
 	save.pressed.connect(_save)
 	tools.add_child(save)
+	save.visible = controls_host == null
 	_status.text = "変更は即反映。保存前の値は終了時に破棄します。"
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	layout.add_child(_status)
+	panel_host.add_child(_status)
+	_status.visible = controls_host == null
 	var container := SubViewportContainer.new()
 	container.stretch = true
 	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	container.mouse_filter = Control.MOUSE_FILTER_PASS
-	layout.add_child(container)
+	(preview_host if preview_host != null else layout).add_child(container)
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(1280, 720)
 	_viewport.handle_input_locally = true
 	container.add_child(_viewport)
+	if controls_host != null:
+		# 本番と同じタイトル背景とマップを使い、アプリ全体の画面遷移は起こさない。
+		_title = preload("res://scenes/app/title.tscn").instantiate()
+		_viewport.add_child(_title)
+		_title.show_screen(GameManager.Screen.STAGE_SELECT, false)
+		if is_instance_valid(_title.menu_accessory):
+			_title.menu_accessory.hide()
+		_title.set_process_input(false)
+		_title.set_process_unhandled_input(false)
+		_map = _title._map
+		_map.reveal_settings = _settings
+		_map.navigation_enabled = false
+		_map._launch.disabled = true
+		_map._back.disabled = true
+		_map._launch.tooltip_text = "編集プレビュー / 再生ボタンで演出を確認"
+		_map.select_constellation(0)
+		tabs.free()
+		return
 	# 本番と同じ入口・画面・入力を使う。
 	GameManager.screen = GameManager.Screen.STAGE_SELECT
 	GameManager.boot_request = Callable()
@@ -109,6 +154,7 @@ func _add_field(parent: Control, field: Array) -> void:
 	spin.get_line_edit().tooltip_text = field[5]
 	spin.value_changed.connect(func(value: float):
 		_settings.set(field[1], value)
+		dirty = true
 		_status.text = "未保存。『調整値を保存』で本番用リソースへ反映します。"
 		if is_instance_valid(_map) and (field[1].begins_with("spectrum_") or field[1] in ["crt_strength", "orbit_speed"]):
 			_map._apply_reveal_settings()
@@ -116,8 +162,12 @@ func _add_field(parent: Control, field: Array) -> void:
 			_replay()
 	)
 	row.add_child(spin)
+	_fields[field[1]] = spin
 
 func _replay() -> void:
+	if controls_host != null:
+		_map.select_constellation(_map._selected)
+		return
 	if is_instance_valid(_map) and _map.is_visible_in_tree():
 		_map.select_constellation(_map._selected)
 	else:
@@ -127,14 +177,15 @@ func _replay() -> void:
 		_map.reveal_settings = _settings
 
 func _save() -> void:
-	if FileAccess.get_md5(SETTINGS_PATH) != _source_hash:
-		_status.text = "保存を止めました。別の場所で設定が変わっています。プレビューを開き直して確認してください。"
+	if FileAccess.get_md5(settings_path) != _source_hash:
+		_status.text = "保存を止めました。別の場所で設定が変わっています。再読込して確認してください。"
 		return
-	var error := ResourceSaver.save(_settings, SETTINGS_PATH)
+	var error := ResourceSaver.save(_settings, settings_path)
 	if error != OK:
 		_status.text = "設定を保存できませんでした（%d）。" % error
 		return
-	_source_hash = FileAccess.get_md5(SETTINGS_PATH)
+	_source_hash = FileAccess.get_md5(settings_path)
+	dirty = false
 	_status.text = "保存済み。次の本番起動からこの値を使います。"
 
 ## --fixed-fps 30 -- --capture=/absolute/path で短い実描画連番を保存する。
@@ -158,3 +209,31 @@ func _capture(directory: String) -> void:
 			return
 	print("[MapRevealPreview] 実描画連番を保存: " + directory)
 	get_tree().quit()
+
+func editing_state() -> Dictionary:
+	return {"path": settings_path, "dirty_paths": [settings_path] if dirty else [], "busy": false, "message": _status.text}
+
+func save_current() -> void:
+	_save()
+
+func reload_current() -> void:
+	var restored := ResourceLoader.load(settings_path, "", ResourceLoader.CACHE_MODE_IGNORE) as Resource
+	if restored == null or restored.get_script() != _settings.get_script():
+		_status.text = "マップ演出設定を読み込めません。"
+		return
+	_settings = restored.duplicate()
+	_source_hash = FileAccess.get_md5(settings_path)
+	dirty = false
+	for key in _fields:
+		_fields[key].set_value_no_signal(_settings.get(key))
+	_map.reveal_settings = _settings
+	_map._apply_reveal_settings()
+	_replay()
+	_status.text = "保存値を読み込みました。"
+
+func set_active(active: bool) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+	_viewport.gui_disable_input = not active
+	if active:
+		_replay()

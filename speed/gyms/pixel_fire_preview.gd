@@ -38,6 +38,11 @@ var _source_hash := ""
 var _panel: Control
 var _status_label: Label
 var _view_dirty := true
+var dirty := false
+# 統合画面では既存の描画と操作部を別々の列へ配置する。
+var preview_host: Control
+var controls_host: Control
+var request_reload: Callable
 
 func _ready() -> void:
 	var margin := MarginContainer.new()
@@ -45,15 +50,19 @@ func _ready() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 16)
 	add_child(margin)
+	margin.visible = controls_host == null
 	var split := HSplitContainer.new()
 	margin.add_child(split)
 	if not Engine.is_editor_hint():
 		_panel = PANEL.new()
-		split.add_child(_panel)
+		_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		(controls_host if controls_host != null else split).add_child(_panel)
 	var right := VBoxContainer.new()
+	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	split.add_child(right)
+	(preview_host if preview_host != null else split).add_child(right)
 	var title := Label.new()
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.text = "ピクセル炎 — 粒子 → 密度 → 色面 → 発光"
 	right.add_child(title)
 	var container := SubViewportContainer.new()
@@ -78,6 +87,7 @@ func _ready() -> void:
 	_status_label = Label.new()
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_status_label)
+	_status_label.visible = controls_host == null
 	settings = PixelFireSettings.new()
 	reload_preset()
 	if is_instance_valid(_panel):
@@ -85,7 +95,7 @@ func _ready() -> void:
 	_set_status(status)
 
 func _process(dt: float) -> void:
-	if not is_instance_valid(fire):
+	if not is_instance_valid(fire) or not is_visible_in_tree():
 		return
 	# 編集中のシーンだけを進める。非表示タブと停止中は密度場を更新しない。
 	if Engine.is_editor_hint() and get_tree().edited_scene_root != self:
@@ -103,6 +113,7 @@ func _process(dt: float) -> void:
 			stage.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 func _changed() -> void:
+	dirty = true
 	_view_dirty = true
 	_set_status("未保存の調整値 / 保存先: " + _loaded_path)
 
@@ -139,6 +150,7 @@ func reload_preset() -> void:
 	notify_property_list_changed()
 	if is_instance_valid(_panel):
 		_panel.refresh()
+	dirty = false
 	_set_status("保存値を読み込みました: " + _loaded_path)
 
 func save_preset() -> void:
@@ -174,7 +186,24 @@ func _write_preset(path: String) -> bool:
 		return false
 	_loaded_path = path
 	_source_hash = FileAccess.get_md5(path)
+	dirty = false
 	_set_status("保存しました: " + path)
 	if Engine.is_editor_hint():
 		EditorInterface.get_resource_filesystem().scan()
 	return true
+
+func editing_state() -> Dictionary:
+	return {"path": _loaded_path, "dirty_paths": [_loaded_path] if dirty else [], "busy": false, "message": status}
+
+func save_current() -> void:
+	save_preset()
+
+func reload_current() -> void:
+	preset_path = _loaded_path
+	reload_preset()
+
+func set_active(active: bool) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	stage.render_target_update_mode = SubViewport.UPDATE_ONCE if active else SubViewport.UPDATE_DISABLED
+	if active:
+		_view_dirty = true

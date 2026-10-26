@@ -1,4 +1,4 @@
-## ツールバーに「▶ ステージ」「▶ 実験場」ボタンを足すエディタプラグイン（設計書 14.1）。
+## ツールバーからステージ・実験場・ビジュアル編集を起動する（設計書 14.1）。
 ##
 ## 押すと起動するステージを予約し、通常どおりメインシーンを実行する。予約はゲーム側が
 ## 起動時に1回だけ消費するので、F5（通常実行）はこれまでどおりタイトルから始まる。
@@ -10,6 +10,7 @@ const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 
 var _button: Button = null
 var _lab_button: Button = null
+var _visual_button: Button = null
 
 func _enter_tree() -> void:
 	_button = Button.new()
@@ -22,6 +23,11 @@ func _enter_tree() -> void:
 	_lab_button.tooltip_text = "敵・ルート実験場を直接起動する（編集中のシーンに関係なく起動）"
 	_lab_button.pressed.connect(_on_lab_pressed)
 	add_control_to_container(CONTAINER_TOOLBAR, _lab_button)
+	_visual_button = Button.new()
+	_visual_button.text = "▶ ビジュアル編集"
+	_visual_button.tooltip_text = "炎・オーラ・後光・マップを共通画面で調整する"
+	_visual_button.pressed.connect(func(): EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn"))
+	add_control_to_container(CONTAINER_TOOLBAR, _visual_button)
 	_move_next_to_main_screen_buttons()
 
 ## 既定では右端に置かれて見つけにくいので、「2D／3D／スクリプト」の並びの直後へ移す。
@@ -36,8 +42,13 @@ func _move_next_to_main_screen_buttons() -> void:
 		return
 	bar.move_child(_button, anchor.get_index() + 1)
 	bar.move_child(_lab_button, _button.get_index() + 1)
+	bar.move_child(_visual_button, _lab_button.get_index() + 1)
 
 func _exit_tree() -> void:
+	if _visual_button != null:
+		remove_control_from_container(CONTAINER_TOOLBAR, _visual_button)
+		_visual_button.queue_free()
+		_visual_button = null
 	if _lab_button != null:
 		remove_control_from_container(CONTAINER_TOOLBAR, _lab_button)
 		_lab_button.queue_free()

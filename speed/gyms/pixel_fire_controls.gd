@@ -35,8 +35,13 @@ func refresh() -> void:
 	path.text = preview.preset_path
 	path.text_changed.connect(func(text): preview.preset_path = text)
 	fields.add_child(path)
-	_button("保存値を読み込む / 未保存値を破棄", preview.reload_preset)
+	_button("選択パスを読み込む", func():
+		if preview.request_reload.is_valid():
+			preview.request_reload.call(preview.reload_preset)
+		else:
+			preview.reload_preset())
 	_button("調整値を保存", preview.save_preset)
+	fields.get_child(fields.get_child_count() - 1).visible = preview.controls_host == null
 	var copy := LineEdit.new()
 	copy.text = preview.copy_path
 	copy.text_changed.connect(func(text): preview.copy_path = text)
