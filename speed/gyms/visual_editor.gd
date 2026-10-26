@@ -37,7 +37,7 @@ func _ready() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
+		margin.add_theme_constant_override("margin_" + side, 8)
 	add_child(margin)
 	var layout := VBoxContainer.new()
 	layout.add_theme_constant_override("separation", 8)
@@ -75,7 +75,7 @@ func _ready() -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(columns)
 	var types := VBoxContainer.new()
-	types.custom_minimum_size.x = 120
+	types.custom_minimum_size.x = 72
 	columns.add_child(types)
 	var group := ButtonGroup.new()
 	for index in TOOLS.size():
@@ -87,22 +87,16 @@ func _ready() -> void:
 		button.pressed.connect(select_tool.bind(index))
 		types.add_child(button)
 		_buttons.append(button)
-	var hint := Label.new()
-	hint.text = "未保存値は切替後も保持\n\n保存・再読込は選択中の素材へ反映"
-	hint.add_theme_font_size_override("font_size", 16)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size.x = 120
-	types.add_child(hint)
 	var split := HSplitContainer.new()
 	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(split)
 	_previews.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_previews.custom_minimum_size.x = 240
+	_previews.custom_minimum_size.x = 220
 	split.add_child(_previews)
-	_controls.custom_minimum_size.x = 330
+	_controls.custom_minimum_size.x = 260
 	_controls.size_flags_horizontal = Control.SIZE_FILL
 	split.add_child(_controls)
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	layout.add_child(_status)
 	_confirm.title = "未保存の調整値"
 	_confirm.ok_button_text = "破棄して続ける"
@@ -170,18 +164,24 @@ func dirty_paths() -> Array[String]:
 	return paths
 
 func _process(_delta: float) -> void:
+	var controls_width := 340.0 if get_viewport_rect().size.x >= 800.0 else 260.0
+	if _controls.custom_minimum_size.x != controls_width:
+		_controls.custom_minimum_size.x = controls_width
 	_refresh()
 
 func _refresh() -> void:
 	if _sessions.is_empty(): return
 	var state: Dictionary = _current().editing_state()
 	var busy := is_busy()
-	if _path.text != state.path:
-		_path.text = state.path
+	var short_path: String = state.path.get_file()
+	if _path.text != short_path:
+		_path.text = short_path
 	_path.tooltip_text = state.path
 	var current_dirty: bool = state.path in state.dirty_paths
-	_dirty.text = ("● 未保存" if current_dirty else "保存済み") + " / 全体の未保存 %d件" % dirty_paths().size()
+	_dirty.text = "● 未保存" if current_dirty else "保存済"
+	_dirty.tooltip_text = "全体の未保存 %d件。切替後も調整値を保持します" % dirty_paths().size()
 	_status.text = state.message
+	_status.tooltip_text = state.message
 	_save.disabled = busy or state.path.is_empty()
 	_reload.disabled = busy or state.path.is_empty()
 	_close.disabled = busy

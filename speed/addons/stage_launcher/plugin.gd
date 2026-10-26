@@ -6,6 +6,7 @@
 extends EditorPlugin
 
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
+const FireInspector := preload("res://addons/stage_launcher/fire_inspector.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 const SCENES := {
 	"lab": LAB_SCENE,
@@ -20,9 +21,12 @@ var _button: Button = null
 var _lab_button: Button = null
 var _visual_button: Button = null
 var _menu_items: Array[String] = []
+var _fire_inspector: EditorInspectorPlugin
 
 func _enter_tree() -> void:
 	add_to_group("speed_stage_launcher")
+	_fire_inspector = FireInspector.new()
+	add_inspector_plugin(_fire_inspector)
 	_button = Button.new()
 	_button.text = "▶ ステージ"
 	_button.tooltip_text = "編集中のステージを直接起動する（F5 は通常どおりタイトルから）"
@@ -77,6 +81,9 @@ func _move_next_to_main_screen_buttons() -> void:
 	bar.move_child(_visual_button, _lab_button.get_index() + 1)
 
 func _exit_tree() -> void:
+	if _fire_inspector != null:
+		remove_inspector_plugin(_fire_inspector)
+		_fire_inspector = null
 	for label in _menu_items:
 		remove_tool_menu_item(label)
 	_menu_items.clear()

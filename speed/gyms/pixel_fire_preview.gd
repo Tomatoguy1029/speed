@@ -7,6 +7,7 @@ const DEFAULT_PRESET := "res://data/visuals/pixel_fire.tres"
 const PANEL := preload("res://gyms/pixel_fire_controls.gd")
 
 @export_file("*.tres") var preset_path := DEFAULT_PRESET
+@export_tool_button("▶ 炎の制作画面を開く") var open_editor_action = open_editor
 @export_tool_button("選択したプリセットを読み込む") var load_action = reload_preset
 @export_custom(PROPERTY_HINT_RESOURCE_TYPE, "PixelFireSettings", PROPERTY_USAGE_EDITOR)
 var settings: PixelFireSettings:
@@ -60,6 +61,9 @@ var preview_host: Control
 var controls_host: Control
 var request_reload: Callable
 
+func open_editor() -> void:
+	EditorInterface.play_custom_scene("res://gyms/visual_editor.tscn")
+
 func _ready() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -79,7 +83,8 @@ func _ready() -> void:
 	(preview_host if preview_host != null else split).add_child(right)
 	var title := Label.new()
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.text = "ピクセル炎 — 粒子 → 密度 → 色面 → 発光"
+	title.text = "炎プレビュー"
+	title.tooltip_text = "粒子から密度・色面・発光を作る PixelFire"
 	right.add_child(title)
 	var container := SubViewportContainer.new()
 	container.stretch = true
@@ -109,7 +114,7 @@ func _ready() -> void:
 	stage.add_child(fire)
 	stage.size_changed.connect(func(): _view_dirty = true)
 	_status_label = Label.new()
-	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	right.add_child(_status_label)
 	_status_label.visible = controls_host == null
 	settings = PixelFireSettings.new()
@@ -144,6 +149,7 @@ func _set_status(value: String) -> void:
 	status = value
 	if is_instance_valid(_status_label):
 		_status_label.text = value
+		_status_label.tooltip_text = value
 
 func restart() -> void:
 	if not is_instance_valid(fire):
@@ -228,7 +234,7 @@ func select_context(path: String, target: int) -> void:
 		context_root.add_child(sprite)
 	_refresh_subject()
 	_view_dirty = true
-	_set_status("背景: " + path + " / 対象 %d" % (context_target + 1))
+	_set_status("背景: " + path.get_file().get_basename() + " / 対象 %d" % (context_target + 1))
 
 func choose_subject() -> void:
 	_subject_dialog.popup_centered_ratio(0.75)
