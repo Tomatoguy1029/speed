@@ -52,6 +52,7 @@ func _ready() -> void:
 	TranslationServer.set_locale("en")
 	_show([&"crit_chance", &"max_hp", &"heal"])
 	await _ready_cards()
+	_check(run.state.cards[0].info.desc == "+1 points", "英語の追加強化は英語の増分を表示")
 	await _shot("postmax_english")
 	for button in hud._cards_row.get_children():
 		_check(not button.tooltip_text.contains("postmax."), "英語表示の翻訳キーを解決")

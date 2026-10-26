@@ -128,7 +128,7 @@ func _ready() -> void:
 	fresh(Vector2(150,0),Vector2.ZERO,1,0.0)
 	actor._cooldown = 0.0
 	actor.cooldowns[&"sweep"] = actor.clock+4.0
-	check(actor.technique_ready(&"charge",actor.action_rules.conditions.charge), "近接技のCD中は突進へ戻れる")
+	check(not actor.technique_ready(&"charge",actor.action_rules.conditions.charge), "近接技のCD中も近距離で突進を連発しない")
 	# 自機を攻撃線へ置き直さず、回復・CD・共有スタミナ込みの連続した戦闘を進める。
 	for phase in [1,2]:
 		for speed in [0.0,250.0,500.0]:
@@ -191,7 +191,7 @@ func _ready() -> void:
 		tick(Vector2(500,0))
 		if actor.mode == &"windup":
 			began = true
-			check(actor.table.pos[actor.body].distance_to(sim.state.ship_pos) <= float(actor.def.params.approach_range)+10, "現在の自機の近くへ戻ってから攻撃")
+			check(actor.table.pos[actor.body].distance_to(sim.state.ship_pos) <= actor._reach(actor.technique)+10, "予告した技の実到達範囲へ戻ってから攻撃")
 			break
 	check(began, "一定速の自機へ接近して攻撃へ復帰する")
 	for frame in 500:

@@ -321,7 +321,8 @@ func _test_selection_lifetime() -> void:
 	for i in 3:
 		_check(run.state.cards[0].kind == &"post_max", "保留レベルごとに追加強化を提示")
 		var info: Dictionary = preload("res://scripts/ui/hud.gd").card_info(run.state.cards[0])
-		_check(not info.name.is_empty() and info.desc.contains("→"), "同じカード表示に現在・次の効果を明示")
+		_check(not info.name.is_empty() and info.desc.length() <= 24 and (info.desc.begins_with("+") or info.desc.begins_with("−")), "カード正面は短い今回の増分")
+		_check(info.tooltip_desc.contains("→") and info.color == Color("#9fe8ff"), "累計詳細をツールチップに残し色を固定")
 		run.command(&"choose_card", {"index": 0})
 	_check(run.state.pending_levels == 0 and run.state.phase == RunState.Phase.PLAY, "保留3レベルを1回ずつ選択して再開")
 	var counts := run.state.post_max_stacks.duplicate()

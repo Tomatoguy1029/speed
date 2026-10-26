@@ -166,9 +166,20 @@ func card_info(id: StringName) -> Dictionary:
 		if id == &"max_hp": text += "\n" + TranslationServer.translate("postmax.keep_hp")
 	var targets_text := target_text(id)
 	if not targets_text.is_empty(): text += "\n" + targets_text
+	var change := after - before
+	var summary: String
+	match id:
+		&"heal": summary = "+%s%% HP" % _number(float(data.increments.heal) * 100.0)
+		&"weapon_interval": summary = TranslationServer.translate("postmax.summary.interval").format({n = _number(change * 100.0)})
+		&"charge_time": summary = TranslationServer.translate("postmax.summary.charge").format({n = _number(-change)})
+		&"max_hp": summary = "+%s HP" % _number(change)
+		&"invulnerability": summary = TranslationServer.translate("postmax.summary.invulnerability").format({n = _number(change)})
+		&"crit_mult": summary = TranslationServer.translate("postmax.summary.multiplier").format({n = _number(change)})
+		&"crit_chance", &"repair": summary = TranslationServer.translate("postmax.summary.points").format({n = _number(change * 100.0)})
+		_: summary = "+%s%%" % _number(change * 100.0)
 	return {"tag": TranslationServer.translate("postmax.tag"), "name": TranslationServer.translate("postmax." + String(id)),
-		"desc": text, "tooltip_desc": text if tooltip_text.is_empty() else tooltip_text,
-		"color": Color("#6dffb0") if id == &"heal" else Color("#9fe8ff")}
+		"desc": summary, "tooltip_desc": text if tooltip_text.is_empty() else tooltip_text,
+		"color": Color("#9fe8ff")}
 
 func current_value(id: StringName, counts: Dictionary) -> float:
 	var base := float(baseline.get(id, 0.0))

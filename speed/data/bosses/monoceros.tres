@@ -25,7 +25,7 @@ params = {
 "horn_length_ratio": 1.85,
 "near_clearance": 220.0,
 "reposition_time": 1.2,
-"approach_range": 1000.0,
+"approach_range": 220.0,
 "approach_speed": 700.0,
 "return_passes": 3,
 "turnaround_time": 0.35,

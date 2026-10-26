@@ -112,29 +112,34 @@ postmax.keep_hp,現在HPはそのまま,Current HP stays the same
 postmax.total,MAX後累計 {a} → {b}{unit},Since MAX: {a} → {b}{unit}
 postmax.current,実効値 {a} → {b},Effective: {a} → {b}
 postmax.points,ポイント,points
+postmax.summary.interval,攻撃間隔 −{n}%,Interval −{n}%
+postmax.summary.charge,充填 −{n}秒,Charge −{n}s
+postmax.summary.invulnerability,無敵 +{n}秒,Invulnerability +{n}s
+postmax.summary.multiplier,倍率 +{n},Multiplier +{n}
+postmax.summary.points,+{n}ポイント,+{n} points
 postmax.heal_desc,"最大HPの{percent}%を即時回復
 HP {a} → {b}","Heal {percent}% of max HP now
 HP {a} → {b}"
 postmax.weapon_damage,武器威力,Weapon damage
-postmax.weapon_interval,武器の攻撃間隔短縮,Weapon interval reduction
-postmax.projectile_speed,武器の弾速,Weapon projectile speed
-postmax.duration,弾・機雷・衝撃波の持続,"Shot, mine and wave duration"
-postmax.knockback,武器の吹き飛ばし,Weapon knockback
-postmax.crit_chance,RAMクリティカル率,RAM critical chance
-postmax.crit_mult,RAMクリティカル倍率,RAM critical multiplier
+postmax.weapon_interval,攻撃間隔,Attack interval
+postmax.projectile_speed,弾速,Projectile speed
+postmax.duration,攻撃持続,Attack duration
+postmax.knockback,吹き飛ばし,Knockback
+postmax.crit_chance,クリティカル率,Critical chance
+postmax.crit_mult,クリティカル倍率,Critical multiplier
 postmax.area,巻き込み範囲,Area of effect
 postmax.followup,追撃威力,Follow-up damage
 postmax.max_speed,最高速度,Maximum speed
-postmax.acceleration,加速,Acceleration
+postmax.acceleration,加速力,Acceleration
 postmax.turn_rate,旋回速度,Turn rate
-postmax.line_length,描ける線の長さ,Drawable line length
-postmax.charge_time,ゲージ充填時間短縮,Charge time reduction
+postmax.line_length,線の長さ,Line length
+postmax.charge_time,充填時間,Charge time
 postmax.max_hp,最大HP,Maximum HP
-postmax.invulnerability,被弾後の無敵時間,Post-hit invulnerability
-postmax.repair,修理キット回復量,Repair kit healing
+postmax.invulnerability,無敵時間,Invulnerability
+postmax.repair,修理回復量,Repair healing
 postmax.heal,緊急修理,Emergency repair
-postmax.pickup_radius,XP吸引範囲,XP attraction radius
-postmax.pickup_speed,XP吸引速度,XP attraction speed
+postmax.pickup_radius,XP吸引範囲,XP pickup radius
+postmax.pickup_speed,XP吸引速度,XP pickup speed
 postmax.xp_gain,XP獲得量,XP gain
 postmax.target.W03.area,衝角の船体・破片半径,Ram hull and fragment radius
 postmax.target.W04.area,接触波動の半径,Contact wave radius

@@ -672,11 +672,11 @@ func _show_cards() -> void:
 				label.position = entry[0]
 				label.size = entry[1]
 				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", 9 if cards[i].kind == &"post_max" and entry[0].y == 65 else font_size)
+				label.add_theme_font_size_override("font_size", (17 if entry[0].y == 65 else 13) if cards[i].kind == &"post_max" else font_size)
 				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				label.clip_text = true
-				label.max_lines_visible = (9 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
+				label.max_lines_visible = (2 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
 				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
@@ -1026,6 +1026,8 @@ func _draw_hero_slot(at: Vector2) -> void:
 		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
 	draw_string(_font, at + Vector2(26, 32), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
+	if s.hero_active_t > 0.0:
+		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(s.hero_active_t), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
 
 func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
