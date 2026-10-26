@@ -1,0 +1,10 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/bosses/centaurus_boss.gd" id="actor"]
+[ext_resource type="AnimationLibrary" path="res://scenes/bosses/centaurus_boss_timeline.tres" id="timeline"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus_presentation.tscn" id="visual"]
+[node name="CentaurusBoss" type="Node2D"]
+script = ExtResource("actor")
+presentation_scene = ExtResource("visual")
+[node name="Timeline" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+libraries/ = ExtResource("timeline")

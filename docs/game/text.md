@@ -743,6 +743,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.hydra&#95;rubble.kill | 体当たりは弾かれる。武器で壊せる | Rams bounce off. Weapons break it |
 | lab.enemy.monoceros.move | 予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う | Locks its direction after a warning, then charges, sweeps its horn, or kicks backward |
 | lab.enemy.monoceros.kill | 技後の隙や惑星に角が刺さった時に攻める | Strike during its recovery or while its horn is stuck in a planet |
+| lab.enemy.centaurus.move | 距離を取って矢を速射し、引き絞った強弓を射り、前方を走るトレースに矢の雨を降らせる。近づくと走って離れ、背後に回ると赤く光ってから背後を攻撃する | Keeps its distance, fires rapid arrows, looses a drawn power shot, and rains arrows along traces that sweep ahead. Gallops away when approached, and glows red before striking anything behind it |
+| lab.enemy.centaurus.kill | 強弓の構えと射終わりの硬直に、突進で追いついて攻める | Dash in while it draws the power shot or recovers after shooting |
 | lab.enemy.hydra.move | 中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する | Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes |
 | lab.enemy.hydra.kill | 中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す | Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer |
 | lab.ui.freehand | 自由に描く | Freehand |
@@ -906,4 +908,5 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bosses/monoceros.tres | いっかくじゅう座 |
 | bosses/hydra.tres | うみへび座 |
 | bosses/draco.tres | りゅう座 |
+| bosses/centaurus.tres | ケンタウルス座 |
 <!-- resources:end -->
