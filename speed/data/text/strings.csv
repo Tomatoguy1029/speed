@@ -771,6 +771,10 @@ lab.enemy.hydra_rubble.move,うみへび座が吐いた瓦礫。漂って、少�
 lab.enemy.hydra_rubble.kill,体当たりは弾かれる。武器で壊せる,Rams bounce off. Weapons break it
 lab.enemy.monoceros.move,予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う,"Locks its direction after a warning, then charges, sweeps its horn, or kicks backward"
 lab.enemy.monoceros.kill,技後の隙や惑星に角が刺さった時に攻める,Strike during its recovery or while its horn is stuck in a planet
+lab.enemy.centaurus.move,距離を取って矢を速射し、引き絞った強弓を射り、前方を走るトレースに矢の雨を降らせる。近づくと走って離れ、背後に回ると赤く光ってから背後を攻撃する,"Keeps its distance, fires rapid arrows, looses a drawn power shot, and rains arrows along traces that sweep ahead. Gallops away when approached, and glows red before striking anything behind it"
+lab.enemy.canis_major.move,猟犬の群れを前に並べて追い、身を低くしてから飛びかかる。吠えると群れが一斉に飛び出し、口元に溜めたシリウスの光をまっすぐ吐く,"Leads a wedge of hounds ahead of it, crouches before pouncing, barks to send the pack lunging, and breathes a straight beam of Sirius light"
+lab.enemy.canis_major.kill,飛び出した群れの列ごと貫くか、飛びかかりの着地を攻める,"Pierce the lunging pack in one line, or strike after it lands from a pounce"
+lab.enemy.centaurus.kill,強弓の構えと射終わりの硬直に、突進で追いついて攻める,Dash in while it draws the power shot or recovers after shooting
 lab.enemy.hydra.move,中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する,Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes
 lab.enemy.hydra.kill,中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す,"Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer"
 lab.ui.freehand,自由に描く,Freehand

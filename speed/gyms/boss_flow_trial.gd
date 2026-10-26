@@ -139,7 +139,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	_target_id = ""
 	_target_boss = false
 	preview_actor = null
-	var stage := 4 if id == "hydra" else 5 if id == "draco" else 1
+	var stage: int = {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(id, 1)
 	var settings := {"empty": true, "stage": stage, "ship_pos": [400, 0] if id == "hydra" else [500, 0],
 		"invincible": true, "director": {"enabled": false}}
 	if id == "hydra":
@@ -176,17 +176,17 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	if combo_request and id == "monoceros": _prepare_monoceros_combo(program.data.rules, selected)
 	_current_program_path = path
 	if id != "hydra":
-		manual = MANUAL.new()
-		manual.bind(preview_actor)
+		var debugger := MANUAL.new()
+		if debugger.bind(preview_actor): manual = debugger
 	_target_id = id
 	_target_boss = true
 	_select_target(id, true)
 	_populate_moves(selected)
-	_technique_row.show()
-	_manual_status.show()
-	_manual_message.show()
+	_technique_row.visible = id == "hydra" or manual != null
+	_manual_status.visible = _technique_row.visible
+	_manual_message.visible = _technique_row.visible
 	_phase_picker.visible = id != "hydra"
-	_manual_message.text = "選択した技を実行できます。変更は試遊中だけです。"
+	_manual_message.text = "選択した技を実行できます。変更は試遊中だけです。" if _technique_row.visible else "このボスは通常AIで試遊できます。"
 	_switching = false
 	_set_mode(3)
 	_refresh()
@@ -353,6 +353,7 @@ func _reset() -> void:
 func _process(delta: float) -> void:
 	super(delta)
 	if _target_id.is_empty() or not _target_boss or _switching or not is_instance_valid(preview_actor): return
+	if _target_id != "hydra" and manual == null: return
 	if manual != null:
 		var selected := String(_move_picker.get_selected_metadata()) if _move_picker.selected >= 0 else ""
 		var reason: String = "" if preview_actor.action_rules.combos.has(selected) else manual.unavailable(selected, _phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"

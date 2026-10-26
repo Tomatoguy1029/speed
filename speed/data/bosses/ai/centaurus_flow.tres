@@ -1,0 +1,21 @@
+[gd_resource type="Resource" format=3 uid="uid://dj3d5fakqc33j"]
+
+[ext_resource type="Script" uid="uid://eeodn8akgqcw" path="res://scripts/data_types/boss_flow_def.gd" id="1_c7flw"]
+
+[resource]
+script = ExtResource("1_c7flw")
+partial_rest = 0.8
+empty_rest = 2.0
+layout = {
+"section_0": Vector2(40, 20),
+"shared_rest": Vector2(427, 28)
+}
+sections = [{
+"cap": 3.0,
+"name": "牽制",
+"next": 0,
+"request": "any",
+"weights": {
+"single": 100.0
+}
+}]

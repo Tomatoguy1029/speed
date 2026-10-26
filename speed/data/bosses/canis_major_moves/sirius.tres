@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmsir"]
+
+[resource]
+script = ExtResource("1_cmsir")
+technique = &"sirius"
+parameters = {
+"beam_length": 1400.0,
+"beam_time": 0.5,
+"beam_width": 50.0,
+"cd": 6.0,
+"damage": 26.0,
+"lock": 0.3,
+"recover": 1.0,
+"warn": 1.0
+}

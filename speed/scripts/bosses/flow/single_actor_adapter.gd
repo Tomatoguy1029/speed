@@ -72,7 +72,9 @@ func candidates(query: Dictionary) -> Dictionary:
 			if observe: reasons.append("request_category")
 		else:
 			for gate in actor.action_rules.active_gates_for(id):
-				var reason: String = actor.technique_rejection(move.technique, gate)
+				var reason := ""
+				if actor.has_method("technique_rejection"): reason = actor.technique_rejection(move.technique, gate)
+				elif not actor.technique_ready(move.technique, gate): reason = "not_ready"
 				if reason.is_empty():
 					accepted = true
 					break

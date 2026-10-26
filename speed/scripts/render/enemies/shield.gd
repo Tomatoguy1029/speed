@@ -9,5 +9,6 @@ func setup(render: RunPresentation, behavior_name: StringName) -> void:
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 
 func draw_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
-	SHIELD_VISUAL.enemy(c, t, i)
+	if rm.look_of(t.type[i]) == null:
+		SHIELD_VISUAL.enemy(c, t, i)
 	super(c, t, i)
