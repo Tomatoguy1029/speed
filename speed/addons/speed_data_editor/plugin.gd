@@ -9,6 +9,7 @@ var _window: Window
 var _panel: Control
 
 func _enter_tree() -> void:
+	add_to_group("speed_data_editor")
 	add_tool_menu_item(MENU_NAME, _open)
 
 func _exit_tree() -> void:
@@ -37,3 +38,6 @@ func _open() -> void:
 		_window.grab_focus()
 	else:
 		_window.popup_centered_ratio(0.8)
+
+func open_window() -> void:
+	_open()

@@ -154,6 +154,7 @@ func _header(parent: Node) -> void:
 	UI.button(header, tr("lab.ui.files"), open_settings.bind(4), "save")
 	UI.button(header, tr("lab.appearance.title"), open_settings.bind(5), "eye")
 	UI.button(header, tr("lab.ui.help"), func(): lab._messages.text = tr("lab.ui.help_text"), "help", true)
+	lab.build_hitstop_controls(parent)
 
 func _edge_button(parent: Node, action: Callable) -> Button:
 	var button := UI.button(parent, "", action, "chevron_left", true)

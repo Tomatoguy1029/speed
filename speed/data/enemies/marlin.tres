@@ -17,16 +17,11 @@ shape = &"dart"
 behavior = &"marlin"
 ranged = true
 params = {
-"bullet_dmg": 10.0,
-"bullet_speed": 380.0,
 "dash_speed": 1300.0,
 "dash_time": 0.9,
 "fire_interval": 4.0,
 "keep": 520.0,
 "recover": 0.8,
-"spray": 3,
-"spray_step": 0.15,
-"spread": 0.6,
 "telegraph": 0.8
 }
 id = &"marlin"

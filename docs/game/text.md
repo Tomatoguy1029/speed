@@ -138,6 +138,53 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | card.weapon&#95;up | 武器強化 | Weapon Upgrade |
 | card.trait&#95;up | 特性強化 | Trait Upgrade |
 | card.first&#95;weapon | 最初の武器 | First Weapon |
+| postmax.interval_total | MAX後の実効短縮累計 | Effective reduction since MAX |
+| postmax.interval.interval | 発射 | Fire |
+| postmax.interval.interval_by_level | 発射 | Fire |
+| postmax.interval.block_interval | 防弾 | Block |
+| postmax.interval.burst_interval | 連射 | Burst |
+| postmax.tag | 追加強化 | Enhancement |
+| postmax.keep_hp | 現在HPはそのまま | Current HP stays the same |
+| postmax.total | MAX後累計 {a} → {b}{unit} | Since MAX: {a} → {b}{unit} |
+| postmax.current | 実効値 {a} → {b} | Effective: {a} → {b} |
+| postmax.points | ポイント |  points |
+| postmax.heal_desc | 最大HPの{percent}%を即時回復<br>HP {a} → {b} | Heal {percent}% of max HP now<br>HP {a} → {b} |
+| postmax.weapon_damage | 武器威力 | Weapon damage |
+| postmax.weapon_interval | 武器の攻撃間隔短縮 | Weapon interval reduction |
+| postmax.projectile_speed | 武器の弾速 | Weapon projectile speed |
+| postmax.duration | 弾・機雷・衝撃波の持続 | Shot, mine and wave duration |
+| postmax.knockback | 武器の吹き飛ばし | Weapon knockback |
+| postmax.crit_chance | RAMクリティカル率 | RAM critical chance |
+| postmax.crit_mult | RAMクリティカル倍率 | RAM critical multiplier |
+| postmax.area | 巻き込み範囲 | Area of effect |
+| postmax.followup | 追撃威力 | Follow-up damage |
+| postmax.max_speed | 最高速度 | Maximum speed |
+| postmax.acceleration | 加速 | Acceleration |
+| postmax.turn_rate | 旋回速度 | Turn rate |
+| postmax.line_length | 描ける線の長さ | Drawable line length |
+| postmax.charge_time | ゲージ充填時間短縮 | Charge time reduction |
+| postmax.max_hp | 最大HP | Maximum HP |
+| postmax.invulnerability | 被弾後の無敵時間 | Post-hit invulnerability |
+| postmax.repair | 修理キット回復量 | Repair kit healing |
+| postmax.heal | 緊急修理 | Emergency repair |
+| postmax.pickup_radius | XP吸引範囲 | XP attraction radius |
+| postmax.pickup_speed | XP吸引速度 | XP attraction speed |
+| postmax.xp_gain | XP獲得量 | XP gain |
+| postmax.target.W03.area | 衝角の船体・破片半径 | Ram hull and fragment radius |
+| postmax.target.W04.area | 接触波動の半径 | Contact wave radius |
+| postmax.target.W08.area | ソニックブームの半径 | Sonic wave radius |
+| postmax.target.W17.area | 電撃の到達距離 | Electric reach |
+| postmax.target.W21.area | 船体回収半径 | Hull collection radius |
+| postmax.target.W22.area | 双極ビームの幅 | Bipolar beam width |
+| postmax.target.W26.area | 各ドローンの接触半径 | Each drone hit radius |
+| postmax.target.W01.followup | ブラスター弾 | Blaster shots |
+| postmax.target.W02.followup | 散弾砲の弾 | Scatter shots |
+| postmax.target.W23.followup | 後方ブラスター弾 | Rear shots |
+| postmax.target.W25.followup | 迎撃ドローン弾 | Interceptor shots |
+| postmax.target.W05.followup | バリアの波動 | Barrier waves |
+| postmax.target.W07.followup | 軌跡機雷 | Trail mines |
+| postmax.target.W21.followup | 牽引した船体弾 | Towed hull shots |
+| postmax.target.W22.followup | 双極ビーム | Bipolar beam |
 | card.heal&#95;tag | 回復 | Repair |
 | card.heal&#95;name | 緊急修理 | Emergency Repair |
 | card.heal&#95;desc | HP を 30% 回復 | Restores 30% HP |
@@ -197,8 +244,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W04.desc | 高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る | Every high-speed contact sends out a wave. Works even when you bounce off. |
 | weapon.W05.name | バリアシステム | Barrier System |
 | weapon.W05.desc | 周りに定期的な波動を出し、敵の弾を防ぐ | Emits waves around you at intervals and blocks enemy shots. |
-| weapon.W06.name | 追走ドローン | Chaser Drones |
-| weapon.W06.desc | 周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する | Orbit and shoot, then trail your dash line and strike enemies they touch. |
 | weapon.W07.name | 軌跡機雷 | Trail Mines |
 | weapon.W07.desc | 高速で実際に通った線に機雷を残す。遅れて入った敵を爆破 | Leaves mines along the line you flew at high speed. Blasts enemies that wander in. |
 | weapon.W08.name | ソニックブーム | Sonic Boom |

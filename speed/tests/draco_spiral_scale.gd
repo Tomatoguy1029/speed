@@ -1,4 +1,5 @@
 extends Node
+const FORM = preload("res://scripts/bosses/draco_form.gd")
 var failures := 0
 func check(ok: bool,label: String) -> void:
 	if not ok: failures+=1;push_error(label)
@@ -24,7 +25,10 @@ func _ready() -> void:
 			check(actor.body_width>=short_side*0.13,"胴体を画面に対して十分太くする")
 			check(actor.head_scale>=1.8,"螺旋では頭部も大きくする")
 			for frame in 540: actor.sim_tick(1.0/120.0,1.0/120.0)
-			for h in spiral.walls: check(is_equal_approx(sim.projectiles.hazard_width[h],actor.body_width),"青紫の壁と胴体の太さが一致する")
+			var fractions: PackedFloat32Array=FORM.fractions(spiral.points)
+			for index in spiral.walls.size():
+				var fraction := (fractions[index]+fractions[index+1])*0.5
+				check(is_equal_approx(sim.projectiles.hazard_width[spiral.walls[index]],actor.body_width*FORM.taper(fraction)),"青紫の壁と胴体の先細りが一致する")
 		actor.cancel_attack()
 	actor.cancel_attack();actor.cycle.cancel()
 	sim.state.view_half=Vector2(980,550)

@@ -5,7 +5,7 @@ extends WeaponBehavior
 var _buf := PackedInt32Array()
 
 func _speed() -> float:
-	return float(p("speed_base")) + float(p("speed_per_tier")) * tier()
+	return (float(p("speed_base")) + float(p("speed_per_tier")) * tier()) * post_factor(&"knockback")
 
 func _dmg() -> float:
 	return atk() * float(p("damage")) * dmg_k()
@@ -14,8 +14,10 @@ func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
 	var t := ctx.enemies.table
 	var v := _speed()
 	if t.dead[i] != 0:
-		if t.hull_scattered[i] == 0 and not ctx.projectiles.scatter_hull(i, dir, v, _dmg()):
-			ctx.projectiles.fling_corpse(i, dir * v, _dmg())
+		# 飛ばす船体だけに弾速を足す。生きた敵への押出しは吹き飛ばし強化が担当する。
+		v += (float(p("speed_base")) + float(p("speed_per_tier")) * tier()) * (post_factor(&"projectile_speed") - 1.0)
+		if t.hull_scattered[i] == 0 and not ctx.projectiles.scatter_hull(i, dir, v, _dmg(), cfg.hull_debris_knock * post_factor(&"knockback"), post_factor(&"area"), post_factor(&"duration")):
+			ctx.projectiles.fling_corpse(i, dir * v, _dmg(), post_factor(&"area"), post_factor(&"knockback"), post_factor(&"duration"))
 	else:
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
 		var push := ctx.enemies.knockback_scale(i)
@@ -39,7 +41,7 @@ func tick(_dt: float, _busy: bool) -> void:
 			continue
 		var from := t.shove_from[i]
 		var pos := t.pos[i]
-		var r := t.r[i]
+		var r := t.r[i] * post_factor(&"area")
 		var pad := Vector2(r, r)
 		var hits: Dictionary = t.shove_hits[i]
 		ctx.combat.in_rect(from.min(pos) - pad, from.max(pos) + pad, _buf)

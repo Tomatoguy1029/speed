@@ -33,10 +33,40 @@ func radius_k() -> float:
 	return 1.0 + 0.1 * (tier() - 1)
 
 func p(key: String, default = 0.0):
-	return def.params.get(key, default)
+	var value: Variant = def.params.get(key, default)
+	var targets := cfg.post_max.target(def.id)
+	if key in targets.get("area", []):
+		return float(value) * post_factor(&"area")
+	if key in targets.get("duration", []):
+		return float(value) * post_factor(&"duration")
+	if key == "knock" or key == "chain_knock":
+		return float(value) * post_factor(&"knockback")
+	return value
+
+func post_factor(id: StringName) -> float:
+	var key := String(id)
+	if id == &"projectile_speed": key = "projectile"
+	if id in [&"projectile_speed", &"duration", &"knockback", &"area"] and not cfg.post_max.target(def.id).has(key):
+		return 1.0
+	return cfg.post_max.factor(id, state.post_max_stacks)
+
+func damage_factor() -> float:
+	return 1.0 + cfg.post_max.amount(&"weapon_damage", state.post_max_stacks) + \
+		(cfg.post_max.amount(&"followup", state.post_max_stacks) if cfg.post_max.target(def.id).has("followup") else 0.0)
+
+func interval(base: float) -> float:
+	if not cfg.post_max.target(def.id).has("interval"): return base
+	return cfg.post_max.reduced(base, &"weapon_interval", state.post_max_stacks, cfg.post_max.minimum_interval)
+
+## 武器から発射する弾だけを補正する。特性の弾と共通ProjectileSystemは基準を保つ。
+func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
+	var enhanced := opts.duplicate()
+	enhanced.speed = float(opts.get("speed", 1300.0)) * post_factor(&"projectile_speed")
+	enhanced.knock = float(opts.get("knock", 250.0)) * post_factor(&"knockback")
+	ctx.projectiles.fire_shot(from, angle, dmg, enhanced)
 
 func atk() -> float:
-	return ctx.combat.attack_power()
+	return ctx.combat.attack_power() * damage_factor()
 
 # ── 発動のきっかけ ─────────────────────────────────────────────────
 ## 固定更新ごと。busy は描画中・なぞり中（このときは周期の攻撃を休む）

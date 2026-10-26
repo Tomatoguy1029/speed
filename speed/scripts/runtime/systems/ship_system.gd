@@ -73,11 +73,11 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 	var sp := state.ship_vel.length()
 	if sp > 1.0:
 		var cur := state.ship_vel.angle()
-		var turn := clampf(Geom.angle_diff(want, cur), -cfg.steer_rate * dt, cfg.steer_rate * dt)
+		var turn := clampf(Geom.angle_diff(want, cur), -state.stats.turn_rate * dt, state.stats.turn_rate * dt)
 		state.ship_vel = state.ship_vel.rotated(turn)
 	var cruise := state.stats.max_speed * cruise_share
 	if sp < cruise:
-		state.ship_vel += Vector2.from_angle(want) * minf(cfg.steer_accel * dt, cruise - sp)
+		state.ship_vel += Vector2.from_angle(want) * minf(state.stats.acceleration * dt, cruise - sp)
 	if state.ship_vel.is_zero_approx():
 		state.ship_heading = Vector2.from_angle(want)
 
@@ -179,30 +179,39 @@ func steal_shield(i: int) -> void:
 
 ## HP を amount 減らし、速さを slow の割合だけ落とす。無敵中なら何もしない。
 ## source は攻撃した敵の種類（分かるときだけ。プレイの記録が読む）。
-func damage(amount: float, slow: float, cause: StringName, source := &"") -> bool:
+func damage(amount: float, slow: float, cause: StringName, source := &"", observation: Dictionary = {}) -> bool:
 	# 最終勝利が通知されたフレームの残りの接触・弾でも HP を減らさない。
 	if state.phase != RunState.Phase.PLAY or state.boss_dead or state.controls_locked or state.encounter_protected:
+		_record_damage(amount, cause, source, "run_phase" if state.phase != RunState.Phase.PLAY else "boss_defeated" if state.boss_dead else "controls_locked" if state.controls_locked else "encounter_protected", state.ship_hp, observation)
 		return false
 	if state.ship_shield_t > 0.0:
 		if state.ship_shield_flash <= 0.0:
 			state.emit(&"shield_block", {"pos": state.ship_pos})
 		state.ship_shield_flash = 0.12
+		_record_damage(amount, cause, source, "shield", state.ship_hp, observation)
 		return false
 	if state.ship_invuln > 0.0 or invincible:
+		_record_damage(amount, cause, source, "invulnerability" if state.ship_invuln > 0.0 else "debug_invincible", state.ship_hp, observation)
 		return false
+	var hp_before := state.ship_hp
 	state.ship_hp -= amount
 	if slow > 0.0:
 		state.glide = false
 	state.ship_vel *= 1.0 - minf(0.9, slow)
-	state.ship_invuln = cfg.invuln_time
+	state.ship_invuln = state.stats.invulnerability
 	state.ship_hurt = cfg.ship_hurt_time
 	var hit := {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source,
 		"t": state.time, "world_t": state.world_time, "hp_after": state.ship_hp}
 	state.emit(&"hurt", hit)
 	if OS.is_debug_build() and hurt_recorded.has_connections(): hurt_recorded.emit(hit)
+	_record_damage(amount, cause, source, "applied", hp_before, observation)
 	if state.ship_hp > 0.0:
 		build.on_hurt()
 	return true
+
+func _record_damage(amount: float, cause: StringName, source: StringName, reason: String, before: float, observation: Dictionary) -> void:
+	if ctx.bosses != null and ctx.bosses.diagnostics.enabled():
+		ctx.bosses.diagnostics.player_damage(amount, cause, source, reason, before, observation)
 
 func heal(amount: float) -> void:
 	state.ship_hp = minf(state.stats.max_hp, state.ship_hp + amount)

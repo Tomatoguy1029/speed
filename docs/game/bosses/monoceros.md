@@ -88,7 +88,7 @@
 - `presentation_advanced`：世界時間の進行。停止中はアニメーションも止まる。
 - `horn_points()`：ワールド座標の判定線。薙ぎ払いでは引数で扇内の位置を取得できる。
 
-パーツの構成は `monoceros_parts.tscn`、戦闘との同期と攻撃の光は `monoceros_presentation.gd` で扱う。
+パーツの構成は `monoceros_parts.tscn`、戦闘との同期と攻撃の光は `monoceros_presentation.gd` で扱う。 実際にHPが減った被弾では本体を薄く白く光らせ、短い減衰する揺れを描画へ加える。連続命中では演出時間と揺れ幅を上限内へ戻し、本体座標・照準・予告線・攻撃判定は戦闘状態を使う。
 
 ## 9. 実装・調整・接続
 

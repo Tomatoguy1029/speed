@@ -14,11 +14,14 @@ func dispose() -> void:
 	trait_behaviors.clear()
 	for connection in cards_opened.get_connections():
 		cards_opened.disconnect(connection.callable)
+	post_max.ctx = null
 	super()
 
 var _candidate_resources: Dictionary = {}
 var _equipped_resources: Dictionary = {}
 var _pending_choice := -1
+var _applied_post_max_hp := 0.0
+var post_max := PostMaxProgression.new()
 
 func resource_scopes() -> Array:
 	return _candidate_resources.values() + _equipped_resources.values()
@@ -34,6 +37,7 @@ func _release_candidates() -> void:
 func _publish_cards() -> void:
 	_release_candidates()
 	for card in state.cards:
+		if card.kind == &"post_max" or card.kind == &"heal": continue
 		var id: StringName = state.swap_pick if state.swap_pick != &"" else card.id
 		var category: StringName = &"weapons" if state.swap_pick != &"" or card.kind == &"weapon" else &"traits"
 		var entry := ContentManager.catalog.find(category, id)
@@ -84,9 +88,11 @@ var trait_behaviors: Dictionary = {}
 
 func setup(context: RunContext) -> void:
 	super(context)
+	post_max.setup(context)
 	state.level = 0
 	state.weapons = {}
 	state.traits = {}
+	state.post_max_stacks = {}
 	refresh_stats()
 	state.rerolls_left = cfg.reroll_count + roundi(float(ctx.profile.add.get(&"reroll", 0.0)))
 
@@ -107,9 +113,38 @@ func refresh_stats() -> void:
 	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _per(&"T14") * _n(&"T14"))
 	s.glide_duration_mult = 1.0 + _per(&"T31") * _n(&"T31")
 	s.xp_mult = float(ctx.profile.mult.get(&"xp", 1.0))
-	if old_max > 0.0 and s.max_hp > old_max:
-		state.ship_hp += s.max_hp - old_max
+	# HP増加は現在HPを維持。既存の永続HP変更時の差分回復だけを残す。
+	var old_baseline_max := old_max - _applied_post_max_hp
+	var baseline_max := s.max_hp
+	_apply_post_max_stats()
+	_applied_post_max_hp = s.max_hp - baseline_max
+	if old_baseline_max > 0.0 and baseline_max > old_baseline_max:
+		state.ship_hp += baseline_max - old_baseline_max
 	state.ship_hp = minf(state.ship_hp, s.max_hp)
+
+func _apply_post_max_stats() -> void:
+	post_max.apply_stats()
+
+## 満員の武器枠を基準にする。彗星限定も装備時から上限として数える。
+func all_weapons_max() -> bool:
+	if cfg.weapon_slots <= 0 or state.weapons.size() < cfg.weapon_slots:
+		return false
+	for id in state.weapons:
+		if ContentManager.catalog.find(&"weapons", id) == null or int(state.weapons[id]) < cfg.weapon_max_level:
+			return false
+	return true
+
+## 取得可能な特性枠が埋まり、所持している特性がすべて上限に達したか。
+func all_traits_max() -> bool:
+	if cfg.trait_slots <= 0 or state.traits.size() < cfg.trait_slots:
+		return false
+	for id in state.traits:
+		if ContentManager.catalog.find(&"traits", id) == null or int(state.traits[id]) < cfg.trait_max_stacks:
+			return false
+	return true
+
+func normal_progression_complete() -> bool:
+	return all_weapons_max() and all_traits_max()
 
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
@@ -129,6 +164,7 @@ func xp_needed() -> float:
 	return cfg.xp_base + cfg.xp_growth * L + cfg.xp_curve * L * L
 
 func add_xp(v: float) -> void:
+	v *= state.stats.xp_gain_mult
 	state.xp += v
 	state.xp_gained += v
 	var need := xp_needed()
@@ -196,7 +232,8 @@ func roll_start_cards() -> Array[Dictionary]:
 	return out
 
 func roll_cards() -> Array[Dictionary]:
-	var pool: Array = []
+	var enhanced := normal_progression_complete()
+	var pool: Array = post_max.cards() if enhanced else []
 	for kind in [&"weapon", &"trait"]:
 		var defs := ContentManager.catalog.table(&"weapons" if kind == &"weapon" else &"traits")
 		var owned: Dictionary = state.weapons if kind == &"weapon" else state.traits
@@ -212,6 +249,13 @@ func roll_cards() -> Array[Dictionary]:
 				continue
 			pool.append({"kind": kind, "id": id, "level": lv + 1, "weight": cfg.owned_card_bias if lv > 0 else 1.0})
 	var out: Array[Dictionary] = []
+	# 通常育成が完了したら、毎回少なくとも1枚の追加強化を提示する。
+	if enhanced:
+		var enhancements := pool.filter(func(c): return c.kind == &"post_max")
+		if not enhancements.is_empty():
+			var first: Dictionary = enhancements[state.rng.randi_range(0, enhancements.size() - 1)]
+			out.append(first)
+			pool.erase(first)
 	while out.size() < 3 and not pool.is_empty():
 		var total := 0.0
 		for c in pool:
@@ -223,7 +267,7 @@ func roll_cards() -> Array[Dictionary]:
 			i += 1
 		out.append(pool[i])
 		pool.remove_at(i)
-	while out.size() < 3:
+	while not enhanced and out.size() < 3:
 		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
@@ -266,12 +310,18 @@ func choose_card(index: int) -> bool:
 		_release_candidates()
 		state.cards = []
 		return false
+	if c.kind == &"post_max":
+		if not post_max.select(c.id):
+			state.cards = roll_cards()
+			_publish_cards()
+			return true
+		refresh_stats()
 	if c.kind == &"heal":
 		ship.heal(state.stats.max_hp * cfg.fallback_heal)
-	else:
+	elif c.kind != &"post_max":
 		grant(c.kind, c.id, 1, &"card")
 	state.emit(&"upgrade", {"card": c})
-	if c.kind != &"heal":
+	if c.kind == &"weapon" or c.kind == &"trait":
 		_level_bonus()
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
@@ -405,6 +455,7 @@ func reset_loadout() -> void:
 	_equipped_resources.clear()
 	state.weapons = {}
 	state.traits = {}
+	state.post_max_stacks = {}
 	weapon_behaviors = {}
 	trait_behaviors = {}
 	refresh_stats()

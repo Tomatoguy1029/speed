@@ -215,8 +215,8 @@ func _collect_gems(dt: float) -> void:
 	_fly_gems(dt)
 	enemies.gather_pickups(self, dt)
 	var reach := cfg.ship_radius + 14.0
-	var radius := state.stats.pickup_radius
-	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
+	var radius := state.stats.xp_pickup_radius
+	var step := (700.0 + state.ship_vel.length() * 1.2) * state.stats.pickup_speed_mult * dt
 	# 吸い寄せも回収もされない遠くの結晶は、平方根を使わない距離比較だけで飛ばす
 	var far := maxf(radius, reach)
 	var far_sq := far * far

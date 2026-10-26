@@ -126,7 +126,7 @@ func reload() -> void:
 				files.append(dir.path_join(sub).path_join(f))
 		if not files.is_empty():
 			_add_category(files, false)
-	_cats.sort_custom(func(a, b): return a.order < b.order if a.order != b.order else a.title < b.title)
+	_cats.sort_custom(func(a, b): return a.order < b.order if a.order != b.order else String(a.title) < String(b.title))
 	_build_nav()
 	_set_status("左から調整したいものを選ぶ。値を変えるとすぐ保存される", COLOR_DIM)
 

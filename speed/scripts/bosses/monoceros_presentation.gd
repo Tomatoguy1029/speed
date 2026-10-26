@@ -2,6 +2,7 @@
 extends Node2D
 @export var pixel_size := 3.0
 var lance_afterglow := 0.0
+var lance_launched := false
 var lance_points := PackedVector2Array()
 const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
@@ -15,11 +16,16 @@ func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	actor = owner_actor
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
+	material = actor.hit_feedback.make_material()
 	z_index = 1
 	_sync_parts(0.0)
 
 func _event(event: Dictionary) -> void:
-	if event.cue == &"recovery_started" and event.technique == &"lance":
+	if event.technique == &"lance":
+		if event.cue == &"telegraph": lance_launched = false
+		if event.cue == &"attack_started": lance_launched = true
+	if event.cue == &"recovery_started" and event.technique == &"lance" and lance_launched:
+		lance_launched = false
 		lance_points = actor.horn_points()
 		lance_afterglow = float(actor.def.params.get("lance_hold", 0.12)) + float(actor.def.params.get("lance_fade", 0.45))
 	if event.cue == &"hit": hit = 0.18
@@ -31,14 +37,22 @@ func _advance(dt: float) -> void:
 	_sync_parts(dt)
 	queue_redraw()
 
+func _process(_dt: float) -> void:
+	if actor == null or not actor.has_body(): return
+	var reaction: Dictionary = actor.hit_feedback.sample(actor.body_id)
+	material.set_shader_parameter("boss_hit_white", reaction.white)
+	_sync_parts(0.0)
+	queue_redraw()
+
 func _sync_parts(dt: float) -> void:
 	if actor == null or not actor.has_body(): return
 	var k := actor.table.r[actor.body] / 96.0
 	parts.scale = Vector2.ONE * k
 	# 元絵の下向きを役者の前方（+X）へ合わせ、胴体の中心を判定円へ置く。
-	parts.position = Vector2(37.0 * k, 0.0)
-	parts.rotation = -PI * 0.5
-	parts.modulate = Color(1.35, 1.35, 1.35) if hit > 0.0 else Color.WHITE
+	var reaction: Dictionary = actor.hit_feedback.sample(actor.body_id)
+	parts.position = Vector2(37.0 * k, 0.0) + reaction.offset
+	parts.rotation = -PI * 0.5 + reaction.angle
+	parts.modulate = Color(1.35, 1.35, 1.35) if hit > 0.0 or reaction.white > 0.0 else Color.WHITE
 	var moving := actor.table.vel[actor.body].length_squared() > 25.0
 	parts.advance_gait(dt, moving and actor.mode not in [&"windup", &"stuck", &"phase", &"final", &"defeated"])
 	var neck_angle := 0.0
@@ -94,10 +108,9 @@ func _draw() -> void:
 		var points := actor.horn_points()
 		var a := _body_point(points[0])
 		var b := _body_point(points[1])
-		if actor.technique in [&"charge", &"return_charge"] and actor.mode==&"windup":
-			var end := actor.table.pos[actor.body]+actor.direction*float(actor.rule().distance)
-			# 薄い進路は移動方向、太い角の光は実際の攻撃形状を示す。
-			draw_line(a,_body_point(end),Color(color,0.3),6.0,false)
+		if actor.technique in [&"charge", &"return_charge", &"lance"] and actor.mode==&"windup":
+			# 薄い進路は移動後の角先、太い角の光は実際の攻撃形状を示す。
+			draw_line(a,_body_point(actor.warning_points()[1]),Color(color,0.3),6.0,false)
 		draw_line(a,b,Color(color,0.3),width,false)
 		draw_line(a,b, ENERGY if actor.technique==&"lance" else color, 7.0 if actor.mode==&"windup" else 13.0,false)
 		if actor.locked:

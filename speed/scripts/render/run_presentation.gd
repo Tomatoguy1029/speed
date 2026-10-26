@@ -67,6 +67,9 @@ var view_override: Variant = null
 var show_background := true
 var _background_sprites: Array[Sprite2D] = []
 var _background_placements: Array[BackgroundPlacement] = []
+var _background_fires: Array[PixelFire] = []
+var _fire_placements: Array[BackgroundPlacement] = []
+var _static_fires: Array[PixelFire] = []
 var _background_origin := Vector2.ZERO
 var _path_band_group: CanvasGroup
 var _path_band: DrawLayer
@@ -351,7 +354,9 @@ func _process(delta: float) -> void:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	_sync_picaro()
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
-	if hud != null: hud.visible = state.cinematic_bars<=0.0
+	# HUD owns cinematic visibility so the explicit entrance skip and the
+	# completed legendary module strip remain usable while the combat UI hides.
+	if hud != null: hud.visible = true
 	var phase := state.phase
 	var frozen := run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP \
 		or (phase == RunState.Phase.DYING and run.sequence_t < cfg.death_freeze_time)
@@ -647,6 +652,7 @@ func _build_star_batch() -> void:
 ## 透明な余白を除く画像の中心を、開始地点からの距離に合わせる。
 func _build_stage_background() -> void:
 	_background_origin = state.ship_pos
+	var pending_fires: Array[PixelFire] = []
 	for placement: BackgroundPlacement in state.stage.backgrounds:
 		if placement.texture_path.is_empty():
 			continue
@@ -663,6 +669,35 @@ func _build_stage_background() -> void:
 		_layers.background.add_child(sprite)
 		_background_sprites.append(sprite)
 		_background_placements.append(placement)
+		if not placement.fire_preset_path.is_empty():
+			var preset := run.ctx.resources.resources.get(placement.fire_preset_path) as PixelFireSettings
+			if preset == null:
+				push_warning("背景の炎設定を読み込めません: " + placement.fire_preset_path)
+				continue
+			var fire := PixelFire.new()
+			fire.settings = preset
+			fire.position = state.ship_pos + placement.offset + placement.fire_offset
+			fire.scale = Vector2.ONE * placement.fire_scale
+			pending_fires.append(fire)
+			_background_fires.append(fire)
+			_fire_placements.append(placement)
+	for fire in pending_fires:
+		_layers.background.add_child(fire)
+	for use_name in state.stage.fire_uses:
+		var fire_use: Dictionary = state.stage.fire_uses[use_name]
+		var preset_path := str(fire_use.get("preset", ""))
+		var preset := run.ctx.resources.resources.get(preset_path) as PixelFireSettings
+		if preset == null:
+			push_warning("固定炎の設定を読み込めません: " + preset_path)
+			continue
+		var fire := PixelFire.new()
+		fire.name = str(use_name)
+		fire.settings = preset
+		var offset: Vector2 = fire_use.get("offset", Vector2.ZERO)
+		fire.position = _background_origin + offset
+		fire.scale = Vector2.ONE * float(fire_use.get("scale", 1.0))
+		_layers.background.add_child(fire)
+		_static_fires.append(fire)
 
 func _draw_background(c: CanvasItem) -> void:
 	var view := view_rect().grow(200.0)
@@ -672,6 +707,12 @@ func _draw_background(c: CanvasItem) -> void:
 		var sprite := _background_sprites[i]
 		sprite.visible = show_background
 		sprite.position = _background_origin + _background_placements[i].position_at(cam_center - _background_origin)
+	for i in _background_fires.size():
+		var fire := _background_fires[i]
+		fire.visible = show_background
+		fire.position = _background_origin + _fire_placements[i].position_at(cam_center - _background_origin) + _fire_placements[i].fire_offset
+	for fire in _static_fires:
+		fire.visible = show_background
 	_star_material.set_shader_parameter("view_center", cam_center)
 	_star_material.set_shader_parameter("view_half", view_rect().size / 2.0)
 	_star_material.set_shader_parameter("camera_zoom", cam_zoom)
@@ -1399,6 +1440,7 @@ func _sync_picaro() -> void:
 			_layers.enemies.add_child(node)
 			_picaro_sprites[id] = node
 		var sprite: Node2D = _picaro_sprites[id]
+		sprite.visible = not run.state.cinematic_hide_enemies or t.is_boss[i] != 0
 		sprite.position = t.pos[i]
 		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
 		var radius := enemy_sprite_radius(source,t.r[i])

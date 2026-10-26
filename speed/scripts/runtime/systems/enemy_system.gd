@@ -5,6 +5,7 @@
 ## 行動する雑魚は、行動の種類ごとの行番号の一覧（beh_rows）に入り、更新は種類ごとにその一覧だけを回す。
 class_name EnemySystem
 extends RunSystem
+signal picaro_spawned(row: int, row_id: int, owner_id: int)
 
 var motion := EnemyMotion.new()
 
@@ -166,6 +167,8 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	# 強敵と大物の出現は、プレイの記録が倒れるまでを追う
 	if def.rank >= 3:
 		state.emit(&"strong_spawn", {"id": t.id[i], "enemy_type": def.id})
+	if def.params.get("picaro", false):
+		picaro_spawned.emit(i, t.id[i], int(def.params.get("picaro_owner", 0)))
 	return i
 
 ## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
@@ -294,6 +297,8 @@ func _reset_row(i: int) -> void:
 	t.links[i] = PackedInt32Array()
 	t.stone[i] = 0.0
 	t.held[i] = 0
+	t.pump_owner[i] = -1
+	t.pump_owner_id[i] = -1
 	t.landmark[i] = 0
 	t.fire_hit[i] = -1e9
 	t.parent[i] = -1

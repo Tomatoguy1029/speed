@@ -11,6 +11,10 @@ extends Resource
 @export_range(-180.0, 180.0, 1.0) var rotation_degrees := 0.0
 ## RGBは色、Aは明るさ。元画像のアルファは保ち、背後の星を遮る。
 @export var tint := Color(0.55, 0.65, 0.75, 0.7)
+## この背景の位置に置く任意の共通炎。未指定なら従来どおり描かない。
+@export_file("*.tres") var fire_preset_path := ""
+@export var fire_offset := Vector2.ZERO
+@export_range(0.1, 8.0, 0.05) var fire_scale := 1.0
 @export_storage var texture_path := ""
 @export_storage var used_rect := Rect2()
 
@@ -31,6 +35,9 @@ func copy() -> BackgroundPlacement:
 	result.scale = scale
 	result.rotation_degrees = rotation_degrees
 	result.tint = tint
+	result.fire_preset_path = fire_preset_path
+	result.fire_offset = fire_offset
+	result.fire_scale = fire_scale
 	result.texture_path = texture_path
 	result.used_rect = used_rect
 	return result

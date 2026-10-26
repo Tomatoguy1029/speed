@@ -4,7 +4,11 @@
 
 数値の正は `.tres`。基礎値（半径・HP・装甲・速度・経験値・倒し方・行動の値）は `speed/data/enemies/<type ID>.tres`、ボスは `speed/data/bosses/`、出現の重みは `speed/data/phases/` が正で、Godot エディタの「データ編集」（メニューバーの「プロジェクト → ツール」）で見て調整する。
 
+敵とボスの種類ごとの停止時間は `hitstop_multiplier` で調整する。[ヒットストップの適用条件・継承・上限](../../spec.md#74-ヒットストップ)に従い、[敵設定の編集手順](../../dev/stage-production.md#53-保存戻すエディターで編集する)から保存する。
+
 同じ敵をステージ別に調整する値は `speed/data/stages/stage_*.tres` の `enemy_tuning` に持つ。[ステージ敵調整](../../spec.md#20-調整機能)で編集する。
+
+ステージ1の強敵と三角の星のHP上書きは、[Stage1の調整箇所](../stages/stage-1.md#調整する場所)を参照する。
 
 強敵の攻撃の重なりは、出現タイムラインの時間帯の予算と、ステージの種類ごとの個体value（`enemy_attack_values`）と、クリップの攻撃優先度（`attack_priority`）と任意の共有overrideで調整する。[攻撃の管理](../../spec.md#117-敵の攻撃の形)を参照。
 
@@ -52,7 +56,7 @@
 | `splitling` | 分裂体 | 雑魚 | 1 | 採用 | 実装済み | 分裂する雑魚から生まれ、機体を追う | — | — | 分裂する雑魚と同じ | `data/enemies/splitling.tres`（行動は `chase`） |
 | `beamer` | ビームの敵 | 硬め | 2 | 採用 | 実装済み | 距離を保ち、止まって砲口に光を集めてからビームを撃つ | 射線を読んで外れるか、撃たれる前に倒す | — | 2 | `data/enemies/beamer.tres`、行動 `beamer` |
 | `pulser` | 波動の敵 | 硬め | 2 | 採用 | 実装済み | 距離を保ち、止まって1枚だけの輪を出す。切れ目はなく、届く距離は短い | 輪の合間を突く | — | 1 | `data/enemies/pulser.tres`、行動 `pulser` |
-| `pump` | ポンプ座 | 強敵 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せて固め、巨大な弾を一発撃つ。倒すと固めた敵が飛び散り、周りの敵を倒す | 吸っている間だけ口が開き、倒せる | — | 1・5 | `data/enemies/pump.tres`、行動 `pump` |
+| `pump` | ポンプ座 | 強敵 | 3 | 採用 | 実装済み | 周りの敵と遅い自機を吸い寄せて固め、巨大な弾を一発撃つ。吸引中の敵は最初のポンプが確保し、吸引停止・範囲外・所有者や対象の消失で解放する。倒すと固めた敵が飛び散り、周りの敵を倒す | 吸っている間だけ口が開き、倒せる | — | 1・5 | `data/enemies/pump.tres`、行動 `pump` |
 | `telescope` | ぼうえんきょう座 | 強敵 | 3 | 採用 | 実装済み | 探索する光の帯で照準を溜め、予告後に先端を丸く薄めた太いレーザーを撃ち、消える直前に短くフェードする。光と射線は小隕石で遮られる。攻撃枠を取得してから照準を出し、射程外・遮蔽・向きの外では照準と未発射の予約を解除する | 帯を素早く横切る、岩陰を使う、本体を倒す | HP は柔らかめ（星3の標準より体当たり1回少ない） | 2・4 | `data/enemies/telescope.tres`、行動 `sniper`。外観は [デザインとアートスタイル](../art-style.md#42-敵) |
 | `triangle` | みなみのさんかく座 | 強敵 | 3 | 採用 | 実装済み。数値は試遊用の仮値 | 3つの星が三角の辺に沿って回りながら、ゆっくり自機へ寄ってくる。星は頂点で止まり、止まる時間が終わると次の頂点へ辺を動く。動いている星の後ろに赤いレーザーの軌跡が伸び、通り抜けられるが触れると被弾する（近距離・線）。詳細は[ステージ1](../stages/stage-1.md#みなみのさんかく座) | 星が頂点で止まっている間だけ攻撃が通る。止まった3つの星を、三角をなぞる一筆でまとめて貫く。星が全部倒れると倒れる | 中心は見えず、当たり判定もない。残った星は元の三角の軌道を回り続ける | 1 | `data/enemies/triangle.tres`（`params` の `move_time`・`stop_time`・`span`・`trail_width`・`trail_dmg`）・`triangle_star.tres`、行動 `triangle`・`triangle_star`。外観は[敵の描画](../art-style.md#42-敵) |
 | `shield` | たて座 | 強敵 | 4 | 採用 | 実装済み | 機体を追ってゆっくり向き直る。前面の青白い盾が弾を反射する。反射弾の発生間隔に上限がある | 前面の盾は通常移動の接触も隕石と同じように押し戻し、高速の体当たりも弾く。側面・背面の本体へ通常攻撃が通る。装甲を突破する高速体当たりで背面を貫くと一撃で倒れ、盾を奪う。奪った盾は一定時間、全方向の敵の攻撃を防いで勢いを保つ | — | 1・2 | `data/enemies/shield.tres`（盾の持続時間・反射弾の値）、`scripts/enemies/shield.gd`・`scripts/enemies/gates/back.gd`・`scripts/runtime/systems/ship_system.gd`。外観は[アートスタイル](../art-style.md#42-敵) |
@@ -63,10 +67,10 @@
 | `cross` | みなみじゅうじ座 | 強敵 | 4 | 採用 | 実装済み | 機体と縦か横にそろう位置で停止し、予告後に十字のレーザーを撃つ | 停止して構える間に攻める | — | 4・5 | `data/enemies/cross.tres`、行動 `cross`。本体の外観は[敵の描画](../art-style.md#42-敵) |
 | `dolphin` | いるか座 | 強敵 | 5 | 採用 | 実装済み | 距離を保ち、赤い予告から、両端が丸い赤色の層状の扇の波動を撃つ。先頭の弧が機体とほかの敵に当たる | 群れを射線に挟んで撃たせ、自分は離れる。本体を普通に倒す | HP は硬め（星5の標準より体当たり1回多い） | 4・5 | `data/enemies/dolphin.tres`、行動 `dolphin`。外観は[敵の描画](../art-style.md#42-敵) |
 | `crab` | かに座 | 強敵 | 5 | 採用 | 横歩き・停止・前方の薙ぎ・90度以内の向き直し・突進を実装。正面も通常攻撃が通る。数値と外観は調整対象 | 横にしか動けないが横には速い。自機の横の位置に合わせて詰め寄り、ハサミで前を薙ぐ。届かない状態が続くと自機へ向きを合わせる。詳細は[ステージ2](../stages/stage-2.md#かに座) | 縦から突っ込めば貫ける。向きを変えている間も狙える | — | 2・5 | `data/enemies/crab.tres`、行動 `crab`。外観は[敵の描画](../art-style.md#42-敵) |
-| `marlin` | かじき座 | 強敵 | 5 | 採用 | 実装済み（高速回遊・停止予告・停止時の現在位置への直線突進・進路の敵と隕石の破壊。突進中は横へしぶきを撒く） | 高速で回遊し、急停止して光る。停止時の自機の位置を固定して直線突進し、進路の敵や隕石を壊す。対象と例外は下記 | — | — | 1・3 | `data/enemies/marlin.tres`、行動 `marlin`。本体の外観は[敵の描画](../art-style.md#42-敵) |
+| `marlin` | かじき座 | 強敵 | 5 | 採用 | 実装済み（高速回遊・停止予告・停止時の現在位置への直線突進・進路の敵と隕石の破壊。方向を示す進路予告・画面外からの進入予告） | 高速で回遊し、急停止して光る。停止時の自機の位置を固定して直線突進し、進路の敵や隕石を壊す。対象と例外は下記 | — | — | 1・3 | `data/enemies/marlin.tres`、行動 `marlin`。本体の外観は[敵の描画](../art-style.md#42-敵) |
 | `auriga` | ぎょしゃ座 | 強敵 | 5 | 採用 | 実装済み | 光の戦車が猛スピードで飛び回り、通った跡に炎の帯を残す。帯がつながって自機のまわりに囲いができる | 囲いの中で固まった群れを、切れ目から飛び込んで刈り、反対側へ抜ける | — | 3・5 | `data/enemies/auriga.tres`、行動 `auriga` |
 | `corona` | みなみのかんむり座 | 大物 | 6 | 採用 | 実装済み・数値は試遊用の仮値 | 冠が近くの雑魚を小さな渦で率いて接近し、予告後にその個体を進行方向へ投げる（[詳しい仕様](#みなみのかんむり座)） | 渦の群れを突き抜けてまとめて倒すと、次の投擲の弾薬が減る | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 3・4 | `data/enemies/corona.tres`、`data/formations/corona_solo.tscn`、`scripts/enemies/corona_vortex.gd`。外観は[冠の描画](../art-style.md#46-みなみのかんむり座) |
-| `phoenix` | ほうおう座 | 大物 | 7 | 採用 | 離脱・火の粉と影による着地点予告・飛び込み・広域炎・停止まで実装済み。数値は試遊用の仮値。範囲炎は鳳凰専用shaderで描画する。丸い炎の外観は不採用。共通ピクセル炎の編集画面・単体調整プレビューを実装し、外観は本人確認待ち。鳳凰との接続は未実装 | 遠くへ飛び去ったあと、火の粉と影で落ちる場所を見せてから飛び込んでくる。飛び込んだ所で、体より広い範囲に炎が弾ける | 飛び込んだ直後は止まっているので、まわりの群れごと貫く | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 3 | `data/enemies/phoenix.tres`、行動 `phoenix`、共通炎 `scripts/render/fx/pixel_fire.gd`、[単体調整](../../../speed/assets/pixel/README.md#ピクセル炎を単体で調整する) |
+| `phoenix` | ほうおう座 | 大物 | 7 | 採用 | 離脱・火の粉と影による着地点予告・飛び込み・広域炎・停止まで実装済み。数値は試遊用の仮値。範囲炎は鳳凰専用shaderで描画する。丸い炎の外観は不採用。共通ピクセル炎をビジュアル編集で調整でき、外観は本人確認待ち。鳳凰との接続は未実装 | 遠くへ飛び去ったあと、火の粉と影で落ちる場所を見せてから飛び込んでくる。飛び込んだ所で、体より広い範囲に炎が弾ける | 飛び込んだ直後は止まっているので、まわりの群れごと貫く | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 3 | `data/enemies/phoenix.tres`、行動 `phoenix`、共通炎 `scripts/render/fx/pixel_fire.gd`、[炎の調整](../../../speed/assets/pixel/README.md#ピクセル炎を調整する) |
 | `cepheus` | ケフェウス座 | 大物 | 7 | 採用 | 実装済み | 距離を保ち、専用の兵を召喚して隊列を組ませる王。一定時間ごとに増援して隊列を組み直し、号令で兵が一斉に撃つ | 王を倒すと軍勢が崩れる | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 5 | `data/enemies/cepheus.tres`・`cepheus_soldier.tres`、行動 `cepheus`・`soldier`。本体の外観方針は[敵の描画](../art-style.md#42-敵)。本体・兵の専用画像を実装済み |
 | `aquarius` | みずがめ座 | 大物 | 10 | 採用 | 実装済み | 瓶の口を機体へ向けて近づき、溜めながら通り道に水の流れを見せて予告し、先へ行くほど広がる極太ビームを全方位へ等間隔で一斉に照射する。ビームの間に安全な隙間が残る | 予告を読んで隙間へ抜け、本体を狙う | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 4 | `data/enemies/aquarius.tres`、行動 `aquarius`。外観は[敵の描画](../art-style.md#42-敵) |
 | `aquila` | わし座 | 大物 | 10 | 採用 | 実装済み | 大きく旋回しながら飛び、通り道に沿って雷を落とす | — | HPは[星ごとの暫定設定](../../spec.md#111-見た目と強さ) | 5 | `data/enemies/aquila.tres`、行動 `aquila`。雷撃の見た目は [デザインとアートスタイル](../art-style.md#37-雷撃)。本体の外観は[敵の描画](../art-style.md#42-敵) |
@@ -120,7 +124,9 @@
 
 ## かじき座の突進
 
+- 回遊中は目標へ鼻先を旋回し、その向きへ泳ぐ。速度だけを横へ補間して顔と進行方向をずらさない。突進後は一度止まり、休み明けも鼻先へ加速する。
 - 停止予告の開始時に自機の現在位置を固定し、光ってからその方向へ高速で泳ぎ抜ける。予告中は完全に停止し、突進中は発進方向を保つ。
+- 停止中は吻先から実際の直進区間へ赤いレーザーを照射し、本体の接触幅を薄く示す。地形で止まる場合はその位置で切り、画面外から進路が入る場合も画面端から射線を示す。発進に近づくほど光を強める。
 - 実際の移動区間と本体の接触半径で進路を判定する。敵は既存の倒し方と無敵時間に従い、倒せる対象を共通の撃破処理へ渡す。経験値・ドロップ・撃破時効果は通常の撃破と同じ扱いにする。
 - ボスと所属部位は各ボスの戦闘規則に従う。丸鋸・固定瓦礫など攻撃で壊れない対象はその防御を保つ。惑星・月とボスの固定外周は共通の地形衝突を使う。
 - 隕石は敵テーブルの障害物として破壊対象に含める。惑星・月は地形として保持する。
@@ -133,10 +139,10 @@
 | type ID | 名称 | 採用状態 | 本番の実装状況 | 行動・攻撃 | 出現条件 | データ・コード |
 | --- | --- | --- | --- | --- | --- | --- |
 | `hydra` | うみへび座 | 採用 | 中央HP・首増加・通常10技・大技5種・コンボ3種・分離から決着・固定瓦礫の戦闘エリアを実装。共通フロー・条件線・技ノードによる編集と消費型スタミナを実装。胴体・3種の頭・点列に沿って重ねる首の仮絵を接続（法線マップ未追加）。格子は仮1配置、試遊調整は未完 | [専用仕様](../bosses/hydra.md) | ステージ4のボス | `scenes/bosses/hydra_boss.tscn`、`data/bosses/ai/hydra_flow.tres`、`data/bosses/ai/hydra_action_rules.tres`、`scripts/bosses/hydra_boss.gd`、`scripts/bosses/hydra_neck.gd`、`data/bosses/hydra.tres`、`scenes/bosses/hydra_presentation.tscn`。`gyms/hydra_trial.tscn` で試遊する。編集方法は [設計書 6.1](../../architecture.md#61-敵とボスの-ai) |
-| `monoceros` | いっかくじゅう座 | 採用 | 通常／往復突進・薙ぎ・蹴り・後半の光槍・惑星の角刺さり・形態予約、共通フローによる選択と消費型スタミナを実装。`combo` は専用仕様に記載した連携の仮実装例。パーツの仮絵・往復する走り・戦闘方向への旋回を表示へ接続（法線マップ未追加）。数値は仮。登場飛行・青白い炎の尾・突進噴射を実装。[剣状の角・光槍の固定から飛散・減衰](../bosses/monoceros.md#8-素材と演出)を実装。[演出の未完項目](../bosses/monoceros.md#10-調整素材の未完項目)が残る | [専用仕様](../bosses/monoceros.md)・[一戦の完成ラインと調整要件](../bosses/monoceros.md#9-実装調整接続) | ステージ1のボス | `scenes/bosses/monoceros_boss.tscn`、`data/bosses/ai/monoceros_action_rules.tres`、`data/bosses/ai/monoceros_flow.tres`、`data/bosses/monoceros_moves/`、`scripts/bosses/monoceros_boss.gd`、`data/bosses/monoceros.tres`、`scenes/bosses/monoceros_presentation.tscn`。実験場で配置できる |
+| `monoceros` | いっかくじゅう座 | 採用 | 通常／往復突進・薙ぎ・蹴り・後半の光槍・惑星の角刺さり・形態予約、共通フローによる選択と消費型スタミナを実装。現在位置と実射程で候補を判定し、近距離は薙ぎ、背後は蹴りを優先する。予告中に速度から接触位置を見積もり、固定した直線へ発進する。実被弾を薄い白色と描画だけの揺れで示す。`combo` は届く場合に薙ぎへつなぐ仮実装例。パーツの仮絵・往復する走り・戦闘方向への旋回を表示へ接続（法線マップ未追加）。数値は仮。登場飛行・青白い炎の尾・突進噴射を実装。[剣状の角・光槍の固定から飛散・減衰](../bosses/monoceros.md#8-素材と演出)を実装。[演出の未完項目](../bosses/monoceros.md#10-調整素材の未完項目)が残る | [専用仕様](../bosses/monoceros.md)・[一戦の完成ラインと調整要件](../bosses/monoceros.md#9-実装調整接続) | ステージ1のボス | `scenes/bosses/monoceros_boss.tscn`、`data/bosses/ai/monoceros_action_rules.tres`、`data/bosses/ai/monoceros_flow.tres`、`data/bosses/monoceros_moves/`、`scripts/bosses/monoceros_boss.gd`、`data/bosses/monoceros.tres`、`scenes/bosses/monoceros_presentation.tscn`。実験場で配置できる |
 | `centaurus` | ケンタウルス座 | 採用 | 第1形態の速射の矢・貫く強弓・矢の雨・背後攻撃・離脱・守る雑魚の側への位置取り、共通フローによる選択を実装。第2形態・大技は未実装。背後攻撃の動作の見た目は未決。外観は仮の図形、数値は試遊用の仮値 | [専用仕様](../bosses/centaurus.md) | ステージ2のボス | `scenes/bosses/centaurus_boss.tscn`、`scripts/bosses/centaurus_boss.gd`、`data/bosses/centaurus.tres`、`data/bosses/centaurus_moves/`、`data/bosses/ai/centaurus_flow.tres`・`centaurus_action_rules.tres`、`scenes/bosses/centaurus_presentation.tscn`。`gyms/centaurus_trial.tscn` で試遊する |
 | `canis_major` | おおいぬ座 | 採用 | 第1形態の群れの統率・飛びかかり・号令、共通フローによる選択を実装。第2形態・シリウスの光・大技は未実装。外観は仮の図形、数値は試遊用の仮値 | [専用仕様](../bosses/canis-major.md) | ステージ3のボス | `scenes/bosses/canis_major_boss.tscn`、`scripts/bosses/canis_major_boss.gd`、`data/bosses/canis_major.tres`、`data/bosses/canis_major_moves/`、`data/bosses/ai/canis_major_flow.tres`・`canis_major_action_rules.tres`、`scenes/bosses/canis_major_presentation.tscn`。`gyms/canis_major_trial.tscn` で試遊する |
-| `draco` | りゅう座 | 採用 | 全身の単一命中先、通常6技・主な7技、既存敵のコズミック版と全身複製、HP3段階、登場・小熊座解放・最終入力・固定フィニッシュを仮表示で接続。共通フロー・ボス行動画面・全技の単独試遊とステージ5の本番出現を有効化。正式構図と最終バランスを調整する | [裂け目からの登場・自機越しの対面構図](../bosses/draco.md#83-ラスボス戦の登場)・[HP段階移行と隕石の消去](../bosses/draco.md#2-戦闘の進行)・[通常攻撃とブレスの遮蔽](../bosses/draco.md#4-通常攻撃)・[光の矢の固定着弾予告と光の爆発](../bosses/draco.md#52-隊列越しの遠距離攻撃ケンタウルス座)・[本体を含む3体編成と5系統からの選出](../bosses/draco.md#54-全身複製うみへび座)・[吸引と編集可能な複数の弧状弾配置](../bosses/draco.md#57-吸引大技)・[主な技・壁と被弾後の挙動](../bosses/draco.md#5-主な技)・[こぐま座の咆哮から合体・連撃・光の貫通と切断・爆発](../bosses/draco.md#23-hp0から最終決着)・[一戦の完成ライン](../bosses/draco.md#91-一戦を試遊できる完成ライン)・[発動条件と行動編集](../bosses/draco.md#71-攻撃区間と技の選択) | ステージ5のラスボス | `scripts/bosses/draco_boss.gd`・`draco_*.gd`、`data/bosses/draco_moves/`、`data/bosses/ai/draco_action_rules.tres`・`draco_flow.tres`、`scenes/bosses/draco_boss.tscn`。矢は共通の `scripts/attacks/light_arrow.gd` とコズミック版を使う |
+| `draco` | りゅう座 | 採用 | 共通寸法・姿勢に沿った全身の単一命中先、通常6技・主な7技、既存敵のコズミック版と全身複製、HP3段階、登場・小熊座解放・最終入力・固定フィニッシュを接続。現在位置に基づく狙いと確定予告、噛みつきの首・尾の動作、装甲と星の核の手続き描画、有効被弾の白色化・微振動を使う。共通フロー・ボス行動画面・全技の単独試遊とステージ5の本番出現を有効化。正式構図と最終バランスを調整する | [裂け目からの登場・自機越しの対面構図](../bosses/draco.md#83-ラスボス戦の登場)・[HP段階移行と隕石の消去](../bosses/draco.md#2-戦闘の進行)・[通常攻撃とブレスの遮蔽](../bosses/draco.md#4-通常攻撃)・[光の矢の固定着弾予告と光の爆発](../bosses/draco.md#52-隊列越しの遠距離攻撃ケンタウルス座)・[本体を含む3体編成と5系統からの選出](../bosses/draco.md#54-全身複製うみへび座)・[吸引と編集可能な複数の弧状弾配置](../bosses/draco.md#57-吸引大技)・[主な技・壁と被弾後の挙動](../bosses/draco.md#5-主な技)・[こぐま座の咆哮から合体・連撃・光の貫通と切断・爆発](../bosses/draco.md#23-hp0から最終決着)・[一戦の完成ライン](../bosses/draco.md#91-一戦を試遊できる完成ライン)・[発動条件と行動編集](../bosses/draco.md#71-攻撃区間と技の選択) | ステージ5のラスボス | `scripts/bosses/draco_boss.gd`・`draco_*.gd`、`data/bosses/draco_moves/`、`data/bosses/ai/draco_action_rules.tres`・`draco_flow.tres`、`scenes/bosses/draco_boss.tscn`。矢は共通の `scripts/attacks/light_arrow.gd` とコズミック版を使う |
 
 各ステージのボスの出現時刻は `speed/data/stages/` の定義に従う。
 

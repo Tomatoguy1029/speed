@@ -104,6 +104,9 @@ var fire_hit := PackedFloat64Array()
 var stone := PackedFloat64Array()
 ## 1 ならほかの敵に抱えられている（みなみのかんむり座の渦など）。抱えている側が動かし、自分の行動は止まる
 var held := PackedByteArray()
+## 吸引中の敵：最初に確保したポンプ座の行とID。未所有は -1。
+var pump_owner := PackedInt32Array()
+var pump_owner_id := PackedInt32Array()
 
 # ── 吹き飛ばされている間 ──────────────────────────────────────────
 

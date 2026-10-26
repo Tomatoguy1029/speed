@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"picaro_wall"
 category = &"major"
-parameters = {"driver": ExtResource("2"), "warn": 1.0, "active": 6.0, "recover": 1.2, "damage": 28.0, "reach": 1800.0, "width": 20.0, "count": 3, "arrows": 5, "interval": 0.45, "flight": 0.75, "impact_warn": 1.0, "radius": 85.0}
+parameters = {"driver": ExtResource("2"), "warn": 1.0, "active": 6.0, "recover": 1.2, "damage": 28.0, "reach": 1800.0, "width": 20.0, "wall_candidates": [&"telescope", &"lynx"], "count": 3, "arrows": 5, "interval": 0.45, "flight": 0.75, "impact_warn": 1.0, "radius": 85.0}

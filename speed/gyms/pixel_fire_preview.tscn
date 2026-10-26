@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://b8s2mseyewwry"]
 
-[ext_resource type="Script" path="res://gyms/pixel_fire_preview.gd" id="1"]
+[ext_resource type="Script" uid="uid://mmij7f2qouko" path="res://gyms/pixel_fire_preview.gd" id="1"]
 
-[node name="PixelFirePreview" type="Control"]
+[node name="PixelFirePreview" type="Control" unique_id=265382610]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0

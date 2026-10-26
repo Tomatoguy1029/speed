@@ -26,7 +26,7 @@ func contact(ps: ProjectileSystem, i: int, from: Vector2, to: Vector2, body_hit,
 
 ## 機体に当たったときの被弾。
 func _damage_ship(ps: ProjectileSystem, i: int) -> void:
-	ps.ship.damage(ps.hostile_dmg[i], ps.hostile_slow[i], ProjectileSystem.HOSTILE_CAUSE[ps.hostile_kind[i]])
+	ps.damage_hostile(i)
 
 ## 飛びきった・何かに当たった位置 at で消えるとき（まだ寿命が残っていたら reached は false）。
 func on_end(_ps: ProjectileSystem, _i: int, _at: Vector2, _reached: bool) -> void:

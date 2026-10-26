@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://data/formations/s1_marlin.tscn" id="marlin"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_pump.tscn" id="pump"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_shield.tscn" id="shield"]
+[ext_resource type="PackedScene" uid="uid://7f0mms4dx4xw" path="res://data/formations/s1_shield.tscn" id="shield"]
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 [ext_resource type="PackedScene" path="res://data/formations/s1_triangle.tscn" id="triangle"]
 
@@ -30,7 +30,7 @@ types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("pump")])
 attack_priority = 1
 time = 120.0
-length = 37.0
+length = 39.0
 groups = 2
 interval = 14.0
 
@@ -41,8 +41,8 @@ track = 0
 types = Array[StringName]([&"shield"])
 formations = Array[PackedScene]([ExtResource("shield")])
 attack_priority = 1
-time = 143.0
-length = 14.0
+time = 130.0
+length = 59.0
 groups = 2
 interval = 12.0
 
@@ -54,7 +54,7 @@ types = Array[StringName]([&"marlin"])
 formations = Array[PackedScene]([ExtResource("marlin")])
 attack_priority = 1
 time = 195.0
-length = 37.0
+length = 39.0
 groups = 2
 interval = 12.0
 
@@ -66,7 +66,7 @@ types = Array[StringName]([&"triangle"])
 formations = Array[PackedScene]([ExtResource("triangle")])
 attack_priority = 1
 time = 270.0
-length = 37.0
+length = 39.0
 groups = 2
 interval = 16.0
 
@@ -78,20 +78,8 @@ types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("pump")])
 attack_priority = 1
 time = 278.0
-length = 29.0
+length = 53.0
 interval = 18.0
-
-[sub_resource type="Resource" id="Clip_6"]
-script = ExtResource("clip")
-label = "たて座"
-track = 0
-types = Array[StringName]([&"shield"])
-formations = Array[PackedScene]([ExtResource("shield")])
-attack_priority = 1
-time = 286.0
-length = 21.0
-groups = 2
-interval = 14.0
 
 [sub_resource type="Resource" id="Clip_7"]
 script = ExtResource("clip")
@@ -101,7 +89,7 @@ types = Array[StringName]([&"marlin"])
 formations = Array[PackedScene]([ExtResource("marlin")])
 attack_priority = 1
 time = 345.0
-length = 37.0
+length = 41.0
 groups = 3
 interval = 9.0
 
@@ -114,7 +102,7 @@ formations = Array[PackedScene]([ExtResource("pump")])
 layouts = Array[StringName]([&"s1_pump/単体"])
 attack_priority = 1
 time = 354.0
-length = 28.0
+length = 32.0
 interval = 22.0
 
 [sub_resource type="Resource" id="Clip_9"]
@@ -163,6 +151,18 @@ time = 432.0
 length = 40.0
 groups = 2
 interval = 18.0
+
+[sub_resource type="Resource" id="Resource_2gqev"]
+script = ExtResource("clip")
+label = "たて座"
+track = 0
+types = Array[StringName]([&"shield"])
+formations = Array[PackedScene]([ExtResource("shield")])
+attack_priority = 1
+time = 240.0
+length = 69.0
+groups = 2
+interval = 12.0
 
 [sub_resource type="Resource" id="Phase_grow_1"]
 script = ExtResource("phase")
@@ -280,32 +280,66 @@ attack_budget = 1
 id = &"s1_boss"
 display_name = "ボス戦"
 
+[sub_resource type="Resource" id="Resource_m3sfq"]
+script = ExtResource("phase")
+start = 600.0
+rate = 6.0
+xp_bonus = 1.0
+attack_budget = 1
+id = &"phase_6421032582117185046"
+display_name = "新しい時間帯"
+
 [sub_resource type="Resource" id="Curve_biter"]
 script = ExtResource("curve")
 type = &"biter"
-points = PackedVector2Array(0, 18, 14, 100, 29, 175, 45, 110, 58, 230, 68, 110, 80, 230, 90, 120, 105, 240, 120, 140, 133, 280, 143, 140, 155, 280, 165, 150, 180, 290, 195, 160, 208, 330, 218, 160, 230, 330, 240, 165, 255, 340, 270, 180, 283, 365, 293, 180, 305, 365, 315, 180, 330, 380, 345, 200, 358, 400, 368, 200, 380, 400, 390, 200, 405, 420, 420, 220, 437, 450, 451, 220, 467, 450, 480, 90)
+points = PackedVector2Array(0, 18, 14, 100, 29, 175, 45, 110, 58, 230, 68, 110, 87, 247, 90, 85, 107, 147, 120, 85, 133, 280, 143, 140, 161, 324, 166, 77, 188, 170, 195, 101, 200, 383, 218, 160, 230, 330, 240, 85, 263, 190, 270, 105, 278, 387, 293, 180, 312, 328, 315, 81, 323, 190, 339, 182, 345, 85, 350, 407, 368, 200, 387, 440, 391, 137, 415, 161, 420, 220, 428, 408, 451, 220, 476, 428, 480, 90, 489, 0, 501, 0, 550, 102, 601, 402)
 
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
 type = &"bomber"
-points = PackedVector2Array(0, 0, 14, 0, 29, 0, 45, 0, 58, 0, 68, 0, 80, 0, 90, 3, 105, 8, 120, 5, 133, 14, 143, 5, 155, 14, 165, 5, 180, 10, 195, 6, 208, 16, 218, 6, 230, 16, 240, 6, 255, 12, 270, 8, 283, 18, 293, 8, 305, 18, 315, 7, 330, 14, 345, 9, 358, 20, 368, 9, 380, 20, 390, 8, 405, 16, 420, 10, 437, 22, 451, 10, 467, 22, 480, 4)
+points = PackedVector2Array(0, 0, 14, 0, 29, 0, 45, 0, 58, 0, 68, 0, 80, 0, 90, 3, 106, 5, 120, 5, 133, 14, 143, 5, 155, 14, 165, 5, 180, 5, 195, 6, 208, 16, 218, 6, 230, 16, 240, 6, 255, 6, 270, 8, 283, 18, 293, 8, 305, 18, 315, 7, 330, 9, 345, 9, 358, 20, 368, 9, 380, 20, 390, 8, 405, 10, 420, 10, 437, 22, 451, 10, 467, 22, 480, 4, 489, 1, 553, 6, 600, 21)
 
 [sub_resource type="Resource" id="Curve_splitter"]
 script = ExtResource("curve")
 type = &"splitter"
-points = PackedVector2Array(0, 3, 14, 12, 29, 24, 45, 15, 58, 18, 68, 15, 80, 18, 90, 26, 105, 42, 120, 18, 133, 22, 143, 18, 155, 22, 165, 38, 180, 52, 195, 22, 208, 26, 218, 22, 230, 26, 240, 48, 255, 64, 270, 24, 283, 30, 293, 24, 305, 30, 315, 55, 330, 72, 345, 28, 358, 34, 368, 28, 380, 34, 390, 62, 405, 80, 420, 30, 437, 38, 451, 30, 467, 38, 480, 12)
+points = PackedVector2Array(0, 3, 14, 12, 29, 24, 45, 15, 58, 18, 68, 15, 80, 18, 90, 26, 105, 42, 120, 18, 133, 22, 143, 18, 161, 23, 165, 38, 180, 52, 195, 22, 208, 26, 218, 22, 237, 26, 240, 48, 255, 64, 270, 24, 283, 30, 293, 24, 312, 33, 315, 55, 330, 72, 345, 28, 358, 34, 368, 28, 385, 36, 390, 62, 405, 69, 420, 30, 437, 38, 451, 30, 467, 38, 480, 12, 489, 0, 554, 25, 600, 51)
 
 [sub_resource type="Resource" id="Curve_pulser"]
 script = ExtResource("curve")
 type = &"pulser"
-points = PackedVector2Array(0, 0, 14, 0, 29, 0, 45, 0, 58, 0, 68, 0, 80, 0, 90, 0, 105, 0, 120, 0, 133, 0, 143, 0, 155, 0, 165, 1, 180, 3, 195, 1, 208, 3, 218, 1, 230, 3, 240, 1, 255, 4, 270, 2, 283, 4, 293, 2, 305, 4, 315, 2, 330, 5, 345, 2, 358, 5, 368, 2, 380, 5, 390, 2, 405, 5, 420, 3, 437, 6, 451, 3, 467, 6, 480, 1)
+points = PackedVector2Array(0, 0, 14, 0, 29, 0, 45, 0, 58, 0, 68, 0, 80, 0, 90, 0, 105, 0, 120, 0, 133, 0, 143, 0, 155, 0, 165, 1, 180, 3, 195, 1, 208, 3, 218, 1, 230, 3, 240, 1, 255, 4, 270, 2, 283, 4, 293, 2, 305, 4, 315, 2, 330, 5, 345, 2, 358, 5, 368, 2, 380, 5, 390, 2, 405, 5, 420, 3, 437, 6, 451, 3, 467, 6, 480, 1, 489, 0, 542, 0, 571, 6, 600, 12)
 
 [resource]
 script = ExtResource("stage")
 index = 1
 scene_path = "res://scenes/stages/stage_1.tscn"
-phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss")]
+phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss"), SubResource("Resource_m3sfq")]
 enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
+enemy_tuning = {
+"bomber": {
+"params.blast_dmg": 14.0
+},
+"marlin": {
+"hp": 80.0,
+"params.fire_interval": 3.6
+},
+"pulser": {
+"params.bullet_dmg": 14.0
+},
+"pump": {
+"hp": 60.0,
+"params.bullet_dmg": 28.0
+},
+"shield": {
+"hp": 45.0
+},
+"triangle": {
+"params.trail_dmg": 14.0
+},
+"triangle_star": {
+"hp": 12.0
+}
+}
 enemy_attack_values = {
 "bomber": 0.3,
 "marlin": 1.0,
@@ -315,9 +349,9 @@ enemy_attack_values = {
 "triangle": 1.0
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
-clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12")])
+clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Resource_2gqev")])
 track_names = PackedStringArray("たて座", "ポンプ座", "かじき座", "みなみのさんかく座")
-boss_time = 480.0
-time_limit = 900.0
+boss_time = 495.0
+time_limit = 720.0
 boss_id = &"monoceros"
 legendary_module_id = &"legendary_stern"
