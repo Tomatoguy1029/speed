@@ -17,6 +17,13 @@ ALLOWED = {
     "docs/game/stages": {f"stage-{n}.md" for n in range(1, 6)},
     "docs/game/bosses": None,
     "docs/dev": {"stage-production.md", "stage-production-ai.md"},
+    "docs/dev/tools": {
+        "index.md", "stage-launch.md", "enemy-lab.md", "visual-editor.md",
+        "background-editor.md", "data-editor.md", "boss-ai.md",
+        "spawn-timeline.md", "stage-enemy-tuning.md", "f4-enemy-tuning.md",
+        "pixel-assets.md", "pixel-fire-2d.md", "enemy-render-benchmark.md",
+        "run-profile.md",
+    },
 }
 # 今の状態だけを書く置き場
 STATE_DIRS = ["docs/treatment.md", "docs/spec.md", "docs/architecture.md", "docs/game", "docs/dev"]
