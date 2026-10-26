@@ -73,11 +73,11 @@ func _steer_toward(want: float, dt: float, cruise_share: float) -> void:
 	var sp := state.ship_vel.length()
 	if sp > 1.0:
 		var cur := state.ship_vel.angle()
-		var turn := clampf(Geom.angle_diff(want, cur), -cfg.steer_rate * dt, cfg.steer_rate * dt)
+		var turn := clampf(Geom.angle_diff(want, cur), -state.stats.turn_rate * dt, state.stats.turn_rate * dt)
 		state.ship_vel = state.ship_vel.rotated(turn)
 	var cruise := state.stats.max_speed * cruise_share
 	if sp < cruise:
-		state.ship_vel += Vector2.from_angle(want) * minf(cfg.steer_accel * dt, cruise - sp)
+		state.ship_vel += Vector2.from_angle(want) * minf(state.stats.acceleration * dt, cruise - sp)
 	if state.ship_vel.is_zero_approx():
 		state.ship_heading = Vector2.from_angle(want)
 
@@ -194,7 +194,7 @@ func damage(amount: float, slow: float, cause: StringName, source := &"") -> boo
 	if slow > 0.0:
 		state.glide = false
 	state.ship_vel *= 1.0 - minf(0.9, slow)
-	state.ship_invuln = cfg.invuln_time
+	state.ship_invuln = state.stats.invulnerability
 	state.ship_hurt = cfg.ship_hurt_time
 	var hit := {"pos": state.ship_pos, "amount": amount, "cause": cause, "source": source,
 		"t": state.time, "world_t": state.world_time, "hp_after": state.ship_hp}

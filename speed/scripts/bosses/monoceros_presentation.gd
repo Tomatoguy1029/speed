@@ -5,10 +5,10 @@ extends Node2D
 @export var hoof_texture: Texture2D
 @export var pixel_size := 3.0
 var actor: MonocerosBoss
-var hit := 0.0
 var pulse := 0.0
 var gait := 0.0
 var lance_afterglow := 0.0
+var lance_launched := false
 var lance_points := PackedVector2Array()
 const OUTLINE := Color("#1a1928")
 const HULL := Color("#ae9b87")
@@ -22,21 +22,30 @@ func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	actor = owner_actor
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
+	material = actor.hit_feedback.make_material()
 	z_index = 1
 
 func _event(event: Dictionary) -> void:
-	if event.cue == &"recovery_started" and event.technique == &"lance":
+	if event.technique == &"lance":
+		if event.cue == &"telegraph": lance_launched = false
+		if event.cue == &"attack_started": lance_launched = true
+	if event.cue == &"recovery_started" and event.technique == &"lance" and lance_launched:
+		lance_launched = false
 		lance_points = actor.horn_points()
 		lance_afterglow = float(actor.def.params.get("lance_hold", 0.12)) + float(actor.def.params.get("lance_fade", 0.45))
-	if event.cue == &"hit": hit = 0.18
 	if event.cue in [&"aim_locked", &"horn_stuck", &"phase_changed"]: pulse = 0.35
 	queue_redraw()
 
 func _advance(dt: float) -> void:
 	lance_afterglow = maxf(0.0, lance_afterglow - dt)
-	hit = maxf(0.0, hit - dt)
 	pulse = maxf(0.0, pulse - dt)
 	gait += dt * (15.0 if actor.mode == &"active" else 7.0)
+	queue_redraw()
+
+func _process(_dt: float) -> void:
+	if actor == null or not actor.has_body(): return
+	var reaction: Dictionary = actor.hit_feedback.sample(actor.body_id)
+	material.set_shader_parameter("boss_hit_white", reaction.white)
 	queue_redraw()
 
 func _poly(points: Array, color: Color) -> void:
@@ -76,7 +85,10 @@ func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	var r := actor.table.r[actor.body]
 	var k := r / 96.0
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
+	var reaction: Dictionary = actor.hit_feedback.sample(actor.body_id)
+	var shake: Vector2 = reaction.offset
+	var shake_angle: float = reaction.angle
+	draw_set_transform(shake, shake_angle, Vector2.ONE * k)
 	var moving := actor.table.vel[actor.body].length() > 5.0
 	var turning := clampf(actor.turn_motion / maxf(actor.def.turn, 0.001), -1.0, 1.0)
 	var braced := actor.mode in [&"windup", &"stuck", &"recovery", &"phase"]
@@ -91,14 +103,16 @@ func _draw() -> void:
 			var foot := Vector2(x * 58.0 + stride, y * (69.0 if braced else 60.0))
 			if x < 0 and actor.technique == &"kick":
 				if actor.mode == &"windup": foot.x += 24.0
-				elif actor.mode == &"active": foot = Vector2(-float(actor.rule().reach)/k, y * 13.0)
+				elif actor.mode == &"active":
+					var kick_dir := actor.direction.rotated(-actor.table.facing[actor.body])
+					foot = kick_dir * float(actor.rule().reach) / k + kick_dir.orthogonal() * y * 13.0
 			_limb(root, knee, foot, 7.0, SHADE if y < 0 else HULL)
 	# 船尾の装甲を背負う馬。装甲の見た目は両形態で保つ。
 	var breathe := sin(actor.clock * 4.0) * (3.0 if actor.mode == &"recovery" else 1.0)
 	if body_texture != null:
 		draw_texture_rect(body_texture, Rect2(-82,-42,150,84), false)
 	else:
-		_poly([Vector2(-80,-24),Vector2(-62,-40-breathe),Vector2(30,-38-breathe),Vector2(62,-25),Vector2(64,25),Vector2(28,39+breathe),Vector2(-62,40+breathe),Vector2(-80,24)], LIGHT if hit > 0 else HULL)
+		_poly([Vector2(-80,-24),Vector2(-62,-40-breathe),Vector2(30,-38-breathe),Vector2(62,-25),Vector2(64,25),Vector2(28,39+breathe),Vector2(-62,40+breathe),Vector2(-80,24)], HULL)
 		_poly([Vector2(-70,-26),Vector2(-22,-32),Vector2(-6,0),Vector2(-22,32),Vector2(-70,26)], SHADE)
 		_poly([Vector2(-58,-28),Vector2(-44,-28),Vector2(-44,28),Vector2(-58,28)], HULL)
 		_poly([Vector2(-20,-23),Vector2(23,-23),Vector2(35,0),Vector2(23,23),Vector2(-20,23)], SHADE)
@@ -109,14 +123,14 @@ func _draw() -> void:
 	if actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]:
 		neck_angle = (actor.horn_points()[1]-actor.table.pos[actor.body]).angle()-actor.table.facing[actor.body]
 	elif braced: neck_angle = sin(actor.clock * 8.0) * 0.06
-	draw_set_transform(Vector2(46+strain, 0)*k, neck_angle, Vector2.ONE*k)
+	draw_set_transform((Vector2(46+strain, 0)*k).rotated(shake_angle) + shake, neck_angle + shake_angle, Vector2.ONE*k)
 	_poly([Vector2(-8,-20),Vector2(20,-28),Vector2(54,-17),Vector2(54,17),Vector2(20,28),Vector2(-8,20)], HULL)
 	_poly([Vector2(-5,-25),Vector2(17,-39),Vector2(37,-29),Vector2(19,-24)], SHADE)
 	_poly([Vector2(-5,25),Vector2(17,39),Vector2(37,29),Vector2(19,24)], SHADE)
 	if head_texture != null:
 		draw_texture_rect(head_texture, Rect2(30,-22,52,44),false)
 	else:
-		_poly([Vector2(28,-19),Vector2(57,-17),Vector2(78,-10),Vector2(80,10),Vector2(57,17),Vector2(28,19)], LIGHT if hit>0 else HULL)
+		_poly([Vector2(28,-19),Vector2(57,-17),Vector2(78,-10),Vector2(80,10),Vector2(57,17),Vector2(28,19)], HULL)
 		draw_rect(Rect2(42,-15,9,6), ENERGY if actor.phase==2 else WARNING)
 		draw_rect(Rect2(42,9,9,6), ENERGY if actor.phase==2 else WARNING)
 	if actor.phase == 2:
@@ -142,10 +156,9 @@ func _draw() -> void:
 		var points := actor.horn_points()
 		var a := actor.to_local(points[0])
 		var b := actor.to_local(points[1])
-		if actor.technique in [&"charge", &"return_charge"] and actor.mode==&"windup":
-			var end := actor.table.pos[actor.body]+actor.direction*float(actor.rule().distance)
-			# 薄い進路は移動方向、太い角の光は実際の攻撃形状を示す。
-			draw_line(a,actor.to_local(end),Color(color,0.3),6.0,false)
+		if actor.technique in [&"charge", &"return_charge", &"lance"] and actor.mode==&"windup":
+			# 薄い進路は移動後の角先、太い光は現在の攻撃形状を示す。
+			draw_line(a,actor.to_local(actor.warning_points()[1]),Color(color,0.3),6.0,false)
 		draw_line(a,b,Color(color,0.3),width,false)
 		draw_line(a,b, ENERGY if actor.technique==&"lance" else color, 7.0 if actor.mode==&"windup" else 13.0,false)
 		if actor.locked:

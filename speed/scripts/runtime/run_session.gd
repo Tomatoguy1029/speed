@@ -104,7 +104,7 @@ func _physics_process(delta: float) -> void:
 	if auto_step and sim.state != null:
 		sim.physics_step(delta)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
 		_progress.value = resources.progress() * 100.0
@@ -126,6 +126,7 @@ func _process(_delta: float) -> void:
 		_pending_options = {}
 		start(options, true)
 		return
+	if sim.bosses != null: sim.bosses.tick_feedback(delta)
 	sim.flush_events()
 
 ## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。

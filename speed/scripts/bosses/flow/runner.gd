@@ -28,7 +28,7 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 		if rest_remaining <= 0.0:
 			stamina = flow.maximum_stamina
 			index = _rest_next
-			last.clear()
+			# 休息は攻撃履歴を消さない。成立する別候補がある時の連続回避を維持する。
 		return
 	var section: Dictionary = flow.sections[index]
 	if active:

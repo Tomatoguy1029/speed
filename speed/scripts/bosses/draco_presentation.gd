@@ -4,6 +4,15 @@ var actor: BossActor
 var effects: Array = []
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 const MODULE_GEOMETRY = preload("res://scripts/ui/legendary_module_geometry.gd")
+func _ready() -> void:
+	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
+func _process(_dt: float) -> void:
+	var sample := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
+	if actor != null and actor.has_body(): sample = actor.hit_feedback.sample(actor.body_id)
+	position = sample.offset
+	rotation = sample.angle
+	material.set_shader_parameter("boss_hit_white", sample.white)
+
 func on_event(event: Dictionary) -> void:
 	if event.cue in [&"phase_changed",&"bear_roar"]:
 		var at: Vector2=event.get("pos",actor.table.pos[actor.body])

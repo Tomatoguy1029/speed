@@ -25,7 +25,7 @@ func on_launch(_full: bool) -> void:
 		copies.append({"delay": delay * (k + 1), "cursor": 0, "progress": 0.0,
 			"hits": {}, "pos": state.ship_pos, "dir": state.ship_heading, "alpha": 0.0})
 	_current = {"legs": [], "copies": copies, "start": _clock, "until": _clock,
-		"end": false, "share": maxf(0.0, level_value("echo_total_by_level")) / count}
+		"end": false, "share": maxf(0.0, level_value("echo_total_by_level")) * damage_factor() / count}
 	echoes.append(_current)
 	if echoes.size() > MAX_DASHES:
 		echoes.pop_front()
@@ -40,7 +40,7 @@ func on_trail(run: TraceRun, a: Vector2, b: Vector2) -> void:
 	var start := maxf(_clock, float(_current.until))
 	var finish := start + a.distance_to(b) / maxf(run.rate, 1.0)
 	_current.legs.append({"a": a, "b": b, "start": start, "finish": finish,
-		"power": atk(), "radius": cfg.trace_radius})
+		"power": ctx.combat.attack_power(), "radius": cfg.trace_radius})
 	_current.until = finish
 
 func on_end() -> void:

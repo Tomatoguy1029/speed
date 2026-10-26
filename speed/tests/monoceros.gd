@@ -43,6 +43,7 @@ func _ready() -> void:
 		actor._cooldown = 0.0
 		actor.phase = 2 if tech in [&"lance", &"combo"] else 1
 		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(180, 0) if tech == &"sweep" else Vector2(600, 0)
+		sim.state.ship_pos = sim.state.enemy_aim
 		var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
 		check(candidates.any(func(c): return c.id == String(tech)), "仕様の距離・形態で候補へ入る: " + tech)
 		var flow := actor.flow_runner.flow.duplicate(true)
@@ -53,11 +54,13 @@ func _ready() -> void:
 	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
+	sim.state.ship_pos = sim.state.enemy_aim
 	step(0.4)
-	check(actor.table.facing[actor.body] > 0.1, "予告中は遅延照準へ向き直る")
+	check(actor.table.facing[actor.body] > 0.1, "予告中は現在の自機へ向き直る")
 	until(&"windup", true)
 	var locked_angle := actor.table.facing[actor.body]
 	sim.state.enemy_aim = Vector2(0, -800)
+	sim.state.ship_pos = sim.state.enemy_aim
 	step(0.15)
 	check(is_equal_approx(actor.table.facing[actor.body], locked_angle), "発進前に方向を固定する")
 	while actor.mode == &"windup": step(DT)
@@ -70,10 +73,11 @@ func _ready() -> void:
 		fresh()
 		actor.phase = 2
 		sim.state.enemy_aim = Vector2(-600, 0)
+		sim.state.ship_pos = sim.state.enemy_aim
 		actor.start_attack(tech)
 		until(&"windup", true)
 		var target_direction := (sim.state.enemy_aim - actor.table.pos[actor.body]).normalized()
-		check(actor.direction.dot(target_direction) > 0.9999, "背後へ切り返しても固定時点の遅延照準を狙う: " + tech)
+		check(actor.direction.dot(target_direction) > 0.9999, "背後へ切り返しても固定時点の自機を狙う: " + tech)
 		check(Vector2.from_angle(actor.table.facing[actor.body]).dot(actor.direction) > 0.9999, "予告と発進方向を一致させる: " + tech)
 
 	fresh()
@@ -84,6 +88,7 @@ func _ready() -> void:
 	for frame in 1600:
 		if actor.mode == &"turnaround":
 			sim.state.enemy_aim = actor.table.pos[actor.body] + Vector2(-500, sign_y * 160)
+			sim.state.ship_pos = sim.state.enemy_aim
 			sign_y = -sign_y
 		var before := actor.mode
 		var was_locked := actor.locked
@@ -133,6 +138,8 @@ func _ready() -> void:
 	for tech in [&"charge", &"sweep", &"kick", &"lance"]:
 		fresh()
 		actor.phase = 2
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		var hp := sim.state.ship_hp
 		step(float(actor.rule().warn) - 0.02)
@@ -154,6 +161,7 @@ func _ready() -> void:
 	actor._cooldown = 0.0
 	check(actor.can_select(&"kick",1,0,260,true)==false, "正面の自機に後ろ蹴りを選ばない")
 	sim.state.enemy_aim = Vector2(-180, 0)
+	sim.state.ship_pos = sim.state.enemy_aim
 	check(actor.can_select(&"kick",1,0,260,true), "序盤から背後への蹴りを選べる")
 	actor.start_attack(&"kick")
 	step(2.5)
@@ -163,7 +171,15 @@ func _ready() -> void:
 	actor.phase = 2
 	actor.start_attack(&"combo")
 	step(2.5)
-	check(actor.technique == &"sweep" and actor.mode == &"windup", "後半は突進後に予告付きの薙ぎへつなぐ")
+	check(actor.technique == &"charge" and actor.mode == &"recovery" and not actor.combo_pending, "突進後に届かない薙ぎを強制せず隙を作る")
+	fresh()
+	actor.phase = 2
+	actor.start_attack(&"combo")
+	step(2.0)
+	sim.state.ship_pos = actor.table.pos[actor.body] + Vector2(160,0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	step(0.5)
+	check(actor.technique == &"sweep" and actor.mode == &"windup", "仮連携は突進後に薙ぎが届く時だけ予告を始める")
 	step(1.5)
 	check(actor.mode == &"recovery" and not actor.combo_pending, "連携の最後に隙を作る")
 
@@ -195,6 +211,14 @@ func _ready() -> void:
 		while actor.mode == &"windup": step(DT)
 		check(float(actor._presentation.call("booster_strength")) > idle_strength, "突進で炎の尻尾が大きく噴き出す")
 
+	fresh()
+	actor.phase = 2
+	actor.start_attack(&"lance")
+	step(0.6)
+	sim.state.ship_pos = Vector2(2200,0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	step(0.8)
+	check(actor.mode == &"recovery" and float(actor._presentation.get("lance_afterglow")) <= 0.0, "発進を見送った槍は突いた残光を出さない")
 	fresh()
 	actor.phase = 2
 	actor.start_attack(&"lance")
@@ -244,6 +268,7 @@ func fresh() -> void:
 	sim.state.boss_dead = false
 	sim.state.lab_mode = true
 	sim.state.ship_pos = Vector2(600, 0)
+	sim.state.ship_vel = Vector2.ZERO
 	sim.state.enemy_aim = sim.state.ship_pos
 	sim.state.ship_hp = sim.state.stats.max_hp
 	sim.state.ship_invuln = 0.0
@@ -279,6 +304,8 @@ func capture() -> void:
 	for tech in stage_names:
 		fresh()
 		actor.phase = 2 if tech==&"lance" else 1
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		for frame in 170:
 			step(1.0/60.0)

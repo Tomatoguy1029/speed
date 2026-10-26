@@ -45,6 +45,10 @@ func tick(real_dt: float, world_dt: float) -> void:
 			owner.sim_tick(real_dt, world_dt)
 			projectiles.lab_context = 0
 
+## 表示だけの被弾パルスは、世界停止・決着の更新分岐から独立して進める。
+func tick_feedback(real_dt: float) -> void:
+	for owner in actors: owner.hit_feedback.tick(real_dt)
+
 ## ボスの行が残っているか（撃破の演出中を含む）。
 func has_boss() -> bool:
 	return actor != null and actor.has_body()
@@ -116,6 +120,14 @@ func body_damaged(row: int) -> void:
 	if owner != null:
 		owner.on_body_damaged()
 
+## 形態側のHP補正後に、実際に減った量だけを表示へ渡す。
+func damage_applied(row: int, amount: float) -> void:
+	if amount <= 0.0: return
+	for owner in actors:
+		if owner.has_body() and owner.owns_damage_target(row):
+			owner.hit_feedback.pulse(enemies.table.id[row])
+			return
+
 ## ボスの HP が0になった（CombatSystem から呼ばれる）。撃破の演出は RunManager が始める。
 func on_boss_defeated(i: int, opts: Dictionary) -> void:
 	var owner := actor_for_row(i)
@@ -143,6 +155,7 @@ func remove_actor(owner: BossActor) -> void:
 	if owner.has_body():
 		enemies.mark_dead(owner.body)
 	owner.registered = false
+	owner.hit_feedback.clear()
 	actors.erase(owner)
 	owner.queue_free()
 

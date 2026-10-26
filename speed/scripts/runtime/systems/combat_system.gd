@@ -271,9 +271,11 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 			t.dash_seen[i] = state.dash_id
 			t.dash_fresh[i] = 1 if fresh else 0
 		fresh = t.dash_fresh[i] != 0
+	var hp_before := t.hp[i]
 	t.hp[i] -= dmg
 	if t.is_boss[i] != 0:
 		bosses.body_damaged(i)
+	if bosses != null: bosses.damage_applied(i, maxf(0.0, hp_before - maxf(0.0, t.hp[i])))
 	t.flash[i] = 0.12
 	state.emit(&"hit", {"pos": t.pos[i], "crit": crit, "dmg": dmg, "cause": cause, "id": t.id[i]})
 	if crit:

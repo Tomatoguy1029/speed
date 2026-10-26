@@ -133,8 +133,14 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				_begin_pass()
 			elif combo_pending:
 				combo_pending = false
-				technique = &"sweep"
-				_begin_pass()
+				# 仮連携も、突進後の現在位置から薙ぎが届く時だけ続ける。
+				if _close_ready(&"sweep"):
+					technique = &"sweep"
+					cooldowns[technique] = clock + float(rule().cd)
+					_begin_pass()
+				else:
+					mode = &"recovery"
+					recovery = float(rule().recover)
 			else:
 				mode = &"idle"
 				technique = &""
@@ -172,8 +178,29 @@ func rule() -> Dictionary:
 	return _moves[technique].parameters if _moves.has(technique) else {}
 
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
-	if not can_select(attack, int(gate.get("min_phase", 1)), float(gate.get("min", 0.0)), float(gate.get("max", INF)), false): return false
-	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim - table.pos[body]).rotated(-table.facing[body]))
+	if not _moves.has(attack) or not can_select(attack, int(gate.get("min_phase", 1)), float(gate.get("min", 0.0)), minf(float(gate.get("max", INF)), _reach(attack)), false): return false
+	if not _gate_allows(gate): return false
+	# 接近された時は、その状況に対応する蹄・薙ぎを使う。CD中は突進へ戻れる。
+	if attack != &"kick" and _close_ready(&"kick"): return false
+	if attack not in [&"kick", &"sweep"] and _close_ready(&"sweep"): return false
+	if attack != &"kick":
+		var r: Dictionary = _moves[attack].parameters
+		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
+		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return false
+	# 予告中も走り続ける相手へ、発進時には届かない技を選ばない。
+	return table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) <= _reach(attack)
+
+func _gate_allows(gate: Dictionary) -> bool:
+	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
+
+func _reach(attack: StringName) -> float:
+	var r: Dictionary = _moves[&"charge" if attack == &"combo" else attack].parameters
+	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
+
+func _close_ready(attack: StringName) -> bool:
+	if not _moves.has(attack): return false
+	var gate: Dictionary = action_rules.conditions.get(String(attack), {})
+	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) <= _reach(attack)
 
 func selection_blocked() -> bool:
 	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
@@ -188,7 +215,7 @@ func attack_failed() -> bool:
 func can_select(attack: StringName, min_phase: int, min_range: float, max_range: float, rear_only: bool) -> bool:
 	if mode != &"idle" or _cooldown > 0.0 or reposition > 0.0 or phase < min_phase: return false
 	if clock < float(cooldowns.get(attack, 0.0)): return false
-	var d := run_state.enemy_aim - table.pos[body]
+	var d := run_state.ship_pos - table.pos[body]
 	if d.length() < min_range or d.length() > max_range: return false
 	return not rear_only or absf(Geom.angle_diff(d.angle(), table.facing[body] + PI)) < float(def.params.kick_trigger_arc)
 
@@ -211,8 +238,8 @@ func _begin_pass() -> void:
 	locked = false
 	attack_hit = false
 	table.vel[body] = Vector2.ZERO
-	aim_point = run_state.enemy_aim
-	direction = Vector2.from_angle(table.facing[body])
+	aim_point = _strike_aim()
+	direction = Vector2.from_angle(table.facing[body] + (PI if technique == &"kick" else 0.0))
 	var r := rule()
 	var anim := timeline.get_animation(&"attack")
 	anim.length = float(r.warn) + float(r.active)
@@ -225,28 +252,64 @@ func _begin_pass() -> void:
 	_cue(&"telegraph")
 
 func _aim(dt: float) -> void:
-	# 共通の遅延照準をそのまま使い、未来位置を予測しない。
-	aim_point = run_state.enemy_aim
-	if technique == &"kick": return
+	aim_point = _strike_aim()
+	if technique == &"kick":
+		direction = (aim_point - table.pos[body]).normalized()
+		return
 	var wanted := (aim_point - table.pos[body]).angle()
 	var prior := table.facing[body]
 	table.facing[body] = rotate_toward(prior, wanted, def.turn * dt)
 	turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
 	direction = Vector2.from_angle(table.facing[body])
 
+func _strike_aim(attack: StringName = &"", lead := -1.0) -> Vector2:
+	# ボス固有の捕捉。選択時・予告中だけ現在位置と速度から接触時点を狙う。
+	if attack == &"": attack = technique
+	if attack == &"combo": attack = &"charge"
+	var velocity := run_state.ship_vel
+	var target := run_state.ship_pos + velocity * (float(def.params.lock_lead) if lead < 0.0 else lead)
+	if attack not in [&"charge", &"return_charge", &"lance"]: return target
+	var r: Dictionary = _moves[attack].parameters
+	var speed := float(r.distance) / float(r.active)
+	var reach := float(r.get("reach", horn_length()))
+	var offset := target - table.pos[body]
+	var a := velocity.length_squared() - speed * speed
+	var b := 2.0 * (offset.dot(velocity) - reach * speed)
+	var c := offset.length_squared() - reach * reach
+	var contact := 0.0
+	if c > 0.0:
+		contact = float(r.active)
+		if absf(a) < 0.001:
+			if b < -0.001: contact = -c / b
+		else:
+			var discriminant := b * b - 4.0 * a * c
+			if discriminant >= 0.0:
+				for root in [(-b - sqrt(discriminant)) / (2.0 * a), (-b + sqrt(discriminant)) / (2.0 * a)]:
+					if root >= 0.0: contact = minf(contact, root)
+	return target + velocity * clampf(contact, 0.0, float(r.active))
+
 func lock_aim() -> void:
-	if mode != &"windup": return
-	# 旋回途中の姿勢を狙いと取り違えず、この時点の遅延照準を固定する。
+	if mode != &"windup" or locked: return
+	# 固定後は再捕捉せず、予告で見せた方向へ発進する。
 	# 蹴りは背後への攻撃なので本体の向きを保つ。
 	if technique != &"kick" and not aim_point.is_equal_approx(table.pos[body]):
 		table.facing[body] = (aim_point - table.pos[body]).angle()
 	locked = true
-	direction = Vector2.from_angle(table.facing[body])
+	direction = (aim_point - table.pos[body]).normalized() if technique == &"kick" else Vector2.from_angle(table.facing[body])
 	_cue(&"aim_locked")
 
 func launch_strike() -> void:
 	if mode != &"windup": return
 	lock_aim()
+	if table.pos[body].distance_to(aim_point) > _reach(technique) or (technique == &"kick" and absf(Geom.angle_diff(direction.angle(), table.facing[body] + PI)) > float(def.params.kick_trigger_arc)):
+		# 予告中に届かない位置へ離れた自機へ、空の近接攻撃を出し続けない。
+		timeline.stop()
+		combo_pending = false
+		passes_left = 0
+		mode = &"recovery"
+		recovery = float(rule().recover)
+		_cue(&"recovery_started")
+		return
 	if technique in [&"charge", &"return_charge", &"lance"] and _path_blocked():
 		combo_pending = false
 		passes_left = 0
@@ -337,14 +400,21 @@ func _reposition_tick(dt: float) -> void:
 		var prior := table.facing[body]
 		table.facing[body] = rotate_toward(prior, reposition_direction.angle(), def.turn * dt)
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
-	elif table.pos[body].distance_to(run_state.enemy_aim) > float(def.params.approach_range):
-		var toward := (run_state.enemy_aim - table.pos[body]).normalized()
-		var prior := table.facing[body]
-		table.facing[body] = rotate_toward(prior, toward.angle(), def.turn * dt)
-		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
-		_move_body(Vector2.from_angle(table.facing[body]) * def.speed * dt)
 	else:
-		table.vel[body] = Vector2.ZERO
+		var toward := run_state.ship_pos - table.pos[body]
+		var prior := table.facing[body]
+		if not _close_ready(&"kick"):
+			table.facing[body] = rotate_toward(prior, toward.angle(), def.turn * dt)
+		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
+		var closing := toward.length() > float(def.params.approach_range)
+		if not closing and _moves.has(&"charge"):
+			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].parameters.warn))) > _reach(&"charge")
+		if closing:
+			# 先に向き直る。走り続ける相手にも、予告後の突進が届く所まで戻る。
+			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))
+			_move_body(Vector2.from_angle(table.facing[body]) * float(def.params.approach_speed) * alignment * dt)
+		else:
+			table.vel[body] = Vector2.ZERO
 
 func _move_body(step: Vector2) -> void:
 	var from := table.pos[body]
@@ -362,7 +432,7 @@ func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:
 	var reach := horn_length()
 	var root := table.r[body] * 0.65
 	if technique == &"kick":
-		angle += PI
+		angle = direction.angle()
 		reach = float(rule().reach)
 	elif technique == &"lance":
 		reach = float(rule().reach)
@@ -372,6 +442,13 @@ func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:
 		angle += lerpf(-float(rule().arc), float(rule().arc), f)
 	var dir := Vector2.from_angle(angle)
 	return PackedVector2Array([at + dir * root, at + dir * reach])
+
+## 予告の細線は、移動後の角先までの直線を共有する。
+func warning_points() -> PackedVector2Array:
+	var points := horn_points()
+	if technique in [&"charge", &"return_charge", &"lance"]:
+		points[1] += direction * float(rule().distance)
+	return points
 
 func _damage_shape(prior: PackedVector2Array, points: PackedVector2Array) -> void:
 	if attack_hit or mode != &"active": return

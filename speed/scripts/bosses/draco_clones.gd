@@ -47,7 +47,8 @@ func begin(a: BossActor) -> void:
 		if j>0:
 			var copy := EnemyDef.new()
 			copy.params.clone_visual=true
-			copy.id=&"draco_copy";copy.behavior=&"drift";copy.radius=a.table.r[a.body];copy.hp=float(a.rule().clone_hp);copy.speed=0;copy.rank=1
+			# 複製の耐久は技の設定を使う。通常敵の星別HP表へ置き換えない。
+			copy.id=&"draco_copy";copy.behavior=&"drift";copy.radius=a.table.r[a.body];copy.hp=float(a.rule().clone_hp);copy.speed=0;copy.rank=0
 			row=a.ctx.enemies.spawn(copy,center+Vector2.from_angle(j*TAU/3.0)*650.0)
 			a.table.held[row]=1
 		var move: Resource = MOVES[order[j]]

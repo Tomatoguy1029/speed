@@ -144,6 +144,12 @@ func damage_target(row: int) -> int:
 		if table.id[row]==int(target.part_id) and ctx.enemies.is_same(target.row,target.id): return int(target.row)
 	return body if row==body or row in body_rows else row
 
+func owns_damage_target(row: int) -> bool:
+	if super.owns_damage_target(row): return true
+	for target: Dictionary in clone_damage_rows.values():
+		if int(target.row)==row and ctx.enemies.is_same(row,int(target.id)): return true
+	return false
+
 func _exit_tree() -> void:
 	if entrance != null: entrance.cancel()
 	if finale != null: finale.dispose()

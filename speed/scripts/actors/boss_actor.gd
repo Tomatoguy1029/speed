@@ -13,6 +13,8 @@ var body := -1
 var def: BossDef
 ## true なら、役者が本体を自分で描く（RunPresentation はボスの行を描かない）
 var draws_self := false
+## 命中行IDごとの表示用状態。物理・照準・技の状態へは書き戻さない。
+var hit_feedback := preload("res://scripts/bosses/boss_hit_feedback.gd").new()
 
 var run_state: RunState:
 	get: return ctx.state
@@ -68,6 +70,10 @@ func body_alive() -> bool:
 ## 複数の命中形状を一体として受けるボスで上書きする。
 func damage_target(row: int) -> int:
 	return row
+
+## 独立HPの複製を持つ役者は、その有効な命中先も含める。
+func owns_damage_target(row: int) -> bool:
+	return row == body and has_body()
 
 func contains_hit(point: Vector2, radius: float) -> bool:
 	return point.distance_to(table.pos[body]) <= table.r[body]+radius

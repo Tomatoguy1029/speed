@@ -2,8 +2,11 @@
 
 [ext_resource type="Script" uid="uid://b0iaw5utoqs3t" path="res://scripts/data_types/game_config.gd" id="1"]
 
+[ext_resource type="Resource" path="res://data/post_max.tres" id="2_post_max"]
+
 [resource]
 script = ExtResource("1")
+post_max = ExtResource("2_post_max")
 boss_time = 600.0
 boss_time_spread = 20.0
 boss_hp = 2200.0

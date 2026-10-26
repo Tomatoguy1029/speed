@@ -98,6 +98,8 @@ var xp_dropped := 0.0
 ## 武器の管理 ID → Lv、特性の管理 ID → 重ね数
 var weapons: Dictionary = {}
 var traits: Dictionary = {}
+## このランだけの全武器MAX後の選択回数。永続セーブへ書き込まない。
+var post_max_stacks: Dictionary = {}
 ## 保留中のレベルアップの数と、表示中の3択
 var pending_levels := 0
 var cards: Array[Dictionary] = []

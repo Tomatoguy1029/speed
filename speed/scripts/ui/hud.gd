@@ -649,23 +649,34 @@ func _show_cards() -> void:
 			var b := Button.new()
 			b.position = Vector2(89 + i * (width + 16), 83)
 			b.size = Vector2(width, 193)
-			b.tooltip_text = "%s: %s" % [info.name, info.desc]
-			_card_art(b, Rect2(89, 83, 145, 193))
+			b.tooltip_text = "%s: %s" % [info.name, info.get("tooltip_desc", info.desc)]
+			if cards[i].kind == &"post_max":
+				var style := _card_style(info.color)
+				style.bg_color = Color("#233c49")
+				style.set_corner_radius_all(0)
+				style.set_border_width_all(2)
+				b.add_theme_stylebox_override("normal", style)
+				var focus_style := style.duplicate() as StyleBoxFlat
+				focus_style.border_color = Color("#c0ffff")
+				for visual_state in ["focus", "hover", "pressed"]:
+					b.add_theme_stylebox_override(visual_state, focus_style)
+			else:
+				_card_art(b, Rect2(89, 83, 145, 193))
 			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
 			_cards_row.add_child(b)
 			var font_size := 10 if cards.size() <= 3 else 8
 			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
 				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-				[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
+				[Vector2(7, 65), Vector2(width - 14, 122 if cards[i].kind == &"post_max" else 57), info.desc]]:
 				var label := Label.new()
 				label.position = entry[0]
 				label.size = entry[1]
 				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", font_size)
+				label.add_theme_font_size_override("font_size", 9 if cards[i].kind == &"post_max" and entry[0].y == 65 else font_size)
 				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				label.clip_text = true
-				label.max_lines_visible = 4 if entry[0].y == 65 else 2
+				label.max_lines_visible = (9 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
 				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
@@ -724,6 +735,7 @@ func _card_style(col: Color) -> StyleBoxFlat:
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
+	if c.kind == &"post_max": return c.info
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
 			var new_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.new)
