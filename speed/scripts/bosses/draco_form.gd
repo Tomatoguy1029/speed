@@ -53,9 +53,19 @@ static func samples_even(points: PackedVector2Array, count: int, include_head :=
 		else: result.append(points[cursor].lerp(points[cursor + 1], (target - traversed) / maxf(0.001, lengths[cursor])))
 	return result
 
-static func draw_body(canvas: CanvasItem, points: PackedVector2Array, width: float, time: float, cosmic := false, alpha := 1.0, fractions_override := PackedFloat32Array()) -> void:
+static func draw_body(canvas: CanvasItem, points: PackedVector2Array, width: float, time: float, cosmic := false, alpha := 1.0, fractions_override := PackedFloat32Array(), batch_segments := false) -> void:
 	if points.size()<2 or alpha<=0.001: return
 	var progress := fractions_override if fractions_override.size()==points.size() else fractions(points)
+	var right_lines := PackedVector2Array()
+	var left_lines := PackedVector2Array()
+	var cosmic_left := PackedVector2Array()
+	var cosmic_right := PackedVector2Array()
+	var rib_lines := PackedVector2Array()
+	var flow_points := PackedVector2Array()
+	var flow_colors := PackedColorArray()
+	var triangles := PackedVector2Array()
+	var triangle_colors := PackedColorArray()
+	var triangle_indices := PackedInt32Array()
 	# Each span uses its own perpendicular, rather than a miter between opposing neck tangents.
 	# Round joins share the capsule radii used by the damage samples; no self-crossing ribbon is triangulated.
 	for j in points.size():
@@ -72,17 +82,57 @@ static func draw_body(canvas: CanvasItem, points: PackedVector2Array, width: flo
 		var right0 := points[j]-normal*half0
 		var right1 := points[j+1]-normal*half1
 		var shade := 0.5+0.5*sin(float(j)*0.61)
-		quad(canvas,left0,left1,right1,right0,faded(Color("#544c70").lerp(Color("#756b91"),shade*0.32),alpha))
-		quad(canvas,left0,left1,points[j+1]+normal*half1*0.15,points[j]+normal*half0*0.15,faded(Color("#857b9e"),alpha))
-		canvas.draw_line(right0,right1,faded(Color("#211c39"),alpha),maxf(3.0,width*0.04),false)
-		canvas.draw_line(left0,left1,faded(Color(0.48,0.55,0.87,0.7),alpha),3.0,false)
+		var main_color := faded(Color("#544c70").lerp(Color("#756b91"),shade*0.32),alpha)
+		var glint_color := faded(Color("#857b9e"),alpha)
+		if batch_segments:
+			_append_quad(triangles,triangle_colors,triangle_indices,left0,left1,right1,right0,main_color)
+			_append_quad(triangles,triangle_colors,triangle_indices,left0,left1,points[j+1]+normal*half1*0.15,points[j]+normal*half0*0.15,glint_color)
+		else:
+			quad(canvas,left0,left1,right1,right0,main_color)
+			quad(canvas,left0,left1,points[j+1]+normal*half1*0.15,points[j]+normal*half0*0.15,glint_color)
+		if batch_segments:
+			right_lines.append_array(PackedVector2Array([right0,right1]))
+			left_lines.append_array(PackedVector2Array([left0,left1]))
+		else:
+			canvas.draw_line(right0,right1,faded(Color("#211c39"),alpha),maxf(3.0,width*0.04),false)
+			canvas.draw_line(left0,left1,faded(Color(0.48,0.55,0.87,0.7),alpha),3.0,false)
 		if j%2==0:
-			canvas.draw_line(left0,right0,faded(Color("#39314e"),alpha),3.0,false)
+			if batch_segments: rib_lines.append_array(PackedVector2Array([left0,right0]))
+			else: canvas.draw_line(left0,right0,faded(Color("#39314e"),alpha),3.0,false)
 			var flow := 0.58+0.18*sin(time*1.6-j*0.4)
-			canvas.draw_circle(points[j]-normal*half0*0.2,3.0,faded(Color(0.52,0.66,1.0,flow),alpha))
+			if batch_segments:
+				flow_points.append(points[j]-normal*half0*0.2)
+				flow_colors.append(faded(Color(0.52,0.66,1.0,flow),alpha))
+			else: canvas.draw_circle(points[j]-normal*half0*0.2,3.0,faded(Color(0.52,0.66,1.0,flow),alpha))
 		if cosmic:
-			canvas.draw_line(left0,left1,faded(Color(0.55,0.42,1.0,0.7),alpha),5.0,false)
-			canvas.draw_line(right0,right1,faded(Color(0.27,0.63,1.0,0.6),alpha),5.0,false)
+			if batch_segments:
+				cosmic_left.append_array(PackedVector2Array([left0,left1]))
+				cosmic_right.append_array(PackedVector2Array([right0,right1]))
+			else:
+				canvas.draw_line(left0,left1,faded(Color(0.55,0.42,1.0,0.7),alpha),5.0,false)
+				canvas.draw_line(right0,right1,faded(Color(0.27,0.63,1.0,0.6),alpha),5.0,false)
+	if batch_segments and not triangle_indices.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(canvas.get_canvas_item(),triangle_indices,triangles,triangle_colors)
+	if batch_segments:
+		canvas.draw_multiline(right_lines,faded(Color("#211c39"),alpha),maxf(3.0,width*0.04),false)
+		canvas.draw_multiline(left_lines,faded(Color(0.48,0.55,0.87,0.7),alpha),3.0,false)
+		canvas.draw_multiline(rib_lines,faded(Color("#39314e"),alpha),3.0,false)
+		if cosmic:
+			canvas.draw_multiline(cosmic_left,faded(Color(0.55,0.42,1.0,0.7),alpha),5.0,false)
+			canvas.draw_multiline(cosmic_right,faded(Color(0.27,0.63,1.0,0.6),alpha),5.0,false)
+	if batch_segments:
+		for j in flow_points.size(): canvas.draw_circle(flow_points[j],3.0,flow_colors[j])
+
+static func _append_quad(points: PackedVector2Array, colors: PackedColorArray, indices: PackedInt32Array, a: Vector2, b: Vector2, c: Vector2, d: Vector2, color: Color) -> void:
+	_append_triangle(points,colors,indices,a,b,c,color)
+	_append_triangle(points,colors,indices,a,c,d,color)
+
+static func _append_triangle(points: PackedVector2Array, colors: PackedColorArray, indices: PackedInt32Array, a: Vector2, b: Vector2, c: Vector2, color: Color) -> void:
+	if absf((b-a).cross(c-a))<=0.01: return
+	var index := points.size()
+	points.append_array(PackedVector2Array([a,b,c]))
+	colors.append_array(PackedColorArray([color,color,color]))
+	indices.append_array(PackedInt32Array([index,index+1,index+2]))
 
 static func quad(canvas: CanvasItem, a: Vector2, b: Vector2, c: Vector2, d: Vector2, color: Color) -> void:
 	triangle(canvas,a,b,c,color)

@@ -21,5 +21,5 @@ func _draw() -> void:
 	var world: PackedVector2Array = unit.get("points",actor.neutral_body_points(actor.table.pos[unit.row],unit.angle))
 	var points := PackedVector2Array()
 	for point in world: points.append((point-actor.table.pos[unit.row]).rotated(-float(unit.angle)))
-	FORM.draw_body(self,points,actor.body_width,actor.clock,true)
+	FORM.draw_body(self,points,actor.body_width,actor.clock,true,1.0,PackedFloat32Array(),true)
 	FORM.draw_head(self,actor.head_scale,0.6 if not unit.get("done",false) else 0.0)
