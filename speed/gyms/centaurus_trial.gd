@@ -26,6 +26,7 @@ func _ready() -> void:
 		if arg.begins_with("--centaurus-capture="): capture_path = arg.trim_prefix("--centaurus-capture=")
 		if arg.begins_with("--centaurus-capture-at="): capture_at = float(arg.trim_prefix("--centaurus-capture-at="))
 		if arg.begins_with("--centaurus-tech="): _only(StringName(arg.trim_prefix("--centaurus-tech=")))
+		if arg == "--centaurus-pin": session.pinned = trial_ship_position
 	_set_mode(3)
 	_refresh()
 
@@ -45,7 +46,8 @@ func _process(delta: float) -> void:
 	await RenderingServer.frame_post_draw
 	var error := get_viewport().get_texture().get_image().save_png(capture_path)
 	var actor = session.run.bosses.actor
-	print("[centaurus-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if actor != null else &"", " tech=", actor.technique if actor != null else &"")
+	var distance: float = actor.table.pos[actor.body].distance_to(session.run.state.ship_pos) if actor != null and actor.has_body() else -1.0
+	print("[centaurus-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if actor != null else &"", " tech=", actor.technique if actor != null else &"", " distance=", roundi(distance))
 	get_tree().quit(0 if error == OK else 1)
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。

@@ -256,7 +256,8 @@ func _retreat_tick(dt: float) -> void:
 		retreat_ready_at = clock + turn_time + float(def.params.retreat_cd)
 		_cue(&"retreat_finished")
 
-## 好む距離を保つ。守る雑魚が近くに集まっていれば、機体から見てその奥へ回る。
+## 好む距離を保つ。守る雑魚が近くに集まっていれば、機体から見てその集まりの側へ回る。
+## 距離は好む範囲だけで決める（集まりの奥へ下がると、ボスの前へ並び直す雑魚を追って下がり続けるため）。
 func _position_tick(dt: float) -> void:
 	_scan_guards(dt)
 	var aim := run_state.enemy_aim
@@ -266,7 +267,6 @@ func _position_tick(dt: float) -> void:
 	var direction := offset / maxf(distance, 1.0)
 	if guard_point != Vector2.INF and guard_point.distance_squared_to(aim) > 1.0:
 		direction = (guard_point - aim).normalized()
-		distance = guard_point.distance_to(aim) + float(def.params.guard_offset)
 	var target := aim + direction * clampf(distance, float(def.params.keep_min), float(def.params.keep_max))
 	var step := target - at
 	if step.length() > 24.0:

@@ -26,7 +26,6 @@ params = {
 "retreat_cd": 2.0,
 "guard_search": 800.0,
 "guard_min": 3,
-"guard_offset": 260.0,
 "guard_scan": 0.25,
 "bow_reach": 0.9,
 "final_beam_width": 5000.0,
