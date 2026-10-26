@@ -1,0 +1,31 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_c7rul"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/volley.tres" id="2_c7vly"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/power_shot.tres" id="3_c7pws"]
+
+[resource]
+script = ExtResource("1_c7rul")
+adapter = &"centaurus"
+trial_scene = "res://gyms/boss_flow_trial.tscn"
+techniques = Array[Resource]([ExtResource("2_c7vly"), ExtResource("3_c7pws")])
+conditions = {
+"power_shot": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1500.0,
+"min": 450.0,
+"min_phase": 1
+},
+"volley": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1200.0,
+"min": 500.0,
+"min_phase": 1
+}
+}
+costs = {
+"power_shot": 2.0,
+"volley": 1.0
+}

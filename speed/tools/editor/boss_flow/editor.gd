@@ -41,7 +41,8 @@ var _probability_previous := ""
 var _scale := 1.0
 var _file_dialog := FileDialog.new()
 const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
-const PARAM_LABELS := {"radius_factor":"螺旋の半径倍率","body_ratio":"螺旋の胴体幅（画面短辺比）","head_scale":"頭の拡大倍率","coil_turns":"胴体の巻き数","first_lap":"1周目の時間（秒）","second_lap":"2周目の時間（秒）","pause":"巻き終わりの停止（秒）","shrink_time":"収縮と離脱（秒）","clone_stars":"複製1体の星数（仮）","warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）"}
+const BOSS_IDS := ["hydra", "monoceros", "draco", "centaurus"]
+const PARAM_LABELS := {"radius_factor":"螺旋の半径倍率","body_ratio":"螺旋の胴体幅（画面短辺比）","head_scale":"頭の拡大倍率","coil_turns":"胴体の巻き数","first_lap":"1周目の時間（秒）","second_lap":"2周目の時間（秒）","pause":"巻き終わりの停止（秒）","shrink_time":"収縮と離脱（秒）","clone_stars":"複製1体の星数（仮）","warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）", "count": "矢の数", "interval": "矢の間隔（秒）", "speed": "矢の速さ", "radius": "矢の半径", "travel": "矢の射程", "lock": "向きを止める時間（秒）"}
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -60,12 +61,12 @@ func _ready() -> void:
 	files.get_popup().id_pressed.connect(func(_id): _file_dialog.popup_centered_ratio(0.65))
 	toolbar.add_child(files)
 	var bosses := OptionButton.new()
-	for title_text in ["うみへび座", "いっかくじゅう座", "りゅう座"]: bosses.add_item(title_text)
-	bosses.selected = 2 if "draco" in rules_path else 0 if "hydra" in rules_path else 1
+	for title_text in ["うみへび座", "いっかくじゅう座", "りゅう座", "ケンタウルス座"]: bosses.add_item(title_text)
+	bosses.selected = _boss_index()
 	bosses.item_selected.connect(func(index):
-		var id: String = ["hydra", "monoceros", "draco"][index]
+		var id: String = BOSS_IDS[index]
 		if open_boss("res://data/bosses/ai/" + id + "_action_rules.tres", "res://data/bosses/ai/" + id + "_flow.tres") != OK:
-			bosses.selected = 2 if "draco" in rules_path else 0 if "hydra" in rules_path else 1)
+			bosses.selected = _boss_index())
 	toolbar.add_child(bosses)
 	for entry in [["変更を保存", save_current], ["保存して戦闘を試す", play_current], ["元に戻す", undo_edit], ["やり直す", redo_edit]]:
 		var button := Button.new()
@@ -281,6 +282,11 @@ func open_boss(action_path: String, section_path: String) -> Error:
 	_picked("technique", _selected_technique)
 	_status.text = "ボスの技定義と戦闘フローを開きました"
 	return OK
+
+func _boss_index() -> int:
+	for i in BOSS_IDS.size():
+		if BOSS_IDS[i] + "_action_rules" in rules_path: return i
+	return 0
 
 func _is_hydra() -> bool: return rules.adapter == &"hydra" or "hydra_action_rules" in rules_path
 

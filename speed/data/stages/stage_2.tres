@@ -313,4 +313,5 @@ surge_phases = {
 "phase_6374603078355179547": false
 }
 time_limit = 900.0
+boss_id = &"centaurus"
 legendary_module_id = &"legendary_sail"

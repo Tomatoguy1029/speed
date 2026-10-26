@@ -1,0 +1,15 @@
+[gd_resource type="AnimationLibrary" format=3]
+
+[sub_resource type="Animation" id="attack"]
+resource_name = "attack"
+length = 1.5
+tracks/0/type = "method"
+tracks/0/path = NodePath(".")
+tracks/0/keys = {
+"times": PackedFloat32Array(1.0, 1.4, 1.45),
+"transitions": PackedFloat32Array(1, 1, 1),
+"values": [{"args": [], "method": &"lock_aim"}, {"args": [], "method": &"release"}, {"args": [], "method": &"end_attack"}]
+}
+
+[resource]
+_data = {&"attack": SubResource("attack")}
