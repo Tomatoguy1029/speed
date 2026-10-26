@@ -173,6 +173,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 		_switching = false
 		return
 	preview_actor.configure_flow(program)
+	if combo_request and id == "monoceros": _prepare_monoceros_combo(program.data.rules, selected)
 	_current_program_path = path
 	if id != "hydra":
 		manual = MANUAL.new()
@@ -213,6 +214,34 @@ func _single_candidate_program(program: Resource, selected: String) -> void:
 	flow.sections = [{"name": "選択した技", "request": "any", "cap": flow.maximum_stamina, "next": 1,
 		"weights": {"single": 100.0, "combo": 100.0, "major": 100.0}},
 		{"name": "再生完了", "request": "any", "cap": flow.maximum_stamina, "next": 1, "weights": {}}]
+
+func _first_combo_action(step: Dictionary) -> String:
+	if step.get("type", "") == "action": return String(step.get("id", ""))
+	for child in step.get("children", []):
+		if child is Dictionary:
+			var action := _first_combo_action(child)
+			if not action.is_empty(): return action
+	return ""
+
+func _prepare_monoceros_combo(rules: Resource, selected: String) -> void:
+	var first := _first_combo_action(rules.combos[selected])
+	if first.is_empty(): return
+	var combo_gate: Dictionary = rules.conditions.get(selected, {})
+	var first_gate: Dictionary = rules.conditions.get(first, {})
+	var minimum := maxf(float(combo_gate.get("min", 0.0)), float(first_gate.get("min", 0.0)))
+	var maximum := minf(float(combo_gate.get("max", INF)), float(first_gate.get("max", INF)))
+	if maximum < minimum: return
+	var distance := (minimum + maxf(minimum, minf(maximum, 1400.0))) * 0.5
+	var angle := deg_to_rad(float(first_gate.get("angle", combo_gate.get("angle", 0.0))))
+	var origin: Vector2 = preview_actor.table.pos[preview_actor.body]
+	var point := origin + Vector2.from_angle(preview_actor.table.facing[preview_actor.body] + angle) * distance
+	preview_actor.phase = maxi(int(combo_gate.get("min_phase", 1)), int(first_gate.get("min_phase", 1)))
+	preview_actor._cooldown = 0.0
+	preview_actor.reposition = 0.0
+	session.pinned = point
+	session.run.state.ship_pos = point
+	session.run.state.enemy_aim = point
+	session.run.state.view_center = point
 
 func _finish_manual() -> void:
 	if manual != null: manual.finish()

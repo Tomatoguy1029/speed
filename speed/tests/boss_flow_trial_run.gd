@@ -25,7 +25,11 @@ func exercise() -> void:
 			trial.session.playing = false
 			for step in 600: trial.session.step()
 			var chosen: Array = actor.flow_runner.last
-			var correct: bool = trial.manual.requested == entry[1] and not actor.selection_enabled if trial.manual != null else chosen.size() == 1 and chosen[0].id == entry[1]
+			var is_combo: bool = actor.action_rules.combos.has(entry[1])
+			var correct := false
+			if is_combo: correct = chosen.size() == 1 and chosen[0].id == entry[1]
+			elif trial.manual != null: correct = trial.manual.requested == entry[1] and not actor.selection_enabled
+			else: correct = chosen.size() == 1 and chosen[0].id == entry[1]
 			if not correct:
 				failed += 1
 				push_error("選択技の単独再生になっていません: " + entry[1])
