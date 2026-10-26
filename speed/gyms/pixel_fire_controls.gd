@@ -97,6 +97,14 @@ func refresh() -> void:
 	copy.text_changed.connect(func(value): preview.copy_path = value)
 	copy_row.add_child(copy)
 	_button(copy_row, "複製", "別名で複製保存して切り替える", preview.save_copy)
+	var png_row := _row(fields)
+	var png := LineEdit.new()
+	png.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	png.text = preview.png_path
+	png.tooltip_text = "現在の1コマを透明 PNG に出力。設定の .tres 保存とは別です"
+	png.text_changed.connect(func(value): preview.png_path = value)
+	png_row.add_child(png)
+	_button(png_row, "出力確認", "移動・回転・配置倍率・参照絵を除いた実際の PNG を確認してから書き出す", preview.request_png_preview)
 	_scene_section()
 	var props := _properties()
 	_label(fields, "形・動き")
@@ -154,18 +162,33 @@ func _scene_section() -> void:
 	var subject_row := _row(section)
 	var subject := LineEdit.new()
 	subject.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	subject.placeholder_text = "対象 PNG（確認用）"
-	subject.tooltip_text = "プロジェクト内の PNG を実寸合成。対象画像はステージへ保存しません"
-	subject.text = preview.subject_path
+	subject.placeholder_text = "敵・装甲・normal の PNG"
+	subject.tooltip_text = "プロジェクト内の PNG を何枚でも追加。参照絵は炎の設定と出力に含めません"
 	subject.text_submitted.connect(preview.select_subject)
 	subject_row.add_child(subject)
-	_button(subject_row, "選択", "合成確認する PNG を選択", preview.choose_subject)
+	_button(subject_row, "追加", "参照 PNG を追加して選択", preview.choose_subject)
+	var edit_row := _row(section)
+	var selected := OptionButton.new()
+	selected.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selected.fit_to_longest_item = false
+	selected.add_item("炎")
+	for sprite in preview.reference_sprites:
+		selected.add_item(sprite.name)
+	selected.selected = preview.selected_reference + 1
+	selected.tooltip_text = "重なった絵もここから選択。キャンバス上ではクリックで選択、ドラッグで移動"
+	selected.item_selected.connect(preview.select_edit_item)
+	edit_row.add_child(selected)
+	_button(edit_row, "戻す", "選択物の移動・回転・配置倍率を初期値へ戻す", preview.reset_edit_transform)
+	var remove := _button(edit_row, "削除", "選択した参照 PNG だけを取り除く", preview.remove_selected_reference)
+	remove.disabled = preview.selected_reference < 0
 	var place := _grid(section)
-	_number(place, "表示", "プレビュー倍率。1倍がゲーム上の実寸", preview.preview_zoom, "0.1,4,0.1", func(v): preview.preview_zoom = v; preview._view_dirty = true)
-	_number(place, "対象", "対象 PNG の表示倍率", preview.subject_scale, "0.1,8,0.05", func(v): preview.subject_scale = v; preview._view_dirty = true)
-	_number(place, "炎X", "対象背景からの炎の横位置。ワールド単位", preview.usage_offset.x, "-1024,1024,1", func(v): preview.usage_offset.x = v; preview._view_dirty = true)
-	_number(place, "炎Y", "対象背景からの炎の縦位置。ワールド単位", preview.usage_offset.y, "-1024,1024,1", func(v): preview.usage_offset.y = v; preview._view_dirty = true)
-	_number(place, "炎倍", "炎の配置倍率", preview.usage_scale, "0.1,8,0.05", func(v): preview.usage_scale = v; preview._view_dirty = true)
+	_number(place, "表示", "キャンバスだけのズーム。ホイールでも調整。PNG 出力には反映しません", preview.preview_zoom, "0.1,8,0.1", func(v): preview.preview_zoom = v; preview._view_dirty = true)
+	_number(place, "倍率", "選択物の配置倍率。炎の PNG 出力サイズは形の設定で調整", preview.edit_scale(), "0.1,8,0.05", preview.set_edit_scale)
+	_number(place, "X", "選択物の表示位置。キャンバス上でドラッグ可能", preview.edit_position().x, "-2048,2048,1", func(v): preview.set_edit_position(Vector2(v, preview.edit_position().y)))
+	_number(place, "Y", "選択物の表示位置。キャンバス上でドラッグ可能", preview.edit_position().y, "-2048,2048,1", func(v): preview.set_edit_position(Vector2(preview.edit_position().x, v)))
+	_number(place, "回転", "選択物の表示だけの角度。Shift+ホイールでも調整", preview.edit_rotation(), "-360,360,1", preview.set_edit_rotation)
+	_number(place, "パンX", "キャンバスの横移動。中ボタンドラッグでも調整", preview.view_pan.x, "-2048,2048,1", func(v): preview.view_pan.x = v; preview._view_dirty = true)
+	_number(place, "パンY", "キャンバスの縦移動。中ボタンドラッグでも調整", preview.view_pan.y, "-2048,2048,1", func(v): preview.view_pan.y = v; preview._view_dirty = true)
 	_button(section, "選択背景へ配置保存", "保存済みの炎設定と位置・倍率を選択背景へ割り当てる", preview.save_usage)
 	var use_row := _row(section)
 	var uses := OptionButton.new()

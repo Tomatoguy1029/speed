@@ -40,16 +40,25 @@ var context_root: Node2D
 var context_stage_path := "res://data/stages/stage_4.tres"
 var context_target := 0
 var preview_zoom := 1.0
+var view_pan := Vector2.ZERO
 var usage_offset := Vector2.ZERO
 var usage_scale := 1.0
+var fire_rotation := 0.0
 var usage_name := ""
 var _context_stage: StageDef
 var _context_hash := ""
 var _context_items: Array[BackgroundPlacement] = []
 var subject_path := ""
-var subject_scale := 1.0
 var subject_sprite: Sprite2D
+var reference_sprites: Array[Sprite2D] = []
+var selected_reference := -1 # -1 は炎。参照画像は制作中だけ保持する。
+var _dragging := false
+var _panning := false
 var _subject_dialog: FileDialog
+var png_path := "res://data/visuals/pixel_fire_frame.png"
+var _export_dialog: ConfirmationDialog
+var _export_image: Image
+var _export_preview: TextureRect
 var _loaded_path := ""
 var _source_hash := ""
 var _panel: Control
@@ -88,6 +97,8 @@ func _ready() -> void:
 	right.add_child(title)
 	var container := SubViewportContainer.new()
 	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_STOP
+	container.gui_input.connect(_canvas_input)
 	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_child(container)
@@ -109,6 +120,27 @@ func _ready() -> void:
 	_subject_dialog.filters = PackedStringArray(["*.png ; PNG"])
 	_subject_dialog.file_selected.connect(select_subject)
 	add_child(_subject_dialog)
+	_export_dialog = ConfirmationDialog.new()
+	_export_dialog.title = "透明 PNG の書き出し確認"
+	_export_dialog.ok_button_text = "この画像を書き出す"
+	_export_dialog.confirmed.connect(_write_png)
+	var preview_box := Control.new()
+	preview_box.custom_minimum_size = Vector2(320, 320)
+	var checker := Image.create(320, 320, false, Image.FORMAT_RGBA8)
+	for y in 320:
+		for x in 320:
+			checker.set_pixel(x, y, Color("47505a") if (floori(x / 16.0) + floori(y / 16.0)) % 2 == 0 else Color("303943"))
+	var checker_rect := TextureRect.new()
+	checker_rect.texture = ImageTexture.create_from_image(checker)
+	checker_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	preview_box.add_child(checker_rect)
+	_export_preview = TextureRect.new()
+	_export_preview.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_export_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_export_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview_box.add_child(_export_preview)
+	_export_dialog.add_child(preview_box)
+	add_child(_export_dialog)
 	fire = PixelFire.new()
 	fire.manual = true
 	stage.add_child(fire)
@@ -199,6 +231,12 @@ func select_context(path: String, target: int) -> void:
 	if loaded == null:
 		_set_status("背景を読み込めません: " + path)
 		return
+	var old_center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	var references: Array[Dictionary] = []
+	for sprite in reference_sprites:
+		if is_instance_valid(sprite):
+			references.append({"path": sprite.texture.resource_path, "offset": sprite.position - old_center,
+				"rotation": sprite.rotation_degrees, "scale": sprite.scale})
 	if path != context_stage_path:
 		usage_name = ""
 	context_stage_path = path
@@ -217,6 +255,7 @@ func select_context(path: String, target: int) -> void:
 		usage_scale = 1.0
 	for child in context_root.get_children():
 		child.queue_free()
+	reference_sprites.clear()
 	for item in _context_items:
 		if item.texture == null:
 			continue
@@ -232,7 +271,15 @@ func select_context(path: String, target: int) -> void:
 		sprite.modulate = item.display_tint()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		context_root.add_child(sprite)
-	_refresh_subject()
+	for reference in references:
+		if not _add_reference_sprite(reference.path, false):
+			continue
+		var sprite: Sprite2D = reference_sprites.back()
+		var new_center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+		sprite.position = new_center + reference.offset
+		sprite.rotation_degrees = reference.rotation
+		sprite.scale = reference.scale
+	selected_reference = mini(selected_reference, reference_sprites.size() - 1)
 	_view_dirty = true
 	_set_status("背景: " + path.get_file().get_basename() + " / 対象 %d" % (context_target + 1))
 
@@ -240,41 +287,186 @@ func choose_subject() -> void:
 	_subject_dialog.popup_centered_ratio(0.75)
 
 func select_subject(path: String) -> void:
-	if not path.is_empty() and (not path.begins_with("res://") or not path.ends_with(".png")):
+	if path.is_empty():
+		return
+	if not path.begins_with("res://") or not path.to_lower().ends_with(".png"):
 		_set_status("対象画像にはプロジェクト内の PNG を選択してください。")
 		return
-	subject_path = path
-	_refresh_subject()
+	_add_reference_sprite(path, true)
 	_view_dirty = true
 	if is_instance_valid(_panel):
 		_panel.refresh()
 
-func _refresh_subject() -> void:
-	if is_instance_valid(subject_sprite):
-		subject_sprite.queue_free()
-	subject_sprite = null
-	if subject_path.is_empty():
-		return
-	var texture := ResourceLoader.load(subject_path) as Texture2D
+func _add_reference_sprite(path: String, select: bool) -> bool:
+	var texture := ResourceLoader.load(path) as Texture2D
 	if texture == null:
-		_set_status("対象画像を読み込めません: " + subject_path)
+		_set_status("対象画像を読み込めません: " + path)
+		return false
+	var sprite := Sprite2D.new()
+	sprite.name = path.get_file().get_basename()
+	sprite.texture = texture
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.position = _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	context_root.add_child(sprite)
+	reference_sprites.append(sprite)
+	subject_sprite = sprite
+	subject_path = path
+	if select:
+		selected_reference = reference_sprites.size() - 1
+		_set_status("参照画像を追加: " + path.get_file())
+	return true
+
+func select_edit_item(index: int) -> void:
+	selected_reference = index - 1
+	if is_instance_valid(_panel):
+		_panel.refresh()
+
+func remove_selected_reference() -> void:
+	if selected_reference < 0 or selected_reference >= reference_sprites.size():
 		return
-	subject_sprite = Sprite2D.new()
-	subject_sprite.texture = texture
-	subject_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	context_root.add_child(subject_sprite)
+	reference_sprites[selected_reference].queue_free()
+	reference_sprites.remove_at(selected_reference)
+	selected_reference = -1
+	subject_sprite = reference_sprites.back() if not reference_sprites.is_empty() else null
+	subject_path = subject_sprite.texture.resource_path if is_instance_valid(subject_sprite) else ""
+	if is_instance_valid(_panel):
+		_panel.refresh()
+
+func edit_position() -> Vector2:
+	if selected_reference < 0 or selected_reference >= reference_sprites.size():
+		return usage_offset
+	var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+	return reference_sprites[selected_reference].position - center
+
+func edit_rotation() -> float:
+	return fire_rotation if selected_reference < 0 else reference_sprites[selected_reference].rotation_degrees
+
+func edit_scale() -> float:
+	return usage_scale if selected_reference < 0 else reference_sprites[selected_reference].scale.x
+
+func set_edit_position(offset: Vector2) -> void:
+	if selected_reference < 0:
+		usage_offset = offset
+	else:
+		var center := _context_items[context_target].offset if context_target < _context_items.size() else Vector2.ZERO
+		reference_sprites[selected_reference].position = center + offset
+	_view_dirty = true
+
+func set_edit_rotation(degrees: float) -> void:
+	if selected_reference < 0:
+		fire_rotation = degrees
+	else:
+		reference_sprites[selected_reference].rotation_degrees = degrees
+	_view_dirty = true
+
+func set_edit_scale(value: float) -> void:
+	if selected_reference < 0:
+		usage_scale = value
+	else:
+		reference_sprites[selected_reference].scale = Vector2.ONE * value
+	_view_dirty = true
+
+func reset_edit_transform() -> void:
+	set_edit_position(Vector2.ZERO)
+	set_edit_rotation(0.0)
+	set_edit_scale(1.0)
+	if is_instance_valid(_panel):
+		_panel.refresh()
 
 func _layout_context() -> void:
 	var center := Vector2.ZERO
 	if context_target < _context_items.size():
 		center = _context_items[context_target].offset
-	context_root.position = Vector2(stage.size) * 0.5 - center * preview_zoom
+	context_root.position = Vector2(stage.size) * 0.5 + view_pan - center * preview_zoom
 	context_root.scale = Vector2.ONE * preview_zoom
-	if is_instance_valid(subject_sprite):
-		subject_sprite.position = center
-		subject_sprite.scale = Vector2.ONE * subject_scale
 	fire.position = context_root.position + (center + usage_offset) * preview_zoom
 	fire.scale = Vector2.ONE * usage_scale * preview_zoom
+	fire.rotation_degrees = fire_rotation
+
+func _canvas_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if event.pressed:
+				var direction := 1.0 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+				if event.shift_pressed:
+					set_edit_rotation(edit_rotation() + direction * 5.0)
+				else:
+					preview_zoom = clampf(preview_zoom * (1.1 if direction > 0.0 else 1.0 / 1.1), 0.1, 8.0)
+					_view_dirty = true
+				if is_instance_valid(_panel): _panel.refresh()
+			accept_event()
+		elif event.button_index == MOUSE_BUTTON_MIDDLE:
+			_panning = event.pressed
+			accept_event()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			_dragging = event.pressed
+			if event.pressed:
+				selected_reference = -1
+				for index in range(reference_sprites.size() - 1, -1, -1):
+					var sprite := reference_sprites[index]
+					if is_instance_valid(sprite) and sprite.get_rect().has_point(sprite.to_local(event.position)):
+						selected_reference = index
+						break
+				if is_instance_valid(_panel): _panel.refresh()
+			accept_event()
+	elif event is InputEventMouseMotion:
+		if _panning:
+			view_pan += event.relative
+			_view_dirty = true
+			accept_event()
+		elif _dragging:
+			set_edit_position(edit_position() + event.relative / preview_zoom)
+			accept_event()
+
+func request_png_preview() -> void:
+	if not png_path.begins_with("res://") or not png_path.to_lower().ends_with(".png"):
+		_set_status("PNG の保存先にはプロジェクト内の .png パスを指定してください。")
+		return
+	var output_size := Vector2i(settings.field_size.clamp(Vector2(32, 64), Vector2(1024, 1024)).ceil())
+	var was_playing := playing
+	playing = false
+	var capture := SubViewport.new()
+	capture.size = output_size
+	capture.transparent_bg = true
+	capture.disable_3d = true
+	capture.world_2d = World2D.new()
+	capture.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(capture)
+	var source := PixelFire.new()
+	source.manual = true
+	source.settings = settings.duplicate(true)
+	capture.add_child(source)
+	await get_tree().process_frame
+	source.position = Vector2(output_size.x * 0.5, output_size.y - 40.0)
+	source.particles = fire.particles.duplicate(true)
+	source._clock = fire._clock
+	source._render_density()
+	for frame in 3:
+		await RenderingServer.frame_post_draw
+	_export_image = capture.get_texture().get_image()
+	_export_image.convert(Image.FORMAT_RGBA8)
+	# 実行時の加算発光シェーダーは黒の領域にも微量の Alpha を書く。
+	# PNG では色が全くない背景だけを完全透明に戻す。
+	for y in output_size.y:
+		for x in output_size.x:
+			var color := _export_image.get_pixel(x, y)
+			if color.r == 0.0 and color.g == 0.0 and color.b == 0.0 and color.a < 0.04:
+				_export_image.set_pixel(x, y, Color.TRANSPARENT)
+	capture.queue_free()
+	playing = was_playing
+	_export_preview.texture = ImageTexture.create_from_image(_export_image)
+	_export_dialog.dialog_text = "%d×%d px / 透明背景 / 現在の1コマ\n参照画像・配置の移動/回転/倍率・表示ズームは含めません。\n%s" % [output_size.x, output_size.y, png_path]
+	_export_dialog.popup_centered(Vector2i(440, 430))
+
+func _write_png() -> void:
+	if _export_image == null:
+		return
+	var error := _export_image.save_png(ProjectSettings.globalize_path(png_path))
+	if error == OK:
+		_set_status("透明 PNG を書き出しました: " + png_path)
+		if Engine.is_editor_hint(): EditorInterface.get_resource_filesystem().scan()
+	else:
+		_set_status("PNG の書き出しに失敗しました: " + error_string(error))
 
 func world_usage_names() -> Array[String]:
 	var names: Array[String] = []
