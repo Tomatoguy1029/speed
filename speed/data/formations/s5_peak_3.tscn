@@ -1,35 +1,48 @@
-[gd_scene load_steps=5 format=3]
-[ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
-[node name="Stage5Peak3" type="Node2D"]
-script=ExtResource("1")
-types=Array[StringName]([&"cepheus",&"crab",&"dolphin"])
-[node name="peak3" type="Node2D" parent="."]
-position=Vector2(-2600,0)
-script=ExtResource("2")
-[node name="cepheus" type="Node2D" parent="peak3"]
-position=Vector2(-240.0,0)
-script=ExtResource("3")
-enemy=&"cepheus"
-[node name="dolphin" type="Node2D" parent="peak3"]
-position=Vector2(0.0,80)
-script=ExtResource("3")
-enemy=&"dolphin"
-[node name="crab" type="Node2D" parent="peak3"]
-position=Vector2(240.0,0)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
-[node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
-[node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
-[node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+[gd_scene format=3 uid="uid://dokulyt5aelbc"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Stage5Peak3" type="Node2D" unique_id=643469631]
+script = ExtResource("1")
+types = Array[StringName]([&"cepheus", &"crab", &"dolphin"])
+
+[node name="peak3" type="Node2D" parent="." unique_id=1775678910]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="cepheus" type="Node2D" parent="peak3" unique_id=1503965474]
+position = Vector2(-240, 0)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="dolphin" type="Node2D" parent="peak3" unique_id=1287916958]
+position = Vector2(0, 80)
+script = ExtResource("3")
+enemy = &"dolphin"
+
+[node name="crab" type="Node2D" parent="peak3" unique_id=425477460]
+position = Vector2(240, 0)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="Entry0" type="Node2D" parent="." unique_id=906006876]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=1041916526]
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=698215095]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=1641377841]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4")

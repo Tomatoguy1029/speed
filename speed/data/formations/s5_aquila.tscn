@@ -1,83 +1,55 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://p6qopama1bp6"]
 
-[ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="Stage5Aquila" type="Node2D"]
+[node name="Stage5Aquila" type="Node2D" unique_id=22404570]
 script = ExtResource("1")
 types = Array[StringName]([&"aquila"])
 
-[node name="1体・左240" type="Node2D" parent="."]
+[node name="1体・左240" type="Node2D" parent="." unique_id=2129504668]
 position = Vector2(-2600, 0)
 script = ExtResource("2")
 
-[node name="aquila1" type="Node2D" parent="1体・左240"]
+[node name="aquila1" type="Node2D" parent="1体・左240" unique_id=563622512]
 position = Vector2(-240, 0)
 script = ExtResource("3")
 enemy = &"aquila"
 
-[node name="1体・左120後80" type="Node2D" parent="."]
+[node name="1体・左120後80" type="Node2D" parent="." unique_id=1767343389]
 position = Vector2(-4400, 0)
 script = ExtResource("2")
 
-[node name="aquila1" type="Node2D" parent="1体・左120後80"]
+[node name="aquila1" type="Node2D" parent="1体・左120後80" unique_id=1740951310]
 position = Vector2(-120, 80)
 script = ExtResource("3")
 enemy = &"aquila"
 
-[node name="1体・中央" type="Node2D" parent="."]
+[node name="1体・中央" type="Node2D" parent="." unique_id=226434546]
 position = Vector2(-6200, 0)
 script = ExtResource("2")
 
-[node name="aquila1" type="Node2D" parent="1体・中央"]
-position = Vector2(0, 0)
+[node name="aquila1" type="Node2D" parent="1体・中央" unique_id=1191707160]
 script = ExtResource("3")
 enemy = &"aquila"
 
-[node name="2体・左右旋回" type="Node2D" parent="."]
-position = Vector2(-2600, 1400)
-script = ExtResource("2")
-
-[node name="aquila1" type="Node2D" parent="2体・左右旋回"]
-position = Vector2(-480, 0)
-rotation = -0.4
-script = ExtResource("3")
-enemy = &"aquila"
-
-[node name="aquila2" type="Node2D" parent="2体・左右旋回"]
-position = Vector2(480, 0)
-rotation = 0.4
-script = ExtResource("3")
-enemy = &"aquila"
-
-[node name="2体・前後旋回" type="Node2D" parent="."]
-position = Vector2(-4400, 1400)
-script = ExtResource("2")
-
-[node name="aquila1" type="Node2D" parent="2体・前後旋回"]
-position = Vector2(-320, -80)
-script = ExtResource("3")
-enemy = &"aquila"
-
-[node name="aquila2" type="Node2D" parent="2体・前後旋回"]
-position = Vector2(320, 600)
-script = ExtResource("3")
-enemy = &"aquila"
-
-[node name="Entry0" type="Node2D" parent="."]
+[node name="Entry0" type="Node2D" parent="." unique_id=1161639618]
 position = Vector2(0, -1600)
+rotation = 3.1415927
 script = ExtResource("4")
 
-[node name="Entry1" type="Node2D" parent="."]
+[node name="Entry1" type="Node2D" parent="." unique_id=867350022]
 position = Vector2(0, 1600)
 script = ExtResource("4")
 
-[node name="Entry2" type="Node2D" parent="."]
+[node name="Entry2" type="Node2D" parent="." unique_id=146204604]
 position = Vector2(-1600, 0)
+rotation = 1.5707964
 script = ExtResource("4")
 
-[node name="Entry3" type="Node2D" parent="."]
+[node name="Entry3" type="Node2D" parent="." unique_id=1704774451]
 position = Vector2(1600, 0)
+rotation = -1.5707961
 script = ExtResource("4")

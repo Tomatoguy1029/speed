@@ -1,81 +1,55 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://dcsv22ppl5x8w"]
 
-[ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="Stage5Cepheus" type="Node2D"]
+[node name="Stage5Cepheus" type="Node2D" unique_id=626643615]
 script = ExtResource("1")
 types = Array[StringName]([&"cepheus"])
 
-[node name="1体・左240" type="Node2D" parent="."]
+[node name="1体・左240" type="Node2D" parent="." unique_id=1539853442]
 position = Vector2(-2600, 0)
 script = ExtResource("2")
 
-[node name="cepheus1" type="Node2D" parent="1体・左240"]
+[node name="cepheus1" type="Node2D" parent="1体・左240" unique_id=508849997]
 position = Vector2(-240, 0)
 script = ExtResource("3")
 enemy = &"cepheus"
 
-[node name="1体・左360" type="Node2D" parent="."]
-position = Vector2(-4400, 0)
+[node name="1体・左360" type="Node2D" parent="." unique_id=88056418]
+position = Vector2(-2600, 1100)
 script = ExtResource("2")
 
-[node name="cepheus1" type="Node2D" parent="1体・左360"]
+[node name="cepheus1" type="Node2D" parent="1体・左360" unique_id=2002611981]
 position = Vector2(-360, 0)
 script = ExtResource("3")
 enemy = &"cepheus"
 
-[node name="1体・中央" type="Node2D" parent="."]
+[node name="1体・中央" type="Node2D" parent="." unique_id=539791220]
 position = Vector2(-6200, 0)
 script = ExtResource("2")
 
-[node name="cepheus1" type="Node2D" parent="1体・中央"]
-position = Vector2(0, 0)
+[node name="cepheus1" type="Node2D" parent="1体・中央" unique_id=1729727995]
 script = ExtResource("3")
 enemy = &"cepheus"
 
-[node name="2王・離間" type="Node2D" parent="."]
-position = Vector2(-2600, 1400)
-script = ExtResource("2")
-
-[node name="cepheus1" type="Node2D" parent="2王・離間"]
-position = Vector2(-420, 0)
-script = ExtResource("3")
-enemy = &"cepheus"
-
-[node name="cepheus2" type="Node2D" parent="2王・離間"]
-position = Vector2(420, 0)
-script = ExtResource("3")
-enemy = &"cepheus"
-
-[node name="2王・前後斜列" type="Node2D" parent="."]
-position = Vector2(-4400, 1400)
-script = ExtResource("2")
-
-[node name="cepheus1" type="Node2D" parent="2王・前後斜列"]
-position = Vector2(-420, -80)
-script = ExtResource("3")
-enemy = &"cepheus"
-
-[node name="cepheus2" type="Node2D" parent="2王・前後斜列"]
-position = Vector2(420, 520)
-script = ExtResource("3")
-enemy = &"cepheus"
-
-[node name="Entry0" type="Node2D" parent="."]
+[node name="Entry0" type="Node2D" parent="." unique_id=934821614]
 position = Vector2(0, -1600)
+rotation = 3.1415927
 script = ExtResource("4")
 
-[node name="Entry1" type="Node2D" parent="."]
+[node name="Entry1" type="Node2D" parent="." unique_id=1159105756]
 position = Vector2(0, 1600)
 script = ExtResource("4")
 
-[node name="Entry2" type="Node2D" parent="."]
+[node name="Entry2" type="Node2D" parent="." unique_id=1202277842]
 position = Vector2(-1600, 0)
+rotation = 1.5707964
 script = ExtResource("4")
 
-[node name="Entry3" type="Node2D" parent="."]
+[node name="Entry3" type="Node2D" parent="." unique_id=824248816]
 position = Vector2(1600, 0)
+rotation = -1.5707961
 script = ExtResource("4")

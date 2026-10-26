@@ -1,19 +1,18 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://c1oc0arox6d64"]
 
-[ext_resource type="Script" path="res://scripts/data_types/background_placement.gd" id="1_tpwl5"]
-[ext_resource type="Script" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_crow.tscn" id="crow"]
-[ext_resource type="Script" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
-[ext_resource type="Script" path="res://scripts/data_types/phase_def.gd" id="phase"]
-[ext_resource type="Script" path="res://scripts/data_types/stage_def.gd" id="stage"]
-
-[ext_resource type="PackedScene" path="res://data/formations/s5_pump.tscn" id="pump"]
+[ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_tpwl5"]
+[ext_resource type="PackedScene" uid="uid://p6qopama1bp6" path="res://data/formations/s5_aquila.tscn" id="aquila"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_auriga.tscn" id="auriga"]
+[ext_resource type="PackedScene" uid="uid://dcsv22ppl5x8w" path="res://data/formations/s5_cepheus.tscn" id="cepheus"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
 [ext_resource type="PackedScene" path="res://data/formations/s5_crab.tscn" id="crab"]
 [ext_resource type="PackedScene" path="res://data/formations/s5_cross.tscn" id="cross"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_auriga.tscn" id="auriga"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_crow.tscn" id="crow"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
 [ext_resource type="PackedScene" path="res://data/formations/s5_dolphin.tscn" id="dolphin"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_cepheus.tscn" id="cepheus"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_aquila.tscn" id="aquila"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_pump.tscn" id="pump"]
+[ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 
 [sub_resource type="Resource" id="Clip_0"]
 script = ExtResource("clip")
@@ -389,7 +388,6 @@ length = 42.5
 groups = 2
 interval = 12.0
 
-
 [sub_resource type="Resource" id="Phase0"]
 script = ExtResource("phase")
 rate = 10.0
@@ -488,26 +486,35 @@ attack_budget = 6
 id = &"s5_peak_6"
 display_name = "ボス"
 
+[sub_resource type="Resource" id="Resource_tpwl5"]
+script = ExtResource("phase")
+start = 600.0
+rate = 20.0
+xp_bonus = 1.0
+attack_budget = 6
+id = &"phase_1074496266818550097"
+display_name = "新しい時間帯"
+
 [sub_resource type="Resource" id="Curve_biter"]
 script = ExtResource("curve")
 type = &"biter"
-points = PackedVector2Array(0, 24, 10, 120, 25, 210, 36, 140, 45, 120, 57, 235, 68, 155, 80, 260, 90, 150, 99, 250, 107, 185, 115, 175, 128, 285, 141, 195, 156, 315, 170, 185, 178, 280, 187, 210, 195, 200, 210, 330, 225, 225, 242, 360, 255, 250, 265, 210, 273, 310, 282, 240, 290, 230, 306, 370, 321, 250, 337, 395, 351, 265, 362, 415, 370, 235, 379, 340, 387, 260, 395, 250, 409, 430, 423, 290, 437.5, 315, 450, 465, 462, 330, 473, 500, 477, 280, 480, 0)
+points = PackedVector2Array(0, 24, 10, 120, 23, 183, 36, 174, 45, 120, 49, 339, 69, 237, 86, 330, 90, 150, 99, 165, 107, 185, 115, 175, 121, 384, 144, 375, 163, 375, 170, 185, 178, 85, 189, 80, 195, 200, 204, 460, 226, 195, 249, 451, 261, 379, 265, 210, 274, 174, 282, 240, 290, 230, 297, 527, 313, 286, 338, 570, 349, 521, 364, 567, 370, 235, 378, 194, 387, 260, 395, 250, 399, 706, 424, 631, 438, 373, 450, 721, 464, 750, 475, 718, 480, 0, 532, 87, 570, 295, 601, 544)
 
 [sub_resource type="Resource" id="Curve_splitter"]
 script = ExtResource("curve")
 type = &"splitter"
-points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 57, 12, 68, 16, 80, 12, 90, 24, 99, 52, 107, 68, 115, 22, 128, 14, 141, 20, 156, 14, 170, 30, 178, 62, 187, 78, 195, 24, 210, 16, 225, 24, 242, 16, 255, 22, 265, 36, 273, 70, 282, 86, 290, 26, 306, 18, 321, 26, 337, 18, 351, 24, 362, 18, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0)
+points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 47, 82, 49, 90, 24, 99, 52, 107, 68, 115, 22, 126, 31, 141, 35, 155, 33, 170, 30, 178, 62, 187, 78, 195, 24, 207, 40, 225, 47, 242, 56, 257, 53, 265, 36, 273, 70, 282, 86, 290, 26, 305, 50, 322, 46, 339, 51, 355, 48, 364, 47, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0, 530, 4, 570, 27, 600, 63)
 
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
 type = &"bomber"
-points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0)
+points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 529, 0, 570, 9, 601, 23)
 
 [resource]
 script = ExtResource("stage")
 index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
-phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10")]
+phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10"), SubResource("Resource_tpwl5")]
 enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila"])
 enemy_attack_values = {
 "aquila": 3.0,
@@ -526,6 +533,6 @@ enemy_attack_values = {
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
 clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_27"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
 track_names = PackedStringArray("ポンプ座", "かに座", "みなみじゅうじ座", "ぎょしゃ座", "いるか座", "からす座", "ケフェウス座", "わし座")
-boss_time = 480.0
+boss_time = 495.0
 time_limit = 900.0
 boss_id = &"draco"
