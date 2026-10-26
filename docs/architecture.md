@@ -574,6 +574,9 @@ sequenceDiagram
 
 ステージごとにランの状態を作り直す。武器・特性などプレイ中に手に入れたものは持ち越さない。ステージをまたいで残るのは、セーブデータ（11章）だけ。
 
+
+全武器MAX後の追加選択は `LoadoutSystem` が既存の候補と同じカード経路で処理し、`PostMaxProgression` が適格性・実効値・表示内容を求める。固定の調整値と武器ID別適用先は `GameConfig.post_max` のResourceをロード時に保持する。現在の装備・HP・選択回数に依存する抽選と能力値計算はラン中に行う。選択回数は `RunState.post_max_stacks` に保持し、`refresh_stats()` は毎回基礎・特性・永続強化の基準から合計を計算する。終了時はランとともに解放し、永続のプロフィールとSaveManagerへ書き込む経路を分ける。
+
 ### 8.3 調整できる数値
 
 - demo の `config.js` にあたる数値を、1つの `GameConfig`（`data/config.tres`）にまとめる。

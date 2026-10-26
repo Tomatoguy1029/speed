@@ -1,0 +1,342 @@
+## 全武器MAXへの遷移・加算・特性保護・実際の発射経路・ラン寿命を確認する。
+extends "res://tests/thrill_acceptance.gd"
+
+func _ready() -> void:
+	var settings: Dictionary = SaveManager.settings.duplicate(true)
+	SaveManager.set_script(MemorySave)
+	SaveManager.data = SaveManager.default_data()
+	SaveManager.settings = settings
+	var saved := JSON.stringify(SaveManager.data)
+	var config := ContentManager.cfg.duplicate(true) as GameConfig
+	config.levelup_bonus_chance = 0.0
+	scene = RunManager.create_session(self, {"lab": true, "seed": 42, "config": config}, false)
+	scene.auto_step = false
+	run = scene.sim
+	_test_transition()
+	_test_traits_and_stacks()
+	_test_hp_and_healing()
+	_test_weapon_paths()
+	_test_collision_and_pickups()
+	_test_target_filtering()
+	_test_time_caps()
+	_test_selection_lifetime()
+	_check(JSON.stringify(SaveManager.data) == saved, "全選択が永続セーブへ漏れない")
+	await _close()
+	var fresh := RunManager.create_session(self, {"lab": true, "seed": 84}, false)
+	_check(fresh.sim.state.post_max_stacks.is_empty(), "次ランの追加強化は空")
+	_check(is_equal_approx(fresh.sim.state.stats.max_hp, 100.0), "次ランに最大HPが漏れない")
+	_check(is_equal_approx(fresh.sim.state.stats.crit_chance, 0.05), "次ランのRAMクリティカルは基礎値")
+	fresh.free()
+	print("[post_max_progression] passed=%d failed=%d" % [passed, failed])
+	get_tree().quit(1 if failed else 0)
+
+func _equip(ids: Array, lv := -1) -> void:
+	run.loadout.reset_loadout()
+	for id in ids:
+		_check(run.loadout.grant(&"weapon", id, run.cfg.weapon_max_level if lv < 0 else lv), "装備 %s" % id)
+	run.state.ship_hp = run.state.stats.max_hp
+	run.set_phase(RunState.Phase.PLAY)
+
+func _test_transition() -> void:
+	_check(not run.loadout.all_weapons_max(), "武器なしでは全MAXにならない")
+	_equip([&"W01"])
+	_check(not run.loadout.all_weapons_max(), "1本MAXでも空き枠があれば通常")
+	run.state.level = 999
+	for i in 20:
+		_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "プレイヤーレベルでは解禁しない")
+	_equip([&"W01", &"W03", &"W08", &"W17"], 1)
+	for id in [&"W01", &"W03", &"W08"]:
+		run.loadout.grant(&"weapon", id, 10)
+	_check(not run.loadout.all_weapons_max(), "最後の1本が未完成なら通常")
+	var normal := run.loadout.roll_cards()
+	_check(normal.all(func(c): return c.kind == &"weapon" or c.kind == &"trait"), "通常抽選の種類を維持")
+	run.loadout.grant(&"weapon", &"W17", 10)
+	_check(run.loadout.all_weapons_max(), "満員の全武器MAXで切替")
+	var saw_trait := false
+	for i in 100:
+		var cards := run.loadout.roll_cards()
+		var seen := {}
+		_check(cards.size() == 3 and cards.any(func(c): return c.kind == &"post_max"), "毎回同じ3択に追加強化を提示")
+		for card in cards:
+			_check(not seen.has(card.id), "1画面に同じ候補は1枚")
+			seen[card.id] = true
+			if card.kind == &"trait": saw_trait = true
+	_check(saw_trait, "全武器MAX後も未完成特性の取得機会がある")
+	_equip([&"W01", &"W03", &"W21", &"W22"])
+	_check(run.loadout.all_weapons_max(), "彗星限定も装備枠のMAXとして扱う")
+	_check(not ContentManager.catalog.table(&"weapons").has(&"W06"), "廃止W06を復元しない")
+
+func _test_traits_and_stacks() -> void:
+	_equip([&"W01", &"W03", &"W08", &"W17"])
+	var pm := run.loadout.post_max
+	for trait_count in range(0, run.cfg.trait_max_stacks + 1):
+		for count in [0, 1, 2, 9, 10, 11, 1000]:
+			run.state.traits = {&"T09": trait_count}
+			run.state.post_max_stacks = {&"crit_chance": count}
+			run.loadout.refresh_stats()
+			var expected := 0.05 + trait_count * 0.05 + minf(0.1, count * 0.01)
+			_check(is_equal_approx(run.state.stats.crit_chance, expected), "T09 %d / 追加 %d の確率" % [trait_count, count])
+			var before := run.state.stats.crit_chance
+			for repeat in 4: run.loadout.refresh_stats()
+			_check(is_equal_approx(run.state.stats.crit_chance, before), "再計算で加算を重複しない")
+			run.state.post_max_stacks = JSON.parse_string(JSON.stringify(run.state.post_max_stacks))
+			run.loadout.refresh_stats()
+			_check(is_equal_approx(run.state.stats.crit_chance, expected), "全T09枚数・追加回数でJSON読込が等価")
+			_check(pm.eligible(&"crit_chance") == (count < 10), "追加クリティカルの上限と無効候補除外")
+			if trait_count < run.cfg.trait_max_stacks:
+				run.state.traits[&"T09"] += 1
+				run.loadout.refresh_stats()
+				_check(is_equal_approx(run.state.stats.crit_chance - before, 0.05), "追加上限でもT09の1枚5ポイントを維持")
+	# 特性の重ね上限を増やして既存30%の縁に達しても、追加強化が特性枠を奪わない。
+	var original_max := run.cfg.trait_max_stacks
+	run.cfg.trait_max_stacks = 5
+	for trait_count in range(6):
+		run.state.traits = {&"T09": trait_count}
+		run.state.post_max_stacks = {&"crit_chance": 1000}
+		run.loadout.refresh_stats()
+		_check(is_equal_approx(run.state.stats.crit_chance, minf(0.3, 0.05 + trait_count * 0.05)), "特性だけで上限に届く設定でも予約・総上限を維持")
+		_check(not pm.eligible(&"crit_chance"), "特性予約が上限を使い切ると追加確率を除外")
+	run.cfg.trait_max_stacks = original_max
+	# 実際の取得順を入れ替えて、同じスタックなら同じ結果になる。
+	for order in [0, 1]:
+		run.state.traits = {}
+		run.state.post_max_stacks = {}
+		run.loadout.refresh_stats()
+		if order == 0:
+			for i in 3: run.loadout.grant(&"trait", &"T09")
+		for i in 12: pm.select(&"crit_chance")
+		if order == 1:
+			for i in 3: run.loadout.grant(&"trait", &"T09")
+		run.loadout.refresh_stats()
+		_check(is_equal_approx(run.state.stats.crit_chance, 0.3), "取得順 %d でも30%%、特性が不利にならない" % order)
+		_check(int(run.state.post_max_stacks[&"crit_chance"]) == 10, "効かない11枚目以降を消費しない")
+	# 全既存の数値特性と永続強化を含む基準に、増分を加算する。
+	run.ctx.profile = ProfileManager.compute({"speed": 5, "atk": 5, "hp": 5, "charge": 5, "pickup": 5, "length": 5, "xp": 5})
+	run.state.post_max_stacks = {}
+	run.state.traits = {&"T07": 3, &"T08": 3, &"T09": 3, &"T10": 3, &"T11": 3, &"T12": 3, &"T14": 3, &"T31": 3}
+	run.loadout.refresh_stats()
+	var base := pm.baseline.duplicate()
+	var attack := run.combat.attack_power()
+	var capacity := run.state.stats.capacity
+	for key in [&"max_speed", &"acceleration", &"turn_rate", &"line_length", &"charge_time", &"pickup_radius", &"pickup_speed", &"xp_gain", &"crit_mult"]:
+		for i in 5: _check(pm.select(key), "繰り返し取得 %s" % key)
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(run.state.stats.max_speed, float(base[&"max_speed"]) * 1.15), "速度は永続・T10込み基準+15%、累乗しない")
+	_check(is_equal_approx(run.state.stats.length_mult * run.cfg.draw_length, float(base[&"line_length"]) * 1.25), "T14と線の追加分を両立")
+	_check(is_equal_approx(run.state.stats.xp_pickup_radius, float(base[&"pickup_radius"]) * 1.25), "T12とXP吸引範囲を両立")
+	_check(is_equal_approx(run.state.stats.pickup_radius, float(base[&"pickup_radius"])), "XP半径の追加分を硬貨・カプセルへ漏らさない")
+	_check(is_equal_approx(run.state.stats.charge_time, float(base[&"charge_time"]) * 0.85), "T07と永続充填を保持して15%短縮")
+	_check(is_equal_approx(run.state.stats.xp_mult * run.state.stats.xp_gain_mult, float(base[&"xp_gain"]) * 1.15), "永続XP倍率を基準に加算")
+	_check(is_equal_approx(run.state.stats.crit_mult, 2.5), "RAM倍率は5回で+0.5")
+	_check(is_equal_approx(run.combat.attack_power(), attack) and run.state.stats.capacity == capacity, "RAM威力・T08を武器強化で書き換えない")
+	# JSONで読み直したラン内カウントでも、基準から同じ結果を再構築できる。
+	var reloaded: Dictionary = JSON.parse_string(JSON.stringify(run.state.post_max_stacks))
+	run.state.post_max_stacks = reloaded
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(run.state.stats.max_speed, float(base[&"max_speed"]) * 1.15), "カウントの保存形式読込・再計算が等価")
+	run.ctx.profile = ProfileManager.compute({})
+
+func _test_hp_and_healing() -> void:
+	_equip([&"W01", &"W03", &"W08", &"W17"])
+	var pm := run.loadout.post_max
+	run.state.ship_hp = 40.0
+	_check(pm.select(&"max_hp"), "最大HPカードを選択")
+	run.loadout.refresh_stats()
+	_check(run.state.stats.max_hp == 105.0 and run.state.ship_hp == 40.0, "最大HP+5は現在HPを回復しない")
+	for i in 5: run.loadout.refresh_stats()
+	_check(run.state.ship_hp == 40.0, "再計算によるHP水増しなし")
+	run.loadout.add_xp(run.loadout.xp_needed())
+	_check(is_equal_approx(run.state.ship_hp, 48.4), "通常レベルアップ回復を保持")
+	_check(pm.select(&"heal"), "追加即時修理を選択")
+	_check(is_equal_approx(run.state.ship_hp, 79.9), "通常回復に加え最大HPの30%を回復")
+	pm.select(&"heal")
+	_check(run.state.ship_hp == 105.0, "即時回復は最大HPにクランプ")
+	_check(not pm.eligible(&"heal") and not pm.select(&"heal"), "満HPの回復を候補・取得から除外")
+	_check(not run.state.post_max_stacks.has(&"heal"), "回復カードは永続スタックを作らない")
+	run.state.post_max_stacks[&"repair"] = 90
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(run.state.stats.repair_fraction, 1.0) and not pm.eligible(&"repair"), "修理キットは最大HPの100%まで")
+	run.state.ship_hp = 1.0
+	run.pickups.collect(&"heal")
+	_check(run.state.ship_hp == 105.0, "実際の修理キット経路に適用")
+	run.state.post_max_stacks[&"invulnerability"] = 1000
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(run.state.stats.invulnerability, 2.0) and not pm.eligible(&"invulnerability"), "無敵時間の上限・無効候補を確認")
+	run.state.ship_invuln = 0.0
+	run.ship.damage(1.0, 0.0, &"test")
+	_check(is_equal_approx(run.state.ship_invuln, 2.0), "被弾の実経路に世界秒の無敵時間を適用")
+
+func _test_weapon_paths() -> void:
+	_equip([&"W01", &"W08", &"W17", &"W27"])
+	var b: WeaponBehavior = run.loadout.weapon_behaviors[&"W01"]
+	var ram := run.combat.attack_power()
+	run.state.post_max_stacks = {&"weapon_damage": 2, &"followup": 2, &"projectile_speed": 2, &"duration": 2, &"knockback": 2, &"area": 2}
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(b.atk(), ram * 1.14), "武器共通4%と対象追撃10%は基準に加算")
+	_check(run.combat.attack_power() == ram, "武器威力をRAM本体へ掛けない")
+	var f := run.projectiles.friend_alive.size()
+	b.tick(1.0, false)
+	_check(run.projectiles.friend_alive.size() > f, "実際の武器発射を検証")
+	_check(is_equal_approx(run.projectiles.friend_vel[f].length(), 1430.0), "武器弾の速度+10%")
+	_check(is_equal_approx(run.projectiles.friend_life[f], 0.99), "武器弾の寿命+10%")
+	_check(is_equal_approx(run.projectiles.friend_knock[f], 275.0), "武器弾の吹き飛ばし+10%")
+	_check(is_equal_approx(run.projectiles.friend_dmg[f], ram * 1.14 * b.dmg_k() * 0.4), "武器弾ダメージを二重適用しない")
+	run.projectiles.fire_shot(Vector2.ZERO, 0.0, 7.0)
+	var normal := run.projectiles.friend_dmg.find(7.0)
+	_check(is_equal_approx(run.projectiles.friend_vel[normal].length(), 1300.0) and is_equal_approx(run.projectiles.friend_dmg[normal], 7.0), "特性・共通弾へ武器補正を漏らさない")
+	var sonic: WeaponBehavior = run.loadout.weapon_behaviors[&"W08"]
+	sonic.on_launch(false)
+	var wave: Dictionary = run.projectiles.attached_attack(&"sonic").waves.back()
+	_check(is_equal_approx(wave.radius, float(sonic.def.params.radius) * sonic.radius_k() * 1.1), "W08実波動の巻き込み半径")
+	_check(is_equal_approx(wave.life, float(sonic.def.params.travel) * 1.1), "W08の実際に攻撃する持続時間")
+	var arc: WeaponBehavior = run.loadout.weapon_behaviors[&"W17"]
+	_check(is_equal_approx(arc.p("range"), float(arc.def.params.range) * 1.1), "W17電撃探索の到達距離")
+	var echo: WeaponBehavior = run.loadout.weapon_behaviors[&"W27"]
+	echo.on_launch(false)
+	_check(is_equal_approx(float(echo.echoes.back().share) * echo.echoes.back().copies.size(), echo.level_value("echo_total_by_level") * 1.04), "W27は武器共通威力だけ適用し未定の役割を追加しない")
+	var enemy := run.enemies.spawn(run.enemies.def_of(&"biter"), Vector2(500, 0))
+	run.combat.damage_enemy(enemy, 1.0, {"cause": &"shot"})
+	var hits := run.state.events.filter(func(e): return e.type == &"hit")
+	_check(not hits.is_empty() and not hits.back().crit, "共通武器ダメージにクリティカルを追加しない")
+
+func _test_collision_and_pickups() -> void:
+	_equip([&"W03", &"W21", &"W22", &"W26"])
+	_clear()
+	var drone: WeaponBehavior = run.loadout.weapon_behaviors[&"W26"]
+	var victim := run.enemies.spawn(run.enemies.def_of(&"biter"), Vector2.ZERO)
+	var t := run.enemies.table
+	var radius := float(drone.def.params.drone_hit_radius) * run.cfg.character_scale
+	t.pos[victim] = Vector2(50.0, t.r[victim] + radius * 1.025)
+	run.combat.rebuild_grid()
+	var hp := t.hp[victim]
+	drone._hit_along(Vector2.ZERO, Vector2(100, 0), Vector2.RIGHT)
+	_check(t.hp[victim] == hp, "W26基準半径の外側には当たらない")
+	run.state.post_max_stacks = {&"area": 1}
+	drone._hit_along(Vector2.ZERO, Vector2(100, 0), Vector2.RIGHT)
+	_check(t.hp[victim] < hp, "範囲+5%でW26の実接触判定が外側へ届く")
+	var tow: WeaponBehavior = run.loadout.weapon_behaviors[&"W21"]
+	var beam: WeaponBehavior = run.loadout.weapon_behaviors[&"W22"]
+	_check(is_equal_approx(tow.p("capture_radius"), float(tow.def.params.capture_radius) * 1.05), "W21は回収判定の半径を拡大")
+	_check(is_equal_approx(beam.p("width"), float(beam.def.params.width) * 1.05), "W22は実判定ビーム幅を拡大")
+	# W03で飛ばす船体は、汎用の撃破破片と異なる補正を受ける。
+	var ram: WeaponBehavior = run.loadout.weapon_behaviors[&"W03"]
+	var corpse := run.enemies.spawn(run.enemies.def_of(&"biter"), Vector2(300, 300))
+	t.dead[corpse] = 1
+	t.r[corpse] = 80.0
+	run.state.post_max_stacks = {&"area": 2, &"duration": 2, &"projectile_speed": 2, &"knockback": 2}
+	var initial := run.projectiles.friend_count()
+	ram.on_contact(corpse, t.pos[corpse], Vector2.RIGHT)
+	_check(run.projectiles.friend_count() > initial, "W03の実接触から攻撃破片を発射")
+	var debris := run.projectiles.friend_cause.find(&"hullDebris")
+	_check(debris >= 0, "W03の船体破片を取得")
+	if debris >= 0:
+		_check(is_equal_approx(run.projectiles.friend_r[debris], 80.0 * 0.17 * 1.1), "W03の破片接触半径を拡大")
+		_check(is_equal_approx(run.projectiles.friend_life[debris], run.cfg.hull_debris_life * 1.1), "W03の攻撃破片の持続に適用")
+		_check(is_equal_approx(run.projectiles.friend_vel[debris].length(), (float(ram.def.params.speed_base) + float(ram.def.params.speed_per_tier) * ram.tier()) * 1.2 * 0.85), "W03の弾速と吹き飛ばしは基準へ加算")
+	_clear()
+	run.state.post_max_stacks = {&"pickup_radius": 2, &"pickup_speed": 2, &"xp_gain": 2, &"acceleration": 2, &"turn_rate": 2}
+	run.loadout.refresh_stats()
+	run.state.ship_pos = Vector2.ZERO
+	run.state.ship_vel = Vector2.ZERO
+	var gem := run.pickups._add_gem(Vector2(100, 0), 1.0)
+	run.pickups._collect_gems(0.01)
+	_check(is_equal_approx(run.pickups.gem_pos[gem].x, 92.3), "XP結晶は実吸引式700×1.1で移動")
+	var enemy := run.enemies.spawn(run.enemies.def_of(&"biter"), Vector2(400, 0))
+	var before := run.state.xp_dropped
+	run.pickups.on_enemy_killed(enemy)
+	_check(is_equal_approx(run.state.xp_dropped - before, t.xp[enemy]), "取得XPの追加分を敵ドロップ時に二重適用しない")
+	var gained := run.state.xp_gained
+	run.pickups.collect(&"gem", 10.0)
+	_check(is_equal_approx(run.state.xp_gained - gained, 10.6), "通常・大きいXP結晶の取得入口で+6%を適用")
+	run.pickups._clear_gems()
+	run.pickups._add_gem(Vector2(800, 0), 20.0)
+	gained = run.state.xp_gained
+	run.pickups.collect(&"magnet")
+	_check(is_equal_approx(run.state.xp_gained - gained, 21.2), "回収ビーコンも取得XP+6%を一度だけ適用")
+	run.ship._steer_toward(0.0, 0.01, run.cfg.steer_cruise)
+	_check(is_equal_approx(run.state.ship_vel.x, 9.9), "通常操縦は基準加速900の+10%")
+	run.state.ship_vel = Vector2.RIGHT * 250.0
+	run.ship._steer_toward(PI / 2.0, 0.01, run.cfg.steer_cruise)
+	_check(is_equal_approx(run.state.ship_vel.angle(), 4.5 * 1.06 * 0.01), "通常操縦の旋回速度+6%")
+
+func _test_target_filtering() -> void:
+	var old_slots := run.cfg.weapon_slots
+	run.cfg.weapon_slots = 1
+	var expectations := {
+		&"W01": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
+		&"W03": [&"projectile_speed", &"duration", &"knockback", &"area"], &"W04": [&"knockback", &"area"],
+		&"W05": [&"weapon_interval", &"knockback", &"followup"], &"W07": [&"duration", &"knockback", &"followup"],
+		&"W08": [&"weapon_interval", &"duration", &"knockback", &"area"], &"W17": [&"knockback", &"area"],
+		&"W21": [&"projectile_speed", &"duration", &"knockback", &"area", &"followup"],
+		&"W22": [&"knockback", &"area", &"followup"],
+		&"W23": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
+		&"W25": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
+		&"W26": [&"area"], &"W27": []}
+	for weapon in expectations:
+		_equip([weapon])
+		for id in [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"area", &"followup"]:
+			_check(run.loadout.post_max.eligible(id) == expectations[weapon].has(id), "%s の実適用先に応じて %s を抽選" % [weapon, id])
+		if weapon == &"W22":
+			var b: WeaponBehavior = run.loadout.weapon_behaviors[weapon]
+			var visual_life: float = b.p("life")
+			run.state.post_max_stacks[&"duration"] = 10
+			_check(b.p("life") == visual_life, "W22の演出寿命をゲームプレイ強化にしない")
+		if weapon == &"W26":
+			var b: WeaponBehavior = run.loadout.weapon_behaviors[weapon]
+			var span: float = b.level_value("half_span_by_level")
+			var tail: float = b.level_value("tail_by_level")
+			run.state.post_max_stacks[&"area"] = 2
+			_check(b.level_value("half_span_by_level") == span and b.level_value("tail_by_level") == tail, "W26の固定編隊幅・演出光跡を保つ")
+			_check(is_equal_approx(b.p("drone_hit_radius"), float(b.def.params.drone_hit_radius) * 1.1), "W26は接触半径を広げて隙間を増やさない")
+	run.cfg.weapon_slots = old_slots
+
+func _test_time_caps() -> void:
+	_equip([&"W01", &"W05", &"W23", &"W25"])
+	var pm := run.loadout.post_max
+	run.state.post_max_stacks = {&"weapon_interval": 1000, &"charge_time": 1000}
+	run.loadout.refresh_stats()
+	_check(not pm.eligible(&"weapon_interval") and not pm.eligible(&"charge_time"), "時間短縮が下限で候補から消える")
+	_check(is_equal_approx(run.state.stats.charge_time, 1.2), "充填は基準6秒の20%で止まる")
+	for b: WeaponBehavior in run.loadout.weapon_behaviors.values():
+		_check(b.interval(0.5) >= 0.1 and b.interval(0.1) >= 0.05, "間隔は比率・秒の下限を守る")
+		_check(is_equal_approx(b.interval(0.01), 0.01), "元から短い間隔を遅くしない")
+	# 強い永続・特性で既に短い場合、追加上限がそれを弱めない。
+	run.ctx.profile.reduce[&"charge_time"] = 0.001
+	run.loadout.refresh_stats()
+	_check(run.state.stats.charge_time <= 0.00601, "既存の極短充填を絶対下限で弱めない")
+	run.ctx.profile = ProfileManager.compute({})
+
+func _test_selection_lifetime() -> void:
+	_equip([&"W01", &"W03", &"W08", &"W17"])
+	run.state.pending_levels = 3
+	run.loadout.try_open_cards()
+	_check(run.state.phase == RunState.Phase.LEVELUP, "既存LEVELUPフェーズを再利用")
+	var cards := run.state.cards.duplicate(true)
+	var initial := run.state.time
+	run.command(&"pause")
+	run.command(&"choose_card", {"index": 0})
+	run.physics_step(1.0)
+	_check(run.state.cards == cards and run.state.pending_levels == 3 and run.state.time == initial, "ポーズ中の選択入力・時計を停止")
+	run.command(&"resume")
+	for i in 3:
+		_check(run.state.cards[0].kind == &"post_max", "保留レベルごとに追加強化を提示")
+		var info: Dictionary = preload("res://scripts/ui/hud.gd").card_info(run.state.cards[0])
+		_check(not info.name.is_empty() and info.desc.contains("→"), "同じカード表示に現在・次の効果を明示")
+		run.command(&"choose_card", {"index": 0})
+	_check(run.state.pending_levels == 0 and run.state.phase == RunState.Phase.PLAY, "保留3レベルを1回ずつ選択して再開")
+	var counts := run.state.post_max_stacks.duplicate()
+	run.state.pending_levels = 1
+	run.loadout.try_open_cards()
+	_check(run.loadout.reroll_cards(), "同じリロール処理を利用")
+	_check(run.state.post_max_stacks == counts, "リロールでは増分を付与しない")
+	var reloaded := ResourceLoader.load("res://data/post_max.tres", "", ResourceLoader.CACHE_MODE_IGNORE) as PostMaxConfig
+	_check(reloaded.increments == run.cfg.post_max.increments, "調整リソースを再読込して同じ値を得る")
+	# メニュー中の開発操作などで表示後に満HPになっても、無効な回復でレベルを消費しない。
+	run.state.ship_hp = 50.0
+	run.state.cards = [{"kind": &"post_max", "id": &"heal", "level": 1, "info": run.loadout.post_max.card_info(&"heal")}]
+	run.loadout._publish_cards()
+	run.ship.heal(run.state.stats.max_hp)
+	run.command(&"choose_card", {"index": 0})
+	_check(run.state.pending_levels == 1 and not run.state.cards.any(func(c): return c.kind == &"post_max" and c.id == &"heal"), "表示後に無効になった回復は再抽選しレベルを保持")
+	run.loadout.reset_loadout()
+	_check(run.state.post_max_stacks.is_empty() and run.state.stats.max_hp == 100.0, "調整用装備リセットでも追加分を消す")

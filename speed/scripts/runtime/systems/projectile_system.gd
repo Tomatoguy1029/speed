@@ -220,8 +220,8 @@ func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Col
 	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
-func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
-	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock])
+func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0) -> bool:
+	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock, radius_mult, life_mult])
 
 ## 牽引した船体を撃ち出す（質量牽引砲 W21）。敵を貫き、クリティカルにならない。source_id の敵には当たらない。
 func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, knock: float, type: StringName,
@@ -233,8 +233,8 @@ func fire_saw(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float) -> 
 	emit_attack(&"saw", [pos, vel, r, dmg, life])
 
 ## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
-func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
-	emit_attack(&"fling_corpse", [i, vel, dmg])
+func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mult := 1.0, life_mult := 1.0) -> void:
+	emit_attack(&"fling_corpse", [i, vel, dmg, radius_mult, knock_mult, life_mult])
 
 ## 味方の弾・破片を1行加え、その行番号を返す。hit_id は最初から当てたことにする敵（-1 なら無し）。
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。

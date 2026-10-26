@@ -15,16 +15,16 @@ func tick(dt: float, busy: bool) -> void:
 	if busy:
 		return
 	var index := clampi(level, 1, def.level_steps.size()) - 1
-	var interval := float(p("interval_by_level")[index])
+	var shot_interval := interval(float(p("interval_by_level")[index]))
 	_t += dt
-	if _t < interval:
+	if _t < shot_interval:
 		return
-	_t = fmod(_t, interval)
+	_t = fmod(_t, shot_interval)
 	var shots := int(p("shots_by_level")[index])
 	var backwards := aim_direction()
 	var origin := mount_position() + backwards * 12.5 * cfg.character_scale
 	for i in shots:
 		var angle := backwards.angle() + (i - (shots - 1) / 2.0) * float(p("spread_step"))
-		ctx.projectiles.fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
+		fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
 			{"life": p("life"), "color": Color(p("color"))})
 	state.emit(&"weapon_fire", {"id": def.id})
