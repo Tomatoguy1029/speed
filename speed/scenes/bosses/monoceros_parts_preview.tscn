@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros_parts.tscn" id="1_parts"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros_parts_preview.gd" id="2_preview"]
+[node name="MonocerosPartsPreview" type="Node2D"]
+script = ExtResource("2_preview")
+
+[node name="Parts" parent="." instance=ExtResource("1_parts")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(2, 2)

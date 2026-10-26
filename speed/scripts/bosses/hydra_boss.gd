@@ -10,6 +10,8 @@ signal presentation_advanced(world_dt: float)
 @export var body_texture: Texture2D
 @export var neck_texture: Texture2D
 @export var compass_texture: Texture2D
+@export var head_textures: Dictionary = {}
+@export_range(1.0, 32.0) var neck_spacing_pixels := 14.0
 @export_group("Presentation")
 @export var energy_shader: Shader=preload("res://shaders/hydra_energy.gdshader")
 @export var tornado_scene: PackedScene=preload("res://scenes/bosses/hydra_tornado.tscn")
@@ -1072,10 +1074,29 @@ func draw_on(c: CanvasItem) -> void:
 			if neck_texture!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
 		return
-	if body_texture!=null:c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
-	else:c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
-	c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
-	_draw_compass(c, r * 0.75)
+	if body_texture!=null:
+		c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
+	else:
+		c.draw_circle(Vector2.ZERO, r, Color("#5b4f45") if t.flash[body] <= 0.0 else Color("#fff4e0"))
+		c.draw_arc(Vector2.ZERO, r, 0, TAU, 48, Color("#2e2722"), 4.0)
+	# 納品された胴体の中央には羅針盤を含む。
+	if body_texture == null or compass_texture != null:
+		_draw_compass(c, r * 0.75)
+
+func draw_head_on(c: CanvasItem, row: int, at: Vector2) -> bool:
+	var kind: StringName = &""
+	for neck in necks:
+		if neck.row == row and _alive(neck):
+			kind = neck.kind
+			break
+	if row == immortal_row and ctx.enemies.is_same(row, immortal_id): kind = &"immortal"
+	var texture := head_textures.get(kind) as Texture2D
+	if texture == null: return false
+	var scale_factor := table.r[body] * 2.0 / body_texture.get_width() if body_texture != null else 1.0
+	c.draw_set_transform(at, table.facing[row] - PI * 0.5, Vector2.ONE * scale_factor)
+	c.draw_texture(texture, -texture.get_size() * 0.5)
+	c.draw_set_transform(Vector2.ZERO)
+	return true
 
 ## 仮の首の節・継ぎ目・ハイライトを一枚へまとめ、色と重なり順を保つ。
 func _draw_neck_mesh(c: CanvasItem,radius: float)->void:
@@ -1127,6 +1148,9 @@ func _append_neck_polygon(points: PackedVector2Array,col: Color,vertices: Packed
 	for i in range(1,points.size()-1):indices.append_array(PackedInt32Array([start,start+i,start+i+1]))
 
 func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Color, glow: float) -> void:
+	if neck_texture != null:
+		_draw_neck_tiles(c, segs, body_r, glow)
+		return
 	var origin := table.pos[body]
 	var point_count := segs.size()
 	var dark := col.darkened(0.15)
@@ -1136,19 +1160,37 @@ func _draw_neck(c: CanvasItem, segs: PackedVector2Array, body_r: float, col: Col
 		var size := body_r * (0.32 - 0.14 * float(s) / point_count)
 		if s > 0:
 			c.draw_line(previous, at, col, size * 2.0)
-		if neck_texture!=null:
-			var facing: float=(at-previous).angle() if s>0 else 0.0
-			c.draw_set_transform(at,facing)
-			c.draw_texture_rect(neck_texture,Rect2(Vector2.ONE*-size,Vector2.ONE*size*2.0),false)
-			c.draw_set_transform(Vector2.ZERO)
-		else:
-			var polygon:=PackedVector2Array()
-			for corner in 8:polygon.append((at+Vector2.from_angle(float(corner)*TAU/8.0)*size).snapped(Vector2(3,3)))
-			c.draw_colored_polygon(polygon,col if s%2==0 else dark)
-			c.draw_line(at+Vector2(-size*0.5,-size*0.4),at+Vector2(size*0.4,-size*0.4),col.lightened(0.2),3.0)
+		var polygon:=PackedVector2Array()
+		for corner in 8:polygon.append((at+Vector2.from_angle(float(corner)*TAU/8.0)*size).snapped(Vector2(3,3)))
+		c.draw_colored_polygon(polygon,col if s%2==0 else dark)
+		c.draw_line(at+Vector2(-size*0.5,-size*0.4),at+Vector2(size*0.4,-size*0.4),col.lightened(0.2),3.0)
 		previous = at
 	if glow > 0.0 and not segs.is_empty():
 		c.draw_circle(previous, body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
+
+## 動的な骨組みの弧長に沿って重ね、伸長しても節の大きさと隙間を保つ。
+func _draw_neck_tiles(c: CanvasItem, segs: PackedVector2Array, body_r: float, glow: float) -> void:
+	if segs.size() < 2: return
+	var scale_factor := body_r * 2.0 / body_texture.get_width() if body_texture != null else body_r / 64.0
+	var spacing := neck_spacing_pixels * scale_factor
+	var until_next := 0.0
+	var origin := table.pos[body]
+	var center := neck_texture.get_size() * 0.5
+	for index in range(1, segs.size()):
+		var start := segs[index - 1]
+		var delta := segs[index] - start
+		var length := delta.length()
+		if length < 0.001: continue
+		var direction := delta / length
+		while until_next <= length:
+			var at := start + direction * until_next - origin
+			c.draw_set_transform(at, direction.angle() - PI * 0.5, Vector2.ONE * scale_factor)
+			c.draw_texture(neck_texture, -center)
+			until_next += spacing
+		until_next -= length
+	c.draw_set_transform(Vector2.ZERO)
+	if glow > 0.0:
+		c.draw_circle(segs[-1] - origin, body_r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * glow))
 
 ## 本体に埋め込まれた羅針盤。強めの技の前だけ針が回る（強めの技で使う）。
 func _draw_compass(c: CanvasItem, R: float) -> void:

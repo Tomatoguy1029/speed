@@ -1,5 +1,20 @@
 [gd_scene format=3]
 [ext_resource type="Script" path="res://scripts/bosses/monoceros_presentation.gd" id="visual"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros_parts.tscn" id="parts"]
 [node name="MonocerosPresentation" type="Node2D"]
 texture_filter = 1
 script = ExtResource("visual")
+
+[node name="Parts" parent="." instance=ExtResource("parts")]
+position = Vector2(37, 0)
+rotation = -1.5707963267949
+
+[node name="SwordGlow" type="Polygon2D" parent="Parts/Head"]
+visible = false
+color = Color(0.623529, 0.909804, 1, 1)
+polygon = PackedVector2Array(-4, 105, -9, 111, 0, 131.6, 9, 111, 4, 105)
+
+[node name="Guard" type="Line2D" parent="Parts/Head/SwordGlow"]
+points = PackedVector2Array(-19, 110, 19, 110)
+width = 7.0
+default_color = Color(0.917647, 1, 1, 1)
