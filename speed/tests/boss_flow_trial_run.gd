@@ -25,7 +25,8 @@ func exercise() -> void:
 			trial.session.playing = false
 			for step in 600: trial.session.step()
 			var chosen: Array = actor.flow_runner.last
-			if chosen.size() != 1 or chosen[0].id != entry[1]:
+			var correct: bool = trial.manual.requested == entry[1] and not actor.selection_enabled if trial.manual != null else chosen.size() == 1 and chosen[0].id == entry[1]
+			if not correct:
 				failed += 1
 				push_error("選択技の単独再生になっていません: " + entry[1])
 			if entry[1] == "test_combo" and (actor.flow_adapter.custom_run != null or actor.mode != &"idle" or actor.flow_runner.index != 1):

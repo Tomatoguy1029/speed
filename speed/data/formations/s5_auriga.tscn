@@ -9,43 +9,89 @@
 script = ExtResource("1")
 types = Array[StringName]([&"auriga"])
 
-[node name="s5_grow_3_auriga" type="Node2D" parent="."]
-position=Vector2(-2600,1650)
-script=ExtResource("2")
-[node name="auriga" type="Node2D" parent="s5_grow_3_auriga"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"auriga"
-[node name="s5_peak_2_peak2" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="auriga" type="Node2D" parent="s5_peak_2_peak2"]
-position=Vector2(-240.0,0)
-script=ExtResource("3")
-enemy=&"auriga"
-[node name="s5_peak_4_peak4" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="auriga" type="Node2D" parent="s5_peak_4_peak4"]
-position=Vector2(0.0,80)
-script=ExtResource("3")
-enemy=&"auriga"
-[node name="s5_peak_5b_peak5b" type="Node2D" parent="."]
-position=Vector2(-2600,1650)
-script=ExtResource("2")
-[node name="auriga" type="Node2D" parent="s5_peak_5b_peak5b"]
-position=Vector2(120.0,0)
-script=ExtResource("3")
-enemy=&"auriga"
+[node name="1体・中央" type="Node2D" parent="."]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="1体・中央"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="1体・左240" type="Node2D" parent="."]
+position = Vector2(-4400, 0)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="1体・左240"]
+position = Vector2(-240, 0)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="1体・後80" type="Node2D" parent="."]
+position = Vector2(-6200, 0)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="1体・後80"]
+position = Vector2(0, 80)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="1体・右120" type="Node2D" parent="."]
+position = Vector2(-2600, 1400)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="1体・右120"]
+position = Vector2(120, 0)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="2体・左右走路" type="Node2D" parent="."]
+position = Vector2(-4400, 1400)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="2体・左右走路"]
+position = Vector2(-340, 0)
+rotation = -0.28
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="auriga2" type="Node2D" parent="2体・左右走路"]
+position = Vector2(340, 0)
+rotation = 0.28
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="3体・追走" type="Node2D" parent="."]
+position = Vector2(-6200, 1400)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="3体・追走"]
+position = Vector2(-240, -80)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="auriga2" type="Node2D" parent="3体・追走"]
+position = Vector2(0, 280)
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="auriga3" type="Node2D" parent="3体・追走"]
+position = Vector2(240, 640)
+script = ExtResource("3")
+enemy = &"auriga"
+
 [node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
+position = Vector2(0, -1600)
+script = ExtResource("4")
+
 [node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
 [node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
+position = Vector2(-1600, 0)
+script = ExtResource("4")
+
 [node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+position = Vector2(1600, 0)
+script = ExtResource("4")

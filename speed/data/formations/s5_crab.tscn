@@ -9,66 +9,87 @@
 script = ExtResource("1")
 types = Array[StringName]([&"crab"])
 
-[node name="s5_grow_1_crab" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_grow_1_crab"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="s5_grow_2_crab" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_grow_2_crab"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="s5_grow_5_crab" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_grow_5_crab"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="s5_peak_1_peak1" type="Node2D" parent="."]
-position=Vector2(-2600,0)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_peak_1_peak1"]
-position=Vector2(0.0,80)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="s5_peak_2_peak2" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_peak_2_peak2"]
-position=Vector2(0.0,80)
-script=ExtResource("3")
-enemy=&"crab"
-[node name="s5_peak_3_peak3" type="Node2D" parent="."]
+[node name="1体・中央" type="Node2D" parent="."]
 position = Vector2(-2600, 0)
 script = ExtResource("2")
 
-[node name="crab" type="Node2D" parent="s5_peak_3_peak3"]
+[node name="crab1" type="Node2D" parent="1体・中央"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="1体・後80" type="Node2D" parent="."]
+position = Vector2(-4400, 0)
+script = ExtResource("2")
+
+[node name="crab1" type="Node2D" parent="1体・後80"]
+position = Vector2(0, 80)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="1体・右240" type="Node2D" parent="."]
+position = Vector2(-6200, 0)
+script = ExtResource("2")
+
+[node name="crab1" type="Node2D" parent="1体・右240"]
 position = Vector2(240, 0)
 script = ExtResource("3")
 enemy = &"crab"
 
-[node name="s5_peak_5a_peak5a" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="crab" type="Node2D" parent="s5_peak_5a_peak5a"]
-position=Vector2(120.0,0)
-script=ExtResource("3")
-enemy=&"crab"
+[node name="1体・右120" type="Node2D" parent="."]
+position = Vector2(-2600, 1400)
+script = ExtResource("2")
+
+[node name="crab1" type="Node2D" parent="1体・右120"]
+position = Vector2(120, 0)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="2体・横壁" type="Node2D" parent="."]
+position = Vector2(-4400, 1400)
+script = ExtResource("2")
+
+[node name="crab1" type="Node2D" parent="2体・横壁"]
+position = Vector2(-220, 0)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="crab2" type="Node2D" parent="2体・横壁"]
+position = Vector2(220, 0)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="3体・前後二列" type="Node2D" parent="."]
+position = Vector2(-6200, 1400)
+script = ExtResource("2")
+
+[node name="crab1" type="Node2D" parent="3体・前後二列"]
+position = Vector2(-260, -80)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="crab2" type="Node2D" parent="3体・前後二列"]
+position = Vector2(260, -80)
+script = ExtResource("3")
+enemy = &"crab"
+
+[node name="crab3" type="Node2D" parent="3体・前後二列"]
+position = Vector2(0, 360)
+script = ExtResource("3")
+enemy = &"crab"
+
 [node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
+position = Vector2(0, -1600)
+script = ExtResource("4")
+
 [node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
 [node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
+position = Vector2(-1600, 0)
+script = ExtResource("4")
+
 [node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+position = Vector2(1600, 0)
+script = ExtResource("4")

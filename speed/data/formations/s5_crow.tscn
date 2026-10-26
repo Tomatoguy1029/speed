@@ -1,27 +1,63 @@
 [gd_scene load_steps=5 format=3]
+
 [ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
 [node name="Stage5Crow" type="Node2D"]
-script=ExtResource("1")
-types=Array[StringName]([&"crow"])
-[node name="crow" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="crow" type="Node2D" parent="crow"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"crow"
+script = ExtResource("1")
+types = Array[StringName]([&"crow"])
+
+[node name="1群・中央" type="Node2D" parent="."]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="crow1" type="Node2D" parent="1群・中央"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"crow"
+
+[node name="2群・横並び" type="Node2D" parent="."]
+position = Vector2(-4400, 0)
+script = ExtResource("2")
+
+[node name="crow1" type="Node2D" parent="2群・横並び"]
+position = Vector2(-260, 0)
+script = ExtResource("3")
+enemy = &"crow"
+
+[node name="crow2" type="Node2D" parent="2群・横並び"]
+position = Vector2(260, 0)
+script = ExtResource("3")
+enemy = &"crow"
+
+[node name="2群・前後横断" type="Node2D" parent="."]
+position = Vector2(-6200, 0)
+script = ExtResource("2")
+
+[node name="crow1" type="Node2D" parent="2群・前後横断"]
+position = Vector2(-180, -80)
+script = ExtResource("3")
+enemy = &"crow"
+
+[node name="crow2" type="Node2D" parent="2群・前後横断"]
+position = Vector2(180, 560)
+script = ExtResource("3")
+enemy = &"crow"
+
 [node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
+position = Vector2(0, -1600)
+script = ExtResource("4")
+
 [node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
 [node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
+position = Vector2(-1600, 0)
+script = ExtResource("4")
+
 [node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+position = Vector2(1600, 0)
+script = ExtResource("4")

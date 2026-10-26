@@ -9,57 +9,78 @@
 script = ExtResource("1")
 types = Array[StringName]([&"cross"])
 
-[node name="s5_grow_2_cross" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_grow_2_cross"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="s5_grow_4_cross" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_grow_4_cross"]
-position=Vector2(0.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="s5_peak_1_peak1" type="Node2D" parent="."]
-position=Vector2(-2600,0)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_peak_1_peak1"]
-position=Vector2(240.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="s5_peak_2_peak2" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_peak_2_peak2"]
-position=Vector2(240.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="s5_peak_4_peak4" type="Node2D" parent="."]
-position=Vector2(-2600,550)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_peak_4_peak4"]
-position=Vector2(240.0,0)
-script=ExtResource("3")
-enemy=&"cross"
-[node name="s5_peak_5a_peak5a" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="cross" type="Node2D" parent="s5_peak_5a_peak5a"]
-position=Vector2(360.0,80)
-script=ExtResource("3")
-enemy=&"cross"
+[node name="1体・中央" type="Node2D" parent="."]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="cross1" type="Node2D" parent="1体・中央"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="1体・右240" type="Node2D" parent="."]
+position = Vector2(-4400, 0)
+script = ExtResource("2")
+
+[node name="cross1" type="Node2D" parent="1体・右240"]
+position = Vector2(240, 0)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="1体・右360後80" type="Node2D" parent="."]
+position = Vector2(-6200, 0)
+script = ExtResource("2")
+
+[node name="cross1" type="Node2D" parent="1体・右360後80"]
+position = Vector2(360, 80)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="2体・段差射線" type="Node2D" parent="."]
+position = Vector2(-2600, 1400)
+script = ExtResource("2")
+
+[node name="cross1" type="Node2D" parent="2体・段差射線"]
+position = Vector2(-260, -80)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="cross2" type="Node2D" parent="2体・段差射線"]
+position = Vector2(260, 320)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="3体・射線三角" type="Node2D" parent="."]
+position = Vector2(-4400, 1400)
+script = ExtResource("2")
+
+[node name="cross1" type="Node2D" parent="3体・射線三角"]
+position = Vector2(-420, -80)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="cross2" type="Node2D" parent="3体・射線三角"]
+position = Vector2(420, -80)
+script = ExtResource("3")
+enemy = &"cross"
+
+[node name="cross3" type="Node2D" parent="3体・射線三角"]
+position = Vector2(0, 460)
+script = ExtResource("3")
+enemy = &"cross"
+
 [node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
+position = Vector2(0, -1600)
+script = ExtResource("4")
+
 [node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
 [node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
+position = Vector2(-1600, 0)
+script = ExtResource("4")
+
 [node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+position = Vector2(1600, 0)
+script = ExtResource("4")

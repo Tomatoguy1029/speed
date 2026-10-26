@@ -9,38 +9,73 @@
 script = ExtResource("1")
 types = Array[StringName]([&"cepheus"])
 
-[node name="s5_peak_3_peak3" type="Node2D" parent="."]
+[node name="1体・左240" type="Node2D" parent="."]
 position = Vector2(-2600, 0)
 script = ExtResource("2")
 
-[node name="cepheus" type="Node2D" parent="s5_peak_3_peak3"]
+[node name="cepheus1" type="Node2D" parent="1体・左240"]
 position = Vector2(-240, 0)
 script = ExtResource("3")
 enemy = &"cepheus"
 
-[node name="s5_peak_5a_peak5a" type="Node2D" parent="."]
-position=Vector2(-2600,1100)
-script=ExtResource("2")
-[node name="cepheus" type="Node2D" parent="s5_peak_5a_peak5a"]
-position=Vector2(-360.0,0)
-script=ExtResource("3")
-enemy=&"cepheus"
-[node name="s5_peak_5b_peak5b" type="Node2D" parent="."]
-position=Vector2(-2600,1650)
-script=ExtResource("2")
-[node name="cepheus" type="Node2D" parent="s5_peak_5b_peak5b"]
-position=Vector2(-360.0,0)
-script=ExtResource("3")
-enemy=&"cepheus"
+[node name="1体・左360" type="Node2D" parent="."]
+position = Vector2(-4400, 0)
+script = ExtResource("2")
+
+[node name="cepheus1" type="Node2D" parent="1体・左360"]
+position = Vector2(-360, 0)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="1体・中央" type="Node2D" parent="."]
+position = Vector2(-6200, 0)
+script = ExtResource("2")
+
+[node name="cepheus1" type="Node2D" parent="1体・中央"]
+position = Vector2(0, 0)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="2王・離間" type="Node2D" parent="."]
+position = Vector2(-2600, 1400)
+script = ExtResource("2")
+
+[node name="cepheus1" type="Node2D" parent="2王・離間"]
+position = Vector2(-420, 0)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="cepheus2" type="Node2D" parent="2王・離間"]
+position = Vector2(420, 0)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="2王・前後斜列" type="Node2D" parent="."]
+position = Vector2(-4400, 1400)
+script = ExtResource("2")
+
+[node name="cepheus1" type="Node2D" parent="2王・前後斜列"]
+position = Vector2(-420, -80)
+script = ExtResource("3")
+enemy = &"cepheus"
+
+[node name="cepheus2" type="Node2D" parent="2王・前後斜列"]
+position = Vector2(420, 520)
+script = ExtResource("3")
+enemy = &"cepheus"
+
 [node name="Entry0" type="Node2D" parent="."]
-position=Vector2(0,-1600)
-script=ExtResource("4")
+position = Vector2(0, -1600)
+script = ExtResource("4")
+
 [node name="Entry1" type="Node2D" parent="."]
-position=Vector2(0,1600)
-script=ExtResource("4")
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
 [node name="Entry2" type="Node2D" parent="."]
-position=Vector2(-1600,0)
-script=ExtResource("4")
+position = Vector2(-1600, 0)
+script = ExtResource("4")
+
 [node name="Entry3" type="Node2D" parent="."]
-position=Vector2(1600,0)
-script=ExtResource("4")
+position = Vector2(1600, 0)
+script = ExtResource("4")
