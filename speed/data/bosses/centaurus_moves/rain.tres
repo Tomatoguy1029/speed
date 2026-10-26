@@ -22,5 +22,6 @@ parameters = {
 "trace_length": 900.0,
 "trace_speed": 450.0,
 "traces": 4,
+"traces_p2": 6,
 "warn": 0.6
 }

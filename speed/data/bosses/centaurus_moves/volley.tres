@@ -8,6 +8,7 @@ technique = &"volley"
 parameters = {
 "cd": 3.0,
 "count": 5,
+"count_p2": 8,
 "damage": 12.0,
 "interval": 0.18,
 "radius": 12.0,

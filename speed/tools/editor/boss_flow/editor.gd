@@ -926,8 +926,11 @@ func _refresh() -> void:
 			continue
 		if key in ["cost", "major_cost"] or not (current.parameters[key] is float or current.parameters[key] is int): continue
 		var label := Label.new()
-		var description: Array = BossDef.PARAMS_DOCS.get(key, [])
-		label.text = PARAM_LABELS.get(key, description[0] if not description.is_empty() else String(key))
+		# 第2形態の値は、同じ名前の値の表示名に形態を添える。
+		var base_key := String(key).trim_suffix("_p2")
+		var description: Array = BossDef.PARAMS_DOCS.get(base_key, [])
+		label.text = PARAM_LABELS.get(base_key, description[0] if not description.is_empty() else base_key)
+		if base_key != String(key): label.text += "（第2形態）"
 		if description.size() > 1: label.tooltip_text = description[1]
 		_fields.add_child(label)
 		var field := SpinBox.new()

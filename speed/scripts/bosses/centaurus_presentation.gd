@@ -14,6 +14,9 @@ const STRING := Color("#f4ecd8")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
+const SAIL := Color("#e6ecf7")
+const SAIL_SHADE := Color("#a9b6d0")
+const SAIL_STAR := Color("#fff6c8")
 ## 背後攻撃の予告で本体に掛ける色
 const REAR_GLOW := Color(1.9, 0.35, 0.35)
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
@@ -34,7 +37,7 @@ func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"alert", &"released", &"rain_started"]: pulse = 0.3
+	if event.cue in [&"alert", &"released", &"rain_started", &"phase_changed"]: pulse = 0.3
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -103,6 +106,38 @@ func _oval(center: Vector2, radius: Vector2, color: Color, segments := 14) -> vo
 		points.append(center + Vector2(cos(a) * radius.x, sin(a) * radius.y))
 	_poly(points, color)
 
+## 帆を広げた割合（0〜1）。第2形態への移行の間に広げ、そのあとは広げたまま。
+func sail_fraction() -> float:
+	if actor.phase < 2: return 0.0
+	if actor.mode != &"phase": return 1.0
+	var f := 1.0 - actor.phase_time / maxf(float(actor.def.params.phase_time), 0.001)
+	return 1.0 - pow(1.0 - clampf(f, 0.0, 1.0), 3.0)
+
+## 馬の背に、ほ座の帆を左右へ広げる。風を受けて後ろへふくらみ、四隅の星が瞬く。
+func _draw_sail(open: float) -> void:
+	if open <= 0.0: return
+	var half := 84.0 * open
+	var belly := 34.0 * open
+	var yard := -14.0
+	var cloth := []
+	for j in 9:
+		var f := lerpf(-1.0, 1.0, j / 8.0)
+		cloth.append(Vector2(yard, f * half))
+	for j in 9:
+		var f := lerpf(1.0, -1.0, j / 8.0)
+		cloth.append(Vector2(yard - 14.0 - belly * (1.0 - f * f), f * half * 0.9))
+	_poly(cloth, SAIL)
+	# 縫い目：帆桁から後ろの縁へ。
+	for f in [-0.5, 0.0, 0.5]:
+		var back := Vector2(yard - 14.0 - belly * (1.0 - f * f), f * half * 0.9)
+		draw_line(Vector2(yard, f * half).snapped(Vector2.ONE * pixel_size), back.snapped(Vector2.ONE * pixel_size), SAIL_SHADE, pixel_size)
+	draw_line(Vector2(yard, -half - 6.0), Vector2(yard, half + 6.0), OUTLINE, pixel_size * 3.0)
+	draw_line(Vector2(yard, -half - 6.0), Vector2(yard, half + 6.0), BOW, pixel_size * 1.5)
+	var twinkle := 0.6 + 0.4 * sin(actor.clock * 6.0)
+	for corner in [Vector2(yard, -half), Vector2(yard, half), Vector2(yard - 14.0, -half * 0.9), Vector2(yard - 14.0, half * 0.9)]:
+		draw_circle(corner, 7.0 * open, Color(SAIL_STAR, 0.35 * twinkle))
+		draw_circle(corner, 3.5 * open, SAIL_STAR)
+
 ## 弓を引く割合（0〜1）。
 func draw_fraction() -> float:
 	if actor.mode == &"windup": return actor.table.charge[actor.body]
@@ -120,7 +155,8 @@ func _draw() -> void:
 		var from := Vector2(r * float(actor.def.params.bow_reach), 0.0)
 		var color := DANGER if actor.alerting else WARNING
 		color.a = 0.85 if actor.alerting else 0.35 + draw_fraction() * 0.35
-		draw_line(from, from + Vector2(reach, 0.0), color, width if actor.alerting else pixel_size * 2.0)
+		for offset in actor.power_offsets():
+			draw_line(from, from + Vector2.from_angle(offset) * reach, color, width if actor.alerting else pixel_size * 2.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	# 背後攻撃は、構えの間ボスを赤く明滅させ、当たりが有効な間は赤く光らせ続ける。
@@ -137,6 +173,7 @@ func _draw() -> void:
 	# 尾と馬の胴
 	_poly([Vector2(-82, -6), Vector2(-112, -14 + sin(gait) * 6.0), Vector2(-116, 4 + sin(gait) * 6.0), Vector2(-82, 8)], SHADE)
 	_oval(Vector2(-22, 0), Vector2(64, 32), COAT)
+	_draw_sail(sail_fraction())
 	# 人の上半身と頭
 	_oval(Vector2(36, 0), Vector2(22, 26), SKIN)
 	_oval(Vector2(46, 0), Vector2(13, 13), Color("#c99c74"))
@@ -159,6 +196,10 @@ func _draw() -> void:
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25
 		draw_arc(Vector2(-6, 0), 96.0, 0.0, TAU, 32, Color(OPEN, a), pixel_size * 2.0)
+	# 帆を広げる間は、帆のまわりへ光の輪を広げる。
+	if actor.mode == &"phase":
+		var grow := sail_fraction()
+		draw_arc(Vector2(-14, 0), 60.0 + grow * 90.0, 0.0, TAU, 32, Color(SAIL_STAR, 0.8 * (1.0 - grow)), pixel_size * 2.0)
 	if pulse > 0.0:
 		draw_arc(Vector2(62, 0), 30.0 + (0.3 - pulse) * 80.0, 0.0, TAU, 20, Color(STRING, pulse * 2.5), pixel_size)
 	draw_set_transform(Vector2.ZERO)
