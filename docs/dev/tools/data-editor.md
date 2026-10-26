@@ -621,7 +621,7 @@
 | smoke_color (`smoke_color`) | 鳳凰専用炎の煙の色。 | — |
 | amount (`amount`) | 鳳凰専用炎の発生量。増やすと表示粒が増える。 | — |
 | speed (`speed`) | 鳳凰専用炎の粒の動く速さ。 | — |
-| pixel_size (`pixel_size`) | 炎の描画ピクセルの大きさ。[ピクセル炎2D](pixel-fire-2d.md)に別の共通炎設定もある。 | — |
+| pixel_size (`pixel_size`) | 炎の描画ピクセルの大きさ。[ビジュアル編集の炎](pixel-fire-2d.md)に別の共通炎設定もある。 | — |
 | turbulence (`turbulence`) | 鳳凰専用炎の揺れの強さ。 | — |
 | sparks (`sparks`) | 鳳凰専用炎の火の粉の量。 | — |
 | opacity (`opacity`) | 鳳凰専用炎の透明度。 | — |
@@ -655,44 +655,44 @@
 
 | 画面の欄（内部名） | 何を変えるか | 単位・入力上の注意 |
 |---|---|---|
-| emission_shape (`emission_shape`) | 共通ピクセル炎の emission_shape。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| source_size (`source_size`) | 共通ピクセル炎の source_size。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| birth_rate (`birth_rate`) | 共通ピクセル炎の birth_rate。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| lifetime (`lifetime`) | 共通ピクセル炎の lifetime。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| rise_speed (`rise_speed`) | 共通ピクセル炎の rise_speed。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| sway (`sway`) | 共通ピクセル炎の sway。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| particle_size (`particle_size`) | 共通ピクセル炎の particle_size。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| capacity (`capacity`) | 共通ピクセル炎の capacity。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
+| emission_shape (`emission_shape`) | 共通ピクセル炎の emission_shape。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| source_size (`source_size`) | 共通ピクセル炎の source_size。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| birth_rate (`birth_rate`) | 共通ピクセル炎の birth_rate。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| lifetime (`lifetime`) | 共通ピクセル炎の lifetime。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| rise_speed (`rise_speed`) | 共通ピクセル炎の rise_speed。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| sway (`sway`) | 共通ピクセル炎の sway。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| particle_size (`particle_size`) | 共通ピクセル炎の particle_size。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| capacity (`capacity`) | 共通ピクセル炎の capacity。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
 
 #### 外炎・内炎・芯
 
 | 画面の欄（内部名） | 何を変えるか | 単位・入力上の注意 |
 |---|---|---|
-| layer_rates (`layer_rates`) | 共通ピクセル炎の layer_rates。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| layer_lifetimes (`layer_lifetimes`) | 共通ピクセル炎の layer_lifetimes。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| layer_sizes (`layer_sizes`) | 共通ピクセル炎の layer_sizes。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| outer_color (`outer_color`) | 共通ピクセル炎の outer_color。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| inner_color (`inner_color`) | 共通ピクセル炎の inner_color。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| core_color (`core_color`) | 共通ピクセル炎の core_color。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
+| layer_rates (`layer_rates`) | 共通ピクセル炎の layer_rates。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| layer_lifetimes (`layer_lifetimes`) | 共通ピクセル炎の layer_lifetimes。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| layer_sizes (`layer_sizes`) | 共通ピクセル炎の layer_sizes。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| outer_color (`outer_color`) | 共通ピクセル炎の outer_color。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| inner_color (`inner_color`) | 共通ピクセル炎の inner_color。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| core_color (`core_color`) | 共通ピクセル炎の core_color。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
 
 #### 密度場と輪郭
 
 | 画面の欄（内部名） | 何を変えるか | 単位・入力上の注意 |
 |---|---|---|
-| field_size (`field_size`) | 共通ピクセル炎の field_size。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| density_pixel_size (`density_pixel_size`) | 共通ピクセル炎の density_pixel_size。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| merge_threshold (`merge_threshold`) | 共通ピクセル炎の merge_threshold。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| edge_softness (`edge_softness`) | 共通ピクセル炎の edge_softness。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| deformation (`deformation`) | 共通ピクセル炎の deformation。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
-| pixel_size (`pixel_size`) | 炎の描画ピクセルの大きさ。[ピクセル炎2D](pixel-fire-2d.md)に別の共通炎設定もある。 | — |
-| update_fps (`update_fps`) | 共通ピクセル炎の update_fps。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
+| field_size (`field_size`) | 共通ピクセル炎の field_size。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| density_pixel_size (`density_pixel_size`) | 共通ピクセル炎の density_pixel_size。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| merge_threshold (`merge_threshold`) | 共通ピクセル炎の merge_threshold。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| edge_softness (`edge_softness`) | 共通ピクセル炎の edge_softness。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| deformation (`deformation`) | 共通ピクセル炎の deformation。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
+| pixel_size (`pixel_size`) | 炎の描画ピクセルの大きさ。[ビジュアル編集の炎](pixel-fire-2d.md)に別の共通炎設定もある。 | — |
+| update_fps (`update_fps`) | 共通ピクセル炎の update_fps。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
 
 #### 完成した炎の発光
 
 | 画面の欄（内部名） | 何を変えるか | 単位・入力上の注意 |
 |---|---|---|
 | glow_strength (`glow_strength`) | 地図の公開演出の glow_strength。[ビジュアル編集](visual-editor.md)の「地図公開」を参照。 | — |
-| glow_radius (`glow_radius`) | 共通ピクセル炎の glow_radius。[ピクセル炎2D](pixel-fire-2d.md)の同名欄を参照。 | — |
+| glow_radius (`glow_radius`) | 共通ピクセル炎の glow_radius。[ビジュアル編集の炎](pixel-fire-2d.md)の同名欄を参照。 | — |
 
 
 ### map_reveal_settings

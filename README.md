@@ -18,7 +18,7 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 炎・オーラ・後光・マップは、エディタ上部の **▶ ビジュアル編集**、または `speed/gyms/visual_editor.tscn` のF6から共通画面で調整できます。左で種類を選び、中央でプレビュー、右で項目を編集します。保存先と未保存状態を上部へ表示し、切替後も未保存値を保持します。「保存」は表示中の素材だけへ反映し、「再読込」と終了時には未保存値の破棄を確認します。オーラと後光は選択中の伝説モジュールを共有し、ベイク操作はオーラに表示します。
 
-ピクセル炎は **プロジェクト → ツール → SPEED → ピクセル炎（2D編集）** または `speed/gyms/pixel_fire_preview.tscn` を開き、Godotの2D編集画面でも動きを確認・調整できます。F6の単体画面も使えます。[炎の調整・プリセット保存](speed/assets/pixel/README.md#ピクセル炎を単体で調整する)を参照してください。
+ピクセル炎の再生・配置・保存・PNG出力は **ビジュアル編集 → 炎** にまとめています。既存の `speed/gyms/pixel_fire_preview.tscn` を直接開いた場合も、Inspectorで炎を編集できます。[炎の調整・プリセット保存](docs/dev/tools/pixel-fire-2d.md)を参照してください。
 
 ステージ制作は [制作ガイド](docs/dev/stage-production.md) から始めます。録画JSONLと感想を使うバランス調整は [試遊・分析・再比較の手順](docs/dev/stage-production.md#6-記録と感想で調整する) に沿って [分析スキル](.agents/skills/speed-balance-analysis/SKILL.md) を呼び出します。AIへの実装依頼は [AI向け資料](docs/dev/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stages/stage-4.md) を参照してください。
 

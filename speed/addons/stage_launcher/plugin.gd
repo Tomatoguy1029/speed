@@ -11,7 +11,6 @@ const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 const SCENES := {
 	"lab": LAB_SCENE,
 	"visual": "res://gyms/visual_editor.tscn",
-	"fire_scene": "res://gyms/pixel_fire_preview.tscn",
 	"background": "res://gyms/background_lab/background_lab.tscn",
 	"art": "res://tools/preview_pixel_assets.tscn",
 	"performance": "res://gyms/perf_enemies/perf_enemies.tscn",
@@ -57,8 +56,6 @@ func _register_menu_items() -> void:
 	_add_menu_item("ビジュアル編集（炎・オーラ・後光・マップ）", _on_visual_pressed)
 	_add_scene("背景編集", "background")
 	_add_scene("ピクセル素材確認", "art")
-	if ResourceLoader.exists(SCENES.fire_scene):
-		_add_menu_item("ピクセル炎（2D編集）", EditorInterface.open_scene_from_path.bind(SCENES.fire_scene))
 	_add_scene("敵描画ベンチ", "performance")
 	_add_scene("ラン処理・描画ベンチ", "profile")
 
