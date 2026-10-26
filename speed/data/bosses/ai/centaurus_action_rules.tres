@@ -1,0 +1,72 @@
+[gd_resource type="Resource" format=3 uid="uid://bay7nt1g67f70"]
+
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_c7rul"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/volley.tres" id="2_c7vly"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/power_shot.tres" id="3_c7pws"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/rain.tres" id="4_c7ran"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/rear_attack.tres" id="5_c7rea"]
+
+[resource]
+script = ExtResource("1_c7rul")
+adapter = &"centaurus"
+trial_scene = "res://gyms/boss_flow_trial.tscn"
+techniques = Array[Resource]([ExtResource("2_c7vly"), ExtResource("3_c7pws"), ExtResource("4_c7ran"), ExtResource("5_c7rea")])
+conditions = {
+"power_shot": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1500.0,
+"min": 450.0,
+"min_phase": 1
+},
+"rain": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1400.0,
+"min": 300.0,
+"min_phase": 1
+},
+"rear_attack": {
+"angle": 180.0,
+"half_angle": 45.0,
+"max": 300.0,
+"min": 0.0,
+"min_phase": 1
+},
+"volley": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1200.0,
+"min": 500.0,
+"min_phase": 1
+}
+}
+costs = {
+"power_shot": 2.0,
+"rain": 2.0,
+"rear_attack": 1.0,
+"volley": 1.0
+}
+layout = {
+"choose_combo": Vector2(752, 116),
+"choose_major": Vector2(1464, 116),
+"choose_normal": Vector2(40, 116),
+"power_shot": Vector2(380, 340),
+"rain": Vector2(720, 340),
+"rear_attack": Vector2(1060, 340),
+"volley": Vector2(40, 340)
+}
+condition_groups = {
+"choose_combo": {
+"nodes": [],
+"title": "コンボ"
+},
+"choose_major": {
+"nodes": [],
+"title": "大技"
+},
+"choose_normal": {
+"nodes": ["volley", "power_shot", "rain", "rear_attack"],
+"title": "通常技"
+}
+}

@@ -24,6 +24,21 @@ func _ready() -> void:
 	check(actor.table.max_hp[actor.body] == actor.def.hp * sim.cfg.enemy_hp_mult, "専用HPを共通倍率付きで使う")
 	check(actor.table.armor[actor.body] == actor.def.armor * sim.cfg.enemy_armor_mult, "専用装甲を使う")
 	check(actor.table.gate[actor.body] == EnemyTable.Gate.NONE and actor.table.weak_arc[actor.body] == 0.0, "全方向から本体を攻撃できる")
+	fresh()
+	sim.state.ship_pos = Vector2(2400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor._cooldown = 0.0
+	step(0.1)
+	check(actor.mode == &"idle", "遠方では届かない突進を始めず接近する")
+	check(actor.table.pos[actor.body].x > 0.0, "遠方からプレイヤーへ戻る")
+	var approached := false
+	for frame in 1200:
+		step(DT)
+		if actor.mode == &"windup":
+			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= float(actor.def.params.approach_range)
+			break
+	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
+	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
 	step(0.4)
@@ -142,6 +157,34 @@ func _ready() -> void:
 	check(actor.phase == 2 and actor.mode == &"phase", "通常の隙を消費してから移行する")
 	step(1.1)
 	check(actor.phase == 2 and actor.get("flow_runner") != null, "第2形態も共通フローで行動を選ぶ")
+
+	fresh()
+	check(actor.has_method("begin_entrance"), "ブースターで画面外から飛び込む登場を持つ")
+	if actor.has_method("begin_entrance"):
+		var target := actor.table.pos[actor.body]
+		actor.call("begin_entrance")
+		check(actor.mode == &"entrance" and not actor.can_begin_sequence(), "登場中は攻撃を選ばない")
+		check(actor.table.pos[actor.body].distance_to(target) > 100.0, "登場は目標の外側から始まる")
+		step(2.0)
+		check(actor.mode == &"idle" and actor.table.pos[actor.body].is_equal_approx(target), "飛来後に目標で停止する")
+	check(actor._presentation.has_method("booster_strength"), "表示側はブースターの噴射強度を持つ")
+	if actor._presentation.has_method("booster_strength"):
+		var idle_strength: float = actor._presentation.call("booster_strength")
+		actor.start_attack(&"charge")
+		while actor.mode == &"windup": step(DT)
+		check(float(actor._presentation.call("booster_strength")) > idle_strength, "突進で炎の尻尾が大きく噴き出す")
+
+	fresh()
+	actor.phase = 2
+	actor.start_attack(&"lance")
+	while actor.mode in [&"windup", &"active"]: step(DT)
+	check(actor._presentation.get("lance_afterglow") != null, "光の槍は突き終わりに全体を残す")
+	if actor._presentation.get("lance_afterglow") != null:
+		check(float(actor._presentation.get("lance_afterglow")) > 0.0, "突き終わりの残光を開始する")
+		var hp_after := sim.state.ship_hp
+		step(0.7)
+		check(float(actor._presentation.get("lance_afterglow")) <= 0.0, "飛散後の粒子はフェードして消える")
+		check(sim.state.ship_hp == hp_after, "槍の残光に攻撃判定を残さない")
 
 	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。

@@ -1,18 +1,294 @@
-[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://ds3u6mc4qb7fv"]
+[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://c1oc0arox6d64"]
 
-[ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
-[ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
-[ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
-[ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
-[ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
-[ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
-[ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
+[ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_a733b"]
+[ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
+[ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_early.tscn" id="early"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_growth.tscn" id="growth"]
+[ext_resource type="PackedScene" path="res://data/formations/s5_late.tscn" id="late"]
+[ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
+[ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
+
+[sub_resource type="Resource" id="Clip0"]
+script = ExtResource("clip")
+label = "育成1"
+track = 0
+types = Array[StringName]([&"pump", &"crab"])
+formations = Array[PackedScene]([ExtResource("growth")])
+layouts = Array[StringName]([&"s5_growth/pump", &"s5_growth/crab"])
+attack_priority = 1
+length = 45.0
+interval = 22.0
+
+[sub_resource type="Resource" id="Clip1"]
+script = ExtResource("clip")
+label = "育成2"
+track = 0
+types = Array[StringName]([&"crab", &"cross"])
+formations = Array[PackedScene]([ExtResource("growth")])
+layouts = Array[StringName]([&"s5_growth/crab", &"s5_growth/cross"])
+attack_priority = 1
+time = 90.0
+length = 25.0
+interval = 20.0
+
+[sub_resource type="Resource" id="Clip2"]
+script = ExtResource("clip")
+label = "育成3"
+track = 0
+types = Array[StringName]([&"auriga", &"dolphin"])
+formations = Array[PackedScene]([ExtResource("growth")])
+layouts = Array[StringName]([&"s5_growth/auriga", &"s5_growth/dolphin"])
+attack_priority = 1
+time = 170.0
+length = 25.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip3"]
+script = ExtResource("clip")
+label = "育成4"
+track = 0
+types = Array[StringName]([&"pump", &"cross"])
+formations = Array[PackedScene]([ExtResource("growth")])
+layouts = Array[StringName]([&"s5_growth/pump", &"s5_growth/cross"])
+attack_priority = 1
+time = 265.0
+length = 25.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip4"]
+script = ExtResource("clip")
+label = "育成5"
+track = 0
+types = Array[StringName]([&"crab", &"dolphin"])
+formations = Array[PackedScene]([ExtResource("growth")])
+layouts = Array[StringName]([&"s5_growth/crab", &"s5_growth/dolphin"])
+attack_priority = 1
+time = 370.0
+length = 25.0
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip5"]
+script = ExtResource("clip")
+label = "山1"
+track = 1
+types = Array[StringName]([&"pump", &"crab", &"cross"])
+formations = Array[PackedScene]([ExtResource("early")])
+layouts = Array[StringName]([&"s5_early/peak1"])
+attack_priority = 1
+time = 45.0
+length = 45.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip6"]
+script = ExtResource("clip")
+label = "山2"
+track = 1
+types = Array[StringName]([&"auriga", &"crab", &"cross"])
+formations = Array[PackedScene]([ExtResource("early")])
+layouts = Array[StringName]([&"s5_early/peak2"])
+attack_priority = 1
+time = 115.0
+length = 55.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip7"]
+script = ExtResource("clip")
+label = "からす継続"
+track = 2
+types = Array[StringName]([&"crow"])
+formations = Array[PackedScene]([ExtResource("early")])
+layouts = Array[StringName]([&"s5_early/crow"])
+attack_priority = 1
+time = 115.0
+length = 365.0
+interval = 24.0
+
+[sub_resource type="Resource" id="Clip8"]
+script = ExtResource("clip")
+label = "山3"
+track = 3
+types = Array[StringName]([&"cepheus", &"dolphin", &"crab"])
+formations = Array[PackedScene]([ExtResource("late")])
+layouts = Array[StringName]([&"s5_late/peak3"])
+attack_priority = 1
+time = 195.0
+length = 70.0
+interval = 18.0
+
+[sub_resource type="Resource" id="Clip9"]
+script = ExtResource("clip")
+label = "山4"
+track = 3
+types = Array[StringName]([&"aquila", &"auriga", &"cross"])
+formations = Array[PackedScene]([ExtResource("late")])
+layouts = Array[StringName]([&"s5_late/peak4"])
+attack_priority = 1
+time = 290.0
+length = 80.0
+interval = 16.0
+
+[sub_resource type="Resource" id="Clip10"]
+script = ExtResource("clip")
+label = "山5"
+track = 3
+types = Array[StringName]([&"cepheus", &"dolphin", &"crab", &"cross"])
+formations = Array[PackedScene]([ExtResource("late")])
+layouts = Array[StringName]([&"s5_late/peak5a"])
+attack_priority = 1
+time = 395.0
+length = 42.5
+interval = 14.0
+
+[sub_resource type="Resource" id="Clip11"]
+script = ExtResource("clip")
+label = "山6"
+track = 3
+types = Array[StringName]([&"cepheus", &"aquila", &"auriga", &"pump"])
+formations = Array[PackedScene]([ExtResource("late")])
+layouts = Array[StringName]([&"s5_late/peak5b"])
+attack_priority = 1
+time = 437.5
+length = 42.5
+groups = 2
+interval = 12.0
+
+[sub_resource type="Resource" id="Phase0"]
+script = ExtResource("phase")
+rate = 10.0
+xp_bonus = 1.6
+attack_budget = 2
+id = &"s5_grow_1"
+display_name = "育成1"
+
+[sub_resource type="Resource" id="Phase1"]
+script = ExtResource("phase")
+start = 45.0
+rate = 11.0
+xp_bonus = 1.0
+attack_budget = 4
+id = &"s5_peak_1"
+display_name = "山1"
+
+[sub_resource type="Resource" id="Phase2"]
+script = ExtResource("phase")
+start = 90.0
+rate = 12.0
+xp_bonus = 1.6
+attack_budget = 3
+id = &"s5_grow_2"
+display_name = "育成2"
+
+[sub_resource type="Resource" id="Phase3"]
+script = ExtResource("phase")
+start = 115.0
+rate = 13.0
+xp_bonus = 1.0
+attack_budget = 5
+id = &"s5_peak_2"
+display_name = "山2"
+
+[sub_resource type="Resource" id="Phase4"]
+script = ExtResource("phase")
+start = 170.0
+rate = 14.0
+xp_bonus = 1.6
+attack_budget = 4
+id = &"s5_grow_3"
+display_name = "育成3"
+
+[sub_resource type="Resource" id="Phase5"]
+script = ExtResource("phase")
+start = 195.0
+rate = 15.0
+xp_bonus = 1.0
+attack_budget = 7
+id = &"s5_peak_3"
+display_name = "山3"
+
+[sub_resource type="Resource" id="Phase6"]
+script = ExtResource("phase")
+start = 265.0
+rate = 16.0
+xp_bonus = 1.6
+attack_budget = 5
+id = &"s5_grow_4"
+display_name = "育成4"
+
+[sub_resource type="Resource" id="Phase7"]
+script = ExtResource("phase")
+start = 290.0
+rate = 17.0
+xp_bonus = 1.0
+attack_budget = 8
+id = &"s5_peak_4"
+display_name = "山4"
+
+[sub_resource type="Resource" id="Phase8"]
+script = ExtResource("phase")
+start = 370.0
+rate = 18.0
+xp_bonus = 1.6
+attack_budget = 5
+id = &"s5_grow_5"
+display_name = "育成5"
+
+[sub_resource type="Resource" id="Phase9"]
+script = ExtResource("phase")
+start = 395.0
+rate = 19.0
+xp_bonus = 1.0
+attack_budget = 9
+id = &"s5_peak_5"
+display_name = "山5"
+
+[sub_resource type="Resource" id="Phase10"]
+script = ExtResource("phase")
+start = 480.0
+rate = 20.0
+xp_bonus = 1.0
+attack_budget = 6
+id = &"s5_peak_6"
+display_name = "山6"
+
+[sub_resource type="Resource" id="Curve_biter"]
+script = ExtResource("curve")
+type = &"biter"
+points = PackedVector2Array(0, 24, 42, 24, 45, 28, 87, 28, 90, 36, 112, 36, 115, 40, 167, 40, 170, 48, 192, 48, 195, 52, 262, 52, 265, 64, 287, 64, 290, 68, 367, 68, 370, 80, 392, 80, 395, 88, 477, 88, 480, 0)
+
+[sub_resource type="Resource" id="Curve_splitter"]
+script = ExtResource("curve")
+type = &"splitter"
+points = PackedVector2Array(0, 18, 42, 18, 45, 6, 87, 6, 90, 24, 112, 24, 115, 8, 167, 8, 170, 28, 192, 28, 195, 10, 262, 10, 265, 32, 287, 32, 290, 12, 367, 12, 370, 36, 392, 36, 395, 14, 477, 14, 480, 0)
+
+[sub_resource type="Resource" id="Curve_bomber"]
+script = ExtResource("curve")
+type = &"bomber"
+points = PackedVector2Array(0, 0, 42, 0, 45, 3, 87, 3, 90, 3, 112, 3, 115, 5, 167, 5, 170, 5, 192, 5, 195, 8, 262, 8, 265, 7, 287, 7, 290, 11, 367, 11, 370, 10, 392, 10, 395, 16, 477, 16, 480, 0)
 
 [resource]
-script = ExtResource("1")
+script = ExtResource("stage")
 index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7")]
+phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10")]
+enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila"])
+enemy_attack_values = {
+"aquila": 3.0,
+"auriga": 1.5,
+"biter": 0.1,
+"bomber": 0.3,
+"cepheus": 2.0,
+"cepheus_soldier": 0.2,
+"crab": 1.0,
+"cross": 1.0,
+"crow": 0.2,
+"dolphin": 1.0,
+"pump": 1.0,
+"splitter": 0.1
+}
+zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
+clips = Array[ExtResource("clip")]([SubResource("Clip0"), SubResource("Clip1"), SubResource("Clip2"), SubResource("Clip3"), SubResource("Clip4"), SubResource("Clip5"), SubResource("Clip6"), SubResource("Clip7"), SubResource("Clip8"), SubResource("Clip9"), SubResource("Clip10"), SubResource("Clip11")])
+track_names = PackedStringArray("育成の強敵", "山1・2", "からす", "大物の山")
+boss_time = 480.0
 time_limit = 900.0
-boss_id = &""
-boss_enabled = false
+boss_id = &"draco"

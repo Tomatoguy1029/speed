@@ -1,0 +1,8 @@
+[gd_resource type="Resource" load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/data_types/boss_flow_def.gd" id="1"]
+[resource]
+script = ExtResource("1")
+maximum_stamina = 4.0
+partial_rest = 0.8
+empty_rest = 2.0
+sections = [{"name":"本体攻撃","request":"any","cap":4.0,"next":0,"weights":{"single":100.0,"combo":100.0,"major":100.0}}]

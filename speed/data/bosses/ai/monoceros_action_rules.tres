@@ -1,6 +1,6 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" format=3 uid="uid://bbccqeoqelrve"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_fdbe4"]
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_fdbe4"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/kick.tres" id="2_glkwt"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/lance.tres" id="3_ia7vf"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/combo.tres" id="4_gnbgk"]
@@ -17,7 +17,7 @@ conditions = {
 "charge": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 100000.0,
+"max": 1000.0,
 "min": 0.0,
 "min_phase": 1
 },
@@ -45,7 +45,7 @@ conditions = {
 "return_charge": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 2000.0,
+"max": 1000.0,
 "min": 280.0,
 "min_phase": 1
 },
@@ -64,4 +64,29 @@ costs = {
 "lance": 3.0,
 "return_charge": 3.0,
 "sweep": 1.0
+}
+layout = {
+"charge": Vector2(40, 614),
+"choose_combo": Vector2(752, 116),
+"choose_major": Vector2(1464, 119.99997),
+"choose_normal": Vector2(40, 116),
+"combo": Vector2(752, 314),
+"kick": Vector2(40, 314),
+"lance": Vector2(1464, 314),
+"return_charge": Vector2(1084, 314),
+"sweep": Vector2(380, 314)
+}
+condition_groups = {
+"choose_combo": {
+"nodes": ["combo", "return_charge"],
+"title": "コンボ"
+},
+"choose_major": {
+"nodes": ["lance"],
+"title": "大技"
+},
+"choose_normal": {
+"nodes": ["kick", "sweep", "charge"],
+"title": "通常技"
+}
 }

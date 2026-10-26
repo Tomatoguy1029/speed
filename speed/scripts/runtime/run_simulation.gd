@@ -227,8 +227,16 @@ func _leave_bonus() -> void:
 func _play_tick(real_dt: float) -> void:
 	state.sim_time += real_dt
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
+	if bosses.actor != null and bosses.actor.get("mode")==&"finale":
+		bosses.actor.advance_finale(real_dt,it)
+		_check_end()
+		return
 	if input != null:
 		input.drawing = state.drawing
+	if state.steering_locked: it = Intent.new()
+	if state.controls_locked:
+		it = Intent.new()
+		state.ship_vel = Vector2.ZERO
 	ship.intent = it
 	draw.intent = it
 	draw.handle_input()
@@ -364,6 +372,9 @@ func _view_size() -> Vector2:
 	return view_size_source.call() if view_size_source.is_valid() else Vector2(1280, 720)
 
 func _update_camera(real_dt: float) -> void:
+	if state.cinematic_camera:
+		state.view_half=_view_size()/2.0/maxf(0.001,state.camera_zoom)
+		return
 	var size := _view_size()
 	var zoom_t := _base_zoom()
 	if not _cam_ready:
@@ -450,6 +461,10 @@ func _begin_finish() -> void:
 	projectiles.clear_hostile()
 	state.emit(&"boss_finish", {"pos": finish_origin})
 	set_phase(RunState.Phase.FINISHING)
+	if state.draco_finish_done:
+		finish_replay.clear()
+		sequence_t=finish_reveal_start()+finish_reveal_duration()
+		_finish_blast()
 
 ## 表示するだけ。既存の報酬付与は finish → GameManager → SaveManager が1回行う。
 func finish_legendary() -> LegendaryModuleDef:

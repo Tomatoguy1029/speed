@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://b5ynln1hy5dmj"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_rdo7f"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_id2uc"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_acusr"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_g53gn"]
+
+[node name="Stage3Lynx" type="Node2D" unique_id=1462650156]
+script = ExtResource("1_rdo7f")
+types = Array[StringName]([&"lynx"])
+
+[node name="単体" type="Node2D" parent="." unique_id=1380940436]
+position = Vector2(-2400, 0)
+script = ExtResource("2_id2uc")
+
+[node name="Lynx" type="Node2D" parent="単体" unique_id=1063353023]
+script = ExtResource("3_acusr")
+enemy = &"lynx"
+
+[node name="正面" type="Node2D" parent="." unique_id=1183137142]
+position = Vector2(0, -1900)
+rotation = 3.1415927
+script = ExtResource("4_g53gn")
+weight = 2.0
+
+[node name="左前" type="Node2D" parent="." unique_id=414890150]
+position = Vector2(-1545.9999, -1148)
+rotation = 2.2095199
+script = ExtResource("4_g53gn")
+
+[node name="右前" type="Node2D" parent="." unique_id=870306583]
+position = Vector2(1520, -1140)
+rotation = 4.0688877
+script = ExtResource("4_g53gn")

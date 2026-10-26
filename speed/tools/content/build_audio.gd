@@ -14,6 +14,7 @@ static func build(output: String) -> Error:
 	_sounds[&"pickup"] = _tone(880.0, 1200.0, 0.05, "sine")
 	_sounds[&"dash"] = _tone(200.0, 900.0, 0.18, "noise")
 	_sounds[&"shoot"] = _tone(700.0, 500.0, 0.04, "square")
+	_sounds[&"roar"] = _tone(90.0,38.0,1.0,"saw")
 	_sounds[&"boom"] = _tone(120.0, 30.0, 0.5, "noise")
 	_sounds[&"ui"] = _tone(660.0, 660.0, 0.04, "sine")
 

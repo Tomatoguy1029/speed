@@ -23,6 +23,15 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 
 生成対象は以下のマーカー内だけとする。採用前の文言は[文書の運用規定](../README.md#1-置き場)に従い、リポジトリの外で検討する。新しい敵・英雄・ボスを追加するときは、その `.tres` の `display_name` もリソース表示名の表へ登録する。データ編集画面で名前を試したら、採用する値をこの表へ戻して生成する。
 
+## 演出用の台詞
+
+主人公の台詞はごく少量に抑え、物語と感情は映像を中心に伝える。以下は導入とラスボス対面に使う日本語の台詞とする。提示方法と英訳は未決、演出への接続は未実装。翻訳キーへの登録は演出実装時に行う。
+
+| 場面 | 話者 | 日本語 |
+|---|---|---|
+| [冒頭の竜が去る場面](art-style.md#38-導入) | 主人公 | 何事だ！？ |
+| [ラスボスとの対面前に星空を眺める場面](bosses/draco.md#83-ラスボス戦の登場) | 主人公 | あぁ、なんて綺麗なんだ。ずっと見ていたい |
+
 ## 翻訳文
 
 <!-- csv:start -->
@@ -734,6 +743,10 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.hydra&#95;rubble.kill | 体当たりは弾かれる。武器で壊せる | Rams bounce off. Weapons break it |
 | lab.enemy.monoceros.move | 予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う | Locks its direction after a warning, then charges, sweeps its horn, or kicks backward |
 | lab.enemy.monoceros.kill | 技後の隙や惑星に角が刺さった時に攻める | Strike during its recovery or while its horn is stuck in a planet |
+| lab.enemy.centaurus.move | 距離を取って矢を速射し、引き絞った強弓を射り、前方を走るトレースに矢の雨を降らせる。近づくと走って離れ、背後に回ると赤く光ってから背後を攻撃する | Keeps its distance, fires rapid arrows, looses a drawn power shot, and rains arrows along traces that sweep ahead. Gallops away when approached, and glows red before striking anything behind it |
+| lab.enemy.canis&#95;major.move | 猟犬の群れを前に並べて追い、身を低くしてから飛びかかる。吠えると群れが一斉に飛び出し、口元に溜めたシリウスの光をまっすぐ吐く | Leads a wedge of hounds ahead of it, crouches before pouncing, barks to send the pack lunging, and breathes a straight beam of Sirius light |
+| lab.enemy.canis&#95;major.kill | 飛び出した群れの列ごと貫くか、飛びかかりの着地を攻める | Pierce the lunging pack in one line, or strike after it lands from a pounce |
+| lab.enemy.centaurus.kill | 強弓の構えと射終わりの硬直に、突進で追いついて攻める | Dash in while it draws the power shot or recovers after shooting |
 | lab.enemy.hydra.move | 中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する | Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes |
 | lab.enemy.hydra.kill | 中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す | Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer |
 | lab.ui.freehand | 自由に描く | Freehand |
@@ -896,4 +909,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | heroes/perseus.tres | ペルセウス座 |
 | bosses/monoceros.tres | いっかくじゅう座 |
 | bosses/hydra.tres | うみへび座 |
+| bosses/draco.tres | りゅう座 |
+| bosses/centaurus.tres | ケンタウルス座 |
+| bosses/canis&#95;major.tres | おおいぬ座 |
 <!-- resources:end -->

@@ -26,7 +26,7 @@ static func is_current(output := ROOT) -> bool:
 		if not FileAccess.file_exists(path): return false
 	return true
 static func build_all(force := false, output := ROOT) -> Error:
-	for id in ["hydra", "monoceros"]:
+	for id in ["hydra", "monoceros", "draco", "centaurus", "canis_major"]:
 		var boss: Dictionary = preload("res://tools/content/build_boss_program.gd").build_boss(id, output.path_join("boss_" + id + ".tres"))
 		if boss.error != OK: return boss.error
 	if not force and is_current(output): return OK
@@ -34,6 +34,8 @@ static func build_all(force := false, output := ROOT) -> Error:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
 	var visual_error: Error = load("res://tools/content/build_visuals.gd").build(output)
 	if visual_error != OK: return visual_error
+	var aura_error: Error = preload("res://tools/content/build_hero_aura.gd").build(output)
+	if aura_error != OK: return aura_error
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 	var error: Error = load("res://tools/content/build_catalog.gd").build(catalog_path)
 	if error != OK: return error

@@ -1,5 +1,8 @@
 ## パーツの走りは世界時間、向きは役者と同じ戦闘方向へ同期する。
 extends Node2D
+@export var pixel_size := 3.0
+var lance_afterglow := 0.0
+var lance_points := PackedVector2Array()
 const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
@@ -16,10 +19,14 @@ func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	_sync_parts(0.0)
 
 func _event(event: Dictionary) -> void:
+	if event.cue == &"recovery_started" and event.technique == &"lance":
+		lance_points = actor.horn_points()
+		lance_afterglow = float(actor.def.params.get("lance_hold", 0.12)) + float(actor.def.params.get("lance_fade", 0.45))
 	if event.cue == &"hit": hit = 0.18
 	queue_redraw()
 
 func _advance(dt: float) -> void:
+	lance_afterglow = maxf(0.0, lance_afterglow - dt)
 	hit = maxf(0.0, hit - dt)
 	_sync_parts(dt)
 	queue_redraw()
@@ -39,15 +46,39 @@ func _sync_parts(dt: float) -> void:
 		var points := actor.horn_points()
 		neck_angle = angle_difference(actor.table.facing[actor.body], (points[1] - actor.table.pos[actor.body]).angle())
 	parts.get_node("Head").rotation = neck_angle
+	var sword := parts.get_node("Head/SwordGlow") as Polygon2D
+	sword.visible = actor.phase == 2
+	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
+	parts.get_node("Head/SwordGlow/Guard").visible = sword.visible
 
 func _body_point(world_point: Vector2) -> Vector2:
 	# 旋回したフレームも、役者ノードの描画更新を待たず戦闘方向を使う。
 	return (world_point - actor.table.pos[actor.body]).rotated(-actor.table.facing[actor.body])
 
+func booster_strength() -> float:
+	if actor == null or actor.mode == &"defeated": return 0.0
+	if actor.mode == &"entrance": return 2.0
+	return 2.5 if actor.mode == &"active" and actor.technique in [&"charge", &"return_charge"] else 0.55
+
+func _booster() -> void:
+	var strength := booster_strength()
+	if strength <= 0.0: return
+	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength
+	for layer in 3:
+		var factor := 1.0 - float(layer) * 0.24
+		for j in 12:
+			var t := float(j) / 12.0
+			var height := maxf(pixel_size, (24.0 - t * 22.0) * factor)
+			var at := Vector2(-96.0 - length * t * factor, sin(actor.clock * 20.0 - t * 8.0) * 7.0 * t * factor - height * 0.5).snapped(Vector2.ONE * pixel_size)
+			draw_rect(Rect2(at, Vector2(maxf(pixel_size, length * factor / 12.0), height)), [Color("#245c96"), Color("#61c9ff"), Color("#e0fbff")][layer])
+
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (actor.table.r[actor.body] / 96.0))
+	_booster()
 	# 正確な攻撃線をワールド→役者座標へ戻す。警告と攻撃の幅は共通。
 	draw_set_transform(Vector2.ZERO)
+	_lance_remnants()
 	if actor.mode in [&"windup", &"active"]:
 		var color := DANGER if actor.mode==&"active" else WARNING
 		var width := float(actor.def.params.horn_width)
@@ -75,3 +106,19 @@ func _draw() -> void:
 		var at := _body_point(actor.table.pos[actor.body]+actor.direction*actor.horn_length())
 		for j in 3:
 			draw_line(at+Vector2(-15,j*10-10),at+Vector2(15,j*10-10),WARNING,3.0,false)
+
+func _lance_remnants() -> void:
+	if lance_afterglow <= 0.0 or lance_points.size() != 2: return
+	var fade := maxf(0.01, float(actor.def.params.get("lance_fade", 0.45)))
+	var a := _body_point(lance_points[0])
+	var b := _body_point(lance_points[1])
+	if lance_afterglow > fade:
+		draw_line(a, b, Color("#eaffff"), 13.0, false)
+		return
+	var progress := 1.0 - lance_afterglow / fade
+	var side := (b-a).normalized().orthogonal()
+	for j in 32:
+		var t := float(j) / 31.0
+		var spread := sin(float(j) * 17.3) * 90.0 * progress
+		var at := (a.lerp(b,t) + side * spread).snapped(Vector2.ONE * pixel_size)
+		draw_rect(Rect2(at,Vector2.ONE * (6.0 - progress * 3.0)), Color(ENERGY, 1.0-progress))

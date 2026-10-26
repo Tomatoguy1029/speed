@@ -315,6 +315,7 @@ func _draw() -> void:
 			draw_arc(point, maxf(8, float(entry.get("radius", 0)) * zoom), 0, TAU, 32, Color("#9d8ccf"), 1)
 			draw_string(ThemeDB.fallback_font, point + Vector2(8, 8), "%s ×%d / %.1fs" % [String(entry.get("type", "")), int(entry.get("count", 1)), float(entry.get("interval", 1))], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c0b0e2"))
 	_draw_projectiles(run.projectiles)
+	_draw_boss_ranges(run)
 	var t := run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i]:
@@ -400,6 +401,21 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_po
 		if endpoint or (edit_points and pts.size() <= 16):
 			var number := str(i + 1) if edit_points else ("1" if i == 0 else "2")
 			draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), number, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
+
+## 本番の画面に出さないボスの攻撃範囲（lab_ranges() を持つボス）を重ねる。選択中のボスは構えていない間の範囲も描く。
+func _draw_boss_ranges(run: RunSimulation) -> void:
+	if not show_ranges:
+		return
+	for actor in run.bosses.actors:
+		if not is_instance_valid(actor) or not actor.body_alive() or not actor.has_method("lab_ranges"):
+			continue
+		var selected: bool = session.selected == actor.body or selection.has(actor.body_id)
+		for shape: Dictionary in actor.lab_ranges(selected):
+			var color := Color("#ff6b7a") if shape.active else Color("#e6b969")
+			var pos := screen(shape.center)
+			var radius := float(shape.radius) * zoom
+			draw_circle(pos, radius, Color(color, 0.1 if shape.active else 0.05))
+			draw_arc(pos, radius, 0, TAU, 48, color, 2)
 
 func _draw_projectiles(p: ProjectileSystem) -> void:
 	if show_ranges and p.director != null:

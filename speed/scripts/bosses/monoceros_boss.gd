@@ -31,6 +31,9 @@ var previous_ship := Vector2.ZERO
 var previous_horn := PackedVector2Array()
 var _defeated := false
 var _presentation: Node
+var entrance_time := 0.0
+var entrance_from := Vector2.ZERO
+var entrance_target := Vector2.ZERO
 var _cooldown := 0.0
 var selection_enabled := true
 var action_rules: Resource
@@ -62,6 +65,16 @@ func _on_bound() -> void:
 		add_child(_presentation)
 		_presentation.bind_monoceros(self)
 	_cue(&"spawned")
+	if not run_state.lab_mode: begin_entrance()
+
+func begin_entrance() -> void:
+	entrance_target = table.pos[body]
+	entrance_from = entrance_target - Vector2(maxf(1000.0, run_state.view_half.x * 2.0), 0.0)
+	entrance_time = 0.0
+	mode = &"entrance"
+	table.pos[body] = entrance_from
+	table.facing[body] = 0.0
+	_cue(&"entering")
 
 func on_body_damaged() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold):
@@ -90,7 +103,18 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
 	turn_motion = 0.0
-	if final_strike_t >= 0.0:
+	if mode == &"entrance":
+		entrance_time += dt
+		var duration := maxf(0.05, float(def.params.get("entrance_time", 1.4)))
+		var progress := clampf(entrance_time / duration, 0.0, 1.0)
+		var before := table.pos[body]
+		table.pos[body] = entrance_from.lerp(entrance_target, 1.0 - pow(1.0 - progress, 3.0))
+		table.vel[body] = (table.pos[body] - before) / dt
+		if progress >= 1.0:
+			mode = &"idle"
+			table.vel[body] = Vector2.ZERO
+			_cue(&"entrance_finished")
+	elif final_strike_t >= 0.0:
 		_final_strike_tick(dt)
 	elif mode == &"stuck":
 		stuck_time -= dt
@@ -151,7 +175,7 @@ func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.enemy_aim - table.pos[body]).rotated(-table.facing[body]))
 
 func selection_blocked() -> bool:
-	return not body_alive() or not selection_enabled or mode in [&"phase", &"final", &"defeated"]
+	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
 
 func can_begin_sequence() -> bool:
 	return mode == &"idle" and _cooldown <= 0.0 and reposition <= 0.0

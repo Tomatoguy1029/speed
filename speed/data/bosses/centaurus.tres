@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="BossDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+radius = 90.0
+use_def_stats = true
+hp = 3000.0
+armor = 12.0
+speed = 150.0
+accel = 3.0
+turn = 2.4
+xp = 120.0
+weak_arc = 0.0
+params = {
+"initial_wait": 1.2,
+"entrance_time": 1.4,
+"keep_min": 700.0,
+"keep_max": 1000.0,
+"run_speed": 280.0,
+"retreat_trigger": 420.0,
+"retreat_far": 900.0,
+"retreat_max": 1.6,
+"retreat_turn": 0.4,
+"retreat_cd": 2.0,
+"guard_search": 800.0,
+"guard_min": 3,
+"guard_scan": 0.25,
+"bow_reach": 0.9,
+"final_beam_width": 5000.0,
+"final_reach": 6000.0,
+"final_warn_width": 18.0,
+"final_widen_time": 0.35
+}
+id = &"centaurus"
+display_name = "ケンタウルス座"
+scene_path = "res://scenes/bosses/centaurus_boss.tscn"

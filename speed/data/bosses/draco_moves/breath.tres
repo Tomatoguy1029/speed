@@ -1,0 +1,8 @@
+[gd_resource type="Resource" load_steps=3 format=3]
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/draco_breath.gd" id="2"]
+[resource]
+script = ExtResource("1")
+technique = &"breath"
+category = &"single"
+parameters = {"driver": ExtResource("2"), "warn": 1.1, "active": 2.4, "recover": 1.5, "damage": 32.0, "reach": 1500.0, "width": 40.0, "rocks": 3, "rock_hp": 100.0, "rock_radius": 65.0, "rock_distance": 300.0, "rock_spacing": 180.0, "half_angle": 0.24, "sweep": 1.2}
