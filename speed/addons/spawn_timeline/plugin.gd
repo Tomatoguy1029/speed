@@ -18,6 +18,7 @@ var _save_queued := false
 var _phase_histories: Array[UndoRedo] = []
 
 func _enter_tree() -> void:
+	add_to_group("speed_spawn_timeline")
 	_panel = Timeline.new()
 	_panel.undo_redo = get_undo_redo()
 	add_control_to_bottom_panel(_panel, TITLE)
@@ -32,6 +33,16 @@ func _enter_tree() -> void:
 	# 開いたステージは、インスペクターの対象が変わったときに拾う（上部の画面へ勝手に切り替えないように _handles は使わない）
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	EditorInterface.get_inspector().property_edited.connect(_on_property_edited)
+
+func open_timeline() -> void:
+	if _panel.stage == null:
+		var path: String = ProjectSettings.get_setting("spawn_timeline/default_stage", "")
+		if ResourceLoader.exists(path):
+			var stage := load(path) as Resource
+			_panel.set_stage(stage)
+			_main.set_stage(stage)
+	EditorInterface.set_main_screen_editor(TITLE)
+	make_bottom_panel_item_visible(_panel)
 
 func _exit_tree() -> void:
 	if EditorInterface.get_inspector().property_edited.is_connected(_on_property_edited):

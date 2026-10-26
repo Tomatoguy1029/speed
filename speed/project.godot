@@ -62,6 +62,7 @@ textures/vram_compression/import_etc2_astc=true
 
 enemy_dir="res://data/enemies"
 defaults_resource="res://data/config.tres"
+default_stage="res://data/stages/stage_1.tres"
 
 [speed_data_editor]
 

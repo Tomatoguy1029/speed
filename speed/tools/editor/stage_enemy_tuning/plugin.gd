@@ -7,6 +7,7 @@ var _panel: Control
 var _inspected: StageDef
 
 func _enter_tree() -> void:
+	add_to_group("speed_stage_enemy_tuning")
 	# 折り返す説明文や一覧の最小サイズを、エディター全体へ伝えない。
 	_dock = ScrollContainer.new()
 	_dock.name = "ステージ敵調整"
@@ -21,6 +22,13 @@ func _enter_tree() -> void:
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	_on_inspected.call_deferred()
+
+func open_dock() -> void:
+	if _panel.stage_path.is_empty():
+		_panel.open_stage("res://data/stages/stage_1.tres")
+	var tabs := _dock.get_parent() as TabContainer
+	if tabs != null:
+		tabs.current_tab = _dock.get_index()
 
 func _exit_tree() -> void:
 	EditorInterface.get_inspector().edited_object_changed.disconnect(_on_inspected)

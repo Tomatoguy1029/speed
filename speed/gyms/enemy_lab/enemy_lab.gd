@@ -52,6 +52,9 @@ var _branch: OptionButton
 var _left: Control
 var _right: Control
 var _messages: Label
+var _hitstop_type: OptionButton
+var _hitstop_value: SpinBox
+var _hitstop_status: Label
 
 func _ready() -> void:
 	if not OS.is_debug_build():
@@ -102,6 +105,85 @@ func _build_ui() -> void:
 	workspace = WORKSPACE.new()
 	workspace.build(self)
 	_fill_palette()
+
+## 試遊中も触れる種類別ヒットストップ。変更は LabSession の履歴だけに記録する。
+func build_hitstop_controls(parent: Node) -> void:
+	var row := HFlowContainer.new()
+	parent.add_child(row)
+	_label(row, "ヒットストップ（試遊のみ）")
+	_hitstop_type = OptionButton.new()
+	_hitstop_type.custom_minimum_size.x = 170
+	_hitstop_type.tooltip_text = "対象の敵種類。選択中の個体の種類にも切り替えられます。"
+	for def in ContentManager.sorted(ContentManager.enemies):
+		if def is EnemyDef and def.behavior != &"part":
+			var index := _hitstop_type.item_count
+			_hitstop_type.add_item("%s (%s)" % [def.display_name, def.id])
+			_hitstop_type.set_item_metadata(index, {"id": String(def.id), "boss": false})
+	for def in ContentManager.sorted(ContentManager.bosses):
+		var index := _hitstop_type.item_count
+		_hitstop_type.add_item("%s (%s)" % [def.display_name, def.id])
+		_hitstop_type.set_item_metadata(index, {"id": String(def.id), "boss": true})
+	row.add_child(_hitstop_type)
+	_hitstop_type.item_selected.connect(func(_index): _refresh_hitstop())
+	_button(row, "選択中の敵", _pick_selected_hitstop_type)
+	_hitstop_value = _spin(row, 0.0, 100000.0, 1.0)
+	_hitstop_value.step = 0.05
+	_hitstop_value.custom_minimum_size.x = 90
+	_hitstop_value.tooltip_text = "0: 停止なし / 1: 共通時間。現在の敵と次に出現する同種へ即時反映。"
+	_hitstop_value.value_changed.connect(_preview_hitstop)
+	_button(row, "元の値へ戻す", _restore_hitstop)
+	_hitstop_status = _label(row, "")
+	_hitstop_status.tooltip_text = "Resource へは保存しません。恒久保存は Godot のプロジェクト → ツール → SPEED → データ編集／ステージ敵調整。"
+	if _hitstop_type.item_count > 0: _hitstop_type.select(0)
+
+func _hitstop_target() -> Dictionary:
+	return _hitstop_type.get_item_metadata(_hitstop_type.selected) if _hitstop_type != null and _hitstop_type.selected >= 0 else {}
+
+func _pick_selected_hitstop_type() -> void:
+	if session.selected < 0:
+		_messages.text = "先に実験場の敵を選択してください。"
+		return
+	var type := String(session.run.enemies.table.type[session.selected])
+	for index in _hitstop_type.item_count:
+		if _hitstop_type.get_item_metadata(index).id == type:
+			_hitstop_type.select(index)
+			_refresh_hitstop()
+			return
+
+func _authored_hitstop(target: Dictionary) -> float:
+	var id := StringName(target.id)
+	if target.boss:
+		return ContentManager.bosses[id].hitstop_multiplier
+	var source: EnemyDef = ContentManager.enemies[id]
+	var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
+	var values: Dictionary = stage.enemy_tuning.get(String(id), {}) if stage != null else {}
+	return float(values.get("hitstop_multiplier", source.hitstop_multiplier))
+
+func _effective_hitstop(target: Dictionary) -> float:
+	if target.boss:
+		var boss: BossDef = session.run.bosses.definitions.get(StringName(target.id))
+		return boss.hitstop_multiplier if boss != null else _authored_hitstop(target)
+	var enemy: EnemyDef = session.run.enemies.def_of(StringName(target.id))
+	return enemy.hitstop_multiplier if enemy != null else _authored_hitstop(target)
+
+func _preview_hitstop(value: float) -> void:
+	var target := _hitstop_target()
+	if target.is_empty() or session.seeking or not is_instance_valid(session.run): return
+	session.perform("boss_parameter" if target.boss else "parameter", {"type": target.id, "key": "hitstop_multiplier", "value": value})
+	_refresh_hitstop()
+
+func _restore_hitstop() -> void:
+	var target := _hitstop_target()
+	if not target.is_empty(): _preview_hitstop(_authored_hitstop(target))
+
+func _refresh_hitstop() -> void:
+	if _hitstop_value == null or not is_instance_valid(session.run): return
+	var target := _hitstop_target()
+	if target.is_empty(): return
+	var authored := _authored_hitstop(target)
+	var current := _effective_hitstop(target)
+	_hitstop_value.set_value_no_signal(current)
+	_hitstop_status.text = "元 %.2f → 試遊 %.2f%s" % [authored, current, "（未保存）" if not is_equal_approx(authored, current) else ""]
 
 func _fill_palette() -> void:
 	for child in _palette.get_children():
@@ -445,6 +527,7 @@ func _export() -> void:
 func _refresh() -> void:
 	if not is_instance_valid(session.run):
 		return
+	_refresh_hitstop()
 	workspace.sync()
 	_seek.max_value = maxf(1, session.furthest)
 	if not _scrubbing:
