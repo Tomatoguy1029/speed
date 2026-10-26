@@ -20,10 +20,10 @@ const SCENES := {
 	"profile": "res://tools/profile_run.tscn",
 }
 const EDITOR_TOOLS := [
-	["データ編集", "speed_data_editor", "open_window"],
-	["ボス行動", "speed_boss_flow", "open_editor"],
-	["出現タイムライン・編成", "speed_spawn_timeline", "open_timeline"],
-	["ステージ敵調整", "speed_stage_enemy_tuning", "open_dock"],
+	["データ編集", "speed_data_editor", "open_window", "res://addons/speed_data_editor/plugin.gd"],
+	["ボス行動", "speed_boss_flow", "open_editor", "res://tools/editor/boss_flow/plugin.gd"],
+	["出現タイムライン・編成", "speed_spawn_timeline", "open_timeline", "res://addons/spawn_timeline/plugin.gd"],
+	["ステージ敵調整", "speed_stage_enemy_tuning", "open_dock", "res://tools/editor/stage_enemy_tuning/plugin.gd"],
 ]
 
 var _button: Button = null
@@ -62,8 +62,8 @@ func _rebuild_menu() -> void:
 	_actions.clear()
 	_menu.add_separator("編集")
 	for entry in EDITOR_TOOLS:
-		if not get_tree().get_nodes_in_group(entry[1]).is_empty():
-			_add_action(entry[0], ["plugin", entry[1], entry[2]])
+		if _find_editor_plugin(entry[1], entry[3]) != null:
+			_add_action(entry[0], ["plugin", entry[1], entry[2], entry[3]])
 	_menu.add_separator("起動・試遊")
 	_add_action("編集中のステージを起動", ["stage"])
 	for entry in [["敵・ルート実験場", "lab"], ["ボス技試遊", "boss_trial"], ["Hydra 試遊", "hydra_trial"]]:
@@ -94,11 +94,38 @@ func _dispatch_menu(id: int) -> void:
 		"scene": EditorInterface.play_custom_scene(SCENES[action[1]])
 		"edit_scene": EditorInterface.open_scene_from_path(SCENES[action[1]])
 		"plugin":
-			var owners := get_tree().get_nodes_in_group(action[1])
-			if owners.is_empty():
+			var owner := _find_editor_plugin(action[1], action[3])
+			if owner == null:
 				push_warning("SPEED ツールは現在無効です: %s" % action[1])
 				return
-			owners[0].call(action[2])
+			if owner.has_method(action[2]):
+				owner.call(action[2])
+			else:
+				_open_loaded_legacy_plugin(owner, action[1])
+
+## 外部で更新されたスクリプトは、開いたままのエディター内では旧インスタンスが残る。
+## グループ登録前の実体も識別し、編集中のパネルを破棄せずに使えるようにする。
+func _find_editor_plugin(group: String, script_path: String) -> EditorPlugin:
+	for node in get_tree().get_nodes_in_group(group):
+		if node is EditorPlugin:
+			return node
+	for node in get_tree().root.find_children("*", "EditorPlugin", true, false):
+		var script: Script = node.get_script()
+		if script != null and script.resource_path == script_path:
+			return node
+	return null
+
+func _open_loaded_legacy_plugin(owner: EditorPlugin, group: String) -> void:
+	match group:
+		"speed_data_editor": owner.call("_open")
+		"speed_boss_flow": EditorInterface.set_main_screen_editor("ボス行動")
+		"speed_spawn_timeline": EditorInterface.set_main_screen_editor("出現タイムライン")
+		"speed_stage_enemy_tuning":
+			var dock: Control = owner.get("_dock")
+			if dock != null:
+				dock.custom_minimum_size.x = 160
+				if dock.get_parent() is TabContainer:
+					(dock.get_parent() as TabContainer).current_tab = dock.get_index()
 
 ## 既定では右端に置かれて見つけにくいので、「2D／3D／スクリプト」の並びの直後へ移す。
 ## エディタ内部のノードが見つからなければ、既定の位置のままにする。

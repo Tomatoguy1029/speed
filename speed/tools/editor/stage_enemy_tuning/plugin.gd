@@ -11,7 +11,7 @@ func _enter_tree() -> void:
 	# 折り返す説明文や一覧の最小サイズを、エディター全体へ伝えない。
 	_dock = ScrollContainer.new()
 	_dock.name = "ステージ敵調整"
-	_dock.custom_minimum_size = Vector2(280, 320)
+	_dock.custom_minimum_size = Vector2(160, 320)
 	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_dock.follow_focus = true
 	_panel = PANEL.new()
@@ -24,6 +24,7 @@ func _enter_tree() -> void:
 	_on_inspected.call_deferred()
 
 func open_dock() -> void:
+	_dock.custom_minimum_size.x = 160
 	if _panel.stage_path.is_empty():
 		_panel.open_stage("res://data/stages/stage_1.tres")
 	var tabs := _dock.get_parent() as TabContainer
