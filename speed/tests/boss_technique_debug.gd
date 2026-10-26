@@ -18,9 +18,17 @@ func exercise() -> void:
  for boss_index in 2:
   if boss_index == 1: await trial._switch_boss(1)
   trial.session.playing = false
+  # 起動中に実画面から記録した操舵を、低水準の固定更新試験へ持ち越さない。
+  # UIの実行経路は同じ消去を行うが、下のdebug.execute直接呼び出しは行わない。
+  trial._clear_trial_input()
   var session = trial.session
   var a = trial.preview_actor
   var debug = trial.manual
+  # 通常AIが既に技を選んだ後でも、手動実行がその実行状態を片付ける。
+  for tick in 1200:
+   if a.flow_runner.active: break
+   session.step()
+  check(a.flow_runner.active, "autonomous move starts before manual takeover")
   check(debug.moves().size() == (6 if boss_index == 0 else 13), "enumerate every registered move")
   var original_phase: int = a.phase
   var original_zoom: float = session.run.state.camera_zoom
@@ -57,6 +65,7 @@ func exercise() -> void:
    if boss_index == 1:
     check(a.retained_fields.is_empty() and a.picaro.members.is_empty() and a.placed_meteors.is_empty() and a.closing_walls.is_empty() and a.clone_damage_rows.is_empty(), "release move resources " + id)
    print("[boss-debug] ", a.def.id, "/", id, " phase=", phase, " repeated/active/recovery/completed")
+  if boss_index == 0: _check_melee_input_boundary(trial)
   check(not debug.execute("missing", 1), "unknown move rejected")
   check(not debug.execute(String(debug.moves()[0].technique), 99), "invalid phase rejected")
   var gated := "lance" if boss_index == 0 else "inhale"
@@ -138,3 +147,20 @@ func exercise() -> void:
  await create_timer(0.2).timeout
  print("[boss-debug] checks=", checks, " failures=", failures)
  quit(1 if failures else 0)
+
+func _check_melee_input_boundary(trial) -> void:
+ # 残留操舵は予告中に自機を背後角・射程の外へ動かす。実行ボタンは消去してから技を開始する。
+ for id in ["kick", "sweep"]:
+  for cursor in [Vector2(1000, 0), Vector2(-2000, 0)]:
+   trial.session.perform("input", {"has_cursor": true, "cursor": [cursor.x, cursor.y]})
+   check(trial.session._intent.has_cursor, "record startup steering before " + id)
+   trial._populate_moves(id)
+   trial._execute.grab_focus()
+   trial._execute.pressed.emit()
+   trial.session.playing = false
+   check(not trial.session._intent.has_cursor, "execute button clears startup steering")
+   for tick in 900:
+    trial.session.step()
+    if trial.preview_actor.mode == &"active": break
+   check(trial.preview_actor.mode == &"active", "execute button reaches real " + id + " with prior steering")
+   trial.manual.finish()

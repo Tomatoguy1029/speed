@@ -89,6 +89,7 @@ func _cleanup() -> void:
 	# この画面が所有する単独ボスのセッション。次の試行へ残留弾を持ち越さない。
 	if actor.flow_adapter != null: actor.flow_adapter.cancel()
 	actor.cancel_attack()
+	actor.flow_runner.active = false
 	if actor.def.id == &"draco":
 		actor.entrance.cancel()
 		actor.cycle.cancel()
