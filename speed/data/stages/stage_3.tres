@@ -307,7 +307,7 @@ enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx",
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
 clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela")])
 track_names = PackedStringArray("やまねこ座", "ぎょしゃ座", "かじき座", "みなみのかんむり座", "ほうおう座")
-boss_enabled = false
+boss_time = 455.0
 surge_phases = {
 "escape": false,
 "phase_1030509691842008278": false,
@@ -315,4 +315,5 @@ surge_phases = {
 "phase_5747225833786728851": false,
 "phase_6369425975374370843": false
 }
+boss_id = &"canis_major"
 legendary_module_id = &"legendary_keel"

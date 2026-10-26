@@ -744,6 +744,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.monoceros.move | 予告して向きを固定し、突進・角の薙ぎ・後ろ蹴りを使う | Locks its direction after a warning, then charges, sweeps its horn, or kicks backward |
 | lab.enemy.monoceros.kill | 技後の隙や惑星に角が刺さった時に攻める | Strike during its recovery or while its horn is stuck in a planet |
 | lab.enemy.centaurus.move | 距離を取って矢を速射し、引き絞った強弓を射り、前方を走るトレースに矢の雨を降らせる。近づくと走って離れ、背後に回ると赤く光ってから背後を攻撃する | Keeps its distance, fires rapid arrows, looses a drawn power shot, and rains arrows along traces that sweep ahead. Gallops away when approached, and glows red before striking anything behind it |
+| lab.enemy.canis&#95;major.move | 猟犬の群れを前に並べて追い、身を低くしてから飛びかかる。吠えると群れが一斉に飛び出す | Leads a wedge of hounds ahead of it, crouches before pouncing, and barks to send the pack lunging |
+| lab.enemy.canis&#95;major.kill | 飛び出した群れの列ごと貫くか、飛びかかりの着地を攻める | Pierce the lunging pack in one line, or strike after it lands from a pounce |
 | lab.enemy.centaurus.kill | 強弓の構えと射終わりの硬直に、突進で追いついて攻める | Dash in while it draws the power shot or recovers after shooting |
 | lab.enemy.hydra.move | 中央を守る首が3・5・8本へ増え、羅針盤で大技を予告する。瓦礫を壊すと蛇が分離する | Heads defend the core and grow from three to five to eight. The compass warns of major attacks. Breaking the rubble separates the snakes |
 | lab.enemy.hydra.kill | 中央の瓦礫を削る。全頭ダウンは攻めどき。分離後は羅針盤を持つ蛇を倒す | Damage the central rubble. Downing every head opens a chance. After separation, defeat the compass bearer |
@@ -909,4 +911,5 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | bosses/hydra.tres | うみへび座 |
 | bosses/draco.tres | りゅう座 |
 | bosses/centaurus.tres | ケンタウルス座 |
+| bosses/canis&#95;major.tres | おおいぬ座 |
 <!-- resources:end -->
