@@ -14,16 +14,25 @@ const STRING := Color("#f4ecd8")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
+const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
+## 矢の雨の矢の向き（画面の下向きから少し傾ける）
+const RAIN_ANGLE := PI * 0.5 - 0.35
+## 矢の雨のトレースと矢を描く層。本体の回転に付いていかないよう、ワールド座標で描く。
+var _rain_layer := Node2D.new()
 
 func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 	actor = owner_actor
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
 	z_index = 1
+	_rain_layer.top_level = true
+	_rain_layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_rain_layer.draw.connect(_draw_rain)
+	add_child(_rain_layer)
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"alert", &"released"]: pulse = 0.3
+	if event.cue in [&"alert", &"released", &"rain_started"]: pulse = 0.3
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -31,6 +40,52 @@ func _advance(dt: float) -> void:
 	pulse = maxf(0.0, pulse - dt)
 	gait += dt * (16.0 if actor.mode == &"retreat" else 7.0)
 	queue_redraw()
+	_rain_layer.queue_redraw()
+
+## まだ矢が着いていない帯を、円が走った跡として描く。矢は着弾点の上から降り、透明から不透明へ変わる。
+func _draw_rain() -> void:
+	if actor == null or actor.mode != &"rain": return
+	var r := actor.rule()
+	var radius := float(r.circle_radius)
+	var length := float(r.trace_length)
+	var speed := maxf(float(r.trace_speed), 1.0)
+	for trace in actor.rain_traces:
+		var head := clampf((actor.clock - float(trace.t0)) * speed, 0.0, length)
+		var landed := float(trace.landed)
+		if head <= landed: continue
+		var center := PackedVector2Array()
+		var s := landed
+		while s < head:
+			center.append(actor.trace_point(trace, s))
+			s += 14.0
+		center.append(actor.trace_point(trace, head))
+		if center.size() >= 2:
+			_rain_layer.draw_polyline(center, Color(WARNING, 0.2), radius * 2.0, true)
+			var left := PackedVector2Array()
+			var right := PackedVector2Array()
+			for j in center.size():
+				var along := center[mini(j + 1, center.size() - 1)] - center[maxi(j - 1, 0)]
+				var normal := along.normalized().orthogonal() * radius
+				left.append(center[j] + normal)
+				right.append(center[j] - normal)
+			_rain_layer.draw_polyline(left, Color(WARNING, 0.6), pixel_size, true)
+			_rain_layer.draw_polyline(right, Color(WARNING, 0.6), pixel_size, true)
+		# 走っている円
+		if head < length:
+			_rain_layer.draw_arc(actor.trace_point(trace, head), radius, 0.0, TAU, 32, Color(WARNING, 0.95), pixel_size, true)
+	var fall := maxf(float(r.fall), 0.001)
+	var fade := maxf(float(r.fade), 0.001)
+	var linger := float(r.linger)
+	var down := Vector2.from_angle(RAIN_ANGLE)
+	for arrow in actor.rain_arrows:
+		var t := actor.clock - arrow.z
+		if t < 0.0: continue
+		var f := clampf(t / fall, 0.0, 1.0)
+		# 落ちるほど速く降り、不透明へはキリっと切り替わる。
+		var at := Vector2(arrow.x, arrow.y) - down * float(r.drop_height) * (1.0 - f * f)
+		var opacity := pow(clampf(t / fade, 0.0, 1.0), 3.0)
+		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
+		LIGHT_ARROW.draw_arrow(_rain_layer, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity)
 
 func _poly(points: Array, color: Color) -> void:
 	var packed := PackedVector2Array()

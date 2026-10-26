@@ -1,11 +1,14 @@
-## ケンタウルス座。選択は共通フロー、距離取り・離脱・射撃は個別ロジックで進める。
+## ケンタウルス座。選択は共通フロー、距離取り・離脱・射撃・矢の雨は個別ロジックで進める。
 ## 予告・発射前の警告・発射・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
+## 矢の雨は、円が弧を走ったトレースの中へ、円を追って矢を降らせる。着弾は落とし始めから fall 遅れる。
 class_name CentaurusBoss
 extends "res://scripts/bosses/boss_final_strike.gd"
 
 signal presentation_event(event: Dictionary)
 signal presentation_advanced(world_dt: float)
 @export var presentation_scene: PackedScene
+## 刺さった矢の雨の矢が消えるまでの時間
+const RAIN_OUT := 0.15
 
 var phase := 1
 var mode: StringName = &"idle"
@@ -33,6 +36,12 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+## 矢の雨のトレース。start・dir・turn（曲がる向き ±1）・t0（走り始めの clock）・next_drop・landed・hit を持つ
+var rain_traces: Array[Dictionary] = []
+## 矢の雨の矢。x・y が着弾点、z が落とし始めの clock（時刻順）
+var rain_arrows := PackedVector3Array()
+var _rain_left := 0
+var _rain_next_at := 0.0
 
 func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
@@ -81,6 +90,7 @@ func _stop_combat() -> void:
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	timeline.stop()
+	_clear_rain()
 	mode = &"defeated"
 	table.vel[body] = Vector2.ZERO
 	table.charge[body] = 0.0
@@ -118,6 +128,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if recovery <= 0.0:
 			mode = &"idle"
 			technique = &""
+	elif mode == &"rain":
+		_rain_tick(dt)
 	elif mode in [&"windup", &"shooting"]:
 		table.vel[body] = Vector2.ZERO
 		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。
@@ -170,19 +182,23 @@ func start_attack(attack: StringName) -> bool:
 	return true
 
 func attack_playing() -> bool:
-	return mode in [&"windup", &"shooting", &"recovery"]
+	return mode in [&"windup", &"shooting", &"rain", &"recovery"]
 
 func cancel_attack() -> void:
 	timeline.stop()
+	_clear_rain()
 	alerting = false
 	recovery = 0.0
 	technique = &""
-	if mode in [&"windup", &"shooting", &"recovery"]: mode = &"idle"
+	if mode in [&"windup", &"shooting", &"rain", &"recovery"]: mode = &"idle"
 
 # ── 射撃 ──────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
 	if attack == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
+	if attack == &"rain":
+		var traces := int(r.traces)
+		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
 
 func _begin_windup(r: Dictionary, length: float) -> void:
@@ -190,14 +206,19 @@ func _begin_windup(r: Dictionary, length: float) -> void:
 	alerting = false
 	table.vel[body] = Vector2.ZERO
 	var anim := timeline.get_animation(&"attack")
-	anim.length = length
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	if technique == &"power_shot":
-		anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.alert)), {"method": &"alert", "args": []})
-		anim.track_insert_key(0, float(r.warn), {"method": &"release", "args": []})
+	if technique == &"rain":
+		# 予告のあとはトレースの進行で終わるので、タイムラインは開始の鍵だけを持つ。
+		anim.length = float(r.warn) + 0.01
+		anim.track_insert_key(0, float(r.warn), {"method": &"begin_rain", "args": []})
 	else:
-		for k in int(r.count): anim.track_insert_key(0, float(r.warn) + float(r.interval) * k, {"method": &"release", "args": []})
-	anim.track_insert_key(0, length, {"method": &"end_attack", "args": []})
+		anim.length = length
+		if technique == &"power_shot":
+			anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.alert)), {"method": &"alert", "args": []})
+			anim.track_insert_key(0, float(r.warn), {"method": &"release", "args": []})
+		else:
+			for k in int(r.count): anim.track_insert_key(0, float(r.warn) + float(r.interval) * k, {"method": &"release", "args": []})
+		anim.track_insert_key(0, length, {"method": &"end_attack", "args": []})
 	timeline.play(&"attack")
 	timeline.advance(0.0)
 	_cue(&"telegraph")
@@ -231,6 +252,99 @@ func end_attack() -> void:
 	mode = &"recovery"
 	recovery = float(rule().recover)
 	_cue(&"recovery_started")
+
+# ── 矢の雨 ────────────────────────────────────────────────
+
+func begin_rain() -> void:
+	if mode != &"windup": return
+	timeline.stop()
+	_clear_rain()
+	mode = &"rain"
+	_rain_left = int(rule().traces)
+	_rain_next_at = clock
+	_cue(&"rain_started")
+
+func _clear_rain() -> void:
+	rain_traces.clear()
+	rain_arrows.clear()
+	_rain_left = 0
+
+func _trace_duration(r: Dictionary) -> float:
+	return float(r.trace_length) / maxf(float(r.trace_speed), 1.0)
+
+## トレースの道すじの、走り始めから距離 s の点。円弧で、曲がりの合計が trace_bend になる。
+func trace_point(trace: Dictionary, s: float) -> Vector2:
+	var r := rule()
+	var start: Vector2 = trace.start
+	var direction: Vector2 = trace.dir
+	var bend := float(r.trace_bend)
+	if absf(bend) < 0.001: return start + direction * s
+	var radius := float(r.trace_length) / bend
+	var normal := direction.orthogonal() * float(trace.turn)
+	var center := start + normal * radius
+	return center + (start - center).rotated(-float(trace.turn) * s / radius)
+
+## 自機の進む向きの前方に始点を置き、弧が自機の位置を通るように向けて走らせる。
+func _start_trace(r: Dictionary) -> void:
+	var ship := run_state.ship_pos
+	var heading := run_state.ship_vel.normalized() if run_state.ship_vel.length() > 60.0 else (ship - table.pos[body]).normalized()
+	var start := ship + heading * float(r.forward)
+	var trace := {"start": start, "dir": (ship - start).normalized(), "turn": 1.0 if rain_traces.size() % 2 == 0 else -1.0,
+		"t0": clock, "next_drop": 0.0, "landed": 0.0, "hit": false}
+	# 弧の上で、始点から自機までの直線距離にあたる点を自機へ重ねる。
+	var bend := float(r.trace_bend)
+	var reach := float(r.forward)
+	if absf(bend) >= 0.001:
+		var radius := float(r.trace_length) / absf(bend)
+		reach = 2.0 * radius * asin(minf(1.0, reach / (2.0 * radius)))
+	var probe := trace_point(trace, reach)
+	trace.dir = (trace.dir as Vector2).rotated(Geom.angle_diff((ship - start).angle(), (probe - start).angle()))
+	rain_traces.append(trace)
+	_cue(&"rain_trace")
+
+func _rain_tick(dt: float) -> void:
+	_position_tick(dt)
+	var r := rule()
+	var length := float(r.trace_length)
+	var speed := maxf(float(r.trace_speed), 1.0)
+	if _rain_left > 0 and clock >= _rain_next_at:
+		_start_trace(r)
+		_rain_left -= 1
+		_rain_next_at = clock + _trace_duration(r) + float(r.trace_gap)
+	var fall := float(r.fall)
+	var radius := float(r.circle_radius)
+	var gap := maxf(float(r.arrow_gap), 1.0)
+	var all_landed := true
+	for trace in rain_traces:
+		var run := clock - float(trace.t0)
+		var head := clampf(run * speed, 0.0, length)
+		# 円が通った所へ、円を追って矢を落とし始める。
+		while float(trace.next_drop) <= head:
+			var center := trace_point(trace, trace.next_drop)
+			for k in int(r.arrows_per_step):
+				var offset := Vector2.from_angle(run_state.rng.randf() * TAU) * sqrt(run_state.rng.randf()) * radius
+				rain_arrows.append(Vector3(center.x + offset.x, center.y + offset.y, float(trace.t0) + float(trace.next_drop) / speed))
+			trace.next_drop = float(trace.next_drop) + gap
+		# 着弾の円は fall 遅れて同じ道すじを進む。前回からの区間で機体に触れたら1回だけ当たる。
+		var land := clampf((run - fall) * speed, 0.0, length)
+		if not trace.hit and land > float(trace.landed):
+			var a := trace_point(trace, trace.landed)
+			var b := trace_point(trace, land)
+			var ship := run_state.ship_pos
+			if Geometry2D.get_closest_point_to_segment(ship, a, b).distance_to(ship) <= radius + ctx.cfg.ship_radius:
+				trace.hit = true
+				ctx.ship.damage(float(r.damage) * ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
+		trace.landed = land
+		if land < length: all_landed = false
+	var expire := fall + float(r.linger) + RAIN_OUT
+	var spent := 0
+	while spent < rain_arrows.size() and rain_arrows[spent].z + expire < clock: spent += 1
+	if spent > 0: rain_arrows = rain_arrows.slice(spent)
+	if _rain_left == 0 and all_landed and rain_arrows.is_empty():
+		_clear_rain()
+		mode = &"recovery"
+		recovery = float(r.recover)
+		_cue(&"recovery_started")
 
 # ── 移動 ──────────────────────────────────────────────────
 

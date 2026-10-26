@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスと機体の間に置く守る雑魚の数
 @export_range(0, 40) var trial_defenders := 8
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "volley", "power_shot") var trial_technique := "normal"
+@export_enum("normal", "volley", "power_shot", "rain") var trial_technique := "normal"
 
 func _ready() -> void:
 	await super._ready()
@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 	var error := get_viewport().get_texture().get_image().save_png(capture_path)
 	var actor = session.run.bosses.actor
 	var distance: float = actor.table.pos[actor.body].distance_to(session.run.state.ship_pos) if actor != null and actor.has_body() else -1.0
-	print("[centaurus-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if actor != null else &"", " tech=", actor.technique if actor != null else &"", " distance=", roundi(distance))
+	print("[centaurus-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if actor != null else &"", " tech=", actor.technique if actor != null else &"", " distance=", roundi(distance), " ship_hp=", session.run.state.ship_hp)
 	get_tree().quit(0 if error == OK else 1)
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。
