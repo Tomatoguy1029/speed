@@ -1,4 +1,4 @@
-## 全武器MAX後の候補と、ラン内だけの加算強化。固定データはPostMaxConfig、選択回数はRunStateが所有する。
+## 通常育成完了後の候補と、ラン内だけの加算強化。固定データはPostMaxConfig、選択回数はRunStateが所有する。
 class_name PostMaxProgression
 extends RefCounted
 
@@ -107,7 +107,7 @@ func cards() -> Array:
 	return out
 
 func select(id: StringName) -> bool:
-	if not ctx.loadout.all_weapons_max() or not eligible(id): return false
+	if not ctx.loadout.normal_progression_complete() or not eligible(id): return false
 	if id == &"heal":
 		ctx.ship.heal(ctx.state.stats.max_hp * float(data.increments.heal))
 	else:

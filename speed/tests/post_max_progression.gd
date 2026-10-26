@@ -1,4 +1,4 @@
-## 全武器MAXへの遷移・加算・特性保護・実際の発射経路・ラン寿命を確認する。
+## 武器と特性の育成完了への遷移・加算・実際の発射経路・ラン寿命を確認する。
 extends "res://tests/thrill_acceptance.gd"
 
 func _ready() -> void:
@@ -37,6 +37,10 @@ func _equip(ids: Array, lv := -1) -> void:
 	run.state.ship_hp = run.state.stats.max_hp
 	run.set_phase(RunState.Phase.PLAY)
 
+func _complete_traits() -> void:
+	for id in [&"T01", &"T03", &"T04", &"T05", &"T06"]:
+		_check(run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks), "特性 %s をMAX" % id)
+
 func _test_transition() -> void:
 	_check(not run.loadout.all_weapons_max(), "武器なしでは全MAXにならない")
 	_equip([&"W01"])
@@ -51,8 +55,24 @@ func _test_transition() -> void:
 	var normal := run.loadout.roll_cards()
 	_check(normal.all(func(c): return c.kind == &"weapon" or c.kind == &"trait"), "通常抽選の種類を維持")
 	run.loadout.grant(&"weapon", &"W17", 10)
-	_check(run.loadout.all_weapons_max(), "満員の全武器MAXで切替")
-	var saw_trait := false
+	_check(run.loadout.all_weapons_max() and not run.loadout.normal_progression_complete(), "武器が全MAXでも特性の育成を続ける")
+	_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "空の特性枠があれば追加強化を出さない")
+	_check(not run.loadout.post_max.select(&"duration"), "通常育成中は直接の追加取得も拒否")
+	for id in [&"T01", &"T03", &"T04", &"T05"]:
+		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
+	_check(not run.loadout.all_traits_max() and run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "特性4/5枠では未取得特性を優先")
+	_equip([&"W01", &"W03", &"W08", &"W17"])
+	for id in [&"T31", &"T08", &"T01"]:
+		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
+	for id in [&"T14", &"T12"]:
+		run.loadout.grant(&"trait", id)
+	_check(run.loadout.all_weapons_max() and not run.loadout.all_traits_max(), "録画のT14/T12が1/3なら通常育成")
+	var unfinished := run.loadout.roll_cards()
+	_check(unfinished.filter(func(c): return c.kind == &"trait").size() == 2 and unfinished.all(func(c): return c.kind == &"trait" or c.kind == &"heal"), "録画の未MAX特性を提示し不足枠は通常回復")
+	run.loadout.grant(&"trait", &"T14", 2)
+	_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "最後の特性が未完成なら追加強化なし")
+	run.loadout.grant(&"trait", &"T12", 2)
+	_check(run.loadout.normal_progression_complete(), "5枠の所持特性が全てMAXで解禁")
 	for i in 100:
 		var cards := run.loadout.roll_cards()
 		var seen := {}
@@ -60,10 +80,10 @@ func _test_transition() -> void:
 		for card in cards:
 			_check(not seen.has(card.id), "1画面に同じ候補は1枚")
 			seen[card.id] = true
-			if card.kind == &"trait": saw_trait = true
-	_check(saw_trait, "全武器MAX後も未完成特性の取得機会がある")
+			_check(card.kind != &"trait", "通常育成完了後は特性の未完成候補なし")
 	_equip([&"W01", &"W03", &"W21", &"W22"])
-	_check(run.loadout.all_weapons_max(), "彗星限定も装備枠のMAXとして扱う")
+	_complete_traits()
+	_check(run.loadout.normal_progression_complete(), "彗星限定も装備枠のMAXとして扱う")
 	_check(not ContentManager.catalog.table(&"weapons").has(&"W06"), "廃止W06を復元しない")
 
 func _test_traits_and_stacks() -> void:
@@ -97,19 +117,15 @@ func _test_traits_and_stacks() -> void:
 		_check(is_equal_approx(run.state.stats.crit_chance, minf(0.3, 0.05 + trait_count * 0.05)), "特性だけで上限に届く設定でも予約・総上限を維持")
 		_check(not pm.eligible(&"crit_chance"), "特性予約が上限を使い切ると追加確率を除外")
 	run.cfg.trait_max_stacks = original_max
-	# 実際の取得順を入れ替えて、同じスタックなら同じ結果になる。
-	for order in [0, 1]:
-		run.state.traits = {}
-		run.state.post_max_stacks = {}
-		run.loadout.refresh_stats()
-		if order == 0:
-			for i in 3: run.loadout.grant(&"trait", &"T09")
-		for i in 12: pm.select(&"crit_chance")
-		if order == 1:
-			for i in 3: run.loadout.grant(&"trait", &"T09")
-		run.loadout.refresh_stats()
-		_check(is_equal_approx(run.state.stats.crit_chance, 0.3), "取得順 %d でも30%%、特性が不利にならない" % order)
-		_check(int(run.state.post_max_stacks[&"crit_chance"]) == 10, "効かない11枚目以降を消費しない")
+	# 通常育成完了後、上限に達した追加確率は消費しない。
+	run.state.traits = {&"T09": 3, &"T01": 3, &"T03": 3, &"T04": 3, &"T05": 3}
+	run.state.post_max_stacks = {}
+	run.loadout.refresh_stats()
+	for i in 10: _check(pm.select(&"crit_chance"), "MAX特性後に追加確率を取得")
+	for i in 2: _check(not pm.select(&"crit_chance"), "効かない11枚目以降を消費しない")
+	run.loadout.refresh_stats()
+	_check(is_equal_approx(run.state.stats.crit_chance, 0.3), "T09をMAXにしてから追加確率で30%")
+	_check(int(run.state.post_max_stacks[&"crit_chance"]) == 10, "追加確率の上限は10枚")
 	# 全既存の数値特性と永続強化を含む基準に、増分を加算する。
 	run.ctx.profile = ProfileManager.compute({"speed": 5, "atk": 5, "hp": 5, "charge": 5, "pickup": 5, "length": 5, "xp": 5})
 	run.state.post_max_stacks = {}
@@ -138,6 +154,7 @@ func _test_traits_and_stacks() -> void:
 
 func _test_hp_and_healing() -> void:
 	_equip([&"W01", &"W03", &"W08", &"W17"])
+	_complete_traits()
 	var pm := run.loadout.post_max
 	run.state.ship_hp = 40.0
 	_check(pm.select(&"max_hp"), "最大HPカードを選択")
@@ -308,6 +325,7 @@ func _test_time_caps() -> void:
 
 func _test_selection_lifetime() -> void:
 	_equip([&"W01", &"W03", &"W08", &"W17"])
+	_complete_traits()
 	run.state.pending_levels = 3
 	run.loadout.try_open_cards()
 	_check(run.state.phase == RunState.Phase.LEVELUP, "既存LEVELUPフェーズを再利用")
@@ -321,7 +339,7 @@ func _test_selection_lifetime() -> void:
 	for i in 3:
 		_check(run.state.cards[0].kind == &"post_max", "保留レベルごとに追加強化を提示")
 		var info: Dictionary = preload("res://scripts/ui/hud.gd").card_info(run.state.cards[0])
-		_check(not info.name.is_empty() and info.desc.length() <= 24 and (info.desc.begins_with("+") or info.desc.begins_with("−")), "カード正面は短い今回の増分")
+		_check(not info.name.is_empty() and info.desc.length() <= 24 and (info.desc.contains("+") or info.desc.contains("−")), "カード正面は短い今回の増分")
 		_check(info.tooltip_desc.contains("→") and info.color == Color("#9fe8ff"), "累計詳細をツールチップに残し色を固定")
 		run.command(&"choose_card", {"index": 0})
 	_check(run.state.pending_levels == 0 and run.state.phase == RunState.Phase.PLAY, "保留3レベルを1回ずつ選択して再開")

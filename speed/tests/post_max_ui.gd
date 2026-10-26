@@ -18,6 +18,7 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	run.state.lab_mode = false # 実験場では省かれる通常HUDのキー入力も確認する。
 	for id in [&"W03", &"W04", &"W08", &"W17"]: run.loadout.grant(&"weapon", id, 5)
+	for id in [&"T01", &"T03", &"T04", &"T05", &"T06"]: run.loadout.grant(&"trait", id, 3)
 	run.state.ship_hp = 40.0
 	run.state.pending_levels = 3
 	_show([&"area", &"max_hp", &"heal"])

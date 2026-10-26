@@ -125,7 +125,7 @@ func refresh_stats() -> void:
 func _apply_post_max_stats() -> void:
 	post_max.apply_stats()
 
-## 満員の装備枠を基準にする。彗星限定も装備時から上限として数える。
+## 満員の武器枠を基準にする。彗星限定も装備時から上限として数える。
 func all_weapons_max() -> bool:
 	if cfg.weapon_slots <= 0 or state.weapons.size() < cfg.weapon_slots:
 		return false
@@ -133,6 +133,18 @@ func all_weapons_max() -> bool:
 		if ContentManager.catalog.find(&"weapons", id) == null or int(state.weapons[id]) < cfg.weapon_max_level:
 			return false
 	return true
+
+## 取得可能な特性枠が埋まり、所持している特性がすべて上限に達したか。
+func all_traits_max() -> bool:
+	if cfg.trait_slots <= 0 or state.traits.size() < cfg.trait_slots:
+		return false
+	for id in state.traits:
+		if ContentManager.catalog.find(&"traits", id) == null or int(state.traits[id]) < cfg.trait_max_stacks:
+			return false
+	return true
+
+func normal_progression_complete() -> bool:
+	return all_weapons_max() and all_traits_max()
 
 func _n(id: StringName) -> int:
 	return state.traits.get(id, 0)
@@ -220,7 +232,7 @@ func roll_start_cards() -> Array[Dictionary]:
 	return out
 
 func roll_cards() -> Array[Dictionary]:
-	var enhanced := all_weapons_max()
+	var enhanced := normal_progression_complete()
 	var pool: Array = post_max.cards() if enhanced else []
 	for kind in [&"weapon", &"trait"]:
 		var defs := ContentManager.catalog.table(&"weapons" if kind == &"weapon" else &"traits")
@@ -237,7 +249,7 @@ func roll_cards() -> Array[Dictionary]:
 				continue
 			pool.append({"kind": kind, "id": id, "level": lv + 1, "weight": cfg.owned_card_bias if lv > 0 else 1.0})
 	var out: Array[Dictionary] = []
-	# 特性の取得機会を保ちつつ、毎回少なくとも1枚の追加強化を提示する。
+	# 通常育成が完了したら、毎回少なくとも1枚の追加強化を提示する。
 	if enhanced:
 		var enhancements := pool.filter(func(c): return c.kind == &"post_max")
 		if not enhancements.is_empty():

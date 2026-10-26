@@ -1,4 +1,4 @@
-## 全武器MAX後の仮調整値。増分はそのランの基準値に対して加算する。
+## 武器と特性の育成完了後の仮調整値。増分はそのランの基準値に対して加算する。
 class_name PostMaxConfig
 extends Resource
 

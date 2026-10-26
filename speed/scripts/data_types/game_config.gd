@@ -723,7 +723,7 @@ extends Resource
 ## 3択の候補が足りないときに出る回復のカードで、最大 HP のこの割合を回復する。
 ## 単位：割合（0〜1）
 @export var fallback_heal: float
-## 全武器MAX後の仮調整値と、武器ごとの適用先。
+## 通常育成完了後の仮調整値と、武器ごとの適用先。
 @export var post_max: PostMaxConfig
 
 ## 画面に映る範囲と、速さによる引き
