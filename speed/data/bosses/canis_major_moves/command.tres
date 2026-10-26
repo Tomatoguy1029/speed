@@ -8,7 +8,7 @@ technique = &"command"
 parameters = {
 "cd": 7.0,
 "damage": 12.0,
-"lunge_speed": 420.0,
+"lunge_speed": 1260.0,
 "lunge_time": 0.55,
 "min_hounds": 3,
 "recover": 0.6,

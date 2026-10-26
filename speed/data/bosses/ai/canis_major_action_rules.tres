@@ -3,12 +3,13 @@
 [ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1_cmrul"]
 [ext_resource type="Resource" path="res://data/bosses/canis_major_moves/pounce.tres" id="2_cmpnc"]
 [ext_resource type="Resource" path="res://data/bosses/canis_major_moves/command.tres" id="3_cmcmd"]
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/sirius.tres" id="4_cmsir"]
 
 [resource]
 script = ExtResource("1_cmrul")
 adapter = &"canis_major"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("2_cmpnc"), ExtResource("3_cmcmd")])
+techniques = Array[Resource]([ExtResource("2_cmpnc"), ExtResource("3_cmcmd"), ExtResource("4_cmsir")])
 conditions = {
 "command": {
 "angle": 0.0,
@@ -23,9 +24,17 @@ conditions = {
 "max": 520.0,
 "min": 150.0,
 "min_phase": 1
+},
+"sirius": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1200.0,
+"min": 400.0,
+"min_phase": 1
 }
 }
 costs = {
 "command": 2.0,
-"pounce": 1.0
+"pounce": 1.0,
+"sirius": 2.0
 }

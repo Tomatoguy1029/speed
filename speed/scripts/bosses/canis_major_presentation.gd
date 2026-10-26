@@ -13,23 +13,62 @@ const SIRIUS := Color("#e8f6ff")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
+## 号令で飛び出している猟犬の軌跡に残す位置の数
+const LUNGE_TRAIL := 6
+## 号令で飛び出している猟犬の光と軌跡を描く層。本体の回転に付いていかないよう、ワールド座標で描く。
+var _pack_layer := Node2D.new()
+## 飛び出している猟犬の行 → 最近の位置（古い順）
+var _trails: Dictionary = {}
 
 func bind_canis_major(owner_actor: CanisMajorBoss) -> void:
 	actor = owner_actor
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
 	z_index = 1
+	_pack_layer.top_level = true
+	_pack_layer.draw.connect(_draw_lunge)
+	add_child(_pack_layer)
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"aim_locked", &"pounce", &"command"]: pulse = 0.35
+	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius"]: pulse = 0.35
 	queue_redraw()
 
 func _advance(dt: float) -> void:
 	hit = maxf(0.0, hit - dt)
 	pulse = maxf(0.0, pulse - dt)
 	gait += dt * (18.0 if actor.mode == &"active" else 9.0)
+	_track_lunge()
 	queue_redraw()
+	_pack_layer.queue_redraw()
+
+## 飛び出している猟犬の位置を軌跡へ足す。飛び出しが終わった猟犬の軌跡は消す。
+func _track_lunge() -> void:
+	var t := actor.table
+	for i in _trails.keys():
+		if not actor.lunging.has(i): _trails.erase(i)
+	for i in actor.lunging:
+		if t.alive[i] == 0 or t.dead[i] != 0: continue
+		var points: PackedVector2Array = _trails.get(i, PackedVector2Array())
+		points.append(t.pos[i])
+		if points.size() > LUNGE_TRAIL: points = points.slice(points.size() - LUNGE_TRAIL)
+		_trails[i] = points
+
+## 飛び出している猟犬の後ろに短い軌跡を引き、体のまわりを光らせる。
+func _draw_lunge() -> void:
+	var t := actor.table
+	for i in _trails:
+		var points: PackedVector2Array = _trails[i]
+		if points.size() < 1 or t.alive[i] == 0 or t.dead[i] != 0: continue
+		var r := t.r[i]
+		for j in range(1, points.size()):
+			var f := float(j) / (points.size() - 1)
+			_pack_layer.draw_line(points[j - 1], points[j], Color(DANGER, 0.15 + 0.55 * f), r * (0.4 + 0.9 * f), true)
+		var at := t.pos[i]
+		var flicker := 0.75 + 0.25 * sin(actor.clock * 40.0 + float(i))
+		_pack_layer.draw_circle(at, r * 1.9, Color(DANGER, 0.22 * flicker))
+		_pack_layer.draw_circle(at, r * 1.3, Color(WARNING, 0.35 * flicker))
+		_pack_layer.draw_arc(at, r * 1.3, 0.0, TAU, 20, Color(SIRIUS, 0.8 * flicker), pixel_size * 0.7, true)
 
 func _poly(points: Array, color: Color) -> void:
 	var packed := PackedVector2Array()
@@ -57,6 +96,13 @@ func _draw() -> void:
 		var color := DANGER if actor.locked else WARNING
 		draw_line(Vector2(r, 0.0), Vector2(maxf(r, reach), 0.0), Color(color, 0.35 + charge * 0.4), pixel_size * (2.0 if actor.locked else 1.0))
 		draw_arc(Vector2(reach, 0.0), r * 0.5, 0.0, TAU, 24, Color(color, 0.6), pixel_size)
+	# シリウスの光の溜めは、口元から射線を細く示す。向きが固定されると光の太さの赤い線にする。
+	if actor.technique == &"sirius" and actor.mode == &"windup":
+		var from := Vector2(r * CanisMajorBoss.MOUTH_REACH, 0.0)
+		var length := float(actor.rule().get("beam_length", 1400.0))
+		var color := DANGER if actor.locked else WARNING
+		var width := float(actor.rule().get("beam_width", 50.0)) if actor.locked else pixel_size * 1.5
+		draw_line(from, from + Vector2(length, 0.0), Color(color, 0.35 if actor.locked else 0.25 + charge * 0.3), width)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	modulate = Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	# 身を低くする：構えるほど胴を短く太く、脚を外へ開く。
@@ -77,7 +123,8 @@ func _draw() -> void:
 	# 口元のシリウス。号令の構えでは強く瞬き、輪を広げる。
 	var mouth := Vector2(84 * stretch, 0)
 	var shout := actor.technique == &"command" and actor.mode == &"windup"
-	var glow := 6.0 + (8.0 * charge if shout else 1.5 * sin(actor.clock * 5.0))
+	var gather := actor.technique == &"sirius" and actor.mode == &"windup"
+	var glow := 6.0 + (8.0 * charge if shout else 18.0 * charge if gather else 1.5 * sin(actor.clock * 5.0))
 	draw_circle(mouth, glow + 4.0, Color(OPEN, 0.35))
 	draw_circle(mouth, glow, SIRIUS)
 	if shout:

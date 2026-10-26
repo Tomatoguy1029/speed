@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスが連れて出る群れとは別に、ボスのまわりへ置く猟犬の群れの数（1群れは猟犬の pack_count 体）
 @export_range(0, 10) var trial_extra_packs := 0
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "pounce", "command") var trial_technique := "normal"
+@export_enum("normal", "pounce", "command", "sirius") var trial_technique := "normal"
 
 var capture_path := ""
 var capture_at := 3.0
@@ -51,7 +51,8 @@ func _process(delta: float) -> void:
 	var alive: bool = actor != null and actor.has_body()
 	var distance: float = actor.table.pos[actor.body].distance_to(session.run.state.ship_pos) if alive else -1.0
 	print("[canis-visual] ", "PASS " if error == OK else "FAIL ", capture_path, " mode=", actor.mode if alive else &"", " tech=", actor.technique if alive else &"",
-		" distance=", roundi(distance), " led=", actor.led.size() if alive else 0, " ship_hp=", session.run.state.ship_hp)
+		" distance=", roundi(distance), " led=", actor.led.size() if alive else 0, " led_hound_max_hp=", actor.table.max_hp[actor.led[0]] if alive and not actor.led.is_empty() else 0.0,
+		" ram_power=", actor.ram_power() if alive else 0.0, " ship_hp=", session.run.state.ship_hp)
 	get_tree().quit(0 if error == OK else 1)
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。

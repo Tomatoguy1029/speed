@@ -1,4 +1,4 @@
-## おおいぬ座。選択は共通フロー、追跡・群れの統率・飛びかかり・号令は個別ロジックで進める。
+## おおいぬ座。選択は共通フロー、追跡・群れの統率・飛びかかり・号令・シリウスの光は個別ロジックで進める。
 ## 予告・狙い固定・発進・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
 ## 近くの猟犬を、ボスの前から機体へ向けて広がるくさび形の隊形へ並べ、走る先を猟犬の行動（hound.gd）へ渡す。
 class_name CanisMajorBoss
@@ -9,6 +9,9 @@ signal presentation_advanced(world_dt: float)
 @export var presentation_scene: PackedScene
 ## 隊形の走る先を渡し直す間隔より長く、猟犬が目標を保つ時間
 const FOLLOW_HOLD := 0.3
+## シリウスの光の色と、口元の位置（本体の半径に対する割合）
+const SIRIUS_COLOR := Color("#cfefff")
+const MOUTH_REACH := 0.84
 
 var phase := 1
 var mode: StringName = &"idle"
@@ -26,6 +29,8 @@ var led: PackedInt32Array = []
 var lunging: PackedInt32Array = []
 var attack_hit := false
 var _led_ids: Dictionary = {}
+## 率いている猟犬の行 → [個体ID, 加わる前の最大HP, 加わる前の色]。外れたら最大HPと色を戻す。
+var _hound_base: Dictionary = {}
 var _lead_scan := 0.0
 var _pack_spawned := false
 var _previous_ship := Vector2.ZERO
@@ -188,6 +193,7 @@ func cancel_attack() -> void:
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
 	if attack == &"command": return float(r.warn) + float(r.lunge_time) + 0.05
+	if attack == &"sirius": return float(r.warn) + float(r.beam_time) + 0.05
 	return float(r.warn) + float(r.active) + 0.05
 
 func _begin_windup(r: Dictionary, length: float) -> void:
@@ -199,7 +205,7 @@ func _begin_windup(r: Dictionary, length: float) -> void:
 	var anim := timeline.get_animation(&"attack")
 	anim.length = length
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	if technique == &"pounce":
+	if technique in [&"pounce", &"sirius"]:
 		anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.lock)), {"method": &"lock_aim", "args": []})
 	anim.track_insert_key(0, float(r.warn), {"method": &"launch", "args": []})
 	anim.track_insert_key(0, length, {"method": &"end_attack", "args": []})
@@ -212,15 +218,23 @@ func _aim(dt: float) -> void:
 	aim_point = run_state.enemy_aim
 	_face(aim_point, def.turn, dt)
 
+## 飛びかかりは着地点を、シリウスの光は向きを固定する。
 func lock_aim() -> void:
 	if mode != &"windup": return
 	locked = true
-	var to := aim_point - table.pos[body]
-	direction = to.normalized() if to.length_squared() > 1.0 else Vector2.from_angle(table.facing[body])
-	aim_point += direction * float(rule().overshoot)
+	if technique == &"sirius":
+		direction = Vector2.from_angle(table.facing[body])
+	else:
+		var to := aim_point - table.pos[body]
+		direction = to.normalized() if to.length_squared() > 1.0 else Vector2.from_angle(table.facing[body])
+		aim_point += direction * float(rule().overshoot)
 	_cue(&"aim_locked")
 
-## 飛びかかりは固定した着地点へ跳ぶ。号令は率いている猟犬を一斉に機体の方へ飛び出させる。
+## 口元。シリウスの光はここから出る。
+func mouth() -> Vector2:
+	return table.pos[body] + Vector2.from_angle(table.facing[body]) * table.r[body] * MOUTH_REACH
+
+## 飛びかかりは固定した着地点へ跳ぶ。号令は率いている猟犬を一斉に機体の方へ、最初から全速で飛び出させる。
 func launch() -> void:
 	if mode != &"windup": return
 	mode = &"active"
@@ -228,6 +242,9 @@ func launch() -> void:
 	if technique == &"pounce":
 		if not locked: lock_aim()
 		_cue(&"pounce")
+		return
+	if technique == &"sirius":
+		_fire_sirius()
 		return
 	var r := rule()
 	var hounds = _hounds()
@@ -239,6 +256,23 @@ func launch() -> void:
 		var speed_scale := float(r.lunge_speed) / maxf(table.speed[i], 1.0)
 		var toward := (run_state.ship_pos - table.pos[i]).normalized()
 		hounds.follow(i, table.pos[i] + toward * float(r.lunge_speed) * (float(r.lunge_time) + 0.2), until, speed_scale)
+		# 加速を待たず、最初から全速で飛び出す。
+		table.vel[i] = toward * float(r.lunge_speed)
+
+## 固定した向きへ光を出す。光は猟犬などの敵をすり抜け、惑星・月で止まる。ボスが倒れると消える。
+func _fire_sirius() -> void:
+	if not locked: lock_aim()
+	var r := rule()
+	var from := mouth()
+	var length := float(r.beam_length)
+	var hit = ctx.field.first_body_hit(from, from + direction * length, float(r.beam_width) * 0.5)
+	if hit != null: length *= float(hit.t)
+	var beam := ctx.projectiles.fire_beam(from, direction.angle(), length, float(r.beam_width), 0.0, float(r.beam_time),
+		float(r.damage) * ctx.cfg.atk_scale, SIRIUS_COLOR)
+	if beam >= 0:
+		ctx.projectiles.hazard_style[beam] = ProjectileSystem.HazardStyle.TELESCOPE
+		ctx.projectiles.attach_hazard(beam, body)
+	_cue(&"sirius")
 
 func _active_tick(dt: float) -> void:
 	var r := rule()
@@ -250,6 +284,9 @@ func _active_tick(dt: float) -> void:
 		table.facing[body] = direction.angle()
 		if not attack_hit and _ship_touches(from, table.pos[body], table.r[body]):
 			_hit_ship(float(r.damage))
+		return
+	if technique == &"sirius":
+		table.vel[body] = Vector2.ZERO
 		return
 	# 号令：飛び出した猟犬に触れたら1回だけ当たる。
 	if attack_hit: return
@@ -359,6 +396,40 @@ func _scan_pack(hounds) -> void:
 		_led_ids[entry[1]] = t.id[entry[1]]
 	rows.sort_custom(func(a: int, b: int): return t.id[a] < t.id[b])
 	led = PackedInt32Array(rows)
+	_toughen_pack()
+
+## 体当たりの基準の強さ。満タンの突進（T04）を持っていれば、その倍率も掛ける。クリティカルは含めない。
+func ram_power() -> float:
+	var burst := 1.0
+	var full_charge = ctx.loadout.trait_behaviors.get(&"T04")
+	if full_charge != null: burst = maxf(1.0, full_charge.val("mult"))
+	return ctx.cfg.base_attack * run_state.stats.attack_mult * ctx.cfg.atk_scale * burst
+
+## 率いている猟犬の最大HPを、体当たりの基準の強さで led_hits 回目に倒れる値まで上げ（元より下げない）、色を led_color にする。
+## 群れから外れた猟犬は元の最大HPと色へ戻す。どちらも今のHPは割合を保つ。
+func _toughen_pack() -> void:
+	var t := table
+	var power := ram_power()
+	var hits := maxf(1.0, float(def.params.led_hits))
+	var target := power * (hits - 1.0) + power * 0.5
+	for i in _hound_base.keys():
+		var entry: Array = _hound_base[i]
+		if _led_ids.get(i, -1) == entry[0]: continue
+		if t.alive[i] != 0 and t.id[i] == entry[0]:
+			_set_max_hp(i, float(entry[1]))
+			t.color[i] = entry[2]
+		_hound_base.erase(i)
+	var color: Color = def.params.get("led_color", Color.WHITE)
+	for i in led:
+		if not _hound_base.has(i): _hound_base[i] = [t.id[i], t.max_hp[i], t.color[i]]
+		_set_max_hp(i, maxf(float(_hound_base[i][1]), target))
+		t.color[i] = color
+
+func _set_max_hp(i: int, value: float) -> void:
+	var t := table
+	var health := t.hp[i] / maxf(t.max_hp[i], 0.001)
+	t.max_hp[i] = value
+	t.hp[i] = value * health
 
 ## 撃破で群れを解き、猟犬を通常の群れの追跡へ戻す。
 func _release_pack() -> void:
@@ -368,6 +439,7 @@ func _release_pack() -> void:
 	led.clear()
 	lunging.clear()
 	_led_ids.clear()
+	_toughen_pack()
 
 func _face(point: Vector2, rate: float, dt: float) -> void:
 	var prior := table.facing[body]
