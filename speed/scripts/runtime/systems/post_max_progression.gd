@@ -19,7 +19,7 @@ func factor(id: StringName) -> float:
 func crit_reserve_limit() -> float:
 	var trait_def := ContentManager.definition(&"traits", &"T09") as TraitDef
 	var cap := minf(1.0, float(trait_def.params.get("max", 1.0)))
-	var fully_trained := minf(cap, ctx.cfg.base_crit_chance + float(trait_def.params.get("per_stack", 0.0)) * ctx.cfg.trait_max_stacks)
+	var fully_trained := minf(cap, ctx.cfg.base_crit_chance + trait_def.stack_bonus(ctx.cfg.trait_max_stacks))
 	return maxf(0.0, cap - fully_trained)
 
 ## 各カードの実効値。倍率は増分、固定値は加算、充填は秒数。

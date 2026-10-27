@@ -96,6 +96,8 @@ func _rebuild() -> void:
 	var cfg: GameConfig = ContentManager.base.duplicate(true)
 	for key in spec.get("config", {}):
 		cfg.set(key, spec.config[key])
+	# 旧実験セッションの5枠装備はすべて復元し、そのセッションだけ枠数を保持する。
+	cfg.trait_slots = maxi(cfg.trait_slots, spec.get("traits", {}).size())
 	var field_flags: Dictionary = spec.get("field", {})
 	var terrain: bool = field_flags.get("terrain", not spec.get("empty", true))
 	var rocks: bool = field_flags.get("rocks", not spec.get("empty", true))

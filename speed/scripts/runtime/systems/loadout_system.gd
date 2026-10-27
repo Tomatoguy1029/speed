@@ -107,7 +107,8 @@ func refresh_stats() -> void:
 	s.max_hp = cfg.base_hp + float(ctx.profile.add.get(&"max_hp", 0.0))
 	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
 	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _per(&"T07") * _n(&"T07"))
-	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
+	var crit_def := ContentManager.definition(&"traits", &"T09") as TraitDef
+	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
 	s.crit_mult = cfg.crit_mult
 	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _per(&"T12") * _n(&"T12"))
 	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _per(&"T14") * _n(&"T14"))

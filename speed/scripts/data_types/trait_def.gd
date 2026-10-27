@@ -35,6 +35,7 @@ const PARAMS_DOCS := {
 	"width_per": ["ビームの幅（重ねるごと）", "重ねるごとに足すビームの幅。", "単位（距離）"],
 	"cooldown": ["次に出せるまで", "ビームを出してから、次に出せるようになるまでの時間。", "実秒"],
 	"per_stack": ["重ねるごとの効果", "1回重ねるごとに能力値を伸ばす割合。0.25 なら 25%。", "割合"],
+	"late_per_stack": ["4・5重ね目の効果", "4回目以降に1回重ねるごとに能力値を伸ばす割合。未指定なら通常の重ねごとの効果を使う。", "割合"],
 	"max": ["上限", "重ねて伸ばしても、この値を超えない。", "割合（0〜1）"],
 }
 
@@ -42,6 +43,11 @@ const PARAMS_DOCS := {
 ## 特性ごとの範囲・威力・効果の量など。
 ## 単位：—
 @export var params: Dictionary
+
+## 1〜3重ねと4〜5重ねで増分を分けられる能力値の合計。
+func stack_bonus(stacks: int) -> float:
+	var early := mini(maxi(stacks, 0), 3)
+	return early * float(params.get("per_stack", 0.0)) + maxi(stacks - 3, 0) * float(params.get("late_per_stack", params.get("per_stack", 0.0)))
 
 ## 見分けるための ID
 @export_group("ID")
