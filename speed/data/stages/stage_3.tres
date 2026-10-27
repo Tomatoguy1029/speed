@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://psh27x4c22fn" path="res://data/formations/s3_marlin.tscn" id="4_p4nfj"]
 [ext_resource type="PackedScene" uid="uid://2jtm8qsrcrj1" path="res://data/formations/s3_corona.tscn" id="5_d6uyw"]
 [ext_resource type="PackedScene" uid="uid://dck8igaktitco" path="res://data/formations/s3_phoenix.tscn" id="6_fori7"]
+[ext_resource type="PackedScene" uid="uid://cndq41mk8akpn" path="res://data/formations/s3_auriga.tscn" id="7_2vgpk"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
 
@@ -136,6 +137,69 @@ types = Array[StringName]([&"lynx"])
 formations = Array[PackedScene]([ExtResource("3_gibww")])
 time = 455.0
 length = 445.0
+
+[sub_resource type="Resource" id="Resource_nf088"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 61.0
+length = 36.0
+groups = 2
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_4tdib"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 97.0
+length = 32.0
+groups = 3
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_uagtc"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 156.0
+length = 53.0
+groups = 2
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_d5nqe"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 231.0
+length = 69.0
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_7rw0m"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 320.0
+length = 105.0
+interval = 5.0
+
+[sub_resource type="Resource" id="Resource_ariil"]
+script = ExtResource("2_mgob6")
+label = "新しいクリップ"
+track = 1
+types = Array[StringName]([&"auriga"])
+formations = Array[PackedScene]([ExtResource("7_2vgpk")])
+time = 455.0
+length = 445.0
+interval = 5.0
 
 [sub_resource type="Resource" id="Phase_stage3_build1"]
 script = ExtResource("9_mgob6")
@@ -343,8 +407,13 @@ index = 3
 scene_path = "res://scenes/stages/stage_3.tscn"
 phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
+enemy_attack_values = {
+"bomber": 0.001,
+"hound": 0.001,
+"splitter": 0.001
+}
 zako_curves = Array[ExtResource("10_gibww")]([SubResource("Resource_2vgpk"), SubResource("Resource_mgob6"), SubResource("Resource_uudoi")])
-clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_fori7"), SubResource("Resource_5d1dk"), SubResource("Resource_luhxi"), SubResource("Resource_kpaf0")])
+clips = Array[ExtResource("2_mgob6")]([SubResource("Resource_ruix5"), SubResource("Resource_tcq7l"), SubResource("Resource_beaf5"), SubResource("Resource_yo0rm"), SubResource("Resource_f46h8"), SubResource("Resource_l47yt"), SubResource("Resource_q0ddx"), SubResource("Resource_iwkbi"), SubResource("Resource_7wela"), SubResource("Resource_fori7"), SubResource("Resource_5d1dk"), SubResource("Resource_luhxi"), SubResource("Resource_kpaf0"), SubResource("Resource_nf088"), SubResource("Resource_4tdib"), SubResource("Resource_uagtc"), SubResource("Resource_d5nqe"), SubResource("Resource_7rw0m"), SubResource("Resource_ariil")])
 track_names = PackedStringArray("やまねこ座", "ぎょしゃ座", "かじき座", "みなみのかんむり座", "ほうおう座")
 boss_time = 455.0
 surge_phases = {
