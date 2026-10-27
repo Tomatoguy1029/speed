@@ -1,7 +1,12 @@
 ## 短時間の性能計測専用。実ゲームの仕様・セーブは変更しない。
 ## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on --types=pump,lynx
+## -- --enemies=1000 --type=biter --keep=on --levels=off --hitstop=off --gpu=off
 extends Node
 
+## 敵の数を保つときに補う間隔（フレーム）
+const REFILL_FRAMES := 15
+
+var session: RunSession
 var run: RunSimulation
 var render: RunPresentation
 var drawing_times: Dictionary = {}
@@ -36,7 +41,7 @@ func _ready() -> void:
 	if options.has("overlay"):
 		# --overlay=compact|detail で性能の表示を出した状態で始める
 		PerfOverlay.saved_mode = PerfOverlay.Mode.DETAIL if options.overlay == "detail" else PerfOverlay.Mode.COMPACT
-	var session := RunManager.create_run()
+	session = RunManager.create_run()
 	add_child(session)
 	if session.sim.state == null: await session.started
 	run = session.sim
@@ -74,8 +79,14 @@ func _ready() -> void:
 	run.input.set_process_unhandled_input(false)
 	run.state.time = float(options.get("time", "10"))
 	if options.has("enemies"):
-		run.enemies.debug_spawn_random(int(options.enemies))
-		run.combat.rebuild_grid()
+		_spawn_enemies(int(options.enemies))
+	if options.get("levels", "on") == "off":
+		# 倒した経験値でレベルアップ画面に入ると世界が止まり、装備も変わるので、経験値を入れない
+		get_tree().physics_frame.connect(_hold_level)
+	if options.get("hitstop", "on") == "off":
+		# 大量に倒すとヒットストップで世界の更新が止まり、処理の時間が測れないので切る
+		run.state.hitstop_enabled = false
+		run.state.hitstop = 0.0
 	if options.has("types"):
 		# --types=pump,lynx で、指定した種類の敵を機体の周りに2体ずつ出す
 		for type in String(options.types).split(",", false):
@@ -105,7 +116,8 @@ func _ready() -> void:
 	for key in render._layers:
 		var layer: DrawLayer = render._layers[key]
 		layer.draw_fn = _timed_draw.bind(key, layer.draw_fn)
-	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+	# GPU時間の計測は描画の完了を待ってフレームを延ばすので、--gpu=off で切れる
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), options.get("gpu", "on") != "off")
 	if options.get("trace", "off") == "on":
 		get_tree().physics_frame.connect(_mark.bind(&"physics_begin"))
 		get_tree().process_frame.connect(_mark.bind(&"process_begin"))
@@ -119,6 +131,9 @@ func _ready() -> void:
 	run.profile.clear()
 	drawing_times.clear()
 	run.profiling = true
+	render.profile.clear()
+	render.profile_counts.clear()
+	render.profiling = true
 	previous_us = Time.get_ticks_usec()
 	start_us = previous_us
 	measuring = true
@@ -160,6 +175,11 @@ func _process(_delta: float) -> void:
 	# --hazards=on で、敵の攻撃の形を一定間隔で出す（描画と当たり判定の確認用）
 	if options.get("hazards", "off") == "on" and Engine.get_process_frames() % 90 == 0:
 		run.command(&"debug_hazards")
+	# --keep=on で、倒された分を補って --enemies の数を保つ
+	if options.get("keep", "off") == "on" and options.has("enemies") and Engine.get_process_frames() % REFILL_FRAMES == 0:
+		var missing := int(options.enemies) - run.enemies.count()
+		if missing > 0:
+			_spawn_enemies(missing)
 	if not measuring:
 		return
 	var now := Time.get_ticks_usec()
@@ -228,9 +248,19 @@ func _finish(seconds: float) -> void:
 		draw_ms[key] = rec[0] / 1000.0 / frames.size()
 	for key in counts:
 		counts[key] /= frames.size()
+	# 表示側（RunPresentation）の処理ごとの時間。名前に「.」を含む項目は前半の項目の内訳
+	var view_ms := {}
+	for key in render.profile:
+		var rec: Array = render.profile[key]
+		view_ms[String(key)] = {"ms_frame": rec[0] / 1000.0 / frames.size(), "max_ms": rec[2] / 1000.0, "calls": rec[1]}
+	var view_rows := {}
+	for key in render.profile_counts:
+		var rec: Array = render.profile_counts[key]
+		view_rows[String(key)] = {"mean": float(rec[0]) / maxi(1, rec[1]), "max": rec[2]}
 	var result := {"seconds": seconds, "frames": frames.size(), "fps": frames.size() / seconds,
 		"frame_ms": _stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
 		"draw_calls": _stats(draws), "counts": counts, "managers": manager_ms, "drawing_ms_frame": draw_ms,
+		"view_ms": view_ms, "view_enemy_rows": view_rows,
 		"phase": run.state.phase, "time": run.state.time, "world_time": run.state.world_time, "weapons": run.state.weapons}
 	result.timeline = timeline
 	result.phase_trace = phase_trace
@@ -240,6 +270,7 @@ func _finish(seconds: float) -> void:
 	if gpu_times[-1] <= 0.0:
 		result.gpu_viewport_ms = {"available": false}
 	print("PROFILE_RESULT ", JSON.stringify(result))
+	print("PROFILE_SUMMARY ", _summary(result))
 	if options.has("capture"):
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(options.capture)
@@ -247,11 +278,58 @@ func _finish(seconds: float) -> void:
 		render.pipeline.sparks.rd = saved_rd
 	set_process(false)
 	run.profiling = false
+	render.profiling = false
 	# ランと描画リソースの後始末を、通常のノード削除で済ませてから閉じる。
-	run.get_parent().get_parent().queue_free()
+	session.queue_free()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	get_tree().quit()
+
+## 結果の要点を、出力で読みやすい複数行の文字列にする（1フレームあたりの平均、ms）。
+func _summary(result: Dictionary) -> String:
+	var frame: Dictionary = result.frame_ms
+	var game: float = result.managers.get(&"play_total", {}).get("ms_frame", 0.0)
+	var view := 0.0
+	for key in result.view_ms:
+		if not key.contains("."):
+			view += result.view_ms[key].ms_frame
+	var lines: Array[String] = []
+	lines.append("fps %.1f  フレーム 平均 %.2f p95 %.2f 最大 %.2f" % [result.fps, frame.mean, frame.p95, frame.max])
+	lines.append("ゲーム処理 %.2f  表示側 %.2f  残り（描画エンジン・GPU・待ち）%.2f  敵 %.0f" % [
+		game, view, maxf(0.0, frame.mean - game - view), result.counts.enemies])
+	var managers: Array = result.managers.keys().filter(func(k): return k != &"play_total")
+	managers.sort_custom(func(a, b): return result.managers[a].ms_frame > result.managers[b].ms_frame)
+	for key in managers.slice(0, 6):
+		lines.append("  処理 %-18s %.2f（更新1回 %.3f）" % [key, result.managers[key].ms_frame, result.managers[key].ms_tick])
+	var views: Array = result.view_ms.keys()
+	views.sort_custom(func(a, b): return result.view_ms[a].ms_frame > result.view_ms[b].ms_frame)
+	for key in views.slice(0, 8):
+		lines.append("  表示 %-26s %.2f（1回の最大 %.2f）" % [key, result.view_ms[key].ms_frame, result.view_ms[key].max_ms])
+	var rows: Dictionary = result.view_enemy_rows
+	if rows.has("rows"):
+		lines.append("  敵の行 見た %.0f 生存 %.0f 一括 %.0f 個別 %.0f 飾り %.0f" % [rows["rows"].mean, rows["live"].mean,
+			rows["batched"].mean, rows["self_drawn"].mean, rows["marked"].mean])
+	return "\n".join(lines)
+
+## 画面内に n 体の敵を出す。--type=ID ならその種類だけ、なければ試せる種類から無作為に選ぶ。
+func _spawn_enemies(n: int) -> void:
+	if not options.has("type"):
+		run.command(&"debug_spawn_enemies", {"count": n})
+		return
+	var def := run.enemies.def_of(StringName(options.type))
+	assert(def != null, "--type の敵が見つからない")
+	var view := run.state.view_rect()
+	for k in n:
+		var pos := Vector2(run.state.rng.randf_range(view.position.x, view.end.x),
+			run.state.rng.randf_range(view.position.y, view.end.y))
+		run.enemies.spawn(def, pos, {"facing": (run.state.ship_pos - pos).angle()})
+	run.combat.rebuild_grid()
+
+func _hold_level() -> void:
+	if run != null and run.state != null:
+		run.state.stats.xp_mult = 0.0
+		run.state.pending_levels = 0
+		run.state.pending_comet_weapons.clear()
 
 ## 同じ弾の位置で旧方式と格子方式を交互に測る。ランの状態は変更しない。
 func _benchmark_bodies() -> Dictionary:
