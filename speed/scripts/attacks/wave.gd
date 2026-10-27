@@ -25,16 +25,12 @@ func act(ps: ProjectileSystem, i: int, dt: float) -> bool:
 	for j in rows:
 		if t.dead[j] != 0 or t.meteor_index[j] >= 0:
 			continue
-		var enemy_id := t.id[j]
-		if ps.hazard_enemy_hit[i].has(enemy_id):
-			continue
 		var d := t.pos[j] - ps.hazard_pos[i]
 		var dist := d.length()
 		if dist + t.r[j] < lo or dist - t.r[j] > now + half:
 			continue
 		if absf(Geom.angle_diff(d.angle(), ps.hazard_angle[i])) > ps.hazard_arc[i] + t.r[j] / maxf(dist, 1.0):
 			continue
-		ps.hazard_enemy_hit[i][enemy_id] = true
 		ps.combat.damage_enemy(j, ps.hazard_edmg[i], {"cause": &"wave", "dir": d / maxf(dist, 1.0), "knock": 300.0, "no_crit": true})
 		if ps.state.phase != RunState.Phase.PLAY:
 			return false
