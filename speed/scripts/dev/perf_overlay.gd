@@ -26,6 +26,8 @@ var run: RunSimulation
 var view: RunPresentation
 var mode := Mode.HIDDEN
 var _label: RichTextLabel
+## 詳細表示の右の列（表示側の時間）
+var _view_label: RichTextLabel
 var _graph: Control
 ## 直近のフレーム時間（ms）の輪。_frame_head が次に書く位置
 var _frames := PackedFloat32Array()
@@ -56,17 +58,18 @@ func _ready() -> void:
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)
 	add_theme_stylebox_override("panel", style)
+	# 詳細表示は縦に収まるよう、表示側の時間を右の列に分ける
+	var columns := HBoxContainer.new()
+	columns.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	columns.add_theme_constant_override("separation", 16)
+	add_child(columns)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(box)
-	_label = RichTextLabel.new()
-	_label.bbcode_enabled = true
-	_label.fit_content = true
-	_label.scroll_active = false
-	_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_label.add_theme_font_size_override("normal_font_size", 13)
+	columns.add_child(box)
+	_label = _new_label()
 	box.add_child(_label)
+	_view_label = _new_label()
+	columns.add_child(_view_label)
 	_graph = Control.new()
 	_graph.custom_minimum_size = GRAPH_SIZE
 	_graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -94,6 +97,7 @@ func _set_mode(m: Mode) -> void:
 	mode = m
 	visible = mode != Mode.HIDDEN
 	_graph.visible = mode == Mode.DETAIL
+	_view_label.visible = mode == Mode.DETAIL and view != null
 	_label.custom_minimum_size = Vector2(380.0 if mode == Mode.DETAIL else 0.0, 0.0)
 	if mode == Mode.DETAIL and not run.profiling:
 		run.profiling = true
@@ -156,6 +160,8 @@ func _process(delta: float) -> void:
 		return
 	_acc = 0.0
 	_label.text = _text()
+	if _view_label.visible:
+		_view_label.text = "\n".join(_view_lines())
 	_reset_window()
 
 func _reset_window() -> void:
@@ -191,7 +197,6 @@ func _text() -> String:
 		lines.append("残り（描画エンジン・GPU・待ち）%.2fms" % maxf(0.0, avg - game_ms - view_ms))
 		lines.append("ゲーム更新 1回 平均 %.2fms 最大 %.2fms" % [total[0] / 1000.0 / maxi(1, total[1]), total[2] / 1000.0])
 		lines.append_array(_manager_lines())
-		lines.append_array(_view_lines())
 		lines.append(HEAD % "描画")
 		lines.append("描画命令 %d  オブジェクト %d  頂点・図形 %d" % [
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
@@ -247,7 +252,7 @@ func _view_total_ms() -> float:
 			us += view.profile[key][0]
 	return us / 1000.0 / maxi(1, _frame_n)
 
-## 表示側の各処理の、1フレームあたりの平均と1回の最大（多い順）。内訳は親の項目の下に字下げして出す。
+## 表示側の各処理の、1フレームあたりの平均と1回の最大（多い順）。内訳は親の項目の下に1行でまとめる。
 ## 読んだら次の区間のために空にする。
 func _view_lines() -> Array[String]:
 	var out: Array[String] = []
@@ -259,25 +264,38 @@ func _view_lines() -> Array[String]:
 		var rec: Array = view.profile[key]
 		rows.append([String(key), rec[0] / 1000.0 / frames, rec[2] / 1000.0])
 	rows.sort_custom(func(a, b): return a[1] > b[1])
-	out.append(HEAD % "表示側")
-	out.append("処理ごと（1フレームあたり 平均 / 1回の最大）")
+	out.append(HEAD % "表示側（1フレームあたり 平均 / 1回の最大）")
 	for r in rows:
 		if r[0].contains("."):
 			continue
-		out.append("  %-22s %.3f / %.3fms" % r)
+		out.append("%-20s %.3f / %.3fms" % r)
+		var parts: Array[String] = []
 		for s in rows:
 			if s[0].begins_with(r[0] + "."):
-				out.append("    %-20s %.3f / %.3fms" % [s[0].get_slice(".", 1), s[1], s[2]])
+				parts.append("%s %.3f" % [s[0].get_slice(".", 1), s[1]])
+		if not parts.is_empty():
+			out.append("  └ " + "  ".join(parts))
 	var counts := view.profile_counts
 	if counts.has(&"rows"):
 		var avg := func(key: StringName) -> String:
 			var rec: Array = counts.get(key, [0, 1, 0])
-			return "%.0f（最大 %d）" % [float(rec[0]) / maxi(1, rec[1]), rec[2]]
-		out.append("敵の描画1回あたりの行  見た行 %s  生存 %s" % [avg.call(&"rows"), avg.call(&"live")])
-		out.append("  一括で描いた %s  個別に描いた %s  飾り %s" % [avg.call(&"batched"), avg.call(&"self_drawn"), avg.call(&"marked")])
+			return "%.0f" % (float(rec[0]) / maxi(1, rec[1]))
+		out.append(HEAD % "敵の描画1回あたりの行（平均）")
+		out.append("見た行 %s  生存 %s" % [avg.call(&"rows"), avg.call(&"live")])
+		out.append("一括 %s  個別 %s  飾り %s" % [avg.call(&"batched"), avg.call(&"self_drawn"), avg.call(&"marked")])
 	view.profile.clear()
 	counts.clear()
 	return out
+
+func _new_label() -> RichTextLabel:
+	var label := RichTextLabel.new()
+	label.bbcode_enabled = true
+	label.fit_content = true
+	label.scroll_active = false
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("normal_font_size", 13)
+	return label
 
 func _ms(v: float, warn: float) -> String:
 	if v >= warn:
