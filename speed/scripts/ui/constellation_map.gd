@@ -25,6 +25,8 @@ var _launch: Button
 var _back: Button
 var _final_stage: Button
 var _launch_requested := false
+## 制作プレビューでは選択と演出だけを使う。
+var navigation_enabled := true
 var _selected := 0
 var _angle := 0.0
 var _turn: Tween
@@ -367,7 +369,7 @@ func _select(index: int) -> void:
 	var unlocked := OS.is_debug_build() or SaveManager.is_stage_unlocked(stage)
 	_heading.text = tr("stage.%d.name" % stage)
 	_preview.texture = TEXTURES[index] if index < TEXTURES.size() else null
-	_launch.disabled = not unlocked
+	_launch.disabled = not unlocked or not navigation_enabled
 	_status.text = tr("stage_select.debug") if OS.is_debug_build() else (tr("stage_select.available") if unlocked else tr("stage_select.locked").format({n = stage}))
 	_apply_rotation(_angle)
 
@@ -418,7 +420,7 @@ func _focus_selected() -> void:
 		_final_stage.grab_focus()
 
 func _start() -> void:
-	if _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
+	if not navigation_enabled or _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
 		return
 	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):
 		_launch_requested = true

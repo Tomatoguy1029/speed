@@ -24,7 +24,7 @@ const SLOTS := preload(ART + "combat_ui_upgrades_boxes.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := [
-	"W01", "W02", "W03", "W04", "W05", "W06", "W07", "W08", "W17", "W21", "W22", "W23",
+	"W01", "W02", "W03", "W04", "W05", "W25", "W07", "W08", "W17", "W21", "W22", "W23",
 	"T01", "T03", "T04", "T05", "T06", "T07", "T08", "T09", "T10", "T11", "T12", "T13", "T14",
 ]
 
@@ -60,6 +60,7 @@ var _card_discard: Dictionary = {}
 @export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
 var _legendary_reveal: Control
 var _finish_skip: Button
+var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
@@ -140,6 +141,15 @@ func _ready() -> void:
 	_finish_skip.hide()
 	_finish_skip.pressed.connect(func(): run.command(&"skip_finish"))
 	add_child(_finish_skip)
+	_entrance_skip = Button.new()
+	_entrance_skip.name = "BossEntranceSkip"
+	_entrance_skip.text = tr("hud.skip_finish")
+	_entrance_skip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_entrance_skip.position = Vector2(-210, -58)
+	_entrance_skip.size = Vector2(190, 38)
+	_entrance_skip.hide()
+	_entrance_skip.pressed.connect(func(): run.command(&"skip_boss_entrance"))
+	add_child(_entrance_skip)
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
@@ -221,7 +231,7 @@ func _sync_menu_visibility() -> void:
 	_pause_box.visible = not covered and paused and _settings == null
 	_rewards.visible = not covered and not paused and _rewards.is_active()
 	_rewards.set_process(not covered and not paused)
-	_draw_button.visible = not covered and not paused and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY and DisplayServer.is_touchscreen_available()
+	_draw_button.visible = _can_show_draw_button(DisplayServer.is_touchscreen_available())
 
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
@@ -374,12 +384,29 @@ func _notification(what: int) -> void:
 
 func _process(delta: float) -> void:
 	_update_finish_presentation()
+	_update_cinematic_visibility()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
 	_layout_art()
 	_refresh_loadout_icons()
 	queue_redraw()
+
+func _update_cinematic_visibility() -> void:
+	_sync_combat_art_visibility()
+	var boss := run.bosses.actor
+	var entrance: RefCounted = boss.get("entrance") if boss != null else null
+	_entrance_skip.visible = run.state.phase == RunState.Phase.PLAY and entrance != null and entrance.active and entrance.time >= 0.4
+	_draw_button.visible = _can_show_draw_button(DisplayServer.is_touchscreen_available())
+
+func _can_show_draw_button(touchscreen: bool) -> bool:
+	return touchscreen and run.state.cinematic_bars <= 0.0 and _menu_overlay == null and not _rewards.is_active() and run.state.phase == RunState.Phase.PLAY
+
+func _sync_combat_art_visibility() -> void:
+	var state := run.state
+	var cinematic := state != null and state.cinematic_bars > 0.0
+	_frame.visible = show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
+	_loadout_icons.visible = _frame.visible or (cinematic and not state.final_modules.is_empty())
 
 func _update_finish_presentation() -> void:
 	if run.state.phase != RunState.Phase.FINISHING:
@@ -411,8 +438,7 @@ func _layout_art() -> void:
 		_cards_box.scale = Vector2.ONE * factor
 		_cards_box.size = ART_SIZE
 	_frame.size = ART_SIZE
-	_frame.visible = show_status and run.state != null and run.state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING]
-	_loadout_icons.visible = _frame.visible
+	_sync_combat_art_visibility()
 
 func _make_bar_fill(frame: Texture2D) -> AtlasTexture:
 	var source := frame.get_image()
@@ -446,7 +472,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 		return
 	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef or definition is ContentEntry else null
 	if texture == null:
-		var icon_id := "W06" if definition.id == &"W25" else String(definition.id)
+		var icon_id := String(definition.id)
 		var index := ICON_IDS.find(icon_id)
 		if index < 0:
 			return
@@ -466,7 +492,7 @@ func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 func _refresh_loadout_icons() -> void:
 	if run.state == null:
 		return
-	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules)
+	var key := str(run.state.weapons) + str(run.state.traits) + str(run.state.final_modules) + str(run.state.cinematic_bars > 0.0)
 	if key == _loadout_key:
 		return
 	_loadout_key = key
@@ -474,6 +500,9 @@ func _refresh_loadout_icons() -> void:
 		child.queue_free()
 	var row := 0
 	for owned in [run.state.weapons, run.state.traits]:
+		if run.state.cinematic_bars > 0.0:
+			row += 1
+			continue
 		if row==0 and not run.state.final_modules.is_empty():
 			row+=1
 			continue
@@ -620,23 +649,34 @@ func _show_cards() -> void:
 			var b := Button.new()
 			b.position = Vector2(89 + i * (width + 16), 83)
 			b.size = Vector2(width, 193)
-			b.tooltip_text = "%s: %s" % [info.name, info.desc]
-			_card_art(b, Rect2(89, 83, 145, 193))
+			b.tooltip_text = "%s: %s" % [info.name, info.get("tooltip_desc", info.desc)]
+			if cards[i].kind == &"post_max":
+				var style := _card_style(info.color)
+				style.bg_color = Color("#233c49")
+				style.set_corner_radius_all(0)
+				style.set_border_width_all(2)
+				b.add_theme_stylebox_override("normal", style)
+				var focus_style := style.duplicate() as StyleBoxFlat
+				focus_style.border_color = Color("#c0ffff")
+				for visual_state in ["focus", "hover", "pressed"]:
+					b.add_theme_stylebox_override(visual_state, focus_style)
+			else:
+				_card_art(b, Rect2(89, 83, 145, 193))
 			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
 			_cards_row.add_child(b)
 			var font_size := 10 if cards.size() <= 3 else 8
 			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
 				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
-				[Vector2(7, 65), Vector2(width - 14, 57), info.desc]]:
+				[Vector2(7, 65), Vector2(width - 14, 122 if cards[i].kind == &"post_max" else 57), info.desc]]:
 				var label := Label.new()
 				label.position = entry[0]
 				label.size = entry[1]
 				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", font_size)
+				label.add_theme_font_size_override("font_size", (17 if entry[0].y == 65 else 13) if cards[i].kind == &"post_max" else font_size)
 				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				label.clip_text = true
-				label.max_lines_visible = 4 if entry[0].y == 65 else 2
+				label.max_lines_visible = (2 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
 				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
@@ -695,6 +735,7 @@ func _card_style(col: Color) -> StyleBoxFlat:
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
 static func card_info(c: Dictionary) -> Dictionary:
+	if c.kind == &"post_max": return c.info
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
 			var new_def: ContentEntry = ContentManager.catalog.find(&"weapons", c.new)
@@ -784,6 +825,8 @@ func _open_settings(from: Button) -> void:
 func _draw() -> void:
 	var s := run.state
 	if s == null:
+		return
+	if s.cinematic_bars > 0.0:
 		return
 	var W := size.x
 	_pause_box.position = (size - _pause_box.size) / 2.0
@@ -983,6 +1026,8 @@ func _draw_hero_slot(at: Vector2) -> void:
 		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
 	draw_string(_font, at + Vector2(26, 32), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
+	if s.hero_active_t > 0.0:
+		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(s.hero_active_t), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
 
 func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()

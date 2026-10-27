@@ -15,6 +15,8 @@ const EDITOR_ORDER := 5
 @export var index: int
 ## 開始地点を基準に置く背景。配列の後ろほど手前に重ねる。
 @export var backgrounds: Array[BackgroundPlacement] = []
+## 開始地点を基準とする固定位置の共通炎。名前 → {preset, offset, scale}。
+@export var fire_uses: Dictionary = {}
 
 ## 配置のシーン
 ## ステージの配置を置いたシーンのファイル。

@@ -93,5 +93,5 @@ func _strike(from: Vector2, next: int, dmg: float, used: Dictionary, segments: P
 	var pos := t.pos[next]
 	segments.append(from)
 	segments.append(pos)
-	ctx.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized()})
+	ctx.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized(), "knock": 160.0 * post_factor(&"knockback")})
 	return pos

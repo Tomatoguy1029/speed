@@ -102,6 +102,60 @@ card.new_trait,新しい特性,New Trait
 card.weapon_up,武器強化,Weapon Upgrade
 card.trait_up,特性強化,Trait Upgrade
 card.first_weapon,最初の武器,First Weapon
+postmax.interval_total,MAX後の実効短縮累計,Effective reduction since MAX
+postmax.interval.interval,発射,Fire
+postmax.interval.interval_by_level,発射,Fire
+postmax.interval.block_interval,防弾,Block
+postmax.interval.burst_interval,連射,Burst
+postmax.tag,追加強化,Enhancement
+postmax.keep_hp,現在HPはそのまま,Current HP stays the same
+postmax.total,MAX後累計 {a} → {b}{unit},Since MAX: {a} → {b}{unit}
+postmax.current,実効値 {a} → {b},Effective: {a} → {b}
+postmax.points,ポイント,points
+postmax.summary.interval,攻撃間隔 −{n}%,Interval −{n}%
+postmax.summary.charge,充填 −{n}秒,Charge −{n}s
+postmax.summary.invulnerability,無敵 +{n}秒,Invulnerability +{n}s
+postmax.summary.multiplier,倍率 +{n},Multiplier +{n}
+postmax.summary.points,+{n}ポイント,+{n} points
+postmax.heal_desc,"最大HPの{percent}%を即時回復
+HP {a} → {b}","Heal {percent}% of max HP now
+HP {a} → {b}"
+postmax.weapon_damage,武器威力,Weapon damage
+postmax.weapon_interval,攻撃間隔,Attack interval
+postmax.projectile_speed,弾速,Projectile speed
+postmax.duration,攻撃持続,Attack duration
+postmax.knockback,吹き飛ばし,Knockback
+postmax.crit_chance,クリティカル率,Critical chance
+postmax.crit_mult,クリティカル倍率,Critical multiplier
+postmax.area,巻き込み範囲,Area of effect
+postmax.followup,追撃威力,Follow-up damage
+postmax.max_speed,最高速度,Maximum speed
+postmax.acceleration,加速力,Acceleration
+postmax.turn_rate,旋回速度,Turn rate
+postmax.line_length,線の長さ,Line length
+postmax.charge_time,充填時間,Charge time
+postmax.max_hp,最大HP,Maximum HP
+postmax.invulnerability,無敵時間,Invulnerability
+postmax.repair,修理回復量,Repair healing
+postmax.heal,緊急修理,Emergency repair
+postmax.pickup_radius,XP吸引範囲,XP pickup radius
+postmax.pickup_speed,XP吸引速度,XP pickup speed
+postmax.xp_gain,XP獲得量,XP gain
+postmax.target.W03.area,衝角の船体・破片半径,Ram hull and fragment radius
+postmax.target.W04.area,接触波動の半径,Contact wave radius
+postmax.target.W08.area,ソニックブームの半径,Sonic wave radius
+postmax.target.W17.area,電撃の到達距離,Electric reach
+postmax.target.W21.area,船体回収半径,Hull collection radius
+postmax.target.W22.area,双極ビームの幅,Bipolar beam width
+postmax.target.W26.area,各ドローンの接触半径,Each drone hit radius
+postmax.target.W01.followup,ブラスター弾,Blaster shots
+postmax.target.W02.followup,散弾砲の弾,Scatter shots
+postmax.target.W23.followup,後方ブラスター弾,Rear shots
+postmax.target.W25.followup,迎撃ドローン弾,Interceptor shots
+postmax.target.W05.followup,バリアの波動,Barrier waves
+postmax.target.W07.followup,軌跡機雷,Trail mines
+postmax.target.W21.followup,牽引した船体弾,Towed hull shots
+postmax.target.W22.followup,双極ビーム,Bipolar beam
 card.heal_tag,回復,Repair
 card.heal_name,緊急修理,Emergency Repair
 card.heal_desc,HP を 30% 回復,Restores 30% HP
@@ -161,8 +215,6 @@ weapon.W04.name,接触波動,Contact Wave
 weapon.W04.desc,高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る,Every high-speed contact sends out a wave. Works even when you bounce off.
 weapon.W05.name,バリアシステム,Barrier System
 weapon.W05.desc,周りに定期的な波動を出し、敵の弾を防ぐ,Emits waves around you at intervals and blocks enemy shots.
-weapon.W06.name,追走ドローン,Chaser Drones
-weapon.W06.desc,周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する,"Orbit and shoot, then trail your dash line and strike enemies they touch."
 weapon.W07.name,軌跡機雷,Trail Mines
 weapon.W07.desc,高速で実際に通った線に機雷を残す。遅れて入った敵を爆破,Leaves mines along the line you flew at high speed. Blasts enemies that wander in.
 weapon.W08.name,ソニックブーム,Sonic Boom

@@ -10,6 +10,7 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
+	_check_stage1_hp()
 	var common := IO.definition("telescope")
 	var cfg := ContentManager.cfg.duplicate(true) as GameConfig
 	var hp := common.base_hp(cfg)
@@ -115,3 +116,28 @@ func _ready() -> void:
 	await get_tree().process_frame
 	print("[stage_enemy_tuning] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _check_stage1_hp() -> void:
+	var stage := ContentManager.stage(1)
+	var expected := {"marlin": 80.0, "pump": 60.0, "shield": 45.0, "triangle_star": 12.0}
+	check(stage.enemy_tuning.keys().size() == 7, "Stage1のHPと攻撃を対象7種類だけ上書き")
+	var runtime := BUILD.compile(stage)
+	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 1, "seed": 42}, false)
+	session.auto_step = false
+	var enemies := session.sim.enemies
+	for entry in [[&"bomber", "blast_dmg", 14.0], [&"pulser", "bullet_dmg", 14.0], [&"pump", "bullet_dmg", 28.0], [&"triangle", "trail_dmg", 14.0], [&"marlin", "fire_interval", 3.6]]:
+		var tuned := enemies.def_of(entry[0])
+		check(is_equal_approx(float(tuned.params[entry[1]]), entry[2]), "Stage1の攻撃・間隔をランへ渡す: " + String(entry[0]))
+		check(not is_equal_approx(float(ContentManager.definition(&"enemies", entry[0]).params[entry[1]]), entry[2]), "他ステージ用の共通値を保持する: " + String(entry[0]))
+	for id: String in expected:
+		var definition := enemies.def_of(StringName(id))
+		check(is_equal_approx(definition.base_hp(session.sim.cfg), expected[id]), "Stage1の生成・ランにHPを渡す: " + id)
+		check(not is_equal_approx(ContentManager.definition(&"enemies", id).base_hp(session.sim.cfg), expected[id]), "共通定義のHPを保持する: " + id)
+	var row := enemies.spawn(enemies.def_of(&"triangle"), Vector2(400, 200))
+	var parts := enemies.table.parts[row]
+	check(parts.size() == 6, "三角は3つの破壊対象を生成する")
+	for k in 3:
+		var part: int = parts[k * 2]
+		check(is_equal_approx(enemies.table.max_hp[part], expected.triangle_star), "生成された三角の星にも局所HPを適用する")
+	check(is_equal_approx(enemies.def_of(&"triangle").base_hp(session.sim.cfg), ContentManager.definition(&"enemies", &"triangle").base_hp(session.sim.cfg)), "当たり判定のない中心のHPは変更しない")
+	session.free()

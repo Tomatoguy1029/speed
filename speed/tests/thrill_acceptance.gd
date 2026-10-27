@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_surge()
 	_test_shapes()
 	_test_enemy_roster()
+	_test_stage_roster_descendants()
 	_test_enemy_gates()
 	await _close()
 	await _start(1)
@@ -106,6 +107,7 @@ func _test_debug_stage_selection() -> void:
 			await _shot("debug_stage_%d_start" % stage)
 			initial_run.command(&"choose_card", {"index": 0})
 			_check(initial_run.state.phase == RunState.Phase.PLAY and initial_run.state.stage.boss_id == (&"hydra" if stage==4 else &"monoceros" if stage==1 else &"draco" if stage==5 else &""), "ステージ選択：ステージ%dの通常ランと対応ボスを使う" % stage)
+			_check(initial_run.state.stage.boss_enabled == (stage in [1, 4, 5]), "ステージ選択：専用ボス実装済みのステージだけ出現を有効にする：%d" % stage)
 			GameManager.abort_run()
 			await _settle_screen()
 	_check(SaveManager.data.cleared_stage == 0 and SaveManager.coins() == 123 and SaveManager.data.best.runs == 0, "ステージ選択：全ステージを試しても既存の部品とクリア記録を保つ")
@@ -333,12 +335,15 @@ const IMPLEMENTED_ROSTERS := {
 
 const ORIGINAL_ROSTER := "drifter,swarm,darter,armored,gunner,missile,splitter,splitling,titan,battleship"
 const ROSTERS := {1: ORIGINAL_ROSTER, 2: ORIGINAL_ROSTER, 3: ORIGINAL_ROSTER, 4: ORIGINAL_ROSTER, 5: ORIGINAL_ROSTER}
+# 直接配置される生成元の行動（enemies/split.gd・cepheus.gd）が生む種類だけを加える。
+const SPAWNED_DESCENDANTS := {"splitter": "splitling", "cepheus": "cepheus_soldier"}
 
-func _advance_enemies(seconds: float) -> Dictionary:
+func _advance_enemies(seconds: float, observed_row: int = -1) -> Dictionary:
 	# 行動単体の検証では予算を外す。予算はattack_priorityで別途確認する。
 	run.projectiles.director.configure({"enabled": false})
-	var peaks := {"hazards": 0, "hostile": 0, "wells": 0}
+	var peaks := {"hazards": 0, "hostile": 0, "wells": 0, "modes": [], "dash_distance": 0.0}
 	for k in ceili(seconds / 0.05):
+		var from := run.enemies.table.pos[observed_row] if observed_row >= 0 else Vector2.ZERO
 		run.state.world_time += 0.05
 		run.projectiles.director.advance(run.state.world_time,run.enemies)
 		run.enemies.tick(0.05, 0.05)
@@ -347,6 +352,11 @@ func _advance_enemies(seconds: float) -> Dictionary:
 		peaks.hazards = maxi(peaks.hazards, run.projectiles.hazard_count())
 		peaks.hostile = maxi(peaks.hostile, run.projectiles.hostile_count())
 		peaks.wells = maxi(peaks.wells, run.field.wells.size())
+		if observed_row >= 0:
+			var t := run.enemies.table
+			if not peaks.modes.has(t.mode[observed_row]): peaks.modes.append(t.mode[observed_row])
+			if t.mode[observed_row] == EnemyTable.Mode.DASH:
+				peaks.dash_distance += t.pos[observed_row].distance_to(from)
 	return peaks
 
 func _test_enemy_roster() -> void:
@@ -376,7 +386,7 @@ func _test_enemy_roster() -> void:
 			for n in 4:
 				var food := _enemy(&"splitling", t.pos[i] + Vector2(0, n * 5))
 				run.combat.kill_enemy(food, {"cause": &"test"})
-		var peaks := _advance_enemies(14.0)
+		var peaks := _advance_enemies(14.0, i if type == &"marlin" else -1)
 		if type in [&"volatile", &"splitter", &"splitling"]:
 			_check(t.dead[i] != 0 or t.pos[i].distance_to(from) > 1, "タスク7〜12：%sが追ってくる" % type)
 		elif type == &"shield":
@@ -391,6 +401,11 @@ func _test_enemy_roster() -> void:
 			_check(t.dead[i] != 0 or t.mode[i] == EnemyTable.Mode.DASH, "支援先のいないレチクル座は退却する")
 		elif type == &"aquarius":
 			_check(peaks.hazards > 0, "みずがめ座は広がる水流の当たりを出す")
+		elif type == &"marlin":
+			# かじき座の攻撃は本体の突進。弾の有無だけでは停止した本体も通してしまう。
+			_check([EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH, EnemyTable.Mode.RECOVER].all(func(mode): return mode in peaks.modes)
+				and peaks.dash_distance > t.r[i], "タスク7〜12：marlinは停止予告から本体で突進して休む")
+			_check(peaks.hazards == 0 and peaks.hostile == 0 and peaks.wells == 0, "かじき座は突進で左右弾や別の攻撃領域を出さない")
 		else:
 			_check(peaks.hazards > 0 or peaks.hostile > 0 or peaks.wells > 0, "タスク7〜12：%sが固有の攻撃を出す" % type)
 	_clear()
@@ -413,6 +428,25 @@ func _test_enemy_roster() -> void:
 		if run.enemies.table.alive[i] and not run.enemies.table.dead[i] and run.enemies.table.type[i] == &"splitling":
 			children += 1
 	_check(children >= 2 and children <= 3, "タスク7：分裂後は2〜3体の分裂体が残る")
+
+func _test_stage_roster_descendants() -> void:
+	var stage := StageDef.new()
+	var phase := PhaseDef.new()
+	stage.phases = [phase]
+	for pair in [[&"cepheus", &"cepheus_soldier"], [&"splitter", &"splitling"]]:
+		_clear()
+		_enemy(pair[1], run.state.ship_pos + Vector2(200, 0))
+		phase.mix = {pair[0]: 1.0}
+		_check(_stage_roster_matches(_stage_types(stage)), "出現種類：%sから生まれる%sを許可する" % pair)
+		phase.mix = {&"biter": 1.0}
+		_check(not _stage_roster_matches(_stage_types(stage)), "出現種類：生成元のない%sを拒否する" % pair[1])
+		phase.mix = {pair[1]: 1.0}
+		_check(_stage_roster_matches(_stage_types(stage)), "出現種類：%sの直接配置も許可する" % pair[1])
+		phase.mix = {pair[0]: 1.0}
+		_enemy(&"drifter", run.state.ship_pos + Vector2(300, 0))
+		_check(not _stage_roster_matches(_stage_types(stage)), "出現種類：%sの派生敵に無関係な敵が混ざると拒否する" % pair[0])
+	_clear()
+	_check(not _stage_roster_matches(_stage_types(stage)), "出現種類：敵がいない状態を正常な出現として扱わない")
 
 func _ram(at: Vector2, direction: Vector2, approach := 100.0) -> bool:
 	_resume_for_check()
@@ -916,14 +950,7 @@ func _test_app_flow() -> void:
 			_line(PackedVector2Array([at, at + Vector2(300, 150)]))
 			await _play_steps(20, 0.05)
 			var expected := _stage_types(ContentManager.stage(stage))
-			var valid := true
-			var regular := 0
-			var t := run.enemies.table
-			for i in t.alive.size():
-				if t.alive[i] and not t.dead[i] and not t.is_boss[i] and t.parent[i] < 0 and t.meteor_index[i] < 0:
-					regular += 1
-					valid = valid and (expected.has(String(t.type[i])) or t.type[i] == &"splitling")
-			_check(valid and regular > 0, "通し確認：ステージ%dの%.0f秒で決めた敵が出る" % [stage, clock])
+			_check(_stage_roster_matches(expected), "通し確認：ステージ%dの%.0f秒で決めた敵が出る" % [stage, clock])
 			await get_tree().process_frame
 		var definition := ContentManager.stage(stage)
 		if not definition.boss_enabled:
@@ -935,10 +962,15 @@ func _test_app_flow() -> void:
 			GameManager.abort_run()
 			await _settle_screen()
 			continue
-		expected_clears += 1
 		run.command(&"debug_time", {"seconds": maxf(0.0, run.state.boss_at + 0.1 - run.state.time)})
 		await _play_steps(2, 0.05)
-		_check(run.state.boss_spawned and run.bosses.actor.def.id == ContentManager.stage(stage).boss_id, "通し確認：ステージ%dに対応するボスが出る" % stage)
+		var boss_ready := run.state.boss_spawned and run.bosses.actor != null and run.bosses.actor.def.id == definition.boss_id
+		_check(boss_ready, "通し確認：ステージ%dに対応するボスが出る" % stage)
+		if not boss_ready:
+			GameManager.abort_run()
+			await _settle_screen()
+			continue
+		expected_clears += 1
 		await _shot("stage_%d_boss" % stage)
 		var enemies := run.enemies.table
 		for row in enemies.alive.size():
@@ -1109,6 +1141,16 @@ func _test_head_world_steps() -> void:
 	_check(neck.row < 0 and neck.burned, "タスク20・23：世界更新の間に倒れた頭も、火による再生遅延を保つ")
 	_check(is_equal_approx(run.enemies.table.hp[boss.body], hp), "タスク20：行の解放と世界更新で頭のダメージを二重に数えない")
 
+func _stage_roster_matches(expected: PackedStringArray) -> bool:
+	var valid := true
+	var regular := 0
+	var t := run.enemies.table
+	for i in t.alive.size():
+		if t.alive[i] and not t.dead[i] and not t.is_boss[i] and t.parent[i] < 0 and t.meteor_index[i] < 0:
+			regular += 1
+			valid = valid and expected.has(String(t.type[i]))
+	return valid and regular > 0
+
 func _stage_types(stage: StageDef) -> PackedStringArray:
 	var types := PackedStringArray()
 	for curve: SpawnCurve in stage.zako_curves:
@@ -1123,6 +1165,9 @@ func _stage_types(stage: StageDef) -> PackedStringArray:
 				for marker in layout.markers:
 					if (clip.types.is_empty() or StringName(marker.type) in clip.types) and not types.has(String(marker.type)):
 						types.append(String(marker.type))
+	for source: String in SPAWNED_DESCENDANTS:
+		var child: String = SPAWNED_DESCENDANTS[source]
+		if types.has(source) and not types.has(child): types.append(child)
 	return types
 
 func _settle_screen() -> void:

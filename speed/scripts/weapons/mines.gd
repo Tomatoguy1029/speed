@@ -28,7 +28,7 @@ func tick(dt: float, _busy: bool) -> void:
 			continue
 		ctx.combat.nearby(m.pos, float(p("trigger")), _buf)
 		if not _buf.is_empty():
-			ctx.combat.explode(m.pos, m.radius, m.dmg, {"cause": &"mine", "color": Color("#ff7b54"), "knock": 300.0, "life": 0.3})
+			ctx.combat.explode(m.pos, m.radius, m.dmg, {"cause": &"mine", "color": Color("#ff7b54"), "knock": 300.0 * post_factor(&"knockback"), "life": 0.3})
 			m.life = 0.0
 			if state.phase != RunState.Phase.PLAY:
 				return

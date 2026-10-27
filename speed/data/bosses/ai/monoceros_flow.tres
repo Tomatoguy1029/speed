@@ -22,8 +22,8 @@ sections = [{
 "next": 0,
 "request": "any",
 "weights": {
-"combo": 40.0,
-"major": 20.0,
-"single": 40.0
+"combo": 35.0,
+"major": 40.0,
+"single": 25.0
 }
 }]

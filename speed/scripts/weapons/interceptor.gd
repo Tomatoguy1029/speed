@@ -23,7 +23,7 @@ func tick(dt: float, busy: bool) -> void:
 	while drones.size() < count():
 		var i := drones.size()
 		drones.append({"pos": state.ship_pos, "angle": 0.0, "flash": 0.0,
-			"next": _clock + i * float(value("interval_by_level")) / count(), "left": 0})
+			"next": _clock + i * interval(float(value("interval_by_level"))) / count(), "left": 0})
 	for i in drones.size():
 		var d := drones[i]
 		# 編隊を常に自機へ固定する。高速経路の記録・追走は行わない。
@@ -44,11 +44,11 @@ func tick(dt: float, busy: bool) -> void:
 			d.angle = (t.pos[target] - d.pos).angle()
 			d.flash = 0.09
 			var direction := Vector2.from_angle(float(d.angle))
-			ctx.projectiles.fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
+			fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
 				atk() * float(value("damage_by_level")), {"cause": &"interceptor", "r": p("shot_radius"),
 				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy})
 		d.left = int(d.left) - 1
-		d.next = _clock + (float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
+		d.next = _clock + interval(float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
 
 func _nearest(from: Vector2) -> int:
 	var range_r := float(p("range"))

@@ -45,7 +45,7 @@ func _ready() -> void:
 	margin.add_child(root)
 	var top := HBoxContainer.new()
 	root.add_child(top)
-	UI.button(top, tr("bg.back"), func(): _request(GameManager.back), "back")
+	UI.button(top, tr("bg.back"), func(): _request(_leave), "back")
 	var title := _label(top, tr("bg.title"))
 	title.add_theme_font_size_override("font_size", 22)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -185,6 +185,12 @@ func _request(action: Callable) -> void:
 		_confirm.popup_centered()
 	else:
 		action.call()
+
+func _leave() -> void:
+	if get_tree().current_scene == self:
+		get_tree().quit()
+	else:
+		GameManager.back()
 
 func _change_stage(index: int) -> void:
 	var next := _stage.get_item_id(index)

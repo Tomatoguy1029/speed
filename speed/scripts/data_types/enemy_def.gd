@@ -2,7 +2,7 @@
 ## 雑魚の種類ごとの強さと動き。ここの値はレベル1・標準の大きさのときの値で、時間帯のレベル・エリート・大きさで強くなる。
 ## HP・装甲には、調整値の「敵の HP 倍率」「敵の装甲倍率」も掛かる。
 ## ---
-## 値の正は res://data/enemies/*.tres（一覧 docs/game/catalog/enemies.md）。既定値は 0（GameConfig と同じ理由）。
+## 値の正は res://data/enemies/*.tres（一覧 docs/game/catalog/enemies.md）。既定値は原則0。hitstop_multiplierは未指定の定義が共通値を使うため1。
 @tool
 class_name EnemyDef
 extends Resource
@@ -253,6 +253,11 @@ const PARAMS_DOCS := {
 ## これより低い攻撃力の体当たりは弾かれる。
 ## 単位：攻撃力
 @export var armor: float
+## ヒットストップ時間倍率
+## この種類への一撃撃破・体当たりクリティカルの停止実時間に掛ける。1で共通値、0で停止なし。
+## 停止時間は共通の累積上限内に収める。世界の速度倍率と白色化・振動は独立。
+## 単位：倍（0以上）
+@export_range(0.0, 10.0, 0.05, "or_greater") var hitstop_multiplier: float = 1.0
 ## 速さ
 ## 追いかけるときの速さ。
 ## 単位：単位/秒

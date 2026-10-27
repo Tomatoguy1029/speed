@@ -555,7 +555,7 @@ func _edit_definition(args: Dictionary) -> void:
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
-		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
+		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight", "hitstop_multiplier"]:
 			return
 		if key == "toughness":
 			def.toughness = clampi(int(args.value), -1, 1)
@@ -747,8 +747,8 @@ func _edit_boss_definition(args: Dictionary) -> void:
 	var key := String(args.get("key", ""))
 	if key.begins_with("params.") and def.params.has(key.trim_prefix("params.")):
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
-	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc"]:
-		def.set(key, maxf(0.01, float(args.value)))
+	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc", "hitstop_multiplier"]:
+		def.set(key, maxf(0.0 if key == "hitstop_multiplier" else 0.01, float(args.value)))
 	else:
 		return
 	run.bosses.definitions[type] = def

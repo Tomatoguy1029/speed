@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://ceb2ql85hgqar"]
+[gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://d30gdh43u6kli"]
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="1_3ghul"]

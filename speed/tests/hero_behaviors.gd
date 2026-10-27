@@ -14,9 +14,13 @@ func _ready() -> void:
 		for id in [&"perseus", &"hercules", &"gemini", &"leo"]:
 			check(sim.heroes.behavior(id) != null, "%sの力が共通の入口を持つ" % id)
 		sim.state.hero_power = &"leo"
-		sim.state.hero_active_t = 1.0
+		sim.heroes.activate()
+		check(is_equal_approx(sim.state.hero_active_t, 14.0), "しし座の発動は14秒")
+		sim.heroes.tick(13.0, 0.0)
+		check(sim.heroes.active_power() == &"leo" and is_equal_approx(sim.state.hero_active_t, 1.0), "13秒後も継続")
 		check(sim.heroes.trace_width() > 1.0, "しし座の力が当たりの太さへ反映される")
-		sim.state.hero_active_t = 0.0
+		sim.heroes.tick(1.0, 0.0)
+		check(sim.heroes.active_power() == &"" and sim.state.hero_active_t == 0.0, "14秒で終了")
 		check(sim.heroes.trace_width() == 1.0, "力の終了後は通常の太さへ戻る")
 		sim.state.hero_power = &"gemini"
 		sim.state.hero_active_t = 1.0

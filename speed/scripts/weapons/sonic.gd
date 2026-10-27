@@ -15,7 +15,7 @@ func tick(dt: float, busy: bool) -> void:
 	if busy:
 		return
 	_t += dt
-	if _t < float(p("interval")) / rate_k():
+	if _t < interval(float(p("interval")) / rate_k()):
 		return
 	_t = 0.0
 	_fire()

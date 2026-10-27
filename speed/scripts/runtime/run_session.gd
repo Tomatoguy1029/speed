@@ -63,6 +63,10 @@ func start(options: Dictionary, with_view: bool) -> void:
 		if with_view:
 			for placement: BackgroundPlacement in options.stage.backgrounds:
 				if not placement.texture_path.is_empty(): paths.append(placement.texture_path)
+				if not placement.fire_preset_path.is_empty(): paths.append(placement.fire_preset_path)
+			for fire_use: Dictionary in options.stage.fire_uses.values():
+				var preset_path := str(fire_use.get("preset", ""))
+				if not preset_path.is_empty(): paths.append(preset_path)
 		resources = ContentManager.prepare_resources(paths, false)
 	sim.ctx.resources = resources
 	sim.options = options
@@ -104,7 +108,7 @@ func _physics_process(delta: float) -> void:
 	if auto_step and sim.state != null:
 		sim.physics_step(delta)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if sim.state == null:
 		if resources == null or _pending_options.is_empty(): return
 		_progress.value = resources.progress() * 100.0
@@ -126,6 +130,7 @@ func _process(_delta: float) -> void:
 		_pending_options = {}
 		start(options, true)
 		return
+	if sim.bosses != null: sim.bosses.tick_feedback(delta)
 	sim.flush_events()
 
 ## 実験場はチェックポイントのために木から外して持つので、片付けは消えるときに行う。

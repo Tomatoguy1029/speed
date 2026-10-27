@@ -4,11 +4,13 @@ extends RefCounted
 
 const GROUPS := {
 	"耐久・弱点": ["耐久・装甲", "弱点"],
+	"命中演出": ["ヒットストップ"],
 	"移動": ["速度・旋回", "距離・隊列"],
 	"攻撃": ["威力・効果", "予告・頻度", "照準・追尾", "範囲・形状", "弾速・軌道"],
 	"固有行動": ["分裂・召喚", "捕捉・投擲", "その他の行動"],
 }
 const BASICS := {
+	"hitstop_multiplier": ["ヒットストップ時間倍率", "一撃撃破・体当たりクリティカルの停止実時間に掛ける。1で共通時間、0で停止なし。共通の累積上限内で停止。", "倍"],
 	"hp": ["標準HP", "星から計算したHPを上書き。サイズ・エリート補正の前の値。", "HP"],
 	"armor": ["装甲", "これより低い攻撃力の体当たりを弾く。", "攻撃力"],
 	"speed": ["移動速度", "追跡するときの標準の速さ。", "距離/秒"],
@@ -23,6 +25,7 @@ static func docs(key: String) -> Array:
 	return EnemyDef.PARAMS_DOCS.get(name, [name, "敵固有の行動が参照する値。", "—"])
 
 static func category(key: String) -> String:
+	if key == "hitstop_multiplier": return "ヒットストップ"
 	if key in ["hp", "armor"]: return "耐久・装甲"
 	if key == "weak_arc" or key == "params.front_arc": return "弱点"
 	if key in ["speed", "accel", "turn"]: return "速度・旋回"

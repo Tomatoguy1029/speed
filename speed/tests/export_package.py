@@ -24,7 +24,8 @@ def inspect(path: Path) -> None:
         files[name] = data[base + offset:base + offset + size]
     excluded = ("gyms/", "tests/", "tools/", "scripts/dev/", ".content/dev/",
                 "addons/content_build/", "addons/spawn_timeline/",
-                "addons/speed_data_editor/", "addons/stage_launcher/", "addons/boss_flow/")
+                "addons/speed_data_editor/", "addons/stage_launcher/",
+                "addons/stage_enemy_tuning/", "addons/boss_flow/")
     forbidden = [name for name in files if name.startswith(excluded)]
     assert not forbidden, f"開発用ファイルが残っている: {forbidden}"
     assert b"autoload/DevBootstrap" not in files["project.binary"], "開発用Autoloadを除外"

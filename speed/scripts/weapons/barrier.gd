@@ -10,11 +10,11 @@ func radius() -> float:
 func tick(dt: float, busy: bool) -> void:
 	_block_t = maxf(0.0, _block_t - dt)
 	if _block_t <= 0.0 and ctx.projectiles.block_one(state.ship_pos, radius()):
-		_block_t = float(p("block_interval")) / rate_k()
+		_block_t = interval(float(p("block_interval")) / rate_k())
 	if busy:
 		return
 	_t += dt
-	if _t < float(p("interval")) / rate_k():
+	if _t < interval(float(p("interval")) / rate_k()):
 		return
 	_t = 0.0
 	ctx.combat.explode(state.ship_pos, radius(), atk() * float(p("damage")) * dmg_k(),
