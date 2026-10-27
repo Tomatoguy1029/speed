@@ -72,7 +72,7 @@ condition_groups = {
 }
 graph_nodes = {
 "rear_attack": {
-&"connected": false,
+&"connected": true,
 "source": "rear_attack"
 }
 }
