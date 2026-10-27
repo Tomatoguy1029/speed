@@ -33,6 +33,7 @@ func _decorate(reference: WeakRef) -> void:
 	var overlay := PERF_OVERLAY.new()
 	overlay.name = "PerfOverlay"
 	overlay.run = session.sim
+	overlay.view = session.view.get_node("RunPresentation")
 	session.view.get_node("Hud").add_child(overlay)
 	var tuning := ENEMY_TUNING.new()
 	tuning.name = "StageEnemyTuning"

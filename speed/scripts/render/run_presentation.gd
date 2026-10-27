@@ -108,6 +108,12 @@ var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
+## 開発版の計測（PerfOverlay の詳細表示の間だけ有効）：表示側の処理時間の合計（マイクロ秒）・回数・最大時間。
+## 名前に「.」を含む項目は、前半の名前の項目の内訳なので合算しない。
+var profile: Dictionary = {}
+## 計測中の、敵の描画1回あたりの行の数（合計・回数・最大）
+var profile_counts: Dictionary = {}
+var profiling := false
 
 func _ready() -> void:
 	state = run.state
@@ -124,13 +130,13 @@ func _ready() -> void:
 		var layer := DrawLayer.new()
 		layer.name = name.capitalize().replace(" ", "")
 		layer.z_index = _layers.size() * 2
-		layer.draw_fn = Callable(self, "_draw_" + name)
+		layer.draw_fn = _timed(StringName("draw_" + name), Callable(self, "_draw_" + name))
 		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		world.add_child(layer)
 		_layers[name] = layer
 	_field_boundary = DrawLayer.new()
 	_field_boundary.show_behind_parent = true
-	_field_boundary.draw_fn = _draw_field_boundary
+	_field_boundary.draw_fn = _timed(&"draw_field_boundary", _draw_field_boundary)
 	_layers.field.add_child(_field_boundary)
 	_hero_aura = MeshInstance2D.new()
 	_hero_aura.show_behind_parent = true
@@ -149,7 +155,7 @@ func _ready() -> void:
 	_path_band_group.z_index = -1
 	_layers.path.add_child(_path_band_group)
 	_path_band = DrawLayer.new()
-	_path_band.draw_fn = Callable(self, "_draw_path_band")
+	_path_band.draw_fn = _timed(&"draw_path_band", _draw_path_band)
 	_path_band_group.add_child(_path_band)
 	_build_batches()
 	_build_directional_lights(world)
@@ -178,7 +184,7 @@ func _build_directional_lights(world: Node2D) -> void:
 	marks.follow_viewport_enabled = true
 	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
-	_lit_enemy_marks.draw_fn = _draw_lit_enemy_marks
+	_lit_enemy_marks.draw_fn = _timed(&"draw_lit_enemy_marks", _draw_lit_enemy_marks)
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	_lit_enemy_marks.material = unshaded
@@ -349,10 +355,42 @@ func _visual_of(table: EnemyTable, row: int) -> EnemyVisual:
 func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
+## 計測中なら、key の記録に start_us からの経過時間を足す。
+func _add_time(key: StringName, start_us: int) -> void:
+	if profiling:
+		_add_record(profile, key, Time.get_ticks_usec() - start_us)
+
+static func _add_record(records: Dictionary, key: StringName, value: int) -> void:
+	var rec: Array = records.get(key, [0, 0, 0])
+	rec[0] += value
+	rec[1] += 1
+	rec[2] = maxi(rec[2], value)
+	records[key] = rec
+
+## 層の描く処理を、計測中なら時間を測る形で包む。
+func _timed(key: StringName, f: Callable) -> Callable:
+	return func(c: CanvasItem) -> void:
+		if not profiling:
+			f.call(c)
+			return
+		var t0 := Time.get_ticks_usec()
+		f.call(c)
+		_add_time(key, t0)
+
 func _process(delta: float) -> void:
+	if not profiling:
+		_present(delta)
+		return
+	var t0 := Time.get_ticks_usec()
+	_present(delta)
+	_add_time(&"process", t0)
+
+func _present(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
+	var t0 := Time.get_ticks_usec()
 	_sync_picaro()
+	_add_time(&"process.picaro", t0)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	# HUD owns cinematic visibility so the explicit entrance skip and the
 	# completed legendary module strip remain usable while the combat UI hides.
@@ -364,7 +402,9 @@ func _process(delta: float) -> void:
 	# 停止中は減衰も止まるため、残った画面揺れを持ち越さない。
 	if run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
 		shake = 0.0
+	t0 = Time.get_ticks_usec()
 	_update_fx(dt)
+	_add_time(&"process.fx", t0)
 	_ship_visual.update(dt)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
@@ -379,7 +419,9 @@ func _process(delta: float) -> void:
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(cam_zoom, 0.01)
 	_camera.position = cam_center + offset
 	_camera.zoom = Vector2(cam_zoom, cam_zoom)
+	t0 = Time.get_ticks_usec()
 	pipeline.step(dt, _camera.position, cam_zoom)
+	_add_time(&"process.pipeline", t0)
 	_field_boundary.queue_redraw()
 	for layer in _layers.values():
 		layer.queue_redraw()
@@ -880,6 +922,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
 	_sync_visuals()
@@ -902,9 +945,14 @@ func _draw_enemies(c: CanvasItem) -> void:
 	var radius := t.r
 	var hp := t.hp
 	var max_hp := t.max_hp
+	var live := 0
+	var batched := 0
+	var self_drawn := 0
+	var marked := 0
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		live += 1
 		if state.cinematic_hide_enemies and t.is_boss[i] == 0: continue
 		if t.def[i] != null and t.def[i].params.get("clone_visual", false): continue
 		if t.def[i] != null and t.def[i].params.get("picaro", false): continue
@@ -927,7 +975,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
 		if visual != null and visual.draw_body(c, t, i, p):
+			self_drawn += 1
 			continue
+		batched += 1
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
@@ -940,17 +990,29 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var v := _visual_of(t, i)
 		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
 				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or (v != null and v.always_marked):
+			marked += 1
 			_draw_enemy_marks(c, t, i)
+	_add_time(&"draw_enemies.rows", t0)
+	t0 = Time.get_ticks_usec()
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
-	_draw_meteor_shards(c)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.end()
+	_add_time(&"draw_enemies.upload", t0)
+	_draw_meteor_shards(c)
+	t0 = Time.get_ticks_usec()
 	for v in _visuals:
 		v.draw_layer(c, view)
+	_add_time(&"draw_enemies.visual_layers", t0)
 	_drawing_enemies = false
 	_enemy_sprite_metrics.clear()
+	if profiling:
+		_add_record(profile_counts, &"rows", alive.size())
+		_add_record(profile_counts, &"live", live)
+		_add_record(profile_counts, &"batched", batched)
+		_add_record(profile_counts, &"self_drawn", self_drawn)
+		_add_record(profile_counts, &"marked", marked)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table

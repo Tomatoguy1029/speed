@@ -1,7 +1,7 @@
 ## 性能の表示（仕様書 20）。開発版だけで、F3 を押すたびに 簡易 → 詳細 → 非表示 と切り替わる。
 ##
 ## 初期位置は画面の右上（ボスの HP バーの下）。つかんで動かせ、位置と表示の段階は同じ起動の間は次のランにも引き継ぐ。
-## 文字は1秒に4回更新し、その間の平均と最大を出す。Manager ごとの時間は詳細表示の間だけ計測する。
+## 文字は1秒に4回更新し、その間の平均と最大を出す。Manager ごとと表示側の時間は詳細表示の間だけ計測する。
 class_name PerfOverlay
 extends PanelContainer
 
@@ -23,6 +23,7 @@ static var _saved_pos := Vector2(-1, -1)
 
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var view: RunPresentation
 var mode := Mode.HIDDEN
 var _label: RichTextLabel
 var _graph: Control
@@ -81,6 +82,8 @@ func _exit_tree() -> void:
 		_saved_pos = position
 	if _owns_profiling and run != null:
 		run.profiling = false
+	if is_instance_valid(view):
+		view.profiling = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"debug_perf"):
@@ -99,6 +102,10 @@ func _set_mode(m: Mode) -> void:
 	elif mode != Mode.DETAIL and _owns_profiling:
 		run.profiling = false
 		_owns_profiling = false
+	if view != null:
+		view.profiling = mode == Mode.DETAIL
+		view.profile.clear()
+		view.profile_counts.clear()
 	_reset_window()
 	_acc = REFRESH
 	reset_size()
@@ -176,12 +183,15 @@ func _text() -> String:
 	if mode == Mode.DETAIL:
 		lines.append(HEAD % "処理時間")
 		# 描画時間の計測（viewport_set_measure_render_time）は描画の完了を待ってフレームを引き延ばすので使わない。
-		# ゲーム処理の時間をフレーム時間から引いた残りを、描画と待ちの目安にする。
+		# ゲーム処理と表示側のスクリプトの時間をフレーム時間から引いた残りを、描画エンジン・GPU・待ちの目安にする。
 		var total: Array = run.profile.get(&"play_total", [0, 0, 0])
 		var game_ms: float = total[0] / 1000.0 / maxi(1, _frame_n)
-		lines.append("ゲーム処理 %.2fms/フレーム  それ以外（描画・待ち）%.2fms" % [game_ms, maxf(0.0, avg - game_ms)])
+		var view_ms := _view_total_ms()
+		lines.append("ゲーム処理 %.2fms/フレーム  表示側 %.2fms/フレーム" % [game_ms, view_ms])
+		lines.append("残り（描画エンジン・GPU・待ち）%.2fms" % maxf(0.0, avg - game_ms - view_ms))
 		lines.append("ゲーム更新 1回 平均 %.2fms 最大 %.2fms" % [total[0] / 1000.0 / maxi(1, total[1]), total[2] / 1000.0])
 		lines.append_array(_manager_lines())
+		lines.append_array(_view_lines())
 		lines.append(HEAD % "描画")
 		lines.append("描画命令 %d  オブジェクト %d  頂点・図形 %d" % [
 			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
@@ -225,6 +235,48 @@ func _manager_lines() -> Array[String]:
 	out.append("処理ごと（世界側の更新1回あたり 平均 / 最大）")
 	for r in rows.slice(0, 8):
 		out.append("  %-12s %.3f / %.3fms" % [r[0], r[1], r[2]])
+	return out
+
+## 表示側（RunPresentation の _process と各層の描く処理）の、1フレームあたりの合計（ms）。内訳の項目は数えない。
+func _view_total_ms() -> float:
+	if view == null or not view.profiling:
+		return 0.0
+	var us := 0
+	for key in view.profile:
+		if not String(key).contains("."):
+			us += view.profile[key][0]
+	return us / 1000.0 / maxi(1, _frame_n)
+
+## 表示側の各処理の、1フレームあたりの平均と1回の最大（多い順）。内訳は親の項目の下に字下げして出す。
+## 読んだら次の区間のために空にする。
+func _view_lines() -> Array[String]:
+	var out: Array[String] = []
+	if view == null or not view.profiling:
+		return out
+	var frames := maxi(1, _frame_n)
+	var rows: Array = []
+	for key in view.profile:
+		var rec: Array = view.profile[key]
+		rows.append([String(key), rec[0] / 1000.0 / frames, rec[2] / 1000.0])
+	rows.sort_custom(func(a, b): return a[1] > b[1])
+	out.append(HEAD % "表示側")
+	out.append("処理ごと（1フレームあたり 平均 / 1回の最大）")
+	for r in rows:
+		if r[0].contains("."):
+			continue
+		out.append("  %-22s %.3f / %.3fms" % r)
+		for s in rows:
+			if s[0].begins_with(r[0] + "."):
+				out.append("    %-20s %.3f / %.3fms" % [s[0].get_slice(".", 1), s[1], s[2]])
+	var counts := view.profile_counts
+	if counts.has(&"rows"):
+		var avg := func(key: StringName) -> String:
+			var rec: Array = counts.get(key, [0, 1, 0])
+			return "%.0f（最大 %d）" % [float(rec[0]) / maxi(1, rec[1]), rec[2]]
+		out.append("敵の描画1回あたりの行  見た行 %s  生存 %s" % [avg.call(&"rows"), avg.call(&"live")])
+		out.append("  一括で描いた %s  個別に描いた %s  飾り %s" % [avg.call(&"batched"), avg.call(&"self_drawn"), avg.call(&"marked")])
+	view.profile.clear()
+	counts.clear()
 	return out
 
 func _ms(v: float, warn: float) -> String:
