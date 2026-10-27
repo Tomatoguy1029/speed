@@ -13,7 +13,7 @@ visual_settings = {
 }
 rank = 6
 radius = 44.0
-hp = 700.0
+hp = 2100.0
 armor = 10.0
 speed = 70.0
 accel = 1.2
@@ -26,12 +26,12 @@ params = {
 "align_angle": 0.07,
 "capture_interval": 0.2,
 "capture_max": 18,
-"fire_interval": 3.0,
+"fire_interval": 0.25,
 "pull": 130.0,
 "pull_radius": 185.0,
 "ring": 100.0,
-"spin": 2.4,
-"telegraph": 0.75,
+"spin": 4.8,
+"telegraph": 0.3,
 "throw_damage_armored": 22.0,
 "throw_damage_biter": 9.0,
 "throw_damage_darter": 12.0,
