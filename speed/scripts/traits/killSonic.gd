@@ -7,7 +7,7 @@ var _next := 0
 var _active := false
 
 func _every() -> int:
-	return maxi(3, int(val("kills")))
+	return maxi(int(def.params.get("kills_min", 4)), int(val("kills")))
 
 func on_launch(_full: bool) -> void:
 	_kills = 0
@@ -18,10 +18,10 @@ func on_end() -> void:
 	_active = false
 
 func on_kill(cause: StringName) -> void:
-	if not _active:
+	if not _active or cause == &"killSonic":
 		return
 	_kills += 1
-	if cause == &"killSonic" or _kills < _next or state.phase != RunState.Phase.PLAY:
+	if _kills < _next or state.phase != RunState.Phase.PLAY:
 		return
 	_next = _kills + _every()
 	ctx.projectiles.attached_attack(&"sonic").fire(&"killSonic", val("radius"), atk() * val("damage"), def.params.knock, def.params.travel)
