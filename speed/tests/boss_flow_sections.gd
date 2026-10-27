@@ -29,6 +29,22 @@ func exercise() -> void:
 	panel._parallel_toggle.toggled.emit(false)
 	assert(not panel.rules.allow_parallel_attacks, "unchecked simultaneous attacks are inactive")
 	panel._edit_section(0)
+	var normal_targets: VBoxContainer = panel._fields.find_child("targets_normal", true, false).get_node("Rows")
+	assert(normal_targets.get_child_count() == 1, "condition nodes have individual rows without an all-category control")
+	var selected_group: String = panel.graph.hub_for("bite_thrust")
+	var selected_groups_before: Array = panel._effective_groups(panel.flow.sections[0])
+	var target_check: CheckBox = normal_targets.get_child(0).get_child(0)
+	assert(target_check.button_pressed)
+	target_check.set_pressed_no_signal(false)
+	target_check.toggled.emit(false)
+	assert(selected_group not in panel.flow.sections[0].allowed_groups and panel.flow.sections[0].allowed_groups.size() == selected_groups_before.size() - 1, "an individual condition checkbox changes only its node selection")
+	panel.undo_edit()
+	assert(panel._fields.find_child("targets_normal", true, false).get_node("Rows").get_child(0).get_child(0).button_pressed, "undo restores the individual node selection")
+	var field_nodes: Array = panel._fields.get_children()
+	var exclusion_label_index := -1
+	for i in field_nodes.size():
+		if field_nodes[i] is Label and field_nodes[i].text == "使わない技": exclusion_label_index = i
+	assert(exclusion_label_index >= 2 and field_nodes[exclusion_label_index - 1] is HSeparator and field_nodes[exclusion_label_index - 2] is HSeparator, "attack selection and excluded techniques have their own separator")
 	var before_collapse: Array = panel.flow.sections.duplicate(true)
 	var history_before_collapse: int = panel.history.get_version()
 	for list_kind in ["targets", "exclusions"]:

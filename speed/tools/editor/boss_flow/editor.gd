@@ -614,7 +614,7 @@ func _edit_section(i: int, previous := "") -> void:
 	count_field.rounded = true
 	_number_field("攻撃間隔（秒）", float(flow.sections[i].get("action_interval", 0.0)), func(value): _section_property(i, "action_interval", value))
 	_optional_section_number(i, "no_candidate_timeout", "候補なしで次へ（秒）", 0.5, 0.0)
-	_section_heading("攻撃候補")
+	_section_heading("攻撃選択")
 	_append_section_targets(i)
 	_section_heading("選択確率")
 	var weights: Dictionary = flow.sections[i].get("weights", {})
@@ -644,14 +644,17 @@ func _edit_section(i: int, previous := "") -> void:
 		_append_forbidden(i)
 
 func _section_heading(title_text: String) -> void:
-	_fields.add_child(HSeparator.new())
-	var second := HSeparator.new()
-	second.set_meta("hide_when_narrow", true)
-	_fields.add_child(second)
+	_section_divider()
 	var label := Label.new()
 	label.text = title_text
 	_fields.add_child(label)
 	_fields.add_child(Control.new())
+
+func _section_divider() -> void:
+	_fields.add_child(HSeparator.new())
+	var second := HSeparator.new()
+	second.set_meta("hide_when_narrow", true)
+	_fields.add_child(second)
 
 func _number_field(title_text: String, value: float, changed: Callable, minimum := 0.0, maximum := 100000.0) -> SpinBox:
 	var label := Label.new()
@@ -745,7 +748,7 @@ func _effective_groups(section: Dictionary) -> Array:
 func _append_section_targets(index: int) -> void:
 	var heading := Label.new()
 	heading.text = "条件選択ノード"
-	heading.tooltip_text = "分類のチェックは、その分類のノードをまとめて選びます。個別チェックは指定ノードだけを追加します。"
+	heading.tooltip_text = "この区間で使う条件選択ノードを個別に選びます。"
 	_fields.add_child(heading)
 	var section: Dictionary = flow.sections[index]
 	var attached: Array = _effective_groups(section)
@@ -759,12 +762,11 @@ func _append_section_targets(index: int) -> void:
 		var all_in_kind: Array = rules.condition_groups.keys().filter(func(group): return rules.category_for_group(String(group)) == kind)
 		if all_in_kind.is_empty(): continue
 		var rows := _append_collapsible_category(target_list, index, "targets", kind, all_in_kind.size())
-		var whole_kind: bool = not all_in_kind.is_empty() and all_in_kind.all(func(group): return group in attached)
-		_append_selection_row(rows, {"normal": "通常技 全部", "combo": "コンボ技 全部", "major": "大技 全部"}[kind], whole_kind, false, func(value): _set_section_target(index, kind, true, value))
 		for group in rules.condition_groups:
 			if rules.category_for_group(String(group)) != kind: continue
-			_append_selection_row(rows, "  " + String(rules.condition_groups[group].get("title", group)), group in attached, whole_kind, func(value): _set_section_target(index, String(group), false, value))
+			_append_selection_row(rows, String(rules.condition_groups[group].get("title", group)), group in attached, false, func(value): _set_section_target(index, String(group), false, value))
 	_fields.add_child(targets)
+	_section_divider()
 	var exclude := Label.new()
 	exclude.text = "使わない技"
 	exclude.tooltip_text = "選んだ技は、接続ノードで成立してもこの区間では使用しません。"
