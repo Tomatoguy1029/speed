@@ -1,7 +1,7 @@
 ## 冠の短距離の渦（みなみのかんむり座の Behavior が持つ）。敵の表の同じ個体を保持し、通常 AI だけを旋回・投擲に置き換える。
 ## 保持している個体は敵の表の held を 1 にし、EnemySystem はその行の行動を止める。
 ## owners[row].types[type] は個体の配列。members[row].slot と末尾交換で O(1) で除去する。
-## 抽選は現在ある種類だけを回り、個体数を重みに加えない。
+## 抽選は現在ある種類だけを回り、個体数を重みに加えない。種類の中では、次に機体の方を向く個体を投げる。
 extends RefCounted
 
 const ATTACK := Color("#ff3b3b")
@@ -138,7 +138,7 @@ func tick(m: EnemySystem, dt: float, rows: PackedInt32Array) -> void:
 			var kind := choose_type(o, p, m.state.rng)
 			if not kind.is_empty():
 				var bucket: Array = o.types[kind]
-				o.selected = bucket[m.state.rng.randi_range(0, bucket.size() - 1)]
+				o.selected = _soonest(m, i, o, bucket, p, dt)
 				o.selected_id = t.id[int(o.selected)]
 				o.wait = float(p.telegraph)
 				t.mode[i] = EnemyTable.Mode.WINDUP
@@ -182,6 +182,39 @@ func tick(m: EnemySystem, dt: float, rows: PackedInt32Array) -> void:
 			_detach(m, j)
 	for i in owners:
 		owners[i].center = t.pos[i]
+
+## 選んだ種類の中から、予告が終わったあと最も早く自機の方を向く1体を選ぶ。輪に乗った個体を先に選ぶ。
+func _soonest(m: EnemySystem, i: int, o: Dictionary, bucket: Array, p: Dictionary, dt: float) -> int:
+	var t := m.table
+	var center := t.pos[i]
+	var center_v := (center - Vector2(o.center)) / maxf(dt, 0.001)
+	var spin := float(p.spin)
+	var lead := spin * float(p.telegraph)
+	var best := int(bucket[0])
+	var best_turn := INF
+	for j: int in bucket:
+		var a: Dictionary = members[j]
+		var turn := _turn_to_aim(center, center_v, float(a.angle) + lead, float(p.ring), spin, m.state.ship_pos, float(p.align_angle))
+		if not a.settled:
+			turn += TAU
+		if turn < best_turn:
+			best_turn = turn
+			best = j
+	return best
+
+## 輪の上の angle の位置から、回る向きへ進んで接線が target を向くまでの角度。1周しても向かなければ TAU。
+static func _turn_to_aim(center: Vector2, center_v: Vector2, angle: float, radius: float, spin: float, target: Vector2, tolerance: float) -> float:
+	const STEPS := 48
+	var previous := _error(center, center_v, angle, radius, spin, target)
+	if absf(previous) <= tolerance:
+		return 0.0
+	for k in range(1, STEPS + 1):
+		var turn := TAU * k / STEPS
+		var e := _error(center, center_v, angle + signf(spin) * turn, radius, spin, target)
+		if previous * e <= 0.0 and absf(e - previous) < PI:
+			return turn
+		previous = e
+	return TAU
 
 ## 可視の速度＝冠の並進＋円の接線。吸い込み中の半径も連続的に ring へ近づける。
 func _orbit(m: EnemySystem, j: int, a: Dictionary, o: Dictionary, p: Dictionary, dt: float) -> void:
