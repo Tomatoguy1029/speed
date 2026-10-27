@@ -2,11 +2,13 @@
 extends EditorPlugin
 
 const PANEL := preload("res://tools/editor/stage_enemy_tuning/dock_panel.gd")
+const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
 var _dock: ScrollContainer
 var _panel: Control
 var _inspected: StageDef
 
 func _enter_tree() -> void:
+	FormationPaths.sync()
 	add_to_group("speed_stage_enemy_tuning")
 	# 折り返す説明文や一覧の最小サイズを、エディター全体へ伝えない。
 	_dock = ScrollContainer.new()
@@ -25,6 +27,7 @@ func _enter_tree() -> void:
 	_on_inspected.call_deferred()
 
 func open_dock() -> void:
+	FormationPaths.sync()
 	_dock.custom_minimum_size.x = 160
 	if _panel.stage_path.is_empty():
 		_panel.open_stage("res://data/stages/stage_1.tres")

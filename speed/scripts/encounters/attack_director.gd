@@ -2,6 +2,9 @@
 ## 本番では個体ごとにvalueを消費し、明示overrideの群れだけ1つのvalueを共有する。分類は記録用。
 ## 待っていた攻撃は、許可が出てもばらつき（jitter 秒までの乱数）だけ遅れて始める。
 extends RefCounted
+## 倍精度の加算順だけで越えた分を、値の大きさに応じた数ULPで吸収する。
+## 固定の絶対epsilonは微小な正のvalueを0扱いするので使わない。
+const FLOAT_ROUNDING := 4.0 * 2.220446049250313e-16
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
 const BEHAVIORS := {
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
@@ -42,7 +45,7 @@ func advance(time: float, enemies: EnemySystem) -> void:
 				var row := int(member.row)
 				if enemies.is_same(row, int(member.id)) and not enemies.table.dead[row] and enemies.table.mode[row] == EnemyTable.Mode.WINDUP:
 					group.until = maxf(float(group.until), now + maxf(0.05, enemies.table.timer[row]))
-		if group.until <= now:
+		if _time_reached(now, float(group.until)):
 			expired.append(token)
 	if not expired.is_empty():
 		var live := {}
@@ -100,9 +103,12 @@ func cancel_attack(owner: String, id: int) -> void:
 func _next_owner() -> String:
 	var winner := ""
 	var best := -INF
+	var budget := float(settings.budget)
+	if budget <= 0.0:
+		return ""
 	for candidate: String in waiting:
 		var item: Dictionary = waiting[candidate]
-		if float(item.get("cost", 1.0)) > float(settings.budget):
+		if _greater_than(float(item.get("cost", 1.0)), budget):
 			continue
 		var score := float(item.priority) - float(item.since) * 0.2
 		# 同点は待機登録の順。owner名に含まれる種類や群れの有無で優先しない。
@@ -119,20 +125,20 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		var group: Dictionary = groups[owners[owner]]
 		if formation_mode:
 			var member := str(id)
-			if enabled and used_cost() > float(settings.budget):
+			if group.members.has(member):
+				return not _time_reached(now, float(group.members[member].until))
+			if enabled and (float(settings.budget) <= 0.0 or _greater_than(used_cost(), float(settings.budget))):
 				reasons[owner] = TranslationServer.translate("lab.message_9ce7705ba3")
 				return false
-			if group.members.has(member):
-				return float(group.members[member].until) > now
 			group.members[member] = {"row": row, "id": id, "until": now + maxf(0.05, duration)}
 			group.until = maxf(float(group.until), now + maxf(0.05, duration))
 			return true
-		if float(group.until) > now:
+		if not _time_reached(now, float(group.until)):
 			return true
 		if enabled:
 			reasons[owner] = TranslationServer.translate("lab.message_eb3d91decb")
 			return false
-	if cost < 0.0:
+	if not is_finite(cost) or cost < 0.0:
 		cost = 1.0
 	queue(owner, cats, row, id, priority)
 	waiting[owner].cost = cost
@@ -152,7 +158,7 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 	if enabled and now > float(waiting[owner].since) + 0.001 and float(settings.get("jitter", 0.0)) > 0.0:
 		if not waiting[owner].has("ready"):
 			waiting[owner].ready = now + (state.rng.randf() if state != null else 0.5) * float(settings.jitter)
-		if now < float(waiting[owner].ready):
+		if not _time_reached(now, float(waiting[owner].ready)):
 			return false
 	serial += 1
 	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row), "type": _source_type(row), "cost": cost}
@@ -172,8 +178,20 @@ func used_cost() -> float:
 		total += float(group.get("cost", 1.0))
 	return total
 
+func _greater_than(a: float, b: float) -> bool:
+	return a > b and a - b > maxf(absf(a), absf(b)) * FLOAT_ROUNDING
+
+func _time_reached(time: float, deadline: float) -> bool:
+	return time >= deadline or deadline - time <= maxf(absf(time), absf(deadline)) * FLOAT_ROUNDING
+
 func _capacity(cost: float) -> String:
-	return TranslationServer.translate("lab.message_9ce7705ba3") if used_cost() + cost > float(settings.budget) else ""
+	var budget := float(settings.budget)
+	var used := used_cost()
+	# 予算0は新しい能動攻撃を止める。満杯のときも微小な正valueを無料扱いしない。
+	if budget <= 0.0 or (cost > 0.0 and used >= budget) \
+			or _greater_than(used + cost, budget):
+		return TranslationServer.translate("lab.message_9ce7705ba3")
+	return ""
 
 func token(owner: String) -> int:
 	return int(owners.get(owner, 0))

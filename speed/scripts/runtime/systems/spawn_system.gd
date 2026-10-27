@@ -198,7 +198,7 @@ func _pick_weighted(items: Array) -> int:
 ## priorityが数値なら0を含めて群れ全員へ渡す。nullならステージの種類別優先度を使う。
 func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null) -> PackedInt32Array:
 	var rows := PackedInt32Array()
-	var group := enemies._next_id if value > 0.0 else 0
+	var group := enemies._next_id if value >= 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:

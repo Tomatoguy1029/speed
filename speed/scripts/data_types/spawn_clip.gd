@@ -24,11 +24,11 @@ extends Resource
 ## 単位：シーン
 @export var formations: Array[PackedScene] = []
 ## 使う並び
-## フォーメーションの配置のうち、このクリップで使うもの（「フォーメーションのファイル名/配置のノード名」）。
+## フォーメーションの配置のうち、このクリップで使うもの（シーンUID/配置ノードID）。
 ## 選んだ並びが1つもないフォーメーションは使わない。空なら、すべての並びを使う。
 ## 単位：並びの名前
 @export var layouts: Array[StringName] = []
-## 並びごとの共有override。「シーンのファイル名/並びのノード名」→正の小数。
+## 並びごとの共有override。「シーンUID/配置ノードID」→0以上の小数。
 ## 保存済みの整数も共有overrideとして読む。キーがなければ個体ごとの自動計算。
 @export var formation_values: Dictionary = {}
 ## 攻撃優先度
@@ -56,11 +56,12 @@ extends Resource
 
 ## 同じ並びから1回で出た群れ全体の共有override。未設定は -1（個体ごと）。
 func formation_value(scene_path: String, layout_name: String) -> float:
-	var key := String(layout_key(scene_path, layout_name))
+	var key := String(_stored_key(formation_values.keys(), scene_path, layout_name))
 	if not formation_values.has(key):
 		return -1.0
 	var value := float(formation_values[key])
-	return value if is_finite(value) and value > 0.0 else 1.0
+	if value == 0.0: return 0.0
+	return value if is_finite(value) and value >= 0.0 else 1.0
 
 ## 実際に出す種類だけを数えた、指定配置の個体valueの合計。選択の有無はUIで別表示する。
 func automatic_value(stage: StageDef, layout: Dictionary) -> float:
@@ -76,15 +77,44 @@ func automatic_value(stage: StageDef, layout: Dictionary) -> float:
 func end_time() -> float:
 	return time + length
 
-## フォーメーション scene の配置 layout_name を指す、使う並びの名前。
+## フォーメーション scene と配置の、改名しても変わらない保存キー。
 static func layout_key(scene_path: String, layout_name: String) -> StringName:
-	return StringName(scene_path.get_file().get_basename() + "/" + layout_name)
+	var uid := ResourceLoader.get_resource_uid(scene_path)
+	var scene_id := ResourceUID.id_to_text(uid) if uid != ResourceUID.INVALID_ID else scene_path
+	var layout_id := layout_name
+	var text := FileAccess.get_file_as_string(scene_path)
+	for line in text.split("\n"):
+		if not line.begins_with("[node ") or not line.contains('parent="."') or not line.contains("unique_id="):
+			continue
+		if line.get_slice('name="', 1).get_slice('"', 0) == layout_name:
+			layout_id = line.get_slice("unique_id=", 1).get_slice(" ", 0).trim_suffix("]")
+			break
+	return StringName(scene_id + "/" + layout_id)
+
+## 旧ファイル名キーは、候補が一意のときだけ同じ配置として扱う。読み取りでは保存値を変えない。
+func _stored_key(keys: Array, scene_path: String, layout_name: String) -> StringName:
+	var stable := layout_key(scene_path, layout_name)
+	if keys.has(stable): return stable
+	var legacy := StringName(scene_path.get_file().get_basename() + "/" + layout_name)
+	if keys.has(legacy): return legacy
+	if formations.size() == 1:
+		var matches := []
+		for key in keys:
+			if String(key).ends_with("/" + layout_name): matches.append(key)
+		if matches.size() == 1: return StringName(matches[0])
+	return stable
+
+func stored_layout_key(scene_path: String, layout_name: String) -> StringName:
+	return _stored_key(layouts, scene_path, layout_name)
+
+func stored_value_key(scene_path: String, layout_name: String) -> StringName:
+	return _stored_key(formation_values.keys(), scene_path, layout_name)
 
 ## フォーメーション scene の、ゲーム中に使う形 data のうち、このクリップで使う配置の番号。
 func allowed_layouts(scene_path: String, data: Dictionary) -> Array[int]:
 	var out: Array[int] = []
 	var ls: Array = data.get("layouts", [])
 	for k in ls.size():
-		if layouts.is_empty() or layouts.has(layout_key(scene_path, str(ls[k].get("name", "")))):
+		if layouts.is_empty() or layouts.has(stored_layout_key(scene_path, str(ls[k].get("name", "")))):
 			out.append(k)
 	return out

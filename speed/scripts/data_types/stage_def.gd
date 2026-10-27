@@ -33,7 +33,7 @@ const EDITOR_ORDER := 5
 ## 敵調整dock／プレイ中パネルが編集する、敵ID → 数値項目 → 上書き値。
 ## HPは星から計算した標準HP、params.*は敵固有の行動値。未指定は共通値を使う。
 @export_storage var enemy_tuning: Dictionary = {}
-## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 正の小数）。
+## 敵の種類ごとの、1体が攻撃中に消費するvalue（type ID → 0以上の小数）。
 ## 未設定は互換用の仮値1。確定した種類だけ設定する。出現数には影響しない。
 @export var enemy_attack_values: Dictionary = {}
 ## クリップ以外から出る敵の、種類ごとの攻撃待ちの優先度（0〜5の整数）。大きいほど先。未設定は0（標準）。
@@ -46,7 +46,8 @@ func enemy_attack_priority(type: StringName) -> float:
 
 func enemy_attack_value(type: StringName) -> float:
 	var value := float(enemy_attack_values.get(String(type), 1.0))
-	return value if is_finite(value) and value > 0.0 else 1.0
+	if value == 0.0: return 0.0
+	return value if is_finite(value) and value >= 0.0 else 1.0
 ## 雑魚の目標の数
 ## 雑魚の種類ごとの、時刻ごとの目標の数の曲線。1つでもあれば、雑魚はこの曲線で補充し、時間帯の敵の数と重みは使わない。
 ## 単位：—
