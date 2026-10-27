@@ -138,7 +138,7 @@ func exercise() -> void:
 	panel._edit_section(0)
 	await _settle()
 	text = _texts(panel, true)
-	check(_has(text, "単独攻撃の割合") and _has(text, "技1回の消費上限") and _has(text, "区間の攻撃回数") and _has(text, "区間内の攻撃間隔（秒）") and _has(text, "区間の累計消費上限") and _has(text, "候補なしの待機上限（秒）"), "selecting a section exposes its rhythm, budget and fallback limit")
+	check(_has(text, "攻撃回数") and _has(text, "攻撃間隔（秒）") and _has(text, "この区間で使える力") and _has(text, "候補なしで次へ（秒）") and _has(text, "条件選択ノード") and not _has(text, "技1回の消費上限"), "selecting a section exposes its rhythm, targets, budget and fallback limit")
 	check(_has(text, "禁止ペア") or _has(text, "同時攻撃の禁止"), "forbidden simultaneous attacks belong to the selected section")
 	check(not _has(text, "噛みつきのダメージ") and not _has(text, "最大距離"), "section editing does not expose technique performance or trigger distances")
 

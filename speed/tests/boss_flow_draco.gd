@@ -6,7 +6,7 @@ func exercise() -> void:
 	var listed := false
 	for picker in editor.find_children("*", "OptionButton", true, false):
 		for index in picker.item_count:
-			if picker.get_item_text(index) == "りゅう座": listed = true
+			if picker.get_item_text(index).ends_with("りゅう座"): listed = true
 	if not listed:
 		push_error("ボス選択に竜を表示する")
 		quit(1)
