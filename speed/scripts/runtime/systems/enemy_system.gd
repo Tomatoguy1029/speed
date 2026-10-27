@@ -682,7 +682,10 @@ func _tick_behavior(b: int, dt: float) -> void:
 			if managed and not needs_admission:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
-				motion._chase(i, bdt)
+				if t.type[i] == &"aquila":
+					motion._drive(i, bdt)
+				else:
+					motion._chase(i, bdt)
 				pos[i] += vel[i] * dt
 				if motion._near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 					field.collide_enemy(i, from)
