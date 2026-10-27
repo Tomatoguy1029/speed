@@ -49,13 +49,11 @@ func _update_pushed(i: int, dt: float) -> void:
 
 ## 敵の狙い：機体の遅れた位置（仕様書 7.5）。
 func _update_aim(dt: float) -> void:
+	# なぞりは自機だけ実時間で進む。世界側の照準はその間固定する。
+	if state.tracing:
+		return
 	var d := state.ship_pos - state.enemy_aim
 	var dist := d.length()
-	var max_lag := maxf(300.0, state.view_half.length() * 0.55)
-	if dist > max_lag:
-		state.enemy_aim = state.ship_pos - d / dist * max_lag
-		d = state.ship_pos - state.enemy_aim
-		dist = max_lag
 	if dist < 1e-6:
 		return
 	var step := minf(dist * (1.0 - exp(-dt / cfg.enemy_aim_lag)), cfg.enemy_aim_speed * dt)
