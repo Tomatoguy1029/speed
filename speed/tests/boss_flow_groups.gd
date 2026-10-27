@@ -119,6 +119,48 @@ func exercise() -> void:
 	check(rules.condition_groups.size() == group_count + 1 and rules.node_ids().size() == initial_count + member_count, "duplicating a condition-selection hub includes its techniques and internal connections")
 	history.undo()
 	check(rules.condition_groups.size() == group_count and rules.node_ids().size() == initial_count, "one undo removes a copied hub and its techniques together")
+	rules.layout["choose_normal"] = Vector2(240, 110)
+	graph.show_rules(rules)
+	await _settle()
+	var hand_placed: Dictionary = rules.layout.duplicate(true)
+	graph.arrange_categories()
+	await _settle()
+	var stacked := true
+	for group in rules.condition_groups:
+		var members: Array = rules.condition_groups[group].get("nodes", [])
+		if members.is_empty(): continue
+		var hub := graph.get_node_or_null(NodePath(group)) as GraphNode
+		var first := graph.get_node_or_null(NodePath(members[0])) as GraphNode
+		if hub == null or first == null: continue
+		if first.position_offset.x <= hub.position_offset.x + hub.size.x or not is_equal_approx(first.position_offset.y, hub.position_offset.y): print("[boss-flow-groups] layout detail ", group, " hub=", hub.position_offset, " size=", hub.size, " first=", first.position_offset, " member=", members[0])
+		stacked = stacked and first.position_offset.x > hub.position_offset.x + hub.size.x
+		stacked = stacked and is_equal_approx(first.position_offset.y, hub.position_offset.y)
+		for i in range(1, members.size()):
+			var member := graph.get_node_or_null(NodePath(members[i])) as GraphNode
+			if member != null: stacked = stacked and is_equal_approx(member.position_offset.x, first.position_offset.x) and member.position_offset.y > first.position_offset.y
+	check(stacked, "automatic layout puts a hub left of its vertically stacked targets with a straight first edge")
+	history.undo()
+	check(rules.layout == hand_placed, "undo restores the original hand placement after automatic layout")
+	var moved := GraphNode.new()
+	moved.name = "snap_moved"
+	moved.size = Vector2(180, 120)
+	moved.position_offset = Vector2(10000, 5000)
+	graph.add_child(moved)
+	var nearby := GraphNode.new()
+	nearby.name = "snap_nearby"
+	nearby.size = Vector2(180, 120)
+	nearby.position_offset = Vector2(10250, 5001)
+	graph.add_child(nearby)
+	var distant := GraphNode.new()
+	distant.name = "snap_distant"
+	distant.size = Vector2(180, 120)
+	distant.position_offset = Vector2(15000, 4999)
+	graph.add_child(distant)
+	await _settle()
+	graph.zoom = 1.0
+	moved.selected = true
+	graph._assist(moved)
+	check(is_equal_approx(moved.position_offset.y, nearby.position_offset.y), "nearby node wins over a distant node with almost the same height")
 
 	history.clear_history()
 	history.free()

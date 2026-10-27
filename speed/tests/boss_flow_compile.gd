@@ -23,9 +23,12 @@ func _initialize() -> void:
 	check(compiled.program.data.techniques[0].parameters.bite_dmg == 16.0, "runtime values are independent of editor resources")
 	var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
 	var signature: Variant = compiler.canonical({"rules": rules})
-	rules.condition_groups = {"custom": {"title": "表示用の条件選択", "nodes": ["bite_thrust"]}}
-	check(compiler.canonical({"rules": rules}) == signature, "editor-only condition groups leave the runtime signature unchanged")
-	check(compiler.snapshot({"rules": rules}).rules.condition_groups.is_empty(), "condition group editing data stays out of the runtime payload")
+	rules.condition_groups = {"custom": {"title": "表示用の条件選択", "category": "normal", "nodes": ["bite_thrust"]}}
+	check(compiler.canonical({"rules": rules}) != signature, "runtime condition categories update the signature")
+	var grouped_signature: Variant = compiler.canonical({"rules": rules})
+	rules.condition_groups.custom.title = "別の表示名"
+	check(compiler.canonical({"rules": rules}) == grouped_signature, "display-only condition titles do not update the runtime signature")
+	check(compiler.snapshot({"rules": rules}).rules.condition_groups.custom.category == "normal" and not compiler.snapshot({"rules": rules}).rules.condition_groups.custom.has("title"), "runtime retains category and membership without editor titles")
 	rules.conditions.bite_thrust.min = 900.0
 	rules.conditions.bite_thrust.max = 100.0
 	var invalid = compiler.compile({"rules": rules}, "res://.content/tests/invalid_boss.tres")

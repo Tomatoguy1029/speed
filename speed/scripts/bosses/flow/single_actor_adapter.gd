@@ -65,31 +65,32 @@ func candidates(query: Dictionary) -> Dictionary:
 	var observe: bool = actor.combat_trace.enabled(2)
 	for move in actor.action_rules.techniques:
 		var id := String(move.technique)
-		var kind := String(move.category)
-		var accepted := false
-		var reasons: Array = []
-		for gate in actor.action_rules.active_gates_for(id):
+		for entry in actor.action_rules.active_gate_entries_for(id):
+			var gate: Dictionary = entry.gate
 			var reason := ""
 			if actor.has_method("technique_rejection"): reason = actor.technique_rejection(move.technique, gate)
 			elif not actor.technique_ready(move.technique, gate): reason = "not_ready"
-			if reason.is_empty():
-				accepted = true
-				break
-			if observe and reasons.size() < 16: reasons.append(reason)
-		if accepted: result.append({"id": id, "cost": actor.action_rules.costs.get(id, 1.0), "category": kind, "parts": [actor.body_id], "exclusive": true})
-		if observe and evaluated.size() < 128:
-			evaluated.append({"id": id, "category": kind, "cost": actor.action_rules.costs.get(id, 1.0), "eligible": accepted, "reasons": [] if accepted else reasons if not reasons.is_empty() else ["no_active_gate"]})
+			var accepted := reason.is_empty()
+			var kind := "single" if entry.category == "normal" else String(entry.category)
+			if accepted: result.append({"id": id, "cost": actor.action_rules.costs.get(id, 1.0), "category": kind, "label": entry.category, "group": entry.group, "gate": gate, "post_gap": move.post_gap, "parts": [actor.body_id], "exclusive": true})
+			if observe and evaluated.size() < 128:
+				evaluated.append({"id": id, "category": kind, "label": entry.category, "group": entry.group, "cost": actor.action_rules.costs.get(id, 1.0), "eligible": accepted, "reasons": [] if accepted else [reason]})
 	for id in actor.action_rules.combos:
 		var reason := ""
 		if not actor.can_begin_sequence(): reason = "sequence_not_ready"
-		elif not actor.action_rules.active_gates_for(String(id)).any(step_condition): reason = "combo_gate"
 		elif not _available(actor.action_rules.combos[id]): reason = "combo_first_step_unavailable"
-		if reason.is_empty(): result.append({"id": String(id), "cost": actor.action_rules.costs.get(id, 2.0), "category": "combo", "parts": [actor.body_id], "exclusive": true, "program": actor.action_rules.combos[id]})
-		if observe and evaluated.size() < 128: evaluated.append({"id": String(id), "category": "combo", "cost": actor.action_rules.costs.get(id, 2.0), "eligible": reason.is_empty(), "reasons": [] if reason.is_empty() else [reason]})
+		for entry in actor.action_rules.active_gate_entries_for(String(id)):
+			var gate_ready: bool = step_condition(entry.gate)
+			var kind := "single" if entry.category == "normal" else String(entry.category)
+			if reason.is_empty() and gate_ready: result.append({"id": String(id), "cost": actor.action_rules.costs.get(id, 2.0), "category": kind, "label": entry.category, "group": entry.group, "gate": entry.gate, "parts": [actor.body_id], "exclusive": true, "program": actor.action_rules.combos[id]})
+			if observe and evaluated.size() < 128: evaluated.append({"id": String(id), "category": kind, "label": entry.category, "group": entry.group, "cost": actor.action_rules.costs.get(id, 2.0), "eligible": reason.is_empty() and gate_ready, "reasons": [] if reason.is_empty() and gate_ready else [reason if not reason.is_empty() else "combo_gate"]})
 	return {"candidates": result, "evaluated": evaluated, "reason": "距離・方向・形態・再使用待ち"}
 
 func selection_bias() -> Dictionary:
 	return actor.action_rules.selection_bias
+
+func parallel_attacks_enabled() -> bool:
+	return actor.action_rules.allow_parallel_attacks
 
 func record_decision(query: Dictionary, result: Dictionary, section: Dictionary, history: Array, selected: Array, selection: Dictionary, reason: String) -> void:
 	if not actor.combat_trace.enabled(2): return
@@ -99,11 +100,14 @@ func record_decision(query: Dictionary, result: Dictionary, section: Dictionary,
 	for item in evaluated:
 		if not item.eligible: continue
 		var rejection := ""
-		if (query.request == "major" and item.category != "major") or (query.request == "normal" and item.category == "major"): rejection = "request_category"
-		elif section.has("allowed_techniques") and String(item.id) not in section.allowed_techniques: rejection = "section_not_allowed"
-		elif float(item.cost) < 0.0 or float(item.cost) > cap: rejection = "section_cap"
-		elif float(item.cost) > remaining_budget: rejection = "section_budget"
-		elif float(item.cost) > float(query.stamina): rejection = "stamina"
+		if section.has("allowed_groups") or section.has("allowed_categories"):
+			if String(item.get("group", "")) not in section.get("allowed_groups", []) and String(item.get("label", "normal")) not in section.get("allowed_categories", []): rejection = "section_not_attached"
+		elif (query.request == "major" and item.category != "major") or (query.request == "normal" and item.category == "major"): rejection = "request_category"
+		if rejection.is_empty() and section.has("allowed_techniques") and String(item.id) not in section.allowed_techniques: rejection = "section_not_allowed"
+		if rejection.is_empty() and section.has("excluded_techniques") and String(item.id) in section.excluded_techniques: rejection = "section_excluded"
+		if rejection.is_empty() and (float(item.cost) < 0.0 or float(item.cost) > cap): rejection = "section_cap"
+		if rejection.is_empty() and float(item.cost) > remaining_budget: rejection = "section_budget"
+		if rejection.is_empty() and float(item.cost) > float(query.stamina): rejection = "stamina"
 		if not rejection.is_empty():
 			item.eligible = false
 			item.reasons = [rejection]
@@ -124,10 +128,10 @@ func start(actions: Array) -> bool:
 	if blocked() or actions.size() != 1: return false
 	var id := String(actions[0].id)
 	if actions[0].has("program"):
-		if not _available(actions[0].program): return false
+		if not step_condition(actions[0].get("gate", {})) or not _available(actions[0].program): return false
 		custom_run = preload("res://scripts/bosses/flow/combo_runner.gd").new(actions[0].program, self)
 		return true
-	if not actor.action_rules.active_gates_for(id).any(func(gate): return actor.technique_ready(StringName(id), gate)): return false
+	if not actor.technique_ready(StringName(id), actions[0].get("gate", {})): return false
 	return _start_attack(StringName(id))
 
 func observing_decisions() -> bool:

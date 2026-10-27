@@ -17,6 +17,7 @@ func _initialize() -> void:
 		print("[boss-select] FAIL parallel choice missing")
 		quit(1)
 		return
+	assert(selector.choose([a, b], {"weights": {"parallel": 100.0}, "cap": 2.0, "allow_parallel": false}, []).is_empty(), "unchecked simultaneous attacks never form a pair")
 	assert(selector.choose([a, b], together, [], [["a", "b"]]).is_empty())
 	b.parts = [1]
 	assert(selector.choose([a, b], together, []).is_empty())

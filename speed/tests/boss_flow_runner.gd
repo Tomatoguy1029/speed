@@ -85,11 +85,34 @@ func _initialize() -> void:
 		runner.tick(0.2, {}, adapter)
 		if runner.index == 1: break
 	assert(runner.index == 1 and adapter.started.is_empty(), "a section with no eligible attack advances after its timeout")
+	flow.maximum_stamina = 10.0
+	flow.sections = [{"request": "any", "allowed_groups": ["chosen"], "allowed_categories": ["major"], "excluded_techniques": ["blocked"], "action_count": 2, "weights": {"single": 100.0, "major": 0.0}, "next": 0}]
+	runner.configure(flow)
+	adapter = Adapter.new()
+	adapter.options = [{"id": "a", "cost": 1.0, "parts": [1], "category": "single", "label": "normal", "group": "chosen", "post_gap": 0.6}, {"id": "blocked", "cost": 1.0, "parts": [1], "category": "single", "label": "normal", "group": "chosen"}, {"id": "m", "cost": 1.0, "parts": [1], "category": "major", "label": "major", "group": "other"}]
+	runner.tick(0.1, {}, adapter)
+	assert(adapter.started[0][0].id == "a", "attached nodes, category labels and technique exclusions select together")
+	adapter.busy = false
+	runner.tick(0.1, {}, adapter)
+	runner.tick(0.2, {}, adapter)
+	assert(adapter.started.size() == 1, "an ordinary attack keeps its own post-attack gap")
+	runner.tick(0.4, {}, adapter)
+	assert(adapter.started.size() == 2, "the next attack starts after its gap")
+	flow.sections[0].weights = {"combo": 100.0}
+	runner.configure(flow)
+	adapter = Adapter.new()
+	adapter.options = [{"id": "chain", "cost": 1.0, "parts": [1], "category": "combo", "label": "combo", "group": "chosen", "post_gap": 2.0}]
+	runner.tick(0.2, {}, adapter)
+	adapter.busy = false
+	runner.tick(0.2, {}, adapter)
+	runner.tick(0.2, {}, adapter)
+	assert(adapter.started.size() == 2, "a combo label does not add a post-attack gap")
 	flow.sections[0].erase("section_budget")
 	flow.sections[0].erase("no_candidate_timeout")
 	flow.sections[0].erase("action_count")
 	flow.sections[0].erase("action_interval")
 	flow.sections[0].fallback = 1
+	flow.sections.append({"request": "rest", "next": 0})
 	runner.configure(flow)
 	adapter = Adapter.new()
 	adapter.options.clear()

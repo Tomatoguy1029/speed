@@ -22,6 +22,7 @@
 
 [resource]
 script = ExtResource("1_hy4gv")
+allow_parallel_attacks = true
 techniques = Array[Resource]([ExtResource("2_uae8c"), ExtResource("3_xrdwf"), ExtResource("4_x5nyk"), ExtResource("5_rny2e"), ExtResource("6_awxv5"), ExtResource("7_324oc"), ExtResource("8_tlhcy"), ExtResource("9_d4juc"), ExtResource("10_h1jcp"), ExtResource("11_62bfn"), ExtResource("12_6a8j0"), ExtResource("13_baoas"), ExtResource("14_orjre"), ExtResource("15_7b8q5"), ExtResource("16_ano7g"), ExtResource("17_dfhe2"), ExtResource("18_f7ol8"), ExtResource("19_t6ymw")])
 conditions = {
 "beam_bolt": {

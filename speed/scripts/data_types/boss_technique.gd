@@ -4,6 +4,7 @@ extends Resource
 class_name BossTechnique
 @export var technique: StringName
 @export var category: StringName = &"single"
+@export_range(0.0, 30.0, 0.05, "or_greater") var post_gap := 0.0
 @export_storage var parameters: Dictionary = {}:
 	set(value):
 		parameters = value

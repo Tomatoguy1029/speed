@@ -12,6 +12,7 @@ func weights_for(section: Dictionary, last: Array) -> Dictionary:
 	return section.get("weights", {"single": 100.0})
 
 func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Array = []) -> Array:
+	var weights := weights_for(section, last)
 	var groups := {}
 	for candidate in candidates:
 		var kind: String = candidate.get("category", "single")
@@ -20,18 +21,18 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 		if not groups[kind].has(id): groups[kind][id] = []
 		groups[kind][id].append([candidate])
 	var cap := float(section.get("available", section.get("cap", INF)))
-	var parallel := {}
-	for i in candidates.size():
-		if candidates[i].get("category", "single") != "single": continue
-		for j in range(i + 1, candidates.size()):
-			if candidates[j].get("category", "single") != "single": continue
-			var pair := [candidates[i], candidates[j]]
-			if not compatible([pair[0]], pair[1], cap, _forbidden): continue
-			var key := identity(pair)
-			if not parallel.has(key): parallel[key] = []
-			parallel[key].append(pair)
-	if not parallel.is_empty(): groups.parallel = parallel
-	var weights := weights_for(section, last)
+	if section.get("allow_parallel", true) and float(weights.get("parallel", 0.0)) > 0.0:
+		var parallel := {}
+		for i in candidates.size():
+			if candidates[i].get("category", "single") != "single": continue
+			for j in range(i + 1, candidates.size()):
+				if candidates[j].get("category", "single") != "single": continue
+				var pair := [candidates[i], candidates[j]]
+				if not compatible([pair[0]], pair[1], cap, _forbidden): continue
+				var key := identity(pair)
+				if not parallel.has(key): parallel[key] = []
+				parallel[key].append(pair)
+		if not parallel.is_empty(): groups.parallel = parallel
 	var previous := identity(last)
 	if section.get("avoid_repeat", true) and not previous.is_empty():
 		var alternatives := groups.duplicate(true)

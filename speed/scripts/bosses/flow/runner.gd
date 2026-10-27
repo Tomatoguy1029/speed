@@ -15,6 +15,7 @@ var section_spent := 0.0
 var interval_remaining := 0.0
 var no_candidate_elapsed := 0.0
 var waiting_for_candidate := false
+var active_post_gap := 0.0
 
 func configure(value: Resource) -> void:
 	flow = value
@@ -27,6 +28,7 @@ func configure(value: Resource) -> void:
 	completed_actions = 0
 	section_spent = 0.0
 	interval_remaining = 0.0
+	active_post_gap = 0.0
 	_reset_candidate_wait()
 
 func tick(dt: float, context: Dictionary, adapter: Object) -> void:
@@ -46,9 +48,11 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 		completed_actions += 1
 		if completed_actions >= maxi(1, int(section.get("action_count", 1))) or section_spent >= float(section.get("section_budget", INF)) - 0.00001:
 			_advance(section)
+			interval_remaining = active_post_gap
 		else:
-			interval_remaining = maxf(0.0, float(section.get("action_interval", 0.0)))
+			interval_remaining = active_post_gap + maxf(0.0, float(section.get("action_interval", 0.0)))
 			if interval_remaining > 0.0: retry = 0.0
+		active_post_gap = 0.0
 		if stamina <= 0.00001:
 			# 明示休息への遷移時は二重に休まない。
 			if flow.sections[index].get("request", "normal") == "rest": index = int(flow.sections[index].get("next", 0))
@@ -81,10 +85,14 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	var result: Dictionary = adapter.candidates(query)
 	var candidates: Array = result.get("candidates", [])
 	var request: String = String(section.get("request", "normal"))
-	if request == "major": candidates = candidates.filter(func(candidate): return candidate.get("category", "single") == "major")
+	if section.has("allowed_groups") or section.has("allowed_categories"):
+		candidates = candidates.filter(func(candidate): return String(candidate.get("group", "")) in section.get("allowed_groups", []) or String(candidate.get("label", "normal")) in section.get("allowed_categories", []))
+	elif request == "major": candidates = candidates.filter(func(candidate): return candidate.get("category", "single") == "major")
 	elif request == "normal": candidates = candidates.filter(func(candidate): return candidate.get("category", "single") != "major")
 	if section.has("allowed_techniques"):
 		candidates = candidates.filter(func(candidate): return String(candidate.id) in section.allowed_techniques)
+	if section.has("excluded_techniques"):
+		candidates = candidates.filter(func(candidate): return String(candidate.id) not in section.excluded_techniques)
 	if candidates.is_empty():
 		_record_decision(adapter, query, result, section, [], {}, "no_eligible_candidate")
 		status = result.get("reason", "候補なし")
@@ -108,6 +116,7 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	candidates = affordable
 	var selection := section.duplicate()
 	selection.available = minf(minf(stamina, cap), remaining_budget)
+	if adapter.has_method("parallel_attacks_enabled"): selection["allow_parallel"] = adapter.parallel_attacks_enabled()
 	if adapter.has_method("selection_bias"): selection["technique_weights"] = adapter.selection_bias()
 	selector.record_details = adapter.has_method("observing_decisions") and adapter.observing_decisions()
 	var actions: Array = selector.choose(candidates, selection, last, section.get("forbidden", []))
@@ -122,6 +131,9 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 			section_spent += float(action.cost)
 		active = true
 		last = actions
+		active_post_gap = 0.0
+		for action in actions:
+			if action.get("label", "normal") != "combo": active_post_gap = maxf(active_post_gap, float(action.get("post_gap", 0.0)))
 		status = "実行中"
 		_reset_candidate_wait()
 	else:
