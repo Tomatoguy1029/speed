@@ -288,6 +288,7 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))
+		_run(&"enemy_avoidance", func(): enemies.avoid_strong(wd))
 		_check_end()
 		if state.phase != RunState.Phase.PLAY:
 			return

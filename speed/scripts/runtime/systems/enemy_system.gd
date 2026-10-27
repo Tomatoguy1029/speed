@@ -8,6 +8,12 @@ extends RunSystem
 signal picaro_spawned(row: int, row_id: int, owner_id: int)
 
 var motion := EnemyMotion.new()
+## 位置を動かす前の雑魚の行IDと位置。強敵・ボスの更新後に雑魚側だけ進路を直す。
+var _avoid_ids := PackedInt32Array()
+var _avoid_from := PackedVector2Array()
+var _avoid_obstacles := PackedInt32Array()
+var _avoid_cells: Dictionary = {}
+const AVOID_CELL := 160.0
 
 func dispose() -> void:
 	motion.m = null
@@ -463,6 +469,7 @@ func def_of(type: StringName) -> EnemyDef:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	_capture_avoidance_starts()
 	motion._update_aim(world_dt)
 	_lod += 1
 	_aim = state.enemy_aim
@@ -480,6 +487,147 @@ func tick(_real_dt: float, world_dt: float) -> void:
 	for b in behaviors:
 		b.after_tick(world_dt)
 	_flush_new()
+
+func _can_avoid_strong(i: int) -> bool:
+	var t := table
+	return t.alive[i] != 0 and t.dead[i] == 0 and t.def[i] != null and t.def[i].rank <= 2 \
+		and t.is_boss[i] == 0 and t.meteor_index[i] < 0 and t.parent[i] < 0 \
+		and t.mode[i] == EnemyTable.Mode.MOVE and t.held[i] == 0 and t.stone[i] <= 0.0 \
+		and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.pump_owner[i] < 0
+
+func _capture_avoidance_starts() -> void:
+	var t := table
+	var count := t.alive.size()
+	_avoid_ids.resize(count)
+	_avoid_from.resize(count)
+	for i in count:
+		_avoid_ids[i] = t.id[i] if _can_avoid_strong(i) else -1
+		if _avoid_ids[i] >= 0:
+			_avoid_from[i] = t.pos[i]
+
+func _avoid_clearance(point: Vector2, i: int, candidates: Array) -> float:
+	var gap := INF
+	for j: int in candidates:
+		gap = minf(gap, point.distance_to(table.pos[j]) - table.r[i] - table.r[j] - 2.0)
+	return gap
+
+## 通常の行動とボスの姿勢を確定した後、移動中の雑魚だけを身体の外へ導く。
+## 位置補正は1世界更新の通常速度を超えず、ボス・強敵・攻撃中の行は動かさない。
+func avoid_strong(world_dt: float) -> void:
+	if world_dt <= 0.0:
+		return
+	var t := table
+	var pos := t.pos
+	var radius_rows := t.r
+	var ids := t.id
+	var speeds := t.speed
+	_avoid_obstacles.clear()
+	_avoid_cells.clear()
+	var normal_radius := 0.0
+	var normal_step := 0.0
+	for j in t.alive.size():
+		if t.alive[j] == 0 or t.dead[j] != 0 or t.held[j] != 0 or t.meteor_index[j] >= 0:
+			continue
+		if t.is_boss[j] != 0 or (t.def[j] != null and t.def[j].rank >= 3):
+			# 吸い込める間は、雑魚がPumpの口へ入ることを優先する。
+			if t.type[j] == &"pump" and t.mode[j] == EnemyTable.Mode.MOVE and t.stone[j] <= 0.0 \
+					and t.shove_time[j] <= 0.0 and t.knock_t[j] <= 0.0 \
+					and t.buds[j] < int(t.def[j].params.store_max):
+				continue
+			_avoid_obstacles.append(j)
+		elif j < _avoid_ids.size() and _avoid_ids[j] == t.id[j] and _can_avoid_strong(j):
+			normal_radius = maxf(normal_radius, radius_rows[j])
+			normal_step = maxf(normal_step, speeds[j] * world_dt)
+	if _avoid_obstacles.is_empty() or normal_radius <= 0.0:
+		return
+	# 強敵の占有円が届くセルだけ登録する。各雑魚は自分のセルだけを見る。
+	for j in _avoid_obstacles:
+		var extent := radius_rows[j] + normal_radius + normal_step + 2.0
+		var lo := Vector2i(floori((pos[j].x - extent) / AVOID_CELL), floori((pos[j].y - extent) / AVOID_CELL))
+		var hi := Vector2i(floori((pos[j].x + extent) / AVOID_CELL), floori((pos[j].y + extent) / AVOID_CELL))
+		for cy in range(lo.y, hi.y + 1):
+			for cx in range(lo.x, hi.x + 1):
+				var key := Vector2i(cx, cy)
+				if not _avoid_cells.has(key):
+					_avoid_cells[key] = [j]
+				else:
+					_avoid_cells[key].append(j)
+	for i in mini(_avoid_ids.size(), t.alive.size()):
+		if _avoid_ids[i] != ids[i] or not _can_avoid_strong(i):
+			continue
+		var from := _avoid_from[i]
+		var key := Vector2i(floori(from.x / AVOID_CELL), floori(from.y / AVOID_CELL))
+		if not _avoid_cells.has(key):
+			continue
+		var intended := pos[i] - from
+		var limit := speeds[i] * world_dt
+		if limit <= 0.0 or intended.length() > limit + 0.01:
+			continue # 専用行動による瞬間移動・高速移動は書き換えない。
+		var inside := Vector2.ZERO
+		var most_inside := -1.0
+		var fallback := Vector2.ZERO
+		var near_row := -1
+		var near_depth := 0.0
+		for j: int in _avoid_cells[key]:
+			if j == i:
+				continue
+			var radius := radius_rows[i] + radius_rows[j] + 2.0
+			var offset := from - pos[j]
+			var distance_sq := offset.length_squared()
+			var reach := radius + limit
+			if distance_sq > reach * reach:
+				continue
+			if distance_sq < radius * radius:
+				var distance := sqrt(distance_sq)
+				var normal := offset / distance if distance > 0.001 else Vector2.from_angle(float((ids[i] * 17 + ids[j] * 31) % 360) * PI / 180.0)
+				var depth := radius - distance
+				inside += normal * depth
+				if depth > most_inside:
+					most_inside = depth
+					fallback = normal
+				continue
+			var next_distance := (from + intended).distance_to(pos[j])
+			if next_distance < radius and radius - next_distance > near_depth:
+				near_depth = radius - next_distance
+				near_row = j
+		var corrected := intended
+		if most_inside > 0.0:
+			var outward := inside.normalized() if inside.length_squared() > 0.000001 else fallback
+			# 連続するボス部位の中心線では左右の法線が互いを塞ぐ。
+			# 複数円からの最小距離が最も増える、横方向も含む進路を選ぶ。
+			var tangent := outward.orthogonal()
+			var side := 1.0 if ids[i] % 2 == 0 else -1.0
+			var best := _avoid_clearance(from + outward * limit, i, _avoid_cells[key])
+			for direction in [tangent * side, tangent * -side, -outward]:
+				var score := _avoid_clearance(from + direction * limit, i, _avoid_cells[key])
+				if score > best + 0.0001:
+					best = score
+					outward = direction
+			corrected = outward * limit
+		elif near_row >= 0:
+			var radial := (from - pos[near_row]).normalized()
+			corrected -= radial * minf(0.0, corrected.dot(radial))
+			if corrected.length_squared() < 0.000001:
+				var side := 1.0 if (ids[i] + ids[near_row]) % 2 == 0 else -1.0
+				corrected = radial.orthogonal() * side * intended.length()
+			else:
+				corrected = corrected.normalized() * intended.length()
+		if not corrected.is_equal_approx(intended):
+			# 一つ目の円の接線が隣の部位へ入る場合、もう一方の接線を試す。
+			# 外から身体へ入る進路しかなければその更新だけ止まる。
+			if most_inside <= 0.0 and _avoid_clearance(from + corrected, i, _avoid_cells[key]) < 0.0:
+				var side := corrected.orthogonal().normalized() * intended.length()
+				var opposite := -side
+				if _avoid_clearance(from + side, i, _avoid_cells[key]) >= 0.0:
+					corrected = side
+				elif _avoid_clearance(from + opposite, i, _avoid_cells[key]) >= 0.0:
+					corrected = opposite
+				else:
+					corrected = Vector2.ZERO
+			pos[i] = from + corrected
+			t.vel[i] = corrected / world_dt
+			if field.body_gap(pos[i], radius_rows[i]) < 0.0:
+				field.collide_enemy(i, from)
 
 ## 行動の種類 b の敵を進める。押し出し・石化・遠い敵の間引きを済ませてから、種類の処理を1行ずつ呼ぶ。
 func _tick_behavior(b: int, dt: float) -> void:
