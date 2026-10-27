@@ -151,9 +151,7 @@ func card_info(id: StringName) -> Dictionary:
 		var unit := "%"
 		var value_before := before * 100.0
 		var value_after := after * 100.0
-		if id in [&"crit_chance", &"repair"]:
-			unit = TranslationServer.translate("postmax.points")
-		elif id in [&"max_hp", &"crit_mult", &"invulnerability"]:
+		if id in [&"max_hp", &"crit_mult", &"invulnerability"]:
 			value_before = before
 			value_after = after
 			unit = "HP" if id == &"max_hp" else ("s" if id == &"invulnerability" else "×")
@@ -175,7 +173,7 @@ func card_info(id: StringName) -> Dictionary:
 		&"max_hp": summary = "+%s HP" % _number(change)
 		&"invulnerability": summary = TranslationServer.translate("postmax.summary.invulnerability").format({n = _number(change)})
 		&"crit_mult": summary = TranslationServer.translate("postmax.summary.multiplier").format({n = _number(change)})
-		&"crit_chance", &"repair": summary = TranslationServer.translate("postmax.summary.points").format({n = _number(change * 100.0)})
+		&"crit_chance", &"repair": summary = "+%s%%" % _number(change * 100.0)
 		_: summary = "+%s%%" % _number(change * 100.0)
 	return {"tag": TranslationServer.translate("postmax.tag"), "name": TranslationServer.translate("postmax." + String(id)),
 		"desc": summary, "tooltip_desc": text if tooltip_text.is_empty() else tooltip_text,

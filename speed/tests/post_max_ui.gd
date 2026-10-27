@@ -37,6 +37,8 @@ func _ready() -> void:
 	_check(int(run.state.post_max_stacks.get(&"area", 0)) == 1 and run.state.pending_levels == 2, "新たな数字入力で追加強化を1回取得")
 	_show([&"crit_chance", &"charge_time", &"repair"])
 	await _ready_cards()
+	_check(run.state.cards[0].info.desc == "+1%" and run.state.cards[0].info.tooltip_desc.contains("1%"), "クリティカル率は増分と累計を%表示")
+	_check(run.state.cards[2].info.desc == "+1%" and run.state.cards[2].info.tooltip_desc.contains("1%"), "修理キットの割合も%表示")
 	await _shot("postmax_crit_charge_repair")
 	for id in [&"W03", &"W04", &"W08", &"W17"]: run.loadout.remove_weapon(id)
 	for id in [&"W01", &"W05", &"W07", &"W23"]: run.loadout.grant(&"weapon", id, 5)
@@ -53,7 +55,7 @@ func _ready() -> void:
 	TranslationServer.set_locale("en")
 	_show([&"crit_chance", &"max_hp", &"heal"])
 	await _ready_cards()
-	_check(run.state.cards[0].info.desc == "+1 points", "英語の追加強化は英語の増分を表示")
+	_check(run.state.cards[0].info.desc == "+1%", "英語でも追加確率の増分を%表示")
 	await _shot("postmax_english")
 	for button in hud._cards_row.get_children():
 		_check(not button.tooltip_text.contains("postmax."), "英語表示の翻訳キーを解決")

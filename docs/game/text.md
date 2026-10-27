@@ -148,6 +148,10 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.total | MAX後累計 {a} → {b}{unit} | Since MAX: {a} → {b}{unit} |
 | postmax.current | 実効値 {a} → {b} | Effective: {a} → {b} |
 | postmax.points | ポイント |  points |
+| postmax.summary.interval | 攻撃間隔 −{n}% | Interval −{n}% |
+| postmax.summary.charge | 充填 −{n}秒 | Charge −{n}s |
+| postmax.summary.invulnerability | 無敵 +{n}秒 | Invulnerability +{n}s |
+| postmax.summary.multiplier | 倍率 +{n} | Multiplier +{n} |
 | postmax.heal_desc | 最大HPの{percent}%を即時回復<br>HP {a} → {b} | Heal {percent}% of max HP now<br>HP {a} → {b} |
 | postmax.weapon_damage | 武器威力 | Weapon damage |
 | postmax.weapon_interval | 武器の攻撃間隔短縮 | Weapon interval reduction |
