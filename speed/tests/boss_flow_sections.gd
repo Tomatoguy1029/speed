@@ -29,6 +29,12 @@ func exercise() -> void:
 	panel._parallel_toggle.toggled.emit(false)
 	assert(not panel.rules.allow_parallel_attacks, "unchecked simultaneous attacks are inactive")
 	panel._edit_section(0)
+	panel._split.split_offset = 1000
+	await process_frame
+	assert(panel._detail_scroll.size.x <= 420 and panel._fields.columns == 1 and not panel._detail_scroll.get_h_scroll_bar().visible, "narrow inspector stacks fields with one vertical scroll")
+	panel._split.split_offset = -1000
+	await process_frame
+	assert(panel._fields.columns == 2, "wide inspector uses available width for paired fields")
 	assert(not panel._fields.get_children().any(func(child): return child is Label and child.text == "禁止する組合せ"), "unchecked simultaneous attacks have no section controls")
 	panel.undo_edit()
 	assert(panel.rules.allow_parallel_attacks, "undo restores simultaneous attacks")
