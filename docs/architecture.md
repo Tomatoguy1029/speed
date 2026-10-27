@@ -401,17 +401,17 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `body_gap` | 雑魚 | 前回確かめたときの、天体の表面までの距離（7章） |
 | `body_gap_pos` | 雑魚 | `body_gap` を確かめた位置 |
 | `body_gap_time` | 雑魚 | `body_gap` を確かめた世界時刻 |
-| `mode` | `darter`・`rocket`・`biter`・`defender`・`hound`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`MOVE` が横歩き、`WINDUP` が薙ぎ・向き直し、`DASH` が突進、`RECOVER` が停止）・`marlin`・`phoenix`（`MOVE` が離脱、`WINDUP` が着地点予告、`DASH` が飛び込み、`RECOVER` が着地後の停止）・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
+| `mode` | `darter`・`rocket`・`biter`・`defender`・`hound`・`bomber`・`beamer`・`pulser`・`pump`（`WINDUP` が吸い込み）・`triangle`（`RECOVER` が膜の消えた間）・`crab`（`MOVE` が横歩き、`WINDUP` が薙ぎの予告、`RECOVER` が薙いだあとの停止）・`marlin`・`phoenix`（`MOVE` が離脱、`WINDUP` が着地点予告、`DASH` が飛び込み、`RECOVER` が着地後の停止）・`aquarius`（`WINDUP` が予告と照射、`RECOVER` が照射後の休み）・`corona`（`WINDUP` が投擲の予告） | 行動の段階（動く → 構える・飛ぶ など） |
 | `timer` | `mode` を使う敵 | 段階の残り時間 |
 | `fire_t` | 撃つ敵 | 次の射撃までの時間 |
 | `charge` | `biter`・`defender`・`hound`・`gunner`・`missile`・`battleship`・`telescope`・`pump`・`reticle`・`marlin`・`crab`・`phoenix`・`aquarius`・`cepheus`・ボス | 攻撃の予告の溜め（0〜1） |
-| `bud_t` | `splitter`・`marlin`・`pump`・`crab` | 次の分裂までの時間。かじき座は次のしぶき、ポンプ座は次の吸い込み、かに座は小走り・停止の残り時間 |
-| `buds` | `splitter`・`pump`・`crow`・`crab` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数、かに座は左右の進行方向（停止は0） |
-| `carry` | `crow`・`crab` | からす座が運ぶ経験値の量。かに座は横歩きで届かない経過時間 |
-| `target` | `reticle`・`soldier`・`crab` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号、かに座は薙ぎ・向き直しの区分 |
-| `target_id` | `reticle`・`soldier`・`crab` | 狙っている岩の id。ケフェウス座の兵は仕える王の id、かに座は向き直す回数 |
-| `anchor` | `cepheus`・`phoenix`・`crab` | ケフェウス座の隊列の基準位置。ほうおう座の離脱先・着地点。かに座の向き直す先・突進直前の位置 |
-| `spin` | 漂流（`drift`）の雑魚、`clock`・`crab` | 回転の速さ。とけい座は針の経過時間、かに座は向き直す前の角度 |
+| `bud_t` | `splitter`・`marlin`・`pump` | 次の分裂までの時間。かじき座は次のしぶき、ポンプ座は次の吸い込み |
+| `buds` | `splitter`・`pump`・`crow`・`crab` | 分裂した数。ポンプ座は吸い込んだ敵の数、からす座は回収した結晶の数、かに座は進む向き（体の右が1、左が-1） |
+| `carry` | `crow` | からす座が運ぶ経験値の量 |
+| `target` | `reticle`・`soldier` | 狙っている岩の行番号（狙っていなければ -1）。ケフェウス座の兵は仕える王の行番号 |
+| `target_id` | `reticle`・`soldier` | 狙っている岩の id。ケフェウス座の兵は仕える王の id |
+| `anchor` | `cepheus`・`phoenix` | ケフェウス座の隊列の基準位置。ほうおう座の離脱先・着地点 |
+| `spin` | 漂流（`drift`）の雑魚、`clock` | 回転の速さ。とけい座は針の経過時間 |
 | `links` | とけい座・みなみのさんかく座・かに座 | 付いて動く攻撃の形の行番号（`ProjectileSystem` の `hazard_` の行） |
 | `parent` | 部位（みなみのさんかく座の星など） | 親の敵の行番号（部位でなければ -1） |
 | `parent_id` | 部位 | 親の敵の id |

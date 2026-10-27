@@ -112,34 +112,29 @@ postmax.keep_hp,現在HPはそのまま,Current HP stays the same
 postmax.total,MAX後累計 {a} → {b}{unit},Since MAX: {a} → {b}{unit}
 postmax.current,実効値 {a} → {b},Effective: {a} → {b}
 postmax.points,ポイント,points
-postmax.summary.interval,攻撃間隔 −{n}%,Interval −{n}%
-postmax.summary.charge,充填 −{n}秒,Charge −{n}s
-postmax.summary.invulnerability,無敵 +{n}秒,Invulnerability +{n}s
-postmax.summary.multiplier,倍率 +{n},Multiplier +{n}
-postmax.summary.points,+{n}ポイント,+{n} points
 postmax.heal_desc,"最大HPの{percent}%を即時回復
 HP {a} → {b}","Heal {percent}% of max HP now
 HP {a} → {b}"
 postmax.weapon_damage,武器威力,Weapon damage
-postmax.weapon_interval,攻撃間隔,Attack interval
-postmax.projectile_speed,弾速,Projectile speed
-postmax.duration,攻撃持続,Attack duration
-postmax.knockback,吹き飛ばし,Knockback
-postmax.crit_chance,クリティカル率,Critical chance
-postmax.crit_mult,クリティカル倍率,Critical multiplier
+postmax.weapon_interval,武器の攻撃間隔短縮,Weapon interval reduction
+postmax.projectile_speed,武器の弾速,Weapon projectile speed
+postmax.duration,弾・機雷・衝撃波の持続,"Shot, mine and wave duration"
+postmax.knockback,武器の吹き飛ばし,Weapon knockback
+postmax.crit_chance,RAMクリティカル率,RAM critical chance
+postmax.crit_mult,RAMクリティカル倍率,RAM critical multiplier
 postmax.area,巻き込み範囲,Area of effect
 postmax.followup,追撃威力,Follow-up damage
 postmax.max_speed,最高速度,Maximum speed
-postmax.acceleration,加速力,Acceleration
+postmax.acceleration,加速,Acceleration
 postmax.turn_rate,旋回速度,Turn rate
-postmax.line_length,線の長さ,Line length
-postmax.charge_time,充填時間,Charge time
+postmax.line_length,描ける線の長さ,Drawable line length
+postmax.charge_time,ゲージ充填時間短縮,Charge time reduction
 postmax.max_hp,最大HP,Maximum HP
-postmax.invulnerability,無敵時間,Invulnerability
-postmax.repair,修理回復量,Repair healing
+postmax.invulnerability,被弾後の無敵時間,Post-hit invulnerability
+postmax.repair,修理キット回復量,Repair kit healing
 postmax.heal,緊急修理,Emergency repair
-postmax.pickup_radius,XP吸引範囲,XP pickup radius
-postmax.pickup_speed,XP吸引速度,XP pickup speed
+postmax.pickup_radius,XP吸引範囲,XP attraction radius
+postmax.pickup_speed,XP吸引速度,XP attraction speed
 postmax.xp_gain,XP獲得量,XP gain
 postmax.target.W03.area,衝角の船体・破片半径,Ram hull and fragment radius
 postmax.target.W04.area,接触波動の半径,Contact wave radius
@@ -731,7 +726,7 @@ lab.enemy.clock.move,長針と短針が刃として回り続ける。2本の速�
 lab.enemy.clock.kill,針の隙間から本体を狙う,Hit the body through the gap between the hands
 lab.enemy.dolphin.move,距離を保ち、構えて撃つ向きを予告してから、機体の方へ数層の弧の大きな扇の波動を撃つ。当たるのは先頭の1枚だけで、機体にもほかの敵にも当たる。追尾しない,Keeps its distance and after marking its aim fires a big fan of layered arcs toward the ship. Only the leading arc hits and it hits the ship and other enemies alike. It does not home
 lab.enemy.dolphin.kill,群れを射線に挟んで撃たせ、自分は離れる。本体は普通に倒す,Put a crowd in its line of fire then slip away. Defeat the body normally
-lab.enemy.crab.move,近づいてハサミを開き、前方を挟む,Approaches and opens its claws then pinches in front
+lab.enemy.crab.move,横腹を向けて素早く横歩きで寄り、進む方向をハサミで薙ぐ,Scuttles sideways toward you and sweeps its claws in the direction it moves
 lab.enemy.crab.kill,背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる,Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front
 lab.enemy.marlin.move,距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く,Keeps its distance then flashes and darts past you spraying both sides
 lab.enemy.marlin.kill,HP を削る,Wear down its HP
