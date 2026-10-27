@@ -1,4 +1,4 @@
-[gd_resource type="Resource" format=3 uid="uid://bbccqeoqelrve"]
+[gd_resource type="Resource" format=3 uid="uid://by5ginevbxlfn"]
 
 [ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_fdbe4"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/kick.tres" id="2_glkwt"]
@@ -65,17 +65,20 @@ costs = {
 "return_charge": 3.0,
 "sweep": 1.0
 }
-selection_bias = {"kick": 3.0, "sweep": 3.0}
+selection_bias = {
+"kick": 3.0,
+"sweep": 3.0
+}
 layout = {
-"charge": Vector2(40, 614),
-"choose_combo": Vector2(752, 116),
-"choose_major": Vector2(1464, 119.99997),
-"choose_normal": Vector2(40, 116),
-"combo": Vector2(752, 314),
-"kick": Vector2(40, 314),
-"lance": Vector2(1464, 314),
-"return_charge": Vector2(1084, 314),
-"sweep": Vector2(380, 314)
+"charge": Vector2(1464, 614),
+"choose_combo": Vector2(40, 119.999985),
+"choose_major": Vector2(752, 116),
+"choose_normal": Vector2(1464, 116),
+"combo": Vector2(40, 314),
+"kick": Vector2(1464, 314),
+"lance": Vector2(752, 314),
+"return_charge": Vector2(372, 314),
+"sweep": Vector2(1796, 314)
 }
 condition_groups = {
 "choose_combo": {
