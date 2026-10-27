@@ -210,6 +210,10 @@ func try_open_cards() -> bool:
 	if state.pending_levels <= 0:
 		return false
 	state.cards = roll_cards()
+	if state.cards.is_empty():
+		# 取得可能な候補が尽きた場合は空の選択画面で進行を止めない。
+		state.pending_levels = 0
+		return false
 	_publish_cards()
 	return true
 
@@ -267,16 +271,16 @@ func roll_cards() -> Array[Dictionary]:
 			i += 1
 		out.append(pool[i])
 		pool.remove_at(i)
-	while not enhanced and out.size() < 3:
-		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
 ## 表示中のカードを引き直す（仕様書 9.3）。最初の武器の選択でも使える。回数が残っていなければ false。
 func reroll_cards() -> bool:
 	if state.cards.is_empty() or state.rerolls_left <= 0 or state.swap_pick != &"":
 		return false
+	var next := roll_start_cards() if state.start_pick else roll_cards()
+	if next.is_empty(): return false
 	state.rerolls_left -= 1
-	state.cards = roll_start_cards() if state.start_pick else roll_cards()
+	state.cards = next
 	state.emit(&"reroll", {})
 	_publish_cards()
 	return true
@@ -326,8 +330,10 @@ func choose_card(index: int) -> bool:
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
 		state.cards = roll_cards()
-		_publish_cards()
-		return true
+		if not state.cards.is_empty():
+			_publish_cards()
+			return true
+		state.pending_levels = 0
 	_release_candidates()
 	state.cards = []
 	return false

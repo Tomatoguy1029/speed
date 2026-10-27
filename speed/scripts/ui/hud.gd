@@ -635,7 +635,7 @@ func _show_cards() -> void:
 		for i in cards.size():
 			if cards[i].kind == &"keep":
 				_swap_keep_index = i
-				var info := card_info(cards[i])
+				var info := card_info(cards[i], run.cfg.trait_max_stacks)
 				_swap_keep.text = "%s\n%s" % [info.tag, info.desc]
 			else:
 				var b := _card_button(cards[i], i, Vector2(0, 220))
@@ -643,11 +643,12 @@ func _show_cards() -> void:
 				_swap_grid.add_child(b)
 	else:
 		_cards_title.text = tr("hud.start_title") if start else tr("hud.levelup_title")
-		var width := (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size())
+		var width := minf(144.0, (464.0 - 16.0 * (cards.size() - 1)) / maxi(1, cards.size()))
+		var left := 89.0 + (464.0 - (cards.size() * width + maxi(0, cards.size() - 1) * 16.0)) / 2.0
 		for i in cards.size():
-			var info := card_info(cards[i])
+			var info := card_info(cards[i], run.cfg.trait_max_stacks)
 			var b := Button.new()
-			b.position = Vector2(89 + i * (width + 16), 83)
+			b.position = Vector2(left + i * (width + 16), 83)
 			b.size = Vector2(width, 193)
 			b.tooltip_text = "%s: %s" % [info.name, info.get("tooltip_desc", info.desc)]
 			if cards[i].kind == &"post_max":
@@ -710,7 +711,7 @@ func _layout_cards() -> void:
 	_swap_box.size = _cards_box.size
 
 func _card_button(card: Dictionary, index: int, minimum_size: Vector2) -> Button:
-	var info := card_info(card)
+	var info := card_info(card, run.cfg.trait_max_stacks)
 	var b := Button.new()
 	b.custom_minimum_size = minimum_size
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -734,7 +735,7 @@ func _card_style(col: Color) -> StyleBoxFlat:
 	return style
 
 ## カードの表示内容（仕様書 9.2）。色は取得後の段階（仕様書 8）。
-static func card_info(c: Dictionary) -> Dictionary:
+static func card_info(c: Dictionary, trait_max_stacks := -1) -> Dictionary:
 	if c.kind == &"post_max": return c.info
 	if c.kind == &"swap" or c.kind == &"keep":
 		if c.kind == &"keep":
@@ -755,7 +756,8 @@ static func card_info(c: Dictionary) -> Dictionary:
 	var tag := ("card.new_weapon" if weapon else "card.new_trait") if lv == 1 else ("card.weapon_up" if weapon else "card.trait_up")
 	if c.get("start", false):
 		tag = "card.first_weapon"
-	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, ContentManager.cfg.trait_max_stacks]
+	var max_stacks: int = ContentManager.cfg.trait_max_stacks if trait_max_stacks < 0 else trait_max_stacks
+	var suffix := "Lv%d" % lv if weapon else "%d/%d" % [lv, max_stacks]
 	return {"tag": TranslationServer.translate(tag), "name": "%s %s" % [def.get_display_name(), suffix], "desc": def.get_description(),
 		"color": RANK_COLORS[clampi(lv - 1, 0, 4)]}
 

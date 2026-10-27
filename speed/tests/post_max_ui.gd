@@ -66,6 +66,15 @@ func _ready() -> void:
 			for button in hud._cards_row.get_children():
 				_check(viewport_rect.encloses(button.get_global_rect()), "追加強化カードが異なる画面比率でも画面内に収まる")
 		await _shot("postmax_small_english")
+	for ids: Array in [[&"T01"], [&"T01", &"T03"]]:
+		run.state.cards = []
+		for id in ids:
+			run.state.cards.append({"kind": &"trait", "id": id, "level": 3})
+		run.loadout._publish_cards()
+		await _ready_cards()
+		_check(hud._cards_row.get_child_count() == ids.size(), "通常候補%d枚を表示" % ids.size())
+		var first: Control = hud._cards_row.get_child(0)
+		_check(first.size.x <= 145.0 and first.position.x >= 169.0, "少数候補もカード幅を保って中央へ配置")
 	await _close()
 	print("[post_max_ui] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
