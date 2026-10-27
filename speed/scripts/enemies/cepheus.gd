@@ -16,6 +16,8 @@ func on_death(i: int, _atk: float) -> void:
 
 ## ケフェウス座の隊列の兵の数（段階ごと）。3体は横一列、5体は扇形、7体は千鳥の二重隊列（前列4体・後列3体）
 const CEPHEUS_TIERS := [3, 5, 7]
+## 兵の射撃予告が画面内で見える時間。
+const VOLLEY_WARNING := 0.4
 
 ## ケフェウス座：距離を保ち、専用の兵を召喚して隊列を組ませる王（buds が今の段階 1〜3。0 は召喚前）。
 ## reinforce_interval ごとに増援して段階を上げ（3→5→7体）、そのときだけ隊列を組み直す（WINDUP：射撃を休み、新しい兵の出現位置を
@@ -61,9 +63,12 @@ func _cepheus(i: int, dt: float) -> void:
 			t.fire_t[i] = float(p.reinforce_interval)
 		_:
 			t.timer[i] -= dt
+			_cepheus_warn_volley(i, dt)
 			if t.timer[i] <= 0.0:
 				_cepheus_volley(i)
 				t.timer[i] = float(p.fire_interval) * (0.5 if t.buds[i] == 3 else 1.0)
+				for j in _soldiers_of(i):
+					t.charge[j] = 0.0
 			if t.fire_t[i] <= 0.0:
 				_cepheus_reform(i)
 
@@ -92,6 +97,7 @@ func _cepheus_reform(i: int) -> void:
 			break
 		t.buds[j] = k
 		t.mode[j] = EnemyTable.Mode.DASH
+		t.charge[j] = 0.0
 		k += 1
 	for n in range(k, size):
 		state.emit(&"summon_mark", {"pos": cepheus_slot(i, n)[0], "king": t.pos[i], "life": float(p.summon_time), "color": t.color[i]})
@@ -119,14 +125,28 @@ func cepheus_slot(i: int, k: int) -> Array:
 				return [base + u * float(p.row_far) + n * (float(k) - 1.5) * spacing, a]
 			return [base + u * float(p.row_near) + n * float(k - 5) * spacing, a]
 
-## 王の号令で兵が撃つ。7体の隊列は前列（0〜3番）と後列（4〜6番）が交互に撃つ（bud_t が号令の回数）。
+## 画面内で予告を続けた兵だけ、次の号令に備える。カメラ移動・ズームも現在の表示矩形に従う。
+func _cepheus_warn_volley(i: int, dt: float) -> void:
+	var t := table
+	var view := state.view_rect()
+	var back := int(t.bud_t[i]) % 2 == 1
+	for j in _soldiers_of(i):
+		if t.mode[j] != EnemyTable.Mode.MOVE or not view.has_point(t.pos[j]) or t.timer[i] > VOLLEY_WARNING \
+				or (t.buds[i] == 3 and (t.buds[j] >= 4) != back):
+			t.charge[j] = 0.0
+			continue
+		# 遠距離LODのまとめ更新でも、1回の処理で予告なしに満了させない。
+		t.charge[j] = minf(1.0, t.charge[j] + minf(dt, 0.05) / VOLLEY_WARNING)
+
+## 王の号令で予告済みの兵が撃つ。7体の隊列は前列（0〜3番）と後列（4〜6番）が交互に撃つ（bud_t が号令の回数）。
 func _cepheus_volley(i: int) -> void:
 	var t := table
+	var view := state.view_rect()
 	var staggered := t.buds[i] == 3
 	var back := int(t.bud_t[i]) % 2 == 1
 	t.bud_t[i] += 1.0
 	for j in _soldiers_of(i):
-		if t.mode[j] != EnemyTable.Mode.MOVE:
+		if t.mode[j] != EnemyTable.Mode.MOVE or t.charge[j] < 1.0 or not view.has_point(t.pos[j]):
 			continue
 		if staggered and (t.buds[j] >= 4) != back:
 			continue
