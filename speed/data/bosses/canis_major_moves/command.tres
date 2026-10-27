@@ -7,8 +7,10 @@ script = ExtResource("1_cmcmd")
 technique = &"command"
 parameters = {
 "cd": 7.0,
+"cd_p2": 5.0,
 "damage": 12.0,
 "lunge_speed": 1260.0,
+"lunge_speed_p2": 1500.0,
 "lunge_time": 0.55,
 "min_hounds": 3,
 "recover": 0.6,

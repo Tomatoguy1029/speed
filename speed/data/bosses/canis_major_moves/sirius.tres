@@ -8,7 +8,9 @@ technique = &"sirius"
 parameters = {
 "beam_length": 1400.0,
 "beam_time": 0.5,
+"beam_time_p2": 0.8,
 "beam_width": 50.0,
+"beam_width_p2": 80.0,
 "cd": 6.0,
 "damage": 26.0,
 "lock": 0.3,

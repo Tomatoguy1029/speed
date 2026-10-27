@@ -7,7 +7,9 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスが連れて出る群れとは別に、ボスのまわりへ置く猟犬の群れの数（1群れは猟犬の pack_count 体）
 @export_range(0, 10) var trial_extra_packs := 0
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "pounce", "command", "sirius") var trial_technique := "normal"
+@export_enum("normal", "pounce", "command", "sirius", "howl") var trial_technique := "normal"
+## 有効なら、始めてすぐシリウスを強く輝かせて第2形態へ移る
+@export var trial_phase_two := false
 
 var capture_path := ""
 var capture_at := 3.0
@@ -24,6 +26,7 @@ func _ready() -> void:
 		var at := Vector2.from_angle(TAU * j / maxf(trial_extra_packs, 1)) * 350.0
 		session.perform("spawn", {"type": "hound", "pos": [at.x, at.y]})
 	if trial_technique != "normal": _only(StringName(trial_technique))
+	if trial_phase_two: _phase_two()
 	# 画面確認用。--canis-capture=<png> と --canis-capture-at=<秒> で一枚保存して終了する。
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--canis-capture="): capture_path = arg.trim_prefix("--canis-capture=")
@@ -34,6 +37,7 @@ func _ready() -> void:
 				var at := Vector2.from_angle(TAU * j / 8.0) * 350.0
 				session.perform("spawn", {"type": "hound", "pos": [at.x, at.y]})
 		if arg == "--canis-pin": session.pinned = trial_ship_position
+		if arg == "--canis-phase2": _phase_two()
 	_set_mode(3)
 	_refresh()
 
@@ -67,3 +71,8 @@ func _only(id: StringName) -> void:
 		binding.connected = binding.source == String(id)
 		rules.graph_nodes[node] = binding
 	actor.configure_flow(program)
+
+## HPを変えずに、次の追跡で第2形態へ移らせる。
+func _phase_two() -> void:
+	var actor: BossActor = session.run.bosses.actor
+	if actor != null: actor.phase_pending = true
