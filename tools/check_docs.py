@@ -30,10 +30,9 @@ STATE_DIRS = ["docs/treatment.md", "docs/spec.md", "docs/architecture.md", "docs
 # 廃止した個人の作業ログ
 PERSONAL_LOGS = [f"demo/docs/{n}.md" for n in ("wakida", "shumak", "keporusu")]
 # リポジトリに置かない、作業用の置き場
-WORK_DIRS = ["docs/proposals", "docs/logs"]
-PLAN_FILES = {"plan.md", "todo.md"}
+WORK_DIRS = ["tasks", "docs/proposals", "docs/logs"]
 # リンク切れを調べる文書
-LINK_TARGETS = ["docs", "AGENTS.md", "README.md", "SPEC.md", "tasks"]
+LINK_TARGETS = ["docs", "AGENTS.md", "README.md"]
 
 DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2}月\d{1,2}日|最終更新")
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
@@ -89,23 +88,6 @@ def column_table_errors():
     return errors
 
 
-def work_directory_errors():
-    errors = []
-    for d in WORK_DIRS:
-        if os.path.exists(os.path.join(ROOT, d)):
-            errors.append(f"{d}/: 作業用の計画・案・報告はリポジトリに置かない")
-    plans = os.path.join(ROOT, "tasks")
-    if os.path.isdir(plans):
-        for name in sorted(os.listdir(plans)):
-            if name == ".DS_Store":
-                continue
-            if name not in PLAN_FILES or not os.path.isfile(os.path.join(plans, name)):
-                errors.append(f"tasks/{name}: 計画は plan.md・todo.md だけに置く")
-    elif os.path.exists(plans):
-        errors.append("tasks: 計画用のフォルダを使う")
-    return errors
-
-
 def main():
     errors = []
 
@@ -136,7 +118,9 @@ def main():
             if not name.endswith(".md") or (allowed is not None and name not in allowed):
                 errors.append(f"{rel}/{name}: {rel}/ に置けない文書（案・報告・作業の計画はリポジトリの外へ）")
 
-    errors += work_directory_errors()
+    for d in WORK_DIRS:
+        if os.path.exists(os.path.join(ROOT, d)):
+            errors.append(f"{d}/: 作業用の計画・案・報告はリポジトリに置かない")
 
     for path in PERSONAL_LOGS:
         if os.path.exists(os.path.join(ROOT, path)):

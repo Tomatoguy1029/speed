@@ -41,7 +41,7 @@
 | [dev/stage-production-ai.md](dev/stage-production-ai.md) | AI向けの制作参照。編集先・記録分析・変更確認の進め方 |
 | [dev/tools/index.md](dev/tools/index.md)・`dev/tools/*.md` | Godotの制作ツール一覧と各ツールの操作・保存範囲 |
 
-採用前の案、計測・実装の報告、特定の作業のための計画・タスク一覧・引継ぎは、リポジトリの外（会話や各自のローカル）に置く。明示的に依頼された制作仕様はルートの `SPEC.md`、実装計画と作業一覧は `tasks/plan.md`・`tasks/todo.md` に置ける。この2ファイルは対象セッションの制作計画を管理し、共有タスク一覧は管理担当が更新する。ほかの作業文書は `tasks/` に追加しない。
+採用前の案、計測・実装の報告、特定の作業のための計画・タスク一覧・引継ぎは、リポジトリの外（会話や各自のローカル）に置く。
 
 ## 2. 書き方
 
@@ -78,7 +78,7 @@ python3 tools/check_docs.py
 - `docs/` の中の日付・「最終更新」・作業者の名前
 - `docs/` の決められた文書以外のファイル
 - 個人の作業ログのファイル
-- `tasks/plan.md`・`tasks/todo.md` 以外の作業文書と、`docs/proposals/`・`docs/logs/`
+- リポジトリの `tasks/`・`docs/proposals/`・`docs/logs/`
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
 - [設計書](architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
 
