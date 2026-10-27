@@ -33,6 +33,11 @@ var _source_hashes := {}
 var _rules_paths := {}
 var _rules_hashes := {}
 var _prefer_preview_values := false
+## 再生中の技。終わるたびに同じ技を撃ち直し、技・ボスの選び直し・リセット・通常AIへ戻すで止める。
+var _repeat_id := ""
+var _repeat_wait := 0.0
+## 技が終わってから撃ち直すまでの間（秒）
+const REPEAT_GAP := 0.6
 
 func _ready() -> void:
 	await super._ready()
@@ -88,7 +93,7 @@ func _build_trial_ui() -> void:
 	_move_picker.clip_text = true
 	_move_picker.tooltip_text = "実行するボス技"
 	_technique_row.add_child(_move_picker)
-	_move_picker.item_selected.connect(func(_index): _manual_message.hide(); _refresh_tuning_selection())
+	_move_picker.item_selected.connect(func(_index): _repeat_id = ""; _manual_message.hide(); _refresh_tuning_selection())
 	_phase_picker.item_selected.connect(func(_index): _manual_message.hide())
 	_execute = _button(_technique_row, "技を再生", _execute_selected)
 	_button(_technique_row, "通常AIへ戻す", _return_to_ai)
@@ -545,6 +550,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	_target_id = ""
 	_target_boss = false
 	preview_actor = null
+	if selected.is_empty(): _repeat_id = ""
 	var stage: int = {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(id, 1)
 	var settings := {"empty": true, "stage": stage, "ship_pos": [400, 0] if id == "hydra" else [500, 0],
 		"invincible": true, "director": {"enabled": false}}
@@ -692,6 +698,8 @@ func _execute_selected() -> void:
 		_apply_tuning_preview()
 	if preview_actor.action_rules.combos.has(id):
 		await _activate_boss(_target_id, id, _current_program_path)
+		_repeat_id = id if is_instance_valid(preview_actor) else ""
+		_repeat_wait = REPEAT_GAP
 		return
 	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
 	if _target_id != "hydra" and manual == null:
@@ -706,9 +714,41 @@ func _execute_selected() -> void:
 	if started:
 		session.playing = true
 		_manual_message.hide()
+		_repeat_id = id
+		_repeat_wait = REPEAT_GAP
 	else:
+		_repeat_id = ""
 		_manual_message.text = "実行できません: " + id if _target_id == "hydra" else manual.message
 		_manual_message.show()
+
+## 再生した技が終わったら、少し間を置いて同じ技を最初から撃ち直す。
+func _tick_repeat(delta: float) -> void:
+	if _repeat_id.is_empty() or not session.playing: return
+	if not _repeat_finished():
+		_repeat_wait = REPEAT_GAP
+		return
+	_repeat_wait -= delta
+	if _repeat_wait > 0.0: return
+	_repeat_wait = REPEAT_GAP
+	if preview_actor.action_rules.combos.has(_repeat_id):
+		var combo := _repeat_id
+		await _activate_boss(_target_id, combo, _current_program_path)
+		_repeat_id = combo if is_instance_valid(preview_actor) else ""
+		return
+	if _repeat_id == _selected_technique(): _apply_tuning_preview()
+	var started: bool = _execute_hydra(_repeat_id) if _target_id == "hydra" else manual != null and manual.execute(_repeat_id, _phase_picker.get_selected_id())
+	if not started:
+		_manual_message.text = "繰り返しを止めました: " + (_repeat_id if _target_id == "hydra" or manual == null else manual.message)
+		_manual_message.show()
+		_repeat_id = ""
+
+func _repeat_finished() -> bool:
+	if preview_actor.action_rules.combos.has(_repeat_id):
+		var adapter = preview_actor.flow_adapter
+		return preview_actor.flow_runner.index >= 1 and not preview_actor.attack_playing() and (adapter == null or not adapter.running())
+	if _target_id == "hydra":
+		return not preview_actor.busy and preview_actor.necks.all(func(n): return n.mode == &"idle")
+	return not preview_actor.attack_playing()
 
 func _execute_hydra(id: String) -> bool:
 	var actor = preview_actor
@@ -753,6 +793,7 @@ func _position_for_hydra(id: String) -> void:
 	session.run.loadout.reset_loadout()
 
 func _return_to_ai() -> void:
+	_repeat_id = ""
 	_finish_manual()
 	if _target_id == "hydra" and is_instance_valid(preview_actor):
 		preview_actor.interrupt_tech()
@@ -785,6 +826,7 @@ func _process(delta: float) -> void:
 	super(delta)
 	if _target_id.is_empty() or not _target_boss or _switching or not is_instance_valid(preview_actor): return
 	if _target_id != "hydra" and manual == null: return
+	_tick_repeat(delta)
 	if manual != null:
 		var selected := String(_move_picker.get_selected_metadata()) if _move_picker.selected >= 0 else ""
 		var reason: String = "" if preview_actor.action_rules.combos.has(selected) else manual.unavailable(selected, _phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"

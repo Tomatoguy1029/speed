@@ -32,10 +32,6 @@ func unavailable(id: String, phase: int) -> String:
 	if move == null: return "未登録の技: " + id
 	var maximum := 3 if actor.def.id == &"draco" else 2
 	if phase < 1 or phase > maximum: return "存在しない形態です。"
-	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
-	var first := int(gate.get("min_phase", 1))
-	var last := int(gate.get("max_phase", maximum))
-	if phase < first or phase > last: return "形態 %d〜%d の技です。" % [first, last]
 	if actor.def.id == &"draco":
 		var driver: Variant = move.parameters.get("driver")
 		if not driver is Script or not driver.can_instantiate(): return "技の実行スクリプトがありません。"
@@ -54,10 +50,12 @@ func execute(id: String, phase: int) -> bool:
 		active = true
 	_cleanup()
 	actor.selection_enabled = false
-	_set_phase(phase)
+	# 発動条件の形態から外れた形態を選んでいても、技が使える形態へ寄せて撃つ。
+	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
+	var maximum := 3 if actor.def.id == &"draco" else 2
+	_set_phase(clampi(phase, int(gate.get("min_phase", 1)), int(gate.get("max_phase", maximum))))
 	actor.table.pos[actor.body] = _origin
 	actor.table.facing[actor.body] = 0.0
-	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
 	var distance := (float(gate.get("min", 0.0)) + minf(1400.0, float(gate.get("max", 600.0)))) * 0.5
 	var point := _origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance
 	actor.run_state.ship_pos = point
