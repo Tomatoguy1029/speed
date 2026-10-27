@@ -47,6 +47,10 @@ const SPIRAL_LABELS := SPIRAL_FIELDS.SPIRAL_LABELS
 const SPIRAL_TIPS := SPIRAL_FIELDS.SPIRAL_TIPS
 const SPIRAL_BOUNDS := SPIRAL_FIELDS.SPIRAL_BOUNDS
 const BOSS_IDS := ["hydra", "monoceros", "draco", "centaurus", "canis_major"]
+const BOSS_TITLES := {"hydra": "うみへび座", "monoceros": "いっかくじゅう座", "draco": "りゅう座", "centaurus": "ケンタウルス座", "canis_major": "おおいぬ座"}
+var _ordered_boss_ids: Array[String] = []
+var _boss_selector: OptionButton
+var _detail_scroll: ScrollContainer
 const PARAM_LABELS := SPIRAL_FIELDS.PARAM_LABELS
 
 func _ready() -> void:
@@ -66,10 +70,14 @@ func _ready() -> void:
 	files.get_popup().id_pressed.connect(func(_id): _file_dialog.popup_centered_ratio(0.65))
 	toolbar.add_child(files)
 	var bosses := OptionButton.new()
-	for title_text in ["うみへび座", "いっかくじゅう座", "りゅう座", "ケンタウルス座", "おおいぬ座"]: bosses.add_item(title_text)
+	_boss_selector = bosses
+	_ordered_boss_ids.clear()
+	for entry in _boss_entries():
+		_ordered_boss_ids.append(entry.id)
+		bosses.add_item(entry.title)
 	bosses.selected = _boss_index()
 	bosses.item_selected.connect(func(index):
-		var id: String = BOSS_IDS[index]
+		var id: String = _ordered_boss_ids[index]
 		if open_boss("res://data/bosses/ai/" + id + "_action_rules.tres", "res://data/bosses/ai/" + id + "_flow.tres") != OK:
 			bosses.selected = _boss_index())
 	toolbar.add_child(bosses)
@@ -144,13 +152,17 @@ func _ready() -> void:
 			history.add_undo_method(_set_sections.bind(flow_before))
 		history.commit_action())
 	var details := VBoxContainer.new()
-	details.custom_minimum_size.x = 300 * _scale
-	details.size_flags_horizontal = Control.SIZE_FILL
+	details.custom_minimum_size.x = maxf(320.0, 205.0 * _scale)
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_split.add_child(details)
 	_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details.add_child(_heading)
 	var scroll := ScrollContainer.new()
+	_detail_scroll = scroll
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.resized.connect(_refresh_field_columns)
 	details.add_child(scroll)
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -160,7 +172,7 @@ func _ready() -> void:
 	preview.custom_minimum_size = Vector2(160, 160) * _scale
 	preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	preview.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_fields.columns = 2
+	_fields.columns = 1
 	_fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_child(_fields)
 	add_child(_status)
@@ -210,7 +222,6 @@ func _set_graph_state(value: Dictionary) -> void:
 	for key in value: rules.set(key, value[key].duplicate(true))
 	dirty_rules = true
 	graph.show_rules(rules)
-	_refresh_flow()
 	_refresh_techniques()
 	if coverage: _edit_coverage(_coverage_group if rules.condition_groups.has(_coverage_group) else "")
 	elif rules.node_ids().has(_selected_technique): _picked("condition" if _inspector_mode == 1 else "technique", _selected_technique)
@@ -279,7 +290,6 @@ func _load_rules() -> void:
 			if filename.ends_with(".tres"): rules.techniques.append(load("res://data/bosses/hydra_moves/" + filename))
 	graph.show_rules(rules)
 	_parallel_toggle.set_pressed_no_signal(rules.allow_parallel_attacks)
-	if flow != null: _refresh_flow()
 	_refresh_techniques()
 
 func open_boss(action_path: String, section_path: String) -> Error:
@@ -301,12 +311,29 @@ func open_boss(action_path: String, section_path: String) -> Error:
 	_refresh_flow()
 	_picked("technique", _selected_technique)
 	_status.text = "ボスの技定義と戦闘フローを開きました"
+	if _boss_selector != null: _boss_selector.selected = _boss_index()
 	return OK
 
 func _boss_index() -> int:
-	for i in BOSS_IDS.size():
-		if BOSS_IDS[i] + "_action_rules" in rules_path: return i
+	for i in _ordered_boss_ids.size():
+		if _ordered_boss_ids[i] + "_action_rules" in rules_path: return i
 	return 0
+
+func _boss_entries() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	var seen := {}
+	for number in range(1, 6):
+		var path := "res://data/stages/stage_%d.tres" % number
+		if not ResourceLoader.exists(path): continue
+		var stage: Resource = ResourceLoader.load(path)
+		if stage == null: continue
+		var id := String(stage.boss_id)
+		if id not in BOSS_IDS or seen.has(id): continue
+		entries.append({"id": id, "title": "ステージ%d · %s" % [number, BOSS_TITLES[id]]})
+		seen[id] = true
+	for id in BOSS_IDS:
+		if not seen.has(id): entries.append({"id": id, "title": "未配置 · " + BOSS_TITLES[id]})
+	return entries
 
 func _is_hydra() -> bool: return rules.adapter == &"hydra" or "hydra_action_rules" in rules_path
 
@@ -352,6 +379,7 @@ func _picked(kind: String, id: String) -> void:
 			label.text = {"min": "最小距離", "max": "最大距離", "angle": "中心角度（度）", "half_angle": "半角（度）"}[key]
 			_fields.add_child(label)
 			var field := SpinBox.new()
+			field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			field.min_value = -180 if key == "angle" else 0
 			field.max_value = 180 if "angle" in key else 100000
 			field.value = gate[key]
@@ -519,10 +547,19 @@ func _clear_fields() -> void:
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
+	call_deferred("_refresh_field_columns")
+
+func _refresh_field_columns() -> void:
+	if _detail_scroll == null or _fields == null: return
+	var narrow := _detail_scroll.size.x < maxf(500.0, 320.0 * _scale)
+	_fields.columns = 1 if narrow else 2
+	for child in _fields.get_children():
+		if child.get_class() == "Control" or child.get_meta("hide_when_narrow", false):
+			child.visible = not narrow
 
 func _refresh_flow() -> void:
 	_selected_section = clampi(_selected_section, 0, maxi(0, flow.sections.size() - 1))
-	flow_graph.show_flow(flow, rules)
+	flow_graph.show_flow(flow)
 
 func _add_section() -> void:
 	var copy: Array = flow.sections.duplicate(true)
@@ -543,29 +580,18 @@ func _set_sections(value: Array) -> void:
 func _edit_section(i: int, previous := "") -> void:
 	_selected_section = i
 	combo_editor.hide()
-	_probability_previous = previous
-	_context(flow.sections[i].get("name", "区間") + " の選択割合", 2)
+	_probability_previous = ""
+	_context(flow.sections[i].get("name", "区間") + " の設定", 2)
 	editing_flow = true
 	_clear_fields()
-	_status.text = "接続線が次の区間を決めます"
-	var avoid := CheckButton.new()
-	avoid.text = "同じ技の連続を減らす"
-	avoid.tooltip_text = "別候補があるとき、直前と同じ技の組み合わせを避けます。"
-	avoid.button_pressed = flow.sections[i].get("avoid_repeat", true)
-	avoid.toggled.connect(func(value):
-		var copy: Array = flow.sections.duplicate(true)
-		copy[i].avoid_repeat = value
-		history.create_action("連発回避を変更")
-		history.add_do_method(_set_sections.bind(copy))
-		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
-		history.commit_action())
-	_fields.add_child(avoid)
-	_fields.add_child(Control.new())
+	_status.text = ""
+	_section_heading("進行")
 	for key in ["name"]:
 		var label := Label.new()
 		label.text = "区間名"
 		_fields.add_child(label)
 		var field := LineEdit.new()
+		field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		field.text = str(flow.sections[i].get(key, 0 if key == "next" else "normal"))
 		field.text_submitted.connect(func(value):
 			var copy: Array = flow.sections.duplicate(true)
@@ -582,41 +608,56 @@ func _edit_section(i: int, previous := "") -> void:
 		_fields.add_child(rest)
 		_fields.add_child(Control.new())
 		return
-	_append_section_targets(i)
 	var count_field := _number_field("攻撃回数", float(flow.sections[i].get("action_count", 1)), func(value): _section_property(i, "action_count", int(value)), 1.0)
 	count_field.step = 1.0
 	count_field.rounded = true
 	_number_field("攻撃間隔（秒）", float(flow.sections[i].get("action_interval", 0.0)), func(value): _section_property(i, "action_interval", value))
-	_optional_section_number(i, "section_budget", "この区間で使える力", float(flow.maximum_stamina), 0.1)
 	_optional_section_number(i, "no_candidate_timeout", "候補なしで次へ（秒）", 0.5, 0.0)
-	var probability_label := Label.new()
-	probability_label.text = "直前の攻撃"
-	probability_label.tooltip_text = "基本の確率を選びます。直前の攻撃別に確率を変える場合だけ切り替えます。"
-	_fields.add_child(probability_label)
-	var probability := OptionButton.new()
-	var previous_types := ["", "single", "combo", "major"]
-	if rules.allow_parallel_attacks: previous_types.insert(2, "parallel")
-	for kind in previous_types:
-		probability.add_item({"": "基本の確率", "single": "直前が通常技", "parallel": "直前が同時攻撃", "combo": "直前がコンボ技", "major": "直前が大技"}[kind])
-	probability.selected = maxi(0, previous_types.find(previous))
-	probability.item_selected.connect(func(index): _edit_section(i, previous_types[index]))
-	_fields.add_child(probability)
+	_section_heading("攻撃候補")
+	_append_section_targets(i)
+	_section_heading("選択確率")
 	var weights: Dictionary = flow.sections[i].get("weights", {})
-	for rule in flow.sections[i].get("probability_rules", []):
-		if rule.previous == previous: weights = rule.weights
 	var visible_categories: Array = _section_categories(i)
 	for key in ["single", "parallel", "combo", "major"]:
 		if key == "parallel" and (not rules.allow_parallel_attacks or "normal" not in visible_categories): continue
 		if key != "parallel" and not ({"single": "normal", "combo": "combo", "major": "major"}[key] in visible_categories): continue
-		var chance := _number_field({"single": "通常技の確率", "parallel": "同時攻撃の確率", "combo": "コンボ技の確率", "major": "大技の確率"}[key], float(weights.get(key, 0.0)), func(value): _section_weight(i, key, value, previous))
+		var chance := _number_field({"single": "通常技の確率", "parallel": "同時攻撃の確率", "combo": "コンボ技の確率", "major": "大技の確率"}[key], float(weights.get(key, 0.0)), func(value): _section_weight(i, key, value))
 		chance.tooltip_text = "成立した分類の値を合計した中での相対的な選択確率です。候補がない分類は除きます。"
-	if "normal" in visible_categories: _append_forbidden(i)
+	var avoid := CheckButton.new()
+	avoid.text = "連発を抑える"
+	avoid.tooltip_text = "別候補があるとき、直前と同じ技の組み合わせを避けます。"
+	avoid.button_pressed = flow.sections[i].get("avoid_repeat", true)
+	avoid.toggled.connect(func(value):
+		var copy: Array = flow.sections.duplicate(true)
+		copy[i].avoid_repeat = value
+		history.create_action("連発回避を変更")
+		history.add_do_method(_set_sections.bind(copy))
+		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+		history.commit_action())
+	_fields.add_child(avoid)
+	_fields.add_child(Control.new())
+	_section_heading("スタミナ")
+	_optional_section_number(i, "section_budget", "この区間で使える力", float(flow.maximum_stamina), 0.1)
+	if rules.allow_parallel_attacks and "normal" in visible_categories:
+		_section_heading("同時攻撃")
+		_append_forbidden(i)
+
+func _section_heading(title_text: String) -> void:
+	_fields.add_child(HSeparator.new())
+	var second := HSeparator.new()
+	second.set_meta("hide_when_narrow", true)
+	_fields.add_child(second)
+	var label := Label.new()
+	label.text = title_text
+	_fields.add_child(label)
+	_fields.add_child(Control.new())
 
 func _number_field(title_text: String, value: float, changed: Callable, minimum := 0.0, maximum := 100000.0) -> SpinBox:
 	var label := Label.new()
 	label.text = title_text
 	_fields.add_child(label)
 	var field := SpinBox.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	field.min_value = minimum
 	field.max_value = maximum
 	field.step = 0.1
@@ -631,6 +672,7 @@ func _optional_section_number(index: int, key: String, title_text: String, defau
 	enabled.button_pressed = flow.sections[index].has(key)
 	_fields.add_child(enabled)
 	var field := SpinBox.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	field.min_value = minimum
 	field.max_value = 100000.0
 	field.step = 0.1
@@ -689,66 +731,72 @@ func _section_categories(index: int) -> Array:
 		if not kind.is_empty() and kind not in kinds: kinds.append(kind)
 	return kinds
 
+func _effective_groups(section: Dictionary) -> Array:
+	if section.get("request") == "rest": return []
+	var selected: Array = section.get("allowed_groups", []).duplicate()
+	var categories: Array = section.get("allowed_categories", [])
+	if not section.has("allowed_groups") and not section.has("allowed_categories"):
+		categories = ["major"] if section.get("request", "normal") == "major" else ["normal", "combo"] if section.get("request", "normal") == "normal" else ["normal", "combo", "major"]
+	for group in rules.condition_groups:
+		if rules.category_for_group(String(group)) in categories and group not in selected: selected.append(group)
+	return selected
+
 func _append_section_targets(index: int) -> void:
 	var heading := Label.new()
 	heading.text = "条件選択ノード"
 	heading.tooltip_text = "分類のチェックは、その分類のノードをまとめて選びます。個別チェックは指定ノードだけを追加します。"
 	_fields.add_child(heading)
 	var section: Dictionary = flow.sections[index]
-	var attached: Array = flow_graph._effective_groups(section)
-	var targets := Tree.new()
-	targets.hide_root = true
-	targets.custom_minimum_size.y = 180.0 * _scale
+	var attached: Array = _effective_groups(section)
+	var targets := PanelContainer.new()
+	targets.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	targets.tooltip_text = heading.tooltip_text
-	var root_item := targets.create_item()
+	var target_list := VBoxContainer.new()
+	target_list.add_theme_constant_override("separation", int(3 * _scale))
+	targets.add_child(target_list)
 	for kind in ["normal", "combo", "major"]:
-		var category_item := targets.create_item(root_item)
-		category_item.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
-		category_item.set_text(0, {"normal": "通常技 全部", "combo": "コンボ技 全部", "major": "大技 全部"}[kind])
-		category_item.set_metadata(0, {"id": kind, "by_category": true})
-		category_item.set_editable(0, true)
 		var all_in_kind: Array = rules.condition_groups.keys().filter(func(group): return rules.category_for_group(String(group)) == kind)
+		if all_in_kind.is_empty(): continue
 		var whole_kind: bool = not all_in_kind.is_empty() and all_in_kind.all(func(group): return group in attached)
-		category_item.set_checked(0, whole_kind)
+		_append_selection_row(target_list, {"normal": "通常技 全部", "combo": "コンボ技 全部", "major": "大技 全部"}[kind], whole_kind, false, func(value): _set_section_target(index, kind, true, value))
 		for group in rules.condition_groups:
 			if rules.category_for_group(String(group)) != kind: continue
-			var group_item := targets.create_item(category_item)
-			group_item.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
-			group_item.set_text(0, String(rules.condition_groups[group].get("title", group)))
-			group_item.set_metadata(0, {"id": String(group), "by_category": false})
-			group_item.set_editable(0, not whole_kind)
-			group_item.set_checked(0, group in attached)
-	targets.item_edited.connect(func():
-		var item := targets.get_edited()
-		if item == null: return
-		var target: Dictionary = item.get_metadata(0)
-		_set_section_target(index, target.id, target.by_category, item.is_checked(0)))
+			_append_selection_row(target_list, "  " + String(rules.condition_groups[group].get("title", group)), group in attached, whole_kind, func(value): _set_section_target(index, String(group), false, value))
 	_fields.add_child(targets)
 	var exclude := Label.new()
 	exclude.text = "使わない技"
 	exclude.tooltip_text = "選んだ技は、接続ノードで成立してもこの区間では使用しません。"
 	_fields.add_child(exclude)
-	var exclusions := Tree.new()
-	exclusions.hide_root = true
-	exclusions.custom_minimum_size.y = 125.0 * _scale
-	var exclusions_root := exclusions.create_item()
+	var exclusions := PanelContainer.new()
+	exclusions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var exclusion_list := VBoxContainer.new()
+	exclusion_list.add_theme_constant_override("separation", int(3 * _scale))
+	exclusions.add_child(exclusion_list)
 	for id in rules.node_ids():
 		if rules.source_for(id) != id: continue
-		var item := exclusions.create_item(exclusions_root)
-		item.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
-		item.set_text(0, GRAPH.title_for(id))
-		item.set_metadata(0, id)
-		item.set_editable(0, true)
-		item.set_checked(0, id in section.get("excluded_techniques", []) or section.has("allowed_techniques") and id not in section.allowed_techniques)
-	exclusions.item_edited.connect(func():
-		var item := exclusions.get_edited()
-		if item != null: _set_section_exclusion(index, String(item.get_metadata(0)), item.is_checked(0)))
+		var excluded: bool = id in section.get("excluded_techniques", []) or section.has("allowed_techniques") and id not in section.allowed_techniques
+		_append_selection_row(exclusion_list, GRAPH.title_for(id), excluded, false, func(value): _set_section_exclusion(index, id, value))
 	_fields.add_child(exclusions)
+
+func _append_selection_row(parent: VBoxContainer, title_text: String, checked: bool, disabled: bool, changed: Callable) -> void:
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var choice := CheckBox.new()
+	choice.button_pressed = checked
+	choice.disabled = disabled
+	choice.tooltip_text = title_text
+	choice.toggled.connect(changed)
+	row.add_child(choice)
+	var title := Label.new()
+	title.text = title_text
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(title)
 
 func _set_section_target(index: int, id: String, by_category: bool, enabled: bool) -> void:
 	var copy: Array = flow.sections.duplicate(true)
 	var section: Dictionary = copy[index]
-	var groups: Array = flow_graph._effective_groups(section)
+	var groups: Array = _effective_groups(section)
 	var targets: Array = rules.condition_groups.keys().filter(func(group): return rules.category_for_group(String(group)) == id) if by_category else [id]
 	for group in targets:
 		if enabled and group not in groups: groups.append(group)
@@ -815,7 +863,7 @@ func _edit_forbidden() -> void:
 
 func _append_forbidden(index: int) -> void:
 	var heading := Label.new()
-	heading.text = "同時攻撃の禁止"
+	heading.text = "禁止する組合せ"
 	_fields.add_child(heading)
 	_fields.add_child(Control.new())
 	if not rules.allow_parallel_attacks:
@@ -843,6 +891,7 @@ func _append_forbidden(index: int) -> void:
 	var choices: Array[OptionButton] = []
 	for side in 2:
 		var choice := OptionButton.new()
+		choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		choice.add_item("登録なし")
 		choice.set_item_metadata(0, "")
 		for move in rules.techniques:
@@ -927,6 +976,7 @@ func _edit_coverage(group := "") -> void:
 		label.text = "ノード名"
 		_fields.add_child(label)
 		var name_field := LineEdit.new()
+		name_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_field.text = selection.title
 		var original_name: String = selection.title
 		name_field.text_submitted.connect(func(value): _rename_group(group, value, original_name))
@@ -1150,6 +1200,7 @@ func _refresh() -> void:
 		label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
 		_fields.add_child(label)
 		var field := SpinBox.new()
+		field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		field.min_value = 0
 		field.max_value = 100000
 		if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
