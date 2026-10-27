@@ -51,6 +51,7 @@ const BOSS_TITLES := {"hydra": "うみへび座", "monoceros": "いっかくじ�
 var _ordered_boss_ids: Array[String] = []
 var _boss_selector: OptionButton
 var _detail_scroll: ScrollContainer
+var _expanded_section_categories: Dictionary = {}
 const PARAM_LABELS := SPIRAL_FIELDS.PARAM_LABELS
 
 func _ready() -> void:
@@ -757,11 +758,12 @@ func _append_section_targets(index: int) -> void:
 	for kind in ["normal", "combo", "major"]:
 		var all_in_kind: Array = rules.condition_groups.keys().filter(func(group): return rules.category_for_group(String(group)) == kind)
 		if all_in_kind.is_empty(): continue
+		var rows := _append_collapsible_category(target_list, index, "targets", kind, all_in_kind.size())
 		var whole_kind: bool = not all_in_kind.is_empty() and all_in_kind.all(func(group): return group in attached)
-		_append_selection_row(target_list, {"normal": "通常技 全部", "combo": "コンボ技 全部", "major": "大技 全部"}[kind], whole_kind, false, func(value): _set_section_target(index, kind, true, value))
+		_append_selection_row(rows, {"normal": "通常技 全部", "combo": "コンボ技 全部", "major": "大技 全部"}[kind], whole_kind, false, func(value): _set_section_target(index, kind, true, value))
 		for group in rules.condition_groups:
 			if rules.category_for_group(String(group)) != kind: continue
-			_append_selection_row(target_list, "  " + String(rules.condition_groups[group].get("title", group)), group in attached, whole_kind, func(value): _set_section_target(index, String(group), false, value))
+			_append_selection_row(rows, "  " + String(rules.condition_groups[group].get("title", group)), group in attached, whole_kind, func(value): _set_section_target(index, String(group), false, value))
 	_fields.add_child(targets)
 	var exclude := Label.new()
 	exclude.text = "使わない技"
@@ -772,11 +774,57 @@ func _append_section_targets(index: int) -> void:
 	var exclusion_list := VBoxContainer.new()
 	exclusion_list.add_theme_constant_override("separation", int(3 * _scale))
 	exclusions.add_child(exclusion_list)
+	var technique_ids: Array = []
 	for id in rules.node_ids():
 		if rules.source_for(id) != id: continue
-		var excluded: bool = id in section.get("excluded_techniques", []) or section.has("allowed_techniques") and id not in section.allowed_techniques
-		_append_selection_row(exclusion_list, GRAPH.title_for(id), excluded, false, func(value): _set_section_exclusion(index, id, value))
+		technique_ids.append(id)
+	for kind in ["normal", "combo", "major", "other"]:
+		var in_kind: Array = technique_ids.filter(func(id): return kind in _section_technique_categories(String(id)))
+		if in_kind.is_empty(): continue
+		var rows := _append_collapsible_category(exclusion_list, index, "exclusions", kind, in_kind.size())
+		for id in in_kind:
+			var excluded: bool = id in section.get("excluded_techniques", []) or section.has("allowed_techniques") and id not in section.allowed_techniques
+			_append_selection_row(rows, GRAPH.title_for(id), excluded, false, func(value): _set_section_exclusion(index, id, value))
 	_fields.add_child(exclusions)
+
+func _section_technique_categories(id: String) -> Array:
+	var kinds: Array = []
+	for entry in rules.active_gate_entries_for(id):
+		var kind := String(entry.category)
+		if kind in ["normal", "combo", "major"] and kind not in kinds: kinds.append(kind)
+	if not kinds.is_empty(): return kinds
+	if rules.combos.has(id): return ["combo"]
+	for move in rules.techniques:
+		if String(move.technique) == id:
+			var kind := "normal" if move.category == &"single" else String(move.category)
+			return [kind if kind in ["normal", "combo", "major"] else "other"]
+	return ["other"]
+
+func _append_collapsible_category(parent: VBoxContainer, index: int, list_kind: String, kind: String, count: int) -> VBoxContainer:
+	if parent.get_child_count() > 0: parent.add_child(HSeparator.new())
+	var category := VBoxContainer.new()
+	category.name = list_kind + "_" + kind
+	category.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(category)
+	var state_key := "%s:%d:%s:%s" % [rules_path, index, list_kind, kind]
+	var expanded: bool = _expanded_section_categories.get(state_key, true)
+	var header := Button.new()
+	header.name = "Header"
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.toggle_mode = true
+	header.button_pressed = expanded
+	var title_text: String = {"normal": "通常技", "combo": "コンボ技", "major": "大技", "other": "未分類"}[kind]
+	header.text = ("▾ " if expanded else "▸ ") + title_text + "（%d）" % count
+	category.add_child(header)
+	var rows := VBoxContainer.new()
+	rows.name = "Rows"
+	rows.visible = expanded
+	category.add_child(rows)
+	header.toggled.connect(func(value):
+		_expanded_section_categories[state_key] = value
+		rows.visible = value
+		header.text = ("▾ " if value else "▸ ") + title_text + "（%d）" % count)
+	return rows
 
 func _append_selection_row(parent: VBoxContainer, title_text: String, checked: bool, disabled: bool, changed: Callable) -> void:
 	var row := HBoxContainer.new()

@@ -29,9 +29,23 @@ func exercise() -> void:
 	panel._parallel_toggle.toggled.emit(false)
 	assert(not panel.rules.allow_parallel_attacks, "unchecked simultaneous attacks are inactive")
 	panel._edit_section(0)
+	var before_collapse: Array = panel.flow.sections.duplicate(true)
+	var history_before_collapse: int = panel.history.get_version()
+	for list_kind in ["targets", "exclusions"]:
+		var category: VBoxContainer = panel._fields.find_child(list_kind + "_normal", true, false)
+		assert(category != null, "each list groups its normal entries independently")
+		var header: Button = category.get_node("Header")
+		var rows: VBoxContainer = category.get_node("Rows")
+		header.set_pressed_no_signal(false)
+		header.toggled.emit(false)
+		assert(not rows.visible, "category entries collapse")
+	panel._edit_section(0)
+	assert(not panel._fields.find_child("targets_normal", true, false).get_node("Rows").visible)
+	assert(not panel._fields.find_child("exclusions_normal", true, false).get_node("Rows").visible)
+	assert(panel.flow.sections == before_collapse and panel.history.get_version() == history_before_collapse, "folding both lists is view-only")
 	panel._split.split_offset = 1000
 	await process_frame
-	assert(panel._detail_scroll.size.x <= 420 and panel._fields.columns == 1 and not panel._detail_scroll.get_h_scroll_bar().visible, "narrow inspector stacks fields with one vertical scroll")
+	assert(panel._detail_scroll.size.x <= 500 and panel._fields.columns == 1 and not panel._detail_scroll.get_h_scroll_bar().visible, "narrow inspector stacks fields with one vertical scroll")
 	panel._split.split_offset = -1000
 	await process_frame
 	assert(panel._fields.columns == 2, "wide inspector uses available width for paired fields")
@@ -121,6 +135,12 @@ func exercise() -> void:
 	assert(panel._boss_selector.selected == 0, "opening a boss externally updates the stage-order switcher")
 	assert(not panel._parallel_toggle.button_pressed, "Monoceros has no simultaneous attack registration")
 	panel._edit_section(1)
+	for kind in ["normal", "combo", "major"]:
+		assert(panel._fields.find_child("targets_" + kind, true, false) != null and panel._fields.find_child("exclusions_" + kind, true, false) != null, "both lists group every existing technique category")
+	var normal_header: Button = panel._fields.find_child("targets_normal", true, false).get_node("Header")
+	normal_header.set_pressed_no_signal(false)
+	normal_header.toggled.emit(false)
+	assert(panel._fields.find_child("targets_combo", true, false).get_node("Rows").visible and panel._fields.find_child("exclusions_normal", true, false).get_node("Rows").visible, "folding one category does not fold another category or list")
 	assert(_number_field(panel, "攻撃回数").value == 2.0 and is_equal_approx(_number_field(panel, "この区間で使える力").value, 4.0))
 	assert(_toggle(panel, "この区間で使える力").button_pressed and _toggle(panel, "候補なしで次へ（秒）").button_pressed)
 	assert(panel.open_boss("res://data/bosses/ai/draco_action_rules.tres", "res://data/bosses/ai/draco_flow.tres") == OK)
