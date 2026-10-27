@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="BossTechnique" format=3]
+[gd_resource type="Resource" script_class="BossTechnique" format=3 uid="uid://dyiikkcybskeg"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_c7ran"]
+[ext_resource type="Script" uid="uid://dweav7o7ej3r6" path="res://scripts/data_types/boss_technique.gd" id="1_c7ran"]
 
 [resource]
 script = ExtResource("1_c7ran")
@@ -9,18 +9,20 @@ parameters = {
 "arrow_gap": 22.0,
 "arrows_per_step": 2,
 "cd": 9.0,
-"circle_radius": 70.0,
+"circle_radius": 100.0,
 "damage": 14.0,
+"drop_delay": 0.4,
 "drop_height": 70.0,
 "fade": 0.3,
 "fall": 0.3,
-"forward": 450.0,
+"forward": 650.0,
 "linger": 0.4,
 "recover": 0.8,
 "trace_bend": 1.2,
 "trace_gap": 0.35,
 "trace_length": 900.0,
-"trace_speed": 450.0,
+"trace_speed": 1200.0,
 "traces": 4,
-"warn": 0.6
+"traces_p2": 6,
+"warn": 0.8
 }

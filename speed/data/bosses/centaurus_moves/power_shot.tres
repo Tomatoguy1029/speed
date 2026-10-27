@@ -7,11 +7,14 @@ script = ExtResource("1_c7pws")
 technique = &"power_shot"
 parameters = {
 "cd": 7.0,
+"count": 1,
+"count_p2": 3,
 "damage": 28.0,
 "alert": 0.4,
 "radius": 30.0,
 "recover": 1.5,
 "speed": 1800.0,
+"spread": 0.22,
 "travel": 1600.0,
 "warn": 1.4
 }

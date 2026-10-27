@@ -8,6 +8,8 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 @export_range(0, 40) var trial_defenders := 8
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
 @export_enum("normal", "volley", "power_shot", "rain", "rear_attack") var trial_technique := "normal"
+## 有効なら、始めてすぐ帆を広げて第2形態へ移る
+@export var trial_phase_two := false
 
 func _ready() -> void:
 	await super._ready()
@@ -21,6 +23,7 @@ func _ready() -> void:
 		var at := toward * 320.0 + toward.orthogonal() * spread
 		session.perform("spawn", {"type": "defender", "pos": [at.x, at.y]})
 	if trial_technique != "normal": _only(StringName(trial_technique))
+	if trial_phase_two: _phase_two()
 	# 画面確認用。--centaurus-capture=<png> と --centaurus-capture-at=<秒> で一枚保存して終了する。
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--centaurus-capture="): capture_path = arg.trim_prefix("--centaurus-capture=")
@@ -28,6 +31,7 @@ func _ready() -> void:
 		if arg.begins_with("--centaurus-tech="): _only(StringName(arg.trim_prefix("--centaurus-tech=")))
 		if arg == "--centaurus-pin": session.pinned = trial_ship_position
 		if arg == "--centaurus-rear": _place_behind()
+		if arg == "--centaurus-phase2": _phase_two()
 	_set_mode(3)
 	_refresh()
 
@@ -61,6 +65,11 @@ func _place_behind() -> void:
 	session.pinned = at - Vector2(220, 0)
 	session.run.state.ship_pos = session.pinned
 	session.run.state.enemy_aim = session.pinned
+
+## HPを変えずに、次の待機で第2形態へ移らせる。
+func _phase_two() -> void:
+	var actor: BossActor = session.run.bosses.actor
+	if actor != null: actor.phase_pending = true
 
 ## 編集元を変更せず、選んだ技だけが候補になる試遊用のフローにする。
 func _only(id: StringName) -> void:
