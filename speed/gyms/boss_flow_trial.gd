@@ -249,7 +249,7 @@ func _finish_manual() -> void:
 
 func _populate_moves(selected := "") -> void:
 	_phase_picker.clear()
-	for phase in (2 if _target_id == "monoceros" else 3):
+	for phase in (3 if _target_id == "draco" else 2):
 		_phase_picker.add_item("形態 %d" % (phase + 1), phase + 1)
 	_move_picker.clear()
 	if preview_actor.action_rules == null: return
@@ -330,7 +330,7 @@ func _position_for_hydra(id: String) -> void:
 
 func _return_to_ai() -> void:
 	_finish_manual()
-	if _target_id in ["monoceros", "draco"] and is_instance_valid(preview_actor):
+	if StringName(_target_id) in MANUAL.BOSSES and is_instance_valid(preview_actor):
 		manual = MANUAL.new()
 		manual.bind(preview_actor)
 	_clear_trial_input()
