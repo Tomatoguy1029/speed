@@ -212,7 +212,10 @@ func _process(_delta: float) -> void:
 		"canvas_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
 		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
 		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
-		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count()}
+		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count(),
+		"objects": Performance.get_monitor(Performance.OBJECT_COUNT), "nodes": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+		"orphans": Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), "static_mb": Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0,
+		"gems": run.pickups.gem_slots.live, "friendly": run.projectiles.friend_count(), "hazards": run.projectiles.hazard_count()}
 	for key in sim_rec:
 		var rec: Array = sim_rec[key]
 		var prev: Array = last_totals.get(key, [0, 0])
@@ -223,6 +226,14 @@ func _process(_delta: float) -> void:
 		var label: String = "draw:" + key
 		var prev: Array = last_totals.get(label, [0, 0])
 		row.drawing[key] = {"ms": (rec[0] - prev[0]) / 1000.0, "calls": rec[1] - prev[1]}
+		last_totals[label] = [rec[0], rec[1]]
+	# 表示側の処理（内訳を含む）の、このフレームの時間
+	row["view"] = {}
+	for key in view_rec:
+		var rec: Array = view_rec[key]
+		var label: String = "view:" + String(key)
+		var prev: Array = last_totals.get(label, [0, 0])
+		row.view[String(key)] = (rec[0] - prev[0]) / 1000.0
 		last_totals[label] = [rec[0], rec[1]]
 	timeline.append(row)
 	if options.get("attack", "off") == "on" and not attacked and now - start_us > 1500000:
