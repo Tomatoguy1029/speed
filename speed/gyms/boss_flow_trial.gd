@@ -275,6 +275,10 @@ func _execute_selected() -> void:
 	if preview_actor.action_rules.combos.has(id):
 		await _activate_boss(_target_id, id, _current_program_path)
 		return
+	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
+	if _target_id != "hydra" and manual == null:
+		_manual_message.text = "このボスは技を選んで実行できません。通常AIで試遊します。"
+		return
 	var started := false
 	if _target_id == "hydra":
 		started = _execute_hydra(id)
