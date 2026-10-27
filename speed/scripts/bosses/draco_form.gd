@@ -53,6 +53,36 @@ static func samples_even(points: PackedVector2Array, count: int, include_head :=
 		else: result.append(points[cursor].lerp(points[cursor + 1], (target - traversed) / maxf(0.001, lengths[cursor])))
 	return result
 
+## Retain the head's travelled route and place each body sample at a fixed arc distance.
+## The input trail runs from head to tail; a new head position extends it without moving old bends.
+static func follow_trail(trail: PackedVector2Array, head: Vector2, body_length: float, count: int) -> Dictionary:
+	if trail.size() < 2: trail = PackedVector2Array([head, head + Vector2.LEFT * body_length])
+	var previous := trail[0]
+	var distance := previous.distance_to(head)
+	if distance < 0.01 and trail.size() == count and absf(length(trail) - body_length) < body_length * 0.02:
+		return {"trail": trail, "points": trail}
+	if distance > 0.01:
+		var steps := maxi(1, ceili(distance / 24.0))
+		for step in range(1, steps + 1):
+			trail.insert(0, previous.lerp(head, float(step) / float(steps)))
+	else:
+		trail[0] = head
+	var path := PackedVector2Array([trail[0]])
+	var remaining := body_length
+	for j in range(1, trail.size()):
+		var span := path[-1].distance_to(trail[j])
+		if span < 0.001: continue
+		if span >= remaining:
+			path.append(path[-1].lerp(trail[j], remaining / span))
+			remaining = 0.0
+			break
+		path.append(trail[j])
+		remaining -= span
+	if remaining > 0.001:
+		var direction := (path[-1] - path[-2]).normalized() if path.size() > 1 else Vector2.LEFT
+		path.append(path[-1] + direction * remaining)
+	return {"trail": path, "points": samples_even(path, count)}
+
 static func draw_body(canvas: CanvasItem, points: PackedVector2Array, width: float, time: float, cosmic := false, alpha := 1.0, fractions_override := PackedFloat32Array(), batch_segments := false) -> void:
 	if points.size()<2 or alpha<=0.001: return
 	var progress := fractions_override if fractions_override.size()==points.size() else fractions(points)
@@ -142,18 +172,19 @@ static func triangle(canvas: CanvasItem, a: Vector2, b: Vector2, c: Vector2, col
 	if absf((b-a).cross(c-a))>0.01: canvas.draw_colored_polygon(PackedVector2Array([a,b,c]),color)
 
 static func draw_head(canvas: CanvasItem, scale: float, mouth_open := 0.0, light := 1.0, alpha := 1.0, offset := Vector2.ZERO) -> void:
-	canvas.draw_set_transform(offset,0.0,Vector2.ONE*scale)
+	canvas.draw_set_transform(offset,0.0,Vector2(scale * 1.12, scale * 0.72))
 	var skull := PackedVector2Array([Vector2(-80,-60),Vector2(-38,-96),Vector2(24,-91),Vector2(76,-57),Vector2(103,-23),Vector2(110,0),Vector2(92,32),Vector2(55,62),Vector2(-8,87),Vector2(-66,65),Vector2(-95,21)])
 	canvas.draw_colored_polygon(skull,faded(Color("#211d39"),alpha))
 	canvas.draw_colored_polygon(PackedVector2Array([Vector2(-76,-51),Vector2(-31,-84),Vector2(21,-78),Vector2(64,-49),Vector2(91,-20),Vector2(101,0),Vector2(75,21),Vector2(12,23),Vector2(-51,5)]),faded(Color("#77718f"),alpha))
 	canvas.draw_colored_polygon(PackedVector2Array([Vector2(-70,38),Vector2(0,58),Vector2(52,37),Vector2(91,8),Vector2(79,38),Vector2(48,64),Vector2(-8,77)]),faded(Color("#4a4567"),alpha))
 	# Swept-back horns and a brow identify a dragon without adding forelegs.
 	for side in [-1,1]:
-		canvas.draw_colored_polygon(PackedVector2Array([Vector2(-27,side*66),Vector2(-118,side*108),Vector2(-75,side*35),Vector2(-11,side*43)]),faded(Color("#625d7c"),alpha))
-		canvas.draw_line(Vector2(-107,side*94),Vector2(-26,side*59),faded(Color("#aaa1bb"),alpha),3.0,false)
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(-35,side*53),Vector2(-100,side*82),Vector2(-74,side*39),Vector2(-18,side*36)]),faded(Color("#625d7c"),alpha))
+		canvas.draw_line(Vector2(-92,side*75),Vector2(-33,side*50),faded(Color("#aaa1bb"),alpha),3.0,false)
 		canvas.draw_colored_polygon(PackedVector2Array([Vector2(18,side*36),Vector2(60,side*20),Vector2(75,side*30),Vector2(33,side*46)]),faded(Color("#19162a"),alpha))
 		canvas.draw_line(Vector2(32,side*33),Vector2(61,side*27),faded(Color(1.0,0.13,0.32,light),alpha),7.0,false)
 		canvas.draw_line(Vector2(31,side*30),Vector2(59,side*25),faded(Color(1.0,0.67,0.8,light),alpha),2.0,false)
+		canvas.draw_circle(Vector2(83,side*13),4.0,faded(Color("#211d39"),alpha))
 	var jaw := 7.0+mouth_open*29.0
 	canvas.draw_colored_polygon(PackedVector2Array([Vector2(29,-jaw),Vector2(103,-jaw*0.5),Vector2(110,jaw*0.35),Vector2(33,jaw)]),faded(Color("#090a19"),alpha))
 	for side in [-1,1]:

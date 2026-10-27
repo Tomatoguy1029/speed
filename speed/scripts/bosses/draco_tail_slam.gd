@@ -14,8 +14,8 @@ func _pose(a: BossActor, tip: Vector2) -> PackedVector2Array:
 	var side := backward.orthogonal()
 	var control1 := origin+backward*float(a.def.params.get("body_length",1500.0))*0.7
 	var control2 := tip+backward*220.0+side*float(a.def.params.get("body_length",1500.0))*0.35
-	for j in 33:
-		var t := float(j)/32.0
+	for j in a.body_segments + 1:
+		var t := float(j) / float(a.body_segments)
 		points.append(origin*(1.0-t)*(1.0-t)*(1.0-t)+control1*3.0*(1.0-t)*(1.0-t)*t+control2*3.0*(1.0-t)*t*t+tip*t*t*t)
 	return MOTION.fit_spine(points,base,true)
 func begin(a: BossActor) -> void:

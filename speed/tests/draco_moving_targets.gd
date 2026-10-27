@@ -17,6 +17,7 @@ func _ready() -> void:
 			for dodge in [false,true]:
 				a.cancel_attack();a.cycle.cancel();sim.projectiles.clear_hostile()
 				a.table.pos[a.body]=Vector2.ZERO;a.table.facing[a.body]=angle
+				a.body_trail.clear();a.body_pose.clear();a.reset_pose()
 				sim.state.phase=RunState.Phase.PLAY;sim.state.ship_hp=10000.0;sim.state.ship_invuln=0.0
 				sim.state.ship_pos=Vector2.from_angle(angle)*(300.0 if id==&"bite" else 600.0)
 				sim.state.ship_vel=Vector2.from_angle(angle).orthogonal()*500.0
@@ -24,9 +25,10 @@ func _ready() -> void:
 				a.start_attack(id)
 				var changed := false
 				var lock := Vector2.ZERO
-				for frame in 420:
+				for frame in 600:
 					var t := frame/120.0
-					if t>0.35 and not changed:
+					var commit: bool = (a._driver != null and bool(a._driver.locked)) if id in [&"charge",&"leap"] else t>0.35
+					if commit and not changed:
 						changed=true;lock=a.aim
 						if dodge:sim.state.ship_vel=-sim.state.ship_vel*2.0
 					if changed and a.mode==&"windup":check(a.aim.distance_to(lock)<1.0,"committed target no longer homes: %s" % id)
@@ -36,6 +38,7 @@ func _ready() -> void:
 					sim.projectiles.tick(1.0/120.0,1.0/120.0)
 				var hit := sim.state.ship_hp<10000.0
 				print("[moving] ",id," angle=",angle," reverse=",dodge," hit=",hit)
+				check(changed,"予告照準を確定する: %s" % id)
 				check(hit!=dodge,"steady cruise is threatened; direction change dodges: %s %s reverse%s" % [id,angle,dodge])
 	# 最小射程250でも、口先の前に現れた中央弾が停止機体へ届く。
 	a.cancel_attack();a.table.pos[a.body]=Vector2.ZERO;sim.projectiles.clear_hostile()

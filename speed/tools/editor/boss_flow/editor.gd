@@ -41,8 +41,12 @@ var _probability_previous := ""
 var _scale := 1.0
 var _file_dialog := FileDialog.new()
 const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
+const SPIRAL_FIELDS := preload("res://tools/editor/boss_flow/technique_fields.gd")
+const SPIRAL_LABELS := SPIRAL_FIELDS.SPIRAL_LABELS
+const SPIRAL_TIPS := SPIRAL_FIELDS.SPIRAL_TIPS
+const SPIRAL_BOUNDS := SPIRAL_FIELDS.SPIRAL_BOUNDS
 const BOSS_IDS := ["hydra", "monoceros", "draco", "centaurus", "canis_major"]
-const PARAM_LABELS := {"radius_factor":"螺旋の半径倍率","body_ratio":"螺旋の胴体幅（画面短辺比）","head_scale":"頭の拡大倍率","coil_turns":"胴体の巻き数","first_lap":"1周目の時間（秒）","second_lap":"2周目の時間（秒）","pause":"巻き終わりの停止（秒）","shrink_time":"収縮と離脱（秒）","clone_stars":"複製1体の星数（仮）","warn": "予告（秒）", "active": "実行時間（秒）", "recover": "技後の待ち（秒）", "cd": "再使用待ち（秒）", "damage": "ダメージ", "distance": "移動距離", "reach": "届く長さ", "arc": "薙ぐ角度（rad）", "normal_charge": "予備動作（秒）", "normal_hold": "攻撃後の停止（秒）", "attack_cd": "技後の待ち（秒）", "normal_lunge": "踏み込み時間（秒）", "warning_time": "予告（秒）", "performance_time": "実行時間（秒）", "tech_recovery": "技後の全体待ち（秒）", "cooldown": "再使用待ち（秒）", "sweep_time": "薙ぎ時間（秒）", "sweep_reach": "薙ぎの長さ", "sweep_arc": "薙ぎの角度（rad）", "aim_tracking": "標的位置を追う時間（秒）", "count": "矢の数", "interval": "矢の間隔（秒）", "speed": "矢の速さ", "radius": "矢の半径", "travel": "矢の射程", "alert": "発射前の警告（秒）", "traces": "トレースの回数", "forward": "前方への距離", "circle_radius": "円の半径", "trace_length": "トレースの長さ", "trace_speed": "トレースの速さ", "trace_bend": "曲がり具合（rad）", "trace_gap": "トレースの間隔（秒）", "drop_delay": "円が通ってから矢を落とし始めるまで（秒）", "fall": "矢が降りる時間（秒）", "fade": "矢が不透明になる時間（秒）", "drop_height": "矢が降りる高さ", "arrow_gap": "矢を落とす間隔（距離）", "arrows_per_step": "一度に落とす矢の数", "linger": "刺さった矢が残る時間（秒）", "back_offset": "背中から範囲の中心までの距離", "range_radius": "攻撃範囲の半径", "lock": "狙いを固定する時間（秒）", "overshoot": "着地点の先までの距離", "lunge_speed": "猟犬が飛び出す速さ", "lunge_time": "猟犬が飛び出す時間（秒）", "min_hounds": "号令に要る猟犬の数", "alone_hounds": "群れが少ないとみなす猟犬の数", "cd_alone": "群れが少ないときの再使用待ち（秒）", "beam_length": "光の長さ", "beam_width": "光の太さ", "beam_time": "光を出す時間（秒）", "ring_count": "囲みの猟犬の数", "ring_radius": "囲みの始めの半径", "ring_close": "囲みの終わりの半径", "gather_time": "囲みに並ぶ時間（秒）", "close_time": "囲みを狭める時間（秒）", "gaps": "薄い所の数", "gap_slots": "薄い所で抜く猟犬の数", "summon_max": "呼び足す猟犬の上限", "spawn_out": "呼んだ猟犬が出る輪の外の距離", "catch_up": "囲みへ走る速さの倍率"}
+const PARAM_LABELS := SPIRAL_FIELDS.PARAM_LABELS
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -921,6 +925,7 @@ func _refresh() -> void:
 		_fields.remove_child(child)
 		child.queue_free()
 	for key in current.parameters:
+		if current.technique == &"spiral" and key == "warn": continue
 		if key=="arcs":
 			_append_arcs()
 			continue
@@ -928,15 +933,17 @@ func _refresh() -> void:
 		var label := Label.new()
 		# 第2形態の値は、同じ名前の値の表示名に形態を添える。
 		var base_key := String(key).trim_suffix("_p2")
-		var description: Array = BossDef.PARAMS_DOCS.get(base_key, [])
-		label.text = PARAM_LABELS.get(base_key, description[0] if not description.is_empty() else base_key)
-		if base_key != String(key): label.text += "（第2形態）"
-		if description.size() > 1: label.tooltip_text = description[1]
+		label.text = SPIRAL_FIELDS.label_for(current, String(key))
+		label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
 		_fields.add_child(label)
 		var field := SpinBox.new()
 		field.min_value = 0
 		field.max_value = 100000
+		if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
+			field.min_value = SPIRAL_BOUNDS[base_key].x
+			field.max_value = SPIRAL_BOUNDS[base_key].y
 		field.step = 1 if current.parameters[key] is int else 0.01
+		field.tooltip_text = label.tooltip_text
 		field.value = float(current.parameters[key])
 		field.set_meta("key", key)
 		field.value_changed.connect(func(value): set_value(key, value))

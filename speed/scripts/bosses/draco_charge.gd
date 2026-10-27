@@ -1,18 +1,16 @@
 ## 頭の星を集め、画面外の入口から固定した進路を貫く。歯先の掃引が予告と一致する。
 extends RefCounted
 const MOTION = preload("res://scripts/bosses/draco_attack_motion.gd")
+const STAGING = preload("res://scripts/bosses/draco_screen_staging.gd")
+var staging: Dictionary
 var origin := Vector2.ZERO
 var destination := Vector2.ZERO
-var entry := Vector2.ZERO
+var positioned := false
 var locked := false
 var settled := Vector2.ZERO
 func begin(a: BossActor) -> void:
-	entry=a.table.pos[a.body]
-	var radial: Vector2=entry-a.run_state.view_center
-	if radial.length()<1.0:radial=Vector2.LEFT.rotated(a.table.facing[a.body])
-	var distance := maxf(850.0,a.run_state.view_half.length()+260.0)
-	origin=a.run_state.view_center+radial.normalized()*distance
-	_lock(a)
+	var side := -1.0 if a.run_state.rng.randf() < 0.5 else 1.0
+	staging=STAGING.begin(a,side,false)
 	locked=false
 func _lock(a: BossActor) -> void:
 	var remaining := maxf(0.0,float(a.rule().warn)-a.elapsed)
@@ -30,8 +28,13 @@ func _lock(a: BossActor) -> void:
 	destination=a.aim+a.direction*float(a.rule().get("overshoot",260.0))
 	MOTION.line_tell(a,origin+a.direction*105.0*a.head_scale,destination+a.direction*105.0*a.head_scale,float(a.rule().width))
 func windup(a: BossActor,_dt: float) -> void:
+	if not STAGING.advance_full(a,staging,_dt): return
+	if not positioned:
+		origin = a.table.pos[a.body]
+		positioned = true
+		_lock(a)
+		a.combat_trace.stage("telegraph")
 	var setup_time := minf(0.2,float(a.rule().warn)*0.3)
-	a.table.pos[a.body]=entry.lerp(origin,MOTION.smooth(a.elapsed/setup_time))
 	if not locked:
 		_lock(a)
 		locked=a.elapsed>=setup_time

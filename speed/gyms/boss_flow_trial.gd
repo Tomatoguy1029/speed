@@ -3,6 +3,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 
 const MANUAL := preload("res://gyms/boss_technique_debug.gd")
 const TECHNIQUE_GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
+const TECHNIQUE_FIELDS := preload("res://tools/editor/boss_flow/technique_fields.gd")
 
 var preview_actor: BossActor
 var manual: RefCounted
@@ -18,6 +19,20 @@ var _manual_message: Label
 var _technique_row: Control
 var _switching := false
 var _switch_serial := 0
+var _tuning_panel: PanelContainer
+var _tuning_toggle: Button
+var _tuning_title: Label
+var _tuning_status: Label
+var _tuning_save_button: Button
+var _tuning_fields: VBoxContainer
+var _tuning_revert_dialog: ConfirmationDialog
+var _drafts := {}
+var _saved := {}
+var _source_paths := {}
+var _source_hashes := {}
+var _rules_paths := {}
+var _rules_hashes := {}
+var _prefer_preview_values := false
 
 func _ready() -> void:
 	await super._ready()
@@ -43,7 +58,7 @@ func _build_trial_ui() -> void:
 	layout.move_child(panel, workspace._vertical_split.get_index())
 	var target_row := HFlowContainer.new()
 	panel.add_child(target_row)
-	_label(target_row, "試遊対象")
+	_label(target_row, "敵・ボス")
 	_target_picker = OptionButton.new()
 	_target_picker.custom_minimum_size.x = 180
 	_target_picker.fit_to_longest_item = false
@@ -62,29 +77,412 @@ func _build_trial_ui() -> void:
 		_target_picker.set_item_metadata(index, {"id": String(def.id), "boss": true})
 	target_row.add_child(_target_picker)
 	_target_picker.item_selected.connect(_switch_target)
-	_technique_row = HFlowContainer.new()
-	panel.add_child(_technique_row)
-	_label(_technique_row, "ボス技")
+	_technique_row = HBoxContainer.new()
+	target_row.add_child(_technique_row)
 	_phase_picker = OptionButton.new()
+	_phase_picker.tooltip_text = "ボスの形態"
 	_technique_row.add_child(_phase_picker)
 	_move_picker = OptionButton.new()
 	_move_picker.custom_minimum_size.x = 190
 	_move_picker.fit_to_longest_item = false
 	_move_picker.clip_text = true
+	_move_picker.tooltip_text = "実行するボス技"
 	_technique_row.add_child(_move_picker)
-	_execute = _button(_technique_row, "選択した技を実行", _execute_selected)
+	_move_picker.item_selected.connect(func(_index): _manual_message.hide(); _refresh_tuning_selection())
+	_phase_picker.item_selected.connect(func(_index): _manual_message.hide())
+	_execute = _button(_technique_row, "技を再生", _execute_selected)
 	_button(_technique_row, "通常AIへ戻す", _return_to_ai)
-	_manual_status = _label(panel, "")
-	_manual_message = _label(panel, "")
-	for label in [_manual_status, _manual_message]:
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tuning_toggle = _button(_technique_row, "技を調整", _toggle_tuning_panel)
+	_tuning_toggle.tooltip_text = "選択した技の値を画面を見ながら調整します。次の再生から反映します。"
+	_tuning_toggle.hide()
+	_manual_status = _label(target_row, "")
+	_manual_message = _label(target_row, "")
+	_manual_message.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_manual_message.custom_minimum_size.x = 0
 	_technique_row.hide()
 	_manual_status.hide()
 	_manual_message.hide()
+	_build_tuning_panel()
+
+func _build_tuning_panel() -> void:
+	_tuning_panel = PanelContainer.new()
+	_tuning_panel.custom_minimum_size.x = 316
+	_tuning_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace._right_dock.add_child(_tuning_panel)
+	_tuning_panel.hide()
+	var body := VBoxContainer.new()
+	_tuning_panel.add_child(body)
+	_tuning_title = _label(body, "技の調整")
+	_tuning_title.add_theme_font_size_override("font_size", 17)
+	var hint := _label(body, "値を変えたら「技を再生」で確認")
+	hint.tooltip_text = "進行中の技には途中から反映しません。次の再生で新しい値を使います。"
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(scroll)
+	_tuning_fields = VBoxContainer.new()
+	_tuning_fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_tuning_fields)
+	var actions := HBoxContainer.new()
+	body.add_child(actions)
+	_tuning_save_button = _button(actions, "変更を保存", _save_tuning)
+	_button(actions, "元に戻す", _request_tuning_revert)
+	_tuning_status = _label(body, "")
+	_tuning_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tuning_revert_dialog = ConfirmationDialog.new()
+	_tuning_revert_dialog.title = "技の変更を元に戻す"
+	_tuning_revert_dialog.dialog_text = "選択した技の未保存の変更を破棄し、保存済みの値を読み直しますか？"
+	_tuning_revert_dialog.confirmed.connect(_revert_tuning)
+	_tuning_panel.add_child(_tuning_revert_dialog)
+
+func _source_move(boss: String, id: String) -> Resource:
+	var path := "res://data/bosses/ai/%s_action_rules.tres" % boss
+	var rules: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if rules == null or not rules.get("techniques") is Array: return null
+	for move: Resource in rules.techniques:
+		if String(move.technique) == id: return move
+	return null
+
+func _rules_path(boss: String) -> String:
+	return "res://data/bosses/ai/%s_action_rules.tres" % boss
+
+func _capture_conditions(rules: Resource, id: String) -> Dictionary:
+	var values := {}
+	if rules == null or not rules.get("conditions") is Dictionary: return values
+	var gate: Dictionary = rules.conditions.get(id, {})
+	for field in ["min", "max", "angle", "half_angle"]:
+		if gate.get(field) is float or gate.get(field) is int:
+			values["condition_" + field] = gate[field]
+	return values
+
+func _normalize_preview_program(program: Resource, boss: String) -> String:
+	var rules: Resource = program.data.rules
+	var source_rules: Resource = ResourceLoader.load("res://data/bosses/ai/%s_action_rules.tres" % boss, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if source_rules == null or not source_rules.get("techniques") is Array: return "保存済みの技定義を読めません。"
+	var sources := {}
+	for source: Resource in source_rules.techniques: sources[String(source.technique)] = source
+	for move: Resource in rules.techniques:
+		var id := String(move.technique)
+		if not sources.has(id): return "技の保存元がありません: " + id
+		var source: Resource = sources[id]
+		if not source.get("parameters") is Dictionary or not move.get("parameters") is Dictionary:
+			return "技の値が壊れています: " + id
+		for required in TECHNIQUE_FIELDS.REQUIRED.get(id, []):
+			if not source.parameters.has(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
+		var values: Dictionary = move.parameters.duplicate(true)
+		for key in source.parameters:
+			if not values.has(key): values[key] = source.parameters[key]
+		move.parameters = values
+	return ""
+
+func _capture_editable(move: Resource) -> Dictionary:
+	var values := {}
+	for key in TECHNIQUE_FIELDS.editable_keys(move): values[key] = move.parameters[key]
+	if move.parameters.get("arcs") is Array:
+		var arcs := []
+		for arc: Resource in move.parameters.arcs:
+			arcs.append({"offset_x": arc.offset.x, "offset_y": arc.offset.y,
+				"radius": arc.radius, "angle_degrees": arc.angle_degrees,
+				"spread_degrees": arc.spread_degrees, "count": arc.count})
+		values["arcs"] = arcs
+	return values
+
+func _move_key(boss: String, id: String) -> String:
+	return boss + "/" + id
+
+func _selected_technique() -> String:
+	return String(_move_picker.get_selected_metadata()) if _move_picker != null and _move_picker.selected >= 0 else ""
+
+func _current_tuning_key() -> String:
+	return _move_key(_target_id, _selected_technique())
+
+func _tuning_dirty(key: String) -> bool:
+	return _drafts.has(key) and _drafts[key] != _saved[key]
+
+func _first_dirty_key() -> String:
+	for key in _drafts:
+		if _tuning_dirty(key): return key
+	return ""
+
+func _ensure_tuning_state(boss: String, id: String, preview_move: Resource = null) -> bool:
+	var key := _move_key(boss, id)
+	if _drafts.has(key): return true
+	var source: Resource = _source_move(boss, id)
+	if source == null or not source.get("parameters") is Dictionary:
+		_tuning_status.text = "技の保存元を開けません: " + key
+		return false
+	var path := source.resource_path
+	if path.is_empty() or "::" in path or not path.begins_with("res://"):
+		_tuning_status.text = "この技には単独の保存先がありません: " + key
+		return false
+	var saved := _capture_editable(source)
+	var rules_path := _rules_path(boss)
+	var source_rules: Resource = ResourceLoader.load(rules_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if source_rules == null:
+		_tuning_status.text = "技の発動条件を開けません: " + key
+		return false
+	saved.merge(_capture_conditions(source_rules, id))
+	if saved.is_empty():
+		_tuning_status.text = "この技に調整できる数値がありません: " + key
+		return false
+	var draft: Dictionary = saved.duplicate(true)
+	if _prefer_preview_values and preview_move != null:
+		var preview_values := _capture_editable(preview_move)
+		preview_values.merge(_capture_conditions(preview_actor.action_rules, id))
+		for field in saved:
+			if preview_values.has(field): draft[field] = preview_values[field]
+	_saved[key] = saved
+	_drafts[key] = draft
+	_source_paths[key] = path
+	_source_hashes[key] = FileAccess.get_sha256(path)
+	_rules_paths[key] = rules_path
+	_rules_hashes[key] = FileAccess.get_sha256(rules_path)
+	return true
+
+func _selected_move() -> Resource:
+	if not is_instance_valid(preview_actor): return null
+	var id := _selected_technique()
+	if id.is_empty() or preview_actor.action_rules.combos.has(id): return null
+	return preview_actor._moves.get(StringName(id))
+
+func _refresh_tuning_selection() -> void:
+	if _tuning_toggle == null: return
+	var move := _selected_move()
+	_tuning_toggle.visible = _target_boss and move != null
+	if move == null:
+		workspace.hide_tuning()
+		return
+	var key := _current_tuning_key()
+	if not _ensure_tuning_state(_target_id, _selected_technique(), move):
+		_tuning_toggle.disabled = true
+		_tuning_toggle.tooltip_text = _tuning_status.text
+		workspace.hide_tuning()
+		return
+	_tuning_toggle.disabled = false
+	_tuning_title.text = TECHNIQUE_GRAPH.title_for(_selected_technique()) + "を調整"
+	_rebuild_tuning_fields(key, move)
+	_update_tuning_status(key)
+
+func _rebuild_tuning_fields(key: String, move: Resource) -> void:
+	for child in _tuning_fields.get_children():
+		_tuning_fields.remove_child(child)
+		child.queue_free()
+	var draft: Dictionary = _drafts[key]
+	for field in ["min", "max", "angle", "half_angle"]:
+		var condition: String = "condition_" + field
+		if not draft.has(condition): continue
+		var bounds := Vector2(-180.0, 180.0) if field == "angle" else Vector2(0.0, 180.0) if field == "half_angle" else Vector2(0.0, 100000.0)
+		var title: String = {"min": "発動の最小距離", "max": "発動の最大距離", "angle": "発動の中心角度", "half_angle": "発動の左右角度"}[field]
+		_add_tuning_field(title, float(draft[condition]), bounds, 0.01, "この技を発動する自機との位置・方向の条件です。", _change_tuning_value.bind(key, condition))
+	for field in TECHNIQUE_FIELDS.editable_keys(move):
+		if not draft.has(field): continue
+		var bounds: Vector2 = TECHNIQUE_FIELDS.bounds_for(move, field)
+		var step := 1.0 if move.parameters[field] is int else 0.01
+		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), float(draft[field]), bounds, step,
+			TECHNIQUE_FIELDS.tip_for(move, field), _change_tuning_value.bind(key, field))
+	if draft.has("arcs"):
+		var arcs: Array = draft.arcs
+		for index in arcs.size():
+			var heading := HBoxContainer.new()
+			_tuning_fields.add_child(heading)
+			_label(heading, "彗星弾の弧 %d" % (index + 1))
+			_button(heading, "削除", _remove_tuning_arc.bind(key, index))
+			for field in TECHNIQUE_FIELDS.ARC_KEYS:
+				_add_tuning_field(TECHNIQUE_FIELDS.ARC_LABELS[field], float(arcs[index][field]),
+					TECHNIQUE_FIELDS.arc_bounds(field), 1.0 if field == "count" else 0.01,
+					"彗星弾の弧 %d の%s" % [index + 1, TECHNIQUE_FIELDS.ARC_LABELS[field]],
+					_change_tuning_arc.bind(key, index, field))
+		_button(_tuning_fields, "弧を追加", _add_tuning_arc.bind(key))
+
+func _add_tuning_field(label_text: String, value: float, bounds: Vector2, step: float, tip: String, changed: Callable) -> void:
+	var row := HBoxContainer.new()
+	_tuning_fields.add_child(row)
+	var caption := _label(row, label_text)
+	caption.custom_minimum_size.x = 183
+	caption.clip_text = true
+	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	caption.tooltip_text = tip
+	var input := SpinBox.new()
+	input.custom_minimum_size.x = 91
+	input.min_value = bounds.x
+	input.max_value = bounds.y
+	input.step = step
+	input.tooltip_text = tip
+	input.value = value
+	input.value_changed.connect(changed)
+	row.add_child(input)
+
+func _change_tuning_value(value: float, key: String, field: String) -> void:
+	var draft: Dictionary = _drafts[key]
+	draft[field] = int(value) if _saved[key][field] is int else value
+	_drafts[key] = draft
+	_update_tuning_status(key)
+
+func _change_tuning_arc(value: float, key: String, index: int, field: String) -> void:
+	var draft: Dictionary = _drafts[key]
+	var arcs: Array = draft.arcs
+	var arc: Dictionary = arcs[index]
+	arc[field] = int(value) if field == "count" else value
+	arcs[index] = arc
+	draft.arcs = arcs
+	_drafts[key] = draft
+	_update_tuning_status(key)
+
+func _add_tuning_arc(key: String) -> void:
+	var draft: Dictionary = _drafts[key]
+	var arcs: Array = draft.arcs
+	var arc: Resource = preload("res://scripts/bosses/draco_exhale_arc.gd").new()
+	arcs.append({"offset_x": arc.offset.x, "offset_y": arc.offset.y,
+		"radius": arc.radius, "angle_degrees": arc.angle_degrees,
+		"spread_degrees": arc.spread_degrees, "count": arc.count})
+	draft.arcs = arcs
+	_drafts[key] = draft
+	_rebuild_tuning_fields(key, _selected_move())
+	_update_tuning_status(key)
+
+func _remove_tuning_arc(key: String, index: int) -> void:
+	var draft: Dictionary = _drafts[key]
+	var arcs: Array = draft.arcs
+	arcs.remove_at(index)
+	draft.arcs = arcs
+	_drafts[key] = draft
+	_rebuild_tuning_fields(key, _selected_move())
+	_update_tuning_status(key)
+
+func _update_tuning_status(key: String) -> void:
+	_tuning_save_button.disabled = not _tuning_dirty(key)
+	_tuning_toggle.text = "技を調整（未保存）" if _tuning_dirty(key) else "技を調整"
+	_tuning_toggle.tooltip_text = "未保存の変更は次の再生から反映します。" if _tuning_dirty(key) else "選択した技の値を画面を見ながら調整します。"
+	_tuning_status.text = "未保存。次の再生から反映します。" if _tuning_dirty(key) else "保存済みの値です。"
+	_tuning_save_button.tooltip_text = String(_source_paths[key]) + " に保存します。"
+
+func _toggle_tuning_panel() -> void:
+	if _tuning_panel.visible: workspace.hide_tuning()
+	else: workspace.show_tuning(_tuning_panel)
+
+func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
+	var copy: Resource = move.duplicate(true)
+	var values: Dictionary = copy.parameters.duplicate(true)
+	for field in draft:
+		if field.begins_with("condition_"): continue
+		if field == "arcs":
+			var previous: Array = values.get("arcs", [])
+			var arcs := []
+			for index in draft.arcs.size():
+				var arc: Resource = previous[index].duplicate(true) if index < previous.size() else preload("res://scripts/bosses/draco_exhale_arc.gd").new()
+				var entry: Dictionary = draft.arcs[index]
+				arc.offset = Vector2(entry.offset_x, entry.offset_y)
+				for property in ["radius", "angle_degrees", "spread_degrees", "count"]: arc.set(property, entry[property])
+				arcs.append(arc)
+			values.arcs = arcs
+		else: values[field] = draft[field]
+	copy.parameters = values
+	return copy
+
+func _apply_tuning_preview() -> void:
+	var move := _selected_move()
+	var key := _current_tuning_key()
+	if move == null or not _drafts.has(key): return
+	var copy := _move_with_draft(move, _drafts[key])
+	preview_actor._moves[StringName(_selected_technique())] = copy
+	for index in preview_actor.action_rules.techniques.size():
+		if String(preview_actor.action_rules.techniques[index].technique) == _selected_technique():
+			preview_actor.action_rules.techniques[index] = copy
+	var gate: Dictionary = preview_actor.action_rules.conditions.get(_selected_technique(), {}).duplicate(true)
+	for field in ["min", "max", "angle", "half_angle"]:
+		if _drafts[key].has("condition_" + field): gate[field] = _drafts[key]["condition_" + field]
+	preview_actor.action_rules.conditions[_selected_technique()] = gate
+
+func _save_tuning() -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and _tuning_panel.is_ancestor_of(focus): focus.release_focus()
+	var key := _current_tuning_key()
+	if not _tuning_dirty(key): return
+	var path: String = _source_paths[key]
+	if FileAccess.get_sha256(path) != _source_hashes[key] or FileAccess.get_sha256(_rules_paths[key]) != _rules_hashes[key]:
+		_tuning_status.text = "外部でこの技の設定が変わりました。保存を止めました。"
+		return
+	var draft: Dictionary = _drafts[key]
+	if draft.has("condition_min") and draft.has("condition_max") and float(draft.condition_min) > float(draft.condition_max):
+		_tuning_status.text = "発動の最小距離が最大距離を超えています。"
+		return
+	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if move == null or not move.get("parameters") is Dictionary:
+		_tuning_status.text = "保存用の技の設定を開けません。"
+		return
+	var saved: Resource = _move_with_draft(move, _drafts[key])
+	var rules: Resource = ResourceLoader.load(_rules_paths[key], "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if rules == null:
+		_tuning_status.text = "発動条件を保存用に開けません。"
+		return
+	var id := _selected_technique()
+	var gate: Dictionary = rules.conditions.get(id, {}).duplicate(true)
+	var condition_changed := false
+	var move_changed := false
+	for field in draft:
+		if not String(field).begins_with("condition_") and draft[field] != _saved[key][field]: move_changed = true
+	for field in ["min", "max", "angle", "half_angle"]:
+		if draft.has("condition_" + field):
+			gate[field] = draft["condition_" + field]
+			condition_changed = condition_changed or draft["condition_" + field] != _saved[key]["condition_" + field]
+	if condition_changed:
+		rules.conditions[id] = gate
+		var rules_error := ResourceSaver.save(rules, _rules_paths[key])
+		if rules_error != OK:
+			_tuning_status.text = "発動条件を保存できません: " + error_string(rules_error)
+			return
+	if move_changed:
+		var error := ResourceSaver.save(saved, path)
+		if error != OK:
+			_tuning_status.text = "技の値を保存できません: " + error_string(error)
+			return
+	_saved[key] = _drafts[key].duplicate(true)
+	_source_hashes[key] = FileAccess.get_sha256(path)
+	_rules_hashes[key] = FileAccess.get_sha256(_rules_paths[key])
+	_update_tuning_status(key)
+	_tuning_status.text = "保存しました。次の再生から反映します。"
+
+func _request_tuning_revert() -> void:
+	if _tuning_dirty(_current_tuning_key()): _tuning_revert_dialog.popup_centered()
+	else: _revert_tuning()
+
+func _revert_tuning() -> void:
+	var key := _current_tuning_key()
+	if not _source_paths.has(key): return
+	var path: String = _source_paths[key]
+	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if move == null or not move.get("parameters") is Dictionary:
+		_tuning_status.text = "保存済みの技を読み直せません。"
+		return
+	var values := _capture_editable(move)
+	var rules: Resource = ResourceLoader.load(_rules_paths[key], "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if rules == null:
+		_tuning_status.text = "保存済みの発動条件を読み直せません。"
+		return
+	values.merge(_capture_conditions(rules, _selected_technique()))
+	_saved[key] = values
+	_drafts[key] = values.duplicate(true)
+	_source_hashes[key] = FileAccess.get_sha256(path)
+	_rules_hashes[key] = FileAccess.get_sha256(_rules_paths[key])
+	_rebuild_tuning_fields(key, _selected_move())
+	_update_tuning_status(key)
+	_tuning_status.text = "保存済みの値を読み直しました。次の再生から反映します。"
 
 func _switch_target(index: int) -> void:
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus != null and _tuning_panel.is_ancestor_of(focus): focus.release_focus()
 	var target: Dictionary = _target_picker.get_item_metadata(index)
 	var id := String(target.get("id", ""))
+	var dirty := _first_dirty_key()
+	if not dirty.is_empty() and (id != _target_id or not bool(target.get("boss", false))):
+		_select_target(_target_id, _target_boss)
+		for move_index in _move_picker.item_count:
+			if String(_move_picker.get_item_metadata(move_index)) == dirty.get_slice("/", 1):
+				_move_picker.select(move_index)
+				break
+		_refresh_tuning_selection()
+		workspace.show_tuning(_tuning_panel)
+		_tuning_status.text = "未保存の技があります。保存か「元に戻す」を選んでください。"
+		return
 	if id.is_empty():
 		await _activate_enemy_mode()
 	elif not target.get("boss", false):
@@ -102,6 +500,8 @@ func _activate_enemy_mode() -> void:
 	_technique_row.hide()
 	_manual_status.hide()
 	_manual_message.hide()
+	workspace.hide_tuning()
+	_tuning_toggle.hide()
 	await session.reset()
 	_target_picker.select(0)
 	_set_mode(1)
@@ -120,6 +520,8 @@ func _activate_enemy(id: String) -> void:
 	_technique_row.hide()
 	_manual_status.hide()
 	_manual_message.hide()
+	workspace.hide_tuning()
+	_tuning_toggle.hide()
 	await session.reset({"empty": true, "stage": int(session.spec.get("stage", 1)), "invincible": true,
 		"director": {"enabled": false}})
 	if serial != _switch_serial: return
@@ -131,10 +533,14 @@ func _activate_enemy(id: String) -> void:
 	_refresh()
 
 func _activate_boss(id: String, selected := "", preview_program := "") -> void:
-	if not ContentManager.bosses.has(StringName(id)): return
+	if not ContentManager.bosses.has(StringName(id)):
+		_manual_message.text = "登録されていないボスです: " + id
+		_manual_message.show()
+		return
 	_switch_serial += 1
 	var serial := _switch_serial
 	_switching = true
+	workspace.hide_tuning()
 	_finish_manual()
 	_target_id = ""
 	_target_boss = false
@@ -165,6 +571,12 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 		_manual_message.show()
 		_switching = false
 		return
+	var data_error := _normalize_preview_program(program, id)
+	if not data_error.is_empty():
+		_manual_message.text = data_error
+		_manual_message.show()
+		_switching = false
+		return
 	var combo_request: bool = not selected.is_empty() and program.data.rules.combos.has(selected)
 	if combo_request: _single_candidate_program(program, selected)
 	session.perform("boss", {"type": id, "pos": [0, 0]})
@@ -173,6 +585,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 		_switching = false
 		return
 	preview_actor.configure_flow(program)
+	_prefer_preview_values = not preview_program.is_empty() and not path.ends_with("boss_%s.tres" % id)
 	if combo_request and id == "monoceros": _prepare_monoceros_combo(program.data.rules, selected)
 	_current_program_path = path
 	if id != "hydra":
@@ -183,15 +596,16 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	_select_target(id, true)
 	_populate_moves(selected)
 	_technique_row.visible = id == "hydra" or manual != null
-	_manual_status.visible = _technique_row.visible
-	_manual_message.visible = _technique_row.visible
+	_manual_status.hide()
+	_manual_message.hide()
 	_phase_picker.visible = id != "hydra"
-	_manual_message.text = "選択した技を実行できます。変更は試遊中だけです。" if _technique_row.visible else "このボスは通常AIで試遊できます。"
+	_refresh_tuning_selection()
+	_execute.tooltip_text = "選択した技を最初から再生します。変更は試遊中だけです。"
 	_switching = false
 	_set_mode(3)
 	_refresh()
 	if not selected.is_empty() and not combo_request: _execute_selected()
-	elif combo_request: _manual_message.text = "選択コンボを通常AIで再生中: " + selected
+	elif combo_request: _manual_message.hide()
 
 func _select_target(id: String, boss: bool) -> void:
 	for index in _target_picker.item_count:
@@ -272,12 +686,17 @@ func _execute_selected() -> void:
 	if _switching or _move_picker.selected < 0 or not is_instance_valid(preview_actor): return
 	_clear_trial_input()
 	var id := String(_move_picker.get_selected_metadata())
+	if _target_boss and not preview_actor.action_rules.combos.has(id):
+		var focus := get_viewport().gui_get_focus_owner()
+		if focus != null and _tuning_panel.is_ancestor_of(focus): focus.release_focus()
+		_apply_tuning_preview()
 	if preview_actor.action_rules.combos.has(id):
 		await _activate_boss(_target_id, id, _current_program_path)
 		return
 	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
 	if _target_id != "hydra" and manual == null:
-		_manual_message.text = "このボスは技を選んで実行できません。通常AIで試遊します。"
+		_manual_message.text = "この技は手動再生できません。"
+		_manual_message.show()
 		return
 	var started := false
 	if _target_id == "hydra":
@@ -286,9 +705,10 @@ func _execute_selected() -> void:
 		started = manual.execute(id, _phase_picker.get_selected_id())
 	if started:
 		session.playing = true
-		_manual_message.text = "実行: " + id
+		_manual_message.hide()
 	else:
 		_manual_message.text = "実行できません: " + id if _target_id == "hydra" else manual.message
+		_manual_message.show()
 
 func _execute_hydra(id: String) -> bool:
 	var actor = preview_actor
@@ -303,10 +723,14 @@ func _execute_hydra(id: String) -> bool:
 	_position_for_hydra(id)
 	var move: Resource = actor._moves.get(StringName(id))
 	if move == null: return false
+	var started := false
 	if move.head_kind != &"":
 		var neck = actor._first(move.head_kind)
-		return neck != null and actor.start_normal(actor.necks.find(neck), StringName(id))
-	return actor.try_start_tech(StringName(id), 1.0)
+		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id))
+	else:
+		started = actor.try_start_tech(StringName(id), 1.0)
+	if started: actor.hsm.set_active(false)
+	return started
 
 func _position_for_hydra(id: String) -> void:
 	var actor = preview_actor
@@ -330,11 +754,14 @@ func _position_for_hydra(id: String) -> void:
 
 func _return_to_ai() -> void:
 	_finish_manual()
+	if _target_id == "hydra" and is_instance_valid(preview_actor):
+		preview_actor.interrupt_tech()
+		preview_actor.hsm.set_active(true)
 	if StringName(_target_id) in MANUAL.BOSSES and is_instance_valid(preview_actor):
 		manual = MANUAL.new()
 		manual.bind(preview_actor)
 	_clear_trial_input()
-	_manual_message.text = "通常AIへ戻しました。"
+	_manual_message.hide()
 
 func _clear_trial_input() -> void:
 	if not is_instance_valid(session.run): return
@@ -363,10 +790,11 @@ func _process(delta: float) -> void:
 		var reason: String = "" if preview_actor.action_rules.combos.has(selected) else manual.unavailable(selected, _phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"
 		_execute.disabled = not reason.is_empty()
 		_manual_status.text = manual.status() + (" / 再生中" if session.playing else " / 停止中")
-		if not reason.is_empty(): _manual_message.text = reason
+		_execute.tooltip_text = reason if not reason.is_empty() else _manual_status.text
 	else:
 		_execute.disabled = _move_picker.selected < 0 or not preview_actor.has_body()
 		_manual_status.text = "Hydra / %s / %s" % ["再生中" if session.playing else "停止中", String(preview_actor.tech)]
+		_execute.tooltip_text = _manual_status.text
 
 func _exit_tree() -> void:
 	_finish_manual()

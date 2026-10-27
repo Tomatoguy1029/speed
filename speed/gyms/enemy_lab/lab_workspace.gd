@@ -19,11 +19,13 @@ var _notice: HBoxContainer
 var _budget: ProgressBar
 var _route_cost: Label
 var _palette_auto_hidden := false
+var _palette_tuning_hidden := false
 var _last_mode := -1
 var _left_split: HSplitContainer
 var _right_split: HSplitContainer
 var _vertical_split: VSplitContainer
 var _right_dock: VBoxContainer
+var tuning_panel: Control
 var _left_toggle: Button
 var _right_toggle: Button
 var _right_collapsed := false
@@ -85,7 +87,6 @@ func build(owner: Control) -> void:
 	var frame_material := ShaderMaterial.new()
 	frame_material.shader = preload("res://shaders/lab_viewport.gdshader")
 	frame.material = frame_material
-	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	frame.focus_mode = Control.FOCUS_ALL
 	stage.add_child(frame)
 	var viewport := SubViewport.new()
@@ -97,8 +98,10 @@ func build(owner: Control) -> void:
 	lab.canvas = lab.CANVAS.new()
 	lab.canvas.session = lab.session
 	lab.canvas.field_lookup = lab.field_item
-	lab.canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage.add_child(lab.canvas)
+	# 再生枠と編集用の重ね描きを同じ16:9の矩形へ収める。
+	stage.resized.connect(_fit_game_view.bind(stage, frame, lab.canvas))
+	_fit_game_view(stage, frame, lab.canvas)
 	_hint_row(_center)
 	_right_dock = VBoxContainer.new()
 	_right_split.add_child(_right_dock)
@@ -154,7 +157,18 @@ func _header(parent: Node) -> void:
 	UI.button(header, tr("lab.ui.files"), open_settings.bind(4), "save")
 	UI.button(header, tr("lab.appearance.title"), open_settings.bind(5), "eye")
 	UI.button(header, tr("lab.ui.help"), func(): lab._messages.text = tr("lab.ui.help_text"), "help", true)
-	lab.build_hitstop_controls(parent)
+	lab.build_hitstop_controls(parent, header)
+
+func _fit_game_view(stage: Control, frame: Control, overlay: Control) -> void:
+	var available := stage.size
+	if available.x <= 0.0 or available.y <= 0.0: return
+	var unit := maxf(1.0, minf(floorf(available.x / 16.0), floorf(available.y / 9.0)))
+	var bounds := Vector2(16.0, 9.0) * unit
+	var origin := (available - bounds) * 0.5
+	frame.position = origin
+	frame.size = bounds
+	overlay.position = origin
+	overlay.size = bounds
 
 func _edge_button(parent: Node, action: Callable) -> Button:
 	var button := UI.button(parent, "", action, "chevron_left", true)
@@ -456,35 +470,58 @@ func _set_history(open: bool) -> void:
 
 func open_settings(page: int) -> void:
 	lab.session.playing = false
+	hide_tuning()
 	_right_collapsed = false
 	_restore_settings = true
 	_restore_page = page
 	lab._right.hide()
 	settings.show()
 	lab.controls.current_tab = page
+	lab.controls.sync_from_session()
 
 func close_settings() -> void:
 	settings.hide()
 	lab._right.visible = lab.session.selected >= 0
 	lab.canvas.grab_focus()
 
+func show_tuning(panel: Control) -> void:
+	tuning_panel = panel
+	_right_collapsed = false
+	settings.hide()
+	lab._right.hide()
+	if lab._left.visible:
+		_palette_tuning_hidden = true
+		lab._left.hide()
+	panel.show()
+	_fit_panels()
+
+func hide_tuning() -> void:
+	if tuning_panel != null: tuning_panel.hide()
+	if _palette_tuning_hidden:
+		_palette_tuning_hidden = false
+		if not _palette_auto_hidden: lab._left.show()
+	_fit_panels()
+
 func _fit_panels() -> void:
 	if not is_instance_valid(settings): return
-	_right_dock.visible = settings.visible or lab._right.visible
-	var narrow: bool = lab.size.x < 1000 and (settings.visible or lab._right.visible)
+	var tuning: bool = tuning_panel != null and tuning_panel.visible
+	_right_dock.visible = settings.visible or lab._right.visible or tuning
+	var narrow: bool = lab.size.x < 1000 and _right_dock.visible
 	if narrow and lab._left.visible:
 		_palette_auto_hidden = true
 		lab._left.hide()
-	elif not narrow and _palette_auto_hidden:
+	elif not narrow and _palette_auto_hidden and not tuning:
 		_palette_auto_hidden = false
 		lab._left.show()
 
 func _toggle_palette() -> void:
 	var show: bool = not lab._left.visible
+	if show and tuning_panel != null and tuning_panel.visible: hide_tuning()
 	_palette_auto_hidden = false
 	if show and lab.size.x < 1000:
 		settings.hide()
 		lab._right.hide()
+		hide_tuning()
 	lab._left.visible = show
 
 func _toggle_right() -> void:
@@ -494,10 +531,13 @@ func _toggle_right() -> void:
 		_restore_page = lab.controls.current_tab
 		settings.hide()
 		lab._right.hide()
+		hide_tuning()
 	else:
 		_right_collapsed = false
 		if _restore_settings: open_settings(_restore_page)
-		elif lab.session.selected >= 0: lab._right.show()
+		elif lab.session.selected >= 0:
+			lab._right.show()
+			lab.inspector.refresh(true)
 		else: open_settings(0)
 
 func sync() -> void:

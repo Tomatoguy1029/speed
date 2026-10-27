@@ -27,6 +27,28 @@ func _ready() -> void:
 	check(is_equal_approx(actor.head_scale, baseline_head), "螺旋は共通の頭倍率を変えない")
 	check(is_equal_approx(actor.table.r[actor.body], baseline_radius), "螺旋は頭の判定だけを拡大しない")
 	actor.cancel_attack()
+	for staged_move in [&"leap", &"charge", &"rifts"]:
+		sim.state.ship_pos = Vector2(300, 0)
+		sim.state.view_center = Vector2.ZERO
+		actor.table.pos[actor.body] = Vector2.ZERO
+		actor.table.facing[actor.body] = PI * 0.25
+		actor.body_trail.clear()
+		actor.reset_pose()
+		var initial_facing: float = actor.table.facing[actor.body]
+		actor.start_attack(staged_move)
+		var driver = actor._driver
+		check(is_equal_approx(actor.table.facing[actor.body], initial_facing), "画面退場前に顔の向きを飛ばさない: " + staged_move)
+		check(actor.telegraph_paths.is_empty(), "画面退場中に攻撃予告を出さない: " + staged_move)
+		var frames := 0
+		while driver.staging.phase != &"ready" and frames < 900:
+			actor.elapsed += 1.0 / 120.0
+			driver.windup(actor, 1.0 / 120.0)
+			actor._update_body()
+			frames += 1
+		check(driver.staging.phase == &"ready" and driver.staging.exited_all, "胴体全体の退場後に入口を作る: " + staged_move)
+		check(not actor.telegraph_paths.is_empty(), "再配置後に固定した経路を予告する: " + staged_move)
+		actor.cancel_attack()
+		check(actor.body_override.is_empty() and actor.telegraph_paths.is_empty(), "中断で胴体姿勢と予告を回収する: " + staged_move)
 	actor.start_attack(&"rifts")
 	check(actor._driver.center == sim.state.ship_pos, "亀裂は古い共通照準ではなく現在の自機を基準に予告する")
 	actor.cancel_attack()
@@ -53,9 +75,17 @@ func _ready() -> void:
 	sim.state.ship_invuln = 0.0
 	actor.start_attack(&"rifts")
 	var rifts = actor._driver
+	var staging_frames := 0
+	while rifts.staging.phase != &"ready" and staging_frames < 600:
+		actor.elapsed += 1.0 / 120.0
+		rifts.windup(actor, 1.0 / 120.0)
+		actor._update_body()
+		staging_frames += 1
+	check(rifts.staging.phase == &"ready" and staging_frames < 600, "引っ掻きは全身退場後に画面へ再入場する")
+	check(rifts.paths.size() == 6 and actor.telegraph_paths.size() == 6, "引っ掻きの予告と左右の三本爪は同じ経路を使う")
 	actor.mode = &"active"
 	actor.elapsed = 0.16
-	sim.state.ship_pos = Vector2(-375, -37.5)
+	sim.state.ship_pos = rifts.paths[0][0].lerp(rifts.paths[0][1], 0.25)
 	var hp: float = sim.state.ship_hp
 	rifts.tick(actor, 0.01)
 	sim.projectiles._update_hazards(0.01)
@@ -74,6 +104,9 @@ func _ready() -> void:
 	actor.cancel_attack()
 	sim.projectiles.clear_hostile()
 	sim.ship.invincible = true
+	sim.state.ship_pos = Vector2.ZERO
+	actor.table.pos[actor.body] = Vector2.ZERO
+	actor.reset_pose()
 	actor.start_attack(&"clones")
 	var clones = actor._driver
 	check(clones.units.size() == 3, "本体と複製二体で共同攻撃する")
@@ -115,7 +148,7 @@ func _ready() -> void:
 		var size := 0.0
 		var pose: PackedVector2Array = actor.body_points()
 		for j in range(pose.size() - 1): size += pose[j].distance_to(pose[j + 1])
-		check(absf(size - actor.body_length) < actor.body_length * 0.025, "螺旋を収縮しても竜本体の長さを縮めない")
+		check(absf(size - spiral.spiral_length) < spiral.spiral_length * 0.025, "螺旋をほどいても有効長を縮めない")
 	var last_head: Vector2 = actor.table.pos[actor.body]
 	spiral.end(actor, false)
 	check(actor.table.pos[actor.body] == last_head, "螺旋終了時に頭を別位置へ瞬間移動しない")

@@ -95,14 +95,22 @@ func _ready() -> void:
 		actor.cancel_attack()
 		check(actor.start_attack(id), "移動攻撃を開始する: "+id)
 		var origin: Vector2 = sim.enemies.table.pos[actor.body]
-		for frame in ceili((float(actor.rule().warn)+float(actor.rule().active)+float(actor.rule().recover)+0.1)*120.0): actor.sim_tick(1.0/120.0,1.0/120.0)
+		for frame in 1200:
+			actor.sim_tick(1.0/120.0,1.0/120.0)
+			if actor.mode == &"idle": break
 		check(sim.enemies.table.pos[actor.body].distance_to(origin)>100.0, "移動攻撃で本体が移動する: "+id)
 		check(actor.mode == &"idle", "移動攻撃後に隙を終える: "+id)
 	actor.cancel_attack()
 	check(actor.start_attack(&"rifts"), "三本爪の亀裂を開始する")
 	if actor.technique == &"rifts":
-		for frame in 240: actor.sim_tick(1.0/120.0,1.0/120.0)
-		check(actor._driver.walls.size() == 6, "左右それぞれ三本の亀裂を残す")
+		var rifts_complete := false
+		for frame in 1200:
+			actor.sim_tick(1.0/120.0,1.0/120.0)
+			if actor._driver == null: break
+			if actor._driver.walls.size() == 6:
+				rifts_complete = true
+				break
+		check(rifts_complete, "左右それぞれ三本の亀裂を残す")
 		actor.cancel_attack()
 		for frame in 60: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(actor.closing_walls.is_empty(), "亀裂を修復してから次へ進む")

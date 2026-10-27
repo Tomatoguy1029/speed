@@ -120,15 +120,19 @@ func _rift_paths() -> void:
 		var session := _begin(&"rifts",Vector2.ZERO)
 		var sim := session.sim
 		var a = sim.bosses.actor
-		var warn := float(a.rule().warn)
-		var before := sim.state.ship_hp
-		for frame in ceili((warn + 0.85) / STEP):
-			if cross and frame == ceili(warn / STEP) - 1: sim.state.ship_pos = Vector2(-375,-37.5)
+		for frame in 1200:
+			if a.mode == &"active": break
 			_tick(sim,Vector2.ZERO)
+		_check(a.mode == &"active", "rifts warning follows full-body staging")
+		var path: PackedVector2Array = a._driver.paths[0]
+		var cross_point: Vector2 = path[0].lerp(path[1], 0.35)
+		var before := sim.state.ship_hp
+		if cross: sim.state.ship_pos = cross_point
+		for frame in ceili(0.85 / STEP): _tick(sim,Vector2.ZERO)
 		var scratch_damage := before - sim.state.ship_hp
 		_check((scratch_damage>0.0)==cross,"rifts scratch crossing vs center gap")
 		sim.state.ship_invuln = 0.0
-		sim.state.ship_pos = Vector2(-375,-37.5)
+		sim.state.ship_pos = cross_point
 		var residual_hp := sim.state.ship_hp
 		for frame in 120: _tick(sim,Vector2.ZERO)
 		_check(is_equal_approx(residual_hp,sim.state.ship_hp),"rifts residual blocks without damage")
@@ -167,14 +171,16 @@ func _spiral(evade: bool) -> void:
 	var sim := session.sim
 	var a = sim.bosses.actor
 	var duration := float(a.rule().warn) + float(a.rule().active) + float(a.rule().recover)
-	var warn := float(a.rule().warn)
 	var before := sim.state.ship_hp
+	var escaped := false
 	for frame in ceili(duration / STEP):
-		var t := frame * STEP
-		_tick(sim,Vector2.from_angle(deg_to_rad(-160.0)) * 1700.0 if evade and t >= warn + 2.75 and t < warn + 3.35 else Vector2.ZERO)
-	_finish(session,"spiral_" + ("leave_pause_gap_before_shrink" if evade else "wait_for_squeeze"),before,not evade)
-	rows[-1]["escape_angle_degrees"] = -160.0 if evade else 0.0
-	rows[-1]["escape_active_interval"] = [2.75,3.35] if evade else []
+		var can_escape: bool = a.mode == &"active" and a.elapsed >= a._driver.coil_time + 0.05 and not sim.state.controls_locked
+		var move: bool = evade and can_escape and sim.state.ship_pos.x < 220.0
+		_tick(sim,Vector2.RIGHT * 1700.0 if move else Vector2.ZERO)
+		if evade and can_escape and sim.state.ship_pos.x >= 220.0: escaped = true
+	if evade: _check(escaped,"spiral releases controls and leaves time to reach the inner escape lane")
+	_finish(session,"spiral_" + ("reach_inner_gap_before_shrink" if evade else "wait_for_squeeze"),before,not evade)
+	rows[-1]["escape_distance_x"] = 220.0 if evade else 0.0
 
 func _tick(sim: RunSimulation, velocity: Vector2) -> void:
 	super._tick(sim, velocity)

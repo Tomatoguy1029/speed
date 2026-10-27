@@ -31,7 +31,7 @@ func _draw() -> void:
 		if actor.finale.split>0.0:
 			_draw_split_body(points,width,body_alpha)
 		else:
-			FORM.draw_body(self,points,width,actor.clock,actor.technique==&"spiral",body_alpha)
+			FORM.draw_body(self,points,width,actor.clock,actor.technique==&"spiral",body_alpha,PackedFloat32Array(),true)
 		var mouth_open := 0.0
 		if actor.mode in [&"windup",&"active"] and actor.technique in [&"bite",&"breath",&"inhale",&"star_fan",&"picaro_wall"]:
 			mouth_open = 0.8 if actor.mode==&"windup" else 1.0
@@ -48,6 +48,7 @@ func _draw() -> void:
 		draw_circle(core,43.0*actor.perspective_scale,Color(0.38,0.59,1.0,core_glow*0.16*pulse))
 		FORM.star(self,core,27.0*actor.perspective_scale,Color(0.85,0.96,1.0,core_glow))
 	_draw_telegraphs()
+	_draw_spiral_charge()
 	if actor.attack_points.size()>1:
 		var line := _local_points(actor.attack_points)
 		if actor.technique==&"breath" and line.size()>3:
@@ -75,20 +76,29 @@ func _draw() -> void:
 				draw_polyline(path,Color(0.83,0.93,1.0,maxf(0.0,0.7-age*1.4)),3.0,false)
 
 	for member: Dictionary in actor.picaro.alive():
+		if actor.run_state.cinematic_hide_enemies: continue
 		var age: float = actor.clock-float(member.born)
 		if age>1.4: continue
 		var center := actor.to_local(actor.table.pos[member.row])
-		var radius: float = actor.table.r[member.row]*1.5
+		var radius: float = maxf(125.0,actor.table.r[member.row]*2.35)
 		var alpha := clampf((1.4-age)*2.0,0.0,1.0)
+		var gather := clampf(age/0.8,0.0,1.0)
+		var swell := 1.0+0.06*sin(age*18.0)
+		draw_circle(center,radius*0.92*swell,Color(0.35,0.26,0.9,alpha*0.075))
+		draw_arc(center,radius*1.16,0.0,TAU,48,Color(0.58,0.74,1.0,alpha*0.2),8.0,false)
 		var membrane := PackedVector2Array()
 		for j in 49:
 			var angle := j*TAU/48.0
-			membrane.append(center+Vector2.from_angle(angle)*radius*(1.0+sin(angle*5.0+age*12.0)*0.1)*(1.0+maxf(0.0,age-0.8)))
-		draw_polyline(membrane,Color(0.5,0.3,1.0,alpha*0.6),4.0,false)
-		for j in 12:
-			var angle := j*TAU/12.0+age*6.0
-			var at := center+Vector2.from_angle(angle)*radius*maxf(0.1,1.5-age)
-			draw_line(at,at+Vector2.from_angle(angle+1.0)*12.0,Color(0.6,0.85,1.0,alpha),3.0)
+			membrane.append(center+Vector2.from_angle(angle)*radius*swell*(1.0+sin(angle*5.0+age*12.0)*0.055))
+		draw_polyline(membrane,Color(0.68,0.54,1.0,alpha*0.85),7.0,false)
+		for j in 16:
+			var angle := j*TAU/16.0+age*4.0
+			var direction := Vector2.from_angle(angle)
+			var at := center+direction*radius*(1.55-0.72*gather)
+			var to := center+direction.rotated(0.36)*radius*(1.18-0.35*gather)
+			draw_line(at,to,Color(0.69,0.87,1.0,alpha*(0.55+0.35*gather)),3.0)
+			if j%2==0: draw_circle(at,3.5,Color(0.87,0.96,1.0,alpha))
+		FORM.star(self,center,radius*0.3,Color(0.82,0.91,1.0,alpha*0.75))
 
 	if actor.technique == &"picaro_wall" and actor._driver != null:
 		for impact: Dictionary in actor._driver.impacts:
@@ -199,6 +209,20 @@ func _draw_telegraphs() -> void:
 		for side in [-1,1]:
 			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),3.0,false)
 			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),3.0,false)
+
+func _draw_spiral_charge() -> void:
+	if actor.technique != &"spiral" or actor.mode != &"active" or actor._driver == null: return
+	var wrap: float = actor._driver.coil_time
+	if actor.elapsed < wrap or actor._driver.locked: return
+	var progress := clampf((actor.elapsed - wrap) / actor._driver.pause_time, 0.0, 1.0)
+	var center: Vector2 = actor.to_local(actor._driver.center)
+	var radius: float = lerpf(minf(actor._driver.horizontal_extent, actor._driver.extent) * 0.56, actor.body_width * 0.7, progress)
+	var warning := Color(1.0, 0.38, 0.23, 0.18 + progress * 0.6)
+	draw_arc(center, radius, 0.0, TAU, 64, warning, 4.0 + progress * 4.0, false)
+	for j in 12:
+		var direction := Vector2.from_angle(float(j) * TAU / 12.0)
+		draw_line(center + direction * (radius + 20.0), center + direction * (radius + 4.0), warning, 3.0, false)
+	FORM.star(self, center, 7.0 + progress * 12.0, warning)
 
 func _draw_impacts() -> void:
 	for effect: Dictionary in effects:

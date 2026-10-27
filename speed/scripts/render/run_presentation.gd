@@ -415,7 +415,7 @@ func _present(delta: float) -> void:
 			_equipment_visuals.erase(key)
 	_update_view()
 	var offset := Vector2.ZERO
-	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
+	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and (view_override == null or (view_override is Dictionary and view_override.get("shake", false))):
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(cam_zoom, 0.01)
 	_camera.position = cam_center + offset
 	_camera.zoom = Vector2(cam_zoom, cam_zoom)
@@ -1480,6 +1480,11 @@ func _sync_picaro() -> void:
 		_picaro_material = ShaderMaterial.new()
 		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
 	var t := run.enemies.table
+	var birth_age := {}
+	if run.bosses.actor != null and run.bosses.actor.get("picaro") != null:
+		var actor = run.bosses.actor
+		for member: Dictionary in actor.picaro.alive():
+			birth_age[member.id] = maxf(0.0,actor.clock-float(member.born))
 	var used := {}
 	for i in t.alive.size():
 		if t.alive[i]==0 or t.dead[i]!=0 or t.def[i]==null or not t.def[i].params.get("picaro",false): continue
@@ -1506,9 +1511,13 @@ func _sync_picaro() -> void:
 		sprite.position = t.pos[i]
 		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
 		var radius := enemy_sprite_radius(source,t.r[i])
-		if sprite is Sprite2D: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
-		else: sprite.scale=Vector2.ONE*radius
-		sprite.modulate = Color(1,1,1,0.45 if t.guard[i]>0.0 else 1.0)
+		# Only the invulnerable emergence grows visually; it settles to the normal sprite size before release.
+		var age: float = birth_age.get(id,2.0)
+		var forming := clampf(1.0-age,0.0,1.0)
+		var emerge_radius := lerpf(radius,maxf(radius*1.8,70.0),forming*forming)
+		if sprite is Sprite2D: sprite.scale = Vector2.ONE*emerge_radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		else: sprite.scale=Vector2.ONE*emerge_radius
+		sprite.modulate = Color(1,1,1,0.7 if t.guard[i]>0.0 else 1.0)
 	for id in _picaro_sprites.keys():
 		if not used.has(id):
 			_picaro_sprites[id].queue_free()

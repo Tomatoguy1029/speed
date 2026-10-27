@@ -1,64 +1,157 @@
-## 胴幅と頭の大きさは通常姿勢と共有し、巻き・収縮・下方離脱を点列でつなぐ。
+## 頭から全身を画面外へ抜き、見えない位置から再入場して渦を巻く。
 extends RefCounted
 const FORM = preload("res://scripts/bosses/draco_form.gd")
-const STAGING = preload("res://scripts/bosses/draco_screen_staging.gd")
+const STATE = preload("res://scripts/bosses/draco_cinematic_state.gd")
 var staging: Dictionary
 var center := Vector2.ZERO
 var extent := 1000.0
+var horizontal_extent := 1000.0
+var spiral_length := 6200.0
+var pitch_ratio := 0.4
+var coil_time := 1.2
+var first_lap_time := 0.48
+var second_lap_time := 0.72
+var pause_time := 1.6
+var shrink_time := 2.0
+var head_offset := 320.0
+var end_correction := Vector2.ZERO
+var locked := false
+var charging := false
+var camera_zoom_target := 1.0
+var camera_was_cinematic := false
 var points := PackedVector2Array()
+var trail := PackedVector2Array()
 var walls: Array[int] = []
 var trapped := false
 var trapped_hit := false
 var entry := PackedVector2Array()
-var recovery_pose := PackedVector2Array()
+var recovery_head := Vector2.ZERO
+var departing := true
+var departure_time := 0.0
+var departure_angle := 0.0
+var holding_player := false
+var held_ship_pos := Vector2.ZERO
+var controls_before := false
+var protection_before := false
 func begin(a: BossActor) -> void:
 	center = a.aim_target()
-	var short_half := minf(a.run_state.view_half.x, a.run_state.view_half.y)
-	extent = maxf(a.body_width * 2.1, short_half * float(a.rule().radius_factor))
-	entry = _resample(a.body_points(), 65)
+	camera_was_cinematic = a.run_state.cinematic_camera
+	camera_zoom_target = a.run_state.camera_zoom * 0.82
+	var p: Dictionary = a.rule()
+	var filmed_half: Vector2 = a.run_state.view_half / 0.82
+	var broad: float = maxf(filmed_half.x, filmed_half.y) * clampf(float(p.radius_factor),0.5,1.5)
+	var aspect: float = clampf(float(p.get("aspect_ratio",1.0)),0.85,1.5)
+	var narrow: float = broad / aspect
+	if filmed_half.x >= filmed_half.y:
+		horizontal_extent = maxf(a.body_width * 4.0, broad)
+		extent = maxf(a.body_width * 4.0, narrow)
+	else:
+		horizontal_extent = maxf(a.body_width * 4.0, narrow)
+		extent = maxf(a.body_width * 4.0, broad)
+	# Keep a gap between the innermost body and the head's escape corridor.
+	# This bound uses the same head/body/ship radii as their contact checks.
+	var inner_clearance: float = a.table.r[a.body] + a.body_width * 0.5 + a.ctx.cfg.ship_radius * 2.0 + 40.0
+	var minimum_extent: float = a.body_width * 3.0 + inner_clearance
+	horizontal_extent = maxf(horizontal_extent, minimum_extent)
+	extent = maxf(extent, minimum_extent)
+	spiral_length = maxf(float(p.spiral_length), PI * (extent + horizontal_extent) * 1.4)
+	var short_extent: float = minf(extent, horizontal_extent)
+	var minimum_pitch: float = a.body_width * 1.5 / short_extent
+	var maximum_pitch: float = minf(0.44, (1.0 - inner_clearance / short_extent) * 0.5)
+	pitch_ratio = clampf(float(p.get("pitch_ratio",0.4)), minimum_pitch, maximum_pitch)
+	var active_time: float = maxf(0.5,float(p.active))
+	shrink_time = clampf(float(p.shrink_time),0.3,maxf(0.3,active_time*0.5))
+	coil_time = clampf(float(p.get("coil_time",1.2)),0.5,minf(3.0,maxf(0.5,active_time-shrink_time-0.8)))
+	pause_time = clampf(float(p.pause),0.8,minf(3.0,maxf(0.8,active_time-shrink_time-coil_time-0.15)))
+	first_lap_time = coil_time*0.4
+	second_lap_time = coil_time*0.6
+	var clearance: float = a.table.r[a.body]+a.ctx.cfg.ship_radius+60.0
+	head_offset = clampf(float(p.get("head_offset",320.0)),clearance,maxf(clearance,extent*(1.0-pitch_ratio)*0.8))
+	locked = false
+	charging = false
+	end_correction = Vector2.ZERO
+	departing = true
+	departure_time = 0.0
+	holding_player = false
+	controls_before = a.run_state.controls_locked
+	protection_before = a.run_state.encounter_protected
+	a.run_state.cinematic_camera = true
+	entry = FORM.samples_even(a.body_points(), a.body_segments + 1)
+	departure_angle = (entry[0] - entry[1]).angle()
+	a.table.facing[a.body] = departure_angle
+	trail = entry.duplicate()
+	points = entry.duplicate()
+	walls.clear()
 	a.picaro.pause(true)
-	var gap: float = a.body_width + a.ctx.cfg.ship_radius * 2.0 + 12.0
-	var inner := maxf(a.body_width * 0.7, extent - gap * float(a.rule().coil_turns))
 	a.telegraph_points.clear()
-	staging = STAGING.capture(a, center + Vector2(0, -a.run_state.view_half.y - a.body_width * 2.0), center + Vector2(0, -inner), PI * 0.5)
-func windup(a: BossActor, _dt: float) -> void:
-	STAGING.advance(a, staging, clampf(a.elapsed / float(a.rule().warn), 0.0, 1.0))
-	entry = _resample(a.body_points(), 65)
+	a.body_override = points
+func windup(a: BossActor, dt: float) -> void:
+	_camera_tick(a, dt)
+	if departing:
+		departure_time += dt
+		var turn := smoothstep(0.0, 0.55, departure_time)
+		var direction := Vector2.from_angle(lerp_angle(departure_angle, -PI * 0.5, turn))
+		var exit_duration: float = clampf(float(a.rule().get("exit_duration",1.8)),0.6,3.0)
+		var speed: float = maxf((a.body_length + a.run_state.view_half.y * 2.0 + a.body_width * 2.0) / exit_duration,
+			maxf(0.0,-a.run_state.ship_vel.y) + 1100.0)
+		var head: Vector2 = a.table.pos[a.body] + direction * speed * dt
+		_set_head(a, head, a.body_length)
+		if _entire_body_offscreen(a):
+			_begin_reentry(a)
+		else:
+			# The common attack clock may not start the spiral while any segment is visible.
+			a.elapsed = minf(a.elapsed, float(a.rule().warn) - 1.01)
+		return
+	var shift := _follow_center(a, dt)
+	for key in ["outside", "control", "inside"]: staging[key] += shift
+	for j in trail.size(): trail[j] += shift
+	var progress := clampf(a.elapsed - (float(a.rule().warn) - 1.0), 0.0, 1.0)
+	var head: Vector2 = (staging.outside as Vector2).lerp(staging.control, progress).lerp((staging.control as Vector2).lerp(staging.inside, progress), progress)
+	_set_head(a, head, spiral_length)
 func tick(a: BossActor, _dt: float) -> void:
 	var p: Dictionary = a.rule()
-	var wrap := float(p.first_lap) + float(p.second_lap)
-	var shrink_at := wrap + float(p.pause)
+	var wrap := coil_time
+	var shrink_at := wrap + pause_time
+	if a.elapsed < wrap:
+		if not holding_player:
+			held_ship_pos = a.run_state.ship_pos
+			end_correction = held_ship_pos + Vector2.UP*head_offset - (center + Vector2.UP*extent*(1.0-2.0*pitch_ratio))
+			holding_player = true
+			a.run_state.controls_locked = true
+			a.run_state.encounter_protected = true
+		a.run_state.ship_pos = held_ship_pos
+		a.run_state.ship_vel = Vector2.ZERO
+	elif holding_player:
+		_release_player(a)
+	if a.elapsed >= wrap and not charging:
+		charging = true
+		# The warning marks the committed aim. Keep the opened escape lane in
+		# world space while the player moves during the pause.
+		locked = true
+		a.combat_trace.stage("lock", {"scope": "spiral_departure"})
+		a.run_state.emit(&"draco_roar", {"pos": center, "radius": minf(horizontal_extent, extent) * 0.8})
+	if not locked and not holding_player:
+		var shift := _follow_center(a, _dt)
+		for j in trail.size(): trail[j] += shift
+		for j in entry.size(): entry[j] += shift
+	_camera_tick(a, _dt)
 	a.telegraph_paths.clear()
 	a.telegraph_widths.clear()
 	if a.elapsed >= wrap and a.elapsed < shrink_at:
 		a.telegraph_paths.append(PackedVector2Array([a.table.pos[a.body], a.table.pos[a.body] + Vector2.DOWN * extent * 2.0]))
 		a.telegraph_widths.append(a.body_width * 0.5)
-	var turns: float = a.elapsed / float(p.first_lap) if a.elapsed < float(p.first_lap) else 1.0 + (a.elapsed - float(p.first_lap)) / float(p.second_lap)
-	turns = minf(2.0, turns)
-	var shrink := clampf((a.elapsed - shrink_at) / float(p.shrink_time), 0.0, 1.0)
-	var head_angle := -PI * 0.5 - turns * TAU
-	var coil_turns := float(p.coil_turns)
-	var pitch: float = a.body_width + a.ctx.cfg.ship_radius * 2.0 + 12.0
-	var outer_radius := extent * lerpf(1.15, 1.0, turns * 0.5)
-	var base_radius := maxf(a.body_width * 0.7, outer_radius - pitch * coil_turns)
-	var radius_scale := 1.0 - shrink * 0.7
-	var exit_offset: Vector2 = Vector2.DOWN * pow(shrink, 2.0) * (extent * 2.0 + a.body_length)
-	# 巻径を縮めても竜の長さは縮めない。余った尾は続く螺旋へ巻き込む。
-	var coil := PackedVector2Array()
-	var angle := 0.0
-	var travelled := 0.0
-	while travelled < a.body_length and coil.size() < 1024:
-		var radius := (base_radius + pitch * angle / TAU) * radius_scale
-		var point: Vector2 = center + Vector2.from_angle(head_angle + angle) * radius + exit_offset
-		if not coil.is_empty(): travelled += coil[-1].distance_to(point)
-		coil.append(point)
-		angle += 0.04
-	points = _fit_length(coil, a.body_length, 65)
-	for j in points.size(): points[j] = entry[j].lerp(points[j], smoothstep(0.0, 0.45, a.elapsed))
-	if shrink > 0.65:
-		var straight: PackedVector2Array = _resample(a.neutral_body_points(points[0], PI * 0.5), 65)
-		for j in points.size(): points[j] = points[j].lerp(straight[j], smoothstep(0.65, 1.0, shrink))
-	points = _fit_length(points, a.body_length, 65)
+	var turns: float = a.elapsed / first_lap_time if a.elapsed < first_lap_time else 1.0 + (a.elapsed - first_lap_time) / second_lap_time
+	turns = clampf(turns, 0.0, 2.0)
+	var shrink := clampf((a.elapsed - shrink_at) / shrink_time, 0.0, 1.0)
+	var angle := -PI * 0.5 - turns * TAU
+	var radius_scale := 1.0 - turns * pitch_ratio
+	var coil_head := center + Vector2(cos(angle) * horizontal_extent, sin(angle) * extent) * radius_scale + end_correction*smoothstep(1.0,2.0,turns)
+	var exit_distance: float = extent * 2.0 + spiral_length
+	var extra_exit := maxf(0.0, a.elapsed - shrink_at - shrink_time) * exit_distance / shrink_time
+	var head := coil_head + Vector2.DOWN * (shrink * exit_distance + extra_exit)
+	var followed: Dictionary = FORM.follow_trail(trail, head, spiral_length, a.body_segments + 1)
+	trail = followed.trail
+	points = followed.points
 	var fractions: PackedFloat32Array = FORM.fractions(points)
 	if a.elapsed >= shrink_at:
 		# 収縮中は共通hazardの反復ヒットを止め、接触を一度だけ受付する。
@@ -74,8 +167,8 @@ func tick(a: BossActor, _dt: float) -> void:
 			trapped = true
 			trapped_hit = true
 			a.combat_trace.damage(float(p.damage) * a.ctx.cfg.atk_scale, 0.0, &"spiral", &"draco")
-			a.run_state.ship_invuln = maxf(a.run_state.ship_invuln, float(p.shrink_time) * (1.0 - shrink) + 1.0)
-	a.table.facing[a.body] = (points[0] - points[1]).angle() if shrink < 0.65 else PI * 0.5
+			a.run_state.ship_invuln = maxf(a.run_state.ship_invuln, shrink_time * (1.0 - shrink) + 1.0)
+	a.table.facing[a.body] = (points[0] - points[1]).angle()
 	a.table.pos[a.body] = points[0]
 	a.body_override = points
 	while walls.size() < points.size() - 1:
@@ -91,40 +184,78 @@ func tick(a: BossActor, _dt: float) -> void:
 		a.ctx.projectiles.hazard_width[walls[j]] = a.body_width * FORM.taper((fractions[j] + fractions[j + 1]) * 0.5)
 	if a.elapsed >= shrink_at: a.telegraph_points.clear()
 func end(a: BossActor, _cancelled: bool) -> void:
+	if holding_player: _release_player(a)
+	a.run_state.cinematic_camera = camera_was_cinematic
+	a.picaro.pause(false)
 	for h in walls:
 		if a.ctx.projectiles.owns_hazard(h, a.body, a.body_id): a.ctx.projectiles.release_hazard(h)
-	recovery_pose = points.duplicate()
+	recovery_head = a.table.pos[a.body]
 	a.telegraph_points.clear()
 	a.telegraph_paths.clear()
 	a.telegraph_widths.clear()
 func recover(a: BossActor, _dt: float) -> void:
-	if recovery_pose.is_empty(): return
-	var neutral: PackedVector2Array = _resample(a.neutral_body_points(a.table.pos[a.body], a.table.facing[a.body]), recovery_pose.size())
-	var blend := smoothstep(0.0, float(a.rule().recover), a.elapsed)
-	var pose := PackedVector2Array()
-	for j in recovery_pose.size(): pose.append(recovery_pose[j].lerp(neutral[j], blend))
-	a.body_override = _fit_length(pose, a.body_length, pose.size())
-func _resample(source: PackedVector2Array, count: int) -> PackedVector2Array:
-	var result := PackedVector2Array()
-	for j in count:
-		var index := float(j) / float(count - 1) * float(source.size() - 1)
-		var start := mini(source.size() - 2, int(index))
-		result.append(source[start].lerp(source[start + 1], index - float(start)))
-	return result
+	if trail.is_empty(): return
+	var speed: float = (extent * 2.0 + spiral_length) / shrink_time
+	var head: Vector2 = recovery_head + Vector2.DOWN * speed * a.elapsed
+	var followed: Dictionary = FORM.follow_trail(trail, head, spiral_length, a.body_segments + 1)
+	trail = followed.trail
+	points = followed.points
+	a.table.pos[a.body] = head
+	a.table.facing[a.body] = PI * 0.5
+	a.body_override = points
 
-func _fit_length(source: PackedVector2Array, length: float, count: int) -> PackedVector2Array:
-	var trimmed := PackedVector2Array([source[0]])
-	var remaining := length
-	for j in range(1, source.size()):
-		var segment := source[j].distance_to(source[j - 1])
-		if segment > remaining:
-			trimmed.append(source[j - 1].lerp(source[j], remaining / segment))
-			remaining = 0.0
-			break
-		trimmed.append(source[j])
-		remaining -= segment
-	if remaining > 0.01:
-		var tangent := (source[-1] - source[-2]).normalized()
-		if tangent.is_zero_approx(): tangent = Vector2.LEFT
-		trimmed.append(trimmed[-1] + tangent * remaining)
-	return FORM.samples_even(trimmed, count)
+func _follow_center(a: BossActor, dt: float) -> Vector2:
+	var shift: Vector2 = (a.run_state.ship_pos - center) * (1.0 - exp(-1.4 * dt))
+	shift = shift.limit_length(350.0 * dt)
+	center += shift
+	return shift
+
+func _camera_tick(a: BossActor, dt: float) -> void:
+	var s = a.run_state
+	var zoom := lerpf(s.camera_zoom, camera_zoom_target, 1.0 - exp(-3.0 * dt))
+	var camera_center: Vector2 = s.view_center.lerp(s.ship_pos, 1.0 - exp(-5.0 * dt))
+	STATE.frame(a, camera_center, zoom)
+
+func _set_head(a: BossActor, head: Vector2, length: float) -> void:
+	var followed: Dictionary = FORM.follow_trail(trail, head, length, a.body_segments + 1)
+	trail = followed.trail
+	points = followed.points
+	a.table.pos[a.body] = points[0]
+	a.table.facing[a.body] = (points[0] - points[1]).angle()
+	a.body_override = points
+
+func _entire_body_offscreen(a: BossActor) -> bool:
+	var camera: Vector2 = a.run_state.view_center
+	var half: Vector2 = a.run_state.view_half
+	var head_radius: float = a.table.r[a.body]
+	for j in points.size():
+		var radius: float = head_radius if j == 0 else a.body_width * 0.5 * FORM.taper(float(j) / float(points.size() - 1))
+		var relative: Vector2 = points[j] - camera
+		if absf(relative.x) <= half.x + radius and absf(relative.y) <= half.y + radius: return false
+	return true
+
+func _begin_reentry(a: BossActor) -> void:
+	departing = false
+	center = a.run_state.ship_pos
+	var margin: float = a.table.r[a.body] + a.body_width + 100.0
+	var outside := Vector2(maxf(center.x + horizontal_extent + margin,a.run_state.view_center.x + a.run_state.view_half.x + margin),
+		minf(center.y - extent - margin,a.run_state.view_center.y - a.run_state.view_half.y - margin))
+	staging = {"outside":outside,
+		"control":center + Vector2(horizontal_extent * 0.52, -extent),
+		"inside":center + Vector2(0.0, -extent)}
+	# Only reset history after the whole animal is outside the filmed rectangle.
+	trail.clear()
+	for j in a.body_segments + 1:
+		trail.append(staging.outside + Vector2.RIGHT * spiral_length * float(j) / float(a.body_segments))
+	points = trail.duplicate()
+	a.table.pos[a.body] = points[0]
+	a.table.facing[a.body] = PI
+	a.body_override = points
+	a.elapsed = float(a.rule().warn) - 1.0
+
+func _release_player(a: BossActor) -> void:
+	if not holding_player: return
+	holding_player = false
+	a.run_state.controls_locked = controls_before
+	a.run_state.encounter_protected = protection_before
+	a.run_state.ship_invuln = maxf(a.run_state.ship_invuln,0.35)
