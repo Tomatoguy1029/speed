@@ -7,10 +7,15 @@ script = ExtResource("1_cmpnc")
 technique = &"pounce"
 parameters = {
 "active": 0.45,
+"alone_hounds": 3,
 "cd": 4.0,
+"cd_alone": 2.0,
+"cd_alone_p2": 1.5,
+"cd_p2": 3.0,
 "damage": 24.0,
 "lock": 0.2,
 "overshoot": 80.0,
 "recover": 1.4,
-"warn": 0.7
+"warn": 0.7,
+"warn_p2": 0.5
 }

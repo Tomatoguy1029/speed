@@ -8,9 +8,11 @@ var requested := ""
 var _saved: Dictionary = {}
 var _camera := preload("res://scripts/bosses/draco_cinematic_state.gd").new()
 var _origin := Vector2.ZERO
+## 手動実行に対応するボス
+const BOSSES: Array[StringName] = [&"monoceros", &"draco", &"centaurus", &"canis_major"]
 
 func bind(value: BossActor) -> bool:
-	if not OS.is_debug_build() or value == null or not value.run_state.lab_mode or value.def.id not in [&"monoceros", &"draco"]:
+	if not OS.is_debug_build() or value == null or not value.run_state.lab_mode or value.def.id not in BOSSES:
 		return false
 	actor = value
 	_origin = actor.table.pos[actor.body]
@@ -28,7 +30,7 @@ func unavailable(id: String, phase: int) -> String:
 	for item in moves():
 		if String(item.technique) == id: move = item; break
 	if move == null: return "未登録の技: " + id
-	var maximum := 2 if actor.def.id == &"monoceros" else 3
+	var maximum := 3 if actor.def.id == &"draco" else 2
 	if phase < 1 or phase > maximum: return "存在しない形態です。"
 	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
 	var first := int(gate.get("min_phase", 1))
@@ -52,7 +54,7 @@ func execute(id: String, phase: int) -> bool:
 		active = true
 	_cleanup()
 	actor.selection_enabled = false
-	actor.phase = phase
+	_set_phase(phase)
 	actor.table.pos[actor.body] = _origin
 	actor.table.facing[actor.body] = 0.0
 	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
@@ -77,13 +79,18 @@ func finish() -> void:
 		_camera.restore(actor)
 		actor.run_state.steering_locked = _saved.steering_locked
 		actor.table.guard[actor.body] = _saved.guard
-		actor.phase = _saved.phase
+		_set_phase(_saved.phase)
 		actor.selection_enabled = _saved.selection
 		actor.flow_runner.configure(actor.flow_runner.flow)
 	active = false
 	_saved.clear()
 	requested = ""
 	message = "手動実行終了・通常AI"
+
+## 形態を切り替える。形態ごとに技の性能を持つボスは、性能も切り替える。
+func _set_phase(phase: int) -> void:
+	actor.phase = phase
+	if actor.has_method("_apply_phase"): actor._apply_phase()
 
 func _cleanup() -> void:
 	# この画面が所有する単独ボスのセッション。次の試行へ残留弾を持ち越さない。
@@ -108,13 +115,18 @@ func _cleanup() -> void:
 		actor.attack_token = 0
 		actor.reset_pose()
 		actor._presentation.effects.clear()
-	else:
+	elif actor.def.id == &"monoceros":
 		actor.phase_pending = false
 		actor.reposition = 0.0
 		actor.stuck_body = null
 		actor.stuck_time = 0.0
 		actor.locked = false
 		actor._cooldown = 0.0
+	else:
+		actor.phase_pending = false
+		actor._cooldown = 0.0
+		if actor.mode in [&"retreat", &"turn"]: actor.mode = &"idle"
+		if actor.def.id == &"canis_major": actor._end_ring()
 	actor.technique = &""
 	actor.table.vel[actor.body] = Vector2.ZERO
 	actor.table.charge[actor.body] = 0.0

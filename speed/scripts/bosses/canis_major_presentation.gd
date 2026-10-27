@@ -31,7 +31,7 @@ func bind_canis_major(owner_actor: CanisMajorBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius"]: pulse = 0.35
+	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius", &"phase_changed", &"howl"]: pulse = 0.35
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -41,6 +41,13 @@ func _advance(dt: float) -> void:
 	_track_lunge()
 	queue_redraw()
 	_pack_layer.queue_redraw()
+
+## シリウスの輝きの強さ（0〜1）。第2形態への移行の間に強め、そのあとは強いまま。
+func blaze() -> float:
+	if actor.phase < 2: return 0.0
+	if actor.mode != &"phase": return 1.0
+	var f := 1.0 - actor.phase_time / maxf(float(actor.def.params.phase_time), 0.001)
+	return 1.0 - pow(1.0 - clampf(f, 0.0, 1.0), 3.0)
 
 ## 飛び出している猟犬の位置を軌跡へ足す。飛び出しが終わった猟犬の軌跡は消す。
 func _track_lunge() -> void:
@@ -54,9 +61,12 @@ func _track_lunge() -> void:
 		if points.size() > LUNGE_TRAIL: points = points.slice(points.size() - LUNGE_TRAIL)
 		_trails[i] = points
 
-## 飛び出している猟犬の後ろに短い軌跡を引き、体のまわりを光らせる。
+## 飛び出している猟犬の後ろに短い軌跡を引き、体のまわりを光らせる。遠吠えの囲みの間は、今の囲みの半径を薄い円で示す。
 func _draw_lunge() -> void:
 	var t := actor.table
+	var radius := actor.ring_radius()
+	if radius > 0.0:
+		_pack_layer.draw_arc(actor.ring_center, radius, 0.0, TAU, 96, Color(WARNING, 0.35), pixel_size, true)
 	for i in _trails:
 		var points: PackedVector2Array = _trails[i]
 		if points.size() < 1 or t.alive[i] == 0 or t.dead[i] != 0: continue
@@ -123,10 +133,29 @@ func _draw() -> void:
 	# 口元のシリウス。号令の構えでは強く瞬き、輪を広げる。
 	var mouth := Vector2(84 * stretch, 0)
 	var shout := actor.technique == &"command" and actor.mode == &"windup"
+	var howl := actor.technique == &"howl" and actor.mode == &"windup"
 	var gather := actor.technique == &"sirius" and actor.mode == &"windup"
-	var glow := 6.0 + (8.0 * charge if shout else 18.0 * charge if gather else 1.5 * sin(actor.clock * 5.0))
+	var strong := blaze()
+	var glow := 6.0 + 6.0 * strong + (8.0 * charge if shout else 18.0 * charge if gather else (1.5 + 2.0 * strong) * sin(actor.clock * 5.0))
+	# 第2形態では、口元のまわりに大きな光の暈と十字の光芒を足す。
+	if strong > 0.0:
+		var flare := (1.0 + 0.15 * sin(actor.clock * 9.0)) * strong
+		draw_circle(mouth, glow + 18.0 * flare, Color(OPEN, 0.18))
+		for ray in 4:
+			var u := Vector2.from_angle(ray * PI / 2.0 + actor.clock * 0.6) * (glow + 34.0 * flare)
+			draw_line(mouth - u, mouth + u, Color(SIRIUS, 0.55 * strong), pixel_size)
 	draw_circle(mouth, glow + 4.0, Color(OPEN, 0.35))
 	draw_circle(mouth, glow, SIRIUS)
+	# 移行の間は、口元から光の輪を広げる。
+	if actor.mode == &"phase":
+		for ring in 2:
+			var grow := fmod(strong * 1.5 + ring * 0.5, 1.0)
+			draw_arc(mouth, 20.0 + grow * 140.0, 0.0, TAU, 32, Color(SIRIUS, 0.9 * (1.0 - grow)), pixel_size * 2.0)
+	# 遠吠えは、口元から大きな輪を次々に広げる。
+	if howl:
+		for ring in 3:
+			var grow := fmod(actor.clock * 1.8 + ring / 3.0, 1.0)
+			draw_arc(mouth, 30.0 + grow * 220.0, -1.2, 1.2, 32, Color(OPEN, 0.9 * (1.0 - grow)), pixel_size * 2.0)
 	if shout:
 		for ring in 2:
 			var grow := fmod(actor.clock * 2.5 + ring * 0.5, 1.0)

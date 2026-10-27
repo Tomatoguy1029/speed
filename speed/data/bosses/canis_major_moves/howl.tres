@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmhwl"]
+
+[resource]
+script = ExtResource("1_cmhwl")
+technique = &"howl"
+category = &"major"
+parameters = {
+"catch_up": 4.0,
+"cd": 15.0,
+"close_time": 2.2,
+"gap_slots": 2,
+"gaps": 2,
+"gather_time": 1.0,
+"recover": 1.5,
+"ring_close": 220.0,
+"ring_count": 16,
+"ring_radius": 800.0,
+"spawn_out": 350.0,
+"summon_max": 10,
+"warn": 1.2
+}

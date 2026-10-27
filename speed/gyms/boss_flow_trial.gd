@@ -249,7 +249,7 @@ func _finish_manual() -> void:
 
 func _populate_moves(selected := "") -> void:
 	_phase_picker.clear()
-	for phase in (2 if _target_id == "monoceros" else 3):
+	for phase in (3 if _target_id == "draco" else 2):
 		_phase_picker.add_item("形態 %d" % (phase + 1), phase + 1)
 	_move_picker.clear()
 	if preview_actor.action_rules == null: return
@@ -274,6 +274,10 @@ func _execute_selected() -> void:
 	var id := String(_move_picker.get_selected_metadata())
 	if preview_actor.action_rules.combos.has(id):
 		await _activate_boss(_target_id, id, _current_program_path)
+		return
+	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
+	if _target_id != "hydra" and manual == null:
+		_manual_message.text = "このボスは技を選んで実行できません。通常AIで試遊します。"
 		return
 	var started := false
 	if _target_id == "hydra":
@@ -326,7 +330,7 @@ func _position_for_hydra(id: String) -> void:
 
 func _return_to_ai() -> void:
 	_finish_manual()
-	if _target_id in ["monoceros", "draco"] and is_instance_valid(preview_actor):
+	if StringName(_target_id) in MANUAL.BOSSES and is_instance_valid(preview_actor):
 		manual = MANUAL.new()
 		manual.bind(preview_actor)
 	_clear_trial_input()
