@@ -134,6 +134,8 @@ var hazard_owner := PackedInt32Array()
 var hazard_owner_id := PackedInt32Array()
 ## 遅れて弾ける範囲・広がる波が、敵に与えるダメージ（0 なら敵には当たらない。誘爆・いるか座の波動に使う）
 var hazard_edmg := PackedFloat64Array()
+## 敵へ当たる波ごとの命中済みID。敵の行番号は再利用されるのでIDで判定する。
+var hazard_enemy_hit: Array[Dictionary] = []
 ## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
 var hazard_block := PackedByteArray()
 ## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
@@ -618,6 +620,7 @@ func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 func release_hazard(h: int) -> void:
 	if h < hazard_alive.size() and hazard_alive[h] != 0:
 		_combat_end(_combat_hazards, h, "released", hazard_pos[h])
+		hazard_enemy_hit[h].clear()
 		hazard_slots.release(h)
 
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
@@ -639,6 +642,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_hit[i] = 0
 	hazard_color[i] = color
 	hazard_edmg[i] = 0.0
+	hazard_enemy_hit[i] = {}
 	hazard_block[i] = 0
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
@@ -670,6 +674,7 @@ func _update_hazards(dt: float) -> void:
 		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
 				or combat.enemies.table.dead[owner] != 0)):
 			_combat_end(_combat_hazards, i, "lifetime_or_owner_end", hazard_pos[i])
+			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)
 			continue
 		var shape := _hazard_shape(hazard_kind[i])
