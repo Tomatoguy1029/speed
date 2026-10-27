@@ -11,6 +11,7 @@ parameters = {
 "cd": 9.0,
 "circle_radius": 70.0,
 "damage": 14.0,
+"drop_delay": 0.4,
 "drop_height": 70.0,
 "fade": 0.3,
 "fall": 0.3,

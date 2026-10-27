@@ -1,6 +1,6 @@
 ## ケンタウルス座。選択は共通フロー、距離取り・離脱・射撃・矢の雨は個別ロジックで進める。
 ## 予告・発射前の警告・発射・終了はAnimationPlayerで進め、本体は全方向から攻撃できる。
-## 矢の雨は、円が弧を走ったトレースの中へ、円を追って矢を降らせる。着弾は落とし始めから fall 遅れる。
+## 矢の雨は、円が弧を走ったトレースの中へ、円を追って矢を降らせる。矢は円が通ってから drop_delay 後に落とし始め、さらに fall 遅れて着く。
 ## 背後攻撃は、背後へ回った機体へ、背中の後ろの円で当たる。範囲の円は実験場だけが描く。
 ## 第2形態では、技と本体の数値のうち `_p2` を付けた値が同じ名前の値を置き換える。
 class_name CentaurusBoss
@@ -258,7 +258,7 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 	if attack == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
 	if attack == &"rain":
 		var traces := int(r.traces)
-		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.fall) + float(r.linger) + 0.3
+		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.get("drop_delay", 0.0)) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
 
 func _begin_windup(r: Dictionary, length: float) -> void:
@@ -422,6 +422,7 @@ func _rain_tick(dt: float) -> void:
 		_start_trace(r)
 		_rain_left -= 1
 		_rain_next_at = clock + _trace_duration(r) + float(r.trace_gap)
+	var delay := float(r.get("drop_delay", 0.0))
 	var fall := float(r.fall)
 	var radius := float(r.circle_radius)
 	var gap := maxf(float(r.arrow_gap), 1.0)
@@ -429,15 +430,15 @@ func _rain_tick(dt: float) -> void:
 	for trace in rain_traces:
 		var run := clock - float(trace.t0)
 		var head := clampf(run * speed, 0.0, length)
-		# 円が通った所へ、円を追って矢を落とし始める。
+		# 円が通った所へ、drop_delay 遅れて矢を落とし始める。
 		while float(trace.next_drop) <= head:
 			var center := trace_point(trace, trace.next_drop)
 			for k in int(r.arrows_per_step):
 				var offset := Vector2.from_angle(run_state.rng.randf() * TAU) * sqrt(run_state.rng.randf()) * radius
-				rain_arrows.append(Vector3(center.x + offset.x, center.y + offset.y, float(trace.t0) + float(trace.next_drop) / speed))
+				rain_arrows.append(Vector3(center.x + offset.x, center.y + offset.y, float(trace.t0) + float(trace.next_drop) / speed + delay))
 			trace.next_drop = float(trace.next_drop) + gap
-		# 着弾の円は fall 遅れて同じ道すじを進む。前回からの区間で機体に触れたら1回だけ当たる。
-		var land := clampf((run - fall) * speed, 0.0, length)
+		# 着弾の円は drop_delay と fall 遅れて同じ道すじを進む。前回からの区間で機体に触れたら1回だけ当たる。
+		var land := clampf((run - delay - fall) * speed, 0.0, length)
 		if not trace.hit and land > float(trace.landed):
 			var a := trace_point(trace, trace.landed)
 			var b := trace_point(trace, land)
