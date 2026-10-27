@@ -207,14 +207,24 @@ func setup(context: RunContext) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：味方の弾・撃破後の処理・敵の弾・攻撃の形を分けて足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	_update_friendly(world_dt)
+	perf.since(&"projectiles.friend", t0)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	t0 = Time.get_ticks_usec()
 	combat.enemies.after_combat()
+	perf.since(&"projectiles.after_combat", t0)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	t0 = Time.get_ticks_usec()
 	_update_hostile(world_dt)
+	perf.since(&"projectiles.hostile", t0)
+	t0 = Time.get_ticks_usec()
 	_update_hazards(world_dt)
+	perf.since(&"projectiles.hazards", t0)
 
 # ── 味方の弾と破片 ───────────────────────────────────────────────
 

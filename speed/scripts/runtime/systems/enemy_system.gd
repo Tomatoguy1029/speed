@@ -469,7 +469,11 @@ func def_of(type: StringName) -> EnemyDef:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：避け合いの準備・行動の種類ごと・更新後の処理を enemies.<名前> に足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	_capture_avoidance_starts()
+	perf.since(&"enemies.avoid_capture", t0)
 	motion._update_aim(world_dt)
 	_lod += 1
 	_aim = state.enemy_aim
@@ -480,13 +484,18 @@ func tick(_real_dt: float, world_dt: float) -> void:
 		var rows := beh_rows[k]
 		if rows.is_empty():
 			continue
+		t0 = Time.get_ticks_usec()
 		if behaviors[k].custom_loop:
 			behaviors[k].tick_rows(rows, world_dt)
 		else:
 			_tick_behavior(k, world_dt)
+		if perf.active:
+			perf.since(StringName("enemies." + String(behaviors[k].name)), t0)
+	t0 = Time.get_ticks_usec()
 	for b in behaviors:
 		b.after_tick(world_dt)
 	_flush_new()
+	perf.since(&"enemies.after_tick", t0)
 
 func _can_avoid_strong(i: int) -> bool:
 	var t := table
@@ -525,6 +534,9 @@ func avoid_strong(world_dt: float) -> void:
 	_avoid_cells.clear()
 	var normal_radius := 0.0
 	var normal_step := 0.0
+	# 開発版の計測：強敵を集める全行の走査（scan）と、雑魚ごとの補正（rows）
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	for j in t.alive.size():
 		if t.alive[j] == 0 or t.dead[j] != 0 or t.held[j] != 0 or t.meteor_index[j] >= 0:
 			continue
@@ -538,8 +550,10 @@ func avoid_strong(world_dt: float) -> void:
 		elif j < _avoid_ids.size() and _avoid_ids[j] == t.id[j] and _can_avoid_strong(j):
 			normal_radius = maxf(normal_radius, radius_rows[j])
 			normal_step = maxf(normal_step, speeds[j] * world_dt)
+	perf.since(&"enemy_avoidance.scan", t0)
 	if _avoid_obstacles.is_empty() or normal_radius <= 0.0:
 		return
+	t0 = Time.get_ticks_usec()
 	# 強敵の占有円が届くセルだけ登録する。各雑魚は自分のセルだけを見る。
 	for j in _avoid_obstacles:
 		var extent := radius_rows[j] + normal_radius + normal_step + 2.0
@@ -628,6 +642,7 @@ func avoid_strong(world_dt: float) -> void:
 			t.vel[i] = corrected / world_dt
 			if field.body_gap(pos[i], radius_rows[i]) < 0.0:
 				field.collide_enemy(i, from)
+	perf.since(&"enemy_avoidance.rows", t0)
 
 ## 行動の種類 b の敵を進める。押し出し・石化・遠い敵の間引きを済ませてから、種類の処理を1行ずつ呼ぶ。
 func _tick_behavior(b: int, dt: float) -> void:

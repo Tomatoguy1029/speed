@@ -76,10 +76,8 @@ var _cam_ready := false
 var _world_real_dt := 0.0
 var _world_dt := 0.0
 var _world_steps := 0
-## 開発版の計測：処理時間の合計（マイクロ秒）・回数・最大時間。
-## play_total は全体の包含時間なので、個別の項目と合算しない。
-var profile: Dictionary = {}
-var profiling := false
+## 開発版の計測の記録先。play_total は全体の包含時間なので、個別の項目と合算しない。
+var perf := PerfLog.new()
 ## 追加の命令。シミュレーションの利用側が必要に応じて渡す。
 var command_extension: Callable
 
@@ -104,6 +102,7 @@ func setup() -> void:
 	ctx.state = state
 	ctx.cfg = cfg
 	ctx.options = options
+	ctx.perf = perf
 	ctx.profile = options.get("profile", ProfileManager.for_run(state.lab_mode, state.meta_override)).duplicate(true)
 	ctx.field = FieldSystem.new()
 	ctx.ship = ShipSystem.new()
@@ -193,7 +192,7 @@ func physics_step(delta: float) -> void:
 		return
 	match state.phase:
 		RunState.Phase.PLAY:
-			if profiling:
+			if perf.active:
 				_run(&"play_total", func(): _play_tick(delta))
 			else:
 				_play_tick(delta)
@@ -246,7 +245,7 @@ func _play_tick(real_dt: float) -> void:
 	if state.hitstop > 0.0:
 		state.hitstop = maxf(0.0, state.hitstop - real_dt)
 		return
-	if profiling:
+	if perf.active:
 		_run(&"combat", func(): combat.tick(real_dt, 0.0))
 		_run(&"draw", func(): draw.tick(real_dt, 0.0))
 	else:
@@ -321,17 +320,12 @@ func _play_tick(real_dt: float) -> void:
 
 ## 処理を呼ぶ。計測中なら時間を測る。
 func _run(key: StringName, f: Callable) -> void:
-	if not profiling:
+	if not perf.active:
 		f.call()
 		return
 	var t0 := Time.get_ticks_usec()
 	f.call()
-	var elapsed := Time.get_ticks_usec() - t0
-	var rec: Array = profile.get(key, [0, 0, 0])
-	rec[0] += elapsed
-	rec[1] += 1
-	rec[2] = maxi(rec[2], elapsed)
-	profile[key] = rec
+	perf.since(key, t0)
 
 ## 積んだ出来事を表示・音・UI へ渡す。RunSession が毎フレーム呼ぶ。
 func flush_events() -> void:
@@ -339,7 +333,10 @@ func flush_events() -> void:
 		return
 	var events := state.events
 	state.events = []
+	# 開発版の計測：表示・音・HUD・録画が出来事を受け取って処理する時間（世界側の更新とは別に、1フレームに1回）
+	var t0 := Time.get_ticks_usec()
 	frame_events.emit(events)
+	perf.since(&"events_out", t0)
 
 func _check_end() -> void:
 	if state.lab_mode:

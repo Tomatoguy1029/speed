@@ -185,20 +185,33 @@ func add_xp(v: float) -> void:
 func tick(real_dt: float, world_dt: float) -> void:
 	if state.controls_locked: return
 	var busy := state.drawing or state.tracing
+	# 開発版の計測：武器・特性ごとの時間を build.<ID> に足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	ctx.projectiles.tick_attached(real_dt)
+	perf.since(&"build.attached", t0)
 	if state.phase != RunState.Phase.PLAY or state.controls_locked:
 		return
-	for behavior in weapon_behaviors.values():
-		behavior.tick_real(real_dt)
+	for id: StringName in weapon_behaviors:
+		t0 = Time.get_ticks_usec()
+		weapon_behaviors[id].tick_real(real_dt)
+		if perf.active:
+			perf.since(StringName("build." + String(id)), t0)
 		if state.phase != RunState.Phase.PLAY:
 			return
 	if world_dt > 0.0:
-		for b in weapon_behaviors.values():
-			b.tick(world_dt, busy)
+		for id: StringName in weapon_behaviors:
+			t0 = Time.get_ticks_usec()
+			weapon_behaviors[id].tick(world_dt, busy)
+			if perf.active:
+				perf.since(StringName("build." + String(id)), t0)
 			if state.phase != RunState.Phase.PLAY:
 				return
-		for b in trait_behaviors.values():
-			b.tick(world_dt, busy)
+		for id: StringName in trait_behaviors:
+			t0 = Time.get_ticks_usec()
+			trait_behaviors[id].tick(world_dt, busy)
+			if perf.active:
+				perf.since(StringName("build." + String(id)), t0)
 
 ## 保留中のレベルアップがあり、描画中・なぞり中でなければ3択を開く。開いたら true。
 ## 拾った彗星限定の武器があれば、先に受け取る（枠が満員なら入れ替えを選ぶ）。

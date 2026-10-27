@@ -41,6 +41,14 @@ var armed := false
 var _run: RunSimulation = null
 ## 記録中のランのセッション（木から出たら記録を閉じる）
 var _session: RunSession = null
+## 記録中だけ開く、録画用の処理時間の記録（ゲーム側・表示側・敵の描画の行の数）。性能の区間ごとに書いて空にする
+var _view: RunPresentation = null
+var _perf_sim := {}
+var _perf_view := {}
+var _perf_rows := {}
+## 性能の区間のあいだに録画が書いた行数と、その時間（マイクロ秒）
+var _self_lines := 0
+var _self_write_us := 0
 var _file: FileAccess = null
 var _next_sample := 0.0
 var _last_xp_gained := 0.0
@@ -180,6 +188,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 	_last_xp_gained = run.state.xp_gained
 	_last_xp_dropped = run.state.xp_dropped
 	_next_sample = run.state.time + INTERVAL
+	_open_profiles()
 	_perf_start(Time.get_ticks_usec())
 	var names_path := "res://.content/dev/stage_%d.json" % run.state.stage_index
 	_record_names = {}
@@ -204,7 +213,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 		recording_start.conditions["enemy_tuning"] = IDENTITY.plain(run.enemies.get("stage_tuning"))
 	_write({"type": "start", "stage": run.state.stage_index, "stage_file": run.state.stage.resource_path.get_file(),
 		"start_time": _r(run.state.time), "date": Time.get_datetime_string_from_system(), "interval": INTERVAL, "bands": bands,
-		"schema_version": 4, "measurement_version": 1, "combat_version": 1,
+		"schema_version": 4, "measurement_version": 2, "combat_version": 1,
 		"combat_config": {"level": combat_level, "events_per_second": clampi(combat_events_per_second, 1, 1000), "max_events": clampi(combat_max_events, 1, 1000000), "max_bytes": maxi(0, combat_max_bytes), "line_bytes": COMBAT_LINE_BYTES}, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
 		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
@@ -435,6 +444,7 @@ func _end(result: String) -> void:
 	for c in _session.tree_exiting.get_connections() if is_instance_valid(_session) else []:
 		if c.callable.get_object() == self:
 			_session.tree_exiting.disconnect(c.callable)
+	_close_profiles()
 	_run = null
 	_session = null
 	_big_crystals = {}
@@ -446,15 +456,22 @@ func _end(result: String) -> void:
 
 func _write(record: Dictionary) -> void:
 	if _file != null and not _io_failed:
-		# 既存の区間行と出来事を同じ時計精度で並べる。
-		if record.has("t"): record.t = _r(float(record.t))
-		if _real_start_us > 0:
-			if not record.has("real_t"):
-				record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0
-		if _run != null:
-			record["run_id"] = _run.bosses.diagnostics.run_id
-			record["recording_id"] = _recording_id
-		if not _store_line(JSON.stringify(record)): _fail_io()
+		var t0 := Time.get_ticks_usec()
+		_write_line(record)
+		# 録画そのものの重さ（書いた行数と、行を作って書く時間）
+		_self_lines += 1
+		_self_write_us += Time.get_ticks_usec() - t0
+
+func _write_line(record: Dictionary) -> void:
+	# 既存の区間行と出来事を同じ時計精度で並べる。
+	if record.has("t"): record.t = _r(float(record.t))
+	if _real_start_us > 0:
+		if not record.has("real_t"):
+			record.real_t = (Time.get_ticks_usec() - _real_start_us) / 1000000.0
+	if _run != null:
+		record["run_id"] = _run.bosses.diagnostics.run_id
+		record["recording_id"] = _recording_id
+	if not _store_line(JSON.stringify(record)): _fail_io()
 
 func _update_label() -> void:
 	if _label == null:
@@ -489,6 +506,11 @@ func _perf_start(now_us: int) -> void:
 	_clear_performance()
 
 func _clear_performance() -> void:
+	_self_lines = 0
+	_self_write_us = 0
+	_perf_sim.clear()
+	_perf_view.clear()
+	_perf_rows.clear()
 	_perf_frames = 0
 	_perf_sum_us = 0
 	_perf_max_us = 0
@@ -512,6 +534,8 @@ func _perf_tick(now_us: int) -> void:
 			_flush_performance(now_us)
 		else:
 			_flush_performance(_perf_last_us)
+		# 停止・カード選択の間に描いた分を、次の区間へ混ぜない
+		_clear_performance()
 		_perf_phase = phase
 		_perf_bonus = bonus
 		_perf_window_us = now_us
@@ -556,11 +580,47 @@ func _flush_performance(now_us: int) -> void:
 			"hazards": pr.hazard_count(), "hazard_capacity": pr.hazard_slots.capacity(),
 			"gems": pk.gem_slots.live, "gem_capacity": pk.gem_slots.capacity(),
 			"coins": pk.coin_slots.live, "coin_capacity": pk.coin_slots.capacity(), "capsules": pk.capsules.size(),
-			"corona_members": (_run.enemies.behavior(&"corona").vortex.members.size() if _run.enemies.behavior(&"corona") != null else 0)}})
+			"corona_members": (_run.enemies.behavior(&"corona").vortex.members.size() if _run.enemies.behavior(&"corona") != null else 0)},
+		"profile": _profile_record()})
 	if _file != null:
 		_flush()
 	_clear_performance()
 	_perf_window_us = now_us
+
+func _open_profiles() -> void:
+	_perf_sim = _run.perf.open(&"recorder")
+	_view = _session.view.get_node_or_null("RunPresentation") as RunPresentation if _session.view != null else null
+	if _view != null:
+		_perf_view = _view.perf.open(&"recorder")
+		_perf_rows = _view.perf_rows.open(&"recorder")
+
+func _close_profiles() -> void:
+	if _run != null:
+		_run.perf.close(&"recorder")
+	if is_instance_valid(_view):
+		_view.perf.close(&"recorder")
+		_view.perf_rows.close(&"recorder")
+	_view = null
+	_perf_sim = {}
+	_perf_view = {}
+	_perf_rows = {}
+
+## 区間の処理時間。sim・view は 項目 → [合計ms, 回数, 1回の最大ms]、enemy_rows は敵の描画1回あたりの行の数の平均、
+## recorder は録画が書いた行数と、行を作って書いた時間の合計。
+func _profile_record() -> Dictionary:
+	var rows := {}
+	for key in _perf_rows:
+		var rec: Array = _perf_rows[key]
+		rows[String(key)] = snappedf(float(rec[0]) / maxi(1, rec[1]), 0.1)
+	return {"sim": _pack_times(_perf_sim), "view": _pack_times(_perf_view), "enemy_rows": rows,
+		"recorder": {"lines": _self_lines, "write_ms": snappedf(_self_write_us / 1000.0, 0.001)}}
+
+static func _pack_times(records: Dictionary) -> Dictionary:
+	var out := {}
+	for key in records:
+		var rec: Array = records[key]
+		out[String(key)] = [snappedf(rec[0] / 1000.0, 0.001), rec[1], snappedf(rec[2] / 1000.0, 0.001)]
+	return out
 
 func _on_combat(record: Dictionary) -> void:
 	if _io_failed or _run == null: return

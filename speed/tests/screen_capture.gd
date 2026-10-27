@@ -116,7 +116,7 @@ func _perf_steps() -> void:
 	run.ship.invincible = true
 	run.command(&"debug_time", {"seconds": 320.0})
 	await _wait(6.0)
-	run.profiling = true
+	var profile := run.perf.open(&"test")
 	var phys := 0.0
 	var proc := 0.0
 	var n := 0
@@ -134,8 +134,8 @@ func _perf_steps() -> void:
 		if t.alive[i] != 0 and t.dead[i] == 0:
 			alive += 1
 	print("[perf] enemies=%d fps=%.1f physics_ms=%.2f process_ms=%.2f" % [alive, frames / 5.0, phys / n, proc / n])
-	for k in run.profile:
-		var rec: Array = run.profile[k]
+	for k in profile:
+		var rec: Array = profile[k]
 		print("[perf]   %s %.3f ms/tick" % [k, float(rec[0]) / maxi(1, rec[1]) / 1000.0])
 	await _shot("perf_rampage", 0.1)
 

@@ -108,12 +108,9 @@ var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
-## 開発版の計測（PerfOverlay の詳細表示の間だけ有効）：表示側の処理時間の合計（マイクロ秒）・回数・最大時間。
-## 名前に「.」を含む項目は、前半の名前の項目の内訳なので合算しない。
-var profile: Dictionary = {}
-## 計測中の、敵の描画1回あたりの行の数（合計・回数・最大）
-var profile_counts: Dictionary = {}
-var profiling := false
+## 開発版の計測の記録先：表示側の処理時間と、敵の描画1回あたりの行の数
+var perf := PerfLog.new()
+var perf_rows := PerfLog.new()
 
 func _ready() -> void:
 	state = run.state
@@ -355,42 +352,30 @@ func _visual_of(table: EnemyTable, row: int) -> EnemyVisual:
 func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
-## 計測中なら、key の記録に start_us からの経過時間を足す。
-func _add_time(key: StringName, start_us: int) -> void:
-	if profiling:
-		_add_record(profile, key, Time.get_ticks_usec() - start_us)
-
-static func _add_record(records: Dictionary, key: StringName, value: int) -> void:
-	var rec: Array = records.get(key, [0, 0, 0])
-	rec[0] += value
-	rec[1] += 1
-	rec[2] = maxi(rec[2], value)
-	records[key] = rec
-
 ## 層の描く処理を、計測中なら時間を測る形で包む。
 func _timed(key: StringName, f: Callable) -> Callable:
 	return func(c: CanvasItem) -> void:
-		if not profiling:
+		if not perf.active:
 			f.call(c)
 			return
 		var t0 := Time.get_ticks_usec()
 		f.call(c)
-		_add_time(key, t0)
+		perf.since(key, t0)
 
 func _process(delta: float) -> void:
-	if not profiling:
+	if not perf.active:
 		_present(delta)
 		return
 	var t0 := Time.get_ticks_usec()
 	_present(delta)
-	_add_time(&"process", t0)
+	perf.since(&"process", t0)
 
 func _present(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
 	var t0 := Time.get_ticks_usec()
 	_sync_picaro()
-	_add_time(&"process.picaro", t0)
+	perf.since(&"process.picaro", t0)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	# HUD owns cinematic visibility so the explicit entrance skip and the
 	# completed legendary module strip remain usable while the combat UI hides.
@@ -404,7 +389,7 @@ func _present(delta: float) -> void:
 		shake = 0.0
 	t0 = Time.get_ticks_usec()
 	_update_fx(dt)
-	_add_time(&"process.fx", t0)
+	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
@@ -421,7 +406,7 @@ func _present(delta: float) -> void:
 	_camera.zoom = Vector2(cam_zoom, cam_zoom)
 	t0 = Time.get_ticks_usec()
 	pipeline.step(dt, _camera.position, cam_zoom)
-	_add_time(&"process.pipeline", t0)
+	perf.since(&"process.pipeline", t0)
 	_field_boundary.queue_redraw()
 	for layer in _layers.values():
 		layer.queue_redraw()
@@ -438,6 +423,14 @@ func _present(delta: float) -> void:
 # ── イベント → 演出 ───────────────────────────────────────────────
 
 func _on_events(events: Array[Dictionary]) -> void:
+	if not perf.active:
+		_handle_events(events)
+		return
+	var t0 := Time.get_ticks_usec()
+	_handle_events(events)
+	perf.since(&"events", t0)
+
+func _handle_events(events: Array[Dictionary]) -> void:
 	_sync_visuals()
 	if pipeline.sparks.available():
 		var minimum := 0
@@ -992,27 +985,27 @@ func _draw_enemies(c: CanvasItem) -> void:
 				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or (v != null and v.always_marked):
 			marked += 1
 			_draw_enemy_marks(c, t, i)
-	_add_time(&"draw_enemies.rows", t0)
+	perf.since(&"draw_enemies.rows", t0)
 	t0 = Time.get_ticks_usec()
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.end()
-	_add_time(&"draw_enemies.upload", t0)
+	perf.since(&"draw_enemies.upload", t0)
 	_draw_meteor_shards(c)
 	t0 = Time.get_ticks_usec()
 	for v in _visuals:
 		v.draw_layer(c, view)
-	_add_time(&"draw_enemies.visual_layers", t0)
+	perf.since(&"draw_enemies.visual_layers", t0)
 	_drawing_enemies = false
 	_enemy_sprite_metrics.clear()
-	if profiling:
-		_add_record(profile_counts, &"rows", alive.size())
-		_add_record(profile_counts, &"live", live)
-		_add_record(profile_counts, &"batched", batched)
-		_add_record(profile_counts, &"self_drawn", self_drawn)
-		_add_record(profile_counts, &"marked", marked)
+	if perf_rows.active:
+		perf_rows.add(&"rows", alive.size())
+		perf_rows.add(&"live", live)
+		perf_rows.add(&"batched", batched)
+		perf_rows.add(&"self_drawn", self_drawn)
+		perf_rows.add(&"marked", marked)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table

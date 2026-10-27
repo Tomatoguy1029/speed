@@ -1,14 +1,24 @@
 ## 短時間の性能計測専用。実ゲームの仕様・セーブは変更しない。
 ## -- --time=320 --stage=1 --size=1280x720 --sparks=off --glow=off --hazards=on --types=pump,lynx
 ## -- --enemies=1000 --type=biter --keep=on --levels=off --hitstop=off --gpu=off
+## -- --weapons=W02:5,W05:5,W08:5,W17:5 --drive=circle --draw=2
 extends Node
 
 ## 敵の数を保つときに補う間隔（フレーム）
 const REFILL_FRAMES := 15
+## --drive=circle で機体が回る円の半径（ワールド単位）
+const DRIVE_RADIUS := 900.0
 
 var session: RunSession
 var run: RunSimulation
 var render: RunPresentation
+## 計測の間だけ開く、このベンチ用の処理時間の記録（ゲーム側・表示側・敵の描画の行の数）
+var sim_rec := {}
+var view_rec := {}
+var rows_rec := {}
+## --drive=circle の円の中心と、--draw で次に線を描く実時刻（マイクロ秒）
+var drive_center := Vector2.ZERO
+var next_draw_us := 0
 var drawing_times: Dictionary = {}
 var frames: Array[float] = []
 var gpu_times: Array[float] = []
@@ -83,6 +93,10 @@ func _ready() -> void:
 	if options.get("levels", "on") == "off":
 		# 倒した経験値でレベルアップ画面に入ると世界が止まり、装備も変わるので、経験値を入れない
 		get_tree().physics_frame.connect(_hold_level)
+	if options.get("drive", "") == "circle":
+		# 決まった円を回り続ける入力に替え、機体の速さと向きの変化で動く武器も働かせる
+		drive_center = run.state.ship_pos
+		run.input_source = _drive_intent
 	if options.get("hitstop", "on") == "off":
 		# 大量に倒すとヒットストップで世界の更新が止まり、処理の時間が測れないので切る
 		run.state.hitstop_enabled = false
@@ -128,12 +142,13 @@ func _ready() -> void:
 		end.process_priority = 10000
 		add_child(end)
 	await get_tree().create_timer(6.0).timeout
-	run.profile.clear()
 	drawing_times.clear()
-	run.profiling = true
-	render.profile.clear()
-	render.profile_counts.clear()
-	render.profiling = true
+	sim_rec = run.perf.open(&"bench")
+	view_rec = render.perf.open(&"bench")
+	rows_rec = render.perf_rows.open(&"bench")
+	sim_rec.clear()
+	view_rec.clear()
+	rows_rec.clear()
 	previous_us = Time.get_ticks_usec()
 	start_us = previous_us
 	measuring = true
@@ -175,6 +190,11 @@ func _process(_delta: float) -> void:
 	# --hazards=on で、敵の攻撃の形を一定間隔で出す（描画と当たり判定の確認用）
 	if options.get("hazards", "off") == "on" and Engine.get_process_frames() % 90 == 0:
 		run.command(&"debug_hazards")
+	# --draw=秒 で、その間隔で機体の前へジグザグの線を描いて駆け抜ける
+	if options.has("draw") and Engine.get_process_frames() > 2:
+		var now_draw := Time.get_ticks_usec()
+		if now_draw >= next_draw_us and _draw_ahead():
+			next_draw_us = now_draw + int(float(options.draw) * 1000000.0)
 	# --keep=on で、倒された分を補って --enemies の数を保つ
 	if options.get("keep", "off") == "on" and options.has("enemies") and Engine.get_process_frames() % REFILL_FRAMES == 0:
 		var missing := int(options.enemies) - run.enemies.count()
@@ -193,8 +213,8 @@ func _process(_delta: float) -> void:
 		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
 		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
 		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count()}
-	for key in run.profile:
-		var rec: Array = run.profile[key]
+	for key in sim_rec:
+		var rec: Array = sim_rec[key]
 		var prev: Array = last_totals.get(key, [0, 0])
 		row.managers[key] = {"ms": (rec[0] - prev[0]) / 1000.0, "calls": rec[1] - prev[1]}
 		last_totals[key] = [rec[0], rec[1]]
@@ -237,8 +257,8 @@ func _stats(values: Array[float]) -> Dictionary:
 
 func _finish(seconds: float) -> void:
 	var manager_ms := {}
-	for key in run.profile:
-		var rec: Array = run.profile[key]
+	for key in sim_rec:
+		var rec: Array = sim_rec[key]
 		manager_ms[key] = {"ms_tick": rec[0] / 1000.0 / rec[1], "ms_frame": rec[0] / 1000.0 / frames.size(), "calls": rec[1]}
 		if rec.size() >= 3:
 			manager_ms[key].max_tick_ms = rec[2] / 1000.0
@@ -250,12 +270,12 @@ func _finish(seconds: float) -> void:
 		counts[key] /= frames.size()
 	# 表示側（RunPresentation）の処理ごとの時間。名前に「.」を含む項目は前半の項目の内訳
 	var view_ms := {}
-	for key in render.profile:
-		var rec: Array = render.profile[key]
+	for key in view_rec:
+		var rec: Array = view_rec[key]
 		view_ms[String(key)] = {"ms_frame": rec[0] / 1000.0 / frames.size(), "max_ms": rec[2] / 1000.0, "calls": rec[1]}
 	var view_rows := {}
-	for key in render.profile_counts:
-		var rec: Array = render.profile_counts[key]
+	for key in rows_rec:
+		var rec: Array = rows_rec[key]
 		view_rows[String(key)] = {"mean": float(rec[0]) / maxi(1, rec[1]), "max": rec[2]}
 	var result := {"seconds": seconds, "frames": frames.size(), "fps": frames.size() / seconds,
 		"frame_ms": _stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
@@ -277,8 +297,9 @@ func _finish(seconds: float) -> void:
 	if saved_rd != null:
 		render.pipeline.sparks.rd = saved_rd
 	set_process(false)
-	run.profiling = false
-	render.profiling = false
+	run.perf.close(&"bench")
+	render.perf.close(&"bench")
+	render.perf_rows.close(&"bench")
 	# ランと描画リソースの後始末を、通常のノード削除で済ませてから閉じる。
 	session.queue_free()
 	await get_tree().process_frame
@@ -289,18 +310,25 @@ func _finish(seconds: float) -> void:
 func _summary(result: Dictionary) -> String:
 	var frame: Dictionary = result.frame_ms
 	var game: float = result.managers.get(&"play_total", {}).get("ms_frame", 0.0)
+	# 表示側の出来事の処理（events）は、出来事の受け渡し（events_out）に含まれるので数えない
 	var view := 0.0
 	for key in result.view_ms:
-		if not key.contains("."):
+		if not key.contains(".") and key != "events":
 			view += result.view_ms[key].ms_frame
+	var events: float = result.managers.get(&"events_out", {}).get("ms_frame", 0.0)
 	var lines: Array[String] = []
 	lines.append("fps %.1f  フレーム 平均 %.2f p95 %.2f 最大 %.2f" % [result.fps, frame.mean, frame.p95, frame.max])
-	lines.append("ゲーム処理 %.2f  表示側 %.2f  残り（描画エンジン・GPU・待ち）%.2f  敵 %.0f" % [
-		game, view, maxf(0.0, frame.mean - game - view), result.counts.enemies])
-	var managers: Array = result.managers.keys().filter(func(k): return k != &"play_total")
+	lines.append("ゲーム処理 %.2f  出来事の受け渡し %.2f  表示側 %.2f  残り（描画エンジン・GPU・待ち）%.2f  敵 %.0f" % [
+		game, events, view, maxf(0.0, frame.mean - game - events - view), result.counts.enemies])
+	var managers: Array = result.managers.keys().filter(func(k): return k != &"play_total" and k != &"events_out" and not String(k).contains("."))
 	managers.sort_custom(func(a, b): return result.managers[a].ms_frame > result.managers[b].ms_frame)
 	for key in managers.slice(0, 6):
 		lines.append("  処理 %-18s %.2f（更新1回 %.3f）" % [key, result.managers[key].ms_frame, result.managers[key].ms_tick])
+	# 敵の行動・武器・弾などの種類ごとの内訳
+	var parts: Array = result.managers.keys().filter(func(k): return String(k).contains("."))
+	parts.sort_custom(func(a, b): return result.managers[a].ms_frame > result.managers[b].ms_frame)
+	for key in parts.slice(0, 10):
+		lines.append("  内訳 %-26s %.2f" % [key, result.managers[key].ms_frame])
 	var views: Array = result.view_ms.keys()
 	views.sort_custom(func(a, b): return result.view_ms[a].ms_frame > result.view_ms[b].ms_frame)
 	for key in views.slice(0, 8):
@@ -324,6 +352,32 @@ func _spawn_enemies(n: int) -> void:
 			run.state.rng.randf_range(view.position.y, view.end.y))
 		run.enemies.spawn(def, pos, {"facing": (run.state.ship_pos - pos).angle()})
 	run.combat.rebuild_grid()
+
+## 円の少し先を指すカーソルの入力。中心から DRIVE_RADIUS の円を回る。
+func _drive_intent() -> Intent:
+	var it := Intent.new()
+	var rel := run.state.ship_pos - drive_center
+	var ahead := rel.normalized().rotated(0.5) if rel.length() > 1.0 else Vector2.RIGHT
+	it.has_cursor = true
+	it.cursor = drive_center + ahead * DRIVE_RADIUS
+	return it
+
+## 機体の向きの先へジグザグの線を描いて確定する。描けたら true。
+func _draw_ahead() -> bool:
+	var s := run.state
+	if s.phase != RunState.Phase.PLAY or s.drawing or s.tracing or s.gauge < run.cfg.draw_min_charge:
+		return false
+	var p := s.ship_pos
+	var heading := s.ship_heading if not s.ship_heading.is_zero_approx() else Vector2.RIGHT
+	var side := heading.orthogonal()
+	var it := Intent.new()
+	it.press = true
+	it.pen = p + heading * 60.0
+	run.draw._start(it)
+	for k in range(1, 7):
+		run.draw._extend(p + heading * (60.0 + 220.0 * k) + side * (160.0 if k % 2 else -160.0))
+	run.draw._commit(it)
+	return true
 
 func _hold_level() -> void:
 	if run != null and run.state != null:

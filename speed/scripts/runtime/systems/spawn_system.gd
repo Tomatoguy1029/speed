@@ -299,6 +299,13 @@ var _survey_raw := 0
 ## 戻り値は、目標の数 pop と比べる、再配置の範囲の中の敵の数。上下左右と中心付近の領域ごとに、
 ## pop × config.spawn_region_cap までしか数えない（一か所に固まった敵だけで目標に届かないように）。
 func _survey(pop: float) -> float:
+	var t0 := Time.get_ticks_usec()
+	var alive_n := _survey_rows(pop)
+	# 開発版の計測：出現のための数え直しの時間
+	ctx.perf.since(&"spawner.survey", t0)
+	return alive_n
+
+func _survey_rows(pop: float) -> float:
 	_edge_counts.fill(0)
 	_type_counts.clear()
 	_zako_counts.clear()
