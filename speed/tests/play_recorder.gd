@@ -405,7 +405,7 @@ func measurement_scenario(recording: bool) -> Dictionary:
 		rec._end("stopped")
 		var rows := read_rows(path)
 		var start: Dictionary = rows[0]
-		check(start.schema_version == 4 and start.measurement_version == 1, "schema4 に識別可能な追加計測を保存する")
+		check(start.schema_version == 4 and start.measurement_version == 2, "schema4 に識別可能な追加計測を保存する")
 		check(start.run_start.conditions.config.gem_max == 1 and start.run_start.conditions.profile.mult.xp == 1.0, "開始時の実効設定と強化係数を保存する")
 		check(start.run_start.conditions.identity.code_sha256.length() == 64 and start.run_start.conditions.identity.runtime_stage_sha256.length() == 64, "コード・実行ステージを識別するハッシュ")
 		var changes := rows.filter(func(e): return e.type == "loadout")

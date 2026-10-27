@@ -12,6 +12,7 @@ func weights_for(section: Dictionary, last: Array) -> Dictionary:
 	return section.get("weights", {"single": 100.0})
 
 func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Array = []) -> Array:
+	var weights := weights_for(section, last)
 	var groups := {}
 	for candidate in candidates:
 		var kind: String = candidate.get("category", "single")
@@ -20,18 +21,18 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 		if not groups[kind].has(id): groups[kind][id] = []
 		groups[kind][id].append([candidate])
 	var cap := float(section.get("available", section.get("cap", INF)))
-	var parallel := {}
-	for i in candidates.size():
-		if candidates[i].get("category", "single") != "single": continue
-		for j in range(i + 1, candidates.size()):
-			if candidates[j].get("category", "single") != "single": continue
-			var pair := [candidates[i], candidates[j]]
-			if not compatible([pair[0]], pair[1], cap, _forbidden): continue
-			var key := identity(pair)
-			if not parallel.has(key): parallel[key] = []
-			parallel[key].append(pair)
-	if not parallel.is_empty(): groups.parallel = parallel
-	var weights := weights_for(section, last)
+	if section.get("allow_parallel", true) and float(weights.get("parallel", 0.0)) > 0.0:
+		var parallel := {}
+		for i in candidates.size():
+			if candidates[i].get("category", "single") != "single": continue
+			for j in range(i + 1, candidates.size()):
+				if candidates[j].get("category", "single") != "single": continue
+				var pair := [candidates[i], candidates[j]]
+				if not compatible([pair[0]], pair[1], cap, _forbidden): continue
+				var key := identity(pair)
+				if not parallel.has(key): parallel[key] = []
+				parallel[key].append(pair)
+		if not parallel.is_empty(): groups.parallel = parallel
 	var previous := identity(last)
 	if section.get("avoid_repeat", true) and not previous.is_empty():
 		var alternatives := groups.duplicate(true)
@@ -41,7 +42,7 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 			if alternatives[kind].is_empty(): alternatives.erase(kind)
 			elif float(weights.get(kind, 0.0)) > 0.0: positive = true
 		if positive: groups = alternatives
-	var actions: Array = sample(groups, weights)
+	var actions: Array = sample(groups, weights, section.get("technique_weights", {}))
 	if record_details:
 		diagnostics["previous_identity"] = previous
 		diagnostics["avoid_repeat"] = section.get("avoid_repeat", true)
@@ -73,7 +74,7 @@ static func compatible(actions: Array, next: Dictionary, cap: float, forbidden: 
 			if pair.size() == 2 and ((pair[0] == action.id and pair[1] == next.id) or (pair[1] == action.id and pair[0] == next.id)): return false
 	return cost <= cap + 0.00001
 
-func sample(groups: Dictionary, weights: Dictionary) -> Array:
+func sample(groups: Dictionary, weights: Dictionary, technique_weights: Dictionary = {}) -> Array:
 	var total := 0.0
 	for kind in groups: total += maxf(0.0, float(weights.get(kind, 0.0)))
 	diagnostics = {"available": groups.keys(), "weights": weights, "total": total}
@@ -84,6 +85,20 @@ func sample(groups: Dictionary, weights: Dictionary) -> Array:
 		cursor -= maxf(0.0, float(weights.get(kind, 0.0)))
 		if cursor < 0.0:
 			var ids: Array = groups[kind].keys()
-			var variants: Array = groups[kind][ids[random.randi_range(0, ids.size() - 1)]]
+			var picked: String
+			if technique_weights.is_empty():
+				picked = String(ids[random.randi_range(0, ids.size() - 1)])
+			else:
+				var total_ids := 0.0
+				for id in ids: total_ids += maxf(0.0, float(technique_weights.get(id, 1.0)))
+				if total_ids <= 0.0: return []
+				var id_cursor := random.randf() * total_ids
+				picked = String(ids.back())
+				for id in ids:
+					id_cursor -= maxf(0.0, float(technique_weights.get(id, 1.0)))
+					if id_cursor < 0.0:
+						picked = String(id)
+						break
+			var variants: Array = groups[kind][picked]
 			return variants[random.randi_range(0, variants.size() - 1)]
 	return []

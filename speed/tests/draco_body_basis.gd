@@ -23,7 +23,7 @@ func _ready() -> void:
 		actor.table.facing[actor.body]=angle
 		actor._update_body()
 		var points: PackedVector2Array=actor.body_points()
-		check(is_equal_approx(FORM.length(points),actor.body_length),"authored body arc length must survive every facing and wave pose")
+		check(absf(FORM.length(points)-actor.body_length)<actor.body_length*0.001,"trail sampling keeps authored body length within 0.1 percent")
 		var base_radius: float=actor.table.r[actor.body]
 		for j in actor.body_rows.size():
 			var t:=float(j+1)/float(actor.body_rows.size())

@@ -5,7 +5,21 @@
 [resource]
 script = ExtResource("1_rn1s6")
 maximum_stamina = 8.0
-layout = null
+layout = {
+"condition_choose_combo": Vector2(2190, 380),
+"condition_choose_major": Vector2(2600, 380),
+"condition_choose_major_2": Vector2(3010, 380),
+"condition_choose_normal": Vector2(140, 380),
+"condition_choose_normal_2": Vector2(500, 420),
+"condition_choose_normal_3": Vector2(960, 380),
+"condition_choose_normal_4": Vector2(1370, 380),
+"condition_choose_normal_5": Vector2(1780, 380),
+"section_0": Vector2(40, 20),
+"section_1": Vector2(342, 28),
+"section_2": Vector2(640, 20),
+"section_3": Vector2(946, 28),
+"shared_rest": Vector2(1288, 28)
+}
 sections = [{
 "cap": 2.0,
 "name": "牽制",
@@ -38,8 +52,34 @@ sections = [{
 }, {
 "cap": 2.0,
 "name": "区間4",
-"next": 0,
+"next": 4,
 "request": "normal",
+"weights": {
+"combo": 15.0,
+"parallel": 25.0,
+"single": 60.0
+}
+}, {
+"action_count": 1,
+"action_interval": 0.0,
+"allowed_categories": ["normal", "combo"],
+"name": "区間5",
+"next": 5,
+"no_candidate_timeout": 0.5,
+"request": "any",
+"weights": {
+"combo": 15.0,
+"parallel": 25.0,
+"single": 60.0
+}
+}, {
+"action_count": 1,
+"action_interval": 0.0,
+"allowed_categories": ["normal", "combo"],
+"name": "区間6",
+"next": 0,
+"no_candidate_timeout": 0.5,
+"request": "any",
 "weights": {
 "combo": 15.0,
 "parallel": 25.0,

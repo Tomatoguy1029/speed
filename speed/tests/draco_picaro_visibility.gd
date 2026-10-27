@@ -20,6 +20,13 @@ func _ready() -> void:
 	check(presentation._picaro_sprites.has(id),"Picaro has independent rendering node")
 	var sprite: Node2D = presentation._picaro_sprites[id]
 	check(sprite.visible,"Picaro visible during normal combat")
+	var birth_scale := sprite.scale.x
+	var physical_radius: float = sim.enemies.table.r[row]
+	actor.clock += 1.05
+	sim.enemies.table.guard[row] = 0.0
+	presentation._sync_picaro()
+	check(birth_scale>sprite.scale.x*1.5,"Picaro emerges large and returns to normal sprite size")
+	check(is_equal_approx(sim.enemies.table.r[row],physical_radius),"Emergence does not change Picaro collision radius")
 	sim.state.cinematic_hide_enemies = true
 	presentation._sync_picaro()
 	check(not sprite.visible,"Cinematic hides independent Picaro sprite too")

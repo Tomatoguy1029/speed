@@ -21,11 +21,13 @@ var placed_meteors: Array = []
 var telegraph_points := PackedVector2Array()
 var attack_points := PackedVector2Array()
 var body_override := PackedVector2Array()
+var body_trail := PackedVector2Array()
+var body_pose := PackedVector2Array()
 ## Combat dimensions are authored once. Poses change the spine, not the size of the animal.
 var body_length := 1500.0
 var body_width := 154.0
-var head_scale := 2.0
-var body_segments := 32
+var head_scale := 1.35
+var body_segments := 128
 var perspective_scale := 1.0
 var telegraph_paths: Array[PackedVector2Array] = []
 var telegraph_widths: Array[float] = []
@@ -47,8 +49,8 @@ func _on_bound() -> void:
 	draws_self = true
 	body_length = float(def.params.get("body_length",1500.0))
 	body_width = float(def.params.get("body_width",154.0))
-	head_scale = float(def.params.get("head_scale",2.0))
-	body_segments = int(def.params.get("body_segments",32))
+	head_scale = float(def.params.get("head_scale",1.35))
+	body_segments = int(def.params.get("body_segments",128))
 	entrance = preload("res://scripts/bosses/draco_entrance.gd").new(self)
 	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
 	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
@@ -90,18 +92,20 @@ func neutral_body_points(head: Vector2, angle: float) -> PackedVector2Array:
 	return points
 
 func body_points() -> PackedVector2Array:
-	var points := body_override.duplicate() if not body_override.is_empty() else neutral_body_points(table.pos[body],table.facing[body])
+	var points := body_override.duplicate() if not body_override.is_empty() else (body_pose.duplicate() if not body_pose.is_empty() else neutral_body_points(table.pos[body],table.facing[body]))
 	if not is_equal_approx(perspective_scale,1.0):
 		var head: Vector2 = table.pos[body]
 		for j in points.size(): points[j] = head+(points[j]-head)*perspective_scale
 	return points
 
 func aim_target(lead_seconds := 0.0) -> Vector2:
+	if run_state.tracing:
+		return run_state.enemy_aim
 	var lead: Vector2 = run_state.ship_vel*maxf(0.0,lead_seconds)
 	return run_state.ship_pos+lead.limit_length(float(def.params.get("aim_lead_cap",280.0)))
 
 func mouth_pos() -> Vector2:
-	return table.pos[body]+Vector2.from_angle(table.facing[body])*105.0*head_scale*perspective_scale
+	return table.pos[body]+Vector2.from_angle(table.facing[body])*120.0*head_scale*perspective_scale
 
 func mouth_position() -> Vector2:
 	return mouth_pos()
@@ -116,9 +120,14 @@ func apply_depth(depth: float, alpha := 1.0) -> void:
 	_update_body()
 
 func reset_pose() -> void:
+	if has_body() and is_equal_approx(perspective_scale,1.0):
+		body_trail = body_override.duplicate() if not body_override.is_empty() else body_points()
+	else:
+		body_trail.clear()
 	body_override.clear()
+	body_pose.clear()
 	body_width = float(def.params.get("body_width",154.0))
-	head_scale = float(def.params.get("head_scale",2.0))
+	head_scale = float(def.params.get("head_scale",1.35))
 	perspective_scale = 1.0
 	if _presentation != null:
 		_presentation.scale = Vector2.ONE
@@ -127,6 +136,10 @@ func reset_pose() -> void:
 	if has_body(): _update_body()
 
 func _update_body() -> void:
+	if body_override.is_empty():
+		var followed: Dictionary = FORM.follow_trail(body_trail if not body_trail.is_empty() else neutral_body_points(table.pos[body],table.facing[body]), table.pos[body], body_length, body_segments + 1)
+		body_trail = followed.trail
+		body_pose = followed.points
 	position = table.pos[body]
 	rotation = table.facing[body]
 	var points := body_points()
@@ -152,6 +165,7 @@ func owns_damage_target(row: int) -> bool:
 	return false
 
 func _exit_tree() -> void:
+	if _driver != null: _driver.end(self,true)
 	if entrance != null: entrance.cancel()
 	if finale != null: finale.dispose()
 	if cycle != null: cycle.cancel()
@@ -189,14 +203,15 @@ func start_attack(id: StringName) -> bool:
 	attack_hit = false
 	aim = aim_target()
 	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
-	table.facing[body] = direction.angle()
+	var screen_staged := id in [&"leap", &"charge", &"rifts"]
+	if not screen_staged: table.facing[body] = direction.angle()
 	_driver = rule().driver.new() if rule().has("driver") else null
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	if _driver != null: _driver.begin(self)
 	ctx.bosses.recording_actor = prior_observer
-	combat_trace.stage("telegraph")
-	if _driver == null or not ("locked" in _driver): combat_trace.stage("lock", {"scope": "initial_aim"})
+	combat_trace.stage("reposition" if screen_staged else "telegraph")
+	if not screen_staged and (_driver == null or not ("locked" in _driver)): combat_trace.stage("lock", {"scope": "initial_aim"})
 	_update_body()
 	_presentation.queue_redraw()
 	return true
@@ -224,6 +239,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	elapsed += dt
+	# なぞり中は予告の狙いを固定する。渦の中心移動は構図維持なので対象外。
+	if mode == &"windup" and run_state.tracing and technique not in [&"spiral", &"charge", &"leap", &"rifts"] and _driver != null and "locked" in _driver and not _driver.locked:
+		_driver.locked = true
+		combat_trace.stage("lock", {"scope": "trace_aim"})
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
@@ -258,7 +277,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_update_body()
 	_presentation.queue_redraw()
 	if selection_enabled and mode == &"idle" and flow_adapter != null:
-		var delta := run_state.ship_pos-table.pos[body]
+		var delta := aim_target()-table.pos[body]
 		if delta.length()>float(def.params.get("approach_distance",900.0)):
 			table.pos[body]+=delta.normalized()*def.speed*dt
 			table.facing[body]=delta.angle()

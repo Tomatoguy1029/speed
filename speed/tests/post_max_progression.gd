@@ -14,6 +14,7 @@ func _ready() -> void:
 	run = scene.sim
 	_test_transition()
 	_test_traits_and_stacks()
+	_test_trait_levels()
 	_test_hp_and_healing()
 	_test_weapon_paths()
 	_test_collision_and_pickups()
@@ -21,6 +22,7 @@ func _ready() -> void:
 	_test_time_caps()
 	_test_selection_lifetime()
 	_check(JSON.stringify(SaveManager.data) == saved, "全選択が永続セーブへ漏れない")
+	await _test_legacy_lab_traits()
 	await _close()
 	var fresh := RunManager.create_session(self, {"lab": true, "seed": 84}, false)
 	_check(fresh.sim.state.post_max_stacks.is_empty(), "次ランの追加強化は空")
@@ -38,8 +40,75 @@ func _equip(ids: Array, lv := -1) -> void:
 	run.set_phase(RunState.Phase.PLAY)
 
 func _complete_traits() -> void:
-	for id in [&"T01", &"T03", &"T04", &"T05", &"T06"]:
+	for id in [&"T01", &"T03", &"T04", &"T05"]:
 		_check(run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks), "特性 %s をMAX" % id)
+
+func _test_trait_levels() -> void:
+	_check(run.cfg.trait_slots == 4 and run.cfg.trait_max_stacks == 5, "新ランは特性4枠・Lv5")
+	for lv in range(1, 6):
+		run.loadout.reset_loadout()
+		_check(run.loadout.grant(&"trait", &"T05", lv), "T05 Lv%d を装備" % lv)
+		var sonic = run.loadout.trait_behaviors[&"T05"]
+		_check(sonic._every() == [8, 6, 4, 4, 4][lv - 1], "T05 Lv%d の撃破間隔" % lv)
+		_check(is_equal_approx(sonic.val("radius"), 270.0 + lv * 30.0), "T05 Lv%d の範囲" % lv)
+		_check(is_equal_approx(sonic.val("damage"), 0.55 + lv * 0.05), "T05 Lv%d の威力倍率" % lv)
+		_check(is_equal_approx(float(sonic.def.params.knock), 1000.0), "T05 Lv%d の吹き飛ばし" % lv)
+		sonic.on_launch(false)
+		sonic.on_kill(&"killSonic")
+		_check(sonic._kills == 0, "T05 Lv%d の衝撃波撃破を次の発生数に含めない" % lv)
+		_check(run.loadout.grant(&"trait", &"T13", lv), "T13 Lv%d を装備" % lv)
+		var reactive = run.loadout.trait_behaviors[&"T13"]
+		_check(is_equal_approx(reactive.val("radius"), 185.0 + lv * 15.0), "T13 Lv%d の範囲" % lv)
+		_check(is_equal_approx(reactive.val("damage"), 1.0 + lv * 0.2), "T13 Lv%d の威力倍率" % lv)
+		_check(is_equal_approx(float(reactive.def.params.knock), 450.0), "T13 Lv%d の吹き飛ばし" % lv)
+	_check(not run.loadout.grant(&"trait", &"T05"), "Lv5より上へ進まない")
+	run.loadout.reset_loadout()
+	for id in [&"T01", &"T03", &"T04", &"T05"]:
+		_check(run.loadout.grant(&"trait", id), "4枠を取得")
+	_check(not run.loadout.grant(&"trait", &"T06"), "5個目の新規特性は取得しない")
+	_check(run.loadout.grant(&"trait", &"T01"), "4枠でも所持特性はLv5まで上げられる")
+	run.loadout.reset_loadout()
+	var effect_levels := {
+		&"T01": {"damage": [1.5, 1.75, 2.0, 2.25, 2.5], "radius": [210.0, 225.0, 240.0, 255.0, 270.0]},
+		&"T03": {"radius": [215.0, 232.5, 250.0, 267.5, 285.0], "life": [1.9, 2.1, 2.3, 2.5, 2.7], "power": [270.0, 305.0, 340.0, 375.0, 410.0]},
+		&"T04": {"mult": [1.5, 1.625, 1.75, 1.875, 2.0]},
+		&"T06": {"damage": [2.4, 2.8, 3.2, 3.6, 4.0], "length": [840.0, 900.0, 960.0, 1020.0, 1080.0], "width": [40.0, 44.0, 48.0, 52.0, 56.0]},
+	}
+	for id in effect_levels:
+		for lv in range(1, 6):
+			run.loadout.reset_loadout()
+			_check(run.loadout.grant(&"trait", id, lv), "%s Lv%d を装備" % [id, lv])
+			var behavior: TraitBehavior = run.loadout.trait_behaviors[id]
+			for key in effect_levels[id]:
+				_check(is_equal_approx(behavior.val(key), float(effect_levels[id][key][lv - 1])), "%s Lv%d %s" % [id, lv, key])
+	var stat_levels := {
+		&"T07": {"field": "charge_time", "values": [1.25, 1.375, 1.5, 1.625, 1.75]},
+		&"T08": {"field": "capacity", "values": [1.2, 1.4, 1.6, 1.8, 2.0]},
+		&"T10": {"field": "max_speed", "values": [1.12, 1.19, 1.26, 1.33, 1.4]},
+		&"T11": {"field": "attack_mult", "values": [1.2, 1.3, 1.4, 1.5, 1.6]},
+		&"T12": {"field": "pickup_radius", "values": [1.3, 1.6, 1.9, 2.2, 2.5]},
+		&"T14": {"field": "length_mult", "values": [1.25, 1.4, 1.55, 1.7, 1.85]},
+		&"T31": {"field": "glide_duration_mult", "values": [1.25, 1.375, 1.5, 1.625, 1.75]},
+	}
+	for id in stat_levels:
+		for lv in range(1, 6):
+			run.loadout.reset_loadout()
+			var field: String = stat_levels[id].field
+			var baseline := float(run.state.stats.get(field))
+			_check(run.loadout.grant(&"trait", id, lv), "%s Lv%d を装備" % [id, lv])
+			var expected: float = stat_levels[id]["values"][lv - 1]
+			var value := float(run.state.stats.get(field))
+			_check(is_equal_approx(value, baseline / expected if id == &"T07" else baseline * expected), "%s Lv%d %s" % [id, lv, field])
+	run.loadout.reset_loadout()
+
+func _test_legacy_lab_traits() -> void:
+	var lab: Node = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"traits": {"T01": 3, "T03": 3, "T04": 3, "T05": 3, "T06": 3}})
+	_check(lab.run.cfg.trait_slots == 5 and lab.run.state.traits.size() == 5, "旧実験場の5枠装備を削除せず復元")
+	_check(lab.run.state.traits.values().all(func(level): return level == 3), "旧実験場のLv3を維持")
+	_check(not lab.run.loadout.all_traits_max() and lab.run.loadout.grant(&"trait", &"T06", 2), "旧装備もLv5まで成長できる")
+	lab.queue_free()
 
 func _test_transition() -> void:
 	_check(not run.loadout.all_weapons_max(), "武器なしでは全MAXにならない")
@@ -58,21 +127,25 @@ func _test_transition() -> void:
 	_check(run.loadout.all_weapons_max() and not run.loadout.normal_progression_complete(), "武器が全MAXでも特性の育成を続ける")
 	_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "空の特性枠があれば追加強化を出さない")
 	_check(not run.loadout.post_max.select(&"duration"), "通常育成中は直接の追加取得も拒否")
-	for id in [&"T01", &"T03", &"T04", &"T05"]:
+	for id in [&"T01", &"T03", &"T04"]:
 		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
-	_check(not run.loadout.all_traits_max() and run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "特性4/5枠では未取得特性を優先")
+	_check(not run.loadout.all_traits_max() and run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "特性3/4枠では未取得特性を優先")
 	_equip([&"W01", &"W03", &"W08", &"W17"])
-	for id in [&"T31", &"T08", &"T01"]:
+	for id in [&"T31"]:
 		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
-	for id in [&"T14", &"T12"]:
+	for id in [&"T01", &"T14", &"T12"]:
 		run.loadout.grant(&"trait", id)
-	_check(run.loadout.all_weapons_max() and not run.loadout.all_traits_max(), "録画のT14/T12が1/3なら通常育成")
+	_check(run.loadout.all_weapons_max() and not run.loadout.all_traits_max(), "MAX直前も通常育成")
+	var three := run.loadout.roll_cards()
+	_check(three.size() == 3 and three.all(func(c): return c.kind == &"trait"), "通常候補3件を提示し回復なし")
+	run.loadout.grant(&"trait", &"T01", 4)
 	var unfinished := run.loadout.roll_cards()
-	_check(unfinished.filter(func(c): return c.kind == &"trait").size() == 2 and unfinished.all(func(c): return c.kind == &"trait" or c.kind == &"heal"), "録画の未MAX特性を提示し不足枠は通常回復")
-	run.loadout.grant(&"trait", &"T14", 2)
-	_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "最後の特性が未完成なら追加強化なし")
-	run.loadout.grant(&"trait", &"T12", 2)
-	_check(run.loadout.normal_progression_complete(), "5枠の所持特性が全てMAXで解禁")
+	_check(unfinished.size() == 2 and unfinished.all(func(c): return c.kind == &"trait"), "通常候補2件を提示し回復なし")
+	run.loadout.grant(&"trait", &"T14", 4)
+	var last := run.loadout.roll_cards()
+	_check(last.size() == 1 and last[0].kind == &"trait" and last[0].id == &"T12", "通常候補1件で回復・追加強化なし")
+	run.loadout.grant(&"trait", &"T12", 4)
+	_check(run.loadout.normal_progression_complete(), "4枠の所持特性が全てLv5で解禁")
 	for i in 100:
 		var cards := run.loadout.roll_cards()
 		var seen := {}
@@ -81,6 +154,14 @@ func _test_transition() -> void:
 			_check(not seen.has(card.id), "1画面に同じ候補は1枚")
 			seen[card.id] = true
 			_check(card.kind != &"trait", "通常育成完了後は特性の未完成候補なし")
+	# データ欠落・特殊設定で候補0になっても、空のカード画面で停止しない。
+	var weapon_slots := run.cfg.weapon_slots
+	run.cfg.weapon_slots = 0
+	run.state.pending_levels = 2
+	run.state.cards = []
+	_check(run.loadout.roll_cards().is_empty(), "MAX判定未成立で候補0を検出")
+	_check(not run.loadout.try_open_cards() and run.state.pending_levels == 0 and run.state.cards.is_empty(), "候補0は空画面を開かず保留を完了")
+	run.cfg.weapon_slots = weapon_slots
 	_equip([&"W01", &"W03", &"W21", &"W22"])
 	_complete_traits()
 	_check(run.loadout.normal_progression_complete(), "彗星限定も装備枠のMAXとして扱う")
@@ -94,7 +175,7 @@ func _test_traits_and_stacks() -> void:
 			run.state.traits = {&"T09": trait_count}
 			run.state.post_max_stacks = {&"crit_chance": count}
 			run.loadout.refresh_stats()
-			var expected := 0.05 + trait_count * 0.05 + minf(0.1, count * 0.01)
+			var expected := 0.05 + mini(trait_count, 3) * 0.05 + maxi(trait_count - 3, 0) * 0.03 + minf(0.04, count * 0.01)
 			_check(is_equal_approx(run.state.stats.crit_chance, expected), "T09 %d / 追加 %d の確率" % [trait_count, count])
 			var before := run.state.stats.crit_chance
 			for repeat in 4: run.loadout.refresh_stats()
@@ -102,34 +183,34 @@ func _test_traits_and_stacks() -> void:
 			run.state.post_max_stacks = JSON.parse_string(JSON.stringify(run.state.post_max_stacks))
 			run.loadout.refresh_stats()
 			_check(is_equal_approx(run.state.stats.crit_chance, expected), "全T09枚数・追加回数でJSON読込が等価")
-			_check(pm.eligible(&"crit_chance") == (count < 10), "追加クリティカルの上限と無効候補除外")
+			_check(pm.eligible(&"crit_chance") == (count < 4), "追加クリティカルの上限と無効候補除外")
 			if trait_count < run.cfg.trait_max_stacks:
 				run.state.traits[&"T09"] += 1
 				run.loadout.refresh_stats()
-				_check(is_equal_approx(run.state.stats.crit_chance - before, 0.05), "追加上限でもT09の1枚5ポイントを維持")
-	# 特性の重ね上限を増やして既存30%の縁に達しても、追加強化が特性枠を奪わない。
+				_check(is_equal_approx(run.state.stats.crit_chance - before, 0.05 if trait_count < 3 else 0.03), "T09の既存3段と上位2段の増分を維持")
+	# 上限を越える特殊設定でも、クリティカル率を30%以内に保つ。
 	var original_max := run.cfg.trait_max_stacks
-	run.cfg.trait_max_stacks = 5
-	for trait_count in range(6):
+	run.cfg.trait_max_stacks = 7
+	for trait_count in range(8):
 		run.state.traits = {&"T09": trait_count}
 		run.state.post_max_stacks = {&"crit_chance": 1000}
 		run.loadout.refresh_stats()
-		_check(is_equal_approx(run.state.stats.crit_chance, minf(0.3, 0.05 + trait_count * 0.05)), "特性だけで上限に届く設定でも予約・総上限を維持")
+		_check(is_equal_approx(run.state.stats.crit_chance, minf(0.3, 0.05 + mini(trait_count, 3) * 0.05 + maxi(trait_count - 3, 0) * 0.03)), "特性だけで上限に届く設定でも予約・総上限を維持")
 		_check(not pm.eligible(&"crit_chance"), "特性予約が上限を使い切ると追加確率を除外")
 	run.cfg.trait_max_stacks = original_max
 	# 通常育成完了後、上限に達した追加確率は消費しない。
-	run.state.traits = {&"T09": 3, &"T01": 3, &"T03": 3, &"T04": 3, &"T05": 3}
+	run.state.traits = {&"T09": 5, &"T01": 5, &"T03": 5, &"T04": 5}
 	run.state.post_max_stacks = {}
 	run.loadout.refresh_stats()
-	for i in 10: _check(pm.select(&"crit_chance"), "MAX特性後に追加確率を取得")
-	for i in 2: _check(not pm.select(&"crit_chance"), "効かない11枚目以降を消費しない")
+	for i in 4: _check(pm.select(&"crit_chance"), "MAX特性後に追加確率を取得")
+	for i in 2: _check(not pm.select(&"crit_chance"), "効かない5枚目以降を消費しない")
 	run.loadout.refresh_stats()
 	_check(is_equal_approx(run.state.stats.crit_chance, 0.3), "T09をMAXにしてから追加確率で30%")
-	_check(int(run.state.post_max_stacks[&"crit_chance"]) == 10, "追加確率の上限は10枚")
+	_check(int(run.state.post_max_stacks[&"crit_chance"]) == 4, "追加確率の上限は4枚")
 	# 全既存の数値特性と永続強化を含む基準に、増分を加算する。
 	run.ctx.profile = ProfileManager.compute({"speed": 5, "atk": 5, "hp": 5, "charge": 5, "pickup": 5, "length": 5, "xp": 5})
 	run.state.post_max_stacks = {}
-	run.state.traits = {&"T07": 3, &"T08": 3, &"T09": 3, &"T10": 3, &"T11": 3, &"T12": 3, &"T14": 3, &"T31": 3}
+	run.state.traits = {&"T07": 5, &"T08": 5, &"T09": 5, &"T10": 5, &"T11": 5, &"T12": 5, &"T14": 5, &"T31": 5}
 	run.loadout.refresh_stats()
 	var base := pm.baseline.duplicate()
 	var attack := run.combat.attack_power()

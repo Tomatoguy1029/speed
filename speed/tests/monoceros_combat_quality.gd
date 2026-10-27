@@ -108,6 +108,7 @@ func _ready() -> void:
 				actor._cooldown = 0.0
 				actor.selection_enabled = true
 				sim.state.rng.seed = seed_value
+				if context == "middle" and seed_value % 2 == 0: actor.flow_runner.index = 1
 				var candidates: Array = actor.flow_adapter.candidates({"request":"any"}).candidates.map(func(c): return String(c.id))
 				actor.flow_runner.tick(DT,{},actor.flow_adapter)
 				var selected := String(actor.flow_runner.last[0].id) if not actor.flow_runner.last.is_empty() else ""
@@ -120,7 +121,13 @@ func _ready() -> void:
 			selection_results.append({"phase":phase,"context":context,"selected":chosen})
 			if context == "middle":
 				check(chosen.has("charge") and chosen.has("return_charge"), "中距離で通常・往復を両方選べる")
-				if phase == 2: check(chosen.has("lance"), "第2形態は槍も実際に選べる")
+				if phase == 2:
+					fresh(Vector2(700,0), Vector2.ZERO, phase, 0.0)
+					actor._cooldown = 0.0
+					actor.selection_enabled = true
+					actor.flow_runner.index = 2
+					actor.flow_runner.tick(DT, {}, actor.flow_adapter)
+					check(not actor.flow_runner.last.is_empty() and actor.flow_runner.last[0].id == "lance", "第2形態の大技区間は槍を選べる")
 	fresh(Vector2(-180,0),Vector2.ZERO,1,0.0)
 	actor._cooldown = 0.0
 	actor.cooldowns[&"kick"] = actor.clock+9.0

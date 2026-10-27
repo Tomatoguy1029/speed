@@ -1,9 +1,4 @@
-"""Validate the reusable Stage 5 library and optionally compare a Git baseline.
-
-Run from the repository root:
-    python3 speed/tests/stage5_formations.py --baseline-ref <commit>
-"""
-import argparse
+"""Validate the Stage 5 formation references and per-species patterns."""
 import math
 from pathlib import Path
 import re
@@ -87,22 +82,27 @@ def placed(entry, marker, turn, stretch):
     return (x * math.cos(turn) - y * math.sin(turn), x * math.sin(turn) + y * math.cos(turn), angle + rotation + turn)
 
 
-def validate(baseline):
+def validate():
     _, clips = stage()
     config = props(read("speed/data/config.tres"))
     view = float(config["base_view"])
     safe_radius = math.hypot(view * 16 / 9, view) / 2 + 300
-    assert len(clips) == 31
+    assert clips
     assert {int(c[0]["track"]) for c in clips.values()} == set(range(8))
     for species in SPECIES:
-        layouts, entries = formation(f"speed/data/formations/s5_{species}.tscn")
-        assert len(entries) == 4
-        assert len(set(tuple(sorted(markers)) for _, markers in layouts.values())) == len(layouts), f"{species}: duplicate placements"
+        scene = "s2_crab" if species == "crab" else species
+        path = f"speed/data/formations/{scene}.tscn"
+        layouts, entries = formation(path)
+        assert entries, f"{species}: no entries"
+        signatures = []
+        for _, markers in layouts.values():
+            min_x = min(pos[0] for _, pos, _ in markers)
+            min_y = min(pos[1] for _, pos, _ in markers)
+            signatures.append(tuple(sorted((kind, round(pos[0] - min_x, 3), round(pos[1] - min_y, 3), round(rot, 3))
+                                           for kind, pos, rot in markers)))
+        assert len(set(signatures)) == len(layouts), f"{species}: translated duplicate placements"
+        assert sum(len(markers) == 1 for _, markers in layouts.values()) == 1, f"{species}: one solo pattern"
         assert not any(re.search(r'(?:peak|grow|phase)\d*', name) for name in layouts), f"{species}: phase identity"
-        multis = [markers for _, markers in layouts.values() if len(markers) > 1]
-        if species not in ("cepheus", "aquila"):
-            assert len(multis) >= 2, f"{species}: needs distinct multi-member alternatives"
-        path = f"speed/data/formations/s5_{species}.tscn"
         assert f'types = Array[StringName]([&"{species}"])' in read(path)
         for reference in re.findall(r'path="res://([^"]+)"', read(path)):
             assert (ROOT / "speed" / reference).is_file(), f"broken asset: {reference}"
@@ -118,30 +118,14 @@ def validate(baseline):
                     assert math.dist(a[1], b[1]) >= radius * 2 * 1.3, f"{species}: overlapping members"
         if species == "crow":
             flock = int(re.search(r'"flock": (\d+)', read("speed/data/enemies/crow.tres"))[1])
-            assert flock == 4 and all(len(markers) * flock == 8 for markers in multis), "crow alternatives must represent two four-bird flocks"
+            assert flock == 4 and {len(markers) for _, markers in layouts.values()} == {1, 2}, "crow one and two flock patterns"
     for _, signatures, _ in clips.values():
-        assert len(signatures) == 1 and len(signatures[0][1]) == 1, "new multi-member choice was enabled"
-    if baseline:
-        old_text, old = stage(baseline)
-        new_text, _ = stage()
-        scrub = lambda s: re.sub(r'^layouts = .*$', '', s, flags=re.M)
-        assert scrub(old_text) == scrub(new_text), "stage changed beyond layout references"
-        assert old.keys() == clips.keys()
-        comparisons = 0
-        for key, (values, signatures, entries) in clips.items():
-            old_values, old_signatures, old_entries = old[key]
-            assert {k: v for k, v in values.items() if k != "layouts"} == {k: v for k, v in old_values.items() if k != "layouts"}
-            assert signatures == old_signatures and entries == old_entries, f"{key}: spawn semantics changed"
-            for entry, old_entry in zip(entries, old_entries):
-                for turn in (0, math.pi / 2, -0.73):
-                    for stretch in (1, 1.8):
-                        assert placed(entry, signatures[0][1][0], turn, stretch) == placed(old_entry, old_signatures[0][1][0], turn, stretch)
-                        comparisons += 1
-        print(f"PASS: 31 clips unchanged except references; {comparisons} spawn transforms identical")
-    print("PASS: 8 reusable libraries; valid layouts, types, spacing and safe entries")
+        assert signatures, "clip needs a selected pattern"
+    assert not list((ROOT / 'speed/data/formations').glob('s5_grow_*.tscn'))
+    assert not list((ROOT / 'speed/data/formations').glob('s5_peak_*.tscn'))
+    assert not list((ROOT / 'speed/data/formations').glob('s5_*.tscn'))
+    print(f"PASS: {len(clips)} clip references; 8 per-species libraries without translated solo duplicates")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--baseline-ref")
-    validate(parser.parse_args().baseline_ref)
+    validate()

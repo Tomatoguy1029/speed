@@ -1,17 +1,17 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://c1oc0arox6d64"]
 
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_tpwl5"]
-[ext_resource type="PackedScene" uid="uid://p6qopama1bp6" path="res://data/formations/s5_aquila.tscn" id="aquila"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_auriga.tscn" id="auriga"]
-[ext_resource type="PackedScene" uid="uid://dcsv22ppl5x8w" path="res://data/formations/s5_cepheus.tscn" id="cepheus"]
+[ext_resource type="PackedScene" uid="uid://gua8dfi6p1wd" path="res://data/formations/pump.tscn" id="3_b421h"]
+[ext_resource type="PackedScene" uid="uid://cc5rfloat4luf" path="res://data/formations/cross.tscn" id="5_b421h"]
+[ext_resource type="PackedScene" uid="uid://dix03w6vstef7" path="res://data/formations/s2_crab.tscn" id="10_l47qx"]
+[ext_resource type="PackedScene" uid="uid://bxl2barjiuk3s" path="res://data/formations/dolphin.tscn" id="11_l47qx"]
+[ext_resource type="PackedScene" uid="uid://p6qopama1bp6" path="res://data/formations/aquila.tscn" id="aquila"]
+[ext_resource type="PackedScene" uid="uid://kb2gn6nbf7dj" path="res://data/formations/auriga.tscn" id="auriga"]
+[ext_resource type="PackedScene" uid="uid://dcsv22ppl5x8w" path="res://data/formations/cepheus.tscn" id="cepheus"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_crab.tscn" id="crab"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_cross.tscn" id="cross"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_crow.tscn" id="crow"]
+[ext_resource type="PackedScene" uid="uid://k4vwt3h3l6ap" path="res://data/formations/crow.tscn" id="crow"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_dolphin.tscn" id="dolphin"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
-[ext_resource type="PackedScene" path="res://data/formations/s5_pump.tscn" id="pump"]
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 
 [sub_resource type="Resource" id="Clip_0"]
@@ -19,9 +19,8 @@ script = ExtResource("clip")
 label = "ポンプ座"
 track = 0
 types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s5_pump/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("3_b421h")])
+layouts = Array[StringName]([&"pump/単体"])
 length = 45.0
 interval = 22.0
 
@@ -30,9 +29,8 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 length = 45.0
 interval = 22.0
 
@@ -41,9 +39,8 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 90.0
 length = 25.0
 interval = 20.0
@@ -53,12 +50,11 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体"])
 time = 90.0
 length = 25.0
-interval = 20.0
+interval = 15.0
 
 [sub_resource type="Resource" id="Clip_4"]
 script = ExtResource("clip")
@@ -66,8 +62,7 @@ label = "ぎょしゃ座"
 track = 3
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("auriga")])
-layouts = Array[StringName]([&"s5_auriga/1体・中央"])
-attack_priority = 1
+layouts = Array[StringName]([&"auriga/1体"])
 time = 170.0
 length = 25.0
 interval = 18.0
@@ -77,9 +72,8 @@ script = ExtResource("clip")
 label = "いるか座"
 track = 4
 types = Array[StringName]([&"dolphin"])
-formations = Array[PackedScene]([ExtResource("dolphin")])
-layouts = Array[StringName]([&"s5_dolphin/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("11_l47qx")])
+layouts = Array[StringName]([&"dolphin/1体"])
 time = 170.0
 length = 25.0
 interval = 18.0
@@ -89,9 +83,8 @@ script = ExtResource("clip")
 label = "ポンプ座"
 track = 0
 types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s5_pump/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("3_b421h")])
+layouts = Array[StringName]([&"pump/単体", &"pump/二体並び"])
 time = 265.0
 length = 25.0
 interval = 16.0
@@ -101,21 +94,19 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体"])
 time = 265.0
 length = 25.0
-interval = 16.0
+interval = 15.0
 
 [sub_resource type="Resource" id="Clip_8"]
 script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 370.0
 length = 25.0
 interval = 14.0
@@ -125,9 +116,8 @@ script = ExtResource("clip")
 label = "いるか座"
 track = 4
 types = Array[StringName]([&"dolphin"])
-formations = Array[PackedScene]([ExtResource("dolphin")])
-layouts = Array[StringName]([&"s5_dolphin/1体・中央"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("11_l47qx")])
+layouts = Array[StringName]([&"dolphin/1体", &"dolphin/2体並び"])
 time = 370.0
 length = 25.0
 interval = 14.0
@@ -137,9 +127,8 @@ script = ExtResource("clip")
 label = "ポンプ座"
 track = 0
 types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s5_pump/1体・左240"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("3_b421h")])
+layouts = Array[StringName]([&"pump/単体", &"pump/二体並び"])
 time = 45.0
 length = 45.0
 interval = 18.0
@@ -149,11 +138,11 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・後80"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 45.0
 length = 45.0
+groups = 2
 interval = 18.0
 
 [sub_resource type="Resource" id="Clip_12"]
@@ -161,9 +150,8 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・右240"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 time = 45.0
 length = 45.0
 interval = 18.0
@@ -174,8 +162,7 @@ label = "ぎょしゃ座"
 track = 3
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("auriga")])
-layouts = Array[StringName]([&"s5_auriga/1体・左240"])
-attack_priority = 1
+layouts = Array[StringName]([&"auriga/1体", &"auriga/2体・横並び"])
 time = 115.0
 length = 55.0
 interval = 16.0
@@ -185,11 +172,11 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・後80"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 115.0
 length = 55.0
+groups = 2
 interval = 16.0
 
 [sub_resource type="Resource" id="Clip_15"]
@@ -197,9 +184,8 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・右240"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 time = 115.0
 length = 55.0
 interval = 16.0
@@ -210,11 +196,10 @@ label = "からす座"
 track = 5
 types = Array[StringName]([&"crow"])
 formations = Array[PackedScene]([ExtResource("crow")])
-layouts = Array[StringName]([&"s5_crow/1群・中央"])
-attack_priority = 1
+layouts = Array[StringName]([&"crow/1群", &"crow/2群"])
 time = 115.0
-length = 365.0
-interval = 24.0
+length = 357.0
+interval = 15.0
 
 [sub_resource type="Resource" id="Clip_17"]
 script = ExtResource("clip")
@@ -222,7 +207,7 @@ label = "ケフェウス座"
 track = 6
 types = Array[StringName]([&"cepheus"])
 formations = Array[PackedScene]([ExtResource("cepheus")])
-layouts = Array[StringName]([&"s5_cepheus/1体・左240"])
+layouts = Array[StringName]([&"cepheus/1体"])
 attack_priority = 1
 time = 195.0
 length = 70.0
@@ -233,9 +218,8 @@ script = ExtResource("clip")
 label = "いるか座"
 track = 4
 types = Array[StringName]([&"dolphin"])
-formations = Array[PackedScene]([ExtResource("dolphin")])
-layouts = Array[StringName]([&"s5_dolphin/1体・後80"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("11_l47qx")])
+layouts = Array[StringName]([&"dolphin/1体"])
 time = 195.0
 length = 70.0
 interval = 18.0
@@ -245,11 +229,11 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・右240"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 195.0
 length = 70.0
+groups = 2
 interval = 18.0
 
 [sub_resource type="Resource" id="Clip_20"]
@@ -258,11 +242,11 @@ label = "わし座"
 track = 7
 types = Array[StringName]([&"aquila"])
 formations = Array[PackedScene]([ExtResource("aquila")])
-layouts = Array[StringName]([&"s5_aquila/1体・左240"])
+layouts = Array[StringName]([&"aquila/1体"])
 attack_priority = 1
 time = 290.0
 length = 80.0
-interval = 16.0
+interval = 30.0
 
 [sub_resource type="Resource" id="Clip_21"]
 script = ExtResource("clip")
@@ -270,9 +254,8 @@ label = "ぎょしゃ座"
 track = 3
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("auriga")])
-layouts = Array[StringName]([&"s5_auriga/1体・後80"])
-attack_priority = 1
-time = 290.0
+layouts = Array[StringName]([&"auriga/1体", &"auriga/2体・横並び", &"auriga/3体・斜め並び"])
+time = 325.0
 length = 80.0
 interval = 16.0
 
@@ -281,12 +264,12 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・右240"])
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 attack_priority = 1
 time = 290.0
 length = 80.0
-interval = 16.0
+interval = 15.0
 
 [sub_resource type="Resource" id="Clip_23"]
 script = ExtResource("clip")
@@ -294,22 +277,22 @@ label = "ケフェウス座"
 track = 6
 types = Array[StringName]([&"cepheus"])
 formations = Array[PackedScene]([ExtResource("cepheus")])
-layouts = Array[StringName]([&"s5_cepheus/1体・左360"])
+layouts = Array[StringName]([&"cepheus/1体"])
 attack_priority = 1
 time = 395.0
-length = 42.5
-interval = 14.0
+length = 77.0
+interval = 20.0
 
 [sub_resource type="Resource" id="Clip_24"]
 script = ExtResource("clip")
 label = "いるか座"
 track = 4
 types = Array[StringName]([&"dolphin"])
-formations = Array[PackedScene]([ExtResource("dolphin")])
-layouts = Array[StringName]([&"s5_dolphin/1体・左120後80"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("11_l47qx")])
+layouts = Array[StringName]([&"dolphin/1体"])
 time = 395.0
 length = 42.5
+groups = 3
 interval = 14.0
 
 [sub_resource type="Resource" id="Clip_25"]
@@ -317,11 +300,11 @@ script = ExtResource("clip")
 label = "かに座"
 track = 1
 types = Array[StringName]([&"crab"])
-formations = Array[PackedScene]([ExtResource("crab")])
-layouts = Array[StringName]([&"s5_crab/1体・右120"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("10_l47qx")])
+layouts = Array[StringName]([&"s2_crab/単体"])
 time = 395.0
 length = 42.5
+groups = 2
 interval = 14.0
 
 [sub_resource type="Resource" id="Clip_26"]
@@ -329,25 +312,11 @@ script = ExtResource("clip")
 label = "みなみじゅうじ座"
 track = 2
 types = Array[StringName]([&"cross"])
-formations = Array[PackedScene]([ExtResource("cross")])
-layouts = Array[StringName]([&"s5_cross/1体・右360後80"])
-attack_priority = 1
+formations = Array[PackedScene]([ExtResource("5_b421h")])
+layouts = Array[StringName]([&"cross/1体", &"cross/2体"])
 time = 395.0
 length = 42.5
 interval = 14.0
-
-[sub_resource type="Resource" id="Clip_27"]
-script = ExtResource("clip")
-label = "ケフェウス座"
-track = 6
-types = Array[StringName]([&"cepheus"])
-formations = Array[PackedScene]([ExtResource("cepheus")])
-layouts = Array[StringName]([&"s5_cepheus/1体・左360"])
-attack_priority = 1
-time = 437.5
-length = 42.5
-groups = 2
-interval = 12.0
 
 [sub_resource type="Resource" id="Clip_28"]
 script = ExtResource("clip")
@@ -355,12 +324,12 @@ label = "わし座"
 track = 7
 types = Array[StringName]([&"aquila"])
 formations = Array[PackedScene]([ExtResource("aquila")])
-layouts = Array[StringName]([&"s5_aquila/1体・左120後80"])
+layouts = Array[StringName]([&"aquila/1体"])
 attack_priority = 1
-time = 437.5
-length = 42.5
+time = 438.0
+length = 34.0
 groups = 2
-interval = 12.0
+interval = 30.0
 
 [sub_resource type="Resource" id="Clip_29"]
 script = ExtResource("clip")
@@ -368,10 +337,9 @@ label = "ぎょしゃ座"
 track = 3
 types = Array[StringName]([&"auriga"])
 formations = Array[PackedScene]([ExtResource("auriga")])
-layouts = Array[StringName]([&"s5_auriga/1体・右120"])
-attack_priority = 1
-time = 437.5
-length = 42.5
+layouts = Array[StringName]([&"auriga/1体", &"auriga/2体・横並び", &"auriga/3体・斜め並び"])
+time = 438.0
+length = 35.0
 groups = 2
 interval = 12.0
 
@@ -380,11 +348,10 @@ script = ExtResource("clip")
 label = "ポンプ座"
 track = 0
 types = Array[StringName]([&"pump"])
-formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s5_pump/1体・右360後80"])
-attack_priority = 1
-time = 437.5
-length = 42.5
+formations = Array[PackedScene]([ExtResource("3_b421h")])
+layouts = Array[StringName]([&"pump/単体"])
+time = 437.0
+length = 30.0
 groups = 2
 interval = 12.0
 
@@ -498,17 +465,17 @@ display_name = "新しい時間帯"
 [sub_resource type="Resource" id="Curve_biter"]
 script = ExtResource("curve")
 type = &"biter"
-points = PackedVector2Array(0, 24, 10, 120, 23, 183, 36, 174, 45, 120, 49, 339, 69, 237, 86, 330, 90, 150, 99, 165, 107, 185, 115, 175, 121, 384, 144, 375, 163, 375, 170, 185, 178, 85, 189, 80, 195, 200, 204, 460, 226, 195, 249, 451, 261, 379, 265, 210, 274, 174, 282, 240, 290, 230, 297, 527, 313, 286, 338, 570, 349, 521, 364, 567, 370, 235, 378, 194, 387, 260, 395, 250, 399, 706, 424, 631, 438, 373, 450, 721, 464, 750, 475, 718, 480, 0, 532, 87, 570, 295, 601, 544)
+points = PackedVector2Array(0, 24, 10, 120, 23, 183, 36, 174, 45, 120, 49, 339, 69, 237, 86, 330, 90, 150, 99, 165, 107, 185, 115, 175, 121, 384, 144, 375, 163, 375, 170, 185, 178, 85, 189, 80, 195, 200, 204, 460, 226, 195, 249, 451, 261, 379, 265, 210, 274, 174, 282, 240, 290, 230, 297, 527, 313, 286, 338, 570, 349, 521, 364, 567, 370, 235, 378, 194, 387, 260, 395, 250, 399, 706, 424, 631, 438, 373, 450, 721, 464, 750, 475, 718, 480, 0, 532, 40, 570, 154, 600, 208)
 
 [sub_resource type="Resource" id="Curve_splitter"]
 script = ExtResource("curve")
 type = &"splitter"
-points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 47, 82, 49, 90, 24, 99, 52, 107, 68, 115, 22, 126, 31, 141, 35, 155, 33, 170, 30, 178, 62, 187, 78, 195, 24, 207, 40, 225, 47, 242, 56, 257, 53, 265, 36, 273, 70, 282, 86, 290, 26, 305, 50, 322, 46, 339, 51, 355, 48, 364, 47, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0, 530, 4, 570, 27, 600, 63)
+points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 47, 82, 49, 90, 24, 99, 52, 107, 68, 115, 22, 126, 31, 141, 35, 155, 33, 170, 30, 178, 62, 187, 78, 195, 24, 207, 40, 225, 47, 242, 56, 257, 53, 265, 36, 273, 70, 282, 86, 290, 26, 305, 50, 322, 46, 339, 51, 355, 48, 364, 47, 370, 42, 379, 82, 387, 98, 395, 30, 409, 20, 423, 28, 437.5, 20, 450, 22, 462, 28, 473, 18, 477, 12, 480, 0, 530, 4, 570, 14, 601, 35)
 
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
 type = &"bomber"
-points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 529, 0, 570, 9, 601, 23)
+points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 529, 0, 570, 6, 600, 14)
 
 [resource]
 script = ExtResource("stage")
@@ -516,23 +483,38 @@ index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10"), SubResource("Resource_tpwl5")]
 enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila"])
+enemy_tuning = {
+"aquila": {
+"hp": 240.0
+},
+"auriga": {
+"hp": 100.0
+},
+"cepheus": {
+"hp": 160.0
+},
+"cross": {
+"hp": 60.0
+}
+}
 enemy_attack_values = {
 "aquila": 3.0,
-"auriga": 1.5,
+"auriga": 1.0,
 "biter": 0.1,
-"bomber": 0.3,
-"cepheus": 2.0,
-"cepheus_soldier": 0.2,
+"bomber": 0.0,
+"cepheus": 1.0,
+"cepheus_soldier": 0.5,
 "crab": 1.0,
 "cross": 1.0,
-"crow": 0.2,
+"crow": 0.0,
 "dolphin": 1.0,
 "pump": 1.0,
+"splitling": 0.0,
 "splitter": 0.1
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_splitter"), SubResource("Curve_bomber")])
-clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_27"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
+clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_6"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Clip_13"), SubResource("Clip_14"), SubResource("Clip_15"), SubResource("Clip_16"), SubResource("Clip_17"), SubResource("Clip_18"), SubResource("Clip_19"), SubResource("Clip_20"), SubResource("Clip_21"), SubResource("Clip_22"), SubResource("Clip_23"), SubResource("Clip_24"), SubResource("Clip_25"), SubResource("Clip_26"), SubResource("Clip_28"), SubResource("Clip_29"), SubResource("Clip_30")])
 track_names = PackedStringArray("ポンプ座", "かに座", "みなみじゅうじ座", "ぎょしゃ座", "いるか座", "からす座", "ケフェウス座", "わし座")
-boss_time = 495.0
+boss_time = 490.0
 time_limit = 900.0
 boss_id = &"draco"

@@ -18,7 +18,7 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	run.state.lab_mode = false # 実験場では省かれる通常HUDのキー入力も確認する。
 	for id in [&"W03", &"W04", &"W08", &"W17"]: run.loadout.grant(&"weapon", id, 5)
-	for id in [&"T01", &"T03", &"T04", &"T05", &"T06"]: run.loadout.grant(&"trait", id, 3)
+	for id in [&"T01", &"T03", &"T04", &"T05"]: run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
 	run.state.ship_hp = 40.0
 	run.state.pending_levels = 3
 	_show([&"area", &"max_hp", &"heal"])
@@ -37,6 +37,8 @@ func _ready() -> void:
 	_check(int(run.state.post_max_stacks.get(&"area", 0)) == 1 and run.state.pending_levels == 2, "新たな数字入力で追加強化を1回取得")
 	_show([&"crit_chance", &"charge_time", &"repair"])
 	await _ready_cards()
+	_check(run.state.cards[0].info.desc == "+1%" and run.state.cards[0].info.tooltip_desc.contains("1%"), "クリティカル率は増分と累計を%表示")
+	_check(run.state.cards[2].info.desc == "+1%" and run.state.cards[2].info.tooltip_desc.contains("1%"), "修理キットの割合も%表示")
 	await _shot("postmax_crit_charge_repair")
 	for id in [&"W03", &"W04", &"W08", &"W17"]: run.loadout.remove_weapon(id)
 	for id in [&"W01", &"W05", &"W07", &"W23"]: run.loadout.grant(&"weapon", id, 5)
@@ -53,7 +55,7 @@ func _ready() -> void:
 	TranslationServer.set_locale("en")
 	_show([&"crit_chance", &"max_hp", &"heal"])
 	await _ready_cards()
-	_check(run.state.cards[0].info.desc == "+1 points", "英語の追加強化は英語の増分を表示")
+	_check(run.state.cards[0].info.desc == "+1%", "英語でも追加確率の増分を%表示")
 	await _shot("postmax_english")
 	for button in hud._cards_row.get_children():
 		_check(not button.tooltip_text.contains("postmax."), "英語表示の翻訳キーを解決")
@@ -66,6 +68,15 @@ func _ready() -> void:
 			for button in hud._cards_row.get_children():
 				_check(viewport_rect.encloses(button.get_global_rect()), "追加強化カードが異なる画面比率でも画面内に収まる")
 		await _shot("postmax_small_english")
+	for ids: Array in [[&"T01"], [&"T01", &"T03"]]:
+		run.state.cards = []
+		for id in ids:
+			run.state.cards.append({"kind": &"trait", "id": id, "level": 3})
+		run.loadout._publish_cards()
+		await _ready_cards()
+		_check(hud._cards_row.get_child_count() == ids.size(), "通常候補%d枚を表示" % ids.size())
+		var first: Control = hud._cards_row.get_child(0)
+		_check(first.size.x <= 145.0 and first.position.x >= 169.0, "少数候補もカード幅を保って中央へ配置")
 	await _close()
 	print("[post_max_ui] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)

@@ -23,6 +23,7 @@
 [resource]
 script = ExtResource("1_hy4gv")
 techniques = Array[Resource]([ExtResource("2_uae8c"), ExtResource("3_xrdwf"), ExtResource("4_x5nyk"), ExtResource("5_rny2e"), ExtResource("6_awxv5"), ExtResource("7_324oc"), ExtResource("8_tlhcy"), ExtResource("9_d4juc"), ExtResource("10_h1jcp"), ExtResource("11_62bfn"), ExtResource("12_6a8j0"), ExtResource("13_baoas"), ExtResource("14_orjre"), ExtResource("15_7b8q5"), ExtResource("16_ano7g"), ExtResource("17_dfhe2"), ExtResource("18_f7ol8"), ExtResource("19_t6ymw")])
+allow_parallel_attacks = true
 conditions = {
 "beam_bolt": {
 "angle": 0.0,
@@ -207,24 +208,45 @@ costs = {
 "wind_band": 1.0,
 "wind_blades": 1.0
 }
-layout = {
-"beam_bolt": Vector2(474, 1398),
-"beam_fixed": Vector2(474, 1204),
-"beam_pincer": Vector2(474, 2368),
-"bite_sweep": Vector2(474, 234),
-"bite_thrust": Vector2(474, 40),
-"choose": Vector2(60, 200),
-"curve": Vector2(474, 2950),
-"debris_shatter": Vector2(474, 2174),
-"grid": Vector2(474, 3338),
-"north": Vector2(474, 2562),
-"rubble_fan": Vector2(474, 1009.9999),
-"rubble_lump": Vector2(474, 816),
-"sequence": Vector2(474, 2756),
-"swarm": Vector2(474, 3144),
-"thunder_drop": Vector2(474, 1786),
-"thunder_headbutt": Vector2(474, 1592),
-"tornado": Vector2(474, 1980),
-"wind_band": Vector2(474, 428),
-"wind_blades": Vector2(474, 622)
+condition_groups = {
+"choose_combo": {
+"category": "combo",
+"nodes": ["tornado", "debris_shatter", "beam_pincer"],
+"title": "コンボ"
+},
+"choose_major": {
+"category": "major",
+"nodes": ["north", "sequence", "curve"],
+"title": "大技"
+},
+"choose_major_2": {
+"category": "major",
+"nodes": ["swarm", "grid"],
+"title": "大技 2"
+},
+"choose_normal": {
+"category": "normal",
+"nodes": ["bite_thrust", "bite_sweep"],
+"title": "通常技 · 噛みつき"
+},
+"choose_normal_2": {
+"category": "normal",
+"nodes": ["wind_band", "wind_blades"],
+"title": "通常技 · 渦"
+},
+"choose_normal_3": {
+"category": "normal",
+"nodes": ["rubble_lump", "rubble_fan"],
+"title": "通常技 · 瓦礫"
+},
+"choose_normal_4": {
+"category": "normal",
+"nodes": ["beam_fixed", "beam_bolt"],
+"title": "通常技 · ビーム"
+},
+"choose_normal_5": {
+"category": "normal",
+"nodes": ["thunder_headbutt", "thunder_drop"],
+"title": "通常技 · 雷"
+}
 }

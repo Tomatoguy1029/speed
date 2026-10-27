@@ -33,11 +33,11 @@ func _ready() -> void:
 	check(ContentManager.traits.has(&"T31"), "T31 is loaded through the standard registry")
 	var icon: Texture2D = ContentManager.traits[&"T31"].icon_texture
 	check(icon != null and icon.get_width() == 47, "T31 has a card/loadout icon")
-	for level in range(4):
+	for level in range(6):
 		if level > 0:
 			check(run.loadout.grant(&"trait", &"T31"), "T31 stacks through grant")
-		var mult := 1.0 + 0.25 * level
-		check(s.stats.glide_duration_mult == mult, "T31 provisional additive multiplier")
+		var mult: float = [1.0, 1.25, 1.375, 1.5, 1.625, 1.75][level]
+		check(is_equal_approx(s.stats.glide_duration_mult, mult), "T31 five-level duration multiplier")
 		s.ship_vel = baseline_vel
 		check(baseline == [s.stats.max_speed, s.stats.capacity, s.stats.charge_time, run.draw.budget(1.0), run.draw._launch_speed(Vector2.RIGHT, 1.0)], "Top speed, capacity, charge, line budget and launch speed stay unchanged")
 		for time in [0.0, cfg.glide_hold, cfg.glide_hold + cfg.glide_fade * 0.25, cfg.glide_hold + cfg.glide_fade * 0.5, cfg.glide_hold + cfg.glide_fade]:
@@ -50,14 +50,14 @@ func _ready() -> void:
 		_begin_glide()
 		run.ship._step(7.5, Vector2.ZERO)
 		print("[glide_duration] level=%d multiplier=%.2f at7.5s speed=%.1f glide=%s" % [level, mult, s.ship_vel.length(), s.glide])
-		if level == 0 or level == 3:
+		if level == 0 or level == 5:
 			await _capture("level%d_at7_5s" % level)
 	if shots != "":
 		run.ship._step(3.0, Vector2.ZERO)
-		await _capture("level3_late_fade")
+		await _capture("level5_late_fade")
 		run.ship._step(1.75, Vector2.ZERO)
-		await _capture("level3_cruise")
-	check(not run.loadout.grant(&"trait", &"T31"), "T31 respects the three-stack cap")
+		await _capture("level5_cruise")
+	check(not run.loadout.grant(&"trait", &"T31"), "T31 respects the five-stack cap")
 	check(s.modules_obtained.has(&"T31"), "Standard result module list includes T31")
 	var saved := SaveManager.data.duplicate(true)
 	SaveManager.unlock_module(&"T31")
@@ -69,17 +69,17 @@ func _ready() -> void:
 	var limited := ContentCatalog.new()
 	limited.entries = [catalog.find(&"traits", &"T31")]
 	ContentManager.catalog = limited
-	for level in [0, 1, 3]:
+	for level in [0, 1, 5]:
 		s.traits = {} if level == 0 else {&"T31": level}
 		var cards := run.loadout.roll_cards()
-		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 3), "Standard new/upgrade/maxed card pool")
+		check(cards.any(func(c): return c.id == &"T31" and c.level == level + 1) == (level < 5), "Standard new/upgrade/maxed card pool")
 	ContentManager.catalog = catalog
-	s.traits = {&"T31": 3}
+	s.traits = {&"T31": 5}
 	run.loadout.refresh_stats()
-	s.cards = [{"kind": &"trait", "id": &"T31", "level": 3}]
+	s.cards = [{"kind": &"trait", "id": &"T31", "level": 5}]
 	run.set_phase(RunState.Phase.LEVELUP)
 	run.cards_changed.emit()
-	check(scene.view.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("3/3"), "Trait card displays the configured stack cap")
+	check(scene.view.get_node("Hud/HudRoot").card_info(s.cards[0]).name.ends_with("5/5"), "Trait card displays the configured stack cap")
 	await _capture("card_and_loadout")
 	await get_tree().process_frame
 	scene.queue_free()

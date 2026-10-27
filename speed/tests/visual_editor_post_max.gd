@@ -13,9 +13,9 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	for id in [&"W03", &"W04", &"W08", &"W17"]:
 		run.loadout.grant(&"weapon", id, run.cfg.weapon_max_level)
-	for id in [&"T01", &"T03", &"T04", &"T05", &"T09"]:
+	for id in [&"T01", &"T03", &"T04", &"T09"]:
 		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
-	for i in 10: _check(run.loadout.post_max.select(&"crit_chance"), "追加クリティカルを取得")
+	for i in 4: _check(run.loadout.post_max.select(&"crit_chance"), "追加クリティカルを取得")
 	run.loadout.refresh_stats()
 	run.state.ship_hp = 40.0
 	run.state.pending_levels = 2
@@ -37,7 +37,7 @@ func _ready() -> void:
 		_check(preview.get_ref() == null, "ランを残して編集プレビューを解放")
 		_check(GameManager.screen == screen and GameManager.screen_changed.get_connections().size() == connections, "編集の開閉でゲーム画面と接続を維持")
 		_check(run.state.cards == cards and run.state.pending_levels == 2, "編集の開閉で追加成長の候補を維持")
-		_check(is_equal_approx(run.state.stats.crit_chance, 0.3) and int(run.state.post_max_stacks[&"crit_chance"]) == 10, "T09と追加成長の上限を維持")
+		_check(is_equal_approx(run.state.stats.crit_chance, 0.3) and int(run.state.post_max_stacks[&"crit_chance"]) == 4, "T09と追加成長の上限を維持")
 	var hp := run.state.ship_hp
 	run.loadout.choose_card(2)
 	_check(is_equal_approx(run.state.ship_hp, hp + run.state.stats.max_hp * 0.3), "編集を閉じた後も同じカードから30%回復")

@@ -67,7 +67,7 @@ func begin(a: BossActor) -> void:
 				a.clone_damage_rows[segment]={"row":row,"id":a.table.id[row],"part_id":a.table.id[segment]}
 				units[-1].parts.append({"row":segment,"id":a.table.id[segment]})
 		_sync_shape(a,units[-1])
-		a.telegraph_paths.append(PackedVector2Array([a.table.pos[row]+Vector2.from_angle(float(units[-1].angle))*105.0*a.head_scale,center]))
+		a.telegraph_paths.append(PackedVector2Array([a.table.pos[row]+Vector2.from_angle(float(units[-1].angle))*120.0*a.head_scale,center]))
 		a.telegraph_widths.append(float(a.rule().width))
 func tick(a: BossActor, dt: float) -> void:
 	host.attack_field.tick(dt)
@@ -80,11 +80,11 @@ func tick(a: BossActor, dt: float) -> void:
 			continue
 		var entry: float = float(unit.index)*0.7
 		if a.elapsed<entry:
-			a.telegraph_paths.append(PackedVector2Array([a.table.pos[unit.row]+Vector2.from_angle(float(unit.angle))*105.0*a.head_scale,center]))
+			a.telegraph_paths.append(PackedVector2Array([a.table.pos[unit.row]+Vector2.from_angle(float(unit.angle))*120.0*a.head_scale,center]))
 			a.telegraph_widths.append(float(a.rule().width))
 			continue
 		var forward := Vector2.from_angle(float(unit.angle))
-		var mouth_offset: float = 105.0 * a.head_scale
+		var mouth_offset: float = 120.0 * a.head_scale
 		var landing := center - forward * mouth_offset
 		if a.elapsed<entry+0.5:
 			var before: Vector2 = a.table.pos[unit.row] + forward * mouth_offset

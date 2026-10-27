@@ -50,7 +50,7 @@ func geometry() -> Dictionary:
 	var at: Vector2 = a.table.pos[a.body]
 	var row := {"actor_pos": _point(at), "player_pos": _point(a.run_state.ship_pos),
 		"player_velocity": _point(a.run_state.ship_vel), "facing": a.table.facing[a.body],
-		"distance": at.distance_to(a.run_state.ship_pos), "mode": String(a.get("mode"))}
+		"distance": at.distance_to(a.run_state.ship_pos), "mode": String(a.mode) if "mode" in a else ""}
 	if "aim_point" in a: row.aim = _point(a.aim_point)
 	elif "aim" in a: row.aim = _point(a.aim)
 	if "direction" in a: row.direction = _point(a.direction)

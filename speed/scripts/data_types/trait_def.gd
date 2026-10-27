@@ -3,7 +3,7 @@
 ## 「（基本）」と「（重ねるごと）」の組の値は、効果 ＝ 基本 ＋ 重ねるごと × 重ね数 で決まる。
 ## ---
 ## 値の正は res://data/traits/*.tres（一覧 docs/game/catalog/traits.md）。発動する特性の処理は res://scripts/traits/<内部 ID>.gd、
-## 能力値を変える特性は LoadoutSystem.refresh_stats() が per_stack と max を読む。
+## 能力値を変える特性は LoadoutSystem.refresh_stats() が stack_bonus() と max を読む。
 class_name TraitDef
 extends Resource
 
@@ -25,7 +25,8 @@ const PARAMS_DOCS := {
 	"power_per": ["吸い寄せる強さ（重ねるごと）", "重ねるごとに足す吸い寄せる強さ。", "単位/秒"],
 	"mult_base": ["攻撃力の倍率（基本）", "満タンから始めた線をなぞっている間、攻撃力に掛ける倍率の基本の値。", "倍"],
 	"mult_per": ["攻撃力の倍率（重ねるごと）", "重ねるごとに足す倍率。", "倍"],
-	"kills_base": ["必要な撃破数（基本）", "1回の突進でこの数を倒すたびに衝撃波を出す（最低3）。", "体"],
+	"kills_base": ["必要な撃破数（基本）", "1回の突進でこの数を倒すたびに衝撃波を出す。", "体"],
+	"kills_min": ["必要な撃破数（下限）", "重ねても衝撃波の発生間隔をこれより短くしない。", "体"],
 	"kills_per": ["必要な撃破数（重ねるごと）", "重ねるごとに足す撃破数（負の値で少なくなる）。", "体"],
 	"travel": ["衝撃波の進む時間", "衝撃波が機体と一緒に進路を進む時間。", "世界秒"],
 	"length_base": ["ビームの長さ（基本）", "クリティカルで出るビームの長さの基本の値。", "単位（距離）"],
@@ -34,6 +35,8 @@ const PARAMS_DOCS := {
 	"width_per": ["ビームの幅（重ねるごと）", "重ねるごとに足すビームの幅。", "単位（距離）"],
 	"cooldown": ["次に出せるまで", "ビームを出してから、次に出せるようになるまでの時間。", "実秒"],
 	"per_stack": ["重ねるごとの効果", "1回重ねるごとに能力値を伸ばす割合。0.25 なら 25%。", "割合"],
+	"first_stack": ["1重ね目の効果", "1重ね目だけの能力値増分。未指定なら重ねるごとの効果を使う。", "割合"],
+	"late_per_stack": ["4・5重ね目の効果", "4回目以降に1回重ねるごとに能力値を伸ばす割合。未指定なら通常の重ねごとの効果を使う。", "割合"],
 	"max": ["上限", "重ねて伸ばしても、この値を超えない。", "割合（0〜1）"],
 }
 
@@ -41,6 +44,14 @@ const PARAMS_DOCS := {
 ## 特性ごとの範囲・威力・効果の量など。
 ## 単位：—
 @export var params: Dictionary
+
+## 1重ね目、2〜3重ね目、4重ね目以降で増分を分けられる能力値の合計。
+func stack_bonus(stacks: int) -> float:
+	if stacks <= 0:
+		return 0.0
+	var per := float(params.get("per_stack", 0.0))
+	var early := mini(maxi(stacks, 0), 3)
+	return float(params.get("first_stack", per)) + (early - 1) * per + maxi(stacks - 3, 0) * float(params.get("late_per_stack", per))
 
 ## 見分けるための ID
 @export_group("ID")

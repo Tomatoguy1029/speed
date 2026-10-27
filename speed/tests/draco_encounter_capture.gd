@@ -7,6 +7,9 @@ var output := "/tmp/draco-qa-evidence/render"
 var metadata: Array = []
 var pilot := false
 var cinematics_only := false
+var spiral_entry_only := false
+var batch_regression := false
+var screen_staging_only := false
 var stage_template: RuntimeStage
 var identity_start: Dictionary
 var viewport: SubViewport
@@ -32,6 +35,9 @@ func _ready() -> void:
 		if arg.begins_with("--capture-output="): output = arg.trim_prefix("--capture-output=")
 		if arg == "--capture-pilot": pilot = true
 		if arg == "--capture-cinematics-only": cinematics_only = true
+		if arg == "--capture-spiral-entry-only": spiral_entry_only = true
+		if arg == "--capture-batch-regression": batch_regression = true; pilot = true
+		if arg == "--capture-screen-staging-only": screen_staging_only = true
 	DirAccess.make_dir_recursive_absolute(output)
 	stage_template = ContentManager.runtime_stage(5)
 	identity_start = _identity()
@@ -42,9 +48,16 @@ func _ready() -> void:
 	for index in (1 if pilot else 3):
 		var size: Vector2i = [Vector2i(1280,720), Vector2i(900,900), Vector2i(720,1280)][index]
 		viewport.size = size
+		if screen_staging_only:
+			for id in [&"leap", &"charge", &"rifts"]: await _capture_screen_staged(id, size)
+			continue
+		if spiral_entry_only:
+			await _capture_spiral_entry(size)
+			continue
 		if not cinematics_only:
-			for id in ([&"bite", &"spiral"] if pilot else IDS):
-				await _capture_attack(id, size, [0.0, PI * 0.5, PI * 0.25][index])
+			for id in ([&"bite", &"clones", &"spiral"] if batch_regression else [&"bite", &"spiral"] if pilot else IDS):
+				if id in [&"leap", &"charge", &"rifts"]: await _capture_screen_staged(id, size)
+				else: await _capture_attack(id, size, [0.0, PI * 0.5, PI * 0.25][index])
 		if not pilot: await _capture_cinematics(size)
 	var file := FileAccess.open(output.path_join("frames.json"), FileAccess.WRITE)
 	file.store_string(JSON.stringify({"engine": Engine.get_version_info().string, "renderer": RenderingServer.get_current_rendering_method(), "identity_start":identity_start, "identity_end":_identity(), "frames": metadata}, "\t"))
@@ -136,6 +149,55 @@ func _snapshot(sim: RunSimulation, key: String, beat: String, time: float) -> vo
 		await RenderingServer.frame_post_draw
 		viewport.get_texture().get_image().save_png(output.path_join(key + "_" + beat + "_colliders.png"))
 		overlay.visible = false
+
+func _capture_spiral_entry(size: Vector2i) -> void:
+	var sim := _fresh(size)
+	var actor = sim.bosses.actor
+	actor.table.pos[actor.body] = Vector2.ZERO
+	actor.table.facing[actor.body] = -PI * 0.5
+	actor.body_trail.clear()
+	actor.body_pose.clear()
+	actor.reset_pose()
+	actor.start_attack(&"spiral")
+	var elapsed := 0.0
+	for index in 25:
+		var target := float(index) * 0.25
+		while elapsed + 0.0001 < target:
+			if elapsed >= 0.75 and elapsed < 0.75 + STEP:
+				sim.state.ship_pos += Vector2(120,-150)
+			_tick(sim)
+			elapsed += STEP
+		await _snapshot(sim,"spiral_entry_%dx%d" % [size.x,size.y],"%02d" % index,elapsed)
+
+func _capture_screen_staged(id: StringName, size: Vector2i) -> void:
+	var sim := _fresh(size)
+	var actor = sim.bosses.actor
+	sim.state.ship_pos = Vector2(300, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor.table.pos[actor.body] = Vector2.ZERO
+	actor.table.facing[actor.body] = PI * 0.25
+	actor.body_trail.clear()
+	actor.reset_pose()
+	var key := "%s_%dx%d" % [id, size.x, size.y]
+	await _snapshot(sim, key, "normal", 0.0)
+	actor.start_attack(id)
+	var elapsed := 0.0
+	var marked := {}
+	for frame in 1400:
+		_tick(sim)
+		elapsed += STEP
+		var staging: Dictionary = actor._driver.staging if actor._driver != null else {}
+		var beat := ""
+		if staging.get("phase") == &"exit" and elapsed >= 0.25 and not marked.has("retreat"): beat = "retreat"
+		elif staging.get("phase") == &"enter" and not marked.has("hidden"): beat = "hidden"
+		elif staging.get("phase") == &"enter" and float(staging.entry_time) >= 0.2 and not marked.has("reentry"): beat = "reentry"
+		elif staging.get("phase") == &"ready" and not marked.has("posed"): beat = "posed"
+		elif actor.mode == &"windup" and staging.get("phase") == &"ready" and actor.elapsed > float(actor.rule().warn) * 0.7 and not marked.has("warn"): beat = "warn"
+		elif actor.mode == &"active" and actor.elapsed > 0.16 and not marked.has("impact"): beat = "impact"
+		if not beat.is_empty():
+			marked[beat] = true
+			await _snapshot(sim, key, beat, elapsed)
+		if marked.has("impact"): break
 
 func _capture_attack(id: StringName, size: Vector2i, angle: float) -> void:
 	var sim := _fresh(size)

@@ -5,12 +5,12 @@
 [resource]
 script = ExtResource("1")
 params = {
-"life_base": 1.5,
-"life_per": 0.4,
-"power_base": 200.0,
-"power_per": 70.0,
-"radius_base": 180.0,
-"radius_per": 35.0
+"life_base": 1.7,
+"life_per": 0.2,
+"power_base": 235.0,
+"power_per": 35.0,
+"radius_base": 197.5,
+"radius_per": 17.5
 }
 id = &"T03"
 code_id = &"vortex"

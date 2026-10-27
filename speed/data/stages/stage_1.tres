@@ -3,12 +3,12 @@
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_2gqev"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="clip"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="curve"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_marlin.tscn" id="marlin"]
+[ext_resource type="PackedScene" uid="uid://bk0v3p2khcvgt" path="res://data/formations/marlin.tscn" id="marlin"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="phase"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_pump.tscn" id="pump"]
-[ext_resource type="PackedScene" uid="uid://7f0mms4dx4xw" path="res://data/formations/s1_shield.tscn" id="shield"]
+[ext_resource type="PackedScene" uid="uid://gua8dfi6p1wd" path="res://data/formations/pump.tscn" id="pump"]
+[ext_resource type="PackedScene" uid="uid://7f0mms4dx4xw" path="res://data/formations/shield.tscn" id="shield"]
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
-[ext_resource type="PackedScene" path="res://data/formations/s1_triangle.tscn" id="triangle"]
+[ext_resource type="PackedScene" uid="uid://tvxo6bjbdqry" path="res://data/formations/triangle.tscn" id="triangle"]
 
 [sub_resource type="Resource" id="Clip_0"]
 script = ExtResource("clip")
@@ -99,7 +99,7 @@ label = "ポンプ座"
 track = 1
 types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("pump")])
-layouts = Array[StringName]([&"s1_pump/単体"])
+layouts = Array[StringName]([&"uid://gua8dfi6p1wd/2057036033", &"uid://gua8dfi6p1wd/1744096993"])
 attack_priority = 1
 time = 354.0
 length = 32.0
@@ -123,10 +123,11 @@ label = "ポンプ座"
 track = 1
 types = Array[StringName]([&"pump"])
 formations = Array[PackedScene]([ExtResource("pump")])
+layouts = Array[StringName]([&"uid://gua8dfi6p1wd/2057036033"])
 attack_priority = 1
 time = 424.0
 length = 48.0
-groups = 2
+groups = 3
 interval = 14.0
 
 [sub_resource type="Resource" id="Clip_11"]
@@ -320,7 +321,7 @@ enemy_tuning = {
 "params.blast_dmg": 14.0
 },
 "marlin": {
-"hp": 80.0,
+"hp": 150.0,
 "params.fire_interval": 3.6
 },
 "pulser": {
@@ -341,12 +342,16 @@ enemy_tuning = {
 }
 }
 enemy_attack_values = {
+"biter": 0.0,
 "bomber": 0.3,
 "marlin": 1.0,
-"pulser": 0.5,
+"pulser": 0.0,
 "pump": 1.0,
 "shield": 1.0,
-"triangle": 1.0
+"splitling": 0.0,
+"splitter": 0.0,
+"triangle": 1.0,
+"triangle_star": 0.0
 }
 zako_curves = Array[ExtResource("curve")]([SubResource("Curve_biter"), SubResource("Curve_bomber"), SubResource("Curve_splitter"), SubResource("Curve_pulser")])
 clips = Array[ExtResource("clip")]([SubResource("Clip_0"), SubResource("Clip_1"), SubResource("Clip_2"), SubResource("Clip_3"), SubResource("Clip_4"), SubResource("Clip_5"), SubResource("Clip_7"), SubResource("Clip_8"), SubResource("Clip_9"), SubResource("Clip_10"), SubResource("Clip_11"), SubResource("Clip_12"), SubResource("Resource_2gqev")])

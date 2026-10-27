@@ -78,6 +78,34 @@ func exercise() -> void:
 	first[0] += Vector2(30, 30)
 	var again: PackedVector2Array = router.route(Vector2(40, 60), Vector2(440, 60), none)
 	check(again[0].is_equal_approx(Vector2(40, 60)), "drawing offsets cannot mutate a cached route")
+	var straight: PackedVector2Array = router.natural_route(Vector2(40, 60), Vector2(440, 60), none)
+	check(straight.size() == 2 and straight[0].is_equal_approx(Vector2(40, 60)) and straight[-1].is_equal_approx(Vector2(440, 60)), "side-by-side nodes connect with one straight line")
+	var curved: PackedVector2Array = router.natural_route(Vector2(40, 60), Vector2(440, 360), none)
+	check(curved.size() > 2 and curved[1].x > curved[0].x and curved[-1].x > curved[-2].x, "lower branches curve naturally while leaving and entering horizontally")
+	var detour: PackedVector2Array = router.natural_route(Vector2(40, 100), Vector2(540, 100), blocked)
+	var clearance: Array[Rect2] = [blocked[0].grow(8.0)]
+	check(detour.size() > 2 and router._segments_clear(detour, clearance), "curved routing still avoids an intervening node")
+	var graph := GraphEdit.new()
+	root.add_child(graph)
+	var source := GraphNode.new()
+	source.name = "source"
+	source.size = Vector2(150, 100)
+	graph.add_child(source)
+	var target := GraphNode.new()
+	target.name = "target"
+	target.position_offset = Vector2(450, 300)
+	target.size = Vector2(150, 100)
+	graph.add_child(target)
+	await process_frame
+	graph.zoom = 1.0
+	var full: PackedVector2Array = router.for_graph(graph, Vector2(150, 50), Vector2(450, 350))
+	graph.zoom = 0.5
+	var half: PackedVector2Array = router.for_graph(graph, Vector2(75, 25), Vector2(225, 175))
+	var same_shape := full.size() == half.size()
+	if same_shape:
+		for i in full.size(): same_shape = same_shape and full[i].distance_to(half[i] * 2.0) < EPSILON
+	check(same_shape, "zoom changes only the scale, never the route shape")
+	graph.queue_free()
 	finished = true
 	print("[boss-wire-routing] failures=", failures)
 	quit(1 if failures else 0)

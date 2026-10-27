@@ -102,16 +102,17 @@ func setup(context: RunContext) -> void:
 func refresh_stats() -> void:
 	var s := state.stats
 	var old_max := s.max_hp
-	s.max_speed = cfg.base_max_speed * float(ctx.profile.mult.get(&"max_speed", 1.0)) * (1.0 + _per(&"T10") * _n(&"T10"))
-	s.attack_mult = float(ctx.profile.mult.get(&"attack", 1.0)) * (1.0 + _per(&"T11") * _n(&"T11"))
+	s.max_speed = cfg.base_max_speed * float(ctx.profile.mult.get(&"max_speed", 1.0)) * (1.0 + _trait_bonus(&"T10"))
+	s.attack_mult = float(ctx.profile.mult.get(&"attack", 1.0)) * (1.0 + _trait_bonus(&"T11"))
 	s.max_hp = cfg.base_hp + float(ctx.profile.add.get(&"max_hp", 0.0))
-	s.capacity = 1.0 + _per(&"T08") * _n(&"T08")
-	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _per(&"T07") * _n(&"T07"))
-	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + _per(&"T09") * _n(&"T09"))
+	s.capacity = 1.0 + _trait_bonus(&"T08")
+	s.charge_time = cfg.dash_charge_time * float(ctx.profile.reduce.get(&"charge_time", 1.0)) / (1.0 + _trait_bonus(&"T07"))
+	var crit_def := ContentManager.definition(&"traits", &"T09") as TraitDef
+	s.crit_chance = minf(_trait_param(&"T09", "max", 1.0), cfg.base_crit_chance + (crit_def.stack_bonus(_n(&"T09")) if crit_def != null else 0.0))
 	s.crit_mult = cfg.crit_mult
-	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _per(&"T12") * _n(&"T12"))
-	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _per(&"T14") * _n(&"T14"))
-	s.glide_duration_mult = 1.0 + _per(&"T31") * _n(&"T31")
+	s.pickup_radius = cfg.pickup_radius * float(ctx.profile.mult.get(&"pickup", 1.0)) * (1.0 + _trait_bonus(&"T12"))
+	s.length_mult = float(ctx.profile.mult.get(&"length", 1.0)) * (1.0 + _trait_bonus(&"T14"))
+	s.glide_duration_mult = 1.0 + _trait_bonus(&"T31")
 	s.xp_mult = float(ctx.profile.mult.get(&"xp", 1.0))
 	# HP増加は現在HPを維持。既存の永続HP変更時の差分回復だけを残す。
 	var old_baseline_max := old_max - _applied_post_max_hp
@@ -154,8 +155,9 @@ func _trait_param(id: StringName, key: String, default := 0.0) -> float:
 	var def := ContentManager.definition(&"traits", id) as TraitDef
 	return float(def.params.get(key, default)) if def != null else default
 
-func _per(id: StringName) -> float:
-	return _trait_param(id, "per_stack")
+func _trait_bonus(id: StringName) -> float:
+	var def := ContentManager.definition(&"traits", id) as TraitDef
+	return def.stack_bonus(_n(id)) if def != null else 0.0
 
 # ── 経験値とレベル（仕様書 9.1） ──────────────────────────────────
 
@@ -183,20 +185,33 @@ func add_xp(v: float) -> void:
 func tick(real_dt: float, world_dt: float) -> void:
 	if state.controls_locked: return
 	var busy := state.drawing or state.tracing
+	# 開発版の計測：武器・特性ごとの時間を build.<ID> に足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	ctx.projectiles.tick_attached(real_dt)
+	perf.since(&"build.attached", t0)
 	if state.phase != RunState.Phase.PLAY or state.controls_locked:
 		return
-	for behavior in weapon_behaviors.values():
-		behavior.tick_real(real_dt)
+	for id: StringName in weapon_behaviors:
+		t0 = Time.get_ticks_usec()
+		weapon_behaviors[id].tick_real(real_dt)
+		if perf.active:
+			perf.since(StringName("build." + String(id)), t0)
 		if state.phase != RunState.Phase.PLAY:
 			return
 	if world_dt > 0.0:
-		for b in weapon_behaviors.values():
-			b.tick(world_dt, busy)
+		for id: StringName in weapon_behaviors:
+			t0 = Time.get_ticks_usec()
+			weapon_behaviors[id].tick(world_dt, busy)
+			if perf.active:
+				perf.since(StringName("build." + String(id)), t0)
 			if state.phase != RunState.Phase.PLAY:
 				return
-		for b in trait_behaviors.values():
-			b.tick(world_dt, busy)
+		for id: StringName in trait_behaviors:
+			t0 = Time.get_ticks_usec()
+			trait_behaviors[id].tick(world_dt, busy)
+			if perf.active:
+				perf.since(StringName("build." + String(id)), t0)
 
 ## 保留中のレベルアップがあり、描画中・なぞり中でなければ3択を開く。開いたら true。
 ## 拾った彗星限定の武器があれば、先に受け取る（枠が満員なら入れ替えを選ぶ）。
@@ -210,6 +225,10 @@ func try_open_cards() -> bool:
 	if state.pending_levels <= 0:
 		return false
 	state.cards = roll_cards()
+	if state.cards.is_empty():
+		# 取得可能な候補が尽きた場合は空の選択画面で進行を止めない。
+		state.pending_levels = 0
+		return false
 	_publish_cards()
 	return true
 
@@ -267,16 +286,16 @@ func roll_cards() -> Array[Dictionary]:
 			i += 1
 		out.append(pool[i])
 		pool.remove_at(i)
-	while not enhanced and out.size() < 3:
-		out.append({"kind": &"heal", "id": StringName("heal%d" % out.size()), "level": 1})
 	return out
 
 ## 表示中のカードを引き直す（仕様書 9.3）。最初の武器の選択でも使える。回数が残っていなければ false。
 func reroll_cards() -> bool:
 	if state.cards.is_empty() or state.rerolls_left <= 0 or state.swap_pick != &"":
 		return false
+	var next := roll_start_cards() if state.start_pick else roll_cards()
+	if next.is_empty(): return false
 	state.rerolls_left -= 1
-	state.cards = roll_start_cards() if state.start_pick else roll_cards()
+	state.cards = next
 	state.emit(&"reroll", {})
 	_publish_cards()
 	return true
@@ -326,8 +345,10 @@ func choose_card(index: int) -> bool:
 	state.pending_levels = maxi(0, state.pending_levels - 1)
 	if state.pending_levels > 0:
 		state.cards = roll_cards()
-		_publish_cards()
-		return true
+		if not state.cards.is_empty():
+			_publish_cards()
+			return true
+		state.pending_levels = 0
 	_release_candidates()
 	state.cards = []
 	return false

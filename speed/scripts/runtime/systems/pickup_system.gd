@@ -63,9 +63,17 @@ func setup(context: RunContext) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：結晶・部品・カプセルを分けて足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	_collect_gems(world_dt)
+	perf.since(&"pickups.gems", t0)
+	t0 = Time.get_ticks_usec()
 	_collect_coins(world_dt)
+	perf.since(&"pickups.coins", t0)
+	t0 = Time.get_ticks_usec()
 	_collect_capsules(world_dt)
+	perf.since(&"pickups.capsules", t0)
 
 # ── 落とす ────────────────────────────────────────────────────────
 

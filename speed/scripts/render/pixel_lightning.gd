@@ -20,7 +20,7 @@ static func intensity(age: float, lifetime: float) -> float:
 	return (1.0 - t) * 2.0
 
 ## from・to・pixel は呼び出し元の座標系。pixel は画面またはプレビュー上のドット幅。
-static func draw(c: CanvasItem, from: Vector2, to: Vector2, pixel: float, seed_value: int, alpha: float) -> void:
+static func draw(c: CanvasItem, from: Vector2, to: Vector2, pixel: float, seed_value: int, alpha: float, color := COLOR) -> void:
 	if pixel <= 0.0 or alpha <= 0.0 or from.distance_squared_to(to) < pixel * pixel * 0.25:
 		return
 	var key := [from, to, pixel, seed_value]
@@ -31,10 +31,10 @@ static func draw(c: CanvasItem, from: Vector2, to: Vector2, pixel: float, seed_v
 		_cache[key] = [_lines(cells[0], pixel), _lines(cells[1], pixel)]
 	var cells: Array = _cache[key]
 	# セルの中央に短い水平線を置き、アンチエイリアスなしでドットの階段を出す。
-	_draw_lines(c, cells[0], pixel, COLOR, alpha * 0.12, 5.0)
-	_draw_lines(c, cells[1], pixel, COLOR, alpha * 0.12, 3.0)
-	_draw_lines(c, cells[0], pixel, COLOR, alpha * 0.35, 3.0)
-	_draw_lines(c, cells[1], pixel, COLOR, alpha * 0.75, 1.0)
+	_draw_lines(c, cells[0], pixel, color, alpha * 0.12, 5.0)
+	_draw_lines(c, cells[1], pixel, color, alpha * 0.12, 3.0)
+	_draw_lines(c, cells[0], pixel, color, alpha * 0.35, 3.0)
+	_draw_lines(c, cells[1], pixel, color, alpha * 0.75, 1.0)
 	_draw_lines(c, cells[0], pixel, Color.WHITE, alpha, 1.0)
 
 static func _draw_lines(c: CanvasItem, lines: PackedVector2Array, pixel: float, color: Color, alpha: float, width: float) -> void:

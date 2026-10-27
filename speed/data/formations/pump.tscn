@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://gua8dfi6p1wd"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_pujkk"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_ef7b5"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_j2wyr"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_p2e1i"]
+
+[node name="Pump" type="Node2D" unique_id=31655551]
+script = ExtResource("1_pujkk")
+types = Array[StringName]([&"pump"])
+
+[node name="単体" type="Node2D" parent="." unique_id=2057036033]
+position = Vector2(-2400, 0)
+script = ExtResource("2_ef7b5")
+
+[node name="Pump1" type="Node2D" parent="単体" unique_id=1233082836]
+script = ExtResource("3_j2wyr")
+enemy = &"pump"
+
+[node name="二体並び" type="Node2D" parent="." unique_id=1744096993]
+position = Vector2(-2400, 450)
+script = ExtResource("2_ef7b5")
+weight = 1.5
+
+[node name="Pump1" type="Node2D" parent="二体並び" unique_id=1426564003]
+position = Vector2(-150, 0)
+script = ExtResource("3_j2wyr")
+enemy = &"pump"
+
+[node name="Pump2" type="Node2D" parent="二体並び" unique_id=58512811]
+position = Vector2(150, 0)
+script = ExtResource("3_j2wyr")
+enemy = &"pump"
+
+[node name="正面" type="Node2D" parent="." unique_id=1203216461]
+position = Vector2(0, -1900)
+rotation = 3.1415927
+script = ExtResource("4_p2e1i")
+weight = 2.0
+
+[node name="左前" type="Node2D" parent="." unique_id=813078513]
+position = Vector2(-1520, -1140)
+rotation = 2.2142975
+script = ExtResource("4_p2e1i")
+
+[node name="右前" type="Node2D" parent="." unique_id=1597704670]
+position = Vector2(1520, -1140)
+rotation = 4.0688877
+script = ExtResource("4_p2e1i")
+
+[node name="後ろ" type="Node2D" parent="." unique_id=1323416582]
+position = Vector2(0, 1900)
+script = ExtResource("4_p2e1i")
+weight = 0.5

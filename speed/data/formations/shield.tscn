@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
 [ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="Stage1Shield" type="Node2D" unique_id=815324822]
+[node name="Shield" type="Node2D" unique_id=815324822]
 script = ExtResource("1")
 types = Array[StringName]([&"shield"])
 

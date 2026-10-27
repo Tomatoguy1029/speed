@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 params = {
-"damage_base": 1.0,
-"damage_per": 0.5,
+"damage_base": 1.25,
+"damage_per": 0.25,
 "knock": 500.0,
-"radius_base": 180.0,
-"radius_per": 30.0
+"radius_base": 195.0,
+"radius_per": 15.0
 }
 id = &"T01"
 code_id = &"endBlast"

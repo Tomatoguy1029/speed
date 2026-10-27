@@ -1,22 +1,177 @@
-[gd_resource type="Resource" load_steps=15 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
+[gd_resource type="Resource" format=3 uid="uid://ctkhtt7jw5dyx"]
+
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/bite.tres" id="2"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_sweep.tres" id="move_tail_sweep"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/star_fan.tres" id="move_star_fan"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_slam.tres" id="move_tail_slam"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/breath.tres" id="move_breath"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/meteor.tres" id="move_meteor"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/charge.tres" id="move_charge"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/leap.tres" id="move_leap"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/rifts.tres" id="move_rifts"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/picaro_wall.tres" id="move_picaro_wall"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/clones.tres" id="move_clones"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/inhale.tres" id="move_inhale"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/leap.tres" id="move_leap"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/meteor.tres" id="move_meteor"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/picaro_wall.tres" id="move_picaro_wall"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/rifts.tres" id="move_rifts"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/spiral.tres" id="move_spiral"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/star_fan.tres" id="move_star_fan"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_slam.tres" id="move_tail_slam"]
+[ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_sweep.tres" id="move_tail_sweep"]
+
 [resource]
 script = ExtResource("1")
 adapter = &"draco"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
 techniques = Array[Resource]([ExtResource("move_spiral"), ExtResource("move_inhale"), ExtResource("move_clones"), ExtResource("move_picaro_wall"), ExtResource("move_rifts"), ExtResource("move_leap"), ExtResource("move_charge"), ExtResource("move_meteor"), ExtResource("move_breath"), ExtResource("move_tail_slam"), ExtResource("move_star_fan"), ExtResource("move_tail_sweep"), ExtResource("2")])
-conditions = {"spiral": {"min":0.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "inhale": {"min":0.0,"angle":0.0,"half_angle":180.0,"min_phase":3,"max_phase":3}, "clones": {"min":0.0,"max":1800.0,"angle":0.0,"half_angle":180.0,"min_phase":2,"max_phase":3}, "picaro_wall": {"min":0.0,"max":1800.0,"angle":0.0,"half_angle":180.0,"min_phase":2,"max_phase":3}, "rifts": {"min":0.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "leap": {"min":0.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "charge": {"min":0.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "meteor": {"min":200.0,"max":1300.0,"angle":0.0,"half_angle":70.0,"min_phase":1,"max_phase":3}, "breath": {"min":350.0,"max":1500.0,"angle":0.0,"half_angle":70.0,"min_phase":1,"max_phase":3}, "tail_slam": {"min":0.0,"max":1200.0,"angle":0.0,"half_angle":180.0,"min_phase":1}, "star_fan": {"min":250.0,"max":1500.0,"angle":0.0,"half_angle":70.0,"min_phase":1,"max_phase":3}, "tail_sweep": {"min":0.0,"max":1000.0,"angle":180.0,"half_angle":85.0,"min_phase":1,"max_phase":3}, "bite": {"min":0.0,"max":360.0,"angle":0.0,"half_angle":100.0,"min_phase":1,"max_phase":3}}
-costs = {"spiral": 2.0, "inhale": 2.0, "clones": 2.0, "picaro_wall": 2.0, "rifts": 2.0, "leap": 2.0, "charge": 2.0, "meteor": 1.0, "breath": 1.0, "tail_slam": 1.0, "star_fan": 1.0, "tail_sweep": 1.0, "bite":1.0}
+conditions = {
+"bite": {
+"angle": 0.0,
+"half_angle": 100.0,
+"max": 360.0,
+"max_phase": 3,
+"min": 0.0,
+"min_phase": 1
+},
+"breath": {
+"angle": 0.0,
+"half_angle": 70.0,
+"max": 1500.0,
+"max_phase": 3,
+"min": 350.0,
+"min_phase": 1
+},
+"charge": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 600.0,
+"min": 0.0,
+"min_phase": 1
+},
+"clones": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1800.0,
+"max_phase": 3,
+"min": 0.0,
+"min_phase": 2
+},
+"inhale": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max_phase": 3,
+"min": 0.0,
+"min_phase": 3
+},
+"leap": {
+"angle": 0.0,
+"half_angle": 180.0,
+"min": 0.0,
+"min_phase": 1
+},
+"meteor": {
+"angle": 0.0,
+"half_angle": 70.0,
+"max": 1300.0,
+"max_phase": 3,
+"min": 200.0,
+"min_phase": 1
+},
+"picaro_wall": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1800.0,
+"max_phase": 3,
+"min": 0.0,
+"min_phase": 2
+},
+"rifts": {
+"angle": 0.0,
+"half_angle": 180.0,
+"min": 0.0,
+"min_phase": 1
+},
+"spiral": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 600.0,
+"min": 0.0,
+"min_phase": 1
+},
+"star_fan": {
+"angle": 0.0,
+"half_angle": 70.0,
+"max": 1500.0,
+"max_phase": 3,
+"min": 250.0,
+"min_phase": 1
+},
+"tail_slam": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 1200.0,
+"min": 0.0,
+"min_phase": 1
+},
+"tail_sweep": {
+"angle": 180.0,
+"half_angle": 85.0,
+"max": 1000.0,
+"max_phase": 3,
+"min": 0.0,
+"min_phase": 1
+}
+}
+costs = {
+"bite": 1.0,
+"breath": 1.0,
+"charge": 2.0,
+"clones": 2.0,
+"inhale": 2.0,
+"leap": 2.0,
+"meteor": 1.0,
+"picaro_wall": 2.0,
+"rifts": 2.0,
+"spiral": 2.0,
+"star_fan": 1.0,
+"tail_slam": 1.0,
+"tail_sweep": 1.0
+}
+layout = {
+"bite": Vector2(540, 1057),
+"breath": Vector2(3276, 432),
+"charge": Vector2(2364, 752),
+"choose_combo": Vector2(40, 116),
+"choose_major": Vector2(952, 116),
+"choose_major_2": Vector2(1864, 116),
+"choose_normal": Vector2(2776, 116),
+"choose_normal_2": Vector2(40, 425),
+"clones": Vector2(1452, 748),
+"inhale": Vector2(1452, 432),
+"leap": Vector2(2364, 432),
+"meteor": Vector2(3276, 116),
+"picaro_wall": Vector2(1452, 1064),
+"rifts": Vector2(2364, 116),
+"spiral": Vector2(1452, 116),
+"star_fan": Vector2(540, 425),
+"tail_slam": Vector2(3276, 748),
+"tail_sweep": Vector2(540, 741)
+}
+condition_groups = {
+"choose_combo": {
+"nodes": [],
+"title": "コンボ"
+},
+"choose_major": {
+"nodes": ["spiral", "inhale", "clones", "picaro_wall"],
+"title": "大技"
+},
+"choose_major_2": {
+"nodes": ["rifts", "leap", "charge"],
+"title": "大技 2"
+},
+"choose_normal": {
+"nodes": ["meteor", "breath", "tail_slam"],
+"title": "通常技"
+},
+"choose_normal_2": {
+"nodes": ["star_fan", "tail_sweep", "bite"],
+"title": "通常技 2"
+}
+}

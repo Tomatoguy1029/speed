@@ -108,6 +108,9 @@ var _drawing_enemies := false
 var _hero_aura: MeshInstance2D
 var _hero_aura_material: ShaderMaterial
 var _field_boundary: DrawLayer
+## 開発版の計測の記録先：表示側の処理時間と、敵の描画1回あたりの行の数
+var perf := PerfLog.new()
+var perf_rows := PerfLog.new()
 
 func _ready() -> void:
 	state = run.state
@@ -124,13 +127,13 @@ func _ready() -> void:
 		var layer := DrawLayer.new()
 		layer.name = name.capitalize().replace(" ", "")
 		layer.z_index = _layers.size() * 2
-		layer.draw_fn = Callable(self, "_draw_" + name)
+		layer.draw_fn = _timed(StringName("draw_" + name), Callable(self, "_draw_" + name))
 		layer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		world.add_child(layer)
 		_layers[name] = layer
 	_field_boundary = DrawLayer.new()
 	_field_boundary.show_behind_parent = true
-	_field_boundary.draw_fn = _draw_field_boundary
+	_field_boundary.draw_fn = _timed(&"draw_field_boundary", _draw_field_boundary)
 	_layers.field.add_child(_field_boundary)
 	_hero_aura = MeshInstance2D.new()
 	_hero_aura.show_behind_parent = true
@@ -149,7 +152,7 @@ func _ready() -> void:
 	_path_band_group.z_index = -1
 	_layers.path.add_child(_path_band_group)
 	_path_band = DrawLayer.new()
-	_path_band.draw_fn = Callable(self, "_draw_path_band")
+	_path_band.draw_fn = _timed(&"draw_path_band", _draw_path_band)
 	_path_band_group.add_child(_path_band)
 	_build_batches()
 	_build_directional_lights(world)
@@ -178,7 +181,7 @@ func _build_directional_lights(world: Node2D) -> void:
 	marks.follow_viewport_enabled = true
 	world.add_child(marks)
 	_lit_enemy_marks = DrawLayer.new()
-	_lit_enemy_marks.draw_fn = _draw_lit_enemy_marks
+	_lit_enemy_marks.draw_fn = _timed(&"draw_lit_enemy_marks", _draw_lit_enemy_marks)
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	_lit_enemy_marks.material = unshaded
@@ -349,10 +352,30 @@ func _visual_of(table: EnemyTable, row: int) -> EnemyVisual:
 func _read_settings() -> void:
 	_shake_scale = float(SaveManager.settings.screen_shake)
 
+## 層の描く処理を、計測中なら時間を測る形で包む。
+func _timed(key: StringName, f: Callable) -> Callable:
+	return func(c: CanvasItem) -> void:
+		if not perf.active:
+			f.call(c)
+			return
+		var t0 := Time.get_ticks_usec()
+		f.call(c)
+		perf.since(key, t0)
+
 func _process(delta: float) -> void:
+	if not perf.active:
+		_present(delta)
+		return
+	var t0 := Time.get_ticks_usec()
+	_present(delta)
+	perf.since(&"process", t0)
+
+func _present(delta: float) -> void:
 	if run != null and run.loadout != null:
 		for scope: ContentResourceScope in run.loadout.resource_scopes(): warm_resources(self, scope)
+	var t0 := Time.get_ticks_usec()
 	_sync_picaro()
+	perf.since(&"process.picaro", t0)
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	# HUD owns cinematic visibility so the explicit entrance skip and the
 	# completed legendary module strip remain usable while the combat UI hides.
@@ -364,7 +387,9 @@ func _process(delta: float) -> void:
 	# 停止中は減衰も止まるため、残った画面揺れを持ち越さない。
 	if run.ui_overlay_active or phase == RunState.Phase.PAUSED or phase == RunState.Phase.LEVELUP:
 		shake = 0.0
+	t0 = Time.get_ticks_usec()
 	_update_fx(dt)
+	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
@@ -375,11 +400,13 @@ func _process(delta: float) -> void:
 			_equipment_visuals.erase(key)
 	_update_view()
 	var offset := Vector2.ZERO
-	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and view_override == null:
+	if not frozen and shake > 0.0 and phase != RunState.Phase.DYING and (view_override == null or (view_override is Dictionary and view_override.get("shake", false))):
 		offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * shake * _shake_scale / maxf(cam_zoom, 0.01)
 	_camera.position = cam_center + offset
 	_camera.zoom = Vector2(cam_zoom, cam_zoom)
+	t0 = Time.get_ticks_usec()
 	pipeline.step(dt, _camera.position, cam_zoom)
+	perf.since(&"process.pipeline", t0)
 	_field_boundary.queue_redraw()
 	for layer in _layers.values():
 		layer.queue_redraw()
@@ -396,6 +423,14 @@ func _process(delta: float) -> void:
 # ── イベント → 演出 ───────────────────────────────────────────────
 
 func _on_events(events: Array[Dictionary]) -> void:
+	if not perf.active:
+		_handle_events(events)
+		return
+	var t0 := Time.get_ticks_usec()
+	_handle_events(events)
+	perf.since(&"events", t0)
+
+func _handle_events(events: Array[Dictionary]) -> void:
 	_sync_visuals()
 	if pipeline.sparks.available():
 		var minimum := 0
@@ -880,6 +915,7 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
 	_sync_visuals()
@@ -902,9 +938,14 @@ func _draw_enemies(c: CanvasItem) -> void:
 	var radius := t.r
 	var hp := t.hp
 	var max_hp := t.max_hp
+	var live := 0
+	var batched := 0
+	var self_drawn := 0
+	var marked := 0
 	for i in alive.size():
 		if alive[i] == 0 or dead[i] != 0:
 			continue
+		live += 1
 		if state.cinematic_hide_enemies and t.is_boss[i] == 0: continue
 		if t.def[i] != null and t.def[i].params.get("clone_visual", false): continue
 		if t.def[i] != null and t.def[i].params.get("picaro", false): continue
@@ -927,7 +968,9 @@ func _draw_enemies(c: CanvasItem) -> void:
 		if t.def[i] != null and t.def[i].behavior == &"bomber" and t.mode[i] == EnemyTable.Mode.WINDUP:
 			col.g = 1.0 if fmod(t.charge[i] * 3.0, 1.0) >= 0.45 else 0.0
 		if visual != null and visual.draw_body(c, t, i, p):
+			self_drawn += 1
 			continue
+		batched += 1
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
@@ -940,17 +983,29 @@ func _draw_enemies(c: CanvasItem) -> void:
 		var v := _visual_of(t, i)
 		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
 				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or (v != null and v.always_marked):
+			marked += 1
 			_draw_enemy_marks(c, t, i)
+	perf.since(&"draw_enemies.rows", t0)
+	t0 = Time.get_ticks_usec()
 	for key in _batches:
 		if key != &"gem":
 			_batches[key].end()
-	_draw_meteor_shards(c)
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.end()
+	perf.since(&"draw_enemies.upload", t0)
+	_draw_meteor_shards(c)
+	t0 = Time.get_ticks_usec()
 	for v in _visuals:
 		v.draw_layer(c, view)
+	perf.since(&"draw_enemies.visual_layers", t0)
 	_drawing_enemies = false
 	_enemy_sprite_metrics.clear()
+	if perf_rows.active:
+		perf_rows.add(&"rows", alive.size())
+		perf_rows.add(&"live", live)
+		perf_rows.add(&"batched", batched)
+		perf_rows.add(&"self_drawn", self_drawn)
+		perf_rows.add(&"marked", marked)
 
 func _draw_lit_enemy_marks(c: CanvasItem) -> void:
 	var t := run.enemies.table
@@ -1418,6 +1473,11 @@ func _sync_picaro() -> void:
 		_picaro_material = ShaderMaterial.new()
 		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
 	var t := run.enemies.table
+	var birth_age := {}
+	if run.bosses.actor != null and run.bosses.actor.get("picaro") != null:
+		var actor = run.bosses.actor
+		for member: Dictionary in actor.picaro.alive():
+			birth_age[member.id] = maxf(0.0,actor.clock-float(member.born))
 	var used := {}
 	for i in t.alive.size():
 		if t.alive[i]==0 or t.dead[i]!=0 or t.def[i]==null or not t.def[i].params.get("picaro",false): continue
@@ -1444,9 +1504,13 @@ func _sync_picaro() -> void:
 		sprite.position = t.pos[i]
 		sprite.rotation = _enemy_sprite_angle(source,t.facing[i])
 		var radius := enemy_sprite_radius(source,t.r[i])
-		if sprite is Sprite2D: sprite.scale = Vector2.ONE*radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
-		else: sprite.scale=Vector2.ONE*radius
-		sprite.modulate = Color(1,1,1,0.45 if t.guard[i]>0.0 else 1.0)
+		# Only the invulnerable emergence grows visually; it settles to the normal sprite size before release.
+		var age: float = birth_age.get(id,2.0)
+		var forming := clampf(1.0-age,0.0,1.0)
+		var emerge_radius := lerpf(radius,maxf(radius*1.8,70.0),forming*forming)
+		if sprite is Sprite2D: sprite.scale = Vector2.ONE*emerge_radius*2.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
+		else: sprite.scale=Vector2.ONE*emerge_radius
+		sprite.modulate = Color(1,1,1,0.7 if t.guard[i]>0.0 else 1.0)
 	for id in _picaro_sprites.keys():
 		if not used.has(id):
 			_picaro_sprites[id].queue_free()

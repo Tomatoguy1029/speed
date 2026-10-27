@@ -115,6 +115,8 @@ func snapshot() -> Dictionary:
 	return {"conditions": rules.conditions.duplicate(true), "layout": rules.layout.duplicate(true), "graph_nodes": rules.graph_nodes.duplicate(true), "combos": rules.combos.duplicate(true), "costs": rules.costs.duplicate(true), "condition_groups": rules.condition_groups.duplicate(true)}
 
 func category_for(id: String) -> String:
+	var group := hub_for(id)
+	if not group.is_empty(): return rules.category_for_group(group)
 	var source: String = rules.source_for(id)
 	if rules.combos.has(source): return "combo"
 	for move in rules.techniques:
@@ -148,7 +150,7 @@ func _default_groups() -> Dictionary:
 				var group: String = "choose_" + category + ("_" + str(number) if number > 1 else "")
 				var title_text: String = {"normal": "通常技", "combo": "コンボ", "major": "大技"}[category]
 				title_text += " · " + {"bite": "噛みつき", "vortex": "渦", "debris": "瓦礫", "beam": "ビーム", "thunder": "雷"}.get(kind, kind) if not kind.is_empty() else (" " + str(number) if number > 1 else "")
-				result[group] = {"title": title_text, "nodes": ids.slice(i * chunk, (i + 1) * chunk)}
+				result[group] = {"title": title_text, "category": category, "nodes": ids.slice(i * chunk, (i + 1) * chunk)}
 	return result
 
 func assign_group(id: String, group: String) -> void:
@@ -167,7 +169,7 @@ func add_group() -> void:
 	var n := 1
 	while after.condition_groups.has("choose_custom_" + str(n)): n += 1
 	var id := "choose_custom_" + str(n)
-	after.condition_groups[id] = {"title": "条件選択 " + str(n), "nodes": []}
+	after.condition_groups[id] = {"title": "条件選択 " + str(n), "category": "normal", "nodes": []}
 	after.layout[id] = (scroll_offset + size * 0.5) / zoom
 	edit_requested.emit(before, after, "条件選択を追加")
 	picked.emit("coverage", id)
@@ -198,21 +200,21 @@ func show_rules(value: Resource) -> void:
 	var block_size := Vector2.ZERO
 	for group in rules.condition_groups:
 		var ids: Array[String] = []
-		for id in rules.node_ids():
-			if hub_for(id) == group: ids.append(id)
-		var hub := _add_node(group, rules.condition_groups[group].title + " · 条件選択", Vector2.ZERO, false)
-		var columns := mini(2, maxi(1, ids.size()))
+		for id in rules.condition_groups[group].get("nodes", []):
+			if rules.node_ids().has(id) and hub_for(id) == group: ids.append(id)
+		var label: String = {"normal": "通常技", "combo": "コンボ技", "major": "大技"}.get(rules.category_for_group(group), "通常技")
+		var hub := _add_node(group, rules.condition_groups[group].title + " · " + label, Vector2.ZERO, false)
 		var nodes: Array[GraphNode] = []
-		var cell := Vector2.ZERO
+		var node_size := Vector2.ZERO
 		for id in ids:
 			var node := _add_node(id, node_title(rules, id), Vector2.ZERO, true)
 			nodes.append(node)
-			cell.x = maxf(cell.x, node.get_combined_minimum_size().x + 18 * factor)
-			cell.y = maxf(cell.y, node.get_combined_minimum_size().y + 18 * factor)
-		var height := hub.get_combined_minimum_size().y + 30 * factor
-		block_size.x = maxf(block_size.x, maxf(hub.get_combined_minimum_size().x, columns * cell.x) + 24 * factor)
-		block_size.y = maxf(block_size.y, height + ceili(ids.size() / float(columns)) * cell.y + 24 * factor)
-		blocks.append({"hub": hub, "ids": ids, "nodes": nodes, "columns": columns, "cell": cell, "height": height, "total_height": height + ceili(ids.size() / float(columns)) * cell.y + 24 * factor})
+			node_size.x = maxf(node_size.x, node.get_combined_minimum_size().x)
+			node_size.y = maxf(node_size.y, node.get_combined_minimum_size().y)
+		var row_height := node_size.y + 26 * factor
+		var height := maxf(hub.get_combined_minimum_size().y, ids.size() * row_height - (26 * factor if not ids.is_empty() else 0.0)) + 56 * factor
+		block_size.x = maxf(block_size.x, hub.get_combined_minimum_size().x + 80 * factor + node_size.x + 56 * factor)
+		blocks.append({"hub": hub, "ids": ids, "nodes": nodes, "row_height": row_height, "node_x": hub.get_combined_minimum_size().x + 80 * factor, "total_height": height})
 	var lanes := mini(4, blocks.size())
 	var heights := []
 	heights.resize(lanes)
@@ -227,7 +229,7 @@ func show_rules(value: Resource) -> void:
 		block.hub.position_offset = rules.layout.get(String(block.hub.name), at)
 		for i in block.nodes.size():
 			var id: String = block.ids[i]
-			block.nodes[i].position_offset = rules.layout.get(id, at + Vector2((i % block.columns) * block.cell.x, block.height + floori(i / float(block.columns)) * block.cell.y))
+			block.nodes[i].position_offset = rules.layout.get(id, at + Vector2(block.node_x, i * block.row_height))
 			if rules.graph_nodes.get(id, {}).get("connected", true): connect_node(String(block.hub.name), 0, id, 0)
 	_updating = false
 	if rules.layout.is_empty(): fit_all.call_deferred()
@@ -252,6 +254,7 @@ func _add_node(id: String, title_text: String, at: Vector2, input: bool) -> Grap
 	else:
 		var label := Label.new()
 		label.text = "条件のカバーを確認"
+		label.custom_minimum_size.y = 58.0 * maxf(1.0, get_theme_default_font_size() / 14.0)
 		node.add_child(label)
 	node.set_slot(0, input, 0, Color(0.6, 0.8, 0.7), not input, 0, Color(0.6, 0.8, 0.7))
 	add_child(node)
@@ -329,15 +332,26 @@ func _assist(node: GraphNode) -> void:
 	var scale_factor := maxf(1.0, get_theme_default_font_size() / 14.0)
 	var threshold := 12.0 * scale_factor / zoom
 	var gap := 28.0 * scale_factor
+	var closest_x := INF
+	var closest_y := INF
 	for other in get_children():
 		if not other is GraphNode or other == node or other.selected: continue
-		if absf(next.x - other.position_offset.x) < threshold:
-			next.x = other.position_offset.x
-			_guides.append_array(PackedVector2Array([Vector2(next.x, -10000), Vector2(next.x, 10000)]))
+		var horizontal_gap := maxf(0.0, maxf(other.position_offset.x - (node.position_offset.x + node.size.x), node.position_offset.x - (other.position_offset.x + other.size.x)))
+		var vertical_gap := maxf(0.0, maxf(other.position_offset.y - (node.position_offset.y + node.size.y), node.position_offset.y - (other.position_offset.y + other.size.y)))
+		if vertical_gap <= 160.0 * scale_factor and absf(node.position_offset.x - other.position_offset.x) < threshold:
+			var score_x := vertical_gap + absf(node.position_offset.x - other.position_offset.x)
+			if score_x < closest_x:
+				closest_x = score_x
+				next.x = other.position_offset.x
+		if horizontal_gap > 120.0 * scale_factor: continue
 		for y in [other.position_offset.y, other.position_offset.y + other.size.y + gap, other.position_offset.y - node.size.y - gap]:
-			if absf(next.y - y) < threshold:
+			if absf(node.position_offset.y - y) < threshold:
+				var score_y := horizontal_gap + absf(node.position_offset.y - y)
+				if score_y >= closest_y: continue
+				closest_y = score_y
 				next.y = y
-				_guides.append_array(PackedVector2Array([Vector2(-10000, y), Vector2(10000, y)]))
+	if closest_x < INF: _guides.append_array(PackedVector2Array([Vector2(next.x, -10000), Vector2(next.x, 10000)]))
+	if closest_y < INF: _guides.append_array(PackedVector2Array([Vector2(-10000, next.y), Vector2(10000, next.y)]))
 	_updating = true
 	node.position_offset = next
 	_updating = false
@@ -427,7 +441,7 @@ func command(action: String) -> void:
 			while after.condition_groups.has(entry.id + "_copy_" + str(n)): n += 1
 			var id: String = entry.id + "_copy_" + str(n)
 			groups[entry.id] = id
-			after.condition_groups[id] = {"title": entry.group.title + "（複製）", "nodes": []}
+			after.condition_groups[id] = {"title": entry.group.title + "（複製）", "category": entry.group.get("category", rules.category_for_group(entry.id)), "nodes": []}
 			after.layout[id] = entry.position + offset
 			pasted.append(id)
 		for entry in clipboard:

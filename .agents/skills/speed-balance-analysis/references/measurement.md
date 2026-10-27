@@ -13,7 +13,7 @@
 - [loadout_system.gd](../../../../speed/scripts/runtime/systems/loadout_system.gd)・[pickup_system.gd](../../../../speed/scripts/runtime/systems/pickup_system.gd)・[ship_system.gd](../../../../speed/scripts/runtime/systems/ship_system.gd)：装備差分・XP・実被弾の発生元。
 - 同じ systems 内の `spawn_system.gd`・`combat_system.gd`・`enemy_system.gd`・`boss_system.gd`：出現、命中/撃破、局所設定の適用。ゲーム内イベントの存在とrecorderが保存する内容を区別する。
 
-現行は `schema_version=4`・`measurement_version=1`。schema 4だけでは追加計測の有無を判別できない。ヘッダーの版・条件と `loadout`・`hurt`・`xp_*`・調整通知の実在を調べ、項目のない録画はその目的の精度を下げる。新形式でもイベントが観測区間内に発生しなければ行は出ないため、型の不在だけで機能の未対応や発生0を断定しない。未対応の測定版を現行とみなさず、対応する実装を確認するか、解釈できる範囲を限定する。
+現行は `schema_version=4`・`measurement_version=2`。2 では `performance` の `profile` に処理時間（世界側・表示側の項目、敵の描画の行の数、記録自身の書き込み）を持つ。schema 4だけでは追加計測の有無を判別できない。ヘッダーの版・条件と `loadout`・`hurt`・`xp_*`・調整通知の実在を調べ、項目のない録画はその目的の精度を下げる。新形式でもイベントが観測区間内に発生しなければ行は出ないため、型の不在だけで機能の未対応や発生0を断定しない。未対応の測定版を現行とみなさず、対応する実装を確認するか、解釈できる範囲を限定する。
 
 ## ステージ固有の変更先を確かめる
 

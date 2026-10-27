@@ -1,6 +1,6 @@
-[gd_resource type="SpriteFrames" format=3]
+[gd_resource type="SpriteFrames" format=3 uid="uid://inan5pfkbg25"]
 
-[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/unicorn.png" id="1_sheet"]
+[ext_resource type="Texture2D" uid="uid://bccd60ifibi4l" path="res://assets/pixel/monoceros/unicorn.png" id="1_sheet"]
 
 [sub_resource type="AtlasTexture" id="Atlas_long"]
 atlas = ExtResource("1_sheet")
@@ -24,7 +24,25 @@ filter_clip = true
 
 [resource]
 animations = [{
-"frames": [{"duration": 0.17, "texture": SubResource("Atlas_long")}, {"duration": 0.08, "texture": SubResource("Atlas_middle")}, {"duration": 0.08, "texture": SubResource("Atlas_short")}, {"duration": 0.17, "texture": SubResource("Atlas_down")}, {"duration": 0.15, "texture": SubResource("Atlas_short")}, {"duration": 0.18, "texture": SubResource("Atlas_middle")}],
+"frames": [{
+"duration": 0.17,
+"texture": SubResource("Atlas_long")
+}, {
+"duration": 0.08,
+"texture": SubResource("Atlas_middle")
+}, {
+"duration": 0.08,
+"texture": SubResource("Atlas_short")
+}, {
+"duration": 0.17,
+"texture": SubResource("Atlas_down")
+}, {
+"duration": 0.15,
+"texture": SubResource("Atlas_short")
+}, {
+"duration": 0.18,
+"texture": SubResource("Atlas_middle")
+}],
 "loop": true,
 "name": &"run",
 "speed": 1.0

@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://cc5rfloat4luf"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1_j7p5h"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2_pmfra"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3_bp1pc"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4_a2wli"]
+
+[node name="Cross" type="Node2D" unique_id=110137245]
+script = ExtResource("1_j7p5h")
+types = Array[StringName]([&"cross"])
+
+[node name="1体" type="Node2D" parent="." unique_id=697287512]
+position = Vector2(-2600, 0)
+script = ExtResource("2_pmfra")
+
+[node name="cross1" type="Node2D" parent="1体" unique_id=1013148370]
+script = ExtResource("3_bp1pc")
+enemy = &"cross"
+
+[node name="2体" type="Node2D" parent="." unique_id=1120234988]
+position = Vector2(-2600, 1400)
+script = ExtResource("2_pmfra")
+
+[node name="cross1" type="Node2D" parent="2体" unique_id=619532343]
+position = Vector2(-260, -80)
+script = ExtResource("3_bp1pc")
+enemy = &"cross"
+
+[node name="cross2" type="Node2D" parent="2体" unique_id=243797469]
+position = Vector2(243, 205)
+script = ExtResource("3_bp1pc")
+enemy = &"cross"
+
+[node name="Entry0" type="Node2D" parent="." unique_id=1352042965]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4_a2wli")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=1311960933]
+position = Vector2(0, 1600)
+script = ExtResource("4_a2wli")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=1792405420]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4_a2wli")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=732567099]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4_a2wli")

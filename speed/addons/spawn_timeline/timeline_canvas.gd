@@ -396,10 +396,15 @@ static func _max_curve_total(all_values: Array, end: float) -> float:
 func _curve_max(c: Resource) -> float:
 	if _drag.get("kind", "") == "point" and _drag.get("curve") == c:
 		return float(_drag.vmax)
-	var m := 10.0
-	for p: Vector2 in c.get("points"):
-		m = maxf(m, p.y)
+	var m := maxf(10.0, _curve_peak(c))
 	return ceilf(m * 1.25 / 5.0) * 5.0
+
+## 曲線は点の値を行き過ぎないので、点の最大が実際の目標最大になる。
+static func _curve_peak(c: Resource) -> float:
+	var peak := 0.0
+	for p: Vector2 in c.get("points"):
+		peak = maxf(peak, p.y)
+	return peak
 
 ## 曲線の行 k で、目標の数 v の y と、y の目標の数。
 func _curve_y(k: int, v: float, vmax: float) -> float:
@@ -644,7 +649,7 @@ func _draw() -> void:
 				draw_string(font, tp, text, HORIZONTAL_ALIGNMENT_LEFT, -1, _fs(13), Color(1, 0.95, 0.6))
 		draw_string(font, Vector2(8 * ui, top + 20 * ui), timeline.enemy_name(c.get("type")), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15),
 			Color(1, 1, 0.8) if k == curve_selected else Color(0.7, 1.0, 0.8))
-		draw_string(font, Vector2(8 * ui, top + 40 * ui), "最大 %d 体" % int(vmax), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12), Color(1, 1, 1, 0.6))
+		draw_string(font, Vector2(8 * ui, top + 40 * ui), "目標最大 約%d体" % roundi(_curve_peak(c)), HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12), Color(1, 1, 1, 0.6))
 	# 終わりより先は暗くする
 	if _x(end) < size.x:
 		draw_rect(Rect2(_x(end), 0, size.x - _x(end), size.y), Color(0, 0, 0, 0.45))
@@ -712,7 +717,12 @@ func _draw() -> void:
 	draw_rect(Rect2(0, off, GUTTER, RULER), Color(0.16, 0.17, 0.21))
 	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW * 0.6), "時間帯 / 予算", HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(15))
 	var display_max := roundi(max_pop) if not curves.is_empty() else int(max_pop)
-	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + POP_ROW * 0.6), ("雑魚の目標（全体最大 約%d）" if not curves.is_empty() else "雑魚の数（最大 %d）") % display_max, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(14))
+	var value_text := ("全体最大 約%d" if not curves.is_empty() else "最大 %d") % display_max
+	var value_size := _fs(13)
+	while value_size > _fs(9) and font.get_string_size(value_text, HORIZONTAL_ALIGNMENT_LEFT, -1, value_size).x > GUTTER - 12 * ui:
+		value_size -= 1
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + 18 * ui), "雑魚の目標", HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, _fs(12))
+	draw_string(font, Vector2(8 * ui, off + RULER + PHASE_ROW + 37 * ui), value_text, HORIZONTAL_ALIGNMENT_LEFT, GUTTER - 12 * ui, value_size)
 	clocks.draw()
 	draw_line(Vector2(0, off + _tracks_top()), Vector2(size.x, off + _tracks_top()), Color(1, 1, 1, 0.25))
 	# 見えている目盛りの階層を明示する（数字は常に秒）。

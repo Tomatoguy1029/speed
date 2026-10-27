@@ -35,7 +35,7 @@ func _ready() -> void:
 	for frame in 1200:
 		step(DT)
 		if actor.mode == &"windup":
-			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= float(actor.def.params.approach_range)
+			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= actor._reach(actor.technique)
 			break
 	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
 	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"combo"]:
@@ -49,6 +49,7 @@ func _ready() -> void:
 		var flow := actor.flow_runner.flow.duplicate(true)
 		for section in flow.sections: section["allowed_techniques"] = [String(tech)]
 		actor.flow_runner.configure(flow)
+		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech in [&"return_charge", &"combo"] else 0
 		step(DT)
 		check(actor.mode == &"windup" and actor.technique == (&"charge" if tech == &"combo" else tech), "共通フローから技を開始できる: " + tech)
 	fresh()
@@ -199,10 +200,13 @@ func _ready() -> void:
 	check(actor.has_method("begin_entrance"), "ブースターで画面外から飛び込む登場を持つ")
 	if actor.has_method("begin_entrance"):
 		var target := actor.table.pos[actor.body]
+		actor.selection_enabled = false
 		actor.call("begin_entrance")
 		check(actor.mode == &"entrance" and not actor.can_begin_sequence(), "登場中は攻撃を選ばない")
 		check(actor.table.pos[actor.body].distance_to(target) > 100.0, "登場は目標の外側から始まる")
-		step(2.0)
+		for frame in 240:
+			step(DT)
+			if actor.mode == &"idle": break
 		check(actor.mode == &"idle" and actor.table.pos[actor.body].is_equal_approx(target), "飛来後に目標で停止する")
 	check(actor._presentation.has_method("booster_strength"), "表示側はブースターの噴射強度を持つ")
 	if actor._presentation.has_method("booster_strength"):

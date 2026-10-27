@@ -492,12 +492,35 @@ backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), Su
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_s6gwe"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
+enemy_tuning = {
+"aquarius": {
+"hp": 240.0
+},
+"corona": {
+"hp": 110.0
+},
+"cross": {
+"hp": 60.0
+},
+"dolphin": {
+"hp": 90.0
+},
+"reticle": {
+"hp": 55.0
+},
+"telescope": {
+"hp": 35.0
+}
+}
 enemy_attack_values = {
 "aquarius": 4.0,
-"corona": 1.0,
+"biter": 0.0,
+"bomber": 0.0,
+"corona": 0.5,
 "cross": 1.0,
 "dolphin": 1.0,
 "reticle": 0.5,
+"splitter": 0.0,
 "telescope": 1.0
 }
 zako_curves = Array[ExtResource("8_xsgcl")]([SubResource("Resource_mpbfx"), SubResource("Resource_vh3c5"), SubResource("Resource_02yv8")])

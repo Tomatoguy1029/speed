@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1")
 params = {
-"per_stack": 0.2
+"first_stack": 0.2,
+"per_stack": 0.1
 }
 id = &"T11"
 code_id = &"attack"

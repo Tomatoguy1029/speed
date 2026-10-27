@@ -2,7 +2,38 @@
 [ext_resource type="Script" path="res://scripts/data_types/boss_flow_def.gd" id="1"]
 [resource]
 script = ExtResource("1")
-maximum_stamina = 4.0
+maximum_stamina = 6.0
 partial_rest = 0.8
 empty_rest = 2.0
-sections = [{"name":"本体攻撃","request":"any","cap":4.0,"next":0,"weights":{"single":100.0,"combo":100.0,"major":100.0}}]
+sections = [{
+"name": "牽制",
+"request": "normal",
+"cap": 1.0,
+"section_budget": 2.0,
+"action_count": 2,
+"action_interval": 0.2,
+"no_candidate_timeout": 0.3,
+"next": 1,
+"weights": {"single": 100.0}
+}, {
+"name": "機動とピカロの圧力",
+"request": "any",
+"cap": 2.0,
+"action_count": 1,
+"no_candidate_timeout": 0.8,
+"next": 2,
+"weights": {"single": 45.0, "major": 55.0}
+}, {
+"name": "山場",
+"request": "major",
+"cap": 2.0,
+"action_count": 1,
+"no_candidate_timeout": 1.0,
+"next": 3,
+"weights": {"major": 100.0}
+}, {
+"name": "反撃の間",
+"request": "rest",
+"next": 0,
+"weights": {}
+}]

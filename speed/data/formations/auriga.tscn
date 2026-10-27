@@ -1,0 +1,77 @@
+[gd_scene format=3 uid="uid://kb2gn6nbf7dj"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Auriga" type="Node2D" unique_id=1585388225]
+script = ExtResource("1")
+types = Array[StringName]([&"auriga"])
+
+[node name="1体" type="Node2D" parent="." unique_id=766440305]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="1体" unique_id=375903412]
+script = ExtResource("3")
+enemy = &"auriga"
+
+[node name="2体・横並び" type="Node2D" parent="." unique_id=1571030607]
+position = Vector2(-2069, 10)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="2体・横並び" unique_id=850046981]
+position = Vector2(-145, 0)
+rotation = -0.28
+script = ExtResource("3")
+enemy = &"auriga"
+metadata/_edit_lock_ = true
+
+[node name="auriga2" type="Node2D" parent="2体・横並び" unique_id=473250000]
+position = Vector2(160, 8)
+rotation = 0.28
+script = ExtResource("3")
+enemy = &"auriga"
+metadata/_edit_lock_ = true
+
+[node name="3体・斜め並び" type="Node2D" parent="." unique_id=733738955]
+position = Vector2(-3318, 0)
+script = ExtResource("2")
+
+[node name="auriga1" type="Node2D" parent="3体・斜め並び" unique_id=1138267222]
+position = Vector2(-175, -118)
+script = ExtResource("3")
+enemy = &"auriga"
+metadata/_edit_lock_ = true
+
+[node name="auriga2" type="Node2D" parent="3体・斜め並び" unique_id=1665322416]
+position = Vector2(2, -3)
+script = ExtResource("3")
+enemy = &"auriga"
+metadata/_edit_lock_ = true
+
+[node name="auriga3" type="Node2D" parent="3体・斜め並び" unique_id=1390879180]
+position = Vector2(148, 185)
+script = ExtResource("3")
+enemy = &"auriga"
+metadata/_edit_lock_ = true
+
+[node name="Entry0" type="Node2D" parent="." unique_id=972002672]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=1535719555]
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=270953532]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=319843801]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4")

@@ -8,18 +8,34 @@ var sides := 0
 var center := Vector2.ZERO
 var ended := false
 var paths: Array[PackedVector2Array] = []
+var locked := false
 func begin(a: BossActor) -> void:
 	center = a.aim_target()
-	staging = STAGING.side_entry(a, center)
+	var side := -1.0 if a.run_state.rng.randf() < 0.5 else 1.0
+	staging = STAGING.begin(a, side, true)
+
+func _lock(a: BossActor) -> void:
+	center = a.aim_target()
+	var origin: Vector2 = a.table.pos[a.body]
+	var forward: Vector2 = (center - origin).normalized()
+	if forward.is_zero_approx(): forward = Vector2(-float(staging.side), 0.0)
+	var lateral: Vector2 = forward.orthogonal()
+	a.direction = forward
 	for side in [-1, 1]:
 		for j in 3:
-			var from := center + Vector2(side * 620.0, (j - 1) * 140.0)
-			var to := center + Vector2(side * 130.0, (j - 1) * 140.0 + side * 75.0)
+			var stripe := float(side * 135 + (j - 1) * 70)
+			var from: Vector2 = origin + forward * 125.0 * a.head_scale + lateral * stripe
+			var to: Vector2 = center + forward * 125.0 + lateral * (stripe + float(side) * 60.0)
 			paths.append(PackedVector2Array([from, to]))
 			a.telegraph_paths.append(paths[-1])
 			a.telegraph_widths.append(float(a.rule().get("scratch_width", 30.0)) * 0.5)
-func windup(a: BossActor, _dt: float) -> void:
-	STAGING.advance(a, staging, clampf(a.elapsed / float(a.rule().warn), 0.0, 1.0))
+	locked = true
+	a.combat_trace.stage("telegraph")
+	a.combat_trace.stage("lock", {"scope": "rifts_paths"})
+func windup(a: BossActor, dt: float) -> void:
+	if not STAGING.advance_full(a, staging, dt): return
+	if not locked: _lock(a)
+	a.table.facing[a.body] = lerp_angle(a.table.facing[a.body], a.direction.angle(), clampf(dt * 9.0, 0.0, 1.0))
 func tick(a: BossActor, _dt: float) -> void:
 	var p: Dictionary = a.rule()
 	var scratch_time := float(p.get("scratch_time", 0.32))

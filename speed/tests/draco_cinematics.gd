@@ -145,7 +145,13 @@ func _ready() -> void:
 	actor.cancel_attack();actor.cycle.cancel();sim.projectiles.clear_hostile()
 	actor.phase=3;actor.mode=&"idle"
 	actor.start_attack(&"rifts")
-	for frame in 90: actor.sim_tick(1.0/60.0,1.0/60.0)
+	var rifts_open := false
+	for frame in 600:
+		actor.sim_tick(1.0/60.0,1.0/60.0)
+		if actor.technique == &"rifts" and actor._driver != null and actor._driver.walls.size() == 6:
+			rifts_open = true
+			break
+	check(rifts_open,"引っ掻きの退場・再登場後に亀裂を開く")
 	actor.finale.begin()
 	check(sim.state.cinematic_hide_enemies,"最終演出では残った通常敵を画面から退ける")
 	check(not actor.closing_walls.is_empty(),"亀裂を引き裂いた後の決着移行で修復を開始する")

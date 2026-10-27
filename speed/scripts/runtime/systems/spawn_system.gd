@@ -198,7 +198,7 @@ func _pick_weighted(items: Array) -> int:
 ## priorityが数値なら0を含めて群れ全員へ渡す。nullならステージの種類別優先度を使う。
 func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null) -> PackedInt32Array:
 	var rows := PackedInt32Array()
-	var group := enemies._next_id if value > 0.0 else 0
+	var group := enemies._next_id if value >= 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:
@@ -299,6 +299,13 @@ var _survey_raw := 0
 ## 戻り値は、目標の数 pop と比べる、再配置の範囲の中の敵の数。上下左右と中心付近の領域ごとに、
 ## pop × config.spawn_region_cap までしか数えない（一か所に固まった敵だけで目標に届かないように）。
 func _survey(pop: float) -> float:
+	var t0 := Time.get_ticks_usec()
+	var alive_n := _survey_rows(pop)
+	# 開発版の計測：出現のための数え直しの時間
+	ctx.perf.since(&"spawner.survey", t0)
+	return alive_n
+
+func _survey_rows(pop: float) -> float:
 	_edge_counts.fill(0)
 	_type_counts.clear()
 	_zako_counts.clear()

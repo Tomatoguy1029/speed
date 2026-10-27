@@ -48,13 +48,13 @@ costs = {
 "volley": 1.0
 }
 layout = {
-"choose_combo": Vector2(760, 116),
-"choose_major": Vector2(1464, 116),
-"choose_normal": Vector2(40, 116),
-"power_shot": Vector2(380, 340),
-"rain": Vector2(720, 340),
-"rear_attack": Vector2(1060, 340),
-"volley": Vector2(40, 340)
+"choose_combo": Vector2(40, 116),
+"choose_major": Vector2(948, 116),
+"choose_normal": Vector2(1856, 116),
+"power_shot": Vector2(2356, 432),
+"rain": Vector2(2356, 748),
+"rear_attack": Vector2(2356, 1064),
+"volley": Vector2(2356, 116)
 }
 condition_groups = {
 "choose_combo": {

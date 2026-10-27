@@ -10,8 +10,8 @@ var prior := PackedVector2Array()
 func _pose(a: BossActor, offset: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	var reach := float(a.rule().reach)
-	for j in 33:
-		var t := float(j)/32.0
+	for j in a.body_segments + 1:
+		var t := float(j) / float(a.body_segments)
 		var angle := facing+PI+offset*t*t
 		points.append(origin+Vector2.from_angle(angle)*reach*t)
 	return MOTION.fit_spine(points,base,true)
@@ -21,8 +21,8 @@ func begin(a: BossActor) -> void:
 	base=a.neutral_body_points(origin,facing)
 	var outer := PackedVector2Array()
 	var inner := PackedVector2Array()
-	for j in 33:
-		var angle := facing+PI+lerpf(-1.3,1.3,j/32.0)
+	for j in a.body_segments + 1:
+		var angle := facing+PI+lerpf(-1.3,1.3,float(j) / float(a.body_segments))
 		outer.append(origin+Vector2.from_angle(angle)*float(a.rule().reach))
 		inner.append(origin+Vector2.from_angle(angle)*float(a.rule().reach)*0.55)
 	a.telegraph_paths.assign([outer,inner,PackedVector2Array([inner[0],outer[0]]),PackedVector2Array([inner[-1],outer[-1]])])
@@ -33,7 +33,7 @@ func tick(a: BossActor,_dt: float) -> void:
 	MOTION.clear_tell(a)
 	var points := _pose(a,lerpf(-1.3,1.3,clampf(a.elapsed/float(a.rule().active),0.0,1.0)))
 	var fractions: PackedFloat32Array=FORM.fractions(points)
-	for j in range(18,points.size()-1):
+	for j in range(int(points.size() * 0.55),points.size()-1):
 		var segment := PackedVector2Array([points[j],points[j+1]])
 		var old := PackedVector2Array([prior[j],prior[j+1]]) if prior.size()==points.size() else PackedVector2Array()
 		a.hit_segment(segment,a.body_width*0.5*FORM.taper((fractions[j]+fractions[j+1])*0.5),old)

@@ -1,15 +1,15 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://tvxo6bjbdqry"]
 
 [ext_resource type="Script" path="res://scripts/encounters/enemy_formation.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_layout.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_marker.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
-[node name="Stage1Triangle" type="Node2D"]
+[node name="Triangle" type="Node2D"]
 script = ExtResource("1")
 types = Array[StringName]([&"triangle"])
 
-[node name="単体" type="Node2D" parent="."]
+[node name="単体" type="Node2D" parent="." unique_id=1042501638]
 position = Vector2(-2400, 0)
 script = ExtResource("2")
 weight = 1.0
