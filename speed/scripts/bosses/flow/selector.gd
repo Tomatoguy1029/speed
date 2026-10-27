@@ -41,7 +41,7 @@ func choose(candidates: Array, section: Dictionary, last: Array, _forbidden: Arr
 			if alternatives[kind].is_empty(): alternatives.erase(kind)
 			elif float(weights.get(kind, 0.0)) > 0.0: positive = true
 		if positive: groups = alternatives
-	var actions: Array = sample(groups, weights)
+	var actions: Array = sample(groups, weights, section.get("technique_weights", {}))
 	if record_details:
 		diagnostics["previous_identity"] = previous
 		diagnostics["avoid_repeat"] = section.get("avoid_repeat", true)
@@ -73,7 +73,7 @@ static func compatible(actions: Array, next: Dictionary, cap: float, forbidden: 
 			if pair.size() == 2 and ((pair[0] == action.id and pair[1] == next.id) or (pair[1] == action.id and pair[0] == next.id)): return false
 	return cost <= cap + 0.00001
 
-func sample(groups: Dictionary, weights: Dictionary) -> Array:
+func sample(groups: Dictionary, weights: Dictionary, technique_weights: Dictionary = {}) -> Array:
 	var total := 0.0
 	for kind in groups: total += maxf(0.0, float(weights.get(kind, 0.0)))
 	diagnostics = {"available": groups.keys(), "weights": weights, "total": total}
@@ -84,6 +84,20 @@ func sample(groups: Dictionary, weights: Dictionary) -> Array:
 		cursor -= maxf(0.0, float(weights.get(kind, 0.0)))
 		if cursor < 0.0:
 			var ids: Array = groups[kind].keys()
-			var variants: Array = groups[kind][ids[random.randi_range(0, ids.size() - 1)]]
+			var picked: String
+			if technique_weights.is_empty():
+				picked = String(ids[random.randi_range(0, ids.size() - 1)])
+			else:
+				var total_ids := 0.0
+				for id in ids: total_ids += maxf(0.0, float(technique_weights.get(id, 1.0)))
+				if total_ids <= 0.0: return []
+				var id_cursor := random.randf() * total_ids
+				picked = String(ids.back())
+				for id in ids:
+					id_cursor -= maxf(0.0, float(technique_weights.get(id, 1.0)))
+					if id_cursor < 0.0:
+						picked = String(id)
+						break
+			var variants: Array = groups[kind][picked]
 			return variants[random.randi_range(0, variants.size() - 1)]
 	return []

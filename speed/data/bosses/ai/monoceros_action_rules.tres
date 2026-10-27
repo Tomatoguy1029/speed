@@ -65,6 +65,7 @@ costs = {
 "return_charge": 3.0,
 "sweep": 1.0
 }
+selection_bias = {"kick": 3.0, "sweep": 3.0}
 layout = {
 "charge": Vector2(40, 614),
 "choose_combo": Vector2(752, 116),

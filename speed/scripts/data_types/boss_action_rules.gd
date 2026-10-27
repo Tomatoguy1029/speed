@@ -6,6 +6,7 @@ extends Resource
 @export var conditions: Dictionary = {}
 @export var combos: Dictionary = {}
 @export var costs: Dictionary = {}
+@export var selection_bias: Dictionary = {}
 @export var layout: Dictionary = {}
 @export_storage var condition_groups: Dictionary = {}
 @export_storage var graph_nodes: Dictionary = {}

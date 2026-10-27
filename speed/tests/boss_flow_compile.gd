@@ -32,4 +32,13 @@ func _initialize() -> void:
 	check(invalid.error != OK, "invalid distance interval is rejected before writing")
 	rules.conditions.bite_thrust = {"half_angle": -1.0}
 	check(not compiler.validate({"rules": rules}).is_empty(), "negative sector angles are rejected")
+	var flow = load("res://scripts/data_types/boss_flow_def.gd").new()
+	flow.sections = [{"next": 0, "action_count": 1.5, "no_candidate_timeout": 0.5}]
+	check(not compiler.validate({"flow": flow}).is_empty(), "fractional attack counts cannot silently become a different battle rhythm")
+	flow.sections[0].action_count = 2
+	flow.sections[0].section_budget = -1.0
+	check(not compiler.validate({"flow": flow}).is_empty(), "negative section budgets are rejected")
+	var weighted = load("res://data/bosses/ai/monoceros_action_rules.tres").duplicate(true)
+	weighted.selection_bias = {"missing": 2.0}
+	check(not compiler.validate({"rules": weighted}).is_empty(), "selection policy cannot refer to a missing technique")
 	quit(1 if failed else 0)

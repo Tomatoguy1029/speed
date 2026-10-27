@@ -133,12 +133,12 @@ func exercise() -> void:
 	var text := _texts(panel, true)
 	check(_has(text, "最大距離") and _has(text, "噛みつきのダメージ"), "selecting a technique directly exposes its trigger condition and performance")
 	check(_preview_count(panel) > _preview_count(graph), "the selected technique has a detailed range preview")
-	check(not _has(text, "単独攻撃の割合") and not _has(text, "今回の消費上限") and not _has(text, "禁止ペアを追加"), "technique editing does not expose section probability, cap or forbidden pairs")
+	check(not _has(text, "単独攻撃の割合") and not _has(text, "技1回の消費上限") and not _has(text, "禁止ペアを追加"), "technique editing does not expose section probability, cap or forbidden pairs")
 
 	panel._edit_section(0)
 	await _settle()
 	text = _texts(panel, true)
-	check(_has(text, "単独攻撃の割合") and _has(text, "今回の消費上限"), "selecting a section exposes its probability and consumption cap")
+	check(_has(text, "単独攻撃の割合") and _has(text, "技1回の消費上限") and _has(text, "区間の攻撃回数") and _has(text, "区間内の攻撃間隔（秒）") and _has(text, "区間の累計消費上限") and _has(text, "候補なしの待機上限（秒）"), "selecting a section exposes its rhythm, budget and fallback limit")
 	check(_has(text, "禁止ペア") or _has(text, "同時攻撃の禁止"), "forbidden simultaneous attacks belong to the selected section")
 	check(not _has(text, "噛みつきのダメージ") and not _has(text, "最大距離"), "section editing does not expose technique performance or trigger distances")
 

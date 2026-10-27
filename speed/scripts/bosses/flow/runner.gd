@@ -10,6 +10,11 @@ var selector := preload("res://scripts/bosses/flow/selector.gd").new()
 var rest_remaining := 0.0
 var _rest_next := 0
 var rest_kind := ""
+var completed_actions := 0
+var section_spent := 0.0
+var interval_remaining := 0.0
+var no_candidate_elapsed := 0.0
+var waiting_for_candidate := false
 
 func configure(value: Resource) -> void:
 	flow = value
@@ -19,6 +24,10 @@ func configure(value: Resource) -> void:
 	last.clear()
 	rest_remaining = 0.0
 	retry = 0.0
+	completed_actions = 0
+	section_spent = 0.0
+	interval_remaining = 0.0
+	_reset_candidate_wait()
 
 func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	if dt > 0.0 and adapter.has_method("tick"): adapter.tick(dt)
@@ -34,15 +43,32 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	if active:
 		if adapter.running(): return
 		active = false
-		index = clampi(int(section.get("next", (index + 1) % flow.sections.size())), 0, flow.sections.size() - 1)
+		completed_actions += 1
+		if completed_actions >= maxi(1, int(section.get("action_count", 1))) or section_spent >= float(section.get("section_budget", INF)) - 0.00001:
+			_advance(section)
+		else:
+			interval_remaining = maxf(0.0, float(section.get("action_interval", 0.0)))
+			if interval_remaining > 0.0: retry = 0.0
 		if stamina <= 0.00001:
 			# 明示休息への遷移時は二重に休まない。
 			if flow.sections[index].get("request", "normal") == "rest": index = int(flow.sections[index].get("next", 0))
 			begin_rest(index)
 		return
 	if section.get("request", "normal") == "rest":
+		completed_actions = 0
+		section_spent = 0.0
+		interval_remaining = 0.0
+		_reset_candidate_wait()
 		begin_rest(clampi(int(section.get("next", 0)), 0, flow.sections.size() - 1))
 		return
+	if interval_remaining > 0.0:
+		interval_remaining = maxf(0.0, interval_remaining - dt)
+		if interval_remaining > 0.0: return
+	if waiting_for_candidate:
+		no_candidate_elapsed += dt
+		if section.has("no_candidate_timeout") and no_candidate_elapsed >= float(section.no_candidate_timeout):
+			_skip_unavailable(section)
+			return
 	retry = maxf(0.0, retry - dt)
 	if retry > 0.0: return
 	retry = 0.15
@@ -51,39 +77,89 @@ func tick(dt: float, context: Dictionary, adapter: Object) -> void:
 	query["stamina"] = stamina
 	query["stamina_max"] = flow.maximum_stamina
 	query["section"] = index
+	query["section_spent"] = section_spent
 	var result: Dictionary = adapter.candidates(query)
 	var candidates: Array = result.get("candidates", [])
+	var request: String = String(section.get("request", "normal"))
+	if request == "major": candidates = candidates.filter(func(candidate): return candidate.get("category", "single") == "major")
+	elif request == "normal": candidates = candidates.filter(func(candidate): return candidate.get("category", "single") != "major")
 	if section.has("allowed_techniques"):
 		candidates = candidates.filter(func(candidate): return String(candidate.id) in section.allowed_techniques)
 	if candidates.is_empty():
 		_record_decision(adapter, query, result, section, [], {}, "no_eligible_candidate")
 		status = result.get("reason", "候補なし")
-		if section.has("fallback"): index = clampi(int(section.fallback), 0, flow.sections.size() - 1)
+		_wait_for_candidate(section)
 		return
 	var cap := minf(float(section.get("cap", flow.maximum_stamina)), flow.maximum_stamina)
 	var within_cap: Array = candidates.filter(func(c): return float(c.cost) >= 0.0 and float(c.cost) <= cap)
-	var affordable: Array = within_cap.filter(func(c): return float(c.cost) <= stamina)
+	var remaining_budget := maxf(0.0, float(section.get("section_budget", INF)) - section_spent)
+	var within_budget: Array = within_cap.filter(func(c): return float(c.cost) <= remaining_budget)
+	var affordable: Array = within_budget.filter(func(c): return float(c.cost) <= stamina)
 	if affordable.is_empty():
-		_record_decision(adapter, query, result, section, [], {}, "stamina_rest" if not within_cap.is_empty() else "section_cap")
-		if not within_cap.is_empty(): begin_rest(index)
-		else: status = "区間上限または最大スタミナで実行できる技がありません"
+		var reason := "section_cap" if within_cap.is_empty() else "section_budget" if within_budget.is_empty() else "stamina_rest"
+		_record_decision(adapter, query, result, section, [], {}, reason)
+		if not within_budget.is_empty():
+			_reset_candidate_wait()
+			begin_rest(index)
+		else:
+			status = "区間上限または最大スタミナで実行できる技がありません"
+			_wait_for_candidate(section)
 		return
 	candidates = affordable
 	var selection := section.duplicate()
-	selection.available = minf(stamina, cap)
+	selection.available = minf(minf(stamina, cap), remaining_budget)
+	if adapter.has_method("selection_bias"): selection["technique_weights"] = adapter.selection_bias()
 	selector.record_details = adapter.has_method("observing_decisions") and adapter.observing_decisions()
 	var actions: Array = selector.choose(candidates, selection, last, section.get("forbidden", []))
 	_record_decision(adapter, query, result, section, actions, selector.diagnostics, "zero_weight" if actions.is_empty() else "weighted_random")
 	if actions.is_empty():
 		status = "成立する攻撃種別の確率が0です"
+		_wait_for_candidate(section)
 		return
 	if adapter.start(actions):
-		for action in actions: stamina = maxf(0.0, stamina - float(action.cost))
+		for action in actions:
+			stamina = maxf(0.0, stamina - float(action.cost))
+			section_spent += float(action.cost)
 		active = true
 		last = actions
 		status = "実行中"
+		_reset_candidate_wait()
+	else:
+		status = "開始条件が変わりました"
+		_wait_for_candidate(section)
+
+func _advance(section: Dictionary) -> void:
+	index = clampi(int(section.get("next", (index + 1) % flow.sections.size())), 0, flow.sections.size() - 1)
+	completed_actions = 0
+	section_spent = 0.0
+	interval_remaining = 0.0
+	_reset_candidate_wait()
+
+func _skip_unavailable(section: Dictionary) -> void:
+	index = clampi(int(section.get("fallback", section.get("next", (index + 1) % flow.sections.size()))), 0, flow.sections.size() - 1)
+	completed_actions = 0
+	section_spent = 0.0
+	interval_remaining = 0.0
+	retry = 0.0
+	_reset_candidate_wait()
+	status = "候補なしで次区間へ"
+
+func _wait_for_candidate(section: Dictionary) -> void:
+	if not section.has("no_candidate_timeout") and section.has("fallback"):
+		_skip_unavailable(section)
+		return
+	if section.has("no_candidate_timeout") and float(section.no_candidate_timeout) <= 0.0:
+		_skip_unavailable(section)
+		return
+	waiting_for_candidate = true
+
+func _reset_candidate_wait() -> void:
+	no_candidate_elapsed = 0.0
+	waiting_for_candidate = false
 
 func begin_rest(next_index: int) -> void:
+	interval_remaining = 0.0
+	_reset_candidate_wait()
 	rest_kind = "empty" if stamina <= 0.00001 else "partial"
 	rest_remaining = maxf(0.001, flow.empty_rest if rest_kind == "empty" else flow.partial_rest)
 	_rest_next = next_index

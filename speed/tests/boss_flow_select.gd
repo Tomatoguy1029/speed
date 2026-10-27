@@ -29,5 +29,12 @@ func _initialize() -> void:
 		return
 	assert(selector.choose([a], avoid, [a]).front().id == "a")
 	assert(not selector.choose([a, b], avoid, [a, b]).is_empty())
-	print("[boss-select] PASS weighted category, history row, unavailable redistribution")
+	selector.random.seed = 17
+	var biased := {"weights": {"single": 100.0}, "technique_weights": {"a": 20.0, "b": 1.0}, "avoid_repeat": false}
+	var a_count := 0
+	for _draw in 200:
+		if selector.choose([a, b], biased, []).front().id == "a": a_count += 1
+	assert(a_count > 170 and a_count < 200, "policy bias prefers but does not veto the other eligible technique")
+	assert(selector.choose([b], biased, []).front().id == "b", "bias does not exclude the remaining eligible choice")
+	print("[boss-select] PASS category, history, redistribution and nonexclusive technique bias")
 	quit()

@@ -68,39 +68,41 @@ func candidates(query: Dictionary) -> Dictionary:
 		var kind := String(move.category)
 		var accepted := false
 		var reasons: Array = []
-		if (query.get("request", "normal") == "major" and kind != "major") or (query.get("request", "normal") == "normal" and kind == "major"):
-			if observe: reasons.append("request_category")
-		else:
-			for gate in actor.action_rules.active_gates_for(id):
-				var reason := ""
-				if actor.has_method("technique_rejection"): reason = actor.technique_rejection(move.technique, gate)
-				elif not actor.technique_ready(move.technique, gate): reason = "not_ready"
-				if reason.is_empty():
-					accepted = true
-					break
-				if observe and reasons.size() < 16: reasons.append(reason)
+		for gate in actor.action_rules.active_gates_for(id):
+			var reason := ""
+			if actor.has_method("technique_rejection"): reason = actor.technique_rejection(move.technique, gate)
+			elif not actor.technique_ready(move.technique, gate): reason = "not_ready"
+			if reason.is_empty():
+				accepted = true
+				break
+			if observe and reasons.size() < 16: reasons.append(reason)
 		if accepted: result.append({"id": id, "cost": actor.action_rules.costs.get(id, 1.0), "category": kind, "parts": [actor.body_id], "exclusive": true})
 		if observe and evaluated.size() < 128:
 			evaluated.append({"id": id, "category": kind, "cost": actor.action_rules.costs.get(id, 1.0), "eligible": accepted, "reasons": [] if accepted else reasons if not reasons.is_empty() else ["no_active_gate"]})
 	for id in actor.action_rules.combos:
 		var reason := ""
-		if query.get("request", "normal") == "major": reason = "request_category"
-		elif not actor.can_begin_sequence(): reason = "sequence_not_ready"
+		if not actor.can_begin_sequence(): reason = "sequence_not_ready"
 		elif not actor.action_rules.active_gates_for(String(id)).any(step_condition): reason = "combo_gate"
 		elif not _available(actor.action_rules.combos[id]): reason = "combo_first_step_unavailable"
 		if reason.is_empty(): result.append({"id": String(id), "cost": actor.action_rules.costs.get(id, 2.0), "category": "combo", "parts": [actor.body_id], "exclusive": true, "program": actor.action_rules.combos[id]})
 		if observe and evaluated.size() < 128: evaluated.append({"id": String(id), "category": "combo", "cost": actor.action_rules.costs.get(id, 2.0), "eligible": reason.is_empty(), "reasons": [] if reason.is_empty() else [reason]})
 	return {"candidates": result, "evaluated": evaluated, "reason": "距離・方向・形態・再使用待ち"}
 
+func selection_bias() -> Dictionary:
+	return actor.action_rules.selection_bias
+
 func record_decision(query: Dictionary, result: Dictionary, section: Dictionary, history: Array, selected: Array, selection: Dictionary, reason: String) -> void:
 	if not actor.combat_trace.enabled(2): return
 	var evaluated: Array = result.get("evaluated", [])
 	var cap := minf(float(section.get("cap", INF)), float(query.stamina_max))
+	var remaining_budget := maxf(0.0, float(section.get("section_budget", INF)) - float(query.section_spent))
 	for item in evaluated:
 		if not item.eligible: continue
 		var rejection := ""
-		if section.has("allowed_techniques") and String(item.id) not in section.allowed_techniques: rejection = "section_not_allowed"
+		if (query.request == "major" and item.category != "major") or (query.request == "normal" and item.category == "major"): rejection = "request_category"
+		elif section.has("allowed_techniques") and String(item.id) not in section.allowed_techniques: rejection = "section_not_allowed"
 		elif float(item.cost) < 0.0 or float(item.cost) > cap: rejection = "section_cap"
+		elif float(item.cost) > remaining_budget: rejection = "section_budget"
 		elif float(item.cost) > float(query.stamina): rejection = "stamina"
 		if not rejection.is_empty():
 			item.eligible = false

@@ -483,7 +483,7 @@ func _refresh_flow() -> void:
 func _add_section() -> void:
 	var copy: Array = flow.sections.duplicate(true)
 	if not copy.is_empty() and copy[-1].get("next", 0) == 0: copy[-1].next = copy.size()
-	copy.append({"name": "区間" + str(copy.size() + 1), "request": "normal", "cap": 2.0, "weights": {"single": 60.0, "parallel": 25.0, "combo": 15.0}, "next": 0})
+	copy.append({"name": "区間" + str(copy.size() + 1), "request": "normal", "cap": 2.0, "action_count": 1, "action_interval": 0.0, "no_candidate_timeout": 0.5, "weights": {"single": 60.0, "parallel": 25.0, "combo": 15.0}, "next": 0})
 	history.create_action("区間を追加")
 	history.add_do_method(_set_sections.bind(copy))
 	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
@@ -548,13 +548,19 @@ func _edit_section(i: int, previous := "") -> void:
 	next.selected = clampi(int(flow.sections[i].get("next", 0)), 0, flow.sections.size() - 1)
 	next.item_selected.connect(func(j): _section_property(i, "next", j))
 	_fields.add_child(next)
-	_number_field("今回の消費上限", float(flow.sections[i].get("cap", 2.0)), func(value):
+	_number_field("技1回の消費上限", float(flow.sections[i].get("cap", 2.0)), func(value):
 		var copy: Array = flow.sections.duplicate(true)
 		copy[i].cap = value
 		history.create_action("消費上限を変更")
 		history.add_do_method(_set_sections.bind(copy))
 		history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
 		history.commit_action())
+	var count_field := _number_field("区間の攻撃回数", float(flow.sections[i].get("action_count", 1)), func(value): _section_property(i, "action_count", int(value)), 1.0)
+	count_field.step = 1.0
+	count_field.rounded = true
+	_number_field("区間内の攻撃間隔（秒）", float(flow.sections[i].get("action_interval", 0.0)), func(value): _section_property(i, "action_interval", value))
+	_optional_section_number(i, "section_budget", "区間の累計消費上限", float(flow.maximum_stamina), 0.1)
+	_optional_section_number(i, "no_candidate_timeout", "候補なしの待機上限（秒）", 0.5, 0.0)
 	var probability_label := Label.new()
 	probability_label.text = "割合を使う条件"
 	_fields.add_child(probability_label)
@@ -584,6 +590,27 @@ func _number_field(title_text: String, value: float, changed: Callable, minimum 
 	field.value_changed.connect(changed)
 	_fields.add_child(field)
 	return field
+
+func _optional_section_number(index: int, key: String, title_text: String, default_value: float, minimum: float) -> void:
+	var enabled := CheckButton.new()
+	enabled.text = title_text + "を使う"
+	enabled.button_pressed = flow.sections[index].has(key)
+	_fields.add_child(enabled)
+	var field := _number_field(title_text, float(flow.sections[index].get(key, default_value)), func(value): _section_property(index, key, value), minimum)
+	field.editable = enabled.button_pressed
+	enabled.toggled.connect(func(value):
+		field.editable = value
+		_set_optional_section_property(index, key, value, field.value))
+
+func _set_optional_section_property(index: int, key: String, enabled: bool, value: float) -> void:
+	if flow.sections[index].has(key) == enabled: return
+	var copy: Array = flow.sections.duplicate(true)
+	if enabled: copy[index][key] = value
+	else: copy[index].erase(key)
+	history.create_action("区間の待機・予算を変更")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
 
 func _section_property(index: int, key: String, value: Variant) -> void:
 	if flow.sections[index].get(key) == value: return

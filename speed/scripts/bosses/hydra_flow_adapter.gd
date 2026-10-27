@@ -63,12 +63,9 @@ func candidates(query: Dictionary) -> Dictionary:
 		if not query.get("children_only", false) and actor.action_rules != null and actor.action_rules.combos.has(String(id)): continue
 		var move: Resource = actor._moves[id]
 		if move.head_kind != &"":
-			if query.get("request", "normal") == "major": continue
 			for i in actor.necks.size():
 				if actor.normal_ready(i, id, query.get("children_only", false)): result.append(_candidate(id, [actor.necks[i]], "single"))
 		else:
-			if query.get("request", "normal") == "normal" and id not in actor.COMBOS: continue
-			if query.get("request", "normal") == "major" and id in actor.COMBOS: continue
 			if not actor.attack_ready(id, query.get("children_only", false)): continue
 			var heads: Array = []
 			if id in [&"north", &"sequence"]: heads = actor.front_heads()
@@ -83,7 +80,7 @@ func candidates(query: Dictionary) -> Dictionary:
 				continue
 			else: heads = actor.necks.filter(func(n): return actor._alive(n))
 			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if id in actor.COMBOS else "major"))
-	if not query.get("children_only", false) and query.get("request", "normal") != "major" and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
+	if not query.get("children_only", false) and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
 		for id in actor.action_rules.combos:
 			if not actor.action_rules.active_gates_for(String(id)).any(func(gate): return step_condition(gate)): continue
 			var needs: Dictionary = _requirements(actor.action_rules.combos[id])
