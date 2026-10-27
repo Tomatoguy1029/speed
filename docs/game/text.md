@@ -278,21 +278,21 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T06.name | クリティカルランス | Critical Lance |
 | trait.T06.desc | クリティカルのたびに前方へ貫く光の槍を飛ばす | Every critical hit fires a piercing lance of light forward. |
 | trait.T07.name | 急速充填 | Quick Charge |
-| trait.T07.desc | ゲージが早く溜まる（充填速度 +25% ずつ） | The gauge fills faster (+25% charge speed each). |
+| trait.T07.desc | ゲージの充填速度が上がる（初回+25%、以降+12.5%ずつ） | The gauge charges faster (+25% first, then +12.5% per level). |
 | trait.T08.name | 大容量チャージ | High-Capacity Charge |
 | trait.T08.desc | 1回で描ける長さが伸びる（容量 +20% ずつ） | Draw longer lines in one go (+20% capacity each). |
 | trait.T09.name | クリティカル率 | Critical Rate |
-| trait.T09.desc | 体当たりのクリティカルが出やすくなる（+5% ずつ） | Ram critical hits happen more often (+5% each). |
+| trait.T09.desc | 体当たりのクリティカル率が上がる（Lv1〜3は各+5%、Lv4・5は各+3%） | Ram critical chance rises (+5% at Lv1–3, +3% at Lv4–5). |
 | trait.T10.name | 最高速度 | Top Speed |
-| trait.T10.desc | 速くなり、描ける長さも伸びる（+12% ずつ） | Fly faster and draw longer lines (+12% each). |
+| trait.T10.desc | 速くなり、描ける長さも伸びる（初回+12%、以降+7%ずつ） | Fly faster and draw longer lines (+12% first, then +7% per level). |
 | trait.T11.name | 攻撃力 | Attack Power |
-| trait.T11.desc | すべての攻撃が強くなる（+20% ずつ） | All attacks get stronger (+20% each). |
+| trait.T11.desc | すべての攻撃が強くなる（初回+20%、以降+10%ずつ） | All attacks get stronger (+20% first, then +10% per level). |
 | trait.T12.name | 広域回収 | Wide Pickup |
 | trait.T12.desc | 遠くのアイテムも拾える（回収範囲 +30% ずつ） | Collect items from farther away (+30% pickup range each). |
 | trait.T13.name | 反応波動 | Reactive Wave |
 | trait.T13.desc | ダメージを受けたとき、周りを押し返す | Pushes nearby enemies away when you take damage. |
 | trait.T14.name | 軌跡延長 | Trail Extension |
-| trait.T14.desc | 描ける長さが伸びる（+25% ずつ） | Draw longer lines (+25% each). |
+| trait.T14.desc | 描ける長さが伸びる（初回+25%、以降+15%ずつ） | Draw longer lines (+25% first, then +15% per level). |
 | trait.T31.name | 高速持続 | Extended Glide |
 | trait.T31.desc | 突進後の高速状態が長く続く | Stay fast longer after a dash. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |

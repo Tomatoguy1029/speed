@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1")
 params = {
-"per_stack": 0.25
+"first_stack": 0.25,
+"per_stack": 0.125
 }
 id = &"T07"
 code_id = &"quickCharge"

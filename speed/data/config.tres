@@ -1,12 +1,10 @@
 [gd_resource type="Resource" script_class="GameConfig" format=3 uid="uid://cokmr01hunlnf"]
 
 [ext_resource type="Script" uid="uid://b0iaw5utoqs3t" path="res://scripts/data_types/game_config.gd" id="1"]
-
 [ext_resource type="Resource" path="res://data/post_max.tres" id="2_post_max"]
 
 [resource]
 script = ExtResource("1")
-post_max = ExtResource("2_post_max")
 boss_time = 600.0
 boss_time_spread = 20.0
 boss_hp = 2200.0
@@ -169,8 +167,8 @@ xp_growth = 105.0
 xp_curve = 1.0
 weapon_slots = 4
 weapon_max_level = 5
-trait_slots = 5
-trait_max_stacks = 3
+trait_slots = 4
+trait_max_stacks = 5
 start_weapon_choices = 3
 reroll_count = 3
 owned_card_bias = 1.6
@@ -178,6 +176,7 @@ levelup_bonus_chance = 0.12280138
 levelup_bonus_more = 0.32747034
 levelup_bonus_last = 0.20466896
 fallback_heal = 0.3
+post_max = ExtResource("2_post_max")
 base_view = 1100.0
 zoom_ref_speed = 700.0
 zoom_exp = 0.7

@@ -998,7 +998,11 @@ func _dense_cells() -> PackedVector2Array:
 ## 下の目盛りは強化の段階（仕様書 8）。
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
-	draw_texture(SLOTS, Vector2.ZERO)
+	# 枠素材は特性5個で描かれている。通常4枠では下段だけを切り出す。
+	var upper := Rect2(0, 0, SLOTS.get_width(), 337)
+	draw_texture_rect_region(SLOTS, upper, upper)
+	var lower := Rect2(0, 337, 9 + mini(run.cfg.trait_slots, 5) * 15, SLOTS.get_height() - 337)
+	draw_texture_rect_region(SLOTS, lower, lower)
 	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
 	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
 	_draw_hero_slot(Vector2(99, 315))

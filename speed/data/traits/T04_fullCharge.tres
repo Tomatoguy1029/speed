@@ -5,8 +5,8 @@
 [resource]
 script = ExtResource("1")
 params = {
-"mult_base": 1.25,
-"mult_per": 0.25
+"mult_base": 1.375,
+"mult_per": 0.125
 }
 id = &"T04"
 code_id = &"fullCharge"

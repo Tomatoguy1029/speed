@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1")
 params = {
-"per_stack": 0.12
+"first_stack": 0.12,
+"per_stack": 0.07
 }
 id = &"T10"
 code_id = &"speed"
