@@ -1258,9 +1258,9 @@ func _refresh() -> void:
 			field.max_value = SPIRAL_BOUNDS[base_key].y
 		field.step = 1 if current.parameters[key] is int else 0.01
 		field.tooltip_text = label.tooltip_text
-		field.value = float(current.parameters[key])
+		field.value = SPIRAL_FIELDS.to_display(String(key), float(current.parameters[key]))
 		field.set_meta("key", key)
-		field.value_changed.connect(func(value): set_value(key, value))
+		field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value)))
 		_fields.add_child(field)
 	if graph.category_for(_selected_technique) != "combo":
 		var gap := _number_field("技後の隙（秒）", current.post_gap, _set_post_gap)

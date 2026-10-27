@@ -422,31 +422,21 @@ func _reposition_tick(dt: float) -> void:
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
 	else:
 		var toward := run_state.ship_pos - table.pos[body]
-		var pursuit := toward
-		var lead_close := false
-		if _moves.has(&"sweep") and not _close_ready(&"kick") and toward.length() < float(action_rules.conditions.get("charge", {}).get("min", 300.0)):
-			var forecast := _strike_aim(&"sweep", float(_moves[&"sweep"].parameters.warn)) - table.pos[body]
-			if forecast.length() > _reach(&"sweep") - 10.0:
-				pursuit = forecast
-				lead_close = true
 		var prior := table.facing[body]
 		if not _close_ready(&"kick"):
-			table.facing[body] = rotate_toward(prior, pursuit.angle(), def.turn * dt)
+			table.facing[body] = rotate_toward(prior, toward.angle(), def.turn * dt)
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
-		var closing := toward.length() > float(def.params.approach_range) or lead_close
+		var keep := float(def.params.approach_range)
+		var closing := toward.length() > keep
 		if not closing and _moves.has(&"charge"):
 			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].parameters.warn))) > _reach(&"charge")
 		if closing:
-			# 近接では現在の距離を保ちながら予告終了時の位置へ回り込み、それ以外は接近する。
-			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(pursuit.normalized()))
-			var step := Vector2.from_angle(table.facing[body]) * float(def.params.approach_speed) * alignment * dt
-			if lead_close:
-				var next_offset := table.pos[body] + step - run_state.ship_pos
-				var clearance := minf(toward.length(), float(def.params.approach_range))
-				if next_offset.length() < clearance:
-					var radial := next_offset.normalized() if next_offset.length() > 0.001 else -toward.normalized()
-					step = run_state.ship_pos + radial * clearance - table.pos[body]
-			_move_body(step)
+			# approach_range の距離まで寄って止まり、その内側では向きだけを合わせる。
+			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))
+			var travel := float(def.params.approach_speed) * alignment * dt
+			if toward.length() > keep:
+				travel = minf(travel, toward.length() - keep)
+			_move_body(Vector2.from_angle(table.facing[body]) * travel)
 		else:
 			table.vel[body] = Vector2.ZERO
 

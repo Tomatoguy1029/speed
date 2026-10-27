@@ -277,8 +277,8 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 		if not draft.has(field): continue
 		var bounds: Vector2 = TECHNIQUE_FIELDS.bounds_for(move, field)
 		var step := 1.0 if move.parameters[field] is int else 0.01
-		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), float(draft[field]), bounds, step,
-			TECHNIQUE_FIELDS.tip_for(move, field), _change_tuning_value.bind(key, field))
+		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), TECHNIQUE_FIELDS.to_display(field, float(draft[field])), bounds, step,
+			TECHNIQUE_FIELDS.tip_for(move, field), func(value: float): _change_tuning_value(TECHNIQUE_FIELDS.from_display(field, value), key, field))
 	if draft.has("arcs"):
 		var arcs: Array = draft.arcs
 		for index in arcs.size():
