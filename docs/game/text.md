@@ -748,7 +748,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.clock.kill | 針の隙間から本体を狙う | Hit the body through the gap between the hands |
 | lab.enemy.dolphin.move | 距離を保ち、構えて撃つ向きを予告してから、機体の方へ数層の弧の大きな扇の波動を撃つ。当たるのは先頭の1枚だけで、機体にもほかの敵にも当たる。追尾しない | Keeps its distance and after marking its aim fires a big fan of layered arcs toward the ship. Only the leading arc hits and it hits the ship and other enemies alike. It does not home |
 | lab.enemy.dolphin.kill | 群れを射線に挟んで撃たせ、自分は離れる。本体は普通に倒す | Put a crowd in its line of fire then slip away. Defeat the body normally |
-| lab.enemy.crab.move | 近づいてハサミを開き、前方を挟む | Approaches and opens its claws then pinches in front |
+| lab.enemy.crab.move | 横腹を向けて素早く横歩きで寄り、進む方向をハサミで薙ぐ | Scuttles sideways toward you and sweeps its claws in the direction it moves |
 | lab.enemy.crab.kill | 背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる | Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front |
 | lab.enemy.marlin.move | 距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く | Keeps its distance then flashes and darts past you spraying both sides |
 | lab.enemy.marlin.kill | HP を削る | Wear down its HP |

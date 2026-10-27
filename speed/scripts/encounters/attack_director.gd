@@ -8,7 +8,7 @@ const BEHAVIORS := {
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 	"lynx": ["aimed"], "triangle": ["residue"],
-	"phoenix": ["dash", "zone"], "crab": ["dash", "zone"], "marlin": ["dash", "aimed"],
+	"phoenix": ["dash", "zone"], "crab": ["zone"], "marlin": ["dash", "aimed"],
 	"aquarius": ["beam"], "reticle": ["beam"], "auriga": ["residue"], "corona": ["aimed"],
 	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
