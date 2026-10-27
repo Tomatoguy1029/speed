@@ -39,9 +39,11 @@ func verify() -> void:
 	combat.rebuild_grid()
 	var arc = load("res://scripts/weapons/contactArc.gd").new()
 	arc.setup(context, load("res://data/weapons/W17_contactArc.tres"))
+	assert(is_equal_approx(float(arc.p("cooldown")), 0.15), "W17 global cooldown changed")
 	var visual_segments := PackedVector2Array()
 	for lv in range(1, 6):
 		arc.level = lv
+		s.world_time += 0.15
 		s.events.clear()
 		arc.on_any_contact(target)
 		var ids := {}
@@ -50,7 +52,7 @@ func verify() -> void:
 			if e.type == &"hit":
 				assert(not ids.has(e.id), "Duplicate enemy hit")
 				ids[e.id] = true
-				assert(is_equal_approx(e.dmg, 10.0 * 0.325 * arc.dmg_k()), "Damage changed")
+				assert(is_equal_approx(e.dmg, 10.0 * 0.16 * arc.dmg_k()), "Damage changed")
 			if e.type == &"bolt": segments = e.segments
 		assert(ids.size() == 1 + lv * 2, "Shared target cap changed")
 		assert(not ids.has(em.table.id[meteor]) and not ids.has(em.table.id[dead]), "Invalid target")
@@ -80,6 +82,7 @@ func verify() -> void:
 	for k in 12: em.spawn(definition, Vector2(40.0 + k * 15.0, 0))
 	combat.rebuild_grid()
 	s.events.clear()
+	s.world_time += 0.15
 	arc.on_any_contact(target)
 	var one_side_hits := 0
 	for e in s.events:
@@ -93,6 +96,7 @@ func verify() -> void:
 	target = em.spawn(definition, Vector2.ZERO)
 	combat.rebuild_grid()
 	s.events.clear()
+	s.world_time += 0.15
 	arc.on_any_contact(target)
 	assert(s.events.back().segments.size() == 2)
 	print("W17 isolated target: OK")

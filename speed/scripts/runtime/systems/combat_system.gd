@@ -3,7 +3,7 @@ class_name CombatSystem
 extends RunSystem
 
 ## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
-const FORCEFUL := [&"sonic", &"killSonic", &"critBeam", &"bipolar", &"towShot"]
+const FORCEFUL := [&"killSonic", &"critBeam", &"bipolar", &"towShot"]
 
 var enemies: EnemySystem:
 	get: return ctx.enemies
