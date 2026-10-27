@@ -698,7 +698,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
 				if t.type[i] == &"aquila":
-					motion._drive(i, bdt)
+					behavior.call(&"cruise", i, bdt)
 				else:
 					motion._chase(i, bdt)
 				pos[i] += vel[i] * dt

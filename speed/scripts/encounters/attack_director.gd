@@ -13,7 +13,7 @@ const BEHAVIORS := {
 	"lynx": ["aimed"], "triangle": ["residue"],
 	"phoenix": ["dash", "zone"], "crab": ["zone"], "marlin": ["dash", "aimed"],
 	"aquarius": ["beam"], "reticle": ["beam"], "corona": ["aimed"],
-	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
+	"aquila": ["dash", "zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
 var enabled := false
 ## 本番タイムライン：個体IDまたは共有override群れのIDで枠を管理する。
