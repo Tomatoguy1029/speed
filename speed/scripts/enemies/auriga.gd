@@ -1,6 +1,10 @@
 ## ぎょしゃ座。
 extends EnemyBehavior
 
+func _init() -> void:
+	# 走ること自体が攻撃なので、攻撃の順番待ちを通さず、常に走って帯を残す。
+	admission = false
+
 func step(i: int, dt: float) -> void:
 	_drive(i, dt)
 	_auriga(i, dt)
