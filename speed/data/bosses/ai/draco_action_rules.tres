@@ -40,6 +40,7 @@ conditions = {
 "charge": {
 "angle": 0.0,
 "half_angle": 180.0,
+"max": 600.0,
 "min": 0.0,
 "min_phase": 1
 },
@@ -133,24 +134,24 @@ costs = {
 "tail_sweep": 1.0
 }
 layout = {
-"bite": Vector2(760, 614),
-"breath": Vector2(372, 314),
-"charge": Vector2(1480, 860),
-"choose_combo": Vector2(1480, 116),
-"choose_major": Vector2(2200, 116),
-"choose_major_2": Vector2(1480, 362),
-"choose_normal": Vector2(40, 116),
-"choose_normal_2": Vector2(760, 116),
-"clones": Vector2(2200, 614),
-"inhale": Vector2(2536, 314),
-"leap": Vector2(1816, 560),
-"meteor": Vector2(40, 314),
-"picaro_wall": Vector2(2536, 614),
-"rifts": Vector2(1480, 560),
-"spiral": Vector2(2200, 314),
-"star_fan": Vector2(760, 314),
-"tail_slam": Vector2(40, 614),
-"tail_sweep": Vector2(1092, 314)
+"bite": Vector2(540, 1057),
+"breath": Vector2(3276, 432),
+"charge": Vector2(2364, 752),
+"choose_combo": Vector2(40, 116),
+"choose_major": Vector2(952, 116),
+"choose_major_2": Vector2(1864, 116),
+"choose_normal": Vector2(2776, 116),
+"choose_normal_2": Vector2(40, 425),
+"clones": Vector2(1452, 748),
+"inhale": Vector2(1452, 432),
+"leap": Vector2(2364, 432),
+"meteor": Vector2(3276, 116),
+"picaro_wall": Vector2(1452, 1064),
+"rifts": Vector2(2364, 116),
+"spiral": Vector2(1452, 116),
+"star_fan": Vector2(540, 425),
+"tail_slam": Vector2(3276, 748),
+"tail_sweep": Vector2(540, 741)
 }
 condition_groups = {
 "choose_combo": {
