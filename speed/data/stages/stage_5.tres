@@ -483,6 +483,20 @@ index = 5
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10"), SubResource("Resource_tpwl5")]
 enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila"])
+enemy_tuning = {
+"aquila": {
+"hp": 240.0
+},
+"auriga": {
+"hp": 100.0
+},
+"cepheus": {
+"hp": 160.0
+},
+"cross": {
+"hp": 60.0
+}
+}
 enemy_attack_values = {
 "aquila": 3.0,
 "auriga": 1.0,

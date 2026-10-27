@@ -321,7 +321,7 @@ enemy_tuning = {
 "params.blast_dmg": 14.0
 },
 "marlin": {
-"hp": 80.0,
+"hp": 150.0,
 "params.fire_interval": 3.6
 },
 "pulser": {

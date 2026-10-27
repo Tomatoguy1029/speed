@@ -492,6 +492,26 @@ backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), Su
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_s6gwe"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
+enemy_tuning = {
+"aquarius": {
+"hp": 240.0
+},
+"corona": {
+"hp": 110.0
+},
+"cross": {
+"hp": 60.0
+},
+"dolphin": {
+"hp": 90.0
+},
+"reticle": {
+"hp": 55.0
+},
+"telescope": {
+"hp": 35.0
+}
+}
 enemy_attack_values = {
 "aquarius": 4.0,
 "biter": 0.0,
