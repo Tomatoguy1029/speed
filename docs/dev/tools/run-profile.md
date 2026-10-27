@@ -25,7 +25,7 @@
 | `--keep=on` | 倒された分を補い、`--enemies` の体数を保つ。既定off |
 | `--types=ID,ID` | 指定種類を機体の周りに各2体生成。未指定なら追加なし |
 | `--levels=off`・`--hitstop=off` | 経験値を入れずレベルアップを止める／ヒットストップを切る。大量に倒しても世界の更新を止めずに測る。既定は各on |
-| `--gpu=off` | GPU時間の計測を切る。GPU時間の計測は描画の完了を待つのでフレームを延ばし、固定更新の回数も増える。処理の時間を比べるときに使う。既定on |
+| `--gpu=off` | GPU時間の計測を切る。GPU時間を取れない環境（macOSのMetalなど）では結果の `gpu_viewport_ms` が `available: false` になる。既定on |
 | `--attack=on`・`--weapons=W01:5,T03:2` | 攻撃と負荷を有効化し、またはIDとレベルを指定して装備を入れ替える。未指定の装備はW01 Lv1 |
 | `--sparks=off`・`--glow=off`・`--background=off` | 火花・発光・背景の描画を個別に切る。既定は各on |
 | `--hazards=on` | 障害物を定期追加。既定off |

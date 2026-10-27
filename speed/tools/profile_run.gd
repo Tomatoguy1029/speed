@@ -116,7 +116,7 @@ func _ready() -> void:
 	for key in render._layers:
 		var layer: DrawLayer = render._layers[key]
 		layer.draw_fn = _timed_draw.bind(key, layer.draw_fn)
-	# GPU時間の計測は描画の完了を待ってフレームを延ばすので、--gpu=off で切れる
+	# --gpu=off で GPU 時間の計測を切る
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), options.get("gpu", "on") != "off")
 	if options.get("trace", "off") == "on":
 		get_tree().physics_frame.connect(_mark.bind(&"physics_begin"))
