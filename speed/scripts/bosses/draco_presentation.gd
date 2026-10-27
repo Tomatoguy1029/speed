@@ -213,7 +213,7 @@ func _draw_telegraphs() -> void:
 func _draw_spiral_charge() -> void:
 	if actor.technique != &"spiral" or actor.mode != &"active" or actor._driver == null: return
 	var wrap: float = actor._driver.coil_time
-	if actor.elapsed < wrap or actor._driver.locked: return
+	if actor.elapsed < wrap or actor.elapsed >= wrap + actor._driver.pause_time: return
 	var progress := clampf((actor.elapsed - wrap) / actor._driver.pause_time, 0.0, 1.0)
 	var center: Vector2 = actor.to_local(actor._driver.center)
 	var radius: float = lerpf(minf(actor._driver.horizontal_extent, actor._driver.extent) * 0.56, actor.body_width * 0.7, progress)

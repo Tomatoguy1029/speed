@@ -71,6 +71,11 @@ func _ready() -> void:
 	while actor._driver.holding_player and wait_release<300:
 		actor.sim_tick(1.0/120.0,1.0/120.0)
 		wait_release+=1
+	var bent_spine: PackedVector2Array=actor._driver.points
+	var bent_heading: Vector2=(bent_spine[0]-bent_spine[1]).normalized()
+	check(bent_spine[3].x>bent_spine[0].x+20.0 and bent_spine[3].y<bent_spine[0].y-20.0,"巻き終わりの胴体が左へ曲がって頭を中心へ向ける")
+	check(bent_heading.dot(Vector2.DOWN)>0.95,"巻き終わりの頭は渦の中心を向く")
+	check(bent_heading.dot(actor._driver.launch_direction)>0.999,"発進方向は曲げた頭の接線に一致する")
 	var center_before: Vector2=actor._driver.center
 	sim.state.ship_pos=Vector2(350,0)
 	for frame in 8: actor.sim_tick(1.0/120.0,1.0/120.0)
@@ -84,6 +89,13 @@ func _ready() -> void:
 	sim.state.ship_pos=Vector2(900,0)
 	for frame in 30: actor.sim_tick(1.0/120.0,1.0/240.0)
 	check(actor._driver.center==locked_center,"スロー中も発進後の軌道を追尾しない")
+	var departure_wait:=0
+	while actor.elapsed<actor._driver.coil_time+actor._driver.pause_time and departure_wait<300:
+		actor.sim_tick(1.0/120.0,1.0/120.0)
+		departure_wait+=1
+	var launch_head: Vector2=actor._driver.points[0]
+	for frame in 5: actor.sim_tick(1.0/120.0,1.0/120.0)
+	check(departure_wait<300 and (actor._driver.points[0]-launch_head).normalized().dot(bent_heading)>0.999,"曲がった頭の向きへ直進し逃走中の機体を追尾しない")
 	actor.cancel_attack()
 	check(not sim.state.cinematic_camera,"中断で通常カメラへ戻す")
 	sim.state.view_center=Vector2.ZERO

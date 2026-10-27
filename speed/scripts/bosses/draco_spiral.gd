@@ -11,6 +11,9 @@ var pitch_ratio := 0.4
 var coil_time := 1.2
 var first_lap_time := 0.48
 var second_lap_time := 0.72
+var bend_time := 0.24
+var bend_radius := 220.0
+var launch_direction := Vector2.DOWN
 var pause_time := 1.6
 var shrink_time := 2.0
 var head_offset := 320.0
@@ -63,10 +66,13 @@ func begin(a: BossActor) -> void:
 	shrink_time = clampf(float(p.shrink_time),0.3,maxf(0.3,active_time*0.5))
 	coil_time = clampf(float(p.get("coil_time",1.2)),0.5,minf(3.0,maxf(0.5,active_time-shrink_time-0.8)))
 	pause_time = clampf(float(p.pause),0.8,minf(3.0,maxf(0.8,active_time-shrink_time-coil_time-0.15)))
-	first_lap_time = coil_time*0.4
-	second_lap_time = coil_time*0.6
+	first_lap_time = coil_time*0.35
+	second_lap_time = coil_time*0.45
+	bend_time = coil_time*0.2
 	var clearance: float = a.table.r[a.body]+a.ctx.cfg.ship_radius+60.0
 	head_offset = clampf(float(p.get("head_offset",320.0)),clearance,maxf(clearance,extent*(1.0-pitch_ratio)*0.8))
+	bend_radius = minf(head_offset,minf(extent,horizontal_extent)*0.34)
+	launch_direction = Vector2.DOWN
 	locked = false
 	charging = false
 	end_correction = Vector2.ZERO
@@ -115,7 +121,9 @@ func tick(a: BossActor, _dt: float) -> void:
 	if a.elapsed < wrap:
 		if not holding_player:
 			held_ship_pos = a.run_state.ship_pos
-			end_correction = held_ship_pos + Vector2.UP*head_offset - (center + Vector2.UP*extent*(1.0-2.0*pitch_ratio))
+			# The last quarter turn runs left from this point and ends above the
+			# held player, already tangent to the inward launch direction.
+			end_correction = held_ship_pos + Vector2(bend_radius,-head_offset-bend_radius) - (center + Vector2.UP*extent*(1.0-2.0*pitch_ratio))
 			holding_player = true
 			a.run_state.controls_locked = true
 			a.run_state.encounter_protected = true
@@ -127,6 +135,8 @@ func tick(a: BossActor, _dt: float) -> void:
 		charging = true
 		# The warning marks the committed aim. Keep the opened escape lane in
 		# world space while the player moves during the pause.
+		if points.size() > 1:
+			launch_direction = (points[0] - points[1]).normalized()
 		locked = true
 		a.combat_trace.stage("lock", {"scope": "spiral_departure"})
 		a.run_state.emit(&"draco_roar", {"pos": center, "radius": minf(horizontal_extent, extent) * 0.8})
@@ -138,7 +148,7 @@ func tick(a: BossActor, _dt: float) -> void:
 	a.telegraph_paths.clear()
 	a.telegraph_widths.clear()
 	if a.elapsed >= wrap and a.elapsed < shrink_at:
-		a.telegraph_paths.append(PackedVector2Array([a.table.pos[a.body], a.table.pos[a.body] + Vector2.DOWN * extent * 2.0]))
+		a.telegraph_paths.append(PackedVector2Array([a.table.pos[a.body], a.table.pos[a.body] + launch_direction * extent * 2.0]))
 		a.telegraph_widths.append(a.body_width * 0.5)
 	var turns: float = a.elapsed / first_lap_time if a.elapsed < first_lap_time else 1.0 + (a.elapsed - first_lap_time) / second_lap_time
 	turns = clampf(turns, 0.0, 2.0)
@@ -146,9 +156,12 @@ func tick(a: BossActor, _dt: float) -> void:
 	var angle := -PI * 0.5 - turns * TAU
 	var radius_scale := 1.0 - turns * pitch_ratio
 	var coil_head := center + Vector2(cos(angle) * horizontal_extent, sin(angle) * extent) * radius_scale + end_correction*smoothstep(1.0,2.0,turns)
+	var bend_progress := clampf((a.elapsed - first_lap_time - second_lap_time) / bend_time,0.0,1.0)
+	var bend_angle := bend_progress * PI * 0.5
+	coil_head += Vector2(-bend_radius*sin(bend_angle),bend_radius*(1.0-cos(bend_angle)))
 	var exit_distance: float = extent * 2.0 + spiral_length
 	var extra_exit := maxf(0.0, a.elapsed - shrink_at - shrink_time) * exit_distance / shrink_time
-	var head := coil_head + Vector2.DOWN * (shrink * exit_distance + extra_exit)
+	var head := coil_head + launch_direction * (shrink * exit_distance + extra_exit)
 	var followed: Dictionary = FORM.follow_trail(trail, head, spiral_length, a.body_segments + 1)
 	trail = followed.trail
 	points = followed.points
@@ -196,12 +209,12 @@ func end(a: BossActor, _cancelled: bool) -> void:
 func recover(a: BossActor, _dt: float) -> void:
 	if trail.is_empty(): return
 	var speed: float = (extent * 2.0 + spiral_length) / shrink_time
-	var head: Vector2 = recovery_head + Vector2.DOWN * speed * a.elapsed
+	var head: Vector2 = recovery_head + launch_direction * speed * a.elapsed
 	var followed: Dictionary = FORM.follow_trail(trail, head, spiral_length, a.body_segments + 1)
 	trail = followed.trail
 	points = followed.points
 	a.table.pos[a.body] = head
-	a.table.facing[a.body] = PI * 0.5
+	a.table.facing[a.body] = launch_direction.angle()
 	a.body_override = points
 
 func _follow_center(a: BossActor, dt: float) -> Vector2:
