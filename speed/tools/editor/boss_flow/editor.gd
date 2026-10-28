@@ -1334,7 +1334,7 @@ func _refresh() -> void:
 		history.add_undo_method(_set_cost.bind(id, float(rules.costs.get(id, 1.0))))
 		history.commit_action())
 	_append_gate(_selected_technique)
-	_status.text = "左の青：発動条件　右の橙：攻撃範囲。動的な照準・配置は実験場で確認できます。"
+	_status.text = "左の青：発動条件（∞は上限なし）　右の橙：攻撃範囲。右図は仮の自機距離・向きで描き、実戦の配置で変化します。"
 	call_deferred("_refresh_field_columns")
 
 ## 技の値1つ分の名前と入力欄。
