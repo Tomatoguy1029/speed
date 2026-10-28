@@ -34,7 +34,7 @@ func tick(a: BossActor,_dt: float) -> void:
 	for j in range(1,points.size()-1):
 		var segment := PackedVector2Array([points[j],points[j+1]])
 		var old := PackedVector2Array([prior[j],prior[j+1]]) if prior.size()==points.size() else PackedVector2Array()
-		a.hit_segment(segment,a.body_width*0.5*FORM.taper((fractions[j]+fractions[j+1])*0.5),old)
+		a.hit_segment(segment,float(a.rule().width)*FORM.taper((fractions[j]+fractions[j+1])*0.5),old)
 	a.body_override=points
 	prior=points
 	a.attack_points.clear()

@@ -36,14 +36,16 @@ func set_attack(move: Resource, adapter: String) -> void:
 		attack = {"length": p.get("reach", p.get("distance", 180.0)), "width": 30.0, "angle": 180.0 if move.technique == &"kick" else 0.0}
 	queue_redraw()
 
-## りゅう座の判定が通る範囲。画面外から入り直す技と、配置で形が変わる技は「配置で変化」にする。
+## りゅう座の判定が通る範囲。ボスの中心から正面（+X）を基準に、狙った自機の距離 D に合わせて形を作る。
 static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
 	var def: Resource = load("res://data/bosses/draco.tres")
-	var head := 105.0 * float(def.params.get("head_scale", 1.35))
+	var scale := float(def.params.get("head_scale", 1.35))
+	var head := 105.0 * scale
+	var half := float(p.get("width", 45.0))
 	match technique:
 		&"bite":
 			var reach := float(p.get("reach", 0.0)) + head
-			return {"from": 0.0, "to": reach, "angle": 0.0, "width": float(p.get("width", 45.0)) * 2.0, "length": reach}
+			return {"from": 0.0, "to": reach, "angle": 0.0, "width": half * 2.0, "length": reach}
 		&"breath":
 			var reach := float(p.get("reach", 0.0)) + head
 			return {"from": 0.0, "to": reach, "angle": 0.0, "half_angle": rad_to_deg(float(p.get("sweep", 0.0)) + float(p.get("half_angle", 0.0))), "width": 0.0, "length": reach}
@@ -52,7 +54,61 @@ static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
 			return {"polygon": shape, "length": float(p.get("reach", 0.0))}
 		&"tail_slam":
 			return {"targeted": true, "circle": true, "width": float(p.get("radius", 110.0)) * 2.0, "max_target": float(p.get("reach", 0.0)), "length": 0.0}
+		&"charge":
+			var overshoot := float(p.get("overshoot", 0.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(d + overshoot, 0.0), half)]}
+		&"leap":
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2(-70.0 + head, 0.0), Vector2(d, 0.0), half)]}
+		&"clones":
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(d, 0.0), half)]}
+		&"rifts":
+			var scratch := float(p.get("scratch_width", 30.0)) * 0.5
+			return {"length": 0.0, "builder": func(d: float) -> Array:
+				var shapes := []
+				for side in [-1.0, 1.0]:
+					for j in 3:
+						var stripe: float = side * 135.0 + (j - 1) * 70.0
+						shapes.append(_band(Vector2(125.0 * scale, stripe), Vector2(d + 125.0, stripe + side * 60.0), scratch))
+				return shapes}
+		&"picaro_wall":
+			var radius := float(p.get("radius", 85.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_circle(Vector2(d, 0.0), radius)]}
+		&"spiral":
+			# 自機を中心に画面の長辺の半分ほどで2周巻く。外周の輪を胴の太さで示す。
+			var ring := float(p.get("radius_factor", 0.8)) * 960.0
+			var thickness := float(p.get("width", 154.0)) * 0.5
+			return {"length": 0.0, "builder": func(d: float) -> Array:
+				var shapes := []
+				for j in 48: shapes.append(_band(Vector2(d, 0.0) + Vector2.from_angle(TAU * j / 48.0) * ring, Vector2(d, 0.0) + Vector2.from_angle(TAU * (j + 1) / 48.0) * ring, thickness))
+				return shapes}
+		&"inhale":
+			return {"polygon": _circle(Vector2(head, 0.0), float(p.get("pull_range", 0.0))), "length": head + float(p.get("pull_range", 0.0))}
+		&"meteor":
+			var shapes := []
+			var count := int(p.get("rocks", 3))
+			for j in count:
+				var side := float(j) - float(count - 1) * 0.5
+				shapes.append(_circle(Vector2(head + float(p.get("rock_distance", 0.0)), side * float(p.get("rock_spacing", 0.0))), float(p.get("rock_radius", 78.0))))
+			return {"polygons": shapes, "length": head + float(p.get("rock_distance", 0.0)) + float(p.get("rock_radius", 78.0))}
+		&"star_fan":
+			var shapes := []
+			var arc := float(p.get("arc", 0.0))
+			var count := int(p.get("count", 1))
+			for j in count:
+				var direction := Vector2.from_angle(lerpf(-arc, arc, float(j) / maxf(1.0, float(count) - 1.0)))
+				shapes.append(_band(direction * float(p.get("radius", 0.0)), direction * float(p.get("reach", 0.0)), maxf(4.0, float(p.get("width", 9.0)))))
+			return {"polygons": shapes, "length": float(p.get("reach", 0.0))}
 	return {"dynamic": true, "length": 0.0}
+
+## a から b への、半幅 half の帯。
+static func _band(a: Vector2, b: Vector2, half: float) -> PackedVector2Array:
+	var side := (b - a).normalized().orthogonal() * half
+	return PackedVector2Array([a + side, b + side, b - side, a - side])
+
+static func _circle(at: Vector2, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for j in 48: points.append(at + Vector2.from_angle(TAU * j / 48.0) * radius)
+	return points
 
 ## ケンタウルス座の判定が通る範囲。矢は弓から射程まで飛ぶ帯、背後攻撃は背中の後ろの円。
 static func _centaurus_attack(technique: StringName, p: Dictionary) -> Dictionary:
@@ -67,6 +123,12 @@ static func _centaurus_attack(technique: StringName, p: Dictionary) -> Dictionar
 			var at := Vector2(-float(p.get("back_offset", 0.0)), 0.0)
 			for j in 48: circle.append(at + Vector2.from_angle(TAU * j / 48.0) * float(p.get("range_radius", 0.0)))
 			return {"polygon": circle, "length": float(p.get("back_offset", 0.0)) + float(p.get("range_radius", 0.0))}
+		&"rain":
+			# 自機の先 forward から自機を通って後ろへ、矢を落とす円が軌跡を走る。
+			var forward := float(p.get("forward", 0.0))
+			var trace := float(p.get("trace_length", 0.0))
+			var radius := float(p.get("circle_radius", 100.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2(d + forward, 0.0), Vector2(d + forward - trace, 0.0), radius)]}
 	return {"dynamic": true, "length": 0.0}
 
 ## おおいぬ座の判定が通る範囲。飛びかかりは狙った位置の先まで体が通る帯、シリウスは口からの光の帯。
@@ -77,6 +139,20 @@ static func _canis_attack(technique: StringName, p: Dictionary) -> Dictionary:
 			return {"to_target": true, "extra": float(p.get("overshoot", 0.0)), "angle": 0.0, "width": float(def.radius) * 2.0, "length": 0.0}
 		&"sirius":
 			return {"from": 0.0, "to": float(p.get("beam_length", 0.0)), "angle": 0.0, "width": float(p.get("beam_width", 50.0)), "length": float(p.get("beam_length", 0.0))}
+		&"command":
+			# 率いる群れが自機へ飛び出す。群れの通り道を本体から自機の先までの帯で示す。
+			var lunge := float(p.get("lunge_speed", 0.0)) * float(p.get("lunge_time", 0.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(maxf(d, lunge), 0.0), float(def.radius) * 1.5)]}
+		&"howl":
+			# 自機を囲む猟犬の輪が ring_radius から ring_close まで縮む。縮みきった輪を示す。
+			var ring := float(p.get("ring_close", 0.0))
+			var outer := float(p.get("ring_radius", 0.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array:
+				var shapes := []
+				for j in 48:
+					shapes.append(_band(Vector2(d, 0.0) + Vector2.from_angle(TAU * j / 48.0) * ring, Vector2(d, 0.0) + Vector2.from_angle(TAU * (j + 1) / 48.0) * ring, 40.0))
+					shapes.append(_band(Vector2(d, 0.0) + Vector2.from_angle(TAU * j / 48.0) * outer, Vector2(d, 0.0) + Vector2.from_angle(TAU * (j + 1) / 48.0) * outer, 6.0))
+				return shapes}
 	return {"dynamic": true, "length": 0.0}
 
 ## 一角獣の角・蹄の判定が通る範囲。from〜to は本体の中心からの距離、angle と half_angle は度。
@@ -133,7 +209,7 @@ func _draw() -> void:
 		for point in gaps: draw_circle(center + point * scaling, 1.5, Color(0.95, 0.55, 0.2, 0.7))
 		_boss_marker(center)
 		return
-	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), float(attack.get("length", 0.0)))))
+	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), _attack_extent())))
 	if split:
 		# 2枚は同じ縮尺。左に発動条件、右に攻撃範囲を描く。
 		var side := minf(size.y, (size.x - SPLIT_GAP) * 0.5)
@@ -159,6 +235,16 @@ func _draw() -> void:
 			draw_circle(origin+direction*arc.radius*scale_factor,2.0,Color("#c6bdff"))
 	_attack_area(center, scale_factor, maximum)
 	_boss_marker(center)
+
+## 攻撃範囲がボスの中心から届く一番遠い距離。縮尺を決めるのに使う。
+func _attack_extent() -> float:
+	var far := float(attack.get("length", 0.0))
+	var shapes: Array = attack.get("polygons", [])
+	if attack.has("polygon"): shapes = [attack.polygon]
+	if attack.has("builder"): shapes = attack.builder.call((float(gate.get("min", 0.0)) + minf(100000.0, float(gate.get("max", 600.0)))) * 0.5)
+	for points: PackedVector2Array in shapes:
+		for point in points: far = maxf(far, point.length())
+	return far
 
 ## ボスの仮の姿。尖った先が正面（右）を向く三角形。
 func _boss_marker(center: Vector2) -> void:
@@ -186,10 +272,14 @@ func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
 		var at := center + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance * scaling
 		draw_circle(at, maxf(2.0, float(attack.width) * 0.5 * scaling), fill)
 		return
-	if attack.has("polygon"):
-		var shape := PackedVector2Array()
-		for point: Vector2 in attack.polygon: shape.append(center + point * scaling)
-		draw_colored_polygon(shape, fill)
+	var shapes: Array = attack.get("polygons", [])
+	if attack.has("polygon"): shapes = [attack.polygon]
+	if attack.has("builder"): shapes = attack.builder.call(target_distance)
+	if not shapes.is_empty():
+		for points: PackedVector2Array in shapes:
+			var shape := PackedVector2Array()
+			for point: Vector2 in points: shape.append(center + point * scaling)
+			draw_colored_polygon(shape, fill)
 		return
 	var start := float(attack.get("from", 0.0))
 	var finish := target_distance + float(attack.get("extra", 0.0)) if attack.get("to_target", false) else float(attack.get("to", attack.get("length", 0.0)))
