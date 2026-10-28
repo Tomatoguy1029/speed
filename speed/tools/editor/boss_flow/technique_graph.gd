@@ -234,11 +234,15 @@ func show_rules(value: Resource) -> void:
 	_updating = false
 	if rules.layout.is_empty(): fit_all.call_deferred()
 
+## 条件選択ノードは黄、技ノードは紫。
+const SELECT_COLOR := Color(1.0, 0.88, 0.45)
+const TECHNIQUE_COLOR := Color(0.85, 0.7, 1.0)
+
 func _add_node(id: String, title_text: String, at: Vector2, input: bool) -> GraphNode:
 	var node := GraphNode.new()
 	node.name = id
 	node.title = title_text
-	node.self_modulate = Color(0.65, 0.95, 0.8) if not input else Color.WHITE
+	node.self_modulate = TECHNIQUE_COLOR if input else SELECT_COLOR
 	if input:
 		var diagram := preload("res://tools/editor/boss_flow/range_preview.gd").new()
 		diagram.custom_minimum_size = Vector2(120, 58) * maxf(1.0, get_theme_default_font_size() / 14.0)

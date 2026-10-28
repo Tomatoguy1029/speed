@@ -163,6 +163,7 @@ func open(value: Dictionary, moves: Array) -> void:
 		label.text = "%s秒" % step.get("seconds", 0.0) if step.get("type", "") == "wait" else "技後の待ちまで実行" if step.get("type") == "action" else "ダブルクリックして内部を編集"
 		node.add_child(label)
 		node.set_slot(0, true, 0, Color.GRAY, true, 0, Color.GRAY)
+		if step.get("type") == "action": node.self_modulate = preload("res://tools/editor/boss_flow/technique_graph.gd").TECHNIQUE_COLOR
 		graph.add_child(node)
 		next_x += node.get_combined_minimum_size().x + 40.0
 		if step.get("type", "") in ["sequence", "parallel", "branch"]:

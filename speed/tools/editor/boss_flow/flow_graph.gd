@@ -7,6 +7,9 @@ var flow: Resource
 var _before := {}
 var _reroute_pending := false
 var clipboard: Array = []
+## 区間ノードの色。攻撃の区間は青、休息の区間は緑。
+const SECTION_COLOR := Color(0.65, 0.85, 1.0)
+const REST_COLOR := Color(0.55, 1.0, 0.55)
 
 func _request_reroute() -> void:
 	if _reroute_pending: return
@@ -71,7 +74,7 @@ func show_flow(value: Resource) -> void:
 		var node := GraphNode.new()
 		node.name = "section_" + str(i)
 		node.title = ("開始 · " if i == 0 else "") + String(section.get("name", "区間"))
-		node.self_modulate = Color(0.65, 0.85, 1.0)
+		node.self_modulate = REST_COLOR if section.get("request") == "rest" else SECTION_COLOR
 		var summary := Label.new()
 		summary.text = "休息" if section.get("request") == "rest" else "攻撃 %d 回" % int(section.get("action_count", 1))
 		node.add_child(summary)

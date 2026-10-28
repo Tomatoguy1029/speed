@@ -122,6 +122,11 @@ func _ready() -> void:
 	add_section.text = "＋ 区間を追加"
 	add_section.pressed.connect(_add_section)
 	flow_tools.add_child(add_section)
+	var add_rest := Button.new()
+	add_rest.text = "＋ 休息を追加"
+	add_rest.tooltip_text = "攻撃せずに休む区間を最後に足します。休む時間は「スタミナ・休息」で全区間共通に決めます。"
+	add_rest.pressed.connect(_add_rest)
+	flow_tools.add_child(add_rest)
 	var align_sections := Button.new()
 	align_sections.text = "区間を整列"
 	align_sections.pressed.connect(func(): flow_graph.command("align"))
@@ -596,6 +601,30 @@ func _add_section() -> void:
 	history.commit_action()
 	_edit_section(copy.size() - 1)
 
+func _add_rest() -> void:
+	var copy: Array = flow.sections.duplicate(true)
+	if not copy.is_empty() and copy[-1].get("next", 0) == 0: copy[-1].next = copy.size()
+	copy.append({"name": "休息" + str(copy.size() + 1), "request": "rest", "next": 0})
+	history.create_action("休息を追加")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
+	_edit_section(copy.size() - 1)
+
+## 区間を休息と攻撃の区間で切り替える。攻撃の設定は残し、戻したときに使う。
+func _set_section_rest(i: int, rest: bool) -> void:
+	var copy: Array = flow.sections.duplicate(true)
+	if rest: copy[i].request = "rest"
+	else:
+		copy[i].request = "any"
+		for key in ["allowed_categories", "action_count", "action_interval", "no_candidate_timeout", "weights"]:
+			if not copy[i].has(key): copy[i][key] = {"allowed_categories": ["normal", "combo"], "action_count": 1, "action_interval": 0.0, "no_candidate_timeout": 0.5, "weights": {"single": 85.0, "combo": 15.0}}[key]
+	history.create_action("休息の切り替え")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
+	_edit_section(i)
+
 func _set_sections(value: Array) -> void:
 	dirty_flow = true
 	flow.sections = value.duplicate(true)
@@ -626,7 +655,14 @@ func _edit_section(i: int, previous := "") -> void:
 			history.commit_action())
 		field.focus_exited.connect(func(): _section_property(i, key, field.text))
 		_fields.add_child(field)
-	if flow.sections[i].get("request", "normal") == "rest":
+	var resting := CheckBox.new()
+	resting.text = "休息の区間にする"
+	resting.tooltip_text = "ONでは攻撃せず、「スタミナ・休息」で決めた時間だけ休んでから次の区間へ進みます。"
+	resting.button_pressed = flow.sections[i].get("request", "normal") == "rest"
+	resting.toggled.connect(func(value): _set_section_rest(i, value))
+	_fields.add_child(resting)
+	_fields.add_child(Control.new())
+	if resting.button_pressed:
 		var rest := Label.new()
 		rest.text = "休息して次へ"
 		_fields.add_child(rest)
