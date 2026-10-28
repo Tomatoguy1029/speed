@@ -24,7 +24,7 @@ const MORE_LABELS := {
 	"curve_delay": "曲線攻撃までの遅れ", "curve_lag": "曲線攻撃の軌跡差（度）", "curve_time": "曲線攻撃の時間", "curve_turn": "曲線攻撃の回転速度（度/秒）",
 	"swarm_flight": "群れの飛行時間", "swarm_gap": "群れの間隔", "swarm_reach": "群れの到達距離", "grid_time": "格子攻撃の時間",
 	"active": "攻撃の継続時間", "damage": "ダメージ", "reach": "到達距離", "recover": "攻撃後の待ち", "shrink_time": "縮む時間", "touch_invuln": "胴に触れたあとの無敵（秒）", "width": "当たりの太さ（中心から片側）",
-	"inhale_time": "吸い込み時間", "pull_range": "引き寄せる範囲", "pull_speed": "引き寄せる速さ", "picaro_pull_speed": "複製体の引き寄せ速度", "mouth_radius": "口元の半径", "bite_damage": "噛みつきのダメージ", "beam_warn": "ビームの予告",
+	"inhale_time": "吸い込み時間", "pull_range": "引き寄せる範囲", "pull_speed": "引き寄せる速さ", "picaro_pull_speed": "複製体の引き寄せ速度", "mouth_radius": "口元の半径", "bite_damage": "噛みつきのダメージ", "beam_warn": "ビームの予告", "beam_extend": "ビームが伸びきる時間（秒）",
 	"comets_per_star": "星ごとの彗星数", "comet_cap": "彗星の同時上限", "comet_speed": "彗星の速さ", "clone_hp": "複製体のHP", "arrows": "矢の数", "flight": "飛行時間", "impact_warn": "着弾の予告",
 	"scratch_time": "ひっかきの時間", "scratch_width": "ひっかきの幅", "lead_cap": "標的の先読み上限", "rocks": "岩の数", "rock_hp": "岩のHP", "rock_radius": "岩の半径", "rock_distance": "岩までの距離", "rock_spacing": "岩の間隔", "half_angle": "左右の広がり角度（度）", "sweep": "薙ぐ角度（度）", "spread": "扇の角度（度）", "retract": "引き戻す時間"
 }

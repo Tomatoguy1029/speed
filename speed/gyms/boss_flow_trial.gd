@@ -273,6 +273,11 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 		_tuning_fields.remove_child(child)
 		child.queue_free()
 	var draft: Dictionary = _drafts[key]
+	if move.technique == &"inhale" and is_instance_valid(preview_actor) and "lab_inhale_stars" in preview_actor:
+		# 実験場には吸い込むピカロがいないので、吐き出す彗星弾の数を確かめるための星の数を決める。保存しない。
+		_add_tuning_field("吸い込んだ星の数（試遊用）", float(preview_actor.lab_inhale_stars), Vector2(0.0, 200.0), 1.0,
+			"実験場で吸い込んだことにする星の数です。星1つにつき彗星弾の数が増え、弧ごとの弾数と全体の上限で止まります。保存しません。",
+			func(value: float): preview_actor.lab_inhale_stars = int(value))
 	for field in ["min", "max", "angle", "half_angle"]:
 		var condition: String = "condition_" + field
 		if not draft.has(condition): continue

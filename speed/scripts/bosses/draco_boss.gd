@@ -41,6 +41,8 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves: Dictionary = {}
+## 実験場で吸い込みを試すとき、吸い込んだことにする星の数。ゲーム中は吸い込んだピカロの星を数える。
+var lab_inhale_stars := 12
 var retained_fields: Array = []
 var clone_damage_rows: Dictionary = {}
 var body_rows: Array[int] = []

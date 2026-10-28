@@ -35,6 +35,8 @@ func _draw() -> void:
 		var mouth_open := 0.0
 		if actor.mode in [&"windup",&"active"] and actor.technique in [&"bite",&"breath",&"inhale",&"star_fan",&"picaro_wall"]:
 			mouth_open = 0.8 if actor.mode==&"windup" else 1.0
+			# 吸い込んでいる間は口を大きく開ける
+			if actor.technique==&"inhale" and actor.mode==&"active": mouth_open = 1.35
 		var head_offset := Vector2.ZERO
 		if actor.finale.split>0.0:
 			var side := -1.0 if actor.table.pos[actor.body].x<actor.finale.center.x else 1.0
