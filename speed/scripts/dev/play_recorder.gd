@@ -217,6 +217,7 @@ func _begin(session: RunSession, during_run := false) -> void:
 		"combat_config": {"level": combat_level, "events_per_second": clampi(combat_events_per_second, 1, 1000), "max_events": clampi(combat_max_events, 1, 1000000), "max_bytes": maxi(0, combat_max_bytes), "line_bytes": COMBAT_LINE_BYTES}, "run_start": run_start, "recording_start": recording_start, "missing_prefix": during_run,
 		"xp_config": _xp_config(), "perf_interval_real": PERF_INTERVAL_US / 1000000.0,
 		"engine_version": Engine.get_version_info().string, "meta_levels": _meta_levels(), "meta_dev_override": not SaveManager.dev_meta_override.is_empty(),
+		"perf_excludes_ui_pause": true,
 		"stage_file_sha256_at_start": FileAccess.get_sha256(run.state.stage.resource_path) if FileAccess.file_exists(run.state.stage.resource_path) else ""})
 	# 途中録画に存在する結晶は、生成時刻・出所を推定せず、ID と現値だけ引き継ぐ。
 	if during_run:
@@ -501,7 +502,7 @@ func _perf_start(now_us: int) -> void:
 	_real_start_us = now_us
 	_perf_last_us = now_us
 	_perf_window_us = now_us
-	_perf_phase = _run.state.phase
+	_perf_phase = _performance_phase()
 	_perf_bonus = _run.state.bonus_t > 0.0
 	_clear_performance()
 
@@ -520,12 +521,19 @@ func _clear_performance() -> void:
 	_perf_drawing = 0
 	_perf_tracing = 0
 
+## 報酬・メニューの表示は PLAY のまま世界を止めるため、性能集計では停止として扱う。
+func _performance_phase() -> int:
+	var phase: int = _run.state.phase
+	if phase == RunState.Phase.PLAY and (_run.ui_reward_active or _run.ui_overlay_active):
+		return RunState.Phase.PAUSED
+	return phase
+
 func _perf_tick(now_us: int) -> void:
 	if _perf_last_us == 0:
 		_perf_start(now_us)
 		return
 	var s = _run.state
-	var phase: int = s.phase
+	var phase := _performance_phase()
 	var bonus: bool = s.bonus_t > 0.0
 	if phase != _perf_phase or bonus != _perf_bonus:
 		if phase == RunState.Phase.PLAY and phase == _perf_phase:

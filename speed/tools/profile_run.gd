@@ -25,6 +25,10 @@ var gpu_times: Array[float] = []
 var render_times: Array[float] = []
 var draws: Array[float] = []
 var measuring := false
+var configured := false
+var initial_weapons := {}
+var initial_traits := {}
+var loadout_changes := 0
 var previous_us := 0
 var start_us := 0
 var counts := {"enemies": 0.0, "hostile": 0.0, "hazards": 0.0, "friendly": 0.0, "gems": 0.0}
@@ -52,14 +56,19 @@ func _ready() -> void:
 		# --overlay=compact|detail で性能の表示を出した状態で始める
 		PerfOverlay.saved_mode = PerfOverlay.Mode.DETAIL if options.overlay == "detail" else PerfOverlay.Mode.COMPACT
 	session = RunManager.create_run()
+	# 配置と装備の初期化も同じ乱数列から始める。
+	session.sim.options.seed = 1029
 	add_child(session)
 	if session.sim.state == null: await session.started
 	run = session.sim
 	render = session.view.get_node("RunPresentation")
 	await get_tree().process_frame
 	await get_tree().process_frame
-	run.command(&"choose_card", {"index": 0})
+	# 指定装備へ直接置き換える。準備中の初期カードを後から確定させない。
 	run.loadout.reset_loadout()
+	run.state.start_pick = false
+	run.state.cards.clear()
+	run.set_phase(RunState.Phase.PLAY)
 	run.loadout.grant(&"weapon", &"W01", 1)
 	if options.get("attack", "off") == "on":
 		run.loadout.reset_loadout()
@@ -73,6 +82,9 @@ func _ready() -> void:
 			var parts := item.split(":")
 			var kind := &"trait" if parts[0].begins_with("T") else &"weapon"
 			run.loadout.grant(kind, StringName(parts[0]), int(parts[1]) if parts.size() > 1 else 1)
+	initial_weapons = run.state.weapons.duplicate()
+	initial_traits = run.state.traits.duplicate()
+	run.loadout.loadout_recorded.connect(func(_change: Dictionary): loadout_changes += 1)
 	run.state.rng.seed = 1029
 	# ランの初期化は乱数配置なので、天体も同じシードで作り直す。
 	# 天体との接触量の違いを、描画の比較条件へ混ぜない。
@@ -141,6 +153,7 @@ func _ready() -> void:
 		end.recorder = self
 		end.process_priority = 10000
 		add_child(end)
+	configured = true
 	await get_tree().create_timer(6.0).timeout
 	drawing_times.clear()
 	sim_rec = run.perf.open(&"bench")
@@ -180,8 +193,12 @@ func _mark(label: StringName) -> void:
 		phase_trace.append({"name": label, "us": Time.get_ticks_usec() - start_us, "frame": Engine.get_process_frames()})
 
 func _process(_delta: float) -> void:
-	if run == null:
+	if run == null or not configured:
 		return
+	var ui_paused := run.ui_reward_active or run.ui_overlay_active
+	# 付与済み報酬の表示だけを閉じ、連続して戦闘を測るための明示指定。
+	if options.get("rewards", "on") == "off" and run.ui_reward_active:
+		session.view.get_node("Hud/HudRoot")._rewards.cancel()
 	# フォーカスによるポーズと強化選択を計測に含めない。
 	if run.state.phase == RunState.Phase.PAUSED:
 		run.command(&"resume")
@@ -206,6 +223,7 @@ func _process(_delta: float) -> void:
 	frames.append((now - previous_us) / 1000.0)
 	previous_us = now
 	var row := {"elapsed_ms": (now - start_us) / 1000.0, "frame_ms": frames[-1],
+		"ui_paused": ui_paused,
 		"engine_frame": Engine.get_process_frames(), "managers": {}, "drawing": {},
 		"frame_setup_cpu_ms": RenderingServer.get_frame_setup_time_cpu(),
 		"viewport_cpu_ms": RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid()),
@@ -289,6 +307,10 @@ func _finish(seconds: float) -> void:
 		var rec: Array = rows_rec[key]
 		view_rows[String(key)] = {"mean": float(rec[0]) / maxi(1, rec[1]), "max": rec[2]}
 	var result := {"seconds": seconds, "frames": frames.size(), "fps": frames.size() / seconds,
+		"ui_pause_frames": timeline.filter(func(row): return row.ui_paused).size(),
+		"initial_weapons": initial_weapons, "initial_traits": initial_traits,
+		"loadout_changes": loadout_changes, "traits": run.state.traits,
+		"level": run.state.level,
 		"frame_ms": _stats(frames), "gpu_viewport_ms": _stats(gpu_times), "render_cpu_ms": _stats(render_times),
 		"draw_calls": _stats(draws), "counts": counts, "managers": manager_ms, "drawing_ms_frame": draw_ms,
 		"view_ms": view_ms, "view_enemy_rows": view_rows,
@@ -329,6 +351,10 @@ func _summary(result: Dictionary) -> String:
 	var events: float = result.managers.get(&"events_out", {}).get("ms_frame", 0.0)
 	var lines: Array[String] = []
 	lines.append("fps %.1f  フレーム 平均 %.2f p95 %.2f 最大 %.2f" % [result.fps, frame.mean, frame.p95, frame.max])
+	if result.ui_pause_frames > 0:
+		lines.append("報酬・メニューでゲームが停止したフレーム %d（連続戦闘の比較には使わない）" % result.ui_pause_frames)
+	if result.loadout_changes > 0:
+		lines.append("準備開始後の装備変更 %d（固定装備の比較には使わない）" % result.loadout_changes)
 	lines.append("ゲーム処理 %.2f  出来事の受け渡し %.2f  表示側 %.2f  残り（描画エンジン・GPU・待ち）%.2f  敵 %.0f" % [
 		game, events, view, maxf(0.0, frame.mean - game - events - view), result.counts.enemies])
 	var managers: Array = result.managers.keys().filter(func(k): return k != &"play_total" and k != &"events_out" and not String(k).contains("."))
@@ -393,6 +419,8 @@ func _draw_ahead() -> bool:
 func _hold_level() -> void:
 	if run != null and run.state != null:
 		run.state.stats.xp_mult = 0.0
+		# 大きい結晶は固定量のため、取得側の倍率でも経験値を止める。
+		run.state.stats.xp_gain_mult = 0.0
 		run.state.pending_levels = 0
 		run.state.pending_comet_weapons.clear()
 

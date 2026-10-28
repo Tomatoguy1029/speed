@@ -96,6 +96,8 @@
 
 総FPSは `sum(frames) / sum(duration_real)`、平均フレーム時間は `1000 * sum(duration_real) / sum(frames)`。閾値超過率・ヒットストップ観測率は各回数合計/総フレーム数を使う。窓のFPSや割合を単純平均しない。窓の最大フレーム時間を分位点へ変換できない。
 
+ヘッダーの `perf_excludes_ui_pause=true` は、報酬表示・メニュー表示で世界が止まる時間も性能窓から除いたことを示す。識別子のない録画は、PLAYのまま表示だけが続く時間を含み得る。処理別合計や平均FPSから、こうした停止と連続戦闘の負荷を分離できるとは限らない。
+
 `real_t` は書込時刻、性能窓は `window_start_real/window_end_real`、`duration_real` は観測間隔の合計。`objects_at_write/bonus_at_write` は書込時点で、窓全体の最大・平均・状態を保証しない。ヒットストップ観測率は停止時間率ではなく、描画FPS低下の原因と決めない。
 
 ## 複数ランの比較と不確実性
