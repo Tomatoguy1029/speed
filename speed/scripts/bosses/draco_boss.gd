@@ -31,6 +31,8 @@ var body_segments := 128
 var perspective_scale := 1.0
 var telegraph_paths: Array[PackedVector2Array] = []
 var telegraph_widths: Array[float] = []
+## 塗りで見せる予告の範囲。polygon（ワールド座標）を塗り、center から外へ広がる塗りで予告の進みを示す。
+var telegraph_areas: Array[Dictionary] = []
 var attack_width := 45.0
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 var _driver: RefCounted
@@ -195,6 +197,7 @@ func start_attack(id: StringName) -> bool:
 	telegraph_points.clear()
 	telegraph_paths.clear()
 	telegraph_widths.clear()
+	telegraph_areas.clear()
 	combat_trace.begin(id, combat_origin)
 	technique = id
 	attack_width = float(rule().get("width",45.0))
@@ -276,7 +279,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			_driver = null
 			mode = &"idle"
 			technique = &""
-			telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear()
+			telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear();telegraph_areas.clear()
 			attack_points.clear()
 			reset_pose()
 	ctx.bosses.recording_actor = prior_observer
@@ -294,7 +297,7 @@ func cancel_attack() -> void:
 	if _driver != null: _driver.end(self,true)
 	_driver = null
 	attack_points.clear()
-	telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear()
+	telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear();telegraph_areas.clear()
 	reset_pose()
 	mode = &"idle"
 	technique = &""

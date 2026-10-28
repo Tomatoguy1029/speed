@@ -1,12 +1,16 @@
-## 構えた尾そのものが後方の弧を掃く。頭から伸びる無関係な棒に判定を置かない。
+## 構えた尾そのものが後方の扇を掃く。頭から伸びる無関係な棒に判定を置かない。
 extends RefCounted
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 const MOTION = preload("res://scripts/bosses/draco_attack_motion.gd")
+const AREA = preload("res://scripts/bosses/draco_tail_area.gd")
 var origin := Vector2.ZERO
 var facing := 0.0
 var base := PackedVector2Array()
 var last := PackedVector2Array()
 var prior := PackedVector2Array()
+func _half(a: BossActor) -> float:
+	return float(a.rule().get("half_angle",1.3))
+
 func _pose(a: BossActor, offset: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	var reach := float(a.rule().reach)
@@ -19,21 +23,15 @@ func begin(a: BossActor) -> void:
 	origin=a.table.pos[a.body]
 	facing=a.table.facing[a.body]
 	base=a.neutral_body_points(origin,facing)
-	var outer := PackedVector2Array()
-	var inner := PackedVector2Array()
-	for j in a.body_segments + 1:
-		var angle := facing+PI+lerpf(-1.3,1.3,float(j) / float(a.body_segments))
-		outer.append(origin+Vector2.from_angle(angle)*float(a.rule().reach))
-		inner.append(origin+Vector2.from_angle(angle)*float(a.rule().reach)*0.55)
-	a.telegraph_paths.assign([outer,inner,PackedVector2Array([inner[0],outer[0]]),PackedVector2Array([inner[-1],outer[-1]])])
-	a.telegraph_widths.assign([a.body_width*0.5,a.body_width*0.5,a.body_width*0.5,a.body_width*0.5])
+	a.telegraph_areas.assign([{"center": origin, "polygon": AREA.area(origin,facing,float(a.rule().reach),_half(a))}])
 func windup(a: BossActor,_dt: float) -> void:
-	MOTION.blend(a,base,_pose(a,-1.3),a.elapsed/float(a.rule().warn))
+	MOTION.blend(a,base,_pose(a,-_half(a)),a.elapsed/float(a.rule().warn))
 func tick(a: BossActor,_dt: float) -> void:
 	MOTION.clear_tell(a)
-	var points := _pose(a,lerpf(-1.3,1.3,clampf(a.elapsed/float(a.rule().active),0.0,1.0)))
+	var points := _pose(a,lerpf(-_half(a),_half(a),clampf(a.elapsed/float(a.rule().active),0.0,1.0)))
 	var fractions: PackedFloat32Array=FORM.fractions(points)
-	for j in range(int(points.size() * 0.55),points.size()-1):
+	# 予告の扇と同じく、尾の根元から先まで当たる。
+	for j in range(1,points.size()-1):
 		var segment := PackedVector2Array([points[j],points[j+1]])
 		var old := PackedVector2Array([prior[j],prior[j+1]]) if prior.size()==points.size() else PackedVector2Array()
 		a.hit_segment(segment,a.body_width*0.5*FORM.taper((fractions[j]+fractions[j+1])*0.5),old)

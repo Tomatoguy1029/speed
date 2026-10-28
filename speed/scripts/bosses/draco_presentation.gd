@@ -187,6 +187,19 @@ func _draw_residual_rifts() -> void:
 
 func _draw_telegraphs() -> void:
 	var progress := clampf(actor.elapsed/maxf(0.01,float(actor.rule().get("warn",1.0))),0.0,1.0) if actor.mode==&"windup" else 1.0
+	for area: Dictionary in actor.telegraph_areas:
+		var shape := _local_points(area.polygon)
+		if shape.size() < 3: continue
+		# 範囲全体を薄く塗り、中心から外へ広がる濃い塗りが端へ届くと攻撃が出る。
+		draw_colored_polygon(shape,Color(1.0,0.61,0.25,0.12))
+		var center: Vector2=actor.to_local(area.center)
+		var far := 0.0
+		for point in shape: far=maxf(far,point.distance_to(center))
+		var circle := PackedVector2Array()
+		for j in 64: circle.append(center+Vector2.from_angle(TAU*j/64.0)*far*progress)
+		if progress > 0.0:
+			for part in Geometry2D.intersect_polygons(shape,circle): draw_colored_polygon(part,Color(1.0,0.66,0.3,0.3))
+		draw_polyline(shape+PackedVector2Array([shape[0]]),Color(1.0,0.69,0.36,0.42+progress*0.4),3.0,false)
 	for i in actor.telegraph_paths.size():
 		var path := _local_points(actor.telegraph_paths[i])
 		if path.size()<2: continue

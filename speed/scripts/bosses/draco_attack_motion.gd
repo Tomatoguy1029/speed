@@ -29,6 +29,7 @@ static func clear_tell(a: BossActor) -> void:
 	a.telegraph_paths.clear()
 	a.telegraph_widths.clear()
 	a.telegraph_points.clear()
+	a.telegraph_areas.clear()
 
 ## 各節の長さを保ったまま曲げる。尾を着地点へ置く技だけ両端を固定する。
 static func fit_spine(desired: PackedVector2Array, reference: PackedVector2Array, anchor_tip := false) -> PackedVector2Array:

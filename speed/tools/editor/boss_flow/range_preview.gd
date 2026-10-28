@@ -26,9 +26,58 @@ func set_attack(move: Resource, adapter: String) -> void:
 		if move.technique == &"thunder_drop": attack = {"targeted": true, "length": 0.0, "width": float(p.thunder_radius) * 2.0, "circle": true}
 	elif adapter == "monoceros":
 		attack = _monoceros_attack(move.technique, p)
+	elif adapter == "draco":
+		attack = _draco_attack(move.technique, p)
+	elif adapter == "centaurus":
+		attack = _centaurus_attack(move.technique, p)
+	elif adapter == "canis_major":
+		attack = _canis_attack(move.technique, p)
 	else:
 		attack = {"length": p.get("reach", p.get("distance", 180.0)), "width": 30.0, "angle": 180.0 if move.technique == &"kick" else 0.0}
 	queue_redraw()
+
+## りゅう座の判定が通る範囲。画面外から入り直す技と、配置で形が変わる技は「配置で変化」にする。
+static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
+	var def: Resource = load("res://data/bosses/draco.tres")
+	var head := 105.0 * float(def.params.get("head_scale", 1.35))
+	match technique:
+		&"bite":
+			var reach := float(p.get("reach", 0.0)) + head
+			return {"from": 0.0, "to": reach, "angle": 0.0, "width": float(p.get("width", 45.0)) * 2.0, "length": reach}
+		&"breath":
+			var reach := float(p.get("reach", 0.0)) + head
+			return {"from": 0.0, "to": reach, "angle": 0.0, "half_angle": rad_to_deg(float(p.get("sweep", 0.0)) + float(p.get("half_angle", 0.0))), "width": 0.0, "length": reach}
+		&"tail_sweep":
+			var shape: PackedVector2Array = preload("res://scripts/bosses/draco_tail_area.gd").area(Vector2.ZERO, 0.0, float(p.get("reach", 0.0)), float(p.get("half_angle", 1.3)))
+			return {"polygon": shape, "length": float(p.get("reach", 0.0))}
+		&"tail_slam":
+			return {"targeted": true, "circle": true, "width": float(p.get("radius", 110.0)) * 2.0, "max_target": float(p.get("reach", 0.0)), "length": 0.0}
+	return {"dynamic": true, "length": 0.0}
+
+## ケンタウルス座の判定が通る範囲。矢は弓から射程まで飛ぶ帯、背後攻撃は背中の後ろの円。
+static func _centaurus_attack(technique: StringName, p: Dictionary) -> Dictionary:
+	var def: Resource = load("res://data/bosses/centaurus.tres")
+	match technique:
+		&"volley", &"power_shot":
+			var start := float(def.radius) * float(def.params.get("bow_reach", 0.9))
+			var reach := start + float(p.get("travel", 0.0))
+			return {"from": start, "to": reach, "angle": 0.0, "width": float(p.get("radius", 12.0)) * 2.0, "length": reach}
+		&"rear_attack":
+			var circle := PackedVector2Array()
+			var at := Vector2(-float(p.get("back_offset", 0.0)), 0.0)
+			for j in 48: circle.append(at + Vector2.from_angle(TAU * j / 48.0) * float(p.get("range_radius", 0.0)))
+			return {"polygon": circle, "length": float(p.get("back_offset", 0.0)) + float(p.get("range_radius", 0.0))}
+	return {"dynamic": true, "length": 0.0}
+
+## おおいぬ座の判定が通る範囲。飛びかかりは狙った位置の先まで体が通る帯、シリウスは口からの光の帯。
+static func _canis_attack(technique: StringName, p: Dictionary) -> Dictionary:
+	var def: Resource = load("res://data/bosses/canis_major.tres")
+	match technique:
+		&"pounce":
+			return {"to_target": true, "extra": float(p.get("overshoot", 0.0)), "angle": 0.0, "width": float(def.radius) * 2.0, "length": 0.0}
+		&"sirius":
+			return {"from": 0.0, "to": float(p.get("beam_length", 0.0)), "angle": 0.0, "width": float(p.get("beam_width", 50.0)), "length": float(p.get("beam_length", 0.0))}
+	return {"dynamic": true, "length": 0.0}
 
 ## 一角獣の角・蹄の判定が通る範囲。from〜to は本体の中心からの距離、angle と half_angle は度。
 static func _monoceros_attack(technique: StringName, p: Dictionary) -> Dictionary:
@@ -108,14 +157,7 @@ func _draw() -> void:
 		for j in arc.count:
 			var direction := Vector2.from_angle(angle+lerpf(-spread,spread,j/maxf(1.0,arc.count-1.0)))
 			draw_circle(origin+direction*arc.radius*scale_factor,2.0,Color("#c6bdff"))
-	if not attack.is_empty() and not attack.get("dynamic", false):
-		var length := float(attack.get("length", 0.0))
-		if attack.get("targeted", false): length = (float(gate.get("min", 0.0)) + maximum) * 0.5
-		var end := center + Vector2.from_angle(deg_to_rad(float(attack.get("angle", gate.get("angle", 0.0))))) * length * scale_factor
-		if attack.get("circle", false): draw_circle(end, maxf(2.0, float(attack.width) * 0.5 * scale_factor), Color(1.0, 0.65, 0.15, 0.8), false, 2.0)
-		else: draw_line(center, end, Color(1.0, 0.65, 0.15, 0.9), maxf(2.0, float(attack.get("width", 30.0)) * scale_factor))
-	elif attack.get("dynamic", false):
-		draw_string(get_theme_default_font(), Vector2(4, size.y - 3), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), Color(1.0, 0.65, 0.15))
+	_attack_area(center, scale_factor, maximum)
 	_boss_marker(center)
 
 ## ボスの仮の姿。尖った先が正面（右）を向く三角形。
@@ -137,12 +179,20 @@ func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
 		draw_string(get_theme_default_font(), center + Vector2(-30, 4), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), ATTACK_COLOR)
 		return
 	var fill := Color(ATTACK_COLOR, 0.35)
+	# 自機を狙う技は、発動条件の距離の真ん中にいる自機を狙ったときの形で描く。
+	var target_distance := (float(gate.get("min", 0.0)) + minf(maximum, float(gate.get("max", maximum)))) * 0.5
 	if attack.get("targeted", false):
-		var at := center + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * (float(gate.get("min", 0.0)) + maximum) * 0.5 * scaling
+		var distance := minf(target_distance, float(attack.get("max_target", INF)))
+		var at := center + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance * scaling
 		draw_circle(at, maxf(2.0, float(attack.width) * 0.5 * scaling), fill)
 		return
+	if attack.has("polygon"):
+		var shape := PackedVector2Array()
+		for point: Vector2 in attack.polygon: shape.append(center + point * scaling)
+		draw_colored_polygon(shape, fill)
+		return
 	var start := float(attack.get("from", 0.0))
-	var finish := float(attack.get("to", attack.get("length", 0.0)))
+	var finish := target_distance + float(attack.get("extra", 0.0)) if attack.get("to_target", false) else float(attack.get("to", attack.get("length", 0.0)))
 	var angle := deg_to_rad(float(attack.get("angle", 0.0)))
 	var half := deg_to_rad(float(attack.get("half_angle", 0.0)))
 	var width := float(attack.get("width", 30.0))
