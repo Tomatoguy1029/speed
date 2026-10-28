@@ -82,6 +82,10 @@ func _ready() -> void:
 		if open_boss("res://data/bosses/ai/" + id + "_action_rules.tres", "res://data/bosses/ai/" + id + "_flow.tres") != OK:
 			bosses.selected = _boss_index())
 	toolbar.add_child(bosses)
+	var add_technique := Button.new()
+	add_technique.text = "＋ 技を追加"
+	add_technique.pressed.connect(_show_add_technique)
+	toolbar.add_child(add_technique)
 	_parallel_toggle.text = "同時攻撃あり"
 	_parallel_toggle.tooltip_text = "複数の通常技を同時に選ぶ。OFFは未登録扱い。コンボ内部の並列実行とは別。"
 	_parallel_toggle.toggled.connect(_change_parallel)
@@ -1291,6 +1295,7 @@ func _refresh() -> void:
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
+	_append_display_name()
 	# 時間に関わる値と、威力・範囲の値を分けて並べる。
 	var timing: Array = []
 	var others: Array = []
@@ -1493,3 +1498,93 @@ func _append_arcs() -> void:
 		history.commit_action()
 		_refresh())
 	_full_row(button)
+
+func _append_display_name() -> void:
+	var label := Label.new()
+	label.text = "表示名"
+	_fields.add_child(label)
+	var field := LineEdit.new()
+	field.text = current.display_name
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var target := current
+	field.text_changed.connect(func(value):
+		history.create_action("技の表示名を変更", UndoRedo.MERGE_ENDS)
+		history.add_do_method(_set_display_name.bind(target, value))
+		history.add_undo_method(_set_display_name.bind(target, target.display_name))
+		history.commit_action())
+	_fields.add_child(field)
+
+func _set_display_name(target: Resource, value: String) -> void:
+	target.display_name = value
+	_mark_move_dirty(target)
+	for node in graph.get_children():
+		if node is GraphNode and rules.source_for(String(node.name)) == String(target.technique): node.title = value if not value.is_empty() else String(target.technique)
+
+func _mark_move_dirty(target: Resource) -> void:
+	var found := false
+	for path in working:
+		if working[path] == target:
+			_dirty_working[path] = true
+			found = true
+	if not found: dirty_rules = true
+	target.emit_changed()
+
+func _show_add_technique() -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "技を追加"
+	dialog.ok_button_text = "作成"
+	dialog.cancel_button_text = "キャンセル"
+	var fields := VBoxContainer.new()
+	dialog.add_child(fields)
+	var id := LineEdit.new()
+	id.placeholder_text = "技ID（例：new_attack）"
+	id.tooltip_text = "保存先と接続に使う、重複しないID"
+	fields.add_child(id)
+	var title_field := LineEdit.new()
+	title_field.placeholder_text = "表示名"
+	fields.add_child(title_field)
+	var mode := OptionButton.new()
+	mode.add_item("ひな形からスクリプトを作る")
+	mode.add_item("既存の技スクリプトを選ぶ")
+	fields.add_child(mode)
+	var script_path := LineEdit.new()
+	script_path.placeholder_text = "技スクリプト（res://… .gd）"
+	script_path.editable = false
+	fields.add_child(script_path)
+	var browse := Button.new()
+	browse.text = "スクリプトを選ぶ…"
+	browse.disabled = true
+	fields.add_child(browse)
+	mode.item_selected.connect(func(index): script_path.editable = index == 1; browse.disabled = index == 0)
+	browse.pressed.connect(func():
+		var picker := FileDialog.new()
+		picker.access = FileDialog.ACCESS_RESOURCES
+		picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		picker.filters = PackedStringArray(["*.gd ; 技のスクリプト"])
+		picker.file_selected.connect(func(path): script_path.text = path; picker.queue_free())
+		picker.canceled.connect(picker.queue_free)
+		dialog.add_child(picker)
+		picker.popup_centered_ratio(0.6))
+	var result := Label.new()
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fields.add_child(result)
+	dialog.dialog_hide_on_ok = false
+	dialog.confirmed.connect(func():
+		if rules.node_ids().has(id.text): result.text = "同じIDの技がすでにあります。"; return
+		var created: Dictionary = preload("res://tools/editor/boss_flow/technique_authoring.gd").create(String(rules.adapter), id.text, title_field.text, script_path.text, mode.selected == 0)
+		result.text = created.message
+		if created.error != OK: return
+		var move: Resource = created.move
+		rules.techniques.append(move)
+		rules.graph_nodes[id.text] = {"connected": false}
+		rules.costs[id.text] = 1.0
+		dirty_rules = true
+		graph.show_rules(rules)
+		_refresh_techniques()
+		_picked("technique", id.text)
+		_status.text = created.message
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(520 * _scale, 0))
+	id.grab_focus()
