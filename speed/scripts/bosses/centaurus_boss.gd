@@ -42,6 +42,8 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+## 予告の間に自機を追わない技の狙い。予告を始めた時の位置。
+var warn_aim := Vector2.ZERO
 ## 今の形態の技の性能。技のID → 性能
 var _rules := {}
 ## 矢の雨のトレース。start・dir・turn（曲がる向き ±1）・t0（走り始めの clock）・next_drop・landed・hit を持つ
@@ -154,7 +156,9 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	elif mode in [&"windup", &"shooting", &"strike"]:
 		table.vel[body] = Vector2.ZERO
 		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。背後攻撃は背中を向けたまま構える。
-		if technique == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+		if mode == &"windup" and not _tracks_during_warn():
+			if technique != &"rear_attack": _face(warn_aim, def.turn, dt)
+		elif technique == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
 		elif technique != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
 		if mode == &"strike": _strike_tick()
 		if timeline.is_playing(): timeline.advance(dt)
@@ -261,9 +265,13 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.get("drop_delay", 0.0)) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
 
+func _tracks_during_warn() -> bool:
+	return not _moves.has(technique) or _moves[technique].track_during_warn
+
 func _begin_windup(r: Dictionary, length: float) -> void:
 	mode = &"windup"
 	alerting = false
+	warn_aim = run_state.ship_pos if technique == &"power_shot" else run_state.enemy_aim
 	table.vel[body] = Vector2.ZERO
 	var anim := timeline.get_animation(&"attack")
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
@@ -302,7 +310,8 @@ func release() -> void:
 	var r := rule()
 	var mouth := bow_mouth()
 	var power := technique == &"power_shot"
-	var angle := ((run_state.ship_pos if power else run_state.enemy_aim) - mouth).angle()
+	var target := (run_state.ship_pos if power else run_state.enemy_aim) if _tracks_during_warn() else warn_aim
+	var angle := (target - mouth).angle()
 	for offset in power_offsets() if power else [0.0]:
 		ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle + offset, float(r.speed), float(r.radius), float(r.travel),
 			float(r.damage) * ctx.cfg.atk_scale, power])

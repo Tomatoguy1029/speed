@@ -18,6 +18,7 @@ func prepare()->void:
 		n.locked=false
 		n.step=0
 		n.emission.clear()
+		n.target=a.run_state.ship_pos
 	if a.tech==&"curve":curve(0.0)
 	if a.tech in [&"swarm",&"grid"]:
 		positioning=true
@@ -50,7 +51,7 @@ func sequence(dt: float)->void:
 		var local: float=time-i*float(p.sequence_gap)
 		if local<0.0:continue
 		if not n.locked:
-			n.target=a.run_state.ship_pos
+			if a.tracks_during_warn(a.tech):n.target=a.run_state.ship_pos
 			if local<float(p.sequence_charge):continue
 			n.locked=true
 			n.strike_from=n.strike_pos

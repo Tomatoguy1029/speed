@@ -509,8 +509,6 @@ func _assign_post_gap(target: Resource, value: float) -> void:
 			if working[path] == target: _dirty_working[path] = true
 	target.emit_changed()
 
-## 予告中の追尾に対応するボス
-const TRACKING_BOSSES := ["monoceros", "canis_major"]
 ## 技の欄の「タイミング」にまとめる値。この順で並べる。
 const TIMING_KEYS := ["warn", "active", "hold", "return_speed", "recover", "cd"]
 
@@ -1308,7 +1306,7 @@ func _refresh() -> void:
 		if key == "arcs": _append_arcs()
 		else: _technique_field(key)
 	_section_heading("狙いと消費スタミナ")
-	if String(rules.adapter) in TRACKING_BOSSES and not rules.combos.has(String(current.technique)):
+	if not rules.combos.has(String(current.technique)):
 		var tracking := CheckBox.new()
 		tracking.text = "予告の間、自機を追う"
 		tracking.tooltip_text = "ONでは予告の間ずっと自機を追って狙いと向きを直します。OFFでは予告を始めた時の自機の位置へ撃ちます。"

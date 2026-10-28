@@ -765,6 +765,10 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 	if special.positioning:timeline.pause()
 	return true
 
+## 予告の間に自機を追うか。技の設定が無い動作は追う。
+func tracks_during_warn(id: StringName) -> bool:
+	return not _moves.has(id) or _moves[id].track_during_warn
+
 func attack_playing() -> bool:
 	return busy
 

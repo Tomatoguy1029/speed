@@ -244,6 +244,12 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_driver.locked = true
 		combat_trace.stage("lock", {"scope": "trace_aim"})
 	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
+	# 予告の間に自機を追わない技は、画面外からの配置を終えて最初に狙った時点で固定する。渦の中心移動は構図維持なので対象外。
+	if mode == &"windup" and technique != &"spiral" and _driver != null and "locked" in _driver and not _driver.locked \
+			and _moves.has(technique) and not _moves[technique].track_during_warn \
+			and (not "staging" in _driver or _driver.staging.is_empty() or _driver.staging.get("phase", &"ready") == &"ready"):
+		_driver.locked = true
+		combat_trace.stage("lock", {"scope": "warn_tracking_off"})
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
 		elapsed = 0.0

@@ -12,7 +12,7 @@ static func reach(id: StringName, p: Dictionary) -> Dictionary:
 	return {"origin": "head", "max": INF}
 static func tick(a: Node, n, dt: float) -> void:
 	var aim: Dictionary = a.move_params(n.mode)
-	if n.t <= minf(float(aim.get("aim_tracking", 0.0)), float(aim.get("normal_charge", 0.0))): n.target = a.run_state.ship_pos
+	if a.tracks_during_warn(n.mode) and n.t <= minf(float(aim.get("aim_tracking", 0.0)), float(aim.get("normal_charge", 0.0))): n.target = a.run_state.ship_pos
 	if n.mode == &"thunder_drop":
 		thunder_drop(a,n,dt)
 		return

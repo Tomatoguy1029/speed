@@ -6,7 +6,7 @@ class_name BossTechnique
 @export var category: StringName = &"single"
 @export_range(0.0, 30.0, 0.05, "or_greater") var post_gap := 0.0
 ## 予告の間、自機を追って狙いと向きを更新する。OFFでは予告を始めた時の狙いへ撃つ。
-## 対応するボス：いっかくじゅう座・おおいぬ座。
+## りゅう座は画面外からの配置を終えた最初の狙いで固定し、渦の中心移動は対象外。
 @export var track_during_warn := true
 @export_storage var parameters: Dictionary = {}:
 	set(value):
