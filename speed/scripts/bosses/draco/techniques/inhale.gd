@@ -41,6 +41,11 @@ extends BossTechnique
 ## 彗星の速さ
 @export_range(0,100000,0.01) var comet_speed := 480.0
 
+## 撃つ弾の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/bolt.tscn")
+## ビームの見た目
+@export var beam_visual: PackedScene = preload("res://scenes/attacks/beam_draco.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 
@@ -124,7 +129,7 @@ class Runner extends BossTechnique.Runner:
 		a.table.facing[a.body] = a.direction.angle()
 		mouth = a.mouth_pos()
 		a.combat_trace.stage("lock", {"scope": "exhale", "aim": [a.aim_target().x, a.aim_target().y]})
-		beam = a.ctx.projectiles.fire_beam(mouth, a.direction.angle(), float(a.rule().reach), float(a.rule().width), float(a.rule().get("beam_warn", 0.5)), float(a.rule().beam_time), float(a.rule().damage) * a.ctx.cfg.atk_scale, Color("#d4bbff"))
+		beam = a.ctx.projectiles.emit_attack(&"beam", [mouth, a.direction.angle(), float(a.rule().reach), float(a.rule().width), float(a.rule().get("beam_warn", 0.5)), float(a.rule().beam_time), float(a.rule().damage) * a.ctx.cfg.atk_scale, Color("#d4bbff")], a.rule().get("beam_visual"))
 		a.ctx.projectiles.hazard_style[beam] = ProjectileSystem.HazardStyle.DRACO
 		a.ctx.projectiles.attach_hazard(beam, a.body)
 		_extend_beam(a)
@@ -139,7 +144,7 @@ class Runner extends BossTechnique.Runner:
 				for j in quota:
 					var angle: float = a.direction.angle() + deg_to_rad(arc.angle_degrees + lerpf(-arc.spread_degrees, arc.spread_degrees, float(j) / maxf(1.0, float(quota) - 1.0)))
 					var origin: Vector2 = mouth + arc.offset.rotated(a.direction.angle()) + Vector2.from_angle(angle) * arc.radius
-					a.ctx.projectiles.fire_bolt(origin, angle, float(a.rule().comet_speed), float(a.rule().damage) * 0.6 * a.ctx.cfg.atk_scale)
+					a.ctx.projectiles.emit_attack(&"bolt", [origin, angle, float(a.rule().comet_speed), float(a.rule().damage) * 0.6 * a.ctx.cfg.atk_scale], a.rule().get("shot_visual"))
 				remaining -= quota
 		stars = 0
 	## 光線の先を口から射程まで伸ばす。判定も同じ長さを使う。

@@ -437,6 +437,8 @@ func _handle_events(events: Array[Dictionary]) -> void:
 		for event in events: minimum += _common_burst_count(event)*2
 		pipeline.sparks.reserve_bursts(minimum)
 	for ev in events:
+		if ev.type == &"attack_visual_end" and ResourceLoader.exists(ev.scene):
+			_attack_visual("", load(ev.scene)).end_effect(ev.phase, ev.pos)
 		for v in _event_visuals.get(ev.type, []):
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
@@ -631,6 +633,7 @@ func _update_fx(dt: float) -> void:
 	shield_transfers = shield_transfers.filter(func(f): return f.life > 0.0)
 	for visual in _attack_visuals.values():
 		visual.update(dt)
+		visual.advance_end_effects(dt)
 
 ## みずがめ座の照射の演出を進める。照射の瞬間に揺れと衝撃波、照射中は細かい揺れ。
 ## 予告中に本体が倒れたら演出をやめ、照射中に倒れたらその場で崩れ始める。
@@ -1197,12 +1200,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	for i in pr.hostile_alive.size():
 		var pos := pr.hostile_pos[i]
 		if pr.hostile_alive[i] != 0 and view.has_point(pos):
-			if not _attack_visual(ProjectileSystem.HostileKind.keys()[pr.hostile_kind[i]]).draw_shot(c, pr, i, pos):
+			if not _attack_visual(ProjectileSystem.HostileKind.keys()[pr.hostile_kind[i]], pr.hostile_visual[i]).render_shot(c, pr, i, pos):
 				_hostile_batch.add(pos, 0.0, pr.hostile_r[i], Color.WHITE)
 			if pr.hostile_stone[i] > 0.0:
 				c.draw_circle(pos, pr.hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
 	_hostile_batch.end()
 	for visual: AttackVisual in _attack_visuals.values(): visual.end_batch()
+	for visual: AttackVisual in _attack_visuals.values(): visual.draw_end_effects(c)
 	_draw_hazards(c, view)
 
 ## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
@@ -1210,7 +1214,7 @@ func _draw_hazards(c: CanvasItem, view: Rect2) -> void:
 	var pr := run.projectiles
 	for i in pr.hazard_alive.size():
 		if pr.hazard_alive[i] != 0:
-			_hazard_visual(pr, i).draw_hazard(c, pr, i, view)
+			_hazard_visual(pr, i).render_hazard(c, pr, i, view)
 
 func _draw_path_band(c: CanvasItem) -> void:
 	# ふたご座：取っておいた1本目と、双子の機体がなぞる線
@@ -1399,10 +1403,10 @@ func _draw_top(c: CanvasItem) -> void:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 
 ## 種類の表示は、その種類を初めて使ったときに作る。
-func _attack_visual(kind: String) -> AttackVisual:
-	var key := kind.to_lower()
+func _attack_visual(kind: String, scene: PackedScene = null) -> AttackVisual:
+	var key := scene.resource_path if scene != null else kind.to_lower()
 	if not _attack_visuals.has(key):
-		var scene_path := "res://scenes/attacks/%s.tscn" % key
+		var scene_path := scene.resource_path if scene != null else "res://scenes/attacks/%s.tscn" % key
 		var visual: AttackVisual = load(scene_path).instantiate()
 		visual.setup(self)
 		_attack_visuals[key] = visual
@@ -1412,7 +1416,7 @@ func _hazard_visual(pr: ProjectileSystem, i: int) -> AttackVisual:
 	var kind: String = ProjectileSystem.HazardKind.keys()[pr.hazard_kind[i]].to_lower()
 	var style: String = ProjectileSystem.HazardStyle.keys()[pr.hazard_style[i]].to_lower()
 	var name := kind + "_" + style
-	return _attack_visual(name if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % name) else kind)
+	return _attack_visual(name if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % name) else kind, pr.hazard_visual[i])
 
 func flood() -> AttackVisual:
 	return _attack_visual("flood")

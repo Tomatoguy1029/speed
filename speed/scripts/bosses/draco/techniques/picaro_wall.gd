@@ -25,6 +25,11 @@ extends BossTechnique
 ## 半径
 @export_range(0,100000,0.01) var radius := 85.0
 
+## 撃つ弾の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/cosmic_arrow.tscn")
+## 着弾の見た目
+@export var blast_visual: PackedScene = preload("res://scenes/attacks/zone.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 
@@ -47,7 +52,7 @@ class Runner extends BossTechnique.Runner:
 	func tick(a: BossActor, dt: float) -> void:
 		if shots < int(a.rule().arrows) and a.elapsed >= shots * float(a.rule().interval):
 			var from: Vector2 = a.table.pos[a.body] + Vector2.from_angle(a.table.facing[a.body]) * 100.0 * a.head_scale
-			a.ctx.projectiles.emit_attack(&"cosmic_arrow", [from, -PI * 0.5, 900.0, 12.0, maxf(1000.0, a.run_state.view_half.y * 2.5), 0.0, true])
+			a.ctx.projectiles.emit_attack(&"cosmic_arrow", [from, -PI * 0.5, 900.0, 12.0, maxf(1000.0, a.run_state.view_half.y * 2.5), 0.0, true], a.rule().get("shot_visual"))
 			var top: float = a.run_state.view_center.y - a.run_state.view_half.y
 			var leave_screen: float = maxf(0.0, from.y - top + 80.0) / 900.0
 			impacts.append({"wait":maxf(float(a.rule().flight), leave_screen + 0.15), "warn":float(a.rule().impact_warn), "pos":Vector2.INF, "age":0.0})
@@ -59,7 +64,7 @@ class Runner extends BossTechnique.Runner:
 				a.combat_trace.stage("lock", {"scope": "arrow_impact", "aim": [impact.pos.x, impact.pos.y]})
 				a.presentation_event.emit({"cue":&"target_locked", "pos":impact.pos, "radius":a.rule().radius})
 			if impact.pos != Vector2.INF and float(impact.age) >= float(impact.wait) + float(impact.warn):
-				a.ctx.projectiles.fire_zone(impact.pos, float(a.rule().radius), 0.0, float(a.rule().damage) * a.ctx.cfg.atk_scale, ProjectileSystem.HazardStyle.BLAST, Color("#b7a3ff"))
+				a.ctx.projectiles.emit_attack(&"zone", [impact.pos, float(a.rule().radius), 0.0, float(a.rule().damage) * a.ctx.cfg.atk_scale, ProjectileSystem.HazardStyle.BLAST, Color("#b7a3ff")], a.rule().get("blast_visual"))
 				a.presentation_event.emit({"cue":&"arrow_impact", "pos":impact.pos, "radius":a.rule().radius})
 				impacts.erase(impact)
 	func end(a: BossActor, cancelled: bool) -> void:

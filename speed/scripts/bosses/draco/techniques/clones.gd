@@ -33,6 +33,7 @@ class Runner extends BossTechnique.Runner:
 		var _time: float:
 			get: return actor.clock
 		var runners := {}
+		var tech: StringName
 		var actor: BossActor
 		var ctx: RunContext
 		var run_state: RunState
@@ -41,12 +42,17 @@ class Runner extends BossTechnique.Runner:
 		var attack_field: Node2D
 		var energy_shader: Shader = preload("res://shaders/hydra_energy.gdshader")
 		var tornado_scene: PackedScene = preload("res://scenes/bosses/hydra_tornado.tscn")
+		func move_settings(id: StringName) -> Resource:
+			for move in MOVES:
+				if move.technique == id: return move
+			return null
 		func move_params(id: StringName) -> Dictionary:
 			for move in MOVES:
 				if move.technique == id: return HYDRA.params.merged(move.values(),true)
 			return HYDRA.params
 		func tracks_during_warn(_id: StringName) -> bool: return true
 		func tick_normal(n: Dictionary, dt: float) -> void:
+			tech = n.mode
 			if not runners.has(n.mode):
 				for move in MOVES:
 					if move.technique == n.mode: runners[n.mode] = move.make_runner()

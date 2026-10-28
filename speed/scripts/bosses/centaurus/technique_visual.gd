@@ -71,4 +71,8 @@ func _draw_rain() -> void:
 		var at := Vector2(arrow.x, arrow.y) - down * float(r.drop_height) * (1.0 - f * f)
 		var opacity := pow(clampf(t / fade, 0.0, 1.0), 3.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
-		LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity)
+		var scene: PackedScene = r.get("shot_visual")
+		var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
+		var mesh: Mesh = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight") if library != null and scene != null else null
+		if mesh != null: draw_mesh(mesh, null, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity))
+		else: LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity)

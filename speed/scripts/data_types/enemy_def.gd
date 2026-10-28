@@ -278,6 +278,8 @@ const PARAMS_DOCS := {
 ## chase（追う）、dash（構えて突進）、split（分裂体を生む）、gunner（距離を保って撃つ）、missile（ミサイルを撃つ）、battleship（扇状に撃つ）、drift（漂う）。
 ## 単位：文字
 @export var behavior: StringName
+## 撃つ弾の見た目。空なら攻撃の種類ごとの共通シーンを使う。
+@export var attack_visual: PackedScene
 ## 同時に出る数の上限
 ## この種類が同時に出ていられる数。0 なら上限なし。強敵を出しすぎないために使う。
 ## 単位：体

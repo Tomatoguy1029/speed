@@ -26,6 +26,9 @@ extends HydraTechnique
 func range_info(p: Dictionary) -> Dictionary:
 	return {"origin": "head", "max": float(p.blade_speed) * float(p.blade_life) + float(p.blade_size)}
 
+## 放つ攻撃の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/hydra_shape.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 

@@ -23,6 +23,9 @@ extends BossTechnique
 ## 矢の速さ
 @export_range(0,100000,0.01) var speed := 800.0
 
+## 撃つ弾の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/star_bolt.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 
@@ -64,7 +67,7 @@ class Runner extends BossTechnique.Runner:
 		if fired:return
 		fired=true
 		for j in positions.size():
-			a.ctx.projectiles.emit_attack(&"star_bolt",[positions[j],angles[j],float(a.rule().speed),float(a.rule().damage)*a.ctx.cfg.atk_scale])
+			a.ctx.projectiles.emit_attack(&"star_bolt",[positions[j],angles[j],float(a.rule().speed),float(a.rule().damage)*a.ctx.cfg.atk_scale], a.rule().get("shot_visual"))
 		MOTION.clear_tell(a)
 	func end(a: BossActor,_cancelled: bool) -> void:
 		MOTION.clear_tell(a)

@@ -37,7 +37,7 @@ func release(host: CentaurusBoss) -> void:
 	var angle := (target - mouth).angle()
 	for offset in host.power_offsets() if power else [0.0]:
 		host.ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle + offset, float(r.speed), float(r.radius), float(r.travel),
-			float(r.damage) * host.ctx.cfg.atk_scale, power])
+			float(r.damage) * host.ctx.cfg.atk_scale, power], host.rule().get("shot_visual"))
 	host.mode = &"shooting"
 	host._cue(&"released")
 

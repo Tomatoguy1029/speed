@@ -23,6 +23,9 @@ extends BossTechnique
 ## 予告（秒）
 @export_range(0,100000,0.01) var warn := 0.6
 
+## 撃つ弾の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/light_arrow.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 

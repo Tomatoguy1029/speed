@@ -707,7 +707,10 @@ func _tick_behavior(b: int, dt: float) -> void:
 				continue
 			var previous_source:=_source_row
 			_source_row=i
+			var prior_visual := projectiles.visual_context
+			projectiles.visual_context = table.def[i].attack_visual
 			behavior.step(i, bdt)
+			projectiles.visual_context = prior_visual
 			_source_row=previous_source
 			if dead[i] != 0:
 				continue

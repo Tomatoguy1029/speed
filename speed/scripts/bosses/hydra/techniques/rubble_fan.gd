@@ -19,6 +19,9 @@ extends HydraTechnique
 ## lump_dmg
 @export_range(0,100000,0.01) var lump_dmg := 16.0
 
+## 放つ攻撃の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/hydra_shape.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 

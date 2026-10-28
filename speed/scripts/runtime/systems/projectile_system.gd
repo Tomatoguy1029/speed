@@ -77,6 +77,7 @@ var hostile_slow := PackedFloat32Array()
 ## 誘導の曲がる速さ（ミサイル）
 var hostile_turn := PackedFloat32Array()
 var hostile_kind := PackedByteArray()
+var hostile_visual: Array = []
 ## 天体の表面までの余裕の下限。これが移動量より大きい間は天体の判定を省く
 var hostile_gap := PackedFloat32Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は止まり、触れると砕けて被弾しない）
@@ -116,6 +117,7 @@ const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 const ZONE_FLASH := 0.25
 var hazard_alive := PackedByteArray()
 var hazard_kind := PackedByteArray()
+var hazard_visual: Array = []
 var hazard_style := PackedByteArray()
 var hazard_pos := PackedVector2Array()
 var hazard_angle := PackedFloat32Array()
@@ -157,10 +159,16 @@ var _attack_kinds: Dictionary = {}
 func register_attack(kind: StringName, attack: AttackKind) -> void:
 	_attack_kinds[kind] = attack
 
-func emit_attack(kind: StringName, args: Array) -> Variant:
+var visual_context: PackedScene
+
+func emit_attack(kind: StringName, args: Array, visual: PackedScene = null) -> Variant:
 	if not _attack_kinds.has(kind):
 		register_attack(kind, load("res://scripts/attacks/%s.gd" % kind).new())
-	return _attack_kinds[kind].emit(self, args)
+	var previous := visual_context
+	if visual != null: visual_context = visual
+	var result: Variant = _attack_kinds[kind].emit(self, args)
+	visual_context = previous
+	return result
 
 func attached_attack(kind: StringName) -> RunSystem:
 	if not _attached_attacks.has(kind):
@@ -407,6 +415,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_slow[i] = slow
 	hostile_turn[i] = turn
 	hostile_kind[i] = kind
+	hostile_visual[i] = visual_context
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
@@ -440,7 +449,7 @@ func _update_hostile(dt: float) -> void:
 		var life := hostile_life[i]
 		if life <= 0.0:
 			# バリアで消された弾
-			_combat_end(_combat_hostiles, i, "removed_before_contact", hostile_pos[i])
+			_end_hostile(i, "removed_before_contact", hostile_pos[i])
 			hostile_slots.release(i)
 			i += 1
 			continue
@@ -449,7 +458,7 @@ func _update_hostile(dt: float) -> void:
 			hostile_stone[i] -= dt
 			var reach_s := hostile_r[i] + R
 			if ship_pos.distance_squared_to(from) <= reach_s * reach_s:
-				_combat_end(_combat_hostiles, i, "petrified", from)
+				_end_hostile(i, "petrified", from)
 				hostile_slots.release(i)
 			i += 1
 			continue
@@ -491,7 +500,7 @@ func _update_hostile(dt: float) -> void:
 		if body_hit != null or life <= 0.0:
 			# 飛びきるか何かに当たった位置で消える（圧縮弾はそこで破裂する）
 			shape.on_end(self, i, to if body_hit == null else from + (to - from) * float(body_hit.t), life <= 0.0)
-			_combat_end(_combat_hostiles, i, "contact" if stop != null else "obstacle" if body_hit != null else "lifetime_or_view_exit", to)
+			_end_hostile(i, "contact" if stop != null else "obstacle" if body_hit != null else "lifetime_or_view_exit", to)
 			hostile_slots.release(i)
 		else:
 			hostile_pos[i] = to
@@ -640,6 +649,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	if director != null:
 		lab_hazard_group[i] = lab_context
 	hazard_kind[i] = kind
+	hazard_visual[i] = visual_context
 	hazard_style[i] = style
 	hazard_pos[i] = pos
 	hazard_angle[i] = angle
@@ -746,3 +756,9 @@ func _combat_end(records: Dictionary, row: int, reason: String, pos: Vector2) ->
 func clear_combat_observations(reason := "recording_end") -> void:
 	for row: int in _combat_hostiles.keys(): _combat_end(_combat_hostiles, row, reason, hostile_pos[row])
 	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])
+
+func _end_hostile(row: int, reason: String, at: Vector2) -> void:
+	var scene: PackedScene = hostile_visual[row]
+	if scene != null:
+		state.emit(&"attack_visual_end", {"scene": scene.resource_path, "phase": "Hit" if reason in ["contact", "obstacle"] else "Fade", "pos": at})
+	_combat_end(_combat_hostiles, row, reason, at)

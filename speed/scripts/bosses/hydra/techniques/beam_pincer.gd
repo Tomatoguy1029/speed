@@ -25,6 +25,9 @@ extends HydraTechnique
 ## 予告（秒）
 @export_range(0,100000,0.01) var warning_time := 0.8
 
+## 放つ攻撃の見た目
+@export var shot_visual: PackedScene = preload("res://scenes/attacks/hydra_shape.tscn")
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 
