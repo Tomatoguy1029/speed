@@ -1,39 +1,47 @@
-[gd_resource type="Resource" load_steps=2 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_flow_def.gd" id="1"]
+[gd_resource type="Resource" format=3 uid="uid://bpaa45k6kf01x"]
+
+[ext_resource type="Script" uid="uid://eeodn8akgqcw" path="res://scripts/data_types/boss_flow_def.gd" id="1"]
+
 [resource]
 script = ExtResource("1")
-maximum_stamina = 6.0
 partial_rest = 0.8
 empty_rest = 2.0
 sections = [{
-"name": "牽制",
-"request": "normal",
-"cap": 1.0,
-"section_budget": 2.0,
 "action_count": 2,
 "action_interval": 0.2,
-"no_candidate_timeout": 0.3,
+"cap": 1.0,
+"name": "牽制",
 "next": 1,
-"weights": {"single": 100.0}
+"no_candidate_timeout": 0.3,
+"request": "normal",
+"section_budget": 2.0,
+"weights": {
+"single": 100.0
+}
 }, {
-"name": "機動とピカロの圧力",
-"request": "any",
-"cap": 2.0,
 "action_count": 1,
-"no_candidate_timeout": 0.8,
+"cap": 2.0,
+"name": "圧力",
 "next": 2,
-"weights": {"single": 45.0, "major": 55.0}
+"no_candidate_timeout": 0.8,
+"request": "any",
+"weights": {
+"major": 55.0,
+"single": 45.0
+}
 }, {
-"name": "山場",
-"request": "major",
-"cap": 2.0,
 "action_count": 1,
-"no_candidate_timeout": 1.0,
+"cap": 2.0,
+"name": "山場",
 "next": 3,
-"weights": {"major": 100.0}
+"no_candidate_timeout": 1.0,
+"request": "major",
+"weights": {
+"major": 100.0
+}
 }, {
-"name": "反撃の間",
-"request": "rest",
+"name": "休息",
 "next": 0,
+"request": "rest",
 "weights": {}
 }]

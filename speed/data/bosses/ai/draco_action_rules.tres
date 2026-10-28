@@ -1,6 +1,6 @@
-[gd_resource type="Resource" format=3 uid="uid://ctkhtt7jw5dyx"]
+[gd_resource type="Resource" format=3]
 
-[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/bite.tres" id="2"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/breath.tres" id="move_breath"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/charge.tres" id="move_charge"]
@@ -55,6 +55,7 @@ conditions = {
 "inhale": {
 "angle": 0.0,
 "half_angle": 180.0,
+"max": 1000.0,
 "max_phase": 3,
 "min": 0.0,
 "min_phase": 3
@@ -62,6 +63,7 @@ conditions = {
 "leap": {
 "angle": 0.0,
 "half_angle": 180.0,
+"max": 600.0,
 "min": 0.0,
 "min_phase": 1
 },
@@ -84,6 +86,7 @@ conditions = {
 "rifts": {
 "angle": 0.0,
 "half_angle": 180.0,
+"max": 600.0,
 "min": 0.0,
 "min_phase": 1
 },
@@ -137,21 +140,21 @@ layout = {
 "bite": Vector2(540, 1057),
 "breath": Vector2(3276, 432),
 "charge": Vector2(2364, 752),
-"choose_combo": Vector2(40, 116),
+"choose_combo": Vector2(40, 120),
 "choose_major": Vector2(952, 116),
-"choose_major_2": Vector2(1864, 116),
+"choose_major_2": Vector2(1860, 116),
 "choose_normal": Vector2(2776, 116),
 "choose_normal_2": Vector2(40, 425),
 "clones": Vector2(1452, 748),
 "inhale": Vector2(1452, 432),
 "leap": Vector2(2364, 432),
 "meteor": Vector2(3276, 116),
-"picaro_wall": Vector2(1452, 1064),
-"rifts": Vector2(2364, 116),
-"spiral": Vector2(1452, 116),
+"picaro_wall": Vector2(1452, 1068),
+"rifts": Vector2(2364, 112),
+"spiral": Vector2(1452, 112),
 "star_fan": Vector2(540, 425),
 "tail_slam": Vector2(3276, 748),
-"tail_sweep": Vector2(540, 741)
+"tail_sweep": Vector2(540, 737)
 }
 condition_groups = {
 "choose_combo": {

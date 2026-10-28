@@ -1,4 +1,4 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" script_class="BossTechnique" format=3 uid="uid://dlfrbgea3gijn"]
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/rifts.gd" id="1"]
 
@@ -9,18 +9,18 @@ script = ExtResource("1")
 technique = &"rifts"
 category = &"major"
 display_name = "三本爪の亀裂"
-warn = 0.7
 active = 3.8
 claw_angle = 0.0666
 claw_count = 3
 claw_gap = 70.0
 claw_offset = 135.0
 claw_overshoot = 125.0
-recover = 0.7
 damage = 30.0
-reach = 1500.0
-width = 24.0
 interval = 0.4
+reach = 1500.06
+recover = 0.7
 scratch_time = 0.32
 scratch_width = 30.0
+warn = 0.7
+width = 24.0
 visual = ExtResource("visual")
