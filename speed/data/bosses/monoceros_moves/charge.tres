@@ -1,15 +1,17 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_m6gi3"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/charge.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/charge_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_m6gi3")
+script = ExtResource("1")
 technique = &"charge"
-parameters = {
-"active": 0.85,
-"cd": 3.0,
-"damage": 25.0,
-"distance": 1250.0,
-"recover": 1.5,
-"warn": 1.05
-}
+display_name = "突進"
+active = 0.85
+cd = 3.0
+damage = 25.0
+distance = 1250.0
+recover = 1.5
+warn = 1.05
+visual = ExtResource("visual")
