@@ -21,6 +21,7 @@ static func _attack(paths: Dictionary, kind: String) -> void:
 	if kind in ["zone", "beam"]:
 		for file in DirAccess.get_files_at("res://scripts/render/attacks"):
 			if file.begins_with(kind + "_") and file.ends_with(".gd") and file != "beam_flood.gd":
+				_add(paths, "res://scenes/attacks/" + file.get_basename() + ".tscn")
 				_script(paths, "res://scripts/render/attacks/" + file)
 	if kind in ["enemy", "ring_hold", "lump"]:
 		_script(paths, "res://scripts/attacks/bullet.gd")

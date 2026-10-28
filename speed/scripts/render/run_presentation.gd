@@ -1403,7 +1403,7 @@ func _attack_visual(kind: String) -> AttackVisual:
 	var key := kind.to_lower()
 	if not _attack_visuals.has(key):
 		var scene_path := "res://scenes/attacks/%s.tscn" % key
-		var visual: AttackVisual = load(scene_path).instantiate() if ResourceLoader.exists(scene_path) else load("res://scripts/render/attacks/%s.gd" % key).new()
+		var visual: AttackVisual = load(scene_path).instantiate()
 		visual.setup(self)
 		_attack_visuals[key] = visual
 	return _attack_visuals[key]
@@ -1412,7 +1412,7 @@ func _hazard_visual(pr: ProjectileSystem, i: int) -> AttackVisual:
 	var kind: String = ProjectileSystem.HazardKind.keys()[pr.hazard_kind[i]].to_lower()
 	var style: String = ProjectileSystem.HazardStyle.keys()[pr.hazard_style[i]].to_lower()
 	var name := kind + "_" + style
-	return _attack_visual(name if ResourceLoader.exists("res://scripts/render/attacks/%s.gd" % name) else kind)
+	return _attack_visual(name if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % name) else kind)
 
 func flood() -> AttackVisual:
 	return _attack_visual("flood")
