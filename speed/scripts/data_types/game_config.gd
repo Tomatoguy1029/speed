@@ -451,10 +451,10 @@ extends Resource
 ## 単位：単位（距離）
 @export var max_enemy_radius: float
 
-## 大型の敵を倒したときに飛ぶ、攻撃する破片
+## 吹き飛ばし衝角（W03）で倒した大型の敵と、敵のギミックから飛ぶ、攻撃する破片
 @export_group("大型の敵の破片")
 ## 破片が出る大きさ
-## 半径がこれ以上の敵を倒すと、攻撃する破片が飛ぶ。
+## 吹き飛ばし衝角で、半径がこれ以上の敵を倒すと、攻撃する破片が飛ぶ。
 ## 単位：単位（距離）
 @export var hull_debris_min_radius: float
 ## 破片の最大数
@@ -465,18 +465,6 @@ extends Resource
 ## 破片が飛んでいる時間。
 ## 単位：世界秒
 @export var hull_debris_life: float
-## 破片の威力
-## 破片のダメージ ＝ 攻撃力 × この値。
-## 単位：倍
-@export var hull_debris_damage: float
-## 破片の速さ
-## 普通に倒したときの破片の初速。
-## 単位：単位/秒
-@export var hull_debris_speed: float
-## 強い攻撃での破片の速さ
-## ソニックブーム・クリティカルランスで倒したときの破片の初速。
-## 単位：単位/秒
-@export var hull_debris_force_speed: float
 ## 破片の吹き飛ばし
 ## 破片が当たった敵を吹き飛ばす強さ。
 ## 単位：単位/秒

@@ -368,16 +368,12 @@ func kill_enemy(i: int, opts := {}) -> void:
 	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
-	# 大型の敵の撃破では、攻撃する破片が飛ぶ（仕様書 11.6）
-	# 質量牽引砲（W21）が船体を牽引したら、破片も死体も出さない
+	# 質量牽引砲（W21）が船体を牽引したら、吹き飛ばし衝角（W03）の破片も死体も出さない
 	# 残像の追撃は直撃だけで完結させ、牽引・攻撃破片・撃破発動の武器/特性を複製しない。
 	if cause == &"afterimage":
 		t.hull_scattered[i] = 1
 	elif build.capture_hull(i):
 		t.hull_scattered[i] = 1
-	elif cause != &"hullDebris" and cause != &"towShot" and not (cause == &"ram" and state.weapons.has(&"W03")):
-		var speed := cfg.hull_debris_force_speed if FORCEFUL.has(cause) else cfg.hull_debris_speed
-		projectiles.scatter_hull(i, dir, speed, attack_power() * cfg.hull_debris_damage)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
 	if cause != &"afterimage":

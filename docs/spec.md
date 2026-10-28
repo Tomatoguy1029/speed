@@ -406,11 +406,13 @@ T09の増分は特性自身の `per_stack`・`late_per_stack` を使い、特性
 - 体当たりや攻撃で敵が吹き飛ぶ強さは、星ごとの倍率（`config.rank_knockback`、左から星1、星2、…）を掛けたもの。星6以上は吹き飛ばない。星のない敵（障害物・部位など）は倍率 1。吹き飛ばし衝角（W03）で押し出す勢いにも同じ倍率を掛ける。
 - ソニックブーム・クリティカルランスを受けて生き残った雑魚は、0.3世界秒だけ追跡をやめて吹き飛んだ勢いを保つ（ボスを除く）。
 
-### 11.6 大型の敵を倒したときの破片
+### 11.6 攻撃する破片
 
-- 半径 `config.hull_debris_min_radius` 以上の通常の敵を倒すと、ceil（半径 ÷ 12）個（6個以上、`config.hull_debris_max_pieces` 個まで）の攻撃する破片が飛ぶ。
-- 初速 `config.hull_debris_speed`（ソニックブーム・クリティカルランスでの撃破は `config.hull_debris_force_speed`、吹き飛ばし衝角での接触撃破は W03 の値）。攻撃の方向がある場合はその方向へ `config.hull_debris_spread` 度の扇状に、方向がない場合は全周へ飛ぶ。
-- 破片は `config.hull_debris_life` 世界秒残り、威力 A × `config.hull_debris_damage`、敵を貫き、吹き飛ばし `config.hull_debris_knock` で周りを巻き込む。
+攻撃する破片は、吹き飛ばし衝角（W03）で倒した大型の敵と、破片を出すギミックを持つ敵（ポンプ座・うみへび座）から飛ぶ。
+
+- 吹き飛ばし衝角の接触で、半径 `config.hull_debris_min_radius` 以上の通常の敵を倒すと、ceil（半径 ÷ 12）個（6個以上、`config.hull_debris_max_pieces` 個まで）の破片が、体当たりの向きへ `config.hull_debris_spread` 度の扇状に飛ぶ。初速と威力は W03 の値を使う。それより小さい敵は、死体を1つ飛ばす。
+- ギミックの破片の数・速さ・威力は、各敵の行動の値で決める。
+- 破片は `config.hull_debris_life` 世界秒残り、敵を貫き、吹き飛ばし `config.hull_debris_knock` で周りを巻き込む。
 - 破片で倒した敵からは破片を出さない。隕石とボスは対象外。クリティカルは乗らない。
 
 ### 11.7 敵の攻撃の形

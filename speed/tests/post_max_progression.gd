@@ -316,7 +316,7 @@ func _test_collision_and_pickups() -> void:
 	var beam: WeaponBehavior = run.loadout.weapon_behaviors[&"W22"]
 	_check(is_equal_approx(tow.p("capture_radius"), float(tow.def.params.capture_radius) * 1.05), "W21は回収判定の半径を拡大")
 	_check(is_equal_approx(beam.p("width"), float(beam.def.params.width) * 1.05), "W22は実判定ビーム幅を拡大")
-	# W03で飛ばす船体は、汎用の撃破破片と異なる補正を受ける。
+	# W03で飛ばす船体と破片は、W03の値に追加強化の補正を受ける。
 	var ram: WeaponBehavior = run.loadout.weapon_behaviors[&"W03"]
 	var corpse := run.enemies.spawn(run.enemies.def_of(&"biter"), Vector2(300, 300))
 	t.dead[corpse] = 1
