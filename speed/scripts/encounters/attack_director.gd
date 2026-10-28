@@ -7,6 +7,7 @@ extends RefCounted
 const FLOAT_ROUNDING := 4.0 * 2.220446049250313e-16
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
 const BEHAVIORS := {
+	"biter": ["zone"], "defender": ["zone"], "hound": ["zone"], "auriga": ["residue"],
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
@@ -119,7 +120,9 @@ func _next_owner() -> String:
 
 ## cost はownerのvalue（個体、または共有override群れ。省略時は1）。
 func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0, cost := -1.0) -> bool:
-	if cats.is_empty():
+	if not is_finite(cost) or cost < 0.0:
+		cost = 1.0
+	if cost == 0.0 or cats.is_empty():
 		return true
 	if owners.has(owner):
 		var group: Dictionary = groups[owners[owner]]
@@ -138,8 +141,6 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 		if enabled:
 			reasons[owner] = TranslationServer.translate("lab.message_eb3d91decb")
 			return false
-	if not is_finite(cost) or cost < 0.0:
-		cost = 1.0
 	queue(owner, cats, row, id, priority)
 	waiting[owner].cost = cost
 	if enabled:

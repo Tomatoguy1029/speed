@@ -640,7 +640,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.ui.stage&#95;time | 時間帯 | Stage phases |
 | lab.ui.formation | 敵の組み合わせ | Enemy formations |
 | lab.attack.jitter | 待ち方のばらつき（秒） | Wait jitter (s) |
-| lab.attack.danger | 攻撃の重さ（強敵と大物） | Attack weight (strong and big enemies) |
+| lab.attack.danger | 攻撃の重さ | Attack weight |
 | lab.attack.used | 重さ %.1f / %.1f | Weight %.1f / %.1f |
 | lab.formation.layout | 配置 | Layout |
 

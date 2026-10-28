@@ -624,7 +624,7 @@ lab.ui.loadout,装備・英雄,Loadout and hero
 lab.ui.stage_time,時間帯,Stage phases
 lab.ui.formation,敵の組み合わせ,Enemy formations
 lab.attack.jitter,待ち方のばらつき（秒）,Wait jitter (s)
-lab.attack.danger,攻撃の重さ（強敵と大物）,Attack weight (strong and big enemies)
+lab.attack.danger,攻撃の重さ,Attack weight
 lab.attack.used,重さ %.1f / %.1f,Weight %.1f / %.1f
 lab.formation.layout,配置,Layout
 lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (-1 soft, 0 standard, 1 hard)

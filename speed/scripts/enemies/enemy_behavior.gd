@@ -15,7 +15,7 @@ var index := 0
 var custom_loop := false
 ## 高速移動など、画面外でも行動と移動区間の判定を毎回進める種類。
 var full_rate := false
-## 強敵（rank 3 以上）は、攻撃の枠を取ってから動く。自分で枠を取る種類は false
+## 正の実効valueを持つ攻撃は枠を取ってから動く。自分で枠を取る種類は false
 var admission := true
 ## ほかの種類の行が倒れた・空きに戻ったことも on_row_gone() で知りたいか（ほかの敵を抱える種類）
 var watches_rows := false
@@ -106,6 +106,10 @@ func admit_due(i: int, dt: float) -> bool:
 func admit_duration(i: int) -> float:
 	var p: Dictionary = table.def[i].params
 	return float(p.get("telegraph", p.get("windup", 0))) + float(p.get("dash_time", p.get("beam_time", p.get("blast_delay", 0.2)))) + 0.1
+
+## 攻撃の許可を待っている間の移動。種類固有の距離の取り方は派生側で保つ。
+func wait_for_attack(i: int, dt: float) -> void:
+	_chase(i, dt)
 
 ## 隕石が増えた（隕石を遮る物として見る種類が使う）。
 func rocks_changed() -> void:

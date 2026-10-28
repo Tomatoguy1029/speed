@@ -649,6 +649,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var rows: PackedInt32Array = beh_rows[b]
 	var behavior := behaviors[b]
 	var managed := behavior.admission
+	var formation_mode: bool = projectiles.director != null and projectiles.director.formation_mode
 	var t := table
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -693,14 +694,15 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			motion._update_pushed(i, dt)
 		else:
-			var needs_admission := managed and t.def[i].rank >= 3
+			var cost: float = t.attack_value[i] if formation_mode else t.def[i].attack_weight
+			var needs_admission := managed and cost > 0.0
 			if managed and not needs_admission:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
 				if t.type[i] == &"aquila":
 					behavior.call(&"cruise", i, bdt)
 				else:
-					motion._chase(i, bdt)
+					behavior.wait_for_attack(i, bdt)
 				pos[i] += vel[i] * dt
 				if motion._near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 					field.collide_enemy(i, from)
@@ -761,22 +763,23 @@ func _lab_owner(i: int) -> String:
 	var d = projectiles.director
 	return "formation:%d" % table.attack_group[i] if d != null and d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
 
-## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
+## 正の実効valueを持つ攻撃は予告前に許可を取る。value 0は管理用の枠や待機を作らず通す。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
 	projectiles.lab_context = 0
 	var def := table.def[i]
-	if def == null:
+	if def == null or d == null:
 		return true
-	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
-	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
+	var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
+	if cost <= 0.0:
+		return true
+	var cats: Array = d.categories(def.behavior)
 	if cats.is_empty():
 		return true
 	var owner := _lab_owner(i)
 	var behavior := behaviors[table.beh[i]]
 	if not behavior.admit_active(i, d, owner) and behavior.admit_due(i, dt):
 		var duration := behavior.admit_duration(i)
-		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
 		var priority := table.attack_priority[i]
 		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, priority, cost):
 			table.charge[i] = 0

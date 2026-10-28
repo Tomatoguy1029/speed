@@ -1,6 +1,9 @@
 ## 波動の敵：距離を保ち、間隔ごとに止まって、1枚の輪か扇を出す。
 extends EnemyBehavior
 
+func wait_for_attack(i: int, dt: float) -> void:
+	_keep_distance(i, dt)
+
 func step(i: int, dt: float) -> void:
 	if table.mode[i] == EnemyTable.Mode.MOVE:
 		_keep_distance(i, dt)

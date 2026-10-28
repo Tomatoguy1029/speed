@@ -184,8 +184,9 @@ func _ready() -> void:
 	precision.owners.clear()
 	precision.waiting.clear()
 	precision.configure({"enabled": true, "budget": 0.0, "jitter": 0.0})
-	check(not precision.request("zero", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 0.0),
-		"予算0はvalue0の新規能動攻撃も開始しない")
+	check(precision.request("zero", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 0.0)
+		and precision.groups.is_empty() and precision.waiting.is_empty(),
+		"予算0でもvalue0は枠と待機を作らず通す")
 	check(not precision.request("tiny", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 1e-18),
 		"予算0で微小な正valueを無料扱いしない")
 	precision.waiting.clear()

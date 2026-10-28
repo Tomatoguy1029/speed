@@ -5,6 +5,9 @@ func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 	super(system, behavior_name, idx)
 	custom_loop = true
 
+func admit_duration(i: int) -> float:
+	return float(table.def[i].params.bite_telegraph) + 0.1
+
 ## 噛みつく雑魚（小さなヘビなど。ステージごとに見た目だけ変える）：追ってきて、機体が噛みつける距離に入ると一瞬光って構え（WINDUP）、
 ## その場で小さく噛みつく（体の前の小さな範囲が一瞬当たる）。噛みついたあとは少し休む（RECOVER）。弾は出さない。
 ## 数の多い雑魚なので、関数をまとめて呼ばずにここで計算する。定義の数値は、同じ定義が続くあいだは読み直さない。
@@ -30,6 +33,8 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	var timer := t.timer
 	var charge := t.charge
 	var now := state.world_time
+	var director = projectiles.director
+	var formation_mode: bool = director != null and director.formation_mode
 	var body_move := field.body_speed_max
 	var body_gap := t.body_gap
 	var body_gap_pos := t.body_gap_pos
@@ -57,6 +62,11 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 		if flash[i] > 0.0:
 			flash[i] -= dt
 		var from := pos[i]
+		# 出現時に解決したvalueが0なら、枠・待機・追跡へ入れない。
+		var cost: float = t.attack_value[i] if formation_mode else t.def[i].attack_weight
+		projectiles.lab_context = 0
+		if cost > 0.0 and director != null and mode[i] == EnemyTable.Mode.WINDUP:
+			projectiles.lab_context = director.token(m._lab_owner(i))
 		# 画面から遠い敵は、m.LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
 		var bdt := dt
 		var rel := from - vc
@@ -107,9 +117,10 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				else:
 					var reach := r[i] + reach_add
 					if dist * dist <= reach * reach:
-						mode[i] = EnemyTable.Mode.WINDUP
-						timer[i] = telegraph
-						flash[i] = 0.1
+						if cost <= 0.0 or _lab_admit(i, bdt):
+							mode[i] = EnemyTable.Mode.WINDUP
+							timer[i] = telegraph
+							flash[i] = 0.1
 			if dead[i] != 0:
 				continue
 			pos[i] += vel[i] * dt
@@ -124,6 +135,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 		body_gap_time[i] = now
 		if gap < margin:
 			field.collide_enemy(i, from)
+	projectiles.lab_context = 0
 
 ## 機体へまっすぐ、決まった速さで向かう（_chase と同じ）。
 func _pursuit_velocity(i: int, ship: Vector2, _dt: float) -> Vector2:
