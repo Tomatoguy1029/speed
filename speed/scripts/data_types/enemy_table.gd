@@ -32,6 +32,8 @@ var meteor_index := PackedInt32Array()
 var attack_group := PackedInt32Array()
 ## 個体の攻撃value、またはoverride群れが共有するvalue。
 var attack_value := PackedFloat64Array()
+## 予算管理の対象。生成済み設定か実験場の編集時に解決する。
+var attack_managed := PackedByteArray()
 ## 出現元から引き継いだ攻撃待ちの優先度。0も独立した値として持つ。
 var attack_priority := PackedFloat64Array()
 ## 1 なら撃破済み（その回の終わりに空きへ戻る）

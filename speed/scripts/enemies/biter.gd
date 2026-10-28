@@ -34,7 +34,6 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	var charge := t.charge
 	var now := state.world_time
 	var director = projectiles.director
-	var formation_mode: bool = director != null and director.formation_mode
 	var body_move := field.body_speed_max
 	var body_gap := t.body_gap
 	var body_gap_pos := t.body_gap_pos
@@ -63,9 +62,9 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 			flash[i] -= dt
 		var from := pos[i]
 		# 出現時に解決したvalueが0なら、枠・待機・追跡へ入れない。
-		var cost: float = t.attack_value[i] if formation_mode else t.def[i].attack_weight
+		var managed := t.attack_managed[i] != 0
 		projectiles.lab_context = 0
-		if cost > 0.0 and director != null and mode[i] == EnemyTable.Mode.WINDUP:
+		if managed and director != null and mode[i] == EnemyTable.Mode.WINDUP:
 			projectiles.lab_context = director.token(m._lab_owner(i))
 		# 画面から遠い敵は、m.LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
 		var bdt := dt
@@ -117,7 +116,7 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 				else:
 					var reach := r[i] + reach_add
 					if dist * dist <= reach * reach:
-						if cost <= 0.0 or _lab_admit(i, bdt):
+						if not managed or _lab_admit(i, bdt):
 							mode[i] = EnemyTable.Mode.WINDUP
 							timer[i] = telegraph
 							flash[i] = 0.1

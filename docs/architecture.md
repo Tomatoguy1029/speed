@@ -392,7 +392,8 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `is_boss` | ボス | ボスの当たり判定の行か |
 | `meteor_index` | 隕石・鉄のがれき・回る丸鋸 | `FieldSystem` の配置の通し番号（それ以外は -1）。0 以上なら固い障害物として扱う |
 | `attack_group` | 強敵 | 共有override群れの通し番号。個体ごとに消費する場合は0 |
-| `attack_value` | 強敵 | 個体の攻撃value、またはoverride群れが共有するvalue（小数） |
+| `attack_value` | 通常敵 | 個体の攻撃value、またはoverride群れが共有するvalue（小数） |
+| `attack_managed` | 通常敵 | 予算管理の対象か。生成済みの設定、または実験場の編集値から解決する |
 | `attack_priority` | 強敵とその派生個体 | 出現元から引き継ぐ攻撃待ちの優先度。クリップの値を優先し、クリップ以外は種類別の値を出現時に確定する |
 | `dead` | 全部 | 撃破済みか（その回の終わりに空きへ戻る） |
 | `elite` | 雑魚 | エリートか |

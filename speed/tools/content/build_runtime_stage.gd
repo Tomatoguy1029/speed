@@ -19,6 +19,7 @@ static func clip(source: SpawnClip) -> RuntimeClip:
 		for index in source.allowed_layouts(scene.resource_path, data):
 			var layout: Dictionary = data.layouts[index].duplicate(true)
 			layout.value = source.formation_value(scene.resource_path, str(layout.get("name", "")))
+			layout.attack_managed = layout.value > 0.0
 			layout.erase("name")
 			layouts.append(layout)
 		if not layouts.is_empty():
@@ -32,6 +33,8 @@ static func compile(source: StageDef, output := "res://.content") -> RuntimeStag
 		if property.name in ["script", "resource_path", "resource_name", "resource_local_to_scene", "clips", "phases", "track_names", "scene_path", "backgrounds"]: continue
 		var value: Variant = source.get(property.name)
 		result.set(property.name, value.duplicate(true) if value is Dictionary or value is Array else value)
+	for id in source.enemy_attack_values:
+		result.attack_managed_by_type[String(id)] = source.enemy_attack_value(StringName(id)) > 0.0
 	for placement in source.backgrounds:
 		result.backgrounds.append(preload("res://tools/content/prepare_background.gd").compile(placement))
 	result.zako_curves = []

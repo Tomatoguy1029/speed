@@ -144,6 +144,14 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 		t.attack_value[i] = float(opts.get("attack_value", 1.0))
 	else:
 		t.attack_value[i] = state.stage.enemy_attack_value(def.id) if state.stage != null else 1.0
+	if projectiles.director != null and not projectiles.director.formation_mode:
+		t.attack_managed[i] = int(def.attack_weight > 0.0)
+	elif t.attack_group[i] > 0:
+		t.attack_managed[i] = int(opts.get("attack_managed", t.attack_value[i] > 0.0))
+	elif state.stage is RuntimeStage:
+		t.attack_managed[i] = int(state.stage.attack_managed_by_type.get(String(def.id), true))
+	else:
+		t.attack_managed[i] = int(t.attack_value[i] > 0.0)
 	apply_scaling(i, def, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
@@ -255,6 +263,7 @@ func _reset_row(i: int) -> void:
 	t.meteor_index[i] = -1
 	t.attack_group[i] = 0
 	t.attack_value[i] = 1
+	t.attack_managed[i] = 1
 	t.attack_priority[i] = 0
 	t.dead[i] = 0
 	t.elite[i] = 0
@@ -649,7 +658,6 @@ func _tick_behavior(b: int, dt: float) -> void:
 	var rows: PackedInt32Array = beh_rows[b]
 	var behavior := behaviors[b]
 	var managed := behavior.admission
-	var formation_mode: bool = projectiles.director != null and projectiles.director.formation_mode
 	var t := table
 	var now := state.world_time
 	var body_move := field.body_speed_max
@@ -694,8 +702,7 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			motion._update_pushed(i, dt)
 		else:
-			var cost: float = t.attack_value[i] if formation_mode else t.def[i].attack_weight
-			var needs_admission := managed and cost > 0.0
+			var needs_admission := managed and t.attack_managed[i] != 0
 			if managed and not needs_admission:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
@@ -770,9 +777,9 @@ func _lab_admit(i: int, dt: float) -> bool:
 	var def := table.def[i]
 	if def == null or d == null:
 		return true
-	var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
-	if cost <= 0.0:
+	if table.attack_managed[i] == 0:
 		return true
+	var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
 	var cats: Array = d.categories(def.behavior)
 	if cats.is_empty():
 		return true

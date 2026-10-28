@@ -74,6 +74,7 @@ func _ready() -> void:
 	var prepared = load("res://tools/content/build_runtime_stage.gd").clip(prepared_clip)
 	check(prepared.prepared.size() == 1 and prepared.prepared[0].layouts[0].value == 0.0,
 		"Build-time RuntimeClip keeps a zero shared override")
+	check(not prepared.prepared[0].layouts[0].attack_managed, "共有value 0は生成時に管理対象外と確定する")
 	var d = load("res://scripts/encounters/attack_director.gd").new()
 	d.state = lab.run.state
 	d.projectiles = pm
@@ -135,6 +136,12 @@ func _ready() -> void:
 		"予算0でもvalue 0の群れは管理対象外として動く")
 	check(stage.enemy_attack_value(&"unspecified") == 1.0, "Unspecified type uses transparent compatibility default")
 	_check_light_attacks(lab)
+	var lab_row := em.spawn(em.def_of(&"pulser"), Vector2(260, 0))
+	pm.director.formation_mode = false
+	lab._edit_definition({"type": "pulser", "key": "attack_weight", "value": 0.0})
+	check(em.table.attack_managed[lab_row] == 0, "実験場で0へ変更すると管理対象外へ更新する")
+	lab._edit_definition({"type": "pulser", "key": "attack_weight", "value": 0.5})
+	check(em.table.attack_managed[lab_row] == 1, "実験場で正の値へ変更すると管理対象へ更新する")
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[attack_values] %d checks, %d failures" % [checks, failed])

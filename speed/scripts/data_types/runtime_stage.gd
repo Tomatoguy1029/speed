@@ -4,3 +4,6 @@
 class_name RuntimeStage
 extends StageDef
 @export var resources: StageResources
+
+## 種類別の予算管理対象をビルド時に解決する。未指定は互換値1のため対象。
+@export_storage var attack_managed_by_type: Dictionary = {}

@@ -583,6 +583,8 @@ func _edit_definition(args: Dictionary) -> void:
 			var field := key.trim_prefix("visual.")
 			t.r[i] *= def.visual_value(field, 1.0) / old.visual_value(field, 1.0)
 		t.def[i] = def
+		if key == "attack_weight":
+			t.attack_managed[i] = int(def.attack_weight > 0.0)
 
 func row_for_id(id: int) -> int:
 	var t := run.enemies.table

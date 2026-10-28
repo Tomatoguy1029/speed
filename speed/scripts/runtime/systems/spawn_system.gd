@@ -196,7 +196,7 @@ func _pick_weighted(items: Array) -> int:
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
 ## priorityが数値なら0を含めて群れ全員へ渡す。nullならステージの種類別優先度を使う。
-func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null) -> PackedInt32Array:
+func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null, attack_managed: Variant = null) -> PackedInt32Array:
 	var rows := PackedInt32Array()
 	var group := enemies._next_id if value >= 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
@@ -222,6 +222,8 @@ func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: A
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
 		var opts := {"facing": facing, "attack_group": group, "attack_value": value}
+		if attack_managed != null and group > 0:
+			opts.attack_managed = attack_managed
 		if priority != null:
 			opts.attack_priority = priority
 		var i := spawn(def, pos, opts)
@@ -279,7 +281,7 @@ func _tick_clips() -> void:
 			continue
 		var layout_index: int = choices[c].index
 		var value: float = items[k].data.layouts[layout_index].value
-		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority)
+		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority, items[k].data.layouts[layout_index].get("attack_managed"))
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
