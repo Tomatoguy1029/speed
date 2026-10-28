@@ -82,7 +82,7 @@ func _draw() -> void:
 						cell.append(center + Vector2.from_angle(direction + TAU * corner.y / 64.0) * radius * corner.x / 16.0 * scaling)
 					draw_colored_polygon(cell, color)
 		for point in gaps: draw_circle(center + point * scaling, 1.5, Color(0.95, 0.55, 0.2, 0.7))
-		draw_circle(center, 5, Color(0.9, 0.5, 0.25))
+		_boss_marker(center)
 		return
 	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), float(attack.get("length", 0.0)))))
 	if split:
@@ -116,12 +116,14 @@ func _draw() -> void:
 		else: draw_line(center, end, Color(1.0, 0.65, 0.15, 0.9), maxf(2.0, float(attack.get("width", 30.0)) * scale_factor))
 	elif attack.get("dynamic", false):
 		draw_string(get_theme_default_font(), Vector2(4, size.y - 3), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), Color(1.0, 0.65, 0.15))
-	draw_circle(center, 5, Color(0.9, 0.5, 0.25))
-	draw_line(center, center + Vector2(18, 0), Color(0.9, 0.5, 0.25), 2)
+	_boss_marker(center)
 
+## ボスの仮の姿。尖った先が正面（右）を向く三角形。
 func _boss_marker(center: Vector2) -> void:
-	draw_circle(center, 5, Color(0.9, 0.5, 0.25))
-	draw_line(center, center + Vector2(18, 0), Color(0.9, 0.5, 0.25), 2)
+	var length := clampf(minf(size.x, size.y) * 0.09, 9.0, 18.0)
+	var points := PackedVector2Array([center + Vector2(length, 0.0), center + Vector2(-length * 0.7, -length * 0.65), center + Vector2(-length * 0.35, 0.0), center + Vector2(-length * 0.7, length * 0.65)])
+	draw_colored_polygon(points, Color(0.95, 0.95, 1.0))
+	draw_polyline(points + PackedVector2Array([points[0]]), Color(0.15, 0.15, 0.2), 1.5)
 
 func _caption(corner: Vector2, text: String, color: Color) -> void:
 	var font := get_theme_default_font()
