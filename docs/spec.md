@@ -476,7 +476,7 @@ T09の増分は特性自身の `per_stack`・`late_per_stack` を使い、特性
 | 開始位置 | 中心から `config.start_radius` |
 | 惑星 | 中心に半径 `config.planet_radius`。障害物 |
 | 月 | `config.moon_count` 個。中心の周りの軌道を毎秒 `config.moon_orbit_speed` ラジアンで回る。障害物 |
-| 重力 | 下記 |
+| 重力 | 開発用の手動配置。下記 |
 | 隕石 | 下記 |
 | 鉄のがれき | 下記 |
 | 回る丸鋸 | 下記 |
@@ -500,7 +500,7 @@ T09の増分は特性自身の `per_stack`・`late_per_stack` を使い、特性
 
 **重力**
 
-- `config.gravity_interval_min`〜`config.gravity_interval_max` 世界秒ごとに、画面の中の機体から少し離れた位置に1つ現れる。置き方は仮。
+- 開発用の操作で配置する。通常出撃では定期的に現れない。
 - 現れたときの届く半径は `config.gravity_radius`、中心の引き寄せる加速は `config.gravity_pull`。中心から離れるほど弱く、`config.gravity_life` 世界秒かけて縮んで消える。
 - 敵・敵の弾・遅い機体を引き寄せ、敵や弾の進路を曲げる。高速の機体（7.2の高速の接触と同じ条件）には効かない。ボス・障害物・部位には効かない。
 
