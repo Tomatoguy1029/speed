@@ -600,6 +600,12 @@ func attach_hazard(h: int, e: int) -> void:
 func owns_hazard(h: int, e: int, id: int) -> bool:
 	return h >= 0 and h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
+## 発生元に紐づく持続判定だけを止める。独立して飛ぶ発射済みの弾はそのまま進める。
+func _hazard_owner_pulled(h: int) -> bool:
+	var owner := hazard_owner[h]
+	return owner >= 0 and combat.enemies.is_same(owner, hazard_owner_id[h]) \
+		and combat.enemies.table.pump_owner[owner] >= 0
+
 ## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
 func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
@@ -607,6 +613,8 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 	var best_t := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
+			continue
+		if _hazard_owner_pulled(h):
 			continue
 		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
 			continue
@@ -692,7 +700,7 @@ func _update_hazards(dt: float) -> void:
 		var delay := hazard_delay[i]
 		var owner := hazard_owner[i]
 		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
-				or combat.enemies.table.dead[owner] != 0)):
+				or combat.enemies.table.dead[owner] != 0 or _hazard_owner_pulled(i))):
 			_combat_end(_combat_hazards, i, "lifetime_or_owner_end", hazard_pos[i])
 			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)

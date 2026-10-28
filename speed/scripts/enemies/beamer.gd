@@ -29,7 +29,9 @@ func _beamer(i: int, dt: float) -> void:
 					float(p.telegraph), float(p.beam_time), float(p.bullet_dmg), t.color[i].lightened(0.3)))
 			# 予告の間、ビームの通り道を予告線で示す。
 			for h in beams:
-				if h >= 0: projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.GUIDE
+				if h >= 0:
+					projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.GUIDE
+					projectiles.attach_hazard(h, i)
 		return
 	t.timer[i] -= dt
 	# charge は砲口に光が集まる進み（0〜1）。撃っている間は 1
