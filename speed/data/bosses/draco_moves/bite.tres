@@ -1,7 +1,16 @@
-[gd_resource type="Resource" script_class="BossTechnique" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_bite.gd" id="driver"]
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/bite.gd" id="1"]
+
 [resource]
 script = ExtResource("1")
 technique = &"bite"
-parameters = {"lead_cap": 440.0, "driver": ExtResource("driver"), "retract": 110.0, "warn": 0.8, "active": 0.3, "recover": 0.8, "damage": 30.0, "reach": 360.0, "width": 96.0}
+display_name = "噛みつき"
+lead_cap = 440.0
+retract = 110.0
+warn = 0.8
+active = 0.3
+recover = 0.8
+damage = 30.0
+reach = 360.0
+width = 96.0

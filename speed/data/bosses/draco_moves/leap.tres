@@ -1,8 +1,15 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_leap.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/leap.gd" id="1"]
+
 [resource]
 script = ExtResource("1")
 technique = &"leap"
 category = &"major"
-parameters = {"lead_cap": 900.0, "driver": ExtResource("2"), "warn": 0.8, "active": 0.5, "recover": 1.15, "damage": 35.0, "width": 96.0}
+display_name = "飛びかかり噛みつき"
+lead_cap = 900.0
+warn = 0.8
+active = 0.5
+recover = 1.15
+damage = 35.0
+width = 96.0

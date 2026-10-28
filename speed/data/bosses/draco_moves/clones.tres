@@ -1,8 +1,16 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_clones.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/clones.gd" id="1"]
+
 [resource]
 script = ExtResource("1")
 technique = &"clones"
 category = &"major"
-parameters = {"driver": ExtResource("2"), "warn": 1.2, "active": 7.5, "recover": 1.2, "damage": 28.0, "width": 50.0, "clone_hp": 350.0, "clone_stars": 13}
+display_name = "全身複製"
+warn = 1.2
+active = 7.5
+recover = 1.2
+damage = 28.0
+width = 50.0
+clone_hp = 350.0
+clone_stars = 13
