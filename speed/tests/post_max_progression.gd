@@ -368,7 +368,7 @@ func _test_target_filtering() -> void:
 		&"W21": [&"projectile_speed", &"duration", &"knockback", &"area", &"followup"],
 		&"W22": [&"knockback", &"area", &"followup"],
 		&"W23": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
-		&"W25": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
+		&"W25": [&"weapon_interval", &"projectile_speed", &"duration", &"followup"],
 		&"W26": [&"area"], &"W27": []}
 	for weapon in expectations:
 		_equip([weapon])

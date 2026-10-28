@@ -138,7 +138,6 @@ targets = {
       "life"
     ],
     "projectile": true,
-    "knockback": true,
     "followup": true
   },
   "W26": {
