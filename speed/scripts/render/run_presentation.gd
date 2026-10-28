@@ -1192,6 +1192,7 @@ func _draw_projectiles(c: CanvasItem) -> void:
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		_friendly_visual(pr, i).draw_friend(c, pr, i, pos)
+	for visual: AttackVisual in _attack_visuals.values(): visual.begin_batch()
 	_hostile_batch.begin()
 	for i in pr.hostile_alive.size():
 		var pos := pr.hostile_pos[i]
@@ -1201,6 +1202,7 @@ func _draw_projectiles(c: CanvasItem) -> void:
 			if pr.hostile_stone[i] > 0.0:
 				c.draw_circle(pos, pr.hostile_r[i] * 1.3, Color(0.62, 0.6, 0.58, 0.9))
 	_hostile_batch.end()
+	for visual: AttackVisual in _attack_visuals.values(): visual.end_batch()
 	_draw_hazards(c, view)
 
 ## 敵の攻撃の形（仕様書 11.7）。予告は攻撃する敵の側の光や模様で見せ、当たる範囲そのものは予告しない。
@@ -1400,7 +1402,8 @@ func _draw_top(c: CanvasItem) -> void:
 func _attack_visual(kind: String) -> AttackVisual:
 	var key := kind.to_lower()
 	if not _attack_visuals.has(key):
-		var visual: AttackVisual = load("res://scripts/render/attacks/%s.gd" % key).new()
+		var scene_path := "res://scenes/attacks/%s.tscn" % key
+		var visual: AttackVisual = load(scene_path).instantiate() if ResourceLoader.exists(scene_path) else load("res://scripts/render/attacks/%s.gd" % key).new()
 		visual.setup(self)
 		_attack_visuals[key] = visual
 	return _attack_visuals[key]

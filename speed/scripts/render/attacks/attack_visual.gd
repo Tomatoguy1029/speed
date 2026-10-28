@@ -1,6 +1,6 @@
 ## 攻撃の種類ごとの表示。状態を読み、描画だけを受け持つ。
 class_name AttackVisual
-extends RefCounted
+extends Node2D
 
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
 var rm: RunPresentation
@@ -9,6 +9,10 @@ var state: RunState:
 
 func setup(render: RunPresentation) -> void:
 	rm = render
+	if get_parent() == null: rm.add_child(self)
+	for phase in ["Flight", "Hit", "Fade"]:
+		var node := get_node_or_null(phase) as CanvasItem
+		if node != null: node.hide()
 
 ## 専用の形を描いた場合はtrue。falseなら共通の弾のバッチで描く。
 func draw_shot(_c: CanvasItem, _pr: ProjectileSystem, _i: int, _pos: Vector2) -> bool:
@@ -25,3 +29,6 @@ func _px(px: float) -> float:
 
 func draw_friend(_c: CanvasItem, _projectiles: ProjectileSystem, _row: int, _pos: Vector2) -> void:
 	pass
+
+func begin_batch() -> void: pass
+func end_batch() -> void: pass
