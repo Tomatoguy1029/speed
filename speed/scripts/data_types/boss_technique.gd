@@ -25,6 +25,37 @@ var _values_dirty := true
 ## 継承した技のスクリプトが値として並べた名前。
 var _field_cache: Array[String] = []
 
+## 技の実行状態。Resourceを共有しても、再生ごとに新しいRunnerを作る。
+class Runner extends RefCounted:
+	func begin(_actor: BossActor) -> void: pass
+	func windup(_actor: BossActor, _dt: float) -> void: pass
+	func tick(_actor: BossActor, _dt: float) -> void: pass
+	func end(_actor: BossActor, _cancelled: bool) -> void: pass
+	func recover(_actor: BossActor, _dt: float) -> void: pass
+
+## エディターと実験場が使う @export の型・範囲・単位。
+func field_property(name: String) -> Dictionary:
+	for property in get_property_list():
+		if String(property.name) == name: return property
+	return {}
+
+## 説明は編集時にスクリプトの ## から読む。戦闘中の値の取得では解析しない。
+func field_description(name: String) -> String:
+	var script: Script = get_script()
+	var member := RegEx.new()
+	member.compile("(?:^|\\s)var\\s+" + name + "(?:\\s|:|=|$)")
+	while script != null and script != BossTechnique:
+		var lines: Array[String] = []
+		for source in script.source_code.split("\n"):
+			if source.begins_with("##"):
+				lines.append(source.trim_prefix("##").strip_edges())
+			elif member.search(source) != null:
+				return "\n".join(lines)
+			elif not source.begins_with("@"):
+				lines.clear()
+		script = script.get_base_script()
+	return ""
+
 ## 技の動きを1回分作る。技のスクリプトが Runner を返す。古い形は null。
 func make_runner() -> RefCounted:
 	return null
@@ -43,7 +74,7 @@ func field_names() -> Array[String]:
 		var shared := {}
 		for property in BossTechnique.new().get_property_list(): shared[property.name] = true
 		for property in get_property_list():
-			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_STORAGE and not shared.has(property.name):
+			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_STORAGE and property.usage & PROPERTY_USAGE_EDITOR and not shared.has(property.name):
 				_field_cache.append(String(property.name))
 	return _field_cache
 

@@ -210,7 +210,8 @@ func start_attack(id: StringName) -> bool:
 	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
 	var screen_staged := id in [&"leap", &"charge", &"rifts"]
 	if not screen_staged: table.facing[body] = direction.angle()
-	_driver = rule().driver.new() if rule().has("driver") else null
+	_driver = _moves[id].make_runner()
+	if _driver == null and rule().has("driver"): _driver = rule().driver.new()
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	if _driver != null: _driver.begin(self)

@@ -32,16 +32,18 @@ const MORE_LABELS := {
 ## 技はラジアン（回転はラジアン/秒）で持ち、画面では度（度/秒）で表示・入力する値。
 const ANGLE_KEYS := ["arc", "sweep_arc", "trace_bend", "blade_spread", "rubble_spread", "shatter_arc", "pincer_close_angle", "pincer_open_angle", "curve_lag", "curve_turn", "return_speed", "claw_angle", "half_angle", "sweep", "spread"]
 
-static func is_angle(key: String) -> bool:
+static func is_angle(key: String, move: Resource = null) -> bool:
+	if move != null and move.is_scripted():
+		return "radians_as_degrees" in String(move.field_property(key).get("hint_string", ""))
 	return key.trim_suffix("_p2") in ANGLE_KEYS
 
 ## 保存値を画面の値（度）へ。
-static func to_display(key: String, value: float) -> float:
-	return rad_to_deg(value) if is_angle(key) else value
+static func to_display(key: String, value: float, move: Resource = null) -> float:
+	return rad_to_deg(value) if is_angle(key, move) else value
 
 ## 画面の値（度）を保存値へ。
-static func from_display(key: String, value: float) -> float:
-	return deg_to_rad(value) if is_angle(key) else value
+static func from_display(key: String, value: float, move: Resource = null) -> float:
+	return deg_to_rad(value) if is_angle(key, move) else value
 
 static func editable_keys(move: Resource) -> Array[String]:
 	var keys: Array[String] = []
@@ -52,6 +54,9 @@ static func editable_keys(move: Resource) -> Array[String]:
 	return keys
 
 static func label_for(move: Resource, key: String, compact := false) -> String:
+	if move.is_scripted():
+		var description: String = move.field_description(key)
+		return description.split("\n")[0] if not description.is_empty() else key
 	var base := key.trim_suffix("_p2")
 	var docs: Array = BossDef.PARAMS_DOCS.get(base, [])
 	var fallback: String = String(docs[0]) if not docs.is_empty() else base
@@ -60,14 +65,24 @@ static func label_for(move: Resource, key: String, compact := false) -> String:
 	return label + ("（第2形態）" if base != key else "")
 
 static func tip_for(move: Resource, key: String) -> String:
+	if move.is_scripted(): return move.field_description(key)
 	var base := key.trim_suffix("_p2")
 	if move.technique == &"spiral" and SPIRAL_TIPS.has(base): return SPIRAL_TIPS[base]
 	var docs: Array = BossDef.PARAMS_DOCS.get(base, [])
 	return String(docs[1]) if docs.size() > 1 else "選択中の技の値です。変更は次に技を再生すると反映します。"
 
 static func bounds_for(move: Resource, key: String) -> Vector2:
+	if move.is_scripted():
+		var hint := String(move.field_property(key).get("hint_string", "")).split(",")
+		if hint.size() >= 2: return Vector2(float(hint[0]), float(hint[1]))
 	var base := key.trim_suffix("_p2")
 	return SPIRAL_BOUNDS.get(base, Vector2(0.0, 100000.0)) if move.technique == &"spiral" else Vector2(0.0, 100000.0)
 
 static func arc_bounds(key: String) -> Vector2:
 	return Vector2(-10000.0, 100000.0) if key in ["offset_x", "offset_y", "angle_degrees"] else Vector2(1.0, 100000.0)
+
+static func step_for(move: Resource, key: String) -> float:
+	if move.is_scripted():
+		var hint := String(move.field_property(key).get("hint_string", "")).split(",")
+		if hint.size() >= 3: return float(hint[2])
+	return 1.0 if move.field(key) is int else 0.01

@@ -1335,23 +1335,19 @@ func _refresh() -> void:
 ## 技の値1つ分の名前と入力欄。
 func _technique_field(key: Variant) -> void:
 	var label := Label.new()
-	# 第2形態の値は、同じ名前の値の表示名に形態を添える。
-	var base_key := String(key).trim_suffix("_p2")
 	label.text = SPIRAL_FIELDS.label_for(current, String(key))
 	label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
 	_fields.add_child(label)
 	var field := SpinBox.new()
 	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	field.min_value = 0
-	field.max_value = 100000
-	if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
-		field.min_value = SPIRAL_BOUNDS[base_key].x
-		field.max_value = SPIRAL_BOUNDS[base_key].y
-	field.step = 1 if current.field(key) is int else 0.01
+	var bounds := SPIRAL_FIELDS.bounds_for(current, String(key))
+	field.min_value = bounds.x
+	field.max_value = bounds.y
+	field.step = SPIRAL_FIELDS.step_for(current, String(key))
 	field.tooltip_text = label.tooltip_text
-	field.value = SPIRAL_FIELDS.to_display(String(key), float(current.field(key)))
+	field.value = SPIRAL_FIELDS.to_display(String(key), float(current.field(key)), current)
 	field.set_meta("key", key)
-	field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value)))
+	field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value, current)))
 	_fields.add_child(field)
 
 func _set_cost(id: String, value: float) -> void:
