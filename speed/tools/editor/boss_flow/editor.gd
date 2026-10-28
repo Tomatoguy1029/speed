@@ -1204,7 +1204,6 @@ func _analyze_coverage() -> void:
 		return
 	var layers: Array = []
 	var definition = load("res://data/bosses/hydra.tres")
-	var motion = preload("res://scripts/bosses/hydra_normals.gd")
 	var total := 0
 	for kind in preview_heads: total += preview_heads[kind]
 	var count := 3 if total <= 3 else 5 if total <= 5 else 8
@@ -1240,7 +1239,7 @@ func _analyze_coverage() -> void:
 					var snapshot: Dictionary = head.duplicate()
 					snapshot.gate = gate
 					snapshot.separated = preview_separated
-					snapshot.reach = motion.reach(move.technique, definition.params.merged(move.values(), true))
+					snapshot.reach = move.range_info(definition.params.merged(move.values(), true))
 					layers.append(snapshot)
 	preview.radius = preview_radius
 	preview.layers = layers

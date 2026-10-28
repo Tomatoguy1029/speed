@@ -25,7 +25,8 @@ var _neck_mesh_radius:=-1.0
 
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
-const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
+var normal_runners := {}
 var _moves: Dictionary = {}
 var flow_controlled := false
 var action_rules: Resource
@@ -54,6 +55,8 @@ func use_action_rules(value: Resource) -> void:
 	for move in value.techniques:
 		_moves[move.technique] = move.duplicate(true)
 		if move.head_kind != &"": _normal_moves[move.technique] = true
+	technique_visuals.configure(self, _moves)
+	normal_runners.clear()
 	flow_controlled = true
 	hsm.set_active(false)
 var _normal_moves: Dictionary = {}
@@ -214,11 +217,12 @@ func _on_bound() -> void:
 	attack_field = load("res://scripts/bosses/hydra_attack_field.gd").new()
 	add_child(attack_field)
 	attack_field.bind(self)
-	special=load("res://scripts/bosses/hydra_techniques.gd").new(self)
+	special=load("res://scripts/bosses/hydra/technique_runner.gd").new(self)
 	if not ResourceLoader.exists("res://.content/boss_hydra.tres"):
 		push_error("ヒュドラAIの実行データがありません。試遊前のコンテンツ生成を実行してください。")
 		return
 	configure_flow(load("res://.content/boss_hydra.tres"))
+	presentation_event.connect(technique_visuals.event)
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	queue_redraw()
@@ -243,6 +247,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_sim_dt = dt
 	if final_strike_t >= 0.0:
 		_final_strike_tick(dt)
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -256,6 +261,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				table.pos[neck.row] = _head_pos(neck)
 				_follow_neck(neck, dt)
 		if growth_t <= 0.0: _check_growth()
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -268,6 +274,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if immortal_row>=0:table.guard[immortal_row]=separation_t
 		for n in necks:
 			if _alive(n):table.guard[n.row]=separation_t
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -320,6 +327,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_cue(&"defeated")
 		ctx.bosses.on_boss_defeated(body, {"cause": &"ram"})
 	attack_field.tick(dt)
+	_sync_technique_visuals(dt)
 	presentation_advanced.emit(dt)
 	queue_redraw()
 
@@ -452,7 +460,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		neck.head_hp = table.hp[neck.row]
 		if _normal_moves.has(neck.mode):
 			neck.t += dt
-			NORMALS.tick(self,neck,dt)
+			tick_normal(neck,dt)
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
 			if flow_controlled: position_head(k, dt)
@@ -526,7 +534,7 @@ func _position_ready(attack: StringName, index := -1, internal_step := false) ->
 				snapshot.head = _head_pos(n)
 				snapshot.base = _neck_base(n)
 				snapshot.base_angle = n.base_angle
-				snapshot.reach = NORMALS.reach(attack, move_params(attack))
+				snapshot.reach = move_reach(attack)
 			if preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos): return true
 		return false
 	return true
@@ -753,6 +761,8 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 		combo_wait=float(def.params.combo_cooldown)
 	if not chosen.is_empty(): participants.assign(chosen)
 	tech = attack
+	special = _moves[attack].make_runner()
+	special.a = self
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
 	busy = true
@@ -929,53 +939,20 @@ func front_heads() -> Array[Neck]:
 	return result
 
 func _update_north_targets() -> void:
-	north_target = run_state.ship_pos
-	var direction := (north_target-table.pos[body]).normalized()
-	var side := direction.orthogonal()
-	var center := table.pos[body]+direction*maxf(north_target.distance_to(table.pos[body]),table.r[body]+float(def.params.neck_rest))
-	var ordered := participants.duplicate()
-	ordered.sort_custom(func(a,b):return _neck_base(a).dot(side) < _neck_base(b).dot(side))
-	for i in ordered.size():
-		ordered[i].target = center+side*float(move_params(&"north").north_spread)*(i-1)
+	_runner_north()._update_north_targets(self)
 
 func north_curl() -> void:
-	_update_north_targets()
-	north_aiming = false
-	_cue(&"target_locked", &"north", -1, {"target_position": north_target})
+	_runner_north().north_curl(self)
 
 func north_burst() -> void:
-	north_aiming = false
-	_north_duration = maxf(0.001, _timeline_key_time(&"north", &"north_follow") - _timeline_key_time(&"north", &"north_burst"))
-	_cue(&"attack_started")
-	for neck in participants:
-		if _alive(neck):
-			neck.strike_from = _head_pos(neck)
-			neck.strike_pos = neck.strike_from
-			neck.mode = &"tech_lunge"
-			neck.t = 0.0
-			neck.angle = (neck.target - neck.strike_from).angle()
-			_cue(&"attack_started", &"north", necks.find(neck), {"target_position": neck.target})
+	_runner_north().north_burst(self)
 
-## 先端の移動区間にも判定を出し、粗い固定更新で標的位置を飛び越えない。
 func _north_step(neck: Neck, fraction: float, dt: float) -> void:
-	var previous := neck.strike_pos
-	neck.strike_pos = neck.strike_from.lerp(neck.target, fraction)
-	_release_attack(neck)
-	neck.glow = 1.0
-	var delta := neck.strike_pos - previous
-	neck.hazard = ctx.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(move_params(&"north").bite_radius) * 2.0,
-		0.0, maxf(dt, 0.001) + 0.001, float(move_params(&"north").bite_dmg), Color("#ff7a5a"))
-	ctx.projectiles.attach_hazard(neck.hazard, neck.row)
-	if fraction >= 1.0:
-		neck.mode = &"tech_hold"
+	_runner_north()._north_step(self, neck, fraction, dt)
 
-## 世界の更新がキーをまたいでも、最後の区間を判定してから止める。
 func north_follow() -> void:
-	for neck in necks:
-		if neck.mode == &"tech_lunge":
-			_north_step(neck, 1.0, _sim_dt)
+	_runner_north().north_follow(self)
 
-## 瓦礫を砕き、破片を飛ばす。from が 0 でなければ、その向きを中心に飛ばす。
 func _burst_rubble(j: int, from: Vector2) -> void:
 	var p: Dictionary = move_params(tech)
 	var base := from.angle() if from != Vector2.ZERO else run_state.rng.randf() * TAU
@@ -1263,7 +1240,7 @@ func tick_bearer(dt: float)->void:
 	var alone:=necks.all(func(head):return not _alive(head))
 	if alone and n.mode!=&"idle":
 		n.t+=dt
-		NORMALS.tick(self,n,dt)
+		tick_normal(n,dt)
 	elif alone and n.cd<=0.0:
 		n.mode=&"bite_thrust"
 		n.t=0.0
@@ -1340,3 +1317,18 @@ func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formatio
 		var inward: Vector2=(inside-n.free_pos).normalized()
 		n.velocity-=inward*minf(0.0,n.velocity.dot(inward))
 		n.free_pos=inside
+
+func move_reach(id: StringName) -> Dictionary:
+	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
+func tick_normal(neck, dt: float) -> void:
+	var id: StringName = neck.mode
+	if not normal_runners.has(id): normal_runners[id] = _moves[id].make_runner()
+	normal_runners[id].tick_neck(self, neck, dt)
+
+func _sync_technique_visuals(dt: float) -> void:
+	for node: Node2D in technique_visuals.nodes.values(): node.advance_effects(dt)
+	technique_visuals.sync(tech, &"active" if busy else &"recovery", special.time if special != null else 0.0, 1.0)
+
+func _runner_north() -> RefCounted:
+	if tech == &"north": return special
+	return _moves[&"north"].make_runner()

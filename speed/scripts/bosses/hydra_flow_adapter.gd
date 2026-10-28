@@ -1,6 +1,5 @@
 extends RefCounted
 const RANGE := preload("res://scripts/bosses/flow/range_condition.gd")
-const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 var actor: Node
 var active: Array = []
 var custom_run: RefCounted
@@ -119,7 +118,7 @@ func _gate_ready(candidate: Dictionary, gate: Dictionary) -> bool:
 		snapshot.head = actor._head_pos(neck)
 		snapshot.base = actor._neck_base(neck)
 		snapshot.base_angle = neck.base_angle
-		snapshot.reach = NORMALS.reach(StringName(candidate.id), actor.move_params(StringName(candidate.id)))
+		snapshot.reach = actor.move_reach(StringName(candidate.id))
 	return RANGE.allows_snapshot(snapshot, actor.run_state.ship_pos)
 
 func _requirements(node: Dictionary) -> Dictionary:

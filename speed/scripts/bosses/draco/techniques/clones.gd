@@ -22,7 +22,6 @@ func make_runner() -> RefCounted:
 
 class Runner extends BossTechnique.Runner:
 	const FORM = preload("res://scripts/bosses/draco_form.gd")
-	const NORMALS = preload("res://scripts/bosses/hydra_normals.gd")
 	const HYDRA = preload("res://data/bosses/hydra.tres")
 	const MOVES = [preload("res://data/bosses/hydra_moves/bite_thrust.tres"),preload("res://data/bosses/hydra_moves/wind_band.tres"),preload("res://data/bosses/hydra_moves/rubble_fan.tres"),preload("res://data/bosses/hydra_moves/beam_fixed.tres"),preload("res://data/bosses/hydra_moves/thunder_drop.tres")]
 	var units: Array = []
@@ -33,6 +32,7 @@ class Runner extends BossTechnique.Runner:
 		extends Node
 		var _time: float:
 			get: return actor.clock
+		var runners := {}
 		var actor: BossActor
 		var ctx: RunContext
 		var run_state: RunState
@@ -45,6 +45,12 @@ class Runner extends BossTechnique.Runner:
 			for move in MOVES:
 				if move.technique == id: return HYDRA.params.merged(move.values(),true)
 			return HYDRA.params
+		func tracks_during_warn(_id: StringName) -> bool: return true
+		func tick_normal(n: Dictionary, dt: float) -> void:
+			if not runners.has(n.mode):
+				for move in MOVES:
+					if move.technique == n.mode: runners[n.mode] = move.make_runner()
+			runners[n.mode].tick_neck(self, n, dt)
 		func _head_pos(n: Dictionary) -> Vector2: return n.strike_pos if n.locked else table.pos[n.row]
 		func _neck_base(n: Dictionary) -> Vector2: return table.pos[n.row]
 		func aim_neck(n: Dictionary, angle: float, _dt: float) -> void: n.angle=angle
@@ -119,7 +125,7 @@ class Runner extends BossTechnique.Runner:
 				a.table.pos[unit.row]=landing.lerp(unit.origin,(a.elapsed-entry-0.5)/0.4)
 			elif not unit.done:
 				unit.t=float(unit.t)+dt
-				NORMALS.tick(host,unit,dt)
+				host.tick_normal(unit,dt)
 				if unit.mode==&"bite_thrust" and unit.locked: a.table.pos[unit.row]=unit.strike_pos
 			if a.elapsed>float(a.rule().active)-1.0 and unit.index>0:
 				a.table.pos[unit.row]=a.table.pos[unit.row].lerp(a.table.pos[a.body],minf(1.0,dt*5.0))

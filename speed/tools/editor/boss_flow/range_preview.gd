@@ -21,7 +21,7 @@ func set_attack(move: Resource, adapter: String) -> void:
 	arcs=p.get("arcs",[])
 	if adapter == "hydra" or move.get("head_kind") != null:
 		p = load("res://data/bosses/hydra.tres").params.merged(p, true)
-		var reach: Dictionary = preload("res://scripts/bosses/hydra_normals.gd").reach(move.technique, p)
+		var reach: Dictionary = move.range_info(p)
 		attack = {"length": reach.get("max", INF), "width": p.get("beam_width", p.get("bite_radius", 60.0)), "angle": 0.0}
 		if not is_finite(float(attack.length)): attack = _hydra_major(move.technique, p)
 		if move.technique in [&"bite_thrust", &"thunder_headbutt"]: attack = {"targeted": true, "length": 0.0, "width": float(p.bite_radius)}

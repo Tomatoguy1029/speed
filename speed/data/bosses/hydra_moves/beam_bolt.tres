@@ -1,19 +1,20 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/beam_bolt.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/beam_bolt_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"beam_bolt"
 head_kind = &"beam"
-parameters = {
-"normal_charge": 0.6,
-"normal_hold": 0.9,
-"attack_cd": 3.0,
-"bolt_length": 150.0,
-"bolt_width": 28.0,
-"bolt_life": 2.8,
-"bolt_speed": 780.0,
-"beam_dmg": 18.0,
-"cost": 1.0
-}
+display_name = "ビーム弾"
+normal_charge = 0.6
+normal_hold = 0.9
+attack_cd = 3.0
+bolt_length = 150.0
+bolt_width = 28.0
+bolt_life = 2.8
+bolt_speed = 780.0
+beam_dmg = 18.0
+visual = ExtResource("visual")

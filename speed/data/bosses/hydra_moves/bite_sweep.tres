@@ -1,19 +1,20 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/bite_sweep.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/bite_sweep_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"bite_sweep"
 head_kind = &"bite"
-parameters = {
-"normal_charge": 0.6,
-"normal_hold": 0.9,
-"attack_cd": 3.0,
-"sweep_time": 0.7,
-"sweep_arc": 1.8,
-"sweep_reach": 350.0,
-"bite_radius": 75.0,
-"bite_dmg": 16.0,
-"cost": 1.2
-}
+display_name = "薙ぎ払い"
+normal_charge = 0.6
+normal_hold = 0.9
+attack_cd = 3.0
+sweep_time = 0.7
+sweep_arc = 1.8
+sweep_reach = 350.0
+bite_radius = 75.0
+bite_dmg = 16.0
+visual = ExtResource("visual")

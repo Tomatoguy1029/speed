@@ -75,7 +75,7 @@ func field_names() -> Array[String]:
 		var shared := {}
 		for property in BossTechnique.new().get_property_list(): shared[property.name] = true
 		for property in get_property_list():
-			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_STORAGE and property.usage & PROPERTY_USAGE_EDITOR and not shared.has(property.name):
+			if property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE and property.usage & PROPERTY_USAGE_STORAGE and property.usage & PROPERTY_USAGE_EDITOR and not shared.has(property.name) and property.name != "head_kind":
 				_field_cache.append(String(property.name))
 	return _field_cache
 
@@ -133,3 +133,6 @@ func _set(property: StringName, value: Variant) -> bool:
 func _validate_property(property: Dictionary) -> void:
 	if property.name in ["technique"]: property.usage |= PROPERTY_USAGE_READ_ONLY
 	if property.name == "parameters" and is_scripted(): property.usage = PROPERTY_USAGE_NONE
+
+func range_info(_values: Dictionary) -> Dictionary:
+	return {"origin": "head", "max": INF}

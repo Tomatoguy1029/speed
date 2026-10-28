@@ -28,6 +28,7 @@ func bind_hydra(actor: Node) -> void:
 	hydra.presentation_advanced.connect(advance_effects)
 
 func on_hydra_event(event: Dictionary) -> void:
+	if event.cue not in [&"growth_started", &"separation_started", &"head_destroyed", &"hit", &"phase_changed", &"exposed", &"defeated"]: return
 	var cue: StringName = event.cue
 	var index: int = event.neck_index
 	if cue in [&"growth_started",&"separation_started",&"head_destroyed",&"gather_started",&"rubble_shattered",&"target_locked"]:_flash(event)
