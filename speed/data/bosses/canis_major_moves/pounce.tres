@@ -1,21 +1,23 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmpnc"]
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/pounce.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/pounce_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_cmpnc")
+script = ExtResource("1")
 technique = &"pounce"
-parameters = {
-"active": 0.45,
-"alone_hounds": 3,
-"cd": 4.0,
-"cd_alone": 2.0,
-"cd_alone_p2": 1.5,
-"cd_p2": 3.0,
-"damage": 24.0,
-"lock": 0.2,
-"overshoot": 80.0,
-"recover": 1.4,
-"warn": 0.7,
-"warn_p2": 0.5
-}
+display_name = "飛びかかり"
+active = 0.45
+alone_hounds = 3
+cd = 4.0
+cd_alone = 2.0
+cd_alone_p2 = 1.5
+cd_p2 = 3.0
+damage = 24.0
+lock = 0.2
+overshoot = 80.0
+recover = 1.4
+warn = 0.7
+warn_p2 = 0.5
+visual = ExtResource("visual")

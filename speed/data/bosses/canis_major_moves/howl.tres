@@ -1,23 +1,25 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmhwl"]
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/howl.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/howl_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_cmhwl")
+script = ExtResource("1")
 technique = &"howl"
 category = &"major"
-parameters = {
-"catch_up": 4.0,
-"cd": 15.0,
-"close_time": 2.2,
-"gap_slots": 2,
-"gaps": 2,
-"gather_time": 1.0,
-"recover": 1.5,
-"ring_close": 220.0,
-"ring_count": 16,
-"ring_radius": 800.0,
-"spawn_out": 350.0,
-"summon_max": 10,
-"warn": 1.2
-}
+display_name = "遠吠え"
+catch_up = 4.0
+cd = 15.0
+close_time = 2.2
+gap_slots = 2
+gaps = 2
+gather_time = 1.0
+recover = 1.5
+ring_close = 220.0
+ring_count = 16
+ring_radius = 800.0
+spawn_out = 350.0
+summon_max = 10
+warn = 1.2
+visual = ExtResource("visual")
