@@ -8,6 +8,11 @@ const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const ENERGY := Color("#9fe8ff")
+const REAR_LEGS := ["RearLeftLeg", "RearRightLeg"]
+## 後ろ蹴りで畳んだ後脚の、付け根から蹄の付け根までの長さ（元絵の画素）
+const KICK_FOLD := 18.0
+## 攻撃時間のうち、蹄を伸ばしきるまでの割合
+const KICK_EXTEND := 0.4
 var actor: MonocerosBoss
 var hit := 0.0
 @onready var parts: PartsVisual = $Parts
@@ -55,6 +60,7 @@ func _sync_parts(dt: float) -> void:
 	parts.modulate = Color(1.35, 1.35, 1.35) if hit > 0.0 or reaction.white > 0.0 else Color.WHITE
 	var moving := actor.table.vel[actor.body].length_squared() > 25.0
 	parts.advance_gait(dt, moving and actor.mode not in [&"windup", &"stuck", &"phase", &"final", &"defeated"])
+	_pose_kick()
 	var neck_angle := 0.0
 	if actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]:
 		var points := actor.horn_points()
@@ -64,6 +70,38 @@ func _sync_parts(dt: float) -> void:
 	sword.visible = actor.phase == 2
 	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
 	parts.get_node("Head/SwordGlow/Guard").visible = sword.visible
+
+## 後ろ蹴り：予告で後脚を蹴る向きへ畳み、攻撃で蹄を判定の先端まで伸ばす。
+func _pose_kick() -> void:
+	for path in REAR_LEGS:
+		var leg := parts.get_node(path) as Node2D
+		leg.rotation = 0.0
+		leg.scale = Vector2.ONE
+	if actor.technique != &"kick" or actor.mode not in [&"windup", &"active"]: return
+	var rule := actor.rule()
+	var warn := maxf(0.001, float(rule.warn))
+	var elapsed := actor.timeline.current_animation_position
+	# 判定の先端を、役者座標から元絵（下向きが前方）の座標へ戻す。
+	var tip := Vector2.from_angle(angle_difference(actor.table.facing[actor.body], actor.direction.angle())) * float(rule.reach)
+	var tip_in_parts := parts.transform.affine_inverse() * tip
+	for path in REAR_LEGS:
+		var leg := parts.get_node(path) as Node2D
+		var foot := leg.get_node("Foot") as Node2D
+		var hoof := foot.get_node("Sprite") as Sprite2D
+		var toward := tip_in_parts - leg.position
+		# 真後ろをまたいでも回る向きが反転しないよう、後ろ向きの回転を -2π〜0 へまとめる。
+		var turn := wrapf(toward.angle() - PI * 0.5, -TAU, 0.0)
+		var rest := foot.position.y
+		if actor.mode == &"windup":
+			var fold := clampf(elapsed / warn, 0.0, 1.0)
+			leg.rotation = lerpf(0.0, turn, fold)
+			foot.position.y = lerpf(rest, KICK_FOLD, fold)
+		else:
+			var extend := clampf((elapsed - warn) / maxf(0.001, float(rule.active) * KICK_EXTEND), 0.0, 1.0)
+			var natural := rest + hoof.position.y + hoof.texture.get_height()
+			leg.rotation = turn
+			foot.position.y = lerpf(KICK_FOLD, rest, extend)
+			leg.scale.y = lerpf(1.0, maxf(1.0, toward.length() / natural), extend)
 
 func _body_point(world_point: Vector2) -> Vector2:
 	# 旋回したフレームも、役者ノードの描画更新を待たず戦闘方向を使う。
@@ -108,6 +146,7 @@ func _draw() -> void:
 		var points := actor.horn_points()
 		var a := _body_point(points[0])
 		var b := _body_point(points[1])
+		if actor.technique == &"kick" and actor.mode == &"active": return
 		if actor.technique in [&"charge", &"return_charge", &"lance"] and actor.mode==&"windup":
 			# 薄い進路は移動後の角先、太い角の光は実際の攻撃形状を示す。
 			draw_line(a,_body_point(actor.warning_points()[1]),Color(color,0.3),6.0,false)
