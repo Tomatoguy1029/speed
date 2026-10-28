@@ -966,6 +966,10 @@ func _edit_common() -> void:
 	_context("全区間で共有するスタミナと休息", 3)
 	editing_flow = true
 	_clear_fields()
+	var presentation := Button.new()
+	presentation.text = "ボスの表示を開く"
+	presentation.pressed.connect(func(): preload("res://tools/editor/boss_flow/technique_visual_fields.gd").open_scene(self, "res://scenes/bosses/" + String(rules.adapter) + "_presentation.tscn"))
+	_full_row(presentation)
 	_status.text = "全区間から不足時に休息へ入ります"
 	for key in ["maximum_stamina", "partial_rest", "empty_rest"]:
 		_number_field({"maximum_stamina": "最大スタミナ", "partial_rest": "残量ありの休息（秒）", "empty_rest": "枯渇時の休息（秒）"}[key], flow.get(key), func(value):
@@ -1296,6 +1300,7 @@ func _refresh() -> void:
 		_fields.remove_child(child)
 		child.queue_free()
 	_append_display_name()
+	preload("res://tools/editor/boss_flow/technique_visual_fields.gd").append(self, current)
 	# 時間に関わる値と、威力・範囲の値を分けて並べる。
 	var timing: Array = []
 	var others: Array = []

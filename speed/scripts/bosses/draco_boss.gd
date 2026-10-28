@@ -62,7 +62,7 @@ func _on_bound() -> void:
 	finale = preload("res://scripts/bosses/draco_finale.gd").new(self)
 	cycle = preload("res://scripts/bosses/draco_cycle.gd").new(self)
 	picaro = preload("res://scripts/bosses/draco_picaro.gd").new(self)
-	_presentation = load("res://scripts/bosses/draco_presentation.gd").new()
+	_presentation = load("res://scenes/bosses/draco_presentation.tscn").instantiate()
 	add_child(_presentation)
 	_presentation.actor = self
 	presentation_event.connect(_presentation.on_event)
