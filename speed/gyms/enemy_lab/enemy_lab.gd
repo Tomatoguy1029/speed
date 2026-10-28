@@ -30,6 +30,8 @@ var _file_dialog: FileDialog
 var canvas
 ## 本番のランを映す表示枠
 var game_frame: SubViewportContainer
+## 16:9 の表示枠とは独立した、実験場だけの表示倍率。
+var view_scale := 1.0
 var inspector
 var workspace
 var _palette: GridContainer
@@ -80,6 +82,7 @@ func _ready() -> void:
 	generator = GENERATOR.new()
 	add_child(generator)
 	_build_ui()
+	canvas.zoom_changed.connect(_on_canvas_zoom_changed)
 	canvas.picked.connect(func(_row): _refresh_hitstop())
 	trial.progress.connect(func(v): _messages.text = TranslationServer.translate("lab.message_7b47f8fa60") % roundi(v * 100))
 	generator.progress.connect(func(n): _messages.text = TranslationServer.translate("lab.message_0db4675b27") % n)
@@ -699,14 +702,38 @@ func _sync_view() -> void:
 	else:
 		render.view_override = {"center": canvas.center, "zoom": canvas.zoom}
 
-## 本番の1280×720画面と同じ範囲を再生枠へ収める倍率。
-func game_zoom() -> float:
+## 表示枠へ本番画面を収める倍率。枠の16:9は表示倍率を変えても維持する。
+func base_game_zoom() -> float:
 	if not is_instance_valid(session.run) or game_frame == null: return 1.0
 	var view_size: Vector2 = session.run.options.get("view_size", Vector2(1280, 720))
 	if view_size.x <= 0.0 or view_size.y <= 0.0: return 1.0
 	var fit := minf(game_frame.size.x / view_size.x, game_frame.size.y / view_size.y)
 	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
 	return zoom * fit
+
+func game_zoom() -> float:
+	return base_game_zoom() * view_scale
+
+func set_view_scale(value: float) -> void:
+	var base := maxf(base_game_zoom(), 0.001)
+	var old := maxf(view_scale, 0.001)
+	view_scale = clampf(value, 0.08 / base, 16.0 / base)
+	if canvas.mode != 3 and not canvas.follow:
+		canvas.zoom = clampf(canvas.zoom * view_scale / old, 0.08, 16.0)
+	if is_instance_valid(session.run): _sync_view()
+	canvas.queue_redraw()
+	workspace.sync_view_scale()
+
+func reset_view_scale() -> void:
+	view_scale = 1.0
+	canvas.zoom = base_game_zoom()
+	if is_instance_valid(session.run): _sync_view()
+	canvas.queue_redraw()
+	workspace.sync_view_scale()
+
+func _on_canvas_zoom_changed() -> void:
+	view_scale = canvas.zoom / maxf(base_game_zoom(), 0.001)
+	workspace.sync_view_scale()
 
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。
 ## ボタンや本番の入力（描画の補助）には渡さない。

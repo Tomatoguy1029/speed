@@ -593,6 +593,9 @@ lab.ui.try,試遊,Play as ship
 lab.ui.range,範囲,Range
 lab.ui.view,表示する情報,Display options
 lab.ui.center,自機を中心に表示,Center on ship
+lab.ui.view_zoom_out,表示を縮小,Zoom out of the game view
+lab.ui.view_zoom_reset,表示倍率を標準に戻す,Reset game view zoom
+lab.ui.view_zoom_in,表示を拡大,Zoom into the game view
 lab.ui.edit_more,消去メニュー,Clear menu
 lab.ui.evaluate,ルートを試す,Try route
 lab.ui.tune,敵を調整,Tune enemy
