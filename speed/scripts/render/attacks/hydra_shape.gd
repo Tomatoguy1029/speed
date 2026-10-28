@@ -1,10 +1,10 @@
 ## 首が放つ攻撃の見た目。点列と時間は技から受け取り、判定を書き換えない。
-extends Node2D
+extends AttackVisual
 @export var energy_shader: Shader = preload("res://shaders/hydra_energy.gdshader")
 @export var area_shader: Shader = preload("res://shaders/hydra_area.gdshader")
 @export var tornado_scene: PackedScene = preload("res://scenes/bosses/hydra_tornado.tscn")
 var line: Node2D
-func configure(actor: Node, kind: StringName, points: PackedVector2Array, white: Texture2D) -> void:
+func configure(_actor: Node, kind: StringName, points: PackedVector2Array, white: Texture2D) -> void:
 	var area := kind == &"lightning" and points[0].distance_to(points[-1]) < 1.0
 	if kind in [&"tornado", &"tornado_charge"]:
 		line = tornado_scene.instantiate()
@@ -21,7 +21,7 @@ func configure(actor: Node, kind: StringName, points: PackedVector2Array, white:
 	line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	if kind not in [&"tornado", &"tornado_charge"]:
 		line.material = ShaderMaterial.new()
-		line.material.shader = area_shader if area else actor.energy_shader if actor.energy_shader != null else energy_shader
+		line.material.shader = area_shader if area else energy_shader
 	add_child(line)
 func update_effect(effect: Dictionary, clock: float) -> void:
 	if line.has_method("update_effect"):

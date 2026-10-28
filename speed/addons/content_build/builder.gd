@@ -13,6 +13,8 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 static func signature() -> String:
 	var files := PackedStringArray()
 	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders", "res://assets"]: _files(directory, files)
+	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
+		if not path in files and FileAccess.file_exists(path): files.append(path)
 	files.sort()
 	var hashes := PackedStringArray(["engine:" + str(Engine.get_version_info().string), "res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))

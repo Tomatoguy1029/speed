@@ -441,7 +441,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 		pipeline.sparks.reserve_bursts(minimum)
 	for ev in events:
 		if ev.type == &"attack_visual_end" and ResourceLoader.exists(ev.scene):
-			_attack_visual("", load(ev.scene)).end_effect(ev.phase, ev.pos)
+			_attack_visual("", StringName(ev.scene)).end_effect(ev.phase, ev.pos)
 		for v in _event_visuals.get(ev.type, []):
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
@@ -1400,10 +1400,10 @@ func _draw_top(c: CanvasItem) -> void:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 
 ## 種類の表示は、その種類を初めて使ったときに作る。
-func _attack_visual(kind: String, scene: PackedScene = null) -> AttackVisual:
-	var key := scene.resource_path if scene != null else kind.to_lower()
+func _attack_visual(kind: String, scene: StringName = &"") -> AttackVisual:
+	var key := String(scene) if scene != &"" else kind.to_lower()
 	if not _attack_visuals.has(key):
-		var scene_path := scene.resource_path if scene != null else "res://scenes/attacks/%s.tscn" % key
+		var scene_path := String(scene) if scene != &"" else "res://scenes/attacks/%s.tscn" % key
 		var visual: AttackVisual = load(scene_path).instantiate()
 		visual.setup(self)
 		_attack_visuals[key] = visual

@@ -61,6 +61,7 @@ func tick(dt: float) -> void:
 		e.age += dt
 		var alive: bool = e.owner < 0 or e.persistent or (actor.ctx.enemies.is_same(e.owner,e.owner_id) and actor.table.dead[e.owner] == 0)
 		if not alive or e.age >= e.delay + e.life:
+			actor.ctx.projectiles.end_attack_visual(StringName(visuals[e.id].scene_file_path), "Fade", e.points[0])
 			visuals[e.id].queue_free()
 			visuals.erase(e.id)
 			effects.erase(e)
@@ -85,6 +86,7 @@ func tick(dt: float) -> void:
 				if not actor.run_state.tracing and not actor.run_state.glide and actor.run_state.ship_vel.length() < actor.run_state.stats.max_speed:
 					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(e.get("wind_force", actor.def.params.wind_force)) * dt
 			elif touching and not e.hit and e.damage > 0.0:
+				actor.ctx.projectiles.end_attack_visual(StringName(visuals[e.id].scene_file_path), "Hit", ship)
 				actor.ctx.projectiles.ship.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
 		e.previous_points=e.points.duplicate()

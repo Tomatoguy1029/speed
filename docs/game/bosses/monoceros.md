@@ -106,6 +106,8 @@
 
 ### 9.2 調整と実装の接続
 
+技の動きと公開値は `scripts/bosses/monoceros/techniques/`、技の見た目は `scenes/bosses/monoceros/`、保存値は `data/bosses/monoceros_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+
 「ボス行動」画面で、使う技・区間の順序と選択条件・既存技の組み合わせ・技の数値を調整できるようにする。技固有の動作と演出はスクリプトと表示シーンで作り、戦闘の組み立ては[共通のノード編集](../../dev/stage-production.md#56-ボス行動を調整する)を使う。組み合わせは本体を共有する技の実行制約と[連携の方針](#5-大技と連携)に従う。
 
 本体の数値の正は [`speed/data/bosses/monoceros.tres`](../../../speed/data/bosses/monoceros.tres)、技別の性能は [`monoceros_moves/`](../../../speed/data/bosses/monoceros_moves/) のリソースとする。HP・装甲・移動速度・旋回速度、距離・角度、技別の予告・実行・硬直・ダメージ・再使用待ち時間、突進回数、角刺さり・角抜き時間、形態移行のHP閾値は試遊調整用の仮値とする。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。

@@ -36,7 +36,7 @@ func _draw_beams(c: CanvasItem) -> void:
 	mat.set_shader_parameter("clock", rm.state.world_time)
 	mat.set_shader_parameter("pixel", _px(2.0))
 	for i in pr.hazard_alive.size():
-		if pr.hazard_visual[i] != null and pr.hazard_visual[i].resource_path != scene_file_path: continue
+		if pr.hazard_visual[i] != &"" and String(pr.hazard_visual[i]) != scene_file_path: continue
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.DRACO:
 			continue
 		# 判定は幅の半分まで。光線の太い所が判定の幅と一致する。

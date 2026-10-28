@@ -21,11 +21,33 @@ static func create(adapter: String, id: String, title: String, script_path: Stri
 	if script_path.is_empty() or not ResourceLoader.exists(script_path): return {"error": ERR_FILE_NOT_FOUND, "message": "技のスクリプトを選んでください。"}
 	var script := load(script_path) as Script
 	if script == null or not script.can_instantiate(): return {"error": ERR_INVALID_DATA, "message": "スクリプトを読み込めません。"}
+	var ancestor := script
+	var belongs_to_boss := false
+	while ancestor != null:
+		if ancestor.resource_path.begins_with("res://scripts/bosses/" + adapter + "/"): belongs_to_boss = true
+		ancestor = ancestor.get_base_script()
+	if not belongs_to_boss: return {"error": ERR_INVALID_DATA, "message": "選択したボスの技スクリプトを選んでください。"}
 	var move: Variant = script.new()
 	if not move is BossTechnique: return {"error": ERR_INVALID_DATA, "message": "BossTechniqueを継承するスクリプトを選んでください。"}
+	var runner: RefCounted = move.make_runner()
+	if runner == null or not runner.has_method("kind"): return {"error": ERR_INVALID_DATA, "message": "実行するRunnerを持つ技スクリプトを選んでください。"}
+	if adapter != "hydra" and not move.has_field("warn"): return {"error": ERR_INVALID_DATA, "message": "予告と実行処理を持つ技スクリプトを選んでください。"}
+	var prototype: Resource
+	for file in DirAccess.get_files_at("res://data/bosses/%s_moves" % adapter):
+		if not file.ends_with(".tres"): continue
+		var source: Resource = load("res://data/bosses/%s_moves/" % adapter + file)
+		if source.get_script() == script or (from_template and file == PROTOTYPES[adapter] + ".tres"):
+			prototype = source
+			break
+	if prototype != null:
+		move.assign_values(prototype.values())
+		move.category = prototype.category
+		move.visual = prototype.visual
+		move.track_during_warn = prototype.track_during_warn
+		move.post_gap = prototype.post_gap
 	move.technique = StringName(id)
 	move.display_name = title.strip_edges()
-	if adapter == "hydra": move.head_kind = &"bite"
+	if adapter == "hydra": move.head_kind = prototype.head_kind if prototype != null else &"bite"
 	var error := ResourceSaver.save(move, path)
 	if error == OK: move = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	return {"error": error, "move": move, "path": path, "script": script_path, "message": "作成しました。条件をつなぐとAIが使います。" if error == OK else "技を保存できません。"}

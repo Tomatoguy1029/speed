@@ -279,6 +279,8 @@ HP段階移行時の配置済み隕石は[段階移行時の扱い](#22-段階�
 
 ### 9.2 実装状況と接続先
 
+技の動きと公開値は `scripts/bosses/draco/techniques/`、技の見た目は `scenes/bosses/draco/`、保存値は `data/bosses/draco_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+
 実装状況は[敵一覧](../catalog/enemies.md)で管理する。役者・技・演出の共通基盤は[設計書6.1](../../architecture.md#61-敵とボスの-ai)を参照する。区間ごとの候補リストと本書の行動条件を実装要件とする。
 
 調整値の正は`speed/data/`のリソースとし、本体HPと段階閾値は `data/bosses/draco.tres` で調整する。攻撃の威力・速度・時間・体数・予算配分も各リソースで調整する。具体値は試遊用の仮値として扱う。

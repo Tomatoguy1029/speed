@@ -77,7 +77,7 @@ var hostile_slow := PackedFloat32Array()
 ## 誘導の曲がる速さ（ミサイル）
 var hostile_turn := PackedFloat32Array()
 var hostile_kind := PackedByteArray()
-var hostile_visual: Array = []
+var hostile_visual: Array[StringName] = []
 ## 天体の表面までの余裕の下限。これが移動量より大きい間は天体の判定を省く
 var hostile_gap := PackedFloat32Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は止まり、触れると砕けて被弾しない）
@@ -117,7 +117,7 @@ const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 const ZONE_FLASH := 0.25
 var hazard_alive := PackedByteArray()
 var hazard_kind := PackedByteArray()
-var hazard_visual: Array = []
+var hazard_visual: Array[StringName] = []
 var hazard_style := PackedByteArray()
 var hazard_pos := PackedVector2Array()
 var hazard_angle := PackedFloat32Array()
@@ -415,7 +415,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_slow[i] = slow
 	hostile_turn[i] = turn
 	hostile_kind[i] = kind
-	hostile_visual[i] = visual_context
+	hostile_visual[i] = StringName(visual_context.resource_path) if visual_context != null else &""
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
@@ -646,6 +646,7 @@ func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 ## 攻撃の形（行 h）を消す。
 func release_hazard(h: int) -> void:
 	if h < hazard_alive.size() and hazard_alive[h] != 0:
+		end_attack_visual(_hazard_visual_path(h), "Fade", hazard_pos[h])
 		_combat_end(_combat_hazards, h, "released", hazard_pos[h])
 		hazard_enemy_hit[h].clear()
 		hazard_slots.release(h)
@@ -657,7 +658,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	if director != null:
 		lab_hazard_group[i] = lab_context
 	hazard_kind[i] = kind
-	hazard_visual[i] = visual_context
+	hazard_visual[i] = StringName(visual_context.resource_path) if visual_context != null else &""
 	hazard_style[i] = style
 	hazard_pos[i] = pos
 	hazard_angle[i] = angle
@@ -701,6 +702,7 @@ func _update_hazards(dt: float) -> void:
 		var owner := hazard_owner[i]
 		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
 				or combat.enemies.table.dead[owner] != 0 or _hazard_owner_pulled(i))):
+			end_attack_visual(_hazard_visual_path(i), "Fade", hazard_pos[i])
 			_combat_end(_combat_hazards, i, "lifetime_or_owner_end", hazard_pos[i])
 			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)
@@ -717,6 +719,7 @@ func _update_hazards(dt: float) -> void:
 			continue
 		if shape.hits_once:
 			hazard_hit[i] = 1
+		end_attack_visual(_hazard_visual_path(i), "Hit", ship_pos)
 		_combat_damage(_combat_hazards, i, hazard_dmg[i], 0.0, HAZARD_CAUSE[hazard_kind[i]], _hazard_source(i))
 		if state.phase != RunState.Phase.PLAY:
 			return
@@ -766,7 +769,29 @@ func clear_combat_observations(reason := "recording_end") -> void:
 	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])
 
 func _end_hostile(row: int, reason: String, at: Vector2) -> void:
-	var scene: PackedScene = hostile_visual[row]
-	if scene != null:
-		state.emit(&"attack_visual_end", {"scene": scene.resource_path, "phase": "Hit" if reason in ["contact", "obstacle"] else "Fade", "pos": at})
+	var scene: StringName = hostile_visual[row]
+	if scene == &"": scene = StringName("res://scenes/attacks/%s.tscn" % HostileKind.keys()[hostile_kind[row]].to_lower())
+	end_attack_visual(scene, "Hit" if reason in ["contact", "obstacle"] else "Fade", at)
 	_combat_end(_combat_hostiles, row, reason, at)
+
+var _end_visual_library: Resource
+var _end_visual_phases := {}
+func end_attack_visual(scene: StringName, phase: String, at: Vector2) -> void:
+	if not _end_visual_phases.has(scene):
+		if _end_visual_library == null and ctx.resources != null:
+			_end_visual_library = ctx.resources.resources.get("res://.content/attack_visuals.res")
+		if _end_visual_library == null and state.lab_mode and ResourceLoader.exists("res://.content/attack_visuals.res"):
+			_end_visual_library = load("res://.content/attack_visuals.res")
+		if _end_visual_library == null: return
+		var layers: Dictionary = _end_visual_library.get_meta("looks", {}).get(String(scene), {})
+		var phases := {}
+		for name in ["Hit", "Fade"]:
+			phases[name] = layers.get(name) != null or not layers.get(name + "_sprites", []).is_empty()
+		_end_visual_phases[scene] = phases
+	if _end_visual_phases[scene][phase]: state.emit(&"attack_visual_end", {"scene": String(scene), "phase": phase, "pos": at})
+
+func _hazard_visual_path(row: int) -> StringName:
+	if hazard_visual[row] != &"": return hazard_visual[row]
+	var kind: String = HazardKind.keys()[hazard_kind[row]].to_lower()
+	var styled := "%s_%s" % [kind, HazardStyle.keys()[hazard_style[row]].to_lower()]
+	return StringName("res://scenes/attacks/%s.tscn" % (styled if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % styled) else kind))

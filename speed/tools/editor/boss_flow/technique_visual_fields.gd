@@ -5,7 +5,7 @@ static func append(editor: Control, move: Resource) -> void:
 	editor._section_heading("見た目")
 	_row(editor, move, "visual", "技の見た目")
 	for key in move.field_names():
-		if move.field(key) is PackedScene:
+		if move.field_property(key).get("class_name", "") == &"PackedScene":
 			_row(editor, move, key, move.field_description(key).split("\n")[0])
 
 static func _row(editor: Control, move: Resource, key: String, title: String) -> void:
@@ -75,6 +75,13 @@ static func _choose(editor: Control, move: Resource, key: String, action: String
 			scene = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 		if scene == null:
 			editor._status.text = "シーンを読み込めません。"
+			dialog.queue_free()
+			return
+		var source := scene.instantiate()
+		var valid := source is Node2D if key == "visual" else source is AttackVisual
+		source.free()
+		if not valid:
+			editor._status.text = "技の見た目はNode2D、弾の見た目はAttackVisualを使ってください。"
 			dialog.queue_free()
 			return
 		editor.history.create_action("見た目のシーンを変更")
