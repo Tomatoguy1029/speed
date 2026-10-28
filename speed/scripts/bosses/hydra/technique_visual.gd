@@ -23,7 +23,7 @@ var flashes: Array[Dictionary] = []
 var sprites: Dictionary={}
 var serial:=0
 @export var burst_shader: Shader=preload("res://shaders/hydra_burst.gdshader")
-@onready var animations: AnimationPlayer = $VisualTimeline
+@onready var animations: AnimationPlayer = $AnimationPlayer
 @onready var body_anchor: Marker2D = $BodyAnchor
 @onready var head_anchor: Marker2D = $HeadAnchor
 
@@ -33,6 +33,7 @@ func bind_hydra(actor: Node) -> void:
 	hydra.presentation_advanced.connect(advance_effects)
 
 func on_event(event: Dictionary) -> void:
+	if event.cue in [&"growth_started", &"separation_started", &"head_destroyed", &"hit", &"phase_changed", &"exposed", &"defeated"]: return
 	if event.technique != technique_id: return
 	on_hydra_event(event)
 
@@ -50,7 +51,7 @@ func on_hydra_event(event: Dictionary) -> void:
 				slots[index].delay = event.damage_delay
 			if cue == &"attack_started" and float(event.get("damage_delay", 0.0)) <= 0.0:
 				_flash(event)
-			var clip := &"warning" if cue == &"warning_started" else (&"attack" if cue == &"attack_started" else &"recovery")
+			var clip := &"windup" if cue == &"warning_started" else (&"active" if cue == &"attack_started" else &"recover")
 			if animations.has_animation(clip):
 				animations.play(clip)
 				animations.advance(0.0)
@@ -146,3 +147,11 @@ func _flash(event: Dictionary)->void:
 	sprites[serial]=sprite
 	var duration:=0.8 if large else maxf(flash_duration,0.3)
 	flashes.append({"id":serial,"position":event.position,"cue":event.cue,"life":duration,"duration":duration})
+
+func phase_state() -> Dictionary:
+	if slots.is_empty() or hydra == null: return {}
+	var event: Dictionary = slots[-1] if slots.has(-1) else slots.values()[0]
+	var phase: StringName = &"windup" if event.cue == &"warning_started" else &"recover" if event.cue == &"recovery_started" else &"active"
+	var settings: Dictionary = hydra.move_params(technique_id)
+	var duration := float(event.get("duration", settings.get("normal_charge", settings.get("warning_time", 1.0)))) if phase == &"windup" else float(event.get("duration", settings.get("tech_recovery", settings.get("normal_hold", 1.0)))) if phase == &"recover" else float(settings.get("performance_time", settings.get("beam_time", settings.get("normal_lunge", 1.0))))
+	return {"phase": phase, "elapsed": hydra._time - float(event.world_time), "duration": duration}

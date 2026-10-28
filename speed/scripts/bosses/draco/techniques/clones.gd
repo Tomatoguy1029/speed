@@ -3,24 +3,47 @@
 extends BossTechnique
 
 ## 予告（秒）
-@export_range(0,100000,0.01) var warn := 1.2
+@export_range(0,100000,0.01) var warn := 1.2:
+	set(value):
+		warn = value
+		_values_dirty = true
 ## 攻撃の継続時間
-@export_range(0,100000,0.01) var active := 7.5
+@export_range(0,100000,0.01) var active := 7.5:
+	set(value):
+		active = value
+		_values_dirty = true
 ## 攻撃後の待ち
-@export_range(0,100000,0.01) var recover := 1.2
+@export_range(0,100000,0.01) var recover := 1.2:
+	set(value):
+		recover = value
+		_values_dirty = true
 ## ダメージ
-@export_range(0,100000,0.01) var damage := 28.0
+@export_range(0,100000,0.01) var damage := 28.0:
+	set(value):
+		damage = value
+		_values_dirty = true
 ## 当たりの太さ（中心から片側）
-@export_range(0,100000,0.01) var width := 50.0
+@export_range(0,100000,0.01) var width := 50.0:
+	set(value):
+		width = value
+		_values_dirty = true
 ## 複製体のHP
-@export_range(0,100000,0.01) var clone_hp := 350.0
+@export_range(0,100000,0.01) var clone_hp := 350.0:
+	set(value):
+		clone_hp = value
+		_values_dirty = true
 ## 複製1体の星数（仮）
-@export_range(0,100000,1) var clone_stars := 13
+@export_range(0,100000,1) var clone_stars := 13:
+	set(value):
+		clone_stars = value
+		_values_dirty = true
 
 func make_runner() -> RefCounted:
 	return Runner.new()
 
 class Runner extends BossTechnique.Runner:
+	func kind() -> StringName: return &"clones"
+
 	const FORM = preload("res://scripts/bosses/draco_form.gd")
 	const HYDRA = preload("res://data/bosses/hydra.tres")
 	const MOVES = [preload("res://data/bosses/hydra_moves/bite_thrust.tres"),preload("res://data/bosses/hydra_moves/wind_band.tres"),preload("res://data/bosses/hydra_moves/rubble_fan.tres"),preload("res://data/bosses/hydra_moves/beam_fixed.tres"),preload("res://data/bosses/hydra_moves/thunder_drop.tres")]
@@ -42,6 +65,7 @@ class Runner extends BossTechnique.Runner:
 		var attack_field: Node2D
 		var energy_shader: Shader = preload("res://shaders/hydra_energy.gdshader")
 		var tornado_scene: PackedScene = preload("res://scenes/bosses/hydra_tornado.tscn")
+		func tech_kind(id: StringName) -> StringName: return id
 		func move_settings(id: StringName) -> Resource:
 			for move in MOVES:
 				if move.technique == id: return move

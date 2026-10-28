@@ -27,7 +27,7 @@ func _ready() -> void:
 				var lock := Vector2.ZERO
 				for frame in 600:
 					var t := frame/120.0
-					var commit: bool = (a._driver != null and bool(a._driver.locked)) if id in [&"charge",&"leap"] else t>0.35
+					var commit: bool = (a._runner != null and bool(a._runner.locked)) if id in [&"charge",&"leap"] else t>0.35
 					if commit and not changed:
 						changed=true;lock=a.aim
 						if dodge:sim.state.ship_vel=-sim.state.ship_vel*2.0

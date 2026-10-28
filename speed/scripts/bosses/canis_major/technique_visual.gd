@@ -1,12 +1,13 @@
 ## 技の予告・猟犬の軌跡・号令と遠吠えの輪。
 extends Node2D
 @export var technique_id: StringName
+var visual_kind: StringName
 @export var pixel_size := 3.0
 var actor: CanisMajorBoss
 var _pack_layer := Node2D.new()
 var _trails: Dictionary = {}
 var retained: bool:
-	get: return technique_id == &"howl" and actor != null and actor.ring_started >= 0.0
+	get: return visual_kind == &"howl" and actor != null and actor.ring_started >= 0.0
 const OUTLINE := Color("#1a1928")
 const COAT := Color("#7a6f8f")
 const SHADE := Color("#4d4660")
@@ -21,20 +22,20 @@ func _ready() -> void:
 	_pack_layer.draw.connect(_draw_lunge)
 	add_child(_pack_layer)
 func update_technique() -> void:
-	if technique_id == &"command": _track_lunge()
+	if visual_kind == &"command": _track_lunge()
 	_pack_layer.queue_redraw()
 func _draw() -> void:
 	if actor == null or not actor.has_body() or actor.technique != technique_id: return
 	var r := actor.table.r[actor.body]
 	var charge := actor.table.charge[actor.body]
 	# 飛びかかりの構えは着地点までの線を描く。狙いが固定されると赤くする。
-	if actor.technique == &"pounce" and actor.mode == &"windup":
+	if visual_kind == &"pounce" and actor.mode == &"windup":
 		var reach := actor.table.pos[actor.body].distance_to(actor.aim_point)
 		var color := DANGER if actor.locked else WARNING
 		draw_line(Vector2(r, 0.0), Vector2(maxf(r, reach), 0.0), Color(color, 0.35 + charge * 0.4), pixel_size * (2.0 if actor.locked else 1.0))
 		draw_arc(Vector2(reach, 0.0), r * 0.5, 0.0, TAU, 24, Color(color, 0.6), pixel_size)
 	# シリウスの光の溜めは、口元から射線を細く示す。向きが固定されると光の太さの赤い線にする。
-	if actor.technique == &"sirius" and actor.mode == &"windup":
+	if visual_kind == &"sirius" and actor.mode == &"windup":
 		var from := Vector2(r * CanisMajorBoss.MOUTH_REACH, 0.0)
 		var length := float(actor.rule().get("beam_length", 1400.0))
 		var color := DANGER if actor.locked else WARNING
@@ -42,8 +43,8 @@ func _draw() -> void:
 		draw_line(from, from + Vector2(length, 0.0), Color(color, 0.35 if actor.locked else 0.25 + charge * 0.3), width)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (r / 100.0))
 	var mouth := Vector2(84.0, 0.0)
-	var howl := actor.technique == &"howl" and actor.mode == &"windup"
-	var shout := actor.technique == &"command" and actor.mode == &"windup"
+	var howl := visual_kind == &"howl" and actor.mode == &"windup"
+	var shout := visual_kind == &"command" and actor.mode == &"windup"
 	# 遠吠えは、口元から大きな輪を次々に広げる。
 	if howl:
 		for ring in 3:
@@ -69,9 +70,9 @@ func _track_lunge() -> void:
 func _draw_lunge() -> void:
 	var t := actor.table
 	var radius := actor.ring_radius()
-	if technique_id == &"howl" and radius > 0.0:
+	if visual_kind == &"howl" and radius > 0.0:
 		_pack_layer.draw_arc(actor.ring_center, radius, 0.0, TAU, 96, Color(WARNING, 0.35), pixel_size, true)
-	if technique_id != &"command": return
+	if visual_kind != &"command": return
 	for i in _trails:
 		var points: PackedVector2Array = _trails[i]
 		if points.size() < 1 or t.alive[i] == 0 or t.dead[i] != 0: continue

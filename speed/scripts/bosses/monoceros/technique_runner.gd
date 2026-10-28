@@ -7,8 +7,8 @@ func _begin_pass(host: MonocerosBoss) -> void:
 	host.attack_hit = false
 	host.table.vel[host.body] = Vector2.ZERO
 	host.aim_point = host._strike_aim()
-	host.direction = Vector2.from_angle(host.table.facing[host.body] + (PI if host.technique == &"kick" else 0.0))
-	if host.technique == &"kick" and not host.aim_point.is_equal_approx(host.table.pos[host.body]):
+	host.direction = Vector2.from_angle(host.table.facing[host.body] + (PI if kind() == &"kick" else 0.0))
+	if kind() == &"kick" and not host.aim_point.is_equal_approx(host.table.pos[host.body]):
 		host.direction = (host.aim_point - host.table.pos[host.body]).normalized()
 	var r := host.rule()
 	var anim := host.timeline.get_animation(&"attack")
@@ -23,7 +23,7 @@ func _begin_pass(host: MonocerosBoss) -> void:
 
 func _aim(host: MonocerosBoss, dt: float) -> void:
 	host.aim_point = host._strike_aim()
-	if host.technique == &"kick":
+	if kind() == &"kick":
 		host.direction = (host.aim_point - host.table.pos[host.body]).normalized()
 		return
 	var wanted := (host.aim_point - host.table.pos[host.body]).angle()
@@ -35,10 +35,10 @@ func _aim(host: MonocerosBoss, dt: float) -> void:
 func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) -> Vector2:
 	# ボス固有の捕捉。選択時・予告中だけ現在位置と速度から接触時点を狙う。
 	if attack == &"": attack = host.technique
-	if attack == &"combo": attack = &"charge"
+	if host.tech_kind(attack) == &"combo": attack = &"charge"
 	var velocity := host.run_state.ship_vel
 	var target := host.run_state.ship_pos + velocity * (float(host.def.params.lock_lead) if lead < 0.0 else lead)
-	if attack not in [&"charge", &"return_charge", &"lance"]: return target
+	if host.tech_kind(attack) not in [&"charge", &"return_charge", &"lance"]: return target
 	var r: Dictionary = host._moves[attack].values()
 	var speed := float(r.distance) / float(r.active)
 	var reach := float(r.get("reach", host.horn_length()))
@@ -62,16 +62,16 @@ func lock_aim(host: MonocerosBoss) -> void:
 	if host.mode != &"windup" or host.locked: return
 	# 固定後は再捕捉せず、予告で見せた方向へ発進する。
 	# 蹴りは背後への攻撃なので本体の向きを保つ。
-	if host.technique != &"kick" and not host.aim_point.is_equal_approx(host.table.pos[host.body]):
+	if kind() != &"kick" and not host.aim_point.is_equal_approx(host.table.pos[host.body]):
 		host.table.facing[host.body] = (host.aim_point - host.table.pos[host.body]).angle()
 	host.locked = true
-	host.direction = (host.aim_point - host.table.pos[host.body]).normalized() if host.technique == &"kick" else Vector2.from_angle(host.table.facing[host.body])
+	host.direction = (host.aim_point - host.table.pos[host.body]).normalized() if kind() == &"kick" else Vector2.from_angle(host.table.facing[host.body])
 	host._cue(&"aim_locked")
 
 func launch_strike(host: MonocerosBoss) -> void:
 	if host.mode != &"windup": return
 	host.lock_aim()
-	if host.table.pos[host.body].distance_to(host.aim_point) > host._reach(host.technique) or (host.technique == &"kick" and absf(Geom.angle_diff(host.direction.angle(), host.table.facing[host.body] + PI)) > float(host.def.params.kick_trigger_arc)):
+	if host.table.pos[host.body].distance_to(host.aim_point) > host._reach(host.technique) or (kind() == &"kick" and absf(Geom.angle_diff(host.direction.angle(), host.table.facing[host.body] + PI)) > float(host.def.params.kick_trigger_arc)):
 		host.combat_trace.finish("interrupted", "target_left_launch_range")
 		# 予告中に届かない位置へ離れた自機へ、空の近接攻撃を出し続けない。
 		host.timeline.stop()
@@ -81,7 +81,7 @@ func launch_strike(host: MonocerosBoss) -> void:
 		host.recovery = host._begin_settle() + float(host.rule().recover)
 		host._cue(&"recovery_started")
 		return
-	if host.technique in [&"charge", &"return_charge", &"lance"] and host._path_blocked():
+	if kind() in [&"charge", &"return_charge", &"lance"] and host._path_blocked():
 		host.combat_trace.finish("interrupted", "path_obstructed")
 		host.combo_pending = false
 		host.passes_left = 0
@@ -115,7 +115,7 @@ func end_strike(host: MonocerosBoss) -> void:
 	host.table.vel[host.body] = Vector2.ZERO
 	host.previous_horn.clear()
 	host.passes_left -= 1
-	if host.technique == &"return_charge" and host.passes_left > 0:
+	if kind() == &"return_charge" and host.passes_left > 0:
 		host.mode = &"turnaround"
 		host.recovery = float(host.def.params.turnaround_time)
 	elif host.combo_pending:
@@ -132,10 +132,10 @@ func _begin_settle(host: MonocerosBoss) -> float:
 	host.settle_at = host.clock
 	host.settle_hold = 0.0
 	host.settle_return = 0.0
-	if host.technique not in [&"sweep", &"kick"]: return 0.0
+	if kind() not in [&"sweep", &"kick"]: return 0.0
 	var r := host.rule()
 	# 戻す角度：薙ぎは振り終えた端から正面まで、蹴りは後ろへ回した後脚を前へ戻すまで。
-	var angle := float(r.get("arc", 0.0)) * 0.5 if host.technique == &"sweep" else PI
+	var angle := float(r.get("arc", 0.0)) * 0.5 if kind() == &"sweep" else PI
 	var speed := float(r.get("return_speed", 0.0))
 	host.settle_hold = maxf(0.0, float(r.get("hold", 0.0)))
 	host.settle_return = angle / speed if speed > 0.0 else 0.0
@@ -143,29 +143,14 @@ func _begin_settle(host: MonocerosBoss) -> float:
 
 ## 攻撃後の姿勢戻しの進み。0は終わった姿勢のまま、1は正面の姿勢。
 
-func horn_points(host: MonocerosBoss, sweep_fraction := -1.0) -> PackedVector2Array:
+func horn_points(host: MonocerosBoss, _sweep_fraction := -1.0) -> PackedVector2Array:
 	var at := host.table.pos[host.body]
-	var angle := host.table.facing[host.body]
-	var reach := host.horn_length()
-	var root := host.table.r[host.body] * 0.65
-	if host.technique == &"kick":
-		angle = host.direction.angle()
-		reach = float(host.rule().reach)
-	elif host.technique == &"lance":
-		reach = float(host.rule().reach)
-	elif host.technique == &"sweep":
-		var f := sweep_fraction
-		if f < 0.0: f = clampf((host.timeline.current_animation_position - float(host.rule().warn)) / float(host.rule().active), 0.0, 1.0)
-		# 薙ぐ角度は振る範囲の全体。正面を中心に、左端から右端へ振る。
-		angle += lerpf(-0.5, 0.5, f) * float(host.rule().arc)
-	var dir := Vector2.from_angle(angle)
-	return PackedVector2Array([at + dir * root, at + dir * reach])
-
-## 予告の細線は、移動後の角先までの直線を共有する。
+	var direction := Vector2.from_angle(host.table.facing[host.body])
+	return PackedVector2Array([at + direction * host.table.r[host.body] * 0.65, at + direction * host.horn_length()])
 
 func warning_points(host: MonocerosBoss) -> PackedVector2Array:
 	var points := host.horn_points()
-	if host.technique in [&"charge", &"return_charge", &"lance"]:
+	if kind() in [&"charge", &"return_charge", &"lance"]:
 		points[1] += host.direction * float(host.rule().distance)
 	return points
 
@@ -193,3 +178,6 @@ func _hit_ship(host: MonocerosBoss) -> void:
 
 func body_pose(_host: MonocerosBoss, _parts: Node2D) -> Dictionary:
 	return {"neck": 0.0, "legs": []}
+
+func kind() -> StringName:
+	return &""

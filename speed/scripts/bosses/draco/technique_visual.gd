@@ -1,6 +1,7 @@
 ## 技の予告・攻撃線・着弾。各技のシーンが表示の値と追加描画を持つ。
 extends Node2D
 @export var technique_id: StringName
+var visual_kind: StringName
 @export var keep_visible := false
 var actor: BossActor
 var effects: Array = []
@@ -33,14 +34,14 @@ func _draw_current() -> void:
 	_draw_telegraphs()
 	if actor.attack_points.size()>1:
 		var line := _local_points(actor.attack_points)
-		if actor.technique==&"breath" and line.size()>3:
+		if visual_kind == &"breath" and line.size()>3:
 			for j in range(1,line.size()-1):
 				if absf((line[j]-line[0]).cross(line[j+1]-line[0]))>0.1:
 					draw_colored_polygon(PackedVector2Array([line[0],line[j],line[j+1]]),Color(0.34,0.46,1.0,0.5))
 			draw_polyline(line,Color(0.68,0.86,1.0,0.8),4.0,false)
 		elif FORM.length(line)>=8.0:
 			var active: bool=actor.mode==&"active"
-			if actor.technique in [&"bite",&"charge",&"leap",&"tail_slam",&"tail_sweep"]:
+			if visual_kind in [&"bite",&"charge",&"leap",&"tail_slam",&"tail_sweep"]:
 				# The moving creature is the physical hit shape; a restrained motion seam is not a debug hitbox.
 				draw_polyline(line,Color(0.52,0.72,1.0,0.24),14.0,false)
 				draw_polyline(line,Color(0.86,0.95,1.0,0.7),3.0,false)
@@ -80,7 +81,7 @@ func _draw_telegraphs() -> void:
 		FORM.star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
 	for target in actor.telegraph_points:
 		var at: Vector2=actor.to_local(target)
-		if actor.technique == &"star_fan":
+		if visual_kind == &"star_fan":
 			# radius is the formation radius, not a blast at each of the nine stars.
 			FORM.star(self,at,8.0+progress*4.0,Color(1.0,0.78,0.48,0.85))
 			continue

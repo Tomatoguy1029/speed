@@ -2,48 +2,48 @@
 [ext_resource type="Script" path="res://scripts/bosses/hydra/technique_visual.gd" id="script"]
 
 [sub_resource type="Animation" id="warning"]
-length = 0.6
+length = 1.0
 loop_mode = 1
 tracks/0/type = "value"
 tracks/0/path = NodePath(".:pulse_scale")
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.3, 0.6),
+"times": PackedFloat32Array(0, 0.5, 1.0),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
 "values": [1.0, 1.12, 1.0]
 }
 
 [sub_resource type="Animation" id="attack"]
-length = 0.6
+length = 1.0
 loop_mode = 0
 tracks/0/type = "value"
 tracks/0/path = NodePath(".:pulse_scale")
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.3, 0.6),
+"times": PackedFloat32Array(0, 0.5, 1.0),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
 "values": [1.3, 1.1, 1.0]
 }
 
 [sub_resource type="Animation" id="recovery"]
-length = 0.6
+length = 1.0
 loop_mode = 1
 tracks/0/type = "value"
 tracks/0/path = NodePath(".:pulse_scale")
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.3, 0.6),
+"times": PackedFloat32Array(0, 0.5, 1.0),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
 "values": [1.0, 0.9, 1.0]
 }
 
 [sub_resource type="Animation" id="hit"]
-length = 0.6
+length = 1.0
 loop_mode = 0
 tracks/0/type = "value"
 tracks/0/path = NodePath(".:pulse_scale")
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.3, 0.6),
+"times": PackedFloat32Array(0, 0.5, 1.0),
 "transitions": PackedFloat32Array(1, 1, 1),
 "update": 0,
 "values": [1.4, 1.15, 1.0]
@@ -51,9 +51,9 @@ tracks/0/keys = {
 
 [sub_resource type="AnimationLibrary" id="library"]
 _data = {
-&"warning": SubResource("warning"),
-&"attack": SubResource("attack"),
-&"recovery": SubResource("recovery"),
+&"windup": SubResource("warning"),
+&"active": SubResource("attack"),
+&"recover": SubResource("recovery"),
 &"hit": SubResource("hit")
 }
 
@@ -70,6 +70,6 @@ technique_id = &"beam_fixed"
 [node name="Telegraph" type="Polygon2D" parent="."]
 color = Color(0, 0, 0, 0)
 
-[node name="VisualTimeline" type="AnimationPlayer" parent="."]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
 callback_mode_process = 2
 libraries/ = SubResource("library")

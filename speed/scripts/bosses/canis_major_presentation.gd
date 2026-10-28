@@ -63,8 +63,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	modulate = Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	# 身を低くする：構えるほど胴を短く太く、脚を外へ開く。
-	var crouch := charge if actor.technique == &"pounce" and actor.mode == &"windup" else 0.0
-	var stretch := 1.15 if actor.mode == &"active" and actor.technique == &"pounce" else 1.0 - crouch * 0.15
+	var crouch: float = actor.technique_pose.get("crouch", 0.0)
+	var stretch: float = actor.technique_pose.get("stretch", 1.0)
 	for j in 4:
 		var side := -1.0 if j % 2 == 0 else 1.0
 		var x := (-48.0 if j < 2 else 22.0) * stretch
@@ -79,9 +79,9 @@ func _draw() -> void:
 	_oval(Vector2(70 * stretch, 0), Vector2(16, 12), MUZZLE)
 	# 口元のシリウス。号令の構えでは強く瞬き、輪を広げる。
 	var mouth := Vector2(84 * stretch, 0)
-	var shout := actor.technique == &"command" and actor.mode == &"windup"
-	var howl := actor.technique == &"howl" and actor.mode == &"windup"
-	var gather := actor.technique == &"sirius" and actor.mode == &"windup"
+	var shout: bool = actor.technique_pose.get("shout", false)
+	var howl: bool = actor.technique_pose.get("howl", false)
+	var gather: bool = actor.technique_pose.get("gather", false)
 	var strong := blaze()
 	var glow := 6.0 + 6.0 * strong + (8.0 * charge if shout else 18.0 * charge if gather else (1.5 + 2.0 * strong) * sin(actor.clock * 5.0))
 	# 第2形態では、口元のまわりに大きな光の暈と十字の光芒を足す。

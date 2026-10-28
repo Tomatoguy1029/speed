@@ -33,12 +33,12 @@ func run_test() -> void:
 			sim.combat.damage_enemy(actor.body,1.0e8,{"cause":&"shot"})
 			check(actor.phase==2,"各時点でHP段階を一つ進める: "+id)
 			check(sim.projectiles.hostile_count()==bullets,"発射済みの弾を残す: "+id)
-			check(actor._driver==null,"移行時に技の所有を解放する: "+id)
+			check(actor._runner==null,"移行時に技の所有を解放する: "+id)
 			check(not sim.state.boss_dead,"移行中に勝利しない: "+id)
 	actor.cycle.cancel();actor.cancel_attack()
 	actor.phase=1;actor.mode=&"idle";actor.table.guard[actor.body]=0.0;actor.table.hp[actor.body]=actor.table.max_hp[actor.body]
 	actor.start_attack(&"clones")
-	var driver=actor._driver
+	var driver=actor._runner
 	driver.units[0].mode=&"rubble_fan"
 	for frame in 480: actor.sim_tick(1.0/120.0,1.0/120.0)
 	check(driver.host.attack_field.effects.any(func(e):return e.persistent),"複製の瓦礫は発射済みの弾として存在する")

@@ -70,15 +70,15 @@ func exercise() -> void:
  undo_button.pressed.emit()
  numbers = panel._fields.get_children().filter(func(n): return n is SpinBox)
  assert(panel.rules.conditions.bite_thrust.max == old_max and numbers[1].value == old_max, "undo must refresh the displayed condition value as well as its data")
- var original_damage: float = panel.working["res://data/bosses/hydra_moves/bite_thrust.tres"].parameters.bite_dmg
+ var original_damage: float = panel.working["res://data/bosses/hydra_moves/bite_thrust.tres"].bite_dmg
  panel._picked("technique", "bite_thrust")
  panel.set_value("bite_dmg", original_damage + 1.0)
  panel.rebuild_ui()
- assert(panel.current.parameters.bite_dmg == original_damage + 1.0)
+ assert(panel.current.bite_dmg == original_damage + 1.0)
  panel.history.undo()
- assert(panel.current.parameters.bite_dmg == original_damage, "a UI rebuild must preserve user edits and undo history")
+ assert(panel.current.bite_dmg == original_damage, "a UI rebuild must preserve user edits and undo history")
  panel._picked("technique", "beam_fixed")
- var beam_width: float = panel.current.parameters.beam_width
+ var beam_width: float = panel.current.beam_width
  panel.set_value("beam_width", beam_width + 10.0)
  panel._picked("technique", "bite_thrust")
  panel.undo_edit()

@@ -19,12 +19,12 @@ func _ready() -> void:
 func exercise(a, lab) -> void:
 	var config = a.move_settings(&"bite_thrust")
 	check(config != null, "normal action exposes its settings")
-	config.parameters.normal_charge = 0.1
-	config.parameters.normal_lunge = 0.1
-	config.parameters.normal_hold = 0.1
-	config.parameters.attack_cd = 2.1
-	config.parameters.bite_radius = 117.0
-	config.parameters.bite_dmg = 31.0
+	config.normal_charge = 0.1
+	config.normal_lunge = 0.1
+	config.normal_hold = 0.1
+	config.attack_cd = 2.1
+	config.bite_radius = 117.0
+	config.bite_dmg = 31.0
 	var n = a.necks[0]
 	n.cd = 0.0
 	check(a.start_normal(0, &"bite_thrust"), "normal start uses conditions and settings")
@@ -41,14 +41,14 @@ func exercise(a, lab) -> void:
 	a._set_count(8)
 	a._tech_cd = 0.0
 	var major = a.move_settings(&"beam_pincer")
-	major.parameters.warning_time = 0.2
-	major.parameters.performance_time = 1.0
-	major.parameters.pincer_delay = 0.1
-	major.parameters.pincer_time = 0.4
-	major.parameters.beam_width = 91.0
-	major.parameters.beam_dmg = 43.0
-	major.parameters.tech_recovery = 0.7
-	major.parameters.cooldown = 2.3
+	major.warning_time = 0.2
+	major.performance_time = 1.0
+	major.pincer_delay = 0.1
+	major.pincer_time = 0.4
+	major.beam_width = 91.0
+	major.beam_dmg = 43.0
+	major.tech_recovery = 0.7
+	major.cooldown = 2.3
 	check(a.try_start_tech(&"beam_pincer", 1.0), "major starts through the same resource")
 	for i in 5: a.sim_tick(0.1, 0.1)
 	check(a.attack_field.effects.any(func(e): return is_equal_approx(e.width, 91.0) and is_equal_approx(e.damage, 43.0)), "major width and damage reach actual geometry")

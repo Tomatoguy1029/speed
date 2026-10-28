@@ -3,22 +3,42 @@
 extends BossTechnique
 
 ## 標的の先読み上限
-@export_range(0,100000,0.01) var lead_cap := 900.0
+@export_range(0,100000,0.01) var lead_cap := 900.0:
+	set(value):
+		lead_cap = value
+		_values_dirty = true
 ## 予告（秒）
-@export_range(0,100000,0.01) var warn := 0.8
+@export_range(0,100000,0.01) var warn := 0.8:
+	set(value):
+		warn = value
+		_values_dirty = true
 ## 攻撃の継続時間
-@export_range(0,100000,0.01) var active := 0.5
+@export_range(0,100000,0.01) var active := 0.5:
+	set(value):
+		active = value
+		_values_dirty = true
 ## 攻撃後の待ち
-@export_range(0,100000,0.01) var recover := 1.15
+@export_range(0,100000,0.01) var recover := 1.15:
+	set(value):
+		recover = value
+		_values_dirty = true
 ## ダメージ
-@export_range(0,100000,0.01) var damage := 35.0
+@export_range(0,100000,0.01) var damage := 35.0:
+	set(value):
+		damage = value
+		_values_dirty = true
 ## 当たりの太さ（中心から片側）
-@export_range(0,100000,0.01) var width := 96.0
+@export_range(0,100000,0.01) var width := 96.0:
+	set(value):
+		width = value
+		_values_dirty = true
 
 func make_runner() -> RefCounted:
 	return Runner.new()
 
 class Runner extends BossTechnique.Runner:
+	func kind() -> StringName: return &"leap"
+
 	const MOTION = preload("res://scripts/bosses/draco_attack_motion.gd")
 	const STAGING = preload("res://scripts/bosses/draco_screen_staging.gd")
 	var staging: Dictionary

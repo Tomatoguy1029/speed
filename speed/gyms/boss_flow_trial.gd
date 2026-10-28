@@ -173,11 +173,6 @@ func _normalize_preview_program(program: Resource, boss: String) -> String:
 			return "技の値が壊れています: " + id
 		for required in TECHNIQUE_FIELDS.REQUIRED.get(id, []):
 			if not source.has_field(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
-		if not move.is_scripted():
-			var values: Dictionary = move.parameters.duplicate(true)
-			for key in source.parameters:
-				if not values.has(key): values[key] = source.parameters[key]
-			move.parameters = values
 	return ""
 
 func _capture_editable(move: Resource) -> Dictionary:
@@ -213,7 +208,7 @@ func _ensure_tuning_state(boss: String, id: String, preview_move: Resource = nul
 	var key := _move_key(boss, id)
 	if _drafts.has(key): return true
 	var source: Resource = _source_move(boss, id)
-	if source == null or not source.get("parameters") is Dictionary:
+	if not source is BossTechnique:
 		_tuning_status.text = "技の保存元を開けません: " + key
 		return false
 	var path := source.resource_path
@@ -417,7 +412,7 @@ func _save_tuning() -> void:
 		_tuning_status.text = "発動の最小距離が最大距離を超えています。"
 		return
 	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	if move == null or not move.get("parameters") is Dictionary:
+	if not move is BossTechnique:
 		_tuning_status.text = "保存用の技の設定を開けません。"
 		return
 	var saved: Resource = _move_with_draft(move, _drafts[key])
@@ -461,7 +456,7 @@ func _revert_tuning() -> void:
 	if not _source_paths.has(key): return
 	var path: String = _source_paths[key]
 	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	if move == null or not move.get("parameters") is Dictionary:
+	if not move is BossTechnique:
 		_tuning_status.text = "保存済みの技を読み直せません。"
 		return
 	var values := _capture_editable(move)
@@ -772,9 +767,9 @@ func _execute_hydra(id: String) -> bool:
 	var started := false
 	if move.head_kind != &"":
 		var neck = actor._first(move.head_kind)
-		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id))
+		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id), true)
 	else:
-		started = actor.try_start_tech(StringName(id), 1.0)
+		started = actor.try_start_tech(StringName(id), 1.0, [], true)
 	if started: actor.hsm.set_active(false)
 	return started
 

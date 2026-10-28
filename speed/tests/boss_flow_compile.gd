@@ -16,11 +16,11 @@ func _initialize() -> void:
 	source.layout.a = Vector2(900, 200)
 	result = compiler.compile(source, "res://.content/tests/compiled_boss.tres")
 	check(result.error == OK and not result.generated, "layout change reuses runtime data")
-	check(result.program.data.techniques[0].parameters.bite_dmg == 16.0, "compiled values preserved")
+	check(result.program.data.techniques[0].bite_dmg == 16.0, "compiled values preserved")
 	source.techniques[0] = source.techniques[0].duplicate(true)
 	var compiled = compiler.compile(source, "res://.content/tests/embedded_boss.tres")
-	source.techniques[0].parameters.bite_dmg = 999.0
-	check(compiled.program.data.techniques[0].parameters.bite_dmg == 16.0, "runtime values are independent of editor resources")
+	source.techniques[0].bite_dmg = 999.0
+	check(compiled.program.data.techniques[0].bite_dmg == 16.0, "runtime values are independent of editor resources")
 	var rules = load("res://data/bosses/ai/hydra_action_rules.tres").duplicate(true)
 	var signature: Variant = compiler.canonical({"rules": rules})
 	rules.condition_groups = {"custom": {"title": "表示用の条件選択", "category": "normal", "nodes": ["bite_thrust"]}}

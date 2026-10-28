@@ -4,19 +4,19 @@ extends BossTechnique.Runner
 func _begin_windup(host: CentaurusBoss, r: Dictionary, length: float) -> void:
 	host.mode = &"windup"
 	host.alerting = false
-	host.warn_aim = host.run_state.ship_pos if host.technique == &"power_shot" else host.run_state.enemy_aim
+	host.warn_aim = host.run_state.ship_pos if kind() == &"power_shot" else host.run_state.enemy_aim
 	host.table.vel[host.body] = Vector2.ZERO
 	var anim := host.timeline.get_animation(&"attack")
 	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	if host.technique == &"rain":
+	if kind() == &"rain":
 		# 予告のあとはトレースの進行で終わるので、タイムラインは開始の鍵だけを持つ。
 		anim.length = float(r.warn) + 0.01
 		anim.track_insert_key(0, float(r.warn), {"method": &"begin_rain", "args": []})
 	else:
 		anim.length = length
-		if host.technique == &"rear_attack":
+		if kind() == &"rear_attack":
 			anim.track_insert_key(0, float(r.warn), {"method": &"strike_on", "args": []})
-		elif host.technique == &"power_shot":
+		elif kind() == &"power_shot":
 			anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.alert)), {"method": &"alert", "args": []})
 			anim.track_insert_key(0, float(r.warn), {"method": &"release", "args": []})
 		else:
@@ -32,7 +32,7 @@ func release(host: CentaurusBoss) -> void:
 	if host.mode not in [&"windup", &"shooting"]: return
 	var r := host.rule()
 	var mouth := host.bow_mouth()
-	var power := host.technique == &"power_shot"
+	var power := kind() == &"power_shot"
 	var target := (host.run_state.ship_pos if power else host.run_state.enemy_aim) if host._tracks_during_warn() else host.warn_aim
 	var angle := (target - mouth).angle()
 	for offset in host.power_offsets() if power else [0.0]:
@@ -54,3 +54,9 @@ func end_attack(host: CentaurusBoss) -> void:
 # ── 背後攻撃 ──────────────────────────────────────────────
 
 ## 背後攻撃の当たりを有効にする。有効な間に範囲の円へ触れた機体へ1回だけ当たる。
+
+func kind() -> StringName:
+	return &""
+
+func body_pose(host: CentaurusBoss) -> Dictionary:
+	return {"tint": Color.WHITE, "pull": host.table.charge[host.body] if host.mode == &"windup" else 0.0}

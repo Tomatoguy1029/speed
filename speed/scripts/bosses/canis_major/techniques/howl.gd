@@ -3,31 +3,70 @@
 extends BossTechnique
 
 ## 囲みへ走る速さの倍率
-@export_range(0,100000,0.01) var catch_up := 4.0
+@export_range(0,100000,0.01) var catch_up := 4.0:
+	set(value):
+		catch_up = value
+		_values_dirty = true
 ## 再使用待ち（秒）
-@export_range(0,100000,0.01) var cd := 15.0
+@export_range(0,100000,0.01) var cd := 15.0:
+	set(value):
+		cd = value
+		_values_dirty = true
 ## 囲みを狭める時間（秒）
-@export_range(0,100000,0.01) var close_time := 2.2
+@export_range(0,100000,0.01) var close_time := 2.2:
+	set(value):
+		close_time = value
+		_values_dirty = true
 ## 薄い所で抜く猟犬の数
-@export_range(0,100000,1) var gap_slots := 2
+@export_range(0,100000,1) var gap_slots := 2:
+	set(value):
+		gap_slots = value
+		_values_dirty = true
 ## 薄い所の数
-@export_range(0,100000,1) var gaps := 2
+@export_range(0,100000,1) var gaps := 2:
+	set(value):
+		gaps = value
+		_values_dirty = true
 ## 囲みに並ぶ時間（秒）
-@export_range(0,100000,0.01) var gather_time := 1.0
+@export_range(0,100000,0.01) var gather_time := 1.0:
+	set(value):
+		gather_time = value
+		_values_dirty = true
 ## 攻撃後の待ち
-@export_range(0,100000,0.01) var recover := 1.5
+@export_range(0,100000,0.01) var recover := 1.5:
+	set(value):
+		recover = value
+		_values_dirty = true
 ## 囲みの終わりの半径
-@export_range(0,100000,0.01) var ring_close := 220.0
+@export_range(0,100000,0.01) var ring_close := 220.0:
+	set(value):
+		ring_close = value
+		_values_dirty = true
 ## 囲みの猟犬の数
-@export_range(0,100000,1) var ring_count := 16
+@export_range(0,100000,1) var ring_count := 16:
+	set(value):
+		ring_count = value
+		_values_dirty = true
 ## 囲みの始めの半径
-@export_range(0,100000,0.01) var ring_radius := 800.0
+@export_range(0,100000,0.01) var ring_radius := 800.0:
+	set(value):
+		ring_radius = value
+		_values_dirty = true
 ## 呼んだ猟犬が出る輪の外の距離
-@export_range(0,100000,0.01) var spawn_out := 350.0
+@export_range(0,100000,0.01) var spawn_out := 350.0:
+	set(value):
+		spawn_out = value
+		_values_dirty = true
 ## 呼び足す猟犬の上限
-@export_range(0,100000,1) var summon_max := 10
+@export_range(0,100000,1) var summon_max := 10:
+	set(value):
+		summon_max = value
+		_values_dirty = true
 ## 予告（秒）
-@export_range(0,100000,0.01) var warn := 1.2
+@export_range(0,100000,0.01) var warn := 1.2:
+	set(value):
+		warn = value
+		_values_dirty = true
 
 func make_runner() -> RefCounted:
 	return Runner.new()
@@ -108,3 +147,12 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		host.ring_started = -1.0
 
 	## 撃破で群れを解き、猟犬を通常の群れの追跡へ戻す。
+
+	func kind() -> StringName:
+		return &"howl"
+
+	func execute(host: CanisMajorBoss) -> void:
+		host._form_ring(host.rule())
+
+	func body_pose(host: CanisMajorBoss) -> Dictionary:
+		return {"howl": host.mode == &"windup"}

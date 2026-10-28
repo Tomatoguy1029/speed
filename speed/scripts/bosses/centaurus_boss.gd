@@ -42,6 +42,7 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var technique_pose := {}
 var _support_runners := {}
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
@@ -161,9 +162,9 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		table.vel[body] = Vector2.ZERO
 		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。背後攻撃は背中を向けたまま構える。
 		if mode == &"windup" and not _tracks_during_warn():
-			if technique != &"rear_attack": _face(warn_aim, def.turn, dt)
-		elif technique == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
-		elif technique != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
+			if _runner_for().kind() != &"rear_attack": _face(warn_aim, def.turn, dt)
+		elif _runner_for().kind() == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+		elif _runner_for().kind() != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
 		if mode == &"strike": _strike_tick()
 		if timeline.is_playing(): timeline.advance(dt)
 	else:
@@ -265,9 +266,9 @@ func cancel_attack() -> void:
 # ── 射撃 ──────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
-	if attack == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
-	if attack == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
-	if attack == &"rain":
+	if _moves[attack].make_runner().kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
+	if _moves[attack].make_runner().kind() == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
+	if _moves[attack].make_runner().kind() == &"rain":
 		var traces := int(r.traces)
 		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.get("drop_delay", 0.0)) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
@@ -313,7 +314,7 @@ func _rear_ready() -> bool:
 ## with_idle なら、構えていない間も背後攻撃の範囲を返す。
 func lab_ranges(with_idle := false) -> Array[Dictionary]:
 	var ranges: Array[Dictionary] = []
-	if technique == &"rear_attack" and mode in [&"windup", &"strike"]:
+	if _runner_for().kind() == &"rear_attack" and mode in [&"windup", &"strike"]:
 		ranges.append({"center": rear_center(rule()), "radius": float(rule().range_radius), "active": mode == &"strike"})
 	elif with_idle and _rules.has(&"rear_attack"):
 		var r: Dictionary = _rules[&"rear_attack"]
@@ -427,10 +428,12 @@ func _runner_for() -> RefCounted:
 	return preload("res://scripts/bosses/centaurus/technique_runner.gd").new()
 
 func _runner_id(id: StringName) -> RefCounted:
+	if _runner != null and _runner.kind() == id: return _runner
 	if not _support_runners.has(id): _support_runners[id] = _moves[id].make_runner()
 	return _support_runners[id]
 
 func _sync_technique_visuals() -> void:
+	technique_pose = _runner_for().body_pose(self)
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
 	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))

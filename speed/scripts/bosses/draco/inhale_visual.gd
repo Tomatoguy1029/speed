@@ -4,7 +4,7 @@ extends "res://scripts/bosses/draco/technique_visual.gd"
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	super()
-	if actor.technique == &"inhale" and actor._driver != null and not actor._driver.spent:
+	if actor.technique == technique_id and actor._runner != null and not actor._runner.spent:
 		var mouth := actor.to_local(actor.mouth_pos())
 		for j in 24:
 			var k := fmod(actor.elapsed*0.7+j/24.0,1.0)

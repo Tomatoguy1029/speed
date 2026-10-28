@@ -24,7 +24,7 @@ func _ready() -> void:
 			sim.state.ship_pos=Vector2.from_angle(angle)*(300.0 if id!=&"tail_sweep" else -800.0)
 			sim.state.enemy_aim=Vector2(-900,-900);sim.state.ship_vel=Vector2.ZERO
 			a.start_attack(id)
-			var initial_length: float=length_of(a._driver.base)
+			var initial_length: float=length_of(a._runner.base)
 			var maximum_error := 0.0
 			var active_seen := false
 			for frame in 600:
@@ -51,7 +51,7 @@ func _ready() -> void:
 	for rock: FieldSystem.Rock in rocks:
 		check(a.table.max_hp[rock.row]>100.0,"cover tougher than normal meteor")
 	a.start_attack(&"breath")
-	check(a._driver.reused,"breath reuses prior thrown cover")
+	check(a._runner.reused,"breath reuses prior thrown cover")
 	for frame in 370:a.sim_tick(1.0/120.0,1.0/120.0)
 	for rock: FieldSystem.Rock in rocks:check(a.table.dead[rock.row]==0,"cover survives entire unfinished breath")
 	for frame in 100:a.sim_tick(1.0/120.0,1.0/120.0)

@@ -26,12 +26,12 @@ func _ready() -> void:
 			sim.state.view_center=Vector2(-150,0)
 		if form=="copy":
 			actor.phase=2;actor.start_attack(&"clones")
-			var unit: Dictionary=actor._driver.units[1]
+			var unit: Dictionary=actor._runner.units[1]
 			target=unit.row;hit_row=unit.parts[6].row
 			actor._presentation.hide()
-			actor._driver.units[2].visual.hide()
+			actor._runner.units[2].visual.hide()
 			# Keep the other copy hidden across its normal process; only the selected copy is in view.
-			actor._driver.units[2].visual.set_process(false)
+			actor._runner.units[2].visual.set_process(false)
 			var bounds := Rect2(unit.points[0],Vector2.ZERO)
 			for point: Vector2 in unit.points: bounds=bounds.expand(point)
 			bounds=bounds.grow(250.0)

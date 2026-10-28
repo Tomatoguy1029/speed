@@ -87,8 +87,7 @@ func _draw_sail(open: float) -> void:
 
 ## 弓を引く割合（0〜1）。
 func draw_fraction() -> float:
-	if actor.mode == &"windup": return actor.table.charge[actor.body]
-	return 0.0
+	return float(actor.technique_pose.get("pull", 0.0))
 
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
@@ -97,10 +96,7 @@ func _draw() -> void:
 	var moving := actor.table.vel[actor.body].length() > 5.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
-	# 背後攻撃は、構えの間ボスを赤く明滅させ、当たりが有効な間は赤く光らせ続ける。
-	if actor.technique == &"rear_attack" and actor.mode in [&"windup", &"strike"]:
-		var blink := 1.0 if actor.mode == &"strike" else 0.5 + 0.5 * sin(actor.clock * TAU * 6.0)
-		tint = Color.WHITE.lerp(REAR_GLOW, blink)
+	if actor.technique_pose.get("tint", Color.WHITE) != Color.WHITE: tint = actor.technique_pose.tint
 	modulate = tint
 	# 脚：走っている間は前後に振る。
 	for j in 4:
@@ -126,10 +122,6 @@ func _draw() -> void:
 	draw_polyline(packed, BOW, pixel_size * 1.5, false)
 	var pull := Vector2(62.0 + cos(1.1) * 26.0 - draw_fraction() * 34.0, 0.0)
 	draw_polyline(PackedVector2Array([packed[0], pull, packed[packed.size() - 1]]), STRING, pixel_size, false)
-	if actor.mode == &"windup":
-		var glow := DANGER if actor.alerting else WARNING
-		var length := 40.0 if actor.technique == &"power_shot" else 26.0
-		draw_line(pull, pull + Vector2(length + 30.0, 0.0), glow, pixel_size * (3.0 if actor.technique == &"power_shot" else 1.5))
 	# 攻めどき（射終わりの硬直）は縁を光らせる。
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25

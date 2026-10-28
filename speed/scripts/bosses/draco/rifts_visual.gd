@@ -8,8 +8,8 @@ func _draw() -> void:
 
 func _draw_residual_rifts() -> void:
 	var hazards: Array[int] = []
-	if actor.technique == &"rifts" and actor._driver != null:
-		for h: int in actor._driver.walls: hazards.append(h)
+	if actor.technique == technique_id and actor._runner != null:
+		for h: int in actor._runner.walls: hazards.append(h)
 	for closing: Dictionary in actor.closing_walls:
 		if not int(closing.h) in hazards: hazards.append(int(closing.h))
 	var ps := actor.ctx.projectiles

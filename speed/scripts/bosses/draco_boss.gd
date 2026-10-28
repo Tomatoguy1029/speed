@@ -38,7 +38,8 @@ var mouth_open := 0.0
 var cosmic_body := false
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
-var _driver: RefCounted
+var _move_kinds := {}
+var _runner: RefCounted
 var selection_enabled := false
 var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
@@ -83,7 +84,10 @@ func configure_flow(program: Resource) -> void:
 	selection_enabled = true
 	action_rules = program.data.rules
 	_moves.clear()
-	for move in action_rules.techniques: _moves[move.technique] = move
+	_move_kinds.clear()
+	for move in action_rules.techniques:
+		_moves[move.technique] = move
+		_move_kinds[move.technique] = move.make_runner().kind()
 	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
@@ -174,7 +178,7 @@ func owns_damage_target(row: int) -> bool:
 	return false
 
 func _exit_tree() -> void:
-	if _driver != null: _driver.end(self,true)
+	if _runner != null: _runner.end(self,true)
 	if entrance != null: entrance.cancel()
 	if finale != null: finale.dispose()
 	if cycle != null: cycle.cancel()
@@ -193,13 +197,13 @@ func start_attack(id: StringName) -> bool:
 		var director: RefCounted=ctx.projectiles.director
 		var key := "draco:%d:%d" % [body_id,attack_serial]
 		var p: Dictionary=_moves[id].values()
-		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0):
+		if not director.request(key,["beam" if tech_kind(id) in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0):
 			combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(id), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 			return false
 		attack_token=director.token(key)
 		ctx.projectiles.lab_context=attack_token
 		attack_serial+=1
-	if id != &"picaro_wall": picaro.pause(false)
+	if tech_kind(id) != &"picaro_wall": picaro.pause(false)
 	reset_pose()
 	telegraph_points.clear()
 	telegraph_paths.clear()
@@ -212,17 +216,16 @@ func start_attack(id: StringName) -> bool:
 	elapsed = 0.0
 	attack_hit = false
 	aim = aim_target()
-	direction = Vector2.from_angle(table.facing[body]) if id == &"tail_sweep" else (aim - table.pos[body]).normalized()
-	var screen_staged := id in [&"leap", &"charge", &"rifts"]
+	direction = Vector2.from_angle(table.facing[body]) if tech_kind(id) == &"tail_sweep" else (aim - table.pos[body]).normalized()
+	var screen_staged := tech_kind(id) in [&"leap", &"charge", &"rifts"]
 	if not screen_staged: table.facing[body] = direction.angle()
-	_driver = _moves[id].make_runner()
-	if _driver == null and rule().has("driver"): _driver = rule().driver.new()
+	_runner = _moves[id].make_runner()
 	var prior_observer := ctx.bosses.recording_actor
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
-	if _driver != null: _driver.begin(self)
+	if _runner != null: _runner.begin(self)
 	ctx.bosses.recording_actor = prior_observer
 	combat_trace.stage("reposition" if screen_staged else "telegraph")
-	if not screen_staged and (_driver == null or not ("locked" in _driver)): combat_trace.stage("lock", {"scope": "initial_aim"})
+	if not screen_staged and (_runner == null or not ("locked" in _runner)): combat_trace.stage("lock", {"scope": "initial_aim"})
 	_update_body()
 	_sync_technique_visuals()
 	_presentation.queue_redraw()
@@ -252,15 +255,15 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	elapsed += dt
 	# なぞり中は予告の狙いを固定する。渦の中心移動は構図維持なので対象外。
-	if mode == &"windup" and run_state.tracing and technique not in [&"spiral", &"charge", &"leap", &"rifts"] and _driver != null and "locked" in _driver and not _driver.locked:
-		_driver.locked = true
+	if mode == &"windup" and run_state.tracing and tech_kind(technique) not in [&"spiral", &"charge", &"leap", &"rifts"] and _runner != null and "locked" in _runner and not _runner.locked:
+		_runner.locked = true
 		combat_trace.stage("lock", {"scope": "trace_aim"})
-	if mode == &"windup" and _driver != null and _driver.has_method("windup"): _driver.windup(self,dt)
+	if mode == &"windup" and _runner != null and _runner.has_method("windup"): _runner.windup(self,dt)
 	# 予告の間に自機を追わない技は、画面外からの配置を終えて最初に狙った時点で固定する。渦の中心移動は構図維持なので対象外。
-	if mode == &"windup" and technique != &"spiral" and _driver != null and "locked" in _driver and not _driver.locked \
+	if mode == &"windup" and tech_kind(technique) != &"spiral" and _runner != null and "locked" in _runner and not _runner.locked \
 			and _moves.has(technique) and not _moves[technique].track_during_warn \
-			and (not "staging" in _driver or _driver.staging.is_empty() or _driver.staging.get("phase", &"ready") == &"ready"):
-		_driver.locked = true
+			and (not "staging" in _runner or _runner.staging.is_empty() or _runner.staging.get("phase", &"ready") == &"ready"):
+		_runner.locked = true
 		combat_trace.stage("lock", {"scope": "warn_tracking_off"})
 	if mode == &"windup" and elapsed >= float(rule().warn):
 		mode = &"active"
@@ -272,20 +275,20 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			table.guard[body] = 0.0
 			run_state.encounter_protected=false
 	elif mode == &"active":
-		if _driver != null: _driver.tick(self,dt)
+		if _runner != null: _runner.tick(self,dt)
 		else:
 			var tip := table.pos[body] + direction * float(rule().reach)
 			hit_segment(PackedVector2Array([table.pos[body],tip]),float(rule().width))
 		if elapsed >= float(rule().active):
-			if _driver != null: _driver.end(self,false)
+			if _runner != null: _runner.end(self,false)
 			mode = &"recovery"
 			elapsed = 0.0
 			combat_trace.stage("recovery")
 	elif mode == &"recovery":
-		if _driver != null and _driver.has_method("recover"): _driver.recover(self,dt)
+		if _runner != null and _runner.has_method("recover"): _runner.recover(self,dt)
 		if elapsed >= float(rule().recover):
 			combat_trace.finish()
-			_driver = null
+			_runner = null
 			mode = &"idle"
 			technique = &""
 			telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear();telegraph_areas.clear()
@@ -305,14 +308,14 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 func _sync_technique_visuals() -> void:
 	mouth_open = 0.0
 	cosmic_body = false
-	if _driver != null: _driver.pose(self)
+	if _runner != null: _runner.pose(self)
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
 
 func cancel_attack() -> void:
 	combat_trace.finish("interrupted", "cancelled")
-	if _driver != null: _driver.end(self,true)
-	_driver = null
+	if _runner != null: _runner.end(self,true)
+	_runner = null
 	attack_points.clear()
 	telegraph_points.clear();telegraph_paths.clear();telegraph_widths.clear();telegraph_areas.clear()
 	reset_pose()
@@ -431,3 +434,6 @@ func contains_additional_target(row: int, point: Vector2, radius: float) -> bool
 		if int(target.row)!=row or not ctx.enemies.is_same(row,target.id) or not ctx.enemies.is_same(part,target.part_id): continue
 		if point.distance_to(table.pos[part])<=table.r[part]+radius:return true
 	return false
+
+func tech_kind(id: StringName) -> StringName:
+	return _move_kinds.get(id, id)

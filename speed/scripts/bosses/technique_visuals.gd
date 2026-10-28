@@ -14,6 +14,8 @@ func configure(owner_actor: BossActor, moves: Dictionary) -> void:
 		if node == null: continue
 		actor.add_child(node)
 		if "actor" in node: node.actor = actor
+		if "visual_kind" in node: node.visual_kind = node.technique_id
+		if "technique_id" in node: node.technique_id = StringName(id)
 		node.visible = false
 		nodes[id] = node
 
@@ -25,10 +27,14 @@ func sync(id: StringName, phase: StringName, elapsed: float, duration: float) ->
 		if not node.visible: continue
 		if node.has_method("update_technique"): node.update_technique()
 		var player := node.get_node_or_null("AnimationPlayer") as AnimationPlayer
-		var animation: StringName = &"recover" if phase == &"recovery" else phase
-		if key == id and player != null and player.has_animation(animation):
+		var sample: Dictionary = node.phase_state() if node.has_method("phase_state") else {}
+		var stage: StringName = sample.get("phase", phase)
+		var stage_elapsed: float = sample.get("elapsed", elapsed)
+		var stage_duration: float = sample.get("duration", duration)
+		var animation: StringName = &"recover" if stage == &"recovery" else stage
+		if (key == id or not sample.is_empty()) and player != null and player.has_animation(animation):
 			if player.current_animation != animation: player.play(animation)
-			player.seek(player.get_animation(animation).length * clampf(elapsed / maxf(0.001, duration), 0.0, 1.0), true)
+			player.seek(player.get_animation(animation).length * clampf(stage_elapsed / maxf(0.001, stage_duration), 0.0, 1.0), true)
 			player.pause()
 		node.queue_redraw()
 

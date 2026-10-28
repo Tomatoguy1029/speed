@@ -43,16 +43,12 @@ var _file_dialog := FileDialog.new()
 var _parallel_toggle := CheckButton.new()
 const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
 const SPIRAL_FIELDS := preload("res://tools/editor/boss_flow/technique_fields.gd")
-const SPIRAL_LABELS := SPIRAL_FIELDS.SPIRAL_LABELS
-const SPIRAL_TIPS := SPIRAL_FIELDS.SPIRAL_TIPS
-const SPIRAL_BOUNDS := SPIRAL_FIELDS.SPIRAL_BOUNDS
 const BOSS_IDS := ["hydra", "monoceros", "draco", "centaurus", "canis_major"]
 const BOSS_TITLES := {"hydra": "うみへび座", "monoceros": "いっかくじゅう座", "draco": "りゅう座", "centaurus": "ケンタウルス座", "canis_major": "おおいぬ座"}
 var _ordered_boss_ids: Array[String] = []
 var _boss_selector: OptionButton
 var _detail_scroll: ScrollContainer
 var _expanded_section_categories: Dictionary = {}
-const PARAM_LABELS := SPIRAL_FIELDS.PARAM_LABELS
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -458,7 +454,7 @@ func _open_path() -> void:
 
 func open_technique(path: String) -> Error:
 	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
-	if loaded == null or not loaded.get("parameters") is Dictionary:
+	if not loaded is BossTechnique:
 		_status.text = "技の設定を開けません: " + path
 		return ERR_INVALID_DATA
 	current = working.get(path, loaded.duplicate(true))

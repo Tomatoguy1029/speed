@@ -29,8 +29,8 @@ func _draw() -> void:
 			if j%2==0: draw_circle(at,3.5,Color(0.87,0.96,1.0,alpha))
 		FORM.star(self,center,radius*0.3,Color(0.82,0.91,1.0,alpha*0.75))
 
-	if actor.technique == &"picaro_wall" and actor._driver != null:
-		for impact: Dictionary in actor._driver.impacts:
+	if actor.technique == technique_id and actor._runner != null:
+		for impact: Dictionary in actor._runner.impacts:
 			if impact.pos == Vector2.INF: continue
 			var progress := clampf((float(impact.age)-float(impact.wait))/float(impact.warn),0.0,1.0)
 			var point := actor.to_local(impact.pos)

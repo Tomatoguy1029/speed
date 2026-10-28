@@ -19,7 +19,7 @@ func _ready() -> void:
 		editor.set_arc_value(1,"offset_x",77.0)
 		check(editor.save_current()==OK,"弧の編集を保存する")
 		var reloaded: Resource=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-		check(reloaded.parameters.arcs[0].radius==321.0 and reloaded.parameters.arcs[1].offset.x==77.0,"半径と弧の位置が再読込後も残る")
+		check(reloaded.arcs[0].radius==321.0 and reloaded.arcs[1].offset.x==77.0,"半径と弧の位置が再読込後も残る")
 		DirAccess.remove_absolute(path)
 	var spiral_source: Resource=load("res://data/bosses/draco_moves/spiral.tres").duplicate(true)
 	var spiral_path := "res://.content/dev/draco_spiral_test.tres"
@@ -37,7 +37,7 @@ func _ready() -> void:
 	editor.set_value("head_offset",370.0)
 	check(editor.save_current()==OK,"渦の調整値を保存する")
 	var spiral_reloaded: Resource=ResourceLoader.load(spiral_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	check(is_equal_approx(spiral_reloaded.parameters.radius_factor,1.05) and is_equal_approx(spiral_reloaded.parameters.coil_time,0.8) and is_equal_approx(spiral_reloaded.parameters.head_offset,370.0),"渦半径・速度・頭終点が保存後の読み直しでも残る")
+	check(is_equal_approx(spiral_reloaded.radius_factor,1.05) and is_equal_approx(spiral_reloaded.coil_time,0.8) and is_equal_approx(spiral_reloaded.head_offset,370.0),"渦半径・速度・頭終点が保存後の読み直しでも残る")
 	DirAccess.remove_absolute(spiral_path)
 	editor.free()
 	print("[draco_editor_roundtrip] failures=",failures)

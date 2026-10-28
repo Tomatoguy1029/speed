@@ -58,6 +58,7 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var technique_pose := {}
 var _support_runners := {}
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
@@ -263,9 +264,9 @@ func cancel_attack() -> void:
 # ── 技 ────────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
-	if attack == &"command": return float(r.warn) + float(r.lunge_time) + 0.05
-	if attack == &"sirius": return float(r.warn) + float(r.beam_time) + 0.05
-	if attack == &"howl": return float(r.warn) + 0.05
+	if _moves[attack].has_field("lunge_time"): return float(r.warn) + float(r.lunge_time) + 0.05
+	if _moves[attack].has_field("beam_time"): return float(r.warn) + float(r.beam_time) + 0.05
+	if _moves[attack].has_field("ring_count"): return float(r.warn) + 0.05
 	return float(r.warn) + float(r.active) + 0.05
 
 func _begin_windup(r: Dictionary, length: float) -> void:
@@ -474,10 +475,12 @@ func _runner_for() -> RefCounted:
 	return preload("res://scripts/bosses/canis_major/technique_runner.gd").new()
 
 func _sync_technique_visuals() -> void:
+	technique_pose = _runner_for().body_pose(self)
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
 	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
 
 func _runner_id(id: StringName) -> RefCounted:
+	if _runner != null and _runner.kind() == id: return _runner
 	if not _support_runners.has(id): _support_runners[id] = _moves[id].make_runner()
 	return _support_runners[id]

@@ -19,8 +19,8 @@ func prepare()->void:
 		n.step=0
 		n.emission.clear()
 		n.target=a.run_state.ship_pos
-	if a.tech==&"curve":call("curve", 0.0)
-	if a.tech in [&"swarm",&"grid"]:
+	if a.tech_kind(a.tech)==&"curve":call("curve", 0.0)
+	if a.tech_kind(a.tech) in [&"swarm",&"grid"]:
 		positioning=true
 		state.slots=[]
 		state.arrived={}
@@ -30,7 +30,7 @@ func prepare()->void:
 			var angle: float=TAU*float(i)/a.participants.size()
 			var slot: Vector2=rect.get_center()+Vector2(cos(angle)*rect.size.x*0.45,sin(angle)*rect.size.y*0.45)
 			state.slots.append(a.arena.safe_point(slot,a.table.r[a.participants[i].row]+12.0))
-		if a.tech==&"grid":
+		if a.tech_kind(a.tech)==&"grid":
 			state.plan=a.grid_plan()
 			state.slots.clear()
 			for beam in state.plan.beams:state.slots.append(beam[0])
@@ -44,15 +44,15 @@ func position(dt: float)->bool:
 		var n=a.participants[i]
 		if not a._alive(n):continue
 		if not state.arrived.has(i):
-			if a.tech==&"grid" and n.free_pos.distance_to(state.slots[i])<45.0:
+			if a.tech_kind(a.tech)==&"grid" and n.free_pos.distance_to(state.slots[i])<45.0:
 				n.velocity=(state.slots[i]-n.free_pos).limit_length(100.0)
 				n.free_pos+=n.velocity*dt*4.0
 			else:a.steer_snake(n,state.slots[i],dt,1.8,true)
 		n.strike_pos=n.free_pos
 		a.table.pos[n.row]=n.free_pos
-		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.grid_tolerance if a.tech==&"grid" else a.def.params.formation_tolerance):state.arrived[i]=true
+		if n.free_pos.distance_to(state.slots[i])<=float(a.def.params.grid_tolerance if a.tech_kind(a.tech)==&"grid" else a.def.params.formation_tolerance):state.arrived[i]=true
 		if not state.arrived.has(i):ready=false
-	if a.tech==&"grid" and a.immortal_neck.free_pos.distance_to(state.plan.bearer)>float(a.def.params.grid_tolerance):ready=false
+	if a.tech_kind(a.tech)==&"grid" and a.immortal_neck.free_pos.distance_to(state.plan.bearer)>float(a.def.params.grid_tolerance):ready=false
 	if ready and not a.participants.filter(func(n):return a._alive(n)).all(func(n):return a.run_state.view_rect().grow(-a.table.r[n.row]).has_point(n.strike_pos)):
 		a.interrupt_tech()
 		return false

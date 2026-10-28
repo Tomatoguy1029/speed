@@ -44,13 +44,17 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var _move_kinds := {}
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 
 func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
 	_moves.clear()
-	for move in action_rules.techniques: _moves[move.technique] = move
+	_move_kinds.clear()
+	for move in action_rules.techniques:
+		_moves[move.technique] = move
+		_move_kinds[move.technique] = move.make_runner().kind()
 	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
@@ -202,7 +206,7 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	if distance > float(gate.get("max", INF)): return "distance_above_max"
 	if distance > _reach(attack): return "out_of_reach"
 	if not _gate_allows(gate): return "direction_or_range_gate"
-	if attack != &"kick":
+	if tech_kind(attack) != &"kick":
 		var r: Dictionary = _moves[attack].values()
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
 		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
@@ -213,7 +217,7 @@ func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
 
 func _reach(attack: StringName) -> float:
-	var r: Dictionary = _moves[&"charge" if attack == &"combo" else attack].values()
+	var r: Dictionary = _moves[&"charge" if tech_kind(attack) == &"combo" else attack].values()
 	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 
 func _close_ready(attack: StringName) -> bool:
@@ -247,16 +251,16 @@ func start_attack(attack: StringName) -> bool:
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
 	combat_trace.begin(attack, combat_origin)
-	technique = &"charge" if attack == &"combo" else attack
+	technique = &"charge" if tech_kind(attack) == &"combo" else attack
 	cooldowns[attack] = clock + float(r.cd)
-	combo_pending = attack == &"combo"
-	passes_left = int(def.params.return_passes) if attack == &"return_charge" else 1
+	combo_pending = tech_kind(attack) == &"combo"
+	passes_left = int(def.params.return_passes) if tech_kind(attack) == &"return_charge" else 1
 	_begin_pass()
 	return true
 
 ## 攻撃予算に申告する長さ。コンボは中の突進・切り返し・薙ぎの予告と実行の合計。
 func _attack_length(attack: StringName) -> float:
-	if attack == &"combo":
+	if tech_kind(attack) == &"combo":
 		var charge: Dictionary = _moves[&"charge"].values()
 		var sweep: Dictionary = _moves[&"sweep"].values() if _moves.has(&"sweep") else {}
 		return float(charge.warn) + float(charge.active) + float(def.params.combo_gap) + float(sweep.get("warn", 0.0)) + float(sweep.get("active", 0.0))
@@ -396,3 +400,6 @@ func _sync_technique_visuals(dt: float) -> void:
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	var elapsed := clock - settle_at if mode == &"recovery" else (timeline.current_animation_position if timeline.is_playing() else 0.0) - (float(rule().get("warn", 0.0)) if mode == &"active" else 0.0)
 	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
+
+func tech_kind(id: StringName) -> StringName:
+	return _move_kinds.get(id, id)

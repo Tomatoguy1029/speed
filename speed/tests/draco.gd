@@ -75,7 +75,7 @@ func _ready() -> void:
 	actor.cancel_attack()
 	check(actor.start_attack(&"breath"), "隕石投射からブレスを開始する")
 	if actor.technique == &"breath":
-		var breath = actor._driver
+		var breath = actor._runner
 		check(breath.rocks.size() == 3, "口から遮蔽用の隕石を出す")
 		for frame in 150: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(breath.rays.size() > 12, "炎の表示と命中に使う遮蔽光線を計算する")
@@ -106,8 +106,8 @@ func _ready() -> void:
 		var rifts_complete := false
 		for frame in 1200:
 			actor.sim_tick(1.0/120.0,1.0/120.0)
-			if actor._driver == null: break
-			if actor._driver.walls.size() == 6:
+			if actor._runner == null: break
+			if actor._runner.walls.size() == 6:
 				rifts_complete = true
 				break
 		check(rifts_complete, "左右それぞれ三本の亀裂を残す")
@@ -133,7 +133,7 @@ func _ready() -> void:
 	actor.cancel_attack()
 	check(actor.start_attack(&"picaro_wall"), "隊列と口からの光の矢を開始する")
 	if actor.technique == &"picaro_wall":
-		var driver = actor._driver
+		var driver = actor._runner
 		for frame in 240: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(driver.shots>1, "口から上向きに複数発を連射する")
 		check(not driver.impacts.is_empty(), "画面外へ消えた後に固定地点を予告する")
@@ -146,7 +146,7 @@ func _ready() -> void:
 	actor.cancel_attack()
 	check(actor.start_attack(&"clones"), "全身複製を開始できる")
 	if actor.technique == &"clones":
-		var clones = actor._driver
+		var clones = actor._runner
 		check(clones.units.size()==3, "本体を含め合計三体を編成する")
 		var hp: float = sim.enemies.table.hp[actor.body]
 		var row: int = clones.units[1].row
@@ -158,7 +158,7 @@ func _ready() -> void:
 	actor.cancel_attack()
 	check(actor.start_attack(&"inhale"), "吸引と吐き出しを開始する")
 	if actor.technique == &"inhale":
-		var inhale = actor._driver
+		var inhale = actor._runner
 		var member: int = actor.picaro.spawn_picaro(&"pump",sim.enemies.table.pos[actor.body]+Vector2(70,0))
 		for frame in 600: actor.sim_tick(1.0/120.0,1.0/120.0)
 		check(sim.enemies.table.dead[member]!=0, "口元に来たピカロを吸収する")
@@ -167,7 +167,7 @@ func _ready() -> void:
 	actor.cancel_attack()
 	check(actor.start_attack(&"spiral"), "螺旋収縮を開始する")
 	if actor.technique == &"spiral":
-		var spiral = actor._driver
+		var spiral = actor._runner
 		var center: Vector2 = spiral.center
 		sim.state.enemy_aim += Vector2(500,0)
 		for frame in 540: actor.sim_tick(1.0/120.0,1.0/120.0)
