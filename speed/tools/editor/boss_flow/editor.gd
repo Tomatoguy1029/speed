@@ -1114,21 +1114,6 @@ func _edit_coverage(group := "") -> void:
 			enabled.button_pressed = rules.graph_nodes.get(id, {}).get("connected", true)
 			enabled.toggled.connect(func(value): graph._connect(id, value))
 			members.add_child(enabled)
-		var move_label := Label.new()
-		move_label.text = "技の接続先を変更"
-		move_label.tooltip_text = "選んだ技を、このノードにつなぎ直します。元のノードとの接続を外し、技の性能と発動条件は引き継ぎます。"
-		_fields.add_child(move_label)
-		var choices := OptionButton.new()
-		choices.fit_to_longest_item = false
-		choices.add_item("技を選択…")
-		choices.tooltip_text = move_label.tooltip_text
-		for id in rules.node_ids():
-			if graph.hub_for(id) == group: continue
-			choices.add_item(GRAPH.node_title(rules, id))
-			choices.set_item_metadata(choices.item_count - 1, id)
-		choices.item_selected.connect(func(index):
-			if index > 0: graph.assign_group(choices.get_item_metadata(index), group))
-		_fields.add_child(choices)
 	var simulation := CheckBox.new()
 	simulation.text = "範囲図の戦闘状況"
 	simulation.tooltip_text = "範囲図に使う仮の状況を設定します。実際の戦闘設定や発動条件は変更しません。"

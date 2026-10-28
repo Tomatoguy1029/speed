@@ -517,7 +517,7 @@ Hydraの分離後は `_update_guard_approach()` が残量・区間上限・技�
 
 Hydraの `_configure_tech_timeline()` は技別の `warning_time`・`performance_time` と伸長時間等から内部Timelineのイベントを構成する。一角獣も `_begin_pass()` で `warn`・`active` からイベントを組む。性能リソースの数値とTimelineの時刻を別々の調整元として二重管理しない。ビーム等の技内追加予告・持続は個別の実行コードも追い、動作開始イベントと判定開始を区別する。
 
-条件選択を選ぶと、名前・単一分類・配下技のON/OFF・「技の接続先を変更」が編集できる。ON/OFFは接続状態を変える。`condition_groups` の名前・見た目は実行値ではなく、分類と所属技が実行候補に作用する。
+条件選択を選ぶと、名前・単一分類・配下技のON/OFFが編集できる。技の所属を移すときは、グラフ上で条件選択から技へ線を引き直す。ON/OFFは接続状態を変える。`condition_groups` の名前・見た目は実行値ではなく、分類と所属技が実行候補に作用する。
 
 「範囲図の戦闘状況」は表示専用の `preview_stamina`・`preview_heads`・`preview_separated`・`preview_radius`。編集値はカバー解析へ使うが、フロー・技設定へ保存しない。通常技の図は青が条件、橙が基準形状。カバー表示の橙点は未カバーの標本を表す。`range_preview.gd.analyze()` の角度64×半径16のサンプル検査であり、全連続空間の証明ではない。
 
