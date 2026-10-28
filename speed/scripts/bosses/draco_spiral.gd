@@ -27,6 +27,8 @@ var trail := PackedVector2Array()
 var walls: Array[int] = []
 var trapped := false
 var trapped_hit := false
+## 巻いている途中の胴に触れて被弾したかを見分けるための、前の更新の機体HP。
+var _hp_before := INF
 var entry := PackedVector2Array()
 var recovery_head := Vector2.ZERO
 var departing := true
@@ -166,16 +168,20 @@ func tick(a: BossActor, _dt: float) -> void:
 	trail = followed.trail
 	points = followed.points
 	var fractions: PackedFloat32Array = FORM.fractions(points)
+	var touching := false
+	for j in range(points.size() - 1):
+		if Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos, points[j], points[j + 1]).distance_to(a.run_state.ship_pos) <= a.body_width * 0.5 * FORM.taper((fractions[j] + fractions[j + 1]) * 0.5) + a.ctx.cfg.ship_radius:
+			touching = true
+			break
+	if a.elapsed < shrink_at and touching and a.run_state.ship_hp < _hp_before:
+		# 巻いている途中の胴に触れて被弾したら、離れて抜け出せるだけ長く無敵にする。
+		a.run_state.ship_invuln = maxf(a.run_state.ship_invuln, float(p.get("touch_invuln", 0.0)))
+	_hp_before = a.run_state.ship_hp
 	if a.elapsed >= shrink_at:
 		# 収縮中は共通hazardの反復ヒットを止め、接触を一度だけ受付する。
 		for h in walls:
 			if a.ctx.projectiles.owns_hazard(h, a.body, a.body_id): a.ctx.projectiles.hazard_dmg[h] = 0.0
 		if not trapped_hit: a.combat_trace.evaluate()
-		var touching := false
-		for j in range(points.size() - 1):
-			if Geometry2D.get_closest_point_to_segment(a.run_state.ship_pos, points[j], points[j + 1]).distance_to(a.run_state.ship_pos) <= a.body_width * 0.5 * FORM.taper((fractions[j] + fractions[j + 1]) * 0.5) + a.ctx.cfg.ship_radius:
-				touching = true
-				break
 		if not trapped_hit and touching:
 			trapped = true
 			trapped_hit = true
