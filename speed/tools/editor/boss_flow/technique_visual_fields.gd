@@ -11,6 +11,7 @@ static func append(editor: Control, move: Resource) -> void:
 static func _row(editor: Control, move: Resource, key: String, title: String) -> void:
 	var label := Label.new()
 	label.text = title if not title.is_empty() else key
+	label.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	editor._fields.add_child(label)
 	var controls := VBoxContainer.new()
 	controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -20,12 +21,17 @@ static func _row(editor: Control, move: Resource, key: String, title: String) ->
 	path.text = scene.resource_path if scene != null else "未設定"
 	path.tooltip_text = path.text
 	path.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	controls.add_child(path)
-	var buttons := HFlowContainer.new()
+	var buttons := GridContainer.new()
+	buttons.columns = 2
+	buttons.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	controls.add_child(buttons)
 	for action in ["選ぶ…", "開く", "専用に複製…", "新規作成…"]:
 		var button := Button.new()
-		button.text = action
+		button.text = {"専用に複製…": "専用コピー…", "新規作成…": "新規作成…"}.get(action, action)
+		button.tooltip_text = action
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.disabled = scene == null and action in ["開く", "専用に複製…"]
 		buttons.add_child(button)
 		button.pressed.connect(func():
