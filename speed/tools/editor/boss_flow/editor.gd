@@ -1296,6 +1296,8 @@ func _refresh() -> void:
 		tracking.button_pressed = current.track_during_warn
 		tracking.toggled.connect(_set_tracking)
 		_fields.add_child(tracking)
+		# 2列の欄で、隣の入力欄の位置を空けて後ろの欄をずらさない。
+		_fields.add_child(Control.new())
 	var id := String(current.technique)
 	_number_field("消費スタミナ", float(rules.costs.get(id, 1.0)), func(value):
 		history.create_action("技の消費を変更")
