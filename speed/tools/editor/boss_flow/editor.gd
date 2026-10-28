@@ -503,6 +503,25 @@ func _assign_post_gap(target: Resource, value: float) -> void:
 			if working[path] == target: _dirty_working[path] = true
 	target.emit_changed()
 
+## 予告中の追尾に対応するボス
+const TRACKING_BOSSES := ["monoceros", "canis_major"]
+
+func _set_tracking(enabled: bool) -> void:
+	if current == null or current.track_during_warn == enabled: return
+	history.create_action("予告中の追尾を変更")
+	history.add_do_method(_assign_tracking.bind(current, enabled))
+	history.add_undo_method(_assign_tracking.bind(current, current.track_during_warn))
+	history.commit_action()
+
+func _assign_tracking(target: Resource, enabled: bool) -> void:
+	target.track_during_warn = enabled
+	if not working.values().has(target): dirty_rules = true
+	else:
+		for path in working:
+			if working[path] == target: _dirty_working[path] = true
+	target.emit_changed()
+	if target == current: _refresh()
+
 func _change_parallel(enabled: bool) -> void:
 	if rules == null or rules.allow_parallel_attacks == enabled: return
 	history.create_action("同時攻撃の有無を変更")
@@ -525,7 +544,7 @@ func save_current() -> Error:
 			return ERR_BUSY
 		var move: Resource = working[path]
 		var disk := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-		if disk == null or disk.parameters != move.parameters or not is_equal_approx(disk.post_gap, move.post_gap):
+		if disk == null or disk.parameters != move.parameters or not is_equal_approx(disk.post_gap, move.post_gap) or disk.track_during_warn != move.track_during_warn:
 			var error := ResourceSaver.save(move, path)
 			if error != OK: return error
 		_source_hashes[path] = FileAccess.get_sha256(path)
@@ -1266,6 +1285,13 @@ func _refresh() -> void:
 		var gap := _number_field("技後の隙（秒）", current.post_gap, _set_post_gap)
 		gap.step = 0.05
 		gap.tooltip_text = "技の演出と回復動作が終わってから、次の攻撃選択まで待つ時間です。コンボ技には追加しません。"
+	if String(rules.adapter) in TRACKING_BOSSES and not rules.combos.has(String(current.technique)):
+		var tracking := CheckBox.new()
+		tracking.text = "予告の間、自機を追う"
+		tracking.tooltip_text = "ONでは予告の間ずっと自機を追って狙いと向きを直します。OFFでは予告を始めた時の自機の位置へ撃ちます。"
+		tracking.button_pressed = current.track_during_warn
+		tracking.toggled.connect(_set_tracking)
+		_fields.add_child(tracking)
 	var id := String(current.technique)
 	_number_field("消費スタミナ", float(rules.costs.get(id, 1.0)), func(value):
 		history.create_action("技の消費を変更")

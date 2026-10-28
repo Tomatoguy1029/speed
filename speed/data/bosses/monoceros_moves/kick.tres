@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_2xook")
 technique = &"kick"
+track_during_warn = false
 parameters = {
 "active": 0.24,
 "cd": 9.0,

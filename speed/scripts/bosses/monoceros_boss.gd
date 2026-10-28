@@ -150,7 +150,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		phase_time -= dt
 		if phase_time <= 0.0: mode = &"idle"
 	elif mode in [&"windup", &"active"]:
-		if mode == &"windup" and not locked: _aim(dt)
+		if mode == &"windup" and not locked and _tracks_during_warn(): _aim(dt)
 		var prior_mode := mode
 		var prior_horn := horn_points()
 		# 発進したフレームでは移動を次の固定更新まで待つ。
@@ -256,6 +256,8 @@ func _begin_pass() -> void:
 	table.vel[body] = Vector2.ZERO
 	aim_point = _strike_aim()
 	direction = Vector2.from_angle(table.facing[body] + (PI if technique == &"kick" else 0.0))
+	if technique == &"kick" and not aim_point.is_equal_approx(table.pos[body]):
+		direction = (aim_point - table.pos[body]).normalized()
 	var r := rule()
 	var anim := timeline.get_animation(&"attack")
 	anim.length = float(r.warn) + float(r.active)
@@ -266,6 +268,9 @@ func _begin_pass() -> void:
 	timeline.play(&"attack")
 	timeline.advance(0.0)
 	_cue(&"telegraph")
+
+func _tracks_during_warn() -> bool:
+	return not _moves.has(technique) or _moves[technique].track_during_warn
 
 func _aim(dt: float) -> void:
 	aim_point = _strike_aim()

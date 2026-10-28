@@ -154,7 +154,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	elif mode in [&"windup", &"active"]:
 		if mode == &"windup":
 			table.vel[body] = Vector2.ZERO
-			if not locked: _aim(dt)
+			if not locked and (not _moves.has(technique) or _moves[technique].track_during_warn): _aim(dt)
 		if mode == &"active": _active_tick(dt)
 		if timeline.is_playing(): timeline.advance(dt)
 	else:

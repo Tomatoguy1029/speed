@@ -122,6 +122,7 @@ static func canonical(value: Variant) -> Variant:
 				if property.name == "selection_bias" and value.get(property.name).is_empty(): continue
 				if property.name == "allow_parallel_attacks" and not value.get(property.name): continue
 				if property.name == "post_gap" and is_zero_approx(float(value.get(property.name))): continue
+				if property.name == "track_during_warn" and value.get(property.name): continue
 				if property.name == "condition_groups":
 					if not value.get(property.name).is_empty(): fields[property.name] = canonical(_runtime_groups(value.get(property.name)))
 				else: fields[property.name] = canonical(value.get(property.name))
