@@ -169,22 +169,23 @@ func _normalize_preview_program(program: Resource, boss: String) -> String:
 		var id := String(move.technique)
 		if not sources.has(id): return "技の保存元がありません: " + id
 		var source: Resource = sources[id]
-		if not source.get("parameters") is Dictionary or not move.get("parameters") is Dictionary:
+		if not source.has_method("values") or not move.has_method("values"):
 			return "技の値が壊れています: " + id
 		for required in TECHNIQUE_FIELDS.REQUIRED.get(id, []):
-			if not source.parameters.has(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
-		var values: Dictionary = move.parameters.duplicate(true)
-		for key in source.parameters:
-			if not values.has(key): values[key] = source.parameters[key]
-		move.parameters = values
+			if not source.has_field(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
+		if not move.is_scripted():
+			var values: Dictionary = move.parameters.duplicate(true)
+			for key in source.parameters:
+				if not values.has(key): values[key] = source.parameters[key]
+			move.parameters = values
 	return ""
 
 func _capture_editable(move: Resource) -> Dictionary:
 	var values := {}
-	for key in TECHNIQUE_FIELDS.editable_keys(move): values[key] = move.parameters[key]
-	if move.parameters.get("arcs") is Array:
+	for key in TECHNIQUE_FIELDS.editable_keys(move): values[key] = move.field(key)
+	if move.field("arcs") is Array:
 		var arcs := []
-		for arc: Resource in move.parameters.arcs:
+		for arc: Resource in move.field("arcs"):
 			arcs.append({"offset_x": arc.offset.x, "offset_y": arc.offset.y,
 				"radius": arc.radius, "angle_degrees": arc.angle_degrees,
 				"spread_degrees": arc.spread_degrees, "count": arc.count})
@@ -263,7 +264,7 @@ func _refresh_tuning_selection() -> void:
 		workspace.hide_tuning()
 		return
 	_tuning_toggle.disabled = false
-	_tuning_title.text = TECHNIQUE_GRAPH.title_for(_selected_technique()) + "を調整"
+	_tuning_title.text = TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, _selected_technique()) + "を調整"
 	_rebuild_tuning_fields(key, move)
 	_update_tuning_status(key)
 
@@ -281,7 +282,7 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 	for field in TECHNIQUE_FIELDS.editable_keys(move):
 		if not draft.has(field): continue
 		var bounds: Vector2 = TECHNIQUE_FIELDS.bounds_for(move, field)
-		var step := 1.0 if move.parameters[field] is int else 0.01
+		var step := 1.0 if move.field(field) is int else 0.01
 		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), TECHNIQUE_FIELDS.to_display(field, float(draft[field])), bounds, step,
 			TECHNIQUE_FIELDS.tip_for(move, field), func(value: float): _change_tuning_value(TECHNIQUE_FIELDS.from_display(field, value), key, field))
 	if draft.has("arcs"):
@@ -366,7 +367,7 @@ func _toggle_tuning_panel() -> void:
 
 func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
 	var copy: Resource = move.duplicate(true)
-	var values: Dictionary = copy.parameters.duplicate(true)
+	var values: Dictionary = copy.values().duplicate(true)
 	for field in draft:
 		if field.begins_with("condition_"): continue
 		if field == "arcs":
@@ -380,7 +381,7 @@ func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
 				arcs.append(arc)
 			values.arcs = arcs
 		else: values[field] = draft[field]
-	copy.parameters = values
+	copy.assign_values(values)
 	return copy
 
 func _apply_tuning_preview() -> void:
@@ -676,7 +677,7 @@ func _populate_moves(selected := "") -> void:
 	for move in preview_actor.action_rules.techniques:
 		var id := String(move.technique)
 		var index := _move_picker.item_count
-		_move_picker.add_item(TECHNIQUE_GRAPH.title_for(id) + " · " + id)
+		_move_picker.add_item(TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, id) + " · " + id)
 		_move_picker.set_item_metadata(index, id)
 		if id == selected:
 			_move_picker.select(index)

@@ -184,7 +184,7 @@ func chase_speed() -> float:
 func _apply_phase() -> void:
 	_rules.clear()
 	for id in _moves:
-		var base: Dictionary = _moves[id].parameters
+		var base: Dictionary = _moves[id].values()
 		var values := {}
 		for key: String in base:
 			if not key.ends_with("_p2"): values[key] = base[key]

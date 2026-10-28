@@ -22,7 +22,14 @@ static func title_for(id: String) -> String:
 
 static func node_title(value: Resource, id: String) -> String:
 	var source: String = value.source_for(id)
-	return title_for(source) + ("（別条件" + id.trim_prefix(source + "_copy_") + "）" if source != id else "")
+	return technique_title(value, source) + ("（別条件" + id.trim_prefix(source + "_copy_") + "）" if source != id else "")
+
+## 技のデータに表示名があればそれを、なければ既定の名前を返す。
+static func technique_title(value: Resource, id: String) -> String:
+	if value != null:
+		for move in value.get("techniques"):
+			if String(move.technique) == id and not String(move.get("display_name")).is_empty(): return String(move.display_name)
+	return title_for(id)
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(280, 160)

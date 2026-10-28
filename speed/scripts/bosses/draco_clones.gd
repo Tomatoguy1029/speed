@@ -22,7 +22,7 @@ class Host:
 	var tornado_scene: PackedScene = preload("res://scenes/bosses/hydra_tornado.tscn")
 	func move_params(id: StringName) -> Dictionary:
 		for move in MOVES:
-			if move.technique == id: return HYDRA.params.merged(move.parameters,true)
+			if move.technique == id: return HYDRA.params.merged(move.values(),true)
 		return HYDRA.params
 	func _head_pos(n: Dictionary) -> Vector2: return n.strike_pos if n.locked else table.pos[n.row]
 	func _neck_base(n: Dictionary) -> Vector2: return table.pos[n.row]

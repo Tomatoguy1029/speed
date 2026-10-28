@@ -515,7 +515,7 @@ func move_settings(attack: StringName) -> HydraTechnique:
 ## 移行済みの技別値は Settings が正。Params は本体・移動・共通予算の値を供給する。
 func move_params(attack: StringName) -> Dictionary:
 	var settings := move_settings(attack)
-	return def.params.merged(settings.parameters, true) if settings != null else def.params
+	return def.params.merged(settings.values(), true) if settings != null else def.params
 
 func _position_ready(attack: StringName, index := -1, internal_step := false) -> bool:
 	if flow_controlled and action_rules != null:
@@ -534,7 +534,7 @@ func _position_ready(attack: StringName, index := -1, internal_step := false) ->
 func _normal_cost(attack: StringName) -> float:
 	if action_rules != null: return float(action_rules.costs.get(String(attack), INF))
 	var settings := move_settings(attack)
-	return float(settings.parameters.cost) if settings != null else INF
+	return float(settings.values().cost) if settings != null else INF
 
 func normal_ready(index: int, attack: StringName, internal_step := false) -> bool:
 	if index < 0 or index >= necks.size() or not _normal_moves.has(attack): return false

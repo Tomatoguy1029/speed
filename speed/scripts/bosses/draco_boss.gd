@@ -176,7 +176,7 @@ func _exit_tree() -> void:
 		if ctx.enemies.is_same(body_rows[j], body_ids[j]): ctx.enemies.mark_dead(body_rows[j])
 
 func rule() -> Dictionary:
-	return _moves[technique].parameters if _moves.has(technique) else def.params
+	return _moves[technique].values() if _moves.has(technique) else def.params
 
 func start_attack(id: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(id):
@@ -185,7 +185,7 @@ func start_attack(id: StringName) -> bool:
 	if selection_enabled and ctx.projectiles.director != null:
 		var director: RefCounted=ctx.projectiles.director
 		var key := "draco:%d:%d" % [body_id,attack_serial]
-		var p: Dictionary=_moves[id].parameters
+		var p: Dictionary=_moves[id].values()
 		if not director.request(key,["beam" if id in [&"breath",&"inhale"] else "aimed"],body,body_id,float(p.warn)+float(p.active)+float(p.recover),1.5,1.0):
 			combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(id), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 			return false

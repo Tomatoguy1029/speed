@@ -15,7 +15,7 @@ const GATE_COLOR := Color(0.2, 0.65, 0.9)
 const ATTACK_COLOR := Color(1.0, 0.65, 0.15)
 
 func set_attack(move: Resource, adapter: String) -> void:
-	var p: Dictionary = move.parameters
+	var p: Dictionary = move.values()
 	arcs=p.get("arcs",[])
 	if adapter == "hydra" or move.get("head_kind") != null:
 		p = load("res://data/bosses/hydra.tres").params.merged(p, true)

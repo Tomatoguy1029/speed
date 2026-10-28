@@ -181,7 +181,7 @@ func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
 
 func rule() -> Dictionary:
-	return _moves[technique].parameters if _moves.has(technique) else {}
+	return _moves[technique].values() if _moves.has(technique) else {}
 
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 	return technique_rejection(attack, gate).is_empty()
@@ -199,23 +199,23 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	if distance > _reach(attack): return "out_of_reach"
 	if not _gate_allows(gate): return "direction_or_range_gate"
 	if attack != &"kick":
-		var r: Dictionary = _moves[attack].parameters
+		var r: Dictionary = _moves[attack].values()
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
 		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
-	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) > _reach(attack): return "predicted_target_out_of_reach"
+	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) > _reach(attack): return "predicted_target_out_of_reach"
 	return ""
 
 func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
 
 func _reach(attack: StringName) -> float:
-	var r: Dictionary = _moves[&"charge" if attack == &"combo" else attack].parameters
+	var r: Dictionary = _moves[&"charge" if attack == &"combo" else attack].values()
 	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 
 func _close_ready(attack: StringName) -> bool:
 	if not _moves.has(attack): return false
 	var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) <= _reach(attack)
+	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) <= _reach(attack)
 
 func selection_blocked() -> bool:
 	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
@@ -238,7 +238,7 @@ func start_attack(attack: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(attack):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
 		return false
-	var r: Dictionary = _moves[attack].parameters
+	var r: Dictionary = _moves[attack].values()
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
@@ -294,7 +294,7 @@ func _strike_aim(attack: StringName = &"", lead := -1.0) -> Vector2:
 	var velocity := run_state.ship_vel
 	var target := run_state.ship_pos + velocity * (float(def.params.lock_lead) if lead < 0.0 else lead)
 	if attack not in [&"charge", &"return_charge", &"lance"]: return target
-	var r: Dictionary = _moves[attack].parameters
+	var r: Dictionary = _moves[attack].values()
 	var speed := float(r.distance) / float(r.active)
 	var reach := float(r.get("reach", horn_length()))
 	var offset := target - table.pos[body]
@@ -459,7 +459,7 @@ func _reposition_tick(dt: float) -> void:
 		var keep := float(def.params.approach_range)
 		var closing := toward.length() > keep
 		if not closing and _moves.has(&"charge"):
-			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].parameters.warn))) > _reach(&"charge")
+			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].values().warn))) > _reach(&"charge")
 		if closing:
 			# approach_range の距離まで寄って止まり、その内側では向きだけを合わせる。
 			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))

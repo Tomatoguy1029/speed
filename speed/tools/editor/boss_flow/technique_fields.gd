@@ -45,10 +45,10 @@ static func from_display(key: String, value: float) -> float:
 
 static func editable_keys(move: Resource) -> Array[String]:
 	var keys: Array[String] = []
-	if move == null or not move.get("parameters") is Dictionary: return keys
-	for key in move.parameters:
+	if move == null or not move.has_method("field_names"): return keys
+	for key in move.field_names():
 		if key in ["cost", "major_cost"] or (move.technique == &"spiral" and key == "warn"): continue
-		if move.parameters[key] is int or move.parameters[key] is float: keys.append(String(key))
+		if move.field(key) is int or move.field(key) is float: keys.append(String(key))
 	return keys
 
 static func label_for(move: Resource, key: String, compact := false) -> String:
