@@ -9,6 +9,8 @@ var center := Vector2.ZERO
 var ended := false
 var paths: Array[PackedVector2Array] = []
 var locked := false
+## 片側の爪の数
+var claws := 3
 func begin(a: BossActor) -> void:
 	center = a.aim_target()
 	var side := -1.0 if a.run_state.rng.randf() < 0.5 else 1.0
@@ -21,11 +23,16 @@ func _lock(a: BossActor) -> void:
 	if forward.is_zero_approx(): forward = Vector2(-float(staging.side), 0.0)
 	var lateral: Vector2 = forward.orthogonal()
 	a.direction = forward
+	var p: Dictionary = a.rule()
+	claws = maxi(1, int(p.get("claw_count", 3)))
+	var start: float = 125.0 * a.head_scale
+	# 爪は口の前から自機の先まで伸び、外側へ claw_angle だけ開く。長さは reach で止める。
+	var length := minf(float(p.get("reach", 1500.0)), (center - origin).dot(forward) + float(p.get("claw_overshoot", 125.0)) - start)
 	for side in [-1, 1]:
-		for j in 3:
-			var stripe := float(side * 135 + (j - 1) * 70)
-			var from: Vector2 = origin + forward * 125.0 * a.head_scale + lateral * stripe
-			var to: Vector2 = center + forward * 125.0 + lateral * (stripe + float(side) * 60.0)
+		for j in claws:
+			var stripe := float(side) * float(p.get("claw_offset", 135.0)) + (j - (claws - 1) * 0.5) * float(p.get("claw_gap", 70.0))
+			var from: Vector2 = origin + forward * start + lateral * stripe
+			var to: Vector2 = from + forward.rotated(-float(side) * float(p.get("claw_angle", 0.0666))) * maxf(1.0, length)
 			paths.append(PackedVector2Array([from, to]))
 			a.telegraph_paths.append(paths[-1])
 			a.telegraph_widths.append(float(a.rule().get("scratch_width", 30.0)) * 0.5)
@@ -41,8 +48,8 @@ func tick(a: BossActor, _dt: float) -> void:
 	var scratch_time := float(p.get("scratch_time", 0.32))
 	var interval := float(p.interval)
 	while sides < 2 and a.elapsed >= sides * interval:
-		for j in 3:
-			var points: PackedVector2Array = paths[sides * 3 + j]
+		for j in claws:
+			var points: PackedVector2Array = paths[sides * claws + j]
 			var delta := points[1] - points[0]
 			var slash := a.ctx.projectiles.fire_wall(points[0], delta.angle(), 1.0, float(p.get("scratch_width", 30.0)), 0.0, scratch_time, float(p.damage) * a.ctx.cfg.atk_scale, Color("#e4cfff"))
 			slashes.append(slash)
@@ -56,7 +63,7 @@ func tick(a: BossActor, _dt: float) -> void:
 	a.telegraph_paths.clear()
 	a.telegraph_widths.clear()
 	for index in paths.size():
-		var side_index := index / 3
+		var side_index := index / claws
 		var local_time: float = a.elapsed - side_index * interval
 		if local_time < 0.0:
 			a.telegraph_paths.append(paths[index])

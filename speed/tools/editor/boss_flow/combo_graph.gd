@@ -142,7 +142,8 @@ func _ready() -> void:
 ## 技のデータの表示名、なければ既定の名前。
 func _title(id: String) -> String:
 	for move in _moves:
-		if String(move.technique) == id and not String(move.get("display_name")).is_empty(): return String(move.display_name)
+		var name: Variant = move.get("display_name")
+		if String(move.technique) == id and name is String and not name.is_empty(): return name
 	return preload("res://tools/editor/boss_flow/technique_graph.gd").title_for(id)
 
 func open(value: Dictionary, moves: Array) -> void:

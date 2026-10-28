@@ -28,7 +28,8 @@ static func node_title(value: Resource, id: String) -> String:
 static func technique_title(value: Resource, id: String) -> String:
 	if value != null:
 		for move in value.get("techniques"):
-			if String(move.technique) == id and not String(move.get("display_name")).is_empty(): return String(move.display_name)
+			var name: Variant = move.get("display_name")
+			if String(move.technique) == id and name is String and not name.is_empty(): return name
 	return title_for(id)
 
 func _ready() -> void:

@@ -62,13 +62,19 @@ static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
 		&"clones":
 			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(d, 0.0), half)]}
 		&"rifts":
+			# 戦闘の爪と同じ並び。口の前から自機の先まで伸び、外側へ開く。
 			var scratch := float(p.get("scratch_width", 30.0)) * 0.5
+			var claws := maxi(1, int(p.get("claw_count", 3)))
 			return {"length": 0.0, "builder": func(d: float) -> Array:
 				var shapes := []
+				var start := 125.0 * scale
+				var length := maxf(1.0, minf(float(p.get("reach", 1500.0)), d + float(p.get("claw_overshoot", 125.0)) - start))
 				for side in [-1.0, 1.0]:
-					for j in 3:
-						var stripe: float = side * 135.0 + (j - 1) * 70.0
-						shapes.append(_band(Vector2(125.0 * scale, stripe), Vector2(d + 125.0, stripe + side * 60.0), scratch))
+					for j in claws:
+						# 画面の上（-Y）が戦闘の lateral の正の向き
+						var stripe: float = -(side * float(p.get("claw_offset", 135.0)) + (j - (claws - 1) * 0.5) * float(p.get("claw_gap", 70.0)))
+						var from := Vector2(start, stripe)
+						shapes.append(_band(from, from + Vector2.RIGHT.rotated(side * float(p.get("claw_angle", 0.0666))) * length, scratch))
 				return shapes}
 		&"picaro_wall":
 			var radius := float(p.get("radius", 85.0))
