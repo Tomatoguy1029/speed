@@ -5,7 +5,8 @@ static func steer(n, target: Vector2, dt: float, p: Dictionary, speed_scale:=1.0
 	var previous: float=n.angle
 	if offset.length()>1.0:
 		n.angle=rotate_toward(n.angle,offset.angle(),float(p.snake_turn)*dt)
-	var speed: float=float(p.snake_speed)*speed_scale*clampf(offset.length()/100.0,0.3,1.0)
+	# 目標へ着いたら減速して止まる。最低速度があると目標の周囲を旋回し続け、胴体履歴が一箇所へ巻き込まれる。
+	var speed: float=float(p.snake_speed)*speed_scale*clampf(offset.length()/100.0,0.0,1.0)
 	speed*=0.3+0.7*maxf(0.0,cos(angle_difference(n.angle,offset.angle())))
 	var desired:=Vector2.from_angle(n.angle)*speed
 	n.velocity=n.velocity.lerp(desired,1.0-exp(-float(p.snake_accel)*dt))

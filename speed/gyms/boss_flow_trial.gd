@@ -755,7 +755,9 @@ func _execute_hydra(id: String) -> bool:
 	var actor = preview_actor
 	if not actor.has_body() or actor.action_rules == null: return false
 	actor.interrupt_tech()
-	actor._set_count(8)
+	# 再生のたびに全頭を生やし直すと、離脱した蛇の移動履歴と姿勢が途切れる。
+	if actor.count != 8 or actor.necks.any(func(neck): return not actor._alive(neck)):
+		actor._set_count(8)
 	actor._tech_cd = 0.0
 	actor.combo_wait = 0.0
 	actor.recovery_t = 0.0
@@ -777,7 +779,8 @@ func _position_for_hydra(id: String) -> void:
 	var actor = preview_actor
 	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
 	var distance := (float(gate.get("min", 0.0)) + minf(1400.0, float(gate.get("max", 600.0)))) * 0.5
-	var origin := Vector2.ZERO
+	# 離脱後の本体は泳いで移動する。再再生でも現在地を基準に自機を置く。
+	var origin: Vector2 = actor.table.pos[actor.body]
 	var move: Resource = actor._moves.get(StringName(id))
 	if move != null and move.head_kind != &"":
 		var neck = actor._first(move.head_kind)

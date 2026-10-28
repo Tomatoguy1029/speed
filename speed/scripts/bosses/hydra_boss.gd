@@ -403,6 +403,8 @@ func _grow(neck: Neck) -> void:
 	neck.mode = &"idle"
 	neck.glow = 0.0
 	neck.segs.clear()
+	# 再生した頭に、以前の頭が通った座標列を引き継がない。
+	neck.motion.erase("trail")
 	_follow_neck(neck, 0.0)
 
 ## 根元は胴体表面のローカル座標で固定し、首の狙い角から分離する。
