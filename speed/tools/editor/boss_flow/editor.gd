@@ -511,6 +511,8 @@ func _assign_post_gap(target: Resource, value: float) -> void:
 
 ## 予告中の追尾に対応するボス
 const TRACKING_BOSSES := ["monoceros", "canis_major"]
+## 技の欄の「タイミング」にまとめる値。この順で並べる。
+const TIMING_KEYS := ["warn", "active", "hold", "return_speed", "recover", "cd"]
 
 func _set_tracking(enabled: bool) -> void:
 	if current == null or current.track_during_warn == enabled: return
@@ -1081,6 +1083,7 @@ func _edit_coverage(group := "") -> void:
 	_clear_fields()
 	_heading.tooltip_text = "このノードに接続する技を管理します。各技の発動距離・方向は技ノードを選んで編集します。"
 	if not selection.is_empty():
+		_section_heading("基本")
 		var label := Label.new()
 		label.text = "ノード名"
 		_fields.add_child(label)
@@ -1100,20 +1103,26 @@ func _edit_coverage(group := "") -> void:
 		category.selected = maxi(0, kinds.find(rules.category_for_group(group)))
 		category.item_selected.connect(func(value): _set_group_category(group, kinds[value]))
 		_fields.add_child(category)
-		var members_label := Label.new()
-		members_label.text = "攻撃候補の有効／無効"
-		members_label.tooltip_text = "チェックを外した技は、この接続から発動しなくなります。"
-		_fields.add_child(members_label)
-		var members := VBoxContainer.new()
-		_fields.add_child(members)
+		_section_heading("つながっている技（チェックを外すと出さない）")
+		var member_count := 0
 		for id in rules.node_ids():
 			if graph.hub_for(id) != group: continue
 			var enabled := CheckBox.new()
 			enabled.text = GRAPH.node_title(rules, id)
-			enabled.tooltip_text = members_label.tooltip_text
+			enabled.tooltip_text = "チェックを外した技は、この条件選択から発動しなくなります。"
 			enabled.button_pressed = rules.graph_nodes.get(id, {}).get("connected", true)
 			enabled.toggled.connect(func(value): graph._connect(id, value))
-			members.add_child(enabled)
+			_fields.add_child(enabled)
+			_fields.add_child(Control.new())
+			member_count += 1
+		if member_count == 0:
+			var empty := Label.new()
+			empty.text = "つながっている技はありません。グラフでこの条件選択から技へ線を引くと追加されます。"
+			empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			empty.custom_minimum_size.x = 160.0 * _scale
+			_fields.add_child(empty)
+			_fields.add_child(Control.new())
+	_section_heading("範囲図の確認（保存しない）")
 	var simulation := CheckBox.new()
 	simulation.text = "範囲図の戦闘状況"
 	simulation.tooltip_text = "範囲図に使う仮の状況を設定します。実際の戦闘設定や発動条件は変更しません。"
@@ -1260,10 +1269,7 @@ func _prepare_trial(id: String) -> void:
 	if Engine.is_editor_hint(): EditorInterface.play_custom_scene(scene)
 
 func _append_gate(id: String) -> void:
-	var heading := Label.new()
-	heading.text = "この技へ進む条件"
-	_fields.add_child(heading)
-	_fields.add_child(Control.new())
+	_section_heading("この技へ進む条件")
 	var gate: Dictionary = {"min": 0.0, "max": 600.0, "angle": 0.0, "half_angle": 180.0}.merged(rules.conditions.get(id, {}), true)
 	rules.conditions[id] = gate
 	for key in ["min", "max", "angle", "half_angle"]:
@@ -1281,35 +1287,27 @@ func _refresh() -> void:
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
+	# 時間に関わる値と、威力・範囲の値を分けて並べる。
+	var timing: Array = []
+	var others: Array = []
 	for key in current.parameters:
 		if current.technique == &"spiral" and key == "warn": continue
-		if key=="arcs":
-			_append_arcs()
-			continue
-		if key in ["cost", "major_cost"] or not (current.parameters[key] is float or current.parameters[key] is int): continue
-		var label := Label.new()
-		# 第2形態の値は、同じ名前の値の表示名に形態を添える。
-		var base_key := String(key).trim_suffix("_p2")
-		label.text = SPIRAL_FIELDS.label_for(current, String(key))
-		label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
-		_fields.add_child(label)
-		var field := SpinBox.new()
-		field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		field.min_value = 0
-		field.max_value = 100000
-		if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
-			field.min_value = SPIRAL_BOUNDS[base_key].x
-			field.max_value = SPIRAL_BOUNDS[base_key].y
-		field.step = 1 if current.parameters[key] is int else 0.01
-		field.tooltip_text = label.tooltip_text
-		field.value = SPIRAL_FIELDS.to_display(String(key), float(current.parameters[key]))
-		field.set_meta("key", key)
-		field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value)))
-		_fields.add_child(field)
-	if graph.category_for(_selected_technique) != "combo":
+		if key != "arcs" and (key in ["cost", "major_cost"] or not (current.parameters[key] is float or current.parameters[key] is int)): continue
+		if String(key).trim_suffix("_p2") in TIMING_KEYS: timing.append(key)
+		else: others.append(key)
+	timing.sort_custom(func(a, b): return TIMING_KEYS.find(String(a).trim_suffix("_p2")) < TIMING_KEYS.find(String(b).trim_suffix("_p2")))
+	var combo_category := graph.category_for(_selected_technique) == "combo"
+	if not timing.is_empty() or not combo_category: _section_heading("タイミング")
+	for key in timing: _technique_field(key)
+	if not combo_category:
 		var gap := _number_field("技後の隙（秒）", current.post_gap, _set_post_gap)
 		gap.step = 0.05
 		gap.tooltip_text = "技の演出と回復動作が終わってから、次の攻撃選択まで待つ時間です。コンボ技には追加しません。"
+	if not others.is_empty(): _section_heading("威力と範囲")
+	for key in others:
+		if key == "arcs": _append_arcs()
+		else: _technique_field(key)
+	_section_heading("狙いと消費スタミナ")
 	if String(rules.adapter) in TRACKING_BOSSES and not rules.combos.has(String(current.technique)):
 		var tracking := CheckBox.new()
 		tracking.text = "予告の間、自機を追う"
@@ -1327,6 +1325,29 @@ func _refresh() -> void:
 		history.commit_action())
 	_append_gate(_selected_technique)
 	_status.text = "左の青：発動条件　右の橙：攻撃範囲。動的な照準・配置は実験場で確認できます。"
+	call_deferred("_refresh_field_columns")
+
+## 技の値1つ分の名前と入力欄。
+func _technique_field(key: Variant) -> void:
+	var label := Label.new()
+	# 第2形態の値は、同じ名前の値の表示名に形態を添える。
+	var base_key := String(key).trim_suffix("_p2")
+	label.text = SPIRAL_FIELDS.label_for(current, String(key))
+	label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
+	_fields.add_child(label)
+	var field := SpinBox.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.min_value = 0
+	field.max_value = 100000
+	if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
+		field.min_value = SPIRAL_BOUNDS[base_key].x
+		field.max_value = SPIRAL_BOUNDS[base_key].y
+	field.step = 1 if current.parameters[key] is int else 0.01
+	field.tooltip_text = label.tooltip_text
+	field.value = SPIRAL_FIELDS.to_display(String(key), float(current.parameters[key]))
+	field.set_meta("key", key)
+	field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value)))
+	_fields.add_child(field)
 
 func _set_cost(id: String, value: float) -> void:
 	rules.costs[id] = value
