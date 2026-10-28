@@ -51,6 +51,7 @@ var _friendly_visuals: Dictionary = {}
 var _event_visuals: Dictionary = {}
 var _enemy_mat: ShaderMaterial
 var _armor_material: ShaderMaterial
+var _mark_effects: EnemyMarkEffects
 var _lit_enemy_marks: DrawLayer
 var _directional_lights: Dictionary = {}
 var lighting_settings: Resource = preload("res://data/visuals/enemy_lighting.tres")
@@ -155,6 +156,8 @@ func _ready() -> void:
 	_path_band.draw_fn = _timed(&"draw_path_band", _draw_path_band)
 	_path_band_group.add_child(_path_band)
 	_build_batches()
+	_mark_effects = EnemyMarkEffects.new()
+	_layers.enemies.add_child(_mark_effects)
 	_build_directional_lights(world)
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
@@ -922,6 +925,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
 	_sync_visuals()
+	_mark_effects.begin(state.world_time)
 	var query_padding := run.combat.enemy_query_padding
 	var view := view_rect().grow(query_padding)
 	for batch: InstanceBatch in _armor_batches.values():
@@ -965,6 +969,8 @@ func _draw_enemies(c: CanvasItem) -> void:
 		# 共通の境界内に収まる外観は同じ矩形を使う。大きい外観だけ元の拡張判定を行う。
 		if not (view.has_point(p) if extra == 0.0 else view.grow(extra).has_point(p)):
 			continue
+		if elite[i] != 0 or landmark[i] != 0:
+			_mark_effects.add(p, maxf(sprite_radius, radius[i]), t.id[i], landmark[i] != 0, elite[i] != 0)
 		# 色のr成分はスプライトシェーダーの被弾フラッシュ。
 		var col := Color(1.0 if t.flash[i] > 0.0 else 0.0, 0.0, 0.0, 1.0)
 		# g成分は自爆予告の赤い装甲。被弾の白いフラッシュとは分ける。
@@ -984,7 +990,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 			continue
 		# 飾りのある敵だけ、飾りを描く
 		var v := _visual_of(t, i)
-		if elite[i] != 0 or weak[i] > 0.0 or charge[i] > 0.0 or landmark[i] != 0 or stone[i] > 0.0 \
+		if weak[i] > 0.0 or charge[i] > 0.0 or stone[i] > 0.0 \
 				or (radius[i] >= 25.0 and hp[i] < max_hp[i]) or (v != null and v.always_marked):
 			marked += 1
 			_draw_enemy_marks(c, t, i)
@@ -995,6 +1001,7 @@ func _draw_enemies(c: CanvasItem) -> void:
 			_batches[key].end()
 	for batch: InstanceBatch in _armor_batches.values():
 		batch.end()
+	_mark_effects.finish()
 	perf.since(&"draw_enemies.upload", t0)
 	_draw_meteor_shards(c)
 	t0 = Time.get_ticks_usec()
@@ -1147,25 +1154,15 @@ func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: fl
 	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
 	c.draw_set_transform(Vector2.ZERO)
 
-## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
+## 数の少ない飾り（背面の弱点・予告・HP バー）は個別に描く。目印とエリートは背後のバッチへ渡す。
 func _draw_enemy_marks(c: CanvasItem, t: EnemyTable, i: int) -> void:
 	var p := t.pos[i]
 	var r := t.r[i]
 	var v := _visual_of(t, i)
-	if t.elite[i] != 0:
-		c.draw_arc(p, r + _px(3.0), 0, TAU, 32, Color("#ffd24a"), _px(2.0))
 	var weak := t.weak_arc[i]
 	if weak > 0.0 and t.type[i] not in EnemyDef.NATIVE_SPRITES and (v == null or v.draws_weak_arc):
 		var f := t.facing[i]
 		c.draw_arc(p, r + _px(2.0), f + PI - weak, f + PI + weak, 12, Color("#ffe46b"), _px(3.0))
-	if t.landmark[i] != 0:
-		# 目印の星：金色とも白ともつかない特別な光
-		var tw := 0.75 + 0.25 * sin(state.world_time * 5.0 + float(t.id[i]))
-		c.draw_circle(p, r * 2.2 * tw, Color(1.0, 0.95, 0.8, 0.16))
-		c.draw_circle(p, r * 0.5, Color(1.0, 0.97, 0.88, 0.95))
-		for k in 4:
-			var u := Vector2.from_angle(k * PI / 2.0 + state.world_time) * r * 1.8 * tw
-			c.draw_line(p - u, p + u, Color(1.0, 0.95, 0.75, 0.6), _px(2.0))
 	if t.stone[i] > 0.0:
 		# 石になっている
 		c.draw_circle(p, r * 1.05, Color(0.62, 0.6, 0.58, 0.85))
