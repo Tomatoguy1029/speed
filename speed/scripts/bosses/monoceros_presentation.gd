@@ -14,6 +14,9 @@ const KICK_FOLD := 18.0
 ## 攻撃時間のうち、蹄を伸ばしきるまでの割合
 const KICK_EXTEND := 0.4
 var actor: MonocerosBoss
+## 攻撃が終わった時点の姿勢。攻撃後はここから正面の姿勢へ戻す。
+var _end_neck := 0.0
+var _end_legs: Array[Dictionary] = []
 var hit := 0.0
 @onready var parts: PartsVisual = $Parts
 
@@ -65,19 +68,33 @@ func _sync_parts(dt: float) -> void:
 	if actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]:
 		var points := actor.horn_points()
 		neck_angle = angle_difference(actor.table.facing[actor.body], (points[1] - actor.table.pos[actor.body]).angle())
+		_end_neck = neck_angle
+	elif actor.technique == &"sweep" and actor.mode == &"recovery":
+		neck_angle = lerpf(_end_neck, 0.0, actor.settle_progress())
 	parts.get_node("Head").rotation = neck_angle
 	var sword := parts.get_node("Head/SwordGlow") as Polygon2D
 	sword.visible = actor.phase == 2
 	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
 	parts.get_node("Head/SwordGlow/Guard").visible = sword.visible
 
-## 後ろ蹴り：予告で後脚を蹴る向きへ畳み、攻撃で蹄を判定の先端まで伸ばす。
+## 後ろ蹴り：予告で後脚を蹴る向きへ畳み、攻撃で蹄を判定の先端まで伸ばす。攻撃後は止まってから前へ戻す。
 func _pose_kick() -> void:
 	for path in REAR_LEGS:
 		var leg := parts.get_node(path) as Node2D
 		leg.rotation = 0.0
 		leg.scale = Vector2.ONE
+	if actor.technique == &"kick" and actor.mode == &"recovery" and _end_legs.size() == REAR_LEGS.size():
+		var back := actor.settle_progress()
+		for index in REAR_LEGS.size():
+			var leg := parts.get_node(REAR_LEGS[index]) as Node2D
+			var foot := leg.get_node("Foot") as Node2D
+			var pose: Dictionary = _end_legs[index]
+			leg.rotation = lerpf(pose.rotation, 0.0, back)
+			leg.scale.y = lerpf(pose.stretch, 1.0, back)
+			foot.position.y = lerpf(pose.foot, foot.position.y, back)
+		return
 	if actor.technique != &"kick" or actor.mode not in [&"windup", &"active"]: return
+	_end_legs.clear()
 	var rule := actor.rule()
 	var warn := maxf(0.001, float(rule.warn))
 	var elapsed := actor.timeline.current_animation_position
@@ -96,12 +113,14 @@ func _pose_kick() -> void:
 			var fold := clampf(elapsed / warn, 0.0, 1.0)
 			leg.rotation = lerpf(0.0, turn, fold)
 			foot.position.y = lerpf(rest, KICK_FOLD, fold)
+			_end_legs.append({"rotation": leg.rotation, "stretch": 1.0, "foot": foot.position.y})
 		else:
 			var extend := clampf((elapsed - warn) / maxf(0.001, float(rule.active) * KICK_EXTEND), 0.0, 1.0)
 			var natural := rest + hoof.position.y + hoof.texture.get_height()
 			leg.rotation = turn
 			foot.position.y = lerpf(KICK_FOLD, rest, extend)
 			leg.scale.y = lerpf(1.0, maxf(1.0, toward.length() / natural), extend)
+			_end_legs.append({"rotation": leg.rotation, "stretch": leg.scale.y, "foot": foot.position.y})
 
 func _body_point(world_point: Vector2) -> Vector2:
 	# 旋回したフレームも、役者ノードの描画更新を待たず戦闘方向を使う。

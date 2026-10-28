@@ -10,7 +10,9 @@ parameters = {
 "active": 0.24,
 "cd": 9.0,
 "damage": 18.0,
+"hold": 0.25,
 "reach": 210.0,
 "recover": 1.2,
+"return_speed": 4.1887902047863905,
 "warn": 0.85
 }

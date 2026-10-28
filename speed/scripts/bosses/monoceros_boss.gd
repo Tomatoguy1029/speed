@@ -29,6 +29,10 @@ var turn_motion := 0.0
 var attack_hit := false
 var previous_ship := Vector2.ZERO
 var previous_horn := PackedVector2Array()
+## 攻撃後の姿勢戻し。終わった姿勢で hold 秒止まり、return_speed で正面の姿勢へ戻ってから recover の隙に入る。
+var settle_at := -1.0
+var settle_hold := 0.0
+var settle_return := 0.0
 var _defeated := false
 var _presentation: Node
 var entrance_time := 0.0
@@ -329,7 +333,7 @@ func launch_strike() -> void:
 		combo_pending = false
 		passes_left = 0
 		mode = &"recovery"
-		recovery = float(rule().recover)
+		recovery = _begin_settle() + float(rule().recover)
 		_cue(&"recovery_started")
 		return
 	if technique in [&"charge", &"return_charge", &"lance"] and _path_blocked():
@@ -412,11 +416,32 @@ func end_strike() -> void:
 		recovery = float(def.params.turnaround_time)
 	elif combo_pending:
 		mode = &"recovery"
-		recovery = float(def.params.combo_gap)
+		recovery = _begin_settle() + float(def.params.combo_gap)
 	else:
 		mode = &"recovery"
-		recovery = float(rule().recover)
+		recovery = _begin_settle() + float(rule().recover)
 	_cue(&"recovery_started")
+
+## 姿勢戻しを始め、止まる時間と正面へ戻る時間の合計を返す。姿勢を持たない技は0。
+func _begin_settle() -> float:
+	settle_at = clock
+	settle_hold = 0.0
+	settle_return = 0.0
+	if technique not in [&"sweep", &"kick"]: return 0.0
+	var r := rule()
+	# 戻す角度：薙ぎは振り終えた端から正面まで、蹴りは後ろへ回した後脚を前へ戻すまで。
+	var angle := float(r.get("arc", 0.0)) * 0.5 if technique == &"sweep" else PI
+	var speed := float(r.get("return_speed", 0.0))
+	settle_hold = maxf(0.0, float(r.get("hold", 0.0)))
+	settle_return = angle / speed if speed > 0.0 else 0.0
+	return settle_hold + settle_return
+
+## 攻撃後の姿勢戻しの進み。0は終わった姿勢のまま、1は正面の姿勢。
+func settle_progress() -> float:
+	if mode != &"recovery" or settle_at < 0.0: return 1.0
+	var elapsed := clock - settle_at - settle_hold
+	if elapsed < 0.0: return 0.0
+	return clampf(elapsed / settle_return, 0.0, 1.0) if settle_return > 0.0 else 1.0
 
 func _reposition_tick(dt: float) -> void:
 	if reposition > 0.0:
@@ -468,7 +493,8 @@ func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:
 	elif technique == &"sweep":
 		var f := sweep_fraction
 		if f < 0.0: f = clampf((timeline.current_animation_position - float(rule().warn)) / float(rule().active), 0.0, 1.0)
-		angle += lerpf(-float(rule().arc), float(rule().arc), f)
+		# 薙ぐ角度は振る範囲の全体。正面を中心に、左端から右端へ振る。
+		angle += lerpf(-0.5, 0.5, f) * float(rule().arc)
 	var dir := Vector2.from_angle(angle)
 	return PackedVector2Array([at + dir * root, at + dir * reach])
 

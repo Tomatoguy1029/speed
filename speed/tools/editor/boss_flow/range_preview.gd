@@ -7,6 +7,12 @@ var gaps := PackedVector2Array()
 var radius := 1800.0
 var attack := {}
 var arcs: Array = []
+## true では発動条件（左）と攻撃範囲（右）を間を空けて並べる。false では1枚に重ねる。
+var split := false
+## 並べるときの2枚の図の間
+const SPLIT_GAP := 24.0
+const GATE_COLOR := Color(0.2, 0.65, 0.9)
+const ATTACK_COLOR := Color(1.0, 0.65, 0.15)
 
 func set_attack(move: Resource, adapter: String) -> void:
 	var p: Dictionary = move.parameters
@@ -18,9 +24,28 @@ func set_attack(move: Resource, adapter: String) -> void:
 		if not is_finite(float(attack.length)): attack = {"dynamic": true, "length": 0.0}
 		if move.technique in [&"bite_thrust", &"thunder_headbutt"]: attack = {"targeted": true, "length": 0.0, "width": float(p.bite_radius)}
 		if move.technique == &"thunder_drop": attack = {"targeted": true, "length": 0.0, "width": float(p.thunder_radius) * 2.0, "circle": true}
+	elif adapter == "monoceros":
+		attack = _monoceros_attack(move.technique, p)
 	else:
 		attack = {"length": p.get("reach", p.get("distance", 180.0)), "width": 30.0, "angle": 180.0 if move.technique == &"kick" else 0.0}
 	queue_redraw()
+
+## 一角獣の角・蹄の判定が通る範囲。from〜to は本体の中心からの距離、angle と half_angle は度。
+static func _monoceros_attack(technique: StringName, p: Dictionary) -> Dictionary:
+	var def: Resource = load("res://data/bosses/monoceros.tres")
+	var horn := float(def.radius) * float(def.params.horn_length_ratio)
+	var root := float(def.radius) * 0.65
+	var width := float(def.params.horn_width)
+	match technique:
+		&"sweep":
+			return {"from": root, "to": horn, "angle": 0.0, "half_angle": rad_to_deg(float(p.get("arc", 0.0))) * 0.5, "width": width, "length": horn}
+		&"kick":
+			return {"from": root, "to": float(p.get("reach", horn)), "angle": 180.0, "width": width, "length": float(p.get("reach", horn))}
+		&"lance":
+			var reach := float(p.get("reach", horn)) + float(p.get("distance", 0.0))
+			return {"from": root, "to": reach, "angle": 0.0, "width": width, "length": reach}
+	var travel := float(p.get("distance", 0.0)) + horn
+	return {"from": root, "to": travel, "angle": 0.0, "width": width, "length": travel}
 
 static func analyze(conditions: Array, limit: float) -> Dictionary:
 	var missing := PackedVector2Array()
@@ -60,6 +85,19 @@ func _draw() -> void:
 		draw_circle(center, 5, Color(0.9, 0.5, 0.25))
 		return
 	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), float(attack.get("length", 0.0)))))
+	if split:
+		# 2枚は同じ縮尺。左に発動条件、右に攻撃範囲を描く。
+		var side := minf(size.y, (size.x - SPLIT_GAP) * 0.5)
+		var scaling := side * 0.43 / maximum
+		var left := Vector2(size.x * 0.5 - SPLIT_GAP * 0.5 - side * 0.5, size.y * 0.5)
+		var right := Vector2(size.x * 0.5 + SPLIT_GAP * 0.5 + side * 0.5, size.y * 0.5)
+		_sector(gate, left, scaling)
+		_boss_marker(left)
+		_caption(left - Vector2(side * 0.5, side * 0.5), "発動条件", GATE_COLOR)
+		_attack_area(right, scaling, maximum)
+		_boss_marker(right)
+		_caption(right - Vector2(side * 0.5, side * 0.5), "攻撃範囲", ATTACK_COLOR)
+		return
 	var scale_factor := minf(size.x, size.y) * 0.43 / maximum
 	_sector(gate, center, scale_factor)
 	for arc: DracoExhaleArc in arcs:
@@ -80,6 +118,46 @@ func _draw() -> void:
 		draw_string(get_theme_default_font(), Vector2(4, size.y - 3), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), Color(1.0, 0.65, 0.15))
 	draw_circle(center, 5, Color(0.9, 0.5, 0.25))
 	draw_line(center, center + Vector2(18, 0), Color(0.9, 0.5, 0.25), 2)
+
+func _boss_marker(center: Vector2) -> void:
+	draw_circle(center, 5, Color(0.9, 0.5, 0.25))
+	draw_line(center, center + Vector2(18, 0), Color(0.9, 0.5, 0.25), 2)
+
+func _caption(corner: Vector2, text: String, color: Color) -> void:
+	var font := get_theme_default_font()
+	var font_size := maxi(10, int(get_theme_default_font_size() * 0.75))
+	draw_string(font, corner + Vector2(2, font_size), text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+
+## 攻撃範囲を、発動条件の扇と同じ塗りで描く。扇の範囲は扇形、直線の判定は幅を持つ帯にする。
+func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
+	if attack.is_empty(): return
+	if attack.get("dynamic", false):
+		draw_string(get_theme_default_font(), center + Vector2(-30, 4), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), ATTACK_COLOR)
+		return
+	var fill := Color(ATTACK_COLOR, 0.35)
+	if attack.get("targeted", false):
+		var at := center + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * (float(gate.get("min", 0.0)) + maximum) * 0.5 * scaling
+		draw_circle(at, maxf(2.0, float(attack.width) * 0.5 * scaling), fill)
+		return
+	var start := float(attack.get("from", 0.0))
+	var finish := float(attack.get("to", attack.get("length", 0.0)))
+	var angle := deg_to_rad(float(attack.get("angle", 0.0)))
+	var half := deg_to_rad(float(attack.get("half_angle", 0.0)))
+	var width := float(attack.get("width", 30.0))
+	if half > 0.0:
+		# 扇の外周は判定の幅の半分だけ外へ広げる。
+		var outer := (finish + width * 0.5) * scaling
+		var inner := maxf(0.0, start - width * 0.5) * scaling
+		var points := PackedVector2Array()
+		for i in 49: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * i / 48.0) * outer)
+		for i in 49: points.append(center + Vector2.from_angle(angle + half - half * 2.0 * i / 48.0) * inner)
+		draw_colored_polygon(points, fill)
+		return
+	var axis := Vector2.from_angle(angle)
+	var side := axis.orthogonal() * maxf(1.0, width * 0.5 * scaling)
+	var a := center + axis * start * scaling
+	var b := center + axis * finish * scaling
+	draw_colored_polygon(PackedVector2Array([a + side, b + side, b - side, a - side]), fill)
 
 func _sector(value: Dictionary, center: Vector2, scale_factor: float) -> void:
 	var maximum := float(value.get("max", 600.0))

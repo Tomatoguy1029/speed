@@ -10,6 +10,8 @@ parameters = {
 "arc": 1.15,
 "cd": 4.0,
 "damage": 20.0,
+"hold": 0.25,
 "recover": 1.3,
+"return_speed": 3.141592653589793,
 "warn": 0.85
 }

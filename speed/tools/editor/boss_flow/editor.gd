@@ -170,7 +170,8 @@ func _ready() -> void:
 	scroll.add_child(content)
 	content.add_child(_preview_frame)
 	_preview_frame.add_child(preview)
-	preview.custom_minimum_size = Vector2(160, 160) * _scale
+	preview.split = true
+	preview.custom_minimum_size = Vector2(160.0 * 2.0 * _scale + preview.SPLIT_GAP, 160.0 * _scale)
 	preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	preview.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_fields.columns = 1
@@ -573,6 +574,9 @@ func _refresh_field_columns() -> void:
 	if _detail_scroll == null or _fields == null: return
 	var narrow := _detail_scroll.size.x < maxf(500.0, 320.0 * _scale)
 	_fields.columns = 1 if narrow else 2
+	# 発動条件と攻撃範囲の2枚が並ぶ幅を、詳細欄の幅に収める。
+	var side := clampf((_detail_scroll.size.x - 16.0 - preview.SPLIT_GAP) * 0.5, 80.0 * _scale, 160.0 * _scale)
+	preview.custom_minimum_size = Vector2(side * 2.0 + preview.SPLIT_GAP, side)
 	for child in _fields.get_children():
 		if child.get_class() == "Control" or child.get_meta("hide_when_narrow", false):
 			child.visible = not narrow
@@ -1299,7 +1303,7 @@ func _refresh() -> void:
 		history.add_undo_method(_set_cost.bind(id, float(rules.costs.get(id, 1.0))))
 		history.commit_action())
 	_append_gate(_selected_technique)
-	_status.text = "青：発動条件　橙：基準の射程。動的な照準・配置は実験場で確認できます。"
+	_status.text = "左の青：発動条件　右の橙：攻撃範囲。動的な照準・配置は実験場で確認できます。"
 
 func _set_cost(id: String, value: float) -> void:
 	rules.costs[id] = value
