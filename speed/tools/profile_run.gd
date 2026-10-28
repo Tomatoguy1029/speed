@@ -376,7 +376,7 @@ func _drive_intent() -> Intent:
 ## 機体の向きの先へジグザグの線を描いて確定する。描けたら true。
 func _draw_ahead() -> bool:
 	var s := run.state
-	if s.phase != RunState.Phase.PLAY or s.drawing or s.tracing or s.gauge < run.cfg.draw_min_charge:
+	if s.phase != RunState.Phase.PLAY or s.drawing or s.tracing or s.gauge_amount() < run.cfg.draw_min_charge:
 		return false
 	var p := s.ship_pos
 	var heading := s.ship_heading if not s.ship_heading.is_zero_approx() else Vector2.RIGHT

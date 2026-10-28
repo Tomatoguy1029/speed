@@ -230,7 +230,7 @@ func _draw_route_step() -> void:
 	var n: int = _route_play.n
 	var draw := run.draw
 	if n == 0:
-		if run.state.drawing or run.state.tracing or run.state.gauge < run.cfg.draw_min_charge:
+		if run.state.drawing or run.state.tracing or run.state.gauge_amount() < run.cfg.draw_min_charge:
 			_route_play = {}
 			return
 		var it := Intent.new()
