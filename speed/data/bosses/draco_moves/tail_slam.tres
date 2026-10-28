@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/tail_slam.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/tail_slam_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"tail_slam"
@@ -14,3 +16,4 @@ recover = 1.0
 damage = 30.0
 reach = 1200.0
 radius = 110.0
+visual = ExtResource("visual")

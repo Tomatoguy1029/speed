@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/meteor.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/meteor_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"meteor"
@@ -16,3 +18,4 @@ rock_hp = 180.0
 rock_radius = 78.0
 rock_distance = 340.0
 rock_spacing = 240.0
+visual = ExtResource("visual")

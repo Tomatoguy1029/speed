@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/inhale.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/bosses/draco_exhale_arc.gd" id="arc"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/inhale_visual.tscn" id="visual"]
+
 [sub_resource type="Resource" id="left"]
 script = ExtResource("arc")
 offset = Vector2(40,-100)
@@ -16,6 +18,7 @@ radius = 260.0
 angle_degrees = 38.0
 spread_degrees = 20.0
 count = 12
+
 
 [resource]
 script = ExtResource("1")
@@ -41,3 +44,4 @@ beam_warn = 0.5
 comets_per_star = 2
 comet_cap = 24
 comet_speed = 480.0
+visual = ExtResource("visual")

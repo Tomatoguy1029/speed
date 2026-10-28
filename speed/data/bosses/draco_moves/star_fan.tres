@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/star_fan.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/star_fan_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"star_fan"
@@ -17,3 +19,4 @@ count = 9
 arc = 1.134464
 radius = 260.0
 speed = 800.0
+visual = ExtResource("visual")

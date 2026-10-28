@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/charge.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/charge_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"charge"
@@ -14,3 +16,4 @@ active = 0.7
 recover = 1.0
 damage = 35.0
 width = 96.0
+visual = ExtResource("visual")

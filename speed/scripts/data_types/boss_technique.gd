@@ -32,6 +32,7 @@ class Runner extends RefCounted:
 	func tick(_actor: BossActor, _dt: float) -> void: pass
 	func end(_actor: BossActor, _cancelled: bool) -> void: pass
 	func recover(_actor: BossActor, _dt: float) -> void: pass
+	func pose(_actor: BossActor) -> void: pass
 
 ## エディターと実験場が使う @export の型・範囲・単位。
 func field_property(name: String) -> Dictionary:

@@ -68,3 +68,6 @@ class Runner extends BossTechnique.Runner:
 		MOTION.clear_tell(a)
 	func end(a: BossActor,_cancelled: bool) -> void:
 		MOTION.clear_tell(a)
+
+	func pose(a: BossActor) -> void:
+		a.mouth_open = (1.35 if a.technique == &"inhale" else 1.0) if a.mode == &"active" else 0.8 if a.mode == &"windup" else 0.0

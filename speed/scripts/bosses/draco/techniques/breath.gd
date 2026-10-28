@@ -130,3 +130,6 @@ class Runner extends BossTechnique.Runner:
 		var progress := MOTION.smooth(a.elapsed/float(a.rule().recover))
 		a.table.facing[a.body]=lerp_angle(axis+float(a.rule().sweep),axis,progress)
 		if not recovering.is_empty():MOTION.blend(a,recovering,a.neutral_body_points(a.table.pos[a.body],axis),progress)
+
+	func pose(a: BossActor) -> void:
+		a.mouth_open = (1.35 if a.technique == &"inhale" else 1.0) if a.mode == &"active" else 0.8 if a.mode == &"windup" else 0.0

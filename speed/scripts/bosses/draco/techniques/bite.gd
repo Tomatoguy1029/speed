@@ -59,3 +59,6 @@ class Runner extends BossTechnique.Runner:
 	func recover(a: BossActor,_dt: float) -> void:
 		if landed.is_empty():return
 		MOTION.blend(a,landed,a.neutral_body_points(origin,a.direction.angle()),a.elapsed/float(a.rule().recover))
+
+	func pose(a: BossActor) -> void:
+		a.mouth_open = (1.35 if a.technique == &"inhale" else 1.0) if a.mode == &"active" else 0.8 if a.mode == &"windup" else 0.0

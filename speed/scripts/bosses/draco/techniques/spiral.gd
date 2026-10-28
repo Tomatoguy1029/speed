@@ -316,3 +316,6 @@ class Runner extends BossTechnique.Runner:
 		a.run_state.controls_locked = controls_before
 		a.run_state.encounter_protected = protection_before
 		a.run_state.ship_invuln = maxf(a.run_state.ship_invuln,0.35)
+
+	func pose(a: BossActor) -> void:
+		a.cosmic_body = true

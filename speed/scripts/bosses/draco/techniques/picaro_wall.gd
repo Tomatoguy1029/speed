@@ -65,3 +65,6 @@ class Runner extends BossTechnique.Runner:
 	func end(a: BossActor, cancelled: bool) -> void:
 		impacts.clear()
 		a.picaro.pause(cancelled)
+
+	func pose(a: BossActor) -> void:
+		a.mouth_open = (1.35 if a.technique == &"inhale" else 1.0) if a.mode == &"active" else 0.8 if a.mode == &"windup" else 0.0

@@ -157,3 +157,6 @@ class Runner extends BossTechnique.Runner:
 		if a.ctx.projectiles.owns_hazard(beam, a.body, a.body_id): a.ctx.projectiles.release_hazard(beam)
 		a.run_state.steering_locked = false
 		stars = 0
+
+	func pose(a: BossActor) -> void:
+		a.mouth_open = (1.35 if a.technique == &"inhale" else 1.0) if a.mode == &"active" else 0.8 if a.mode == &"windup" else 0.0

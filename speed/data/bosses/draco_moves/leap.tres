@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/leap.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/leap_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"leap"
@@ -13,3 +15,4 @@ active = 0.5
 recover = 1.15
 damage = 35.0
 width = 96.0
+visual = ExtResource("visual")

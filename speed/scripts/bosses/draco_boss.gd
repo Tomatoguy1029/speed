@@ -34,6 +34,8 @@ var telegraph_widths: Array[float] = []
 ## 塗りで見せる予告の範囲。polygon（ワールド座標）を塗り、center から外へ広がる塗りで予告の進みを示す。
 var telegraph_areas: Array[Dictionary] = []
 var attack_width := 45.0
+var mouth_open := 0.0
+var cosmic_body := false
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 var _driver: RefCounted
@@ -301,6 +303,9 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		flow_runner.tick(dt, {"player": run_state.ship_pos}, flow_adapter)
 
 func _sync_technique_visuals() -> void:
+	mouth_open = 0.0
+	cosmic_body = false
+	if _driver != null: _driver.pose(self)
 	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
 	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
 

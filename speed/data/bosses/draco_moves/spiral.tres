@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/draco/techniques/spiral.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/spiral_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"spiral"
@@ -21,3 +23,4 @@ exit_duration = 1.8
 spiral_length = 9000.0
 shrink_time = 2.0
 touch_invuln = 1.5
+visual = ExtResource("visual")
