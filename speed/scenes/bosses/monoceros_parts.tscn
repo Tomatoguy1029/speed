@@ -1,148 +1,409 @@
 [gd_scene format=3]
 
-[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/unicorn.png" id="1_sheet"]
-[ext_resource type="Script" path="res://scripts/bosses/monoceros_parts.gd" id="2_parts"]
-[ext_resource type="SpriteFrames" path="res://data/visuals/monoceros_gait.tres" id="3_gait"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros_parts.gd" id="script"]
+[ext_resource type="SpriteFrames" path="res://data/visuals/monoceros_gait.tres" id="gait"]
+[ext_resource type="Shader" path="res://shaders/boss_part.gdshader" id="shader"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor.png" id="tex_body_armor"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_base.png" id="tex_body_armor_base"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_base_normal.png" id="tex_body_armor_base_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_layered.png" id="tex_body_armor_layered"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_layered_normal.png" id="tex_body_armor_layered_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_normal.png" id="tex_body_armor_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/booster.png" id="tex_booster"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor.png" id="tex_head_armor"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor_back.png" id="tex_head_armor_back"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor_back_normal.png" id="tex_head_armor_back_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor_normal.png" id="tex_head_armor_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_base.png" id="tex_head_base"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_base_back.png" id="tex_head_base_back"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_gold_armor.png" id="tex_head_gold_armor"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_gold_armor_normal.png" id="tex_head_gold_armor_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor.png" id="tex_leg_armor"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor_normal.png" id="tex_leg_armor_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_base.png" id="tex_leg_base"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_root.png" id="tex_leg_root"]
 
-[sub_resource type="AtlasTexture" id="Atlas_body"]
-atlas = ExtResource("1_sheet")
-region = Rect2(9, 1, 89, 130)
-filter_clip = true
+[sub_resource type="ShaderMaterial" id="Material_base"]
+shader = ExtResource("shader")
 
-[sub_resource type="AtlasTexture" id="Atlas_head_upper"]
-atlas = ExtResource("1_sheet")
-region = Rect2(196, 35, 71, 86)
-filter_clip = true
+[sub_resource type="ShaderMaterial" id="Material_armor"]
+shader = ExtResource("shader")
+shader_parameter/use_normal = true
 
-[sub_resource type="AtlasTexture" id="Atlas_head_lower"]
-atlas = ExtResource("1_sheet")
-region = Rect2(197, 133, 69, 99)
-filter_clip = true
-
-[sub_resource type="AtlasTexture" id="Atlas_booster"]
-atlas = ExtResource("1_sheet")
+[sub_resource type="AtlasTexture" id="booster_0"]
+atlas = ExtResource("tex_booster")
 region = Rect2(115, 72, 74, 53)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="Atlas_leg_root"]
-atlas = ExtResource("1_sheet")
-region = Rect2(132, 144, 45, 59)
-filter_clip = true
-
-[sub_resource type="AtlasTexture" id="Atlas_leg_raised"]
-atlas = ExtResource("1_sheet")
+[sub_resource type="AtlasTexture" id="leg_base_1"]
+atlas = ExtResource("tex_leg_base")
 region = Rect2(4, 144, 24, 89)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="Atlas_leg_low"]
-atlas = ExtResource("1_sheet")
+[sub_resource type="CanvasTexture" id="canvas_leg_armor_2"]
+diffuse_texture = ExtResource("tex_leg_armor")
+normal_texture = ExtResource("tex_leg_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="leg_armor_2"]
+atlas = SubResource("canvas_leg_armor_2")
+region = Rect2(4, 144, 24, 89)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="leg_base_3"]
+atlas = ExtResource("tex_leg_base")
+region = Rect2(132, 144, 45, 59)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="leg_root_4"]
+atlas = ExtResource("tex_leg_root")
+region = Rect2(132, 144, 45, 59)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="leg_base_5"]
+atlas = ExtResource("tex_leg_base")
 region = Rect2(67, 145, 26, 57)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="Atlas_leg_down"]
-atlas = ExtResource("1_sheet")
+[sub_resource type="CanvasTexture" id="canvas_leg_armor_6"]
+diffuse_texture = ExtResource("tex_leg_armor")
+normal_texture = ExtResource("tex_leg_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="leg_armor_6"]
+atlas = SubResource("canvas_leg_armor_6")
+region = Rect2(67, 145, 26, 57)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="leg_base_7"]
+atlas = ExtResource("tex_leg_base")
 region = Rect2(99, 145, 26, 36)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_leg_armor_8"]
+diffuse_texture = ExtResource("tex_leg_armor")
+normal_texture = ExtResource("tex_leg_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="leg_armor_8"]
+atlas = SubResource("canvas_leg_armor_8")
+region = Rect2(99, 145, 26, 36)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_body_armor_base_9"]
+diffuse_texture = ExtResource("tex_body_armor_base")
+normal_texture = ExtResource("tex_body_armor_base_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="body_armor_base_9"]
+atlas = SubResource("canvas_body_armor_base_9")
+region = Rect2(9, 1, 89, 130)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_body_armor_layered_10"]
+diffuse_texture = ExtResource("tex_body_armor_layered")
+normal_texture = ExtResource("tex_body_armor_layered_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="body_armor_layered_10"]
+atlas = SubResource("canvas_body_armor_layered_10")
+region = Rect2(9, 1, 89, 130)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_body_armor_11"]
+diffuse_texture = ExtResource("tex_body_armor")
+normal_texture = ExtResource("tex_body_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="body_armor_11"]
+atlas = SubResource("canvas_body_armor_11")
+region = Rect2(9, 1, 89, 130)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="head_base_back_12"]
+atlas = ExtResource("tex_head_base_back")
+region = Rect2(196, 35, 71, 86)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_head_armor_back_13"]
+diffuse_texture = ExtResource("tex_head_armor_back")
+normal_texture = ExtResource("tex_head_armor_back_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="head_armor_back_13"]
+atlas = SubResource("canvas_head_armor_back_13")
+region = Rect2(196, 35, 71, 86)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="head_base_14"]
+atlas = ExtResource("tex_head_base")
+region = Rect2(197, 133, 69, 99)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_head_armor_15"]
+diffuse_texture = ExtResource("tex_head_armor")
+normal_texture = ExtResource("tex_head_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="head_armor_15"]
+atlas = SubResource("canvas_head_armor_15")
+region = Rect2(197, 133, 69, 99)
+filter_clip = true
+
+[sub_resource type="CanvasTexture" id="canvas_head_gold_armor_16"]
+diffuse_texture = ExtResource("tex_head_gold_armor")
+normal_texture = ExtResource("tex_head_gold_armor_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="head_gold_armor_16"]
+atlas = SubResource("canvas_head_gold_armor_16")
+region = Rect2(197, 133, 69, 99)
 filter_clip = true
 
 [node name="MonocerosParts" type="Node2D"]
 texture_filter = 1
-script = ExtResource("2_parts")
-gait = ExtResource("3_gait")
+script = ExtResource("script")
+gait = ExtResource("gait")
 
 [node name="TailBooster" type="Node2D" parent="."]
 position = Vector2(0, -107)
+metadata/part_label = "尻尾ブースター（全体）"
 
-[node name="Sprite" type="Sprite2D" parent="TailBooster"]
+[node name="Sprite" type="Node2D" parent="TailBooster"]
 position = Vector2(-37, -27)
-texture = SubResource("Atlas_booster")
+
+[node name="booster" type="Sprite2D" parent="TailBooster/Sprite"]
+texture = SubResource("booster_0")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "ブースター / booster"
 
 [node name="RearLeftLeg" type="Node2D" parent="."]
 position = Vector2(-27, -87)
+metadata/part_label = "後左脚（全体）"
 
 [node name="Foot" type="Node2D" parent="RearLeftLeg"]
 position = Vector2(-3, 33)
 
-[node name="Sprite" type="Sprite2D" parent="RearLeftLeg/Foot"]
+[node name="Sprite" type="Node2D" parent="RearLeftLeg/Foot"]
 position = Vector2(-13, -6)
-texture = SubResource("Atlas_leg_raised")
-centered = false
+metadata/part_label = "後左脚 / 足先（全体）"
 
-[node name="Root" type="Sprite2D" parent="RearLeftLeg"]
-position = Vector2(-30, -12)
-texture = SubResource("Atlas_leg_root")
+[node name="Base" type="Sprite2D" parent="RearLeftLeg/Foot/Sprite"]
+texture = SubResource("leg_base_1")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後左脚足先 / leg_base"
+
+[node name="Armor" type="Sprite2D" parent="RearLeftLeg/Foot/Sprite"]
+texture = SubResource("leg_armor_2")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "後左脚足先 / leg_armor"
+
+[node name="Root" type="Node2D" parent="RearLeftLeg"]
+position = Vector2(-30, -12)
+metadata/part_label = "後左脚 / 根元（全体）"
+
+[node name="Base" type="Sprite2D" parent="RearLeftLeg/Root"]
+texture = SubResource("leg_base_3")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後左脚根元 / leg_base"
+
+[node name="leg_root" type="Sprite2D" parent="RearLeftLeg/Root"]
+texture = SubResource("leg_root_4")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後左脚根元 / leg_root"
 
 [node name="RearRightLeg" type="Node2D" parent="."]
 position = Vector2(28, -86)
+metadata/part_label = "後右脚（全体）"
 
 [node name="Foot" type="Node2D" parent="RearRightLeg"]
 position = Vector2(4, 47)
 
-[node name="Sprite" type="Sprite2D" parent="RearRightLeg/Foot"]
+[node name="Sprite" type="Node2D" parent="RearRightLeg/Foot"]
 position = Vector2(-13, -6)
-texture = SubResource("Atlas_leg_low")
-centered = false
+metadata/part_label = "後右脚 / 足先（全体）"
 
-[node name="Root" type="Sprite2D" parent="RearRightLeg"]
-position = Vector2(-15, -12)
-texture = SubResource("Atlas_leg_root")
+[node name="Base" type="Sprite2D" parent="RearRightLeg/Foot/Sprite"]
+texture = SubResource("leg_base_5")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後右脚足先 / leg_base"
+
+[node name="Armor" type="Sprite2D" parent="RearRightLeg/Foot/Sprite"]
+texture = SubResource("leg_armor_6")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "後右脚足先 / leg_armor"
+
+[node name="Root" type="Node2D" parent="RearRightLeg"]
+position = Vector2(-15, -12)
+metadata/part_label = "後右脚 / 根元（全体）"
+
+[node name="Base" type="Sprite2D" parent="RearRightLeg/Root"]
+texture = SubResource("leg_base_3")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後右脚根元 / leg_base"
+flip_h = true
+
+[node name="leg_root" type="Sprite2D" parent="RearRightLeg/Root"]
+texture = SubResource("leg_root_4")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "後右脚根元 / leg_root"
 flip_h = true
 
 [node name="FrontLeftLeg" type="Node2D" parent="."]
 position = Vector2(-31, -2)
+metadata/part_label = "前左脚（全体）"
 
 [node name="Foot" type="Node2D" parent="FrontLeftLeg"]
 position = Vector2(-5, 40)
 
-[node name="Sprite" type="Sprite2D" parent="FrontLeftLeg/Foot"]
+[node name="Sprite" type="Node2D" parent="FrontLeftLeg/Foot"]
 position = Vector2(-13, -6)
-texture = SubResource("Atlas_leg_down")
-centered = false
+metadata/part_label = "前左脚 / 足先（全体）"
 
-[node name="Root" type="Sprite2D" parent="FrontLeftLeg"]
-position = Vector2(-30, -12)
-texture = SubResource("Atlas_leg_root")
+[node name="Base" type="Sprite2D" parent="FrontLeftLeg/Foot/Sprite"]
+texture = SubResource("leg_base_7")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前左脚足先 / leg_base"
+
+[node name="Armor" type="Sprite2D" parent="FrontLeftLeg/Foot/Sprite"]
+texture = SubResource("leg_armor_8")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "前左脚足先 / leg_armor"
+
+[node name="Root" type="Node2D" parent="FrontLeftLeg"]
+position = Vector2(-30, -12)
+metadata/part_label = "前左脚 / 根元（全体）"
+
+[node name="Base" type="Sprite2D" parent="FrontLeftLeg/Root"]
+texture = SubResource("leg_base_3")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前左脚根元 / leg_base"
+
+[node name="leg_root" type="Sprite2D" parent="FrontLeftLeg/Root"]
+texture = SubResource("leg_root_4")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前左脚根元 / leg_root"
 
 [node name="FrontRightLeg" type="Node2D" parent="."]
 position = Vector2(30, -3)
+metadata/part_label = "前右脚（全体）"
 
 [node name="Foot" type="Node2D" parent="FrontRightLeg"]
 position = Vector2(4, 40)
 
-[node name="Sprite" type="Sprite2D" parent="FrontRightLeg/Foot"]
+[node name="Sprite" type="Node2D" parent="FrontRightLeg/Foot"]
 position = Vector2(-13, -6)
-texture = SubResource("Atlas_leg_low")
-centered = false
+metadata/part_label = "前右脚 / 足先（全体）"
 
-[node name="Root" type="Sprite2D" parent="FrontRightLeg"]
-position = Vector2(-15, -12)
-texture = SubResource("Atlas_leg_root")
+[node name="Base" type="Sprite2D" parent="FrontRightLeg/Foot/Sprite"]
+texture = SubResource("leg_base_5")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前右脚足先 / leg_base"
+
+[node name="Armor" type="Sprite2D" parent="FrontRightLeg/Foot/Sprite"]
+texture = SubResource("leg_armor_6")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "前右脚足先 / leg_armor"
+
+[node name="Root" type="Node2D" parent="FrontRightLeg"]
+position = Vector2(-15, -12)
+metadata/part_label = "前右脚 / 根元（全体）"
+
+[node name="Base" type="Sprite2D" parent="FrontRightLeg/Root"]
+texture = SubResource("leg_base_3")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前右脚根元 / leg_base"
+flip_h = true
+
+[node name="leg_root" type="Sprite2D" parent="FrontRightLeg/Root"]
+texture = SubResource("leg_root_4")
+centered = false
+material = SubResource("Material_base")
+metadata/part_label = "前右脚根元 / leg_root"
 flip_h = true
 
 [node name="Body" type="Node2D" parent="."]
 position = Vector2(0, -37)
+metadata/part_label = "胴体（全体）"
 
-[node name="Sprite" type="Sprite2D" parent="Body"]
+[node name="Sprite" type="Node2D" parent="Body"]
 position = Vector2(-44, -65)
-texture = SubResource("Atlas_body")
+
+[node name="body_armor_base" type="Sprite2D" parent="Body/Sprite"]
+texture = SubResource("body_armor_base_9")
 centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "胴体 / body_armor_base"
+
+[node name="body_armor_layered" type="Sprite2D" parent="Body/Sprite"]
+texture = SubResource("body_armor_layered_10")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "胴体 / body_armor_layered"
+
+[node name="body_armor" type="Sprite2D" parent="Body/Sprite"]
+texture = SubResource("body_armor_11")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "胴体 / body_armor"
 
 [node name="Head" type="Node2D" parent="."]
 position = Vector2(0, 9)
+metadata/part_label = "頭（全体）"
 
-[node name="Upper" type="Sprite2D" parent="Head"]
+[node name="Upper" type="Node2D" parent="Head"]
 position = Vector2(-36, -25)
-texture = SubResource("Atlas_head_upper")
+metadata/part_label = "頭上半分（全体）"
+
+[node name="head_base_back" type="Sprite2D" parent="Head/Upper"]
+texture = SubResource("head_base_back_12")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "頭上半分 / head_base_back"
+
+[node name="head_armor_back" type="Sprite2D" parent="Head/Upper"]
+texture = SubResource("head_armor_back_13")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "頭上半分 / head_armor_back"
 
 [node name="Lower" type="Node2D" parent="Head"]
 position = Vector2(0, 50)
+metadata/part_label = "頭下半分（全体）"
 
-[node name="Sprite" type="Sprite2D" parent="Head/Lower"]
+[node name="Sprite" type="Node2D" parent="Head/Lower"]
 position = Vector2(-35, -23)
-texture = SubResource("Atlas_head_lower")
+
+[node name="head_base" type="Sprite2D" parent="Head/Lower/Sprite"]
+texture = SubResource("head_base_14")
 centered = false
+material = SubResource("Material_base")
+metadata/part_label = "頭下半分 / head_base"
+
+[node name="head_armor" type="Sprite2D" parent="Head/Lower/Sprite"]
+texture = SubResource("head_armor_15")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "頭下半分 / head_armor"
+
+[node name="head_gold_armor" type="Sprite2D" parent="Head/Lower/Sprite"]
+texture = SubResource("head_gold_armor_16")
+centered = false
+material = SubResource("Material_armor")
+metadata/part_label = "頭下半分 / head_gold_armor"

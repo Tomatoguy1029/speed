@@ -732,6 +732,23 @@ lab.ui.freehand_hint,クリックで描き始め・もう一度クリックで�
 lab.ui.drawing_route,描画中：クリックで確定・右クリック／Escで取り消し,Drawing: click to finish; right-click or Esc to cancel
 lab.ui.collapse_bottom,下のバー全体を折りたたむ,Collapse the entire bottom bar
 lab.ui.expand_bottom,下のバーを開く,Expand the bottom bar
+lab.boss_parts.open,一角獣の外観・パーツ編集,Edit Monoceros parts
+lab.boss_parts.title,一角獣：色とパーツ配置,Monoceros: colors and parts
+lab.boss_parts.help,パーツを選び、色と位置を調整します。全体とBase／Armorを個別に選べます。,Select a part to adjust its color and position. Whole parts and Base/Armor layers can be selected separately.
+lab.boss_parts.layer_help,全体の項目は一括移動用です。色を変える場合は下位のBase／Armorを選んでください。,Whole-part entries move parts together. Select a Base/Armor layer to change its color.
+lab.boss_parts.color,パーツの色（元の明暗を保持）,Part color (preserves shading)
+lab.boss_parts.x,横方向の位置補正（ピクセル）,Horizontal offset (pixels)
+lab.boss_parts.y,縦方向の位置補正（ピクセル）,Vertical offset (pixels)
+lab.boss_parts.reset_part,選択したパーツを元に戻す,Reset selected part
+lab.boss_parts.reset_all,すべての色と配置を元に戻す,Reset all colors and positions
+lab.boss_parts.play,走りを再生,Play running animation
+lab.boss_parts.rotation,見本の向き（度）,Preview angle (degrees)
+lab.boss_parts.normal_strength,見本の法線の強さ,Preview normal strength
+lab.boss_parts.preview_only,向きと法線の強さは見本だけに適用します。,Angle and normal strength apply to the preview only.
+lab.boss_parts.save,色と配置を本番へ保存,Save colors and positions to game
+lab.boss_parts.unsaved,実験所に反映済み・本番には未保存,Applied in lab; not saved to game
+lab.boss_parts.saved,色と配置を本番へ保存しました,Colors and positions saved to game
+lab.boss_parts.collision_help,配置を変えても、当たり判定と攻撃の性能は変わりません。,Visual offsets do not change collisions or attack performance.
 lab.appearance.title,外観,Appearance
 lab.appearance.help,本番と同じ描画で確認します。拡大後もホイールで倍率、中央ドラッグで視点を変更できます。,Inspect the production renderer. Use the wheel to zoom and middle-drag to pan.
 lab.appearance.bomber,自爆型を配置して拡大,Place and magnify a bomber

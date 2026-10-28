@@ -1,6 +1,7 @@
 ## 実験条件・攻撃・出現・配置規則・保存の編集ドック。
 extends TabContainer
 const ARMOR_VIEW := preload("res://gyms/enemy_lab/lab_armor_paint.gd")
+const BOSS_PARTS := preload("res://gyms/enemy_lab/lab_boss_parts.gd")
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 const LIGHTING := preload("res://data/visuals/enemy_lighting.tres")
 var lab
@@ -50,6 +51,7 @@ func _ready() -> void:
 func _appearance(page: Node) -> void:
 	_appearance_hashes = ContentManager.source_hashes.duplicate()
 	_text(page, tr("lab.appearance.help"))
+	_button(page, tr("lab.boss_parts.open"), _open_boss_parts)
 	_button(page, tr("lab.appearance.bomber"), _inspect_bomber)
 	_button(page, tr("lab.appearance.focus"), _focus_appearance)
 	_appearance_label = _text(page, "")
@@ -85,6 +87,30 @@ func _appearance(page: Node) -> void:
 		var key: String = entry[0]
 		_lighting_fields[key] = _number(page, tr("lab.appearance." + key), LIGHTING.get(key), entry[1], entry[2], entry[3], _set_visual.bind(key))
 	_text(page, tr("lab.appearance.type_help"))
+
+func _open_boss_parts() -> void:
+	if not is_instance_valid(lab.session.run): return
+	var existing := get_node_or_null("BossPartsEditor") as Window
+	if existing != null:
+		existing.grab_focus()
+		return
+	lab.session.playing = false
+	var owner: BossActor
+	for actor in lab.session.run.bosses.actors:
+		if actor.has_body() and actor.def.id == &"monoceros":
+			owner = actor
+			break
+	if owner == null:
+		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260, 0)
+		lab.session.perform("boss", {"type": "monoceros", "pos": [point.x, point.y]})
+	else:
+		lab.session.selected = owner.body
+	_focus_appearance()
+	var editor := BOSS_PARTS.new()
+	editor.name = "BossPartsEditor"
+	add_child(editor)
+	editor.open_editor(lab)
+
 
 func _paint_armor_piece(region: int, restore: bool) -> void:
 	if _appearance_type == &"" or _armor_view.source == null:

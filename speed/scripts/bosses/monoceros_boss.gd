@@ -81,6 +81,11 @@ func on_body_damaged() -> void:
 		phase_pending = true
 	_cue(&"hit")
 
+func refresh_appearance() -> void:
+	if is_instance_valid(_presentation):
+		_presentation.parts.apply_appearance(def.part_appearance)
+		_presentation.queue_redraw()
+
 func handle_body_defeat(_opts: Dictionary) -> bool:
 	_stop_combat()
 	return false
