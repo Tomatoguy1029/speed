@@ -29,7 +29,7 @@ func _ready() -> void:
 	for child in editor._fields.get_children():
 		if child is SpinBox and child.has_meta("key"):
 			fields[child.get_meta("key")]=child
-	for key in ["radius_factor","aspect_ratio","pitch_ratio","coil_time","head_offset","pause","exit_duration"]:
+	for key in ["radius_factor","aspect_ratio","inner_radius_factor","coil_time","head_offset","pause","exit_duration"]:
 		check(fields.has(key) and not fields[key].tooltip_text.is_empty(),"渦の調整項目と説明を表示する: "+key)
 	check(not fields.has("first_lap") and not fields.has("second_lap") and not fields.has("warn"),"巻く速さを二重に編集させない")
 	editor.set_value("radius_factor",1.05)

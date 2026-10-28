@@ -29,8 +29,8 @@ func _ready() -> void:
 		check(maxf(spiral.extent,spiral.horizontal_extent)>=maxf(half.x,half.y)*0.75,"円寄りでも外周を画面全体へ広げる")
 		check(maxf(spiral.extent,spiral.horizontal_extent)/minf(spiral.extent,spiral.horizontal_extent)<=1.31,"渦を画面の縦横比でつぶさず円に近づける")
 		if is_equal_approx(half.x,half.y): check(is_equal_approx(spiral.extent,spiral.horizontal_extent),"正方形画面の渦は円にする")
-		check(minf(spiral.extent,spiral.horizontal_extent)*spiral.pitch_ratio>=actor.body_width*1.5,"隣の周回との間隔を胴幅より広く取る")
-		check(spiral.spiral_length>=PI*(spiral.extent+spiral.horizontal_extent)*1.39,"広げた渦を巻ける有効胴体長を用意する")
+		check(minf(spiral.extent,spiral.horizontal_extent)*(1.0-spiral.inner_ratio)*0.5>=actor.body_width*1.5-0.01,"隣の周回との間隔を胴幅より広く取る")
+		check(is_equal_approx(spiral.spiral_length,float(actor._moves[&"spiral"].values().spiral_length)),"渦の体長は設定した値を使う")
 		check(actor.get("body_width")!=null,"螺旋の胴体の太さを表示と判定で共有する")
 		if actor.get("body_width")!=null:
 			check(actor.body_width>=short_side*0.13,"胴体を画面に対して十分太くする")
@@ -163,7 +163,7 @@ func _ready() -> void:
 	var original_move: Resource=actor._moves[&"spiral"]
 	var tuned_move: Resource=original_move.duplicate(true)
 	var tuned: Dictionary=tuned_move.parameters.duplicate(true)
-	tuned.radius_factor=1.05;tuned.aspect_ratio=1.25;tuned.pitch_ratio=0.30
+	tuned.radius_factor=1.05;tuned.aspect_ratio=1.25;tuned.inner_radius_factor=0.3
 	tuned.coil_time=0.8;tuned.pause=0.9;tuned.head_offset=370.0;tuned.exit_duration=1.2
 	tuned_move.parameters=tuned
 	actor._moves[&"spiral"]=tuned_move
@@ -173,10 +173,10 @@ func _ready() -> void:
 	var tuned_spiral=actor._driver
 	check(absf(tuned_spiral.horizontal_extent-980.0/0.82*1.05)<1.0,"調整した外周半径を実動作で読む")
 	check(absf(tuned_spiral.horizontal_extent/tuned_spiral.extent-1.25)<0.01,"調整した縦横比を実動作で読む")
-	check(is_equal_approx(tuned_spiral.pitch_ratio,0.30) and is_equal_approx(tuned_spiral.coil_time,0.8),"周間隔と構築速度の変更を実動作で読む")
+	check(is_equal_approx(tuned_spiral.inner_ratio,0.3/1.05) and is_equal_approx(tuned_spiral.coil_time,0.8),"内周半径と構築速度の変更を実動作で読む")
 	check(is_equal_approx(tuned_spiral.head_offset,370.0),"頭終点の変更を実動作で読む")
 	actor.cancel_attack()
-	tuned.radius_factor=0.1;tuned.aspect_ratio=9.0;tuned.pitch_ratio=0.0
+	tuned.radius_factor=0.1;tuned.aspect_ratio=9.0;tuned.inner_radius_factor=1.5
 	tuned.coil_time=99.0;tuned.pause=0.0;tuned.head_offset=0.0;tuned.exit_duration=100.0
 	tuned_move.parameters=tuned
 	reset_visible(actor)
@@ -184,7 +184,7 @@ func _ready() -> void:
 	var safe_spiral=actor._driver
 	check(minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*4.0,"小さすぎる半径でも渦の逃げ道を維持する")
 	check(maxf(safe_spiral.extent,safe_spiral.horizontal_extent)/minf(safe_spiral.extent,safe_spiral.horizontal_extent)<=1.51,"極端な縦横比は補正する")
-	check(safe_spiral.pitch_ratio*minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*1.5,"狭すぎる周間隔を補正する")
+	check((1.0-safe_spiral.inner_ratio)*0.5*minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*1.5-0.01,"狭すぎる周間隔を補正する")
 	check(safe_spiral.coil_time<=3.0 and safe_spiral.pause_time>=0.8,"構築と逃走の時間を安全範囲へ補正する")
 	check(safe_spiral.head_offset>=actor.table.r[actor.body]+sim.cfg.ship_radius+60.0,"頭終点に接触余白を確保する")
 	actor.cancel_attack()

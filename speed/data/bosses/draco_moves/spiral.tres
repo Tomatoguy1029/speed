@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"spiral"
 category = &"major"
-parameters = {"driver": ExtResource("2"), "warn": 5.0, "active": 6.0, "recover": 1.5, "damage": 35.0, "reach": 2000.0, "width": 154.0, "radius_factor": 0.8, "aspect_ratio": 1.0, "pitch_ratio": 0.4, "coil_time": 1.2, "pause": 1.6, "head_offset": 320.0, "exit_duration": 1.8, "spiral_length": 6200.0, "shrink_time": 2.0, "touch_invuln": 1.5}
+parameters = {"driver": ExtResource("2"), "warn": 5.0, "active": 6.0, "recover": 1.5, "damage": 35.0, "reach": 2000.0, "width": 154.0, "radius_factor": 0.8, "aspect_ratio": 1.0, "inner_radius_factor": 0.16, "coil_time": 1.2, "pause": 1.6, "head_offset": 320.0, "exit_duration": 1.8, "spiral_length": 9000.0, "shrink_time": 2.0, "touch_invuln": 1.5}

@@ -7,7 +7,8 @@ var center := Vector2.ZERO
 var extent := 1000.0
 var horizontal_extent := 1000.0
 var spiral_length := 6200.0
-var pitch_ratio := 0.4
+## 巻き終わりの内周半径の、外周半径に対する割合。2周かけて 1 からこの値まで縮める。
+var inner_ratio := 0.2
 var coil_time := 1.2
 var first_lap_time := 0.48
 var second_lap_time := 0.72
@@ -59,11 +60,12 @@ func begin(a: BossActor) -> void:
 	var minimum_extent: float = a.body_width * 3.0 + inner_clearance
 	horizontal_extent = maxf(horizontal_extent, minimum_extent)
 	extent = maxf(extent, minimum_extent)
-	spiral_length = maxf(float(p.spiral_length), PI * (extent + horizontal_extent) * 1.4)
+	spiral_length = float(p.spiral_length)
 	var short_extent: float = minf(extent, horizontal_extent)
-	var minimum_pitch: float = a.body_width * 1.5 / short_extent
-	var maximum_pitch: float = minf(0.44, (1.0 - inner_clearance / short_extent) * 0.5)
-	pitch_ratio = clampf(float(p.get("pitch_ratio",0.4)), minimum_pitch, maximum_pitch)
+	# 内周は頭の通り道を残し、隣の周とは胴幅1.5本分の間をあける。
+	var smallest: float = minf(1.0, inner_clearance / short_extent)
+	var largest: float = maxf(smallest, 1.0 - a.body_width * 3.0 / short_extent)
+	inner_ratio = clampf(float(p.get("inner_radius_factor", 0.16)) / clampf(float(p.radius_factor),0.5,1.5), smallest, largest)
 	var active_time: float = maxf(0.5,float(p.active))
 	shrink_time = clampf(float(p.shrink_time),0.3,maxf(0.3,active_time*0.5))
 	coil_time = clampf(float(p.get("coil_time",1.2)),0.5,minf(3.0,maxf(0.5,active_time-shrink_time-0.8)))
@@ -72,7 +74,7 @@ func begin(a: BossActor) -> void:
 	second_lap_time = coil_time*0.45
 	bend_time = coil_time*0.2
 	var clearance: float = a.table.r[a.body]+a.ctx.cfg.ship_radius+60.0
-	head_offset = clampf(float(p.get("head_offset",320.0)),clearance,maxf(clearance,extent*(1.0-pitch_ratio)*0.8))
+	head_offset = clampf(float(p.get("head_offset",320.0)),clearance,maxf(clearance,extent*(1.0+inner_ratio)*0.5*0.8))
 	bend_radius = minf(head_offset,minf(extent,horizontal_extent)*0.34)
 	launch_direction = Vector2.DOWN
 	locked = false
@@ -125,7 +127,7 @@ func tick(a: BossActor, _dt: float) -> void:
 			held_ship_pos = a.run_state.ship_pos
 			# The last quarter turn runs left from this point and ends above the
 			# held player, already tangent to the inward launch direction.
-			end_correction = held_ship_pos + Vector2(bend_radius,-head_offset-bend_radius) - (center + Vector2.UP*extent*(1.0-2.0*pitch_ratio))
+			end_correction = held_ship_pos + Vector2(bend_radius,-head_offset-bend_radius) - (center + Vector2.UP*extent*inner_ratio)
 			holding_player = true
 			a.run_state.controls_locked = true
 			a.run_state.encounter_protected = true
@@ -137,8 +139,8 @@ func tick(a: BossActor, _dt: float) -> void:
 		charging = true
 		# The warning marks the committed aim. Keep the opened escape lane in
 		# world space while the player moves during the pause.
-		if points.size() > 1:
-			launch_direction = (points[0] - points[1]).normalized()
+		# 頭は自機の真上で巻き終わるので、真下へまっすぐ突っ込む。
+		launch_direction = Vector2.DOWN
 		locked = true
 		a.combat_trace.stage("lock", {"scope": "spiral_departure"})
 		a.run_state.emit(&"draco_roar", {"pos": center, "radius": minf(horizontal_extent, extent) * 0.8})
@@ -156,7 +158,8 @@ func tick(a: BossActor, _dt: float) -> void:
 	turns = clampf(turns, 0.0, 2.0)
 	var shrink := clampf((a.elapsed - shrink_at) / shrink_time, 0.0, 1.0)
 	var angle := -PI * 0.5 - turns * TAU
-	var radius_scale := 1.0 - turns * pitch_ratio
+	# 外周から内周まで、2周かけて半径を少しずつ縮める。
+	var radius_scale := lerpf(1.0, inner_ratio, turns * 0.5)
 	var coil_head := center + Vector2(cos(angle) * horizontal_extent, sin(angle) * extent) * radius_scale + end_correction*smoothstep(1.0,2.0,turns)
 	var bend_progress := clampf((a.elapsed - first_lap_time - second_lap_time) / bend_time,0.0,1.0)
 	var bend_angle := bend_progress * PI * 0.5
