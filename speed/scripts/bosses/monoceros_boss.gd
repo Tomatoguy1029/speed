@@ -239,7 +239,7 @@ func start_attack(attack: StringName) -> bool:
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
 		return false
 	var r: Dictionary = _moves[attack].values()
-	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)):
+	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, _attack_length(attack)):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
 	combat_trace.begin(attack, combat_origin)
@@ -249,6 +249,15 @@ func start_attack(attack: StringName) -> bool:
 	passes_left = int(def.params.return_passes) if attack == &"return_charge" else 1
 	_begin_pass()
 	return true
+
+## 攻撃予算に申告する長さ。コンボは中の突進・切り返し・薙ぎの予告と実行の合計。
+func _attack_length(attack: StringName) -> float:
+	if attack == &"combo":
+		var charge: Dictionary = _moves[&"charge"].values()
+		var sweep: Dictionary = _moves[&"sweep"].values() if _moves.has(&"sweep") else {}
+		return float(charge.warn) + float(charge.active) + float(def.params.combo_gap) + float(sweep.get("warn", 0.0)) + float(sweep.get("active", 0.0))
+	var r: Dictionary = _moves[attack].values()
+	return float(r.warn) + float(r.active)
 
 func attack_playing() -> bool:
 	return mode != &"idle"
