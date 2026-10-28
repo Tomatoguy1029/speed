@@ -23,7 +23,7 @@ func set_attack(move: Resource, adapter: String) -> void:
 		p = load("res://data/bosses/hydra.tres").params.merged(p, true)
 		var reach: Dictionary = preload("res://scripts/bosses/hydra_normals.gd").reach(move.technique, p)
 		attack = {"length": reach.get("max", INF), "width": p.get("beam_width", p.get("bite_radius", 60.0)), "angle": 0.0}
-		if not is_finite(float(attack.length)): attack = {"dynamic": true, "length": 0.0}
+		if not is_finite(float(attack.length)): attack = _hydra_major(move.technique, p)
 		if move.technique in [&"bite_thrust", &"thunder_headbutt"]: attack = {"targeted": true, "length": 0.0, "width": float(p.bite_radius)}
 		if move.technique == &"thunder_drop": attack = {"targeted": true, "length": 0.0, "width": float(p.thunder_radius) * 2.0, "circle": true}
 	elif adapter == "monoceros":
@@ -37,6 +37,81 @@ func set_attack(move: Resource, adapter: String) -> void:
 	else:
 		attack = {"length": p.get("reach", p.get("distance", 180.0)), "width": 30.0, "angle": 180.0 if move.technique == &"kick" else 0.0}
 	queue_redraw()
+
+## うみへび座の大技の範囲。攻撃を出す首の頭を中心に、狙った自機の距離 D に合わせて描く。
+static func _hydra_major(technique: StringName, p: Dictionary) -> Dictionary:
+	var bite := float(p.get("bite_radius", 60.0)) * 0.5
+	var beam := float(p.get("beam_width", 40.0)) * 0.5
+	var beam_len := float(p.get("beam_len", 1400.0))
+	match technique:
+		&"north":
+			# 前の首が自機のまわりへ広げた位置へ噛みつく。届く距離は north_reach まで。
+			var reach := float(p.get("north_reach", 900.0))
+			var spread := float(p.get("north_spread", 120.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array:
+				var shapes := []
+				for side in [-1.0, 0.0, 1.0]:
+					var end := Vector2(d, side * spread)
+					shapes.append(_band(Vector2.ZERO, end.limit_length(reach), bite))
+				return shapes}
+		&"sequence":
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(d, 0.0), bite)]}
+		&"swarm":
+			# 自機のまわりへ散った首が、自機を通って swarm_reach まで突っ込む。
+			var reach := float(p.get("swarm_reach", 1000.0))
+			return {"polygon": _band(Vector2.ZERO, Vector2(reach, 0.0), bite), "length": reach}
+		&"grid":
+			return {"polygon": _band(Vector2.ZERO, Vector2(beam_len, 0.0), beam), "length": beam_len}
+		&"curve":
+			# 首から伸びる光線が、先へ行くほど curve_lag だけ曲がる。
+			var lag := float(p.get("curve_lag", 0.0))
+			var shapes := []
+			var at := Vector2.ZERO
+			for j in range(1, 25):
+				var next := at + Vector2.from_angle(-float(j) / 24.0 * lag) * beam_len / 24.0
+				shapes.append(_band(at, next, beam))
+				at = next
+			return {"polygons": shapes, "length": beam_len}
+		&"tornado":
+			# 首の前 120 に竜巻ができ、自機の方へ tornado_speed で tornado_life 秒進む。
+			var travel := float(p.get("tornado_speed", 0.0)) * float(p.get("tornado_life", 0.0))
+			return {"polygon": _band(Vector2(120.0, 0.0), Vector2(120.0 + travel, 0.0), float(p.get("tornado_width", 80.0)) * 0.5), "length": 120.0 + travel}
+		&"debris_shatter":
+			# 光線が自機の向きを中心に shatter_arc を薙ぎ、手前に並べた瓦礫を砕く。
+			var half := float(p.get("shatter_arc", 0.0)) * 0.5
+			var shapes := [_fan(Vector2.ZERO, -half, half, beam_len)]
+			var count := int(p.get("rubble_count", 0))
+			for j in count:
+				var offset := (float(j) / maxf(1.0, float(count) - 1.0) - 0.5) * 1.4
+				shapes.append(_circle(Vector2.from_angle(offset) * 420.0, 30.0))
+			return {"polygons": shapes, "length": beam_len}
+		&"beam_pincer":
+			# 2本の首が自機の左右から光線を閉じる。片側の首が掃く範囲を示す。
+			var opened := float(p.get("pincer_open_angle", 0.0))
+			var closed := float(p.get("pincer_close_angle", 0.0))
+			return {"polygons": [_fan(Vector2.ZERO, minf(opened, closed), maxf(opened, closed), beam_len)], "length": beam_len}
+		&"rubble_lump":
+			# 首の頭から自機へ瓦礫の塊を投げる。
+			var lump := float(p.get("lump_r", 40.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array: return [_band(Vector2.ZERO, Vector2(d, 0.0), lump)]}
+		&"rubble_fan":
+			# 小さい瓦礫を自機の向きを中心に rubble_spread の扇へ投げる。
+			var spread := float(p.get("rubble_spread", 0.0))
+			var count := int(p.get("rubble_count", 1))
+			var small := float(p.get("rubble_small_radius", 20.0))
+			return {"length": 0.0, "builder": func(d: float) -> Array:
+				var shapes := []
+				for i in count:
+					var angle := spread * (float(i) / maxf(1.0, float(count) - 1.0) - 0.5)
+					shapes.append(_band(Vector2.ZERO, Vector2.from_angle(angle) * d, small))
+				return shapes}
+	return {"dynamic": true, "length": 0.0}
+
+## at を中心に、角度 from〜to（ラジアン）、半径 radius の扇。
+static func _fan(at: Vector2, from: float, to: float, radius: float) -> PackedVector2Array:
+	var points := PackedVector2Array([at])
+	for j in 33: points.append(at + Vector2.from_angle(lerpf(from, to, j / 32.0)) * radius)
+	return points
 
 ## りゅう座の判定が通る範囲。ボスの中心から正面（+X）を基準に、狙った自機の距離 D に合わせて形を作る。
 static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
