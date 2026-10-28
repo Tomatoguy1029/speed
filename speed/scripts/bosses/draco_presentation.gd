@@ -189,7 +189,7 @@ func _draw_residual_rifts() -> void:
 
 func _draw_telegraphs() -> void:
 	var progress := clampf(actor.elapsed/maxf(0.01,float(actor.rule().get("warn",1.0))),0.0,1.0) if actor.mode==&"windup" else 1.0
-	for area: Dictionary in actor.telegraph_areas:
+	for area: Dictionary in ([] if actor.technique == &"tail_sweep" else actor.telegraph_areas):
 		var shape := _local_points(area.polygon)
 		if shape.size() < 3: continue
 		# 範囲全体を薄く塗り、中心から外へ広がる濃い塗りが端へ届くと攻撃が出る。

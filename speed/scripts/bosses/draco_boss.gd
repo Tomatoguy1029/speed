@@ -35,6 +35,7 @@ var telegraph_widths: Array[float] = []
 var telegraph_areas: Array[Dictionary] = []
 var attack_width := 45.0
 const FORM = preload("res://scripts/bosses/draco_form.gd")
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 var _driver: RefCounted
 var selection_enabled := false
 var action_rules: Resource
@@ -63,6 +64,7 @@ func _on_bound() -> void:
 	add_child(_presentation)
 	_presentation.actor = self
 	presentation_event.connect(_presentation.on_event)
+	presentation_event.connect(technique_visuals.event)
 	for j in body_segments:
 		var row := ctx.enemies.spawn_boss(&"draco", table.pos[body], body_width*0.5, def.hp, def.armor, 0.0, 0.0, 0.0, 0.0, Color("#544475"))
 		table.parent[row] = body
@@ -80,6 +82,7 @@ func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
 	_moves.clear()
 	for move in action_rules.techniques: _moves[move.technique] = move
+	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
@@ -219,6 +222,7 @@ func start_attack(id: StringName) -> bool:
 	combat_trace.stage("reposition" if screen_staged else "telegraph")
 	if not screen_staged and (_driver == null or not ("locked" in _driver)): combat_trace.stage("lock", {"scope": "initial_aim"})
 	_update_body()
+	_sync_technique_visuals()
 	_presentation.queue_redraw()
 	return true
 
@@ -287,6 +291,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			reset_pose()
 	ctx.bosses.recording_actor = prior_observer
 	_update_body()
+	_sync_technique_visuals()
 	_presentation.queue_redraw()
 	if selection_enabled and mode == &"idle" and flow_adapter != null:
 		var delta := aim_target()-table.pos[body]
@@ -294,6 +299,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			table.pos[body]+=delta.normalized()*def.speed*dt
 			table.facing[body]=delta.angle()
 		flow_runner.tick(dt, {"player": run_state.ship_pos}, flow_adapter)
+
+func _sync_technique_visuals() -> void:
+	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
+	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
 
 func cancel_attack() -> void:
 	combat_trace.finish("interrupted", "cancelled")
@@ -305,6 +314,7 @@ func cancel_attack() -> void:
 	mode = &"idle"
 	technique = &""
 	elapsed = 0.0
+	_sync_technique_visuals()
 
 func handle_body_defeat(_opts: Dictionary) -> bool:
 	if mode != &"finale":
