@@ -13,6 +13,8 @@ var split := false
 const SPLIT_GAP := 24.0
 const GATE_COLOR := Color(0.2, 0.65, 0.9)
 const ATTACK_COLOR := Color(1.0, 0.65, 0.15)
+## 星弾の扇の図で、弾の通り道を描く長さ
+const STAR_TRAVEL := 1200.0
 
 func set_attack(move: Resource, adapter: String) -> void:
 	var p: Dictionary = move.values()
@@ -82,7 +84,7 @@ static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
 		&"spiral":
 			# 自機を中心に画面の長辺の半分ほどで2周巻く。外周の輪を胴の太さで示す。
 			var ring := float(p.get("radius_factor", 0.8)) * 960.0
-			var thickness := float(p.get("width", 154.0)) * 0.5
+			var thickness := float(def.params.get("body_width", 154.0)) * 0.5
 			return {"length": 0.0, "builder": func(d: float) -> Array:
 				var shapes := []
 				for j in 48: shapes.append(_band(Vector2(d, 0.0) + Vector2.from_angle(TAU * j / 48.0) * ring, Vector2(d, 0.0) + Vector2.from_angle(TAU * (j + 1) / 48.0) * ring, thickness))
@@ -102,8 +104,9 @@ static func _draco_attack(technique: StringName, p: Dictionary) -> Dictionary:
 			var count := int(p.get("count", 1))
 			for j in count:
 				var direction := Vector2.from_angle(lerpf(-arc, arc, float(j) / maxf(1.0, float(count) - 1.0)))
-				shapes.append(_band(direction * float(p.get("radius", 0.0)), direction * float(p.get("reach", 0.0)), maxf(4.0, float(p.get("width", 9.0)))))
-			return {"polygons": shapes, "length": float(p.get("reach", 0.0))}
+				# 弾は画面の外まで飛ぶ。図では並びの外側へ STAR_TRAVEL だけ伸ばして向きを示す。
+				shapes.append(_band(direction * float(p.get("radius", 0.0)), direction * (float(p.get("radius", 0.0)) + STAR_TRAVEL), maxf(4.0, float(p.get("width", 9.0)))))
+			return {"polygons": shapes, "length": float(p.get("radius", 0.0)) + STAR_TRAVEL}
 	return {"dynamic": true, "length": 0.0}
 
 ## a から b への、半幅 half の帯。

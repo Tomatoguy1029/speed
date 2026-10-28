@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"tail_slam"
 category = &"single"
-parameters = {"lead_cap": 600.0, "driver": ExtResource("2"), "warn": 0.75, "active": 0.35, "recover": 1.0, "damage": 30.0, "reach": 1200.0, "width": 30.0, "radius": 110.0}
+parameters = {"lead_cap": 600.0, "driver": ExtResource("2"), "warn": 0.75, "active": 0.35, "recover": 1.0, "damage": 30.0, "reach": 1200.0, "radius": 110.0}

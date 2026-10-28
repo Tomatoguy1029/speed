@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"star_fan"
 category = &"single"
-parameters = {"lead_cap": 1200.0, "driver": ExtResource("2"), "warn": 0.9, "active": 0.15, "recover": 0.8, "damage": 18.0, "reach": 1600.0, "width": 9.0, "count": 9, "arc": 1.134464, "radius": 260.0, "speed": 800.0}
+parameters = {"lead_cap": 1200.0, "driver": ExtResource("2"), "warn": 0.9, "active": 0.15, "recover": 0.8, "damage": 18.0, "width": 9.0, "count": 9, "arc": 1.134464, "radius": 260.0, "speed": 800.0}

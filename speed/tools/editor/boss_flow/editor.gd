@@ -510,7 +510,7 @@ func _assign_post_gap(target: Resource, value: float) -> void:
 	target.emit_changed()
 
 ## 技の欄の「タイミング」にまとめる値。この順で並べる。
-const TIMING_KEYS := ["warn", "active", "hold", "return_speed", "recover", "cd"]
+const TIMING_KEYS := ["warn", "exit_duration", "coil_time", "pause", "shrink_time", "active", "hold", "return_speed", "recover", "cd", "touch_invuln"]
 
 func _set_tracking(enabled: bool) -> void:
 	if current == null or current.track_during_warn == enabled: return

@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"charge"
 category = &"major"
-parameters = {"lead_cap": 900.0, "overshoot": 260.0, "driver": ExtResource("2"), "warn": 0.9, "active": 0.7, "recover": 1.0, "damage": 35.0, "reach": 1800.0, "width": 96.0}
+parameters = {"lead_cap": 900.0, "overshoot": 260.0, "driver": ExtResource("2"), "warn": 0.9, "active": 0.7, "recover": 1.0, "damage": 35.0, "width": 96.0}

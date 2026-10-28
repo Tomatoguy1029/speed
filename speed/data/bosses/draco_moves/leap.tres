@@ -5,4 +5,4 @@
 script = ExtResource("1")
 technique = &"leap"
 category = &"major"
-parameters = {"lead_cap": 900.0, "driver": ExtResource("2"), "warn": 0.8, "active": 0.5, "recover": 1.15, "damage": 35.0, "reach": 1600.0, "width": 96.0}
+parameters = {"lead_cap": 900.0, "driver": ExtResource("2"), "warn": 0.8, "active": 0.5, "recover": 1.15, "damage": 35.0, "width": 96.0}
