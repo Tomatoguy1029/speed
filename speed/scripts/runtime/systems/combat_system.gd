@@ -359,6 +359,12 @@ func kill_enemy(i: int, opts := {}) -> void:
 		state.emit(&"landmark", {"pos": t.pos[i]})
 	var cause: StringName = opts.get("cause", &"")
 	var dir: Vector2 = opts.get("dir", Vector2.ZERO)
+	# 通常の彗星を機体側の攻撃で壊した地点に、重力を1つ残す。
+	# 敵の波・爆発・突進による破壊と、レア武器入りの彗星は対象外。
+	if t.meteor_index[i] >= 0 and cause != &"" and cause not in [&"wave", &"chain", &"pump_burst", &"marlin", &"collapse"]:
+		var comet := field.comet_at(t.meteor_index[i])
+		if comet != null and comet.rare_weapon == &"":
+			field.add_well(t.pos[i], cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
 	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
