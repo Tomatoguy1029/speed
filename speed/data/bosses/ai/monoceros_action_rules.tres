@@ -4,7 +4,7 @@
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/kick.tres" id="2_glkwt"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/lance.tres" id="3_ia7vf"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/combo.tres" id="4_gnbgk"]
-[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/sweep.tres" id="5_rmxme"]
+[ext_resource type="Resource" uid="uid://daol2dr8j7g4f" path="res://data/bosses/monoceros_moves/sweep.tres" id="5_rmxme"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/return_charge.tres" id="6_r5v4j"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/charge.tres" id="7_qrfmn"]
 
@@ -25,7 +25,7 @@ conditions = {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 1300.0,
-"min": 300.0,
+"min": 0.0,
 "min_phase": 2
 },
 "kick": {
@@ -39,20 +39,20 @@ conditions = {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 950.0,
-"min": 450.0,
+"min": 100.0,
 "min_phase": 2
 },
 "return_charge": {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 1000.0,
-"min": 280.0,
+"min": 0.0,
 "min_phase": 1
 },
 "sweep": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 260.0,
+"max": 250.0,
 "min": 0.0,
 "min_phase": 1
 }
