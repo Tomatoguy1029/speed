@@ -418,8 +418,7 @@ func _draw_ahead() -> bool:
 
 func _hold_level() -> void:
 	if run != null and run.state != null:
-		run.state.stats.xp_mult = 0.0
-		# 大きい結晶は固定量のため、取得側の倍率でも経験値を止める。
+		# 結晶の生成・回収・描画を保ち、取得側の倍率だけで成長を止める。
 		run.state.stats.xp_gain_mult = 0.0
 		run.state.pending_levels = 0
 		run.state.pending_comet_weapons.clear()
