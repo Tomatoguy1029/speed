@@ -15,6 +15,7 @@ const GATE_COLOR := Color(0.2, 0.65, 0.9)
 const ATTACK_COLOR := Color(1.0, 0.65, 0.15)
 ## 星弾の扇の図で、弾の通り道を描く長さ
 const STAR_TRAVEL := 1200.0
+const UNBOUNDED_GATE := 100000.0
 
 func set_attack(move: Resource, adapter: String) -> void:
 	var p: Dictionary = move.values()
@@ -26,6 +27,7 @@ func set_attack(move: Resource, adapter: String) -> void:
 		if not is_finite(float(attack.length)): attack = _hydra_major(move.technique, p)
 		if move.technique in [&"bite_thrust", &"thunder_headbutt"]: attack = {"targeted": true, "length": 0.0, "width": float(p.bite_radius)}
 		if move.technique == &"thunder_drop": attack = {"targeted": true, "length": 0.0, "width": float(p.thunder_radius) * 2.0, "circle": true}
+		attack.sample_distance = float(p.get("engage", 1100.0))
 	elif adapter == "monoceros":
 		attack = _monoceros_attack(move.technique, p)
 	elif adapter == "draco":
@@ -293,22 +295,27 @@ func _draw() -> void:
 		for point in gaps: draw_circle(center + point * scaling, 1.5, Color(0.95, 0.55, 0.2, 0.7))
 		_boss_marker(center)
 		return
-	var maximum := maxf(1.0, minf(100000.0, maxf(float(gate.get("max", 600.0)), _attack_extent())))
+	var gate_max := float(gate.get("max", 600.0))
+	var unbounded := not is_finite(gate_max) or gate_max >= UNBOUNDED_GATE
+	var shown_gate_max := _sample_target_distance() if unbounded else gate_max
+	var maximum := maxf(1.0, maxf(shown_gate_max, _attack_extent()))
+	var shown_gate := gate.duplicate()
+	if unbounded: shown_gate.max = shown_gate_max
 	if split:
-		# 2枚は同じ縮尺。左に発動条件、右に攻撃範囲を描く。
+		# 上限なしの条件は代表距離までを描き、攻撃の形が消えない縮尺にする。
 		var side := minf(size.y, (size.x - SPLIT_GAP) * 0.5)
 		var scaling := side * 0.43 / maximum
 		var left := Vector2(size.x * 0.5 - SPLIT_GAP * 0.5 - side * 0.5, size.y * 0.5)
 		var right := Vector2(size.x * 0.5 + SPLIT_GAP * 0.5 + side * 0.5, size.y * 0.5)
-		_sector(gate, left, scaling)
+		_sector(shown_gate, left, scaling)
 		_boss_marker(left)
-		_caption(left - Vector2(side * 0.5, side * 0.5), "発動条件", GATE_COLOR)
+		_caption(left - Vector2(side * 0.5, side * 0.5), "発動条件 ∞" if unbounded else "発動条件", GATE_COLOR)
 		_attack_area(right, scaling, maximum)
 		_boss_marker(right)
 		_caption(right - Vector2(side * 0.5, side * 0.5), "攻撃範囲", ATTACK_COLOR)
 		return
 	var scale_factor := minf(size.x, size.y) * 0.43 / maximum
-	_sector(gate, center, scale_factor)
+	_sector(shown_gate, center, scale_factor)
 	for arc: DracoExhaleArc in arcs:
 		var origin: Vector2=center+arc.offset*scale_factor
 		var angle := deg_to_rad(arc.angle_degrees)
@@ -325,10 +332,17 @@ func _attack_extent() -> float:
 	var far := float(attack.get("length", 0.0))
 	var shapes: Array = attack.get("polygons", [])
 	if attack.has("polygon"): shapes = [attack.polygon]
-	if attack.has("builder"): shapes = attack.builder.call((float(gate.get("min", 0.0)) + minf(100000.0, float(gate.get("max", 600.0)))) * 0.5)
+	if attack.has("builder"): shapes = attack.builder.call(_sample_target_distance())
 	for points: PackedVector2Array in shapes:
 		for point in points: far = maxf(far, point.length())
 	return far
+
+func _sample_target_distance() -> float:
+	var near := maxf(0.0, float(gate.get("min", 0.0)))
+	var far := float(gate.get("max", 600.0))
+	if not is_finite(far) or far >= UNBOUNDED_GATE:
+		return maxf(near, float(attack.get("sample_distance", 1100.0)))
+	return (near + far) * 0.5
 
 ## ボスの仮の姿。尖った先が正面（右）を向く三角形。
 func _boss_marker(center: Vector2) -> void:
@@ -349,25 +363,30 @@ func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
 		draw_string(get_theme_default_font(), center + Vector2(-30, 4), "配置で変化", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(get_theme_default_font_size() * 0.7)), ATTACK_COLOR)
 		return
 	var fill := Color(ATTACK_COLOR, 0.35)
-	# 自機を狙う技は、発動条件の距離の真ん中にいる自機を狙ったときの形で描く。
-	var target_distance := (float(gate.get("min", 0.0)) + minf(maximum, float(gate.get("max", maximum)))) * 0.5
+	# 自機を狙う技は、条件内の代表距離に自機がいるときの形で描く。
+	var target_distance := minf(maximum, _sample_target_distance())
+	var orientation := deg_to_rad(float(gate.get("angle", 0.0))) if attack.has("sample_distance") else 0.0
 	if attack.get("targeted", false):
 		var distance := minf(target_distance, float(attack.get("max_target", INF)))
 		var at := center + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance * scaling
-		draw_circle(at, maxf(2.0, float(attack.width) * 0.5 * scaling), fill)
+		var hit_radius := maxf(2.0, float(attack.width) * 0.5 * scaling)
+		draw_circle(at, hit_radius, fill)
+		draw_arc(at, hit_radius, 0.0, TAU, 32, ATTACK_COLOR, 1.5)
 		return
 	var shapes: Array = attack.get("polygons", [])
 	if attack.has("polygon"): shapes = [attack.polygon]
 	if attack.has("builder"): shapes = attack.builder.call(target_distance)
 	if not shapes.is_empty():
 		for points: PackedVector2Array in shapes:
+			if points.size() < 3: continue
 			var shape := PackedVector2Array()
-			for point: Vector2 in points: shape.append(center + point * scaling)
+			for point: Vector2 in points: shape.append(center + point.rotated(orientation) * scaling)
 			draw_colored_polygon(shape, fill)
+			draw_polyline(shape + PackedVector2Array([shape[0]]), ATTACK_COLOR, 1.5)
 		return
 	var start := float(attack.get("from", 0.0))
 	var finish := target_distance + float(attack.get("extra", 0.0)) if attack.get("to_target", false) else float(attack.get("to", attack.get("length", 0.0)))
-	var angle := deg_to_rad(float(attack.get("angle", 0.0)))
+	var angle := deg_to_rad(float(attack.get("angle", 0.0))) + orientation
 	var half := deg_to_rad(float(attack.get("half_angle", 0.0)))
 	var width := float(attack.get("width", 30.0))
 	if half > 0.0:
@@ -378,12 +397,15 @@ func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
 		for i in 49: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * i / 48.0) * outer)
 		for i in 49: points.append(center + Vector2.from_angle(angle + half - half * 2.0 * i / 48.0) * inner)
 		draw_colored_polygon(points, fill)
+		draw_polyline(points + PackedVector2Array([points[0]]), ATTACK_COLOR, 1.5)
 		return
 	var axis := Vector2.from_angle(angle)
 	var side := axis.orthogonal() * maxf(1.0, width * 0.5 * scaling)
 	var a := center + axis * start * scaling
 	var b := center + axis * finish * scaling
-	draw_colored_polygon(PackedVector2Array([a + side, b + side, b - side, a - side]), fill)
+	var band := PackedVector2Array([a + side, b + side, b - side, a - side])
+	draw_colored_polygon(band, fill)
+	draw_polyline(band + PackedVector2Array([band[0]]), ATTACK_COLOR, 1.5)
 
 func _sector(value: Dictionary, center: Vector2, scale_factor: float) -> void:
 	var maximum := float(value.get("max", 600.0))
