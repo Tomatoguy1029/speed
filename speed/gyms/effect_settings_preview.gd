@@ -222,7 +222,7 @@ func _select(path: String) -> void:
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
 	var boss_effect := path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path) or ATTACK_PREVIEWS.has(path)
-	var live_effect := boss_effect or path.begins_with("weapon/") or path.begins_with("trait/")
+	var live_effect := boss_effect or path == "boss/final_strike" or path.begins_with("weapon/") or path.begins_with("trait/")
 	_static_container.visible = not live_effect
 	_boss_preview.visible = live_effect
 	_boss_preview.set_active(live_effect)
@@ -273,7 +273,7 @@ func _set_value(name: String, value: Variant) -> void:
 	_dirty = true
 	_message = "未保存: " + _selected
 	_apply_preview()
-	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		_boss_preview.refresh_effects()
 
 func _add_color(label: String, name: String, original: Color) -> void:
@@ -307,7 +307,7 @@ func _add_number(label: String, name: String, original: float, hint: String) -> 
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
-	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
@@ -344,7 +344,7 @@ func reload_current() -> void:
 
 func set_active(active: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
-	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
+	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
 	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
 	if not active: EFFECT_SETTINGS.clear_preview_profiles()
 	elif _working != null and live_effect: EFFECT_SETTINGS.set_preview_profiles(_working.profiles)

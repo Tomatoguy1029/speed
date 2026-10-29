@@ -6,6 +6,8 @@ const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const MANUAL := preload("res://gyms/boss_technique_debug.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const SPEEDS := [0.25, 0.5, 1.0, 2.0, 4.0]
+const FINAL_BOSSES := ["canis_major", "centaurus", "monoceros"]
+const FINAL_BOSS_NAMES := ["おおいぬ座", "ケンタウルス座", "いっかくじゅう座"]
 
 var session
 var actor
@@ -15,9 +17,12 @@ var _frame: SubViewportContainer
 var _status := Label.new()
 var _play := Button.new()
 var _speed := OptionButton.new()
+var _final_picker := OptionButton.new()
 var _boss := ""
 var _technique := ""
 var _equipment_key := ""
+var _final_preview := false
+var _final_boss := "canis_major"
 var _serial := 0
 
 func _ready() -> void:
@@ -40,6 +45,13 @@ func _ready() -> void:
 	_speed.select(2)
 	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
 	controls.add_child(_speed)
+	for boss_name in FINAL_BOSS_NAMES:
+		_final_picker.add_item(boss_name)
+	_final_picker.visible = false
+	_final_picker.item_selected.connect(func(index: int):
+		_final_boss = FINAL_BOSSES[index]
+		if _final_preview: set_effect("boss/final_strike"))
+	controls.add_child(_final_picker)
 	var aspect := AspectRatioContainer.new()
 	aspect.ratio = 16.0 / 9.0
 	aspect.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -71,21 +83,27 @@ func set_effect(path: String) -> void:
 	manual = null
 	actor = null
 	_equipment_key = ""
+	_final_preview = path == "boss/final_strike"
+	_final_picker.visible = _final_preview
 	session.playing = false
 	_play.text = "再生"
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
 		_equipment_key = path
 		await _setup_equipment(path, serial)
 		return
-	var relative := path.trim_prefix(ROOT).trim_suffix("_visual.tscn")
-	var parts := relative.split("/")
-	if not path.begins_with(ROOT) or parts.size() != 2:
-		_boss = ""
-		_technique = ""
-		_status.text = "ボス技の描画を選ぶと実戦プレビューを表示します"
-		return
-	_boss = parts[0]
-	_technique = parts[1]
+	if _final_preview:
+		_boss = _final_boss
+		_technique = "final_strike"
+	else:
+		var relative := path.trim_prefix(ROOT).trim_suffix("_visual.tscn")
+		var parts := relative.split("/")
+		if not path.begins_with(ROOT) or parts.size() != 2:
+			_boss = ""
+			_technique = ""
+			_status.text = "ボス技の描画を選ぶと実戦プレビューを表示します"
+			return
+		_boss = parts[0]
+		_technique = parts[1]
 	if not ContentManager.bosses.has(StringName(_boss)):
 		_status.text = "登録されていないボス: " + _boss
 		return
@@ -114,10 +132,19 @@ func set_effect(path: String) -> void:
 	actor.configure_flow(program)
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
 	if hud != null: hud.visible = false
-	if _boss != "hydra":
+	if _boss != "hydra" and not _final_preview:
 		var debugger := MANUAL.new()
 		if debugger.bind(actor): manual = debugger
-	_replay()
+	if _final_preview: _start_final_strike()
+	else: _replay()
+
+func _start_final_strike() -> void:
+	if not is_instance_valid(actor): return
+	# 実験セッションは時間切れ判定を通さないため、同じ本番開始経路を明示して呼ぶ。
+	session.run._begin_final_strike()
+	session.playing = true
+	_play.text = "停止"
+	_status.text = "制限時間の一撃を再生中: " + FINAL_BOSS_NAMES[FINAL_BOSSES.find(_boss)]
 
 func _setup_equipment(key: String, serial: int) -> void:
 	var trait := key.begins_with("trait/")
@@ -138,27 +165,76 @@ func _setup_equipment(key: String, serial: int) -> void:
 	else: settings["weapons"] = {id: 5}
 	await session.reset(settings)
 	if serial != _serial: return
-	session.perform("spawn", {"type": "drifter", "pos": [220, 0], "count": 3, "spacing": 60})
-	session.perform("spawn", {"type": "drifter", "pos": [-220, 0], "count": 2, "spacing": 60})
-	if key in ["weapon/sonic", "weapon/bipolar", "weapon/afterimage", "weapon/dashRangeDrone",
-		"weapon/mines", "weapon/knockback", "weapon/contactWave", "weapon/contactArc", "weapon/massTow",
-		"trait/endBlast", "trait/vortex"]:
-		session.perform("route", {"points": [[0, 0], [300, 0]], "draw_seconds": 0.3})
+	var behavior = (session.run.loadout.trait_behaviors if trait else session.run.loadout.weapon_behaviors).get(id)
+	if behavior == null:
+		_status.text = "装備を試遊へ設定できません: " + key
+		return
+	var target := -1
+	if key not in ["weapon/sonic", "weapon/dashRangeDrone", "weapon/afterimage", "weapon/mines"]:
+		target = _spawn_preview_enemy(Vector2(120, 0))
 	match key:
+		"weapon/forward", "weapon/scatter", "weapon/rear", "weapon/barrier":
+			behavior.tick(10.0, false)
+		"weapon/interceptor":
+			behavior.tick(1.0, false)
+			behavior.tick(1.0, false)
+		"weapon/knockback":
+			if target >= 0:
+				var at: Vector2 = session.run.enemies.table.pos[target]
+				session.run.enemies.mark_dead(target)
+				behavior.on_contact(target, at, Vector2.RIGHT)
+		"weapon/contactWave":
+			if target >= 0: behavior.on_contact(target, session.run.enemies.table.pos[target], Vector2.RIGHT)
+		"weapon/contactArc":
+			_spawn_preview_enemy(Vector2(170, 70))
+			_spawn_preview_enemy(Vector2(180, -70))
+			if target >= 0: behavior.on_any_contact(target)
+		"weapon/mines":
+			behavior.on_trail(null, Vector2.ZERO, Vector2(160, 0))
+			if not behavior.mines.is_empty():
+				_spawn_preview_enemy(behavior.mines[0].pos)
+				behavior.tick(float(behavior.p("armed")) + 0.01, false)
+		"weapon/massTow":
+			if target >= 0:
+				session.run.state.tracing = true
+				behavior.capture(target)
+				session.run.state.tracing = false
+				session.run.enemies.mark_dead(target)
+				behavior.on_end()
+				behavior.tick(0.1, false)
+		"weapon/bipolar":
+			behavior.on_launch(false)
+			session.run.state.ship_pos = Vector2(240, 0)
+			behavior.on_end()
+		"weapon/sonic":
+			behavior.on_launch(false)
+			_start_preview_route()
+		"weapon/dashRangeDrone", "weapon/afterimage":
+			_start_preview_route()
+		"trait/endBlast", "trait/vortex":
+			session.run.loadout.on_end()
 		"trait/killSonic":
-			var behavior = session.run.loadout.trait_behaviors.get(id)
-			if behavior != null:
-				session.run.loadout.on_launch(true)
-				for _i in behavior._every(): session.run.loadout.on_kill(&"shot")
+			session.run.loadout.on_launch(true)
+			for _i in behavior._every(): session.run.loadout.on_kill(&"shot")
 		"trait/critBeam": session.run.loadout.on_critical(session.run.state.ship_pos)
 		"trait/reactive": session.run.loadout.on_hurt()
 	session.playing = true
 	_play.text = "停止"
 	_status.text = "試遊中: " + key
 
+func _spawn_preview_enemy(at: Vector2) -> int:
+	session.perform("spawn", {"type": "drifter", "pos": [at.x, at.y]})
+	return session.selected
+
+func _start_preview_route() -> void:
+	session.perform("route", {"points": [[0, 0], [300, 0]], "draw_seconds": 0.3})
+
 func _replay() -> void:
 	if not _equipment_key.is_empty():
 		set_effect(_equipment_key)
+		return
+	if _final_preview:
+		set_effect("boss/final_strike")
 		return
 	if not is_instance_valid(actor): return
 	var started := _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
@@ -174,6 +250,9 @@ func refresh_effects() -> void:
 	if not _equipment_key.is_empty():
 		set_effect(_equipment_key)
 		return
+	if _final_preview:
+		set_effect("boss/final_strike")
+		return
 	if not is_instance_valid(actor): return
 	var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
 	if presentation != null:
@@ -188,6 +267,12 @@ func _toggle_play() -> void:
 
 func _process(_delta: float) -> void:
 	if not is_instance_valid(session) or not is_instance_valid(session.run): return
+	if _final_preview and session.playing and is_instance_valid(actor) \
+			and session.run.state.phase == RunState.Phase.PLAY \
+			and actor.final_strike_t >= session.run.cfg.time_up_charge_time:
+		# 実験場では終了判定が止まるため、試遊セッションだけ同じ着弾・敗北表示へ進める。
+		session.run._land_final_strike()
+		session.run._begin_death()
 	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	if render == null: return
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
