@@ -1,6 +1,14 @@
 ## ケフェウス座。
 extends EnemyBehavior
 
+func admit_due(i: int, dt: float) -> bool:
+	return table.buds[i] > 0 and table.mode[i] == EnemyTable.Mode.MOVE and table.timer[i] <= dt
+
+func wait_for_attack(i: int, dt: float) -> void:
+	var t := table
+	var away := (t.pos[i] - _aim).normalized()
+	_steer_to(i, _aim + away * float(t.def[i].params.keep), t.speed[i], t.accel[i], dt)
+
 func step(i: int, dt: float) -> void:
 	_cepheus(i, dt)
 

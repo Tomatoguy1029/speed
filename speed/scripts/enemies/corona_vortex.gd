@@ -10,7 +10,12 @@ var owners: Dictionary = {}
 var members: Dictionary = {}
 var _near := PackedInt32Array()
 
-func clear() -> void:
+func clear(m: EnemySystem) -> void:
+	if m.projectiles.director != null:
+		for j in members:
+			var a: Dictionary = members[j]
+			if a.has("attack_token"):
+				m.projectiles.director.release_external(int(a.attack_token), "throw:%d:%d" % [j, int(a.id)])
 	owners.clear()
 	members.clear()
 
@@ -19,7 +24,7 @@ func _live(m: EnemySystem, row: int, id: int) -> bool:
 
 func _cancel(m: EnemySystem, i: int, o: Dictionary) -> void:
 	if m.projectiles.director != null:
-		m.projectiles.director.cancel_wait(m._lab_owner(i), m.table.id[i])
+		m.projectiles.director.cancel_attack(m._lab_owner(i), m.table.id[i])
 	o.selected = -1
 	o.selected_id = -1
 	o.wait = 0.0
@@ -38,6 +43,8 @@ func release(m: EnemySystem, i: int) -> void:
 
 func _detach(m: EnemySystem, j: int) -> void:
 	var a: Dictionary = members[j]
+	if m.projectiles.director != null and a.has("attack_token"):
+		m.projectiles.director.release_external(int(a.attack_token), "throw:%d:%d" % [j, int(a.id)])
 	_unstock(j, a)
 	members.erase(j)
 	m.table.held[j] = 0
@@ -255,6 +262,9 @@ func _orbit(m: EnemySystem, j: int, a: Dictionary, o: Dictionary, p: Dictionary,
 			if direction != Vector2.ZERO and direction.dot((m.state.ship_pos - at).normalized()) > 0.0:
 				_unstock(j, a)
 				a.thrown = true
+				if m.projectiles.director != null:
+					a.attack_token = m.projectiles.director.token(m._lab_owner(i))
+					m.projectiles.director.track_external(int(a.attack_token), "throw:%d:%d" % [j, int(a.id)])
 				a.life = float(p.throw_life)
 				a.damage = float(p["throw_damage_" + String(a.type)])
 				a.from = at

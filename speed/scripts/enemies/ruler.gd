@@ -4,8 +4,9 @@ extends EnemyBehavior
 func step(i: int, dt: float) -> void:
 	_ruler(i, dt)
 
-func admit_active(i: int, _d, _owner: String) -> bool:
-	return table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.RECOVER] or not table.links[i].is_empty()
+func admit_active(i: int, director, owner: String) -> bool:
+	return director.owns_action(owner, table.id[i]) and (table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.RECOVER] \
+		or not table.links[i].is_empty())
 
 func admit_due(i: int, dt: float) -> bool:
 	return table.buds[i] != 0 and table.mode[i] == EnemyTable.Mode.DASH and table.timer[i] <= dt

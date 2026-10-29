@@ -5,8 +5,8 @@ func step(i: int, dt: float) -> void:
 	_triangle(i, dt)
 
 ## 辺を動いている間（DASH）が攻撃の最中。
-func admit_active(i: int, _d, _owner: String) -> bool:
-	return table.mode[i] == EnemyTable.Mode.DASH
+func admit_active(i: int, director, owner: String) -> bool:
+	return table.mode[i] == EnemyTable.Mode.DASH and director.owns_action(owner, table.id[i])
 
 ## 頂点で止まる時間が終わったら、攻撃の枠を取りにいく。枠が取れない間は頂点で止まったまま。
 func admit_due(i: int, dt: float) -> bool:

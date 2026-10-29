@@ -12,7 +12,7 @@ func admit_due(_i: int, _dt: float) -> bool:
 	return true
 
 func admit_active(i: int, d, owner: String) -> bool:
-	return (table.mode[i] == EnemyTable.Mode.WINDUP or table.mode[i] == EnemyTable.Mode.RECOVER) and d.token(owner) > 0
+	return (table.mode[i] == EnemyTable.Mode.WINDUP or table.charge[i] > 0.0) and d.owns_action(owner, table.id[i])
 
 func admit_duration(i: int) -> float:
 	var p: Dictionary = table.def[i].params

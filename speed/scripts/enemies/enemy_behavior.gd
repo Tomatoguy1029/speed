@@ -95,8 +95,9 @@ func rear_open(_i: int, _hit: Vector2) -> bool:
 	return false
 
 ## 攻撃の枠（攻撃の管理。仕様書 11.7）の判断。攻撃の最中か。
-func admit_active(i: int, _d, _owner: String) -> bool:
-	return table.mode[i] != EnemyTable.Mode.MOVE or not table.links[i].is_empty()
+func admit_active(i: int, director, owner: String) -> bool:
+	return director.owns_action(owner, table.id[i]) and (table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH] \
+		or not table.links[i].is_empty())
 
 ## 攻撃の枠を取りにいく時期か。普段は射撃の時間が予告の長さまで来たとき。
 func admit_due(i: int, dt: float) -> bool:

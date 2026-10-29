@@ -26,7 +26,7 @@ func on_row_gone(i: int) -> void:
 	vortex.release(m, i)
 
 func clear() -> void:
-	vortex.clear()
+	vortex.clear(m)
 
 func admit_due(i: int, dt: float) -> bool:
 	return table.fire_t[i] <= dt
