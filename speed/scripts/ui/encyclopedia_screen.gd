@@ -133,10 +133,12 @@ func _entry(def: Resource, has: bool, number: int, rare: bool) -> Button:
 	button.toggle_mode=true
 	button.button_group=_selected_group
 	button.text=def.get_display_name() if has else tr("codex.unknown_name")
+	# 名前は子のLabelで表示し、ボタン自身の文字で列の最小幅を広げない。
+	button.clip_text=true
 	button.tooltip_text=button.text
 	for state_name in ["normal","hover"]: button.add_theme_stylebox_override(state_name,_style(rare))
 	for state_name in ["pressed","focus"]: button.add_theme_stylebox_override(state_name,_style(rare,true))
-	for state_name in ["font_color","font_hover_color","font_pressed_color","font_focus_color"]: button.add_theme_color_override(state_name,Color.TRANSPARENT)
+	for state_name in ["font_color","font_hover_color","font_pressed_color","font_hover_pressed_color","font_focus_color","font_outline_color"]: button.add_theme_color_override(state_name,Color.TRANSPARENT)
 	var column:=VBoxContainer.new()
 	column.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -161,6 +163,10 @@ func _entry(def: Resource, has: bool, number: int, rare: bool) -> Button:
 	title.add_theme_font_size_override("font_size",16)
 	title.modulate=Color("#a6b4cb") if not has else Color("#ffd27a") if rare else Color("#e3ebf8")
 	column.add_child(title)
+	# 画像・番号・名前と余白の高さを確保する。フォントが変わっても下端を切らない。
+	var fit_height := func(): button.custom_minimum_size.y = column.get_combined_minimum_size().y + 12.0
+	column.minimum_size_changed.connect(fit_height)
+	fit_height.call()
 	button.pressed.connect(_show.bind(def,has,number,rare,button))
 	return button
 
