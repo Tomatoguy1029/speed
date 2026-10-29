@@ -39,7 +39,7 @@ func world_scale() -> float:
 func handle_input() -> void:
 	var it := intent
 	if not state.drawing and not state.tracing:
-		if (it.press or it.alt_press) and state.gauge >= cfg.draw_min_charge:
+		if (it.press or it.alt_press) and state.gauge_amount() >= cfg.draw_min_charge:
 			_start(it)
 			return
 	if state.drawing:

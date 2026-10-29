@@ -5,6 +5,7 @@ const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
 signal route_edited
+signal zoom_changed
 
 var session
 var mode := 0 # 0 選択、1 配置、2 線、3 試遊
@@ -119,6 +120,7 @@ func _gui_input(event: InputEvent) -> void:
 			var old := world(event.position)
 			zoom = clampf(zoom * (1.15 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15), 0.08, 16.0)
 			center += old - world(event.position)
+			zoom_changed.emit()
 			queue_redraw()
 			accept_event()
 		elif event.button_index == MOUSE_BUTTON_MIDDLE:

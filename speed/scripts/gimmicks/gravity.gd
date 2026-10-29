@@ -4,17 +4,14 @@ var _well_t := 0.0
 
 func initialize() -> void:
 	field.wells.clear()
-	_well_t = state.rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
+	# 通常出撃の定期発生は止める。手動配置の渦は残す。
+	_well_t = INF
 
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt > 0.0:
 		_tick_wells(world_dt)
 
 func _tick_wells(dt: float) -> void:
-	_well_t -= dt
-	if _well_t <= 0.0:
-		_well_t = state.rng.randf_range(cfg.gravity_interval_min, cfg.gravity_interval_max)
-		spawn_well()
 	var now := state.world_time
 	for k in range(field.wells.size() - 1, -1, -1):
 		if now - field.wells[k].born >= field.wells[k].life:

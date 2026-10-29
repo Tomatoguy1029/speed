@@ -23,14 +23,14 @@ func _ready() -> void:
 		reset_visible(actor)
 		sim.state.view_half=half
 		actor.start_attack(&"spiral")
-		var spiral=actor._driver
+		var spiral=actor._runner
 		var short_side := minf(half.x,half.y)*2.0
 		check(minf(spiral.extent,spiral.horizontal_extent)>=minf(half.x,half.y),"渦の短辺半径を画面の短辺より小さくしない")
 		check(maxf(spiral.extent,spiral.horizontal_extent)>=maxf(half.x,half.y)*0.75,"円寄りでも外周を画面全体へ広げる")
 		check(maxf(spiral.extent,spiral.horizontal_extent)/minf(spiral.extent,spiral.horizontal_extent)<=1.31,"渦を画面の縦横比でつぶさず円に近づける")
 		if is_equal_approx(half.x,half.y): check(is_equal_approx(spiral.extent,spiral.horizontal_extent),"正方形画面の渦は円にする")
-		check(minf(spiral.extent,spiral.horizontal_extent)*spiral.pitch_ratio>=actor.body_width*1.5,"隣の周回との間隔を胴幅より広く取る")
-		check(spiral.spiral_length>=PI*(spiral.extent+spiral.horizontal_extent)*1.39,"広げた渦を巻ける有効胴体長を用意する")
+		check(minf(spiral.extent,spiral.horizontal_extent)*(1.0-spiral.inner_ratio)*0.5>=actor.body_width*1.5-0.01,"隣の周回との間隔を胴幅より広く取る")
+		check(is_equal_approx(spiral.spiral_length,float(actor._moves[&"spiral"].values().spiral_length)),"渦の体長は設定した値を使う")
 		check(actor.get("body_width")!=null,"螺旋の胴体の太さを表示と判定で共有する")
 		if actor.get("body_width")!=null:
 			check(actor.body_width>=short_side*0.13,"胴体を画面に対して十分太くする")
@@ -50,10 +50,10 @@ func _ready() -> void:
 	actor.start_attack(&"spiral")
 	var damage_frames:=0
 	var early_damage:=false
-	while not actor._driver.trapped_hit and damage_frames<1000:
+	while not actor._runner.trapped_hit and damage_frames<1000:
 		sim.state.ship_invuln=maxf(0.0,sim.state.ship_invuln-1.0/120.0)
 		actor.sim_tick(1.0/120.0,1.0/120.0)
-		if actor.mode==&"windup" or (actor.mode==&"active" and actor.elapsed<actor._driver.coil_time+actor._driver.pause_time):
+		if actor.mode==&"windup" or (actor.mode==&"active" and actor.elapsed<actor._runner.coil_time+actor._runner.pause_time):
 			if sim.state.ship_hp<hp: early_damage=true
 		damage_frames+=1
 	check(not early_damage,"構築と溜めで中心の機体へ接触ダメージを出さない")
@@ -68,34 +68,34 @@ func _ready() -> void:
 	check(sim.state.camera_zoom<original_zoom,"構築中は操作を残してカメラを少し引く")
 	check(not sim.state.controls_locked,"巻き終わりには操作を戻す")
 	var wait_release:=0
-	while actor._driver.holding_player and wait_release<300:
+	while actor._runner.holding_player and wait_release<300:
 		actor.sim_tick(1.0/120.0,1.0/120.0)
 		wait_release+=1
-	var bent_spine: PackedVector2Array=actor._driver.points
+	var bent_spine: PackedVector2Array=actor._runner.points
 	var bent_heading: Vector2=(bent_spine[0]-bent_spine[1]).normalized()
 	check(bent_spine[3].x>bent_spine[0].x+20.0 and bent_spine[3].y<bent_spine[0].y-20.0,"巻き終わりの胴体が左へ曲がって頭を中心へ向ける")
 	check(bent_heading.dot(Vector2.DOWN)>0.95,"巻き終わりの頭は渦の中心を向く")
-	check(bent_heading.dot(actor._driver.launch_direction)>0.999,"発進方向は曲げた頭の接線に一致する")
-	var center_before: Vector2=actor._driver.center
+	check(bent_heading.dot(actor._runner.launch_direction)>0.999,"発進方向は曲げた頭の接線に一致する")
+	var center_before: Vector2=actor._runner.center
 	sim.state.ship_pos=Vector2(350,0)
 	for frame in 8: actor.sim_tick(1.0/120.0,1.0/120.0)
-	check(actor._driver.center==center_before,"溜めの予告後は逃走しても渦の中心を追従させない")
+	check(actor._runner.center==center_before,"溜めの予告後は逃走しても渦の中心を追従させない")
 	var lock_frames:=0
-	while not actor._driver.locked and lock_frames<180:
+	while not actor._runner.locked and lock_frames<180:
 		actor.sim_tick(1.0/120.0,1.0/120.0)
 		lock_frames+=1
-	check(actor._driver.locked,"発進時に照準を固定する")
-	var locked_center: Vector2=actor._driver.center
+	check(actor._runner.locked,"発進時に照準を固定する")
+	var locked_center: Vector2=actor._runner.center
 	sim.state.ship_pos=Vector2(900,0)
 	for frame in 30: actor.sim_tick(1.0/120.0,1.0/240.0)
-	check(actor._driver.center==locked_center,"スロー中も発進後の軌道を追尾しない")
+	check(actor._runner.center==locked_center,"スロー中も発進後の軌道を追尾しない")
 	var departure_wait:=0
-	while actor.elapsed<actor._driver.coil_time+actor._driver.pause_time and departure_wait<300:
+	while actor.elapsed<actor._runner.coil_time+actor._runner.pause_time and departure_wait<300:
 		actor.sim_tick(1.0/120.0,1.0/120.0)
 		departure_wait+=1
-	var launch_head: Vector2=actor._driver.points[0]
+	var launch_head: Vector2=actor._runner.points[0]
 	for frame in 5: actor.sim_tick(1.0/120.0,1.0/120.0)
-	check(departure_wait<300 and (actor._driver.points[0]-launch_head).normalized().dot(bent_heading)>0.999,"曲がった頭の向きへ直進し逃走中の機体を追尾しない")
+	check(departure_wait<300 and (actor._runner.points[0]-launch_head).normalized().dot(bent_heading)>0.999,"曲がった頭の向きへ直進し逃走中の機体を追尾しない")
 	actor.cancel_attack()
 	check(not sim.state.cinematic_camera,"中断で通常カメラへ戻す")
 	sim.state.view_center=Vector2.ZERO
@@ -108,7 +108,7 @@ func _ready() -> void:
 	actor.reset_pose()
 	var visible_pose: PackedVector2Array=actor.body_points()
 	actor.start_attack(&"spiral")
-	var spiral_exit=actor._driver
+	var spiral_exit=actor._runner
 	check(spiral_exit.departing and spiral_exit.points[0].distance_to(visible_pose[0])<0.01,"開始時に画面内の頭を飛ばさない")
 	check(not sim.state.controls_locked and not sim.state.encounter_protected,"退場中は機体の操作を止めない")
 	var exit_frames:=0
@@ -152,7 +152,7 @@ func _ready() -> void:
 	check(not sim.state.cinematic_camera and not sim.state.controls_locked and actor.body_override.is_empty(),"全身退場の途中でも元の姿勢と入力へ戻す")
 	reset_visible(actor)
 	actor.start_attack(&"spiral")
-	spiral_exit=actor._driver
+	spiral_exit=actor._runner
 	var transition_frames:=0
 	while spiral_exit.departing and transition_frames<600:
 		actor.sim_tick(1.0/120.0,1.0/120.0)
@@ -162,29 +162,29 @@ func _ready() -> void:
 	check(not sim.state.cinematic_camera and not sim.state.controls_locked and actor.body_override.is_empty(),"再登場の途中でも元の姿勢と入力へ戻す")
 	var original_move: Resource=actor._moves[&"spiral"]
 	var tuned_move: Resource=original_move.duplicate(true)
-	var tuned: Dictionary=tuned_move.parameters.duplicate(true)
-	tuned.radius_factor=1.05;tuned.aspect_ratio=1.25;tuned.pitch_ratio=0.30
+	var tuned: Dictionary=tuned_move.duplicate(true)
+	tuned.radius_factor=1.05;tuned.aspect_ratio=1.25;tuned.inner_radius_factor=0.3
 	tuned.coil_time=0.8;tuned.pause=0.9;tuned.head_offset=370.0;tuned.exit_duration=1.2
-	tuned_move.parameters=tuned
+	tuned_move.assign_values(tuned)
 	actor._moves[&"spiral"]=tuned_move
 	sim.state.view_center=Vector2.ZERO;sim.state.view_half=Vector2(980,550);sim.state.camera_zoom=1.0
 	reset_visible(actor)
 	actor.start_attack(&"spiral")
-	var tuned_spiral=actor._driver
+	var tuned_spiral=actor._runner
 	check(absf(tuned_spiral.horizontal_extent-980.0/0.82*1.05)<1.0,"調整した外周半径を実動作で読む")
 	check(absf(tuned_spiral.horizontal_extent/tuned_spiral.extent-1.25)<0.01,"調整した縦横比を実動作で読む")
-	check(is_equal_approx(tuned_spiral.pitch_ratio,0.30) and is_equal_approx(tuned_spiral.coil_time,0.8),"周間隔と構築速度の変更を実動作で読む")
+	check(is_equal_approx(tuned_spiral.inner_ratio,0.3/1.05) and is_equal_approx(tuned_spiral.coil_time,0.8),"内周半径と構築速度の変更を実動作で読む")
 	check(is_equal_approx(tuned_spiral.head_offset,370.0),"頭終点の変更を実動作で読む")
 	actor.cancel_attack()
-	tuned.radius_factor=0.1;tuned.aspect_ratio=9.0;tuned.pitch_ratio=0.0
+	tuned.radius_factor=0.1;tuned.aspect_ratio=9.0;tuned.inner_radius_factor=1.5
 	tuned.coil_time=99.0;tuned.pause=0.0;tuned.head_offset=0.0;tuned.exit_duration=100.0
-	tuned_move.parameters=tuned
+	tuned_move.assign_values(tuned)
 	reset_visible(actor)
 	actor.start_attack(&"spiral")
-	var safe_spiral=actor._driver
+	var safe_spiral=actor._runner
 	check(minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*4.0,"小さすぎる半径でも渦の逃げ道を維持する")
 	check(maxf(safe_spiral.extent,safe_spiral.horizontal_extent)/minf(safe_spiral.extent,safe_spiral.horizontal_extent)<=1.51,"極端な縦横比は補正する")
-	check(safe_spiral.pitch_ratio*minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*1.5,"狭すぎる周間隔を補正する")
+	check((1.0-safe_spiral.inner_ratio)*0.5*minf(safe_spiral.extent,safe_spiral.horizontal_extent)>=actor.body_width*1.5-0.01,"狭すぎる周間隔を補正する")
 	check(safe_spiral.coil_time<=3.0 and safe_spiral.pause_time>=0.8,"構築と逃走の時間を安全範囲へ補正する")
 	check(safe_spiral.head_offset>=actor.table.r[actor.body]+sim.cfg.ship_radius+60.0,"頭終点に接触余白を確保する")
 	actor.cancel_attack()
@@ -193,7 +193,7 @@ func _ready() -> void:
 	sim.state.ship_vel=Vector2.UP*2200.0
 	reset_visible(actor)
 	actor.start_attack(&"spiral")
-	var chasing_exit=actor._driver
+	var chasing_exit=actor._runner
 	var chasing_frames:=0
 	while chasing_exit.departing and chasing_frames<600:
 		sim.state.ship_pos+=sim.state.ship_vel/120.0

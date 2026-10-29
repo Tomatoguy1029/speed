@@ -1,23 +1,49 @@
-[gd_resource type="Resource" load_steps=6 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_inhale.gd" id="2"]
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/inhale.gd" id="1"]
+
 [ext_resource type="Script" path="res://scripts/bosses/draco_exhale_arc.gd" id="arc"]
-[sub_resource type="Resource" id="left"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/inhale_visual.tscn" id="visual"]
+
+[sub_resource type="Resource" id="Resource_cxxdc"]
 script = ExtResource("arc")
-offset = Vector2(40,-100)
-radius = 180.0
+offset = Vector2(40, -100)
 angle_degrees = -35.0
 spread_degrees = 18.0
 count = 12
-[sub_resource type="Resource" id="right"]
+
+[sub_resource type="Resource" id="Resource_a5kf3"]
 script = ExtResource("arc")
-offset = Vector2(-30,110)
+offset = Vector2(-30, 110)
 radius = 260.0
 angle_degrees = 38.0
 spread_degrees = 20.0
 count = 12
+
+
 [resource]
 script = ExtResource("1")
 technique = &"inhale"
 category = &"major"
-parameters = {"arcs": [SubResource("left"),SubResource("right")], "driver": ExtResource("2"), "warn": 1.2, "active": 6.0, "recover": 1.4, "damage": 40.0, "reach": 1800.0, "width": 120.0, "inhale_time": 3.0, "pull_range": 1500.0, "pull_speed": 650.0, "picaro_pull_speed": 900.0, "mouth_radius": 75.0, "bite_damage": 30.0, "beam_time": 2.0, "beam_warn": 0.5, "comets_per_star": 2, "comet_cap": 24, "comet_speed": 480.0}
+display_name = "吸引と吐き出し"
+active = 6.0
+arcs = [SubResource("Resource_cxxdc"), SubResource("Resource_a5kf3")]
+beam_extend = 0.25
+beam_time = 5.0
+beam_warn = 1.0
+bite_damage = 30.0
+comet_cap = 24
+comet_speed = 480.0
+comets_per_star = 2
+damage = 40.0
+inhale_time = 3.0
+mouth_radius = 75.0
+picaro_pull_speed = 900.0
+pull_range = 1500.0
+pull_speed = 650.0
+reach = 1800.0
+recover = 1.4
+warn = 1.2
+width = 120.0
+visual = ExtResource("visual")

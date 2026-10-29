@@ -43,16 +43,12 @@ var _file_dialog := FileDialog.new()
 var _parallel_toggle := CheckButton.new()
 const GRAPH := preload("res://tools/editor/boss_flow/technique_graph.gd")
 const SPIRAL_FIELDS := preload("res://tools/editor/boss_flow/technique_fields.gd")
-const SPIRAL_LABELS := SPIRAL_FIELDS.SPIRAL_LABELS
-const SPIRAL_TIPS := SPIRAL_FIELDS.SPIRAL_TIPS
-const SPIRAL_BOUNDS := SPIRAL_FIELDS.SPIRAL_BOUNDS
 const BOSS_IDS := ["hydra", "monoceros", "draco", "centaurus", "canis_major"]
 const BOSS_TITLES := {"hydra": "うみへび座", "monoceros": "いっかくじゅう座", "draco": "りゅう座", "centaurus": "ケンタウルス座", "canis_major": "おおいぬ座"}
 var _ordered_boss_ids: Array[String] = []
 var _boss_selector: OptionButton
 var _detail_scroll: ScrollContainer
 var _expanded_section_categories: Dictionary = {}
-const PARAM_LABELS := SPIRAL_FIELDS.PARAM_LABELS
 
 func _ready() -> void:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -82,6 +78,10 @@ func _ready() -> void:
 		if open_boss("res://data/bosses/ai/" + id + "_action_rules.tres", "res://data/bosses/ai/" + id + "_flow.tres") != OK:
 			bosses.selected = _boss_index())
 	toolbar.add_child(bosses)
+	var add_technique := Button.new()
+	add_technique.text = "＋ 技を追加"
+	add_technique.pressed.connect(_show_add_technique)
+	toolbar.add_child(add_technique)
 	_parallel_toggle.text = "同時攻撃あり"
 	_parallel_toggle.tooltip_text = "複数の通常技を同時に選ぶ。OFFは未登録扱い。コンボ内部の並列実行とは別。"
 	_parallel_toggle.toggled.connect(_change_parallel)
@@ -122,6 +122,11 @@ func _ready() -> void:
 	add_section.text = "＋ 区間を追加"
 	add_section.pressed.connect(_add_section)
 	flow_tools.add_child(add_section)
+	var add_rest := Button.new()
+	add_rest.text = "＋ 休息を追加"
+	add_rest.tooltip_text = "攻撃せずに休む区間を最後に足します。休む時間は「スタミナ・休息」で全区間共通に決めます。"
+	add_rest.pressed.connect(_add_rest)
+	flow_tools.add_child(add_rest)
 	var align_sections := Button.new()
 	align_sections.text = "区間を整列"
 	align_sections.pressed.connect(func(): flow_graph.command("align"))
@@ -170,7 +175,8 @@ func _ready() -> void:
 	scroll.add_child(content)
 	content.add_child(_preview_frame)
 	_preview_frame.add_child(preview)
-	preview.custom_minimum_size = Vector2(160, 160) * _scale
+	preview.split = true
+	preview.custom_minimum_size = Vector2(160.0 * 2.0 * _scale + preview.SPLIT_GAP, 160.0 * _scale)
 	preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	preview.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_fields.columns = 1
@@ -364,7 +370,7 @@ func _picked(kind: String, id: String) -> void:
 		preview.attack = {}
 		for move in rules.techniques:
 			if String(move.technique) == rules.source_for(id): preview.set_attack(move, "hydra" if _is_hydra() else String(rules.adapter))
-		_context(GRAPH.title_for(rules.source_for(id)) + " の発動条件", 1, true)
+		_context(GRAPH.technique_title(rules, rules.source_for(id)) + " の発動条件", 1, true)
 		editing_rules = true
 		preview.layers = []
 		preview.coverage_mode = false
@@ -412,7 +418,7 @@ func _edit_combo_step(path: Array) -> void:
 	_clear_fields()
 	var step: Dictionary = rules.combos[combo_id]
 	for index in path: step = step.children[index]
-	_heading.text = GRAPH.title_for(combo_id) + " / " + {"wait": "待機", "action": "実行する技", "branch": "条件分岐", "sequence": "順番に実行", "parallel": "同時に実行"}.get(step.get("type", ""), "要素") + "の設定"
+	_heading.text = GRAPH.technique_title(rules, combo_id) + " / " + {"wait": "待機", "action": "実行する技", "branch": "条件分岐", "sequence": "順番に実行", "parallel": "同時に実行"}.get(step.get("type", ""), "要素") + "の設定"
 	_status.text = "内部の要素を編集しています。「内部編集を閉じる」で技の図へ戻れます。"
 	if step.type == "wait":
 		_number_field("待機（秒）", step.seconds, func(value): _combo_field(path, "seconds", value))
@@ -426,7 +432,7 @@ func _edit_combo_step(path: Array) -> void:
 		_fields.add_child(label)
 		var choices := OptionButton.new()
 		for move in rules.techniques:
-			choices.add_item(GRAPH.title_for(String(move.technique)))
+			choices.add_item(GRAPH.technique_title(rules, String(move.technique)))
 			choices.set_item_metadata(choices.item_count - 1, String(move.technique))
 			if String(move.technique) == step.id: choices.selected = choices.item_count - 1
 		choices.item_selected.connect(func(index): _combo_field(path, "id", choices.get_item_metadata(index)))
@@ -448,7 +454,7 @@ func _open_path() -> void:
 
 func open_technique(path: String) -> Error:
 	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
-	if loaded == null or not loaded.get("parameters") is Dictionary:
+	if not loaded is BossTechnique:
 		_status.text = "技の設定を開けません: " + path
 		return ERR_INVALID_DATA
 	current = working.get(path, loaded.duplicate(true))
@@ -462,8 +468,8 @@ func open_technique(path: String) -> Error:
 	return OK
 
 func set_value(key: String, value: float) -> void:
-	if current == null or not current.parameters.has(key): return
-	var old: Variant = current.parameters[key]
+	if current == null or not current.has_field(key): return
+	var old: Variant = current.field(key)
 	var next: Variant = int(value) if old is int else value
 	if old == next: return
 	history.create_action("技の " + key + " を変更")
@@ -472,7 +478,7 @@ func set_value(key: String, value: float) -> void:
 	history.commit_action()
 
 func _assign(target: Resource, key: String, value: Variant) -> void:
-	target.parameters[key] = value
+	target.set_field(key, value)
 	if not working.values().has(target): dirty_rules = true
 	else:
 		for path in working:
@@ -503,6 +509,25 @@ func _assign_post_gap(target: Resource, value: float) -> void:
 			if working[path] == target: _dirty_working[path] = true
 	target.emit_changed()
 
+## 技の欄の「タイミング」にまとめる値。この順で並べる。
+const TIMING_KEYS := ["warn", "exit_duration", "coil_time", "pause", "shrink_time", "active", "hold", "return_speed", "recover", "cd", "touch_invuln"]
+
+func _set_tracking(enabled: bool) -> void:
+	if current == null or current.track_during_warn == enabled: return
+	history.create_action("予告中の追尾を変更")
+	history.add_do_method(_assign_tracking.bind(current, enabled))
+	history.add_undo_method(_assign_tracking.bind(current, current.track_during_warn))
+	history.commit_action()
+
+func _assign_tracking(target: Resource, enabled: bool) -> void:
+	target.track_during_warn = enabled
+	if not working.values().has(target): dirty_rules = true
+	else:
+		for path in working:
+			if working[path] == target: _dirty_working[path] = true
+	target.emit_changed()
+	if target == current: _refresh()
+
 func _change_parallel(enabled: bool) -> void:
 	if rules == null or rules.allow_parallel_attacks == enabled: return
 	history.create_action("同時攻撃の有無を変更")
@@ -525,7 +550,7 @@ func save_current() -> Error:
 			return ERR_BUSY
 		var move: Resource = working[path]
 		var disk := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-		if disk == null or disk.parameters != move.parameters or not is_equal_approx(disk.post_gap, move.post_gap):
+		if disk == null or disk.values() != move.values() or not is_equal_approx(disk.post_gap, move.post_gap) or disk.track_during_warn != move.track_during_warn or disk.display_name != move.display_name or disk.visual != move.visual:
 			var error := ResourceSaver.save(move, path)
 			if error != OK: return error
 		_source_hashes[path] = FileAccess.get_sha256(path)
@@ -552,8 +577,13 @@ func _clear_fields() -> void:
 
 func _refresh_field_columns() -> void:
 	if _detail_scroll == null or _fields == null: return
+	# 欄は「名前・入力欄」の組で並べる。数が合わなければ、組の崩れた部品を足した箇所がある。
+	if OS.is_debug_build() and _fields.get_child_count() % 2 != 0: push_warning("ボスAIの欄の数が奇数です。1マスだけの部品は _full_row で足してください。")
 	var narrow := _detail_scroll.size.x < maxf(500.0, 320.0 * _scale)
 	_fields.columns = 1 if narrow else 2
+	# 発動条件と攻撃範囲の2枚が並ぶ幅を、詳細欄の幅に収める。
+	var side := clampf((_detail_scroll.size.x - 16.0 - preview.SPLIT_GAP) * 0.5, 80.0 * _scale, 160.0 * _scale)
+	preview.custom_minimum_size = Vector2(side * 2.0 + preview.SPLIT_GAP, side)
 	for child in _fields.get_children():
 		if child.get_class() == "Control" or child.get_meta("hide_when_narrow", false):
 			child.visible = not narrow
@@ -572,6 +602,30 @@ func _add_section() -> void:
 	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
 	history.commit_action()
 	_edit_section(copy.size() - 1)
+
+func _add_rest() -> void:
+	var copy: Array = flow.sections.duplicate(true)
+	if not copy.is_empty() and copy[-1].get("next", 0) == 0: copy[-1].next = copy.size()
+	copy.append({"name": "休息" + str(copy.size() + 1), "request": "rest", "next": 0})
+	history.create_action("休息を追加")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
+	_edit_section(copy.size() - 1)
+
+## 区間を休息と攻撃の区間で切り替える。攻撃の設定は残し、戻したときに使う。
+func _set_section_rest(i: int, rest: bool) -> void:
+	var copy: Array = flow.sections.duplicate(true)
+	if rest: copy[i].request = "rest"
+	else:
+		copy[i].request = "any"
+		for key in ["allowed_categories", "action_count", "action_interval", "no_candidate_timeout", "weights"]:
+			if not copy[i].has(key): copy[i][key] = {"allowed_categories": ["normal", "combo"], "action_count": 1, "action_interval": 0.0, "no_candidate_timeout": 0.5, "weights": {"single": 85.0, "combo": 15.0}}[key]
+	history.create_action("休息の切り替え")
+	history.add_do_method(_set_sections.bind(copy))
+	history.add_undo_method(_set_sections.bind(flow.sections.duplicate(true)))
+	history.commit_action()
+	_edit_section(i)
 
 func _set_sections(value: Array) -> void:
 	dirty_flow = true
@@ -603,7 +657,14 @@ func _edit_section(i: int, previous := "") -> void:
 			history.commit_action())
 		field.focus_exited.connect(func(): _section_property(i, key, field.text))
 		_fields.add_child(field)
-	if flow.sections[i].get("request", "normal") == "rest":
+	var resting := CheckBox.new()
+	resting.text = "休息の区間にする"
+	resting.tooltip_text = "ONでは攻撃せず、「スタミナ・休息」で決めた時間だけ休んでから次の区間へ進みます。"
+	resting.button_pressed = flow.sections[i].get("request", "normal") == "rest"
+	resting.toggled.connect(func(value): _set_section_rest(i, value))
+	_fields.add_child(resting)
+	_fields.add_child(Control.new())
+	if resting.button_pressed:
 		var rest := Label.new()
 		rest.text = "休息して次へ"
 		_fields.add_child(rest)
@@ -648,6 +709,11 @@ func _section_heading(title_text: String) -> void:
 	var label := Label.new()
 	label.text = title_text
 	_fields.add_child(label)
+	_fields.add_child(Control.new())
+
+## 2列の欄で1行を使う部品。隣の入力欄の位置を空けて、後ろの欄をずらさない。
+func _full_row(control: Control) -> void:
+	_fields.add_child(control)
 	_fields.add_child(Control.new())
 
 func _section_divider() -> void:
@@ -786,7 +852,7 @@ func _append_section_targets(index: int) -> void:
 		var rows := _append_collapsible_category(exclusion_list, index, "exclusions", kind, in_kind.size())
 		for id in in_kind:
 			var excluded: bool = id in section.get("excluded_techniques", []) or section.has("allowed_techniques") and id not in section.allowed_techniques
-			_append_selection_row(rows, GRAPH.title_for(id), excluded, false, func(value): _set_section_exclusion(index, id, value))
+			_append_selection_row(rows, GRAPH.technique_title(rules, id), excluded, false, func(value): _set_section_exclusion(index, id, value))
 	_fields.add_child(exclusions)
 
 func _section_technique_categories(id: String) -> Array:
@@ -896,6 +962,10 @@ func _edit_common() -> void:
 	_context("全区間で共有するスタミナと休息", 3)
 	editing_flow = true
 	_clear_fields()
+	var presentation := Button.new()
+	presentation.text = "ボスの表示を開く"
+	presentation.pressed.connect(func(): preload("res://tools/editor/boss_flow/technique_visual_fields.gd").open_scene(self, "res://scenes/bosses/" + String(rules.adapter) + "_presentation.tscn"))
+	_full_row(presentation)
 	_status.text = "全区間から不足時に休息へ入ります"
 	for key in ["maximum_stamina", "partial_rest", "empty_rest"]:
 		_number_field({"maximum_stamina": "最大スタミナ", "partial_rest": "残量ありの休息（秒）", "empty_rest": "枯渇時の休息（秒）"}[key], flow.get(key), func(value):
@@ -929,7 +999,7 @@ func _append_forbidden(index: int) -> void:
 		_fields.add_child(Control.new())
 	for pair in flow.sections[index].get("forbidden", []):
 		var label := Label.new()
-		label.text = "%s × %s" % [GRAPH.title_for(pair[0]), GRAPH.title_for(pair[1])]
+		label.text = "%s × %s" % [GRAPH.technique_title(rules, pair[0]), GRAPH.technique_title(rules, pair[1])]
 		_fields.add_child(label)
 		var remove := Button.new()
 		remove.text = "この禁止ペアを削除"
@@ -945,7 +1015,7 @@ func _append_forbidden(index: int) -> void:
 		choice.add_item("登録なし")
 		choice.set_item_metadata(0, "")
 		for move in rules.techniques:
-			choice.add_item(GRAPH.title_for(String(move.technique)))
+			choice.add_item(GRAPH.technique_title(rules, String(move.technique)))
 			choice.set_item_metadata(choice.item_count - 1, String(move.technique))
 		choice.selected = 0
 		choices.append(choice)
@@ -993,7 +1063,7 @@ func _append_section_techniques(index: int) -> void:
 		groups[source] = true
 		var item := choices.create_item(root)
 		item.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
-		item.set_text(0, GRAPH.title_for(source))
+		item.set_text(0, GRAPH.technique_title(rules, source))
 		item.set_metadata(0, source)
 		item.set_editable(0, not all.button_pressed)
 		item.set_checked(0, all.button_pressed or source in allowed)
@@ -1022,6 +1092,7 @@ func _edit_coverage(group := "") -> void:
 	_clear_fields()
 	_heading.tooltip_text = "このノードに接続する技を管理します。各技の発動距離・方向は技ノードを選んで編集します。"
 	if not selection.is_empty():
+		_section_heading("基本")
 		var label := Label.new()
 		label.text = "ノード名"
 		_fields.add_child(label)
@@ -1041,35 +1112,26 @@ func _edit_coverage(group := "") -> void:
 		category.selected = maxi(0, kinds.find(rules.category_for_group(group)))
 		category.item_selected.connect(func(value): _set_group_category(group, kinds[value]))
 		_fields.add_child(category)
-		var members_label := Label.new()
-		members_label.text = "攻撃候補の有効／無効"
-		members_label.tooltip_text = "チェックを外した技は、この接続から発動しなくなります。"
-		_fields.add_child(members_label)
-		var members := VBoxContainer.new()
-		_fields.add_child(members)
+		_section_heading("つながっている技（チェックを外すと出さない）")
+		var member_count := 0
 		for id in rules.node_ids():
 			if graph.hub_for(id) != group: continue
 			var enabled := CheckBox.new()
 			enabled.text = GRAPH.node_title(rules, id)
-			enabled.tooltip_text = members_label.tooltip_text
+			enabled.tooltip_text = "チェックを外した技は、この条件選択から発動しなくなります。"
 			enabled.button_pressed = rules.graph_nodes.get(id, {}).get("connected", true)
 			enabled.toggled.connect(func(value): graph._connect(id, value))
-			members.add_child(enabled)
-		var move_label := Label.new()
-		move_label.text = "技の接続先を変更"
-		move_label.tooltip_text = "選んだ技を、このノードにつなぎ直します。元のノードとの接続を外し、技の性能と発動条件は引き継ぎます。"
-		_fields.add_child(move_label)
-		var choices := OptionButton.new()
-		choices.fit_to_longest_item = false
-		choices.add_item("技を選択…")
-		choices.tooltip_text = move_label.tooltip_text
-		for id in rules.node_ids():
-			if graph.hub_for(id) == group: continue
-			choices.add_item(GRAPH.node_title(rules, id))
-			choices.set_item_metadata(choices.item_count - 1, id)
-		choices.item_selected.connect(func(index):
-			if index > 0: graph.assign_group(choices.get_item_metadata(index), group))
-		_fields.add_child(choices)
+			_fields.add_child(enabled)
+			_fields.add_child(Control.new())
+			member_count += 1
+		if member_count == 0:
+			var empty := Label.new()
+			empty.text = "つながっている技はありません。グラフでこの条件選択から技へ線を引くと追加されます。"
+			empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			empty.custom_minimum_size.x = 160.0 * _scale
+			_fields.add_child(empty)
+			_fields.add_child(Control.new())
+	_section_heading("範囲図の確認（保存しない）")
 	var simulation := CheckBox.new()
 	simulation.text = "範囲図の戦闘状況"
 	simulation.tooltip_text = "範囲図に使う仮の状況を設定します。実際の戦闘設定や発動条件は変更しません。"
@@ -1146,7 +1208,6 @@ func _analyze_coverage() -> void:
 		return
 	var layers: Array = []
 	var definition = load("res://data/bosses/hydra.tres")
-	var motion = preload("res://scripts/bosses/hydra_normals.gd")
 	var total := 0
 	for kind in preview_heads: total += preview_heads[kind]
 	var count := 3 if total <= 3 else 5 if total <= 5 else 8
@@ -1182,7 +1243,7 @@ func _analyze_coverage() -> void:
 					var snapshot: Dictionary = head.duplicate()
 					snapshot.gate = gate
 					snapshot.separated = preview_separated
-					snapshot.reach = motion.reach(move.technique, definition.params.merged(move.parameters, true))
+					snapshot.reach = move.range_info(definition.params.merged(move.values(), true))
 					layers.append(snapshot)
 	preview.radius = preview_radius
 	preview.layers = layers
@@ -1216,10 +1277,7 @@ func _prepare_trial(id: String) -> void:
 	if Engine.is_editor_hint(): EditorInterface.play_custom_scene(scene)
 
 func _append_gate(id: String) -> void:
-	var heading := Label.new()
-	heading.text = "この技へ進む条件"
-	_fields.add_child(heading)
-	_fields.add_child(Control.new())
+	_section_heading("この技へ進む条件")
 	var gate: Dictionary = {"min": 0.0, "max": 600.0, "angle": 0.0, "half_angle": 180.0}.merged(rules.conditions.get(id, {}), true)
 	rules.conditions[id] = gate
 	for key in ["min", "max", "angle", "half_angle"]:
@@ -1230,42 +1288,45 @@ func _append_gate(id: String) -> void:
 			history.commit_action(), -180.0 if key == "angle" else 0.0, 180.0 if "angle" in key else 100000.0)
 
 func _refresh() -> void:
-	_context(GRAPH.title_for(String(current.technique)) + " · 技の性能と発動条件", 0, true)
+	_context(GRAPH.technique_title(rules, String(current.technique)) + " · 技の性能と発動条件", 0, true)
 	preview.coverage_mode = false
 	preview.gate = rules.conditions.get(_selected_technique, {})
 	preview.set_attack(current, "hydra" if _is_hydra() else String(rules.adapter))
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
-	for key in current.parameters:
+	_append_display_name()
+	preload("res://tools/editor/boss_flow/technique_visual_fields.gd").append(self, current)
+	# 時間に関わる値と、威力・範囲の値を分けて並べる。
+	var timing: Array = []
+	var others: Array = []
+	for key in current.field_names():
 		if current.technique == &"spiral" and key == "warn": continue
-		if key=="arcs":
-			_append_arcs()
-			continue
-		if key in ["cost", "major_cost"] or not (current.parameters[key] is float or current.parameters[key] is int): continue
-		var label := Label.new()
-		# 第2形態の値は、同じ名前の値の表示名に形態を添える。
-		var base_key := String(key).trim_suffix("_p2")
-		label.text = SPIRAL_FIELDS.label_for(current, String(key))
-		label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
-		_fields.add_child(label)
-		var field := SpinBox.new()
-		field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		field.min_value = 0
-		field.max_value = 100000
-		if current.technique == &"spiral" and SPIRAL_BOUNDS.has(base_key):
-			field.min_value = SPIRAL_BOUNDS[base_key].x
-			field.max_value = SPIRAL_BOUNDS[base_key].y
-		field.step = 1 if current.parameters[key] is int else 0.01
-		field.tooltip_text = label.tooltip_text
-		field.value = float(current.parameters[key])
-		field.set_meta("key", key)
-		field.value_changed.connect(func(value): set_value(key, value))
-		_fields.add_child(field)
-	if graph.category_for(_selected_technique) != "combo":
+		if key != "arcs" and (key in ["cost", "major_cost"] or not (current.field(key) is float or current.field(key) is int)): continue
+		if String(key).trim_suffix("_p2") in TIMING_KEYS: timing.append(key)
+		else: others.append(key)
+	timing.sort_custom(func(a, b): return TIMING_KEYS.find(String(a).trim_suffix("_p2")) < TIMING_KEYS.find(String(b).trim_suffix("_p2")))
+	var combo_category := graph.category_for(_selected_technique) == "combo"
+	if not timing.is_empty() or not combo_category: _section_heading("タイミング")
+	for key in timing: _technique_field(key)
+	if not combo_category:
 		var gap := _number_field("技後の隙（秒）", current.post_gap, _set_post_gap)
 		gap.step = 0.05
 		gap.tooltip_text = "技の演出と回復動作が終わってから、次の攻撃選択まで待つ時間です。コンボ技には追加しません。"
+	if not others.is_empty(): _section_heading("威力と範囲")
+	for key in others:
+		if key == "arcs": _append_arcs()
+		else: _technique_field(key)
+	_section_heading("狙いと消費スタミナ")
+	if not rules.combos.has(String(current.technique)):
+		var tracking := CheckBox.new()
+		tracking.text = "予告の間、自機を追う"
+		tracking.tooltip_text = "ONでは予告の間ずっと自機を追って狙いと向きを直します。OFFでは予告を始めた時の自機の位置へ撃ちます。"
+		tracking.button_pressed = current.track_during_warn
+		tracking.toggled.connect(_set_tracking)
+		_fields.add_child(tracking)
+		# 2列の欄で、隣の入力欄の位置を空けて後ろの欄をずらさない。
+		_fields.add_child(Control.new())
 	var id := String(current.technique)
 	_number_field("消費スタミナ", float(rules.costs.get(id, 1.0)), func(value):
 		history.create_action("技の消費を変更")
@@ -1273,7 +1334,26 @@ func _refresh() -> void:
 		history.add_undo_method(_set_cost.bind(id, float(rules.costs.get(id, 1.0))))
 		history.commit_action())
 	_append_gate(_selected_technique)
-	_status.text = "青：発動条件　橙：基準の射程。動的な照準・配置は実験場で確認できます。"
+	_status.text = "左の青：発動条件（∞は上限なし）　右の橙：攻撃範囲。右図は仮の自機距離・向きで描き、実戦の配置で変化します。"
+	call_deferred("_refresh_field_columns")
+
+## 技の値1つ分の名前と入力欄。
+func _technique_field(key: Variant) -> void:
+	var label := Label.new()
+	label.text = SPIRAL_FIELDS.label_for(current, String(key))
+	label.tooltip_text = SPIRAL_FIELDS.tip_for(current, String(key))
+	_fields.add_child(label)
+	var field := SpinBox.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bounds := SPIRAL_FIELDS.bounds_for(current, String(key))
+	field.min_value = bounds.x
+	field.max_value = bounds.y
+	field.step = SPIRAL_FIELDS.step_for(current, String(key))
+	field.tooltip_text = label.tooltip_text
+	field.value = SPIRAL_FIELDS.to_display(String(key), float(current.field(key)), current)
+	field.set_meta("key", key)
+	field.value_changed.connect(func(value): set_value(key, SPIRAL_FIELDS.from_display(String(key), value, current)))
+	_fields.add_child(field)
 
 func _set_cost(id: String, value: float) -> void:
 	rules.costs[id] = value
@@ -1306,7 +1386,7 @@ func _remove_combo(id: String) -> void:
 
 func _edit_custom(id: String) -> void:
 	_last_combo_path.clear()
-	_context(GRAPH.title_for(id) + " の実行内容", 0, true)
+	_context(GRAPH.technique_title(rules, id) + " の実行内容", 0, true)
 	preview.coverage_mode = false
 	preview.gate = rules.conditions.get(id, {})
 	preview.attack = {"dynamic": true}
@@ -1369,8 +1449,8 @@ func _exit_tree() -> void:
 	working.clear()
 
 func set_arc_value(index: int, property: String, value: float) -> void:
-	if current==null or not current.parameters.has("arcs"): return
-	var old: Array=current.parameters.arcs
+	if current==null or not current.has_field("arcs"): return
+	var old: Array=current.field("arcs")
 	if index<0 or index>=old.size(): return
 	var next: Array=[]
 	for arc: Resource in old: next.append(arc.duplicate(true))
@@ -1386,19 +1466,19 @@ func set_arc_value(index: int, property: String, value: float) -> void:
 	history.commit_action()
 
 func _append_arcs() -> void:
-	var arcs: Array=current.parameters.arcs
+	var arcs: Array=current.field("arcs")
 	for index in arcs.size():
 		var arc: Resource=arcs[index]
 		var label := Label.new()
 		label.text="彗星弾の弧 %d" % (index+1)
-		_fields.add_child(label)
+		_full_row(label)
 		for property in ["offset_x","offset_y","radius","angle_degrees","spread_degrees","count"]:
 			var value: float=arc.offset.x if property=="offset_x" else arc.offset.y if property=="offset_y" else float(arc.get(property))
 			_number_field({"offset_x":"位置 X","offset_y":"位置 Y","radius":"半径","angle_degrees":"中心角度","spread_degrees":"広がり","count":"弾数"}[property],value,func(next): set_arc_value(index,property,next),-10000.0 if property in ["offset_x","offset_y","angle_degrees"] else 1.0)
 		var remove := Button.new()
 		remove.text="この弧を削除"
 		remove.pressed.connect(func():
-			var old: Array=current.parameters.arcs
+			var old: Array=current.field("arcs")
 			var next:=old.duplicate()
 			next.remove_at(index)
 			history.create_action("吐き出しの弧を削除")
@@ -1406,11 +1486,11 @@ func _append_arcs() -> void:
 			history.add_undo_method(_assign.bind(current,"arcs",old))
 			history.commit_action()
 			_refresh())
-		_fields.add_child(remove)
+		_full_row(remove)
 	var button := Button.new()
 	button.text="弧を追加"
 	button.pressed.connect(func():
-		var old: Array=current.parameters.arcs
+		var old: Array=current.field("arcs")
 		var next := old.duplicate()
 		next.append(preload("res://scripts/bosses/draco_exhale_arc.gd").new())
 		history.create_action("吐き出しの弧を追加")
@@ -1418,4 +1498,94 @@ func _append_arcs() -> void:
 		history.add_undo_method(_assign.bind(current,"arcs",old))
 		history.commit_action()
 		_refresh())
-	_fields.add_child(button)
+	_full_row(button)
+
+func _append_display_name() -> void:
+	var label := Label.new()
+	label.text = "表示名"
+	_fields.add_child(label)
+	var field := LineEdit.new()
+	field.text = current.display_name
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var target := current
+	field.text_changed.connect(func(value):
+		history.create_action("技の表示名を変更", UndoRedo.MERGE_ENDS)
+		history.add_do_method(_set_display_name.bind(target, value))
+		history.add_undo_method(_set_display_name.bind(target, target.display_name))
+		history.commit_action())
+	_fields.add_child(field)
+
+func _set_display_name(target: Resource, value: String) -> void:
+	target.display_name = value
+	_mark_move_dirty(target)
+	for node in graph.get_children():
+		if node is GraphNode and rules.source_for(String(node.name)) == String(target.technique): node.title = value if not value.is_empty() else String(target.technique)
+
+func _mark_move_dirty(target: Resource) -> void:
+	var found := false
+	for path in working:
+		if working[path] == target:
+			_dirty_working[path] = true
+			found = true
+	if not found: dirty_rules = true
+	target.emit_changed()
+
+func _show_add_technique() -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "技を追加"
+	dialog.ok_button_text = "作成"
+	dialog.cancel_button_text = "キャンセル"
+	var fields := VBoxContainer.new()
+	dialog.add_child(fields)
+	var id := LineEdit.new()
+	id.placeholder_text = "技ID（例：new_attack）"
+	id.tooltip_text = "保存先と接続に使う、重複しないID"
+	fields.add_child(id)
+	var title_field := LineEdit.new()
+	title_field.placeholder_text = "表示名"
+	fields.add_child(title_field)
+	var mode := OptionButton.new()
+	mode.add_item("ひな形からスクリプトを作る")
+	mode.add_item("既存の技スクリプトを選ぶ")
+	fields.add_child(mode)
+	var script_path := LineEdit.new()
+	script_path.placeholder_text = "技スクリプト（res://… .gd）"
+	script_path.editable = false
+	fields.add_child(script_path)
+	var browse := Button.new()
+	browse.text = "スクリプトを選ぶ…"
+	browse.disabled = true
+	fields.add_child(browse)
+	mode.item_selected.connect(func(index): script_path.editable = index == 1; browse.disabled = index == 0)
+	browse.pressed.connect(func():
+		var picker := FileDialog.new()
+		picker.access = FileDialog.ACCESS_RESOURCES
+		picker.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		picker.filters = PackedStringArray(["*.gd ; 技のスクリプト"])
+		picker.file_selected.connect(func(path): script_path.text = path; picker.queue_free())
+		picker.canceled.connect(picker.queue_free)
+		dialog.add_child(picker)
+		picker.popup_centered_ratio(0.6))
+	var result := Label.new()
+	result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fields.add_child(result)
+	dialog.dialog_hide_on_ok = false
+	dialog.confirmed.connect(func():
+		if rules.node_ids().has(id.text): result.text = "同じIDの技がすでにあります。"; return
+		var created: Dictionary = preload("res://tools/editor/boss_flow/technique_authoring.gd").create(String(rules.adapter), id.text, title_field.text, script_path.text, mode.selected == 0)
+		result.text = created.message
+		if created.error != OK: return
+		var move: Resource = created.move
+		rules.techniques.append(move)
+		rules.graph_nodes[id.text] = {"connected": false}
+		rules.costs[id.text] = 1.0
+		dirty_rules = true
+		graph.show_rules(rules)
+		_refresh_techniques()
+		_picked("technique", id.text)
+		_status.text = created.message
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(520 * _scale, 0))
+	id.grab_focus()

@@ -1,6 +1,9 @@
 ## ビームの敵：距離を保ち、間隔ごとに止まって砲口に光を集め、ビームを撃つ。
 extends EnemyBehavior
 
+func wait_for_attack(i: int, dt: float) -> void:
+	_keep_distance(i, dt)
+
 func step(i: int, dt: float) -> void:
 	if table.mode[i] == EnemyTable.Mode.MOVE:
 		_keep_distance(i, dt)
@@ -29,7 +32,9 @@ func _beamer(i: int, dt: float) -> void:
 					float(p.telegraph), float(p.beam_time), float(p.bullet_dmg), t.color[i].lightened(0.3)))
 			# 予告の間、ビームの通り道を予告線で示す。
 			for h in beams:
-				if h >= 0: projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.GUIDE
+				if h >= 0:
+					projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.GUIDE
+					projectiles.attach_hazard(h, i)
 		return
 	t.timer[i] -= dt
 	# charge は砲口に光が集まる進み（0〜1）。撃っている間は 1

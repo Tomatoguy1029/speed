@@ -1,22 +1,23 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://ba2ex12u0acdl"]
 
-[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/beam_pincer.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/beam_pincer_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"beam_pincer"
 category = &"combo"
-parameters = {
-"beam_dmg": 18.0,
-"beam_len": 1400.0,
-"beam_width": 40.0,
-"cooldown": 12.0,
-"major_cost": 1.0,
-"performance_time": 3.4,
-"pincer_close_angle": 0.12,
-"pincer_delay": 0.5,
-"pincer_open_angle": 0.8,
-"pincer_time": 1.8,
-"tech_recovery": 1.5,
-"warning_time": 0.8
-}
+display_name = "挟撃ビーム"
+beam_dmg = 18.0
+beam_len = 1400.0
+beam_width = 40.0
+cooldown = 12.0
+performance_time = 3.4
+pincer_close_angle = 0.12
+pincer_delay = 0.5
+pincer_open_angle = 0.8
+pincer_time = 1.8
+tech_recovery = 1.5
+warning_time = 0.8
+visual = ExtResource("visual")

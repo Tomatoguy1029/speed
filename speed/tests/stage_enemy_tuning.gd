@@ -119,13 +119,13 @@ func _ready() -> void:
 
 func _check_stage1_hp() -> void:
 	var stage := ContentManager.stage(1)
-	var expected := {"marlin": 80.0, "pump": 60.0, "shield": 45.0, "triangle_star": 12.0}
-	check(stage.enemy_tuning.keys().size() == 7, "Stage1のHPと攻撃を対象7種類だけ上書き")
+	var expected := {"marlin": 150.0, "pump": 60.0, "shield": 45.0, "triangle_star": 12.0}
+	check(stage.enemy_tuning.keys().size() == 8, "Stage1のHPと攻撃を対象8種類だけ上書き")
 	var runtime := BUILD.compile(stage)
 	var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 1, "seed": 42}, false)
 	session.auto_step = false
 	var enemies := session.sim.enemies
-	for entry in [[&"bomber", "blast_dmg", 14.0], [&"pulser", "bullet_dmg", 14.0], [&"pump", "bullet_dmg", 28.0], [&"triangle", "trail_dmg", 14.0], [&"marlin", "fire_interval", 3.6]]:
+	for entry in [[&"biter", "bullet_dmg", 4.0], [&"bomber", "blast_dmg", 14.0], [&"pulser", "bullet_dmg", 14.0], [&"pump", "bullet_dmg", 28.0], [&"triangle", "trail_dmg", 14.0], [&"marlin", "fire_interval", 3.6]]:
 		var tuned := enemies.def_of(entry[0])
 		check(is_equal_approx(float(tuned.params[entry[1]]), entry[2]), "Stage1の攻撃・間隔をランへ渡す: " + String(entry[0]))
 		check(not is_equal_approx(float(ContentManager.definition(&"enemies", entry[0]).params[entry[1]]), entry[2]), "他ステージ用の共通値を保持する: " + String(entry[0]))

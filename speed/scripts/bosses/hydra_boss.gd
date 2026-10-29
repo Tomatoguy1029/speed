@@ -25,7 +25,9 @@ var _neck_mesh_radius:=-1.0
 
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
-const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
+var normal_runners := {}
+var _move_kinds := {}
 var _moves: Dictionary = {}
 var flow_controlled := false
 var action_rules: Resource
@@ -51,9 +53,13 @@ func use_action_rules(value: Resource) -> void:
 	action_rules = value
 	_moves.clear()
 	_normal_moves.clear()
+	_move_kinds.clear()
 	for move in value.techniques:
 		_moves[move.technique] = move.duplicate(true)
+		_move_kinds[move.technique] = move.make_runner().kind()
 		if move.head_kind != &"": _normal_moves[move.technique] = true
+	technique_visuals.configure(self, _moves)
+	normal_runners.clear()
 	flow_controlled = true
 	hsm.set_active(false)
 var _normal_moves: Dictionary = {}
@@ -214,11 +220,12 @@ func _on_bound() -> void:
 	attack_field = load("res://scripts/bosses/hydra_attack_field.gd").new()
 	add_child(attack_field)
 	attack_field.bind(self)
-	special=load("res://scripts/bosses/hydra_techniques.gd").new(self)
+	special=load("res://scripts/bosses/hydra/technique_runner.gd").new(self)
 	if not ResourceLoader.exists("res://.content/boss_hydra.tres"):
 		push_error("ヒュドラAIの実行データがありません。試遊前のコンテンツ生成を実行してください。")
 		return
 	configure_flow(load("res://.content/boss_hydra.tres"))
+	presentation_event.connect(technique_visuals.event)
 	_set_count(3)
 	_tech_cd = float(def.params.tech_cd) * 0.6
 	queue_redraw()
@@ -243,6 +250,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_sim_dt = dt
 	if final_strike_t >= 0.0:
 		_final_strike_tick(dt)
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -256,6 +264,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				table.pos[neck.row] = _head_pos(neck)
 				_follow_neck(neck, dt)
 		if growth_t <= 0.0: _check_growth()
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -268,6 +277,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if immortal_row>=0:table.guard[immortal_row]=separation_t
 		for n in necks:
 			if _alive(n):table.guard[n.row]=separation_t
+		_sync_technique_visuals(dt)
 		presentation_advanced.emit(dt)
 		queue_redraw()
 		return
@@ -299,7 +309,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if tech != &"" and not _tech_ok(tech):
 			# 先に片方の首を落とされた：技が崩れる
 			interrupt_tech()
-		if busy and tech in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
+		if busy and tech_kind(tech) in [&"sequence",&"curve",&"tornado",&"debris_shatter",&"beam_pincer",&"swarm",&"grid"]: special.tick(dt)
 	# 攻撃の位置が確定してから、頭と胴の姿勢を固定更新につき一度だけ進める。
 	for n in necks:
 		if _alive(n):
@@ -320,6 +330,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_cue(&"defeated")
 		ctx.bosses.on_boss_defeated(body, {"cause": &"ram"})
 	attack_field.tick(dt)
+	_sync_technique_visuals(dt)
 	presentation_advanced.emit(dt)
 	queue_redraw()
 
@@ -330,7 +341,7 @@ func _move(dt: float) -> void:
 	var p: Dictionary = def.params
 	var d := run_state.ship_pos - t.pos[i]
 	var dist := maxf(d.length(), 1.0)
-	if busy and ((tech==&"north" and north_aiming) or tech==&"sequence"):
+	if busy and ((tech_kind(tech) == &"north" and north_aiming) or tech_kind(tech) == &"sequence"):
 		var middle:=Vector2.ZERO
 		for n in participants:middle+=Vector2.from_angle(n.base_angle)
 		var wanted: float=d.angle()-middle.angle()
@@ -392,6 +403,8 @@ func _grow(neck: Neck) -> void:
 	neck.mode = &"idle"
 	neck.glow = 0.0
 	neck.segs.clear()
+	# 再生した頭に、以前の頭が通った座標列を引き継がない。
+	neck.motion.erase("trail")
 	_follow_neck(neck, 0.0)
 
 ## 根元は胴体表面のローカル座標で固定し、首の狙い角から分離する。
@@ -413,7 +426,7 @@ func _head_pos(neck: Neck) -> Vector2:
 
 func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
-	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
+	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
 	if neck.locked and _normal_moves.has(neck.mode): return neck.strike_pos
 	if separated:return neck.free_pos
@@ -452,7 +465,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 		neck.head_hp = table.hp[neck.row]
 		if _normal_moves.has(neck.mode):
 			neck.t += dt
-			NORMALS.tick(self,neck,dt)
+			tick_normal(neck,dt)
 		elif neck.mode == &"idle":
 			neck.cd = maxf(0.0,neck.cd-dt)
 			if flow_controlled: position_head(k, dt)
@@ -515,7 +528,7 @@ func move_settings(attack: StringName) -> HydraTechnique:
 ## 移行済みの技別値は Settings が正。Params は本体・移動・共通予算の値を供給する。
 func move_params(attack: StringName) -> Dictionary:
 	var settings := move_settings(attack)
-	return def.params.merged(settings.parameters, true) if settings != null else def.params
+	return def.params.merged(settings.values(), true) if settings != null else def.params
 
 func _position_ready(attack: StringName, index := -1, internal_step := false) -> bool:
 	if flow_controlled and action_rules != null:
@@ -526,7 +539,7 @@ func _position_ready(attack: StringName, index := -1, internal_step := false) ->
 				snapshot.head = _head_pos(n)
 				snapshot.base = _neck_base(n)
 				snapshot.base_angle = n.base_angle
-				snapshot.reach = NORMALS.reach(attack, move_params(attack))
+				snapshot.reach = move_reach(attack)
 			if preload("res://scripts/bosses/flow/range_condition.gd").allows_snapshot(snapshot, run_state.ship_pos): return true
 		return false
 	return true
@@ -534,7 +547,7 @@ func _position_ready(attack: StringName, index := -1, internal_step := false) ->
 func _normal_cost(attack: StringName) -> float:
 	if action_rules != null: return float(action_rules.costs.get(String(attack), INF))
 	var settings := move_settings(attack)
-	return float(settings.parameters.cost) if settings != null else INF
+	return float(settings.values().cost) if settings != null else INF
 
 func normal_ready(index: int, attack: StringName, internal_step := false) -> bool:
 	if index < 0 or index >= necks.size() or not _normal_moves.has(attack): return false
@@ -689,7 +702,7 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 
 func _end(neck: Neck, interrupted := false) -> void:
 	# 伸びた頭をその場に残し、攻めどきが終わってから通常の長さへ戻す。
-	if tech == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
+	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		var offset := neck.strike_pos - _neck_base(neck)
 		neck.angle = offset.angle()
 		neck.length = offset.length()
@@ -720,8 +733,8 @@ func _release_attack(neck: Neck) -> void:
 
 func attack_ready(attack: StringName, internal_step := false) -> bool:
 	if tech==attack:return true
-	if not TECH_DIR.has(attack) or busy or timeline.is_playing() or chance_t>0.0 or growth_t>0.0 or separation_pending or recovery_t>0.0:return false
-	if COMBOS.has(attack):
+	if not TECH_DIR.has(tech_kind(attack)) or busy or timeline.is_playing() or chance_t>0.0 or growth_t>0.0 or separation_pending or recovery_t>0.0:return false
+	if COMBOS.has(tech_kind(attack)):
 		if combo_wait>0.0:return false
 	elif _tech_cd>0.0:return false
 	return _time>=float(_tech_until.get(attack,0.0)) and _tech_ok(attack) and _position_ready(attack, -1, internal_step)
@@ -741,18 +754,20 @@ func combo_heads(kinds: Array) -> Array[Neck]:
 func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [], internal_step := false) -> bool:
 	if busy or not attack_ready(attack, internal_step):
 		return false
-	if not timeline.has_animation(attack):return false
+	if not timeline.has_animation(tech_kind(attack)):return false
 	var director=ctx.projectiles.director
 	var major_cost: float = action_rules.costs.get(String(attack), 1.0) if action_rules != null else float(move_params(attack).major_cost)
 	if director!=null and not director.formation_mode and not director.request("boss:"+str(table.id[body]),["dash","beam","zone","aimed"],body,table.id[body],12.0,1.5,major_cost):
 		return false
-	if attack in [&"north",&"sequence"]: participants = front_heads()
-	elif attack in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
-	elif COMBOS.has(attack):
-		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[attack])
+	if tech_kind(attack) in [&"north",&"sequence"]: participants = front_heads()
+	elif tech_kind(attack) in [&"curve",&"swarm",&"grid"]: participants.assign(necks.filter(func(n):return _alive(n)))
+	elif COMBOS.has(tech_kind(attack)):
+		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[tech_kind(attack)])
 		combo_wait=float(def.params.combo_cooldown)
 	if not chosen.is_empty(): participants.assign(chosen)
 	tech = attack
+	special = _moves[attack].make_runner()
+	special.a = self
 	_cooldown_scale = cooldown_scale
 	last_tech_result = &""
 	busy = true
@@ -764,6 +779,10 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 	timeline.advance(0.0)
 	if special.positioning:timeline.pause()
 	return true
+
+## 予告の間に自機を追うか。技の設定が無い動作は追う。
+func tracks_during_warn(id: StringName) -> bool:
+	return not _moves.has(id) or _moves[id].track_during_warn
 
 func attack_playing() -> bool:
 	return busy
@@ -840,7 +859,7 @@ func _final_strike_tick(dt: float) -> void:
 
 ## 技に必要な首：北は噛みつく首、東は瓦礫の首とビームの首、南は渦の首と瓦礫の首、西はビームの首2本。
 func _tech_ok(name: StringName) -> bool:
-	match name:
+	match tech_kind(name):
 		&"grid":
 			return separated and (participants.any(func(n):return _alive(n)) if busy else not grid_plan().is_empty())
 		&"swarm":
@@ -871,15 +890,15 @@ func _first(kind: StringName) -> Neck:
 
 ## 羅針盤の針がくるくる回り出し、技の方位を指して止まる。
 func tech_compass(name: StringName) -> void:
-	if name in [&"sequence",&"curve",&"swarm",&"grid"] or COMBOS.has(name): special.prepare()
-	if name == &"north":
+	if tech_kind(name) in [&"sequence",&"curve",&"swarm",&"grid"] or COMBOS.has(tech_kind(name)): special.prepare()
+	if tech_kind(name) == &"north":
 		north_aiming = true
 		_update_north_targets()
 		for neck in necks:
 			if participants.has(neck): neck.mode = &"tech_aim"
 	_spin_t = _warning_duration(name) * compass_spin_fraction
 	_cue(&"warning_started", name, -1, {"duration": _warning_duration(name)})
-	_needle = TECH_DIR.get(name, -PI / 2.0)
+	_needle = TECH_DIR.get(tech_kind(name), -PI / 2.0)
 
 ## 技の終わり（崩れたときも）。首を普段に戻す。
 func special_attack() -> void:
@@ -925,53 +944,20 @@ func front_heads() -> Array[Neck]:
 	return result
 
 func _update_north_targets() -> void:
-	north_target = run_state.ship_pos
-	var direction := (north_target-table.pos[body]).normalized()
-	var side := direction.orthogonal()
-	var center := table.pos[body]+direction*maxf(north_target.distance_to(table.pos[body]),table.r[body]+float(def.params.neck_rest))
-	var ordered := participants.duplicate()
-	ordered.sort_custom(func(a,b):return _neck_base(a).dot(side) < _neck_base(b).dot(side))
-	for i in ordered.size():
-		ordered[i].target = center+side*float(move_params(&"north").north_spread)*(i-1)
+	_runner_north()._update_north_targets(self)
 
 func north_curl() -> void:
-	_update_north_targets()
-	north_aiming = false
-	_cue(&"target_locked", &"north", -1, {"target_position": north_target})
+	_runner_north().north_curl(self)
 
 func north_burst() -> void:
-	north_aiming = false
-	_north_duration = maxf(0.001, _timeline_key_time(&"north", &"north_follow") - _timeline_key_time(&"north", &"north_burst"))
-	_cue(&"attack_started")
-	for neck in participants:
-		if _alive(neck):
-			neck.strike_from = _head_pos(neck)
-			neck.strike_pos = neck.strike_from
-			neck.mode = &"tech_lunge"
-			neck.t = 0.0
-			neck.angle = (neck.target - neck.strike_from).angle()
-			_cue(&"attack_started", &"north", necks.find(neck), {"target_position": neck.target})
+	_runner_north().north_burst(self)
 
-## 先端の移動区間にも判定を出し、粗い固定更新で標的位置を飛び越えない。
 func _north_step(neck: Neck, fraction: float, dt: float) -> void:
-	var previous := neck.strike_pos
-	neck.strike_pos = neck.strike_from.lerp(neck.target, fraction)
-	_release_attack(neck)
-	neck.glow = 1.0
-	var delta := neck.strike_pos - previous
-	neck.hazard = ctx.projectiles.fire_wall(previous, delta.angle(), delta.length(), float(move_params(&"north").bite_radius) * 2.0,
-		0.0, maxf(dt, 0.001) + 0.001, float(move_params(&"north").bite_dmg), Color("#ff7a5a"))
-	ctx.projectiles.attach_hazard(neck.hazard, neck.row)
-	if fraction >= 1.0:
-		neck.mode = &"tech_hold"
+	_runner_north()._north_step(self, neck, fraction, dt)
 
-## 世界の更新がキーをまたいでも、最後の区間を判定してから止める。
 func north_follow() -> void:
-	for neck in necks:
-		if neck.mode == &"tech_lunge":
-			_north_step(neck, 1.0, _sim_dt)
+	_runner_north().north_follow(self)
 
-## 瓦礫を砕き、破片を飛ばす。from が 0 でなければ、その向きを中心に飛ばす。
 func _burst_rubble(j: int, from: Vector2) -> void:
 	var p: Dictionary = move_params(tech)
 	var base := from.angle() if from != Vector2.ZERO else run_state.rng.randf() * TAU
@@ -988,7 +974,7 @@ func _configure_tech_timeline(attack: StringName) -> void:
 	animation.track_set_path(track, NodePath("."))
 	animation.track_insert_key(track, 0.0, {"method": &"tech_compass", "args": [attack]})
 	var warning := maxf(0.001, float(p.warning_time))
-	if attack == &"north":
+	if tech_kind(attack) == &"north":
 		animation.track_insert_key(track, clampf(float(p.north_lock_time), 0.0, warning), {"method": &"north_curl", "args": []})
 		animation.track_insert_key(track, warning, {"method": &"north_burst", "args": []})
 		animation.track_insert_key(track, warning+float(p.north_flight), {"method": &"north_follow", "args": []})
@@ -1016,7 +1002,7 @@ func _timeline_key_time(name: StringName, method: StringName) -> float:
 	return 0.0
 
 func _warning_duration(name: StringName) -> float:
-	var method: StringName=&"north_burst" if name==&"north" else &"special_attack"
+	var method: StringName=&"north_burst" if tech_kind(name) == &"north" else &"special_attack"
 	return maxf(0.0, _timeline_key_time(name, method) - _timeline_key_time(name, &"tech_compass"))
 
 ## -1 は本体、-2 は不死首、0 以上は通常首の配列の添字。戻り値はワールド座標。
@@ -1030,11 +1016,11 @@ func presentation_anchor(index := -1) -> Transform2D:
 ## 予告と実際の判定が共有する標的位置。絵の側から射程を推測しない。
 func presentation_targets() -> Array[Dictionary]:
 	var targets: Array[Dictionary] = []
-	if tech != &"north": return targets
+	if tech_kind(tech) != &"north": return targets
 	for i in necks.size():
 		if participants.has(necks[i]) and _alive(necks[i]):
 			targets.append({"neck_index": i, "base": _neck_base(necks[i]), "from": _head_pos(necks[i]),
-				"target": necks[i].target, "radius": float(move_params(&"north").bite_radius), "locked": not north_aiming})
+				"target": necks[i].target, "radius": float(move_params(tech if tech_kind(tech) == &"north" else &"north").bite_radius), "locked": not north_aiming})
 	return targets
 
 func presentation_state() -> Dictionary:
@@ -1259,7 +1245,7 @@ func tick_bearer(dt: float)->void:
 	var alone:=necks.all(func(head):return not _alive(head))
 	if alone and n.mode!=&"idle":
 		n.t+=dt
-		NORMALS.tick(self,n,dt)
+		tick_normal(n,dt)
 	elif alone and n.cd<=0.0:
 		n.mode=&"bite_thrust"
 		n.t=0.0
@@ -1272,7 +1258,7 @@ func tick_bearer(dt: float)->void:
 		var away: Vector2=(n.free_pos-run_state.ship_pos).normalized()
 		if away==Vector2.ZERO:away=Vector2.LEFT
 		var target: Vector2=run_state.ship_pos+away.rotated(sin(_time*0.7)*0.6)*float(def.params.bearer_distance)
-		var grid_hold: bool=busy and tech==&"grid" and special.state.has("plan")
+		var grid_hold: bool=busy and tech_kind(tech) == &"grid" and special.state.has("plan")
 		if grid_hold:target=special.state.plan.bearer
 		target=arena.clamp_point(target,table.r[n.row]+12.0 if grid_hold else float(def.params.neck_rest)+60.0)
 		if grid_hold and n.free_pos.distance_to(target)<45.0:
@@ -1336,3 +1322,21 @@ func steer_snake(n: Neck, target: Vector2, dt: float, speed_scale:=1.0, formatio
 		var inward: Vector2=(inside-n.free_pos).normalized()
 		n.velocity-=inward*minf(0.0,n.velocity.dot(inward))
 		n.free_pos=inside
+
+func move_reach(id: StringName) -> Dictionary:
+	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
+func tick_normal(neck, dt: float) -> void:
+	var id: StringName = neck.mode
+	if not normal_runners.has(id): normal_runners[id] = _moves[id].make_runner()
+	normal_runners[id].tick_neck(self, neck, dt)
+
+func _sync_technique_visuals(dt: float) -> void:
+	for node: Node2D in technique_visuals.nodes.values(): node.advance_effects(dt)
+	technique_visuals.sync(tech, &"active" if busy else &"recovery", special.time if special != null else 0.0, 1.0)
+
+func _runner_north() -> RefCounted:
+	if tech_kind(tech) == &"north": return special
+	return _moves[&"north"].make_runner()
+
+func tech_kind(id: StringName) -> StringName:
+	return _move_kinds.get(id, id)

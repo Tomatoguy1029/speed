@@ -33,6 +33,7 @@ var _restore_settings := true
 var _restore_page := 0
 var _history_offset := 0
 var _zoom_label: Label
+var _view_scale_button: Button
 var _track_scroll: HScrollBar
 var _route_tool: OptionButton
 var _pin: Button
@@ -270,6 +271,10 @@ func _toolbar(parent: Node) -> void:
 		var key: String = ["show_ranges", "show_ids", "show_hud", "show_minimap", "show_background"][id]
 		lab.canvas.set(key, on))
 	UI.button(bar, tr("lab.ui.center"), func(): lab.canvas.center = lab.session.run.state.ship_pos; lab.canvas.zoom = lab.game_zoom(), "focus", true)
+	UI.button(bar, tr("lab.ui.view_zoom_out"), func(): lab.set_view_scale(lab.view_scale / 1.25), "minus", true)
+	_view_scale_button = UI.button(bar, "100%", lab.reset_view_scale)
+	_view_scale_button.tooltip_text = tr("lab.ui.view_zoom_reset")
+	UI.button(bar, tr("lab.ui.view_zoom_in"), func(): lab.set_view_scale(lab.view_scale * 1.25), "plus", true)
 	var more := MenuButton.new()
 	more.icon = UI.icon("more")
 	more.tooltip_text = tr("lab.ui.edit_more")
@@ -540,7 +545,12 @@ func _toggle_right() -> void:
 			lab.inspector.refresh(true)
 		else: open_settings(0)
 
+func sync_view_scale() -> void:
+	if _view_scale_button != null:
+		_view_scale_button.text = "%d%%" % roundi(lab.view_scale * 100.0)
+
 func sync() -> void:
+	sync_view_scale()
 	_pin.set_pressed_no_signal(lab.session.pinned != null)
 	lab._play.icon = UI.icon("pause" if lab.session.playing else "play")
 	lab._play.text = tr("lab.ui.pause" if lab.session.playing else "lab.ui.play")

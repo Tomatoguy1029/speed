@@ -65,7 +65,7 @@ func _ready() -> void:
 	sim=fresh(); actor=sim.bosses.actor
 	actor.phase=2
 	actor.start_attack(&"clones")
-	var unit: Dictionary = actor._driver.units[1]
+	var unit: Dictionary = actor._runner.units[1]
 	var part: int = unit.parts[0].row
 	check(is_equal_approx(actor.table.max_hp[unit.row],float(actor.rule().clone_hp)*sim.cfg.enemy_hp_mult),"Independent copy must use its authored HP instead of the ordinary rank1 table")
 	sim.combat.damage_enemy(part,10.0,{"cause":&"shot"})

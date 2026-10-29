@@ -1,20 +1,22 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_c7pws"]
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/power_shot.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/power_shot_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_c7pws")
+script = ExtResource("1")
 technique = &"power_shot"
-parameters = {
-"cd": 7.0,
-"count": 1,
-"count_p2": 3,
-"damage": 28.0,
-"alert": 0.4,
-"radius": 30.0,
-"recover": 1.5,
-"speed": 1800.0,
-"spread": 0.22,
-"travel": 1600.0,
-"warn": 1.4
-}
+display_name = "強弓"
+cd = 7.0
+count = 1
+count_p2 = 3
+damage = 28.0
+alert = 0.4
+radius = 30.0
+recover = 1.5
+speed = 1800.0
+spread = 0.22
+travel = 1600.0
+warn = 1.4
+visual = ExtResource("visual")

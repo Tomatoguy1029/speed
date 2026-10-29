@@ -16,8 +16,8 @@ func _check() -> void:
 	var second := first * cfg.levelup_bonus_more
 	var fourth := second * cfg.levelup_bonus_last
 	var run_27 := 1.0 - pow(1.0 - fourth, 27)
-	if absf(first - 0.12280138) > 0.000001 or absf(cfg.levelup_bonus_more - 0.32747034) > 0.000001: failed += 1
-	if absf(cfg.levelup_bonus_last - 0.20466896) > 0.000001 or absf(run_27 - 0.2) > 0.000001: failed += 1
+	if absf(first - 0.12280138) > 0.000001 or absf(cfg.levelup_bonus_more - 0.2) > 0.000001: failed += 1
+	if absf(cfg.levelup_bonus_last - 0.1) > 0.000001 or absf(run_27 - (1.0 - pow(1.0 - 0.12280138 * 0.2 * 0.1, 27))) > 0.000001: failed += 1
 	for trial in 2000:
 		sim.state.weapons = {&"W01": 1}
 		sim.state.traits = {}

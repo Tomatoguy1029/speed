@@ -42,6 +42,12 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var technique_pose := {}
+var _support_runners := {}
+var _runner: RefCounted
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
+## 予告の間に自機を追わない技の狙い。予告を始めた時の位置。
+var warn_aim := Vector2.ZERO
 ## 今の形態の技の性能。技のID → 性能
 var _rules := {}
 ## 矢の雨のトレース。start・dir・turn（曲がる向き ±1）・t0（走り始めの clock）・next_drop・landed・hit を持つ
@@ -59,6 +65,7 @@ func configure_flow(program: Resource) -> void:
 	_moves.clear()
 	for move in action_rules.techniques: _moves[move.technique] = move
 	_apply_phase()
+	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
@@ -154,8 +161,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	elif mode in [&"windup", &"shooting", &"strike"]:
 		table.vel[body] = Vector2.ZERO
 		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。背後攻撃は背中を向けたまま構える。
-		if technique == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
-		elif technique != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
+		if mode == &"windup" and not _tracks_during_warn():
+			if _runner_for().kind() != &"rear_attack": _face(warn_aim, def.turn, dt)
+		elif _runner_for().kind() == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
+		elif _runner_for().kind() != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
 		if mode == &"strike": _strike_tick()
 		if timeline.is_playing(): timeline.advance(dt)
 	else:
@@ -171,6 +180,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
 	_previous_ship = run_state.ship_pos
+	_sync_technique_visuals()
 	presentation_advanced.emit(dt)
 
 func rule() -> Dictionary:
@@ -185,7 +195,7 @@ func param(key: String) -> Variant:
 func _apply_phase() -> void:
 	_rules.clear()
 	for id in _moves:
-		var base: Dictionary = _moves[id].parameters
+		var base: Dictionary = _moves[id].values()
 		var values := {}
 		for key: String in base:
 			if not key.ends_with("_p2"): values[key] = base[key]
@@ -236,6 +246,8 @@ func start_attack(attack: StringName) -> bool:
 	var length := _attack_length(attack, r)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, length): return false
 	technique = attack
+	_runner = _moves[attack].make_runner()
+	_support_runners[attack] = _runner
 	cooldowns[attack] = clock + float(r.cd)
 	_begin_windup(r, length)
 	return true
@@ -254,100 +266,45 @@ func cancel_attack() -> void:
 # ── 射撃 ──────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
-	if attack == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
-	if attack == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
-	if attack == &"rain":
+	if _moves[attack].make_runner().kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
+	if _moves[attack].make_runner().kind() == &"rear_attack": return float(r.warn) + float(r.active) + 0.05
+	if _moves[attack].make_runner().kind() == &"rain":
 		var traces := int(r.traces)
 		return float(r.warn) + traces * _trace_duration(r) + maxi(traces - 1, 0) * float(r.trace_gap) + float(r.get("drop_delay", 0.0)) + float(r.fall) + float(r.linger) + 0.3
 	return float(r.warn) + 0.05
 
+func _tracks_during_warn() -> bool:
+	return not _moves.has(technique) or _moves[technique].track_during_warn
+
 func _begin_windup(r: Dictionary, length: float) -> void:
-	mode = &"windup"
-	alerting = false
-	table.vel[body] = Vector2.ZERO
-	var anim := timeline.get_animation(&"attack")
-	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	if technique == &"rain":
-		# 予告のあとはトレースの進行で終わるので、タイムラインは開始の鍵だけを持つ。
-		anim.length = float(r.warn) + 0.01
-		anim.track_insert_key(0, float(r.warn), {"method": &"begin_rain", "args": []})
-	else:
-		anim.length = length
-		if technique == &"rear_attack":
-			anim.track_insert_key(0, float(r.warn), {"method": &"strike_on", "args": []})
-		elif technique == &"power_shot":
-			anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.alert)), {"method": &"alert", "args": []})
-			anim.track_insert_key(0, float(r.warn), {"method": &"release", "args": []})
-		else:
-			for k in int(r.count): anim.track_insert_key(0, float(r.warn) + float(r.interval) * k, {"method": &"release", "args": []})
-		anim.track_insert_key(0, length, {"method": &"end_attack", "args": []})
-	timeline.play(&"attack")
-	timeline.advance(0.0)
-	_cue(&"telegraph")
+	_runner_for()._begin_windup(self, r, length)
 
-## 強弓の発射直前の警告。向きは発射まで機体を追い続ける。
 func alert() -> void:
-	if mode != &"windup": return
-	alerting = true
-	_cue(&"alert")
+	_runner_id(&"power_shot").alert(self)
 
-## 弓の先。矢はここから出る。
 func bow_mouth() -> Vector2:
 	return table.pos[body] + Vector2.from_angle(table.facing[body]) * table.r[body] * float(def.params.bow_reach)
 
 ## 速射は1本ごとに共通の遅延照準を狙う。強弓は発射の瞬間の機体の位置へ射る。矢は敵をすり抜ける。
 ## 強弓が複数本なら、真ん中を機体へ向け、残りを左右へ spread ずつ開いて同時に射る。
 func release() -> void:
-	if mode not in [&"windup", &"shooting"]: return
-	var r := rule()
-	var mouth := bow_mouth()
-	var power := technique == &"power_shot"
-	var angle := ((run_state.ship_pos if power else run_state.enemy_aim) - mouth).angle()
-	for offset in power_offsets() if power else [0.0]:
-		ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle + offset, float(r.speed), float(r.radius), float(r.travel),
-			float(r.damage) * ctx.cfg.atk_scale, power])
-	mode = &"shooting"
-	_cue(&"released")
+	_runner_for().release(self)
 
-## 強弓の矢ごとの、機体への向きからの角度。
 func power_offsets() -> Array[float]:
-	var r := rule()
-	var count := maxi(1, int(r.get("count", 1)))
-	var offsets: Array[float] = []
-	for k in count: offsets.append((float(k) - float(count - 1) * 0.5) * float(r.get("spread", 0.0)))
-	return offsets
+	return _runner_id(&"power_shot").power_offsets(self)
 
 func end_attack() -> void:
-	if mode not in [&"windup", &"shooting", &"strike"]: return
-	timeline.stop()
-	alerting = false
-	mode = &"recovery"
-	recovery = float(rule().recover)
-	_cue(&"recovery_started")
+	_runner_for().end_attack(self)
 
-# ── 背後攻撃 ──────────────────────────────────────────────
-
-## 背後攻撃の当たりを有効にする。有効な間に範囲の円へ触れた機体へ1回だけ当たる。
 func strike_on() -> void:
-	if mode != &"windup": return
-	mode = &"strike"
-	attack_hit = false
-	_cue(&"strike")
+	_runner_id(&"rear_attack").strike_on(self)
 
-## 背後攻撃の範囲の中心。背中から back_offset だけ後ろ。
 func rear_center(r: Dictionary) -> Vector2:
-	return table.pos[body] - Vector2.from_angle(table.facing[body]) * float(r.back_offset)
+	return _runner_id(&"rear_attack").rear_center(self, r)
 
 func _strike_tick() -> void:
-	if attack_hit: return
-	var r := rule()
-	var center := rear_center(r)
-	var reach := float(r.range_radius) + ctx.cfg.ship_radius
-	if Geometry2D.get_closest_point_to_segment(center, _previous_ship, run_state.ship_pos).distance_to(center) <= reach:
-		attack_hit = true
-		ctx.ship.damage(float(r.damage) * ctx.cfg.atk_scale, 0.0, &"rear_attack", &"centaurus")
+	_runner_id(&"rear_attack")._strike_tick(self)
 
-## 背後攻撃を共通フローが今すぐ選べるか。選べる間は離脱より背後攻撃を優先する。
 func _rear_ready() -> bool:
 	if action_rules == null or not _rules.has(&"rear_attack"): return false
 	if flow_runner.rest_remaining > 0.0 or flow_runner.stamina < float(action_rules.costs.get("rear_attack", 1.0)): return false
@@ -357,7 +314,7 @@ func _rear_ready() -> bool:
 ## with_idle なら、構えていない間も背後攻撃の範囲を返す。
 func lab_ranges(with_idle := false) -> Array[Dictionary]:
 	var ranges: Array[Dictionary] = []
-	if technique == &"rear_attack" and mode in [&"windup", &"strike"]:
+	if _runner_for().kind() == &"rear_attack" and mode in [&"windup", &"strike"]:
 		ranges.append({"center": rear_center(rule()), "radius": float(rule().range_radius), "active": mode == &"strike"})
 	elif with_idle and _rules.has(&"rear_attack"):
 		var r: Dictionary = _rules[&"rear_attack"]
@@ -367,98 +324,22 @@ func lab_ranges(with_idle := false) -> Array[Dictionary]:
 # ── 矢の雨 ────────────────────────────────────────────────
 
 func begin_rain() -> void:
-	if mode != &"windup": return
-	timeline.stop()
-	_clear_rain()
-	mode = &"rain"
-	_rain_left = int(rule().traces)
-	_rain_next_at = clock
-	_cue(&"rain_started")
+	_runner_id(&"rain").begin_rain(self)
 
 func _clear_rain() -> void:
-	rain_traces.clear()
-	rain_arrows.clear()
-	_rain_left = 0
+	_runner_id(&"rain")._clear_rain(self)
 
 func _trace_duration(r: Dictionary) -> float:
-	return float(r.trace_length) / maxf(float(r.trace_speed), 1.0)
+	return _runner_id(&"rain")._trace_duration(self, r)
 
-## トレースの道すじの、走り始めから距離 s の点。円弧で、曲がりの合計が trace_bend になる。
 func trace_point(trace: Dictionary, s: float) -> Vector2:
-	var r := rule()
-	var start: Vector2 = trace.start
-	var direction: Vector2 = trace.dir
-	var bend := float(r.trace_bend)
-	if absf(bend) < 0.001: return start + direction * s
-	var radius := float(r.trace_length) / bend
-	var normal := direction.orthogonal() * float(trace.turn)
-	var center := start + normal * radius
-	return center + (start - center).rotated(-float(trace.turn) * s / radius)
+	return _runner_id(&"rain").trace_point(self, trace, s)
 
-## 自機の進む向きの前方に始点を置き、弧が自機の位置を通るように向けて走らせる。
 func _start_trace(r: Dictionary) -> void:
-	var ship := run_state.ship_pos
-	var heading := run_state.ship_vel.normalized() if run_state.ship_vel.length() > 60.0 else (ship - table.pos[body]).normalized()
-	var start := ship + heading * float(r.forward)
-	var trace := {"start": start, "dir": (ship - start).normalized(), "turn": 1.0 if rain_traces.size() % 2 == 0 else -1.0,
-		"t0": clock, "next_drop": 0.0, "landed": 0.0, "hit": false}
-	# 弧の上で、始点から自機までの直線距離にあたる点を自機へ重ねる。
-	var bend := float(r.trace_bend)
-	var reach := float(r.forward)
-	if absf(bend) >= 0.001:
-		var radius := float(r.trace_length) / absf(bend)
-		reach = 2.0 * radius * asin(minf(1.0, reach / (2.0 * radius)))
-	var probe := trace_point(trace, reach)
-	trace.dir = (trace.dir as Vector2).rotated(Geom.angle_diff((ship - start).angle(), (probe - start).angle()))
-	rain_traces.append(trace)
-	_cue(&"rain_trace")
+	_runner_id(&"rain")._start_trace(self, r)
 
 func _rain_tick(dt: float) -> void:
-	_position_tick(dt)
-	var r := rule()
-	var length := float(r.trace_length)
-	var speed := maxf(float(r.trace_speed), 1.0)
-	if _rain_left > 0 and clock >= _rain_next_at:
-		_start_trace(r)
-		_rain_left -= 1
-		_rain_next_at = clock + _trace_duration(r) + float(r.trace_gap)
-	var delay := float(r.get("drop_delay", 0.0))
-	var fall := float(r.fall)
-	var radius := float(r.circle_radius)
-	var gap := maxf(float(r.arrow_gap), 1.0)
-	var all_landed := true
-	for trace in rain_traces:
-		var run := clock - float(trace.t0)
-		var head := clampf(run * speed, 0.0, length)
-		# 円が通った所へ、drop_delay 遅れて矢を落とし始める。
-		while float(trace.next_drop) <= head:
-			var center := trace_point(trace, trace.next_drop)
-			for k in int(r.arrows_per_step):
-				var offset := Vector2.from_angle(run_state.rng.randf() * TAU) * sqrt(run_state.rng.randf()) * radius
-				rain_arrows.append(Vector3(center.x + offset.x, center.y + offset.y, float(trace.t0) + float(trace.next_drop) / speed + delay))
-			trace.next_drop = float(trace.next_drop) + gap
-		# 着弾の円は drop_delay と fall 遅れて同じ道すじを進む。前回からの区間で機体に触れたら1回だけ当たる。
-		var land := clampf((run - delay - fall) * speed, 0.0, length)
-		if not trace.hit and land > float(trace.landed):
-			var a := trace_point(trace, trace.landed)
-			var b := trace_point(trace, land)
-			var ship := run_state.ship_pos
-			if Geometry2D.get_closest_point_to_segment(ship, a, b).distance_to(ship) <= radius + ctx.cfg.ship_radius:
-				trace.hit = true
-				ctx.ship.damage(float(r.damage) * ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
-		trace.landed = land
-		if land < length: all_landed = false
-	var expire := fall + float(r.linger) + RAIN_OUT
-	var spent := 0
-	while spent < rain_arrows.size() and rain_arrows[spent].z + expire < clock: spent += 1
-	if spent > 0: rain_arrows = rain_arrows.slice(spent)
-	if _rain_left == 0 and all_landed and rain_arrows.is_empty():
-		_clear_rain()
-		mode = &"recovery"
-		recovery = float(r.recover)
-		_cue(&"recovery_started")
-
-# ── 移動 ──────────────────────────────────────────────────
+	_runner_id(&"rain")._rain_tick(self, dt)
 
 func _begin_retreat() -> void:
 	mode = &"retreat"
@@ -541,3 +422,18 @@ func begin_final_strike(charge: float) -> void:
 
 func _exit_tree() -> void:
 	if flow_adapter != null: flow_adapter.cancel()
+
+func _runner_for() -> RefCounted:
+	if _runner != null: return _runner
+	return preload("res://scripts/bosses/centaurus/technique_runner.gd").new()
+
+func _runner_id(id: StringName) -> RefCounted:
+	if _runner != null and _runner.kind() == id: return _runner
+	if not _support_runners.has(id): _support_runners[id] = _moves[id].make_runner()
+	return _support_runners[id]
+
+func _sync_technique_visuals() -> void:
+	technique_pose = _runner_for().body_pose(self)
+	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
+	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
+	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))

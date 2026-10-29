@@ -161,5 +161,9 @@ func emit(type: StringName, data := {}) -> void:
 	data.type = type
 	events.append(data)
 
+## 溜まっている量（容量 × 充填率）。1でリング1周ぶん
+func gauge_amount() -> float:
+	return gauge * stats.capacity
+
 func view_rect() -> Rect2:
 	return Rect2(view_center - view_half, view_half * 2.0)

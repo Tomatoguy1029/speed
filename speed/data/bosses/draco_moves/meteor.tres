@@ -1,8 +1,21 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_meteor.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/meteor.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/meteor_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"meteor"
 category = &"single"
-parameters = {"driver": ExtResource("2"), "warn": 1.1, "active": 0.05, "recover": 0.25, "damage": 0.0, "reach": 1500.0, "width": 40.0, "rocks": 3, "rock_hp": 180.0, "rock_radius": 78.0, "rock_distance": 340.0, "rock_spacing": 240.0, "half_angle": 0.24, "sweep": 1.2}
+display_name = "隕石投射"
+warn = 1.1
+active = 0.05
+recover = 0.25
+damage = 0.0
+rocks = 3
+rock_hp = 180.0
+rock_radius = 78.0
+rock_distance = 340.0
+rock_spacing = 240.0
+visual = ExtResource("visual")

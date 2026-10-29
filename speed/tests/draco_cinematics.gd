@@ -148,7 +148,7 @@ func _ready() -> void:
 	var rifts_open := false
 	for frame in 600:
 		actor.sim_tick(1.0/60.0,1.0/60.0)
-		if actor.technique == &"rifts" and actor._driver != null and actor._driver.walls.size() == 6:
+		if actor.technique == &"rifts" and actor._runner != null and actor._runner.walls.size() == 6:
 			rifts_open = true
 			break
 	check(rifts_open,"引っ掻きの退場・再登場後に亀裂を開く")

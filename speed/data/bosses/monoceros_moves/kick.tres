@@ -1,15 +1,20 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_2xook"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/kick.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/kick_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_2xook")
+script = ExtResource("1")
 technique = &"kick"
-parameters = {
-"active": 0.24,
-"cd": 9.0,
-"damage": 18.0,
-"reach": 210.0,
-"recover": 1.2,
-"warn": 0.85
-}
+track_during_warn = false
+display_name = "後ろ蹴り"
+active = 0.24
+cd = 9.0
+damage = 18.0
+hold = 0.25
+reach = 210.0
+recover = 1.2
+return_speed = 4.1887902047863905
+warn = 0.85
+visual = ExtResource("visual")

@@ -36,7 +36,7 @@ func _ready() -> void:
 		actor.reset_pose()
 		var initial_facing: float = actor.table.facing[actor.body]
 		actor.start_attack(staged_move)
-		var driver = actor._driver
+		var driver = actor._runner
 		check(is_equal_approx(actor.table.facing[actor.body], initial_facing), "画面退場前に顔の向きを飛ばさない: " + staged_move)
 		check(actor.telegraph_paths.is_empty(), "画面退場中に攻撃予告を出さない: " + staged_move)
 		var frames := 0
@@ -50,10 +50,10 @@ func _ready() -> void:
 		actor.cancel_attack()
 		check(actor.body_override.is_empty() and actor.telegraph_paths.is_empty(), "中断で胴体姿勢と予告を回収する: " + staged_move)
 	actor.start_attack(&"rifts")
-	check(actor._driver.center == sim.state.ship_pos, "亀裂は古い共通照準ではなく現在の自機を基準に予告する")
+	check(actor._runner.center == sim.state.ship_pos, "亀裂は古い共通照準ではなく現在の自機を基準に予告する")
 	actor.cancel_attack()
 	actor.start_attack(&"picaro_wall")
-	var wall = actor._driver
+	var wall = actor._runner
 	actor.mode = &"active"
 	actor.elapsed = 0.0
 	wall.tick(actor, 0.01)
@@ -74,7 +74,7 @@ func _ready() -> void:
 	sim.ship.invincible = false
 	sim.state.ship_invuln = 0.0
 	actor.start_attack(&"rifts")
-	var rifts = actor._driver
+	var rifts = actor._runner
 	var staging_frames := 0
 	while rifts.staging.phase != &"ready" and staging_frames < 600:
 		actor.elapsed += 1.0 / 120.0
@@ -108,7 +108,7 @@ func _ready() -> void:
 	actor.table.pos[actor.body] = Vector2.ZERO
 	actor.reset_pose()
 	actor.start_attack(&"clones")
-	var clones = actor._driver
+	var clones = actor._runner
 	check(clones.units.size() == 3, "本体と複製二体で共同攻撃する")
 	for unit: Dictionary in clones.units:
 		for j in unit.parts.size():
@@ -140,7 +140,7 @@ func _ready() -> void:
 	actor.table.pos[actor.body] = Vector2.ZERO
 	sim.state.ship_pos = Vector2.ZERO
 	actor.start_attack(&"spiral")
-	var spiral = actor._driver
+	var spiral = actor._runner
 	actor.mode = &"active"
 	for frame in 720:
 		actor.elapsed = float(frame + 1) / 120.0

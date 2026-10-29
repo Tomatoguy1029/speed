@@ -1,8 +1,23 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_picaro_wall.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/picaro_wall.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/picaro_wall_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"picaro_wall"
 category = &"major"
-parameters = {"driver": ExtResource("2"), "warn": 1.0, "active": 6.0, "recover": 1.2, "damage": 28.0, "reach": 1800.0, "width": 20.0, "wall_candidates": [&"telescope", &"lynx"], "count": 3, "arrows": 5, "interval": 0.45, "flight": 0.75, "impact_warn": 1.0, "radius": 85.0}
+display_name = "ピカロ隊列と光の矢"
+warn = 1.0
+active = 6.0
+recover = 1.2
+damage = 28.0
+wall_candidates = [&"telescope", &"lynx"]
+count = 3
+arrows = 5
+interval = 0.45
+flight = 0.75
+impact_warn = 1.0
+radius = 85.0
+visual = ExtResource("visual")

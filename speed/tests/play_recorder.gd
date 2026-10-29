@@ -38,6 +38,7 @@ func _ready() -> void:
 	file.close()
 	verify(records)
 	await verify_performance()
+	await verify_ui_pause_performance()
 	await verify_mid_run_start()
 	await verify_start_routes()
 	var measured_on := await measurement_scenario(true)
@@ -255,6 +256,61 @@ func verify(records: Array[Dictionary]) -> void:
 		count += int(end.big_crystals[tier].count)
 	check(count == drops.size(), "終了時に段ごとの数を集計する")
 
+## 報酬とメニューは PLAY のまま停止する。描画だけの時間を性能窓に混ぜない。
+func verify_ui_pause_performance() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed": 932, "empty": true, "stage": 1})
+	lab.scene.auto_step = false
+	var run: RunSimulation = lab.run
+	var rec := TempRecorder.new()
+	add_child(rec)
+	rec.set_process(false)
+	DirAccess.make_dir_recursive_absolute(rec.directory)
+	var path := rec.directory.path_join("ui-pause.jsonl")
+	rec._file = FileAccess.open(path, FileAccess.WRITE)
+	rec._run = run
+	rec._session = lab.scene
+	run.state.phase = RunState.Phase.PLAY
+	var stamp := Time.get_ticks_usec()
+	run.ui_reward_active = true
+	rec._perf_start(stamp)
+	stamp += 100000000
+	rec._perf_tick(stamp)
+	run.ui_reward_active = false
+	stamp += 16667
+	rec._perf_tick(stamp)
+	for pause_kind in ["ui_reward_active", "ui_overlay_active"]:
+		for k in 60:
+			stamp += 16667
+			rec._perf_tick(stamp)
+		run.set(pause_kind, true)
+		stamp += 16667
+		rec._perf_tick(stamp)
+		stamp += 100000000
+		rec._perf_tick(stamp)
+		run.set(pause_kind, false)
+		stamp += 16667
+		rec._perf_tick(stamp)
+	for k in 60:
+		stamp += 16667
+		rec._perf_tick(stamp)
+	rec._flush_performance(stamp)
+	rec._file.close()
+	rec._file = null
+	rec._run = null
+	var records := read_rows(path)
+	check(records.size() == 3, "報酬とメニューの停止を境に性能窓を分ける")
+	var measured_frames := 0
+	var measured_seconds := 0.0
+	for record in records:
+		measured_frames += int(record.frames)
+		measured_seconds += float(record.duration_real)
+	check(measured_frames == 180 and measured_seconds < 3.1, "PLAYのまま止まった300秒をプレイ性能へ混ぜない")
+	rec.queue_free()
+	lab.queue_free()
+	await get_tree().process_frame
+
 func verify_performance() -> void:
 	var lab = load('res://gyms/enemy_lab/lab_session.gd').new()
 	add_child(lab)
@@ -406,6 +462,7 @@ func measurement_scenario(recording: bool) -> Dictionary:
 		var rows := read_rows(path)
 		var start: Dictionary = rows[0]
 		check(start.schema_version == 4 and start.measurement_version == 2, "schema4 に識別可能な追加計測を保存する")
+		check(start.perf_excludes_ui_pause, "報酬・メニューの停止を除いた録画を識別できる")
 		check(start.run_start.conditions.config.gem_max == 1 and start.run_start.conditions.profile.mult.xp == 1.0, "開始時の実効設定と強化係数を保存する")
 		check(start.run_start.conditions.identity.code_sha256.length() == 64 and start.run_start.conditions.identity.runtime_stage_sha256.length() == 64, "コード・実行ステージを識別するハッシュ")
 		var changes := rows.filter(func(e): return e.type == "loadout")

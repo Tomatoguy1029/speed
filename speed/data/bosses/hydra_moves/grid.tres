@@ -1,19 +1,20 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://ceqdi55m261mo"]
 
-[ext_resource type="Script" uid="uid://bslcd4l517tvs" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/grid.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/grid_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"grid"
 category = &"major"
-parameters = {
-"beam_dmg": 18.0,
-"beam_width": 40.0,
-"cooldown": 30.0,
-"grid_time": 3.5,
-"major_cost": 1.0,
-"normal_charge": 0.6,
-"performance_time": 5.2,
-"tech_recovery": 1.5,
-"warning_time": 0.8
-}
+display_name = "格子ビーム"
+beam_dmg = 18.0
+beam_width = 40.0
+cooldown = 30.0
+grid_time = 3.5
+normal_charge = 0.6
+performance_time = 5.2
+tech_recovery = 1.5
+warning_time = 0.8
+visual = ExtResource("visual")

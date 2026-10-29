@@ -33,6 +33,11 @@ var _source_hashes := {}
 var _rules_paths := {}
 var _rules_hashes := {}
 var _prefer_preview_values := false
+## 再生中の技。終わるたびに同じ技を撃ち直し、技・ボスの選び直し・リセット・通常AIへ戻すで止める。
+var _repeat_id := ""
+var _repeat_wait := 0.0
+## 技が終わってから撃ち直すまでの間（秒）
+const REPEAT_GAP := 0.6
 
 func _ready() -> void:
 	await super._ready()
@@ -88,7 +93,7 @@ func _build_trial_ui() -> void:
 	_move_picker.clip_text = true
 	_move_picker.tooltip_text = "実行するボス技"
 	_technique_row.add_child(_move_picker)
-	_move_picker.item_selected.connect(func(_index): _manual_message.hide(); _refresh_tuning_selection())
+	_move_picker.item_selected.connect(func(_index): _repeat_id = ""; _manual_message.hide(); _refresh_tuning_selection())
 	_phase_picker.item_selected.connect(func(_index): _manual_message.hide())
 	_execute = _button(_technique_row, "技を再生", _execute_selected)
 	_button(_technique_row, "通常AIへ戻す", _return_to_ai)
@@ -164,22 +169,18 @@ func _normalize_preview_program(program: Resource, boss: String) -> String:
 		var id := String(move.technique)
 		if not sources.has(id): return "技の保存元がありません: " + id
 		var source: Resource = sources[id]
-		if not source.get("parameters") is Dictionary or not move.get("parameters") is Dictionary:
+		if not source.has_method("values") or not move.has_method("values"):
 			return "技の値が壊れています: " + id
 		for required in TECHNIQUE_FIELDS.REQUIRED.get(id, []):
-			if not source.parameters.has(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
-		var values: Dictionary = move.parameters.duplicate(true)
-		for key in source.parameters:
-			if not values.has(key): values[key] = source.parameters[key]
-		move.parameters = values
+			if not source.has_field(required): return "技の保存元に必要な値がありません: %s / %s" % [id, required]
 	return ""
 
 func _capture_editable(move: Resource) -> Dictionary:
 	var values := {}
-	for key in TECHNIQUE_FIELDS.editable_keys(move): values[key] = move.parameters[key]
-	if move.parameters.get("arcs") is Array:
+	for key in TECHNIQUE_FIELDS.editable_keys(move): values[key] = move.field(key)
+	if move.field("arcs") is Array:
 		var arcs := []
-		for arc: Resource in move.parameters.arcs:
+		for arc: Resource in move.field("arcs"):
 			arcs.append({"offset_x": arc.offset.x, "offset_y": arc.offset.y,
 				"radius": arc.radius, "angle_degrees": arc.angle_degrees,
 				"spread_degrees": arc.spread_degrees, "count": arc.count})
@@ -207,7 +208,7 @@ func _ensure_tuning_state(boss: String, id: String, preview_move: Resource = nul
 	var key := _move_key(boss, id)
 	if _drafts.has(key): return true
 	var source: Resource = _source_move(boss, id)
-	if source == null or not source.get("parameters") is Dictionary:
+	if not source is BossTechnique:
 		_tuning_status.text = "技の保存元を開けません: " + key
 		return false
 	var path := source.resource_path
@@ -258,7 +259,7 @@ func _refresh_tuning_selection() -> void:
 		workspace.hide_tuning()
 		return
 	_tuning_toggle.disabled = false
-	_tuning_title.text = TECHNIQUE_GRAPH.title_for(_selected_technique()) + "を調整"
+	_tuning_title.text = TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, _selected_technique()) + "を調整"
 	_rebuild_tuning_fields(key, move)
 	_update_tuning_status(key)
 
@@ -267,6 +268,11 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 		_tuning_fields.remove_child(child)
 		child.queue_free()
 	var draft: Dictionary = _drafts[key]
+	if move.technique == &"inhale" and is_instance_valid(preview_actor) and "lab_inhale_stars" in preview_actor:
+		# 実験場には吸い込むピカロがいないので、吐き出す彗星弾の数を確かめるための星の数を決める。保存しない。
+		_add_tuning_field("吸い込んだ星の数（試遊用）", float(preview_actor.lab_inhale_stars), Vector2(0.0, 200.0), 1.0,
+			"実験場で吸い込んだことにする星の数です。星1つにつき彗星弾の数が増え、弧ごとの弾数と全体の上限で止まります。保存しません。",
+			func(value: float): preview_actor.lab_inhale_stars = int(value))
 	for field in ["min", "max", "angle", "half_angle"]:
 		var condition: String = "condition_" + field
 		if not draft.has(condition): continue
@@ -276,9 +282,9 @@ func _rebuild_tuning_fields(key: String, move: Resource) -> void:
 	for field in TECHNIQUE_FIELDS.editable_keys(move):
 		if not draft.has(field): continue
 		var bounds: Vector2 = TECHNIQUE_FIELDS.bounds_for(move, field)
-		var step := 1.0 if move.parameters[field] is int else 0.01
-		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), float(draft[field]), bounds, step,
-			TECHNIQUE_FIELDS.tip_for(move, field), _change_tuning_value.bind(key, field))
+		var step := TECHNIQUE_FIELDS.step_for(move, field)
+		_add_tuning_field(TECHNIQUE_FIELDS.label_for(move, field, true), TECHNIQUE_FIELDS.to_display(field, float(draft[field]), move), bounds, step,
+			TECHNIQUE_FIELDS.tip_for(move, field), func(value: float): _change_tuning_value(TECHNIQUE_FIELDS.from_display(field, value, move), key, field))
 	if draft.has("arcs"):
 		var arcs: Array = draft.arcs
 		for index in arcs.size():
@@ -361,7 +367,7 @@ func _toggle_tuning_panel() -> void:
 
 func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
 	var copy: Resource = move.duplicate(true)
-	var values: Dictionary = copy.parameters.duplicate(true)
+	var values: Dictionary = copy.values().duplicate(true)
 	for field in draft:
 		if field.begins_with("condition_"): continue
 		if field == "arcs":
@@ -375,7 +381,7 @@ func _move_with_draft(move: Resource, draft: Dictionary) -> Resource:
 				arcs.append(arc)
 			values.arcs = arcs
 		else: values[field] = draft[field]
-	copy.parameters = values
+	copy.assign_values(values)
 	return copy
 
 func _apply_tuning_preview() -> void:
@@ -406,7 +412,7 @@ func _save_tuning() -> void:
 		_tuning_status.text = "発動の最小距離が最大距離を超えています。"
 		return
 	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	if move == null or not move.get("parameters") is Dictionary:
+	if not move is BossTechnique:
 		_tuning_status.text = "保存用の技の設定を開けません。"
 		return
 	var saved: Resource = _move_with_draft(move, _drafts[key])
@@ -450,7 +456,7 @@ func _revert_tuning() -> void:
 	if not _source_paths.has(key): return
 	var path: String = _source_paths[key]
 	var move: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	if move == null or not move.get("parameters") is Dictionary:
+	if not move is BossTechnique:
 		_tuning_status.text = "保存済みの技を読み直せません。"
 		return
 	var values := _capture_editable(move)
@@ -545,6 +551,7 @@ func _activate_boss(id: String, selected := "", preview_program := "") -> void:
 	_target_id = ""
 	_target_boss = false
 	preview_actor = null
+	if selected.is_empty(): _repeat_id = ""
 	var stage: int = {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(id, 1)
 	var settings := {"empty": true, "stage": stage, "ship_pos": [400, 0] if id == "hydra" else [500, 0],
 		"invincible": true, "director": {"enabled": false}}
@@ -670,7 +677,7 @@ func _populate_moves(selected := "") -> void:
 	for move in preview_actor.action_rules.techniques:
 		var id := String(move.technique)
 		var index := _move_picker.item_count
-		_move_picker.add_item(TECHNIQUE_GRAPH.title_for(id) + " · " + id)
+		_move_picker.add_item(TECHNIQUE_GRAPH.technique_title(preview_actor.action_rules if is_instance_valid(preview_actor) else null, id) + " · " + id)
 		_move_picker.set_item_metadata(index, id)
 		if id == selected:
 			_move_picker.select(index)
@@ -692,6 +699,8 @@ func _execute_selected() -> void:
 		_apply_tuning_preview()
 	if preview_actor.action_rules.combos.has(id):
 		await _activate_boss(_target_id, id, _current_program_path)
+		_repeat_id = id if is_instance_valid(preview_actor) else ""
+		_repeat_wait = REPEAT_GAP
 		return
 	# 手動実行に対応していないボスは、通常AIの試遊を続ける。
 	if _target_id != "hydra" and manual == null:
@@ -706,15 +715,49 @@ func _execute_selected() -> void:
 	if started:
 		session.playing = true
 		_manual_message.hide()
+		_repeat_id = id
+		_repeat_wait = REPEAT_GAP
 	else:
+		_repeat_id = ""
 		_manual_message.text = "実行できません: " + id if _target_id == "hydra" else manual.message
 		_manual_message.show()
+
+## 再生した技が終わったら、少し間を置いて同じ技を最初から撃ち直す。
+func _tick_repeat(delta: float) -> void:
+	if _repeat_id.is_empty() or not session.playing: return
+	if not _repeat_finished():
+		_repeat_wait = REPEAT_GAP
+		return
+	_repeat_wait -= delta
+	if _repeat_wait > 0.0: return
+	_repeat_wait = REPEAT_GAP
+	if preview_actor.action_rules.combos.has(_repeat_id):
+		var combo := _repeat_id
+		await _activate_boss(_target_id, combo, _current_program_path)
+		_repeat_id = combo if is_instance_valid(preview_actor) else ""
+		return
+	if _repeat_id == _selected_technique(): _apply_tuning_preview()
+	var started: bool = _execute_hydra(_repeat_id) if _target_id == "hydra" else manual != null and manual.execute(_repeat_id, _phase_picker.get_selected_id())
+	if not started:
+		_manual_message.text = "繰り返しを止めました: " + (_repeat_id if _target_id == "hydra" or manual == null else manual.message)
+		_manual_message.show()
+		_repeat_id = ""
+
+func _repeat_finished() -> bool:
+	if preview_actor.action_rules.combos.has(_repeat_id):
+		var adapter = preview_actor.flow_adapter
+		return preview_actor.flow_runner.index >= 1 and not preview_actor.attack_playing() and (adapter == null or not adapter.running())
+	if _target_id == "hydra":
+		return not preview_actor.busy and preview_actor.necks.all(func(n): return n.mode == &"idle")
+	return not preview_actor.attack_playing()
 
 func _execute_hydra(id: String) -> bool:
 	var actor = preview_actor
 	if not actor.has_body() or actor.action_rules == null: return false
 	actor.interrupt_tech()
-	actor._set_count(8)
+	# 再生のたびに全頭を生やし直すと、離脱した蛇の移動履歴と姿勢が途切れる。
+	if actor.count != 8 or actor.necks.any(func(neck): return not actor._alive(neck)):
+		actor._set_count(8)
 	actor._tech_cd = 0.0
 	actor.combo_wait = 0.0
 	actor.recovery_t = 0.0
@@ -726,9 +769,9 @@ func _execute_hydra(id: String) -> bool:
 	var started := false
 	if move.head_kind != &"":
 		var neck = actor._first(move.head_kind)
-		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id))
+		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(id), true)
 	else:
-		started = actor.try_start_tech(StringName(id), 1.0)
+		started = actor.try_start_tech(StringName(id), 1.0, [], true)
 	if started: actor.hsm.set_active(false)
 	return started
 
@@ -736,7 +779,8 @@ func _position_for_hydra(id: String) -> void:
 	var actor = preview_actor
 	var gate: Dictionary = actor.action_rules.conditions.get(id, {})
 	var distance := (float(gate.get("min", 0.0)) + minf(1400.0, float(gate.get("max", 600.0)))) * 0.5
-	var origin := Vector2.ZERO
+	# 離脱後の本体は泳いで移動する。再再生でも現在地を基準に自機を置く。
+	var origin: Vector2 = actor.table.pos[actor.body]
 	var move: Resource = actor._moves.get(StringName(id))
 	if move != null and move.head_kind != &"":
 		var neck = actor._first(move.head_kind)
@@ -753,6 +797,7 @@ func _position_for_hydra(id: String) -> void:
 	session.run.loadout.reset_loadout()
 
 func _return_to_ai() -> void:
+	_repeat_id = ""
 	_finish_manual()
 	if _target_id == "hydra" and is_instance_valid(preview_actor):
 		preview_actor.interrupt_tech()
@@ -785,6 +830,7 @@ func _process(delta: float) -> void:
 	super(delta)
 	if _target_id.is_empty() or not _target_boss or _switching or not is_instance_valid(preview_actor): return
 	if _target_id != "hydra" and manual == null: return
+	_tick_repeat(delta)
 	if manual != null:
 		var selected := String(_move_picker.get_selected_metadata()) if _move_picker.selected >= 0 else ""
 		var reason: String = "" if preview_actor.action_rules.combos.has(selected) else manual.unavailable(selected, _phase_picker.get_selected_id()) if not selected.is_empty() else "登録技なし"

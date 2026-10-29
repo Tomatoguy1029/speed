@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
-const VERSION := 3
+const VERSION := 4
 static var generation_count := 0
 
 static func validate(source: Dictionary) -> PackedStringArray:
@@ -11,6 +11,9 @@ static func validate(source: Dictionary) -> PackedStringArray:
 	if rules != null:
 		var ids := {}
 		for move in rules.techniques:
+			if not move is BossTechnique or move.make_runner() == null:
+				errors.append("技の実行スクリプトがありません")
+				continue
 			var id := String(move.technique)
 			if id.is_empty() or ids.has(id): errors.append("技IDの重複・欠損: " + id)
 			if not is_finite(float(move.post_gap)) or move.post_gap < 0.0: errors.append("技後の隙が不正: " + id)
@@ -115,13 +118,17 @@ static func build_boss(id: String, output: String) -> Dictionary:
 	return compile({"rules": rules, "flow": flow}, output)
 
 static func canonical(value: Variant) -> Variant:
+	if value is Script: return {"script": value.resource_path}
+	if value is PackedScene: return {"scene": value.resource_path, "hash": FileAccess.get_sha256(value.resource_path) if FileAccess.file_exists(value.resource_path) else ""}
 	if value is Resource:
 		var fields := {}
+		if value is BossTechnique: fields["implementation"] = value.get_script().resource_path
 		for property in value.get_property_list():
 			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["resource_name", "resource_local_to_scene", "script", "layout"]:
 				if property.name == "selection_bias" and value.get(property.name).is_empty(): continue
 				if property.name == "allow_parallel_attacks" and not value.get(property.name): continue
 				if property.name == "post_gap" and is_zero_approx(float(value.get(property.name))): continue
+				if property.name == "track_during_warn" and value.get(property.name): continue
 				if property.name == "condition_groups":
 					if not value.get(property.name).is_empty(): fields[property.name] = canonical(_runtime_groups(value.get(property.name)))
 				else: fields[property.name] = canonical(value.get(property.name))
@@ -143,7 +150,13 @@ static func compile(source: Dictionary, output: String) -> Dictionary:
 	var errors := validate(source)
 	if not errors.is_empty(): return {"error": ERR_INVALID_DATA, "errors": errors, "program": null, "generated": false}
 	var signature := var_to_str(canonical(source)).sha256_text()
-	if FileAccess.file_exists(output):
+	var reusable := FileAccess.file_exists(output)
+	if reusable:
+		for dependency in ResourceLoader.get_dependencies(output):
+			if not ResourceLoader.exists(dependency.split("::")[-1]):
+				reusable = false
+				break
+	if reusable:
 		var previous = ResourceLoader.load(output, "", ResourceLoader.CACHE_MODE_IGNORE)
 		if previous != null and previous.get_script() == PROGRAM and previous.version == VERSION and previous.signature == signature:
 			return {"error": OK, "program": previous, "generated": false}

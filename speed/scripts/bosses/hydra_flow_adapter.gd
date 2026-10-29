@@ -1,6 +1,5 @@
 extends RefCounted
 const RANGE := preload("res://scripts/bosses/flow/range_condition.gd")
-const NORMALS := preload("res://scripts/bosses/hydra_normals.gd")
 var actor: Node
 var active: Array = []
 var custom_run: RefCounted
@@ -70,9 +69,9 @@ func candidates(query: Dictionary) -> Dictionary:
 		else:
 			if not actor.attack_ready(id, query.get("children_only", false)): continue
 			var heads: Array = []
-			if id in [&"north", &"sequence"]: heads = actor.front_heads()
-			elif id in actor.COMBOS:
-				var kinds: Array = {&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[id]
+			if actor.tech_kind(id) in [&"north", &"sequence"]: heads = actor.front_heads()
+			elif actor.tech_kind(id) in actor.COMBOS:
+				var kinds: Array = {&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[actor.tech_kind(id)]
 				for first in actor.necks:
 					if not actor._alive(first) or first.mode != &"idle" or first.kind != kinds[0]: continue
 					for second in actor.necks:
@@ -81,7 +80,7 @@ func candidates(query: Dictionary) -> Dictionary:
 						result.append(_candidate(id, [first, second], "combo"))
 				continue
 			else: heads = actor.necks.filter(func(n): return actor._alive(n))
-			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if id in actor.COMBOS else "major"))
+			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if actor.tech_kind(id) in actor.COMBOS else "major"))
 	if not query.get("children_only", false) and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
 		for id in actor.action_rules.combos:
 			if not actor.action_rules.active_gates_for(String(id)).any(func(gate): return step_condition(gate)): continue
@@ -119,7 +118,7 @@ func _gate_ready(candidate: Dictionary, gate: Dictionary) -> bool:
 		snapshot.head = actor._head_pos(neck)
 		snapshot.base = actor._neck_base(neck)
 		snapshot.base_angle = neck.base_angle
-		snapshot.reach = NORMALS.reach(StringName(candidate.id), actor.move_params(StringName(candidate.id)))
+		snapshot.reach = actor.move_reach(StringName(candidate.id))
 	return RANGE.allows_snapshot(snapshot, actor.run_state.ship_pos)
 
 func _requirements(node: Dictionary) -> Dictionary:

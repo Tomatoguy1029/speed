@@ -230,7 +230,7 @@ func _draw_route_step() -> void:
 	var n: int = _route_play.n
 	var draw := run.draw
 	if n == 0:
-		if run.state.drawing or run.state.tracing or run.state.gauge < run.cfg.draw_min_charge:
+		if run.state.drawing or run.state.tracing or run.state.gauge_amount() < run.cfg.draw_min_charge:
 			_route_play = {}
 			return
 		var it := Intent.new()
@@ -583,6 +583,8 @@ func _edit_definition(args: Dictionary) -> void:
 			var field := key.trim_prefix("visual.")
 			t.r[i] *= def.visual_value(field, 1.0) / old.visual_value(field, 1.0)
 		t.def[i] = def
+		if key == "attack_weight":
+			t.attack_managed[i] = int(def.attack_weight > 0.0)
 
 func row_for_id(id: int) -> int:
 	var t := run.enemies.table

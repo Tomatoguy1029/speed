@@ -38,7 +38,7 @@
 |---|---|---|
 | フェーズ・雑魚の曲線・強敵の出現 | `data/stages/stage_*.tres` | `scripts/data_types/stage_def.gd`・`phase_def.gd`・`spawn_curve.gd`・`spawn_clip.gd`、[出現仕様](../spec.md#113-出現と補充) |
 | 群れの形と出現位置 | `data/formations/*.tscn` | `scripts/encounters/` の `EnemyFormation`・`FormationLayout`・`FormationMarker`・`FormationEntry`、[配置の構造](../architecture.md#81-定義データresource) |
-| 強敵の同時攻撃 | ステージの `phases[].attack_budget`・`enemy_attack_values`、クリップの `attack_priority`・`formation_values` | [攻撃の管理](../spec.md#117-敵の攻撃の形)、`scripts/encounters/attack_director.gd` |
+| 通常敵の同時攻撃 | ステージの `phases[].attack_budget`・`enemy_attack_values`、クリップの `attack_priority`・`formation_values` | [攻撃の管理](../spec.md#117-敵の攻撃の形)、`scripts/encounters/attack_director.gd` |
 | ステージ内の敵数値 | 対象ステージの `enemy_tuning` | `scripts/data_types/stage_enemy_tuning.gd` の許可項目と `scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md)を照合する。共通定義を保ってラン専用の値へ解決する |
 | 敵の共通基準と行動（基礎担当の依頼範囲） | `data/enemies/<type ID>.tres`、種類別の `scripts/enemies/` | `scripts/data_types/enemy_def.gd`、`scripts/runtime/systems/enemy_system.gd`、[敵一覧](../game/catalog/enemies.md) |
 | 成長とドロップ | ステージ固有の時間帯の `xp_bonus` 等。共通の `data/config.tres`・敵の報酬値は基礎担当の依頼範囲 | [成長](../spec.md#9-成長)・[ドロップ](../spec.md#10-ドロップと回収)、`scripts/runtime/systems/loadout_system.gd`・`pickup_system.gd` |
@@ -434,19 +434,19 @@ sequenceDiagram
 
 1. 対象ボスの仕様を読み、技ID、開始条件、予告・照準固定・攻撃・技後待ち、中断・形態移行時の扱いを整理する。既存技の順次・並列・待機・距離分岐で満たせる依頼は、コンボ編集の経路を使う。
 2. 新動作なら役者と技スクリプトに開始・更新・終了処理を実装する。海蛇では通常技と連携・大技の入口を分け、一角獣では `technique_ready()`・`start_attack()`・`attack_playing()` と技内の処理を追う。攻撃判定・演出・部位の解放まで確認する。
-3. 技の性能リソースを作り、`technique`・`category`・実行処理が読む `parameters` を揃える。ルールの `techniques` に参照を追加し、消費は `costs`、発動条件は `conditions` に設定する。技を追加しただけで区間の明示許可リストへ入るとは扱わず、使わせる区間の参照も確認する。
-4. 公開値を増やすときは、値の読み取り先・型・単位・有効範囲・日本語の項目名を揃える。`editor.gd` の性能欄は実在キーを列挙するため、単にDictionaryへ追加して表示できることと、意味が伝わる項目であることを分けて確認する。詳細説明はツールチップに置く。技の値は技へ、区間の選択方針は区間へ置く。
+3. 技の性能リソースを作り、`technique`・`category`・技スクリプトが公開する値を揃える。ルールの `techniques` に参照を追加し、消費は `costs`、発動条件は `conditions` に設定する。「＋ 技を追加」は未接続の技を作る。条件選択ノードへの接続と使わせる区間の参照を確認する。
+4. 公開値を増やすときは、値の読み取り先・型・単位・有効範囲・日本語の項目名を揃える。`scripts/bosses/<ボス>/techniques/<技ID>.gd` の `@export`・`@export_range`・`##` から編集欄を作る。詳細説明はツールチップに置く。技の値は技へ、区間の選択方針は区間へ置く。
 5. 新しい判定条件なら、条件データ・評価処理・編集欄・保存／読込・必要な範囲図を一緒に扱う。技名や数値を増やすだけで「プレイヤーが突進中」等の判定が追加されるとは説明しない。共通に使える判定とボス固有の判定を分ける。
 6. 候補取得・開始時の再検証・完了・失敗・取消を接続する。コンボから使う技は内部開始と実行票の扱いも確認する。候補を表示できるだけで対応完了としない。
 7. 攻撃形状を変えた場合は `range_preview.gd` と到達範囲の計算を確認する。図で表せる基準形状と、実際の移動・照準による範囲を区別し、単独試遊で技の挙動を確かめる。
-8. 新ボスは役者の `configure_flow()` と生成データの読込、ボス定義・シーン・登録、生成対象、エディターのボス選択、試遊シーンまで接続する。`single_actor_adapter.gd` は役者の所定メソッド群を要求するため、既存クラスへ付けるだけで汎用化済みとは扱わない。現行エディターのボス選択は海蛇・一角獣の列挙を持つ。
+8. 新ボスは役者の `configure_flow()` と生成データの読込、ボス定義・シーン・登録、生成対象、エディターのボス選択、試遊シーンまで接続する。`single_actor_adapter.gd` は役者の所定メソッド群を要求するため、既存クラスへ付けるだけで汎用化済みとは扱わない。現行エディターのボス選択は5体を対象とする。
 9. 保存後の再読込と明示的な生成を確認し、単独再生と区間全体の試遊を分けて検証する。実装変更に応じて候補なし、残量不足、開始失敗、中断、ループ、同時使用制約を確認する。テスト実行は依頼範囲に従い、実画面の操作確認と分けて報告する。対象のボス仕様と敵一覧も共通の運用ルールに従って更新する。
 
 編集のたびにランタイムデータを再生成する処理は追加しない。公開値は編集元を正とし、実行コードとTimelineが同じ値を読む。保存・生成・試遊の具体的な経路は[保存・生成・試遊・録画](#保存生成試遊録画)に従う。
 
 #### 編集元と適用範囲
 
-以下は `speed/` 内のパス。`<boss>` は `hydra`・`monoceros`・`draco`。
+以下は `speed/` 内のパス。`<boss>` は `hydra`・`monoceros`・`draco`・`centaurus`・`canis_major`。
 
 | データ | 保存する内容 | 実装の確認先 |
 |---|---|---|
@@ -517,7 +517,7 @@ Hydraの分離後は `_update_guard_approach()` が残量・区間上限・技�
 
 Hydraの `_configure_tech_timeline()` は技別の `warning_time`・`performance_time` と伸長時間等から内部Timelineのイベントを構成する。一角獣も `_begin_pass()` で `warn`・`active` からイベントを組む。性能リソースの数値とTimelineの時刻を別々の調整元として二重管理しない。ビーム等の技内追加予告・持続は個別の実行コードも追い、動作開始イベントと判定開始を区別する。
 
-条件選択を選ぶと、名前・単一分類・配下技のON/OFF・「技の接続先を変更」が編集できる。ON/OFFは接続状態を変える。`condition_groups` の名前・見た目は実行値ではなく、分類と所属技が実行候補に作用する。
+条件選択を選ぶと、名前・単一分類・配下技のON/OFFが編集できる。技の所属を移すときは、グラフ上で条件選択から技へ線を引き直す。ON/OFFは接続状態を変える。`condition_groups` の名前・見た目は実行値ではなく、分類と所属技が実行候補に作用する。
 
 「範囲図の戦闘状況」は表示専用の `preview_stamina`・`preview_heads`・`preview_separated`・`preview_radius`。編集値はカバー解析へ使うが、フロー・技設定へ保存しない。通常技の図は青が条件、橙が基準形状。カバー表示の橙点は未カバーの標本を表す。`range_preview.gd.analyze()` の角度64×半径16のサンプル検査であり、全連続空間の証明ではない。
 
@@ -559,7 +559,7 @@ Hydraは基準姿勢の首配置・生存本数・一部の参加条件と、通
 5. 通常の起動前生成とexportは `addons/content_build/builder.gd` からボスプログラムを生成する。`compile()` は版と意味的署名が同じなら再利用し、異なれば一時ファイル経由で置換する。図配置・条件選択の見た目と、接続・条件・技性能等の戦闘内容を分ける。`.content/` を直接修正して合わせない。
 6. 本番を起動し直し、同じ開始条件で録画し、時刻付きの感想と一緒に分析する。実験場の試遊は通常の録画母集団から分ける。画面確認だけで実行した全候補やスタミナ履歴を保存済みと見なさず、[計測の観測限界](../../.agents/skills/speed-balance-analysis/references/measurement.md#編成とボスの調整で観測できる範囲)を確認する。
 
-関連する自動検証の入口は `tests/boss_flow_select.gd`・`boss_flow_stamina.gd`・`boss_flow_range.gd`・`boss_flow_sections.gd`・`boss_flow_groups.gd`・`boss_flow_combo.gd`・`boss_flow_editor_workflow.gd`・`boss_flow_trial_run.gd`。実行は依頼範囲に従う。これらの読解・自動実行を、実ウィンドウで入力・選択・保存・試遊を操作した手動確認と表現しない。UIを未確認の場合は、その範囲を報告する。
+関連する自動検証の入口は `tests/boss_flow_select.gd`・`boss_flow_stamina.gd`・`boss_flow_range.gd`・`boss_flow_sections.gd`・`boss_flow_groups.gd`・`boss_flow_combo.gd`・`boss_flow_editor_workflow.gd`・`boss_flow_trial_run.gd`。変更リスクに応じて必要な既存検査を選ぶ。これらの読解・自動実行を、実ウィンドウで入力・選択・保存・試遊を操作した手動確認と表現しない。UIを未確認の場合は、その範囲を報告する。
 
 ## プレイ記録を読む
 
@@ -660,7 +660,7 @@ Godotの新規処理・変更処理は、着手時とレビュー時に[設計�
 ## 編集後に確認する
 
 - 依頼されたステージ・敵だけを編集する。全ステージ共通値の変更が必要なら、その影響も相談する。出現数を変える案と攻撃の重なりを変える案は、それぞれ対象を明示する。
-- 編成の種類とステージ/クリップの種類を照合し、タイムラインの警告、保存後のリソース読み込み、変更に応じた短い画面確認を行う。ゲームの自動テスト・長時間自動プレイは依頼時に実行する。
+- 編成の種類とステージ/クリップの種類を照合し、タイムラインの警告、保存後のリソース読み込み、変更に応じた短い画面確認を行う。関連する既存テストと自動プレイは[AGENTS.md](../../AGENTS.md#検証)のリスク基準で必要な範囲を選ぶ。
 - 素材・見た目・挙動の仮実装と、試遊による品質確認を分けて報告する。実験場の書き出しを本番へ反映する場合は[採用手順](../spec.md#201-敵ルート実験場)と、この資料の[共通値・ステージ差分の確認](#実験場共通デフォルトステージ上書き)を併せて使い、許可された編集先だけを変更する。
 - 文書を変えたら `python3 tools/check_docs.py` を実行する。敵・武器・特性の仕様を変えた作業では[一覧ルール](../game/catalog/rules.md)に沿って同じ作業で更新する。
 - 解析・合成・索引・資源取得の処理を変えたら、[実行時期の確認手順](#処理の実行時期を設計レビューする)で設計と実装を再照合する。

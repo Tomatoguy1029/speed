@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyMarkSettings" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/enemy_mark_settings.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+pixel_grid = 72
+inner_radius = 0.31
+outer_radius = 0.48
+noise_scale = 11.0
+motion_speed = 1.25
+intensity = 0.9
+color = Color(0.82, 0.68, 0.38, 1)
+highlight = Color(1, 0.96, 0.8, 1)

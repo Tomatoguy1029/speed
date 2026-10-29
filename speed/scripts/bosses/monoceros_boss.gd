@@ -29,6 +29,10 @@ var turn_motion := 0.0
 var attack_hit := false
 var previous_ship := Vector2.ZERO
 var previous_horn := PackedVector2Array()
+## 攻撃後の姿勢戻し。終わった姿勢で hold 秒止まり、return_speed で正面の姿勢へ戻ってから recover の隙に入る。
+var settle_at := -1.0
+var settle_hold := 0.0
+var settle_return := 0.0
 var _defeated := false
 var _presentation: Node
 var entrance_time := 0.0
@@ -40,11 +44,18 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var _move_kinds := {}
+var _runner: RefCounted
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 
 func configure_flow(program: Resource) -> void:
 	action_rules = program.data.rules
 	_moves.clear()
-	for move in action_rules.techniques: _moves[move.technique] = move
+	_move_kinds.clear()
+	for move in action_rules.techniques:
+		_moves[move.technique] = move
+		_move_kinds[move.technique] = move.make_runner().kind()
+	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
@@ -150,7 +161,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		phase_time -= dt
 		if phase_time <= 0.0: mode = &"idle"
 	elif mode in [&"windup", &"active"]:
-		if mode == &"windup" and not locked: _aim(dt)
+		if mode == &"windup" and not locked and _tracks_during_warn(): _aim(dt)
 		var prior_mode := mode
 		var prior_horn := horn_points()
 		# 発進したフレームでは移動を次の固定更新まで待つ。
@@ -171,13 +182,14 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 			if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
 	previous_ship = run_state.ship_pos
+	_sync_technique_visuals(dt)
 	presentation_advanced.emit(dt)
 
 func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
 
 func rule() -> Dictionary:
-	return _moves[technique].parameters if _moves.has(technique) else {}
+	return _moves[technique].values() if _moves.has(technique) else {}
 
 func technique_ready(attack: StringName, gate: Dictionary) -> bool:
 	return technique_rejection(attack, gate).is_empty()
@@ -194,24 +206,24 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	if distance > float(gate.get("max", INF)): return "distance_above_max"
 	if distance > _reach(attack): return "out_of_reach"
 	if not _gate_allows(gate): return "direction_or_range_gate"
-	if attack != &"kick":
-		var r: Dictionary = _moves[attack].parameters
+	if tech_kind(attack) != &"kick":
+		var r: Dictionary = _moves[attack].values()
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
 		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
-	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) > _reach(attack): return "predicted_target_out_of_reach"
+	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) > _reach(attack): return "predicted_target_out_of_reach"
 	return ""
 
 func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
 
 func _reach(attack: StringName) -> float:
-	var r: Dictionary = _moves[&"charge" if attack == &"combo" else attack].parameters
+	var r: Dictionary = _moves[&"charge" if tech_kind(attack) == &"combo" else attack].values()
 	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 
 func _close_ready(attack: StringName) -> bool:
 	if not _moves.has(attack): return false
 	var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].parameters.warn))) <= _reach(attack)
+	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) <= _reach(attack)
 
 func selection_blocked() -> bool:
 	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
@@ -234,184 +246,66 @@ func start_attack(attack: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(attack):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
 		return false
-	var r: Dictionary = _moves[attack].parameters
-	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, float(r.warn) + float(r.active)):
+	var r: Dictionary = _moves[attack].values()
+	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, _attack_length(attack)):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
 	combat_trace.begin(attack, combat_origin)
-	technique = &"charge" if attack == &"combo" else attack
+	technique = &"charge" if tech_kind(attack) == &"combo" else attack
 	cooldowns[attack] = clock + float(r.cd)
-	combo_pending = attack == &"combo"
-	passes_left = int(def.params.return_passes) if attack == &"return_charge" else 1
+	combo_pending = tech_kind(attack) == &"combo"
+	passes_left = int(def.params.return_passes) if tech_kind(attack) == &"return_charge" else 1
 	_begin_pass()
 	return true
+
+## 攻撃予算に申告する長さ。コンボは中の突進・切り返し・薙ぎの予告と実行の合計。
+func _attack_length(attack: StringName) -> float:
+	if tech_kind(attack) == &"combo":
+		var charge: Dictionary = _moves[&"charge"].values()
+		var sweep: Dictionary = _moves[&"sweep"].values() if _moves.has(&"sweep") else {}
+		return float(charge.warn) + float(charge.active) + float(def.params.combo_gap) + float(sweep.get("warn", 0.0)) + float(sweep.get("active", 0.0))
+	var r: Dictionary = _moves[attack].values()
+	return float(r.warn) + float(r.active)
 
 func attack_playing() -> bool:
 	return mode != &"idle"
 
 func _begin_pass() -> void:
-	mode = &"windup"
-	locked = false
-	attack_hit = false
-	table.vel[body] = Vector2.ZERO
-	aim_point = _strike_aim()
-	direction = Vector2.from_angle(table.facing[body] + (PI if technique == &"kick" else 0.0))
-	var r := rule()
-	var anim := timeline.get_animation(&"attack")
-	anim.length = float(r.warn) + float(r.active)
-	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(def.params.lock_lead)), {"method": &"lock_aim", "args": []})
-	anim.track_insert_key(0, float(r.warn), {"method": &"launch_strike", "args": []})
-	anim.track_insert_key(0, anim.length, {"method": &"end_strike", "args": []})
-	timeline.play(&"attack")
-	timeline.advance(0.0)
-	_cue(&"telegraph")
+	_runner = _moves[technique].make_runner()
+	_runner._begin_pass(self)
+
+func _tracks_during_warn() -> bool:
+	return not _moves.has(technique) or _moves[technique].track_during_warn
 
 func _aim(dt: float) -> void:
-	aim_point = _strike_aim()
-	if technique == &"kick":
-		direction = (aim_point - table.pos[body]).normalized()
-		return
-	var wanted := (aim_point - table.pos[body]).angle()
-	var prior := table.facing[body]
-	table.facing[body] = rotate_toward(prior, wanted, def.turn * dt)
-	turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
-	direction = Vector2.from_angle(table.facing[body])
+	_runner_for()._aim(self, dt)
 
 func _strike_aim(attack: StringName = &"", lead := -1.0) -> Vector2:
-	# ボス固有の捕捉。選択時・予告中だけ現在位置と速度から接触時点を狙う。
-	if attack == &"": attack = technique
-	if attack == &"combo": attack = &"charge"
-	var velocity := run_state.ship_vel
-	var target := run_state.ship_pos + velocity * (float(def.params.lock_lead) if lead < 0.0 else lead)
-	if attack not in [&"charge", &"return_charge", &"lance"]: return target
-	var r: Dictionary = _moves[attack].parameters
-	var speed := float(r.distance) / float(r.active)
-	var reach := float(r.get("reach", horn_length()))
-	var offset := target - table.pos[body]
-	var a := velocity.length_squared() - speed * speed
-	var b := 2.0 * (offset.dot(velocity) - reach * speed)
-	var c := offset.length_squared() - reach * reach
-	var contact := 0.0
-	if c > 0.0:
-		contact = float(r.active)
-		if absf(a) < 0.001:
-			if b < -0.001: contact = -c / b
-		else:
-			var discriminant := b * b - 4.0 * a * c
-			if discriminant >= 0.0:
-				for root in [(-b - sqrt(discriminant)) / (2.0 * a), (-b + sqrt(discriminant)) / (2.0 * a)]:
-					if root >= 0.0: contact = minf(contact, root)
-	return target + velocity * clampf(contact, 0.0, float(r.active))
+	return _runner_for()._strike_aim(self, attack, lead)
 
 func lock_aim() -> void:
-	if mode != &"windup" or locked: return
-	# 固定後は再捕捉せず、予告で見せた方向へ発進する。
-	# 蹴りは背後への攻撃なので本体の向きを保つ。
-	if technique != &"kick" and not aim_point.is_equal_approx(table.pos[body]):
-		table.facing[body] = (aim_point - table.pos[body]).angle()
-	locked = true
-	direction = (aim_point - table.pos[body]).normalized() if technique == &"kick" else Vector2.from_angle(table.facing[body])
-	_cue(&"aim_locked")
+	_runner_for().lock_aim(self)
 
 func launch_strike() -> void:
-	if mode != &"windup": return
-	lock_aim()
-	if table.pos[body].distance_to(aim_point) > _reach(technique) or (technique == &"kick" and absf(Geom.angle_diff(direction.angle(), table.facing[body] + PI)) > float(def.params.kick_trigger_arc)):
-		combat_trace.finish("interrupted", "target_left_launch_range")
-		# 予告中に届かない位置へ離れた自機へ、空の近接攻撃を出し続けない。
-		timeline.stop()
-		combo_pending = false
-		passes_left = 0
-		mode = &"recovery"
-		recovery = float(rule().recover)
-		_cue(&"recovery_started")
-		return
-	if technique in [&"charge", &"return_charge", &"lance"] and _path_blocked():
-		combat_trace.finish("interrupted", "path_obstructed")
-		combo_pending = false
-		passes_left = 0
-		timeline.stop()
-		mode = &"idle"
-		technique = &""
-		reposition = float(def.params.reposition_time)
-		var toward := (aim_point - table.pos[body]).normalized()
-		var side := toward.orthogonal()
-		var a := ctx.field.body_gap(table.pos[body] + side * 220.0, table.r[body])
-		var b := ctx.field.body_gap(table.pos[body] - side * 220.0, table.r[body])
-		reposition_direction = side if a >= b else -side
-		_cue(&"reposition")
-		return
-	mode = &"active"
-	previous_horn = horn_points()
-	_cue(&"attack_started")
+	_runner_for().launch_strike(self)
 
 func _path_blocked() -> bool:
-	var at := table.pos[body]
-	var distance := maxf(float(def.params.near_clearance), minf(at.distance_to(aim_point), float(rule().distance)))
-	# 狙いまでを確認する。かわされた先までの全突進経路は調べない。
-	return ctx.field.first_body_hit(at, at + direction * distance, table.r[body]) != null
+	return _runner_for()._path_blocked(self)
 
 func _tick_strike(dt: float, prior: PackedVector2Array) -> void:
-	if technique in [&"charge", &"return_charge", &"lance"]:
-		var step := direction * float(rule().distance) / float(rule().active) * dt
-		var from := table.pos[body]
-		var to := from + step
-		var horn_from := from + direction * horn_length()
-		var hit = ctx.field.first_body_hit(horn_from, horn_from + step, float(def.params.horn_width) * 0.5) if technique != &"lance" else null
-		var body_hit = ctx.field.first_body_hit(from, to, table.r[body])
-		if hit != null and hit.body != null and hit.body.is_planet and (body_hit == null or float(hit.t) <= float(body_hit.t)):
-			table.pos[body] = from.lerp(to, hit.t)
-			_damage_shape(prior, horn_points())
-			stuck_body = hit.body
-			stuck_offset = table.pos[body] - stuck_body.pos
-			stuck_time = float(def.params.stuck_time)
-			combat_trace.finish("interrupted", "horn_stuck_in_planet")
-			mode = &"stuck"
-			combo_pending = false
-			passes_left = 0
-			table.vel[body] = Vector2.ZERO
-			timeline.stop()
-			_cue(&"horn_stuck")
-			return
-		if body_hit != null:
-			combat_trace.stage("interruption", {"reason": "body_obstacle"})
-			table.pos[body] = from.lerp(to, body_hit.t)
-			_damage_shape(prior, horn_points())
-			combo_pending = false
-			passes_left = 0
-			end_strike()
-			return
-		table.pos[body] = to
-		table.vel[body] = step / dt
-	if technique == &"sweep":
-		# 頭の角度を小さく刻み、フレーム間の扇形も掃引する。
-		var start := maxf(0.0, timeline.current_animation_position - float(rule().warn))
-		var steps := maxi(1, ceili(dt / 0.008))
-		for j in steps:
-			var f := clampf((start + dt * float(j + 1) / steps) / float(rule().active), 0.0, 1.0)
-			var next := horn_points(f)
-			_damage_shape(prior, next)
-			prior = next
-	else:
-		_damage_shape(prior, horn_points())
+	_runner_for()._tick_strike(self, dt, prior)
 
 func end_strike() -> void:
-	if mode != &"active": return
-	timeline.stop()
-	table.vel[body] = Vector2.ZERO
-	previous_horn.clear()
-	passes_left -= 1
-	if technique == &"return_charge" and passes_left > 0:
-		mode = &"turnaround"
-		recovery = float(def.params.turnaround_time)
-	elif combo_pending:
-		mode = &"recovery"
-		recovery = float(def.params.combo_gap)
-	else:
-		mode = &"recovery"
-		recovery = float(rule().recover)
-	_cue(&"recovery_started")
+	_runner_for().end_strike(self)
+
+func _begin_settle() -> float:
+	return _runner_for()._begin_settle(self)
+
+func settle_progress() -> float:
+	if mode != &"recovery" or settle_at < 0.0: return 1.0
+	var elapsed := clock - settle_at - settle_hold
+	if elapsed < 0.0: return 0.0
+	return clampf(elapsed / settle_return, 0.0, 1.0) if settle_return > 0.0 else 1.0
 
 func _reposition_tick(dt: float) -> void:
 	if reposition > 0.0:
@@ -422,31 +316,21 @@ func _reposition_tick(dt: float) -> void:
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
 	else:
 		var toward := run_state.ship_pos - table.pos[body]
-		var pursuit := toward
-		var lead_close := false
-		if _moves.has(&"sweep") and not _close_ready(&"kick") and toward.length() < float(action_rules.conditions.get("charge", {}).get("min", 300.0)):
-			var forecast := _strike_aim(&"sweep", float(_moves[&"sweep"].parameters.warn)) - table.pos[body]
-			if forecast.length() > _reach(&"sweep") - 10.0:
-				pursuit = forecast
-				lead_close = true
 		var prior := table.facing[body]
 		if not _close_ready(&"kick"):
-			table.facing[body] = rotate_toward(prior, pursuit.angle(), def.turn * dt)
+			table.facing[body] = rotate_toward(prior, toward.angle(), def.turn * dt)
 		turn_motion = Geom.angle_diff(table.facing[body], prior) / maxf(dt, 0.001)
-		var closing := toward.length() > float(def.params.approach_range) or lead_close
+		var keep := float(def.params.approach_range)
+		var closing := toward.length() > keep
 		if not closing and _moves.has(&"charge"):
-			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].parameters.warn))) > _reach(&"charge")
+			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].values().warn))) > _reach(&"charge")
 		if closing:
-			# 近接では現在の距離を保ちながら予告終了時の位置へ回り込み、それ以外は接近する。
-			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(pursuit.normalized()))
-			var step := Vector2.from_angle(table.facing[body]) * float(def.params.approach_speed) * alignment * dt
-			if lead_close:
-				var next_offset := table.pos[body] + step - run_state.ship_pos
-				var clearance := minf(toward.length(), float(def.params.approach_range))
-				if next_offset.length() < clearance:
-					var radial := next_offset.normalized() if next_offset.length() > 0.001 else -toward.normalized()
-					step = run_state.ship_pos + radial * clearance - table.pos[body]
-			_move_body(step)
+			# approach_range の距離まで寄って止まり、その内側では向きだけを合わせる。
+			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))
+			var travel := float(def.params.approach_speed) * alignment * dt
+			if toward.length() > keep:
+				travel = minf(travel, toward.length() - keep)
+			_move_body(Vector2.from_angle(table.facing[body]) * travel)
 		else:
 			table.vel[body] = Vector2.ZERO
 
@@ -461,50 +345,16 @@ func horn_length() -> float:
 
 ## 判定と表示が共有する角／蹄の線分。ワールド座標。
 func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:
-	var at := table.pos[body]
-	var angle := table.facing[body]
-	var reach := horn_length()
-	var root := table.r[body] * 0.65
-	if technique == &"kick":
-		angle = direction.angle()
-		reach = float(rule().reach)
-	elif technique == &"lance":
-		reach = float(rule().reach)
-	elif technique == &"sweep":
-		var f := sweep_fraction
-		if f < 0.0: f = clampf((timeline.current_animation_position - float(rule().warn)) / float(rule().active), 0.0, 1.0)
-		angle += lerpf(-float(rule().arc), float(rule().arc), f)
-	var dir := Vector2.from_angle(angle)
-	return PackedVector2Array([at + dir * root, at + dir * reach])
+	return _runner_for().horn_points(self, sweep_fraction)
 
-## 予告の細線は、移動後の角先までの直線を共有する。
 func warning_points() -> PackedVector2Array:
-	var points := horn_points()
-	if technique in [&"charge", &"return_charge", &"lance"]:
-		points[1] += direction * float(rule().distance)
-	return points
+	return _runner_for().warning_points(self)
 
 func _damage_shape(prior: PackedVector2Array, points: PackedVector2Array) -> void:
-	if attack_hit or mode != &"active": return
-	combat_trace.evaluate()
-	var radius := float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
-	var paths: Array[PackedVector2Array] = [points, prior]
-	if prior.size() == 2:
-		paths.append(PackedVector2Array([prior[0], points[0]]))
-		paths.append(PackedVector2Array([prior[1], points[1]]))
-		if Geometry2D.is_point_in_polygon(run_state.ship_pos, PackedVector2Array([prior[0], prior[1], points[1], points[0]])):
-			_hit_ship()
-	for line in paths:
-		if line.size() != 2: continue
-		if Geometry2D.segment_intersects_segment(previous_ship, run_state.ship_pos, line[0], line[1]) != null:
-			_hit_ship()
-		for pair in [[previous_ship,line[0],line[1]],[run_state.ship_pos,line[0],line[1]],[line[0],previous_ship,run_state.ship_pos],[line[1],previous_ship,run_state.ship_pos]]:
-			if Geometry2D.get_closest_point_to_segment(pair[0], pair[1], pair[2]).distance_squared_to(pair[0]) <= radius * radius: _hit_ship()
+	_runner_for()._damage_shape(self, prior, points)
 
 func _hit_ship() -> void:
-	if attack_hit: return
-	combat_trace.damage(float(rule().damage) * ctx.cfg.atk_scale, 0.0, &"horn", &"monoceros")
-	attack_hit = true
+	_runner_for()._hit_ship(self)
 
 func _cue(cue: StringName) -> void:
 	match cue:
@@ -513,6 +363,7 @@ func _cue(cue: StringName) -> void:
 		&"attack_started": combat_trace.stage("execute")
 		&"recovery_started": combat_trace.stage("recovery")
 		&"phase_changed": combat_trace.event("boss_phase", {"reason": "hp_threshold"})
+	technique_visuals.event({"cue": cue, "technique": technique})
 	presentation_event.emit({"cue": cue, "technique": technique, "phase": phase, "mode": mode,
 		"position": table.pos[body], "angle": table.facing[body], "world_time": clock})
 
@@ -538,3 +389,17 @@ func cancel_attack() -> void:
 
 func _exit_tree() -> void:
 	if flow_adapter != null: flow_adapter.cancel()
+
+func _runner_for() -> RefCounted:
+	if _runner != null: return _runner
+	return preload("res://scripts/bosses/monoceros/technique_runner.gd").new()
+
+func _sync_technique_visuals(dt: float) -> void:
+	for node: Node2D in technique_visuals.nodes.values():
+		if node.has_method("advance"): node.advance(dt)
+	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
+	var elapsed := clock - settle_at if mode == &"recovery" else (timeline.current_animation_position if timeline.is_playing() else 0.0) - (float(rule().get("warn", 0.0)) if mode == &"active" else 0.0)
+	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
+
+func tech_kind(id: StringName) -> StringName:
+	return _move_kinds.get(id, id)

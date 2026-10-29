@@ -17,9 +17,9 @@ func exercise() -> void:
 	runner.tick(0.1, {"player": Vector2(120, 0)}, adapter)
 	runner.tick(0.2, {"player": Vector2(120, 0)}, adapter)
 	assert(adapter.started.size() == 2)
-	var move = load("res://scripts/data_types/boss_technique.gd").new()
+	var move = load("res://data/bosses/monoceros_moves/charge.tres").duplicate(true)
 	move.technique = &"strike"
-	move.parameters = {"damage": 12.0}
+	move.set_field("damage", 12.0)
 	var rules = load("res://scripts/data_types/boss_action_rules.gd").new()
 	rules.techniques.append(move)
 	DirAccess.make_dir_recursive_absolute("res://.content/tests")
@@ -35,7 +35,7 @@ func exercise() -> void:
 	assert(editor.open_boss("res://data/bosses/ai/hydra_action_rules.tres", "res://data/bosses/ai/hydra_flow.tres") == ERR_BUSY, "switching bosses cannot discard unsaved edits")
 	assert(editor.save_current() == OK)
 	var saved = ResourceLoader.load("res://.content/tests/single_action_rules.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
-	assert(saved.techniques[0].parameters.damage == 15.0)
+	assert(saved.techniques[0].damage == 15.0)
 	editor._edit_coverage()
 	editor.preview_stamina = -1.0
 	editor._analyze_coverage()

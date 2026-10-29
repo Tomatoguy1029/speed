@@ -58,6 +58,10 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var technique_pose := {}
+var _support_runners := {}
+var _runner: RefCounted
+var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 ## 今の形態の技の性能。技のID → 性能
 var _rules := {}
 
@@ -66,6 +70,7 @@ func configure_flow(program: Resource) -> void:
 	_moves.clear()
 	for move in action_rules.techniques: _moves[move.technique] = move
 	_apply_phase()
+	technique_visuals.configure(self, _moves)
 	flow_runner.configure(program.data.flow)
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
@@ -154,7 +159,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	elif mode in [&"windup", &"active"]:
 		if mode == &"windup":
 			table.vel[body] = Vector2.ZERO
-			if not locked: _aim(dt)
+			if not locked and (not _moves.has(technique) or _moves[technique].track_during_warn): _aim(dt)
 		if mode == &"active": _active_tick(dt)
 		if timeline.is_playing(): timeline.advance(dt)
 	else:
@@ -171,6 +176,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_ring_tick()
 	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" else 0.0
 	_previous_ship = run_state.ship_pos
+	_sync_technique_visuals()
 	presentation_advanced.emit(dt)
 
 func rule() -> Dictionary:
@@ -184,7 +190,7 @@ func chase_speed() -> float:
 func _apply_phase() -> void:
 	_rules.clear()
 	for id in _moves:
-		var base: Dictionary = _moves[id].parameters
+		var base: Dictionary = _moves[id].values()
 		var values := {}
 		for key: String in base:
 			if not key.ends_with("_p2"): values[key] = base[key]
@@ -238,6 +244,8 @@ func start_attack(attack: StringName) -> bool:
 	var length := _attack_length(attack, r)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, length): return false
 	technique = attack
+	_runner = _moves[attack].make_runner()
+	_support_runners[attack] = _runner
 	used_at[attack] = clock
 	_begin_windup(r, length)
 	return true
@@ -256,137 +264,42 @@ func cancel_attack() -> void:
 # ── 技 ────────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
-	if attack == &"command": return float(r.warn) + float(r.lunge_time) + 0.05
-	if attack == &"sirius": return float(r.warn) + float(r.beam_time) + 0.05
-	if attack == &"howl": return float(r.warn) + 0.05
+	if _moves[attack].has_field("lunge_time"): return float(r.warn) + float(r.lunge_time) + 0.05
+	if _moves[attack].has_field("beam_time"): return float(r.warn) + float(r.beam_time) + 0.05
+	if _moves[attack].has_field("ring_count"): return float(r.warn) + 0.05
 	return float(r.warn) + float(r.active) + 0.05
 
 func _begin_windup(r: Dictionary, length: float) -> void:
-	mode = &"windup"
-	locked = false
-	attack_hit = false
-	table.vel[body] = Vector2.ZERO
-	aim_point = run_state.enemy_aim
-	var anim := timeline.get_animation(&"attack")
-	anim.length = length
-	while anim.track_get_key_count(0) > 0: anim.track_remove_key(0, 0)
-	if technique in [&"pounce", &"sirius"]:
-		anim.track_insert_key(0, maxf(0.01, float(r.warn) - float(r.lock)), {"method": &"lock_aim", "args": []})
-	anim.track_insert_key(0, float(r.warn), {"method": &"launch", "args": []})
-	anim.track_insert_key(0, length, {"method": &"end_attack", "args": []})
-	timeline.play(&"attack")
-	timeline.advance(0.0)
-	_cue(&"telegraph")
+	_runner_for()._begin_windup(self, r, length)
 
-## 構えの間は共通の遅延照準を追い、飛びかかりの着地点を決める。
 func _aim(dt: float) -> void:
-	aim_point = run_state.enemy_aim
-	_face(aim_point, def.turn, dt)
+	_runner_for()._aim(self, dt)
 
-## 飛びかかりは着地点を、シリウスの光は向きを固定する。
 func lock_aim() -> void:
-	if mode != &"windup": return
-	locked = true
-	if technique == &"sirius":
-		direction = Vector2.from_angle(table.facing[body])
-	else:
-		var to := aim_point - table.pos[body]
-		direction = to.normalized() if to.length_squared() > 1.0 else Vector2.from_angle(table.facing[body])
-		aim_point += direction * float(rule().overshoot)
-	_cue(&"aim_locked")
+	_runner_for().lock_aim(self)
 
-## 口元。シリウスの光はここから出る。
 func mouth() -> Vector2:
 	return table.pos[body] + Vector2.from_angle(table.facing[body]) * table.r[body] * MOUTH_REACH
 
 ## 飛びかかりは固定した着地点へ跳ぶ。号令は率いている猟犬を一斉に機体の方へ、最初から全速で飛び出させる。
 func launch() -> void:
-	if mode != &"windup": return
-	mode = &"active"
-	attack_hit = false
-	if technique == &"pounce":
-		if not locked: lock_aim()
-		_cue(&"pounce")
-		return
-	if technique == &"sirius":
-		_fire_sirius()
-		return
-	if technique == &"howl":
-		_form_ring(rule())
-		return
-	var r := rule()
-	var hounds = _hounds()
-	_cue(&"command")
-	if hounds == null: return
-	lunging = PackedInt32Array(Array(led).filter(func(i): return not ring.has(i)))
-	var until := run_state.world_time + float(r.lunge_time)
-	for i in lunging:
-		var speed_scale := float(r.lunge_speed) / maxf(table.speed[i], 1.0)
-		var toward := (run_state.ship_pos - table.pos[i]).normalized()
-		hounds.follow(i, table.pos[i] + toward * float(r.lunge_speed) * (float(r.lunge_time) + 0.2), until, speed_scale)
-		# 加速を待たず、最初から全速で飛び出す。
-		table.vel[i] = toward * float(r.lunge_speed)
+	_runner_for().launch(self)
 
-## 固定した向きへ光を出す。光は猟犬などの敵をすり抜け、惑星・月で止まる。ボスが倒れると消える。
 func _fire_sirius() -> void:
-	if not locked: lock_aim()
-	var r := rule()
-	var from := mouth()
-	var length := float(r.beam_length)
-	var hit = ctx.field.first_body_hit(from, from + direction * length, float(r.beam_width) * 0.5)
-	if hit != null: length *= float(hit.t)
-	var beam := ctx.projectiles.fire_beam(from, direction.angle(), length, float(r.beam_width), 0.0, float(r.beam_time),
-		float(r.damage) * ctx.cfg.atk_scale, SIRIUS_COLOR)
-	if beam >= 0:
-		ctx.projectiles.hazard_style[beam] = ProjectileSystem.HazardStyle.TELESCOPE
-		ctx.projectiles.attach_hazard(beam, body)
-	_cue(&"sirius")
+	_runner_id(&"sirius")._fire_sirius(self)
 
 func _active_tick(dt: float) -> void:
-	var r := rule()
-	if technique == &"pounce":
-		# 着地の時刻までに、残りの距離を等速で詰める。
-		var from := table.pos[body]
-		var left := float(r.warn) + float(r.active) - timeline.current_animation_position
-		_move_body((aim_point - from) * clampf(dt / maxf(left, dt), 0.0, 1.0), dt)
-		table.facing[body] = direction.angle()
-		if not attack_hit and _ship_touches(from, table.pos[body], table.r[body]):
-			_hit_ship(float(r.damage))
-		return
-	if technique in [&"sirius", &"howl"]:
-		table.vel[body] = Vector2.ZERO
-		return
-	# 号令：飛び出した猟犬に触れたら1回だけ当たる。
-	if attack_hit: return
-	for i in lunging:
-		if not _alive_hound(i): continue
-		if _ship_touches(table.pos[i], table.pos[i], table.r[i]):
-			_hit_ship(float(r.damage))
-			return
+	_runner_for()._active_tick(self, dt)
 
 func end_attack() -> void:
-	if mode not in [&"windup", &"active"]: return
-	timeline.stop()
-	locked = false
-	lunging.clear()
-	table.vel[body] = Vector2.ZERO
-	mode = &"recovery"
-	recovery = float(rule().recover)
-	_cue(&"recovery_started")
+	_runner_for().end_attack(self)
 
 func _ship_touches(from: Vector2, to: Vector2, radius: float) -> bool:
-	var reach := radius + ctx.cfg.ship_radius
-	var ship := run_state.ship_pos
-	return Geometry2D.get_closest_point_to_segment(ship, from, to).distance_to(ship) <= reach \
-		or Geometry2D.get_closest_point_to_segment(to, _previous_ship, ship).distance_to(to) <= reach
+	return _runner_for()._ship_touches(self, from, to, radius)
 
 func _hit_ship(damage: float) -> void:
-	attack_hit = true
-	ctx.ship.damage(damage * ctx.cfg.atk_scale, 0.0, technique, &"canis_major")
+	_runner_for()._hit_ship(self, damage)
 
-# ── 追跡と群れ ────────────────────────────────────────────
-
-## 群れの先頭で、共通の遅延照準を追う。
 func _chase_tick(dt: float) -> void:
 	var aim := run_state.enemy_aim
 	_face(aim, def.turn, dt)
@@ -504,78 +417,17 @@ func _set_max_hp(i: int, value: float) -> void:
 ## 機体のまわりの輪に猟犬を並べる。輪の位置は ring_count に薄い所の分を足して等分し、
 ## gaps か所で gap_slots 個ずつ空ける。群れの猟犬を近い位置から先に使い、足りない分を summon_max まで輪の外へ呼ぶ。
 func _form_ring(r: Dictionary) -> void:
-	var hounds = _hounds()
-	var hound := ctx.enemies.def_of(&"hound")
-	_end_ring()
-	_cue(&"howl")
-	ring_rule = r
-	ring_center = run_state.ship_pos
-	ring_started = clock
-	var gaps := maxi(0, int(r.gaps))
-	var gap_slots := maxi(0, int(r.gap_slots))
-	var total := int(r.ring_count) + gaps * gap_slots
-	if total <= 0: return
-	var rng: RandomNumberGenerator = run_state.rng
-	var offset := rng.randf() * TAU
-	var empty := {}
-	for g in gaps:
-		var start := int(float(g) * total / gaps)
-		for k in gap_slots: empty[(start + k) % total] = true
-	var angles: Array[float] = []
-	for slot in total:
-		if not empty.has(slot): angles.append(offset + TAU * slot / total)
-	var pool: Array = []
-	if hounds != null:
-		for i in led:
-			if _alive_hound(i) and not lunging.has(i): pool.append(i)
-	var summoned := 0
-	for angle in angles:
-		var best := -1
-		var best_gap := INF
-		for i: int in pool:
-			var gap := absf(Geom.angle_diff((table.pos[i] - ring_center).angle(), angle))
-			if gap < best_gap:
-				best_gap = gap
-				best = i
-		if best >= 0:
-			pool.erase(best)
-			ring[best] = [table.id[best], angle]
-		elif hound != null and summoned < int(r.summon_max):
-			var at := ring_center + Vector2.from_angle(angle) * (float(r.ring_radius) + float(r.spawn_out))
-			var row := ctx.enemies.spawn(hound, at, {"hound_pack": -body_id, "facing": angle + PI})
-			if row >= 0:
-				ring[row] = [table.id[row], angle]
-				summoned += 1
+	_runner_id(&"howl")._form_ring(self, r)
 
-## 猟犬を gather_time かけて半径 ring_radius の輪へ並べ、そこから close_time かけて ring_close まで狭める。
-## 狭め終えると囲みを解き、群れの猟犬は隊形へ、呼んだ猟犬は通常の追跡へ戻る。
 func _ring_tick() -> void:
-	if ring_started < 0.0: return
-	var r := ring_rule
-	var hounds = _hounds()
-	if clock - ring_started >= float(r.gather_time) + float(r.close_time) or hounds == null:
-		_end_ring()
-		return
-	var radius := ring_radius()
-	var until := run_state.world_time + FOLLOW_HOLD
-	for i: int in ring.keys():
-		var entry: Array = ring[i]
-		if table.alive[i] == 0 or table.dead[i] != 0 or table.id[i] != entry[0]:
-			ring.erase(i)
-			continue
-		hounds.follow(i, ring_center + Vector2.from_angle(float(entry[1])) * radius, until, float(r.catch_up))
+	_runner_id(&"howl")._ring_tick(self)
 
-## 今の囲みの半径。囲んでいなければ -1。
 func ring_radius() -> float:
-	if ring_started < 0.0: return -1.0
-	var progress := clampf((clock - ring_started - float(ring_rule.gather_time)) / maxf(float(ring_rule.close_time), 0.001), 0.0, 1.0)
-	return lerpf(float(ring_rule.ring_radius), float(ring_rule.ring_close), progress)
+	return _runner_id(&"howl").ring_radius(self)
 
 func _end_ring() -> void:
-	ring.clear()
-	ring_started = -1.0
+	_runner_id(&"howl")._end_ring(self)
 
-## 撃破で群れを解き、猟犬を通常の群れの追跡へ戻す。
 func _release_pack() -> void:
 	var hounds = _hounds()
 	if hounds != null:
@@ -617,3 +469,18 @@ func begin_final_strike(charge: float) -> void:
 func _exit_tree() -> void:
 	if flow_adapter != null: flow_adapter.cancel()
 	if ctx != null and ctx.enemies != null: _release_pack()
+
+func _runner_for() -> RefCounted:
+	if _runner != null: return _runner
+	return preload("res://scripts/bosses/canis_major/technique_runner.gd").new()
+
+func _sync_technique_visuals() -> void:
+	technique_pose = _runner_for().body_pose(self)
+	var key := "recover" if mode == &"recovery" else "warn" if mode == &"windup" else "active"
+	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
+	technique_visuals.sync(technique, mode, elapsed, float(rule().get(key, 1.0)))
+
+func _runner_id(id: StringName) -> RefCounted:
+	if _runner != null and _runner.kind() == id: return _runner
+	if not _support_runners.has(id): _support_runners[id] = _moves[id].make_runner()
+	return _support_runners[id]

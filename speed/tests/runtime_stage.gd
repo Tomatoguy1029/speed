@@ -15,12 +15,25 @@ func _ready() -> void:
 		clip.label = "recording_label"
 		clip.formations = [load("res://data/formations/telescope_reticle.tscn")]
 		source.clips = [clip]
+		source.enemy_attack_values["biter"] = 0.0
+		source.enemy_attack_values["pulser"] = 0.5
 		var runtime: StageDef = builder.compile(source)
+		check(not runtime.attack_managed_by_type["biter"] and runtime.attack_managed_by_type["pulser"], "種類ごとの予算管理対象を生成時に確定する")
+		check(not runtime.clips[0].prepared[0].layouts[0].attack_managed, "個体値を使う配置に共有overrideの管理対象を作らない")
 		check(runtime.get_script().resource_path.ends_with("runtime_stage.gd"), "実行用の型を生成する")
 		check(runtime.track_names.is_empty() and runtime.scene_path.is_empty(), "編集用の情報を外す")
 		check(runtime.phases[0] != source.phases[0] and runtime.phases[0].display_name.is_empty(), "時間帯の値を独立して持ち、名前を外す")
 		check(runtime.clips[0].label.is_empty() and runtime.clips[0].formations.is_empty(), "クリップにラベルとシーンを持たない")
 		check(not runtime.clips[0].prepared.is_empty(), "展開済みの配置を持つ")
+		var session := RunManager.create_session(self, {"stage": runtime, "stage_index": 4, "seed": 42}, false)
+		session.auto_step = false
+		var enemies := session.sim.enemies
+		var free := enemies.spawn(enemies.def_of(&"biter"), Vector2.ZERO)
+		var paid := enemies.spawn(enemies.def_of(&"pulser"), Vector2.ZERO)
+		var group := enemies.spawn(enemies.def_of(&"pulser"), Vector2.ZERO, {"attack_group": 42, "attack_value": 0.0, "attack_managed": false})
+		check(enemies.table.attack_managed[free] == 0 and enemies.table.attack_managed[paid] == 1, "生成済みの種類別判定を個体へ渡す")
+		check(enemies.table.attack_managed[group] == 0, "共有overrideの生成済み判定を優先する")
+		session.free()
 		check(builder.names(source).clips[0] == "recording_label", "記録用の名前を別の表に保存する")
 		var minimal := StageDef.new()
 		minimal.enemies = [&"drifter"]

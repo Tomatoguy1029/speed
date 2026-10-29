@@ -6,6 +6,11 @@ extends Control
 
 ## 描けるようになったときに広がる輪の時間（実秒）
 const RING_PULSE_TIME := 0.35
+## リングが1周溜まりきったときに白く光る時間（実秒）
+const RING_FLASH_TIME := 0.3
+## 内側のリングの半径と、外側のリングまでの間隔
+const RING_RADIUS := 14.0
+const RING_GAP := 7.0
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
 const LOADOUT_WEAPON := 21.0
@@ -92,6 +97,9 @@ var _ring_usable := true
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
+var _ring_flash_t := 0.0
+## 前のフレームの溜まっている量（1周溜まりきった瞬間を見つける）
+var _ring_amount := 1.0
 var _pause_after_reward := false
 var _menu_overlay: Control
 var _overlay_focus: WeakRef
@@ -388,6 +396,7 @@ func _process(delta: float) -> void:
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
 	_warning_t = maxf(0.0, _warning_t - delta)
 	_ring_pulse_t = maxf(0.0, _ring_pulse_t - delta)
+	_ring_flash_t = maxf(0.0, _ring_flash_t - delta)
 	_layout_art()
 	_refresh_loadout_icons()
 	queue_redraw()
@@ -998,11 +1007,7 @@ func _dense_cells() -> PackedVector2Array:
 ## 下の目盛りは強化の段階（仕様書 8）。
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
-	# 枠素材は特性5個で描かれている。通常4枠では下段だけを切り出す。
-	var upper := Rect2(0, 0, SLOTS.get_width(), 337)
-	draw_texture_rect_region(SLOTS, upper, upper)
-	var lower := Rect2(0, 337, 9 + mini(run.cfg.trait_slots, 5) * 15, SLOTS.get_height() - 337)
-	draw_texture_rect_region(SLOTS, lower, lower)
+	draw_texture(SLOTS, Vector2.ZERO)
 	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
 	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
 	_draw_hero_slot(Vector2(99, 315))
@@ -1092,31 +1097,56 @@ func _draw_edge_arrow(p: Vector2, col: Color) -> void:
 	var side := Vector2(-dir.y, dir.x) * 12.0
 	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 
-## カーソル付近のリング：描画前は充填率、描画中は残りの長さ（仕様書 6.2）。
-## 描けるまでは同じ色を暗くして溜まり具合を見せ、描ける割合に目盛りを置く。描けるようになった瞬間に広がる輪を出す。
+## カーソル付近のリング：描画前は溜まっている量、描画中は残りの長さ（仕様書 6.2）。
+## 内側の1周が容量1、大容量チャージで増えた容量は外側の弧。内側から順に埋まる。
+## 描けるまでは同じ色を暗くし、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
 func _draw_gauge_ring() -> void:
 	var s := run.state
 	var c := get_viewport().get_mouse_position() + Vector2(26, 26)
 	var min_charge := run.cfg.draw_min_charge
-	var usable := s.gauge >= min_charge
-	if usable and not _ring_usable and not s.drawing and not s.tracing:
+	var capacity := s.stats.capacity
+	var laps := ceili(capacity - 1e-6)
+	var amount := s.gauge_amount()
+	var usable := amount >= min_charge
+	var charging := not s.drawing and not s.tracing
+	if usable and not _ring_usable and charging:
 		_ring_pulse_t = RING_PULSE_TIME
 	_ring_usable = usable
-	var frac := s.gauge
-	var col := Color("#ffd24a") if s.gauge >= 1.0 - 1e-6 else Color("#5dffa0")
+	if charging and _lap_filled(_ring_amount, amount, capacity):
+		_ring_flash_t = RING_FLASH_TIME
+	_ring_amount = amount
+	var col := Color("#5dffa0")
 	if not usable:
 		col.a = 0.4
 	if s.drawing:
-		frac = 1.0 - s.draw_length / maxf(1.0, s.draw_limit)
+		amount = s.draw_gauge * (1.0 - s.draw_length / maxf(1.0, s.draw_limit))
 		col = Color("#c8f7ff")
-	draw_arc(c, 14.0, 0, TAU, 32, Color(1, 1, 1, 0.15), 4.0)
-	draw_arc(c, 14.0, -PI / 2.0, -PI / 2.0 + TAU * clampf(frac, 0.0, 1.0), 32, col, 4.0)
+	var width := 4.0
+	if _ring_flash_t > 0.0:
+		var k := _ring_flash_t / RING_FLASH_TIME
+		col = col.lerp(Color.WHITE, k)
+		width += 2.0 * k
+	for lap in laps:
+		var r := RING_RADIUS + RING_GAP * lap
+		var lap_cap := minf(1.0, capacity - lap)
+		var fill := clampf(amount - lap, 0.0, lap_cap)
+		draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, Color(1, 1, 1, 0.15), 4.0)
+		if fill > 0.0:
+			draw_arc(c, r, -PI / 2.0, -PI / 2.0 + TAU * fill, 32, col, width)
 	if not s.drawing:
 		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
-		draw_line(c + tick * 10.0, c + tick * 19.0, Color(1, 1, 1, 0.9 if usable else 0.5), 2.0)
+		draw_line(c + tick * (RING_RADIUS - 4.0), c + tick * (RING_RADIUS + 5.0), Color(1, 1, 1, 0.9 if usable else 0.5), 2.0)
 	if _ring_pulse_t > 0.0:
 		var k := 1.0 - _ring_pulse_t / RING_PULSE_TIME
-		draw_arc(c, 14.0 + 12.0 * k, 0, TAU, 32, Color(0.36, 1.0, 0.63, 1.0 - k), 3.0)
+		draw_arc(c, RING_RADIUS + RING_GAP * (laps - 1) + 12.0 * k, 0, TAU, 32, Color(0.36, 1.0, 0.63, 1.0 - k), 3.0)
+
+## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
+func _lap_filled(before: float, after: float, capacity: float) -> bool:
+	for lap in ceili(capacity - 1e-6):
+		var end := minf(lap + 1.0, capacity) - 1e-6
+		if before < end and after >= end:
+			return true
+	return false
 
 func _draw_banner() -> void:
 	if _banner == "":

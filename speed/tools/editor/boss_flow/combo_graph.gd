@@ -139,12 +139,19 @@ func _ready() -> void:
 		_menu.position = Vector2i(graph.get_screen_position() + at)
 		_menu.popup())
 
+## 技のデータの表示名、なければ既定の名前。
+func _title(id: String) -> String:
+	for move in _moves:
+		var name: Variant = move.get("display_name")
+		if String(move.technique) == id and name is String and not name.is_empty(): return name
+	return preload("res://tools/editor/boss_flow/technique_graph.gd").title_for(id)
+
 func open(value: Dictionary, moves: Array) -> void:
 	program = value
 	_moves = moves
 	_technique.clear()
 	for move in moves:
-		_technique.add_item(preload("res://tools/editor/boss_flow/technique_graph.gd").title_for(String(move.technique)))
+		_technique.add_item(_title(String(move.technique)))
 		_technique.set_item_metadata(_technique.item_count - 1, String(move.technique))
 	graph.clear_connections()
 	for node in graph.get_children():
@@ -157,12 +164,13 @@ func open(value: Dictionary, moves: Array) -> void:
 		var step: Dictionary = nodes[i]
 		var node := GraphNode.new()
 		node.name = "step_" + str(i)
-		node.title = preload("res://tools/editor/boss_flow/technique_graph.gd").title_for(String(step.id)) if step.get("type") == "action" else {"wait": "待機", "sequence": "順番に実行", "parallel": "同時に実行", "branch": "条件で分岐"}.get(step.get("type", ""), "技")
+		node.title = _title(String(step.id)) if step.get("type") == "action" else {"wait": "待機", "sequence": "順番に実行", "parallel": "同時に実行", "branch": "条件で分岐"}.get(step.get("type", ""), "技")
 		node.position_offset = _at(program).get("layout", {}).get("step_" + str(i), Vector2(next_x, 50))
 		var label := Label.new()
 		label.text = "%s秒" % step.get("seconds", 0.0) if step.get("type", "") == "wait" else "技後の待ちまで実行" if step.get("type") == "action" else "ダブルクリックして内部を編集"
 		node.add_child(label)
 		node.set_slot(0, true, 0, Color.GRAY, true, 0, Color.GRAY)
+		if step.get("type") == "action": node.self_modulate = preload("res://tools/editor/boss_flow/technique_graph.gd").TECHNIQUE_COLOR
 		graph.add_child(node)
 		next_x += node.get_combined_minimum_size().x + 40.0
 		if step.get("type", "") in ["sequence", "parallel", "branch"]:

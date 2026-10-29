@@ -1,4 +1,4 @@
-## 炎・オーラ・後光・マップの制作入口。描画と保存は既存プレビューが所有する。
+## 制作対象を選ぶ共通画面。描画と保存は各プレビューが所有する。
 extends Control
 
 const TOOLS := [
@@ -6,10 +6,12 @@ const TOOLS := [
 	["aura", "オーラ", "res://gyms/legendary_reveal_preview.gd"],
 	["rays", "後光", "res://gyms/legendary_reveal_preview.gd"],
 	["map", "マップ", "res://gyms/map_reveal_preview.gd"],
+	["landmark", "目印の星", "res://gyms/enemy_mark_preview.gd"],
+	["elite", "エリート", "res://gyms/enemy_mark_preview.gd"],
 ]
 
 var _sessions: Dictionary = {}
-var _buttons: Array[Button] = []
+var _selector := OptionButton.new()
 var _selected := 0
 var _previews := VBoxContainer.new()
 var _controls := VBoxContainer.new()
@@ -89,22 +91,20 @@ func _ready() -> void:
 	_path.add_theme_color_override("font_uneditable_color", Color("bdcbd8"))
 	_path.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	path_row.add_child(_path)
+	var target_row := HBoxContainer.new()
+	layout.add_child(target_row)
+	var target_label := Label.new()
+	target_label.text = "編集対象"
+	target_row.add_child(target_label)
+	_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_selector.fit_to_longest_item = false
+	for entry in TOOLS:
+		_selector.add_item(entry[1])
+	_selector.item_selected.connect(select_tool)
+	target_row.add_child(_selector)
 	var columns := HBoxContainer.new()
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(columns)
-	var types := VBoxContainer.new()
-	types.custom_minimum_size.x = 72
-	columns.add_child(types)
-	var group := ButtonGroup.new()
-	for index in TOOLS.size():
-		var button := Button.new()
-		button.text = TOOLS[index][1]
-		button.toggle_mode = true
-		button.button_group = group
-		button.custom_minimum_size.y = 44
-		button.pressed.connect(select_tool.bind(index))
-		types.add_child(button)
-		_buttons.append(button)
 	var split := HSplitContainer.new()
 	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(split)
@@ -128,7 +128,9 @@ func _ready() -> void:
 	select_tool(0)
 
 func _key(index: int) -> String:
-	return "legendary" if index in [1, 2] else TOOLS[index][0]
+	if index in [1, 2]: return "legendary"
+	if index in [4, 5]: return "enemy_marks"
+	return TOOLS[index][0]
 
 func _current() -> Variant:
 	return _sessions[_key(_selected)].editor
@@ -162,9 +164,9 @@ func select_tool(index: int) -> void:
 		session.preview.process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 		session.editor.visible = active
 		session.editor.set_active(active)
-	if key == "legendary":
+	if key == "legendary" or key == "enemy_marks":
 		_current().set_section(TOOLS[index][0])
-	_buttons[index].set_pressed_no_signal(true)
+	_selector.select(index)
 	_refresh()
 
 func is_busy() -> bool:
@@ -203,11 +205,13 @@ func _refresh() -> void:
 	_save.disabled = busy or state.path.is_empty()
 	_reload.disabled = busy or state.path.is_empty()
 	_close.disabled = busy
-	for index in _buttons.size():
+	for index in TOOLS.size():
 		var key := _key(index)
 		var changed: bool = _sessions.has(key) and not _sessions[key].editor.editing_state().dirty_paths.is_empty()
-		_buttons[index].text = TOOLS[index][1] + (" ●" if changed else "")
-		_buttons[index].disabled = busy
+		if key == "enemy_marks" and _sessions.has(key):
+			changed = _sessions[key].editor.is_section_dirty(TOOLS[index][0])
+		_selector.set_item_text(index, TOOLS[index][1] + (" ●" if changed else ""))
+	_selector.disabled = busy
 
 func request_reload(action: Callable) -> void:
 	if is_busy(): return

@@ -96,7 +96,7 @@ func _leap_escape() -> void:
 	var before := session.sim.state.ship_hp
 	for frame in ceili(duration / STEP):
 		var t := frame * STEP
-		var escape: Vector2 = (a._driver.destination-a._driver.takeoff).normalized().orthogonal() if a._driver != null else Vector2.UP
+		var escape: Vector2 = (a._runner.destination-a._runner.takeoff).normalized().orthogonal() if a._runner != null else Vector2.UP
 		_tick(session.sim, escape * 1200.0 if t >= warn * 0.8 and t < warn + 0.7 else Vector2.ZERO)
 	_finish(session,"leap_perpendicular_to_committed_path",before,false)
 
@@ -106,7 +106,7 @@ func _breath_cover(destroy: bool) -> void:
 	var a = sim.bosses.actor
 	var warn := float(a.rule().warn)
 	for frame in ceili((warn + STEP) / STEP): _tick(sim,Vector2.ZERO)
-	var driver = a._driver
+	var driver = a._runner
 	var rock = driver.rocks[1]
 	sim.state.ship_pos = sim.enemies.table.pos[rock.row] + a.direction * 240.0
 	if destroy:
@@ -124,7 +124,7 @@ func _rift_paths() -> void:
 			if a.mode == &"active": break
 			_tick(sim,Vector2.ZERO)
 		_check(a.mode == &"active", "rifts warning follows full-body staging")
-		var path: PackedVector2Array = a._driver.paths[0]
+		var path: PackedVector2Array = a._runner.paths[0]
 		var cross_point: Vector2 = path[0].lerp(path[1], 0.35)
 		var before := sim.state.ship_hp
 		if cross: sim.state.ship_pos = cross_point
@@ -148,8 +148,8 @@ func _arrows(evade: bool) -> void:
 	var before := sim.state.ship_hp
 	var warnings := false
 	for frame in ceili(duration / STEP):
-		if a._driver != null:
-			for impact in a._driver.impacts:
+		if a._runner != null:
+			for impact in a._runner.impacts:
 				if impact.pos != Vector2.INF: warnings = true
 		_tick(sim,Vector2.DOWN * 700.0 if evade and warnings else Vector2.ZERO)
 	_check(warnings,"arrows actually shows fixed landing warnings")
@@ -174,7 +174,7 @@ func _spiral(evade: bool) -> void:
 	var before := sim.state.ship_hp
 	var escaped := false
 	for frame in ceili(duration / STEP):
-		var can_escape: bool = a.mode == &"active" and a.elapsed >= a._driver.coil_time + 0.05 and not sim.state.controls_locked
+		var can_escape: bool = a.mode == &"active" and a.elapsed >= a._runner.coil_time + 0.05 and not sim.state.controls_locked
 		var move: bool = evade and can_escape and sim.state.ship_pos.x < 220.0
 		_tick(sim,Vector2.RIGHT * 1700.0 if move else Vector2.ZERO)
 		if evade and can_escape and sim.state.ship_pos.x >= 220.0: escaped = true

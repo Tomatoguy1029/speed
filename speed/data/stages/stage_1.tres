@@ -317,6 +317,9 @@ scene_path = "res://scenes/stages/stage_1.tscn"
 phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss"), SubResource("Resource_m3sfq")]
 enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
 enemy_tuning = {
+"biter": {
+"params.bullet_dmg": 4.0
+},
 "bomber": {
 "params.blast_dmg": 14.0
 },
@@ -343,9 +346,9 @@ enemy_tuning = {
 }
 enemy_attack_values = {
 "biter": 0.0,
-"bomber": 0.3,
+"bomber": 0.0,
 "marlin": 1.0,
-"pulser": 0.0,
+"pulser": 0.5,
 "pump": 1.0,
 "shield": 1.0,
 "splitling": 0.0,

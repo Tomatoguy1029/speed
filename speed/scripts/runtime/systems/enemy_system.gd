@@ -144,6 +144,14 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 		t.attack_value[i] = float(opts.get("attack_value", 1.0))
 	else:
 		t.attack_value[i] = state.stage.enemy_attack_value(def.id) if state.stage != null else 1.0
+	if projectiles.director != null and not projectiles.director.formation_mode:
+		t.attack_managed[i] = int(def.attack_weight > 0.0)
+	elif t.attack_group[i] > 0:
+		t.attack_managed[i] = int(opts.get("attack_managed", t.attack_value[i] > 0.0))
+	elif state.stage is RuntimeStage:
+		t.attack_managed[i] = int(state.stage.attack_managed_by_type.get(String(def.id), true))
+	else:
+		t.attack_managed[i] = int(t.attack_value[i] > 0.0)
 	apply_scaling(i, def, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
@@ -255,6 +263,7 @@ func _reset_row(i: int) -> void:
 	t.meteor_index[i] = -1
 	t.attack_group[i] = 0
 	t.attack_value[i] = 1
+	t.attack_managed[i] = 1
 	t.attack_priority[i] = 0
 	t.dead[i] = 0
 	t.elite[i] = 0
@@ -693,21 +702,24 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			motion._update_pushed(i, dt)
 		else:
-			var needs_admission := managed and t.def[i].rank >= 3
+			var needs_admission := managed and t.attack_managed[i] != 0
 			if managed and not needs_admission:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
 				if t.type[i] == &"aquila":
 					behavior.call(&"cruise", i, bdt)
 				else:
-					motion._chase(i, bdt)
+					behavior.wait_for_attack(i, bdt)
 				pos[i] += vel[i] * dt
 				if motion._near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 					field.collide_enemy(i, from)
 				continue
 			var previous_source:=_source_row
 			_source_row=i
+			var prior_visual := projectiles.visual_context
+			projectiles.visual_context = table.def[i].attack_visual
 			behavior.step(i, bdt)
+			projectiles.visual_context = prior_visual
 			_source_row=previous_source
 			if dead[i] != 0:
 				continue
@@ -758,22 +770,23 @@ func _lab_owner(i: int) -> String:
 	var d = projectiles.director
 	return "formation:%d" % table.attack_group[i] if d != null and d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
 
-## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
+## 正の実効valueを持つ攻撃は予告前に許可を取る。value 0は管理用の枠や待機を作らず通す。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
 	projectiles.lab_context = 0
 	var def := table.def[i]
-	if def == null:
+	if def == null or d == null:
 		return true
-	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
-	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
+	if table.attack_managed[i] == 0:
+		return true
+	var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
+	var cats: Array = d.categories(def.behavior)
 	if cats.is_empty():
 		return true
 	var owner := _lab_owner(i)
 	var behavior := behaviors[table.beh[i]]
 	if not behavior.admit_active(i, d, owner) and behavior.admit_due(i, dt):
 		var duration := behavior.admit_duration(i)
-		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
 		var priority := table.attack_priority[i]
 		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, priority, cost):
 			table.charge[i] = 0

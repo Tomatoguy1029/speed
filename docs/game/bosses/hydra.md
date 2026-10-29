@@ -266,6 +266,8 @@ Godotの「ボス行動」画面で、戦闘の区間と、区間から独立し
 
 ## 9. 実装・調整・接続
 
+技の動きと公開値は `scripts/bosses/hydra/techniques/`、技の見た目は `scenes/bosses/hydra/`、保存値は `data/bosses/hydra_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+
 - 本番Godotの試遊場所は `speed/gyms/hydra_trial.tscn` とする。
 - 完成の対象は通常攻撃・コンボ・大技・行動判断・演出と、合体から分離・決着までの一戦全体。
 - 段階進行、行動選択、攻撃と判定、素材差し替えの編集方法は [設計書 6.1](../../architecture.md#61-敵とボスの-ai) に置く。

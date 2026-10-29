@@ -3,5 +3,5 @@ extends AttackKind
 func spawn(ps: ProjectileSystem, i: int, angle: float, speed: float, kind: StringName, params := {}) -> void:
 	var table := ps.combat.enemies.table
 	var values: Dictionary = params if not params.is_empty() else table.def[i].params
-	ps.emit_attack(kind, [table.pos[i], table.r[i], angle, speed, values])
+	ps.emit_attack(kind, [table.pos[i], table.r[i], angle, speed, values], table.def[i].attack_visual)
 	ps.state.emit(&"shoot", {"pos": table.pos[i], "kind": kind})

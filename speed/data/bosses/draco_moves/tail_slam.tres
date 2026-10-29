@@ -1,8 +1,19 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_tail_slam.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/tail_slam.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/tail_slam_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"tail_slam"
 category = &"single"
-parameters = {"lead_cap": 600.0, "driver": ExtResource("2"), "warn": 0.75, "active": 0.35, "recover": 1.0, "damage": 30.0, "reach": 1200.0, "width": 30.0, "radius": 110.0}
+display_name = "尻尾の叩きつけ"
+lead_cap = 600.0
+warn = 0.75
+active = 0.35
+recover = 1.0
+damage = 30.0
+reach = 1200.0
+radius = 110.0
+visual = ExtResource("visual")

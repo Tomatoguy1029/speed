@@ -1,19 +1,11 @@
-[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+[gd_resource type="Resource" format=3 uid="uid://dwnx31bm112fu"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" uid="uid://dggr4n8firvvm" path="res://scripts/bosses/hydra/techniques/thunder_drop.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/thunder_drop_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
-technique = &"thunder_drop"
 head_kind = &"thunder"
-parameters = {
-"normal_charge": 0.6,
-"normal_hold": 0.9,
-"attack_cd": 3.0,
-"thunder_radius": 150.0,
-"thunder_flash": 0.22,
-"beam_dmg": 18.0,
-"target_lock_fraction": 0.55,
-"thunder_lead": 0.4,
-"cost": 1.4
-}
+technique = &"thunder_drop"
+display_name = "落雷"
+visual = ExtResource("visual")

@@ -1,16 +1,16 @@
 [gd_resource type="Resource" format=3 uid="uid://83fwp546x24l"]
 
 [ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1_hy4gv"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/bite_thrust.tres" id="2_uae8c"]
+[ext_resource type="Resource" uid="uid://cvgf1y0pakok5" path="res://data/bosses/hydra_moves/bite_thrust.tres" id="2_uae8c"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/bite_sweep.tres" id="3_xrdwf"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/wind_band.tres" id="4_x5nyk"]
+[ext_resource type="Resource" uid="uid://u0hkhsx1n51q" path="res://data/bosses/hydra_moves/wind_band.tres" id="4_x5nyk"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/wind_blades.tres" id="5_rny2e"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/rubble_lump.tres" id="6_awxv5"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/rubble_fan.tres" id="7_324oc"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/beam_fixed.tres" id="8_tlhcy"]
+[ext_resource type="Resource" uid="uid://or8f0t10sje6" path="res://data/bosses/hydra_moves/rubble_fan.tres" id="7_324oc"]
+[ext_resource type="Resource" uid="uid://do4goaukujtsi" path="res://data/bosses/hydra_moves/beam_fixed.tres" id="8_tlhcy"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/beam_bolt.tres" id="9_d4juc"]
 [ext_resource type="Resource" path="res://data/bosses/hydra_moves/thunder_headbutt.tres" id="10_h1jcp"]
-[ext_resource type="Resource" path="res://data/bosses/hydra_moves/thunder_drop.tres" id="11_62bfn"]
+[ext_resource type="Resource" uid="uid://dwnx31bm112fu" path="res://data/bosses/hydra_moves/thunder_drop.tres" id="11_62bfn"]
 [ext_resource type="Resource" uid="uid://dqduf0fhhub6t" path="res://data/bosses/hydra_moves/tornado.tres" id="12_6a8j0"]
 [ext_resource type="Resource" uid="uid://c4ex4dw2hghn6" path="res://data/bosses/hydra_moves/debris_shatter.tres" id="13_baoas"]
 [ext_resource type="Resource" uid="uid://ba2ex12u0acdl" path="res://data/bosses/hydra_moves/beam_pincer.tres" id="14_orjre"]
@@ -207,6 +207,34 @@ costs = {
 "tornado": 2.0,
 "wind_band": 1.0,
 "wind_blades": 1.0
+}
+layout = {
+"beam_bolt": Vector2(548, 1440),
+"beam_fixed": Vector2(548, 1124),
+"beam_pincer": Vector2(540, 748),
+"bite_sweep": Vector2(3408, 432),
+"bite_thrust": Vector2(3408, 116),
+"choose_combo": Vector2(40, 116),
+"choose_major": Vector2(984, 116),
+"choose_major_2": Vector2(1928, 116),
+"choose_normal": Vector2(2872, 116),
+"choose_normal_2": Vector2(1928, 808),
+"choose_normal_3": Vector2(2872, 808),
+"choose_normal_4": Vector2(40, 1124),
+"choose_normal_5": Vector2(984, 1124),
+"curve": Vector2(1484, 748),
+"debris_shatter": Vector2(540, 432),
+"grid": Vector2(2428, 432),
+"north": Vector2(1484, 116),
+"rubble_fan": Vector2(3372, 1124),
+"rubble_lump": Vector2(3372, 808),
+"sequence": Vector2(1484, 436),
+"swarm": Vector2(2428, 112),
+"thunder_drop": Vector2(1484, 1440),
+"thunder_headbutt": Vector2(1484, 1124),
+"tornado": Vector2(540, 116),
+"wind_band": Vector2(2428, 808),
+"wind_blades": Vector2(2428, 1124)
 }
 condition_groups = {
 "choose_combo": {

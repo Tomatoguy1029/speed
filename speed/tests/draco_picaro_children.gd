@@ -27,7 +27,7 @@ func _ready() -> void:
 	for soldier: int in soldiers:check(a.table.held[soldier]!=0,"攻撃担当の停止は増援にも適用する")
 	a.picaro.clear();a.cancel_attack();a.cycle.cancel()
 	a.start_attack(&"clones")
-	var driver=a._driver
+	var driver=a._runner
 	var copy: int=driver.units[1].row
 	var part: int=driver.units[1].parts[0].row
 	a.table.pos[driver.units[1].parts[-1].row]=a.table.pos[copy]+Vector2(-500,0)

@@ -186,7 +186,7 @@ func _capture_screen_staged(id: StringName, size: Vector2i) -> void:
 	for frame in 1400:
 		_tick(sim)
 		elapsed += STEP
-		var staging: Dictionary = actor._driver.staging if actor._driver != null else {}
+		var staging: Dictionary = actor._runner.staging if actor._runner != null else {}
 		var beat := ""
 		if staging.get("phase") == &"exit" and elapsed >= 0.25 and not marked.has("retreat"): beat = "retreat"
 		elif staging.get("phase") == &"enter" and not marked.has("hidden"): beat = "hidden"

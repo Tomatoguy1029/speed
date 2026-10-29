@@ -227,7 +227,7 @@ weapon.W22.desc,なぞり始めに発射器を残し、なぞり終えると機�
 weapon.W23.name,後方ブラスター,Rear Blaster
 weapon.W23.desc,機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇,"Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage."
 weapon.W25.name,迎撃ドローン,Interceptor Drones
-weapon.W25.desc,周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える,"Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts."
+weapon.W25.desc,周回編隊から近くの敵へ弾を撃ってダメージを与える。Lvで機数と連射が増える,Orbiting escorts shoot nearby enemies for damage. Levels add drones and bursts.
 weapon.W26.name,突進範囲ドローン,Dash Range Drones
 weapon.W26.desc,突進時に左右へ編隊を展開し、横の敵まで貫く。Lvで機数と編隊幅、光跡が成長,"Deploy a formation beside the ship during a dash to pierce enemies across a wider path. Levels add drones, width, and longer light trails."
 weapon.W27.name,残像機,Afterimage
@@ -593,6 +593,9 @@ lab.ui.try,試遊,Play as ship
 lab.ui.range,範囲,Range
 lab.ui.view,表示する情報,Display options
 lab.ui.center,自機を中心に表示,Center on ship
+lab.ui.view_zoom_out,表示を縮小,Zoom out of the game view
+lab.ui.view_zoom_reset,表示倍率を標準に戻す,Reset game view zoom
+lab.ui.view_zoom_in,表示を拡大,Zoom into the game view
 lab.ui.edit_more,消去メニュー,Clear menu
 lab.ui.evaluate,ルートを試す,Try route
 lab.ui.tune,敵を調整,Tune enemy
@@ -624,7 +627,7 @@ lab.ui.loadout,装備・英雄,Loadout and hero
 lab.ui.stage_time,時間帯,Stage phases
 lab.ui.formation,敵の組み合わせ,Enemy formations
 lab.attack.jitter,待ち方のばらつき（秒）,Wait jitter (s)
-lab.attack.danger,攻撃の重さ（強敵と大物）,Attack weight (strong and big enemies)
+lab.attack.danger,攻撃の重さ,Attack weight
 lab.attack.used,重さ %.1f / %.1f,Weight %.1f / %.1f
 lab.formation.layout,配置,Layout
 lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (-1 soft, 0 standard, 1 hard)

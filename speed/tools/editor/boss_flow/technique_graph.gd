@@ -12,17 +12,24 @@ var _updating := false
 var _guides := PackedVector2Array()
 var _popup := PopupMenu.new()
 var _reroute_pending := false
-const TITLES := {"bite":"噛みつき","tail_sweep":"尻尾の薙ぎ払い","star_fan":"星弾の扇","tail_slam":"尻尾の叩きつけ","breath":"薙ぎ払いブレス","meteor":"隕石投射","leap":"飛びかかり噛みつき","rifts":"三本爪の亀裂","picaro_wall":"ピカロ隊列と光の矢","clones":"全身複製","inhale":"吸引と吐き出し","spiral":"螺旋収縮","charge": "突進", "return_charge": "往復突進", "sweep": "角の薙ぎ払い", "kick": "後ろ蹴り", "lance": "光の槍", "combo": "突進から薙ぎ払い", "bite_thrust": "噛みつき", "bite_sweep": "薙ぎ払い", "wind_band": "風の帯", "wind_blades": "風刃", "rubble_lump": "瓦礫の塊", "rubble_fan": "瓦礫の散弾", "beam_fixed": "固定ビーム", "beam_bolt": "ビーム弾", "thunder_headbutt": "雷の頭突き", "thunder_drop": "落雷", "tornado": "瓦礫竜巻", "debris_shatter": "瓦礫砕き", "beam_pincer": "挟撃ビーム", "north": "同時噛みつき", "sequence": "順番噛みつき", "curve": "曲線ビーム", "swarm": "連続飛びかかり", "grid": "格子ビーム"}
 
 static func title_for(id: String) -> String:
 	if id.begins_with("combo_"):
 		var parts := id.split("_copy_")
 		return "コンボ" + parts[0].trim_prefix("combo_") + ("（複製" + parts[-1] + "）" if parts.size() > 1 else "")
-	return TITLES.get(id, id)
+	return id
 
 static func node_title(value: Resource, id: String) -> String:
 	var source: String = value.source_for(id)
-	return title_for(source) + ("（別条件" + id.trim_prefix(source + "_copy_") + "）" if source != id else "")
+	return technique_title(value, source) + ("（別条件" + id.trim_prefix(source + "_copy_") + "）" if source != id else "")
+
+## 技のデータに表示名があればそれを、なければ既定の名前を返す。
+static func technique_title(value: Resource, id: String) -> String:
+	if value != null:
+		for move in value.get("techniques"):
+			var name: Variant = move.get("display_name")
+			if String(move.technique) == id and name is String and not name.is_empty(): return name
+	return title_for(id)
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(280, 160)
@@ -234,11 +241,15 @@ func show_rules(value: Resource) -> void:
 	_updating = false
 	if rules.layout.is_empty(): fit_all.call_deferred()
 
+## 条件選択ノードは黄、技ノードは紫。
+const SELECT_COLOR := Color(1.0, 0.88, 0.45)
+const TECHNIQUE_COLOR := Color(0.85, 0.7, 1.0)
+
 func _add_node(id: String, title_text: String, at: Vector2, input: bool) -> GraphNode:
 	var node := GraphNode.new()
 	node.name = id
 	node.title = title_text
-	node.self_modulate = Color(0.65, 0.95, 0.8) if not input else Color.WHITE
+	node.self_modulate = TECHNIQUE_COLOR if input else SELECT_COLOR
 	if input:
 		var diagram := preload("res://tools/editor/boss_flow/range_preview.gd").new()
 		diagram.custom_minimum_size = Vector2(120, 58) * maxf(1.0, get_theme_default_font_size() / 14.0)

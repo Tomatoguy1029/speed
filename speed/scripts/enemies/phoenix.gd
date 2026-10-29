@@ -61,8 +61,8 @@ func impact_radius(i: int) -> float:
 	return maxf(table.r[i] * 1.1, float(table.def[i].params.impact_radius))
 
 func admit_active(i: int, director, owner: String) -> bool:
-	# 石化・吹き飛ばしなどで期限が過ぎた場合は、再び枠を取ってから続ける。
-	return director.token(owner) > 0 and (table.mode[i] != EnemyTable.Mode.MOVE or table.timer[i] > 0.0)
+	return director.owns_action(owner, table.id[i]) and (table.mode[i] in [EnemyTable.Mode.WINDUP, EnemyTable.Mode.DASH] \
+		or (table.mode[i] == EnemyTable.Mode.MOVE and table.timer[i] > 0.0))
 
 func admit_due(_i: int, _dt: float) -> bool:
 	return true

@@ -74,10 +74,10 @@ func exercise() -> void:
   check(debug.execute("charge", 1), "start before invalid request")
   check(not debug.execute("missing", 1) and a.mode == &"windup" and a.technique == &"charge", "invalid request preserves current action")
   if boss_index == 1:
-   var driver = a._moves[&"bite"].parameters.driver
-   a._moves[&"bite"].parameters.driver = null
-   check(not debug.execute("bite", 1) and debug.message.contains("スクリプト"), "missing driver is visibly unavailable")
-   a._moves[&"bite"].parameters.driver = driver
+   var valid_move: Resource = a._moves[&"bite"]
+   a._moves[&"bite"] = BossTechnique.new()
+   check(not debug.execute("bite", 1) and debug.message.contains("スクリプト"), "実行処理がない技は理由を表示する")
+   a._moves[&"bite"] = valid_move
   debug.finish()
   # Damage has to come from the actual actor and combat path, with invulnerability off.
   var attack := "charge" if boss_index == 0 else "bite"
