@@ -207,6 +207,20 @@ params = {
 "snake_turn": 3.2,
 "solo_bearer_distance": 650.0,
 "squad": {
+"look": {
+"attack": {"on": Vector2(3, 6), "off": Vector2(0.3, 0.6), "limit": 1.4},
+"front": {"on": Vector2(2, 4), "off": Vector2(0.5, 1.1), "limit": 1.4},
+"close": {"on": Vector2(0.8, 1.6), "off": Vector2(1.5, 3), "limit": 1.2},
+"block": {"on": Vector2(9, 9), "off": Vector2(0.1, 0.1), "limit": 1.6},
+"bearer": {"on": Vector2(0.6, 1.2), "off": Vector2(1, 2), "limit": 1.9}
+},
+"look_forward_noise": 0.6,
+"look_forward_turn": 2.2,
+"look_player_turn": 3.2,
+"look_wave": 0.07,
+"look_wave_speed": 0.8,
+"look_near_extra": 150.0,
+"attack_ranges": {&"bite": 170.0, &"thunder": 230.0, &"vortex": 300.0, &"debris": 460.0, &"beam": 520.0},
 "alignment_cap": 2.0,
 "alignment_weight": 0.8,
 "arrival": 180.0,

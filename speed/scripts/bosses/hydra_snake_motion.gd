@@ -122,3 +122,25 @@ static func apply_force(n, force: Vector2, speed: float, turn: float, dt: float,
 		n.velocity = velocity
 	n.free_pos += n.velocity * dt
 	n.motion.turn = angle_difference(previous, n.angle) / maxf(dt, 0.001)
+
+static func watch_player(n, rng: RandomNumberGenerator, p: Dictionary, role: StringName) -> void:
+	n.motion.look_on = true
+	var timing: Vector2 = p.look[role].on
+	n.motion.look_time = rng.randf_range(timing.x, timing.y)
+
+static func update_look(n, player: Vector2, dt: float, time: float, rng: RandomNumberGenerator, p: Dictionary, role: StringName, keep: bool) -> void:
+	var settings: Dictionary = p.look[role]
+	n.motion.look_time = float(n.motion.get("look_time", 0.0)) - dt
+	if n.motion.look_time <= 0.0:
+		n.motion.look_on = not n.motion.get("look_on", true)
+		var timing: Vector2 = settings.on if n.motion.look_on else settings.off
+		n.motion.look_time = rng.randf_range(timing.x, timing.y)
+		n.motion.look_offset = rng.randf_range(-float(p.look_forward_noise), float(p.look_forward_noise))
+	if keep:
+		n.motion.look_on = true
+		n.motion.look_time = maxf(n.motion.look_time, 0.3)
+	var on: bool = n.motion.look_on
+	var desired: float = (player - n.free_pos).angle() + sin(time * float(p.look_wave_speed) + n.base_angle) * float(p.look_wave) if on else n.angle + float(n.motion.get("look_offset", 0.0))
+	desired = n.angle + clampf(angle_difference(n.angle, desired), -float(settings.limit), float(settings.limit))
+	n.look_angle = rotate_toward(n.look_angle, desired, float(p.look_player_turn if on else p.look_forward_turn) * dt)
+	n.look_angle = n.angle + clampf(angle_difference(n.angle, n.look_angle), -float(settings.limit), float(settings.limit))

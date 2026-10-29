@@ -75,6 +75,7 @@ class Neck:
 	## 本体から見た付け根の向きと、今の首の向き・長さ
 	var base_angle := 0.0
 	var angle := 0.0
+	var look_angle := 0.0
 	var length := 0.0
 	## 頭の行と id（落ちていれば -1）、前の更新の頭の HP
 	var row := -1
@@ -313,7 +314,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	for n in necks:
 		if _alive(n):
 			table.pos[n.row]=_head_pos(n)
-			table.facing[n.row]=n.angle
+			table.facing[n.row]=head_angle(n)
 		if n.row>=0 or n.length>0.0:_follow_neck(n,dt)
 	if separated and immortal_neck!=null:_follow_neck(immortal_neck,dt)
 
@@ -460,6 +461,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 	else:
 		if table.hp[neck.row] < neck.head_hp:
 			neck.motion.hit=0.35
+			if separated: SNAKE.watch_player(neck, run_state.rng, def.params.squad, squad.profile(neck))
 			_cue(&"hit", neck.mode, k, {"target": &"hydra", "damage": neck.head_hp - maxf(0.0, table.hp[neck.row])})
 		neck.head_hp = table.hp[neck.row]
 		if _normal_moves.has(neck.mode):
@@ -470,7 +472,7 @@ func _tick_neck(neck: Neck, k: int, dt: float) -> void:
 			if flow_controlled: position_head(k, dt)
 		elif not String(neck.mode).begins_with("special_"): _attack(neck,k,dt)
 		table.pos[neck.row] = _head_pos(neck)
-		table.facing[neck.row] = neck.angle
+		table.facing[neck.row] = head_angle(neck)
 
 ## 頭が落ちた：首の残骸を破片にして飛ばし、生え直す時間を決める。
 ## 同じ線で倒した本数と、火の命中に応じて再生待ち時間を延長する。
@@ -586,13 +588,13 @@ func finish_normal(n: Neck) -> void:
 	var cooldown := float(move_params(n.mode).attack_cd)
 	var at := _head_pos(n)
 	_release_attack(n)
-	n.angle = (at-_neck_base(n)).angle()
+	if not separated: n.angle = (at-_neck_base(n)).angle()
 	n.length = at.distance_to(_neck_base(n))
 	n.free_pos=at
 	n.locked = false
 	n.mode = &"idle"
 	n.cd = cooldown
-	if separated and immortal_row >= 0: n.motion.guard_angle = (at - table.pos[immortal_row]).angle()
+	if separated: SNAKE.watch_player(n, run_state.rng, def.params.squad, &"bearer" if n == immortal_neck else squad.profile(n))
 	_cue(&"finished",&"",head_index(n))
 
 func position_head(index: int, dt: float) -> void:
@@ -640,6 +642,9 @@ func _update_guard_approach()->void:
 
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
 	if dt<=0.0:return
+	if separated and n != immortal_neck:
+		n.look_angle = rotate_toward(n.look_angle, desired, float(def.params.squad.look_player_turn) * dt)
+		return
 	var offset:=angle_difference(n.angle,desired)
 	var accel:=float(def.params.aim_accel)
 	var speed:=minf(float(def.params.aim_turn),sqrt(2.0*accel*absf(offset)))
@@ -971,7 +976,7 @@ func _warning_duration(name: StringName) -> float:
 ## -1 は本体、-2 は不死首、0 以上は通常首の配列の添字。戻り値はワールド座標。
 func presentation_anchor(index := -1) -> Transform2D:
 	if index >= 0 and index < necks.size():
-		return Transform2D(necks[index].angle, _head_pos(necks[index]))
+		return Transform2D(head_angle(necks[index]), _head_pos(necks[index]))
 	if index == -2 and immortal_row >= 0 and ctx.enemies.is_same(immortal_row, immortal_id):
 		return Transform2D(0.0, table.pos[immortal_row])
 	return Transform2D(table.facing[body], table.pos[body])
@@ -1171,7 +1176,9 @@ func begin_separation()->void:
 	interrupt_tech()
 	attack_field.clear_effects()
 	_set_count(count)
-	for n in necks:n.free_pos=_head_pos(n)
+	for n in necks:
+		n.free_pos=_head_pos(n)
+		n.look_angle=n.angle
 	separated=true
 	separation_pending=false
 	chance_t=0.0
@@ -1181,6 +1188,7 @@ func begin_separation()->void:
 	immortal_neck.kind=&"immortal"
 	immortal_neck.free_pos=table.pos[body]
 	immortal_neck.angle=(table.pos[body]-run_state.ship_pos).angle()
+	immortal_neck.look_angle=immortal_neck.angle
 	immortal_row=ctx.enemies.spawn_part(body,ctx.enemies.def_of(&"hydra_immortal"),immortal_neck.free_pos)
 	immortal_id=table.id[immortal_row]
 	immortal_neck.row=immortal_row
@@ -1232,9 +1240,10 @@ func tick_bearer(dt: float)->void:
 			n.free_pos=n.free_pos.lerp(target,1.0-exp(-4.0*dt))
 			n.velocity=Vector2.ZERO
 		else:steer_snake(n,target,dt,float(def.params.bearer_speed)/float(def.params.snake_speed),grid_hold)
+	if not alone and not busy: SNAKE.update_look(n, run_state.ship_pos, dt, _time, run_state.rng, def.params.squad, &"bearer", false)
 	var at:=_head_pos(n)
 	table.pos[immortal_row]=at
-	table.facing[immortal_row]=n.angle
+	table.facing[immortal_row]=n.angle if alone or busy else n.look_angle
 	table.pos[body]=at
 	table.hp[body]=table.hp[immortal_row]
 
@@ -1330,3 +1339,6 @@ func _runner_north() -> RefCounted:
 
 func tech_kind(id: StringName) -> StringName:
 	return _move_kinds.get(id, id)
+
+func head_angle(n: Neck) -> float:
+	return n.look_angle if separated else n.angle

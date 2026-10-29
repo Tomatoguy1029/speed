@@ -44,6 +44,9 @@ func tick(dt: float) -> void:
 		forces.append({"neck": n, "force": a.SNAKE.boid_force(n, destination, heads, a.immortal_neck, a.run_state.ship_pos, speed, dt, p), "speed": speed})
 	for item in forces:
 		a.swim_snake(item.neck, item.force, item.speed, float(p.turn), dt)
+		var n = item.neck
+		var near: bool = n.free_pos.distance_to(a.run_state.ship_pos) < minf(float(p.attack_ranges[n.kind]), 300.0) + 100.0 + float(p.look_near_extra)
+		a.SNAKE.update_look(n, a.run_state.ship_pos, dt, a._time, a.run_state.rng, p, profile(n), near)
 
 func replan() -> void:
 	var p: Dictionary = a.def.params.squad
