@@ -581,7 +581,7 @@ func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var n := _n(&"T37")
 	if n == 0: return out
-	var d := ContentManager.definition(&"traits", &"T37") as TraitDef
+	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
 	if generation >= int(d.params.generations) or projectiles.flying_count() + 2 > int(d.params.max): return out
 	if state.rng.randf() >= float(d.params.chance_by_level[n - 1]): return out
 	for side in [-1.0, 1.0]:
@@ -590,7 +590,7 @@ func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
 	return out
 
 func split_damage() -> float:
-	var d := ContentManager.definition(&"traits", &"T37") as TraitDef
+	var d: TraitDef = trait_behaviors[&"T37"].def if trait_behaviors.has(&"T37") else ContentManager.definition(&"traits", &"T37") as TraitDef
 	return float(d.params.damage_by_level[_n(&"T37") - 1]) if _n(&"T37") > 0 else 1.0
 
 func prepare_ram(extra_distance: float) -> float:

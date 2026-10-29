@@ -35,3 +35,7 @@ func fire(from: Vector2, direction: Vector2, length: float, width: float, damage
 func tick(_real_dt: float, world_dt: float) -> void:
 	for lance in items: lance.life -= world_dt
 	items = items.filter(func(l): return l.life > 0.0)
+
+## 槍は発射時の世界座標で進む。機体の移動通知で位置を変えない。
+func on_trail(_p0: Vector2, _p1: Vector2) -> void:
+	pass

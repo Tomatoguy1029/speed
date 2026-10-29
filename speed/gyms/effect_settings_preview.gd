@@ -19,6 +19,8 @@ const DIRECT_EFFECTS := [
 	"weapon/dashRangeDrone", "weapon/afterimage", "weapon/interceptor", "weapon/massTow",
 	"weapon/sonic", "trait/vortex", "trait/critBeam", "weapon/endBlast", "weapon/flashSlash",
 	"trait/killSonic", "trait/fullCharge", "trait/runUp", "trait/rampage", "trait/fullBurst", "trait/duplicator",
+	"trait/quickCharge", "trait/capacity", "trait/critRate", "trait/speed", "trait/attack", "trait/pickup",
+	"trait/length", "trait/glideDuration", "trait/bigSwing", "trait/multiShot",
 	"boss/final_strike",
 ]
 const ATTACK_SCENES := [
@@ -259,7 +261,7 @@ func _ready() -> void:
 	body.add_child(_picker)
 	_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for path in _paths:
-		_picker.add_item(path.trim_prefix(ROOT + "/").trim_suffix("_visual.tscn"))
+		_picker.add_item(_effect_label(path))
 	_picker.item_selected.connect(func(index: int): _select(_paths[index]))
 	body.add_child(_fields)
 	var preview := VBoxContainer.new()
@@ -291,6 +293,14 @@ func _ready() -> void:
 	reload_current()
 	if _working == null: return
 	if not _paths.is_empty(): _select(_paths[0])
+
+func _effect_label(path: String) -> String:
+	if path.begins_with("weapon/") or path.begins_with("trait/"):
+		var category := &"weapons" if path.begins_with("weapon/") else &"traits"
+		for entry in ContentManager.catalog.table(category).values():
+			if String(entry.code_id) == path.get_slice("/",1):
+				return ("武器：" if category == &"weapons" else "特性：") + entry.get_display_name()
+	return path.trim_prefix(ROOT+"/").trim_suffix("_visual.tscn")
 
 func _collect(folder: String) -> void:
 	for filename in DirAccess.get_files_at(folder):
@@ -330,6 +340,12 @@ func _build_fields() -> void:
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
+	if _selected in preload("res://gyms/equipment_effect_scenario.gd").PASSIVE_KEYS:
+		var note := Label.new()
+		note.text = "数値の変化を、効き先の射撃・移動・回収と一緒に再生します。"
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_fields.add_child(note)
+		return
 	if not BODY_EFFECTS.has(_selected): _add_color("色・明るさ倍率", "effect_tint", Color.WHITE)
 	for field in DIRECT_FIELDS.get(_selected, []):
 		_add_number(field[0], field[1], field[5], "%s,%s,%s" % [field[2], field[3], field[4]])

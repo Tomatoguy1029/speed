@@ -40,6 +40,11 @@ func _test_multipliers() -> void:
 
 func _test_duplication() -> void:
 	_check(run.loadout.grant(&"trait", &"T37", 5), "デュプリケーターを装備")
+	var behavior = run.loadout.trait_behaviors[&"T37"]
+	behavior.def = behavior.def.duplicate(true)
+	behavior.def.params.chance_by_level = [0.0,0.0,0.0,0.0,0.0]
+	_check(run.loadout.split_vectors(Vector2.RIGHT,0).is_empty(),"分裂は装備した定義を使い、局所的な試遊の設定も反映する")
+	behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
 	var ps := run.projectiles
 	ps.fire_shot(Vector2.ZERO, 0.0, 10.0)
 	var original := 0

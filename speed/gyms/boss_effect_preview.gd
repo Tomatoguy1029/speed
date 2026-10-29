@@ -2,6 +2,7 @@
 extends VBoxContainer
 
 const ROOT := "res://scenes/bosses/"
+const EQUIPMENT := preload("res://gyms/equipment_effect_scenario.gd")
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const MANUAL := preload("res://gyms/boss_technique_debug.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
@@ -17,6 +18,7 @@ var _frame: SubViewportContainer
 var _status := Label.new()
 var _play := Button.new()
 var _speed := OptionButton.new()
+var _equipment_level := OptionButton.new()
 var _final_picker := OptionButton.new()
 var _boss := ""
 var _technique := ""
@@ -45,6 +47,11 @@ func _ready() -> void:
 	_speed.select(2)
 	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
 	controls.add_child(_speed)
+	for level in range(1,6): _equipment_level.add_item("Lv%d" % level)
+	_equipment_level.select(4)
+	_equipment_level.visible = false
+	_equipment_level.item_selected.connect(func(_index: int): _replay())
+	controls.add_child(_equipment_level)
 	for boss_name in FINAL_BOSS_NAMES:
 		_final_picker.add_item(boss_name)
 	_final_picker.visible = false
@@ -83,6 +90,7 @@ func set_effect(path: String) -> void:
 	manual = null
 	actor = null
 	_equipment_key = ""
+	_equipment_level.visible = path.begins_with("weapon/") or path.begins_with("trait/")
 	_final_preview = path == "boss/final_strike"
 	_final_picker.visible = _final_preview
 	session.playing = false
@@ -161,74 +169,20 @@ func _setup_equipment(key: String, serial: int) -> void:
 	_status.text = "試遊を準備中: " + key
 	var settings := {"empty": true, "stage": 1, "ship_pos": [0, 0], "invincible": true,
 		"director": {"enabled": false}, "weapons": {}, "traits": {}}
-	if is_trait: settings["traits"] = {id: 5}
-	else: settings["weapons"] = {id: 5}
+	var level := _equipment_level.selected+1
+	if is_trait: settings["traits"] = {id: level}
+	else: settings["weapons"] = {id: level}
 	await session.reset(settings)
 	if serial != _serial: return
 	var behavior = (session.run.loadout.trait_behaviors if is_trait else session.run.loadout.weapon_behaviors).get(id)
 	if behavior == null:
 		_status.text = "装備を試遊へ設定できません: " + key
 		return
-	var target := -1
-	if key not in ["weapon/sonic", "weapon/dashRangeDrone", "weapon/afterimage", "weapon/mines"]:
-		target = _spawn_preview_enemy(Vector2(120, 0))
-	match key:
-		"weapon/forward", "weapon/scatter", "weapon/rear":
-			behavior.tick(10.0, false)
-		"weapon/interceptor":
-			behavior.tick(1.0, false)
-			behavior.tick(1.0, false)
-		"weapon/knockback":
-			if target >= 0:
-				var at: Vector2 = session.run.enemies.table.pos[target]
-				session.run.enemies.mark_dead(target)
-				behavior.def = behavior.def.duplicate(true)
-				behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
-				behavior.on_defeated(target, {"one_shot":true,"dir":Vector2.RIGHT})
-		"weapon/contactWave":
-			if target >= 0: behavior.on_contact(target, session.run.enemies.table.pos[target], Vector2.RIGHT)
-		"weapon/contactArc":
-			_spawn_preview_enemy(Vector2(170, 70))
-			_spawn_preview_enemy(Vector2(180, -70))
-			if target >= 0: behavior.on_any_contact(target)
-		"weapon/barrier":
-			behavior.block_segment(Vector2(100,0),Vector2.ZERO,1.0,10.0)
-		"weapon/mines":
-			behavior.on_end()
-			if not behavior.mines.is_empty(): _spawn_preview_enemy(behavior.mines[0].to)
-		"weapon/massTow":
-			if target >= 0:
-				session.run.state.tracing = true
-				behavior.capture(target)
-				session.run.state.tracing = false
-				session.run.enemies.mark_dead(target)
-				behavior.on_end()
-				behavior.tick(0.1, false)
-		"weapon/bipolar":
-			behavior.on_launch(false)
-			session.run.state.ship_pos = Vector2(240, 0)
-			behavior.on_end()
-		"weapon/sonic":
-			behavior.on_launch(false)
-			_start_preview_route()
-		"weapon/dashRangeDrone", "weapon/afterimage":
-			_start_preview_route()
-		"trait/endBlast", "trait/vortex":
-			session.run.loadout.on_end()
-		"trait/killSonic":
-			session.run.loadout.on_launch(true)
-			for _i in behavior._every(): session.run.loadout.on_kill(&"shot")
-		"trait/critBeam": session.run.loadout.on_critical(session.run.state.ship_pos)
+	EQUIPMENT.play(session,key)
 	session.playing = true
 	_play.text = "停止"
-	_status.text = "試遊中: " + key
-
-func _spawn_preview_enemy(at: Vector2) -> int:
-	session.perform("spawn", {"type": "drifter", "pos": [at.x, at.y]})
-	return session.selected
-
-func _start_preview_route() -> void:
-	session.perform("route", {"points": [[0, 0], [300, 0]], "draw_seconds": 0.3})
+	_status.text = "%s / Lv%d を再生中" % [catalog[id].get_display_name(),level]
+	if key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
 
 func _replay() -> void:
 	if not _equipment_key.is_empty():
