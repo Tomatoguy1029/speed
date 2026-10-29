@@ -13,6 +13,8 @@ var pixel := 2.36
 var effects: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
 var _particles: InstanceBatch
+var _needle_trails: InstanceBatch
+var _mine_trails: InstanceBatch
 var _shots: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var clock := 0.0
@@ -22,6 +24,7 @@ var _last_world_delta := 0.0
 var _needles: Dictionary = {}
 var preview_editable := false
 var _wave_mesh: ArrayMesh
+var _effect_mesh: ArrayMesh
 
 ## 音の輪に四角い面を持たせない。形とUVは生成時だけ用意し、全ての輪で共有する。
 func _sonic_mesh() -> ArrayMesh:
@@ -45,6 +48,15 @@ func _ready() -> void:
 	_particles = InstanceBatch.new()
 	_particles.setup_shader_quad()
 	add_child(_particles)
+	_needle_trails = InstanceBatch.new()
+	_needle_trails.setup_shader_quad()
+	var additive := CanvasItemMaterial.new()
+	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_needle_trails.material = additive
+	add_child(_needle_trails)
+	_mine_trails = InstanceBatch.new()
+	_mine_trails.setup_shader_quad()
+	add_child(_mine_trails)
 	for key in ["weapon/forward", "weapon/scatter", "weapon/rear", "weapon/interceptor", "weapon/knockback"]:
 		var batch := InstanceBatch.new()
 		batch.setup_shader_quad()
@@ -57,9 +69,15 @@ func _ready() -> void:
 
 func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, options := {}) -> Dictionary:
 	var node := MeshInstance2D.new()
-	var mesh := QuadMesh.new()
-	mesh.size = Vector2.ONE * 2.0
-	node.mesh = mesh
+	if _effect_mesh == null:
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([Vector2(-1,-1),Vector2(1,-1),Vector2(1,1),Vector2(-1,1)])
+		arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2.ZERO,Vector2(1,0),Vector2.ONE,Vector2(0,1)])
+		arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0,1,2,0,2,3])
+		_effect_mesh = ArrayMesh.new()
+		_effect_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	node.mesh = _effect_mesh
 	if mode == 7: node.mesh = _sonic_mesh()
 	var material := ShaderMaterial.new()
 	material.shader = SONIC_WAVE if mode == 7 else EFFECT
@@ -67,8 +85,9 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	node.position = (pos / pixel).round() * pixel
 	var r := radius * SETTINGS.number(key, "effect_scale", 1.0)
-	node.scale = Vector2.ONE * (r + pixel * 2.0)
+	node.scale = Vector2.ONE * (r + pixel * (8.0 if mode==5 else 2.0))
 	material.set_shader_parameter("mode", mode)
+	if mode==5: material.set_shader_parameter("barrier_radius",r/(pixel*SETTINGS.number(key,"pixel_scale",1.0)))
 	material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
 	material.set_shader_parameter("extent", node.scale * 2.0)
 	material.set_shader_parameter("duration", life * SETTINGS.number(key, "duration_scale", 1.0))
@@ -87,7 +106,7 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 			var multiplier: Color = values[setting]
 			material.set_shader_parameter(uniform, original * multiplier)
 	add_child(node)
-	var item := {"node": node, "material": material, "age": 0.0, "life": life * SETTINGS.number(key, "duration_scale", 1.0), "key": key, "follow": false}
+	var item := {"node": node, "material": material, "age": 0.0, "life": life * SETTINGS.number(key, "duration_scale", 1.0), "key": key, "follow": false, "padding":8.0 if mode==5 else 2.0}
 	if preview_editable: item.merge({"base_radius": radius, "base_life": life, "base_options": options.duplicate()})
 	effects.append(item)
 	if effects.size() > 160:
@@ -119,7 +138,8 @@ func refresh_preview() -> void:
 		var material: ShaderMaterial = item.material
 		if item.has("base_radius"):
 			var radius: float = item.base_radius * SETTINGS.number(key, "effect_scale", 1.0)
-			node.scale = Vector2.ONE * (radius + pixel * 2.0)
+			node.scale = Vector2.ONE * (radius + pixel * float(item.get("padding",2.0)))
+			if int(material.get_shader_parameter("mode"))==5: material.set_shader_parameter("barrier_radius",radius/(pixel*SETTINGS.number(key,"pixel_scale",1.0)))
 			material.set_shader_parameter("extent", node.scale * 2.0)
 			material.set_shader_parameter("duration", item.base_life * SETTINGS.number(key, "duration_scale", 1.0))
 		material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
@@ -146,6 +166,12 @@ func event(ev: Dictionary) -> bool:
 		_needles.erase(ev.id)
 	match ev.type:
 		&"kill":
+			if ev.get("cause", &"")==&"bipolar":
+				var fire := effect(1,ev.pos,7.0*pixel,0.5,"weapon/bipolar",{"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
+				fire.age=-_rng.randf()*0.08
+				for sign_side in [-1.0,1.0]:
+					burst(ev.pos,4,ev.dir.angle()+PI*0.5*sign_side,1.0,40,100,0.3,[Color.WHITE,Color("#ff7a6b")],"weapon/bipolar")
+				return true
 			return ev.get("cause", &"")==&"vortex"
 		&"hole_capture":
 			if texture_provider.is_valid() and _captures.size()<128:
@@ -164,7 +190,7 @@ func event(ev: Dictionary) -> bool:
 				effect(8,(target+ev.pos)*0.5,d.length()*0.5,0.12,"weapon/dashRangeDrone",{"angle":d.angle(),"c1":Color("#9ffff4")})
 				effect(3,target,6.0*pixel,0.12,"weapon/dashRangeDrone",{"width":0.0})
 		&"escort_slash":
-			effect(4,ev.pos,12.0*pixel,0.16,"weapon/dashRangeDrone",{"angle":ev.dir.angle(),"width":1.5,"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
+			effect(19,ev.pos,14.0*pixel,0.16,"weapon/dashRangeDrone",{"angle":ev.dir.angle(),"c1":Color("#7ff3ff")})
 			burst(ev.pos,8,ev.dir.angle()+PI*0.5,TAU,10,45,0.16,[Color.WHITE,Color("#69fff0")],"weapon/dashRangeDrone")
 		&"anchor_capture":
 			effect(0,ev.pos,12.0*pixel,0.14,"weapon/massTow",{"c1":Color("#ffbe65")})
@@ -174,8 +200,8 @@ func event(ev: Dictionary) -> bool:
 			effect(0,ev.pos,28.0*pixel,0.16,"weapon/massTow",{"c1":Color("#ffbe65")})
 			burst(ev.pos,9,ev.dir.angle(),1.3,60,120,0.25,[Color.WHITE,Color("#fff2c0"),Color("#ffbe65")],"weapon/massTow")
 		&"ring":
-			if key!="weapon/bipolar":return false
-			effect(0,ev.pos,ev.radius,0.2,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0")})
+			# 双極の両端はbeamで二重輪を描く。
+			return key=="weapon/bipolar"
 		&"bipolar_charge":
 			for pos in [ev.from,ev.to]:
 				for i in 20:
@@ -184,13 +210,21 @@ func event(ev: Dictionary) -> bool:
 		&"beam":
 			if key!="weapon/bipolar":return false
 			var delta: Vector2=ev.to-ev.from
-			effect(6,(ev.from+ev.to)*0.5,delta.length()*0.5,0.7,key,{"angle":delta.angle(),"width":float(ev.width)/pixel,"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
+			var visual_width := 16.0*float(ev.get("width_scale",1.0))
+			var beam := effect(6,(ev.from+ev.to)*0.5,delta.length()*0.5+visual_width*pixel*0.6,0.7,key,{"angle":delta.angle(),"width":visual_width,"beam_length":delta.length()/pixel,"phase":clock,"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
+			beam["beam"]={"from":ev.from,"to":ev.to,"width":visual_width,"acc":0.0}
 			for pos in [ev.from,ev.to]:
-				effect(1,pos,20.0*pixel,0.45,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
+				effect(20,pos,36.0*pixel,0.35,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0")})
+				effect(1,pos,20.0*pixel,0.5,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
 				burst(pos,16,0,TAU,35,140,0.4,[Color.WHITE,Color("#69fff0")],key)
-			burst((ev.from+ev.to)*0.5,70,delta.angle()+PI*0.5,TAU,20,80,0.35,[Color("#cffff9"),Color("#69fff0")],key)
+			burst((ev.from+ev.to)*0.5,70,delta.angle()+PI*0.5,0.0,10,40,0.5,[Color("#cffff9"),Color("#69fff0")],key)
 			for i in range(maxi(0,sparks.size()-70),sparks.size()):
-				sparks[i].delay=0.7
+				sparks[i].delay=0.55
+				sparks[i].life=_rng.randf_range(0.3,0.5)
+				sparks[i].fade=true
+				sparks[i].color=Color("#cffff9")
+				sparks[i].late_color=Color("#69fff0")
+				if _rng.randf()<0.5: sparks[i].velocity=-sparks[i].velocity
 				sparks[i].pos=ev.from.lerp(ev.to,_rng.randf())
 
 		&"weapon_fire":
@@ -204,10 +238,13 @@ func event(ev: Dictionary) -> bool:
 			if key=="weapon/massTow":
 				effect(1,ev.pos,13.0*pixel,0.45,key,{"c1":Color("#fff2a8"),"c2":Color("#ffb030"),"c3":Color("#d2461c")})
 				return true
-			var big := key != "weapon/scatter" and key != "weapon/interceptor"
+			if key=="weapon/interceptor":
+				burst(ev.pos,4,ev.dir.angle()+PI,2.0,25,70,0.16,[Color.WHITE,Color("#8fffe2"),Color("#3e9eaa")],key)
+				return true
+			var big := key != "weapon/scatter"
 			effect(3, ev.pos, 16.0 * pixel, 0.18 if big else 0.14, key, {"width": 2.0 if big else 0.0})
 			burst(ev.pos, 13 if big else 5, ev.dir.angle() + PI, 2.6 if big else 2.0, 30, 120 if big else 90, 0.22,
-				[Color.WHITE, Color("#8fffe2") if key == "weapon/interceptor" else Color("#bff3ff"), Color("#3e9eaa") if key == "weapon/interceptor" else Color("#4fb8ff")], key)
+				[Color.WHITE, Color("#bff3ff"), Color("#4fb8ff")], key)
 		&"duplicate":
 			effect(3, ev.pos, pixel * 8.0, 0.14, "trait/duplicator", {"width": 0.0})
 			for velocity in ev.directions: burst(ev.pos, 4, velocity.angle(), 0.6, 20, 70, 0.16, [Color.WHITE, Color("#bff3ff")], "trait/duplicator")
@@ -223,9 +260,14 @@ func event(ev: Dictionary) -> bool:
 		&"chain_shock": effect(0, ev.pos, ev.radius, ev.life, "trait/killSonic", {"c1": Color("#d8f6ff"), "c2": Color("#7fd8ff")})
 		&"space_quake":
 			_distortion(ev.pos, ev.radius, 0.58, "weapon/contactWave", 0)
-			burst(ev.pos, 9, 0, TAU, 80, 180, 0.14, [Color.WHITE], "weapon/contactWave")
+			var flash := effect(9,ev.pos,3.0*pixel,0.05,"weapon/contactWave",{"c1":Color.WHITE})
+			flash.age = -0.08
+			for i in 9:
+				var ray := effect(18,ev.pos,20.0*pixel,0.1,"weapon/contactWave",{"angle":i*TAU/9.0+_rng.randf()*0.5,"width":_rng.randf_range(8.0,18.0),"c1":Color("#e8f6ff")})
+				ray.age = -0.08
 		&"barrier_hit":
-			var life: float = 0.26 + ceil(float(ev.radius) / (sqrt(3.0) * 4.0 * pixel) - 4.0) * 0.05 + 0.1
+			var last := roundi(float(ev.radius)*SETTINGS.number("weapon/barrier","effect_scale",1.0)/(sqrt(3.0)*4.0*pixel*SETTINGS.number("weapon/barrier","pixel_scale",1.0)))
+			var life: float = 0.21+(last-3)*0.05+0.1
 			effect(5, ev.pos, ev.radius, life, "weapon/barrier", {"angle": ev.angle, "broken": ev.broken, "c1": Color("#e6f3ff"), "c2": Color("#76aaff")})
 			if ev.broken:
 				var count := roundi(TAU * float(ev.radius) / (sqrt(3.0) * 4.0 * pixel) * 6.0 * SETTINGS.number("weapon/barrier","particle_count_scale",1.0))
@@ -254,8 +296,8 @@ func event(ev: Dictionary) -> bool:
 					var f := _rng.randf()
 					var index := mini(ev.path.size() - 2, floori(f * (ev.path.size() - 1)))
 					var direction: Vector2 = (ev.path[index + 1] - ev.path[index]).normalized()
-					var p: Vector2 = ev.path[index].lerp(ev.path[index + 1], fmod(f * (ev.path.size() - 1), 1.0)) + direction.orthogonal() * _rng.randf_range(-40, 40) * pixel
-					var item := effect(4, p, _rng.randf_range(30, 210) * pixel * 0.5, 0.7, "weapon/flashSlash", {"angle": direction.angle() + _rng.randf_range(-1.3, 1.3), "width": _rng.randf_range(1.4, 3.6), "c2": Color("#dcaaff"), "c3": Color("#8f52d0")})
+					var p: Vector2 = ev.path[index].lerp(ev.path[index + 1], fmod(f * (ev.path.size() - 1), 1.0)) + direction.orthogonal() * (_rng.randf()-0.5) * (24.0 if _rng.randf()<0.7 else 80.0) * pixel
+					var item := effect(4, p, (30.0+_rng.randf()*(180.0 if _rng.randf()<0.25 else 80.0)) * pixel * 0.5, 0.7, "weapon/flashSlash", {"angle": direction.angle() + (_rng.randf()-0.5)*(0.7 if _rng.randf()<0.6 else 2.6), "width": _rng.randf_range(1.4, 3.6), "c2": Color("#dcaaff"), "c3": Color("#8f52d0")})
 					item.age = -float(ev.pause) - f * float(ev.sweep)
 		&"hull_scatter":
 			effect(3, ev.pos, 16.0 * pixel, 0.18, "weapon/knockback", {"width": 2.0})
@@ -297,6 +339,7 @@ func step(dt: float, ship_pos := Vector2.ZERO) -> void:
 	captures_step(dt,ship_pos)
 	clock += dt
 	_last_world_delta=dt
+	_needle_trails.begin()
 	for needle in _needles.values():
 		needle.age+=dt
 		var progress:=minf(1.0,float(needle.age)/0.06)
@@ -304,6 +347,14 @@ func step(dt: float, ship_pos := Vector2.ZERO) -> void:
 		needle.node.position=needle.center+Vector2.from_angle(float(needle.angle))*(float(needle.radius)*0.6+170.0*pixel*(1.0-progress))
 		needle.material.set_shader_parameter("age",0.0)
 		needle.material.set_shader_parameter("width",2.4 if needle.release else 1.6)
+		var tail_alpha := maxf(0.0,(progress-0.6)/0.4) if needle.age<0.06 else maxf(0.0,1.0-(float(needle.age)-0.06)/0.08)
+		if tail_alpha>0.0:
+			var length_px := 60.0 if needle.age<0.06 else 60.0*tail_alpha
+			var direction := Vector2.from_angle(float(needle.angle))
+			var center: Vector2 = needle.node.position+direction*length_px*pixel*0.5
+			_needle_trails.add_rect(center,Vector2(length_px,2.2*tail_alpha+0.4)*pixel*0.5,needle.angle,SETTINGS.tinted("weapon/flashSlash",Color(Color("#c8a0ff"),0.55*tail_alpha)))
+			_needle_trails.add_rect(center,Vector2(length_px,0.8)*pixel*0.5,needle.angle,SETTINGS.tinted("weapon/flashSlash",Color(1,1,1,0.7*tail_alpha)))
+	_needle_trails.end()
 	for item in effects:
 		item.age += dt
 		item.node.visible = item.age >= 0.0
@@ -311,6 +362,14 @@ func step(dt: float, ship_pos := Vector2.ZERO) -> void:
 		item.material.set_shader_parameter("age", maxf(0.0, item.age))
 		if item.get("distortion", false):
 			item.material.set_shader_parameter("screen_scale", get_global_transform_with_canvas().get_scale().abs())
+		if item.has("beam") and item.age<0.3:
+			var beam: Dictionary = item.beam
+			beam.acc+=dt*48.0
+			while beam.acc>=1.0:
+				beam.acc-=1.0
+				var side: Vector2 = (beam.to-beam.from).normalized().orthogonal()*(1.0 if _rng.randf()<0.5 else -1.0)
+				var pos: Vector2 = beam.from.lerp(beam.to,_rng.randf())+side*float(beam.width)*pixel*0.5
+				burst(pos,2,side.angle(),0.8,30,90,0.2,[Color.WHITE,Color("#cffff9"),Color("#69fff0")],item.key)
 		if item.age >= item.life: item.node.queue_free()
 	effects = effects.filter(func(e): return e.age < e.life)
 	_particles.begin()
@@ -327,6 +386,8 @@ func step(dt: float, ship_pos := Vector2.ZERO) -> void:
 		var cell: Vector2 = (particle.pos / pixel).round()
 		if q > 0.6 and int(cell.x + cell.y) % 2 != 0: continue
 		var color: Color = particle.color
+		if particle.has("late_color") and q>0.4: color=particle.late_color
+		if particle.get("fade",false): color.a*=1.0-q
 		if particle.has("palette"): color = particle.palette[mini(5, floori(q * 6.0))]
 		_particles.add_upright(cell * pixel, particle.size * pixel * 0.5, color)
 	sparks = sparks.filter(func(p): return p.age < p.life + p.delay)
@@ -434,11 +495,22 @@ func sample(ctx: RunContext, dt: float) -> void:
 	_mines.material.set_shader_parameter("tint",SETTINGS.tinted("weapon/mines",Color.WHITE))
 	_mines.material.set_shader_parameter("pixel_scale",SETTINGS.number("weapon/mines","pixel_scale",1.0))
 	_mines.begin()
+	_mine_trails.begin()
 	var launcher = ctx.loadout.weapon_behaviors.get(&"W07")
 	if launcher != null:
 		for mine in launcher.mines:
-			_mines.add_upright((mine.pos / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number("weapon/mines","effect_scale",1.0), Color(0, 0, 0, 1))
+			_mines.add_upright((mine.pos / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number("weapon/mines","effect_scale",1.0), Color(0, mine.age, clock+float(mine.id)*0.17, 1))
+			if mine.age<0.3:
+				var ease := 1.0-pow(1.0-minf(1.0,float(mine.age)/0.14),3.0)
+				var start: Vector2 = mine.from.lerp(mine.to,maxf(0.0,ease-0.5))
+				var count := ceili(start.distance_to(mine.pos)/pixel)
+				for dot in range(count+1):
+					if mine.age>0.12 and (dot+floori(clock*60.0))%3==0: continue
+					var pos: Vector2 = start.lerp(mine.pos,float(dot)/maxi(1,count))
+					var color := Color("#cfeaff") if mine.age<0.15 else Color("#6fa8e8")
+					_mine_trails.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/mines",color))
 	_mines.end()
+	_mine_trails.end()
 
 func captures_step(dt: float, center: Vector2) -> void:
 	for capture in _captures:
@@ -510,7 +582,7 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 	_escort_samples=_escort_samples.filter(func(p):return p.age<0.3)
 	if state.weapons.has(&"W26") and state.tracing and dt>0.0:
 		if _escort_samples.is_empty() or state.ship_pos.distance_to(_escort_samples.back().pos)>pixel*2.0:
-			_escort_samples.append({"pos":state.ship_pos,"age":0.0})
+			_escort_samples.append({"pos":state.ship_pos-state.ship_heading*9.0*pixel,"age":0.0})
 	_escort.begin()
 	var remaining:=80.0*pixel
 	for i in range(_escort_samples.size()-1,0,-1):
@@ -521,9 +593,13 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 		b=a.move_toward(b,minf(distance,remaining))
 		var fade:=1.0-float(_escort_samples[i].age)/0.3
 		for k in 3:
-			var width_value:float=[6.0,3.0,2.0][k]
-			var color:Color=[Color(0.35,0.85,1.0,0.25*fade),Color(0.5,0.95,1.0,0.65*fade),Color(1,1,1,fade)][k]
+			var width_value:float=[6.0,3.0,2.0 if fade>0.5 else 1.0][k]
+			var color:Color=[Color(Color("#5ff6ff"),0.12*fade),Color(Color("#3fd0e8"),0.6*fade),Color(Color("#f2ffff"),fade)][k]
 			_escort.add_rect((a+b)*0.5,Vector2(a.distance_to(b)*0.5,width_value*pixel*0.5),(a-b).angle(),SETTINGS.tinted("weapon/dashRangeDrone", color))
+		if i%3==0:
+			var side := (a-b).normalized().orthogonal()*4.0*pixel
+			for sign_side in [-1.0,1.0]:
+				_escort.add_upright(((b+side*sign_side)/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/dashRangeDrone",Color(Color("#5ff6ff"),fade*0.65)))
 		remaining-=distance
 		if remaining<=0.0:break
 	_escort.end()

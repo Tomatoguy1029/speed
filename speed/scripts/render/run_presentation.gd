@@ -941,6 +941,15 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	var wave_deformations := {}
+	var quake = run.loadout.weapon_behaviors.get(&"W04")
+	if quake != null:
+		for wave in quake.waves:
+			for id in wave.caught:
+				var held: Dictionary = wave.caught[id]
+				if not run.enemies.is_same(held.row,id): continue
+				var progress := clampf(float(held.age)/0.16,0.0,1.0)
+				wave_deformations[id] = {"direction":run.enemies.table.pos[held.row]-wave.pos,"amount":sin(progress*PI),"flash":progress<0.45}
 	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
@@ -997,13 +1006,17 @@ func _draw_enemies(c: CanvasItem) -> void:
 			self_drawn += 1
 			continue
 		batched += 1
+		var deform: Dictionary = wave_deformations.get(t.id[i],{})
+		if not deform.is_empty() and deform.flash: col.r=1.0
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
 		else:
 			batch.add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+		if not deform.is_empty(): batch.deform_last(deform.direction,deform.amount)
 		if _armor_batches.has(type):
 			_armor_batches[type].add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+			if not deform.is_empty(): _armor_batches[type].deform_last(deform.direction,deform.amount)
 			continue
 		# 飾りのある敵だけ、飾りを描く
 		var v := _visual_of(t, i)
@@ -1377,7 +1390,7 @@ func _draw_fx(c: CanvasItem) -> void:
 		var segments: PackedVector2Array = bo.segments
 		for i in range(0, segments.size(), 2):
 			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1],
-				1.82 * cfg.character_scale * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0),
+				_px(2.0 * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0)),
 				int(bo.seed) * 7919 + i * 313 + shape * 101, alpha,
 				EFFECT_SETTINGS.tinted("weapon/contactArc", Color("#ffcf3a")), Color("#fff8d6"))
 	for r in rings:

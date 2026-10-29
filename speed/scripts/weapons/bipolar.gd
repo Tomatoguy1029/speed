@@ -47,7 +47,7 @@ func _fire(from: Vector2, to: Vector2) -> void:
 	var color := Color(p("color", "#69fff0"))
 	var life := float(p("life"))
 	state.emit(&"beam", {"from": from, "to": to, "width": width, "color": color, "life": life,
-		"visual_key": "weapon/bipolar"})
+		"visual_key": "weapon/bipolar", "width_scale": radius_k()})
 	state.emit(&"ring", {"pos": from, "radius": 65.0, "color": color, "life": life,
 		"visual_key": "weapon/bipolar"})
 	state.emit(&"ring", {"pos": to, "radius": 65.0, "color": color, "life": life,

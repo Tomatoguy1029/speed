@@ -22,7 +22,7 @@ void fragment(){
   float gap=r-edge;
   if(abs(gap)>8.0*pixel || r<pixel) discard;
   float band=1.0-abs(gap)/(8.0*pixel);
-  float amp=time<0.08?3.0:10.0*(1.0-q*0.75);
+  float amp=time<0.08?-8.0*(1.0-time/0.08*0.3):10.0*(1.0-q*0.75);
   offset=-u*band*amp*pixel;
   light=gap>0.0?1.0+0.9*band:1.0-0.35*band;
   if(gap>0.0) extra=vec3(1.0,1.0,1.15)*(38.0/255.0)*band*band;

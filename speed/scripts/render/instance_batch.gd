@@ -141,3 +141,15 @@ func add_rect(pos: Vector2, half_size: Vector2, angle: float, color: Color) -> v
 	_buf[i + 4] *= half_size.x
 	_buf[i + 1] *= half_size.y
 	_buf[i + 5] *= half_size.y
+
+## 直前の個体を、ワールド上の指定方向へ縮め、その直角方向へ広げる。
+func deform_last(radial: Vector2, amount: float) -> void:
+	if _count == 0 or radial.length_squared()<0.0001: return
+	var n := radial.normalized()
+	var side := n.orthogonal()
+	var i := (_count-1)*STRIDE
+	for column in 2:
+		var basis := Vector2(_buf[i+column],_buf[i+4+column])
+		var stretched := n*basis.dot(n)*(1.0-0.5*amount)+side*basis.dot(side)*(1.0+0.6*amount)
+		_buf[i+column]=stretched.x
+		_buf[i+4+column]=stretched.y

@@ -8,6 +8,9 @@ uniform float age = 0.0;
 uniform float duration = 0.4;
 uniform float angle = 0.0;
 uniform float width = 2.0;
+uniform float barrier_radius = 0.0;
+uniform float beam_length = 0.0;
+uniform float phase = 0.0;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform vec4 c0 : source_color = vec4(1.0);
 uniform vec4 c1 : source_color = vec4(0.85,0.96,1.0,1.0);
@@ -29,7 +32,7 @@ mat2 rotate(float a) { return mat2(vec2(cos(a),sin(a)),vec2(-sin(a),cos(a))); }
 float ring(vec2 p, float r) { return step(abs(length(p)-r),0.62); }
 float bayer(vec2 p) { ivec2 c=ivec2(mod(p,4.0)); int b[16]=int[](0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5); return (float(b[c.x+c.y*4])+0.5)/16.0; }
 void fragment() {
- vec2 cell=floor((UV-0.5)*extent/pixel); vec2 p=cell+0.5;
+ vec2 cell=floor((UV-0.5)*extent/pixel); vec2 p=cell;
  vec2 v=rotate(-angle)*p;
  float q=clamp(age/max(duration,0.001),0.0,1.0);
  float radius=min(extent.x,extent.y)*0.5/pixel-2.0;
@@ -70,31 +73,51 @@ void fragment() {
   }
  } else if(mode==5) { // 六角形の殻と外へ広がる段
   float step_r=sqrt(3.0)*4.0;
-  float row=floor((p.y+3.0)/6.0); float cx=floor((p.x+step_r*0.5-mod(row,2.0)*step_r*0.5)/step_r)*step_r+mod(row,2.0)*step_r*0.5;
-  vec2 center=vec2(cx,row*6.0); vec2 h=abs(p-center);
-  float hex=max(h.x*0.8660254+h.y*0.5,h.y); float line=step(abs(hex-3.1),0.55);
-  float d=length(center); float a=abs(atan(center.y,center.x)-angle); a=min(a,6.2831853-a);
+  float row=floor((p.y+3.0)/6.0);
+  vec2 center=vec2(0.0);float best=1e20;
+  for(int offset=-1;offset<=1;offset++){
+   float ry=row+float(offset);float shift=mod(ry,2.0)*step_r*0.5;
+   float cx=floor((p.x-shift)/step_r+0.5)*step_r+shift;
+   vec2 candidate=vec2(cx,ry*6.0);float distance=length(p-candidate);
+   if(distance<best){best=distance;center=candidate;}
+  }
+  vec2 h=abs(p-center);
+  float hex=max(h.x,h.x*0.5+h.y*0.8660254);float line=step(abs(hex-3.6*0.8660254),0.55);
+  float d=length(center); float a=abs(mod(atan(center.y,center.x)-angle+3.14159265,6.2831853)-3.14159265);
   if(width<0.0) {
    float at=age-a/3.14159265*0.3;
    if(d>=13.0&&d<=24.0&&at>=0.0&&age<0.5) outc=(at<0.06?c0:c2)*line*(age<0.3?1.0:1.0-(age-0.3)/0.2);
   } else {
    if(d>=13.0&&d<=24.0&&age<0.21&&age-a/3.14159265*0.16>=0.0) outc=(age-a/3.14159265*0.16<0.04?c0:c1)*line;
    float k=4.0+floor((age-0.21)/0.05); float ck=floor(d/step_r+0.5);
-   if(age>=0.21&&d<=radius) {
+   float last=floor(barrier_radius/step_r+0.5);
+   if(age>=0.21&&ck<=last) {
     if(ck==k) outc=c1*line;
-    else if(ck==k-1.0&&k-1.0>=4.0) outc=c2*line*0.45;
+    else if(ck==k-1.0&&k-1.0>=4.0) outc=vec4(c2.rgb,c2.a*line*0.45);
+    float flash=age-(0.21+(last-3.0)*0.05);
+    if(broken&&ck==last&&flash>=0.0&&flash<0.1){
+     float arm=flash<0.05?4.0:2.0;
+     if((h.x<0.5&&h.y<=arm)||(h.y<0.5&&h.x<=arm))outc=flash<0.05?c0:c1;
+     if(flash<0.05&&line>0.5)outc=c0;
+    }
    }
   }
  } else if(mode==6) { // 両端を丸めた双極ビーム
-  float halfw=width*(age<0.3?1.0:max(0.0,1.0-(age-0.3)/0.4))*0.5;
-  float along=max(abs(v.x)-max(0.0,radius-halfw),0.0);
-  float d=length(vec2(along,v.y));
-  float edge=texture(noise_tex,vec2(v.x*0.03,age*0.8)).r;
-  halfw+=floor(edge*2.0);
+  float w=age<0.3?width+2.0*sin((phase+age)*60.0):width*pow(max(0.0,1.0-(age-0.3)/0.4),0.8);
+  float along=v.x+beam_length*0.5;float ic=clamp(along,0.0,beam_length);
+  float halfw=w*0.5*(1.0+0.14*sin(ic*0.45-(phase+age)*40.0));
+  float d=length(vec2(along-ic,v.y));
   if(d<halfw*0.35) outc=c0;
   else if(d<halfw*0.7) outc=c2;
   else if(d<halfw&&mod(cell.x+cell.y,2.0)<1.0) outc=c3;
-  if(abs(v.y-sin(v.x*0.13-age*12.0)*halfw*0.45)<0.7&&d<halfw) outc=c1;
+  float helix=w*0.32*sin(along*0.12-(phase+age)*30.0);
+  if(along>=0.0&&along<=beam_length){
+   if(abs(v.y-helix)<0.7) outc=c1;
+   if(abs(v.y+helix)<0.7) outc=c3;
+  }
+ } else if(mode==20) { // 双極ビームの両端の二重輪
+  if(pixel_ring(cell,4.0+30.0*q)>0.0)outc=q<0.25?c0:c2;
+  if(q>0.15&&pixel_ring(cell,2.0+18.0*q)>0.0)outc=c1;
  } else if(mode==14) {
   float ke=width;
   for(int i=0;i<64;i++){
@@ -113,6 +136,15 @@ void fragment() {
   if(length(p)<=radius) outc=c1;
  } else if(mode==10) {
   if(abs(length(p)-radius)<=width*0.5) outc=c1;
+ } else if(mode==19) {
+  float len=floor(5.0+4.0*q+0.5);
+  if(abs(p.x)<=len&&abs(abs(p.y)-1.0)<0.5)outc=c1;
+  if(abs(p.x)<=len+2.0&&abs(p.y)<0.5)outc=c0;
+  outc.a*=1.0-q;
+ } else if(mode==18) { // 震空：白い閃光から9本の線が短くなる
+  float len=width*(q<0.5?1.0:0.6);
+  if(v.x>=2.0&&v.x<=len&&abs(v.y)<0.5)outc=q<0.5?c0:c1;
+  if(q<0.5&&v.x>=0.0&&v.x<=len*0.45&&abs(v.y)<1.0)outc=c0;
  } else if(mode==15) { // ソニックの押し出し：進路側から当たる7ドットの弧
   for(int k=-3;k<=3;k++) {
    vec2 target=rotate(angle)*vec2(-5.0+abs(float(k))*0.6,float(k));

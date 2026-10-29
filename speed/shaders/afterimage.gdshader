@@ -31,6 +31,12 @@ void fragment() {
 	vec3 light = mix(vec3(0.2, 0.85, 1.0), cyan, source.a);
 	light *= mix(0.65, 1.35, scan);
 	float alpha=max(source.a*0.9,edge*0.6)*tint.a;
-	if(ghost){vec2 cell=floor(UV/TEXTURE_PIXEL_SIZE);float step_size=tint.g<0.333?2.0:(tint.g<0.667?3.0:4.0);if(mod(cell.x+cell.y,step_size)>0.5)alpha=0.0;}
+	if(ghost){
+	 vec2 cell=floor(UV/TEXTURE_PIXEL_SIZE);
+	 bool dot_visible=tint.g<0.333?mod(cell.x+cell.y,2.0)<0.5:
+	  (tint.g<0.667?(mod(cell.x,2.0)<0.5&&mod(cell.y,2.0)<0.5):(mod(cell.x,4.0)<0.5&&mod(cell.y,2.0)<0.5));
+	 light=vec3(63.0,184.0,255.0)/255.0;
+	 alpha=dot_visible?max(source.a,edge)*tint.a:0.0;
+	}
 	COLOR = vec4(light, alpha) * effect_tint;
 }

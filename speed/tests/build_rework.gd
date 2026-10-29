@@ -161,6 +161,25 @@ func _test_endpoint() -> void:
 	mines.on_end()
 	mines.on_end()
 	_check(mines.mines.size() == 60, "機雷は古いものから消して60個")
+	# 終点で反射しても、機雷は到着した区間の進行方向へ出る。
+	_clear()
+	mines.mines.clear()
+	run.state.ship_heading=Vector2.LEFT
+	run.state.trace_path=PackedVector2Array([Vector2(-100,0),Vector2.ZERO])
+	run.draw.run=TraceRun.new()
+	mines.on_end()
+	_check(mines.mines.all(func(m):return m.to.x>=m.from.x),"終点の反射後も入ってきた方向へ機雷を出す")
+	run.draw.run=null
+	# 発射直後に敵へ触れても、着地前は爆発と誘爆を始めない。
+	for mine in mines.mines: mine.to=run.state.ship_pos
+	var victim := _enemy(&"drifter",run.state.ship_pos)
+	run.enemies.table.hp[victim]=100000.0
+	run.combat.rebuild_grid()
+	mines.tick(0.13,false)
+	_check(mines.mines.size()==24,"飛行中の機雷は敵と重なっても残る")
+	mines.tick(0.02,false)
+	_check(mines.mines.is_empty(),"停止した機雷は敵の接近で爆発し、周囲も誘爆する")
+	_clear()
 	run.loadout.reset_loadout()
 
 func _test_shooting_multiplier_hits() -> void:

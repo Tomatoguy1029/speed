@@ -5,7 +5,7 @@ extends WeaponBehavior
 const MAX_DASHES := 8
 const MAX_LEGS := 2048
 const MAX_RECORD_SECONDS := 4.0
-const FADE_SECONDS := 0.12
+const FADE_SECONDS := 0.2
 
 var echoes: Array[Dictionary] = []
 var _current: Dictionary = {}

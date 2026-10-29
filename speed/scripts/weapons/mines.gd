@@ -3,7 +3,12 @@ extends WeaponBehavior
 var mines: Array[Dictionary] = []
 var _serial := 0
 func on_end() -> void:
-	var heading := state.ship_heading.angle()
+	var direction := state.ship_heading
+	var trace: TraceRun = ctx.draw.run
+	if trace != null and state.trace_path.size() >= 2:
+		var segment := mini(trace.seg,state.trace_path.size()-2)
+		direction = (state.trace_path[segment+1]-state.trace_path[segment]).normalized()
+	var heading := direction.angle()
 	var count := int(at_level("count_by_level"))
 	for k in count:
 		var a := heading + deg_to_rad(state.rng.randf_range(-float(p("spread")), float(p("spread"))))
@@ -19,7 +24,7 @@ func tick(dt: float, _busy: bool) -> void:
 		m.life -= dt
 		m.age += dt
 		m.pos = m.from.lerp(m.to, 1.0 - pow(1.0 - minf(1.0, m.age / 0.14), 3.0))
-		if m.life <= 0.0: continue
+		if m.life <= 0.0 or m.age < 0.14: continue
 		var rows := PackedInt32Array()
 		ctx.combat.nearby(m.pos, area(float(p("trigger"))), rows)
 		for i in rows:
@@ -34,7 +39,7 @@ func tick(dt: float, _busy: bool) -> void:
 		ctx.combat.explode(m.pos, m.radius, m.damage, {"cause": &"mine", "knock": 300.0 * post_factor(&"knockback"), "life": 0.6})
 		if level >= 3:
 			for other in mines:
-				if other.life > 0.0 and not other.detonate and other.pos.distance_to(m.pos) <= m.radius:
+				if other.life > 0.0 and other.age >= 0.14 and not other.detonate and other.pos.distance_to(m.pos) <= m.radius:
 					other.detonate = true
 					queue.append(other)
 	mines = mines.filter(func(m): return m.life > 0.0)

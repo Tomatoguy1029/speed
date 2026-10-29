@@ -40,7 +40,6 @@ var _visual_time := 0.0
 var _preview_origin := Vector2.ZERO
 var _preview_heading := Vector2.RIGHT
 var _loop_seconds := 0.0
-var _shot_seconds := 0.0
 var _dragging_origin := false
 
 func _ready() -> void:
@@ -70,6 +69,10 @@ func _ready() -> void:
 	_speed.tooltip_text = "再生速度"
 	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
 	controls.add_child(_speed)
+	var add_enemy := Button.new()
+	add_enemy.text = "敵を追加"
+	add_enemy.pressed.connect(_add_preview_enemies)
+	controls.add_child(add_enemy)
 	add_child(_loadout_row)
 	_loadout_row.visible = false
 	_loadout_row.add_child(_weapon_name)
@@ -182,7 +185,6 @@ func set_effect(path: String, resume: Variant = null) -> void:
 	_serial += 1
 	var serial := _serial
 	_loop_seconds = 0.0
-	_shot_seconds = 0.0
 	if manual != null: manual.finish()
 	manual = null
 	actor = null
@@ -298,7 +300,7 @@ func _setup_equipment(_key: String, serial: int, keep_playing: bool) -> void:
 	if behavior == null:
 		_status.text = "装備を試遊へ設定できません: " + play_key
 		return
-	EQUIPMENT.preview(session, play_key, _preview_heading)
+	EQUIPMENT.play(session, play_key, false, _preview_heading)
 	_flush_preview_events()
 	_show_effect_canvas()
 	session.playing = keep_playing
@@ -317,12 +319,14 @@ func _show_effect_canvas() -> void:
 	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud")
 	if hud != null: hud.visible = false
 	var layers: Dictionary = render.get("_layers")
-	for name in ["field", "pickups", "enemies", "dim"]:
+	for name in ["field", "dim"]:
 		if layers.has(name): (layers[name] as CanvasItem).visible = false
 
 func _flush_preview_events() -> void:
 	var events: Array[Dictionary] = []
-	for event in session.run.state.events: events.append(event)
+	for event in session.run.state.events:
+		events.append(event)
+		session.events.append(event)
 	session.run.state.events.clear()
 	if not events.is_empty(): session.run.frame_events.emit(events)
 
@@ -454,20 +458,14 @@ func _process(_delta: float) -> void:
 		if not _equipment_key.is_empty():
 			_show_effect_canvas()
 			_loop_seconds += _delta * session.speed
-			if _equipment_key == "weapon/interceptor":
-				_shot_seconds += _delta * session.speed
-				if _shot_seconds >= 0.7:
-					_shot_seconds = 0.0
-					EQUIPMENT.preview(session, _equipment_key, _preview_heading)
-					_flush_preview_events()
-			if _loop_seconds >= 4.0:
+			if _loop_seconds >= 10.0:
 				set_effect(_equipment_key, true)
 				return
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
 	var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-	render.view_override = {"center": Vector2.ZERO if not _equipment_key.is_empty() else session.run.state.view_center,
+	render.view_override = {"center": session.run.state.view_center,
 		"zoom": zoom * fit, "shake": _equipment_key.is_empty()}
 
 func _step() -> void:
@@ -525,3 +523,11 @@ func set_active(active: bool) -> void:
 
 func _exit_tree() -> void:
 	if manual != null: manual.finish()
+
+func _add_preview_enemies() -> void:
+	if _equipment_key.is_empty() or not is_instance_valid(session.run): return
+	var origin: Vector2 = session.run.state.ship_pos
+	for offset in [Vector2(180,0),Vector2(240,80),Vector2(240,-80)]:
+		EQUIPMENT.spawn(session,origin+offset.rotated(_preview_heading.angle()))
+	session.run.combat.rebuild_grid()
+	refresh_effects()
