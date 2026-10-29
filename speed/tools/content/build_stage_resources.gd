@@ -15,11 +15,13 @@ static func _script(paths: Dictionary, path: String) -> String:
 	_add(paths, path)
 	return FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
 static func _attack(paths: Dictionary, kind: String) -> void:
+	_add(paths, "res://scenes/attacks/%s.tscn" % kind)
 	_script(paths, "res://scripts/attacks/%s.gd" % kind)
 	_script(paths, "res://scripts/render/attacks/%s.gd" % kind)
 	if kind in ["zone", "beam"]:
 		for file in DirAccess.get_files_at("res://scripts/render/attacks"):
 			if file.begins_with(kind + "_") and file.ends_with(".gd") and file != "beam_flood.gd":
+				_add(paths, "res://scenes/attacks/" + file.get_basename() + ".tscn")
 				_script(paths, "res://scripts/render/attacks/" + file)
 	if kind in ["enemy", "ring_hold", "lump"]:
 		_script(paths, "res://scripts/attacks/bullet.gd")
@@ -42,7 +44,17 @@ static func build(stage: RuntimeStage, output := "res://.content") -> StageResou
 	result.look_paths = index.look_paths.duplicate()
 	for placement: BackgroundPlacement in stage.backgrounds:
 		if not placement.texture_path.is_empty(): _add(paths, placement.texture_path)
+		if not placement.fire_preset_path.is_empty():
+			_add(paths, placement.fire_preset_path)
+			_script(paths, "res://scripts/render/fx/pixel_fire.gd")
+	for use_name in stage.fire_uses:
+		var fire_use: Dictionary = stage.fire_uses[use_name]
+		var preset_path := str(fire_use.get("preset", ""))
+		if not preset_path.is_empty():
+			_add(paths, preset_path)
+			_script(paths, "res://scripts/render/fx/pixel_fire.gd")
 	_add(paths, "res://.content/boss_hydra.tres")
+	_add(paths, "res://.content/attack_visuals.res")
 	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
 	var ids := {}
 	for id in stage.enemies: ids[String(id)] = true

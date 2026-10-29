@@ -2,15 +2,19 @@
 ## 本番では個体ごとにvalueを消費し、明示overrideの群れだけ1つのvalueを共有する。分類は記録用。
 ## 待っていた攻撃は、許可が出てもばらつき（jitter 秒までの乱数）だけ遅れて始める。
 extends RefCounted
+## 倍精度の加算順だけで越えた分を、値の大きさに応じた数ULPで吸収する。
+## 固定の絶対epsilonは微小な正のvalueを0扱いするので使わない。
+const FLOAT_ROUNDING := 4.0 * 2.220446049250313e-16
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
 const BEHAVIORS := {
+	"biter": ["zone"], "defender": ["zone"], "hound": ["zone"], "auriga": ["residue"],
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 	"lynx": ["aimed"], "triangle": ["residue"],
-	"phoenix": ["dash", "zone"], "crab": ["dash", "zone"], "marlin": ["dash", "aimed"],
-	"aquarius": ["beam"], "reticle": ["beam"], "auriga": ["residue"], "corona": ["aimed"],
-	"aquila": ["zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
+	"phoenix": ["dash", "zone"], "crab": ["zone"], "marlin": ["dash", "aimed"],
+	"aquarius": ["beam"], "reticle": ["beam"], "corona": ["aimed"],
+	"aquila": ["dash", "zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 var guard: Dictionary = {}
 var enabled := false
 ## 本番タイムライン：個体IDまたは共有override群れのIDで枠を管理する。
@@ -33,16 +37,29 @@ func configure(value: Dictionary) -> void:
 
 func advance(time: float, enemies: EnemySystem) -> void:
 	now = time
-	# 期限前の枠は弾を調べず保持する。失効候補がある更新だけ全体を照合する。
+	# 行動中は同じ枠を維持する。終了後は紐づく最後の判定が消えるまで枠を残す。
 	var expired: Array = []
 	for token in groups:
 		var group: Dictionary = groups[token]
-		if formation_mode:
+		if group.has("members"):
+			group.until = now
 			for member in group.get("members", {}).values():
 				var row := int(member.row)
-				if enemies.is_same(row, int(member.id)) and not enemies.table.dead[row] and enemies.table.mode[row] == EnemyTable.Mode.WINDUP:
-					group.until = maxf(float(group.until), now + maxf(0.05, enemies.table.timer[row]))
-		if group.until <= now:
+				if not member.get("closed", false):
+					if not enemies.is_same(row, int(member.id)) or enemies.table.dead[row] != 0:
+						member.closed = true
+						member.until = now
+					else:
+						var behavior := enemies.row_behavior(row)
+						if behavior != null and behavior.admit_active(row, self, str(group.owner)):
+							member.begun = true
+							member.until = now + 0.05
+						elif member.get("begun", false) or behavior == null \
+								or not behavior.admit_due(row, 0.0) or _time_reached(now, float(member.until)):
+							member.closed = true
+							member.until = now
+				group.until = maxf(float(group.until), float(member.until))
+		if _time_reached(now, float(group.until)):
 			expired.append(token)
 	if not expired.is_empty():
 		var live := {}
@@ -53,7 +70,7 @@ func advance(time: float, enemies: EnemySystem) -> void:
 			if projectiles.hazard_alive[i]:
 				live[projectiles.lab_hazard_group.get(i, 0)] = true
 		for token in expired:
-			if live.has(token):
+			if live.has(token) or not groups[token].get("external", {}).is_empty():
 				continue
 			var group: Dictionary = groups[token]
 			if state != null: state.emit(&"attack_end", {"token": token, "owner": group.owner})
@@ -88,21 +105,49 @@ func cancel_attack(owner: String, id: int) -> void:
 		return
 	var group: Dictionary = groups[owners[owner]]
 	if group.has("members"):
-		group.members.erase(str(id))
+		if group.members.has(str(id)):
+			group.members[str(id)].closed = true
+			group.members[str(id)].until = now
 		group.until = now
 		for member in group.members.values():
 			group.until = maxf(float(group.until), float(member.until))
 	elif int(group.id) == id:
 		group.until = now
 
+## 所有中の行動か。残留判定だけを保持する枠は、同じ行動を再開させない。
+func owns_action(owner: String, id: int) -> bool:
+	if not owners.has(owner):
+		return false
+	var group: Dictionary = groups[owners[owner]]
+	return group.has("members") and group.members.has(str(id)) and not group.members[str(id)].get("closed", false)
+
+## ProjectileSystem以外が持つ攻撃判定も、同じ攻撃グループの寿命へ結び付ける。
+func track_external(token: int, key: String) -> void:
+	if token <= 0 or not groups.has(token):
+		return
+	var group: Dictionary = groups[token]
+	if not group.has("external"):
+		group.external = {}
+	group.external[key] = true
+
+func release_external(token: int, key: String) -> void:
+	if token <= 0 or not groups.has(token):
+		return
+	var group: Dictionary = groups[token]
+	if group.has("external"):
+		group.external.erase(key)
+
 ## 予算全体に収まる待機から先頭を選ぶ。必要量が空くまで後続を待たせる。
 ## 待ち時間は全候補に同じ割合で加算するので、比較はpriority - since * 0.2で行える。
 func _next_owner() -> String:
 	var winner := ""
 	var best := -INF
+	var budget := float(settings.budget)
+	if budget <= 0.0:
+		return ""
 	for candidate: String in waiting:
 		var item: Dictionary = waiting[candidate]
-		if float(item.get("cost", 1.0)) > float(settings.budget):
+		if _greater_than(float(item.get("cost", 1.0)), budget):
 			continue
 		var score := float(item.priority) - float(item.since) * 0.2
 		# 同点は待機登録の順。owner名に含まれる種類や群れの有無で優先しない。
@@ -113,27 +158,29 @@ func _next_owner() -> String:
 
 ## cost はownerのvalue（個体、または共有override群れ。省略時は1）。
 func request(owner: String, cats: Array, row: int, id: int, duration: float, priority := 0.0, cost := -1.0) -> bool:
-	if cats.is_empty():
+	if not is_finite(cost) or cost < 0.0:
+		cost = 1.0
+	if cost == 0.0 or cats.is_empty():
 		return true
 	if owners.has(owner):
 		var group: Dictionary = groups[owners[owner]]
-		if formation_mode:
+		if group.has("members"):
 			var member := str(id)
-			if enabled and used_cost() > float(settings.budget):
+			if group.members.has(member):
+				return not group.members[member].get("closed", false)
+			if not formation_mode:
+				return false
+			if enabled and (float(settings.budget) <= 0.0 or _greater_than(used_cost(), float(settings.budget))):
 				reasons[owner] = TranslationServer.translate("lab.message_9ce7705ba3")
 				return false
-			if group.members.has(member):
-				return float(group.members[member].until) > now
-			group.members[member] = {"row": row, "id": id, "until": now + maxf(0.05, duration)}
+			group.members[member] = {"row": row, "id": id, "until": now + maxf(0.05, duration), "begun": false, "closed": false}
 			group.until = maxf(float(group.until), now + maxf(0.05, duration))
 			return true
-		if float(group.until) > now:
+		if not _time_reached(now, float(group.until)):
 			return true
 		if enabled:
 			reasons[owner] = TranslationServer.translate("lab.message_eb3d91decb")
 			return false
-	if cost < 0.0:
-		cost = 1.0
 	queue(owner, cats, row, id, priority)
 	waiting[owner].cost = cost
 	if enabled:
@@ -152,13 +199,13 @@ func request(owner: String, cats: Array, row: int, id: int, duration: float, pri
 	if enabled and now > float(waiting[owner].since) + 0.001 and float(settings.get("jitter", 0.0)) > 0.0:
 		if not waiting[owner].has("ready"):
 			waiting[owner].ready = now + (state.rng.randf() if state != null else 0.5) * float(settings.jitter)
-		if now < float(waiting[owner].ready):
+		if not _time_reached(now, float(waiting[owner].ready)):
 			return false
 	serial += 1
 	groups[serial] = {"owner": owner, "row": row, "id": id, "categories": cats.duplicate(), "until": now + maxf(0.05, duration), "start": now, "passive": false, "pos": _source_position(row), "type": _source_type(row), "cost": cost}
 	owners[owner] = serial
-	if formation_mode:
-		groups[serial].members = {str(id): {"row": row, "id": id, "until": now + maxf(0.05, duration)}}
+	if formation_mode or _normal_enemy(row, id):
+		groups[serial].members = {str(id): {"row": row, "id": id, "until": now + maxf(0.05, duration), "begun": false, "closed": false}}
 	waiting.erase(owner)
 	reasons.erase(owner)
 	if state != null:
@@ -172,8 +219,20 @@ func used_cost() -> float:
 		total += float(group.get("cost", 1.0))
 	return total
 
+func _greater_than(a: float, b: float) -> bool:
+	return a > b and a - b > maxf(absf(a), absf(b)) * FLOAT_ROUNDING
+
+func _time_reached(time: float, deadline: float) -> bool:
+	return time >= deadline or deadline - time <= maxf(absf(time), absf(deadline)) * FLOAT_ROUNDING
+
 func _capacity(cost: float) -> String:
-	return TranslationServer.translate("lab.message_9ce7705ba3") if used_cost() + cost > float(settings.budget) else ""
+	var budget := float(settings.budget)
+	var used := used_cost()
+	# 予算0は新しい能動攻撃を止める。満杯のときも微小な正valueを無料扱いしない。
+	if budget <= 0.0 or (cost > 0.0 and used >= budget) \
+			or _greater_than(used + cost, budget):
+		return TranslationServer.translate("lab.message_9ce7705ba3")
+	return ""
 
 func token(owner: String) -> int:
 	return int(owners.get(owner, 0))
@@ -202,3 +261,9 @@ func _source_position(row: int) -> Vector2:
 func _source_type(row: int) -> String:
 	if projectiles != null and projectiles.combat != null and row >= 0 and row < projectiles.combat.enemies.table.type.size(): return String(projectiles.combat.enemies.table.type[row])
 	return ""
+
+func _normal_enemy(row: int, id: int) -> bool:
+	if projectiles == null or projectiles.combat == null:
+		return false
+	var enemies: EnemySystem = projectiles.combat.enemies
+	return enemies != null and enemies.is_same(row, id) and enemies.table.def[row] != null

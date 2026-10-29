@@ -16,6 +16,7 @@
 | `docs/game/stages/` | ステージごとの個別仕様（`stage-1.md`〜`stage-5.md`） |
 | `docs/game/bosses/` | ボスごとの詳しい仕様。ステージの個別仕様からリンクする |
 | `docs/dev/` | 制作手順。ステージ制作の進め方とAI向けの参照 |
+| `docs/dev/tools/` | 制作ツールの一覧と、入口ごとの短い操作ガイド |
 
 置ける文書は次のものだけ。増やすときは、この表と `tools/check_docs.py` を同じ作業で直す。
 
@@ -38,8 +39,9 @@
 | [game/bosses/draco.md](game/bosses/draco.md) | りゅう座の個別仕様。戦闘・行動判断の要件・素材と演出・最終決着 |
 | [dev/stage-production.md](dev/stage-production.md) | ステージ制作ガイド。制作者が使う制作・操作・試遊調整の入口 |
 | [dev/stage-production-ai.md](dev/stage-production-ai.md) | AI向けの制作参照。編集先・記録分析・変更確認の進め方 |
+| [dev/tools/index.md](dev/tools/index.md)・`dev/tools/*.md` | Godotの制作ツール一覧と各ツールの操作・保存範囲 |
 
-採用前の案、計測・実装の報告、特定の作業のための計画・タスク一覧・引継ぎは、リポジトリの外（会話や各自のローカル）に置く。明示的に依頼された制作仕様はルートの `SPEC.md`、実装計画と作業一覧は `tasks/plan.md`・`tasks/todo.md` に置ける。この2ファイルは対象セッションの制作計画を管理し、共有タスク一覧は管理担当が更新する。ほかの作業文書は `tasks/` に追加しない。
+採用前の案、計測・実装の報告、特定の作業のための計画・タスク一覧・引継ぎは、リポジトリの外（会話や各自のローカル）に置く。
 
 ## 2. 書き方
 
@@ -52,7 +54,7 @@
    - 見た目：デザインとアートスタイル。ボスの個別素材と演出は `game/bosses/` の各ボスの仕様。UIのグラフィック改善要件は[グラフィック改善ポイント](game/graphics-improvements.md)、必要な画像・素材は[共有アート素材リスト](game/catalog/art-assets.md)
    - ゲームの決まり：仕様書。ボスの個別仕様は `game/bosses/`、個別の武器・特性・敵の詳しい仕様は `game/catalog/` の各一覧
    - ステージ固有のゲーム仕様：各ステージの個別仕様。`game/stages/` の `stage-1.md`〜`stage-5.md`（例：[stage-4.md](game/stages/stage-4.md)）。共通の決まりとボスの詳細仕様はそれぞれの正本を参照する
-   - 現在使う制作の進め方：[制作ガイド](dev/stage-production.md)。AIへの実装・分析依頼は [AI向け参照](dev/stage-production-ai.md)、ツールの詳細な編集契約と記録形式は設計書
+   - 現在使う制作の進め方：[制作ガイド](dev/stage-production.md)。各画面の操作は[ツール一覧](dev/tools/index.md)、AIへの実装・分析依頼は [AI向け参照](dev/stage-production-ai.md)、ツールの詳細な編集契約と記録形式は設計書
    - 実装パラメータの数値：`speed/data/` の `.tres`（文書には `config.xxx` やデータのファイルで示す）。到達レベル・選択間隔など設計上の目標は、ステージの個別仕様に置き、仮目標と確定目標を区別する
    - ゲーム中の文章（日本語・英語）と敵・英雄・ボスの表示名：[ゲーム内文言](game/text.md)。CSV・リソース表示名は生成結果を使う
    - 企画書だけは、要約としてほかと重なってよい。細かい数値と決まりは書かずにリンクする。
@@ -76,7 +78,7 @@ python3 tools/check_docs.py
 - `docs/` の中の日付・「最終更新」・作業者の名前
 - `docs/` の決められた文書以外のファイル
 - 個人の作業ログのファイル
-- `tasks/plan.md`・`tasks/todo.md` 以外の作業文書と、`docs/proposals/`・`docs/logs/`
+- リポジトリの `tasks/`・`docs/proposals/`・`docs/logs/`
 - `docs/` と `AGENTS.md`・`README.md` の切れたリンク
 - [設計書](architecture.md) 6.2 の敵の列の一覧と、`speed/scripts/data_types/enemy_table.gd` の列の食い違い
 

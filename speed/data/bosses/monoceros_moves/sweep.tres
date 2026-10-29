@@ -1,15 +1,19 @@
-[gd_resource type="Resource" script_class="BossTechnique" format=3]
+[gd_resource type="Resource" script_class="BossTechnique" format=3 uid="uid://daol2dr8j7g4f"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_hh10e"]
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/sweep.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/sweep_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_hh10e")
+script = ExtResource("1")
 technique = &"sweep"
-parameters = {
-"active": 0.5,
-"arc": 1.15,
-"cd": 4.0,
-"damage": 20.0,
-"recover": 1.3,
-"warn": 0.85
-}
+display_name = "角の薙ぎ払い"
+active = 0.3
+arc = 1.7453292519943295
+cd = 4.0
+damage = 20.0
+hold = 0.25
+recover = 1.0
+return_speed = 3.141592653589793
+warn = 0.85
+visual = ExtResource("visual")

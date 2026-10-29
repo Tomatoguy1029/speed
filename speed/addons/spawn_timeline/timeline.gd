@@ -4,6 +4,9 @@
 extends VBoxContainer
 
 const Canvas := preload("res://addons/spawn_timeline/timeline_canvas.gd")
+const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
+
+signal stage_saved(saved_stage: Resource)
 
 var undo_redo: EditorUndoRedoManager
 var _pin_buttons: Dictionary = {}
@@ -314,6 +317,7 @@ func _save() -> void:
 
 ## Undo のあと別のステージを表示していても、編集したステージを保存する。
 func _save_stage(target: Resource) -> void:
+	if target is StageDef: FormationPaths.rebind_stage(target)
 	_edit_feedback = ""
 	if target == null or target.resource_path == "":
 		return
@@ -322,6 +326,7 @@ func _save_stage(target: Resource) -> void:
 			ResourceSaver.save(p)
 	ResourceSaver.save(target)
 	refresh()
+	stage_saved.emit(target)
 
 ## clips の要素の型（プロパティの型の指定から、プロジェクトのクラスを探して作る）。
 func _new_clip() -> Resource:

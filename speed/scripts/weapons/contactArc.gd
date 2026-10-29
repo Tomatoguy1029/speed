@@ -3,11 +3,21 @@
 extends WeaponBehavior
 
 var _buf := PackedInt32Array()
+var _ready_at := 0.0
+var _known_level := 0
+
+const COOLDOWN_EPSILON := 0.000001
 
 func on_any_contact(target: int) -> void:
 	var t := ctx.enemies.table
 	if t.meteor_index[target] >= 0:
 		return
+	if _known_level != level:
+		_known_level = level
+		_ready_at = 0.0
+	if state.world_time + COOLDOWN_EPSILON < _ready_at:
+		return
+	_ready_at = state.world_time + float(p("cooldown"))
 	var dmg := atk() * float(p("damage")) * dmg_k()
 	var used := {t.id[target]: true}
 	var origin := t.pos[target]
@@ -93,5 +103,5 @@ func _strike(from: Vector2, next: int, dmg: float, used: Dictionary, segments: P
 	var pos := t.pos[next]
 	segments.append(from)
 	segments.append(pos)
-	ctx.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized()})
+	ctx.combat.damage_enemy(next, dmg, {"cause": &"contactArc", "dir": (pos - from).normalized(), "knock": 160.0 * post_factor(&"knockback")})
 	return pos

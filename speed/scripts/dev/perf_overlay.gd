@@ -1,7 +1,7 @@
 ## 性能の表示（仕様書 20）。開発版だけで、F3 を押すたびに 簡易 → 詳細 → 非表示 と切り替わる。
 ##
 ## 初期位置は画面の右上（ボスの HP バーの下）。つかんで動かせ、位置と表示の段階は同じ起動の間は次のランにも引き継ぐ。
-## 文字は1秒に4回更新し、その間の平均と最大を出す。Manager ごとの時間は詳細表示の間だけ計測する。
+## 文字は1秒に4回更新し、その間の平均と最大を出す。処理ごとの時間は詳細表示の間だけ、この表示用の記録に取る。
 class_name PerfOverlay
 extends PanelContainer
 
@@ -23,8 +23,11 @@ static var _saved_pos := Vector2(-1, -1)
 
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var view: RunPresentation
 var mode := Mode.HIDDEN
 var _label: RichTextLabel
+## 詳細表示の右の列（表示側の時間）
+var _view_label: RichTextLabel
 var _graph: Control
 ## 直近のフレーム時間（ms）の輪。_frame_head が次に書く位置
 var _frames := PackedFloat32Array()
@@ -39,8 +42,10 @@ var _frame_sum := 0.0
 var _frame_max := 0.0
 var _frame_n := 0
 var _compiles_prev := -1
-## RunSimulation の計測をこの表示が有効にしたか
-var _owns_profiling := false
+## 詳細表示の間だけ開く、この表示用の記録（ゲーム側・表示側・敵の描画の行の数）
+var _sim_rec := {}
+var _view_rec := {}
+var _rows_rec := {}
 var _dragging := false
 var _drag_offset := Vector2.ZERO
 var _placed := false
@@ -55,17 +60,18 @@ func _ready() -> void:
 	style.set_corner_radius_all(4)
 	style.set_content_margin_all(8)
 	add_theme_stylebox_override("panel", style)
+	# 詳細表示は縦に収まるよう、表示側の時間を右の列に分ける
+	var columns := HBoxContainer.new()
+	columns.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	columns.add_theme_constant_override("separation", 16)
+	add_child(columns)
 	var box := VBoxContainer.new()
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(box)
-	_label = RichTextLabel.new()
-	_label.bbcode_enabled = true
-	_label.fit_content = true
-	_label.scroll_active = false
-	_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_label.add_theme_font_size_override("normal_font_size", 13)
+	columns.add_child(box)
+	_label = _new_label()
 	box.add_child(_label)
+	_view_label = _new_label()
+	columns.add_child(_view_label)
 	_graph = Control.new()
 	_graph.custom_minimum_size = GRAPH_SIZE
 	_graph.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -79,8 +85,7 @@ func _exit_tree() -> void:
 	saved_mode = mode
 	if _placed:
 		_saved_pos = position
-	if _owns_profiling and run != null:
-		run.profiling = false
+	_close_records()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"debug_perf"):
@@ -91,14 +96,16 @@ func _set_mode(m: Mode) -> void:
 	mode = m
 	visible = mode != Mode.HIDDEN
 	_graph.visible = mode == Mode.DETAIL
+	_view_label.visible = mode == Mode.DETAIL and view != null
 	_label.custom_minimum_size = Vector2(380.0 if mode == Mode.DETAIL else 0.0, 0.0)
-	if mode == Mode.DETAIL and not run.profiling:
-		run.profiling = true
-		run.profile.clear()
-		_owns_profiling = true
-	elif mode != Mode.DETAIL and _owns_profiling:
-		run.profiling = false
-		_owns_profiling = false
+	if mode == Mode.DETAIL:
+		_sim_rec = run.perf.open(&"overlay")
+		if view != null:
+			_view_rec = view.perf.open(&"overlay")
+			_rows_rec = view.perf_rows.open(&"overlay")
+		_clear_records()
+	else:
+		_close_records()
 	_reset_window()
 	_acc = REFRESH
 	reset_size()
@@ -149,6 +156,9 @@ func _process(delta: float) -> void:
 		return
 	_acc = 0.0
 	_label.text = _text()
+	if _view_label.visible:
+		_view_label.text = "\n".join(_view_lines())
+	_clear_records()
 	_reset_window()
 
 func _reset_window() -> void:
@@ -176,10 +186,14 @@ func _text() -> String:
 	if mode == Mode.DETAIL:
 		lines.append(HEAD % "処理時間")
 		# 描画時間の計測（viewport_set_measure_render_time）は描画の完了を待ってフレームを引き延ばすので使わない。
-		# ゲーム処理の時間をフレーム時間から引いた残りを、描画と待ちの目安にする。
-		var total: Array = run.profile.get(&"play_total", [0, 0, 0])
+		# ゲーム処理と表示側のスクリプトの時間をフレーム時間から引いた残りを、描画エンジン・GPU・待ちの目安にする。
+		var total: Array = _sim_rec.get(&"play_total", [0, 0, 0])
 		var game_ms: float = total[0] / 1000.0 / maxi(1, _frame_n)
-		lines.append("ゲーム処理 %.2fms/フレーム  それ以外（描画・待ち）%.2fms" % [game_ms, maxf(0.0, avg - game_ms)])
+		var view_ms := _view_total_ms()
+		var events: Array = _sim_rec.get(&"events_out", [0, 0, 0])
+		var events_ms: float = events[0] / 1000.0 / maxi(1, _frame_n)
+		lines.append("ゲーム処理 %.2f  出来事の受け渡し %.2f  表示側 %.2f（ms/フレーム）" % [game_ms, events_ms, view_ms])
+		lines.append("残り（描画エンジン・GPU・待ち）%.2fms" % maxf(0.0, avg - game_ms - events_ms - view_ms))
 		lines.append("ゲーム更新 1回 平均 %.2fms 最大 %.2fms" % [total[0] / 1000.0 / maxi(1, total[1]), total[2] / 1000.0])
 		lines.append_array(_manager_lines())
 		lines.append(HEAD % "描画")
@@ -210,22 +224,99 @@ func _text() -> String:
 		lines.append(HEAD % ("フレーム時間（直近 %d フレーム、線は 16.7ms と 33.3ms）" % GRAPH_FRAMES))
 	return "\n".join(lines)
 
-## 世界側の各処理の、1回あたりの平均と最大（多い順に8件）。読んだら次の区間のために空にする。
+## 世界側の各処理の、1回あたりの平均と最大（多い順に8件）。内訳の項目は右の列に出す。
 func _manager_lines() -> Array[String]:
 	var out: Array[String] = []
-	if not run.profiling:
+	if mode != Mode.DETAIL:
 		return out
 	var rows: Array = []
-	for key in run.profile:
-		var rec: Array = run.profile[key]
-		if key != &"play_total" and rec[1] > 0:
+	for key in _sim_rec:
+		var rec: Array = _sim_rec[key]
+		if key != &"play_total" and key != &"events_out" and not String(key).contains(".") and rec[1] > 0:
 			rows.append([String(key), rec[0] / 1000.0 / rec[1], rec[2] / 1000.0])
-	run.profile.clear()
 	rows.sort_custom(func(a, b): return a[1] > b[1])
 	out.append("処理ごと（世界側の更新1回あたり 平均 / 最大）")
 	for r in rows.slice(0, 8):
 		out.append("  %-12s %.3f / %.3fms" % [r[0], r[1], r[2]])
 	return out
+
+## 表示側（RunPresentation の _process と各層の描く処理）の、1フレームあたりの合計（ms）。内訳の項目と、
+## 出来事の受け渡し（events_out）に含まれる出来事の処理（events）は数えない。
+func _view_total_ms() -> float:
+	if view == null or mode != Mode.DETAIL:
+		return 0.0
+	var us := 0
+	for key in _view_rec:
+		if not String(key).contains(".") and key != &"events":
+			us += _view_rec[key][0]
+	return us / 1000.0 / maxi(1, _frame_n)
+
+## 右の列：表示側の各処理の、1フレームあたりの平均と1回の最大（多い順。内訳は親の項目の下に1行でまとめる）と、
+## ゲーム側の内訳（敵の行動・武器・弾の種類ごと）の1フレームあたりの時間。
+func _view_lines() -> Array[String]:
+	var out: Array[String] = []
+	if view == null or mode != Mode.DETAIL:
+		return out
+	var frames := maxi(1, _frame_n)
+	var rows: Array = []
+	for key in _view_rec:
+		var rec: Array = _view_rec[key]
+		rows.append([String(key), rec[0] / 1000.0 / frames, rec[2] / 1000.0])
+	rows.sort_custom(func(a, b): return a[1] > b[1])
+	out.append(HEAD % "表示側（1フレームあたり 平均 / 1回の最大）")
+	for r in rows:
+		if r[0].contains("."):
+			continue
+		out.append("%-20s %.3f / %.3fms" % r)
+		var parts: Array[String] = []
+		for s in rows:
+			if s[0].begins_with(r[0] + "."):
+				parts.append("%s %.3f" % [s[0].get_slice(".", 1), s[1]])
+		if not parts.is_empty():
+			out.append("  └ " + "  ".join(parts))
+	var counts: Dictionary = _rows_rec
+	if counts.has(&"rows"):
+		var avg := func(key: StringName) -> String:
+			var rec: Array = counts.get(key, [0, 1, 0])
+			return "%.0f" % (float(rec[0]) / maxi(1, rec[1]))
+		out.append(HEAD % "敵の描画1回あたりの行（平均）")
+		out.append("見た行 %s  生存 %s" % [avg.call(&"rows"), avg.call(&"live")])
+		out.append("一括 %s  個別 %s  飾り %s" % [avg.call(&"batched"), avg.call(&"self_drawn"), avg.call(&"marked")])
+	var parts: Array = []
+	for key in _sim_rec:
+		if String(key).contains("."):
+			parts.append([String(key), _sim_rec[key][0] / 1000.0 / frames])
+	parts.sort_custom(func(a, b): return a[1] > b[1])
+	if not parts.is_empty():
+		out.append(HEAD % "ゲーム側の内訳（1フレームあたり、多い順に10件）")
+		for r in parts.slice(0, 10):
+			out.append("%-28s %.3fms" % r)
+	return out
+
+func _clear_records() -> void:
+	_sim_rec.clear()
+	_view_rec.clear()
+	_rows_rec.clear()
+
+func _close_records() -> void:
+	if run != null:
+		run.perf.close(&"overlay")
+	if is_instance_valid(view):
+		view.perf.close(&"overlay")
+		view.perf_rows.close(&"overlay")
+	_sim_rec = {}
+	_view_rec = {}
+	_rows_rec = {}
+
+func _new_label() -> RichTextLabel:
+	var label := RichTextLabel.new()
+	label.bbcode_enabled = true
+	label.fit_content = true
+	label.scroll_active = false
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("normal_font_size", 13)
+	return label
 
 func _ms(v: float, warn: float) -> String:
 	if v >= warn:

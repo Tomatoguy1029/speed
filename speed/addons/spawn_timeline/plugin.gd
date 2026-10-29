@@ -9,7 +9,9 @@ extends EditorPlugin
 
 const Timeline := preload("res://addons/spawn_timeline/timeline.gd")
 const TypeChecks := preload("res://addons/spawn_timeline/type_checks.gd")
+const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
 const TITLE := "出現タイムライン"
+const MENU_LABEL := "出現タイムライン・編成"
 
 var _panel: Control = null
 var _main: Control = null
@@ -18,22 +20,47 @@ var _save_queued := false
 var _phase_histories: Array[UndoRedo] = []
 
 func _enter_tree() -> void:
+	FormationPaths.sync()
+	EditorInterface.get_resource_filesystem().filesystem_changed.connect(FormationPaths.sync)
+	add_to_group("speed_spawn_timeline")
 	_panel = Timeline.new()
 	_panel.undo_redo = get_undo_redo()
 	add_control_to_bottom_panel(_panel, TITLE)
 	_main = Timeline.new()
 	_main.undo_redo = get_undo_redo()
+	_panel.stage_saved.connect(func(saved_stage: Resource) -> void:
+		if _main != null and _main.stage == saved_stage:
+			_main.refresh())
+	_main.stage_saved.connect(func(saved_stage: Resource) -> void:
+		if _panel != null and _panel.stage == saved_stage:
+			_panel.refresh())
 	_main.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_main.hide()
 	EditorInterface.get_editor_main_screen().add_child(_main)
 	_checks = TypeChecks.new()
 	_checks.timeline = _panel
 	add_inspector_plugin(_checks)
+	add_tool_menu_item(MENU_LABEL, open_timeline)
 	# 開いたステージは、インスペクターの対象が変わったときに拾う（上部の画面へ勝手に切り替えないように _handles は使わない）
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	EditorInterface.get_inspector().property_edited.connect(_on_property_edited)
 
+func open_timeline() -> void:
+	FormationPaths.sync()
+	if _panel.stage == null:
+		var path: String = ProjectSettings.get_setting("spawn_timeline/default_stage", "")
+		if ResourceLoader.exists(path):
+			var stage := load(path) as Resource
+			if stage is StageDef: FormationPaths.rebind_stage(stage)
+			_panel.set_stage(stage)
+			_main.set_stage(stage)
+	EditorInterface.set_main_screen_editor(TITLE)
+	make_bottom_panel_item_visible(_panel)
+
 func _exit_tree() -> void:
+	if EditorInterface.get_resource_filesystem().filesystem_changed.is_connected(FormationPaths.sync):
+		EditorInterface.get_resource_filesystem().filesystem_changed.disconnect(FormationPaths.sync)
+	remove_tool_menu_item(MENU_LABEL)
 	if EditorInterface.get_inspector().property_edited.is_connected(_on_property_edited):
 		EditorInterface.get_inspector().property_edited.disconnect(_on_property_edited)
 	for history in _phase_histories:
@@ -57,11 +84,13 @@ func _on_inspected() -> void:
 	var object := EditorInterface.get_inspector().get_edited_object()
 	# クリップや曲線をインスペクターで開いてもステージの表示は残す
 	if Timeline.is_stage(object):
+		if object is StageDef: FormationPaths.rebind_stage(object)
 		_panel.set_stage(object as Resource)
 		_main.set_stage(object as Resource)
 		_watch_phase_history(object)
 		make_bottom_panel_item_visible(_panel)
 	elif _panel != null and _panel.stage != null and (_contains_resource(_panel.phases(), object) or _contains_resource(_panel.clips(), object)):
+		if _panel.stage is StageDef: FormationPaths.rebind_stage(_panel.stage)
 		_watch_phase_history(object)
 
 ## TypedArray.has()は異なる種類のResourceでもエラーになるため、参照を比較する。
@@ -78,6 +107,7 @@ func _has_main_screen() -> bool:
 
 ## F5・F6・ツールバー・途中再生を、エディター共通の実行前フックで生成する。
 func _build() -> bool:
+	FormationPaths.sync()
 	var error: Error = load("res://addons/content_build/builder.gd").build_all()
 	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
 	return error == OK

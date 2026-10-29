@@ -2,15 +2,18 @@
 extends EditorPlugin
 
 const PANEL := preload("res://tools/editor/stage_enemy_tuning/dock_panel.gd")
+const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
 var _dock: ScrollContainer
 var _panel: Control
 var _inspected: StageDef
 
 func _enter_tree() -> void:
+	FormationPaths.sync()
+	add_to_group("speed_stage_enemy_tuning")
 	# 折り返す説明文や一覧の最小サイズを、エディター全体へ伝えない。
 	_dock = ScrollContainer.new()
 	_dock.name = "ステージ敵調整"
-	_dock.custom_minimum_size = Vector2(280, 320)
+	_dock.custom_minimum_size = Vector2(160, 320)
 	_dock.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_dock.follow_focus = true
 	_panel = PANEL.new()
@@ -19,10 +22,21 @@ func _enter_tree() -> void:
 	_panel.saved.connect(_on_saved)
 	_dock.add_child(_panel)
 	add_control_to_dock(DOCK_SLOT_RIGHT_UL, _dock)
+	add_tool_menu_item("ステージ敵調整", open_dock)
 	EditorInterface.get_inspector().edited_object_changed.connect(_on_inspected)
 	_on_inspected.call_deferred()
 
+func open_dock() -> void:
+	FormationPaths.sync()
+	_dock.custom_minimum_size.x = 160
+	if _panel.stage_path.is_empty():
+		_panel.open_stage("res://data/stages/stage_1.tres")
+	var tabs := _dock.get_parent() as TabContainer
+	if tabs != null:
+		tabs.current_tab = _dock.get_index()
+
 func _exit_tree() -> void:
+	remove_tool_menu_item("ステージ敵調整")
 	EditorInterface.get_inspector().edited_object_changed.disconnect(_on_inspected)
 	remove_control_from_docks(_dock)
 	_dock.queue_free()

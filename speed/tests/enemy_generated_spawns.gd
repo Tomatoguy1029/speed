@@ -237,7 +237,7 @@ func _check_hydra(run: RunSimulation) -> void:
 	var debris = boss.necks.filter(func(n): return n.kind == &"debris")[0]
 	debris.mode = &"rubble_lump"
 	var before := m.count()
-	load("res://scripts/bosses/hydra_normals.gd").launch_rubble(boss, debris, 0.0, 20.0)
+	load("res://data/bosses/hydra_moves/rubble_lump.tres").make_runner().launch_rubble(boss, debris, 0.0, 20.0)
 	check(m.count() == before + 1, "通常技の瓦礫を生成")
 	debris.mode = &"idle"
 	for technique in [&"tornado", &"debris_shatter"]:

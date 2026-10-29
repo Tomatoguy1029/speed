@@ -5,9 +5,10 @@
 
 [resource]
 script = ExtResource("1")
-; 試遊用の暫定値。保持・減速時間の倍率 = 1 + per_stack * 重ね数（最大3）。
+; 試遊用の暫定値。1重ね目は first_stack、2重ね目以降は per_stack を加える（最大5）。
 params = {
-"per_stack": 0.25
+"first_stack": 0.25,
+"per_stack": 0.125
 }
 id = &"T31"
 code_id = &"glideDuration"

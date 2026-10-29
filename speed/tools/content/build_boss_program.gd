@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
-const VERSION := 3
+const VERSION := 4
 static var generation_count := 0
 
 static func validate(source: Dictionary) -> PackedStringArray:
@@ -11,8 +11,12 @@ static func validate(source: Dictionary) -> PackedStringArray:
 	if rules != null:
 		var ids := {}
 		for move in rules.techniques:
+			if not move is BossTechnique or move.make_runner() == null:
+				errors.append("技の実行スクリプトがありません")
+				continue
 			var id := String(move.technique)
 			if id.is_empty() or ids.has(id): errors.append("技IDの重複・欠損: " + id)
+			if not is_finite(float(move.post_gap)) or move.post_gap < 0.0: errors.append("技後の隙が不正: " + id)
 			ids[id] = true
 		for id in rules.conditions:
 			var gate: Dictionary = rules.conditions[id]
@@ -24,10 +28,16 @@ static func validate(source: Dictionary) -> PackedStringArray:
 		for id in rules.costs:
 			var cost := float(rules.costs[id])
 			if not is_finite(cost) or cost < 0.0: errors.append("消費が不正: " + id)
+		for id in rules.selection_bias:
+			var bias := float(rules.selection_bias[id])
+			if not ids.has(String(id)) and not rules.combos.has(String(id)): errors.append("選択優先の技参照が不正: " + String(id))
+			if not is_finite(bias) or bias <= 0.0: errors.append("選択優先の重みが不正: " + String(id))
 		for id in rules.combos: _validate_combo(rules.combos[id], ids, errors, String(id), 0)
 		for id in rules.graph_nodes:
 			var source_id: String = rules.source_for(String(id))
 			if not ids.has(source_id) and not rules.combos.has(source_id): errors.append("ノードの技参照が不正: " + String(id))
+		for group in rules.condition_groups:
+			if String(rules.condition_groups[group].get("category", "")) not in ["", "normal", "combo", "major"]: errors.append("条件選択ノードの分類が不正: " + String(group))
 	if flow != null:
 		if flow.maximum_stamina <= 0.0 or flow.partial_rest < 0.0 or flow.empty_rest < 0.0: errors.append("最大スタミナ・休息時間が不正")
 		if flow.sections.is_empty(): errors.append("区間がありません")
@@ -37,12 +47,23 @@ static func validate(source: Dictionary) -> PackedStringArray:
 				var known: Array = rules.techniques.map(func(move): return String(move.technique)) + rules.combos.keys()
 				for id in section.get("allowed_techniques", []):
 					if not known.has(String(id)): errors.append("区間の候補技が存在しません: " + String(id))
+				for id in section.get("excluded_techniques", []):
+					if not known.has(String(id)): errors.append("区間の除外技が存在しません: " + String(id))
+				for group in section.get("allowed_groups", []):
+					if not rules.condition_groups.has(String(group)): errors.append("区間の条件選択ノードが存在しません: " + String(group))
+				for category in section.get("allowed_categories", []):
+					if String(category) not in ["normal", "combo", "major"]: errors.append("区間の選択分類が不正: " + str(i))
 				for pair in section.get("forbidden", []):
 					if pair.size() != 2 or not known.has(String(pair[0])) or not known.has(String(pair[1])): errors.append("区間の禁止ペアが不正: " + str(i))
 			if int(section.get("next", 0)) < 0 or int(section.get("next", 0)) >= flow.sections.size(): errors.append("次区間が存在しません: " + str(i))
 			if section.has("fallback") and (int(section.fallback) < 0 or int(section.fallback) >= flow.sections.size()): errors.append("不成立時の区間が存在しません: " + str(i))
 			if section.get("request", "normal") not in ["normal", "major", "rest", "any"]: errors.append("要求種別が不正: " + str(i))
 			if float(section.get("cap", flow.maximum_stamina)) <= 0.0: errors.append("消費上限が不正: " + str(i))
+			if section.has("section_budget") and (not is_finite(float(section.section_budget)) or float(section.section_budget) <= 0.0): errors.append("区間予算が不正: " + str(i))
+			var action_count := float(section.get("action_count", 1))
+			if not is_finite(action_count) or action_count < 1.0 or action_count != floorf(action_count): errors.append("区間の攻撃回数が不正: " + str(i))
+			for field in ["action_interval", "no_candidate_timeout"]:
+				if section.has(field) and (not is_finite(float(section[field])) or float(section[field]) < 0.0): errors.append("区間の待機時間が不正: " + str(i))
 	return errors
 
 static func _validate_combo(node: Dictionary, ids: Dictionary, errors: PackedStringArray, id: String, depth: int) -> void:
@@ -66,7 +87,8 @@ static func snapshot(value: Variant) -> Variant:
 		var copy: Resource = value.duplicate(true)
 		for property in value.get_property_list():
 			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["script", "resource_name", "resource_local_to_scene"]:
-				copy.set(property.name, {} if property.name in ["layout", "condition_groups"] else snapshot(value.get(property.name)))
+				if property.name == "condition_groups": copy.set(property.name, _runtime_groups(value.get(property.name)))
+				else: copy.set(property.name, {} if property.name == "layout" else snapshot(value.get(property.name)))
 		return copy
 	if value is Dictionary:
 		var copy := {}
@@ -79,6 +101,13 @@ static func snapshot(value: Variant) -> Variant:
 		return copy
 	return value
 
+static func _runtime_groups(groups: Dictionary) -> Dictionary:
+	var kept := {}
+	for group in groups:
+		var definition: Dictionary = groups[group]
+		kept[group] = {"nodes": definition.get("nodes", []).duplicate(), "category": definition.get("category", "")}
+	return kept
+
 static func build_hydra(output := "res://.content/boss_hydra.tres") -> Dictionary:
 	return build_boss("hydra", output)
 
@@ -89,11 +118,20 @@ static func build_boss(id: String, output: String) -> Dictionary:
 	return compile({"rules": rules, "flow": flow}, output)
 
 static func canonical(value: Variant) -> Variant:
+	if value is Script: return {"script": value.resource_path}
+	if value is PackedScene: return {"scene": value.resource_path, "hash": FileAccess.get_sha256(value.resource_path) if FileAccess.file_exists(value.resource_path) else ""}
 	if value is Resource:
 		var fields := {}
+		if value is BossTechnique: fields["implementation"] = value.get_script().resource_path
 		for property in value.get_property_list():
-			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["resource_name", "resource_local_to_scene", "script", "layout", "condition_groups"]:
-				fields[property.name] = canonical(value.get(property.name))
+			if property.usage & PROPERTY_USAGE_STORAGE and property.name not in ["resource_name", "resource_local_to_scene", "script", "layout"]:
+				if property.name == "selection_bias" and value.get(property.name).is_empty(): continue
+				if property.name == "allow_parallel_attacks" and not value.get(property.name): continue
+				if property.name == "post_gap" and is_zero_approx(float(value.get(property.name))): continue
+				if property.name == "track_during_warn" and value.get(property.name): continue
+				if property.name == "condition_groups":
+					if not value.get(property.name).is_empty(): fields[property.name] = canonical(_runtime_groups(value.get(property.name)))
+				else: fields[property.name] = canonical(value.get(property.name))
 		return fields
 	if value is Dictionary:
 		var fields := {}
@@ -112,7 +150,13 @@ static func compile(source: Dictionary, output: String) -> Dictionary:
 	var errors := validate(source)
 	if not errors.is_empty(): return {"error": ERR_INVALID_DATA, "errors": errors, "program": null, "generated": false}
 	var signature := var_to_str(canonical(source)).sha256_text()
-	if FileAccess.file_exists(output):
+	var reusable := FileAccess.file_exists(output)
+	if reusable:
+		for dependency in ResourceLoader.get_dependencies(output):
+			if not ResourceLoader.exists(dependency.split("::")[-1]):
+				reusable = false
+				break
+	if reusable:
 		var previous = ResourceLoader.load(output, "", ResourceLoader.CACHE_MODE_IGNORE)
 		if previous != null and previous.get_script() == PROGRAM and previous.version == VERSION and previous.signature == signature:
 			return {"error": OK, "program": previous, "generated": false}

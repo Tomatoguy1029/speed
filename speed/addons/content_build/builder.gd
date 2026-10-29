@@ -13,6 +13,8 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 static func signature() -> String:
 	var files := PackedStringArray()
 	for directory in ["res://data", "res://scripts", "res://scenes", "res://addons", "res://tools/content", "res://shaders", "res://assets"]: _files(directory, files)
+	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
+		if not path in files and FileAccess.file_exists(path): files.append(path)
 	files.sort()
 	var hashes := PackedStringArray(["engine:" + str(Engine.get_version_info().string), "res://project.godot:" + FileAccess.get_sha256("res://project.godot")])
 	for path in files: hashes.append(path + ":" + FileAccess.get_sha256(path))
@@ -34,6 +36,8 @@ static func build_all(force := false, output := ROOT) -> Error:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(output.path_join("dev")))
 	var visual_error: Error = load("res://tools/content/build_visuals.gd").build(output)
 	if visual_error != OK: return visual_error
+	var attack_error: Error = load("res://tools/content/build_attack_visuals.gd").build(output)
+	if attack_error != OK: return attack_error
 	var aura_error: Error = preload("res://tools/content/build_hero_aura.gd").build(output)
 	if aura_error != OK: return aura_error
 	var catalog_path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")

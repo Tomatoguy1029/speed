@@ -96,6 +96,8 @@ func _rebuild() -> void:
 	var cfg: GameConfig = ContentManager.base.duplicate(true)
 	for key in spec.get("config", {}):
 		cfg.set(key, spec.config[key])
+	# 旧実験セッションの5枠装備はすべて復元し、そのセッションだけ枠数を保持する。
+	cfg.trait_slots = maxi(cfg.trait_slots, spec.get("traits", {}).size())
 	var field_flags: Dictionary = spec.get("field", {})
 	var terrain: bool = field_flags.get("terrain", not spec.get("empty", true))
 	var rocks: bool = field_flags.get("rocks", not spec.get("empty", true))
@@ -228,7 +230,7 @@ func _draw_route_step() -> void:
 	var n: int = _route_play.n
 	var draw := run.draw
 	if n == 0:
-		if run.state.drawing or run.state.tracing or run.state.gauge < run.cfg.draw_min_charge:
+		if run.state.drawing or run.state.tracing or run.state.gauge_amount() < run.cfg.draw_min_charge:
 			_route_play = {}
 			return
 		var it := Intent.new()
@@ -557,7 +559,7 @@ func _edit_definition(args: Dictionary) -> void:
 			return
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
 	else:
-		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight"]:
+		if key not in ["hp", "toughness", "armor", "speed", "radius", "accel", "turn", "xp", "weak_arc", "attack_weight", "hitstop_multiplier"]:
 			return
 		if key == "toughness":
 			def.toughness = clampi(int(args.value), -1, 1)
@@ -583,6 +585,8 @@ func _edit_definition(args: Dictionary) -> void:
 			var field := key.trim_prefix("visual.")
 			t.r[i] *= def.visual_value(field, 1.0) / old.visual_value(field, 1.0)
 		t.def[i] = def
+		if key == "attack_weight":
+			t.attack_managed[i] = int(def.attack_weight > 0.0)
 
 func row_for_id(id: int) -> int:
 	var t := run.enemies.table
@@ -762,8 +766,8 @@ func _edit_boss_definition(args: Dictionary) -> void:
 	var key := String(args.get("key", ""))
 	if key.begins_with("params.") and def.params.has(key.trim_prefix("params.")):
 		def.params[key.trim_prefix("params.")] = safe_parameter(key.trim_prefix("params."), args.value)
-	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc"]:
-		def.set(key, maxf(0.01, float(args.value)))
+	elif key in ["speed", "radius", "accel", "turn", "xp", "weak_arc", "hitstop_multiplier"]:
+		def.set(key, maxf(0.0 if key == "hitstop_multiplier" else 0.01, float(args.value)))
 	else:
 		return
 	run.bosses.definitions[type] = def

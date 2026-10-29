@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://k4vwt3h3l6ap"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Crow" type="Node2D" unique_id=1090303665]
+script = ExtResource("1")
+types = Array[StringName]([&"crow"])
+
+[node name="1群" type="Node2D" parent="." unique_id=1586104825]
+position = Vector2(-2600, 0)
+script = ExtResource("2")
+
+[node name="crow1" type="Node2D" parent="1群" unique_id=599726835]
+script = ExtResource("3")
+enemy = &"crow"
+
+[node name="2群" type="Node2D" parent="." unique_id=918931790]
+position = Vector2(-3122, 4)
+script = ExtResource("2")
+
+[node name="crow1" type="Node2D" parent="2群" unique_id=1739525470]
+position = Vector2(-180, -80)
+script = ExtResource("3")
+enemy = &"crow"
+metadata/_edit_lock_ = true
+
+[node name="crow2" type="Node2D" parent="2群" unique_id=1253787292]
+position = Vector2(169, 160)
+script = ExtResource("3")
+enemy = &"crow"
+metadata/_edit_lock_ = true
+
+[node name="Entry0" type="Node2D" parent="." unique_id=349464004]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=583130568]
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=1397340572]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=1459409030]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4")
+
+[node name="Entry4" type="Node2D" parent="." unique_id=237970061]
+position = Vector2(1104, -1127)
+rotation = 3.9166818
+script = ExtResource("4")
+
+[node name="Entry5" type="Node2D" parent="." unique_id=310264799]
+position = Vector2(-1138, -1172)
+rotation = 2.370912
+script = ExtResource("4")
+
+[node name="Entry6" type="Node2D" parent="." unique_id=177959779]
+position = Vector2(-1189, 997)
+rotation = 0.873005
+script = ExtResource("4")
+
+[node name="Entry7" type="Node2D" parent="." unique_id=1112215577]
+position = Vector2(1132, 1070)
+rotation = -0.81354684
+script = ExtResource("4")

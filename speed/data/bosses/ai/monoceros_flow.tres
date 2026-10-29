@@ -4,26 +4,39 @@
 
 [resource]
 script = ExtResource("1_attlg")
+maximum_stamina = 8.0
 partial_rest = 0.8
 empty_rest = 2.0
 sections = [{
-"cap": 3.0,
-"name": "接近・牽制",
+"name": "牽制",
+"request": "normal",
+"cap": 1.0,
+"action_count": 1,
+"no_candidate_timeout": 1.0,
 "next": 1,
-"request": "any",
-"weights": {
-"combo": 20.0,
-"major": 10.0,
-"single": 70.0
-}
+"weights": {"single": 100.0}
 }, {
+"name": "圧力",
+"request": "normal",
 "cap": 3.0,
-"name": "連撃・強襲",
+"section_budget": 4.0,
+"action_count": 2,
+"action_interval": 0.25,
+"no_candidate_timeout": 1.0,
+"next": 2,
+"weights": {"single": 35.0, "combo": 65.0}
+}, {
+"name": "大技候補",
+"request": "major",
+"cap": 3.0,
+"action_count": 1,
+"no_candidate_timeout": 0.6,
+"next": 3,
+"fallback": 3,
+"weights": {"major": 100.0}
+}, {
+"name": "反撃の間",
+"request": "rest",
 "next": 0,
-"request": "any",
-"weights": {
-"combo": 40.0,
-"major": 20.0,
-"single": 40.0
-}
+"weights": {}
 }]

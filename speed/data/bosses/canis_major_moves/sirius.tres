@@ -1,17 +1,21 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_cmsir"]
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/sirius.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/sirius_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_cmsir")
+script = ExtResource("1")
 technique = &"sirius"
-parameters = {
-"beam_length": 1400.0,
-"beam_time": 0.5,
-"beam_width": 50.0,
-"cd": 6.0,
-"damage": 26.0,
-"lock": 0.3,
-"recover": 1.0,
-"warn": 1.0
-}
+display_name = "シリウス"
+beam_length = 1400.0
+beam_time = 0.5
+beam_time_p2 = 0.8
+beam_width = 50.0
+beam_width_p2 = 80.0
+cd = 6.0
+damage = 26.0
+lock = 0.3
+recover = 1.0
+warn = 1.0
+visual = ExtResource("visual")

@@ -14,7 +14,7 @@ rank = 10
 radius = 64.0
 hp = 2400.0
 armor = 16.0
-speed = 380.0
+speed = 360.0
 accel = 1.2
 turn = 0.9
 xp = 170.0
@@ -22,10 +22,17 @@ color = Color(0.95, 0.85, 0.6, 1)
 shape = &"dart"
 behavior = &"aquila"
 params = {
-"blast_delay": 0.9,
-"blast_radius": 85.0,
+"aim_time": 0.4,
+"blast_delay": 0.4,
+"blast_radius": 220.0,
 "bullet_dmg": 14.0,
-"drop_step": 0.25
+"dash_speed": 900.0,
+"dash_time": 0.55,
+"drop_step": 0.13,
+"fire_interval": 3.2,
+"keep": 550.0,
+"lock_time": 0.45,
+"recover": 0.9
 }
 id = &"aquila"
 display_name = "わし座"

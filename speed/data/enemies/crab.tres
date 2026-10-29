@@ -11,7 +11,7 @@ rank = 5
 radius = 30.0
 hp = 90.0
 armor = 8.0
-speed = 110.0
+speed = 880.0
 accel = 1.5
 turn = 1.6
 xp = 16.0
@@ -20,22 +20,12 @@ shape = &"hex"
 behavior = &"crab"
 weak_arc = 1.0
 params = {
+"approach": 220.0,
 "bullet_dmg": 16.0,
-"fire_interval": 2.2,
-"dash_speed": 480.0,
-"dash_time": 0.55,
 "open_time": 1.4,
-"reach": 150.0,
-"telegraph": 0.7,
-"walk_min": 0.35,
-"walk_max": 0.9,
-"pause_min": 0.15,
-"pause_max": 0.4,
-"rethink_time": 0.22,
-"reverse_chance": 0.2,
-"walk_deadzone": 8.0,
-"turn_delay": 2.6,
-"turn_time": 1.0
+"reach": 300.0,
+"telegraph": 0.25,
+"turn_angle": 20.0
 }
 id = &"crab"
 display_name = "かに座"

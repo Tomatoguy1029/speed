@@ -25,7 +25,7 @@ static func validate(session, path: PackedVector2Array, margin := 20.0, window :
 	var budget := run.draw.budget(run.state.stats.capacity * run.state.gauge)
 	if path.size() < 2:
 		return {"status": "invalid", "reason": TranslationServer.translate("lab.message_7474db4292"), "valid": false}
-	if run.state.gauge < run.cfg.draw_min_charge: blockers.append({"reason": TranslationServer.translate("lab.low_charge"), "pos": path[0]})
+	if run.state.gauge_amount() < run.cfg.draw_min_charge: blockers.append({"reason": TranslationServer.translate("lab.low_charge"), "pos": path[0]})
 	if path[path.size() - 1].length() + radius + exit_clearance >= run.cfg.field_radius: blockers.append({"reason": TranslationServer.translate("lab.message_fdee8bc433"), "pos": path[path.size() - 1]})
 	if length(path) > budget + 0.01:
 		blockers.append({"reason": TranslationServer.translate("lab.message_ace1dcf08b"), "pos": path[path.size() - 1]})

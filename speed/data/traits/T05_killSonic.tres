@@ -5,13 +5,14 @@
 [resource]
 script = ExtResource("1")
 params = {
-"damage_base": 0.5,
-"damage_per": 0.1,
+"damage_base": 0.55,
+"damage_per": 0.05,
 "kills_base": 10.0,
+"kills_min": 4.0,
 "kills_per": -2.0,
 "knock": 1000.0,
-"radius_base": 240.0,
-"radius_per": 60.0,
+"radius_base": 270.0,
+"radius_per": 30.0,
 "travel": 0.5
 }
 id = &"T05"

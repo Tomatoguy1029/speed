@@ -98,6 +98,8 @@ var xp_dropped := 0.0
 ## 武器の管理 ID → Lv、特性の管理 ID → 重ね数
 var weapons: Dictionary = {}
 var traits: Dictionary = {}
+## このランだけの通常育成完了後の選択回数。永続セーブへ書き込まない。
+var post_max_stacks: Dictionary = {}
 ## 保留中のレベルアップの数と、表示中の3択
 var pending_levels := 0
 var cards: Array[Dictionary] = []
@@ -158,6 +160,10 @@ var events: Array[Dictionary] = []
 func emit(type: StringName, data := {}) -> void:
 	data.type = type
 	events.append(data)
+
+## 溜まっている量（容量 × 充填率）。1でリング1周ぶん
+func gauge_amount() -> float:
+	return gauge * stats.capacity
 
 func view_rect() -> Rect2:
 	return Rect2(view_center - view_half, view_half * 2.0)

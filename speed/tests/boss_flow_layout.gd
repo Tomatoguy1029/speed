@@ -21,13 +21,13 @@ func exercise() -> void:
   assert(panel.preview.size.y <= 200.0 * panel._scale, "the condition preview must remain compact")
  assert(panel.get("_settings") == null, "a universal settings selector must not mix node responsibilities")
  assert(panel.flow_graph is GraphEdit, "flow sections use a separate node editor")
- var original: float = panel.working["res://data/bosses/hydra_moves/bite_thrust.tres"].parameters.bite_dmg
+ var original: float = panel.working["res://data/bosses/hydra_moves/bite_thrust.tres"].bite_dmg
  panel._picked("technique", "bite_thrust")
  panel.set_value("bite_dmg", original + 1.0)
  panel.rebuild_ui()
- assert(panel.current.parameters.bite_dmg == original + 1.0)
+ assert(panel.current.bite_dmg == original + 1.0)
  panel.history.undo()
- assert(panel.current.parameters.bite_dmg == original)
+ assert(panel.current.bite_dmg == original)
  panel.queue_free()
  await process_frame
  var large = load("res://tools/editor/boss_flow/editor.gd").new()

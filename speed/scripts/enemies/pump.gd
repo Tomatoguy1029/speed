@@ -4,6 +4,39 @@ extends EnemyBehavior
 ## 吸い込み口の位置（胴体の中心から前へ、半径に対する割合。pump.png の口に合わせる）
 const MOUTH := 0.85
 
+func _init() -> void:
+	watches_rows = true
+
+## 所有は対象の列に持つ。飲み込み後の在庫（buds）とは独立させる。
+func _pulling(i: int) -> bool:
+	var t := table
+	return t.dead[i] == 0 and t.beh[i] == index and t.mode[i] == EnemyTable.Mode.MOVE \
+		and t.buds[i] < int(t.def[i].params.store_max) and t.stone[i] <= 0.0 \
+		and t.held[i] == 0 and t.knock_t[i] <= 0.0 and t.shove_time[i] <= 0.0
+
+func _owns(j: int) -> bool:
+	var t := table
+	var owner := t.pump_owner[j]
+	return m.is_same(owner, t.pump_owner_id[j]) and _pulling(owner) \
+		and t.pos[owner].distance_squared_to(t.pos[j]) <= pow(float(t.def[owner].params.pull_radius), 2.0)
+
+func _release(j: int) -> void:
+	table.pump_owner[j] = -1
+	table.pump_owner_id[j] = -1
+
+func on_row_gone(i: int) -> void:
+	var t := table
+	_release(i)
+	for j in t.alive.size():
+		if t.alive[j] != 0 and t.pump_owner[j] == i:
+			_release(j)
+
+func after_tick(_dt: float) -> void:
+	var t := table
+	for j in t.alive.size():
+		if t.alive[j] != 0 and t.pump_owner[j] >= 0 and (t.dead[j] != 0 or not _owns(j)):
+			_release(j)
+
 func step(i: int, dt: float) -> void:
 	_pump(i, dt)
 
@@ -58,11 +91,12 @@ func _pump(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.MOVE
 
-## ポンプ座が周りの敵を吸い寄せ、口に届いた敵を一定の間隔で吸い込む。吸い込める敵は、上限を持たない雑魚と硬めの敵。
+## ポンプ座が周りの雑魚（星1・2）を吸い寄せ、口に届いた敵を一定の間隔で吸い込む。
 ## 吸い寄せられている敵は自分の動きをやめ（knock_t）、自転しながら口へまっすぐ進む。口に近いほど速く、速く回る。
 ## 吸い込んだ敵は撃破にせずに消し、自転しながら小さくなって口へ飛び込む見た目を描画へ知らせる。
 func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 	var t := table
+	if not _pulling(i): return
 	var reach := float(p.pull_radius)
 	var pull := float(p.pull)
 	var spin := float(p.pull_spin)
@@ -72,11 +106,18 @@ func _pump_suck(i: int, p: Dictionary, dt: float) -> void:
 	var rows := PackedInt32Array()
 	projectiles.combat.nearby(t.pos[i], reach, rows)
 	for j in rows:
+		if t.buds[i] >= int(p.store_max): break
 		if j == i or t.dead[j] != 0 or t.is_boss[j] != 0 or t.meteor_index[j] >= 0 or t.parent[j] >= 0 \
 				or t.landmark[j] != 0:
 			continue
-		if t.def[j] == null or t.def[j].max_alive > 0 or t.beh[j] == index:
+		if t.def[j] == null or t.def[j].rank < 1 or t.def[j].rank > 2 or t.beh[j] == index:
 			continue
+		if t.pos[i].distance_squared_to(t.pos[j]) > reach * reach:
+			continue
+		if _owns(j) and (t.pump_owner[j] != i or t.pump_owner_id[j] != t.id[i]):
+			continue
+		t.pump_owner[j] = i
+		t.pump_owner_id[j] = t.id[i]
 		var d := mouth - t.pos[j]
 		var dist := d.length()
 		if dist < bite and t.bud_t[i] <= 0.0 and t.buds[i] < int(p.store_max):

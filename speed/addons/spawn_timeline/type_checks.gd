@@ -2,13 +2,14 @@
 ##   ステージの敵（enemies）：プロジェクト設定 spawn_timeline/enemy_dir にある、すべての敵から選ぶ
 ##   出現のクリップの種類の組み合わせ（types）：出現タイムラインで開いているステージの敵から選ぶ
 ##   敵の組み合わせのシーンの置ける種類（types）：すべての敵から選ぶ
-##   出現のクリップの使う並び（layouts）：クリップのフォーメーションの配置から選ぶ（「ファイル名/配置のノード名」）
+##   出現のクリップの使う並び（layouts）：クリップのフォーメーションの配置から選ぶ（保存キーはUID、表示は名前）
 ## この道具は Godot 本体だけに依存する（設計書 4.1）。中身はプロパティ名で読み書きする。
 @tool
 extends EditorInspectorPlugin
 
 ## 敵の定義を置いたフォルダを書くプロジェクト設定
 const SETTING_ENEMIES := "spawn_timeline/enemy_dir"
+const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
 
 ## 出現タイムラインのパネル（開いているステージを持つ）
 var timeline
@@ -60,33 +61,43 @@ func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_ty
 		return true
 	return false
 
-## フォーメーションのシーンのパス → [変更の時刻, to_dataの配置一覧]
+## フォーメーションのシーンのパス → [ファイルの内容ハッシュ, to_dataの配置一覧]
 var _layout_cache: Dictionary = {}
 
-## クリップのフォーメーションの配置：[[「ファイル名/配置の名前」, 表示名], …]。配置は、置き場所（markers）を持つ子のノード。
+## クリップのフォーメーションの配置。表示名から保存キーを作らない。
 func _layout_options(clip: Object) -> Array:
 	var out := []
+	var known := []
 	var scenes = clip.get("formations")
 	if scenes == null:
 		return out
 	for scene in scenes:
 		if not scene is PackedScene or scene.resource_path == "":
 			continue
-		var path: String = scene.resource_path
-		var stamp := FileAccess.get_modified_time(path)
+		var path: String = FormationPaths.current_path(scene.resource_path)
+		if not FileAccess.file_exists(path): continue
+		var stamp := FileAccess.get_sha256(path)
 		if not _layout_cache.has(path) or _layout_cache[path][0] != stamp:
 			var layouts := []
-			var root := (scene as PackedScene).instantiate()
-			if root.has_method("to_data"):
-				layouts = root.to_data().get("layouts", [])
-			root.free()
+			var fresh := ResourceLoader.load(path, "PackedScene", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+			if fresh != null:
+				var root := fresh.instantiate()
+				if root.has_method("to_data"):
+					layouts = root.to_data().get("layouts", [])
+				root.free()
 			_layout_cache[path] = [stamp, layouts]
 		var base := path.get_file().get_basename()
 		for layout: Dictionary in _layout_cache[path][1]:
 			var n := str(layout.name)
 			var stage: Resource = timeline.stage if timeline != null else null
 			var total: float = clip.automatic_value(stage, layout) if stage != null else -1.0
-			out.append([StringName(base + "/" + n), "%s：%s" % [base, n], total])
+			var selected_key: StringName = clip.stored_layout_key(path, n)
+			var value_key: StringName = clip.stored_value_key(path, n)
+			known.append(selected_key)
+			out.append([selected_key, "%s：%s" % [base, n], total, clip.layout_key(path, n), value_key, true])
+	for key in clip.get("layouts"):
+		if not known.has(key):
+			out.append([key, "参照先なし：%s" % key, -1.0, key, key, false])
 	return out
 
 ## すべての敵：[[type ID, 表示名], …]
@@ -130,6 +141,7 @@ class Checks extends EditorProperty:
 	var _none_text := ""
 	var _unit := "種類を選択中"
 	var _refresh_left := 0.0
+	var _generation := 0
 
 	func _process(dt: float) -> void:
 		# 他のインスペクターで編集したstage値と保存した配置にも追従する。
@@ -158,6 +170,10 @@ class Checks extends EditorProperty:
 		_set_options(options)
 
 	func _set_options(options: Array) -> void:
+		var was_updating := _updating
+		_updating = true
+		_generation += 1
+		var generation := _generation
 		_options = options
 		for child in _grid.get_children():
 			_grid.remove_child(child)
@@ -179,7 +195,7 @@ class Checks extends EditorProperty:
 		for k in options.size():
 			var opt: Array = options[k]
 			var box := CheckBox.new()
-			box.toggled.connect(_on_toggled)
+			box.toggled.connect(_on_toggled.bind(generation))
 			_boxes.append(box)
 			if not table:
 				box.text = str(opt[1])
@@ -194,28 +210,30 @@ class Checks extends EditorProperty:
 			label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 			_table_cell(label, k, true)
 			var total := Label.new()
-			total.text = str(opt[2]) if float(opt[2]) >= 0.0 else "ステージを開く"
+			total.text = str(opt[2]) if float(opt[2]) >= 0.0 else ("参照先なし" if not opt[5] else "ステージを開く")
 			total.tooltip_text = "選んだ種類のvalue × この配置の体数。使用OFFの並びも比較用に表示する。"
 			_table_cell(total, k)
 			_totals.append(total)
 			var shared := HBoxContainer.new()
 			var override := CheckBox.new()
 			override.tooltip_text = "ON：群れが指定valueを1回分共有。OFF：各個体がstageのvalueを消費。保存済みのvalueはON。"
-			override.toggled.connect(_on_override_toggled.bind(str(opt[0]), float(opt[2])))
+			override.toggled.connect(_on_override_toggled.bind(str(opt[4]), float(opt[2]), generation))
 			shared.add_child(override)
 			_overrides.append(override)
 			var number := SpinBox.new()
 			number.hide()
-			number.min_value = 0.001
+			number.min_value = 0.0
 			number.max_value = 2147483647
-			number.step = 0.5
+			number.step = 0.0
+			number.custom_arrow_step = 0.5
 			number.alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			number.custom_minimum_size.x = 72 * EditorInterface.get_editor_scale()
 			number.tooltip_text = "群れ全体が共有する正のvalue（0.5刻みで調整）"
-			number.value_changed.connect(_on_value_changed.bind(str(opt[0])))
+			number.value_changed.connect(_on_value_changed.bind(str(opt[4]), generation))
 			shared.add_child(number)
 			_table_cell(shared, k)
 			_numbers.append(number)
+		_updating = was_updating
 
 	func _table_cell(control: Control, row: int, expand := false) -> void:
 		var cell := PanelContainer.new()
@@ -245,12 +263,15 @@ class Checks extends EditorProperty:
 		for k in _options.size():
 			_boxes[k].set_pressed_no_signal(current.has(_options[k][0]) or (_values_property != "" and current.is_empty()))
 			if _values_property != "":
-				var key := String(_options[k][0])
+				var key := String(_options[k][4])
 				var overridden := values.has(key)
+				_numbers[k].min_value = 0.0
+				_numbers[k].step = 0.0
+				_numbers[k].custom_arrow_step = 0.5
 				_overrides[k].set_pressed_no_signal(overridden)
 				_numbers[k].editable = overridden
 				_numbers[k].visible = overridden
-				_numbers[k].set_value_no_signal(float(values.get(key, maxf(0.5, float(_options[k][2])))))
+				_numbers[k].set_value_no_signal(float(values.get(key, maxf(0.0, float(_options[k][2])))))
 				_totals[k].modulate.a = 1.0 if _boxes[k].button_pressed else 0.45
 		_updating = false
 		_show_fold(current.size())
@@ -274,35 +295,38 @@ class Checks extends EditorProperty:
 		queue_sort()
 		queue_redraw()
 		var arrow := "▼" if _is_open() else "▶"
+		if _values_property != "" and _options.is_empty():
+			_toggle.text = "%s 参照できる並びがありません" % arrow
+			return
 		_toggle.text = "%s %s" % [arrow, _none_text] if chosen == 0 and _none_text != "" else "%s %d%s" % [arrow, chosen, _unit]
 
-	func _on_toggled(_pressed: bool) -> void:
-		if _updating:
+	func _on_toggled(_pressed: bool, generation: int) -> void:
+		if _updating or generation != _generation:
 			return
 		var value: Array[StringName] = []
 		for k in _options.size():
 			if _boxes[k].button_pressed:
-				value.append(StringName(_options[k][0]))
+				value.append(StringName(_options[k][3] if _values_property != "" else _options[k][0]))
 		if _values_property != "" and value.is_empty() and not _options.is_empty():
 			_update_property()
 			return
 		emit_changed(get_edited_property(), value)
 
-	func _on_value_changed(value: float, key: String) -> void:
-		if _updating:
+	func _on_value_changed(value: float, key: String, generation: int) -> void:
+		if _updating or generation != _generation:
 			return
 		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
-		if not values.has(key) or is_equal_approx(value, float(values[key])):
+		if not values.has(key) or value == float(values[key]):
 			return
 		values[key] = value
 		emit_changed(_values_property, values)
 
-	func _on_override_toggled(pressed: bool, key: String, automatic: float) -> void:
-		if _updating:
+	func _on_override_toggled(pressed: bool, key: String, automatic: float, generation: int) -> void:
+		if _updating or generation != _generation:
 			return
 		var values: Dictionary = get_edited_object().get(_values_property).duplicate()
 		if pressed:
-			values[key] = maxf(0.5, automatic)
+			values[key] = maxf(0.0, automatic)
 		else:
 			values.erase(key)
 		emit_changed(_values_property, values)
@@ -345,9 +369,10 @@ class EnemyValues extends EditorProperty:
 				row.add_child(fallback)
 				_defaults.append(fallback)
 				var number := SpinBox.new()
-				number.min_value = 0.0 if _priority else 0.001
+				number.min_value = 0.0
 				number.max_value = 5.0 if _priority else 2147483647
-				number.step = 1.0 if _priority else 0.5
+				number.step = 1.0 if _priority else 0.0
+				if not _priority: number.custom_arrow_step = 0.5
 				number.rounded = _priority
 				number.value_changed.connect(_on_value_changed.bind(str(option[0])))
 				row.add_child(number)
@@ -356,6 +381,10 @@ class EnemyValues extends EditorProperty:
 		var values: Dictionary = get_edited_object().get(get_edited_property())
 		for k in _options.size():
 			var key := str(_options[k][0])
+			if not _priority:
+				_numbers[k].min_value = 0.0
+				_numbers[k].step = 0.0
+				_numbers[k].custom_arrow_step = 0.5
 			_numbers[k].set_value_no_signal(float(values.get(key, 0.0 if _priority else 1.0)))
 			_defaults[k].visible = not values.has(key)
 
@@ -414,7 +443,7 @@ class Assets extends EditorProperty:
 			picker.base_type = "PackedScene"
 			picker.edited_resource = current[k]
 			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			picker.resource_changed.connect(_replace.bind(k))
+			picker.resource_changed.connect(_replace.bind(k, current[k]))
 			picker.resource_selected.connect(func(resource: Resource, _inspect: bool) -> void:
 				if resource != null and resource.resource_path != "":
 					EditorInterface.open_scene_from_path(resource.resource_path))
@@ -422,18 +451,22 @@ class Assets extends EditorProperty:
 			var remove := Button.new()
 			remove.text = "−"
 			remove.tooltip_text = "シーンの登録を外す"
-			remove.pressed.connect(_remove.bind(k))
+			remove.pressed.connect(_remove.bind(k, current[k]))
 			row.add_child(remove)
 			_rows.add_child(row)
 		_show_fold()
-	func _replace(resource: Resource, index: int) -> void:
+	func _replace(resource: Resource, index: int, previous: Resource) -> void:
 		var value: Array[PackedScene] = []
 		value.assign(get_edited_object().get(get_edited_property()))
+		if index >= value.size() or value[index] != previous:
+			return
 		value[index] = resource as PackedScene
 		emit_changed(get_edited_property(), value)
-	func _remove(index: int) -> void:
+	func _remove(index: int, previous: Resource) -> void:
 		var value: Array[PackedScene] = []
 		value.assign(get_edited_object().get(get_edited_property()))
+		if index >= value.size() or value[index] != previous:
+			return
 		value.remove_at(index)
 		emit_changed(get_edited_property(), value)
 

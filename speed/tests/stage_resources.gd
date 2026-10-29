@@ -41,11 +41,35 @@ func _ready() -> void:
 		var loaded := RunManager.create_run()
 		add_child(loaded)
 		if loaded.sim.state == null: await loaded.started
+		await _check_debug_spawns(loaded, 2)
+		await _check_debug_spawns(loaded, 600)
+		await _check_debug_spawns(loaded, 600)
 		await get_tree().process_frame
 		var stage_reference: WeakRef = weakref(loaded.resources.resources["res://data/enemies/aquarius.tres"])
 		loaded.free()
 		await get_tree().process_frame
 		check(stage_reference.get_ref() == null, "ラン終了後にステージ専用の敵定義を解放する")
+		GameManager.run_stage = 4
+		var switched := RunManager.create_run()
+		add_child(switched)
+		if switched.sim.state == null: await switched.started
+		await _check_debug_spawns(switched, 2)
+		switched.free()
 
 	print("[stage_resources] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)
+
+func _check_debug_spawns(session: RunSession, amount: int) -> void:
+	var run := session.sim
+	var before := run.enemies.count()
+	run.command(&"debug_spawn_enemies", {"count": amount})
+	check(run.enemies.count() >= before + amount, "デバッグ命令で指定数を生成: %d" % amount)
+	var scope := session.resources
+	for id in ContentManager.enemies:
+		var type := StringName(id)
+		var skin := run.state.stage.enemy_sprite_path(type).get_file().get_basename()
+		var path: String = run.state.stage.resources.look_paths.get(skin,
+			run.state.stage.resources.look_paths.get(String(type), ""))
+		if not path.is_empty():
+			check(scope.resources.has(path), "派生体を含む敵外観をランのScopeに保持: " + String(type))
+	await get_tree().process_frame

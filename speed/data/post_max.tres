@@ -1,0 +1,154 @@
+[gd_resource type="Resource" script_class="PostMaxConfig" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/post_max_config.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+increments = {
+  "weapon_damage": 0.02,
+  "weapon_interval": 0.02,
+  "projectile_speed": 0.05,
+  "duration": 0.05,
+  "knockback": 0.05,
+  "crit_chance": 0.01,
+  "crit_mult": 0.1,
+  "area": 0.05,
+  "followup": 0.05,
+  "max_speed": 0.03,
+  "acceleration": 0.05,
+  "turn_rate": 0.03,
+  "line_length": 0.05,
+  "charge_time": 0.03,
+  "max_hp": 5.0,
+  "invulnerability": 0.03,
+  "repair": 0.01,
+  "heal": 0.3,
+  "pickup_radius": 0.05,
+  "pickup_speed": 0.05,
+  "xp_gain": 0.03
+}
+targets = {
+  "W01": {
+    "interval": [
+      "interval"
+    ],
+    "duration": [
+      "life"
+    ],
+    "projectile": true,
+    "knockback": true,
+    "followup": true
+  },
+  "W02": {
+    "interval": [
+      "interval"
+    ],
+    "duration": [
+      "life"
+    ],
+    "projectile": true,
+    "knockback": true,
+    "followup": true
+  },
+  "W03": {
+    "projectile": true,
+    "duration": ["hull_life"],
+    "knockback": true,
+    "area": [
+      "collision_radius"
+    ]
+  },
+  "W04": {
+    "knockback": true,
+    "area": [
+      "radius"
+    ]
+  },
+  "W05": {
+    "interval": [
+      "interval",
+      "block_interval"
+    ],
+    "knockback": true,
+    "followup": true
+  },
+  "W07": {
+    "duration": [
+      "life"
+    ],
+    "knockback": true,
+    "followup": true
+  },
+  "W08": {
+    "interval": [
+      "interval"
+    ],
+    "duration": [
+      "travel"
+    ],
+    "knockback": true,
+    "area": [
+      "radius"
+    ]
+  },
+  "W17": {
+    "knockback": true,
+    "area": [
+      "range"
+    ]
+  },
+  "W21": {
+    "interval": [
+      "interval"
+    ],
+    "duration": [
+      "life"
+    ],
+    "projectile": true,
+    "knockback": true,
+    "area": [
+      "capture_radius"
+    ],
+    "followup": true
+  },
+  "W22": {
+    "knockback": true,
+    "area": [
+      "width"
+    ],
+    "followup": true
+  },
+  "W23": {
+    "interval": [
+      "interval_by_level"
+    ],
+    "duration": [
+      "life"
+    ],
+    "projectile": true,
+    "knockback": true,
+    "followup": true
+  },
+  "W25": {
+    "interval": [
+      "interval_by_level",
+      "burst_interval"
+    ],
+    "duration": [
+      "life"
+    ],
+    "projectile": true,
+    "followup": true
+  },
+  "W26": {
+    "area": [
+      "drone_hit_radius"
+    ]
+  },
+  "W27": {}
+}
+minimum_time_ratio = 0.2
+minimum_interval = 0.05
+minimum_charge_time = 0.25
+maximum_invulnerability = 2.0
+maximum_repair_fraction = 1.0

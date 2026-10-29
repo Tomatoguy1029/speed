@@ -1,4 +1,4 @@
-## 迎撃型の装甲・銃口・制御弾。ゲームと図鑑で同じピクセル形状を使う。
+## 迎撃型の装甲・銃口・弾。ゲームと図鑑で同じピクセル形状を使う。
 extends RefCounted
 
 const DRONE := preload("res://assets/pixel/drone.png")

@@ -5,6 +5,10 @@ func _init() -> void:
 	full_rate = true
 	admission = false
 
+func on_spawn(i: int, opts: Dictionary) -> void:
+	if not opts.has("facing") and table.vel[i].length_squared() > 0.001:
+		table.facing[i] = table.vel[i].angle()
+
 func step(i: int, dt: float) -> void:
 	var t := table
 	var p: Dictionary = t.def[i].params
@@ -22,7 +26,7 @@ func step(i: int, dt: float) -> void:
 				t.timer[i] = maxf(0.0, t.fire_t[i])
 				t.charge[i] = 0.01
 			else:
-				_keep_distance(i, dt)
+				_cruise(i, dt)
 		EnemyTable.Mode.WINDUP:
 			t.vel[i] = Vector2.ZERO
 			t.timer[i] -= dt
@@ -32,7 +36,6 @@ func step(i: int, dt: float) -> void:
 				t.timer[i] = float(p.dash_time)
 				t.fire_t[i] = float(p.fire_interval)
 				t.charge[i] = 0.0
-				t.bud_t[i] = 0.0
 		EnemyTable.Mode.DASH:
 			if t.timer[i] <= 0.0:
 				t.vel[i] = Vector2.ZERO
@@ -42,7 +45,28 @@ func step(i: int, dt: float) -> void:
 			_hold(i, dt)
 			t.timer[i] -= dt
 			if t.timer[i] <= 0.0:
+				t.vel[i] = Vector2.ZERO
 				t.mode[i] = EnemyTable.Mode.MOVE
+
+## 回遊は目標点へ鼻先を旋回してから前進する。速度だけを横へ補間しない。
+func _cruise(i: int, dt: float) -> void:
+	var t := table
+	var to_ship := t.pos[i] - state.enemy_aim
+	var outward := to_ship.normalized() if to_ship.length_squared() > 0.001 else Vector2.RIGHT
+	var side := 1.0 if t.id[i] % 2 == 1 else -1.0
+	var target := state.enemy_aim + outward * float(t.def[i].params.keep) + outward.orthogonal() * 200.0 * side
+	var course := target - t.pos[i]
+	if course.length_squared() > 0.001:
+		_turn_toward(i, course.angle(), t.turn[i], dt)
+	var speed := move_toward(t.vel[i].length(), t.speed[i], t.speed[i] * t.accel[i] * dt)
+	t.vel[i] = Vector2.from_angle(t.facing[i]) * speed
+
+## 天体に接したときの共通衝突処理が速度を接線へ変えた後も、鼻先を進行方向へ揃える。
+func after_tick(_dt: float) -> void:
+	var t := table
+	for i in rows():
+		if t.dead[i] == 0 and t.mode[i] == EnemyTable.Mode.MOVE and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.vel[i].length_squared() > 0.001:
+			t.facing[i] = t.vel[i].angle()
 
 ## 通常の移動・地形衝突の前に、実際に進む区間を掃引する。
 func before_move(i: int, dt: float) -> void:
@@ -77,11 +101,3 @@ func before_move(i: int, dt: float) -> void:
 		if t.dead[i] or state.phase != RunState.Phase.PLAY: return
 	t.vel[i] = (to - from) / dt
 	t.timer[i] = maxf(0.0, t.timer[i] - dt)
-	t.bud_t[i] -= dt
-	if travel > 0.0 and t.bud_t[i] <= 0.0:
-		t.bud_t[i] = float(p.spray_step)
-		var n := int(p.spray)
-		for side: float in [-1.0, 1.0]:
-			for k in n:
-				var a := t.facing[i] + side * PI / 2.0 + (float(k) / maxf(n - 1, 1) - 0.5) * float(p.spread)
-				projectiles.fire_enemy(i, a, float(p.bullet_speed), &"bullet")

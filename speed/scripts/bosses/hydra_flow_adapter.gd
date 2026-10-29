@@ -1,4 +1,5 @@
 extends RefCounted
+const RANGE := preload("res://scripts/bosses/flow/range_condition.gd")
 var actor: Node
 var active: Array = []
 var custom_run: RefCounted
@@ -17,8 +18,8 @@ class StepTicket:
 		var host = owner.get_ref()
 		if host == null: return true
 		for action in actions:
-			if action.category == "single" and action.heads.any(func(n): return not host.actor._alive(n)): return true
-			if action.category != "single" and not host.actor.busy and host.actor.last_tech_result == &"interrupted": return true
+			if action.get("execution_kind", action.category) == "single" and action.heads.any(func(n): return not host.actor._alive(n)): return true
+			if action.get("execution_kind", action.category) != "single" and not host.actor.busy and host.actor.last_tech_result == &"interrupted": return true
 		return false
 
 func _init(value: Node) -> void: actor = value
@@ -63,17 +64,14 @@ func candidates(query: Dictionary) -> Dictionary:
 		if not query.get("children_only", false) and actor.action_rules != null and actor.action_rules.combos.has(String(id)): continue
 		var move: Resource = actor._moves[id]
 		if move.head_kind != &"":
-			if query.get("request", "normal") == "major": continue
 			for i in actor.necks.size():
 				if actor.normal_ready(i, id, query.get("children_only", false)): result.append(_candidate(id, [actor.necks[i]], "single"))
 		else:
-			if query.get("request", "normal") == "normal" and id not in actor.COMBOS: continue
-			if query.get("request", "normal") == "major" and id in actor.COMBOS: continue
 			if not actor.attack_ready(id, query.get("children_only", false)): continue
 			var heads: Array = []
-			if id in [&"north", &"sequence"]: heads = actor.front_heads()
-			elif id in actor.COMBOS:
-				var kinds: Array = {&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[id]
+			if actor.tech_kind(id) in [&"north", &"sequence"]: heads = actor.front_heads()
+			elif actor.tech_kind(id) in actor.COMBOS:
+				var kinds: Array = {&"tornado": [&"vortex", &"debris"], &"debris_shatter": [&"debris", &"beam"], &"beam_pincer": [&"beam", &"beam"]}[actor.tech_kind(id)]
 				for first in actor.necks:
 					if not actor._alive(first) or first.mode != &"idle" or first.kind != kinds[0]: continue
 					for second in actor.necks:
@@ -82,8 +80,8 @@ func candidates(query: Dictionary) -> Dictionary:
 						result.append(_candidate(id, [first, second], "combo"))
 				continue
 			else: heads = actor.necks.filter(func(n): return actor._alive(n))
-			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if id in actor.COMBOS else "major"))
-	if not query.get("children_only", false) and query.get("request", "normal") != "major" and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
+			if not heads.is_empty(): result.append(_candidate(id, heads, "combo" if actor.tech_kind(id) in actor.COMBOS else "major"))
+	if not query.get("children_only", false) and actor.action_rules != null and not actor.busy and actor.recovery_t <= 0.0:
 		for id in actor.action_rules.combos:
 			if not actor.action_rules.active_gates_for(String(id)).any(func(gate): return step_condition(gate)): continue
 			var needs: Dictionary = _requirements(actor.action_rules.combos[id])
@@ -98,7 +96,30 @@ func candidates(query: Dictionary) -> Dictionary:
 				var parts: Array = []
 				for head in heads: parts.append(head.row_id)
 				result.append({"id": id, "heads": heads, "parts": parts, "category": "combo", "exclusive": true, "cost": float(actor.action_rules.costs.get(id, 2.0)), "program": actor.action_rules.combos[id]})
-	return {"candidates": result, "reason": "距離・部位・再使用待ち"}
+	if actor.action_rules == null: return {"candidates": result, "reason": "距離・部位・再使用待ち"}
+	if query.get("children_only", false):
+		return {"candidates": result.filter(func(candidate): return _gate_ready(candidate, actor.action_rules.conditions.get(String(candidate.id), {}))), "reason": "コンボ内の技条件"}
+	var labeled: Array = []
+	for candidate in result:
+		for entry in actor.action_rules.active_gate_entries_for(String(candidate.id)):
+			if not _gate_ready(candidate, entry.gate): continue
+			var option: Dictionary = candidate.duplicate()
+			option["group"] = entry.group
+			option["label"] = entry.category
+			option["category"] = "single" if entry.category == "normal" else String(entry.category)
+			option["gate"] = entry.gate
+			labeled.append(option)
+	return {"candidates": labeled, "reason": "距離・部位・再使用待ち"}
+
+func _gate_ready(candidate: Dictionary, gate: Dictionary) -> bool:
+	var snapshot := {"gate": gate, "body": actor.table.pos[actor.body], "facing": actor.table.facing[actor.body], "separated": actor.separated}
+	if candidate.get("execution_kind", candidate.category) == "single":
+		var neck = candidate.heads[0]
+		snapshot.head = actor._head_pos(neck)
+		snapshot.base = actor._neck_base(neck)
+		snapshot.base_angle = neck.base_angle
+		snapshot.reach = actor.move_reach(StringName(candidate.id))
+	return RANGE.allows_snapshot(snapshot, actor.run_state.ship_pos)
 
 func _requirements(node: Dictionary) -> Dictionary:
 	var result := {}
@@ -124,18 +145,24 @@ func _candidate(id: StringName, heads: Array, kind: String) -> Dictionary:
 	var params: Dictionary = actor.move_params(id)
 	var cost := float(params.get("stamina", params.get("cost", params.get("major_cost", 2.0))))
 	if actor.action_rules != null: cost = float(actor.action_rules.costs.get(String(id), cost))
-	return {"id": String(id), "heads": heads, "parts": parts, "category": kind, "exclusive": kind != "single", "cost": cost}
+	var gap := 0.0
+	if actor._moves.has(id): gap = actor._moves[id].post_gap
+	return {"id": String(id), "heads": heads, "parts": parts, "category": kind, "execution_kind": kind, "exclusive": kind != "single", "cost": cost, "post_gap": gap}
+
+func parallel_attacks_enabled() -> bool:
+	return actor.action_rules != null and actor.action_rules.allow_parallel_attacks
 
 func start(actions: Array, internal_step := false) -> bool:
 	# 同一更新内で全体を検証し、候補の具体的個体を固定する。
 	if blocked() or actions.is_empty(): return false
 	for action in actions:
 		if not action.has("heads") or action.parts.size() != action.heads.size(): return false
+		if action.has("gate") and not _gate_ready(action, action.gate): return false
 		for i in action.heads.size():
 			var head = action.heads[i]
 			if not actor._alive(head) or head.row_id != action.parts[i]: return false
 		if action.has("program"): continue
-		if action.category == "single":
+		if action.get("execution_kind", action.category) == "single":
 			if not actor.normal_ready(actor.necks.find(action.heads[0]), StringName(action.id), internal_step): return false
 		elif not actor.attack_ready(StringName(action.id), internal_step): return false
 	var started: Array = []
@@ -144,7 +171,7 @@ func start(actions: Array, internal_step := false) -> bool:
 		if action.has("program"):
 			custom_run = preload("res://scripts/bosses/flow/combo_runner.gd").new(action.program, self)
 			ok = true
-		elif action.category == "single": ok = actor.start_normal(actor.necks.find(action.heads[0]), StringName(action.id), internal_step)
+		elif action.get("execution_kind", action.category) == "single": ok = actor.start_normal(actor.necks.find(action.heads[0]), StringName(action.id), internal_step)
 		else: ok = actor.try_start_tech(StringName(action.id), 1.0, action.heads, internal_step)
 		if not ok:
 			_cancel_actions(started + [action])
@@ -159,7 +186,7 @@ func running() -> bool:
 func _running_actions(actions: Array) -> bool:
 	for action in actions:
 		if action.has("program"): continue
-		if action.category != "single":
+		if action.get("execution_kind", action.category) != "single":
 			if actor.busy or actor.recovery_t > 0.0: return true
 		else:
 			var head = action.heads[0]
@@ -168,7 +195,7 @@ func _running_actions(actions: Array) -> bool:
 
 func _cancel_actions(actions: Array) -> void:
 	for action in actions:
-		if action.category == "single":
+		if action.get("execution_kind", action.category) == "single":
 			if actor.ctx.projectiles.director != null: actor.ctx.projectiles.director.cancel_attack("neck:" + str(action.heads[0].row_id), action.heads[0].row_id)
 			actor._release_attack(action.heads[0])
 			actor._end(action.heads[0], true)

@@ -1,18 +1,11 @@
-[gd_resource type="Resource" script_class="HydraTechnique" format=3]
+[gd_resource type="Resource" format=3 uid="uid://u0hkhsx1n51q"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" uid="uid://bjtq1kqnbkb2e" path="res://scripts/bosses/hydra/techniques/wind_band.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/wind_band_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
-technique = &"wind_band"
 head_kind = &"vortex"
-parameters = {
-"normal_charge": 0.6,
-"normal_hold": 0.9,
-"attack_cd": 3.0,
-"wind_time": 1.0,
-"wind_length": 340.0,
-"wind_width": 180.0,
-"wind_force": 2600.0,
-"cost": 1.4
-}
+technique = &"wind_band"
+display_name = "風の帯"
+visual = ExtResource("visual")

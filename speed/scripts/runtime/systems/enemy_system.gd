@@ -5,8 +5,15 @@
 ## 行動する雑魚は、行動の種類ごとの行番号の一覧（beh_rows）に入り、更新は種類ごとにその一覧だけを回す。
 class_name EnemySystem
 extends RunSystem
+signal picaro_spawned(row: int, row_id: int, owner_id: int)
 
 var motion := EnemyMotion.new()
+## 位置を動かす前の雑魚の行IDと位置。強敵・ボスの更新後に雑魚側だけ進路を直す。
+var _avoid_ids := PackedInt32Array()
+var _avoid_from := PackedVector2Array()
+var _avoid_obstacles := PackedInt32Array()
+var _avoid_cells: Dictionary = {}
+const AVOID_CELL := 160.0
 
 func dispose() -> void:
 	motion.m = null
@@ -137,6 +144,14 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 		t.attack_value[i] = float(opts.get("attack_value", 1.0))
 	else:
 		t.attack_value[i] = state.stage.enemy_attack_value(def.id) if state.stage != null else 1.0
+	if projectiles.director != null and not projectiles.director.formation_mode:
+		t.attack_managed[i] = int(def.attack_weight > 0.0)
+	elif t.attack_group[i] > 0:
+		t.attack_managed[i] = int(opts.get("attack_managed", t.attack_value[i] > 0.0))
+	elif state.stage is RuntimeStage:
+		t.attack_managed[i] = int(state.stage.attack_managed_by_type.get(String(def.id), true))
+	else:
+		t.attack_managed[i] = int(t.attack_value[i] > 0.0)
 	apply_scaling(i, def, opts)
 	t.pos[i] = pos
 	t.vel[i] = opts.get("vel", Vector2.ZERO)
@@ -166,6 +181,8 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	# 強敵と大物の出現は、プレイの記録が倒れるまでを追う
 	if def.rank >= 3:
 		state.emit(&"strong_spawn", {"id": t.id[i], "enemy_type": def.id})
+	if def.params.get("picaro", false):
+		picaro_spawned.emit(i, t.id[i], int(def.params.get("picaro_owner", 0)))
 	return i
 
 ## 強さと大きさを同じ規則で再計算する。位置・行動・個体IDは保つ。
@@ -246,6 +263,7 @@ func _reset_row(i: int) -> void:
 	t.meteor_index[i] = -1
 	t.attack_group[i] = 0
 	t.attack_value[i] = 1
+	t.attack_managed[i] = 1
 	t.attack_priority[i] = 0
 	t.dead[i] = 0
 	t.elite[i] = 0
@@ -294,6 +312,8 @@ func _reset_row(i: int) -> void:
 	t.links[i] = PackedInt32Array()
 	t.stone[i] = 0.0
 	t.held[i] = 0
+	t.pump_owner[i] = -1
+	t.pump_owner_id[i] = -1
 	t.landmark[i] = 0
 	t.fire_hit[i] = -1e9
 	t.parent[i] = -1
@@ -458,6 +478,11 @@ func def_of(type: StringName) -> EnemyDef:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：避け合いの準備・行動の種類ごと・更新後の処理を enemies.<名前> に足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
+	_capture_avoidance_starts()
+	perf.since(&"enemies.avoid_capture", t0)
 	motion._update_aim(world_dt)
 	_lod += 1
 	_aim = state.enemy_aim
@@ -468,13 +493,165 @@ func tick(_real_dt: float, world_dt: float) -> void:
 		var rows := beh_rows[k]
 		if rows.is_empty():
 			continue
+		t0 = Time.get_ticks_usec()
 		if behaviors[k].custom_loop:
 			behaviors[k].tick_rows(rows, world_dt)
 		else:
 			_tick_behavior(k, world_dt)
+		if perf.active:
+			perf.since(StringName("enemies." + String(behaviors[k].name)), t0)
+	t0 = Time.get_ticks_usec()
 	for b in behaviors:
 		b.after_tick(world_dt)
 	_flush_new()
+	perf.since(&"enemies.after_tick", t0)
+
+func _can_avoid_strong(i: int) -> bool:
+	var t := table
+	return t.alive[i] != 0 and t.dead[i] == 0 and t.def[i] != null and t.def[i].rank <= 2 \
+		and t.is_boss[i] == 0 and t.meteor_index[i] < 0 and t.parent[i] < 0 \
+		and t.mode[i] == EnemyTable.Mode.MOVE and t.held[i] == 0 and t.stone[i] <= 0.0 \
+		and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.pump_owner[i] < 0
+
+func _capture_avoidance_starts() -> void:
+	var t := table
+	var count := t.alive.size()
+	_avoid_ids.resize(count)
+	_avoid_from.resize(count)
+	for i in count:
+		_avoid_ids[i] = t.id[i] if _can_avoid_strong(i) else -1
+		if _avoid_ids[i] >= 0:
+			_avoid_from[i] = t.pos[i]
+
+func _avoid_clearance(point: Vector2, i: int, candidates: Array) -> float:
+	var gap := INF
+	for j: int in candidates:
+		gap = minf(gap, point.distance_to(table.pos[j]) - table.r[i] - table.r[j] - 2.0)
+	return gap
+
+## 通常の行動とボスの姿勢を確定した後、移動中の雑魚だけを身体の外へ導く。
+## 位置補正は1世界更新の通常速度を超えず、ボス・強敵・攻撃中の行は動かさない。
+func avoid_strong(world_dt: float) -> void:
+	if world_dt <= 0.0:
+		return
+	var t := table
+	var pos := t.pos
+	var radius_rows := t.r
+	var ids := t.id
+	var speeds := t.speed
+	_avoid_obstacles.clear()
+	_avoid_cells.clear()
+	var normal_radius := 0.0
+	var normal_step := 0.0
+	# 開発版の計測：強敵を集める全行の走査（scan）と、雑魚ごとの補正（rows）
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
+	for j in t.alive.size():
+		if t.alive[j] == 0 or t.dead[j] != 0 or t.held[j] != 0 or t.meteor_index[j] >= 0:
+			continue
+		if t.is_boss[j] != 0 or (t.def[j] != null and t.def[j].rank >= 3):
+			# 吸い込める間は、雑魚がPumpの口へ入ることを優先する。
+			if t.type[j] == &"pump" and t.mode[j] == EnemyTable.Mode.MOVE and t.stone[j] <= 0.0 \
+					and t.shove_time[j] <= 0.0 and t.knock_t[j] <= 0.0 \
+					and t.buds[j] < int(t.def[j].params.store_max):
+				continue
+			_avoid_obstacles.append(j)
+		elif j < _avoid_ids.size() and _avoid_ids[j] == t.id[j] and _can_avoid_strong(j):
+			normal_radius = maxf(normal_radius, radius_rows[j])
+			normal_step = maxf(normal_step, speeds[j] * world_dt)
+	perf.since(&"enemy_avoidance.scan", t0)
+	if _avoid_obstacles.is_empty() or normal_radius <= 0.0:
+		return
+	t0 = Time.get_ticks_usec()
+	# 強敵の占有円が届くセルだけ登録する。各雑魚は自分のセルだけを見る。
+	for j in _avoid_obstacles:
+		var extent := radius_rows[j] + normal_radius + normal_step + 2.0
+		var lo := Vector2i(floori((pos[j].x - extent) / AVOID_CELL), floori((pos[j].y - extent) / AVOID_CELL))
+		var hi := Vector2i(floori((pos[j].x + extent) / AVOID_CELL), floori((pos[j].y + extent) / AVOID_CELL))
+		for cy in range(lo.y, hi.y + 1):
+			for cx in range(lo.x, hi.x + 1):
+				var key := Vector2i(cx, cy)
+				if not _avoid_cells.has(key):
+					_avoid_cells[key] = [j]
+				else:
+					_avoid_cells[key].append(j)
+	for i in mini(_avoid_ids.size(), t.alive.size()):
+		if _avoid_ids[i] != ids[i] or not _can_avoid_strong(i):
+			continue
+		var from := _avoid_from[i]
+		var key := Vector2i(floori(from.x / AVOID_CELL), floori(from.y / AVOID_CELL))
+		if not _avoid_cells.has(key):
+			continue
+		var intended := pos[i] - from
+		var limit := speeds[i] * world_dt
+		if limit <= 0.0 or intended.length() > limit + 0.01:
+			continue # 専用行動による瞬間移動・高速移動は書き換えない。
+		var inside := Vector2.ZERO
+		var most_inside := -1.0
+		var fallback := Vector2.ZERO
+		var near_row := -1
+		var near_depth := 0.0
+		for j: int in _avoid_cells[key]:
+			if j == i:
+				continue
+			var radius := radius_rows[i] + radius_rows[j] + 2.0
+			var offset := from - pos[j]
+			var distance_sq := offset.length_squared()
+			var reach := radius + limit
+			if distance_sq > reach * reach:
+				continue
+			if distance_sq < radius * radius:
+				var distance := sqrt(distance_sq)
+				var normal := offset / distance if distance > 0.001 else Vector2.from_angle(float((ids[i] * 17 + ids[j] * 31) % 360) * PI / 180.0)
+				var depth := radius - distance
+				inside += normal * depth
+				if depth > most_inside:
+					most_inside = depth
+					fallback = normal
+				continue
+			var next_distance := (from + intended).distance_to(pos[j])
+			if next_distance < radius and radius - next_distance > near_depth:
+				near_depth = radius - next_distance
+				near_row = j
+		var corrected := intended
+		if most_inside > 0.0:
+			var outward := inside.normalized() if inside.length_squared() > 0.000001 else fallback
+			# 連続するボス部位の中心線では左右の法線が互いを塞ぐ。
+			# 複数円からの最小距離が最も増える、横方向も含む進路を選ぶ。
+			var tangent := outward.orthogonal()
+			var side := 1.0 if ids[i] % 2 == 0 else -1.0
+			var best := _avoid_clearance(from + outward * limit, i, _avoid_cells[key])
+			for direction in [tangent * side, tangent * -side, -outward]:
+				var score := _avoid_clearance(from + direction * limit, i, _avoid_cells[key])
+				if score > best + 0.0001:
+					best = score
+					outward = direction
+			corrected = outward * limit
+		elif near_row >= 0:
+			var radial := (from - pos[near_row]).normalized()
+			corrected -= radial * minf(0.0, corrected.dot(radial))
+			if corrected.length_squared() < 0.000001:
+				var side := 1.0 if (ids[i] + ids[near_row]) % 2 == 0 else -1.0
+				corrected = radial.orthogonal() * side * intended.length()
+			else:
+				corrected = corrected.normalized() * intended.length()
+		if not corrected.is_equal_approx(intended):
+			# 一つ目の円の接線が隣の部位へ入る場合、もう一方の接線を試す。
+			# 外から身体へ入る進路しかなければその更新だけ止まる。
+			if most_inside <= 0.0 and _avoid_clearance(from + corrected, i, _avoid_cells[key]) < 0.0:
+				var side := corrected.orthogonal().normalized() * intended.length()
+				var opposite := -side
+				if _avoid_clearance(from + side, i, _avoid_cells[key]) >= 0.0:
+					corrected = side
+				elif _avoid_clearance(from + opposite, i, _avoid_cells[key]) >= 0.0:
+					corrected = opposite
+				else:
+					corrected = Vector2.ZERO
+			pos[i] = from + corrected
+			t.vel[i] = corrected / world_dt
+			if field.body_gap(pos[i], radius_rows[i]) < 0.0:
+				field.collide_enemy(i, from)
+	perf.since(&"enemy_avoidance.rows", t0)
 
 ## 行動の種類 b の敵を進める。押し出し・石化・遠い敵の間引きを済ませてから、種類の処理を1行ずつ呼ぶ。
 func _tick_behavior(b: int, dt: float) -> void:
@@ -525,18 +702,24 @@ func _tick_behavior(b: int, dt: float) -> void:
 		if shove_time[i] > 0.0 or knock_t[i] > 0.0:
 			motion._update_pushed(i, dt)
 		else:
-			var needs_admission := managed and t.def[i].rank >= 3
+			var needs_admission := managed and t.attack_managed[i] != 0
 			if managed and not needs_admission:
 				projectiles.lab_context = 0
 			if needs_admission and not _lab_admit(i, bdt):
-				motion._chase(i, bdt)
+				if t.type[i] == &"aquila":
+					behavior.call(&"cruise", i, bdt)
+				else:
+					behavior.wait_for_attack(i, bdt)
 				pos[i] += vel[i] * dt
 				if motion._near_body(i, pos[i], r[i] + vel[i].length() * dt, now, body_move):
 					field.collide_enemy(i, from)
 				continue
 			var previous_source:=_source_row
 			_source_row=i
+			var prior_visual := projectiles.visual_context
+			projectiles.visual_context = table.def[i].attack_visual
 			behavior.step(i, bdt)
+			projectiles.visual_context = prior_visual
 			_source_row=previous_source
 			if dead[i] != 0:
 				continue
@@ -587,22 +770,23 @@ func _lab_owner(i: int) -> String:
 	var d = projectiles.director
 	return "formation:%d" % table.attack_group[i] if d != null and d.formation_mode and table.attack_group[i] > 0 else str(table.id[i])
 
-## 予告へ入る前に取る、強敵と大物の攻撃の許可（攻撃の管理。仕様書 11.7）。許可がなければ、攻撃せずに追う。
+## 正の実効valueを持つ攻撃は予告前に許可を取る。value 0は管理用の枠や待機を作らず通す。
 func _lab_admit(i: int, dt: float) -> bool:
 	var d = projectiles.director
 	projectiles.lab_context = 0
 	var def := table.def[i]
-	if def == null:
+	if def == null or d == null:
 		return true
-	# 雑魚と硬めの敵は数だけで抑え、攻撃は管理しない
-	var cats: Array = d.categories(def.behavior) if d != null and def.rank >= 3 else []
+	if table.attack_managed[i] == 0:
+		return true
+	var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
+	var cats: Array = d.categories(def.behavior)
 	if cats.is_empty():
 		return true
 	var owner := _lab_owner(i)
 	var behavior := behaviors[table.beh[i]]
 	if not behavior.admit_active(i, d, owner) and behavior.admit_due(i, dt):
 		var duration := behavior.admit_duration(i)
-		var cost: float = table.attack_value[i] if d.formation_mode else def.attack_weight
 		var priority := table.attack_priority[i]
 		if not cats.is_empty() and not d.request(owner, cats, i, table.id[i], duration, priority, cost):
 			table.charge[i] = 0

@@ -18,27 +18,17 @@ func bind(owner_actor: Node) -> void:
 func add_shape(points: PackedVector2Array, width: float, delay: float, life: float, damage: float,
 		kind: StringName, owner := -1, velocity := Vector2.ZERO, persistent := false) -> Dictionary:
 	serial += 1
-	var line: Node2D
-	var area: bool=kind==&"lightning" and points[0].distance_to(points[-1])<1.0
-	var tornado: bool=kind in [&"tornado",&"tornado_charge"]
-	if tornado:
-		line=actor.tornado_scene.instantiate()
-	elif area:
-		line=Sprite2D.new()
-		line.texture=white
-	else:
-		line=Line2D.new()
-	if not tornado:line.texture = white
-	line.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
-	if line is Line2D:
-		line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
-		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-		line.end_cap_mode = Line2D.LINE_CAP_ROUND
-		line.joint_mode = Line2D.LINE_JOINT_ROUND
-	if not tornado:
-		line.material = ShaderMaterial.new()
-		line.material.shader = preload("res://shaders/hydra_area.gdshader") if area else (actor.energy_shader if actor.energy_shader!=null else FX)
+	var scene: PackedScene = preload("res://scenes/attacks/hydra_shape.tscn")
+	var id: StringName = actor.tech if "tech" in actor else &""
+	if "necks" in actor:
+		for neck in actor.necks:
+			if neck.row == owner and actor.move_settings(neck.mode) != null: id = neck.mode
+	if actor.has_method("move_settings"):
+		var settings: Resource = actor.move_settings(id)
+		if settings != null and settings.has_field("shot_visual"): scene = settings.field("shot_visual")
+	var line := scene.instantiate() as Node2D
 	add_child(line)
+	line.configure(actor, kind, points, white)
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,
 		"age": 0.0, "damage": damage, "kind": kind, "owner": owner,
 		"owner_id": actor.table.id[owner] if owner >= 0 else -1, "velocity": velocity,
@@ -71,6 +61,7 @@ func tick(dt: float) -> void:
 		e.age += dt
 		var alive: bool = e.owner < 0 or e.persistent or (actor.ctx.enemies.is_same(e.owner,e.owner_id) and actor.table.dead[e.owner] == 0)
 		if not alive or e.age >= e.delay + e.life:
+			actor.ctx.projectiles.end_attack_visual(StringName(visuals[e.id].scene_file_path), "Fade", e.points[0])
 			visuals[e.id].queue_free()
 			visuals.erase(e.id)
 			effects.erase(e)
@@ -95,26 +86,12 @@ func tick(dt: float) -> void:
 				if not actor.run_state.tracing and not actor.run_state.glide and actor.run_state.ship_vel.length() < actor.run_state.stats.max_speed:
 					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(e.get("wind_force", actor.def.params.wind_force)) * dt
 			elif touching and not e.hit and e.damage > 0.0:
+				actor.ctx.projectiles.end_attack_visual(StringName(visuals[e.id].scene_file_path), "Hit", ship)
 				actor.ctx.projectiles.ship.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
 		e.previous_points=e.points.duplicate()
 		var line: Node2D=visuals[e.id]
-		if line.has_method("update_effect"):
-			line.update_effect(e,actor._time)
-			continue
-		if line is Line2D:
-			line.points=e.points
-			line.width=e.width
-		else:
-			line.position=e.points[0]
-			line.scale=Vector2.ONE*float(e.width)*0.5
-		var color: Color = {&"tornado":Color(0.3,0.85,0.72), &"rubble": Color(0.55,0.44,0.3), &"wind": Color(0.25,0.9,0.75), &"wind_blade": Color(0.3,1,0.8), &"lightning": Color(0.4,0.75,1), &"bite": Color(1,0.45,0.18)}.get(e.kind,Color(1,0.25,0.4))
-		line.material.set_shader_parameter("style",{&"wind":1,&"wind_blade":1,&"lightning":2,&"rubble":3,&"tornado":4,&"bolt":5}.get(e.kind,0))
-		line.material.set_shader_parameter("tint", color)
-		line.material.set_shader_parameter("clock", actor._time)
-		line.material.set_shader_parameter("warning", e.age < e.delay)
-		line.material.set_shader_parameter("span", maxf(1.0,_length(e.points)))
-		line.material.set_shader_parameter("thickness", e.width)
+		line.update_effect(e, actor._time)
 	ship_previous = ship
 
 func _length(points: PackedVector2Array)->float:

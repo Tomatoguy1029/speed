@@ -138,6 +138,57 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | card.weapon&#95;up | 武器強化 | Weapon Upgrade |
 | card.trait&#95;up | 特性強化 | Trait Upgrade |
 | card.first&#95;weapon | 最初の武器 | First Weapon |
+| postmax.interval_total | MAX後の実効短縮累計 | Effective reduction since MAX |
+| postmax.interval.interval | 発射 | Fire |
+| postmax.interval.interval_by_level | 発射 | Fire |
+| postmax.interval.block_interval | 防弾 | Block |
+| postmax.interval.burst_interval | 連射 | Burst |
+| postmax.tag | 追加強化 | Enhancement |
+| postmax.keep_hp | 現在HPはそのまま | Current HP stays the same |
+| postmax.total | MAX後累計 {a} → {b}{unit} | Since MAX: {a} → {b}{unit} |
+| postmax.current | 実効値 {a} → {b} | Effective: {a} → {b} |
+| postmax.points | ポイント |  points |
+| postmax.summary.interval | 攻撃間隔 −{n}% | Interval −{n}% |
+| postmax.summary.charge | 充填 −{n}秒 | Charge −{n}s |
+| postmax.summary.invulnerability | 無敵 +{n}秒 | Invulnerability +{n}s |
+| postmax.summary.multiplier | 倍率 +{n} | Multiplier +{n} |
+| postmax.heal_desc | 最大HPの{percent}%を即時回復<br>HP {a} → {b} | Heal {percent}% of max HP now<br>HP {a} → {b} |
+| postmax.weapon_damage | 武器威力 | Weapon damage |
+| postmax.weapon_interval | 武器の攻撃間隔短縮 | Weapon interval reduction |
+| postmax.projectile_speed | 武器の弾速 | Weapon projectile speed |
+| postmax.duration | 弾・機雷・衝撃波の持続 | Shot, mine and wave duration |
+| postmax.knockback | 武器の吹き飛ばし | Weapon knockback |
+| postmax.crit_chance | RAMクリティカル率 | RAM critical chance |
+| postmax.crit_mult | RAMクリティカル倍率 | RAM critical multiplier |
+| postmax.area | 巻き込み範囲 | Area of effect |
+| postmax.followup | 追撃威力 | Follow-up damage |
+| postmax.max_speed | 最高速度 | Maximum speed |
+| postmax.acceleration | 加速 | Acceleration |
+| postmax.turn_rate | 旋回速度 | Turn rate |
+| postmax.line_length | 描ける線の長さ | Drawable line length |
+| postmax.charge_time | ゲージ充填時間短縮 | Charge time reduction |
+| postmax.max_hp | 最大HP | Maximum HP |
+| postmax.invulnerability | 被弾後の無敵時間 | Post-hit invulnerability |
+| postmax.repair | 修理キット回復量 | Repair kit healing |
+| postmax.heal | 緊急修理 | Emergency repair |
+| postmax.pickup_radius | XP吸引範囲 | XP attraction radius |
+| postmax.pickup_speed | XP吸引速度 | XP attraction speed |
+| postmax.xp_gain | XP獲得量 | XP gain |
+| postmax.target.W03.area | 衝角の船体・破片半径 | Ram hull and fragment radius |
+| postmax.target.W04.area | 接触波動の半径 | Contact wave radius |
+| postmax.target.W08.area | ソニックブームの半径 | Sonic wave radius |
+| postmax.target.W17.area | 電撃の到達距離 | Electric reach |
+| postmax.target.W21.area | 船体回収半径 | Hull collection radius |
+| postmax.target.W22.area | 双極ビームの幅 | Bipolar beam width |
+| postmax.target.W26.area | 各ドローンの接触半径 | Each drone hit radius |
+| postmax.target.W01.followup | ブラスター弾 | Blaster shots |
+| postmax.target.W02.followup | 散弾砲の弾 | Scatter shots |
+| postmax.target.W23.followup | 後方ブラスター弾 | Rear shots |
+| postmax.target.W25.followup | 迎撃ドローン弾 | Interceptor shots |
+| postmax.target.W05.followup | バリアの波動 | Barrier waves |
+| postmax.target.W07.followup | 軌跡機雷 | Trail mines |
+| postmax.target.W21.followup | 牽引した船体弾 | Towed hull shots |
+| postmax.target.W22.followup | 双極ビーム | Bipolar beam |
 | card.heal&#95;tag | 回復 | Repair |
 | card.heal&#95;name | 緊急修理 | Emergency Repair |
 | card.heal&#95;desc | HP を 30% 回復 | Restores 30% HP |
@@ -197,8 +248,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W04.desc | 高速で敵に触れるたび、周りへ波動。弾かれた接触でも出る | Every high-speed contact sends out a wave. Works even when you bounce off. |
 | weapon.W05.name | バリアシステム | Barrier System |
 | weapon.W05.desc | 周りに定期的な波動を出し、敵の弾を防ぐ | Emits waves around you at intervals and blocks enemy shots. |
-| weapon.W06.name | 追走ドローン | Chaser Drones |
-| weapon.W06.desc | 周りを回って撃ち、駆け抜けた線を遅れて追って触れた敵も攻撃する | Orbit and shoot, then trail your dash line and strike enemies they touch. |
 | weapon.W07.name | 軌跡機雷 | Trail Mines |
 | weapon.W07.desc | 高速で実際に通った線に機雷を残す。遅れて入った敵を爆破 | Leaves mines along the line you flew at high speed. Blasts enemies that wander in. |
 | weapon.W08.name | ソニックブーム | Sonic Boom |
@@ -212,7 +261,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W23.name | 後方ブラスター | Rear Blaster |
 | weapon.W23.desc | 機体の後ろへ自動射撃。Lv2・5で弾数、Lv3で連射速度、Lv4で威力が上昇 | Fires automatically behind you. Lv2 and Lv5 add shots, Lv3 raises fire rate, Lv4 raises damage. |
 | weapon.W25.name | 迎撃ドローン | Interceptor Drones |
-| weapon.W25.desc | 周回編隊から近くの敵へ制御弾を撃ち、押し返して突進の余地を作る。Lvで機数と連射が増える | Orbiting escorts fire control rounds at nearby enemies, pushing them back to open space for a dash. Levels add drones and bursts. |
+| weapon.W25.desc | 周回編隊から近くの敵へ弾を撃ってダメージを与える。Lvで機数と連射が増える | Orbiting escorts shoot nearby enemies for damage. Levels add drones and bursts. |
 | weapon.W26.name | 突進範囲ドローン | Dash Range Drones |
 | weapon.W26.desc | 突進時に左右へ編隊を展開し、横の敵まで貫く。Lvで機数と編隊幅、光跡が成長 | Deploy a formation beside the ship during a dash to pierce enemies across a wider path. Levels add drones, width, and longer light trails. |
 | weapon.W27.name | 残像機 | Afterimage |
@@ -229,21 +278,21 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T06.name | クリティカルランス | Critical Lance |
 | trait.T06.desc | クリティカルのたびに前方へ貫く光の槍を飛ばす | Every critical hit fires a piercing lance of light forward. |
 | trait.T07.name | 急速充填 | Quick Charge |
-| trait.T07.desc | ゲージが早く溜まる（充填速度 +25% ずつ） | The gauge fills faster (+25% charge speed each). |
+| trait.T07.desc | ゲージの充填速度が上がる（初回+25%、以降+12.5%ずつ） | The gauge charges faster (+25% first, then +12.5% per level). |
 | trait.T08.name | 大容量チャージ | High-Capacity Charge |
 | trait.T08.desc | 1回で描ける長さが伸びる（容量 +20% ずつ） | Draw longer lines in one go (+20% capacity each). |
 | trait.T09.name | クリティカル率 | Critical Rate |
-| trait.T09.desc | 体当たりのクリティカルが出やすくなる（+5% ずつ） | Ram critical hits happen more often (+5% each). |
+| trait.T09.desc | 体当たりのクリティカル率が上がる（Lv1〜3は各+5%、Lv4・5は各+3%） | Ram critical chance rises (+5% at Lv1–3, +3% at Lv4–5). |
 | trait.T10.name | 最高速度 | Top Speed |
-| trait.T10.desc | 速くなり、描ける長さも伸びる（+12% ずつ） | Fly faster and draw longer lines (+12% each). |
+| trait.T10.desc | 速くなり、描ける長さも伸びる（初回+12%、以降+7%ずつ） | Fly faster and draw longer lines (+12% first, then +7% per level). |
 | trait.T11.name | 攻撃力 | Attack Power |
-| trait.T11.desc | すべての攻撃が強くなる（+20% ずつ） | All attacks get stronger (+20% each). |
+| trait.T11.desc | すべての攻撃が強くなる（初回+20%、以降+10%ずつ） | All attacks get stronger (+20% first, then +10% per level). |
 | trait.T12.name | 広域回収 | Wide Pickup |
 | trait.T12.desc | 遠くのアイテムも拾える（回収範囲 +30% ずつ） | Collect items from farther away (+30% pickup range each). |
 | trait.T13.name | 反応波動 | Reactive Wave |
 | trait.T13.desc | ダメージを受けたとき、周りを押し返す | Pushes nearby enemies away when you take damage. |
 | trait.T14.name | 軌跡延長 | Trail Extension |
-| trait.T14.desc | 描ける長さが伸びる（+25% ずつ） | Draw longer lines (+25% each). |
+| trait.T14.desc | 描ける長さが伸びる（初回+25%、以降+15%ずつ） | Draw longer lines (+25% first, then +15% per level). |
 | trait.T31.name | 高速持続 | Extended Glide |
 | trait.T31.desc | 突進後の高速状態が長く続く | Stay fast longer after a dash. |
 |  | ■ 伝説のモジュール（legendary.&lt;ID&gt;） |  |
@@ -591,7 +640,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.ui.stage&#95;time | 時間帯 | Stage phases |
 | lab.ui.formation | 敵の組み合わせ | Enemy formations |
 | lab.attack.jitter | 待ち方のばらつき（秒） | Wait jitter (s) |
-| lab.attack.danger | 攻撃の重さ（強敵と大物） | Attack weight (strong and big enemies) |
+| lab.attack.danger | 攻撃の重さ | Attack weight |
 | lab.attack.used | 重さ %.1f / %.1f | Weight %.1f / %.1f |
 | lab.formation.layout | 配置 | Layout |
 
@@ -703,7 +752,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.enemy.clock.kill | 針の隙間から本体を狙う | Hit the body through the gap between the hands |
 | lab.enemy.dolphin.move | 距離を保ち、構えて撃つ向きを予告してから、機体の方へ数層の弧の大きな扇の波動を撃つ。当たるのは先頭の1枚だけで、機体にもほかの敵にも当たる。追尾しない | Keeps its distance and after marking its aim fires a big fan of layered arcs toward the ship. Only the leading arc hits and it hits the ship and other enemies alike. It does not home |
 | lab.enemy.dolphin.kill | 群れを射線に挟んで撃たせ、自分は離れる。本体は普通に倒す | Put a crowd in its line of fire then slip away. Defeat the body normally |
-| lab.enemy.crab.move | 近づいてハサミを開き、前方を挟む | Approaches and opens its claws then pinches in front |
+| lab.enemy.crab.move | 横腹を向けて素早く横歩きで寄り、進む方向をハサミで薙ぐ | Scuttles sideways toward you and sweeps its claws in the direction it moves |
 | lab.enemy.crab.kill | 背面から倒す。挟んだ直後（ハサミが開いたまま）は正面からでも倒せる | Defeat it from behind. Right after a pinch (claws still open) it breaks even from the front |
 | lab.enemy.marlin.move | 距離を保ち、光ってから高速で泳ぎ抜け、左右へしぶきを撒く | Keeps its distance then flashes and darts past you spraying both sides |
 | lab.enemy.marlin.kill | HP を削る | Wear down its HP |

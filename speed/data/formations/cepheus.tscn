@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://dcsv22ppl5x8w"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Cepheus" type="Node2D" unique_id=626643615]
+script = ExtResource("1")
+types = Array[StringName]([&"cepheus"])
+
+[node name="1体" type="Node2D" parent="." unique_id=539791220]
+position = Vector2(-2234, 0)
+script = ExtResource("2")
+
+[node name="cepheus1" type="Node2D" parent="1体" unique_id=1729727995]
+script = ExtResource("3")
+enemy = &"cepheus"
+metadata/_edit_lock_ = true
+
+[node name="Entry0" type="Node2D" parent="." unique_id=934821614]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=1159105756]
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=1202277842]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=824248816]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4")
+
+[node name="Entry4" type="Node2D" parent="." unique_id=1455140641]
+position = Vector2(1406.0001, -610)
+rotation = 4.3030424
+script = ExtResource("4")
+
+[node name="Entry5" type="Node2D" parent="." unique_id=1440638257]
+position = Vector2(-1066, -1102)
+rotation = 2.3727982
+script = ExtResource("4")
+
+[node name="Entry6" type="Node2D" parent="." unique_id=577221219]
+position = Vector2(-1091.0001, 1072)
+rotation = 0.79418206
+script = ExtResource("4")
+
+[node name="Entry7" type="Node2D" parent="." unique_id=1693160674]
+position = Vector2(1066, 1052)
+rotation = -0.7920081
+script = ExtResource("4")

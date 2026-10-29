@@ -35,7 +35,7 @@ func evaluate(source, path: PackedVector2Array, draw_seconds := 0.5, start_offse
 	var run: RunSimulation = worker.run
 	if run.state.tracing or run.state.phase != RunState.Phase.PLAY:
 		return await _finish({"status": "invalid", "reason": tr("lab.trace_in_progress")})
-	if run.state.gauge < run.cfg.draw_min_charge:
+	if run.state.gauge_amount() < run.cfg.draw_min_charge:
 		return await _finish({"status": "invalid", "reason": tr("lab.low_charge")})
 	worker.history = worker.history.filter(func(e): return int(e.tick) <= source_tick)
 	worker._cursor = worker.history.size()

@@ -1,4 +1,4 @@
-[gd_resource type="SpriteFrames" format=3]
+[gd_resource type="SpriteFrames" format=3 uid="uid://inan5pfkbg25"]
 
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_base.png" id="leg_base"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor.png" id="leg_armor"]

@@ -6,13 +6,13 @@
 script = ExtResource("1")
 params = {
 "cooldown": 0.15,
-"damage_base": 1.6,
-"damage_per": 0.8,
+"damage_base": 2.0,
+"damage_per": 0.4,
 "knock": 900.0,
-"length_base": 720.0,
-"length_per": 120.0,
-"width_base": 32.0,
-"width_per": 8.0
+"length_base": 780.0,
+"length_per": 60.0,
+"width_base": 36.0,
+"width_per": 4.0
 }
 id = &"T06"
 code_id = &"critBeam"

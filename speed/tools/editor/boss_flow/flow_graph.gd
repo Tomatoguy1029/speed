@@ -7,6 +7,9 @@ var flow: Resource
 var _before := {}
 var _reroute_pending := false
 var clipboard: Array = []
+## 区間ノードの色。攻撃の区間は青、休息の区間は緑。
+const SECTION_COLOR := Color(0.65, 0.85, 1.0)
+const REST_COLOR := Color(0.55, 1.0, 0.55)
 
 func _request_reroute() -> void:
 	if _reroute_pending: return
@@ -39,7 +42,7 @@ func _ready() -> void:
 		if flow != null: fit_all.call_deferred())
 	node_selected.connect(func(node):
 		if node.name == &"shared_rest": shared_settings_requested.emit()
-		else: picked.emit(String(node.name).trim_prefix("section_").to_int()))
+		elif String(node.name).begins_with("section_"): picked.emit(String(node.name).trim_prefix("section_").to_int()))
 	connection_request.connect(func(from, _port, to, _input):
 		if not String(from).begins_with("section_") or not String(to).begins_with("section_"): return
 		var after := snapshot()
@@ -71,9 +74,9 @@ func show_flow(value: Resource) -> void:
 		var node := GraphNode.new()
 		node.name = "section_" + str(i)
 		node.title = ("開始 · " if i == 0 else "") + String(section.get("name", "区間"))
-		node.self_modulate = Color(0.65, 0.85, 1.0)
+		node.self_modulate = REST_COLOR if section.get("request") == "rest" else SECTION_COLOR
 		var summary := Label.new()
-		summary.text = "休息" if section.get("request") == "rest" else "消費上限 %s" % section.get("cap", 2)
+		summary.text = "休息" if section.get("request") == "rest" else "攻撃 %d 回" % int(section.get("action_count", 1))
 		node.add_child(summary)
 		node.set_slot(0, true, 0, Color.SKY_BLUE, true, 0, Color.SKY_BLUE)
 		add_child(node)

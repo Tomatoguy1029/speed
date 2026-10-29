@@ -23,11 +23,25 @@ func exercise() -> void:
 			push_error("指定ボスの実験場を開けません: " + entry[0])
 		else:
 			trial.session.playing = false
+			var hydra_started := false
+			if entry[0] == "hydra":
+				hydra_started = not actor.hsm.active and actor.necks.any(func(neck): return neck.mode == StringName(entry[1]))
 			for step in 600: trial.session.step()
 			var chosen: Array = actor.flow_runner.last
-			if chosen.size() != 1 or chosen[0].id != entry[1]:
+			var is_combo: bool = actor.action_rules.combos.has(entry[1])
+			var correct := false
+			if is_combo: correct = chosen.size() == 1 and chosen[0].id == entry[1]
+			elif entry[0] == "hydra": correct = hydra_started and not actor.hsm.active and chosen.is_empty()
+			elif trial.manual != null: correct = trial.manual.requested == entry[1] and not actor.selection_enabled
+			else: correct = chosen.size() == 1 and chosen[0].id == entry[1]
+			if not correct:
 				failed += 1
 				push_error("選択技の単独再生になっていません: " + entry[1])
+			if entry[0] == "hydra":
+				trial._return_to_ai()
+				if not actor.hsm.active:
+					failed += 1
+					push_error("通常AIへ戻せません: " + entry[0])
 			if entry[1] == "test_combo" and (actor.flow_adapter.custom_run != null or actor.mode != &"idle" or actor.flow_runner.index != 1):
 				failed += 1
 				push_error("一角獣のカスタムコンボが完了しません")

@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://p6qopama1bp6"]
+
+[ext_resource type="Script" uid="uid://c4ouye88msfeb" path="res://scripts/encounters/enemy_formation.gd" id="1"]
+[ext_resource type="Script" uid="uid://u13oaf1ehqun" path="res://scripts/encounters/formation_layout.gd" id="2"]
+[ext_resource type="Script" uid="uid://dwrbodjk22erp" path="res://scripts/encounters/formation_marker.gd" id="3"]
+[ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
+
+[node name="Aquila" type="Node2D" unique_id=22404570]
+script = ExtResource("1")
+types = Array[StringName]([&"aquila"])
+
+[node name="1体" type="Node2D" parent="." unique_id=226434546]
+position = Vector2(-2459, 6)
+script = ExtResource("2")
+
+[node name="aquila1" type="Node2D" parent="1体" unique_id=1191707160]
+script = ExtResource("3")
+enemy = &"aquila"
+metadata/_edit_lock_ = true
+
+[node name="Entry0" type="Node2D" parent="." unique_id=1161639618]
+position = Vector2(0, -1600)
+rotation = 3.1415927
+script = ExtResource("4")
+
+[node name="Entry1" type="Node2D" parent="." unique_id=867350022]
+position = Vector2(0, 1600)
+script = ExtResource("4")
+
+[node name="Entry2" type="Node2D" parent="." unique_id=146204604]
+position = Vector2(-1600, 0)
+rotation = 1.5707964
+script = ExtResource("4")
+
+[node name="Entry3" type="Node2D" parent="." unique_id=1704774451]
+position = Vector2(1600, 0)
+rotation = -1.5707961
+script = ExtResource("4")
+
+[node name="Entry4" type="Node2D" parent="." unique_id=1868546519]
+position = Vector2(-1194, -1005)
+rotation = 2.270457
+script = ExtResource("4")
+
+[node name="Entry5" type="Node2D" parent="." unique_id=706051891]
+position = Vector2(1163, -987)
+rotation = 4.0086694
+script = ExtResource("4")
+
+[node name="Entry6" type="Node2D" parent="." unique_id=1263868993]
+position = Vector2(-1204, 977)
+rotation = 0.88910544
+script = ExtResource("4")
+
+[node name="Entry7" type="Node2D" parent="." unique_id=1039494058]
+position = Vector2(1189, 941)
+rotation = -0.90130824
+script = ExtResource("4")

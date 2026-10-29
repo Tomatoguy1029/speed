@@ -196,9 +196,9 @@ func _pick_weighted(items: Array) -> int:
 ## 機体の向きに合わせて回して置く。出現位置の距離は、今の映る広さ（止まっているときとの比）だけ伸ばす。
 ## types を渡せば、その種類の敵だけを出す（クリップの種類の組み合わせ）。出した敵の行番号と id を交互に並べて返す。
 ## priorityが数値なら0を含めて群れ全員へ渡す。nullならステージの種類別優先度を使う。
-func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null) -> PackedInt32Array:
+func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: Array = [], value := -1.0, priority: Variant = null, attack_managed: Variant = null) -> PackedInt32Array:
 	var rows := PackedInt32Array()
-	var group := enemies._next_id if value > 0.0 else 0
+	var group := enemies._next_id if value >= 0.0 else 0
 	var li := layout if layout >= 0 and layout < data.get("layouts", []).size() else _pick_weighted(data.get("layouts", []))
 	var ei := entry_index if entry_index >= 0 and entry_index < data.get("entries", []).size() else _pick_weighted(data.get("entries", []))
 	if li < 0 or ei < 0:
@@ -222,6 +222,8 @@ func spawn_formation(data: Dictionary, layout := -1, entry_index := -1, types: A
 		# 置き場所の正面は y の負の向き
 		var facing := turn + local.get_rotation() - PI / 2.0
 		var opts := {"facing": facing, "attack_group": group, "attack_value": value}
+		if attack_managed != null and group > 0:
+			opts.attack_managed = attack_managed
 		if priority != null:
 			opts.attack_priority = priority
 		var i := spawn(def, pos, opts)
@@ -279,7 +281,7 @@ func _tick_clips() -> void:
 			continue
 		var layout_index: int = choices[c].index
 		var value: float = items[k].data.layouts[layout_index].value
-		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority)
+		var rows := spawn_formation(items[k].data, layout_index, -1, clip.types, value, clip.attack_priority, items[k].data.layouts[layout_index].get("attack_managed"))
 		if not rows.is_empty():
 			groups.append(rows)
 			_clip_next[n] = state.time + clip.interval
@@ -299,6 +301,13 @@ var _survey_raw := 0
 ## 戻り値は、目標の数 pop と比べる、再配置の範囲の中の敵の数。上下左右と中心付近の領域ごとに、
 ## pop × config.spawn_region_cap までしか数えない（一か所に固まった敵だけで目標に届かないように）。
 func _survey(pop: float) -> float:
+	var t0 := Time.get_ticks_usec()
+	var alive_n := _survey_rows(pop)
+	# 開発版の計測：出現のための数え直しの時間
+	ctx.perf.since(&"spawner.survey", t0)
+	return alive_n
+
+func _survey_rows(pop: float) -> float:
 	_edge_counts.fill(0)
 	_type_counts.clear()
 	_zako_counts.clear()

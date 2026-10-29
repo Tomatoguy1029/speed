@@ -13,7 +13,7 @@
 - [loadout_system.gd](../../../../speed/scripts/runtime/systems/loadout_system.gd)・[pickup_system.gd](../../../../speed/scripts/runtime/systems/pickup_system.gd)・[ship_system.gd](../../../../speed/scripts/runtime/systems/ship_system.gd)：装備差分・XP・実被弾の発生元。
 - 同じ systems 内の `spawn_system.gd`・`combat_system.gd`・`enemy_system.gd`・`boss_system.gd`：出現、命中/撃破、局所設定の適用。ゲーム内イベントの存在とrecorderが保存する内容を区別する。
 
-現行は `schema_version=4`・`measurement_version=1`。schema 4だけでは追加計測の有無を判別できない。ヘッダーの版・条件と `loadout`・`hurt`・`xp_*`・調整通知の実在を調べ、項目のない録画はその目的の精度を下げる。新形式でもイベントが観測区間内に発生しなければ行は出ないため、型の不在だけで機能の未対応や発生0を断定しない。未対応の測定版を現行とみなさず、対応する実装を確認するか、解釈できる範囲を限定する。
+現行は `schema_version=4`・`measurement_version=2`。2 では `performance` の `profile` に処理時間（世界側・表示側の項目、敵の描画の行の数、記録自身の書き込み）を持つ。schema 4だけでは追加計測の有無を判別できない。ヘッダーの版・条件と `loadout`・`hurt`・`xp_*`・調整通知の実在を調べ、項目のない録画はその目的の精度を下げる。新形式でもイベントが観測区間内に発生しなければ行は出ないため、型の不在だけで機能の未対応や発生0を断定しない。未対応の測定版を現行とみなさず、対応する実装を確認するか、解釈できる範囲を限定する。
 
 ## ステージ固有の変更先を確かめる
 
@@ -95,6 +95,8 @@
 ### 時間と性能
 
 総FPSは `sum(frames) / sum(duration_real)`、平均フレーム時間は `1000 * sum(duration_real) / sum(frames)`。閾値超過率・ヒットストップ観測率は各回数合計/総フレーム数を使う。窓のFPSや割合を単純平均しない。窓の最大フレーム時間を分位点へ変換できない。
+
+ヘッダーの `perf_excludes_ui_pause=true` は、報酬表示・メニュー表示で世界が止まる時間も性能窓から除いたことを示す。識別子のない録画は、PLAYのまま表示だけが続く時間を含み得る。処理別合計や平均FPSから、こうした停止と連続戦闘の負荷を分離できるとは限らない。
 
 `real_t` は書込時刻、性能窓は `window_start_real/window_end_real`、`duration_real` は観測間隔の合計。`objects_at_write/bonus_at_write` は書込時点で、窓全体の最大・平均・状態を保証しない。ヒットストップ観測率は停止時間率ではなく、描画FPS低下の原因と決めない。
 

@@ -10,6 +10,8 @@ var attack_mult := 1.0
 var crit_chance := 0.0
 var crit_mult := 2.5
 var pickup_radius := 0.0
+## 追加強化込みのXP結晶専用半径。硬貨・カプセルは既存のpickup_radiusを使う。
+var xp_pickup_radius := 0.0
 ## 1単位の充填にかかる実秒
 var charge_time := 0.0
 ## ゲージの容量（1 ＋ 0.2 × 大容量チャージ）
@@ -19,3 +21,10 @@ var length_mult := 1.0
 ## 突進後の保持・減速時間の倍率（高速持続）
 var glide_duration_mult := 1.0
 var xp_mult := 1.0
+## 全MAX後の取得XP倍率。永続強化による敵ドロップ量とは分けて、取得入口で1回だけ使う。
+var xp_gain_mult := 1.0
+var acceleration := 0.0
+var turn_rate := 0.0
+var invulnerability := 0.0
+var repair_fraction := 0.0
+var pickup_speed_mult := 1.0

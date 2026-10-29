@@ -6,6 +6,7 @@ class_name ProjectileSystem
 extends RunSystem
 
 func dispose() -> void:
+	clear_combat_observations()
 	for attack in _attached_attacks.values():
 		attack.dispose()
 	_attached_attacks.clear()
@@ -76,6 +77,7 @@ var hostile_slow := PackedFloat32Array()
 ## 誘導の曲がる速さ（ミサイル）
 var hostile_turn := PackedFloat32Array()
 var hostile_kind := PackedByteArray()
+var hostile_visual: Array[StringName] = []
 ## 天体の表面までの余裕の下限。これが移動量より大きい間は天体の判定を省く
 var hostile_gap := PackedFloat32Array()
 ## 石になっている残り時間（ペルセウス座の力。石の間は止まり、触れると砕けて被弾しない）
@@ -92,6 +94,10 @@ var lab_hazard_group: Dictionary = {}
 var director
 var _hostile_updating := false
 var _hostile_clear_pending := false
+## Only boss-created effects are tracked, with a fixed cap independent of mob count.
+var _combat_hostiles: Dictionary = {}
+var _combat_hazards: Dictionary = {}
+const COMBAT_EFFECT_LIMIT := 512
 
 ## 敵の攻撃の形。項目ごとの列で持つ。1行が1つ（設計書 6）。
 ##   BEAM：pos から angle の向きへ長さ len・幅 width の線。予告（delay）のあと active の間当たる。
@@ -104,13 +110,14 @@ enum HazardKind { BEAM, ZONE, WAVE, WALL }
 ## 見た目の種類（描画が読む）
 ## RAY は残る線をビームとして描く（じょうぎ座）。BITE は噛みつき（噛みつく雑魚）。RIPPLE は数層の弧の波動（いるか座）。
 ## FLOOD は広がるビームで、予告の間も照射する範囲全体を見せる（みずがめ座）。TRAIL は付いている敵の見た目が描く
-## 残る線（みなみのさんかく座の赤いレーザーの軌跡）
-enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX }
+## 残る線（みなみのさんかく座の赤いレーザーの軌跡）。GUIDE は予告の間、ビームの通り道を予告線で示す（ビームの敵）
+enum HazardStyle { PLAIN, RETICLE, LIGHTNING, BLAST, RAY, BITE, RIPPLE, FLOOD, TRAIL, TELESCOPE, PHOENIX, GUIDE, AQUILA, DRACO }
 const HAZARD_CAUSE: Array[StringName] = [&"beam", &"blast", &"wave", &"wall"]
 ## 弾けた範囲を見せる時間
 const ZONE_FLASH := 0.25
 var hazard_alive := PackedByteArray()
 var hazard_kind := PackedByteArray()
+var hazard_visual: Array[StringName] = []
 var hazard_style := PackedByteArray()
 var hazard_pos := PackedVector2Array()
 var hazard_angle := PackedFloat32Array()
@@ -129,6 +136,8 @@ var hazard_owner := PackedInt32Array()
 var hazard_owner_id := PackedInt32Array()
 ## 遅れて弾ける範囲・広がる波が、敵に与えるダメージ（0 なら敵には当たらない。誘爆・いるか座の波動に使う）
 var hazard_edmg := PackedFloat64Array()
+## 敵へ当たる波ごとの命中済みID。敵の行番号は再利用されるのでIDで判定する。
+var hazard_enemy_hit: Array[Dictionary] = []
 ## 1 なら、当たっている間の残る線が機体の移動を止める壁になる（じょうぎ座のビーム）
 var hazard_block := PackedByteArray()
 ## 広がる波の速さ、扇の左右の角度（広がるビームでは広がる角度）、切れ目の向きと左右の角度
@@ -150,10 +159,16 @@ var _attack_kinds: Dictionary = {}
 func register_attack(kind: StringName, attack: AttackKind) -> void:
 	_attack_kinds[kind] = attack
 
-func emit_attack(kind: StringName, args: Array) -> Variant:
+var visual_context: PackedScene
+
+func emit_attack(kind: StringName, args: Array, visual: PackedScene = null) -> Variant:
 	if not _attack_kinds.has(kind):
 		register_attack(kind, load("res://scripts/attacks/%s.gd" % kind).new())
-	return _attack_kinds[kind].emit(self, args)
+	var previous := visual_context
+	if visual != null: visual_context = visual
+	var result: Variant = _attack_kinds[kind].emit(self, args)
+	visual_context = previous
+	return result
 
 func attached_attack(kind: StringName) -> RunSystem:
 	if not _attached_attacks.has(kind):
@@ -200,14 +215,24 @@ func setup(context: RunContext) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：味方の弾・撃破後の処理・敵の弾・攻撃の形を分けて足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	_update_friendly(world_dt)
+	perf.since(&"projectiles.friend", t0)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	t0 = Time.get_ticks_usec()
 	combat.enemies.after_combat()
+	perf.since(&"projectiles.after_combat", t0)
 	if state.phase != RunState.Phase.PLAY:
 		return
+	t0 = Time.get_ticks_usec()
 	_update_hostile(world_dt)
+	perf.since(&"projectiles.hostile", t0)
+	t0 = Time.get_ticks_usec()
 	_update_hazards(world_dt)
+	perf.since(&"projectiles.hazards", t0)
 
 # ── 味方の弾と破片 ───────────────────────────────────────────────
 
@@ -220,8 +245,8 @@ func burst_debris(pos: Vector2, count: int, speed: float, dmg: float, color: Col
 	emit_attack(&"burst_debris", [pos, count, speed, dmg, color, source_id])
 
 ## 撃破された大型の敵（行 i）から、攻撃する破片を飛ばす（仕様書 11.6）。
-func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0) -> bool:
-	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock])
+func scatter_hull(i: int, dir: Vector2, speed: float, dmg: float, knock := -1.0, radius_mult := 1.0, life_mult := 1.0) -> bool:
+	return emit_attack(&"scatter_hull", [i, dir, speed, dmg, knock, radius_mult, life_mult])
 
 ## 牽引した船体を撃ち出す（質量牽引砲 W21）。敵を貫き、クリティカルにならない。source_id の敵には当たらない。
 func fire_hull(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float, knock: float, type: StringName,
@@ -233,8 +258,8 @@ func fire_saw(pos: Vector2, vel: Vector2, r: float, dmg: float, life: float) -> 
 	emit_attack(&"saw", [pos, vel, r, dmg, life])
 
 ## 敵の死体（行 i）を1つ飛ばす（吹き飛ばし衝角で小型の敵を倒したとき）。
-func fling_corpse(i: int, vel: Vector2, dmg: float) -> void:
-	emit_attack(&"fling_corpse", [i, vel, dmg])
+func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mult := 1.0, life_mult := 1.0) -> void:
+	emit_attack(&"fling_corpse", [i, vel, dmg, radius_mult, knock_mult, life_mult])
 
 ## 味方の弾・破片を1行加え、その行番号を返す。hit_id は最初から当てたことにする敵（-1 なら無し）。
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
@@ -379,8 +404,10 @@ func fire_slash(from: Vector2, angle: float, speed: float, size: float, range: f
 func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: float, dmg: float, slow: float,
 		turn: float, kind: HostileKind) -> int:
 	var i := hostile_slots.take()
-	if director != null:
+	if director != null and lab_context > 0:
 		lab_hostile_group[i] = lab_context
+	else:
+		lab_hostile_group.erase(i)
 	hostile_pos[i] = pos
 	hostile_vel[i] = vel
 	hostile_speed[i] = speed
@@ -390,10 +417,12 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_slow[i] = slow
 	hostile_turn[i] = turn
 	hostile_kind[i] = kind
+	hostile_visual[i] = StringName(visual_context.resource_path) if visual_context != null else &""
 	hostile_gap[i] = 0.0
 	hostile_stone[i] = 0.0
 	hostile_wait[i] = 0.0
 	hostile_burst[i] = 0.0
+	_combat_spawn(_combat_hostiles, i, "hostile", pos)
 	return i
 
 ## 画面の中の敵の弾を、seconds 世界秒のあいだ石にする（ペルセウス座の力）。
@@ -422,6 +451,7 @@ func _update_hostile(dt: float) -> void:
 		var life := hostile_life[i]
 		if life <= 0.0:
 			# バリアで消された弾
+			_end_hostile(i, "removed_before_contact", hostile_pos[i])
 			hostile_slots.release(i)
 			i += 1
 			continue
@@ -430,6 +460,7 @@ func _update_hostile(dt: float) -> void:
 			hostile_stone[i] -= dt
 			var reach_s := hostile_r[i] + R
 			if ship_pos.distance_squared_to(from) <= reach_s * reach_s:
+				_end_hostile(i, "petrified", from)
 				hostile_slots.release(i)
 			i += 1
 			continue
@@ -463,6 +494,7 @@ func _update_hostile(dt: float) -> void:
 			body_hit = {"t":wall_hit.t,"point":wall_hit.pos,"body":null}
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
+		_combat_evaluate(_combat_hostiles, i)
 		var stop = shape.contact(self, i, from, to, body_hit, ship_pos, R, step)
 		if stop != null:
 			life = 0.0
@@ -470,6 +502,7 @@ func _update_hostile(dt: float) -> void:
 		if body_hit != null or life <= 0.0:
 			# 飛びきるか何かに当たった位置で消える（圧縮弾はそこで破裂する）
 			shape.on_end(self, i, to if body_hit == null else from + (to - from) * float(body_hit.t), life <= 0.0)
+			_end_hostile(i, "contact" if stop != null else "obstacle" if body_hit != null else "lifetime_or_view_exit", to)
 			hostile_slots.release(i)
 		else:
 			hostile_pos[i] = to
@@ -502,6 +535,7 @@ func block_one(center: Vector2, radius: float) -> bool:
 
 ## ボスの撃破などで、敵の弾と攻撃の形をすべて消す。
 func clear_hostile() -> void:
+	clear_combat_observations("cleared")
 	hazard_slots.clear()
 	if _hostile_updating:
 		_hostile_clear_pending = true
@@ -568,6 +602,12 @@ func attach_hazard(h: int, e: int) -> void:
 func owns_hazard(h: int, e: int, id: int) -> bool:
 	return h >= 0 and h < hazard_alive.size() and hazard_alive[h] != 0 and hazard_owner[h] == e and hazard_owner_id[h] == id
 
+## 発生元に紐づく持続判定だけを止める。独立して飛ぶ発射済みの弾はそのまま進める。
+func _hazard_owner_pulled(h: int) -> bool:
+	var owner := hazard_owner[h]
+	return owner >= 0 and combat.enemies.is_same(owner, hazard_owner_id[h]) \
+		and combat.enemies.table.pump_owner[owner] >= 0
+
 ## 機体（半径 radius）が from から to へ動くとき、移動を止める壁（hazard_block の残る線）に最初にぶつかる位置。
 ## ぶつからなければ空の辞書。ぶつかれば t（移動の割合。壁の手前で止まる位置）と normal（壁から機体の側への向き）。
 func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
@@ -575,6 +615,8 @@ func block_hit(from: Vector2, to: Vector2, radius: float) -> Dictionary:
 	var best_t := INF
 	for h in hazard_alive.size():
 		if hazard_alive[h] == 0 or hazard_block[h] == 0 or hazard_kind[h] != HazardKind.WALL:
+			continue
+		if _hazard_owner_pulled(h):
 			continue
 		if hazard_t[h] < hazard_delay[h] or hazard_t[h] > hazard_delay[h] + hazard_active[h]:
 			continue
@@ -606,15 +648,21 @@ func move_hazard(h: int, pos: Vector2, angle: float, length := -1.0) -> void:
 ## 攻撃の形（行 h）を消す。
 func release_hazard(h: int) -> void:
 	if h < hazard_alive.size() and hazard_alive[h] != 0:
+		end_attack_visual(_hazard_visual_path(h), "Fade", hazard_pos[h])
+		_combat_end(_combat_hazards, h, "released", hazard_pos[h])
+		hazard_enemy_hit[h].clear()
 		hazard_slots.release(h)
 
 ## 攻撃の形を1行加え、その行番号を返す。空いた行を使い回すので、hazard_ の全部の列をここで書き直す。
 func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: float, length: float, width: float,
 		delay: float, active: float, dmg: float, color: Color, speed := 0.0, arc := 0.0, gap := 0.0, gap_w := 0.0) -> int:
 	var i := hazard_slots.take()
-	if director != null:
+	if director != null and lab_context > 0:
 		lab_hazard_group[i] = lab_context
+	else:
+		lab_hazard_group.erase(i)
 	hazard_kind[i] = kind
+	hazard_visual[i] = StringName(visual_context.resource_path) if visual_context != null else &""
 	hazard_style[i] = style
 	hazard_pos[i] = pos
 	hazard_angle[i] = angle
@@ -627,6 +675,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_hit[i] = 0
 	hazard_color[i] = color
 	hazard_edmg[i] = 0.0
+	hazard_enemy_hit[i] = {}
 	hazard_block[i] = 0
 	hazard_owner[i] = -1
 	hazard_owner_id[i] = 0
@@ -634,6 +683,7 @@ func _add_hazard(kind: HazardKind, style: HazardStyle, pos: Vector2, angle: floa
 	hazard_arc[i] = arc
 	hazard_gap[i] = gap
 	hazard_gap_w[i] = gap_w
+	_combat_spawn(_combat_hazards, i, "hazard", pos)
 	return i
 
 ## 広がる波（行 i）の、今の半径。
@@ -655,7 +705,10 @@ func _update_hazards(dt: float) -> void:
 		var delay := hazard_delay[i]
 		var owner := hazard_owner[i]
 		if t >= delay + hazard_active[i] or (owner >= 0 and (not combat.enemies.is_same(owner, hazard_owner_id[i])
-				or combat.enemies.table.dead[owner] != 0)):
+				or combat.enemies.table.dead[owner] != 0 or _hazard_owner_pulled(i))):
+			end_attack_visual(_hazard_visual_path(i), "Fade", hazard_pos[i])
+			_combat_end(_combat_hazards, i, "lifetime_or_owner_end", hazard_pos[i])
+			hazard_enemy_hit[i].clear()
 			hazard_slots.release(i)
 			continue
 		var shape := _hazard_shape(hazard_kind[i])
@@ -665,10 +718,84 @@ func _update_hazards(dt: float) -> void:
 			continue
 		if not shape.before_touch(self, i):
 			return
+		_combat_evaluate(_combat_hazards, i)
 		if not shape.touches(self, i, ship_pos, R):
 			continue
 		if shape.hits_once:
 			hazard_hit[i] = 1
-		ship.damage(hazard_dmg[i], 0.0, HAZARD_CAUSE[hazard_kind[i]], _hazard_source(i))
+		end_attack_visual(_hazard_visual_path(i), "Hit", ship_pos)
+		_combat_damage(_combat_hazards, i, hazard_dmg[i], 0.0, HAZARD_CAUSE[hazard_kind[i]], _hazard_source(i))
 		if state.phase != RunState.Phase.PLAY:
 			return
+
+func _combat_spawn(records: Dictionary, row: int, kind: String, pos: Vector2) -> void:
+	# Always remove stale slot metadata, including when recording was stopped mid-effect.
+	records.erase(row)
+	if ctx.bosses == null or not ctx.bosses.diagnostics.enabled(): return
+	var actor := ctx.bosses.recording_actor
+	if actor == null: return
+	if _combat_hostiles.size() + _combat_hazards.size() >= COMBAT_EFFECT_LIMIT:
+		ctx.bosses.diagnostics.dropped += 1
+		return
+	var meta: Dictionary = actor.combat_trace.context()
+	meta.merge({"effect_id": ctx.bosses.diagnostics.next_id(), "effect_kind": kind, "effect_row": row,
+		"spawn_pos": [pos.x, pos.y], "checks": 0, "contacts": 0, "applied": 0.0})
+	records[row] = meta
+	ctx.bosses.diagnostics.record("boss_effect", meta.merged({"step": "spawn"}))
+
+func _combat_evaluate(records: Dictionary, row: int) -> void:
+	if not records.is_empty() and records.has(row): records[row].checks += 1
+
+func damage_hostile(row: int) -> void:
+	_combat_damage(_combat_hostiles, row, hostile_dmg[row], hostile_slow[row], HOSTILE_CAUSE[hostile_kind[row]], &"")
+
+func _combat_damage(records: Dictionary, row: int, amount: float, slow: float, cause: StringName, source: StringName) -> void:
+	if records.is_empty() or not records.has(row):
+		ship.damage(amount, slow, cause, source)
+		return
+	var meta: Dictionary = records[row]
+	meta.contacts += 1
+	var before := state.ship_hp
+	ship.damage(amount, slow, cause, source, meta)
+	meta.applied += maxf(0.0, before - maxf(0.0, state.ship_hp))
+
+func _combat_end(records: Dictionary, row: int, reason: String, pos: Vector2) -> void:
+	if records.is_empty() or not records.has(row): return
+	var meta: Dictionary = records[row]
+	records.erase(row)
+	if ctx.bosses == null or not ctx.bosses.diagnostics.enabled(): return
+	meta.merge({"step": "end", "reason": reason, "end_pos": [pos.x, pos.y], "player_pos": [state.ship_pos.x, state.ship_pos.y],
+		"observation_scope": "effect_observed_lifetime", "outcome": "hit" if float(meta.applied) > 0.0 else "contact_blocked" if int(meta.contacts) > 0 else "evaluated_miss" if int(meta.checks) > 0 else "no_hit_observed"})
+	ctx.bosses.diagnostics.record("boss_effect", meta)
+
+func clear_combat_observations(reason := "recording_end") -> void:
+	for row: int in _combat_hostiles.keys(): _combat_end(_combat_hostiles, row, reason, hostile_pos[row])
+	for row: int in _combat_hazards.keys(): _combat_end(_combat_hazards, row, reason, hazard_pos[row])
+
+func _end_hostile(row: int, reason: String, at: Vector2) -> void:
+	var scene: StringName = hostile_visual[row]
+	if scene == &"": scene = StringName("res://scenes/attacks/%s.tscn" % HostileKind.keys()[hostile_kind[row]].to_lower())
+	end_attack_visual(scene, "Hit" if reason in ["contact", "obstacle"] else "Fade", at)
+	_combat_end(_combat_hostiles, row, reason, at)
+
+var _end_visual_library: Resource
+var _end_visual_phases := {}
+func end_attack_visual(scene: StringName, phase: String, at: Vector2) -> void:
+	if not _end_visual_phases.has(scene):
+		if _end_visual_library == null and ctx.resources != null:
+			_end_visual_library = ctx.resources.resources.get("res://.content/attack_visuals.res")
+		if _end_visual_library == null and state.lab_mode and ResourceLoader.exists("res://.content/attack_visuals.res"):
+			_end_visual_library = load("res://.content/attack_visuals.res")
+		if _end_visual_library == null: return
+		var layers: Dictionary = _end_visual_library.get_meta("looks", {}).get(String(scene), {})
+		var phases := {}
+		for name in ["Hit", "Fade"]:
+			phases[name] = layers.get(name) != null or not layers.get(name + "_sprites", []).is_empty()
+		_end_visual_phases[scene] = phases
+	if _end_visual_phases[scene][phase]: state.emit(&"attack_visual_end", {"scene": String(scene), "phase": phase, "pos": at})
+
+func _hazard_visual_path(row: int) -> StringName:
+	if hazard_visual[row] != &"": return hazard_visual[row]
+	var kind: String = HazardKind.keys()[hazard_kind[row]].to_lower()
+	var styled := "%s_%s" % [kind, HazardStyle.keys()[hazard_style[row]].to_lower()]
+	return StringName("res://scenes/attacks/%s.tscn" % (styled if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % styled) else kind))

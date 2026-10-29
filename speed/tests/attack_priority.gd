@@ -131,6 +131,115 @@ func _ready() -> void:
 	em.table.pos[rock] = Vector2(200,0)
 	em.table.dead[rock] = 1
 	check(em.behavior(&"reticle")._blocking_rock(a,30.0)==-1,"Destroyed rock immediately excluded")
+	# からす座の横断・結晶回収は予算0でも、他の攻撃が占有中でも進む。
+	em.clear_all()
+	pm.clear_hostile()
+	var crow_director = load("res://scripts/encounters/attack_director.gd").new()
+	crow_director.projectiles = pm
+	crow_director.formation_mode = true
+	crow_director.configure({"enabled": true, "budget": 0.0, "jitter": 0.0})
+	pm.director = crow_director
+	var crow := em.spawn(em.def_of(&"crow"), Vector2(0, 100))
+	check(not em.behavior(&"crow").admission, "Crow flight bypasses attack admission")
+	var crow_before: Vector2 = em.table.pos[crow]
+	em.tick(0.1, 0.1)
+	check(em.table.pos[crow] != crow_before and crow_director.used_cost() == 0.0
+		and crow_director.waiting.is_empty(), "Crow flies at zero attack budget without requesting a slot")
+	var pickups: PickupSystem = lab.run.pickups
+	var foot := em.table.pos[crow] - Vector2.from_angle(em.table.facing[crow]) * em.table.r[crow] * 0.62
+	var gem: int = pickups.drop_gem(foot, 7.0)
+	pickups.gem_pos[gem] = foot
+	em.gather_pickups(pickups, 0.1)
+	check(em.table.carry[crow] >= 7.0 and pickups.gem_alive[gem] == 0,
+		"Crow collects experience with zero attack budget")
+	crow_director.settings.budget = 1.0
+	var blocker := em.spawn(em.def_of(&"telescope"), Vector2(400, 0))
+	check(crow_director.request("other", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 1.0),
+		"Other attacker occupies the budget")
+	crow_before = em.table.pos[crow]
+	em.tick(0.1, 0.1)
+	check(em.table.pos[crow] != crow_before and crow_director.used_cost() == 1.0,
+		"Crow flies without consuming another attacker's slot")
+	em.mark_dead(crow)
+	em.cleanup()
+	crow_director.advance(1.0, em)
+	check(crow_director.used_cost() == 1.0 and crow_director.token("other") > 0,
+		"Crow removal does not return another attacker's budget")
+	crow_director.advance(20.0, em)
+	crow_director.advance(21.0, em)
+	check(crow_director.used_cost() == 0.0 and crow_director.owners.is_empty(),
+		"Budget returns once when its actual attack ends")
+	# float valueの反復加算は数ULPだけずれる。予算0と微小な正値は区別する。
+	var precision = load("res://scripts/encounters/attack_director.gd").new()
+	precision.projectiles = pm
+	precision.formation_mode = true
+	precision.configure({"enabled": true, "budget": 0.3, "jitter": 0.0})
+	for n in 3:
+		check(precision.request("decimal_%d" % n, ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 0.1),
+			"0.1を3回使って予算0.3に収まる")
+	check(absf(precision.used_cost() - 0.3) < 1e-14, "反復加算の予算使用量")
+	check(not precision.request("tiny_over", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 1e-14),
+		"満杯では微小な正valueも追加しない")
+	precision.groups.clear()
+	precision.owners.clear()
+	precision.waiting.clear()
+	precision.configure({"enabled": true, "budget": 0.0, "jitter": 0.0})
+	check(precision.request("zero", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 0.0)
+		and precision.groups.is_empty() and precision.waiting.is_empty(),
+		"予算0でもvalue0は枠と待機を作らず通す")
+	check(not precision.request("tiny", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 1e-18),
+		"予算0で微小な正valueを無料扱いしない")
+	precision.waiting.clear()
+	precision.configure({"enabled": true, "budget": 1e-12, "jitter": 0.0})
+	check(precision.request("small_1", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 5e-13)
+		and precision.request("small_2", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 5e-13),
+		"微小な正予算と正valueはその精度のまま使う")
+	check(not precision.request("small_over", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 1e-16),
+		"微小な正予算でも満杯後の超過を止める")
+	precision.groups.clear()
+	precision.owners.clear()
+	precision.waiting.clear()
+	precision.configure({"enabled": true, "budget": 1.0, "jitter": 0.0})
+	check(precision.request("free", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 0.0)
+		and precision.used_cost() == 0.0, "正の予算内ではvalue0は残量を消費しない")
+	check(precision.request("positive", ["beam"], blocker, em.table.id[blocker], 10.0, 0.0, 1e-16)
+		and precision.used_cost() > 0.0, "微小な正valueを0へ丸めない")
+	precision.groups.clear()
+	precision.owners.clear()
+	precision.waiting.clear()
+	precision.configure({"enabled": true, "budget": 0.5, "jitter": 0.0})
+	check(not precision.request("negative_default", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, -1.0),
+		"負の省略印は既定value1へ戻す")
+	precision.waiting.clear()
+	precision.configure({"enabled": true, "budget": 1.0, "jitter": 0.0})
+	precision.now = 0.2
+	check(precision.request("deadline", ["beam"], blocker, em.table.id[blocker], 0.1, 0.0, 0.2),
+		"小数秒の期限を持つ攻撃を開始")
+	precision.advance(0.3, em)
+	check(precision.token("deadline") == 0 and precision.used_cost() == 0.0,
+		"0.2+0.1の丸め残りで攻撃枠を保持しない")
+	precision.waiting.clear()
+	precision.serial = 10000 # 過去の弾に付いた別Directorのtokenと重ねない。
+	precision.configure({"enabled": true, "budget": 0.3, "jitter": 0.0})
+	var cycles_ok := true
+	for cycle in 20:
+		precision.now = float(cycle)
+		for n in 3:
+			cycles_ok = precision.request("repeat_%d_%d" % [cycle, n], ["beam"], blocker,
+				em.table.id[blocker], 0.1, 0.0, 0.1) and cycles_ok
+		precision.advance(float(cycle) + 0.1, em)
+		cycles_ok = precision.used_cost() == 0.0 and cycles_ok
+	check(cycles_ok, "小数valueの反復取得・期限切れで予算残差を残さない")
+	precision.configure({"enabled": true, "budget": 1.0, "jitter": 0.0})
+	precision.now = 30.0
+	var owner_id := em.table.id[blocker]
+	check(precision.request("existing", ["beam"], blocker, owner_id, 1.0, 0.0, 1.0),
+		"予算縮小前に攻撃を開始")
+	precision.settings.budget = 0.0
+	check(precision.request("existing", ["beam"], blocker, owner_id, 1.0, 0.0, 1.0),
+		"予算0へ縮小しても開始済み個体は継続")
+	check(not precision.request("existing", ["beam"], blocker, owner_id + 1, 1.0, 0.0, 1.0),
+		"予算0では共有枠への新規個体追加を止める")
 	lab.queue_free()
 	await get_tree().process_frame
 	print("[attack_priority] %d checks, %d failures" % [checks,failed])

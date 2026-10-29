@@ -1,8 +1,19 @@
-[gd_resource type="Resource" load_steps=3 format=3]
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/bosses/draco_charge.gd" id="2"]
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/draco/techniques/charge.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/draco/charge_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"charge"
 category = &"major"
-parameters = {"driver": ExtResource("2"), "warn": 0.8, "active": 0.55, "recover": 1.0, "damage": 35.0, "reach": 1800.0, "width": 45.0}
+display_name = "突進"
+lead_cap = 900.0
+overshoot = 260.0
+warn = 0.9
+active = 0.7
+recover = 1.0
+damage = 35.0
+width = 96.0
+visual = ExtResource("visual")

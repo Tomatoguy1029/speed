@@ -19,6 +19,7 @@ params = {
 "keep_min": 700.0,
 "keep_max": 1000.0,
 "run_speed": 280.0,
+"run_speed_p2": 360.0,
 "retreat_trigger": 420.0,
 "retreat_far": 900.0,
 "retreat_max": 1.6,
@@ -31,7 +32,9 @@ params = {
 "final_beam_width": 5000.0,
 "final_reach": 6000.0,
 "final_warn_width": 18.0,
-"final_widen_time": 0.35
+"final_widen_time": 0.35,
+"phase_threshold": 0.5,
+"phase_time": 1.2
 }
 id = &"centaurus"
 display_name = "ケンタウルス座"

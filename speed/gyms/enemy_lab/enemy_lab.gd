@@ -15,6 +15,7 @@ const WORKSPACE := preload("res://gyms/enemy_lab/lab_workspace.gd")
 const PALETTE_ITEM := preload("res://gyms/enemy_lab/lab_palette_item.gd")
 const INSPECTOR := preload("res://gyms/enemy_lab/lab_inspector.gd")
 const FIELD_ITEM := preload("res://gyms/enemy_lab/lab_field_item.gd")
+const STAGE_ENEMY_EDIT := preload("res://scripts/dev/stage_enemy_edit.gd")
 
 var session
 var controls
@@ -29,6 +30,8 @@ var _file_dialog: FileDialog
 var canvas
 ## 本番のランを映す表示枠
 var game_frame: SubViewportContainer
+## 16:9 の表示枠とは独立した、実験場だけの表示倍率。
+var view_scale := 1.0
 var inspector
 var workspace
 var _palette: GridContainer
@@ -52,6 +55,16 @@ var _branch: OptionButton
 var _left: Control
 var _right: Control
 var _messages: Label
+var _hitstop_target_label: Label
+var _hitstop_value: SpinBox
+var _hitstop_status: Label
+var _hitstop_scope: OptionButton
+var _hitstop_save_button: Button
+var _hitstop_inherit_button: Button
+var _hitstop_baselines := {}
+var _hitstop_last_target := ""
+var _hitstop_notice := ""
+var _hitstop_details: Control
 
 func _ready() -> void:
 	if not OS.is_debug_build():
@@ -69,6 +82,8 @@ func _ready() -> void:
 	generator = GENERATOR.new()
 	add_child(generator)
 	_build_ui()
+	canvas.zoom_changed.connect(_on_canvas_zoom_changed)
+	canvas.picked.connect(func(_row): _refresh_hitstop())
 	trial.progress.connect(func(v): _messages.text = TranslationServer.translate("lab.message_7b47f8fa60") % roundi(v * 100))
 	generator.progress.connect(func(n): _messages.text = TranslationServer.translate("lab.message_0db4675b27") % n)
 	session.changed.connect(_refresh)
@@ -103,6 +118,196 @@ func _build_ui() -> void:
 	workspace.build(self)
 	_fill_palette()
 
+## 試遊中の変更は LabSession に留め、明示保存時だけ元の定義へ書き込む。
+func build_hitstop_controls(parent: Node, header: Node) -> void:
+	_hitstop_details = VBoxContainer.new()
+	parent.add_child(_hitstop_details)
+	_hitstop_details.hide()
+	var toggle := _button(header, "ヒットストップ", func():
+		_hitstop_details.visible = not _hitstop_details.visible
+		if _hitstop_details.visible: _refresh_hitstop())
+	toggle.tooltip_text = "選択した敵の停止時間を試し、必要な場合だけ設定を保存します。"
+	var row := HFlowContainer.new()
+	_hitstop_details.add_child(row)
+	_label(row, "停止時間の倍率")
+	_hitstop_target_label = _label(row, "対象を選択してください")
+	_hitstop_target_label.tooltip_text = "配置する敵、選択中の個体、または試遊中のボスにだけ適用します。"
+	_hitstop_value = _spin(row, 0.0, 100000.0, 1.0)
+	_hitstop_value.step = 0.05
+	_hitstop_value.custom_minimum_size.x = 90
+	_hitstop_value.tooltip_text = "0: 停止なし / 1: 共通時間。現在の敵と次に出現する同種へ即時反映。"
+	_hitstop_value.value_changed.connect(_preview_hitstop)
+	_button(row, "元に戻す", _restore_hitstop)
+	_hitstop_scope = OptionButton.new()
+	_hitstop_scope.add_item("敵種類の定義（全ステージ）")
+	_hitstop_scope.add_item("このステージのみ")
+	_hitstop_scope.item_selected.connect(func(_index): _refresh_hitstop())
+	row.add_child(_hitstop_scope)
+	_hitstop_save_button = _button(row, "この倍率を保存", _save_hitstop)
+	_hitstop_inherit_button = _button(row, "ステージ別の設定を解除", _inherit_hitstop)
+	_hitstop_status = _label(_hitstop_details, "")
+	_hitstop_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_hitstop_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hitstop_status.tooltip_text = "0: 停止なし / 1: 従来の時間。保存は明示操作のみ。"
+	_hitstop_save_button.disabled = true
+	_hitstop_inherit_button.disabled = true
+
+func _hitstop_target() -> Dictionary:
+	if not is_instance_valid(session.run): return {}
+	var id := StringName(session.run.enemies.table.type[session.selected]) if session.selected >= 0 else StringName(canvas.spawn_type)
+	if ContentManager.bosses.has(id): return {"id": String(id), "boss": true}
+	if ContentManager.enemies.has(id): return {"id": String(id), "boss": false}
+	return {}
+
+func _authored_hitstop(target: Dictionary) -> float:
+	var id := StringName(target.id)
+	if target.boss:
+		return ContentManager.bosses[id].hitstop_multiplier
+	var source: EnemyDef = ContentManager.enemies[id]
+	var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
+	var values: Dictionary = stage.enemy_tuning.get(String(id), {}) if stage != null else {}
+	return float(values.get("hitstop_multiplier", source.hitstop_multiplier))
+
+func _effective_hitstop(target: Dictionary) -> float:
+	if target.boss:
+		var boss: BossDef = session.run.bosses.definitions.get(StringName(target.id))
+		return boss.hitstop_multiplier if boss != null else _authored_hitstop(target)
+	var enemy: EnemyDef = session.run.enemies.def_of(StringName(target.id))
+	return enemy.hitstop_multiplier if enemy != null else _authored_hitstop(target)
+
+func _preview_hitstop(value: float) -> void:
+	var target := _hitstop_target()
+	if target.is_empty() or session.seeking or not is_instance_valid(session.run): return
+	session.perform("boss_parameter" if target.boss else "parameter", {"type": target.id, "key": "hitstop_multiplier", "value": value})
+	_refresh_hitstop()
+
+func _restore_hitstop() -> void:
+	var target := _hitstop_target()
+	if not target.is_empty(): _preview_hitstop(_authored_hitstop(target))
+
+func _hitstop_source(target: Dictionary, stage_scope: bool) -> Dictionary:
+	var id := String(target.id)
+	if stage_scope:
+		var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
+		if stage == null: return {}
+		var path := stage.resource_path
+		var source: StageDef = STAGE_ENEMY_EDIT.read_stage(path)
+		if source == null: return {}
+		var tuning: Dictionary = source.enemy_tuning.get(id, {})
+		return {"path": path, "value": tuning.get("hitstop_multiplier"), "exists": tuning.has("hitstop_multiplier")}
+	var path := "res://data/%s/%s.tres" % ["bosses" if target.boss else "enemies", id]
+	var source: Resource = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if source == null: return {}
+	return {"path": path, "value": source.hitstop_multiplier, "exists": true}
+
+func _hitstop_source_key(target: Dictionary, stage_scope: bool) -> String:
+	return "%s:%s:%s" % ["boss" if target.boss else "enemy", target.id,
+		str(session.spec.get("stage", 1)) if stage_scope else "all"]
+
+func _save_hitstop() -> void:
+	var target := _hitstop_target()
+	if target.is_empty() or not is_instance_valid(session.run): return
+	var stage_scope: bool = _hitstop_scope.selected == 1 and not target.boss
+	var key := _hitstop_source_key(target, stage_scope)
+	var fresh := _hitstop_source(target, stage_scope)
+	if fresh.is_empty():
+		_hitstop_notice = "保存元を読めません。"
+		_refresh_hitstop()
+		return
+	if _hitstop_baselines.has(key) and (fresh.value != _hitstop_baselines[key].value or fresh.exists != _hitstop_baselines[key].exists):
+		_hitstop_notice = "別の編集で値が変わりました。試遊値を確認してから画面を開き直してください。"
+		_refresh_hitstop()
+		return
+	var value := _effective_hitstop(target)
+	var error := ERR_CANT_OPEN
+	if stage_scope:
+		var stage: StageDef = STAGE_ENEMY_EDIT.read_stage(fresh.path)
+		var values: Dictionary = stage.enemy_tuning.duplicate(true)
+		var tuning: Dictionary = values.get(String(target.id), {}).duplicate(true)
+		tuning["hitstop_multiplier"] = value
+		values[String(target.id)] = tuning
+		var result: Dictionary = STAGE_ENEMY_EDIT.save(fresh.path, values, stage.enemy_tuning)
+		if result.has("error"):
+			_hitstop_notice = String(result.error)
+			_refresh_hitstop()
+			return
+		ContentManager.stage(int(session.spec.get("stage", 1))).enemy_tuning = values
+		error = OK
+	else:
+		var source: Resource = ResourceLoader.load(fresh.path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+		source.hitstop_multiplier = value
+		error = ResourceSaver.save(source, fresh.path)
+		if error == OK:
+			if target.boss: ContentManager.bosses[StringName(target.id)].hitstop_multiplier = value
+			else: ContentManager.enemies[StringName(target.id)].hitstop_multiplier = value
+	if error != OK:
+		_hitstop_notice = "保存に失敗: " + error_string(error)
+	else:
+		_hitstop_baselines[key] = _hitstop_source(target, stage_scope)
+		_hitstop_notice = "%s の設定を保存しました。" % ["ステージ %s" % session.spec.get("stage", 1) if stage_scope else "敵種類"]
+	_refresh_hitstop()
+
+func _inherit_hitstop() -> void:
+	var target := _hitstop_target()
+	if target.is_empty() or target.boss or _hitstop_scope.selected != 1: return
+	var key := _hitstop_source_key(target, true)
+	var fresh := _hitstop_source(target, true)
+	if fresh.is_empty(): return
+	if _hitstop_baselines.has(key) and (fresh.value != _hitstop_baselines[key].value or fresh.exists != _hitstop_baselines[key].exists):
+		_hitstop_notice = "別の編集で値が変わりました。画面を開き直してください。"
+		_refresh_hitstop()
+		return
+	var stage: StageDef = STAGE_ENEMY_EDIT.read_stage(fresh.path)
+	var values: Dictionary = stage.enemy_tuning.duplicate(true)
+	var tuning: Dictionary = values.get(String(target.id), {}).duplicate(true)
+	tuning.erase("hitstop_multiplier")
+	if tuning.is_empty(): values.erase(String(target.id))
+	else: values[String(target.id)] = tuning
+	var result: Dictionary = STAGE_ENEMY_EDIT.save(fresh.path, values, stage.enemy_tuning)
+	if result.has("error"):
+		_hitstop_notice = String(result.error)
+	else:
+		ContentManager.stage(int(session.spec.get("stage", 1))).enemy_tuning = values
+		_hitstop_baselines[key] = _hitstop_source(target, true)
+		_preview_hitstop(ContentManager.enemies[StringName(target.id)].hitstop_multiplier)
+		_hitstop_notice = "ステージ設定を削除し、敵種類の定義を継承しました。"
+	_refresh_hitstop()
+
+func _refresh_hitstop() -> void:
+	if _hitstop_value == null or not is_instance_valid(session.run): return
+	var target := _hitstop_target()
+	_hitstop_value.editable = not target.is_empty()
+	_hitstop_scope.disabled = target.is_empty() or target.boss
+	_hitstop_save_button.disabled = target.is_empty()
+	if target.is_empty():
+		_hitstop_target_label.text = "対象: 敵を選択してください"
+		_hitstop_status.text = ""
+		_hitstop_inherit_button.disabled = true
+		return
+	var target_key := "%s:stage-%s" % [_hitstop_source_key(target, false), session.spec.get("stage", 1)]
+	if target_key != _hitstop_last_target:
+		_hitstop_last_target = target_key
+		var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
+		var tuning: Dictionary = stage.enemy_tuning.get(String(target.id), {}) if stage != null and not target.boss else {}
+		_hitstop_scope.select(1 if tuning.has("hitstop_multiplier") else 0)
+		_hitstop_scope.set_item_text(0, "ボス定義（全ステージ）" if target.boss else "敵種類の定義（全ステージ）")
+		_hitstop_notice = ""
+	var definition: Resource = ContentManager.bosses[StringName(target.id)] if target.boss else ContentManager.enemies[StringName(target.id)]
+	_hitstop_target_label.text = "対象: %s (%s)" % [definition.display_name, target.id]
+	var stage_scope: bool = _hitstop_scope.selected == 1 and not target.boss
+	var source_key := _hitstop_source_key(target, stage_scope)
+	if not _hitstop_baselines.has(source_key): _hitstop_baselines[source_key] = _hitstop_source(target, stage_scope)
+	_hitstop_inherit_button.disabled = not stage_scope or not bool(_hitstop_baselines[source_key].get("exists", false))
+	var authored := _authored_hitstop(target)
+	var current := _effective_hitstop(target)
+	var stage: StageDef = ContentManager.stage(int(session.spec.get("stage", 1)))
+	var tuning: Dictionary = stage.enemy_tuning.get(String(target.id), {}) if stage != null and not target.boss else {}
+	var override_note := " このステージでは個別設定が優先されます。" if not stage_scope and tuning.has("hitstop_multiplier") else ""
+	_hitstop_value.set_value_no_signal(current)
+	_hitstop_status.text = "%s / 元 %.2f → 試遊 %.2f%s%s %s" % [
+		"ステージ %s のみ" % session.spec.get("stage", 1) if stage_scope else "ボス定義・全ステージ" if target.boss else "敵種類の定義・全ステージ",
+		authored, current, "（未保存）" if not is_equal_approx(authored, current) else "", override_note, _hitstop_notice]
+
 func _fill_palette() -> void:
 	for child in _palette.get_children():
 		_palette.remove_child(child)
@@ -120,8 +325,6 @@ func _fill_palette() -> void:
 	var wanted_class: int = workspace.category.selected
 	var wanted_stars: int = workspace.stars.selected
 	for def in definitions:
-		if def is EnemyDef and def.behavior == &"part": continue
-		if def is EnemyDef and def.id in [&"triangle_star"]: continue
 		var id := String(def.id)
 		if wanted_class > 0 and wanted_class != _palette_class(def): continue
 		# 星の数：1〜5 はその数、6 は 6〜10 をまとめて選ぶ。ボスは区分で選ぶ
@@ -133,6 +336,7 @@ func _fill_palette() -> void:
 		button.tooltip_text = tr("lab.ui.enemy_tooltip") % [def.display_name, id]
 		button.pressed.connect(func():
 			canvas.spawn_type = id
+			_refresh_hitstop()
 			workspace._last_mode = -1
 			_set_mode(1))
 		workspace.palette_buttons[id] = button
@@ -225,9 +429,7 @@ func _reset() -> void:
 	canvas.selection.clear()
 	canvas.result.clear()
 	canvas.center = session.run.state.ship_pos
-	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
-	if render != null:
-		canvas.zoom = render.game_zoom()
+	canvas.zoom = game_zoom()
 	_busy = false
 	_refresh()
 
@@ -445,6 +647,7 @@ func _export() -> void:
 func _refresh() -> void:
 	if not is_instance_valid(session.run):
 		return
+	if _hitstop_details.visible: _refresh_hitstop()
 	workspace.sync()
 	_seek.max_value = maxf(1, session.furthest)
 	if not _scrubbing:
@@ -460,16 +663,15 @@ func _refresh() -> void:
 		_branch.set_item_text(index + 1, String(session.branches[index].name))
 	_status.tooltip_text = tr("lab.message_15d10dbb3a") % [session.tick * session.DT, session.furthest * session.DT, session.run.state.world_time, session.run.enemies.count(), int(session.spec.seed)] + "\n" + tr("lab.route_length") % [CHECK.length(canvas.route), session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge), 100 * CHECK.length(canvas.route) / maxf(0.01, session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge))]
 	canvas.queue_redraw()
-	_timeline.queue_redraw()
+	if workspace._history.visible: _timeline.queue_redraw()
 	if not canvas.result.is_empty() and _evaluation_revision >= 0 and _evaluation_revision != session.revision:
 		_result.text = TranslationServer.translate("lab.message_91f8bdc328")
-	inspector.refresh()
-	controls.sync_from_session()
+	if _right.visible: inspector.refresh()
+	if workspace.settings.visible: controls.sync_from_session()
 
 func _process(_delta: float) -> void:
 	if session != null and is_instance_valid(session.run):
 		_sync_view()
-		_refresh()
 
 ## 試遊中は本番のカメラが機体を追い、編集用の層もその視点に合わせる。
 ## 編集中は編集用の層の視点（ホイール・中ドラッグで動かす）を、本番の描画のカメラに渡す。ゲームの状態は変えない。
@@ -491,17 +693,47 @@ func _sync_view() -> void:
 		if hud_root != null:
 			hud_root.show_minimap = canvas.show_minimap
 			hud_root.show_status = canvas.show_hud
-	if following and render.cam_zoom > 0.0001:
-		render.view_override = null
-		canvas.center = render.cam_center
-		canvas.zoom = render.cam_zoom
+	if following:
+		# 固定の本番画面を再生枠へ等倍比率で縮小し、同じ範囲を映す。
+		var zoom := game_zoom()
+		render.view_override = {"center": session.run.state.view_center, "zoom": zoom, "shake": true}
+		canvas.center = session.run.state.view_center
+		canvas.zoom = zoom
 	else:
 		render.view_override = {"center": canvas.center, "zoom": canvas.zoom}
 
-## 本番の画面と同じ大きさで映す倍率（描画がまだなければ 1）。
+## 表示枠へ本番画面を収める倍率。枠の16:9は表示倍率を変えても維持する。
+func base_game_zoom() -> float:
+	if not is_instance_valid(session.run) or game_frame == null: return 1.0
+	var view_size: Vector2 = session.run.options.get("view_size", Vector2(1280, 720))
+	if view_size.x <= 0.0 or view_size.y <= 0.0: return 1.0
+	var fit := minf(game_frame.size.x / view_size.x, game_frame.size.y / view_size.y)
+	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
+	return zoom * fit
+
 func game_zoom() -> float:
-	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
-	return render.game_zoom() if render != null else 1.0
+	return base_game_zoom() * view_scale
+
+func set_view_scale(value: float) -> void:
+	var base := maxf(base_game_zoom(), 0.001)
+	var old := maxf(view_scale, 0.001)
+	view_scale = clampf(value, 0.08 / base, 16.0 / base)
+	if canvas.mode != 3 and not canvas.follow:
+		canvas.zoom = clampf(canvas.zoom * view_scale / old, 0.08, 16.0)
+	if is_instance_valid(session.run): _sync_view()
+	canvas.queue_redraw()
+	workspace.sync_view_scale()
+
+func reset_view_scale() -> void:
+	view_scale = 1.0
+	canvas.zoom = base_game_zoom()
+	if is_instance_valid(session.run): _sync_view()
+	canvas.queue_redraw()
+	workspace.sync_view_scale()
+
+func _on_canvas_zoom_changed() -> void:
+	view_scale = canvas.zoom / maxf(base_game_zoom(), 0.001)
+	workspace.sync_view_scale()
 
 ## Space で再生・停止を切り替える（実験場のどこにフォーカスがあっても。文字を入力している間を除く）。
 ## ボタンや本番の入力（描画の補助）には渡さない。

@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://48g1kbf3ft4j" path="res://scripts/encounters/formation_entry.gd" id="4"]
 
 [node name="Dolphin" type="Node2D" unique_id=427327335]
+rotation = -0.0008807364
 script = ExtResource("1")
 types = Array[StringName]([&"dolphin"])
 
@@ -23,11 +24,13 @@ script = ExtResource("2")
 
 [node name="いるか座左" type="Node2D" parent="2体並び" unique_id=1291272697]
 position = Vector2(-102, -1)
+rotation = 0.5235988
 script = ExtResource("3")
 enemy = &"dolphin"
 
 [node name="いるか座右" type="Node2D" parent="2体並び" unique_id=1928259087]
 position = Vector2(109, 0)
+rotation = -0.5235988
 script = ExtResource("3")
 enemy = &"dolphin"
 

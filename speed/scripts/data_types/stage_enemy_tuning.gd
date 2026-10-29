@@ -3,9 +3,9 @@
 class_name StageEnemyTuning
 extends RefCounted
 
-const FIELDS := ["hp", "armor", "speed", "accel", "turn", "weak_arc"]
+const FIELDS := ["hp", "armor", "speed", "accel", "turn", "weak_arc", "hitstop_multiplier"]
 const REWARDS := ["big_crystal", "gem_count", "shield_time"]
-const LABELS := {"hp": "標準HP（星の計算後）", "armor": "装甲", "speed": "速さ", "accel": "加速", "turn": "旋回速度", "weak_arc": "背面の弱点の半角"}
+const LABELS := {"hp": "標準HP（星の計算後）", "armor": "装甲", "speed": "速さ", "accel": "加速", "turn": "旋回速度", "weak_arc": "背面の弱点の半角", "hitstop_multiplier": "ヒットストップ時間倍率"}
 
 static func keys_for(definition: EnemyDef) -> Array[String]:
 	var keys: Array[String] = []

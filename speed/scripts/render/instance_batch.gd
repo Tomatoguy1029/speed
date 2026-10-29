@@ -47,6 +47,17 @@ func setup_texture(sprite: Texture2D, region := Rect2()) -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_setup_mesh(mesh)
 
+## 画像を使わないピクセルシェーダー用の UV 付き四角形。
+func setup_shader_quad() -> void:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)])
+	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2.ZERO, Vector2(1, 0), Vector2.ONE, Vector2(0, 1)])
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_setup_mesh(mesh)
+
 func _setup_mesh(mesh: Mesh) -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_2D

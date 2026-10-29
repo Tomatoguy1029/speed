@@ -12,6 +12,7 @@ sections = [{
 "next": 0,
 "request": "any",
 "weights": {
-"single": 100.0
+"major": 20.0,
+"single": 80.0
 }
 }]

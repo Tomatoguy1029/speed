@@ -1,21 +1,22 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra_technique.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/wind_blades.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra/wind_blades_visual.tscn" id="visual"]
 
 [resource]
 script = ExtResource("1")
 technique = &"wind_blades"
 head_kind = &"vortex"
-parameters = {
-"normal_charge": 0.6,
-"normal_hold": 0.9,
-"attack_cd": 3.0,
-"blade_interval": 0.18,
-"blade_size": 100.0,
-"blade_width": 28.0,
-"blade_life": 3.0,
-"blade_speed": 600.0,
-"blade_spread": 1.0,
-"bite_dmg": 16.0,
-"cost": 1.6
-}
+display_name = "風刃"
+normal_charge = 0.6
+normal_hold = 0.9
+attack_cd = 3.0
+blade_interval = 0.18
+blade_size = 100.0
+blade_width = 28.0
+blade_life = 3.0
+blade_speed = 600.0
+blade_spread = 1.0
+bite_dmg = 16.0
+visual = ExtResource("visual")

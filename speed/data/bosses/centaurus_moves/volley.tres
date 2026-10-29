@@ -1,18 +1,21 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_technique.gd" id="1_c7vly"]
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/volley.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/volley_visual.tscn" id="visual"]
 
 [resource]
-script = ExtResource("1_c7vly")
+script = ExtResource("1")
 technique = &"volley"
-parameters = {
-"cd": 3.0,
-"count": 5,
-"damage": 12.0,
-"interval": 0.18,
-"radius": 12.0,
-"recover": 0.8,
-"speed": 900.0,
-"travel": 1400.0,
-"warn": 0.6
-}
+display_name = "速射"
+cd = 3.0
+count = 5
+count_p2 = 8
+damage = 12.0
+interval = 0.18
+radius = 12.0
+recover = 0.8
+speed = 900.0
+travel = 1400.0
+warn = 0.6
+visual = ExtResource("visual")

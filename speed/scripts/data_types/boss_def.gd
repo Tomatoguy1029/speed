@@ -88,6 +88,11 @@ const PARAMS_DOCS := {
 ## use_def_stats がfalseなら共通調整値の「ボスの装甲」を使う。
 ## 単位：攻撃力
 @export var armor: float
+## ヒットストップ時間倍率
+## この種類への一撃撃破・体当たりクリティカルの停止実時間に掛ける。1で共通値、0で停止なし。
+## 停止時間は共通の累積上限内に収める。世界の速度倍率と白色化・振動は独立。
+## 単位：倍（0以上）
+@export_range(0.0, 10.0, 0.05, "or_greater") var hitstop_multiplier: float = 1.0
 ## 速さ
 ## 機体を追う速さ。
 ## 単位：単位/秒

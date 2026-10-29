@@ -26,3 +26,5 @@ var resources: ContentResourceScope
 
 ## 永続強化を反映した係数のスナップショット。
 var profile: Dictionary = {}
+## 開発版の処理時間の記録先。RunSimulation と同じもの
+var perf := PerfLog.new()

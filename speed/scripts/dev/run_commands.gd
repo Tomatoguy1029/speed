@@ -103,6 +103,7 @@ func _spawn_random(run: RunSimulation, count_n: int) -> void:
 			choices.append(def)
 	if choices.is_empty():
 		return
+	_prepare_debug_looks(run)
 	var view := state.view_rect()
 	for k in clampi(count_n, 1, 10000):
 		var def := choices[state.rng.randi_range(0, choices.size() - 1)]
@@ -117,3 +118,17 @@ func _spawn_random(run: RunSimulation, count_n: int) -> void:
 		if p.length() > cfg.field_radius - r:
 			p = p.normalized() * (cfg.field_radius - r)
 		table.pos[i] = p
+
+## デバッグ抽選はステージ外の敵も選ぶ。派生体を含む全敵の生成済み外観を、このランのScopeへ足す。
+func _prepare_debug_looks(run: RunSimulation) -> void:
+	var scope := run.ctx.resources
+	assert(scope != null and run.state.stage != null and run.state.stage.resources != null)
+	var index: StageResources = run.state.stage.resources
+	for id in ContentManager.enemies:
+		var type := StringName(id)
+		var skin := run.state.stage.enemy_sprite_path(type).get_file().get_basename()
+		var path: String = index.look_paths.get(skin, index.look_paths.get(String(type), ""))
+		if path.is_empty() or scope.resources.has(path): continue
+		assert(ResourceLoader.exists(path), "生成済みの敵外観が必要: " + path)
+		scope.provide(path, load(path))
+		assert(scope.resources.has(path), "敵外観を準備できない: " + path)

@@ -9,5 +9,5 @@ func can_collect(_pickup: Pickup) -> bool:
 
 func apply(_value: float, _pickup: Pickup) -> void:
 	var before := state.ship_hp
-	ctx.ship.heal(state.stats.max_hp * cfg.meteor_heal_frac)
+	ctx.ship.heal(state.stats.max_hp * state.stats.repair_fraction)
 	state.emit(&"text", {"pos": state.ship_pos + Vector2(0, -40), "text": "HP +%d" % roundi(state.ship_hp - before), "color": ring_color, "size": 18})

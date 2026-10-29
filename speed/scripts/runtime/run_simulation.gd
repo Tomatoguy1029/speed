@@ -76,10 +76,8 @@ var _cam_ready := false
 var _world_real_dt := 0.0
 var _world_dt := 0.0
 var _world_steps := 0
-## 開発版の計測：処理時間の合計（マイクロ秒）・回数・最大時間。
-## play_total は全体の包含時間なので、個別の項目と合算しない。
-var profile: Dictionary = {}
-var profiling := false
+## 開発版の計測の記録先。play_total は全体の包含時間なので、個別の項目と合算しない。
+var perf := PerfLog.new()
 ## 追加の命令。シミュレーションの利用側が必要に応じて渡す。
 var command_extension: Callable
 
@@ -104,6 +102,7 @@ func setup() -> void:
 	ctx.state = state
 	ctx.cfg = cfg
 	ctx.options = options
+	ctx.perf = perf
 	ctx.profile = options.get("profile", ProfileManager.for_run(state.lab_mode, state.meta_override)).duplicate(true)
 	ctx.field = FieldSystem.new()
 	ctx.ship = ShipSystem.new()
@@ -151,6 +150,7 @@ func setup() -> void:
 
 ## ランを片付ける。設定の通知を外し、ボスの役者を消す。
 func dispose() -> void:
+	if state != null: state.hitstop = 0.0
 	command_extension = Callable()
 	if SaveManager.settings_changed.is_connected(_read_settings):
 		SaveManager.settings_changed.disconnect(_read_settings)
@@ -192,7 +192,7 @@ func physics_step(delta: float) -> void:
 		return
 	match state.phase:
 		RunState.Phase.PLAY:
-			if profiling:
+			if perf.active:
 				_run(&"play_total", func(): _play_tick(delta))
 			else:
 				_play_tick(delta)
@@ -207,6 +207,7 @@ func physics_step(delta: float) -> void:
 ## 設定のうちランに効くもの（ポーズ中に変えるとすぐ反映）。
 func _read_settings() -> void:
 	state.hitstop_enabled = bool(options.get("hitstop", true)) if state.lab_mode else bool(SaveManager.settings.hitstop)
+	if not state.hitstop_enabled: state.hitstop = 0.0
 
 ## 更新の順番（設計書 4.3）。
 ## ワープホールからボーナスステージに入る：周りの敵と敵の攻撃を消し、雑魚と硬めの敵を多く出す（仕様書 13.1）。
@@ -225,6 +226,7 @@ func _leave_bonus() -> void:
 	state.emit(&"bonus", {"enter": false, "pos": state.ship_pos})
 
 func _play_tick(real_dt: float) -> void:
+	if state.controls_locked or state.encounter_protected: state.hitstop = 0.0
 	state.sim_time += real_dt
 	var it: Intent = input_source.call() if input_source.is_valid() else input.poll()
 	if bosses.actor != null and bosses.actor.get("mode")==&"finale":
@@ -241,9 +243,9 @@ func _play_tick(real_dt: float) -> void:
 	draw.intent = it
 	draw.handle_input()
 	if state.hitstop > 0.0:
-		state.hitstop -= real_dt
+		state.hitstop = maxf(0.0, state.hitstop - real_dt)
 		return
-	if profiling:
+	if perf.active:
 		_run(&"combat", func(): combat.tick(real_dt, 0.0))
 		_run(&"draw", func(): draw.tick(real_dt, 0.0))
 	else:
@@ -285,6 +287,7 @@ func _play_tick(real_dt: float) -> void:
 		_run(&"field", func(): field.tick(wr, wd))
 		_run(&"enemies", func(): enemies.tick(wr, wd))
 		_run(&"bosses", func(): bosses.tick(wr, wd))
+		_run(&"enemy_avoidance", func(): enemies.avoid_strong(wd))
 		_check_end()
 		if state.phase != RunState.Phase.PLAY:
 			return
@@ -317,17 +320,12 @@ func _play_tick(real_dt: float) -> void:
 
 ## 処理を呼ぶ。計測中なら時間を測る。
 func _run(key: StringName, f: Callable) -> void:
-	if not profiling:
+	if not perf.active:
 		f.call()
 		return
 	var t0 := Time.get_ticks_usec()
 	f.call()
-	var elapsed := Time.get_ticks_usec() - t0
-	var rec: Array = profile.get(key, [0, 0, 0])
-	rec[0] += elapsed
-	rec[1] += 1
-	rec[2] = maxi(rec[2], elapsed)
-	profile[key] = rec
+	perf.since(key, t0)
 
 ## 積んだ出来事を表示・音・UI へ渡す。RunSession が毎フレーム呼ぶ。
 func flush_events() -> void:
@@ -335,7 +333,10 @@ func flush_events() -> void:
 		return
 	var events := state.events
 	state.events = []
+	# 開発版の計測：表示・音・HUD・録画が出来事を受け取って処理する時間（世界側の更新とは別に、1フレームに1回）
+	var t0 := Time.get_ticks_usec()
 	frame_events.emit(events)
+	perf.since(&"events_out", t0)
 
 func _check_end() -> void:
 	if state.lab_mode:
@@ -356,6 +357,7 @@ func set_phase(phase: RunState.Phase) -> void:
 	if state.phase == phase:
 		return
 	state.phase = phase
+	if phase != RunState.Phase.PLAY: state.hitstop = 0.0
 	loadout.on_phase_changed(phase)
 	phase_changed.emit(phase)
 
@@ -579,6 +581,12 @@ func command(name: StringName, args := {}) -> void:
 		return
 	if command_extension.is_valid() and command_extension.call(name, args): return
 	match name:
+		&"skip_boss_entrance":
+			var owner := bosses.actor
+			var entrance: RefCounted = owner.get("entrance") if owner != null else null
+			if state.phase == RunState.Phase.PLAY and entrance != null and entrance.active:
+				entrance.skip()
+				if input != null: input.cancel_gesture()
 		&"choose_card":
 			choose_card(args.get("index", 0))
 		&"reroll":

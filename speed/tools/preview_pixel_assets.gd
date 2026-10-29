@@ -66,10 +66,10 @@ func _preview() -> void:
 		state.events.clear()
 		# 破片が分離した瞬間を静止確認する。
 		renderer._update_fx(0.2)
-		var drone = load("res://scripts/weapons/drone.gd").new()
-		drone.setup(run.loadout, ContentManager.weapons[&"W06"])
-		drone.drones = [{"pos": Vector2(-60, 0)}, {"pos": Vector2(60, 0)}]
-		run.loadout.weapon_behaviors[&"W06"] = drone
+		var drone = load("res://scripts/weapons/interceptor.gd").new()
+		drone.setup(run.loadout, ContentManager.weapons[&"W25"])
+		drone.drones = [{"pos": Vector2(-60, 0), "angle": PI, "flash": 0.0}, {"pos": Vector2(60, 0), "angle": 0.0, "flash": 0.0}]
+		run.loadout.weapon_behaviors[&"W25"] = drone
 	if "--path-preview" in OS.get_cmdline_user_args() or "--trace-preview" in OS.get_cmdline_user_args():
 		run.enemies.clear_all()
 		state.phase = RunState.Phase.PLAY
@@ -120,11 +120,11 @@ func _preview() -> void:
 			if pr.friend_alive[i] != 0:
 				pr.friend_pos[i] += pr.friend_vel[i] * 0.08
 		state.ship_pos = Vector2.ZERO
-		var drone = load("res://scripts/weapons/drone.gd").new()
-		drone.setup(run.loadout, ContentManager.weapons[&"W06"])
-		drone.drones = [{"pos": Vector2(-70, 0)}, {"pos": Vector2(70, 0)},
-			{"pos": Vector2(0, -70)}, {"pos": Vector2(0, 70)}]
-		run.loadout.weapon_behaviors[&"W06"] = drone
+		var drone = load("res://scripts/weapons/interceptor.gd").new()
+		drone.setup(run.loadout, ContentManager.weapons[&"W25"])
+		drone.drones = [{"pos": Vector2(-70, 0), "angle": PI, "flash": 0.0}, {"pos": Vector2(70, 0), "angle": 0.0, "flash": 0.0},
+			{"pos": Vector2(0, -70), "angle": -PI / 2.0, "flash": 0.0}, {"pos": Vector2(0, 70), "angle": PI / 2.0, "flash": 0.0}]
+		run.loadout.weapon_behaviors[&"W25"] = drone
 	if "--attachments-preview" in OS.get_cmdline_user_args():
 		for id in [&"W01", &"W02", &"W03", &"W05", &"W07", &"W08", &"W17", &"W23"]:
 			run.loadout._sync_behavior(true, id, ContentManager.weapons[id], 1)

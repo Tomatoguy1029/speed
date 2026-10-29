@@ -6,6 +6,8 @@ func step(i: int, dt: float) -> void:
 
 func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 	super(system, behavior_name, idx)
+	# 横断と結晶回収は攻撃ではない。攻撃枠の許可待ちへ入れない。
+	admission = false
 	recycles_far = false
 
 ## 群れの先頭として出たら、残りを隊列に並べて出す。

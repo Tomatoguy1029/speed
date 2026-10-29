@@ -18,8 +18,9 @@ func exercise() -> void:
 	actor.hsm.set_active(false)
 	actor.use_action_rules(load("res://data/bosses/ai/hydra_action_rules.tres"))
 	var adapter = script.new(actor)
+	check(adapter.parallel_attacks_enabled(), "Hydra keeps its simultaneous attack registration")
 	var result: Dictionary = adapter.candidates({"request": "normal"})
-	check(not result.candidates.is_empty(), "returns concrete normal candidates")
+	check(not result.candidates.is_empty(), "returns concrete sensor-eligible candidates")
 	if not result.candidates.is_empty():
 		var action: Dictionary = result.candidates[0]
 		var stale: Dictionary = action.duplicate(true)

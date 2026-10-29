@@ -27,19 +27,28 @@ var _selected := ""
 var _reveal: Control
 var _clock := 0.0
 var _paused := false
+var preview_host: Control
+var controls_host: Control
+var _aura_controls := VBoxContainer.new()
+var _rays_controls := VBoxContainer.new()
+var _bake_controls := VBoxContainer.new()
+var _section := "aura"
 
 func _ready() -> void:
-	get_window().title = "SPEED — 伝説モジュール演出プレビュー"
+	if controls_host == null:
+		get_window().title = "SPEED — 伝説モジュール演出プレビュー"
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 12)
 	add_child(margin)
+	margin.visible = controls_host == null
 	var split := HSplitContainer.new()
 	margin.add_child(split)
 	var left := VBoxContainer.new()
+	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.custom_minimum_size.x = 320
-	split.add_child(left)
+	(controls_host if controls_host != null else split).add_child(left)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -65,6 +74,9 @@ func _ready() -> void:
 	pause.text = "一時停止"
 	pause.toggled.connect(func(value): _paused = value)
 	panel.add_child(pause)
+	panel.add_child(_aura_controls)
+	var common := panel
+	panel = _aura_controls
 	_label(panel, "オーラの位置（デザイン座標のpx）")
 	_spin(panel, "X", "offset_x", -640, 640, 1)
 	_spin(panel, "Y", "offset_y", -360, 360, 1)
@@ -84,6 +96,8 @@ func _ready() -> void:
 	_label(panel, "絵とは別の輪郭画像。アルファ方式：不透明から生成、透明はなし。輝度方式：白から生成、黒・透明はなし。")
 	_button(panel, "マスクを選ぶ…", func(): _file.popup_centered_ratio(0.7))
 	_button(panel, "マスク解除（旧表示の確認用）", func(): _set_mask(null))
+	common.add_child(_rays_controls)
+	panel = _rays_controls
 	_label(panel, "後光の設定（選択中のモジュールだけ）")
 	for key in LegendaryModuleDef.BACKLIGHT_PARAMETERS:
 		var field: Array = LegendaryModuleDef.BACKLIGHT_PARAMETERS[key]
@@ -100,20 +114,25 @@ func _ready() -> void:
 		_read(_selected).reveal_backlight_settings.clear()
 		_changed()
 		_select_module(_modules.selected))
+	left.add_child(_bake_controls)
 	_bake_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	left.add_child(_bake_status)
-	_bake_button = _button(left, "オーラをベイクして保存", _bake)
+	_bake_controls.add_child(_bake_status)
+	_bake_button = _button(_bake_controls, "オーラをベイクして保存", _bake)
 	_bake_button.tooltip_text = "絵と別の輪郭マスクが必要です。256×186px・32フレームを2枚の圧縮アトラスへ保存します。"
-	_button(left, "設定だけ保存", _save)
-	_button(left, "保存状態を再読込", _reload_selected)
+	if controls_host == null:
+		_button(left, "設定だけ保存", _save)
+		_button(left, "保存状態を再読込", _reload_selected)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(_status)
-	_label(left, "変更は即反映。未保存値は切替後も保持し、終了時に消えます。")
+	_status.visible = controls_host == null
+	if controls_host == null:
+		_label(left, "変更は即反映。未保存値は切替後も保持し、終了時に消えます。")
 	var background := ColorRect.new()
 	background.color = Color("#0a0f1b")
 	background.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	split.add_child(background)
+	(preview_host if preview_host != null else split).add_child(background)
+	background.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	background.add_child(_stage)
 	_file.access = FileDialog.ACCESS_RESOURCES
@@ -131,6 +150,7 @@ func _ready() -> void:
 		_modules.set_item_tooltip(_modules.item_count - 1, path)
 	if not _paths.is_empty():
 		_select_module(0)
+	set_section(_section)
 
 func _label(parent: Control, text: String) -> void:
 	var label := Label.new()
@@ -253,7 +273,9 @@ func _refresh_bake_status() -> void:
 	_bake_status.text = "ベイク済み（32フレーム・4秒ループ）" if valid else "未作成／要再ベイク。ゲームではオーラを非表示。"
 	if definition.reveal_aura_mask == null:
 		_bake_status.text += " 輪郭マスクを選んでください。"
-	_bake_button.disabled = _baking or definition.reveal_aura_mask == null
+	_bake_button.disabled = _baking or definition.reveal_aura_mask == null or DisplayServer.get_name() == "headless"
+	if DisplayServer.get_name() == "headless":
+		_bake_status.text += " ベイクには描画付きで起動してください。"
 	if not _reveal._procedural_preview:
 		_reveal._baked_valid = valid
 	_show_layers()
@@ -299,6 +321,8 @@ func _reload_selected() -> void:
 func _set_busy(value: bool) -> void:
 	_baking = value
 	var stack: Array[Node] = [self]
+	if controls_host != null:
+		stack.append(controls_host)
 	while not stack.is_empty():
 		var node := stack.pop_back() as Node
 		if node is BaseButton:
@@ -310,7 +334,7 @@ func _set_busy(value: bool) -> void:
 		_refresh_bake_status()
 
 func _bake() -> void:
-	if _baking or _selected.is_empty():
+	if _baking or _selected.is_empty() or DisplayServer.get_name() == "headless":
 		return
 	var path := _selected
 	var definition := _read(path)
@@ -364,3 +388,30 @@ func _bake() -> void:
 	_set_busy(false)
 	_source_mode.select(1)
 	_select_module(_modules.selected)
+
+# オーラと後光は同じモジュールの複製を共有し、切替で保存値を失わない。
+func set_section(section: String) -> void:
+	_section = section
+	if not is_node_ready():
+		return
+	_aura_controls.visible = controls_host == null or section == "aura"
+	_rays_controls.visible = controls_host == null or section == "rays"
+	_bake_controls.visible = controls_host == null or section == "aura"
+
+func editing_state() -> Dictionary:
+	var paths: Array[String] = []
+	for path in _dirty:
+		if _dirty[path]:
+			paths.append(path)
+	return {"path": _selected, "dirty_paths": paths, "busy": _baking, "message": _status.text}
+
+func save_current() -> void:
+	_save()
+
+func reload_current() -> void:
+	_reload_selected()
+
+func set_active(active: bool) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	if is_instance_valid(_reveal):
+		_reveal._viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED

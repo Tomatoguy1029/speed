@@ -6,6 +6,7 @@
 script = ExtResource("1")
 params = {
 "max": 0.3,
+"late_per_stack": 0.03,
 "per_stack": 0.05
 }
 id = &"T09"

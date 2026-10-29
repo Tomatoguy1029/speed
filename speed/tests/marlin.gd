@@ -22,17 +22,42 @@ func _ready() -> void:
 	sim = session.sim
 	t = sim.enemies.table
 	reset()
+	var visual := preload("res://scripts/render/enemies/marlin.gd")
+	var view := Rect2(-100, -60, 200, 120)
+	for from in [Vector2(-200, 0), Vector2(200, 0), Vector2(0, -200), Vector2(0, 200), Vector2(-200, -120)]:
+		var line: PackedVector2Array = visual.clip_warning(from, Vector2.ZERO, view)
+		check(line.size() == 2 and view.grow(0.01).has_point(line[0]) and line[1] == Vector2.ZERO,
+			"画面外からの進入点と進路を画面内に示す")
+		check((line[1] - line[0]).normalized().is_equal_approx((-from).normalized()), "予告の方向を実際の固定方向に保つ")
+	check(visual.clip_warning(Vector2(-200, 80), Vector2(200, 80), view).is_empty(), "画面を通らない進路を画面端へ寄せない")
+	check(visual.clip_warning(Vector2(-200, 0), Vector2(-150, 0), view).is_empty(), "画面へ届かない突進を描かない")
+	var onscreen: PackedVector2Array = visual.clip_warning(Vector2.ZERO, Vector2(50, 0), view)
+	check(onscreen == PackedVector2Array([Vector2.ZERO, Vector2(50, 0)]), "画面内の吻先と終点を保持する")
 	var def := sim.enemies.def_of(&"marlin")
+	for key in ["spray", "spray_step", "spread", "bullet_speed", "bullet_dmg"]:
+		check(not def.params.has(key), "不要な弾設定%sを持たない" % key)
 	check(StageEnemyTuning.keys_for(def).has("params.recover"), "休みをステージ別に調整できる")
 	check(StageEnemyTuning.keys_for(def).has("speed"), "回遊速度を既存の調整画面で変更できる")
 	var tuned := StageEnemyTuning.resolve(def, {"speed": 700.0, "params.recover": 1.2, "params.dash_speed": 2400.0})
 	check(tuned.speed == 700.0 and tuned.params.recover == 1.2 and tuned.params.dash_speed == 2400.0 and def.speed == 560.0,
 		"ステージ別上書きを共通定義と分離できる")
+	sim.state.ship_pos = Vector2(-1000, 1000)
+	sim.state.enemy_aim = sim.state.ship_pos
 	var row := sim.enemies.spawn(def, Vector2(1000, 1000), {"vel": Vector2(200, 300)})
 	b = sim.enemies.behavior(&"marlin")
+	check(is_equal_approx(t.facing[row], Vector2(200, 300).angle()), "回遊開始時の鼻先は既存速度に揃う")
 	t.fire_t[row] = 3.0
 	var from := t.pos[row]
-	sim.enemies.tick(0.1, 0.1)
+	var initial_facing := t.facing[row]
+	for frame in 30:
+		var prior := t.pos[row]
+		var prior_facing := t.facing[row]
+		sim.enemies.tick(0.05, 0.05)
+		var travel := t.pos[row] - prior
+		check(t.mode[row] == EnemyTable.Mode.MOVE and absf(Geom.angle_diff(t.facing[row], prior_facing)) <= t.turn[row] * 0.05 + 0.002, "回遊は旋回速度を守る")
+		check(t.vel[row].length() > 0.0 and absf(Geom.angle_diff(t.vel[row].angle(), t.facing[row])) < 0.002, "回遊の顔と速度を一致させる")
+		check(travel.length() > 0.0 and absf(Geom.angle_diff(travel.angle(), t.facing[row])) < 0.002, "回遊の顔と移動軌跡を一致させる")
+	check(absf(Geom.angle_diff(t.facing[row], initial_facing)) > 0.5, "回遊中は目標へ向けて実際に旋回する")
 	check(t.pos[row] != from and t.mode[row] == EnemyTable.Mode.MOVE, "回遊中は移動する")
 	sim.state.ship_pos = t.pos[row] + Vector2(600, 0)
 	sim.state.enemy_aim = t.pos[row] + Vector2(0, 600)
@@ -57,8 +82,16 @@ func _ready() -> void:
 	for frame in 20:
 		sim.enemies.tick(0.1, 0.1)
 		if t.mode[row] == EnemyTable.Mode.RECOVER: break
+	check(sim.projectiles.hostile_alive.count(1) == 0, "突進で左右弾を発射しない")
 	check(t.mode[row] == EnemyTable.Mode.RECOVER and t.charge[row] == 0.0, "突進後に予告を残さず休む")
+	check(t.vel[row] == Vector2.ZERO, "突進終了時に古い高速速度を残さない")
 	check(t.fire_t[row] == float(def.params.fire_interval), "既存の攻撃間隔を保つ")
+	for frame in 20:
+		sim.enemies.tick(0.05, 0.05)
+		if t.mode[row] == EnemyTable.Mode.MOVE: break
+	check(t.mode[row] == EnemyTable.Mode.MOVE and t.vel[row] == Vector2.ZERO, "休みの終わりまで静止する")
+	sim.enemies.tick(0.05, 0.05)
+	check(t.vel[row].length() > 0.0 and absf(Geom.angle_diff(t.vel[row].angle(), t.facing[row])) < 0.002, "休み明けも顔の方向へ加速する")
 
 	# 一更新で複数の小対象を飛び越える。前フレームの戦闘格子にいない対象も拾う。
 	reset()
@@ -244,6 +277,9 @@ func _capture(stage: RuntimeStage) -> void:
 	reset()
 	var render := session.view.get_node("RunPresentation") as RunPresentation
 	render.view_override = {"center": Vector2.ZERO, "zoom": 0.65}
+	if "--warnings" in OS.get_cmdline_user_args():
+		await _capture_warnings(session, render)
+		return
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var label := Label.new()
@@ -272,9 +308,30 @@ func _capture(stage: RuntimeStage) -> void:
 		sim.projectiles.tick(dt, dt)
 		sim.enemies.cleanup()
 		sim.flush_events()
+		if frame >= 190:
+			render.view_override = {"center": t.pos[row], "zoom": 0.65}
 		await get_tree().process_frame
-		if frame == 110:
+		if frame in [25, 50, 75, 110, 150, 200, 215, 240]:
 			await RenderingServer.frame_post_draw
-			get_viewport().get_texture().get_image().save_png("/tmp/speed-marlin-warning.png")
+			get_viewport().get_texture().get_image().save_png("/tmp/speed-marlin-motion-%03d.png" % frame)
+	session.free()
+	get_tree().quit()
+
+## 同じ描画経路で停止直後・発進直前・画面外の予告を比較する。
+func _capture_warnings(session: Node, render: RunPresentation) -> void:
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.ship_invuln = 100.0
+	var row := sim.enemies.spawn(sim.enemies.def_of(&"marlin"), Vector2(-500, -160))
+	for sample in ["on-early", "on-late", "off-left", "off-top"]:
+		t.pos[row] = Vector2(-500, -160)
+		if sample == "off-left": t.pos[row] = Vector2(render.view_rect().position.x - 150.0, -100)
+		if sample == "off-top": t.pos[row] = Vector2(-100, render.view_rect().position.y - 150.0)
+		t.facing[row] = (sim.state.ship_pos - t.pos[row]).angle()
+		t.anchor[row] = sim.state.ship_pos
+		t.mode[row] = EnemyTable.Mode.WINDUP
+		t.charge[row] = 0.01 if sample == "on-early" else 0.9
+		for frame in 30: await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/tmp/speed-marlin-warning-%s.png" % sample)
 	session.free()
 	get_tree().quit()

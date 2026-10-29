@@ -5,11 +5,11 @@
 [resource]
 script = ExtResource("1")
 params = {
-"damage_base": 0.8,
-"damage_per": 0.4,
+"damage_base": 1.0,
+"damage_per": 0.2,
 "knock": 450.0,
-"radius_base": 170.0,
-"radius_per": 30.0
+"radius_base": 185.0,
+"radius_per": 15.0
 }
 id = &"T13"
 code_id = &"reactive"

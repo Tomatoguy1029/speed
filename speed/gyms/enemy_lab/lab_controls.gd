@@ -431,10 +431,10 @@ func _attacks(box: Node) -> void:
 	_settings = {"enabled": false, "budget": 4.0, "jitter": 0.3}
 	_attack_budget = _number(box, TranslationServer.translate("lab.message_f4a90d8530"), 4, 0, 100, 0.25, func(value): _settings.budget = value; _apply_director())
 	_number(box, tr("lab.attack.jitter"), 0.3, 0, 3, 0.05, func(value): _settings.jitter = value; _apply_director())
-	# 強敵と大物の攻撃の重さ（種類ごと。予算の合計に数える）
+	# 通常敵の攻撃の重さ（種類ごと。正の値だけ予算管理へ入る）
 	var heavy := UI.fold(box, tr("lab.attack.danger"))
 	for def in ContentManager.sorted(ContentManager.enemies):
-		if def.rank >= 3 and preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
+		if preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
 			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
 	var meter = load("res://gyms/enemy_lab/lab_attack_meter.gd").new()

@@ -8,11 +8,17 @@
 
 Godot のプロジェクトは [speed/project.godot](speed/project.godot) です。このリポジトリを `speed/` にクローンした場合、`speed/speed/project.godot` を Godot のプロジェクトマネージャーからインポートしてください。
 
+開発用の入口はメニューバーの **プロジェクト → ツール → SPEED** にまとめています。データ編集・ボス行動・出現タイムライン／編成・ステージ敵調整、ステージ起動・各実験場、ビジュアル／背景編集、素材確認・性能計測をここから開けます。既存のツールバーボタンとショートカットも使えます。無効にしたエディタープラグインの項目は表示されません。
+
 プロジェクト設定は Godot 4.6・Forward Plus です。タイトル・ステージ選択・ゲーム本体を実装済みで、メインシーンは `scenes/app/main.tscn` です。Godot 4.6 でインポートし、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用のビルドでは、全ステージを選べます。調整機能は [仕様書](docs/spec.md#20-調整機能) を参照してください。
 
 開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
 
-ピクセル炎は `speed/gyms/pixel_fire_preview.tscn` を開き、Godotの2D編集画面で動きを確認・調整できます。F6の独立した調整画面も使えます。[炎の調整・プリセット保存](speed/assets/pixel/README.md#ピクセル炎を単体で調整する)を参照してください。
+実験場上部の **ヒットストップ（試遊のみ）** では、敵種類を選ぶか配置済みの敵を選択し、「選択中の敵」で対象を合わせて倍率を変えます。試遊を続けながら、現在の同種の敵と次に出現する敵で効果を確認できます。0は停止なし、1は共通時間です。「元の値へ戻す」は選択種類の定義またはステージ上書きへ戻し、実験場の条件リセットも試遊値を消します。恒久保存は **データ編集** または **ステージ敵調整** で行います。
+
+炎・オーラ・後光・マップは、エディタ上部の **▶ ビジュアル編集**、または `speed/gyms/visual_editor.tscn` のF6から共通画面で調整できます。左で種類を選び、中央でプレビュー、右で項目を編集します。保存先と未保存状態を上部へ表示し、切替後も未保存値を保持します。「保存」は表示中の素材だけへ反映し、「再読込」と終了時には未保存値の破棄を確認します。オーラと後光は選択中の伝説モジュールを共有し、ベイク操作はオーラに表示します。
+
+ピクセル炎の再生・配置・保存・PNG出力は **ビジュアル編集 → 炎** にまとめています。既存の `speed/gyms/pixel_fire_preview.tscn` を直接開いた場合も、Inspectorで炎を編集できます。[炎の調整・プリセット保存](docs/dev/tools/pixel-fire-2d.md)を参照してください。
 
 ステージ制作は [制作ガイド](docs/dev/stage-production.md) から始めます。録画JSONLと感想を使うバランス調整は [試遊・分析・再比較の手順](docs/dev/stage-production.md#6-記録と感想で調整する) に沿って [分析スキル](.agents/skills/speed-balance-analysis/SKILL.md) を呼び出します。AIへの実装依頼は [AI向け資料](docs/dev/stage-production-ai.md)、ステージ4の制作要件は [個別仕様](docs/game/stages/stage-4.md) を参照してください。
 
@@ -35,6 +41,8 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 macOSのローカル確認用アプリは `godot --headless --path speed --export-release macOS /tmp/SPEED.app` で作れます。開発用ファイルの除外と製品公開の設定範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
 接触・敵・英雄・仕掛け・ボス・全ステージの進行の受け入れ確認は `godot --headless --log-file /tmp/speed-acceptance.log --path speed res://tests/thrill_acceptance.tscn`。確認用のセーブと設定はメモリだけで扱い、時計や強さを調整して実行します。描画付きの画面確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-captures` を足します。
+
+全武器MAX後の成長は `godot --headless --path speed res://tests/post_max_progression.tscn`、同じ3択UIとポーズ入力は `res://tests/post_max_ui.tscn` で確認できます。描画付きの確認は `--headless` を外し、末尾に `-- --out=/tmp/speed-postmax-captures` を付けます。
 
 敵の出現の仕組み（時間帯・強敵の群れ・出現のクリップ・攻撃の予算）の確認は `godot --headless --path speed res://tests/spawn_formations.tscn`。
 

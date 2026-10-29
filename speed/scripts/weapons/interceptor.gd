@@ -1,10 +1,9 @@
-## W25 迎撃ドローン（仮称）：周回編隊から近敵へ制御弾を撒き、突進前の余地を作る。
+## W25 迎撃ドローン（仮称）：周回編隊から近敵へダメージ弾を撃つ。
 extends WeaponBehavior
 
 var drones: Array[Dictionary] = []
 var _clock := 0.0
 var _target_after: Dictionary = {}
-var _control_after: Dictionary = {}
 var _hit_after: Dictionary = {}
 var _buf := PackedInt32Array()
 
@@ -16,14 +15,14 @@ func count() -> int:
 
 func tick(dt: float, busy: bool) -> void:
 	_clock += dt
-	for times in [_target_after, _control_after, _hit_after]:
+	for times in [_target_after, _hit_after]:
 		for id in times.keys():
 			if float(times[id]) <= _clock:
 				times.erase(id)
 	while drones.size() < count():
 		var i := drones.size()
 		drones.append({"pos": state.ship_pos, "angle": 0.0, "flash": 0.0,
-			"next": _clock + i * float(value("interval_by_level")) / count(), "left": 0})
+			"next": _clock + i * interval(float(value("interval_by_level"))) / count(), "left": 0})
 	for i in drones.size():
 		var d := drones[i]
 		# 編隊を常に自機へ固定する。高速経路の記録・追走は行わない。
@@ -44,11 +43,11 @@ func tick(dt: float, busy: bool) -> void:
 			d.angle = (t.pos[target] - d.pos).angle()
 			d.flash = 0.09
 			var direction := Vector2.from_angle(float(d.angle))
-			ctx.projectiles.fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
+			fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
 				atk() * float(value("damage_by_level")), {"cause": &"interceptor", "r": p("shot_radius"),
 				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy})
 		d.left = int(d.left) - 1
-		d.next = _clock + (float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
+		d.next = _clock + interval(float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
 
 func _nearest(from: Vector2) -> int:
 	var range_r := float(p("range"))
@@ -77,15 +76,4 @@ func hit_enemy(i: int, damage: float, impact: Vector2) -> void:
 	if _hit_after.has(id):
 		return
 	_hit_after[id] = _clock + float(p("hit_interval"))
-	var opts := {"cause": &"interceptor", "impact": impact, "no_crit": true}
-	var push_scale := t.def[i].knockback_scale(cfg) if t.def[i] != null else 1.0
-	var control := t.is_boss[i] == 0 and t.parent[i] < 0 and push_scale > 0.0 and not _control_after.has(id)
-	if control:
-		opts.dir = (t.pos[i] - state.ship_pos).normalized()
-		opts.knock = float(p("knock"))
-	var hp := t.hp[i]
-	ctx.combat.damage_enemy(i, damage, opts)
-	if control and t.hp[i] < hp and t.dead[i] == 0:
-		# 既存の押し返し時間を使う。耐性・質量補正は damage_enemy が適用する。
-		t.knock_t[i] = maxf(t.knock_t[i], float(p("control_time")))
-		_control_after[id] = _clock + float(p("control_interval"))
+	ctx.combat.damage_enemy(i, damage, {"cause": &"interceptor", "impact": impact, "no_crit": true})

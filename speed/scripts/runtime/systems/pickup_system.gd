@@ -63,9 +63,17 @@ func setup(context: RunContext) -> void:
 func tick(_real_dt: float, world_dt: float) -> void:
 	if world_dt <= 0.0:
 		return
+	# 開発版の計測：結晶・部品・カプセルを分けて足す
+	var perf := ctx.perf
+	var t0 := Time.get_ticks_usec()
 	_collect_gems(world_dt)
+	perf.since(&"pickups.gems", t0)
+	t0 = Time.get_ticks_usec()
 	_collect_coins(world_dt)
+	perf.since(&"pickups.coins", t0)
+	t0 = Time.get_ticks_usec()
 	_collect_capsules(world_dt)
+	perf.since(&"pickups.capsules", t0)
 
 # ── 落とす ────────────────────────────────────────────────────────
 
@@ -215,8 +223,8 @@ func _collect_gems(dt: float) -> void:
 	_fly_gems(dt)
 	enemies.gather_pickups(self, dt)
 	var reach := cfg.ship_radius + 14.0
-	var radius := state.stats.pickup_radius
-	var step := (700.0 + state.ship_vel.length() * 1.2) * dt
+	var radius := state.stats.xp_pickup_radius
+	var step := (700.0 + state.ship_vel.length() * 1.2) * state.stats.pickup_speed_mult * dt
 	# 吸い寄せも回収もされない遠くの結晶は、平方根を使わない距離比較だけで飛ばす
 	var far := maxf(radius, reach)
 	var far_sq := far * far
