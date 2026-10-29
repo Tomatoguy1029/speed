@@ -167,7 +167,6 @@ const TECH_DIR := {&"grid":0.0,&"swarm":-PI/2.0,&"tornado":PI/2.0,&"debris_shatt
 @onready var timeline: AnimationPlayer = $Timeline
 
 var necks: Array[Neck] = []
-var _guard_approach: Array[Neck] = []
 var squad: RefCounted
 ## 今の段階の首の本数
 var count := 0
@@ -292,7 +291,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	_chance_step(dt)
 	if north_aiming:
 		_update_north_targets()
-	_update_guard_approach()
 	if separated and squad != null: squad.tick(dt)
 	for k in necks.size():
 		_tick_neck(necks[k], k, dt)
@@ -618,33 +616,6 @@ func position_head(index: int, dt: float) -> void:
 	var defend: float=facing+clampf(local,-0.8,0.8)
 	aim_neck(n,defend+sin(_time+n.base_angle)*0.06,dt)
 	n.length = move_toward(n.length,float(def.params.neck_rest),float(def.params.neck_rest)*dt)
-
-## 通常攻撃の予算と待ち順から、画面内へ入る護衛だけを先に選ぶ。
-func _update_guard_approach()->void:
-	_guard_approach.clear()
-	if not separated or busy or recovery_t>0.0:return
-	var budget:=float(def.params.normal_budget)
-	if flow_controlled and flow_runner.flow != null:
-		budget = minf(flow_runner.stamina, float(flow_runner.flow.sections[flow_runner.index].get("cap", flow_runner.flow.maximum_stamina)))
-	var pending: Array[Neck]=[]
-	for n in necks:
-		if not _alive(n):continue
-		if _normal_moves.has(n.mode):
-			budget-=_normal_cost(n.mode)*maxf(0.0,table.attack_value[n.row])
-		elif n.mode==&"idle" and n.cd<=0.0:
-			if not n.motion.has("guard_ready_since"):n.motion.guard_ready_since=_time
-			pending.append(n)
-		else:n.motion.erase("guard_ready_since")
-	pending.sort_custom(func(a,b):
-		if a.motion.guard_ready_since!=b.motion.guard_ready_since:return a.motion.guard_ready_since<b.motion.guard_ready_since
-		return a.free_pos.distance_squared_to(run_state.ship_pos)<b.free_pos.distance_squared_to(run_state.ship_pos))
-	for n in pending:
-		var cost:=INF
-		for settings: HydraTechnique in _moves.values():
-			if settings.head_kind==n.kind:cost=minf(cost,_normal_cost(settings.technique))
-		if cost>budget:continue
-		budget-=cost
-		_guard_approach.append(n)
 
 func aim_neck(n: Neck, desired: float, dt: float) -> void:
 	if dt<=0.0:return
