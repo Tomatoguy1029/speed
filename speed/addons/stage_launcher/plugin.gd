@@ -9,6 +9,8 @@ const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const FireInspector := preload("res://addons/stage_launcher/fire_inspector.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 const MENU_SEPARATORS := ["試遊", "表示制作", "計測"]
+const SEPARATOR_IDS := [0x535001, 0x535002, 0x535003]
+const MENU_PROBE := "__speed_stage_launcher_menu_probe__"
 const SCENES := {
 	"lab": LAB_SCENE,
 	"visual": "res://gyms/visual_editor.tscn",
@@ -21,6 +23,7 @@ var _button: Button = null
 var _lab_button: Button = null
 var _visual_button: Button = null
 var _menu_items: Array[String] = []
+var _tool_menu: PopupMenu
 var _fire_inspector: EditorInspectorPlugin
 var _launch_error: AcceptDialog
 
@@ -52,32 +55,42 @@ func _enter_tree() -> void:
 ## Godot 標準の「プロジェクト → ツール」直下へ登録する。
 ## エディター拡張の入口は各 plugin 自身が登録し、無効時に項目を残さない。
 func _register_menu_items() -> void:
-	_add_menu_item(MENU_SEPARATORS[0], _on_menu_separator)
+	# 公開 API で項目を一時登録し、Godot が使う同じ Tools PopupMenu を特定する。
+	add_tool_menu_item(MENU_PROBE, _on_menu_separator)
+	_tool_menu = _find_tools_menu()
+	remove_tool_menu_item(MENU_PROBE)
+	if _tool_menu == null:
+		push_warning("Stage Launcher: Tools メニューを見つけられず区切りを表示できません")
+	_add_separator(0)
 	_add_menu_item("編集中のステージを起動", _on_pressed)
 	_add_scene("実験場", "lab")
-	_add_menu_item(MENU_SEPARATORS[1], _on_menu_separator)
+	_add_separator(1)
 	_add_menu_item("ビジュアル編集（炎・オーラ・後光・マップ・目印・エリート）", _on_visual_pressed)
 	_add_scene("背景編集", "background")
 	_add_scene("ピクセル素材確認", "art")
-	_add_menu_item(MENU_SEPARATORS[2], _on_menu_separator)
+	_add_separator(2)
 	_add_scene("敵描画ベンチ", "performance")
 	_add_scene("ラン処理・描画ベンチ", "profile")
-	_mark_menu_separators.call_deferred()
 
-## EditorPlugin の公開 API には区切りの登録がないため、登録した項目だけを PopupMenu の区切りに変える。
-func _mark_menu_separators() -> void:
-	if not is_inside_tree(): return
+## EditorPlugin の公開 API に区切りはない。実際の PopupMenu に区切りを追加し、ネイティブメニューにも同期する。
+func _find_tools_menu() -> PopupMenu:
 	for node in EditorInterface.get_base_control().find_children("*", "PopupMenu", true, false):
 		var menu := node as PopupMenu
-		var has_own_item := false
 		for index in menu.item_count:
-			if menu.get_item_text(index).begins_with("ビジュアル編集（"):
-				has_own_item = true
-				break
-		if not has_own_item: continue
-		for index in menu.item_count:
-			if menu.get_item_text(index) in MENU_SEPARATORS:
-				menu.set_item_as_separator(index, true)
+			if menu.get_item_text(index) == MENU_PROBE:
+				return menu
+	return null
+
+func _add_separator(group: int) -> void:
+	if _tool_menu != null:
+		_tool_menu.add_separator(MENU_SEPARATORS[group], SEPARATOR_IDS[group])
+
+func _remove_separators() -> void:
+	if not is_instance_valid(_tool_menu): return
+	for index in range(_tool_menu.item_count - 1, -1, -1):
+		if _tool_menu.is_item_separator(index) and _tool_menu.get_item_id(index) in SEPARATOR_IDS:
+			_tool_menu.remove_item(index)
+	_tool_menu = null
 
 func _on_menu_separator() -> void:
 	pass
@@ -114,6 +127,7 @@ func _exit_tree() -> void:
 	for label in _menu_items:
 		remove_tool_menu_item(label)
 	_menu_items.clear()
+	_remove_separators()
 	if _visual_button != null:
 		remove_control_from_container(CONTAINER_TOOLBAR, _visual_button)
 		_visual_button.queue_free()
