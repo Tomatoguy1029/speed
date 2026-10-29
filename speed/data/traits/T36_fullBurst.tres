@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TraitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+params = {
+"rate_base": 0.2,
+"rate_per": 0.05
+}
+id = &"T36"
+code_id = &"fullBurst"

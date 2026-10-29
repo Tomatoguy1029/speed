@@ -57,3 +57,6 @@ func tick(_dt: float, _busy: bool) -> void:
 			state.emit(&"ring", {"pos": t.pos[other], "radius": t.r[other] + 30.0, "color": Color("#ff986b"), "life": 0.25})
 			if state.phase != RunState.Phase.PLAY:
 				return
+
+func on_defeated(_i: int, _opts: Dictionary) -> void:
+	pass

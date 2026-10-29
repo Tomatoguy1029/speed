@@ -25,6 +25,11 @@
 | T14 | 軌跡延長 | 採用 | 描ける長さが伸びる。容量・最高速度とは別の倍率 | 複数の群れを1回で通る | 実装済み。`LoadoutSystem.refresh_stats()`、`data/traits/T14_length.tres` | [demo T14](../../../demo/docs/traits.md) `length`。最大5重ね |
 | T31 | 慣性航行 | 採用 | 突進後の保持時間と減速時間を同じ倍率で伸ばす | 突破後に高速で移動できる時間が伸びる | 実装済み。`LoadoutSystem.refresh_stats()`、`ShipSystem._step()`、`data/traits/T31_glideDuration.tres` | 最大5重ね。名称・数値の品質確認は未完了 |
 
+| T34 | 大振り | 採用 | すべての攻撃の半径を広げる | 広い群れを巻き込む | 共通倍率を実装。`LoadoutSystem.area_multiplier()`、`data/traits/T34_bigSwing.tres` | 仮のアイコン。攻撃ごとの接続を進める |
+| T35 | マルチショット | 採用 | 射撃武器の弾数を同じ割合で増やし、端数は確率で加える | 射撃を主力にする | 共通倍率を実装。`LoadoutSystem.shot_count()`、`data/traits/T35_multiShot.tres` | 仮のアイコン。射撃ごとの接続を進める |
+| T36 | フルバースト | 採用 | ゲージが基本容量以上ある間、ゲージ量に応じて連射を上げる | ゲージをためて射撃する | 共通倍率を実装。`LoadoutSystem.shooting_rate()`、`data/traits/T36_fullBurst.tres` | 射撃と演出の接続を進める |
+| T37 | デュプリケーター | 採用 | 命中した弾や破片を確率で左右へ分ける。世代数と同時数に共通上限を持つ | 飛ぶ攻撃を群れへ通す | 弾と破片の共通処理を実装。`ProjectileSystem.duplicate_friend()`、`data/traits/T37_duplicator.tres` | 光の槍の接続を進める |
+
 ### 各特性の重ね掛け
 
 各列は取得後のLvを表す。`n` は列のLv（1、2、3、4、5）で、発動型の各パラメータは `.tres` の `<項目>_base + <項目>_per × n` を使う。能力値型はLv1に `first_stack`（未指定なら `per_stack`）、Lv2以降に `per_stack`、T09のLv4・5に `late_per_stack` を足す。数値と各パラメータの正は上記の `.tres` に置く。

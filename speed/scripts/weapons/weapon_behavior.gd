@@ -30,7 +30,7 @@ func rate_k() -> float:
 	return 1.0 + 0.12 * (tier() - 1)
 
 func radius_k() -> float:
-	return 1.0 + 0.1 * (tier() - 1)
+	return (1.0 + 0.1 * (tier() - 1)) * ctx.loadout.area_multiplier()
 
 func p(key: String, default = 0.0):
 	var value: Variant = def.params.get(key, default)
@@ -64,6 +64,20 @@ func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	enhanced.speed = float(opts.get("speed", 1300.0)) * post_factor(&"projectile_speed")
 	enhanced.knock = float(opts.get("knock", 250.0)) * post_factor(&"knockback")
 	ctx.projectiles.fire_shot(from, angle, dmg, enhanced)
+
+## 独自のLv配列を使う武器も同じ範囲補正へつなぐ。
+func area(value: float) -> float:
+	return value * ctx.loadout.area_multiplier()
+
+func shots(base: int) -> int:
+	return ctx.loadout.shot_count(base)
+
+func shooting_interval(base: float) -> float:
+	return interval(base) / ctx.loadout.shooting_rate()
+
+func at_level(key: String) -> float:
+	var values: Array = def.params[key]
+	return float(values[clampi(level - 1, 0, values.size() - 1)])
 
 func atk() -> float:
 	return ctx.combat.attack_power() * damage_factor()

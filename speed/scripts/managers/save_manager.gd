@@ -123,7 +123,8 @@ func unlock_module(id: StringName) -> void:
 		data.encyclopedia.append(String(id))
 
 func is_module_known(id: StringName) -> bool:
-	return data.encyclopedia.has(String(id))
+	if id == &"T13" or id == &"T01": return false
+	return data.encyclopedia.has(String(id)) or (id == &"W29" and data.encyclopedia.has("T01"))
 
 ## ランの結果を記録する。途中でやめたランは呼ばない（仕様書 3）。
 func record_run(result: Dictionary) -> void:
@@ -172,6 +173,9 @@ func _migrate(loaded: Dictionary, d: Dictionary) -> Dictionary:
 					if not loaded[k].has(kk):
 						loaded[k][kk] = d[k][kk]
 			d[k] = loaded[k]
+	if d.encyclopedia.has("T01") and not d.encyclopedia.has("W29"):
+		d.encyclopedia.append("W29")
+	d.encyclopedia.erase("T13")
 	d.version = SAVE_VERSION
 	return d
 

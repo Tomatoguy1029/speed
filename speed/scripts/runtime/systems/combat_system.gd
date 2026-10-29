@@ -54,7 +54,7 @@ func in_rect(lo: Vector2, hi: Vector2, out: PackedInt32Array) -> void:
 # ── 攻撃力と装甲（仕様書 7.1・7.2・7.3） ──────────────────────────
 
 func attack_power() -> float:
-	return cfg.base_attack * state.stats.attack_mult * cfg.atk_scale * burst_power
+	return cfg.base_attack * state.stats.attack_mult * cfg.atk_scale * burst_power * build.damage_multiplier()
 
 func can_pierce(atk: float, i: int, crit: bool) -> bool:
 	return atk >= enemies.table.armor[i] * (cfg.crit_armor if crit else 1.0)
@@ -217,7 +217,7 @@ func trace_width() -> float:
 ## なぞり中の機体の当たり判定の半径（仕様書 6.5）。線の左右この距離に触れた敵に、体当たりが当たる。
 ## しし座の力が効いている間は太くなる（仕様書 8.1）。
 func trace_radius() -> float:
-	return cfg.trace_radius * trace_width()
+	return cfg.trace_radius * trace_width() * build.area_multiplier()
 
 ## ふたご座の双子の機体が from から to へ動いた：通った敵に体当たりと同じように当てる（弾かれず、被弾もしない）。
 func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
@@ -286,7 +286,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
 	if t.hp[i] <= 0.0:
-		kill_enemy(i, opts.merged({"crit": crit}))
+		kill_enemy(i, opts.merged({"crit": crit, "one_shot": dmg >= t.max_hp[i] * 0.8}))
 	elif opts.has("dir"):
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
 		var push := enemies.knockback_scale(i)
@@ -374,6 +374,8 @@ func kill_enemy(i: int, opts := {}) -> void:
 		t.hull_scattered[i] = 1
 	elif build.capture_hull(i):
 		t.hull_scattered[i] = 1
+	var shatter = build.weapon_behaviors.get(&"W03")
+	if shatter != null: shatter.on_defeated(i, opts)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
 	if cause != &"afterimage":

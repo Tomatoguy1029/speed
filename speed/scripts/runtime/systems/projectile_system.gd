@@ -31,6 +31,7 @@ enum FriendKind { SHOT, DEBRIS, HULL }
 ## 1 なら使用中の行
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
+var friend_generation := PackedByteArray()
 var friend_cause: Array[StringName] = []
 ## ダメージ原因と独立した、描画だけに使う装備の識別子。
 var friend_visual: Array[StringName] = []
@@ -270,6 +271,7 @@ func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2
 		angle: float, spin: float, hit_id: int, type := &"", visual := &"") -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
+	friend_generation[i] = 0
 	friend_cause[i] = cause
 	friend_visual[i] = visual
 	friend_pos[i] = pos
@@ -355,6 +357,8 @@ func _update_friendly(dt: float) -> void:
 			else:
 				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
 					"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
+			duplicate_friend(i, impact)
+			state.emit(&"shot_hit", {"pos": impact, "dir": vel.normalized(), "visual_key": String(friend_visual[i]), "kind": friend_kind[i]})
 			if state.phase != RunState.Phase.PLAY:
 				# 残りの行は進めずにそのまま残す
 				friend_pos[i] = pos
@@ -802,3 +806,30 @@ func _hazard_visual_path(row: int) -> StringName:
 	var kind: String = HazardKind.keys()[hazard_kind[row]].to_lower()
 	var styled := "%s_%s" % [kind, HazardStyle.keys()[hazard_style[row]].to_lower()]
 	return StringName("res://scenes/attacks/%s.tscn" % (styled if ResourceLoader.exists("res://scenes/attacks/%s.tscn" % styled) else kind))
+
+## 物理弾と飛ぶ槍の同時数。分裂の共通上限に使う。
+func flying_count() -> int:
+	var lances = _attached_attacks.get(&"light_lances")
+	return friend_count() + (lances.items.size() if lances != null else 0)
+
+func duplicate_friend(source: int, impact: Vector2) -> bool:
+	var vectors := build.split_vectors(friend_vel[source], friend_generation[source])
+	if vectors.is_empty(): return false
+	for v in vectors:
+		# 星屑は200個まで。ほかの飛ぶ攻撃と分裂全体の上限も共有する。
+		if friend_kind[source] == FriendKind.DEBRIS and debris_count() >= 200: break
+		var child := _add_friend(friend_kind[source], friend_cause[source], impact, v, friend_r[source],
+			friend_dmg[source] * build.split_damage(), friend_life[source], friend_pierce[source] != 0,
+			friend_pierce_left[source], friend_color[source], friend_no_crit[source] != 0, friend_knock[source],
+			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source])
+		friend_hit[child] = friend_hit[source].duplicate()
+		friend_generation[child] = friend_generation[source] + 1
+		friend_on_hit[child] = friend_on_hit[source]
+	state.emit(&"duplicate", {"pos": impact, "directions": vectors})
+	return true
+
+func debris_count() -> int:
+	var count := 0
+	for i in friend_alive.size():
+		if friend_alive[i] != 0 and friend_kind[i] == FriendKind.DEBRIS: count += 1
+	return count

@@ -546,3 +546,37 @@ func on_end() -> void:
 func on_phase_changed(phase: RunState.Phase) -> void:
 	for behavior in weapon_behaviors.values():
 		behavior.on_phase_changed(phase)
+
+## 攻撃範囲・弾数・射撃頻度は、装備を選んだ時点の共通値から求める。
+func area_multiplier() -> float:
+	return 1.0 + _trait_bonus(&"T34")
+
+func shot_count(base: int) -> int:
+	var amount := base * (1.0 + _trait_bonus(&"T35"))
+	var count := floori(amount)
+	return count + (1 if state.rng.randf() < amount - count else 0)
+
+func shooting_rate() -> float:
+	if _n(&"T36") == 0 or state.gauge < 1.0: return 1.0
+	return 1.0 + (_trait_param(&"T36", "rate_base") + _trait_param(&"T36", "rate_per") * _n(&"T36")) * state.gauge
+
+func damage_multiplier() -> float:
+	var rampage = trait_behaviors.get(&"T33")
+	return rampage.multiplier() if rampage != null else 1.0
+
+## 弾・星屑・槍は同じ確率と同時数の上限を共有する。
+func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var n := _n(&"T37")
+	if n == 0: return out
+	var d := ContentManager.definition(&"traits", &"T37") as TraitDef
+	if generation >= int(d.params.generations) or projectiles.flying_count() + 2 > int(d.params.max): return out
+	if state.rng.randf() >= float(d.params.chance_by_level[n - 1]): return out
+	for side in [-1.0, 1.0]:
+		var angle: float = deg_to_rad(state.rng.randf_range(float(d.params.angle_min), float(d.params.angle_max))) * side
+		out.append(velocity.rotated(angle) * state.rng.randf_range(0.9, 1.1))
+	return out
+
+func split_damage() -> float:
+	var d := ContentManager.definition(&"traits", &"T37") as TraitDef
+	return float(d.params.damage_by_level[_n(&"T37") - 1]) if _n(&"T37") > 0 else 1.0
