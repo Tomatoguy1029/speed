@@ -52,6 +52,17 @@ func ring(p: Vector2, r: float, color: Color) -> void:
 		seen[k] = true
 		fill(x, y, color)
 
+## 太さ w ドットの輪（半径 r から内側へ w ドット）。nz は輪の形の揺らぎ（5山の正弦）。
+func thick_ring(p: Vector2, r: float, w: int, color: Color, nz := 0.0) -> void:
+	if r <= 0.0: return
+	var c := p / px
+	var n := maxi(16, ceili(r * 7.0))
+	for i in n:
+		var a := float(i) / n * TAU
+		var rr := r * (1.0 + nz * sin(a * 5.0 + r * 0.1))
+		for k in w:
+			fill(c.x + cos(a) * (rr - k), c.y + sin(a) * (rr - k), color)
+
 ## 太さ w ドットの線（両端は世界座標）。
 func line(a: Vector2, b: Vector2, color: Color, w := 1) -> void:
 	var ca := a / px

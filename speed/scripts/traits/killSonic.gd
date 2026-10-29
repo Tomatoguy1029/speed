@@ -21,7 +21,7 @@ func on_kill(_cause: StringName) -> void:
 	var damage := atk() * val("damage") * pow(float(def.params.damage_decay), chains)
 	chains += 1
 	waves.append({"pos": ctx.loadout.kill_position, "radius": radius, "damage": damage, "age": 0.0, "hit": {}})
-	state.emit(&"chain_shock", {"pos": ctx.loadout.kill_position, "radius": radius, "life": 0.4})
+	state.emit(&"chain_shock", {"pos": ctx.loadout.kill_position, "radius": radius, "life": 0.4, "generation": chains - 1})
 func tick(dt: float, _busy: bool) -> void:
 	# 命中で次の波が増えるので、更新対象を固定する。
 	for wave in waves.duplicate():

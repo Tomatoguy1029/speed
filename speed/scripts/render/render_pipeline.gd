@@ -18,6 +18,9 @@ var _camera: Camera2D
 var _glow_viewport: SubViewport
 var _glow_camera: Camera2D
 var _shock: ColorRect
+var _ripple: ColorRect
+## 震空の歪み：pos（世界）、radius（世界）、age、cell（世界の1ドット）
+var _ripples: Array = []
 ## 衝撃波：pos、radius（世界）、life、max
 var _waves: Array = []
 
@@ -87,6 +90,14 @@ func _setup_shockwave() -> void:
 	_shock.material = mat
 	_shock.visible = false
 	layer.add_child(_shock)
+	_ripple = ColorRect.new()
+	_ripple.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ripple.set_anchors_preset(Control.PRESET_FULL_RECT)
+	var ripple_mat := ShaderMaterial.new()
+	ripple_mat.shader = load("res://shaders/space_ripple.gdshader")
+	_ripple.material = ripple_mat
+	_ripple.visible = false
+	layer.add_child(_ripple)
 	add_child(layer)
 
 func _setup_sparks() -> void:
@@ -104,6 +115,12 @@ func add_wave(pos: Vector2, radius: float, life := 0.5) -> void:
 	if _waves.size() > 8:
 		_waves.pop_front()
 
+## 震空の空間の歪みを足す。触れた点へ 0.08 秒引き込み、そのあと 0.5 秒で radius まで押し広げる。
+func add_ripple(pos: Vector2, radius: float, cell: float) -> void:
+	_ripples.append({"pos": pos, "radius": radius, "age": 0.0, "cell": cell})
+	if _ripples.size() > 8:
+		_ripples.pop_front()
+
 ## 1フレームぶん進める。dt は演出の時間（ポーズ中は 0）。
 func step(dt: float, view_center: Vector2, zoom: float) -> void:
 	if _glow_viewport != null:
@@ -112,6 +129,7 @@ func step(dt: float, view_center: Vector2, zoom: float) -> void:
 		_glow_camera.position = _camera.position
 		_glow_camera.zoom = _camera.zoom * 0.5
 	_update_waves(dt, view_center, zoom)
+	_update_ripples(dt, view_center, zoom)
 	if sparks.available():
 		sparks.step(dt, view_center, zoom)
 
@@ -134,3 +152,35 @@ func _update_waves(dt: float, view_center: Vector2, zoom: float) -> void:
 	mat.set_shader_parameter("count", _waves.size())
 	mat.set_shader_parameter("waves", arr)
 	mat.set_shader_parameter("aspect", size.x / size.y)
+
+func _update_ripples(dt: float, view_center: Vector2, zoom: float) -> void:
+	for r in _ripples:
+		r.age += dt
+	_ripples = _ripples.filter(func(r): return r.age < 0.58)
+	_ripple.visible = not _ripples.is_empty()
+	if _ripples.is_empty():
+		return
+	var size := get_viewport().get_visible_rect().size
+	var arr: Array[Vector4] = []
+	var cell := 1.0
+	for r in _ripples:
+		cell = float(r.cell) * zoom
+		var screen: Vector2 = (r.pos - view_center) * zoom + size / 2.0
+		var cells: float = float(r.radius) / float(r.cell)
+		var radius := 0.0
+		var amp := 0.0
+		if r.age < 0.08:
+			var k: float = r.age / 0.08
+			radius = 3.0 + 9.0 * (1.0 - k)
+			amp = -8.0 * (1.0 - k * 0.3)
+		else:
+			var q: float = (r.age - 0.08) / 0.5
+			radius = 4.0 + (cells - 4.0) * (1.0 - pow(1.0 - q, 2.2))
+			amp = 10.0 * (1.0 - q * 0.75)
+		arr.append(Vector4(screen.x, screen.y, radius * cell, amp))
+	while arr.size() < 8:
+		arr.append(Vector4.ZERO)
+	var mat := _ripple.material as ShaderMaterial
+	mat.set_shader_parameter("count", _ripples.size())
+	mat.set_shader_parameter("ripples", arr)
+	mat.set_shader_parameter("cell", cell)

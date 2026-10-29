@@ -184,14 +184,7 @@ func event(ev: Dictionary) -> bool:
 					sprite.scale=Vector2.ONE*base
 					add_child(sprite)
 					_captures.append({"sprite":sprite,"from":ev.pos,"age":0.0,"delay":_rng.randf()*0.08,"duration":0.12+_rng.randf()*0.12,"swirl":_rng.randf_range(-0.6,0.6),"scale":base,"color":ev.color})
-		&"escort_deploy":
-			for target in ev.targets:
-				var d:Vector2=target-ev.pos
-				effect(8,(target+ev.pos)*0.5,d.length()*0.5,0.12,"weapon/dashRangeDrone",{"angle":d.angle(),"c1":Color("#9ffff4")})
-				effect(3,target,6.0*pixel,0.12,"weapon/dashRangeDrone",{"width":0.0})
-		&"escort_slash":
-			effect(19,ev.pos,14.0*pixel,0.16,"weapon/dashRangeDrone",{"angle":ev.dir.angle(),"c1":Color("#7ff3ff")})
-			burst(ev.pos,8,ev.dir.angle()+PI*0.5,TAU,10,45,0.16,[Color.WHITE,Color("#69fff0")],"weapon/dashRangeDrone")
+		&"escort_deploy", &"escort_slash": pass  # 表示は render/equipment/dashRangeDrone.gd
 		&"anchor_capture":
 			effect(0,ev.pos,12.0*pixel,0.14,"weapon/massTow",{"c1":Color("#ffbe65")})
 			burst(ev.pos,12,(ev.to-ev.pos).angle(),0.3,40,80,0.45,[Color("#fff2c0"),Color("#ffbe65")],"weapon/massTow")
@@ -257,14 +250,8 @@ func event(ev: Dictionary) -> bool:
 			if cause == "endBlast": palette = {"c0": Color.WHITE, "c1": Color("#e6d2ff"), "c2": Color("#b070ff"), "c3": Color("#5a1eb0")}
 			effect(1, ev.pos, ev.radius, 0.6 if cause=="mine" else 0.55, key, palette)
 			if cause=="endBlast": burst(ev.pos,36,0,TAU,50,170,0.5,[Color.WHITE,Color("#b48cff")],key)
-		&"chain_shock": effect(0, ev.pos, ev.radius, ev.life, "trait/killSonic", {"c1": Color("#d8f6ff"), "c2": Color("#7fd8ff")})
-		&"space_quake":
-			_distortion(ev.pos, ev.radius, 0.58, "weapon/contactWave", 0)
-			var flash := effect(9,ev.pos,3.0*pixel,0.05,"weapon/contactWave",{"c1":Color.WHITE})
-			flash.age = -0.08
-			for i in 9:
-				var ray := effect(18,ev.pos,20.0*pixel,0.1,"weapon/contactWave",{"angle":i*TAU/9.0+_rng.randf()*0.5,"width":_rng.randf_range(8.0,18.0),"c1":Color("#e8f6ff")})
-				ray.age = -0.08
+		&"chain_shock": pass  # 表示は render/equipment/killSonic.gd
+		&"space_quake": pass  # 表示は render/equipment/contactWave.gd と RenderPipeline.add_ripple
 		&"barrier_hit":
 			var last := roundi(float(ev.radius)*SETTINGS.number("weapon/barrier","effect_scale",1.0)/(sqrt(3.0)*4.0*pixel*SETTINGS.number("weapon/barrier","pixel_scale",1.0)))
 			var life: float = 0.21+(last-3)*0.05+0.1
@@ -312,12 +299,7 @@ func event(ev: Dictionary) -> bool:
 			var item := effect(0, ev.pos, 52.0 * pixel, 0.7, "trait/vortex", {"c0": Color("#dcffe6"), "c1": Color("#8fffbe"), "c2": Color("#6effaa")})
 			item.follow = true
 			burst(ev.pos, 14, -PI * 0.5, 2.0, 14, 40, 0.7, [Color("#8fffbe")], "trait/vortex")
-		&"sonic_push":
-			var item := effect(15, ev.pos, 9.0 * pixel, 0.07, "weapon/sonic", {"angle": ev.dir.angle(), "c1": Color("#cfe4ff")})
-			if ev.has("row") and ev.has("id"): item["sonic_target"] = Vector2i(ev.row,ev.id)
-		&"sonic_impact":
-			effect(16, ev.pos, 12.0 * pixel, 0.16, "weapon/sonic", {"broken": ev.dead, "c1": Color("#cfe4ff")})
-			burst(ev.pos, 10 if ev.dead else 5, ev.dir.angle(), 1.3, 50, 130, 0.26, [Color.WHITE, Color("#cfe4ff"), Color("#8a96b0")], "weapon/sonic")
+		&"sonic_push", &"sonic_impact": pass  # 表示は render/equipment/sonic.gd
 		&"run_up_hit": burst(ev.pos, 16, 0, TAU, 30, 60, 0.2, [Color.WHITE, Color("#ffd040"), Color("#ff9a1e")], "trait/runUp")
 		&"full_burst_ready": pass  # 表示は render/equipment/fullBurst.gd
 		_: return false
@@ -421,38 +403,13 @@ var _mines: InstanceBatch
 func sample(ctx: RunContext, dt: float) -> void:
 	_continuous(ctx,dt)
 	var state := ctx.state
-	for item in effects:
-		if not item.has("sonic_target"): continue
-		var target: Vector2i = item.sonic_target
-		if ctx.enemies.is_same(target.x,target.y):
-			item.node.position = (ctx.enemies.table.pos[target.x]/pixel).round()*pixel
 	for id in _needles.keys():
 		var needle: Dictionary=_needles[id]
 		if not ctx.enemies.is_same(needle.row,id) or ctx.enemies.table.dead[needle.row]!=0 or not state.weapons.has(&"W28"):
 			needle.node.queue_free()
 			_needles.erase(id)
 		else:needle.center=ctx.enemies.table.pos[needle.row]
-	var rampage = ctx.loadout.trait_behaviors.get(&"T33")
-	if _aura == null:
-		_aura = Sprite2D.new()
-		_aura.texture = preload("res://assets/effects/build/airship_aura_mask.png")
-		_aura.position = Vector2.ZERO
-		var mat := ShaderMaterial.new()
-		mat.shader = preload("res://shaders/build_aura.gdshader")
-		mat.set_shader_parameter("noise_tex", NOISE)
-		_aura.material = mat
-		add_child(_aura)
-	_aura.visible = rampage != null
-	if rampage != null:
-		_aura.position = state.ship_pos + Vector2(0, 5.0 * ctx.cfg.character_scale).rotated(state.ship_heading.angle() + PI * 0.5)
-		_aura.rotation = state.ship_heading.angle() + PI * 0.5
-		_aura.scale = Vector2.ONE * ctx.cfg.character_scale * SETTINGS.number("trait/rampage", "effect_scale", 1.0)
-		var mat: ShaderMaterial = _aura.material
-		mat.set_shader_parameter("strength", minf(1.0, float(rampage.kills) / 150.0) if state.tracing else rampage.strength)
-		mat.set_shader_parameter("pop", rampage.pop)
-		mat.set_shader_parameter("clock", clock / maxf(0.01, SETTINGS.number("trait/rampage", "duration_scale", 1.0)))
-		mat.set_shader_parameter("pixel_scale", SETTINGS.number("trait/rampage", "pixel_scale", 1.0))
-		mat.set_shader_parameter("tint", SETTINGS.tinted("trait/rampage", Color.WHITE))
+	# 快進撃のオーラは render/equipment/rampage.gd が描く。
 	var gear = ctx.loadout.trait_behaviors.get(&"T04")
 	if gear != null and state.tracing:
 		var x := clampf(ctx.loadout.boost_distance / ctx.cfg.draw_length, 0, 1)
@@ -464,26 +421,7 @@ func sample(ctx: RunContext, dt: float) -> void:
 			var p := state.ship_pos + state.ship_heading * (9.0 if nose else 2.0 - _rng.randf() * 6.0) * pixel + state.ship_heading.orthogonal() * _rng.randf_range(-0.5, 0.5) * (2.0 if nose else 5.0 + 10.0 * ex) * pixel
 			burst(p, 1, state.ship_heading.angle() + PI, 0.9 + 0.8 * ex, 60.0 + 160.0 * ex, 60.0 + 160.0 * ex, 0.16 + 0.24 * ex * _rng.randf(), [Color.WHITE], "trait/fullCharge", 2.0 if _rng.randf() < 0.35 + 0.4 * ex else 1.0, false)
 			if not sparks.is_empty(): sparks.back().palette = [Color.WHITE, Color("#fff2a8"), Color("#ffd040"), Color("#ff9a1e"), Color("#e9561c"), Color("#9a2a14")]
-	var sonic = ctx.loadout.weapon_behaviors.get(&"W08")
-	var frames: Array = sonic.frames if sonic != null else []
-	while _sonic_nodes.size() < frames.size():
-		var item := effect(7, Vector2.ZERO, 1.0, 1.0, "weapon/sonic", {"c1": Color("#bed7ff")})
-		effects.erase(item)
-		_sonic_nodes.append(item)
-	for i in _sonic_nodes.size():
-		var item := _sonic_nodes[i]
-		item.node.visible = i < frames.size()
-		if i >= frames.size(): continue
-		var radius: float = sonic.wave_speed() * sonic.wave_life() * SETTINGS.number("weapon/sonic","effect_scale",1.0)
-		item.node.position = (frames[i].pos / pixel).round() * pixel
-		item.node.scale = Vector2.ONE * (radius + 2.0 * pixel)
-		item.material.set_shader_parameter("extent", Vector2.ONE * (radius + 2.0 * pixel) * 2.0)
-		item.material.set_shader_parameter("duration", sonic.wave_life())
-		item.material.set_shader_parameter("age", frames[i].age / maxf(0.01,SETTINGS.number("weapon/sonic","duration_scale",1.0)))
-		item.material.set_shader_parameter("width", float(sonic.pulse) / 0.25)
-		item.material.set_shader_parameter("pixel", pixel * SETTINGS.number("weapon/sonic", "pixel_scale", 1.0))
-		item.material.set_shader_parameter("tint", SETTINGS.tinted("weapon/sonic", Color.WHITE))
-		item.material.set_shader_parameter("c1", Color("#bed7ff") * SETTINGS.values_for("weapon/sonic").get("shader_c1", Color.WHITE))
+	# ソニックブームの音の輪は render/equipment/sonic.gd が描く。
 	if _mines == null:
 		_mines = InstanceBatch.new()
 		_mines.setup_shader_quad()
@@ -526,8 +464,6 @@ func captures_step(dt: float, center: Vector2) -> void:
 
 var _tether: InstanceBatch
 var _steam: InstanceBatch
-var _escort: InstanceBatch
-var _escort_samples: Array[Dictionary] = []
 var _runup_node: Dictionary = {}
 var _tow_node: Dictionary = {}
 var _steam_opacity := 0.0
@@ -536,73 +472,8 @@ var _previous_sonic_pulse := 0.0
 var _sonic_tracks: Dictionary = {}
 func _continuous(ctx: RunContext, dt: float) -> void:
 	var state:=ctx.state
-	if _steam==null:
-		_steam=InstanceBatch.new()
-		_steam.setup_shader_quad()
-		add_child(_steam)
-	_steam.begin()
-	var sonic=ctx.loadout.weapon_behaviors.get(&"W08")
-	var speed:=state.ship_vel.length()/pixel
-	var active:=sonic!=null and (state.tracing or state.glide) and speed>100.0
-	_steam_opacity=lerpf(_steam_opacity,1.0 if active else 0.0,minf(1.0,dt*6.0))
-	var pulse:float=sonic.pulse if sonic!=null else 0.0
-	_steam_pulse=1.0 if pulse>_previous_sonic_pulse else _steam_pulse*exp(-dt*6.0)
-	_previous_sonic_pulse=pulse
-	var opacity:=_steam_opacity*(0.28+0.35*_steam_pulse)
-	if sonic!=null and opacity>0.02:
-		var c:=float(sonic.at_level("speed_by_level"))
-		var tangent:=tan(asin(minf(0.99,c/maxf(speed,c+1.0))))
-		for i in 40:
-			var u:=float((i*37)%40)/40.0
-			var along:=4.0+u*20.0
-			var half:=along*tangent*(0.35+0.65*float((i*53)%10)/10.0)
-			var pos:=state.ship_pos-state.ship_heading*along*pixel+state.ship_heading.orthogonal()*half*(1.0 if i%2 else -1.0)*pixel
-			_steam.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic", Color(235.0/255.0,243.0/255.0,1.0,opacity*(1.0-u*0.6))))
-	var live_tracks: Dictionary = {}
-	if sonic!=null:
-		for hit in sonic.pending:
-			if not ctx.enemies.is_same(hit.row,hit.id) or ctx.enemies.table.dead[hit.row]!=0: continue
-			var points: Array = _sonic_tracks.get(hit.id,[])
-			if dt>0.0: points.append(ctx.enemies.table.pos[hit.row])
-			if points.size()>10: points.pop_front()
-			live_tracks[hit.id]=points
-			var speed_px:float=hit.velocity.length()/pixel
-			for i in maxi(0,points.size()-1):
-				var k:=points.size()-1-i
-				if speed_px<6.0 or k>speed_px/7.0 or (k>3 and k%2!=0): continue
-				var color:=Color("#cfe4ff") if k<3 else Color("#6f86b0")
-				_steam.add_upright((points[i]/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic",color))
-	_sonic_tracks=live_tracks
-	_steam.end()
-	if _escort==null:
-		_escort=InstanceBatch.new()
-		_escort.setup_shader_quad()
-		add_child(_escort)
-	for p in _escort_samples:p.age+=dt
-	_escort_samples=_escort_samples.filter(func(p):return p.age<0.3)
-	if state.weapons.has(&"W26") and state.tracing and dt>0.0:
-		if _escort_samples.is_empty() or state.ship_pos.distance_to(_escort_samples.back().pos)>pixel*2.0:
-			_escort_samples.append({"pos":state.ship_pos-state.ship_heading*9.0*pixel,"age":0.0})
-	_escort.begin()
-	var remaining:=80.0*pixel
-	for i in range(_escort_samples.size()-1,0,-1):
-		var a:Vector2=_escort_samples[i].pos
-		var b:Vector2=_escort_samples[i-1].pos
-		var distance:=a.distance_to(b)
-		if distance<=0.01:continue
-		b=a.move_toward(b,minf(distance,remaining))
-		var fade:=1.0-float(_escort_samples[i].age)/0.3
-		for k in 3:
-			var width_value:float=[6.0,3.0,2.0 if fade>0.5 else 1.0][k]
-			var color:Color=[Color(Color("#5ff6ff"),0.12*fade),Color(Color("#3fd0e8"),0.6*fade),Color(Color("#f2ffff"),fade)][k]
-			_escort.add_rect((a+b)*0.5,Vector2(a.distance_to(b)*0.5,width_value*pixel*0.5),(a-b).angle(),SETTINGS.tinted("weapon/dashRangeDrone", color))
-		if i%3==0:
-			var side := (a-b).normalized().orthogonal()*4.0*pixel
-			for sign_side in [-1.0,1.0]:
-				_escort.add_upright(((b+side*sign_side)/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/dashRangeDrone",Color(Color("#5ff6ff"),fade*0.65)))
-		remaining-=distance
-		if remaining<=0.0:break
-	_escort.end()
+	# ソニックブームの蒸気と押された敵の筋は render/equipment/sonic.gd が描く。
+	# エスコートウィングの機体の光跡は render/dash_range_drone.gd が描く。
 	var runup=ctx.loadout.trait_behaviors.get(&"T32")
 	if _runup_node.is_empty():
 		_runup_node=effect(14,Vector2.ZERO,110.0*pixel,1.0,"trait/runUp")

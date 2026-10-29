@@ -2,6 +2,7 @@
 extends RefCounted
 const AIRSHIP := preload("res://assets/pixel/airship.png")
 const AIRSHIP_FLAME := preload("res://assets/pixel/airship_flame.png")
+const AIRSHIP_BLUE_FLAME := preload("res://assets/pixel/airship_blue_flame.png")
 const AIRSHIP_SPARK := preload("res://assets/pixel/airship_spark.png")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 var rm: RunPresentation
@@ -65,7 +66,7 @@ func draw_exhaust(c: CanvasItem) -> void:
 	var frame := int(_jet_time * 12.0) % 3
 	var region := Rect2(frame * AIRSHIP.get_width(), 0, AIRSHIP.get_width(), AIRSHIP.get_height())
 	c.draw_set_transform(state.ship_pos, state.ship_heading.angle() + PI / 2.0)
-	var flame := load("res://assets/pixel/airship_blue_flame.png") if sonic else AIRSHIP_FLAME
+	var flame := AIRSHIP_BLUE_FLAME if sonic else AIRSHIP_FLAME
 	c.draw_texture_rect_region(flame, rect, region)
 	c.draw_texture_rect_region(AIRSHIP_SPARK, rect, region, Color(1, 1, 1, 0.65))
 	c.draw_set_transform(Vector2.ZERO)

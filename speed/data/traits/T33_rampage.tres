@@ -5,9 +5,9 @@
 [resource]
 script = ExtResource("1")
 params = {
-"kills": 150,
-"bonus_base": 0.2,
-"bonus_per": 0.1,
+"kills": 18,
+"bonus_base": 0.36,
+"bonus_per": 0.18,
 "half_life": 1.4
 }
 id = &"T33"
