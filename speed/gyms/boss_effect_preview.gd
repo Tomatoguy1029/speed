@@ -41,7 +41,7 @@ func _ready() -> void:
 	replay.pressed.connect(_replay)
 	controls.add_child(replay)
 	for value in SPEEDS:
-		_speed.add_item("%g倍" % value)
+		_speed.add_item(str(value) + "倍")
 	_speed.select(2)
 	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
 	controls.add_child(_speed)

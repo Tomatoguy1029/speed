@@ -65,7 +65,7 @@ func _register_menu_items() -> void:
 	_add_menu_item("編集中のステージを起動", _on_pressed)
 	_add_scene("実験場", "lab")
 	_add_separator(1)
-	_add_menu_item("ビジュアル編集（炎・オーラ・後光・マップ・目印・エリート）", _on_visual_pressed)
+	_add_menu_item("ビジュアル編集", _on_visual_pressed)
 	_add_scene("背景編集", "background")
 	_add_scene("ピクセル素材確認", "art")
 	_add_separator(2)
