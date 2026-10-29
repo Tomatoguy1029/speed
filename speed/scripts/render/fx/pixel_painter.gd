@@ -148,6 +148,27 @@ func hit_flash(p: Vector2, q: float, big: int) -> void:
 	ring(p, 2.0 + [5.0, 7.0, 12.0][big] * q, Color("#bff3ff") if q < 0.4 else Color("#4fb8ff"))
 	if big == 2 and q > 0.2: ring(p, 1.0 + 6.0 * q, Color("#d8f6ff"))
 
+## 両端の尖った針状の光（菱形）。外側は紫、内側に白い芯。len・w はドット数（w は中心から片側の幅）。
+func spindle(p: Vector2, angle: float, length: float, w: float, alpha: float) -> void:
+	if alpha <= 0.0 or length <= 0.0: return
+	var c := p / px
+	var u := Vector2.from_angle(angle)
+	var n := u.orthogonal()
+	var half := length * 0.5
+	var extent := ceili(half + w + 1.0)
+	var outer := Color("#a855ff", alpha)
+	var inner := Color(1, 1, 1, alpha)
+	for y in range(-extent, extent + 1):
+		for x in range(-extent, extent + 1):
+			var cx := roundf(c.x) + x
+			var cy := roundf(c.y) + y
+			var d := Vector2(cx + 0.5 - c.x, cy + 0.5 - c.y)
+			var a := absf(d.dot(u))
+			var b := absf(d.dot(n))
+			if a / half + b / maxf(w, 0.01) > 1.0: continue
+			var white := a / (length * 0.42) + b / maxf(w * 0.35, 0.01) <= 1.0
+			fill(cx, cy, inner if white else outer)
+
 ## Bayer 4×4 のしきい値（0〜15）。
 static func bayer(x: int, y: int) -> int:
 	return BAYER[(y & 3) * 4 + (x & 3)]

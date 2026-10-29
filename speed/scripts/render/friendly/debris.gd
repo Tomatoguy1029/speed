@@ -1,6 +1,25 @@
 extends AttackVisual
+## 飛ぶ破片。星砕きの破片は星屑（またたく小さな四角と、後ろへ引く紫の尾）をドット単位で描く。
+
+var _painter: PixelPainter
+
+func begin_batch() -> void:
+	if _painter == null:
+		_painter = PixelPainter.new()
+		_painter.setup_painter(1.82 * rm.cfg.character_scale)
+		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		rm._layers.projectiles.add_child(_painter)
+	_painter.begin()
+	super()
+
+func end_batch() -> void:
+	if _painter != null: _painter.end()
+	super()
+
 func draw_friend(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> void:
-	if pr.friend_visual[i] == &"weapon/knockback": return
+	if pr.friend_visual[i] == &"weapon/knockback":
+		_stardust(pr, i, pos)
+		return
 	var r := pr.friend_r[i]
 	var trail := pr.friend_trail[i]
 	var key := String(pr.friend_visual[i])
@@ -13,3 +32,16 @@ func draw_friend(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> v
 	c.draw_colored_polygon(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v]), Color("#aeb6c4") * tint)
 	c.draw_polyline(PackedVector2Array([pos + u, pos + v, pos - u * 0.7, pos - v, pos + u]),
 		Color("#ff9a3c") * tint, _px(1.5))
+
+## 星屑：0.07秒前の位置から今の位置まで、1ドットおきに紫の尾。本体は 2〜4 ドット角で、またたく。
+func _stardust(pr: ProjectileSystem, i: int, pos: Vector2) -> void:
+	if _painter == null: return
+	var tail := pos - pr.friend_vel[i] * 0.07
+	var n := ceili(tail.distance_to(pos) / _painter.px)
+	for j in range(0, n, 2):
+		var k := float(j) / maxi(n, 1)
+		_painter.dot(tail.lerp(pos, k), Color("#7a4fd0") if k < 0.5 else Color("#b48cff"))
+	var twinkle := sin(state.world_time * 30.0 + i * 1.7) > -0.3
+	var size := 2 + (i * 7) % 3
+	var cell := _painter.cell(pos)
+	_painter.fill(cell.x - size / 2.0, cell.y - size / 2.0, Color("#fff3c4") if twinkle else Color("#e0d0ff"), size, size)

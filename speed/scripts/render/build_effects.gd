@@ -57,7 +57,7 @@ func _ready() -> void:
 	_mine_trails = InstanceBatch.new()
 	_mine_trails.setup_shader_quad()
 	add_child(_mine_trails)
-	for key in ["weapon/knockback"]:
+	for key in []:
 		var batch := InstanceBatch.new()
 		batch.setup_shader_quad()
 		var mat := ShaderMaterial.new()
@@ -266,27 +266,10 @@ func event(ev: Dictionary) -> bool:
 		&"barrier_restore":
 			var item := effect(5, ev.pos, 26.0 * pixel, 0.5, "weapon/barrier", {"width": -1.0, "angle": 0.0, "c2": Color("#76aaff")})
 			item.follow = true
-		&"flash_slash": effect(4, ev.pos, float(ev.length) * pixel * 0.5, 0.7, "weapon/flashSlash", {"angle": ev.angle, "width": ev.width, "c2": Color("#dcaaff"), "c3": Color("#8f52d0")})
-		&"slash_mark":
-			var item:=effect(4,ev.pos,float(ev.radius)*1.6,1.0,"weapon/flashSlash",{"angle":ev.angle,"width":1.6,"c2":Color("#dcaaff")})
-			effects.erase(item)
-			item.center=ev.pos
-			item.angle=ev.angle
-			item.radius=ev.radius
-			item.row=ev.row
-			item.release=false
-			_needles[ev.id]=item
-		&"slash_release":
-			for needle in _needles.values(): needle.release=true
-			if ev.path.size() >= 2:
-				for i in int(ev.count):
-					var f := _rng.randf()
-					var index := mini(ev.path.size() - 2, floori(f * (ev.path.size() - 1)))
-					var direction: Vector2 = (ev.path[index + 1] - ev.path[index]).normalized()
-					var p: Vector2 = ev.path[index].lerp(ev.path[index + 1], fmod(f * (ev.path.size() - 1), 1.0)) + direction.orthogonal() * (_rng.randf()-0.5) * (24.0 if _rng.randf()<0.7 else 80.0) * pixel
-					var item := effect(4, p, (30.0+_rng.randf()*(180.0 if _rng.randf()<0.25 else 80.0)) * pixel * 0.5, 0.7, "weapon/flashSlash", {"angle": direction.angle() + (_rng.randf()-0.5)*(0.7 if _rng.randf()<0.6 else 2.6), "width": _rng.randf_range(1.4, 3.6), "c2": Color("#dcaaff"), "c3": Color("#8f52d0")})
-					item.age = -float(ev.pause) - f * float(ev.sweep)
+		&"flash_slash", &"slash_mark", &"slash_release": pass  # 表示は render/equipment/flashSlash.gd
 		&"hull_scatter":
+			# 星砕きの破片の割れ方は render/equipment/knockback.gd が描く。
+			if key == "weapon/knockback": return true
 			effect(3, ev.pos, 16.0 * pixel, 0.18, "weapon/knockback", {"width": 2.0})
 			burst(ev.pos, 20, 0, TAU, 10, 70, 0.3, [Color.WHITE, Color("#dcaaff"), Color("#8e62df")], "weapon/knockback")
 		&"end_hole":
@@ -300,7 +283,7 @@ func event(ev: Dictionary) -> bool:
 			item.follow = true
 			burst(ev.pos, 14, -PI * 0.5, 2.0, 14, 40, 0.7, [Color("#8fffbe")], "trait/vortex")
 		&"sonic_push", &"sonic_impact": pass  # 表示は render/equipment/sonic.gd
-		&"run_up_hit": burst(ev.pos, 16, 0, TAU, 30, 60, 0.2, [Color.WHITE, Color("#ffd040"), Color("#ff9a1e")], "trait/runUp")
+		&"run_up_hit": pass  # 表示は render/equipment/runUp.gd
 		&"full_burst_ready": pass  # 表示は render/equipment/fullBurst.gd
 		_: return false
 	return true
@@ -391,8 +374,6 @@ func projectiles(pr: ProjectileSystem) -> void:
 		if not _shots.has(key): continue
 		var a := fposmod(pr.friend_vel[i].angle(), TAU) / TAU
 		_shots[key].add_upright((pr.friend_pos[i] / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number(key,"effect_scale",1.0), Color(a, 1.0 if key == "weapon/scatter" and pr.friend_life[i] < 0.09 else 0.0, clock, 1.0))
-		if _last_world_delta>0.0 and key=="weapon/knockback":
-			burst(pr.friend_pos[i],1,pr.friend_vel[i].angle()+PI,0.3,5,15,0.18,[Color("#b46bff") if key=="weapon/knockback" else Color("#ffb030")],key)
 	for batch in _shots.values(): batch.end()
 
 var _aura: Sprite2D
@@ -410,17 +391,7 @@ func sample(ctx: RunContext, dt: float) -> void:
 			_needles.erase(id)
 		else:needle.center=ctx.enemies.table.pos[needle.row]
 	# 快進撃のオーラは render/equipment/rampage.gd が描く。
-	var gear = ctx.loadout.trait_behaviors.get(&"T04")
-	if gear != null and state.tracing:
-		var x := clampf(ctx.loadout.boost_distance / ctx.cfg.draw_length, 0, 1)
-		var ex := (exp(3.0 * x) - 1.0) / (exp(3.0) - 1.0)
-		_gear_acc += dt * (40.0 + 600.0 * ex) * SETTINGS.number("trait/fullCharge", "particle_count_scale", 1.0)
-		while _gear_acc >= 1.0 and sparks.size() < 4096:
-			_gear_acc -= 1.0
-			var nose := _rng.randf() < 0.55
-			var p := state.ship_pos + state.ship_heading * (9.0 if nose else 2.0 - _rng.randf() * 6.0) * pixel + state.ship_heading.orthogonal() * _rng.randf_range(-0.5, 0.5) * (2.0 if nose else 5.0 + 10.0 * ex) * pixel
-			burst(p, 1, state.ship_heading.angle() + PI, 0.9 + 0.8 * ex, 60.0 + 160.0 * ex, 60.0 + 160.0 * ex, 0.16 + 0.24 * ex * _rng.randf(), [Color.WHITE], "trait/fullCharge", 2.0 if _rng.randf() < 0.35 + 0.4 * ex else 1.0, false)
-			if not sparks.is_empty(): sparks.back().palette = [Color.WHITE, Color("#fff2a8"), Color("#ffd040"), Color("#ff9a1e"), Color("#e9561c"), Color("#9a2a14")]
+	# ギアアップの炎は render/equipment/fullCharge.gd が描く。
 	# ソニックブームの音の輪は render/equipment/sonic.gd が描く。
 	if _mines == null:
 		_mines = InstanceBatch.new()
@@ -474,18 +445,7 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 	var state:=ctx.state
 	# ソニックブームの蒸気と押された敵の筋は render/equipment/sonic.gd が描く。
 	# エスコートウィングの機体の光跡は render/dash_range_drone.gd が描く。
-	var runup=ctx.loadout.trait_behaviors.get(&"T32")
-	if _runup_node.is_empty():
-		_runup_node=effect(14,Vector2.ZERO,110.0*pixel,1.0,"trait/runUp")
-		effects.erase(_runup_node)
-	_runup_node.node.visible=runup!=null and state.tracing and runup.first
-	if _runup_node.node.visible:
-		var x:=clampf(ctx.loadout.boost_distance/600.0,0,1)
-		_runup_node.node.position=state.ship_pos
-		_runup_node.material.set_shader_parameter("age",clock / maxf(0.01,SETTINGS.number("trait/runUp","duration_scale",1.0)))
-		_runup_node.material.set_shader_parameter("streak_count",roundi(16 * SETTINGS.number("trait/runUp","particle_count_scale",1.0)))
-		_runup_node.material.set_shader_parameter("angle",state.ship_heading.angle())
-		_runup_node.material.set_shader_parameter("width",(exp(3*x)-1)/(exp(3.0)-1))
+	# 助走の尾は render/equipment/runUp.gd が描く。
 	if _tether==null:
 		_tether=InstanceBatch.new()
 		_tether.setup_shader_quad()
