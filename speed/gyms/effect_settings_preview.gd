@@ -13,6 +13,8 @@ const BODY_EFFECTS := {
 }
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
+const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
+const TARGET_GROUPS := ["武器", "特性", "ボス本体", "ボス技", "共通攻撃"]
 const DIRECT_EFFECTS := [
 	"weapon/forward", "weapon/scatter", "weapon/knockback", "weapon/contactArc",
 	"weapon/barrier", "weapon/contactWave", "weapon/mines", "weapon/rear", "weapon/bipolar",
@@ -334,7 +336,11 @@ var _dirty := false
 var _message := ""
 var _paths: Array[String] = []
 var _selected := ""
-var _picker := OptionButton.new()
+var _target_group := "武器"
+var _group_buttons := {}
+var _target_buttons := {}
+var _target_list := HFlowContainer.new()
+var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
 var _sample: Node2D
 var _viewport: SubViewport
@@ -348,6 +354,16 @@ func _ready() -> void:
 	_paths.append_array(ATTACK_SCENES)
 	_paths.append_array(BODY_EFFECTS.keys())
 	_paths.sort()
+	var groups := HFlowContainer.new()
+	groups.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	(controls_host if controls_host != null else self).add_child(groups)
+	for group in TARGET_GROUPS:
+		var button := Button.new()
+		button.text = group
+		button.toggle_mode = true
+		button.pressed.connect(_show_target_group.bind(group))
+		groups.add_child(button)
+		_group_buttons[group] = button
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -355,14 +371,12 @@ func _ready() -> void:
 	var body := VBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(body)
-	body.add_child(_picker)
-	_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_picker.add_item("編集対象を選択")
-	_picker.set_item_disabled(0, true)
-	for path in _paths:
-		_picker.add_item(_effect_label(path))
-	_picker.item_selected.connect(func(index: int):
-		if index > 0: _select(_paths[index - 1]))
+	_target_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_target_list.add_theme_constant_override("h_separation", 4)
+	_target_list.add_theme_constant_override("v_separation", 4)
+	body.add_child(_target_list)
+	_editing_label.text = "編集対象を選択してください"
+	body.add_child(_editing_label)
 	body.add_child(_fields)
 	var preview := VBoxContainer.new()
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -391,6 +405,79 @@ func _ready() -> void:
 	_boss_preview.visible = false
 	preview.add_child(_boss_preview)
 	reload_current()
+	_show_target_group(_target_group)
+
+func _group_for(path: String) -> String:
+	if path.begins_with("weapon/"): return "武器"
+	if path.begins_with("trait/"): return "特性"
+	if path.begins_with("boss/body/"): return "ボス本体"
+	if path.begins_with(ROOT + "/") or path == "boss/final_strike": return "ボス技"
+	return "共通攻撃"
+
+func _definition_for(path: String) -> Resource:
+	if not path.begins_with("weapon/") and not path.begins_with("trait/"): return null
+	var category: StringName = &"weapons" if path.begins_with("weapon/") else &"traits"
+	for definition in ContentManager.catalog.table(category).values():
+		if String(definition.code_id) == path.get_slice("/", 1): return definition
+	return null
+
+func _target_style(selected: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#213b52") if selected else Color("#141d2b")
+	style.border_color = Color("#80dfff") if selected else Color("#40546b")
+	style.set_border_width_all(2 if selected else 1)
+	style.set_corner_radius_all(3)
+	return style
+
+func _show_target_group(group: String) -> void:
+	_target_group = group
+	for title in _group_buttons: _group_buttons[title].button_pressed = title == group
+	for child in _target_list.get_children():
+		_target_list.remove_child(child)
+		child.queue_free()
+	_target_buttons.clear()
+	for path in _paths:
+		if _group_for(path) != group: continue
+		var definition := _definition_for(path)
+		var name: String = definition.get_display_name() if definition != null else _effect_label(path)
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(76, 70) if definition != null else Vector2(94, 42)
+		button.tooltip_text = name + ("\n" + definition.get_description() if definition != null else "\n" + path)
+		button.pressed.connect(_select.bind(path))
+		_target_list.add_child(button)
+		_target_buttons[path] = button
+		if definition == null:
+			button.text = name.substr(0, 8) + "…" if name.length() > 8 else name
+			button.clip_text = true
+			continue
+		var column := VBoxContainer.new()
+		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		button.add_child(column)
+		var icon := TextureRect.new()
+		icon.texture = MODULE_ICONS.texture_for(definition)
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size.y = 43
+		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(icon)
+		var caption := Label.new()
+		caption.text = name.substr(0, 5) + "…" if name.length() > 5 else name
+		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		caption.clip_text = true
+		caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(caption)
+	_refresh_target_selection()
+
+func _refresh_target_selection() -> void:
+	for path in _target_buttons:
+		var selected: bool = path == _selected
+		_target_buttons[path].add_theme_stylebox_override("normal", _target_style(selected))
+		_target_buttons[path].add_theme_stylebox_override("hover", _target_style(selected))
+	_editing_label.text = "編集中: " + _effect_label(_selected) if not _selected.is_empty() else "編集対象を選択してください"
 
 func _effect_label(path: String) -> String:
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
@@ -409,7 +496,8 @@ func _collect(folder: String) -> void:
 
 func _select(path: String) -> void:
 	_selected = path
-	_picker.select(_paths.find(path) + 1)
+	if _group_for(path) != _target_group: _show_target_group(_group_for(path))
+	else: _refresh_target_selection()
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
 	var boss_effect := path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path) or ATTACK_PREVIEWS.has(path)
