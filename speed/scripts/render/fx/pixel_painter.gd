@@ -169,6 +169,25 @@ func spindle(p: Vector2, angle: float, length: float, w: float, alpha: float) ->
 			var white := a / (length * 0.42) + b / maxf(w * 0.35, 0.01) <= 1.0
 			fill(cx, cy, inner if white else outer)
 
+## 試作の vnoise：格子点の乱数をなめらかにつないだ 0〜1 の値ノイズ。
+static func vnoise(x: float, y: float, z: float) -> float:
+	var xi := floorf(x)
+	var yi := floorf(y)
+	var zi := floorf(z)
+	var u := _smooth(x - xi)
+	var v := _smooth(y - yi)
+	var w := _smooth(z - zi)
+	var a := lerpf(lerpf(_hash(xi, yi, zi), _hash(xi + 1, yi, zi), u), lerpf(_hash(xi, yi + 1, zi), _hash(xi + 1, yi + 1, zi), u), v)
+	var b := lerpf(lerpf(_hash(xi, yi, zi + 1), _hash(xi + 1, yi, zi + 1), u), lerpf(_hash(xi, yi + 1, zi + 1), _hash(xi + 1, yi + 1, zi + 1), u), v)
+	return lerpf(a, b, w)
+
+static func _hash(i: float, j: float, k: float) -> float:
+	var s := sin(i * 127.1 + j * 311.7 + k * 74.7) * 43758.5453
+	return s - floorf(s)
+
+static func _smooth(f: float) -> float:
+	return f * f * (3.0 - 2.0 * f)
+
 ## Bayer 4×4 のしきい値（0〜15）。
 static func bayer(x: int, y: int) -> int:
 	return BAYER[(y & 3) * 4 + (x & 3)]

@@ -32,6 +32,8 @@ func dispose() -> void:
 		node.queue_free()
 	if is_instance_valid(_painter):
 		_painter.queue_free()
+	if is_instance_valid(_fires):
+		_fires.queue_free()
 	behavior = null
 	rm = null
 
@@ -45,6 +47,15 @@ func painter() -> PixelPainter:
 		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		rm._layers.fx.add_child(_painter)
 	return _painter
+var _fires: FireBursts
+## ドット単位の炎の爆発。初めて使うときに演出の層へ置く。進めるのは各表示の tick（fires().step）。
+func fires() -> FireBursts:
+	if _fires == null:
+		_fires = FireBursts.new()
+		_fires.setup(1.82 * cfg.character_scale)
+		_fires.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		rm._layers.fx.add_child(_fires)
+	return _fires
 ## 前回から進んだ世界秒。ヒットストップや停止の間は 0。
 func world_dt() -> float:
 	var now := state.world_time

@@ -90,7 +90,6 @@ var _bolt_seed := 0
 var shield_transfers: Array = []
 var _attack_visuals: Dictionary = {}
 var _build_world_time := 0.0
-var _bipolar_flash := 0.0
 var build_effects: BuildEffects
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
@@ -452,9 +451,6 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
 			visual.on_event(ev)
-		if ev.type==&"beam" and ev.get("visual_key","")=="weapon/bipolar":
-			_bipolar_flash=0.1
-			shake=maxf(shake,6.0)
 		if build_effects.event(ev): continue
 		match ev.type:
 			&"ring":
@@ -623,7 +619,6 @@ func _shatter_meteor(ev: Dictionary) -> void:
 func _update_fx(dt: float) -> void:
 	var world_dt := maxf(0.0, state.world_time - _build_world_time)
 	_build_world_time = state.world_time
-	_bipolar_flash=maxf(0.0,_bipolar_flash-world_dt)
 	build_effects.step(world_dt, state.ship_pos)
 	build_effects.sample(run.ctx, world_dt)
 	build_effects.projectiles(run.projectiles)
@@ -1444,7 +1439,6 @@ func _draw_top(c: CanvasItem) -> void:
 		var height := rect.size.y*0.1*state.cinematic_bars
 		c.draw_rect(Rect2(rect.position,Vector2(rect.size.x,height)),Color.BLACK)
 		c.draw_rect(Rect2(Vector2(rect.position.x,rect.end.y-height),Vector2(rect.size.x,height)),Color.BLACK)
-	if _bipolar_flash>0.0:c.draw_rect(view_rect().grow(400.0),Color(1,1,1,0.45*_bipolar_flash/0.1))
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 

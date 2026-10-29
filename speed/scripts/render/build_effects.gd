@@ -168,50 +168,15 @@ func event(ev: Dictionary) -> bool:
 		_needles.erase(ev.id)
 	match ev.type:
 		&"kill":
-			if ev.get("cause", &"")==&"bipolar":
-				var fire := effect(1,ev.pos,7.0*pixel,0.5,"weapon/bipolar",{"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
-				fire.age=-_rng.randf()*0.08
-				for sign_side in [-1.0,1.0]:
-					burst(ev.pos,4,ev.dir.angle()+PI*0.5*sign_side,1.0,40,100,0.3,[Color.WHITE,Color("#ff7a6b")],"weapon/bipolar")
-				return true
+			if ev.get("cause", &"")==&"bipolar": return true  # 表示は render/equipment/bipolar.gd
 			return ev.get("cause", &"")==&"vortex"  # 引き込まれた敵は render/equipment/vortex.gd が描く
 		&"hole_capture": pass  # 表示は render/equipment/vortex.gd
 		&"escort_deploy", &"escort_slash": pass  # 表示は render/equipment/dashRangeDrone.gd
-		&"anchor_capture":
-			effect(0,ev.pos,12.0*pixel,0.14,"weapon/massTow",{"c1":Color("#ffbe65")})
-			burst(ev.pos,12,(ev.to-ev.pos).angle(),0.3,40,80,0.45,[Color("#fff2c0"),Color("#ffbe65")],"weapon/massTow")
-		&"anchor_fire":
-			effect(1,ev.pos,14.0*pixel,0.45,"weapon/massTow",{"c1":Color("#fff2a8"),"c2":Color("#ffb030"),"c3":Color("#d2461c")})
-			effect(0,ev.pos,28.0*pixel,0.16,"weapon/massTow",{"c1":Color("#ffbe65")})
-			burst(ev.pos,9,ev.dir.angle(),1.3,60,120,0.25,[Color.WHITE,Color("#fff2c0"),Color("#ffbe65")],"weapon/massTow")
-		&"ring":
-			# 双極の両端はbeamで二重輪を描く。
+		&"anchor_capture", &"anchor_fire": pass  # 表示は render/equipment/massTow.gd
+		&"ring", &"beam":
+			# 双極ビームの帯と両端の輪は render/equipment/bipolar.gd が描く。
 			return key=="weapon/bipolar"
-		&"bipolar_charge":
-			for pos in [ev.from,ev.to]:
-				for i in 20:
-					var radial:=Vector2.from_angle(_rng.randf()*TAU)*_rng.randf_range(10,30)*pixel
-					sparks.append({"pos":pos+radial,"center":pos,"inward":radial,"swirl":0.0,"velocity":Vector2.ZERO,"age":0.0,"life":0.18,"delay":0.0,"color":Color("#cffff9"),"size":1.0})
-		&"beam":
-			if key!="weapon/bipolar":return false
-			var delta: Vector2=ev.to-ev.from
-			var visual_width := 16.0*float(ev.get("width_scale",1.0))
-			var beam := effect(6,(ev.from+ev.to)*0.5,delta.length()*0.5+visual_width*pixel*0.6,0.7,key,{"angle":delta.angle(),"width":visual_width,"beam_length":delta.length()/pixel,"phase":clock,"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
-			beam["beam"]={"from":ev.from,"to":ev.to,"width":visual_width,"acc":0.0}
-			for pos in [ev.from,ev.to]:
-				effect(20,pos,36.0*pixel,0.35,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0")})
-				effect(1,pos,20.0*pixel,0.5,key,{"c1":Color("#cffff9"),"c2":Color("#69fff0"),"c3":Color("#1f7f86")})
-				burst(pos,16,0,TAU,35,140,0.4,[Color.WHITE,Color("#69fff0")],key)
-			burst((ev.from+ev.to)*0.5,70,delta.angle()+PI*0.5,0.0,10,40,0.5,[Color("#cffff9"),Color("#69fff0")],key)
-			for i in range(maxi(0,sparks.size()-70),sparks.size()):
-				sparks[i].delay=0.55
-				sparks[i].life=_rng.randf_range(0.3,0.5)
-				sparks[i].fade=true
-				sparks[i].color=Color("#cffff9")
-				sparks[i].late_color=Color("#69fff0")
-				if _rng.randf()<0.5: sparks[i].velocity=-sparks[i].velocity
-				sparks[i].pos=ev.from.lerp(ev.to,_rng.randf())
-
+		&"bipolar_charge": pass  # 表示は render/equipment/bipolar.gd
 		&"weapon_fire":
 			if not ev.has("pos"): return false
 			# 射撃の武器の砲口・当たりは各武器の表示（render/equipment）が描く。
@@ -221,9 +186,7 @@ func event(ev: Dictionary) -> bool:
 				burst(ev.pos, 15, ev.angle, 1.4, 60.0, 120.0, 0.1, [Color("#ffffff"), Color("#7fd8ff"), Color("#d8f6ff")], key)
 			if key == "weapon/rear": burst(ev.pos, 1, ev.angle + PI * 0.5, 0.3, 30.0, 50.0, 0.35, [Color("#ffd27a"), Color("#b07a14")], key, 1.5)
 		&"shot_hit":
-			if key=="weapon/massTow":
-				effect(1,ev.pos,13.0*pixel,0.45,key,{"c1":Color("#fff2a8"),"c2":Color("#ffb030"),"c3":Color("#d2461c")})
-				return true
+			if key=="weapon/massTow": return true
 			# 射撃の武器の当たりは各武器の表示（render/equipment）が描く。
 			if key in ["weapon/interceptor", "weapon/forward", "weapon/scatter", "weapon/rear"]: return true
 			var big := key != "weapon/scatter"
@@ -339,8 +302,6 @@ func projectiles(pr: ProjectileSystem) -> void:
 	for i in pr.friend_alive.size():
 		if pr.friend_alive[i] == 0: continue
 		var key := String(pr.friend_visual[i])
-		if key=="weapon/massTow" and _last_world_delta>0.0:
-			burst(pr.friend_pos[i],1,pr.friend_vel[i].angle()+PI,0.3,5,15,0.18,[Color("#ffb030")],key)
 		if not _shots.has(key): continue
 		var a := fposmod(pr.friend_vel[i].angle(), TAU) / TAU
 		_shots[key].add_upright((pr.friend_pos[i] / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number(key,"effect_scale",1.0), Color(a, 1.0 if key == "weapon/scatter" and pr.friend_life[i] < 0.09 else 0.0, clock, 1.0))
@@ -403,10 +364,8 @@ func captures_step(dt: float, center: Vector2) -> void:
 		if q>=1.0:capture.sprite.queue_free()
 	_captures=_captures.filter(func(c):return c.age<c.delay+c.duration)
 
-var _tether: InstanceBatch
 var _steam: InstanceBatch
 var _runup_node: Dictionary = {}
-var _tow_node: Dictionary = {}
 var _steam_opacity := 0.0
 var _steam_pulse := 0.0
 var _previous_sonic_pulse := 0.0
@@ -416,39 +375,3 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 	# ソニックブームの蒸気と押された敵の筋は render/equipment/sonic.gd が描く。
 	# エスコートウィングの機体の光跡は render/dash_range_drone.gd が描く。
 	# 助走の尾は render/equipment/runUp.gd が描く。
-	if _tether==null:
-		_tether=InstanceBatch.new()
-		_tether.setup_shader_quad()
-		add_child(_tether)
-	_tether.begin()
-	var bipolar=ctx.loadout.weapon_behaviors.get(&"W22")
-	if bipolar!=null and bipolar.origin!=null:
-		var origin:Vector2=bipolar.origin
-		var d:=state.ship_pos-origin
-		var side:=d.normalized().orthogonal()
-		var count:=mini(512,maxi(1,ceili(d.length()/pixel)))
-		for i in count:
-			var f:=float(i)/count
-			for sign_side in [-1.0,1.0]:
-				var pos:Vector2=origin+d*f+side*sin(f*TAU*3.0-clock*8.0)*2.5*pixel*sign_side
-				_tether.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color("#69fff0") if sign_side<0 else Color("#cffff9")))
-		for i in 4:
-			var f:=fposmod(clock*1.5+i*0.25,1.0)
-			_tether.add_upright(((origin+d*f)/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color.WHITE))
-		for y in range(-4,5):
-			for x in range(-4,5):
-				if abs(x)+abs(y)>4:continue
-				_tether.add_upright((origin/pixel).round()*pixel+Vector2(x,y)*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color.WHITE if abs(x)+abs(y)<2 else Color("#69fff0")))
-	_tether.end()
-	var tow=ctx.loadout.weapon_behaviors.get(&"W21")
-	if _tow_node.is_empty():
-		_tow_node=effect(1,Vector2.ZERO,30.0*pixel,1.0,"weapon/massTow",{"c0":Color("#ffbe65"),"c1":Color("#ffbe65"),"c2":Color("#c86a1e"),"c3":Color("#c86a1e")})
-		_tow_node.node.z_index=-1
-		effects.erase(_tow_node)
-	_tow_node.node.visible=tow!=null and not tow.cargo.is_empty()
-	if _tow_node.node.visible:
-		_tow_node.node.position=tow.cargo[0].pos
-		var radius:float=(12.0+sqrt(tow.cargo.size())*3.0)*pixel
-		_tow_node.node.scale=Vector2.ONE*(radius+2.0*pixel)
-		_tow_node.material.set_shader_parameter("extent",_tow_node.node.scale*2.0)
-		_tow_node.material.set_shader_parameter("age",0.15)
