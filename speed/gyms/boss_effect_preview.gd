@@ -7,6 +7,7 @@ const EQUIPMENT := preload("res://gyms/equipment_effect_scenario.gd")
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const MANUAL := preload("res://gyms/boss_technique_debug.gd")
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const MODULE_ICONS := preload("res://scripts/ui/module_icons.gd")
 const SPEEDS := [0.25, 0.5, 1.0, 2.0, 4.0]
 const FINAL_BOSSES := ["canis_major", "centaurus", "monoceros"]
 const FINAL_BOSS_NAMES := ["おおいぬ座", "ケンタウルス座", "いっかくじゅう座"]
@@ -20,8 +21,15 @@ var _status := Label.new()
 var _play := Button.new()
 var _speed := OptionButton.new()
 var _loadout_row := HBoxContainer.new()
-var _weapon_picker := OptionButton.new()
-var _trait_picker := OptionButton.new()
+var _weapon_tab := Button.new()
+var _trait_tab := Button.new()
+var _weapon_grid := HFlowContainer.new()
+var _trait_grid := HFlowContainer.new()
+var _weapon_buttons := {}
+var _trait_buttons := {}
+var _weapon_key := ""
+var _trait_key := ""
+var _show_weapons := true
 var _equipment_level := OptionButton.new()
 var _trait_level := OptionButton.new()
 var _play_kind := OptionButton.new()
@@ -32,6 +40,7 @@ var _equipment_key := ""
 var _final_preview := false
 var _final_boss := "canis_major"
 var _serial := 0
+var _visual_time := 0.0
 
 func _ready() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -58,32 +67,34 @@ func _ready() -> void:
 	var loadout_label := Label.new()
 	loadout_label.text = "試遊装備"
 	_loadout_row.add_child(loadout_label)
-	_fill_equipment_options(_weapon_picker, &"weapons")
-	_fill_equipment_options(_trait_picker, &"traits")
-	var weapon_label := Label.new()
-	weapon_label.text = "武器"
-	_loadout_row.add_child(weapon_label)
-	_loadout_row.add_child(_weapon_picker)
-	_weapon_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_weapon_picker.item_selected.connect(func(_index: int): _replay())
+	_weapon_tab.toggle_mode = true
+	_weapon_tab.clip_text = true
+	_weapon_tab.custom_minimum_size.x = 100
+	_weapon_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_weapon_tab.pressed.connect(func(): _show_equipment_group(true))
+	_loadout_row.add_child(_weapon_tab)
 	for level in range(1,6): _equipment_level.add_item("Lv%d" % level)
 	_equipment_level.select(4)
-	_equipment_level.item_selected.connect(func(_index: int): _replay())
+	_equipment_level.item_selected.connect(func(_index: int): _change_loadout())
 	_loadout_row.add_child(_equipment_level)
-	var trait_label := Label.new()
-	trait_label.text = "特性"
-	_loadout_row.add_child(trait_label)
-	_loadout_row.add_child(_trait_picker)
-	_trait_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_trait_picker.item_selected.connect(func(_index: int): _replay())
+	_trait_tab.toggle_mode = true
+	_trait_tab.clip_text = true
+	_trait_tab.custom_minimum_size.x = 100
+	_trait_tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_trait_tab.pressed.connect(func(): _show_equipment_group(false))
+	_loadout_row.add_child(_trait_tab)
 	for level in range(1,6): _trait_level.add_item("Lv%d" % level)
 	_trait_level.select(4)
-	_trait_level.item_selected.connect(func(_index: int): _replay())
+	_trait_level.item_selected.connect(func(_index: int): _change_loadout())
 	_loadout_row.add_child(_trait_level)
 	_play_kind.add_item("武器を再生")
 	_play_kind.add_item("特性を再生")
-	_play_kind.item_selected.connect(func(_index: int): _replay())
-	_loadout_row.add_child(_play_kind)
+	_play_kind.item_selected.connect(func(_index: int): _change_loadout())
+	_play_kind.visible = false
+	controls.add_child(_play_kind)
+	for category in [&"weapons", &"traits"]:
+		_build_equipment_grid(category)
+	_refresh_equipment_selection()
 	for boss_name in FINAL_BOSS_NAMES:
 		_final_picker.add_item(boss_name)
 	_final_picker.visible = false
@@ -115,36 +126,105 @@ func _ready() -> void:
 	session.viewport = _viewport
 	add_child(session)
 
-func _fill_equipment_options(picker: OptionButton, category: StringName) -> void:
-	picker.add_item("なし")
-	picker.set_item_metadata(0, "")
+func _build_equipment_grid(category: StringName) -> void:
+	var grid: HFlowContainer = _weapon_grid if category == &"weapons" else _trait_grid
+	var buttons: Dictionary = _weapon_buttons if category == &"weapons" else _trait_buttons
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	add_child(grid)
+	grid.visible = false
+	_add_equipment_tile(grid, buttons, "", null)
 	var definitions: Array = ContentManager.catalog.table(category).values()
 	definitions.sort_custom(func(a, b): return String(a.get_display_name()) < String(b.get_display_name()))
 	for definition in definitions:
-		picker.add_item(definition.get_display_name())
-		picker.set_item_metadata(picker.item_count - 1, ("weapon/" if category == &"weapons" else "trait/") + String(definition.code_id))
-	picker.select(0)
+		var path := ("weapon/" if category == &"weapons" else "trait/") + String(definition.code_id)
+		_add_equipment_tile(grid, buttons, path, definition)
 
-func _selected_equipment(picker: OptionButton) -> String:
-	return String(picker.get_item_metadata(picker.selected)) if picker.selected >= 0 else ""
+func _tile_style(selected: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#213b52") if selected else Color("#141d2b")
+	style.border_color = Color("#80dfff") if selected else Color("#40546b")
+	style.set_border_width_all(2 if selected else 1)
+	style.set_corner_radius_all(3)
+	return style
 
-func _select_equipment(picker: OptionButton, path: String) -> void:
-	for index in picker.item_count:
-		if String(picker.get_item_metadata(index)) == path:
-			picker.select(index)
-			return
+func _add_equipment_tile(grid: HFlowContainer, buttons: Dictionary, path: String, definition: Resource) -> void:
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(76, 72)
+	button.tooltip_text = "解除" if definition == null else definition.get_display_name() + "\n" + definition.get_description()
+	button.pressed.connect(func():
+		if grid == _weapon_grid: _weapon_key = path
+		else: _trait_key = path
+		_refresh_equipment_selection()
+		_change_loadout())
+	grid.add_child(button)
+	buttons[path] = button
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.add_child(column)
+	if definition != null:
+		var icon := TextureRect.new()
+		icon.texture = MODULE_ICONS.texture_for(definition)
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size.y = 43
+		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(icon)
+	var caption := Label.new()
+	var name := "なし" if definition == null else String(definition.get_display_name())
+	caption.text = name.substr(0, 5) + "…" if name.length() > 5 else name
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	caption.clip_text = true
+	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(caption)
+
+func _refresh_equipment_selection() -> void:
+	for path in _weapon_buttons:
+		var selected: bool = path == _weapon_key
+		_weapon_buttons[path].add_theme_stylebox_override("normal", _tile_style(selected))
+		_weapon_buttons[path].add_theme_stylebox_override("hover", _tile_style(selected))
+	for path in _trait_buttons:
+		var selected: bool = path == _trait_key
+		_trait_buttons[path].add_theme_stylebox_override("normal", _tile_style(selected))
+		_trait_buttons[path].add_theme_stylebox_override("hover", _tile_style(selected))
+	_weapon_tab.text = "武器: " + _equipment_name(_weapon_key)
+	_trait_tab.text = "特性: " + _equipment_name(_trait_key)
+	_weapon_tab.tooltip_text = _weapon_tab.text
+	_trait_tab.tooltip_text = _trait_tab.text
+	_weapon_tab.button_pressed = _show_weapons
+	_trait_tab.button_pressed = not _show_weapons
+
+func _equipment_name(path: String) -> String:
+	if path.is_empty(): return "なし"
+	var category: StringName = &"traits" if path.begins_with("trait/") else &"weapons"
+	var definition: Resource = ContentManager.catalog.table(category).get(_equipment_id(path))
+	return definition.get_display_name() if definition != null else path
+
+func _show_equipment_group(weapons: bool) -> void:
+	_show_weapons = weapons
+	_weapon_grid.visible = _loadout_row.visible and weapons
+	_trait_grid.visible = _loadout_row.visible and not weapons
+	_refresh_equipment_selection()
 
 func _select_equipment_for_effect(path: String) -> void:
-	_weapon_picker.select(0)
-	_trait_picker.select(0)
+	_weapon_key = ""
+	_trait_key = ""
 	if path.begins_with("weapon/"):
-		_select_equipment(_weapon_picker, path)
+		_weapon_key = path
 		_play_kind.select(0)
 	else:
-		_select_equipment(_trait_picker, path)
+		_trait_key = path
 		_play_kind.select(1)
 		if path in EQUIPMENT.PASSIVE_KEYS or path in ["trait/fullBurst", "trait/duplicator"]:
-			_select_equipment(_weapon_picker, "weapon/endBlast" if path == "trait/bigSwing" else "weapon/forward")
+			_weapon_key = "weapon/endBlast" if path == "trait/bigSwing" else "weapon/forward"
+	_show_equipment_group(path.begins_with("weapon/"))
+	_refresh_equipment_selection()
 
 func _equipment_id(key: String) -> StringName:
 	if key.is_empty(): return &""
@@ -155,7 +235,8 @@ func _equipment_id(key: String) -> StringName:
 			return id
 	return &""
 
-func set_effect(path: String) -> void:
+func set_effect(path: String, resume: Variant = null) -> void:
+	var keep_playing: bool = session.playing if resume == null else bool(resume)
 	_serial += 1
 	var serial := _serial
 	if manual != null: manual.finish()
@@ -165,13 +246,16 @@ func set_effect(path: String) -> void:
 		_select_equipment_for_effect(path)
 	_equipment_key = ""
 	_loadout_row.visible = path.begins_with("weapon/") or path.begins_with("trait/")
+	_play_kind.visible = _loadout_row.visible
+	_show_equipment_group(_show_weapons)
 	_final_preview = path == "boss/final_strike"
 	_final_picker.visible = _final_preview
+	_set_scene_processing(false)
 	session.playing = false
 	_play.text = "再生"
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
 		_equipment_key = path
-		await _setup_equipment(path, serial)
+		await _setup_equipment(path, serial, keep_playing)
 		return
 	if _final_preview:
 		_boss = _final_boss
@@ -198,6 +282,7 @@ func set_effect(path: String) -> void:
 	_status.text = "ボス技を準備中: %s / %s" % [_boss, _technique]
 	await session.reset(settings)
 	if serial != _serial: return
+	_pause_render_process()
 	var program_path := "res://.content/boss_%s.tres" % _boss
 	var built: Dictionary = BOSS_PROGRAM.build_boss(_boss, program_path)
 	if built.get("error", ERR_INVALID_DATA) != OK:
@@ -221,28 +306,28 @@ func set_effect(path: String) -> void:
 	if _boss != "hydra" and not _final_preview:
 		var debugger := MANUAL.new()
 		if debugger.bind(actor): manual = debugger
-	if _final_preview: _start_final_strike()
-	else: _replay()
+	if _final_preview: _start_final_strike(keep_playing)
+	else: _execute_selected(keep_playing)
 
-func _start_final_strike() -> void:
+func _start_final_strike(keep_playing: bool) -> void:
 	if not is_instance_valid(actor): return
 	# 実験セッションは時間切れ判定を通さないため、同じ本番開始経路を明示して呼ぶ。
 	session.run._begin_final_strike()
-	session.playing = true
-	_play.text = "停止"
-	_status.text = "制限時間の一撃を再生中: " + FINAL_BOSS_NAMES[FINAL_BOSSES.find(_boss)]
+	session.playing = keep_playing
+	_set_scene_processing(keep_playing)
+	_play.text = "停止" if keep_playing else "再生"
+	_status.text = "制限時間の一撃: " + FINAL_BOSS_NAMES[FINAL_BOSSES.find(_boss)]
+	refresh_effects()
 
-func _setup_equipment(_key: String, serial: int) -> void:
-	var weapon_key := _selected_equipment(_weapon_picker)
-	var trait_key := _selected_equipment(_trait_picker)
+func _setup_equipment(_key: String, serial: int, keep_playing: bool) -> void:
+	var weapon_key := _weapon_key
+	var trait_key := _trait_key
 	var weapon_id := _equipment_id(weapon_key)
 	var trait_id := _equipment_id(trait_key)
 	if (not weapon_key.is_empty() and weapon_id == &"") or (not trait_key.is_empty() and trait_id == &""):
 		_status.text = "試遊装備が見つかりません"
 		return
-	if weapon_key.is_empty() and trait_key.is_empty():
-		_status.text = "試遊する武器・特性を選んでください"
-		return
+	var no_equipment := weapon_key.is_empty() and trait_key.is_empty()
 	var play_trait := _play_kind.selected == 1
 	if (play_trait and trait_key.is_empty()) or (not play_trait and weapon_key.is_empty()):
 		play_trait = weapon_key.is_empty()
@@ -256,52 +341,98 @@ func _setup_equipment(_key: String, serial: int) -> void:
 	if trait_id != &"": settings["traits"] = {trait_id: _trait_level.selected + 1}
 	await session.reset(settings)
 	if serial != _serial: return
+	_pause_render_process()
+	if no_equipment:
+		_set_scene_processing(false)
+		_status.text = "試遊する武器・特性を選んでください"
+		refresh_effects()
+		return
 	var behavior = (session.run.loadout.trait_behaviors if play_trait else session.run.loadout.weapon_behaviors).get(play_id)
 	if behavior == null:
 		_status.text = "装備を試遊へ設定できません: " + play_key
 		return
 	EQUIPMENT.play(session, play_key, false)
-	session.playing = true
-	_play.text = "停止"
-	_status.text = "%s / Lv%d を再生中" % [catalog[play_id].get_display_name(), _trait_level.selected + 1 if play_trait else _equipment_level.selected + 1]
+	session.playing = keep_playing
+	_set_scene_processing(keep_playing)
+	_play.text = "停止" if keep_playing else "再生"
+	_status.text = "%s / Lv%d を試遊" % [catalog[play_id].get_display_name(), _trait_level.selected + 1 if play_trait else _equipment_level.selected + 1]
 	if not weapon_key.is_empty() and not trait_key.is_empty(): _status.text += "（武器・特性を併用）"
 	if _equipment_key not in [weapon_key, trait_key]: _status.text += "（編集中の効果は未装備）"
 	if play_key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
+	refresh_effects()
+
+func _change_loadout() -> void:
+	if not _equipment_key.is_empty(): set_effect(_equipment_key)
 
 func _replay() -> void:
 	if not _equipment_key.is_empty():
-		set_effect(_equipment_key)
+		set_effect(_equipment_key, false)
 		return
 	if _final_preview:
-		set_effect("boss/final_strike")
+		set_effect("boss/final_strike", false)
 		return
+	_execute_selected(false)
+
+func _execute_selected(keep_playing: bool) -> void:
 	if not is_instance_valid(actor): return
 	var started: bool = _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
 	if started:
-		session.playing = true
-		_play.text = "停止"
-		_status.text = "%s / %s を再生中" % [_boss, _technique]
+		session.playing = keep_playing
+		_set_scene_processing(keep_playing)
+		_play.text = "停止" if keep_playing else "再生"
+		_status.text = "%s / %s を試遊" % [_boss, _technique]
+		refresh_effects()
 	else:
 		_status.text = "この技は単独再生できません: %s / %s" % [_boss, _technique]
 		if manual != null and not manual.message.is_empty(): _status.text += " / " + manual.message
 
 func refresh_effects() -> void:
-	if not _equipment_key.is_empty():
-		set_effect(_equipment_key)
-		return
-	if _final_preview:
-		set_effect("boss/final_strike")
-		return
-	if not is_instance_valid(actor): return
-	var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
-	if presentation != null:
-		EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
-		presentation.queue_redraw()
-	_replay()
+	if is_instance_valid(actor):
+		var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
+		if presentation != null:
+			EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
+			presentation.queue_redraw()
+	var render := _render()
+	if render == null: return
+	_refresh_scene_visuals(session.scene.view)
+	render.build_effects.refresh_preview()
+	render._present(0.0)
+	_sync_preview_shader_time(session.scene.view)
+
+func _refresh_scene_visuals(node: Node) -> void:
+	if node is AttackVisual:
+		(node as AttackVisual)._apply_effect_settings()
+	elif node is CanvasItem:
+		EFFECT_SETTINGS.apply_to(node as CanvasItem)
+	if node is CanvasItem: (node as CanvasItem).queue_redraw()
+	for child in node.get_children(): _refresh_scene_visuals(child)
+
+func _render() -> RunPresentation:
+	if not is_instance_valid(session) or not is_instance_valid(session.scene) or not is_instance_valid(session.scene.view): return null
+	return session.scene.view.get_node_or_null("RunPresentation") as RunPresentation
+
+func _pause_render_process() -> void:
+	var render := _render()
+	if render != null:
+		render.set_process(false)
+		render.build_effects.preview_editable = true
+
+func _set_scene_processing(playing: bool) -> void:
+	if is_instance_valid(session.scene):
+		session.scene.process_mode = Node.PROCESS_MODE_INHERIT if playing else Node.PROCESS_MODE_DISABLED
+
+func _sync_preview_shader_time(node: Node) -> void:
+	var canvas := node as CanvasItem
+	if canvas != null and canvas.material is ShaderMaterial:
+		var material := canvas.material as ShaderMaterial
+		if material.shader != null and material.shader.resource_path in ["res://shaders/picaro.gdshader", "res://shaders/water_flood.gdshader"]:
+			material.set_shader_parameter("preview_clock", _visual_time)
+	for child in node.get_children(): _sync_preview_shader_time(child)
 
 func _toggle_play() -> void:
 	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
 	session.playing = not session.playing
+	_set_scene_processing(session.playing)
 	_play.text = "停止" if session.playing else "再生"
 
 func _process(_delta: float) -> void:
@@ -314,6 +445,10 @@ func _process(_delta: float) -> void:
 		session.run._begin_death()
 	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
 	if render == null: return
+	if session.playing:
+		_visual_time += _delta * session.speed
+		render._present(_delta * session.speed)
+	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
 	var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
@@ -322,8 +457,10 @@ func _process(_delta: float) -> void:
 func _step() -> void:
 	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
 	session.playing = false
+	_set_scene_processing(false)
 	_play.text = "再生"
 	session.step()
+	refresh_effects()
 
 func _execute_hydra() -> bool:
 	if not actor.has_body() or actor.action_rules == null: return false
@@ -363,7 +500,10 @@ func _execute_hydra() -> bool:
 	return started
 
 func set_active(active: bool) -> void:
-	if not active and session != null: session.playing = false
+	if not active and session != null:
+		session.playing = false
+		_set_scene_processing(false)
+		_play.text = "再生"
 	if is_instance_valid(_viewport):
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 

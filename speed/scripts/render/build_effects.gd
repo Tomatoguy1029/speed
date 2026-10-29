@@ -19,6 +19,7 @@ var texture_provider: Callable
 var _captures: Array[Dictionary] = []
 var _last_world_delta := 0.0
 var _needles: Dictionary = {}
+var preview_editable := false
 
 func _ready() -> void:
 	_rng.seed = 121
@@ -67,6 +68,7 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 			material.set_shader_parameter(uniform, original * multiplier)
 	add_child(node)
 	var item := {"node": node, "material": material, "age": 0.0, "life": life * SETTINGS.number(key, "duration_scale", 1.0), "key": key, "follow": false}
+	if preview_editable: item.merge({"base_radius": radius, "base_life": life, "base_options": options.duplicate()})
 	effects.append(item)
 	if effects.size() > 160:
 		effects.pop_front().node.queue_free()
@@ -79,9 +81,40 @@ func burst(pos: Vector2, count: int, angle: float, spread: float, low: float, hi
 	life *= SETTINGS.number(key, "duration_scale", 1.0)
 	for i in mini(count, 4096 - sparks.size()):
 		var direction := Vector2.from_angle(angle + _rng.randf_range(-spread * 0.5, spread * 0.5))
-		sparks.append({"pos": pos, "velocity": direction * _rng.randf_range(low, high) * pixel * visual_scale,
-			"age": 0.0, "life": life * _rng.randf_range(0.7, 1.0), "color": SETTINGS.tinted(key, colors[i % colors.size()]),
-			"size": size_value * visual_scale * cell_scale * _rng.randf_range(0.7, 1.4), "delay": 0.0})
+		var velocity := direction * _rng.randf_range(low, high) * pixel * visual_scale
+		var particle_life := life * _rng.randf_range(0.7, 1.0)
+		var base_size := size_value * _rng.randf_range(0.7, 1.4)
+		var base_color: Color = colors[i % colors.size()]
+		var particle := {"pos": pos, "velocity": velocity,
+			"age": 0.0, "life": particle_life, "color": SETTINGS.tinted(key, base_color),
+			"size": base_size * visual_scale * cell_scale, "delay": 0.0}
+		if preview_editable: particle.merge({"base_size": base_size, "base_color": base_color, "visual_key": key})
+		sparks.append(particle)
+
+## 停止中の画面を作り直さず、既存の粒とシェーダに編集値だけを反映する。
+func refresh_preview() -> void:
+	for item in effects:
+		var key: String = item.key
+		var node: MeshInstance2D = item.node
+		var material: ShaderMaterial = item.material
+		if item.has("base_radius"):
+			var radius: float = item.base_radius * SETTINGS.number(key, "effect_scale", 1.0)
+			node.scale = Vector2.ONE * (radius + pixel * 2.0)
+			material.set_shader_parameter("extent", node.scale * 2.0)
+			material.set_shader_parameter("duration", item.base_life * SETTINGS.number(key, "duration_scale", 1.0))
+		material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
+		material.set_shader_parameter("tint", SETTINGS.tinted(key, Color.WHITE))
+		material.set_shader_parameter("age", maxf(0.0, item.age))
+		var options: Dictionary = item.get("base_options", {})
+		for index in SHADER_PALETTE.size():
+			var field := "shader_c" + str(index)
+			material.set_shader_parameter("c" + str(index), options.get("c" + str(index), SHADER_PALETTE[index]) * SETTINGS.values_for(key).get(field, Color.WHITE))
+		if item.get("distortion", false): material.set_shader_parameter("strength", SETTINGS.number(key, "distortion_strength", 1.0))
+	for particle in sparks:
+		if not particle.has("visual_key"): continue
+		var key: String = particle.visual_key
+		particle.color = SETTINGS.tinted(key, particle.base_color)
+		particle.size = particle.base_size * SETTINGS.number(key, "effect_scale", 1.0) * SETTINGS.number(key, "pixel_scale", 1.0)
 
 func event(ev: Dictionary) -> bool:
 	var key := String(ev.get("visual_key", ""))

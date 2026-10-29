@@ -254,6 +254,77 @@ const DIRECT_COLOR_FIELDS := {
 	"boss/body/monoceros": [["推進炎の芯色", "booster_core_color", Color("#e0fbff")]],
 	"boss/shared/tornado_shader": [["渦シェーダの色", "vortex_tint", Color.WHITE]],
 }
+const FIELD_LABELS := {
+	"effect_tint": "全体色", "effect_scale": "描画サイズ（倍）", "pixel_scale": "ドット幅（倍）",
+	"duration_scale": "残光時間（倍）", "particle_count_scale": "発生粒数（倍）",
+	"shot_length_scale": "弾の長さ（倍）", "shot_width_scale": "弾の太さ（倍）",
+	"beam_core_ratio": "ビーム芯の割合", "ring_width_scale": "輪の太さ（倍）",
+	"visible_time_scale": "輪の残光（倍）", "visible_seconds": "稲妻の表示（秒）",
+	"distortion_strength": "空間のゆがみ（倍）", "body_opacity": "分身の不透明度",
+	"wake_length": "航跡の長さ（px）", "wake_width": "航跡の半幅（px）",
+	"wake_fade_seconds": "航跡の消失（秒）", "wake_opacity": "航跡の不透明度",
+	"wake_filaments": "航跡の筋の密度", "wake_color": "航跡の色",
+	"pixel_size": "描画ドット幅（px）", "line_width": "予告線の幅（px）",
+	"flash_duration": "閃光の時間（秒）", "burst_pixel_scale": "爆発ドット幅（倍）",
+	"core_glow_radius": "胸の光の半径（px）", "core_glow_opacity": "胸の光の不透明度",
+	"sail_star_scale": "帆の星の大きさ（倍）", "sirius_glow_scale": "シリウスの光の広さ（倍）",
+	"booster_length_scale": "推進炎の長さ（倍）", "flight_scale": "飛翔中の大きさ（倍）",
+	"warning_color": "予告色", "locked_color": "照準固定色", "attack_color": "攻撃色",
+	"recovery_color": "回復色", "hit_color": "命中色", "base_color": "本体色",
+	"progress_color": "進行色", "outline_color": "輪郭色", "outline_width": "輪郭幅（px）",
+	"core_glow_color": "胸の光色", "rift_color": "裂け目の色", "sail_star_color": "帆の星色",
+	"open_color": "開放の輪色", "sirius_color": "シリウス色", "sirius_halo_color": "光の暈色",
+	"booster_core_color": "推進炎の芯色", "vortex_tint": "渦の色",
+}
+const FIELD_HELP := {
+	"effect_tint": "描画結果の色に掛ける値。白で元の色。",
+	"effect_scale": "シェーダ面・粒の大きさと粒の移動距離に掛ける倍率。判定範囲は変えない。",
+	"pixel_scale": "エフェクトの1ドットの表示幅に掛ける倍率。",
+	"duration_scale": "シェーダと粒の表示時間に掛ける倍率。攻撃判定の時間は変えない。",
+	"particle_count_scale": "次の発生時に作る粒の数に掛ける倍率。現在の停止フレームの粒数は維持する。",
+	"shot_length_scale": "飛行中の弾シェーダの長さに掛ける倍率。判定は変えない。",
+	"shot_width_scale": "飛行中の弾シェーダの太さに掛ける倍率。判定は変えない。",
+	"beam_core_ratio": "ビームの表示幅に占める明るい芯の割合。",
+	"ring_width_scale": "表示する輪の線幅に掛ける倍率。",
+	"visible_time_scale": "ビーム後の輪が画面に残る時間の倍率。判定時間は変えない。",
+	"visible_seconds": "接触雷が画面に残る秒数。判定時間は変えない。",
+	"distortion_strength": "シェーダで背景をずらす量の倍率。",
+	"body_opacity": "残像として描く機体の不透明度。0で透明、1で不透明。",
+	"wake_length": "機体の後ろへ残す航跡の最大長。画面上のピクセル数。",
+	"wake_width": "航跡の中心から片側の幅。画面上のピクセル数。",
+	"wake_fade_seconds": "航跡が消えるまでの秒数。",
+	"wake_opacity": "航跡の濃さ。0で透明、1で不透明。",
+	"core_glow_radius": "りゅう座の胸の光が広がる半径。画面上のピクセル数。",
+	"core_glow_opacity": "りゅう座の胸の光の透明度。",
+	"wake_color": "機体後方へ残る航跡の色。",
+	"wake_filaments": "航跡シェーダの細い筋の寄与。大きいほど筋が目立つ。",
+	"pixel_size": "攻撃描画の1ドットの幅。画面上のピクセル数。",
+	"line_width": "うみへび座の攻撃前に出る予告線の表示幅。",
+	"flash_duration": "うみへび座の攻撃時の閃光が残る秒数。",
+	"burst_pixel_scale": "うみへび座の爆発シェーダの1ドット幅の倍率。",
+	"sail_star_scale": "ケンタウルス座の帆に付く星の描画サイズの倍率。",
+	"sirius_glow_scale": "おおいぬ座のシリウス周囲の輝きの広さの倍率。",
+	"booster_length_scale": "いっかくじゅう座の推進炎の表示長の倍率。",
+	"flight_scale": "飛翔中の星弾の描画サイズの倍率。",
+	"outline_width": "攻撃表示の輪郭線の幅。画面上のピクセル数。",
+	"warning_color": "攻撃前の予告を描く色。",
+	"locked_color": "照準が固定されたときの表示色。",
+	"attack_color": "攻撃中の表示色。",
+	"recovery_color": "攻撃後の回復状態を描く色。",
+	"hit_color": "命中時の表示色。",
+	"base_color": "効果の本体を描く色。",
+	"progress_color": "効果の進行部分を描く色。",
+	"outline_color": "効果の輪郭を描く色。",
+	"core_glow_color": "りゅう座の胸の光色。",
+	"rift_color": "りゅう座の裂け目の表示色。",
+	"sail_star_color": "ケンタウルス座の帆の星色。",
+	"open_color": "ケンタウルス座の開放時に出る輪の色。",
+	"sirius_color": "シリウス本体の輝きの色。",
+	"sirius_halo_color": "シリウス周囲の暈の色。",
+	"booster_core_color": "いっかくじゅう座の推進炎の芯の色。",
+	"vortex_tint": "共有渦シェーダの色に掛ける値。",
+}
+const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子"]
 
 var preview_host: Control
 var controls_host: Control
@@ -373,23 +444,53 @@ func _build_fields() -> void:
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_fields.add_child(note)
 		return
-	if not BODY_EFFECTS.has(_selected): _add_color("色・明るさ倍率", "effect_tint", Color.WHITE)
+	var entries: Array[Dictionary] = []
+	if not BODY_EFFECTS.has(_selected): entries.append({"name": "effect_tint", "value": Color.WHITE})
 	for field in DIRECT_FIELDS.get(_selected, []):
-		_add_number(field[0], field[1], field[5], "%s,%s,%s" % [field[2], field[3], field[4]])
+		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
-		_add_color(field[0], field[1], field[2])
+		entries.append({"name": field[1], "value": field[2], "fallback": field[0]})
 	for channel in SHADER_PALETTE_FIELDS.get(_selected, []):
-		_add_color("シェーダ色 " + str(channel), "shader_c" + str(channel), Color.WHITE)
-	if not is_instance_valid(_sample): return
-	for info in _sample.get_property_list():
-		var name: String = info.name
-		if name not in VISUAL_FIELDS: continue
-		if name == "flight_scale" and _selected != "res://scenes/attacks/star_bolt.tscn": continue
-		if not (info.usage & PROPERTY_USAGE_EDITOR): continue
-		if info.type == TYPE_COLOR:
-			_add_color(name, name, _sample.get(name))
-		elif info.type == TYPE_FLOAT:
-			_add_number(name, name, _sample.get(name), info.hint_string)
+		entries.append({"name": "shader_c" + str(channel), "value": Color.WHITE,
+			"help": "共通シェーダの第%d階調色に掛ける値。白で元の色。" % (int(channel) + 1)})
+	if is_instance_valid(_sample):
+		for info in _sample.get_property_list():
+			var name: String = info.name
+			if name not in VISUAL_FIELDS: continue
+			if name == "flight_scale" and _selected != "res://scenes/attacks/star_bolt.tscn": continue
+			if not (info.usage & PROPERTY_USAGE_EDITOR): continue
+			if info.type in [TYPE_COLOR, TYPE_FLOAT]:
+				entries.append({"name": name, "value": _sample.get(name), "hint": info.hint_string})
+	for group in GROUP_ORDER:
+		var grouped: Array[Dictionary] = []
+		for entry in entries:
+			if _field_group(entry.name) == group: grouped.append(entry)
+		if grouped.is_empty(): continue
+		_add_group(group)
+		for entry in grouped:
+			var name: String = entry.name
+			var label: String = _field_label(name, String(entry.get("fallback", name)))
+			var help: String = entry.get("help", FIELD_HELP.get(name, label + "の表示値を調整します。"))
+			if entry.value is Color: _add_color(label, name, entry.value, help)
+			else: _add_number(label, name, entry.value, String(entry.get("hint", "")), help)
+
+func _field_group(name: String) -> String:
+	if name.begins_with("shader_c") or name.ends_with("color") or name.ends_with("tint") or name == "effect_tint": return "色"
+	if name in ["duration_scale", "visible_time_scale", "visible_seconds", "flash_duration", "wake_fade_seconds"]: return "動き・時間"
+	if name in ["particle_count_scale", "wake_filaments"]: return "粒子"
+	return "形・大きさ"
+
+func _field_label(name: String, fallback: String) -> String:
+	if name.begins_with("shader_c"):
+		return ["最明部の色", "明部の色", "中間色", "影色"][clampi(int(name.trim_prefix("shader_c")), 0, 3)]
+	return FIELD_LABELS.get(name, fallback)
+
+func _add_group(title: String) -> void:
+	_fields.add_child(HSeparator.new())
+	var heading := Label.new()
+	heading.text = title
+	heading.add_theme_color_override("font_color", Color("#86dfff"))
+	_fields.add_child(heading)
 
 func _value(name: String, fallback: Variant) -> Variant:
 	return (_working.profiles.get(_selected, {}) as Dictionary).get(name, fallback)
@@ -404,26 +505,32 @@ func _set_value(name: String, value: Variant) -> void:
 	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected == "boss/final_strike" or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
 		_boss_preview.refresh_effects()
 
-func _add_color(label: String, name: String, original: Color) -> void:
+func _add_color(label: String, name: String, original: Color, help := "") -> void:
 	var row := HBoxContainer.new()
+	row.tooltip_text = help
 	_fields.add_child(row)
 	var caption := Label.new()
 	caption.text = label
+	caption.tooltip_text = help
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(caption)
 	var picker := ColorPickerButton.new()
+	picker.tooltip_text = help
 	picker.color = _value(name, original)
 	picker.color_changed.connect(func(color: Color): _set_value(name, color))
 	row.add_child(picker)
 
-func _add_number(label: String, name: String, original: float, hint: String) -> void:
+func _add_number(label: String, name: String, original: float, hint: String, help := "") -> void:
 	var row := HBoxContainer.new()
+	row.tooltip_text = help
 	_fields.add_child(row)
 	var caption := Label.new()
 	caption.text = label
+	caption.tooltip_text = help
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(caption)
 	var spin := SpinBox.new()
+	spin.tooltip_text = help
 	var parts := hint.split(",")
 	var limits: Array = NUMBER_LIMITS.get(name, [0.0, maxf(100.0, original * 4.0), 0.05])
 	spin.min_value = float(parts[0]) if parts.size() > 0 and parts[0].is_valid_float() else limits[0]
