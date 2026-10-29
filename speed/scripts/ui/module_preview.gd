@@ -16,6 +16,9 @@ var _icon: Sprite2D
 var _holo: ShaderMaterial
 var _selected_age := 0.0
 var _generation := 0
+var _pending := false
+static var _thumbnail_frame := -1
+static var _loads: Dictionary = {}
 
 func setup(def: Resource, acquired: bool, animate := false) -> void:
 	definition = def
@@ -23,21 +26,69 @@ func setup(def: Resource, acquired: bool, animate := false) -> void:
 	animated = animate
 	_clock = 0.0
 	_selected_age = 0.0
-	if is_node_ready(): _build()
+	if is_node_ready(): _queue_build()
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	resized.connect(_layout)
-	if definition != null: _build()
+	if definition != null: _queue_build()
 
-func _build() -> void:
+func _queue_build() -> void:
 	_generation+=1
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
 	_demo = null
 	_icon = null
+	_viewport = null
+	_image = null
+	_holo = null
+	_pending = true
+	queue_redraw()
+	set_process(true)
+
+func _on_screen() -> bool:
+	if not is_visible_in_tree(): return false
+	var visible_rect := get_global_rect().intersection(get_viewport_rect())
+	var parent := get_parent()
+	while parent is Control:
+		if parent.clip_contents: visible_rect = visible_rect.intersection(parent.get_global_rect())
+		parent = parent.get_parent()
+	return visible_rect.has_area()
+
+func _start_build() -> void:
+	var path := "res://data/codex/%s.res" % definition.code_id if "code_id" in definition else ""
+	if known and definition.preview_texture == null and not path.is_empty() and ResourceLoader.exists(path):
+		if animated:
+			_load_animation(path,weakref(self),_generation,get_tree())
+		else:
+			var thumbnail := load("res://.content/codex_thumbnail_%s.res" % definition.code_id) as CodexAnimation
+			if thumbnail != null: _build(thumbnail)
+	else: _build()
+
+## 待機処理は画面を保持せず、閉じたあとも読み込みの受け取りだけを終える。
+static func _load_animation(path: String, target: WeakRef, generation: int, tree: SceneTree) -> void:
+	if _loads.has(path):
+		_loads[path].append([target,generation])
+		return
+	_loads[path] = [[target,generation]]
+	var error := ResourceLoader.load_threaded_request(path)
+	if error != OK:
+		_loads.erase(path)
+		push_error("図鑑の実演を読み込めません: "+path)
+		return
+	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		await tree.process_frame
+	var animation := ResourceLoader.load_threaded_get(path) as CodexAnimation
+	var targets: Array = _loads[path]
+	_loads.erase(path)
+	if animation == null: return
+	for request in targets:
+		var preview = request[0].get_ref()
+		if preview != null and preview.is_inside_tree() and preview._generation == request[1]: preview._build(animation)
+
+func _build(animation: Resource = null) -> void:
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(300,170)
 	_viewport.disable_3d = true
@@ -64,7 +115,7 @@ func _build() -> void:
 		elif ResourceLoader.exists("res://data/codex/%s.res" % definition.code_id):
 			_demo = preload("res://scripts/ui/codex_demonstration.gd").new()
 			_viewport.add_child(_demo)
-			_demo.setup(definition)
+			_demo.setup(definition,animation)
 			if not animated: _clock = _demo.animation.period*0.42
 			_demo.sample(_clock)
 		else:
@@ -114,6 +165,16 @@ func _layout() -> void:
 		_image.size = size
 
 func _process(dt: float) -> void:
+	if _pending:
+		if not _on_screen(): return
+		if not animated:
+			var frame := Engine.get_process_frames()
+			if frame == _thumbnail_frame: return
+			_thumbnail_frame = frame
+		_pending = false
+		_start_build()
+		return
+	if _viewport == null: return
 	_accum += dt
 	if _accum < 1.0/30.0: return
 	_clock += _accum

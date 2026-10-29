@@ -26,11 +26,11 @@ func _ready() -> void:
 	fx.pixel = 1.0
 	add_child(fx)
 
-func setup(module: Resource) -> void:
+func setup(module: Resource, prepared_animation: Resource = null) -> void:
 	code = String(module.code_id)
 	key = ("weapon/" if String(module.id).begins_with("W") else "trait/") + code
 	var path := "res://data/codex/%s.res" % code
-	animation = load(path) if ResourceLoader.exists(path) else null
+	animation = prepared_animation if prepared_animation != null else load(path) if ResourceLoader.exists(path) else null
 	clock = 0.0
 
 func sample(time: float) -> void:
