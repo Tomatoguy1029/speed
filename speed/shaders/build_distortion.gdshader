@@ -7,6 +7,7 @@ uniform vec2 extent=vec2(200.0);
 uniform float pixel=2.36;
 uniform float age=0.0;
 uniform float duration=0.58;
+uniform float strength=1.0;
 void fragment(){
  vec2 p=(floor((UV-0.5)*extent/pixel)+0.5)*pixel;
  float r=length(p); vec2 u=p/max(r,0.001);
@@ -21,8 +22,8 @@ void fragment(){
   float e=hole*1.8; float mapped=r-e*e/max(r,pixel); offset=u*(mapped-r); black=step(r,hole);
   light=1.0+0.5*max(0.0,1.0-abs(r-hole)/pixel);
  }
- vec2 uv=SCREEN_UV+offset*screen_scale*SCREEN_PIXEL_SIZE;
- vec4 color=texture(screen_tex,uv); color.rgb*=light;
+ vec2 uv=SCREEN_UV+offset*strength*screen_scale*SCREEN_PIXEL_SIZE;
+ vec4 color=texture(screen_tex,uv); color.rgb*=mix(1.0,light,strength);
  if(black>0.5) color=vec4(0.0,0.0,0.0,1.0);
  COLOR=color;
 }

@@ -39,6 +39,16 @@ const ATTACK_PREVIEWS := {
 	"res://scenes/attacks/beam.tscn": "res://scenes/bosses/canis_major/sirius_visual.tscn",
 	"res://scenes/attacks/zone.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
 }
+const SHADER_PALETTE_FIELDS := {
+	"weapon/forward": [0, 1, 2, 3], "weapon/scatter": [0, 1, 2, 3],
+	"weapon/rear": [0, 1, 2, 3], "weapon/interceptor": [0, 1, 2, 3],
+	"weapon/knockback": [0, 1, 2, 3], "weapon/dashRangeDrone": [0, 1, 2, 3],
+	"weapon/massTow": [0, 1, 2, 3], "weapon/bipolar": [0, 1, 2, 3],
+	"weapon/mines": [0, 1, 2, 3], "weapon/endBlast": [0, 1, 2, 3],
+	"weapon/barrier": [0, 1, 2], "weapon/sonic": [0, 1, 2],
+	"weapon/flashSlash": [0, 2, 3], "trait/vortex": [0, 2],
+	"trait/killSonic": [0, 2], "trait/duplicator": [0, 1, 2],
+}
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
 	"hit_color", "line_width", "flash_duration", "base_color", "progress_color",
@@ -67,6 +77,7 @@ const DIRECT_FIELDS := {
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["ゆがみの強さ", "distortion_strength", 0.0, 2.0, 0.05, 1.0],
 	],
 	"weapon/barrier": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
@@ -144,12 +155,16 @@ const DIRECT_FIELDS := {
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
+		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
 	],
 	"weapon/knockback": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
+		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
 	],
 	"weapon/contactArc": [
 		["雷のドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
@@ -160,12 +175,20 @@ const DIRECT_FIELDS := {
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["ビームの芯", "beam_core_ratio", 0.05, 1.0, 0.05, 0.3],
+		["輪の線幅", "ring_width_scale", 0.25, 4.0, 0.05, 1.0],
+		["残光の時間", "visible_time_scale", 0.25, 4.0, 0.05, 1.0],
 	],
 	"weapon/sonic": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["航跡の長さ", "wake_length", 20.0, 300.0, 1.0, 150.0],
+		["航跡の幅", "wake_width", 2.0, 40.0, 0.5, 18.0],
+		["航跡の余韻", "wake_fade_seconds", 0.05, 0.5, 0.01, 0.20],
+		["航跡の透明度", "wake_opacity", 0.0, 1.0, 0.01, 0.55],
+		["航跡シェーダの筋", "wake_filaments", 0.0, 2.0, 0.05, 0.7],
 	],
 	"trait/killSonic": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
@@ -206,12 +229,14 @@ const DIRECT_FIELDS := {
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["ゆがみの強さ", "distortion_strength", 0.0, 2.0, 0.05, 1.0],
 	],
 	"weapon/afterimage": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
+		["分身の透明度", "body_opacity", 0.0, 1.0, 0.01, 0.85],
 	],
 	"res://scenes/attacks/hydra_shape.tscn": [
 		["ドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
@@ -221,6 +246,7 @@ const DIRECT_FIELDS := {
 	],
 }
 const DIRECT_COLOR_FIELDS := {
+	"weapon/sonic": [["航跡シェーダの色", "wake_color", Color(0.25, 0.65, 1.0)]],
 	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
 	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],
 	"boss/body/centaurus": [["帆の星色", "sail_star_color", Color("#fff6c8")], ["開放の輪色", "open_color", Color("#9fe8ff")]],
@@ -351,6 +377,8 @@ func _build_fields() -> void:
 		_add_number(field[0], field[1], field[5], "%s,%s,%s" % [field[2], field[3], field[4]])
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
 		_add_color(field[0], field[1], field[2])
+	for channel in SHADER_PALETTE_FIELDS.get(_selected, []):
+		_add_color("シェーダ色 " + str(channel), "shader_c" + str(channel), Color.WHITE)
 	if not is_instance_valid(_sample): return
 	for info in _sample.get_property_list():
 		var name: String = info.name

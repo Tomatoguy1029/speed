@@ -7,6 +7,7 @@ const EFFECT := preload("res://shaders/build_effect.gdshader")
 const SHOT := preload("res://shaders/build_shot.gdshader")
 const VALUE_NOISE := preload("res://assets/effects/build/value_noise.png")
 const NOISE := preload("res://assets/effects/build/aura_noise.png")
+const SHADER_PALETTE := [Color.WHITE, Color(0.85, 0.96, 1.0), Color(0.5, 0.85, 1.0), Color(0.23, 0.61, 0.94)]
 var pixel := 2.36
 var effects: Array[Dictionary] = []
 var sparks: Array[Dictionary] = []
@@ -56,6 +57,14 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 	material.set_shader_parameter("noise_seed", _rng.randf_range(0,30))
 	material.set_shader_parameter("tint", SETTINGS.tinted(key, Color.WHITE))
 	for name in options: material.set_shader_parameter(name, options[name])
+	var values := SETTINGS.values_for(key)
+	for index in SHADER_PALETTE.size():
+		var setting := "shader_c" + str(index)
+		if values.has(setting):
+			var uniform := "c" + str(index)
+			var original: Color = options.get(uniform, SHADER_PALETTE[index])
+			var multiplier: Color = values[setting]
+			material.set_shader_parameter(uniform, original * multiplier)
 	add_child(node)
 	var item := {"node": node, "material": material, "age": 0.0, "life": life * SETTINGS.number(key, "duration_scale", 1.0), "key": key, "follow": false}
 	effects.append(item)
@@ -223,6 +232,7 @@ func _distortion(pos: Vector2, radius: float, life: float, key: String, kind: in
 	item.material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
 	item.material.set_shader_parameter("extent", item.node.scale * 2.0)
 	item.material.set_shader_parameter("duration", item.life)
+	item.material.set_shader_parameter("strength", SETTINGS.number(key, "distortion_strength", 1.0))
 	item["distortion"] = true
 	return item
 
@@ -372,7 +382,7 @@ func captures_step(dt: float, center: Vector2) -> void:
 		var radial: Vector2=capture.from-center
 		capture.sprite.position=center+radial.rotated(float(capture.swirl)*q*q)*(1.0-q*q)
 		capture.sprite.scale=Vector2.ONE*float(capture.scale)*(1.0-0.65*q)
-		capture.sprite.modulate=Color(1,1,1,1.0-0.85*q)
+		capture.sprite.modulate=SETTINGS.tinted("trait/vortex", Color(1,1,1,1.0-0.85*q))
 		if q>0.0 and q<1.0 and dt>0.0:burst(capture.sprite.position,1,(center-capture.sprite.position).angle(),0.4,40,70,0.08,[capture.color],"trait/vortex")
 		if q>=1.0:capture.sprite.queue_free()
 	_captures=_captures.filter(func(c):return c.age<c.delay+c.duration)
@@ -399,7 +409,7 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 			var along:=4.0+u*20.0
 			var half:=along*tangent*(0.35+0.65*float((i*53)%10)/10.0)
 			var pos:=state.ship_pos-state.ship_heading*along*pixel+state.ship_heading.orthogonal()*half*(1.0 if i%2 else -1.0)*pixel
-			_steam.add_upright((pos/pixel).round()*pixel,pixel*0.5,Color(0.92,0.95,1.0,0.28*(1.0-u*0.6)))
+			_steam.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic", Color(0.92,0.95,1.0,0.28*(1.0-u*0.6))))
 	_steam.end()
 	if _escort==null:
 		_escort=InstanceBatch.new()
@@ -422,7 +432,7 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 		for k in 3:
 			var width_value:float=[6.0,3.0,2.0][k]
 			var color:Color=[Color(0.35,0.85,1.0,0.25*fade),Color(0.5,0.95,1.0,0.65*fade),Color(1,1,1,fade)][k]
-			_escort.add_rect((a+b)*0.5,Vector2(a.distance_to(b)*0.5,width_value*pixel*0.5),(a-b).angle(),color)
+			_escort.add_rect((a+b)*0.5,Vector2(a.distance_to(b)*0.5,width_value*pixel*0.5),(a-b).angle(),SETTINGS.tinted("weapon/dashRangeDrone", color))
 		remaining-=distance
 		if remaining<=0.0:break
 	_escort.end()
@@ -453,14 +463,14 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 			var f:=float(i)/count
 			for sign_side in [-1.0,1.0]:
 				var pos:Vector2=origin+d*f+side*sin(f*TAU*3.0-clock*8.0)*2.5*pixel*sign_side
-				_tether.add_upright((pos/pixel).round()*pixel,pixel*0.5,Color("#69fff0") if sign_side<0 else Color("#cffff9"))
+				_tether.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color("#69fff0") if sign_side<0 else Color("#cffff9")))
 		for i in 4:
 			var f:=fposmod(clock*1.5+i*0.25,1.0)
-			_tether.add_upright(((origin+d*f)/pixel).round()*pixel,pixel*0.5,Color.WHITE)
+			_tether.add_upright(((origin+d*f)/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color.WHITE))
 		for y in range(-4,5):
 			for x in range(-4,5):
 				if abs(x)+abs(y)>4:continue
-				_tether.add_upright((origin/pixel).round()*pixel+Vector2(x,y)*pixel,pixel*0.5,Color.WHITE if abs(x)+abs(y)<2 else Color("#69fff0"))
+				_tether.add_upright((origin/pixel).round()*pixel+Vector2(x,y)*pixel,pixel*0.5,SETTINGS.tinted("weapon/bipolar", Color.WHITE if abs(x)+abs(y)<2 else Color("#69fff0")))
 	_tether.end()
 	var tow=ctx.loadout.weapon_behaviors.get(&"W21")
 	if _tow_node.is_empty():
