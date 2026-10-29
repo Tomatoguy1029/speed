@@ -82,7 +82,7 @@ func exercise() -> void:
 	guard.free_pos = actor.table.pos[actor.immortal_row] + Vector2(500, 100)
 	actor._sim_dt = 0.1
 	actor.squad.replan()
-	check(guard.motion.has("lane") and actor.arena.bounds.has_point(actor.squad.goal_for(guard)), "guard receives a formation lane and a position inside the arena")
+	check(guard.motion.has("lane") and actor.arena.bounds.has_point(actor.squad.goal_for(guard)), "護衛の列とエリア内の持ち場を割り当てる")
 	# 保存したコンボ定義を実際のヒュドラへ接続する。
 	actor.action_rules = actor.action_rules.duplicate(true)
 	actor.action_rules.combos["test_wait"] = {"type": "sequence", "children": [{"type": "wait", "seconds": 0.2}]}
