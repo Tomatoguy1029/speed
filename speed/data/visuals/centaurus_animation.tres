@@ -1,0 +1,2381 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/boss_part_animation.gd" id="1_wtrfb"]
+
+[resource]
+script = ExtResource("1_wtrfb")
+poses = {
+"aim": {
+"Bow": {
+"bow": 5,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+},
+"neutral": {
+"Bow": {
+"bow": 0,
+"position": Vector2(13, 39),
+"rotation": 0.17453292,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(21, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, -3),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(-1, 16),
+"position": Vector2(-14, 16),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(3, -19),
+"rotation": 0.17453292,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(3, 5),
+"rotation": 0.7853982,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-13, -10),
+"rotation": -0.41887903,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+},
+"up": {
+"Bow": {
+"bow": 7,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}
+clips = {
+"idle": [],
+"rain": [{
+"duration": 0.3,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 7,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}],
+"rain_recovery": [{
+"duration": 0.2,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 0,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}],
+"rain_windup": [{
+"duration": 0.15,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 6,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.15,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 7,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}],
+"shot_recovery": [{
+"duration": 0.2,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 0,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}],
+"shot_release": [{
+"duration": 0.18,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 5,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}],
+"shot_windup": [{
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 0,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 1,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 2,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 3,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 4,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}, {
+"duration": 0.1,
+"interpolate": false,
+"pose": {
+"Bow": {
+"bow": 5,
+"position": Vector2(-7, 60),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontLeftLeg": {
+"bow": -1,
+"position": Vector2(-40, 1),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"FrontRightLeg": {
+"bow": -1,
+"position": Vector2(20, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm": {
+"bow": -1,
+"position": Vector2(-20.594498, 29.747355),
+"rotation": 0.8693707,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.9738722, 28.409946),
+"rotation": -1.8972466,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(0.99999994, 0.99999994),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-11.456017, 27.330667),
+"rotation": -0.24665698,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"LeftArm/Upper": {
+"bow": -1,
+"position": Vector2(-8.999999, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"LowerBody": {
+"bow": -1,
+&"pivot_origin": Vector2(1.8399487, 22.033648),
+"position": Vector2(-11, 20),
+"rotation": 0.15707964,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"MiddleBody": {
+"bow": -1,
+"position": Vector2(-23, 5),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"Plume": {
+"bow": -1,
+"position": Vector2(-46, -135),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearLeftLeg": {
+"bow": -1,
+"position": Vector2(-35, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RearRightLeg": {
+"bow": -1,
+"position": Vector2(16, -53),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm": {
+"bow": -1,
+"position": Vector2(25.16726, 33.170837),
+"rotation": 0.31460193,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow": {
+"bow": -1,
+"position": Vector2(-3.0525608, 21.190247),
+"rotation": -0.035791766,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Forearm": {
+"bow": -1,
+"position": Vector2(-7, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Elbow/Hand": {
+"bow": -1,
+"position": Vector2(-4.019331, 23.75925),
+"rotation": 0.6829892,
+"scale": Vector2(0.9999999, 0.9999999),
+"visible": true,
+"z_index": 0
+},
+"RightArm/Upper": {
+"bow": -1,
+"position": Vector2(-9, 0),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+},
+"UpperBody": {
+"bow": -1,
+"position": Vector2(-23, -54),
+"rotation": 0.0,
+"scale": Vector2(1, 1),
+"visible": true,
+"z_index": 0
+}
+}
+}]
+}
+part_pivots = {
+"LowerBody": Vector2(13, 0)
+}

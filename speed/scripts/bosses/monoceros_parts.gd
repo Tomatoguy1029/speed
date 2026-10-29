@@ -27,6 +27,7 @@ func _collect_parts(parent: Node) -> void:
 		if child is Sprite2D and child.material is ShaderMaterial:
 			child.material = child.material.duplicate()
 			var material := child.material as ShaderMaterial
+			material.set_shader_parameter("normal_flip_x", child.flip_h)
 			for field in ["ambient", "normal_strength", "key_energy", "fill_energy"]:
 				material.set_shader_parameter(field, LIGHTING.get(field))
 			for entry in [["key_direction", LIGHTING.key_angle], ["fill_direction", LIGHTING.fill_angle]]:

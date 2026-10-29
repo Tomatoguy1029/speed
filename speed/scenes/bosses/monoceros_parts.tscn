@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_layered_normal.png" id="tex_body_armor_layered_normal"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/body_armor_normal.png" id="tex_body_armor_normal"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/booster.png" id="tex_booster"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/booster_normal.png" id="tex_booster_normal"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor.png" id="tex_head_armor"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor_back.png" id="tex_head_armor_back"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/head_armor_back_normal.png" id="tex_head_armor_back_normal"]
@@ -22,6 +23,7 @@
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor_normal.png" id="tex_leg_armor_normal"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_base.png" id="tex_leg_base"]
 [ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_root.png" id="tex_leg_root"]
+[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_root_normal.png" id="tex_leg_root_normal"]
 
 [sub_resource type="ShaderMaterial" id="Material_base"]
 shader = ExtResource("shader")
@@ -30,8 +32,13 @@ shader = ExtResource("shader")
 shader = ExtResource("shader")
 shader_parameter/use_normal = true
 
+[sub_resource type="CanvasTexture" id="canvas_booster"]
+diffuse_texture = ExtResource("tex_booster")
+normal_texture = ExtResource("tex_booster_normal")
+texture_filter = 1
+
 [sub_resource type="AtlasTexture" id="booster_0"]
-atlas = ExtResource("tex_booster")
+atlas = SubResource("canvas_booster")
 region = Rect2(115, 72, 74, 53)
 filter_clip = true
 
@@ -55,8 +62,13 @@ atlas = ExtResource("tex_leg_base")
 region = Rect2(132, 144, 45, 59)
 filter_clip = true
 
+[sub_resource type="CanvasTexture" id="canvas_leg_root"]
+diffuse_texture = ExtResource("tex_leg_root")
+normal_texture = ExtResource("tex_leg_root_normal")
+texture_filter = 1
+
 [sub_resource type="AtlasTexture" id="leg_root_4"]
-atlas = ExtResource("tex_leg_root")
+atlas = SubResource("canvas_leg_root")
 region = Rect2(132, 144, 45, 59)
 filter_clip = true
 
@@ -175,7 +187,7 @@ position = Vector2(-37, -27)
 [node name="booster" type="Sprite2D" parent="TailBooster/Sprite"]
 texture = SubResource("booster_0")
 centered = false
-material = SubResource("Material_base")
+material = SubResource("Material_armor")
 metadata/part_label = "ブースター / booster"
 
 [node name="RearLeftLeg" type="Node2D" parent="."]
@@ -214,7 +226,7 @@ metadata/part_label = "後左脚根元 / leg_base"
 [node name="leg_root" type="Sprite2D" parent="RearLeftLeg/Root"]
 texture = SubResource("leg_root_4")
 centered = false
-material = SubResource("Material_base")
+material = SubResource("Material_armor")
 metadata/part_label = "後左脚根元 / leg_root"
 
 [node name="RearRightLeg" type="Node2D" parent="."]
@@ -254,7 +266,7 @@ flip_h = true
 [node name="leg_root" type="Sprite2D" parent="RearRightLeg/Root"]
 texture = SubResource("leg_root_4")
 centered = false
-material = SubResource("Material_base")
+material = SubResource("Material_armor")
 metadata/part_label = "後右脚根元 / leg_root"
 flip_h = true
 
@@ -294,7 +306,7 @@ metadata/part_label = "前左脚根元 / leg_base"
 [node name="leg_root" type="Sprite2D" parent="FrontLeftLeg/Root"]
 texture = SubResource("leg_root_4")
 centered = false
-material = SubResource("Material_base")
+material = SubResource("Material_armor")
 metadata/part_label = "前左脚根元 / leg_root"
 
 [node name="FrontRightLeg" type="Node2D" parent="."]
@@ -334,7 +346,7 @@ flip_h = true
 [node name="leg_root" type="Sprite2D" parent="FrontRightLeg/Root"]
 texture = SubResource("leg_root_4")
 centered = false
-material = SubResource("Material_base")
+material = SubResource("Material_armor")
 metadata/part_label = "前右脚根元 / leg_root"
 flip_h = true
 

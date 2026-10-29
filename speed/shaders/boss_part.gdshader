@@ -2,6 +2,7 @@ shader_type canvas_item;
 render_mode unshaded;
 
 uniform bool use_normal = false;
+uniform bool normal_flip_x = false;
 uniform bool painted = false;
 uniform vec4 paint : source_color = vec4(1.0);
 uniform float normal_strength = 1.0;
@@ -30,6 +31,7 @@ void fragment() {
 	float light_amount = 1.0;
 	if (use_normal) {
 		vec3 normal = texture(NORMAL_TEXTURE, UV).rgb * 2.0 - 1.0;
+		if (normal_flip_x) { normal.x = -normal.x; }
 		normal = normalize(vec3(normal.xy * normal_strength, max(normal.z, 0.001)));
 		vec2 world_xy = mat2(axis_x, -axis_y) * normal.xy;
 		normal = vec3(world_xy, normal.z);
