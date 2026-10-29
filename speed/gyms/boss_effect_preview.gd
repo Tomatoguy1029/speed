@@ -339,17 +339,17 @@ func _on_preview_input(event: InputEvent) -> void:
 				_dragging_origin = false
 				set_effect(_equipment_key, false)
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			var center := _frame.size * 0.5
+			var center: Vector2 = _frame.size * 0.5
 			var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
-			var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-			var target := center + (_preview_origin - session.run.state.view_center) * zoom * fit
-			var direction := event.position - target
+			var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+			var target: Vector2 = center + (_preview_origin - session.run.state.view_center) * zoom * fit
+			var direction: Vector2 = event.position - target
 			if direction.length_squared() > 16.0:
 				_preview_heading = direction.normalized()
 				set_effect(_equipment_key, false)
 	elif event is InputEventMouseMotion and _dragging_origin:
 		var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
-		var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+		var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
 		_preview_origin += event.relative / maxf(zoom * fit, 0.01)
 		session.run.state.ship_pos = _preview_origin
 		session.run.state.enemy_aim = _preview_origin
@@ -466,7 +466,7 @@ func _process(_delta: float) -> void:
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
-	var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+	var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
 	render.view_override = {"center": Vector2.ZERO if not _equipment_key.is_empty() else session.run.state.view_center,
 		"zoom": zoom * fit, "shake": _equipment_key.is_empty()}
 
