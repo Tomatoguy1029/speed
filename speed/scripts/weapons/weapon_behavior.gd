@@ -61,6 +61,7 @@ func interval(base: float) -> float:
 ## 武器から発射する弾だけを補正する。特性の弾と共通ProjectileSystemは基準を保つ。
 func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	var enhanced := opts.duplicate()
+	enhanced.weapon_id = def.id
 	enhanced.r = float(opts.get("r", 5.0)) * ctx.loadout.area_multiplier()
 	enhanced.speed = float(opts.get("speed", 1300.0)) * post_factor(&"projectile_speed")
 	enhanced.knock = float(opts.get("knock", 250.0)) * post_factor(&"knockback")

@@ -34,6 +34,7 @@ var friend_kind := PackedByteArray()
 var friend_generation := PackedByteArray()
 var friend_age := PackedFloat32Array()
 var friend_cause: Array[StringName] = []
+var friend_weapon_id: Array[StringName] = []
 ## ダメージ原因と独立した、描画だけに使う装備の識別子。
 var friend_visual: Array[StringName] = []
 var friend_pos := PackedVector2Array()
@@ -269,12 +270,13 @@ func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mu
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
 func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2, r: float, dmg: float,
 		life: float, pierce: bool, pierce_left: int, color: Color, no_crit: bool, knock: float,
-		angle: float, spin: float, hit_id: int, type := &"", visual := &"") -> int:
+		angle: float, spin: float, hit_id: int, type := &"", visual := &"", weapon_id := &"") -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
 	friend_generation[i] = 0
 	friend_age[i] = 0.0
 	friend_cause[i] = cause
+	friend_weapon_id[i] = weapon_id
 	friend_visual[i] = visual
 	friend_pos[i] = pos
 	friend_vel[i] = vel
@@ -358,7 +360,7 @@ func _update_friendly(dt: float) -> void:
 			if friend_on_hit[i].is_valid():
 				friend_on_hit[i].call(row, friend_dmg[i], impact)
 			else:
-				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "no_crit": friend_no_crit[i] != 0,
+				combat.damage_enemy(row, friend_dmg[i], {"cause": friend_cause[i], "weapon_id": friend_weapon_id[i], "no_crit": friend_no_crit[i] != 0,
 					"dir": vel / sp if sp > 0.0 else Vector2.ZERO, "knock": friend_knock[i], "impact": impact})
 			duplicate_friend(i, impact)
 			state.emit(&"shot_hit", {"pos": impact, "dir": vel.normalized(), "visual_key": String(friend_visual[i]), "kind": friend_kind[i]})
@@ -833,7 +835,7 @@ func duplicate_friend(source: int, impact: Vector2) -> bool:
 		var child := _add_friend(friend_kind[source], friend_cause[source], impact, v, friend_r[source],
 			friend_dmg[source] * build.split_damage(), friend_life[source], friend_pierce[source] != 0,
 			friend_pierce_left[source], friend_color[source], friend_no_crit[source] != 0, friend_knock[source],
-			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source])
+			v.angle(), friend_spin[source], -1, friend_type[source], friend_visual[source], friend_weapon_id[source])
 		friend_hit[child] = friend_hit[source].duplicate()
 		friend_generation[child] = friend_generation[source] + 1
 		friend_age[child] = friend_age[source]

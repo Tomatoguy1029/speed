@@ -70,6 +70,7 @@ signal cards_opened(cards: Array)
 signal equipment_changed
 ## 記録中だけ購読する装備の差分。選択画面で時計が止まっていても即座に通知する。
 signal loadout_recorded(change: Dictionary)
+signal choice_recorded(card: Dictionary, source: StringName)
 
 var combat: CombatSystem:
 	get: return ctx.combat
@@ -317,6 +318,7 @@ func choose_card(index: int) -> bool:
 		_pending_choice = index
 		return true
 	if state.swap_pick != &"":
+		if choice_recorded.has_connections(): choice_recorded.emit(c, &"comet_swap")
 		if c.kind == &"swap":
 			remove_weapon(c.id, &"comet_swap")
 			grant(&"weapon", state.swap_pick, cfg.weapon_max_level, &"comet_swap")
@@ -326,6 +328,7 @@ func choose_card(index: int) -> bool:
 		state.cards = []
 		return try_open_cards()
 	if state.start_pick:
+		if choice_recorded.has_connections(): choice_recorded.emit(c, &"initial_choice")
 		state.start_pick = false
 		grant(c.kind, c.id, 1, &"initial_choice")
 		_release_candidates()
@@ -341,6 +344,7 @@ func choose_card(index: int) -> bool:
 		ship.heal(state.stats.max_hp * cfg.fallback_heal)
 	elif c.kind != &"post_max":
 		grant(c.kind, c.id, 1, &"card")
+	if choice_recorded.has_connections(): choice_recorded.emit(c, &"card")
 	state.emit(&"upgrade", {"card": c})
 	if c.kind == &"weapon" or c.kind == &"trait":
 		_level_bonus()

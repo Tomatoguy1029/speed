@@ -1,6 +1,8 @@
 ## 戦闘の計算。当たり判定の格子・攻撃力・接触・クリティカル・ダメージ・撃破・範囲攻撃・ヒットストップ（仕様書 7）。
 class_name CombatSystem
 extends RunSystem
+## HPを実際に更新した命中だけを、開発録画へ通知する。
+signal recording_damage(hit: Dictionary)
 
 ## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
 const FORCEFUL := [&"killSonic", &"critBeam", &"bipolar", &"towShot"]
@@ -282,6 +284,13 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		bosses.body_damaged(i)
 	_record_boss_damage(struck_row, i, requested, dmg, hp_before, opts, "phase_floor" if t.hp[i] > hp_before - dmg else "applied")
 	if bosses != null: bosses.damage_applied(i, maxf(0.0, hp_before - maxf(0.0, t.hp[i])))
+	if recording_damage.has_connections():
+		var applied := maxf(0.0, hp_before - maxf(0.0, t.hp[i]))
+		recording_damage.emit({"id": t.id[i], "enemy_type": String(t.type[i]), "rank": t.def[i].rank if t.def[i] != null else 0,
+			"boss": t.is_boss[i] != 0, "meteor": t.meteor_index[i] >= 0, "elite": t.elite[i] != 0,
+			"cause": String(cause), "weapon_id": String(opts.get("weapon_id", &"")),
+			"resolved": dmg, "applied": applied,
+			"overkill": maxf(0.0, dmg - maxf(0.0, hp_before)) if t.hp[i] <= 0.0 else 0.0})
 	if cause == &"ram" and hp_before > maxf(0.0, t.hp[i]):
 		_hit_stop(i, fresh, crit)
 	t.flash[i] = 0.12
@@ -369,6 +378,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 		if comet != null and comet.rare_weapon == &"":
 			field.add_well(t.pos[i], cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
 	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
+		"t": state.time, "world_t": state.world_time,
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 質量牽引砲（W21）が船体を牽引したら、吹き飛ばし衝角（W03）の破片も死体も出さない

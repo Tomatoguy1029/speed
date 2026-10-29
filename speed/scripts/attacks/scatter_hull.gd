@@ -21,6 +21,6 @@ func spawn(ps: ProjectileSystem, i: int, dir: Vector2, speed: float, dmg: float,
 		ps._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"hullDebris", pos + u * r * 0.3, u * v,
 			4.0 * 1.82 * ps.cfg.character_scale * radius_mult, dmg, ps.cfg.hull_debris_life * life_mult, true, 0, t.color[i], true,
 			ps.cfg.hull_debris_knock if knock < 0.0 else knock, ps.state.rng.randf() * TAU,
-			10.0 * (1.0 if k % 2 == 0 else -1.0), t.id[i], &"", &"weapon/knockback")
+			10.0 * (1.0 if k % 2 == 0 else -1.0), t.id[i], &"", &"weapon/knockback", &"W03")
 	ps.state.emit(&"hull_scatter", {"pos": pos, "count": count, "visual_key": "weapon/knockback"})
 	return true

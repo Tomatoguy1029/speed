@@ -29,3 +29,4 @@ func spawn(ps: ProjectileSystem, from: Vector2, angle: float, dmg: float, opts :
 		opts.get("color", Color("#ffe46b")), false, float(opts.get("knock", 250.0)), 0.0, 0.0, -1,
 		&"", StringName(opts.get("visual_key", "")))
 	ps.friend_on_hit[i] = opts.get("on_hit", Callable())
+	ps.friend_weapon_id[i] = StringName(opts.get("weapon_id", &""))

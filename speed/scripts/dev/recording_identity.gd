@@ -43,6 +43,23 @@ static func _scan(path: String, extensions: Array, files: Dictionary, loaded: Di
 	for name in DirAccess.get_directories_at(path):
 		_scan(path.path_join(name), extensions, files, loaded)
 
+## 録画開始時のディスク上のGodotプロジェクトだけを識別する。Gitが使えなければ未知にする。
+static func git_state() -> Dictionary:
+	var root := ProjectSettings.globalize_path("res://")
+	var revision_out := []
+	var revision_status := OS.execute("git", PackedStringArray(["-C", root, "rev-parse", "HEAD"]), revision_out)
+	if revision_status != 0 or revision_out.is_empty():
+		return {"revision": "", "dirty": null, "scope": "project_disk_at_recording_start"}
+	var status_out := []
+	var status_code := OS.execute("git", PackedStringArray(["-c", "core.optionalLocks=false", "-C", root,
+		"status", "--porcelain=v1", "--untracked-files=all", "--", "."]), status_out)
+	var dirty: Variant = null
+	if status_code == 0:
+		dirty = not String(status_out[0]).strip_edges().is_empty() if not status_out.is_empty() else false
+	return {"revision": String(revision_out[0]).strip_edges(),
+		"dirty": dirty,
+		"scope": "project_disk_at_recording_start"}
+
 static func digest(value: Variant) -> String:
 	return JSON.stringify(value, "", true, true).sha256_text()
 

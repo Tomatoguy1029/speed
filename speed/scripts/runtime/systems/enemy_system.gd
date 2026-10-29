@@ -6,6 +6,9 @@
 class_name EnemySystem
 extends RunSystem
 signal picaro_spawned(row: int, row_id: int, owner_id: int)
+## 開発録画が購読したときだけ使う、個体の出現と行の解放。
+signal recording_spawned(row: int)
+signal recording_released(row: int)
 
 var motion := EnemyMotion.new()
 ## 位置を動かす前の雑魚の行IDと位置。強敵・ボスの更新後に雑魚側だけ進路を直す。
@@ -181,6 +184,7 @@ func spawn(def: EnemyDef, pos: Vector2, opts := {}) -> int:
 	# 強敵と大物の出現は、プレイの記録が倒れるまでを追う
 	if def.rank >= 3:
 		state.emit(&"strong_spawn", {"id": t.id[i], "enemy_type": def.id})
+	if recording_spawned.has_connections(): recording_spawned.emit(i)
 	if def.params.get("picaro", false):
 		picaro_spawned.emit(i, t.id[i], int(def.params.get("picaro_owner", 0)))
 	return i
@@ -248,6 +252,7 @@ func spawn_boss(type: StringName, pos: Vector2, r: float, max_hp: float, armor: 
 	t.weak_arc[i] = weak_arc
 	t.facing[i] = facing
 	t.color[i] = color
+	if recording_spawned.has_connections(): recording_spawned.emit(i)
 	return i
 
 ## 行 i の全部の列を初期値にし、新しい id を振る。敵を出す関数は、必ずここを通してから値を入れる。
@@ -420,6 +425,7 @@ func _add_beh(i: int) -> void:
 
 ## 行 i を空きに戻す。行動の種類ごとの一覧からは、最後の行と入れ替えて外す。
 func _release_row(i: int) -> void:
+	if recording_released.has_connections(): recording_released.emit(i)
 	for w in _row_watchers:
 		w.on_row_gone(i)
 	var s := table.beh_slot[i]
