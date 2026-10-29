@@ -1,7 +1,7 @@
 extends WeaponVisual
-const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
-
-func draw_objects(c: CanvasItem) -> void:
-	var interceptors = behavior
-	for d in interceptors.drones:
-		INTERCEPTOR_VISUAL.drone(c, d.pos, d.angle, cfg.character_scale, d.flash, visual_color(Color.WHITE))
+func setup(render: RunPresentation, owner_behavior) -> void:
+	super(render,owner_behavior)
+	attach("res://scripts/render/interceptor_visual.gd","Interceptor",0)
+	node.modulate = Color.WHITE
+func tick(_dt: float) -> void:
+	node.step(behavior if active else null,cfg)

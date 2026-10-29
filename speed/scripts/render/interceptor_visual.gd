@@ -1,30 +1,35 @@
-## 迎撃型の装甲・銃口・弾。ゲームと図鑑で同じピクセル形状を使う。
-extends RefCounted
-
+## ストライクウィングの機体・装甲・砲口をまとめて描く。
+extends Node2D
 const DRONE := preload("res://assets/pixel/drone.png")
-const MINT := Color("#8fffe2")
-const EDGE := Color("#3e9eaa")
-const AMBER := Color("#ffc77c")
-
-static func drone(c: CanvasItem, pos: Vector2, angle: float, scale_value: float, flash: float, tint := Color.WHITE) -> void:
-	c.draw_set_transform(pos, angle + PI / 2.0, Vector2.ONE * scale_value)
-	var size := DRONE.get_size()
-	c.draw_texture_rect(DRONE, Rect2(-size / 2.0, size), false, Color("#b5ffea") * tint)
-	# 両翼の装甲と二連の砲口で追走型と区別する。
-	for side in [-1.0, 1.0]:
-		c.draw_rect(Rect2(Vector2(side * 7.0 - 2.0, -4.0), Vector2(4, 9)), Color("#153949") * tint)
-		c.draw_rect(Rect2(Vector2(side * 7.0 - 1.0, -5.0), Vector2(2, 8)), EDGE * tint)
-		c.draw_rect(Rect2(Vector2(side * 4.0 - 1.0, -9.0), Vector2(2, 5)), MINT * tint)
-		if flash > 0.0:
-			c.draw_rect(Rect2(Vector2(side * 4.0 - 2.0, -14.0), Vector2(4, 5)), AMBER * tint)
-			c.draw_rect(Rect2(Vector2(side * 4.0 - 1.0, -16.0), Vector2(2, 7)), tint)
-	c.draw_rect(Rect2(-2, 6, 4, 3), Color(MINT, 0.6) * tint)
-	c.draw_set_transform(Vector2.ZERO)
-
-static func shot(c: CanvasItem, pos: Vector2, angle: float, pixel: float, tint := Color.WHITE) -> void:
-	c.draw_set_transform(pos, angle, Vector2.ONE * pixel)
-	c.draw_rect(Rect2(-9, -3, 13, 6), Color(MINT, 0.12) * tint)
-	c.draw_rect(Rect2(-7, -2, 10, 4), Color(MINT, 0.4) * tint)
-	c.draw_rect(Rect2(-5, -1, 8, 2), MINT * tint)
-	c.draw_rect(Rect2(0, -1, 3, 2), Color.WHITE * tint)
-	c.draw_set_transform(Vector2.ZERO)
+const SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const KEY := "weapon/interceptor"
+var _bodies: InstanceBatch
+var _parts: InstanceBatch
+func _ready() -> void:
+	_bodies = InstanceBatch.new()
+	_bodies.setup_texture(DRONE)
+	add_child(_bodies)
+	_parts = InstanceBatch.new()
+	_parts.setup_shader_quad()
+	add_child(_parts)
+func step(weapon, cfg: GameConfig) -> void:
+	_bodies.begin()
+	_parts.begin()
+	var scale_value := cfg.character_scale * SETTINGS.number(KEY,"effect_scale",1.0)
+	var pixel := 1.82 * cfg.character_scale * SETTINGS.number(KEY,"pixel_scale",1.0)
+	if weapon != null:
+		for d in weapon.drones:
+			var angle: float = d.angle + PI * 0.5
+			_bodies.add((d.pos/pixel).round()*pixel,angle,DRONE.get_height()*scale_value*0.5,SETTINGS.tinted(KEY,Color.WHITE))
+			for x in [-5.0,4.0]:
+				_part(d.pos,Vector2(x+0.5,0),Vector2(0.5,2),angle,pixel,Color("#3e9eaa"))
+			for x in [-2.0,1.0]:
+				_part(d.pos,Vector2(x+0.5,-5),Vector2(0.5,1),angle,pixel,Color("#8fffe2"))
+			if d.flash > 0.0:
+				var pos: Vector2 = d.pos + Vector2.from_angle(d.angle)*6.0*pixel
+				var first: bool = d.flash > 0.03
+				_parts.add_rect((pos/pixel).round()*pixel,Vector2.ONE*pixel*(1.5 if first else 1.0),0,SETTINGS.tinted(KEY,Color.WHITE if first else Color("#ffc77c")))
+	_bodies.end()
+	_parts.end()
+func _part(center: Vector2, offset: Vector2, half: Vector2, angle: float, pixel: float, color: Color) -> void:
+	_parts.add_rect(center+(offset*pixel).rotated(angle),half*pixel,angle,SETTINGS.tinted(KEY,color))

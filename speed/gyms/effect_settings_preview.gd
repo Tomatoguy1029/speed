@@ -88,7 +88,6 @@ const DIRECT_FIELDS := {
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
 	],
 	"trait/runUp": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
@@ -170,7 +169,6 @@ const DIRECT_FIELDS := {
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
 	],
 	"boss/body/hydra": [
 		["予告線の太さ", "line_width", 1.0, 12.0, 0.25, 3.0],
@@ -200,7 +198,6 @@ const DIRECT_FIELDS := {
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
 	],
 	"trait/vortex": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
@@ -222,7 +219,6 @@ const DIRECT_FIELDS := {
 	],
 }
 const DIRECT_COLOR_FIELDS := {
-	"weapon/sonic": [["残光の色", "wake_color", Color(0.25, 0.65, 1.0)]],
 	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
 	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],
 	"boss/body/centaurus": [["帆の星色", "sail_star_color", Color("#fff6c8")], ["開放の輪色", "open_color", Color("#9fe8ff")]],

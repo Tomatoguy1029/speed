@@ -1,6 +1,7 @@
 shader_type canvas_item;
 render_mode unshaded;
 uniform int mode = 0;
+uniform int streak_count = 16;
 uniform vec2 extent = vec2(100.0);
 uniform float pixel = 2.36;
 uniform float age = 0.0;
@@ -93,7 +94,8 @@ void fragment() {
   if(abs(v.y-sin(v.x*0.13-age*12.0)*halfw*0.45)<0.7&&d<halfw) outc=c1;
  } else if(mode==14) {
   float ke=width;
-  for(int i=0;i<16;i++){
+  for(int i=0;i<64;i++){
+   if(i>=streak_count) break;
    float h1=mod(float(i*73),100.0)/100.0;float h2=mod(float(i*37),100.0)/100.0;
    float ph=fract(h1+age*(1.8+2.6*ke)*(0.7+0.6*h2));
    float spread=(h2-0.5)*(5.0+14.0*ke)*(0.4+0.6*abs(h1-0.5)*2.0);

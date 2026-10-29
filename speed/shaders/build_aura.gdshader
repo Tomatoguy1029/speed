@@ -4,7 +4,7 @@ uniform sampler2D noise_tex : repeat_enable, filter_linear;
 uniform float clock=0.0;
 uniform float strength=0.0;
 uniform float pop=0.0;
-uniform float pixel=2.36;
+uniform float pixel_scale=1.0;
 uniform vec4 tint : source_color=vec4(1.0);
 vec3 palette(float stage, int band){
  vec3 a[3]=vec3[](vec3(242,246,255),vec3(185,198,230),vec3(111,127,174));
@@ -13,7 +13,7 @@ vec3 palette(float stage, int band){
  return (stage<1.0?mix(a[band],b[band],stage):mix(b[band],c[band],min(1.0,stage-1.0)))/255.0;
 }
 void fragment(){
- vec2 p=floor(UV*vec2(83,122)*0.55)+0.5;
+ vec2 p=(floor(UV*vec2(83,122)*0.55/pixel_scale)+0.5)*pixel_scale;
  vec2 uv=p/(vec2(83,122)*0.55);
  float raw=texture(TEXTURE,uv).r*255.0;
  float distance=raw/8.0*0.55;

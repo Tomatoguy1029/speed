@@ -42,7 +42,10 @@ func on_launch(_full: bool) -> void:
 		var after := (pts[i + 1] - pts[i]).normalized() if i < pts.size() - 1 else before
 		# 平均を正規化せず、鋭角ほど幅を畳む。Uターンの頂点では中心へ戻る。
 		_normals.append((before.orthogonal() + after.orthogonal()) * 0.5)
-	state.emit(&"escort_deploy", {"pos": state.ship_pos, "targets": drones.map(func(d):return d.pos)})
+	var targets: Array[Vector2] = []
+	for i in drones.size():
+		targets.append(state.ship_pos + _formation_offset(i,state.ship_heading.orthogonal(),state.ship_heading,float(p("deploy_distance"))*cfg.character_scale))
+	state.emit(&"escort_deploy", {"pos": state.ship_pos, "targets": targets})
 	for d in drones:
 		d.trail.clear()
 		d.break_trail = true

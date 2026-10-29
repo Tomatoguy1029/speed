@@ -63,13 +63,16 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 		effects.pop_front().node.queue_free()
 	return item
 
-func burst(pos: Vector2, count: int, angle: float, spread: float, low: float, high: float, life: float, colors: Array, key: String, size_value := 1.0) -> void:
-	count = roundi(count * SETTINGS.number(key, "particle_count_scale", 1.0))
+func burst(pos: Vector2, count: int, angle: float, spread: float, low: float, high: float, life: float, colors: Array, key: String, size_value := 1.0, scale_count := true) -> void:
+	if scale_count: count = roundi(count * SETTINGS.number(key, "particle_count_scale", 1.0))
+	var visual_scale := SETTINGS.number(key, "effect_scale", 1.0)
+	var cell_scale := SETTINGS.number(key, "pixel_scale", 1.0)
+	life *= SETTINGS.number(key, "duration_scale", 1.0)
 	for i in mini(count, 4096 - sparks.size()):
 		var direction := Vector2.from_angle(angle + _rng.randf_range(-spread * 0.5, spread * 0.5))
-		sparks.append({"pos": pos, "velocity": direction * _rng.randf_range(low, high) * pixel,
+		sparks.append({"pos": pos, "velocity": direction * _rng.randf_range(low, high) * pixel * visual_scale,
 			"age": 0.0, "life": life * _rng.randf_range(0.7, 1.0), "color": SETTINGS.tinted(key, colors[i % colors.size()]),
-			"size": size_value * _rng.randf_range(0.7, 1.4), "delay": 0.0})
+			"size": size_value * visual_scale * cell_scale * _rng.randf_range(0.7, 1.4), "delay": 0.0})
 
 func event(ev: Dictionary) -> bool:
 	var key := String(ev.get("visual_key", ""))
@@ -130,6 +133,7 @@ func event(ev: Dictionary) -> bool:
 
 		&"weapon_fire":
 			if not ev.has("pos"): return false
+			if key == "weapon/interceptor": return true
 			effect(2, ev.pos, pixel * 17.0, 0.1, key, {"angle": ev.angle, "width": 1.0 if key == "weapon/scatter" else 2.0})
 			if key == "weapon/scatter":
 				burst(ev.pos, 15, ev.angle, 1.4, 60.0, 120.0, 0.1, [Color("#ffffff"), Color("#7fd8ff"), Color("#d8f6ff")], key)
@@ -162,11 +166,11 @@ func event(ev: Dictionary) -> bool:
 			var life: float = 0.26 + ceil(float(ev.radius) / (sqrt(3.0) * 4.0 * pixel) - 4.0) * 0.05 + 0.1
 			effect(5, ev.pos, ev.radius, life, "weapon/barrier", {"angle": ev.angle, "broken": ev.broken, "c1": Color("#e6f3ff"), "c2": Color("#76aaff")})
 			if ev.broken:
-				var count := roundi(TAU * float(ev.radius) / (sqrt(3.0) * 4.0 * pixel)) * 6
+				var count := roundi(TAU * float(ev.radius) / (sqrt(3.0) * 4.0 * pixel) * 6.0 * SETTINGS.number("weapon/barrier","particle_count_scale",1.0))
 				for i in count:
 					var a := _rng.randf() * TAU
 					var p: Vector2 = ev.pos + Vector2.from_angle(a) * float(ev.radius) * _rng.randf_range(0.92, 1.04)
-					burst(p, 1, a, 1.1, 35, 145, _rng.randf_range(0.25, 0.55), [Color.WHITE, Color("#76aaff"), Color("#bfe0ff")], "weapon/barrier", _rng.randf_range(1, 3))
+					burst(p, 1, a, 1.1, 35, 145, _rng.randf_range(0.25, 0.55), [Color.WHITE, Color("#76aaff"), Color("#bfe0ff")], "weapon/barrier", _rng.randf_range(1, 3), false)
 					if not sparks.is_empty(): sparks.back().delay = life - 0.1 + _rng.randf() * 0.05
 		&"barrier_restore":
 			var item := effect(5, ev.pos, 26.0 * pixel, 0.5, "weapon/barrier", {"width": -1.0, "angle": 0.0, "c2": Color("#76aaff")})
@@ -197,7 +201,7 @@ func event(ev: Dictionary) -> bool:
 		&"end_hole":
 			var item := _distortion(ev.pos, 60.0 * pixel, float(ev.life), "trait/vortex", 1)
 			item.follow = true
-			for i in 140:
+			for i in roundi(140 * SETTINGS.number("trait/vortex","particle_count_scale",1.0)):
 				var radial:=Vector2.from_angle(_rng.randf()*TAU)*_rng.randf_range(40,180)*pixel
 				sparks.append({"pos":ev.pos+radial,"inward":radial,"swirl":_rng.randf_range(-0.8,0.8),"velocity":Vector2.ZERO,"age":0.0,"life":_rng.randf_range(0.08,0.24),"delay":_rng.randf()*0.18,"color":Color.WHITE if i%3==0 else Color("#be78ff"),"size":_rng.randf_range(0.8,2.6)})
 		&"hole_recover":
@@ -216,9 +220,9 @@ func _distortion(pos: Vector2, radius: float, life: float, key: String, kind: in
 	var item := effect(0, pos, radius, life, key)
 	item.material.shader = preload("res://shaders/build_distortion.gdshader")
 	item.material.set_shader_parameter("mode", kind)
-	item.material.set_shader_parameter("pixel", pixel)
-	item.material.set_shader_parameter("extent", Vector2.ONE * (radius + pixel * 2.0) * 2.0)
-	item.material.set_shader_parameter("duration", life)
+	item.material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
+	item.material.set_shader_parameter("extent", item.node.scale * 2.0)
+	item.material.set_shader_parameter("duration", item.life)
 	item["distortion"] = true
 	return item
 
@@ -266,6 +270,7 @@ func projectiles(pr: ProjectileSystem) -> void:
 		_shots[key].begin()
 		var mat: ShaderMaterial = _shots[key].material
 		mat.set_shader_parameter("tint", SETTINGS.tinted(key, Color.WHITE))
+		mat.set_shader_parameter("pixel_scale", SETTINGS.number(key, "pixel_scale", 1.0))
 		mat.set_shader_parameter("length_scale", SETTINGS.number(key, "shot_length_scale", 1.0))
 		mat.set_shader_parameter("width_scale", SETTINGS.number(key, "shot_width_scale", 1.0))
 	for i in pr.friend_alive.size():
@@ -275,7 +280,7 @@ func projectiles(pr: ProjectileSystem) -> void:
 			burst(pr.friend_pos[i],1,pr.friend_vel[i].angle()+PI,0.3,5,15,0.18,[Color("#ffb030")],key)
 		if not _shots.has(key): continue
 		var a := fposmod(pr.friend_vel[i].angle(), TAU) / TAU
-		_shots[key].add_upright((pr.friend_pos[i] / pixel).round() * pixel, 18.0 * pixel, Color(a, 1.0 if key == "weapon/scatter" and pr.friend_life[i] < 0.09 else 0.0, clock, 1.0))
+		_shots[key].add_upright((pr.friend_pos[i] / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number(key,"effect_scale",1.0), Color(a, 1.0 if key == "weapon/scatter" and pr.friend_life[i] < 0.09 else 0.0, clock, 1.0))
 		if _last_world_delta>0.0 and key=="weapon/knockback":
 			burst(pr.friend_pos[i],1,pr.friend_vel[i].angle()+PI,0.3,5,15,0.18,[Color("#b46bff") if key=="weapon/knockback" else Color("#ffb030")],key)
 	for batch in _shots.values(): batch.end()
@@ -308,11 +313,12 @@ func sample(ctx: RunContext, dt: float) -> void:
 	if rampage != null:
 		_aura.position = state.ship_pos + Vector2(0, 5.0 * ctx.cfg.character_scale).rotated(state.ship_heading.angle() + PI * 0.5)
 		_aura.rotation = state.ship_heading.angle() + PI * 0.5
-		_aura.scale = Vector2.ONE * ctx.cfg.character_scale
+		_aura.scale = Vector2.ONE * ctx.cfg.character_scale * SETTINGS.number("trait/rampage", "effect_scale", 1.0)
 		var mat: ShaderMaterial = _aura.material
 		mat.set_shader_parameter("strength", minf(1.0, float(rampage.kills) / 150.0) if state.tracing else rampage.strength)
 		mat.set_shader_parameter("pop", rampage.pop)
-		mat.set_shader_parameter("clock", clock)
+		mat.set_shader_parameter("clock", clock / maxf(0.01, SETTINGS.number("trait/rampage", "duration_scale", 1.0)))
+		mat.set_shader_parameter("pixel_scale", SETTINGS.number("trait/rampage", "pixel_scale", 1.0))
 		mat.set_shader_parameter("tint", SETTINGS.tinted("trait/rampage", Color.WHITE))
 	var gear = ctx.loadout.trait_behaviors.get(&"T04")
 	if gear != null and state.tracing:
@@ -323,7 +329,7 @@ func sample(ctx: RunContext, dt: float) -> void:
 			_gear_acc -= 1.0
 			var nose := _rng.randf() < 0.55
 			var p := state.ship_pos + state.ship_heading * (9.0 if nose else 2.0 - _rng.randf() * 6.0) * pixel + state.ship_heading.orthogonal() * _rng.randf_range(-0.5, 0.5) * (2.0 if nose else 5.0 + 10.0 * ex) * pixel
-			burst(p, 1, state.ship_heading.angle() + PI, 0.9 + 0.8 * ex, 60.0 + 160.0 * ex, 60.0 + 160.0 * ex, 0.16 + 0.24 * ex * _rng.randf(), [Color.WHITE], "trait/fullCharge", 2.0 if _rng.randf() < 0.35 + 0.4 * ex else 1.0)
+			burst(p, 1, state.ship_heading.angle() + PI, 0.9 + 0.8 * ex, 60.0 + 160.0 * ex, 60.0 + 160.0 * ex, 0.16 + 0.24 * ex * _rng.randf(), [Color.WHITE], "trait/fullCharge", 2.0 if _rng.randf() < 0.35 + 0.4 * ex else 1.0, false)
 			if not sparks.is_empty(): sparks.back().palette = [Color.WHITE, Color("#fff2a8"), Color("#ffd040"), Color("#ff9a1e"), Color("#e9561c"), Color("#9a2a14")]
 	var sonic = ctx.loadout.weapon_behaviors.get(&"W08")
 	var frames: Array = sonic.frames if sonic != null else []
@@ -335,12 +341,12 @@ func sample(ctx: RunContext, dt: float) -> void:
 		var item := _sonic_nodes[i]
 		item.node.visible = i < frames.size()
 		if i >= frames.size(): continue
-		var radius: float = sonic.wave_speed() * sonic.wave_life()
+		var radius: float = sonic.wave_speed() * sonic.wave_life() * SETTINGS.number("weapon/sonic","effect_scale",1.0)
 		item.node.position = frames[i].pos
 		item.node.scale = Vector2.ONE * (radius + 2.0 * pixel)
 		item.material.set_shader_parameter("extent", Vector2.ONE * (radius + 2.0 * pixel) * 2.0)
 		item.material.set_shader_parameter("duration", sonic.wave_life())
-		item.material.set_shader_parameter("age", frames[i].age)
+		item.material.set_shader_parameter("age", frames[i].age / maxf(0.01,SETTINGS.number("weapon/sonic","duration_scale",1.0)))
 		item.material.set_shader_parameter("width", float(sonic.pulse) / 0.25)
 	if _mines == null:
 		_mines = InstanceBatch.new()
@@ -350,11 +356,13 @@ func sample(ctx: RunContext, dt: float) -> void:
 		mat.set_shader_parameter("style", 4)
 		_mines.material = mat
 		add_child(_mines)
+	_mines.material.set_shader_parameter("tint",SETTINGS.tinted("weapon/mines",Color.WHITE))
+	_mines.material.set_shader_parameter("pixel_scale",SETTINGS.number("weapon/mines","pixel_scale",1.0))
 	_mines.begin()
 	var launcher = ctx.loadout.weapon_behaviors.get(&"W07")
 	if launcher != null:
 		for mine in launcher.mines:
-			_mines.add_upright((mine.pos / pixel).round() * pixel, 18.0 * pixel, Color(0, 0, 0, 1))
+			_mines.add_upright((mine.pos / pixel).round() * pixel, 18.0 * pixel * SETTINGS.number("weapon/mines","effect_scale",1.0), Color(0, 0, 0, 1))
 	_mines.end()
 
 func captures_step(dt: float, center: Vector2) -> void:
@@ -426,7 +434,8 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 	if _runup_node.node.visible:
 		var x:=clampf(ctx.loadout.boost_distance/600.0,0,1)
 		_runup_node.node.position=state.ship_pos
-		_runup_node.material.set_shader_parameter("age",clock)
+		_runup_node.material.set_shader_parameter("age",clock / maxf(0.01,SETTINGS.number("trait/runUp","duration_scale",1.0)))
+		_runup_node.material.set_shader_parameter("streak_count",roundi(16 * SETTINGS.number("trait/runUp","particle_count_scale",1.0)))
 		_runup_node.material.set_shader_parameter("angle",state.ship_heading.angle())
 		_runup_node.material.set_shader_parameter("width",(exp(3*x)-1)/(exp(3.0)-1))
 	if _tether==null:

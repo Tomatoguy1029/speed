@@ -1065,7 +1065,7 @@ params = {
 "color": "#8fffe2"
 }
 costs = PackedInt32Array()
-resources = PackedStringArray("res://assets/pixel/drone.png", "res://data/weapons/W25_interceptor.tres", "res://scripts/data_types/weapon_def.gd", "res://scripts/render/equipment/interceptor.gd", "res://scripts/render/interceptor_visual.gd", "res://scripts/weapons/interceptor.gd")
+resources = PackedStringArray("res://assets/pixel/drone.png", "res://data/visuals/effect_settings.tres", "res://data/weapons/W25_interceptor.tres", "res://scripts/data_types/weapon_def.gd", "res://scripts/render/equipment/interceptor.gd", "res://scripts/render/interceptor_visual.gd", "res://scripts/render/visual_effect_settings.gd", "res://scripts/weapons/interceptor.gd")
 
 [sub_resource type="Resource" id="Resource_f85gy"]
 script = ExtResource("1_na87o")
@@ -1076,7 +1076,7 @@ text_prefix = "weapon"
 code_id = &"dashRangeDrone"
 icon_path = "res://assets/ui/combat/dash_range_drone_icon.svg"
 costs = PackedInt32Array()
-resources = PackedStringArray("res://assets/pixel/drone.png", "res://assets/ui/combat/dash_range_drone_icon.svg", "res://data/weapons/W26_dashRangeDrone.tres", "res://scripts/data_types/weapon_def.gd", "res://scripts/render/dash_range_drone.gd", "res://scripts/render/equipment/dashRangeDrone.gd", "res://scripts/weapons/dashRangeDrone.gd")
+resources = PackedStringArray("res://assets/pixel/drone.png", "res://assets/ui/combat/dash_range_drone_icon.svg", "res://data/visuals/effect_settings.tres", "res://data/weapons/W26_dashRangeDrone.tres", "res://scripts/data_types/weapon_def.gd", "res://scripts/render/dash_range_drone.gd", "res://scripts/render/equipment/dashRangeDrone.gd", "res://scripts/render/visual_effect_settings.gd", "res://scripts/weapons/dashRangeDrone.gd")
 
 [sub_resource type="Resource" id="Resource_5a1q6"]
 script = ExtResource("1_na87o")

@@ -219,7 +219,6 @@ func _setup_equipment(key: String, serial: int) -> void:
 			session.run.loadout.on_launch(true)
 			for _i in behavior._every(): session.run.loadout.on_kill(&"shot")
 		"trait/critBeam": session.run.loadout.on_critical(session.run.state.ship_pos)
-		"trait/reactive": session.run.loadout.on_hurt()
 	session.playing = true
 	_play.text = "停止"
 	_status.text = "試遊中: " + key
@@ -239,7 +238,7 @@ func _replay() -> void:
 		set_effect("boss/final_strike")
 		return
 	if not is_instance_valid(actor): return
-	var started := _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
+	var started: bool = _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
 	if started:
 		session.playing = true
 		_play.text = "停止"
