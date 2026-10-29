@@ -207,6 +207,8 @@ params = {
 "snake_turn": 3.2,
 "solo_bearer_distance": 650.0,
 "squad": {
+"busy_speed": {&"windup": 0.4, &"active": 0.3, &"hold": 0.5},
+"lunge_momentum": 0.6,
 "look": {
 "attack": {"on": Vector2(3, 6), "off": Vector2(0.3, 0.6), "limit": 1.4},
 "front": {"on": Vector2(2, 4), "off": Vector2(0.5, 1.1), "limit": 1.4},

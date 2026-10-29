@@ -24,6 +24,7 @@ var _neck_mesh_origin:=Vector2.INF
 var _neck_mesh_radius:=-1.0
 
 const GRID := preload("res://scripts/bosses/hydra_grid.gd")
+const NORMAL_SWIM := preload("res://scripts/bosses/hydra/normal_swim.gd")
 const SNAKE := preload("res://scripts/bosses/hydra_snake_motion.gd")
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 var normal_runners := {}
@@ -428,6 +429,8 @@ func _unbounded_head_pos(neck: Neck) -> Vector2:
 	if neck.mode in [&"special_aim",&"special_hold"]: return neck.strike_pos
 	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		return neck.strike_pos
+	if separated and neck != immortal_neck and _normal_moves.has(neck.mode):
+		return neck.strike_pos if neck.motion.get("extension", false) else neck.free_pos
 	if neck.locked and _normal_moves.has(neck.mode): return neck.strike_pos
 	if separated:return neck.free_pos
 	return _neck_base(neck) + Vector2.from_angle(neck.angle) * neck.length
@@ -579,6 +582,9 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 	n.locked = false
 	n.step = 0
 	n.emission.clear()
+	n.motion.erase("normal_phase")
+	n.motion.erase("lunge_done")
+	n.motion.erase("extension")
 	n.target = run_state.ship_pos
 	if attack==&"thunder_drop":n.target+=run_state.ship_vel*float(move_params(attack).thunder_lead)
 	_cue(&"warning_started",attack,index)
@@ -1325,6 +1331,9 @@ func _finish_snake_step(n: Neck, from: Vector2) -> void:
 func move_reach(id: StringName) -> Dictionary:
 	return _moves[id].range_info(move_params(id)) if _moves.has(id) else {"origin": "head", "max": INF}
 func tick_normal(neck, dt: float) -> void:
+	if separated and neck != immortal_neck:
+		NORMAL_SWIM.tick(self, neck, dt)
+		return
 	var id: StringName = neck.mode
 	if not normal_runners.has(id): normal_runners[id] = _moves[id].make_runner()
 	normal_runners[id].tick_neck(self, neck, dt)
