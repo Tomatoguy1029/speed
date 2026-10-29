@@ -15,6 +15,14 @@
 [ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_2_normal.png" id="head_normal1"]
 [ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_3_normal.png" id="head_normal2"]
 
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/body/hydra_body.png" id="body_diffuse"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/body/hydra_body_lit_normal.png" id="body_normal"]
+
+[sub_resource type="CanvasTexture" id="body_lit"]
+diffuse_texture = ExtResource("body_diffuse")
+normal_texture = ExtResource("body_normal")
+texture_filter = 1
+
 [sub_resource type="CanvasTexture" id="head_lit0"]
 diffuse_texture = ExtResource("art_head")
 normal_texture = ExtResource("head_normal0")
@@ -50,6 +58,11 @@ callback_mode_process = 2
 libraries/ = ExtResource("3")
 
 [node name="NeckArtwork" parent="." instance=ExtResource("neck_art")]
+
+[node name="BodyArtwork" parent="." instance=ExtResource("neck_art")]
+show_behind_parent = false
+body_only = true
+body_texture = SubResource("body_lit")
 
 [node name="HeadArtwork" parent="." instance=ExtResource("neck_art")]
 show_behind_parent = false

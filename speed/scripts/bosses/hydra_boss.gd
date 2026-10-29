@@ -1064,6 +1064,8 @@ func draw_on(c: CanvasItem) -> void:
 			if neck_texture!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
 		return
+	if has_node("BodyArtwork"):
+		return
 	if body_texture!=null:
 		c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
 	else:

@@ -1,6 +1,8 @@
 ## 手描きの節と法線を、戦闘用の点列へ重ねる。解析・切り出しは制作時に完了する。
 extends Node2D
 
+@export var body_only := false
+@export var body_texture: Texture2D
 @export var heads_only := false
 @export var head_textures: Dictionary = {}
 @export var segments: Array[Texture2D] = []
@@ -22,6 +24,11 @@ func _ready() -> void:
 
 func _draw() -> void:
 	if host == null or host.ctx == null or not host.has_body(): return
+	if body_only:
+		if not host.separated and body_texture != null:
+			var radius: float = host.table.r[host.body]
+			draw_texture_rect(body_texture, Rect2(Vector2.ONE * -radius, Vector2.ONE * radius * 2.0), false)
+		return
 	if heads_only:
 		_draw_heads()
 		return
