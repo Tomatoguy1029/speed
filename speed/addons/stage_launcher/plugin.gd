@@ -8,6 +8,7 @@ extends EditorPlugin
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const FireInspector := preload("res://addons/stage_launcher/fire_inspector.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
+const MENU_SEPARATORS := ["試遊", "表示制作", "計測"]
 const SCENES := {
 	"lab": LAB_SCENE,
 	"visual": "res://gyms/visual_editor.tscn",
@@ -51,13 +52,35 @@ func _enter_tree() -> void:
 ## Godot 標準の「プロジェクト → ツール」直下へ登録する。
 ## エディター拡張の入口は各 plugin 自身が登録し、無効時に項目を残さない。
 func _register_menu_items() -> void:
+	_add_menu_item(MENU_SEPARATORS[0], _on_menu_separator)
 	_add_menu_item("編集中のステージを起動", _on_pressed)
 	_add_scene("実験場", "lab")
+	_add_menu_item(MENU_SEPARATORS[1], _on_menu_separator)
 	_add_menu_item("ビジュアル編集（炎・オーラ・後光・マップ・目印・エリート）", _on_visual_pressed)
 	_add_scene("背景編集", "background")
 	_add_scene("ピクセル素材確認", "art")
+	_add_menu_item(MENU_SEPARATORS[2], _on_menu_separator)
 	_add_scene("敵描画ベンチ", "performance")
 	_add_scene("ラン処理・描画ベンチ", "profile")
+	_mark_menu_separators.call_deferred()
+
+## EditorPlugin の公開 API には区切りの登録がないため、登録した項目だけを PopupMenu の区切りに変える。
+func _mark_menu_separators() -> void:
+	if not is_inside_tree(): return
+	for node in EditorInterface.get_base_control().find_children("*", "PopupMenu", true, false):
+		var menu := node as PopupMenu
+		var has_own_item := false
+		for index in menu.item_count:
+			if menu.get_item_text(index).begins_with("ビジュアル編集（"):
+				has_own_item = true
+				break
+		if not has_own_item: continue
+		for index in menu.item_count:
+			if menu.get_item_text(index) in MENU_SEPARATORS:
+				menu.set_item_as_separator(index, true)
+
+func _on_menu_separator() -> void:
+	pass
 
 func _add_scene(label: String, key: String) -> void:
 	if ResourceLoader.exists(SCENES[key]):
