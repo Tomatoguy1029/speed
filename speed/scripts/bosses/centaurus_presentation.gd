@@ -6,6 +6,7 @@ var _parts: Node2D
 var actor: CentaurusBoss
 var hit := 0.0
 var pulse := 0.0
+const BOW := Color("#d8b46a")
 const OUTLINE := Color("#1a1928")
 const STRING := Color("#f4ecd8")
 const WARNING := Color("#f2b567")
