@@ -2,7 +2,7 @@
 extends EnemyBehavior
 
 func _init() -> void:
-	# 移動を続けながら、帯を出す直前に攻撃の枠を取る。
+	# 走ること自体が攻撃なので、攻撃の順番待ちを通さず、常に走って帯を残す。
 	admission = false
 
 func step(i: int, dt: float) -> void:
@@ -15,8 +15,6 @@ func _auriga(i: int, dt: float) -> void:
 	var p: Dictionary = t.def[i].params
 	t.fire_t[i] -= dt
 	if t.fire_t[i] > 0.0:
-		return
-	if not _lab_admit(i, dt):
 		return
 	t.fire_t[i] = float(p.trail_step)
 	var seg := t.vel[i] * float(p.trail_step)

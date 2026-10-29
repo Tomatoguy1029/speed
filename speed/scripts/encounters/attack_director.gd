@@ -7,7 +7,7 @@ extends RefCounted
 const FLOAT_ROUNDING := 4.0 * 2.220446049250313e-16
 const CATEGORIES := ["aimed", "homing", "dash", "beam", "zone", "wave", "residue"]
 const BEHAVIORS := {
-	"biter": ["zone"], "defender": ["zone"], "hound": ["zone"], "auriga": ["residue"],
+	"biter": ["zone"], "defender": ["zone"], "hound": ["zone"],
 	"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
 	"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 	"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
