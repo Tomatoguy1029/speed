@@ -4,9 +4,10 @@ uniform vec4 tint : source_color = vec4(0.4,0.75,1.0,1.0);
 uniform float clock=0.0;
 uniform float thickness=300.0;
 uniform bool warning=false;
+uniform float cell_size=4.0;
 float hash(float p){return fract(sin(p*127.1)*43758.5453);}
 void fragment(){
- float cells=max(thickness/4.0,8.0);
+ float cells=max(thickness/cell_size,8.0);
  vec2 p=((floor(UV*cells)+0.5)/cells-0.5)*2.0;
  float r=length(p);
  float a=atan(p.y,p.x);
@@ -24,5 +25,5 @@ void fragment(){
   alpha=inside*0.06+ring*(0.35+ticks*0.4);
   color=mix(tint.rgb,vec3(1.0,0.85,0.45),0.6);
  }
- COLOR=vec4(color,clamp(alpha,0.0,1.0));
+ COLOR=vec4(color,clamp(alpha,0.0,1.0)*tint.a);
 }

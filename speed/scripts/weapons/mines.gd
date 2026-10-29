@@ -1,6 +1,7 @@
 ## W07 軌跡機雷：高速で実際に通った線に、一定の間隔で機雷を残す。少し遅れて有効になり、
 ## 敵が近づくと爆発する（一覧 docs/game/catalog/weapons.md）。
 extends WeaponBehavior
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 ## 機雷：pos、life、armed、dmg、radius
 var mines: Array = []
@@ -28,7 +29,7 @@ func tick(dt: float, _busy: bool) -> void:
 			continue
 		ctx.combat.nearby(m.pos, float(p("trigger")), _buf)
 		if not _buf.is_empty():
-			ctx.combat.explode(m.pos, m.radius, m.dmg, {"cause": &"mine", "color": Color("#ff7b54"), "knock": 300.0 * post_factor(&"knockback"), "life": 0.3})
+			ctx.combat.explode(m.pos, m.radius, m.dmg, {"cause": &"mine", "color": EFFECT_SETTINGS.tinted("weapon/mines", Color("#ff7b54")), "knock": 300.0 * post_factor(&"knockback"), "life": 0.3})
 			m.life = 0.0
 			if state.phase != RunState.Phase.PLAY:
 				return

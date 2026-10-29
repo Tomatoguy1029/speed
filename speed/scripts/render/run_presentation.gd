@@ -1135,16 +1135,16 @@ func _enemy_sprite_path(type: StringName) -> String:
 	return "res://assets/pixel/%s.png" % type
 
 ## 敵の船体を絵で描く（牽引中・撃ち出した船体）。glow は周りの光の色（透明なら光らせない）。
-func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color) -> void:
+func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color, tint := Color.WHITE) -> void:
 	var tex := _enemy_texture(type)
 	if glow.a > 0.0:
 		c.draw_circle(p, r * 1.1, Color(glow, 0.25))
 	if tex == null:
-		c.draw_circle(p, r, Color("#aeb6c4"))
+		c.draw_circle(p, r, Color("#aeb6c4") * tint)
 		return
 	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r) * 2.0
 	c.draw_set_transform(p, _enemy_sprite_angle(type, angle))
-	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
+	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false, tint)
 	c.draw_set_transform(Vector2.ZERO)
 
 ## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
@@ -1443,14 +1443,19 @@ func _blue_exhaust() -> bool:
 	return false
 
 func _draw_equipment_parts(c: CanvasItem, rect: Rect2, color: Color, under: bool) -> void:
-	var drawn := {}
+	var tints := {}
+	var ordered: Array[Texture2D] = []
 	var visuals := _equipment_visuals.values()
 	visuals.sort_custom(func(a, b): return a.overlay_order < b.overlay_order)
 	for visual in visuals:
 		var texture: Texture2D = visual.underlay if under else visual.overlay
-		if visual.active and texture != null and not drawn.has(texture):
-			c.draw_texture_rect(texture, rect, false, color)
-			drawn[texture] = true
+		if visual.active and texture != null:
+			if not tints.has(texture):
+				tints[texture] = Color.WHITE
+				ordered.append(texture)
+			tints[texture] = tints[texture] * visual.visual_color(Color.WHITE)
+	for texture in ordered:
+		c.draw_texture_rect(texture, rect, false, color * tints[texture])
 
 func _meteors() -> RefCounted:
 	if _meteor_visual == null:

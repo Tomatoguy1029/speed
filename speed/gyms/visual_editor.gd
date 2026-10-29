@@ -8,6 +8,7 @@ const TOOLS := [
 	["map", "マップ", "res://gyms/map_reveal_preview.gd"],
 	["landmark", "目印の星", "res://gyms/enemy_mark_preview.gd"],
 	["elite", "エリート", "res://gyms/enemy_mark_preview.gd"],
+	["boss_effects", "戦闘エフェクト", "res://gyms/effect_settings_preview.gd"],
 ]
 
 var _sessions: Dictionary = {}

@@ -1,5 +1,6 @@
 ## 角・蹄の予告と光の槍の残光。体のパーツは本体の表示が描く。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 @export var pixel_size := 3.0
 var actor: MonocerosBoss
@@ -11,6 +12,8 @@ var retained: bool:
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const ENERGY := Color("#9fe8ff")
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 func on_event(event: Dictionary) -> void:
 	if technique_id != &"lance": return
 	if event.technique == &"lance":

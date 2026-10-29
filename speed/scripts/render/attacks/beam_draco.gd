@@ -34,7 +34,7 @@ func _draw_beams(c: CanvasItem) -> void:
 	# HDR の描画では頂点の色が線形に直されて届くので、shaderで元の値に戻す
 	mat.set_shader_parameter("linear_colors", _layer.get_viewport().use_hdr_2d)
 	mat.set_shader_parameter("clock", rm.state.world_time)
-	mat.set_shader_parameter("pixel", _px(2.0))
+	mat.set_shader_parameter("pixel", _px(2.0) * EFFECT_SETTINGS.number(scene_file_path, "pixel_scale", 1.0))
 	for i in pr.hazard_alive.size():
 		if pr.hazard_visual[i] != &"" and String(pr.hazard_visual[i]) != scene_file_path: continue
 		if pr.hazard_alive[i] == 0 or pr.hazard_style[i] != ProjectileSystem.HazardStyle.DRACO:
@@ -43,7 +43,8 @@ func _draw_beams(c: CanvasItem) -> void:
 		var half := pr.hazard_width[i] * 0.5
 		var col: Color = pr.hazard_color[i]
 		mat.set_shader_parameter("half0", half)
-		mat.set_shader_parameter("tint", Vector3(col.r, col.g, col.b))
+		mat.set_shader_parameter("tint", Vector3(col.r * effect_tint.r, col.g * effect_tint.g, col.b * effect_tint.b))
+		mat.set_shader_parameter("opacity", effect_tint.a)
 		var seed := float(i % 17) / 17.0
 		var t := pr.hazard_t[i]
 		var delay := pr.hazard_delay[i]

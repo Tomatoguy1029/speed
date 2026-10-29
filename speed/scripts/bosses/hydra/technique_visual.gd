@@ -1,5 +1,6 @@
 ## 絵担当の差し替え用の最小実装。イベントを受け取り、判定と同じ世界時間で表示する。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 @export var warning_color := Color("#ffd16c")
 @export var locked_color := Color("#fff2b0")
@@ -26,6 +27,9 @@ var serial:=0
 @onready var animations: AnimationPlayer = $AnimationPlayer
 @onready var body_anchor: Marker2D = $BodyAnchor
 @onready var head_anchor: Marker2D = $HeadAnchor
+
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 
 func bind_hydra(actor: Node) -> void:
 	hydra = actor

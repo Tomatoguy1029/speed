@@ -1,5 +1,6 @@
 ## ボスの時間切れ演出。AIの選択処理は各ボスが持つ。
 extends BossActor
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @onready var timeline: AnimationPlayer = $Timeline
 
 var final_strike_t := -1.0
@@ -43,7 +44,7 @@ func _final_strike_tick(dt: float) -> void:
 	_final_beam.points = points
 	_final_beam.width = width
 	var mat := _final_beam.material as ShaderMaterial
-	mat.set_shader_parameter("tint", Color(1, 0.25, 0.4))
+	mat.set_shader_parameter("tint", EFFECT_SETTINGS.tinted("boss/final_strike", Color(1, 0.25, 0.4)))
 	mat.set_shader_parameter("clock", run_state.time)
 	mat.set_shader_parameter("warning", final_strike_t < _final_charge - widen_time)
 	mat.set_shader_parameter("span", points[0].distance_to(points[1]))

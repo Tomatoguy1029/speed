@@ -1,5 +1,6 @@
 ## 機体の移動に沿う衝撃波。武器と特性で命中済みの記録・同時数を共有する。
 extends RunSystem
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 var waves: Array = []
 var _buf := PackedInt32Array()
@@ -12,7 +13,9 @@ func fire(cause: StringName, radius: float, dmg: float, knock: float, travel: fl
 	if waves.size() > 4:
 		waves.pop_front()
 	sweep(wave, state.ship_pos, state.ship_pos)
-	state.emit(&"ring", {"pos": state.ship_pos, "radius": radius, "color": Color("#c8f7ff"), "life": 0.5})
+	var effect_key := "trait/killSonic" if cause == &"killSonic" else "weapon/sonic"
+	state.emit(&"ring", {"pos": state.ship_pos, "radius": radius,
+		"color": EFFECT_SETTINGS.tinted(effect_key, Color("#c8f7ff")), "life": 0.5})
 	state.emit(&"sonic", {"pos": state.ship_pos, "radius": radius})
 
 func sweep(wave: Dictionary, p0: Vector2, p1: Vector2) -> void:

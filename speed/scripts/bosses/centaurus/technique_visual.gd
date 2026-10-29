@@ -1,5 +1,6 @@
 ## 矢の予告と降下。ボス中心と正面+Xに合わせ、雨だけをワールド座標で描く。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var pixel_size := 3.0
@@ -8,6 +9,8 @@ const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 const RAIN_ANGLE := PI * 0.5 - 0.35
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 func update_technique() -> void:
 	if visual_kind == &"rain":
 		top_level = true
@@ -81,9 +84,10 @@ func _draw_rain() -> void:
 		var opacity := pow(clampf(t / fade, 0.0, 1.0), 3.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
 		var scene: PackedScene = r.get("shot_visual")
+		var shot_tint: Color = EFFECT_SETTINGS.values_for(scene.resource_path).get("effect_tint", Color.WHITE) if scene != null else Color.WHITE
 		var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
 		var mesh: Mesh = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight") if library != null and scene != null else null
 		var sprites: Array = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight_sprites", []) if library != null and scene != null else []
-		if mesh != null: draw_mesh(mesh, null, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity))
-		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity))
-		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity)
+		if mesh != null: draw_mesh(mesh, null, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity) * shot_tint)
+		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity) * shot_tint)
+		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity, shot_tint)

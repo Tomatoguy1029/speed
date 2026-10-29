@@ -2,6 +2,7 @@
 extends Node2D
 const ROCKS := [preload("res://assets/pixel/meteor_0.png"),preload("res://assets/pixel/meteor_1.png")]
 @export var vortex_shader: Shader=preload("res://shaders/hydra_tornado.gdshader")
+var effect_tint := Color.WHITE
 var wind: Sprite2D
 var stones: Array[Sprite2D]=[]
 var feed_stones: Array[Sprite2D]=[]
@@ -13,6 +14,7 @@ func _ready() -> void:
 	wind.texture=ImageTexture.create_from_image(pixels)
 	wind.material=ShaderMaterial.new()
 	wind.material.shader=vortex_shader
+	wind.material.set_shader_parameter("tint",effect_tint)
 	wind.z_index=1
 	add_child(wind)
 	for i in 14:
@@ -26,6 +28,11 @@ func _ready() -> void:
 		rock.z_index=3
 		feed_stones.append(rock)
 		add_child(rock)
+func set_effect_tint(value: Color) -> void:
+	effect_tint=value
+	if is_instance_valid(wind): wind.material.set_shader_parameter("tint",effect_tint)
+func set_pixel_size(value: float) -> void:
+	if is_instance_valid(wind): wind.material.set_shader_parameter("pixel_size",value)
 func update_effect(effect: Dictionary, clock: float) -> void:
 	var points: PackedVector2Array=effect.points
 	var delta:=points[-1]-points[0]

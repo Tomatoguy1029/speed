@@ -1,5 +1,6 @@
 ## 技の予告・猟犬の軌跡・号令と遠吠えの輪。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var pixel_size := 3.0
@@ -18,6 +19,7 @@ const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
 const LUNGE_TRAIL := 6
 func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 	_pack_layer.top_level = true
 	_pack_layer.draw.connect(_draw_lunge)
 	add_child(_pack_layer)

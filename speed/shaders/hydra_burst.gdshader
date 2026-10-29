@@ -18,5 +18,5 @@ void fragment(){
  float chips=step(0.91,hash(floor(p*18.0)+seed))*step(ring_radius-0.12,r)*step(r,ring_radius+0.13);
  float alpha=(ring*0.7+inner+rays*0.8+chips)*(1.0-progress);
  vec3 color=tint.rgb*(1.2+chips)+vec3(inner*1.4+ring*0.25);
- COLOR=vec4(color,clamp(alpha,0.0,1.0));
+ COLOR=vec4(color,clamp(alpha,0.0,1.0)*tint.a);
 }

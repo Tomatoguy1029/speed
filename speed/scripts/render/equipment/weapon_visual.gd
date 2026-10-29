@@ -1,6 +1,7 @@
 ## 装備が使う表示。装備の種類は個別の表示だけが知り、描画側は共通の入口を呼ぶ。
 class_name WeaponVisual
 extends RefCounted
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var rm: RunPresentation
 var behavior
 var active := true
@@ -37,5 +38,13 @@ func attach(path: String, node_name: String, z := 0) -> void:
 	node.z_index = z
 	node.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 	rm._layers.ship.add_child(node)
+	node.modulate *= visual_color(Color.WHITE)
 func _px(value: float) -> float:
 	return rm._px(value)
+func visual_color(original: Color) -> Color:
+	return EFFECT_SETTINGS.tinted(_effect_key(), original)
+func visual_number(field: String, original: float) -> float:
+	return EFFECT_SETTINGS.number(_effect_key(), field, original)
+func _effect_key() -> String:
+	var category := "trait/" if String(behavior.def.id).begins_with("T") else "weapon/"
+	return category + String(behavior.def.code_id)
