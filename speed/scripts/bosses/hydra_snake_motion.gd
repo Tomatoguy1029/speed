@@ -31,7 +31,8 @@ static func follow(n, head: Vector2, dt: float, time: float, p: Dictionary)->voi
 	n.motion.hit=maxf(0.0,float(n.motion.hit)-dt)
 	var weight: float=1.0-exp(-8.0*dt)
 	var attacking: bool=n.mode!=&"idle"
-	var goals: Dictionary={"swim":clampf(n.velocity.length()/float(p.snake_speed),0.0,1.0),"turn":clampf(absf(float(n.motion.get("turn",0.0)))/float(p.snake_turn),0.0,1.0),"hit":1.0 if float(n.motion.hit)>0.0 else 0.0,"windup":1.0 if attacking and not n.locked else 0.0,"attack":1.0 if attacking and n.locked else 0.0,"hold":1.0 if String(n.mode).ends_with("hold") else 0.0}
+	var stage: StringName=n.motion.get("normal_phase", &"")
+	var goals: Dictionary={"swim":clampf(n.velocity.length()/float(p.snake_speed),0.0,1.0),"turn":clampf(absf(float(n.motion.get("turn",0.0)))/float(p.snake_turn),0.0,1.0),"hit":1.0 if float(n.motion.hit)>0.0 else 0.0,"windup":1.0 if attacking and (stage==&"windup" or (stage==&"" and not n.locked)) else 0.0,"attack":1.0 if attacking and (stage==&"active" or (stage==&"" and n.locked)) else 0.0,"hold":1.0 if attacking and (stage==&"hold" or String(n.mode).ends_with("hold")) else 0.0}
 	for key in goals:n.motion.weights[key]=lerpf(float(n.motion.weights[key]),float(goals[key]),weight)
 	var path:=PackedVector2Array([head])
 	path.append_array(trail)

@@ -3,7 +3,8 @@ extends RefCounted
 
 static func duration(id: StringName, p: Dictionary) -> float:
 	match id:
-		&"bite_thrust", &"thunder_headbutt": return float(p.normal_lunge)
+		&"bite_thrust": return float(p.normal_lunge)
+		&"thunder_headbutt": return float(p.normal_lunge) + float(p.thunder_flash)
 		&"bite_sweep": return float(p.sweep_time)
 		&"beam_fixed": return float(p.beam_time)
 		&"wind_band": return float(p.wind_time)
@@ -14,10 +15,11 @@ static func duration(id: StringName, p: Dictionary) -> float:
 static func phase(a: Node, n) -> StringName:
 	var p: Dictionary = a.move_params(n.mode)
 	if n.t < float(p.normal_charge): return &"windup"
-	return &"active" if n.t < float(p.normal_charge) + duration(n.mode, p) else &"hold"
+	return &"active" if n.t < float(p.normal_charge) + duration(a.tech_kind(n.mode), p) else &"hold"
 
 static func tick(a: Node, n, dt: float) -> void:
 	var id: StringName = n.mode
+	var kind: StringName = a.tech_kind(id)
 	var p: Dictionary = a.move_params(id)
 	var charge := float(p.normal_charge)
 	var elapsed: float = n.t - charge
@@ -25,15 +27,16 @@ static func tick(a: Node, n, dt: float) -> void:
 	var stage := phase(a, n)
 	if stage == &"hold" and n.motion.get("normal_phase", &"") != &"hold":
 		a.SNAKE.watch_player(n, a.run_state.rng, a.def.params.squad, a.squad.profile(n))
+		a.attack_field.remove_owner(n.row)
 	n.motion.normal_phase = stage
 	if n.t < charge:
 		a.aim_neck(n, (n.target - n.free_pos).angle(), dt)
 		n.glow = n.t / maxf(charge, 0.001)
-		if id == &"beam_fixed":
+		if kind == &"beam_fixed":
 			var points := PackedVector2Array([n.free_pos, n.free_pos + Vector2.from_angle(n.look_angle) * float(p.beam_len)])
 			if n.emission.is_empty(): n.emission = a.attack_field.add_shape(points, float(p.beam_width), charge - n.t, float(p.beam_time), float(p.beam_dmg), &"beam", n.row)
 			else: n.emission.points = points
-	if id == &"thunder_drop" and not n.locked:
+	if kind == &"thunder_drop" and not n.locked:
 		var points := PackedVector2Array([n.target, n.target + Vector2(0.1, 0)])
 		if n.emission.is_empty(): n.emission = a.attack_field.add_shape(points, float(p.thunder_radius) * 2.0, maxf(0.0, charge - n.t), float(p.thunder_flash), float(p.beam_dmg), &"lightning", n.row)
 		else: n.emission.points = points
@@ -48,13 +51,15 @@ static func tick(a: Node, n, dt: float) -> void:
 			n.sweep = n.look_angle
 			n.step = 1
 			a._cue(&"attack_started", id, a.head_index(n))
-			match id:
+			match kind:
+				&"beam_fixed":
+					if n.emission.is_empty(): n.emission = a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + Vector2.from_angle(n.sweep) * float(p.beam_len)]), float(p.beam_width), 0.0, float(p.beam_time), float(p.beam_dmg), &"beam", n.row)
 				&"beam_bolt":
 					var direction := Vector2.from_angle(n.sweep)
 					a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + direction * float(p.bolt_length)]), float(p.bolt_width), 0.0, float(p.bolt_life), float(p.beam_dmg), &"bolt", n.row, direction * float(p.bolt_speed), true)
 				&"rubble_lump", &"rubble_fan":
 					var runner: RefCounted = a._moves[id].make_runner()
-					if id == &"rubble_lump": runner.launch_rubble(a, n, n.sweep, float(p.lump_r))
+					if kind == &"rubble_lump": runner.launch_rubble(a, n, n.sweep, float(p.lump_r))
 					else:
 						for i in int(p.rubble_count):
 							var angle: float = n.sweep + float(p.rubble_spread) * (float(i) / maxf(1.0, float(p.rubble_count) - 1.0) - 0.5)
@@ -63,9 +68,9 @@ static func tick(a: Node, n, dt: float) -> void:
 					n.emission = a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + Vector2.from_angle(n.sweep) * float(p.wind_length)]), float(p.wind_width), 0.0, float(p.wind_time), 0.0, &"wind", n.row)
 					n.emission.wind_force = float(p.wind_force)
 		if stage == &"active": n.look_angle = n.sweep
-		if id in [&"bite_thrust", &"bite_sweep", &"thunder_headbutt"]:
+		if kind in [&"bite_thrust", &"bite_sweep", &"thunder_headbutt"]:
 			_extend(a, n, p, elapsed)
-		elif id == &"wind_blades":
+		elif kind == &"wind_blades":
 			# 向きは狙い固定時の値を使い、放つ位置は毎回の頭に付ける。
 			if n.step <= 3 and elapsed >= (n.step - 1) * float(p.blade_interval):
 				var angle: float = n.sweep + ((n.step - 1) * 0.5 - 0.5) * float(p.blade_spread)
@@ -75,17 +80,19 @@ static func tick(a: Node, n, dt: float) -> void:
 					points.append(n.free_pos + Vector2(cos(arc) * float(p.blade_size) * 0.6, sin(arc) * float(p.blade_size)).rotated(angle))
 				a.attack_field.add_shape(points, float(p.blade_width), 0.0, float(p.blade_life), float(p.bite_dmg), &"wind_blade", n.row, Vector2.from_angle(angle) * float(p.blade_speed), true)
 				n.step += 1
-		if id in [&"beam_fixed", &"wind_band"] and not n.emission.is_empty():
-			var length := float(p.beam_len if id == &"beam_fixed" else p.wind_length)
+		if kind in [&"beam_fixed", &"wind_band"] and not n.emission.is_empty():
+			var length := float(p.beam_len if kind == &"beam_fixed" else p.wind_length)
 			n.emission.points = PackedVector2Array([n.free_pos, n.free_pos + Vector2.from_angle(n.sweep) * length])
 		n.glow = 0.0
-	if elapsed >= duration(id, p) + float(p.normal_hold): a.finish_normal(n)
+	if elapsed >= duration(kind, p) + float(p.normal_hold): a.finish_normal(n)
 
 static func _extend(a: Node, n, p: Dictionary, elapsed: float) -> void:
 	if n.motion.get("lunge_done", false): return
 	var previous: Vector2 = a._head_pos(n)
-	var fraction := clampf(elapsed / maxf(duration(n.mode, p), 0.001), 0.0, 1.0)
-	if n.mode == &"bite_sweep":
+	var kind: StringName = a.tech_kind(n.mode)
+	var flight := float(p.sweep_time) if kind == &"bite_sweep" else float(p.normal_lunge)
+	var fraction := clampf(elapsed / maxf(flight, 0.001), 0.0, 1.0)
+	if kind == &"bite_sweep":
 		var angle: float = n.sweep + float(p.sweep_arc) * (fraction - 0.5)
 		n.strike_pos = n.strike_from + Vector2.from_angle(angle) * float(p.sweep_reach)
 		n.look_angle = angle
@@ -95,10 +102,10 @@ static func _extend(a: Node, n, p: Dictionary, elapsed: float) -> void:
 	n.motion.extension = true
 	n.free_pos = a._head_pos(n)
 	n.strike_pos = n.free_pos
-	if elapsed < duration(n.mode, p):
+	if elapsed < flight:
 		a.attack_field.add_shape(PackedVector2Array([previous, n.free_pos]), float(p.bite_radius), 0.0, 0.1, float(p.bite_dmg), &"bite", n.row)
 	else:
-		if n.mode == &"thunder_headbutt": a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + Vector2(0.1, 0)]), float(p.thunder_radius) * 2.0, 0.0, float(p.thunder_flash), float(p.beam_dmg), &"lightning", n.row)
+		if kind == &"thunder_headbutt": a.attack_field.add_shape(PackedVector2Array([n.free_pos, n.free_pos + Vector2(0.1, 0)]), float(p.thunder_radius) * 2.0, 0.0, float(p.thunder_flash), float(p.beam_dmg), &"lightning", n.row)
 		n.motion.extension = false
 		n.motion.lunge_done = true
 		n.angle = n.look_angle

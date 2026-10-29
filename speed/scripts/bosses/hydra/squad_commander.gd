@@ -86,7 +86,7 @@ func replan() -> void:
 	for i in front_count:
 		var weights := []
 		for n in pool:
-			weights.append((float(p.front_loyalty) if profile(n) == &"front" else 1.0) / pow(1.0 + n.free_pos.distance_to(front_center) / float(p.front_pick_distance), 3))
+			weights.append((float(p.front_loyalty) if n.motion.get("lane", &"close") == &"front" else 1.0) / pow(1.0 + n.free_pos.distance_to(front_center) / float(p.front_pick_distance), 3))
 		var chosen = pick(pool, weights)
 		front.append(chosen)
 		pool.erase(chosen)
