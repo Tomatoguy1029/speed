@@ -44,9 +44,10 @@ func tick(dt: float) -> void:
 	tick_tactic(dt)
 	if a.busy: return
 	tick_counter(dt)
+	tick_block()
 	replan_time -= dt
 	reorient_time = maxf(0.0, reorient_time - dt)
-	if heads != roster or replan_time <= 0.0:
+	if heads != roster or replan_time <= 0.0 or (reorient_time <= 0.0 and absf(angle_difference(formation_angle, (predicted - a.immortal_neck.free_pos).angle())) >= float(p.reorient)):
 		replan()
 	# 大技・コンボが使う首は、技の配置処理に任せる。
 	var forces := []
@@ -55,18 +56,18 @@ func tick(dt: float) -> void:
 		if n.mode != &"idle" and not a._normal_moves.has(n.mode): continue
 		if n.motion.get("extension", false): continue
 		var goal := goal_for(n)
-		n.motion.squad_goal = Vector2(n.motion.get("squad_goal", goal)).lerp(goal, 1.0 - exp(-float(p.goal_response) * dt))
-		var speed := float(p.attack_speed if profile(n) == &"attack" else p.front_speed if profile(n) == &"front" else p.close_speed)
+		n.motion.squad_goal = Vector2(n.motion.get("squad_goal", goal)).lerp(goal, 1.0 - exp(-float(p.block_response if profile(n) == &"block" else p.goal_response) * dt))
+		var speed := float(p.front_speed) * float(p.block_speed) if profile(n) == &"block" else float(p.attack_speed if profile(n) == &"attack" else p.front_speed if profile(n) == &"front" else p.close_speed)
 		if a._normal_moves.has(n.mode): speed *= float(p.busy_speed[a.NORMAL_SWIM.phase(a, n)])
 		if n.free_pos.distance_to(n.motion.squad_goal) > float(p.far_distance): speed *= float(p.far_speed)
 		var destination: Vector2 = a.snake_destination(n, n.motion.squad_goal, true)
 		forces.append({"neck": n, "force": a.SNAKE.boid_force(n, destination, heads, a.immortal_neck, a.run_state.ship_pos, speed, dt, p), "speed": speed})
 	for item in forces:
-		a.swim_snake(item.neck, item.force, item.speed, float(p.turn), dt)
+		a.swim_snake(item.neck, item.force, item.speed, float(p.turn) * (float(p.block_turn) if profile(item.neck) == &"block" else 1.0), dt)
 		var n = item.neck
 		var near: bool = n.free_pos.distance_to(a.run_state.ship_pos) < minf(float(p.attack_ranges[n.kind]), 300.0) + 100.0 + float(p.look_near_extra)
 		if a._normal_moves.has(n.mode) and a.NORMAL_SWIM.phase(a, n) != &"hold": continue
-		a.SNAKE.update_look(n, a.run_state.ship_pos, dt, a._time, a.run_state.rng, p, profile(n), near)
+		a.SNAKE.update_look(n, a.run_state.ship_pos, dt, a._time, a.run_state.rng, p, profile(n), near or profile(n) == &"block")
 
 func replan() -> void:
 	var p: Dictionary = a.def.params.squad
@@ -106,6 +107,7 @@ func replan() -> void:
 
 func goal_for(n) -> Vector2:
 	var p: Dictionary = a.def.params.squad
+	if n.motion.has("block"): return a.arena.clamp_point(n.motion.block.target, float(p.slot_margin))
 	var center: Vector2 = a.immortal_neck.free_pos
 	var offset := predicted - center
 	var angle := offset.angle()
@@ -145,6 +147,7 @@ func tick_bearer(dt: float) -> void:
 	if distance < float(p.panic_distance) and panic_cooldown <= 0.0:
 		panic = float(p.panic_time)
 		panic_cooldown = float(p.panic_cooldown)
+		replan_time = 0.0
 		choose_flee(float(p.panic_radius), band)
 	elif bearer_replan <= 0.0:
 		bearer_replan = float(p.bearer_replan)
@@ -228,7 +231,9 @@ func tick_tactic(dt: float) -> void:
 		section_index = runner.index
 		cancel_pending()
 	for n in live():
-		if n.motion.get("counter", false) and n.mode == &"idle": n.motion.counter = false
+		if n.motion.get("counter", false) and n.mode == &"idle":
+			n.motion.counter = false
+			replan_time = 0.0
 		if not pair.has(n) and n.motion.get("role", &"guard") == &"attack" and n.mode == &"idle" and float(n.motion.get("reserved", 0.0)) <= 0.0:
 			guard(n)
 			replan()
@@ -431,3 +436,30 @@ func tick_counter(dt: float) -> void:
 			n.motion.erase("block")
 			counter_time = float(p.counter_gap)
 			return
+
+## 近い護衛を二つの遮る点へ固定し、条件が続く間は担当を入れ替えない。
+func tick_block() -> void:
+	var p: Dictionary = a.def.params.squad
+	var heads := live()
+	if a.immortal_neck.free_pos.distance_to(a.run_state.ship_pos) >= float(p.block_distance) and panic <= 0.0:
+		for n in heads: n.motion.erase("block")
+		return
+	for n in heads:
+		if n.mode != &"idle" or n.motion.get("counter", false) or n.motion.get("role", &"guard") != &"guard": n.motion.erase("block")
+	var player: Vector2 = a.run_state.ship_pos + a.run_state.ship_vel * float(p.block_predict)
+	var delta: Vector2 = a.immortal_neck.free_pos - player
+	var center: Vector2 = player + delta * float(p.block_fraction)
+	for i in int(p.block_count):
+		var point := center + delta.normalized().orthogonal() * float(p.block_spread) * (1.0 if i == 0 else -1.0)
+		var current = null
+		for n in heads:
+			if n.motion.has("block") and int(n.motion.block.index) == i: current = n
+		if current == null:
+			var pool := heads.filter(func(n): return n.mode == &"idle" and n.motion.get("role", &"guard") == &"guard" and not n.motion.get("counter", false) and not n.motion.has("block") and not custom_owns(n))
+			var closest := INF
+			for n in pool:
+				var distance: float = n.free_pos.distance_squared_to(point)
+				if distance < closest:
+					closest = distance
+					current = n
+		if current != null: current.motion.block = {"index": i, "target": point}

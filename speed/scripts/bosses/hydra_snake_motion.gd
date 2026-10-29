@@ -61,6 +61,16 @@ static func boid_force(n, target: Vector2, heads: Array, bearer, player: Vector2
 	var blocking: bool = n.motion.has("block")
 	var attacker: bool = n.motion.get("role", &"guard") == &"attack"
 	var direction := offset.normalized()
+	if distance >= 1.0:
+		var projection := clampf((bearer.free_pos - n.free_pos).dot(offset) / offset.length_squared(), 0.0, 1.0)
+		if (n.free_pos + offset * projection).distance_to(bearer.free_pos) < float(p.detour_radius) and projection >= 0.05 and projection <= 0.95:
+			var radial: Vector2 = (n.free_pos - bearer.free_pos).normalized()
+			var side := float(n.motion.get("detour_side", 0.0))
+			if side == 0.0: side = 1.0 if radial.cross(offset) >= 0.0 else -1.0
+			n.motion.detour_side = side
+			direction = (direction * float(p.detour_seek) + radial.orthogonal() * side).normalized()
+		else:
+			n.motion.detour_side = 0.0
 	var desired := direction * speed * minf(1.0, distance / float(p.block_arrival if blocking else p.arrival))
 	if distance < float(p.arrival_drift_distance): desired += (player - n.free_pos).normalized() * float(p.arrival_drift)
 	if not blocking and player.distance_to(n.free_pos) < float(p.sight_distance) and desired.length() >= 1.0:

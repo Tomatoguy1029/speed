@@ -1321,4 +1321,4 @@ func tech_kind(id: StringName) -> StringName:
 	return _move_kinds.get(id, id)
 
 func head_angle(n: Neck) -> float:
-	return n.look_angle if separated else n.angle
+	return n.look_angle if separated and (n.mode == &"idle" or _normal_moves.has(n.mode)) else n.angle
