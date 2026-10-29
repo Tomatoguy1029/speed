@@ -41,20 +41,11 @@ func check(ok: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 
-func check_sonic_surface() -> void:
-	var fx := BuildEffects.new()
-	add_child(fx)
-	var wave := fx.effect(7, Vector2.ZERO, 70.0*fx.pixel, 0.7, "weapon/sonic")
-	var vertices = wave.node.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-	var bounded: bool = not vertices.is_empty()
-	for point in vertices:
-		bounded = bounded and point.length() <= 1.0001
-	check(bounded, "音の輪の描画面は円内に収まり、四角の角まで描かない")
-	fx.event({"type": &"sonic_push", "pos": Vector2.ZERO, "dir": Vector2.UP})
-	check(is_equal_approx(float(fx.effects.back().life),0.07), "押し出しの弧は試作の0.07秒で消える")
-	fx.step(0.071)
-	check(fx.effects.size()==1, "押し出しの弧の終了後は輪だけが残る")
-	fx.queue_free()
+## 装備キー（weapon/〜・trait/〜）の表示。
+func _visual(presentation, key: String) -> WeaponVisual:
+	for visual in presentation._equipment_visuals.values():
+		if visual._effect_key() == key: return visual
+	return null
 
 ## 大きな白い面が出る再発を、実際の描画画素から検出する。
 func measure_white_square(viewport: SubViewport) -> int:
@@ -80,7 +71,6 @@ func _ready() -> void:
 		if arg == "--combinations-only": only = PackedStringArray(["__combinations__"])
 		if arg.begins_with("--only="): only = arg.trim_prefix("--only=").split(",")
 	OS.add_logger(capture)
-	check_sonic_surface()
 	# 高速な描画処理の検査では音を再生せず、音声再生の終了待ちを含めない。
 	AudioManager._sounds = {}
 	var settings: Dictionary = SaveManager.settings.duplicate(true)
@@ -121,14 +111,14 @@ func _ready() -> void:
 					if frame%4 == 0:
 						presentation._present(4.0*session.DT)
 						if key == "weapon/interceptor": observed = observed or session.run.loadout.weapon_behaviors[entry.id].drones.any(func(d):return d.flash>0.0)
-						if key == "weapon/sonic": observed = observed or not presentation.build_effects._sonic_nodes.is_empty()
+						if key == "weapon/sonic": observed = observed or _visual(presentation, key).impacts.size() + _visual(presentation, key).pushes.size() > 0
 						if key == "weapon/afterimage":
 							var mirage = session.run.loadout.weapon_behaviors[entry.id]
 							observed = observed or not mirage.echoes.is_empty()
 							for echo in mirage.echoes: check(echo.copies.size()==level,"ミラージュの本体はLvごとの1〜5機")
 							var visual = presentation._equipment_visuals.get(mirage.get_instance_id())
 							if visual != null: check(visual.node._body._count<=level,"ミラージュの描画で本体を重複させない")
-						if key == "trait/fullCharge": observed = observed or presentation.build_effects._gear_acc > 0.0
+						if key == "trait/fullCharge": observed = observed or not _visual(presentation, key).flames.is_empty()
 						if key == "trait/rampage": observed = observed or (not session.run.state.tracing and session.run.loadout.trait_behaviors[entry.id].strength>0.9)
 					if gpu and frame%4 == 0:
 						await RenderingServer.frame_post_draw

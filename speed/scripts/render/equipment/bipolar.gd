@@ -16,6 +16,10 @@ var _crystal_since := -1.0
 var _flash := 0.0
 var _flash_rect: ColorRect
 
+func claims(ev: Dictionary) -> bool:
+	if ev.type == &"kill": return ev.get("cause", &"") == &"bipolar"
+	return ev.type in [&"ring", &"beam"] and ev.get("visual_key", "") == "weapon/bipolar"
+
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"bipolar_charge":

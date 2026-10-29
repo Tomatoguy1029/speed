@@ -23,6 +23,10 @@ func dispose() -> void:
 func _free_lens(h: Dictionary) -> void:
 	if is_instance_valid(h.lens): h.lens.queue_free()
 
+## 引き込まれて倒れた敵は、砕けながら中心へ消える姿をここで描く。
+func claims(ev: Dictionary) -> bool:
+	return ev.type == &"kill" and ev.get("cause", &"") == &"vortex"
+
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"end_hole":

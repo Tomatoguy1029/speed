@@ -394,7 +394,6 @@ func refresh_effects() -> void:
 	var render := _render()
 	if render == null: return
 	_refresh_scene_visuals(session.scene.view)
-	render.build_effects.refresh_preview()
 	render._present(0.0)
 	_hide_preview_hud()
 	if not _equipment_key.is_empty(): _show_effect_canvas()
@@ -421,7 +420,6 @@ func _pause_render_process() -> void:
 	var render := _render()
 	if render != null:
 		render.set_process(false)
-		render.build_effects.preview_editable = true
 
 func _set_scene_processing(playing: bool) -> void:
 	if is_instance_valid(session.scene):

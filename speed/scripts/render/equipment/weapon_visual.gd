@@ -21,6 +21,9 @@ func tick(_dt: float) -> void:
 	pass
 func on_event(_event: Dictionary) -> void:
 	pass
+## この表示が描くので、描画側の既定の処理（死亡の破片・輪・ビーム）を行わない出来事なら true。
+func claims(_event: Dictionary) -> bool:
+	return false
 func draw_objects(_c: CanvasItem) -> void:
 	pass
 func draw_extra(_c: CanvasItem, _ship_pos: Vector2, _color: Color) -> void:
@@ -46,6 +49,7 @@ func painter() -> PixelPainter:
 		_painter.setup_painter(1.82 * cfg.character_scale)
 		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		rm._layers.fx.add_child(_painter)
+	_painter.modulate = visual_color(Color.WHITE)
 	return _painter
 var _fires: FireBursts
 ## ドット単位の炎の爆発。初めて使うときに演出の層へ置く。進めるのは各表示の tick（fires().step）。

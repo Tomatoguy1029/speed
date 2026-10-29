@@ -5,6 +5,9 @@ extends WeaponVisual
 
 var hits: Array[Dictionary] = []
 
+func claims(ev: Dictionary) -> bool:
+	return ev.type == &"explode" and ev.get("cause", &"") == &"runUp"
+
 func on_event(ev: Dictionary) -> void:
 	if ev.type != &"run_up_hit": return
 	var rays: Array[Dictionary] = []
