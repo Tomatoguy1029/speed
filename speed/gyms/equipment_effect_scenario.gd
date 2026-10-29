@@ -24,6 +24,10 @@ static func play(session, key: String, use_sample_weapon := true) -> void:
 			run.enemies.table.hp[row] = 100.0
 			run.enemies.table.max_hp[row] = 100.0
 		targets.append(row)
+	if key == "weapon/sonic":
+		# 進路上の敵は体当たりで倒れるため、音の円錐へ触れる敵を左右にも置く。
+		for i in 8:
+			for side in [-1.0,1.0]: spawn(session,Vector2(230.0+i*70.0,80.0*side))
 	run.state.gauge = run.state.stats.capacity
 	run.state.ship_heading = Vector2.RIGHT
 	run.combat.rebuild_grid()

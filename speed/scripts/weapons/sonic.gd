@@ -55,7 +55,7 @@ func tick(dt: float, _busy: bool) -> void:
 			if sign_side == 0.0: sign_side = 1.0
 			var velocity := (side * sign_side * float(p("side_speed")) - forward * float(p("back_speed"))) * 1.82 * cfg.character_scale
 			pending.append({"row": i, "id": t.id[i], "delay": float(p("damage_delay")), "age": 0.0, "velocity": velocity, "damage": atk() * at_level("damage_by_level"), "hit": false})
-			state.emit(&"sonic_push", {"pos": t.pos[i], "dir": velocity.normalized()})
+			state.emit(&"sonic_push", {"pos": t.pos[i], "dir": velocity.normalized(), "row": i, "id": t.id[i]})
 	for hit in pending:
 		var i: int = hit.row
 		if not ctx.enemies.is_same(i, hit.id) or t.dead[i] != 0: continue

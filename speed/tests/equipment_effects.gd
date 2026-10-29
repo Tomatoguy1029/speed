@@ -29,7 +29,7 @@ var only := PackedStringArray()
 const EVENTS := {
 	"weapon/forward":&"weapon_fire", "weapon/scatter":&"weapon_fire", "weapon/rear":&"weapon_fire",
 	"weapon/knockback":&"hull_scatter", "weapon/contactWave":&"space_quake", "weapon/contactArc":&"bolt",
-	"weapon/barrier":&"barrier_hit", "weapon/mines":&"explode", "weapon/massTow":&"anchor_fire",
+	"weapon/barrier":&"barrier_hit", "weapon/mines":&"explode", "weapon/massTow":&"anchor_fire", "weapon/sonic":&"sonic_push",
 	"weapon/bipolar":&"beam", "weapon/dashRangeDrone":&"escort_deploy", "weapon/flashSlash":&"flash_slash", "weapon/endBlast":&"explode",
 	"trait/vortex":&"hole_recover", "trait/killSonic":&"chain_shock", "trait/critBeam":&"critical_lance",
 	"trait/runUp":&"run_up_hit", "trait/fullBurst":&"full_burst_ready", "trait/duplicator":&"duplicate"
@@ -38,10 +38,27 @@ func check(ok: bool, message: String) -> void:
 	if not ok:
 		failures += 1
 		push_error(message)
+
+func check_sonic_surface() -> void:
+	var fx := BuildEffects.new()
+	add_child(fx)
+	var wave := fx.effect(7, Vector2.ZERO, 70.0*fx.pixel, 0.7, "weapon/sonic")
+	var vertices = wave.node.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var bounded: bool = not vertices.is_empty()
+	for point in vertices:
+		bounded = bounded and point.length() <= 1.0001
+	check(bounded, "音の輪の描画面は円内に収まり、四角の角まで描かない")
+	fx.event({"type": &"sonic_push", "pos": Vector2.ZERO, "dir": Vector2.UP})
+	check(is_equal_approx(float(fx.effects.back().life),0.07), "押し出しの弧は試作の0.07秒で消える")
+	fx.step(0.071)
+	check(fx.effects.size()==1, "押し出しの弧の終了後は輪だけが残る")
+	fx.queue_free()
+
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--only="): only = arg.trim_prefix("--only=").split(",")
 	OS.add_logger(capture)
+	check_sonic_surface()
 	# 高速な描画処理の検査では音を再生せず、音声再生の終了待ちを含めない。
 	AudioManager._sounds = {}
 	var settings: Dictionary = SaveManager.settings.duplicate(true)
@@ -81,6 +98,7 @@ func _ready() -> void:
 				if EVENTS.has(key): check(session.events.any(func(ev):return ev.type == EVENTS[key]),"対象の演出が実際に発動する: %s Lv%d" % [key,level])
 				if key in ["weapon/interceptor","weapon/sonic","weapon/afterimage","trait/fullCharge","trait/rampage"]: check(observed,"連続する演出が実際に動く: %s Lv%d" % [key,level])
 				if key == "weapon/barrier": check(session.events.any(func(ev):return ev.type == &"barrier_restore"),"バリアが復活する演出まで再生する")
+				if key == "weapon/sonic": check(session.events.any(func(ev):return ev.type == &"sonic_impact"),"ソニックは輪だけでなく押し出し後の破裂まで再生する")
 				check(capture.count() == error_count,"装備再生でエラー: %s Lv%d" % [key,level])
 				if key == "weapon/knockback":
 					check(not session.events.any(func(ev):return ev.type == &"debris_trail"),"星砕きの消滅後に古い航跡を残さない")

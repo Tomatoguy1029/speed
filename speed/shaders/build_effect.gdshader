@@ -18,6 +18,7 @@ uniform bool broken = false;
 uniform sampler2D value_noise : repeat_disable, filter_nearest;
 uniform vec2 noise_origin=vec2(0.0);
 uniform float noise_seed=0.0;
+#include "build_pixel_ring.gdshaderinc"
 float lattice(vec3 p){vec3 i=mod(p,64.0);vec2 tile=vec2(mod(i.z,8.0),floor(i.z/8.0));return texture(value_noise,(tile*64.0+i.xy+0.5)/512.0).r;}
 float vnoise(vec3 p){vec3 i=floor(p);vec3 f=fract(p);vec3 u=f*f*(3.0-2.0*f);
  float a=mix(mix(lattice(i),lattice(i+vec3(1,0,0)),u.x),mix(lattice(i+vec3(0,1,0)),lattice(i+vec3(1,1,0)),u.x),u.y);
@@ -62,9 +63,11 @@ void fragment() {
  } else if(mode==4) { // 両端の尖った斬撃。4分の1保ってから細く消える
   float envelope=q<0.25?1.0:1.0-(q-0.25)/0.75;
   float shape=max(0.0,1.0-abs(v.x)/max(radius,1.0))*width*(1.0-q*0.5)*envelope;
-  if(abs(v.y)<shape+1.0) outc=c3;
-  if(abs(v.y)<shape) outc=c2;
-  if(abs(v.y)<shape*0.3) outc=c0;
+  if(abs(v.x)<radius) {
+   if(abs(v.y)<shape+1.0) outc=c3;
+   if(abs(v.y)<shape) outc=c2;
+   if(abs(v.y)<shape*0.3) outc=c0;
+  }
  } else if(mode==5) { // 六角形の殻と外へ広がる段
   float step_r=sqrt(3.0)*4.0;
   float row=floor((p.y+3.0)/6.0); float cx=floor((p.x+step_r*0.5-mod(row,2.0)*step_r*0.5)/step_r)*step_r+mod(row,2.0)*step_r*0.5;
@@ -110,9 +113,14 @@ void fragment() {
   if(length(p)<=radius) outc=c1;
  } else if(mode==10) {
   if(abs(length(p)-radius)<=width*0.5) outc=c1;
- } else if(mode==7) { // その場に残る音の輪
-  float r=radius*q;
-  outc=c1*(ring(p,r)*0.24+ring(p,r-1.0)*0.168)*(1.0-q)*(1.0+width*2.0);
+ } else if(mode==15) { // ソニックの押し出し：進路側から当たる7ドットの弧
+  for(int k=-3;k<=3;k++) {
+   vec2 target=rotate(angle)*vec2(-5.0+abs(float(k))*0.6,float(k));
+   if(all(equal(cell,floor(target+0.5)))) outc=q<0.5?c0:c1;
+  }
+ } else if(mode==16) { // ソニックの遅れてはじける白い円と輪
+  if(q<0.35 && length(cell)<=(broken?5.0:3.0)) outc=c0;
+  if(pixel_ring(cell,2.0+(broken?9.0:5.0)*q)>0.5) outc=q<0.4?c0:c1;
  }
  COLOR=outc*tint;
 }

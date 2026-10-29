@@ -4,6 +4,7 @@ class_name BuildEffects
 extends Node2D
 const SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const EFFECT := preload("res://shaders/build_effect.gdshader")
+const SONIC_WAVE := preload("res://shaders/build_sonic_wave.gdshader")
 const SHOT := preload("res://shaders/build_shot.gdshader")
 const VALUE_NOISE := preload("res://assets/effects/build/value_noise.png")
 const NOISE := preload("res://assets/effects/build/aura_noise.png")
@@ -20,6 +21,24 @@ var _captures: Array[Dictionary] = []
 var _last_world_delta := 0.0
 var _needles: Dictionary = {}
 var preview_editable := false
+var _wave_mesh: ArrayMesh
+
+## 音の輪に四角い面を持たせない。形とUVは生成時だけ用意し、全ての輪で共有する。
+func _sonic_mesh() -> ArrayMesh:
+	if _wave_mesh != null: return _wave_mesh
+	var vertices := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	for i in 64:
+		for point in [Vector2.ZERO, Vector2.from_angle(i * TAU / 64.0), Vector2.from_angle((i + 1) * TAU / 64.0)]:
+			vertices.append(point)
+			uvs.append(point * 0.5 + Vector2.ONE * 0.5)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	_wave_mesh = ArrayMesh.new()
+	_wave_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _wave_mesh
 
 func _ready() -> void:
 	_rng.seed = 121
@@ -41,8 +60,9 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 	var mesh := QuadMesh.new()
 	mesh.size = Vector2.ONE * 2.0
 	node.mesh = mesh
+	if mode == 7: node.mesh = _sonic_mesh()
 	var material := ShaderMaterial.new()
-	material.shader = EFFECT
+	material.shader = SONIC_WAVE if mode == 7 else EFFECT
 	node.material = material
 	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	node.position = (pos / pixel).round() * pixel
@@ -241,7 +261,7 @@ func event(ev: Dictionary) -> bool:
 			effect(3, ev.pos, 16.0 * pixel, 0.18, "weapon/knockback", {"width": 2.0})
 			burst(ev.pos, 20, 0, TAU, 10, 70, 0.3, [Color.WHITE, Color("#dcaaff"), Color("#8e62df")], "weapon/knockback")
 		&"end_hole":
-			var item := _distortion(ev.pos, 60.0 * pixel, float(ev.life), "trait/vortex", 1)
+			var item := _distortion(ev.pos, 98.0 * pixel, float(ev.life), "trait/vortex", 1)
 			item.follow = true
 			for i in roundi(140 * SETTINGS.number("trait/vortex","particle_count_scale",1.0)):
 				var radial:=Vector2.from_angle(_rng.randf()*TAU)*_rng.randf_range(40,180)*pixel
@@ -250,16 +270,20 @@ func event(ev: Dictionary) -> bool:
 			var item := effect(0, ev.pos, 52.0 * pixel, 0.7, "trait/vortex", {"c0": Color("#dcffe6"), "c1": Color("#8fffbe"), "c2": Color("#6effaa")})
 			item.follow = true
 			burst(ev.pos, 14, -PI * 0.5, 2.0, 14, 40, 0.7, [Color("#8fffbe")], "trait/vortex")
-		&"sonic_push", &"sonic_impact":
-			effect(3, ev.pos, 14.0 * pixel, 0.16, "weapon/sonic", {"width": 0.0})
-			if ev.type == &"sonic_impact": burst(ev.pos, 10 if ev.dead else 5, ev.dir.angle(), 1.3, 50, 130, 0.26, [Color.WHITE, Color("#cfe4ff"), Color("#8a96b0")], "weapon/sonic")
+		&"sonic_push":
+			var item := effect(15, ev.pos, 9.0 * pixel, 0.07, "weapon/sonic", {"angle": ev.dir.angle(), "c1": Color("#cfe4ff")})
+			if ev.has("row") and ev.has("id"): item["sonic_target"] = Vector2i(ev.row,ev.id)
+		&"sonic_impact":
+			effect(16, ev.pos, 12.0 * pixel, 0.16, "weapon/sonic", {"broken": ev.dead, "c1": Color("#cfe4ff")})
+			burst(ev.pos, 10 if ev.dead else 5, ev.dir.angle(), 1.3, 50, 130, 0.26, [Color.WHITE, Color("#cfe4ff"), Color("#8a96b0")], "weapon/sonic")
 		&"run_up_hit": burst(ev.pos, 16, 0, TAU, 30, 60, 0.2, [Color.WHITE, Color("#ffd040"), Color("#ff9a1e")], "trait/runUp")
 		&"full_burst_ready": burst(ev.pos, 12, 0, TAU, 25, 90, 0.3, [Color.WHITE, Color("#7fd8ff")], "trait/fullBurst")
 		_: return false
 	return true
 
 func _distortion(pos: Vector2, radius: float, life: float, key: String, kind: int) -> Dictionary:
-	var item := effect(0, pos, radius, life, key)
+	# 波の帯（片側8ドット）が最外周でも切れない範囲を取る。
+	var item := effect(0, pos, radius + (8.0 * pixel if kind == 0 else 0.0), life, key)
 	item.material.shader = preload("res://shaders/build_distortion.gdshader")
 	item.material.set_shader_parameter("mode", kind)
 	item.material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
@@ -336,6 +360,11 @@ var _mines: InstanceBatch
 func sample(ctx: RunContext, dt: float) -> void:
 	_continuous(ctx,dt)
 	var state := ctx.state
+	for item in effects:
+		if not item.has("sonic_target"): continue
+		var target: Vector2i = item.sonic_target
+		if ctx.enemies.is_same(target.x,target.y):
+			item.node.position = (ctx.enemies.table.pos[target.x]/pixel).round()*pixel
 	for id in _needles.keys():
 		var needle: Dictionary=_needles[id]
 		if not ctx.enemies.is_same(needle.row,id) or ctx.enemies.table.dead[needle.row]!=0 or not state.weapons.has(&"W28"):
@@ -377,7 +406,7 @@ func sample(ctx: RunContext, dt: float) -> void:
 	var sonic = ctx.loadout.weapon_behaviors.get(&"W08")
 	var frames: Array = sonic.frames if sonic != null else []
 	while _sonic_nodes.size() < frames.size():
-		var item := effect(7, Vector2.ZERO, 1.0, 1.0, "weapon/sonic")
+		var item := effect(7, Vector2.ZERO, 1.0, 1.0, "weapon/sonic", {"c1": Color("#bed7ff")})
 		effects.erase(item)
 		_sonic_nodes.append(item)
 	for i in _sonic_nodes.size():
@@ -385,12 +414,15 @@ func sample(ctx: RunContext, dt: float) -> void:
 		item.node.visible = i < frames.size()
 		if i >= frames.size(): continue
 		var radius: float = sonic.wave_speed() * sonic.wave_life() * SETTINGS.number("weapon/sonic","effect_scale",1.0)
-		item.node.position = frames[i].pos
+		item.node.position = (frames[i].pos / pixel).round() * pixel
 		item.node.scale = Vector2.ONE * (radius + 2.0 * pixel)
 		item.material.set_shader_parameter("extent", Vector2.ONE * (radius + 2.0 * pixel) * 2.0)
 		item.material.set_shader_parameter("duration", sonic.wave_life())
 		item.material.set_shader_parameter("age", frames[i].age / maxf(0.01,SETTINGS.number("weapon/sonic","duration_scale",1.0)))
 		item.material.set_shader_parameter("width", float(sonic.pulse) / 0.25)
+		item.material.set_shader_parameter("pixel", pixel * SETTINGS.number("weapon/sonic", "pixel_scale", 1.0))
+		item.material.set_shader_parameter("tint", SETTINGS.tinted("weapon/sonic", Color.WHITE))
+		item.material.set_shader_parameter("c1", Color("#bed7ff") * SETTINGS.values_for("weapon/sonic").get("shader_c1", Color.WHITE))
 	if _mines == null:
 		_mines = InstanceBatch.new()
 		_mines.setup_shader_quad()
@@ -426,6 +458,10 @@ var _escort: InstanceBatch
 var _escort_samples: Array[Dictionary] = []
 var _runup_node: Dictionary = {}
 var _tow_node: Dictionary = {}
+var _steam_opacity := 0.0
+var _steam_pulse := 0.0
+var _previous_sonic_pulse := 0.0
+var _sonic_tracks: Dictionary = {}
 func _continuous(ctx: RunContext, dt: float) -> void:
 	var state:=ctx.state
 	if _steam==null:
@@ -433,16 +469,38 @@ func _continuous(ctx: RunContext, dt: float) -> void:
 		_steam.setup_shader_quad()
 		add_child(_steam)
 	_steam.begin()
-	if state.weapons.has(&"W08") and (state.tracing or state.glide):
-		var sonic=ctx.loadout.weapon_behaviors[&"W08"]
-		var speed:=maxf(state.ship_vel.length()/pixel,float(sonic.at_level("speed_by_level")))
-		var tangent:=tan(asin(minf(0.99,float(sonic.at_level("speed_by_level"))/maxf(speed,float(sonic.at_level("speed_by_level"))+1.0))))
+	var sonic=ctx.loadout.weapon_behaviors.get(&"W08")
+	var speed:=state.ship_vel.length()/pixel
+	var active:=sonic!=null and (state.tracing or state.glide) and speed>100.0
+	_steam_opacity=lerpf(_steam_opacity,1.0 if active else 0.0,minf(1.0,dt*6.0))
+	var pulse:float=sonic.pulse if sonic!=null else 0.0
+	_steam_pulse=1.0 if pulse>_previous_sonic_pulse else _steam_pulse*exp(-dt*6.0)
+	_previous_sonic_pulse=pulse
+	var opacity:=_steam_opacity*(0.28+0.35*_steam_pulse)
+	if sonic!=null and opacity>0.02:
+		var c:=float(sonic.at_level("speed_by_level"))
+		var tangent:=tan(asin(minf(0.99,c/maxf(speed,c+1.0))))
 		for i in 40:
 			var u:=float((i*37)%40)/40.0
 			var along:=4.0+u*20.0
 			var half:=along*tangent*(0.35+0.65*float((i*53)%10)/10.0)
 			var pos:=state.ship_pos-state.ship_heading*along*pixel+state.ship_heading.orthogonal()*half*(1.0 if i%2 else -1.0)*pixel
-			_steam.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic", Color(0.92,0.95,1.0,0.28*(1.0-u*0.6))))
+			_steam.add_upright((pos/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic", Color(235.0/255.0,243.0/255.0,1.0,opacity*(1.0-u*0.6))))
+	var live_tracks: Dictionary = {}
+	if sonic!=null:
+		for hit in sonic.pending:
+			if not ctx.enemies.is_same(hit.row,hit.id) or ctx.enemies.table.dead[hit.row]!=0: continue
+			var points: Array = _sonic_tracks.get(hit.id,[])
+			if dt>0.0: points.append(ctx.enemies.table.pos[hit.row])
+			if points.size()>10: points.pop_front()
+			live_tracks[hit.id]=points
+			var speed_px:float=hit.velocity.length()/pixel
+			for i in maxi(0,points.size()-1):
+				var k:=points.size()-1-i
+				if speed_px<6.0 or k>speed_px/7.0 or (k>3 and k%2!=0): continue
+				var color:=Color("#cfe4ff") if k<3 else Color("#6f86b0")
+				_steam.add_upright((points[i]/pixel).round()*pixel,pixel*0.5,SETTINGS.tinted("weapon/sonic",color))
+	_sonic_tracks=live_tracks
 	_steam.end()
 	if _escort==null:
 		_escort=InstanceBatch.new()
