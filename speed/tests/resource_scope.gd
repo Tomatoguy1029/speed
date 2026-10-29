@@ -59,8 +59,15 @@ func _test_pending_shutdown() -> void:
 	if DisplayServer.get_name() != "headless":
 		paths.append_array(PackedStringArray(["res://scenes/bosses/hydra_tornado.tscn",
 			"res://scenes/bosses/hydra_presentation.tscn", "res://assets/pixel/meteor_spritesheet.png"]))
+	# 起動済みの定義やShaderのキャッシュ状況と独立して、未読込の要求を一つ作る。
+	var probe_path := "res://.godot/scope_shutdown_probe.gdshader"
+	var probe := Shader.new()
+	probe.code = "shader_type canvas_item;"
+	check(ResourceSaver.save(probe, probe_path) == OK, "終了時の未読込要求に使う資源を作れる")
+	paths.append(probe_path)
 	var scope: ContentResourceScope = loader.prepare_resources(paths)
 	check(loader.pending_resources() > 0, "未回収の読込がある状態で終了を確認する")
 	scope.cancel()
 	loader.free()
 	check(scope.resources.is_empty() and scope.pending.is_empty(), "読込中の所有者を破棄しても取り消し状態を保つ")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(probe_path))
