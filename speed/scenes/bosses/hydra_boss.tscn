@@ -5,9 +5,30 @@
 [ext_resource type="PackedScene" path="res://scenes/bosses/hydra_presentation.tscn" id="presentation"]
 [ext_resource type="Texture2D" path="res://assets/pixel/hydra/hydra.png" id="art_body"]
 [ext_resource type="Texture2D" path="res://assets/pixel/hydra/hydra_neck.png" id="art_neck"]
-[ext_resource type="Texture2D" path="res://assets/pixel/hydra/hydra_head.png" id="art_head"]
-[ext_resource type="Texture2D" path="res://assets/pixel/hydra/hydra_head_2.png" id="art_head2"]
-[ext_resource type="Texture2D" path="res://assets/pixel/hydra/hydra_head_3.png" id="art_head3"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head.png" id="art_head"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_2.png" id="art_head2"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_3.png" id="art_head3"]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/hydra_neck_art.tscn" id="neck_art"]
+
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_normal.png" id="head_normal0"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_2_normal.png" id="head_normal1"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/heads/hydra_head_3_normal.png" id="head_normal2"]
+
+[sub_resource type="CanvasTexture" id="head_lit0"]
+diffuse_texture = ExtResource("art_head")
+normal_texture = ExtResource("head_normal0")
+texture_filter = 1
+
+[sub_resource type="CanvasTexture" id="head_lit1"]
+diffuse_texture = ExtResource("art_head2")
+normal_texture = ExtResource("head_normal1")
+texture_filter = 1
+
+[sub_resource type="CanvasTexture" id="head_lit2"]
+diffuse_texture = ExtResource("art_head3")
+normal_texture = ExtResource("head_normal2")
+texture_filter = 1
 
 [node name="HydraBoss" type="Node2D" unique_id=1207611038]
 script = ExtResource("1")
@@ -27,3 +48,17 @@ head_textures = {
 [node name="Timeline" type="AnimationPlayer" parent="." unique_id=277545997]
 callback_mode_process = 2
 libraries/ = ExtResource("3")
+
+[node name="NeckArtwork" parent="." instance=ExtResource("neck_art")]
+
+[node name="HeadArtwork" parent="." instance=ExtResource("neck_art")]
+show_behind_parent = false
+heads_only = true
+head_textures = {
+&"bite": SubResource("head_lit0"),
+&"vortex": SubResource("head_lit1"),
+&"debris": SubResource("head_lit2"),
+&"beam": SubResource("head_lit2"),
+&"thunder": SubResource("head_lit1"),
+&"immortal": SubResource("head_lit1")
+}
