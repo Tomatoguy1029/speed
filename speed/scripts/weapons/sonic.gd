@@ -1,28 +1,70 @@
-## W08 ソニックブーム：駆け抜け始めと、普段の移動中は一定間隔で、進路ごと大きな衝撃波（一覧 docs/game/catalog/weapons.md）。
+## W08 ソニックブーム：ブーストと勢いの間だけ音の輪を残し、重なる円錐のふちを攻撃する。
 extends WeaponBehavior
-
-var _t := 0.0
-var _first_launch_ready := true
-
-func _interval() -> float:
-	return interval(float(p("interval")) / rate_k())
-
-func _fire() -> void:
-	var damage_by_level: Array = p("damage_by_level")
-	var index := clampi(level, 1, damage_by_level.size()) - 1
-	ctx.projectiles.attached_attack(&"sonic").fire(&"sonic", float(p("radius")) * radius_k(), atk() * float(damage_by_level[index]), p("knock"), p("travel"))
-	_t = 0.0
-	_first_launch_ready = false
-
+var frames: Array[Dictionary] = []
+var pending: Array[Dictionary] = []
+var hits: Dictionary = {}
+var _active := false
+var _last := Vector2.ZERO
+var _emission := 0.0
+var _distance := 0.0
+var pulse := 0.0
 func on_launch(_full: bool) -> void:
-	if not _first_launch_ready and _t < _interval():
-		return
-	_fire()
-
-func tick(dt: float, busy: bool) -> void:
-	if busy:
-		return
-	_t += dt
-	if _t < _interval():
-		return
-	_fire()
+	_active = true
+	hits.clear()
+	_last = state.ship_pos
+	_distance = 0.0
+	_emission = 0.0
+func wave_speed() -> float:
+	return at_level("speed_by_level") * 1.82 * cfg.character_scale * ctx.loadout.area_multiplier()
+func wave_life() -> float: return float(p("life"))
+func tick(dt: float, _busy: bool) -> void:
+	var t := ctx.enemies.table
+	for f in frames: f.age += dt
+	frames = frames.filter(func(f): return f.age < wave_life())
+	pulse = maxf(0.0, pulse - dt)
+	if _active and (state.tracing or state.glide):
+		var move := _last.distance_to(state.ship_pos)
+		_distance += move
+		if _distance >= float(p("distance")) * 1.82 * cfg.character_scale:
+			_distance = fmod(_distance, float(p("distance")) * 1.82 * cfg.character_scale)
+			pulse = float(p("pulse"))
+		_emission += dt
+		while _emission >= float(p("emit_interval")):
+			_emission -= float(p("emit_interval"))
+			frames.append({"pos": _last.lerp(state.ship_pos, 1.0 - _emission / maxf(dt, 0.001)), "age": _emission})
+	elif _active:
+		_active = false
+	_last = state.ship_pos
+	if pulse > 0.0:
+		var rows := PackedInt32Array()
+		var reach := wave_speed() * wave_life()
+		ctx.combat.nearby(state.ship_pos, reach + state.ship_vel.length() * wave_life(), rows)
+		var forward := state.ship_heading
+		var side := forward.orthogonal()
+		for i in rows:
+			if t.dead[i] != 0 or hits.has(t.id[i]) or (t.pos[i] - state.ship_pos).dot(forward) >= 0.0: continue
+			var overlaps := 0
+			for f in frames:
+				var radius := wave_speed() * float(f.age)
+				if radius > 2.0 * 1.82 * cfg.character_scale and absf(t.pos[i].distance_to(f.pos) - radius) < 4.0 * 1.82 * cfg.character_scale + t.r[i]:
+					overlaps += 1
+					if overlaps >= 3: break
+			if overlaps < 3: continue
+			hits[t.id[i]] = true
+			var sign_side := signf((t.pos[i] - state.ship_pos).dot(side))
+			if sign_side == 0.0: sign_side = 1.0
+			var velocity := (side * sign_side * float(p("side_speed")) - forward * float(p("back_speed"))) * 1.82 * cfg.character_scale
+			pending.append({"row": i, "id": t.id[i], "delay": float(p("damage_delay")), "age": 0.0, "velocity": velocity, "damage": atk() * at_level("damage_by_level"), "hit": false})
+			state.emit(&"sonic_push", {"pos": t.pos[i], "dir": velocity.normalized()})
+	for hit in pending:
+		var i: int = hit.row
+		if not ctx.enemies.is_same(i, hit.id) or t.dead[i] != 0: continue
+		hit.age += dt
+		if ctx.enemies.knockback_scale(i) > 0.0:
+			t.pos[i] += hit.velocity * dt * ctx.enemies.knockback_scale(i)
+			hit.velocity *= pow(float(p("decay")), dt)
+		if not hit.hit and hit.age >= hit.delay:
+			hit.hit = true
+			ctx.combat.damage_enemy(i, hit.damage, {"cause": &"sonic", "knock": 0.0})
+			state.emit(&"sonic_impact", {"pos": t.pos[i], "dir": hit.velocity.normalized(), "dead": t.dead[i] != 0})
+	pending = pending.filter(func(h): return h.age < 0.7 and ctx.enemies.is_same(h.row, h.id) and t.dead[h.row] == 0)

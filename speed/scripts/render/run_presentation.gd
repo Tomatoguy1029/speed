@@ -89,6 +89,9 @@ var bolts: Array = []
 var _bolt_seed := 0
 var shield_transfers: Array = []
 var _attack_visuals: Dictionary = {}
+var _build_world_time := 0.0
+var _bipolar_flash := 0.0
+var build_effects: BuildEffects
 var shake := 0.0
 ## 設定の「画面の揺れ」の強さ（0〜1。ポーズ中に変えるとすぐ反映）
 var _shake_scale := 1.0
@@ -165,6 +168,10 @@ func _ready() -> void:
 	_layers.exhaust.add_child(_glide_wake)
 	run.loadout.equipment_changed.connect(_sync_equipment_visuals)
 	_sync_equipment_visuals()
+	build_effects = BuildEffects.new()
+	build_effects.pixel = 1.82 * cfg.character_scale
+	build_effects.texture_provider = _enemy_texture
+	_layers.fx.add_child(build_effects)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for i in 400:
@@ -392,6 +399,7 @@ func _present(delta: float) -> void:
 	_update_fx(dt)
 	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
+	_glide_wake.visible = not state.weapons.has(&"W08") and not (state.weapons.has(&"W26") and state.tracing)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
@@ -444,6 +452,10 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
 			visual.on_event(ev)
+		if ev.type==&"beam" and ev.get("visual_key","")=="weapon/bipolar":
+			_bipolar_flash=0.1
+			shake=maxf(shake,6.0)
+		if build_effects.event(ev): continue
 		match ev.type:
 			&"ring":
 				_ring(ev.pos, ev.radius, ev.color, ev.life, String(ev.get("visual_key", "")))
@@ -609,6 +621,12 @@ func _shatter_meteor(ev: Dictionary) -> void:
 	_meteors().shatter(ev)
 
 func _update_fx(dt: float) -> void:
+	var world_dt := maxf(0.0, state.world_time - _build_world_time)
+	_build_world_time = state.world_time
+	_bipolar_flash=maxf(0.0,_bipolar_flash-world_dt)
+	build_effects.step(world_dt, state.ship_pos)
+	build_effects.sample(run.ctx, world_dt)
+	build_effects.projectiles(run.projectiles)
 	for shard in meteor_shards:
 		shard.pos += shard.vel * dt
 		shard.angle += shard.spin * dt
@@ -1359,9 +1377,9 @@ func _draw_fx(c: CanvasItem) -> void:
 		var segments: PackedVector2Array = bo.segments
 		for i in range(0, segments.size(), 2):
 			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1],
-				_px(2.0 * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0)),
+				1.82 * cfg.character_scale * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0),
 				int(bo.seed) * 7919 + i * 313 + shape * 101, alpha,
-				EFFECT_SETTINGS.tinted("weapon/contactArc", PIXEL_LIGHTNING.COLOR))
+				EFFECT_SETTINGS.tinted("weapon/contactArc", Color("#ffcf3a")), Color("#fff8d6"))
 	for r in rings:
 		var k: float = r.life / r.max
 		var key := String(r.get("visual_key", ""))
@@ -1411,6 +1429,7 @@ func _draw_top(c: CanvasItem) -> void:
 		var height := rect.size.y*0.1*state.cinematic_bars
 		c.draw_rect(Rect2(rect.position,Vector2(rect.size.x,height)),Color.BLACK)
 		c.draw_rect(Rect2(Vector2(rect.position.x,rect.end.y-height),Vector2(rect.size.x,height)),Color.BLACK)
+	if _bipolar_flash>0.0:c.draw_rect(view_rect().grow(400.0),Color(1,1,1,0.45*_bipolar_flash/0.1))
 	if flash > 0.0:
 		c.draw_rect(view_rect().grow(400.0), Color(1, 1, 1, flash * 0.5))
 

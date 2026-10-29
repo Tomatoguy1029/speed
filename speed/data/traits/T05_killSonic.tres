@@ -5,15 +5,16 @@
 [resource]
 script = ExtResource("1")
 params = {
-"damage_base": 0.55,
-"damage_per": 0.05,
-"kills_base": 10.0,
-"kills_min": 4.0,
-"kills_per": -2.0,
-"knock": 1000.0,
-"radius_base": 270.0,
-"radius_per": 30.0,
-"travel": 0.5
+"kills_base": 10,
+"kills_per": 0,
+"radius_base": 150.0,
+"radius_per": 10.0,
+"damage_base": 0.7,
+"damage_per": 0.1,
+"limit_by_level": [3, 4, 5, 6, 8],
+"radius_decay": 0.6,
+"damage_decay": 0.8,
+"knock": 130.0
 }
 id = &"T05"
 code_id = &"killSonic"

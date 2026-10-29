@@ -147,8 +147,8 @@ func _start_final_strike() -> void:
 	_status.text = "制限時間の一撃を再生中: " + FINAL_BOSS_NAMES[FINAL_BOSSES.find(_boss)]
 
 func _setup_equipment(key: String, serial: int) -> void:
-	var trait := key.begins_with("trait/")
-	var catalog: Dictionary = ContentManager.traits if trait else ContentManager.weapons
+	var is_trait := key.begins_with("trait/")
+	var catalog: Dictionary = ContentManager.catalog.table(&"traits" if is_trait else &"weapons")
 	var code := key.get_slice("/", 1)
 	var id := StringName()
 	for candidate in catalog:
@@ -161,11 +161,11 @@ func _setup_equipment(key: String, serial: int) -> void:
 	_status.text = "試遊を準備中: " + key
 	var settings := {"empty": true, "stage": 1, "ship_pos": [0, 0], "invincible": true,
 		"director": {"enabled": false}, "weapons": {}, "traits": {}}
-	if trait: settings["traits"] = {id: 5}
+	if is_trait: settings["traits"] = {id: 5}
 	else: settings["weapons"] = {id: 5}
 	await session.reset(settings)
 	if serial != _serial: return
-	var behavior = (session.run.loadout.trait_behaviors if trait else session.run.loadout.weapon_behaviors).get(id)
+	var behavior = (session.run.loadout.trait_behaviors if is_trait else session.run.loadout.weapon_behaviors).get(id)
 	if behavior == null:
 		_status.text = "装備を試遊へ設定できません: " + key
 		return
@@ -173,7 +173,7 @@ func _setup_equipment(key: String, serial: int) -> void:
 	if key not in ["weapon/sonic", "weapon/dashRangeDrone", "weapon/afterimage", "weapon/mines"]:
 		target = _spawn_preview_enemy(Vector2(120, 0))
 	match key:
-		"weapon/forward", "weapon/scatter", "weapon/rear", "weapon/barrier":
+		"weapon/forward", "weapon/scatter", "weapon/rear":
 			behavior.tick(10.0, false)
 		"weapon/interceptor":
 			behavior.tick(1.0, false)
@@ -182,18 +182,20 @@ func _setup_equipment(key: String, serial: int) -> void:
 			if target >= 0:
 				var at: Vector2 = session.run.enemies.table.pos[target]
 				session.run.enemies.mark_dead(target)
-				behavior.on_contact(target, at, Vector2.RIGHT)
+				behavior.def = behavior.def.duplicate(true)
+				behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
+				behavior.on_defeated(target, {"one_shot":true,"dir":Vector2.RIGHT})
 		"weapon/contactWave":
 			if target >= 0: behavior.on_contact(target, session.run.enemies.table.pos[target], Vector2.RIGHT)
 		"weapon/contactArc":
 			_spawn_preview_enemy(Vector2(170, 70))
 			_spawn_preview_enemy(Vector2(180, -70))
 			if target >= 0: behavior.on_any_contact(target)
+		"weapon/barrier":
+			behavior.block_segment(Vector2(100,0),Vector2.ZERO,1.0,10.0)
 		"weapon/mines":
-			behavior.on_trail(null, Vector2.ZERO, Vector2(160, 0))
-			if not behavior.mines.is_empty():
-				_spawn_preview_enemy(behavior.mines[0].pos)
-				behavior.tick(float(behavior.p("armed")) + 0.01, false)
+			behavior.on_end()
+			if not behavior.mines.is_empty(): _spawn_preview_enemy(behavior.mines[0].to)
 		"weapon/massTow":
 			if target >= 0:
 				session.run.state.tracing = true

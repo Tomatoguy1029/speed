@@ -20,6 +20,7 @@ func capture(i: int) -> bool:
 		return false
 	cargo.append({"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "color": t.color[i],
 		"angle": t.facing[i], "source_id": t.id[i], "ready": false})
+	state.emit(&"anchor_capture", {"pos": t.pos[i], "to": state.ship_pos - state.ship_heading * 70.0})
 	return true
 
 func on_end() -> void:
@@ -49,9 +50,9 @@ func tick(dt: float, _busy: bool) -> void:
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:
 		var c: Dictionary = cargo.pop_front()
 		var dmg := atk() * float(p("damage")) * dmg_k() * maxf(1.0, float(c.r) / float(p("size_ref")))
-		ctx.projectiles.fire_hull(c.pos, u * (float(p("shot_speed")) + sp) * post_factor(&"projectile_speed"), c.r, dmg, p("life"), p("knock"),
+		ctx.projectiles.fire_hull(c.pos, u * (float(p("shot_speed")) + sp) * post_factor(&"projectile_speed"), area(c.r), dmg, p("life"), p("knock"),
 			c.type, u.angle(), c.source_id)
-		state.emit(&"ring", {"pos": c.pos, "radius": maxf(34.0, float(c.r)), "color": Color("#ffbe65"), "life": 0.15})
+		state.emit(&"anchor_fire", {"pos": c.pos, "dir": u, "radius": c.r})
 		_fire_t += shot_interval
 	if cargo.is_empty() or not cargo[0].ready:
 		_fire_t = 0.0

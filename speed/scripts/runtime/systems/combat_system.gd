@@ -98,7 +98,8 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var vel := state.ship_vel
 		var sp := vel.length()
 		var dir := vel / sp if sp > 0.0 else Vector2.ZERO
-		var atk := attack_power()
+		var run_up := build.prepare_ram(from.distance_to(hit_pos)) if run != null else 1.0
+		var atk := attack_power() * run_up
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
 		var shield_front := enemies.blocks_front(i, hit_pos, dir)
 		if shield_front and (not fast or (run == null and t.hit_cd[damage_target(i)] > 0.0)):
@@ -142,6 +143,8 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			if enemies.rear_open(i, hit_pos):
 				ship.steal_shield(i)
 				dmg = maxf(dmg, t.hp[i])
+			var target := damage_target(i)
+			var hp_before := t.hp[target]
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
 			if crit:
 				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
@@ -157,7 +160,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			# なぞり中と勢いの間は、雑魚を貫いても減速しない（仕様書 6.6）
 			if not (state.glide or state.tracing):
 				state.ship_vel *= _pierce_keep(i)
-			build.on_contact(i, hit_pos, dir)
+			build.on_contact(i, hit_pos, dir, maxf(0.0, hp_before - maxf(0.0, t.hp[target])))
 			continue
 		# 弾かれた（仕様書 6.5・7.2）
 		state.glide = false
@@ -378,8 +381,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 	if shatter != null: shatter.on_defeated(i, opts)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	if cause != &"afterimage":
-		build.on_kill(cause)
+	build.on_kill(cause, t.pos[i])
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:

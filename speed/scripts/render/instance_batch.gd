@@ -132,3 +132,12 @@ func end() -> void:
 		_buf.resize(mm.instance_count * STRIDE)
 	mm.buffer = _buf
 	mm.visible_instance_count = _count
+
+## 長方形の粒・固定の実演データをまとめる。半幅と半高さを独立して指定する。
+func add_rect(pos: Vector2, half_size: Vector2, angle: float, color: Color) -> void:
+	add(pos, angle, 1.0, color)
+	var i := (_count - 1) * STRIDE
+	_buf[i] *= half_size.x
+	_buf[i + 4] *= half_size.x
+	_buf[i + 1] *= half_size.y
+	_buf[i + 5] *= half_size.y

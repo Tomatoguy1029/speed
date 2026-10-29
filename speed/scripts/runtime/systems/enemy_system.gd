@@ -312,6 +312,7 @@ func _reset_row(i: int) -> void:
 	t.links[i] = PackedInt32Array()
 	t.stone[i] = 0.0
 	t.held[i] = 0
+	t.slash_hold[i] = 0
 	t.pump_owner[i] = -1
 	t.pump_owner_id[i] = -1
 	t.landmark[i] = 0
@@ -690,6 +691,9 @@ func _tick_behavior(b: int, dt: float) -> void:
 			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
+		if t.slash_hold[i] != 0:
+			vel[i] = Vector2.ZERO
+			continue
 		var from := pos[i]
 		# 画面から遠い敵は、LOD 回に1回だけ、まとめた時間で判断する。間の回は今の速度で進むだけ
 		var bdt := dt

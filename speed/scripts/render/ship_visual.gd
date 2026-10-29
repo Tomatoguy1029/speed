@@ -48,6 +48,8 @@ func update(dt: float) -> void:
 		_exhaust.pop_front()
 
 func draw_exhaust(c: CanvasItem) -> void:
+	var escort = run.loadout.weapon_behaviors.get(&"W26")
+	if escort != null and escort.active: return
 	var sonic := rm._blue_exhaust()
 	var trail_color := Color(0.3, 0.65, 1.0) if sonic else Color(1.0, 0.57, 0.3)
 	for i in range(1, _exhaust.size()):
@@ -72,6 +74,9 @@ func draw_ship(c: CanvasItem) -> void:
 	if state.phase == RunState.Phase.DYING and run.sequence_t >= cfg.death_freeze_time:
 		return
 	var p := state.ship_pos
+	for id in [&"W01", &"W02"]:
+		var gun = run.loadout.weapon_behaviors.get(id)
+		if gun != null and gun.recoil > 0.0: p -= state.ship_heading * (2.0 if gun.recoil > 0.06 else 1.0) * 1.82 * cfg.character_scale
 	var R := cfg.ship_radius
 	var col := Color.WHITE
 	var hurt := state.ship_hurt > 0.0

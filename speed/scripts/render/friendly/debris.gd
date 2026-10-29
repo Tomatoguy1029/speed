@@ -1,5 +1,6 @@
 extends AttackVisual
 func draw_friend(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> void:
+	if pr.friend_visual[i] == &"weapon/knockback": return
 	var r := pr.friend_r[i]
 	var trail := pr.friend_trail[i]
 	var key := String(pr.friend_visual[i])

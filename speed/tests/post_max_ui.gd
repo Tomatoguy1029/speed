@@ -18,7 +18,7 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	run.state.lab_mode = false # 実験場では省かれる通常HUDのキー入力も確認する。
 	for id in [&"W03", &"W04", &"W08", &"W17"]: run.loadout.grant(&"weapon", id, 5)
-	for id in [&"T01", &"T03", &"T04", &"T05"]: run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
+	for id in [&"T08", &"T03", &"T04", &"T05"]: run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
 	run.state.ship_hp = 40.0
 	run.state.pending_levels = 3
 	_show([&"area", &"max_hp", &"heal"])
@@ -68,7 +68,7 @@ func _ready() -> void:
 			for button in hud._cards_row.get_children():
 				_check(viewport_rect.encloses(button.get_global_rect()), "追加強化カードが異なる画面比率でも画面内に収まる")
 		await _shot("postmax_small_english")
-	for ids: Array in [[&"T01"], [&"T01", &"T03"]]:
+	for ids: Array in [[&"T08"], [&"T08", &"T03"]]:
 		run.state.cards = []
 		for id in ids:
 			run.state.cards.append({"kind": &"trait", "id": id, "level": 3})

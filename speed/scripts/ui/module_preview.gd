@@ -1,226 +1,169 @@
-## 図鑑の効果イメージ。機体・ドローンはゲームと同じ素材を使う。
-## 専用画像が定義されていれば優先。未入手は動かさず単色のシルエットにする。
+## 300×170の実演を投影する。静止サムネイルは描画結果を保持し、選択・タブ切替で再生成しない。
 class_name ModulePreview
 extends Control
-
-const INTERCEPTOR_VISUAL := preload("res://scripts/render/interceptor_visual.gd")
-const SILHOUETTE := preload("res://shaders/module_silhouette.gdshader")
-const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
-const SHIP := preload("res://assets/pixel/airship.png")
-const FOLLOWER := preload("res://assets/pixel/drone.png")
-const ENEMY := preload("res://assets/pixel/drifter.png")
-const CYAN := Color("#9fe8ff")
-const GOLD := Color("#ffe99a")
-
+const HOLO := preload("res://shaders/codex_hologram.gdshader")
+const WARP := preload("res://assets/effects/build/codex_warp.png")
+const ICONS := preload("res://scripts/ui/module_icons.gd")
 var definition: Resource
 var known := false
 var animated := false
 var _clock := 0.0
-var _lance_preview: Node2D
+var _accum := 0.0
+var _viewport: SubViewport
+var _image: TextureRect
+var _demo: Node2D
+var _icon: Sprite2D
+var _holo: ShaderMaterial
+var _selected_age := 0.0
+var _generation := 0
 
 func setup(def: Resource, acquired: bool, animate := false) -> void:
-	if is_instance_valid(_lance_preview):
-		remove_child(_lance_preview)
-		_lance_preview.queue_free()
-	_lance_preview = null
 	definition = def
 	known = acquired
 	animated = animate
 	_clock = 0.0
+	_selected_age = 0.0
+	if is_node_ready(): _build()
+
+func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	material = null
-	if not known:
-		var silhouette := ShaderMaterial.new()
-		silhouette.shader = SILHOUETTE
-		material = silhouette
-	if "code_id" in definition and definition.code_id == &"critBeam" and definition.preview_texture == null:
-		_lance_preview = load("res://scripts/render/light_lance.gd").new()
-		add_child(_lance_preview)
-	set_process(animated and known)
+	resized.connect(_layout)
+	if definition != null: _build()
+
+func _build() -> void:
+	_generation+=1
+	for child in get_children():
+		remove_child(child)
+		child.queue_free()
+	_demo = null
+	_icon = null
+	_viewport = SubViewport.new()
+	_viewport.size = Vector2i(300,170)
+	_viewport.disable_3d = true
+	_viewport.world_2d = World2D.new()
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_viewport)
+	var background := ColorRect.new()
+	background.size = Vector2(300,170)
+	background.color = Color.BLACK
+	_viewport.add_child(background)
+	if known:
+		if definition.preview_texture != null:
+			_icon = Sprite2D.new()
+			_icon.texture = definition.preview_texture
+			_icon.position = Vector2(150,74)
+			_icon.scale = Vector2.ONE*minf(220.0/_icon.texture.get_width(),130.0/_icon.texture.get_height())
+			_viewport.add_child(_icon)
+		elif definition is LegendaryModuleDef or (definition is ContentEntry and definition.category==&"legendary_modules"):
+			var legend: Control = preload("res://scripts/ui/legendary_module_icon.gd").new()
+			legend.module_id = definition.id
+			legend.position = Vector2(60,0)
+			legend.size = Vector2(180,150)
+			_viewport.add_child(legend)
+		elif ResourceLoader.exists("res://data/codex/%s.res" % definition.code_id):
+			_demo = preload("res://scripts/ui/codex_demonstration.gd").new()
+			_viewport.add_child(_demo)
+			_demo.setup(definition)
+			if not animated: _clock = _demo.animation.period*0.42
+			_demo.sample(_clock)
+		else:
+			_icon = Sprite2D.new()
+			_icon.position = Vector2(150,74)
+			if definition.id in [&"T34",&"T35"]:
+				var placeholder := Label.new()
+				placeholder.text = "◇\n？"
+				placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				placeholder.add_theme_font_size_override("font_size",32)
+				placeholder.position = Vector2(120,30)
+				_viewport.add_child(placeholder)
+			else: _icon.texture = ICONS.texture_for(definition)
+			_icon.scale = Vector2.ONE*2.0
+			_viewport.add_child(_icon)
+	_holo = ShaderMaterial.new()
+	_holo.shader = HOLO
+	_holo.set_shader_parameter("warp",WARP)
+	_holo.set_shader_parameter("source_tex",_viewport.get_texture())
+	_holo.set_shader_parameter("locked",not known)
+	_holo.set_shader_parameter("rare",bool(definition.comet_only) if "comet_only" in definition else false)
+	_image = TextureRect.new()
+	_image.texture = _viewport.get_texture()
+	_image.material = _holo
+	_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_image)
+	_update_hologram(0.5 if not animated else 0.0)
+	_layout()
+	set_process(animated)
+	if not animated and DisplayServer.get_name()!="headless": _freeze.call_deferred(_generation)
+
+func _freeze(generation: int) -> void:
+	await RenderingServer.frame_post_draw
+	if generation!=_generation or animated or not is_instance_valid(_viewport): return
+	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	if is_instance_valid(_demo):
+		_demo.queue_free()
+		_demo = null
+
+func _layout() -> void:
 	queue_redraw()
+	if _image != null:
+		_image.position = Vector2.ZERO
+		_image.size = size
 
 func _process(dt: float) -> void:
-	_clock += dt
-	queue_redraw()
+	_accum += dt
+	if _accum < 1.0/30.0: return
+	_clock += _accum
+	_selected_age += _accum
+	_accum = 0.0
+	if is_instance_valid(_demo): _demo.sample(_clock)
+	if _icon != null and definition.preview_texture==null:
+		var cosine := cos(_clock*1.1)
+		_icon.scale = Vector2((1.0 if cosine>=0.0 else -1.0)*maxf(0.12,absf(cosine))*2.0,2.0)
+	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_update_hologram(_clock)
+
+static func _hash(n: float) -> float:
+	return fposmod(sin(n*127.1+311.7)*43758.5453,1.0)
+
+func _update_hologram(time: float) -> void:
+	_holo.set_shader_parameter("clock",time)
+	_holo.set_shader_parameter("reveal",minf(1.0,_selected_age/0.38) if animated else 1.0)
+	var start := 0.0
+	var scan := -99.0
+	for n in 4001:
+		var gap := 1.0+_hash(n)*2.4
+		var duration := 190.0/(120.0+_hash(n+0.5)*120.0)
+		if time < start+gap: break
+		if time < start+gap+duration:
+			scan = (time-start-gap)/duration*190.0-10.0
+			break
+		start += gap+duration
+	_holo.set_shader_parameter("scan_y",scan)
+	var slot := 0
+	for j in range(floori(time*5.0)-2,floori(time*5.0)+1):
+		var glitch := Vector4(-99,0,0,0)
+		var at := j/5.0+_hash(j+0.9)*0.18
+		var duration := 0.03+_hash(j+0.5)*0.1
+		if _hash(j)<=0.22 and time>=at and time<=at+duration:
+			var offset := roundf((_hash(j+0.2)-0.5)*10.0)
+			if offset==0.0: offset=2.0
+			glitch=Vector4(floor(_hash(j+0.3)*156.0),1+floor(_hash(j+0.7)*3.0),offset,1.25)
+		_holo.set_shader_parameter("glitch%d" % slot,glitch)
+		slot += 1
 
 func _draw() -> void:
-	if definition == null:
-		return
-	var scale_factor := minf(size.x / 360.0, size.y / 220.0)
-	draw_set_transform(size / 2.0, 0.0, Vector2.ONE * scale_factor)
-	if definition.preview_texture != null:
-		var texture: Texture2D = definition.preview_texture
-		var image_size := texture.get_size()
-		image_size *= minf(300.0 / image_size.x, 180.0 / image_size.y)
-		draw_texture_rect(texture, Rect2(-image_size / 2.0, image_size), false,
-			Color.WHITE if known else Color(0, 0, 0, 1))
-	elif definition is LegendaryModuleDef or (definition is ContentEntry and definition.category == &"legendary_modules"):
-		_draw_legend(String(definition.id))
-	else:
-		_draw_effect(String(definition.code_id))
-	draw_set_transform(Vector2.ZERO)
-
-func _ink(color: Color) -> Color:
-	return color if known else Color("#394151")
-
-func _sprite(texture: Texture2D, pos: Vector2, width: float, angle := 0.0) -> void:
-	var image_size := texture.get_size() * (width / texture.get_width())
-	var points := PackedVector2Array()
-	for corner in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]:
-		points.append(pos + (corner * image_size).rotated(angle))
-	draw_polygon(points, PackedColorArray([_ink(Color.WHITE)]),
-		PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]), texture)
-
-func _ring(pos: Vector2, radius: float, color := CYAN) -> void:
-	draw_arc(pos, radius, 0, TAU, 48, _ink(color), 3.0, true)
-
-func _line(a: Vector2, b: Vector2, color := CYAN, width := 3.0) -> void:
-	draw_line(a, b, _ink(color), width, true)
-
-func _burst(pos: Vector2, radius: float, color := GOLD) -> void:
-	_ring(pos, radius, color)
-	for i in 8:
-		var dir := Vector2.from_angle(i * TAU / 8.0)
-		_line(pos + dir * radius * 0.45, pos + dir * radius * 1.15, color, 2.0)
-
-func _draw_effect(code: String) -> void:
-	var pulse := 0.5 + 0.5 * sin(_clock * 3.0)
-	var ship := Vector2(-92, 12)
-	if code == "rear":
-		ship.x = 92
-	elif code == "contactArc":
-		ship = Vector2(-140, 75)
-	var end := Vector2(65, 12)
-	var route := PackedVector2Array([Vector2(-145, 65), Vector2(-75, -45), end])
-	var route_effect := code in ["knockback", "contactWave", "mines", "endBlast", "vortex", "fullCharge", "killSonic", "critBeam", "length", "bipolar"]
-	if route_effect:
-		draw_polyline(route, _ink(Color(0.8, 0.97, 1.0, 0.45)), 3.0, true)
-		ship = end
-	_sprite(SHIP, ship, 46.0, PI / 2.0)
-	match code:
-		"afterimage":
-			for i in 3:
-				var distance := fmod(_clock * 100.0 + i * 55.0, 180.0)
-				var pos := ship + Vector2(-45.0 - distance, 0)
-				_sprite(SHIP, pos, 46.0, PI / 2.0)
-				_line(pos + Vector2(-36, -8), pos + Vector2(-24, -8), CYAN, 2.0)
-				_line(pos + Vector2(-36, 8), pos + Vector2(-24, 8), CYAN, 2.0)
-		"forward", "scatter", "rear":
-			var shots := 5 if code == "scatter" else 2
-			var direction := -1.0 if code == "rear" else 1.0
-			var color := Color(definition.params.get("color", "#9fe8ff"))
-			for i in shots:
-				var angle := (i - (shots - 1) * 0.5) * (0.19 if code == "scatter" else 0.06)
-				var dir := Vector2(direction, 0).rotated(angle)
-				for j in 3:
-					var distance := 36.0 + fmod(j * 35.0 + _clock * 65.0, 110.0)
-					_line(ship + dir * distance, ship + dir * (distance + 16), color, 4.0)
-			_sprite(ENEMY, Vector2(115, -15), 46.0)
-		"knockback":
-			_sprite(ENEMY, Vector2(110 + pulse * 15, 12), 42.0)
-			for i in 3:
-				_line(Vector2(80, i * 13 - 1), Vector2(111, i * 13 - 1), Color("#ff9a3c"), 2.0)
-			_sprite(ENEMY, Vector2(152, -26), 33.0)
-		"contactWave", "barrier", "sonic", "killSonic", "reactive":
-			var color := Color("#76aaff") if code == "barrier" else CYAN
-			var center := ship + Vector2(26, 0) if code == "contactWave" else ship
-			for i in 2:
-				_ring(center, 32 + i * 20 + pulse * 14, color)
-			_sprite(ENEMY, center + Vector2(85, -35), 35.0)
-		"dashRangeDrone":
-			for side in [-1, 1]:
-				for rank in 3:
-					var pos := ship + Vector2(35, side * (24 + rank * 22))
-					_line(pos - Vector2(65 + rank * 8, 0), pos, CYAN, 6.0)
-					_line(pos - Vector2(65 + rank * 8, 0), pos, Color.WHITE, 2.0)
-					_sprite(FOLLOWER, pos, 25.0, PI / 2.0)
-		"drone":
-			for i in 3:
-				var pos := ship + Vector2.from_angle(_clock * 0.8 + i * TAU / 3.0) * 62
-				_sprite(FOLLOWER, pos, 32.0, PI / 2.0)
-				_line(pos + Vector2(15, 0), pos + Vector2(45, 0), CYAN, 2.0)
-		"interceptor":
-			var preview_scale := minf(size.x / 360.0, size.y / 220.0)
-			for i in 6:
-				var a := _clock * 0.75 + i * TAU / 6.0
-				var pos := ship + Vector2.from_angle(a) * 64.0
-				var aim := Vector2(140, pos.y * 1.4)
-				var angle := (aim - pos).angle()
-				INTERCEPTOR_VISUAL.drone(self, size / 2.0 + pos * preview_scale, angle,
-					1.4 * preview_scale, 0.06 if pulse > 0.7 else 0.0)
-				for j in 2:
-					var progress := fmod(_clock * 1.8 + j * 0.3 + i * 0.16, 1.0)
-					INTERCEPTOR_VISUAL.shot(self, size / 2.0 + pos.lerp(aim, progress) * preview_scale,
-						angle, preview_scale)
-			draw_set_transform(size / 2.0, 0.0, Vector2.ONE * preview_scale)
-		"mines":
-			for i in 5:
-				var pos := route[0].lerp(route[1], i / 4.0)
-				draw_circle(pos, 7, _ink(Color("#ff7b54")))
-				_ring(pos, 11, Color(1, 0.6, 0.4, 0.5))
-		"contactArc":
-			var origin := Vector2(10, -5)
-			var points := PackedVector2Array([ship + Vector2(20, 0), origin])
-			var targets: Array[Vector2] = []
-			var counts: Array = definition.params.branches_by_level
-			var count := int(counts.back())
-			for i in count:
-				var pos := origin + Vector2.from_angle(i * TAU / count) * Vector2(115, 75)
-				points.append(origin)
-				points.append(pos)
-				targets.append(pos)
-			var age := fmod(_clock, 0.8) if animated and known else 0.05
-			var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
-			for i in range(0, points.size(), 2):
-				PIXEL_LIGHTNING.draw(self, points[i], points[i + 1], 2.0, i * 313 + shape * 101, PIXEL_LIGHTNING.intensity(age, 0.22))
-			_sprite(ENEMY, origin, 30.0)
-			for pos in targets:
-				_sprite(ENEMY, pos, 24.0)
-		"endBlast":
-			_burst(end, 42 + pulse * 12)
-		"vortex":
-			for i in 3:
-				var angle := _clock + i * TAU / 3
-				draw_arc(end, 25 + i * 14, angle, angle + 2.0, 24, _ink(Color(0.75, 0.45, 1, 0.8)), 3.0, true)
-		"critBeam":
-			var fit := minf(size.x / 360.0, size.y / 220.0)
-			_lance_preview.position = size / 2.0
-			_lance_preview.scale = Vector2.ONE * fit
-			var age := fmod(_clock, 0.7) if animated and known else 0.12
-			_lance_preview.preview(end, Vector2(165, 12), age, known)
-		"fullCharge", "quickCharge", "capacity":
-			_ring(ship, 48, Color(0.3, 0.5, 0.6, 0.4))
-			var fill := 1.0 if code == "fullCharge" else 0.4 + pulse * 0.6
-			draw_arc(ship, 48, -PI / 2, -PI / 2 + TAU * fill, 48, _ink(CYAN), 5.0, true)
-			if code == "capacity":
-				_ring(ship, 58, CYAN)
-		"pickup":
-			_ring(ship, 72, Color("#c7a2ff"))
-			for i in 5:
-				var pos := ship + Vector2.from_angle(i * TAU / 5) * (65 - pulse * 20)
-				draw_colored_polygon(PackedVector2Array([pos + Vector2(0, -7), pos + Vector2(5, 0), pos + Vector2(0, 7), pos + Vector2(-5, 0)]), _ink(Color("#c7a2ff")))
-		"speed", "length", "glideDuration":
-			for i in 3:
-				_line(ship + Vector2(-65, -15 + i * 15), ship + Vector2(-27, -15 + i * 15), CYAN, 2.0)
-			if code == "length":
-				_line(end, Vector2(155, -55), CYAN)
-		"massTow":
-			for i in 3:
-				_sprite(ENEMY, ship + Vector2(-48 - i * 34, (i % 2) * 22 - 11), 30.0)
-			var flight := fmod(_clock * 140.0, 150.0)
-			_sprite(ENEMY, ship + Vector2(40 + flight, 0), 34.0)
-			_line(ship + Vector2(28, 0), ship + Vector2(36 + flight, 0), Color("#ffbe65"), 2.0)
-		"bipolar":
-			var beam_color := Color("#69fff0")
-			_ring(route[0], 16, beam_color)
-			_line(route[0], end, Color(0.41, 1.0, 0.94, 0.45 + pulse * 0.4), 14.0)
-			_line(route[0], end, Color.WHITE, 3.0)
-			_sprite(ENEMY, route[0].lerp(end, 0.5), 32.0)
-		"attack", "critRate":
-			_sprite(ENEMY, Vector2(48, 12), 48.0)
-			_line(ship + Vector2(24, 0), Vector2(30, 12), CYAN, 5.0)
-			_burst(Vector2(30, 12), 22 + pulse * 10)
-
-func _draw_legend(id: String) -> void:
-	preload("res://scripts/ui/legendary_module_geometry.gd").draw(self,id,_ink(GOLD))
+	if definition==null:return
+	var ratio:=minf(size.x/300.0,size.y/170.0)
+	var image_size:=Vector2(300,170)*ratio
+	var lo:Vector2=(size-image_size)*0.5-Vector2.ONE*6.0
+	var hi:Vector2=(size+image_size)*0.5+Vector2.ONE*6.0
+	var rare:=bool(definition.comet_only) if "comet_only" in definition else false
+	var color:=Color("#ffd27a") if rare else Color("#7fe8ff")
+	for corner in [Vector2(lo.x,lo.y),Vector2(hi.x,lo.y),Vector2(lo.x,hi.y),hi]:
+		var direction:=Vector2(1.0 if corner.x==lo.x else -1.0,1.0 if corner.y==lo.y else -1.0)
+		draw_line(corner,corner+Vector2(direction.x*14,0),color,2.0,false)
+		draw_line(corner,corner+Vector2(0,direction.y*14),color,2.0,false)

@@ -327,7 +327,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 **うみへび座の編集と役割**
 
-`EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と吹き飛ばし衝角はこの判定を使い、役者が管理する移動速度と外力を分ける。
+`EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と震空・ソニックブームはこの判定を使い、役者が管理する移動速度と外力を分ける。
 
 ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
@@ -437,11 +437,12 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `landmark` | 強めの敵（星2〜5） | 1 なら目印の星を持つ（`HeroSystem` が選ぶ） |
 | `fire_hit` | ヘルクレス座の火で焼かれた敵 | 最後に火でダメージを受けた世界時刻（うみへび座の頭が火で落ちたかの判定に使う） |
 | `stone` | ペルセウス座の力で石になった敵 | 石になっている残り時間（世界秒） |
+| `slash_hold` | 閃光斬の印による停止 | 印が付いた通常敵の自力移動を止め、ほかの攻撃を受けられる状態を保つ |
 | `held` | みなみのかんむり座の渦に捕まった敵 | 1 ならほかの敵に抱えられている。抱えている側が動かし、自分の行動は止まる |
 | `pump_owner` | ポンプ座に吸引中の敵 | 最初に確保したポンプ座の行。未所有は -1。吸引停止・範囲外・撃破・再配置で解放する |
 | `pump_owner_id` | ポンプ座に吸引中の敵 | 所有者の id。行の再利用を識別する |
 | `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
-| `shove_time` | 吹き飛ばし衝角（W03）で押し出された敵 | 押し出しの残り時間 |
+| `shove_time` | 敵のギミックで押し出された敵 | 押し出しの残り時間 |
 | `shove_vel` | 同上 | 押し出しの速度 |
 | `shove_dmg` | 同上 | ぶつかった敵へのダメージ |
 | `shove_hits` | 同上 | 押し出し中に当てた敵（id → true） |
@@ -669,6 +670,11 @@ sequenceDiagram
 AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisualは状態と種類別の演出を描く。実装の入口は [RunState.emit](../speed/scripts/data_types/run_state.gd)、[RunSimulation.flush_events](../speed/scripts/runtime/run_simulation.gd)、[RunPresentation](../speed/scripts/render/run_presentation.gd)、[DrawLayer](../speed/scripts/render/draw_layer.gd)。HUDも `frame_events` を購読し、カード候補と位相の変更は `cards_changed`・`phase_changed` で受け取る。
 
 ### 10.2 層・資源・画面効果
+
+ビルドの攻撃は `BuildEffects` のピクセルshaderとMultiMeshで描く。ノイズと機体の外側の距離マスクは固定画像を読み、実行中はゲーム状態に応じて粒・命中・時間を更新する。表示の上書きは `effect_settings.tres` の装備キーで保持する。
+
+図鑑は `CodexAnimation` の固定の実演配置を `data/codex/*.res` から読み、`SubViewport` の中で同じ描画部品を使う。たる型の対応表は固定画像を読み、投影の走査線・横ずれ・段階色・ディザはshaderで合成する。詳細は表示中だけ実演を保持し、一覧は最初の描画結果を保持して実演の資源を解放する。項目選択は一覧を再生成せず、選択枠と詳細を更新する。
+
 
 重ねた絵の編集元は `data/visuals/looks/<外観名>.tres` のEnemyLookに本体・装甲・法線と任意の `decorations` を指定する。[固定外観の生成](#固定データ処理の生成と参照)が本体・固定塗装・サムネイルと牽引船体用の合成画像を用意し、`base_texture()` は合成済みの本体を返す。分離する外観は `split_other` にもう片側を持ち、`ruler` の表示が `buds` に応じて描画する。パーツのバッチは元の敵の外観設定・塗装を共有する。種類の外観を足す入口はこのResourceとし、ステージの `enemy_looks` から外観名を選ぶ。バッチ・照明・種類固有の表示は、そのランで使う種類を初めて表示するときに作り、照明の値は編集時に反映する。水流の専用層とshaderも初回使用時に作る。
 

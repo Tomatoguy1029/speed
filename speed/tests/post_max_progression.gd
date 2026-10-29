@@ -40,7 +40,7 @@ func _equip(ids: Array, lv := -1) -> void:
 	run.set_phase(RunState.Phase.PLAY)
 
 func _complete_traits() -> void:
-	for id in [&"T01", &"T03", &"T04", &"T05"]:
+	for id in [&"T08", &"T03", &"T04", &"T05"]:
 		_check(run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks), "特性 %s をMAX" % id)
 
 func _test_trait_levels() -> void:
@@ -49,28 +49,22 @@ func _test_trait_levels() -> void:
 		run.loadout.reset_loadout()
 		_check(run.loadout.grant(&"trait", &"T05", lv), "T05 Lv%d を装備" % lv)
 		var sonic = run.loadout.trait_behaviors[&"T05"]
-		_check(sonic._every() == [8, 6, 4, 4, 4][lv - 1], "T05 Lv%d の撃破間隔" % lv)
-		_check(is_equal_approx(sonic.val("radius"), 270.0 + lv * 30.0), "T05 Lv%d の範囲" % lv)
-		_check(is_equal_approx(sonic.val("damage"), 0.55 + lv * 0.05), "T05 Lv%d の威力倍率" % lv)
-		_check(is_equal_approx(float(sonic.def.params.knock), 1000.0), "T05 Lv%d の吹き飛ばし" % lv)
+		_check(sonic._every() == 10, "T05 Lv%d の撃破間隔" % lv)
+		_check(is_equal_approx(sonic.val("radius"), 150.0 + lv * 10.0), "T05 Lv%d の範囲" % lv)
+		_check(is_equal_approx(sonic.val("damage"), 0.7 + lv * 0.1), "T05 Lv%d の威力倍率" % lv)
+		_check(is_equal_approx(float(sonic.def.params.knock), 130.0), "T05 Lv%d の吹き飛ばし" % lv)
 		sonic.on_launch(false)
 		sonic.on_kill(&"killSonic")
-		_check(sonic._kills == 0, "T05 Lv%d の衝撃波撃破を次の発生数に含めない" % lv)
-		_check(run.loadout.grant(&"trait", &"T13", lv), "T13 Lv%d を装備" % lv)
-		var reactive = run.loadout.trait_behaviors[&"T13"]
-		_check(is_equal_approx(reactive.val("radius"), 185.0 + lv * 15.0), "T13 Lv%d の範囲" % lv)
-		_check(is_equal_approx(reactive.val("damage"), 1.0 + lv * 0.2), "T13 Lv%d の威力倍率" % lv)
-		_check(is_equal_approx(float(reactive.def.params.knock), 450.0), "T13 Lv%d の吹き飛ばし" % lv)
+		_check(sonic._kills == 1, "T05 Lv%d の衝撃波の撃破も次の発生数へ含める" % lv)
 	_check(not run.loadout.grant(&"trait", &"T05"), "Lv5より上へ進まない")
 	run.loadout.reset_loadout()
-	for id in [&"T01", &"T03", &"T04", &"T05"]:
+	for id in [&"T08", &"T03", &"T04", &"T05"]:
 		_check(run.loadout.grant(&"trait", id), "4枠を取得")
 	_check(not run.loadout.grant(&"trait", &"T06"), "5個目の新規特性は取得しない")
-	_check(run.loadout.grant(&"trait", &"T01"), "4枠でも所持特性はLv5まで上げられる")
+	_check(run.loadout.grant(&"trait", &"T08"), "4枠でも所持特性はLv5まで上げられる")
 	run.loadout.reset_loadout()
 	var effect_levels := {
-		&"T01": {"damage": [1.5, 1.75, 2.0, 2.25, 2.5], "radius": [210.0, 225.0, 240.0, 255.0, 270.0]},
-		&"T03": {"radius": [215.0, 232.5, 250.0, 267.5, 285.0], "life": [1.9, 2.1, 2.3, 2.5, 2.7], "power": [270.0, 305.0, 340.0, 375.0, 410.0]},
+		&"T03": {"damage": [1.0, 1.25, 1.5, 1.75, 2.0]},
 		&"T04": {"mult": [1.5, 1.625, 1.75, 1.875, 2.0]},
 		&"T06": {"damage": [2.4, 2.8, 3.2, 3.6, 4.0], "length": [840.0, 900.0, 960.0, 1020.0, 1080.0], "width": [40.0, 44.0, 48.0, 52.0, 56.0]},
 	}
@@ -104,7 +98,7 @@ func _test_trait_levels() -> void:
 func _test_legacy_lab_traits() -> void:
 	var lab: Node = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
-	await lab.reset({"traits": {"T01": 3, "T03": 3, "T04": 3, "T05": 3, "T06": 3}})
+	await lab.reset({"traits": {"T08": 3, "T03": 3, "T04": 3, "T05": 3, "T06": 3}})
 	_check(lab.run.cfg.trait_slots == 5 and lab.run.state.traits.size() == 5, "旧実験場の5枠装備を削除せず復元")
 	_check(lab.run.state.traits.values().all(func(level): return level == 3), "旧実験場のLv3を維持")
 	_check(not lab.run.loadout.all_traits_max() and lab.run.loadout.grant(&"trait", &"T06", 2), "旧装備もLv5まで成長できる")
@@ -127,18 +121,18 @@ func _test_transition() -> void:
 	_check(run.loadout.all_weapons_max() and not run.loadout.normal_progression_complete(), "武器が全MAXでも特性の育成を続ける")
 	_check(run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "空の特性枠があれば追加強化を出さない")
 	_check(not run.loadout.post_max.select(&"duration"), "通常育成中は直接の追加取得も拒否")
-	for id in [&"T01", &"T03", &"T04"]:
+	for id in [&"T08", &"T03", &"T04"]:
 		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
 	_check(not run.loadout.all_traits_max() and run.loadout.roll_cards().all(func(c): return c.kind != &"post_max"), "特性3/4枠では未取得特性を優先")
 	_equip([&"W01", &"W03", &"W08", &"W17"])
 	for id in [&"T31"]:
 		run.loadout.grant(&"trait", id, run.cfg.trait_max_stacks)
-	for id in [&"T01", &"T14", &"T12"]:
+	for id in [&"T08", &"T14", &"T12"]:
 		run.loadout.grant(&"trait", id)
 	_check(run.loadout.all_weapons_max() and not run.loadout.all_traits_max(), "MAX直前も通常育成")
 	var three := run.loadout.roll_cards()
 	_check(three.size() == 3 and three.all(func(c): return c.kind == &"trait"), "通常候補3件を提示し回復なし")
-	run.loadout.grant(&"trait", &"T01", 4)
+	run.loadout.grant(&"trait", &"T08", 4)
 	var unfinished := run.loadout.roll_cards()
 	_check(unfinished.size() == 2 and unfinished.all(func(c): return c.kind == &"trait"), "通常候補2件を提示し回復なし")
 	run.loadout.grant(&"trait", &"T14", 4)
@@ -199,7 +193,7 @@ func _test_traits_and_stacks() -> void:
 		_check(not pm.eligible(&"crit_chance"), "特性予約が上限を使い切ると追加確率を除外")
 	run.cfg.trait_max_stacks = original_max
 	# 通常育成完了後、上限に達した追加確率は消費しない。
-	run.state.traits = {&"T09": 5, &"T01": 5, &"T03": 5, &"T04": 5}
+	run.state.traits = {&"T09": 5, &"T08": 5, &"T03": 5, &"T04": 5}
 	run.state.post_max_stacks = {}
 	run.loadout.refresh_stats()
 	for i in 4: _check(pm.select(&"crit_chance"), "MAX特性後に追加確率を取得")
@@ -277,16 +271,15 @@ func _test_weapon_paths() -> void:
 	_check(run.projectiles.friend_alive.size() > f, "実際の武器発射を検証")
 	_check(is_equal_approx(run.projectiles.friend_vel[f].length(), 1430.0), "武器弾の速度+10%")
 	_check(is_equal_approx(run.projectiles.friend_life[f], 0.99), "武器弾の寿命+10%")
-	_check(is_equal_approx(run.projectiles.friend_knock[f], 275.0), "武器弾の吹き飛ばし+10%")
-	_check(is_equal_approx(run.projectiles.friend_dmg[f], ram * 1.14 * b.dmg_k() * 0.4), "武器弾ダメージを二重適用しない")
+	_check(is_equal_approx(run.projectiles.friend_knock[f], 337.7), "武器弾の吹き飛ばし+10%")
+	_check(is_equal_approx(run.projectiles.friend_dmg[f], ram * 1.14 * b.at_level("damage_by_level")), "武器弾ダメージを二重適用しない")
 	run.projectiles.fire_shot(Vector2.ZERO, 0.0, 7.0)
 	var normal := run.projectiles.friend_dmg.find(7.0)
 	_check(is_equal_approx(run.projectiles.friend_vel[normal].length(), 1300.0) and is_equal_approx(run.projectiles.friend_dmg[normal], 7.0), "特性・共通弾へ武器補正を漏らさない")
 	var sonic: WeaponBehavior = run.loadout.weapon_behaviors[&"W08"]
 	sonic.on_launch(false)
-	var wave: Dictionary = run.projectiles.attached_attack(&"sonic").waves.back()
-	_check(is_equal_approx(wave.radius, float(sonic.def.params.radius) * sonic.radius_k() * 1.1), "W08実波動の巻き込み半径")
-	_check(is_equal_approx(wave.life, float(sonic.def.params.travel) * 1.1), "W08の実際に攻撃する持続時間")
+	_check(is_equal_approx(sonic.wave_speed(), float(sonic.def.params.speed_by_level[4]) * 1.82 * run.cfg.character_scale * 1.1), "W08は輪の広がる速さを拡大")
+	_check(is_equal_approx(sonic.wave_life(), float(sonic.def.params.life) * 1.1), "W08は輪が残る時間を延長")
 	var arc: WeaponBehavior = run.loadout.weapon_behaviors[&"W17"]
 	_check(is_equal_approx(arc.p("range"), float(arc.def.params.range) * 1.1), "W17電撃探索の到達距離")
 	var echo: WeaponBehavior = run.loadout.weapon_behaviors[&"W27"]
@@ -323,14 +316,16 @@ func _test_collision_and_pickups() -> void:
 	t.r[corpse] = 80.0
 	run.state.post_max_stacks = {&"area": 2, &"duration": 2, &"projectile_speed": 2, &"knockback": 2}
 	var initial := run.projectiles.friend_count()
-	ram.on_contact(corpse, t.pos[corpse], Vector2.RIGHT)
-	_check(run.projectiles.friend_count() > initial, "W03の実接触から攻撃破片を発射")
+	ram.def = ram.def.duplicate(true)
+	ram.def.params.chance_by_level = [1.0, 1.0, 1.0, 1.0, 1.0]
+	ram.on_defeated(corpse, {"one_shot": true, "dir": Vector2.RIGHT})
+	_check(run.projectiles.friend_count() > initial, "W03の一撃撃破から攻撃破片を発射")
 	var debris := run.projectiles.friend_cause.find(&"hullDebris")
 	_check(debris >= 0, "W03の船体破片を取得")
 	if debris >= 0:
-		_check(is_equal_approx(run.projectiles.friend_r[debris], 80.0 * 0.17 * 1.1), "W03の破片接触半径を拡大")
+		_check(is_equal_approx(run.projectiles.friend_r[debris], 4.0 * 1.82 * run.cfg.character_scale * 1.1), "W03の破片接触半径を拡大")
 		_check(is_equal_approx(run.projectiles.friend_life[debris], run.cfg.hull_debris_life * 1.1), "W03の攻撃破片の持続に適用")
-		_check(is_equal_approx(run.projectiles.friend_vel[debris].length(), (float(ram.def.params.speed_base) + float(ram.def.params.speed_per_tier) * ram.tier()) * 1.2 * 0.85), "W03の弾速と吹き飛ばしは基準へ加算")
+		_check(is_equal_approx(run.projectiles.friend_vel[debris].length(), float(ram.def.params.speed) * 1.1 * 0.85), "W03の弾速の補正を一度だけ適用")
 	_clear()
 	run.state.post_max_stacks = {&"pickup_radius": 2, &"pickup_speed": 2, &"xp_gain": 2, &"acceleration": 2, &"turn_rate": 2}
 	run.loadout.refresh_stats()
@@ -364,7 +359,7 @@ func _test_target_filtering() -> void:
 		&"W01": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],
 		&"W03": [&"projectile_speed", &"duration", &"knockback", &"area"], &"W04": [&"knockback", &"area"],
 		&"W05": [&"weapon_interval", &"knockback", &"followup"], &"W07": [&"duration", &"knockback", &"followup"],
-		&"W08": [&"weapon_interval", &"duration", &"knockback", &"area"], &"W17": [&"knockback", &"area"],
+		&"W08": [&"duration", &"knockback", &"area"], &"W17": [&"knockback", &"area"],
 		&"W21": [&"projectile_speed", &"duration", &"knockback", &"area", &"followup"],
 		&"W22": [&"knockback", &"area", &"followup"],
 		&"W23": [&"weapon_interval", &"projectile_speed", &"duration", &"knockback", &"followup"],

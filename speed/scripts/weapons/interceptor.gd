@@ -4,7 +4,6 @@ extends WeaponBehavior
 var drones: Array[Dictionary] = []
 var _clock := 0.0
 var _target_after: Dictionary = {}
-var _hit_after: Dictionary = {}
 var _buf := PackedInt32Array()
 
 func value(key: String):
@@ -15,40 +14,49 @@ func count() -> int:
 
 func tick(dt: float, busy: bool) -> void:
 	_clock += dt
-	for times in [_target_after, _hit_after]:
-		for id in times.keys():
-			if float(times[id]) <= _clock:
-				times.erase(id)
+	for id in _target_after.keys():
+		if float(_target_after[id]) <= _clock: _target_after.erase(id)
 	while drones.size() < count():
 		var i := drones.size()
 		drones.append({"pos": state.ship_pos, "angle": 0.0, "flash": 0.0,
-			"next": _clock + i * interval(float(value("interval_by_level"))) / count(), "left": 0})
+			"target": -1, "target_id": -1, "kick": 0.0, "next": _clock + i * interval(float(value("interval_by_level"))) / count(), "left": 0})
 	for i in drones.size():
 		var d := drones[i]
 		# 編隊を常に自機へ固定する。高速経路の記録・追走は行わない。
 		var a := _clock * float(p("orbit_speed")) + i * TAU / drones.size()
 		var radial := Vector2.from_angle(a)
-		d.pos = state.ship_pos + radial * float(p("orbit"))
+		d.pos = state.ship_pos + radial * float(p("orbit")) - Vector2.from_angle(float(d.angle)) * float(d.kick)
+		d.kick = maxf(0.0, float(d.kick) - dt * 12.0 * 1.82 * cfg.character_scale)
 		d.flash = maxf(0.0, float(d.flash) - dt)
-		if int(d.left) == 0:
-			d.angle = lerp_angle(float(d.angle), a, minf(dt * 5.0, 1.0))
+		var aim: int = d.target if int(d.left)>0 and ctx.enemies.is_same(int(d.target),int(d.target_id)) else _nearest(d.pos)
+		if aim >= 0:
+			d.angle = lerp_angle(float(d.angle), (ctx.enemies.table.pos[aim] - d.pos).angle(), minf(dt * 14.0, 1.0))
 		if busy or _clock < float(d.next):
 			continue
+		var target := -1
 		if int(d.left) == 0:
+			target = _nearest(d.pos)
+			if target<0: continue
 			d.left = int(value("burst_by_level"))
-		var target := _nearest(d.pos)
+			d.target = target
+			d.target_id = ctx.enemies.table.id[target]
+		elif ctx.enemies.is_same(int(d.target),int(d.target_id)) and ctx.enemies.table.dead[int(d.target)]==0:
+			target = int(d.target)
+		else: target = _nearest(d.pos)
 		if target >= 0:
 			var t := ctx.enemies.table
 			_target_after[t.id[target]] = _clock + float(p("target_interval"))
-			d.angle = (t.pos[target] - d.pos).angle()
-			d.flash = 0.09
+			d.kick = 1.5 * 1.82 * cfg.character_scale
+			d.flash = 0.06
 			var direction := Vector2.from_angle(float(d.angle))
-			fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
+			var count := shots(1)
+			for shot in count:
+				fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle + (shot - (count - 1) / 2.0) * 0.08,
 				atk() * float(value("damage_by_level")), {"cause": &"interceptor", "r": p("shot_radius"),
 				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy,
 				"visual_key": "weapon/interceptor"})
 		d.left = int(d.left) - 1
-		d.next = _clock + interval(float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
+		d.next = _clock + shooting_interval(float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
 
 func _nearest(from: Vector2) -> int:
 	var range_r := float(p("range"))
@@ -72,9 +80,4 @@ func _nearest(from: Vector2) -> int:
 
 ## 実際の着弾だけを扱う。弾の掃引・地形・盾反射は ProjectileSystem が先に判定する。
 func hit_enemy(i: int, damage: float, impact: Vector2) -> void:
-	var t := ctx.enemies.table
-	var id := t.id[i]
-	if _hit_after.has(id):
-		return
-	_hit_after[id] = _clock + float(p("hit_interval"))
 	ctx.combat.damage_enemy(i, damage, {"cause": &"interceptor", "impact": impact, "no_crit": true})

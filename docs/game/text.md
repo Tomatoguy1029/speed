@@ -141,7 +141,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.interval_total | MAX後の実効短縮累計 | Effective reduction since MAX |
 | postmax.interval.interval | 発射 | Fire |
 | postmax.interval.interval_by_level | 発射 | Fire |
-| postmax.interval.block_interval | 防弾 | Block |
+| postmax.interval.revive_by_level | 殻の復活 | Shell recovery |
 | postmax.interval.burst_interval | 連射 | Burst |
 | postmax.tag | 追加強化 | Enhancement |
 | postmax.keep_hp | 現在HPはそのまま | Current HP stays the same |
@@ -175,18 +175,18 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.pickup_speed | XP吸引速度 | XP attraction speed |
 | postmax.xp_gain | XP獲得量 | XP gain |
 | postmax.target.W03.area | 衝角の船体・破片半径 | Ram hull and fragment radius |
-| postmax.target.W04.area | 接触波動の半径 | Contact wave radius |
-| postmax.target.W08.area | ソニックブームの半径 | Sonic wave radius |
+| postmax.target.W04.area | 震空の半径 | Contact wave radius |
+| postmax.target.W08.area | ソニックブームの輪の広がり | Sonic wave radius |
 | postmax.target.W17.area | 電撃の到達距離 | Electric reach |
 | postmax.target.W21.area | 船体回収半径 | Hull collection radius |
 | postmax.target.W22.area | 双極ビームの幅 | Bipolar beam width |
 | postmax.target.W26.area | 各ドローンの接触半径 | Each drone hit radius |
 | postmax.target.W01.followup | ブラスター弾 | Blaster shots |
-| postmax.target.W02.followup | 散弾砲の弾 | Scatter shots |
-| postmax.target.W23.followup | 後方ブラスター弾 | Rear shots |
-| postmax.target.W25.followup | 迎撃ドローン弾 | Interceptor shots |
+| postmax.target.W02.followup | スプレッドブラスターの弾 | Scatter shots |
+| postmax.target.W23.followup | リアブラスター弾 | Rear shots |
+| postmax.target.W25.followup | ストライクウィング弾 | Interceptor shots |
 | postmax.target.W05.followup | バリアの波動 | Barrier waves |
-| postmax.target.W07.followup | 軌跡機雷 | Trail mines |
+| postmax.target.W07.followup | マインランチャー | Trail mines |
 | postmax.target.W21.followup | 牽引した船体弾 | Towed hull shots |
 | postmax.target.W22.followup | 双極ビーム | Bipolar beam |
 | card.heal&#95;tag | 回復 | Repair |
@@ -272,8 +272,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | weapon.W29.name | エンドブラスト | End Blast |
 | weapon.W29.desc | ブーストの終点で爆発する。 | Explodes at the end of a boost. |
 |  | ■ 特性（trait.&lt;ID&gt;） |  |
-| trait.T01.name | 終端爆縮 | End Implosion |
-| trait.T01.desc | 線の終点で爆発 | Explodes at the end of your line. |
 | trait.T03.name | エンドホール | End Hole |
 | trait.T03.desc | ブーストが終わると機体を中心に重力が生まれ、周りの敵を引きずり込む。 | When a boost ends, gravity around the ship draws in surrounding enemies. |
 | trait.T04.name | ギアアップ | Gear Up |
@@ -294,8 +292,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T11.desc | すべての攻撃の威力が上がる。 | Increases the damage of all attacks. |
 | trait.T12.name | 広域回収 | Wide Pickup |
 | trait.T12.desc | アイテムを拾える範囲が広がる。 | Increases item pickup range. |
-| trait.T13.name | 反応波動 | Reactive Wave |
-| trait.T13.desc | ダメージを受けたとき、周りを押し返す | Pushes nearby enemies away when you take damage. |
 | trait.T14.name | 軌跡延長 | Trail Extension |
 | trait.T14.desc | 描ける線の長さが伸びる。 | Increases the length of lines you can draw. |
 | trait.T31.name | 慣性航行 | Inertial Cruise |

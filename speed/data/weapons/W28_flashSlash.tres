@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="WeaponDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/weapon_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+level_steps = PackedInt32Array(1, 2, 3, 4, 5)
+params = {
+"mult_by_level": [1.0, 1.25, 1.5, 1.75, 2.0],
+"cuts_by_level": [1, 2, 2, 3, 4],
+"streaks_by_level": [12, 21, 30, 39, 48],
+"pause": 0.15,
+"sweep": 0.3
+}
+id = &"W28"
+code_id = &"flashSlash"

@@ -451,17 +451,11 @@ extends Resource
 ## 単位：単位（距離）
 @export var max_enemy_radius: float
 
-## 吹き飛ばし衝角（W03）で倒した大型の敵と、敵のギミックから飛ぶ、攻撃する破片
-@export_group("大型の敵の破片")
-## 破片が出る大きさ
-## 吹き飛ばし衝角で、半径がこれ以上の敵を倒すと、攻撃する破片が飛ぶ。
-## 単位：単位（距離）
-@export var hull_debris_min_radius: float
-## 破片の最大数
-## 1体から飛ぶ破片の数の上限（敵の大きさで増える）。
-## 単位：個
-@export var hull_debris_max_pieces: int
-## 破片の寿命
+## 星砕きと敵のギミックから飛ぶ攻撃する破片
+@export_group("攻撃する破片")
+## 星屑の基準威力。攻撃力の倍率を掛ける。
+## 単位：HP
+@export var hull_debris_damage: float
 ## 破片が飛んでいる時間。
 ## 単位：世界秒
 @export var hull_debris_life: float

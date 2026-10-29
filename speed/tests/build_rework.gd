@@ -12,6 +12,14 @@ func _ready() -> void:
 	_test_multipliers()
 	_test_duplication()
 	_test_discovery()
+	_test_shooting()
+	_test_one_shot()
+	_test_barrier()
+	_test_distance()
+	_test_endpoint()
+	_test_shooting_multiplier_hits()
+	_test_sonic_edge()
+	_test_hole_capture()
 	await _close()
 	print("[build_rework] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
@@ -59,3 +67,149 @@ func _test_discovery() -> void:
 	_check(SaveManager.is_module_known(&"W29"), "終端爆縮の取得をエンドブラストへ引き継ぐ")
 	_check(not SaveManager.is_module_known(&"T13"), "廃止した反応波動を表示しない")
 	_check(SaveManager.is_module_known(&"W01"), "他の獲得記録を保つ")
+
+func _test_shooting() -> void:
+	for id in [&"W01", &"W23"]:
+		run.loadout.reset_loadout()
+		_check(run.loadout.grant(&"weapon", id, 5), "前後の射撃を装備")
+		var behavior = run.loadout.weapon_behaviors[id]
+		behavior.tick(0.5, false)
+		_check(run.projectiles.friend_count() == 1, "Lv5も基準は1発")
+		_check(run.projectiles.friend_pierce_left[0] == 2, "Lv5は2体を貫く")
+		run.projectiles.friend_slots.clear()
+	run.loadout.reset_loadout()
+
+func _test_one_shot() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W03", 5)
+	var shatter = run.loadout.weapon_behaviors[&"W03"]
+	shatter.def = shatter.def.duplicate(true)
+	shatter.def.params.chance_by_level = [1.0, 1.0, 1.0, 1.0, 1.0]
+	var t := run.enemies.table
+	for cause in [&"shot", &"ram", &"afterimage"]:
+		var i := _enemy(&"drifter", Vector2(100, 100))
+		t.max_hp[i] = 10.0
+		t.hp[i] = 8.0
+		var before := run.projectiles.friend_count()
+		run.combat.damage_enemy(i, 8.0, {"cause": cause})
+		_check(run.projectiles.friend_count() == before + 2, "全攻撃から8割の一撃で小さい敵も砕く")
+	var weak := _enemy(&"drifter", Vector2(200, 100))
+	t.max_hp[weak] = 10.0
+	t.hp[weak] = 7.99
+	var before := run.projectiles.friend_count()
+	run.combat.damage_enemy(weak, 7.99, {"cause": &"shot"})
+	_check(run.projectiles.friend_count() == before, "8割未満のとどめでは砕かない")
+	while run.projectiles.debris_count() < 199:
+		run.projectiles._add_friend(ProjectileSystem.FriendKind.DEBRIS, &"hullDebris", Vector2.ZERO, Vector2.RIGHT, 1.0, 1.0, 1.0, false, 0, Color.WHITE, true, 0.0, 0.0, 0.0, -1)
+	var last := _enemy(&"armored", Vector2(300, 100))
+	t.max_hp[last] = 10.0
+	t.hp[last] = 10.0
+	run.combat.damage_enemy(last, 10.0, {"cause": &"shot", "dir": Vector2.RIGHT})
+	_check(run.projectiles.debris_count() == 200, "破片を200個までに絞る")
+	var finite:=true
+	for row in run.projectiles.friend_alive.size():
+		if run.projectiles.friend_alive[row]!=0 and not run.projectiles.friend_vel[row].is_finite():finite=false
+	_check(finite,"上限まで残り1個でも破片の位置と速度を有限に保つ")
+	_clear()
+	run.loadout.reset_loadout()
+
+func _test_barrier() -> void:
+	run.loadout.grant(&"weapon", &"W05", 1)
+	var b = run.loadout.weapon_behaviors[&"W05"]
+	var center := run.state.ship_pos
+	_check(b.block_segment(center + Vector2(100, 0), center, 1.0, 10.0) != null, "弾が殻を横切れば受け止める")
+	_check(is_equal_approx(b.durability, 5.0) and b.ready(), "耐久をダメージ分だけ減らす")
+	_check(b.block_segment(center + Vector2(100, 0), center, 1.0, 100.0) != null, "耐久を超える最後の1発も受け止める")
+	_check(not b.ready() and b.waves.size() == 2, "砕ける回にも波動が出る")
+	_check(b.block_segment(center + Vector2(100, 0), center, 1.0, 10.0) == null, "壊れている間は弾を通す")
+	b.tick(6.01, false)
+	_check(b.ready() and is_equal_approx(b.durability, 15.0), "時間が来ると耐久が全部戻る")
+	run.loadout.reset_loadout()
+
+func _test_distance() -> void:
+	run.loadout.grant(&"trait", &"T04", 5)
+	run.loadout.grant(&"trait", &"T32", 5)
+	var gear = run.loadout.trait_behaviors[&"T04"]
+	var start = run.loadout.trait_behaviors[&"T32"]
+	_check(is_equal_approx(gear.multiplier(0.0), 1.0) and is_equal_approx(gear.multiplier(1000.0), 2.0), "ギアアップは0から基本線長まで成長")
+	_check(is_equal_approx(gear.multiplier(2000.0), 2.0), "長い線も最大倍率を維持")
+	_check(is_equal_approx(start.multiplier(600.0), 3.0), "助走は600で最大")
+	_check(start.multiplier(300.0) < 1.4, "助走は後半ほど大きく伸びる")
+	run.loadout.reset_loadout()
+
+func _test_endpoint() -> void:
+	run.loadout.grant(&"weapon", &"W29", 5)
+	var blast = run.loadout.weapon_behaviors[&"W29"]
+	blast.on_end()
+	_check(blast.pending.size() == 7, "エンドブラストLv5の二段目は7個")
+	blast.tick(0.13, false)
+	_check(blast.pending.size() == 7, "二段目は0.14秒まで待つ")
+	blast.tick(0.3, false)
+	_check(blast.pending.is_empty(), "二段目が時間差で全部発動する")
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W07", 5)
+	var mines = run.loadout.weapon_behaviors[&"W07"]
+	run.state.ship_heading = Vector2.RIGHT
+	mines.on_end()
+	_check(mines.mines.size() == 24 and mines.mines.all(func(m): return m.to.x >= m.from.x), "機雷は前方へ24個")
+	mines.on_end()
+	mines.on_end()
+	_check(mines.mines.size() == 60, "機雷は古いものから消して60個")
+	run.loadout.reset_loadout()
+
+func _test_shooting_multiplier_hits() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.field.bodies.clear()
+	run.field.moons.clear()
+	run.loadout.grant(&"weapon",&"W25",1)
+	run.loadout.grant(&"trait",&"T35",5)
+	var victim:=_enemy(&"drifter",run.state.ship_pos+Vector2(180,0))
+	run.enemies.table.hp[victim]=1000.0
+	run.enemies.table.max_hp[victim]=1000.0
+	run.combat.rebuild_grid()
+	var wing=run.loadout.weapon_behaviors[&"W25"]
+	wing.tick(1.0,false)
+	var count:=run.projectiles.friend_count()
+	var damage:float=wing.atk()*float(wing.value("damage_by_level"))
+	run.projectiles._update_friendly(0.3)
+	_check(count>=2 and is_equal_approx(run.enemies.table.hp[victim],1000.0-damage*count),"ウィングの追加弾を同時着弾でも全部ダメージに反映する")
+	_clear()
+	run.loadout.reset_loadout()
+
+func _test_sonic_edge() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon",&"W08",1)
+	var sonic=run.loadout.weapon_behaviors[&"W08"]
+	run.state.ship_pos=Vector2(200,0)
+	run.state.ship_heading=Vector2.RIGHT
+	run.state.ship_vel=Vector2(100,0)
+	var victim:=_enemy(&"drifter",Vector2(50,100))
+	run.enemies.table.r[victim]=50.0
+	run.enemies.table.hp[victim]=100.0
+	for i in 3:sonic.frames.append({"pos":Vector2(50,0),"age":60.0/sonic.wave_speed()})
+	sonic.pulse=0.25
+	run.combat.rebuild_grid()
+	sonic.tick(0.01,false)
+	_check(sonic.pending.size()==1,"音の輪が大型敵の外周へ触れたときも当てる")
+	_check(run.enemies.table.hp[victim]==100.0,"押してから威力まで一拍待つ")
+	sonic.tick(0.1,false)
+	_check(run.enemies.table.hp[victim]<100.0,"押した敵へ遅れて威力を与える")
+	_clear()
+	run.loadout.reset_loadout()
+
+func _test_hole_capture() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"trait", &"T03", 5)
+	var hole = run.loadout.trait_behaviors[&"T03"]
+	var victim := _enemy(&"drifter", run.state.ship_pos + Vector2(30,0))
+	run.enemies.table.guard[victim] = 1.0
+	run.combat.rebuild_grid()
+	hole.on_end()
+	hole.tick(0.2, false)
+	_check(run.enemies.table.dead[victim] == 0 and run.enemies.table.hull_scattered[victim] == 0, "無敵の敵はエンドホールへ吸い込んだ扱いにしない")
+	_clear()
+	run.loadout.reset_loadout()

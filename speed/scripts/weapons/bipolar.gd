@@ -5,6 +5,7 @@ extends WeaponBehavior
 ## 発射器の位置（なぞっていない間は null）
 var origin = null
 var _buf := PackedInt32Array()
+var pending: Array[Dictionary] = []
 
 func on_launch(_full: bool) -> void:
 	origin = state.ship_pos
@@ -19,6 +20,18 @@ func on_end() -> void:
 	var length := d.length()
 	if length <= float(p("min_length")):
 		return
+	pending.append({"from":from,"to":to,"delay":0.18})
+	state.emit(&"bipolar_charge",{"from":from,"to":to})
+
+func tick(dt: float, _busy: bool) -> void:
+	for shot in pending:
+		shot.delay-=dt
+		if shot.delay<=0.0:_fire(shot.from,shot.to)
+	pending=pending.filter(func(s):return s.delay>0.0)
+
+func _fire(from: Vector2, to: Vector2) -> void:
+	var d:=to-from
+	var length:=d.length()
 	var u := d / length
 	var width := float(p("width")) * radius_k()
 	var pad := Vector2(width / 2.0, width / 2.0)

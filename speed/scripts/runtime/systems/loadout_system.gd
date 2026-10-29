@@ -21,6 +21,8 @@ var _candidate_resources: Dictionary = {}
 var _equipped_resources: Dictionary = {}
 var _pending_choice := -1
 var _applied_post_max_hp := 0.0
+var boost_distance := 0.0
+var kill_position := Vector2.ZERO
 var post_max := PostMaxProgression.new()
 
 func resource_scopes() -> Array:
@@ -188,7 +190,7 @@ func tick(real_dt: float, world_dt: float) -> void:
 	# 開発版の計測：武器・特性ごとの時間を build.<ID> に足す
 	var perf := ctx.perf
 	var t0 := Time.get_ticks_usec()
-	ctx.projectiles.tick_attached(real_dt)
+	ctx.projectiles.tick_attached(real_dt,world_dt)
 	perf.since(&"build.attached", t0)
 	if state.phase != RunState.Phase.PLAY or state.controls_locked:
 		return
@@ -438,6 +440,7 @@ func remove_weapon(id: StringName, source := &"direct") -> void:
 		_equipped_resources.erase(id)
 	state.weapons.erase(id)
 	if previous > 0: _record_change(&"weapon", id, previous, 0, source)
+	if weapon_behaviors.has(id): weapon_behaviors[id].dispose()
 	weapon_behaviors.erase(id)
 	refresh_stats()
 	equipment_changed.emit()
@@ -474,6 +477,9 @@ func reset_loadout() -> void:
 	_release_candidates()
 	for scope: ContentResourceScope in _equipped_resources.values(): scope.cancel()
 	_equipped_resources.clear()
+	combat.burst_power=1.0
+	combat.ignore_armor=false
+	for b in weapon_behaviors.values(): b.dispose()
 	state.weapons = {}
 	state.traits = {}
 	state.post_max_stacks = {}
@@ -485,12 +491,14 @@ func reset_loadout() -> void:
 # ── 発動のきっかけ（CombatSystem・DrawSystem・ShipSystem から呼ばれる） ─
 
 func on_launch(full: bool) -> void:
+	boost_distance = 0.0
 	for b in trait_behaviors.values():
 		b.on_launch(full)
 	for b in weapon_behaviors.values():
 		b.on_launch(full)
 
 func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
+	boost_distance += p0.distance_to(p1)
 	ctx.projectiles.trail_attached(p0, p1)
 	if state.phase != RunState.Phase.PLAY:
 		return
@@ -504,12 +512,15 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 			return
 
 ## 高速で敵（行 i）に触れた。
-func on_contact(i: int, hit: Vector2, dir: Vector2) -> void:
+func on_contact(i: int, hit: Vector2, dir: Vector2, damage := 0.0) -> void:
 	on_electric_contact(i)
 	for b in weapon_behaviors.values():
 		if state.phase != RunState.Phase.PLAY:
 			return
 		b.on_contact(i, hit, dir)
+		b.on_ram_hit(i, hit, dir, damage)
+	for b in trait_behaviors.values():
+		b.on_contact(i, hit, dir, damage)
 
 ## 普段の接触でも発動するもの（接触電撃）。
 func on_electric_contact(i: int) -> void:
@@ -518,7 +529,8 @@ func on_electric_contact(i: int) -> void:
 			return
 		b.on_any_contact(i)
 
-func on_kill(cause: StringName) -> void:
+func on_kill(cause: StringName, pos := Vector2.ZERO) -> void:
+	kill_position = pos
 	for b in trait_behaviors.values():
 		b.on_kill(cause)
 	for b in weapon_behaviors.values():
@@ -580,3 +592,10 @@ func split_vectors(velocity: Vector2, generation: int) -> Array[Vector2]:
 func split_damage() -> float:
 	var d := ContentManager.definition(&"traits", &"T37") as TraitDef
 	return float(d.params.damage_by_level[_n(&"T37") - 1]) if _n(&"T37") > 0 else 1.0
+
+func prepare_ram(extra_distance: float) -> float:
+	var distance := boost_distance + extra_distance
+	var gear = trait_behaviors.get(&"T04")
+	if gear != null: combat.burst_power = gear.multiplier(distance) if state.tracing else 1.0
+	var run_up = trait_behaviors.get(&"T32")
+	return run_up.multiplier(distance) if state.tracing and run_up != null else 1.0

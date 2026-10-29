@@ -46,7 +46,7 @@ func step(dt: float, character_scale: float, zoom: float) -> void:
 	for layer in [_body, _tail]:
 		var mat := layer.material as ShaderMaterial
 		mat.set_shader_parameter("clock", shots.back().age if not shots.is_empty() else 0.0)
-		mat.set_shader_parameter("pixel", maxf(1.0, 2.0 / maxf(zoom * _scale, 0.01)) * EFFECT_SETTINGS.number("trait/critBeam", "pixel_scale", 1.0))
+		mat.set_shader_parameter("pixel", 1.82 * EFFECT_SETTINGS.number("trait/critBeam", "pixel_scale", 1.0))
 		mat.set_shader_parameter("silhouette", silhouette)
 		layer.queue_redraw()
 

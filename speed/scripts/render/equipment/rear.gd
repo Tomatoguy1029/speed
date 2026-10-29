@@ -6,6 +6,7 @@ func draw_extra(c: CanvasItem, ship_pos: Vector2, color: Color) -> void:
 	c.draw_texture_rect(BASE, Rect2(Vector2(-BASE.get_width() / 2.0, -20.0) * cfg.character_scale,
 		BASE.get_size() * cfg.character_scale), false, visual_color(color))
 	var mount: Vector2 = behavior.mount_position() + (ship_pos - state.ship_pos)
+	if behavior.recoil > 0.0: mount += state.ship_heading * (2.0 if behavior.recoil > 0.06 else 1.0) * 1.82 * cfg.character_scale
 	var aim: Vector2 = behavior.aim_direction()
 	c.draw_set_transform(mount, aim.angle() - PI / 2.0)
 	c.draw_texture_rect(TURRET, Rect2(-behavior.MOUNT_PIXEL * cfg.character_scale,

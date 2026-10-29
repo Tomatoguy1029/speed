@@ -36,9 +36,9 @@ func p(key: String, default = 0.0):
 	var value: Variant = def.params.get(key, default)
 	var targets := cfg.post_max.target(def.id)
 	if key in targets.get("area", []):
-		return float(value) * post_factor(&"area")
+		return value.map(func(v):return float(v)*post_factor(&"area")) if value is Array else float(value)*post_factor(&"area")
 	if key in targets.get("duration", []):
-		return float(value) * post_factor(&"duration")
+		return value.map(func(v):return float(v)*post_factor(&"duration")) if value is Array else float(value)*post_factor(&"duration")
 	if key == "knock" or key == "chain_knock":
 		return float(value) * post_factor(&"knockback")
 	return value
@@ -61,6 +61,7 @@ func interval(base: float) -> float:
 ## 武器から発射する弾だけを補正する。特性の弾と共通ProjectileSystemは基準を保つ。
 func fire_shot(from: Vector2, angle: float, dmg: float, opts := {}) -> void:
 	var enhanced := opts.duplicate()
+	enhanced.r = float(opts.get("r", 5.0)) * ctx.loadout.area_multiplier()
 	enhanced.speed = float(opts.get("speed", 1300.0)) * post_factor(&"projectile_speed")
 	enhanced.knock = float(opts.get("knock", 250.0)) * post_factor(&"knockback")
 	ctx.projectiles.fire_shot(from, angle, dmg, enhanced)
@@ -76,7 +77,7 @@ func shooting_interval(base: float) -> float:
 	return interval(base) / ctx.loadout.shooting_rate()
 
 func at_level(key: String) -> float:
-	var values: Array = def.params[key]
+	var values: Array = p(key)
 	return float(values[clampi(level - 1, 0, values.size() - 1)])
 
 func atk() -> float:
@@ -98,6 +99,12 @@ func on_contact(_i: int, _hit: Vector2, _dir: Vector2) -> void:
 ## 普段・高速を問わない接触。_i は触れた敵の行番号
 func on_any_contact(_i: int) -> void:
 	pass
+func on_ram_hit(_i: int, _hit: Vector2, _dir: Vector2, _damage: float) -> void:
+	pass
+
+func dispose() -> void:
+	pass
+
 func on_kill(_cause: StringName) -> void:
 	pass
 func on_end() -> void:

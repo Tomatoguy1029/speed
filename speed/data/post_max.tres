@@ -30,7 +30,7 @@ increments = {
 targets = {
   "W01": {
     "interval": [
-      "interval"
+      "interval_by_level"
     ],
     "duration": [
       "life"
@@ -41,7 +41,7 @@ targets = {
   },
   "W02": {
     "interval": [
-      "interval"
+      "interval_by_level"
     ],
     "duration": [
       "life"
@@ -66,30 +66,22 @@ targets = {
   },
   "W05": {
     "interval": [
-      "interval",
-      "block_interval"
+      "revive_by_level"
     ],
     "knockback": true,
     "followup": true
   },
   "W07": {
     "duration": [
-      "life"
+      "life_by_level"
     ],
     "knockback": true,
     "followup": true
   },
   "W08": {
-    "interval": [
-      "interval"
-    ],
-    "duration": [
-      "travel"
-    ],
+    "duration": ["life"],
     "knockback": true,
-    "area": [
-      "radius"
-    ]
+    "area": ["speed_by_level"]
   },
   "W17": {
     "knockback": true,
@@ -145,7 +137,9 @@ targets = {
       "drone_hit_radius"
     ]
   },
-  "W27": {}
+  "W27": {},
+  "W28": {},
+  "W29": {"area": ["radius_by_level"], "knockback": true, "followup": true}
 }
 minimum_time_ratio = 0.2
 minimum_interval = 0.05

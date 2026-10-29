@@ -40,7 +40,7 @@ func on_trail(run: TraceRun, a: Vector2, b: Vector2) -> void:
 	var start := maxf(_clock, float(_current.until))
 	var finish := start + a.distance_to(b) / maxf(run.rate, 1.0)
 	_current.legs.append({"a": a, "b": b, "start": start, "finish": finish,
-		"power": ctx.combat.attack_power(), "radius": cfg.trace_radius})
+		"power": ctx.combat.attack_power(), "radius": area(cfg.trace_radius)})
 	_current.until = finish
 
 func on_end() -> void:
