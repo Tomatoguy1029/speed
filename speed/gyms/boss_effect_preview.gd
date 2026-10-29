@@ -2,6 +2,7 @@
 extends VBoxContainer
 
 const ROOT := "res://scenes/bosses/"
+const BOSS_PROGRAM := preload("res://tools/content/build_boss_program.gd")
 const EQUIPMENT := preload("res://gyms/equipment_effect_scenario.gd")
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const MANUAL := preload("res://gyms/boss_technique_debug.gd")
@@ -18,7 +19,12 @@ var _frame: SubViewportContainer
 var _status := Label.new()
 var _play := Button.new()
 var _speed := OptionButton.new()
+var _loadout_row := HBoxContainer.new()
+var _weapon_picker := OptionButton.new()
+var _trait_picker := OptionButton.new()
 var _equipment_level := OptionButton.new()
+var _trait_level := OptionButton.new()
+var _play_kind := OptionButton.new()
 var _final_picker := OptionButton.new()
 var _boss := ""
 var _technique := ""
@@ -47,11 +53,37 @@ func _ready() -> void:
 	_speed.select(2)
 	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
 	controls.add_child(_speed)
+	add_child(_loadout_row)
+	_loadout_row.visible = false
+	var loadout_label := Label.new()
+	loadout_label.text = "試遊装備"
+	_loadout_row.add_child(loadout_label)
+	_fill_equipment_options(_weapon_picker, &"weapons")
+	_fill_equipment_options(_trait_picker, &"traits")
+	var weapon_label := Label.new()
+	weapon_label.text = "武器"
+	_loadout_row.add_child(weapon_label)
+	_loadout_row.add_child(_weapon_picker)
+	_weapon_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_weapon_picker.item_selected.connect(func(_index: int): _replay())
 	for level in range(1,6): _equipment_level.add_item("Lv%d" % level)
 	_equipment_level.select(4)
-	_equipment_level.visible = false
 	_equipment_level.item_selected.connect(func(_index: int): _replay())
-	controls.add_child(_equipment_level)
+	_loadout_row.add_child(_equipment_level)
+	var trait_label := Label.new()
+	trait_label.text = "特性"
+	_loadout_row.add_child(trait_label)
+	_loadout_row.add_child(_trait_picker)
+	_trait_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_trait_picker.item_selected.connect(func(_index: int): _replay())
+	for level in range(1,6): _trait_level.add_item("Lv%d" % level)
+	_trait_level.select(4)
+	_trait_level.item_selected.connect(func(_index: int): _replay())
+	_loadout_row.add_child(_trait_level)
+	_play_kind.add_item("武器を再生")
+	_play_kind.add_item("特性を再生")
+	_play_kind.item_selected.connect(func(_index: int): _replay())
+	_loadout_row.add_child(_play_kind)
 	for boss_name in FINAL_BOSS_NAMES:
 		_final_picker.add_item(boss_name)
 	_final_picker.visible = false
@@ -83,14 +115,56 @@ func _ready() -> void:
 	session.viewport = _viewport
 	add_child(session)
 
+func _fill_equipment_options(picker: OptionButton, category: StringName) -> void:
+	picker.add_item("なし")
+	picker.set_item_metadata(0, "")
+	var definitions: Array = ContentManager.catalog.table(category).values()
+	definitions.sort_custom(func(a, b): return String(a.get_display_name()) < String(b.get_display_name()))
+	for definition in definitions:
+		picker.add_item(definition.get_display_name())
+		picker.set_item_metadata(picker.item_count - 1, ("weapon/" if category == &"weapons" else "trait/") + String(definition.code_id))
+	picker.select(0)
+
+func _selected_equipment(picker: OptionButton) -> String:
+	return String(picker.get_item_metadata(picker.selected)) if picker.selected >= 0 else ""
+
+func _select_equipment(picker: OptionButton, path: String) -> void:
+	for index in picker.item_count:
+		if String(picker.get_item_metadata(index)) == path:
+			picker.select(index)
+			return
+
+func _select_equipment_for_effect(path: String) -> void:
+	_weapon_picker.select(0)
+	_trait_picker.select(0)
+	if path.begins_with("weapon/"):
+		_select_equipment(_weapon_picker, path)
+		_play_kind.select(0)
+	else:
+		_select_equipment(_trait_picker, path)
+		_play_kind.select(1)
+		if path in EQUIPMENT.PASSIVE_KEYS or path in ["trait/fullBurst", "trait/duplicator"]:
+			_select_equipment(_weapon_picker, "weapon/endBlast" if path == "trait/bigSwing" else "weapon/forward")
+
+func _equipment_id(key: String) -> StringName:
+	if key.is_empty(): return &""
+	var category: StringName = &"traits" if key.begins_with("trait/") else &"weapons"
+	var table: Dictionary = ContentManager.catalog.table(category)
+	for id in table:
+		if String(table[id].code_id) == key.get_slice("/", 1):
+			return id
+	return &""
+
 func set_effect(path: String) -> void:
 	_serial += 1
 	var serial := _serial
 	if manual != null: manual.finish()
 	manual = null
 	actor = null
+	if path != _equipment_key and (path.begins_with("weapon/") or path.begins_with("trait/")):
+		_select_equipment_for_effect(path)
 	_equipment_key = ""
-	_equipment_level.visible = path.begins_with("weapon/") or path.begins_with("trait/")
+	_loadout_row.visible = path.begins_with("weapon/") or path.begins_with("trait/")
 	_final_preview = path == "boss/final_strike"
 	_final_picker.visible = _final_preview
 	session.playing = false
@@ -125,6 +199,10 @@ func set_effect(path: String) -> void:
 	await session.reset(settings)
 	if serial != _serial: return
 	var program_path := "res://.content/boss_%s.tres" % _boss
+	var built: Dictionary = BOSS_PROGRAM.build_boss(_boss, program_path)
+	if built.get("error", ERR_INVALID_DATA) != OK:
+		_status.text = "ボス技データを生成できません: " + program_path
+		return
 	if not ResourceLoader.exists(program_path):
 		_status.text = "ボス技データを読めません: " + program_path
 		return
@@ -154,35 +232,41 @@ func _start_final_strike() -> void:
 	_play.text = "停止"
 	_status.text = "制限時間の一撃を再生中: " + FINAL_BOSS_NAMES[FINAL_BOSSES.find(_boss)]
 
-func _setup_equipment(key: String, serial: int) -> void:
-	var is_trait := key.begins_with("trait/")
-	var catalog: Dictionary = ContentManager.catalog.table(&"traits" if is_trait else &"weapons")
-	var code := key.get_slice("/", 1)
-	var id := StringName()
-	for candidate in catalog:
-		if String(catalog[candidate].code_id) == code:
-			id = candidate
-			break
-	if id == &"":
-		_status.text = "装備が見つかりません: " + key
+func _setup_equipment(_key: String, serial: int) -> void:
+	var weapon_key := _selected_equipment(_weapon_picker)
+	var trait_key := _selected_equipment(_trait_picker)
+	var weapon_id := _equipment_id(weapon_key)
+	var trait_id := _equipment_id(trait_key)
+	if (not weapon_key.is_empty() and weapon_id == &"") or (not trait_key.is_empty() and trait_id == &""):
+		_status.text = "試遊装備が見つかりません"
 		return
-	_status.text = "試遊を準備中: " + key
+	if weapon_key.is_empty() and trait_key.is_empty():
+		_status.text = "試遊する武器・特性を選んでください"
+		return
+	var play_trait := _play_kind.selected == 1
+	if (play_trait and trait_key.is_empty()) or (not play_trait and weapon_key.is_empty()):
+		play_trait = weapon_key.is_empty()
+	var play_key := trait_key if play_trait else weapon_key
+	var play_id := trait_id if play_trait else weapon_id
+	var catalog: Dictionary = ContentManager.catalog.table(&"traits" if play_trait else &"weapons")
+	_status.text = "試遊を準備中: " + play_key
 	var settings := {"empty": true, "stage": 1, "ship_pos": [0, 0], "invincible": true,
 		"director": {"enabled": false}, "weapons": {}, "traits": {}}
-	var level := _equipment_level.selected+1
-	if is_trait: settings["traits"] = {id: level}
-	else: settings["weapons"] = {id: level}
+	if weapon_id != &"": settings["weapons"] = {weapon_id: _equipment_level.selected + 1}
+	if trait_id != &"": settings["traits"] = {trait_id: _trait_level.selected + 1}
 	await session.reset(settings)
 	if serial != _serial: return
-	var behavior = (session.run.loadout.trait_behaviors if is_trait else session.run.loadout.weapon_behaviors).get(id)
+	var behavior = (session.run.loadout.trait_behaviors if play_trait else session.run.loadout.weapon_behaviors).get(play_id)
 	if behavior == null:
-		_status.text = "装備を試遊へ設定できません: " + key
+		_status.text = "装備を試遊へ設定できません: " + play_key
 		return
-	EQUIPMENT.play(session,key)
+	EQUIPMENT.play(session, play_key, false)
 	session.playing = true
 	_play.text = "停止"
-	_status.text = "%s / Lv%d を再生中" % [catalog[id].get_display_name(),level]
-	if key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
+	_status.text = "%s / Lv%d を再生中" % [catalog[play_id].get_display_name(), _trait_level.selected + 1 if play_trait else _equipment_level.selected + 1]
+	if not weapon_key.is_empty() and not trait_key.is_empty(): _status.text += "（武器・特性を併用）"
+	if _equipment_key not in [weapon_key, trait_key]: _status.text += "（編集中の効果は未装備）"
+	if play_key in ["weapon/knockback","trait/duplicator"]: _status.text += "（試遊では確率の演出を必ず発動）"
 
 func _replay() -> void:
 	if not _equipment_key.is_empty():

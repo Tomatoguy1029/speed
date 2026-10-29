@@ -2,7 +2,7 @@
 extends RefCounted
 const PASSIVE_KEYS := ["trait/quickCharge","trait/capacity","trait/critRate","trait/speed","trait/attack","trait/pickup","trait/length","trait/glideDuration","trait/bigSwing","trait/multiShot"]
 
-static func play(session, key: String) -> void:
+static func play(session, key: String, use_sample_weapon := true) -> void:
 	var run: RunSimulation = session.run
 	var is_trait := key.begins_with("trait/")
 	var table: Dictionary = run.loadout.trait_behaviors if is_trait else run.loadout.weapon_behaviors
@@ -11,9 +11,9 @@ static func play(session, key: String) -> void:
 		if String(item.def.code_id) == key.get_slice("/",1): behavior = item
 	if behavior == null: return
 	# 数値だけの特性は、効き先の武器・移動・回収を一緒に再生する。
-	if key in ["trait/multiShot","trait/fullBurst","trait/duplicator","trait/attack"]:
+	if use_sample_weapon and key in ["trait/multiShot","trait/fullBurst","trait/duplicator","trait/attack"]:
 		run.loadout.grant(&"weapon",&"W01",5)
-	if key == "trait/bigSwing": run.loadout.grant(&"weapon",&"W29",5)
+	if use_sample_weapon and key == "trait/bigSwing": run.loadout.grant(&"weapon",&"W29",5)
 	if key == "trait/duplicator":
 		behavior.def = behavior.def.duplicate(true)
 		behavior.def.params.chance_by_level = [1.0,1.0,1.0,1.0,1.0]
@@ -35,8 +35,12 @@ static func play(session, key: String) -> void:
 		"weapon/interceptor":
 			behavior.tick(1.0,false)
 		"trait/duplicator":
-			run.loadout.weapon_behaviors[&"W01"].tick(0.5,false)
-			run.projectiles._update_friendly(0.3)
+			var paired_weapon = null
+			if use_sample_weapon: paired_weapon = run.loadout.weapon_behaviors.get(&"W01")
+			elif not run.loadout.weapon_behaviors.is_empty(): paired_weapon = run.loadout.weapon_behaviors.values().front()
+			if paired_weapon != null:
+				paired_weapon.tick(0.5,false)
+				run.projectiles._update_friendly(0.3)
 		"weapon/mines":
 			behavior.on_end()
 			if not behavior.mines.is_empty(): spawn(session,behavior.mines[0].to)

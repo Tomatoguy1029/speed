@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 const PROGRAM := preload("res://scripts/data_types/boss_runtime_program.gd")
-const VERSION := 4
+const VERSION := 5
 static var generation_count := 0
 
 static func validate(source: Dictionary) -> PackedStringArray:
@@ -83,6 +83,9 @@ static func _validate_combo(node: Dictionary, ids: Dictionary, errors: PackedStr
 
 static func snapshot(value: Variant) -> Variant:
 	if value is Script: return value
+	# 外部シーンを複製すると生成済み .tres のサブリソースになり、
+	# 戦闘描画が resource_path から元のシーンを再ロードできなくなる。
+	if value is PackedScene: return value
 	if value is Resource:
 		var copy: Resource = value.duplicate(true)
 		for property in value.get_property_list():

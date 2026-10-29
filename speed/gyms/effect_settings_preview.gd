@@ -286,9 +286,12 @@ func _ready() -> void:
 	scroll.add_child(body)
 	body.add_child(_picker)
 	_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_picker.add_item("編集対象を選択")
+	_picker.set_item_disabled(0, true)
 	for path in _paths:
 		_picker.add_item(_effect_label(path))
-	_picker.item_selected.connect(func(index: int): _select(_paths[index]))
+	_picker.item_selected.connect(func(index: int):
+		if index > 0: _select(_paths[index - 1]))
 	body.add_child(_fields)
 	var preview := VBoxContainer.new()
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -317,8 +320,6 @@ func _ready() -> void:
 	_boss_preview.visible = false
 	preview.add_child(_boss_preview)
 	reload_current()
-	if _working == null: return
-	if not _paths.is_empty(): _select(_paths[0])
 
 func _effect_label(path: String) -> String:
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
@@ -337,7 +338,7 @@ func _collect(folder: String) -> void:
 
 func _select(path: String) -> void:
 	_selected = path
-	_picker.select(_paths.find(path))
+	_picker.select(_paths.find(path) + 1)
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
 	var boss_effect := path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path) or ATTACK_PREVIEWS.has(path)
