@@ -21,6 +21,8 @@ uniform bool broken = false;
 uniform sampler2D value_noise : repeat_disable, filter_nearest;
 uniform vec2 noise_origin=vec2(0.0);
 uniform float noise_seed=0.0;
+// ピクセル炎の半径（ドット）。炎は半径の 1.2 倍まで広がるので、描く面は半径より大きく取る
+uniform float fire_radius=0.0;
 #include "build_pixel_ring.gdshaderinc"
 float lattice(vec3 p){vec3 i=mod(p,64.0);vec2 tile=vec2(mod(i.z,8.0),floor(i.z/8.0));return texture(value_noise,(tile*64.0+i.xy+0.5)/512.0).r;}
 float vnoise(vec3 p){vec3 i=floor(p);vec3 f=fract(p);vec3 u=f*f*(3.0-2.0*f);
@@ -42,9 +44,11 @@ void fragment() {
   float edge=ring(p,r); float band=step(abs(length(p)-r),2.0)*(1.0-q);
   outc=mix(c2,c0,edge)*max(edge,band*0.45); outc.a*=1.0-q;
  } else if(mode==1) { // 試作のpfire：焼いたノイズと段階色、市松
-  float rt=radius*(0.35+0.65*(1.0-pow(1.0-min(1.0,q*3.0),3.0)));
+  float rt=(fire_radius>0.0?fire_radius:radius)*(0.35+0.65*(1.0-pow(1.0-min(1.0,q*3.0),3.0)));
   float n=vnoise(vec3((p+noise_origin)*0.16+vec2(noise_seed,-q*3.0),q*5.0+noise_seed));
-  float den=(1.0-length(p)/max(rt,0.1))*1.35+(n-0.5)*0.95-q*1.15+(q<0.07?0.7:0.0);
+  float d=length(p)/max(rt,0.1);
+  if(d>1.2) discard;
+  float den=(1.0-d)*1.35+(n-0.5)*0.95-q*1.15+(q<0.07?0.7:0.0);
   if(den>0.8) outc=c0; else if(den>0.55) outc=c1; else if(den>0.33) outc=c2;
   else if(den>0.16&&mod(cell.x+cell.y,2.0)<1.0) outc=c3;
  } else if(mode==2) { // ブラスター砲口：白い菱形、長い光線、横火花

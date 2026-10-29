@@ -85,7 +85,9 @@ func effect(mode: int, pos: Vector2, radius: float, life: float, key: String, op
 	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	node.position = (pos / pixel).round() * pixel
 	var r := radius * SETTINGS.number(key, "effect_scale", 1.0)
-	node.scale = Vector2.ONE * (r + pixel * (8.0 if mode==5 else 2.0))
+	# ピクセル炎は半径の 1.2 倍まで広がり、ノイズで外へ崩れるので、四角く切れないよう面を広く取る。
+	node.scale = Vector2.ONE * (r * (1.45 if mode == 1 else 1.0) + pixel * (8.0 if mode==5 else 2.0))
+	if mode == 1: options = options.merged({"fire_radius": r / (pixel * SETTINGS.number(key, "pixel_scale", 1.0))})
 	material.set_shader_parameter("mode", mode)
 	if mode==5: material.set_shader_parameter("barrier_radius",r/(pixel*SETTINGS.number(key,"pixel_scale",1.0)))
 	material.set_shader_parameter("pixel", pixel * SETTINGS.number(key, "pixel_scale", 1.0))
@@ -172,18 +174,8 @@ func event(ev: Dictionary) -> bool:
 				for sign_side in [-1.0,1.0]:
 					burst(ev.pos,4,ev.dir.angle()+PI*0.5*sign_side,1.0,40,100,0.3,[Color.WHITE,Color("#ff7a6b")],"weapon/bipolar")
 				return true
-			return ev.get("cause", &"")==&"vortex"
-		&"hole_capture":
-			if texture_provider.is_valid() and _captures.size()<128:
-				var sprite := Sprite2D.new()
-				sprite.texture=texture_provider.call(ev.enemy_type)
-				if sprite.texture!=null:
-					sprite.position=ev.pos
-					sprite.rotation=ev.facing
-					var base := float(ev.radius)*3.0/maxf(sprite.texture.get_width(),sprite.texture.get_height())
-					sprite.scale=Vector2.ONE*base
-					add_child(sprite)
-					_captures.append({"sprite":sprite,"from":ev.pos,"age":0.0,"delay":_rng.randf()*0.08,"duration":0.12+_rng.randf()*0.12,"swirl":_rng.randf_range(-0.6,0.6),"scale":base,"color":ev.color})
+			return ev.get("cause", &"")==&"vortex"  # 引き込まれた敵は render/equipment/vortex.gd が描く
+		&"hole_capture": pass  # 表示は render/equipment/vortex.gd
 		&"escort_deploy", &"escort_slash": pass  # 表示は render/equipment/dashRangeDrone.gd
 		&"anchor_capture":
 			effect(0,ev.pos,12.0*pixel,0.14,"weapon/massTow",{"c1":Color("#ffbe65")})
@@ -252,36 +244,14 @@ func event(ev: Dictionary) -> bool:
 			if cause=="endBlast": burst(ev.pos,36,0,TAU,50,170,0.5,[Color.WHITE,Color("#b48cff")],key)
 		&"chain_shock": pass  # 表示は render/equipment/killSonic.gd
 		&"space_quake": pass  # 表示は render/equipment/contactWave.gd と RenderPipeline.add_ripple
-		&"barrier_hit":
-			var last := roundi(float(ev.radius)*SETTINGS.number("weapon/barrier","effect_scale",1.0)/(sqrt(3.0)*4.0*pixel*SETTINGS.number("weapon/barrier","pixel_scale",1.0)))
-			var life: float = 0.21+(last-3)*0.05+0.1
-			effect(5, ev.pos, ev.radius, life, "weapon/barrier", {"angle": ev.angle, "broken": ev.broken, "c1": Color("#e6f3ff"), "c2": Color("#76aaff")})
-			if ev.broken:
-				var count := roundi(TAU * float(ev.radius) / (sqrt(3.0) * 4.0 * pixel) * 6.0 * SETTINGS.number("weapon/barrier","particle_count_scale",1.0))
-				for i in count:
-					var a := _rng.randf() * TAU
-					var p: Vector2 = ev.pos + Vector2.from_angle(a) * float(ev.radius) * _rng.randf_range(0.92, 1.04)
-					burst(p, 1, a, 1.1, 35, 145, _rng.randf_range(0.25, 0.55), [Color.WHITE, Color("#76aaff"), Color("#bfe0ff")], "weapon/barrier", _rng.randf_range(1, 3), false)
-					if not sparks.is_empty(): sparks.back().delay = life - 0.1 + _rng.randf() * 0.05
-		&"barrier_restore":
-			var item := effect(5, ev.pos, 26.0 * pixel, 0.5, "weapon/barrier", {"width": -1.0, "angle": 0.0, "c2": Color("#76aaff")})
-			item.follow = true
+		&"barrier_hit", &"barrier_restore": pass  # 表示は render/equipment/barrier.gd
 		&"flash_slash", &"slash_mark", &"slash_release": pass  # 表示は render/equipment/flashSlash.gd
 		&"hull_scatter":
 			# 星砕きの破片の割れ方は render/equipment/knockback.gd が描く。
 			if key == "weapon/knockback": return true
 			effect(3, ev.pos, 16.0 * pixel, 0.18, "weapon/knockback", {"width": 2.0})
 			burst(ev.pos, 20, 0, TAU, 10, 70, 0.3, [Color.WHITE, Color("#dcaaff"), Color("#8e62df")], "weapon/knockback")
-		&"end_hole":
-			var item := _distortion(ev.pos, 98.0 * pixel, float(ev.life), "trait/vortex", 1)
-			item.follow = true
-			for i in roundi(140 * SETTINGS.number("trait/vortex","particle_count_scale",1.0)):
-				var radial:=Vector2.from_angle(_rng.randf()*TAU)*_rng.randf_range(40,180)*pixel
-				sparks.append({"pos":ev.pos+radial,"inward":radial,"swirl":_rng.randf_range(-0.8,0.8),"velocity":Vector2.ZERO,"age":0.0,"life":_rng.randf_range(0.08,0.24),"delay":_rng.randf()*0.18,"color":Color.WHITE if i%3==0 else Color("#be78ff"),"size":_rng.randf_range(0.8,2.6)})
-		&"hole_recover":
-			var item := effect(0, ev.pos, 52.0 * pixel, 0.7, "trait/vortex", {"c0": Color("#dcffe6"), "c1": Color("#8fffbe"), "c2": Color("#6effaa")})
-			item.follow = true
-			burst(ev.pos, 14, -PI * 0.5, 2.0, 14, 40, 0.7, [Color("#8fffbe")], "trait/vortex")
+		&"end_hole", &"hole_recover": pass  # 表示は render/equipment/vortex.gd と RenderPipeline.set_hole
 		&"sonic_push", &"sonic_impact": pass  # 表示は render/equipment/sonic.gd
 		&"run_up_hit": pass  # 表示は render/equipment/runUp.gd
 		&"full_burst_ready": pass  # 表示は render/equipment/fullBurst.gd
