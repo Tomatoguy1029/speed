@@ -207,6 +207,11 @@ params = {
 "snake_turn": 3.2,
 "solo_bearer_distance": 650.0,
 "squad": {
+"counter_max": 2,
+"counter_gap": 0.8,
+"counter_sight": 1.0,
+"counter_range_cap": 300.0,
+"counter_extra": 100.0,
 "pincer_weight": 1.2,
 "wave_weight": 1.0,
 "wall_weight": 0.6,

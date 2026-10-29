@@ -4,7 +4,7 @@ var a: Node
 var predicted := Vector2.ZERO
 var replan_time := 0.0
 var roster: Array = []
-var tactic := &"wave"
+var tactic := &""
 var formation_angle := 0.0
 var reorient_time := 0.0
 var bearer_goal := Vector2.ZERO
@@ -22,6 +22,7 @@ var wave_angle := INF
 var wave_gap := 0.6
 var suspended := false
 var section_index := -1
+var counter_time := 0.0
 
 func _init(actor: Node) -> void:
 	a = actor
@@ -42,6 +43,7 @@ func tick(dt: float) -> void:
 	var heads := live()
 	tick_tactic(dt)
 	if a.busy: return
+	tick_counter(dt)
 	replan_time -= dt
 	reorient_time = maxf(0.0, reorient_time - dt)
 	if heads != roster or replan_time <= 0.0:
@@ -49,6 +51,7 @@ func tick(dt: float) -> void:
 	# 大技・コンボが使う首は、技の配置処理に任せる。
 	var forces := []
 	for n in heads:
+		if custom_owns(n): continue
 		if n.mode != &"idle" and not a._normal_moves.has(n.mode): continue
 		if n.motion.get("extension", false): continue
 		var goal := goal_for(n)
@@ -225,16 +228,20 @@ func tick_tactic(dt: float) -> void:
 		section_index = runner.index
 		cancel_pending()
 	for n in live():
+		if n.motion.get("counter", false) and n.mode == &"idle": n.motion.counter = false
 		if not pair.has(n) and n.motion.get("role", &"guard") == &"attack" and n.mode == &"idle" and float(n.motion.get("reserved", 0.0)) <= 0.0:
 			guard(n)
 			replan()
 	pair = pair.filter(func(n): return a._alive(n) and n.motion.get("role", &"guard") == &"attack")
 	if runner.rest_remaining > 0.0:
+		var had_pending := reserved() > 0.0
 		cancel_pending()
+		if had_pending: replan()
 		return
 	tactic_time -= dt
 	if tactic_time <= 0.0: choose_tactic()
 	if not a.hsm.active: return
+	if rest_if_exhausted(): return
 	if tactic == &"wall": return
 	if tactic == &"pincer":
 		if pair.is_empty():
@@ -389,3 +396,38 @@ func started(n) -> void:
 	n.motion.reserved = 0.0
 	n.motion.last_attack = a._time
 	if pair.has(n): pair_launched = true
+
+func custom_owns(n) -> bool:
+	if a.flow_adapter == null or a.flow_adapter.custom_run == null: return false
+	return a.flow_adapter.active.any(func(action): return n.row_id in action.parts)
+
+func rest_if_exhausted() -> bool:
+	var runner = a.flow_runner
+	if runner.active or reserved() > 0.0 or live().any(func(n): return n.mode != &"idle"): return false
+	var minimum := INF
+	for n in live():
+		for id in a._normal_moves:
+			if a._moves[id].head_kind == n.kind and allowed(id): minimum = minf(minimum, a._normal_cost(id))
+	# 指名の前に残量不足が分かる場合も、休息は共通フローの入口で始める。
+	if minimum < INF and runner.stamina + 0.00001 < minimum:
+		runner.begin_rest(runner.index)
+		cancel_pending()
+		return true
+	return false
+
+func tick_counter(dt: float) -> void:
+	var p: Dictionary = a.def.params.squad
+	counter_time = maxf(0.0, counter_time - dt)
+	if not a.hsm.active or suspended or a.flow_runner.rest_remaining > 0.0 or counter_time > 0.0: return
+	var heads := live()
+	if heads.filter(func(n): return n.motion.get("counter", false) and n.mode != &"idle").size() >= int(p.counter_max): return
+	var pool := heads.filter(func(n): return n.motion.get("role", &"guard") == &"guard" and not n.motion.get("counter", false) and n.mode == &"idle" and n.cd <= 0.0 and in_view(n) and n.free_pos.distance_to(a.run_state.ship_pos) < minf(float(p.attack_ranges[n.kind]), float(p.counter_range_cap)) + float(p.counter_extra) and absf(angle_difference(n.look_angle, (a.run_state.ship_pos - n.free_pos).angle())) <= float(p.counter_sight))
+	pool.sort_custom(func(x, y): return x.free_pos.distance_squared_to(a.run_state.ship_pos) < y.free_pos.distance_squared_to(a.run_state.ship_pos))
+	for n in pool:
+		var action: Dictionary = a.flow_adapter.reactive_candidate(n)
+		if action.is_empty() or float(action.cost) > available() + 0.00001: continue
+		if a.flow_runner.try_start_reactive(a.flow_adapter, action):
+			n.motion.counter = true
+			n.motion.erase("block")
+			counter_time = float(p.counter_gap)
+			return

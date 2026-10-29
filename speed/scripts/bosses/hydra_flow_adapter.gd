@@ -3,6 +3,7 @@ const RANGE := preload("res://scripts/bosses/flow/range_condition.gd")
 var actor: Node
 var active: Array = []
 var custom_run: RefCounted
+var reactive: Array = []
 
 class StepTicket:
 	extends RefCounted
@@ -25,6 +26,7 @@ class StepTicket:
 func _init(value: Node) -> void: actor = value
 
 func tick(dt: float) -> void:
+	reactive = reactive.filter(func(action): return action.heads.any(func(n): return actor._alive(n) and n.mode != &"idle"))
 	if custom_run != null:
 		if blocked():
 			custom_run.cancel()
@@ -222,4 +224,27 @@ func cancel_all() -> void:
 		custom_run.cancel()
 		custom_run = null
 	_cancel_actions(active.filter(func(a): return not a.has("program")))
+	_cancel_actions(reactive)
+	reactive.clear()
 	active.clear()
+
+## 区間の実行中候補を上書きせず、迎撃だけを独立して追跡する。
+func start_reactive(action: Dictionary) -> bool:
+	var previous := active
+	var ok := start([action])
+	if ok: reactive.append_array(active)
+	active = previous
+	return ok
+
+func reactive_candidate(n) -> Dictionary:
+	if blocked() or actor.busy or custom_run != null: return {}
+	for id in actor._normal_moves:
+		if not actor.squad.allowed(id) or not actor.normal_ready(actor.necks.find(n), id): continue
+		var candidate := _candidate(id, [n], "single")
+		for entry in actor.action_rules.active_gate_entries_for(String(id)):
+			if not _gate_ready(candidate, entry.gate): continue
+			candidate.gate = entry.gate
+			candidate.group = entry.group
+			candidate.label = entry.category
+			return candidate
+	return {}
