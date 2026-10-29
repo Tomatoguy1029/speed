@@ -9,12 +9,13 @@ script = ExtResource("visual")
 position = Vector2(37, 0)
 rotation = -1.5707963267949
 
-[node name="SwordGlow" type="Polygon2D" parent="Parts/Head"]
+[node name="SwordGlow" type="Polygon2D" parent="Parts/Head/Lower"]
 visible = false
+position = Vector2(0, -50)
 color = Color(0.623529, 0.909804, 1, 1)
 polygon = PackedVector2Array(-4, 105, -9, 111, 0, 131.6, 9, 111, 4, 105)
 
-[node name="Guard" type="Line2D" parent="Parts/Head/SwordGlow"]
+[node name="Guard" type="Line2D" parent="Parts/Head/Lower/SwordGlow"]
 points = PackedVector2Array(-19, 110, 19, 110)
 width = 7.0
 default_color = Color(0.917647, 1, 1, 1)

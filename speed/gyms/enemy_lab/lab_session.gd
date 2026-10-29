@@ -512,6 +512,8 @@ func _apply(kind: String, args: Dictionary) -> void:
 			run.projectiles.director.guard = args.duplicate(true)
 		"director":
 			run.projectiles.director.configure(args)
+		"boss_appearance":
+			_edit_boss_appearance(args)
 		"boss_parameter":
 			_edit_boss_definition(args)
 		"parameter":
@@ -742,6 +744,19 @@ func _cache_current() -> void:
 func definition_for_row(row: int) -> Resource:
 	var t := run.enemies.table
 	return run.bosses.definitions.get(t.type[row]) if t.is_boss[row] else t.def[row]
+
+func _edit_boss_appearance(args: Dictionary) -> void:
+	var type := StringName(args.get("type", ""))
+	var original: BossDef = run.bosses.definitions.get(type)
+	if original == null or not BossDef.valid_part_appearance(args.get("parts")): return
+	var definition := original.duplicate(true) as BossDef
+	definition.part_appearance = args.parts.duplicate(true)
+	run.bosses.definitions[type] = definition
+	for owner in run.bosses.actors:
+		if owner.has_body() and owner.def.id == type:
+			owner.def = definition
+			if owner.has_method("refresh_appearance"): owner.refresh_appearance()
+
 
 func _edit_boss_definition(args: Dictionary) -> void:
 	var type := StringName(args.get("type", ""))

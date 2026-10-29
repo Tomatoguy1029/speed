@@ -1,15 +1,13 @@
-## 仮の図形の半人半馬。攻撃の向き・時間は役者から読み、演出だけを差し替える。
+## 攻撃の向きと進行を読み、パーツの弓差分を表示する。
 extends Node2D
 @export var pixel_size := 3.0
+const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
+var _parts: Node2D
 var actor: CentaurusBoss
 var hit := 0.0
 var pulse := 0.0
-var gait := 0.0
-const OUTLINE := Color("#1a1928")
-const COAT := Color("#8f6f58")
-const SHADE := Color("#5c4a48")
-const SKIN := Color("#e4c39c")
 const BOW := Color("#d8b46a")
+const OUTLINE := Color("#1a1928")
 const STRING := Color("#f4ecd8")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
@@ -24,11 +22,15 @@ const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 const RAIN_ANGLE := PI * 0.5 - 0.35
 func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 	actor = owner_actor
+	_parts = PARTS.instantiate()
+	_parts.rotation = -PI * 0.5
+	add_child(_parts)
 	actor.presentation_event.connect(_event)
 	actor.presentation_advanced.connect(_advance)
 	z_index = 1
 
 func _event(event: Dictionary) -> void:
+	if event.cue == &"released": _parts.release_bow(float(actor.rule().get("interval", 0.4)))
 	if event.cue == &"hit": hit = 0.18
 	if event.cue in [&"alert", &"released", &"rain_started", &"phase_changed"]: pulse = 0.3
 	queue_redraw()
@@ -36,7 +38,10 @@ func _event(event: Dictionary) -> void:
 func _advance(dt: float) -> void:
 	hit = maxf(0.0, hit - dt)
 	pulse = maxf(0.0, pulse - dt)
-	gait += dt * (16.0 if actor.mode == &"retreat" else 7.0)
+	_parts.visible = actor.has_body()
+	if actor.has_body():
+		_parts.scale = Vector2.ONE * actor.table.r[actor.body] / 135.0
+		_parts.set_bow_pose(actor.technique, actor.mode, actor.table.charge[actor.body], dt)
 	queue_redraw()
 
 func _poly(points: Array, color: Color) -> void:
@@ -45,13 +50,6 @@ func _poly(points: Array, color: Color) -> void:
 	draw_colored_polygon(packed, color)
 	packed.append(packed[0])
 	draw_polyline(packed, OUTLINE, pixel_size, false)
-
-func _oval(center: Vector2, radius: Vector2, color: Color, segments := 14) -> void:
-	var points := []
-	for j in segments:
-		var a := TAU * j / segments
-		points.append(center + Vector2(cos(a) * radius.x, sin(a) * radius.y))
-	_poly(points, color)
 
 ## 帆を広げた割合（0〜1）。第2形態への移行の間に広げ、そのあとは広げたまま。
 func sail_fraction() -> float:
@@ -93,35 +91,11 @@ func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	var r := actor.table.r[actor.body]
 	var k := r / 90.0
-	var moving := actor.table.vel[actor.body].length() > 5.0
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * k)
 	var tint := Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	if actor.technique_pose.get("tint", Color.WHITE) != Color.WHITE: tint = actor.technique_pose.tint
 	modulate = tint
-	# 脚：走っている間は前後に振る。
-	for j in 4:
-		var side := -1.0 if j % 2 == 0 else 1.0
-		var x := -58.0 if j < 2 else 18.0
-		var swing := sin(gait + j * 1.7) * (12.0 if moving else 2.0)
-		_poly([Vector2(x + swing - 8, side * 26), Vector2(x + swing + 8, side * 26), Vector2(x + swing + 6, side * 46), Vector2(x + swing - 6, side * 46)], SHADE)
-	# 尾と馬の胴
-	_poly([Vector2(-82, -6), Vector2(-112, -14 + sin(gait) * 6.0), Vector2(-116, 4 + sin(gait) * 6.0), Vector2(-82, 8)], SHADE)
-	_oval(Vector2(-22, 0), Vector2(64, 32), COAT)
 	_draw_sail(sail_fraction())
-	# 人の上半身と頭
-	_oval(Vector2(36, 0), Vector2(22, 26), SKIN)
-	_oval(Vector2(46, 0), Vector2(13, 13), Color("#c99c74"))
-	# 弓：機体の方へ向けた弧。引くほど弦が後ろへ下がる。
-	var bow := []
-	for j in 9:
-		var a := lerpf(-1.1, 1.1, j / 8.0)
-		bow.append(Vector2(62.0 + cos(a) * 26.0, sin(a) * 52.0))
-	var packed := PackedVector2Array()
-	for p: Vector2 in bow: packed.append(p.snapped(Vector2.ONE * pixel_size))
-	draw_polyline(packed, OUTLINE, pixel_size * 3.0, false)
-	draw_polyline(packed, BOW, pixel_size * 1.5, false)
-	var pull := Vector2(62.0 + cos(1.1) * 26.0 - draw_fraction() * 34.0, 0.0)
-	draw_polyline(PackedVector2Array([packed[0], pull, packed[packed.size() - 1]]), STRING, pixel_size, false)
 	# 攻めどき（射終わりの硬直）は縁を光らせる。
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25

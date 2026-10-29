@@ -8,6 +8,24 @@ extends Resource
 ## データ編集の画面での並び順
 const EDITOR_ORDER := 6
 
+## 表示パーツの塗装色と元の配置からの位置補正。戦闘判定とは独立する。
+@export var part_appearance: Dictionary = {}
+
+static func valid_part_appearance(value) -> bool:
+	if not value is Dictionary or value.size() > 128: return false
+	for key in value:
+		if not key is String or key.length() > 160 or not value[key] is Dictionary: return false
+		for field in value[key]:
+			var entry = value[key][field]
+			if field == "color":
+				if not entry is String or entry.length() != 6 or not Color.html_is_valid(entry): return false
+			elif field == "offset":
+				if not entry is Array or entry.size() != 2: return false
+				for number in entry:
+					if typeof(number) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(number)) or absf(float(number)) > 256: return false
+			else: return false
+	return true
+
 ## 攻撃の値（params）の名前・説明・単位
 const PARAMS_DOCS := {
 	"fire_interval": ["撃つ間隔", "扇状の射撃を撃ってから次に撃つまでの時間。予告の長さはボスのシーンの攻撃の動き（volley）で決まる。", "世界秒"],

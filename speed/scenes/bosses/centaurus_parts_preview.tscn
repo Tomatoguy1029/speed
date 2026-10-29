@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus_parts.tscn" id="parts"]
+[ext_resource type="Script" path="res://scripts/bosses/centaurus_parts_preview.gd" id="preview"]
+
+[node name="CentaurusPartsPreview" type="Node2D"]
+script = ExtResource("preview")
+
+[node name="Parts" parent="." instance=ExtResource("parts")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, -5)
