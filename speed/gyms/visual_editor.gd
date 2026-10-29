@@ -95,7 +95,7 @@ func _ready() -> void:
 	var target_row := HBoxContainer.new()
 	layout.add_child(target_row)
 	var target_label := Label.new()
-	target_label.text = "編集対象"
+	target_label.text = "ツール"
 	target_row.add_child(target_label)
 	_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_selector.fit_to_longest_item = false

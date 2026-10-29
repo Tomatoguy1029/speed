@@ -76,6 +76,68 @@ static func play(session, key: String, use_sample_weapon := true) -> void:
 	# 全項目で描き始め・移動中・接触・終点・その後の寿命を通す。
 	session.perform("route",{"points":[[0,0],[600,0],[900,100]],"draw_seconds":0.3})
 
+## ビジュアル編集専用。敵や撃破条件を追加せず、本番の装備と描画イベントを発火する。
+static func preview(session, key: String, heading: Vector2) -> void:
+	var run: RunSimulation = session.run
+	var is_trait := key.begins_with("trait/")
+	var table: Dictionary = run.loadout.trait_behaviors if is_trait else run.loadout.weapon_behaviors
+	var behavior = null
+	for item in table.values():
+		if String(item.def.code_id) == key.get_slice("/", 1): behavior = item
+	if behavior == null: return
+	var origin: Vector2 = run.state.ship_pos
+	run.state.ship_heading = heading
+	run.state.gauge = run.state.stats.capacity
+	var forward := origin + heading * 260.0
+	match key:
+		"weapon/forward", "weapon/scatter", "weapon/rear":
+			behavior.tick(2.0, false)
+		"weapon/interceptor":
+			behavior.tick(0.1, false)
+			behavior.fire_shot(origin + heading * 60.0, heading.angle(), behavior.atk(),
+				{"life": behavior.p("life"), "visual_key": "weapon/interceptor"})
+		"weapon/knockback":
+			run.state.emit(&"hull_scatter", {"pos": forward})
+		"weapon/contactArc":
+			run.state.emit(&"bolt", {"segments": PackedVector2Array([origin, forward, forward, forward + heading.rotated(0.6) * 140.0])})
+		"weapon/contactWave":
+			behavior.on_contact(-1, forward, heading)
+		"weapon/barrier":
+			behavior.block_segment(origin, forward, 1.0, 100.0)
+		"weapon/mines":
+			behavior.on_end()
+			run.state.emit(&"explode", {"pos": forward, "radius": 65.0, "life": 0.6, "cause": &"mine", "color": Color("#ffb030")})
+		"weapon/massTow":
+			run.state.emit(&"anchor_capture", {"pos": forward, "to": origin})
+			run.state.emit(&"anchor_fire", {"pos": origin, "dir": heading, "radius": 20.0})
+		"weapon/flashSlash":
+			run.state.emit(&"flash_slash", {"pos": forward, "angle": heading.angle(), "length": 150.0, "width": 3.2, "id": -1})
+		"trait/killSonic":
+			run.state.emit(&"chain_shock", {"pos": forward, "radius": behavior.val("radius"), "life": 0.4})
+		"trait/runUp":
+			run.state.emit(&"run_up_hit", {"pos": forward, "dir": heading, "strength": 1.0})
+		"trait/critBeam":
+			behavior.on_critical(origin)
+		"trait/vortex":
+			behavior.on_end()
+		"trait/fullBurst":
+			behavior.tick(0.01, false)
+		"trait/rampage":
+			behavior.strength = 1.0
+			behavior.pop = 1.0
+		"trait/duplicator":
+			run.state.emit(&"duplicate", {"pos": origin, "directions": [heading, heading.rotated(0.25)]})
+		_:
+			if is_trait:
+				var sample = run.loadout.weapon_behaviors.values().front() if not run.loadout.weapon_behaviors.is_empty() else null
+				if sample != null: sample.tick(2.0, false)
+	# 距離に応じた演出は実際の本番ルートを描いて発動させる。
+	if key not in ["weapon/forward", "weapon/scatter", "weapon/rear", "weapon/interceptor", "trait/rampage"]:
+		var p0 := origin
+		var p1 := origin + heading * 600.0
+		var p2 := p1 + heading.rotated(0.2) * 320.0
+		session.perform("route", {"points": [[p0.x, p0.y], [p1.x, p1.y], [p2.x, p2.y]], "draw_seconds": 0.3})
+
 static func spawn(session, pos: Vector2) -> int:
 	session.perform("spawn",{"type":"drifter","pos":[pos.x,pos.y]})
 	return session.selected

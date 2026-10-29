@@ -375,6 +375,7 @@ func _ready() -> void:
 	_target_list.add_theme_constant_override("h_separation", 4)
 	_target_list.add_theme_constant_override("v_separation", 4)
 	body.add_child(_target_list)
+	body.add_child(HSeparator.new())
 	_editing_label.text = "編集対象を選択してください"
 	body.add_child(_editing_label)
 	body.add_child(_fields)
@@ -382,10 +383,6 @@ func _ready() -> void:
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	(preview_host if preview_host != null else self).add_child(preview)
-	var note := Label.new()
-	note.text = "武器・特性・ボス技と共通攻撃を本番描画で試遊します。"
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	preview.add_child(note)
 	_static_container = SubViewportContainer.new()
 	_static_container.stretch = true
 	_static_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -528,7 +525,7 @@ func _build_fields() -> void:
 		child.queue_free()
 	if _selected in preload("res://gyms/equipment_effect_scenario.gd").PASSIVE_KEYS:
 		var note := Label.new()
-		note.text = "数値の変化を、効き先の射撃・移動・回収と一緒に再生します。"
+		note.text = "固有演出はありません。射撃・移動への作用は試遊で確認できます。攻撃力や回収量などの数値は表示しません。"
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_fields.add_child(note)
 		return
