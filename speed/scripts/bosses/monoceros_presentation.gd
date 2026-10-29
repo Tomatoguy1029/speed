@@ -1,6 +1,9 @@
 ## パーツの走りは世界時間、向きは役者と同じ戦闘方向へ同期する。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var pixel_size := 3.0
+@export var booster_length_scale := 1.0
+@export var booster_core_color := Color("#e0fbff")
 const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
@@ -13,6 +16,9 @@ const KICK_EXTEND := 0.4
 var actor: MonocerosBoss
 var hit := 0.0
 @onready var parts: PartsVisual = $Parts
+
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 
 func bind_monoceros(owner_actor: MonocerosBoss) -> void:
 	actor = owner_actor
@@ -77,14 +83,14 @@ func booster_strength() -> float:
 func _booster() -> void:
 	var strength := booster_strength()
 	if strength <= 0.0: return
-	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength
+	var length := (50.0 + sin(actor.clock * 27.0) * 9.0) * strength * booster_length_scale
 	for layer in 3:
 		var factor := 1.0 - float(layer) * 0.24
 		for j in 12:
 			var t := float(j) / 12.0
 			var height := maxf(pixel_size, (24.0 - t * 22.0) * factor)
 			var at := Vector2(-96.0 - length * t * factor, sin(actor.clock * 20.0 - t * 8.0) * 7.0 * t * factor - height * 0.5).snapped(Vector2.ONE * pixel_size)
-			draw_rect(Rect2(at, Vector2(maxf(pixel_size, length * factor / 12.0), height)), [Color("#245c96"), Color("#61c9ff"), Color("#e0fbff")][layer])
+			draw_rect(Rect2(at, Vector2(maxf(pixel_size, length * factor / 12.0), height)), [Color("#245c96"), Color("#61c9ff"), booster_core_color][layer])
 
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return

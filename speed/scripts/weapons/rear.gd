@@ -26,5 +26,5 @@ func tick(dt: float, busy: bool) -> void:
 	for i in shots:
 		var angle := backwards.angle() + (i - (shots - 1) / 2.0) * float(p("spread_step"))
 		fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
-			{"life": p("life"), "color": Color(p("color"))})
+			{"life": p("life"), "color": Color(p("color")), "visual_key": "weapon/rear"})
 	state.emit(&"weapon_fire", {"id": def.id})

@@ -10,6 +10,7 @@ const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -445,7 +446,7 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			visual.on_event(ev)
 		match ev.type:
 			&"ring":
-				_ring(ev.pos, ev.radius, ev.color, ev.life)
+				_ring(ev.pos, ev.radius, ev.color, ev.life, String(ev.get("visual_key", "")))
 			&"explode":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 				if ev.radius >= 150.0:
@@ -525,12 +526,14 @@ func _handle_events(events: Array[Dictionary]) -> void:
 				_ship_visual.clear()
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
 			&"beam":
-				var life: float = ev.get("life", 0.4)
+				var visual_key := String(ev.get("visual_key", ""))
+				var life: float = ev.get("life", 0.4) * EFFECT_SETTINGS.number(visual_key, "visible_time_scale", 1.0)
 				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": life, "max": life,
-					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
+					"color": ev.get("color", Color(1.0, 0.95, 0.6)), "visual_key": visual_key})
 			&"bolt":
 				_bolt_seed += 1
-				bolts.append({"segments": ev.segments, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
+				var bolt_life := EFFECT_SETTINGS.number("weapon/contactArc", "visible_seconds", 0.22)
+				bolts.append({"segments": ev.segments, "life": bolt_life, "max": bolt_life, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -565,10 +568,12 @@ func _common_burst_count(event: Dictionary) -> int:
 		&"gem_burst": return 14
 	return 0
 
-func _ring(p: Vector2, radius: float, color: Color, life: float) -> void:
+func _ring(p: Vector2, radius: float, color: Color, life: float, visual_key := "") -> void:
 	if rings.size() > 80:
 		rings.pop_front()
-	rings.append({"pos": p, "radius": radius, "color": color, "life": life, "max": life})
+	var visible := life * EFFECT_SETTINGS.number(visual_key, "visible_time_scale", 1.0)
+	rings.append({"pos": p, "radius": radius, "color": color, "life": visible, "max": visible,
+		"visual_key": visual_key})
 
 func _text(p: Vector2, s: String, color: Color, size: int) -> void:
 	if texts.size() > 40:
@@ -1338,25 +1343,32 @@ func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
-		var bc: Color = bm.color
+		var key := String(bm.get("visual_key", ""))
+		var bc: Color = EFFECT_SETTINGS.tinted(key, bm.color)
+		var core_ratio := EFFECT_SETTINGS.number(key, "beam_core_ratio", 0.3)
 		if bm.get("rounded", false):
 			_draw_round_beam(c, bm.from, bm.to, Color(bc, 0.7 * k), bm.width)
-			_draw_round_beam(c, bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+			_draw_round_beam(c, bm.from, bm.to, Color(1, 1, 1, k), bm.width * core_ratio)
 			continue
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
-		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * core_ratio)
 	for bo in bolts:
 		var age: float = bo.max - bo.life
 		var alpha := PIXEL_LIGHTNING.intensity(age, bo.max)
 		var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
 		var segments: PackedVector2Array = bo.segments
 		for i in range(0, segments.size(), 2):
-			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1], _px(2.0), int(bo.seed) * 7919 + i * 313 + shape * 101, alpha)
+			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1],
+				_px(2.0 * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0)),
+				int(bo.seed) * 7919 + i * 313 + shape * 101, alpha,
+				EFFECT_SETTINGS.tinted("weapon/contactArc", PIXEL_LIGHTNING.COLOR))
 	for r in rings:
 		var k: float = r.life / r.max
-		var col: Color = r.color
+		var key := String(r.get("visual_key", ""))
+		var col: Color = EFFECT_SETTINGS.tinted(key, r.color)
 		col.a *= k
-		c.draw_arc(r.pos, r.radius * (1.0 + (1.0 - k) * 0.15), 0, TAU, 48, col, _px(3.0))
+		c.draw_arc(r.pos, r.radius * (1.0 + (1.0 - k) * 0.15), 0, TAU, 48, col,
+			_px(3.0 * EFFECT_SETTINGS.number(key, "ring_width_scale", 1.0)))
 	for im in impacts:
 		var k: float = im.life / im.max
 		var col: Color = im.color

@@ -1,6 +1,10 @@
 ## 仮の図形の大型の猟犬。攻撃の向き・時間は役者から読み、演出だけを差し替える。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var pixel_size := 3.0
+@export var sirius_color := Color("#e8f6ff")
+@export var sirius_halo_color := Color("#9fe8ff")
+@export var sirius_glow_scale := 1.0
 var actor: CanisMajorBoss
 var hit := 0.0
 var pulse := 0.0
@@ -9,10 +13,10 @@ const OUTLINE := Color("#1a1928")
 const COAT := Color("#7a6f8f")
 const SHADE := Color("#4d4660")
 const MUZZLE := Color("#a99cc0")
-const SIRIUS := Color("#e8f6ff")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
-const OPEN := Color("#9fe8ff")
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_key(self, "boss/body/canis_major")
 ## 号令で飛び出している猟犬の軌跡に残す位置の数
 const LUNGE_TRAIL := 6
 ## 号令で飛び出している猟犬の光と軌跡を描く層。本体の回転に付いていかないよう、ワールド座標で描く。
@@ -83,24 +87,24 @@ func _draw() -> void:
 	var howl: bool = actor.technique_pose.get("howl", false)
 	var gather: bool = actor.technique_pose.get("gather", false)
 	var strong := blaze()
-	var glow := 6.0 + 6.0 * strong + (8.0 * charge if shout else 18.0 * charge if gather else (1.5 + 2.0 * strong) * sin(actor.clock * 5.0))
+	var glow := (6.0 + 6.0 * strong + (8.0 * charge if shout else 18.0 * charge if gather else (1.5 + 2.0 * strong) * sin(actor.clock * 5.0))) * sirius_glow_scale
 	# 第2形態では、口元のまわりに大きな光の暈と十字の光芒を足す。
 	if strong > 0.0:
 		var flare := (1.0 + 0.15 * sin(actor.clock * 9.0)) * strong
-		draw_circle(mouth, glow + 18.0 * flare, Color(OPEN, 0.18))
+		draw_circle(mouth, glow + 18.0 * flare, Color(sirius_halo_color, 0.18))
 		for ray in 4:
 			var u := Vector2.from_angle(ray * PI / 2.0 + actor.clock * 0.6) * (glow + 34.0 * flare)
-			draw_line(mouth - u, mouth + u, Color(SIRIUS, 0.55 * strong), pixel_size)
-	draw_circle(mouth, glow + 4.0, Color(OPEN, 0.35))
-	draw_circle(mouth, glow, SIRIUS)
+			draw_line(mouth - u, mouth + u, Color(sirius_color, 0.55 * strong), pixel_size)
+	draw_circle(mouth, glow + 4.0, Color(sirius_halo_color, 0.35))
+	draw_circle(mouth, glow, sirius_color)
 	# 移行の間は、口元から光の輪を広げる。
 	if actor.mode == &"phase":
 		for ring in 2:
 			var grow := fmod(strong * 1.5 + ring * 0.5, 1.0)
-			draw_arc(mouth, 20.0 + grow * 140.0, 0.0, TAU, 32, Color(SIRIUS, 0.9 * (1.0 - grow)), pixel_size * 2.0)
+			draw_arc(mouth, 20.0 + grow * 140.0, 0.0, TAU, 32, Color(sirius_color, 0.9 * (1.0 - grow)), pixel_size * 2.0)
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25
-		draw_arc(Vector2(-6, 0), 106.0, 0.0, TAU, 32, Color(OPEN, a), pixel_size * 2.0)
+		draw_arc(Vector2(-6, 0), 106.0, 0.0, TAU, 32, Color(sirius_halo_color, a), pixel_size * 2.0)
 	if pulse > 0.0:
-		draw_arc(mouth, 24.0 + (0.35 - pulse) * 120.0, 0.0, TAU, 24, Color(SIRIUS, pulse * 2.4), pixel_size)
+		draw_arc(mouth, 24.0 + (0.35 - pulse) * 120.0, 0.0, TAU, 24, Color(sirius_color, pulse * 2.4), pixel_size)
 	draw_set_transform(Vector2.ZERO)

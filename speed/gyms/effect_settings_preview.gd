@@ -3,7 +3,18 @@ extends Control
 
 const SETTINGS_PATH := "res://data/visuals/effect_settings.tres"
 const ROOT := "res://scenes/bosses"
+const BODY_EFFECTS := {
+	"boss/body/hydra": "res://scenes/bosses/hydra/beam_fixed_visual.tscn",
+	"boss/body/draco": "res://scenes/bosses/draco/breath_visual.tscn",
+	"boss/body/centaurus": "res://scenes/bosses/centaurus/power_shot_visual.tscn",
+	"boss/body/canis_major": "res://scenes/bosses/canis_major/sirius_visual.tscn",
+	"boss/body/monoceros": "res://scenes/bosses/monoceros/lance_visual.tscn",
+	"boss/shared/tornado_shader": "res://scenes/bosses/hydra/tornado_visual.tscn",
+}
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const BOSS_PREVIEW := preload("res://gyms/boss_effect_preview.gd")
 const DIRECT_EFFECTS := [
+	"weapon/forward", "weapon/scatter", "weapon/knockback", "weapon/contactArc",
 	"weapon/barrier", "weapon/contactWave", "weapon/mines", "weapon/rear", "weapon/bipolar",
 	"weapon/dashRangeDrone", "weapon/afterimage", "weapon/interceptor", "weapon/massTow",
 	"weapon/sonic", "trait/vortex", "trait/critBeam", "trait/endBlast",
@@ -16,16 +27,91 @@ const ATTACK_SCENES := [
 	"res://scenes/attacks/light_arrow.tscn", "res://scenes/attacks/cosmic_arrow.tscn",
 	"res://scenes/attacks/beam.tscn", "res://scenes/attacks/zone.tscn",
 ]
+const ATTACK_PREVIEWS := {
+	"res://scenes/attacks/star_bolt.tscn": "res://scenes/bosses/draco/star_fan_visual.tscn",
+	"res://scenes/attacks/hydra_shape.tscn": "res://scenes/bosses/hydra/wind_blades_visual.tscn",
+	"res://scenes/attacks/beam_draco.tscn": "res://scenes/bosses/draco/inhale_visual.tscn",
+	"res://scenes/attacks/bolt.tscn": "res://scenes/bosses/draco/inhale_visual.tscn",
+	"res://scenes/attacks/light_arrow.tscn": "res://scenes/bosses/centaurus/power_shot_visual.tscn",
+	"res://scenes/attacks/cosmic_arrow.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
+	"res://scenes/attacks/beam.tscn": "res://scenes/bosses/canis_major/sirius_visual.tscn",
+	"res://scenes/attacks/zone.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
+}
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
 	"hit_color", "line_width", "flash_duration", "base_color", "progress_color",
-	"outline_color", "outline_width", "flight_scale",
+	"outline_color", "outline_width", "flight_scale", "burst_pixel_scale",
 ]
 const NUMBER_LIMITS := {
 	"pixel_size": [1.0, 8.0, 0.25], "line_width": [0.5, 12.0, 0.25],
 	"outline_width": [0.5, 12.0, 0.25], "flash_duration": [0.05, 2.0, 0.05],
+	"burst_pixel_scale": [0.5, 3.0, 0.05],
 }
 const DIRECT_FIELDS := {
+	"weapon/forward": [
+		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
+		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"weapon/scatter": [
+		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
+		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"weapon/rear": [
+		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
+		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"weapon/interceptor": [
+		["弾のドット倍率", "shot_pixel_scale", 0.5, 3.0, 0.05, 1.0],
+	],
+	"weapon/knockback": [
+		["破片の軌跡幅", "debris_trail_width", 0.25, 4.0, 0.05, 1.0],
+	],
+	"weapon/contactArc": [
+		["雷のドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
+		["雷の表示秒数", "visible_seconds", 0.05, 1.0, 0.01, 0.22],
+	],
+	"weapon/bipolar": [
+		["ビームの芯", "beam_core_ratio", 0.1, 0.8, 0.01, 0.3],
+		["両端の輪の太さ", "ring_width_scale", 0.25, 4.0, 0.05, 1.0],
+		["残光の長さ", "visible_time_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"weapon/sonic": [
+		["残光の長さ", "wake_length", 20.0, 300.0, 1.0, 150.0],
+		["残光の太さ", "wake_width", 2.0, 40.0, 0.5, 18.0],
+		["残光の透明度", "wake_opacity", 0.0, 1.0, 0.01, 0.55],
+		["残光の持続", "wake_fade_seconds", 0.05, 0.5, 0.01, 0.20],
+		["シェーダの繊維量", "wake_filaments", 0.0, 2.0, 0.05, 0.7],
+		["衝撃輪の表示時間", "visible_time_scale", 0.25, 4.0, 0.05, 1.0],
+		["衝撃輪の太さ", "ring_width_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"trait/killSonic": [
+		["衝撃輪の表示時間", "visible_time_scale", 0.25, 4.0, 0.05, 1.0],
+		["衝撃輪の太さ", "ring_width_scale", 0.25, 4.0, 0.05, 1.0],
+	],
+	"boss/body/hydra": [
+		["予告線の太さ", "line_width", 1.0, 12.0, 0.25, 3.0],
+		["閃光の秒数", "flash_duration", 0.05, 2.0, 0.05, 0.25],
+		["爆発シェーダのドット", "burst_pixel_scale", 0.5, 3.0, 0.05, 1.0],
+	],
+	"trait/critBeam": [
+		["槍シェーダのドット", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
+	],
+	"boss/body/draco": [
+		["胸の光の大きさ", "core_glow_radius", 8.0, 100.0, 1.0, 43.0],
+		["胸の光の透明度", "core_glow_opacity", 0.0, 1.0, 0.01, 0.16],
+	],
+	"boss/body/centaurus": [
+		["帆の星の大きさ", "sail_star_scale", 0.25, 3.0, 0.05, 1.0],
+	],
+	"boss/body/canis_major": [
+		["シリウスの輝き", "sirius_glow_scale", 0.25, 3.0, 0.05, 1.0],
+	],
+	"boss/body/monoceros": [
+		["推進炎の長さ", "booster_length_scale", 0.25, 3.0, 0.05, 1.0],
+	],
+	"boss/shared/tornado_shader": [
+		["渦シェーダのドット", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
+	],
 	"weapon/mines": [
 		["機雷の点", "dot_radius", 2.0, 20.0, 0.5, 7.0],
 		["周囲の輪", "ring_radius", 4.0, 28.0, 0.5, 11.0],
@@ -48,6 +134,15 @@ const DIRECT_FIELDS := {
 		["ドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 	],
 }
+const DIRECT_COLOR_FIELDS := {
+	"weapon/sonic": [["残光の色", "wake_color", Color(0.25, 0.65, 1.0)]],
+	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
+	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],
+	"boss/body/centaurus": [["帆の星色", "sail_star_color", Color("#fff6c8")], ["開放の輪色", "open_color", Color("#9fe8ff")]],
+	"boss/body/canis_major": [["シリウス色", "sirius_color", Color("#e8f6ff")], ["光の暈色", "sirius_halo_color", Color("#9fe8ff")]],
+	"boss/body/monoceros": [["推進炎の芯色", "booster_core_color", Color("#e0fbff")]],
+	"boss/shared/tornado_shader": [["渦シェーダの色", "vortex_tint", Color.WHITE]],
+}
 
 var preview_host: Control
 var controls_host: Control
@@ -62,11 +157,14 @@ var _fields := VBoxContainer.new()
 var _sample: Node2D
 var _viewport: SubViewport
 var _swatch := ColorRect.new()
+var _static_container: SubViewportContainer
+var _boss_preview
 
 func _ready() -> void:
 	_collect(ROOT)
 	_paths.append_array(DIRECT_EFFECTS)
 	_paths.append_array(ATTACK_SCENES)
+	_paths.append_array(BODY_EFFECTS.keys())
 	_paths.sort()
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -86,17 +184,17 @@ func _ready() -> void:
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	(preview_host if preview_host != null else self).add_child(preview)
 	var note := Label.new()
-	note.text = "戦闘イベントを必要とする表現は、シーンの静的な部分だけを表示します。"
+	note.text = "武器・特性・ボス技と共通攻撃を本番描画で試遊します。"
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview.add_child(note)
-	var container := SubViewportContainer.new()
-	container.stretch = true
-	container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview.add_child(container)
+	_static_container = SubViewportContainer.new()
+	_static_container.stretch = true
+	_static_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview.add_child(_static_container)
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(480, 480)
 	_viewport.disable_3d = true
-	container.add_child(_viewport)
+	_static_container.add_child(_viewport)
 	var background := ColorRect.new()
 	background.color = Color("#10141e")
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -104,6 +202,9 @@ func _ready() -> void:
 	_swatch.position = Vector2(168, 168)
 	_swatch.size = Vector2(144, 144)
 	_viewport.add_child(_swatch)
+	_boss_preview = BOSS_PREVIEW.new()
+	_boss_preview.visible = false
+	preview.add_child(_boss_preview)
 	reload_current()
 	if _working == null: return
 	if not _paths.is_empty(): _select(_paths[0])
@@ -120,24 +221,37 @@ func _select(path: String) -> void:
 	_picker.select(_paths.find(path))
 	if is_instance_valid(_sample): _sample.queue_free()
 	_sample = null
+	var boss_effect := path.begins_with(ROOT + "/") or BODY_EFFECTS.has(path) or ATTACK_PREVIEWS.has(path)
+	var live_effect := boss_effect or path.begins_with("weapon/") or path.begins_with("trait/")
+	_static_container.visible = not live_effect
+	_boss_preview.visible = live_effect
+	_boss_preview.set_active(live_effect)
 	if path.begins_with("res://"):
 		var scene := load(path) as PackedScene
 		_sample = scene.instantiate() as Node2D
-		var base_modulate := _sample.modulate
-		_sample.position = Vector2(240, 240)
-		_viewport.add_child(_sample)
-		_sample.set_meta("visual_base_modulate", base_modulate)
+		if not boss_effect:
+			var base_modulate := _sample.modulate
+			_sample.position = Vector2(240, 240)
+			_viewport.add_child(_sample)
+			_sample.set_meta("visual_base_modulate", base_modulate)
 	_swatch.visible = _sample == null
 	_build_fields()
+	if boss_effect and is_instance_valid(_sample):
+		_sample.free()
+		_sample = null
 	_apply_preview()
+	var preview_path := String(ATTACK_PREVIEWS.get(path, BODY_EFFECTS.get(path, path))) if boss_effect else (path if live_effect else "")
+	_boss_preview.set_effect(preview_path)
 
 func _build_fields() -> void:
 	for child in _fields.get_children():
 		_fields.remove_child(child)
 		child.queue_free()
-	_add_color("色・明るさ倍率", "effect_tint", Color.WHITE)
+	if not BODY_EFFECTS.has(_selected): _add_color("色・明るさ倍率", "effect_tint", Color.WHITE)
 	for field in DIRECT_FIELDS.get(_selected, []):
 		_add_number(field[0], field[1], field[5], "%s,%s,%s" % [field[2], field[3], field[4]])
+	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
+		_add_color(field[0], field[1], field[2])
 	if not is_instance_valid(_sample): return
 	for info in _sample.get_property_list():
 		var name: String = info.name
@@ -159,6 +273,8 @@ func _set_value(name: String, value: Variant) -> void:
 	_dirty = true
 	_message = "未保存: " + _selected
 	_apply_preview()
+	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+		_boss_preview.refresh_effects()
 
 func _add_color(label: String, name: String, original: Color) -> void:
 	var row := HBoxContainer.new()
@@ -191,6 +307,8 @@ func _add_number(label: String, name: String, original: float, hint: String) -> 
 
 func _apply_preview() -> void:
 	_swatch.color = _value("effect_tint", Color.WHITE)
+	if _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/"):
+		EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if not is_instance_valid(_sample): return
 	_sample.modulate = Color.WHITE
 	_working.apply_to(_sample)
@@ -226,5 +344,12 @@ func reload_current() -> void:
 
 func set_active(active: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	var live_effect := _selected.begins_with(ROOT + "/") or BODY_EFFECTS.has(_selected) or ATTACK_PREVIEWS.has(_selected) or _selected.begins_with("weapon/") or _selected.begins_with("trait/")
+	if is_instance_valid(_boss_preview): _boss_preview.set_active(active and live_effect)
+	if not active: EFFECT_SETTINGS.clear_preview_profiles()
+	elif _working != null and live_effect: EFFECT_SETTINGS.set_preview_profiles(_working.profiles)
 	if is_instance_valid(_viewport):
 		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+
+func _exit_tree() -> void:
+	EFFECT_SETTINGS.clear_preview_profiles()

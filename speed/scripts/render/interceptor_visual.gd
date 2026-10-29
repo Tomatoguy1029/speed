@@ -21,10 +21,10 @@ static func drone(c: CanvasItem, pos: Vector2, angle: float, scale_value: float,
 	c.draw_rect(Rect2(-2, 6, 4, 3), Color(MINT, 0.6) * tint)
 	c.draw_set_transform(Vector2.ZERO)
 
-static func shot(c: CanvasItem, pos: Vector2, angle: float, pixel: float) -> void:
+static func shot(c: CanvasItem, pos: Vector2, angle: float, pixel: float, tint := Color.WHITE) -> void:
 	c.draw_set_transform(pos, angle, Vector2.ONE * pixel)
-	c.draw_rect(Rect2(-9, -3, 13, 6), Color(MINT, 0.12))
-	c.draw_rect(Rect2(-7, -2, 10, 4), Color(MINT, 0.4))
-	c.draw_rect(Rect2(-5, -1, 8, 2), MINT)
-	c.draw_rect(Rect2(0, -1, 3, 2), Color.WHITE)
+	c.draw_rect(Rect2(-9, -3, 13, 6), Color(MINT, 0.12) * tint)
+	c.draw_rect(Rect2(-7, -2, 10, 4), Color(MINT, 0.4) * tint)
+	c.draw_rect(Rect2(-5, -1, 8, 2), MINT * tint)
+	c.draw_rect(Rect2(0, -1, 3, 2), Color.WHITE * tint)
 	c.draw_set_transform(Vector2.ZERO)

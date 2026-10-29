@@ -1,0 +1,247 @@
+## 戦闘エフェクト画面に本番のボス描画を映し、選択技だけを試遊する。
+extends VBoxContainer
+
+const ROOT := "res://scenes/bosses/"
+const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
+const MANUAL := preload("res://gyms/boss_technique_debug.gd")
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const SPEEDS := [0.25, 0.5, 1.0, 2.0, 4.0]
+
+var session
+var actor
+var manual
+var _viewport: SubViewport
+var _frame: SubViewportContainer
+var _status := Label.new()
+var _play := Button.new()
+var _speed := OptionButton.new()
+var _boss := ""
+var _technique := ""
+var _equipment_key := ""
+var _serial := 0
+
+func _ready() -> void:
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var controls := HBoxContainer.new()
+	add_child(controls)
+	_play.text = "再生"
+	_play.pressed.connect(_toggle_play)
+	controls.add_child(_play)
+	var step := Button.new()
+	step.text = "1コマ"
+	step.pressed.connect(_step)
+	controls.add_child(step)
+	var replay := Button.new()
+	replay.text = "最初から"
+	replay.pressed.connect(_replay)
+	controls.add_child(replay)
+	for value in SPEEDS:
+		_speed.add_item("%g倍" % value)
+	_speed.select(2)
+	_speed.item_selected.connect(func(index: int): session.speed = SPEEDS[index])
+	controls.add_child(_speed)
+	var aspect := AspectRatioContainer.new()
+	aspect.ratio = 16.0 / 9.0
+	aspect.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(aspect)
+	_frame = SubViewportContainer.new()
+	_frame.stretch = true
+	_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var frame_material := ShaderMaterial.new()
+	frame_material.shader = preload("res://shaders/lab_viewport.gdshader")
+	_frame.material = frame_material
+	aspect.add_child(_frame)
+	_viewport = SubViewport.new()
+	_viewport.size = Vector2i(1280, 720)
+	_viewport.disable_3d = true
+	_viewport.handle_input_locally = false
+	_viewport.audio_listener_enable_2d = true
+	_frame.add_child(_viewport)
+	_status.text = "ボス技を選択してください"
+	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	add_child(_status)
+	session = SESSION.new()
+	session.viewport = _viewport
+	add_child(session)
+
+func set_effect(path: String) -> void:
+	_serial += 1
+	var serial := _serial
+	if manual != null: manual.finish()
+	manual = null
+	actor = null
+	_equipment_key = ""
+	session.playing = false
+	_play.text = "再生"
+	if path.begins_with("weapon/") or path.begins_with("trait/"):
+		_equipment_key = path
+		await _setup_equipment(path, serial)
+		return
+	var relative := path.trim_prefix(ROOT).trim_suffix("_visual.tscn")
+	var parts := relative.split("/")
+	if not path.begins_with(ROOT) or parts.size() != 2:
+		_boss = ""
+		_technique = ""
+		_status.text = "ボス技の描画を選ぶと実戦プレビューを表示します"
+		return
+	_boss = parts[0]
+	_technique = parts[1]
+	if not ContentManager.bosses.has(StringName(_boss)):
+		_status.text = "登録されていないボス: " + _boss
+		return
+	var stage: int = {"hydra": 4, "draco": 5, "centaurus": 2, "canis_major": 3}.get(_boss, 1)
+	var settings := {"empty": true, "stage": stage, "ship_pos": [400, 0] if _boss == "hydra" else [500, 0],
+		"invincible": true, "director": {"enabled": false}}
+	if _boss == "hydra":
+		settings["hero"] = "hercules"
+		settings["config"] = {"base_attack": ContentManager.base.base_attack * 6.0}
+	_status.text = "ボス技を準備中: %s / %s" % [_boss, _technique]
+	await session.reset(settings)
+	if serial != _serial: return
+	var program_path := "res://.content/boss_%s.tres" % _boss
+	if not ResourceLoader.exists(program_path):
+		_status.text = "ボス技データを読めません: " + program_path
+		return
+	var program: Resource = ResourceLoader.load(program_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if program == null or program.get("data") is not Dictionary or program.data.get("rules") == null:
+		_status.text = "ボス技データが不正です: " + program_path
+		return
+	session.perform("boss", {"type": _boss, "pos": [0, 0]})
+	actor = session.run.bosses.actor
+	if actor == null:
+		_status.text = "ボスを配置できません: " + _boss
+		return
+	actor.configure_flow(program)
+	var hud: CanvasLayer = session.scene.view.get_node_or_null("Hud") if session.scene.view != null else null
+	if hud != null: hud.visible = false
+	if _boss != "hydra":
+		var debugger := MANUAL.new()
+		if debugger.bind(actor): manual = debugger
+	_replay()
+
+func _setup_equipment(key: String, serial: int) -> void:
+	var trait := key.begins_with("trait/")
+	var catalog: Dictionary = ContentManager.traits if trait else ContentManager.weapons
+	var code := key.get_slice("/", 1)
+	var id := StringName()
+	for candidate in catalog:
+		if String(catalog[candidate].code_id) == code:
+			id = candidate
+			break
+	if id == &"":
+		_status.text = "装備が見つかりません: " + key
+		return
+	_status.text = "試遊を準備中: " + key
+	var settings := {"empty": true, "stage": 1, "ship_pos": [0, 0], "invincible": true,
+		"director": {"enabled": false}, "weapons": {}, "traits": {}}
+	if trait: settings["traits"] = {id: 5}
+	else: settings["weapons"] = {id: 5}
+	await session.reset(settings)
+	if serial != _serial: return
+	session.perform("spawn", {"type": "drifter", "pos": [220, 0], "count": 3, "spacing": 60})
+	session.perform("spawn", {"type": "drifter", "pos": [-220, 0], "count": 2, "spacing": 60})
+	if key in ["weapon/sonic", "weapon/bipolar", "weapon/afterimage", "weapon/dashRangeDrone",
+		"weapon/mines", "weapon/knockback", "weapon/contactWave", "weapon/contactArc", "weapon/massTow",
+		"trait/endBlast", "trait/vortex"]:
+		session.perform("route", {"points": [[0, 0], [300, 0]], "draw_seconds": 0.3})
+	match key:
+		"trait/killSonic":
+			var behavior = session.run.loadout.trait_behaviors.get(id)
+			if behavior != null:
+				session.run.loadout.on_launch(true)
+				for _i in behavior._every(): session.run.loadout.on_kill(&"shot")
+		"trait/critBeam": session.run.loadout.on_critical(session.run.state.ship_pos)
+		"trait/reactive": session.run.loadout.on_hurt()
+	session.playing = true
+	_play.text = "停止"
+	_status.text = "試遊中: " + key
+
+func _replay() -> void:
+	if not _equipment_key.is_empty():
+		set_effect(_equipment_key)
+		return
+	if not is_instance_valid(actor): return
+	var started := _execute_hydra() if _boss == "hydra" else manual != null and manual.execute(_technique, 1)
+	if started:
+		session.playing = true
+		_play.text = "停止"
+		_status.text = "%s / %s を再生中" % [_boss, _technique]
+	else:
+		_status.text = "この技は単独再生できません: %s / %s" % [_boss, _technique]
+		if manual != null and not manual.message.is_empty(): _status.text += " / " + manual.message
+
+func refresh_effects() -> void:
+	if not _equipment_key.is_empty():
+		set_effect(_equipment_key)
+		return
+	if not is_instance_valid(actor): return
+	var presentation: CanvasItem = actor.get("_presentation") as CanvasItem
+	if presentation != null:
+		EFFECT_SETTINGS.apply_key(presentation, "boss/body/" + _boss)
+		presentation.queue_redraw()
+	_replay()
+
+func _toggle_play() -> void:
+	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
+	session.playing = not session.playing
+	_play.text = "停止" if session.playing else "再生"
+
+func _process(_delta: float) -> void:
+	if not is_instance_valid(session) or not is_instance_valid(session.run): return
+	var render: RunPresentation = session.scene.view.get_node_or_null("RunPresentation") if session.scene.view != null else null
+	if render == null: return
+	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
+	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
+	var fit := minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
+	render.view_override = {"center": session.run.state.view_center, "zoom": zoom * fit, "shake": true}
+
+func _step() -> void:
+	if not is_instance_valid(actor) and (session == null or not is_instance_valid(session.run)): return
+	session.playing = false
+	_play.text = "再生"
+	session.step()
+
+func _execute_hydra() -> bool:
+	if not actor.has_body() or actor.action_rules == null: return false
+	actor.interrupt_tech()
+	if actor.count != 8 or actor.necks.any(func(neck): return not actor._alive(neck)):
+		actor._set_count(8)
+	actor._tech_cd = 0.0
+	actor.combo_wait = 0.0
+	actor.recovery_t = 0.0
+	if _technique in ["grid", "swarm"] and not actor.separated: actor.begin_separation()
+	for neck in actor.necks: neck.cd = 0.0
+	var gate: Dictionary = actor.action_rules.conditions.get(_technique, {})
+	var distance := (float(gate.get("min", 0.0)) + minf(1400.0, float(gate.get("max", 600.0)))) * 0.5
+	var origin: Vector2 = actor.table.pos[actor.body]
+	var move: Resource = actor._moves.get(StringName(_technique))
+	if move == null: return false
+	if move.head_kind != &"":
+		var neck = actor._first(move.head_kind)
+		if neck != null:
+			actor.table.facing[actor.body] = -neck.base_angle
+			neck.angle = 0.0
+			neck.length = float(actor.def.params.neck_rest)
+			origin = actor._head_pos(neck) if int(gate.get("distance_origin", 0)) == 1 else actor._neck_base(neck)
+	var point := origin + Vector2.from_angle(deg_to_rad(float(gate.get("angle", 0.0)))) * distance
+	session.pinned = point
+	session.run.state.ship_pos = point
+	session.run.state.enemy_aim = point
+	session.run.state.view_center = point
+	session.run.loadout.reset_loadout()
+	var started := false
+	if move.head_kind != &"":
+		var neck = actor._first(move.head_kind)
+		started = neck != null and actor.start_normal(actor.necks.find(neck), StringName(_technique), true)
+	else:
+		started = actor.try_start_tech(StringName(_technique), 1.0, [], true)
+	if started: actor.hsm.set_active(false)
+	return started
+
+func set_active(active: bool) -> void:
+	if not active and session != null: session.playing = false
+	if is_instance_valid(_viewport):
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
+
+func _exit_tree() -> void:
+	if manual != null: manual.finish()

@@ -45,7 +45,8 @@ func tick(dt: float, busy: bool) -> void:
 			var direction := Vector2.from_angle(float(d.angle))
 			fire_shot(d.pos + direction * 15.0 * cfg.character_scale, d.angle,
 				atk() * float(value("damage_by_level")), {"cause": &"interceptor", "r": p("shot_radius"),
-				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy})
+				"speed": p("shot_speed"), "life": p("life"), "color": Color(p("color")), "on_hit": hit_enemy,
+				"visual_key": "weapon/interceptor"})
 		d.left = int(d.left) - 1
 		d.next = _clock + interval(float(p("burst_interval")) if int(d.left) > 0 else float(value("interval_by_level")))
 

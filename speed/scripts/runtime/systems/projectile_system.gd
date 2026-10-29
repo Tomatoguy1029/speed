@@ -32,6 +32,8 @@ enum FriendKind { SHOT, DEBRIS, HULL }
 var friend_alive := PackedByteArray()
 var friend_kind := PackedByteArray()
 var friend_cause: Array[StringName] = []
+## ダメージ原因と独立した、描画だけに使う装備の識別子。
+var friend_visual: Array[StringName] = []
 var friend_pos := PackedVector2Array()
 var friend_vel := PackedVector2Array()
 var friend_r := PackedFloat32Array()
@@ -265,10 +267,11 @@ func fling_corpse(i: int, vel: Vector2, dmg: float, radius_mult := 1.0, knock_mu
 ## 空いた行を使い回すので、friend_ の全部の列をここで書き直す。
 func _add_friend(kind: FriendKind, cause: StringName, pos: Vector2, vel: Vector2, r: float, dmg: float,
 		life: float, pierce: bool, pierce_left: int, color: Color, no_crit: bool, knock: float,
-		angle: float, spin: float, hit_id: int, type := &"") -> int:
+		angle: float, spin: float, hit_id: int, type := &"", visual := &"") -> int:
 	var i := friend_slots.take()
 	friend_kind[i] = kind
 	friend_cause[i] = cause
+	friend_visual[i] = visual
 	friend_pos[i] = pos
 	friend_vel[i] = vel
 	friend_r[i] = r

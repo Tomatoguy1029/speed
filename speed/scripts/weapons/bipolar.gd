@@ -33,6 +33,9 @@ func on_end() -> void:
 			return
 	var color := Color(p("color", "#69fff0"))
 	var life := float(p("life"))
-	state.emit(&"beam", {"from": from, "to": to, "width": width, "color": color, "life": life})
-	state.emit(&"ring", {"pos": from, "radius": 65.0, "color": color, "life": life})
-	state.emit(&"ring", {"pos": to, "radius": 65.0, "color": color, "life": life})
+	state.emit(&"beam", {"from": from, "to": to, "width": width, "color": color, "life": life,
+		"visual_key": "weapon/bipolar"})
+	state.emit(&"ring", {"pos": from, "radius": 65.0, "color": color, "life": life,
+		"visual_key": "weapon/bipolar"})
+	state.emit(&"ring", {"pos": to, "radius": 65.0, "color": color, "life": life,
+		"visual_key": "weapon/bipolar"})

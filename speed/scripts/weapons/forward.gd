@@ -17,5 +17,5 @@ func tick(dt: float, busy: bool) -> void:
 	for i in shots:
 		fire_shot(state.ship_pos, a + (i - (shots - 1) / 2.0) * step,
 			atk() * dmg_k() * float(p("damage")),
-			{"pierce_left": n / 3, "life": p("life"), "color": Color(p("color", "#ffe46b"))})
+			{"pierce_left": n / 3, "life": p("life"), "color": Color(p("color", "#ffe46b")), "visual_key": "weapon/forward"})
 	state.emit(&"weapon_fire", {"id": def.id})
