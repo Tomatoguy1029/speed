@@ -30,8 +30,27 @@ func finished() -> bool:
 func dispose() -> void:
 	if is_instance_valid(node):
 		node.queue_free()
+	if is_instance_valid(_painter):
+		_painter.queue_free()
 	behavior = null
 	rm = null
+
+var _painter: PixelPainter
+var _world_time := -1.0
+## ドット単位の演出を描く束。初めて使うときに演出の層へ置く。
+func painter() -> PixelPainter:
+	if _painter == null:
+		_painter = PixelPainter.new()
+		_painter.setup_painter(1.82 * cfg.character_scale)
+		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		rm._layers.fx.add_child(_painter)
+	return _painter
+## 前回から進んだ世界秒。ヒットストップや停止の間は 0。
+func world_dt() -> float:
+	var now := state.world_time
+	var dt := 0.0 if _world_time < 0.0 else maxf(0.0, now - _world_time)
+	_world_time = now
+	return dt
 func attach(path: String, node_name: String, z := 0) -> void:
 	node = load(path).new()
 	node.name = node_name

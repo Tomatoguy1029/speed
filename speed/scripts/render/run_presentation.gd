@@ -1226,11 +1226,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	var pr := run.projectiles
 	var friend_alive := pr.friend_alive
 	var friend_pos := pr.friend_pos
+	for visual: AttackVisual in _friendly_visuals.values(): visual.begin_batch()
 	for i in friend_alive.size():
 		var pos := friend_pos[i]
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		_friendly_visual(pr, i).draw_friend(c, pr, i, pos)
+	for visual: AttackVisual in _friendly_visuals.values(): visual.end_batch()
 	for visual: AttackVisual in _attack_visuals.values(): visual.begin_batch()
 	_hostile_batch.begin()
 	for i in pr.hostile_alive.size():

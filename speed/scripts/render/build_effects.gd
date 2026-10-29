@@ -57,7 +57,7 @@ func _ready() -> void:
 	_mine_trails = InstanceBatch.new()
 	_mine_trails.setup_shader_quad()
 	add_child(_mine_trails)
-	for key in ["weapon/forward", "weapon/scatter", "weapon/rear", "weapon/interceptor", "weapon/knockback"]:
+	for key in ["weapon/knockback"]:
 		var batch := InstanceBatch.new()
 		batch.setup_shader_quad()
 		var mat := ShaderMaterial.new()
@@ -229,7 +229,8 @@ func event(ev: Dictionary) -> bool:
 
 		&"weapon_fire":
 			if not ev.has("pos"): return false
-			if key == "weapon/interceptor": return true
+			# 射撃の武器の砲口・当たりは各武器の表示（render/equipment）が描く。
+			if key in ["weapon/interceptor", "weapon/forward", "weapon/scatter", "weapon/rear"]: return true
 			effect(2, ev.pos, pixel * 17.0, 0.1, key, {"angle": ev.angle, "width": 1.0 if key == "weapon/scatter" else 2.0})
 			if key == "weapon/scatter":
 				burst(ev.pos, 15, ev.angle, 1.4, 60.0, 120.0, 0.1, [Color("#ffffff"), Color("#7fd8ff"), Color("#d8f6ff")], key)
@@ -238,9 +239,8 @@ func event(ev: Dictionary) -> bool:
 			if key=="weapon/massTow":
 				effect(1,ev.pos,13.0*pixel,0.45,key,{"c1":Color("#fff2a8"),"c2":Color("#ffb030"),"c3":Color("#d2461c")})
 				return true
-			if key=="weapon/interceptor":
-				burst(ev.pos,4,ev.dir.angle()+PI,2.0,25,70,0.16,[Color.WHITE,Color("#8fffe2"),Color("#3e9eaa")],key)
-				return true
+			# 射撃の武器の当たりは各武器の表示（render/equipment）が描く。
+			if key in ["weapon/interceptor", "weapon/forward", "weapon/scatter", "weapon/rear"]: return true
 			var big := key != "weapon/scatter"
 			effect(3, ev.pos, 16.0 * pixel, 0.18 if big else 0.14, key, {"width": 2.0 if big else 0.0})
 			burst(ev.pos, 13 if big else 5, ev.dir.angle() + PI, 2.6 if big else 2.0, 30, 120 if big else 90, 0.22,
@@ -319,7 +319,7 @@ func event(ev: Dictionary) -> bool:
 			effect(16, ev.pos, 12.0 * pixel, 0.16, "weapon/sonic", {"broken": ev.dead, "c1": Color("#cfe4ff")})
 			burst(ev.pos, 10 if ev.dead else 5, ev.dir.angle(), 1.3, 50, 130, 0.26, [Color.WHITE, Color("#cfe4ff"), Color("#8a96b0")], "weapon/sonic")
 		&"run_up_hit": burst(ev.pos, 16, 0, TAU, 30, 60, 0.2, [Color.WHITE, Color("#ffd040"), Color("#ff9a1e")], "trait/runUp")
-		&"full_burst_ready": burst(ev.pos, 12, 0, TAU, 25, 90, 0.3, [Color.WHITE, Color("#7fd8ff")], "trait/fullBurst")
+		&"full_burst_ready": pass  # 表示は render/equipment/fullBurst.gd
 		_: return false
 	return true
 
