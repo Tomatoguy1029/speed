@@ -25,6 +25,21 @@ class SpeedRunCore : public RefCounted {
     std::unordered_map<int64_t, size_t> rows_by_id;
     int64_t next_id = 1;
     Vector2 ship_pos, view_center, view_half;
+    struct Ship {
+        Vector2 pos, vel, heading = Vector2(0, -1);
+        double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0;
+        double boost_t = 0, fade_t = 0, glide_t = 0, glide_speed = 0, peak_speed = 0;
+        bool glide = false;
+    } ship;
+    struct ShipConfig {
+        double start_radius, base_max_speed, stick_dead_zone, mouse_dead_zone, steer_cruise;
+        double glide_hold, glide_fade, cruise_floor, energy_cut, cruise_drag, overcap_decay;
+        double field_radius, boundary_push, ship_radius, crash_restitution, ship_hurt_time;
+        double max_hp, max_speed, turn_rate, acceleration, glide_duration_mult, invulnerability;
+    } ship_config{};
+    bool ship_ready = false;
+    void steer_ship(double want, double dt);
+    void move_ship(double dt, Vector2 accel);
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -34,6 +49,9 @@ protected:
     static void _bind_methods();
 public:
     bool configure(const Dictionary &data);
+    bool configure_ship(const Dictionary &config, const Dictionary &stats);
+    bool step_ship(double real_dt, double world_dt, const Dictionary &input);
+    Dictionary ship_snapshot() const;
     bool start(int64_t seed, int64_t first_id = 1);
     bool set_motion_context(Vector2 ship, Vector2 center, Vector2 half);
     int64_t spawn_enemy(StringName type, Vector2 position);
