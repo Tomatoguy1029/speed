@@ -83,7 +83,8 @@ func tick(dt: float) -> void:
 		if nova.finished(actor): nova = null
 	flash.size = get_viewport_rect().size
 	var flash_age: float = actor.clock - nova.started - float(nova.values.warn) if nova != null else -1.0
-	flash.color.a = VISUAL_SETTINGS.number(NOVA_KEY,"flash_opacity",0.32) * (1.0-flash_age/0.25) if flash_age >= 0.0 and flash_age < 0.25 else 0.0
+	var flash_duration := VISUAL_SETTINGS.number(NOVA_KEY,"flash_duration",0.08)
+	flash.color.a = VISUAL_SETTINGS.number(NOVA_KEY,"flash_opacity",0.12) * (1.0-flash_age/maxf(flash_duration,0.001)) if flash_age >= 0.0 and flash_age < flash_duration else 0.0
 	_tick_burning(dt)
 	_tick_tints()
 	_tick_jets(dt)
@@ -222,7 +223,12 @@ func _draw_nova() -> void:
 	var source := actor.mouth()
 	var light := clampf(age/maxf(float(r.warn),0.001),0,1) if age < float(r.warn) else maxf(0.0,1.0-(age-float(r.warn))/maxf(float(r.after),0.001))
 	var light_alpha := VISUAL_SETTINGS.number(NOVA_KEY,"warning_glow_opacity",0.06)
-	for k in range(6,0,-1): draw_circle(source,900.0*k/6.0,Color(actor.SIRIUS_COLOR,light*light_alpha))
+	# 照明はなめらかな面にし、広がる攻撃の輪と同じ模様を作らない。
+	var light_radius := maxf(900.0,float(r.ring_end))
+	for k in 64:
+		var a := Vector2.from_angle(k*TAU/64.0)*light_radius
+		var b := Vector2.from_angle((k+1)*TAU/64.0)*light_radius
+		draw_polygon(PackedVector2Array([source,source+a,source+b]),PackedColorArray([Color(actor.SIRIUS_COLOR,light*light_alpha),Color(actor.SIRIUS_COLOR,0.0),Color(actor.SIRIUS_COLOR,0.0)]))
 	if age < float(r.warn):
 		var progress := clampf(age/maxf(float(r.warn),0.001),0,1)
 		var ray_length := VISUAL_SETTINGS.number(NOVA_KEY,"warning_ray_length",100.0)*lerpf(0.25,1.0,progress)
@@ -239,7 +245,7 @@ func _draw_nova() -> void:
 		for k in range(12,-1,-1):
 			var angle := float(shadow.angle)+lerpf(-float(shadow.half),float(shadow.half),k/12.0)
 			polygon.append(source+Vector2.from_angle(angle)*maxf(900.0,float(r.ring_end)))
-		draw_colored_polygon(polygon,Color(0.0,0.01,0.025,light*0.65))
+		draw_colored_polygon(polygon,Color(0.0,0.005,0.015,light*0.9))
 	for ring in int(r.rings):
 		var elapsed: float = age-float(r.warn)-ring*float(r.ring_gap)
 		if elapsed < 0: continue
@@ -252,9 +258,15 @@ func _draw_nova() -> void:
 			var from := source+Vector2.from_angle(a)*radius
 			var to := source+Vector2.from_angle(b)*radius
 			var width := float(r.ring_band)*2.0
-			draw_line(from,to,Color(actor.SIRIUS_COLOR,0.2),width*VISUAL_SETTINGS.number(NOVA_KEY,"ring_halo_scale",3.0))
-			draw_line(from,to,Color(actor.SIRIUS_COLOR,0.95),width)
-			draw_line(from,to,Color(1,1,1,0.95),VISUAL_SETTINGS.number(NOVA_KEY,"ring_core_width",4.0))
+			# 太い帯が判定の全幅。暗い縁で照明から分離し、白い先端で進む向きを示す。
+			var outline := VISUAL_SETTINGS.number(NOVA_KEY,"ring_outline_width",3.0)
+			var core := minf(width,VISUAL_SETTINGS.number(NOVA_KEY,"ring_core_width",8.0))
+			draw_line(from,to,Color(actor.SIRIUS_COLOR,0.08),width*VISUAL_SETTINGS.number(NOVA_KEY,"ring_halo_scale",1.6))
+			draw_line(from,to,Color(0.005,0.015,0.04,0.95),width+outline*2.0)
+			draw_line(from,to,Color("#65baff"),width)
+			draw_line(from,to,Color(0.95,0.99,1.0,1.0),core)
+			var front := radius+float(r.ring_band)-1.0
+			draw_line(source+Vector2.from_angle(a)*front,source+Vector2.from_angle(b)*front,Color.WHITE,minf(2.0,width))
 
 func tint_hound(i: int, until: float, color: Color) -> void:
 	var base: Color = tints[i].base if tints.has(i) and tints[i].id == actor.table.id[i] else actor.table.color[i]
