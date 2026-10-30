@@ -221,7 +221,10 @@ var _selected := ""
 var _target_group := "武器"
 var _group_buttons := {}
 var _target_buttons := {}
-var _target_list := HFlowContainer.new()
+var _target_list := VBoxContainer.new()
+var _boss_sections: Array[Dictionary] = []
+var _technique_names := {}
+var _expanded_bosses := {}
 var _editing_label := Label.new()
 var _fields := VBoxContainer.new()
 var _sample: Node2D
@@ -232,6 +235,7 @@ var _boss_preview
 
 func _ready() -> void:
 	_collect(ROOT)
+	_collect_boss_techniques()
 	_paths.append_array(DIRECT_EFFECTS)
 	_paths.append_array(ATTACK_SCENES)
 	_paths.append_array(BODY_EFFECTS.keys())
@@ -254,7 +258,6 @@ func _ready() -> void:
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(body)
 	_target_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_target_list.add_theme_constant_override("h_separation", 4)
 	_target_list.add_theme_constant_override("v_separation", 4)
 	body.add_child(_target_list)
 	body.add_child(HSeparator.new())
@@ -308,6 +311,70 @@ func _target_style(selected: bool) -> StyleBoxFlat:
 	style.set_corner_radius_all(3)
 	return style
 
+func _collect_boss_techniques() -> void:
+	for number in range(1, 6):
+		var stage: Resource = load("res://data/stages/stage_%d.tres" % number)
+		if stage == null: continue
+		var boss_id := String(stage.get("boss_id"))
+		var boss: Resource = load("res://data/bosses/%s.tres" % boss_id)
+		var rules: Resource = load("res://data/bosses/ai/%s_action_rules.tres" % boss_id)
+		if boss == null or rules == null: continue
+		_boss_sections.append({"id": boss_id, "title": "ステージ%d · %s" % [number, boss.get("display_name")]})
+		for item in rules.get("techniques"):
+			var move: Resource = item
+			if move == null or move.visual == null or move.display_name.is_empty(): continue
+			var path: String = move.visual.resource_path
+			var names: PackedStringArray = _technique_names.get(path, PackedStringArray())
+			if not names.has(move.display_name): names.append(move.display_name)
+			_technique_names[path] = names
+
+func _toggle_boss_section(boss_id: String, items: HFlowContainer, heading: Button) -> void:
+	var expanded: bool = not items.visible
+	_expanded_bosses[boss_id] = expanded
+	items.visible = expanded
+	heading.text = ("▼ " if expanded else "▶ ") + String(heading.get_meta("title"))
+
+func _add_target_button(path: String, parent: HFlowContainer) -> void:
+	var definition := _definition_for(path)
+	var name: String = definition.get_display_name() if definition != null else _effect_label(path)
+	var button := Button.new()
+	button.custom_minimum_size = Vector2(76, 70) if definition != null else Vector2(220, 46) if _group_for(path) == "ボス技" else Vector2(94, 42)
+	if definition != null:
+		button.tooltip_text = name + "\n" + definition.get_description()
+	elif _technique_names.has(path):
+		var names: PackedStringArray = _technique_names[path]
+		button.tooltip_text = "\n".join(names) + "\n" + path
+	else:
+		button.tooltip_text = name + "\n" + path
+	button.pressed.connect(_select.bind(path))
+	parent.add_child(button)
+	_target_buttons[path] = button
+	if definition == null:
+		if _group_for(path) == "ボス技": button.text = name
+		else: button.text = name.substr(0, 8) + "…" if name.length() > 8 else name
+		button.clip_text = true
+		return
+	var column := VBoxContainer.new()
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	button.add_child(column)
+	var icon := TextureRect.new()
+	icon.texture = MODULE_ICONS.texture_for(definition)
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size.y = 43
+	icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(icon)
+	var caption := Label.new()
+	caption.text = name.substr(0, 5) + "…" if name.length() > 5 else name
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	caption.clip_text = true
+	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(caption)
+
 func _show_target_group(group: String) -> void:
 	_target_group = group
 	for title in _group_buttons: _group_buttons[title].button_pressed = title == group
@@ -315,40 +382,39 @@ func _show_target_group(group: String) -> void:
 		_target_list.remove_child(child)
 		child.queue_free()
 	_target_buttons.clear()
-	for path in _paths:
-		if _group_for(path) != group: continue
-		var definition := _definition_for(path)
-		var name: String = definition.get_display_name() if definition != null else _effect_label(path)
-		var button := Button.new()
-		button.custom_minimum_size = Vector2(76, 70) if definition != null else Vector2(94, 42)
-		button.tooltip_text = name + ("\n" + definition.get_description() if definition != null else "\n" + path)
-		button.pressed.connect(_select.bind(path))
-		_target_list.add_child(button)
-		_target_buttons[path] = button
-		if definition == null:
-			button.text = name.substr(0, 8) + "…" if name.length() > 8 else name
-			button.clip_text = true
-			continue
-		var column := VBoxContainer.new()
-		column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		column.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		button.add_child(column)
-		var icon := TextureRect.new()
-		icon.texture = MODULE_ICONS.texture_for(definition)
-		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.custom_minimum_size.y = 43
-		icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		column.add_child(icon)
-		var caption := Label.new()
-		caption.text = name.substr(0, 5) + "…" if name.length() > 5 else name
-		caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		caption.clip_text = true
-		caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		column.add_child(caption)
+	if group == "ボス技":
+		for section in _boss_sections:
+			var boss_id: String = section.id
+			var paths: Array[String] = []
+			for path in _paths:
+				if path.begins_with(ROOT + "/" + boss_id + "/"): paths.append(path)
+			if paths.is_empty(): continue
+			var heading := Button.new()
+			heading.set_meta("title", section.title)
+			var items := HFlowContainer.new()
+			items.add_theme_constant_override("h_separation", 4)
+			items.add_theme_constant_override("v_separation", 4)
+			var expanded: bool = _expanded_bosses.get(boss_id, _selected.begins_with(ROOT + "/" + boss_id + "/") or String(_boss_sections[0]["id"]) == boss_id)
+			items.visible = expanded
+			heading.text = ("▼ " if expanded else "▶ ") + String(section.title)
+			heading.pressed.connect(_toggle_boss_section.bind(boss_id, items, heading))
+			_target_list.add_child(heading)
+			_target_list.add_child(items)
+			for path in paths: _add_target_button(path, items)
+		if _paths.has("boss/final_strike"):
+			var shared_title := Label.new()
+			shared_title.text = "共通"
+			_target_list.add_child(shared_title)
+			var shared := HFlowContainer.new()
+			_target_list.add_child(shared)
+			_add_target_button("boss/final_strike", shared)
+	else:
+		var items := HFlowContainer.new()
+		items.add_theme_constant_override("h_separation", 4)
+		items.add_theme_constant_override("v_separation", 4)
+		_target_list.add_child(items)
+		for path in _paths:
+			if _group_for(path) == group: _add_target_button(path, items)
 	_refresh_target_selection()
 
 func _refresh_target_selection() -> void:
@@ -359,11 +425,16 @@ func _refresh_target_selection() -> void:
 	_editing_label.text = "編集中: " + _effect_label(_selected) if not _selected.is_empty() else "編集対象を選択してください"
 
 func _effect_label(path: String) -> String:
+	if path == "boss/final_strike": return "制限時間の一撃（共通）"
+	if _technique_names.has(path):
+		var names: PackedStringArray = _technique_names[path]
+		return names[0] + (" ほか%d技" % (names.size() - 1) if names.size() > 1 else "")
 	if path.begins_with("weapon/") or path.begins_with("trait/"):
 		var category := &"weapons" if path.begins_with("weapon/") else &"traits"
 		for entry in ContentManager.catalog.table(category).values():
 			if String(entry.code_id) == path.get_slice("/",1):
 				return ("武器：" if category == &"weapons" else "特性：") + entry.get_display_name()
+	if path.begins_with(ROOT + "/"): return "技名未設定"
 	return path.trim_prefix(ROOT+"/").trim_suffix("_visual.tscn")
 
 func _collect(folder: String) -> void:
