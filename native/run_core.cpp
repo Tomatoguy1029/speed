@@ -5,6 +5,9 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("spawn_hostile", "fields"), &SpeedRunCore::spawn_hostile);
+    ClassDB::bind_method(D_METHOD("step_hostiles", "world_dt"), &SpeedRunCore::step_hostiles);
+    ClassDB::bind_method(D_METHOD("hostiles_snapshot"), &SpeedRunCore::hostiles_snapshot);
     ClassDB::bind_method(D_METHOD("configure_projectiles", "config", "split"), &SpeedRunCore::configure_projectiles, DEFVAL(Dictionary()));
     ClassDB::bind_method(D_METHOD("burst_debris", "position", "count", "speed", "damage", "color", "source_id"), &SpeedRunCore::burst_debris);
     ClassDB::bind_method(D_METHOD("fire_shot", "from", "angle", "damage", "options"), &SpeedRunCore::fire_shot, DEFVAL(Dictionary()));
@@ -100,6 +103,7 @@ void SpeedRunCore::close() {
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
+    hostiles.clear(); free_hostiles.clear();
     friends.clear(); free_friends.clear(); live_friends = 0; live_debris = 0;
     gems.clear(); coins.clear(); free_gems.clear(); free_coins.clear(); gem_queue.clear(); collections.clear();
 }

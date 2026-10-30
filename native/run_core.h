@@ -130,6 +130,17 @@ class SpeedRunCore : public RefCounted {
         double chance = 0, damage = 1, angle_min = 0, angle_max = 0;
         int64_t generations = 0, maximum = 0;
     } projectile_config;
+    struct Hostile {
+        bool alive = true;
+        int64_t kind = 0;
+        Vector2 pos, vel;
+        float speed = 0, radius = 0, life = 0, slow = 0, turn = 0, gap = 0, stone = 0, wait = 0;
+        double damage = 0;
+    };
+    std::deque<Hostile> hostiles;
+    std::vector<size_t> free_hostiles;
+    size_t add_hostile(Hostile shot);
+    bool damage_ship(double amount, double slow, StringName cause, StringName source = StringName());
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -142,6 +153,9 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    int64_t spawn_hostile(const Dictionary &fields);
+    bool step_hostiles(double world_dt);
+    Array hostiles_snapshot() const;
     bool configure_projectiles(const Dictionary &config, const Dictionary &split);
     bool burst_debris(Vector2 position, int64_t count, double speed, double damage, Color color, int64_t source_id);
     bool fire_shot(Vector2 from, double angle, double damage, const Dictionary &options);
