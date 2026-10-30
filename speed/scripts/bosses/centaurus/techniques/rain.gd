@@ -198,9 +198,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		if spent > 0: host.rain_arrows = host.rain_arrows.slice(spent)
 		if host._rain_left == 0 and all_landed and host.rain_arrows.is_empty():
 			host._clear_rain()
-			host.mode = &"recovery"
-			host.recovery = float(r.recover)
-			host._cue(&"recovery_started")
+			host.finish_technique()
 
 	# ── 移動 ──────────────────────────────────────────────────
 

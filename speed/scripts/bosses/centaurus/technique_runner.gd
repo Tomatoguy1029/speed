@@ -45,11 +45,7 @@ func release(host: CentaurusBoss) -> void:
 
 func end_attack(host: CentaurusBoss) -> void:
 	if host.mode not in [&"windup", &"shooting", &"strike"]: return
-	host.timeline.stop()
-	host.alerting = false
-	host.mode = &"recovery"
-	host.recovery = float(host.rule().recover)
-	host._cue(&"recovery_started")
+	host.finish_technique()
 
 # ── 背後攻撃 ──────────────────────────────────────────────
 

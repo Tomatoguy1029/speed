@@ -6,12 +6,26 @@
 [ext_resource type="Resource" uid="uid://dyiikkcybskeg" path="res://data/bosses/centaurus_moves/rain.tres" id="4_c7ran"]
 [ext_resource type="Resource" path="res://data/bosses/centaurus_moves/rear_attack.tres" id="5_c7rea"]
 
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/shower_chase.tres" id="shower_chase"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/shower_wall.tres" id="shower_wall"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/stomp.tres" id="stomp"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/fan_volley.tres" id="fan_volley"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/combo_shower_shot.tres" id="combo_shower_shot"]
+[ext_resource type="Resource" path="res://data/bosses/centaurus_moves/combo_rain_volley.tres" id="combo_rain_volley"]
+
 [resource]
 script = ExtResource("1_c7rul")
 adapter = &"centaurus"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("2_c7vly"), ExtResource("3_c7pws"), ExtResource("4_c7ran"), ExtResource("5_c7rea")])
+techniques = Array[Resource]([ExtResource("2_c7vly"), ExtResource("3_c7pws"), ExtResource("4_c7ran"), ExtResource("5_c7rea"), ExtResource("shower_chase"), ExtResource("shower_wall"), ExtResource("stomp"), ExtResource("fan_volley"), ExtResource("combo_shower_shot"), ExtResource("combo_rain_volley")])
 conditions = {
+"shower_chase": {"angle": 0.0, "half_angle": 180.0, "min": 300.0, "max": 1400.0, "min_phase": 1},
+"shower_wall": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1400.0, "min_phase": 1},
+"stomp": {"angle": 0.0, "half_angle": 50.0, "min": 0.0, "max": 260.0, "min_phase": 1},
+"fan_volley": {"angle": 0.0, "half_angle": 180.0, "min": 400.0, "max": 1300.0, "min_phase": 1},
+"combo_shower_shot": {"angle": 0.0, "half_angle": 180.0, "min": 450.0, "max": 1400.0, "min_phase": 1},
+"combo_rain_volley": {"angle": 0.0, "half_angle": 180.0, "min": 500.0, "max": 1200.0, "min_phase": 1},
+
 "power_shot": {
 "angle": 0.0,
 "half_angle": 180.0,
@@ -42,12 +56,26 @@ conditions = {
 }
 }
 costs = {
+"shower_chase": 2.0,
+"shower_wall": 0.0,
+"stomp": 0.0,
+"fan_volley": 3.0,
+"combo_shower_shot": 3.0,
+"combo_rain_volley": 3.0,
+
 "power_shot": 2.0,
 "rain": 2.0,
 "rear_attack": 1.0,
 "volley": 1.0
 }
 layout = {
+"shower_chase": Vector2(2856, 116),
+"shower_wall": Vector2(2856, 432),
+"stomp": Vector2(2856, 748),
+"fan_volley": Vector2(1448, 1064),
+"combo_shower_shot": Vector2(540, 1380),
+"combo_rain_volley": Vector2(540, 1696),
+
 "choose_combo": Vector2(40, 116),
 "choose_major": Vector2(948, 116),
 "choose_normal": Vector2(1856, 116),
@@ -58,19 +86,26 @@ layout = {
 }
 condition_groups = {
 "choose_combo": {
-"nodes": [],
+"nodes": ["combo_shower_shot", "combo_rain_volley"],
 "title": "コンボ"
 },
 "choose_major": {
-"nodes": [],
+"nodes": ["fan_volley"],
 "title": "大技"
 },
 "choose_normal": {
-"nodes": ["volley", "power_shot", "rain", "rear_attack"],
+"nodes": ["volley", "power_shot", "rain", "rear_attack", "shower_chase"],
 "title": "通常技"
 }
 }
 graph_nodes = {
+"shower_chase": {"connected": true, "source": "shower_chase"},
+"shower_wall": {"connected": true, "source": "shower_wall"},
+"stomp": {"connected": true, "source": "stomp"},
+"fan_volley": {"connected": true, "source": "fan_volley"},
+"combo_shower_shot": {"connected": true, "source": "combo_shower_shot"},
+"combo_rain_volley": {"connected": true, "source": "combo_rain_volley"},
+
 "rear_attack": {
 &"connected": true,
 "source": "rear_attack"

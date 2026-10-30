@@ -10,6 +10,7 @@ var _parts: Node2D
 var actor: CentaurusBoss
 var hit := 0.0
 var pulse := 0.0
+var leap_ring := 0.0
 const BOW := Color("#d8b46a")
 const OUTLINE := Color("#1a1928")
 const STRING := Color("#f4ecd8")
@@ -34,17 +35,20 @@ func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 	z_index = 1
 
 func _event(event: Dictionary) -> void:
-	if event.cue == &"released": _parts.release_bow(float(actor.rule().get("interval", 0.4)))
+	if event.cue in [&"released", &"fan_released"]: _parts.release_bow(float(actor.rule().get("interval", 0.4)))
+	if event.cue == &"leap_landed": leap_ring = 0.3
 	if event.cue == &"hit": hit = 0.18
 	if event.cue in [&"alert", &"released", &"rain_started", &"phase_changed"]: pulse = 0.3
 	queue_redraw()
 
 func _advance(dt: float) -> void:
+	leap_ring = maxf(0.0, leap_ring - dt)
 	hit = maxf(0.0, hit - dt)
 	pulse = maxf(0.0, pulse - dt)
 	_parts.visible = actor.has_body()
 	if actor.has_body():
 		_parts.scale = Vector2.ONE * actor.table.r[actor.body] / 135.0
+		if actor.mode == &"leap": _parts.scale *= 1.0 + 0.25 * sin(PI * clampf(actor.leap_time / maxf(float(actor.def.params.leap_time), 0.001), 0.0, 1.0))
 		_parts.set_bow_pose(actor.technique, actor.mode, actor.table.charge[actor.body], dt)
 	queue_redraw()
 
@@ -92,6 +96,7 @@ func draw_fraction() -> float:
 	return float(actor.technique_pose.get("pull", 0.0))
 
 func _draw() -> void:
+	if leap_ring > 0.0: draw_arc(Vector2.ZERO, 30.0 + (0.3 - leap_ring) * 160.0, 0.0, TAU, 24, Color(BOW, leap_ring / 0.3), pixel_size)
 	if actor == null or not actor.has_body(): return
 	var r := actor.table.r[actor.body]
 	var k := r / 90.0

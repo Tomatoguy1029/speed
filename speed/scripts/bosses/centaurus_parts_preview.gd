@@ -1,7 +1,8 @@
 ## 基礎ポーズを複製し、攻撃用のコマを手付けする制作画面。
 extends Node2D
 
-const CLIPS := ["idle", "shot_windup", "shot_release", "shot_recovery", "rain_windup", "rain", "rain_recovery"]
+const CLIP_NAMES := {"shower_windup": "降り注ぐ矢：構え", "shower": "降り注ぐ矢：降下", "shower_recovery": "降り注ぐ矢：戻し", "fan_windup": "一斉射撃：引き絞り", "fan_release": "一斉射撃：発射", "fan_recovery": "一斉射撃：戻し", "stomp_windup": "前脚の踏みつけ：構え", "stomp": "前脚の踏みつけ", "stomp_recovery": "前脚の踏みつけ：戻し", "leap": "跳び退き", "run": "離脱"}
+const CLIPS := ["idle", "shot_windup", "shot_release", "shot_recovery", "rain_windup", "rain", "rain_recovery", "shower_windup", "shower", "shower_recovery", "fan_windup", "fan_release", "fan_recovery", "stomp_windup", "stomp", "stomp_recovery", "leap", "run"]
 const DATA_PATH := "res://data/visuals/centaurus_animation.tres"
 var _source_path := DATA_PATH
 var _source_hash := ""
@@ -143,7 +144,7 @@ func _build_controls() -> void:
 	_label(column, "centaurus.anim.target")
 	_clip_selector = _option(column)
 	_clip_selector.add_item(tr("centaurus.anim.pose_mode"))
-	for clip in CLIPS: _clip_selector.add_item(tr("centaurus.anim." + clip))
+	for clip in CLIPS: _clip_selector.add_item(CLIP_NAMES.get(clip, tr("centaurus.anim." + clip)))
 	_clip_selector.item_selected.connect(_select_clip)
 	_build_timeline(canvas)
 	_build_joint_controls(column)
