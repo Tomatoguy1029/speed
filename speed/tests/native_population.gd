@@ -15,6 +15,8 @@ func _ready() -> void:
 		check(false, "補充前の人数と再配置をネイティブが扱う")
 	else:
 		await compare_population(comparison)
+		for mode in ["mix", "curve", "bonus", "blocked"]:
+			await compare_refill(comparison, mode)
 	probe.close()
 	print("[native_population] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
@@ -89,5 +91,87 @@ func compare_population(comparison) -> void:
 	core.set_motion_context(center, run.state.view_center, half)
 	check(run.spawn.spawn_point() == null and core.population_spawn_point(0.0) == null, "出現できる位置がない条件を打ち切る")
 	check(str(run.state.rng.state) == core.inspect().rng_state, "位置の選択に失敗したときも乱数消費が一致する")
+	core.close()
+	lab.free()
+
+func compare_refill(comparison, mode: String) -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed": 472, "empty": true})
+	var run: RunSimulation = lab.run
+	var core = comparison.create_native()
+	if not core.has_method("step_regular_population"):
+		check(false, "通常の補充をネイティブが扱う")
+		core.close()
+		lab.free()
+		return
+	var definitions: Array[EnemyDef] = []
+	for type in [&"drifter", &"shield"]:
+		var definition: EnemyDef = run.enemies.def_of(type).duplicate(true)
+		definition.max_alive = 3 if type == &"shield" else 0
+		definition.size_var = true
+		run.enemies.definitions[type] = definition
+		definitions.append(definition)
+	var data := DATA.compile_enemy(definitions[0], run.cfg)
+	data.enemies.append_array(DATA.compile_enemy(definitions[1], run.cfg).enemies)
+	core.configure(data)
+	core.configure_enemy_order(PackedStringArray(["chase"]))
+	var stage := StageDef.new()
+	for number in 2:
+		var phase := PhaseDef.new()
+		phase.id = StringName("補充%d" % number)
+		phase.start = number * 2.0
+		phase.pop_from = 35.0 if number == 0 else 15.0
+		phase.pop_to = phase.pop_from
+		phase.rate = 12.3
+		phase.wave_interval = 0.0
+		phase.mix = {"shield": 1.7, "drifter": 1.0}
+		stage.phases.append(phase)
+	if mode == "curve":
+		for type in [&"shield", &"drifter"]:
+			var curve := SpawnCurve.new()
+			curve.type = type
+			curve.points = PackedVector2Array([Vector2(0,12),Vector2(5,22)])
+			stage.zako_curves.append(curve)
+	run.state.stage = stage
+	run.cfg.density_mult = 1.137
+	run.cfg.spawn_total_cap = 1.1
+	var timeline := DATA.compile_spawn_timeline(stage, run.cfg)
+	timeline.types.shield.max_alive = 3
+	core.configure_spawn_timeline(timeline)
+	var config := {}
+	for key in CONFIG: config[key] = run.cfg.get(key)
+	core.configure_population(config)
+	check(core.configure_refill({"spawn_total_cap": run.cfg.spawn_total_cap, "spawn_refill_time": run.cfg.spawn_refill_time}), "補充の編集値を渡す")
+	check(not core.configure_refill({"spawn_total_cap": 1.0, "spawn_refill_time": 0.0}), "ゼロ秒の補充設定を拒否して直前の設定を保つ")
+	core.start(472, run.enemies._next_id)
+	run.state.rng.seed = 472
+	run.state.ship_pos = Vector2(-3200,0)
+	run.state.enemy_aim = run.state.ship_pos
+	run.state.view_center = Vector2(1e8,1e8) if mode == "blocked" else run.state.ship_pos
+	run.state.view_half = Vector2(640,360)
+	core.set_motion_context(run.state.ship_pos, run.state.view_center, run.state.view_half)
+	for tick in 180:
+		var dt := 0.0 if tick == 10 else 0.031 if tick % 3 else 0.017
+		run.state.time += dt
+		run.state.world_time += dt
+		run.state.bonus_t = 1.0 if mode == "bonus" and tick >= 60 else 0.0
+		run.enemies.tick(dt,dt)
+		core.step(dt)
+		run.state.events.clear()
+		if tick == 90:
+			for row in range(0,run.enemies.table.alive.size(),3):
+				if run.enemies.table.dead[row] != 0: continue
+				core.remove_enemy(run.enemies.table.id[row])
+				run.enemies.mark_dead(row)
+			run.enemies.cleanup()
+		run.spawn.spawner_tick(dt,dt)
+		check(core.step_regular_population(dt, run.state.bonus_t > 0.0), "通常の補充を更新できる")
+		var difference: String = comparison.difference(comparison.snapshot(run, [], tick).enemies, core.enemies_snapshot())
+		check(difference.is_empty(), "補充後の種類・大きさ・HP・位置が一致する %s/%d: %s" % [mode,tick,difference])
+		difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
+		check(difference.is_empty(), "時間帯と出現の通知が一致する: " + difference)
+		check(str(run.state.rng.state) == core.inspect().rng_state, "補充の乱数消費が一致する %s/%d" % [mode,tick])
+		check(run.spawn._spawn_acc == core.refill_snapshot().accumulator, "補充の残り時間が一致する")
 	core.close()
 	lab.free()
