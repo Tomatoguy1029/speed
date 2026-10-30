@@ -63,7 +63,14 @@ func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream: AudioStream = _sounds.get(name)
 	if stream == null:
 		return
+	if name == &"bomber_explode":
+		var active := 0
+		for player in _players:
+			if player.playing and player.get_meta(&"sound_name", &"") == name:
+				active += 1
+		if active >= 2: return
 	var p := _players[_next]
+	p.set_meta(&"sound_name", name)
 	_next = (_next + 1) % MAX_VOICES
 	p.stream = stream
 	p.volume_db = volume_db - 20.0 if name == &"hurt" else volume_db

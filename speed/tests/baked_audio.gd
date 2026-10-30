@@ -225,6 +225,17 @@ func _ready() -> void:
 	check(not sim.state.events.any(func(event): return event.type == &"bomber_explode"), "先に倒した自爆敵は爆発音を鳴らさない")
 	session.free()
 	hud.free()
+	for player in AudioManager._players: player.stop()
+	for i in 10: AudioManager.play(&"bomber_explode", -12.0)
+	var active_blasts := AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"bomber_explode")
+	check(active_blasts.size() == 2, "同時自爆10体でも自爆音は2体分まで")
+	before = AudioManager._next
+	AudioManager.play(&"bomber_explode", -12.0)
+	check(AudioManager._next == before, "再生中の自爆音が2音なら追加音を抑える")
+	active_blasts[0].stop()
+	AudioManager.play(&"bomber_explode", -12.0)
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "自爆音の終了後は次の自爆を再生できる")
+	for player in AudioManager._players: player.stop()
 	var map := preload("res://scripts/ui/constellation_map.gd").new()
 	map.navigation_enabled = false
 	before = AudioManager._next
