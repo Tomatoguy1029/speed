@@ -72,11 +72,17 @@ func compare_population(comparison) -> void:
 		core.remove_enemy(run.enemies.table.id[row])
 		run.enemies.mark_dead(row)
 	run.enemies.cleanup()
+	var held_row := -1
 	for i in 3:
-		run.enemies.spawn(chase, center + Vector2(2000,i*100))
-		core.spawn_enemy(chase.id, center + Vector2(2000,i*100))
+		var row := run.enemies.spawn(chase, center + Vector2(2000,i*100))
+		var id: int = core.spawn_enemy(chase.id, center + Vector2(2000,i*100))
+		if i == 0:
+			held_row = row
+			run.enemies.table.held[row] = 1
+			check(core.set_enemy_motion(id,{"held":true}),"捕捉中の再配置条件を作る")
 	for target in [5.0, 100.0, 0.0]:
 		var expected := run.spawn._survey_rows(target)
+		check(run.enemies.table.pos[held_row] == center + Vector2(2000,0),"捕捉中の遠方個体は元の位置に残る")
 		check(core.survey_population(target) == expected, "地域の上限と再配置後の有効人数が一致する")
 		var snapshot := {"raw": run.spawn._survey_raw, "edges": Array(run.spawn._edge_counts), "type_counts": run.spawn._type_counts, "per_type": run.spawn._zako_counts}
 		var difference: String = comparison.difference(comparison.plain(snapshot), comparison.plain(core.population_snapshot()))

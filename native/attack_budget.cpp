@@ -191,7 +191,7 @@ bool SpeedRunCore::advance_attack_budget(double at) {
     std::vector<StringName> cancelled;
     for (const auto &entry : budget.waiting) {
         const auto found = rows_by_id.find(entry.value.id);
-        if (found == rows_by_id.end() || found->second != entry.value.row || enemies[entry.value.row].dead) cancelled.push_back(entry.key);
+        if (found == rows_by_id.end() || found->second != entry.value.row || enemies[entry.value.row].dead || enemies[entry.value.row].stone > 0 || enemies[entry.value.row].knock_t > 0 || enemies[entry.value.row].shove_time > 0) cancelled.push_back(entry.key);
     }
     for (const auto &owner : cancelled) budget.waiting.erase(owner);
     return true;

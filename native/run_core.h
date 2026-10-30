@@ -32,6 +32,9 @@ class SpeedRunCore : public RefCounted {
         double facing = 0.0, age = 0.0, fire_t = 0.0;
         bool alive = false, dead = false, elite = false;
         double hit_cd = 0, flash = 0;
+        double stone = 0, knock_t = 0, shove_time = 0;
+        Vector2 shove_vel, shove_from;
+        bool held = false, slash_hold = false, shoved = false;
         int64_t dash_seen = -1;
         bool dash_fresh = false;
     };
@@ -241,6 +244,7 @@ class SpeedRunCore : public RefCounted {
     void step_death(double real_dt);
     bool controls_locked = false, encounter_protected = false, steering_locked = false;
     bool invincible = false, hitstop_enabled = true;
+    void update_pushed(Enemy &enemy, double dt);
     void advance_enemies(double delta);
     int64_t ticks = 0;
 protected:
@@ -259,6 +263,8 @@ public:
     bool set_attack_guard(bool active, double until);
     bool request_attack(StringName owner, const PackedStringArray &categories, int64_t id, double duration, double priority, double cost);
     Dictionary attack_budget_snapshot() const;
+    bool set_enemy_motion(int64_t id, const Dictionary &state);
+    Array enemy_motion_snapshot() const;
     bool configure_population(const Dictionary &config);
     bool configure_clips(const Dictionary &data);
     bool step_clips();

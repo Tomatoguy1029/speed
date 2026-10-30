@@ -94,8 +94,9 @@ double SpeedRunCore::survey_population(double target) {
         effective += count * keep;
         for (size_t type = 0; type < definitions.size(); ++type) p.effective[type] += p.region_types[region * definitions.size() + type] * keep;
     }
-    // 代表経路の追跡・盾は、群れ・親子・牽引のない通常個体として再配置する。
+    // 捕捉中の個体は位置も乱数も進めず、所有者の操作を保持する。
     for (size_t row : p.far_rows) {
+        if (enemies[row].held) continue;
         const Variant sampled = population_spawn_point(0.0);
         if (sampled.get_type() != Variant::VECTOR2) continue;
         auto &enemy = enemies[row];

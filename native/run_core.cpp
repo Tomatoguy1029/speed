@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_enemy_motion", "id", "state"), &SpeedRunCore::set_enemy_motion);
+    ClassDB::bind_method(D_METHOD("enemy_motion_snapshot"), &SpeedRunCore::enemy_motion_snapshot);
     ClassDB::bind_method(D_METHOD("set_attack_budget_mode", "enabled", "from_stage"), &SpeedRunCore::set_attack_budget_mode);
     ClassDB::bind_method(D_METHOD("advance_attack_budget", "at"), &SpeedRunCore::advance_attack_budget);
     ClassDB::bind_method(D_METHOD("cancel_attack_wait", "owner", "id"), &SpeedRunCore::cancel_attack_wait, DEFVAL(-1));
@@ -122,14 +124,17 @@ void SpeedRunCore::advance_enemies(double delta) {
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
     for (const auto &rows : behavior_rows) for (size_t row : rows) {
         auto &enemy = enemies[row];
-        if (enemy.dead) continue;
+        if (enemy.dead || enemy.held) continue;
+        if (enemy.stone > 0) { enemy.stone -= delta; enemy.vel = Vector2(); continue; }
         if (enemy.hit_cd > 0) enemy.hit_cd -= delta;
         if (enemy.flash > 0) enemy.flash -= delta;
         enemy.age += delta;
+        const auto &def = definitions[enemy.definition];
+        if (def.kind != speed::EnemyDefinition::Kind::Chase && enemy.slash_hold) { enemy.vel = Vector2(); continue; }
+        if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
         const Vector2 relative = enemy.pos - view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (!far || (enemy.id + ticks) % 3 == 0) {
-            const auto &def = definitions[enemy.definition];
             if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
                 enemy.fire_t = std::max(0.0, enemy.fire_t - bdt);
@@ -330,7 +335,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     for (int i = 0; i < keys.size(); ++i) {
         if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return -1;
         const String key = keys[i];
-        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed") return -1;
+        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed" && key != "knock") return -1;
     }
     if (options.has("elite") && options["elite"].get_type() != Variant::BOOL) return -1;
     enemy.elite = options.get("elite", false);
@@ -342,6 +347,11 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     if (options.has("vel")) {
         if (options["vel"].get_type() != Variant::VECTOR2 || !Vector2(options["vel"]).is_finite()) return -1;
         enemy.vel = options["vel"];
+    }
+    if (options.has("knock")) {
+        const Variant value = options["knock"];
+        if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return -1;
+        enemy.knock_t = value;
     }
     enemy.definition = definition;
     enemy.pos = position;
