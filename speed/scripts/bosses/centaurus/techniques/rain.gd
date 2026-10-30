@@ -196,10 +196,11 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 			if not trace.hit and land > float(trace.landed):
 				var a := host.trace_point(trace, trace.landed)
 				var b := host.trace_point(trace, land)
+				host.combat_trace.evaluate()
 				var ship := host.run_state.ship_pos
 				if Geometry2D.get_closest_point_to_segment(ship, a, b).distance_to(ship) <= radius + host.ctx.cfg.ship_radius:
 					trace.hit = true
-					host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
+					host.combat_trace.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
 			trace.landed = land
 			if land < length: all_landed = false
 		var expire := fall + float(r.linger) + host.RAIN_OUT

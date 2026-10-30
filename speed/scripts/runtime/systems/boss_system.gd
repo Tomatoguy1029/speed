@@ -169,7 +169,7 @@ func remove_actor(owner: BossActor) -> void:
 		return
 	if owner.has_body():
 		enemies.mark_dead(owner.body)
-	owner.combat_trace.finish("interrupted", "actor_removed")
+	owner.finish_combat_observations("interrupted", "actor_removed")
 	owner.registered = false
 	owner.hit_feedback.clear()
 	actors.erase(owner)

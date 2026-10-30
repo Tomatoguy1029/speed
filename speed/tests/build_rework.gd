@@ -14,6 +14,7 @@ func _ready() -> void:
 	_test_discovery()
 	_test_shooting()
 	_test_one_shot()
+	_test_hull_kill_exclusion()
 	_test_barrier()
 	_test_distance()
 	_test_endpoint()
@@ -98,7 +99,7 @@ func _test_one_shot() -> void:
 		t.hp[i] = 8.0
 		var before := run.projectiles.friend_count()
 		run.combat.damage_enemy(i, 8.0, {"cause": cause})
-		_check(run.projectiles.friend_count() == before + 2, "全攻撃から8割の一撃で小さい敵も砕く")
+		_check(run.projectiles.friend_count() == before + (0 if cause == &"afterimage" else 2), "分身以外の8割の一撃で小さい敵も砕く")
 	var weak := _enemy(&"drifter", Vector2(200, 100))
 	t.max_hp[weak] = 10.0
 	t.hp[weak] = 7.99
@@ -235,5 +236,36 @@ func _test_hole_capture() -> void:
 	hole.on_end()
 	hole.tick(0.2, false)
 	_check(run.enemies.table.dead[victim] == 0 and run.enemies.table.hull_scattered[victim] == 0, "無敵の敵はエンドホールへ吸い込んだ扱いにしない")
+	_clear()
+	run.loadout.reset_loadout()
+
+func _test_hull_kill_exclusion() -> void:
+	_clear()
+	run.loadout.reset_loadout()
+	run.loadout.grant(&"weapon", &"W03", 5)
+	run.loadout.grant(&"weapon", &"W21", 1)
+	run.loadout.grant(&"trait", &"T33", 1)
+	var shatter = run.loadout.weapon_behaviors[&"W03"]
+	shatter.def = shatter.def.duplicate(true)
+	shatter.def.params.chance_by_level = [1.0, 1.0, 1.0, 1.0, 1.0]
+	var tow = run.loadout.weapon_behaviors[&"W21"]
+	var rampage = run.loadout.trait_behaviors[&"T33"]
+	var t := run.enemies.table
+	run.state.tracing = true
+	for cause in [&"shot", &"afterimage"]:
+		var i := _enemy(&"drifter", run.state.ship_pos + Vector2(30, 0))
+		var kills := run.state.kills
+		var count: int = tow.cargo.size()
+		var triggered: int = rampage.kills
+		run.combat.kill_enemy(i, {"cause": cause, "one_shot": true})
+		_check(run.projectiles.debris_count() == 0, "船体を使った撃破では星砕きが発動しない")
+		_check(tow.cargo.size() == count + (0 if cause == &"afterimage" else 1), "分身の撃破では船体を牽引しない")
+		_check(rampage.kills == triggered + (0 if cause == &"afterimage" else 1), "牽引は撃破特性を保ち、分身の撃破は発動を抑える")
+		_check(run.state.kills == kills + 1 and t.dead[i] != 0, "どちらの撃破も撃破数へ加算する")
+	run.state.tracing = false
+	var i := _enemy(&"drifter", run.state.ship_pos)
+	t.hull_scattered[i] = 1
+	run.combat.kill_enemy(i, {"cause": &"vortex", "one_shot": true})
+	_check(run.projectiles.debris_count() == 2, "一時的なhull_scatteredだけでは星砕きを抑えない")
 	_clear()
 	run.loadout.reset_loadout()

@@ -7,7 +7,7 @@ signal seek_progress(value: float)
 
 const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const FORMAT := preload("res://gyms/enemy_lab/lab_io.gd")
-const DT := 1.0 / 60.0
+const DT := 1.0 / 120.0
 
 var scene: RunSession
 var run: RunSimulation
@@ -465,7 +465,7 @@ func _apply(kind: String, args: Dictionary) -> void:
 				points.append(vector(p))
 			if points.size() >= 2:
 				_route_play = {"points": points, "n": 0,
-					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, 1800)}
+					"frames": clampi(ceili(maxf(float(args.get("draw_seconds", 0.5)), run.cfg.draw_confirm_delay) / DT), 1, roundi(30.0 / DT))}
 		"field":
 			_add_field(String(args.get("kind", "")), vector(args.get("pos", [0, 0])), float(args.get("radius", 0)))
 		"pin":

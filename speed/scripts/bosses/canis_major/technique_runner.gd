@@ -61,6 +61,7 @@ func end_attack(host: CanisMajorBoss) -> void:
 	host._cue(&"recovery_started")
 
 func _ship_touches(host: CanisMajorBoss, from: Vector2, to: Vector2, radius: float) -> bool:
+	host.combat_trace.evaluate()
 	var reach := radius + host.ctx.cfg.ship_radius
 	var ship := host.run_state.ship_pos
 	return Geometry2D.get_closest_point_to_segment(ship, from, to).distance_to(ship) <= reach \
@@ -68,7 +69,7 @@ func _ship_touches(host: CanisMajorBoss, from: Vector2, to: Vector2, radius: flo
 
 func _hit_ship(host: CanisMajorBoss, damage: float) -> void:
 	host.attack_hit = true
-	host.ctx.ship.damage(damage * host.ctx.cfg.atk_scale, 0.0, host.technique, &"canis_major")
+	host.combat_trace.damage(damage * host.ctx.cfg.atk_scale, 0.0, host.technique, &"canis_major")
 
 # ── 追跡と群れ ────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ func finish(host: CanisMajorBoss, recover: float) -> void:
 	host._cue(&"recovery_started")
 
 func begin_sequence(host: CanisMajorBoss, rows: Array, start: float, interval: float, warn: float) -> void:
+	host.combat_trace.stage("execute")
 	sequence.clear()
 	sequence_start = start
 	last_launch = start + maxf(0, rows.size() - 1) * interval + warn
@@ -160,7 +162,7 @@ func tick_lunges(host: CanisMajorBoss) -> void:
 			continue
 		if not shot.hit and _ship_touches(host, shot.from, host.table.pos[i], host.table.r[i]):
 			shot.hit = true
-			host.ctx.ship.damage(float(shot.damage) * host.ctx.cfg.atk_scale, 0.0, host.technique, &"canis_major")
+			host.combat_trace.damage(float(shot.damage) * host.ctx.cfg.atk_scale, 0.0, host.technique, &"canis_major")
 		shot.from = host.table.pos[i]
 		if host.clock >= float(shot.until):
 			if hounds != null: hounds.release_order(i)

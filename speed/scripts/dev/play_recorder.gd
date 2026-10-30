@@ -554,7 +554,7 @@ func _end(result: String) -> void:
 	# 表示用の待ち行列は消費せず、終了直前の未通知分だけ記録する。
 	_on_events(_run.state.events)
 	var s = _run.state
-	for actor in _run.bosses.actors: actor.combat_trace.finish("observation_end", "recording_end")
+	for actor in _run.bosses.actors: actor.finish_combat_observations("observation_end", "recording_end")
 	_run.projectiles.clear_combat_observations()
 	_flush_performance(_perf_last_us)
 	for id in _enemy_seen.keys():

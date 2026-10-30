@@ -73,6 +73,7 @@ const NECK_CHAIN := preload("res://scripts/bosses/hydra_neck.gd")
 class Neck:
 	## 首の種類（bite・vortex・debris・beam・thunder）
 	var kind: StringName
+	var combat_trace := preload("res://scripts/bosses/combat_trace.gd").new()
 	## 本体から見た付け根の向きと、今の首の向き・長さ
 	var base_angle := 0.0
 	var angle := 0.0
@@ -245,6 +246,16 @@ func _process(delta: float) -> void:
 	if final_strike_t >= 0.0 and run_state.phase != RunState.Phase.PLAY:
 		attack_field.modulate.a = move_toward(attack_field.modulate.a, 0.0, delta / maxf(0.01, ctx.cfg.death_freeze_time))
 
+func finish_combat_observations(step: String, reason: String) -> void:
+	super(step, reason)
+	for n in necks: n.combat_trace.finish(step, reason)
+
+## 通常攻撃は首ごと、大技は本体の行動として記録する。
+func combat_trace_for(row: int):
+	for n in necks:
+		if n.row == row and _normal_moves.has(n.mode): return n.combat_trace
+	return combat_trace
+
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0:
 		return
@@ -372,6 +383,7 @@ func _set_count(n: int) -> void:
 			neck = necks[k]
 		else:
 			neck = Neck.new()
+			neck.combat_trace.bind(self)
 			neck.kind = kinds[k]
 			neck.cd = float(def.params.attack_cd) * (0.5 + 0.5 * run_state.rng.randf())
 			necks.append(neck)
@@ -575,6 +587,9 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 		var cats: Array={&"bite":["dash"],&"vortex":["wave"],&"debris":["aimed"],&"beam":["beam"],&"thunder":["zone"]}[n.kind]
 		var cost: float=_normal_cost(attack)*maxf(0.0,table.attack_value[n.row])
 		if not director.request("neck:"+str(n.row_id),cats,n.row,n.row_id,4.0,table.attack_priority[n.row],cost):return false
+	n.combat_trace = preload("res://scripts/bosses/combat_trace.gd").new()
+	n.combat_trace.bind(self, attack)
+	n.combat_trace.begin(attack, combat_origin)
 	n.mode = attack
 	n.t = 0.0
 	n.locked = false
@@ -589,6 +604,7 @@ func start_normal(index: int, attack: StringName, internal_step := false) -> boo
 	return true
 
 func finish_normal(n: Neck) -> void:
+	n.combat_trace.finish()
 	var cooldown := float(move_params(n.mode).attack_cd)
 	var at := _head_pos(n)
 	_release_attack(n)
@@ -646,6 +662,7 @@ func _attack(neck: Neck, _k: int, dt: float) -> void:
 		&"tech_lunge":_north_step(neck,minf(1.0,neck.t/_north_duration),dt)
 
 func _end(neck: Neck, interrupted := false) -> void:
+	neck.combat_trace.finish("interrupted" if interrupted else "completed", "neck_stopped" if interrupted else "")
 	# 伸びた頭をその場に残し、攻めどきが終わってから通常の長さへ戻す。
 	if tech_kind(tech) == &"north" and neck.mode in [&"tech_lunge", &"tech_hold"]:
 		var offset := neck.strike_pos - _neck_base(neck)
@@ -710,6 +727,7 @@ func try_start_tech(attack: StringName, cooldown_scale: float, chosen: Array = [
 		participants=combo_heads({&"tornado": [&"vortex",&"debris"],&"debris_shatter": [&"debris",&"beam"],&"beam_pincer": [&"beam",&"beam"]}[tech_kind(attack)])
 		combo_wait=float(def.params.combo_cooldown)
 	if not chosen.is_empty(): participants.assign(chosen)
+	combat_trace.begin(attack, combat_origin)
 	tech = attack
 	special = _moves[attack].make_runner()
 	special.a = self
@@ -861,6 +879,7 @@ func tech_end() -> void:
 	recovery_t = float(move_params(tech).tech_recovery)
 	_cue(&"finished" if last_tech_result == &"finished" else &"interrupted")
 	_cue(&"recovery_started", tech, -1, {"duration": recovery_t})
+	combat_trace.finish("completed" if last_tech_result == &"finished" else "interrupted")
 	for neck in necks:
 		if String(neck.mode).begins_with("tech_") or String(neck.mode).begins_with("special_"):
 			_release_attack(neck)
@@ -974,6 +993,12 @@ func presentation_state() -> Dictionary:
 
 func _cue(cue: StringName, attack: StringName = &"", index := -1, details := {}) -> void:
 	if ctx == null or not has_body(): return
+	var trace = necks[index].combat_trace if index >= 0 and index < necks.size() and _normal_moves.has(necks[index].mode) else combat_trace
+	match cue:
+		&"warning_started": trace.stage("telegraph")
+		&"target_locked": trace.stage("lock")
+		&"attack_started": trace.execute()
+		&"recovery_started": trace.stage("recovery")
 	var anchor := presentation_anchor(index)
 	var head_id := necks[index].row_id if index >= 0 and index < necks.size() else (immortal_id if index == -2 else table.id[body])
 	presentation_event.emit({"cue": cue, "technique": attack if attack != &"" else tech,

@@ -131,6 +131,8 @@ func _stop_combat() -> void:
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	clock += dt
 	_update_path_hold(dt)
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
@@ -167,6 +169,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		recovery = maxf(0.0, recovery - dt)
 		table.vel[body] = Vector2.ZERO
 		if recovery <= 0.0:
+			combat_trace.finish()
 			mode = &"idle"
 			technique = &""
 	elif _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"] and mode in [&"windup", &"rain", &"shooting", &"strike", &"sail"]:
@@ -210,6 +213,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		table.charge[body] = clampf((clock - _runner.started_at) / maxf(float(rule().warn), 0.001), 0.0, 1.0)
 	_previous_ship = run_state.ship_pos
 	_sync_technique_visuals()
+	ctx.bosses.recording_actor = prior_observer
 	presentation_advanced.emit(dt)
 
 func rule() -> Dictionary:
@@ -290,10 +294,15 @@ func start_attack(attack: StringName) -> bool:
 	return true
 
 func _begin_technique(attack: StringName) -> void:
+	combat_trace.finish()
+	combat_trace.begin(attack, combat_origin)
 	technique = attack
 	_runner = _moves[attack].make_runner()
 	_support_runners[attack] = _runner
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	_begin_windup(rule(), _attack_length(attack, rule()))
+	ctx.bosses.recording_actor = prior_observer
 
 func _combo_parts(attack: StringName) -> Array[StringName]:
 	if attack == &"combo_shower_shot": return [&"shower_chase", &"power_shot"]
@@ -317,6 +326,7 @@ func attack_playing() -> bool:
 	return mode in [&"windup", &"shooting", &"strike", &"rain", &"sail", &"recovery", &"combo_gap"]
 
 func cancel_attack() -> void:
+	combat_trace.finish("interrupted", "cancelled")
 	_sail_guards(false)
 	combo_pending = &""
 	_support_runners.erase(technique)
@@ -487,6 +497,12 @@ func _move_body(step: Vector2, dt: float) -> void:
 	ctx.field.collide_enemy(body, from)
 
 func _cue(cue: StringName, position := Vector2.INF) -> void:
+	match cue:
+		&"telegraph", &"fan_windup", &"stomp_windup", &"sail_windup": combat_trace.stage("telegraph")
+		&"alert": combat_trace.stage("lock")
+		&"released", &"strike", &"rain_started", &"shower_launched", &"stomp", &"fan_released", &"sail_run": combat_trace.stage("execute")
+		&"recovery_started": combat_trace.stage("recovery")
+		&"phase_changed": combat_trace.event("boss_phase", {"reason": "hp_threshold"})
 	presentation_event.emit({"cue": cue, "technique": technique, "phase": phase, "mode": mode,
 		"position": table.pos[body] if position == Vector2.INF else position, "angle": table.facing[body], "world_time": clock})
 
