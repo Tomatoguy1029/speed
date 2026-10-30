@@ -96,20 +96,19 @@ static func scatter(seed: float, index: int) -> Vector2:
 ## 星と区別できる短く細い金色の光の粉。世界時間で進め、戦闘の乱数は消費しない。
 static func draw_powder(canvas: CanvasItem, center: Vector2, radius: float, age: float, strength: float, salt := 0.0) -> void:
 	var seed := center.x * 0.019 + center.y * 0.071 + salt
+	# 縮小表示でも背景の星より大きい粒を保つ。矢のような長い筋にはしない。
+	var pixel := maxf(1.0, 1.0 / maxf(canvas.get_canvas_transform().x.length(), 0.001))
 	for j in 7:
 		var q := fposmod(sin(j * 127.1 + seed) * 43758.5453, 1.0)
 		var u := fposmod(sin(j * 269.5 + seed + 3.0) * 21563.734, 1.0)
 		var cycle := fposmod(age * (0.8 + q * 0.5) + u, 1.0)
-		var blink := pow(maxf(0.0, sin(cycle * PI)), 3.0) * strength
+		var blink := pow(maxf(0.0, sin(cycle * PI)), 1.5) * strength
 		var at := center + scatter(seed, j) * radius * 0.85 - Vector2(0, (1.0 - cycle) * 26.0)
+		var size := (3.0 + q * 1.2) * pixel
+		# 金色の丸い芯と柔らかな光。短い尾だけで落下方向を示す。
 		if cycle < 0.72:
-			var tip := at - Vector2(0, 3.0 + q * 4.0)
-			canvas.draw_line(tip, at, Color(0.07, 0.04, 0.02, blink * 0.45), 2.4)
-			canvas.draw_line(tip, at, Color(1.0, 0.65, 0.2, blink * 0.3), 1.8)
-			canvas.draw_line(tip, at, Color(1.0, 0.8, 0.4, blink * 0.65), 0.8)
-		else:
-			var size := 0.8 + q * 0.6
-			canvas.draw_circle(at, size * 2.5, Color(GOLD, blink * 0.1))
-			canvas.draw_circle(at, size, Color(1.0, 0.8, 0.4, blink * 0.65))
-			if q > 0.7:
-				canvas.draw_line(at - Vector2(size * 2.2, 0), at + Vector2(size * 2.2, 0), Color(1.0, 0.8, 0.4, blink * 0.65), 1.2)
+			canvas.draw_line(at - Vector2(0, (4.0 + q * 2.0) * pixel), at, Color(1.0, 0.65, 0.18, blink * 0.5), 1.6 * pixel)
+		canvas.draw_circle(at, size * 1.6, Color(0.06, 0.03, 0.01, blink * 0.65))
+		canvas.draw_circle(at, size * 1.7, Color(GOLD, blink * 0.09))
+		canvas.draw_circle(at, size, Color(1.0, 0.67, 0.16, blink * 0.95))
+		canvas.draw_circle(at, size * 0.38, Color(1.0, 0.9, 0.55, blink))
