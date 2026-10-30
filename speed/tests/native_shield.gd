@@ -87,8 +87,10 @@ func compare_hits(comparison, mode: String) -> void:
 		core.drain_events()
 	var origin := run.state.ship_pos
 	var position := Vector2.ZERO if mode.ends_with("shots") or mode == "front_debris" else origin + (Vector2(40,0) if mode.begins_with("rear") else Vector2(0,40) if mode == "side_ram" else Vector2(-40,0))
+	run.state.events.clear()
 	run.enemies.spawn(definition, position)
 	core.spawn_enemy(&"shield", position)
+	check(comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events())).is_empty(), "強敵の出現を同じ個体IDで通知する")
 	run.combat.rebuild_grid()
 	core.rebuild_enemy_grid(run.cfg.grid_cell)
 	core.set_motion_context(run.state.ship_pos, run.state.view_center, run.state.view_half)

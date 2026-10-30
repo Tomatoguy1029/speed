@@ -221,6 +221,14 @@ bool SpeedRunCore::configure(const Dictionary &data) {
             if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
             def.color[k] = double(value);
         }
+        if (row.has("spawn")) {
+            if (row["spawn"].get_type() != Variant::DICTIONARY) return false;
+            const Dictionary source = row["spawn"];
+            const Variant rank = source.get("rank", Variant());
+            if ((rank.get_type() != Variant::INT && rank.get_type() != Variant::FLOAT) || !std::isfinite(double(rank)) || double(rank) < 0 || double(rank) > INT32_MAX || std::floor(double(rank)) != double(rank)) return false;
+            if (source.get("size_var", Variant()).get_type() != Variant::BOOL) return false;
+            def.rank = int64_t(rank); def.size_var = source["size_var"]; def.spawn_ready = true;
+        }
         if (row.has("scaling")) {
             if (row["scaling"].get_type() != Variant::DICTIONARY) return false;
             const Dictionary source = row["scaling"];
@@ -331,6 +339,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     enemy.alive = true;
     enemies[row] = enemy;
     rows_by_id[enemy.id] = row;
+    if (def.rank >= 3) { Dictionary event; event["id"] = enemy.id; event["enemy_type"] = def.id; emit_event("strong_spawn", event); }
     return enemy.id;
 }
 
