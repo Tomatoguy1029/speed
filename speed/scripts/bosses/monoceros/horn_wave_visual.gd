@@ -30,6 +30,3 @@ func _draw() -> void:
 	for ring: Dictionary in rings:
 		var t := clampf(float(ring.time) / 0.3, 0.0, 1.0)
 		draw_arc(_body_point(ring.center), lerpf(10.0, 60.0, t), 0.0, TAU, 32, Color(ENERGY, 1.0 - t), 3.0, false)
-	if actor.technique == technique_id and actor.mode in [&"windup", &"active"]:
-		var points := actor.horn_points()
-		draw_line(_body_point(points[0]), _body_point(points[1]), Color(ENERGY, float(actor._runner.glow_level)), 7.0, false)

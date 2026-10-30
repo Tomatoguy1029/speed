@@ -1,6 +1,5 @@
 ## 仮表示。正式は shader。斬撃の判定線と、表示専用の乱数で針状の光を描く。
 extends Node2D
-const ENERGY := preload("res://scripts/bosses/monoceros/technique_visual.gd").ENERGY
 @export var technique_id: StringName = &"sword_flash"
 var actor: MonocerosBoss
 var rng := RandomNumberGenerator.new()
@@ -48,6 +47,3 @@ func _draw() -> void:
 		var b := _body_point(line[1])
 		_needle(a, b, float(effect.width) * 1.6 * taper, Color(Color("#c9a6ff"), 1.0 - t * t))
 		_needle(a, b, float(effect.width) * 0.6 * taper, Color(Color.WHITE, 1.0 - t * t))
-	if actor.technique == technique_id and actor.mode in [&"windup", &"active"] and actor._runner.stage == &"aim":
-		var points := actor.horn_points()
-		draw_line(_body_point(points[0]), _body_point(points[1]), Color(ENERGY, float(actor._runner.glow_level)), 12.0, false)

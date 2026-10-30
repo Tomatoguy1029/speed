@@ -1,5 +1,6 @@
 ## 仮表示。正式は shader。槍の判定線を使い、光粒・輪・砕ける粒は表示だけで保持する。
 extends Node2D
+const HORN_LIGHT := preload("res://scripts/bosses/monoceros/technique_visual.gd").WARNING
 const ENERGY := preload("res://scripts/bosses/monoceros/technique_visual.gd").ENERGY
 @export var technique_id: StringName = &"lance"
 var actor: MonocerosBoss
@@ -83,7 +84,7 @@ func _draw() -> void:
 	# 判定線の先端が穂先。元の角先を引いて、表示だけ二重に伸ばさない。
 	var tip := points[1]
 	var horn_tip := tip - u * head
-	draw_line(_body_point(points[0]), _body_point(horn_tip), ENERGY, 12.0 + 28.0 * form, false)
+	draw_line(_body_point(points[0]), _body_point(horn_tip), HORN_LIGHT, 12.0 + 28.0 * form, false)
 	draw_line(_body_point(points[0]), _body_point(horn_tip), Color.WHITE, 7.0 + 5.0 * form, false)
 	var side := u.orthogonal() * 18.0 * form
-	draw_colored_polygon(PackedVector2Array([_body_point(tip), _body_point(horn_tip + side), _body_point(horn_tip - u * head * 0.35), _body_point(horn_tip - side)]), Color("#f6fcff"))
+	draw_colored_polygon(PackedVector2Array([_body_point(tip), _body_point(horn_tip + side), _body_point(horn_tip - u * head * 0.35), _body_point(horn_tip - side)]), HORN_LIGHT.lightened(0.8))

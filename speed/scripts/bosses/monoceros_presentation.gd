@@ -15,7 +15,6 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export_range(0.0, 30.0) var tail_turn_degrees := 18.0
 const PartsVisual = preload("res://scripts/bosses/monoceros_parts.gd")
 const WARNING := Color("#f2b567")
-const DANGER := Color("#ff667d")
 const ENERGY := Color("#9fe8ff")
 const REAR_LEGS := ["RearLeftLeg", "RearRightLeg"]
 ## 後ろ蹴りで畳んだ後脚の、付け根から蹄の付け根までの長さ（元絵の画素）
@@ -68,9 +67,8 @@ func _sync_parts(dt: float) -> void:
 	var k := actor.table.r[actor.body] / 96.0
 	parts.scale = Vector2.ONE * k
 	parts.apply_appearance(actor.def.part_appearance)
-	# 溜めの光は角の絵に乗せ、首の振りと外観の位置補正へ追従させる。
-	var sweep_windup := actor.technique == &"sweep" and actor.mode == &"windup"
-	var horn_glow := float(actor._runner_for().glow(actor)) if sweep_windup else 0.0
+	# 角を使う全技で同じ光を絵に乗せ、首の振りと外観の位置補正へ追従させる。
+	var horn_glow := _horn_glow()
 	var horn_light := 1.0 + horn_glow * 3.0
 	var horn_tint := Color(horn_light, horn_light, horn_light)
 	parts.get_node("Head/Lower/Sprite/head_gold_armor").self_modulate = horn_tint
@@ -102,9 +100,20 @@ func _sync_parts(dt: float) -> void:
 		leg.get_node("Foot").position.y = leg_pose.foot
 	var sword := parts.get_node("Head/Lower/SwordGlow") as Polygon2D
 	sword.visible = actor.phase == 2
+	sword.color = WARNING
 	sword.self_modulate = horn_tint
 	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
 	parts.get_node("Head/Lower/SwordGlow/Guard").visible = sword.visible
+
+## 技の進行から角の明るさだけを読む。攻撃中も溜めと同じ色で光らせる。
+func _horn_glow() -> float:
+	if actor.technique == &"kick" or actor.mode not in [&"windup", &"active"]: return 0.0
+	var runner := actor._runner_for()
+	# 槍は砕けた瞬間に消灯し、ほかの技は攻撃が終わるまで光を保つ。
+	if actor.technique == &"lance": return float(runner.glow(actor))
+	if actor.mode == &"active": return 1.0
+	if runner.sequenced(): return float(runner.glow(actor))
+	return clampf(actor.timeline.current_animation_position / maxf(float(actor.rule().warn), 0.001), 0.0, 1.0)
 
 func _update_turn(dt: float) -> void:
 	if dt <= 0.0: return
