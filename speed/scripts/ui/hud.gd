@@ -268,6 +268,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_banner_t = 99.0
 			&"levelup":
 				AudioManager.play(&"levelup", -6.0)
+			&"bolt":
+				AudioManager.play(&"contact_arc", -12.0)
 			&"kill":
 				if not ev.get("silent", false):
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))
@@ -280,8 +282,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"dash", -6.0)
 			&"trace_end":
 				AudioManager.end_dash()
-			&"bounce", &"block_impact":
-				AudioManager.play(&"block", -8.0)
+			&"block_impact":
+				AudioManager.play(&"bounce", -8.0)
 			&"shield_reflect":
 				AudioManager.play(&"block", -10.0, 1.8)
 			&"shield_stolen":
@@ -290,6 +292,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"block", -10.0, 1.3)
 			&"boss_explode":
 				AudioManager.play(&"boom")
+			&"bomber_explode":
+				AudioManager.play(&"bomber_explode", -12.0)
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:

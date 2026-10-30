@@ -80,7 +80,7 @@ func _ready() -> void:
 	AudioManager.stop_music(menu_screen)
 	old_screen.free()
 	menu_screen.free()
-	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"hurt", &"enemy_laser_charge", &"enemy_laser_fire"]:
+	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"hurt", &"bounce", &"contact_arc", &"enemy_laser_charge", &"enemy_laser_fire"]:
 		var stream := AudioManager._sounds.get(sound) as AudioStreamMP3
 		check(stream != null, "強化用MP3を読み込む: " + String(sound))
 		if stream != null: check(not stream.loop and stream.get_length() > 0.0, "強化音を一回再生できる: " + String(sound))
@@ -138,6 +138,40 @@ func _ready() -> void:
 	var before := AudioManager._next
 	hud._on_events([{ "type": &"weapon_fire", "id": &"W02" }])
 	check(AudioManager._next == before, "ほかの武器にブラスター音を追加しない")
+	hud._on_events([{ "type": &"block_impact" }, { "type": &"bounce" }])
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "衝撃と跳ね返りの組で音を二重に鳴らさない")
+	check(AudioManager._players[before].stream == AudioManager.sound(&"bounce"), "敵・鉄の瓦礫の衝撃に指定素材を使う")
+	before = AudioManager._next
+	hud._on_events([{ "type": &"block_impact" }])
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "低速で弾かれた衝撃でも1回鳴らす")
+	before = AudioManager._next
+	hud._on_events([{ "type": &"shield_block" }])
+	check(AudioManager._players[before].stream == AudioManager.sound(&"block"), "盾の防御音は既存素材を保つ")
+	before = AudioManager._next
+	hud._on_events([{ "type": &"bolt", "segments": PackedVector2Array([Vector2.ZERO, Vector2.ONE, Vector2.ONE, Vector2(2, 2)]) }])
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "枝分かれした放電でも雷SEは1回だけ鳴らす")
+	check(AudioManager._players[before].stream == AudioManager.sound(&"contact_arc"), "接触電撃に指定の雷素材を使う")
+	var explosion := AudioManager.sound(&"bomber_explode") as AudioStreamWAV
+	check(explosion != null and is_equal_approx(explosion.get_length(), 0.4), "自爆音を短い大砲音へ加工する")
+	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, false)
+	session.auto_step = false
+	var sim := session.sim
+	var enemies := sim.enemies
+	var row := enemies.spawn(enemies.def_of(&"bomber"), Vector2(200, 0))
+	enemies.table.mode[row] = EnemyTable.Mode.WINDUP
+	enemies.table.timer[row] = 0.01
+	sim.state.events.clear()
+	enemies.behaviors[enemies.table.beh[row]].step(row, 0.02)
+	var blasts: Array[Dictionary] = sim.state.events.filter(func(event): return event.type == &"bomber_explode")
+	check(blasts.size() == 1 and enemies.table.dead[row] != 0, "カウントダウン完了時にだけ自爆音を通知する")
+	before = AudioManager._next
+	hud._on_events(blasts)
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES and AudioManager._players[before].stream == explosion, "自爆時に大砲音を1回再生する")
+	row = enemies.spawn(enemies.def_of(&"bomber"), Vector2(300, 0))
+	sim.state.events.clear()
+	enemies.mark_dead(row)
+	check(not sim.state.events.any(func(event): return event.type == &"bomber_explode"), "先に倒した自爆敵は爆発音を鳴らさない")
+	session.free()
 	hud.free()
 	for player in AudioManager._players: player.stop()
 	await get_tree().process_frame
