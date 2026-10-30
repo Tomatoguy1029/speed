@@ -70,7 +70,8 @@ func sail_fraction() -> float:
 	var f := 1.0 - actor.phase_time / maxf(float(actor.def.params.phase_time), 0.001)
 	return 1.0 - pow(1.0 - clampf(f, 0.0, 1.0), 3.0)
 
-## 馬の背に、ほ座の帆を左右へ広げる。風を受けて後ろへふくらみ、四隅の星が瞬く。
+## 正式な帆の絵が追加されるまでの仮表示。素材が用意できたら差し替える。
+## 馬の背に帆を広げ、ふくらみと四隅の星で動きを確認する。
 func _draw_sail(open: float) -> void:
 	if open <= 0.0: return
 	var half := 84.0 * open
