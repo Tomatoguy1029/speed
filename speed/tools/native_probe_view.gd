@@ -4,6 +4,10 @@ var core: RefCounted
 var batch: InstanceBatch
 var gem_batch: InstanceBatch
 var coin_batch: InstanceBatch
+var shot_batch: InstanceBatch
+var cannon_texture: Texture2D
+var effect_clock := 0.0
+const SETTINGS := preload("res://data/visuals/effect_settings.tres")
 var camera: Camera2D
 var label: Label
 var ship_texture: Texture2D
@@ -26,7 +30,7 @@ func _ready() -> void:
 		if pair.size() == 2: options[pair[0]] = pair[1]
 	core = load("res://tools/compare_runtime.gd").new().create_native()
 	var data = JSON.parse_string(FileAccess.get_file_as_string("res://.content/dev/native_probe.json"))
-	if core == null or not data is Dictionary or not data.has("config"):
+	if core == null or not data is Dictionary or (not data.has("config") or not data.has("forward")):
 		push_error("比較用データと拡張を共通生成で準備してください")
 		get_tree().quit(1)
 		return
@@ -34,7 +38,7 @@ func _ready() -> void:
 	var stats := _base_stats()
 	if not (core.configure(data) and core.configure_ship(config, stats) and core.configure_draw(config, stats)
 		and core.configure_combat(config, stats) and core.configure_pickups(config, stats)
-		and core.configure_frame(config) and core.start(932)):
+		and core.configure_frame(config) and core.configure_forward(data.forward, int(options.get("level", "5")), float(config.character_scale)) and core.start(932)):
 		push_error("比較経路の準備に失敗しました")
 		get_tree().quit(1)
 		return
@@ -58,6 +62,18 @@ func _ready() -> void:
 	coin_batch.z_index = -1
 	coin_batch.setup_polygon(InstanceBatch.circle_points(24))
 	add_child(coin_batch)
+	shot_batch = InstanceBatch.new()
+	shot_batch.setup_shader_quad()
+	var shot_material := ShaderMaterial.new()
+	shot_material.shader = load("res://shaders/build_shot.gdshader")
+	shot_material.set_shader_parameter("style", 0)
+	shot_material.set_shader_parameter("tint", SETTINGS.tinted("weapon/forward", Color.WHITE))
+	for key in ["pixel_scale", "length_scale", "width_scale"]:
+		shot_material.set_shader_parameter(key, SETTINGS.number("weapon/forward", "shot_" + key if key != "pixel_scale" else key, 1.0))
+	shot_batch.material = shot_material
+	shot_batch.z_index = 1
+	add_child(shot_batch)
+	cannon_texture = load("res://assets/pixel/airship_canon.png")
 	ship_texture = load("res://assets/pixel/airship.png")
 	camera = Camera2D.new()
 	add_child(camera)
@@ -112,8 +128,9 @@ func _upload(target: InstanceBatch, buffer: PackedFloat32Array) -> int:
 	target.multimesh.buffer = buffer
 	return count
 
-func _process(_dt: float) -> void:
+func _process(dt: float) -> void:
 	if core == null or batch == null: return
+	effect_clock += dt
 	ship = core.ship_snapshot()
 	drawing = core.draw_snapshot()
 	camera.position = ship.ship_pos
@@ -122,7 +139,8 @@ func _process(_dt: float) -> void:
 	var view := Rect2(camera.position-size/2.0, size).grow(60.0)
 	_upload(gem_batch, core.pickup_buffer(&"gem", 5.0, Color("#b8a0ff"), view))
 	_upload(coin_batch, core.pickup_buffer(&"coin", 6.0, Color("#ffd24a"), view))
-	label.text = "C++の代表経路：移動・描線・接触・撃破・回収\n敵 %d ／ 撃破 %d ／ 回収XP %.1f\n装備・地形・成長・全演出は未接続。通常ステージの性能判定には使いません。" % [count, core.combat_snapshot().kills, collected_xp]
+	var shots := _upload(shot_batch, core.friendly_buffer(&"weapon/forward", 1.82 * character_scale, SETTINGS.number("weapon/forward", "effect_scale", 1.0), effect_clock))
+	label.text = "C++の代表経路：移動・描線・ブラスター・接触・撃破・回収\n敵 %d ／ 撃破 %d ／ 回収XP %.1f ／ 弾 %d\nほかの装備・地形・成長・全演出は未接続。通常ステージの性能判定には使いません。" % [count, core.combat_snapshot().kills, collected_xp, shots]
 	queue_redraw()
 	frames += 1
 	if (Time.get_ticks_usec()-started_us)/1000000.0 < float(options.get("seconds", "3")): return
@@ -131,7 +149,7 @@ func _process(_dt: float) -> void:
 	if options.has("capture") and DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(options.capture)
-	print("NATIVE_PROBE ", JSON.stringify({"enemies":count,"frames":frames,"ticks":core.inspect().ticks,"kills":core.combat_snapshot().kills,"collected_xp":collected_xp}))
+	print("NATIVE_PROBE ", JSON.stringify({"enemies":count,"frames":frames,"ticks":core.inspect().ticks,"kills":core.combat_snapshot().kills,"collected_xp":collected_xp,"shots":shots}))
 	core.close()
 	get_tree().quit()
 
@@ -141,5 +159,7 @@ func _draw() -> void:
 	if points.size() >= 2: draw_polyline(points, Color("#6dffb0"), 3.0)
 	var heading: Vector2 = ship.ship_heading
 	draw_set_transform(ship.ship_pos, heading.angle()+PI/2.0)
-	draw_texture_rect(ship_texture, Rect2(Vector2(-ship_texture.get_width()/2.0,-30.0)*character_scale,ship_texture.get_size()*character_scale), false)
+	var rect := Rect2(Vector2(-ship_texture.get_width()/2.0,-30.0)*character_scale,ship_texture.get_size()*character_scale)
+	draw_texture_rect(cannon_texture, rect, false, SETTINGS.tinted("weapon/forward", Color.WHITE))
+	draw_texture_rect(ship_texture, rect, false)
 	draw_set_transform(Vector2.ZERO)

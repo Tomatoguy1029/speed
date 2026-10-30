@@ -41,6 +41,9 @@ static func build_probe(path: String) -> Error:
 	data["config"] = {}
 	for key in PROBE_CONFIG_FIELDS: data.config[key] = config.get(key)
 	data.config["xp_bonus"] = 1.0
+	var weapon := load("res://data/weapons/W01_forward.tres") as WeaponDef
+	if weapon == null: return ERR_INVALID_DATA
+	data["forward"] = weapon.params.duplicate(true)
 	data["visual_scale"] = 1.0 / definition.visual_value("collision_scale", 1.0)
 	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	if error != OK: return error
