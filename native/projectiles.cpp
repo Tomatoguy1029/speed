@@ -5,6 +5,8 @@
 using namespace godot;
 
 size_t SpeedRunCore::add_friend(Friendly shot) {
+    ++live_friends;
+    if (shot.kind == 1) ++live_debris;
     size_t row;
     if (free_friends.empty()) { row = friends.size(); friends.push_back(std::move(shot)); }
     else { row = free_friends.back(); free_friends.pop_back(); friends[row] = std::move(shot); }
@@ -76,6 +78,10 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         double life = double(shot.life) - world_dt;
         shot.age = double(shot.age) + world_dt;
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
+        if (shot.kind == 1 && shot.visual != StringName("weapon/knockback")) {
+            shot.trail.append(to);
+            if (shot.trail.size() > projectile_config.trail_points) shot.trail.remove_at(0);
+        }
         const double padding = double(shot.radius) + std::max(combat_config.max_enemy_radius, grid.max_radius);
         const Vector2 pad(padding, padding);
         hits.clear();
@@ -93,13 +99,23 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
             const Vector2 impact = from.lerp(to, hit.time);
             shot.hit_ids.insert(enemy.id);
             damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock);
+            duplicate_friend(i, impact);
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
             event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
             emit_event("shot_hit", event);
             if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else life = 0; }
         }
         shot.pos = to; shot.life = life;
-        if (life <= 0) { shot.alive = false; free_friends.push_back(i); }
+        if (life <= 0) {
+            if (shot.kind == 1) {
+                --live_debris;
+                if (shot.visual != StringName("weapon/knockback") && shot.trail.size() > 1) {
+                    Dictionary ended; ended["points"] = shot.trail; ended["color"] = shot.color;
+                    emit_event("debris_trail", ended);
+                }
+            }
+            shot.alive = false; --live_friends; free_friends.push_back(i);
+        }
     }
     return true;
 }
@@ -113,7 +129,7 @@ Array SpeedRunCore::projectiles_snapshot() const {
         std::sort(sorted.begin(), sorted.end());
         Array ids; for (int64_t id : sorted) ids.append(id);
         Dictionary item;
-        item["row"] = int64_t(row); item["kind"] = shot.kind; item["pos"] = shot.pos; item["vel"] = shot.vel;
+        item["row"] = int64_t(row); item["kind"] = shot.kind; item["generation"] = shot.generation; item["pos"] = shot.pos; item["vel"] = shot.vel;
         item["radius"] = shot.radius; item["damage"] = shot.damage; item["life"] = shot.life; item["age"] = shot.age;
         item["pierce_left"] = shot.pierce_left; item["hit_ids"] = ids; item["angle"] = shot.angle; item["trail"] = shot.trail;
         out.append(item);

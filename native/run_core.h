@@ -121,6 +121,15 @@ class SpeedRunCore : public RefCounted {
     std::deque<Friendly> friends;
     std::vector<size_t> free_friends;
     size_t add_friend(Friendly shot);
+    void duplicate_friend(size_t source, Vector2 impact);
+    size_t live_friends = 0, live_debris = 0;
+    struct ProjectileConfig {
+        double debris_life = 0, debris_knock = 0;
+        int64_t trail_points = 0;
+        bool ready = false, split = false;
+        double chance = 0, damage = 1, angle_min = 0, angle_max = 0;
+        int64_t generations = 0, maximum = 0;
+    } projectile_config;
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -133,6 +142,8 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool configure_projectiles(const Dictionary &config, const Dictionary &split);
+    bool burst_debris(Vector2 position, int64_t count, double speed, double damage, Color color, int64_t source_id);
     bool fire_shot(Vector2 from, double angle, double damage, const Dictionary &options);
     bool step_projectiles(double world_dt);
     Array projectiles_snapshot() const;
