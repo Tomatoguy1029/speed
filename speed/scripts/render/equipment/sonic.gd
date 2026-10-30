@@ -42,6 +42,7 @@ func tick(_dt: float) -> void:
 		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		_rings.material = add
 		_rings.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		_rings.modulate = RenderPipeline.plain_color(rm._layers.fx)
 		rm._layers.fx.add_child(_rings)
 	_rings.begin()
 	p.begin()

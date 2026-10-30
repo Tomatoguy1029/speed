@@ -8,6 +8,7 @@ func begin_batch() -> void:
 		_painter = PixelPainter.new()
 		_painter.setup_painter(1.82 * rm.cfg.character_scale)
 		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		_painter.modulate = RenderPipeline.plain_color(rm._layers.projectiles)
 		rm._layers.projectiles.add_child(_painter)
 	_painter.begin()
 	super()

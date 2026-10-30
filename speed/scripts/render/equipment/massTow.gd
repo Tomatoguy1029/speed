@@ -51,6 +51,7 @@ func tick(_dt: float) -> void:
 		_under.setup_painter(p.px)
 		_under.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		_under.show_behind_parent = true
+		_under.modulate = RenderPipeline.plain_color(rm._layers.fx)
 		rm._layers.fx.add_child(_under)
 	p.begin()
 	_under.begin()
@@ -112,7 +113,7 @@ func _clump(p: PixelPainter) -> void:
 			var q := fposmod(state.world_time * 3.0 + k / 3.0 + j * 0.13, 1.0)
 			p.dot(h.pos.lerp(target, q), Color("#fff2c0"))
 
-## 撃った船体：焼けた輪（白→橙）と、後ろへ引くピクセルの炎。
+## 撃った船体：焼けた色と輪（白→橙）と、後ろへ引くピクセルの炎。
 func _hulls(p: PixelPainter, dt: float) -> void:
 	var pr: ProjectileSystem = behavior.ctx.projectiles
 	_trail_clock += dt
@@ -123,6 +124,15 @@ func _hulls(p: PixelPainter, dt: float) -> void:
 		var pos := pr.friend_pos[i]
 		var cells := pr.friend_r[i] / p.px
 		var hot := pr.friend_age[i]
+		# 焼けた色：白 → 薄い橙 → 橙。冷めても橙の網目を重ねたまま飛ぶ
+		var heat := Color(1, 1, 1, 0.85) if hot < 0.08 else Color("#ffd27a", 0.75) if hot < 0.18 else Color("#ff9a3c", 0.55)
+		var c := p.cell(pos).round()
+		var big := ceili(cells)
+		for y in range(-big, big + 1):
+			for x in range(-big, big + 1):
+				if x * x + y * y > cells * cells: continue
+				if hot >= 0.18 and (int(c.x) + x + int(c.y) + y) & 1: continue
+				p.fill(c.x + x, c.y + y, heat)
 		p.ring(pos, cells + (1.0 if hot < 0.18 else 0.0), Color.WHITE if hot < 0.18 else Color("#ffd27a"))
 		var u := pr.friend_vel[i].normalized()
 		for k in emit:

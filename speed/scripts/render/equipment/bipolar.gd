@@ -48,6 +48,7 @@ func _fire(ev: Dictionary) -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER
 	node.material = mat
+	node.modulate = RenderPipeline.plain_color(rm._layers.fx)
 	rm._layers.fx.add_child(node)
 	var width := 16.0 * float(ev.get("width_scale", 1.0))
 	var pad := Vector2.ONE * (width * 0.7 + 2.0) * px

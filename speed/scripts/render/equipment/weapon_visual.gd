@@ -42,14 +42,14 @@ func dispose() -> void:
 
 var _painter: PixelPainter
 var _world_time := -1.0
-## ドット単位の演出を描く束。初めて使うときに演出の層へ置く。
+## ドット単位の演出を描く束。初めて使うときに演出の層へ置く。演出の層の明るさ上げは打ち消し、試作の色で描く。
 func painter() -> PixelPainter:
 	if _painter == null:
 		_painter = PixelPainter.new()
 		_painter.setup_painter(1.82 * cfg.character_scale)
 		_painter.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		rm._layers.fx.add_child(_painter)
-	_painter.modulate = visual_color(Color.WHITE)
+	_painter.modulate = RenderPipeline.plain_color(rm._layers.fx, visual_color(Color.WHITE))
 	return _painter
 var _fires: FireBursts
 ## ドット単位の炎の爆発。初めて使うときに演出の層へ置く。進めるのは各表示の tick（fires().step）。
@@ -59,6 +59,7 @@ func fires() -> FireBursts:
 		_fires.setup(1.82 * cfg.character_scale)
 		_fires.key = _effect_key()
 		_fires.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
+		_fires.modulate = RenderPipeline.plain_color(rm._layers.fx)
 		rm._layers.fx.add_child(_fires)
 	return _fires
 ## 前回から進んだ世界秒。ヒットストップや停止の間は 0。

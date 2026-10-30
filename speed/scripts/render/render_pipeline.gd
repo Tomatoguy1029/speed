@@ -121,6 +121,11 @@ func add_ripple(pos: Vector2, radius: float, cell: float) -> void:
 	if _ripples.size() > 8:
 		_ripples.pop_front()
 
+## 光る層の明るさ上げ（modulate）を打ち消す色。試作どおりの色で描く演出は、この色を自分の modulate にする。
+static func plain_color(layer: CanvasItem, tint := Color.WHITE) -> Color:
+	var m := layer.modulate
+	return Color(tint.r / maxf(m.r, 0.001), tint.g / maxf(m.g, 0.001), tint.b / maxf(m.b, 0.001), tint.a)
+
 ## 震空の歪みの material（戦闘エフェクトツールの調整を当てる）。
 func ripple_material() -> ShaderMaterial:
 	return _ripple.material as ShaderMaterial
