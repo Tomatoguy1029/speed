@@ -49,7 +49,10 @@ func _sync_parts() -> void:
 		var leg := parts.get_node(legs[i]) as Node2D
 		leg.rotation = sin(gait + (0.0 if i == 0 or i == 3 else PI)) * (0.16 if moving else 0.015)
 	parts.get_node("Tail").rotation = sin(gait * 0.4) * 0.07
-	var charging: bool = actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false) or actor.technique_pose.get("bay", false) or actor.technique_pose.get("call", false)
+	# 仮の遠吠えポーズ。頭を上げ、口元の星へ光を集める。正式な動作素材は後で差し替える。
+	var howling: bool = actor.technique_pose.get("howl", false)
+	parts.get_node("Head").rotation = -0.45 * smoothstep(0.0, 0.65, actor.table.charge[actor.body]) if howling else 0.0
+	var charging: bool = howling or actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false) or actor.technique_pose.get("bay", false) or actor.technique_pose.get("call", false)
 	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), actor.table.charge[actor.body] if charging else 0.0, pulse)
 
 ## シリウスの輝きの強さ（0〜1）。第2形態への移行の間に強め、そのあとは強いまま。
