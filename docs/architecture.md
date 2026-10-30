@@ -20,7 +20,7 @@
 | 世界の時間と実時間を分けて扱う。描画中0.1倍、なぞり中は可変、ヒットストップで停止 | 仕様書 1・6 |
 | なぞり中、機体は0.5実秒で最大数千単位を移動する（1回の更新で大きく動く） | 仕様書 6.5 |
 | ほとんどの数値をプレイ中に調整パネルから変えられる | 仕様書 20 |
-| 武器・特性・敵は一覧の管理 ID（W01、T01、`drifter` など）で管理する | [catalog.md](game/catalog/rules.md) |
+| 武器・特性は固定の内部ID（W01、T03 など）で参照し、図鑑の表示番号は各一覧の並び順から付ける。敵はtype IDを使う | [一覧の運用ルール](game/catalog/rules.md) |
 | ストーリー（5ステージ）とエンドレスの2つのモードがある | 仕様書 2 |
 | ステージごとに、星系の広いフィールド・中ボス・フィールドの仕掛けが変わる | 仕様書 2〜22 |
 | 中ボスは複数の部位（うみへび座の首など）を持ちうる。画面より大きくなりうる | 仕様書 12.3 |
@@ -473,8 +473,8 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 
 | クラス | 中身 | 対応する一覧 |
 |---|---|---|
-| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
-| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
+| `WeaponDef` | 固定の内部ID（`W01`）、処理ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
+| `TraitDef` | 固定の内部ID（`T03`）、処理ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
 | `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](game/catalog/enemies.md) |
 | `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、攻撃の予算、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
