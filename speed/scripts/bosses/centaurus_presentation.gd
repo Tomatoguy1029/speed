@@ -48,7 +48,11 @@ func _advance(dt: float) -> void:
 	_parts.visible = actor.has_body()
 	if actor.has_body():
 		_parts.scale = Vector2.ONE * actor.table.r[actor.body] / 135.0
-		if actor.mode == &"leap": _parts.scale *= 1.0 + 0.25 * sin(PI * clampf(actor.leap_time / maxf(float(actor.def.params.leap_time), 0.001), 0.0, 1.0))
+		_parts.position = Vector2.ZERO
+		if actor.mode == &"leap":
+			var height := sin(PI * clampf(actor.leap_time / maxf(float(actor.def.params.leap_time), 0.001), 0.0, 1.0))
+			_parts.scale *= 1.0 + 0.12 * height
+			_parts.position = Vector2(0.0, -65.0 * height).rotated(-global_rotation)
 		_parts.set_bow_pose(actor.technique, actor.mode, actor.table.charge[actor.body], dt)
 	queue_redraw()
 

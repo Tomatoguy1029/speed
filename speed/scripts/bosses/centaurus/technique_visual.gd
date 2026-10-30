@@ -8,7 +8,7 @@ var actor: CentaurusBoss
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
-const RAIN_ANGLE := PI * 0.5 - 0.35
+const RAIN_VISUAL := preload("res://scripts/bosses/centaurus/additional_technique_visual.gd")
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_to(self)
 func update_technique() -> void:
@@ -40,7 +40,7 @@ func _draw() -> void:
 		draw_line(pull, pull + Vector2(length + 30.0, 0.0), glow, pixel_size * (3.0 if actor._runner_for().kind() == &"power_shot" else 1.5))
 	draw_set_transform(Vector2.ZERO)
 
-## まだ矢が着いていない帯を、円が走った跡として描く。矢は着弾点の上から降り、透明から不透明へ変わる。
+## まだ矢が着いていない帯を、円が走った跡として描く。矢は画面の上端の外から着弾点へ降る。
 func _draw_rain() -> void:
 	if actor == null or actor.mode != &"rain": return
 	var r := actor.rule()
@@ -72,22 +72,23 @@ func _draw_rain() -> void:
 		if head < length:
 			draw_arc(actor.trace_point(trace, head), radius, 0.0, TAU, 32, Color(WARNING, 0.95), pixel_size, true)
 	var fall := maxf(float(r.fall), 0.001)
-	var fade := maxf(float(r.fade), 0.001)
 	var linger := float(r.linger)
-	var down := Vector2.from_angle(RAIN_ANGLE)
 	for arrow in actor.rain_arrows:
 		var t := actor.clock - arrow.z
 		if t < 0.0: continue
 		var f := clampf(t / fall, 0.0, 1.0)
-		# 落ちるほど速く降り、不透明へはキリっと切り替わる。
-		var at := Vector2(arrow.x, arrow.y) - down * float(r.drop_height) * (1.0 - f * f)
-		var opacity := pow(clampf(t / fade, 0.0, 1.0), 3.0)
+		# 画面外から加速して降り、判定の発生時刻に着弾する。
+		var target := Vector2(arrow.x, arrow.y)
+		var origin := RAIN_VISUAL.fall_origin(self, target, float(r.drop_height))
+		var angle := (target - origin).angle()
+		var at := origin.lerp(target, f * f)
+		var opacity := clampf(t / maxf(minf(float(r.fade), 0.05), 0.001), 0.0, 1.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
 		var scene: PackedScene = r.get("shot_visual")
 		var shot_tint: Color = EFFECT_SETTINGS.values_for(scene.resource_path).get("effect_tint", Color.WHITE) if scene != null else Color.WHITE
 		var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
 		var mesh: Mesh = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight") if library != null and scene != null else null
 		var sprites: Array = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight_sprites", []) if library != null and scene != null else []
-		if mesh != null: draw_mesh(mesh, null, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity) * shot_tint)
-		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity) * shot_tint)
-		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity, shot_tint)
+		if mesh != null: draw_mesh(mesh, null, Transform2D(angle, Vector2.ONE * 2.5, 0.0, at), Color(1, 1, 1, opacity) * shot_tint)
+		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(angle, Vector2.ONE * 2.5, 0.0, at), Color(1, 1, 1, opacity) * shot_tint)
+		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, angle, 18.0, false, actor.clock, opacity, shot_tint, 150.0)

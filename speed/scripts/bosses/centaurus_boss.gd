@@ -24,7 +24,6 @@ var recovery := 0.0
 ## 強弓の発射直前の警告中か
 var alerting := false
 var cooldowns: Dictionary = {}
-var retreat_done := false
 var leap_ready_at := 0.0
 var leap_time := 0.0
 var leap_from := Vector2.ZERO
@@ -32,9 +31,7 @@ var leap_to := Vector2.ZERO
 var combo_pending: StringName = &""
 var combo_gap := 0.0
 var combo_wait := 0.0
-var retreat_time := 0.0
 var retreat_ready_at := 0.0
-var turn_time := 0.0
 ## 近くの守る雑魚の中心。足りなければ Vector2.INF
 var guard_point := Vector2.INF
 var turn_motion := 0.0
@@ -154,14 +151,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if phase_time <= 0.0: mode = &"idle"
 	elif mode == &"leap":
 		_leap_tick(dt)
-	elif mode == &"retreat":
-		if _leap_ready(): _begin_leap()
-		else: _retreat_tick(dt)
-	elif mode == &"turn":
-		turn_time -= dt
-		table.vel[body] = Vector2.ZERO
-		_face(run_state.enemy_aim, def.turn, dt)
-		if turn_time <= 0.0: mode = &"idle"
 	elif mode == &"combo_gap":
 		table.vel[body] = Vector2.ZERO
 		combo_wait -= dt
@@ -195,8 +184,6 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		else:
 			_refill_guards(dt)
 			_cooldown = maxf(0.0, _cooldown - dt)
-			var after_retreat := retreat_done
-			retreat_done = false
 			if _leap_ready():
 				_begin_leap()
 			elif _rear_ready():
@@ -204,10 +191,8 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 			elif _conditional_ready(&"stomp"):
 				start_attack(&"stomp")
-			elif clock >= retreat_ready_at and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.retreat_trigger):
+			elif clock >= retreat_ready_at and _rules.has(&"shower_wall") and clock >= float(cooldowns.get(&"shower_wall", 0.0)) and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.retreat_trigger):
 				_begin_retreat()
-			elif after_retreat and _conditional_ready(&"shower_wall"):
-				start_attack(&"shower_wall")
 			else:
 				_position_tick(dt)
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
@@ -422,27 +407,9 @@ func _rain_tick(dt: float) -> void:
 	_runner_id(&"rain")._rain_tick(self, dt)
 
 func _begin_retreat() -> void:
-	mode = &"retreat"
-	retreat_time = 0.0
-	_cue(&"retreat")
-
-## 機体から真っすぐ離れる。フィールドの外縁では縁に沿って走る。
-func _retreat_tick(dt: float) -> void:
-	retreat_time += dt
-	var at := table.pos[body]
-	var away := at - run_state.ship_pos
-	var direction := away.normalized() if away.length_squared() > 1.0 else -Vector2.from_angle(table.facing[body])
-	if at.length() > ctx.cfg.field_radius - 400.0 and direction.dot(at) > 0.0:
-		var along := direction.slide(at.normalized())
-		direction = along.normalized() if along.length_squared() > 0.01 else at.normalized().orthogonal()
-	_face(at + direction, def.turn * 2.0, dt)
-	_move_body(direction * float(param("run_speed")) * dt, dt)
-	if away.length() >= float(def.params.retreat_far) or retreat_time >= float(def.params.retreat_max):
-		mode = &"turn"
-		turn_time = float(def.params.retreat_turn)
-		retreat_ready_at = clock + turn_time + float(def.params.retreat_cd)
-		retreat_done = true
-		_cue(&"retreat_finished")
+	# 壁を作るための離脱も、自機を向いた短い後ろ跳びにそろえる。
+	retreat_ready_at = clock + float(def.params.leap_time) + float(def.params.retreat_cd)
+	_begin_leap()
 
 ## 好む距離を保つ。守る雑魚が近くに集まっていれば、機体から見てその集まりの側へ回る。
 ## 距離は好む範囲だけで決める（集まりの奥へ下がると、ボスの前へ並び直す雑魚を追って下がり続けるため）。
@@ -568,12 +535,12 @@ func _leap_ready() -> bool:
 func _begin_leap() -> void:
 	mode = &"leap"
 	leap_time = 0.0
+	table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
 	leap_from = table.pos[body]
 	var away := (leap_from - run_state.ship_pos).normalized()
 	if away == Vector2.ZERO: away = -Vector2.from_angle(table.facing[body])
 	leap_to = leap_from + away * float(def.params.leap_distance)
 	leap_ready_at = clock + float(def.params.leap_cd)
-	retreat_done = false
 	_cue(&"leap")
 
 func _leap_tick(dt: float) -> void:

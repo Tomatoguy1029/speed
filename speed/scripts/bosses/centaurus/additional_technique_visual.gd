@@ -46,11 +46,23 @@ func _draw_shower(r: Dictionary) -> void:
 			draw_circle(center, radius * lerpf(1.0, 0.15, k), Color(GOLD, lerpf(0.08, 0.35, k)))
 			if k >= 0.7:
 				for j in 3:
-					var at := center + Vector2((j - 1) * radius * 0.45, -70.0 * (1.0 - (k - 0.7) / 0.3))
-					ARROW.draw_arrow(self, at, PI * 0.5, 4.0, false, actor.clock, (k - 0.7) / 0.3)
+					var target := center + Vector2((j - 1) * radius * 0.45, 0.0)
+					_draw_falling_arrow(target, (k - 0.7) / 0.3)
 		else:
 			draw_circle(center, radius, Color(GOLD, 0.16))
 			for j in 3:
 				var fall := fposmod(active_age * 4.0 + j * 0.3, 1.0)
-				ARROW.draw_arrow(self, center + Vector2((j - 1) * radius * 0.45, -60.0 * (1.0 - fall)), PI * 0.5, 4.0, false, actor.clock, 0.8)
+				_draw_falling_arrow(center + Vector2((j - 1) * radius * 0.45, 0.0), fall)
 			if active_age < 0.3: draw_arc(center, radius * (0.5 + active_age * 2.3), 0.0, TAU, 24, Color(GOLD, 1.0 - active_age / 0.3), 2.0)
+
+func _draw_falling_arrow(target: Vector2, progress: float) -> void:
+	var origin := fall_origin(self, target)
+	ARROW.draw_arrow(self, origin.lerp(target, progress * progress), (target - origin).angle(), 18.0, false, actor.clock, 1.0, Color.WHITE, 150.0)
+
+## カメラの拡大率・移動・画面サイズに合わせ、画面上端の外を降下の始点にする。
+static func fall_origin(canvas: CanvasItem, target: Vector2, minimum_height := 0.0) -> Vector2:
+	var transform := canvas.get_canvas_transform()
+	var screen := transform * target
+	var origin := transform.affine_inverse() * Vector2(screen.x, -160.0)
+	var toward := (target - origin).normalized()
+	return target - toward * maxf(target.distance_to(origin), minimum_height)
