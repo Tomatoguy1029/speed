@@ -39,6 +39,19 @@ func _ready() -> void:
 			var difference: String = comparison.difference(expected.enemies, core.enemies_snapshot())
 			check(difference.is_empty(), "追跡と画面外の移動が一致する: " + difference)
 			check(str(run.state.rng.state) == core.inspect().rng_state, "乱数の消費が一致する")
+		if not core.has_method("enemy_buffer"):
+			check(false, "ネイティブ状態から表示用の一括データを作れる")
+		else:
+			var reference := InstanceBatch.new()
+			reference.begin()
+			var table := run.enemies.table
+			var scale := 1.0 / definition.visual_value("collision_scale", 1.0)
+			for i in table.alive.size():
+				if table.alive[i] != 0:
+					reference.add(table.pos[i], table.facing[i] + PI / 2.0, table.r[i] * scale, Color(0, 0, 0, 1))
+			var buffer: PackedFloat32Array = core.enemy_buffer(&"drifter", scale, PI / 2.0)
+			check(buffer == reference._buf.slice(0, run.enemies.count() * InstanceBatch.STRIDE), "表示用の位置・回転・大きさ・色が本番の一括描画と一致する")
+			reference.free()
 		var old_id: int = run.enemies.table.id[0]
 		run.enemies.mark_dead(0)
 		run.enemies.cleanup()

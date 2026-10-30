@@ -4,6 +4,7 @@
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <unordered_map>
 
 namespace godot {
@@ -38,6 +39,7 @@ public:
     int64_t spawn_enemy(StringName type, Vector2 position);
     bool remove_enemy(int64_t id);
     Array enemies_snapshot() const;
+    PackedFloat32Array enemy_buffer(StringName type, double scale, double angle_offset) const;
     bool step(double delta);
     void close();
     Dictionary inspect() const;

@@ -12,6 +12,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position"), &SpeedRunCore::spawn_enemy);
     ClassDB::bind_method(D_METHOD("remove_enemy", "id"), &SpeedRunCore::remove_enemy);
     ClassDB::bind_method(D_METHOD("enemies_snapshot"), &SpeedRunCore::enemies_snapshot);
+    ClassDB::bind_method(D_METHOD("enemy_buffer", "type", "scale", "angle_offset"), &SpeedRunCore::enemy_buffer);
     ClassDB::bind_method(D_METHOD("close"), &SpeedRunCore::close);
     ClassDB::bind_method(D_METHOD("inspect"), &SpeedRunCore::inspect);
 }
@@ -167,4 +168,25 @@ Array SpeedRunCore::enemies_snapshot() const {
         }
     }
     return out;
+}
+
+// 最新の所有状態から2D変換8値と表示色4値をまとめて渡す。
+PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, double angle_offset) const {
+    PackedFloat32Array buffer;
+    if (!started || closed || !std::isfinite(scale) || scale <= 0 || !std::isfinite(angle_offset)) return buffer;
+    int64_t count = 0;
+    for (const auto &enemy : enemies) if (enemy.alive && definitions[enemy.definition].id == type) ++count;
+    buffer.resize(count * 12);
+    float *out = buffer.ptrw();
+    int64_t index = 0;
+    for (const auto &enemy : enemies) {
+        if (!enemy.alive || definitions[enemy.definition].id != type) continue;
+        const double radius = definitions[enemy.definition].radius * scale;
+        const double angle = enemy.facing + angle_offset;
+        const double c = std::cos(angle) * radius, s = std::sin(angle) * radius;
+        out[index++] = c; out[index++] = -s; out[index++] = 0; out[index++] = enemy.pos.x;
+        out[index++] = s; out[index++] = c; out[index++] = 0; out[index++] = enemy.pos.y;
+        out[index++] = 0; out[index++] = 0; out[index++] = 0; out[index++] = 1;
+    }
+    return buffer;
 }
