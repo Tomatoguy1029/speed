@@ -18,11 +18,12 @@ func values(object: Object, keys: Array) -> Dictionary:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
-	if not probe.has_method("step_pickups"):
+	if not probe.has_method("step_frame"):
 		check(false, "撃破から報酬の生成までネイティブランが所有する")
 	else:
 		for mode in ["touch", "pierce", "bounce", "kill", "collect"]:
 			await compare_contacts(comparison, mode)
+		await compare_frames(comparison)
 	print("[native_combat] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 func compare_contacts(comparison, mode: String) -> void:
@@ -106,3 +107,58 @@ func pickup_snapshot(run: RunSimulation) -> Dictionary:
 	for i in p.coin_alive.size():
 		if p.coin_alive[i] != 0: coins.append({"pos": p.coin_pos[i], "pulled": p.coin_pulled[i] != 0})
 	return {"gems": gems, "coins": coins, "xp_dropped": run.state.xp_dropped}
+
+func compare_frames(comparison) -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"seed": 932, "empty": true})
+	var run: RunSimulation = lab.run
+	run.ship.setup(run.ship.ctx)
+	run.field.bodies.clear()
+	run.field.battle_arenas.clear()
+	var core = comparison.create_native()
+	var definition := run.enemies.def_of(&"drifter")
+	core.configure(DATA.compile_enemy(definition, run.cfg))
+	core.configure_ship(values(run.cfg, SHIP.CONFIG_KEYS), values(run.state.stats, SHIP.STAT_KEYS))
+	core.configure_draw(values(run.cfg, SHIP.DRAW_CONFIG), values(run.state.stats, SHIP.DRAW_STATS))
+	core.configure_combat(values(run.cfg, COMBAT_CONFIG), values(run.state.stats, COMBAT_STATS))
+	var config := values(run.cfg, PICKUP_CONFIG)
+	config.xp_bonus = run.spawn.current_phase().xp_bonus
+	core.configure_pickups(config, values(run.state.stats, ["xp_mult", "xp_pickup_radius", "pickup_radius", "pickup_speed_mult"]))
+	check(core.configure_frame({"world_tick_div": run.cfg.world_tick_div, "grid_cell": run.cfg.grid_cell, "trace_radius": run.cfg.trace_radius}), "更新順と世界時間の設定を渡す")
+	core.start(932, run.enemies._next_id, run.pickups._gem_next_seq)
+	run.state.rng.seed = 932
+	var origin := run.state.ship_pos
+	for offset in [Vector2(180, 0), Vector2(300, 0), Vector2(1200, 300)]:
+		run.enemies.spawn(definition, origin + offset)
+		core.spawn_enemy(&"drifter", origin + offset)
+	run.combat.rebuild_grid()
+	core.rebuild_enemy_grid(run.cfg.grid_cell)
+	var input := Intent.new()
+	run.input_source = func(): return input
+	var gained := 0.0
+	var saw_stop := false
+	for tick in 150:
+		var command := {"press": tick == 2, "touch": true, "has_cursor": tick <= 12, "pen_release": tick == 12, "pen": origin + Vector2(maxi(0, tick-2)*35, 0)}
+		for key in command: input.set(key, command[key])
+		var center := run.state.view_center
+		var half := run.state.view_half
+		var zoom := run.state.camera_zoom
+		run.state.events.clear()
+		run._play_tick(1.0/60.0)
+		check(core.step_frame(1.0/60.0, command, center, half, zoom), "所有状態を1回の呼出しで更新する")
+		for item in core.drain_collections():
+			if item.kind == "gem": gained += item.value * run.state.stats.xp_gain_mult
+		var difference: String = comparison.difference(comparison.snapshot(run, [], tick).enemies, core.enemies_snapshot())
+		if difference.is_empty(): difference = comparison.difference(comparison.plain(values(run.state, SHIP.STATE_KEYS)), comparison.plain(core.ship_snapshot()))
+		if difference.is_empty(): difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
+		check(difference.is_empty(), "描線→接触→撃破→回収の更新順が一致する tick=%d: %s" % [tick, difference])
+		check(core.inspect().time == run.state.time and core.inspect().world_time == run.state.world_time, "実時間と世界時間が一致する")
+		check(str(run.state.rng.state) == core.inspect().rng_state, "全更新を通した乱数消費が一致する")
+		check(gained == run.state.xp_gained, "全更新を通した回収量が一致する")
+		check(core.combat_snapshot().hitstop == run.state.hitstop, "停止の開始・消費が一致する")
+		saw_stop = saw_stop or run.state.hitstop > 0
+		if not difference.is_empty(): break
+	check(saw_stop and run.state.kills > 0 and gained > 0, "撃破・時間停止・回収を実際に通る")
+	core.close()
+	lab.free()

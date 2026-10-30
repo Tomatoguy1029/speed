@@ -103,7 +103,9 @@ bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &
     }
     const double r = ship.pos.length();
     const Vector2 accel = r <= c.field_radius ? Vector2() : -ship.pos / r * (c.boundary_push + (r - c.field_radius) * 4.0);
+    const Vector2 from = ship.pos;
     move_ship(world_dt, accel);
+    if (combat_ready) collide_ship(from, c.ship_radius);
     // 地形のない比較場面の外周。天体・固定囲いは地形の移行単位で接続する。
     const double radius = ship.pos.length(), wall = c.field_radius + 500.0;
     if (radius > wall) {

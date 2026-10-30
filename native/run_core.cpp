@@ -5,6 +5,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_frame", "config"), &SpeedRunCore::configure_frame);
+    ClassDB::bind_method(D_METHOD("step_frame", "real_dt", "input", "center", "half", "camera_zoom"), &SpeedRunCore::step_frame);
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
     ClassDB::bind_method(D_METHOD("configure_pickups", "config", "stats"), &SpeedRunCore::configure_pickups);
     ClassDB::bind_method(D_METHOD("pickups_snapshot"), &SpeedRunCore::pickups_snapshot);
@@ -38,6 +40,7 @@ void SpeedRunCore::_bind_methods() {
 bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) {
     if (started || closed || first_id <= 0 || first_gem_seq < 0) return false;
     if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
+    if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
     next_id = first_id;
     next_gem_seq = first_gem_seq;
     rng.instantiate();
@@ -50,6 +53,12 @@ bool SpeedRunCore::step(double delta) {
     if (!started || closed || !std::isfinite(delta) || delta <= 0.0 || !std::isfinite(time + delta)) return false;
     if (!rows_by_id.empty() && !motion_ready) return false;
     time += delta;
+    world_time += delta;
+    advance_enemies(delta);
+    return true;
+}
+
+void SpeedRunCore::advance_enemies(double delta) {
     ++ticks;
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
     for (auto &enemy : enemies) {
@@ -71,7 +80,6 @@ bool SpeedRunCore::step(double delta) {
         }
         enemy.pos += enemy.vel * delta;
     }
-    return true;
 }
 
 void SpeedRunCore::close() {
@@ -80,6 +88,7 @@ void SpeedRunCore::close() {
     enemies.clear();
     enemies.shrink_to_fit();
     free_rows.clear();
+    dead_rows.clear();
     rows_by_id.clear();
     definitions.clear();
     draw = Draw();
@@ -93,6 +102,8 @@ Dictionary SpeedRunCore::inspect() const {
     out["active"] = started && !closed;
     out["closed"] = closed;
     out["time"] = time;
+    out["world_time"] = world_time;
+    out["sim_time"] = sim_time;
     out["ticks"] = ticks;
     out["rng_state"] = rng.is_valid() ? String::num_int64(rng->get_state()) : String();
     return out;
@@ -215,4 +226,49 @@ PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, dou
         out[index++] = 0; out[index++] = 0; out[index++] = 0; out[index++] = 1;
     }
     return buffer;
+}
+
+
+bool SpeedRunCore::configure_frame(const Dictionary &config) {
+    if (started || closed) return false;
+    double values[3];
+    const char *keys[] = {"world_tick_div", "grid_cell", "trace_radius"};
+    for (int i = 0; i < 3; ++i) {
+        if (!config.has(keys[i])) return false;
+        const Variant value = config[keys[i]];
+        if (value.get_type() != Variant::INT && value.get_type() != Variant::FLOAT) return false;
+        values[i] = double(value);
+        if (!std::isfinite(values[i]) || values[i] <= 0) return false;
+    }
+    if (std::floor(values[0]) != values[0] || values[0] > INT32_MAX) return false;
+    world_div = int64_t(values[0]); frame_grid_cell = values[1]; trace_radius = values[2]; frame_ready = true;
+    return true;
+}
+
+bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom) {
+    if (!started || closed || !frame_ready || !std::isfinite(real_dt) || real_dt <= 0 ||
+            !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0 || !std::isfinite(camera_zoom) || camera_zoom <= 0) return false;
+    for (const char *key : {"touch", "has_cursor", "stick_active", "press", "alt_press", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
+    for (const char *key : {"cursor", "stick", "pen"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
+    sim_time += real_dt;
+    view_center = center; view_half = half; motion_ready = true;
+    handle_draw(input, int64_t(std::round(sim_time * 1000.0)), camera_zoom);
+    if (hitstop > 0) { hitstop = std::max(0.0, hitstop - real_dt); return true; }
+    if (!draw.tracing && dash_stop > 0) dash_stop = std::max(0.0, dash_stop - real_dt * combat_config.kill_hitstop_regen);
+    step_draw(real_dt);
+    const double world_dt = real_dt * world_scale();
+    time += real_dt; world_time += world_dt;
+    world_accum += world_dt; ++world_steps;
+    const bool world_step = world_steps >= world_div;
+    const double accumulated = world_accum;
+    if (world_step) {
+        world_accum = 0; world_steps = 0;
+        advance_enemies(accumulated);
+        rebuild_enemy_grid(frame_grid_cell);
+    }
+    step_ship(real_dt, world_dt, input);
+    for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
+    dead_rows.clear();
+    if (world_step) step_pickups(accumulated);
+    return true;
 }

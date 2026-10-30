@@ -71,10 +71,10 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
         emit_event("text", text);
     }
     if (enemy.hp <= 0) {
-        enemy.dead = true; ++kills;
+        enemy.dead = true; dead_rows.push_back(row); ++kills;
         Dictionary killed;
         killed["pos"] = enemy.pos; killed["r"] = def.radius; killed["crit"] = crit;
-        killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = time;
+        killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = world_time;
         killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
         killed["elite"] = false; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
         emit_event("kill", killed);
@@ -96,14 +96,14 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     std::vector<Hit> hits;
     for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
         const auto &enemy = enemies[row];
-        if (enemy.hit_cd > 0) continue;
+        if (draw.tracing ? draw.inside.count(enemy.id) > 0 : enemy.hit_cd > 0) continue;
         const double t = segment_circle(from, to, enemy.pos, definitions[enemy.definition].radius + radius);
         if (t >= 0) hits.push_back({t, row});
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
     for (const auto &hit : hits) {
         auto &enemy = enemies[hit.row];
-        if (enemy.dead || enemy.hit_cd > 0) continue;
+        if (enemy.dead || (draw.tracing ? draw.inside.count(enemy.id) > 0 : enemy.hit_cd > 0)) continue;
         const auto &def = definitions[enemy.definition];
         const Vector2 position = from.lerp(to, hit.time);
         const double speed = ship.vel.length();
@@ -123,6 +123,16 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 emit_event("weak_impact", impact);
             }
             enemy.hit_cd = c.contact_cooldown;
+            if (draw.tracing) {
+                draw.inside[enemy.id] = hit.row;
+                const int64_t passes = ++draw.passes[enemy.id];
+                if (passes > 1) {
+                    Dictionary text; text["pos"] = enemy.pos + Vector2(def.radius, -def.radius - 16.0);
+                    text["text"] = String::utf8("×") + String::num_int64(passes);
+                    text["color"] = crit ? Color::html("ffe46b") : Color(1, 1, 1, 1);
+                    text["size"] = 22 + 4 * std::min(int64_t(5), passes); emit_event("text", text);
+                }
+            }
             if (!ship.glide && !draw.tracing) {
                 const double loss = enemy.dead ? (0.004 + def.radius * 0.0006) : (0.1 + def.radius * 0.002);
                 ship.vel *= 1.0 - std::min(0.6, loss);

@@ -26,7 +26,7 @@ class SpeedRunCore : public RefCounted {
         bool dash_fresh = false;
     };
     std::vector<Enemy> enemies;
-    std::vector<size_t> free_rows;
+    std::vector<size_t> free_rows, dead_rows;
     std::unordered_map<int64_t, size_t> rows_by_id;
     struct EnemyGrid {
         Vector2 origin;
@@ -59,6 +59,8 @@ class SpeedRunCore : public RefCounted {
         double speed = 0, rate = 0, seg_pos = 0, total = 0, progress = 0;
         bool drawing = false, started = false, blocked = false, full_charge = false, tracing = false;
         int64_t first_msec = 0, dash_id = 0, segment = 0;
+        std::unordered_map<int64_t, size_t> inside;
+        std::unordered_map<int64_t, int64_t> passes;
         PackedVector2Array points, path;
         PackedFloat32Array lengths;
     } draw;
@@ -104,7 +106,11 @@ class SpeedRunCore : public RefCounted {
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
-    double time = 0.0;
+    double time = 0.0, world_time = 0.0, sim_time = 0.0, world_accum = 0.0;
+    double frame_grid_cell = 160, trace_radius = 0;
+    int64_t world_div = 1, world_steps = 0;
+    bool frame_ready = false;
+    void advance_enemies(double delta);
     int64_t ticks = 0;
 protected:
     static void _bind_methods();
@@ -113,6 +119,8 @@ public:
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);
     Dictionary ship_snapshot() const;
+    bool configure_frame(const Dictionary &config);
+    bool step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom);
     bool configure_pickups(const Dictionary &config, const Dictionary &stats);
     Dictionary pickups_snapshot() const;
     bool step_pickups(double world_dt);

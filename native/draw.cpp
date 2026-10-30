@@ -42,6 +42,7 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     draw.length = 0;
     draw.points.clear();
     if (press) { draw.points.append(pen); draw.first_msec = clock_msec; }
+    emit_event("draw_start");
 }
 
 void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
@@ -102,6 +103,9 @@ void SpeedRunCore::commit_draw() {
     draw.seg_pos = 0;
     draw.drawing = false;
     draw.tracing = true;
+    draw.inside.clear(); draw.passes.clear(); dash_stop = 0;
+    Dictionary launch; launch["pos"] = ship.pos; launch["dir"] = dir; launch["gauge"] = draw.amount;
+    emit_event("launch", launch);
 }
 
 bool SpeedRunCore::handle_draw(const Dictionary &input, int64_t clock_msec, double camera_zoom) {
@@ -141,12 +145,17 @@ void SpeedRunCore::end_trace(bool completed) {
         ship.vel = direction * ship.glide_speed;
         ship.boost_t = draw_config.boost_duration;
     }
+    Dictionary event; event["completed"] = completed; emit_event("trace_end", event);
 }
 
 bool SpeedRunCore::step_draw(double real_dt) {
     if (!started || closed || !ship_ready || !draw_ready || !std::isfinite(real_dt) || real_dt < 0) return false;
     if (!draw.tracing) {
-        if (!draw.drawing) draw.gauge = std::min(1.0, draw.gauge + real_dt / (draw_config.charge_time * draw_config.capacity));
+        if (!draw.drawing) {
+            const double before = draw.gauge;
+            draw.gauge = std::min(1.0, draw.gauge + real_dt / (draw_config.charge_time * draw_config.capacity));
+            if (before < 1 && draw.gauge >= 1) emit_event("gauge_full");
+        }
         return true;
     }
     double dist = draw.rate * real_dt;
@@ -156,11 +165,19 @@ bool SpeedRunCore::step_draw(double real_dt) {
         if (length < 1e-6) { ++draw.segment; draw.seg_pos = 0; continue; }
         const Vector2 u = (b - a) / length;
         const double move = std::min(dist, length - draw.seg_pos);
+        const Vector2 from = ship.pos;
+        for (auto it = draw.inside.begin(); it != draw.inside.end();) {
+            const auto &enemy = enemies[it->second];
+            const double radius = definitions[enemy.definition].radius + trace_radius + 2.0;
+            if (!enemy.alive || enemy.dead || enemy.id != it->first || enemy.pos.distance_squared_to(from) > radius * radius) it = draw.inside.erase(it);
+            else ++it;
+        }
         draw.seg_pos += move;
         dist -= move;
         ship.pos = a + u * draw.seg_pos;
         ship.vel = u * draw.speed;
         ship.heading = u;
+        if (combat_ready && collide_ship(from, trace_radius)) { end_trace(false); return true; }
         const double speed = ship.vel.length();
         if (speed < draw.speed) draw.speed = speed;
         if (draw.seg_pos >= length - 1e-9) { ++draw.segment; draw.seg_pos = 0; }
