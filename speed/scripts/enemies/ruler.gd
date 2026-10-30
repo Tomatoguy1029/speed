@@ -33,6 +33,7 @@ func _ruler(i: int, dt: float) -> void:
 			if t.timer[i] <= 0.0:
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph)
+				state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})
 		EnemyTable.Mode.WINDUP:
 			_hold(i, dt)
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
@@ -42,6 +43,7 @@ func _ruler(i: int, dt: float) -> void:
 				projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.RAY
 				projectiles.hazard_block[h] = 1
 				projectiles.attach_hazard(h, i)
+				state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 				t.links[i] = PackedInt32Array([h])
 				t.charge[i] = 0.0
 				t.mode[i] = EnemyTable.Mode.RECOVER

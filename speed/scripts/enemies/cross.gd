@@ -20,6 +20,7 @@ func _cross(i: int, dt: float) -> void:
 			t.charge[i] = 1.0 - maxf(0.0, t.timer[i]) / float(p.telegraph)
 			if t.timer[i] <= 0.0:
 				t.charge[i] = 0.0
+				state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 				t.mode[i] = EnemyTable.Mode.RECOVER
 				t.timer[i] = float(p.beam_time) + float(p.rest)
 		EnemyTable.Mode.RECOVER:
@@ -44,4 +45,5 @@ func _cross(i: int, dt: float) -> void:
 					projectiles.attach_hazard(h, i)
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph)
+				state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})
 				t.facing[i] = 0.0

@@ -6,14 +6,14 @@
 
 | No. | 名称 | 発動・効果 | ルートへの影響 | 参照先 | 未決事項 |
 |---|---|---|---|---|---|
-| No.01 | ブラスター | 前方へ強い光弾を1発ずつ撃ち、Lvで威力・連射・貫通が伸びる | 移動の向きへ撃つ | `scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres` | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
+| No.01 | ブラスター | 前方へ強い光弾を1発ずつ撃ち、Lvで威力・連射・貫通が伸びる | 移動の向きへ撃つ | `scripts/weapons/forward.gd`、`data/weapons/W01_forward.tres`。短縮加工した共通のブラスター発射音を、同時発射弾数によらず射撃ごとに1回再生 | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.02 | スプレッドブラスター | 弱めの光弾を広い扇へ撃つ。Lvで威力・連射・弾数が伸びる | 群れを広い扇へ入れる | `scripts/weapons/scatter.gd`、`data/weapons/W02_scatter.tres` | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.03 | リアブラスター | 後方へ1発ずつ撃ち、ブラスターと同じ項目が伸びる | 逃げる向きに進みながら後ろを撃つ | `scripts/weapons/rear.gd`、`data/weapons/W23_rear.tres` | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.04 | ストライクウィング | 周回する編隊が近い敵へ向きを寄せ、時間差の2連射で弾を撃つ。各弾は命中済みの敵を個別に保持する | 近い敵を分担して撃つ | `scripts/weapons/interceptor.gd`、`data/weapons/W25_interceptor.tres` | 射撃の釣り合いは試遊待ち。英語・素材は確認待ち |
 | No.05 | エスコートウィング | ブーストでV字の編隊を展開し、横の敵を貫く。編隊は同じブーストで各敵に一度だけ追加直撃する | 群れの中央を通り左右も掃く | `scripts/weapons/dashRangeDrone.gd`、`data/weapons/W26_dashRangeDrone.tres` | 英語・素材・見た目は確認待ち |
 | No.06 | 震空 | 高速で触れた位置から空間の歪みを広げる。先頭で押し運んだ敵へ、先頭が抜けたところで威力を与える | 密集した群れを通る | `scripts/weapons/contactWave.gd`、`data/weapons/W04_contactWave.tres` | 英語・素材・見た目は確認待ち |
 | No.07 | ソニックブーム | ブーストとそのあとの勢いの間、移動した距離ごとに音の輪が一斉に強く光る。後方の輪が重なる円錐のふちへ当たり、横へ押してから遅れて威力を与える。同じ敵には勢いを含むブーストごとに一度当たる | 長く群れを通り、進路の横を掃く | `scripts/weapons/sonic.gd`、`data/weapons/W08_sonic.tres` | 英語・素材・見た目は確認待ち |
-| No.08 | アークフィールド | 普段・高速の接触から周囲の敵へ黄の雷を枝分かれさせる。枝で追加対象枠を共有し、同じ敵には放電ごとに一度当たる。隕石を除く | 群れへ踏み込んで周囲へ雷を広げる | `scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres` | 英語・素材・見た目は確認待ち |
+| No.08 | アークフィールド | 普段・高速の接触から周囲の敵へ黄の雷を枝分かれさせる。枝で追加対象枠を共有し、同じ敵には放電ごとに一度当たる。隕石を除く | 群れへ踏み込んで周囲へ雷を広げる | `scripts/weapons/contactArc.gd`、`data/weapons/W17_contactArc.tres`。レベルアップ後も再発動待ちを維持し、接触電撃のSEは停止する | 英語・素材・見た目は確認待ち |
 | No.09 | ミラージュ | 光の分身が実際のブースト経路を時間差でなぞり、通常の体当たりの威力を機数で分けて追撃する | 抜けた線へ分身を続けて通す | `scripts/weapons/afterimage.gd`、`data/weapons/W27_afterimage.tres` | 英語・素材・見た目は確認待ち |
 | No.10 | 星砕き | 全攻撃で、とどめの一撃が敵の最大HPの規定割合以上なら、確率で星屑へ砕く。星の数で破片数が増え、同時数の上限で新しい破片を絞る | 一撃で倒せる敵を群れへ向けて砕く | `scripts/weapons/knockback.gd`、`data/weapons/W03_knockback.tres` | 英語・素材・見た目は確認待ち。破片の基準威力は未決（`config.hull_debris_damage` を仮設定） |
 | No.11 | 閃光斬 | ブーストの体当たりで敵へ印を付け、ボス以外を止める。ブーストが終わると始点から順に斬る。合計威力は体当たりの威力に倍率を掛け、本数で割る。装甲でダメージが出ない接触は攻撃力を基準にする | 硬い敵へ当てて斬撃で追撃する | `scripts/weapons/flashSlash.gd`、`data/weapons/W28_flashSlash.tres` | 英語・素材・見た目は確認待ち |

@@ -24,7 +24,10 @@ func _aquarius(i: int, dt: float) -> void:
 				_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), 2.0, dt)
 			else:
 				_hold(i, dt)
+			var before := t.timer[i]
 			t.timer[i] -= dt
+			if before > beam_time and t.timer[i] <= beam_time:
+				state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 			t.charge[i] = clampf(1.0 - (t.timer[i] - beam_time) / float(p.telegraph), 0.0, 1.0)
 			if t.timer[i] <= 0.0:
 				t.charge[i] = 0.0
@@ -61,3 +64,4 @@ func _aquarius(i: int, dt: float) -> void:
 					projectiles.attach_hazard(h, i)
 				t.mode[i] = EnemyTable.Mode.WINDUP
 				t.timer[i] = float(p.telegraph) + float(p.beam_time)
+				state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})

@@ -22,6 +22,7 @@ func _beamer(i: int, dt: float) -> void:
 			t.facing[i] = a
 			t.mode[i] = EnemyTable.Mode.WINDUP
 			t.timer[i] = float(p.telegraph) + float(p.beam_time)
+			state.emit(&"enemy_laser_charge", {"id": t.id[i], "row": i})
 			var beams := PackedInt32Array()
 			if p.get("cross", false):
 				# みなみじゅうじ座：十字のレーザー
@@ -36,7 +37,10 @@ func _beamer(i: int, dt: float) -> void:
 					projectiles.hazard_style[h] = ProjectileSystem.HazardStyle.GUIDE
 					projectiles.attach_hazard(h, i)
 		return
+	var before := t.timer[i]
 	t.timer[i] -= dt
+	if before > float(p.beam_time) and t.timer[i] <= float(p.beam_time):
+		state.emit(&"enemy_laser_fire", {"id": t.id[i]})
 	# charge は砲口に光が集まる進み（0〜1）。撃っている間は 1
 	t.charge[i] = clampf(1.0 - (t.timer[i] - float(p.beam_time)) / float(p.telegraph), 0.0, 1.0)
 	if t.timer[i] <= 0.0:

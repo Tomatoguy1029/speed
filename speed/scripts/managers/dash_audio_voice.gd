@@ -14,7 +14,7 @@ func start(sounds: Dictionary, volume_db: float, pitch: float) -> void:
 	attack.play()
 func _player(stream: AudioStream, volume: float, pitch: float) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.bus = &"SFX"
+	player.bus = &"Dash"
 	player.stream = stream
 	player.volume_db = volume
 	player.pitch_scale = pitch
@@ -24,10 +24,16 @@ func finish() -> void:
 	if ending: return
 	ending = true
 	release.play()
+	var duration := release.stream.get_length() / release.pitch_scale
+	var tail_fade := minf(0.2, duration * 0.4)
+	var tail := create_tween().set_ignore_time_scale(true)
+	tail.tween_interval(maxf(0.0, duration - tail_fade))
+	tail.tween_property(release, "volume_linear", 0.0, tail_fade)
 	if sustain.playing:
 		_fade_done = false
-		var fade := create_tween()
-		fade.tween_property(sustain, "volume_db", -80.0, 0.025)
+		var fade := create_tween().set_ignore_time_scale(true)
+		var fade_seconds := minf(0.12, sustain.stream.get_length() / sustain.pitch_scale * 0.25)
+		fade.tween_property(sustain, "volume_linear", 0.0, fade_seconds)
 		fade.tween_callback(func():
 			sustain.stop()
 			_fade_done = true

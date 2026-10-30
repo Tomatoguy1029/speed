@@ -69,6 +69,7 @@ var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var _laser_audio: Node
 var _font: Font
 var _cards_box: Control
 var _reroll_button: Button
@@ -105,6 +106,8 @@ var _menu_overlay: Control
 var _overlay_focus: WeakRef
 
 func _ready() -> void:
+	_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
+	add_child(_laser_audio)
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -238,6 +241,8 @@ func _sync_menu_visibility() -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"enemy_laser_charge", &"enemy_laser_cancel", &"enemy_laser_fire":
+				_laser_audio.handle(ev)
 			&"full_burst_ready":
 				_ring_flash_t = 0.1
 				_ring_flash_max = 0.1
@@ -264,18 +269,21 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
 			&"levelup":
-				AudioManager.play(&"levelup", -6.0)
+				AudioManager.play(&"levelup_notice", -6.0)
 			&"kill":
 				if not ev.get("silent", false):
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))
 			&"hurt":
 				AudioManager.play(&"hurt", -4.0)
+			&"weapon_fire":
+				if ev.id in [&"W01", &"W23"]:
+					AudioManager.play(&"blaster", -12.0)
 			&"launch":
 				AudioManager.play(&"dash", -6.0)
 			&"trace_end":
 				AudioManager.end_dash()
-			&"bounce", &"block_impact":
-				AudioManager.play(&"block", -8.0)
+			&"block_impact":
+				AudioManager.play(&"bounce", -8.0)
 			&"shield_reflect":
 				AudioManager.play(&"block", -10.0, 1.8)
 			&"shield_stolen":
@@ -284,6 +292,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"block", -10.0, 1.3)
 			&"boss_explode":
 				AudioManager.play(&"boom")
+			&"bomber_explode":
+				AudioManager.play(&"bomber_explode", -12.0)
 
 ## GUI が押下を記憶する前に止める。期限後の release やキーリピートにも持ち越さない。
 func _input(event: InputEvent) -> void:
@@ -394,6 +404,11 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_laser_audio.sync(run)
+	var slow := run.state.phase == RunState.Phase.PLAY and run.draw.world_scale() < 0.999
+	if run.state.phase == RunState.Phase.FINISHING:
+		slow = run.sequence_t < run.cfg.boss_finish_slow_time
+	AudioManager.set_slow_motion(slow and _menu_overlay == null and not _rewards.is_active())
 	_update_finish_presentation()
 	_update_cinematic_visibility()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
@@ -1147,6 +1162,7 @@ func _draw_banner() -> void:
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
 
 func _exit_tree() -> void:
+	AudioManager.set_slow_motion(false)
 	if run != null and run.state != null and not run.state.lab_mode:
 		AudioManager.stop_music(self)
 	AudioManager.end_dash()
