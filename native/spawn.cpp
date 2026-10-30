@@ -24,6 +24,13 @@ bool SpeedRunCore::configure_refill(const Dictionary &config) {
     return true;
 }
 
+// 比較入口と実験場の切替。ラン内のボーナス・攻撃管理の移行後は、その状態から同じ値を更新する。
+bool SpeedRunCore::set_population_mode(bool enabled, bool bonus, bool blocked) {
+    if (!started || closed || !population.refill_ready) return false;
+    population.frame_enabled = enabled; population.bonus = bonus; population.blocked = blocked;
+    return true;
+}
+
 Dictionary SpeedRunCore::refill_snapshot() const {
     Dictionary out;
     if (closed || !population.refill_ready) return out;

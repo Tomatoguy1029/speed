@@ -7,6 +7,7 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_population_mode", "enabled", "bonus", "blocked"), &SpeedRunCore::set_population_mode);
     ClassDB::bind_method(D_METHOD("configure_refill", "config"), &SpeedRunCore::configure_refill);
     ClassDB::bind_method(D_METHOD("step_population", "world_dt", "bonus"), &SpeedRunCore::step_population);
     ClassDB::bind_method(D_METHOD("refill_snapshot"), &SpeedRunCore::refill_snapshot);
@@ -485,6 +486,9 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (check_run_end()) return true;
     for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
     dead_rows.clear();
-    if (world_step) step_pickups(accumulated);
+    if (world_step) {
+        if (population.frame_enabled && !population.blocked && !step_population(accumulated, population.bonus)) return false;
+        step_pickups(accumulated);
+    }
     return true;
 }

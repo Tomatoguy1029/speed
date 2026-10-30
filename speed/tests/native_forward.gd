@@ -23,10 +23,12 @@ func _ready() -> void:
 	else:
 		for condition in [[1,1],[5,1],[5,3]]: await compare_frames(comparison, condition[0], condition[1])
 		await compare_frames(comparison, 5, 1, true)
+		await compare_frames(comparison, 5, 1, true, true)
+		await compare_frames(comparison, 5, 3, false, true)
 	probe.close()
 	print("[native_forward] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_frames(comparison, level: int, division: int, guarded := false) -> void:
+func compare_frames(comparison, level: int, division: int, guarded := false, spawning := false) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 631, "empty": true, "invincible": false})
@@ -53,7 +55,33 @@ func compare_frames(comparison, level: int, division: int, guarded := false) -> 
 	core.configure_frame({"world_tick_div": division, "grid_cell": run.cfg.grid_cell, "trace_radius": run.cfg.trace_radius})
 	var weapon = run.loadout.weapon_behaviors[&"W01"]
 	check(core.configure_forward(weapon.def.params, level, run.cfg.character_scale), "W01の編集値とレベルを準備する")
+	if spawning:
+		var stage := RuntimeStage.new()
+		stage.boss_enabled = false
+		run.state.view_center = run.state.ship_pos
+		# 追跡だけの比較条件では、通常の生成ステージと同じく攻撃枠を使わない。
+		stage.attack_managed_by_type = {"drifter": false}
+		var phase := PhaseDef.new()
+		phase.id = &"補充比較"
+		phase.pop_from = 35.0
+		phase.pop_to = 35.0
+		phase.rate = 13.2
+		phase.xp_bonus = config.xp_bonus
+		phase.wave_interval = 0.37
+		phase.wave_type = &"drifter"
+		phase.mix = {"drifter": 1.0}
+		stage.phases = [phase]
+		run.state.stage = stage
+		run.enemies.definitions[&"drifter"] = definition
+		check(core.configure_spawn_timeline(DATA.compile_spawn_timeline(stage,run.cfg)), "フレーム比較の出現条件を生成する")
+		check(core.configure_population(values(run.cfg, ["spawn_recycle_scale", "spawn_region_cap", "spawn_margin", "field_radius", "planet_radius"])), "出現位置の編集値を渡す")
+		check(core.configure_refill(values(run.cfg, ["spawn_total_cap", "spawn_refill_time"])), "フレームで使う補充を準備する")
 	core.start(631, run.enemies._next_id, run.pickups._gem_next_seq)
+	if spawning and not core.has_method("set_population_mode"):
+		check(false, "補充の有効・無効をフレーム更新へ接続する")
+		core.close()
+		lab.free()
+		return
 	run.state.rng.seed = 631
 	var origin := run.state.ship_pos
 	for offset in [Vector2(0,-260),Vector2(0,-340),Vector2(0,-440),Vector2(120,0)]:
@@ -76,6 +104,11 @@ func compare_frames(comparison, level: int, division: int, guarded := false) -> 
 	var fired := 0
 	var shot_hits := 0
 	for tick in 360:
+		if spawning:
+			run.options.auto_spawn = tick < 250 or tick >= 280
+			var blocked := tick >= 150 and tick < 200
+			run.projectiles.director.guard = {"until": INF} if blocked else {}
+			check(core.set_population_mode(run.options.auto_spawn, false, blocked), "実験場の自動補充と出現待機を渡す")
 		if guarded:
 			var guards := {"controls_locked": tick >= 60 and tick < 80, "encounter_protected": tick >= 80 and tick < 95, "steering_locked": tick >= 200 and tick < 220, "invincible": tick >= 95 and tick < 100, "hitstop_enabled": tick < 150}
 			for key in guards:
@@ -102,6 +135,8 @@ func compare_frames(comparison, level: int, division: int, guarded := false) -> 
 		run.state.events.clear()
 		if run.state.phase == RunState.Phase.PLAY: run._play_tick(1.0/60.0)
 		check(core.step_frame(1.0/60.0, command, center, half, zoom), "射撃も含めて一回の呼出しで更新する")
+		if spawning:
+			check(run.spawn._spawn_acc == core.refill_snapshot().accumulator and run.spawn._wave_t == core.refill_snapshot().wave_time, "補充を停止と世界時間の間引きに合わせる")
 		if guarded and tick in [65,205]: check(not run.state.drawing, "操作ロック中は描線入力を受けない")
 		check(run.state.phase == core.inspect().phase, "停止と再開の状態が一致する")
 		check(is_equal_approx(run.state.time, core.inspect().time) and is_equal_approx(run.state.sim_time, core.inspect().sim_time), "停止中は両方の時計が止まる")
