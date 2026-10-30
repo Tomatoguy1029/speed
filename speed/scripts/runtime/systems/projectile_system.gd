@@ -510,11 +510,11 @@ func _update_hostile(dt: float) -> void:
 		# 線分上の点は終点から step 以内にあるので、終点との距離で遠くの弾を除外する。
 		# 高速な弾も線分全体を確認する。
 		_combat_evaluate(_combat_hostiles, i)
-		var barrier = build.weapon_behaviors.get(&"W05")
-		if barrier != null:
+		if build.weapon_behaviors.has(&"W05"):
 			var end: Vector2 = body_hit.point if body_hit != null else to
-			var blocked: Variant = barrier.block_segment(from, end, r, hostile_dmg[i])
+			var blocked: Variant = ship.block_projectile(from, end, r, hostile_dmg[i], HOSTILE_CAUSE[hostile_kind[i]], &"", _combat_hostiles.get(i, {}))
 			if blocked != null:
+				if _combat_hostiles.has(i): _combat_hostiles[i].contacts += 1
 				_end_hostile(i, "barrier", blocked.pos)
 				hostile_slots.release(i)
 				i += 1

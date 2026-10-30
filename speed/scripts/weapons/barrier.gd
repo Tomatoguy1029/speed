@@ -1,23 +1,28 @@
-## W05 バリアシステム：敵弾を耐久で受け止め、殻が光ってから外へ波動を送る。
+## W05 バリアシステム：攻撃を耐久で受け止め、殻が光ってから外へ波動を送る。
 extends WeaponBehavior
 var durability := -1.0
 var restore := 0.0
 var waves: Array[Dictionary] = []
 func radius() -> float: return area(at_level("radius_by_level"))
+func shell_radius() -> float: return float(p("shell_radius")) * 1.82 * cfg.character_scale
 func ready() -> bool: return restore <= 0.0
 func block_segment(from: Vector2, to: Vector2, bullet_radius: float, damage: float) -> Variant:
 	if not ready(): return null
-	var shell := float(p("shell_radius")) * 1.82 * cfg.character_scale
-	var fraction := Geom.seg_circle_t(from, to, state.ship_pos, shell + bullet_radius)
+	var fraction := Geom.seg_circle_t(from, to, state.ship_pos, shell_radius() + bullet_radius)
 	if fraction < 0.0: return null
-	if durability < 0.0: durability = at_level("durability_by_level")
 	var hit := from.lerp(to, fraction)
+	if not block_damage(damage, hit): return null
+	return {"t": fraction, "pos": hit}
+
+func block_damage(damage: float, hit: Vector2) -> bool:
+	if not ready() or damage <= 0.0: return false
+	if durability < 0.0: durability = at_level("durability_by_level")
 	durability -= damage
 	var broken := durability <= 0.0
 	if broken: restore = interval(at_level("revive_by_level"))
 	waves.append({"pos": state.ship_pos, "age": 0.0, "radius": radius(), "damage": atk() * at_level("damage_by_level"), "hit": {}})
 	state.emit(&"barrier_hit", {"pos": state.ship_pos, "hit": hit, "angle": (hit - state.ship_pos).angle(), "radius": radius(), "broken": broken})
-	return {"t": fraction, "pos": hit}
+	return true
 func tick(dt: float, _busy: bool) -> void:
 	if restore > 0.0:
 		restore = maxf(0.0, restore - dt)

@@ -487,8 +487,6 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_write(record)
 			&"bonus":
 				_write({"type": "bonus", "t": time, "enter": bool(e.enter), "remaining": _run.state.bonus_t})
-			&"barrier_hit":
-				_on_enemy_contact({"cause": "hostile_projectile", "source": "", "reason": "barrier"})
 			&"kill":
 				var id: int = e.get("id", -1)
 				_finish_enemy(id, "killed", float(e.get("world_t", -1.0)))
