@@ -23,3 +23,5 @@ brake_speed_ratio = 0.5
 turn_time = 0.4
 turn_lock = 0.1
 head_lead = 0.4363323129985824
+active_p2 = 0.67
+passes_p2 = 4

@@ -42,6 +42,7 @@ func _ready() -> void:
 		fresh()
 		actor._cooldown = 0.0
 		actor.phase = 2 if tech == &"lance" else 1
+		actor._apply_phase()
 		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(400, 0) if tech == &"sweep" else Vector2(600, 0)
 		sim.state.ship_pos = sim.state.enemy_aim
 		var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
@@ -75,6 +76,7 @@ func _ready() -> void:
 	for tech in [&"charge", &"return_charge", &"lance"]:
 		fresh()
 		actor.phase = 2
+		actor._apply_phase()
 		sim.state.enemy_aim = Vector2(-600, 0)
 		sim.state.ship_pos = sim.state.enemy_aim
 		actor.start_attack(tech)
@@ -142,6 +144,7 @@ func _ready() -> void:
 	for tech in [&"charge", &"kick", &"lance"]:
 		fresh()
 		actor.phase = 2
+		actor._apply_phase()
 		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
@@ -225,6 +228,7 @@ func _ready() -> void:
 
 	fresh()
 	actor.phase = 2
+	actor._apply_phase()
 	actor.start_attack(&"lance")
 	step(0.6)
 	sim.state.ship_pos = Vector2(2200,0)
@@ -233,6 +237,7 @@ func _ready() -> void:
 	check(actor.mode == &"recovery" and float(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow")) <= 0.0, "発進を見送った槍は突いた残光を出さない")
 	fresh()
 	actor.phase = 2
+	actor._apply_phase()
 	actor.start_attack(&"lance")
 	while actor.mode in [&"windup", &"active"]: step(DT)
 	check(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow") != null, "光の槍は突き終わりに全体を残す")
@@ -344,6 +349,7 @@ func capture() -> void:
 	for tech in stage_names:
 		fresh()
 		actor.phase = 2 if tech==&"lance" else 1
+		actor._apply_phase()
 		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)

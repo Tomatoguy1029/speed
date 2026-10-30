@@ -53,7 +53,7 @@ func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) ->
 	var velocity := host.run_state.ship_vel
 	var target := host.run_state.ship_pos + velocity * (float(host.def.params.lock_lead) if lead < 0.0 else lead)
 	if host.tech_kind(attack) not in [&"charge", &"return_charge", &"lance"]: return target
-	var r: Dictionary = host._moves[attack].values()
+	var r: Dictionary = host._values_of(attack)
 	var speed := float(r.distance) / float(r.active)
 	var reach := float(r.get("reach", host.horn_length()))
 	var offset := target - host.table.pos[host.body]
@@ -169,10 +169,13 @@ func warning_points(host: MonocerosBoss) -> PackedVector2Array:
 		points[1] += host.direction * float(host.rule().distance)
 	return points
 
+func hit_width(host: MonocerosBoss) -> float:
+	return float(host.def.params.horn_width)
+
 func _damage_shape(host: MonocerosBoss, prior: PackedVector2Array, points: PackedVector2Array) -> void:
 	if host.attack_hit or host.mode != &"active": return
 	host.combat_trace.evaluate()
-	var radius := float(host.def.params.horn_width) * 0.5 + host.ctx.cfg.ship_radius
+	var radius := hit_width(host) * 0.5 + host.ctx.cfg.ship_radius
 	var paths: Array[PackedVector2Array] = [points, prior]
 	if prior.size() == 2:
 		paths.append(PackedVector2Array([prior[0], points[0]]))

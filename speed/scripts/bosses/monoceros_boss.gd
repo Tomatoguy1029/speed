@@ -44,6 +44,7 @@ var action_rules: Resource
 var flow_runner := preload("res://scripts/bosses/flow/runner.gd").new()
 var flow_adapter: RefCounted
 var _moves := {}
+var _rules := {}
 var _move_kinds := {}
 var _sequenced := {}
 var horn_waves: Array[Dictionary] = []
@@ -66,6 +67,7 @@ func configure_flow(program: Resource) -> void:
 	flow_runner.selector.random = run_state.rng
 	flow_adapter = preload("res://scripts/bosses/flow/single_actor_adapter.gd").new(self)
 	selection_enabled = true
+	_apply_phase()
 
 func _on_bound() -> void:
 	draws_self = true
@@ -179,6 +181,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if phase_pending:
 			phase_pending = false
 			phase = 2
+			_apply_phase()
 			mode = &"phase"
 			phase_time = float(def.params.phase_time)
 			_cue(&"phase_changed")
@@ -209,7 +212,23 @@ func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
 
 func rule() -> Dictionary:
-	return _moves[technique].values() if _moves.has(technique) else {}
+	return _values_of(technique)
+
+func _values_of(id: StringName) -> Dictionary:
+	return _rules.get(id, {})
+
+## 技の値を形態ごとに写す。技の途中では形態を変えない。
+func _apply_phase() -> void:
+	_rules.clear()
+	for id in _moves:
+		var base: Dictionary = _moves[id].values()
+		var values := {}
+		for key: String in base:
+			if not key.ends_with("_p2"): values[key] = base[key]
+		if phase >= 2:
+			for key: String in base:
+				if key.ends_with("_p2"): values[key.trim_suffix("_p2")] = base[key]
+		_rules[id] = values
 
 func is_sequenced(id: StringName) -> bool:
 	return _sequenced.get(id, false)
@@ -232,23 +251,23 @@ func technique_rejection(attack: StringName, gate: Dictionary) -> String:
 	if not _gate_allows(gate): return "direction_or_range_gate"
 	if is_sequenced(attack): return ""
 	if tech_kind(attack) != &"kick":
-		var r: Dictionary = _moves[attack].values()
+		var r: Dictionary = _values_of(attack)
 		var turn_window := maxf(0.0, float(r.warn) - float(def.params.lock_lead))
 		if absf(Geom.angle_diff((run_state.ship_pos - table.pos[body]).angle(), table.facing[body])) > def.turn * turn_window: return "insufficient_turn_time"
-	if table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) > _reach(attack): return "predicted_target_out_of_reach"
+	if table.pos[body].distance_to(_strike_aim(attack, float(_values_of(attack).warn))) > _reach(attack): return "predicted_target_out_of_reach"
 	return ""
 
 func _gate_allows(gate: Dictionary) -> bool:
 	return preload("res://scripts/bosses/flow/range_condition.gd").allows(gate, (run_state.ship_pos - table.pos[body]).rotated(-table.facing[body]))
 
 func _reach(attack: StringName) -> float:
-	var r: Dictionary = _moves[attack].values()
+	var r: Dictionary = _values_of(attack)
 	return float(r.get("distance", 0.0)) + float(r.get("reach", horn_length())) + float(def.params.horn_width) * 0.5 + ctx.cfg.ship_radius
 
 func _close_ready(attack: StringName) -> bool:
 	if not _moves.has(attack): return false
 	var gate: Dictionary = action_rules.conditions.get(String(attack), {})
-	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_moves[attack].values().warn))) <= _reach(attack)
+	return clock >= float(cooldowns.get(attack, 0.0)) and phase >= int(gate.get("min_phase", 1)) and _gate_allows(gate) and table.pos[body].distance_to(_strike_aim(attack, float(_values_of(attack).warn))) <= _reach(attack)
 
 func selection_blocked() -> bool:
 	return not body_alive() or not selection_enabled or mode in [&"entrance", &"phase", &"final", &"defeated"]
@@ -271,7 +290,7 @@ func start_attack(attack: StringName) -> bool:
 	if mode != &"idle" or not _moves.has(attack):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "busy" if mode != &"idle" else "unknown_technique", "origin": combat_origin, "action_id": null})
 		return false
-	var r: Dictionary = _moves[attack].values()
+	var r: Dictionary = _values_of(attack)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, _attack_length(attack)):
 		combat_trace.event("boss_action", {"step": "start_rejected", "requested_action": String(attack), "reason": "attack_budget", "origin": combat_origin, "action_id": null})
 		return false
@@ -285,8 +304,10 @@ func start_attack(attack: StringName) -> bool:
 
 ## 攻撃予算に申告する予告と実行の長さ。
 func _attack_length(attack: StringName) -> float:
-	if is_sequenced(attack): return _moves[attack].attack_length()
-	var r: Dictionary = _moves[attack].values()
+	if is_sequenced(attack):
+		if tech_kind(attack) == &"return_charge": return _moves[attack].attack_length(_values_of(attack))
+		return _moves[attack].attack_length()
+	var r: Dictionary = _values_of(attack)
 	return float(r.warn) + float(r.active)
 
 ## 段で進む技を終え、隙に入る。
@@ -359,7 +380,7 @@ func _reposition_tick(dt: float) -> void:
 		var keep := float(def.params.approach_range)
 		var closing := toward.length() > keep
 		if not closing and _moves.has(&"charge"):
-			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_moves[&"charge"].values().warn))) > _reach(&"charge")
+			closing = table.pos[body].distance_to(_strike_aim(&"charge", float(_values_of(&"charge").warn))) > _reach(&"charge")
 		if closing:
 			# approach_range の距離まで寄って止まり、その内側では向きだけを合わせる。
 			var alignment := maxf(0.0, Vector2.from_angle(table.facing[body]).dot(toward.normalized()))
@@ -377,7 +398,7 @@ func _move_body(step: Vector2) -> void:
 	ctx.field.collide_enemy(body, from)
 
 func horn_length() -> float:
-	return table.r[body] * float(def.params.horn_length_ratio)
+	return table.r[body] * float(def.params.horn_length_ratio_p2 if phase >= 2 else def.params.horn_length_ratio)
 
 ## 判定と表示が共有する角／蹄の線分。ワールド座標。
 func horn_points(sweep_fraction := -1.0) -> PackedVector2Array:

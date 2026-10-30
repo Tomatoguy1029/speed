@@ -33,6 +33,12 @@ extends BossTechnique
 		warn = value
 		_values_dirty = true
 
+## 第2形態の攻撃の継続時間（秒）。短いほど速い
+@export_range(0,100000,0.01) var active_p2 := 0.71:
+	set(value):
+		active_p2 = value
+		_values_dirty = true
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 

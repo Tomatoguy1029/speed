@@ -243,6 +243,7 @@ func fresh(at: Vector2, velocity: Vector2, phase: int, facing: float) -> void:
 	sim.bosses.spawn(load("res://data/bosses/monoceros.tres"),Vector2.ZERO)
 	actor = sim.bosses.actor as MonocerosBoss
 	actor.phase = phase
+	actor._apply_phase()
 	actor._cooldown = 1000.0
 	actor.selection_enabled = false
 	actor.table.facing[actor.body] = facing

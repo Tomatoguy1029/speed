@@ -75,8 +75,21 @@ extends BossTechnique
 		head_lead = value
 		_values_dirty = true
 
-func attack_length() -> float:
-	return warn + passes * active + (passes - 1) * (brake_time + turn_time)
+## 第2形態の、1回の最大距離を進む時間（秒）。短いほど速い
+@export_range(0,100000,0.01) var active_p2 := 0.67:
+	set(value):
+		active_p2 = value
+		_values_dirty = true
+
+## 第2形態の突進の回数
+@export_range(1,100000,1) var passes_p2 := 4:
+	set(value):
+		passes_p2 = value
+		_values_dirty = true
+
+func attack_length(phase_values: Dictionary = {}) -> float:
+	var r := values() if phase_values.is_empty() else phase_values
+	return float(r.warn) + int(r.passes) * float(r.active) + (int(r.passes) - 1) * (float(r.brake_time) + float(r.turn_time))
 
 func reach_limit(horn: float) -> float:
 	return distance + horn
