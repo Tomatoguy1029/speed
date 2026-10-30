@@ -10,7 +10,7 @@ func check(ok: bool, label: String) -> void:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var core = comparison.create_native()
-	if core == null or not core.has_method("spawn_enemy"):
+	if core == null or not core.has_method("enemy_order_snapshot"):
 		check(false, "ネイティブ側が敵の出現と移動を所有する")
 	else:
 		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
@@ -18,10 +18,25 @@ func _ready() -> void:
 		await lab.reset({"seed": 932, "empty": true})
 		var run: RunSimulation = lab.run
 		var definition := run.enemies.def_of(&"drifter")
-		check(core.configure(DATA.compile_enemy(definition, run.cfg)), "追跡敵を生成データから準備する")
+		var data := DATA.compile_enemy(definition, run.cfg)
+		var shield: EnemyDef = run.enemies.def_of(&"shield")
+		data.enemies.append_array(DATA.compile_enemy(shield, run.cfg).enemies)
+		check(core.configure(data), "追跡敵と盾を生成データから準備する")
+		check(core.configure_enemy_order(PackedStringArray(["chase"])), "初期化済みの行動の並びを渡す")
+		check(not core.configure_enemy_order(PackedStringArray(["shield", "shield"])), "重複した登録順で準備を上書きしない")
 		run.state.rng.seed = 932
 		check(core.start(932, run.enemies._next_id), "同じ乱数と開始IDを使う")
 		check(core.set_motion_context(run.state.ship_pos, run.state.view_center, run.state.view_half), "追跡先と表示範囲を渡す")
+		var early_shield := run.enemies.spawn(shield, Vector2(500,300))
+		var early_shield_id: int = core.spawn_enemy(shield.id, Vector2(500,300))
+		var early_chase := run.enemies.spawn(definition, Vector2(600,300))
+		var early_chase_id: int = core.spawn_enemy(definition.id, Vector2(600,300))
+		check(core.enemy_order_snapshot() == PackedInt64Array([run.enemies.table.id[early_chase],run.enemies.table.id[early_shield]]), "初期登録済みの空の行動を、最初に出た行動より前に保つ")
+		run.enemies.mark_dead(early_shield)
+		run.enemies.mark_dead(early_chase)
+		run.enemies.cleanup()
+		core.remove_enemy(early_shield_id)
+		core.remove_enemy(early_chase_id)
 		for pos in [Vector2(500, 0), Vector2(-500, 100), Vector2(3000, 0), Vector2.ZERO]:
 			var row := run.enemies.spawn(definition, pos)
 			check(core.spawn_enemy(&"drifter", pos) == run.enemies.table.id[row], "出現したIDが一致する")
@@ -61,6 +76,22 @@ func _ready() -> void:
 		var new_id: int = core.spawn_enemy(&"drifter", Vector2(100, 200))
 		check(new_id != old_id and new_id == run.enemies.table.id[row], "再利用後のIDを一致させる")
 		check(comparison.difference(comparison.snapshot(run, [], 61).enemies, core.enemies_snapshot()).is_empty(), "再利用した個体に古い位置やHPを残さない")
+		# 行動の登録順と、削除時の末尾入替を含む並びを比較する。
+		for tick in 30:
+			var def: EnemyDef = shield if tick % 3 == 0 else definition
+			var at := Vector2(1000 + tick * 50, 300)
+			row = run.enemies.spawn(def, at)
+			core.spawn_enemy(def.id, at)
+			if tick % 2 == 1:
+				var target: int = run.enemies.beh_rows[0][0]
+				var id: int = run.enemies.table.id[target]
+				run.enemies.mark_dead(target)
+				run.enemies.cleanup()
+				check(core.remove_enemy(id), "途中の個体を解放する")
+			var expected_order := PackedInt64Array()
+			for rows in run.enemies.beh_rows:
+				for index in rows: expected_order.append(run.enemies.table.id[index])
+			check(core.enemy_order_snapshot() == expected_order, "行動の順と削除・再利用後の走査順を保つ")
 		core.close()
 		check(core.enemies_snapshot().is_empty(), "終了時に個体を解放する")
 		lab.free()

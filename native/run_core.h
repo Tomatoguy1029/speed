@@ -10,6 +10,7 @@
 #include <deque>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
 namespace godot {
@@ -20,7 +21,7 @@ class SpeedRunCore : public RefCounted {
     std::vector<speed::EnemyDefinition> definitions;
     struct Enemy {
         int64_t id = 0;
-        size_t definition = 0;
+        size_t definition = 0, behavior_group = 0, behavior_slot = 0;
         Vector2 pos, vel;
         double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
         double facing = 0.0, age = 0.0, fire_t = 0.0;
@@ -30,6 +31,8 @@ class SpeedRunCore : public RefCounted {
         bool dash_fresh = false;
     };
     std::vector<Enemy> enemies;
+    std::vector<speed::EnemyDefinition::Kind> behavior_kinds;
+    std::vector<std::vector<size_t>> behavior_rows;
     std::vector<size_t> free_rows, dead_rows;
     std::unordered_map<int64_t, size_t> rows_by_id;
     struct EnemyGrid {
@@ -174,6 +177,8 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool configure_enemy_order(const PackedStringArray &order);
+    PackedInt64Array enemy_order_snapshot() const;
     bool configure_spawn_timeline(const Dictionary &data);
     Dictionary spawn_target(double at, bool bonus) const;
     bool configure_lifecycle(const Dictionary &config);

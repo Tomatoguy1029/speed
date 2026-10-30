@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_enemy_order", "order"), &SpeedRunCore::configure_enemy_order);
+    ClassDB::bind_method(D_METHOD("enemy_order_snapshot"), &SpeedRunCore::enemy_order_snapshot);
     ClassDB::bind_method(D_METHOD("configure_spawn_timeline", "data"), &SpeedRunCore::configure_spawn_timeline);
     ClassDB::bind_method(D_METHOD("spawn_target", "at", "bonus"), &SpeedRunCore::spawn_target);
     ClassDB::bind_method(D_METHOD("configure_lifecycle", "config"), &SpeedRunCore::configure_lifecycle);
@@ -90,8 +92,9 @@ void SpeedRunCore::advance_enemies(double delta) {
         }
     }
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
-    for (auto &enemy : enemies) {
-        if (!enemy.alive || enemy.dead) continue;
+    for (const auto &rows : behavior_rows) for (size_t row : rows) {
+        auto &enemy = enemies[row];
+        if (enemy.dead) continue;
         if (enemy.hit_cd > 0) enemy.hit_cd -= delta;
         if (enemy.flash > 0) enemy.flash -= delta;
         enemy.age += delta;
@@ -130,6 +133,7 @@ void SpeedRunCore::close() {
     enemies.clear();
     enemies.shrink_to_fit();
     free_rows.clear();
+    behavior_rows.clear(); behavior_kinds.clear();
     dead_rows.clear();
     rows_by_id.clear();
     definitions.clear();
@@ -240,6 +244,27 @@ bool SpeedRunCore::set_motion_context(Vector2 ship, Vector2 center, Vector2 half
     return true;
 }
 
+bool SpeedRunCore::configure_enemy_order(const PackedStringArray &order) {
+    if (started || closed) return false;
+    std::vector<speed::EnemyDefinition::Kind> kinds;
+    for (int64_t i = 0; i < order.size(); ++i) {
+        if (order[i] != "chase" && order[i] != "shield") return false;
+        const auto kind = order[i] == "chase" ? speed::EnemyDefinition::Kind::Chase : speed::EnemyDefinition::Kind::Shield;
+        if (std::find(kinds.begin(), kinds.end(), kind) != kinds.end()) return false;
+        kinds.push_back(kind);
+    }
+    behavior_kinds = std::move(kinds);
+    behavior_rows.clear(); behavior_rows.resize(behavior_kinds.size());
+    return true;
+}
+
+PackedInt64Array SpeedRunCore::enemy_order_snapshot() const {
+    PackedInt64Array out;
+    if (closed) return out;
+    for (const auto &rows : behavior_rows) for (size_t row : rows) out.push_back(enemies[row].id);
+    return out;
+}
+
 int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dictionary &options) {
     if (!started || closed || !position.is_finite() || next_id == INT64_MAX) return -1;
     size_t definition = 0;
@@ -290,6 +315,11 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     size_t row = enemies.size();
     if (free_rows.empty()) enemies.emplace_back();
     else { row = free_rows.back(); free_rows.pop_back(); }
+    const auto found = std::find(behavior_kinds.begin(), behavior_kinds.end(), def.kind);
+    enemy.behavior_group = size_t(found - behavior_kinds.begin());
+    if (found == behavior_kinds.end()) { behavior_kinds.push_back(def.kind); behavior_rows.emplace_back(); }
+    auto &active_rows = behavior_rows[enemy.behavior_group];
+    enemy.behavior_slot = active_rows.size(); active_rows.push_back(row);
     enemy.id = next_id++;
     enemy.fire_t = definitions[definition].fire_interval * (0.5 + rng->randf() * 0.5);
     enemy.alive = true;
@@ -302,7 +332,13 @@ bool SpeedRunCore::remove_enemy(int64_t id) {
     if (!started || closed) return false;
     auto found = rows_by_id.find(id);
     if (found == rows_by_id.end()) return false;
-    enemies[found->second].alive = false;
+    auto &enemy = enemies[found->second];
+    auto &active_rows = behavior_rows[enemy.behavior_group];
+    const size_t last = active_rows.back();
+    active_rows[enemy.behavior_slot] = last;
+    enemies[last].behavior_slot = enemy.behavior_slot;
+    active_rows.pop_back();
+    enemy.alive = false;
     free_rows.push_back(found->second);
     rows_by_id.erase(found);
     return true;
