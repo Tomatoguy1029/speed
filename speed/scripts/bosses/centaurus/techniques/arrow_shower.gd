@@ -17,8 +17,8 @@ extends BossTechnique
 	set(value):
 		mark_time = value
 		_values_dirty = true
-## 矢が降り続ける時間（秒）
-@export_range(0, 100000, 0.01) var rain_time := 0.3:
+## 着弾後、硬直へ移るまでの余韻（秒）。当たりは着弾時だけ
+@export_range(0, 100000, 0.01) var rain_time := 0.15:
 	set(value):
 		rain_time = value
 		_values_dirty = true
@@ -138,10 +138,10 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 				var center := at + direction * clampf(toward.length() * float(r.wall_ratio), float(r.wall_min), float(r.wall_max))
 				for j in int(r.count):
 					var offset := j - (int(r.count) - 1) * 0.5
-					_add_mark(center + direction.orthogonal() * offset * float(r.spacing), base + absf(offset) * float(r.step))
+					_add_mark(center + direction.orthogonal() * offset * float(r.spacing), base + absf(offset) * float(r.step), float(r.radius))
 		if r.pattern == "chase":
 			while placed < int(r.count) and host.clock >= base + placed * float(r.interval):
-				_add_mark(host.run_state.ship_pos + host.run_state.ship_vel * float(r.lead), base + placed * float(r.interval))
+				_add_mark(host.run_state.ship_pos + host.run_state.ship_vel * float(r.lead), base + placed * float(r.interval), float(r.radius))
 				placed += 1
 		var finished: bool = r.pattern != "chase" or placed >= int(r.count)
 		for mark in marks:
@@ -154,17 +154,19 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 				host._cue(&"shower_mark", mark.center)
 			if age < float(r.mark_time) + float(r.rain_time): finished = false
 			if age < float(r.mark_time): continue
-			if not mark.landed:
-				mark.landed = true
-				host._cue(&"shower_landed", mark.center)
-			if age >= float(r.mark_time) + float(r.rain_time) or mark.hit: continue
+			if mark.landed: continue
+			mark.landed = true
+			host._cue(&"shower_landed", mark.center)
 			var reach := float(r.radius) + host.ctx.cfg.ship_radius
 			if host.run_state.ship_pos.distance_squared_to(mark.center) <= reach * reach:
-				if host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus"):
-					mark.hit = true
+				host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
+
 		if finished:
 			marks.clear()
 			host.finish_technique()
 
-	func _add_mark(center: Vector2, at: float) -> void:
-		marks.append({"center": center, "at": at, "shown": false, "landed": false, "hit": false})
+	func _add_mark(center: Vector2, at: float, radius: float) -> void:
+		# 追跡先が動かない場合も、一度狙った範囲へ重ねて降らせない。
+		for mark in marks:
+			if center.distance_squared_to(mark.center) < radius * radius: return
+		marks.append({"center": center, "at": at, "shown": false, "landed": false})

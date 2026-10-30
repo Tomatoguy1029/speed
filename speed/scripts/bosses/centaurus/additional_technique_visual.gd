@@ -9,7 +9,6 @@ var _arrow_count := 2
 var retained: bool:
 	get: return not _marks.is_empty()
 const FADE := 0.15
-const WAVE_INTERVAL := 0.65
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const GOLD := Color("#f2b567")
 const RED := Color("#ff667d")
@@ -58,21 +57,20 @@ func _draw_shower(r: Dictionary) -> void:
 		if age < 0.0: continue
 		var center: Vector2 = mark.center
 		var radius := float(r.radius)
-		var strength := clampf(age / 0.12, 0.0, 1.0) * (1.0 - clampf((active_age - float(r.rain_time)) / 0.5, 0.0, 1.0))
-		draw_powder(self, center, radius, age, strength, float(mark.at))
-		# 各波の着弾後も同じ位置へ残す。残った矢には当たり判定を追加しない。
+		# 予兆は着弾前に消し、矢が残る間に追加の予兆を出さない。
+		if active_age < 0.0:
+			var strength := clampf(age / 0.12, 0.0, 1.0) * clampf(-active_age / 0.15, 0.0, 1.0)
+			draw_powder(self, center, radius, age, strength, float(mark.at))
 		var fall := warning * 0.3
-		var last_wave := maxi(0, ceili(float(r.rain_time) / WAVE_INTERVAL) - 1)
-		for wave in range(maxi(0, floori((active_age - float(r.linger) - FADE) / WAVE_INTERVAL)), mini(last_wave, floori((active_age + fall) / WAVE_INTERVAL)) + 1):
-			var landed_age := active_age - wave * WAVE_INTERVAL
-			var opacity := 1.0 - clampf((landed_age - float(r.linger)) / FADE, 0.0, 1.0)
-			if opacity <= 0.0: continue
-			for j in _arrow_count:
-				var seed := float(mark.at) * 19.7 + center.x * 0.019 + center.y * 0.071 + wave * 43.1
-				var target := center + scatter(seed, j) * radius * 0.85
-				var origin := fall_origin(self, target)
-				var progress := clampf((landed_age + fall) / fall, 0.0, 1.0)
-				draw_rain_arrow(self, actor, origin.lerp(target, progress * progress), (target - origin).angle(), opacity)
+		if active_age < -fall: continue
+		var opacity := 1.0 - clampf((active_age - float(r.linger)) / FADE, 0.0, 1.0)
+		if opacity <= 0.0: continue
+		for j in _arrow_count:
+			var seed := float(mark.at) * 19.7 + center.x * 0.019 + center.y * 0.071
+			var target := center + scatter(seed, j) * radius * 0.85
+			var origin := fall_origin(self, target)
+			var progress := clampf((active_age + fall) / fall, 0.0, 1.0)
+			draw_rain_arrow(self, actor, origin.lerp(target, progress * progress), (target - origin).angle(), opacity)
 
 ## 扇状連射と同じ描画・寸法・色を使う。
 static func draw_rain_arrow(canvas: CanvasItem, owner_actor: CentaurusBoss, at: Vector2, angle: float, opacity: float) -> void:
@@ -89,29 +87,29 @@ static func fall_origin(canvas: CanvasItem, target: Vector2, minimum_height := 0
 	var toward := (target - origin).normalized()
 	return target - toward * maxf(target.distance_to(origin), minimum_height)
 
-## 同じ着弾を描き直しても位置は動かさず、波ごとに範囲内へばらけさせる。
+## 同じ着弾を描き直しても位置は動かさず、範囲内へばらけさせる。
 static func scatter(seed: float, index: int) -> Vector2:
 	var angle := fposmod(sin(index * 127.1 + seed) * 43758.5453, 1.0) * TAU
 	var reach := sqrt(fposmod(sin(index * 269.5 + seed + 3.0) * 21563.734, 1.0))
 	return Vector2.from_angle(angle) * reach
 
-## 星と区別できる金色の落下筋と白い芯。世界時間で進め、戦闘の乱数は消費しない。
+## 星と区別できる短く細い金色の光の粉。世界時間で進め、戦闘の乱数は消費しない。
 static func draw_powder(canvas: CanvasItem, center: Vector2, radius: float, age: float, strength: float, salt := 0.0) -> void:
 	var seed := center.x * 0.019 + center.y * 0.071 + salt
-	for j in 10:
+	for j in 7:
 		var q := fposmod(sin(j * 127.1 + seed) * 43758.5453, 1.0)
 		var u := fposmod(sin(j * 269.5 + seed + 3.0) * 21563.734, 1.0)
 		var cycle := fposmod(age * (0.8 + q * 0.5) + u, 1.0)
-		var blink := pow(maxf(0.0, sin(cycle * PI)), 2.0) * strength
-		var at := center + scatter(seed, j) * radius * 0.85 - Vector2(0, (1.0 - cycle) * 65.0)
+		var blink := pow(maxf(0.0, sin(cycle * PI)), 3.0) * strength
+		var at := center + scatter(seed, j) * radius * 0.85 - Vector2(0, (1.0 - cycle) * 26.0)
 		if cycle < 0.72:
-			var tip := at - Vector2(0, 12.0 + q * 12.0)
-			canvas.draw_line(tip, at, Color(0.07, 0.04, 0.02, blink * 0.85), 6.0)
-			canvas.draw_line(tip, at, Color(1.5, 0.85, 0.18, blink * 0.55), 3.8)
-			canvas.draw_line(tip, at, Color(1.7, 1.4, 0.8, blink), 1.5)
+			var tip := at - Vector2(0, 3.0 + q * 4.0)
+			canvas.draw_line(tip, at, Color(0.07, 0.04, 0.02, blink * 0.45), 2.4)
+			canvas.draw_line(tip, at, Color(1.0, 0.65, 0.2, blink * 0.3), 1.8)
+			canvas.draw_line(tip, at, Color(1.0, 0.8, 0.4, blink * 0.65), 0.8)
 		else:
-			var size := 1.5 + q * 1.5
-			canvas.draw_circle(at, size * 2.5, Color(GOLD, blink * 0.22))
-			canvas.draw_circle(at, size, Color(1.7, 1.4, 0.8, blink))
+			var size := 0.8 + q * 0.6
+			canvas.draw_circle(at, size * 2.5, Color(GOLD, blink * 0.1))
+			canvas.draw_circle(at, size, Color(1.0, 0.8, 0.4, blink * 0.65))
 			if q > 0.7:
-				canvas.draw_line(at - Vector2(size * 2.2, 0), at + Vector2(size * 2.2, 0), Color(1.7, 1.4, 0.8, blink), 1.2)
+				canvas.draw_line(at - Vector2(size * 2.2, 0), at + Vector2(size * 2.2, 0), Color(1.0, 0.8, 0.4, blink * 0.65), 1.2)
