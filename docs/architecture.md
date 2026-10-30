@@ -711,7 +711,7 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 ## 13. 音
 
-`tools/content/build_audio.gd` が `.content/audio.res` のAudioBankへ効果音を生成する。AudioManagerは生成済みの音源を読み、再生する。
+`tools/content/build_audio.gd` が `.content/audio.res` のAudioBankへ効果音とループBGMをまとめる。AudioManagerは起動時に生成済みのバンクを読み、BGMは専用のMusicバスと単一の再生口で切り替える。ボス出現によるフェードの予約は、次の切り替えや画面退出で取り消す。メニューのBGMはMain、戦闘のBGMはHUDが所有し、前の画面の退出で次の画面の曲を止めない。
 
 - 音の再生口を使い回し、同時に鳴る数に上限を設ける。
 - バスを「全体」「効果音」「エンジン音」に分ける。

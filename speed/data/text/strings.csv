@@ -28,6 +28,7 @@ menu.encyclopedia,図鑑,Codex
 settings.volume,音量,Volume
 settings.master_volume,全体の音量,Master
 settings.sfx_volume,効果音,Sound Effects
+settings.music_volume,BGMの音量,Music Volume
 settings.engine_volume,エンジン音,Engine
 settings.mute,消音（M キーでも切り替え）,Mute (also toggled with M)
 settings.effects,演出,Effects
@@ -192,6 +193,10 @@ upgrade.part.length,エンジンタンク,Engine Tank
 upgrade.part.pickup,コレクター,Collector
 upgrade.part.speed,ブースター,Booster
 upgrade.part.reroll,演算予備,Spare Processor
+upgrade.debug.reset,全強化リセット,Reset Upgrades
+upgrade.debug.reset_help,デバッグ用。すべての機体強化を初期段階へ戻し、部品を返します。,Debug: reset all ship upgrades and refund parts.
+upgrade.debug.infinite,部品無限,Infinite Parts
+upgrade.debug.infinite_help,デバッグ用。起動中は部品を消費せず強化できます。,Debug: upgrade without spending parts during this session.
 ,■ 図鑑,
 codex.title,図鑑　（{known} / {total}）,Codex  ({known} / {total})
 codex.weapons,武器,Weapons

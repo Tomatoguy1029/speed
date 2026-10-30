@@ -1,0 +1,34 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/ui/stage_clear_art_demo.gd" id="script"]
+[ext_resource type="Texture2D" path="res://assets/ui/clear/stage_clear_keyframe.png" id="art"]
+[ext_resource type="Shader" path="res://shaders/stage_clear_art_demo.gdshader" id="shader"]
+[sub_resource type="ShaderMaterial" id="effect"]
+shader = ExtResource("shader")
+[node name="StageClearArtDemo" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("script")
+[node name="Backdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.012, 0.032, 0.052, 1)
+mouse_filter = 2
+[node name="Artwork" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+material = SubResource("effect")
+texture_filter = 1
+texture = ExtResource("art")
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2

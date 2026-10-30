@@ -155,6 +155,8 @@ func _ready() -> void:
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
+	if not run.state.lab_mode:
+		AudioManager.play_music(&"boss" if run.state.boss_spawned else &"battle", 0.6, self)
 
 func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
@@ -247,12 +249,15 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
+				if not run.state.lab_mode: AudioManager.play_music(&"boss", 1.0, self)
 				_warning_t = 3.0
 			&"clear_banner":
+				AudioManager.end_dash()
 				_banner = tr("hud.clear")
 				_banner_color = Color("#ffe46b")
 				_banner_t = 99.0
 			&"game_over":
+				AudioManager.end_dash()
 				_banner = tr("hud.game_over")
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
@@ -265,6 +270,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"hurt", -4.0)
 			&"launch":
 				AudioManager.play(&"dash", -6.0)
+			&"trace_end":
+				AudioManager.end_dash()
 			&"bounce", &"block_impact":
 				AudioManager.play(&"block", -8.0)
 			&"shield_reflect":
@@ -1143,3 +1150,8 @@ func _draw_banner() -> void:
 	if _banner == "":
 		return
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
+
+func _exit_tree() -> void:
+	if run != null and run.state != null and not run.state.lab_mode:
+		AudioManager.stop_music(self)
+	AudioManager.end_dash()
