@@ -17,6 +17,7 @@ func _ready() -> void:
 		await compare_population(comparison)
 		for mode in ["mix", "curve", "bonus", "blocked", "wave", "wave_bonus"]:
 			await compare_refill(comparison, mode)
+	await compare_attack_metadata(comparison)
 	probe.close()
 	print("[native_population] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
@@ -177,3 +178,52 @@ func compare_refill(comparison, mode: String) -> void:
 		check(run.spawn._wave_t == core.refill_snapshot().wave_time, "波状補充の経過時間が一致する")
 	core.close()
 	lab.free()
+
+func compare_attack_metadata(comparison) -> void:
+	var probe = comparison.create_native()
+	if not probe.has_method("enemy_attack_snapshot"):
+		check(false, "群れと個体の攻撃枠の設定を保持する")
+		probe.close()
+		return
+	probe.close()
+	for formation_mode in [false,true]:
+		for runtime in [false,true]:
+			var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+			add_child(lab)
+			await lab.reset({"seed": 512, "empty": true})
+			var run: RunSimulation = lab.run
+			var stage: StageDef = RuntimeStage.new() if runtime else StageDef.new()
+			stage.enemy_attack_values = {"drifter": 0.37}
+			stage.enemy_attack_priorities = {"drifter": 3.0}
+			if runtime: stage.attack_managed_by_type = {"drifter": false}
+			run.state.stage = stage
+			run.projectiles.director.formation_mode = formation_mode
+			var definition := run.enemies.def_of(&"drifter")
+			var generator: RefCounted = DATA.new()
+			var data: Dictionary = generator.compile_enemy(definition, run.cfg, stage)
+			var core = comparison.create_native()
+			check(core.configure(data), "ステージの攻撃枠の固定値を生成する")
+			core.set_attack_formation_mode(formation_mode)
+			core.start(512, run.enemies._next_id)
+			run.state.rng.seed = 512
+			var options := [{}, {"attack_group": 111, "attack_value": 2.7}, {"attack_group": 112, "attack_value": 0.0},
+				{"attack_group": 113, "attack_value": 0.0, "attack_managed": true, "attack_priority": 0.0},
+				{"attack_group": 114, "attack_value": 0.5, "attack_managed": false, "attack_priority": 4.1},
+				{"attack_group": 115}, {"attack_value": 7.0, "attack_managed": true}]
+			for opts in options:
+				run.enemies.spawn(definition, Vector2.ZERO, opts)
+				check(core.spawn_enemy(&"drifter", Vector2.ZERO, opts) > 0, "群れの上書きを受け付ける")
+			var expected := []
+			for row in run.enemies.table.alive.size():
+				if run.enemies.table.alive[row] == 0: continue
+				expected.append({"id": run.enemies.table.id[row], "group": run.enemies.table.attack_group[row],
+					"value": run.enemies.table.attack_value[row], "priority": run.enemies.table.attack_priority[row], "managed": bool(run.enemies.table.attack_managed[row])})
+			var difference: String = comparison.difference(expected, core.enemy_attack_snapshot())
+			check(difference.is_empty(), "個体と群れの攻撃設定が一致する: " + difference)
+			check(str(run.state.rng.state) == core.inspect().rng_state, "攻撃枠の設定で乱数順を変えない")
+			var before: Dictionary = core.inspect()
+			check(core.spawn_enemy(&"drifter",Vector2.ZERO,{"attack_group": 1.5}) < 0, "整数でない群れIDは個体追加前に拒否する")
+			check(core.spawn_enemy(&"drifter",Vector2.ZERO,{"attack_value": NAN}) < 0, "不正な攻撃枠は個体追加前に拒否する")
+			check(before == core.inspect() and core.enemy_attack_snapshot().size() == expected.size(), "失敗時にIDと乱数と個体を消費しない")
+			core.close()
+			lab.free()

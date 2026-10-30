@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_attack_formation_mode", "enabled"), &SpeedRunCore::set_attack_formation_mode);
+    ClassDB::bind_method(D_METHOD("enemy_attack_snapshot"), &SpeedRunCore::enemy_attack_snapshot);
     ClassDB::bind_method(D_METHOD("set_population_mode", "enabled", "bonus", "blocked"), &SpeedRunCore::set_population_mode);
     ClassDB::bind_method(D_METHOD("configure_refill", "config"), &SpeedRunCore::configure_refill);
     ClassDB::bind_method(D_METHOD("step_population", "world_dt", "bonus"), &SpeedRunCore::step_population);
@@ -225,6 +227,19 @@ bool SpeedRunCore::configure(const Dictionary &data) {
             if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
             def.color[k] = double(value);
         }
+        if (row.has("attack")) {
+            if (row["attack"].get_type() != Variant::DICTIONARY) return false;
+            const Dictionary source = row["attack"];
+            const char *keys[] = {"value", "priority", "weight"};
+            double *values[] = {&def.attack_value, &def.attack_priority, &def.attack_weight};
+            for (int k = 0; k < 3; ++k) {
+                const Variant value = source.get(keys[k], Variant());
+                if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
+                *values[k] = value;
+            }
+            if (source.get("managed", Variant()).get_type() != Variant::BOOL) return false;
+            def.attack_managed = source["managed"];
+        }
         if (row.has("spawn")) {
             if (row["spawn"].get_type() != Variant::DICTIONARY) return false;
             const Dictionary source = row["spawn"];
@@ -293,7 +308,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     for (int i = 0; i < keys.size(); ++i) {
         if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return -1;
         const String key = keys[i];
-        if (key != "elite" && key != "size" && key != "facing" && key != "vel") return -1;
+        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed") return -1;
     }
     if (options.has("elite") && options["elite"].get_type() != Variant::BOOL) return -1;
     enemy.elite = options.get("elite", false);
@@ -309,6 +324,20 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     enemy.definition = definition;
     enemy.pos = position;
     const auto &def = definitions[definition];
+    if (options.has("attack_group")) {
+        const Variant group = options["attack_group"];
+        if (group.get_type() != Variant::INT || int64_t(group) < 0) return -1;
+        enemy.attack_group = group;
+    }
+    for (const char *key : {"attack_value", "attack_priority"}) if (options.has(key)) {
+        const Variant value = options[key];
+        if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return -1;
+    }
+    if (options.has("attack_managed") && options["attack_managed"].get_type() != Variant::BOOL) return -1;
+    enemy.attack_priority = options.get("attack_priority", def.attack_priority);
+    enemy.attack_value = enemy.attack_group > 0 ? double(options.get("attack_value", 1.0)) : def.attack_value;
+    enemy.attack_managed = !attack_formation_mode ? def.attack_weight > 0 :
+        (enemy.attack_group > 0 ? bool(options.get("attack_managed", enemy.attack_value > 0)) : def.attack_managed);
     enemy.hp = enemy.max_hp = def.hp;
     enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
     if ((options.has("size") || enemy.elite) && !def.scaling.ready) return -1;
@@ -491,4 +520,25 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         step_pickups(accumulated);
     }
     return true;
+}
+
+bool SpeedRunCore::set_attack_formation_mode(bool enabled) {
+    if (closed) return false;
+    attack_formation_mode = enabled;
+    return true;
+}
+
+Array SpeedRunCore::enemy_attack_snapshot() const {
+    Array out;
+    if (closed) return out;
+    std::vector<const Enemy *> ordered;
+    for (const auto &enemy : enemies) if (enemy.alive) ordered.push_back(&enemy);
+    std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
+    for (const auto *enemy : ordered) {
+        Dictionary row;
+        row["id"] = enemy->id; row["group"] = enemy->attack_group;
+        row["value"] = enemy->attack_value; row["priority"] = enemy->attack_priority;
+        row["managed"] = enemy->attack_managed; out.append(row);
+    }
+    return out;
 }

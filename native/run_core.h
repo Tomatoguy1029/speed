@@ -22,6 +22,9 @@ class SpeedRunCore : public RefCounted {
     std::vector<speed::EnemyDefinition> definitions;
     struct Enemy {
         int64_t id = 0;
+        int64_t attack_group = 0;
+        double attack_value = 1, attack_priority = 0;
+        bool attack_managed = false;
         size_t definition = 0, behavior_group = 0, behavior_slot = 0;
         Vector2 pos, vel;
         double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
@@ -32,6 +35,7 @@ class SpeedRunCore : public RefCounted {
         bool dash_fresh = false;
     };
     std::vector<Enemy> enemies;
+    bool attack_formation_mode = false;
     std::vector<speed::EnemyDefinition::Kind> behavior_kinds;
     std::vector<std::vector<size_t>> behavior_rows;
     std::vector<size_t> free_rows, dead_rows;
@@ -193,6 +197,8 @@ protected:
     static void _bind_methods();
 public:
     bool configure_population(const Dictionary &config);
+    bool set_attack_formation_mode(bool enabled);
+    Array enemy_attack_snapshot() const;
     bool configure_refill(const Dictionary &config);
     bool step_population(double world_dt, bool bonus);
     bool set_population_mode(bool enabled, bool bonus, bool blocked);
