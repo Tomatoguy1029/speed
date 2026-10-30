@@ -3,7 +3,7 @@ extends RefCounted
 const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]
+const COMMANDS := ["boss_appearance", "armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field"]
 
 static func plain(value):
 	if value is Vector2:
@@ -58,7 +58,8 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 	spec["time"] = session.run.state.time
 	spec["schedule"] = session.schedule.duplicate(true)
 	var phase_ids := []
-	for phase in session.run.state.stage.phases: phase_ids.append(String(phase.id))
+	for phase in session.run.state.stage.phases:
+		if ContentManager.phases.has(phase.id): phase_ids.append(String(phase.id))
 	var commands := [{"tick": 0, "kind": "phase_set", "args": {"ids": phase_ids}}]
 	var t := session.run.enemies.table as EnemyTable
 	for i in t.alive.size():
@@ -221,7 +222,7 @@ static func _validate_command(command) -> String:
 		return TranslationServer.translate("lab.message_2fa6cacf94")
 	if int(command.get("tick", -1)) < 0 or int(command.tick) > 216000:
 		return TranslationServer.translate("lab.message_884b1ef739")
-	if command.kind in ["spawn", "boss", "parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level"]:
+	if command.kind in ["boss_appearance", "spawn", "boss", "parameter", "boss_parameter", "meta", "time", "edit_range", "level"]:
 		if not command.args.get("type", "") is String and not command.args.get("type", "") is StringName: return TranslationServer.translate("lab.message_03af38d54f")
 		var id := StringName(command.args.get("type", ""))
 		if not ContentManager.enemies.has(id) and not ContentManager.bosses.has(id):
@@ -230,7 +231,7 @@ static func _validate_command(command) -> String:
 	if args.has("pos") and not _vector_ok(args.pos): return TranslationServer.translate("lab.message_2a897624ac")
 	for key in ["cursor", "pen"]:
 		if args.has(key) and not _vector_ok(args[key]): return TranslationServer.translate("lab.message_c547a6d3c5")
-	if command.kind in ["parameter", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level"]:
+	if command.kind in ["parameter", "boss_parameter", "meta", "time", "edit_range", "level"]:
 		if not _number_ok(args.get("value")) and not args.get("value") is bool: return TranslationServer.translate("lab.message_6b1292dfc2")
 	for key in ["count", "level", "angle", "gauge", "id", "size"]:
 		if args.has(key) and not _number_ok(args[key]) and not (command.kind in ["loadout", "hero"] and key == "id"): return TranslationServer.translate("lab.message_6d6845a8d1")
@@ -239,6 +240,9 @@ static func _validate_command(command) -> String:
 		if not args.get("id", "") is String or args.get("kind", "weapon") not in ["weapon", "trait"]: return TranslationServer.translate("lab.message_dcb428f285")
 		var registry: Dictionary = ContentManager.weapons if args.get("kind", "weapon") == "weapon" else ContentManager.traits
 		if not registry.has(StringName(args.get("id", ""))): return TranslationServer.translate("lab.message_dcb428f285")
+	if command.kind == "boss_appearance":
+		if not ContentManager.bosses.has(StringName(args.get("type", ""))) or not BossDef.valid_part_appearance(args.get("parts")):
+			return TranslationServer.translate("lab.message_7241f95e31")
 	if command.kind == "armor_paint":
 		if not ContentManager.enemies.has(StringName(args.get("type", ""))) or not ARMOR_PAINT.valid_palettes(args.get("colors")):
 			return TranslationServer.translate("lab.message_7241f95e31")
@@ -264,7 +268,7 @@ static func boss_differences(session) -> Dictionary:
 		var def: BossDef = session.run.bosses.definitions[id]
 		var base: BossDef = ContentManager.bosses[id]
 		var values := {}
-		for key in ["params", "speed", "radius", "accel", "turn", "weak_arc", "xp"]:
+		for key in ["params", "speed", "radius", "accel", "turn", "weak_arc", "xp", "part_appearance"]:
 			if def.get(key) != base.get(key): values[key] = plain(def.get(key))
 		if not values.is_empty(): changes[String(id)] = values
 	return changes
@@ -294,7 +298,9 @@ static func _definition_problem(values, boss := false) -> String:
 		var original: Resource = registry[StringName(id)]
 		for key in values[id]:
 			var value = values[id][key]
-			if key == "armor_colors" and not boss:
+			if key == "part_appearance" and boss:
+				if not BossDef.valid_part_appearance(value): return TranslationServer.translate("lab.message_7241f95e31")
+			elif key == "armor_colors" and not boss:
 				if not ARMOR_PAINT.valid_palettes(value): return TranslationServer.translate("lab.message_7241f95e31")
 			elif key == "visual_settings" and not boss:
 				if not value is Dictionary: return TranslationServer.translate("lab.message_2dac0fe5e5")

@@ -7,7 +7,7 @@ static func _files(directory: String, result: PackedStringArray) -> void:
 		var path := directory.path_join(name)
 		if path == "res://data/content_catalog.tres": continue
 		if path.begins_with("res://data/bosses/ai/") or "_moves/" in path: continue
-		if path.get_extension() in ["gd", "tres", "res", "tscn", "gdshader", "gdshaderinc", "png", "svg", "jpg", "jpeg", "webp", "import"]: result.append(path)
+		if path.get_extension() in ["gd", "tres", "res", "tscn", "gdshader", "gdshaderinc", "png", "svg", "jpg", "jpeg", "webp", "mp3", "wav", "import"]: result.append(path)
 	for name in DirAccess.get_directories_at(directory):
 		if not name.begins_with("."): _files(directory.path_join(name), result)
 static func signature() -> String:

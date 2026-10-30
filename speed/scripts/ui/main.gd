@@ -52,7 +52,10 @@ func _show(screen: GameManager.Screen) -> void:
 	await _replace_screen(screen, request)
 	if request != _screen_request:
 		return
+	if screen == GameManager.Screen.STAGE_SELECT and _displayed_screen != screen:
+		AudioManager.play(&"menu_open")
 	_displayed_screen = screen
+	_sync_screen_music(screen)
 	# 最後の子で先に入力を受け、GUI やランへ演出中の操作を渡さない。
 	move_child(_fade, -1)
 	if fade:
@@ -64,6 +67,14 @@ func _show(screen: GameManager.Screen) -> void:
 		_current.process_mode = Node.PROCESS_MODE_INHERIT
 		if _current is RunSession: _current.auto_step = true
 		GameManager.screen_transition_active = false
+
+func _sync_screen_music(screen: GameManager.Screen) -> void:
+	if screen == GameManager.Screen.RUN:
+		return # 戦闘のHUDが通常曲とボス曲を所有する。
+	if screen in [GameManager.Screen.STAGE_SELECT, GameManager.Screen.INTRO]:
+		AudioManager.stop_music()
+	else:
+		AudioManager.play_music(&"menu", 0.6, self)
 
 func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	var morph: bool = screen == GameManager.Screen.UPGRADE and is_instance_valid(_current) and _current.has_method("can_morph_to_upgrade") and _current.can_morph_to_upgrade()
@@ -101,3 +112,6 @@ func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE and is_instance_valid(_prepared_run):
 		_prepared_run.free()
+
+func _exit_tree() -> void:
+	AudioManager.stop_music(self)

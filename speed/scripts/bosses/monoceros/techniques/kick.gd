@@ -71,7 +71,8 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 		for path in REAR_LEGS:
 			var leg := parts.get_node(path) as Node2D
 			var foot := leg.get_node("Foot") as Node2D
-			var hoof := foot.get_node("Sprite") as Sprite2D
+			var hoof := foot.get_node("Sprite") as Node2D
+			var hoof_art := hoof.get_node("Base") as Sprite2D
 			var toward := tip_in_parts - leg.position
 			var turn := wrapf(toward.angle() - PI * 0.5, -TAU, 0.0)
 			var rest := foot.position.y
@@ -82,7 +83,7 @@ class Runner extends "res://scripts/bosses/monoceros/technique_runner.gd":
 				pose.foot = lerpf(rest, KICK_FOLD, fold)
 			else:
 				var extend := clampf((elapsed - warn) / maxf(0.001, float(rule.active) * KICK_EXTEND), 0.0, 1.0)
-				var natural := rest + hoof.position.y + hoof.texture.get_height()
+				var natural := rest + hoof.position.y + hoof_art.texture.get_height()
 				pose.rotation = turn
 				pose.foot = lerpf(KICK_FOLD, rest, extend)
 				pose.stretch = lerpf(1.0, maxf(1.0, toward.length() / natural), extend)

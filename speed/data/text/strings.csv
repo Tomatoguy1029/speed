@@ -28,6 +28,7 @@ menu.encyclopedia,図鑑,Codex
 settings.volume,音量,Volume
 settings.master_volume,全体の音量,Master
 settings.sfx_volume,効果音,Sound Effects
+settings.music_volume,BGMの音量,Music Volume
 settings.engine_volume,エンジン音,Engine
 settings.mute,消音（M キーでも切り替え）,Mute (also toggled with M)
 settings.effects,演出,Effects
@@ -192,6 +193,10 @@ upgrade.part.length,エンジンタンク,Engine Tank
 upgrade.part.pickup,コレクター,Collector
 upgrade.part.speed,ブースター,Booster
 upgrade.part.reroll,演算予備,Spare Processor
+upgrade.debug.reset,全強化リセット,Reset Upgrades
+upgrade.debug.reset_help,デバッグ用。すべての機体強化を初期段階へ戻し、部品を返します。,Debug: reset all ship upgrades and refund parts.
+upgrade.debug.infinite,部品無限,Infinite Parts
+upgrade.debug.infinite_help,デバッグ用。起動中は部品を消費せず強化できます。,Debug: upgrade without spending parts during this session.
 ,■ 図鑑,
 codex.title,図鑑　（{known} / {total}）,Codex  ({known} / {total})
 codex.weapons,武器,Weapons
@@ -796,6 +801,119 @@ lab.ui.freehand_hint,クリックで描き始め・もう一度クリックで�
 lab.ui.drawing_route,描画中：クリックで確定・右クリック／Escで取り消し,Drawing: click to finish; right-click or Esc to cancel
 lab.ui.collapse_bottom,下のバー全体を折りたたむ,Collapse the entire bottom bar
 lab.ui.expand_bottom,下のバーを開く,Expand the bottom bar
+lab.boss_parts.open,一角獣の外観・パーツ編集,Edit Monoceros parts
+lab.boss_parts.title,一角獣：色とパーツ配置,Monoceros: colors and parts
+lab.boss_parts.help,パーツを選び、色と位置を調整します。全体とBase／Armorを個別に選べます。,Select a part to adjust its color and position. Whole parts and Base/Armor layers can be selected separately.
+lab.boss_parts.layer_help,全体の項目は一括移動用です。色を変える場合は下位のBase／Armorを選んでください。,Whole-part entries move parts together. Select a Base/Armor layer to change its color.
+lab.boss_parts.color,パーツの色（元の明暗を保持）,Part color (preserves shading)
+lab.boss_parts.x,横方向の位置補正（ピクセル）,Horizontal offset (pixels)
+lab.boss_parts.y,縦方向の位置補正（ピクセル）,Vertical offset (pixels)
+lab.boss_parts.reset_part,選択したパーツを元に戻す,Reset selected part
+lab.boss_parts.reset_all,すべての色と配置を元に戻す,Reset all colors and positions
+lab.boss_parts.play,走りを再生,Play running animation
+lab.boss_parts.rotation,見本の向き（度）,Preview angle (degrees)
+lab.boss_parts.normal_strength,見本の法線の強さ,Preview normal strength
+lab.boss_parts.preview_only,向きと法線の強さは見本だけに適用します。,Angle and normal strength apply to the preview only.
+lab.boss_parts.save,色と配置を本番へ保存,Save colors and positions to game
+lab.boss_parts.unsaved,実験所に反映済み・本番には未保存,Applied in lab; not saved to game
+lab.boss_parts.saved,色と配置を本番へ保存しました,Colors and positions saved to game
+lab.boss_parts.collision_help,配置を変えても、当たり判定と攻撃の性能は変わりません。,Visual offsets do not change collisions or attack performance.
+centaurus.parts.title,ケンタウルス：パーツ配置,Centaurus: part layout
+centaurus.parts.help,画像をクリックして選び、ドラッグで移動できます。位置と回転は下の数値でも調整できます。,"Click a part to select it, then drag to move. Adjust its position and rotation with the fields below."
+centaurus.parts.x,横位置（親パーツからのピクセル数）,X position (pixels from parent)
+centaurus.parts.y,縦位置（親パーツからのピクセル数）,Y position (pixels from parent)
+centaurus.parts.rotation,パーツの回転（度）,Part rotation (degrees)
+centaurus.parts.zoom,表示倍率,Preview zoom
+centaurus.parts.save,配置を保存,Save layout
+centaurus.parts.unsaved,配置を変更しました・未保存,Layout changed; not saved
+centaurus.parts.saved,配置を保存しました,Layout saved
+centaurus.parts.conflict,シーンが外部で更新されています。再起動して最新の配置を読み込んでください。,The scene changed externally. Restart to load the latest layout.
+centaurus.parts.failed,保存できませんでした,Could not save layout
+centaurus.parts.shoot,射撃を再生,Preview shot
+centaurus.parts.rain,弓の雨を再生,Preview arrow rain
+centaurus.parts.idle,通常姿勢に戻す,Return to idle
+centaurus.anim.title,ケンタウルス：ポーズ・アニメーション,Centaurus: poses and animation
+centaurus.anim.save,すべて保存,Save all
+centaurus.anim.saved,保存済み,Saved
+centaurus.anim.unsaved,未保存の変更があります,Unsaved changes
+centaurus.anim.base_pose,基礎ポーズ,Base pose
+centaurus.anim.pose_name,新しいポーズ名,New pose name
+centaurus.anim.create_pose,現在の姿勢を基礎ポーズとして追加,Add current pose to library
+centaurus.anim.target,編集する動作,Edit action
+centaurus.anim.pose_mode,基礎ポーズを編集,Edit base pose
+centaurus.anim.idle,通常・待機,Idle
+centaurus.anim.shot_windup,射撃：構え・引き絞り,Shot: raise and draw
+centaurus.anim.shot_release,射撃：発射・引き直し,Shot: release and redraw
+centaurus.anim.shot_recovery,射撃：戻し,Shot: recovery
+centaurus.anim.rain_windup,弓の雨：構え,Arrow rain: windup
+centaurus.anim.rain,弓の雨：発射中,Arrow rain: active
+centaurus.anim.rain_recovery,弓の雨：戻し,Arrow rain: recovery
+centaurus.anim.previous,前のコマ,Previous
+centaurus.anim.next,次のコマ,Next
+centaurus.anim.duplicate_frame,コマを複製,Duplicate frame
+centaurus.anim.delete_frame,コマを削除,Delete frame
+centaurus.anim.from_pose,基礎ポーズをこのコマに適用,Apply base pose to this frame
+centaurus.anim.move_before,前へ移動,Move earlier
+centaurus.anim.move_after,後ろへ移動,Move later
+centaurus.anim.duration,このコマの時間（ms）,Frame duration (ms)
+centaurus.anim.timing_help,実戦では、構えは技の予告時間、発射・引き直しは矢の間隔に合わせて再生します。各コマの時間の比率を保ちます。,"Combat fits windup to the attack warning and release to the shot interval, preserving relative frame durations."
+centaurus.anim.interpolate,次のコマへ位置・回転・拡大率を補間,Interpolate transform to next frame
+centaurus.anim.play,動作を再生,Play action
+centaurus.anim.stop,再生を停止,Stop playback
+centaurus.anim.loop,ループ再生,Loop playback
+centaurus.anim.part,編集するパーツ,Edit part
+centaurus.anim.visible,このポーズ・コマで表示,Visible in this pose or frame
+centaurus.anim.bow,弓の画像差分,Bow variant
+centaurus.anim.bow_0,Base：横向き,Base: horizontal
+centaurus.anim.bow_1,Rotate Bow：1,Rotate Bow: 1
+centaurus.anim.bow_2,Rotate Bow：2,Rotate Bow: 2
+centaurus.anim.bow_3,Rotate Bow：3,Rotate Bow: 3
+centaurus.anim.bow_4,Rotate Bow：7,Rotate Bow: 7
+centaurus.anim.bow_5,Rotate Bow：縦向き,Rotate Bow: vertical
+centaurus.anim.bow_6,Bow Up：1,Bow Up: 1
+centaurus.anim.bow_7,Bow Up：2,Bow Up: 2
+centaurus.anim.bow_8,Rotate Bow：4,Rotate Bow: 4
+centaurus.anim.bow_9,Rotate Bow：5,Rotate Bow: 5
+centaurus.anim.bow_10,Rotate Bow：6,Rotate Bow: 6
+centaurus.anim.x,横位置（px）,X (px)
+centaurus.anim.y,縦位置（px）,Y (px)
+centaurus.anim.scale_x,横の拡大率,Scale X
+centaurus.anim.scale_y,縦の拡大率,Scale Y
+centaurus.anim.rotation,回転（度）,Rotation (degrees)
+centaurus.anim.depth,重なり順,Draw order
+centaurus.anim.duplicate_part,選択パーツを複製・追加,Duplicate selected part
+centaurus.anim.add_png,プロジェクト内のPNGを追加,Add project PNG
+centaurus.anim.help,基礎ポーズを用意し、動作を選んでコマを複製します。画像はドラッグで移動し、プレビュー上のホイールで拡大・縮小、中ドラッグまたはSpace＋左ドラッグで視点移動できます。基礎ポーズから追加したコマは個別に編集できます。保存後は戦闘を起動し直すと反映されます。,"Create a base pose, select an action, and duplicate frames. Drag parts to move them, and use the wheel over the preview to zoom, and middle-drag or Space + left-drag to pan. Frames copied from a pose can be edited independently. Restart combat after saving to apply changes."
+centaurus.anim.unique_name,空欄・既存名を避けて、新しいポーズ名を入力してください,"Enter a new, unique pose name"
+centaurus.anim.conflict,保存先が外部で更新されています。上書きせず、画面を開き直してください,The file changed externally. Reopen this editor before saving.
+centaurus.anim.neutral,基本姿勢,Neutral
+centaurus.anim.reset_view,視点・倍率をリセット,Reset view and zoom
+centaurus.anim.aim,縦向きの弓,Vertical bow
+centaurus.anim.up,上向きの弓,Raised bow
+centaurus.rig.mode,腕の操作,Arm controls
+centaurus.rig.parts,通常のパーツ移動,Move parts normally
+centaurus.rig.setup,関節位置を設定,Set joint positions
+centaurus.rig.pose,関節を動かす（握りはIK）,Drag joints (Grip uses IK)
+centaurus.rig.right,右腕,Right arm
+centaurus.rig.left,左腕,Left arm
+centaurus.rig.reset,現在の配置から接続点を初期化,Initialize joints from current layout
+centaurus.rig.connected,このポーズ・コマで腕を接続,Connect this arm in this pose or frame
+centaurus.rig.shoulder,肩,Shoulder
+centaurus.rig.elbow,肘,Elbow
+centaurus.rig.wrist,手首,Wrist
+centaurus.rig.grip,握り,Grip
+centaurus.rig.flip,肘の曲がる向きを反転,Flip elbow bend direction
+centaurus.rig.bow,手に接続する弓,Bow to attach
+centaurus.rig.bind,この手の握り位置に弓を接続,Attach bow to this hand grip
+centaurus.rig.unbind,選んだ弓の接続を解除,Detach selected bow
+centaurus.rig.help,設定モードでは丸印をドラッグして接続点を決めます。操作モードでは肩で腕全体を移動、肘で上腕、手首で前腕の向きを調整します。「握り」は腕全体のIKです。肩・肘・手首の角度は数値でも変更できます。接続点は全コマ共通、接続状態と姿勢はコマごとに保存します。,"In setup mode, drag the joint markers. In pose mode, drag Shoulder to move the arm, Elbow to aim the upper arm, or Wrist to aim the forearm. Drag Grip for full-arm IK. Edit shoulder, elbow, and wrist angles with the fields. Joint positions are shared; connections and poses are stored per frame."
+centaurus.rig.invalid,肩・肘・手首を離して接続点を設定してください,"Place the shoulder, elbow, and wrist at distinct points"
+centaurus.pivot.enabled,支点を固定して回転,Rotate around fixed pivot
+centaurus.pivot.setup,支点の位置を編集,Edit pivot position
+centaurus.pivot.help,支点編集をOFFにし、絵または「回転」の丸印をドラッグすると支点を中心に回ります。回転の数値でも同じ支点を使います。支点設定は全コマ共通です。,"Turn placement off, then drag the artwork or Rotation handle to rotate around the pivot. The rotation field uses the same pivot. Pivot settings are shared by all frames."
+centaurus.pivot.point,支点,Pivot
+centaurus.pivot.rotate,回転,Rotation
+centaurus.pivot.head,頭（LowerBody）,Head (LowerBody)
 lab.appearance.title,外観,Appearance
 lab.appearance.help,本番と同じ描画で確認します。拡大後もホイールで倍率、中央ドラッグで視点を変更できます。,Inspect the production renderer. Use the wheel to zoom and middle-drag to pan.
 lab.appearance.bomber,自爆型を配置して拡大,Place and magnify a bomber

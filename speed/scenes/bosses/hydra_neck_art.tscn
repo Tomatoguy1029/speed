@@ -1,0 +1,62 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/hydra_neck_art.gd" id="script"]
+[ext_resource type="Shader" path="res://shaders/boss_part.gdshader" id="shader"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/neck/hydra_neck.png" id="hydra_neck"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/neck/hydra_neck_normal.png" id="hydra_neck_normal"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/neck/hydra_undead_neck.png" id="hydra_undead_neck"]
+[ext_resource type="Texture2D" path="res://assets/pixel/hydra/neck/hydra_undead_neck_normal.png" id="hydra_undead_neck_normal"]
+
+[sub_resource type="CanvasTexture" id="neck"]
+diffuse_texture = ExtResource("hydra_neck")
+normal_texture = ExtResource("hydra_neck_normal")
+texture_filter = 1
+
+[sub_resource type="CanvasTexture" id="undead"]
+diffuse_texture = ExtResource("hydra_undead_neck")
+normal_texture = ExtResource("hydra_undead_neck_normal")
+texture_filter = 1
+
+[sub_resource type="AtlasTexture" id="tile0"]
+atlas = SubResource("neck")
+region = Rect2(0, 0, 32, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="tile1"]
+atlas = SubResource("neck")
+region = Rect2(32, 0, 32, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="tile2"]
+atlas = SubResource("neck")
+region = Rect2(64, 0, 32, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="tip"]
+atlas = SubResource("neck")
+region = Rect2(104, 0, 16, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="taper"]
+atlas = SubResource("neck")
+region = Rect2(130, 0, 28, 32)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="bearer"]
+atlas = SubResource("undead")
+region = Rect2(12, 3, 76, 76)
+filter_clip = true
+
+[sub_resource type="ShaderMaterial" id="lighting"]
+shader = ExtResource("shader")
+shader_parameter/use_normal = true
+
+[node name="NeckArtwork" type="Node2D"]
+show_behind_parent = true
+texture_filter = 1
+material = SubResource("lighting")
+script = ExtResource("script")
+segments = Array[Texture2D]([SubResource("tile0"), SubResource("tile1"), SubResource("tile2")])
+tail_taper = SubResource("taper")
+tail_tip = SubResource("tip")
+immortal = SubResource("bearer")

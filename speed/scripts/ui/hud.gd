@@ -13,19 +13,22 @@ const RING_RADIUS := 14.0
 const RING_GAP := 7.0
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
-const LOADOUT_WEAPON := 21.0
-const LOADOUT_TRAIT := 13.0
+const LOADOUT_SLOT := 16.0
+const LOADOUT_STEP := 18.0
+const LOADOUT_WEAPON := Vector2(9, 320)
+const LOADOUT_TRAIT := Vector2(9, 338)
+const LOADOUT_HERO := Vector2(81, 320)
+const LOADOUT_REGION := Rect2(9, 320, 107, 35)
 ## ミニマップの半径（素材のpx）
 const MINIMAP_R := 43.0
 const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
 const ART := "res://assets/ui/combat/"
-const FRAME := preload(ART + "combat_ui_main.png")
 const RADAR := preload(ART + "combat_ui_radar.png")
 const HEALTH := preload(ART + "combat_ui_health_bar.png")
 const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
-const SLOTS := preload(ART + "combat_ui_upgrades_boxes.png")
+const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
@@ -78,7 +81,6 @@ var _swap_new_name: Label
 var _swap_new_desc: Label
 var _swap_keep: Button
 var _swap_keep_index := -1
-var _frame: TextureRect
 var _loadout_icons: Control
 var _loadout_key := ""
 var _health_fill: AtlasTexture
@@ -109,14 +111,6 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_health_fill = _make_bar_fill(HEALTH)
 	_experience_fill = _make_bar_fill(EXPERIENCE)
-	_frame = TextureRect.new()
-	_frame.texture = FRAME
-	_frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var frame_material := ShaderMaterial.new()
-	frame_material.shader = preload(ART + "main_frame.gdshader")
-	_frame.material = frame_material
-	add_child(_frame)
 	_loadout_icons = Control.new()
 	_loadout_icons.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_loadout_icons)
@@ -159,6 +153,8 @@ func _ready() -> void:
 	run.phase_changed.connect(_on_phase)
 	run.cards_changed.connect(_show_cards)
 	run.frame_events.connect(_on_events)
+	if not run.state.lab_mode:
+		AudioManager.play_music(&"boss" if run.state.boss_spawned else &"battle", 0.6, self)
 
 func _on_reward_active(active: bool) -> void:
 	run.ui_reward_active = active
@@ -255,12 +251,15 @@ func _on_events(events: Array[Dictionary]) -> void:
 			&"hero_discovered":
 				_hero_notice_t = 1.8
 			&"boss_spawn":
+				if not run.state.lab_mode: AudioManager.play_music(&"boss", 1.0, self)
 				_warning_t = 3.0
 			&"clear_banner":
+				AudioManager.end_dash()
 				_banner = tr("hud.clear")
 				_banner_color = Color("#ffe46b")
 				_banner_t = 99.0
 			&"game_over":
+				AudioManager.end_dash()
 				_banner = tr("hud.game_over")
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
@@ -273,6 +272,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				AudioManager.play(&"hurt", -4.0)
 			&"launch":
 				AudioManager.play(&"dash", -6.0)
+			&"trace_end":
+				AudioManager.end_dash()
 			&"bounce", &"block_impact":
 				AudioManager.play(&"block", -8.0)
 			&"shield_reflect":
@@ -416,8 +417,8 @@ func _can_show_draw_button(touchscreen: bool) -> bool:
 func _sync_combat_art_visibility() -> void:
 	var state := run.state
 	var cinematic := state != null and state.cinematic_bars > 0.0
-	_frame.visible = show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
-	_loadout_icons.visible = _frame.visible or (cinematic and not state.final_modules.is_empty())
+	var combat_visible := show_status and state != null and state.phase not in [RunState.Phase.DYING, RunState.Phase.FINISHING] and not cinematic
+	_loadout_icons.visible = combat_visible or (cinematic and not state.final_modules.is_empty())
 
 func _update_finish_presentation() -> void:
 	if run.state.phase != RunState.Phase.FINISHING:
@@ -439,16 +440,14 @@ func _update_finish_presentation() -> void:
 func _layout_art() -> void:
 	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
 	var origin := (size - ART_SIZE * factor) * 0.5
-	for item in [_frame, _loadout_icons]:
-		item.position = origin
-		item.scale = Vector2.ONE * factor
+	_loadout_icons.position = origin
+	_loadout_icons.scale = Vector2.ONE * factor
 	if _swap_box.visible:
 		_layout_cards()
 	else:
 		_cards_box.position = origin
 		_cards_box.scale = Vector2.ONE * factor
 		_cards_box.size = ART_SIZE
-	_frame.size = ART_SIZE
 	_sync_combat_art_visibility()
 
 func _make_bar_fill(frame: Texture2D) -> AtlasTexture:
@@ -511,14 +510,15 @@ func _refresh_loadout_icons() -> void:
 			continue
 		var index := 0
 		for id in owned:
-			var area := Rect2(9 + index * 23, 317, 17, 17) if row == 0 else Rect2(10 + index * 15, 340, 11, 9)
+			var at := (LOADOUT_WEAPON if row == 0 else LOADOUT_TRAIT) + Vector2(index * LOADOUT_STEP, 0)
+			var area := Rect2(at + Vector2(2, 2), Vector2(12, 10))
 			_add_icon(_loadout_icons, ContentManager.catalog.find(&"weapons" if row == 0 else &"traits", id), area)
 			index += 1
 		row += 1
 	for j in run.state.final_modules.size():
 		var preview=preload("res://scripts/ui/legendary_module_icon.gd").new()
-		preview.position=Vector2(9+j*23,317)
-		preview.size=Vector2(17,17)
+		preview.position=LOADOUT_WEAPON+Vector2(j*LOADOUT_STEP+2,2)
+		preview.size=Vector2(12,10)
 		preview.module_id=run.state.final_modules[j]
 		_loadout_icons.add_child(preview)
 
@@ -1001,16 +1001,16 @@ func _dense_cells() -> PackedVector2Array:
 ## 下の目盛りは強化の段階（仕様書 8）。
 ## 枠の中は能力IDに対応する専用アイコンを表示する。
 func _draw_loadout() -> void:
-	draw_texture(SLOTS, Vector2.ZERO)
-	_draw_slot_row(315, LOADOUT_WEAPON, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
-	_draw_slot_row(338, LOADOUT_TRAIT, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
-	_draw_hero_slot(Vector2(99, 315))
+	draw_texture_rect_region(SLOTS, LOADOUT_REGION, LOADOUT_REGION)
+	_draw_slot_row(LOADOUT_WEAPON, true, run.cfg.weapon_slots, run.cfg.weapon_max_level, run.state.weapons, ContentManager.catalog.table(&"weapons"))
+	_draw_slot_row(LOADOUT_TRAIT, false, run.cfg.trait_slots, run.cfg.trait_max_stacks, run.state.traits, ContentManager.catalog.table(&"traits"))
+	_draw_hero_slot(LOADOUT_HERO)
 
 func _draw_hero_slot(at: Vector2) -> void:
 	var s := run.state
 	if s.hero_power == &"":
 		return
-	var rect := Rect2(at + Vector2(3, 3), Vector2(32, 31))
+	var rect := Rect2(at + Vector2(3, 3), Vector2(29, 29))
 	var definition: HeroDef = ContentManager.heroes.get(s.hero_power)
 	var gold := Color("#ffe8a0")
 	if definition != null and not definition.stars.is_empty():
@@ -1030,23 +1030,21 @@ func _draw_hero_slot(at: Vector2) -> void:
 	if s.hero_cd > 0.0 and definition != null and definition.cooldown > 0.0:
 		var k := clampf(s.hero_cd / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
-	draw_string(_font, at + Vector2(26, 32), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
+	draw_string(_font, at + Vector2(24, 31), OS.get_keycode_string(InputActions.key_of(&"hero")), HORIZONTAL_ALIGNMENT_LEFT, -1, 7, gold)
 	if s.hero_active_t > 0.0:
 		draw_string(_font, at + Vector2(35, 15), "%ds" % ceili(s.hero_active_t), HORIZONTAL_ALIGNMENT_LEFT, 32, 9, gold)
 
-func _draw_slot_row(y: float, size_px: float, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
+func _draw_slot_row(origin: Vector2, weapon: bool, slots: int, max_level: int, owned: Dictionary, defs: Dictionary) -> void:
 	var ids := owned.keys()
 	for k in mini(slots, ids.size()):
-		var weapon := size_px == LOADOUT_WEAPON
-		var step := 23.0 if weapon else 15.0
-		var rect := Rect2((7.0 if weapon else 9.0) + k * step, y, size_px, size_px)
+		var rect := Rect2(origin + Vector2(k * LOADOUT_STEP, 0), Vector2(LOADOUT_SLOT, 17))
 		var lv: int = owned[ids[k]]
 		var col: Color = RANK_COLORS[clampi(lv - 1, 0, 4)]
 		var definition = defs[ids[k]]
 		if weapon and definition.comet_only:
 			draw_rect(rect.grow(1), COMET_ONLY_COLOR, false, 1)
 			continue
-		var pip_w := (size_px - 4.0) / max_level
+		var pip_w := (LOADOUT_SLOT - 4.0) / max_level
 		for j in max_level:
 			draw_rect(Rect2(rect.position.x + 2 + j * pip_w, rect.end.y - 3, maxf(1, pip_w - 1), 1), col if j < lv else Color(1, 1, 1, 0.15))
 
@@ -1147,3 +1145,8 @@ func _draw_banner() -> void:
 	if _banner == "":
 		return
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
+
+func _exit_tree() -> void:
+	if run != null and run.state != null and not run.state.lab_mode:
+		AudioManager.stop_music(self)
+	AudioManager.end_dash()

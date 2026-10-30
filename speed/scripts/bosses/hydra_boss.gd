@@ -994,16 +994,22 @@ func draw_on(c: CanvasItem) -> void:
 		return
 	var t := table
 	var r := t.r[body]
-	if neck_texture==null:
+	if has_node("NeckArtwork"):
+		for neck in necks:
+			if neck.row >= 0 and neck.glow > 0.0 and not neck.segs.is_empty():
+				c.draw_circle(neck.segs[-1] - table.pos[body], r * 0.5, Color(1.0, 0.85, 0.5, 0.45 * neck.glow))
+	elif neck_texture==null:
 		_draw_neck_mesh(c,r)
 	else:
 		for neck in necks:
 			if neck.row >= 0 or neck.length > 0.0:
 				_draw_neck(c, neck.segs, r, Color("#8f8170"), neck.glow if neck.row >= 0 else 0.0)
 	if separated:
-		if immortal_neck!=null:
+		if immortal_neck!=null and not has_node("NeckArtwork"):
 			if neck_texture!=null:_draw_neck(c,immortal_neck.segs,110.0,Color("#c9a64a"),0.0)
 			_draw_compass(c,52.0)
+		return
+	if has_node("BodyArtwork"):
 		return
 	if body_texture!=null:
 		c.draw_texture_rect(body_texture,Rect2(Vector2.ONE*-r,Vector2.ONE*r*2.0),false)
@@ -1015,6 +1021,7 @@ func draw_on(c: CanvasItem) -> void:
 		_draw_compass(c, r * 0.75)
 
 func draw_head_on(c: CanvasItem, row: int, at: Vector2) -> bool:
+	if has_node("HeadArtwork"): return true
 	var kind: StringName = &""
 	for neck in necks:
 		if neck.row == row and _alive(neck):
