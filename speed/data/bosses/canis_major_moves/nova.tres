@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/nova.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"nova"
+display_name = "シリウスの閃光"
+category = &"major"
+track_during_warn = true
+count = 6
+min_hounds = 6
+pair_dist = 95.0
+pair_side = 14.0
+gather_speed = 420.0
+body_radius = 12.0
+warn = 1.4
+rings = 2
+ring_gap = 0.35
+ring_speed = 560.0
+ring_band = 8.0
+ring_end = 1400.0
+damage = 22.0
+after = 2.4
+recover = 1.6
+cd = 16.0
