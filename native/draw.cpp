@@ -168,7 +168,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
         const Vector2 from = ship.pos;
         for (auto it = draw.inside.begin(); it != draw.inside.end();) {
             const auto &enemy = enemies[it->second];
-            const double radius = definitions[enemy.definition].radius + trace_radius + 2.0;
+            const double radius = enemy.radius + trace_radius + 2.0;
             if (!enemy.alive || enemy.dead || enemy.id != it->first || enemy.pos.distance_squared_to(from) > radius * radius) it = draw.inside.erase(it);
             else ++it;
         }

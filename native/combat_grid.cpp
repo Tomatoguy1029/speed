@@ -30,7 +30,7 @@ bool SpeedRunCore::rebuild_enemy_grid(double cell_size) {
     for (size_t row = 0; row < enemies.size(); ++row) {
         const auto &enemy = enemies[row];
         if (!enemy.alive || enemy.dead) { grid.next[row] = -1; continue; }
-        grid.max_radius = std::max(grid.max_radius, definitions[enemy.definition].radius);
+        grid.max_radius = std::max(grid.max_radius, enemy.radius);
         const int64_t cx = std::floor((double(enemy.pos.x) - grid.origin.x) / grid.cell);
         const int64_t cy = std::floor((double(enemy.pos.y) - grid.origin.y) / grid.cell);
         if (cx < 0 || cy < 0 || cx >= grid.cols || cy >= grid.rows) {

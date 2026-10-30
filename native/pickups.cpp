@@ -70,19 +70,18 @@ void SpeedRunCore::drop_gem(Vector2 position, double value) {
 }
 
 void SpeedRunCore::drop_enemy_pickups(const Enemy &enemy) {
-    const auto &def = definitions[enemy.definition];
     const auto &c = pickup_config;
-    const double value = def.xp * c.xp_mult * (c.xp_bonus > 0 ? c.xp_bonus : 1.0);
+    const double value = enemy.xp * c.xp_mult * (c.xp_bonus > 0 ? c.xp_bonus : 1.0);
     xp_dropped += value;
     drop_gem(enemy.pos, value);
     if (rng->randf() < 0.03) {
         const double angle = rng->randf() * (2.0 * Math_PI);
         const double share = rng->randf();
-        const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * def.radius, true, false};
+        const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * enemy.radius, true, false};
         if (free_coins.empty()) coins.push_back(coin);
         else { coins[free_coins.back()] = coin; free_coins.pop_back(); }
     }
-    if (rng->randf() < std::min(c.drop_max, c.drop_base * std::pow(def.xp, c.drop_power))) {
+    if (rng->randf() < std::min(c.drop_max, c.drop_base * std::pow(enemy.xp, c.drop_power))) {
         const double fraction = std::clamp(time / c.shift_time, 0.0, 1.0);
         std::vector<float> weights;
         double total = 0;

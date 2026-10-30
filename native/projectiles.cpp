@@ -90,7 +90,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
             const auto &enemy = enemies[row];
             if (shot.hit_ids.count(enemy.id)) continue;
-            const double t = segment_circle(from, to, enemy.pos, double(shot.radius) + definitions[enemy.definition].radius);
+            const double t = segment_circle(from, to, enemy.pos, double(shot.radius) + enemy.radius);
             if (t >= 0) hits.push_back({t, row});
         }
         SortArray<Hit, Earlier>().sort(hits.data(), hits.size());

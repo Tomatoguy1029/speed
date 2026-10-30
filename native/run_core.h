@@ -22,7 +22,8 @@ class SpeedRunCore : public RefCounted {
         int64_t id = 0;
         size_t definition = 0;
         Vector2 pos, vel;
-        double hp = 0.0, facing = 0.0, age = 0.0, fire_t = 0.0;
+        double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
+        double facing = 0.0, age = 0.0, fire_t = 0.0;
         bool alive = false, dead = false;
         double hit_cd = 0, flash = 0;
         int64_t dash_seen = -1;

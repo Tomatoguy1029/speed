@@ -105,7 +105,7 @@ void SpeedRunCore::advance_enemies(double delta) {
                 const Vector2 toward = enemy_aim - enemy.pos;
                 double distance = toward.length();
                 if (distance < 0.001) distance = 1;
-                enemy.vel += (toward / distance * def.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
+                enemy.vel += (toward / distance * enemy.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
                 const double difference = double((ship_pos - enemy.pos).angle()) - enemy.facing;
                 const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
                 enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
@@ -115,7 +115,7 @@ void SpeedRunCore::advance_enemies(double delta) {
                 enemy.vel = Vector2();
                 if (distance > 0.001) {
                     const Vector2 unit = toward / distance;
-                    enemy.vel = unit * def.speed;
+                    enemy.vel = unit * enemy.speed;
                     enemy.facing = unit.angle();
                 }
             }
@@ -239,7 +239,9 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position) {
     enemy.id = next_id++;
     enemy.definition = definition;
     enemy.pos = position;
-    enemy.hp = definitions[definition].hp;
+    const auto &def = definitions[definition];
+    enemy.hp = enemy.max_hp = def.hp;
+    enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
     enemy.fire_t = definitions[definition].fire_interval * (0.5 + rng->randf() * 0.5);
     enemy.alive = true;
     enemies[row] = enemy;
@@ -266,8 +268,8 @@ Array SpeedRunCore::enemies_snapshot() const {
         row["id"] = enemy.id; row["type"] = String(def.id);
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
         row["vel"] = Array::make(enemy.vel.x, enemy.vel.y);
-        row["hp"] = enemy.hp; row["armor"] = def.armor;
-        row["radius"] = def.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;
+        row["hp"] = enemy.hp; row["armor"] = enemy.armor;
+        row["radius"] = enemy.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;
         out.append(row);
     }
     // 比較用コピーだけをID順へ並べる。実行中の格納位置は変えない。
@@ -291,7 +293,7 @@ PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, dou
     int64_t index = 0;
     for (const auto &enemy : enemies) {
         if (!enemy.alive || enemy.dead || definitions[enemy.definition].id != type) continue;
-        const double radius = definitions[enemy.definition].radius * scale;
+        const double radius = enemy.radius * scale;
         const double angle = enemy.facing + angle_offset;
         const double c = std::cos(angle) * radius, s = std::sin(angle) * radius;
         out[index++] = c; out[index++] = -s; out[index++] = 0; out[index++] = enemy.pos.x;
