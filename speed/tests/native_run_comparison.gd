@@ -40,9 +40,38 @@ func _ready() -> void:
 	add_child(owner)
 	owner.set_process(false)
 	owner.attach(c)
+	var c_first := "--c-first" in OS.get_cmdline_user_args()
 	var choices := 0
 	var collected := 0
+	var command := {"touch":true}
+	var counts := {"collections":0}
 	var comp = COMPARE.new()
+	var update_b := func():
+		var before := Time.get_ticks_usec()
+		b.step_frame(1.0/60.0,command,Vector2.ZERO,Vector2(640,360),1.0)
+		var clock: Dictionary = b.inspect()
+		var ship_state: Dictionary = b.ship_snapshot()
+		run.state.time = clock.time
+		run.state.world_time = clock.world_time
+		run.state.ship_pos = ship_state.ship_pos
+		run.state.ship_hp = ship_state.ship_hp
+		run.state.rng.state = b.random_state()
+		var notifications: Array = b.drain_events()
+		for item in b.drain_collections():
+			if item.kind==&"gem": run.loadout.add_xp(item.value); counts.collections += 1
+		if run.state.cards.is_empty(): run.loadout.try_open_cards()
+		if not run.state.cards.is_empty(): b.apply_external_progression(values(run.state.stats,run.state.stats.get_property_list().filter(func(p):return p.type in [TYPE_FLOAT,TYPE_INT]).map(func(p):return p.name)),run.state.ship_hp,true,run.state.rng.state)
+		return Time.get_ticks_usec()-before
+	var update_c := func():
+		var before := Time.get_ticks_usec()
+		c.step_frame(1.0/60.0,command,Vector2.ZERO,Vector2(640,360),1.0)
+		c.drain_collections()
+		var native_events: Array = c.drain_events()
+		owner.sync_requests()
+		c.inspect()
+		c.ship_snapshot()
+		return Time.get_ticks_usec()-before
+
 	for tick in 600:
 		# 同じXP入力で複数の保留・選択を必ず通す。戦闘からの回収も併せて扱う。
 		if tick in [60,180,300]:
@@ -51,27 +80,13 @@ func _ready() -> void:
 			if run.state.cards.is_empty(): run.loadout.try_open_cards()
 			c.open_cards(false)
 			b.apply_external_progression(values(run.state.stats,run.state.stats.get_property_list().filter(func(p):return p.type in [TYPE_FLOAT,TYPE_INT]).map(func(p):return p.name)),run.state.ship_hp,not run.state.cards.is_empty(),run.state.rng.state)
-		var command := {"touch":true}
 		var active: bool = b.inspect().phase==0
-		var before := Time.get_ticks_usec()
-		b.step_frame(1.0/60.0,command,Vector2.ZERO,Vector2(640,360),1.0)
-		run.state.time = b.inspect().time
-		run.state.world_time = b.inspect().world_time
-		run.state.ship_pos = b.ship_snapshot().ship_pos
-		run.state.ship_hp = b.ship_snapshot().ship_hp
-		run.state.rng.state = b.random_state()
-		var notifications: Array = b.drain_events()
-		for item in b.drain_collections():
-			if item.kind==&"gem": run.loadout.add_xp(item.value); collected += 1
-		if run.state.cards.is_empty(): run.loadout.try_open_cards()
-		if not run.state.cards.is_empty(): b.apply_external_progression(values(run.state.stats,run.state.stats.get_property_list().filter(func(p):return p.type in [TYPE_FLOAT,TYPE_INT]).map(func(p):return p.name)),run.state.ship_hp,true,run.state.rng.state)
-		var b_time := Time.get_ticks_usec()-before
-		before = Time.get_ticks_usec()
-		c.step_frame(1.0/60.0,command,Vector2.ZERO,Vector2(640,360),1.0)
-		c.drain_collections()
-		var native_events: Array = c.drain_events()
-		owner.sync_requests()
-		var c_time := Time.get_ticks_usec()-before
+		var b_time: int
+		var c_time: int
+		if tick%2==(1 if c_first else 0):
+			b_time = update_b.call(); c_time = update_c.call()
+		else:
+			c_time = update_c.call(); b_time = update_b.call()
 		if tick>=60:
 			var target: Dictionary = samples if active else wait_samples
 			target.B.append(b_time); target.C.append(c_time)
@@ -104,17 +119,20 @@ func _ready() -> void:
 		if diff.is_empty(): diff = comp.difference(comp.plain(b.ship_snapshot()),comp.plain(c.ship_snapshot()))
 		if diff.is_empty(): diff = comp.difference(comp.plain(b.projectiles_snapshot()),comp.plain(c.projectiles_snapshot()))
 		if diff.is_empty(): diff = comp.difference(comp.plain(b.pickups_snapshot()),comp.plain(c.pickups_snapshot()))
+		if tick%30==0:
+			check(b.enemy_buffer(&"drifter",1.0,PI/2.0)==c.enemy_buffer(&"drifter",1.0,PI/2.0),"敵の表示データが一致する")
+			check(b.friendly_buffer(&"weapon/forward",1.82*run.cfg.character_scale,1.0,tick/60.0)==c.friendly_buffer(&"weapon/forward",1.82*run.cfg.character_scale,1.0,tick/60.0),"弾の表示データが一致する")
 		check(diff.is_empty(),"BとCで戦闘・停止・回収の結果が一致する tick%d: %s"%[tick,diff])
 		if failed: break
 	check(choices>=2,"複数のカード選択を実際に比較する")
-	check(collected>0,"戦闘の撃破から経験値を回収する")
+	check(counts.collections>0,"戦闘の撃破から経験値を回収する")
 	var metrics := {}
 	for key in samples:
 		var sorted: Array = samples[key].duplicate(); sorted.sort()
 		var total := 0.0
 		for x in sorted: total += x
 		if not sorted.is_empty(): metrics[key] = {"mean_ms":total/sorted.size()/1000.0,"p95_ms":sorted[ceili(sorted.size()*0.95)-1]/1000.0,"max_ms":sorted.back()/1000.0,"samples":sorted.size()}
-	print("RUN_COMPARISON ",JSON.stringify({"metrics":metrics,"wait_samples":wait_samples.B.size(),"choices":choices,"collections":collected,"failed":failed}))
+	print("RUN_COMPARISON ",JSON.stringify({"metrics":metrics,"c_first":c_first,"wait_samples":wait_samples.B.size(),"choices":choices,"collections":counts.collections,"failed":failed}))
 	owner.close(); owner.free(); b.close(); lab.free()
 	print("[native_run_comparison] failed=%d"%failed)
 	get_tree().quit(1 if failed else 0)
