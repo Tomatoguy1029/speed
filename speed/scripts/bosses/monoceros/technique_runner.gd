@@ -82,23 +82,27 @@ func launch_strike(host: MonocerosBoss) -> void:
 		host._cue(&"recovery_started")
 		return
 	if kind() in [&"charge", &"return_charge", &"lance"] and host._path_blocked():
-		host.combat_trace.finish("interrupted", "path_obstructed")
-		host.combo_pending = false
-		host.passes_left = 0
-		host.timeline.stop()
-		host.mode = &"idle"
-		host.technique = &""
-		host.reposition = float(host.def.params.reposition_time)
-		var toward := (host.aim_point - host.table.pos[host.body]).normalized()
-		var side := toward.orthogonal()
-		var a := host.ctx.field.body_gap(host.table.pos[host.body] + side * 220.0, host.table.r[host.body])
-		var b := host.ctx.field.body_gap(host.table.pos[host.body] - side * 220.0, host.table.r[host.body])
-		host.reposition_direction = side if a >= b else -side
-		host._cue(&"reposition")
+		begin_reposition(host)
 		return
 	host.mode = &"active"
 	host.previous_horn = host.horn_points()
 	host._cue(&"attack_started")
+
+## 地形が狙いを塞ぐときは発進を見送り、横へ位置を変える。
+func begin_reposition(host: MonocerosBoss) -> void:
+	host.combat_trace.finish("interrupted", "path_obstructed")
+	host.combo_pending = false
+	host.passes_left = 0
+	host.timeline.stop()
+	host.mode = &"idle"
+	host.technique = &""
+	host.reposition = float(host.def.params.reposition_time)
+	var toward := (host.aim_point - host.table.pos[host.body]).normalized()
+	var side := toward.orthogonal()
+	var a := host.ctx.field.body_gap(host.table.pos[host.body] + side * 220.0, host.table.r[host.body])
+	var b := host.ctx.field.body_gap(host.table.pos[host.body] - side * 220.0, host.table.r[host.body])
+	host.reposition_direction = side if a >= b else -side
+	host._cue(&"reposition")
 
 func _path_blocked(host: MonocerosBoss) -> bool:
 	var at := host.table.pos[host.body]
