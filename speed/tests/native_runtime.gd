@@ -6,11 +6,12 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
-	if not ClassDB.class_exists(&"SpeedRunCore"):
+	var comparison = load("res://tools/compare_runtime.gd").new()
+	var first = comparison.create_native()
+	if first == null:
 		check(false, "ネイティブランを読み込める")
 	else:
-		var first = ClassDB.instantiate(&"SpeedRunCore")
-		var second = ClassDB.instantiate(&"SpeedRunCore")
+		var second = comparison.create_native()
 		check(not first.step(0.01), "開始前の更新を拒否する")
 		check(first.start(932) and second.start(933), "別々のランを開始する")
 		check(not first.start(934), "開始済みのランを再初期化しない")

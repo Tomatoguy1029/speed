@@ -14,3 +14,10 @@ demo/docs/keporusu.md
 
 # 制作工程で生成する実行用データ
 /speed/.content/
+
+# ネイティブ実装の依存と生成物
+/native/godot-cpp/
+/native/*.o
+/native/*.os
+/native/.sconsign.dblite
+/speed/native/bin/

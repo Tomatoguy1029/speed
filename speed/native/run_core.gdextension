@@ -1,0 +1,9 @@
+[configuration]
+entry_symbol = "speed_runtime_init"
+compatibility_minimum = "4.5"
+reloadable = false
+
+[libraries]
+macos.arm64 = "res://native/bin/libspeed_runtime.macos.template_release.arm64.dylib"
+macos.x86_64 = "res://native/bin/libspeed_runtime.macos.template_release.x86_64.dylib"
+windows.x86_64 = "res://native/bin/speed_runtime.windows.template_release.x86_64.dll"
