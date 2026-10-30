@@ -73,6 +73,8 @@ func _sync_screen_music(screen: GameManager.Screen) -> void:
 		return # 戦闘のHUDが通常曲とボス曲を所有する。
 	if screen == GameManager.Screen.STAGE_SELECT:
 		AudioManager.play_music(&"stage_select", 0.6, self)
+	elif screen == GameManager.Screen.RESULT and not GameManager.last_result.get("cleared", false):
+		AudioManager.play_music(&"game_over", 1.0, self)
 	elif screen == GameManager.Screen.INTRO:
 		AudioManager.stop_music()
 	else:

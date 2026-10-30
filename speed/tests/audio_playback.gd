@@ -17,11 +17,6 @@ const EXPECTED := {
 		"rate": 22050,
 		"size": 2646
 	},
-	"kill": {
-		"hash": "640320e43cb28091db1574b84368f4115f494faf0e7ffac54d7dd6edf509b8c6",
-		"rate": 22050,
-		"size": 5292
-	},
 	"levelup": {
 		"hash": "aa946cb1e3e3066b57f5ea4f40e342bd3de01442590680c9b4261519907ef093",
 		"rate": 22050,
@@ -53,6 +48,12 @@ func _ready() -> void:
 		hash.update(wav.data)
 		check(hash.finish().hex_encode() == EXPECTED[name].hash, "波形を維持する: " + name)
 		check(wav.mix_rate == EXPECTED[name].rate and wav.data.size() == EXPECTED[name].size, "長さとサンプル周波数を維持する: " + name)
+	var kill := AudioManager.sound(&"kill") as AudioStreamMP3
+	var kill_source := load("res://assets/audio/sfx/khoamthanh-punch-sound-effect-7ehhx2evi5k-500092.mp3") as AudioStreamMP3
+	check(kill != null and not kill.loop and kill.data == kill_source.data, "敵の撃破音を指定されたパンチ音へ差し替える")
+	var kill_voice := AudioManager._next
+	AudioManager.play(&"kill", -10.0)
+	check(AudioManager._players[kill_voice].stream == kill and AudioManager._players[kill_voice].playing, "撃破通知用の再生口で指定音源が鳴る")
 	for song in [&"battle", &"boss", &"menu", &"stage_select"]:
 		var music := AudioManager._music.get(song) as AudioStreamMP3
 		check(music != null and music.loop and music.get_length() > 0.0, "BGMをループ再生できる: " + String(song))
@@ -60,10 +61,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check(AudioManager._music_player.playing and AudioManager._music_player.stream == AudioManager._music[&"battle"], "通常戦闘曲を開始する")
+	check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0 / 3.0), "通常戦闘BGMを1/3の音量にする")
 	AudioManager.play_music(&"boss", 0.08)
 	check(AudioManager._music_player.stream == AudioManager._music[&"battle"], "フェードアウト中は前の曲を保持する")
 	await get_tree().create_timer(0.25).timeout
 	check(AudioManager._music_player.stream == AudioManager._music[&"boss"] and AudioManager._music_player.playing, "フェード後にボス曲へ切り替える")
+	check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0 / 3.0), "ボスBGMもフェード後に1/3の音量へ到達する")
 	AudioManager.play_music(&"battle", 0.2)
 	AudioManager.stop_music()
 	await get_tree().create_timer(0.3).timeout
@@ -98,6 +101,38 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check(AudioManager._music_track == &"menu", "メニューへ戻ると通常のメニュー曲へ切り替える")
+	var game_over := AudioManager._music.get(&"game_over") as AudioStreamMP3
+	check(game_over != null and not game_over.loop and game_over.get_length() > 0.0, "ゲームオーバー曲を一度再生する")
+	var hud := preload("res://scripts/ui/hud.gd").new()
+	hud.run = RunSimulation.new()
+	hud.run.state = RunState.new()
+	var saved_result := GameManager.last_result
+	for track in [&"battle", &"boss"]:
+		AudioManager.play_music(track, 0.0, hud)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		hud._on_events([{ "type": &"game_over" }])
+		check(AudioManager._music_track == &"game_over" and AudioManager._music_player.stream == AudioManager._music[track], "ゲームオーバー表示時に元の曲からフェードする: " + String(track))
+		await get_tree().create_timer(0.3).timeout
+		check(AudioManager._music_player.volume_linear < 1.0 / 3.0, "戦闘曲の音量を徐々に下げる")
+		var fade := AudioManager._music_fade
+		GameManager.last_result = {"cleared": false}
+		main._sync_screen_music(GameManager.Screen.RESULT)
+		AudioManager.stop_music(hud)
+		check(AudioManager._music_fade == fade and AudioManager._music_owner == main, "リザルトへの移動とHUD退出でフェードを中断しない")
+		await get_tree().create_timer(0.85).timeout
+		check(AudioManager._music_player.stream == game_over and AudioManager._music_player.playing and AudioManager._music_player.volume_linear < 1.0, "指定曲へ切り替わってフェードインする")
+		await get_tree().create_timer(0.6).timeout
+		check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0), "指定曲を通常音量まで上げる")
+		var playback := AudioManager._music_player.get_playback_position()
+		main._sync_screen_music(GameManager.Screen.RESULT)
+		check(AudioManager._music_player.get_playback_position() >= playback, "敗北リザルトで曲を最初から再生し直さない")
+	GameManager.last_result = {"cleared": true}
+	main._sync_screen_music(GameManager.Screen.RESULT)
+	check(AudioManager._music_track == &"menu", "クリア結果ではゲームオーバー曲を流さない")
+	GameManager.last_result = saved_result
+	hud.run = null
+	hud.free()
 	AudioManager.stop_music()
 	main._fade.free()
 	main.free()

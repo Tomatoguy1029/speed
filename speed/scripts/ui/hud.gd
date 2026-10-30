@@ -265,6 +265,8 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_banner_t = 99.0
 			&"game_over":
 				AudioManager.end_dash()
+				if not run.state.lab_mode:
+					AudioManager.play_music(&"game_over", 1.0, AudioManager)
 				_banner = tr("hud.game_over")
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0

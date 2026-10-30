@@ -7,7 +7,7 @@ static func build(output: String) -> Error:
 	var bank := AudioBank.new()
 	var _sounds := bank.sounds
 	_sounds[&"hit"] = _tone(520.0, 260.0, 0.06, "square")
-	_sounds[&"kill"] = _tone(300.0, 90.0, 0.12, "noise")
+	_sounds[&"kill"] = load("res://assets/audio/sfx/khoamthanh-punch-sound-effect-7ehhx2evi5k-500092.mp3")
 	_sounds[&"block"] = _tone(180.0, 140.0, 0.08, "square")
 	_sounds[&"bounce"] = load("res://assets/audio/sfx/bounce_robot.mp3")
 	_sounds[&"hurt"] = load("res://assets/audio/sfx/hurt_robot.mp3")
@@ -39,11 +39,12 @@ static func build(output: String) -> Error:
 			push_error("音源を読み込めません: %s" % name)
 			return ERR_CANT_OPEN
 	for entry in [[&"battle", "kulakovka-space-283176.mp3"], [&"boss", "nastelbom-war-391660.mp3"], [&"menu", "leberch-space-ambient-509783.mp3"],
-		[&"stage_select", "atlasaudio-space-music-625739.mp3"]]:
+		[&"stage_select", "atlasaudio-space-music-625739.mp3"],
+		[&"game_over", "luminewave-i-know-this-is-the-end-short-version-621150.mp3"]]:
 		var song := load("res://assets/audio/music/" + entry[1]) as AudioStreamMP3
 		if song == null: return ERR_CANT_OPEN
 		song = song.duplicate() as AudioStreamMP3
-		song.loop = true
+		song.loop = entry[0] != &"game_over"
 		if entry[0] == &"stage_select": song.loop_offset = 26.0
 		bank.music[entry[0]] = song
 	return ResourceSaver.save(bank, output)
