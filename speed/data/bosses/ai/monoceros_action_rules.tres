@@ -11,12 +11,15 @@
 
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/sword_flash.tres" id="sword_flash"]
 
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/horn_dance.tres" id="horn_dance"]
+
 [resource]
 script = ExtResource("1_fdbe4")
 adapter = &"monoceros"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn"), ExtResource("horn_wave"), ExtResource("sword_flash")])
+techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn"), ExtResource("horn_wave"), ExtResource("sword_flash"), ExtResource("horn_dance")])
 conditions = {
+"horn_dance": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1000.0, "min_phase": 2},
 "sword_flash": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 700.0, "min_phase": 2},
 "horn_wave": {
 "angle": 0.0,
@@ -62,6 +65,7 @@ conditions = {
 }
 }
 costs = {
+"horn_dance": 4.0,
 "sword_flash": 2.0,
 "horn_wave": 2.0,
 "charge": 1.0,
@@ -75,6 +79,7 @@ selection_bias = {
 "sweep": 3.0
 }
 layout = {
+"horn_dance": Vector2(1448, 432),
 "sword_flash": Vector2(2356, 1380),
 "horn_wave": Vector2(2356, 1064),
 "charge": Vector2(2356, 748),
@@ -92,7 +97,7 @@ condition_groups = {
 "title": "コンボ"
 },
 "choose_major": {
-"nodes": ["lance"],
+"nodes": ["lance", "horn_dance"],
 "title": "大技"
 },
 "choose_normal": {

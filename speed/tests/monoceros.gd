@@ -315,6 +315,27 @@ func _ready() -> void:
 	check(slash_trace.hits.size() == slash_trace.releases and slash_trace.hits.values().all(func(n): return int(n) == 1), "光の剣は静止自機へ各斬撃で1回だけ当たる")
 	check(actor.mode == &"recovery", "光の剣は連撃を終えて隙に入る")
 
+	fresh()
+	actor.phase = 2
+	actor._apply_phase()
+	sim.state.ship_pos = Vector2(600, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	var dance_trace := {"launches": 0, "ended": false, "left": true}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"attack_started": dance_trace.launches += 1
+		if e.cue == &"dance_end": dance_trace.ended = true)
+	actor.start_attack(&"horn_dance")
+	for frame in 2400:
+		var was_circle: bool = actor._runner != null and actor._runner.get("stage") == &"circle"
+		var facing := actor.table.facing[actor.body]
+		step(DT)
+		if was_circle and actor._runner.get("stage") == &"circle":
+			dance_trace.left = bool(dance_trace.left) and actor.table.facing[actor.body] < facing
+		if actor.mode == &"recovery": break
+	check(dance_trace.launches == int(actor.rule().get("passes", 0)) and dance_trace.launches > 0, "光角の乱舞は指定した回数突進する")
+	check(dance_trace.left, "光角の乱舞は旋回中に左へ回り続ける")
+	check(dance_trace.ended and actor.mode == &"recovery", "光角の乱舞は角を掲げて隙に入る")
+
 	session.free()
 	await get_tree().process_frame
 	print("[monoceros] failures=",failed)

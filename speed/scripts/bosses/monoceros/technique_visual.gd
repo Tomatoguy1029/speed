@@ -30,6 +30,14 @@ func _draw() -> void:
 	if actor.technique != technique_id:
 		_lance_remnants()
 		return
+	if technique_id == &"horn_dance":
+		if actor.mode in [&"windup", &"active"]:
+			# 仮表示。正式は shader。角の光だけを描き、軌跡の線は残さない。
+			var points := actor.horn_points()
+			var glow_level := float(actor._runner.glow_level)
+			draw_line(_body_point(points[0]), _body_point(points[1]), Color(ENERGY, glow_level), 12.0, false)
+			if actor._runner.stage == &"end": draw_circle(_body_point(points[1]), 6.0 + 10.0 * glow_level, Color.WHITE)
+		return
 	if technique_id == &"return_charge" and actor._runner != null and actor._runner.stage == &"brake":
 		_reverse_jet(clampf(actor._runner.stage_time / maxf(float(actor.rule().brake_time), 0.001), 0.0, 1.0))
 	if technique_id == &"sweep":

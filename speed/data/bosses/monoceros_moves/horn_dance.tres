@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/monoceros/techniques/horn_dance.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/monoceros/horn_dance_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"horn_dance"
+category = &"major"
+display_name = "光角の乱舞"
+track_during_warn = false
+visual = ExtResource("visual")
+aim_time = 0.5
+aim_turn = 4.991641660703783
+aim_lock = 0.15
+passes = 4
+speed = 2200.0
+overshoot = 280.0
+min_run = 650.0
+circle_turn = 3.4033920413889427
+circle_speed = 900.0
+circle_late_time = 1.2
+circle_speed_late = 600.0
+circle_decel = 6000.0
+circle_accel = 2200.0
+align_angle = 0.059341194567807204
+align_min_distance = 380.0
+align_min_time = 0.25
+circle_max_time = 3.0
+head_lead = 0.5061454830783556
+glow_angle = 1.2042771838760873
+end_time = 0.5
+end_decay = 7.0
+damage = 25.0
+recover = 2.5
+cd = 18.0
