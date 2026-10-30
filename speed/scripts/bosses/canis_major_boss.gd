@@ -62,6 +62,7 @@ var flow_adapter: RefCounted
 var _moves := {}
 var technique_pose := {}
 var _support_runners := {}
+var sirius_effects: Node2D
 var combo_pending := false
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
@@ -93,6 +94,9 @@ func _on_bound() -> void:
 		_presentation = presentation_scene.instantiate()
 		add_child(_presentation)
 		_presentation.bind_canis_major(self)
+	sirius_effects = preload("res://scripts/bosses/canis_major/sirius_effects.gd").new()
+	add_child(sirius_effects)
+	sirius_effects.bind(self)
 	_cue(&"spawned")
 	if not run_state.lab_mode: begin_entrance()
 	else: _spawn_pack()
@@ -126,6 +130,7 @@ func _stop_combat() -> void:
 	cancel_attack()
 	timeline.stop()
 	_end_ring()
+	if sirius_effects != null: sirius_effects.clear()
 	_release_pack()
 	mode = &"defeated"
 	table.vel[body] = Vector2.ZERO
@@ -205,6 +210,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		elif timeline.is_playing(): table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0)
 	elif mode in [&"call", &"entrance_bark"]:
 		table.charge[body] = 1.0
+	if mode not in [&"defeated", &"final"]: sirius_effects.tick(dt)
 	_previous_ship = run_state.ship_pos
 	_sync_technique_visuals()
 	presentation_advanced.emit(dt)
@@ -264,7 +270,8 @@ func attack_failed() -> bool:
 func can_select(attack: StringName, min_phase: int, min_range: float, max_range: float) -> bool:
 	if mode != &"idle" or phase_pending or _cooldown > 0.0 or phase < min_phase: return false
 	if used_at.has(attack) and clock < float(used_at[attack]) + cooldown_of(attack): return false
-	if attack in [&"command", &"stream", &"bay"] and led.size() < int(_rules[attack].min_hounds): return false
+	if attack in [&"command", &"stream", &"bay", &"blaze", &"relay", &"nova"] and led.size() < int(_rules[attack].min_hounds): return false
+	if attack == &"hunt" and led.size() < 5: return false
 	if attack == &"hunt_pounce" and (phase != 1 or led.size() < int(_rules[&"stream"].min_hounds)): return false
 	var distance := run_state.enemy_aim.distance_to(table.pos[body])
 	return distance >= min_range and distance <= max_range
@@ -285,6 +292,7 @@ func attack_playing() -> bool:
 	return mode in [&"windup", &"active", &"bay", &"recovery"]
 
 func cancel_attack() -> void:
+	if sirius_effects != null: sirius_effects.warnings.clear()
 	if _runner != null: _runner.cancel(self)
 	combo_pending = false
 	timeline.stop()
@@ -297,6 +305,14 @@ func cancel_attack() -> void:
 # ── 技 ────────────────────────────────────────────────────
 
 func _attack_length(attack: StringName, r: Dictionary) -> float:
+	if attack == &"nova": return float(r.warn) + maxf(float(r.after), maxf(0,int(r.rings)-1)*float(r.ring_gap)+(float(r.ring_end)-30.0)/maxf(float(r.ring_speed),0.001)) + 0.1
+	if attack == &"relay": return float(r.warn) + maxf(0, led.size()-1)*float(r.interval) + float(r.each_warn) + float(r.interval) + 0.3 + float(r.final_warn) + float(r.final_time) + 0.1
+	if attack == &"hunt":
+		var stream: Dictionary = _rules[&"stream"]
+		return float(stream.warn) + maxf(0,led.size()-1)*float(stream.interval) + float(stream.each_warn) + float(r.gap) + float(r.aim_warn) + float(r.beam_time) + 0.1
+	if attack == &"blaze": return maxf(float(r.warn), float(r.ignite_at) + maxf(0, int(r.count)-1) * float(r.ignite_step)) + 0.1
+	if attack == &"sirius_flame": return float(r.warn) + float(r.duration) + 0.1
+	if attack == &"sirius": return int(r.shots) * (float(r.warn) + float(r.beam_time)) + maxf(0, int(r.shots) - 1) * float(r.shot_gap) + 0.1
 	if attack == &"pounce":
 		var count := int(r.chain) if led.size() < int(r.alone_hounds) else 1
 		return float(r.warn) + float(r.active) + (count - 1) * (float(r.chain_warn) + float(r.active)) + 0.05
@@ -406,7 +422,12 @@ func _lead_tick(dt: float) -> void:
 	for i in led:
 		if not _alive_hound(i): continue
 		if not lunging.has(i) and not ring.has(i):
-			var goal := origin + forward * spacing * row + side * (column - row * 0.5) * width
+			var lateral := (column - row * 0.5) * width
+			var ahead := spacing * row
+			if _opens_lane():
+				lateral += float(def.params.lane_open) * (signf(lateral) if not is_zero_approx(lateral) else (1.0 if column % 2 == 0 else -1.0))
+				ahead = float(def.params.lane_forward) + spacing * (row - 1)
+			var goal := origin + forward * ahead + side * lateral
 			# 個体IDから固定の位相と速さを作り、戦闘用の乱数列を消費しない。
 			var seed_phase := fposmod(float(table.id[i]) * 2.3999632297, TAU)
 			goal += Vector2(sin(clock * 1.3 + seed_phase), cos(clock * 1.1 + seed_phase * 1.7)) * float(def.params.form_wobble)
@@ -419,6 +440,13 @@ func _lead_tick(dt: float) -> void:
 			row += 1
 			column = 0
 
+func _opens_lane() -> bool:
+	if mode not in [&"windup", &"active"]: return false
+	if technique in [&"sirius", &"sirius_flame"]: return true
+	if technique == &"relay" and _runner != null: return _runner.final_aim != null
+	if technique == &"hunt" and _runner != null: return _runner.aim != null
+	return false
+
 func _scan_pack(hounds) -> void:
 	var t := table
 	var at := t.pos[body]
@@ -426,6 +454,7 @@ func _scan_pack(hounds) -> void:
 	var found: Array = []
 	for i in hounds.rows():
 		if t.alive[i] == 0 or t.dead[i] != 0: continue
+		if sirius_effects != null and sirius_effects.burning.has(i): continue
 		if (ring.has(i) or lunging.has(i)) and _led_ids.get(i, -1) != t.id[i]: continue
 		var distance := t.pos[i].distance_squared_to(at)
 		if distance <= reach * reach or _led_ids.get(i, -1) == t.id[i]: found.append([distance, i])
@@ -522,6 +551,7 @@ func _cue(cue: StringName, at: Vector2 = Vector2.INF) -> void:
 func begin_final_strike(charge: float) -> void:
 	cancel_attack()
 	_end_ring()
+	if sirius_effects != null: sirius_effects.clear()
 	if flow_adapter != null: flow_adapter.cancel()
 	selection_enabled = false
 	lunging.clear()
@@ -534,6 +564,7 @@ func _exit_tree() -> void:
 	if ctx != null and ctx.enemies != null:
 		cancel_attack()
 		_end_ring()
+		if sirius_effects != null: sirius_effects.clear()
 		_release_pack()
 
 func _runner_for() -> RefCounted:

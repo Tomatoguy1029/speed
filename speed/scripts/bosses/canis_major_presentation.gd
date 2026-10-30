@@ -53,7 +53,7 @@ func _sync_parts() -> void:
 	var howling: bool = actor.technique_pose.get("howl", false)
 	parts.get_node("Head").rotation = -0.45 * smoothstep(0.0, 0.65, actor.table.charge[actor.body]) if howling else 0.0
 	var charging: bool = howling or actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false) or actor.technique_pose.get("bay", false) or actor.technique_pose.get("call", false)
-	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), actor.table.charge[actor.body] if charging else 0.0, pulse)
+	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), maxf(actor.table.charge[actor.body] if charging else 0.0, float(actor.technique_pose.get("glow", 0.0))), pulse)
 
 ## シリウスの輝きの強さ（0〜1）。第2形態への移行の間に強め、そのあとは強いまま。
 func blaze() -> float:

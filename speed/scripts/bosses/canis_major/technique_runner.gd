@@ -180,3 +180,48 @@ func shuffled_pack(host: CanisMajorBoss) -> Array:
 		rows[k] = rows[j]
 		rows[j] = row
 	return rows
+
+## 直線の光に共通する、追尾・固定・発射。各技が自分の値を渡す。
+class BeamAim extends RefCounted:
+	var cfg: Dictionary
+	var age := 0.0
+	var fired := false
+	var done := false
+	var result: Dictionary = {}
+	func begin(host: CanisMajorBoss, values: Dictionary) -> void:
+		cfg = values
+		age = 0.0
+		fired = false
+		done = false
+		host.mode = &"windup"
+		host.locked = false
+		host.table.vel[host.body] = Vector2.ZERO
+		host._cue(&"telegraph")
+	func step(host: CanisMajorBoss, dt: float) -> bool:
+		if done: return true
+		if not fired:
+			if not host.locked:
+				var lead := maxf(0.0, float(cfg.warn) - age) if cfg.get("remaining_lead", false) else float(cfg.get("lead", 0.0))
+				if host._moves[host.technique].track_during_warn:
+					host._face(host.run_state.ship_pos + host.run_state.ship_vel * lead, float(cfg.turn), dt)
+				if age >= float(cfg.warn) - float(cfg.lock):
+					host.locked = true
+					host.direction = Vector2.from_angle(host.table.facing[host.body])
+					host._cue(&"aim_locked")
+			age += dt
+			host.sirius_effects.warnings = [{"from": host.mouth(), "angle": host.table.facing[host.body], "length": cfg.length, "width": cfg.width, "progress": progress(), "locked": host.locked}]
+			if age < float(cfg.warn): return false
+			host.locked = true
+			host.direction = Vector2.from_angle(host.table.facing[host.body])
+			result = host.sirius_effects.fire_beam(host.mouth(), host.direction.angle(), float(cfg.length), float(cfg.width), float(cfg.time), float(cfg.damage))
+			fired = true
+			age = 0.0
+			host.mode = &"active"
+			host.sirius_effects.warnings.clear()
+			host._cue(&"sirius")
+			return false
+		age += dt
+		done = age >= float(cfg.time)
+		return done
+	func progress() -> float:
+		return clampf(age / maxf(float(cfg.warn), 0.001), 0.0, 1.0) if not fired else 0.0

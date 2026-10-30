@@ -18,6 +18,8 @@ params = {
 "entrance_time": 1.4,
 "pack_size": 8,
 "form_wobble": 16.0,
+"lane_open": 100.0,
+"lane_forward": 40.0,
 "form_speed_min": 0.85,
 "form_speed_max": 1.15,
 "call_below": 6,

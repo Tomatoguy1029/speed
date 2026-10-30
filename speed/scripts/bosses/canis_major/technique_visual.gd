@@ -36,13 +36,6 @@ func _draw() -> void:
 		var color := DANGER if actor.locked else WARNING
 		draw_line(Vector2(r, 0.0), Vector2(maxf(r, reach), 0.0), Color(color, 0.35 + charge * 0.4), pixel_size * (2.0 if actor.locked else 1.0))
 		draw_arc(Vector2(reach, 0.0), r * 0.5, 0.0, TAU, 24, Color(color, 0.6), pixel_size)
-	# シリウスの光の溜めは、口元から射線を細く示す。向きが固定されると光の太さの赤い線にする。
-	if visual_kind == &"sirius" and actor.mode == &"windup":
-		var from := Vector2(r * CanisMajorBoss.MOUTH_REACH, 0.0)
-		var length := float(actor.rule().get("beam_length", 1400.0))
-		var color := DANGER if actor.locked else WARNING
-		var width := float(actor.rule().get("beam_width", 50.0)) if actor.locked else pixel_size * 1.5
-		draw_line(from, from + Vector2(length, 0.0), Color(color, 0.35 if actor.locked else 0.25 + charge * 0.3), width)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (r / 100.0))
 	var mouth := Vector2(84.0, 0.0)
 	var shout := visual_kind == &"command" and actor.mode == &"windup"
