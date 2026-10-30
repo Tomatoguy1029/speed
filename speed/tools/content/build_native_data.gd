@@ -145,3 +145,12 @@ static func compile_spawn_clips(stage: StageDef, config: GameConfig) -> Dictiona
 		out.clips.append({"start":source.time,"end":source.end_time(),"groups":source.groups,"interval":source.interval,
 			"priority":source.attack_priority,"types":types,"formations":references})
 	return out
+
+## 噛みつきの固定寿命と、生成済み表示資源が持つ終了演出を実行用へ渡す。
+static func compile_bite_zone(visual_library: Resource) -> Dictionary:
+	var scene := "res://scenes/attacks/zone_bite.tscn"
+	if not ResourceLoader.exists(scene): scene = "res://scenes/attacks/zone.tscn"
+	var layers: Dictionary = visual_library.get_meta("looks",{}).get(scene,{}) if visual_library != null else {}
+	return {"version":1,"duration":ProjectileSystem.ZONE_FLASH,"scene":scene,
+		"hit":layers.get("Hit") != null or not layers.get("Hit_sprites",[]).is_empty(),
+		"fade":layers.get("Fade") != null or not layers.get("Fade_sprites",[]).is_empty()}

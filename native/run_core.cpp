@@ -7,6 +7,10 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_bite_zone", "data"), &SpeedRunCore::configure_bite_zone);
+    ClassDB::bind_method(D_METHOD("fire_bite_zone", "at", "radius", "delay", "damage", "color", "token"), &SpeedRunCore::fire_bite_zone, DEFVAL(0));
+    ClassDB::bind_method(D_METHOD("step_hazards", "dt"), &SpeedRunCore::step_hazards);
+    ClassDB::bind_method(D_METHOD("hazards_snapshot"), &SpeedRunCore::hazards_snapshot);
     ClassDB::bind_method(D_METHOD("set_enemy_motion", "id", "state"), &SpeedRunCore::set_enemy_motion);
     ClassDB::bind_method(D_METHOD("enemy_motion_snapshot"), &SpeedRunCore::enemy_motion_snapshot);
     ClassDB::bind_method(D_METHOD("set_attack_budget_mode", "enabled", "from_stage"), &SpeedRunCore::set_attack_budget_mode);
@@ -177,6 +181,7 @@ void SpeedRunCore::close() {
     grid = EnemyGrid();
     events.clear();
     hostiles.clear(); free_hostiles.clear();
+    bite_zones.clear(); free_bite_zones.clear(); bite_zone_config = BiteZoneConfig();
     friends.clear(); free_friends.clear(); live_friends = 0; live_debris = 0;
     gems.clear(); coins.clear(); free_gems.clear(); free_coins.clear(); gem_queue.clear(); collections.clear();
 }
@@ -547,6 +552,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (world_step && accumulated > 0) {
         step_projectiles(accumulated);
         step_hostiles(accumulated);
+        step_hazards(accumulated);
     }
     if (check_run_end()) return true;
     for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);

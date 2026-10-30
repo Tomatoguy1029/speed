@@ -203,6 +203,22 @@ class SpeedRunCore : public RefCounted {
         float speed = 0, radius = 0, life = 0, slow = 0, turn = 0, gap = 0, stone = 0, wait = 0;
         double damage = 0;
     };
+    struct BiteZone {
+        Vector2 pos;
+        float radius = 0, time = 0, delay = 0;
+        double damage = 0;
+        Color color;
+        int64_t attack_token = 0;
+        bool alive = true, hit = false;
+    };
+    std::vector<BiteZone> bite_zones;
+    std::vector<size_t> free_bite_zones;
+    struct BiteZoneConfig {
+        bool ready = false, hit = false, fade = false;
+        float duration = 0;
+        String scene;
+    } bite_zone_config;
+    void end_bite_visual(bool hit, Vector2 at);
     std::deque<Hostile> hostiles;
     std::vector<size_t> free_hostiles;
     size_t add_hostile(Hostile shot);
@@ -264,6 +280,10 @@ public:
     bool set_attack_guard(bool active, double until);
     bool request_attack(StringName owner, const PackedStringArray &categories, int64_t id, double duration, double priority, double cost);
     Dictionary attack_budget_snapshot() const;
+    bool configure_bite_zone(const Dictionary &data);
+    int64_t fire_bite_zone(Vector2 at, double radius, double delay, double damage, Color color, int64_t token);
+    bool step_hazards(double dt);
+    Array hazards_snapshot() const;
     bool set_enemy_motion(int64_t id, const Dictionary &state);
     Array enemy_motion_snapshot() const;
     bool configure_population(const Dictionary &config);

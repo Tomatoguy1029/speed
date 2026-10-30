@@ -180,6 +180,7 @@ bool SpeedRunCore::advance_attack_budget(double at) {
     if (!expired.empty()) {
         std::unordered_set<int64_t> live;
         for (const auto &shot : hostiles) if (shot.alive) live.insert(shot.attack_token);
+        for (const auto &zone : bite_zones) if (zone.alive) live.insert(zone.attack_token);
         for (int64_t token : expired) {
             auto &group = budget.groups[token];
             if (live.count(token) || !group.external.empty()) continue;
