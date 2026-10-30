@@ -30,7 +30,7 @@ bool SpeedRunCore::configure_forward(const Dictionary &parameters, int64_t level
     }
     parsed.interval = interval; parsed.damage = damage; parsed.pierce = int64_t(pierce);
     parsed.character_scale = character_scale; parsed.ready = true;
-    forward = parsed;
+    forward = parsed; forward_parameters=parameters.duplicate(true);
     return true;
 }
 
@@ -58,4 +58,10 @@ void SpeedRunCore::step_forward(double world_dt) {
 
 Dictionary SpeedRunCore::forward_snapshot() const {
     Dictionary out; out["elapsed"] = forward.elapsed; out["recoil"] = forward.recoil; return out;
+}
+
+bool SpeedRunCore::set_forward_level(int64_t level) {
+    if (!started || closed || !forward.ready || level<1) return false;
+    const Array intervals=forward_parameters["interval_by_level"], damages=forward_parameters["damage_by_level"], pierces=forward_parameters["pierce_by_level"];
+    forward.interval=intervals[std::min(level-1,intervals.size()-1)]; forward.damage=damages[std::min(level-1,damages.size()-1)]; forward.pierce=int64_t(pierces[std::min(level-1,pierces.size()-1)]); return true;
 }

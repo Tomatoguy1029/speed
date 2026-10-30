@@ -149,6 +149,20 @@ class SpeedRunCore : public RefCounted {
         PackedVector2Array points, path;
         PackedFloat32Array lengths;
     } draw;
+    struct Progression {
+        bool ready = false, start_pick = false;
+        Dictionary data, stats, weapons, traits;
+        Array cards, resource_requests;
+        HashMap<StringName, int> resource_status;
+        int64_t level = 0, pending_levels = 0, rerolls = 0, revision = 0, pending_choice = -1;
+        double xp = 0, gained = 0;
+    } progression;
+    void refresh_progression_stats();
+    void apply_stat_values(const Dictionary &stats);
+    void publish_cards();
+    Array roll_cards(bool initial);
+    bool apply_card(int64_t index);
+    void level_bonus();
     bool draw_ready = false;
     void begin_draw(bool press, Vector2 pen, int64_t clock_msec);
     void extend_draw(Vector2 pen, double camera_zoom);
@@ -247,6 +261,7 @@ class SpeedRunCore : public RefCounted {
         double interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
         int64_t pierce = 0;
     } forward;
+    Dictionary forward_parameters;
     void step_forward(double world_dt);
     bool motion_ready = false;
     bool started = false;
@@ -331,6 +346,7 @@ public:
     bool set_paused(bool paused);
     bool configure_forward(const Dictionary &parameters, int64_t level, double character_scale);
     Dictionary forward_snapshot() const;
+    bool set_forward_level(int64_t level);
     int64_t spawn_hostile(const Dictionary &fields);
     bool step_hostiles(double world_dt);
     Array hostiles_snapshot() const;
@@ -366,6 +382,18 @@ public:
     bool remove_enemy(int64_t id);
     bool follow_hound(int64_t id, Vector2 goal, double until, double scale);
     Dictionary hound_snapshot() const;
+    bool configure_progression(const Dictionary &data);
+    bool grant_equipment(StringName kind, StringName id, int64_t levels = 1);
+    bool add_xp(double amount);
+    bool open_cards(bool initial = false);
+    bool reroll_cards();
+    bool choose_card(int64_t index, int64_t revision);
+    bool resources_ready(int64_t revision, StringName id, int64_t status);
+    Array drain_resource_requests();
+    Dictionary progression_snapshot() const;
+    bool apply_external_progression(const Dictionary &stats, double hp, bool waiting, int64_t random_state);
+    int64_t random_state() const;
+    int64_t progression_revision() const;
     bool avoid_strong(double dt);
     Array enemies_snapshot() const;
     bool rebuild_enemy_grid(double cell_size);

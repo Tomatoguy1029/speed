@@ -113,7 +113,8 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
 
 void SpeedRunCore::collect_pickup(StringName kind, double value) {
     // B案は成長側へまとめて渡す。各回収の順序を保ち、カード待ちの判断は成長の所有者が行う。
-    Dictionary item; item["kind"] = kind; item["value"] = value; collections.append(item);
+    if (progression.ready && kind == StringName("gem")) add_xp(value);
+    else { Dictionary item; item["kind"] = kind; item["value"] = value; collections.append(item); }
     Dictionary event; event["kind"] = kind; emit_event("pickup", event);
 }
 

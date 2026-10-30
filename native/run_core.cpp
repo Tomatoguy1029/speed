@@ -86,6 +86,19 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position", "options"), &SpeedRunCore::spawn_enemy, DEFVAL(Dictionary()));
     ClassDB::bind_method(D_METHOD("follow_hound", "id", "goal", "until", "scale"), &SpeedRunCore::follow_hound);
     ClassDB::bind_method(D_METHOD("avoid_strong", "dt"), &SpeedRunCore::avoid_strong);
+    ClassDB::bind_method(D_METHOD("apply_external_progression", "stats", "hp", "waiting", "random_state"), &SpeedRunCore::apply_external_progression);
+    ClassDB::bind_method(D_METHOD("set_forward_level", "level"), &SpeedRunCore::set_forward_level);
+    ClassDB::bind_method(D_METHOD("progression_revision"), &SpeedRunCore::progression_revision);
+    ClassDB::bind_method(D_METHOD("random_state"), &SpeedRunCore::random_state);
+    ClassDB::bind_method(D_METHOD("configure_progression", "data"), &SpeedRunCore::configure_progression);
+    ClassDB::bind_method(D_METHOD("grant_equipment", "kind", "id", "levels"), &SpeedRunCore::grant_equipment, DEFVAL(1));
+    ClassDB::bind_method(D_METHOD("add_xp", "amount"), &SpeedRunCore::add_xp);
+    ClassDB::bind_method(D_METHOD("open_cards", "initial"), &SpeedRunCore::open_cards, DEFVAL(false));
+    ClassDB::bind_method(D_METHOD("reroll_cards"), &SpeedRunCore::reroll_cards);
+    ClassDB::bind_method(D_METHOD("choose_card", "index", "revision"), &SpeedRunCore::choose_card);
+    ClassDB::bind_method(D_METHOD("resources_ready", "revision", "id", "status"), &SpeedRunCore::resources_ready);
+    ClassDB::bind_method(D_METHOD("drain_resource_requests"), &SpeedRunCore::drain_resource_requests);
+    ClassDB::bind_method(D_METHOD("progression_snapshot"), &SpeedRunCore::progression_snapshot);
     ClassDB::bind_method(D_METHOD("hound_snapshot"), &SpeedRunCore::hound_snapshot);
     ClassDB::bind_method(D_METHOD("remove_enemy", "id"), &SpeedRunCore::remove_enemy);
     ClassDB::bind_method(D_METHOD("enemies_snapshot"), &SpeedRunCore::enemies_snapshot);
@@ -179,6 +192,7 @@ void SpeedRunCore::close() {
     closed = true;
     rng.unref();
     avoidance_ids.clear(); avoidance_from.clear();
+    progression = Progression();
     hound_packs.clear();
     enemies.clear();
     enemies.shrink_to_fit();
@@ -602,7 +616,9 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (world_step) {
         if (population.frame_enabled && !population.blocked && !attack_guard_active() && !step_population(accumulated, population.bonus)) return false;
         step_pickups(accumulated);
+
     }
+    if (progression.ready) open_cards(false);
     return true;
 }
 
