@@ -19,7 +19,10 @@ with tempfile.TemporaryDirectory() as temp:
    n=min(round(.003*rate),len(data)//channels//2)
    for i in range(n*channels):
     gain=(i//channels)/(n-1)
-    data[i]*=gain;data[-1-i]*=gain
+    data[i]*=gain
+   fade_seconds=.03 if name=='dash_start' else .2
+   n=min(round(fade_seconds*rate),round(len(data)/channels*.4))
+   for i in range(n*channels):data[-1-i]*=(i//channels)/(n-1)
   with wave.open(str(root/(name+'.wav')),'wb') as stream:
    stream.setparams((channels,2,rate,0,'NONE','not compressed'))
    encoded=array.array('h',(max(-32768,min(32767,round(value))) for value in data))

@@ -267,7 +267,7 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_banner_color = Color("#ff6b5a")
 				_banner_t = 99.0
 			&"levelup":
-				AudioManager.play(&"levelup", -6.0)
+				AudioManager.play(&"levelup_notice", -6.0)
 			&"kill":
 				if not ev.get("silent", false):
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))

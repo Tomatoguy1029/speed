@@ -19,6 +19,8 @@ var _music_track: StringName = &""
 var _music_owner: Node
 var _music_fade: Tween
 var _slow_motion := false
+var _slow_gain := 1.0
+var _slow_fade: Tween
 
 func _ready() -> void:
 	_ensure_bus(&"SFX")
@@ -121,11 +123,17 @@ func end_dash() -> void:
 func set_slow_motion(enabled: bool) -> void:
 	if _slow_motion == enabled: return
 	_slow_motion = enabled
+	if _slow_fade != null: _slow_fade.kill()
+	_slow_fade = create_tween().set_ignore_time_scale(true)
+	_slow_fade.tween_method(_set_slow_gain, _slow_gain, 0.35 if enabled else 1.0, 0.15 if enabled else 0.25)
+
+func _set_slow_gain(gain: float) -> void:
+	_slow_gain = gain
 	_apply_volumes()
 
 func _apply_volumes() -> void:
 	var s := SaveManager.settings
-	var slow_gain := 0.35 if _slow_motion else 1.0
+	var slow_gain := _slow_gain
 	_set_bus(&"Master", float(s.master_volume), bool(s.muted))
 	_set_bus(&"SFX", float(s.sfx_volume) * slow_gain, false)
 	_set_bus(&"Engine", float(s.engine_volume) * slow_gain, false)

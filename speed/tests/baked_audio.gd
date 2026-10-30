@@ -134,6 +134,9 @@ func _ready() -> void:
 		check(second.sustain.playing, "長いダッシュは維持音につながる")
 		AudioManager.end_dash()
 		check(second.release.playing, "ダッシュ終了から余韻を最後まで鳴らす")
+		var release_volume: float = second.release.volume_linear
+		await get_tree().create_timer(second.release.stream.get_length() / second.release.pitch_scale - 0.08).timeout
+		check(second.release.playing and second.release.volume_linear < release_volume * 0.9, "余韻は音源の長さに合わせて再生終了前にフェードする")
 		await second.release.finished
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -148,6 +151,16 @@ func _ready() -> void:
 	var dash_bus := AudioServer.get_bus_index(&"Dash")
 	var sfx_volume := float(SaveManager.settings.sfx_volume)
 	AudioManager.set_slow_motion(true)
+	check(is_equal_approx(AudioManager._slow_gain, 1.0), "スロー開始時に音量を即座に落とさない")
+	await get_tree().create_timer(0.06).timeout
+	check(AudioManager._slow_gain > 0.35 and AudioManager._slow_gain < 1.0, "スロー開始は途中の音量を通る")
+	var partial_gain := AudioManager._slow_gain
+	AudioManager.set_slow_motion(false)
+	check(is_equal_approx(AudioManager._slow_gain, partial_gain), "切替途中の反転は現在の音量からつなぐ")
+	await get_tree().create_timer(0.3).timeout
+	check(is_equal_approx(AudioManager._slow_gain, 1.0), "スロー解除のフェードが通常音量へ戻る")
+	AudioManager.set_slow_motion(true)
+	await get_tree().create_timer(0.2).timeout
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(master)), original_volume), "スロー中もマスター設定を維持する")
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx)), sfx_volume * 0.35), "スロー中は通常効果音を35%にする")
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(dash_bus)), sfx_volume), "ダッシュはスロー中も通常音量を維持する")
@@ -157,6 +170,7 @@ func _ready() -> void:
 		check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(AudioServer.get_bus_index(bus))), volume * 0.35), "スロー中はエンジン音とBGMも減衰する")
 	check(AudioServer.is_bus_mute(master) == original_muted, "スローで消音設定を変えない")
 	AudioManager.set_slow_motion(false)
+	await get_tree().create_timer(0.3).timeout
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(sfx)), sfx_volume), "スロー終了で通常効果音を戻す")
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(dash_bus)), sfx_volume), "スロー終了でもダッシュ音量は変わらない")
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(master)), original_volume), "スロー終了で全体音量を戻す")
@@ -164,6 +178,11 @@ func _ready() -> void:
 	var blaster := AudioManager._sounds.get(&"blaster") as AudioStreamWAV
 	check(blaster != null and is_equal_approx(blaster.get_length(), 0.12), "連射用の短いブラスター音を読み込む")
 	var hud := preload("res://scripts/ui/hud.gd").new()
+	var levelup := AudioManager.sound(&"levelup_notice") as AudioStreamMP3
+	check(levelup != null and not levelup.loop, "レベルアップ用MP3を一回再生の音として読み込む")
+	var levelup_voice := AudioManager._next
+	hud._on_events([{ "type": &"levelup" }])
+	check(AudioManager._next == (levelup_voice + 1) % AudioManager.MAX_VOICES and AudioManager._players[levelup_voice].stream == levelup, "レベルアップ時に指定の素材を1回再生する")
 	for id in [&"W01", &"W23"]:
 		var before := AudioManager._next
 		hud._on_events([{ "type": &"weapon_fire", "id": id }])

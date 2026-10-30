@@ -12,6 +12,7 @@ static func build(output: String) -> Error:
 	_sounds[&"bounce"] = load("res://assets/audio/sfx/bounce_robot.mp3")
 	_sounds[&"hurt"] = load("res://assets/audio/sfx/hurt_robot.mp3")
 	_sounds[&"levelup"] = _tone(440.0, 880.0, 0.25, "sine")
+	_sounds[&"levelup_notice"] = load("res://assets/audio/sfx/levelup_notice.mp3")
 	_sounds[&"pickup"] = _tone(880.0, 1200.0, 0.05, "sine")
 	_sounds[&"dash"] = load("res://assets/audio/sfx/dash_start.wav")
 	var sustain := load("res://assets/audio/sfx/dash_loop.wav").duplicate() as AudioStreamWAV

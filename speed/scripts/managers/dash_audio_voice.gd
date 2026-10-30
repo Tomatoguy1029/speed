@@ -24,10 +24,16 @@ func finish() -> void:
 	if ending: return
 	ending = true
 	release.play()
+	var duration := release.stream.get_length() / release.pitch_scale
+	var tail_fade := minf(0.2, duration * 0.4)
+	var tail := create_tween().set_ignore_time_scale(true)
+	tail.tween_interval(maxf(0.0, duration - tail_fade))
+	tail.tween_property(release, "volume_linear", 0.0, tail_fade)
 	if sustain.playing:
 		_fade_done = false
-		var fade := create_tween()
-		fade.tween_property(sustain, "volume_db", -80.0, 0.025)
+		var fade := create_tween().set_ignore_time_scale(true)
+		var fade_seconds := minf(0.12, sustain.stream.get_length() / sustain.pitch_scale * 0.25)
+		fade.tween_property(sustain, "volume_linear", 0.0, fade_seconds)
 		fade.tween_callback(func():
 			sustain.stop()
 			_fade_done = true
