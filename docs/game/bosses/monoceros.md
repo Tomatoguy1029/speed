@@ -79,7 +79,7 @@
 
 敵実験所の「外観」から「一角獣の外観・パーツ編集」を開く。パーツ全体とBase／Armorを選び、色と元の配置からのX/Y位置補正を調整する。走り・向き・法線の強さを見本で確認し、色と配置を `BossDef.part_appearance` へ明示的に保存する。見本の向きと法線の強さは確認画面だけに適用する。編集は実験所の履歴と条件保存に含み、当たり判定と攻撃性能は戦闘データを使う。
 
-戦闘中は移動に合わせて走りを再生し、停止・予告・角刺さりでは脚を止める。旋回では頭先端、胴体側の頭、胴体の順に戦闘方向へ追従させ、頭の2パーツは接続部を支点に回す。胴体の表示中心は判定円の中心に保つ。角を使う技の間は、頭を判定線（角）の向きへ合わせる。首の捻りと振りは頭の回転で見せる。アニメーションは役者の世界時間で進み、世界時間の停止中は姿勢を保持する。移動と当たり判定は表示の追従角を使わない。後ろ蹴りでは予告中に両後脚を畳み、攻撃時に判定線の先端まで伸ばす。踏み込み薙ぎと後ろ蹴りは攻撃後に姿勢を保持してから正面へ戻す。攻撃の太い光は実際の角の判定線から描き、後ろ蹴りは伸ばした脚で範囲を示す。通常突進と連続突進の1回目の予告では、薄い直線で移動方向を示す。
+戦闘中は移動に合わせて走りを再生し、停止・予告・角刺さりでは脚を止める。旋回では頭先端、胴体側の頭、胴体の順に戦闘方向へ追従させ、頭の2パーツは接続部を支点に回す。胴体の表示中心は判定円の中心に保つ。角を使う技の間は、頭を判定線（角）の向きへ合わせる。首の捻りと振りは頭の回転で見せる。アニメーションは役者の世界時間で進み、世界時間の停止中は姿勢を保持する。移動と当たり判定は表示の追従角を使わない。後ろ蹴りでは予告中に両後脚を畳み、攻撃時に判定線の先端まで伸ばす。踏み込み薙ぎと後ろ蹴りは攻撃後に姿勢を保持してから正面へ戻す。角を使う技は、角の絵と第2形態の光の剣を金色のまま明るくし、溜めから攻撃まで共通の光り方にする。光の槍の太い光と穂先は実際の角の判定線から描き、後ろ蹴りは伸ばした脚で範囲を示す。通常突進と連続突進の1回目の予告では、薄い直線で移動方向を示す。
 
 登場時は画面外から船尾ブースターを噴射して飛び込み、停止して角を構え、戦闘へ入る。進入方向・停止位置・カメラと各動作の尺は調整する。
 
@@ -124,6 +124,10 @@
 ### 9.2 調整と実装の接続
 
 技の動きと公開値は `scripts/bosses/monoceros/techniques/`、技の見た目は `scenes/bosses/monoceros/`、保存値は `data/bosses/monoceros_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+
+連続突進は `techniques/return_charge.gd`・`monoceros_moves/return_charge.tres`・`monoceros/return_charge_visual.tscn`、踏み込み薙ぎは `techniques/sweep.gd`・`monoceros_moves/sweep.tres`・`monoceros/sweep_visual.tscn`、角の衝撃波は `techniques/horn_wave.gd`・`monoceros_moves/horn_wave.tres`・`monoceros/horn_wave_visual.tscn` を使う。衝撃波の仮表示は `scripts/bosses/monoceros/horn_wave_visual.gd` が持つ。
+
+光の剣の連撃は `techniques/sword_flash.gd`・`monoceros_moves/sword_flash.tres`・`monoceros/sword_flash_visual.tscn`、光の槍は `techniques/lance.gd`・`monoceros_moves/lance.tres`・`monoceros/lance_visual.tscn`、光角の乱舞は `techniques/horn_dance.gd`・`monoceros_moves/horn_dance.tres`・`monoceros/horn_dance_visual.tscn` を使う。連撃と槍の仮表示は `scripts/bosses/monoceros/sword_flash_visual.gd`・`scripts/bosses/monoceros/lance_visual.gd` が持つ。
 
 「ボス行動」画面で、使う技・区間の順序と選択条件・既存技の組み合わせ・技の数値を調整できるようにする。技固有の動作と演出はスクリプトと表示シーンで作り、戦闘の組み立ては[共通のノード編集](../../dev/stage-production.md#56-ボス行動を調整する)を使う。組み合わせは本体を共有する技の実行制約に従う。
 

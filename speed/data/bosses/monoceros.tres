@@ -23,6 +23,7 @@ params = {
 "lock_lead": 0.22,
 "horn_width": 30.0,
 "horn_length_ratio": 1.85,
+"horn_length_ratio_p2": 2.7,
 "near_clearance": 220.0,
 "reposition_time": 1.2,
 "approach_range": 480.0,

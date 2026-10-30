@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/hunt.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"hunt"
+display_name = "追い立てと狙撃"
+category = &"combo"
+track_during_warn = true
+gap = 0.1
+aim_warn = 1.1
+aim_lock = 0.55
+aim_lead = 0.35
+aim_turn = 2.6
+beam_length = 1500.0
+beam_width = 44.0
+beam_time = 0.7
+damage = 26.0
+recover = 1.6
+cd = 10.0

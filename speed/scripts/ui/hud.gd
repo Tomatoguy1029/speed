@@ -31,10 +31,7 @@ const EXPERIENCE := preload(ART + "combat_ui_exp_bar.png")
 const SLOTS := preload(ART + "combat_ui_components.png")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const ICONS := preload(ART + "icons.png")
-const ICON_IDS := [
-	"W01", "W02", "W03", "W04", "W05", "W25", "W07", "W08", "W17", "W21", "W22", "W23",
-	"T01", "T03", "T04", "T05", "T06", "T07", "T08", "T09", "T10", "T11", "T12", "T13", "T14",
-]
+const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
 
 ## ミニマップと、ミニマップ以外の表示（経験値バー・時間・状態の文字・装備一覧・ボス・ゲージのリング）を描くか
 ## （実験場では初めは消す）
@@ -100,6 +97,7 @@ var _ring_usable := true
 var _settings: UiScreen
 var _ring_pulse_t := 0.0
 var _ring_flash_t := 0.0
+var _ring_flash_max := RING_FLASH_TIME
 ## 前のフレームの溜まっている量（1周溜まりきった瞬間を見つける）
 var _ring_amount := 1.0
 var _pause_after_reward := false
@@ -240,6 +238,10 @@ func _sync_menu_visibility() -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"full_burst_ready":
+				_ring_flash_t = 0.1
+				_ring_flash_max = 0.1
+				_ring_pulse_t = 0.3
 			&"level_bonus":
 				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 					_rewards.enqueue_bonus(ev)
@@ -478,16 +480,8 @@ func _draw_bar(frame: Texture2D, fill: AtlasTexture, fraction: float, color: Col
 func _add_icon(parent: Control, definition: Resource, area: Rect2) -> void:
 	if definition == null or definition is HeroDef:
 		return
-	var texture: Texture2D = definition.icon_texture if definition is WeaponDef or definition is TraitDef or definition is ContentEntry else null
-	if texture == null:
-		var icon_id := String(definition.id)
-		var index := ICON_IDS.find(icon_id)
-		if index < 0:
-			return
-		var atlas := AtlasTexture.new()
-		atlas.atlas = ICONS
-		atlas.region = Rect2(index * 47, 0, 47, 47)
-		texture = atlas
+	var texture: Texture2D = preload("res://scripts/ui/module_icons.gd").texture_for(definition)
+	if texture == null: return
 	var icon := TextureRect.new()
 	icon.texture = texture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1111,7 +1105,8 @@ func _draw_gauge_ring() -> void:
 		_ring_pulse_t = RING_PULSE_TIME
 	_ring_usable = usable
 	if charging and _lap_filled(_ring_amount, amount, capacity):
-		_ring_flash_t = RING_FLASH_TIME
+		_ring_flash_t = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
+		_ring_flash_max = 0.1 if s.traits.has(&"T36") else RING_FLASH_TIME
 	_ring_amount = amount
 	var col := Color("#5dffa0")
 	if not usable:
@@ -1121,7 +1116,7 @@ func _draw_gauge_ring() -> void:
 		col = Color("#c8f7ff")
 	var width := 4.0
 	if _ring_flash_t > 0.0:
-		var k := _ring_flash_t / RING_FLASH_TIME
+		var k := _ring_flash_t / _ring_flash_max
 		col = col.lerp(Color.WHITE, k)
 		width += 2.0 * k
 	for lap in laps:

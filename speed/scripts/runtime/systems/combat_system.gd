@@ -1,6 +1,8 @@
 ## 戦闘の計算。当たり判定の格子・攻撃力・接触・クリティカル・ダメージ・撃破・範囲攻撃・ヒットストップ（仕様書 7）。
 class_name CombatSystem
 extends RunSystem
+## HPを実際に更新した命中だけを、開発録画へ通知する。
+signal recording_damage(hit: Dictionary)
 
 ## 吹き飛ばしが強く、生き残った雑魚が追跡をやめる攻撃（仕様書 11.5）
 const FORCEFUL := [&"killSonic", &"critBeam", &"bipolar", &"towShot"]
@@ -54,7 +56,7 @@ func in_rect(lo: Vector2, hi: Vector2, out: PackedInt32Array) -> void:
 # ── 攻撃力と装甲（仕様書 7.1・7.2・7.3） ──────────────────────────
 
 func attack_power() -> float:
-	return cfg.base_attack * state.stats.attack_mult * cfg.atk_scale * burst_power
+	return cfg.base_attack * state.stats.attack_mult * cfg.atk_scale * burst_power * build.damage_multiplier()
 
 func can_pierce(atk: float, i: int, crit: bool) -> bool:
 	return atk >= enemies.table.armor[i] * (cfg.crit_armor if crit else 1.0)
@@ -98,7 +100,8 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 		var vel := state.ship_vel
 		var sp := vel.length()
 		var dir := vel / sp if sp > 0.0 else Vector2.ZERO
-		var atk := attack_power()
+		var run_up := build.prepare_ram(from.distance_to(hit_pos)) if run != null else 1.0
+		var atk := attack_power() * run_up
 		var fast := run != null or state.glide or sp >= state.stats.max_speed * cfg.ram_speed_ratio
 		var shield_front := enemies.blocks_front(i, hit_pos, dir)
 		if shield_front and (not fast or (run == null and t.hit_cd[damage_target(i)] > 0.0)):
@@ -142,6 +145,8 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			if enemies.rear_open(i, hit_pos):
 				ship.steal_shield(i)
 				dmg = maxf(dmg, t.hp[i])
+			var target := damage_target(i)
+			var hp_before := t.hp[target]
 			damage_enemy(i, dmg, {"crit": crit, "cause": &"ram", "dir": dir, "impact": hit_pos})
 			if crit:
 				state.emit(&"weak_impact", {"pos": hit_pos, "enemy_pos": t.pos[i], "r": t.r[i]})
@@ -157,7 +162,7 @@ func collide_ship(from: Vector2, R: float, run: TraceRun) -> bool:
 			# なぞり中と勢いの間は、雑魚を貫いても減速しない（仕様書 6.6）
 			if not (state.glide or state.tracing):
 				state.ship_vel *= _pierce_keep(i)
-			build.on_contact(i, hit_pos, dir)
+			build.on_contact(i, hit_pos, dir, maxf(0.0, hp_before - maxf(0.0, t.hp[target])))
 			continue
 		# 弾かれた（仕様書 6.5・7.2）
 		state.glide = false
@@ -217,7 +222,7 @@ func trace_width() -> float:
 ## なぞり中の機体の当たり判定の半径（仕様書 6.5）。線の左右この距離に触れた敵に、体当たりが当たる。
 ## しし座の力が効いている間は太くなる（仕様書 8.1）。
 func trace_radius() -> float:
-	return cfg.trace_radius * trace_width()
+	return cfg.trace_radius * trace_width() * build.area_multiplier()
 
 ## ふたご座の双子の機体が from から to へ動いた：通った敵に体当たりと同じように当てる（弾かれず、被弾もしない）。
 func twin_sweep(run: TraceRun, from: Vector2, to: Vector2) -> void:
@@ -279,6 +284,13 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 		bosses.body_damaged(i)
 	_record_boss_damage(struck_row, i, requested, dmg, hp_before, opts, "phase_floor" if t.hp[i] > hp_before - dmg else "applied")
 	if bosses != null: bosses.damage_applied(i, maxf(0.0, hp_before - maxf(0.0, t.hp[i])))
+	if recording_damage.has_connections():
+		var applied := maxf(0.0, hp_before - maxf(0.0, t.hp[i]))
+		recording_damage.emit({"id": t.id[i], "enemy_type": String(t.type[i]), "rank": t.def[i].rank if t.def[i] != null else 0,
+			"boss": t.is_boss[i] != 0, "meteor": t.meteor_index[i] >= 0, "elite": t.elite[i] != 0,
+			"cause": String(cause), "weapon_id": String(opts.get("weapon_id", &"")),
+			"resolved": dmg, "applied": applied,
+			"overkill": maxf(0.0, dmg - maxf(0.0, hp_before)) if t.hp[i] <= 0.0 else 0.0})
 	if cause == &"ram" and hp_before > maxf(0.0, t.hp[i]):
 		_hit_stop(i, fresh, crit)
 	t.flash[i] = 0.12
@@ -286,7 +298,7 @@ func damage_enemy(i: int, dmg: float, opts := {}) -> void:
 	if crit:
 		state.emit(&"text", {"pos": t.pos[i] + Vector2(0, -t.r[i] - 10.0), "text": "CRIT", "color": Color("#ffe46b"), "size": 16})
 	if t.hp[i] <= 0.0:
-		kill_enemy(i, opts.merged({"crit": crit}))
+		kill_enemy(i, opts.merged({"crit": crit, "one_shot": dmg >= t.max_hp[i] * 0.8}))
 	elif opts.has("dir"):
 		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
 		var push := enemies.knockback_scale(i)
@@ -366,6 +378,7 @@ func kill_enemy(i: int, opts := {}) -> void:
 		if comet != null and comet.rare_weapon == &"":
 			field.add_well(t.pos[i], cfg.gravity_life, cfg.gravity_radius, cfg.gravity_pull)
 	state.emit(&"kill", {"pos": t.pos[i], "r": t.r[i], "crit": opts.get("crit", false), "type": t.type[i], "id": t.id[i],
+		"t": state.time, "world_t": state.world_time,
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
 	# 質量牽引砲（W21）が船体を牽引したら、吹き飛ばし衝角（W03）の破片も死体も出さない
@@ -374,10 +387,11 @@ func kill_enemy(i: int, opts := {}) -> void:
 		t.hull_scattered[i] = 1
 	elif build.capture_hull(i):
 		t.hull_scattered[i] = 1
+	var shatter = build.weapon_behaviors.get(&"W03")
+	if shatter != null: shatter.on_defeated(i, opts)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	if cause != &"afterimage":
-		build.on_kill(cause)
+	build.on_kill(cause, t.pos[i])
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:

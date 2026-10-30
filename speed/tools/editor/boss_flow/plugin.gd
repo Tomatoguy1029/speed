@@ -2,7 +2,10 @@
 extends EditorPlugin
 
 const TITLE := "ボスAI"
+const MENU_PROBE := "__speed_boss_flow_menu_probe__"
+const SEPARATOR_ID := 0x424F5353
 var panel: Control
+var _tool_menu: PopupMenu
 
 func _enter_tree() -> void:
 	add_to_group("speed_boss_flow")
@@ -14,7 +17,22 @@ func _enter_tree() -> void:
 	EditorInterface.get_editor_main_screen().add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_make_visible(false)
+	add_tool_menu_item(MENU_PROBE, open_editor)
+	_tool_menu = _find_tools_menu()
+	remove_tool_menu_item(MENU_PROBE)
+	if _tool_menu != null:
+		_tool_menu.add_separator("", SEPARATOR_ID)
+	else:
+		push_warning("Boss Flow: Tools メニューを見つけられず区切りを表示できません")
 	add_tool_menu_item(TITLE, open_editor)
+
+func _find_tools_menu() -> PopupMenu:
+	for node in EditorInterface.get_base_control().find_children("*", "PopupMenu", true, false):
+		var menu := node as PopupMenu
+		for index in menu.item_count:
+			if menu.get_item_text(index) == MENU_PROBE:
+				return menu
+	return null
 
 func open_editor() -> void:
 	EditorInterface.set_main_screen_editor(TITLE)
@@ -46,4 +64,10 @@ func _save_external_data() -> void:
 		panel.save_current()
 func _exit_tree() -> void:
 	remove_tool_menu_item(TITLE)
+	if is_instance_valid(_tool_menu):
+		for index in range(_tool_menu.item_count - 1, -1, -1):
+			if _tool_menu.is_item_separator(index) and _tool_menu.get_item_id(index) == SEPARATOR_ID:
+				_tool_menu.remove_item(index)
+				break
+	_tool_menu = null
 	if is_instance_valid(panel): panel.queue_free()

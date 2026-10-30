@@ -3,6 +3,7 @@ const RANGE := preload("res://scripts/bosses/flow/range_condition.gd")
 var actor: Node
 var active: Array = []
 var custom_run: RefCounted
+var reactive: Array = []
 
 class StepTicket:
 	extends RefCounted
@@ -25,6 +26,7 @@ class StepTicket:
 func _init(value: Node) -> void: actor = value
 
 func tick(dt: float) -> void:
+	reactive = reactive.filter(func(action): return action.heads.any(func(n): return actor._alive(n) and n.mode != &"idle"))
 	if custom_run != null:
 		if blocked():
 			custom_run.cancel()
@@ -65,6 +67,7 @@ func candidates(query: Dictionary) -> Dictionary:
 		var move: Resource = actor._moves[id]
 		if move.head_kind != &"":
 			for i in actor.necks.size():
+				if actor.separated and not query.get("children_only", false) and not actor.squad.is_candidate(actor.necks[i], id): continue
 				if actor.normal_ready(i, id, query.get("children_only", false)): result.append(_candidate(id, [actor.necks[i]], "single"))
 		else:
 			if not actor.attack_ready(id, query.get("children_only", false)): continue
@@ -109,6 +112,10 @@ func candidates(query: Dictionary) -> Dictionary:
 			option["category"] = "single" if entry.category == "normal" else String(entry.category)
 			option["gate"] = entry.gate
 			labeled.append(option)
+	if actor.separated:
+		labeled = actor.squad.group_candidates(labeled)
+		var free: float = actor.flow_runner.stamina - actor.squad.reserved()
+		labeled = labeled.filter(func(c): return c.get("execution_kind", "") in ["single", "squad"] or float(c.cost) <= free + 0.00001)
 	return {"candidates": labeled, "reason": "距離・部位・再使用待ち"}
 
 func _gate_ready(candidate: Dictionary, gate: Dictionary) -> bool:
@@ -153,6 +160,14 @@ func parallel_attacks_enabled() -> bool:
 	return actor.action_rules != null and actor.action_rules.allow_parallel_attacks
 
 func start(actions: Array, internal_step := false) -> bool:
+	var expanded: Array = []
+	for action in actions:
+		if action.get("execution_kind", "") == "squad":
+			for member in action.members:
+				if not actor.squad.allowed(StringName(member.id)): return false
+			expanded.append_array(action.members)
+		else: expanded.append(action)
+	actions = expanded
 	# 同一更新内で全体を検証し、候補の具体的個体を固定する。
 	if blocked() or actions.is_empty(): return false
 	for action in actions:
@@ -177,6 +192,9 @@ func start(actions: Array, internal_step := false) -> bool:
 			_cancel_actions(started + [action])
 			return false
 		started.append(action)
+	if actor.separated:
+		for action in started:
+			if action.get("execution_kind", action.category) == "single": actor.squad.started(action.heads[0])
 	active = started
 	return true
 
@@ -206,4 +224,27 @@ func cancel_all() -> void:
 		custom_run.cancel()
 		custom_run = null
 	_cancel_actions(active.filter(func(a): return not a.has("program")))
+	_cancel_actions(reactive)
+	reactive.clear()
 	active.clear()
+
+## 区間の実行中候補を上書きせず、迎撃だけを独立して追跡する。
+func start_reactive(action: Dictionary) -> bool:
+	var previous := active
+	var ok := start([action])
+	if ok: reactive.append_array(active)
+	active = previous
+	return ok
+
+func reactive_candidate(n) -> Dictionary:
+	if blocked() or actor.busy or custom_run != null: return {}
+	for id in actor._normal_moves:
+		if not actor.squad.allowed(id) or not actor.normal_ready(actor.necks.find(n), id): continue
+		var candidate := _candidate(id, [n], "single")
+		for entry in actor.action_rules.active_gate_entries_for(String(id)):
+			if not _gate_ready(candidate, entry.gate): continue
+			candidate.gate = entry.gate
+			candidate.group = entry.group
+			candidate.label = entry.category
+			return candidate
+	return {}

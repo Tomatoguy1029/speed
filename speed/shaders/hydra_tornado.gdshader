@@ -4,10 +4,12 @@ uniform float clock = 0.0;
 uniform float span = 90.0;
 uniform float thickness = 210.0;
 uniform float power = 1.0;
+uniform vec4 tint : source_color = vec4(1.0);
+uniform float pixel_size = 3.0;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
  vec2 extent=vec2(span+thickness,thickness);
- vec2 pixel=(floor(UV*extent/3.0)+0.5)*3.0-extent*0.5;
+ vec2 pixel=(floor(UV*extent/pixel_size)+0.5)*pixel_size-extent*0.5;
  vec2 p=pixel/(extent*0.5);
  float r=length(p);
  float angle=atan(p.y,p.x);
@@ -28,5 +30,5 @@ void fragment(){
  float rim=step(0.90,edge);
  color=mix(color,vec3(0.10,0.24,0.27),rim);
  float alpha=mask*(0.40+band*0.30+thread*0.30)*(0.45+power*0.55);
- COLOR=vec4(color,alpha);
+ COLOR=vec4(color*tint.rgb,alpha*tint.a);
 }

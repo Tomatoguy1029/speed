@@ -1,5 +1,6 @@
 ## 突進と滑走の残光。移動履歴と実速度を読むだけで、機体の運動は変えない。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 ## 長さ・太さは character_scale を掛ける前の世界単位。
 @export_range(20.0, 300.0, 1.0) var max_length := 150.0
@@ -15,8 +16,13 @@ var _clock := 0.0
 var _scale := 1.0
 var _head := Vector2.ZERO
 var _heading := Vector2.UP
+var _sonic_active := false
+
+func _sonic_number(field: String, original: float) -> float:
+	return EFFECT_SETTINGS.number("weapon/sonic", field, original) if _sonic_active else original
 
 func step(dt: float, state: RunState, cfg: GameConfig, sonic: bool) -> void:
+	_sonic_active = sonic
 	# 残光もポーズ・強化選択・ヒットストップ中は止める。
 	if dt <= 0.0 or state.hitstop > 0.0:
 		return
@@ -36,13 +42,14 @@ func step(dt: float, state: RunState, cfg: GameConfig, sonic: bool) -> void:
 	var target := smoothstep(0.0, 1.0, excess) if state.tracing or state.glide else 0.0
 	_intensity = lerpf(_intensity, target, 1.0 - exp(-response * dt))
 	_clock += dt * lerpf(0.4, 1.8, excess)
+	var fade := _sonic_number("wake_fade_seconds", persistence)
 	for i in _ages.size():
 		_ages[i] += dt
-	while not _ages.is_empty() and _ages[0] >= persistence:
+	while not _ages.is_empty() and _ages[0] >= fade:
 		_ages.pop_front()
 		_samples.pop_front()
 	var tail := _head - _heading * 20.0 * _scale
-	if not _samples.is_empty() and tail.distance_to(_samples.back()) > maxf(max_length * _scale * 2.0, speed * dt * 3.0):
+	if not _samples.is_empty() and tail.distance_to(_samples.back()) > maxf(_sonic_number("wake_length", max_length) * _scale * 2.0, speed * dt * 3.0):
 		_samples.clear()
 		_ages.clear()
 	if _intensity > 0.001 and (_samples.is_empty() or tail.distance_to(_samples.back()) > _scale):
@@ -54,13 +61,17 @@ func step(dt: float, state: RunState, cfg: GameConfig, sonic: bool) -> void:
 	var mat := material as ShaderMaterial
 	mat.set_shader_parameter("flow_time", _clock)
 	mat.set_shader_parameter("sonic", sonic)
+	mat.set_shader_parameter("cool_color", EFFECT_SETTINGS.values_for("weapon/sonic").get("wake_color", Color(0.25, 0.65, 1.0)) if sonic else Color(0.25, 0.65, 1.0))
+	mat.set_shader_parameter("filament_strength", _sonic_number("wake_filaments", 0.7))
 	queue_redraw()
 
 func _draw() -> void:
 	if _intensity < 0.001:
 		return
-	var reach := max_length * _scale * sqrt(_intensity)
-	var width := half_width * _scale * lerpf(0.3, 1.0, _intensity)
+	var reach := _sonic_number("wake_length", max_length) * _scale * sqrt(_intensity)
+	var width := _sonic_number("wake_width", half_width) * _scale * lerpf(0.3, 1.0, _intensity)
+	var fade := _sonic_number("wake_fade_seconds", persistence)
+	var strength := _sonic_number("wake_opacity", opacity)
 	var distance := 0.0
 	# 実際に通った場所へ帯を置き、隣接点の向きで両端をそろえて旋回時も帯をつなぐ。
 	for i in range(_samples.size() - 1, 0, -1):
@@ -80,8 +91,8 @@ func _draw() -> void:
 		var u1 := (distance + segment) / reach
 		var w0 := width * (1.0 - u0 * 0.8)
 		var w1 := width * (1.0 - u1 * 0.8)
-		var a0 := _intensity * opacity * pow(1.0 - _ages[i] / persistence, 1.5)
-		var a1 := _intensity * opacity * pow(1.0 - _ages[i - 1] / persistence, 1.5)
+		var a0 := _intensity * strength * pow(1.0 - _ages[i] / fade, 1.5)
+		var a1 := _intensity * strength * pow(1.0 - _ages[i - 1] / fade, 1.5)
 		draw_primitive(PackedVector2Array([head + normal * w0, back + back_normal * w1, back - back_normal * w1, head - normal * w0]),
 			PackedColorArray([Color(1, 0, 0, a0), Color(1, 0, 0, a1), Color(1, 0, 0, a1), Color(1, 0, 0, a0)]),
 			PackedVector2Array([Vector2(u0, 0), Vector2(u1, 0), Vector2(u1, 1), Vector2(u0, 1)]))
@@ -90,6 +101,6 @@ func _draw() -> void:
 	draw_set_transform(_head, _heading.angle())
 	var r := Rect2(Vector2(-52, -30) * _scale, Vector2(86, 60) * _scale)
 	draw_primitive(PackedVector2Array([r.position, r.position + Vector2(r.size.x, 0), r.end, r.position + Vector2(0, r.size.y)]),
-		PackedColorArray([Color(1, 0, 1, _intensity * opacity)]),
+		PackedColorArray([Color(1, 0, 1, _intensity * strength)]),
 		PackedVector2Array([Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)]))
 	draw_set_transform(Vector2.ZERO)

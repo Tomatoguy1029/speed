@@ -19,6 +19,19 @@ func _ready() -> void:
 	run.state.xp = 0.0
 	var probe = load("res://tools/profile_run.gd").new()
 	probe.run = run
+	var samples: Array[float] = []
+	for i in 100:
+		samples.append(float(i))
+	var stats: Dictionary = probe._stats(samples)
+	check(stats.get("p99", -1.0) == 98.0 and stats.get("min", -1.0) == 0.0,
+		"計測値はp99と最小値を欠測と区別して返す")
+	if probe.has_method("_frame_stats"):
+		var frame_samples: Array[float] = [16.0, 1000.0 / 30.0, 33.34, 50.0]
+		var frame_stats: Dictionary = probe.call("_frame_stats", frame_samples)
+		check(frame_stats.get("over_33_33ms", -1) == 2,
+			"30fpsの時間を超えたフレームだけを数え、境界値は含めない")
+	else:
+		check(false, "フレーム時間の引っかかりを集計できる")
 	var drop_multiplier := run.state.stats.xp_mult
 	probe._hold_level()
 	check(run.state.stats.xp_mult == drop_multiplier, "成長停止は敵が落とす結晶の経験値を変えない")

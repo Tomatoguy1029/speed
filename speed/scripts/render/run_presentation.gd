@@ -10,6 +10,7 @@ const COIN_COLOR := Color("#ffd24a")
 const XP_OUTLINE := Color("#39265e")
 const SHIELD_VISUAL := preload("res://scripts/render/shield_visual.gd")
 const PIXEL_LIGHTNING := preload("res://scripts/render/pixel_lightning.gd")
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
@@ -391,6 +392,7 @@ func _present(delta: float) -> void:
 	_update_fx(dt)
 	perf.since(&"process.fx", t0)
 	_ship_visual.update(dt)
+	_glide_wake.visible = not state.weapons.has(&"W08") and not (state.weapons.has(&"W26") and state.tracing)
 	_glide_wake.step(dt, state, cfg, _blue_exhaust())
 	for key in _equipment_visuals.keys():
 		var visual: WeaponVisual = _equipment_visuals[key]
@@ -443,9 +445,10 @@ func _handle_events(events: Array[Dictionary]) -> void:
 			v.on_event(ev)
 		for visual in _equipment_visuals.values():
 			visual.on_event(ev)
+		if _claimed(ev): continue
 		match ev.type:
 			&"ring":
-				_ring(ev.pos, ev.radius, ev.color, ev.life)
+				_ring(ev.pos, ev.radius, ev.color, ev.life, String(ev.get("visual_key", "")))
 			&"explode":
 				_ring(ev.pos, ev.radius, ev.color, ev.life)
 				if ev.radius >= 150.0:
@@ -525,12 +528,14 @@ func _handle_events(events: Array[Dictionary]) -> void:
 				_ship_visual.clear()
 				ghosts.append({"from": ev.from, "to": ev.to, "life": 0.18, "max": 0.18})
 			&"beam":
-				var life: float = ev.get("life", 0.4)
+				var visual_key := String(ev.get("visual_key", ""))
+				var life: float = ev.get("life", 0.4) * EFFECT_SETTINGS.number(visual_key, "visible_time_scale", 1.0)
 				beams.append({"from": ev.from, "to": ev.to, "width": ev.width, "life": life, "max": life,
-					"color": ev.get("color", Color(1.0, 0.95, 0.6))})
+					"color": ev.get("color", Color(1.0, 0.95, 0.6)), "visual_key": visual_key})
 			&"bolt":
 				_bolt_seed += 1
-				bolts.append({"segments": ev.segments, "life": 0.22, "max": 0.22, "seed": _bolt_seed})
+				var bolt_life := EFFECT_SETTINGS.number("weapon/contactArc", "visible_seconds", 0.22)
+				bolts.append({"segments": ev.segments, "life": bolt_life, "max": bolt_life, "seed": _bolt_seed})
 				if bolts.size() > 80:
 					bolts.pop_front()
 			&"debris_trail":
@@ -565,10 +570,12 @@ func _common_burst_count(event: Dictionary) -> int:
 		&"gem_burst": return 14
 	return 0
 
-func _ring(p: Vector2, radius: float, color: Color, life: float) -> void:
+func _ring(p: Vector2, radius: float, color: Color, life: float, visual_key := "") -> void:
 	if rings.size() > 80:
 		rings.pop_front()
-	rings.append({"pos": p, "radius": radius, "color": color, "life": life, "max": life})
+	var visible := life * EFFECT_SETTINGS.number(visual_key, "visible_time_scale", 1.0)
+	rings.append({"pos": p, "radius": radius, "color": color, "life": visible, "max": visible,
+		"visual_key": visual_key})
 
 func _text(p: Vector2, s: String, color: Color, size: int) -> void:
 	if texts.size() > 40:
@@ -918,6 +925,15 @@ func _draw_pickups(c: CanvasItem) -> void:
 				c.draw_rect(Rect2(cap.pos + Vector2(11, 0), Vector2(6, 10)), Color.WHITE)
 
 func _draw_enemies(c: CanvasItem) -> void:
+	var wave_deformations := {}
+	var quake = run.loadout.weapon_behaviors.get(&"W04")
+	if quake != null:
+		for wave in quake.waves:
+			for id in wave.caught:
+				var held: Dictionary = wave.caught[id]
+				if not run.enemies.is_same(held.row,id): continue
+				var progress := clampf(float(held.age)/0.16,0.0,1.0)
+				wave_deformations[id] = {"direction":run.enemies.table.pos[held.row]-wave.pos,"amount":sin(progress*PI),"flash":progress<0.45}
 	var t0 := Time.get_ticks_usec()
 	_enemy_sprite_metrics.clear()
 	_drawing_enemies = true
@@ -974,13 +990,17 @@ func _draw_enemies(c: CanvasItem) -> void:
 			self_drawn += 1
 			continue
 		batched += 1
+		var deform: Dictionary = wave_deformations.get(t.id[i],{})
+		if not deform.is_empty() and deform.flash: col.r=1.0
 		var batch := _ensure_enemy_batch(type)
 		if _shape_ids.has(type):
 			batch.add(p, t.facing[i], sprite_radius, Color.WHITE if t.flash[i] > 0.0 else t.color[i])
 		else:
 			batch.add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+		if not deform.is_empty(): batch.deform_last(deform.direction,deform.amount)
 		if _armor_batches.has(type):
 			_armor_batches[type].add(p, _enemy_sprite_angle(type, t.facing[i]), sprite_radius, col)
+			if not deform.is_empty(): _armor_batches[type].deform_last(deform.direction,deform.amount)
 			continue
 		# 飾りのある敵だけ、飾りを描く
 		var v := _visual_of(t, i)
@@ -1135,16 +1155,16 @@ func _enemy_sprite_path(type: StringName) -> String:
 	return "res://assets/pixel/%s.png" % type
 
 ## 敵の船体を絵で描く（牽引中・撃ち出した船体）。glow は周りの光の色（透明なら光らせない）。
-func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color) -> void:
+func _draw_hull(c: CanvasItem, type: StringName, p: Vector2, angle: float, r: float, glow: Color, tint := Color.WHITE) -> void:
 	var tex := _enemy_texture(type)
 	if glow.a > 0.0:
 		c.draw_circle(p, r * 1.1, Color(glow, 0.25))
 	if tex == null:
-		c.draw_circle(p, r, Color("#aeb6c4"))
+		c.draw_circle(p, r, Color("#aeb6c4") * tint)
 		return
 	var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * enemy_sprite_radius(type, r) * 2.0
 	c.draw_set_transform(p, _enemy_sprite_angle(type, angle))
-	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false)
+	c.draw_texture_rect(tex, Rect2(-size / 2.0, size), false, tint)
 	c.draw_set_transform(Vector2.ZERO)
 
 ## 数の少ない飾り（エリートの輪・背面の弱点・予告・HP バー）は個別に描く。種類ごとの飾りは見た目の処理が描く。
@@ -1190,11 +1210,13 @@ func _draw_projectiles(c: CanvasItem) -> void:
 	var pr := run.projectiles
 	var friend_alive := pr.friend_alive
 	var friend_pos := pr.friend_pos
+	for visual: AttackVisual in _friendly_visuals.values(): visual.begin_batch()
 	for i in friend_alive.size():
 		var pos := friend_pos[i]
 		if friend_alive[i] == 0 or not view.has_point(pos):
 			continue
 		_friendly_visual(pr, i).draw_friend(c, pr, i, pos)
+	for visual: AttackVisual in _friendly_visuals.values(): visual.end_batch()
 	for visual: AttackVisual in _attack_visuals.values(): visual.begin_batch()
 	_hostile_batch.begin()
 	for i in pr.hostile_alive.size():
@@ -1338,25 +1360,32 @@ func _draw_fx(c: CanvasItem) -> void:
 	_draw_build_objects(c)
 	for bm in beams:
 		var k: float = bm.life / bm.max
-		var bc: Color = bm.color
+		var key := String(bm.get("visual_key", ""))
+		var bc: Color = EFFECT_SETTINGS.tinted(key, bm.color)
+		var core_ratio := EFFECT_SETTINGS.number(key, "beam_core_ratio", 0.3)
 		if bm.get("rounded", false):
 			_draw_round_beam(c, bm.from, bm.to, Color(bc, 0.7 * k), bm.width)
-			_draw_round_beam(c, bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+			_draw_round_beam(c, bm.from, bm.to, Color(1, 1, 1, k), bm.width * core_ratio)
 			continue
 		c.draw_line(bm.from, bm.to, Color(bc.r, bc.g, bc.b, 0.7 * k), bm.width)
-		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * 0.3)
+		c.draw_line(bm.from, bm.to, Color(1, 1, 1, k), bm.width * core_ratio)
 	for bo in bolts:
 		var age: float = bo.max - bo.life
 		var alpha := PIXEL_LIGHTNING.intensity(age, bo.max)
 		var shape := int(age / PIXEL_LIGHTNING.SHAPE_INTERVAL)
 		var segments: PackedVector2Array = bo.segments
 		for i in range(0, segments.size(), 2):
-			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1], _px(2.0), int(bo.seed) * 7919 + i * 313 + shape * 101, alpha)
+			PIXEL_LIGHTNING.draw(c, segments[i], segments[i + 1],
+				_px(2.0 * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0)),
+				int(bo.seed) * 7919 + i * 313 + shape * 101, alpha,
+				EFFECT_SETTINGS.tinted("weapon/contactArc", Color("#ffcf3a")), Color("#fff8d6"))
 	for r in rings:
 		var k: float = r.life / r.max
-		var col: Color = r.color
+		var key := String(r.get("visual_key", ""))
+		var col: Color = EFFECT_SETTINGS.tinted(key, r.color)
 		col.a *= k
-		c.draw_arc(r.pos, r.radius * (1.0 + (1.0 - k) * 0.15), 0, TAU, 48, col, _px(3.0))
+		c.draw_arc(r.pos, r.radius * (1.0 + (1.0 - k) * 0.15), 0, TAU, 48, col,
+			_px(3.0 * EFFECT_SETTINGS.number(key, "ring_width_scale", 1.0)))
 	for im in impacts:
 		var k: float = im.life / im.max
 		var col: Color = im.color
@@ -1436,6 +1465,12 @@ func _sync_equipment_visuals() -> void:
 	for key in _equipment_visuals:
 		_equipment_visuals[key].active = current.has(key)
 
+## 装備の表示が自分で描く出来事は、既定の処理（死亡の破片・輪・ビーム）を行わない。
+func _claimed(ev: Dictionary) -> bool:
+	for visual in _equipment_visuals.values():
+		if visual.active and visual.claims(ev): return true
+	return false
+
 func _blue_exhaust() -> bool:
 	for visual in _equipment_visuals.values():
 		if visual.active and visual.blue_exhaust:
@@ -1443,14 +1478,19 @@ func _blue_exhaust() -> bool:
 	return false
 
 func _draw_equipment_parts(c: CanvasItem, rect: Rect2, color: Color, under: bool) -> void:
-	var drawn := {}
+	var tints := {}
+	var ordered: Array[Texture2D] = []
 	var visuals := _equipment_visuals.values()
 	visuals.sort_custom(func(a, b): return a.overlay_order < b.overlay_order)
 	for visual in visuals:
 		var texture: Texture2D = visual.underlay if under else visual.overlay
-		if visual.active and texture != null and not drawn.has(texture):
-			c.draw_texture_rect(texture, rect, false, color)
-			drawn[texture] = true
+		if visual.active and texture != null:
+			if not tints.has(texture):
+				tints[texture] = Color.WHITE
+				ordered.append(texture)
+			tints[texture] = tints[texture] * visual.visual_color(Color.WHITE)
+	for texture in ordered:
+		c.draw_texture_rect(texture, rect, false, color * tints[texture])
 
 func _meteors() -> RefCounted:
 	if _meteor_visual == null:

@@ -3,6 +3,7 @@ extends WeaponBehavior
 
 const MOUNT_PIXEL := Vector2(15.5, 39.5)
 var _t := 0.0
+var recoil := 0.0
 
 func aim_direction() -> Vector2:
 	return -state.ship_heading
@@ -12,19 +13,21 @@ func mount_position() -> Vector2:
 	return state.ship_pos + offset.rotated(state.ship_heading.angle() + PI / 2.0)
 
 func tick(dt: float, busy: bool) -> void:
+	recoil = maxf(0.0, recoil - dt)
 	if busy:
 		return
 	var index := clampi(level, 1, def.level_steps.size()) - 1
-	var shot_interval := interval(float(p("interval_by_level")[index]))
+	var shot_interval := shooting_interval(at_level("interval_by_level"))
 	_t += dt
 	if _t < shot_interval:
 		return
 	_t = fmod(_t, shot_interval)
-	var shots := int(p("shots_by_level")[index])
+	var count := shots(1)
 	var backwards := aim_direction()
 	var origin := mount_position() + backwards * 12.5 * cfg.character_scale
-	for i in shots:
-		var angle := backwards.angle() + (i - (shots - 1) / 2.0) * float(p("spread_step"))
+	for i in count:
+		var angle := backwards.angle() + (i - (count - 1) / 2.0) * float(p("spread_step"))
 		fire_shot(origin, angle, atk() * float(p("damage_by_level")[index]),
-			{"life": p("life"), "color": Color(p("color"))})
-	state.emit(&"weapon_fire", {"id": def.id})
+			{"life": p("life"), "pierce_left": int(at_level("pierce_by_level")), "knock": def.params.knock, "color": Color(p("color")), "visual_key": "weapon/rear"})
+	recoil = 0.12
+	state.emit(&"weapon_fire", {"id": def.id, "pos": origin, "angle": backwards.angle(), "visual_key": "weapon/rear"})

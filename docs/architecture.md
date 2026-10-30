@@ -20,7 +20,7 @@
 | 世界の時間と実時間を分けて扱う。描画中0.1倍、なぞり中は可変、ヒットストップで停止 | 仕様書 1・6 |
 | なぞり中、機体は0.5実秒で最大数千単位を移動する（1回の更新で大きく動く） | 仕様書 6.5 |
 | ほとんどの数値をプレイ中に調整パネルから変えられる | 仕様書 20 |
-| 武器・特性・敵は一覧の管理 ID（W01、T01、`drifter` など）で管理する | [catalog.md](game/catalog/rules.md) |
+| 武器・特性は固定の内部ID（W01、T03 など）で参照し、図鑑の表示番号は各一覧の並び順から付ける。敵はtype IDを使う | [一覧の運用ルール](game/catalog/rules.md) |
 | ストーリー（5ステージ）とエンドレスの2つのモードがある | 仕様書 2 |
 | ステージごとに、星系の広いフィールド・中ボス・フィールドの仕掛けが変わる | 仕様書 2〜22 |
 | 中ボスは複数の部位（うみへび座の首など）を持ちうる。画面より大きくなりうる | 仕様書 12.3 |
@@ -327,7 +327,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 **うみへび座の編集と役割**
 
-`EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と吹き飛ばし衝角はこの判定を使い、役者が管理する移動速度と外力を分ける。
+`EnemySystem.knockback_scale()` はボス本体と、行番号・IDが有効なボスを親に持つ部位の外力倍率を判定する。`CombatSystem.damage_enemy()` と震空・ソニックブームはこの判定を使い、役者が管理する移動速度と外力を分ける。
 
 ゲームの決まりは [ヒュドラ専用仕様](game/bosses/hydra.md)、採用・実装状況は [敵一覧](game/catalog/enemies.md) に置く。`scenes/bosses/hydra_boss.tscn` の役者が中央HP、増加、分離、部位の行番号とID、最終勝利を管理する。`BossActor.handle_body_defeat()` は中央破壊の段階移行を引き受け、`health_row()` は形態ごとのHP表示対象を返す。部位は行解放前の `on_part_defeated()` で確定する。
 
@@ -345,7 +345,7 @@ EnemyBehavior の `before_move()` は通常移動の直前に実際の移動時�
 
 `hydra/techniques/` の技スクリプトは通常技・大技・コンボを持ち、`hydra/technique_runner.gd` は共通の配置待ちと進行を支える。`hydra_grid.gd` は領域判定・優先枠・一筆経路の検証を担当する。`Timeline` と `hydra_boss_timeline.tres` のメソッドキーを世界秒で手動更新する。同時噛みつきは捕捉→固定→伸長→到達、ほかの大技は配置→予告→実行→全体硬直を進める。配置の移動中はタイムラインを待たせる。参加者の喪失は個別仕様に従って中断か欠員として扱う。
 
-合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は `hydra_snake_motion.gd` が操舵し、頭の通過点列を胴体がたどる。速度・旋回・被弾・構え・攻撃・停止の重みを世界秒で連続的に混ぜる。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
+合体中の首は `hydra_neck.gd` が固定根元から頭までをFABRIKで解き、胴体の外側に保つ。分離後は役者が所有する `hydra/squad_commander.gd` が戦術・陣形・攻め手の予約・割り込みを管理し、`hydra_snake_motion.gd` が全員の力を確定してから操舵する。頭の通過点列を胴体がたどり、移動方向と視線を別に持つ。`hydra/normal_swim.gd` が分離した通常の蛇の泳ぐ位置と技の伸長・発射・持続判定を接続する。迎撃は共通フローの即時開始入口で同じスタミナを使う。速度・旋回・被弾・構え・攻撃・攻撃後の隙の重みを世界秒で連続的に混ぜる。群れの判断は現在の位置・速度・生存部位・残量から実行時に更新し、役者の寿命で保持する。頭の位置と姿勢は戦闘値として保持し、描画だけで移動を作る構成を避ける。
 
 通常技の捕捉位置は `start_normal()` で保持し、待機中の狙いは更新間隔を持たせる。`aim_neck()` が角速度と加速度を制御する。全ての攻撃位置が確定した後に頭の向きと胴の骨組みを一度だけ更新する。中央本体と分離後の不死の蛇は、役者の生成時に装甲を通過可能な値へ設定する。
 
@@ -437,11 +437,12 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 | `landmark` | 強めの敵（星2〜5） | 1 なら目印の星を持つ（`HeroSystem` が選ぶ） |
 | `fire_hit` | ヘルクレス座の火で焼かれた敵 | 最後に火でダメージを受けた世界時刻（うみへび座の頭が火で落ちたかの判定に使う） |
 | `stone` | ペルセウス座の力で石になった敵 | 石になっている残り時間（世界秒） |
+| `slash_hold` | 閃光斬の印による停止 | 印が付いた通常敵の自力移動を止め、ほかの攻撃を受けられる状態を保つ |
 | `held` | みなみのかんむり座の渦に捕まった敵 | 1 ならほかの敵に抱えられている。抱えている側が動かし、自分の行動は止まる |
 | `pump_owner` | ポンプ座に吸引中の敵 | 最初に確保したポンプ座の行。未所有は -1。吸引停止・範囲外・撃破・再配置で解放する |
 | `pump_owner_id` | ポンプ座に吸引中の敵 | 所有者の id。行の再利用を識別する |
 | `knock_t` | 強い攻撃で吹き飛ばされた雑魚 | 追跡を止めている残り時間 |
-| `shove_time` | 吹き飛ばし衝角（W03）で押し出された敵 | 押し出しの残り時間 |
+| `shove_time` | 敵のギミックで押し出された敵 | 押し出しの残り時間 |
 | `shove_vel` | 同上 | 押し出しの速度 |
 | `shove_dmg` | 同上 | ぶつかった敵へのダメージ |
 | `shove_hits` | 同上 | 押し出し中に当てた敵（id → true） |
@@ -472,8 +473,8 @@ HydraBossの `body_texture`・`neck_texture`・`compass_texture` は本体・首
 
 | クラス | 中身 | 対応する一覧 |
 |---|---|---|
-| `WeaponDef` | 管理 ID（`W01`）、内部 ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
-| `TraitDef` | 管理 ID（`T01`）、内部 ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
+| `WeaponDef` | 固定の内部ID（`W01`）、処理ID（`forward`）、名前、Lv ごとの値、図鑑用の任意画像 `preview_texture` | [weapons.md](game/catalog/weapons.md) |
+| `TraitDef` | 固定の内部ID（`T03`）、処理ID、名前、重ね数ごとの値、図鑑用の任意画像 `preview_texture` | [traits.md](game/catalog/traits.md) |
 | `EnemyDef` | type ID（`drifter`）、名前、半径、HP、装甲、速度、経験値、倒し方、行動の種類と値、攻撃の重さ | [enemies.md](game/catalog/enemies.md) |
 | `PhaseDef` | 開始の時刻、敵の数、敵レベル、補充の速さ、出現の重み、攻撃の予算、特別なルール | 仕様書 4.2 |
 | `MetaUpgradeDef` | 強化の名前、効果、段階ごとの費用 | 仕様書 14 |
@@ -670,6 +671,13 @@ AttackVisualは攻撃の列を受け取って描き、EnemyVisual・WeaponVisual
 
 ### 10.2 層・資源・画面効果
 
+ビルドの攻撃は、装備ごとの WeaponVisual（`scripts/render/equipment/<code_id>.gd`）が演出の試作と同じドット単位の規則で描く。共通部品は `scripts/render/fx/` にあり、`PixelPainter` が円・輪・線・光弾・砲口などを1ドットの格子にそろえて MultiMesh へまとめ、`PixelSparks` が火花、`FireBursts` がノイズで縁の崩れるピクセル炎を描く。数の多い輪・針・太い輪・六角形は `PixelShapes` が同じドットの規則を shader で判定し、1つの図形を1枚の四角として GPU でまとめて描く。武器・特性の演出は途中で手に入るので、出撃前の shader の準備（`build_stage_resources.gd`）は `scripts/render/equipment`・`friendly`・`fx` が使う shader をすべて含める。重力レンズ・帯状のビームなど面の大きい演出は装備専用の shader を使う。WeaponVisual は描く出来事を `claims` で示し、`RunPresentation` はその出来事の既定の描画（死亡の破片・輪・ビーム）を行わない。ギアアップの炎は共通ピクセル炎を後ろ向きに置いた `GearFire` で描く。表示の上書きは `effect_settings.tres` の装備キーで保持する。shader の調整値は各 shader の `group_uniforms tuning;` にまとめ、`ShaderTuning` が装備キーの `shader/<shader名>/<uniform名>` の値を material へ当てる。
+
+図鑑は `CodexAnimation` の固定の実演配置（演出の試作の描画命令）を `data/codex/*.res` から読み、`SubViewport` の中で同じ描画部品（`PixelPainter`・炎・レンズ・空間の歪みの shader・`GearFire`）で再生する。命令の番号は [codex_demonstration.gd](../speed/scripts/ui/codex_demonstration.gd) の冒頭にある。共通生成の `build_codex_thumbnails.gd` は実演の42%の1コマを `.content/codex_thumbnail_*.res` へ保存し、生成物の欠落検査とexportへ含める。たる型の対応表は固定画像を読み、投影の走査線・横ずれ・段階色・ディザはshaderで合成する。
+
+一覧は画面内に見える項目の固定の1コマを1フレームに1件ずつ準備し、最初の描画結果を保持して実演の資源を解放する。詳細は選択した実演を非同期で読み、表示中だけ保持する。読み込み待ちは投影を弱参照で扱い、選択変更・画面を閉じたあとの古い読み込み結果を受け取って解放する。項目選択は一覧を再生成せず、選択枠と詳細を更新する。
+
+
 重ねた絵の編集元は `data/visuals/looks/<外観名>.tres` のEnemyLookに本体・装甲・法線と任意の `decorations` を指定する。[固定外観の生成](#固定データ処理の生成と参照)が本体・固定塗装・サムネイルと牽引船体用の合成画像を用意し、`base_texture()` は合成済みの本体を返す。分離する外観は `split_other` にもう片側を持ち、`ruler` の表示が `buds` に応じて描画する。パーツのバッチは元の敵の外観設定・塗装を共有する。種類の外観を足す入口はこのResourceとし、ステージの `enemy_looks` から外観名を選ぶ。バッチ・照明・種類固有の表示は、そのランで使う種類を初めて表示するときに作り、照明の値は編集時に反映する。水流の専用層とshaderも初回使用時に作る。
 
 出撃とカード選択では、資源準備に続いて `scripts/render/shader_warmup.gd` が小さなSubViewportで使うマテリアルと描画形式を準備する。準備済みのマテリアルはScopeが保持する。
@@ -760,12 +768,12 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 - 待機中に始めたランは初期化直後から、プレイ中に有効にしたランはその時点から、終わる（クリア・やられた・やめた）か F9 で停止するまで1つのファイルに書く。待機は F9 で切るまで続き、次のランと停止後の再開は別のファイルになる。記録対象は本番のランとし、実験場は専用の記録を使う。
 - 置き場所は書類フォルダの `SPEED/recordings/stage<番号>_<日時>.jsonl`（Mac は `~/Documents/SPEED/recordings/`。書類フォルダが分からなければ `user://recordings/`）。同名ファイルがあれば連番を足して保存する。ほかの開発者もこのファイルを送って共有する。1行に1つの記録（JSON）。書いたそばからファイルへ出し、メモリにためない。
 - 記録の種類（`type`）：
-  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=2`）、Godot の版、報酬・メニューでの停止を性能集計から除く識別子（`perf_excludes_ui_pause=true`）、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
-  - `sample`：3秒（ランの時計）ごとのまとめ。拾った・落ちた・フィールドに残る経験値、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大
+  - `start`：ステージ、録画開始時のラン秒（`start_time`）、日時、まとめる間隔、時間帯の一覧（名前・開始）、形式の版（`schema_version=4`、追加計測は `measurement_version=3`）、Godot の版、報酬・メニューでの停止を性能集計から除く識別子（`perf_excludes_ui_pause=true`）、録画開始時のステージファイルの SHA256、性能の実時間間隔、経験値の設定（`xp_config`。大きい結晶のドロップ率・段ごとの経験値と重み、必要経験値の式）、ランで使う機体の強化の段（`meta_levels`。ID → 段）と、調整パネルで段を上書きしたか（`meta_dev_override`）、下記の開始条件
+  - `sample`：3秒（ランの時計）ごとのラン秒・世界秒とまとめ。拾った・落ちた・フィールドに残る経験値、レベル、HP、敵の数（星ごと・画面の中）、種類ごとの撃破数、倒した原因ごとの撃破数（`kills_by`）、与えたダメージの原因ごとの合計（`dealt`。倒しきった余りも含む）、攻撃の種類ごとの被弾（撃った敵が分かる攻撃は「攻撃/敵の種類」）、攻撃の予算の使用量の最大。`measurement_version=3` では命中を武器ID・敵種・敵級・エリート・原因で集約した `effective_damage` に解決後の量・実際のHP減少・超過分・形態境界などで捨てた量と命中回数、`enemy_life` に敵種・敵級・エリート別の出現時最大HPの合計と件数、出現・撃破・退場・生存終了数、観測できた出現から死亡・初被弾から死亡までの世界秒の合計と件数、`enemy_contacts` に機体への幾何接触の原因・判定結果別件数とバリアが受け止めた敵弾数を置く。未観測の出現と退場を撃破時間へ含めない。`enemy_contacts` は攻撃の発動数ではない。
   - `performance`：PLAY 中の実時間3秒ごとの描画フレーム間隔。`real_t` は書き込み時の記録開始からの実秒、`window_start_real`・`window_end_real` は計測区間の実秒、`duration_real` は観測した間隔の合計とする。`t`・`world_t` でラン秒・世界秒に対応づけ、ボーナス中も実時間で書く。平均FPS、平均・最大フレーム時間、33ms・50ms超の回数、ヒットストップを観測したフレーム数と割合（`hitstop_frame_ratio`）、描線中・駆け抜け中のフレーム数を保持する。ポーズ・カード選択・報酬表示・メニュー表示・ボーナス切替で窓を分け、遊んでいる最中のボーナス切替フレームの待ちは残す。割合はフレーム観測値であり、停止時間の厳密な割合とは区別する。`objects_at_write` に書き込み時点の敵・味方弾・敵弾・攻撃範囲・経験値粒・部品の使用数と確保行数、カプセル数、冠の保持数を置く。`bonus` は計測区間、`bonus_at_write` は書き込み時点の状態を表す。`profile` に計測区間の処理時間を置く。`sim`・`view` は世界側・表示側の `PerfLog` の項目 → [合計ms, 回数, 1回の最大ms]、`enemy_rows` は敵の描画1回あたりの行の数の平均、`recorder` は区間中に記録が書いた行数と書く時間の合計（`lines`・`write_ms`）。`profile` は `measurement_version=2` の記録から持つ。毎フレームは定数個のカウンタだけを更新し、フレーム別の行は保存しない。
   - `bonus`・`run_phase`：ボーナスの出入りと、ポーズ・カード選択を含むラン状態の切り替わり。全ての行に `real_t` を追加し、既存のXP・戦闘の `t` と結び付ける。
   - `band`：時間帯の切り替わり（名前）
-  - `levelup`・`pick`：レベルアップと、出たカード・選んだカード・おまけで上がった数
+  - `levelup`・`pick`：レベルアップと、従来の通常選択記録。`measurement_version=3` の `offer` は初期選択・引き直し・通常選択・彗星交換で表示した候補、`choice` は確定した選択を同じ `offer_id` で結ぶ。録画開始時に表示中だった候補は `offer.snapshot=true` とする。版3の提示率・選択率は `offer/choice` を正本とし、表示待ちイベントから作る `pick.offered` は照合用とする。
   - `loadout`：武器・特性が実際に変わったラン秒・世界秒、種類・管理ID・変更前後の段（`previous`・`current`）、取得経路（`source`）。初期武器選択は `initial_choice`、通常カードは `card`、おまけは `level_bonus`、彗星の空き枠取得は `comet`、交換の取り外しと取得は `comet_swap`、直接付与・取り外しは `direct`、全解除は `reset`。段0は取り外しを表す。取得時に実際に参照した定義のハッシュ（`definition_sha256`）も持つ。装備の復元は開始装備とこの差分を使い、`pick` の回数やおまけ数を重ねて加算しない。
   - `enemy_tuning_changed`・`enemy_tuning_saved`：ライブ適用とステージ保存の通知。`values` に通知時点の上書き辞書全体を保持し、空の辞書は全解除を表す。ライブ適用は既存個体と以後の出現へ反映する変更、保存は対象ファイルへの書き込みとして区別する。`t`・`world_t` は通知処理時点、`event_t`・`event_world_t` は発行元が添えた実際の適用・保存時点を表す。発行元に時刻がない場合は後者を `null` として保持する。保存通知は `path` も持つ。
   - `hurt`：HPが減った被弾ごとの発生ラン秒・世界秒、1発のダメージ（`amount`。致死時の超過分を含む）、原因・発生元・被弾直後のHP（`hp_after`）。無敵・盾で拒否した攻撃は実被弾の件数から区別する。`sample.damage` は同じ被弾の区間集計として読む。
@@ -802,6 +810,8 @@ Godot の「プロジェクト → ツール」直下に各ツールを登録す
 `RunSession` は開発版のラン初期化直後に条件を複製し、録画の有無によらず保持する。`run_start.conditions` に実効GameConfig、永続強化係数（`profile`）、機体能力値、機体強化段、強化上書きの有無、無敵・ヒットストップ設定と物理更新頻度を保存する。`recording_start.conditions` は録画開始時の実効GameConfig・永続強化係数・機体能力値・無敵・ヒットストップ設定を保存し、途中開始時の変更と区別する。ステージ別の敵調整があるランは `enemy_tuning` に各時点の実効上書きを保存する。両時点の乱数seed・状態は、JSONの数値精度を保つ文字列 `rng_seed`・`rng_state` として保存する。
 
 `run_start.conditions.identity` は初期化時点のコード・設定を照合する。`code_files_sha256` は `scripts/`・`addons/` の `.gd` と `project.godot`、`data_files_sha256` は `data/` の `.tres` のファイル別ハッシュを持ち、それぞれの一覧を `code_sha256`・`data_sha256` で照合する。読み込み済みのScript本文は `loaded_script_sources_sha256`、読み込み済みのデータの実効プロパティは `loaded_data_sha256`、実行中GameConfig・RuntimeStage・敵定義差し替え辞書は `config_sha256`・`runtime_stage_sha256`・`enemy_definitions_sha256` に持つ。カタログの署名は `catalog_signature`、起動環境が `SPEED_BUILD_REVISION` を指定したときはその値を `build_revision` に置く。バイト列を含む資源の実効値は、バイト数と内容のSHA-256へ変換してから照合する。この形式を `resource_digest_version: 2` で示し、異なる形式の実効値ハッシュは形式を揃えて比較する。
+
+`start.git_state` は録画開始時にディスク上の Godot プロジェクトについて Git HEAD と作業ツリーの変更有無を調べ、`revision`・`dirty`・`scope` を保存する。Gitが使えない場合の `dirty=null` は不明を表す。初期化済みランが参照するスクリプト・資源の内容は `run_start.conditions.identity` と照合し、録画開始時のディスク状態を実行中の全内容と同一視しない。
 
 ライブ調整の区間は `recording_start.conditions.enemy_tuning` から始め、`enemy_tuning_changed.values` で全体を置き換えて追う。適用境界には `event_t`・`event_world_t` を使い、同じラン秒では行順と世界秒を併用する。`sample` が境界をまたぐ場合は設定が混在する区間として扱う。保存通知は適用履歴から分ける。録画前の変更は前半欠測のまま保持する。
 

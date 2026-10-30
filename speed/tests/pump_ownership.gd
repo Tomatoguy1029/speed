@@ -14,10 +14,13 @@ func _ready() -> void:
 	sim = session.sim
 	t = sim.enemies.table
 	sim.enemies.clear_all()
+	# 所有権の検査は、吸引対象の星1を明示して制作データの分類から切り離す。
+	var prey := sim.enemies.def_of(&"drifter").duplicate(true) as EnemyDef
+	prey.rank = 1
 	var a := sim.enemies.spawn(sim.enemies.def_of(&"pump"), Vector2(-180, 0))
 	var b := sim.enemies.spawn(sim.enemies.def_of(&"pump"), Vector2(180, 0))
 	pump = sim.enemies.behavior(&"pump")
-	var target := sim.enemies.spawn(sim.enemies.def_of(&"drifter"), Vector2.ZERO)
+	var target := sim.enemies.spawn(prey, Vector2.ZERO)
 	t.facing[a] = 0.0
 	t.facing[b] = PI
 	pull(a)
@@ -66,7 +69,7 @@ func _ready() -> void:
 		t.mode[a] = EnemyTable.Mode.MOVE
 	sim.enemies.mark_dead(target)
 	sim.enemies.cleanup()
-	target = sim.enemies.spawn(sim.enemies.def_of(&"drifter"), Vector2.ZERO)
+	target = sim.enemies.spawn(prey, Vector2.ZERO)
 	pull(a)
 	check(t.vel[target].x < 0.0, "消えた対象の行を再利用しても吸引できる")
 	t.pos[target] = t.pos[a]
@@ -75,7 +78,7 @@ func _ready() -> void:
 	check(t.dead[target] != 0 and t.buds[a] == 1 and t.buds[b] == 0, "所有者が飲み込んだ在庫は個体ごとに保持する")
 	sim.enemies.clear_all()
 	a = sim.enemies.spawn(sim.enemies.def_of(&"pump"), Vector2(-180, 0))
-	target = sim.enemies.spawn(sim.enemies.def_of(&"drifter"), Vector2.ZERO)
+	target = sim.enemies.spawn(prey, Vector2.ZERO)
 	pull(a)
 	check(t.vel[target].x < 0.0, "全消去後も所有を持ち越さない")
 	check(t.pump_owner[target] == a and t.pump_owner_id[target] == t.id[a], "対象が所有者の行と個体IDを保持する")

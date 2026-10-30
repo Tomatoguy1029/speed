@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TraitDef" format=3]
+
+[ext_resource type="Script" path="res://scripts/data_types/trait_def.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+params = {
+"per_stack": 0.06
+}
+id = &"T34"
+code_id = &"bigSwing"

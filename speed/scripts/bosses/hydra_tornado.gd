@@ -1,7 +1,9 @@
 ## 攻撃点列を包む渦のシェーダーと、その中を回る実スプライトの瓦礫。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const ROCKS := [preload("res://assets/pixel/meteor_0.png"),preload("res://assets/pixel/meteor_1.png")]
 @export var vortex_shader: Shader=preload("res://shaders/hydra_tornado.gdshader")
+var effect_tint := Color.WHITE
 var wind: Sprite2D
 var stones: Array[Sprite2D]=[]
 var feed_stones: Array[Sprite2D]=[]
@@ -13,6 +15,8 @@ func _ready() -> void:
 	wind.texture=ImageTexture.create_from_image(pixels)
 	wind.material=ShaderMaterial.new()
 	wind.material.shader=vortex_shader
+	wind.material.set_shader_parameter("tint",effect_tint * EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("vortex_tint", Color.WHITE))
+	wind.material.set_shader_parameter("pixel_size",3.0 * EFFECT_SETTINGS.number("boss/shared/tornado_shader", "pixel_scale", 1.0))
 	wind.z_index=1
 	add_child(wind)
 	for i in 14:
@@ -26,6 +30,11 @@ func _ready() -> void:
 		rock.z_index=3
 		feed_stones.append(rock)
 		add_child(rock)
+func set_effect_tint(value: Color) -> void:
+	effect_tint=value
+	if is_instance_valid(wind): wind.material.set_shader_parameter("tint",effect_tint * EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("vortex_tint", Color.WHITE))
+func set_pixel_size(value: float) -> void:
+	if is_instance_valid(wind): wind.material.set_shader_parameter("pixel_size",value * EFFECT_SETTINGS.number("boss/shared/tornado_shader", "pixel_scale", 1.0))
 func update_effect(effect: Dictionary, clock: float) -> void:
 	var points: PackedVector2Array=effect.points
 	var delta:=points[-1]-points[0]

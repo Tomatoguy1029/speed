@@ -4,20 +4,31 @@ extends "res://scripts/enemies/biter.gd"
 ## 1世界更新の間だけ共有する整列先。死亡・行解放・再出現で破棄する。
 var _posts: Dictionary = {}
 var _posts_tick := -1
+var _boosts: Dictionary = {}
 
 func setup(system: EnemySystem, behavior_name: StringName, idx: int) -> void:
 	super(system, behavior_name, idx)
 	watches_rows = true
 
-func on_spawn(_i: int, _opts: Dictionary) -> void:
+func on_spawn(i: int, _opts: Dictionary) -> void:
+	_boosts.erase(i)
 	_posts_tick = -1
 
-func on_row_gone(_i: int) -> void:
+func on_row_gone(i: int) -> void:
+	_boosts.erase(i)
 	_posts_tick = -1
 
 func clear() -> void:
 	_posts.clear()
+	_boosts.clear()
 	_posts_tick = -1
+
+## 指定した世界時刻まで速さと整列先の揺れを上書きする。位相は呼ぶ側が個体ごとに保持する。
+func boost(i: int, speed: float, wobble: float, until: float, phase := 0.0) -> void:
+	_boosts[i] = {"id": table.id[i], "speed": speed, "wobble": wobble, "until": until, "phase": phase}
+
+func clear_boost(i: int) -> void:
+	_boosts.erase(i)
 
 func _move_without_bite(i: int, dt: float) -> bool:
 	if _posts_tick != m._lod:
@@ -29,8 +40,16 @@ func _move_without_bite(i: int, dt: float) -> bool:
 		t.timer[i] = 0.0
 		t.charge[i] = 0.0
 		var goal: Vector2 = _posts[i]
+		var top := t.speed[i]
+		var override: Dictionary = _boosts.get(i, {})
+		if not override.is_empty():
+			if override.id == t.id[i] and float(override.until) > state.world_time:
+				top = float(override.speed)
+				goal += Vector2(sin(state.world_time * 1.3 + float(override.phase)), cos(state.world_time * 1.1 + float(override.phase))) * float(override.wobble)
+			else:
+				_boosts.erase(i)
 		var arrive := maxf(float(t.def[i].params.guard_arrive), 0.001)
-		var speed := t.speed[i] * minf(t.pos[i].distance_to(goal) / arrive, 1.0)
+		var speed := top * minf(t.pos[i].distance_to(goal) / arrive, 1.0)
 		_steer_to(i, goal, speed, t.accel[i], dt)
 		_turn_toward(i, (state.ship_pos - t.pos[i]).angle(), t.turn[i], dt)
 		return true

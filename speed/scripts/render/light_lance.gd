@@ -3,6 +3,7 @@
 extends Node2D
 
 const SHADER := preload("res://shaders/light_lance.gdshader")
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const FLIGHT_TIME := 0.18
 ## 到達した槍を少し保ってから消す。攻撃は発動時に即時判定済み。
 const HOLD_TIME := 0.18
@@ -45,7 +46,8 @@ func step(dt: float, character_scale: float, zoom: float) -> void:
 	for layer in [_body, _tail]:
 		var mat := layer.material as ShaderMaterial
 		mat.set_shader_parameter("clock", shots.back().age if not shots.is_empty() else 0.0)
-		mat.set_shader_parameter("pixel", maxf(1.0, 2.0 / maxf(zoom * _scale, 0.01)))
+		mat.set_shader_parameter("pixel", 1.82 * EFFECT_SETTINGS.number("trait/critBeam", "pixel_scale", 1.0))
+		mat.set_shader_parameter("tint", EFFECT_SETTINGS.tinted("trait/critBeam", Color.WHITE))
 		mat.set_shader_parameter("silhouette", silhouette)
 		layer.queue_redraw()
 

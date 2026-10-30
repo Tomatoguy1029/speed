@@ -1,35 +1,45 @@
-## W07 軌跡機雷：高速で実際に通った線に、一定の間隔で機雷を残す。少し遅れて有効になり、
-## 敵が近づくと爆発する（一覧 docs/game/catalog/weapons.md）。
+## W07 マインランチャー：終点から前方へまっすぐ撃ち出す。Lv3から近くの機雷も誘爆する。
 extends WeaponBehavior
-
-## 機雷：pos、life、armed、dmg、radius
-var mines: Array = []
-var _distance := 0.0
-var _buf := PackedInt32Array()
-
-func on_trail(_run: TraceRun, p0: Vector2, p1: Vector2) -> void:
-	var length := p0.distance_to(p1)
-	if length < 1e-6:
-		return
-	var step := float(p("spacing")) / rate_k()
-	var d := step - _distance
-	while d <= length:
-		if mines.size() < int(p("max")):
-			mines.append({"pos": p0.lerp(p1, d / length), "life": p("life"), "armed": p("armed"),
-				"dmg": atk() * dmg_k() * float(p("damage")), "radius": float(p("radius")) * radius_k()})
-		d += step
-	_distance = fmod(_distance + length, step)
-
+var mines: Array[Dictionary] = []
+var _serial := 0
+func on_end() -> void:
+	var direction := state.ship_heading
+	var trace: TraceRun = ctx.draw.run
+	if trace != null and state.trace_path.size() >= 2:
+		var segment := mini(trace.seg,state.trace_path.size()-2)
+		direction = (state.trace_path[segment+1]-state.trace_path[segment]).normalized()
+	var heading := direction.angle()
+	var count := int(at_level("count_by_level"))
+	for k in count:
+		var a := heading + deg_to_rad(state.rng.randf_range(-float(p("spread")), float(p("spread"))))
+		var target := state.ship_pos + Vector2.from_angle(a) * state.rng.randf_range(float(p("range_min")), float(p("range_max")))
+		_serial += 1
+		mines.append({"id": _serial, "pos": state.ship_pos, "from": state.ship_pos, "to": target, "age": 0.0,
+			"life": at_level("life_by_level"), "armed": 0.0,
+			"damage": atk() * at_level("damage_by_level"), "radius": area(at_level("radius_by_level")), "detonate": false})
+	while mines.size() > int(p("max")): mines.pop_front()
 func tick(dt: float, _busy: bool) -> void:
+	var queue: Array[Dictionary] = []
 	for m in mines:
 		m.life -= dt
-		m.armed -= dt
-		if m.armed > 0.0 or m.life <= 0.0:
-			continue
-		ctx.combat.nearby(m.pos, float(p("trigger")), _buf)
-		if not _buf.is_empty():
-			ctx.combat.explode(m.pos, m.radius, m.dmg, {"cause": &"mine", "color": Color("#ff7b54"), "knock": 300.0 * post_factor(&"knockback"), "life": 0.3})
-			m.life = 0.0
-			if state.phase != RunState.Phase.PLAY:
-				return
+		m.age += dt
+		m.pos = m.from.lerp(m.to, 1.0 - pow(1.0 - minf(1.0, m.age / 0.14), 3.0))
+		if m.life <= 0.0 or m.age < 0.14: continue
+		var rows := PackedInt32Array()
+		ctx.combat.nearby(m.pos, area(float(p("trigger"))), rows)
+		for i in rows:
+			if ctx.enemies.table.dead[i] == 0 and ctx.enemies.table.pos[i].distance_to(m.pos) <= area(float(p("trigger"))) + ctx.enemies.table.r[i]:
+				m.detonate = true
+				queue.append(m)
+				break
+	while not queue.is_empty():
+		var m: Dictionary = queue.pop_front()
+		if m.life <= 0.0: continue
+		m.life = 0.0
+		ctx.combat.explode(m.pos, m.radius, m.damage, {"cause": &"mine", "knock": 300.0 * post_factor(&"knockback"), "life": 0.6})
+		if level >= 3:
+			for other in mines:
+				if other.life > 0.0 and other.age >= 0.14 and not other.detonate and other.pos.distance_to(m.pos) <= m.radius:
+					other.detonate = true
+					queue.append(other)
 	mines = mines.filter(func(m): return m.life > 0.0)

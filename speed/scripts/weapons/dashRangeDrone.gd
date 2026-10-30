@@ -42,6 +42,10 @@ func on_launch(_full: bool) -> void:
 		var after := (pts[i + 1] - pts[i]).normalized() if i < pts.size() - 1 else before
 		# 平均を正規化せず、鋭角ほど幅を畳む。Uターンの頂点では中心へ戻る。
 		_normals.append((before.orthogonal() + after.orthogonal()) * 0.5)
+	var targets: Array[Vector2] = []
+	for i in drones.size():
+		targets.append(state.ship_pos + _formation_offset(i,state.ship_heading.orthogonal(),state.ship_heading,float(p("deploy_distance"))*cfg.character_scale))
+	state.emit(&"escort_deploy", {"pos": state.ship_pos, "targets": targets})
 	for d in drones:
 		d.trail.clear()
 		d.break_trail = true
@@ -69,7 +73,7 @@ func _formation_offset(i: int, normal: Vector2, dir: Vector2, distance: float) -
 	deploy = smoothstep(0.0, 1.0, deploy)
 	var idle := dir.orthogonal() * side * float(p("idle_spacing")) * rank \
 		- dir * (float(p("idle_back")) + rank * 7.0)
-	var wide := normal * side * level_value("half_span_by_level") * rank / (drones.size() / 2)
+	var wide := normal * side * 13.0 * 1.82 * rank - dir * 9.0 * 1.82 * rank
 	return idle.lerp(wide, deploy) * cfg.character_scale
 
 func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
@@ -108,7 +112,7 @@ func on_trail(run: TraceRun, p0: Vector2, p1: Vector2) -> void:
 	_distance += moved
 
 func _hit_along(a: Vector2, b: Vector2, dir: Vector2) -> void:
-	var radius := float(p("drone_hit_radius")) * cfg.character_scale
+	var radius := area(float(p("drone_hit_radius"))) * cfg.character_scale
 	var pad := Vector2.ONE * radius
 	ctx.combat.in_rect(a.min(b) - pad, a.max(b) + pad, _rows)
 	var t := ctx.enemies.table
@@ -119,6 +123,7 @@ func _hit_along(a: Vector2, b: Vector2, dir: Vector2) -> void:
 		if hit_t < 0.0:
 			continue
 		_hit_ids[t.id[i]] = true
+		state.emit(&"escort_slash", {"pos": a.lerp(b,hit_t), "dir": dir})
 		ctx.combat.damage_enemy(i, atk() * level_value("damage_by_level"), \
 			{"cause": &"dashRangeDrone", "dir": dir, "impact": a.lerp(b, hit_t), "knock": 0.0, "no_crit": true})
 		if state.phase != RunState.Phase.PLAY:

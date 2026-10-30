@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/bay.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"bay"
+display_name = "吠え立て"
+category = &"single"
+track_during_warn = true
+warn = 0.7
+count = 8
+min_hounds = 6
+pounce_at = 3.2
+approach_stop = 380.0
+orbit = 0.35
+r_front = 320.0
+r_side = 250.0
+r_back = 200.0
+front_angle = 60.0
+back_angle = 99.0
+wobble = 20.0
+max_speed = 360.0
+turn_fast = 6.0
+turn_slow = 3.2
+turn_switch = 220.0
+accel = 650.0
+decel = 900.0
+arrive = 35.0
+face_turn = 5.0
+bark_min = 0.5
+bark_max = 0.9
+nip_max = 2
+nip_warn = 0.3
+nip_speed = 720.0
+nip_time = 0.25
+nip_after_speed = 260.0
+nip_cd = 1.2
+nip_damage = 10.0
+recover = 0.0
+cd = 13.0

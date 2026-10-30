@@ -1,59 +1,7 @@
-## W03 吹き飛ばし衝角：高速で触れた敵を進む向きへ吹き飛ばし、ほかの敵にぶつける（一覧 docs/game/catalog/weapons.md）。
-## 倒した大型の敵は破片を扇状に飛ばし、小型の敵は1つの死体として飛ばす。
+## W03 星砕き：最後の一撃が最大HPの8割以上なら、全攻撃から確率で砕く。
 extends WeaponBehavior
-
-var _buf := PackedInt32Array()
-
-func _speed() -> float:
-	return (float(p("speed_base")) + float(p("speed_per_tier")) * tier()) * post_factor(&"knockback")
-
-func _dmg() -> float:
-	return atk() * float(p("damage")) * dmg_k()
-
-func on_contact(i: int, _hit: Vector2, dir: Vector2) -> void:
-	var t := ctx.enemies.table
-	var v := _speed()
-	if t.dead[i] != 0:
-		# 飛ばす船体だけに弾速を足す。生きた敵への押出しは吹き飛ばし強化が担当する。
-		v += (float(p("speed_base")) + float(p("speed_per_tier")) * tier()) * (post_factor(&"projectile_speed") - 1.0)
-		if t.hull_scattered[i] == 0 and not ctx.projectiles.scatter_hull(i, dir, v, _dmg(), cfg.hull_debris_knock * post_factor(&"knockback"), post_factor(&"area"), post_factor(&"duration")):
-			ctx.projectiles.fling_corpse(i, dir * v, _dmg(), post_factor(&"area"), post_factor(&"knockback"), post_factor(&"duration"))
-	else:
-		# 星の多い敵ほど飛びにくい（星6以上は飛ばない）
-		var push := ctx.enemies.knockback_scale(i)
-		if push <= 0.0:
-			return
-		t.shove_time[i] = p("shove_time")
-		t.shove_vel[i] = dir * v * push
-		t.shove_dmg[i] = _dmg()
-		t.shove_hits[i] = {t.id[i]: true}
-		t.vel[i] = dir * v * push
-
-## 押し出されている敵が、ほかの敵にぶつかったらダメージを与える。
-func tick(_dt: float, _busy: bool) -> void:
-	var t := ctx.enemies.table
-	var shoved := t.shoved
-	for i in shoved.size():
-		if shoved[i] == 0 or t.alive[i] == 0:
-			continue
-		shoved[i] = 0
-		if t.dead[i] != 0:
-			continue
-		var from := t.shove_from[i]
-		var pos := t.pos[i]
-		var r := t.r[i] * post_factor(&"area")
-		var pad := Vector2(r, r)
-		var hits: Dictionary = t.shove_hits[i]
-		ctx.combat.in_rect(from.min(pos) - pad, from.max(pos) + pad, _buf)
-		for other in _buf:
-			if other == i or hits.has(t.id[other]):
-				continue
-			if Geom.seg_circle_t(from, pos, t.pos[other], t.r[other] + r) < 0.0:
-				continue
-			hits[t.id[other]] = true
-			var sv := t.shove_vel[i]
-			var sp := sv.length()
-			ctx.combat.damage_enemy(other, t.shove_dmg[i], {"cause": &"knockbackChain", "no_crit": true, "dir": sv / sp if sp > 0.0 else Vector2.ZERO, "knock": p("chain_knock")})
-			state.emit(&"ring", {"pos": t.pos[other], "radius": t.r[other] + 30.0, "color": Color("#ff986b"), "life": 0.25})
-			if state.phase != RunState.Phase.PLAY:
-				return
+func on_defeated(i: int, opts: Dictionary) -> void:
+	if not opts.get("one_shot", false) or state.rng.randf() >= at_level("chance_by_level"): return
+	ctx.projectiles.scatter_hull(i, opts.get("dir", Vector2.ZERO), float(p("speed")) * post_factor(&"projectile_speed"),
+		cfg.hull_debris_damage * ctx.combat.attack_power() / cfg.base_attack * damage_factor(), cfg.hull_debris_knock * post_factor(&"knockback"),
+		area(post_factor(&"area")), float(p("life")) / cfg.hull_debris_life * post_factor(&"duration"))

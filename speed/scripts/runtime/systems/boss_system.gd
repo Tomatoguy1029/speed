@@ -149,14 +149,15 @@ func on_boss_defeated(i: int, opts: Dictionary) -> void:
 		return
 	if state.lab_mode:
 		if owner != null:
-			state.emit(&"boss_defeated", {"pos": enemies.table.pos[i]})
+			state.emit(&"boss_defeated", {"pos": enemies.table.pos[i], "id": enemies.table.id[i], "world_t": state.world_time})
 			remove_actor(owner)
 		return
 	if state.boss_dead:
 		return
 	enemies.table.hp[i] = 0.0
 	state.boss_dead = true
-	state.emit(&"boss_defeated", {"pos": enemies.table.pos[i], "dir": opts.get("dir", Vector2.ZERO), "cause": opts.get("cause", &"")})
+	state.emit(&"boss_defeated", {"pos": enemies.table.pos[i], "id": enemies.table.id[i], "world_t": state.world_time,
+		"dir": opts.get("dir", Vector2.ZERO), "cause": opts.get("cause", &"")})
 
 ## 撃破の演出が終わったら、ボスを片付ける。
 func remove_boss() -> void:

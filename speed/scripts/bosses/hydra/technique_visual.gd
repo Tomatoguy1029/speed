@@ -1,5 +1,6 @@
 ## 絵担当の差し替え用の最小実装。イベントを受け取り、判定と同じ世界時間で表示する。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 
 @export var warning_color := Color("#ffd16c")
 @export var locked_color := Color("#fff2b0")
@@ -12,6 +13,7 @@ extends Node2D
 @export_range(0.05, 2.0) var flash_duration := 0.25
 ## VisualTimeline の装飾トラックで編集する。予告の有無はイベントが決める。
 @export var pulse_scale := 1.0
+@export_range(0.5, 3.0, 0.05) var burst_pixel_scale := 1.0
 @export var technique_id: StringName
 var hydra: Node
 var actor: Node:
@@ -26,6 +28,9 @@ var serial:=0
 @onready var animations: AnimationPlayer = $AnimationPlayer
 @onready var body_anchor: Marker2D = $BodyAnchor
 @onready var head_anchor: Marker2D = $HeadAnchor
+
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 
 func bind_hydra(actor: Node) -> void:
 	hydra = actor
@@ -141,7 +146,7 @@ func _flash(event: Dictionary)->void:
 	var color: Color={&"vortex":Color("#70ffe0"),&"thunder":Color("#77bbff"),&"debris":Color("#dbac68"),&"immortal":Color("#ffe69a")}.get(event.kind,attack_color)
 	if event.cue==&"hit":color=hit_color
 	sprite.material.set_shader_parameter("tint",color)
-	sprite.material.set_shader_parameter("pixels",diameter/4.0)
+	sprite.material.set_shader_parameter("pixels",diameter/4.0 * burst_pixel_scale)
 	sprite.material.set_shader_parameter("seed",float(serial%19))
 	add_child(sprite)
 	sprites[serial]=sprite

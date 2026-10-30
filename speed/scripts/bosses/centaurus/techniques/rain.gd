@@ -3,14 +3,24 @@
 extends BossTechnique
 
 ## 矢を落とす間隔（距離）
-@export_range(0,100000,0.01) var arrow_gap := 22.0:
+@export_range(0,100000,0.01) var arrow_gap := 44.0:
 	set(value):
 		arrow_gap = value
 		_values_dirty = true
 ## 一度に落とす矢の数
-@export_range(0,100000,1) var arrows_per_step := 2:
+@export_range(0,100000,1) var arrows_per_step := 1:
 	set(value):
 		arrows_per_step = value
+		_values_dirty = true
+## 第2形態で矢を落とす間隔（距離）
+@export_range(0,100000,0.01) var arrow_gap_p2 := 22.0:
+	set(value):
+		arrow_gap_p2 = value
+		_values_dirty = true
+## 第2形態で一度に落とす矢の数
+@export_range(0,100000,1) var arrows_per_step_p2 := 2:
+	set(value):
+		arrows_per_step_p2 = value
 		_values_dirty = true
 ## 再使用待ち（秒）
 @export_range(0,100000,0.01) var cd := 9.0:
@@ -53,7 +63,7 @@ extends BossTechnique
 		forward = value
 		_values_dirty = true
 ## 刺さった矢が残る時間（秒）
-@export_range(0,100000,0.01) var linger := 0.4:
+@export_range(0,100000,0.01) var linger := 0.6:
 	set(value):
 		linger = value
 		_values_dirty = true
@@ -198,9 +208,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		if spent > 0: host.rain_arrows = host.rain_arrows.slice(spent)
 		if host._rain_left == 0 and all_landed and host.rain_arrows.is_empty():
 			host._clear_rain()
-			host.mode = &"recovery"
-			host.recovery = float(r.recover)
-			host._cue(&"recovery_started")
+			host.finish_technique()
 
 	# ── 移動 ──────────────────────────────────────────────────
 

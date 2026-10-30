@@ -68,8 +68,13 @@ func make_runner() -> RefCounted:
 	return Runner.new()
 
 class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
+	var locked_origin := Vector2.ZERO
+	var locked_angle := 0.0
+
 	func alert(host: CentaurusBoss) -> void:
 		if host.mode != &"windup": return
+		locked_origin = host.bow_mouth()
+		locked_angle = host.table.facing[host.body]
 		host.alerting = true
 		host._cue(&"alert")
 

@@ -1,5 +1,6 @@
-## 技の予告・猟犬の軌跡・号令と遠吠えの輪。
+## 技の予告と、号令で飛び出す猟犬の軌跡。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var pixel_size := 3.0
@@ -18,6 +19,7 @@ const DANGER := Color("#ff667d")
 const OPEN := Color("#9fe8ff")
 const LUNGE_TRAIL := 6
 func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 	_pack_layer.top_level = true
 	_pack_layer.draw.connect(_draw_lunge)
 	add_child(_pack_layer)
@@ -34,22 +36,9 @@ func _draw() -> void:
 		var color := DANGER if actor.locked else WARNING
 		draw_line(Vector2(r, 0.0), Vector2(maxf(r, reach), 0.0), Color(color, 0.35 + charge * 0.4), pixel_size * (2.0 if actor.locked else 1.0))
 		draw_arc(Vector2(reach, 0.0), r * 0.5, 0.0, TAU, 24, Color(color, 0.6), pixel_size)
-	# シリウスの光の溜めは、口元から射線を細く示す。向きが固定されると光の太さの赤い線にする。
-	if visual_kind == &"sirius" and actor.mode == &"windup":
-		var from := Vector2(r * CanisMajorBoss.MOUTH_REACH, 0.0)
-		var length := float(actor.rule().get("beam_length", 1400.0))
-		var color := DANGER if actor.locked else WARNING
-		var width := float(actor.rule().get("beam_width", 50.0)) if actor.locked else pixel_size * 1.5
-		draw_line(from, from + Vector2(length, 0.0), Color(color, 0.35 if actor.locked else 0.25 + charge * 0.3), width)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (r / 100.0))
 	var mouth := Vector2(84.0, 0.0)
-	var howl := visual_kind == &"howl" and actor.mode == &"windup"
 	var shout := visual_kind == &"command" and actor.mode == &"windup"
-	# 遠吠えは、口元から大きな輪を次々に広げる。
-	if howl:
-		for ring in 3:
-			var grow := fmod(actor.clock * 1.8 + ring / 3.0, 1.0)
-			draw_arc(mouth, 30.0 + grow * 220.0, -1.2, 1.2, 32, Color(OPEN, 0.9 * (1.0 - grow)), pixel_size * 2.0)
 	if shout:
 		for ring in 2:
 			var grow := fmod(actor.clock * 2.5 + ring * 0.5, 1.0)
@@ -66,12 +55,9 @@ func _track_lunge() -> void:
 		if points.size() > LUNGE_TRAIL: points = points.slice(points.size() - LUNGE_TRAIL)
 		_trails[i] = points
 
-## 飛び出している猟犬の後ろに短い軌跡を引き、体のまわりを光らせる。遠吠えの囲みの間は、今の囲みの半径を薄い円で示す。
+## 飛び出している猟犬の後ろに短い軌跡を引き、体のまわりを光らせる。
 func _draw_lunge() -> void:
 	var t := actor.table
-	var radius := actor.ring_radius()
-	if visual_kind == &"howl" and radius > 0.0:
-		_pack_layer.draw_arc(actor.ring_center, radius, 0.0, TAU, 96, Color(WARNING, 0.35), pixel_size, true)
 	if visual_kind != &"command": return
 	for i in _trails:
 		var points: PackedVector2Array = _trails[i]

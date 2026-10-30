@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="BossTechnique" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/relay.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+technique = &"relay"
+display_name = "光を継ぐ群れ"
+category = &"single"
+track_during_warn = true
+warn = 0.8
+min_hounds = 6
+interval = 0.25
+each_warn = 0.6
+hound_beam_length = 900.0
+hound_beam_width = 12.0
+hound_beam_time = 0.22
+hound_damage = 10.0
+final_warn = 1.1
+final_lock = 0.35
+final_turn = 6.0
+final_length = 1500.0
+final_width = 44.0
+final_time = 0.7
+final_damage = 26.0
+recover = 1.6
+cd = 12.0

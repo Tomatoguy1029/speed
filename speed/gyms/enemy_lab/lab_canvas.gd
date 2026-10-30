@@ -416,6 +416,15 @@ func _draw_boss_ranges(run: RunSimulation) -> void:
 			var color := Color("#ff6b7a") if shape.active else Color("#e6b969")
 			var pos := screen(shape.center)
 			var radius := float(shape.radius) * zoom
+			if shape.get("fan", false):
+				var angle := float(shape.angle)
+				var half := float(shape.half_angle)
+				var points := PackedVector2Array([pos])
+				for j in 25: points.append(pos + Vector2.from_angle(angle - half + half * 2.0 * j / 24.0) * radius)
+				draw_colored_polygon(points, Color(color, 0.1 if shape.active else 0.05))
+				points.append(pos)
+				draw_polyline(points, color, 2.0)
+				continue
 			draw_circle(pos, radius, Color(color, 0.1 if shape.active else 0.05))
 			draw_arc(pos, radius, 0, TAU, 48, color, 2)
 

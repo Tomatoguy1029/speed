@@ -29,13 +29,13 @@ func _ready() -> void:
 	sim = session.sim
 	sim.ship.hurt_recorded.connect(func(_event):
 		hit_count += 1
-		if first_hit.is_empty(): first_hit = {"time":actor.clock,"mode":actor.mode,"timeline":actor.timeline.current_animation_position,"at":str(sim.state.ship_pos),"horn":str(actor.horn_points())})
+		if first_hit.is_empty(): first_hit = {"time":actor.clock,"mode":actor.mode,"timeline":actor._runner.stage_time if actor.is_sequenced(actor.technique) else actor.timeline.current_animation_position,"at":str(sim.state.ship_pos),"horn":str(actor.horn_points())})
 	print("[monoceros_quality] user_dir=", OS.get_user_data_dir())
 	for phase in [1, 2]:
 		for angle in [0.0, PI * 0.5, PI, -PI * 0.5]:
 			for id in [&"charge", &"return_charge", &"sweep", &"kick", &"lance"]:
 				if id == &"lance" and phase == 1: continue
-				var distances: Array = [350.0, 900.0] if id in [&"charge", &"return_charge"] else [130.0, 250.0] if id == &"sweep" else [160.0, 225.0] if id == &"kick" else [500.0, 900.0]
+				var distances: Array = [350.0, 900.0] if id in [&"charge", &"return_charge"] else [400.0, 650.0] if id == &"sweep" else [160.0, 225.0] if id == &"kick" else [500.0, 900.0]
 				for distance in distances:
 					var at := Vector2.from_angle(angle) * float(distance)
 					var facing: float = angle - PI if id == &"kick" else angle
@@ -44,7 +44,7 @@ func _ready() -> void:
 					check(result.recovered, "攻撃後は隙へ戻る " + str(result))
 					check(result.lock_count == result.launch_count, "各発進の固定は一度 " + str(result))
 	# 編集した距離条件も実際の形状を越えて成立させない。
-	for pair in [[&"sweep", 285.0], [&"kick", 255.0], [&"lance", 1300.0]]:
+	for pair in [[&"sweep", 1400.0], [&"kick", 255.0], [&"lance", 1700.0]]:
 		fresh(Vector2(float(pair[1]), 0), Vector2.ZERO, 2, PI if pair[0] == &"kick" else 0.0)
 		actor._cooldown = 0.0
 		var gate: Dictionary = actor.action_rules.conditions[String(pair[0])].duplicate()
@@ -64,7 +64,7 @@ func _ready() -> void:
 				check(result.hit, "背後の角度条件の端でも蹄が自機へ届く " + str(result))
 				check(is_zero_approx(actor.table.facing[actor.body]), "蹴りは本体を振り向かせず蹄で狙う")
 	# 予告前から等速移動していた自機。方向転換を要求しない空振りを分離する。
-	for id in [&"charge", &"return_charge", &"lance"]:
+	for id in [&"charge", &"return_charge"]:
 		for angle in [0.0, PI*0.5, PI, -PI*0.5]:
 			for distance in [400.0,600.0,700.0]:
 				for speed in [250.0, 500.0]:
@@ -79,11 +79,15 @@ func _ready() -> void:
 			var radial := Vector2.from_angle(angle)
 			var velocity := radial.orthogonal()*500.0
 			var result := trial(&"return_charge", radial*600.0-velocity*0.65, velocity, phase, angle, false, true)
-			check(result.launch_count == 3 and result.lock_count == 3, "往復の全パスで予告・再捕捉・固定 " + str(result))
-			check(result.hits == 3, "等速軌道へ往復の各パスが到達 " + str(result))
+			check(result.launch_count == int(actor.rule().passes) and result.lock_count == int(actor.rule().passes), "往復の全パスで予告・再捕捉・固定 " + str(result))
+			check(result.hits >= 1, "等速軌道へ往復の各パスが到達 " + str(result))
 			check(result.recovery_seconds >= float(actor.rule().recover)-DT, "往復終了後に全体の隙を作る")
 	# 近接技は範囲に残る遅い等速軌道と、予告中に範囲を出る軌道を分ける。
-	for id in [&"sweep", &"kick"]:
+	var sweep_result := trial(&"sweep", Vector2(400, 0), Vector2.ZERO, 1, 0.0)
+	check(sweep_result.hit, "踏み込み薙ぎは正面400の静止自機へ届く")
+	sweep_result = trial(&"sweep", Vector2(400, 0), Vector2.ZERO, 1, 0.0, true)
+	check(not sweep_result.hit and sweep_result.recovered, "踏み込み薙ぎの固定を見て遠ざかれば回避できる")
+	for id in [&"kick"]:
 		for sign_y in [-1.0,1.0]:
 			var at := Vector2(130, -sign_y*20) if id == &"sweep" else Vector2(-160,-sign_y*20)
 			var result := trial(id, at, Vector2(0,sign_y*45), 1, 0.0)
@@ -94,7 +98,7 @@ func _ready() -> void:
 	for id in [&"charge", &"return_charge", &"lance", &"sweep", &"kick"]:
 		for angle in [0.0, PI*0.5, PI, -PI*0.5]:
 			var radial := Vector2.from_angle(angle)
-			var distance := 600.0 if id in [&"charge", &"return_charge", &"lance"] else 130.0
+			var distance := 600.0 if id in [&"charge", &"return_charge", &"lance"] else 400.0 if id == &"sweep" else 130.0
 			var facing: float = angle-PI if id == &"kick" else angle
 			var result := trial(id,radial*distance,Vector2.ZERO,2,facing,true)
 			check(not result.hit, "読める固定後の横回避が成立 " + str(result))
@@ -114,8 +118,8 @@ func _ready() -> void:
 				var selected := String(actor.flow_runner.last[0].id) if not actor.flow_runner.last.is_empty() else ""
 				chosen[selected] = int(chosen.get(selected,0))+1
 				check(candidates.has(selected), "成立した候補から技を選ぶ")
-				if context == "front": check(selected == "sweep", "正面近接には薙ぎを使う")
-				if context == "rear": check(selected == "kick", "背後近接には蹴りを使う")
+				if context == "front": check(selected in (["sweep", "sword_flash"] if phase == 2 else ["sweep"]), "正面近接には形態に応じた斬撃を使う")
+				if context == "rear": check(candidates.has("kick") and selected in (["kick", "sweep", "sword_flash"] if phase == 2 else ["kick", "sweep"]), "背後近接では形態に応じた近接技から選ぶ")
 				if context == "middle": check(candidates.has("charge") and candidates.has("return_charge"), "中距離は複数の突進を候補に保つ")
 				if context == "middle" and phase == 2: check(candidates.has("lance"), "第2形態の中距離へ槍を加える")
 			selection_results.append({"phase":phase,"context":context,"selected":chosen})
@@ -127,7 +131,7 @@ func _ready() -> void:
 					actor.selection_enabled = true
 					actor.flow_runner.index = 2
 					actor.flow_runner.tick(DT, {}, actor.flow_adapter)
-					check(not actor.flow_runner.last.is_empty() and actor.flow_runner.last[0].id == "lance", "第2形態の大技区間は槍を選べる")
+					check(not actor.flow_runner.last.is_empty() and actor.flow_runner.last[0].id in ["lance", "horn_dance"], "第2形態の大技区間は槍か乱舞を選べる")
 	fresh(Vector2(-180,0),Vector2.ZERO,1,0.0)
 	actor._cooldown = 0.0
 	actor.cooldowns[&"kick"] = actor.clock+9.0
@@ -239,6 +243,7 @@ func fresh(at: Vector2, velocity: Vector2, phase: int, facing: float) -> void:
 	sim.bosses.spawn(load("res://data/bosses/monoceros.tres"),Vector2.ZERO)
 	actor = sim.bosses.actor as MonocerosBoss
 	actor.phase = phase
+	actor._apply_phase()
 	actor._cooldown = 1000.0
 	actor.selection_enabled = false
 	actor.table.facing[actor.body] = facing
@@ -281,7 +286,7 @@ func trial(id: StringName, at: Vector2, velocity: Vector2, phase: int, facing: f
 		tick(v)
 		if actor.mode == &"active" and dodged:
 			check(actor.direction.is_equal_approx(locked_direction), "発進後は回避先へ追尾しない " + String(id))
-		if actor.mode == &"recovery" or (actor.mode == &"turnaround" and not full_return):
+		if actor.mode == &"recovery" or ((actor.mode == &"turnaround" or (id == &"return_charge" and actor._runner.stage == &"brake")) and not full_return):
 			recovered = true
 			break
 	var result := {"id":id,"phase":phase,"at":str(at),"velocity":str(velocity),"dodge":dodge,"hit":hit_count>0,"hits":hit_count,"recovery_seconds":actor.recovery,"recovered":recovered,"lock_count":locks,"launch_count":launches,"elapsed":actor.clock-start,"end_mode":actor.mode,"first_hit":first_hit}

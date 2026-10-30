@@ -6,6 +6,8 @@ extends RunSystem
 
 ## 記録中だけ購読する実被弾。表示待ちのフレームをまたぐ前に通知する。
 signal hurt_recorded(hit: Dictionary)
+## 実被弾と盾・無敵等で拒否した幾何接触。攻撃発動数ではない。
+signal recording_hurt_attempt(contact: Dictionary)
 
 var field: FieldSystem:
 	get: return ctx.field
@@ -210,6 +212,8 @@ func damage(amount: float, slow: float, cause: StringName, source := &"", observ
 	return true
 
 func _record_damage(amount: float, cause: StringName, source: StringName, reason: String, before: float, observation: Dictionary) -> void:
+	if recording_hurt_attempt.has_connections():
+		recording_hurt_attempt.emit({"cause": String(cause), "source": String(source), "reason": reason})
 	if ctx.bosses != null and ctx.bosses.diagnostics.enabled():
 		ctx.bosses.diagnostics.player_damage(amount, cause, source, reason, before, observation)
 

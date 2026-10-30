@@ -1,15 +1,19 @@
 ## Asepriteから書き出したパーツの大型の猟犬。攻撃の向き・時間は役者から読み、演出だけを差し替える。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var pixel_size := 3.0
+@export var sirius_color := Color("#e8f6ff")
+@export var sirius_halo_color := Color("#9fe8ff")
+@export var sirius_glow_scale := 1.0
 @onready var parts: Node2D = $Parts
 var actor: CanisMajorBoss
 var hit := 0.0
 var pulse := 0.0
 var gait := 0.0
-const SIRIUS := Color("#e8f6ff")
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
-const OPEN := Color("#9fe8ff")
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_key(self, "boss/body/canis_major")
 ## 号令で飛び出している猟犬の軌跡に残す位置の数
 const LUNGE_TRAIL := 6
 ## 号令で飛び出している猟犬の光と軌跡を描く層。本体の回転に付いていかないよう、ワールド座標で描く。
@@ -22,7 +26,7 @@ func bind_canis_major(owner_actor: CanisMajorBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius", &"phase_changed", &"howl"]: pulse = 0.35
+	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius", &"phase_changed", &"howl", &"call", &"called", &"stream_windup", &"bay_windup", &"entrance_bark"]: pulse = 0.35
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -45,8 +49,11 @@ func _sync_parts() -> void:
 		var leg := parts.get_node(legs[i]) as Node2D
 		leg.rotation = sin(gait + (0.0 if i == 0 or i == 3 else PI)) * (0.16 if moving else 0.015)
 	parts.get_node("Tail").rotation = sin(gait * 0.4) * 0.07
-	var charging: bool = actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false)
-	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), actor.table.charge[actor.body] if charging else 0.0, pulse)
+	# 仮の遠吠えポーズ。頭を上げ、口元の星へ光を集める。正式な動作素材は後で差し替える。
+	var howling: bool = actor.technique_pose.get("howl", false)
+	parts.get_node("Head").rotation = -0.45 * smoothstep(0.0, 0.65, actor.table.charge[actor.body]) if howling else 0.0
+	var charging: bool = howling or actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false) or actor.technique_pose.get("bay", false) or actor.technique_pose.get("call", false)
+	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), maxf(actor.table.charge[actor.body] if charging else 0.0, float(actor.technique_pose.get("glow", 0.0))), pulse)
 
 ## シリウスの輝きの強さ（0〜1）。第2形態への移行の間に強め、そのあとは強いまま。
 func blaze() -> float:
@@ -64,5 +71,9 @@ func _draw() -> void:
 	modulate = Color(1.6, 1.6, 1.6) if hit > 0.0 else Color.WHITE
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25
-		draw_arc(Vector2(-6, 0), 106.0, 0.0, TAU, 32, Color(OPEN, a), pixel_size * 2.0)
+		draw_arc(Vector2(-6, 0), 106.0, 0.0, TAU, 32, Color(sirius_halo_color, a), pixel_size * 2.0)
+	if actor.technique_pose.get("call", false) or (actor.technique in [&"stream", &"bay", &"hunt_pounce"] and actor.technique_pose.get("shout", false)):
+		for ring in 2:
+			var grow := fmod(actor.clock * 2.5 + ring * 0.5, 1.0)
+			draw_arc(Vector2(84, 0), 20.0 + grow * 90.0, 0.0, TAU, 32, Color(WARNING, 1.0 - grow), pixel_size)
 	draw_set_transform(Vector2.ZERO)

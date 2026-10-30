@@ -1,5 +1,6 @@
 ## 矢の予告と降下。ボス中心と正面+Xに合わせ、雨だけをワールド座標で描く。
 extends Node2D
+const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var technique_id: StringName
 var visual_kind: StringName
 @export var pixel_size := 3.0
@@ -7,7 +8,9 @@ var actor: CentaurusBoss
 const WARNING := Color("#f2b567")
 const DANGER := Color("#ff667d")
 const LIGHT_ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
-const RAIN_ANGLE := PI * 0.5 - 0.35
+const RAIN_VISUAL := preload("res://scripts/bosses/centaurus/additional_technique_visual.gd")
+func _ready() -> void:
+	EFFECT_SETTINGS.apply_to(self)
 func update_technique() -> void:
 	if visual_kind == &"rain":
 		top_level = true
@@ -23,12 +26,19 @@ func _draw() -> void:
 	# 照準線は本体の縮尺と別に、実際の射程で描く。
 	if actor.mode == &"windup" and visual_kind == &"power_shot":
 		var reach := float(actor.rule().get("travel", 1600.0))
-		var width := float(actor.rule().get("radius", 30.0)) * 2.0
-		var from := Vector2(r * float(actor.def.params.bow_reach), 0.0)
+		var mouth := actor.power_aim_origin()
+		var from := to_local(mouth)
 		var color := DANGER if actor.alerting else WARNING
-		color.a = 0.85 if actor.alerting else 0.35 + draw_fraction() * 0.35
 		for offset in actor.power_offsets():
-			draw_line(from, from + Vector2.from_angle(offset) * reach, color, width if actor.alerting else pixel_size * 2.0)
+			var endpoint := mouth + Vector2.from_angle(actor.power_aim_angle() + offset) * reach
+			# 固定した射線は動かさず、今の自機に遮られる部分だけを切る。
+			var hit := Geom.seg_circle_t(mouth, endpoint, actor.run_state.ship_pos, actor.ctx.cfg.ship_radius)
+			if hit >= 0.0: endpoint = mouth.lerp(endpoint, hit)
+			var end := to_local(endpoint)
+			draw_line(from, end, Color(color, 0.12), 8.0)
+			draw_line(from, end, Color(color, 0.95 if actor.alerting else 0.6), 2.0)
+			draw_line(from, end, Color(1.0, 0.75 if actor.alerting else 0.95, 0.6, 0.8), 0.8)
+
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (r / 90.0))
 	var pull := Vector2(62.0 + cos(1.1) * 26.0 - draw_fraction() * 34.0, 0.0)
 	if actor.mode == &"windup":
@@ -37,7 +47,7 @@ func _draw() -> void:
 		draw_line(pull, pull + Vector2(length + 30.0, 0.0), glow, pixel_size * (3.0 if actor._runner_for().kind() == &"power_shot" else 1.5))
 	draw_set_transform(Vector2.ZERO)
 
-## まだ矢が着いていない帯を、円が走った跡として描く。矢は着弾点の上から降り、透明から不透明へ変わる。
+## 着弾予定の範囲へ光の粉を落とす。矢は画面上端の外から降る。
 func _draw_rain() -> void:
 	if actor == null or actor.mode != &"rain": return
 	var r := actor.rule()
@@ -48,42 +58,26 @@ func _draw_rain() -> void:
 		var head := clampf((actor.clock - float(trace.t0)) * speed, 0.0, length)
 		var landed := float(trace.landed)
 		if head <= landed: continue
-		var center := PackedVector2Array()
-		var s := landed
-		while s < head:
-			center.append(actor.trace_point(trace, s))
-			s += 14.0
-		center.append(actor.trace_point(trace, head))
-		if center.size() >= 2:
-			draw_polyline(center, Color(WARNING, 0.2), radius * 2.0, true)
-			var left := PackedVector2Array()
-			var right := PackedVector2Array()
-			for j in center.size():
-				var along := center[mini(j + 1, center.size() - 1)] - center[maxi(j - 1, 0)]
-				var normal := along.normalized().orthogonal() * radius
-				left.append(center[j] + normal)
-				right.append(center[j] - normal)
-			draw_polyline(left, Color(WARNING, 0.6), pixel_size, true)
-			draw_polyline(right, Color(WARNING, 0.6), pixel_size, true)
-		# 走っている円
-		if head < length:
-			draw_arc(actor.trace_point(trace, head), radius, 0.0, TAU, 32, Color(WARNING, 0.95), pixel_size, true)
+		# 帯の輪郭を描かず、これから着弾する範囲へ光の筋をまばらに落とす。
+		var spacing := maxf(70.0, radius)
+		var sample_index := ceili(landed / spacing)
+		while sample_index * spacing <= head:
+			var distance := sample_index * spacing
+			var age := actor.clock - float(trace.t0) - distance / speed
+			RAIN_VISUAL.draw_powder(self, actor.trace_point(trace, distance), radius, age, clampf(age / 0.12, 0.0, 1.0), float(trace.t0) + sample_index)
+			sample_index += 1
 	var fall := maxf(float(r.fall), 0.001)
-	var fade := maxf(float(r.fade), 0.001)
 	var linger := float(r.linger)
-	var down := Vector2.from_angle(RAIN_ANGLE)
 	for arrow in actor.rain_arrows:
 		var t := actor.clock - arrow.z
 		if t < 0.0: continue
 		var f := clampf(t / fall, 0.0, 1.0)
-		# 落ちるほど速く降り、不透明へはキリっと切り替わる。
-		var at := Vector2(arrow.x, arrow.y) - down * float(r.drop_height) * (1.0 - f * f)
-		var opacity := pow(clampf(t / fade, 0.0, 1.0), 3.0)
+		# 画面外から加速して降り、判定の発生時刻に着弾する。
+		var target := Vector2(arrow.x, arrow.y)
+		var origin := RAIN_VISUAL.fall_origin(self, target, float(r.drop_height))
+		var angle := (target - origin).angle()
+		var at := origin.lerp(target, f * f)
+		var opacity := clampf(t / maxf(minf(float(r.fade), 0.05), 0.001), 0.0, 1.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
-		var scene: PackedScene = r.get("shot_visual")
-		var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
-		var mesh: Mesh = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight") if library != null and scene != null else null
-		var sprites: Array = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight_sprites", []) if library != null and scene != null else []
-		if mesh != null: draw_mesh(mesh, null, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity))
-		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(RAIN_ANGLE, at), Color(1, 1, 1, opacity))
-		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, RAIN_ANGLE, 8.0, false, actor.clock, opacity)
+		RAIN_VISUAL.draw_rain_arrow(self, actor, at, angle, opacity)
+		if t >= fall: RAIN_VISUAL.draw_powder(self, target, 12.0, t, opacity * 0.4, arrow.z)

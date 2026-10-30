@@ -25,5 +25,28 @@ func _ready() -> void:
 		var low: Dictionary = await trial.evaluate(lab, PackedVector2Array([Vector2(-200, 0), Vector2(200, 0)]), 0.5)
 		check(low.status == "invalid", "本番で描けない充填率を成功にしない")
 		trial.queue_free()
+	lab.queue_free()
+	await get_tree().process_frame
+	var ui_lab = load("res://gyms/enemy_lab/enemy_lab.tscn").instantiate()
+	add_child(ui_lab)
+	await get_tree().create_timer(0.4).timeout
+	ui_lab.session.perform("spawn", {"type": "drifter", "pos": [-250, -80], "count": 18, "spacing": 70})
+	ui_lab.session.perform("spawn", {"type": "beamer", "pos": [300, -140], "count": 3})
+	ui_lab.session.perform("spawn", {"type": "armored", "pos": [150, 200], "count": 4})
+	ui_lab.canvas.route = PackedVector2Array([Vector2(-450,-100), Vector2(-100,0), Vector2(300,150)])
+	ui_lab._refresh()
+	ui_lab.inspector.refresh(true)
+	await ui_lab._evaluate()
+	check(ui_lab.canvas.result.get("status") == "replayed", "実験場の画面から線を評価できる")
+	ui_lab.pattern = ui_lab.generator.capture(ui_lab.session, ui_lab.canvas.route, 20)
+	ui_lab.canvas.pattern = ui_lab.pattern
+	var record: Dictionary = ui_lab.IO.record(ui_lab.session, ui_lab.canvas.route, ui_lab.pattern, ui_lab.comparisons)
+	var record_path := "/tmp/speed-ui-record.json"
+	ui_lab.IO.save_json(record_path, record)
+	var expected: String = ui_lab.session.digest()
+	await ui_lab._load_file(record_path)
+	check(ui_lab.session.run.enemies.count() == 25 and ui_lab.session.digest() == expected, "実験場の画面から記録を読み直して状態を復元できる")
+	ui_lab.queue_free()
+	await get_tree().process_frame
 	print("[lab_route] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
