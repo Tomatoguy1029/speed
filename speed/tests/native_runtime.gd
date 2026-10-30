@@ -41,7 +41,7 @@ func _ready() -> void:
 				var path := "/tmp/speed-native-generated-probe.json"
 				check(compiler.build_probe(path) == OK, "編集元の実行データを生成する")
 				var saved = JSON.parse_string(FileAccess.get_file_as_string(path))
-				check(saved is Dictionary and saved.version == 2 and saved.enemies.size() == 1, "保存結果を再読込できる")
+				check(saved is Dictionary and saved.version == 2 and saved.enemies.size() == 1 and saved.has("config") and saved.config.has("world_tick_div"), "保存結果を再読込できる")
 			var configured = comparison.create_native()
 			check(configured.configure(data), "追跡敵の定義を読み込める")
 			var broken := data.duplicate(true)
