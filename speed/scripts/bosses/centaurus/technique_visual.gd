@@ -40,7 +40,7 @@ func _draw() -> void:
 		draw_line(pull, pull + Vector2(length + 30.0, 0.0), glow, pixel_size * (3.0 if actor._runner_for().kind() == &"power_shot" else 1.5))
 	draw_set_transform(Vector2.ZERO)
 
-## まだ矢が着いていない帯を、円が走った跡として描く。矢は画面の上端の外から着弾点へ降る。
+## 着弾予定の範囲へ光の粉を落とす。矢は画面上端の外から降る。
 func _draw_rain() -> void:
 	if actor == null or actor.mode != &"rain": return
 	var r := actor.rule()
@@ -51,26 +51,14 @@ func _draw_rain() -> void:
 		var head := clampf((actor.clock - float(trace.t0)) * speed, 0.0, length)
 		var landed := float(trace.landed)
 		if head <= landed: continue
-		var center := PackedVector2Array()
-		var s := landed
-		while s < head:
-			center.append(actor.trace_point(trace, s))
-			s += 14.0
-		center.append(actor.trace_point(trace, head))
-		if center.size() >= 2:
-			draw_polyline(center, Color(WARNING, 0.2), radius * 2.0, true)
-			var left := PackedVector2Array()
-			var right := PackedVector2Array()
-			for j in center.size():
-				var along := center[mini(j + 1, center.size() - 1)] - center[maxi(j - 1, 0)]
-				var normal := along.normalized().orthogonal() * radius
-				left.append(center[j] + normal)
-				right.append(center[j] - normal)
-			draw_polyline(left, Color(WARNING, 0.6), pixel_size, true)
-			draw_polyline(right, Color(WARNING, 0.6), pixel_size, true)
-		# 走っている円
-		if head < length:
-			draw_arc(actor.trace_point(trace, head), radius, 0.0, TAU, 32, Color(WARNING, 0.95), pixel_size, true)
+		# 帯の輪郭を描かず、これから着弾する範囲へ光の筋をまばらに落とす。
+		var spacing := maxf(70.0, radius)
+		var sample_index := ceili(landed / spacing)
+		while sample_index * spacing <= head:
+			var distance := sample_index * spacing
+			var age := actor.clock - float(trace.t0) - distance / speed
+			RAIN_VISUAL.draw_powder(self, actor.trace_point(trace, distance), radius, age, clampf(age / 0.12, 0.0, 1.0), float(trace.t0) + sample_index)
+			sample_index += 1
 	var fall := maxf(float(r.fall), 0.001)
 	var linger := float(r.linger)
 	for arrow in actor.rain_arrows:
@@ -85,3 +73,4 @@ func _draw_rain() -> void:
 		var opacity := clampf(t / maxf(minf(float(r.fade), 0.05), 0.001), 0.0, 1.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
 		RAIN_VISUAL.draw_rain_arrow(self, actor, at, angle, opacity)
+		if t >= fall: RAIN_VISUAL.draw_powder(self, target, 12.0, t, opacity * 0.4, arrow.z)

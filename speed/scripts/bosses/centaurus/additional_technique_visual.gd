@@ -58,14 +58,8 @@ func _draw_shower(r: Dictionary) -> void:
 		if age < 0.0: continue
 		var center: Vector2 = mark.center
 		var radius := float(r.radius)
-		if active_age < float(r.rain_time):
-			draw_arc(center, radius, 0.0, TAU, 32, Color(GOLD, 0.8), 2.0)
-			if active_age < 0.0:
-				var k := clampf(age / warning, 0.0, 1.0)
-				draw_circle(center, radius * lerpf(1.0, 0.15, k), Color(GOLD, lerpf(0.08, 0.35, k)))
-			else:
-				draw_circle(center, radius, Color(GOLD, 0.16))
-				if active_age < 0.3: draw_arc(center, radius * (0.5 + active_age * 2.3), 0.0, TAU, 24, Color(GOLD, 1.0 - active_age / 0.3), 2.0)
+		var strength := clampf(age / 0.12, 0.0, 1.0) * (1.0 - clampf((active_age - float(r.rain_time)) / 0.5, 0.0, 1.0))
+		draw_powder(self, center, radius, age, strength, float(mark.at))
 		# 各波の着弾後も同じ位置へ残す。残った矢には当たり判定を追加しない。
 		var fall := warning * 0.3
 		var last_wave := maxi(0, ceili(float(r.rain_time) / WAVE_INTERVAL) - 1)
@@ -74,7 +68,8 @@ func _draw_shower(r: Dictionary) -> void:
 			var opacity := 1.0 - clampf((landed_age - float(r.linger)) / FADE, 0.0, 1.0)
 			if opacity <= 0.0: continue
 			for j in _arrow_count:
-				var target := center + Vector2((j - (_arrow_count - 1) * 0.5) * radius * 0.6, 0.0)
+				var seed := float(mark.at) * 19.7 + center.x * 0.019 + center.y * 0.071 + wave * 43.1
+				var target := center + scatter(seed, j) * radius * 0.85
 				var origin := fall_origin(self, target)
 				var progress := clampf((landed_age + fall) / fall, 0.0, 1.0)
 				draw_rain_arrow(self, actor, origin.lerp(target, progress * progress), (target - origin).angle(), opacity)
@@ -93,3 +88,30 @@ static func fall_origin(canvas: CanvasItem, target: Vector2, minimum_height := 0
 	var origin := transform.affine_inverse() * Vector2(screen.x, -160.0)
 	var toward := (target - origin).normalized()
 	return target - toward * maxf(target.distance_to(origin), minimum_height)
+
+## 同じ着弾を描き直しても位置は動かさず、波ごとに範囲内へばらけさせる。
+static func scatter(seed: float, index: int) -> Vector2:
+	var angle := fposmod(sin(index * 127.1 + seed) * 43758.5453, 1.0) * TAU
+	var reach := sqrt(fposmod(sin(index * 269.5 + seed + 3.0) * 21563.734, 1.0))
+	return Vector2.from_angle(angle) * reach
+
+## 星と区別できる金色の落下筋と白い芯。世界時間で進め、戦闘の乱数は消費しない。
+static func draw_powder(canvas: CanvasItem, center: Vector2, radius: float, age: float, strength: float, salt := 0.0) -> void:
+	var seed := center.x * 0.019 + center.y * 0.071 + salt
+	for j in 10:
+		var q := fposmod(sin(j * 127.1 + seed) * 43758.5453, 1.0)
+		var u := fposmod(sin(j * 269.5 + seed + 3.0) * 21563.734, 1.0)
+		var cycle := fposmod(age * (0.8 + q * 0.5) + u, 1.0)
+		var blink := pow(maxf(0.0, sin(cycle * PI)), 2.0) * strength
+		var at := center + scatter(seed, j) * radius * 0.85 - Vector2(0, (1.0 - cycle) * 65.0)
+		if cycle < 0.72:
+			var tip := at - Vector2(0, 12.0 + q * 12.0)
+			canvas.draw_line(tip, at, Color(0.07, 0.04, 0.02, blink * 0.85), 6.0)
+			canvas.draw_line(tip, at, Color(1.5, 0.85, 0.18, blink * 0.55), 3.8)
+			canvas.draw_line(tip, at, Color(1.7, 1.4, 0.8, blink), 1.5)
+		else:
+			var size := 1.5 + q * 1.5
+			canvas.draw_circle(at, size * 2.5, Color(GOLD, blink * 0.22))
+			canvas.draw_circle(at, size, Color(1.7, 1.4, 0.8, blink))
+			if q > 0.7:
+				canvas.draw_line(at - Vector2(size * 2.2, 0), at + Vector2(size * 2.2, 0), Color(1.7, 1.4, 0.8, blink), 1.2)
