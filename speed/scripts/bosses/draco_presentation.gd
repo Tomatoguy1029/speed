@@ -6,9 +6,17 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var core_glow_color := Color(0.38, 0.59, 1.0)
 @export var rift_color := Color("#5a4d91")
 var actor: BossActor
+var _parts: Node2D
+var _core: Node2D
 const FORM = preload("res://scripts/bosses/draco_form.gd")
 const MODULE_GEOMETRY = preload("res://scripts/ui/legendary_module_geometry.gd")
 func _ready() -> void:
+	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
+	add_child(_parts)
+	_core = Node2D.new()
+	_core.z_index = 2
+	_core.draw.connect(_draw_core)
+	add_child(_core)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
 	EFFECT_SETTINGS.apply_key(self, "boss/body/draco")
 func _process(_dt: float) -> void:
@@ -17,6 +25,18 @@ func _process(_dt: float) -> void:
 	position = sample.offset
 	rotation = sample.angle
 	material.set_shader_parameter("boss_hit_white", sample.white)
+	_core.queue_redraw()
+	if actor == null or not actor.has_body():
+		_parts.hide()
+		return
+	var points := PackedVector2Array()
+	for point in actor.body_points(): points.append(actor.to_local(point))
+	var alpha := smoothstep(0.0, 1.0, actor.entrance.emerged) if actor.entrance.active else 1.0
+	if actor.finale.stage == &"explode": alpha = 0.0
+	_parts.pose(points, actor.body_width * actor.perspective_scale, actor.head_scale * actor.perspective_scale,
+		alpha, actor.cosmic_body, sample.white, actor.to_local(actor.finale.center),
+		Vector2.RIGHT.rotated(-actor.rotation) * actor.finale.split * 90.0)
+
 
 func on_event(event: Dictionary) -> void:
 	if event.cue in [&"phase_changed",&"bear_roar"]:
@@ -25,28 +45,6 @@ func on_event(event: Dictionary) -> void:
 func _draw() -> void:
 	if actor == null or not actor.has_body(): return
 	_draw_rift()
-	var points := PackedVector2Array()
-	for point in actor.body_points(): points.append(actor.to_local(point))
-	var body_alpha := smoothstep(0.0,1.0,actor.entrance.emerged) if actor.entrance.active else 1.0
-	var width: float = actor.body_width*actor.perspective_scale
-	if actor.finale.stage != &"explode":
-		if actor.finale.split>0.0:
-			_draw_split_body(points,width,body_alpha)
-		else:
-			FORM.draw_body(self,points,width,actor.clock,actor.cosmic_body,body_alpha,PackedFloat32Array(),true)
-		var mouth_open: float = actor.mouth_open
-		var head_offset := Vector2.ZERO
-		if actor.finale.split>0.0:
-			var side := -1.0 if actor.table.pos[actor.body].x<actor.finale.center.x else 1.0
-			head_offset=Vector2.RIGHT.rotated(-actor.rotation)*side*actor.finale.split*90.0
-		FORM.draw_head(self,actor.head_scale*actor.perspective_scale,mouth_open,1.0,body_alpha,head_offset)
-		var core: Vector2 = actor.to_local(actor.chest_pos())
-		var core_glow := 1.0
-		if actor.entrance.active: core_glow=float(actor.entrance.get("chest_glow") if actor.entrance.get("chest_glow")!=null else actor.entrance.emerged)
-		if actor.finale.stage!=&"": core_glow=0.12 if actor.finale.split<=0.0 else 0.0
-		var pulse := 0.85+sin(actor.clock*3.0)*0.15
-		draw_circle(core,core_glow_radius*actor.perspective_scale,Color(core_glow_color,core_glow*core_glow_opacity*pulse))
-		FORM.star(self,core,27.0*actor.perspective_scale,Color(0.85,0.96,1.0,core_glow))
 	if actor.finale.stage==&"strikes":
 		for trail: Dictionary in actor.finale.strike_trails:
 			var age: float=actor.clock-float(trail.time)
@@ -111,24 +109,14 @@ func _draw_rift() -> void:
 			var offset: Vector2=axis.rotated(-actor.rotation)*12.0
 			draw_line(at-offset,at+offset,Color(1.0,0.1,0.3,eyes),8.0,false)
 
-func _draw_split_body(local: PackedVector2Array, width: float, alpha: float) -> void:
-	var world: PackedVector2Array=actor.body_points()
-	var fractions := FORM.fractions(world)
-	var cut_x: float=actor.finale.center.x
-	for side in [-1.0,1.0]:
-		var displacement: Vector2=Vector2.RIGHT.rotated(-actor.rotation)*side*actor.finale.split*90.0
-		for j in range(world.size()-1):
-			var left_inside: bool=(world[j].x-cut_x)*side>=0.0
-			var right_inside: bool=(world[j+1].x-cut_x)*side>=0.0
-			if not left_inside and not right_inside: continue
-			var start: Vector2=local[j]
-			var end: Vector2=local[j+1]
-			var first: float=fractions[j]
-			var last: float=fractions[j+1]
-			if left_inside!=right_inside:
-				var blend := clampf((cut_x-world[j].x)/(world[j+1].x-world[j].x),0.0,1.0)
-				var crossing := local[j].lerp(local[j+1],blend)
-				var middle := lerpf(first,last,blend)
-				if left_inside: end=crossing;last=middle
-				else: start=crossing;first=middle
-			FORM.draw_body(self,PackedVector2Array([start+displacement,end+displacement]),width,actor.clock,true,alpha,PackedFloat32Array([first,last]))
+
+func _draw_core() -> void:
+	if actor == null or not actor.has_body(): return
+	if actor.finale.stage != &"explode":
+		var core: Vector2 = actor.to_local(actor.chest_pos())
+		var core_glow := 1.0
+		if actor.entrance.active: core_glow=float(actor.entrance.get("chest_glow") if actor.entrance.get("chest_glow")!=null else actor.entrance.emerged)
+		if actor.finale.stage!=&"": core_glow=0.12 if actor.finale.split<=0.0 else 0.0
+		var pulse := 0.85+sin(actor.clock*3.0)*0.15
+		_core.draw_circle(core,core_glow_radius*actor.perspective_scale,Color(core_glow_color,core_glow*core_glow_opacity*pulse))
+		FORM.star(_core,core,27.0*actor.perspective_scale,Color(0.85,0.96,1.0,core_glow))
