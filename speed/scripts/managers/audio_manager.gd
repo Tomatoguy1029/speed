@@ -94,7 +94,7 @@ func play_music(name: StringName, fade_seconds := 1.0, owner: Node = null) -> vo
 		_music_player.stop()
 		_music_player.stream = song
 		_music_player.volume_linear = 0.0 if fade_seconds > 0.0 else 1.0
-		_music_player.play())
+		_music_player.play(song.loop_offset if song is AudioStreamMP3 else 0.0))
 	_music_fade.tween_property(_music_player, "volume_linear", 1.0, minf(fade_seconds, 0.6))
 func stop_music(owner: Node = null) -> void:
 	if owner != null and _music_owner != owner: return

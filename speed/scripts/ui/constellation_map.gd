@@ -240,6 +240,8 @@ func _label(at: Vector2, dimensions: Vector2, font_size: int) -> Label:
 	return label
 
 func select_constellation(index: int) -> void:
+	if index != _selected:
+		AudioManager.play(&"stage_select_click", -10.0)
 	if _turn != null:
 		_turn.kill()
 	_hide_details()

@@ -53,7 +53,7 @@ func _ready() -> void:
 		hash.update(wav.data)
 		check(hash.finish().hex_encode() == EXPECTED[name].hash, "波形を維持する: " + name)
 		check(wav.mix_rate == EXPECTED[name].rate and wav.data.size() == EXPECTED[name].size, "長さとサンプル周波数を維持する: " + name)
-	for song in [&"battle", &"boss", &"menu"]:
+	for song in [&"battle", &"boss", &"menu", &"stage_select"]:
 		var music := AudioManager._music.get(song) as AudioStreamMP3
 		check(music != null and music.loop and music.get_length() > 0.0, "BGMをループ再生できる: " + String(song))
 	AudioManager.play_music(&"battle", 0.0)
@@ -80,7 +80,28 @@ func _ready() -> void:
 	AudioManager.stop_music(menu_screen)
 	old_screen.free()
 	menu_screen.free()
-	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"hurt", &"bounce", &"contact_arc", &"enemy_laser_charge", &"enemy_laser_fire"]:
+	var select_music := AudioManager._music.get(&"stage_select") as AudioStreamMP3
+	check(select_music != null and is_equal_approx(select_music.loop_offset, 26.0), "ステージセレクト曲のループを26秒地点から始める")
+	var main := preload("res://scripts/ui/main.gd").new()
+	add_child(main._fade)
+	main._sync_screen_music(GameManager.Screen.STAGE_SELECT)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(AudioManager._music_track == &"stage_select" and AudioManager._music_player.stream == select_music, "ステージセレクト画面に専用BGMを割り当てる")
+	check(AudioManager._music_player.get_playback_position() >= 26.0, "初回再生も冒頭を飛ばして26秒から始める")
+	check(AudioManager._music_player.volume_linear < 1.0, "ステージセレクト曲をフェードインする")
+	await get_tree().create_timer(0.7).timeout
+	check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0), "フェードイン後は通常音量へ到達する")
+	main._sync_screen_music(GameManager.Screen.INTRO)
+	check(not AudioManager._music_player.playing, "導入画面への移動でステージセレクト曲を停止する")
+	main._sync_screen_music(GameManager.Screen.MAIN_MENU)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(AudioManager._music_track == &"menu", "メニューへ戻ると通常のメニュー曲へ切り替える")
+	AudioManager.stop_music()
+	main._fade.free()
+	main.free()
+	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"stage_select_click", &"hurt", &"bounce", &"contact_arc", &"enemy_laser_charge", &"enemy_laser_fire"]:
 		var stream := AudioManager._sounds.get(sound) as AudioStreamMP3
 		check(stream != null, "強化用MP3を読み込む: " + String(sound))
 		if stream != null: check(not stream.loop and stream.get_length() > 0.0, "強化音を一回再生できる: " + String(sound))
@@ -185,6 +206,21 @@ func _ready() -> void:
 	check(not sim.state.events.any(func(event): return event.type == &"bomber_explode"), "先に倒した自爆敵は爆発音を鳴らさない")
 	session.free()
 	hud.free()
+	var map := preload("res://scripts/ui/constellation_map.gd").new()
+	map.navigation_enabled = false
+	before = AudioManager._next
+	add_child(map)
+	check(AudioManager._next == before, "ステージ選択の初期表示では選択音を鳴らさない")
+	map._stars[1].pressed.emit()
+	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "別ステージのクリックで選択音を1回鳴らす")
+	check(AudioManager._players[before].stream == AudioManager.sound(&"stage_select_click"), "ステージ選択に指定されたクリック音を使う")
+	before = AudioManager._next
+	map._stars[1].pressed.emit()
+	check(AudioManager._next == before, "同じステージを再クリックしても選択音を重ねない")
+	if map._final_stage != null:
+		map._final_stage.pressed.emit()
+		check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "最終ステージの選択でも同じ音を鳴らす")
+	map.free()
 	for player in AudioManager._players: player.stop()
 	await get_tree().process_frame
 	print("[baked_audio] %d failures" % failed)

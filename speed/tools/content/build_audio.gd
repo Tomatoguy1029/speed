@@ -31,16 +31,19 @@ static func build(output: String) -> Error:
 	_sounds[&"menu_open"] = load("res://assets/audio/sfx/menu_open.mp3")
 	_sounds[&"upgrade_apply"] = load("res://assets/audio/sfx/upgrade_apply.mp3")
 	_sounds[&"ui"] = load("res://assets/audio/sfx/ui_confirm.mp3")
+	_sounds[&"stage_select_click"] = load("res://assets/audio/sfx/stage_select_click.mp3")
 
 	for name in _sounds:
 		if _sounds[name] == null:
 			push_error("音源を読み込めません: %s" % name)
 			return ERR_CANT_OPEN
-	for entry in [[&"battle", "kulakovka-space-283176.mp3"], [&"boss", "nastelbom-war-391660.mp3"], [&"menu", "leberch-space-ambient-509783.mp3"]]:
+	for entry in [[&"battle", "kulakovka-space-283176.mp3"], [&"boss", "nastelbom-war-391660.mp3"], [&"menu", "leberch-space-ambient-509783.mp3"],
+		[&"stage_select", "atlasaudio-space-music-625739.mp3"]]:
 		var song := load("res://assets/audio/music/" + entry[1]) as AudioStreamMP3
 		if song == null: return ERR_CANT_OPEN
 		song = song.duplicate() as AudioStreamMP3
 		song.loop = true
+		if entry[0] == &"stage_select": song.loop_offset = 26.0
 		bank.music[entry[0]] = song
 	return ResourceSaver.save(bank, output)
 
