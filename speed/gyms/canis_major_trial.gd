@@ -67,7 +67,7 @@ func _only(id: StringName) -> void:
 	if actor == null: return
 	_repeat_id = id
 	actor.selection_enabled = false
-	if id in [&"blaze", &"sirius", &"sirius_flame"]: _phase_two()
+	if id in [&"sirius_flame", &"sirius", &"blaze", &"relay", &"hunt", &"nova"]: _phase_two()
 
 func _repeat_technique() -> void:
 	if _repeat_id.is_empty() or not session.playing or session.run == null: return

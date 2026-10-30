@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/nova.gd" id="1"]
 
+[ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/nova_visual.tscn" id="visual"]
+
 [resource]
 script = ExtResource("1")
 technique = &"nova"
@@ -24,3 +26,4 @@ damage = 22.0
 after = 2.4
 recover = 1.6
 cd = 16.0
+visual = ExtResource("visual")

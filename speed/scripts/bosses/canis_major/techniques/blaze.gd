@@ -68,6 +68,12 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
+## 爆発のピクセル炎表示
+@export var explosion_visual: PackedScene = preload("res://scenes/attacks/canis_fire_explosion.tscn"):
+	set(value):
+		explosion_visual = value
+		_values_dirty = true
+
 func make_runner() -> RefCounted:
 	return Runner.new()
 

@@ -1,5 +1,7 @@
 ## おおいぬ座だけが持つ、技の終了後も残る炎。更新・判定は世界時間、描画は同じ状態を読む。
 extends Node2D
+const VISUAL_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const NOVA_KEY := "res://scenes/bosses/canis_major/nova_visual.tscn"
 const BEAM_VISUAL := preload("res://scenes/attacks/canis_flame_beam.tscn")
 const BEAM_CANVAS := preload("res://scripts/render/attacks/canis_flame_beam.gd")
 var tints: Dictionary = {}
@@ -8,7 +10,11 @@ var flash: ColorRect
 var burning: Dictionary = {}
 var transfers: Array = []
 var particles: Array = []
-var particle_canvas: ParticleCanvas
+const FIRE_DISPLAY := preload("res://scripts/bosses/canis_major/pixel_fire_display.gd")
+const IGNITE_FIRE := preload("res://data/visuals/canis_fire_ignite.tres")
+const HOUND_FIRE := preload("res://data/visuals/canis_fire_hound.tres")
+var fire_displays: Dictionary = {}
+var particle_display: Node2D
 var actor: CanisMajorBoss
 var trails: Array = []
 var warnings: Array = []
@@ -21,8 +27,9 @@ func bind(host: CanisMajorBoss) -> void:
 	rotation = 0.0
 	beam_canvas = BEAM_CANVAS.BeamCanvas.new()
 	add_child(beam_canvas)
-	particle_canvas = ParticleCanvas.new()
-	add_child(particle_canvas)
+	particle_display = FIRE_DISPLAY.new()
+	particle_display.setup(preload("res://data/visuals/canis_fire_flame.tres"))
+	add_child(particle_display)
 	var layer := CanvasLayer.new()
 	layer.layer = 80
 	add_child(layer)
@@ -46,11 +53,11 @@ func add_trail(beam: Dictionary, r: Dictionary) -> void:
 
 func tick(dt: float) -> void:
 	if nova != null:
-		nova.update_effect(actor)
+		nova.update_effect(actor,dt)
 		if nova.finished(actor): nova = null
 	flash.size = get_viewport_rect().size
 	var flash_age: float = actor.clock - nova.started - float(nova.values.warn) if nova != null else -1.0
-	flash.color.a = 0.7 * (1.0-flash_age/0.25) if flash_age >= 0.0 and flash_age < 0.25 else 0.0
+	flash.color.a = VISUAL_SETTINGS.number(NOVA_KEY,"flash_opacity",0.32) * (1.0-flash_age/0.25) if flash_age >= 0.0 and flash_age < 0.25 else 0.0
 	_tick_burning(dt)
 	_tick_tints()
 	_tick_particles(dt)
@@ -62,14 +69,14 @@ func tick(dt: float) -> void:
 		if Geometry2D.get_closest_point_to_segment(actor.run_state.ship_pos, trail.from, end).distance_to(actor.run_state.ship_pos) < reach:
 			actor.ctx.ship.damage(float(trail.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_trail", &"canis_major")
 	trails = trails.filter(func(trail): return float(trail.age) < float(trail.life))
-	beam_canvas.beams.clear()
+	var beams: Array = []
 	for trail in trails:
 		var visual: Dictionary = trail.duplicate()
 		visual.width = 20.0
 		visual.alpha = 0.65 * (1.0 - float(trail.age) / maxf(float(trail.life), 0.001))
-		beam_canvas.beams.append(visual)
-	beam_canvas.clock = actor.run_state.world_time
-	beam_canvas.queue_redraw()
+		beams.append(visual)
+	beam_canvas.sync(beams,actor.run_state.world_time)
+	_sync_fire_displays()
 	queue_redraw()
 
 func clear() -> void:
@@ -88,29 +95,15 @@ func clear() -> void:
 	transfers.clear()
 	trails.clear()
 	particles.clear()
-	if particle_canvas != null:
-		particle_canvas.particles.clear()
-		particle_canvas.queue_redraw()
+	if particle_display != null: particle_display.cloud([],actor.run_state.world_time)
+	for fire in fire_displays.values(): fire.queue_free()
+	fire_displays.clear()
 	warnings.clear()
-	if beam_canvas != null:
-		beam_canvas.beams.clear()
-		beam_canvas.queue_redraw()
+	if beam_canvas != null: beam_canvas.sync([],actor.run_state.world_time)
 	queue_redraw()
 
 func _draw() -> void:
 	_draw_nova()
-	for transfer in transfers:
-		if not _valid(transfer.row, transfer.id): continue
-		var at: Vector2 = Vector2(transfer.from).lerp(actor.table.pos[transfer.row], clampf(float(transfer.age) / maxf(float(transfer.life),0.001),0,1))
-		draw_circle(at, 8.0, Color(actor.SIRIUS_COLOR,0.3))
-		draw_circle(at, 3.0, Color.WHITE)
-	for i: int in burning:
-		if not _valid(i, burning[i].id): continue
-		# 燃える猟犬の正式な見た目は未決。既存の体色と仮の火の粉で示す。
-		for k in 5:
-			var life := fposmod(actor.clock * 2.0 + k * 0.618, 1.0)
-			var at := actor.table.pos[i] + Vector2(sin(k * 2.4 + actor.clock) * 12.0, -life * 30.0)
-			draw_circle(at, 2.5 * (1.0-life), Color(1.0,0.4+life*0.3,0.1,1.0-life))
 	for warning in warnings:
 		var direction := Vector2.from_angle(float(warning.angle))
 		var length := float(warning.length)
@@ -139,21 +132,7 @@ func _tick_particles(dt: float) -> void:
 			if Vector2(particle.pos).distance_to(actor.run_state.ship_pos) < float(particle.radius) * float(particle.hit_scale) + actor.ctx.cfg.ship_radius:
 				actor.ctx.ship.damage(float(particle.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_flame", &"canis_major")
 	particles = particles.filter(func(particle): return float(particle.age) < float(particle.life))
-	particle_canvas.particles = particles
-	particle_canvas.queue_redraw()
-
-class ParticleCanvas extends Node2D:
-	var particles: Array = []
-	func _ready() -> void:
-		var shader_material := ShaderMaterial.new()
-		shader_material.shader = preload("res://shaders/canis_flame_particle.gdshader")
-		material = shader_material
-	func _draw() -> void:
-		for p in particles:
-			var at: Vector2 = p.pos
-			var r := float(p.get("radius", p.r_start))
-			var alpha := (1.0 - float(p.age) / float(p.life)) * 0.48
-			draw_primitive(PackedVector2Array([at+Vector2(-r,-r),at+Vector2(r,-r),at+Vector2(r,r),at+Vector2(-r,r)]), PackedColorArray([Color(1,1,1,alpha)]), PackedVector2Array([Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1)]))
+	particle_display.cloud(particles,actor.run_state.world_time,actor.table.facing[actor.body])
 
 func _valid(i: int, id: int) -> bool:
 	return actor.table.alive[i] != 0 and actor.table.dead[i] == 0 and actor.table.id[i] == id
@@ -166,13 +145,13 @@ func ignite(i: int, values: Dictionary) -> void:
 	var entry := {"id": actor.table.id[i], "base_hp": actor.table.max_hp[i], "base_color": actor.table.color[i], "age": 0.0, "blink_age": -1.0, "r": values}
 	burning[i] = entry
 	actor._set_max_hp(i, actor.ram_power() * 0.5)
-	actor.table.color[i] = Color("#ff713d")
+	actor.table.color[i] = actor.SIRIUS_COLOR
 	actor._hounds().release_order(i)
 	actor._cue(&"blaze_ignite", actor.table.pos[i])
 
 func _tick_burning(dt: float) -> void:
 	for transfer in transfers: transfer.age = float(transfer.age) + dt
-	transfers = transfers.filter(func(t): return float(t.age) < float(t.life) and _valid(t.row,t.id))
+	transfers = transfers.filter(func(t): return float(t.age) < maxf(float(t.life),IGNITE_FIRE.lifetime) and _valid(t.row,t.id))
 	for i: int in burning.keys():
 		var entry: Dictionary = burning[i]
 		if not _valid(i, entry.id):
@@ -194,7 +173,7 @@ func _tick_burning(dt: float) -> void:
 		var progress := clampf(float(entry.blink_age) / maxf(float(r.blink),0.001),0,1)
 		actor.table.flash[i] = 0.05 if sin(progress * (3.0 + progress * 5.0) * TAU) > 0 else 0.0
 		if float(entry.blink_age) >= float(r.blink):
-			actor.ctx.projectiles.fire_zone(actor.table.pos[i], float(r.explode_radius), 0.0, float(r.damage) * actor.ctx.cfg.atk_scale, ProjectileSystem.HazardStyle.BLAST, actor.table.color[i])
+			actor.ctx.projectiles.emit_attack(&"zone",[actor.table.pos[i],float(r.explode_radius),0.0,float(r.damage)*actor.ctx.cfg.atk_scale,ProjectileSystem.HazardStyle.BLAST,actor.SIRIUS_COLOR],r.get("explosion_visual"))
 			actor._cue(&"blaze_explode", actor.table.pos[i])
 			actor.ctx.enemies.mark_dead(i)
 			burning.erase(i)
@@ -204,8 +183,17 @@ func _draw_nova() -> void:
 	var r: Dictionary = nova.values
 	var age: float = actor.clock-float(nova.started)
 	var source := actor.mouth()
-	var light := clampf((age-0.4)/maxf(float(r.warn)-0.4,0.001),0,1) if age < float(r.warn) else maxf(0.0,1.0-(age-float(r.warn))/maxf(float(r.after),0.001))
-	for k in range(6,0,-1): draw_circle(source,900.0*k/6.0,Color(actor.SIRIUS_COLOR,light*0.022))
+	var light := clampf(age/maxf(float(r.warn),0.001),0,1) if age < float(r.warn) else maxf(0.0,1.0-(age-float(r.warn))/maxf(float(r.after),0.001))
+	var light_alpha := VISUAL_SETTINGS.number(NOVA_KEY,"warning_glow_opacity",0.06)
+	for k in range(6,0,-1): draw_circle(source,900.0*k/6.0,Color(actor.SIRIUS_COLOR,light*light_alpha))
+	if age < float(r.warn):
+		var progress := clampf(age/maxf(float(r.warn),0.001),0,1)
+		var ray_length := VISUAL_SETTINGS.number(NOVA_KEY,"warning_ray_length",100.0)*lerpf(0.25,1.0,progress)
+		var pulse := 0.7+0.3*sin(progress*PI*6.0)
+		for k in 8:
+			var u := Vector2.from_angle(k*TAU/8.0)
+			draw_line(source+u*10.0,source+u*ray_length,Color(actor.SIRIUS_COLOR,pulse*progress),VISUAL_SETTINGS.number(NOVA_KEY,"warning_ray_width",4.0))
+		draw_circle(source,12.0+progress*18.0,Color(1,1,1,0.2+progress*0.5))
 	for shadow in nova.shadows:
 		var polygon := PackedVector2Array()
 		for k in 13:
@@ -224,7 +212,12 @@ func _draw_nova() -> void:
 			var a := TAU*k/256.0
 			var b := TAU*(k+1)/256.0
 			if nova.in_shadow(actor,source+Vector2.from_angle((a+b)*0.5)*radius,0.0): continue
-			draw_line(source+Vector2.from_angle(a)*radius,source+Vector2.from_angle(b)*radius,Color(actor.SIRIUS_COLOR,0.75),float(r.ring_band)*2.0)
+			var from := source+Vector2.from_angle(a)*radius
+			var to := source+Vector2.from_angle(b)*radius
+			var width := float(r.ring_band)*2.0
+			draw_line(from,to,Color(actor.SIRIUS_COLOR,0.2),width*VISUAL_SETTINGS.number(NOVA_KEY,"ring_halo_scale",3.0))
+			draw_line(from,to,Color(actor.SIRIUS_COLOR,0.95),width)
+			draw_line(from,to,Color(1,1,1,0.95),VISUAL_SETTINGS.number(NOVA_KEY,"ring_core_width",4.0))
 
 func tint_hound(i: int, until: float, color: Color) -> void:
 	var base: Color = tints[i].base if tints.has(i) and tints[i].id == actor.table.id[i] else actor.table.color[i]
@@ -245,3 +238,39 @@ func clear_tint(i: int, id: int) -> void:
 	if not tints.has(i) or tints[i].id != id: return
 	if _valid(i,id): actor.table.color[i] = tints[i].base
 	tints.erase(i)
+
+func _fire_display(key: String, preset: PixelFireSettings) -> Node2D:
+	if not fire_displays.has(key):
+		var fire := FIRE_DISPLAY.new()
+		fire.setup(preset)
+		add_child(fire)
+		fire_displays[key] = fire
+	return fire_displays[key]
+
+func _sync_fire_displays() -> void:
+	var seen := {}
+	var clock := actor.run_state.world_time
+	for transfer in transfers:
+		if not _valid(transfer.row,transfer.id): continue
+		var key := "点火:"+str(transfer.id)
+		seen[key] = true
+		var start: Vector2 = transfer.from
+		var to: Vector2 = actor.table.pos[transfer.row]-start
+		var progress := clampf(float(transfer.age)/maxf(float(transfer.life),0.001),0,1)
+		var fade := 1.0-smoothstep(float(transfer.life),maxf(float(transfer.life)+0.001,IGNITE_FIRE.lifetime),float(transfer.age))
+		_fire_display(key,IGNITE_FIRE).beam(start,to.angle(),maxf(1.0,to.length()*progress),18.0,clock,fade)
+	if not transfers.is_empty() or (actor.technique==&"blaze" and actor.mode in [&"windup",&"active"]):
+		seen["口元の点火"] = true
+		_fire_display("口元の点火",IGNITE_FIRE).cloud([{"pos":actor.mouth(),"radius":28.0,"seed":0}],clock)
+	for i: int in burning:
+		if not _valid(i,burning[i].id): continue
+		var key := "猟犬:"+str(burning[i].id)
+		seen[key] = true
+		# 燃える猟犬の正式な見た目は未決。共通PixelFireの専用プリセットを使う。
+		var fire := _fire_display(key,HOUND_FIRE)
+		fire.cloud([{"pos":actor.table.pos[i],"radius":actor.table.r[i]*1.6,"seed":i}],clock)
+		fire.modulate.a = 0.4 if actor.table.flash[i]>0 else 1.0
+	for key in fire_displays.keys():
+		if not seen.has(key):
+			fire_displays[key].queue_free()
+			fire_displays.erase(key)

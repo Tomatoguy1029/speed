@@ -52,6 +52,14 @@ const NUMBER_LIMITS := {
 	"burst_pixel_scale": [0.5, 3.0, 0.05],
 }
 const DIRECT_FIELDS := {
+	"res://scenes/bosses/canis_major/nova_visual.tscn": [
+		["溜めの光芒の長さ", "warning_ray_length", 20.0, 180.0, 1.0, 100.0],
+		["溜めの光芒の太さ", "warning_ray_width", 1.0, 12.0, 0.5, 4.0],
+		["周囲を照らす強さ", "warning_glow_opacity", 0.0, 0.2, 0.01, 0.06],
+		["光の輪の暈の倍率", "ring_halo_scale", 1.0, 6.0, 0.1, 3.0],
+		["光の輪の白い芯の太さ", "ring_core_width", 1.0, 12.0, 0.5, 4.0],
+		["画面が白む強さ", "flash_opacity", 0.0, 0.8, 0.01, 0.32],
+	],
 	"trait/rampage": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],

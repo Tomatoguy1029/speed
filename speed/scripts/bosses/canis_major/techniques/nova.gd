@@ -114,11 +114,11 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 	func manual_tick(host: CanisMajorBoss, dt: float) -> void:
 		host.table.vel[host.body] = Vector2.ZERO
 		var age := host.clock-started
-		if age < float(values.warn) and host._moves[kind()].track_during_warn: host._face(host.run_state.enemy_aim,host.def.turn,dt)
+		# 並び始めたら口元の向きを保ち、持ち場を動かして猟犬と影を揺らさない。
 		if age >= float(values.warn)+float(values.after):
 			release_pairs(host)
 			finish(host,float(values.recover))
-	func update_effect(host: CanisMajorBoss) -> void:
+	func update_effect(host: CanisMajorBoss, dt: float = 0.0) -> void:
 		var age := host.clock-started
 		var cfg: Dictionary = host._rules[&"bay"].duplicate()
 		cfg.max_speed = values.gather_speed
@@ -127,8 +127,28 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 			if not valid_hound(host,i,member.id): continue
 			if not released:
 				var u := Vector2.from_angle(float(member.angle))
-				var goal := host.mouth() + u*float(values.pair_dist) + u.orthogonal()*float(values.pair_side)*float(member.side)
-				host._hounds().steer_follow(i,goal,host.mouth()+u*1000.0,host.run_state.world_time+host.FOLLOW_HOLD,cfg)
+				var offset := host.mouth()-host.table.pos[host.body]+u.orthogonal()*float(values.pair_side)*float(member.side)
+				# 到着の許容距離を含め、持ち場をボスの占有円の外に置く。
+				var clearance := host.table.r[host.body]+host.table.r[i]+float(cfg.arrive)+4.0
+				var along := offset.dot(u)
+				var exit_distance := -along+sqrt(maxf(0.0,along*along+clearance*clearance-offset.length_squared()))
+				var goal := host.mouth()+u*maxf(float(values.pair_dist),exit_distance)+u.orthogonal()*float(values.pair_side)*float(member.side)
+				if not member.get("stationed",false) and host.table.pos[i].distance_to(goal)<float(cfg.arrive) and host.table.vel[i].length()<80.0:
+					member.stationed = true
+					host._hounds().release_order(i)
+				if member.get("stationed",false):
+					host._hounds().quiet(i,host.run_state.world_time+host.FOLLOW_HOLD,Vector2.ZERO)
+					host.table.facing[i] = rotate_toward(host.table.facing[i],float(member.angle),float(cfg.face_turn)*dt)
+				else:
+					var route_goal := goal
+					var center := host.table.pos[host.body]
+					var at := host.table.pos[i]
+					var obstacle := host.table.r[host.body]+host.table.r[i]+6.0
+					if Geometry2D.get_closest_point_to_segment(center,at,goal).distance_to(center)<obstacle:
+						var current := (at-center).angle()
+						var turn := Geom.angle_diff((goal-center).angle(),current)
+						route_goal = center+Vector2.from_angle(current+clampf(turn,-0.6,0.6))*(clearance+16.0)
+					host._hounds().steer_follow(i,route_goal,host.mouth()+u*1000.0,host.run_state.world_time+host.FOLLOW_HOLD,cfg)
 				host.sirius_effects.tint_hound(i,host.run_state.world_time+host.FOLLOW_HOLD,host.SIRIUS_COLOR)
 		update_shadows(host)
 		if age < float(values.warn): return
