@@ -69,9 +69,9 @@ extends BossTechnique
 		_values_dirty = true
 
 ## 爆発のピクセル炎表示
-@export var explosion_visual: PackedScene = preload("res://scenes/attacks/canis_fire_explosion.tscn"):
+@export var explosion_fire: PixelFireSettings = preload("res://data/visuals/canis_fire_burst.tres"):
 	set(value):
-		explosion_visual = value
+		explosion_fire = value
 		_values_dirty = true
 
 func make_runner() -> RefCounted:

@@ -181,8 +181,8 @@ func shuffled_pack(host: CanisMajorBoss) -> Array:
 		rows[j] = row
 	return rows
 
-## 直線の光に共通する、追尾・固定・発射。各技が自分の値を渡す。
-class BeamAim extends RefCounted:
+## 火炎放射の追尾・固定・開始。炎の発生と移動は世界時間で別に進める。
+class FlameAim extends RefCounted:
 	var cfg: Dictionary
 	var age := 0.0
 	var fired := false
@@ -213,7 +213,7 @@ class BeamAim extends RefCounted:
 			if age < float(cfg.warn): return false
 			host.locked = true
 			host.direction = Vector2.from_angle(host.table.facing[host.body])
-			result = host.sirius_effects.fire_beam(host.mouth(), host.direction.angle(), float(cfg.length), float(cfg.width), float(cfg.time), float(cfg.damage))
+			result = host.sirius_effects.start_jet(host.mouth(), host.direction.angle(), float(cfg.length), float(cfg.width), float(cfg.time), float(cfg.damage),cfg.preset)
 			fired = true
 			age = 0.0
 			host.mode = &"active"

@@ -27,17 +27,17 @@ extends BossTechnique
 	set(value):
 		aim_turn = value
 		_values_dirty = true
-## ビームの長さ
+## 炎の長さ
 @export_range(0,100000,0.01) var beam_length := 1500.0:
 	set(value):
 		beam_length = value
 		_values_dirty = true
-## ビームの太さ
+## 炎の太さ
 @export_range(0,100000,0.01) var beam_width := 44.0:
 	set(value):
 		beam_width = value
 		_values_dirty = true
-## ビームの時間（秒）
+## 炎の時間（秒）
 @export_range(0,100000,0.01) var beam_time := 0.7:
 	set(value):
 		beam_time = value
@@ -58,10 +58,10 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
-## 炎のビームの見た目
-@export var beam_visual: PackedScene = preload("res://scenes/attacks/canis_flame_beam.tscn"):
+## 放射するピクセル炎。ビジュアル編集の「炎」で調整する。
+@export var flame_settings: PixelFireSettings = preload("res://data/visuals/canis_fire_jet.tres"):
 	set(value):
-		beam_visual = value
+		flame_settings = value
 		_values_dirty = true
 
 func make_runner() -> RefCounted:
@@ -69,7 +69,7 @@ func make_runner() -> RefCounted:
 
 class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 	var stream: RefCounted
-	var aim: BeamAim
+	var aim: FlameAim
 	var values: Dictionary
 	func kind() -> StringName: return &"hunt"
 	func _begin_windup(host: CanisMajorBoss, r: Dictionary, _length: float) -> void:
@@ -83,8 +83,8 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		stream.step(host,dt)
 		if host.combo_pending and stream.sent and host.clock >= stream.last_launch + float(values.gap):
 			host.combo_pending = false
-			aim = BeamAim.new()
-			aim.begin(host,{"warn": values.aim_warn, "lock": values.aim_lock, "lead": values.aim_lead, "turn": values.aim_turn, "length": values.beam_length, "width": values.beam_width, "time": values.beam_time, "damage": values.damage})
+			aim = FlameAim.new()
+			aim.begin(host,{"warn": values.aim_warn, "lock": values.aim_lock, "lead": values.aim_lead, "turn": values.aim_turn, "length": values.beam_length, "width": values.beam_width, "time": values.beam_time, "damage": values.damage, "preset":values.flame_settings})
 		if aim != null and aim.step(host,dt): finish(host,float(values.recover))
 	func cancel(host: CanisMajorBoss) -> void:
 		if stream != null: stream.cancel(host)

@@ -2,7 +2,7 @@
 @tool
 extends BossTechnique
 
-## ビームを撃つ回数
+## 炎を撃つ回数
 @export_range(0,100000,1) var shots := 3:
 	set(value):
 		shots = value
@@ -32,17 +32,17 @@ extends BossTechnique
 	set(value):
 		aim_turn = value
 		_values_dirty = true
-## ビームの長さ
+## 炎の長さ
 @export_range(0,100000,0.01) var beam_length := 1300.0:
 	set(value):
 		beam_length = value
 		_values_dirty = true
-## ビームの太さ
+## 炎の太さ
 @export_range(0,100000,0.01) var beam_width := 40.0:
 	set(value):
 		beam_width = value
 		_values_dirty = true
-## ビームの時間（秒）
+## 炎の時間（秒）
 @export_range(0,100000,0.01) var beam_time := 0.35:
 	set(value):
 		beam_time = value
@@ -83,17 +83,17 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
-## 炎のビームの見た目
-@export var beam_visual: PackedScene = preload("res://scenes/attacks/canis_flame_beam.tscn"):
+## 放射するピクセル炎。ビジュアル編集の「炎」で調整する。
+@export var flame_settings: PixelFireSettings = preload("res://data/visuals/canis_fire_jet.tres"):
 	set(value):
-		beam_visual = value
+		flame_settings = value
 		_values_dirty = true
 
 func make_runner() -> RefCounted:
 	return Runner.new()
 
 class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
-	var aim: BeamAim
+	var aim: FlameAim
 	var values: Dictionary
 	var shot := 0
 	var gap_left := 0.0
@@ -104,9 +104,9 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		values = r
 		start_shot(host)
 	func start_shot(host: CanisMajorBoss) -> void:
-		aim = BeamAim.new()
+		aim = FlameAim.new()
 		trailed = false
-		aim.begin(host, {"warn": values.warn, "lock": values.lock, "lead": values.lead, "turn": values.aim_turn, "length": values.beam_length, "width": values.beam_width, "time": values.beam_time, "damage": values.damage})
+		aim.begin(host, {"warn": values.warn, "lock": values.lock, "lead": values.lead, "turn": values.aim_turn, "length": values.beam_length, "width": values.beam_width, "time": values.beam_time, "damage": values.damage, "preset":values.flame_settings})
 	func manual_tick(host: CanisMajorBoss, dt: float) -> void:
 		host.table.vel[host.body] = Vector2.ZERO
 		if gap_left > 0.0:

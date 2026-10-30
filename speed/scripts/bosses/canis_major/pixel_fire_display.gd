@@ -1,4 +1,4 @@
-## 共通PixelFireの密度・輪郭・発光を、戦闘の線分と粒の位置へ合わせる表示用アダプター。
+## 共通PixelFireの密度・輪郭・発光を、戦闘の炎の粒の位置へ合わせる表示用アダプター。
 ## 判定は変更しない。各プリセットはビジュアル編集の「炎」で保存する。
 @tool
 extends PixelFire
@@ -63,20 +63,14 @@ func cloud(samples: Array, clock: float, heading := 0.0) -> void:
 	_clock = clock
 	_render_density()
 
-func beam(from: Vector2, heading: float, length: float, width: float, clock: float, opacity := 1.0) -> void:
-	var samples: Array = []
-	var radius := minf(width*0.5,length*0.5)
-	var count := clampi(ceili(length/maxf(4.0,width*0.35)),2,90)
-	for k in count:
-		var distance := lerpf(radius,maxf(radius,length-radius),k/maxf(1.0,count-1))
-		samples.append({"pos":from+Vector2.from_angle(heading)*distance,"radius":radius,"seed":k})
-	cloud(samples,clock,heading)
-	modulate.a = opacity
-
+## 爆発の円いっぱいへ炎が広がり、塊ごとに崩れて消える。
 func burst(at: Vector2, radius: float, progress: float, clock: float) -> void:
-	var samples: Array = []
-	for k in 20:
-		var u := Vector2.from_angle(k*TAU/20.0)
-		samples.append({"pos":at+u*radius*sqrt(progress)*0.55,"radius":radius*(0.5-progress*0.28),"seed":k})
+	var samples: Array = [{"pos":at,"radius":radius*0.65,"seed":0}]
+	var expand := lerpf(0.3,1.0,smoothstep(0.0,0.18,progress))
+	for k in 18:
+		var phase := k*2.39996
+		var reach := radius*expand*(0.35+0.28*sin(k*1.7)*sin(k*1.7))
+		var u := Vector2.from_angle(phase+progress*0.25)
+		samples.append({"pos":at+u*reach,"radius":radius*(0.5-progress*0.22)*(0.8+0.2*sin(k*2.8)),"seed":k+1})
 	cloud(samples,clock)
-	modulate.a = maxf(0.0,1.0-progress)
+	modulate.a = 1.0-smoothstep(0.5,1.0,progress)

@@ -22,22 +22,22 @@ extends BossTechnique
 	set(value):
 		each_warn = value
 		_values_dirty = true
-## 猟犬のビームの長さ
+## 猟犬の炎の長さ
 @export_range(0,100000,0.01) var hound_beam_length := 900.0:
 	set(value):
 		hound_beam_length = value
 		_values_dirty = true
-## 猟犬のビームの太さ
+## 猟犬の炎の太さ
 @export_range(0,100000,0.01) var hound_beam_width := 12.0:
 	set(value):
 		hound_beam_width = value
 		_values_dirty = true
-## 猟犬のビームの時間（秒）
+## 猟犬の炎の時間（秒）
 @export_range(0,100000,0.01) var hound_beam_time := 0.22:
 	set(value):
 		hound_beam_time = value
 		_values_dirty = true
-## 猟犬のビームのダメージ
+## 猟犬の炎のダメージ
 @export_range(0,100000,0.01) var hound_damage := 10.0:
 	set(value):
 		hound_damage = value
@@ -57,17 +57,17 @@ extends BossTechnique
 	set(value):
 		final_turn = value
 		_values_dirty = true
-## 締めのビームの長さ
+## 締めの炎の長さ
 @export_range(0,100000,0.01) var final_length := 1500.0:
 	set(value):
 		final_length = value
 		_values_dirty = true
-## 締めのビームの太さ
+## 締めの炎の太さ
 @export_range(0,100000,0.01) var final_width := 44.0:
 	set(value):
 		final_width = value
 		_values_dirty = true
-## 締めのビームの時間（秒）
+## 締めの炎の時間（秒）
 @export_range(0,100000,0.01) var final_time := 0.7:
 	set(value):
 		final_time = value
@@ -88,10 +88,10 @@ extends BossTechnique
 		cd = value
 		_values_dirty = true
 
-## 炎のビームの見た目
-@export var beam_visual: PackedScene = preload("res://scenes/attacks/canis_flame_beam.tscn"):
+## 放射するピクセル炎。ビジュアル編集の「炎」で調整する。
+@export var flame_settings: PixelFireSettings = preload("res://data/visuals/canis_fire_jet.tres"):
 	set(value):
-		beam_visual = value
+		flame_settings = value
 		_values_dirty = true
 
 func make_runner() -> RefCounted:
@@ -101,7 +101,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 	var values: Dictionary
 	var started := 0.0
 	var ordered := false
-	var final_aim: BeamAim
+	var final_aim: FlameAim
 	var items: Array = []
 	var last_fire := 0.0
 	func kind() -> StringName: return &"relay"
@@ -113,7 +113,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		host.table.vel[host.body] = Vector2.ZERO
 		for i in host.led:
 			if host._alive_hound(i) and not host.ring.has(i) and not host.lunging.has(i):
-				items.append({"row": i, "id": host.table.id[i], "marked": false, "fired": false})
+				items.append({"row": i, "id": host.table.id[i], "marked": false, "fired": false,"released":false})
 				host.sirius_effects.tint_hound(i, host.run_state.world_time + float(r.warn), host.SIRIUS_COLOR)
 		host._cue(&"relay_windup")
 	func manual_tick(host: CanisMajorBoss, dt: float) -> void:
@@ -140,23 +140,27 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 				item.angle = (host.run_state.ship_pos - host.table.pos[i]).angle()
 				host.lunging.append(i)
 				host._hounds().release_order(i)
-				host._hounds().quiet(i, host.run_state.world_time + float(values.each_warn), Vector2.ZERO)
+				host._hounds().quiet(i, host.run_state.world_time + float(values.each_warn)+float(values.hound_beam_time), Vector2.ZERO)
 				host.table.vel[i] = Vector2.ZERO
 				host.table.facing[i] = item.angle
 				host._hounds().mark(i, host.run_state.world_time + float(values.each_warn))
 				host._cue(&"relay_mark", host.table.pos[i])
-			if not item.marked or item.fired: continue
+			if item.fired:
+				if not item.released and host.clock>=float(item.at)+float(values.each_warn)+float(values.hound_beam_time):
+					item.released = true
+					host._hounds().release_order(i)
+					host.lunging.erase(i)
+				continue
+			if not item.marked: continue
 			if host.clock < float(item.at) + float(values.each_warn):
 				host.sirius_effects.warnings.append({"from": item.from, "angle": item.angle, "length": values.hound_beam_length, "width": 2.0, "progress": clampf((host.clock-float(item.at))/maxf(float(values.each_warn),0.001),0,1), "locked": false})
 			else:
 				item.fired = true
-				host.sirius_effects.fire_beam(item.from, float(item.angle), float(values.hound_beam_length), float(values.hound_beam_width), float(values.hound_beam_time), float(values.hound_damage))
-				host._hounds().release_order(i)
-				host.lunging.erase(i)
+				host.sirius_effects.start_jet(item.from, float(item.angle), float(values.hound_beam_length), float(values.hound_beam_width), float(values.hound_beam_time), float(values.hound_damage),values.flame_settings,i)
 				host._cue(&"relay_fire", host.table.pos[i])
 		if final_aim == null and host.clock >= last_fire + float(values.interval) + 0.3:
-			final_aim = BeamAim.new()
-			final_aim.begin(host,{"warn": values.final_warn, "lock": values.final_lock, "turn": values.final_turn, "remaining_lead": true, "length": values.final_length, "width": values.final_width, "time": values.final_time, "damage": values.final_damage})
+			final_aim = FlameAim.new()
+			final_aim.begin(host,{"warn": values.final_warn, "lock": values.final_lock, "turn": values.final_turn, "remaining_lead": true, "length": values.final_length, "width": values.final_width, "time": values.final_time, "damage": values.final_damage, "preset":values.flame_settings})
 		if final_aim != null and final_aim.step(host,dt):
 			cancel(host)
 			finish(host,float(values.recover))

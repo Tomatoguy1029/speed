@@ -2,8 +2,6 @@
 extends Node2D
 const VISUAL_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const NOVA_KEY := "res://scenes/bosses/canis_major/nova_visual.tscn"
-const BEAM_VISUAL := preload("res://scenes/attacks/canis_flame_beam.tscn")
-const BEAM_CANVAS := preload("res://scripts/render/attacks/canis_flame_beam.gd")
 var tints: Dictionary = {}
 var nova: RefCounted
 var flash: ColorRect
@@ -14,22 +12,20 @@ const FIRE_DISPLAY := preload("res://scripts/bosses/canis_major/pixel_fire_displ
 const IGNITE_FIRE := preload("res://data/visuals/canis_fire_ignite.tres")
 const HOUND_FIRE := preload("res://data/visuals/canis_fire_hound.tres")
 var fire_displays: Dictionary = {}
-var particle_display: Node2D
+const FLAME_FIRE := preload("res://data/visuals/canis_fire_flame.tres")
+const TRAIL_FIRE := preload("res://data/visuals/canis_fire_trail.tres")
+var jets: Array = []
+var bursts: Array = []
+var _burst_id := 0
 var actor: CanisMajorBoss
 var trails: Array = []
 var warnings: Array = []
-var beam_canvas: Node2D
 
 func bind(host: CanisMajorBoss) -> void:
 	actor = host
 	top_level = true
 	position = Vector2.ZERO
 	rotation = 0.0
-	beam_canvas = BEAM_CANVAS.BeamCanvas.new()
-	add_child(beam_canvas)
-	particle_display = FIRE_DISPLAY.new()
-	particle_display.setup(preload("res://data/visuals/canis_fire_flame.tres"))
-	add_child(particle_display)
 	var layer := CanvasLayer.new()
 	layer.layer = 80
 	add_child(layer)
@@ -38,17 +34,47 @@ func bind(host: CanisMajorBoss) -> void:
 	flash.color = Color(1,1,1,0)
 	layer.add_child(flash)
 
-func fire_beam(from: Vector2, angle: float, length: float, width: float, duration: float, damage: float) -> Dictionary:
-	var direction := Vector2.from_angle(angle)
-	var hit = actor.ctx.field.first_body_hit(from, from + direction * length, width * 0.5)
-	if hit != null: length *= float(hit.t)
-	var row: int = actor.ctx.projectiles.emit_attack(&"beam", [from, angle, length, width, 0.0, duration, damage * actor.ctx.cfg.atk_scale, actor.SIRIUS_COLOR], actor.rule().get("beam_visual", BEAM_VISUAL))
-	if row >= 0: actor.ctx.projectiles.attach_hazard(row, actor.body)
-	return {"from": from, "angle": angle, "length": length, "width": width, "row": row}
+## 射程は保ち、口元で生まれた炎だけが順に前へ進む。
+func start_jet(from: Vector2, angle: float, length: float, width: float, duration: float, damage: float, preset: PixelFireSettings, source := -1) -> Dictionary:
+	var jet := {"from":from,"angle":angle,"length":length,"width":width,"duration":duration,"damage":damage,"preset":preset,
+		"age":0.0,"emit":0.0,"source":source,"id":actor.table.id[source] if source>=0 else 0,"attack":actor.technique,"hit":false}
+	if source>=0: jet.from = actor.table.pos[source]+Vector2.from_angle(angle)*actor.table.r[source]
+	jets.append(jet)
+	_emit_jet_particle(jet)
+	return jet
 
-func add_trail(beam: Dictionary, r: Dictionary) -> void:
-	var trail := beam.duplicate()
-	trail.merge({"age": 0.0, "delay": r.trail_delay, "life": r.trail_time, "width": r.trail_width, "damage": r.trail_damage}, true)
+func _emit_jet_particle(jet: Dictionary) -> void:
+	var life: float = maxf(0.1,jet.preset.lifetime)
+	var drag := 0.7
+	var spread := rad_to_deg(atan2(float(jet.width)*1.4,maxf(1.0,float(jet.length))))*2.0
+	var r := {"spread":spread,"particle_speed":float(jet.length)*drag/(1.0-exp(-drag*life)),"life":life,"drag":drag,
+		"r_start":float(jet.width)*0.5,"r_end":float(jet.width)*1.6,"hit_scale":0.85,"damage":jet.damage}
+	flame_particle(jet.from,float(jet.angle),r,true,jet.preset)
+	var particle: Dictionary = particles.back()
+	particle.attack = jet.attack
+	particle.shot = jet
+	particle.range = jet.length
+	particle.origin = jet.from
+	if jet.has("trail"): particle.trail = jet.trail
+
+func _tick_jets(dt: float) -> void:
+	for jet in jets:
+		if int(jet.source)>=0 and not _valid(jet.source,jet.id):
+			jet.age = jet.duration
+			continue
+		if int(jet.source)>=0: jet.from = actor.table.pos[jet.source]+Vector2.from_angle(float(jet.angle))*actor.table.r[jet.source]
+		var elapsed := minf(dt,maxf(0.0,float(jet.duration)-float(jet.age)))
+		jet.age = float(jet.age)+dt
+		jet.emit = float(jet.emit)+elapsed*100.0
+		while float(jet.emit)>=1.0:
+			jet.emit = float(jet.emit)-1.0
+			_emit_jet_particle(jet)
+	jets = jets.filter(func(jet): return float(jet.age)<float(jet.duration))
+
+func add_trail(jet: Dictionary, r: Dictionary) -> void:
+	var trail := {"from":jet.from,"angle":jet.angle,"length":0.0,"maximum":jet.length,"age":0.0,
+		"delay":r.trail_delay,"life":r.trail_time,"width":r.trail_width,"damage":r.trail_damage}
+	jet.trail = trail
 	trails.append(trail)
 
 func tick(dt: float) -> void:
@@ -60,7 +86,10 @@ func tick(dt: float) -> void:
 	flash.color.a = VISUAL_SETTINGS.number(NOVA_KEY,"flash_opacity",0.32) * (1.0-flash_age/0.25) if flash_age >= 0.0 and flash_age < 0.25 else 0.0
 	_tick_burning(dt)
 	_tick_tints()
+	_tick_jets(dt)
 	_tick_particles(dt)
+	for burst in bursts: burst.age = float(burst.age)+dt
+	bursts = bursts.filter(func(burst): return float(burst.age)<burst.preset.lifetime)
 	for trail in trails:
 		trail.age = float(trail.age) + dt
 		if float(trail.age) < float(trail.delay) or float(trail.age) >= float(trail.life): continue
@@ -69,13 +98,6 @@ func tick(dt: float) -> void:
 		if Geometry2D.get_closest_point_to_segment(actor.run_state.ship_pos, trail.from, end).distance_to(actor.run_state.ship_pos) < reach:
 			actor.ctx.ship.damage(float(trail.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_trail", &"canis_major")
 	trails = trails.filter(func(trail): return float(trail.age) < float(trail.life))
-	var beams: Array = []
-	for trail in trails:
-		var visual: Dictionary = trail.duplicate()
-		visual.width = 20.0
-		visual.alpha = 0.65 * (1.0 - float(trail.age) / maxf(float(trail.life), 0.001))
-		beams.append(visual)
-	beam_canvas.sync(beams,actor.run_state.world_time)
 	_sync_fire_displays()
 	queue_redraw()
 
@@ -95,11 +117,11 @@ func clear() -> void:
 	transfers.clear()
 	trails.clear()
 	particles.clear()
-	if particle_display != null: particle_display.cloud([],actor.run_state.world_time)
+	jets.clear()
+	bursts.clear()
 	for fire in fire_displays.values(): fire.queue_free()
 	fire_displays.clear()
 	warnings.clear()
-	if beam_canvas != null: beam_canvas.sync([],actor.run_state.world_time)
 	queue_redraw()
 
 func _draw() -> void:
@@ -113,26 +135,36 @@ func _draw() -> void:
 		color.a = 0.35 if warning.locked else lerpf(0.12, 0.45, float(warning.progress))
 		draw_line(warning.from, warning.from + direction * length, color, float(warning.width) if warning.locked else lerpf(1.0, 3.0, float(warning.progress)))
 
-func flame_particle(at: Vector2, angle: float, r: Dictionary, harmful: bool) -> void:
+func flame_particle(at: Vector2, angle: float, r: Dictionary, harmful: bool, preset: PixelFireSettings = FLAME_FIRE) -> void:
 	var spread := actor.run_state.rng.randf_range(-float(r.spread), float(r.spread)) * 0.5 if harmful else sin(actor.clock * 39.0) * 20.0
 	var speed := float(r.particle_speed) * actor.run_state.rng.randf_range(0.9, 1.1) if harmful else 100.0
-	particles.append({"pos": at, "vel": Vector2.from_angle(angle + deg_to_rad(spread)) * speed, "age": 0.0, "life": float(r.life) if harmful else 0.3, "r_start": float(r.r_start) if harmful else 4.0, "r_end": float(r.r_end) if harmful else 9.0, "drag": r.drag, "hit_scale": r.hit_scale, "damage": r.damage, "harmful": harmful})
+	particles.append({"pos": at, "vel": Vector2.from_angle(angle + deg_to_rad(spread)) * speed, "age": 0.0, "life": float(r.life) if harmful else 0.3, "r_start": float(r.r_start) if harmful else 4.0, "r_end": float(r.r_end) if harmful else 9.0, "drag": r.drag, "hit_scale": r.hit_scale, "damage": r.damage, "harmful": harmful, "preset":preset, "attack":&"sirius_flame"})
 
 func _tick_particles(dt: float) -> void:
 	for particle in particles:
 		particle.age = float(particle.age) + dt
 		var from: Vector2 = particle.pos
-		particle.vel *= exp(-float(particle.drag) * dt)
-		particle.pos += particle.vel * dt
+		var elapsed := minf(dt,maxf(0.0,float(particle.life)-float(particle.age)+dt))
+		particle.vel *= exp(-float(particle.drag) * elapsed)
+		particle.pos += particle.vel * elapsed
 		var ratio := clampf(float(particle.age) / float(particle.life), 0.0, 1.0)
 		particle.radius = lerpf(float(particle.r_start), float(particle.r_end), ratio)
-		if actor.ctx.field.first_body_hit(from, particle.pos, float(particle.radius) * float(particle.hit_scale)) != null:
+		var obstruction = actor.ctx.field.first_body_hit(from, particle.pos, float(particle.radius) * float(particle.hit_scale))
+		if obstruction != null:
+			particle.pos = from.lerp(particle.pos,float(obstruction.t))
 			particle.age = particle.life
-		if particle.harmful and float(particle.age) < float(particle.life):
-			if Vector2(particle.pos).distance_to(actor.run_state.ship_pos) < float(particle.radius) * float(particle.hit_scale) + actor.ctx.cfg.ship_radius:
-				actor.ctx.ship.damage(float(particle.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_flame", &"canis_major")
+		if particle.has("range") and Vector2(particle.pos).distance_to(particle.origin)>=float(particle.range):
+			particle.pos = Vector2(particle.origin)+Vector2(particle.pos-particle.origin).normalized()*float(particle.range)
+			particle.age = particle.life
+		if particle.has("trail"):
+			var trail: Dictionary = particle.trail
+			var distance := (Vector2(particle.pos)-Vector2(trail.from)).dot(Vector2.from_angle(float(trail.angle)))
+			trail.length = clampf(maxf(float(trail.length),distance),0.0,float(trail.maximum))
+		if particle.harmful and (not particle.has("shot") or not particle.shot.hit):
+			if Geometry2D.get_closest_point_to_segment(actor.run_state.ship_pos,from,particle.pos).distance_to(actor.run_state.ship_pos) < float(particle.radius) * float(particle.hit_scale) + actor.ctx.cfg.ship_radius:
+				if particle.has("shot"): particle.shot.hit = true
+				actor.ctx.ship.damage(float(particle.damage) * actor.ctx.cfg.atk_scale, 0.0, particle.attack, &"canis_major")
 	particles = particles.filter(func(particle): return float(particle.age) < float(particle.life))
-	particle_display.cloud(particles,actor.run_state.world_time,actor.table.facing[actor.body])
 
 func _valid(i: int, id: int) -> bool:
 	return actor.table.alive[i] != 0 and actor.table.dead[i] == 0 and actor.table.id[i] == id
@@ -151,7 +183,7 @@ func ignite(i: int, values: Dictionary) -> void:
 
 func _tick_burning(dt: float) -> void:
 	for transfer in transfers: transfer.age = float(transfer.age) + dt
-	transfers = transfers.filter(func(t): return float(t.age) < maxf(float(t.life),IGNITE_FIRE.lifetime) and _valid(t.row,t.id))
+	transfers = transfers.filter(func(t): return float(t.age) < float(t.life)+IGNITE_FIRE.lifetime and _valid(t.row,t.id))
 	for i: int in burning.keys():
 		var entry: Dictionary = burning[i]
 		if not _valid(i, entry.id):
@@ -173,7 +205,12 @@ func _tick_burning(dt: float) -> void:
 		var progress := clampf(float(entry.blink_age) / maxf(float(r.blink),0.001),0,1)
 		actor.table.flash[i] = 0.05 if sin(progress * (3.0 + progress * 5.0) * TAU) > 0 else 0.0
 		if float(entry.blink_age) >= float(r.blink):
-			actor.ctx.projectiles.emit_attack(&"zone",[actor.table.pos[i],float(r.explode_radius),0.0,float(r.damage)*actor.ctx.cfg.atk_scale,ProjectileSystem.HazardStyle.BLAST,actor.SIRIUS_COLOR],r.get("explosion_visual"))
+			var at: Vector2 = actor.table.pos[i]
+			# 表示は短い判定や猟犬の死亡に結び付けず、炎の寿命まで残す。
+			_burst_id += 1
+			bursts.append({"key":_burst_id,"pos":at,"radius":r.explode_radius,"age":0.0,"preset":r.explosion_fire})
+			if at.distance_to(actor.run_state.ship_pos)<=float(r.explode_radius)+actor.ctx.cfg.ship_radius:
+				actor.ctx.ship.damage(float(r.damage)*actor.ctx.cfg.atk_scale,0.0,&"blaze",&"canis_major")
 			actor._cue(&"blaze_explode", actor.table.pos[i])
 			actor.ctx.enemies.mark_dead(i)
 			burning.erase(i)
@@ -257,8 +294,16 @@ func _sync_fire_displays() -> void:
 		var start: Vector2 = transfer.from
 		var to: Vector2 = actor.table.pos[transfer.row]-start
 		var progress := clampf(float(transfer.age)/maxf(float(transfer.life),0.001),0,1)
-		var fade := 1.0-smoothstep(float(transfer.life),maxf(float(transfer.life)+0.001,IGNITE_FIRE.lifetime),float(transfer.age))
-		_fire_display(key,IGNITE_FIRE).beam(start,to.angle(),maxf(1.0,to.length()*progress),18.0,clock,fade)
+		var samples: Array = []
+		var heading := to.angle()
+		var side := Vector2.from_angle(heading+PI*0.5)
+		for k in 5:
+			var p := clampf(progress-k*0.045,0.0,1.0)
+			var point := start+to*p+side*sin(p*PI)*minf(60.0,to.length()*0.15)
+			samples.append({"pos":point,"radius":lerpf(22.0,8.0,k/4.0),"seed":k})
+		var fire := _fire_display(key,IGNITE_FIRE)
+		fire.cloud(samples,clock,heading)
+		fire.modulate.a = 1.0-smoothstep(float(transfer.life),float(transfer.life)+IGNITE_FIRE.lifetime,float(transfer.age))
 	if not transfers.is_empty() or (actor.technique==&"blaze" and actor.mode in [&"windup",&"active"]):
 		seen["口元の点火"] = true
 		_fire_display("口元の点火",IGNITE_FIRE).cloud([{"pos":actor.mouth(),"radius":28.0,"seed":0}],clock)
@@ -270,6 +315,34 @@ func _sync_fire_displays() -> void:
 		var fire := _fire_display(key,HOUND_FIRE)
 		fire.cloud([{"pos":actor.table.pos[i],"radius":actor.table.r[i]*1.6,"seed":i}],clock)
 		fire.modulate.a = 0.4 if actor.table.flash[i]>0 else 1.0
+	var clouds := {}
+	for particle in particles:
+		var preset: PixelFireSettings = particle.preset
+		if not clouds.has(preset): clouds[preset] = []
+		clouds[preset].append(particle)
+	for preset: PixelFireSettings in clouds:
+		var key := "放射:"+str(preset.get_instance_id())
+		seen[key] = true
+		_fire_display(key,preset).cloud(clouds[preset],clock,actor.table.facing[actor.body])
+	for k in trails.size():
+		var trail: Dictionary = trails[k]
+		if float(trail.length)<=0.0: continue
+		var key := "焼け跡:"+str(k)
+		seen[key] = true
+		var samples: Array = []
+		var count := maxi(2,ceili(float(trail.length)/18.0))
+		for n in count:
+			var distance := (n+0.5)/count*float(trail.length)
+			var offset := sin(n*2.4)*float(trail.width)*0.3
+			var pos: Vector2 = trail.from+Vector2(distance,offset).rotated(float(trail.angle))
+			samples.append({"pos":pos,"radius":float(trail.width)*(0.7+0.3*sin(n*1.7+clock*4.0)),"seed":n})
+		var fire := _fire_display(key,TRAIL_FIRE)
+		fire.cloud(samples,clock,float(trail.angle))
+		fire.modulate.a = 0.8*(1.0-smoothstep(0.5,1.0,float(trail.age)/float(trail.life)))
+	for burst in bursts:
+		var key := "爆発:"+str(burst.key)
+		seen[key] = true
+		_fire_display(key,burst.preset).burst(burst.pos,float(burst.radius),float(burst.age)/burst.preset.lifetime,clock)
 	for key in fire_displays.keys():
 		if not seen.has(key):
 			fire_displays[key].queue_free()
