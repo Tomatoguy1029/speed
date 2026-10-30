@@ -40,6 +40,8 @@ var _visual_time := 0.0
 var _preview_origin := Vector2.ZERO
 var _preview_heading := Vector2.RIGHT
 var _loop_seconds := 0.0
+## 装備の試遊で映す世界の横幅（演出の試作の画面は横300ドット＝約710）
+const EQUIPMENT_VIEW_WIDTH := 1000.0
 var _dragging_origin := false
 
 func _ready() -> void:
@@ -462,8 +464,13 @@ func _process(_delta: float) -> void:
 	_sync_preview_shader_time(session.scene.view)
 	(_frame.material as ShaderMaterial).set_shader_parameter("convert_hdr", _viewport.use_hdr_2d and not get_viewport().use_hdr_2d)
 	var zoom: float = session.run.state.camera_zoom if session.run.state.camera_zoom > 0.0 else session.run._base_zoom()
+	var center: Vector2 = session.run.state.view_center
+	if not _equipment_key.is_empty():
+		# 装備の試遊は機体を追い、演出の試作の画面に近い広さまで寄せる
+		center = session.run.state.ship_pos
+		zoom = 1280.0 / EQUIPMENT_VIEW_WIDTH
 	var fit: float = minf(_frame.size.x / 1280.0, _frame.size.y / 720.0)
-	render.view_override = {"center": session.run.state.view_center,
+	render.view_override = {"center": center,
 		"zoom": zoom * fit, "shake": _equipment_key.is_empty()}
 
 func _step() -> void:
