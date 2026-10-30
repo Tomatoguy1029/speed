@@ -8,6 +8,8 @@ const VALUE_NOISE := preload("res://assets/effects/build/value_noise.png")
 ## 爆発の色（白・薄い黄・橙・赤）
 const EMBER := [Color.WHITE, Color("#fff2a8"), Color("#ffb030"), Color("#d2461c")]
 var px := 2.366
+## 戦闘エフェクトツールの装備キー（ShaderTuning）
+var key := ""
 var _items: Array[Dictionary] = []
 static var _quad: ArrayMesh
 
@@ -31,6 +33,7 @@ func add(pos: Vector2, radius: float, life: float, colors: Array = EMBER, delay 
 	mat.set_shader_parameter("origin", center)
 	mat.set_shader_parameter("seed", randf() * 9.0)
 	for i in 4: mat.set_shader_parameter("c%d" % i, colors[i])
+	ShaderTuning.apply(mat, key)
 	node.material = mat
 	add_child(node)
 	node.visible = delay <= 0.0
@@ -45,7 +48,9 @@ func step(dt: float) -> void:
 			item.node.queue_free()
 			continue
 		item.node.visible = item.age >= 0.0
-		(item.node.material as ShaderMaterial).set_shader_parameter("life", maxf(0.0, item.age) / item.life)
+		var mat := item.node.material as ShaderMaterial
+		mat.set_shader_parameter("life", maxf(0.0, item.age) / item.life)
+		ShaderTuning.apply(mat, key)
 	_items = _items.filter(func(item): return item.age < item.life)
 
 static func _mesh() -> ArrayMesh:

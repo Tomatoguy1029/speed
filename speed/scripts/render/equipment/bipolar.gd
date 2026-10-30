@@ -8,6 +8,9 @@ const TEAL := [Color.WHITE, Color("#cffff9"), Color("#69fff0"), Color("#1f7f86")
 const BEAM_SECONDS := 0.7
 const CHARGE_SECONDS := 0.18
 const SHADER := preload("res://shaders/bipolar_beam.gdshader")
+## 戦闘エフェクトツールで調整する shader と、演出が渡す既定値
+const TUNED_SHADERS := [preload("res://shaders/fire_burst.gdshader"), SHADER]
+const SHADER_DEFAULTS := {"shader/fire_burst/c0": TEAL[0], "shader/fire_burst/c1": TEAL[1], "shader/fire_burst/c2": TEAL[2], "shader/fire_burst/c3": TEAL[3]}
 var sparks := PixelSparks.new()
 var charges: Array[Dictionary] = []
 var beams: Array[Dictionary] = []
@@ -152,6 +155,7 @@ func _beam(p: PixelPainter, bm: Dictionary) -> void:
 	var width := base + 2.0 * sin(t * 60.0) if a < 0.3 else base * pow(maxf(0.0, 1.0 - (a - 0.3) / 0.4), 0.8)
 	bm.material.set_shader_parameter("width", width)
 	bm.material.set_shader_parameter("time", t)
+	tune(bm.material)
 	var from: Vector2 = bm.from
 	var to: Vector2 = bm.to
 	var n := (to - from).normalized().orthogonal()

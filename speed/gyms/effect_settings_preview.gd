@@ -41,16 +41,6 @@ const ATTACK_PREVIEWS := {
 	"res://scenes/attacks/beam.tscn": "res://scenes/bosses/canis_major/sirius_visual.tscn",
 	"res://scenes/attacks/zone.tscn": "res://scenes/bosses/draco/picaro_wall_visual.tscn",
 }
-const SHADER_PALETTE_FIELDS := {
-	"weapon/forward": [0, 1, 2, 3], "weapon/scatter": [0, 1, 2, 3],
-	"weapon/rear": [0, 1, 2, 3], "weapon/interceptor": [0, 1, 2, 3],
-	"weapon/knockback": [0, 1, 2, 3], "weapon/dashRangeDrone": [0, 1, 2, 3],
-	"weapon/massTow": [0, 1, 2, 3], "weapon/bipolar": [0, 1, 2, 3],
-	"weapon/mines": [0, 1, 2, 3], "weapon/endBlast": [0, 1, 2, 3],
-	"weapon/barrier": [0, 1, 2], "weapon/sonic": [0, 1, 2],
-	"weapon/flashSlash": [0, 2, 3], "trait/vortex": [0, 2],
-	"trait/killSonic": [0, 2], "trait/duplicator": [0, 1, 2],
-}
 const VISUAL_FIELDS := [
 	"pixel_size", "warning_color", "locked_color", "attack_color", "recovery_color",
 	"hit_color", "line_width", "flash_duration", "base_color", "progress_color",
@@ -62,140 +52,21 @@ const NUMBER_LIMITS := {
 	"burst_pixel_scale": [0.5, 3.0, 0.05],
 }
 const DIRECT_FIELDS := {
-	"weapon/dashRangeDrone": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"weapon/massTow": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"weapon/contactWave": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["ゆがみの強さ", "distortion_strength", 0.0, 2.0, 0.05, 1.0],
-	],
-	"weapon/barrier": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"trait/duplicator": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"trait/fullBurst": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
 	"trait/rampage": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
 		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 	],
-	"trait/runUp": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"trait/fullCharge": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"weapon/flashSlash": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"weapon/endBlast": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-	],
-	"weapon/forward": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
-		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
-	],
-	"weapon/scatter": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
-		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
-	],
-	"weapon/rear": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
-		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
-	],
-	"weapon/interceptor": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
-		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
-	],
-	"weapon/knockback": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["弾の長さ", "shot_length_scale", 0.25, 4.0, 0.05, 1.0],
-		["弾の太さ", "shot_width_scale", 0.25, 4.0, 0.05, 1.0],
-	],
 	"weapon/contactArc": [
 		["雷のドット倍率", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
 		["雷の表示秒数", "visible_seconds", 0.05, 1.0, 0.01, 0.22],
 	],
-	"weapon/bipolar": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["ビームの芯", "beam_core_ratio", 0.05, 1.0, 0.05, 0.3],
-		["輪の線幅", "ring_width_scale", 0.25, 4.0, 0.05, 1.0],
-		["残光の時間", "visible_time_scale", 0.25, 4.0, 0.05, 1.0],
-	],
 	"weapon/sonic": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
 		["航跡の長さ", "wake_length", 20.0, 300.0, 1.0, 150.0],
 		["航跡の幅", "wake_width", 2.0, 40.0, 0.5, 18.0],
 		["航跡の余韻", "wake_fade_seconds", 0.05, 0.5, 0.01, 0.20],
 		["航跡の透明度", "wake_opacity", 0.0, 1.0, 0.01, 0.55],
 		["航跡シェーダの筋", "wake_filaments", 0.0, 2.0, 0.05, 0.7],
-	],
-	"trait/killSonic": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
 	],
 	"boss/body/hydra": [
 		["予告線の太さ", "line_width", 1.0, 12.0, 0.25, 3.0],
@@ -220,18 +91,6 @@ const DIRECT_FIELDS := {
 	],
 	"boss/shared/tornado_shader": [
 		["渦シェーダのドット", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-	],
-	"weapon/mines": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-	],
-	"trait/vortex": [
-		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
-		["ドットの大きさ", "pixel_scale", 0.5, 3.0, 0.05, 1.0],
-		["演出の時間", "duration_scale", 0.25, 4.0, 0.05, 1.0],
-		["粒の数", "particle_count_scale", 0.0, 3.0, 0.05, 1.0],
-		["ゆがみの強さ", "distortion_strength", 0.0, 2.0, 0.05, 1.0],
 	],
 	"weapon/afterimage": [
 		["演出の大きさ", "effect_scale", 0.25, 4.0, 0.05, 1.0],
@@ -326,7 +185,30 @@ const FIELD_HELP := {
 	"booster_core_color": "いっかくじゅう座の推進炎の芯の色。",
 	"vortex_tint": "共有渦シェーダの色に掛ける値。",
 }
-const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子"]
+## shader の調整値（ShaderTuning の tuning の組）の表示名と説明。uniform 名で引く
+const SHADER_LABELS := {
+	"c0": ["炎の芯の色", "炎の一番明るい部分の色。"], "c1": ["炎の明るい色", "芯の外側の色。"],
+	"c2": ["炎の中間色", "炎の本体の色。"], "c3": ["炎の外側の色", "一番外の市松で透ける部分の色。"],
+	"noise_scale": ["炎の模様の細かさ", "縁を崩すノイズの細かさ。大きいほど細かく崩れる。"],
+	"roughness": ["炎の縁の崩れ", "ノイズで縁が崩れる強さ。0で丸い炎。"],
+	"burn_speed": ["炎の燃え尽きる速さ", "時間とともに炎が細る速さ。大きいほど早く消える。"],
+	"start_size": ["炎の出始めの大きさ", "爆発の瞬間の大きさ（最大に対する割合）。"],
+	"flash_boost": ["炎の最初の閃き", "爆発の最初の一瞬だけ明るく大きくする量。"],
+	"core_color": ["帯の芯の色", "ビームの中心の色。"], "mid_color": ["帯の色", "ビームの本体の色。"],
+	"edge_color": ["帯の縁の色", "ビームの縁（市松）とねじれの影の色。"], "helix_color": ["ねじれの光の色", "帯の中を走る明るい光の色。"],
+	"core_ratio": ["芯の太さ", "帯の幅に占める芯の割合。"], "mid_ratio": ["帯の本体の太さ", "帯の幅に占める本体の割合。残りが縁。"],
+	"wobble": ["帯の波打ち", "帯の幅が波打つ大きさ。"], "wobble_speed": ["帯の波打つ速さ", "波打ちが流れる速さ。"],
+	"helix_width": ["ねじれの幅", "2本の光がねじれる幅（帯の幅に対する割合）。"], "helix_speed": ["ねじれの速さ", "ねじれの光が流れる速さ。"],
+	"dim_color": ["沈める色", "引き込みの瞬間に周りを沈める色。"], "glow_color": ["暗黒の光の色", "引き込みの瞬間に中心から広がる光の色。"],
+	"lens_return": ["レンズの戻り始め", "光を曲げる範囲のうち、元の見え方へ戻り始める位置（割合）。"],
+	"band_cells": ["歪みの帯の幅", "空間が歪む帯の片側の幅（ドット）。"], "brighten": ["帯の外側の明るさ", "歪みの帯の外側を明るくする量。"],
+	"darken": ["帯の内側の暗さ", "歪みの帯の内側を暗くする量。"], "highlight": ["帯の外側に足す光", "歪みの帯の外側に足す光の色。"],
+	"silver_rim": ["銀の縁の色", "弱いときのオーラの縁の色。"], "silver_mid": ["銀の中の色", "弱いときのオーラの中ほどの色。"], "silver_outer": ["銀の外の色", "弱いときのオーラの外側（市松）の色。"],
+	"blue_rim": ["青の縁の色", "中くらいのときのオーラの縁の色。"], "blue_mid": ["青の中の色", "中くらいのときのオーラの中ほどの色。"], "blue_outer": ["青の外の色", "中くらいのときのオーラの外側の色。"],
+	"gold_rim": ["金の縁の色", "最大のときのオーラの縁の色。"], "gold_mid": ["金の中の色", "最大のときのオーラの中ほどの色。"], "gold_outer": ["金の外の色", "最大のときのオーラの外側の色。"],
+	"flicker_speed": ["揺らめきの速さ", "オーラの模様が流れる速さ。"], "rise": ["上へ伸びる強さ", "オーラが機体の後ろへ伸びる強さ。"],
+}
+const GROUP_ORDER := ["色", "形・大きさ", "動き・時間", "粒子", "シェーダ"]
 
 var preview_host: Control
 var controls_host: Control
@@ -535,9 +417,7 @@ func _build_fields() -> void:
 		entries.append({"name": field[1], "value": field[5], "hint": "%s,%s,%s" % [field[2], field[3], field[4]], "fallback": field[0]})
 	for field in DIRECT_COLOR_FIELDS.get(_selected, []):
 		entries.append({"name": field[1], "value": field[2], "fallback": field[0]})
-	for channel in SHADER_PALETTE_FIELDS.get(_selected, []):
-		entries.append({"name": "shader_c" + str(channel), "value": Color.WHITE,
-			"help": "共通シェーダの第%d階調色に掛ける値。白で元の色。" % (int(channel) + 1)})
+	entries.append_array(_shader_entries(_selected))
 	if is_instance_valid(_sample):
 		for info in _sample.get_property_list():
 			var name: String = info.name
@@ -559,15 +439,30 @@ func _build_fields() -> void:
 			if entry.value is Color: _add_color(label, name, entry.value, help)
 			else: _add_number(label, name, entry.value, String(entry.get("hint", "")), help)
 
+## 装備の表示（render/equipment/<code_id>.gd）が TUNED_SHADERS で示す shader の調整値。
+func _shader_entries(path: String) -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	if not path.begins_with("weapon/") and not path.begins_with("trait/"): return entries
+	var script_path := "res://scripts/render/equipment/%s.gd" % path.get_slice("/", 1)
+	if not ResourceLoader.exists(script_path): return entries
+	var constants: Dictionary = (load(script_path) as Script).get_script_constant_map()
+	var defaults: Dictionary = constants.get("SHADER_DEFAULTS", {})
+	for shader: Shader in constants.get("TUNED_SHADERS", []):
+		for info in ShaderTuning.tunables(shader):
+			var name := ShaderTuning.field(shader, info.name)
+			var label: Array = SHADER_LABELS.get(info.name, [info.name, ""])
+			entries.append({"name": name, "value": defaults.get(name, ShaderTuning.default_value(shader, info.name)),
+				"hint": info.hint_string, "fallback": label[0], "help": label[1]})
+	return entries
+
 func _field_group(name: String) -> String:
-	if name.begins_with("shader_c") or name.ends_with("color") or name.ends_with("tint") or name == "effect_tint": return "色"
+	if name.begins_with(ShaderTuning.PREFIX): return "シェーダ"
+	if name.ends_with("color") or name.ends_with("tint") or name == "effect_tint": return "色"
 	if name in ["duration_scale", "visible_time_scale", "visible_seconds", "flash_duration", "wake_fade_seconds"]: return "動き・時間"
 	if name in ["particle_count_scale", "wake_filaments"]: return "粒子"
 	return "形・大きさ"
 
 func _field_label(name: String, fallback: String) -> String:
-	if name.begins_with("shader_c"):
-		return ["最明部の色", "明部の色", "中間色", "影色"][clampi(int(name.trim_prefix("shader_c")), 0, 3)]
 	return FIELD_LABELS.get(name, fallback)
 
 func _add_group(title: String) -> void:

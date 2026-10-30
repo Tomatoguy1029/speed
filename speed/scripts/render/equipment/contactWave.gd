@@ -4,6 +4,8 @@ extends WeaponVisual
 
 const PINCH := 0.08
 const LIFE := 0.5
+## 戦闘エフェクトツールで調整する shader
+const TUNED_SHADERS := [preload("res://shaders/space_ripple.gdshader")]
 var quakes: Array[Dictionary] = []
 var sparks := PixelSparks.new()
 
@@ -16,6 +18,7 @@ func on_event(ev: Dictionary) -> void:
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
+	tune(rm.pipeline.ripple_material())
 	var p := painter()
 	p.begin()
 	for w in quakes:

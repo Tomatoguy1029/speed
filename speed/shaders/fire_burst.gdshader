@@ -1,5 +1,6 @@
 // 試作の pfire：ドット単位の炎の爆発。焼いた値ノイズで縁を崩し、密度で4段の色に分け、一番外は市松で透かす。
 // 長さはドット単位。四角の中心が炎の中心で、半径の 1.2 倍の外は描かない。
+// tuning の値は戦闘エフェクトツールで装備ごとに上書きする（ShaderTuning）。
 shader_type canvas_item;
 render_mode unshaded;
 
@@ -10,10 +11,17 @@ uniform float life = 0.0;
 // 炎の中心のドット座標と種（ノイズを場所ごと・炎ごとに変える）
 uniform vec2 origin = vec2(0.0);
 uniform float seed = 0.0;
-uniform vec4 c0 : source_color = vec4(1.0);
+group_uniforms tuning;
+uniform vec4 c0 : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform vec4 c1 : source_color = vec4(1.0, 0.949, 0.659, 1.0);
 uniform vec4 c2 : source_color = vec4(1.0, 0.690, 0.188, 1.0);
 uniform vec4 c3 : source_color = vec4(0.824, 0.275, 0.110, 1.0);
+uniform float noise_scale : hint_range(0.04, 0.5, 0.01) = 0.16;
+uniform float roughness : hint_range(0.0, 2.0, 0.05) = 0.95;
+uniform float burn_speed : hint_range(0.3, 3.0, 0.05) = 1.15;
+uniform float start_size : hint_range(0.0, 1.0, 0.05) = 0.35;
+uniform float flash_boost : hint_range(0.0, 1.5, 0.05) = 0.7;
+group_uniforms;
 
 float lattice(vec3 p) {
 	vec3 i = mod(p, 64.0);
@@ -32,14 +40,14 @@ float vnoise(vec3 p) {
 
 void fragment() {
 	vec2 cell = floor((UV - 0.5) * 2.0 * half_cells);
-	float rt = radius * (0.35 + 0.65 * (1.0 - pow(1.0 - min(1.0, life * 3.0), 3.0)));
+	float rt = radius * (start_size + (1.0 - start_size) * (1.0 - pow(1.0 - min(1.0, life * 3.0), 3.0)));
 	float d = length(cell) / max(rt, 0.1);
 	if (d > 1.2) {
 		discard;
 	}
 	vec2 at = cell + origin;
-	float n = vnoise(vec3(at.x * 0.16 + seed, at.y * 0.16 - life * 3.0, life * 5.0 + seed));
-	float den = (1.0 - d) * 1.35 + (n - 0.5) * 0.95 - life * 1.15 + (life < 0.07 ? 0.7 : 0.0);
+	float n = vnoise(vec3(at.x * noise_scale + seed, at.y * noise_scale - life * 3.0, life * 5.0 + seed));
+	float den = (1.0 - d) * 1.35 + (n - 0.5) * roughness - life * burn_speed + (life < 0.07 ? flash_boost : 0.0);
 	if (den > 0.8) {
 		COLOR = c0;
 	} else if (den > 0.55) {

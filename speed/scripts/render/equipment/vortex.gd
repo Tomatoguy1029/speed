@@ -14,6 +14,8 @@ var heals: Array[Dictionary] = []
 var _add: PixelPainter
 
 const LENS := preload("res://shaders/hole_lens.gdshader")
+## 戦闘エフェクトツールで調整する shader
+const TUNED_SHADERS := [LENS]
 
 func dispose() -> void:
 	if is_instance_valid(_add): _add.queue_free()
@@ -109,6 +111,7 @@ func _hole(h: Dictionary, center: Vector2) -> void:
 	mat.set_shader_parameter("dim", dim)
 	mat.set_shader_parameter("glow_radius", glow_radius * px)
 	mat.set_shader_parameter("glow", glow)
+	tune(mat)
 	if a >= CHARGE and a < CHARGE + PULL + 0.12: rm.shake = maxf(rm.shake, 6.0 * (1.0 - (a - CHARGE) / (PULL + 0.12)))
 	# 溜め：粒が中心へ集まる。中心に近いほど薄れて暗黒に消える
 	for q in h.particles:

@@ -3,6 +3,9 @@ extends WeaponVisual
 ## Lv3からの外周の小さな爆発は炎だけ。大きい爆発ほど画面が強く揺れる。
 
 const VIOLET := [Color.WHITE, Color("#e6d2ff"), Color("#b070ff"), Color("#5a1eb0")]
+## 戦闘エフェクトツールで調整する shader と、演出が渡す既定値
+const TUNED_SHADERS := [preload("res://shaders/fire_burst.gdshader")]
+const SHADER_DEFAULTS := {"shader/fire_burst/c0": VIOLET[0], "shader/fire_burst/c1": VIOLET[1], "shader/fire_burst/c2": VIOLET[2], "shader/fire_burst/c3": VIOLET[3]}
 var booms: Array[Dictionary] = []
 
 func claims(ev: Dictionary) -> bool:

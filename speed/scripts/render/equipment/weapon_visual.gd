@@ -57,6 +57,7 @@ func fires() -> FireBursts:
 	if _fires == null:
 		_fires = FireBursts.new()
 		_fires.setup(1.82 * cfg.character_scale)
+		_fires.key = _effect_key()
 		_fires.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		rm._layers.fx.add_child(_fires)
 	return _fires
@@ -66,6 +67,9 @@ func world_dt() -> float:
 	var dt := 0.0 if _world_time < 0.0 else maxf(0.0, now - _world_time)
 	_world_time = now
 	return dt
+## 戦闘エフェクトツールで調整した shader の値を当てる。
+func tune(mat: ShaderMaterial) -> void:
+	ShaderTuning.apply(mat, _effect_key())
 func attach(path: String, node_name: String, z := 0) -> void:
 	node = load(path).new()
 	node.name = node_name

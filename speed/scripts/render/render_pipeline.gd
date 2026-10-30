@@ -121,6 +121,10 @@ func add_ripple(pos: Vector2, radius: float, cell: float) -> void:
 	if _ripples.size() > 8:
 		_ripples.pop_front()
 
+## 震空の歪みの material（戦闘エフェクトツールの調整を当てる）。
+func ripple_material() -> ShaderMaterial:
+	return _ripple.material as ShaderMaterial
+
 ## 1フレームぶん進める。dt は演出の時間（ポーズ中は 0）。
 func step(dt: float, view_center: Vector2, zoom: float) -> void:
 	if _glow_viewport != null:

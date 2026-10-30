@@ -5,6 +5,8 @@ extends WeaponVisual
 ## 後ろへピクセルの炎を引き、敵を貫くたびに炎の爆発が起きる。
 
 const TRAIL_EVERY := 0.012
+## 戦闘エフェクトツールで調整する shader
+const TUNED_SHADERS := [preload("res://shaders/fire_burst.gdshader")]
 var captures: Array[Dictionary] = []
 var catches: Dictionary = {}
 var shocks: Array[Dictionary] = []
