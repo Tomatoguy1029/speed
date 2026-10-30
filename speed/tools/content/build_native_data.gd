@@ -67,7 +67,14 @@ static func compile_spawn_timeline(stage: StageDef, config: GameConfig) -> Dicti
 	if stage == null or config == null or stage.phases.is_empty(): return {}
 	var data := {"version": 2, "boss_start": stage.boss_start(config), "density": config.density_mult,
 		"bonus_pop": config.bonus_pop, "phases": [], "curves": [], "windows": [], "types": {}}
+	var bundle := compile_spawn_clips(stage,config)
+	if bundle.is_empty(): return {}
+	data.clip_bundle = bundle
 	var types := {}
+	for clip: RuntimeClip in stage.clips:
+		for prepared in clip.prepared:
+			for layout in prepared.layouts:
+				for marker in layout.markers: types[String(marker.type)] = true
 	for phase: PhaseDef in stage.phases:
 		var row := {"id": String(phase.id), "start": phase.start, "pop_from": phase.pop_from, "pop_to": phase.pop_to,
 			"rate": phase.rate, "xp_bonus": phase.xp_bonus, "attack_budget": phase.attack_budget, "mix": phase.mix.duplicate(), "wave_interval": phase.wave_interval, "wave_type": String(phase.wave_type)}
@@ -120,4 +127,19 @@ static func compile_formation(source: Dictionary) -> Dictionary:
 				markers.append({"type":String(marker.type),"offset":local.origin,"rotation":local.get_rotation()})
 			placements.append(markers)
 		out.layouts.append({"weight":layout.weight,"value":layout.get("value",-1.0),"managed":layout.get("attack_managed"),"placements":placements})
+	return out
+
+## RuntimeStageへ展開済みのクリップを使い、実行中の群れと時計は保存しない。
+static func compile_spawn_clips(stage: StageDef, config: GameConfig) -> Dictionary:
+	var out := {"version":1,"base_view":config.base_view,"clips":[],"formations":[]}
+	for source in stage.clips:
+		if not source is RuntimeClip: return {}
+		var references := []
+		for prepared in source.prepared:
+			references.append(out.formations.size())
+			out.formations.append(compile_formation(prepared))
+		var types := []
+		for type in source.types: types.append(String(type))
+		out.clips.append({"start":source.time,"end":source.end_time(),"groups":source.groups,"interval":source.interval,
+			"priority":source.attack_priority,"types":types,"formations":references})
 	return out

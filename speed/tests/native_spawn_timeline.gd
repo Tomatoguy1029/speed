@@ -37,12 +37,33 @@ func compare_stage(comparison, index: int) -> void:
 			for curve in stage.zako_curves: curve.points = PackedVector2Array()
 		run.state.stage = stage
 		var raw := DATA.compile_spawn_timeline(stage, run.cfg)
+		check(raw.has("clip_bundle"), "全クリップの周期と配置を生成データへ含める")
+		if raw.has("clip_bundle"):
+			var bundle: Dictionary = raw.clip_bundle
+			check(bundle.clips.size() == stage.clips.size() and bundle.base_view == run.cfg.base_view, "クリップ数と画面の基準を保つ")
+			var next := 0
+			for i in stage.clips.size():
+				var source: RuntimeClip = stage.clips[i]
+				var clip: Dictionary = bundle.clips[i]
+				var refs := []
+				for prepared in source.prepared:
+					refs.append(next)
+					check(comparison.difference(bundle.formations[next], DATA.compile_formation(prepared)).is_empty(), "配置と出現位置を同じ固定変換で生成する")
+					next += 1
+				var types := []
+				for type in source.types: types.append(String(type))
+				var expected := {"start": source.time, "end": source.end_time(), "groups": source.groups, "interval": source.interval, "priority": source.attack_priority, "types": types, "formations": refs}
+				check(comparison.difference(expected,clip).is_empty(), "クリップの編集値と配置の順番を保つ")
+			check(next == bundle.formations.size(), "参照されない配置を生成物へ残さない")
 		if mode == "curves":
 			var generated_path := "res://.content/dev/native_spawn_%d.bin" % index
 			check(FileAccess.file_exists(generated_path), "共通生成の出力に出現タイムラインがある")
 			if FileAccess.file_exists(generated_path):
 				var generated := FileAccess.open(generated_path, FileAccess.READ)
-				check(comparison.difference(raw, generated.get_var()).is_empty(), "共通生成の出現タイムラインが現在の編集値と一致する")
+				# 共通生成は保存済みRuntimeStageを入力にする。実験場の再展開とは、テキスト保存を挟む回数が異なる。
+				var saved_stage := ResourceLoader.load("res://.content/stage_%d.tres" % index, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
+				var difference: String = comparison.difference(DATA.compile_spawn_timeline(saved_stage, run.cfg), generated.get_var())
+				check(difference.is_empty(), "共通生成の出現タイムラインが保存済みの実行用ステージと一致する: " + difference)
 				generated.close()
 		var path := "/tmp/speed-native-timeline-test.bin"
 		var file := FileAccess.open(path, FileAccess.WRITE)
