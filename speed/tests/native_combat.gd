@@ -23,7 +23,7 @@ func _ready() -> void:
 	else:
 		for mode in ["touch", "pierce", "bounce", "kill", "collect"]:
 			await compare_contacts(comparison, mode)
-		await compare_frames(comparison)
+		for mode in ["normal", "rehit", "bounce", "stop_input"]: await compare_frames(comparison, mode)
 	print("[native_combat] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 func compare_contacts(comparison, mode: String) -> void:
@@ -109,7 +109,7 @@ func pickup_snapshot(run: RunSimulation) -> Dictionary:
 		if p.coin_alive[i] != 0: coins.append({"pos": p.coin_pos[i], "pulled": p.coin_pulled[i] != 0})
 	return {"gems": gems, "coins": coins, "xp_dropped": run.state.xp_dropped}
 
-func compare_frames(comparison) -> void:
+func compare_frames(comparison, mode: String) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 932, "empty": true})
@@ -118,7 +118,14 @@ func compare_frames(comparison) -> void:
 	run.field.bodies.clear()
 	run.field.battle_arenas.clear()
 	var core = comparison.create_native()
-	var definition := run.enemies.def_of(&"drifter")
+	var definition: EnemyDef = run.enemies.def_of(&"drifter").duplicate(true)
+	if mode == "rehit":
+		definition.hp = 18.0
+		run.state.stats.crit_chance = 0.0
+	elif mode == "bounce":
+		definition.hp = 1000.0
+		definition.armor = 1000.0
+	elif mode == "stop_input": run.cfg.ram_speed_ratio = 0.0
 	core.configure(DATA.compile_enemy(definition, run.cfg))
 	core.configure_ship(values(run.cfg, SHIP.CONFIG_KEYS), values(run.state.stats, SHIP.STAT_KEYS))
 	core.configure_draw(values(run.cfg, SHIP.DRAW_CONFIG), values(run.state.stats, SHIP.DRAW_STATS))
@@ -130,7 +137,8 @@ func compare_frames(comparison) -> void:
 	core.start(932, run.enemies._next_id, run.pickups._gem_next_seq)
 	run.state.rng.seed = 932
 	var origin := run.state.ship_pos
-	for offset in [Vector2(180, 0), Vector2(300, 0), Vector2(1200, 300)]:
+	var positions := [Vector2.ZERO] if mode == "stop_input" else [Vector2(180, 0)] if mode == "rehit" else [Vector2(180, 0), Vector2(300, 0), Vector2(1200, 300)]
+	for offset in positions:
 		run.enemies.spawn(definition, origin + offset)
 		core.spawn_enemy(&"drifter", origin + offset)
 	run.combat.rebuild_grid()
@@ -139,8 +147,15 @@ func compare_frames(comparison) -> void:
 	run.input_source = func(): return input
 	var gained := 0.0
 	var saw_stop := false
+	var saw_rehit := false
+	var saw_bounce := false
+	var saw_input_in_stop := false
 	for tick in 150:
 		var command := {"press": tick == 2, "touch": true, "has_cursor": tick <= 12, "pen_release": tick == 12, "pen": origin + Vector2(maxi(0, tick-2)*35, 0)}
+		if mode == "rehit":
+			var x := (tick-2)*90 if tick <= 6 else (10-tick)*90 if tick <= 10 else (tick-10)*90
+			command.pen = origin + Vector2(x, 0)
+		var starts_in_stop: bool = run.state.hitstop > 0 and not run.state.tracing and command.press
 		for key in command: input.set(key, command[key])
 		var center := run.state.view_center
 		var half := run.state.view_half
@@ -152,15 +167,23 @@ func compare_frames(comparison) -> void:
 			if item.kind == "gem": gained += item.value * run.state.stats.xp_gain_mult
 		var difference: String = comparison.difference(comparison.snapshot(run, [], tick).enemies, core.enemies_snapshot())
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(values(run.state, SHIP.STATE_KEYS)), comparison.plain(core.ship_snapshot()))
+		if difference.is_empty(): difference = comparison.difference(comparison.plain(values(run.state, SHIP.DRAW_STATE)), comparison.plain(core.draw_snapshot()))
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
-		check(difference.is_empty(), "描線→接触→撃破→回収の更新順が一致する tick=%d: %s" % [tick, difference])
-		check(core.inspect().time == run.state.time and core.inspect().world_time == run.state.world_time, "実時間と世界時間が一致する")
+		check(difference.is_empty(), "描線→接触→撃破→回収の更新順が一致する %s tick=%d: %s" % [mode, tick, difference])
+		check(core.inspect().sim_time == run.state.sim_time and core.inspect().time == run.state.time and core.inspect().world_time == run.state.world_time, "実時間と世界時間が一致する")
 		check(str(run.state.rng.state) == core.inspect().rng_state, "全更新を通した乱数消費が一致する")
 		check(gained == run.state.xp_gained, "全更新を通した回収量が一致する")
 		check(core.combat_snapshot().hitstop == run.state.hitstop, "停止の開始・消費が一致する")
 		saw_stop = saw_stop or run.state.hitstop > 0
+		saw_input_in_stop = saw_input_in_stop or (starts_in_stop and run.state.drawing)
+		for event in run.state.events:
+			if event.type == &"text" and event.get("text", "") == "×2": saw_rehit = true
+			if event.type == &"trace_end" and not event.completed: saw_bounce = true
 		if not difference.is_empty(): break
-	check(saw_stop and run.state.kills > 0 and gained > 0, "撃破・時間停止・回収を実際に通る")
+	if mode == "bounce": check(saw_bounce, "突進の途中で反発して終了する")
+	else: check(saw_stop and run.state.kills > 0 and gained > 0, "撃破・時間停止・回収を実際に通る: " + mode)
+	if mode == "rehit": check(saw_rehit, "同じ突進で離れて戻り、2回目で撃破する")
+	if mode == "stop_input": check(saw_input_in_stop, "ヒットストップ中にも描き始められる")
 	core.close()
 	lab.free()
 
