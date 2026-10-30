@@ -125,6 +125,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
+	_advance_horn_waves(dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
 	turn_motion = 0.0
 	if mode == &"entrance":
@@ -192,6 +193,17 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	previous_ship = run_state.ship_pos
 	_sync_technique_visuals(dt)
 	presentation_advanced.emit(dt)
+
+## 衝撃波は技を終えたあとも、放ったときの値で世界時間を進める。
+func _advance_horn_waves(dt: float) -> void:
+	for index in range(horn_waves.size() - 1, -1, -1):
+		var wave := horn_waves[index]
+		wave.radius = float(wave.radius) + float(wave.speed) * dt
+		var offset: Vector2 = run_state.ship_pos - Vector2(wave.center)
+		if not wave.hit and absf(offset.length() - float(wave.radius)) <= float(wave.width) * 0.5 + ctx.cfg.ship_radius and absf(angle_difference(float(wave.angle), offset.angle())) <= float(wave.half):
+			combat_trace.damage(float(wave.damage) * ctx.cfg.atk_scale, 0.0, &"horn_wave", &"monoceros")
+			wave.hit = true
+		if float(wave.radius) >= float(wave.max): horn_waves.remove_at(index)
 
 func on_body_threshold() -> void:
 	if phase == 1 and table.hp[body] / table.max_hp[body] <= float(def.params.phase_threshold): phase_pending = true
@@ -274,7 +286,6 @@ func start_attack(attack: StringName) -> bool:
 ## 攻撃予算に申告する予告と実行の長さ。
 func _attack_length(attack: StringName) -> float:
 	if is_sequenced(attack): return _moves[attack].attack_length()
-
 	var r: Dictionary = _moves[attack].values()
 	return float(r.warn) + float(r.active)
 

@@ -7,12 +7,21 @@
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/return_charge.tres" id="6_r5v4j"]
 [ext_resource type="Resource" path="res://data/bosses/monoceros_moves/charge.tres" id="7_qrfmn"]
 
+[ext_resource type="Resource" path="res://data/bosses/monoceros_moves/horn_wave.tres" id="horn_wave"]
+
 [resource]
 script = ExtResource("1_fdbe4")
 adapter = &"monoceros"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn")])
+techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn"), ExtResource("horn_wave")])
 conditions = {
+"horn_wave": {
+"angle": 0.0,
+"half_angle": 180.0,
+"max": 900.0,
+"min": 200.0,
+"min_phase": 1
+},
 "charge": {
 "angle": 0.0,
 "half_angle": 180.0,
@@ -50,6 +59,7 @@ conditions = {
 }
 }
 costs = {
+"horn_wave": 2.0,
 "charge": 1.0,
 "kick": 1.0,
 "lance": 3.0,
@@ -61,6 +71,7 @@ selection_bias = {
 "sweep": 3.0
 }
 layout = {
+"horn_wave": Vector2(2356, 1064),
 "charge": Vector2(2356, 748),
 "choose_combo": Vector2(40, 116),
 "choose_major": Vector2(948, 116),
@@ -80,7 +91,7 @@ condition_groups = {
 "title": "大技"
 },
 "choose_normal": {
-"nodes": ["kick", "sweep", "charge"],
+"nodes": ["kick", "sweep", "charge", "horn_wave"],
 "title": "通常技"
 }
 }

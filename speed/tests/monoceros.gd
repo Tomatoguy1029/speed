@@ -38,7 +38,7 @@ func _ready() -> void:
 			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= actor._reach(actor.technique)
 			break
 	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
-	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance"]:
+	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"horn_wave"]:
 		fresh()
 		actor._cooldown = 0.0
 		actor.phase = 2 if tech == &"lance" else 1
@@ -48,6 +48,8 @@ func _ready() -> void:
 		check(candidates.any(func(c): return c.id == String(tech)), "仕様の距離・形態で候補へ入る: " + tech)
 		var flow := actor.flow_runner.flow.duplicate(true)
 		for section in flow.sections: section["allowed_techniques"] = [String(tech)]
+		# 指定された区間0で衝撃波を単独確認するため、この複製だけ消費上限を技の消費へ合わせる。
+		if tech == &"horn_wave": flow.sections[0]["cap"] = float(actor.action_rules.costs.horn_wave)
 		actor.flow_runner.configure(flow)
 		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech == &"return_charge" else 0
 		step(DT)
@@ -258,6 +260,34 @@ func _ready() -> void:
 	actor.begin_final_strike(1.0)
 	step(0.1)
 	check(actor.final_strike_t >= 0.0 and actor.mode == &"final", "制限時間の共通演出に対応する")
+	fresh()
+	sim.state.ship_pos = Vector2(2000, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor.start_attack(&"horn_wave")
+	for frame in 600:
+		step(DT)
+		if actor.mode == &"recovery" and not actor.horn_waves.is_empty(): break
+	check(actor.mode == &"recovery" and not actor.horn_waves.is_empty(), "角の衝撃波は技が終わったあとも残る")
+	if not actor.horn_waves.is_empty():
+		var wave: Dictionary = actor.horn_waves.back()
+		var radius := float(wave.radius)
+		step(DT)
+		check(float(wave.radius) > radius, "技が終わったあとも衝撃波が広がる")
+		sim.state.ship_pos = Vector2(wave.center) + Vector2.from_angle(float(wave.angle)) * (float(wave.radius) + float(wave.speed) * DT)
+		actor.previous_ship = sim.state.ship_pos
+		sim.state.ship_invuln = 0.0
+		var wave_hp := sim.state.ship_hp
+		step(DT)
+		check(sim.state.ship_hp < wave_hp and wave.hit, "角の衝撃波の帯に入ると被弾する")
+		var wave_hurt_hp := sim.state.ship_hp
+		for frame in 10:
+			sim.state.ship_invuln = 0.0
+			sim.state.ship_pos = Vector2(wave.center) + Vector2.from_angle(float(wave.angle)) * (float(wave.radius) + float(wave.speed) * DT)
+			step(DT)
+		check(sim.state.ship_hp == wave_hurt_hp, "同じ衝撃波の帯では重複被弾しない")
+		step(2.0)
+		check(actor.horn_waves.is_empty(), "角の衝撃波は上限の半径で消える")
+
 	session.free()
 	await get_tree().process_frame
 	print("[monoceros] failures=",failed)
@@ -310,7 +340,7 @@ func capture() -> void:
 	label.position = Vector2(24,130)
 	label.add_theme_font_size_override("font_size",24)
 	layer.add_child(label)
-	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance"]
+	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance",&"horn_wave"]
 	for tech in stage_names:
 		fresh()
 		actor.phase = 2 if tech==&"lance" else 1
