@@ -95,6 +95,7 @@ bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
         type.ranged = row["ranged"]; parsed.types.push_back(type);
     }
     spawn_timeline = std::move(parsed); spawn_timeline_ready = true;
+    population = Population();
     return true;
 }
 

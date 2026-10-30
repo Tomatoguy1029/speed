@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <deque>
+#include <array>
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
@@ -164,6 +165,16 @@ class SpeedRunCore : public RefCounted {
     bool frame_ready = false;
     enum class Phase { Play = 0, LevelUp = 1, Paused = 2, Dying = 3, Finishing = 4, Ended = 5 };
     Phase phase = Phase::Play;
+    struct Population {
+        bool ready = false;
+        double recycle_scale = 0, region_cap = 0, margin = 0, field_radius = 0, planet_radius = 0;
+        std::vector<double> maximum, effective;
+        std::vector<int64_t> type_counts, region_types;
+        std::vector<size_t> far_rows;
+        std::array<int64_t, 4> edges{};
+        std::array<int64_t, 5> regions{};
+        int64_t raw = 0;
+    } population;
     speed::SpawnTimeline spawn_timeline;
     bool spawn_timeline_ready = false;
     bool lifecycle_ready = false;
@@ -177,6 +188,10 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool configure_population(const Dictionary &config);
+    double survey_population(double target);
+    Variant population_spawn_point(double extra);
+    Dictionary population_snapshot() const;
     bool configure_enemy_order(const PackedStringArray &order);
     PackedInt64Array enemy_order_snapshot() const;
     bool configure_spawn_timeline(const Dictionary &data);

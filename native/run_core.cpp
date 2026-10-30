@@ -7,6 +7,10 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_population", "config"), &SpeedRunCore::configure_population);
+    ClassDB::bind_method(D_METHOD("survey_population", "target"), &SpeedRunCore::survey_population);
+    ClassDB::bind_method(D_METHOD("population_spawn_point", "extra"), &SpeedRunCore::population_spawn_point);
+    ClassDB::bind_method(D_METHOD("population_snapshot"), &SpeedRunCore::population_snapshot);
     ClassDB::bind_method(D_METHOD("configure_enemy_order", "order"), &SpeedRunCore::configure_enemy_order);
     ClassDB::bind_method(D_METHOD("enemy_order_snapshot"), &SpeedRunCore::enemy_order_snapshot);
     ClassDB::bind_method(D_METHOD("configure_spawn_timeline", "data"), &SpeedRunCore::configure_spawn_timeline);
@@ -138,6 +142,7 @@ void SpeedRunCore::close() {
     rows_by_id.clear();
     definitions.clear();
     spawn_timeline = speed::SpawnTimeline();
+    population = Population();
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
@@ -232,6 +237,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         parsed.push_back(def);
     }
     definitions = std::move(parsed);
+    population = Population();
     enemy_aim_lag = aim_lag; enemy_aim_speed = aim_speed; aim_ready = aim_lag > 0;
     return true;
 }
