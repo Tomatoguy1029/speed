@@ -20,6 +20,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position"), &SpeedRunCore::spawn_enemy);
     ClassDB::bind_method(D_METHOD("remove_enemy", "id"), &SpeedRunCore::remove_enemy);
     ClassDB::bind_method(D_METHOD("enemies_snapshot"), &SpeedRunCore::enemies_snapshot);
+    ClassDB::bind_method(D_METHOD("rebuild_enemy_grid", "cell_size"), &SpeedRunCore::rebuild_enemy_grid);
+    ClassDB::bind_method(D_METHOD("query_enemy_ids", "lo", "hi"), &SpeedRunCore::query_enemy_ids);
     ClassDB::bind_method(D_METHOD("enemy_buffer", "type", "scale", "angle_offset"), &SpeedRunCore::enemy_buffer);
     ClassDB::bind_method(D_METHOD("close"), &SpeedRunCore::close);
     ClassDB::bind_method(D_METHOD("inspect"), &SpeedRunCore::inspect);
@@ -69,6 +71,7 @@ void SpeedRunCore::close() {
     rows_by_id.clear();
     definitions.clear();
     draw = Draw();
+    grid = EnemyGrid();
 }
 
 Dictionary SpeedRunCore::inspect() const {

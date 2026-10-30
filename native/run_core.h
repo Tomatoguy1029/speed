@@ -6,6 +6,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <unordered_map>
+#include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
 namespace godot {
@@ -24,6 +25,14 @@ class SpeedRunCore : public RefCounted {
     std::vector<Enemy> enemies;
     std::vector<size_t> free_rows;
     std::unordered_map<int64_t, size_t> rows_by_id;
+    struct EnemyGrid {
+        Vector2 origin;
+        double cell = 160, max_radius = 0;
+        int64_t cols = 0, rows = 0;
+        std::vector<int64_t> head, next, used;
+    } grid;
+    void reset_enemy_bounds();
+    std::vector<size_t> query_enemy_rows(Vector2 lo, Vector2 hi) const;
     int64_t next_id = 1;
     Vector2 ship_pos, view_center, view_half;
     struct Ship {
@@ -80,6 +89,8 @@ public:
     int64_t spawn_enemy(StringName type, Vector2 position);
     bool remove_enemy(int64_t id);
     Array enemies_snapshot() const;
+    bool rebuild_enemy_grid(double cell_size);
+    PackedInt64Array query_enemy_ids(Vector2 lo, Vector2 hi) const;
     PackedFloat32Array enemy_buffer(StringName type, double scale, double angle_offset) const;
     bool step(double delta);
     void close();
