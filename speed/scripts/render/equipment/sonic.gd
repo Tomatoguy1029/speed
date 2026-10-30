@@ -5,7 +5,7 @@ extends WeaponVisual
 
 const C_RING := Color(190.0 / 255.0, 215.0 / 255.0, 1.0)
 const C_VAPOR := Color(235.0 / 255.0, 243.0 / 255.0, 1.0)
-var _rings: PixelPainter
+var _rings: PixelShapes
 var _vapor := 0.0
 var _boom_age := 99.0
 var _last_pulse := 0.0
@@ -36,11 +36,8 @@ func tick(_dt: float) -> void:
 	var dt := world_dt()
 	var p := painter()
 	if _rings == null:
-		_rings = PixelPainter.new()
-		_rings.setup_painter(p.px)
-		var add := CanvasItemMaterial.new()
-		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		_rings.material = add
+		_rings = PixelShapes.new()
+		_rings.setup(p.px, PixelShapes.Shape.RING)
 		_rings.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
 		_rings.modulate = RenderPipeline.plain_color(rm._layers.fx)
 		rm._layers.fx.add_child(_rings)
@@ -54,16 +51,15 @@ func tick(_dt: float) -> void:
 	_rings.end()
 	p.end()
 
-## 音の輪：半径 R と R−1 の2重。出てから 0.7 秒で消える。
-func _draw_rings(r: PixelPainter) -> void:
+## 音の輪：半径 R と R−1 の2重。出てから 0.7 秒で消える。輪は GPU でまとめて描く。
+func _draw_rings(r: PixelShapes) -> void:
 	var speed: float = behavior.wave_speed()
 	var life: float = behavior.wave_life()
 	for f in behavior.frames:
 		var radius := speed * float(f.age) / r.px
 		if radius < 1.0: continue
 		var alpha := 0.24 * (1.0 - float(f.age) / life)
-		r.ring(f.pos, radius, Color(C_RING, alpha))
-		if radius > 3.0: r.ring(f.pos, radius - 1.0, Color(C_RING, alpha * 0.7))
+		r.add_ring(f.pos, radius, Color(C_RING, alpha), 0.7)
 
 ## 機体の後ろのマッハ円錐の蒸気と、機首の白い山形。一定距離ごとの衝撃の瞬間は蒸気が濃くなる。
 func _draw_ship(p: PixelPainter, dt: float) -> void:

@@ -9,9 +9,11 @@ var needles: Dictionary = {}
 var streaks: Array[Dictionary] = []
 var _released := -1.0
 var _add: PixelPainter
+var _streaks: PixelShapes
 
 func dispose() -> void:
 	if is_instance_valid(_add): _add.queue_free()
+	if is_instance_valid(_streaks): _streaks.queue_free()
 	super()
 
 func on_event(ev: Dictionary) -> void:
@@ -48,7 +50,11 @@ func tick(_dt: float) -> void:
 		add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 		_add.material = add
 		rm._layers.top.add_child(_add)
+		_streaks = PixelShapes.new()
+		_streaks.setup(p.px, PixelShapes.Shape.SPINDLE)
+		rm._layers.top.add_child(_streaks)
 	_add.begin()
+	_streaks.begin()
 	if _released >= 0.0: _released += dt
 	var t: EnemyTable = behavior.ctx.enemies.table
 	for id in needles.keys():
@@ -62,10 +68,11 @@ func tick(_dt: float) -> void:
 		s.age += dt
 		var k: float = s.age / 0.7
 		if k < 0.0 or k >= 1.0: continue
-		_add.spindle(s.pos, s.angle, s.len, s.w * (1.0 - k * 0.5), 1.0 if k < 0.25 else 1.0 - (k - 0.25) / 0.75)
+		_streaks.add_spindle(s.pos, s.angle, s.len, s.w * (1.0 - k * 0.5), 1.0 if k < 0.25 else 1.0 - (k - 0.25) / 0.75)
 	streaks = streaks.filter(func(s): return s.age < 0.7)
 	if needles.is_empty() and streaks.is_empty(): _released = -1.0
 	_add.end()
+	_streaks.end()
 
 func _needle(p: PixelPainter, enemy: Vector2, nd: Dictionary) -> void:
 	var r: float = nd.r / p.px * 0.55
@@ -81,4 +88,4 @@ func _needle(p: PixelPainter, enemy: Vector2, nd: Dictionary) -> void:
 		p.line(at + u * tail * p.px, at, Color(200.0 / 255.0, 160.0 / 255.0, 1.0, 0.55 * appear), maxi(1, width))
 		p.line(at + u * tail * p.px, at, Color(1, 1, 1, 0.7 * appear))
 	var length := r * 3.2 * (1.0 + 0.25 * pulse)
-	p.spindle(at, nd.angle, length, 1.6 + 1.2 * pulse, (0.85 + 0.15 * pulse) * (appear if k < 1.0 else 1.0))
+	_streaks.add_spindle(at, nd.angle, length, 1.6 + 1.2 * pulse, (0.85 + 0.15 * pulse) * (appear if k < 1.0 else 1.0))

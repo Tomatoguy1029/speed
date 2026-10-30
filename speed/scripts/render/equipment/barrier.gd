@@ -13,6 +13,7 @@ var restores: Array[Dictionary] = []
 var shards: Array[Dictionary] = []
 var crosses: Array[Dictionary] = []
 var sparks := PixelSparks.new()
+var _hexes: PixelShapes
 var _cells: Array[Vector2] = []
 var _cells_radius := -1.0
 
@@ -24,6 +25,9 @@ func setup(render: RunPresentation, owner_behavior) -> void:
 	var p := painter()
 	p.visibility_layer = 1
 	p.reparent(rm._layers.top)
+	_hexes = PixelShapes.new()
+	_hexes.setup(p.px, PixelShapes.Shape.HEX, false)
+	rm._layers.top.add_child(_hexes)
 
 func on_event(ev: Dictionary) -> void:
 	match ev.type:
@@ -37,6 +41,7 @@ func tick(_dt: float) -> void:
 	var dt := world_dt()
 	var p := painter()
 	p.begin()
+	_hexes.begin()
 	var center := state.ship_pos
 	for h in hits:
 		h.age += dt
@@ -49,6 +54,7 @@ func tick(_dt: float) -> void:
 	_shards(p, dt)
 	sparks.draw(p, dt)
 	p.end()
+	_hexes.end()
 
 func _last_ring(radius: float, px: float) -> int:
 	return maxi(FIRST_RING + 1, roundi(radius / px / (sqrt(3.0) * HEX)))
@@ -67,11 +73,9 @@ func _lattice(radius_cells: float) -> Array[Vector2]:
 			if at.length() < radius_cells: _cells.append(at)
 	return _cells
 
+## 六角形のマス（頂点までの半径 3.6 ドット）。GPU でまとめて描く。
 func _hex(p: PixelPainter, center: Vector2, at: Vector2, color: Color) -> void:
-	for i in 6:
-		var a0 := PI / 6.0 + i * PI / 3.0
-		var a1 := a0 + PI / 3.0
-		p.line(center + (at + Vector2.from_angle(a0) * 3.6) * p.px, center + (at + Vector2.from_angle(a1) * 3.6) * p.px, color)
+	_hexes.add_hex(center + at * p.px, 3.6, color)
 
 func _hit(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 	var a: float = h.age
@@ -146,3 +150,7 @@ func _restore(p: PixelPainter, r: Dictionary, center: Vector2) -> void:
 		else:
 			var q := (a - 0.3) / 0.2
 			if q < 1.0: _hex(p, center, at, Color(Color("#e6f3ff") if q < 0.3 else Color("#9cc4ff"), 1.0 - q))
+
+func dispose() -> void:
+	if is_instance_valid(_hexes): _hexes.queue_free()
+	super()

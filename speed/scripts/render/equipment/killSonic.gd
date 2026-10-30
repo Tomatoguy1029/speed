@@ -3,6 +3,7 @@ extends WeaponVisual
 ## 内側に細い輪と、流れる青い点。連鎖するたびに小さく細くなる。点線の円は使わない。
 
 var waves: Array[Dictionary] = []
+var _rings: PixelShapes
 
 func on_event(ev: Dictionary) -> void:
 	if ev.type == &"chain_shock":
@@ -11,7 +12,14 @@ func on_event(ev: Dictionary) -> void:
 func tick(_dt: float) -> void:
 	var dt := world_dt()
 	var p := painter()
+	if _rings == null:
+		_rings = PixelShapes.new()
+		_rings.setup(p.px, PixelShapes.Shape.THICK_RING, false)
+		_rings.visibility_layer = p.visibility_layer
+		_rings.modulate = RenderPipeline.plain_color(rm._layers.fx)
+		rm._layers.fx.add_child(_rings)
 	p.begin()
+	_rings.begin()
 	for w in waves:
 		w.age += dt
 		var k: float = w.age / w.life
@@ -29,7 +37,12 @@ func tick(_dt: float) -> void:
 				var rr := radius - th - 2 - (i * 7) % 4
 				p.dot(w.pos + Vector2.from_angle(a) * rr * p.px, Color("#4f86cc"))
 		var color := Color.WHITE if k < 0.35 else Color("#a8e0ff") if k < 0.7 else Color("#5f9be0")
-		p.thick_ring(w.pos, radius, th, color, 0.05)
-		if k < 0.5: p.thick_ring(w.pos, radius - th, 1, Color("#e0f6ff"), 0.05)
+		_rings.add_thick_ring(w.pos, radius, th, color, 0.05)
+		if k < 0.5: _rings.add_thick_ring(w.pos, radius - th, 1, Color("#e0f6ff"), 0.05)
 	waves = waves.filter(func(w): return w.age < w.life)
 	p.end()
+	_rings.end()
+
+func dispose() -> void:
+	if is_instance_valid(_rings): _rings.queue_free()
+	super()
