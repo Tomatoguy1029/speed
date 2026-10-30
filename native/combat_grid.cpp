@@ -8,7 +8,7 @@ void SpeedRunCore::reset_enemy_bounds() {
     const float infinity = std::numeric_limits<float>::infinity();
     Vector2 lo(infinity, infinity), hi(-infinity, -infinity);
     for (const auto &enemy : enemies) {
-        if (!enemy.alive) continue;
+        if (!enemy.alive || enemy.dead) continue;
         lo = lo.min(enemy.pos); hi = hi.max(enemy.pos);
     }
     grid.used.clear();
@@ -29,7 +29,7 @@ bool SpeedRunCore::rebuild_enemy_grid(double cell_size) {
     grid.used.clear();
     for (size_t row = 0; row < enemies.size(); ++row) {
         const auto &enemy = enemies[row];
-        if (!enemy.alive) { grid.next[row] = -1; continue; }
+        if (!enemy.alive || enemy.dead) { grid.next[row] = -1; continue; }
         grid.max_radius = std::max(grid.max_radius, definitions[enemy.definition].radius);
         const int64_t cx = std::floor((double(enemy.pos.x) - grid.origin.x) / grid.cell);
         const int64_t cy = std::floor((double(enemy.pos.y) - grid.origin.y) / grid.cell);
@@ -56,7 +56,7 @@ std::vector<size_t> SpeedRunCore::query_enemy_rows(Vector2 lo, Vector2 hi) const
     for (int64_t y = y0; y <= y1; ++y) for (int64_t x = x0; x <= x1; ++x) {
         int64_t row = grid.head[y * grid.cols + x];
         while (row != -1) {
-            if (size_t(row) < enemies.size() && enemies[row].alive) out.push_back(row);
+            if (size_t(row) < enemies.size() && enemies[row].alive && !enemies[row].dead) out.push_back(row);
             row = grid.next[row];
         }
     }

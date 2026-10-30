@@ -20,7 +20,10 @@ class SpeedRunCore : public RefCounted {
         size_t definition = 0;
         Vector2 pos, vel;
         double hp = 0.0, facing = 0.0, age = 0.0, fire_t = 0.0;
-        bool alive = false;
+        bool alive = false, dead = false;
+        double hit_cd = 0, flash = 0;
+        int64_t dash_seen = -1;
+        bool dash_fresh = false;
     };
     std::vector<Enemy> enemies;
     std::vector<size_t> free_rows;
@@ -67,6 +70,17 @@ class SpeedRunCore : public RefCounted {
     bool ship_ready = false;
     void steer_ship(double want, double dt);
     void move_ship(double dt, Vector2 accel);
+    struct CombatConfig {
+        double base_attack, atk_scale, ram_speed_ratio, crit_armor, touch_damage, contact_cooldown;
+        double bounce_keep, bounce_min_speed, kill_hitstop, kill_hitstop_cap, kill_hitstop_regen;
+        double hitstop_big_mult, hitstop_crit_mult, max_enemy_radius, attack_mult, crit_chance, crit_mult;
+    } combat_config{};
+    bool combat_ready = false;
+    double hitstop = 0, dash_stop = 0;
+    int64_t kills = 0;
+    Array events;
+    void emit_event(StringName type, Dictionary data = Dictionary());
+    void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction);
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -79,6 +93,10 @@ public:
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);
     Dictionary ship_snapshot() const;
+    bool configure_combat(const Dictionary &config, const Dictionary &stats);
+    bool collide_ship(Vector2 from, double radius);
+    Dictionary combat_snapshot() const;
+    Array drain_events();
     bool configure_draw(const Dictionary &config, const Dictionary &stats);
     bool handle_draw(const Dictionary &input, int64_t clock_msec, double camera_zoom);
     bool step_draw(double real_dt);

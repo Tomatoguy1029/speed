@@ -6,6 +6,10 @@ using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
+    ClassDB::bind_method(D_METHOD("configure_combat", "config", "stats"), &SpeedRunCore::configure_combat);
+    ClassDB::bind_method(D_METHOD("collide_ship", "from", "radius"), &SpeedRunCore::collide_ship);
+    ClassDB::bind_method(D_METHOD("combat_snapshot"), &SpeedRunCore::combat_snapshot);
+    ClassDB::bind_method(D_METHOD("drain_events"), &SpeedRunCore::drain_events);
     ClassDB::bind_method(D_METHOD("configure_ship", "config", "stats"), &SpeedRunCore::configure_ship);
     ClassDB::bind_method(D_METHOD("step_ship", "real_dt", "world_dt", "input"), &SpeedRunCore::step_ship);
     ClassDB::bind_method(D_METHOD("ship_snapshot"), &SpeedRunCore::ship_snapshot);
@@ -43,7 +47,9 @@ bool SpeedRunCore::step(double delta) {
     ++ticks;
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
     for (auto &enemy : enemies) {
-        if (!enemy.alive) continue;
+        if (!enemy.alive || enemy.dead) continue;
+        if (enemy.hit_cd > 0) enemy.hit_cd -= delta;
+        if (enemy.flash > 0) enemy.flash -= delta;
         enemy.age += delta;
         const Vector2 relative = enemy.pos - view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
@@ -72,6 +78,7 @@ void SpeedRunCore::close() {
     definitions.clear();
     draw = Draw();
     grid = EnemyGrid();
+    events.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {
@@ -169,7 +176,7 @@ Array SpeedRunCore::enemies_snapshot() const {
         row["pos"] = Array::make(enemy.pos.x, enemy.pos.y);
         row["vel"] = Array::make(enemy.vel.x, enemy.vel.y);
         row["hp"] = enemy.hp; row["armor"] = def.armor;
-        row["radius"] = def.radius; row["facing"] = enemy.facing; row["dead"] = 0;
+        row["radius"] = def.radius; row["facing"] = enemy.facing; row["dead"] = enemy.dead ? 1 : 0;
         out.append(row);
     }
     // 比較用コピーだけをID順へ並べる。実行中の格納位置は変えない。
@@ -187,12 +194,12 @@ PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, dou
     PackedFloat32Array buffer;
     if (!started || closed || !std::isfinite(scale) || scale <= 0 || !std::isfinite(angle_offset)) return buffer;
     int64_t count = 0;
-    for (const auto &enemy : enemies) if (enemy.alive && definitions[enemy.definition].id == type) ++count;
+    for (const auto &enemy : enemies) if (enemy.alive && !enemy.dead && definitions[enemy.definition].id == type) ++count;
     buffer.resize(count * 12);
     float *out = buffer.ptrw();
     int64_t index = 0;
     for (const auto &enemy : enemies) {
-        if (!enemy.alive || definitions[enemy.definition].id != type) continue;
+        if (!enemy.alive || enemy.dead || definitions[enemy.definition].id != type) continue;
         const double radius = definitions[enemy.definition].radius * scale;
         const double angle = enemy.facing + angle_offset;
         const double c = std::cos(angle) * radius, s = std::sin(angle) * radius;
