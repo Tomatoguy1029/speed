@@ -51,14 +51,18 @@ func tick(_dt: float) -> void:
 	_rings.end()
 	p.end()
 
-## 音の輪：半径 R と R−1 の2重。出てから 0.7 秒で消える。輪は GPU でまとめて描く。
+## 音の輪：半径 R と R−1 の2重。寿命とともに薄れ、縁が機首に届くところでふわっと消える（機体を追い越さない）。
+## 輪は GPU でまとめて描く。
 func _draw_rings(r: PixelShapes) -> void:
 	var speed: float = behavior.wave_speed()
 	var life: float = behavior.wave_life()
+	var nose: Vector2 = state.ship_pos + state.ship_heading * float(behavior.p("nose")) * r.px
 	for f in behavior.frames:
 		var radius := speed * float(f.age) / r.px
 		if radius < 1.0: continue
-		var alpha := 0.24 * (1.0 - float(f.age) / life)
+		var gap: float = nose.distance_to(f.pos) / r.px - radius
+		if gap <= 0.0: continue
+		var alpha := 0.24 * (1.0 - float(f.age) / life) * minf(1.0, gap / 6.0)
 		r.add_ring(f.pos, radius, Color(C_RING, alpha), 0.7)
 
 ## 機体の後ろのマッハ円錐の蒸気と、機首の白い山形。一定距離ごとの衝撃の瞬間は蒸気が濃くなる。
