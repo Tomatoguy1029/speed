@@ -27,6 +27,32 @@ func _ready() -> void:
 		check(not first.step(0.1) and not first.start(932), "終了後の更新と再開始を拒否する")
 		first = null
 		check(second.step(0.25) and second.inspect().time == 0.25, "別ランの解放後も更新できる")
+		var data_path := "res://tools/content/build_native_data.gd"
+		if not ResourceLoader.exists(data_path) or not second.has_method("configure"):
+			check(false, "編集データをネイティブ実行データへ変換できる")
+		else:
+			var compiler = load(data_path)
+			var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+			var data: Dictionary = compiler.compile_enemy(definition, ContentManager.base)
+			var configured = comparison.create_native()
+			check(configured.configure(data), "追跡敵の定義を読み込める")
+			var broken := data.duplicate(true)
+			broken.version = 1.5
+			check(not configured.configure(broken), "形式の版を切り捨てて受け付けない")
+			broken = data.duplicate(true)
+			broken.enemies[0].speed = NAN
+			check(not configured.configure(broken), "不正な数値を拒否する")
+			broken = data.duplicate(true)
+			broken.enemies[0].behavior = "未対応"
+			check(not configured.configure(broken), "未対応の行動を拒否する")
+			broken = data.duplicate(true)
+			broken.enemies.append(broken.enemies[0].duplicate(true))
+			check(not configured.configure(broken), "重複した定義IDを拒否する")
+			definition.speed += 20.0
+			var changed: Dictionary = compiler.compile_enemy(definition, ContentManager.base)
+			check(changed.enemies[0].speed == data.enemies[0].speed + 20.0, "制作データの数値変更が生成結果へ反映する")
+			check(configured.start(932) and not configured.configure(data), "開始後に定義を差し替えない")
+			configured.close()
 		second.close()
 	print("[native_runtime] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
