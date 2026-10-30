@@ -106,6 +106,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("query_enemy_ids", "lo", "hi"), &SpeedRunCore::query_enemy_ids);
     ClassDB::bind_method(D_METHOD("enemy_buffer", "type", "scale", "angle_offset"), &SpeedRunCore::enemy_buffer);
     ClassDB::bind_method(D_METHOD("close"), &SpeedRunCore::close);
+    ClassDB::bind_method(D_METHOD("checkpoint"), &SpeedRunCore::checkpoint);
+    ClassDB::bind_method(D_METHOD("update_enemy_definition", "id", "data"), &SpeedRunCore::update_enemy_definition);
     ClassDB::bind_method(D_METHOD("inspect"), &SpeedRunCore::inspect);
 }
 
