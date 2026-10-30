@@ -164,3 +164,26 @@ bool SpeedRunCore::step_pickups(double world_dt) {
     }
     return true;
 }
+
+PackedFloat32Array SpeedRunCore::pickup_buffer(StringName kind, double size, Color color, Rect2 view) const {
+    PackedFloat32Array buffer;
+    if (!started || closed || !pickups_ready || !std::isfinite(size) || size <= 0 || !view.position.is_finite() || !view.size.is_finite() || view.size.x < 0 || view.size.y < 0) return buffer;
+    const bool is_gem = kind == StringName("gem");
+    if (!is_gem && kind != StringName("coin")) return buffer;
+    int64_t count = 0;
+    if (is_gem) { for (const auto &gem : gems) if (gem.alive && view.has_point(gem.pos)) ++count; }
+    else { for (const auto &coin : coins) if (coin.alive && view.has_point(coin.pos)) ++count; }
+    buffer.resize(count * 12);
+    float *out = buffer.ptrw();
+    int64_t index = 0;
+    const auto append = [&](Vector2 pos, double radius) {
+        out[index++] = radius; out[index++] = 0; out[index++] = 0; out[index++] = pos.x;
+        out[index++] = 0; out[index++] = radius; out[index++] = 0; out[index++] = pos.y;
+        out[index++] = color.r; out[index++] = color.g; out[index++] = color.b; out[index++] = color.a;
+    };
+    if (is_gem) {
+        for (const auto &gem : gems) if (gem.alive && view.has_point(gem.pos))
+            append(gem.pos, size * (gem.value <= 1.0 ? 1.0 : std::min(std::pow(gem.value, 0.2), 3.0)));
+    } else { for (const auto &coin : coins) if (coin.alive && view.has_point(coin.pos)) append(coin.pos, size); }
+    return buffer;
+}

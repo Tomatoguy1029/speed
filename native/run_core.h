@@ -6,6 +6,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <unordered_map>
+#include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 
@@ -123,6 +124,7 @@ public:
     bool step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom);
     bool configure_pickups(const Dictionary &config, const Dictionary &stats);
     Dictionary pickups_snapshot() const;
+    PackedFloat32Array pickup_buffer(StringName kind, double size, Color color, Rect2 view) const;
     bool step_pickups(double world_dt);
     Array drain_collections();
     bool configure_combat(const Dictionary &config, const Dictionary &stats);

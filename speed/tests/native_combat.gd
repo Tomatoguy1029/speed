@@ -18,7 +18,7 @@ func values(object: Object, keys: Array) -> Dictionary:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
-	if not probe.has_method("step_frame"):
+	if not probe.has_method("pickup_buffer"):
 		check(false, "撃破から報酬の生成までネイティブランが所有する")
 	else:
 		for mode in ["touch", "pierce", "bounce", "kill", "collect"]:
@@ -74,6 +74,7 @@ func compare_contacts(comparison, mode: String) -> void:
 		check(not pickup_snapshot(run).coins.is_empty(), "部品の生成も実際に通る")
 		check(run.combat.dash_stop == run.cfg.kill_hitstop_cap, "同時撃破でヒットストップの合計上限へ届く")
 	check(run.state.kills == core.combat_snapshot().kills, "撃破の重複がない: " + mode)
+	check_buffers(core, run, definition)
 	check(run.state.hitstop == core.combat_snapshot().hitstop, "ヒットストップが一致する: " + mode)
 	# 同じ更新で再接触しても、接触待ち時間中は再び傷つけない。
 	run.state.events.clear()
@@ -162,3 +163,24 @@ func compare_frames(comparison) -> void:
 	check(saw_stop and run.state.kills > 0 and gained > 0, "撃破・時間停止・回収を実際に通る")
 	core.close()
 	lab.free()
+
+func check_buffers(core, run: RunSimulation, definition: EnemyDef) -> void:
+	var reference := InstanceBatch.new()
+	var view := Rect2(-10000, -10000, 20000, 20000)
+	for kind in ["gem", "coin"]:
+		reference.begin()
+		var color := Color("#b8a0ff") if kind == "gem" else Color("#ffd24a")
+		var base := 5.0 if kind == "gem" else 6.0
+		for item in pickup_snapshot(run).gems if kind == "gem" else pickup_snapshot(run).coins:
+			var radius := base
+			if kind == "gem" and item.value > 1.0: radius *= minf(pow(item.value, 0.2), 3.0)
+			reference.add_upright(item.pos, radius, color)
+		check(core.pickup_buffer(kind, base, color, view) == reference._buf.slice(0, reference._count * InstanceBatch.STRIDE), "回収物の表示データが一致する: " + kind)
+	reference.begin()
+	var table := run.enemies.table
+	var scale := 1.0 / definition.visual_value("collision_scale", 1.0)
+	for i in table.alive.size():
+		if table.alive[i] != 0 and table.dead[i] == 0:
+			reference.add(table.pos[i], table.facing[i]+PI/2.0, table.r[i]*scale, Color(1 if table.flash[i] > 0 else 0, 0, 0, 1))
+	check(core.enemy_buffer(&"drifter", scale, PI/2.0) == reference._buf.slice(0, reference._count * InstanceBatch.STRIDE), "敵の命中フラッシュと死亡の表示データが一致する")
+	reference.free()

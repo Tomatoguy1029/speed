@@ -10,6 +10,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
     ClassDB::bind_method(D_METHOD("configure_pickups", "config", "stats"), &SpeedRunCore::configure_pickups);
     ClassDB::bind_method(D_METHOD("pickups_snapshot"), &SpeedRunCore::pickups_snapshot);
+    ClassDB::bind_method(D_METHOD("pickup_buffer", "kind", "size", "color", "view"), &SpeedRunCore::pickup_buffer);
     ClassDB::bind_method(D_METHOD("step_pickups", "world_dt"), &SpeedRunCore::step_pickups);
     ClassDB::bind_method(D_METHOD("drain_collections"), &SpeedRunCore::drain_collections);
     ClassDB::bind_method(D_METHOD("configure_combat", "config", "stats"), &SpeedRunCore::configure_combat);
@@ -223,7 +224,7 @@ PackedFloat32Array SpeedRunCore::enemy_buffer(StringName type, double scale, dou
         const double c = std::cos(angle) * radius, s = std::sin(angle) * radius;
         out[index++] = c; out[index++] = -s; out[index++] = 0; out[index++] = enemy.pos.x;
         out[index++] = s; out[index++] = c; out[index++] = 0; out[index++] = enemy.pos.y;
-        out[index++] = 0; out[index++] = 0; out[index++] = 0; out[index++] = 1;
+        out[index++] = enemy.flash > 0 ? 1 : 0; out[index++] = 0; out[index++] = 0; out[index++] = 1;
     }
     return buffer;
 }
