@@ -395,7 +395,10 @@ func _attack_area(center: Vector2, scaling: float, maximum: float) -> void:
 		var inner := maxf(0.0, start - width * 0.5) * scaling
 		var points := PackedVector2Array()
 		for i in 49: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * i / 48.0) * outer)
-		for i in 49: points.append(center + Vector2.from_angle(angle + half - half * 2.0 * i / 48.0) * inner)
+		if inner <= 0.0:
+			points.append(center)
+		else:
+			for i in 49: points.append(center + Vector2.from_angle(angle + half - half * 2.0 * i / 48.0) * inner)
 		draw_colored_polygon(points, fill)
 		draw_polyline(points + PackedVector2Array([points[0]]), ATTACK_COLOR, 1.5)
 		return
@@ -417,8 +420,25 @@ func _sector(value: Dictionary, center: Vector2, scale_factor: float) -> void:
 	if maximum == minimum or half <= 0.0:
 		draw_line(center + Vector2.from_angle(angle) * minimum * scale_factor, center + Vector2.from_angle(angle) * maximum * scale_factor, Color(0.2, 0.65, 0.9), 1.0)
 		return
-	for distance in [maximum, float(value.get("min", 0.0))]:
-		for i in 49:
-			var k := i if distance == maximum else 48 - i
-			points.append(center + Vector2.from_angle(angle - half + half * 2.0 * k / 48.0) * distance * scale_factor)
-	draw_colored_polygon(points, Color(0.2, 0.65, 0.9, 0.25))
+	var fill := Color(0.2, 0.65, 0.9, 0.25)
+	if half >= PI:
+		# 全周の始点・終点と内半径0の中心点を重ねない。
+		if minimum <= 0.0:
+			for i in 48: points.append(center + Vector2.from_angle(angle + TAU * i / 48.0) * maximum * scale_factor)
+			draw_colored_polygon(points, fill)
+		else:
+			for i in 48:
+				var from_angle := angle + TAU * i / 48.0
+				var to_angle := angle + TAU * (i + 1) / 48.0
+				draw_colored_polygon(PackedVector2Array([
+					center + Vector2.from_angle(from_angle) * maximum * scale_factor,
+					center + Vector2.from_angle(to_angle) * maximum * scale_factor,
+					center + Vector2.from_angle(to_angle) * minimum * scale_factor,
+					center + Vector2.from_angle(from_angle) * minimum * scale_factor]), fill)
+		return
+	for i in 49: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * i / 48.0) * maximum * scale_factor)
+	if minimum <= 0.0:
+		points.append(center)
+	else:
+		for i in 49: points.append(center + Vector2.from_angle(angle + half - half * 2.0 * i / 48.0) * minimum * scale_factor)
+	draw_colored_polygon(points, fill)
