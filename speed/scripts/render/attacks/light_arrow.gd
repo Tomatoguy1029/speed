@@ -3,17 +3,18 @@ extends AttackVisual
 const TEXTURE := preload("res://assets/fx/light_arrow.svg")
 
 func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	draw_arrow(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i], false, state.world_time, 1.0, effect_tint)
+	draw_arrow(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i], false, state.world_time, 1.0, effect_tint, pr.hostile_length[i])
 	return true
 
 static func draw_arrow(c: CanvasItem, pos: Vector2, angle: float, radius: float,
-		cosmic: bool, world_time: float, opacity := 1.0, effect_color := Color.WHITE) -> void:
+		cosmic: bool, world_time: float, opacity := 1.0, effect_color := Color.WHITE, length := 0.0) -> void:
 	var scale := radius / 12.0
 	var tint := Color("ffe4a1")
 	if cosmic:
 		tint = Color("9d70ff").lerp(Color("73dcff"), 0.5 + sin(world_time * 3.0) * 0.5)
 	tint.a = opacity
-	c.draw_set_transform(pos, angle, Vector2.ONE * scale)
+	var tail_scale := length / 52.0 if length > 0.0 else scale
+	c.draw_set_transform(pos, angle, Vector2(tail_scale, scale))
 	c.draw_texture_rect(TEXTURE, Rect2(-52, -12, 64, 24), false, tint * effect_color)
 	c.draw_line(Vector2(-32, 0), Vector2(4, 0), Color(0.94, 0.97, 1.0, opacity) * effect_color, 1.5)
 	if cosmic:

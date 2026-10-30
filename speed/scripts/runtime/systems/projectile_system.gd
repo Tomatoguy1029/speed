@@ -76,6 +76,8 @@ var hostile_pos := PackedVector2Array()
 var hostile_vel := PackedVector2Array()
 var hostile_speed := PackedFloat32Array()
 var hostile_r := PackedFloat32Array()
+## 光の矢の先端から後方へ伸びる判定の長さ。0は従来の矢じりの判定。
+var hostile_length := PackedFloat32Array()
 var hostile_life := PackedFloat32Array()
 var hostile_dmg := PackedFloat64Array()
 var hostile_slow := PackedFloat32Array()
@@ -424,6 +426,7 @@ func _add_hostile(pos: Vector2, vel: Vector2, speed: float, r: float, life: floa
 	hostile_vel[i] = vel
 	hostile_speed[i] = speed
 	hostile_r[i] = r
+	hostile_length[i] = 0.0
 	hostile_life[i] = life
 	hostile_dmg[i] = dmg
 	hostile_slow[i] = slow
