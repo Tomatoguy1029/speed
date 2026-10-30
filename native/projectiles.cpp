@@ -2,6 +2,7 @@
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
+#include <godot_cpp/core/math.hpp>
 using namespace godot;
 
 size_t SpeedRunCore::add_friend(Friendly shot) {
@@ -155,4 +156,25 @@ Array SpeedRunCore::projectiles_snapshot() const {
         out.append(item);
     }
     return out;
+}
+
+PackedFloat32Array SpeedRunCore::friendly_buffer(StringName visual, double pixel, double scale, double clock) const {
+    PackedFloat32Array buffer;
+    if (!started || closed || !std::isfinite(pixel) || pixel <= 0 || !std::isfinite(scale) || scale <= 0 || !std::isfinite(clock)) return buffer;
+    int64_t count = 0;
+    for (const auto &shot : friends) if (shot.alive && shot.visual == visual) ++count;
+    buffer.resize(count * 12);
+    float *out = buffer.ptrw();
+    int64_t index = 0;
+    for (const auto &shot : friends) {
+        if (!shot.alive || shot.visual != visual) continue;
+        const Vector2 position = (shot.pos / pixel).round() * pixel;
+        const double size = 18.0 * pixel * scale;
+        const double angle = Math::fposmod(double(shot.vel.angle()), 2.0 * Math_PI) / (2.0 * Math_PI);
+        out[index++] = size; out[index++] = 0; out[index++] = 0; out[index++] = position.x;
+        out[index++] = 0; out[index++] = size; out[index++] = 0; out[index++] = position.y;
+        out[index++] = angle; out[index++] = visual == StringName("weapon/scatter") && shot.life < 0.09 ? 1 : 0;
+        out[index++] = clock; out[index++] = 1;
+    }
+    return buffer;
 }

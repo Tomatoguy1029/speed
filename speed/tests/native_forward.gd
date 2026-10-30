@@ -18,7 +18,7 @@ func values(object: Object, keys: Array) -> Dictionary:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
-	if not probe.has_method("configure_forward"):
+	if not probe.has_method("friendly_buffer"):
 		check(false, "W01の発射周期をネイティブランが所有する")
 	else:
 		for condition in [[1,1],[5,1],[5,3]]: await compare_frames(comparison, condition[0], condition[1])
@@ -65,6 +65,11 @@ func compare_frames(comparison, level: int, division: int) -> void:
 	var hostile_helper = HOSTILES.new()
 	var input := Intent.new()
 	run.input_source = func(): return input
+	var effects := BuildEffects.new()
+	add_child(effects)
+	effects.pixel = 1.82 * run.cfg.character_scale
+	effects.clock = 0.531244
+	var buffer_checked := false
 	var helper = SHOTS.new()
 	var fired := 0
 	var shot_hits := 0
@@ -86,6 +91,12 @@ func compare_frames(comparison, level: int, division: int) -> void:
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 		if difference.is_empty(): difference = comparison.difference({"elapsed": weapon._t, "recoil": weapon.recoil}, core.forward_snapshot())
 		check(difference.is_empty(), "W01とフレーム順序が一致する Lv%d 間引き%d tick%d: %s" % [level,division,tick,difference])
+		if tick % 15 == 0:
+			effects.projectiles(run.projectiles)
+			var reference: InstanceBatch = effects._shots["weapon/forward"]
+			var buffer: PackedFloat32Array = core.friendly_buffer(&"weapon/forward", effects.pixel, effects.SETTINGS.number("weapon/forward", "effect_scale", 1.0), effects.clock)
+			check(buffer == reference._buf.slice(0, reference._count * InstanceBatch.STRIDE), "弾のドット位置・向き・大きさ・表示時間を現行の表示へ照合する")
+			buffer_checked = buffer_checked or not buffer.is_empty()
 		check(str(run.state.rng.state) == core.inspect().rng_state, "発射・命中・報酬の乱数が一致する")
 		core.drain_collections()
 		for event in run.state.events:
@@ -93,6 +104,8 @@ func compare_frames(comparison, level: int, division: int) -> void:
 			if event.type == &"hit" and event.cause == &"shot": shot_hits += 1
 		if not difference.is_empty(): break
 	check(fired >= 2 and shot_hits > 0, "W01の発射と命中を実際に通る")
+	check(buffer_checked, "発射中の弾の表示データを実際に比較する")
+	effects.free()
 	hostile_helper.free()
 	helper.free()
 	core.close()
