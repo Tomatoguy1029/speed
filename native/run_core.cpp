@@ -7,6 +7,10 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_attack_budget", "settings"), &SpeedRunCore::configure_attack_budget);
+    ClassDB::bind_method(D_METHOD("set_attack_guard", "active", "until"), &SpeedRunCore::set_attack_guard);
+    ClassDB::bind_method(D_METHOD("request_attack", "owner", "categories", "id", "duration", "priority", "cost"), &SpeedRunCore::request_attack);
+    ClassDB::bind_method(D_METHOD("attack_budget_snapshot"), &SpeedRunCore::attack_budget_snapshot);
     ClassDB::bind_method(D_METHOD("configure_clips", "data"), &SpeedRunCore::configure_clips);
     ClassDB::bind_method(D_METHOD("step_clips"), &SpeedRunCore::step_clips);
     ClassDB::bind_method(D_METHOD("clips_snapshot"), &SpeedRunCore::clips_snapshot);
@@ -154,6 +158,7 @@ void SpeedRunCore::close() {
     definitions.clear(); formations.clear(); clips.clear(); clips_ready = false;
     spawn_timeline = speed::SpawnTimeline();
     population = Population();
+    attack_budget = AttackBudget();
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
