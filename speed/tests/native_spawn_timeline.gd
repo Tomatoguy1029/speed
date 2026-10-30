@@ -14,6 +14,13 @@ func _ready() -> void:
 		check(false, "生成した時間帯と曲線をネイティブで参照する")
 	else:
 		for stage in range(1,6): await compare_stage(comparison, stage)
+		var builder = load("res://addons/content_build/builder.gd")
+		check(builder.is_current(), "共通生成の出力が現在の入力に一致する")
+		var path := "res://.content/dev/native_spawn_1.bin"
+		if FileAccess.file_exists(path):
+			check(DirAccess.rename_absolute(path, path + ".missing") == OK, "生成物の欠落条件を作る")
+			check(not builder.is_current(), "バイナリの出力欠落も検出する")
+			check(DirAccess.rename_absolute(path + ".missing", path) == OK and builder.is_current(), "生成物を戻して更新判定を復元する")
 	probe.close()
 	print("[native_spawn_timeline] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
@@ -30,6 +37,13 @@ func compare_stage(comparison, index: int) -> void:
 			for curve in stage.zako_curves: curve.points = PackedVector2Array()
 		run.state.stage = stage
 		var raw := DATA.compile_spawn_timeline(stage, run.cfg)
+		if mode == "curves":
+			var generated_path := "res://.content/dev/native_spawn_%d.bin" % index
+			check(FileAccess.file_exists(generated_path), "共通生成の出力に出現タイムラインがある")
+			if FileAccess.file_exists(generated_path):
+				var generated := FileAccess.open(generated_path, FileAccess.READ)
+				check(comparison.difference(raw, generated.get_var()).is_empty(), "共通生成の出現タイムラインが現在の編集値と一致する")
+				generated.close()
 		var path := "/tmp/speed-native-timeline-test.bin"
 		var file := FileAccess.open(path, FileAccess.WRITE)
 		file.store_var(raw)

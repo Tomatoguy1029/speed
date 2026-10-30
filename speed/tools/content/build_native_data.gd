@@ -78,3 +78,20 @@ static func compile_spawn_timeline(stage: StageDef, config: GameConfig) -> Dicti
 		definition = StageEnemyTuning.resolve(definition, stage.enemy_tuning.get(type, {}))
 		data.types[type] = {"rank": definition.rank, "max_alive": definition.max_alive, "ranged": definition.ranged}
 	return data
+
+## 通常のステージ生成結果から、比較用のネイティブ入力を作る。
+static func build_spawn_timelines(output: String) -> Error:
+	var config := load("res://data/config.tres") as GameConfig
+	for name in DirAccess.get_files_at(output):
+		if not name.begins_with("stage_") or not name.ends_with(".tres"): continue
+		var stage := ResourceLoader.load(output.path_join(name), "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
+		if stage == null: return ERR_INVALID_DATA
+		var data := compile_spawn_timeline(stage, config)
+		if data.is_empty(): return ERR_INVALID_DATA
+		var file := FileAccess.open(output.path_join("dev/native_spawn_%d.bin" % stage.index), FileAccess.WRITE)
+		if file == null: return FileAccess.get_open_error()
+		file.store_var(data)
+		var error := file.get_error()
+		file.close()
+		if error != OK: return error
+	return OK

@@ -51,13 +51,15 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if error != OK: return error
 	error = load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json"))
 	if error != OK: return error
+	error = load("res://tools/content/build_native_data.gd").build_spawn_timelines(output)
+	if error != OK: return error
 	var outputs := [catalog_path]
 	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):
 		if file.begins_with("look_") and not output.path_join(file) in visual_index.look_paths.values(): continue
 		if file.get_extension() in ["tres", "res"]: outputs.append(output.path_join(file))
 	for file in DirAccess.get_files_at(output.path_join("dev")):
-		if file.get_extension() in ["json", "res"]: outputs.append(output.path_join("dev").path_join(file))
+		if file.get_extension() in ["json", "res", "bin"]: outputs.append(output.path_join("dev").path_join(file))
 	var stamp := FileAccess.open(output.path_join("stamp.json"), FileAccess.WRITE)
 	if stamp == null: return FileAccess.get_open_error()
 	stamp.store_string(JSON.stringify({"signature": signature(), "outputs": outputs}))
