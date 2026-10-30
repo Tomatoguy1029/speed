@@ -279,7 +279,7 @@ func start_attack(attack: StringName) -> bool:
 	technique = attack
 	cooldowns[attack] = clock + float(r.cd)
 	combo_pending = false
-	passes_left = int(def.params.return_passes) if tech_kind(attack) == &"return_charge" else 1
+	passes_left = int(r.passes) if tech_kind(attack) == &"return_charge" else 1
 	_begin_pass()
 	return true
 

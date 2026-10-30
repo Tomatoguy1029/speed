@@ -116,6 +116,8 @@ func _cleanup() -> void:
 				visual.effects.clear()
 				visual.queue_redraw()
 	elif actor.def.id == &"monoceros":
+		actor.horn_waves.clear()
+		actor.sweep_side = 1
 		actor.phase_pending = false
 		actor.reposition = 0.0
 		actor.stuck_body = null

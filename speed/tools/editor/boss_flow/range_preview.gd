@@ -249,7 +249,9 @@ static func _monoceros_attack(technique: StringName, p: Dictionary) -> Dictionar
 	var width := float(def.params.horn_width)
 	match technique:
 		&"sweep":
-			return {"from": root, "to": horn, "angle": 0.0, "half_angle": rad_to_deg(float(p.get("arc", 0.0))) * 0.5, "width": width, "length": horn}
+			return {"from": root, "to": horn + float(p.get("stop_range", 0.0)), "angle": 0.0, "half_angle": rad_to_deg(float(p.get("arc", 0.0))) * 0.5, "width": width, "length": horn + float(p.get("stop_range", 0.0))}
+		&"horn_wave":
+			return {"from": float(p.wave_start), "to": float(p.wave_max), "angle": 0.0, "half_angle": rad_to_deg(float(p.wave_half_angle) + float(p.release_offset)), "width": float(p.wave_width), "length": float(p.wave_max)}
 		&"kick":
 			return {"from": root, "to": float(p.get("reach", horn)), "angle": 180.0, "width": width, "length": float(p.get("reach", horn))}
 		&"lance":
