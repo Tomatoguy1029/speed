@@ -47,6 +47,7 @@ func request(run: RunSimulation,core,owner: String,row: int,cost: float,priority
 	check(comparison.difference(snapshot(run.projectiles.director),core.attack_budget_snapshot()).is_empty(),"予算・共有枠・待機順が一致する: "+owner)
 	check(events(run.state.events) == events(core.drain_events()),"許可した攻撃の通知が一致する: "+owner)
 	check(str(run.state.rng.state) == core.inspect().rng_state,"要求で乱数消費を変えない")
+	run.state.events.clear()
 func configure(d,core,enabled: bool,budget: float) -> void:
 	var settings := {"enabled":enabled,"budget":budget,"jitter":0.3}
 	d.configure(settings)

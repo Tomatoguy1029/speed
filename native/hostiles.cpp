@@ -17,9 +17,13 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
     const Array keys_in = fields.keys();
     for (int i = 0; i < keys_in.size(); ++i) {
         const String key = keys_in[i];
-        if (key != "kind" && key != "pos" && key != "vel" && key != "speed" && key != "r" && key != "life" && key != "dmg" && key != "slow" && key != "turn" && key != "stone" && key != "wait") return -1;
+        if (key != "kind" && key != "pos" && key != "vel" && key != "speed" && key != "r" && key != "life" && key != "dmg" && key != "slow" && key != "turn" && key != "stone" && key != "wait" && key != "attack_token") return -1;
     }
     Hostile shot;
+    if (fields.has("attack_token")) {
+        if (fields["attack_token"].get_type() != Variant::INT || int64_t(fields["attack_token"]) < 0) return -1;
+        shot.attack_token = fields["attack_token"];
+    }
     shot.kind = fields["kind"];
     if (shot.kind < 0 || shot.kind > 2) return -1;
     for (const char *key : {"pos", "vel"}) if (!fields.has(key) || fields[key].get_type() != Variant::VECTOR2 || !Vector2(fields[key]).is_finite()) return -1;

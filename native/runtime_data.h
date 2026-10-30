@@ -10,7 +10,7 @@ struct EnemyDefinition {
     godot::StringName id;
     enum class Kind { Chase, Shield } kind = Kind::Chase;
     bool spawn_ready = false, size_var = false;
-    double attack_value = 1, attack_priority = 0, attack_weight = 0;
+    double attack_value = 1, attack_priority = 0, attack_weight = 0, attack_telegraph = 0;
     bool attack_managed = true;
     int64_t rank = 0;
     double accel = 0, turn = 0, weak_arc = 0;

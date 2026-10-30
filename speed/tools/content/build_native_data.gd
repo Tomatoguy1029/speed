@@ -18,7 +18,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		"hitstop_multiplier": definition.hitstop_multiplier}
 	var attack_value := stage.enemy_attack_value(definition.id) if stage != null else 1.0
 	row.attack = {"value": attack_value, "priority": stage.enemy_attack_priority(definition.id) if stage != null else 0.0,
-		"weight": definition.attack_weight, "managed": bool(stage.attack_managed_by_type.get(String(definition.id),true)) if stage is RuntimeStage else attack_value > 0.0}
+		"telegraph": float(definition.params.get("telegraph",0.0)), "weight": definition.attack_weight, "managed": bool(stage.attack_managed_by_type.get(String(definition.id),true)) if stage is RuntimeStage else attack_value > 0.0}
 	row.spawn = {"rank": definition.rank, "size_var": definition.size_var}
 	row.scaling = {"radius": definition.radius, "hp": definition.base_hp(config), "armor": definition.armor,
 		"hp_mult": config.enemy_hp_mult, "armor_mult": config.enemy_armor_mult, "character": config.character_scale,

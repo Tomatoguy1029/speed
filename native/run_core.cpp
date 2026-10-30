@@ -7,6 +7,14 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("advance_attack_budget", "at"), &SpeedRunCore::advance_attack_budget);
+    ClassDB::bind_method(D_METHOD("cancel_attack_wait", "owner", "id"), &SpeedRunCore::cancel_attack_wait, DEFVAL(-1));
+    ClassDB::bind_method(D_METHOD("cancel_attack", "owner", "id"), &SpeedRunCore::cancel_attack);
+    ClassDB::bind_method(D_METHOD("owns_attack", "owner", "id"), &SpeedRunCore::owns_attack);
+    ClassDB::bind_method(D_METHOD("attack_token", "owner"), &SpeedRunCore::attack_token);
+    ClassDB::bind_method(D_METHOD("passive_attack", "owner", "id"), &SpeedRunCore::passive_attack);
+    ClassDB::bind_method(D_METHOD("track_attack_external", "token", "key"), &SpeedRunCore::track_attack_external);
+    ClassDB::bind_method(D_METHOD("release_attack_external", "token", "key"), &SpeedRunCore::release_attack_external);
     ClassDB::bind_method(D_METHOD("configure_attack_budget", "settings"), &SpeedRunCore::configure_attack_budget);
     ClassDB::bind_method(D_METHOD("set_attack_guard", "active", "until"), &SpeedRunCore::set_attack_guard);
     ClassDB::bind_method(D_METHOD("request_attack", "owner", "categories", "id", "duration", "priority", "cost"), &SpeedRunCore::request_attack);
@@ -249,6 +257,9 @@ bool SpeedRunCore::configure(const Dictionary &data) {
             }
             if (source.get("managed", Variant()).get_type() != Variant::BOOL) return false;
             def.attack_managed = source["managed"];
+            const Variant telegraph = source.get("telegraph", 0.0);
+            if ((telegraph.get_type() != Variant::FLOAT && telegraph.get_type() != Variant::INT) || !std::isfinite(double(telegraph))) return false;
+            def.attack_telegraph = telegraph;
         }
         if (row.has("spawn")) {
             if (row["spawn"].get_type() != Variant::DICTIONARY) return false;

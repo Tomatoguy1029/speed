@@ -115,3 +115,84 @@ Dictionary SpeedRunCore::attack_budget_snapshot() const {
     out["used"] = used_attack_cost(); out["serial"] = attack_budget.serial; out["now"] = attack_budget.now;
     out["groups"] = groups; out["waiting"] = waiting; return out;
 }
+
+int64_t SpeedRunCore::attack_token(StringName owner) const {
+    const auto *token = attack_budget.owners.getptr(owner); return token ? *token : 0;
+}
+bool SpeedRunCore::owns_attack(StringName owner, int64_t id) const {
+    const auto *group = attack_budget.groups.getptr(attack_token(owner));
+    if (!group) return false;
+    const auto *member = group->members.getptr(id); return member && !member->closed;
+}
+void SpeedRunCore::cancel_attack_wait(StringName owner, int64_t id) {
+    auto *waiting = attack_budget.waiting.getptr(owner);
+    if (waiting && (id < 0 || waiting->id == id)) attack_budget.waiting.erase(owner);
+}
+void SpeedRunCore::cancel_attack(StringName owner, int64_t id) {
+    cancel_attack_wait(owner, id);
+    auto *group = attack_budget.groups.getptr(attack_token(owner));
+    if (!group) return;
+    if (auto *member = group->members.getptr(id)) { member->closed = true; member->until = attack_budget.now; }
+    group->until = attack_budget.now;
+    for (const auto &entry : group->members) group->until = std::max(group->until, entry.value.until);
+}
+void SpeedRunCore::track_attack_external(int64_t token, const String &key) {
+    if (auto *group = attack_budget.groups.getptr(token)) group->external.insert(key.utf8().get_data());
+}
+void SpeedRunCore::release_attack_external(int64_t token, const String &key) {
+    if (auto *group = attack_budget.groups.getptr(token)) group->external.erase(key.utf8().get_data());
+}
+int64_t SpeedRunCore::passive_attack(StringName owner, int64_t id) {
+    if (!started || closed || attack_formation_mode) return 0;
+    const auto found = rows_by_id.find(id); if (found == rows_by_id.end()) return 0;
+    auto &budget = attack_budget;
+    const int64_t token = ++budget.serial;
+    AttackBudget::Group group;
+    group.owner = String(owner) + ":passive:" + String::num_int64(token);
+    group.id = id; group.row = found->second; group.until = budget.now; group.start = budget.now; group.passive = true;
+    group.pos = enemies[group.row].pos; group.type = definitions[enemies[group.row].definition].id;
+    group.categories.append("zone"); budget.groups.insert(token, group); return token;
+}
+bool SpeedRunCore::advance_attack_budget(double at) {
+    if (!started || closed || !std::isfinite(at) || at < attack_budget.now) return false;
+    auto &budget = attack_budget; budget.now = at;
+    std::vector<int64_t> expired;
+    for (auto &entry : budget.groups) {
+        auto &group = entry.value;
+        if (!group.members.is_empty()) {
+            group.until = at;
+            for (auto &m : group.members) {
+                auto &member = m.value;
+                if (!member.closed) {
+                    const auto found = rows_by_id.find(m.key);
+                    const bool same = found != rows_by_id.end() && found->second == member.row && !enemies[member.row].dead;
+                    // 現在対応している追跡・盾には、予告中や突進中の行動状態がない。
+                    // それらを持つ敵は行動の移行時に、この寿命更新にも接続する。
+                    if (!same || member.begun || enemies[member.row].fire_t > definitions[enemies[member.row].definition].attack_telegraph || reached(at, member.until)) {
+                        member.closed = true; member.until = at;
+                    }
+                }
+                group.until = std::max(group.until, member.until);
+            }
+        }
+        if (reached(at, group.until)) expired.push_back(entry.key);
+    }
+    if (!expired.empty()) {
+        std::unordered_set<int64_t> live;
+        for (const auto &shot : hostiles) if (shot.alive) live.insert(shot.attack_token);
+        for (int64_t token : expired) {
+            auto &group = budget.groups[token];
+            if (live.count(token) || !group.external.empty()) continue;
+            Dictionary event; event["token"] = token; event["owner"] = String(group.owner); emit_event("attack_end", event);
+            if (attack_token(group.owner) == token) budget.owners.erase(group.owner);
+            budget.groups.erase(token);
+        }
+    }
+    std::vector<StringName> cancelled;
+    for (const auto &entry : budget.waiting) {
+        const auto found = rows_by_id.find(entry.value.id);
+        if (found == rows_by_id.end() || found->second != entry.value.row || enemies[entry.value.row].dead) cancelled.push_back(entry.key);
+    }
+    for (const auto &owner : cancelled) budget.waiting.erase(owner);
+    return true;
+}

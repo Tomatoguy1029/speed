@@ -47,6 +47,7 @@ class SpeedRunCore : public RefCounted {
             Vector2 pos;
             PackedStringArray categories;
             HashMap<int64_t, Member> members;
+            std::unordered_set<std::string> external;
         };
         struct Waiting {
             int64_t id = 0; size_t row = 0;
@@ -191,7 +192,7 @@ class SpeedRunCore : public RefCounted {
     } projectile_config;
     struct Hostile {
         bool alive = true;
-        int64_t kind = 0;
+        int64_t kind = 0, attack_token = 0;
         Vector2 pos, vel;
         float speed = 0, radius = 0, life = 0, slow = 0, turn = 0, gap = 0, stone = 0, wait = 0;
         double damage = 0;
@@ -243,6 +244,14 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool advance_attack_budget(double at);
+    void cancel_attack_wait(StringName owner, int64_t id);
+    void cancel_attack(StringName owner, int64_t id);
+    bool owns_attack(StringName owner, int64_t id) const;
+    int64_t attack_token(StringName owner) const;
+    int64_t passive_attack(StringName owner, int64_t id);
+    void track_attack_external(int64_t token, const String &key);
+    void release_attack_external(int64_t token, const String &key);
     bool configure_attack_budget(const Dictionary &settings);
     bool set_attack_guard(bool active, double until);
     bool request_attack(StringName owner, const PackedStringArray &categories, int64_t id, double duration, double priority, double cost);
