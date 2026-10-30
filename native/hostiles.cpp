@@ -40,12 +40,13 @@ int64_t SpeedRunCore::spawn_hostile(const Dictionary &fields) {
 }
 
 bool SpeedRunCore::damage_ship(double amount, double slow, StringName cause, StringName source) {
+    if (phase != Phase::Play || controls_locked || encounter_protected) return false;
     if (ship.shield_t > 0) {
         if (ship.shield_flash <= 0) { Dictionary event; event["pos"] = ship.pos; emit_event("shield_block", event); }
         ship.shield_flash = 0.12;
         return false;
     }
-    if (ship.invuln > 0) return false;
+    if (ship.invuln > 0 || invincible) return false;
     ship.hp -= amount;
     if (slow > 0) ship.glide = false;
     ship.vel *= 1.0 - std::min(0.9, slow);

@@ -158,11 +158,17 @@ class SpeedRunCore : public RefCounted {
     double frame_grid_cell = 160, trace_radius = 0;
     int64_t world_div = 1, world_steps = 0;
     bool frame_ready = false;
+    enum class Phase { Play = 0, LevelUp = 1, Paused = 2, Dying = 3, Finishing = 4, Ended = 5 };
+    Phase phase = Phase::Play;
+    bool controls_locked = false, encounter_protected = false, steering_locked = false;
+    bool invincible = false, hitstop_enabled = true;
     void advance_enemies(double delta);
     int64_t ticks = 0;
 protected:
     static void _bind_methods();
 public:
+    bool set_run_guards(const Dictionary &guards);
+    bool set_paused(bool paused);
     bool configure_forward(const Dictionary &parameters, int64_t level, double character_scale);
     Dictionary forward_snapshot() const;
     int64_t spawn_hostile(const Dictionary &fields);

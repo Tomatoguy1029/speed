@@ -21,7 +21,7 @@ func _ready() -> void:
 	if not probe.has_method("pickup_buffer"):
 		check(false, "撃破から報酬の生成までネイティブランが所有する")
 	else:
-		for mode in ["touch", "pierce", "bounce", "kill", "collect"]:
+		for mode in ["touch", "pierce", "bounce", "kill", "collect", "controls_locked", "encounter_protected", "no_hitstop"]:
 			await compare_contacts(comparison, mode)
 		for mode in ["normal", "rehit", "bounce", "stop_input"]: await compare_frames(comparison, mode)
 	print("[native_combat] failed=%d" % failed)
@@ -40,7 +40,7 @@ func compare_contacts(comparison, mode: String) -> void:
 		run.cfg.drop_max = 1.0
 		run.cfg.gem_max = 1
 	var definition: EnemyDef = run.enemies.def_of(&"drifter").duplicate(true)
-	definition.hp = 6 if mode in ["kill", "collect"] else 1000
+	definition.hp = 6 if mode in ["kill", "collect", "no_hitstop"] else 1000
 	definition.armor = 1000 if mode == "bounce" else 2
 	var core = comparison.create_native()
 	check(core.configure(DATA.compile_enemy(definition, run.cfg)), "接触用の敵を準備する")
@@ -52,6 +52,12 @@ func compare_contacts(comparison, mode: String) -> void:
 	check(core.configure_pickups(pickup_config, values(run.state.stats, ["xp_mult", "xp_pickup_radius", "pickup_radius", "pickup_speed_mult"])), "ドロップの編集値を準備する")
 	core.start(932, run.enemies._next_id, run.pickups._gem_next_seq)
 	run.state.rng.seed = 932
+	if mode in ["controls_locked", "encounter_protected"]:
+		run.state.set(mode, true)
+		check(core.set_run_guards({mode: true}), "接触中の保護を設定する")
+	elif mode == "no_hitstop":
+		run.state.hitstop_enabled = false
+		check(core.set_run_guards({"hitstop_enabled": false}), "停止演出を無効にする")
 	var p := run.state.ship_pos
 	var positions := [Vector2(0, 40), Vector2(0, 40), Vector2(0, 10), Vector2(300, 0)]
 	if mode == "kill":
@@ -74,6 +80,9 @@ func compare_contacts(comparison, mode: String) -> void:
 		check(not pickup_snapshot(run).coins.is_empty(), "部品の生成も実際に通る")
 		check(run.combat.dash_stop == run.cfg.kill_hitstop_cap, "同時撃破でヒットストップの合計上限へ届く")
 	check(run.state.kills == core.combat_snapshot().kills, "撃破の重複がない: " + mode)
+	if mode in ["controls_locked", "encounter_protected"]:
+		for enemy in core.enemies_snapshot(): check(is_equal_approx(enemy.hp, definition.base_hp(run.cfg)), "保護期間は敵も傷つかない")
+	if mode == "no_hitstop": check(run.state.kills > 0 and run.state.hitstop == 0, "撃破しても停止設定が無効なら止めない")
 	check_buffers(core, run, definition)
 	check(run.state.hitstop == core.combat_snapshot().hitstop, "ヒットストップが一致する: " + mode)
 	# 同じ更新で再接触しても、接触待ち時間中は再び傷つけない。

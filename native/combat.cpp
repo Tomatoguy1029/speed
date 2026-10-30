@@ -57,7 +57,7 @@ bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) cons
 
 void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock, const Vector2 *impact) {
     auto &enemy = enemies[row];
-    if (enemy.dead || amount <= 0) return;
+    if (enemy.dead || amount <= 0 || phase != Phase::Play || controls_locked || encounter_protected) return;
     const auto &def = definitions[enemy.definition];
     if (cause != StringName("ram") && cause != StringName("bump") && blocks_front(row, impact ? *impact : enemy.pos, direction)) return;
     bool fresh = enemy.hp >= def.hp - 1e-6;
@@ -67,7 +67,7 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
     }
     const double before = enemy.hp;
     enemy.hp -= amount;
-    if (cause == StringName("ram") && before > std::max(0.0, enemy.hp)) {
+    if (hitstop_enabled && cause == StringName("ram") && before > std::max(0.0, enemy.hp)) {
         double seconds = 0;
         if (fresh && enemy.hp <= 0) seconds = combat_config.kill_hitstop * (def.radius > 25 ? combat_config.hitstop_big_mult : 1.0) * (crit ? combat_config.hitstop_crit_mult : 1.0);
         if (crit) seconds = std::max(seconds, enemy.hp <= 0 ? 0.05 : 0.035);

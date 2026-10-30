@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("set_run_guards", "guards"), &SpeedRunCore::set_run_guards);
+    ClassDB::bind_method(D_METHOD("set_paused", "paused"), &SpeedRunCore::set_paused);
     ClassDB::bind_method(D_METHOD("friendly_buffer", "visual", "pixel", "scale", "clock"), &SpeedRunCore::friendly_buffer);
     ClassDB::bind_method(D_METHOD("configure_forward", "parameters", "level", "character_scale"), &SpeedRunCore::configure_forward);
     ClassDB::bind_method(D_METHOD("forward_snapshot"), &SpeedRunCore::forward_snapshot);
@@ -138,6 +140,7 @@ void SpeedRunCore::close() {
 Dictionary SpeedRunCore::inspect() const {
     Dictionary out;
     out["active"] = started && !closed;
+    out["phase"] = int(phase);
     out["closed"] = closed;
     out["time"] = time;
     out["world_time"] = world_time;
@@ -309,15 +312,43 @@ bool SpeedRunCore::configure_frame(const Dictionary &config) {
     return true;
 }
 
+bool SpeedRunCore::set_run_guards(const Dictionary &guards) {
+    if (!started || closed) return false;
+    const Array keys = guards.keys();
+    for (int i = 0; i < keys.size(); ++i) {
+        const String key = keys[i];
+        if (key != "controls_locked" && key != "encounter_protected" && key != "steering_locked" && key != "invincible" && key != "hitstop_enabled") return false;
+        if (guards[keys[i]].get_type() != Variant::BOOL) return false;
+    }
+    controls_locked = guards.get("controls_locked", controls_locked);
+    encounter_protected = guards.get("encounter_protected", encounter_protected);
+    steering_locked = guards.get("steering_locked", steering_locked);
+    invincible = guards.get("invincible", invincible);
+    hitstop_enabled = guards.get("hitstop_enabled", hitstop_enabled);
+    if (!hitstop_enabled) hitstop = 0;
+    return true;
+}
+
+bool SpeedRunCore::set_paused(bool paused) {
+    if (!started || closed || (phase != Phase::Play && phase != Phase::Paused)) return false;
+    phase = paused ? Phase::Paused : Phase::Play;
+    if (paused) hitstop = 0;
+    return true;
+}
+
 bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 center, Vector2 half, double camera_zoom) {
     if (!started || closed || !frame_ready || !std::isfinite(real_dt) || real_dt <= 0 ||
             !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0 || !std::isfinite(camera_zoom) || camera_zoom <= 0) return false;
     for (const char *key : {"touch", "has_cursor", "stick_active", "press", "alt_press", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
     for (const char *key : {"cursor", "stick", "pen"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
+    if (phase != Phase::Play) return true;
+    if (controls_locked || encounter_protected) hitstop = 0;
+    const Dictionary intent = controls_locked || steering_locked ? Dictionary() : input;
+    if (controls_locked) ship.vel = Vector2();
     sim_time += real_dt;
     if (!motion_ready) enemy_aim = ship_pos;
     view_center = center; view_half = half; motion_ready = true;
-    handle_draw(input, int64_t(std::round(sim_time * 1000.0)), camera_zoom);
+    handle_draw(intent, int64_t(std::round(sim_time * 1000.0)), camera_zoom);
     if (hitstop > 0) { hitstop = std::max(0.0, hitstop - real_dt); return true; }
     if (!draw.tracing && dash_stop > 0) dash_stop = std::max(0.0, dash_stop - real_dt * combat_config.kill_hitstop_regen);
     step_draw(real_dt);
@@ -331,8 +362,8 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         advance_enemies(accumulated);
         rebuild_enemy_grid(frame_grid_cell);
     }
-    step_ship(real_dt, world_dt, input);
-    if (world_dt > 0) step_forward(world_dt);
+    step_ship(real_dt, world_dt, intent);
+    if (world_dt > 0 && !controls_locked) step_forward(world_dt);
     if (world_step && accumulated > 0) {
         step_projectiles(accumulated);
         step_hostiles(accumulated);

@@ -18,14 +18,15 @@ func values(object: Object, keys: Array) -> Dictionary:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
-	if not probe.has_method("friendly_buffer"):
-		check(false, "W01の発射周期をネイティブランが所有する")
+	if not probe.has_method("set_run_guards"):
+		check(false, "停止と操作・被弾の保護をネイティブランが所有する")
 	else:
 		for condition in [[1,1],[5,1],[5,3]]: await compare_frames(comparison, condition[0], condition[1])
+		await compare_frames(comparison, 5, 1, true)
 	probe.close()
 	print("[native_forward] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_frames(comparison, level: int, division: int) -> void:
+func compare_frames(comparison, level: int, division: int, guarded := false) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 631, "empty": true, "invincible": false})
@@ -35,6 +36,7 @@ func compare_frames(comparison, level: int, division: int) -> void:
 	run.ship.setup(run.ship.ctx)
 	run.state.enemy_aim = run.state.ship_pos
 	run.cfg.world_tick_div = division
+	if guarded: run.cfg.invuln_time = 0.25
 	# 成長の所有者は別の比較で扱い、ここでは射撃とフレーム順序を独立して確認する。
 	run.cfg.xp_base = 1e9
 	check(run.loadout.grant(&"weapon", &"W01", level), "比較するW01を実際に装備する")
@@ -74,16 +76,39 @@ func compare_frames(comparison, level: int, division: int) -> void:
 	var fired := 0
 	var shot_hits := 0
 	for tick in 360:
+		if guarded:
+			var guards := {"controls_locked": tick >= 60 and tick < 80, "encounter_protected": tick >= 80 and tick < 95, "steering_locked": tick >= 200 and tick < 220, "invincible": tick >= 95 and tick < 100, "hitstop_enabled": tick < 150}
+			for key in guards:
+				if key == "invincible": run.ship.invincible = guards[key]
+				else: run.state.set(key, guards[key])
+			check(core.set_run_guards(guards), "操作・被弾の保護期間を渡す")
+			if tick in [40,50]:
+				run.set_phase(RunState.Phase.PAUSED if tick == 40 else RunState.Phase.PLAY)
+				check(core.set_paused(tick == 40), "ポーズと再開を受け付ける")
+			if tick in [60,80,95,100,160,200,220]:
+				var direct := hostile.merged({"kind": 0, "pos": run.state.ship_pos, "vel": Vector2.ZERO, "speed": 0.0, "turn": 0.0}, true)
+				hostile_helper.add_shot(run, core, direct)
 		var cycle := tick - 100
 		var command := {"touch": true, "press": cycle == 0, "has_cursor": cycle >= 0 and cycle <= 8,
 			"pen_release": cycle == 8, "pen": origin + Vector2(maxi(0,cycle)*30,0)}
+		if guarded:
+			command.stick_active = (tick >= 60 and tick < 80) or (tick >= 200 and tick < 230)
+			command.stick = Vector2.RIGHT if command.stick_active else Vector2.ZERO
+			if tick in [65,205]: command.press = true; command.has_cursor = true
 		for key in command: input.set(key, command[key])
 		var center := run.state.view_center
 		var half := run.state.view_half
 		var zoom := run.state.camera_zoom
 		run.state.events.clear()
-		run._play_tick(1.0/60.0)
+		if run.state.phase == RunState.Phase.PLAY: run._play_tick(1.0/60.0)
 		check(core.step_frame(1.0/60.0, command, center, half, zoom), "射撃も含めて一回の呼出しで更新する")
+		if guarded and tick in [65,205]: check(not run.state.drawing, "操作ロック中は描線入力を受けない")
+		check(run.state.phase == core.inspect().phase, "停止と再開の状態が一致する")
+		check(is_equal_approx(run.state.time, core.inspect().time) and is_equal_approx(run.state.sim_time, core.inspect().sim_time), "停止中は両方の時計が止まる")
+		if guarded and tick in [60,80,95,100,160,200,220]:
+			var hurt := false
+			for event in run.state.events: hurt = hurt or event.type == &"hurt"
+			check(hurt == (tick >= 100), "保護中の接触と解除後の被弾を実際に通る tick%d" % tick)
 		var difference: String = comparison.difference(comparison.snapshot(run, [], tick).enemies, core.enemies_snapshot())
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(helper.snapshot(run.projectiles)), comparison.plain(core.projectiles_snapshot()))
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(hostile_helper.snapshot(run.projectiles)), comparison.plain(core.hostiles_snapshot()))
