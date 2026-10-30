@@ -54,7 +54,7 @@ extends BossTechnique
 		_values_dirty = true
 
 ## ビームの見た目
-@export var beam_visual: PackedScene = preload("res://scenes/attacks/beam.tscn"):
+@export var beam_visual: PackedScene = preload("res://scenes/attacks/canis_flame_beam.tscn"):
 	set(value):
 		beam_visual = value
 		_values_dirty = true
