@@ -1,8 +1,10 @@
 #include "register_types.h"
+#include "run_core.h"
 #include <godot_cpp/godot.hpp>
 
 void initialize_speed_runtime(godot::ModuleInitializationLevel level) {
     if (level != godot::MODULE_INITIALIZATION_LEVEL_SCENE) return;
+    GDREGISTER_CLASS(godot::SpeedRunCore);
 }
 
 void uninitialize_speed_runtime(godot::ModuleInitializationLevel level) {
