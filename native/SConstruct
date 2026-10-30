@@ -1,0 +1,34 @@
+# 固定SDKを外部の作業領域へ置き、生成物もソースとは別の出力先へ作る。
+import json
+import subprocess
+from pathlib import Path
+import SCons
+
+here = Path(Dir('.').abspath)
+locked = json.loads((here / 'dependencies.json').read_text())
+sdk = Path(ARGUMENTS.pop('godot_cpp_dir', str(here / 'godot-cpp'))).resolve()
+if not (sdk / 'SConstruct').is_file():
+    Exit('godot_cpp_dir に dependencies.json の固定SDKを指定してください')
+revision = subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD'], text=True).strip()
+if revision != locked['godot_cpp']['commit']:
+    Exit('godot-cpp の版が dependencies.json と一致しません')
+if subprocess.call(['git', '-C', str(sdk), 'diff', '--quiet', 'HEAD', '--']) != 0:
+    Exit('godot-cpp の追跡ファイルに変更があります')
+if SCons.__version__ != locked['scons']:
+    Exit('SCons の版が dependencies.json と一致しません')
+if ARGUMENTS.get('precision', locked['precision']) != locked['precision']:
+    Exit('このゲームは単精度のGodot用です')
+ARGUMENTS['precision'] = locked['precision']
+ARGUMENTS['build_profile'] = str(here / 'dependencies.json')
+out = Path(ARGUMENTS.pop('output_dir', str(here / '../speed/native/bin'))).resolve()
+env = SConscript(str(sdk / 'SConstruct'))
+if env['platform'] not in ['macos', 'windows']:
+    Exit('対応するビルド対象は macos と windows です')
+# 演算の結合を変えず、GDScript側の比較結果へ照合する。
+if env.get('is_msvc', False):
+    env.Append(CXXFLAGS=['/fp:strict'])
+else:
+    env.Append(CXXFLAGS=['-ffp-contract=off'])
+name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
+library = env.SharedLibrary(str(out / name), Glob('*.cpp'))
+Default(library)
