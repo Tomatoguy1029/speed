@@ -92,7 +92,7 @@ bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &
     if (ship.invuln > 0) ship.invuln -= world_dt;
     ship.shield_flash = std::max(0.0, ship.shield_flash - world_dt);
     ship.shield_t = std::max(0.0, ship.shield_t - world_dt);
-    if (world_dt <= 0) return true;
+    if (draw.drawing || draw.tracing || world_dt <= 0) return true;
     const auto &c = ship_config;
     if (bool(input.get("touch", false))) {
         const Vector2 stick = input.get("stick", Vector2());

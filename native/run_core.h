@@ -6,6 +6,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
 #include <unordered_map>
+#include <godot_cpp/variant/packed_vector2_array.hpp>
 
 namespace godot {
 // 可変状態は各ランが所有する。終了した実体は再利用しない。
@@ -37,6 +38,23 @@ class SpeedRunCore : public RefCounted {
         double field_radius, boundary_push, ship_radius, crash_restitution, ship_hurt_time;
         double max_hp, max_speed, turn_rate, acceleration, glide_duration_mult, invulnerability;
     } ship_config{};
+    struct DrawConfig {
+        double min_charge, length, point_step, confirm_delay, run_time, time_scale, slow_ref, scale_min;
+        double boost_duration, carry, launch_ratio, glide_ratio, capacity, charge_time, length_mult;
+    } draw_config{};
+    struct Draw {
+        double gauge = 1, start_charge = 0, amount = 0, limit = 0, length = 0, before_speed = 0;
+        double speed = 0, rate = 0, seg_pos = 0, total = 0, progress = 0;
+        bool drawing = false, started = false, blocked = false, full_charge = false, tracing = false;
+        int64_t first_msec = 0, dash_id = 0, segment = 0;
+        PackedVector2Array points, path;
+        PackedFloat32Array lengths;
+    } draw;
+    bool draw_ready = false;
+    void begin_draw(bool press, Vector2 pen, int64_t clock_msec);
+    void extend_draw(Vector2 pen, double camera_zoom);
+    void commit_draw();
+    void end_trace(bool completed);
     bool ship_ready = false;
     void steer_ship(double want, double dt);
     void move_ship(double dt, Vector2 accel);
@@ -52,6 +70,11 @@ public:
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);
     Dictionary ship_snapshot() const;
+    bool configure_draw(const Dictionary &config, const Dictionary &stats);
+    bool handle_draw(const Dictionary &input, int64_t clock_msec, double camera_zoom);
+    bool step_draw(double real_dt);
+    double world_scale() const;
+    Dictionary draw_snapshot() const;
     bool start(int64_t seed, int64_t first_id = 1);
     bool set_motion_context(Vector2 ship, Vector2 center, Vector2 half);
     int64_t spawn_enemy(StringName type, Vector2 position);

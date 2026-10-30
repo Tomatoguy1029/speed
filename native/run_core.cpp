@@ -9,6 +9,11 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure_ship", "config", "stats"), &SpeedRunCore::configure_ship);
     ClassDB::bind_method(D_METHOD("step_ship", "real_dt", "world_dt", "input"), &SpeedRunCore::step_ship);
     ClassDB::bind_method(D_METHOD("ship_snapshot"), &SpeedRunCore::ship_snapshot);
+    ClassDB::bind_method(D_METHOD("configure_draw", "config", "stats"), &SpeedRunCore::configure_draw);
+    ClassDB::bind_method(D_METHOD("handle_draw", "input", "clock_msec", "camera_zoom"), &SpeedRunCore::handle_draw);
+    ClassDB::bind_method(D_METHOD("step_draw", "real_dt"), &SpeedRunCore::step_draw);
+    ClassDB::bind_method(D_METHOD("world_scale"), &SpeedRunCore::world_scale);
+    ClassDB::bind_method(D_METHOD("draw_snapshot"), &SpeedRunCore::draw_snapshot);
     ClassDB::bind_method(D_METHOD("start", "seed", "first_id"), &SpeedRunCore::start, DEFVAL(1));
     ClassDB::bind_method(D_METHOD("step", "delta"), &SpeedRunCore::step);
     ClassDB::bind_method(D_METHOD("set_motion_context", "ship", "center", "half"), &SpeedRunCore::set_motion_context);
@@ -63,6 +68,7 @@ void SpeedRunCore::close() {
     free_rows.clear();
     rows_by_id.clear();
     definitions.clear();
+    draw = Draw();
 }
 
 Dictionary SpeedRunCore::inspect() const {
