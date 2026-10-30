@@ -21,7 +21,7 @@ func _ready() -> void:
 	if not probe.has_method("pickup_buffer"):
 		check(false, "撃破から報酬の生成までネイティブランが所有する")
 	else:
-		for mode in ["touch", "pierce", "bounce", "kill", "collect", "controls_locked", "encounter_protected", "no_hitstop"]:
+		for mode in ["touch", "pierce", "bounce", "kill", "collect", "controls_locked", "encounter_protected", "no_hitstop", "scaled", "elite"]:
 			await compare_contacts(comparison, mode)
 		for mode in ["normal", "rehit", "bounce", "stop_input"]: await compare_frames(comparison, mode)
 	print("[native_combat] failed=%d" % failed)
@@ -40,7 +40,14 @@ func compare_contacts(comparison, mode: String) -> void:
 		run.cfg.drop_max = 1.0
 		run.cfg.gem_max = 1
 	var definition: EnemyDef = run.enemies.def_of(&"drifter").duplicate(true)
-	definition.hp = 6 if mode in ["kill", "collect", "no_hitstop"] else 1000
+	if mode in ["scaled", "elite"]:
+		if mode == "scaled": definition.id = &"scalable"
+		definition.radius = 27.3
+		run.cfg.enemy_hp_mult = 1.137
+		run.cfg.enemy_armor_mult = 1.231
+		run.cfg.character_scale = 0.713
+		run.cfg.base_attack = 100000.0
+	definition.hp = 6 if mode in ["kill", "collect", "no_hitstop", "scaled", "elite"] else 1000
 	definition.armor = 1000 if mode == "bounce" else 2
 	var core = comparison.create_native()
 	check(core.configure(DATA.compile_enemy(definition, run.cfg)), "接触用の敵を準備する")
@@ -59,12 +66,21 @@ func compare_contacts(comparison, mode: String) -> void:
 		run.state.hitstop_enabled = false
 		check(core.set_run_guards({"hitstop_enabled": false}), "停止演出を無効にする")
 	var p := run.state.ship_pos
+	if mode in ["scaled", "elite"]:
+		var before_rng = core.inspect().rng_state
+		check(core.spawn_enemy(definition.id, p, {NodePath("size"): NAN}) == -1, "文字列以外の設定キーを拒否する")
+		check(core.spawn_enemy(definition.id, p, {"size": NAN}) == -1 and core.spawn_enemy(definition.id, p, {"size": 0.0}) == -1, "不正な大きさを受け付けない")
+		check(core.enemies_snapshot().is_empty() and core.inspect().rng_state == before_rng, "拒否した出現で個体・乱数を進めない")
 	var positions := [Vector2(0, 40), Vector2(0, 40), Vector2(0, 10), Vector2(300, 0)]
 	if mode == "kill":
 		for i in 64: positions.append(Vector2(0, 40))
 	for offset in positions:
-		run.enemies.spawn(definition, p + offset)
-		core.spawn_enemy(&"drifter", p + offset)
+		var options := {}
+		if mode in ["scaled", "elite"]: options = {"elite": offset.y != 10, "vel": Vector2(12,-7), "size": definition.radius * (1.137 if offset.x == 0 else 0.853), "facing": 0.37}
+		run.enemies.spawn(definition, p + offset, options)
+		if options.is_empty(): core.spawn_enemy(definition.id, p + offset)
+		else: core.spawn_enemy(definition.id, p + offset, options)
+	check(comparison.difference(comparison.snapshot(run, [], 0).enemies, core.enemies_snapshot()).is_empty(), "出現時の個体の大きさ・強さ・向きが一致する: " + mode)
 	run.combat.rebuild_grid()
 	core.rebuild_enemy_grid(run.cfg.grid_cell)
 	run.state.events.clear()
@@ -214,5 +230,5 @@ func check_buffers(core, run: RunSimulation, definition: EnemyDef) -> void:
 	for i in table.alive.size():
 		if table.alive[i] != 0 and table.dead[i] == 0:
 			reference.add(table.pos[i], table.facing[i]+PI/2.0, table.r[i]*scale, Color(1 if table.flash[i] > 0 else 0, 0, 0, 1))
-	check(core.enemy_buffer(&"drifter", scale, PI/2.0) == reference._buf.slice(0, reference._count * InstanceBatch.STRIDE), "敵の命中フラッシュと死亡の表示データが一致する")
+	check(core.enemy_buffer(definition.id, scale, PI/2.0) == reference._buf.slice(0, reference._count * InstanceBatch.STRIDE), "敵の命中フラッシュと死亡の表示データが一致する")
 	reference.free()

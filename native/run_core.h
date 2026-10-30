@@ -24,7 +24,7 @@ class SpeedRunCore : public RefCounted {
         Vector2 pos, vel;
         double hp = 0.0, max_hp = 0.0, radius = 0.0, armor = 0.0, xp = 0.0, speed = 0.0;
         double facing = 0.0, age = 0.0, fire_t = 0.0;
-        bool alive = false, dead = false;
+        bool alive = false, dead = false, elite = false;
         double hit_cd = 0, flash = 0;
         int64_t dash_seen = -1;
         bool dash_fresh = false;
@@ -212,7 +212,7 @@ public:
     Dictionary draw_snapshot() const;
     bool start(int64_t seed, int64_t first_id = 1, int64_t first_gem_seq = 0);
     bool set_motion_context(Vector2 ship, Vector2 center, Vector2 half);
-    int64_t spawn_enemy(StringName type, Vector2 position);
+    int64_t spawn_enemy(StringName type, Vector2 position, const Dictionary &options);
     bool remove_enemy(int64_t id);
     Array enemies_snapshot() const;
     bool rebuild_enemy_grid(double cell_size);

@@ -16,6 +16,10 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig) -> Dictionar
 		"color": [definition.color.r, definition.color.g, definition.color.b, definition.color.a],
 		"xp": definition.xp, "knockback": definition.knockback_scale(config),
 		"hitstop_multiplier": definition.hitstop_multiplier}
+	row.scaling = {"radius": definition.radius, "hp": definition.base_hp(config), "armor": definition.armor,
+		"hp_mult": config.enemy_hp_mult, "armor_mult": config.enemy_armor_mult, "character": config.character_scale,
+		"visual": definition.visual_value("scale", 1.0), "collision": definition.visual_value("collision_scale", 1.0),
+		"fixed_sprite": definition.id in EnemyDef.NATIVE_SPRITES}
 	for key in ["hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"]:
 		if not is_finite(float(row[key])) or float(row[key]) < 0.0:
 			return {}

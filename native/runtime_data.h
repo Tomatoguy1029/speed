@@ -11,6 +11,11 @@ struct EnemyDefinition {
     enum class Kind { Chase, Shield } kind = Kind::Chase;
     double accel = 0, turn = 0, weak_arc = 0;
     double front_arc = 0, reflect_speed = 0, reflect_life = 0, reflect_damage = 0, reflect_interval = 0, shield_time = 0;
+    struct Scaling {
+        bool ready = false, fixed_sprite = false;
+        double radius = 0, hp = 0, armor = 0, hp_mult = 1, armor_mult = 1;
+        double character = 1, visual = 1, collision = 1;
+    } scaling;
     double hp = 0.0;
     double armor = 0.0;
     double radius = 0.0;

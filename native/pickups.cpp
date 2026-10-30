@@ -74,7 +74,8 @@ void SpeedRunCore::drop_enemy_pickups(const Enemy &enemy) {
     const double value = enemy.xp * c.xp_mult * (c.xp_bonus > 0 ? c.xp_bonus : 1.0);
     xp_dropped += value;
     drop_gem(enemy.pos, value);
-    if (rng->randf() < 0.03) {
+    const int64_t coin_count = enemy.elite ? 3 + rng->randi_range(0, 3) : (rng->randf() < 0.03 ? 1 : 0);
+    for (int64_t k = 0; k < coin_count; ++k) {
         const double angle = rng->randf() * (2.0 * Math_PI);
         const double share = rng->randf();
         const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * enemy.radius, true, false};

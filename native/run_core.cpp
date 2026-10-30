@@ -46,7 +46,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("start", "seed", "first_id", "first_gem_seq"), &SpeedRunCore::start, DEFVAL(1), DEFVAL(0));
     ClassDB::bind_method(D_METHOD("step", "delta"), &SpeedRunCore::step);
     ClassDB::bind_method(D_METHOD("set_motion_context", "ship", "center", "half"), &SpeedRunCore::set_motion_context);
-    ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position"), &SpeedRunCore::spawn_enemy);
+    ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position", "options"), &SpeedRunCore::spawn_enemy, DEFVAL(Dictionary()));
     ClassDB::bind_method(D_METHOD("remove_enemy", "id"), &SpeedRunCore::remove_enemy);
     ClassDB::bind_method(D_METHOD("enemies_snapshot"), &SpeedRunCore::enemies_snapshot);
     ClassDB::bind_method(D_METHOD("rebuild_enemy_grid", "cell_size"), &SpeedRunCore::rebuild_enemy_grid);
@@ -212,6 +212,19 @@ bool SpeedRunCore::configure(const Dictionary &data) {
             if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
             def.color[k] = double(value);
         }
+        if (row.has("scaling")) {
+            if (row["scaling"].get_type() != Variant::DICTIONARY) return false;
+            const Dictionary source = row["scaling"];
+            const char *keys[] = {"radius", "hp", "armor", "hp_mult", "armor_mult", "character", "visual", "collision"};
+            double *values[] = {&def.scaling.radius, &def.scaling.hp, &def.scaling.armor, &def.scaling.hp_mult, &def.scaling.armor_mult, &def.scaling.character, &def.scaling.visual, &def.scaling.collision};
+            for (int k = 0; k < 8; ++k) {
+                const Variant value = source.get(keys[k], Variant());
+                if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value)) || double(value) < 0) return false;
+                *values[k] = value;
+            }
+            if (def.scaling.radius <= 0 || source.get("fixed_sprite", Variant()).get_type() != Variant::BOOL) return false;
+            def.scaling.fixed_sprite = source["fixed_sprite"]; def.scaling.ready = true;
+        }
         parsed.push_back(def);
     }
     definitions = std::move(parsed);
@@ -227,21 +240,57 @@ bool SpeedRunCore::set_motion_context(Vector2 ship, Vector2 center, Vector2 half
     return true;
 }
 
-int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position) {
+int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dictionary &options) {
     if (!started || closed || !position.is_finite() || next_id == INT64_MAX) return -1;
     size_t definition = 0;
     while (definition < definitions.size() && definitions[definition].id != type) ++definition;
     if (definition == definitions.size()) return -1;
-    size_t row = enemies.size();
-    if (free_rows.empty()) enemies.emplace_back();
-    else { row = free_rows.back(); free_rows.pop_back(); }
     Enemy enemy;
-    enemy.id = next_id++;
+    const Array keys = options.keys();
+    for (int i = 0; i < keys.size(); ++i) {
+        if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return -1;
+        const String key = keys[i];
+        if (key != "elite" && key != "size" && key != "facing" && key != "vel") return -1;
+    }
+    if (options.has("elite") && options["elite"].get_type() != Variant::BOOL) return -1;
+    enemy.elite = options.get("elite", false);
+    if (options.has("facing")) {
+        const Variant facing = options["facing"];
+        if ((facing.get_type() != Variant::FLOAT && facing.get_type() != Variant::INT) || !std::isfinite(double(facing))) return -1;
+        enemy.facing = facing;
+    }
+    if (options.has("vel")) {
+        if (options["vel"].get_type() != Variant::VECTOR2 || !Vector2(options["vel"]).is_finite()) return -1;
+        enemy.vel = options["vel"];
+    }
     enemy.definition = definition;
     enemy.pos = position;
     const auto &def = definitions[definition];
     enemy.hp = enemy.max_hp = def.hp;
     enemy.radius = def.radius; enemy.armor = def.armor; enemy.xp = def.xp; enemy.speed = def.speed;
+    if ((options.has("size") || enemy.elite) && !def.scaling.ready) return -1;
+    if (def.scaling.ready) {
+        const auto &s = def.scaling;
+        double size = s.radius;
+        if (options.has("size")) {
+            const Variant value = options["size"];
+            if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value)) || double(value) <= 0) return -1;
+            size = value;
+        }
+        const double z = size / s.radius;
+        double radius = size * (enemy.elite ? 1.25 : 1.0);
+        if (s.fixed_sprite) radius = s.radius;
+        radius *= s.character;
+        enemy.radius = radius * s.visual * s.collision;
+        enemy.hp = enemy.max_hp = s.hp * z * z * s.hp_mult * (enemy.elite ? 3.0 : 1.0);
+        enemy.armor = s.armor * z * s.armor_mult * (enemy.elite ? 1.3 : 1.0);
+        enemy.xp = def.xp * z * (enemy.elite ? 4.0 : 1.0);
+        for (double value : {enemy.radius, enemy.hp, enemy.armor, enemy.xp}) if (!std::isfinite(value)) return -1;
+    }
+    size_t row = enemies.size();
+    if (free_rows.empty()) enemies.emplace_back();
+    else { row = free_rows.back(); free_rows.pop_back(); }
+    enemy.id = next_id++;
     enemy.fire_t = definitions[definition].fire_interval * (0.5 + rng->randf() * 0.5);
     enemy.alive = true;
     enemies[row] = enemy;

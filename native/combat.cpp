@@ -92,7 +92,7 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
         killed["pos"] = enemy.pos; killed["r"] = enemy.radius; killed["crit"] = crit;
         killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = world_time;
         killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
-        killed["elite"] = false; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
+        killed["elite"] = enemy.elite; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
         emit_event("kill", killed);
         drop_enemy_pickups(enemy);
     } else if (def.knockback > 0) {
