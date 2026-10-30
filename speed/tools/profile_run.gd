@@ -40,6 +40,10 @@ var attacked := false
 var timeline: Array = []
 var last_totals: Dictionary = {}
 var phase_trace: Array = []
+var mix_types: Array[StringName] = []
+var mix_cursor := 0
+var startup_us := 0
+var ready_us := 0
 
 class FrameEnd extends Node:
 	var recorder: Node
@@ -47,6 +51,7 @@ class FrameEnd extends Node:
 		recorder._mark(&"process_end")
 
 func _ready() -> void:
+	startup_us = Time.get_ticks_usec()
 	for arg in OS.get_cmdline_user_args():
 		var parts := arg.trim_prefix("--").split("=", false, 1)
 		if parts.size() == 2:
@@ -63,6 +68,11 @@ func _ready() -> void:
 	add_child(session)
 	if session.sim.state == null: await session.started
 	run = session.sim
+	ready_us = Time.get_ticks_usec()
+	if not _prepare_mix():
+		push_error("混成条件の敵ID・比率・体数を確認してください")
+		get_tree().quit(1)
+		return
 	render = session.view.get_node("RunPresentation")
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -102,6 +112,8 @@ func _ready() -> void:
 	run.input.set_process_input(false)
 	run.input.set_process_unhandled_input(false)
 	run.state.time = float(options.get("time", "10"))
+	if options.get("bonus", "off") == "on":
+		run._enter_bonus()
 	if options.has("enemies"):
 		_spawn_enemies(int(options.enemies))
 	if options.get("levels", "on") == "off":
@@ -171,7 +183,8 @@ func _ready() -> void:
 	measuring = true
 	print("PROFILE_BEGIN ", JSON.stringify({"options": options, "window": str(DisplayServer.window_get_size()),
 		"viewport": str(get_viewport().get_visible_rect().size), "texture": str(get_viewport().get_texture().get_size()),
-		"field_seed": 1029,
+		"field_seed": 1029, "session_ready_ms": (ready_us - startup_us) / 1000.0,
+		"bonus_remaining": run.state.bonus_t,
 		"sparks_size": str(render.pipeline.sparks._image_size), "gpu_sparks": render.pipeline.sparks.available(),
 		"renderer": RenderingServer.get_current_rendering_method(), "physics_hz": Engine.physics_ticks_per_second,
 		"world_tick_div": run.cfg.world_tick_div, "max_fps": Engine.max_fps,
@@ -234,7 +247,7 @@ func _process(_delta: float) -> void:
 		"canvas_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
 		"draw_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW),
 		"specialization_compiles": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION),
-		"run_clock": run.state.time, "world_clock": run.state.world_time,
+		"run_clock": run.state.time, "world_clock": run.state.world_time, "bonus_remaining": run.state.bonus_t,
 		"enemy_capacity": run.enemies.slots.capacity(),
 		"enemies": run.enemies.count(), "hostile": run.projectiles.hostile_count(),
 		"objects": Performance.get_monitor(Performance.OBJECT_COUNT), "nodes": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
@@ -396,13 +409,19 @@ func _summary(result: Dictionary) -> String:
 
 ## 画面内に n 体の敵を出す。--type=ID ならその種類だけ、なければ試せる種類から無作為に選ぶ。
 func _spawn_enemies(n: int) -> void:
-	if not options.has("type"):
+	if not options.has("type") and mix_types.is_empty():
 		run.command(&"debug_spawn_enemies", {"count": n})
 		return
-	var def := run.enemies.def_of(StringName(options.type))
-	assert(def != null, "--type の敵が見つからない")
+	var def := run.enemies.def_of(StringName(options.get("type", "")))
+	assert(def != null or not mix_types.is_empty(), "--type の敵が見つからない")
 	var view := run.state.view_rect()
+	var target := run.enemies.count() + n
 	for k in n:
+		if not mix_types.is_empty() and run.enemies.count() >= target:
+			break
+		if not mix_types.is_empty():
+			def = run.enemies.def_of(mix_types[mix_cursor % mix_types.size()])
+			mix_cursor += 1
 		var pos := Vector2(run.state.rng.randf_range(view.position.x, view.end.x),
 			run.state.rng.randf_range(view.position.y, view.end.y))
 		run.enemies.spawn(def, pos, {"facing": (run.state.ship_pos - pos).angle()})
@@ -480,3 +499,24 @@ func _old_body_hit(p0: Vector2, p1: Vector2, radius: float) -> Variant:
 			earliest = t
 			found = {"body": b, "t": t, "point": p0.lerp(p1, t)}
 	return found
+
+## 混成比率を生成前に検証する。補充でも比率の途中位置を引き継ぐ。
+func _prepare_mix() -> bool:
+	mix_types.clear()
+	mix_cursor = 0
+	if not options.has("mix"):
+		return true
+	if options.has("type") or not options.has("enemies") or int(options.enemies) <= 0:
+		return false
+	var parsed: Array[StringName] = []
+	for item in String(options.mix).split(",", false):
+		var pair := item.split(":")
+		if pair.size() != 2 or not pair[1].is_valid_int():
+			return false
+		var weight := int(pair[1])
+		if weight <= 0 or weight > 100 or run.enemies.def_of(StringName(pair[0])) == null:
+			return false
+		for k in weight:
+			parsed.append(StringName(pair[0]))
+	mix_types = parsed
+	return not mix_types.is_empty()
