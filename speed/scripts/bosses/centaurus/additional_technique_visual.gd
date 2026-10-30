@@ -102,11 +102,16 @@ static func draw_powder(canvas: CanvasItem, center: Vector2, radius: float, age:
 		var q := fposmod(sin(j * 127.1 + seed) * 43758.5453, 1.0)
 		var u := fposmod(sin(j * 269.5 + seed + 3.0) * 21563.734, 1.0)
 		var cycle := fposmod(age * (0.8 + q * 0.5) + u, 1.0)
-		var blink := pow(maxf(0.0, sin(cycle * PI)), 1.5) * strength
+		var variation := fposmod(sin(j * 91.7 + seed + 8.0) * 19463.17, 1.0)
+		var blink := pow(maxf(0.0, sin(cycle * PI)), 2.0 + variation * 2.0) * strength
 		var at := center + scatter(seed, j) * radius * 0.85 - Vector2(0, (1.0 - cycle) * 26.0)
-		# 矢じりを持たない短い落下線。縮小時も星より太く、実際の矢より短くする。
-		var length := (10.0 + q * 5.0) * pixel
-		var tip := at - Vector2(0, length)
-		canvas.draw_line(tip, at, Color(0.06, 0.03, 0.01, blink * 0.7), 4.5 * pixel)
-		canvas.draw_line(tip, at, Color(GOLD, blink * 0.22), 4.0 * pixel)
-		canvas.draw_line(tip, at, Color(1.0, 0.72, 0.28, blink * 0.9), 2.0 * pixel)
+		# 粒ごとに長さ・太さ・輝きを変え、尾へ向けて細く薄くする。
+		var length := (5.0 + q * 10.0) * pixel
+		var width := (0.65 + u * 0.8) * pixel
+		var opacity := blink * (0.25 + variation * 0.35)
+		var tail := at - Vector2((u - 0.5) * 2.0 * pixel, length)
+		for segment in 4:
+			var f := float(segment + 1) / 4.0
+			var a := tail.lerp(at, float(segment) / 4.0)
+			var b := tail.lerp(at, f)
+			canvas.draw_line(a, b, Color(GOLD, opacity * f * f), width * (0.3 + f * 0.7), true)

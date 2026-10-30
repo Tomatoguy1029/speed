@@ -30,7 +30,11 @@ func _draw() -> void:
 		var from := to_local(mouth)
 		var color := DANGER if actor.alerting else WARNING
 		for offset in actor.power_offsets():
-			var end := to_local(mouth + Vector2.from_angle(actor.power_aim_angle() + offset) * reach)
+			var endpoint := mouth + Vector2.from_angle(actor.power_aim_angle() + offset) * reach
+			# 固定した射線は動かさず、今の自機に遮られる部分だけを切る。
+			var hit := Geom.seg_circle_t(mouth, endpoint, actor.run_state.ship_pos, actor.ctx.cfg.ship_radius)
+			if hit >= 0.0: endpoint = mouth.lerp(endpoint, hit)
+			var end := to_local(endpoint)
 			draw_line(from, end, Color(color, 0.12), 8.0)
 			draw_line(from, end, Color(color, 0.95 if actor.alerting else 0.6), 2.0)
 			draw_line(from, end, Color(1.0, 0.75 if actor.alerting else 0.95, 0.6, 0.8), 0.8)
