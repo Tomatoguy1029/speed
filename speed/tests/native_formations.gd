@@ -18,18 +18,21 @@ func _ready() -> void:
 	if not core.has_method("spawn_formation"):
 		check(false, "生成済みの群れをネイティブが配置する")
 	else:
-		await compare_formations(comparison, core)
+		for base_speed in [100.0,600.0]:
+			var condition = comparison.create_native()
+			await compare_formations(comparison, condition, base_speed)
+			condition.close()
 	core.close()
 	print("[native_formations] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_formations(comparison, core) -> void:
+func compare_formations(comparison, core, base_speed: float) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed": 822, "empty": true})
 	var run: RunSimulation = lab.run
 	run.field.bodies.clear()
 	run.field.battle_arenas.clear()
-	run.cfg.base_max_speed = 100.0
+	run.cfg.base_max_speed = base_speed
 	run.ship.setup(run.ship.ctx)
 	var data := DATA.compile_enemy(run.enemies.def_of(&"drifter"), run.cfg, run.state.stage)
 	data.enemies.append_array(DATA.compile_enemy(run.enemies.def_of(&"shield"), run.cfg, run.state.stage).enemies)
@@ -72,8 +75,8 @@ func compare_formations(comparison, core) -> void:
 		if tick == 33: entry = 999
 		var types: Array = [&"shield"] if tick%4 == 0 else []
 		if tick == 11: types = [&"未選択"]
-		if tick == 0: check(run.state.ship_vel.length() <= 40.0, "低速時の機体の向きを使う条件を通る")
-		if tick == 20: check(run.state.ship_vel.length() > 40.0, "速度から向きを求める条件を通る")
+		if tick == 0 and base_speed == 100.0: check(run.state.ship_vel.length() <= 40.0, "低速時の機体の向きを使う条件を通る")
+		if tick == 0 and base_speed == 600.0: check(run.state.ship_vel.length() > 40.0, "速度から向きを求める条件を通る")
 		var value := -1.0 if tick%3 == 0 else 0.0 if tick%3 == 1 else 2.7
 		var priority: Variant = null if tick%2 == 0 else 0.0
 		var managed: Variant = null if tick%2 == 0 else false
