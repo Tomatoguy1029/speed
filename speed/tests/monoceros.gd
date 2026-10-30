@@ -266,7 +266,7 @@ func _ready() -> void:
 	check(actor.phase == 1 and not actor.phase_pending and actor.mode == &"idle", "再生成で攻撃・形態・角刺さりをリセットする")
 	actor._cooldown = 0.0
 	var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
-	check(not candidates.is_empty() and candidates.all(func(c): return c.id != "lance"), "第1形態の候補に第2形態専用技を混ぜない")
+	check(not candidates.is_empty() and candidates.all(func(c): return c.id not in ["lance", "sword_flash", "horn_dance"]), "第1形態の候補に第2形態専用技を混ぜない")
 	step(0.1)
 	check(actor.flow_runner.active and actor.flow_runner.stamina < actor.flow_runner.flow.maximum_stamina, "共通フローの抽選で技を開始しスタミナを消費する")
 	actor.begin_final_strike(1.0)
@@ -395,12 +395,12 @@ func capture() -> void:
 	label.position = Vector2(24,130)
 	label.add_theme_font_size_override("font_size",24)
 	layer.add_child(label)
-	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance",&"horn_wave"]
+	var stage_names := [&"charge",&"sweep",&"kick",&"return_charge",&"lance",&"horn_wave",&"sword_flash",&"horn_dance"]
 	for tech in stage_names:
 		fresh()
-		actor.phase = 2 if tech==&"lance" else 1
+		actor.phase = 2 if tech in [&"lance", &"sword_flash", &"horn_dance"] else 1
 		actor._apply_phase()
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech in [&"sweep", &"sword_flash"] else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		for frame in 170:

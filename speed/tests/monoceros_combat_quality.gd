@@ -118,7 +118,7 @@ func _ready() -> void:
 				var selected := String(actor.flow_runner.last[0].id) if not actor.flow_runner.last.is_empty() else ""
 				chosen[selected] = int(chosen.get(selected,0))+1
 				check(candidates.has(selected), "成立した候補から技を選ぶ")
-				if context == "front": check(selected == "sweep", "正面近接には薙ぎを使う")
+				if context == "front": check(selected in (["sweep", "sword_flash"] if phase == 2 else ["sweep"]), "正面近接には形態に応じた斬撃を使う")
 				if context == "rear": check(candidates.has("kick") and selected in ["kick", "sweep"], "背後近接では蹴りと踏み込み薙ぎから選ぶ")
 				if context == "middle": check(candidates.has("charge") and candidates.has("return_charge"), "中距離は複数の突進を候補に保つ")
 				if context == "middle" and phase == 2: check(candidates.has("lance"), "第2形態の中距離へ槍を加える")
@@ -131,7 +131,7 @@ func _ready() -> void:
 					actor.selection_enabled = true
 					actor.flow_runner.index = 2
 					actor.flow_runner.tick(DT, {}, actor.flow_adapter)
-					check(not actor.flow_runner.last.is_empty() and actor.flow_runner.last[0].id == "lance", "第2形態の大技区間は槍を選べる")
+					check(not actor.flow_runner.last.is_empty() and actor.flow_runner.last[0].id in ["lance", "horn_dance"], "第2形態の大技区間は槍か乱舞を選べる")
 	fresh(Vector2(-180,0),Vector2.ZERO,1,0.0)
 	actor._cooldown = 0.0
 	actor.cooldowns[&"kick"] = actor.clock+9.0
