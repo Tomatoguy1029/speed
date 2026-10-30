@@ -6,6 +6,8 @@ using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
+    ClassDB::bind_method(D_METHOD("configure_pickups", "config", "stats"), &SpeedRunCore::configure_pickups);
+    ClassDB::bind_method(D_METHOD("pickups_snapshot"), &SpeedRunCore::pickups_snapshot);
     ClassDB::bind_method(D_METHOD("configure_combat", "config", "stats"), &SpeedRunCore::configure_combat);
     ClassDB::bind_method(D_METHOD("collide_ship", "from", "radius"), &SpeedRunCore::collide_ship);
     ClassDB::bind_method(D_METHOD("combat_snapshot"), &SpeedRunCore::combat_snapshot);
@@ -18,7 +20,7 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("step_draw", "real_dt"), &SpeedRunCore::step_draw);
     ClassDB::bind_method(D_METHOD("world_scale"), &SpeedRunCore::world_scale);
     ClassDB::bind_method(D_METHOD("draw_snapshot"), &SpeedRunCore::draw_snapshot);
-    ClassDB::bind_method(D_METHOD("start", "seed", "first_id"), &SpeedRunCore::start, DEFVAL(1));
+    ClassDB::bind_method(D_METHOD("start", "seed", "first_id", "first_gem_seq"), &SpeedRunCore::start, DEFVAL(1), DEFVAL(0));
     ClassDB::bind_method(D_METHOD("step", "delta"), &SpeedRunCore::step);
     ClassDB::bind_method(D_METHOD("set_motion_context", "ship", "center", "half"), &SpeedRunCore::set_motion_context);
     ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position"), &SpeedRunCore::spawn_enemy);
@@ -31,9 +33,11 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("inspect"), &SpeedRunCore::inspect);
 }
 
-bool SpeedRunCore::start(int64_t seed, int64_t first_id) {
-    if (started || closed || first_id <= 0) return false;
+bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) {
+    if (started || closed || first_id <= 0 || first_gem_seq < 0) return false;
+    if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
     next_id = first_id;
+    next_gem_seq = first_gem_seq;
     rng.instantiate();
     rng->set_seed(seed);
     started = true;
@@ -79,6 +83,7 @@ void SpeedRunCore::close() {
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
+    gems.clear(); coins.clear(); free_gems.clear(); gem_queue.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {

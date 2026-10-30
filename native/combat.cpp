@@ -78,6 +78,7 @@ void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, boo
         killed["enemy_type"] = def.id; killed["meteor_index"] = -1; killed["facing"] = enemy.facing;
         killed["elite"] = false; killed["cause"] = cause; killed["dir"] = direction; killed["color"] = def.color;
         emit_event("kill", killed);
+        drop_enemy_pickups(enemy);
     } else if (def.knockback > 0) {
         const double mass = std::max(1.0, def.radius / 20.0);
         enemy.vel += direction * 160.0 * def.knockback / mass;

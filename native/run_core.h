@@ -81,6 +81,23 @@ class SpeedRunCore : public RefCounted {
     Array events;
     void emit_event(StringName type, Dictionary data = Dictionary());
     void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction);
+    struct PickupConfig {
+        int64_t gem_max = 0;
+        double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
+        std::vector<double> xp, start_weights, end_weights;
+    } pickup_config;
+    struct Gem { Vector2 pos; double value = 0; int64_t seq = 0; bool alive = false, pulled = false; };
+    struct Coin { Vector2 pos; bool alive = true, pulled = false; };
+    std::vector<Gem> gems;
+    std::vector<Coin> coins;
+    std::vector<size_t> free_gems;
+    std::vector<std::pair<size_t, int64_t>> gem_queue;
+    size_t gem_queue_head = 0;
+    int64_t next_gem_seq = 0, live_gems = 0;
+    double xp_dropped = 0;
+    bool pickups_ready = false;
+    void drop_enemy_pickups(const Enemy &enemy);
+    void drop_gem(Vector2 position, double value);
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -93,6 +110,8 @@ public:
     bool configure_ship(const Dictionary &config, const Dictionary &stats);
     bool step_ship(double real_dt, double world_dt, const Dictionary &input);
     Dictionary ship_snapshot() const;
+    bool configure_pickups(const Dictionary &config, const Dictionary &stats);
+    Dictionary pickups_snapshot() const;
     bool configure_combat(const Dictionary &config, const Dictionary &stats);
     bool collide_ship(Vector2 from, double radius);
     Dictionary combat_snapshot() const;
@@ -102,7 +121,7 @@ public:
     bool step_draw(double real_dt);
     double world_scale() const;
     Dictionary draw_snapshot() const;
-    bool start(int64_t seed, int64_t first_id = 1);
+    bool start(int64_t seed, int64_t first_id = 1, int64_t first_gem_seq = 0);
     bool set_motion_context(Vector2 ship, Vector2 center, Vector2 half);
     int64_t spawn_enemy(StringName type, Vector2 position);
     bool remove_enemy(int64_t id);
