@@ -84,11 +84,4 @@ func _draw_rain() -> void:
 		var at := origin.lerp(target, f * f)
 		var opacity := clampf(t / maxf(minf(float(r.fade), 0.05), 0.001), 0.0, 1.0)
 		if t > fall + linger: opacity *= clampf(1.0 - (t - fall - linger) / CentaurusBoss.RAIN_OUT, 0.0, 1.0)
-		var scene: PackedScene = r.get("shot_visual")
-		var shot_tint: Color = EFFECT_SETTINGS.values_for(scene.resource_path).get("effect_tint", Color.WHITE) if scene != null else Color.WHITE
-		var library: Resource = actor.ctx.resources.resources.get("res://.content/attack_visuals.res")
-		var mesh: Mesh = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight") if library != null and scene != null else null
-		var sprites: Array = library.get_meta("looks", {}).get(scene.resource_path, {}).get("Flight_sprites", []) if library != null and scene != null else []
-		if mesh != null: draw_mesh(mesh, null, Transform2D(angle, Vector2.ONE * 2.5, 0.0, at), Color(1, 1, 1, opacity) * shot_tint)
-		for piece: Dictionary in sprites: draw_mesh(piece.mesh, piece.texture, Transform2D(angle, Vector2.ONE * 2.5, 0.0, at), Color(1, 1, 1, opacity) * shot_tint)
-		if mesh == null and sprites.is_empty(): LIGHT_ARROW.draw_arrow(self, at, angle, 18.0, false, actor.clock, opacity, shot_tint, 150.0)
+		RAIN_VISUAL.draw_rain_arrow(self, actor, at, angle, opacity)

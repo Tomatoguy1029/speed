@@ -22,13 +22,18 @@ extends BossTechnique
 	set(value):
 		rain_time = value
 		_values_dirty = true
+## 着弾した矢を表示だけ残す時間（秒）
+@export_range(0, 100000, 0.01) var linger := 0.6:
+	set(value):
+		linger = value
+		_values_dirty = true
 ## 円の半径（距離）
 @export_range(0, 100000, 0.01) var radius := 44.0:
 	set(value):
 		radius = value
 		_values_dirty = true
 ## 円の数
-@export_range(0, 100000, 1) var count := 10:
+@export_range(0, 100000, 1) var count := 6:
 	set(value):
 		count = value
 		_values_dirty = true

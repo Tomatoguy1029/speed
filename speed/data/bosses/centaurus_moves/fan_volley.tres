@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1")
 technique = &"fan_volley"
-display_name = "一斉射撃"
+display_name = "扇状連射"
 category = &"major"
 track_during_warn = true
 warn = 0.9
