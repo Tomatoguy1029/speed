@@ -14,6 +14,10 @@ turn = 2.4
 xp = 120.0
 weak_arc = 0.0
 params = {
+"path_cos": 0.4,
+"path_min": 350.0,
+"path_max": 1100.0,
+"path_hold": 1.2,
 "initial_wait": 1.2,
 "entrance_time": 1.4,
 "keep_min": 700.0,
@@ -29,6 +33,10 @@ params = {
 "leap_distance": 320.0,
 "leap_time": 0.35,
 "leap_cd": 4.0,
+"sail_guard_speed": 330.0,
+"sail_guard_min": 0.7,
+"sail_guard_max": 1.1,
+"sail_guard_wobble": 26.0,
 "guard_count": 8,
 "guard_refill": 0.6,
 "guard_search": 800.0,

@@ -1,0 +1,31 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/arrow_shower.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/bosses/centaurus/arrow_shower_visual.tscn" id="visual"]
+
+[resource]
+script = ExtResource("1")
+technique = &"shower_path"
+display_name = "降り注ぐ矢（進む先を塞ぐ）"
+category = &"single"
+track_during_warn = false
+pattern = "path"
+warn = 0.6
+mark_time = 0.8
+linger = 0.6
+rain_time = 1.2
+radius = 40.0
+count = 9
+count_p2 = 9
+interval = 0.22
+lead = 0.5
+spacing = 72.0
+step = 0.08
+wall_ratio = 0.45
+wall_min = 140.0
+wall_max = 400.0
+ahead = 260.0
+damage = 14.0
+recover = 0.8
+cd = 5.0
+visual = ExtResource("visual")

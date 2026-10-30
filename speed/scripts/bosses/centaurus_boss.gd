@@ -24,6 +24,10 @@ var recovery := 0.0
 ## 強弓の発射直前の警告中か
 var alerting := false
 var cooldowns: Dictionary = {}
+var path_hold_time := 0.0
+var path_side := 1.0
+var sail_side := 1.0
+var sail_guards: Dictionary = {}
 var leap_ready_at := 0.0
 var leap_time := 0.0
 var leap_from := Vector2.ZERO
@@ -128,6 +132,7 @@ func _stop_combat() -> void:
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
 	clock += dt
+	_update_path_hold(dt)
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
 	turn_motion = 0.0
@@ -164,7 +169,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		if recovery <= 0.0:
 			mode = &"idle"
 			technique = &""
-	elif _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley"] and mode in [&"windup", &"rain", &"shooting", &"strike"]:
+	elif _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"] and mode in [&"windup", &"rain", &"shooting", &"strike", &"sail"]:
 		_runner.tick(self, dt)
 	elif mode == &"rain":
 		_rain_tick(dt)
@@ -193,13 +198,15 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 			elif _conditional_ready(&"stomp"):
 				start_attack(&"stomp")
+			elif path_hold_time >= float(def.params.path_hold) and _conditional_ready(&"shower_path"):
+				if start_attack(&"shower_path"): path_hold_time = 0.0
 			elif clock >= retreat_ready_at and _rules.has(&"shower_wall") and clock >= float(cooldowns.get(&"shower_wall", 0.0)) and table.pos[body].distance_to(run_state.ship_pos) < float(def.params.retreat_trigger):
 				_begin_retreat()
 			else:
 				_position_tick(dt)
 				if selection_enabled: flow_runner.tick(dt, {"player": run_state.enemy_aim}, flow_adapter)
 	table.charge[body] = clampf(timeline.current_animation_position / maxf(float(rule().get("warn", 1.0)), 0.001), 0.0, 1.0) if mode == &"windup" and timeline.is_playing() else 0.0
-	if mode == &"windup" and _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley"]:
+	if mode == &"windup" and _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"]:
 		table.charge[body] = clampf((clock - _runner.started_at) / maxf(float(rule().warn), 0.001), 0.0, 1.0)
 	_previous_ship = run_state.ship_pos
 	_sync_technique_visuals()
@@ -265,6 +272,7 @@ func can_select(attack: StringName, min_phase: int, min_range: float, max_range:
 	return distance >= min_range and distance <= max_range
 
 func start_attack(attack: StringName) -> bool:
+	if phase < 2 and attack in [&"shower_path", &"sail_run"]: return false
 	if mode != &"idle" or not _rules.has(attack): return false
 	var r: Dictionary = _rules[attack]
 	var length := _attack_length(attack, r)
@@ -306,9 +314,10 @@ func finish_technique() -> void:
 		_cue(&"recovery_started")
 
 func attack_playing() -> bool:
-	return mode in [&"windup", &"shooting", &"strike", &"rain", &"recovery", &"combo_gap"]
+	return mode in [&"windup", &"shooting", &"strike", &"rain", &"sail", &"recovery", &"combo_gap"]
 
 func cancel_attack() -> void:
+	_sail_guards(false)
 	combo_pending = &""
 	_support_runners.erase(technique)
 	_runner = null
@@ -317,7 +326,7 @@ func cancel_attack() -> void:
 	alerting = false
 	recovery = 0.0
 	technique = &""
-	if mode in [&"windup", &"shooting", &"strike", &"rain", &"recovery", &"combo_gap"]: mode = &"idle"
+	if mode in [&"windup", &"shooting", &"strike", &"rain", &"sail", &"recovery", &"combo_gap"]: mode = &"idle"
 
 # ── 射撃 ──────────────────────────────────────────────────
 
@@ -328,7 +337,9 @@ func _attack_length(attack: StringName, r: Dictionary) -> float:
 	var kind: StringName = _moves[attack].make_runner().kind()
 	if kind == &"arrow_shower":
 		var placement := maxi(0, int(r.count) - 1) * float(r.interval) if r.pattern == "chase" else maxi(0, int(r.count) - 1) * 0.5 * float(r.step)
+		if r.pattern == "path": placement = maxi(0, int(r.count) - 1) * float(r.step)
 		return float(r.warn) + placement + float(r.mark_time) + float(r.rain_time)
+	if kind == &"sail_run": return float(r.warn) + float(r.duration)
 	if kind == &"stomp": return float(r.warn) + float(r.active)
 	if kind == &"fan_volley": return float(r.warn) + maxi(0, int(r.shots) - 1) * float(r.interval)
 	if _moves[attack].make_runner().kind() == &"volley": return float(r.warn) + float(r.interval) * (int(r.count) - 1) + 0.05
@@ -505,7 +516,7 @@ func _sync_technique_visuals() -> void:
 	var elapsed := float(rule().get("recover", 0.0)) - recovery if mode == &"recovery" else timeline.current_animation_position if timeline.is_playing() else 0.0
 	var visual_phase := mode
 	var duration := float(rule().get(key, 1.0))
-	if _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley"] and mode in [&"windup", &"rain", &"shooting", &"strike"]:
+	if _runner_for().kind() in [&"arrow_shower", &"stomp", &"fan_volley", &"sail_run"] and mode in [&"windup", &"rain", &"shooting", &"strike", &"sail"]:
 		elapsed = clock - _runner.started_at
 		if mode != &"windup":
 			visual_phase = &"active"
@@ -521,7 +532,7 @@ func _spawn_guards() -> void:
 	var back := -Vector2.from_angle(table.facing[body])
 	for k in count:
 		var offset := (float(k) / maxf(count - 1, 1) - 0.5) * 2.2 if count > 1 else 0.0
-		ctx.enemies.spawn(guard, table.pos[body] + back.rotated(offset) * (table.r[body] + 70.0), {"facing": table.facing[body]})
+		_remember_sail_guard(ctx.enemies.spawn(guard, table.pos[body] + back.rotated(offset) * (table.r[body] + 70.0), {"facing": table.facing[body]}))
 	_guard_refill = float(def.params.guard_refill)
 
 func _refill_guards(dt: float) -> void:
@@ -539,7 +550,7 @@ func _refill_guards(dt: float) -> void:
 	var away := (table.pos[body] - run_state.ship_pos).normalized()
 	if away == Vector2.ZERO: away = -Vector2.from_angle(table.facing[body])
 	var at := table.pos[body] + away.rotated(run_state.rng.randf_range(-0.5, 0.5)) * 70.0
-	ctx.enemies.spawn(guard, at, {"facing": table.facing[body]})
+	_remember_sail_guard(ctx.enemies.spawn(guard, at, {"facing": table.facing[body]}))
 	_guard_refill = float(def.params.guard_refill)
 	_cue(&"guard_called")
 
@@ -573,3 +584,30 @@ func _leap_tick(dt: float) -> void:
 		_cue(&"leap_landed")
 		mode = &"idle"
 		start_attack(&"shower_wall")
+
+## 横切りが続いた世界時間。待機以外や条件から外れたら数え直す。
+func _update_path_hold(dt: float) -> void:
+	var offset := run_state.ship_pos - table.pos[body]
+	var speed := run_state.ship_vel.length()
+	var p := def.params
+	if phase < 2 or mode != &"idle" or speed < ctx.cfg.base_max_speed * ctx.cfg.steer_cruise * 0.5 or speed < 0.001 or offset.length() < float(p.path_min) or offset.length() > float(p.path_max) or absf(run_state.ship_vel.normalized().dot(offset.normalized())) >= float(p.path_cos):
+		path_hold_time = 0.0
+	else:
+		path_hold_time += dt
+
+## 自分が出した守る雑魚だけを覚える。行が再利用されてもIDが違えば操作しない。
+func _remember_sail_guard(row: int) -> void:
+	sail_guards[row] = {"id": table.id[row], "scale": run_state.rng.randf_range(float(def.params.sail_guard_min), float(def.params.sail_guard_max)), "phase": run_state.rng.randf_range(0.0, TAU)}
+
+func _sail_guards(active: bool) -> void:
+	var behavior = ctx.enemies.behavior(&"defender")
+	if behavior == null: return
+	for row: int in sail_guards.keys():
+		var guard: Dictionary = sail_guards[row]
+		if table.alive[row] == 0 or table.dead[row] != 0 or table.id[row] != int(guard.id):
+			sail_guards.erase(row)
+			continue
+		if active:
+			behavior.boost(row, float(def.params.sail_guard_speed) * float(guard.scale), float(def.params.sail_guard_wobble), run_state.world_time + float(rule().warn) + float(rule().duration), float(guard.phase))
+		else:
+			behavior.clear_boost(row)

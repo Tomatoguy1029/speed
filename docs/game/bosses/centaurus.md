@@ -160,7 +160,7 @@
 
 `scenes/bosses/centaurus_presentation.tscn` を差し替えて、役者の `presentation_scene` に指定する。シーンは `bind_centaurus(actor)` で以下を接続する。
 
-- `presentation_event`：登場、第2形態への移行、予告、発射前の警告、発射、矢の雨の開始と各トレースの開始、背後攻撃の当たりの開始、硬直、離脱、被弾、撃破、制限時間演出、守る雑魚の補充（`guard_called`）、降り注ぐ矢の射上げ・円の出現・降り始め（`shower_launched`・`shower_mark`・`shower_landed`）、跳び退きと着地（`leap`・`leap_landed`）、踏みつけの予告と当たり（`stomp_windup`・`stomp`）、扇状連射の予告と各発射（`fan_windup`・`fan_released`）。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。
+- `presentation_event`：帆走の予告・開始・発射・帆をたたむ合図（`sail_windup`・`sail_run`・`sail_shot`・`sail_folded`）、登場、第2形態への移行、予告、発射前の警告、発射、矢の雨の開始と各トレースの開始、背後攻撃の当たりの開始、硬直、離脱、被弾、撃破、制限時間演出、守る雑魚の補充（`guard_called`）、降り注ぐ矢の射上げ・円の出現・降り始め（`shower_launched`・`shower_mark`・`shower_landed`）、跳び退きと着地（`leap`・`leap_landed`）、踏みつけの予告と当たり（`stomp_windup`・`stomp`）、扇状連射の予告と各発射（`fan_windup`・`fan_released`）。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。
 - `presentation_advanced`：世界時間の進行。停止中はアニメーションも止まる。
 
 表現の方針：
@@ -172,7 +172,8 @@
 
 ## 7. 実装・調整・接続
 
-- 降り注ぐ矢は `techniques/arrow_shower.gd` と `centaurus_moves/shower_chase.tres`・`shower_wall.tres`、踏みつけは `techniques/stomp.gd` と `centaurus_moves/stomp.tres`、扇状連射は `techniques/fan_volley.gd` と `centaurus_moves/fan_volley.tres` に置く。技スクリプトの基点は `scripts/bosses/centaurus/`、保存値の基点は `data/bosses/`。
+- 降り注ぐ矢は `techniques/arrow_shower.gd` と `centaurus_moves/shower_chase.tres`・`shower_wall.tres`・`shower_path.tres`、踏みつけは `techniques/stomp.gd` と `centaurus_moves/stomp.tres`、扇状連射は `techniques/fan_volley.gd` と `centaurus_moves/fan_volley.tres` に置く。技スクリプトの基点は `scripts/bosses/centaurus/`、保存値の基点は `data/bosses/`。
+- 帆走の連射は `scripts/bosses/centaurus/techniques/sail_run.gd` と `data/bosses/centaurus_moves/sail_run.tres`、帆走の3動作は `data/visuals/centaurus_animation.tres` の `sail_windup`・`sail_run`・`sail_recovery` に置く。
 - 連携は `scripts/bosses/centaurus/techniques/combo_shower_shot.gd`・`combo_rain_volley.gd` と、同じIDの `data/bosses/centaurus_moves/*.tres` に置く。
 - 追加技の見た目は `scenes/bosses/centaurus/arrow_shower_visual.tscn`・`stomp_visual.tscn`・`fan_volley_visual.tscn` と `scripts/bosses/centaurus/additional_technique_visual.gd`、ポーズの差し替え口は `data/visuals/centaurus_animation.tres` に置く。
 

@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## 本体が連れて出て保つ守る雑魚の数。負数なら本体の設定を使う
 @export_range(-1, 40) var trial_defenders := 8
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "volley", "power_shot", "rain", "rear_attack", "shower_chase", "shower_wall", "stomp", "fan_volley", "combo_shower_shot", "combo_rain_volley", "leap") var trial_technique := "normal"
+@export_enum("normal", "volley", "power_shot", "rain", "rear_attack", "shower_chase", "shower_wall", "shower_path", "sail_run", "stomp", "fan_volley", "combo_shower_shot", "combo_rain_volley", "leap") var trial_technique := "normal"
 ## 有効なら、始めてすぐ帆を広げて第2形態へ移る
 @export var trial_phase_two := false
 
@@ -74,6 +74,7 @@ func _only(id: StringName) -> void:
 	var actor := session.run.bosses.actor as CentaurusBoss
 	if actor == null: return
 	_repeat_id = id
+	if id in [&"shower_path", &"sail_run"]: _phase_two()
 	actor.selection_enabled = false
 	actor.retreat_ready_at = INF
 	actor.leap_ready_at = INF

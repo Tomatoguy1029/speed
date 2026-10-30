@@ -57,7 +57,7 @@ extends BossTechnique
 	set(value):
 		spacing = value
 		_values_dirty = true
-## 壁の中心から外へ現れる時間差（秒）
+## 隣の円が現れる時間差（秒）。wallは中心から外、pathは端から順
 @export_range(0, 100000, 0.01) var step := 0.1:
 	set(value):
 		step = value
@@ -128,9 +128,12 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 			host.mode = &"rain"
 			host._cue(&"shower_launched")
 			if r.pattern == "path":
-				push_warning("進む先を塞ぐ降り注ぐ矢は第2段階で実装します")
-				host.finish_technique()
-				return
+				var direction := host.run_state.ship_vel.normalized() if host.run_state.ship_vel.length() >= 1.0 else host.run_state.ship_heading
+				var center := host.run_state.ship_pos + direction * float(r.ahead)
+				for j in int(r.count):
+					var offset := (j - (int(r.count) - 1) * 0.5) * host.path_side
+					_add_mark(center + direction.orthogonal() * offset * float(r.spacing), base + j * float(r.step))
+				host.path_side *= -1.0
 			if r.pattern == "wall":
 				var at := host.table.pos[host.body]
 				var toward := host.run_state.ship_pos - at

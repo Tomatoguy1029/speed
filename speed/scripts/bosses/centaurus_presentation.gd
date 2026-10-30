@@ -35,7 +35,7 @@ func bind_centaurus(owner_actor: CentaurusBoss) -> void:
 	z_index = 1
 
 func _event(event: Dictionary) -> void:
-	if event.cue in [&"released", &"fan_released"]: _parts.release_bow(float(actor.rule().get("interval", 0.4)))
+	if event.cue in [&"released", &"fan_released", &"sail_shot"]: _parts.release_bow(float(actor.rule().get("interval", 0.4)))
 	if event.cue == &"leap_landed": leap_ring = 0.3
 	if event.cue == &"hit": hit = 0.18
 	if event.cue in [&"alert", &"released", &"rain_started", &"phase_changed"]: pulse = 0.3
@@ -74,7 +74,12 @@ func sail_fraction() -> float:
 func _draw_sail(open: float) -> void:
 	if open <= 0.0: return
 	var half := 84.0 * open
-	var belly := 34.0 * open
+	var fullness := 1.0
+	if actor.technique == &"sail_run":
+		if actor.mode == &"windup": fullness += 0.6 * actor.table.charge[actor.body]
+		elif actor.mode == &"sail": fullness = 1.6
+		elif actor.mode == &"recovery": fullness += 0.6 * clampf(actor.recovery / maxf(float(actor.rule().recover), 0.001), 0.0, 1.0)
+	var belly := 34.0 * open * fullness
 	var yard := -14.0
 	var cloth := []
 	for j in 9:
