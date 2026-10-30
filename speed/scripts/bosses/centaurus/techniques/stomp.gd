@@ -2,6 +2,23 @@
 @tool
 extends BossTechnique
 
+const PART_ANIMATION := preload("res://data/visuals/centaurus_animation.tres")
+# 脚画像（23×52）の下端中央。右脚は画像の配置が左へ4ずれている。
+const FOOT_CONTACTS := {"FrontLeftLeg": Vector2(11.5, 52.0), "FrontRightLeg": Vector2(7.5, 52.0)}
+
+## 描画ノードを参照せず、保存された配置と現在の動作時刻から接地点を求める。
+static func contact_center(animation: Resource, time: float) -> Vector2:
+	var pose: Dictionary = animation.sample("stomp", time)
+	var center := Vector2.ZERO
+	for path: String in FOOT_CONTACTS:
+		var entry: Dictionary = pose.get(path, animation.poses.get("neutral", {}).get(path, {}))
+		var transform := Transform2D(float(entry.get("rotation", 0.0)), entry.get("scale", Vector2.ONE), float(entry.get("skew", 0.0)), entry.get("position", Vector2.ZERO))
+		if animation.part_pivots.has(path) and entry.has("pivot_origin"):
+			transform.origin = entry.pivot_origin - transform.basis_xform(animation.part_pivots[path])
+		center += transform * FOOT_CONTACTS[path]
+	return center * 0.5
+
+
 ## 予告（秒）
 @export_range(0, 100000, 0.01) var warn := 0.6:
 	set(value):
@@ -67,6 +84,6 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		if elapsed >= float(r.warn) + float(r.active):
 			host.finish_technique()
 			return
-		var offset := host.run_state.ship_pos - host.table.pos[host.body]
+		var offset := host.run_state.ship_pos - host.stomp_center()
 		if not hit and offset.length() <= float(r.range_radius) + host.ctx.cfg.ship_radius and absf(Geom.angle_diff(offset.angle(), host.table.facing[host.body])) <= deg_to_rad(float(r.half_angle)):
 			hit = host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"stomp", &"centaurus")

@@ -53,7 +53,7 @@ func _advance(dt: float) -> void:
 			var height := sin(PI * clampf(actor.leap_time / maxf(float(actor.def.params.leap_time), 0.001), 0.0, 1.0))
 			_parts.scale *= 1.0 + 0.12 * height
 			_parts.position = Vector2(0.0, -65.0 * height).rotated(-global_rotation)
-		_parts.set_bow_pose(actor.technique, actor.mode, actor.table.charge[actor.body], dt)
+		_parts.set_bow_pose(actor.technique, actor.mode, actor.table.charge[actor.body], dt, actor.stomp_pose_time())
 	queue_redraw()
 
 func _poly(points: Array, color: Color) -> void:

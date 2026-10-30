@@ -131,7 +131,7 @@ func release_bow(interval := 0.4) -> void:
 	_shot_interval = maxf(0.05, interval)
 	_clip_time = 0.0
 
-func set_bow_pose(technique: StringName, mode: StringName, progress: float, delta := 0.0) -> void:
+func set_bow_pose(technique: StringName, mode: StringName, progress: float, delta := 0.0, pose_time := -1.0) -> void:
 	var clip := "idle"
 	if technique in [&"volley", &"power_shot"]:
 		if mode == &"windup": clip = "shot_windup"
@@ -164,6 +164,7 @@ func set_bow_pose(technique: StringName, mode: StringName, progress: float, delt
 	if mode == &"windup": time = clampf(progress, 0.0, 1.0) * length
 	elif clip in ["shot_release", "fan_release"]: time = _clip_time / _shot_interval * length
 	elif clip in ["idle", "rain", "shower", "run"] and length > 0.0: time = fmod(_clip_time, length)
+	if clip == "stomp" and pose_time >= 0.0: time = pose_time
 	apply_pose(animation_data.sample(clip, time))
 
 

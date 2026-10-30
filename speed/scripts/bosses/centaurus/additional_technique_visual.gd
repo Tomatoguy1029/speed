@@ -18,7 +18,7 @@ func _draw() -> void:
 		_draw_shower(r)
 	elif visual_kind == &"stomp" and actor.mode in [&"windup", &"strike"]:
 		# 動作の見た目は未決。仮表示。
-		var center := actor.table.pos[actor.body]
+		var center := actor.stomp_center()
 		var angle := actor.table.facing[actor.body]
 		var half := deg_to_rad(float(r.half_angle))
 		var radius := float(r.range_radius)

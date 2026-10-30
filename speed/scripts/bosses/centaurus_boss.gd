@@ -373,6 +373,15 @@ func _rear_ready() -> bool:
 	if flow_runner.rest_remaining > 0.0 or flow_runner.stamina < float(action_rules.costs.get("rear_attack", 1.0)): return false
 	return action_rules.active_gates_for("rear_attack").any(func(gate): return technique_ready(&"rear_attack", gate))
 
+## 予告は着地の最初のコマ、当たり中は表示と同じ世界時刻のコマを使う。
+func stomp_pose_time() -> float:
+	return maxf(0.0, clock - _runner.started_at - float(rule().warn)) if technique == &"stomp" and mode == &"strike" else 0.0
+
+func stomp_center() -> Vector2:
+	var move = preload("res://scripts/bosses/centaurus/techniques/stomp.gd")
+	var local: Vector2 = move.contact_center(move.PART_ANIMATION, stomp_pose_time())
+	return table.pos[body] + (local * table.r[body] / 135.0).rotated(table.facing[body] - PI * 0.5)
+
 ## 実験場だけが描く攻撃範囲。center・radius・active（当たりが有効か）を持つ。
 ## with_idle なら、構えていない間も背後攻撃の範囲を返す。
 func lab_ranges(with_idle := false) -> Array[Dictionary]:
@@ -383,7 +392,7 @@ func lab_ranges(with_idle := false) -> Array[Dictionary]:
 		var r: Dictionary = _rules[&"rear_attack"]
 		ranges.append({"center": rear_center(r), "radius": float(r.range_radius), "active": false})
 	if _runner_for().kind() == &"stomp" and mode in [&"windup", &"strike"]:
-		ranges.append({"center": table.pos[body], "radius": float(rule().range_radius), "active": mode == &"strike", "fan": true, "angle": table.facing[body], "half_angle": deg_to_rad(float(rule().half_angle))})
+		ranges.append({"center": stomp_center(), "radius": float(rule().range_radius), "active": mode == &"strike", "fan": true, "angle": table.facing[body], "half_angle": deg_to_rad(float(rule().half_angle))})
 	return ranges
 
 # ── 矢の雨 ────────────────────────────────────────────────
