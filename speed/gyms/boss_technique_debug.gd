@@ -111,7 +111,10 @@ func _cleanup() -> void:
 		actor.closing_walls.clear()
 		actor.attack_token = 0
 		actor.reset_pose()
-		actor._presentation.effects.clear()
+		for visual: Node2D in actor.technique_visuals.nodes.values():
+			if is_instance_valid(visual) and "effects" in visual:
+				visual.effects.clear()
+				visual.queue_redraw()
 	elif actor.def.id == &"monoceros":
 		actor.phase_pending = false
 		actor.reposition = 0.0
