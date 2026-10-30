@@ -8,6 +8,8 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure", "data"), &SpeedRunCore::configure);
     ClassDB::bind_method(D_METHOD("configure_pickups", "config", "stats"), &SpeedRunCore::configure_pickups);
     ClassDB::bind_method(D_METHOD("pickups_snapshot"), &SpeedRunCore::pickups_snapshot);
+    ClassDB::bind_method(D_METHOD("step_pickups", "world_dt"), &SpeedRunCore::step_pickups);
+    ClassDB::bind_method(D_METHOD("drain_collections"), &SpeedRunCore::drain_collections);
     ClassDB::bind_method(D_METHOD("configure_combat", "config", "stats"), &SpeedRunCore::configure_combat);
     ClassDB::bind_method(D_METHOD("collide_ship", "from", "radius"), &SpeedRunCore::collide_ship);
     ClassDB::bind_method(D_METHOD("combat_snapshot"), &SpeedRunCore::combat_snapshot);
@@ -83,7 +85,7 @@ void SpeedRunCore::close() {
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
-    gems.clear(); coins.clear(); free_gems.clear(); gem_queue.clear();
+    gems.clear(); coins.clear(); free_gems.clear(); free_coins.clear(); gem_queue.clear(); collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {

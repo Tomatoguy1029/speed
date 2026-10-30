@@ -18,10 +18,10 @@ func values(object: Object, keys: Array) -> Dictionary:
 func _ready() -> void:
 	var comparison = COMPARE.new()
 	var probe = comparison.create_native()
-	if not probe.has_method("configure_pickups"):
+	if not probe.has_method("step_pickups"):
 		check(false, "撃破から報酬の生成までネイティブランが所有する")
 	else:
-		for mode in ["touch", "pierce", "bounce", "kill"]:
+		for mode in ["touch", "pierce", "bounce", "kill", "collect"]:
 			await compare_contacts(comparison, mode)
 	print("[native_combat] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
@@ -39,7 +39,7 @@ func compare_contacts(comparison, mode: String) -> void:
 		run.cfg.drop_max = 1.0
 		run.cfg.gem_max = 1
 	var definition: EnemyDef = run.enemies.def_of(&"drifter").duplicate(true)
-	definition.hp = 6 if mode == "kill" else 1000
+	definition.hp = 6 if mode in ["kill", "collect"] else 1000
 	definition.armor = 1000 if mode == "bounce" else 2
 	var core = comparison.create_native()
 	check(core.configure(DATA.compile_enemy(definition, run.cfg)), "接触用の敵を準備する")
@@ -48,7 +48,7 @@ func compare_contacts(comparison, mode: String) -> void:
 	var pickup_config := values(run.cfg, PICKUP_CONFIG)
 	pickup_config.xp_bonus = run.spawn.current_phase().xp_bonus
 	check(not core.start(932), "報酬が未接続の戦闘を開始しない")
-	check(core.configure_pickups(pickup_config, {"xp_mult": run.state.stats.xp_mult}), "ドロップの編集値を準備する")
+	check(core.configure_pickups(pickup_config, values(run.state.stats, ["xp_mult", "xp_pickup_radius", "pickup_radius", "pickup_speed_mult"])), "ドロップの編集値を準備する")
 	core.start(932, run.enemies._next_id, run.pickups._gem_next_seq)
 	run.state.rng.seed = 932
 	var p := run.state.ship_pos
@@ -80,6 +80,20 @@ func compare_contacts(comparison, mode: String) -> void:
 	core.collide_ship(from, run.cfg.ship_radius)
 	check(comparison.difference(comparison.snapshot(run, [], 0).enemies, core.enemies_snapshot()).is_empty(), "接触の待ち時間を保つ: " + mode)
 	check(core.drain_events().is_empty() and run.state.events.is_empty(), "同じ接触を重複通知しない: " + mode)
+	if mode == "collect":
+		var gained := 0.0
+		var collected_coins := 0
+		for tick in 60:
+			run.state.events.clear()
+			run.pickups.tick(1.0/60.0, 1.0/60.0)
+			check(core.step_pickups(1.0/60.0), "回収を世界時間で進める")
+			for item in core.drain_collections():
+				if item.kind == "gem": gained += item.value * run.state.stats.xp_gain_mult
+				elif item.kind == "coin": collected_coins += 1
+			check(comparison.difference(comparison.plain(pickup_snapshot(run)), comparison.plain(core.pickups_snapshot())).is_empty(), "吸引と回収の位置・残数が一致する")
+			check(comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events())).is_empty(), "回収の通知順が一致する")
+			check(gained == run.state.xp_gained and collected_coins == run.state.coins, "成長側へ渡す経験値と部品が一致する")
+		check(gained > 0 and core.drain_collections().is_empty(), "回収結果を重複して渡さない")
 	core.close()
 	lab.free()
 

@@ -84,13 +84,16 @@ class SpeedRunCore : public RefCounted {
     struct PickupConfig {
         int64_t gem_max = 0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
+        double xp_radius = 0, coin_radius = 0, speed_mult = 1;
         std::vector<double> xp, start_weights, end_weights;
     } pickup_config;
     struct Gem { Vector2 pos; double value = 0; int64_t seq = 0; bool alive = false, pulled = false; };
     struct Coin { Vector2 pos; bool alive = true, pulled = false; };
     std::vector<Gem> gems;
     std::vector<Coin> coins;
-    std::vector<size_t> free_gems;
+    std::vector<size_t> free_gems, free_coins;
+    Array collections;
+    void collect_pickup(StringName kind, double value = 0);
     std::vector<std::pair<size_t, int64_t>> gem_queue;
     size_t gem_queue_head = 0;
     int64_t next_gem_seq = 0, live_gems = 0;
@@ -112,6 +115,8 @@ public:
     Dictionary ship_snapshot() const;
     bool configure_pickups(const Dictionary &config, const Dictionary &stats);
     Dictionary pickups_snapshot() const;
+    bool step_pickups(double world_dt);
+    Array drain_collections();
     bool configure_combat(const Dictionary &config, const Dictionary &stats);
     bool collide_ship(Vector2 from, double radius);
     Dictionary combat_snapshot() const;

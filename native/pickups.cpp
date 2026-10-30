@@ -7,9 +7,9 @@ using namespace godot;
 bool SpeedRunCore::configure_pickups(const Dictionary &config, const Dictionary &stats) {
     if (started || closed) return false;
     PickupConfig c;
-    const char *keys[] = {"drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "xp_bonus", "xp_mult"};
-    double *values[] = {&c.drop_base, &c.drop_max, &c.drop_power, &c.shift_time, &c.xp_bonus, &c.xp_mult};
-    for (int i = 0; i < 6; ++i) {
+    const char *keys[] = {"drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "xp_bonus", "xp_mult", "xp_pickup_radius", "pickup_radius", "pickup_speed_mult"};
+    double *values[] = {&c.drop_base, &c.drop_max, &c.drop_power, &c.shift_time, &c.xp_bonus, &c.xp_mult, &c.xp_radius, &c.coin_radius, &c.speed_mult};
+    for (int i = 0; i < 9; ++i) {
         const Dictionary &source = i < 5 ? config : stats;
         if (!source.has(keys[i])) return false;
         const Variant value = source[keys[i]];
@@ -78,7 +78,9 @@ void SpeedRunCore::drop_enemy_pickups(const Enemy &enemy) {
     if (rng->randf() < 0.03) {
         const double angle = rng->randf() * (2.0 * Math_PI);
         const double share = rng->randf();
-        coins.push_back({enemy.pos + Vector2::from_angle(angle) * share * def.radius, true, false});
+        const Coin coin{enemy.pos + Vector2::from_angle(angle) * share * def.radius, true, false};
+        if (free_coins.empty()) coins.push_back(coin);
+        else { coins[free_coins.back()] = coin; free_coins.pop_back(); }
     }
     if (rng->randf() < std::min(c.drop_max, c.drop_base * std::pow(def.xp, c.drop_power))) {
         const double fraction = std::clamp(time / c.shift_time, 0.0, 1.0);
@@ -107,4 +109,58 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
     }
     Dictionary out; out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = xp_dropped;
     return out;
+}
+
+void SpeedRunCore::collect_pickup(StringName kind, double value) {
+    // B案は成長側へまとめて渡す。各回収の順序を保ち、カード待ちの判断は成長の所有者が行う。
+    Dictionary item; item["kind"] = kind; item["value"] = value; collections.append(item);
+    Dictionary event; event["kind"] = kind; emit_event("pickup", event);
+}
+
+Array SpeedRunCore::drain_collections() { Array out = collections; collections = Array(); return out; }
+
+bool SpeedRunCore::step_pickups(double world_dt) {
+    if (!started || closed || !ship_ready || !pickups_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
+    if (world_dt == 0) return true;
+    const double reach = ship_config.ship_radius + 14.0;
+    const double gem_radius = pickup_config.xp_radius;
+    const double step = (700.0 + ship.vel.length() * 1.2) * pickup_config.speed_mult * world_dt;
+    const double far = std::max(gem_radius, reach), far_sq = far * far;
+    for (size_t row = 0; row < gems.size(); ++row) {
+        auto &gem = gems[row];
+        if (!gem.alive) continue;
+        if (!gem.pulled && ship.pos.distance_squared_to(gem.pos) >= far_sq) continue;
+        const Vector2 p = gem.pos, d = ship.pos - p;
+        const double distance = d.length();
+        if (distance < gem_radius || gem.pulled) {
+            gem.pulled = true;
+            gem.pos = p + d / std::max(distance, 1.0) * std::min(step, distance);
+        }
+        if (distance < reach) {
+            collect_pickup("gem", gem.value);
+            gem.alive = false;
+            free_gems.push_back(row);
+            --live_gems;
+        }
+    }
+    const double coin_radius = pickup_config.coin_radius * 1.3;
+    const double coin_step = (700.0 + ship.vel.length() * 1.2) * world_dt;
+    const double coin_far = std::max(coin_radius, reach), coin_far_sq = coin_far * coin_far;
+    for (size_t row = 0; row < coins.size(); ++row) {
+        auto &coin = coins[row];
+        if (!coin.alive) continue;
+        if (!coin.pulled && ship.pos.distance_squared_to(coin.pos) >= coin_far_sq) continue;
+        const Vector2 p = coin.pos, d = ship.pos - p;
+        const double distance = d.length();
+        if (distance < coin_radius || coin.pulled) {
+            coin.pulled = true;
+            coin.pos = p + d / std::max(distance, 1.0) * std::min(coin_step, distance);
+        }
+        if (distance < reach) {
+            collect_pickup("coin");
+            coin.alive = false;
+            free_coins.push_back(row);
+        }
+    }
+    return true;
 }
