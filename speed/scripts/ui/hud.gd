@@ -72,6 +72,7 @@ var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var run: RunSimulation
+var _laser_audio: Node
 var _font: Font
 var _cards_box: Control
 var _reroll_button: Button
@@ -107,6 +108,8 @@ var _menu_overlay: Control
 var _overlay_focus: WeakRef
 
 func _ready() -> void:
+	_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
+	add_child(_laser_audio)
 	_font = ThemeDB.fallback_font
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -240,6 +243,8 @@ func _sync_menu_visibility() -> void:
 func _on_events(events: Array[Dictionary]) -> void:
 	for ev in events:
 		match ev.type:
+			&"enemy_laser_charge", &"enemy_laser_cancel", &"enemy_laser_fire":
+				_laser_audio.handle(ev)
 			&"level_bonus":
 				if run.state.phase not in [RunState.Phase.FINISHING, RunState.Phase.ENDED]:
 					_rewards.enqueue_bonus(ev)
@@ -268,6 +273,9 @@ func _on_events(events: Array[Dictionary]) -> void:
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))
 			&"hurt":
 				AudioManager.play(&"hurt", -4.0)
+			&"weapon_fire":
+				if ev.id in [&"W01", &"W23"]:
+					AudioManager.play(&"blaster", -12.0)
 			&"launch":
 				AudioManager.play(&"dash", -6.0)
 			&"trace_end":
@@ -392,6 +400,11 @@ func _notification(what: int) -> void:
 			run.command(&"pause")
 
 func _process(delta: float) -> void:
+	_laser_audio.sync(run)
+	var slow := run.state.phase == RunState.Phase.PLAY and run.draw.world_scale() < 0.999
+	if run.state.phase == RunState.Phase.FINISHING:
+		slow = run.sequence_t < run.cfg.boss_finish_slow_time
+	AudioManager.set_slow_motion(slow and _menu_overlay == null and not _rewards.is_active())
 	_update_finish_presentation()
 	_update_cinematic_visibility()
 	_hero_notice_t = maxf(0.0, _hero_notice_t - delta)
@@ -674,7 +687,6 @@ func _show_cards() -> void:
 				_card_art(b, Rect2(89, 83, 145, 193))
 			b.pressed.connect(func(): _card_command(&"choose_card", {"index": i}))
 			_cards_row.add_child(b)
-			var font_size := 10 if cards.size() <= 3 else 8
 			for entry in [[Vector2(7, 5), Vector2(width - 14, 23), "%d. %s" % [i + 1, info.tag]],
 				[Vector2(7, 34), Vector2(width - 14, 28), info.name],
 				[Vector2(7, 65), Vector2(width - 14, 122 if cards[i].kind == &"post_max" else 57), info.desc]]:
@@ -682,11 +694,11 @@ func _show_cards() -> void:
 				label.position = entry[0]
 				label.size = entry[1]
 				label.text = entry[2]
-				label.add_theme_font_size_override("font_size", (17 if entry[0].y == 65 else 13) if cards[i].kind == &"post_max" else font_size)
+				label.add_theme_font_size_override("font_size", 10 if entry[0].y == 65 else 12)
 				label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				label.clip_text = true
-				label.max_lines_visible = (2 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
+				label.max_lines_visible = (8 if cards[i].kind == &"post_max" else 4) if entry[0].y == 65 else 2
 				label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 				label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 				b.add_child(label)
@@ -1152,6 +1164,7 @@ func _draw_banner() -> void:
 	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
 
 func _exit_tree() -> void:
+	AudioManager.set_slow_motion(false)
 	if run != null and run.state != null and not run.state.lab_mode:
 		AudioManager.stop_music(self)
 	AudioManager.end_dash()

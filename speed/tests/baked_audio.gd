@@ -17,11 +17,6 @@ const EXPECTED := {
 		"rate": 22050,
 		"size": 2646
 	},
-	"hurt": {
-		"hash": "1d171757b9878cb04682c56f5838c397181789006eda8df4dc5eae1f397d7bf3",
-		"rate": 22050,
-		"size": 8820
-	},
 	"kill": {
 		"hash": "640320e43cb28091db1574b84368f4115f494faf0e7ffac54d7dd6edf509b8c6",
 		"rate": 22050,
@@ -85,7 +80,7 @@ func _ready() -> void:
 	AudioManager.stop_music(menu_screen)
 	old_screen.free()
 	menu_screen.free()
-	for sound in [&"menu_open", &"upgrade_apply", &"ui"]:
+	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"hurt", &"enemy_laser_charge", &"enemy_laser_fire"]:
 		var stream := AudioManager._sounds.get(sound) as AudioStreamMP3
 		check(stream != null, "強化用MP3を読み込む: " + String(sound))
 		if stream != null: check(not stream.loop and stream.get_length() > 0.0, "強化音を一回再生できる: " + String(sound))
@@ -104,7 +99,7 @@ func _ready() -> void:
 		check(loop.loop_mode == AudioStreamWAV.LOOP_FORWARD and loop.loop_end > 0, "移動中だけループする")
 		AudioManager.start_dash(-6.0)
 		var first = AudioManager._dash_voice
-		check(is_equal_approx(db_to_linear(first.attack.volume_db), db_to_linear(-6.0) / 3.0), "音量は従来の1/3")
+		check(is_equal_approx(first.attack.volume_db, -6.0), "新しいダッシュ音は基本音量で再生する")
 		AudioManager.end_dash()
 		check(first.attack.playing and first.release.playing, "短いダッシュでも開始音を切らず終了音を鳴らす")
 		for i in 40: AudioManager.play(&"hurt")
@@ -120,5 +115,31 @@ func _ready() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
+	AudioManager.play(&"hurt", -4.0)
+	var hurt: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
+	check(hurt.stream == AudioManager._sounds[&"hurt"] and is_equal_approx(hurt.volume_db, -24.0), "被弾素材を控えめな音量で再生する")
+	var master := AudioServer.get_bus_index(&"Master")
+	var original_volume := float(SaveManager.settings.master_volume)
+	var original_muted := bool(SaveManager.settings.muted)
+	AudioManager.set_slow_motion(true)
+	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(master)), original_volume * 0.35), "スロー中は全体音量を35%にする")
+	check(AudioServer.is_bus_mute(master) == original_muted, "スローで消音設定を変えない")
+	AudioManager.set_slow_motion(false)
+	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(master)), original_volume), "スロー終了で全体音量を戻す")
+	check(float(SaveManager.settings.master_volume) == original_volume, "音量設定を保存し直さない")
+	var blaster := AudioManager._sounds.get(&"blaster") as AudioStreamWAV
+	check(blaster != null and is_equal_approx(blaster.get_length(), 0.12), "連射用の短いブラスター音を読み込む")
+	var hud := preload("res://scripts/ui/hud.gd").new()
+	for id in [&"W01", &"W23"]:
+		var before := AudioManager._next
+		hud._on_events([{ "type": &"weapon_fire", "id": id }])
+		check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "発射ごとに1回鳴らす: " + String(id))
+		check(AudioManager._players[before].stream == blaster, "両ブラスターに同じ素材を使う: " + String(id))
+	var before := AudioManager._next
+	hud._on_events([{ "type": &"weapon_fire", "id": &"W02" }])
+	check(AudioManager._next == before, "ほかの武器にブラスター音を追加しない")
+	hud.free()
+	for player in AudioManager._players: player.stop()
+	await get_tree().process_frame
 	print("[baked_audio] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)

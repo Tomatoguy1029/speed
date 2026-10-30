@@ -9,7 +9,7 @@ static func build(output: String) -> Error:
 	_sounds[&"hit"] = _tone(520.0, 260.0, 0.06, "square")
 	_sounds[&"kill"] = _tone(300.0, 90.0, 0.12, "noise")
 	_sounds[&"block"] = _tone(180.0, 140.0, 0.08, "square")
-	_sounds[&"hurt"] = _tone(140.0, 60.0, 0.2, "saw")
+	_sounds[&"hurt"] = load("res://assets/audio/sfx/hurt_robot.mp3")
 	_sounds[&"levelup"] = _tone(440.0, 880.0, 0.25, "sine")
 	_sounds[&"pickup"] = _tone(880.0, 1200.0, 0.05, "sine")
 	_sounds[&"dash"] = load("res://assets/audio/sfx/dash_start.wav")
@@ -20,6 +20,9 @@ static func build(output: String) -> Error:
 	_sounds[&"dash_loop"] = sustain
 	_sounds[&"dash_end"] = load("res://assets/audio/sfx/dash_end.wav")
 	_sounds[&"shoot"] = _tone(700.0, 500.0, 0.04, "square")
+	_sounds[&"blaster"] = load("res://assets/audio/sfx/blaster_shot.wav")
+	_sounds[&"enemy_laser_charge"] = load("res://assets/audio/sfx/enemy_laser_charge.mp3")
+	_sounds[&"enemy_laser_fire"] = load("res://assets/audio/sfx/enemy_laser_fire.mp3")
 	_sounds[&"roar"] = _tone(90.0,38.0,1.0,"saw")
 	_sounds[&"boom"] = _tone(120.0, 30.0, 0.5, "noise")
 	_sounds[&"menu_open"] = load("res://assets/audio/sfx/menu_open.mp3")

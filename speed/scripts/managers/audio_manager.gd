@@ -18,6 +18,7 @@ var _music_player: AudioStreamPlayer
 var _music_track: StringName = &""
 var _music_owner: Node
 var _music_fade: Tween
+var _slow_motion := false
 
 func _ready() -> void:
 	_ensure_bus(&"SFX")
@@ -43,6 +44,9 @@ func toggle_mute() -> void:
 	SaveManager.set_setting("muted", not bool(SaveManager.settings.muted))
 
 ## 効果音を鳴らす。名前は制作工程の build_audio.gd の一覧。
+func sound(name: StringName) -> AudioStream:
+	return _sounds.get(name)
+
 func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	if name == &"dash":
 		start_dash(volume_db, pitch)
@@ -59,7 +63,7 @@ func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	var p := _players[_next]
 	_next = (_next + 1) % MAX_VOICES
 	p.stream = stream
-	p.volume_db = volume_db
+	p.volume_db = volume_db - 20.0 if name == &"hurt" else volume_db
 	p.pitch_scale = pitch
 	p.play()
 
@@ -107,14 +111,20 @@ func start_dash(volume_db := -6.0, pitch := 1.0) -> void:
 	end_dash()
 	_dash_voice = DASH_VOICE.new()
 	add_child(_dash_voice)
-	_dash_voice.start(_sounds, volume_db + linear_to_db(1.0 / 3.0), pitch)
+	_dash_voice.start(_sounds, volume_db, pitch)
 func end_dash() -> void:
 	if is_instance_valid(_dash_voice): _dash_voice.finish()
 	_dash_voice = null
 
+## ユーザー設定を保ったまま、BGM・効果音をまとめて減衰する。
+func set_slow_motion(enabled: bool) -> void:
+	if _slow_motion == enabled: return
+	_slow_motion = enabled
+	_apply_volumes()
+
 func _apply_volumes() -> void:
 	var s := SaveManager.settings
-	_set_bus(&"Master", float(s.master_volume), bool(s.muted))
+	_set_bus(&"Master", float(s.master_volume) * (0.35 if _slow_motion else 1.0), bool(s.muted))
 	_set_bus(&"SFX", float(s.sfx_volume), false)
 	_set_bus(&"Engine", float(s.engine_volume), false)
 	_set_bus(&"Music", float(s.get("music_volume", 0.5)), false)
