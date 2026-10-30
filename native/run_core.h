@@ -40,7 +40,9 @@ class SpeedRunCore : public RefCounted {
     void reset_enemy_bounds();
     std::vector<size_t> query_enemy_rows(Vector2 lo, Vector2 hi) const;
     int64_t next_id = 1;
-    Vector2 ship_pos, view_center, view_half;
+    Vector2 ship_pos, enemy_aim, view_center, view_half;
+    double enemy_aim_lag = 0, enemy_aim_speed = 0;
+    bool aim_ready = false;
     struct Ship {
         Vector2 pos, vel, heading = Vector2(0, -1);
         double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0;

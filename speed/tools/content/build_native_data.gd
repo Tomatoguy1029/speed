@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig) -> Dictionary:
-	if definition == null or config == null or definition.behavior != &"chase":
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -21,7 +21,16 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig) -> Dictionar
 			return {}
 	if row.id.is_empty() or row.hp <= 0.0 or row.radius <= 0.0:
 		return {}
-	return {"version": 2, "enemies": [row]}
+	if definition.behavior == &"shield":
+		row.shield = {"accel": definition.accel if definition.accel > 0.0 else 2.0,
+			"turn": definition.turn if definition.turn > 0.0 else 4.0, "weak_arc": definition.weak_arc}
+		for key in ["front_arc", "reflect_speed", "reflect_life", "reflect_dmg", "reflect_interval", "shield_time"]:
+			if not definition.params.has(key): return {}
+			row.shield[key] = float(definition.params[key])
+		for value in row.shield.values():
+			if not is_finite(value) or value < 0.0: return {}
+	if not is_finite(config.enemy_aim_lag) or config.enemy_aim_lag <= 0.0 or not is_finite(config.enemy_aim_speed) or config.enemy_aim_speed <= 0.0: return {}
+	return {"version": 2, "enemies": [row], "motion": {"aim_lag": config.enemy_aim_lag, "aim_speed": config.enemy_aim_speed}}
 
 ## 共通生成から使う比較条件。未移行の通常ゲーム用データと混同しない。
 static func build_probe(path: String) -> Error:

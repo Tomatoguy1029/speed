@@ -1,6 +1,8 @@
 #include "run_core.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
+#include <algorithm>
+#include <godot_cpp/core/math.hpp>
 
 using namespace godot;
 
@@ -69,6 +71,14 @@ bool SpeedRunCore::step(double delta) {
 
 void SpeedRunCore::advance_enemies(double delta) {
     ++ticks;
+    if (aim_ready && !draw.tracing) {
+        const Vector2 toward = ship_pos - enemy_aim;
+        const double distance = toward.length();
+        if (distance >= 1e-6) {
+            const double step = std::min(distance * (1.0 - std::exp(-delta / enemy_aim_lag)), enemy_aim_speed * delta);
+            enemy_aim += toward / distance * step;
+        }
+    }
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
     for (auto &enemy : enemies) {
         if (!enemy.alive || enemy.dead) continue;
@@ -78,13 +88,26 @@ void SpeedRunCore::advance_enemies(double delta) {
         const Vector2 relative = enemy.pos - view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
         if (!far || (enemy.id + ticks) % 3 == 0) {
-            const Vector2 toward = ship_pos - enemy.pos;
-            const double distance = toward.length();
-            enemy.vel = Vector2();
-            if (distance > 0.001) {
-                const Vector2 unit = toward / distance;
-                enemy.vel = unit * definitions[enemy.definition].speed;
-                enemy.facing = unit.angle();
+            const auto &def = definitions[enemy.definition];
+            if (def.kind == speed::EnemyDefinition::Kind::Shield) {
+                const double bdt = far ? delta * 3.0 : delta;
+                enemy.fire_t = std::max(0.0, enemy.fire_t - bdt);
+                const Vector2 toward = enemy_aim - enemy.pos;
+                double distance = toward.length();
+                if (distance < 0.001) distance = 1;
+                enemy.vel += (toward / distance * def.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
+                const double difference = double((ship_pos - enemy.pos).angle()) - enemy.facing;
+                const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+                enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
+            } else {
+                const Vector2 toward = ship_pos - enemy.pos;
+                const double distance = toward.length();
+                enemy.vel = Vector2();
+                if (distance > 0.001) {
+                    const Vector2 unit = toward / distance;
+                    enemy.vel = unit * def.speed;
+                    enemy.facing = unit.angle();
+                }
             }
         }
         enemy.pos += enemy.vel * delta;
@@ -125,15 +148,39 @@ bool SpeedRunCore::configure(const Dictionary &data) {
     if (started || closed || !data.has("version") ||
             (data["version"].get_type() != Variant::INT && data["version"].get_type() != Variant::FLOAT) || double(data["version"]) != 2.0 ||
             !data.has("enemies") || data["enemies"].get_type() != Variant::ARRAY) return false;
+    double aim_lag = 0, aim_speed = 0;
+    if (data.has("motion")) {
+        if (data["motion"].get_type() != Variant::DICTIONARY) return false;
+        const Dictionary motion = data["motion"];
+        for (const char *key : {"aim_lag", "aim_speed"}) {
+            if (!motion.has(key) || (motion[key].get_type() != Variant::FLOAT && motion[key].get_type() != Variant::INT)) return false;
+            if (!std::isfinite(double(motion[key])) || double(motion[key]) <= 0) return false;
+        }
+        aim_lag = motion["aim_lag"]; aim_speed = motion["aim_speed"];
+    }
     const Array rows = data["enemies"];
     std::vector<speed::EnemyDefinition> parsed;
     for (int64_t i = 0; i < rows.size(); ++i) {
         if (rows[i].get_type() != Variant::DICTIONARY) return false;
         const Dictionary row = rows[i];
         if (!row.has("id") || row["id"].get_type() != Variant::STRING || String(row["id"]).is_empty() ||
-                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || String(row["behavior"]) != "chase") return false;
+                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield")) return false;
         speed::EnemyDefinition def;
         def.id = String(row["id"]);
+        if (String(row["behavior"]) == "shield") {
+            if (aim_lag <= 0 || !row.has("shield") || row["shield"].get_type() != Variant::DICTIONARY) return false;
+            def.kind = speed::EnemyDefinition::Kind::Shield;
+            const Dictionary shield = row["shield"];
+            const char *keys[] = {"accel", "turn", "weak_arc", "front_arc", "reflect_speed", "reflect_life", "reflect_dmg", "reflect_interval", "shield_time"};
+            double *values[] = {&def.accel, &def.turn, &def.weak_arc, &def.front_arc, &def.reflect_speed, &def.reflect_life, &def.reflect_damage, &def.reflect_interval, &def.shield_time};
+            for (int k = 0; k < 9; ++k) {
+                if (!shield.has(keys[k])) return false;
+                const Variant value = shield[keys[k]];
+                if (value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) return false;
+                *values[k] = double(value);
+                if (!std::isfinite(*values[k]) || *values[k] < 0) return false;
+            }
+        }
         for (const auto &previous : parsed) if (previous.id == def.id) return false;
         const char *keys[] = {"hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"};
         double *values[] = {&def.hp, &def.armor, &def.radius, &def.speed, &def.fire_interval, &def.xp, &def.knockback, &def.hitstop_multiplier};
@@ -155,11 +202,13 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         parsed.push_back(def);
     }
     definitions = std::move(parsed);
+    enemy_aim_lag = aim_lag; enemy_aim_speed = aim_speed; aim_ready = aim_lag > 0;
     return true;
 }
 
 bool SpeedRunCore::set_motion_context(Vector2 ship, Vector2 center, Vector2 half) {
     if (!started || closed || !ship.is_finite() || !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0) return false;
+    if (!motion_ready) enemy_aim = ship;
     ship_pos = ship; view_center = center; view_half = half;
     motion_ready = true;
     return true;
@@ -262,6 +311,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     for (const char *key : {"touch", "has_cursor", "stick_active", "press", "alt_press", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
     for (const char *key : {"cursor", "stick", "pen"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
     sim_time += real_dt;
+    if (!motion_ready) enemy_aim = ship_pos;
     view_center = center; view_half = half; motion_ready = true;
     handle_draw(input, int64_t(std::round(sim_time * 1000.0)), camera_zoom);
     if (hitstop > 0) { hitstop = std::max(0.0, hitstop - real_dt); return true; }
