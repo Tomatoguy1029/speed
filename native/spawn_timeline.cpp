@@ -41,7 +41,7 @@ bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
     if (started || closed) return false;
     speed::SpawnTimeline parsed;
     double version;
-    if (!number(data.get("version", Variant()), version) || version != 1) return false;
+    if (!number(data.get("version", Variant()), version) || version != 2) return false;
     if (!number(data.get("boss_start", Variant()), parsed.boss_start) || !number(data.get("density", Variant()), parsed.density) || !number(data.get("bonus_pop", Variant()), parsed.bonus_pop)) return false;
     if (parsed.density < 0 || parsed.bonus_pop < 0) return false;
     for (const char *key : {"phases", "curves", "windows"}) if (data.get(key, Variant()).get_type() != Variant::ARRAY) return false;
@@ -55,6 +55,10 @@ bool SpeedRunCore::configure_spawn_timeline(const Dictionary &data) {
         const char *keys[] = {"start", "pop_from", "pop_to", "rate", "xp_bonus", "surge_interval", "surge_pop", "surge_ranged", "surge_elite"};
         double *values[] = {&phase.start, &phase.pop_from, &phase.pop_to, &phase.rate, &phase.xp_bonus, &phase.interval, &phase.pop, &phase.ranged, &phase.elite};
         for (int k = 0; k < 9; ++k) if (!number(row.get(keys[k], Variant()), *values[k])) return false;
+        if (!number(row.get("wave_interval", Variant()), phase.wave_interval)) return false;
+        const Variant wave_type = row.get("wave_type", Variant());
+        if (wave_type.get_type() != Variant::STRING && wave_type.get_type() != Variant::STRING_NAME) return false;
+        phase.wave_type = wave_type;
         if (i > 0 && phase.start < parsed.phases.back().start) return false;
         double budget;
         if (!number(row.get("attack_budget", Variant()), budget) || budget < 0 || budget > INT32_MAX || std::floor(budget) != budget) return false;

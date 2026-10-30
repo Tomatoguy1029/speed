@@ -17,6 +17,7 @@ bool SpeedRunCore::configure_refill(const Dictionary &config) {
         return found != definitions.end() && found->spawn_ready && found->scaling.ready;
     };
     for (const auto &phase : spawn_timeline.phases) for (const auto &entry : phase.mix) if (!supported(entry.first)) return false;
+    for (const auto &phase : spawn_timeline.phases) if (phase.wave_interval > 0 && !String(phase.wave_type).is_empty() && !supported(phase.wave_type)) return false;
     for (const auto &curve : spawn_timeline.curves) if (!supported(curve.type)) return false;
     population.total_cap = cap; population.refill_time = interval;
     population.refill_ready = true;
@@ -28,11 +29,12 @@ Dictionary SpeedRunCore::refill_snapshot() const {
     if (closed || !population.refill_ready) return out;
     out["accumulator"] = population.accumulator;
     out["phase"] = population.phase_id;
+    out["wave_time"] = population.wave_time;
     return out;
 }
 
-// 通常補充の比較入口。群れ・クリップ・攻撃予算の接続は別の更新段階で扱う。
-bool SpeedRunCore::step_regular_population(double world_dt, bool bonus) {
+// 補充の比較入口。クリップ・攻撃予算の接続は別の更新段階で扱う。
+bool SpeedRunCore::step_population(double world_dt, bool bonus) {
     if (!started || closed || !motion_ready || !population.refill_ready || !std::isfinite(world_dt) || world_dt < 0) return false;
     if (world_dt == 0) return true;
     const Dictionary target = spawn_target(time, bonus);
@@ -99,6 +101,40 @@ bool SpeedRunCore::step_regular_population(double world_dt, bool bonus) {
         if (spawn_enemy(definition.id, point, options) < 0) return false;
         if (p.maximum[selected] > 0) ++p.type_counts[selected];
         p.effective[selected] += 1.0; alive += 1.0; ++raw;
+    }
+    if (!bonus && current.wave_interval > 0) {
+        p.wave_time += world_dt;
+        if (p.wave_time >= current.wave_interval) {
+            p.wave_time = 0;
+            if (alive < desired && raw < raw_limit) {
+                const double remaining = std::min(desired - alive, raw_limit - raw);
+                const int64_t count = int64_t(std::min(std::round(30.0 * spawn_timeline.density), std::ceil(remaining)));
+                const size_t type = index_of(current.wave_type);
+                if (type == definitions.size()) return true;
+                const bool ring = rng->randf() < 0.5;
+                if (ring) {
+                    for (int64_t k = 0; k < count; ++k) {
+                        const double angle = (double(k) + double(rng->randf())) / double(count) * (2.0 * Math_PI);
+                        const Vector2 unit(std::cos(angle), std::sin(angle));
+                        const double distance = std::min((view_half.x + p.margin) / std::max(0.0001, std::abs(double(unit.x))),
+                            (view_half.y + p.margin) / std::max(0.0001, std::abs(double(unit.y)))) + rng->randf() * 90.0;
+                        Dictionary options; options["facing"] = angle + Math_PI;
+                        if (spawn_enemy(current.wave_type, view_center + unit * distance, options) < 0) return false;
+                    }
+                } else {
+                    const double angle = rng->randf() * (2.0 * Math_PI);
+                    const Vector2 unit(std::cos(angle), std::sin(angle));
+                    for (int64_t k = 0; k < count; ++k) {
+                        const double distance = std::min(view_half.x / std::max(0.0001, std::abs(double(unit.x))),
+                            view_half.y / std::max(0.0001, std::abs(double(unit.y)))) + p.margin + k * 12.0;
+                        const double offset = (rng->randf() - 0.5) * 120.0;
+                        Dictionary options; options["facing"] = angle + Math_PI;
+                        if (spawn_enemy(current.wave_type, ship_pos + unit * distance + Vector2(-unit.y,unit.x) * offset, options) < 0) return false;
+                    }
+                }
+                emit_event("wave", Dictionary());
+            }
+        }
     }
     return true;
 }

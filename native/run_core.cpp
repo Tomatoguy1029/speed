@@ -8,7 +8,7 @@ using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("configure_refill", "config"), &SpeedRunCore::configure_refill);
-    ClassDB::bind_method(D_METHOD("step_regular_population", "world_dt", "bonus"), &SpeedRunCore::step_regular_population);
+    ClassDB::bind_method(D_METHOD("step_population", "world_dt", "bonus"), &SpeedRunCore::step_population);
     ClassDB::bind_method(D_METHOD("refill_snapshot"), &SpeedRunCore::refill_snapshot);
     ClassDB::bind_method(D_METHOD("configure_population", "config"), &SpeedRunCore::configure_population);
     ClassDB::bind_method(D_METHOD("survey_population", "target"), &SpeedRunCore::survey_population);

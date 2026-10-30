@@ -15,7 +15,7 @@ func _ready() -> void:
 		check(false, "補充前の人数と再配置をネイティブが扱う")
 	else:
 		await compare_population(comparison)
-		for mode in ["mix", "curve", "bonus", "blocked"]:
+		for mode in ["mix", "curve", "bonus", "blocked", "wave", "wave_bonus"]:
 			await compare_refill(comparison, mode)
 	probe.close()
 	print("[native_population] failed=%d" % failed)
@@ -100,7 +100,7 @@ func compare_refill(comparison, mode: String) -> void:
 	await lab.reset({"seed": 472, "empty": true})
 	var run: RunSimulation = lab.run
 	var core = comparison.create_native()
-	if not core.has_method("step_regular_population"):
+	if not core.has_method("step_population"):
 		check(false, "通常の補充をネイティブが扱う")
 		core.close()
 		lab.free()
@@ -124,7 +124,8 @@ func compare_refill(comparison, mode: String) -> void:
 		phase.pop_from = 35.0 if number == 0 else 15.0
 		phase.pop_to = phase.pop_from
 		phase.rate = 12.3
-		phase.wave_interval = 0.0
+		phase.wave_interval = 0.19 if mode.begins_with("wave") else 0.0
+		phase.wave_type = &"drifter"
 		phase.mix = {"shield": 1.7, "drifter": 1.0}
 		stage.phases.append(phase)
 	if mode == "curve":
@@ -155,7 +156,7 @@ func compare_refill(comparison, mode: String) -> void:
 		var dt := 0.0 if tick == 10 else 0.031 if tick % 3 else 0.017
 		run.state.time += dt
 		run.state.world_time += dt
-		run.state.bonus_t = 1.0 if mode == "bonus" and tick >= 60 else 0.0
+		run.state.bonus_t = 1.0 if mode in ["bonus", "wave_bonus"] and tick >= 60 else 0.0
 		run.enemies.tick(dt,dt)
 		core.step(dt)
 		run.state.events.clear()
@@ -166,12 +167,13 @@ func compare_refill(comparison, mode: String) -> void:
 				run.enemies.mark_dead(row)
 			run.enemies.cleanup()
 		run.spawn.spawner_tick(dt,dt)
-		check(core.step_regular_population(dt, run.state.bonus_t > 0.0), "通常の補充を更新できる")
+		check(core.step_population(dt, run.state.bonus_t > 0.0), "通常の補充を更新できる")
 		var difference: String = comparison.difference(comparison.snapshot(run, [], tick).enemies, core.enemies_snapshot())
 		check(difference.is_empty(), "補充後の種類・大きさ・HP・位置が一致する %s/%d: %s" % [mode,tick,difference])
 		difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 		check(difference.is_empty(), "時間帯と出現の通知が一致する: " + difference)
 		check(str(run.state.rng.state) == core.inspect().rng_state, "補充の乱数消費が一致する %s/%d" % [mode,tick])
 		check(run.spawn._spawn_acc == core.refill_snapshot().accumulator, "補充の残り時間が一致する")
+		check(run.spawn._wave_t == core.refill_snapshot().wave_time, "波状補充の経過時間が一致する")
 	core.close()
 	lab.free()

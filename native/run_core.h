@@ -167,6 +167,7 @@ class SpeedRunCore : public RefCounted {
     Phase phase = Phase::Play;
     struct Population {
         bool ready = false, refill_ready = false;
+        double wave_time = 0;
         double accumulator = 0, total_cap = 0, refill_time = 0;
         StringName phase_id;
         double recycle_scale = 0, region_cap = 0, margin = 0, field_radius = 0, planet_radius = 0;
@@ -192,7 +193,7 @@ protected:
 public:
     bool configure_population(const Dictionary &config);
     bool configure_refill(const Dictionary &config);
-    bool step_regular_population(double world_dt, bool bonus);
+    bool step_population(double world_dt, bool bonus);
     Dictionary refill_snapshot() const;
     double survey_population(double target);
     Variant population_spawn_point(double extra);

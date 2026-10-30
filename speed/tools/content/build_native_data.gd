@@ -62,15 +62,16 @@ static func build_probe(path: String) -> Error:
 ## 将来の出現個体は決めず、編集値から決まる曲線の傾きと強化区間だけを展開する。
 static func compile_spawn_timeline(stage: StageDef, config: GameConfig) -> Dictionary:
 	if stage == null or config == null or stage.phases.is_empty(): return {}
-	var data := {"version": 1, "boss_start": stage.boss_start(config), "density": config.density_mult,
+	var data := {"version": 2, "boss_start": stage.boss_start(config), "density": config.density_mult,
 		"bonus_pop": config.bonus_pop, "phases": [], "curves": [], "windows": [], "types": {}}
 	var types := {}
 	for phase: PhaseDef in stage.phases:
 		var row := {"id": String(phase.id), "start": phase.start, "pop_from": phase.pop_from, "pop_to": phase.pop_to,
-			"rate": phase.rate, "xp_bonus": phase.xp_bonus, "attack_budget": phase.attack_budget, "mix": phase.mix.duplicate()}
+			"rate": phase.rate, "xp_bonus": phase.xp_bonus, "attack_budget": phase.attack_budget, "mix": phase.mix.duplicate(), "wave_interval": phase.wave_interval, "wave_type": String(phase.wave_type)}
 		for key in ["surge_interval", "surge_pop", "surge_ranged", "surge_elite"]: row[key] = phase.surge_value(key, config)
 		data.phases.append(row)
 		for type in phase.mix: types[String(type)] = true
+		if phase.wave_interval > 0.0 and phase.wave_type != &"": types[String(phase.wave_type)] = true
 	for curve: SpawnCurve in stage.zako_curves:
 		var points := []
 		for i in curve.points.size(): points.append([curve.points[i].x, curve.points[i].y, SpawnCurve._slope(curve.points, i) if curve.points.size() > 1 else 0.0])

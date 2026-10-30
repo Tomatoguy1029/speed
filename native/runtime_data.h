@@ -28,7 +28,8 @@ struct EnemyDefinition {
 };
 struct SpawnTimeline {
     struct Phase {
-        godot::StringName id;
+        godot::StringName id, wave_type;
+        double wave_interval = 0;
         double start = 0, pop_from = 0, pop_to = 0, rate = 0, xp_bonus = 0;
         double interval = 0, pop = 0, ranged = 0, elite = 0;
         int64_t budget = 0;
