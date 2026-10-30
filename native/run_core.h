@@ -39,12 +39,22 @@ class SpeedRunCore : public RefCounted {
     struct Formation {
         struct Marker { StringName type; Vector2 offset; double rotation = 0; };
         struct Entry { double weight = 0; Vector2 pos; };
-        struct Layout { double weight = 0, value = -1; Variant managed; std::vector<std::vector<Marker>> placements; };
+        struct Layout { double weight = 0, value = -1; Variant managed; std::vector<StringName> types; std::vector<std::vector<Marker>> placements; };
         std::vector<Entry> entries;
         std::vector<Layout> layouts;
     };
     std::vector<Formation> formations;
     double formation_base_view = 1;
+    struct Clip {
+        struct Group { std::vector<std::pair<size_t,int64_t>> members; bool arrived = false; };
+        double start = 0, end = 0, interval = 0, priority = 0, next = -1e9;
+        int64_t maximum = 0;
+        PackedStringArray types;
+        std::vector<size_t> formations;
+        std::vector<Group> groups;
+    };
+    std::vector<Clip> clips;
+    bool clips_ready = false;
     std::vector<speed::EnemyDefinition::Kind> behavior_kinds;
     std::vector<std::vector<size_t>> behavior_rows;
     std::vector<size_t> free_rows, dead_rows;
@@ -206,6 +216,9 @@ protected:
     static void _bind_methods();
 public:
     bool configure_population(const Dictionary &config);
+    bool configure_clips(const Dictionary &data);
+    bool step_clips();
+    Array clips_snapshot() const;
     bool configure_formations(const Array &data, double base_view);
     PackedInt64Array spawn_formation(int64_t index, int64_t layout, int64_t entry, const PackedStringArray &types, double value, const Variant &priority, const Variant &managed);
     bool set_attack_formation_mode(bool enabled);

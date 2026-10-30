@@ -7,6 +7,9 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_clips", "data"), &SpeedRunCore::configure_clips);
+    ClassDB::bind_method(D_METHOD("step_clips"), &SpeedRunCore::step_clips);
+    ClassDB::bind_method(D_METHOD("clips_snapshot"), &SpeedRunCore::clips_snapshot);
     ClassDB::bind_method(D_METHOD("configure_formations", "data", "base_view"), &SpeedRunCore::configure_formations);
     ClassDB::bind_method(D_METHOD("spawn_formation", "index", "layout", "entry", "types", "value", "priority", "managed"), &SpeedRunCore::spawn_formation);
     ClassDB::bind_method(D_METHOD("set_attack_formation_mode", "enabled"), &SpeedRunCore::set_attack_formation_mode);
@@ -148,7 +151,7 @@ void SpeedRunCore::close() {
     behavior_rows.clear(); behavior_kinds.clear();
     dead_rows.clear();
     rows_by_id.clear();
-    definitions.clear(); formations.clear();
+    definitions.clear(); formations.clear(); clips.clear(); clips_ready = false;
     spawn_timeline = speed::SpawnTimeline();
     population = Population();
     draw = Draw();
@@ -265,7 +268,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         }
         parsed.push_back(def);
     }
-    definitions = std::move(parsed); formations.clear();
+    definitions = std::move(parsed); formations.clear(); clips.clear(); clips_ready = false;
     population = Population();
     enemy_aim_lag = aim_lag; enemy_aim_speed = aim_speed; aim_ready = aim_lag > 0;
     return true;

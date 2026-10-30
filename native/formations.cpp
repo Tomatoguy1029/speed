@@ -28,7 +28,7 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
         if (data[i].get_type() != Variant::DICTIONARY) return false;
         const Dictionary source = data[i];
         double version;
-        if (!scalar(source.get("version", Variant()), version) || version != 1 || source.get("entries", Variant()).get_type() != Variant::ARRAY || source.get("layouts", Variant()).get_type() != Variant::ARRAY) return false;
+        if (!scalar(source.get("version", Variant()), version) || version != 2 || source.get("entries", Variant()).get_type() != Variant::ARRAY || source.get("layouts", Variant()).get_type() != Variant::ARRAY) return false;
         Formation formation;
         const Array entries = source["entries"], layouts = source["layouts"];
         for (int k = 0; k < entries.size(); ++k) {
@@ -41,6 +41,14 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
             if (layouts[k].get_type() != Variant::DICTIONARY) return false;
             const Dictionary row = layouts[k]; Formation::Layout layout;
             if (!scalar(row.get("weight", Variant()), layout.weight) || !scalar(row.get("value", Variant()), layout.value)) return false;
+            if (row.get("types", Variant()).get_type() != Variant::ARRAY) return false;
+            const Array types = row["types"];
+            for (int t = 0; t < types.size(); ++t) {
+                if (types[t].get_type() != Variant::STRING && types[t].get_type() != Variant::STRING_NAME) return false;
+                const StringName type = types[t];
+                if (std::none_of(definitions.begin(), definitions.end(), [&](const auto &d) { return d.id == type; })) return false;
+                layout.types.push_back(type);
+            }
             layout.managed = row.get("managed", Variant());
             if (layout.managed.get_type() != Variant::NIL && layout.managed.get_type() != Variant::BOOL) return false;
             if (row.get("placements", Variant()).get_type() != Variant::ARRAY) return false;
@@ -49,12 +57,14 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
             for (int e = 0; e < placements.size(); ++e) {
                 if (placements[e].get_type() != Variant::ARRAY) return false;
                 const Array markers = placements[e]; std::vector<Formation::Marker> converted;
+                if (markers.size() != types.size()) return false;
                 for (int m = 0; m < markers.size(); ++m) {
                     if (markers[m].get_type() != Variant::DICTIONARY) return false;
                     const Dictionary item = markers[m]; Formation::Marker marker;
                     const Variant type = item.get("type", Variant());
                     if (type.get_type() != Variant::STRING && type.get_type() != Variant::STRING_NAME) return false;
                     marker.type = type;
+                    if (marker.type != layout.types[m]) return false;
                     if (std::none_of(definitions.begin(), definitions.end(), [&](const auto &d) { return d.id == marker.type; })) return false;
                     if (!point(item.get("offset", Variant()), marker.offset) || !scalar(item.get("rotation", Variant()), marker.rotation)) return false;
                     converted.push_back(marker);
@@ -66,6 +76,7 @@ bool SpeedRunCore::configure_formations(const Array &data, double base_view) {
         parsed.push_back(std::move(formation));
     }
     formations = std::move(parsed); formation_base_view = base_view;
+    clips.clear(); clips_ready = false;
     return true;
 }
 
