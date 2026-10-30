@@ -26,7 +26,7 @@ func bind_canis_major(owner_actor: CanisMajorBoss) -> void:
 
 func _event(event: Dictionary) -> void:
 	if event.cue == &"hit": hit = 0.18
-	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius", &"phase_changed", &"howl"]: pulse = 0.35
+	if event.cue in [&"aim_locked", &"pounce", &"command", &"sirius", &"phase_changed", &"howl", &"call", &"called", &"stream_windup", &"bay_windup", &"entrance_bark"]: pulse = 0.35
 	queue_redraw()
 
 func _advance(dt: float) -> void:
@@ -49,7 +49,7 @@ func _sync_parts() -> void:
 		var leg := parts.get_node(legs[i]) as Node2D
 		leg.rotation = sin(gait + (0.0 if i == 0 or i == 3 else PI)) * (0.16 if moving else 0.015)
 	parts.get_node("Tail").rotation = sin(gait * 0.4) * 0.07
-	var charging: bool = actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false)
+	var charging: bool = actor.technique_pose.get("shout", false) or actor.technique_pose.get("gather", false) or actor.technique_pose.get("bay", false) or actor.technique_pose.get("call", false)
 	parts.get_node("Head/Sirius").set_state(actor.clock, blaze(), actor.table.charge[actor.body] if charging else 0.0, pulse)
 
 ## シリウスの輝きの強さ（0〜1）。第2形態への移行の間に強め、そのあとは強いまま。
@@ -69,4 +69,8 @@ func _draw() -> void:
 	if actor.mode == &"recovery":
 		var a := 0.45 + sin(actor.clock * 14.0) * 0.25
 		draw_arc(Vector2(-6, 0), 106.0, 0.0, TAU, 32, Color(sirius_halo_color, a), pixel_size * 2.0)
+	if actor.technique_pose.get("call", false) or (actor.technique in [&"stream", &"bay", &"hunt_pounce"] and actor.technique_pose.get("shout", false)):
+		for ring in 2:
+			var grow := fmod(actor.clock * 2.5 + ring * 0.5, 1.0)
+			draw_arc(Vector2(84, 0), 20.0 + grow * 90.0, 0.0, TAU, 32, Color(WARNING, 1.0 - grow), pixel_size)
 	draw_set_transform(Vector2.ZERO)

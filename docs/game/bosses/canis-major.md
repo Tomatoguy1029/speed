@@ -145,7 +145,7 @@
 
 `scenes/bosses/canis_major_presentation.tscn` を差し替えて、役者の `presentation_scene` に指定する。シーンは `bind_canis_major(actor)` で以下を接続する。
 
-- `presentation_event`：登場、第2形態への移行、予告、遠吠えの囲みの開始、着地点や向きの固定、飛びかかり、号令、順番の号令と吠え立ての猟犬ごとの予告、呼び声、シリウスの光（炎）と炎のビームの溜め・発射、燃える猟犬の点火と爆発、光を継ぐ群れの猟犬ごとの予告、シリウスの閃光の溜めと発光、硬直、被弾、撃破、制限時間演出。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。
+- `presentation_event`：登場、第2形態への移行、予告、遠吠えの囲みの開始、着地点や向きの固定、飛びかかり、号令、順番の号令と吠え立ての猟犬ごとの予告、呼び声、シリウスの光（炎）と炎のビームの溜め・発射、燃える猟犬の点火と爆発、光を継ぐ群れの猟犬ごとの予告、シリウスの閃光の溜めと発光、硬直、被弾、撃破、制限時間演出。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。群れの合図は `call`・`called`・`stream_windup`・`stream_mark`・`stream_launch`・`bay_windup`・`bay_bark`・`bay_nip_mark`・`bay_nip`・`howl_mark`・`howl_launch`・`entrance_bark`。猟犬ごとの合図はその個体の位置を渡す。
 - `presentation_advanced`：世界時間の進行。停止中はアニメーションも止まる。
 
 表現の方針：
@@ -159,10 +159,11 @@
 
 技の動きと公開値は `scripts/bosses/canis_major/techniques/`、技の見た目は `scenes/bosses/canis_major/`、保存値は `data/bosses/canis_major_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
 
+- 順番の号令・吠え立て・追い立てと飛びかかりは、`scripts/bosses/canis_major/techniques/stream.gd`・`bay.gd`・`hunt_pounce.gd` と、`data/bosses/canis_major_moves/stream.tres`・`bay.tres`・`hunt_pounce.tres` を接続する。猟犬の専用追従と白い予告の期限は `scripts/enemies/hound.gd`、全身の白い表示は `scripts/render/enemies/hound.gd` が扱う。
 - 本体の数値（HP・装甲・追う速さ・旋回、連れて出る猟犬の数、率いる範囲と上限、隊形の列と横の間隔、追いつくときの速さの倍率、率いている猟犬を倒すのに要る体当たりの回数、率いている猟犬の仮表示の色、第2形態へ移るHPの割合・シリウスを輝かせる時間・第2形態の追う速さ、隊形の揺らぎと速さのばらつき、射線を空ける横の幅、隊形を離れて動く猟犬の最高速・旋回・加減速）の正は [`speed/data/bosses/canis_major.tres`](../../../speed/data/bosses/canis_major.tres)、技別の性能（予告・狙いを固定する時間・着地点の先までの距離・跳ぶ時間・猟犬が飛び出す速さと時間・号令に要る猟犬の数、群れが少ないとみなす猟犬の数と群れが少ないときの飛びかかりの再使用待ち、光の長さ・太さ・光を出す時間、遠吠えの囲みの猟犬の数・薄い所の数と抜く数・始めと終わりの半径・並ぶ時間・狭める時間・輪へ走る速さの倍率・呼び足す猟犬の上限と出る距離、順番の号令の光ってから飛び出すまでの時間と間隔、吠え立ての囲む距離・噛みつく猟犬の数と間隔・ボスが飛びかかるまでの時間、呼び声で保つ数、遠吠えの輪の中心が自機を追う時間と飛び出しの間隔、シリウスの光（炎）の溜め・吐く時間・炎の速さと寿命と太さ・向き直りの速さ、焼き焦がす光の回数・焼け跡の時間、燃える猟犬の数・走る速さ・明滅の時間・爆発の半径、光を継ぐ群れの間隔・予告線の時間、追い立ての締めの狙い、シリウスの閃光の猟犬の数と位置・溜め・輪の数と速さと間隔、ダメージ・硬直・再使用待ち）は [`canis_major_moves/`](../../../speed/data/bosses/canis_major_moves/) とする。第2形態の値は、同じファイルの同じ名前に `_p2` を付けた項目に置き、第2形態では置いた項目だけを置き換える。「ボス行動」画面では、その項目の名前に「（第2形態）」を添えて示す。どれも試遊調整用の仮値。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。
 - 技の選択は共通フローで行う。`ai/canis_major_flow.tres` が区間・消費上限・共有スタミナ・休息と単発技と大技の重みを、`ai/canis_major_action_rules.tres` が技ごとの距離条件と消費を持つ。「ボス行動」画面のボスの選択に、おおいぬ座がある。
 - `canis_major_boss_timeline.tres` の `attack` は、着地点や向きの固定・技の開始・終了のメソッドトラックを持つ。役者ごとに複製し、技の開始時に専用データの時間へ合わせて手動更新する。制限時間の一撃は `boss_final_strike.gd` の共通演出を使う。
-- 率いる猟犬へは、猟犬の行動（`scripts/enemies/hound.gd`）の `follow()` で走る先と期限を渡す。期限が過ぎると、猟犬は通常の群れの追跡へ戻る。
+- 率いる猟犬へは、猟犬の行動（`scripts/enemies/hound.gd`）の `follow()` で走る先と期限を渡し、吠え立ては `steer_follow()` で向き・加減速を制限する。期限が過ぎると、猟犬は通常の群れの追跡へ戻る。
 - ステージ3の `boss_id` が `canis_major` を参照し、`boss_time` の時刻に登場する。撃破を最終勝利の接続点とし、共通のボス撃破演出と伝説モジュール（`legendary_keel`）獲得演出へ渡す。
 - `gyms/canis_major_trial.tscn` をF6で起動すると、敵・ルート実験場がステージ3の設定で開き、おおいぬ座と群れを置いた試遊ができる。シーンのInspectorで、開始位置・無敵・試遊用の攻撃倍率・追加で置く猟犬の群れの数・繰り返す技・第2形態から始めるかを変える。実験場の配置からも `canis_major` を置ける。
 

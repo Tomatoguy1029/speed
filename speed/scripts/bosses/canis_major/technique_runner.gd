@@ -79,3 +79,104 @@ func kind() -> StringName:
 
 func body_pose(_host: CanisMajorBoss) -> Dictionary:
 	return {}
+
+## 複数の猟犬と本体を並行して進める技だけ、世界時間で個別に更新する。
+var manual := false
+var shots: Dictionary = {}
+var sequence: Array = []
+var sequence_start := 0.0
+var last_launch := 0.0
+
+func manual_tick(_host: CanisMajorBoss, _dt: float) -> void: pass
+
+func windup_progress(_host: CanisMajorBoss) -> float: return 0.0
+
+func cancel(host: CanisMajorBoss) -> void:
+	var hounds = host._hounds()
+	if hounds != null:
+		for item in sequence:
+			if host.table.id[item.row] == item.id: hounds.release_order(item.row)
+		for i in shots:
+			host.lunging.erase(i)
+			if host.table.id[i] == shots[i].id: hounds.release_order(i)
+	shots.clear()
+	sequence.clear()
+
+func finish(host: CanisMajorBoss, recover: float) -> void:
+	host.timeline.stop()
+	host.locked = false
+	host.table.vel[host.body] = Vector2.ZERO
+	host.mode = &"recovery"
+	host.recovery = recover
+	host._cue(&"recovery_started")
+
+func begin_sequence(host: CanisMajorBoss, rows: Array, start: float, interval: float, warn: float) -> void:
+	sequence.clear()
+	sequence_start = start
+	last_launch = start + maxf(0, rows.size() - 1) * interval + warn
+	for k in rows.size():
+		var i := int(rows[k])
+		sequence.append({"row": i, "id": host.table.id[i], "mark": start + k * interval, "launch": start + k * interval + warn, "marked": false, "launched": false})
+
+func valid_hound(host: CanisMajorBoss, i: int, id: int) -> bool:
+	return host.table.alive[i] != 0 and host.table.dead[i] == 0 and host.table.id[i] == id
+
+func tick_sequence(host: CanisMajorBoss, r: Dictionary, prefix: String) -> void:
+	var hounds = host._hounds()
+	if hounds == null: return
+	for item in sequence:
+		var i := int(item.row)
+		if not valid_hound(host, i, item.id): continue
+		if not item.marked and host.clock >= float(item.mark):
+			item.marked = true
+			hounds.mark(i, host.run_state.world_time + maxf(0.0, float(item.launch) - host.clock))
+			host._cue(StringName(prefix + "_mark"), host.table.pos[i])
+		if not item.launched and host.clock >= float(item.launch):
+			item.launched = true
+			launch_hound(host, i, float(r.lunge_speed), float(r.lunge_time), float(r.damage))
+			host.ring.erase(i)
+			host._cue(StringName(prefix + "_launch"), host.table.pos[i])
+
+func launch_hound(host: CanisMajorBoss, i: int, speed: float, duration: float, damage: float) -> void:
+	var hounds = host._hounds()
+	if hounds == null: return
+	hounds.release_order(i)
+	var toward := (host.run_state.ship_pos - host.table.pos[i]).normalized()
+	var until := host.run_state.world_time + duration
+	hounds.follow(i, host.table.pos[i] + toward * speed * (duration + 0.2), until, speed / maxf(host.table.speed[i], 1.0))
+	hounds.quiet(i, until, toward * speed)
+	host.table.vel[i] = toward * speed
+	host.table.facing[i] = toward.angle()
+	if not host.lunging.has(i): host.lunging.append(i)
+	shots[i] = {"id": host.table.id[i], "until": host.clock + duration, "from": host.table.pos[i], "hit": false, "damage": damage, "velocity": toward * speed}
+
+func tick_lunges(host: CanisMajorBoss) -> void:
+	var hounds = host._hounds()
+	for i: int in shots.keys():
+		var shot: Dictionary = shots[i]
+		if not valid_hound(host, i, shot.id):
+			shots.erase(i)
+			host.lunging.erase(i)
+			continue
+		if not shot.hit and _ship_touches(host, shot.from, host.table.pos[i], host.table.r[i]):
+			shot.hit = true
+			host.ctx.ship.damage(float(shot.damage) * host.ctx.cfg.atk_scale, 0.0, host.technique, &"canis_major")
+		shot.from = host.table.pos[i]
+		if host.clock >= float(shot.until):
+			if hounds != null: hounds.release_order(i)
+			host.lunging.erase(i)
+			shots.erase(i)
+		else:
+			# ボスの突進は固定した向き。群れの分離や通常の噛みつきに曲げられない。
+			host.table.vel[i] = shot.velocity
+
+func shuffled_pack(host: CanisMajorBoss) -> Array:
+	var rows: Array = []
+	for i in host.led:
+		if host._alive_hound(i) and not host.ring.has(i): rows.append(i)
+	for k in range(rows.size() - 1, 0, -1):
+		var j := host.run_state.rng.randi_range(0, k)
+		var row = rows[k]
+		rows[k] = rows[j]
+		rows[j] = row
+	return rows
