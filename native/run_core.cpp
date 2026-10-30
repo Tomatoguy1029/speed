@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_formations", "data", "base_view"), &SpeedRunCore::configure_formations);
+    ClassDB::bind_method(D_METHOD("spawn_formation", "index", "layout", "entry", "types", "value", "priority", "managed"), &SpeedRunCore::spawn_formation);
     ClassDB::bind_method(D_METHOD("set_attack_formation_mode", "enabled"), &SpeedRunCore::set_attack_formation_mode);
     ClassDB::bind_method(D_METHOD("enemy_attack_snapshot"), &SpeedRunCore::enemy_attack_snapshot);
     ClassDB::bind_method(D_METHOD("set_population_mode", "enabled", "bonus", "blocked"), &SpeedRunCore::set_population_mode);
@@ -146,7 +148,7 @@ void SpeedRunCore::close() {
     behavior_rows.clear(); behavior_kinds.clear();
     dead_rows.clear();
     rows_by_id.clear();
-    definitions.clear();
+    definitions.clear(); formations.clear();
     spawn_timeline = speed::SpawnTimeline();
     population = Population();
     draw = Draw();
@@ -263,7 +265,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         }
         parsed.push_back(def);
     }
-    definitions = std::move(parsed);
+    definitions = std::move(parsed); formations.clear();
     population = Population();
     enemy_aim_lag = aim_lag; enemy_aim_speed = aim_speed; aim_ready = aim_lag > 0;
     return true;

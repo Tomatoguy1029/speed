@@ -104,3 +104,20 @@ static func build_spawn_timelines(output: String) -> Error:
 		file.close()
 		if error != OK: return error
 	return OK
+
+## 固定の配置と出現方向の組合せを先に変換する。画面の広さと機体の向きは実行中に適用する。
+static func compile_formation(source: Dictionary) -> Dictionary:
+	var out := {"version":1,"layouts":[],"entries":[]}
+	for entry in source.get("entries",[]):
+		out.entries.append({"weight":entry.weight,"pos":entry.pos})
+	for layout in source.get("layouts",[]):
+		var placements := []
+		for entry in source.get("entries",[]):
+			var markers := []
+			var basis := Transform2D(float(entry.rot),Vector2.ZERO)
+			for marker in layout.markers:
+				var local := basis * Transform2D(float(marker.rot),Vector2(marker.pos))
+				markers.append({"type":String(marker.type),"offset":local.origin,"rotation":local.get_rotation()})
+			placements.append(markers)
+		out.layouts.append({"weight":layout.weight,"value":layout.get("value",-1.0),"managed":layout.get("attack_managed"),"placements":placements})
+	return out
