@@ -176,6 +176,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 		if released: return
 		released = true
 		for member in pairs:
+			host.sirius_effects.clear_tint(member.row,member.id)
 			if valid_hound(host,member.row,member.id): host._hounds().release_order(member.row)
 			host.lunging.erase(member.row)
 	func cancel(host: CanisMajorBoss) -> void:

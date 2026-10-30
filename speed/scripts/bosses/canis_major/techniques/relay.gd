@@ -162,6 +162,7 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 			finish(host,float(values.recover))
 	func cancel(host: CanisMajorBoss) -> void:
 		for item in items:
+			host.sirius_effects.clear_tint(item.row,item.id)
 			if valid_hound(host,item.row,item.id): host._hounds().release_order(item.row)
 			host.lunging.erase(item.row)
 		host.sirius_effects.warnings.clear()

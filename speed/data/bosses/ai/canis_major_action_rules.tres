@@ -10,12 +10,27 @@
 [ext_resource type="Resource" path="res://data/bosses/canis_major_moves/bay.tres" id="bay"]
 [ext_resource type="Resource" path="res://data/bosses/canis_major_moves/hunt_pounce.tres" id="hunt_pounce"]
 
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/sirius_flame.tres" id="sirius_flame"]
+
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/blaze.tres" id="blaze"]
+
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/relay.tres" id="relay"]
+
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/hunt.tres" id="hunt"]
+
+[ext_resource type="Resource" path="res://data/bosses/canis_major_moves/nova.tres" id="nova"]
+
 [resource]
 script = ExtResource("1_cmrul")
 adapter = &"canis_major"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
-techniques = Array[Resource]([ExtResource("2_cmpnc"), ExtResource("3_cmcmd"), ExtResource("4_cmsir"), ExtResource("5_cmhwl"), ExtResource("stream"), ExtResource("bay"), ExtResource("hunt_pounce")])
+techniques = Array[Resource]([ExtResource("2_cmpnc"), ExtResource("3_cmcmd"), ExtResource("4_cmsir"), ExtResource("5_cmhwl"), ExtResource("stream"), ExtResource("bay"), ExtResource("hunt_pounce"), ExtResource("sirius_flame"), ExtResource("blaze"), ExtResource("relay"), ExtResource("hunt"), ExtResource("nova")])
 conditions = {
+"nova": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 800.0, "min_phase": 2},
+"hunt": {"angle": 0.0, "half_angle": 180.0, "min": 250.0, "max": 750.0, "min_phase": 2},
+"relay": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1200.0, "min_phase": 2},
+"blaze": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1200.0, "min_phase": 2},
+"sirius_flame": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 650.0, "min_phase": 2},
 "stream": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 900.0, "min_phase": 1},
 "bay": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1200.0, "min_phase": 1},
 "hunt_pounce": {"angle": 0.0, "half_angle": 180.0, "min": 180.0, "max": 700.0, "min_phase": 1},
@@ -50,6 +65,11 @@ conditions = {
 }
 }
 costs = {
+"nova": 3.0,
+"hunt": 3.0,
+"relay": 3.0,
+"blaze": 2.0,
+"sirius_flame": 2.0,
 "stream": 2.0,
 "bay": 3.0,
 "hunt_pounce": 3.0,
@@ -59,11 +79,16 @@ costs = {
 "sirius": 2.0
 }
 condition_groups = {
-"choose_harass": {"title": "牽制", "nodes": ["pounce", "command", "sirius"]},
-"choose_pressure": {"title": "圧力", "nodes": ["stream", "bay", "hunt_pounce"]},
-"choose_major": {"title": "大技", "nodes": ["howl"]}
+"choose_harass": {"title": "牽制", "nodes": ["pounce", "command", "sirius", "sirius_flame"]},
+"choose_pressure": {"title": "圧力", "nodes": ["stream", "bay", "hunt_pounce", "hunt", "blaze", "relay"]},
+"choose_major": {"title": "大技", "nodes": ["howl", "nova"]}
 }
 layout = {
+"nova": Vector2(2700, 436),
+"hunt": Vector2(1620, 1076),
+"relay": Vector2(1620, 1716),
+"blaze": Vector2(1620, 1396),
+"sirius_flame": Vector2(540, 1076),
 "choose_harass": Vector2(40, 116),
 "pounce": Vector2(540, 116),
 "command": Vector2(540, 436),
@@ -76,6 +101,11 @@ layout = {
 "howl": Vector2(2700, 116)
 }
 graph_nodes = {
+"nova": {"source": "nova", "connected": true},
+"hunt": {"source": "hunt", "connected": true},
+"relay": {"source": "relay", "connected": true},
+"blaze": {"source": "blaze", "connected": true},
+"sirius_flame": {"source": "sirius_flame", "connected": true},
 "pounce": {"source": "pounce", "connected": true},
 "command": {"source": "command", "connected": true},
 "sirius": {"source": "sirius", "connected": true},

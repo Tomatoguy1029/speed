@@ -344,9 +344,6 @@ func mouth() -> Vector2:
 func launch() -> void:
 	_runner_for().launch(self)
 
-func _fire_sirius() -> void:
-	_runner_id(&"sirius")._fire_sirius(self)
-
 func _active_tick(dt: float) -> void:
 	_runner_for()._active_tick(self, dt)
 

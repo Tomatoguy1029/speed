@@ -7,7 +7,7 @@ extends "res://gyms/enemy_lab/enemy_lab.gd"
 ## ボスが連れて出る群れとは別に、ボスのまわりへ置く猟犬の群れの数（1群れは猟犬の pack_count 体）
 @export_range(0, 10) var trial_extra_packs := 0
 ## normal は共通フローの選択。技のIDを選ぶと、その技だけを繰り返す
-@export_enum("normal", "pounce", "command", "sirius", "howl", "stream", "bay", "hunt_pounce") var trial_technique := "normal"
+@export_enum("normal", "pounce", "command", "sirius", "howl", "stream", "bay", "hunt_pounce", "sirius_flame", "blaze", "relay", "hunt", "nova") var trial_technique := "normal"
 ## 有効なら、始めてすぐシリウスを強く輝かせて第2形態へ移る
 @export var trial_phase_two := false
 
@@ -67,7 +67,7 @@ func _only(id: StringName) -> void:
 	if actor == null: return
 	_repeat_id = id
 	actor.selection_enabled = false
-	if id == &"sirius": _phase_two()
+	if id in [&"blaze", &"sirius", &"sirius_flame"]: _phase_two()
 
 func _repeat_technique() -> void:
 	if _repeat_id.is_empty() or not session.playing or session.run == null: return

@@ -159,6 +159,7 @@ func _valid(i: int, id: int) -> bool:
 	return actor.table.alive[i] != 0 and actor.table.dead[i] == 0 and actor.table.id[i] == id
 
 func ignite(i: int, values: Dictionary) -> void:
+	clear_tint(i, actor.table.id[i])
 	actor.led.erase(i)
 	actor._led_ids.erase(i)
 	actor._toughen_pack()
@@ -239,3 +240,8 @@ func _tick_tints() -> void:
 			actor.table.color[i] = entry.base
 			tints.erase(i)
 		else: actor.table.color[i] = entry.color
+
+func clear_tint(i: int, id: int) -> void:
+	if not tints.has(i) or tints[i].id != id: return
+	if _valid(i,id): actor.table.color[i] = tints[i].base
+	tints.erase(i)
