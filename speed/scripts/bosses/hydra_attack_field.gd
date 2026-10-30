@@ -32,7 +32,8 @@ func add_shape(points: PackedVector2Array, width: float, delay: float, life: flo
 	var effect := {"id": serial, "points": points, "width": width, "delay": delay, "life": life,
 		"age": 0.0, "damage": damage, "kind": kind, "owner": owner,
 		"owner_id": actor.table.id[owner] if owner >= 0 else -1, "velocity": velocity,
-		"persistent": persistent, "hit": false}
+		"persistent": persistent, "hit": false, "trace": actor.combat_trace_for(owner)}
+	if damage > 0.0: effect.trace.execute()
 	visuals[serial]=line
 	effects.append(effect)
 	return effect
@@ -74,6 +75,7 @@ func tick(dt: float) -> void:
 			e.points=PackedVector2Array([at,at+Vector2(0.1,0)])
 		if e.age >= e.delay:
 			for i in e.points.size(): e.points[i] += e.velocity * dt
+			if not e.hit and e.damage > 0.0: e.trace.evaluate()
 			var touching := intersects(e.points,e.width,ship_previous,ship) or intersects(prior,e.width,ship_previous,ship)
 			# Moving projectiles sweep their front and back edges too.
 			if not touching and prior.size()==e.points.size():
@@ -87,7 +89,7 @@ func tick(dt: float) -> void:
 					actor.run_state.ship_vel += (e.points[-1]-e.points[0]).normalized() * float(e.get("wind_force", actor.def.params.wind_force)) * dt
 			elif touching and not e.hit and e.damage > 0.0:
 				actor.ctx.projectiles.end_attack_visual(StringName(visuals[e.id].scene_file_path), "Hit", ship)
-				actor.ctx.projectiles.ship.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
+				e.trace.damage(e.damage * actor.ctx.cfg.atk_scale,0.0,e.kind,&"hydra")
 				e.hit = true
 		e.previous_points=e.points.duplicate()
 		var line: Node2D=visuals[e.id]

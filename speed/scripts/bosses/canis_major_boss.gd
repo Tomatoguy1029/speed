@@ -139,6 +139,8 @@ func _stop_combat() -> void:
 
 func sim_tick(_real_dt: float, dt: float) -> void:
 	if dt <= 0.0 or not body_alive(): return
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	clock += dt
 	table.flash[body] = maxf(0.0, table.flash[body] - dt)
 	table.hit_cd[body] = maxf(0.0, table.hit_cd[body] - dt)
@@ -177,6 +179,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		recovery = maxf(0.0, recovery - dt)
 		table.vel[body] = Vector2.ZERO
 		if recovery <= 0.0:
+			combat_trace.finish()
 			mode = &"idle"
 			technique = &""
 	elif mode in [&"windup", &"active", &"bay"] and _runner != null and _runner.manual:
@@ -213,6 +216,7 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 	if mode not in [&"defeated", &"final"]: sirius_effects.tick(dt)
 	_previous_ship = run_state.ship_pos
 	_sync_technique_visuals()
+	ctx.bosses.recording_actor = prior_observer
 	presentation_advanced.emit(dt)
 
 func rule() -> Dictionary:
@@ -281,17 +285,22 @@ func start_attack(attack: StringName) -> bool:
 	var r: Dictionary = _rules[attack]
 	var length := _attack_length(attack, r)
 	if not ctx.bosses.admit("boss:" + str(body_id), ["aimed"], body, length): return false
+	combat_trace.begin(attack, combat_origin)
 	technique = attack
 	_runner = _moves[attack].make_runner()
 	_support_runners[attack] = _runner
 	used_at[attack] = clock
+	var prior_observer := ctx.bosses.recording_actor
+	if combat_trace.enabled(): ctx.bosses.recording_actor = self
 	_begin_windup(r, length)
+	ctx.bosses.recording_actor = prior_observer
 	return true
 
 func attack_playing() -> bool:
 	return mode in [&"windup", &"active", &"bay", &"recovery"]
 
 func cancel_attack() -> void:
+	combat_trace.finish("interrupted", "cancelled")
 	if sirius_effects != null: sirius_effects.warnings.clear()
 	if _runner != null: _runner.cancel(self)
 	combo_pending = false
@@ -542,6 +551,12 @@ func lab_ranges(_with_idle := false) -> Array[Dictionary]:
 	return [{"center": center, "radius": table.r[body], "active": mode == &"active"}]
 
 func _cue(cue: StringName, at: Vector2 = Vector2.INF) -> void:
+	match cue:
+		&"telegraph", &"stream_windup", &"bay_windup", &"blaze_windup", &"relay_windup", &"nova_windup", &"flame_windup": combat_trace.stage("telegraph")
+		&"aim_locked": combat_trace.stage("lock")
+		&"pounce", &"sirius", &"command", &"howl", &"bay_nip", &"bay_bark", &"relay_fire", &"nova_flash", &"flame_start", &"blaze_ignite", &"blaze_explode": combat_trace.stage("execute")
+		&"recovery_started": combat_trace.stage("recovery")
+		&"phase_changed": combat_trace.event("boss_phase", {"reason": "hp_threshold"})
 	presentation_event.emit({"cue": cue, "technique": technique, "phase": phase, "mode": mode,
 		"position": table.pos[body] if at == Vector2.INF else at, "angle": table.facing[body], "world_time": clock})
 

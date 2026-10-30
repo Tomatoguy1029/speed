@@ -161,10 +161,11 @@ class Runner extends "res://scripts/bosses/canis_major/technique_runner.gd":
 			if elapsed < 0.0: continue
 			var radius := 30.0+float(values.ring_speed)*elapsed
 			if radius > float(values.ring_end) or ring_hit[k]: continue
+			host.combat_trace.evaluate()
 			var distance := host.run_state.ship_pos.distance_to(host.mouth())
 			if absf(distance-radius) <= float(values.ring_band)+host.ctx.cfg.ship_radius and not in_shadow(host,host.run_state.ship_pos,host.ctx.cfg.ship_radius):
 				ring_hit[k] = true
-				host.ctx.ship.damage(float(values.damage)*host.ctx.cfg.atk_scale,0.0,&"nova",&"canis_major")
+				host.combat_trace.damage(float(values.damage)*host.ctx.cfg.atk_scale,0.0,&"nova",&"canis_major")
 	func update_shadows(host: CanisMajorBoss) -> void:
 		shadows.clear()
 		var source := host.mouth()

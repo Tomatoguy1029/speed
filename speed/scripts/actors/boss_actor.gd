@@ -34,6 +34,10 @@ func bind(context: RunContext, row: int, d: BossDef) -> void:
 	combat_trace.bind(self)
 	_on_bound()
 
+## 録画停止・役者の解放では、並行する行動も含めて観測を閉じる。
+func finish_combat_observations(step: String, reason: String) -> void:
+	combat_trace.finish(step, reason)
+
 ## 結び付いたあとの準備（各ボスで上書きする）。
 func _on_bound() -> void:
 	pass

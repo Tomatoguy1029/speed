@@ -182,12 +182,15 @@ func start(actions: Array, internal_step := false) -> bool:
 		elif not actor.attack_ready(StringName(action.id), internal_step): return false
 	var started: Array = []
 	for action in actions:
+		var previous_origin: String = actor.combat_origin
+		actor.combat_origin = "natural_ai"
 		var ok: bool
 		if action.has("program"):
 			custom_run = preload("res://scripts/bosses/flow/combo_runner.gd").new(action.program, self)
 			ok = true
 		elif action.get("execution_kind", action.category) == "single": ok = actor.start_normal(actor.necks.find(action.heads[0]), StringName(action.id), internal_step)
 		else: ok = actor.try_start_tech(StringName(action.id), 1.0, action.heads, internal_step)
+		actor.combat_origin = previous_origin
 		if not ok:
 			_cancel_actions(started + [action])
 			return false

@@ -55,12 +55,13 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 
 	func _strike_tick(host: CentaurusBoss) -> void:
 		if host.attack_hit: return
+		host.combat_trace.evaluate()
 		var r := host.rule()
 		var center := host.rear_center(r)
 		var reach := float(r.range_radius) + host.ctx.cfg.ship_radius
 		if Geometry2D.get_closest_point_to_segment(center, host._previous_ship, host.run_state.ship_pos).distance_to(center) <= reach:
 			host.attack_hit = true
-			host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"rear_attack", &"centaurus")
+			host.combat_trace.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"rear_attack", &"centaurus")
 
 	## 背後攻撃を共通フローが今すぐ選べるか。選べる間は離脱より背後攻撃を優先する。
 

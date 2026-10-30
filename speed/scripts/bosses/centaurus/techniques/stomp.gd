@@ -84,6 +84,7 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 		if elapsed >= float(r.warn) + float(r.active):
 			host.finish_technique()
 			return
+		host.combat_trace.evaluate()
 		var offset := host.run_state.ship_pos - host.stomp_center()
 		if not hit and offset.length() <= float(r.range_radius) + host.ctx.cfg.ship_radius and absf(Geom.angle_diff(offset.angle(), host.table.facing[host.body])) <= deg_to_rad(float(r.half_angle)):
-			hit = host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"stomp", &"centaurus")
+			hit = host.combat_trace.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"stomp", &"centaurus")

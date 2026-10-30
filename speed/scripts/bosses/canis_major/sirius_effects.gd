@@ -94,10 +94,11 @@ func tick(dt: float) -> void:
 	for trail in trails:
 		trail.age = float(trail.age) + dt
 		if float(trail.age) < float(trail.delay) or float(trail.age) >= float(trail.life): continue
+		actor.combat_trace.evaluate()
 		var end: Vector2 = trail.from + Vector2.from_angle(float(trail.angle)) * float(trail.length)
 		var reach := float(trail.width) * 0.5 + actor.ctx.cfg.ship_radius
 		if Geometry2D.get_closest_point_to_segment(actor.run_state.ship_pos, trail.from, end).distance_to(actor.run_state.ship_pos) < reach:
-			actor.ctx.ship.damage(float(trail.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_trail", &"canis_major")
+			actor.combat_trace.damage(float(trail.damage) * actor.ctx.cfg.atk_scale, 0.0, &"sirius_trail", &"canis_major")
 	trails = trails.filter(func(trail): return float(trail.age) < float(trail.life))
 	_sync_fire_displays()
 	queue_redraw()
@@ -162,9 +163,10 @@ func _tick_particles(dt: float) -> void:
 			var distance := (Vector2(particle.pos)-Vector2(trail.from)).dot(Vector2.from_angle(float(trail.angle)))
 			trail.length = clampf(maxf(float(trail.length),distance),0.0,float(trail.maximum))
 		if particle.harmful and (not particle.has("shot") or not particle.shot.hit):
+			actor.combat_trace.evaluate()
 			if Geometry2D.get_closest_point_to_segment(actor.run_state.ship_pos,from,particle.pos).distance_to(actor.run_state.ship_pos) < float(particle.radius) * float(particle.hit_scale) + actor.ctx.cfg.ship_radius:
 				if particle.has("shot"): particle.shot.hit = true
-				actor.ctx.ship.damage(float(particle.damage) * actor.ctx.cfg.atk_scale, 0.0, particle.attack, &"canis_major")
+				actor.combat_trace.damage(float(particle.damage) * actor.ctx.cfg.atk_scale, 0.0, particle.attack, &"canis_major")
 	particles = particles.filter(func(particle): return float(particle.age) < float(particle.life))
 
 func _valid(i: int, id: int) -> bool:
@@ -210,8 +212,9 @@ func _tick_burning(dt: float) -> void:
 			# 表示は短い判定や猟犬の死亡に結び付けず、炎の寿命まで残す。
 			_burst_id += 1
 			bursts.append({"key":_burst_id,"pos":at,"radius":r.explode_radius,"age":0.0,"preset":r.explosion_fire})
+			actor.combat_trace.evaluate()
 			if at.distance_to(actor.run_state.ship_pos)<=float(r.explode_radius)+actor.ctx.cfg.ship_radius:
-				actor.ctx.ship.damage(float(r.damage)*actor.ctx.cfg.atk_scale,0.0,&"blaze",&"canis_major")
+				actor.combat_trace.damage(float(r.damage)*actor.ctx.cfg.atk_scale,0.0,&"blaze",&"canis_major")
 			actor._cue(&"blaze_explode", actor.table.pos[i])
 			actor.ctx.enemies.mark_dead(i)
 			burning.erase(i)

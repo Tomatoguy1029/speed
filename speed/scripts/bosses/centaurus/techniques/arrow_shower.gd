@@ -160,9 +160,10 @@ class Runner extends "res://scripts/bosses/centaurus/technique_runner.gd":
 			if mark.landed: continue
 			mark.landed = true
 			host._cue(&"shower_landed", mark.center)
+			host.combat_trace.evaluate()
 			var reach := float(r.radius) + host.ctx.cfg.ship_radius
 			if host.run_state.ship_pos.distance_squared_to(mark.center) <= reach * reach:
-				host.ctx.ship.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
+				host.combat_trace.damage(float(r.damage) * host.ctx.cfg.atk_scale, 0.0, &"arrow", &"centaurus")
 
 		if finished:
 			marks.clear()
