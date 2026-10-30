@@ -11,11 +11,7 @@ const EXPECTED := {
 		"rate": 22050,
 		"size": 22050
 	},
-	"dash": {
-		"hash": "3c2e4040ce6537d4739fd922a0ce27bfc5dbf6e06700f7c0f72c94fa463c6980",
-		"rate": 22050,
-		"size": 7938
-	},
+
 	"hit": {
 		"hash": "5da78562aab917b6d0ecb27af43212180bfff246039a670f2a5c7c1a82766863",
 		"rate": 22050,
@@ -46,11 +42,7 @@ const EXPECTED := {
 		"rate": 22050,
 		"size": 1764
 	},
-	"ui": {
-		"hash": "9ced8e099c4f59ee2cf817e8d5a0d4623120e8dc806fd4a88336b185feace455",
-		"rate": 22050,
-		"size": 1764
-	}
+
 }
 var failed := 0
 func check(ok: bool, label: String) -> void:
@@ -66,5 +58,67 @@ func _ready() -> void:
 		hash.update(wav.data)
 		check(hash.finish().hex_encode() == EXPECTED[name].hash, "波形を維持する: " + name)
 		check(wav.mix_rate == EXPECTED[name].rate and wav.data.size() == EXPECTED[name].size, "長さとサンプル周波数を維持する: " + name)
+	for song in [&"battle", &"boss", &"menu"]:
+		var music := AudioManager._music.get(song) as AudioStreamMP3
+		check(music != null and music.loop and music.get_length() > 0.0, "BGMをループ再生できる: " + String(song))
+	AudioManager.play_music(&"battle", 0.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(AudioManager._music_player.playing and AudioManager._music_player.stream == AudioManager._music[&"battle"], "通常戦闘曲を開始する")
+	AudioManager.play_music(&"boss", 0.08)
+	check(AudioManager._music_player.stream == AudioManager._music[&"battle"], "フェードアウト中は前の曲を保持する")
+	await get_tree().create_timer(0.25).timeout
+	check(AudioManager._music_player.stream == AudioManager._music[&"boss"] and AudioManager._music_player.playing, "フェード後にボス曲へ切り替える")
+	AudioManager.play_music(&"battle", 0.2)
+	AudioManager.stop_music()
+	await get_tree().create_timer(0.3).timeout
+	check(not AudioManager._music_player.playing and AudioManager._music_player.stream == null, "画面退出時は切り替え中でも再生を再開しない")
+	var old_screen := Node.new()
+	var menu_screen := Node.new()
+	AudioManager.play_music(&"battle", 0.0, old_screen)
+	await get_tree().process_frame
+	AudioManager.play_music(&"menu", 0.0, menu_screen)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	AudioManager.stop_music(old_screen)
+	check(AudioManager._music_track == &"menu" and AudioManager._music_player.playing, "前の戦闘画面の退出でメニューBGMを停止しない")
+	AudioManager.stop_music(menu_screen)
+	old_screen.free()
+	menu_screen.free()
+	for sound in [&"menu_open", &"upgrade_apply", &"ui"]:
+		var stream := AudioManager._sounds.get(sound) as AudioStreamMP3
+		check(stream != null, "強化用MP3を読み込む: " + String(sound))
+		if stream != null: check(not stream.loop and stream.get_length() > 0.0, "強化音を一回再生できる: " + String(sound))
+	AudioManager._sounds.erase(&"menu_open")
+	AudioManager.play(&"menu_open")
+	check(AudioManager._sounds.has(&"menu_open"), "更新前のバンクを保持していても強化音を再読込する")
+	var opened: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
+	check(opened.playing and opened.stream is AudioStreamMP3, "強化画面の音を再生口へ渡す")
+	opened.stop()
+	var dash := AudioManager._sounds.get(&"dash") as AudioStreamWAV
+	var loop := AudioManager._sounds.get(&"dash_loop") as AudioStreamWAV
+	var tail := AudioManager._sounds.get(&"dash_end") as AudioStreamWAV
+	check(dash != null and tail != null and loop != null, "開始・維持・終了音を用意する")
+	if dash != null and tail != null and loop != null:
+		check(dash.loop_mode == AudioStreamWAV.LOOP_DISABLED and tail.loop_mode == AudioStreamWAV.LOOP_DISABLED, "開始と終了は一回再生")
+		check(loop.loop_mode == AudioStreamWAV.LOOP_FORWARD and loop.loop_end > 0, "移動中だけループする")
+		AudioManager.start_dash(-6.0)
+		var first = AudioManager._dash_voice
+		check(is_equal_approx(db_to_linear(first.attack.volume_db), db_to_linear(-6.0) / 3.0), "音量は従来の1/3")
+		AudioManager.end_dash()
+		check(first.attack.playing and first.release.playing, "短いダッシュでも開始音を切らず終了音を鳴らす")
+		for i in 40: AudioManager.play(&"hurt")
+		check(first.attack.playing and first.release.playing, "ほかの効果音で上書きされない")
+		AudioManager.start_dash(-6.0)
+		var second = AudioManager._dash_voice
+		check(first.release.playing, "次のダッシュでも前の余韻を切らない")
+		await second.attack.finished
+		check(second.sustain.playing, "長いダッシュは維持音につながる")
+		AudioManager.end_dash()
+		check(second.release.playing, "ダッシュ終了から余韻を最後まで鳴らす")
+		await second.release.finished
+		await get_tree().process_frame
+		await get_tree().process_frame
+		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
 	print("[baked_audio] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)

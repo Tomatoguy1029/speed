@@ -13,6 +13,8 @@
 [ext_resource type="Texture2D" path="res://assets/pixel/canis_major/leg_front_normal.png" id="leg_front_normal"]
 [ext_resource type="Texture2D" path="res://assets/pixel/canis_major/tail_normal.png" id="tail_normal"]
 
+[ext_resource type="Script" path="res://scripts/bosses/canis_major_sirius.gd" id="sirius"]
+
 [sub_resource type="ShaderMaterial" id="lighting"]
 shader = ExtResource("shader")
 shader_parameter/use_normal = true
@@ -103,3 +105,7 @@ position = Vector2(0, 42)
 position = Vector2(0, 27.5)
 material = SubResource("lighting")
 texture = SubResource("head_lit")
+
+[node name="Sirius" type="Node2D" parent="Head"]
+position = Vector2(0, 59)
+script = ExtResource("sirius")
