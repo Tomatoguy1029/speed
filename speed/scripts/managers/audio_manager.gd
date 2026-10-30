@@ -1,6 +1,6 @@
 ## 音。Autoload（設計書 4.3・13）。
 ##
-## バスは「Master（全体）」「SFX（効果音）」「Engine（エンジン音）」「Music（BGM）」。音量と消音は設定（SaveManager）に従う。
+## ダッシュは専用バスでスロー減衰を除外し、音量と消音は設定（SaveManager）に従う。
 ## 制作工程でまとめた納品音声と短い仮の合成音を読む（仕様書 18）。
 ## 通常効果音は再生口を使い回し、ダッシュとBGMは専用の再生口を持つ。
 extends Node
@@ -24,6 +24,7 @@ func _ready() -> void:
 	_ensure_bus(&"SFX")
 	_ensure_bus(&"Engine")
 	_ensure_bus(&"Music")
+	_ensure_bus(&"Dash")
 	_music_player = AudioStreamPlayer.new()
 	_music_player.bus = &"Music"
 	add_child(_music_player)
@@ -124,10 +125,12 @@ func set_slow_motion(enabled: bool) -> void:
 
 func _apply_volumes() -> void:
 	var s := SaveManager.settings
-	_set_bus(&"Master", float(s.master_volume) * (0.35 if _slow_motion else 1.0), bool(s.muted))
-	_set_bus(&"SFX", float(s.sfx_volume), false)
-	_set_bus(&"Engine", float(s.engine_volume), false)
-	_set_bus(&"Music", float(s.get("music_volume", 0.5)), false)
+	var slow_gain := 0.35 if _slow_motion else 1.0
+	_set_bus(&"Master", float(s.master_volume), bool(s.muted))
+	_set_bus(&"SFX", float(s.sfx_volume) * slow_gain, false)
+	_set_bus(&"Engine", float(s.engine_volume) * slow_gain, false)
+	_set_bus(&"Music", float(s.get("music_volume", 0.5)) * slow_gain, false)
+	_set_bus(&"Dash", float(s.sfx_volume), false)
 
 func _set_bus(bus: StringName, linear: float, muted: bool) -> void:
 	var idx := AudioServer.get_bus_index(bus)

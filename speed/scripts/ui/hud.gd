@@ -268,8 +268,6 @@ func _on_events(events: Array[Dictionary]) -> void:
 				_banner_t = 99.0
 			&"levelup":
 				AudioManager.play(&"levelup", -6.0)
-			&"bolt":
-				AudioManager.play(&"contact_arc", -12.0)
 			&"kill":
 				if not ev.get("silent", false):
 					AudioManager.play(&"kill", -10.0, randf_range(0.9, 1.2))

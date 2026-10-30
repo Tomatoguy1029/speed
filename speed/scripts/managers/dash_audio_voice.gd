@@ -14,7 +14,7 @@ func start(sounds: Dictionary, volume_db: float, pitch: float) -> void:
 	attack.play()
 func _player(stream: AudioStream, volume: float, pitch: float) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.bus = &"SFX"
+	player.bus = &"Dash"
 	player.stream = stream
 	player.volume_db = volume
 	player.pitch_scale = pitch
