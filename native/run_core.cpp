@@ -7,6 +7,7 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_lifecycle", "config"), &SpeedRunCore::configure_lifecycle);
     ClassDB::bind_method(D_METHOD("set_run_guards", "guards"), &SpeedRunCore::set_run_guards);
     ClassDB::bind_method(D_METHOD("set_paused", "paused"), &SpeedRunCore::set_paused);
     ClassDB::bind_method(D_METHOD("friendly_buffer", "visual", "pixel", "scale", "clock"), &SpeedRunCore::friendly_buffer);
@@ -55,6 +56,7 @@ void SpeedRunCore::_bind_methods() {
 
 bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) {
     if (started || closed || first_id <= 0 || first_gem_seq < 0) return false;
+    if (lifecycle_ready && !frame_ready) return false;
     if (forward.ready && !combat_ready) return false;
     if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
     if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
@@ -141,6 +143,7 @@ Dictionary SpeedRunCore::inspect() const {
     Dictionary out;
     out["active"] = started && !closed;
     out["phase"] = int(phase);
+    out["sequence_t"] = sequence_t;
     out["closed"] = closed;
     out["time"] = time;
     out["world_time"] = world_time;
@@ -341,6 +344,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
             !center.is_finite() || !half.is_finite() || half.x <= 0 || half.y <= 0 || !std::isfinite(camera_zoom) || camera_zoom <= 0) return false;
     for (const char *key : {"touch", "has_cursor", "stick_active", "press", "alt_press", "pen_release"}) if (input.has(key) && input[key].get_type() != Variant::BOOL) return false;
     for (const char *key : {"cursor", "stick", "pen"}) if (input.has(key) && (input[key].get_type() != Variant::VECTOR2 || !Vector2(input[key]).is_finite())) return false;
+    if (phase == Phase::Dying) { step_death(real_dt); return true; }
     if (phase != Phase::Play) return true;
     if (controls_locked || encounter_protected) hitstop = 0;
     const Dictionary intent = controls_locked || steering_locked ? Dictionary() : input;
@@ -352,6 +356,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (hitstop > 0) { hitstop = std::max(0.0, hitstop - real_dt); return true; }
     if (!draw.tracing && dash_stop > 0) dash_stop = std::max(0.0, dash_stop - real_dt * combat_config.kill_hitstop_regen);
     step_draw(real_dt);
+    if (check_run_end()) return true;
     const double world_dt = real_dt * world_scale();
     time += real_dt; world_time += world_dt;
     world_accum += world_dt; ++world_steps;
@@ -360,6 +365,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
     if (world_step) {
         world_accum = 0; world_steps = 0;
         advance_enemies(accumulated);
+        if (check_run_end()) return true;
         rebuild_enemy_grid(frame_grid_cell);
     }
     step_ship(real_dt, world_dt, intent);
@@ -368,6 +374,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         step_projectiles(accumulated);
         step_hostiles(accumulated);
     }
+    if (check_run_end()) return true;
     for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
     dead_rows.clear();
     if (world_step) step_pickups(accumulated);
