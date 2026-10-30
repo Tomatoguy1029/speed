@@ -101,6 +101,14 @@ func _clump(p: PixelPainter) -> void:
 			if d + 0.35 * (nz - 0.5) > 0.85: continue
 			if (x + y + flicker) & 1 and d > 0.45: continue
 			_under.fill(c.x + x, c.y + y, Color("#ffbe65", 0.55) if d < 0.45 else Color("#c86a1e", 0.4))
+	# 鎖：機体の後ろから、撃ち出す順に船体どうしをつなぐ。撃ち出しを待つ間は明るく光る
+	var ready: bool = tow.cargo[0].ready
+	var link := Color("#fff2c0") if ready else Color("#ffbe65")
+	var prev: Vector2 = state.ship_pos - u * 12.0 * p.px
+	for j in count:
+		var hull: Vector2 = tow.cargo[j].pos
+		_chain(p, prev, hull, link, j)
+		prev = hull
 	# 牽引したばかりの船体から塊へ、光の線と流れる粒
 	for j in count:
 		var h: Dictionary = tow.cargo[j]
@@ -112,6 +120,17 @@ func _clump(p: PixelPainter) -> void:
 		for k in 3:
 			var q := fposmod(state.world_time * 3.0 + k / 3.0 + j * 0.13, 1.0)
 			p.dot(h.pos.lerp(target, q), Color("#fff2c0"))
+
+## 鎖の1区間：4ドットおきの輪（2ドット）を、細い線でつなぐ。輪は機体のほうへ流れる。
+func _chain(p: PixelPainter, a: Vector2, b: Vector2, color: Color, seed: int) -> void:
+	var cells := a.distance_to(b) / p.px
+	if cells < 1.0: return
+	p.line(a, b, Color(color, 0.35))
+	var shift := fposmod(state.world_time * 12.0 + seed * 1.7, 4.0)
+	var k := shift
+	while k < cells:
+		p.dot(b.lerp(a, k / cells), color, 2)
+		k += 4.0
 
 ## 撃った船体：焼けた色と輪（白→橙）と、後ろへ引くピクセルの炎。
 func _hulls(p: PixelPainter, dt: float) -> void:

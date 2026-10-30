@@ -9,7 +9,7 @@ var _rings: PixelPainter
 var _vapor := 0.0
 var _boom_age := 99.0
 var _last_pulse := 0.0
-## マッハ円錐の開き。高速の間の値を保ち、蒸気が消えていく間は広げない
+## マッハ円錐の開き。細い円錐の間の値を保ち、蒸気が消えていく間は広げない
 var _cone := 0.3
 var pushes: Array[Dictionary] = []
 var impacts: Array[Dictionary] = []
@@ -69,7 +69,12 @@ func _draw_rings(r: PixelPainter) -> void:
 func _draw_ship(p: PixelPainter, dt: float) -> void:
 	var speed: float = behavior.speed / p.px
 	var high: bool = (state.tracing or state.glide) and behavior.fast()
-	_vapor += ((1.0 if high else 0.0) - _vapor) * minf(1.0, dt * 6.0)
+	# 蒸気は細い円錐が見える速さ（円錐の半角が35度以下）の間だけ出す。遅いと円錐が横へ開くので出さない
+	var ring_speed: float = behavior.wave_speed() / p.px
+	var cone_now := asin(minf(0.99, ring_speed / maxf(speed, ring_speed + 1.0)))
+	var supersonic := high and cone_now <= deg_to_rad(35.0)
+	if supersonic: _cone = cone_now
+	_vapor += ((1.0 if supersonic else 0.0) - _vapor) * minf(1.0, dt * 6.0)
 	_boom_age += dt
 	if behavior.pulse > _last_pulse: _boom_age = 0.0
 	_last_pulse = behavior.pulse
@@ -77,9 +82,6 @@ func _draw_ship(p: PixelPainter, dt: float) -> void:
 	var u := state.ship_heading
 	var n := u.orthogonal()
 	if level > 0.02:
-		if high:
-			var ring_speed: float = behavior.wave_speed() / p.px
-			_cone = asin(minf(0.99, ring_speed / maxf(speed, ring_speed + 1.0)))
 		var cone := _cone
 		for i in 40:
 			var k := float((i * 37) % 40) / 40.0

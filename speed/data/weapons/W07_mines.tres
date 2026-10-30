@@ -11,7 +11,7 @@ params = {
 "radius_by_level": [110.0, 110.0, 110.0, 110.0, 145.0],
 "life_by_level": [4.0, 4.0, 4.0, 6.0, 6.0],
 "max": 60,
-"trigger": 70.0,
+"trigger": 21.0,
 "spread": 65.0,
 "range_min": 70.0,
 "range_max": 270.0

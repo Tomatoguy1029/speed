@@ -14,12 +14,16 @@ var heals: Array[Dictionary] = []
 var _add: PixelPainter
 
 const LENS := preload("res://shaders/hole_lens.gdshader")
+const GLOW := preload("res://shaders/soft_glow.gdshader")
 ## 戦闘エフェクトツールで調整する shader
 const TUNED_SHADERS := [LENS]
 
 func dispose() -> void:
 	if is_instance_valid(_add): _add.queue_free()
 	for h in holes: _free_lens(h)
+	for g in heals:
+		g.outer.queue_free()
+		g.inner.queue_free()
 	super()
 
 func _free_lens(h: Dictionary) -> void:
@@ -50,8 +54,8 @@ func on_event(ev: Dictionary) -> void:
 				"delay": randf() * 0.08, "sw": (randf() - 0.5) * 1.2, "shards": shards})
 		&"hole_recover":
 			var dots: Array[Dictionary] = []
-			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1 + randi() % 2, "dl": randf() * 0.12})
-			heals.append({"age": 0.0, "dots": dots})
+			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1.2 + randf() * 1.6, "dl": randf() * 0.12})
+			heals.append({"age": 0.0, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
 
 func tick(_dt: float) -> void:
 	var dt := world_dt()
@@ -79,6 +83,10 @@ func tick(_dt: float) -> void:
 	for g in heals:
 		g.age += dt
 		_heal(p, g, center)
+	for g in heals:
+		if g.age >= 0.7:
+			g.outer.queue_free()
+			g.inner.queue_free()
 	heals = heals.filter(func(g): return g.age < 0.7)
 	p.end()
 	_add.end()
@@ -160,25 +168,28 @@ func _capture(p: PixelPainter, c: Dictionary, center: Vector2) -> void:
 		shade.a = fade
 		p.dot(pos, shade, s.s)
 
-## 回復：緑のやわらかい光（市松で透ける円）と、舞い上がる緑の粒。
+## 回復：機体を中心に緑のやわらかい光が広がり（外の光と、白っぽい内の光）、緑の丸い粒が舞い上がる。
 func _heal(p: PixelPainter, g: Dictionary, center: Vector2) -> void:
 	var h: float = g.age / 0.7
-	var c := p.cell(center)
-	var outer := 12.0 + 40.0 * h
-	var inner := 8.0 + 14.0 * h
-	var big := ceili(outer)
-	for y in range(-big, big + 1):
-		for x in range(-big, big + 1):
-			var d := sqrt(float(x * x + y * y))
-			if d > outer: continue
-			var cx := roundf(c.x) + x
-			var cy := roundf(c.y) + y
-			if d <= inner and (x + y) % 2 == 0:
-				p.fill(cx, cy, Color(220.0 / 255.0, 1.0, 230.0 / 255.0, 0.5 * (1.0 - h) * (1.0 - h) * (1.0 - d / inner)))
-			elif PixelPainter.bayer(int(cx), int(cy)) < 6:
-				p.fill(cx, cy, Color(110.0 / 255.0, 1.0, 170.0 / 255.0, 0.55 * (1.0 - h) * (1.0 - d / outer)))
+	_glow(g.outer, center, (12.0 + 40.0 * h) * p.px, Color(110.0 / 255.0, 1.0, 170.0 / 255.0, 0.55 * (1.0 - h)))
+	_glow(g.inner, center, (8.0 + 14.0 * h) * p.px, Color(220.0 / 255.0, 1.0, 230.0 / 255.0, 0.5 * (1.0 - h) * (1.0 - h)))
 	for dot in g.dots:
 		var k := clampf((h - dot.dl) / (1.0 - dot.dl), 0.0, 1.0)
 		if k <= 0.0 or k >= 1.0: continue
 		var pos: Vector2 = center + Vector2(cos(dot.a) * dot.v * k, sin(dot.a) * dot.v * k * 0.6 - dot.up * k) * p.px
-		p.dot(pos, Color(Color("#8fffbe"), 1.0 - k), dot.s)
+		p.disk(pos, dot.s, Color(Color("#8fffbe"), 1.0 - k))
+
+func _glow(rect: ColorRect, center: Vector2, radius: float, color: Color) -> void:
+	rect.position = center - Vector2.ONE * radius
+	rect.size = Vector2.ONE * radius * 2.0
+	(rect.material as ShaderMaterial).set_shader_parameter("glow_color", color)
+
+## 回復の光の面（機体の下に置く）。
+func _glow_rect() -> ColorRect:
+	var rect := ColorRect.new()
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.material = ShaderMaterial.new()
+	rect.material.shader = GLOW
+	rect.z_index = -1
+	rm._layers.ship.add_child(rect)
+	return rect

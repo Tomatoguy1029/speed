@@ -1,5 +1,6 @@
 ## W21 質量牽引砲：なぞり中に機体の近くで倒れた敵の船体を、大型の敵も丸ごと牽引する。
-## なぞり終えると、進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける（彗星限定。一覧 docs/game/catalog/weapons.md）。
+## なぞり終えると、塊を hold 秒その場に止めて見せ、そのときの進む向きへ1つずつ撃ち出し、弾が尽きるまで撃ち続ける
+## （彗星限定。一覧 docs/game/catalog/weapons.md）。撃つ速さに機体の勢いは足さない。
 ## 隕石とボスは牽引しない。
 extends WeaponBehavior
 
@@ -7,6 +8,7 @@ extends WeaponBehavior
 var cargo: Array[Dictionary] = []
 const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
+var _launch_dir := Vector2.RIGHT
 
 ## なぞり中に回収範囲へ船体が入っていれば、倒した手段を問わず牽引する。牽引したら true（破片は出さない）。
 func capture(i: int) -> bool:
@@ -26,7 +28,9 @@ func capture(i: int) -> bool:
 func on_end() -> void:
 	for c in cargo:
 		c.ready = true
-	_fire_t = 0.0
+	_fire_t = float(p("hold"))
+	var v := state.ship_vel
+	_launch_dir = v.normalized() if v.length() > 1.0 else state.ship_heading
 
 func tick(dt: float, _busy: bool) -> void:
 	if cargo.is_empty():
@@ -41,18 +45,20 @@ func tick(dt: float, _busy: bool) -> void:
 	var center := state.ship_pos - u * (70.0 + spacing * sqrt(float(count)) * 0.6)
 	for j in count:
 		var c: Dictionary = cargo[j]
+		c.angle += dt * (0.6 if j % 2 == 0 else -0.6)
+		# 撃ち出しを待つ塊はその場に止める
+		if c.ready: continue
 		var offset := Vector2.from_angle(j * GOLDEN_ANGLE) * spacing * 0.6 * sqrt(float(j))
 		var wobble := Vector2(sin(state.time * 2.0 + j), cos(state.time * 1.7 + j * 1.3)) * 5.0
 		c.pos += (center + offset + wobble - c.pos) * follow
-		c.angle += dt * (0.6 if j % 2 == 0 else -0.6)
 	_fire_t -= dt
 	var shot_interval := interval(float(p("interval")) / rate_k())
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:
 		var c: Dictionary = cargo.pop_front()
 		var dmg := atk() * float(p("damage")) * dmg_k() * maxf(1.0, float(c.r) / float(p("size_ref")))
-		ctx.projectiles.fire_hull(c.pos, u * (float(p("shot_speed")) + sp) * post_factor(&"projectile_speed"), area(c.r), dmg, p("life"), p("knock"),
-			c.type, u.angle(), c.source_id)
-		state.emit(&"anchor_fire", {"pos": c.pos, "dir": u, "radius": c.r})
+		ctx.projectiles.fire_hull(c.pos, _launch_dir * float(p("shot_speed")) * post_factor(&"projectile_speed"), area(c.r), dmg, p("life"), p("knock"),
+			c.type, _launch_dir.angle(), c.source_id)
+		state.emit(&"anchor_fire", {"pos": c.pos, "dir": _launch_dir, "radius": c.r})
 		_fire_t += shot_interval
 	if cargo.is_empty() or not cargo[0].ready:
 		_fire_t = 0.0
