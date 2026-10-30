@@ -2,6 +2,7 @@
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
+#include <godot_cpp/core/math.hpp>
 using namespace godot;
 
 bool SpeedRunCore::configure_combat(const Dictionary &config, const Dictionary &stats) {
@@ -40,10 +41,25 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
     return t >= 0 && t <= 1 ? t : -1;
 }
 
-void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock) {
+static double angle_difference(double target, double current) {
+    const double difference = target - current;
+    return difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+}
+
+bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) const {
+    const auto &enemy = enemies[row];
+    const auto &def = definitions[enemy.definition];
+    if (def.kind != speed::EnemyDefinition::Kind::Shield) return false;
+    Vector2 toward = hit - enemy.pos;
+    if (toward.length_squared() < 0.01) toward = -direction;
+    return toward.length_squared() > 0 && std::abs(angle_difference(toward.angle(), enemy.facing)) <= def.front_arc;
+}
+
+void SpeedRunCore::damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock, const Vector2 *impact) {
     auto &enemy = enemies[row];
     if (enemy.dead || amount <= 0) return;
     const auto &def = definitions[enemy.definition];
+    if (cause != StringName("ram") && cause != StringName("bump") && blocks_front(row, impact ? *impact : enemy.pos, direction)) return;
     bool fresh = enemy.hp >= def.hp - 1e-6;
     if (draw.tracing) {
         if (enemy.dash_seen != draw.dash_id) { enemy.dash_seen = draw.dash_id; enemy.dash_fresh = fresh; }
@@ -96,28 +112,52 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     std::vector<Hit> hits;
     for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
         const auto &enemy = enemies[row];
-        if (draw.tracing ? draw.inside.count(enemy.id) > 0 : enemy.hit_cd > 0) continue;
+        if (draw.tracing ? draw.inside.count(enemy.id) > 0 : (enemy.hit_cd > 0 && definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
         const double t = segment_circle(from, to, enemy.pos, definitions[enemy.definition].radius + radius);
         if (t >= 0) hits.push_back({t, row});
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
     for (const auto &hit : hits) {
         auto &enemy = enemies[hit.row];
-        if (enemy.dead || (draw.tracing ? draw.inside.count(enemy.id) > 0 : enemy.hit_cd > 0)) continue;
+        if (enemy.dead || (draw.tracing && draw.inside.count(enemy.id) > 0)) continue;
         const auto &def = definitions[enemy.definition];
         const Vector2 position = from.lerp(to, hit.time);
         const double speed = ship.vel.length();
         const Vector2 direction = speed > 0 ? ship.vel / speed : Vector2();
         const double attack = c.base_attack * c.attack_mult * c.atk_scale;
         const bool fast = draw.tracing || ship.glide || speed >= ship_config.max_speed * c.ram_speed_ratio;
-        const bool crit = rng->randf() < c.crit_chance;
+        const bool front = blocks_front(hit.row, position, direction);
+        if (front && (!fast || (!draw.tracing && enemy.hit_cd > 0))) {
+            Vector2 normal = position - enemy.pos;
+            normal = normal.length_squared() > 0 ? normal.normalized() : -direction;
+            ship.pos = enemy.pos + normal * (def.radius + radius + 1.0);
+            const double vn = ship.vel.dot(normal);
+            if (vn < 0) { ship.vel -= normal * 2.0 * vn; ship.vel *= c.bounce_keep; }
+            if (enemy.hit_cd <= 0) {
+                enemy.hit_cd = 0.25;
+                Dictionary event; event["pos"] = position; event["normal"] = normal; event["enemy_pos"] = enemy.pos; event["r"] = def.radius;
+                emit_event("block_impact", event);
+            }
+            ship_pos = ship.pos;
+            return true;
+        }
+        if (!draw.tracing && enemy.hit_cd > 0) continue;
+        const bool rear = std::abs(angle_difference((position - enemy.pos).angle(), enemy.facing + Math_PI)) <= def.weak_arc;
+        const bool crit = (def.weak_arc > 0 && rear) || rng->randf() < c.crit_chance;
         if (!fast) {
             enemy.hit_cd = c.contact_cooldown;
-            damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction);
+            damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
             continue;
         }
-        if (attack >= def.armor * (crit ? c.crit_armor : 1.0)) {
-            damage_enemy(hit.row, attack * (crit ? c.crit_mult : 1.0), "ram", crit, direction);
+        if (!front && attack >= def.armor * (crit ? c.crit_armor : 1.0)) {
+            double damage = attack * (crit ? c.crit_mult : 1.0);
+            if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
+                ship.shield_t = def.shield_time; ship.shield_max = def.shield_time; ship.shield_flash = 0.2;
+                Dictionary stolen; stolen["pos"] = enemy.pos; stolen["facing"] = enemy.facing; stolen["r"] = def.radius; stolen["arc"] = def.front_arc;
+                emit_event("shield_stolen", stolen);
+                damage = std::max(damage, enemy.hp);
+            }
+            damage_enemy(hit.row, damage, "ram", crit, direction);
             if (crit) {
                 Dictionary impact; impact["pos"] = position; impact["enemy_pos"] = enemy.pos; impact["r"] = def.radius;
                 emit_event("weak_impact", impact);
@@ -150,7 +190,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         ship.vel *= c.bounce_keep;
         if (ship.vel.length() < c.bounce_min_speed) ship.vel = normal * c.bounce_min_speed;
         ship.boost_t = 0;
-        damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
+        if (!front) damage_enemy(hit.row, attack * 0.25, "bump", crit, -normal);
         enemy.hit_cd = 0.25;
         Dictionary bounce; bounce["pos"] = ship.pos; emit_event("bounce", bounce);
         ship_pos = ship.pos;

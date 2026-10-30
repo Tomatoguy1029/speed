@@ -45,7 +45,7 @@ class SpeedRunCore : public RefCounted {
     bool aim_ready = false;
     struct Ship {
         Vector2 pos, vel, heading = Vector2(0, -1);
-        double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0;
+        double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0, shield_max = 0;
         double boost_t = 0, fade_t = 0, glide_t = 0, glide_speed = 0, peak_speed = 0;
         bool glide = false;
     } ship;
@@ -87,7 +87,8 @@ class SpeedRunCore : public RefCounted {
     int64_t kills = 0;
     Array events;
     void emit_event(StringName type, Dictionary data = Dictionary());
-    void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock = 160.0);
+    void damage_enemy(size_t row, double amount, StringName cause, bool crit, Vector2 direction, double knock = 160.0, const Vector2 *impact = nullptr);
+    bool blocks_front(size_t row, Vector2 hit, Vector2 direction) const;
     struct PickupConfig {
         int64_t gem_max = 0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;

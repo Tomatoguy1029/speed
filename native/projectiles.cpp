@@ -75,6 +75,7 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
         auto &shot = friends[i];
         if (!shot.alive) continue;
         const Vector2 from = shot.pos, vel = shot.vel, to = from + vel * world_dt;
+        Vector2 position = to;
         double life = double(shot.life) - world_dt;
         shot.age = double(shot.age) + world_dt;
         shot.angle = double(shot.angle) + double(shot.spin) * world_dt;
@@ -97,15 +98,34 @@ bool SpeedRunCore::step_projectiles(double world_dt) {
             const auto &enemy = enemies[hit.row];
             if (life <= 0 || enemy.dead || shot.hit_ids.count(enemy.id)) continue;
             const Vector2 impact = from.lerp(to, hit.time);
+            if (shot.kind == 0 && blocks_front(hit.row, impact, vel)) {
+                auto &target = enemies[hit.row];
+                if (target.fire_t <= 0) {
+                    const auto &def = definitions[target.definition];
+                    Vector2 normal = (impact - target.pos).normalized();
+                    if (normal.is_zero_approx()) normal = Vector2::from_angle(target.facing);
+                    const Vector2 direction = (vel - normal * 2.0 * vel.dot(normal)).normalized();
+                    Hostile reflected;
+                    reflected.kind = 2; reflected.pos = impact + normal * 2.0;
+                    reflected.vel = direction * def.reflect_speed; reflected.speed = def.reflect_speed;
+                    reflected.radius = std::clamp(double(shot.radius), 5.0, 10.0);
+                    reflected.life = def.reflect_life; reflected.damage = def.reflect_damage;
+                    add_hostile(std::move(reflected));
+                    target.fire_t = std::max(0.01, def.reflect_interval); target.flash = 0.1;
+                    Dictionary reflected_event; reflected_event["pos"] = impact; reflected_event["normal"] = normal;
+                    emit_event("shield_reflect", reflected_event);
+                }
+                position = impact; life = 0; break;
+            }
             shot.hit_ids.insert(enemy.id);
-            damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock);
+            damage_enemy(hit.row, shot.damage, shot.cause, false, speed > 0 ? vel / speed : Vector2(), shot.knock, &impact);
             duplicate_friend(i, impact);
             Dictionary event; event["pos"] = impact; event["dir"] = vel.normalized();
             event["visual_key"] = String(shot.visual); event["kind"] = shot.kind;
             emit_event("shot_hit", event);
             if (!shot.pierce) { if (shot.pierce_left > 0) --shot.pierce_left; else life = 0; }
         }
-        shot.pos = to; shot.life = life;
+        shot.pos = position; shot.life = life;
         if (life <= 0) {
             if (shot.kind == 1) {
                 --live_debris;

@@ -91,7 +91,10 @@ bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &
     if (ship.hurt > 0) ship.hurt -= real_dt;
     if (ship.invuln > 0) ship.invuln -= world_dt;
     ship.shield_flash = std::max(0.0, ship.shield_flash - world_dt);
-    ship.shield_t = std::max(0.0, ship.shield_t - world_dt);
+    if (ship.shield_t > 0) {
+        ship.shield_t = std::max(0.0, ship.shield_t - world_dt);
+        if (ship.shield_t <= 0) { Dictionary event; event["pos"] = ship.pos; emit_event("shield_expired", event); }
+    }
     if (draw.drawing || draw.tracing || world_dt <= 0) return true;
     const auto &c = ship_config;
     if (bool(input.get("touch", false))) {
@@ -126,7 +129,7 @@ Dictionary SpeedRunCore::ship_snapshot() const {
     if (!ship_ready || closed) return out;
     out["ship_pos"] = ship.pos; out["ship_vel"] = ship.vel; out["ship_heading"] = ship.heading;
     out["ship_hp"] = ship.hp; out["ship_hurt"] = ship.hurt; out["ship_invuln"] = ship.invuln;
-    out["ship_shield_flash"] = ship.shield_flash; out["ship_shield_t"] = ship.shield_t;
+    out["ship_shield_flash"] = ship.shield_flash; out["ship_shield_t"] = ship.shield_t; out["ship_shield_max"] = ship.shield_max;
     out["ship_boost_t"] = ship.boost_t; out["ship_fade_t"] = ship.fade_t;
     out["glide"] = ship.glide; out["glide_t"] = ship.glide_t; out["glide_speed"] = ship.glide_speed;
     out["peak_speed"] = ship.peak_speed;
