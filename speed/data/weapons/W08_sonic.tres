@@ -11,6 +11,7 @@ params = {
 "life": 0.7,
 "emit_spacing": 5.0,
 "min_speed": 100.0,
+"nose": 9.0,
 "distance": 60.0,
 "pulse": 0.25,
 "side_speed": 70.0,

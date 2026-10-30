@@ -43,7 +43,9 @@ func tick(dt: float, _busy: bool) -> void:
 		while _emission >= spacing:
 			_emission -= spacing
 			var back := _emission / maxf(move, 0.001)
-			frames.append({"pos": _last.lerp(state.ship_pos, 1.0 - back), "age": back * dt})
+			# 輪は機首（機体の中心から nose ドット前）から出す
+			var nose := state.ship_heading * float(p("nose")) * 1.82 * cfg.character_scale
+			frames.append({"pos": _last.lerp(state.ship_pos, 1.0 - back) + nose, "age": back * dt})
 	elif _active:
 		_active = false
 	_last = state.ship_pos

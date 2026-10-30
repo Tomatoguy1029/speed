@@ -1,6 +1,6 @@
 extends WeaponVisual
 ## アンカーキャノン：牽引した船体（敵の絵のまま）の下に熱を帯びた橙の光がたまり、数が増えるほど広がる。
-## 牽引した瞬間は小さな光の輪と、塊へ向かう光の線と粒。撃ち出すたびに砲口で白い光の玉とピクセル炎がはじけ、
+## 牽引した瞬間は小さな光の輪。房の船体は短い鎖でつながる。撃ち出すたびに砲口で白い光の玉とピクセル炎がはじけ、
 ## 大きな衝撃の輪が出て、塊は反動で後ろへ押される。撃った船体は白く焼けた色から橙に冷めながら飛び、
 ## 後ろへピクセルの炎を引き、敵を貫くたびに炎の爆発が起きる。
 
@@ -8,7 +8,6 @@ const TRAIL_EVERY := 0.012
 ## 戦闘エフェクトツールで調整する shader
 const TUNED_SHADERS := [preload("res://shaders/fire_burst.gdshader")]
 var captures: Array[Dictionary] = []
-var catches: Dictionary = {}
 var shocks: Array[Dictionary] = []
 var flames: Array[Dictionary] = []
 var sparks := PixelSparks.new()
@@ -26,7 +25,6 @@ func on_event(ev: Dictionary) -> void:
 	match ev.type:
 		&"anchor_capture":
 			captures.append({"pos": ev.pos, "age": 0.0})
-			if not behavior.cargo.is_empty(): catches[behavior.cargo[-1].source_id] = state.world_time
 			sparks.add(ev.pos, 5, (ev.to - ev.pos).angle(), 2.4, 20.0, 60.0, 0.2, [Color("#fff2c0"), Color("#ffbe65")])
 		&"anchor_fire":
 			var cells: float = ev.radius / painter().px
@@ -81,7 +79,6 @@ func _clump(p: PixelPainter) -> void:
 	var tow = behavior
 	var n: int = tow.cargo.size()
 	if n == 0:
-		catches.clear()
 		return
 	var v := state.ship_vel
 	var u := v.normalized() if v.length() > 1.0 else state.ship_heading
@@ -101,25 +98,20 @@ func _clump(p: PixelPainter) -> void:
 			if d + 0.35 * (nz - 0.5) > 0.85: continue
 			if (x + y + flicker) & 1 and d > 0.45: continue
 			_under.fill(c.x + x, c.y + y, Color("#ffbe65", 0.55) if d < 0.45 else Color("#c86a1e", 0.4))
-	# 鎖：機体の後ろから、撃ち出す順に船体どうしをつなぐ。撃ち出しを待つ間は明るく光る
-	var ready: bool = tow.cargo[0].ready
-	var link := Color("#fff2c0") if ready else Color("#ffbe65")
-	var prev: Vector2 = state.ship_pos - u * 12.0 * p.px
+	# 鎖：房の船体を、すでに並んだ中でいちばん近い船体（先頭は機体の後ろ）と短くつなぐ。撃ち出しを待つ間は明るく光る
+	var link := Color("#fff2c0") if tow.cargo[0].ready else Color("#ffbe65")
 	for j in count:
 		var hull: Vector2 = tow.cargo[j].pos
-		_chain(p, prev, hull, link, j)
-		prev = hull
-	# 牽引したばかりの船体から塊へ、光の線と流れる粒
-	for j in count:
-		var h: Dictionary = tow.cargo[j]
-		var since: float = state.world_time - float(catches.get(h.source_id, -9.0))
-		if since >= 0.45: continue
-		var target := center + Vector2.from_angle(j * tow.GOLDEN_ANGLE) * spacing * 0.6 * sqrt(float(j))
-		if h.pos.distance_to(target) < 3.0 * p.px: continue
-		p.line(h.pos, target, Color("#ffbe65", 0.45))
-		for k in 3:
-			var q := fposmod(state.world_time * 3.0 + k / 3.0 + j * 0.13, 1.0)
-			p.dot(h.pos.lerp(target, q), Color("#fff2c0"))
+		var near: Vector2 = state.ship_pos - u * 12.0 * p.px
+		var near_r := 0.0
+		for i in j:
+			var other: Vector2 = tow.cargo[i].pos
+			if other.distance_squared_to(hull) < near.distance_squared_to(hull):
+				near = other
+				near_r = tow.cargo[i].r * 0.7
+		# 船体の縁から縁へつなぐ
+		var dir := (hull - near).normalized()
+		_chain(p, near + dir * near_r, hull - dir * float(tow.cargo[j].r) * 0.7, link, j)
 
 ## 鎖の1区間：4ドットおきの輪（2ドット）を、細い線でつなぐ。輪は機体のほうへ流れる。
 func _chain(p: PixelPainter, a: Vector2, b: Vector2, color: Color, seed: int) -> void:

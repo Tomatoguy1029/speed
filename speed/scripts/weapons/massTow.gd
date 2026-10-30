@@ -4,7 +4,7 @@
 ## 隕石とボスは牽引しない。
 extends WeaponBehavior
 
-## 牽引中の船体。pos・r・type・color・angle・source_id・ready（撃ち出せるか）
+## 牽引中の船体。pos・rel（機体からの位置）・r・type・color・angle・source_id・ready（撃ち出せるか）
 var cargo: Array[Dictionary] = []
 const GOLDEN_ANGLE := 2.39996323
 var _fire_t := 0.0
@@ -20,7 +20,7 @@ func capture(i: int) -> bool:
 	var reach := float(p("capture_radius")) + t.r[i]
 	if state.ship_pos.distance_squared_to(t.pos[i]) > reach * reach:
 		return false
-	cargo.append({"pos": t.pos[i], "r": t.r[i], "type": t.type[i], "color": t.color[i],
+	cargo.append({"pos": t.pos[i], "rel": t.pos[i] - state.ship_pos, "r": t.r[i], "type": t.type[i], "color": t.color[i],
 		"angle": t.facing[i], "source_id": t.id[i], "ready": false})
 	state.emit(&"anchor_capture", {"pos": t.pos[i], "to": state.ship_pos - state.ship_heading * 70.0})
 	return true
@@ -38,19 +38,21 @@ func tick(dt: float, _busy: bool) -> void:
 	var v := state.ship_vel
 	var sp := v.length()
 	var u := v / sp if sp > 1.0 else state.ship_heading
-	# 機体の後ろに1つの塊にまとめる（ひまわりの種の並び）。弾の数に上限はなく、見せるのは先頭だけ
+	# 機体のすぐ後ろに房のようにまとめる（ひまわりの種の並び）。位置は機体からの相対で寄せるので、
+	# 速く進んでも後ろへ引きずられない。弾の数に上限はなく、見せるのは先頭だけ（残りは房の中心に重ねる）
 	var follow := 1.0 - exp(-float(p("follow")) * dt)
 	var count := mini(int(p("visible")), cargo.size())
 	var spacing := float(p("clump_spacing"))
-	var center := state.ship_pos - u * (70.0 + spacing * sqrt(float(count)) * 0.6)
-	for j in count:
+	var center := -u * (70.0 + spacing * sqrt(float(count)) * 0.6)
+	for j in cargo.size():
 		var c: Dictionary = cargo[j]
 		c.angle += dt * (0.6 if j % 2 == 0 else -0.6)
-		# 撃ち出しを待つ塊はその場に止める
-		if c.ready: continue
-		var offset := Vector2.from_angle(j * GOLDEN_ANGLE) * spacing * 0.6 * sqrt(float(j))
-		var wobble := Vector2(sin(state.time * 2.0 + j), cos(state.time * 1.7 + j * 1.3)) * 5.0
-		c.pos += (center + offset + wobble - c.pos) * follow
+		var target := center
+		if j < count:
+			target += Vector2.from_angle(j * GOLDEN_ANGLE) * spacing * 0.6 * sqrt(float(j))
+			target += Vector2(sin(state.time * 2.0 + j), cos(state.time * 1.7 + j * 1.3)) * 5.0
+		c.rel += (target - c.rel) * follow
+		c.pos = state.ship_pos + c.rel
 	_fire_t -= dt
 	var shot_interval := interval(float(p("interval")) / rate_k())
 	while _fire_t <= 0.0 and not cargo.is_empty() and cargo[0].ready:

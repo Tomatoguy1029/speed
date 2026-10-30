@@ -37,33 +37,42 @@ func begin() -> void:
 
 ## 隙間のない輪（半径 radius ドット）。inner は1ドット内側の輪の濃さの割合（0 なら描かない）。
 func add_ring(pos: Vector2, radius: float, color: Color, inner := 0.0) -> void:
-	_add(pos, ceilf(radius) + 2.0, color, Color(0.0, radius, inner, 0.0))
+	var f := _frac(pos)
+	_add(pos, ceilf(radius) + 2.0, color, Color(f.x, radius, inner, f.y))
 
 ## 両端の尖った針（PixelPainter.spindle と同じ形）。
 func add_spindle(pos: Vector2, angle: float, length: float, w: float, alpha: float) -> void:
 	if alpha <= 0.0 or length <= 0.0: return
-	_add(pos, ceilf(length * 0.5 + w) + 2.0, Color(1, 1, 1, alpha), Color(0.0, length, w, angle))
+	# 針は中心を格子の角へ丸めて描く（試作どおり、ドットの中心で判定する）
+	_add((pos / px).round() * px, ceilf(length * 0.5 + w) + 2.0, Color(1, 1, 1, alpha), Color(0.0, length, w, angle))
 
 ## 太さ w ドットの輪（半径から内側へ）。nz は輪の形の揺らぎ（5山の正弦）。
 func add_thick_ring(pos: Vector2, radius: float, w: int, color: Color, nz := 0.0) -> void:
 	if radius <= 0.0: return
-	_add(pos, ceilf(radius * (1.0 + absf(nz))) + 2.0, color, Color(0.0, radius, w, nz))
+	var f := _frac(pos)
+	_add(pos, ceilf(radius * (1.0 + absf(nz))) + 2.0, color, Color(f.x, radius, w + f.y, nz))
 
 ## 六角形の輪郭（頂点までの半径 radius ドット）。
 func add_hex(pos: Vector2, radius: float, color: Color) -> void:
-	_add(pos, ceilf(radius) + 2.0, color, Color(0.0, radius, 0.0, 0.0))
+	var f := _frac(pos)
+	_add(pos, ceilf(radius) + 2.0, color, Color(f.x, radius, f.y, 0.0))
 
 func _add(pos: Vector2, half: float, color: Color, custom: Color) -> void:
 	var need := (_count + 1) * STRIDE
 	if _buf.size() < need: _buf.resize(maxi(need, _buf.size() * 2))
-	var center := (pos / px).round() * px
+	var center := (pos / px).floor() * px
 	var i := _count * STRIDE
 	var size := half * px
 	_buf[i] = size; _buf[i + 1] = 0.0; _buf[i + 2] = 0.0; _buf[i + 3] = center.x
 	_buf[i + 4] = 0.0; _buf[i + 5] = size; _buf[i + 6] = 0.0; _buf[i + 7] = center.y
 	_buf[i + 8] = color.r; _buf[i + 9] = color.g; _buf[i + 10] = color.b; _buf[i + 11] = color.a
-	_buf[i + 12] = half; _buf[i + 13] = custom.g; _buf[i + 14] = custom.b; _buf[i + 15] = custom.a
+	_buf[i + 12] = half + minf(custom.r, 0.999); _buf[i + 13] = custom.g; _buf[i + 14] = custom.b; _buf[i + 15] = custom.a
 	_count += 1
+
+## 図形の中心の、格子の角からの端数（ドット、0〜1）。
+func _frac(pos: Vector2) -> Vector2:
+	var c := pos / px
+	return c - c.floor()
 
 func end() -> void:
 	var mm := multimesh
