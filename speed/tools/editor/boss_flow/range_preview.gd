@@ -244,7 +244,7 @@ static func _canis_attack(technique: StringName, p: Dictionary) -> Dictionary:
 ## 一角獣の角・蹄の判定が通る範囲。from〜to は本体の中心からの距離、angle と half_angle は度。
 static func _monoceros_attack(technique: StringName, p: Dictionary) -> Dictionary:
 	var def: Resource = load("res://data/bosses/monoceros.tres")
-	var horn := float(def.radius) * float(def.params.horn_length_ratio)
+	var horn := float(def.radius) * float(def.params.horn_length_ratio_p2 if technique in [&"sword_flash", &"lance", &"horn_dance"] else def.params.horn_length_ratio)
 	var root := float(def.radius) * 0.65
 	var width := float(def.params.horn_width)
 	match technique:
@@ -254,8 +254,13 @@ static func _monoceros_attack(technique: StringName, p: Dictionary) -> Dictionar
 			return {"from": float(p.wave_start), "to": float(p.wave_max), "angle": 0.0, "half_angle": rad_to_deg(float(p.wave_half_angle) + float(p.release_offset)), "width": float(p.wave_width), "length": float(p.wave_max)}
 		&"kick":
 			return {"from": root, "to": float(p.get("reach", horn)), "angle": 180.0, "width": width, "length": float(p.get("reach", horn))}
+		&"sword_flash":
+			return {"from": float(p.slash_min), "to": float(p.slash_max), "angle": 0.0, "half_angle": 0.0, "width": float(p.slash_length), "length": float(p.slash_max)}
 		&"lance":
-			var reach := float(p.get("reach", horn)) + float(p.get("distance", 0.0))
+			var reach := float(p.distance) + horn + float(p.head_length)
+			return {"from": root, "to": reach, "angle": 0.0, "width": float(p.width), "length": reach}
+		&"horn_dance":
+			var reach := float(p.min_run) + float(p.overshoot) + horn
 			return {"from": root, "to": reach, "angle": 0.0, "width": width, "length": reach}
 	var travel := float(p.get("distance", 0.0)) + horn
 	return {"from": root, "to": travel, "angle": 0.0, "width": width, "length": travel}

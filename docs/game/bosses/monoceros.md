@@ -127,6 +127,8 @@
 
 連続突進は `techniques/return_charge.gd`・`monoceros_moves/return_charge.tres`・`monoceros/return_charge_visual.tscn`、踏み込み薙ぎは `techniques/sweep.gd`・`monoceros_moves/sweep.tres`・`monoceros/sweep_visual.tscn`、角の衝撃波は `techniques/horn_wave.gd`・`monoceros_moves/horn_wave.tres`・`monoceros/horn_wave_visual.tscn` を使う。衝撃波の仮表示は `scripts/bosses/monoceros/horn_wave_visual.gd` が持つ。
 
+光の剣の連撃は `techniques/sword_flash.gd`・`monoceros_moves/sword_flash.tres`・`monoceros/sword_flash_visual.tscn`、光の槍は `techniques/lance.gd`・`monoceros_moves/lance.tres`・`monoceros/lance_visual.tscn`、光角の乱舞は `techniques/horn_dance.gd`・`monoceros_moves/horn_dance.tres`・`monoceros/horn_dance_visual.tscn` を使う。連撃と槍の仮表示は `scripts/bosses/monoceros/sword_flash_visual.gd`・`scripts/bosses/monoceros/lance_visual.gd` が持つ。
+
 「ボス行動」画面で、使う技・区間の順序と選択条件・既存技の組み合わせ・技の数値を調整できるようにする。技固有の動作と演出はスクリプトと表示シーンで作り、戦闘の組み立ては[共通のノード編集](../../dev/stage-production.md#56-ボス行動を調整する)を使う。組み合わせは本体を共有する技の実行制約に従う。
 
 本体の数値の正は [`speed/data/bosses/monoceros.tres`](../../../speed/data/bosses/monoceros.tres)、技別の性能は [`monoceros_moves/`](../../../speed/data/bosses/monoceros_moves/) のリソースとする。HP・装甲・移動速度・旋回速度、距離・角度、技別の予告・実行・硬直・ダメージ・再使用待ち時間、突進回数、角刺さり・角抜き時間、形態移行のHP閾値は試遊調整用の仮値とする。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。

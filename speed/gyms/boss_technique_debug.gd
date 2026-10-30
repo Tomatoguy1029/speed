@@ -117,6 +117,7 @@ func _cleanup() -> void:
 				visual.queue_redraw()
 	elif actor.def.id == &"monoceros":
 		actor.horn_waves.clear()
+		actor.last_slash = PackedVector2Array()
 		actor.sweep_side = 1
 		actor.phase_pending = false
 		actor.reposition = 0.0
