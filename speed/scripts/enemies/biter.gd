@@ -60,6 +60,9 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
+		if t.slash_hold[i] != 0:
+			vel[i] = Vector2.ZERO
+			continue
 		var from := pos[i]
 		# 出現時に解決したvalueが0なら、枠・待機・追跡へ入れない。
 		var managed := t.attack_managed[i] != 0

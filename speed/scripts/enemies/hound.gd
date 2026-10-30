@@ -109,13 +109,13 @@ func on_spawn(i: int, opts: Dictionary) -> void:
 func _running(i: int) -> bool:
 	var t := table
 	return t.alive[i] != 0 and t.dead[i] == 0 and t.held[i] == 0 and t.stone[i] <= 0.0 \
-		and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.mode[i] != EnemyTable.Mode.WINDUP
+		and t.slash_hold[i] == 0 and t.shove_time[i] <= 0.0 and t.knock_t[i] <= 0.0 and t.mode[i] != EnemyTable.Mode.WINDUP
 
 func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 	_pursuit.clear()
 	# 1回の更新前の位置・速度から全個体を計算し、行を回す順番への依存を避ける。
 	for i in rows:
-		if _running(i) or quiet_until.has(i): _pursuit[i] = _pack_velocity(i)
+		if table.slash_hold[i] == 0 and (_running(i) or quiet_until.has(i)): _pursuit[i] = _pack_velocity(i)
 	super(rows, dt)
 
 func _pack_velocity(i: int) -> Vector2:

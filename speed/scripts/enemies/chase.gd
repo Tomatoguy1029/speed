@@ -46,6 +46,9 @@ func tick_rows(rows: PackedInt32Array, dt: float) -> void:
 			guard[i] -= dt
 		if flash[i] > 0.0:
 			flash[i] -= dt
+		if t.slash_hold[i] != 0:
+			vel[i] = Vector2.ZERO
+			continue
 		var from := pos[i]
 		var rel := from - vc
 		# 画面から遠い敵は、m.LOD 回に1回だけ向きを決め直す。間の回は今の速度で進むだけ
