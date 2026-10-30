@@ -160,6 +160,8 @@ class SpeedRunCore : public RefCounted {
     bool frame_ready = false;
     enum class Phase { Play = 0, LevelUp = 1, Paused = 2, Dying = 3, Finishing = 4, Ended = 5 };
     Phase phase = Phase::Play;
+    speed::SpawnTimeline spawn_timeline;
+    bool spawn_timeline_ready = false;
     bool lifecycle_ready = false;
     double sequence_t = 0, death_freeze = 0, death_explosion = 0, death_game_over = 0;
     bool check_run_end();
@@ -171,6 +173,8 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool configure_spawn_timeline(const Dictionary &data);
+    Dictionary spawn_target(double at, bool bonus) const;
     bool configure_lifecycle(const Dictionary &config);
     bool set_run_guards(const Dictionary &guards);
     bool set_paused(bool paused);

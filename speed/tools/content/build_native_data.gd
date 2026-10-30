@@ -53,3 +53,28 @@ static func build_probe(path: String) -> Error:
 	error = file.get_error()
 	file.close()
 	return error
+
+## 将来の出現個体は決めず、編集値から決まる曲線の傾きと強化区間だけを展開する。
+static func compile_spawn_timeline(stage: StageDef, config: GameConfig) -> Dictionary:
+	if stage == null or config == null or stage.phases.is_empty(): return {}
+	var data := {"version": 1, "boss_start": stage.boss_start(config), "density": config.density_mult,
+		"bonus_pop": config.bonus_pop, "phases": [], "curves": [], "windows": [], "types": {}}
+	var types := {}
+	for phase: PhaseDef in stage.phases:
+		var row := {"id": String(phase.id), "start": phase.start, "pop_from": phase.pop_from, "pop_to": phase.pop_to,
+			"rate": phase.rate, "xp_bonus": phase.xp_bonus, "attack_budget": phase.attack_budget, "mix": phase.mix.duplicate()}
+		for key in ["surge_interval", "surge_pop", "surge_ranged", "surge_elite"]: row[key] = phase.surge_value(key, config)
+		data.phases.append(row)
+		for type in phase.mix: types[String(type)] = true
+	for curve: SpawnCurve in stage.zako_curves:
+		var points := []
+		for i in curve.points.size(): points.append([curve.points[i].x, curve.points[i].y, SpawnCurve._slope(curve.points, i) if curve.points.size() > 1 else 0.0])
+		data.curves.append({"type": String(curve.type), "points": points})
+		types[String(curve.type)] = true
+	for window in stage.surge_windows(config): data.windows.append([window.x, window.y if is_finite(window.y) else -1.0])
+	for type in types:
+		var definition := load("res://data/enemies/%s.tres" % type) as EnemyDef
+		if definition == null: return {}
+		definition = StageEnemyTuning.resolve(definition, stage.enemy_tuning.get(type, {}))
+		data.types[type] = {"rank": definition.rank, "max_alive": definition.max_alive, "ranged": definition.ranged}
+	return data

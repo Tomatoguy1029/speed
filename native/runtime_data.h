@@ -19,4 +19,21 @@ struct EnemyDefinition {
     double xp = 0.0, knockback = 0.0, hitstop_multiplier = 0.0;
     godot::Color color;
 };
+struct SpawnTimeline {
+    struct Phase {
+        godot::StringName id;
+        double start = 0, pop_from = 0, pop_to = 0, rate = 0, xp_bonus = 0;
+        double interval = 0, pop = 0, ranged = 0, elite = 0;
+        int64_t budget = 0;
+        std::vector<std::pair<godot::StringName, double>> mix;
+    };
+    struct Point { double time, value, slope; };
+    struct Curve { godot::StringName type; std::vector<Point> points; };
+    struct Type { godot::StringName id; double rank, maximum; bool ranged; };
+    std::vector<Phase> phases;
+    std::vector<Curve> curves;
+    std::vector<Type> types;
+    std::vector<std::pair<double, double>> windows;
+    double boss_start = 0, density = 0, bonus_pop = 0;
+};
 }

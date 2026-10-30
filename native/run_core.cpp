@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_spawn_timeline", "data"), &SpeedRunCore::configure_spawn_timeline);
+    ClassDB::bind_method(D_METHOD("spawn_target", "at", "bonus"), &SpeedRunCore::spawn_target);
     ClassDB::bind_method(D_METHOD("configure_lifecycle", "config"), &SpeedRunCore::configure_lifecycle);
     ClassDB::bind_method(D_METHOD("set_run_guards", "guards"), &SpeedRunCore::set_run_guards);
     ClassDB::bind_method(D_METHOD("set_paused", "paused"), &SpeedRunCore::set_paused);
@@ -131,6 +133,7 @@ void SpeedRunCore::close() {
     dead_rows.clear();
     rows_by_id.clear();
     definitions.clear();
+    spawn_timeline = speed::SpawnTimeline();
     draw = Draw();
     grid = EnemyGrid();
     events.clear();
