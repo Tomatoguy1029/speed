@@ -1,4 +1,5 @@
-## W08 ソニックブーム：ブーストと勢いの間だけ音の輪を残し、重なる円錐のふちを攻撃する。
+## W08 ソニックブーム：ブーストと勢いの間、速さが min_speed（試作のドット/秒）を超えているときだけ、
+## emit_spacing ドット進むごとに音の輪を残し、重なる円錐のふちを攻撃する。
 extends WeaponBehavior
 var frames: Array[Dictionary] = []
 var pending: Array[Dictionary] = []
@@ -8,6 +9,8 @@ var _last := Vector2.ZERO
 var _emission := 0.0
 var _distance := 0.0
 var pulse := 0.0
+## 前のフレームから実際に進んだ速さ（世界の単位/秒）
+var speed := 0.0
 func on_launch(_full: bool) -> void:
 	_active = true
 	hits.clear()
@@ -17,21 +20,30 @@ func on_launch(_full: bool) -> void:
 func wave_speed() -> float:
 	return at_level("speed_by_level") * 1.82 * cfg.character_scale * ctx.loadout.area_multiplier()
 func wave_life() -> float: return float(p("life"))
+## 音の輪を出す速さか。
+func fast() -> bool:
+	return speed > float(p("min_speed")) * 1.82 * cfg.character_scale
 func tick(dt: float, _busy: bool) -> void:
 	var t := ctx.enemies.table
 	for f in frames: f.age += dt
 	frames = frames.filter(func(f): return f.age < wave_life())
 	pulse = maxf(0.0, pulse - dt)
-	if _active and (state.tracing or state.glide):
+	if dt > 0.0: speed = _last.distance_to(state.ship_pos) / dt
+	if _active and (state.tracing or state.glide) and not fast():
+		_emission = 0.0
+	elif _active and (state.tracing or state.glide):
 		var move := _last.distance_to(state.ship_pos)
 		_distance += move
 		if _distance >= float(p("distance")) * 1.82 * cfg.character_scale:
 			_distance = fmod(_distance, float(p("distance")) * 1.82 * cfg.character_scale)
 			pulse = float(p("pulse"))
-		_emission += dt
-		while _emission >= float(p("emit_interval")):
-			_emission -= float(p("emit_interval"))
-			frames.append({"pos": _last.lerp(state.ship_pos, 1.0 - _emission / maxf(dt, 0.001)), "age": _emission})
+		# 輪は進んだ距離ごとに出す。そのフレームの途中で出た輪は、出てからの時間だけ広げておく
+		var spacing := float(p("emit_spacing")) * 1.82 * cfg.character_scale
+		_emission += move
+		while _emission >= spacing:
+			_emission -= spacing
+			var back := _emission / maxf(move, 0.001)
+			frames.append({"pos": _last.lerp(state.ship_pos, 1.0 - back), "age": back * dt})
 	elif _active:
 		_active = false
 	_last = state.ship_pos
