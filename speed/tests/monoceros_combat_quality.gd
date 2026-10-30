@@ -44,7 +44,7 @@ func _ready() -> void:
 					check(result.recovered, "攻撃後は隙へ戻る " + str(result))
 					check(result.lock_count == result.launch_count, "各発進の固定は一度 " + str(result))
 	# 編集した距離条件も実際の形状を越えて成立させない。
-	for pair in [[&"sweep", 1400.0], [&"kick", 255.0], [&"lance", 1300.0]]:
+	for pair in [[&"sweep", 1400.0], [&"kick", 255.0], [&"lance", 1700.0]]:
 		fresh(Vector2(float(pair[1]), 0), Vector2.ZERO, 2, PI if pair[0] == &"kick" else 0.0)
 		actor._cooldown = 0.0
 		var gate: Dictionary = actor.action_rules.conditions[String(pair[0])].duplicate()
@@ -64,7 +64,7 @@ func _ready() -> void:
 				check(result.hit, "背後の角度条件の端でも蹄が自機へ届く " + str(result))
 				check(is_zero_approx(actor.table.facing[actor.body]), "蹴りは本体を振り向かせず蹄で狙う")
 	# 予告前から等速移動していた自機。方向転換を要求しない空振りを分離する。
-	for id in [&"charge", &"return_charge", &"lance"]:
+	for id in [&"charge", &"return_charge"]:
 		for angle in [0.0, PI*0.5, PI, -PI*0.5]:
 			for distance in [400.0,600.0,700.0]:
 				for speed in [250.0, 500.0]:

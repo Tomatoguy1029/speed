@@ -73,7 +73,7 @@ func _ready() -> void:
 	check(absf((actor.table.pos[actor.body] - launch).normalized().cross(Vector2.from_angle(locked_angle))) < 0.001, "発進後は直線で曲がらない")
 	step(2.2)
 	check(actor.mode == &"idle", "通常突進の後に回復する")
-	for tech in [&"charge", &"return_charge", &"lance"]:
+	for tech in [&"charge", &"return_charge"]:
 		fresh()
 		actor.phase = 2
 		actor._apply_phase()
@@ -229,24 +229,31 @@ func _ready() -> void:
 	fresh()
 	actor.phase = 2
 	actor._apply_phase()
+	var lance_trace := {"launch": Vector2.ZERO, "stopped": false, "distance": 0.0, "shatters": 0}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"attack_started": lance_trace.launch = actor.table.pos[actor.body]
+		if e.cue == &"lance_shatter": lance_trace.shatters += 1)
 	actor.start_attack(&"lance")
-	step(0.6)
-	sim.state.ship_pos = Vector2(2200,0)
-	sim.state.enemy_aim = sim.state.ship_pos
-	step(0.8)
-	check(actor.mode == &"recovery" and float(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow")) <= 0.0, "発進を見送った槍は突いた残光を出さない")
-	fresh()
-	actor.phase = 2
-	actor._apply_phase()
-	actor.start_attack(&"lance")
-	while actor.mode in [&"windup", &"active"]: step(DT)
-	check(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow") != null, "光の槍は突き終わりに全体を残す")
-	if actor.technique_visuals.nodes[&"lance"].get("lance_afterglow") != null:
-		check(float(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow")) > 0.0, "突き終わりの残光を開始する")
-		var hp_after := sim.state.ship_hp
-		step(0.7)
-		check(float(actor.technique_visuals.nodes[&"lance"].get("lance_afterglow")) <= 0.0, "飛散後の粒子はフェードして消える")
-		check(sim.state.ship_hp == hp_after, "槍の残光に攻撃判定を残さない")
+	var after_shatter := false
+	var shatter_hp := sim.state.ship_hp
+	for frame in 1200:
+		step(DT)
+		if actor._runner.get("stage") == &"stop" and not lance_trace.stopped:
+			lance_trace.stopped = true
+			lance_trace.distance = actor.table.pos[actor.body].distance_to(lance_trace.launch)
+		if lance_trace.shatters > 0 and not after_shatter:
+			after_shatter = true
+			var points := actor.horn_points()
+			sim.state.ship_pos = points[0].lerp(points[1], 0.65)
+			actor.previous_ship = sim.state.ship_pos
+			shatter_hp = sim.state.ship_hp
+			sim.state.ship_invuln = 0.0
+		if actor.mode == &"recovery": break
+	check(lance_trace.stopped and absf(float(lance_trace.distance) - float(actor.rule().distance)) < 0.1, "光の槍は指定の距離を進んで停止する")
+	check(lance_trace.shatters == 1 and actor.mode == &"recovery", "光の槍は1回だけ砕けて隙に入る")
+	sim.state.ship_invuln = 0.0
+	step(0.7)
+	check(after_shatter and sim.state.ship_hp == shatter_hp, "砕けた光の槍の角に攻撃判定を残さない")
 
 	fresh()
 	# 通常ランの共通撃破通知を使い、伝説モジュールへ進む接続点まで確認する。

@@ -52,7 +52,7 @@ func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) ->
 	if attack == &"": attack = host.technique
 	var velocity := host.run_state.ship_vel
 	var target := host.run_state.ship_pos + velocity * (float(host.def.params.lock_lead) if lead < 0.0 else lead)
-	if host.tech_kind(attack) not in [&"charge", &"return_charge", &"lance"]: return target
+	if host.tech_kind(attack) not in [&"charge", &"return_charge"]: return target
 	var r: Dictionary = host._values_of(attack)
 	var speed := float(r.distance) / float(r.active)
 	var reach := float(r.get("reach", host.horn_length()))
