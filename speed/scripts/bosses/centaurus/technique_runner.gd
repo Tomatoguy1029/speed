@@ -35,6 +35,9 @@ func release(host: CentaurusBoss) -> void:
 	var power := kind() == &"power_shot"
 	var target := (host.run_state.ship_pos if power else host.run_state.enemy_aim) if host._tracks_during_warn() else host.warn_aim
 	var angle := (target - mouth).angle()
+	if power and host.alerting:
+		mouth = host.power_aim_origin()
+		angle = host.power_aim_angle()
 	for offset in host.power_offsets() if power else [0.0]:
 		host.ctx.projectiles.emit_attack(&"light_arrow", [mouth, angle + offset, float(r.speed), float(r.radius), float(r.travel),
 			float(r.damage) * host.ctx.cfg.atk_scale, power], host.rule().get("shot_visual"))

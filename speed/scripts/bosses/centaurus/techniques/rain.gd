@@ -93,7 +93,7 @@ extends BossTechnique
 		trace_speed = value
 		_values_dirty = true
 ## トレースの回数
-@export_range(0,100000,1) var traces := 3:
+@export_range(0,100000,1) var traces := 4:
 	set(value):
 		traces = value
 		_values_dirty = true

@@ -170,8 +170,10 @@ func sim_tick(_real_dt: float, dt: float) -> void:
 		_rain_tick(dt)
 	elif mode in [&"windup", &"shooting", &"strike"]:
 		table.vel[body] = Vector2.ZERO
-		# 強弓は引き絞りの間、機体の今の位置へ向きを合わせ続ける。背後攻撃は背中を向けたまま構える。
-		if mode == &"windup" and not _tracks_during_warn():
+		# 強弓は赤い警告まで機体を追い、警告後は照準を固定する。背後攻撃は背中を向けたまま構える。
+		if _runner_for().kind() == &"power_shot" and alerting:
+			table.facing[body] = _runner.locked_angle
+		elif mode == &"windup" and not _tracks_during_warn():
 			if _runner_for().kind() != &"rear_attack": _face(warn_aim, def.turn, dt)
 		elif _runner_for().kind() == &"power_shot": table.facing[body] = (run_state.ship_pos - table.pos[body]).angle()
 		elif _runner_for().kind() != &"rear_attack": _face(run_state.enemy_aim, def.turn, dt)
@@ -341,6 +343,13 @@ func _tracks_during_warn() -> bool:
 
 func _begin_windup(r: Dictionary, length: float) -> void:
 	_runner_for()._begin_windup(self, r, length)
+
+## 赤い照準の起点と方向は発射まで固定する。
+func power_aim_origin() -> Vector2:
+	return _runner.locked_origin if alerting else bow_mouth()
+
+func power_aim_angle() -> float:
+	return _runner.locked_angle if alerting else table.facing[body]
 
 func alert() -> void:
 	_runner_id(&"power_shot").alert(self)

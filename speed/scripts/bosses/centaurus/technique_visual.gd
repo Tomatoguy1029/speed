@@ -26,12 +26,15 @@ func _draw() -> void:
 	# 照準線は本体の縮尺と別に、実際の射程で描く。
 	if actor.mode == &"windup" and visual_kind == &"power_shot":
 		var reach := float(actor.rule().get("travel", 1600.0))
-		var width := float(actor.rule().get("radius", 30.0)) * 2.0
-		var from := Vector2(r * float(actor.def.params.bow_reach), 0.0)
+		var mouth := actor.power_aim_origin()
+		var from := to_local(mouth)
 		var color := DANGER if actor.alerting else WARNING
-		color.a = 0.85 if actor.alerting else 0.35 + draw_fraction() * 0.35
 		for offset in actor.power_offsets():
-			draw_line(from, from + Vector2.from_angle(offset) * reach, color, width if actor.alerting else pixel_size * 2.0)
+			var end := to_local(mouth + Vector2.from_angle(actor.power_aim_angle() + offset) * reach)
+			draw_line(from, end, Color(color, 0.12), 8.0)
+			draw_line(from, end, Color(color, 0.95 if actor.alerting else 0.6), 2.0)
+			draw_line(from, end, Color(1.0, 0.75 if actor.alerting else 0.95, 0.6, 0.8), 0.8)
+
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (r / 90.0))
 	var pull := Vector2(62.0 + cos(1.1) * 26.0 - draw_fraction() * 34.0, 0.0)
 	if actor.mode == &"windup":
