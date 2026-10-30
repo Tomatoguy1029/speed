@@ -381,17 +381,19 @@ func kill_enemy(i: int, opts := {}) -> void:
 		"t": state.time, "world_t": state.world_time,
 		"enemy_type": t.type[i], "meteor_index": t.meteor_index[i], "facing": t.facing[i],
 		"elite": t.elite[i] != 0, "cause": cause, "dir": dir, "color": t.color[i]})
-	# 質量牽引砲（W21）が船体を牽引したら、吹き飛ばし衝角（W03）の破片も死体も出さない
-	# 残像の追撃は直撃だけで完結させ、牽引・攻撃破片・撃破発動の武器/特性を複製しない。
-	if cause == &"afterimage":
+	# 分身の追撃と牽引は船体を使い、星砕きと重複させない。
+	# hull_scatteredはエンドホールも一時的に書くため、ここでの使用だけを保持する。
+	var afterimage := cause == &"afterimage"
+	var hull_used := afterimage or build.capture_hull(i)
+	if hull_used:
 		t.hull_scattered[i] = 1
-	elif build.capture_hull(i):
-		t.hull_scattered[i] = 1
-	var shatter = build.weapon_behaviors.get(&"W03")
-	if shatter != null: shatter.on_defeated(i, opts)
+	else:
+		var shatter = build.weapon_behaviors.get(&"W03")
+		if shatter != null: shatter.on_defeated(i, opts)
 	enemies.on_enemy_death(i, attack_power())
 	pickups.on_enemy_killed(i)
-	build.on_kill(cause, t.pos[i])
+	if not afterimage:
+		build.on_kill(cause, t.pos[i])
 
 ## 中心 center・半径 radius の敵に、装甲を無視したダメージを与える。
 func explode(center: Vector2, radius: float, dmg: float, opts := {}) -> void:
