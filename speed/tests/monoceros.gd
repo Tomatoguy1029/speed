@@ -84,20 +84,21 @@ func _ready() -> void:
 	fresh()
 	actor.start_attack(&"return_charge")
 	var launches := 0
+	events.clear()
+	actor.presentation_event.connect(func(e): events.append(e.cue))
 	var locked_count := 0
 	var sign_y := 1.0
 	for frame in 1600:
-		if actor.mode == &"turnaround":
+		if actor._runner.get("stage") == &"brake":
 			sim.state.enemy_aim = actor.table.pos[actor.body] + Vector2(-500, sign_y * 160)
 			sim.state.ship_pos = sim.state.enemy_aim
 			sign_y = -sign_y
-		var before := actor.mode
 		var was_locked := actor.locked
 		step(DT)
-		if before == &"windup" and actor.mode == &"active": launches += 1
+		launches = events.count(&"attack_started")
 		if not was_locked and actor.locked: locked_count += 1
 		if actor.mode == &"recovery": break
-	check(launches == int(actor.def.params.return_passes) and locked_count == launches, "往復は毎回予告と固定を挟んで発進する")
+	check(launches == int(actor.rule().get("passes", 0)) and locked_count == launches, "往復は毎回予告と固定を挟んで発進する")
 	check(actor.recovery >= float(actor.rule().recover) - DT, "往復の最後に全体の隙を確保する")
 
 	fresh()

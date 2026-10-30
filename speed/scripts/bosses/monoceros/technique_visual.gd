@@ -30,6 +30,8 @@ func _draw() -> void:
 	if actor.technique != technique_id:
 		_lance_remnants()
 		return
+	if technique_id == &"return_charge" and actor._runner != null and actor._runner.stage == &"brake":
+		_reverse_jet(clampf(actor._runner.stage_time / maxf(float(actor.rule().brake_time), 0.001), 0.0, 1.0))
 	# 正確な攻撃線をワールド→役者座標へ戻す。警告と攻撃の幅は共通。
 	draw_set_transform(Vector2.ZERO)
 	_lance_remnants()
@@ -49,7 +51,7 @@ func _draw() -> void:
 		var a := _body_point(points[0])
 		var b := _body_point(points[1])
 		if actor.technique == &"kick" and actor.mode == &"active": return
-		if actor.technique in [&"charge", &"return_charge", &"lance"] and actor.mode==&"windup":
+		if actor.technique in [&"charge", &"return_charge", &"lance"] and actor.mode==&"windup" and (technique_id != &"return_charge" or actor._runner.stage == &"aim"):
 			# 薄い進路は移動後の角先、太い角の光は実際の攻撃形状を示す。
 			draw_line(a,_body_point(actor.warning_points()[1]),Color(color,0.3),6.0,false)
 		draw_line(a,b,Color(color,0.3),width,false)
@@ -60,6 +62,14 @@ func _draw() -> void:
 		var at := _body_point(actor.table.pos[actor.body]+actor.direction*actor.horn_length())
 		for j in 3:
 			draw_line(at+Vector2(-15,j*10-10),at+Vector2(15,j*10-10),WARNING,3.0,false)
+
+## 仮表示。正式は shader。前向きの噴射を、広がって薄くなる3つの円で示す。
+func _reverse_jet(k: float) -> void:
+	var forward := Vector2.from_angle(actor.table.facing[actor.body])
+	var at := actor.table.pos[actor.body] + forward * actor.table.r[actor.body] * 0.65
+	for j in 3:
+		var offset := forward * float(j) * 8.0 + forward.orthogonal() * float(j - 1) * 8.0
+		draw_circle(_body_point(at + offset), lerpf(10.0, 24.0, k), Color(ENERGY, 0.35 * (1.0 - k)))
 
 func _body_point(world_point: Vector2) -> Vector2:
 	# 旋回したフレームも、役者ノードの描画更新を待たず戦闘方向を使う。

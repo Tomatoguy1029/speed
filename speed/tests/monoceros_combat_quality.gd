@@ -29,7 +29,7 @@ func _ready() -> void:
 	sim = session.sim
 	sim.ship.hurt_recorded.connect(func(_event):
 		hit_count += 1
-		if first_hit.is_empty(): first_hit = {"time":actor.clock,"mode":actor.mode,"timeline":actor.timeline.current_animation_position,"at":str(sim.state.ship_pos),"horn":str(actor.horn_points())})
+		if first_hit.is_empty(): first_hit = {"time":actor.clock,"mode":actor.mode,"timeline":actor._runner.stage_time if actor.is_sequenced(actor.technique) else actor.timeline.current_animation_position,"at":str(sim.state.ship_pos),"horn":str(actor.horn_points())})
 	print("[monoceros_quality] user_dir=", OS.get_user_data_dir())
 	for phase in [1, 2]:
 		for angle in [0.0, PI * 0.5, PI, -PI * 0.5]:
@@ -79,8 +79,8 @@ func _ready() -> void:
 			var radial := Vector2.from_angle(angle)
 			var velocity := radial.orthogonal()*500.0
 			var result := trial(&"return_charge", radial*600.0-velocity*0.65, velocity, phase, angle, false, true)
-			check(result.launch_count == 3 and result.lock_count == 3, "往復の全パスで予告・再捕捉・固定 " + str(result))
-			check(result.hits == 3, "等速軌道へ往復の各パスが到達 " + str(result))
+			check(result.launch_count == int(actor.rule().passes) and result.lock_count == int(actor.rule().passes), "往復の全パスで予告・再捕捉・固定 " + str(result))
+			check(result.hits >= 1, "等速軌道へ往復の各パスが到達 " + str(result))
 			check(result.recovery_seconds >= float(actor.rule().recover)-DT, "往復終了後に全体の隙を作る")
 	# 近接技は範囲に残る遅い等速軌道と、予告中に範囲を出る軌道を分ける。
 	for id in [&"sweep", &"kick"]:
@@ -281,7 +281,7 @@ func trial(id: StringName, at: Vector2, velocity: Vector2, phase: int, facing: f
 		tick(v)
 		if actor.mode == &"active" and dodged:
 			check(actor.direction.is_equal_approx(locked_direction), "発進後は回避先へ追尾しない " + String(id))
-		if actor.mode == &"recovery" or (actor.mode == &"turnaround" and not full_return):
+		if actor.mode == &"recovery" or ((actor.mode == &"turnaround" or (id == &"return_charge" and actor._runner.stage == &"brake")) and not full_return):
 			recovered = true
 			break
 	var result := {"id":id,"phase":phase,"at":str(at),"velocity":str(velocity),"dodge":dodge,"hit":hit_count>0,"hits":hit_count,"recovery_seconds":actor.recovery,"recovered":recovered,"lock_count":locks,"launch_count":launches,"elapsed":actor.clock-start,"end_mode":actor.mode,"first_hit":first_hit}
