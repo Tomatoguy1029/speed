@@ -10,7 +10,7 @@ empty_rest = 2.0
 sections = [{
 "name": "牽制",
 "request": "normal",
-"cap": 1.0,
+"cap": 2.0,
 "action_count": 1,
 "no_candidate_timeout": 1.0,
 "next": 1,
@@ -24,7 +24,7 @@ sections = [{
 "action_interval": 0.25,
 "no_candidate_timeout": 1.0,
 "next": 2,
-"weights": {"single": 35.0, "combo": 65.0}
+"weights": {"single": 85.0, "combo": 15.0}
 }, {
 "name": "大技候補",
 "request": "major",

@@ -119,7 +119,7 @@ func _ready() -> void:
 				chosen[selected] = int(chosen.get(selected,0))+1
 				check(candidates.has(selected), "成立した候補から技を選ぶ")
 				if context == "front": check(selected in (["sweep", "sword_flash"] if phase == 2 else ["sweep"]), "正面近接には形態に応じた斬撃を使う")
-				if context == "rear": check(candidates.has("kick") and selected in ["kick", "sweep"], "背後近接では蹴りと踏み込み薙ぎから選ぶ")
+				if context == "rear": check(candidates.has("kick") and selected in (["kick", "sweep", "sword_flash"] if phase == 2 else ["kick", "sweep"]), "背後近接では形態に応じた近接技から選ぶ")
 				if context == "middle": check(candidates.has("charge") and candidates.has("return_charge"), "中距離は複数の突進を候補に保つ")
 				if context == "middle" and phase == 2: check(candidates.has("lance"), "第2形態の中距離へ槍を加える")
 			selection_results.append({"phase":phase,"context":context,"selected":chosen})

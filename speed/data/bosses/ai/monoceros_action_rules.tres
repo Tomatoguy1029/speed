@@ -19,12 +19,12 @@ adapter = &"monoceros"
 trial_scene = "res://gyms/boss_flow_trial.tscn"
 techniques = Array[Resource]([ExtResource("2_glkwt"), ExtResource("3_ia7vf"), ExtResource("5_rmxme"), ExtResource("6_r5v4j"), ExtResource("7_qrfmn"), ExtResource("horn_wave"), ExtResource("sword_flash"), ExtResource("horn_dance")])
 conditions = {
-"horn_dance": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 1000.0, "min_phase": 2},
+"horn_dance": {"angle": 0.0, "half_angle": 180.0, "min": 550.0, "max": 1000.0, "min_phase": 2},
 "sword_flash": {"angle": 0.0, "half_angle": 180.0, "min": 0.0, "max": 700.0, "min_phase": 2},
 "horn_wave": {
 "angle": 0.0,
 "half_angle": 180.0,
-"max": 900.0,
+"max": 1000.0,
 "min": 200.0,
 "min_phase": 1
 },
@@ -32,7 +32,7 @@ conditions = {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 1000.0,
-"min": 300.0,
+"min": 550.0,
 "min_phase": 1
 },
 "kick": {
@@ -46,14 +46,14 @@ conditions = {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 950.0,
-"min": 100.0,
+"min": 550.0,
 "min_phase": 2
 },
 "return_charge": {
 "angle": 0.0,
 "half_angle": 180.0,
 "max": 1000.0,
-"min": 0.0,
+"min": 550.0,
 "min_phase": 1
 },
 "sweep": {
@@ -76,7 +76,9 @@ costs = {
 }
 selection_bias = {
 "kick": 3.0,
-"sweep": 3.0
+"sweep": 3.0,
+"horn_wave": 3.0,
+"sword_flash": 3.0
 }
 layout = {
 "horn_dance": Vector2(1448, 432),

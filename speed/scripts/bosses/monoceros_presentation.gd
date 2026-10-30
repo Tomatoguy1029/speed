@@ -68,6 +68,12 @@ func _sync_parts(dt: float) -> void:
 	var k := actor.table.r[actor.body] / 96.0
 	parts.scale = Vector2.ONE * k
 	parts.apply_appearance(actor.def.part_appearance)
+	# 溜めの光は角の絵に乗せ、首の振りと外観の位置補正へ追従させる。
+	var sweep_windup := actor.technique == &"sweep" and actor.mode == &"windup"
+	var horn_glow := float(actor._runner_for().glow(actor)) if sweep_windup else 0.0
+	var horn_light := 1.0 + horn_glow * 3.0
+	var horn_tint := Color(horn_light, horn_light, horn_light)
+	parts.get_node("Head/Lower/Sprite/head_gold_armor").self_modulate = horn_tint
 	_update_turn(dt)
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(actor.table.facing[actor.body], _body_facing)
@@ -96,6 +102,7 @@ func _sync_parts(dt: float) -> void:
 		leg.get_node("Foot").position.y = leg_pose.foot
 	var sword := parts.get_node("Head/Lower/SwordGlow") as Polygon2D
 	sword.visible = actor.phase == 2
+	sword.self_modulate = horn_tint
 	sword.polygon = PackedVector2Array([Vector2(-4, 105), Vector2(-9, 111), Vector2(0, actor.horn_length() / k - 46), Vector2(9, 111), Vector2(4, 105)])
 	parts.get_node("Head/Lower/SwordGlow/Guard").visible = sword.visible
 
