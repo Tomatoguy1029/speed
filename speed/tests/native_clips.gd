@@ -18,11 +18,14 @@ func _ready() -> void:
 	if not core.has_method("step_clips"):
 		check(false, "クリップの時計と群れの寿命をネイティブが保持する")
 	else:
-		await compare_clips(comparison,core)
+		await compare_clips(comparison,core,false)
+		var distant = comparison.create_native()
+		await compare_clips(comparison,distant,true)
+		distant.close()
 	core.close()
 	print("[native_clips] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
-func compare_clips(comparison,core) -> void:
+func compare_clips(comparison,core,distant: bool) -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
 	await lab.reset({"seed":901,"empty":true})
@@ -42,6 +45,9 @@ func compare_clips(comparison,core) -> void:
 	var formation := {"entries":[{"weight":1.0,"pos":Vector2(0,-400),"rot":PI},{"weight":0.7,"pos":Vector2(500,-50),"rot":1.7}],
 		"layouts":[{"weight":1.0,"value":1.2,"attack_managed":true,"markers":[{"type":&"drifter","pos":Vector2(-35,0),"rot":0.3},{"type":&"shield","pos":Vector2(35,0),"rot":-0.4}]},
 		{"weight":0.5,"value":0.0,"attack_managed":false,"markers":[{"type":&"drifter","pos":Vector2.ZERO,"rot":0.0}]}]}
+	if distant:
+		formation.entries[0].pos = Vector2(0,-2200)
+		formation.entries[1].pos = Vector2(2400,0)
 	for i in 2:
 		var clip := RuntimeClip.new()
 		clip.time = 0.1 + i*0.2
@@ -86,6 +92,7 @@ func compare_clips(comparison,core) -> void:
 	var spawn_events := 0
 	var ended_events := 0
 	var capped := false
+	var saw_arrival := false
 	for tick in 64:
 		var dt := 0.05
 		run.state.time += dt
@@ -100,6 +107,17 @@ func compare_clips(comparison,core) -> void:
 				run.enemies.mark_dead(row)
 			run.enemies.cleanup()
 		run.state.events.clear()
+		if distant:
+			if tick == 10:
+				var group: PackedInt32Array = run.spawn._clip_groups[0][0]
+				run.state.view_center = run.enemies.table.pos[group[0]]
+			if tick == 11: run.state.view_center = run.state.ship_pos
+			if tick == 14:
+				# 未入場の群れの削除行を別の個体が再利用したときも、既存の走査順を比較する。
+				var definition := run.enemies.def_of(&"drifter")
+				run.enemies.spawn(definition,run.state.ship_pos+Vector2(4000,0))
+				core.spawn_enemy(&"drifter",run.state.ship_pos+Vector2(4000,0))
+			core.set_motion_context(run.state.ship_pos,run.state.view_center,run.state.view_half)
 		run.spawn._survey_rows(0.0)
 		core.survey_population(0.0)
 		capped = capped or run.spawn._formation_capped(formation)
@@ -108,11 +126,14 @@ func compare_clips(comparison,core) -> void:
 		var expected := []
 		for i in stage.clips.size():
 			var groups := []
+			var arrived := []
 			for group in run.spawn._clip_groups.get(i,[]):
 				var ids := []
 				for k in range(1,group.size(),2): ids.append(group[k])
 				groups.append(ids)
-			expected.append({"next":run.spawn._clip_next.get(i,-1e9),"groups":groups})
+				arrived.append(run.spawn._clip_arrived.has(group[1]))
+				saw_arrival = saw_arrival or run.spawn._clip_arrived.has(group[1])
+			expected.append({"next":run.spawn._clip_next.get(i,-1e9),"groups":groups,"arrived":arrived})
 		var difference: String = comparison.difference(expected,core.clips_snapshot())
 		check(difference.is_empty(), "次回時刻と生存する群れが一致する %d: %s" % [tick,difference])
 		difference = comparison.difference(comparison.snapshot(run,[],tick).enemies,core.enemies_snapshot())
@@ -122,6 +143,7 @@ func compare_clips(comparison,core) -> void:
 		for event in run.state.events:
 			if event.type == &"clip_group": spawn_events += 1
 			if event.type == &"clip_group_end": ended_events += 1
+	if distant: check(saw_arrival, "群れの入場後は通常の再配置へ戻る条件を通る")
 	check(capped, "種類上限による群れの見送りを実際に通る")
 	check(spawn_events >= 4 and ended_events > 0, "補充と群れの全滅を実際に通る")
 	lab.free()

@@ -117,31 +117,33 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
                 const double remaining = std::min(desired - alive, raw_limit - raw);
                 const int64_t count = int64_t(std::min(std::round(30.0 * spawn_timeline.density), std::ceil(remaining)));
                 const size_t type = index_of(current.wave_type);
-                if (type == definitions.size()) return true;
-                const bool ring = rng->randf() < 0.5;
-                if (ring) {
-                    for (int64_t k = 0; k < count; ++k) {
-                        const double angle = (double(k) + double(rng->randf())) / double(count) * (2.0 * Math_PI);
+                if (type != definitions.size()) {
+                    const bool ring = rng->randf() < 0.5;
+                    if (ring) {
+                        for (int64_t k = 0; k < count; ++k) {
+                            const double angle = (double(k) + double(rng->randf())) / double(count) * (2.0 * Math_PI);
+                            const Vector2 unit(std::cos(angle), std::sin(angle));
+                            const double distance = std::min((view_half.x + p.margin) / std::max(0.0001, std::abs(double(unit.x))),
+                                (view_half.y + p.margin) / std::max(0.0001, std::abs(double(unit.y)))) + rng->randf() * 90.0;
+                            Dictionary options; options["facing"] = angle + Math_PI;
+                            if (spawn_enemy(current.wave_type, view_center + unit * distance, options) < 0) return false;
+                        }
+                    } else {
+                        const double angle = rng->randf() * (2.0 * Math_PI);
                         const Vector2 unit(std::cos(angle), std::sin(angle));
-                        const double distance = std::min((view_half.x + p.margin) / std::max(0.0001, std::abs(double(unit.x))),
-                            (view_half.y + p.margin) / std::max(0.0001, std::abs(double(unit.y)))) + rng->randf() * 90.0;
-                        Dictionary options; options["facing"] = angle + Math_PI;
-                        if (spawn_enemy(current.wave_type, view_center + unit * distance, options) < 0) return false;
+                        for (int64_t k = 0; k < count; ++k) {
+                            const double distance = std::min(view_half.x / std::max(0.0001, std::abs(double(unit.x))),
+                                view_half.y / std::max(0.0001, std::abs(double(unit.y)))) + p.margin + k * 12.0;
+                            const double offset = (rng->randf() - 0.5) * 120.0;
+                            Dictionary options; options["facing"] = angle + Math_PI;
+                            if (spawn_enemy(current.wave_type, ship_pos + unit * distance + Vector2(-unit.y,unit.x) * offset, options) < 0) return false;
+                        }
                     }
-                } else {
-                    const double angle = rng->randf() * (2.0 * Math_PI);
-                    const Vector2 unit(std::cos(angle), std::sin(angle));
-                    for (int64_t k = 0; k < count; ++k) {
-                        const double distance = std::min(view_half.x / std::max(0.0001, std::abs(double(unit.x))),
-                            view_half.y / std::max(0.0001, std::abs(double(unit.y)))) + p.margin + k * 12.0;
-                        const double offset = (rng->randf() - 0.5) * 120.0;
-                        Dictionary options; options["facing"] = angle + Math_PI;
-                        if (spawn_enemy(current.wave_type, ship_pos + unit * distance + Vector2(-unit.y,unit.x) * offset, options) < 0) return false;
-                    }
+                    emit_event("wave", Dictionary());
                 }
-                emit_event("wave", Dictionary());
             }
         }
     }
+    if (!bonus && clips_ready) return step_clips();
     return true;
 }

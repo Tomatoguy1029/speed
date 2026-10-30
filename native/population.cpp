@@ -59,13 +59,24 @@ double SpeedRunCore::survey_population(double target) {
     std::fill(p.region_types.begin(), p.region_types.end(), 0);
     const Vector2 limit = view_half * p.recycle_scale + Vector2(200,200);
     const double center_x = view_half.x * 0.45, center_y = view_half.y * 0.45;
+    std::unordered_set<size_t> entering;
+    const Rect2 view(view_center - view_half, view_half * 2.0);
+    for (auto &clip : clips) for (auto &group : clip.groups) {
+        if (group.arrived) continue;
+        for (const auto &member : group.members) {
+            if (member.first >= enemies.size()) continue;
+            const auto &enemy = enemies[member.first];
+            if (enemy.alive && enemy.id == member.second && view.has_point(enemy.pos)) { group.arrived = true; break; }
+        }
+        if (!group.arrived) for (const auto &member : group.members) entering.insert(member.first);
+    }
     for (const auto &rows : behavior_rows) for (size_t row : rows) {
         const auto &enemy = enemies[row];
         if (enemy.dead) continue;
         if (p.maximum[enemy.definition] > 0) ++p.type_counts[enemy.definition];
         const Vector2 relative = enemy.pos - view_center;
         const double x = std::abs(relative.x), y = std::abs(relative.y);
-        if (x > limit.x || y > limit.y) { p.far_rows.push_back(row); continue; }
+        if (x > limit.x || y > limit.y) { if (entering.find(row) == entering.end()) p.far_rows.push_back(row); continue; }
         int region = 4;
         if (x >= center_x || y >= center_y) {
             region = x * view_half.y > y * view_half.x ? (relative.x < 0 ? 0 : 1) : (relative.y < 0 ? 2 : 3);

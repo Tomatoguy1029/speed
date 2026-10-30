@@ -46,12 +46,12 @@ Array SpeedRunCore::clips_snapshot() const {
     Array out;
     if (closed || !clips_ready) return out;
     for (const auto &clip : clips) {
-        Dictionary row; Array groups;
+        Dictionary row; Array groups, arrived;
         for (const auto &group : clip.groups) {
             Array ids; for (const auto &member : group.members) ids.append(member.second);
-            groups.append(ids);
+            groups.append(ids); arrived.append(group.arrived);
         }
-        row["next"] = clip.next; row["groups"] = groups; out.append(row);
+        row["next"] = clip.next; row["groups"] = groups; row["arrived"] = arrived; out.append(row);
     }
     return out;
 }

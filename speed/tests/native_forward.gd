@@ -67,15 +67,23 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		phase.pop_to = 35.0
 		phase.rate = 13.2
 		phase.xp_bonus = config.xp_bonus
-		phase.wave_interval = 0.37
-		phase.wave_type = &"drifter"
+		phase.wave_interval = 0.05 if division == 3 else 0.37
+		phase.wave_type = &"" if division == 3 else &"drifter"
 		phase.mix = {"drifter": 1.0}
 		stage.phases = [phase]
+		var clip := RuntimeClip.new()
+		clip.time = 0.6
+		clip.length = 1.2
+		clip.groups = 1
+		clip.interval = 0.5
+		clip.prepared = [{"layouts":[{"weight":1.0,"value":-1.0,"markers":[{"type":&"drifter","pos":Vector2.ZERO,"rot":0.0}]}],"entries":[{"weight":1.0,"pos":Vector2(0,-700),"rot":PI}]}]
+		stage.clips = [clip]
 		run.state.stage = stage
 		run.enemies.definitions[&"drifter"] = definition
 		check(core.configure_spawn_timeline(DATA.compile_spawn_timeline(stage,run.cfg)), "フレーム比較の出現条件を生成する")
 		check(core.configure_population(values(run.cfg, ["spawn_recycle_scale", "spawn_region_cap", "spawn_margin", "field_radius", "planet_radius"])), "出現位置の編集値を渡す")
 		check(core.configure_refill(values(run.cfg, ["spawn_total_cap", "spawn_refill_time"])), "フレームで使う補充を準備する")
+		check(core.configure_clips(DATA.compile_spawn_clips(stage,run.cfg)), "フレームで使うクリップを準備する")
 	core.start(631, run.enemies._next_id, run.pickups._gem_next_seq)
 	if spawning and not core.has_method("set_population_mode"):
 		check(false, "補充の有効・無効をフレーム更新へ接続する")
@@ -103,6 +111,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 	var helper = SHOTS.new()
 	var fired := 0
 	var shot_hits := 0
+	var empty_wave_clip := false
 	for tick in 360:
 		if spawning:
 			run.options.auto_spawn = tick < 250 or tick >= 280
@@ -160,9 +169,12 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		check(str(run.state.rng.state) == core.inspect().rng_state, "発射・命中・報酬の乱数が一致する")
 		core.drain_collections()
 		for event in run.state.events:
+			if spawning and division == 3 and event.type == &"clip_group" and run.spawn._wave_t == 0.0 and run.enemies.count() < float(run.spawn.target().pop):
+				empty_wave_clip = true
 			if event.type == &"weapon_fire": fired += 1
 			if event.type == &"hit" and event.cause == &"shot": shot_hits += 1
 		if not difference.is_empty(): break
+	if spawning and division == 3: check(empty_wave_clip, "出現種類のない波の更新と同時にクリップを実際に出す")
 	check(fired >= 2 and shot_hits > 0, "W01の発射と命中を実際に通る")
 	check(buffer_checked, "発射中の弾の表示データを実際に比較する")
 	effects.free()
