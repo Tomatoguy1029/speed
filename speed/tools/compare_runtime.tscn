@@ -23,7 +23,7 @@ func _ready() -> void:
 		push_error(\"結果の保存先を開けません\")
 		get_tree().quit(1)
 		return
-	file.store_string(JSON.stringify(result))
+	file.store_string(JSON.stringify(result, \"\", true, true))
 	file.close()
 	print(\"固定入力の結果を保存しました: \", options.output)
 	get_tree().quit()

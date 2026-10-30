@@ -49,6 +49,8 @@ static func build_all(force := false, output := ROOT) -> Error:
 	if error != OK: return error
 	error = load("res://tools/content/build_runtime_stage.gd").build_all(output)
 	if error != OK: return error
+	error = load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json"))
+	if error != OK: return error
 	var outputs := [catalog_path]
 	var visual_index := ResourceLoader.load(output.path_join("visual_index.tres"), "", ResourceLoader.CACHE_MODE_IGNORE) as StageResources
 	for file in DirAccess.get_files_at(output):

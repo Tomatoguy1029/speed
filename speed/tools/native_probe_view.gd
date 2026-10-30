@@ -15,12 +15,15 @@ func _ready() -> void:
 	if core == null:
 		get_tree().quit(1)
 		return
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"]
-	var data: Dictionary = load("res://tools/content/build_native_data.gd").compile_enemy(definition, ContentManager.base)
+	var data = JSON.parse_string(FileAccess.get_file_as_string("res://.content/dev/native_probe.json"))
+	if not data is Dictionary:
+		push_error("比較用データを共通生成で準備してください")
+		get_tree().quit(1)
+		return
 	if not core.configure(data) or not core.start(932):
 		get_tree().quit(1)
 		return
-	visual_scale = 1.0 / definition.visual_value("collision_scale", 1.0)
+	visual_scale = float(data.visual_scale)
 	batch = InstanceBatch.new()
 	batch.setup_texture(load("res://assets/pixel/drifter.png"))
 	var material := ShaderMaterial.new()

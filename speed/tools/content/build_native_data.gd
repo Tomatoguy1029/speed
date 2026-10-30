@@ -18,3 +18,19 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig) -> Dictionar
 	if row.id.is_empty() or row.hp <= 0.0 or row.radius <= 0.0:
 		return {}
 	return {"version": 1, "enemies": [row]}
+
+## 共通生成から使う比較条件。未移行の通常ゲーム用データと混同しない。
+static func build_probe(path: String) -> Error:
+	var definition := load("res://data/enemies/drifter.tres") as EnemyDef
+	var config := load("res://data/config.tres") as GameConfig
+	var data := compile_enemy(definition, config)
+	if data.is_empty(): return ERR_INVALID_DATA
+	data["visual_scale"] = 1.0 / definition.visual_value("collision_scale", 1.0)
+	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	if error != OK: return error
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null: return FileAccess.get_open_error()
+	file.store_string(JSON.stringify(data, "", true, true))
+	error = file.get_error()
+	file.close()
+	return error
