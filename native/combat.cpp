@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "geometry.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -43,7 +44,7 @@ static double segment_circle(Vector2 from, Vector2 to, Vector2 center, double ra
 
 static double angle_difference(double target, double current) {
     const double difference = target - current;
-    return difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+    return speed::angle_difference(difference);
 }
 
 bool SpeedRunCore::blocks_front(size_t row, Vector2 hit, Vector2 direction) const {
@@ -99,6 +100,7 @@ void SpeedRunCore::kill_enemy(size_t row, bool crit, StringName cause, Vector2 d
     if (enemy.dead || phase != Phase::Play) return;
     const auto &def = definitions[enemy.definition];
     enemy.dead = true; dead_rows.push_back(row); ++kills;
+    remove_hound(row);
     Dictionary killed;
     killed["pos"] = enemy.pos; killed["r"] = enemy.radius; killed["crit"] = crit;
     killed["id"] = enemy.id; killed["t"] = time; killed["world_t"] = world_time;

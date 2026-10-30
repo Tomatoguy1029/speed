@@ -38,10 +38,25 @@ class SpeedRunCore : public RefCounted {
         double stone = 0, knock_t = 0, shove_time = 0;
         Vector2 shove_vel, shove_from;
         bool held = false, slash_hold = false, shoved = false;
+        int64_t pack = 0;
+        bool in_pack = false, pursuit_ready = false, follow_ready = false;
+        Vector2 pursuit, follow_goal;
+        double follow_until = 0, follow_scale = 1;
         int64_t dash_seen = -1;
         bool dash_fresh = false;
     };
     std::vector<Enemy> enemies;
+    std::vector<int64_t> avoidance_ids;
+    std::vector<Vector2> avoidance_from;
+    bool can_avoid_strong(size_t row) const;
+    void capture_avoidance();
+    double avoidance_clearance(Vector2 point, size_t row, const std::vector<size_t> &candidates) const;
+    HashMap<int64_t, std::vector<size_t>> hound_packs;
+    void spawn_hounds(size_t row, const Dictionary &options);
+    void remove_hound(size_t row);
+    bool running_hound(size_t row) const;
+    Vector2 hound_velocity(size_t row) const;
+    void prepare_hounds(const std::vector<size_t> &rows);
     bool attack_formation_mode = false;
     struct AttackBudget {
         struct Member { size_t row = 0; double until = 0; bool begun = false, closed = false; };
@@ -349,6 +364,9 @@ public:
     bool set_motion_context(Vector2 ship, Vector2 center, Vector2 half);
     int64_t spawn_enemy(StringName type, Vector2 position, const Dictionary &options);
     bool remove_enemy(int64_t id);
+    bool follow_hound(int64_t id, Vector2 goal, double until, double scale);
+    Dictionary hound_snapshot() const;
+    bool avoid_strong(double dt);
     Array enemies_snapshot() const;
     bool rebuild_enemy_grid(double cell_size);
     PackedInt64Array query_enemy_ids(Vector2 lo, Vector2 hi) const;

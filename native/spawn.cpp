@@ -105,9 +105,12 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
         options["elite"] = p.maximum[selected] == 0 && rng->randf() < 0.01 + double(surge["elite"]);
         options["facing"] = (ship_pos - Vector2(point)).angle();
         if (definition.size_var) options["size"] = definition.scaling.radius * (0.85 + rng->randf() * 0.45);
+        const size_t before = rows_by_id.size();
         if (spawn_enemy(definition.id, point, options) < 0) return false;
         if (p.maximum[selected] > 0) ++p.type_counts[selected];
-        p.effective[selected] += 1.0; alive += 1.0; ++raw;
+        p.effective[selected] += 1.0;
+        if (rows_by_id.size() - before > 1) { alive = survey_population(desired); raw = p.raw; }
+        else { alive += 1.0; ++raw; }
     }
     if (!bonus && current.wave_interval > 0) {
         p.wave_time += world_dt;
@@ -118,9 +121,11 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
                 const int64_t count = int64_t(std::min(std::round(30.0 * spawn_timeline.density), std::ceil(remaining)));
                 const size_t type = index_of(current.wave_type);
                 if (type != definitions.size()) {
+                    const size_t before = rows_by_id.size();
                     const bool ring = rng->randf() < 0.5;
                     if (ring) {
                         for (int64_t k = 0; k < count; ++k) {
+                            if (double(rows_by_id.size() - before) >= remaining) break;
                             const double angle = (double(k) + double(rng->randf())) / double(count) * (2.0 * Math_PI);
                             const Vector2 unit(std::cos(angle), std::sin(angle));
                             const double distance = std::min((view_half.x + p.margin) / std::max(0.0001, std::abs(double(unit.x))),
@@ -132,6 +137,7 @@ bool SpeedRunCore::step_population(double world_dt, bool bonus) {
                         const double angle = rng->randf() * (2.0 * Math_PI);
                         const Vector2 unit(std::cos(angle), std::sin(angle));
                         for (int64_t k = 0; k < count; ++k) {
+                            if (double(rows_by_id.size() - before) >= remaining) break;
                             const double distance = std::min(view_half.x / std::max(0.0001, std::abs(double(unit.x))),
                                 view_half.y / std::max(0.0001, std::abs(double(unit.y)))) + p.margin + k * 12.0;
                             const double offset = (rng->randf() - 0.5) * 120.0;

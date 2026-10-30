@@ -5,7 +5,7 @@ extends RefCounted
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -29,7 +29,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			return {}
 	if row.id.is_empty() or row.hp <= 0.0 or row.radius <= 0.0:
 		return {}
-	if definition.behavior == &"biter":
+	if definition.behavior in [&"biter", &"hound"]:
 		row.bite = {"turn":definition.turn if definition.turn > 0.0 else 4.0}
 		for key in ["bite_reach","bite_telegraph","bite_rest","bite_radius","bullet_dmg"]:
 			if not definition.params.has(key): return {}
@@ -37,6 +37,12 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		for value in row.bite.values():
 			if not is_finite(value) or value < 0.0: return {}
 		if row.bite.bite_telegraph <= 0.0: return {}
+	if definition.behavior == &"hound":
+		row.pack = {"count":maxi(1,int(definition.params.pack_count)), "accel":definition.accel if definition.accel > 0.0 else 2.0}
+		for pair in [["gap","pack_gap"],["reach","pack_neighbor_radius"],["alignment","pack_alignment"],["cohesion","pack_cohesion"],["separation","pack_separation"]]:
+			row.pack[pair[0]] = float(definition.params[pair[1]])
+		for value in row.pack.values():
+			if not is_finite(value): return {}
 	if definition.behavior == &"shield":
 		row.shield = {"accel": definition.accel if definition.accel > 0.0 else 2.0,
 			"turn": definition.turn if definition.turn > 0.0 else 4.0, "weak_arc": definition.weak_arc}

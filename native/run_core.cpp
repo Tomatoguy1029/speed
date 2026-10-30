@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "geometry.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
@@ -83,6 +84,9 @@ void SpeedRunCore::_bind_methods() {
     ClassDB::bind_method(D_METHOD("step", "delta"), &SpeedRunCore::step);
     ClassDB::bind_method(D_METHOD("set_motion_context", "ship", "center", "half"), &SpeedRunCore::set_motion_context);
     ClassDB::bind_method(D_METHOD("spawn_enemy", "type", "position", "options"), &SpeedRunCore::spawn_enemy, DEFVAL(Dictionary()));
+    ClassDB::bind_method(D_METHOD("follow_hound", "id", "goal", "until", "scale"), &SpeedRunCore::follow_hound);
+    ClassDB::bind_method(D_METHOD("avoid_strong", "dt"), &SpeedRunCore::avoid_strong);
+    ClassDB::bind_method(D_METHOD("hound_snapshot"), &SpeedRunCore::hound_snapshot);
     ClassDB::bind_method(D_METHOD("remove_enemy", "id"), &SpeedRunCore::remove_enemy);
     ClassDB::bind_method(D_METHOD("enemies_snapshot"), &SpeedRunCore::enemies_snapshot);
     ClassDB::bind_method(D_METHOD("rebuild_enemy_grid", "cell_size"), &SpeedRunCore::rebuild_enemy_grid);
@@ -98,7 +102,7 @@ bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) 
     if (forward.ready && !combat_ready) return false;
     if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
     if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
-    for (const auto &def : definitions) if (def.kind == speed::EnemyDefinition::Kind::Biter && (!ship_ready || !bite_zone_config.ready)) return false;
+    for (const auto &def : definitions) if ((def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) && (!ship_ready || !bite_zone_config.ready)) return false;
     next_id = first_id;
     next_gem_seq = first_gem_seq;
     rng.instantiate();
@@ -117,6 +121,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 void SpeedRunCore::advance_enemies(double delta) {
+    capture_avoidance();
     ++ticks;
     if (aim_ready && !draw.tracing) {
         const Vector2 toward = ship_pos - enemy_aim;
@@ -127,7 +132,10 @@ void SpeedRunCore::advance_enemies(double delta) {
         }
     }
     const Vector2 limit = view_half * 1.25 + Vector2(300, 300);
-    for (const auto &rows : behavior_rows) for (size_t row : rows) {
+    for (size_t group = 0; group < behavior_rows.size(); ++group) {
+      const auto &rows = behavior_rows[group];
+      if (behavior_kinds[group] == speed::EnemyDefinition::Kind::Hound) prepare_hounds(rows);
+      for (size_t row : rows) {
         auto &enemy = enemies[row];
         if (enemy.dead || enemy.held) continue;
         if (enemy.stone > 0) { enemy.stone -= delta; enemy.vel = Vector2(); continue; }
@@ -139,7 +147,7 @@ void SpeedRunCore::advance_enemies(double delta) {
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta); continue; }
         const Vector2 relative = enemy.pos - view_center;
         const bool far = std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y;
-        if (def.kind == speed::EnemyDefinition::Kind::Biter) { advance_biter(row, delta, far); continue; }
+        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + ticks) % 3 == 0) {
             if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 const double bdt = far ? delta * 3.0 : delta;
@@ -149,7 +157,7 @@ void SpeedRunCore::advance_enemies(double delta) {
                 if (distance < 0.001) distance = 1;
                 enemy.vel += (toward / distance * enemy.speed - enemy.vel) * std::min(1.0, def.accel * bdt);
                 const double difference = double((ship_pos - enemy.pos).angle()) - enemy.facing;
-                const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+                const double wrapped = speed::angle_difference(difference);
                 enemy.facing += std::clamp(wrapped, -def.turn * bdt, def.turn * bdt);
             } else {
                 const Vector2 toward = ship_pos - enemy.pos;
@@ -163,12 +171,15 @@ void SpeedRunCore::advance_enemies(double delta) {
             }
         }
         enemy.pos += enemy.vel * delta;
+      }
     }
 }
 
 void SpeedRunCore::close() {
     closed = true;
     rng.unref();
+    avoidance_ids.clear(); avoidance_from.clear();
+    hound_packs.clear();
     enemies.clear();
     enemies.shrink_to_fit();
     free_rows.clear();
@@ -223,7 +234,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
         if (rows[i].get_type() != Variant::DICTIONARY) return false;
         const Dictionary row = rows[i];
         if (!row.has("id") || row["id"].get_type() != Variant::STRING || String(row["id"]).is_empty() ||
-                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield" && String(row["behavior"]) != "biter")) return false;
+                !row.has("behavior") || row["behavior"].get_type() != Variant::STRING || (String(row["behavior"]) != "chase" && String(row["behavior"]) != "shield" && String(row["behavior"]) != "biter" && String(row["behavior"]) != "hound")) return false;
         speed::EnemyDefinition def;
         def.id = String(row["id"]);
         if (String(row["behavior"]) == "shield") {
@@ -240,7 +251,7 @@ bool SpeedRunCore::configure(const Dictionary &data) {
                 if (!std::isfinite(*values[k]) || *values[k] < 0) return false;
             }
         }
-        if (String(row["behavior"]) == "biter") {
+        if (String(row["behavior"]) == "biter" || String(row["behavior"]) == "hound") {
             if (row.get("bite", Variant()).get_type() != Variant::DICTIONARY) return false;
             const Dictionary bite = row["bite"]; def.kind = speed::EnemyDefinition::Kind::Biter;
             const char *keys[] = {"turn", "bite_reach", "bite_telegraph", "bite_rest", "bite_radius", "bullet_dmg"};
@@ -251,6 +262,19 @@ bool SpeedRunCore::configure(const Dictionary &data) {
                 *values[k] = value;
             }
             if (def.bite.telegraph <= 0) return false;
+        }
+        if (String(row["behavior"]) == "hound") {
+            if (row.get("pack", Variant()).get_type() != Variant::DICTIONARY) return false;
+            const Dictionary pack = row["pack"]; def.kind = speed::EnemyDefinition::Kind::Hound;
+            if (pack.get("count", Variant()).get_type() != Variant::INT || int64_t(pack["count"]) < 1) return false;
+            def.pack.count = pack["count"];
+            const char *keys[] = {"gap", "reach", "alignment", "cohesion", "separation", "accel"};
+            double *values[] = {&def.pack.gap, &def.pack.reach, &def.pack.alignment, &def.pack.cohesion, &def.pack.separation, &def.accel};
+            for (int k = 0; k < 6; ++k) {
+                const Variant value = pack.get(keys[k], Variant());
+                if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
+                *values[k] = value;
+            }
         }
         for (const auto &previous : parsed) if (previous.id == def.id) return false;
         const char *keys[] = {"hp", "armor", "radius", "speed", "fire_interval", "xp", "knockback", "hitstop_multiplier"};
@@ -327,8 +351,8 @@ bool SpeedRunCore::configure_enemy_order(const PackedStringArray &order) {
     if (started || closed) return false;
     std::vector<speed::EnemyDefinition::Kind> kinds;
     for (int64_t i = 0; i < order.size(); ++i) {
-        if (order[i] != "chase" && order[i] != "shield" && order[i] != "biter") return false;
-        const auto kind = order[i] == "chase" ? speed::EnemyDefinition::Kind::Chase : order[i] == "shield" ? speed::EnemyDefinition::Kind::Shield : speed::EnemyDefinition::Kind::Biter;
+        if (order[i] != "chase" && order[i] != "shield" && order[i] != "biter" && order[i] != "hound") return false;
+        const auto kind = order[i] == "chase" ? speed::EnemyDefinition::Kind::Chase : order[i] == "shield" ? speed::EnemyDefinition::Kind::Shield : order[i] == "biter" ? speed::EnemyDefinition::Kind::Biter : speed::EnemyDefinition::Kind::Hound;
         if (std::find(kinds.begin(), kinds.end(), kind) != kinds.end()) return false;
         kinds.push_back(kind);
     }
@@ -354,9 +378,10 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     for (int i = 0; i < keys.size(); ++i) {
         if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return -1;
         const String key = keys[i];
-        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed" && key != "knock") return -1;
+        if (key != "elite" && key != "size" && key != "facing" && key != "vel" && key != "attack_group" && key != "attack_value" && key != "attack_priority" && key != "attack_managed" && key != "knock" && key != "hound_pack") return -1;
     }
     if (options.has("elite") && options["elite"].get_type() != Variant::BOOL) return -1;
+    if (options.has("hound_pack") && options["hound_pack"].get_type() != Variant::INT) return -1;
     enemy.elite = options.get("elite", false);
     if (options.has("facing")) {
         const Variant facing = options["facing"];
@@ -423,6 +448,7 @@ int64_t SpeedRunCore::spawn_enemy(StringName type, Vector2 position, const Dicti
     enemy.alive = true;
     enemies[row] = enemy;
     rows_by_id[enemy.id] = row;
+    if (def.kind == speed::EnemyDefinition::Kind::Hound) spawn_hounds(row, options);
     if (def.rank >= 3) { Dictionary event; event["id"] = enemy.id; event["enemy_type"] = def.id; emit_event("strong_spawn", event); }
     return enemy.id;
 }
@@ -431,6 +457,7 @@ bool SpeedRunCore::remove_enemy(int64_t id) {
     if (!started || closed) return false;
     auto found = rows_by_id.find(id);
     if (found == rows_by_id.end()) return false;
+    remove_hound(found->second);
     auto &enemy = enemies[found->second];
     auto &active_rows = behavior_rows[enemy.behavior_group];
     const size_t last = active_rows.back();
@@ -558,6 +585,7 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
             if (!advance_attack_budget(world_time)) return false;
         }
         advance_enemies(accumulated);
+        avoid_strong(accumulated);
         if (check_run_end()) return true;
         rebuild_enemy_grid(frame_grid_cell);
     }

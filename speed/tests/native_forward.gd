@@ -50,7 +50,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		core.close()
 		lab.free()
 		return
-	if enemy_type == &"biter":
+	if enemy_type in [&"biter",&"hound"]:
 		check(core.configure_bite_zone(DATA.compile_bite_zone(load("res://.content/attack_visuals.res"))),"噛みつきの範囲判定を準備する")
 	core.configure_ship(values(run.cfg, SHIP.CONFIG_KEYS), values(run.state.stats, SHIP.STAT_KEYS))
 	core.configure_draw(values(run.cfg, SHIP.DRAW_CONFIG), values(run.state.stats, SHIP.DRAW_STATS))
@@ -197,7 +197,7 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(values(run.state, SHIP.STATE_KEYS)), comparison.plain(core.ship_snapshot()))
 		if difference.is_empty(): difference = comparison.difference(comparison.plain(run.state.events), comparison.plain(core.drain_events()))
 		if difference.is_empty(): difference = comparison.difference({"elapsed": weapon._t, "recoil": weapon.recoil}, core.forward_snapshot())
-		if enemy_type == &"biter":
+		if enemy_type in [&"biter",&"hound"]:
 			if difference.is_empty(): difference = comparison.difference(zone_helper.hazard_snapshot(run.projectiles),comparison.plain(core.hazards_snapshot()))
 			bite_seen = bite_seen or run.projectiles.hazard_count() > 0
 			var rows_by_id := {}
@@ -218,13 +218,13 @@ func compare_frames(comparison, level: int, division: int, guarded := false, spa
 		check(str(run.state.rng.state) == core.inspect().rng_state, "発射・命中・報酬の乱数が一致する")
 		core.drain_collections()
 		for event in run.state.events:
-			if spawning and division == 3 and event.type == &"clip_group" and run.spawn._wave_t == 0.0 and run.enemies.count() < float(run.spawn.target().pop):
+			if spawning and division == 3 and event.type == &"clip_group" and run.spawn._wave_t == 0.0 and (enemy_type == &"hound" or run.enemies.count() < float(run.spawn.target().pop)):
 				empty_wave_clip = true
 			if event.type == &"weapon_fire": fired += 1
 			if event.type == &"hit" and event.cause == &"shot": shot_hits += 1
 		if not difference.is_empty(): break
 	if budgeting: check(permitted > 0 and denied > 0,"時間帯の予算による許可と待機を両方通る")
-	if enemy_type == &"biter": check(bite_seen,"実際の敵が噛みつきの判定を発生させる")
+	if enemy_type in [&"biter",&"hound"]: check(bite_seen,"実際の敵が噛みつきの判定を発生させる")
 	zone_helper.free()
 	budget_helper.free()
 	if spawning and division == 3: check(empty_wave_clip, "出現種類のない波の更新と同時にクリップを実際に出す")

@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -95,7 +96,7 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         if (shot.kind == 1) {
             const double turn = double(shot.turn) * world_dt, current = vel.angle();
             const double difference = double(((aim_ready ? enemy_aim : ship_pos) - shot.pos).angle()) - current;
-            const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+            const double wrapped = speed::angle_difference(difference);
             const Vector2 steered = Vector2::from_angle(current + std::clamp(wrapped, -turn, turn)) * shot.speed;
             if (steered != vel) { vel = steered; shot.vel = vel; }
         }

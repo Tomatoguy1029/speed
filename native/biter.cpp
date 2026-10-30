@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -31,7 +32,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     if (enemy.mode == EnemyMode::Windup) {
         enemy.vel *= std::max(0.0, 1.0 - 8.0 * bdt);
         const double difference = double((ship_pos - from).angle()) - enemy.facing;
-        const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+        const double wrapped = speed::angle_difference(difference);
         const double turn = def.turn * 2.0 * bdt;
         enemy.facing += std::clamp(wrapped, -turn, turn);
         enemy.timer -= bdt;
@@ -44,7 +45,13 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
     } else {
         const Vector2 toward = ship_pos - from;
         const double distance = toward.length();
+        const Vector2 previous_velocity = enemy.vel;
         enemy.vel = toward.length_squared() >= 0.000001 ? toward.normalized() * enemy.speed : Vector2();
+        if (def.kind == speed::EnemyDefinition::Kind::Hound) {
+            const Vector2 target = enemy.pursuit_ready ? enemy.pursuit : toward.normalized() * enemy.speed;
+            // 下の共通追跡値ではなく、更新前の速度から補間する。
+            enemy.vel = previous_velocity.lerp(target, std::clamp(def.accel * bdt, 0.0, 1.0));
+        }
         if (enemy.vel.length_squared() > 0.000001) enemy.facing = enemy.vel.angle();
         if (enemy.mode == EnemyMode::Recover) {
             enemy.timer -= bdt;

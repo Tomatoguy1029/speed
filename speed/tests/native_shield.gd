@@ -42,7 +42,7 @@ func _ready() -> void:
 			check(str(run.state.rng.state) == core.inspect().rng_state, "敵の移動で乱数消費を変えない")
 		core.close()
 	lab.free()
-	for mode in ["front_touch", "front_ram", "rear_ram", "rear_zero_ram", "side_ram", "glide_cooldown", "front_shots", "back_shots", "front_debris"]: await compare_hits(comparison, mode)
+	for mode in ["front_touch", "front_ram", "rear_ram", "rear_zero_ram", "side_ram", "glide_cooldown", "front_shots", "back_shots", "boundary_shots", "front_debris"]: await compare_hits(comparison, mode)
 	print("[native_shield] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
@@ -61,6 +61,7 @@ func compare_hits(comparison, mode: String, stone := false) -> void:
 	if mode.ends_with("ram"): run.cfg.ram_speed_ratio = 0.0
 	var definition: EnemyDef = run.enemies.def_of(&"shield").duplicate(true)
 	if mode == "rear_zero_ram": definition.weak_arc = 0.0
+	if mode == "boundary_shots": definition.params.front_arc = PI - 0.00001
 	if mode == "glide_cooldown" or stone: definition.hp = 1000.0
 	if stone: definition.armor = 1000.0
 	var core = comparison.create_native()
@@ -90,8 +91,9 @@ func compare_hits(comparison, mode: String, stone := false) -> void:
 	var origin := run.state.ship_pos
 	var position := Vector2.ZERO if mode.ends_with("shots") or mode == "front_debris" else origin + (Vector2(40,0) if mode.begins_with("rear") else Vector2(0,40) if mode == "side_ram" else Vector2(-40,0))
 	run.state.events.clear()
-	var row := run.enemies.spawn(definition, position)
-	var id: int = core.spawn_enemy(&"shield", position)
+	var spawn_options := {"facing":0.00002} if mode == "boundary_shots" else {}
+	var row := run.enemies.spawn(definition, position, spawn_options)
+	var id: int = core.spawn_enemy(&"shield", position, spawn_options)
 	if stone:
 		run.enemies.table.stone[row] = 1.0
 		check(core.set_enemy_motion(id,{"stone":1.0}),"石化中の接触と射撃を比較する")

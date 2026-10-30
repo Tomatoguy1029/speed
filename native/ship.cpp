@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -34,7 +35,7 @@ void SpeedRunCore::steer_ship(double want, double dt) {
     const double sp = ship.vel.length();
     if (sp > 1) {
         const double difference = want - double(ship.vel.angle());
-        const double wrapped = difference - (2.0 * Math_PI) * std::floor((difference + Math_PI) / (2.0 * Math_PI));
+        const double wrapped = speed::angle_difference(difference);
         const double turn = std::clamp(wrapped, -c.turn_rate * dt, c.turn_rate * dt);
         ship.vel = ship.vel.rotated(turn);
     }
