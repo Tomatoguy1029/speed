@@ -91,9 +91,6 @@ func _sync_parts(dt: float) -> void:
 		leg.rotation = 0.0
 		leg.scale = Vector2.ONE
 	var pose: Dictionary = actor._runner_for().body_pose(actor, parts)
-	if actor.technique == &"sweep" and actor.mode == &"recovery":
-		parts.get_node("Head").rotation = angle_difference(_body_facing, actor.table.facing[actor.body]) + pose.neck
-		parts.get_node("Head/Lower").rotation = 0.0
 	for leg_pose: Dictionary in pose.legs:
 		var leg := parts.get_node(leg_pose.path) as Node2D
 		leg.rotation = leg_pose.rotation

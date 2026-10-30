@@ -32,21 +32,22 @@ func _draw() -> void:
 		return
 	if technique_id == &"return_charge" and actor._runner != null and actor._runner.stage == &"brake":
 		_reverse_jet(clampf(actor._runner.stage_time / maxf(float(actor.rule().brake_time), 0.001), 0.0, 1.0))
+	if technique_id == &"sweep":
+		if actor.mode not in [&"windup", &"active"]: return
+		if actor._runner.stage == &"stop":
+			_reverse_jet(clampf(actor._runner.stage_time / maxf(float(actor.rule().stop_time), 0.001), 0.0, 1.0))
+		if actor._runner.stage == &"swing":
+			var points := actor.horn_points()
+			draw_line(_body_point(points[0]), _body_point(points[1]), Color(DANGER, 0.3), float(actor.def.params.horn_width), false)
+			draw_line(_body_point(points[0]), _body_point(points[1]), DANGER, 13.0, false)
+		return
 	# 正確な攻撃線をワールド→役者座標へ戻す。警告と攻撃の幅は共通。
 	draw_set_transform(Vector2.ZERO)
 	_lance_remnants()
 	if actor.mode in [&"windup", &"active"]:
 		var color := DANGER if actor.mode==&"active" else WARNING
 		var width := float(actor.def.params.horn_width)
-		if actor.technique==&"sweep" and actor.mode==&"windup":
-			var arc := PackedVector2Array()
-			for j in 25:
-				var points := actor.horn_points(float(j)/24.0)
-				arc.append(_body_point(points[-1]))
-			draw_polyline(arc, Color(color,0.65), 7.0, false)
-			for f in [0.0,1.0]:
-				var edge := actor.horn_points(f)
-				draw_line(_body_point(edge[0]),_body_point(edge[1]),Color(color,0.5),4.0,false)
+
 		var points := actor.horn_points()
 		var a := _body_point(points[0])
 		var b := _body_point(points[1])

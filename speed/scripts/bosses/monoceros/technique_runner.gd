@@ -50,7 +50,6 @@ func _aim(host: MonocerosBoss, dt: float) -> void:
 func _strike_aim(host: MonocerosBoss, attack: StringName = &"", lead := -1.0) -> Vector2:
 	# ボス固有の捕捉。選択時・予告中だけ現在位置と速度から接触時点を狙う。
 	if attack == &"": attack = host.technique
-	if host.tech_kind(attack) == &"combo": attack = &"charge"
 	var velocity := host.run_state.ship_vel
 	var target := host.run_state.ship_pos + velocity * (float(host.def.params.lock_lead) if lead < 0.0 else lead)
 	if host.tech_kind(attack) not in [&"charge", &"return_charge", &"lance"]: return target
@@ -137,9 +136,6 @@ func end_strike(host: MonocerosBoss) -> void:
 	if kind() == &"return_charge" and host.passes_left > 0:
 		host.mode = &"turnaround"
 		host.recovery = float(host.def.params.turnaround_time)
-	elif host.combo_pending:
-		host.mode = &"recovery"
-		host.recovery = host._begin_settle() + float(host.def.params.combo_gap)
 	else:
 		host.mode = &"recovery"
 		host.recovery = host._begin_settle() + float(host.rule().recover)
@@ -151,10 +147,10 @@ func _begin_settle(host: MonocerosBoss) -> float:
 	host.settle_at = host.clock
 	host.settle_hold = 0.0
 	host.settle_return = 0.0
-	if kind() not in [&"sweep", &"kick"]: return 0.0
+	if kind() != &"kick": return 0.0
 	var r := host.rule()
-	# 戻す角度：薙ぎは振り終えた端から正面まで、蹴りは後ろへ回した後脚を前へ戻すまで。
-	var angle := float(r.get("arc", 0.0)) * 0.5 if kind() == &"sweep" else PI
+	# 後ろへ回した後脚を正面へ戻す。
+	var angle := PI
 	var speed := float(r.get("return_speed", 0.0))
 	host.settle_hold = maxf(0.0, float(r.get("hold", 0.0)))
 	host.settle_return = angle / speed if speed > 0.0 else 0.0

@@ -38,20 +38,20 @@ func _ready() -> void:
 			approached = actor.table.pos[actor.body].distance_to(sim.state.enemy_aim) <= actor._reach(actor.technique)
 			break
 	check(approached, "攻撃可能な距離へ戻ってから予告を始める")
-	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance", &"combo"]:
+	for tech in [&"charge", &"return_charge", &"sweep", &"kick", &"lance"]:
 		fresh()
 		actor._cooldown = 0.0
-		actor.phase = 2 if tech in [&"lance", &"combo"] else 1
-		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(180, 0) if tech == &"sweep" else Vector2(600, 0)
+		actor.phase = 2 if tech == &"lance" else 1
+		sim.state.enemy_aim = Vector2(-180, 0) if tech == &"kick" else Vector2(400, 0) if tech == &"sweep" else Vector2(600, 0)
 		sim.state.ship_pos = sim.state.enemy_aim
 		var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
 		check(candidates.any(func(c): return c.id == String(tech)), "仕様の距離・形態で候補へ入る: " + tech)
 		var flow := actor.flow_runner.flow.duplicate(true)
 		for section in flow.sections: section["allowed_techniques"] = [String(tech)]
 		actor.flow_runner.configure(flow)
-		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech in [&"return_charge", &"combo"] else 0
+		actor.flow_runner.index = 2 if tech == &"lance" else 1 if tech == &"return_charge" else 0
 		step(DT)
-		check(actor.mode == &"windup" and actor.technique == (&"charge" if tech == &"combo" else tech), "共通フローから技を開始できる: " + tech)
+		check(actor.mode == &"windup" and actor.technique == tech, "共通フローから技を開始できる: " + tech)
 	fresh()
 	actor.start_attack(&"charge")
 	sim.state.enemy_aim = Vector2(600, 220)
@@ -137,10 +137,10 @@ func _ready() -> void:
 		check(actor.phase == 2, "抜いた後に予約した形態へ進む")
 		check(sim.field.bodies.size() == 1 and planet.r == 80.0 and planet.pos == Vector2(1020,0), "惑星を生成・破壊・移動しない")
 
-	for tech in [&"charge", &"sweep", &"kick", &"lance"]:
+	for tech in [&"charge", &"kick", &"lance"]:
 		fresh()
 		actor.phase = 2
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		var hp := sim.state.ship_hp
@@ -160,6 +160,27 @@ func _ready() -> void:
 		check(sim.state.ship_hp == hurt_hp, "一振りで重複被弾を出さない: " + tech)
 
 	fresh()
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	actor.start_attack(&"sweep")
+	var sweep_hp := sim.state.ship_hp
+	var sweep_points := actor.horn_points()
+	sim.state.ship_pos = sweep_points[0].lerp(sweep_points[1], 0.75)
+	actor.previous_ship = sim.state.ship_pos
+	for frame in 600:
+		if actor._runner.get("stage") == &"swing": break
+		step(DT)
+	check(sim.state.ship_hp == sweep_hp, "踏み込み薙ぎは振り抜く前に角へ触れても無害")
+	sweep_points = actor.horn_points()
+	sim.state.ship_pos = sweep_points[0].lerp(sweep_points[1], 0.65)
+	actor.previous_ship = sim.state.ship_pos
+	step(DT)
+	check(sim.state.ship_hp < sweep_hp, "踏み込み薙ぎは振り抜く角の形状で被弾する")
+	var sweep_hurt_hp := sim.state.ship_hp
+	step(0.1)
+	check(sim.state.ship_hp == sweep_hurt_hp, "踏み込み薙ぎは一振りで重複被弾を出さない")
+
+	fresh()
 	actor._cooldown = 0.0
 	check(actor.can_select(&"kick",1,0,260,true)==false, "正面の自機に後ろ蹴りを選ばない")
 	sim.state.enemy_aim = Vector2(-180, 0)
@@ -168,22 +189,6 @@ func _ready() -> void:
 	actor.start_attack(&"kick")
 	step(2.5)
 	check(not actor.can_select(&"kick",1,0,260,true), "蹴りのCDで背面攻略の機会を確保する")
-
-	fresh()
-	actor.phase = 2
-	actor.start_attack(&"combo")
-	step(2.5)
-	check(actor.technique == &"charge" and actor.mode == &"recovery" and not actor.combo_pending, "突進後に届かない薙ぎを強制せず隙を作る")
-	fresh()
-	actor.phase = 2
-	actor.start_attack(&"combo")
-	step(2.0)
-	sim.state.ship_pos = actor.table.pos[actor.body] + Vector2(160,0)
-	sim.state.enemy_aim = sim.state.ship_pos
-	step(0.5)
-	check(actor.technique == &"sweep" and actor.mode == &"windup", "仮連携は突進後に薙ぎが届く時だけ予告を始める")
-	step(1.5)
-	check(actor.mode == &"recovery" and not actor.combo_pending, "連携の最後に隙を作る")
 
 	fresh()
 	actor.start_attack(&"charge")
@@ -247,7 +252,7 @@ func _ready() -> void:
 	check(actor.phase == 1 and not actor.phase_pending and actor.mode == &"idle", "再生成で攻撃・形態・角刺さりをリセットする")
 	actor._cooldown = 0.0
 	var candidates: Array = actor.flow_adapter.candidates({"request": "any"}).candidates
-	check(not candidates.is_empty() and candidates.all(func(c): return c.id not in ["lance", "combo"]), "第1形態の候補に第2形態専用技を混ぜない")
+	check(not candidates.is_empty() and candidates.all(func(c): return c.id != "lance"), "第1形態の候補に第2形態専用技を混ぜない")
 	step(0.1)
 	check(actor.flow_runner.active and actor.flow_runner.stamina < actor.flow_runner.flow.maximum_stamina, "共通フローの抽選で技を開始しスタミナを消費する")
 	actor.begin_final_strike(1.0)
@@ -309,7 +314,7 @@ func capture() -> void:
 	for tech in stage_names:
 		fresh()
 		actor.phase = 2 if tech==&"lance" else 1
-		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(160,0) if tech == &"sweep" else Vector2(600,0)
+		sim.state.ship_pos = Vector2(-180,0) if tech == &"kick" else Vector2(400,0) if tech == &"sweep" else Vector2(600,0)
 		sim.state.enemy_aim = sim.state.ship_pos
 		actor.start_attack(tech)
 		for frame in 170:
