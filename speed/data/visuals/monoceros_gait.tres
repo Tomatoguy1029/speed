@@ -1,21 +1,36 @@
 [gd_resource type="SpriteFrames" format=3 uid="uid://inan5pfkbg25"]
 
-[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_base.png" id="leg_base"]
-[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor.png" id="leg_armor"]
-[ext_resource type="Texture2D" path="res://assets/pixel/monoceros/layers/leg_armor_normal.png" id="leg_armor_normal"]
+[ext_resource type="Texture2D" uid="uid://bd7etxpj66ttm" path="res://assets/pixel/monoceros/layers/leg_armor.png" id="leg_armor"]
+[ext_resource type="Texture2D" uid="uid://c8uh81l0nmgii" path="res://assets/pixel/monoceros/layers/leg_armor_normal.png" id="leg_armor_normal"]
+[ext_resource type="Texture2D" uid="uid://bwyigf3yep6k2" path="res://assets/pixel/monoceros/layers/leg_base.png" id="leg_base"]
 
 [sub_resource type="CanvasTexture" id="armor_sheet"]
 diffuse_texture = ExtResource("leg_armor")
 normal_texture = ExtResource("leg_armor_normal")
 texture_filter = 1
 
-[sub_resource type="AtlasTexture" id="leg_base_0"]
-atlas = ExtResource("leg_base")
+[sub_resource type="AtlasTexture" id="armor_0"]
+atlas = SubResource("armor_sheet")
 region = Rect2(4, 144, 24, 89)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="armor_0"]
+[sub_resource type="AtlasTexture" id="armor_1"]
 atlas = SubResource("armor_sheet")
+region = Rect2(35, 144, 26, 77)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="armor_2"]
+atlas = SubResource("armor_sheet")
+region = Rect2(67, 145, 26, 57)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="armor_3"]
+atlas = SubResource("armor_sheet")
+region = Rect2(99, 145, 26, 36)
+filter_clip = true
+
+[sub_resource type="AtlasTexture" id="leg_base_0"]
+atlas = ExtResource("leg_base")
 region = Rect2(4, 144, 24, 89)
 filter_clip = true
 
@@ -24,18 +39,8 @@ atlas = ExtResource("leg_base")
 region = Rect2(35, 144, 26, 77)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="armor_1"]
-atlas = SubResource("armor_sheet")
-region = Rect2(35, 144, 26, 77)
-filter_clip = true
-
 [sub_resource type="AtlasTexture" id="leg_base_2"]
 atlas = ExtResource("leg_base")
-region = Rect2(67, 145, 26, 57)
-filter_clip = true
-
-[sub_resource type="AtlasTexture" id="armor_2"]
-atlas = SubResource("armor_sheet")
 region = Rect2(67, 145, 26, 57)
 filter_clip = true
 
@@ -44,23 +49,51 @@ atlas = ExtResource("leg_base")
 region = Rect2(99, 145, 26, 36)
 filter_clip = true
 
-[sub_resource type="AtlasTexture" id="armor_3"]
-atlas = SubResource("armor_sheet")
-region = Rect2(99, 145, 26, 36)
-filter_clip = true
-
 [resource]
-animations = [
-{
-"frames": [{"duration": 0.17, "texture": SubResource("leg_base_0")}, {"duration": 0.08, "texture": SubResource("leg_base_1")}, {"duration": 0.08, "texture": SubResource("leg_base_2")}, {"duration": 0.17, "texture": SubResource("leg_base_3")}, {"duration": 0.15, "texture": SubResource("leg_base_2")}, {"duration": 0.18, "texture": SubResource("leg_base_1")}],
-"loop": true,
-"name": &"run",
-"speed": 1.0
-},
-{
-"frames": [{"duration": 0.17, "texture": SubResource("armor_0")}, {"duration": 0.08, "texture": SubResource("armor_1")}, {"duration": 0.08, "texture": SubResource("armor_2")}, {"duration": 0.17, "texture": SubResource("armor_3")}, {"duration": 0.15, "texture": SubResource("armor_2")}, {"duration": 0.18, "texture": SubResource("armor_1")}],
+animations = [{
+"frames": [{
+"duration": 0.17,
+"texture": SubResource("armor_0")
+}, {
+"duration": 0.08,
+"texture": SubResource("armor_1")
+}, {
+"duration": 0.08,
+"texture": SubResource("armor_2")
+}, {
+"duration": 0.17,
+"texture": SubResource("armor_3")
+}, {
+"duration": 0.15,
+"texture": SubResource("armor_2")
+}, {
+"duration": 0.18,
+"texture": SubResource("armor_1")
+}],
 "loop": true,
 "name": &"armor",
 "speed": 1.0
-}
-]
+}, {
+"frames": [{
+"duration": 0.17,
+"texture": SubResource("leg_base_0")
+}, {
+"duration": 0.08,
+"texture": SubResource("leg_base_1")
+}, {
+"duration": 0.08,
+"texture": SubResource("leg_base_2")
+}, {
+"duration": 0.17,
+"texture": SubResource("leg_base_3")
+}, {
+"duration": 0.15,
+"texture": SubResource("leg_base_2")
+}, {
+"duration": 0.18,
+"texture": SubResource("leg_base_1")
+}],
+"loop": true,
+"name": &"run",
+"speed": 1.0
+}]
