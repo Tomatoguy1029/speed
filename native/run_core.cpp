@@ -7,6 +7,8 @@
 using namespace godot;
 
 void SpeedRunCore::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("configure_forward", "parameters", "level", "character_scale"), &SpeedRunCore::configure_forward);
+    ClassDB::bind_method(D_METHOD("forward_snapshot"), &SpeedRunCore::forward_snapshot);
     ClassDB::bind_method(D_METHOD("spawn_hostile", "fields"), &SpeedRunCore::spawn_hostile);
     ClassDB::bind_method(D_METHOD("step_hostiles", "world_dt"), &SpeedRunCore::step_hostiles);
     ClassDB::bind_method(D_METHOD("hostiles_snapshot"), &SpeedRunCore::hostiles_snapshot);
@@ -50,6 +52,7 @@ void SpeedRunCore::_bind_methods() {
 
 bool SpeedRunCore::start(int64_t seed, int64_t first_id, int64_t first_gem_seq) {
     if (started || closed || first_id <= 0 || first_gem_seq < 0) return false;
+    if (forward.ready && !combat_ready) return false;
     if ((draw_ready && !ship_ready) || (combat_ready && (!ship_ready || !pickups_ready))) return false;
     if (frame_ready && (!ship_ready || !draw_ready || !combat_ready || !pickups_ready)) return false;
     next_id = first_id;
@@ -328,6 +331,11 @@ bool SpeedRunCore::step_frame(double real_dt, const Dictionary &input, Vector2 c
         rebuild_enemy_grid(frame_grid_cell);
     }
     step_ship(real_dt, world_dt, input);
+    if (world_dt > 0) step_forward(world_dt);
+    if (world_step && accumulated > 0) {
+        step_projectiles(accumulated);
+        step_hostiles(accumulated);
+    }
     for (size_t row : dead_rows) if (enemies[row].alive && enemies[row].dead) remove_enemy(enemies[row].id);
     dead_rows.clear();
     if (world_step) step_pickups(accumulated);

@@ -144,6 +144,13 @@ class SpeedRunCore : public RefCounted {
     std::vector<size_t> free_hostiles;
     size_t add_hostile(Hostile shot);
     bool damage_ship(double amount, double slow, StringName cause, StringName source = StringName());
+    struct ForwardWeapon {
+        bool ready = false;
+        double elapsed = 0, recoil = 0;
+        double interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
+        int64_t pierce = 0;
+    } forward;
+    void step_forward(double world_dt);
     bool motion_ready = false;
     bool started = false;
     bool closed = false;
@@ -156,6 +163,8 @@ class SpeedRunCore : public RefCounted {
 protected:
     static void _bind_methods();
 public:
+    bool configure_forward(const Dictionary &parameters, int64_t level, double character_scale);
+    Dictionary forward_snapshot() const;
     int64_t spawn_hostile(const Dictionary &fields);
     bool step_hostiles(double world_dt);
     Array hostiles_snapshot() const;
