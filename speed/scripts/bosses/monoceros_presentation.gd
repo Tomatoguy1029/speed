@@ -108,7 +108,7 @@ func _update_turn(dt: float) -> void:
 	if dt <= 0.0: return
 	var target := actor.table.facing[actor.body]
 	var attacking := actor.mode == &"active" or actor.mode == &"stuck" or (actor.mode == &"windup" and actor.locked)
-	var sweeping := actor.technique == &"sweep" and actor.mode in [&"windup", &"active"]
+	var sweeping: bool = (actor.technique == &"sweep" or (actor._runner != null and actor._runner.sequenced())) and actor.mode in [&"windup", &"active"]
 	_body_facing = _follow_angle(_body_facing, target, dt, body_follow_seconds * (0.3 if attacking else 1.0))
 	_body_facing = _limit_angle(target, _body_facing, body_lag_degrees)
 	if attacking or sweeping:
@@ -140,6 +140,9 @@ func _body_point(world_point: Vector2) -> Vector2:
 func booster_strength() -> float:
 	if actor == null or actor.mode == &"defeated": return 0.0
 	if actor.mode == &"entrance": return 2.0
+	if actor._runner != null and actor._runner.sequenced() and actor.mode in [&"windup", &"active"]:
+		var strength: float = actor._runner.booster(actor)
+		if strength >= 0.0: return strength
 	return 2.5 if actor.mode == &"active" and actor.technique in [&"charge", &"return_charge"] else 0.55
 
 func _booster() -> void:

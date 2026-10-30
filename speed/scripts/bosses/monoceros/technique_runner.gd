@@ -1,6 +1,21 @@
 ## 技に共通する予告・照準・終了処理。技のRunnerが継承する。
 extends BossTechnique.Runner
 
+func sequenced() -> bool:
+	return false
+
+func advance_sequence(_host: MonocerosBoss, _dt: float) -> void:
+	pass
+
+func horn_angle(host: MonocerosBoss) -> float:
+	return host.table.facing[host.body]
+
+func glow(_host: MonocerosBoss) -> float:
+	return 0.0
+
+func booster(_host: MonocerosBoss) -> float:
+	return -1.0
+
 func _begin_pass(host: MonocerosBoss) -> void:
 	host.mode = &"windup"
 	host.locked = false
@@ -149,7 +164,7 @@ func _begin_settle(host: MonocerosBoss) -> float:
 
 func horn_points(host: MonocerosBoss, _sweep_fraction := -1.0) -> PackedVector2Array:
 	var at := host.table.pos[host.body]
-	var direction := Vector2.from_angle(host.table.facing[host.body])
+	var direction := Vector2.from_angle(horn_angle(host))
 	return PackedVector2Array([at + direction * host.table.r[host.body] * 0.65, at + direction * host.horn_length()])
 
 func warning_points(host: MonocerosBoss) -> PackedVector2Array:
