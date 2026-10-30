@@ -293,6 +293,28 @@ func _ready() -> void:
 		step(2.0)
 		check(actor.horn_waves.is_empty(), "角の衝撃波は上限の半径で消える")
 
+	fresh()
+	actor.phase = 2
+	actor._apply_phase()
+	sim.state.ship_pos = Vector2(400, 0)
+	sim.state.enemy_aim = sim.state.ship_pos
+	var slash_trace := {"releases": 0, "hits": {}}
+	actor.presentation_event.connect(func(e):
+		if e.cue == &"slash_release": slash_trace.releases += 1)
+	var record_slash := func(_e):
+		var cut := int(slash_trace.releases)
+		slash_trace.hits[cut] = int(slash_trace.hits.get(cut, 0)) + 1
+	sim.ship.hurt_recorded.connect(record_slash)
+	actor.start_attack(&"sword_flash")
+	for frame in 1200:
+		sim.state.ship_invuln = 0.0
+		step(DT)
+		if actor.mode == &"recovery": break
+	sim.ship.hurt_recorded.disconnect(record_slash)
+	check(slash_trace.releases == int(actor.rule().get("cuts", 0)) and slash_trace.releases > 0, "光の剣は指定した回数の斬撃を放つ")
+	check(slash_trace.hits.size() == slash_trace.releases and slash_trace.hits.values().all(func(n): return int(n) == 1), "光の剣は静止自機へ各斬撃で1回だけ当たる")
+	check(actor.mode == &"recovery", "光の剣は連撃を終えて隙に入る")
+
 	session.free()
 	await get_tree().process_frame
 	print("[monoceros] failures=",failed)

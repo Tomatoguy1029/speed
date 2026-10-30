@@ -49,6 +49,7 @@ var _move_kinds := {}
 var _sequenced := {}
 var horn_waves: Array[Dictionary] = []
 var sweep_side := 1
+var last_slash := PackedVector2Array()
 var _runner: RefCounted
 var technique_visuals := preload("res://scripts/bosses/technique_visuals.gd").new()
 
